@@ -381,6 +381,23 @@ Record snap_bytes (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
      LAST, so no destructuring pattern above moves. *)
   sk_dirloc : forall i n, fss_inodes S !! i = Some n ->
                 node_dir_local i (Z.to_nat (sb_ninodes (fss_sb S) / 16 + 1)) n;
+  (* ---- THE LEDGER'S KEYS ARE REAL BLOCKS (durable-disk lane E-himg).
+     Every block [D] names lies below the state's OWN [size].  It is the one
+     direction the clauses above do not give: they say which blocks [D] MUST
+     hold (the metadata, a node's own, every free block below [size]), and
+     this says [D] holds nothing else.
+
+     WHAT IT IS FOR: a BOOT MINT re-founds the era's configuration from the
+     snapshot, and [FsReady.fgo_covbelow] -- "every covered block is a real
+     file-system block" -- is a fact about the era's [cov] against the era's
+     [size].  [cov] is fixed across power cycles and [fss_sb S] is not, so
+     nothing outside the snapshot can relate them; with this clause and
+     [dom D = fs_home_set cov ls] the relation IS the snapshot's.  Both
+     producers have it for free: at the image [D]'s domain is the home set,
+     which the image's own [FsBoot.fs_cov_in] and disk-size bound put below
+     [size]; at a commit it is [FsCollect.cg_size] verbatim.
+     LAST, so no destructuring pattern above moves. *)
+  sk_dombelow : forall b, is_Some (D !! b) -> 0 <= b < sb_size (fss_sb S);
 }.
 
 Global Arguments sk_bsz {_ _} _.
@@ -403,6 +420,7 @@ Global Arguments sk_reg {_ _} _.
 Global Arguments sk_slot {_ _} _.
 Global Arguments sk_regdom {_ _} _.
 Global Arguments sk_dirloc {_ _} _.
+Global Arguments sk_dombelow {_ _} _.
 
 (* THE REGION'S WIDTH, off [S]'s own superblock: mkfs rounds [ninodes] up to
    a whole inode block, so the region is [ninodes/16 + 1] blocks and the
@@ -862,10 +880,17 @@ Qed.
    the split. *)
 Lemma snap_bytes_frame (S : fs_state_rec) (D : gmap Z (list (bv 8)))
     (b : Z) (bs : list (bv 8)) :
-  snap_bytes S D -> snap_untouched S b -> length bs = BSIZE ->
+  snap_bytes S D -> snap_untouched S b ->
+  (* the written block is a REAL block of this state (durable-disk lane
+     E-himg): [sk_dombelow] says the ledger names nothing else, so a frame
+     that could add an out-of-range key would be false.  Every writer has
+     it -- a free block comes off the bitmap's own range and an owned one
+     off [FsStateInode.inode_local]'s slot bound. *)
+  0 <= b < sb_size (fss_sb S) ->
+  length bs = BSIZE ->
   snap_bytes S (<[b := bs]> D).
 Proof.
-  intros Hok (Hm & Hin) Hlen.
+  intros Hok (Hm & Hin) Hran Hlen.
   (* one lookup transport, used at every clause that names a block *)
   assert (Hne : forall c cs, c <> b -> D !! c = Some cs ->
                   <[b := bs]> D !! c = Some cs).
@@ -909,17 +934,22 @@ Proof.
   - exact (sk_slot Hok).
   - exact (sk_regdom Hok).
   - exact (sk_dirloc Hok).
+  - intros c Hc.
+    destruct (decide (c = b)) as [-> | Hcb]; [exact Hran |].
+    apply (sk_dombelow Hok c).
+    rewrite lookup_insert_ne in Hc; [exact Hc | exact (not_eq_sym Hcb)].
 Qed.
 
 (* ...and the reading at the whole tie, for a consumer that holds both
    halves and wants both back. *)
 Lemma snap_ok_frame (S : fs_state_rec) (D : gmap Z (list (bv 8)))
     (b : Z) (bs : list (bv 8)) :
-  snap_ok S D -> snap_untouched S b -> length bs = BSIZE ->
+  snap_ok S D -> snap_untouched S b ->
+  0 <= b < sb_size (fss_sb S) -> length bs = BSIZE ->
   snap_ok S (<[b := bs]> D).
 Proof.
-  intros [Hok Hloc] Hu Hlen.
-  exact (conj (snap_bytes_frame S D b bs Hok Hu Hlen) Hloc).
+  intros [Hok Hloc] Hu Hran Hlen.
+  exact (conj (snap_bytes_frame S D b bs Hok Hu Hran Hlen) Hloc).
 Qed.
 
 (* ===================================================================== *)
@@ -2163,6 +2193,140 @@ Proof.
   intros Hb Hn.
   pose proof (snap_names_home S P (fs_home_set cov logstart) b Hb Hn) as Hh.
   rewrite /fs_home_set elem_of_difference in Hh. exact Hh.
+Qed.
+
+(* ===================================================================== *)
+(*  9a'. THE COVERAGE READING (durable-disk lane E-himg)                  *)
+(*                                                                        *)
+(*  What a BOOT MINT needs and [snap_names_cov] above does not give: not   *)
+(*  "the blocks the snapshot names are covered" but the CONVERSE sweep --  *)
+(*  every block of the metadata window is one the snapshot names, so it    *)
+(*  is covered.  That is [FsCfgSnap.fs_cfg_alloc_snap]'s coverage corner   *)
+(*  [1 <= b < fs_data_start -> b ∈ cov], and it is the fact that used to   *)
+(*  arrive as a conjunct of the era-wide image hypothesis.                 *)
+(*                                                                        *)
+(*  THE WINDOW SPLITS FOUR WAYS, and each piece is one clause: block 1 is  *)
+(*  [sk_sb]; the log region is not [D]'s at all and is covered by the      *)
+(*  caller's own [log_region_set ⊆ cov] (a fact about the FIXED [cov] and  *)
+(*  a [logstart] that [sk_sbok] pins at 2, so it does not move across a    *)
+(*  power cycle); an inode-region block is inum [16 j]'s record block by   *)
+(*  [sk_regdom] + [sk_rec]; and the bitmap block is [sk_bmap].  The DATA   *)
+(*  region needs no reading -- the mint spends only the free pool there,   *)
+(*  and [sk_pool] already puts every free block in [D].                    *)
+(* ===================================================================== *)
+
+(* the log region is the [LOGBLOCKS + 1] blocks from [ls] up, spelled as a
+   membership rather than as [log_region_bound]'s converse.  [FsCrash]'s
+   [log_slot_in_region] is the same fact one block at a time, and it lives
+   in a file this one is BELOW. *)
+(* ...and its converse, [FsImgBridge.log_region_bound] verbatim.  That file
+   sits above this one ([LogInv] is on its cone), so the six lines are here
+   rather than imported. *)
+Lemma log_region_range (ls b : Z) :
+  b ∈ log_region_set ls -> ls <= b <= ls + Z.of_nat LOGBLOCKS.
+Proof.
+  rewrite /log_region_set elem_of_union. intros [Hs | Hh].
+  - rewrite elem_of_list_to_set elem_of_list_fmap in Hs.
+    destruct Hs as (i & -> & Hi). apply elem_of_seq in Hi.
+    rewrite /log_slot_bno. lia.
+  - apply elem_of_singleton in Hh. rewrite /log_hdr_bno in Hh. lia.
+Qed.
+
+Lemma log_region_between (ls b : Z) :
+  ls <= b <= ls + Z.of_nat LOGBLOCKS -> b ∈ log_region_set ls.
+Proof.
+  intros [Hlo Hhi]. rewrite /log_region_set elem_of_union.
+  destruct (decide (b = ls)) as [-> | Hne].
+  - right. apply elem_of_singleton. reflexivity.
+  - left. rewrite elem_of_list_to_set elem_of_list_fmap.
+    exists (Z.to_nat (b - ls - 1)). split.
+    + rewrite /log_slot_bno. lia.
+    + apply elem_of_seq. lia.
+Qed.
+
+Lemma snap_window_dom (S : fs_state_rec) (D : gmap Z (list (bv 8))) (b : Z) :
+  snap_bytes S D ->
+  1 <= b < fs_data_start (fss_sb S) ->
+  is_Some (D !! b) \/ b ∈ log_region_set (sb_logstart (fss_sb S)).
+Proof.
+  intros Hb Hran.
+  pose proof (sk_sbok Hb) as Hsb.
+  pose proof (sbo_logstart _ Hsb) as Hls.
+  pose proof (sbo_nlog _ Hsb) as Hnl.
+  pose proof (sbo_inodestart _ Hsb) as Hist.
+  pose proof (sbo_bmapstart _ Hsb) as Hbms.
+  pose proof (sbo_ninodes _ Hsb) as Hni. unfold ROOTINO in Hni.
+  assert (Hdiv : 0 <= sb_ninodes (fss_sb S) / 16) by (apply Z.div_pos; lia).
+  assert (Hds : fs_data_start (fss_sb S) = sb_bmapstart (fss_sb S) + 1)
+    by reflexivity.
+  destruct (decide (b = 1)) as [-> | Hne1].
+  - left. exists (fss_sbb S). exact (sk_sb Hb).
+  - destruct (decide (b < sb_inodestart (fss_sb S))) as [Hlog | Hge].
+    + right. apply log_region_between. unfold LOGBLOCKS. lia.
+    + destruct (decide (b = sb_bmapstart (fss_sb S))) as [-> | Hnbm].
+      * left. eexists. exact (sk_bmap Hb).
+      * (* an inode-region block: inum [16 * (b - inodestart)] names it *)
+        left.
+        assert (Hj : 0 <= (b - sb_inodestart (fss_sb S))
+                     < sb_ninodes (fss_sb S) / 16 + 1) by lia.
+        destruct (sk_regdom Hb (16 * (b - sb_inodestart (fss_sb S)))
+                    ltac:(lia)) as [n Hn].
+        destruct (sk_rec Hb _ n Hn) as (bs & Hbs & _).
+        exists bs.
+        rewrite (Z.mul_comm 16 (b - sb_inodestart (fss_sb S))) in Hbs.
+        rewrite (Z.div_mul (b - sb_inodestart (fss_sb S)) 16 ltac:(lia))
+          in Hbs.
+        replace (sb_inodestart (fss_sb S) + (b - sb_inodestart (fss_sb S)))
+          with b in Hbs by lia.
+        exact Hbs.
+Qed.
+
+(* ...AT THE MINT'S MAP: the corner, with the log region's own coverage
+   supplied by the caller. *)
+Lemma snap_cov_window (S : fs_state_rec) (P : Z -> list (bv 8))
+    (cov : gset Z) (b : Z) :
+  snap_bytes S (fs_restrict P (fs_home_set cov (sb_logstart (fss_sb S)))) ->
+  log_region_set (sb_logstart (fss_sb S)) ⊆ cov ->
+  1 <= b < fs_data_start (fss_sb S) -> b ∈ cov.
+Proof.
+  intros Hb Hlog Hran.
+  destruct (snap_window_dom S _ b Hb Hran) as [[bs Hbs] | Hin].
+  - apply fs_restrict_lookup_Some in Hbs as [Hh _].
+    rewrite /fs_home_set elem_of_difference in Hh. exact (proj1 Hh).
+  - exact (Hlog b Hin).
+Qed.
+
+(* ...AND THE OTHER DIRECTION, which is [FsReady.fgo_covbelow]: every
+   covered block is a real file-system block of THIS era.  A home block is
+   one of [D]'s keys ([sk_dombelow]); a log block sits below the inode
+   region, hence below [size].  This is the only place the fixed [cov] and
+   the era's own superblock are related, and it is why [sk_dombelow]
+   exists. *)
+Lemma snap_cov_below (S : fs_state_rec) (P : Z -> list (bv 8))
+    (cov : gset Z) (b : Z) :
+  snap_bytes S (fs_restrict P (fs_home_set cov (sb_logstart (fss_sb S)))) ->
+  b ∈ cov -> 0 <= b < sb_size (fss_sb S).
+Proof.
+  intros Hb Hcov.
+  pose proof (sk_sbok Hb) as Hsb.
+  pose proof (sbo_logstart _ Hsb) as Hls.
+  pose proof (sbo_nlog _ Hsb) as Hnl.
+  pose proof (sbo_inodestart _ Hsb) as Hist.
+  pose proof (sbo_bmapstart _ Hsb) as Hbms.
+  pose proof (sbo_size _ Hsb) as Hsz.
+  pose proof (sbo_ninodes _ Hsb) as Hni. unfold ROOTINO in Hni.
+  pose proof (sbo_nblocks _ Hsb) as Hnb.
+  assert (Hdiv : 0 <= sb_ninodes (fss_sb S) / 16) by (apply Z.div_pos; lia).
+  assert (Hds : fs_data_start (fss_sb S) = sb_bmapstart (fss_sb S) + 1)
+    by reflexivity.
+  destruct (decide (b ∈ log_region_set (sb_logstart (fss_sb S))))
+    as [Hin | Hout].
+  - pose proof (log_region_range (sb_logstart (fss_sb S)) b Hin).
+    unfold LOGBLOCKS in *. lia.
+  - assert (Hh : b ∈ fs_home_set cov (sb_logstart (fss_sb S)))
+      by (rewrite /fs_home_set elem_of_difference; split; assumption).
+    apply (sk_dombelow Hb b).
+    exists (P b). apply fs_restrict_lookup_Some. split; [exact Hh | reflexivity].
 Qed.
 
 Section LedgerEra.

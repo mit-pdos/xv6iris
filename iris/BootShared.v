@@ -1247,18 +1247,26 @@ Section BootAlloc.
   (* THE COMPANION LEMMA.                                               *)
   (* ------------------------------------------------------------------ *)
   Lemma boot_shared_alloc (g : gstate) (ndisk : nat)
-      (sb : fs_sb) (nib : nat) (cov : gset Z) :
+      (sb : fs_sb) (nib : nat) (cov : gset Z)
+      (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) :
     boot_facts g ->
-    (* THE ERA'S DISK IS THE FILE SYSTEM'S (fs-cfg-boot.md (d2b)).  It is a
-       hypothesis about THIS era's disk image, and it has to be: the mint
+    (* THE ERA'S DISK CARRIES A FILE SYSTEM (durable-disk lane E-himg).  It
+       is a hypothesis about THIS era's disk, and it has to be: the mint
        [power_boot_res] hands over is at [v_disk (g.(gdev).(dvirtio))], and
-       nothing in [boot_facts] says what those bytes are. *)
-    fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) ndisk sb nib cov ->
+       nothing in [boot_facts] says what those bytes are.  What it is NOT is
+       an image hypothesis -- a later era boots on whatever the previous era
+       committed, and the DURABLE SNAPSHOT is exactly what
+       [FsCrash.P_fs] carries across the power cycle and
+       [SystemAdequacy.fs_boot_pure] delivers into this fupd. *)
+    fs_boot_snap_wf (v_disk (g.(gdev).(dvirtio))) ndisk S Pb sb nib cov ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk
       (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) g
     ={⊤}=∗ ∃ (HFd : fdslotG Σ) (HIr : irefslotG Σ) (HPav : pavG Σ)
              (HBs : bioslotG Σ)
-             (HF : fileG Σ) (γd : uart_names) (γv : disk_names),
+             (HF : fileG Σ) (γd : uart_names) (γv : disk_names)
+             (* the blocks the era fupd SPENT: the mint's own carve
+                ([FsCfgSnap.snap_spent]), which nothing above reads *)
+             (Rspent : gset Z),
       ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
       kernel_text ∗ kernel_data ∗
@@ -1330,17 +1338,32 @@ Section BootAlloc.
          kit 1 in [ProofMain.mn_grp_fs], kit 2 through [SpecUserinit] to
          forkret's first arm. *)
       fs_boot_supply (@file_icfg Σ HF) (@file_fscfg Σ HF)
-        (v_disk (g.(gdev).(dvirtio))) sb nib cov γd γv.
+        (v_disk (g.(gdev).(dvirtio))) sb nib cov γd γv Rspent Pb
+        (FsCrash.hdr_wset
+           (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))
+           (FsImg.sb_logstart sb)).
   Proof.
-    intros Hbf Himg.
-    (* KEPT WHOLE beside its projections: the era mint takes the BUNDLE now
-       (durable-disk lane E-mint), because [FsDurImg.img_snap_ok] does.
-       Under a DIFFERENT name, because [Himg] is reused below for the era's
-       disk-image gname equation once this [destruct] has cleared it. *)
-    pose proof Himg as Hbfimg.
-    destruct Himg as (Hwf & Hrw & Hnin & Hnib32 & Hnib0 & Hnibeq &
-                      Hcovin & Hcovmeta & Hcovdata & Hparse & Hush & Hnd & Hleq &
-                      Hbare & Hnoself).
+    intros Hbf Hsnap.
+    (* THE ERA'S CONFIGURATION IS THE SNAPSHOT'S OWN SUPERBLOCK, so [sb] is
+       not a free parameter: substituting it is what makes the mint's ties
+       ([FsCfgSnap.fs_cfg_alloc_snap]'s, all at [fss_sb S]) be the
+       postcondition's. *)
+    destruct Hsnap as (Hsbeq & Hnibeq & Hsnok & HlPb & Hhwf & Hagr &
+                       Hslot & Hcovin & Hlogsub).
+    subst sb.
+    pose proof (FsDurSnap.sk_bytes Hsnok) as Hsnb.
+    pose proof (FsDurSnap.sk_sbok Hsnb) as Hsbok.
+    (* the two derived premises of the mint: the region's inum space is
+       inside [2^32] (the superblock's own [ushort] clause is tighter), and
+       the metadata window is covered ([FsDurSnap.snap_cov_window]) *)
+    assert (Hnib32 : 16 * Z.of_nat nib <= 2 ^ 32).
+    { pose proof (FsImg.sbo_ushort _ Hsbok) as Hush.
+      assert (H2 : (2 ^ 16 <= 2 ^ 32)%Z) by (apply Z.pow_le_mono_r; lia).
+      lia. }
+    assert (Hcovmeta : forall b : Z,
+              1 <= b < FsImg.fs_data_start (FsState.fss_sb S) -> b ∈ cov).
+    { intros b Hb.
+      exact (FsDurSnap.snap_cov_window S Pb cov b Hsnb Hlogsub Hb). }
     pose proof (boot_ram_of_facts g Hbf) as Hram.
     pose proof (boot_mem_of_facts g Hbf) as Hmem.
     pose proof Hbf as Hbf'.
@@ -1506,8 +1529,16 @@ Section BootAlloc.
        boot chain now, so there is no pin to drop and no mask premise to
        thread (the mask was [dv_lend_mint]'s).  See
        claude-notes/projects/namei-pinned-lookup.md's banner. *)
-    iMod (fs_cfg_alloc_img γd γv (v_disk (g.(gdev).(dvirtio))) ndisk sb cov
-            nib ⊤ Hbfimg with "Hdimg Hbsauth Hbslots") as (ICFG FSC) "Hfs".
+    iMod (fs_cfg_alloc_snap γd γv (v_disk (g.(gdev).(dvirtio))) ndisk S cov
+            nib ⊤ Pb
+            (FsCrash.hdr_wset
+               (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))
+               (FsImg.sb_logstart (FsState.fss_sb S)))
+            Hsnok HlPb
+            (FsCrash.hdr_wset_home _ cov _ Hhwf)
+            (FsCrash.hdr_wset_sb _ cov _ Hhwf)
+            Hagr Hnibeq Hnib32 Hcovin Hcovmeta
+            with "Hdimg Hbsauth Hbslots") as (ICFG FSC) "Hfs".
     (* durable-disk 2b-inode-3 / 2b-inode-4: NEITHER ERA GHOST ARRIVES HERE
        ANY MORE.  The top map's authority is [InodeRegion.ftop_inv] (carried
        by [ireg_inv]) and its per-inum fragments are the free pool's; the
@@ -1560,7 +1591,8 @@ Section BootAlloc.
     (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- now leaves in the
        postcondition: userinit is proven and its contract
        ([SpecUserinit.v]) takes exactly this. *)
-    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC), γd, γv.
+    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC), γd, γv,
+                       (snap_spent S nib).
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].

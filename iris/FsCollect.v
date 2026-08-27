@@ -1211,6 +1211,12 @@ Section Collect.
       { pose proof (cg_width Hg) as Hcw. pose proof (cg_icfg Hg) as Hci.
         rewrite -Hcw Nat2Z.id. exact Hci. }
       rewrite Hw. exact Hdirloc.
+    - (* sk_dombelow (durable-disk lane E-himg): the collected view is the
+         restriction to the HOME set, and [cg_size] is that bound
+         verbatim. *)
+      intros b [bs Hbs]. rewrite /col_view in Hbs.
+      apply fs_restrict_lookup_Some in Hbs as [Hh _].
+      exact (cg_size Hg b Hh).
   Qed.
 
   (* THE WHOLE OF WHAT [FsDurSnap.fs_snap_alloc] TAKES, and it is the pure

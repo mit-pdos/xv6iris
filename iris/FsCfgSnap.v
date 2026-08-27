@@ -855,9 +855,13 @@ Section SnapMint.
     16 * Z.of_nat nib <= 2 ^ 32 ->
     (* ---- R4's coverage corners ---- *)
     fs_cov_in cov ndisk ->
+    (* ...AND ONE CORNER, NOT TWO (durable-disk lane E-himg).  The DATA
+       region's corner was never read: the mint spends only the FREE pool
+       there, and [FsDurSnap.sk_pool] already puts every free block below
+       [size] into [D] -- hence into the home ledger.  What is left is the
+       METADATA window, and at a boot from the snapshot that comes off
+       [FsDurSnap.snap_cov_window]. *)
     (forall b : Z, 1 <= b < fs_data_start (fss_sb S) -> b ∈ cov) ->
-    (forall b : Z, fs_data_start (fss_sb S) <= b < sb_size (fss_sb S) ->
-       b ∈ cov) ->
     disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
     bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
     ∃ (ICFG : icfg) (FSC : fscfg),
@@ -871,7 +875,7 @@ Section SnapMint.
       fs_kit_icache ICFG FSC ∗
       fs_kit_fsinit_ghost ICFG FSC (fs_blocks dk) (snap_spent S nib) Pb Xexc.
   Proof.
-    intros Hok HlPb HXsub HX1 Hagr Hnibeq Hnib32 Hcovin Hcovmeta Hcovdata.
+    intros Hok HlPb HXsub HX1 Hagr Hnibeq Hnib32 Hcovin Hcovmeta.
     pose proof (sk_bytes Hok) as Hb.
     pose proof (sk_local Hok) as Hloc.
     iIntros "Hdisk Hsa Hsf".
@@ -1437,7 +1441,7 @@ Section SnapEra0.
   Proof.
     intros Hbf.
     pose proof Hbf as (Hwf & Hrw & Hnin & Hnib32 & Hnib0 & Hnibeq & Hcovin
-                       & Hcovmeta & Hcovdata & _).
+                       & Hcovmeta & _).
     iIntros "Hdisk Hsa Hsf".
     iMod (fs_cfg_alloc_snap γd γv dk ndisk (img_state (fs_blocks dk) sb nib)
             cov nib E (fs_blocks dk) ∅
@@ -1445,7 +1449,7 @@ Section SnapEra0.
             (fun b => fs_blocks_length dk b)
             (empty_subseteq _) (not_elem_of_empty 1)
             (fun b _ _ => eq_refl)
-            Hnibeq Hnib32 Hcovin Hcovmeta Hcovdata with "Hdisk Hsa Hsf")
+            Hnibeq Hnib32 Hcovin Hcovmeta with "Hdisk Hsa Hsf")
       as (ICFG FSC) "Hfs".
     iModIntro. iExists ICFG, FSC.
     iDestruct "Hfs" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & %E7 & %E8 &

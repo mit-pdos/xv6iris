@@ -906,48 +906,29 @@ Proof.
   pose proof (fgo_bm_cov Hgeom) as Hbmcov.
   pose proof (fgo_bm_out Hgeom) as Hbmlog.
   (* the exclusive half, in fsinit's own premise order *)
-  iDestruct (first_fsinit_open with "Hfsi") as (dk sb vlock v_start v_dev v_nc v_n
+  iDestruct (first_fsinit_open with "Hfsi") as (dk sb Rspent Pb vlock v_start
+                                                v_dev v_nc v_n
                                                 vname vcpu sb_old)
     "(%Hpures & Hmirf & Hlfree & Hb1 & Hsbraw & _ & Hboot & _ &
       Hlock0 & Hlname & Hlcpu & Hlstart & Hldev & Hlout & Hlcmt & Hlnc & Hlhn &
       Hlhblk & Hauths & Hdirty & Hhdr & Hlslots & Hsl35 & Hirs2 & Hrem &
       #Hbinvf & Hxo)".
   destruct Hpures as [[v_magic [v_nblocks [v_nlog [Himg Hmagic]]]]
-                      [Hhdr0 [H1cov [H1log [Hsbparse [Hsbok
-                       [Hcgeom [Hbmq Hszq]]]]]]]].
+                      [Hhdrwf [H1cov [H1log [Hsbparse [Hsbok
+                       [Hcgeom [Hbmq [Hszq Hxvslot]]]]]]]]].
   (* the era's two readings of one image (durable-disk 1a): the boot mint
      built [L] from the era's disk, which is the same disk the era's mirror
      was born at.  Threaded straight through fsinit into initlog. *)
   iDestruct "Hauths" as (L D) "(%HLdk & HauthL & HauthD)".
-  (* THE BYTE VIEW'S ROW, NAMED (durable-disk lane E-except): fsinit takes
-     it so that [initlog] can name what the logged view holds on the
-     exception set.  At a clean on-disk header that set is EMPTY and the
-     record is unconstrained; the three header rows below are
-     [FsCrash.hdr_wf] read off [hdr_dec_zero]. *)
-  assert (Hhdrbnd : ((hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).1
-                     <= LOGBLOCKS)%nat)
-    by (rewrite (hdr_dec_zero _ Hhdr0); cbn; unfold LOGBLOCKS; lia).
-  assert (Hhdrnd : NoDup (hdr_dec (FsCrash.fs_blocks dk
-                                     (log_hdr_bno fsc_logst))).2)
-    by (rewrite (hdr_dec_zero _ Hhdr0); cbn; constructor).
-  assert (Hhdrok : forall b0 : Z,
-            b0 ∈ (hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).2 ->
-            b0 ∈ fsc_cov /\ b0 ∉ log_region_set fsc_logst /\
-            b0 <> FsImg.SB_BNO).
-  { rewrite (hdr_dec_zero _ Hhdr0). cbn.
-    intros b0 Hb0. destruct (not_elem_of_nil b0 Hb0). }
-  assert (Hxvslot : forall (i : nat) (b0 : Z),
-            (hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).2 !! i
-              = Some b0 ->
-            FsCrash.fs_blocks dk b0
-              = lm_view (FsCrash.mirror_of (FsCrash.fs_blocks dk))
-                  (log_slot_bno fsc_logst i)).
-  { rewrite (hdr_dec_zero _ Hhdr0). cbn. intros i b0 Hi. discriminate. }
-  assert (Hxempty : (list_to_set
-                       (hdr_dec (FsCrash.fs_blocks dk
-                                   (log_hdr_bno fsc_logst))).2 : gset Z) = ∅)
-    by (rewrite (hdr_dec_zero _ Hhdr0); cbn; set_solver).
-  iEval (rewrite -Hxempty) in "Hxo".
+  (* fsinit's premise (g) IS [FsCrash.hdr_wf] at the era's own header
+     (durable-disk lane E-himg): the three clauses are its three, and the
+     exception handle is already at the header's write set, so nothing is
+     re-derived from a CLEAN header here any more. *)
+  destruct Hhdrwf as (Hhdrbnd & Hhdrnd0 & Hhdrok).
+  (* stdpp's [NoDup] and Stdlib's [List.NoDup] are two different inductives;
+     [FsCrash.hdr_wf] is stated at the first and [SpecFsinit]'s premise at
+     the second, and [NoDup_ListNoDup] is the bridge. *)
+  pose proof (proj1 (NoDup_ListNoDup _) Hhdrnd0) as Hhdrnd.
   (* fsinit borrows one reference unit and gives it back; kexec wants two,
      which is why the token carries two. *)
   iDestruct (iref_slots_split 1 1 with "Hirs2") as "[Hirs1 Hirs1b]".
@@ -1013,7 +994,7 @@ Proof.
             (mword_of_int fsc_ninodes) v_nlog (mword_of_int fsc_logst)
             (mword_of_int icfg_ist) (mword_of_int fsc_bmapstart)
             (FsCrash.fs_blocks dk 1) sb_old
-            (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst)) (FsCrash.fs_blocks dk)
+            (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst)) Pb
             (FsCrash.mirror_of (FsCrash.fs_blocks dk)) L D
             vlock vname vcpu v_start v_dev v_nc v_n
             pid (DfracOwn 1) B6 av2 eb eb ∅ V

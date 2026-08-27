@@ -2020,6 +2020,14 @@ Proof.
       as [Hreg ->].
     exact (img_node_dir_local (fs_blocks dk) sb cov nib i Hwf Hrw Hfull
              Hnin Hcovdata Hreg).
+  - (* sk_dombelow (durable-disk lane E-himg): the map's keys ARE the home
+       blocks, and the image's own [fs_cov_in] against conjunct (12) --
+       the disk is no larger than [size] blocks -- puts every covered block
+       below [size]. *)
+    rewrite Hpsb. intros b [bs Hbs].
+    apply fs_restrict_lookup_Some in Hbs as [Hh _].
+    rewrite /fs_home_set elem_of_difference in Hh.
+    destruct (Hcovin b (proj1 Hh)) as [Hb0 Hbn]. lia.
 Qed.
 
 (* ===================================================================== *)

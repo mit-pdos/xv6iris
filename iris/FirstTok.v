@@ -69,7 +69,7 @@ Require Import FileInvDefs.
 Require Import ProcAvail.
 (* the image side: [FsImg.fs_parse_sb] / [fs_sb_ok] / [fsimg_wf], and
    [FsImgBridge.log_region_bound].  This file's two PURE producer lemmas
-   ([fs_geom_ok_of_image], [first_fsinit_pures_of_image]) live here rather
+   ([fs_geom_ok_of_snap], [first_fsinit_pures_of_snap]) live here rather
    than in [FsCfgBoot.v] as the (f) charter said: [first_fsinit_pures] is a
    definition of THIS file and [FsCfgBoot] sits below it, so stating the
    second lemma there would be a dependency cycle. *)
@@ -272,14 +272,22 @@ Section FirstTok.
      [sb] is a parameter and not read: it is here so the pure block is
      indexed by the SAME pair the resource bundle's existential binds, which
      is what lets one [iDestruct] name both. *)
-  Definition first_fsinit_pures (dk : Z -> bv 8) (sb : FsImg.fs_sb) : Prop :=
+  Definition first_fsinit_pures (dk : Z -> bv 8) (sb : FsImg.fs_sb)
+      (Pb : Z -> list (bv 8)) : Prop :=
     (exists v_magic v_nblocks v_nlog : mword 32,
         take 32 (FsCrash.fs_blocks dk 1)
         = first_sb_image v_magic (mword_of_int fsc_size) v_nblocks
             (mword_of_int fsc_ninodes) v_nlog (mword_of_int fsc_logst)
             (mword_of_int icfg_ist) (mword_of_int fsc_bmapstart)
         /\ bv_unsigned v_magic = FsImg.FSMAGIC)
-    /\ hdr_n (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst)) = 0
+    (* THE ON-DISK HEADER IS WELL FORMED, AND THAT IS ALL (durable-disk
+       lane E-himg; the clean-header clause [hdr_n = 0] IS GONE).  It was
+       [SpecFsinit]'s premise (g), deleted at lane E-except, and the only
+       thing left reading it here was the derivation of the three clauses
+       below from an EMPTY write set.  At era N the header is whatever the
+       previous era left, and [FsCrash.hdr_wf] is what the crash
+       predicate carries across the power cycle. *)
+    /\ FsCrash.hdr_wf (FsCrash.fs_blocks dk) fsc_cov fsc_logst
     /\ (1 : Z) ∈ fsc_cov
     /\ ~ ((1 : Z) ∈ log_region_set fsc_logst)
     (* ...AND THE RECORD BLOCK 1 DECODES TO (durable-disk lane C-3a).  Two
@@ -302,7 +310,17 @@ Section FirstTok.
        block moves. *)
     /\ col_geom sb icfg_ist icfg_nib (fs_home_set fsc_cov fsc_logst)
     /\ FsImg.sb_bmapstart sb = fsc_bmapstart
-    /\ FsImg.sb_size sb = fsc_size.
+    /\ FsImg.sb_size sb = fsc_size
+    (* ...AND WHAT THE BYTE VIEW HOLDS ON THE EXCEPTION SET (durable-disk
+       lane E-himg): at the header's entry [i] the view holds log slot
+       [i]'s content, which is the value [install_trans] is about to write
+       home.  [SpecFsinit]'s premise (g'') verbatim, and at a CLEAN header
+       the write set is empty and the clause is vacuous.  LAST, so no
+       destructuring pattern above moves. *)
+    /\ (forall (i : nat) (b : Z),
+          (hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).2 !! i
+            = Some b ->
+          Pb b = FsCrash.fs_blocks dk (log_slot_bno fsc_logst i)).
 
   (* ================================================================== *)
   (*  3.  THE EXCLUSIVE HALF -- [SpecFsinit]'s premise pile               *)
@@ -329,13 +347,21 @@ Section FirstTok.
      produced at WP time -- so row (C) stays. *)
   Definition first_fsinit : iProp Σ :=
     (∃ (dk : Z -> bv 8) (sb : FsImg.fs_sb)
+       (Rspent : gset Z) (Pb : Z -> list (bv 8))
        (vlock v_start v_dev v_nc v_n : mword 32) (vname vcpu : mword 64)
        (sb_old : nat -> bv 8),
-       ⌜first_fsinit_pures dk sb⌝ ∗
-       fs_kit_fsinit_ghost _ _ (FsCrash.fs_blocks dk)
-         (fs_kit_spent (FsCrash.fs_blocks dk) sb icfg_nib
-            (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb))
-         (FsCrash.fs_blocks dk) ∅ ∗
+       ⌜first_fsinit_pures dk sb Pb⌝ ∗
+       (* THE SPENT SET AND THE BYTE VIEW'S VALUE ARE EXISTENTIAL
+          (durable-disk lane E-himg).  They used to be SPELLED at the
+          image's own carve and at the raw disk, which is only true of a
+          boot whose log header is clean; the era's mint chooses both
+          ([FsCfgSnap.snap_spent], and the committed view
+          [FsCrash.fs_rec_view]), nobody below reads either, and what the
+          WAL's exception handle is at is not a choice -- it is the
+          header's own write set. *)
+       fs_kit_fsinit_ghost _ _ (FsCrash.fs_blocks dk) Rspent Pb
+         (list_to_set
+            (hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).2) ∗
        (* rows (A): the raw cells fsinit / initlog write *)
        ([∗ list] i ∈ seq 0 32, pa_add first_sb_base i ↦ₘ sb_old i) ∗
        log_addr ↦₄ vlock ∗
@@ -359,9 +385,10 @@ Section FirstTok.
   Lemma first_fsinit_open :
     first_fsinit -∗
       ∃ (dk : Z -> bv 8) (sb : FsImg.fs_sb)
+        (Rspent : gset Z) (Pb : Z -> list (bv 8))
         (vlock v_start v_dev v_nc v_n : mword 32) (vname vcpu : mword 64)
         (sb_old : nat -> bv 8),
-        ⌜first_fsinit_pures dk sb⌝ ∗
+        ⌜first_fsinit_pures dk sb Pb⌝ ∗
         log_mirror_born (FsCrash.mirror_of (FsCrash.fs_blocks dk)) ∗
         log_free_tok icfg_log ∗
         fsblock (fs_bytes fsc_fs) 1 (FsCrash.fs_blocks dk 1) ∗
@@ -390,24 +417,27 @@ Section FirstTok.
         iref_slots 2 ∗
         (* the coverage remainder, which fsinit does not take: it is the
            first process's, R3 *)
-        ([∗ set] b ∈ fsc_cov ∖ fs_kit_spent (FsCrash.fs_blocks dk) sb icfg_nib
-                                 (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb),
-           fsblock (fs_bytes fsc_fs) b (FsCrash.fs_blocks dk b)) ∗
+        ([∗ set] b ∈ fsc_cov ∖ Rspent,
+           fsblock (fs_bytes fsc_fs) b (Pb b)) ∗
         (* the byte view's row NAMED at what it was minted at, and the WAL's
            exception handle, both straight through to initlog (durable-disk
            lane E-except) *)
         fs_bytes_inv (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
-                     (fs_home_set fsc_cov fsc_logst) (FsCrash.fs_blocks dk) ∗
-        exc_own (fs_exc fsc_fs) ∅.
+                     (fs_home_set fsc_cov fsc_logst) Pb ∗
+        exc_own (fs_exc fsc_fs)
+          (list_to_set
+             (hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).2).
   Proof.
     iIntros "H". rewrite /first_fsinit.
-    iDestruct "H" as (dk sb vlock v_start v_dev v_nc v_n vname vcpu sb_old)
+    iDestruct "H" as (dk sb Rspent Pb vlock v_start v_dev v_nc v_n vname vcpu
+                      sb_old)
       "(%Hp & Hkit & Hsb & Hlk & Hnm & Hcpu & Hst & Hdv & Hout & Hcmt &
         Hnc & Hn & Hblk & Hmir & Hiref & Hbsl)".
     iDestruct (fs_kit_fsinit_ghost_open with "Hkit")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
            Hbmres & Hrem & #Hbinv & Hxo)".
-    iExists dk, sb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu, sb_old.
+    iExists dk, sb, Rspent, Pb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu,
+            sb_old.
     iFrame "Hmir Hlog Hb1 Hsb Hireg Hboot Hbmres Hlk Hnm Hcpu Hst Hdv Hout
             Hcmt Hnc Hn Hblk Hauths Hdty Hhdr Hslots Hbsl Hiref Hrem Hbinv Hxo".
     iPureIntro. exact Hp.
@@ -564,23 +594,20 @@ Section FirstTok.
   Qed.
 
   (* ================================================================== *)
-  (*  5.  THE TWO PURE PRODUCERS, off the image hypothesis                *)
+  (*  5.  THE PURE PRODUCERS                                              *)
+  (*                                                                      *)
+  (*  ONE of them is about the IMAGE and it is era 0's alone: the durable  *)
+  (*  extent, which the top-level theorem reads off the machine it starts  *)
+  (*  on.  The other two are about the DURABLE SNAPSHOT and run at every   *)
+  (*  era, boot 0 included -- [FsCrash.P_fs] carries the snapshot across   *)
+  (*  every power cycle, so nothing here has to assume that a later era's  *)
+  (*  disk is still mkfs's.                                               *)
   (* ================================================================== *)
 
-  (* [FsReady.fs_geom_ok]'s eleven fields out of [BootShared.fs_boot_image_wf]
-     and [FsCfgBoot.fs_boot_supply]'s ties.  Nothing here is new about the
-     image: every field is either a tie, a projection of [FsImg.fs_sb_ok]
-     (W1), or [FsBoot.fs_cov_in] read through [IcacheInv.cov_below_of_image].
-
-     TWO PREMISES ARE TIGHTER THAN THE ERA'S.  [fgo_ushort] wants
-     [16*nib <= 2^16] where [fs_cfg_alloc] threads only [2^32], and
-     [cov_below] wants the disk image to be no larger than [size] blocks;
-     both are true of the mkfs image (208 <= 65536; 2048000 = 1024*2000) and
-     both are threaded exactly the way [0 < nib] is -- as conjuncts of
-     [fs_boot_image_wf], discharged in [FsAdequacyImg]. *)
   (* THE DURABLE DISK'S EXTENT, off the image: every covered block and
      every log-region block lies inside the [ndisk] bytes.  What the crash
-     predicate's fragments are stated over ([FsCrash.P_fs_named]). *)
+     predicate's fragments are stated over ([FsCrash.P_fs_named]), read
+     ONCE at the initial machine. *)
   Lemma fs_extent_of_image (dk : Z -> bv 8) (ndisk : nat)
       (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z) :
     FsImg.fsimg_wf (FsCrash.fs_blocks dk) sb = true ->
@@ -611,16 +638,32 @@ Section FirstTok.
       unfold LOGBLOCKS in Hbb. apply Hcovmeta. lia.
   Qed.
 
-  Lemma fs_geom_ok_of_image (dk : Z -> bv 8) (ndisk : nat)
-      (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z) :
-    FsImg.fsimg_wf (FsCrash.fs_blocks dk) sb = true ->
-    FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
-    16 * Z.of_nat nib <= 2 ^ 16 ->
-    (0 < nib)%nat ->
+  (* [FsReady.fs_geom_ok]'s eleven fields OFF THE DURABLE SNAPSHOT
+     (durable-disk lane E-himg).  Every field is either a configuration
+     tie, a projection of [FsImg.fs_sb_ok] (which [FsDurSnap.sk_sbok]
+     delivers at the era's OWN superblock), or one of the two coverage
+     readings of [snap_bytes]:
+
+       - [FsDurSnap.snap_cov_window] -- every block of the metadata window
+         is covered, because the snapshot NAMES it (block 1, the inode
+         region, the bitmap block) or it is a log block, and the log region
+         is covered by the caller's own era-independent fact;
+       - [FsDurSnap.snap_cov_below] -- every covered block is a real block
+         of THIS era, because the ledger's keys are the home blocks and
+         [sk_dombelow] bounds them by [size].
+
+     THAT SECOND ONE IS WHY THE ERA'S [cov] AND THE ERA'S SUPERBLOCK CAN BE
+     RELATED AT ALL: [cov] is fixed across power cycles and [FsState.fss_sb S] is
+     not.  [fgo_ushort] is [FsImg.sbo_ushort], the superblock's own
+     "an inum is a [ushort]" clause -- nothing outside the record bounds
+     the inode region that tightly. *)
+  Lemma fs_geom_ok_of_snap (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8))
+      (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z) (ndisk : nat) :
+    sb = FsState.fss_sb S ->
     Z.of_nat nib = FsImg.sb_ninodes sb / 16 + 1 ->
+    FsDurSnap.snap_bytes S (fs_restrict Pb (fs_home_set cov (FsImg.sb_logstart sb))) ->
     FsBoot.fs_cov_in cov ndisk ->
-    Z.of_nat ndisk <= 1024 * FsImg.sb_size sb ->
-    (forall b : Z, 1 <= b < FsImg.fs_data_start sb -> b ∈ cov) ->
+    log_region_set (FsImg.sb_logstart sb) ⊆ cov ->
     icfg_dev = ROOTDEV -> icfg_nib = nib ->
     icfg_ist = FsImg.sb_inodestart sb ->
     fsc_cov = cov -> fsc_logst = FsImg.sb_logstart sb ->
@@ -628,45 +671,49 @@ Section FirstTok.
     fsc_size = FsImg.sb_size sb -> fsc_ninodes = FsImg.sb_ninodes sb ->
     fs_geom_ok.
   Proof.
-    intros Hwf Hnin Hush Hnib0 Hnibeq Hcovin Hnd Hcovmeta
+    intros Hsbeq Hnibeq Hb Hcovin Hlogsub
            Hdevq Hnibq Histq Hcovq Hlogq Hbmq Hszq Hninq.
-    pose proof (FsImg.fsimg_wf_sb _ _ Hwf) as Hsb.
-    pose proof (FsImg.sbo_logstart sb Hsb) as Hls.
-    pose proof (FsImg.sbo_nlog sb Hsb) as Hnl.
-    pose proof (FsImg.sbo_inodestart sb Hsb) as Hist.
-    pose proof (FsImg.sbo_bmapstart sb Hsb) as Hbms.
-    pose proof (FsImg.sbo_size sb Hsb) as Hsz.
-    pose proof (FsImg.sbo_ninodes sb Hsb) as Hni.
-    pose proof (FsImg.sbo_nblocks sb Hsb) as Hnb.
-    pose proof (FsImg.sbo_one_bitmap sb Hsb) as Hone.
+    subst sb.
+    pose proof (FsDurSnap.sk_sbok Hb) as Hsb.
+    pose proof (FsImg.sbo_logstart _ Hsb) as Hls.
+    pose proof (FsImg.sbo_nlog _ Hsb) as Hnl.
+    pose proof (FsImg.sbo_inodestart _ Hsb) as Hist.
+    pose proof (FsImg.sbo_bmapstart _ Hsb) as Hbms.
+    pose proof (FsImg.sbo_size _ Hsb) as Hsz.
+    pose proof (FsImg.sbo_ninodes _ Hsb) as Hni.
+    pose proof (FsImg.sbo_nblocks _ Hsb) as Hnb.
+    pose proof (FsImg.sbo_one_bitmap _ Hsb) as Hone.
+    pose proof (FsImg.sbo_ushort _ Hsb) as Hush0.
     unfold FsImg.ROOTINO in Hni. unfold FsImg.BSIZE_z in Hone.
-    assert (Hdiv : 0 <= FsImg.sb_ninodes sb / 16) by (apply Z.div_pos; lia).
-    (* the block layout, all in one arithmetic fact *)
-    assert (Hds : FsImg.fs_data_start sb = FsImg.sb_bmapstart sb + 1)
-      by reflexivity.
-    assert (Hbm : FsImg.sb_bmapstart sb = 33 + Z.of_nat nib) by lia.
-    (* the metadata window in ARITHMETIC form, so every use below is [lia] *)
-    rewrite Hds Hbm in Hcovmeta.
+    assert (Hdiv : 0 <= FsImg.sb_ninodes (FsState.fss_sb S) / 16)
+      by (apply Z.div_pos; lia).
+    assert (Hds : FsImg.fs_data_start (FsState.fss_sb S)
+                  = FsImg.sb_bmapstart (FsState.fss_sb S) + 1) by reflexivity.
+    assert (Hbm : FsImg.sb_bmapstart (FsState.fss_sb S) = 33 + Z.of_nat nib) by lia.
+    (* ---- the two coverage readings ---- *)
+    assert (Hcovmeta : forall b : Z, 1 <= b < 33 + Z.of_nat nib + 1 -> b ∈ cov).
+    { intros b Hbr. apply (FsDurSnap.snap_cov_window S Pb cov b Hb Hlogsub). lia. }
+    assert (Hbel : cov_below cov (FsImg.sb_size (FsState.fss_sb S))).
+    { intros z Hz. exact (proj2 (FsDurSnap.snap_cov_below S Pb cov z Hb Hz)). }
+    assert (Hnib0 : (0 < nib)%nat) by lia.
+    assert (Hush : 16 * Z.of_nat nib <= 2 ^ 16) by lia.
+    assert (Hnin : FsImg.sb_ninodes (FsState.fss_sb S) <= 16 * Z.of_nat nib).
+    { pose proof (Z.div_mod (FsImg.sb_ninodes (FsState.fss_sb S)) 16 ltac:(lia)).
+      pose proof (Z.mod_pos_bound (FsImg.sb_ninodes (FsState.fss_sb S)) 16
+                    ltac:(lia)). lia. }
     (* the two constants the goals below mention as powers *)
     assert (H231 : (2 : Z) ^ 31 = 2147483648) by reflexivity.
     assert (H216 : (2 : Z) ^ 16 = 65536) by reflexivity.
     assert (HBPB : BPB = 8192).
     { rewrite /BPB. vm_compute. reflexivity. }
-    (* ---- the three derived coverage facts ---- *)
-    assert (Hbel : cov_below cov (FsImg.sb_size sb))
-      by exact (cov_below_of_image cov ndisk _ Hcovin Hnd).
     assert (Hok : cov_ok cov).
     { intros z Hz. destruct (Hcovin z Hz) as [Hz0 _].
       pose proof (Hbel z Hz). lia. }
-    assert (Hlogsub : log_region_set (FsImg.sb_logstart sb) ⊆ cov).
-    { apply elem_of_subseteq. intros b Hb.
-      pose proof (log_region_bound (FsImg.sb_logstart sb) b Hb) as Hbb.
-      unfold LOGBLOCKS in Hbb. apply Hcovmeta. lia. }
-    assert (Hlogout : forall b : Z, FsImg.sb_inodestart sb <= b ->
-              ~ (b ∈ log_region_set (FsImg.sb_logstart sb))).
-    { intros b Hb Hc.
-      pose proof (log_region_bound (FsImg.sb_logstart sb) b Hc) as Hbb.
-      unfold LOGBLOCKS in Hbb. lia. }
+    assert (Hlogout : forall b : Z, FsImg.sb_inodestart (FsState.fss_sb S) <= b ->
+              ~ (b ∈ log_region_set (FsImg.sb_logstart (FsState.fss_sb S)))).
+    { intros b Hbb Hc.
+      pose proof (log_region_bound (FsImg.sb_logstart (FsState.fss_sb S)) b Hc) as Hbb2.
+      unfold LOGBLOCKS in Hbb2. lia. }
     constructor.
     - exact Hdevq.
     - rewrite Hnibq. exact Hnib0.
@@ -678,8 +725,8 @@ Section FirstTok.
       split; [apply Hcovmeta; lia | apply Hlogout; lia].
     - rewrite Histq Hnibq Hcovq Hlogq.
       intros w Hw.
-      pose proof (IBLOCK_in_range w (FsImg.sb_inodestart sb) (Z.of_nat nib)
-                    ltac:(lia) Hw) as Hbnd.
+      pose proof (IBLOCK_in_range w (FsImg.sb_inodestart (FsState.fss_sb S))
+                    (Z.of_nat nib) ltac:(lia) Hw) as Hbnd.
       split; [apply Hcovmeta; lia | apply Hlogout; lia].
     - rewrite Hninq. lia.
     - rewrite Hninq Hnibq. exact Hnin.
@@ -687,20 +734,14 @@ Section FirstTok.
     - rewrite Hnibq. exact Hush.
   Qed.
 
-  (* [SpecFsinit]'s (a)/(b)/(g) and its two block-1 corners.  The ONE fact
-     no sweep in the tree provides is (a): [FsImg.fsimg_wf] is arithmetic on
-     the RECORD, and nothing in it says block 1's bytes ARE that record.
-     [FsImg.fs_parse_sb] is exactly that reading, and
-     [FsImgCheck.fsimg_parse_sb] already proves it at the literal image --
-     so this premise costs the adequacy cone no new computation. *)
   (* THE COLLECTION'S GEOMETRY, OFF THE BOOT CONFIGURATION (durable-disk
      C-8).  Four of the six clauses are [FsReady.fs_geom_ok]'s own -- the
      inum bound, the [ushort] width, the coverage bound and the covered
      range's positivity -- and the fifth, [cg_reg], is [FsImg.sbo_bmapstart]
-     against the region's WIDTH TIE.  That tie ([nib = ninodes/16 + 1]) is
-     what [fs_geom_ok_of_image] above is already stated at, so this lemma
-     costs the boot chain nothing it does not already prove. *)
-  Lemma col_geom_of_image (sb : FsImg.fs_sb) :
+     against the region's WIDTH TIE.  Nothing here reads an image or a
+     snapshot: it is the ambient configuration's own record plus the tie,
+     which is why one lemma serves every era. *)
+  Lemma col_geom_of_config (sb : FsImg.fs_sb) :
     fs_geom_ok ->
     FsImg.fs_sb_ok sb ->
     icfg_ist = FsImg.sb_inodestart sb ->
@@ -734,65 +775,113 @@ Section FirstTok.
       reflexivity.
   Qed.
 
-  Lemma first_fsinit_pures_of_image (dk : Z -> bv 8) (sb : FsImg.fs_sb)
-      (cov : gset Z) :
-    FsImg.fsimg_wf (FsCrash.fs_blocks dk) sb = true ->
-    FsImg.fs_parse_sb (FsCrash.fs_blocks dk) = Some sb ->
-    (forall b : Z, 1 <= b < FsImg.fs_data_start sb -> b ∈ cov) ->
+  (* [SpecFsinit]'s (a)/(a')/(a'')/(g)/(g'') and its two block-1 corners,
+     OFF THE DURABLE SNAPSHOT (durable-disk lane E-himg).  Every clause has
+     a snapshot-side source and none of them is an image fact:
+
+       (a)/(a')  block 1's byte shape and the record it parses to are
+                 [FsDurSnap.sk_parse] at the snapshot's own superblock
+                 block, identified with the RAW one by
+                 [FsCrash.fs_recovery_sb_parse] (recovery never writes
+                 block 1 -- [hdr_wf]'s block-1 row, lane E-blk1) --
+                 which is what this lemma's [Hsbb] premise carries;
+       (a'')     [col_geom_of_config] above;
+       (g)       [FsCrash.hdr_wf], carried across the power cycle by the
+                 crash predicate itself;
+       (g'')     the exception set's slot tie, which the era's mint
+                 establishes when it picks the committed view.
+
+     The block-1 SHAPE costs nothing: [first_sb_image_of_le] needs only
+     [32 <= length], and [FsCrash.fs_blocks] is always [BSIZE] long. *)
+  Lemma first_fsinit_pures_of_snap (dk : Z -> bv 8) (S : FsState.fs_state_rec)
+      (Pb : Z -> list (bv 8)) (sb : FsImg.fs_sb) (cov : gset Z) :
+    sb = FsState.fss_sb S ->
+    FsDurSnap.snap_bytes S (fs_restrict Pb (fs_home_set cov (FsImg.sb_logstart sb))) ->
+    FsCrash.hdr_wf (FsCrash.fs_blocks dk) cov (FsImg.sb_logstart sb) ->
+    log_region_set (FsImg.sb_logstart sb) ⊆ cov ->
+    (forall b : Z,
+       b ∈ fs_home_set cov (FsImg.sb_logstart sb) ->
+       b ∉ FsCrash.hdr_wset (FsCrash.fs_blocks dk) (FsImg.sb_logstart sb) ->
+       Pb b = FsCrash.fs_blocks dk b) ->
+    (forall (i : nat) (b : Z),
+       (hdr_dec (FsCrash.fs_blocks dk
+                   (log_hdr_bno (FsImg.sb_logstart sb)))).2 !! i = Some b ->
+       Pb b = FsCrash.fs_blocks dk (log_slot_bno (FsImg.sb_logstart sb) i)) ->
     icfg_ist = FsImg.sb_inodestart sb ->
     fsc_cov = cov -> fsc_logst = FsImg.sb_logstart sb ->
     fsc_bmapstart = FsImg.sb_bmapstart sb ->
     fsc_size = FsImg.sb_size sb -> fsc_ninodes = FsImg.sb_ninodes sb ->
     (* the two the collection's geometry adds (durable-disk C-8), both
-       already in hand wherever [fs_geom_ok_of_image] is called *)
+       already in hand wherever [fs_geom_ok_of_snap] is called *)
     fs_geom_ok ->
     Z.of_nat icfg_nib = FsImg.sb_ninodes sb / 16 + 1 ->
-    first_fsinit_pures dk sb.
+    first_fsinit_pures dk sb Pb.
   Proof.
-    intros Hwf Hparse Hcovmeta Histq Hcovq Hlogq Hbmq Hszq Hninq Hgok Hnibw.
-    pose proof (FsImg.fsimg_wf_sb _ _ Hwf) as Hsb.
-    pose proof (FsImg.sbo_magic sb Hsb) as Hmag.
-    pose proof (FsImg.sbo_logstart sb Hsb) as Hls.
-    pose proof (FsImg.sbo_nlog sb Hsb) as Hnl.
-    pose proof (FsImg.sbo_inodestart sb Hsb) as Hist.
-    pose proof (FsImg.sbo_bmapstart sb Hsb) as Hbms.
-    pose proof (FsImg.sbo_ninodes sb Hsb) as Hni.
+    intros Hsbeq Hb Hhwf Hlogsub Hagr Hslot
+           Histq Hcovq Hlogq Hbmq Hszq Hninq Hgok Hnibw.
+    pose proof Hsbeq as Hsbeq'. subst sb.
+    pose proof (FsDurSnap.sk_sbok Hb) as Hsb.
+    pose proof (FsImg.sbo_magic _ Hsb) as Hmag.
+    pose proof (FsImg.sbo_logstart _ Hsb) as Hls.
+    pose proof (FsImg.sbo_nlog _ Hsb) as Hnl.
+    pose proof (FsImg.sbo_inodestart _ Hsb) as Hist.
+    pose proof (FsImg.sbo_bmapstart _ Hsb) as Hbms.
+    pose proof (FsImg.sbo_ninodes _ Hsb) as Hni.
     unfold FsImg.ROOTINO in Hni.
-    assert (Hdiv : 0 <= FsImg.sb_ninodes sb / 16) by (apply Z.div_pos; lia).
-    assert (Hds : FsImg.fs_data_start sb = FsImg.sb_bmapstart sb + 1)
-      by reflexivity.
-    assert (Hlen : length (FsCrash.fs_blocks dk FsImg.SB_BNO) = BSIZE)
+    assert (Hdiv : 0 <= FsImg.sb_ninodes (FsState.fss_sb S) / 16)
+      by (apply Z.div_pos; lia).
+    assert (Hds : FsImg.fs_data_start (FsState.fss_sb S)
+                  = FsImg.sb_bmapstart (FsState.fss_sb S) + 1) by reflexivity.
+    assert (Hlen : length (FsCrash.fs_blocks dk 1) = BSIZE)
       by apply fs_blocks_length.
+    (* BLOCK 1 IS COVERED, IS NOT LOG STORAGE, AND IS NEVER LOGGED, so the
+       raw superblock block IS the snapshot's ([FsCrash.hdr_wf]'s block-1
+       row, lane E-blk1, read through the mint's own agreement). *)
+    assert (H1cov : (1 : Z) ∈ cov)
+      by (apply (FsDurSnap.snap_cov_window S Pb cov 1 Hb Hlogsub); lia).
+    assert (H1log : ~ ((1 : Z) ∈ log_region_set (FsImg.sb_logstart (FsState.fss_sb S)))).
+    { intro Hc. pose proof (log_region_bound _ _ Hc) as Hbnd. lia. }
+    assert (H1home : (1 : Z) ∈ fs_home_set cov
+                                 (FsImg.sb_logstart (FsState.fss_sb S)))
+      by (rewrite /fs_home_set elem_of_difference; split; assumption).
+    assert (Hsbb : FsCrash.fs_blocks dk 1 = FsState.fss_sbb S).
+    { rewrite -(Hagr 1 H1home
+                  (FsCrash.hdr_wset_sb (FsCrash.fs_blocks dk) cov _ Hhwf)).
+      pose proof (FsDurSnap.sk_sb Hb) as Hs.
+      apply fs_restrict_lookup_Some in Hs as [_ Hv]. by rewrite Hv. }
+    (* THE PARSE, at the RAW block 1. *)
+    assert (Hparse0 : FsImg.fs_parse_sb (fun _ => FsCrash.fs_blocks dk 1)
+                      = Some (FsState.fss_sb S)).
+    { rewrite /FsImg.fs_parse_sb. rewrite Hsbb. exact (FsDurSnap.sk_parse Hb). }
     (* THE EIGHT FIELDS ARE THE EIGHT WORDS, which is all [fs_parse_sb]
-       answering [Some sb] says -- and it is exactly premise (a). *)
-    pose proof Hparse as Hparse0.
+       answering [Some sb] says. *)
+    pose proof Hparse0 as Hparse.
     rewrite /FsImg.fs_parse_sb in Hparse.
-    destruct ((32 <=? length (FsCrash.fs_blocks dk FsImg.SB_BNO))%nat) eqn:Hb;
+    destruct ((32 <=? length (FsCrash.fs_blocks dk 1))%nat) eqn:Hbb;
       [| discriminate].
-    injection Hparse as Hsbeq.
+    injection Hparse as Hsbeq2.
     rewrite /first_fsinit_pures.
     split;
-      [| split; [| split; [| split; [| split; [| split; [| split; [| split]]]]]]].
-    - exists (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk FsImg.SB_BNO) 0 4)),
-             (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk FsImg.SB_BNO) 8 4)),
-             (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk FsImg.SB_BNO) 16 4)).
+      [| split; [| split; [| split; [| split; [| split; [| split;
+         [| split; [| split]]]]]]]].
+    - exists (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk 1) 0 4)),
+             (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk 1) 8 4)),
+             (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk 1) 16 4)).
       split.
-      + rewrite Hszq Hninq Hlogq Hbmq Histq -Hsbeq.
-        exact (first_sb_image_of_le (FsCrash.fs_blocks dk FsImg.SB_BNO)
+      + rewrite Hszq Hninq Hlogq Hbmq Histq -Hsbeq2.
+        exact (first_sb_image_of_le (FsCrash.fs_blocks dk 1)
                  ltac:(rewrite Hlen; unfold BSIZE; lia)).
-      + rewrite -Hsbeq in Hmag. cbn [FsImg.sb_magic] in Hmag.
+      + rewrite -Hsbeq2 in Hmag. cbn [FsImg.sb_magic] in Hmag.
         rewrite Z_to_bv_unsigned Hmag. reflexivity.
-    - rewrite Hlogq /log_hdr_bno /hdr_n.
-      exact (FsImg.fsimg_wf_log _ _ Hwf).
-    - rewrite Hcovq. apply Hcovmeta. lia.
-    - rewrite Hlogq. intro Hc.
-      pose proof (log_region_bound _ _ Hc) as Hbb. lia.
-    - rewrite /FsImg.fs_parse_sb. rewrite /FsImg.fs_parse_sb in Hparse0.
-      exact Hparse0.
+    - rewrite Hcovq Hlogq. exact Hhwf.
+    - rewrite Hcovq. exact H1cov.
+    - rewrite Hlogq. exact H1log.
+    - exact Hparse0.
     - exact Hsb.
-    - exact (col_geom_of_image sb Hgok Hsb Histq Hszq Hninq Hnibw).
+    - exact (col_geom_of_config (FsState.fss_sb S) Hgok Hsb Histq Hszq Hninq Hnibw).
     - by rewrite Hbmq.
     - by rewrite Hszq.
+    - rewrite Hlogq. exact Hslot.
   Qed.
 
 End FirstTok.

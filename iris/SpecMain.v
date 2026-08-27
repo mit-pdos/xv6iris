@@ -448,6 +448,13 @@ Section SpecMain.
          connect the two, and main spends the ties, not the image. *)
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
+      (* ...AND THE DURABLE SNAPSHOT THE ERA WAS MINTED FROM (durable-disk
+         lane E-himg): the abstract state the committed view encodes, the
+         committed view itself as a block view, and the set of blocks the
+         era fupd spent.  [sb]/[nib] above are no longer free -- they are
+         [S]'s own superblock and region width, which is what
+         [FsCfgBoot.fs_boot_snap_wf] says. *)
+      (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P} :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
@@ -475,16 +482,18 @@ Section SpecMain.
        and the boot chain has it in hand; main forwards it to userinit's
        namei corner, where [icfg_nib = 0] would make the returned
        [IcacheRef.inode_held] uninhabitable. *)
-    (* THE WHOLE IMAGE HYPOTHESIS, not two readings of it (fs-cfg-boot.md
-       stage (f)).  Main used to take exactly [0 < nib] (userinit's namei
-       corner) and [0 ∉ cov] ([BioInitAt.bio_init_at]'s premise), both read
-       off this bundle one tier up.  Stage (f) needs SIX more of its
-       conjuncts -- everything [FsReady.fs_geom_ok] and
-       [FirstTok.first_fsinit_pures] are built from -- so the bundle itself
-       comes down and [ProofMain] does the reading.  [FsCfgBoot.v] is where
-       it lives (it used to be [BootShared]'s, which sits above this file);
-       [FsAdequacyImg] is where it is discharged at the mkfs image. *)
-    fs_boot_image_wf dk ndisk sb nib cov ->
+    (* THE WHOLE SNAPSHOT HYPOTHESIS, not two readings of it (fs-cfg-boot.md
+       stage (f); durable-disk lane E-himg).  Main used to take exactly
+       [0 < nib] (userinit's namei corner) and [0 ∉ cov]
+       ([BioInitAt.bio_init_at]'s premise); stage (f) needs everything
+       [FsReady.fs_geom_ok] and [FirstTok.first_fsinit_pures] are built
+       from, so the bundle itself comes down and [ProofMain] does the
+       reading.  IT IS NOT AN IMAGE HYPOTHESIS: what a later era boots on
+       is whatever the previous era committed, and that is exactly what the
+       crash predicate's durable snapshot says
+       ([SystemAdequacy.fs_boot_pure]).  [FsCfgBoot.v] is where the bundle
+       lives (it used to be [BootShared]'s, which sits above this file). *)
+    fs_boot_snap_wf dk ndisk S Pb sb nib cov ->
     (* main has no current proc, and neither does the scheduler() it tail-
        calls. *)
     p0 = zero_reg ->
@@ -566,7 +575,8 @@ Section SpecMain.
        projections -- so that every row is at the instance the boot chain is
        applied at, which is the same discipline
        [BootShared.boot_shared_alloc]'s return uses. *)
-    fs_boot_supply _ _ dk sb nib cov γd γv -∗
+    fs_boot_supply _ _ dk sb nib cov γd γv Rspent Pb
+      (FsCrash.hdr_wset (FsCrash.fs_blocks dk) (FsImg.sb_logstart sb)) -∗
     (* ---- ROW (B) OF THE fsinit BUNDLE: the ERA's log-region mirror
        variable, straight out of [BootShared.boot_shared_alloc] (the era
        fupd cannot mint it -- [FsCfgBoot.fs_kit_fsinit_ghost]'s header says
@@ -672,8 +682,9 @@ Module Type MAIN.
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
+      (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P},
       wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 P.
 End MAIN.

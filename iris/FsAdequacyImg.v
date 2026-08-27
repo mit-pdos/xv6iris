@@ -1,15 +1,15 @@
 (* ====================================================================== *)
 (* FsAdequacyImg.v -- THE SYSTEM THEOREM AT THE LITERAL mkfs IMAGE.        *)
 (*                                                                        *)
-(* [SystemAdequacy.v] proves the two generic theorems.  Since              *)
-(* claude-notes/projects/fs-cfg-boot.md stage (d2b) both of them carry an   *)
-(* IMAGE HYPOTHESIS -- because the boot-era fupd now MINTS the inode        *)
-(* cache's [IcacheRef.icfg] and the file system's [FsCfg.fscfg] off the     *)
-(* era's own disk ([FsCfgBoot.fs_cfg_alloc], wired in at                   *)
-(* [BootShared.boot_shared_alloc]) instead of resolving two hardcoded       *)
-(* all-[1%positive] records that made the boot cone's one assumed contract  *)
-(* vacuous.  THIS FILE IS WHERE THAT HYPOTHESIS IS DISCHARGED at the        *)
-(* 2,048,000 bytes mkfs actually wrote, out of [FsImgCheck.v]'s citations.  *)
+(* [SystemAdequacy.v] proves the two generic theorems.  Each carries ONE    *)
+(* IMAGE HYPOTHESIS, about the disk of the machine the system is switched   *)
+(* on with -- because the boot-era fupd MINTS the inode cache's             *)
+(* [IcacheRef.icfg] and the file system's [FsCfg.fscfg] off the era's own   *)
+(* disk instead of resolving two hardcoded all-[1%positive] records that    *)
+(* made the boot cone's one assumed contract vacuous, and era 0's disk is   *)
+(* the only one nothing has yet written.  THIS FILE IS WHERE THAT           *)
+(* HYPOTHESIS IS DISCHARGED at the 2,048,000 bytes mkfs actually wrote, out *)
+(* of [FsImgCheck.v]'s citations.                                          *)
 (*                                                                        *)
 (* WHY IT IS A LEAF OF ITS OWN (fs-cfg-boot.md, probe-STOP-3's ruling).     *)
 (* Discharging the image sweeps needs [FsImgCheck.v] in the cone, and that  *)
@@ -19,13 +19,6 @@
 (* file nothing imports.  This file itself computes NOTHING: every line is  *)
 (* a citation, and the whole leaf compiles in seconds given                *)
 (* [FsImgCheck.vo].                                                        *)
-(*                                                                        *)
-(* THE TWO COROLLARIES ARE OFF THE BUILD since durable-disk lane E-unpin:  *)
-(* both take "the literal image is on the disk at EVERY era", which is      *)
-(* [Himg] restated and refutable the same way.  §3/§4 below are commented   *)
-(* out; the banner there says what replaces them.  What this file still     *)
-(* DOES is the era-0 discharge -- [fsimg_image_wf] and [fsimg_snap_ok] --   *)
-(* which the boot chain uses and which nothing here weakens.                *)
 (*                                                                        *)
 (* THE TWO COROLLARIES, AND WHY THEIR NAMES ARE NOT SYMMETRIC.             *)
 (* [xv6_fs_adequacy_xv6Σ] MOVED here from [SystemAdequacy.v] unchanged in   *)
@@ -179,95 +172,48 @@ Proof.
            fsimg_cov fsimg_image_wf).
 Qed.
 
-(* ====================================================================== *)
-(*  OFF THE BUILD BELOW (durable-disk lane E-unpin).                       *)
-(*                                                                        *)
-(*  [fsimg_at_every_era] says THE LITERAL IMAGE IS ON THE DISK AT EVERY    *)
-(*  ERA -- it is [Himg] again, and it is refutable for exactly [Himg]'s    *)
-(*  reason: era N's disk is whatever era N-1 WROTE, so a single [create]   *)
-(*  or [unlink] falsifies it.  Its bridge [fsimg_boot_image_eras] and the  *)
-(*  two corollaries built on it ([xv6_power_adequacy_fsimg] and            *)
-(*  [xv6_fs_adequacy_xv6Σ]) inherit that premise, so all four are          *)
-(*  commented out rather than left standing as image-content hypotheses    *)
-(*  nobody can discharge.                                                  *)
-(*                                                                        *)
-(*  WHAT REPLACES THEM.  Lane E's mint takes the era's file system from    *)
-(*  the DURABLE SNAPSHOT rather than from the image, and when [Himg]       *)
-(*  ([SystemAdequacy.fs_boot_image_eras]) goes, the general theorem is     *)
-(*  stated at every era with no image hypothesis at all; era 0's discharge *)
-(*  is [fsimg_image_wf] above, which STAYS and is what the boot chain      *)
-(*  uses.  Restore these four at that point, or delete them, but do not    *)
-(*  re-introduce the premise.  Source kept, not deleted.                   *)
-(* ====================================================================== *)
-(*
 (* ---------------------------------------------------------------------- *)
-(* 3.  ...AT EVERY ERA.                                                    *)
+(* 3.  THE TWO COROLLARIES, AT ONE EQUATION ABOUT [g].                     *)
 (*                                                                        *)
-(* READ THIS PREMISE CAREFULLY.  [SystemAdequacy.fs_boot_image_eras] is     *)
-(* quantified over the eras, not stated at [g], and it has to be: the boot  *)
-(* entailment [RiscvAdequacy.riscv_power_adequacy] asks for is at EVERY     *)
-(* [g'] with [boot_facts g'], and [boot_facts] says nothing about the       *)
-(* disk's bytes -- a second era's disk is whatever the first era WROTE      *)
-(* ([virtio_reset] preserves [v_disk], which is the one crash-surviving     *)
-(* component).  So the honest hypothesis is: EVERY machine this system      *)
-(* boots on carries the mkfs image -- strictly stronger than the            *)
-(* one equation about [g] the FS corollary used to take.                    *)
-(*                                                                        *)
-(* IT IS A HYPOTHESIS AND NOT YET A THEOREM.  What would discharge it is    *)
-(* the durability effort: that xv6's own writes leave the disk a well       *)
-(* formed file system, which is [FsCrash.P_fs]'s business                   *)
-(* (claude-notes/design/crash.md) and is not proved.  The trade this stage  *)
-(* makes is deliberate: before it, the boot cone's assumed [namei("/")]     *)
-(* contract was VACUOUS at these corollaries' own instance                  *)
-(* ([icfg_nib = 0]), so the theorem was unconditional about nothing.        *)
-(* fs-cfg-boot.md (d2b) records it.                                        *)
-(* ---------------------------------------------------------------------- *)
-Definition fsimg_at_every_era (g : gstate) : Prop :=
-  forall g' : gstate,
-    boot_facts g' ->
-    v_disk (g'.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk.
-
-Lemma fsimg_boot_image_eras (g : gstate) :
-  fsimg_at_every_era g ->
-  fs_boot_image_eras fsimg_sb fsimg_nib fsimg_cov.
-Proof.
-  intros Hdisk g' Hbf. rewrite /fs_boot_image_eras.
-  rewrite (Hdisk g' Hbf). exact fsimg_image_wf.
-Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 4.  THE TWO COROLLARIES.                                                *)
+(* [fsimg_at_every_era] IS GONE (durable-disk lane E-himg), and so is the  *)
+(* [SystemAdequacy.fs_boot_image_eras] it was a bridge to.  Both said THE  *)
+(* LITERAL IMAGE IS ON THE DISK AT EVERY ERA, which is refutable -- era N's *)
+(* disk is whatever era N-1 wrote, so one [create] falsifies it.  The      *)
+(* general theorem takes the image ONCE, at the machine the system is      *)
+(* switched on with, and every later boot reads its file system off the    *)
+(* crash predicate's durable snapshot instead.  So these two corollaries    *)
+(* assume exactly what a reader would expect: the initial disk is mkfs's.   *)
 (* ---------------------------------------------------------------------- *)
 
-(* THE POWER THEOREM AT THE IMAGE.  The crash predicate is [True] here (see
-   [SystemAdequacy.xv6_power_adequacy]): nothing is claimed about what
-   survives a power cycle, only that the machine never gets stuck.  What the
-   image buys is that the boot cone's configuration is REAL -- the whole
-   point of stage (d2b). *)
+(* THE POWER THEOREM AT THE IMAGE, with a NON-TRIVIAL trace invariant: at
+   every reachable state of every power cycle the physical disk still
+   recovers to a committed view that IS a file system
+   ([SystemAdequacy.xv6_trace_pure]).  Nothing is assumed about any era but
+   the first. *)
 Corollary xv6_power_adequacy_fsimg (g : gstate)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
-    (Hdisk : fsimg_at_every_era g) :
+    (Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk) :
   forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\
     xv6_trace_pure fsimg_cov (FsImg.sb_logstart fsimg_sb) g2.
 Proof.
-  apply (xv6_trace_invariant g fsimg_sb fsimg_nib fsimg_cov Hgen0 Hpow
-           (fsimg_boot_image_eras g Hdisk)).
+  apply (xv6_trace_invariant g fsimg_sb fsimg_nib fsimg_cov Hgen0 Hpow).
+  rewrite Hdisk. exact fsimg_image_wf.
 Qed.
 
 (* ...AND THE FS FORM, at the same functor list AND AT THE LITERAL mkfs
    IMAGE.  MOVED HERE from [SystemAdequacy.v] by fs-cfg-boot.md's
-   probe-STOP-3 ruling; the statement is the same one it had there, plus the
-   era hypothesis §3 explains.
+   probe-STOP-3 ruling.
 
-   NOTHING ABOUT THE FILE SYSTEM IS ASSUMED BEYOND THAT.  The generic
-   theorem takes mkfs's recovery obligation as [Hrec]; here the initial disk
-   IS the image mkfs built -- [FsImgDisk.fsimg_dk] is kernel-rocq/FsImgRaw.v's
-   2,048,000 bytes, zero-padded beyond them (a virtio disk reads zeroes past
-   the file backing it, and [XV6_DISK_BYTES] is larger than the image) -- and
-   the obligation is DISCHARGED by [FsImgDisk.fsimg_recovery], which is
-   [FsCrash.fs_recovery_clean] at that image's own zero log header.
+   NOTHING ABOUT THE FILE SYSTEM IS ASSUMED BEYOND THE INITIAL DISK.  The
+   generic theorem takes mkfs's recovery obligation as [Hrec]; here the
+   initial disk IS the image mkfs built -- [FsImgDisk.fsimg_dk] is
+   kernel-rocq/FsImgRaw.v's 2,048,000 bytes, zero-padded beyond them (a
+   virtio disk reads zeroes past the file backing it, and [XV6_DISK_BYTES]
+   is larger than the image) -- and the obligation is DISCHARGED by
+   [FsImgDisk.fsimg_recovery], which is [FsCrash.fs_recovery_clean] at that
+   image's own zero log header.
 
    THE PARAMETERS, and why each is what it is:
      [logstart] is pinned to [2], the IMAGE'S OWN [logstart]
@@ -275,8 +221,9 @@ Qed.
        says so);
      [D0] is [FsImgDisk.fsimg_D0 fsimg_cov] -- the image's own home blocks,
        since a clean log replays nothing;
-     [cov] is [fsimg_cov] (§1), NO LONGER PARAMETRIC: stocking the inode
-       pool from the image forces every block a live inode names into it;
+     [cov] is [fsimg_cov] (section 1), NO LONGER PARAMETRIC: stocking the
+       inode pool from the image forces every block a live inode names into
+       it;
      [sb]/[nib] are the parsed superblock and its inode region's 13 blocks.
 
    What the image MEANS as a file system -- [FsImg.fsimg_wf], and that
@@ -285,30 +232,27 @@ Qed.
    is why this file is not [SystemAdequacy.v]. *)
 Corollary xv6_fs_adequacy_xv6Σ (g : gstate)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
-    (Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk)
-    (Hdisk' : fsimg_at_every_era g) :
+    (Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk) :
   forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\
     xv6_trace_pure fsimg_cov (FsImg.sb_logstart fsimg_sb) g2.
 Proof.
-  (* [logstart] IS NO LONGER AN ARGUMENT: [xv6_fs_adequacy] now takes the
-     crash predicate at the SUPERBLOCK'S own log start (fs-cfg-boot.md stage
-     (f) -- the boot seam's [fsc_logst] is tied to it), and
-     [FsImg.sb_logstart fsimg_sb] IS the [2] this corollary used to pass,
-     by conversion on the record literal. *)
+  (* [logstart] IS NO LONGER AN ARGUMENT: [xv6_fs_adequacy] takes the crash
+     predicate at the SUPERBLOCK'S own log start (fs-cfg-boot.md stage (f)
+     -- the boot seam's [fsc_logst] is tied to it), and
+     [FsImg.sb_logstart fsimg_sb] IS the [2] this corollary used to pass, by
+     conversion on the record literal. *)
   apply (xv6_fs_adequacy xv6Σ g fsimg_cov (FsImgDisk.fsimg_D0 fsimg_cov)
            fsimg_sb fsimg_nib
            (* THE TRACE INVARIANT, at the FS's own durability record: the
-              same [phi] [SystemAdequacy.xv6_fs_trace_invariant] takes for the
-              power theorem, discharged by the same [xv6_trace_hook]. *)
+              same [phi] the power corollary above takes, discharged by the
+              same [xv6_trace_hook]. *)
            (xv6_trace_pure fsimg_cov (FsImg.sb_logstart fsimg_sb))
            (xv6_trace_hook xv6Σ fsimg_cov (FsImg.sb_logstart fsimg_sb))
            Hgen0 Hpow).
   - (* mkfs's obligation.  [fsimg_P] IS [fs_blocks fsimg_dk], so once the
        disk is rewritten to the image this is literally [fsimg_recovery]. *)
     rewrite Hdisk. exact (FsImgDisk.fsimg_recovery fsimg_cov).
-  - exact (fsimg_boot_image_eras g Hdisk').
+  - rewrite Hdisk. exact fsimg_image_wf.
 Qed.
-
-*)

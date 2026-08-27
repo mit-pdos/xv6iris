@@ -842,7 +842,20 @@ Definition fs_sb_wf (sb : fs_sb) : bool :=
   (sb_size sb =? fs_data_start sb + sb_nblocks sb) &&
   (ROOTINO <? sb_ninodes sb) &&
   (0 <? sb_nblocks sb) &&
-  (sb_size sb <=? 8 * BSIZE_z).
+  (sb_size sb <=? 8 * BSIZE_z) &&
+  (* AN INUM IS A [ushort] ON THE DISK (durable-disk lane E-himg).  A
+     directory entry's [inum] field is sixteen bits (kernel/fs.h's
+     [struct dirent]), so a superblock that declared more inode slots than
+     [2^16] would name inodes no directory entry can reach.  The region is
+     [ninodes / 16 + 1] blocks of sixteen records, so the bound is on the
+     REGION's inum space and not on [ninodes] itself -- that is the number
+     [FsReady.fgo_ushort] is stated at and the one the boot mint carries.
+     It is here rather than as a separate era premise because it is a fact
+     about the superblock alone, and every era's superblock has to have it:
+     nothing else in this record bounds the region above by anything
+     tighter than the one-bitmap-block limit ([size <= 8 * BSIZE] leaves
+     [16 * nib] up at [2^17]).  LAST, so no destructuring moves. *)
+  (16 * (sb_ninodes sb / 16 + 1) <=? 2 ^ 16).
 
 Record fs_sb_ok (sb : fs_sb) : Prop := {
   sbo_magic : sb_magic sb = FSMAGIC;
@@ -854,14 +867,17 @@ Record fs_sb_ok (sb : fs_sb) : Prop := {
   sbo_ninodes : ROOTINO < sb_ninodes sb;
   sbo_nblocks : 0 < sb_nblocks sb;
   sbo_one_bitmap : sb_size sb <= 8 * BSIZE_z;
+  (* the region's inum space fits a [ushort] -- see [fs_sb_wf]'s last
+     conjunct.  LAST, so no destructuring moves. *)
+  sbo_ushort : 16 * (sb_ninodes sb / 16 + 1) <= 2 ^ 16;
 }.
 
 Lemma fs_sb_wf_ok (sb : fs_sb) : fs_sb_wf sb = true -> fs_sb_ok sb.
 Proof.
   unfold fs_sb_wf. intros H. rewrite !andb_true_iff in H.
-  destruct H as [[[[[[[[H1 H2] H3] H4] H5] H6] H7] H8] H9].
+  destruct H as [[[[[[[[[H1 H2] H3] H4] H5] H6] H7] H8] H9] H10].
   apply Z.eqb_eq in H1, H2, H3, H4, H5, H6.
-  apply Z.ltb_lt in H7, H8. apply Z.leb_le in H9.
+  apply Z.ltb_lt in H7, H8. apply Z.leb_le in H9, H10.
   constructor; assumption.
 Qed.
 

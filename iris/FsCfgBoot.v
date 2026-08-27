@@ -2353,6 +2353,50 @@ Definition fs_boot_image_wf (dk : Z -> bv 8) (ndisk : nat)
   /\ FsImg.fs_region_bare (FsCrash.fs_blocks dk) sb nib = true
   /\ FsImg.fs_root_no_self (FsCrash.fs_blocks dk) sb = true.
 
+(* ---------------------------------------------------------------------- *)
+(* WHAT THE ERA'S DISK MUST BE AT EVERY LATER BOOT (durable-disk lane      *)
+(* E-himg), and it is not an image hypothesis at all.                      *)
+(*                                                                        *)
+(* [fs_boot_image_wf] above is a claim about mkfs's bytes, and asserting   *)
+(* it at EVERY era is refutable -- nothing proves that xv6's own writes    *)
+(* leave the disk mkfs-shaped.  What a boot actually needs is the DURABLE  *)
+(* SNAPSHOT, which [FsCrash.P_fs] carries across every power cycle and     *)
+(* [SystemAdequacy.fs_boot_pure] delivers into each boot: the committed    *)
+(* view IS a file system, and the era's configuration is that state's OWN  *)
+(* superblock.                                                            *)
+(*                                                                        *)
+(* THE ROWS.  (1)/(2) the era's configuration is the snapshot's -- [sb]    *)
+(* and [nib] are not free parameters any more, they are read off [S].      *)
+(* (3)/(4) the snapshot itself, at the committed view as a BLOCK VIEW      *)
+(* ([Pb]) rather than as a map: that is what the mint takes.  (5)/(6)/(7)  *)
+(* the on-disk header, and exactly where [Pb] differs from the raw disk -- *)
+(* on the header's write set, where it holds the LOGGED value; off it, the *)
+(* two agree.  That difference is [FsBlocks]' exception set, which         *)
+(* [initlog] empties and seals.  (8)/(9) the covered range, which is FIXED *)
+(* across power cycles and therefore CANNOT come from the snapshot: both   *)
+(* are era-independent facts about [cov] and about a [logstart] that       *)
+(* [FsImg.sbo_logstart] pins at 2, discharged once at the initial machine. *)
+(* ---------------------------------------------------------------------- *)
+Definition fs_boot_snap_wf (dk : Z -> bv 8) (ndisk : nat)
+    (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8))
+    (sb : fs_sb) (nib : nat) (cov : gset Z) : Prop :=
+  sb = FsState.fss_sb S
+  /\ Z.of_nat nib = FsImg.sb_ninodes sb / 16 + 1
+  /\ FsDurSnap.snap_ok S
+       (fs_restrict Pb (fs_home_set cov (FsImg.sb_logstart sb)))
+  /\ (forall b : Z, length (Pb b) = BSIZE)
+  /\ FsCrash.hdr_wf (FsCrash.fs_blocks dk) cov (FsImg.sb_logstart sb)
+  /\ (forall b : Z,
+        b ∈ fs_home_set cov (FsImg.sb_logstart sb) ->
+        b ∉ FsCrash.hdr_wset (FsCrash.fs_blocks dk) (FsImg.sb_logstart sb) ->
+        Pb b = FsCrash.fs_blocks dk b)
+  /\ (forall (i : nat) (b : Z),
+        (hdr_dec (FsCrash.fs_blocks dk
+                    (log_hdr_bno (FsImg.sb_logstart sb)))).2 !! i = Some b ->
+        Pb b = FsCrash.fs_blocks dk (log_slot_bno (FsImg.sb_logstart sb) i))
+  /\ FsBoot.fs_cov_in cov ndisk
+  /\ log_region_set (FsImg.sb_logstart sb) ⊆ cov.
+
 (* ====================================================================== *)
 (*  THE FILE SYSTEM'S BOOT-ERA OUTPUT, AS ONE ROW.                         *)
 (*                                                                        *)
@@ -2369,10 +2413,19 @@ Definition fs_boot_image_wf (dk : Z -> bv 8) (ndisk : nat)
 (*  both of those files sit BELOW [BootShared].  [BootShared] imports this *)
 (*  file already.                                                          *)
 (* ====================================================================== *)
+(*  THE SPENT SET, THE BYTE VIEW'S VALUE AND THE EXCEPTION SET ARE
+    PARAMETERS since durable-disk lane E-himg.  They used to be SPELLED at
+    the image's own carve, at the raw disk and at [∅] -- true only of a boot
+    whose on-disk log header is clean.  The era's mint chooses the first two
+    ([FsCfgSnap.snap_spent] and the committed view [FsCrash.fs_rec_view])
+    and the third is the header's own write set; nothing between here and
+    [FirstTok.first_fsinit] reads any of them, so all three travel
+    existentially. *)
 Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
     (ICFG : icfg) (FSC : fscfg) (dk : Z -> bv 8)
     (sb : fs_sb) (nib : nat) (cov : gset Z)
-    (γd : uart_names) (γv : disk_names) : iProp Σ :=
+    (γd : uart_names) (γv : disk_names)
+    (Rspent : gset Z) (Pb : Z -> list (bv 8)) (Xexc : gset Z) : iProp Σ :=
   (⌜icfg_dev = InodeInv.ROOTDEV⌝ ∗ ⌜icfg_nib = nib⌝ ∗
    ⌜icfg_ist = FsImg.sb_inodestart sb⌝ ∗
    ⌜fsc_uart = γd⌝ ∗ ⌜fsc_disk = γv⌝ ∗ ⌜fsc_cov = cov⌝ ∗
@@ -2380,7 +2433,4 @@ Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
    ⌜fsc_bmapstart = FsImg.sb_bmapstart sb⌝ ∗
    ⌜fsc_size = FsImg.sb_size sb⌝ ∗ ⌜fsc_ninodes = FsImg.sb_ninodes sb⌝ ∗
    fs_kit_icache ICFG FSC ∗
-   fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk)
-     (fs_kit_spent (FsCrash.fs_blocks dk) sb nib
-        (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb))
-     (FsCrash.fs_blocks dk) ∅)%I.
+   fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk) Rspent Pb Xexc)%I.

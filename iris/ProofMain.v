@@ -1247,7 +1247,8 @@ Section ProofMain.
          ([Pimg]/[Rspent]); stage (f) needs the kit at the spelling
          [FirstTok.first_fsinit] binds, so the image and the superblock come
          in by name and the spent set is written out. *)
-      (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) :
+      (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat)
+      (Pb : Z -> list (bv 8)) (Rspent : gset Z) :
     (K_userinit <= n)%nat ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     virtio_live c0 = false ->
@@ -1262,11 +1263,11 @@ Section ProofMain.
        claiming blockno 0, so block 0 cannot be a client block. *)
     (0 : Z) ∉ fsc_cov ->
     (* ...and stage (f)'s two pure rows: the kit's [nib] IS the ambient one
-       (so the spent set the era chose is the one [FirstTok.first_fsinit]
-       spells), and [SpecFsinit]'s (a)/(b)/(g) block, which
-       [FirstTok.first_fsinit_pures_of_image] produced at main's top. *)
+       (so the era's kit is at the ambient region width), and
+       [SpecFsinit]'s (a)/(a')/(a'')/(g)/(g'') block, which
+       [FirstTok.first_fsinit_pures_of_snap] produced at main's top. *)
     icfg_nib = nib ->
-    first_fsinit_pures dk sb ->
+    first_fsinit_pures dk sb Pb ->
     (* ---- STAGE (f)'S PERSISTENT HALF: the four pure rows of
        [FirstTok.first_boot_persist] plus the two device ties it is spelled
        at.  [fs_geom_ok] and [printk_gen_contract] are produced at
@@ -1360,10 +1361,8 @@ Section ProofMain.
        stage (f) is what deposits it into [FirstTok.first_tok]'s widened
        left disjunct so that forkret's [fsinit] can spend it. *)
     fs_kit_icache_rest _ _ -∗
-    fs_kit_fsinit_ghost _ _ (FsCrash.fs_blocks dk)
-      (fs_kit_spent (FsCrash.fs_blocks dk) sb nib
-         (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb))
-      (FsCrash.fs_blocks dk) ∅ -∗
+    fs_kit_fsinit_ghost _ _ (FsCrash.fs_blocks dk) Rspent Pb
+      (FsCrash.hdr_wset (FsCrash.fs_blocks dk) fsc_logst) -∗
     (* ---- ROWS (A)/(B)/(C) OF [FirstTok.first_fsinit] (fs-cfg-boot.md
        (f-2)): the 32 raw [&sb] bytes and the whole [struct log], both
        carved in [BootShared.boot_bss_carve] for the first time at this
@@ -1712,7 +1711,8 @@ Section ProofMain.
     (* era's log mirror variable, and row (C), one iref-slot unit plus 35  *)
     (* of the [bslots] [bio_init_at] produced at +0x8e.  The two pure      *)
     (* blocks ride with it: [first_fsinit_pures] came down as a premise,   *)
-    (* and the kit's [nib] is the ambient one by [Hnibeq].                 *)
+    (* and the kit's spent set / byte view are EXISTENTIAL in the bundle    *)
+    (* since durable-disk lane E-himg, so nothing has to be re-spelled.     *)
     (*                                                                    *)
     (* BOTH BUNDLES NOW LEAVE THIS GROUP, beside the pinned `first` cell:  *)
     (* they are the three deposit premises [SpecUserinit] grew at (f-5),   *)
@@ -1735,8 +1735,8 @@ Section ProofMain.
         by (unfold BSLOTS_FS, LOGBLOCKS; lia).
       iEval (rewrite Hsl bslots_op) in "Hbslots".
       iDestruct "Hbslots" as "[Hbsl _]".
-      iExists dk, sb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu, sb_old.
-      rewrite Hnibeq.
+      iExists dk, sb, Rspent, Pb, vlock, v_start, v_dev, v_nc, v_n, vname,
+              vcpu, sb_old.
       iFrame "Hkit2 Hsbb Hlw Hln Hlc Hlst Hldv Hlout Hlcmt Hlnc Hln2 Hlblk
               Hmir Hirslot Hbsl".
       iPureIntro. exact Hpures. }
@@ -2017,21 +2017,31 @@ Section ProofMain.
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
+      (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
-    intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Himg Hp0.
-    (* THE IMAGE HYPOTHESIS, READ HERE (fs-cfg-boot.md stage (f)).  The two
-       facts main used to be handed are its fifth and seventh conjuncts; the
-       other nine are what [FirstTok.fs_geom_ok_of_image] and
-       [FirstTok.first_fsinit_pures_of_image] consume at +0x9e. *)
-    destruct Himg as (Hiwf & Hirw & Hinin & Hinib32 & Hnib0 & Hinibeq &
-                      Hicovin & Hicovmeta & Hicovdata & Hiparse & Hiush & Hind & Hileq &
-                      Hibare & Hinoself).
+    intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hsnap Hp0.
+    (* THE SNAPSHOT HYPOTHESIS, READ HERE (fs-cfg-boot.md stage (f);
+       durable-disk lane E-himg).  Two of its rows are main's own ([0 < nib]
+       for userinit's namei corner, [0 ∉ cov] for [bio_init_at]); the rest
+       are what [FirstTok.fs_geom_ok_of_snap] and
+       [FirstTok.first_fsinit_pures_of_snap] consume at +0x9e. *)
+    destruct Hsnap as (Hsbeq & Hinibeq & Hsnok & HlPb & Hihwf & Hiagr &
+                       Hislot & Hicovin & Hilogsub).
+    pose proof (FsDurSnap.sk_bytes Hsnok) as Hsnb.
     assert (Hcov0 : (0 : Z) ∉ cov) by exact (FsBoot.fs_cov_in_0 _ _ Hicovin).
+    (* the region is nonempty: [nib] IS [ninodes/16 + 1] and the state's own
+       superblock has [ROOTINO < ninodes] ([FsDurSnap.sk_sbok]) *)
+    assert (Hnib0 : (0 < nib)%nat).
+    { pose proof (FsImg.sbo_ninodes _ (FsDurSnap.sk_sbok Hsnb)) as Hni.
+      unfold FsImg.ROOTINO in Hni.
+      assert (Hdv : 0 <= FsImg.sb_ninodes (FsState.fss_sb S) / 16)
+        by (apply Z.div_pos; lia).
+      rewrite Hsbeq in Hinibeq. lia. }
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
@@ -2093,16 +2103,21 @@ Section ProofMain.
            [SpecFsinit]'s hypothesis list once [fs_geom_ok]'s accessors have
            been taken out.  Both ride to forkret's first arm. ---- *)
     assert (Hgeomok : fs_geom_ok)
-      by exact (fs_geom_ok_of_image dk ndisk sb nib cov Hiwf Hinin Hiush
-                  Hnib0 Hinibeq Hicovin Hind Hicovmeta
+      by exact (fs_geom_ok_of_snap S Pb sb nib cov ndisk Hsbeq Hinibeq Hsnb
+                  Hicovin Hilogsub
                   Hdevq Hnibq Histq Hcovq Hlogstq Hbmapq Hsizeq Hninq).
     (* THE COLLECTION'S GEOMETRY RIDES THE SAME BLOCK (durable-disk C-8):
        it needs [fs_geom_ok] -- just produced -- and the region's width tie,
        which is the very hypothesis [fs_geom_ok_of_image] above consumes. *)
-    assert (Hpures : first_fsinit_pures dk sb)
-      by exact (first_fsinit_pures_of_image dk sb cov Hiwf Hiparse Hicovmeta
+    assert (Hpures : first_fsinit_pures dk sb Pb)
+      by exact (first_fsinit_pures_of_snap dk S Pb sb cov Hsbeq Hsnb Hihwf
+                  Hilogsub Hiagr Hislot
                   Histq Hcovq Hlogstq Hbmapq Hsizeq Hninq Hgeomok
                   ltac:(rewrite Hnibq; exact Hinibeq)).
+    (* the kit's exception set is the header's write set at the ERA's
+       [logstart]; the supply states it at the superblock's, and the tie is
+       [Hlogstq] (durable-disk lane E-himg) *)
+    iEval (rewrite -Hlogstq) in "Hkit2".
     (* kit 1's two EARLY peels: the "pr" lock's ghost goes to the printk
        group at +0x6a and the "kmem" trio to the kvm group at +0x6e, so the
        three [newlock]s that used to invent their own gnames now fill the
@@ -2150,6 +2165,7 @@ Section ProofMain.
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
     iApply (mn_grp_fs γp γs γv γd γw γtl m4 (K - 2)%nat p0 ps c0 free0 dk sb nib
+              Pb Rspent
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               Huartq Hdiskq Hgeomok Hpkc
               with "Hcg Htext Hkdata Hdev Hwire Htramp Hccaps Hcready Htl Hwaitlock

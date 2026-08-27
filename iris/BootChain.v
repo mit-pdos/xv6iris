@@ -651,7 +651,10 @@ Section BootPrimary.
          straight through to [SpecMain]'s boot arm (fs-cfg-boot.md stage
          (e)).  This chain neither reads nor opens it. *)
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
-      (ndisk : nat) :
+      (ndisk : nat)
+      (* ...and the durable snapshot the era was minted from (durable-disk
+         lane E-himg), threaded the same way *)
+      (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z) :
     reset_regs cpu_id rs ->
     (* the BOOT hart: this is what makes main's [beqz a0] take the boot path *)
     (fin_to_nat cpu_id = 0)%nat ->
@@ -665,11 +668,11 @@ Section BootPrimary.
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     (* the disk's protocol is in its not-live arm at boot *)
     virtio_live c0 = false ->
-    (* THE IMAGE HYPOTHESIS, forwarded whole (fs-cfg-boot.md stage (f)).
-       This chain still neither reads nor opens it; [ProofMain] is what
-       turns it into [FsReady.fs_geom_ok] and
+    (* THE SNAPSHOT HYPOTHESIS, forwarded whole (fs-cfg-boot.md stage (f);
+       durable-disk lane E-himg).  This chain still neither reads nor opens
+       it; [ProofMain] is what turns it into [FsReady.fs_geom_ok] and
        [FirstTok.first_fsinit_pures]. *)
-    fs_boot_image_wf dk ndisk sb nib cov ->
+    fs_boot_snap_wf dk ndisk S Pb sb nib cov ->
     kernel_text -∗
     kernel_data -∗
     boot_hart_res rs iv dq -∗
@@ -694,7 +697,8 @@ Section BootPrimary.
     (* the file system's boot-era mint and the iref-slot authority, both out
        of [BootShared.boot_shared_alloc] and both spent in
        [ProofMain.mn_grp_fs] -- see [SpecMain]'s own rows *)
-    fs_boot_supply _ _ dk sb nib cov γd γv -∗
+    fs_boot_supply _ _ dk sb nib cov γd γv Rspent Pb
+      (FsCrash.hdr_wset (FsCrash.fs_blocks dk) (FsImg.sb_logstart sb)) -∗
     (* rows (B) and (C) of the fsinit bundle -- see [SpecMain]'s own rows.
        Row (B) is VALUE-BEARING since durable-disk 1a: the era's mirror half
        at the picture of the disk it boots on, plus the swap receipt. *)
@@ -738,7 +742,7 @@ Section BootPrimary.
               (add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
               (mword_of_int 0x88000000 : mword 64) γd γv l0 b0 c0
-              dk sb nib cov ndisk
+              dk sb nib cov ndisk S Pb Rspent
               (register_lookup tlb rs) (main_deposit γd γv)
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
               Hlive Himg eq_refl

@@ -53,7 +53,6 @@ Require Import RiscvAdequacy.
 Require Import FsCrash.
 Require Import FsDurSnap.   (* [snap_ok] -- [P_fs_alloc]'s durable premise *)
 Require Import FsDurImg.    (* [img_state] / [img_snap_ok]: era 0's discharge *)
-Require Import PowerBoot.   (* [boot_gstate]: one boot state, for the era-0 extent *)
 Require Import FirstTok.    (* [fs_extent_of_image] *)
 (* THE LITERAL mkfs IMAGE, for the generic FS theorem's [Hrec] vocabulary.
    (The corollaries AT the image live in [FsAdequacyImg.v] since stage
@@ -132,44 +131,18 @@ Proof. reflexivity. Qed.
    file. *)
 Definition XV6_DISK_BYTES : nat := (2000 * 1024)%nat.
 
-(* THE ERA-WIDE IMAGE HYPOTHESIS, and read its shape carefully.
+(* THE PURE PROJECTION OF THE CRASH PREDICATE: what [FsCrash.P_fs_named]
+   says about the PHYSICAL disk it is stated over -- the durable extent's
+   geometry, the map the machine would recover to, that map's log header,
+   and that the recovered view IS a file system.
 
-   [RiscvAdequacy.riscv_power_adequacy] asks for a boot entailment at EVERY
-   [g'] with [RiscvLang.boot_facts g'] -- one per era, for arbitrarily many
-   power cycles -- and [boot_facts] says NOTHING about the disk's bytes
-   ([virtio_reset] preserves [v_disk], which is exactly why a later era's
-   disk is whatever the previous era WROTE).  So an image hypothesis about
-   the initial machine's disk cannot reach the era fupd, and the honest
-   statement quantifies over the eras: "every machine this system ever boots
-   on carries the file system's image".
-
-   THAT IS A STRENGTHENING OF WHAT THE FS COROLLARY USED TO ASSUME (one
-   equation about [g]'s own disk), and it is the price of running
-   [FsCfgBoot.fs_cfg_alloc] in the era fupd: the inode cache's configuration
-   is now minted FROM THE ERA'S ACTUAL DISK, so the boot cone's assumed
-   [namei("/")] contract is non-vacuous -- but nothing yet PROVES that xv6's
-   own writes leave the disk image-shaped, which is the durability effort
-   ([FsCrash.P_fs], claude-notes/design/crash.md).  Until it does, "boots
-   twice on the image" is a hypothesis, not a theorem.
-   claude-notes/projects/fs-cfg-boot.md records this as the (d2b) stop. *)
-Definition fs_boot_image_eras (sb : fs_sb) (nib : nat) (cov : gset Z)
-  : Prop :=
-  forall g' : gstate,
-    boot_facts g' ->
-    fs_boot_image_wf (v_disk (g'.(gdev).(dvirtio))) XV6_DISK_BYTES
-      sb nib cov.
-
-(* THE PURE PROJECTION OF THE CRASH PREDICATE (stage H0, claude-notes/
-   projects/durable-disk.md): what [FsCrash.P_fs_named] says about the
-   PHYSICAL disk it is stated over -- the durable extent's geometry, and that
-   the image recovers to a committed view that is FS-well-formed.
-
-   This is [fs_boot_image_wf]'s SHAPE, and the point of the stage: the era
-   hypothesis [fs_boot_image_eras] above ASSUMES a fact of this kind at every
-   era, while this one is EXTRACTED from the crash predicate by
+   IT IS WHAT EVERY BOOT AFTER THE FIRST KNOWS ABOUT ITS DISK, and there is
+   nothing else: it is EXTRACTED from the crash predicate by
    [FsCrash.P_fs_project], which [RiscvAdequacy.riscv_power_adequacy] runs
-   against its own [state_interp] at each PowerOn.  Stage I is what deletes
-   the assumed form; H0 only builds the channel, so both are live here. *)
+   against its own [state_interp] at each PowerOn.  An assumed "the disk is
+   still mkfs's image at every era" is refutable -- nothing proves that
+   xv6's own writes leave the disk mkfs-shaped -- and there is none: the
+   image hypothesis below is one equation about the INITIAL machine. *)
 Definition fs_boot_pure (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : Prop :=
   fs_extent cov ls XV6_DISK_BYTES /\
   exists D : gmap Z (list (bv 8)),
@@ -183,6 +156,44 @@ Definition fs_boot_pure (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : Prop :=
        off [FsCrash.P_fs]'s durable snapshot, which the commit re-establishes
        at every group commit and nothing else ever moves. *)
     exists S : fs_state_rec, snap_ok S D.
+
+(* THE THREE ERA-INDEPENDENT FACTS a boot needs about the COVERED RANGE
+   (durable-disk lane E-himg), read off the initial machine's image.
+
+   [cov] and the crash predicate's [logstart] are parameters of the whole
+   execution -- one invariant, allocated once into the fixed layer -- so
+   they are the same at every era, and a PER-ERA snapshot is a fact about
+   [S] and [D] alone and therefore cannot mention either.  Everything else a
+   later boot needs about its disk comes off [fs_boot_pure]; these three are
+   what remains, and they cost nothing because they are already conjuncts
+   (or immediate readings) of the image hypothesis at [g].
+
+   [logstart = 2] is what identifies the crash predicate's log start with
+   the era's own ([FsImg.sbo_logstart] pins the snapshot's superblock at the
+   same 2), and the log region's coverage is [1 <= b < data_start -> b ∈ cov]
+   read at the log's own blocks. *)
+Lemma cov_facts_of_image (dk : Z -> bv 8) (ndisk : nat)
+    (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z) :
+  fs_boot_image_wf dk ndisk sb nib cov ->
+  FsBoot.fs_cov_in cov ndisk
+  /\ log_region_set (FsImg.sb_logstart sb) ⊆ cov
+  /\ FsImg.sb_logstart sb = 2.
+Proof.
+  intros (Hwf & _ & _ & _ & _ & _ & Hcovin & Hcovmeta & _).
+  pose proof (FsImg.fsimg_wf_sb _ _ Hwf) as Hsb.
+  pose proof (FsImg.sbo_logstart _ Hsb) as Hls.
+  pose proof (FsImg.sbo_nlog _ Hsb) as Hnl.
+  pose proof (FsImg.sbo_inodestart _ Hsb) as Hist.
+  pose proof (FsImg.sbo_bmapstart _ Hsb) as Hbms.
+  pose proof (FsImg.sbo_ninodes _ Hsb) as Hni. unfold FsImg.ROOTINO in Hni.
+  assert (Hdv : 0 <= FsImg.sb_ninodes sb / 16) by (apply Z.div_pos; lia).
+  split; [exact Hcovin |].
+  split; [| exact Hls].
+  apply elem_of_subseteq. intros b Hb.
+  pose proof (log_region_range _ _ Hb) as Hbb.
+  unfold LOGBLOCKS in Hbb. apply Hcovmeta.
+  unfold FsImg.fs_data_start. lia.
+Qed.
 
 (* ...AND THE SAME FACT AS A TRACE HOOK.  [fs_boot_pure] above is delivered
    INTO each boot, by [riscv_power_adequacy]'s [Hproj] channel.  This is the
@@ -272,15 +283,23 @@ Section SystemBoot.
      constraint. *)
   Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z) :
     boot_facts g ->
-    fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
-      sb nib cov ->
-    (* THE PROJECTION THE POWER THEOREM PROVES AT THIS ERA (stage H0): the
-       crash predicate's own reading of the disk this boot runs on, extracted
-       from [P_fs] rather than assumed.  NOT USED YET -- it is the premise
-       stage H1 mints the FS configuration from and stage I replaces [Himg]
-       with; H0 only builds the channel and proves it carries the fact. *)
+    (* THE PROJECTION THE POWER THEOREM PROVES AT THIS ERA, AND IT IS THE
+       WHOLE OF WHAT THIS BOOT KNOWS ABOUT ITS DISK (durable-disk lane
+       E-himg).  The crash predicate's own reading of the disk this boot
+       runs on -- the durable extent, the recovery record, the header
+       invariant and the DURABLE SNAPSHOT -- extracted from [P_fs] by
+       [FsCrash.P_fs_project] rather than assumed.  There is no image
+       hypothesis at this era and there cannot be one: what a later era
+       boots on is whatever the previous era committed. *)
     fs_boot_pure cov (FsImg.sb_logstart sb)
       (v_disk (g.(gdev).(dvirtio))) ->
+    (* ...AND THE THREE FACTS ABOUT THE COVERED RANGE, which the snapshot
+       cannot carry: [cov] and the crash predicate's [logstart] are FIXED
+       across power cycles while the era's superblock is not, so these are
+       read once off the initial machine and threaded. *)
+    FsBoot.fs_cov_in cov XV6_DISK_BYTES ->
+    log_region_set (FsImg.sb_logstart sb) ⊆ cov ->
+    FsImg.sb_logstart sb = 2 ->
     (* THE CRASH SLOT'S VALUE, as a PURE equation (fs-cfg-boot.md stage
        (f), row 7 of [FirstTok.first_boot_persist]).  The boot cone needs
        [FsCrash.fs_crash_seam], and no fupd inside an era can mint it:
@@ -302,17 +321,61 @@ Section SystemBoot.
       WP (DiskLoopE gen_id : expr riscv_lang) @ ⊤ ∗
       WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤.
   Proof.
-    intros Hbf Himg Hpure Hcp. iIntros "Hres".
+    intros Hbf Hpure Hcovin Hlogsub Hls2 Hcp. iIntros "Hres".
+    (* ================================================================ *)
+    (* THE ERA'S OWN CONFIGURATION, OFF THE SNAPSHOT (durable-disk lane  *)
+    (* E-himg).  [fs_boot_pure] names the committed map [D] and an        *)
+    (* abstract state [S] it encodes; the boot mint takes a total block   *)
+    (* view, which is [FsCrash.fs_rec_view] of that map, and the era's    *)
+    (* superblock and region width are [S]'s own.  The one thing that     *)
+    (* has to be reconciled is the LOG START: the crash predicate's is a  *)
+    (* parameter and [S]'s comes out of its own superblock, and           *)
+    (* [FsImg.sbo_logstart] pins both at 2.                               *)
+    (* ================================================================ *)
+    destruct Hpure as (Hext & D & Hrec & Hhwf & S & Hsnok).
+    pose proof (sk_bytes Hsnok) as Hsnb.
+    pose proof (sk_sbok Hsnb) as Hsbok.
+    pose proof (FsImg.sbo_logstart _ Hsbok) as Hls'.
+    pose proof (FsImg.sbo_ninodes _ Hsbok) as Hni.
+    unfold FsImg.ROOTINO in Hni.
+    assert (Hdv : 0 <= FsImg.sb_ninodes (fss_sb S) / 16)
+      by (apply Z.div_pos; lia).
+    assert (Hlseq : FsImg.sb_logstart (fss_sb S) = FsImg.sb_logstart sb)
+      by (rewrite Hls' Hls2; reflexivity).
+    pose (Pb := fs_rec_view
+                  (fs_blocks (v_disk (g.(gdev).(dvirtio)))) D).
+    assert (Hbundle : fs_boot_snap_wf (v_disk (g.(gdev).(dvirtio)))
+                        XV6_DISK_BYTES S Pb (fss_sb S) (snap_nib S) cov).
+    { split; [reflexivity |].
+      split; [rewrite /snap_nib Z2Nat.id; [reflexivity | lia] |].
+      split.
+      { rewrite Hlseq (fs_recovery_restrict _ D cov _ Hrec Hhwf).
+        exact Hsnok. }
+      split.
+      { intros b. apply fs_rec_view_len;
+          [intros b'; apply fs_blocks_length
+          | intros b' bs Hbs; exact (sk_bsz Hsnb b' bs Hbs)]. }
+      split; [rewrite Hlseq; exact Hhwf |].
+      split.
+      { rewrite Hlseq. intros b Hh Hout.
+        exact (fs_rec_view_raw _ D cov _ b Hrec Hhwf Hh Hout). }
+      split.
+      { rewrite Hlseq. intros i b Hi.
+        exact (fs_rec_view_slot _ D cov _ i b Hrec Hhwf Hi). }
+      split; [exact Hcovin | rewrite Hlseq; exact Hlogsub]. }
     (* THE SEAM, ASSEMBLED FROM THE SLOT EQUATION and put in the
        intuitionistic context: it rides [FirstTok.first_boot_persist] from
        here to forkret's first arm.  Both directions are the identity once
        [Hcp] has rewritten the field away, which is exactly what "the FS's
-       predicate IS the crash predicate" means. *)
-    iAssert (fs_crash_seam cov (FsImg.sb_logstart sb)) as "#Hseam".
-    { rewrite /fs_crash_seam. iModIntro.
+       predicate IS the crash predicate" means.  It is spelled at the ERA's
+       superblock, which is where the boot chain wants it; [Hlseq] is the
+       one step. *)
+    iAssert (fs_crash_seam cov (FsImg.sb_logstart (fss_sb S))) as "#Hseam".
+    { rewrite Hlseq /fs_crash_seam. iModIntro.
       rewrite Hcp. iSplitL; iIntros "H"; iExact "H". }
-    iMod (boot_shared_alloc g XV6_DISK_BYTES sb nib cov Hbf Himg with "Hres")
-      as (Hfd Hir Hpav Hbs HF γd γv)
+    iMod (boot_shared_alloc g XV6_DISK_BYTES (fss_sb S) (snap_nib S) cov
+            S Pb Hbf Hbundle with "Hres")
+      as (Hfd Hir Hpav Hbs HF γd γv Rspent)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
         Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth &
@@ -371,9 +434,10 @@ Section SystemBoot.
         iDestruct "Hh0" as (iv) "Hh0".
         iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
-                  (v_disk (g.(gdev).(dvirtio))) sb nib cov XV6_DISK_BYTES
+                  (v_disk (g.(gdev).(dvirtio))) (fss_sb S) (snap_nib S) cov
+                  XV6_DISK_BYTES S Pb Rspent
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
-                  Himg
+                  Hbundle
                   with "Htext Hdata Hh0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
                         Hfs Hmir Hirslot Hirauth Hcert Hseam
                         Hdev Hwinv Htx Hsent Hlb Hdlab Hcfg Hclaim Hcmauth Hdone Hkpt Hkmap
@@ -431,15 +495,18 @@ Theorem xv6_power_adequacy Σ
        supplied per ERA by [RiscvLang.boot_shape], which the power thread's
        PowerOn transition establishes itself. *)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
-    (* ...AND ONE ABOUT THE DISK, WHICH IS NEW (fs-cfg-boot.md (d2b)): every
-       era boots on a machine whose disk carries the file system's image.
-       See [fs_boot_image_eras] for why this cannot be one equation about
-       [g].  It is what [FsCfgBoot.fs_cfg_alloc] reads the configuration's
-       geometry off, and the conclusion mentions none of it -- so this is
-       the price of a NON-VACUOUS boot cone, not a weaker theorem about
-       reducibility.  [FsAdequacyImg.v] discharges it at the literal mkfs
-       image. *)
-    (Himg : fs_boot_image_eras sb nib cov) :
+    (* ...AND ONE ABOUT THE DISK, AND IT IS ONE EQUATION ABOUT [g]
+       (durable-disk lane E-himg): the machine the system is switched on
+       with carries the file system's image.  NOTHING IS ASSUMED ABOUT ANY
+       LATER ERA -- what a later boot finds is whatever the previous era
+       committed, and that the committed view is still a file system is what
+       [FsCrash.P_fs]'s durable snapshot says and what [fs_boot_pure]
+       delivers into every boot.  The conclusion mentions none of it, so
+       this is the price of a NON-VACUOUS boot cone, not a weaker theorem
+       about reducibility.  [FsAdequacyImg.v] discharges it at the literal
+       mkfs image. *)
+    (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
+              sb nib cov) :
   forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2.
@@ -455,30 +522,28 @@ Proof.
      So the slot is filled with the FS record here too, and the recovery
      obligation that comes with it is DISCHARGED rather than assumed:
      [FsCrash.fs_recovery_total] says every disk image recovers to SOME
-     committed state, which is all [P_fs_alloc] needs.  Nothing about the
-     conclusion changes, nothing new is assumed, and this theorem's
-     premises are byte-identical to what they were -- what it says about a
-     power cycle is still nothing, because [D0] is existential and never
-     mentioned again.  [xv6_fs_adequacy] below is the theorem that makes a
-     DURABILITY claim, by pinning [D0] to mkfs's own recovery. *)
+     committed state, which is all [P_fs_alloc] needs.  What this theorem
+     says about a power cycle is still nothing, because [D0] is existential
+     and never mentioned again -- [xv6_trace_invariant] below is the one
+     that makes a claim at every reachable state, by instantiating [phi] at
+     the crash predicate's own pure content. *)
   destruct (fs_recovery_total (fs_blocks (v_disk (g.(gdev).(dvirtio))))
               cov (FsImg.sb_logstart sb)) as [D0 Hrec].
-  (* the durable disk's extent, read off the image at the first boot state
-     ([PowerBoot.boot_gstate g] is one; [fs_extent] says nothing about the
-     bytes) *)
+  (* the durable disk's extent, and the three ERA-INDEPENDENT facts about
+     the covered range, all read off the initial machine's image *)
+  pose proof (cov_facts_of_image _ _ sb nib cov Himg)
+    as (Hcovin & Hlogsub & Hls2).
   assert (Hext : fs_extent cov (FsImg.sb_logstart sb) XV6_DISK_BYTES).
-  { pose proof (Himg (PowerBoot.boot_gstate g)
-                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
-    destruct Hw as (Hwf & _ & _ & _ & _ & Hnibeq & Hcovin & Hcovmeta & _).
-    exact (FirstTok.fs_extent_of_image _ _ _ _ _ Hwf Hnibeq Hcovin Hcovmeta). }
+  { pose proof Himg as Hw.
+    destruct Hw as (Hwf & _ & _ & _ & _ & Hnibeq & Hcin & Hcmeta & _).
+    exact (FirstTok.fs_extent_of_image _ _ _ _ _ Hwf Hnibeq Hcin Hcmeta). }
   (* ...and the header invariant [P_fs_alloc] now carries (stage B's
      [hdr_wf]): the image's log is clean, so [hdr_wf_zero] closes it.  The
      boot state's disk IS [g]'s ([virtio_reset] keeps [v_disk]), so the
      image sweep applies by conversion. *)
   assert (Hhwf : hdr_wf (fs_blocks (v_disk (g.(gdev).(dvirtio)))) cov
                    (FsImg.sb_logstart sb)).
-  { pose proof (Himg (PowerBoot.boot_gstate g)
-                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
+  { pose proof Himg as Hw.
     destruct Hw as (Hwf & _).
     apply hdr_wf_zero. rewrite /log_hdr_bno /hdr_n.
     exact (FsImg.fsimg_wf_log _ _ Hwf). }
@@ -489,8 +554,7 @@ Proof.
      THIS IS THE ONLY PLACE THE IMAGE DECODER IS READ: every later era's boot
      re-founds the file system from the snapshot the previous era committed. *)
   assert (Hsnap0 : exists S : fs_state_rec, snap_ok S D0).
-  { pose proof (Himg (PowerBoot.boot_gstate g)
-                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
+  { pose proof Himg as Hw.
     assert (Hclean : hdr_n (fs_blocks (v_disk (g.(gdev).(dvirtio)))
                               (log_hdr_bno (FsImg.sb_logstart sb))) = 0).
     { rewrite /hdr_n /log_hdr_bno.
@@ -557,7 +621,7 @@ Proof.
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
-            (Himg g' Hbf) Hpure _).
+            Hpure Hcovin Hlogsub Hls2 _).
   reflexivity.
 Qed.
 
@@ -635,29 +699,28 @@ Theorem xv6_fs_adequacy Σ
        corollary already instantiated it at exactly this value. *)
     (Hrec : fs_recovery (fs_blocks (v_disk (g.(gdev).(dvirtio)))) D0
               cov (FsImg.sb_logstart sb))
-    (* ...and the era-wide image hypothesis the boot-era FS mint needs, at
-       THE SAME [cov] (ruling R4: the parameter stays here and the corollary
-       instantiates it at the image's own range).  [xv6_power_adequacy]'s
-       note is the whole story. *)
-    (Himg : fs_boot_image_eras sb nib cov) :
+    (* ...and the initial machine's image, at THE SAME [cov] (ruling R4: the
+       parameter stays here and the corollary instantiates it at the image's
+       own range).  [xv6_power_adequacy]'s note is the whole story. *)
+    (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
+              sb nib cov) :
   forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2.
 Proof.
-  (* the durable disk's extent, read off the image at the first boot state
-     ([PowerBoot.boot_gstate g] is one; [fs_extent] says nothing about the
-     bytes) *)
+  (* the durable disk's extent, and the three ERA-INDEPENDENT facts about
+     the covered range, all read off the initial machine's image *)
+  pose proof (cov_facts_of_image _ _ sb nib cov Himg)
+    as (Hcovin & Hlogsub & Hls2).
   assert (Hext : fs_extent cov (FsImg.sb_logstart sb) XV6_DISK_BYTES).
-  { pose proof (Himg (PowerBoot.boot_gstate g)
-                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
-    destruct Hw as (Hwf & _ & _ & _ & _ & Hnibeq & Hcovin & Hcovmeta & _).
-    exact (FirstTok.fs_extent_of_image _ _ _ _ _ Hwf Hnibeq Hcovin Hcovmeta). }
+  { pose proof Himg as Hw.
+    destruct Hw as (Hwf & _ & _ & _ & _ & Hnibeq & Hcin & Hcmeta & _).
+    exact (FirstTok.fs_extent_of_image _ _ _ _ _ Hwf Hnibeq Hcin Hcmeta). }
   (* ...and stage B's header invariant, from the image's clean log exactly
      as [xv6_power_adequacy] derives it *)
   assert (Hhwf : hdr_wf (fs_blocks (v_disk (g.(gdev).(dvirtio)))) cov
                    (FsImg.sb_logstart sb)).
-  { pose proof (Himg (PowerBoot.boot_gstate g)
-                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
+  { pose proof Himg as Hw.
     destruct Hw as (Hwf & _).
     apply hdr_wf_zero. rewrite /log_hdr_bno /hdr_n.
     exact (FsImg.fsimg_wf_log _ _ Hwf). }
@@ -668,8 +731,7 @@ Proof.
      THIS IS THE ONLY PLACE THE IMAGE DECODER IS READ: every later era's boot
      re-founds the file system from the snapshot the previous era committed. *)
   assert (Hsnap0 : exists S : fs_state_rec, snap_ok S D0).
-  { pose proof (Himg (PowerBoot.boot_gstate g)
-                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
+  { pose proof Himg as Hw.
     assert (Hclean : hdr_n (fs_blocks (v_disk (g.(gdev).(dvirtio)))
                               (log_hdr_bno (FsImg.sb_logstart sb))) = 0).
     { rewrite /hdr_n /log_hdr_bno.
@@ -732,7 +794,7 @@ Proof.
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
-            (Himg g' Hbf) Hpure _).
+            Hpure Hcovin Hlogsub Hls2 _).
   reflexivity.
 Qed.
 
@@ -793,7 +855,8 @@ Corollary xv6_power_adequacy_xv6Σ (g : gstate)
              (FsImg.sb_logstart sb) -∗
          ◇ ⌜phi g'⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
-    (Himg : fs_boot_image_eras sb nib cov) :
+    (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
+              sb nib cov) :
   forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2.
@@ -828,7 +891,8 @@ Qed.
 Corollary xv6_trace_invariant (g : gstate)
     (sb : fs_sb) (nib : nat) (cov : gset Z)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
-    (Himg : fs_boot_image_eras sb nib cov) :
+    (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
+              sb nib cov) :
   forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\

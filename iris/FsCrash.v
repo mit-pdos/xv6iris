@@ -786,6 +786,121 @@ Proof.
   split; [exact Heq |]. rewrite Heq. exact (sk_parse Hb).
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* 1c'''. THE COMMITTED VIEW AS A BLOCK VIEW (durable-disk lane E-himg).    *)
+(*                                                                          *)
+(*  [fs_recovery] delivers a MAP over the home blocks; a BOOT MINT          *)
+(*  ([FsCfgSnap.fs_cfg_alloc_snap]) takes a TOTAL block view [Pb] plus the  *)
+(*  set on which it differs from the raw disk.  These are the two readings  *)
+(*  of one thing: [fs_rec_view] is the map read off [D] where [D] has an     *)
+(*  entry and off the physical disk where it does not, and [hdr_wset] is     *)
+(*  the header's own write set -- the pending home blocks recovery is about  *)
+(*  to install, which is exactly [FsBlocks]' exception set.                  *)
+(* ---------------------------------------------------------------------- *)
+
+Definition fs_rec_view (P : Z -> list (bv 8)) (D : gmap Z (list (bv 8)))
+    (b : Z) : list (bv 8) :=
+  match D !! b with Some bs => bs | None => P b end.
+
+Definition hdr_wset (P : Z -> list (bv 8)) (ls : Z) : gset Z :=
+  list_to_set (hdr_dec (P (log_hdr_bno ls))).2.
+
+Lemma elem_of_hdr_wset (P : Z -> list (bv 8)) (ls b : Z) :
+  b ∈ hdr_wset P ls <-> b ∈ (hdr_dec (P (log_hdr_bno ls))).2.
+Proof. rewrite /hdr_wset elem_of_list_to_set //. Qed.
+
+(* the write set is a set of HOME blocks, and never block 1 -- [hdr_wf]'s
+   third clause, read as the two facts the mint's premises are stated in *)
+Lemma hdr_wset_home (P : Z -> list (bv 8)) (cov : gset Z) (ls : Z) :
+  hdr_wf P cov ls -> hdr_wset P ls ⊆ fs_home_set cov ls.
+Proof.
+  intros Hwf. apply elem_of_subseteq. intros b Hb.
+  apply elem_of_hdr_wset in Hb.
+  destruct (proj2 (proj2 Hwf) b Hb) as (Hc & Hl & _).
+  rewrite /fs_home_set elem_of_difference. split; assumption.
+Qed.
+
+Lemma hdr_wset_sb (P : Z -> list (bv 8)) (cov : gset Z) (ls : Z) :
+  hdr_wf P cov ls -> (1 : Z) ∉ hdr_wset P ls.
+Proof.
+  intros Hwf Hb. apply elem_of_hdr_wset in Hb.
+  exact (proj2 (proj2 (proj2 (proj2 Hwf) _ Hb)) eq_refl).
+Qed.
+
+(* THE DOMAIN.  Recovery installs the write set over the home blocks and the
+   write set IS home blocks, so what it produces is a ledger over exactly
+   the home set -- which is what [FsDurSnap.sk_dombelow] is read through. *)
+Lemma fs_recovery_dom (P : Z -> list (bv 8)) (D : gmap Z (list (bv 8)))
+    (cov : gset Z) (ls b : Z) :
+  fs_recovery P D cov ls -> hdr_wf P cov ls ->
+  is_Some (D !! b) <-> b ∈ fs_home_set cov ls.
+Proof.
+  intros -> Hwf.
+  destruct (decide (b ∈ (hdr_dec (P (log_hdr_bno ls))).2)) as [Hin | Hout].
+  - apply elem_of_list_lookup_1 in Hin as [i Hi].
+    rewrite (fs_install_hit P ls _ _ i b (proj1 (proj2 Hwf)) Hi).
+    split; [intros _ | intros _; by eexists].
+    destruct (proj2 (proj2 Hwf) b (elem_of_list_lookup_2 _ i _ Hi))
+      as (Hc & Hl & _).
+    rewrite /fs_home_set elem_of_difference. split; assumption.
+  - rewrite (fs_install_miss P ls _ _ b Hout) fs_restrict_lookup.
+    case_decide as Hb.
+    + split; [intros _; exact Hb | intros _; by eexists].
+    + split; [intros [v Hv]; discriminate | intros Hc; destruct (Hb Hc)].
+Qed.
+
+(* ...AND THE VIEW IS THE MAP.  [fs_rec_view] restricted to the home set is
+   [D] itself, which is what lets the mint's premise be stated at a block
+   view while the crash predicate carries a map. *)
+Lemma fs_recovery_restrict (P : Z -> list (bv 8)) (D : gmap Z (list (bv 8)))
+    (cov : gset Z) (ls : Z) :
+  fs_recovery P D cov ls -> hdr_wf P cov ls ->
+  fs_restrict (fs_rec_view P D) (fs_home_set cov ls) = D.
+Proof.
+  intros Hrec Hwf. apply map_eq. intros b.
+  rewrite fs_restrict_lookup. case_decide as Hin.
+  - destruct (proj2 (fs_recovery_dom P D cov ls b Hrec Hwf) Hin) as [bs Hbs].
+    rewrite /fs_rec_view Hbs //.
+  - destruct (D !! b) as [bs |] eqn:Hbs; [| reflexivity].
+    exfalso. apply Hin.
+    apply (proj1 (fs_recovery_dom P D cov ls b Hrec Hwf)). by exists bs.
+Qed.
+
+Lemma fs_rec_view_len (P : Z -> list (bv 8)) (D : gmap Z (list (bv 8)))
+    (b : Z) :
+  (forall b', length (P b') = BSIZE) ->
+  (forall b' bs, D !! b' = Some bs -> length bs = BSIZE) ->
+  length (fs_rec_view P D b) = BSIZE.
+Proof.
+  intros HP HD. rewrite /fs_rec_view.
+  destruct (D !! b) as [bs |] eqn:Hbs; [exact (HD b bs Hbs) | apply HP].
+Qed.
+
+(* off the exception set the view IS the physical disk... *)
+Lemma fs_rec_view_raw (P : Z -> list (bv 8)) (D : gmap Z (list (bv 8)))
+    (cov : gset Z) (ls b : Z) :
+  fs_recovery P D cov ls -> hdr_wf P cov ls ->
+  b ∈ fs_home_set cov ls -> b ∉ hdr_wset P ls ->
+  fs_rec_view P D b = P b.
+Proof.
+  intros Hrec Hwf Hhome Hout.
+  rewrite /fs_rec_view
+    (fs_recovery_untouched P D cov ls b Hrec Hhome
+       ltac:(intros Hc; apply Hout, elem_of_hdr_wset, Hc)) //.
+Qed.
+
+(* ...and ON it, it is the LOGGED value -- log slot [i], for the entry the
+   header names at [i].  That is [SpecFsinit]'s exception/slot tie. *)
+Lemma fs_rec_view_slot (P : Z -> list (bv 8)) (D : gmap Z (list (bv 8)))
+    (cov : gset Z) (ls : Z) (i : nat) (b : Z) :
+  fs_recovery P D cov ls -> hdr_wf P cov ls ->
+  (hdr_dec (P (log_hdr_bno ls))).2 !! i = Some b ->
+  fs_rec_view P D b = P (log_slot_bno ls i).
+Proof.
+  intros -> Hwf Hi.
+  rewrite /fs_rec_view (fs_install_hit P ls _ _ i b (proj1 (proj2 Hwf)) Hi) //.
+Qed.
+
 (* Two congruences.  The first needs no uniqueness (only the slot contents
    move); the second lets the home map move too, at keys the write set names,
    and that is where NoDup is unavoidable. *)
