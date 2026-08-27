@@ -79,6 +79,7 @@ Require Import SchedCtx.
 Require Import WaitInv.
 Require Import SpecProcinit.
 Require Import SpecForkretPark.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park's deposit *)
 Require Import ParkCap.   (* [park_token] / [park_token_park] -- the park, as a resource *)
 Require Import UsertrapRes SyscParkEnv FsReady FileInv FirstTok DiskInv ProcDefs FsCfg.   (* the park's vocabulary *)
 Require Import SpecAcquire SpecRelease.
@@ -277,12 +278,16 @@ Section ProofKforkB5.
     iAssert (park_own N) with "[Hbsl]" as "Hown_park".
     { rewrite /park_own. iExact "Hbsl". }
     iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
+    (* the parker's own thread-of-control token, borrowed and handed back
+       -- see [ProofUserinit]'s note at the same call. *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrunpk Hcgpk]".
     iMod (park_token_park N rest Vc Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hpinv Hglobp Hmk Hstack Henv Hown_park [Hks Hctx Hpriv Hfd Hirsp]")
-      as "Hpctx".
+            with "Hrunpk Htoken Htext Hwire Htramp Hpinv Hglobp Hmk Hstack Henv Hown_park [Hks Hctx Hpriv Hfd Hirsp]")
+      as "[Hrunpk Hpctx]".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirsp".
       (* the two files each define forkret's entry; the constants are equal *)
       iExact "Hctx". }
+    iDestruct ("Hcgpk" with "Hrunpk") as "Hcg".
     iDestruct "Hheld" as "(Htok & Hpstcell & Hpwhole & Hpchan & Hppub)".
     iEval (rewrite kfkb5_pwhole_used) in "Hpwhole".
     iDestruct "Hpwhole" as "[Hplock Hpclaim]".

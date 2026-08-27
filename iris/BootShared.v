@@ -70,6 +70,7 @@ Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsImg.          (* the image sweeps' vocabulary *)
 Require Import FsCfgBoot.      (* [fs_cfg_alloc] and the two boot kits *)
 Require Import TsoCtx.
+Require Import CtxRecord.   (* [ctx_parked_inv]: the deposit record's token *)
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:
@@ -1368,11 +1369,26 @@ Section BootAlloc.
       (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) g
     ={⊤}=∗ ∃ (HFd : fdslotG Σ) (HIr : irefslotG Σ) (HPav : pavG Σ)
              (HBs : bioslotG Σ)
-             (HF : fileG Σ) (γd : uart_names) (γv : disk_names),
+             (HF : fileG Σ) (γd : uart_names) (γv : disk_names)
+             (* THE DEPOSIT'S CONTEXT, MINTED HERE (tso-absorb-memo.md §5).
+                [started_inv] is an [inv] over a ξ-INDEXED body that ALL
+                EIGHT harts must read, each at its own [own_context_boot]
+                identity -- the same shape [BioInv.buf_escrow] has one layer
+                down, and one ruling covers both.  The escrow can ∃-close
+                its context inside its own invariant; this one CANNOT (§5's
+                two-open [▷] problem), so the context is NAMED: minted here
+                with the pure [TsoCtx.ctx_parked_alloc], published as
+                [CtxRecord.ctx_parked_inv] inside the deposit itself, and
+                returned so the chain can state its rows at it. *)
+             (xid : CtxId),
       ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
       kernel_text ∗ kernel_data ∗
-      started_inv (main_deposit γd γv) ∗
+      started_inv (main_deposit xid γd γv) ∗
+      (* the record's own token, published so the BOOT hart can deposit into
+         it ([ProofMain.mn_grp_started]); the SECONDARIES get their copy out
+         of [main_deposit] itself, which carries it as a conjunct. *)
+      ctx_parked_inv xid ∗
       dev_inv γd γv ∗ wire_inv ∗ crash_inv ∗ gen_cert ∗
       (* --- one bundle per hart --- *)
       ([∗ list] c ∈ enum CPU,
@@ -1664,18 +1680,23 @@ Section BootAlloc.
             (fun c => register_lookup sig_meip (g.(gregs) c)) with "[Hpins]")
       as "#Hwinv".
     { iApply RiscvAdequacy.big_sepL_enum_to_set. iExact "Hpins". }
+    (* ---- the deposit's own context, and the token that lets eight harts
+           absorb from it ---- *)
+    iMod (ctx_parked_alloc) as (xid) "Hxpk".
+    iMod (ctx_parked_inv_alloc ⊤ xid 0 with "Hxpk") as "#Hxinv".
     (* ---- the handover channel, at the settled payload ---- *)
-    iMod (started_inv_alloc ⊤ (main_deposit γd γv) with "Hstartcell")
+    iMod (started_inv_alloc ⊤ (main_deposit xid γd γv) with "Hstartcell")
       as "#Hstarted".
     (* ================================================================ *)
     (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- now leaves in the
        postcondition: userinit is proven and its contract
        ([SpecUserinit.v]) takes exactly this. *)
-    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC), γd, γv.
+    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC), γd, γv, xid.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].
     iSplitR; [iExact "Hstarted" |].
+    iSplitR; [iExact "Hxinv" |].
     iSplitR; [iExact "Hdev" |].
     iSplitR; [iExact "Hwinv" |].
     iSplitR; [iExact "Hcinv" |].

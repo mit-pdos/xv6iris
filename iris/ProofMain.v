@@ -110,6 +110,8 @@ Require Import LogDefs LogInv.
 Require Import FsReady FirstTok.
 Require Import WpLockAt.   (* [newlock_at] / [lock_free_tok] *)
 Require Import BioInitAt.  (* [bio_init_at] / [bio_free_tok] / [buf_raw] *)
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: bio_init_at's deposit *)
+Require Import CtxRecord.   (* [ctx_parked_inv]: the started deposit's record *)
 Require Import IcacheBoot IcacheEscrow InodeInv.
 Require Import IcacheRef.
 Require Import IrefSlots FsCfg FsBlocks.
@@ -1477,11 +1479,18 @@ Section ProofMain.
     (* nothing between +0x92 and +0x9e touches a buffer.  Same idiom as the *)
     (* inode-cache interlude at the next seam.                             *)
     (* =================================================================== *)
+    (* THE RUNNING TOKEN IS BORROWED HERE.  Every escrow is a PARKED RECORD  *)
+    (* now, so its initial content is [TsoCtx.ctx_deposit]ed into the        *)
+    (* freshly minted context that record carries -- and a deposit runs at   *)
+    (* the depositor's own authority.  The token rides in [sie_cap]'s fourth *)
+    (* conjunct ([SieCapCtx.sie_cap_gpr_own_ctx_acc]) and goes straight back.*)
     iApply fupd_wp.
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrunbio Hcgbio]".
     iMod (bio_init_at fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) ⊤
             Hcov0
-            with "Hbiotok Hbclk Hbcnm Hbccpu Hbfresh Hbpay Hblru Hblkpool")
-      as "[#Hbioctx Hbslots]".
+            with "Hrunbio Hbiotok Hbclk Hbcnm Hbccpu Hbfresh Hbpay Hblru Hblkpool")
+      as "(Hrunbio & #Hbioctx & Hbslots)".
+    iDestruct ("Hcgbio" with "Hrunbio") as "Hcg".
     iModIntro.
     (* ---- +0x92 jal iinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x92)) (mword_of_int 1 : mword 5)
@@ -1823,6 +1832,7 @@ Section ProofMain.
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (pd pav pu : mword 64)
       (root : mword 44) (pas : nat -> mword 44)
+      (xid : CtxId)
       (P : iProp Σ) `{!Persistent P} :
     (* the scheduler this block tail-calls enables interrupts at its loop head
        and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
@@ -1835,15 +1845,17 @@ Section ProofMain.
     cpu_own 0 false p0 false ∅ -∗
     trap_csrs KT1 -∗
     started_inv P -∗
+    ctx_parked_inv xid -∗
     □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
          (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
-         procs_inv γs' -∗
+         procs_inv (XI := xid) γs' -∗
          console_caps γd -∗
          is_lock γk' d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γv pd' pav' pu') -∗
-         disk_geom γv pd' pav' pu' -∗
+         disk_geom (XI := xid) γv pd' pav' pu' -∗
          kpt_inv root' -∗
-         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
+         ctx_word_pointsto xid
+           (mword_of_int KernelSyms.kernel_pagetable : mword 64) DfracDiscarded
            (zero_extend' 64 (concat_vec root' (zeros' 12 : mword 12))) -∗
          kmap_at tramp_vpn tramp_ppn KP_rx -∗
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas' i) KP_rw) -∗
@@ -1861,12 +1873,55 @@ Section ProofMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hp0.
-    iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv #Hwand".
+    iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv #Hpkinv #Hwand".
     iIntros "#Hpenv #Hpinv #Hccaps #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
+    (* ================================================================== *)
+    (* THE DEPOSIT.  Everything main built is at THIS hart's context, and   *)
+    (* the record eight harts will read it from is at [xid] -- so the three *)
+    (* ξ-indexed rows ([procs_inv]'s per-slot [is_kstack], [disk_geom]'s    *)
+    (* three ring-page pointers, the [kernel_pagetable] word) are handed    *)
+    (* over with [TsoCtx.ctx_deposit], which raises the record's stamp to    *)
+    (* cover them.  The other six are ξ-free or closed handles and pass      *)
+    (* straight through the □-wand.                                          *)
+    (*                                                                       *)
+    (* IT HAPPENS HERE AND NOT IN THE WAND, and that is not a preference:    *)
+    (* [ctx_deposit] CONSUMES an [own_context], and nothing under a [□] can  *)
+    (* consume anything.  A deposit runs at the top level or not at all      *)
+    (* (§0.16′ step (ii)'s lesson, restated one layer up).  This is the last *)
+    (* point on main's boot arm that still holds its [sie_cap_gpr], hence     *)
+    (* its own thread-of-control token.                                      *)
+    (* ================================================================== *)
+    iApply fupd_wp.
+    iInv "Hpkinv" as ">Hpk" "Hclosepk".
+    iDestruct "Hpk" as (Td) "Hpk".
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    (* THE OBLIGATION IS APPLIED AS A TERM.  Instance search does not reach
+       through the [∗] to a payload whose rows are named at an explicit ξ
+       (§0.15′, measured: [Hint Extern] does not rescue it either), so the
+       three instances are composed by hand. *)
+    iMod (ctx_deposit
+            (λ ξ : CtxId,
+               procs_inv (XI := ξ) γs ∗
+               disk_geom (XI := ξ) γv pd pav pu ∗
+               ctx_word_pointsto ξ
+                 (mword_of_int KernelSyms.kernel_pagetable : mword 64)
+                 DfracDiscarded
+                 (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))))%I
+            (CtxMorph0 :=
+               ctx_morph_sep _ _ (procs_inv_morph γs)
+                 (ctx_morph_sep _ _ (disk_geom_morph γv pd pav pu)
+                    (ctx_morph_word _ _ _ _)))
+            cur_ctx xid Td with "Hrun Hpk [Hpinv Hgeom Hkptp]")
+      as "[Hrun Hdres]".
+    { iFrame "Hpinv Hgeom Hkptp". }
+    iDestruct "Hdres" as (Td') "(_ & Hpk & #Hpinvd & #Hgeomd & #Hkptpd)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iMod ("Hclosepk" with "[Hpk]") as "_". { iNext. iExists Td'. iExact "Hpk". }
+    iModIntro.
     (* the deposit itself: everything main built, through the □-wand *)
     iAssert P as "#HP".
     { iApply ("Hwand" $! γpr γs γk pd pav pu root pas
-                with "Hpenv Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx"). }
+                with "Hpenv Hpinvd Hccaps Hdlock Hgeomd Hkinv Hkptpd Htramp Hkstx"). }
     (* The release sequence.  Note the shape: the address is materialized
        BEFORE the barrier and the store is the compressed [c.sw], so the
        fence separates the whole deposit from the store alone -- and it is
@@ -2009,9 +2064,10 @@ Section ProofMain.
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
+      (xid : CtxId)
       (P : iProp Σ) `{!Persistent P}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 xid P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
     intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Himg Hp0.
@@ -2023,7 +2079,7 @@ Section ProofMain.
                       Hicovin & Hicovmeta & Hicovdata & Hiparse & Hiush & Hind & Hileq).
     assert (Hcov0 : (0 : Z) ∉ cov) by exact (FsBoot.fs_cov_in_0 _ _ Hicovin).
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
-    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
+    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hpkinv #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
     iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
     iIntros "#Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
@@ -2181,8 +2237,8 @@ Section ProofMain.
     { iApply bi.later_intro. iExact "Hkvs". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started fsc_printk γk fsc_kalloc γs γd γv m5 (K - 2)%nat p0 pd pav pu
-              root pas P ltac:(lia) Hp0
-              with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hwand Hpenv
+              root pas xid P ltac:(lia) Hp0
+              with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hpkinv Hwand Hpenv
                     Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
     (* fold the boot cells and the freshly built handler resource into the
        [trap_csrs] the scheduler consumes. *)

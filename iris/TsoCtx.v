@@ -588,6 +588,22 @@ Section ctx.
     iIntros (ξ ξ') "Hd H". by iApply (ctx_morph with "Hd H").
   Qed.
 
+  (* THE DISJUNCTION.  A payload that is one of several arms -- the bcache
+     escrow's [buf_parked ∨ buf_chain ∨ buf_mid], [FirstTok.first_tok]'s two
+     arms, [ProcInv.ofile_slot]'s -- transports arm by arm, exactly as the
+     guarded slot above does.  (Kit obligation: derivable from [ctx_morph]
+     alone, like [ctx_morph_big_sepL]; the twin's image is proved at
+     [ZZAbsorbProbe.ctx_morph_or].) *)
+  Global Instance ctx_morph_or (R1 R2 : CtxId → iProp Σ) :
+    CtxMorph R1 → CtxMorph R2 → CtxMorph (λ ξ, R1 ξ ∨ R2 ξ)%I.
+  Proof.
+    iIntros (H1 H2 ξ ξ') "Hd [HR|HR]".
+    - iDestruct (ctx_morph with "Hd HR") as "[Hd HR]".
+      iFrame "Hd". iLeft. iExact "HR".
+    - iDestruct (ctx_morph with "Hd HR") as "[Hd HR]".
+      iFrame "Hd". iRight. iExact "HR".
+  Qed.
+
   (* the word cell's transport obligation, once for every payload *)
   Global Instance ctx_morph_word (kt : ktier) a dq w :
     CtxMorph (λ ξ, ctx_word_pointsto (KTR := kt) ξ a dq w).
@@ -627,6 +643,38 @@ Section ctx.
     iDestruct (ctx_morph ξ ξc with "[] HR") as "[_ HR]".
     { rewrite ctx_dom_unseal /ctx_dom_def. done. }
     iModIntro. iFrame "Hrun". iExists T. iFrame "Hpk HR". done.
+  Qed.
+
+  (* THE ABSORB: [ctx_deposit]'s dual.  A RUNNING context claims a
+     morphable payload OUT of a parked record, against the same stable
+     pair [ctx_resume] consumes -- [hart_view_lb K] with [T ≤ K].  The
+     parked token is handed straight back AT THE SAME STAMP, which is what
+     makes the claim REPEATABLE: a persistent record (the boot deposit) is
+     read once per hart, and an escrow is opened and re-closed on every
+     bread/brelse/recycle.  Contrast [ctx_resume], which CONSUMES the token
+     and can therefore fire once.
+
+     It is INTERP-FREE, and that is the structural point: the twin's mint
+     [ctx_dom_of_parked] needs [tso_interp] only to manufacture the
+     comparison [T ≤ tvs h]; supply the comparison as a premise and the
+     interp drops out.  The premise is HART-LOCAL -- it says nothing about
+     the source context -- so an opener that knows nothing about the record
+     can still supply it, which is why a bare [inv] (no acquire, hence no
+     honest [ctx_dom] producer) can host ξ-indexed data under this law and
+     could not under a [ctx_dom] premise.
+     ([TsoCtxTwin2] image: [ZZAbsorbProbe.twin_absorb], proved at the real
+     construction; the bound-raise is [Nat.max B T ≤ Nat.max K₀ K] and the
+     receipt is [view_lb_max].) *)
+  Lemma ctx_absorb `{CID : CpuId} (R : CtxId → iProp Σ) `{!CtxMorph R}
+      (ξ ξ' : CtxId) (T K : nat) :
+    (T ≤ K)%nat →
+    own_context ξ' -∗ hart_view_lb K -∗ ctx_parked ξ T -∗ R ξ ==∗
+    own_context ξ' ∗ ctx_parked ξ T ∗ R ξ'.
+  Proof.
+    iIntros (HTK) "Hrun HK Hpk HR".
+    iDestruct (ctx_morph ξ ξ' with "[] HR") as "[_ HR]".
+    { rewrite ctx_dom_unseal /ctx_dom_def. done. }
+    iModIntro. iFrame "Hrun Hpk HR".
   Qed.
 
 End ctx.

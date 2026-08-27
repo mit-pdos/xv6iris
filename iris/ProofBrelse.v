@@ -80,6 +80,9 @@ Require Import KernelText.
 Require Import InstrBytes.
 Require Import BufOwn BcacheInv BioInv.
 Require Import CodeBrelse.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the escrow
+                               absorb/deposit sites need the thread's own
+                               [own_context], which rides in [sie_cap]. *)
 Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecBrelse.
@@ -215,7 +218,7 @@ Section ProofBrelse.
 
   (* the escrow, in the raw [inv] shape [iInv] recognizes *)
   Local Lemma buf_escrow_inv (bn : bio_names) (V : bio_view Σ) (k : nat) :
-    buf_escrow bn V k -∗ inv bioN (buf_escrow_body bn V k).
+    buf_escrow bn V k -∗ inv bioN (buf_escrow_rec bn V k).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -641,55 +644,45 @@ Section ProofBrelse.
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.brelse + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
-    (* ===== +0x02 sd ra,24(sp) -- THE PARK ===== *)
-    (* the store's ADDRESS CLAIM, read straight off the frame slot that is
-       about to be deposited: [wordw_claim_of]'s conclusion is persistent, so
-       [Hr24] is still here for the atomic update below. *)
-    (* the claim is read off the engine's RAW window; the frame slot is the
-       flipped [↦₈] ([StackOwn] is thread data), so the slot crosses by name
-       ([WpSconfMem.wordw8_ctx]) and crosses straight back. *)
-    iEval (rewrite -(wordw8_ctx (KTR2 := KT1))) in "Hr24".
-    iDestruct (wordw_claim_of (KTR := KT1) 8
-                 (add_vec (R1 !!! Regidx csp_rs1)
-                    (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
-                 (DfracOwn 1) vr24 ltac:(lia) with "Hr24") as "#Hclr24".
-    iEval (rewrite (wordw8_ctx (KTR2 := KT1))) in "Hr24".
-    iApply (wp_csdsp_au_s_sconf (mword_of_int (KernelSyms.brelse + 0x02)) (mword_of_int 3 : mword 6) Rra
-              R1 (K - 4)%nat
-              ((add_vec (R1 !!! Regidx csp_rs1)
-                  (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
-                 ↦₈[KT1] (R1 !!! Regidx Rra)) ∗
-               (∃ q : Qp, bref_tok bn k q ∗
-                  b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
-                  b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗ bown bn k))%I
-              (⊤ ∖ ↑minstretN ∖ ↑bioN) b p
-              ltac:(solve_ndisj)
-              with "Hcg Hpc [] [] [Hr24 Hvalid Hbdev Hbuf Hbpayload]").
+    (* ===== THE PARK, and then +0x02 sd ra,24(sp) =====
+
+       THE PARK NO LONGER RIDES THE STORE'S ATOMIC UPDATE, and it cannot:
+       the escrow is a PARKED RECORD, so depositing the buffer's bytes back
+       into it needs [TsoCtx.ctx_deposit], whose first premise is the
+       depositor's own [own_context] -- and inside a [wp_..._au_...] the
+       [sie_cap_gpr] that carries it has already been handed to the WP leaf.
+       There was never a reason for the coupling: the swap is a self-contained
+       ghost step (open, swap, close, all in one fupd) and the store it was
+       bundled with is to this thread's PRIVATE stack frame, so moving it one
+       ghost step earlier is the same program point.  With the swap hoisted
+       the store is the plain [wp_csdsp_s_sconf] its three successors at
+       +0x04/+0x06/+0x08 already use.
+
+       This is the SECOND of the two opens that move [BufOwn.buf_own]'s
+       bytes, hence the second (and last) that absorbs -- see
+       [ProofBread]'s checkout for the other, and [ProofBreadParts]'
+       [buf_escrow_inv] for why the recycler's four do not.
+       M2 DEBT: [hart_view_lb K ∗ ⌜T ≤ K⌝] at [K := T], via the SC shim. *)
+    iApply fupd_wp.
+    iInv "Hesc" as ">Hrec" "Hclose".
+    iDestruct "Hrec" as (xie Te) "[Hpke Hbody]".
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iDestruct (TsoCtxShim.hart_view_lb_any Te) as "#HKe".
+    iMod (escrow_absorb bn V k xie Te Te ltac:(lia)
+            with "Hrun HKe Hpke Hbody") as "(Hrun & Hpke & Hbody)".
+    iDestruct (escrow_swap_park bn V k true dev bno bs
+                 with "Hbody Hvalid Hbdev Hbuf Hbpayload") as "[Hbody Hpark]".
+    iMod (escrow_deposit bn V k xie Te with "Hrun Hpke Hbody") as "[Hrun Hres]".
+    iDestruct "Hres" as (Te') "[Hpke Hbody]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iMod ("Hclose" with "[Hpke Hbody]") as "_".
+    { iNext. iApply (buf_escrow_rec_intro bn V k xie Te' with "Hpke Hbody"). }
+    iModIntro.
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.brelse + 0x02)) (mword_of_int 3 : mword 6) Rra
+              R1 (K - 4)%nat vr24 b with "Hcg Hpc [] Hr24").
     { iApply (bri_02 with "Htext"). }
-    { iExact "Hclr24". }
-    (* The escrow body is NOT timeless any more: the parked arm's [buf_pay]
-       carries the view's opaque payload ([bv_clean] / [bv_dirty]), so the
-       [▷] the [iInv] hands out cannot be stripped up front.  It does not
-       have to be: run the swap UNDER the later ([iNext] strips the body's
-       [▷] and weakens the non-later inputs), give the invariant back its
-       [▷ body] as usual, and strip the later off the WITHDRAWN bundle --
-       which is a reference fragment, two word cells and a lock token, all
-       timeless -- with one [iMod] inside the accessor's own fupd. *)
-    { iInv "Hesc" as "Hbody" "Hclose".
-      (* [escrow_swap_park_now] does the [iNext] AND the withdrawn bundle's
-         later-strip inside BioInv, where the context is five hypotheses
-         wide.  Done here it was 34 s in one [iMod] -- the cost is the
-         CONTEXT, not the bundle (optimization.md). *)
-      iMod (escrow_swap_park_now _ bn V k true dev bno bs
-              with "Hbody Hvalid Hbdev Hbuf Hbpayload") as "[Hbody Hpark]".
-      iModIntro. iExists vr24.
-      (* (the flip-era [ctx_word_of_mem] here is gone: BOTH the frame slot and
-         the wrapper's atomic update are the flipped [↦₈] now.) *)
-      iFrame "Hr24".
-      iIntros "Hcell". iEval (rgpeel) in "Hcell".
-      iMod ("Hclose" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
-      iModIntro. iFrame "Hcell Hpark". }
-    iIntros (CID2 Hs2) "Hcg Hpc [Hr24 Hpark]".
+    iIntros (CID2 Hs2) "Hcg Hpc Hr24".
+    iEval (rgpeel) in "Hr24".
     iDestruct "Hpark" as (q) "(Hrtok & Hrdev & Hrbno & Hbown)".
     iEval (rewrite Hb1 HR1ra) in "Hr24".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.brelse + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.brelse + 0x04))

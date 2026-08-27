@@ -523,11 +523,15 @@ Section FsBoot.
   (* THE BUNDLE a boot client applies.  [bio_init]'s premises are copied
      verbatim, in order; the pool bundle it also wants is what this lemma
      manufactures out of the mint. *)
-  Lemma fs_boot_bundle `{XI : CurCtx} (γv : disk_names) (dk : Z -> bv 8) (ndisk : nat)
+  Lemma fs_boot_bundle `{XI : CurCtx} `{CID : RiscvLang.CpuId}
+      (γv : disk_names) (dk : Z -> bv 8) (ndisk : nat)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (γlk γtp : gname)
       (E : coPset) :
     fs_cov_in cov ndisk ->
     log_geom_ok cov logstart ->
+    (* borrowed and handed straight back: [bio_init]'s escrows are parked
+       records and their initial content is deposited into them. *)
+    own_context cur_ctx -∗
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗
     add_vec bcache_addr (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈
@@ -548,6 +552,7 @@ Section FsBoot.
        bundle runs: [BioDefs.bslots_alloc] mints authority and fragments
        together at the era, and the fragments come straight back out below. *)
     bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
+    own_context cur_ctx ∗
     ∃ (bn : bio_names) (γfs : fs_names),
       ⌜fs_link γfs = γlk⌝ ∗ ⌜fs_top γfs = γtp⌝ ∗
       bio_ctx bn (fs_view γfs γv dev cov) ∗ bslots BSLOTS_FS ∗
@@ -568,7 +573,7 @@ Section FsBoot.
       ([∗ set] b ∈ fs_home_set cov logstart,
          fsblock (fs_bytes γfs) b (fs_blocks dk b)).
   Proof.
-    iIntros (Hcov Hgeom) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hm Hsa Hsf".
+    iIntros (Hcov Hgeom) "Hrun Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hm Hsa Hsf".
     assert (Hnc0 : (0 : Z) ∉ cov) by (exact (fs_cov_in_0 cov ndisk Hcov)).
     destruct Hgeom as [Hcovok Hsub].
     iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov logstart) dev
@@ -579,8 +584,10 @@ Section FsBoot.
             with "Hm")
       as (γfs) "(%Hlk & %Htp & Hpool & HaL & HaD & #Hinv & Hdty & Hrest & Hlog)".
     iMod (bio_init (fs_view γfs γv dev cov) E Hnc0
-            with "Hlkw Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf") as (bn) "[Hctx Hsl]".
-    iModIntro. iExists bn, γfs.
+            with "Hrun Hlkw Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf")
+      as "[Hrun Hbio]".
+    iDestruct "Hbio" as (bn) "[Hctx Hsl]".
+    iModIntro. iFrame "Hrun". iExists bn, γfs.
     iSplitR; [done |]. iSplitR; [done |].
     (* the mint's [fs_chalf] half is [cov] minus the home set, i.e. the log
        region itself -- the [∖∖] cancels because the region is covered *)

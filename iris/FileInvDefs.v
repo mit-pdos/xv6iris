@@ -13,7 +13,10 @@
    ξ-indexed body, hence [ftable_res] and [FileInv.is_ftable] unable to cross a
    context -- which is what blocked [ProofForkretPark.forkret_park_paid]'s
    deposit into a freshly minted child context (§0.15′ step 5, MEASURED:
-   [NOTCONV is_ftable], [NO-INSTANCE CtxMorph is_ftable]).
+   [NOTCONV is_ftable], [NO-INSTANCE CtxMorph is_ftable]).  It was ONE of
+   two such invariants; the other was [BioInv.buf_escrow], which could not
+   be fixed this way (its ξ-dependence is the buffer's DATA) and is a PARKED
+   RECORD instead -- tso-port.md §0.17′, where the park closes.
 
    IT ALSO DID NOT WORK ON ITS OWN TERMS.  The transport memo's ruling 2 --
    "give [fpnames] an [fp_ctx : CtxId] and state the [a_fip] row at

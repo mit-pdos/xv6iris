@@ -1677,12 +1677,12 @@ Proof. rewrite /park_globals. apply _. Qed.
    by [ctx_morph_word] applied AS A TERM (instance search does not do the ∃
    unification -- MEASURED).
 
-   THIS INSTANCE IS THE RECORD OF WHAT IS PAYABLE.  Of the six rows
-   [ProofForkretPark.forkret_park_paid] must deposit into the child's
-   context, FIVE are: this one, [SchedCtx.procs_inv], [ProcDefs.is_kstack],
-   [SwtchCtx.ctx_cells] and [StackOwn.stack_own] (the last four resolve by
-   instance search alone).  The sixth, [ProcInv.proc_priv], is REFUTED --
-   see the comment block in [ProofForkretPark.v]. *)
+   THIS INSTANCE IS THE RECORD OF WHAT IS PAYABLE.  ALL SIX rows
+   [ProofForkretPark.forkret_park_paid] deposits into the child's context
+   are: this one, [SchedCtx.procs_inv], [ProcDefs.is_kstack],
+   [SwtchCtx.ctx_cells], [StackOwn.stack_own] -- and, since the bcache
+   escrow became a PARKED RECORD (tso-port.md §0.17′), [ProcInv.proc_priv]
+   too ([ProcInv.proc_priv_morph]).  The park is [Qed]. *)
 Global Instance park_globals_morph `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
     !irefslotG Σ, !pavG Σ} `{GEN : GenId} (γs : list gname) (γft γf : gname) :
   CtxMorph (λ ξ0 : CtxId, park_globals ξ0 γs γft γf).

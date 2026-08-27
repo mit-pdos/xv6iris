@@ -184,7 +184,17 @@ Definition forkret_park_pkg
           forkret pays both instead (SpecForkret.v, "...AND THE CLOSER IS
           HANDED [first_done]") and the builder here owes only the
           persistent rows neither supplies. *)
-   (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (V' : pprivate),
+   (* THE LATER IS ON THIS ROW ALONE, and it is the tranche's one shape
+      lesson (tso-port.md §0.16′ step (ii)).  The park must DEPOSIT three of
+      this package's rows -- [procs_inv], [park_globals], [stack_own] --
+      into the child's freshly minted context, [TsoCtx.ctx_deposit] is an
+      update whose [CtxMorph] wants its [ctx_dom] AT THE TOP LEVEL, and
+      [ctx_dom] is not persistent, so NOTHING UNDER A [▷] CAN BE DEPOSITED
+      and there is no ▷-crossing to be had.  Only the CLOSER needs the
+      later, and for the FIXPOINT's sake rather than the proof's: it is the
+      only row that names [W] (= [ParkCap.park_token]), so it is the only
+      row [park_token_F_contractive] needs guarded. *)
+   ▷ (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (V' : pprivate),
       ⌜pv_upt V' = pt'⌝ -∗
       ⌜ud_data pt' = ud_pas pt'⌝ -∗
       ⌜proc_pt_wf pt'⌝ -∗
@@ -233,19 +243,27 @@ Definition forkret_park_paid_body
        [KSTACK_AV = 342] too, which is not a coincidence: a caller that
      hands over a whole free kernel stack satisfies this exactly. *)
   (K_usertrap <= av)%nat ->
-  (* THE PACKAGE IS TAKEN UNDER A LATER.  The proof uses none of it before
-     the context's own [▷] ([ProofForkretPark]'s [iNext]), and that is what
-     lets [ParkCap.park_token] -- whose cap this is -- be a guarded
-     fixpoint: the package's closer names the token, and a parker holds the
-     token only under a later. *)
-  ⊢ ▷ forkret_park_pkg URes W γs γft γf pa ks pid av -∗
+  (* THE PACKAGE IS NO LONGER TAKEN UNDER A LATER -- its CLOSER ROW is
+     (see [forkret_park_pkg] above), which is all the fixpoint ever needed.
+     Since the [XIp] reshape a parked record's rows are the PARKED thread's
+     own ([SwtchCtx.valid_context_pre]), so this proof must hand six rows
+     over at the child's freshly minted [XIc] with [TsoCtx.ctx_deposit] --
+     and a deposit runs at the top level or not at all.
+     THE PARKER'S OWN [own_context] IS THE OTHER HALF OF THAT.  It is
+     [ctx_deposit]'s first premise and no persistent surrogate can replace
+     it: the depositor's authority over its own context is exactly what
+     bounds the deposited facts' timestamps.  Both parkers hold one inside
+     their [sie_cap_gpr] ([SieCapCtx.sie_cap_gpr_own_ctx_acc]); it is
+     BORROWED and handed straight back, so nothing downstream changes. *)
+  ⊢ own_context cur_ctx -∗
+    forkret_park_pkg URes W γs γft γf pa ks pid av -∗
     ▷ W -∗
     is_kstack pa ks -∗
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
     proc_priv γf pa pid V -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
-    |==> ▷ proc_ctx γs pa.
+    |==> own_context cur_ctx ∗ ▷ proc_ctx γs pa.
 
 Module Type FORKRET_PARK_PAID.
   (* the residue is the module-type parameter it is everywhere else *)

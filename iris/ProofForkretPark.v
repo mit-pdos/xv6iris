@@ -76,6 +76,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import RiscvExtras.
+Require Import StackOwn.   (* [stack_own] / [stack_own_morph]: the child's stack row *)
 Require Import IntrDefs.
 Require Import ProcGeom.
 Require Import ProcDefs.
@@ -177,7 +178,7 @@ Proof.
   cbv beta delta [forkret_park_paid_body].
   intros Hrest [j [Hpa Hj]] Hut.
   subst pa.
-  iIntros "Hpkg HW #Hks Hctx Hpriv Hfd Hirsp".
+  iIntros "Hrun Hpkg HW #Hks Hctx Hpriv Hfd Hirsp".
   (* THE CHILD'S THREAD OF CONTROL IS BORN HERE -- PARKED (tso-port ruling
      2d.4.1, realized by the checkpoint-0.5 repair).  A forked process's
      kernel thread is a NEW thread that has never run, so its mint is the
@@ -186,115 +187,100 @@ Proof.
      here.  The token goes straight into the record it is building; the
      dispatcher's resume ([TsoCtx.ctx_resume], via the p->lock acquire's
      view receipt) is what first ties it to a hart.  From there it moves
-     only by the swtch exchange, until a zombie park drops it.  The mint
-     must precede the [iModIntro] below: that is the only update this
-     proof has. *)
+     only by the swtch exchange, until a zombie park drops it. *)
   iMod (ctx_parked_alloc) as (XIc) "Hthr".
-  (* the package is under a later and is opened only past the context's
-     own [▷] -- which is what lets the token it names be a fixpoint *)
-  iModIntro. iNext.
+  (* THE PACKAGE IS NOT UNDER A LATER ANY MORE -- its CLOSER ROW is, and
+     that is the whole of what the fixpoint needed (§0.16′ step (ii)).  It
+     has to be opened HERE, before the [iModIntro], because three of its
+     rows are about to be DEPOSITED and a deposit is an update that wants
+     its [ctx_dom] at the top level. *)
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
+  (* ==================================================================== *)
+  (* THE PARK'S SECOND CROSSING.  SIX ROWS, ONE DEPOSIT.                    *)
+  (*                                                                       *)
+  (* Since the [XIp] reshape (§0.15′, SwtchCtx.v) a parked record's rows    *)
+  (* are the PARKED thread's own, so every row of the record this proof is  *)
+  (* building -- its save area, its stack, and everything its resume wand   *)
+  (* will hand to forkret -- is spelled at [XIc], the identity minted three *)
+  (* lines above.  This proof holds them at the PARKER's ξ, so it hands     *)
+  (* them over with [TsoCtx.ctx_deposit] ("a fork's hand-me-downs"), whose  *)
+  (* obligation is [CtxMorph] on each.  The stamp comes back RAISED to      *)
+  (* cover what was deposited, and the resumer's p->lock acquire is what    *)
+  (* pays it ([TsoCtx.ctx_resume]'s view receipt).                          *)
+  (*                                                                       *)
+  (* ALL SIX ARE PAYABLE NOW, and the last one to become so is the reason   *)
+  (* this tranche exists.  Five were proved payable a tranche earlier       *)
+  (* ([procs_inv], [park_globals], [is_kstack], [ctx_cells], [stack_own]).  *)
+  (* The sixth, [ProcInv.proc_priv], walks                                  *)
+  (*                                                                       *)
+  (*   proc_priv -> proc_priv_core -> FirstTok.first_tok                    *)
+  (*     -> (steady arm) FsReady.fs_ready       -> BioInv.bio_ctx           *)
+  (*     -> (boot arm)   FirstTok.first_boot_persist -> BioInv.bio_ctx      *)
+  (*     -> BioInv.buf_escrow                                               *)
+  (*                                                                       *)
+  (* and used to die there: [buf_escrow] was an [inv] over a ξ-INDEXED      *)
+  (* body, the ONE shape [CtxMorph] cannot cross (§0.12′: invariant bodies  *)
+  (* are not updatable, so no transport exists and none can be written).    *)
+  (* The escrow is a PARKED RECORD now -- the body at its own ∃-bound       *)
+  (* context, carrying that context's parked token, claimed by each opener  *)
+  (* with [TsoCtx.ctx_absorb] -- so [buf_escrow] and [bio_ctx] are CLOSED   *)
+  (* TERMS, [fs_ready] / [first_tok] / [proc_priv] carry [CtxMorph]         *)
+  (* instances, and the row goes through.  [TsoCtx.ctx_morph_or] is the     *)
+  (* structural instance the walk needed and did not have (three            *)
+  (* disjunctions on the path: the escrow's three arms, [first_tok]'s two,  *)
+  (* [ofile_slot]'s two).                                                   *)
+  (*                                                                       *)
+  (* THE OBLIGATION IS APPLIED AS A TERM.  Instance search does not reach   *)
+  (* through the [∗] to rows named at an explicit ξ (§0.15′/§0.16′,          *)
+  (* measured -- a [Hint Extern] does not rescue it), so the six instances  *)
+  (* are composed by hand.                                                  *)
+  (* ==================================================================== *)
+  iMod (ctx_deposit
+          (λ xi : CtxId,
+             procs_inv (XI := xi) γs ∗
+             UsertrapRes.park_globals xi γs γft γf ∗
+             is_kstack (XI := xi) (proc_addr j) ks ∗
+             proc_priv (XI := xi) γf (proc_addr j) pid V ∗
+             ctx_cells (XI := xi) (p_context (proc_addr j))
+               (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
+             stack_own (KTR := KT1) (XI := xi)
+               (add_vec ks (mword_of_int 4096)) av)%I
+          (CtxMorph0 :=
+             ctx_morph_sep _ _ (procs_inv_morph γs)
+               (ctx_morph_sep _ _ (park_globals_morph γs γft γf)
+                 (ctx_morph_sep _ _ (is_kstack_morph _ _)
+                   (ctx_morph_sep _ _ (proc_priv_morph _ _ _ _)
+                     (ctx_morph_sep _ _ (ctx_cells_morph _ _)
+                        (stack_own_morph _ _))))))
+          cur_ctx XIc 0
+          with "Hrun Hthr [Hctx Hpriv Hstk]")
+    as "[Hrun Hdep]".
+  (* row by row, not one [iFrame]: the globals row is an ∃ over a DISCARDED
+     cell and a named frame will not match it -- an ∃ does not frame against
+     an ∃ ([ParkCap.park_token_park] carries the same note, and [BootShared]
+     hit it twice more at the .bss carve). *)
+  { iSplitR; [iExact "Hpinv" |].
+    iSplitR; [iExact "Hglobp" |].
+    iSplitR; [iExact "Hks" |].
+    iSplitL "Hpriv"; [iExact "Hpriv" |].
+    iSplitL "Hctx"; [iExact "Hctx" |].
+    iExact "Hstk". }
+  iDestruct "Hdep" as (Tc)
+    "(_ & Hthr & #Hpinvc & #Hglobc & #Hksc & Hprivc & Hctxc & Hstkc)".
+  (* the parker's token goes straight back out; nothing downstream of the
+     park sees a difference. *)
+  iModIntro. iFrame "Hrun". iNext.
   (* ---- the record: the cells allocproc left, and the free stack ---- *)
   rewrite /proc_ctx
           (valid_context_unfold (p_sched γs) None (p_context (proc_addr j)) (proc_addr j))
           /valid_context_pre.
-  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av, XIc,
-    0%nat.
+  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av, XIc, Tc.
   iSplit; [iPureIntro; cbn [length]; lia |].
   iSplit; [iPureIntro; apply ret_pc_aligned |].
-  (* ==================================================================== *)
-  (* THE PARK'S SECOND CROSSING -- AND IT IS NOW ONE ROW, IN THE BUFFER     *)
-  (* CACHE.  Left failing HERE, deliberately, as the worklist entry; the    *)
-  (* [Abort] keeps the failure FAST.                                        *)
-  (*                                                                        *)
-  (* WHERE IT STANDS (tso-port.md §0.16′).  Since the [XIp] reshape (§0.15′,*)
-  (* SwtchCtx.v) a parked record's rows are the PARKED thread's own, so     *)
-  (* every row of the record this proof is building -- its save area, its   *)
-  (* stack, its resume wand's whole premise list, and the chain payload --  *)
-  (* is spelled at [XIc], the identity minted three lines above.  That is   *)
-  (* the RIGHT shape and it is what makes [valid_context] a closed term;    *)
-  (* the price is that this proof, which holds those rows at the PARKER's   *)
-  (* ξ, must hand them over with [TsoCtx.ctx_deposit] ("a fork's            *)
-  (* hand-me-downs"), whose obligation is [CtxMorph] on each.               *)
-  (*                                                                        *)
-  (* FIVE OF THE SIX ROWS ARE PAYABLE, AND ARE NOW PROVED SO.  MEASURED     *)
-  (* with §0.13′'s kit on this tree, after §0.16′'s off-borrow ruling:      *)
-  (*                                                                        *)
-  (*     MORPH ftable_res OK      MORPH procs_inv OK                        *)
-  (*     MORPH is_kstack OK       MORPH ctx_cells OK                        *)
-  (*     MORPH stack_own OK       MORPH console_ready OK                    *)
-  (*     MORPH park_globals OK    (UsertrapRes.park_globals_morph)          *)
-  (*                                                                        *)
-  (* [FileInv.is_ftable] -- §0.15′'s blocker -- is a CLOSED TERM now: the   *)
-  (* off-borrow cinv stopped parking a fraction of [f->ip] (FileInvDefs.v's *)
-  (* header) so [off_content] is ξ-free, [ftable_res] was λ-converted and   *)
-  (* [FileInv.ftable_res_morph] follows from the structural instances.      *)
-  (*                                                                        *)
-  (* THE SIXTH ROW IS REFUTED, AND THE REFUTATION IS MEASURED, NOT AN       *)
-  (* EFFORT ESTIMATE.  [ProcInv.proc_priv] cannot be deposited:             *)
-  (*                                                                        *)
-  (*   proc_priv -> proc_priv_core -> FirstTok.first_tok                    *)
-  (*     -> (steady arm) FsReady.fs_ready       -> BioInv.bio_ctx           *)
-  (*     -> (boot arm)   FirstTok.first_boot_persist -> BioInv.bio_ctx      *)
-  (*     -> BioInv.buf_escrow = inv bioN (buf_escrow_body bn V k)           *)
-  (*                                                                        *)
-  (*     @buf_escrow      : … -> CurCtx -> bio_names -> bio_view -> nat -> iProp *)
-  (*     @buf_escrow_body : … -> CurCtx -> …                                *)
-  (*     NOTCONV buf_escrow            NOTCONV buf_escrow_body              *)
-  (*     NO-INSTANCE CtxMorph buf_escrow                                    *)
-  (*     NO-INSTANCE CtxMorph bio_ctx                                       *)
-  (*                                                                        *)
-  (* An [inv] over a ξ-INDEXED body is the ONE shape [CtxMorph] cannot      *)
-  (* cross (§0.12′'s rule: invariant bodies are not updatable, so no        *)
-  (* transport exists and none can be written).  It is the same shape the   *)
-  (* off-borrow ruling had to remove from [off_hold] -- and THE OFF-BORROW  *)
-  (* RULING'S TECHNIQUE DOES NOT REPLAY HERE.  [off_content]'s ξ-dependence *)
-  (* was a REDUNDANT COPY of a pointer, kept only so the invariant could    *)
-  (* name an inode, and a pinned argument replaced it for nothing.          *)
-  (* [buf_escrow_body]'s is the BUFFER'S DATA ([buf_parked] / [buf_mid]     *)
-  (* hold [buf_own (bpa k) …], the cached block's bytes), parked there      *)
-  (* between bread and brelse.  That is what the escrow is FOR; it cannot   *)
-  (* be pinned away.                                                        *)
-  (*                                                                        *)
-  (* AND THE ROW CANNOT BE ROUTED AROUND.  [first_tok] is a conjunct of     *)
-  (* [proc_priv_core] and BOTH its arms reach [bio_ctx], so the boot arm    *)
-  (* (which is exactly what userinit parks) is no cheaper than the steady   *)
-  (* one.  Making it resumer-supplied the way [park_globals] and            *)
-  (* [first_done] are is not available either: the FIRST resumer runs       *)
-  (* BEFORE [first_done] exists -- forkret's own boot arm is the one        *)
-  (* instruction in the kernel that mints it -- which is precisely why      *)
-  (* [proc_priv] carries [first_tok] and not [first_done].                  *)
-  (*                                                                        *)
-  (* SO THE NEXT TRANCHE IS THE BCACHE ESCROW, AND IT NEEDS AN OWNER        *)
-  (* RULING, not an errand.  The shape that would work is [WpLock.lock_inv]'s*)
-  (* own: ∃-close the context INSIDE the escrow body ([inv bioN (∃ ξ,       *)
-  (* buf_escrow_body (XI := ξ) bn V k)]), which makes [buf_escrow] a closed *)
-  (* term -- and then every OPENER (bget, bread, brelse, the recycler) needs*)
-  (* a [ctx_dom] from the ∃-bound ξ to its own before it may read or write  *)
-  (* the block, which it is entitled to by the bcache lock or the buffer    *)
-  (* sleeplock it is holding, but which is not threaded to those proofs     *)
-  (* today.  That is the same seam [SchedCtx.cpu_ctx_free]'s ∃-context      *)
-  (* records leave open (§0.15′), one layer down.                           *)
-  (*                                                                        *)
-  (* WHAT IS *NOT* OPEN: the swtch deposit is PROVED (ProofSwtch.v), the    *)
-  (* trap bundle transports ([IntrDefs.caps_morph]), [proc_lock_res] and    *)
-  (* [ftable_res] are converted payloads, and step (ii) of §0.15′'s forced  *)
-  (* order -- threading the parker's [own_context] through                   *)
-  (* [ParkCap.park_cap] / [forkret_park_paid_body], with the hart           *)
-  (* ∀-quantified beside the context -- was BUILT AND MEASURED in the same  *)
-  (* session and then REVERTED, because it buys nothing while row six is    *)
-  (* refuted and it moves an exported shape.  Re-derive it when the escrow  *)
-  (* lands; §0.16′ records exactly what it was (the package's [▷] moves     *)
-  (* onto its closer row alone, so the deposit is not stuck under a later). *)
-  (* ==================================================================== *)
-Abort.
-
-(* the body from the record's own rows down, kept for the redesign -- every
-   line of it is right except that its rows are at the PARKER's ξ and the
-   record now asks for them at [XIc]:
-  iFrame "Hctx".
-  iSplitL "Hstk"; [cbn [nth]; iExact "Hstk" |].
+  (* ---- the record's rows, all at [XIc]: the DEPOSITED copies ---- *)
+  iFrame "Hctxc".
+  iSplitL "Hstkc"; [cbn [nth]; iExact "Hstkc" |].
   iSplitL "Hthr"; [iExact "Hthr" |].
   (* ================================================================== *)
   (* THE RESUME WAND -- forkret's precondition, assembled.               *)
@@ -347,7 +333,11 @@ Abort.
   iDestruct (cpu_claim_proc (CID := h) j Hj with "Hhlf2 Htag1") as "Hclm".
   (* ---- the lock resource: the raw context cells the wand handed back,
          and THAT hart's parked scheduler, which is [run_slot] ---- *)
-  iAssert (own_ctx (p_context (proc_addr j))) with "[Hcells]" as "Hown".
+  (* AT [XIc], SPELLED: the wand handed the cells back at the RECORD's
+     context and the lock resource this builds is forkret's, which runs as
+     the record.  With the parker's ambient still in scope an unannotated
+     row would silently capture it (§0.8′ rule 3). *)
+  iAssert (own_ctx (XI := XIc) (p_context (proc_addr j))) with "[Hcells]" as "Hown".
   { iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
     iFrame "Hcells". iPureIntro. cbn [length]. lia. }
   iDestruct (proc_slots_running_intro γs j h Hj with "Htag2 Hown Hrec Hmk")
@@ -377,16 +367,20 @@ Abort.
   iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γft γf pid V ks m av
             (av - 6 - trap_res eb')%nat eb'
             Hj Hgl Hbud Hkx Hut Hsp
-          with "Htext Hwire Hkmap Hpc Hpinv Hglobp Hcg Hcpu Htc Hclm
-                Hlocked HR Hks Hpriv HW Hclose").
-   (end of kept body) *)
+          with "Htext Hwire Hkmap Hpc Hpinvc Hglobc Hcg Hcpu Htc Hclm
+                Hlocked HR Hksc Hprivc HW Hclose").
+Qed.
+
 
 (* ===================================================================== *)
 (* THE TOKEN.  The cap above at [W := park_token γs], and the residue's     *)
 (* channel at the same [W] (forkret's [usertrap_res_bare_park]), tied      *)
 (* into [ParkCap.park_token]'s fixpoint by [park_token_intro_of].  The     *)
-(* [▷ package] of the cap and the [▷ closer] of the channel are what make  *)
-(* the knot well-founded: see ParkCap.v.                                   *)
+(* [▷ CLOSER ROW] of the cap's package and the [▷ closer] of the channel   *)
+(* are what make the knot well-founded -- the package's own [▷] moved onto *)
+(* that row alone when the park started DEPOSITING three of its rows, and  *)
+(* nothing under a [▷] can be deposited (tso-port.md §0.17′).  See         *)
+(* ParkCap.v.                                                              *)
 (* ===================================================================== *)
 Theorem park_token_intro
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
@@ -396,19 +390,20 @@ Proof.
   iApply (park_token_intro_of (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) γs).
   { intros N av. exact (FR.usertrap_res_bare_park N av). }
   rewrite /park_cap. iModIntro.
-  iIntros (ξp γft γf pa ks rest pid V av) "%Hrest %Hj %Hav Hpkg HW Hchild".
+  iIntros (hp ξp γft γf pa ks rest pid V av) "%Hrest %Hj %Hav Hrun Hpkg HW Hchild".
   iDestruct "Hchild" as "(#Hks & Hctx & Hpriv & Hfd & Hirsp)".
-  (* THE AMBIENT HART AND CONTEXT ARE BOTH ARBITRARY HERE, and for the same
-     reason: [park_cap] describes a process that is NOT running -- neither
-     [park_pkg] nor [proc_ctx] mentions a hart or a ξ (the record mints and
-     hides the child's own identity, [forkret_park_paid] above).  So the
-     two ambient parameters of the theorem being applied are vacuous, and
-     any witness will do; [CurCtx] has no default instance by design
-     (TsoCtx.v, ruling 1), so one must be named. *)
-  iApply (forkret_park_paid (CID := 0%fin) (XI := ξp)
+  (* THE AMBIENT HART AND CONTEXT ARE BOTH ∀-BOUND HERE -- and the hart is
+     now bound for a REASON rather than for symmetry.  [park_cap] describes
+     a process that is NOT running, so neither [park_pkg] nor [proc_ctx]
+     names a hart or a ξ; but the cap consumes the PARKER's [own_context],
+     which is hart-ambient by construction ([TsoCtx.own_context]'s tie is to
+     the hart the thread runs on).  Quantifying [hp] beside [ξp] keeps the
+     TOKEN hart-free (and hence [SpecSyscall.syscall_env] hart-free) while
+     letting the deposit run at the parker's real hart. *)
+  iApply (forkret_park_paid (CID := hp) (XI := ξp)
             (park_token γs) γs γft γf pa ks rest pid V av
-            Hrest Hj Hav with "[Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
-  iNext. iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
+            Hrest Hj Hav with "Hrun [Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
+  iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
   (* row by row, not one [iFrame]: the globals row is an ∃ over a discarded
      cell and a named frame will not match it (ParkCap.park_token_park makes
@@ -422,7 +417,9 @@ Proof.
   iSplitL "Hstk"; [iExact "Hstk"|].
   (* the closer describes the CHILD, so its identity is ∀-quantified beside
      its hart on BOTH sides -- [park_pkg]'s wand and [forkret_park_pkg]'s --
-     and this hand-over just passes it through. *)
+     and this hand-over just passes it through.  It is the one row still
+     under a [▷] on both sides (§0.16′ step (ii)). *)
+  iNext.
   iIntros (h Xc pt' V') "%HV %Hnorm %Hptwf #Hglob #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
   iApply ("Hclose" $! h Xc pt' V'
             with "[%] [%] [%] Hglob Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");

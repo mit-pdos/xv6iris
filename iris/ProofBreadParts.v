@@ -48,9 +48,17 @@ Section BreadEscrowLeaves.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
-  (* the escrow, in the raw [inv] shape [iInv] recognizes *)
+  (* the escrow, in the raw [inv] shape [iInv] recognizes.  THE BODY IS THE
+     PARKED RECORD now -- [∃ ξ T, ctx_parked ξ T ∗ buf_escrow_body (XI := ξ)]
+     -- so every opener destructs one level further and re-closes with
+     [BioInv.buf_escrow_rec_intro].  Which of them then needs
+     [TsoCtx.ctx_absorb] is decided by WHAT IT TAKES OUT: the three recycler
+     stores and the mid-window peek touch only [↦₄] cells (stage 1 does not
+     flip those) and run AT the record's own ξ; only the checkout
+     ([ProofBread]'s [bread_tail]) and the park ([ProofBrelse]) move
+     [BufOwn.buf_own]'s 1024 flipped bytes, and those two absorb and deposit. *)
   Lemma buf_escrow_inv (bn : bio_names) (V : bio_view Σ) (k : nat) :
-    buf_escrow bn V k -∗ inv bioN (buf_escrow_body bn V k).
+    buf_escrow bn V k -∗ inv bioN (buf_escrow_rec bn V k).
   Proof. iIntros "H". iExact "H". Qed.
 
 End BreadEscrowLeaves.

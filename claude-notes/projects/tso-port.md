@@ -2,6 +2,13 @@
 
 ## 0. CHECKPOINT — READ THIS FIRST
 
+**THE TREE IS FULLY GREEN (2026-08-26).  RED SET EMPTY.  READ §0.17′
+FIRST** — it is the landing note for the last blocker class (the two `inv`s
+over ξ-indexed bodies), for `ProofForkretPark.forkret_park_paid` (now
+`Qed`), and for the second half of the eight-hart adequacy trap that only a
+green park could reveal.  §0.10′–§0.16′ below are the road to it and are
+history where they conflict.
+
 **Where the tree is.** Legs T and M are LANDED on branch `tso`.
 `iris/TsoMem.v` is the minimal Ztso machine; `TsoLitmus.v` its 8
 verdicts; `TsoCtx.v` the SC-degenerate ownership surface Σ that ~600
@@ -1657,6 +1664,300 @@ ruling.
   has no acquire to re-index at, so its body's ξ-dependence is NOT an
   artifact.  `off_hold` was one such (fixed by removing the dependence);
   `buf_escrow` is the other (not fixable that way).
+
+### 0.17′ THE TREE IS FULLY GREEN.  BOTH BARE-INV MEMBERS ARE PARKED RECORDS,
+### AND THE PARK'S SECOND CROSSING IS PROVED (2026-08-26)
+
+Executes `tso-absorb-memo.md` in full, plus §0.16′ step (ii) re-derived.
+**Two consecutive full VM rounds, ZERO errors; no `Admitted`, no `Abort`,
+nothing stubbed.**  `ProofForkretPark.forkret_park_paid` is `Qed`.
+
+#### THE LAW, AND THE ONE INSTANCE THAT WAS MISSING
+
+`TsoCtx.ctx_absorb` — `ctx_deposit`'s dual — is on the sealed surface, with
+the twin image the memo proved (`ZZAbsorbProbe.twin_absorb`).  Five lines at
+SC, and the ONE structural fact worth restating is why the premise is the
+right one: it is HART-LOCAL (`hart_view_lb K ∗ ⌜T ≤ K⌝`, the stable pair
+`ctx_resume` already consumes) and says nothing about the source context, so
+an opener that knows nothing about the record can supply it — which is
+exactly why a bare `inv`, having no acquire and hence no honest `ctx_dom`
+producer, can host ξ-indexed data under THIS law and could not under a
+`ctx_dom` premise.  The token comes back at the SAME stamp, which is what
+makes the claim repeatable (an escrow is opened on every bread/brelse; a
+persistent boot deposit is read once per hart).
+
+`TsoCtx.ctx_morph_or` joins `const`/`pointsto`/`word`/`sep`/`exist`/
+`big_sepL`/`big_sepM`/`if_then`/`if_else`.  Three disjunctions sit on the
+park's critical path (`buf_escrow_body`'s three arms, `first_tok`'s two,
+`ofile_slot`'s two) and the kit had none.
+
+**Two new files, both small and both for the reason `IntrDefs.v` cannot hold
+them (425 files sit on it):**
+
+- `SieCapCtx.v` — `sie_cap_gpr_own_ctx_acc`, borrow-and-return of the
+  thread-of-control token out of `sie_cap`'s fourth conjunct.  SIX call
+  sites: the two escrow opens that move bytes, `bio_init_at` at
+  main+0x8e, the started deposit at main+0xa2, and the two parkers.
+- `CtxRecord.v` — `ctx_parked_inv`, the one-line persistent invariant that
+  publishes a NAMED record's parked token.  Member 2 only; member 1
+  ∃-closes instead.
+
+#### MEMBER 1 — THE BCACHE ESCROW IS A PARKED RECORD, AND FOUR OF ITS SIX
+#### OPENS DO NOT ABSORB AT ALL
+
+```coq
+Definition buf_escrow_rec bn V k := (∃ ξ T, ctx_parked ξ T ∗ buf_escrow_body (XI := ξ) bn V k)%I.
+Definition buf_escrow     bn V k := inv bioN (buf_escrow_rec bn V k).
+```
+
+`buf_escrow` and `bio_ctx` moved below `End BioInv` into a section that
+binds NO `CurCtx` (§0.8′ rule 3, sixth occurrence), and both print with no
+`CurCtx`: **CLOSED TERMS.**  The six arm-swap lemmas are UNCHANGED — they
+are stated on the BODY, and since the body is section-generalized over `XI`
+they instantiate at the record's own ξ for nothing.
+
+> **THE MEMO'S SIX-SITE COUNT IS CORRECTED BY MEASUREMENT, and the
+> correction halves the work.  Only TWO of the six opens absorb.**  What
+> decides it is not which lock is held but WHAT CROSSES THE BOUNDARY.  The
+> escrow body's ONLY ξ-indexed rows are `BufOwn.buf_own`'s 1024 `↦ₘ` data
+> bytes; every other cell it holds — `b_valid`, `b_dev`, `b_blockno`,
+> `b_disk` — is `↦₄`, and **stage 1 does not flip `↦₄`**.  The three
+> recycler stores (`escrow_recyc_dev` / `_bno` / `_valid`) and the
+> mid-window peek borrow only `↦₄` cells, so they run AT the record's
+> ∃-bound ξ with `(XI := ξe)` and hand the token back at the SAME stamp —
+> nothing was written at ξ.  Only `bread_tail`'s CHECKOUT and `brelse`'s
+> PARK move `buf_own`, and those two absorb and deposit.  At stage 2, when
+> `↦₄` flips, the other four become absorb sites too; the two that exist
+> are the template, and `ProofBreadParts.buf_escrow_inv`'s header says so.
+
+**AND ONE OPEN HAD TO MOVE, WHICH IS THE TRANCHE'S SECOND SHAPE LESSON.**
+`brelse`'s park was bundled into the `+0x02 sd ra,24(sp)` store's ATOMIC
+UPDATE — and it cannot stay there:
+
+> **NO DEPOSIT AND NO ABSORB CAN RUN INSIDE A `wp_..._au_...`.**  Both laws
+> want the thread's own `own_context`, that token rides inside
+> `sie_cap_gpr`, and by the time the atomic-update obligation is proved the
+> WP leaf has already consumed the bundle.  There is nowhere to get it
+> from.  The fix is not machinery: the escrow swap is a self-contained
+> ghost step (open, swap, close, one fupd) and the store it was bundled
+> with is to the thread's PRIVATE stack frame, so hoisting the swap to the
+> ghost step before the instruction is the SAME program point.  With it
+> hoisted the store is the plain `wp_csdsp_s_sconf` its three successors at
+> +0x04/+0x06/+0x08 already use, and `escrow_swap_park_now` (which existed
+> only to strip the AU's later cheaply) has no caller left.
+
+`bio_init` / `BioInitAt.bio_init_at` **borrow an `own_context`** — the
+memo's §3.4 asked this to be checked and neither had one.  Their escrows'
+initial content has to be `ctx_deposit`ed into the freshly minted record
+context, and a deposit runs at the depositor's authority.  The fold is
+`BioInv.escrow_alloc_seq`, an explicit induction rather than a
+`big_sepL_mono`: **the running token is EXCLUSIVE and has to be handed from
+one buffer to the next**, which a `big_sepL_mono` cannot do.  Callers:
+`ProofMain` at main+0x8e (peels it out of `sie_cap_gpr`) and
+`FsBoot.fs_boot_bundle` (which has no consumer).
+
+**Cascade, as landed (8 files):** `BioInv` (the two moves, four `CtxMorph`
+instances, `escrow_absorb`/`escrow_deposit`/`escrow_alloc_seq`, `bio_init`),
+`BioInitAt`, `FsBoot`, `ProofBreadParts` (`buf_escrow_inv` re-typed),
+`ProofBread` (five opens), `ProofBrelse` (one open, hoisted), `ProofMain`
+(the `bio_init_at` call).  `bio_ctx`/`fs_ready`/`first_tok`/`proc_priv`
+arities do not change, so their ~1165 mentions across ~290 files are pure
+echo.
+
+#### THE PROBE VERDICTS (memo §10(a)/(b)), RUN FIRST AND CHEAP
+
+```
+@buf_escrow      : ... -> bio_names -> bio_view Σ -> nat -> iProp Σ     (no CurCtx)
+@bio_ctx         : ... -> bio_names -> bio_view Σ -> iProp Σ            (no CurCtx)
+@buf_escrow_body : ... -> CurCtx -> ...      (ξ-indexed, as it should be)
+MORPH bio_ctx OK (closed term)
+```
+
+`fs_ready` / `first_tok` / `proc_priv` still PRINT a `CurCtx`, and they
+should: each has ξ-indexed rows of its own.  What matters is that all three
+now carry `CtxMorph` INSTANCES, and they are **proved, not searched** —
+`FsReady.fs_ready_morph`, `FirstTok.first_boot_persist_morph` /
+`first_fsinit_morph` / `first_tok_morph`, `ProcInv.file_ref_morph` /
+`ofile_slot_morph` / `proc_ofiles_morph` / `proc_priv_core_morph` /
+`proc_priv_morph`.  **`apply _` cannot find them and that is not a
+regression**: `fs_ready` and `first_tok` are `Typeclasses Opaque` (for
+correctness, not speed — `FirstTok.v`'s note), and the ∃/big-op rows are
+unreachable by search anyway (§0.16′, measured).
+
+> **ξ-PROFILE, MEASURED, WORTH NOT RE-DERIVING.**  With the escrow closed,
+> `fs_ready`'s twenty-one conjuncts have EXACTLY ONE ξ-indexed row left: the
+> `∃ pd pav pu` carrying `DiskInv.disk_geom`'s three ring-page pointers (its
+> `is_lock` beside it is closed, the payload being λ-converted).
+> `first_boot_persist` has the same one row; `first_fsinit` has three (the
+> 32 raw superblock BYTES and the log spinlock's two `↦₈` words).
+> `proc_priv`'s are `proc_fields`, `proc_pt_at`, `first_tok`,
+> `ofile_slot`'s `p_ofile ↦₈` and its `file_ref` arm — and
+> `ProcInv.cwd_ref` is a CLOSED TERM (`InodeInv.inode_held`), so it frames.
+> The memo §9 residual — "`proc_ofiles → ofile_slot` is a reading, not a
+> measurement" — is now measured, and it goes through.
+
+#### MEMBER 2 — `started_inv`'s CONTEXT IS NAMED, AND `StartedInv.v` IS
+#### UNCHANGED
+
+`BootShared.boot_shared_alloc` mints `ξd` with the pure
+`TsoCtx.ctx_parked_alloc`, publishes `CtxRecord.ctx_parked_inv ξd`, and
+returns BOTH (one more existential, one more persistent row).
+
+**WHICH OF §5's TWO OPTIONS WON: its own one-line `inv`, carried as a
+CONJUNCT of `main_deposit` — not a new row of `started_body`.**  The reason
+is the memo's own constraint: `StartedInv.v` must not change, and a new row
+of `started_body` IS a change to it.  Riding inside `main_deposit` costs
+nothing — `ctx_parked_inv` is persistent, so the package is still
+`Persistent`, still rides the one-shot escrow, and still reaches all eight
+harts — and it keeps the token's namespace out of `StartedInv`'s.  Landed:
+
+```coq
+Definition main_deposit_rows (ξd : CtxId) γd γv : iProp Σ := (∃ ..., ... at (XI := ξd) ...)%I
+Definition main_deposit      (ξd : CtxId) γd γv : iProp Σ := (ctx_parked_inv ξd ∗ main_deposit_rows ξd γd γv)%I
+```
+
+in a section binding NO `CurCtx`.  Three of the nine rows are ξ-indexed
+(`procs_inv`, `disk_geom`, the `kernel_pagetable ↦₈□` word) and
+`main_deposit_rows_morph` transports exactly those.  **`StartedInv.v` is
+byte-for-byte unchanged**, its `P : iProp Σ` parameter and `{!Persistent P}`
+discipline intact.
+
+**THE PRIMARY'S DEPOSIT MOVED OUT OF THE `□`-WAND**, as §5 said it must, and
+the sharpest way to state why is the general rule this tranche keeps hitting:
+`ctx_deposit` CONSUMES an `own_context`, and **nothing under a `□` can
+consume anything**.  So `SpecMain`'s wand is now PURE PACKING with its rows
+already at `ξd`, and the deposit happens at the wand's APPLICATION site,
+`ProofMain.mn_grp_started` — the last point on main's boot arm that still
+holds its `sie_cap_gpr`.  One `ctx_deposit` of the three rows as a `∗`, with
+the `CtxMorph` composed AS A TERM (search does not reach through the `∗` to
+rows named at an explicit ξ).
+
+**THE SECONDARY ABSORBS AFTER THE FENCE**, at a second open, exactly as §5
+predicted: `ProofMainSecondary.ms_spin`'s fall-through opens
+`ctx_parked_inv ξd` (the token strips its `▷` by timelessness), absorbs
+`main_deposit_rows` into the hart's own context, closes, and hands the rows
+to its continuation.  Nothing downstream of `ms_spin` changed: the rows
+arrive at the ambient, which is what `ms_inithart_sched` and the scheduler
+always wanted.
+
+**Cascade, as landed (8 files):** `SpecMainSecondary`, `SpecMain`,
+`ProofMain`, `ProofMainSecondary`, `BootShared`, `BootChain`,
+`SystemAdequacy`, plus `CtxRecord.v` new.  `FsCfg` / `FsCfgBoot` / `FsReady`
+needed nothing (their mentions are comments).
+
+#### STEP (ii), RE-DERIVED — AND THE SHAPE §0.16′ RECORDED IS EXACTLY RIGHT
+
+`ParkCap.park_cap` gains `∀ (hp : CpuId)` beside its `∀ (ξp : CtxId)` and
+takes `own_context (CID := hp) ξp`, borrowed and returned; `park_token` /
+`park_chan` / `SpecSyscall.syscall_env` stay hart-free and ξ-free, which is
+the whole point of quantifying the hart rather than letting the ambient in.
+`park_pkg`'s and `forkret_park_pkg`'s `▷` moved onto their CLOSER ROW ALONE
+— the only row that names `W`, hence the only one
+`park_token_F_contractive` needs guarded — and `solve_contractive` closes
+unchanged.  `ParkCap.park_token_park` and both parkers (`ProofUserinit`,
+`ProofKforkB5`) thread the token; each peel is three lines.
+
+#### THE PARK CLOSES: SIX ROWS, ONE DEPOSIT
+
+`forkret_park_paid` hands `procs_inv`, `park_globals`, `is_kstack`,
+`proc_priv`, `ctx_cells` and `stack_own` into the child's freshly minted
+`XIc` in ONE `ctx_deposit`, with the six-way `CtxMorph` composed as a term,
+and the raised stamp `Tc` becomes the record's.  Two mechanics were needed
+and both are already-recorded lessons, met again:
+
+- **an ∃ does not frame against an ∃** — the `park_globals` row is an ∃ over
+  a discarded cell, so the deposit's payload is built with row-by-row
+  `iSplitR`/`iExact`, never one `iFrame` (`ParkCap.park_token_park`'s note,
+  fourth occurrence);
+- **the resume wand's body must spell `(XI := XIc)`** — with the parker's
+  ambient still in scope, `iAssert (own_ctx (p_context …))` silently
+  captured it.  §0.15′'s kept body had this latent since the `XIp` reshape;
+  it was invisible because the proof was `Abort`ed.
+
+#### AND THE EIGHT-HART ADEQUACY TRAP HAD A SECOND HALF, WHICH ONLY A GREEN
+#### PARK COULD REVEAL
+
+§0.16′ answered the trap for `BootChain.boot_hart_res`'s one row and stopped
+at `started_inv`.  With both members ruled, `SystemAdequacy` got past
+`Hstarted` — and died on `main_locks_raw`, **the sixth premise, which no
+build had ever reached.**
+
+> **THE BOOT SUPPLY MUST BE CARVED AT THE BOOT HART'S OWN CONTEXT.**
+> `boot_shared_alloc` runs ONCE, inside one fupd, before any hart has a
+> thread of control, and everything it hands the BOOT hart —
+> `main_locks_raw`, `main_globals_raw`, `main_data_raw`, the dormant proc
+> rows, the disk's and kpt's raw cells — is ξ-INDEXED and EXCLUSIVE.  A
+> bundle carved at one ξ can serve at most one identity.  The fix is one
+> line and no machinery: mint `ξ0` with `own_context_boot (CID := 0%fin)`
+> BEFORE the carve and run the carve at `(XI := ξ0)`.  The seven SECONDARIES
+> need nothing ξ-indexed from it — `kernel_text`, `kernel_data`,
+> `boot_hart_res` and `started_inv` are all closed terms — so one ambient
+> serves all eight.  Contrast §0.16′ step (iv)'s ∀-context form, which is
+> sound only for a single EXCLUSIVE timestamp-0 cell: pinning the carve is
+> cheaper and equally honest, and it scales to a bundle.
+
+#### THE M2 DEBT, AND IT IS SMALLER THAN THE MEMO BUDGETED
+
+**THREE new `TsoCtxShim.hart_view_lb_any` sites, not seven** — the escrow's
+checkout (`ProofBread`), the escrow's park (`ProofBrelse`), and the
+secondary's absorb (`ProofMainSecondary`) — joining `ProofSwtch`'s and
+`ProofAcquire`'s.  The four recycler opens need none, because they absorb
+nothing.  **`TsoCtxShim.ctx_dom_sc` is NOT used at any of them**, which is
+the point of choosing absorb over the cheaper ∃-close: a `ctx_dom` at a bare
+`inv` would have no honest producer and would be a permanent lie, while
+absorb's premise is hart-local and an acquire that knows nothing about the
+escrow can still supply it.  The M2 sweep that makes `K` real is ONE item
+serving swtch-resume, both escrow sites and the started absorb alike, and
+`SpecAcquire` already exports `(∃ K, hart_view_lb K)` to every lock winner.
+
+#### MEMO CORRECTIONS
+
+- **`tso-absorb-memo.md` §3.3 and §3.4's "the 6 open sites bracketed
+  absorb→work→deposit"** — **corrected by measurement: FOUR of the six need
+  neither.**  §3.3 is right that the six opens are not under one lock and
+  right that the escrow bridges two lock disciplines; what it did not check
+  is that the recycler's three stores and the mid-window peek move only
+  `↦₄` cells, which stage 1 leaves unflipped.  They run at the record's own
+  ξ with `(XI := ξe)` and nothing else.  The memo's own §3.1 measurement
+  ("the ONLY ξ-indexed row is `buf_own`") is what implies this; §3.3 did not
+  draw the consequence.
+- **`tso-absorb-memo.md` §3.4's "check this one: `bio_init_at` … must hold
+  an `own_context` … if it does not, its parked context has to be threaded
+  in from its caller."**  CHECKED: neither `bio_init` nor `bio_init_at` had
+  one.  The landed answer is neither of the memo's two — the *token* is
+  borrowed, not the *context* threaded: both allocators take
+  `own_context cur_ctx` and hand it straight back, and mint one fresh parked
+  context PER BUFFER inside `escrow_alloc_seq`.  Threading a single parked
+  context in from the caller would not have worked: thirty escrows are
+  thirty invariants and `ctx_parked` is exclusive.
+- **`tso-absorb-memo.md` §6's "used at the 6 escrow opens, the 1 started
+  claim, and the park's step (ii)"** — the accessor has SIX call sites, but
+  not those six: two escrow opens, `bio_init_at`, the started deposit, the
+  started absorb, and the two parkers.  The count is right by accident.
+- **`tso-absorb-memo.md` §5's two options for the parked token ("a new row
+  of `started_body` outside its disjunction, or its own one-line `inv`")** —
+  the second won, and the first is REFUTED by the memo's own constraint: a
+  new row of `started_body` is a change to `StartedInv.v`, which §5 and the
+  §11 ruling both require to stay unchanged.
+- **`tso-absorb-memo.md` §7's "Seven new sites"** — THREE.  See the M2
+  section above.
+- **`tso-port.md` §0.16′ step (iii)'s recommended shape ("∃-close the
+  context INSIDE the escrow body … and then every OPENER needs a `ctx_dom`
+  from the ∃-bound ξ to its own")** — the ∃-close is right and landed; the
+  `ctx_dom` is not, and the memo's §7 says why (a bare `inv` has no acquire).
+  What the openers get instead is `ctx_absorb` against their own hart's
+  view.  And *most* openers need neither.
+- **`tso-port.md` §0.16′ step (iv)'s "THE EIGHT-HART ADEQUACY TRAP, stated
+  once"** — stated once, but it had TWO halves, and only the first was
+  visible while the park was red.  The second is the boot supply, above.
+
+**RED SET: EMPTY.**  `make -f CoqMakefile -j180 -k` exits 0 twice
+consecutively.  The remaining distance to the REAL `TsoCtxTwin2` swap is
+unchanged and is §0.10′'s four items: the `tsoG` ghost-class threading,
+replacing the `_def` bodies and re-proving the law surface (every law now has
+a named twin image, `ctx_absorb` included), the kit re-proofs where
+`TsoCtxShim` bridges sit, and the M2 protocol sweep — whose worklist is
+exactly the five `hart_view_lb_any` sites and the `ctx_dom_sc` uses.
 
 ---
 

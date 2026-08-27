@@ -92,7 +92,13 @@ Section ParkCap.
         applies.  The ∀ over the PARKER's ξ now lives one level up, in
         [park_cap]/[park_chan] below, which is what keeps [park_token] --
         and hence [SpecSyscall]'s [syscall_env] -- ξ-FREE. *)
-     (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (V' : pprivate),
+     (* THE LATER IS ON THIS ROW ALONE (tso-port.md §0.16′ step (ii)): the
+        park DEPOSITS [procs_inv] / [park_globals] / [stack_own] into the
+        child's fresh context, and nothing under a [▷] can be deposited
+        ([ctx_dom] is not persistent and there is no crossing).  The closer
+        is the only row that names [W], hence the only one the fixpoint
+        needs guarded. *)
+     ▷ (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (V' : pprivate),
         ⌜pv_upt V' = pt'⌝ -∗
         ⌜ud_data pt' = ud_pas pt'⌝ -∗
         ⌜proc_pt_wf pt'⌝ -∗
@@ -145,17 +151,31 @@ Section ParkCap.
   Definition park_cap
       (URB : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
-    (□ ∀ (ξp : CtxId) (γft γf : gname) (pa ks : mword 64) (rest : list (mword 64))
+    (* THE PARKER'S HART IS ∀-QUANTIFIED BESIDE ITS CONTEXT, and that is
+       what keeps the token HART-FREE (and hence [SpecSyscall.syscall_env]
+       hart-free) even though the park now consumes an [own_context], which
+       is hart-ambient by construction: the running token's tie is to the
+       hart the thread runs on ([TsoCtx.own_context]'s header).  Same move,
+       same reason, as the ∀ over [ξp] one line down. *)
+    (□ ∀ (hp : CpuId) (ξp : CtxId) (γft γf : gname) (pa ks : mword 64)
+         (rest : list (mword 64))
          (pid : mword 32) (V : pprivate) (av : nat),
        ⌜length rest = 12%nat⌝ -∗
        ⌜exists j : nat, pa = proc_addr j /\ (j < NPROC)%nat⌝ -∗
        ⌜(K_usertrap <= av)%nat⌝ -∗
-       ▷ park_pkg (XI := ξp) URB W γs γft γf pa ks pid av -∗
-       (* ...and [W] itself, for forkret to hand the closer: under the same
-          later, for the same reason *)
+       (* THE PARKER'S OWN THREAD-OF-CONTROL TOKEN, borrowed and handed
+          straight back: [TsoCtx.ctx_deposit]'s first premise, which no
+          persistent surrogate can replace. *)
+       own_context (CID := hp) ξp -∗
+       (* NO LONGER UNDER A [▷]: three of this package's rows are deposited
+          into the child's fresh context, and a deposit cannot run under a
+          later.  The package's own closer row carries the later instead. *)
+       park_pkg (XI := ξp) URB W γs γft γf pa ks pid av -∗
+       (* ...and [W] itself, for forkret to hand the closer: under a later,
+          because it is the fixpoint variable *)
        ▷ W -∗
        park_child (XI := ξp) γs γf pa ks rest pid V -∗
-       |==> ▷ proc_ctx γs pa)%I.
+       |==> own_context (CID := hp) ξp ∗ ▷ proc_ctx γs pa)%I.
 
   (* THE CHANNEL, at a given [W], as a [□] proposition under a later -- for
      the records of THIS table ([un_s N = γs]), which is all the token for
@@ -209,9 +229,16 @@ Section ParkCap.
   (* ------------------------------------------------------------------- *)
   (* USING IT: what userinit and kfork do at their park.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma park_token_park `{XI : CurCtx} (N : ut_names) (rest : list (mword 64)) (V : pprivate) :
+  Lemma park_token_park `{CID : CpuId} `{XI : CurCtx}
+      (N : ut_names) (rest : list (mword 64)) (V : pprivate) :
     ut_wf N ->
     length rest = 12%nat ->
+    (* BORROWED, and handed straight back: the cap deposits three of the
+       package's rows into the child's fresh context and [ctx_deposit] runs
+       at the depositor's own authority.  Both parkers ([ProofUserinit],
+       [ProofKforkB5]) peel it out of their [sie_cap_gpr] with
+       [SieCapCtx.sie_cap_gpr_own_ctx_acc]. *)
+    own_context cur_ctx -∗
     park_token (un_s N) -∗
     kernel_text -∗
     wire_inv -∗
@@ -223,27 +250,26 @@ Section ParkCap.
     park_env N -∗
     park_own N -∗
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) V -∗
-    |==> ▷ proc_ctx (un_s N) (un_pj N).
+    |==> own_context cur_ctx ∗ ▷ proc_ctx (un_s N) (un_pj N).
   Proof.
     (* [procs_inv] IS A PREMISE NOW, not read out of [park_env]: it is
        ξ-dependent, so the M2 split moved it out of the record-carried half
        (UsertrapRes.v, "THE RESUMER'S HALF").  Both parkers hold it at their
        own context anyway -- it is what they built the child's slot out of. *)
-    iIntros (Hwf Hrest) "#Htok #Htext #Hwire #Hkmap #Hprocs #Hglobp #Hslot Hstack #Henv Hown Hchild".
+    iIntros (Hwf Hrest) "Hrun #Htok #Htext #Hwire #Hkmap #Hprocs #Hglobp #Hslot Hstack #Henv Hown Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iPoseProof "Htok" as "Htok'".
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
     iDestruct "Htok'" as (URB) "[#Hcap #Hchan]".
     iDestruct ("Hchan" $! cur_ctx N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
-    iApply ("Hcap" $! cur_ctx (un_ft N) (un_f N) (un_pj N) (un_ks N) rest
+    iApply ("Hcap" $! cpu_id cur_ctx (un_ft N) (un_f N) (un_pj N) (un_ks N) rest
               (un_pid N) V KSTACK_AV
-              with "[%] [%] [%] [Hstack Hown Hclose] [] Hchild").
+              with "[%] [%] [%] Hrun [Hstack Hown Hclose] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
     - exact Hkav.
     - rewrite /park_pkg.
-      iNext.
       (* row by row, not one [iFrame]: the globals row is an ∃ over a
          discarded cell and a named frame will not match it. *)
       iSplitR; [iExact "Htext"|].
@@ -253,6 +279,7 @@ Section ParkCap.
       iSplitR; [iExact "Hglobp"|].
       iSplitR; [iExact "Hslot"|].
       iSplitL "Hstack"; [iExact "Hstack"|].
+      iNext.
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
       iIntros (h Xc pt' V') "%Hupt %Hnorm %Hptwf #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       iApply ("Hclose'" $! h Xc pt' V'

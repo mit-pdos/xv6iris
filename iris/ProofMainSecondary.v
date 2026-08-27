@@ -69,6 +69,9 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import CtxRecord.   (* [ctx_parked_inv]: the deposit record's token *)
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the absorb's authority *)
+Require TsoCtxShim.         (* M2 DEBT: the [hart_view_lb] the absorb wants *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -309,18 +312,33 @@ Section ProofMainSecondary.
   (* =================================================================== *)
   (* 0x16 .. 0x1e -- [while (started == 0) ;] with the acquire fence.     *)
   (* =================================================================== *)
+  (* THE ABSORB LIVES HERE, and §5 of tso-absorb-memo.md is why it cannot
+     live one instruction earlier.  [started_inv_load_au] hands the payload
+     out UNDER A [▷] and re-closes in the same fupd, so nothing can be
+     absorbed inside the load's atomic update ([ctx_dom] is not persistent
+     and there is no step to spend); the [▷] comes off at the acquire fence
+     at +0x18, and by then the record's parked token is back inside its own
+     invariant.  That is exactly why [xid] is NAMED rather than ∃-closed: a
+     SECOND open has to find the same context.  The token comes out from
+     under [iInv]'s later by TIMELESSNESS
+     ([CtxRecord.ctx_parked_inv_body_timeless]).
+
+     What this lemma therefore hands its continuation is the rows AT THIS
+     HART's context -- which is what [ms_inithart_sched] and the scheduler
+     beyond it want, every one of them being stated at the ambient the
+     [sie_cap_gpr] pins. *)
   Local Lemma ms_spin
-      (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
+      (xid : CtxId) (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
       (p0 : mword 64) :
     add_vec (rget m (mword_of_int 14 : mword 5))
         (sign_extend' 64 (mword_of_int 0 : mword 12)) = started_addr ->
     sie_cap_gpr KT0 m n false p0 -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.main + 0x16) : mword 64) -∗
-    started_inv (main_deposit γd γv) -∗
+    started_inv (main_deposit xid γd γv) -∗
     ( ∀ m' : regfile,
         sie_cap_gpr KT0 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
-        main_deposit γd γv -∗
+        main_deposit_rows cur_ctx γd γv -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -345,7 +363,7 @@ Section ProofMainSecondary.
               (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
               (mword_of_int 0 : mword 12) m n
               (fun v => sign_extend' 64 v)
-              (fun v => (▷ (⌜v = started_clear⌝ ∨ main_deposit γd γv))%I)
+              (fun v => (▷ (⌜v = started_clear⌝ ∨ main_deposit xid γd γv))%I)
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_read_ram_plain_4 data2_ext_4
@@ -354,7 +372,7 @@ Section ProofMainSecondary.
     { iApply (mni_16 with "Htext"). }
     { rewrite Ha4. iExact "Hstcl". }
     { rewrite Ha4.
-      iApply (started_inv_load_au (⊤ ∖ ↑minstretN) (main_deposit γd γv)
+      iApply (started_inv_load_au (⊤ ∖ ↑minstretN) (main_deposit xid γd γv)
                 ltac:(solve_ndisj) with "Hsinv"). }
     iIntros (v).
     iApply wp_next_off_intro.
@@ -442,7 +460,30 @@ Section ProofMainSecondary.
       iDestruct "HPsi" as "[%Hv0 | #Hdep]".
       + (* the word read as 0 contradicts the branch having fallen through *)
         exfalso. rewrite HM2a5 Hv0 in Hbz. vm_compute in Hbz. discriminate.
-      + iApply ("Hcont" $! M2 with "Hcg Hpc Hdep").
+      + (* ---- THE ABSORB, at the second open ----
+             M2 DEBT, named: [hart_view_lb K ∗ ⌜T ≤ K⌝] is discharged at
+             [K := T] by the SC-only shim, exactly as the scheduler's resume
+             already does ([ProofSwtch]); the sweep that makes [K] real is
+             one item serving both (tso-absorb-memo.md §7).  NOT
+             [TsoCtxShim.ctx_dom_sc]: a bare [inv] has no acquire, so a
+             [ctx_dom] here would have no honest producer and would be a
+             permanent lie -- absorb's premise is HART-LOCAL and says nothing
+             about the source context, which is the whole reason this law is
+             the right one. *)
+        iDestruct "Hdep" as "[#Hpkinv #Hrows]".
+        iApply fupd_wp.
+        iInv "Hpkinv" as ">Hpk" "Hclosepk".
+        iDestruct "Hpk" as (Td) "Hpk".
+        iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+        iDestruct (TsoCtxShim.hart_view_lb_any Td) as "#HKd".
+        iMod (ctx_absorb (λ ξ : CtxId, main_deposit_rows ξ γd γv)
+                xid cur_ctx Td Td ltac:(lia) with "Hrun HKd Hpk Hrows")
+          as "(Hrun & Hpk & #Hrows')".
+        iDestruct ("Hcgb" with "Hrun") as "Hcg".
+        iMod ("Hclosepk" with "[Hpk]") as "_".
+        { iNext. iExists Td. iExact "Hpk". }
+        iModIntro.
+        iApply ("Hcont" $! M2 with "Hcg Hpc Hrows'").
   Qed.
 
   (* =================================================================== *)
@@ -754,9 +795,10 @@ Section ProofMainSecondary.
   (* =================================================================== *)
   Lemma wp_main_secondary_sconf 
       (m : regfile) (K : nat) (p0 : mword 64)
+      (xid : CtxId)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-    : wp_main_secondary_sconf_body m K p0 γd γv tlbvec0.
+    : wp_main_secondary_sconf_body m K p0 xid γd γv tlbvec0.
   (* [kallocG]/[fileG] are in [MAIN_SECONDARY]'s signature but this arm's proof
      never touches them, so the section would not generalize over them. *)
   Proof using All.
@@ -769,7 +811,7 @@ Section ProofMainSecondary.
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iApply (ms_entry m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc %Ha4".
-    iApply (ms_spin γd γv m1 (K - 2)%nat p0 Ha4 with "Hcg Htext Hpc Hsinv").
+    iApply (ms_spin xid γd γv m1 (K - 2)%nat p0 Ha4 with "Hcg Htext Hpc Hsinv").
     iIntros (m2) "Hcg Hpc #Hdep".
     iDestruct "Hdep" as (γpr γk γs pd pav pu root pas)
       "(#Hpenv & #Hpinv & #Hccaps & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".

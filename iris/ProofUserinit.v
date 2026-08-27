@@ -109,6 +109,7 @@ Require Import SpecNameiRootBoot.
 Require Import SpecRelease.
 Require Import SpecForkretPark.
 Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID] -- [park_token_intro] *)
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park's deposit *)
 Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] *)
@@ -757,10 +758,17 @@ Section ProofUserinit.
     (* THE TOKEN: the park, proved once at the top ([FP.park_token_intro])
        and from here on a resource every process hands its children. *)
     iPoseProof (FP.park_token_intro γs) as "#Htoken".
+    (* THE PARKER'S OWN THREAD-OF-CONTROL TOKEN, peeled out of the bundle
+       that carries it and put straight back: the park DEPOSITS three of the
+       package's rows into the child's freshly minted context, and
+       [TsoCtx.ctx_deposit] runs at the depositor's own authority
+       (tso-port.md §0.16′ step (ii)). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrunpk Hcgpk]".
     iMod (park_token_park N rest (upd_cwd V ipv) Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hpinv Hglobp Hmk Hstack Henv Hown [Hks Hctx Hpriv Hfd Hirs]")
-      as "Hpctx".
+            with "Hrunpk Htoken Htext Hwire Htramp Hpinv Hglobp Hmk Hstack Henv Hown [Hks Hctx Hpriv Hfd Hirs]")
+      as "[Hrunpk Hpctx]".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirs". iExact "Hctx". }
+    iDestruct ("Hcgpk" with "Hrunpk") as "Hcg".
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")
       as "Hpwhole".
     iEval (rewrite uin_pwhole_runnable) in "Hpwhole".

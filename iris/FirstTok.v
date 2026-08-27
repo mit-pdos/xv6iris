@@ -715,3 +715,74 @@ End FirstTok.
    the framing stops at the head symbol and the token travels by name. *)
 Typeclasses Opaque first_boot_persist.
 Typeclasses Opaque first_tok.
+
+(* ====================================================================== *)
+(* THE TRANSPORT OBLIGATION (tso-port M3 / the absorb tranche).            *)
+(*                                                                         *)
+(* [first_tok] is a conjunct of [ProcInv.proc_priv_core], which the park    *)
+(* must DEPOSIT into the child's freshly minted context -- so it owes       *)
+(* [CtxMorph], and BOTH arms do (the boot arm is the one userinit parks).   *)
+(* [ctx_morph_or] is the instance that was missing until this tranche.      *)
+(*                                                                         *)
+(* WHAT IS ACTUALLY ξ-INDEXED HERE, measured: [first_boot_persist]'s ∃ row  *)
+(* carrying [disk_geom]; [first_fsinit]'s 32 raw superblock BYTES and the   *)
+(* two [struct spinlock] words of the log's lock.  Everything else is a     *)
+(* [↦₄] cell (stage 1 does not flip those), a ghost, a pure fact, or a      *)
+(* closed handle -- [bio_ctx] included, since the escrow became a parked    *)
+(* record.  The ∃/big-op rows are applied AS TERMS: instance search reaches *)
+(* neither (§0.16′, measured), and all three names are [Typeclasses Opaque] *)
+(* besides.                                                                 *)
+(* ====================================================================== *)
+Section FirstTokMorph.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId}.
+  Context `{ICFG : icfg}.
+
+  Global Instance first_boot_persist_morph :
+    CtxMorph (λ ξ : CtxId, first_boot_persist (XI := ξ)).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /first_boot_persist.
+    iDestruct "H" as "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9
+                       & H10 & H11 & H12 & H13 & H14 & H15 & H16 & %H17)".
+    iDestruct "H9" as (pd pav pu) "[Hgeom Hdlk]".
+    iDestruct (disk_geom_morph fsc_disk pd pav pu ξ ξ' with "Hd Hgeom")
+      as "[Hd Hgeom]".
+    iFrame "Hd".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H10 H11 H12 H13 H14 H15 H16".
+    iFrame "%".
+    iExists pd, pav, pu. iFrame "Hgeom Hdlk".
+  Qed.
+
+  Global Instance first_fsinit_morph :
+    CtxMorph (λ ξ : CtxId, first_fsinit (XI := ξ)).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /first_fsinit.
+    iDestruct "H" as (dk sb vlock v_start v_dev v_nc v_n vname vcpu sb_old)
+      "(%Hp & Hg & Hsb & Hlk & Hnm & Hcpu & Hst & Hdev & Hout & Hcmt
+        & Hnc & Hn & Hlh & Hmb & Hir & Hbs)".
+    iDestruct (ctx_morph_big_sepL (seq 0 32)
+                 (λ _ i ξ0, ctx_pointsto ξ0 (pa_add first_sb_base i)
+                              (DfracOwn 1) (sb_old i))
+                 (λ i x, ctx_morph_pointsto _ _ _ _) ξ ξ' with "Hd Hsb")
+      as "[Hd Hsb]".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hnm") as "[Hd Hnm]".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hcpu") as "[Hd Hcpu]".
+    iFrame "Hd".
+    iExists dk, sb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu, sb_old.
+    iFrame "Hg Hsb Hlk Hnm Hcpu Hst Hdev Hout Hcmt Hnc Hn Hlh Hmb Hir Hbs".
+    iPureIntro. exact Hp.
+  Qed.
+
+  Global Instance first_tok_morph : CtxMorph (λ ξ : CtxId, first_tok (XI := ξ)).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /first_tok.
+    iDestruct "H" as "[(Hc & Hp & Hka & Hfi) | [Hc Hr]]".
+    - iDestruct (first_boot_persist_morph ξ ξ' with "Hd Hp") as "[Hd Hp]".
+      iDestruct (first_fsinit_morph ξ ξ' with "Hd Hfi") as "[Hd Hfi]".
+      iFrame "Hd". iLeft. iFrame "Hc Hp Hka Hfi".
+    - iDestruct (fs_ready_morph ξ ξ' with "Hd Hr") as "[Hd Hr]".
+      iFrame "Hd". iRight. iFrame "Hc Hr".
+  Qed.
+
+End FirstTokMorph.

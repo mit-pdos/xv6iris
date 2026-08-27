@@ -661,3 +661,44 @@ End FsReady.
    trap the in-section seals fix, one scope up. *)
 Typeclasses Opaque fs_ready.
 Typeclasses Opaque fs_ready_pre.
+
+(* ====================================================================== *)
+(* THE TRANSPORT OBLIGATION (tso-port M3 / the absorb tranche).            *)
+(*                                                                         *)
+(* [fs_ready] rides inside [FirstTok.first_tok], hence inside              *)
+(* [ProcInv.proc_priv], and the park has to DEPOSIT that block into the    *)
+(* child's freshly minted context -- so the whole chain owes [CtxMorph].    *)
+(* Since the escrow became a parked record, [bio_ctx] is a CLOSED TERM and *)
+(* EXACTLY ONE of the twenty-one conjuncts is still ξ-indexed: the ∃ row    *)
+(* carrying [DiskInv.disk_geom]'s three ring-page pointers (its lock handle *)
+(* beside it is closed, the payload being λ-converted).  The ∃ is applied   *)
+(* AS A TERM: instance search will not reach through [bi_exist] (§0.16′,    *)
+(* measured -- a [Hint Extern] does not rescue it), and [fs_ready] is       *)
+(* [Typeclasses Opaque] on top of that, which is why this is an explicit    *)
+(* instance rather than [apply _].                                          *)
+(*                                                                         *)
+(* OUTSIDE the section, because the instance quantifies the context the     *)
+(* section fixes.                                                           *)
+(* ====================================================================== *)
+Section FsReadyMorph.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId}.
+  Context `{ICFG : icfg}.
+
+  Global Instance fs_ready_morph : CtxMorph (λ ξ : CtxId, fs_ready (XI := ξ)).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /fs_ready.
+    iDestruct "H" as "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10
+                       & H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18
+                       & %H19 & H20 & H21)".
+    iDestruct "H10" as (pd pav pu) "[Hgeom Hdlk]".
+    iDestruct (disk_geom_morph fsc_disk pd pav pu ξ ξ' with "Hd Hgeom")
+      as "[Hd Hgeom]".
+    iFrame "Hd".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H11 H12 H13 H14 H15 H16 H17 H18 H20 H21".
+    iFrame "%".
+    iExists pd, pav, pu. iFrame "Hgeom Hdlk".
+  Qed.
+
+End FsReadyMorph.
