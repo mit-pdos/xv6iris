@@ -75,6 +75,10 @@ Qed.
 (* exec-level register-generic ADDI step (32-bit, F_Base): one lemma, ANY rd/rs1. *)
 
 (* WpGprAddi.v : ForwardAddiGpr *)
+(* Opts back out of [WpGpr]'s [gpr_file] seal: this file destructs the
+   register file directly.  Local, so nothing above inherits it. *)
+Local Typeclasses Transparent gpr_file.
+
 Section ForwardAddiGpr.
   Context (s : mstate) (pc : mword 64) (b : bool) (w : mword 32) (rs1 rd : mword 5) (imm : mword 12).
   Hypothesis Hfetch_at :

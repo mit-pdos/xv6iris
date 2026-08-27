@@ -769,3 +769,9 @@ Section span.
   Qed.
 
 End span.
+
+(* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md):
+   the read-only twin of [hreg_frame]; 72 files.
+   AT THE END OF THE FILE, so this file's own lemmas -- the accessors every
+   consumer should be using -- can still take it apart. *)
+Global Typeclasses Opaque hreg_frame_ro.

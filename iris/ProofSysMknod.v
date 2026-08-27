@@ -305,6 +305,10 @@ Proof. vm_compute. discriminate. Qed.
 (*  THE FRAME: sixteen of the eighteen slots ARE [char path[128]].        *)
 (* ===================================================================== *)
 
+(* Opts back out of the [word4_pointsto] seal: this file destructs it directly.
+   Local, so nothing above inherits the transparency. *)
+Local Typeclasses Transparent word4_pointsto.
+
 Section ProofSysMknodFrame.
   Context `{!riscvGS Σ}.
 

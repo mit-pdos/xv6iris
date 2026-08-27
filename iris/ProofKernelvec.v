@@ -273,6 +273,10 @@ Lemma kv_load_run :
   = Some (VSt (KernelSyms.kernelvec + 0x4a) kv_load_regs1 kv_store_heap0 []).
 Proof. vm_compute. reflexivity. Qed.
 
+(* Opts back out of the [gpr_file] seal: this file destructs the register
+   file directly.  Local, so nothing above inherits it. *)
+Local Typeclasses Transparent gpr_file.
+
 Section KernelvecCore.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.

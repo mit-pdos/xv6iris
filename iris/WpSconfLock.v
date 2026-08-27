@@ -73,6 +73,10 @@ Local Lemma data2_id_4 (v : mword 32) :
     reflexivity.
   Qed.
 
+(* Opts back out of the [word4_pointsto] seal: this file destructs it directly.
+   Local, so nothing above inherits the transparency. *)
+Local Typeclasses Transparent word4_pointsto.
+
 Section WpSconfLock.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.

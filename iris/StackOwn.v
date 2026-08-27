@@ -560,3 +560,9 @@ Section stack_own_phys.
   Qed.
 
 End stack_own_phys.
+
+(* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md):
+   ∃ ws, [∗ list] over the stack words; named in 197 files -- the widest in the tree.
+   AT THE END OF THE FILE, so this file's own lemmas -- the accessors every
+   consumer should be using -- can still take it apart. *)
+Global Typeclasses Opaque stack_own.

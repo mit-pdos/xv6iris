@@ -982,7 +982,7 @@ Proof. reflexivity. Qed.
 (* Opts back out of [RiscvPtsto]'s [word_pointsto] seal: this file takes
    page-table words apart byte by byte (same as [WpSmodePtLeaves]).
    Local, so nothing above inherits the transparency. *)
-Local Typeclasses Transparent word_pointsto.
+Local Typeclasses Transparent word_pointsto word4_pointsto.
 
 Section WpSmodePtMemLeaves.
   Context `{!riscvGS Σ, !xv6G Σ}.

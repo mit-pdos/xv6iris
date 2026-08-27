@@ -285,3 +285,9 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
   cbn match. apply exec_returnm.
 Qed.
+
+(* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md):
+   a [∗ map] over the register file; named in 91 files, and on the machine chain the critical path now runs through.
+   AT THE END OF THE FILE, so this file's own lemmas -- the accessors every
+   consumer should be using -- can still take it apart. *)
+Global Typeclasses Opaque gpr_file.

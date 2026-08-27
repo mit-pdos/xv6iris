@@ -184,3 +184,9 @@ Section KernelDataInv.
   Proof. apply kdata_ro_writable_none. vm_compute. discriminate. Qed.
 
 End KernelDataInv.
+
+(* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md):
+   a [∗ map] over the WHOLE kernel .rodata; named in 172 files.
+   AT THE END OF THE FILE, so this file's own lemmas -- the accessors every
+   consumer should be using -- can still take it apart. *)
+Global Typeclasses Opaque kernel_data.
