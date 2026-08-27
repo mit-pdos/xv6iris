@@ -8304,6 +8304,157 @@ steps' contents, and one step is added.
 160-file cone opens.
 
 
+### A6.75 THE GHOST SURGERY IS LANDED AND THE RACY GATE IS PROVEN — AND
+### THE GATE TURNS OUT TO NEED NO RECEIPT AND NO VIEW PREMISE AT ALL
+
+Executing the coordinator's ratified order (commit `cd07c1db`).  Steps 1 and
+the READ half of step 2 are LANDED AND GREEN; the store half, the sibling
+AU and the leaf tier are the handoff.
+
+#### (1) STEP 1: THE `ts_elem` WINDOW PAYLOAD, PER BYTE
+
+`TsoMemPa` §12c/§12d.  `ts_elem` is now `nat * ts_pay` with
+
+```coq
+  Record ts_pay := TsPay { tsp_pin : option (byteset * nat);
+                          tsp_win : option ts_win }.
+  Record ts_win := TsWin { tw_base; tw_n; tw_j; tw_z; tw_cp; tw_own }.
+```
+
+and `ts_ok` grew a THIRD conjunct (`∀ W, tsp_win e.2 = Some W ->
+win_ok1 img log a W`), LAST per durable-notes' new-conjunct rule.  **`e.1`
+did not move**, which is why the ~20 positional projections of the interp
+did not either: the payload is a RECORD, so the two optional arms got NAMES
+instead of positions and only `e.2`'s spelling changed.
+
+**MEASURED CHURN: 33 literal sites across five files** (`TsoCtx` 28,
+`RiscvAdequacy` 4 + 2 tie proofs, `RiscvPtsto` 1, `CtxPinMint` 1), plus
+four hand-written `ts_ok` proofs that gained a `split_and!` and one arm.
+The pin memo's estimate of "six files" was right.
+
+> **AND THE FRAME ARM CAME OUT DEFINITIONAL, WHICH IS THE WHOLE POINT OF
+> A6.74 §(2).**  `win_ok1_app_frame` needs `msg_byte m a = None` and
+> NOTHING ELSE — no premise about the rest of the window — so the three
+> framing tie proofs in `TsoCtx` each took one extra line of exactly the
+> pin's shape.  A store that wrote *some* of the window and not this byte
+> would not falsify the claim, it would drop it (that byte's element is in
+> `dom Pnew` and gets replaced), and it cannot happen anyway:
+> `ledger_store_ok` demands FULL ownership of every byte it writes, so a
+> partial writer would have to own a window byte the lock's invariant is
+> holding.  **Ownership is what makes the per-byte shape work, and that is
+> the sentence the byte-0 shape had no analogue of.**
+
+> **ONE NAME COLLISION, and it reports two files away.**  The obvious field
+> names `tp_pin` / `tp_win` collide with `HartTp.tp_pin` (the hart's
+> register-file pin, used tree-wide).  A record field shadows it in every
+> importer, and the failure surfaces in `IntrDefs` as *`The term "m" has
+> type "regfile" while it is expected to have type "ts_pay"`* — which reads
+> like a broken `gpr_file` and is a naming clash.  Fields are `tsp_*`, and
+> the definition says why.
+
+#### (2) STEP 2, READ HALF: `ledger_read_racy_ok`, AND ITS PREMISE LIST IS
+#### THE RESULT
+
+```coq
+  Definition phys_ledger_win (a : Arch.pa) (dq : dfrac) (v : bv 8) (t : nat)
+      (W : ts_win) : iProp Σ :=
+    (phys_pointsto a dq v ∗ a ↪[ts_name]{dq} (t, ts_pay_win W))%I.
+
+  Lemma ledger_read_racy_ok (g : gstate) base n dq f ts z cp own t :
+    (0 < n)%nat ->
+    own (hart_agent cpu_id) = Some t ->
+    (exists k, (k < n)%nat /\ z k <> cp (hart_agent cpu_id) k) ->
+    (forall h', h' <> hart_agent cpu_id ->
+       exists k, (k < n)%nat /\ cp h' k <> cp (hart_agent cpu_id) k) ->
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ seq 0 n,
+       phys_ledger_win (pa_add base j) dq (f j) (ts j)
+         (TsWin base n j z cp own)) -∗
+    ⌜forall tv, exists k, (k < n)%nat /\
+       tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add base k)
+       <> Some (cp (hart_agent cpu_id) k)⌝.
+```
+
+**READ THE PREMISES FOR WHAT IS NOT THERE: no `view_lb`, no bound `B`, no
+`g.(gtv)`.**  The conclusion holds at EVERY view — not at every view above
+something — because `read_down` scans DOWN from the top and `visibleb_own`
+makes the reader's own message visible at every view.  A receipt could not
+improve it and none is needed.  That is the sharpest available statement of
+why the racy kit is **not a weakened pin**: the pin's conclusion is
+`∀ tv' ≥ B`, and this one has no `B` to have.
+
+The word form (`ledger_read_racy_word_ok`) is the byte-to-word step the
+leaf consumes: one differing byte makes the assembled word differ, stated
+at a general `bv m` so the step is done once.  Both compiled first try over
+the assembly theorems.
+
+#### (3) THE THIRD KIT ITEM, AND IT IS *PURE*
+
+`ledger_read_any_ok` consumes **no resource at all**:
+
+```coq
+  Lemma ledger_read_any_ok (g : gstate) (a : Arch.pa) (b : bv 8) :
+    g.(gimg) !! a = Some b ->
+    forall tv, exists c, tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv a
+                         = Some c.
+```
+
+over the new `TsoMemPa.tso_read_total` (`read_down` bottoms out at
+timestamp 0, visible at every view by `visibleb_below`, and that is the era
+image).  **That is the honest statement of "no evidence"**: the free-path
+leaf's obligation is discharged by the machine's own totality over the
+image, not by anything the client owns.  `ledger_win_img_cover` supplies
+its premise for a WINDOWED cell out of `win_ok1`'s conjunct (2) — so the
+free-path read of `lk->cpu` costs nothing extra.
+
+> **AND IT LEAVES ONE NAMED OBLIGATION.**  The free-path read of the lock
+> WORD (`lk`, not `lk->cpu`) has no window payload, so its image coverage
+> has no supplier yet.  Either give the lock word a (degenerate,
+> `tw_n = 4`) window payload, or add an image-coverage conjunct to the
+> lock's own claim.  It is a premise, not a design question — but it is
+> not free, and it is the one thing between `ledger_read_any_ok` and
+> `wp_clw_lockopen_s_sconf`.
+
+#### THE NUMBER
+
+**1088 of 1296, RED 9 — UNCHANGED across all of it**, over rounds that
+rebuilt `TsoMemPa`'s whole cone twice from source, and a confirm round that
+recompiled **exactly the nine red targets and failed on all nine**.  No `Admitted`, no
+`admit`, no new `Axiom`; the one `Abort` is still
+`UsertrapRes.ut_res_bare_park`.  Shim ledger unchanged at 36 qualified uses
+in 28 files.  **A ghost element grew a second optional payload, a tie grew
+a third conjunct, and not one client moved** — which is the acceptance test
+the pin memo set for this kind of change, passed a second time.
+
+#### HANDOFF: WHAT IS LEFT OF M4, IN ORDER
+
+1. **`TsoCtx.ledger_store_win_ok`** — the payload-preserving twin of
+   `ledger_store_pin_ok`, for the lock's own 8-byte `sd`.  It writes all
+   `n` bytes, so it must (a) re-establish `win_ok1`'s conjunct (1) for the
+   new message from the store's own value, (b) update `tw_own` for the
+   AUTHOR to `S (length glog)` (`own_last_app_self`) and leave every other
+   agent's entry alone (`own_last_app_frame`, side condition off the
+   store's `auth`), and (c) carry (2) unchanged.  The author premise on
+   `ledger_store_pin_ok` is the same `auth` argument and comes with it.
+2. **The phys-datum sibling AU** — A6.74 §(3)'s parametric-`Res` shape,
+   over the `_exv` nodes A6.74 §(1) landed.  This is the file A6.64's
+   forty-argument hazard lives in; keep the three payload spellings in
+   agreement and move the NODE argument with the obligation.
+3. **`WpLock.lk_cpu_res` at `phys_ledger_word`** plus the eight
+   `phys_ledger_win` fragments (the reader assembles from them) and the
+   held arm's `ledger_vis` residue.
+4. **`WpSconfLock`** — delete the dead leaf; holder reads on
+   `ledger_vis_own` + `view_lb_0`; `notheld` on `ledger_read_racy_word_ok`;
+   free path on `ledger_read_any_ok` (plus §(3)'s named obligation for the
+   lock word); stores/AMO on the parked record.  `lock_claims`' surviving
+   `TsoCtxShim.ctx_word_of_mem` dies here.
+5. **`ProofHolding`**'s 2 call sites, statements unchanged.
+
+**ACCEPTANCE, unchanged:** `SpecAcquire` / `SpecRelease` / `SpecHolding` /
+`is_lock` / `locked` / `lock_openable` do not move, and `WpSconfLock`'s
+160-file cone opens.
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
