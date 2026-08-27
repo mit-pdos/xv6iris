@@ -390,27 +390,27 @@ Section KallocCtx.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /byte_any.
     iDestruct "H" as (b) "H".
-    iDestruct (ctx_morph_pointsto _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame "Hd". iExists b. iExact "H".
+    iMod (ctx_morph_pointsto _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]".
+    iModIntro. iFrame "Hd". iExists b. iExact "H".
   Qed.
 
   Global Instance word_at_morph (a w : mword 64) :
     CtxMorph (λ ξ0 : CtxId, word_at (XIk := ξ0) a w).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /word_at.
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame "Hd". iExact "H".
+    iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]".
+    iModIntro. iFrame "Hd". iExact "H".
   Qed.
 
   Global Instance page_rest_morph (p : mword 64) :
     CtxMorph (λ ξ0 : CtxId, page_rest (XIk := ξ0) p).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /page_rest.
-    iDestruct (ctx_morph_big_sepL (seq 8 4088)
+    iMod (ctx_morph_big_sepL (seq 8 4088)
             (λ _ j ξ0, byte_any (XIk := ξ0) (pa_add p j))
             (λ i x, byte_any_morph _)
             ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame.
+    iModIntro. iFrame.
   Qed.
 
   Global Instance run_page_morph (p next : mword 64) :
@@ -418,9 +418,9 @@ Section KallocCtx.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /run_page.
     iDestruct "H" as "[Hw Hr]".
-    iDestruct (word_at_morph p next ξ ξ' with "Hd Hw") as "[Hd Hw]".
-    iDestruct (page_rest_morph p ξ ξ' with "Hd Hr") as "[Hd Hr]".
-    iFrame.
+    iMod (word_at_morph p next ξ ξ' with "Hd Hw") as "[Hd Hw]".
+    iMod (page_rest_morph p ξ ξ' with "Hd Hr") as "[Hd Hr]".
+    iModIntro. iFrame.
   Qed.
 
   Global Instance freelist_chain_morph (head : mword 64)
@@ -428,12 +428,12 @@ Section KallocCtx.
     CtxMorph (λ ξ0 : CtxId, freelist_chain (XIk := ξ0) head pages).
   Proof.
     revert head. induction pages as [|p ps IH] => head.
-    - iIntros (ξ ξ') "Hd H". iFrame.
+    - iIntros (ξ ξ') "Hd H". iModIntro. iFrame.
     - iIntros (ξ ξ') "Hd H". simpl.
       iDestruct "H" as "(%Hh & %Hv & %nxt & Hrun & Hchain)".
-      iDestruct (run_page_morph p nxt ξ ξ' with "Hd Hrun") as "[Hd Hrun]".
-      iDestruct (IH nxt ξ ξ' with "Hd Hchain") as "[Hd Hchain]".
-      iFrame "Hd".
+      iMod (run_page_morph p nxt ξ ξ' with "Hd Hrun") as "[Hd Hrun]".
+      iMod (IH nxt ξ ξ' with "Hd Hchain") as "[Hd Hchain]".
+      iModIntro. iFrame "Hd".
       iSplit; [done|]. iSplit; [done|]. iExists nxt. iFrame.
   Qed.
 
@@ -442,10 +442,10 @@ Section KallocCtx.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /kmem_res.
     iDestruct "H" as (head pages) "(Hw & Hchain & Hauth)".
-    iDestruct (word_at_morph fl head ξ ξ' with "Hd Hw") as "[Hd Hw]".
-    iDestruct (freelist_chain_morph head pages ξ ξ' with "Hd Hchain")
+    iMod (word_at_morph fl head ξ ξ' with "Hd Hw") as "[Hd Hw]".
+    iMod (freelist_chain_morph head pages ξ ξ' with "Hd Hchain")
       as "[Hd Hchain]".
-    iFrame "Hd". iExists head, pages. iFrame.
+    iModIntro. iFrame "Hd". iExists head, pages. iFrame.
   Qed.
 
   (* the whole allocator = a spinlock whose resource is [kmem_res], stated

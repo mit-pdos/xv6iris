@@ -51,6 +51,9 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec.
+(* [fence_post]/[own_pub_le]/[pwmsg]: the barrier is the one silent node with
+   a memory-model effect (see [hsil_tv]).  Import is not transitive. *)
+Require Import TsoMemPa.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 
@@ -125,13 +128,74 @@ Qed.
 (*    view already (no per-CPU insert to case over).                        *)
 (* ====================================================================== *)
 
+(* THE VIEW EFFECT OF A SILENT NODE (tso-machine-flip.md §2).  Every node
+   [hsil_node] accepts leaves the memory-model state alone EXCEPT ONE: under
+   Ztso a BARRIER with a W→R edge DRAINS, and [mnode_step]'s arm takes the
+   view to [fence_post].  So the silent stretch can no longer PIN the view;
+   it CARRIES it, and [wp_hsil_node] below pays the (monotone) view update
+   for a draining fence.
+
+   WHAT THIS DOES NOT DO: it does not mint a [hart_view_lb] receipt.  §6's
+   barrier leaf is a SEPARATE rule over the same node, for the proof that
+   wants the acquire receipt; keeping [Barrier] silent here is what keeps
+   every existing silent-stretch proof (which walks over fences it does not
+   care about) working unchanged.  See the §6 amendments in
+   claude-notes/projects/tso-machine-flip.md. *)
+(* AT THE OUTCOME, so the span layer (which has destructed the node into
+   [oc] and [k] already) can name it without rebuilding the monad term. *)
+Definition hbar_tv {T : Type} (h : agent) (log : list pwmsg)
+    (oc : Interface.outcome (fun _ => exception) T) (tv : nat) : nat :=
+  match oc with
+  | Interface.Barrier b => fence_post h log (fence_drains b) tv
+  | _ => tv
+  end.
+
+Definition hsil_tv {X : Type} (h : agent) (log : list pwmsg) (m : M X)
+    (tv : nat) : nat :=
+  match m with
+  | Interface.Ret _ => tv
+  | Interface.Next oc _ => hbar_tv h log oc tv
+  end.
+
+(* the drain only ever moves the view FORWARD ... *)
+Lemma hbar_tv_ge {T : Type} (h : agent) (log : list pwmsg)
+    (oc : Interface.outcome (fun _ => exception) T) (tv : nat) :
+  (tv <= hbar_tv h log oc tv)%nat.
+Proof.
+  destruct oc; try done. rewrite /hbar_tv /fence_post. case_match; lia.
+Qed.
+
+(* ... and never past the top of the log ([own_pub_le]). *)
+Lemma hbar_tv_le {T : Type} (h : agent) (log : list pwmsg)
+    (oc : Interface.outcome (fun _ => exception) T) (tv : nat) :
+  (tv <= length log)%nat -> (hbar_tv h log oc tv <= length log)%nat.
+Proof.
+  intros Htv. destruct oc; try done.
+  rewrite /hbar_tv /fence_post. case_match; [|done].
+  apply Nat.max_lub; [done|apply own_pub_le].
+Qed.
+
+Lemma hsil_tv_ge {X : Type} (h : agent) (log : list pwmsg) (m : M X)
+    (tv : nat) : (tv <= hsil_tv h log m tv)%nat.
+Proof. destruct m as [y|T oc k]; [done|]. apply hbar_tv_ge. Qed.
+
+Lemma hsil_tv_le {X : Type} (h : agent) (log : list pwmsg) (m : M X)
+    (tv : nat) :
+  (tv <= length log)%nat -> (hsil_tv h log m tv <= length log)%nat.
+Proof.
+  intros Htv. destruct m as [y|T oc k]; [done|]. by apply hbar_tv_le.
+Qed.
+
 Lemma hsil_node_mnode (D : gset register) (rs rs' : regstate)
     (m m' : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state) :
   hsil_node D rs m = Some (rs', m') ->
-  forall (oth : gset Arch.pa) (r : option resv),
-    mnode_step oth (MState rs mem dev) r m m' (MState rs' mem dev) r.
+  forall (oth : gset Arch.pa) (h : agent) (img : gmap Arch.pa (bv 8))
+         (log : list pwmsg) (tv : nat) (r : option resv),
+    mnode_step oth h img (MState rs mem dev) log tv r m m'
+      (MState rs' mem dev) log (hsil_tv h log m tv) r.
 Proof.
-  intros Hnode oth r. destruct m as [y|T oc k]; [by simpl in Hnode|].
+  intros Hnode oth h img log tv r. destruct m as [y|T oc k];
+    [by simpl in Hnode|].
   destruct oc; simpl in Hnode |- *; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
     injection Hnode as <- <-; by split_and!.
@@ -139,15 +203,19 @@ Qed.
 
 Lemma hsil_node_mnode_inv (D : gset register) (rs rs' : regstate)
     (m m' m2 : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state)
-    (σ2 : mstate) (oth : gset Arch.pa) (r r2 : option resv) :
+    (σ2 : mstate) (oth : gset Arch.pa) (h : agent)
+    (img : gmap Arch.pa (bv 8)) (log log2 : list pwmsg) (tv tv2 : nat)
+    (r r2 : option resv) :
   hsil_node D rs m = Some (rs', m') ->
-  mnode_step oth (MState rs mem dev) r m m2 σ2 r2 ->
-  m2 = m' /\ σ2 = MState rs' mem dev /\ r2 = r.
+  mnode_step oth h img (MState rs mem dev) log tv r m m2 σ2 log2 tv2 r2 ->
+  m2 = m' /\ σ2 = MState rs' mem dev /\ log2 = log /\
+  tv2 = hsil_tv h log m tv /\ r2 = r.
 Proof.
   intros Hnode Hstep. destruct m as [y|T oc k]; [by simpl in Hnode|].
-  destruct oc; simpl in Hnode; try discriminate Hnode;
+  destruct oc; simpl in Hnode |- *; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; destruct Hstep as (-> & -> & ->); by split_and!.
+    injection Hnode as <- <-; destruct Hstep as (-> & -> & -> & -> & ->);
+    by split_and!.
 Qed.
 
 (* a silent node never touches the hart's reservation -- the side condition
@@ -155,15 +223,18 @@ Qed.
 Lemma hsil_node_pres (D : gset register) (rs rs' : regstate)
     (m m' : M unit) :
   hsil_node D rs m = Some (rs', m') ->
-  forall (oth : gset Arch.pa) (s : mstate) (r : option resv) (m2 : M unit)
-         (s2 : mstate) (r2 : option resv),
-    mnode_step oth s r m m2 s2 r2 -> r2 = r.
+  forall (oth : gset Arch.pa) (h : agent) (img : gmap Arch.pa (bv 8))
+         (s : mstate) (log : list pwmsg) (tv : nat) (r : option resv)
+         (m2 : M unit) (s2 : mstate) (log2 : list pwmsg) (tv2 : nat)
+         (r2 : option resv),
+    mnode_step oth h img s log tv r m m2 s2 log2 tv2 r2 -> r2 = r.
 Proof.
-  intros Hnode oth s r m2 s2 r2 Hstep.
+  intros Hnode oth h img s log tv r m2 s2 log2 tv2 r2 Hstep.
   destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; destruct Hstep as (_ & _ & ->); reflexivity.
+    injection Hnode as <- <-; destruct Hstep as (_ & _ & _ & _ & ->);
+    reflexivity.
 Qed.
 
 (* ====================================================================== *)
@@ -450,20 +521,41 @@ Section batch.
   Proof.
     iIntros (Hnode) "#Hcert Hrf H".
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
-      exact (hsil_node_pres D rs rs1 m m1 Hnode oth0 σ0 r0 m'0 σ'0 r'0 Hs). }
-    iIntros (σ oth r) "Hσ". destruct σ as [rs0 mem0 dev0].
+    { intros oth0 h0 img0 σ0 log0 tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs.
+      exact (hsil_node_pres D rs rs1 m m1 Hnode oth0 h0 img0 σ0 log0 tv0 r0
+               m'0 σ'0 log'0 tv'0 r'0 Hs). }
+    iIntros (σ oth r img log tv V) "%Htv Hσ Htso".
+    destruct σ as [rs0 mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (hreg_frame_agree rs D rs0 with "Hri Hrf") as %Hag.
     destruct (hsil_node_agree D rs rs0 m m1 rs1 Hag Hnode)
       as (rs2 & Hnode2 & Hag2).
+    (* the view's legal-position bound, read off the bundle: what makes the
+       fence's drain a MONOTONE advance rather than an arbitrary jump *)
+    iAssert (⌜(tv <= length log)%nat⌝)%I as %Htvlen.
+    { iDestruct "Htso" as (TM LM) "(_&_&_&_&_&_&_&_&%Hb&_)".
+      iPureIntro. rewrite -Htv. apply Hb. }
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iExists m1, (MState rs2 mem0 dev0), r.
+    iExists m1, (MState rs2 mem0 dev0), log,
+      (hsil_tv (hart_agent cpu_id) log m tv), r.
     iSplitR.
-    { iPureIntro. exact (hsil_node_mnode D rs0 rs2 m m1 mem0 dev0 Hnode2 oth r). }
-    iNext. iIntros (m' σ' r') "%Hstep".
-    destruct (hsil_node_mnode_inv D rs0 rs2 m m1 m' mem0 dev0 σ' oth r r'
-                Hnode2 Hstep) as (-> & -> & ->).
+    { iPureIntro.
+      exact (hsil_node_mnode D rs0 rs2 m m1 mem0 dev0 Hnode2 oth
+               (hart_agent cpu_id) img log tv r). }
+    iNext. iIntros (m' σ' log' tv' r') "%Hstep".
+    destruct (hsil_node_mnode_inv D rs0 rs2 m m1 m' mem0 dev0 σ' oth
+                (hart_agent cpu_id) img log log' tv tv' r r' Hnode2 Hstep)
+      as (-> & -> & -> & -> & ->).
+    (* THE ONE MEMORY-MODEL EFFECT (see [hsil_tv]): a draining fence moves
+       this hart's view forward.  Every other silent node leaves it where it
+       was, and [tso_interp_of_advance] is then the identity update. *)
+    assert (Hadv : (V (hart_agent cpu_id)
+                    <= hsil_tv (hart_agent cpu_id) log m tv)%nat)
+      by (rewrite Htv; apply hsil_tv_ge).
+    iMod (tso_interp_of_advance _ img mem0 log V (hart_agent cpu_id)
+            (hsil_tv (hart_agent cpu_id) log m tv)
+            (fin_to_nat_lt cpu_id) Hadv (hsil_tv_le _ _ _ _ Htvlen)
+           with "Htso") as "Htso".
     (* re-establish: for a RegWrite one footprint register moves, for
        everything else the file is untouched *)
     iAssert (|==> reg_interp rs2 ∗ hreg_frame rs1 D)%I
@@ -489,7 +581,8 @@ Section batch.
             injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
             iModIntro; iFrame "Hri"; by iApply (hreg_frame_ext rs rs D) ]. }
     iMod "Hmask" as "_". iModIntro.
-    iSplitR "H Hrf"; [iFrame "Hri Hmem Hdev"|].
+    iSplitR "H Hrf Htso"; [iFrame "Hri Hmem Hdev"|].
+    iSplitL "Htso"; [iExact "Htso"|].
     by iApply "H".
   Qed.
 

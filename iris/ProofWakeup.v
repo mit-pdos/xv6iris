@@ -403,7 +403,7 @@ Section ProofWakeup.
          here or below needs to know, see the file header. *)
       iDestruct (cpu_own_transport CIDk CIDe lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDe) γk "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr k)) M3a
+      iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDe) γk "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> M3a
                 lvl eb pme av b lks
                 ltac:(lia)
                 ltac:(lia)
@@ -513,7 +513,7 @@ Section ProofWakeup.
         (* [b] IS [outb] ([cpu_own] forces it, = [Hbmatch]); pure re-spelling
            so that the acquire/release pair composes back to [av]. *)
         iEval (rewrite Hbmatch) in "Hcg".
-        iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr k)) Mr2c
+        iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> Mr2c
                   lvl eb pme av ({["proc"]} ∪ lks)
                   Hlka2
                   ltac:(lia)

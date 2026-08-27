@@ -41,6 +41,15 @@ Local Open Scope Z_scope.
     [CPU] in by [fin_to_nat] and gives the disk [NCPU]. *)
 Notation agent := nat (only parsing).
 
+(* THE FLAT BYTE MAP, AS A NAME.  A file that imports [SailStdpp.Base]
+   elaborates a fresh [gmap Arch.pa (bv 8)] BINDER at the SAIL key instances
+   ([Decidable_eq_mword]/[Countable_mword]) and it will not unify with the
+   stdpp-keyed one this file and [RiscvLang] use -- the durable-notes binder
+   trap, whose error names neither file.  [RiscvLang.v] avoids it by
+   importing [SailStdpp.Base] LATE; a leaf file that cannot reorder its
+   imports spells the type with this name instead. *)
+Definition bytemap : Type := gmap Arch.pa (bv 8).
+
 (* ------------------------------------------------------------------ *)
 (** ** Messages and the global write log *)
 
@@ -339,6 +348,77 @@ Proof.
       rewrite (read_down_app_below img log m h (length log) (S (length log))
                  a (length log)); [lia|lia|lia|].
       by rewrite -IH /tso_read.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** ** THE SOLO ERA: a log with a single author
+
+    The SC collapse above is the collapse AT THE TOP VIEW.  There is a
+    second, orthogonal one, and it is what makes the solo-block bracket
+    ([HartBlock.v], tso-machine-flip.md RULING 3) true at TSO: when the
+    log holds NOTHING BUT [h]'s own messages, the own-author arm of
+    [visibleb] fires at every timestamp, so [h] sees the whole log at
+    EVERY view and its plain loads read the flat cache no matter where
+    the view happens to sit.  "My store buffer is the only one" — the
+    boot era before the other harts are released, and the
+    device-conformance tester's single-agent runs.
+
+    This is exactly the premise the bracket's plain-load arm needs to
+    fold back into [run]'s [s.(mem)] read; the FLAT TIE ([s.(mem)] =
+    [flat img log], the [RiscvLang.mm_ok] conjunct) supplies the other
+    half.  Note that the collapse is UNCONDITIONAL in [tv]: no
+    view-position side condition, which is what keeps the bracket from
+    having to thread a view through the block. *)
+
+Definition all_own (h : agent) (log : list pwmsg) : Prop :=
+  ∀ m, m ∈ log → pm_tid m = h.
+
+Lemma all_own_nil h : all_own h [].
+Proof. move => m. by rewrite elem_of_nil. Qed.
+
+(** The era invariant is INDUCTIVE over the write arm: a hart's own
+    store appends its own message. *)
+Lemma all_own_app h log m :
+  all_own h log → pm_tid m = h → all_own h (log ++ [m]).
+Proof.
+  move => Hl Hm m0 /elem_of_app [Hin|Hin]; first by apply Hl.
+  by apply elem_of_list_singleton in Hin as ->.
+Qed.
+
+(** Every in-range timestamp is visible to the sole author, at any view. *)
+Lemma all_own_visible h tv log t :
+  all_own h log → (t ≤ length log)%nat → visibleb h tv log t = true.
+Proof.
+  move => Hown Ht. destruct t as [|i]; first by apply visibleb_below; lia.
+  destruct (log !! i) as [m|] eqn:Hlk.
+  - eapply visibleb_own; [exact Hlk|].
+    apply Hown. by eapply elem_of_list_lookup_2.
+  - exfalso. apply lookup_ge_None_1 in Hlk. simpl in Ht. lia.
+Qed.
+
+(** [read_down] only ever consults [visibleb] at timestamps it scans, so
+    two views that agree "visible" over the whole scan read alike. *)
+Lemma read_down_vis_irrel img log h tv tv' a n :
+  (∀ t, (t ≤ n)%nat → visibleb h tv log t = true) →
+  (∀ t, (t ≤ n)%nat → visibleb h tv' log t = true) →
+  read_down img log h tv a n = read_down img log h tv' a n.
+Proof.
+  induction n as [|n IH] => Hv Hv'.
+  - by rewrite !read_down_0.
+  - rewrite !read_down_S (Hv (S n) ltac:(lia)) (Hv' (S n) ltac:(lia)).
+    cbn beta iota.
+    destruct (log_byte img log (S n) a); first done.
+    apply IH; move => t Ht; [apply Hv|apply Hv']; lia.
+Qed.
+
+(** THE SOLO COLLAPSE: the sole author of the log reads the flat cache
+    at EVERY view.  (Contrast [tso_read_top_flat], which is any agent at
+    the top view.) *)
+Lemma tso_read_all_own img log h tv a :
+  all_own h log → tso_read img log h tv a = flat img log !! a.
+Proof.
+  move => Hown. rewrite -(tso_read_top_flat img log h a) /tso_read.
+  apply read_down_vis_irrel; move => t Ht; by apply all_own_visible.
 Qed.
 
 (* ------------------------------------------------------------------ *)

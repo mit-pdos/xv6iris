@@ -45,6 +45,9 @@ Require Import WireInv WpVirtio.
    these two are required AFTER SailStdpp.Base/Values above, exactly like
    WpVirtio, so their (RiscvPtsto-mirroring) elaboration is unaffected. *)
 Require Import DiskPtsto VirtioProto.
+(* A6.48 ruling 4: the disk loop is the payer of the DMA completion's log
+   append, so it names the message and the store gate. *)
+Require Import TsoMemPa.
 Require Import PermInv.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)
@@ -888,7 +891,8 @@ Section DevLoops.
        over because a DMA completion is the one step that moves [v_disk]): the
        latch and stutter arms FRAME it, and the completion arm passes it
        through [virtio_proto_step] (claude-notes/design/crash.md). *)
-    iIntros (gr m d n Hn) "(Hgr & Hmem & Hdev & Hdur & Htie & Hsa)".
+    iIntros (gr m d n img log V Hn)
+            "(Hgr & Hmem & Hdev & Hdur & Htie & Hsa & Htso)".
     (* THE PERMIT INVARIANT IS OPENED IN THE FIRST (⊤ -> ∅) LEG, before the
        arm is even known.  It has to be: [perm_inv_body] is NOT timeless (it
        holds the clients' view shifts), so the only [▷]-stripping opportunity
@@ -898,7 +902,7 @@ Section DevLoops.
        so the openings compose ([solve_ndisj]). *)
     iInv "Hqinv" as "Hpbody" "Hpclose".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iNext. iIntros (d' m' Hstep).
+    iNext. iIntros (d' W log') "%Hstep %Hlog".
     iMod "Hmask" as "_".
     destruct Hstep as [mv vnew w Hview Hdisk | mv vnew Hview Hcap
                       | s vnew Hdrain
@@ -928,7 +932,8 @@ Section DevLoops.
       (* the protocol step is an ACCESSOR over the permit channel: it hands
          out the completing request's PENDING token and owes the SPENT one *)
       iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk
-              with "Hmem Hdur Hlease") as (kq wr) "(%Hwr & Hpend & Hback)".
+              with "Hmem Hdur Hlease")
+        as (kq wr old) "(%Hwr & %Hdomold & Hmem & Hold & Hpend & Hback)".
       (* the post-completion image, in the form the tie must move to: the
          IDENTITY, because every sector landed at its own earlier step *)
       assert (Hpost : wr_apply None (v_disk (dvirtio d)) = v_disk vnew)
@@ -966,17 +971,87 @@ Section DevLoops.
       iMod "Hmclose" as "_".
       iEval (rewrite Hpost) in "Htie".
       iMod ("Hcclose" with "HP") as "_".
-      iDestruct ("Hback" with "Hdone") as "(Hmem' & Hdur' & Hlease')".
+      (* ================================================================ *)
+      (* THE DMA COMPLETION'S APPEND (A6.48 ruling 4, closing A6.28/A6.29). *)
+      (* The device is an AGENT of the era log: its whole write set goes in *)
+      (* as ONE message authored by [disk_agent], and the ghost steps that  *)
+      (* append owes are paid HERE, by the one holder of both authorities.  *)
+      (* That is why [virtio_proto_step] had to be turned inside out --     *)
+      (* [ledger_store_ok] moves [gen_heap_interp] and [tso_interp_at]      *)
+      (* TOGETHER (the interp's tie relates the flat cell to the timestamp  *)
+      (* element), so it cannot be split across the protocol and the loop.  *)
+      (* A6.11's log disjunct decides which half runs: an EMPTY write set   *)
+      (* hands both authorities straight back, a non-empty one stores.      *)
+      (* ================================================================ *)
+      iAssert (|==> gen_heap_interp (w ∪ m) ∗
+                 tso_interp_of riscv_eraGS img (w ∪ m) log'
+                   (vstep disk_agent (length log') log' V) ∗
+                 ([∗ map] a ↦ b ∈ w, TsoCtx.phys_ledger a (DfracOwn 1) b))%I
+        with "[Hmem Htso Hold]" as ">(Hmem & Htso & Hnew)".
+      { iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+        iDestruct (tso_interp_of_bound with "Htso") as %Hbnd.
+        destruct Hlog as [[Hw Hl] | [Hne Hl]].
+        - (* nothing was written: [old] is empty too ([dom old = dom w]) *)
+          subst w log'.
+          rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
+          rewrite big_sepM_empty.
+          assert (Hoe : old = ∅) by (apply dom_empty_inv_L;
+            rewrite Hdomold dom_empty_L //).
+          rewrite Hoe big_sepM_empty.
+          iModIntro. iFrame "Hmem".
+          iSplitL; [|done]. iApply (tso_interp_of_disk_idle with "Htso").
+        - (* the real append, at the [disk_agent] author *)
+          subst log'.
+          set (V' := vstep disk_agent
+                       (length (log ++ [TsoMemPa.PWMsg w disk_agent])%list)
+                       (log ++ [TsoMemPa.PWMsg w disk_agent])%list V).
+          assert (Hpin' : forall h, (NCPU <= h)%nat ->
+                    V' h = length (log ++ [TsoMemPa.PWMsg w disk_agent])%list).
+          { intros h Hh. rewrite /V' /vstep. case_decide as Hd; [done|].
+            destruct (lt_dec h NCPU) as [|Hge]; [lia|done]. }
+          assert (Htvmono : forall c : CPU,
+                    (V (hart_agent c) <= V' (hart_agent c))%nat).
+          { intros c. rewrite /V' /vstep. case_decide as Hd.
+            - exfalso. pose proof (fin_to_nat_lt c).
+              rewrite /hart_agent /disk_agent in Hd. lia.
+            - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; [lia|].
+              exfalso. pose proof (fin_to_nat_lt c).
+              rewrite /hart_agent in Hge. lia. }
+          assert (Htvtop : forall c : CPU,
+                    (V' (hart_agent c) <= length
+                       (log ++ [TsoMemPa.PWMsg w disk_agent])%list)%nat).
+          { intros c. rewrite /V' /vstep. case_decide as Hd; [lia|].
+            destruct (lt_dec (hart_agent c) NCPU) as [|Hge].
+            - rewrite length_app /=. have := Hbnd (hart_agent c). lia.
+            - lia. }
+          rewrite (tso_interp_of_at_gs riscv_eraGS img m log V
+                     (gr 0%fin) d Hpin).
+          iMod (TsoCtx.ledger_store_ok
+                  (gs_of img m log V (gr 0%fin) d)
+                  (gs_of img (w ∪ m)
+                     (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
+                     (gr 0%fin) d)
+                  disk_agent old w Hdomold eq_refl eq_refl eq_refl
+                  Htvmono Htvtop with "Hmem Htso Hold")
+            as "(Hmem & Htso & _ & Hnew)".
+          iModIntro. iFrame "Hmem".
+          rewrite -(tso_interp_of_at_gs riscv_eraGS img (w ∪ m)
+                      (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
+                      (gr 0%fin) d Hpin').
+          iFrame "Htso".
+          iApply (big_sepM_mono with "Hnew"). iIntros (a b _) "H".
+          by iApply TsoCtx.phys_ledger_at_ledger. }
+      iDestruct ("Hback" with "Hdone Hnew") as "(Hdur' & Hlease')".
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
         iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w Hvok Hdisk). }
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
-      iModIntro. iFrame "Hgr Hmem' Hdev'".
+      iModIntro. iFrame "Hgr Hmem Hdev'".
       iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdv']".
       iEval (rewrite Himg) in "Hdauth'".
       iSplitL "Hdauth'".
       { iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdv'. }
-      iFrame "Htie Hsa".
+      iFrame "Htie Hsa Htso".
       iApply "IH".
     - (* THE CAPTURE: the head write request's data enters the device's
          VOLATILE cache (claude-notes/completed/async-disk.md).  It reads the
@@ -991,6 +1066,12 @@ Section DevLoops.
       iInv "Hvinv" as ">Hbody" "Hclose".
       iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
       iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
+      (* A6.11: this arm's write set is [∅], so the log disjunct forces
+         [log' = log] and the memory is untouched -- the bundle comes
+         straight back ([RiscvExec.tso_interp_of_disk_idle] pays the disk
+         agent's pinned view). *)
+      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
       rewrite Hv in Hcap.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
       iDestruct (virtio_proto_capture_step γd vs m mv vnew Hview Hcap
@@ -1008,6 +1089,7 @@ Section DevLoops.
       { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
       iEval (rewrite <- Hdk) in "Htie".
       iFrame "Htie Hsa".
+      iSplitL "Htso"; [iApply (tso_interp_of_disk_idle with "Htso") |].
       iApply "IH".
     - (* ONE CACHED SECTOR DRAINS -- THE COMMIT INSTANT
          (claude-notes/completed/sector-atomic-disk.md, restated for the
@@ -1033,6 +1115,12 @@ Section DevLoops.
       iInv "Hvinv" as ">Hbody" "Hclose".
       iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
       iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
+      (* A6.11: this arm's write set is [∅], so the log disjunct forces
+         [log' = log] and the memory is untouched -- the bundle comes
+         straight back ([RiscvExec.tso_interp_of_disk_idle] pays the disk
+         agent's pinned view). *)
+      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
       rewrite Hv in Hdrain.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
       iEval (rewrite -Himg Hv) in "Hdur".
@@ -1065,6 +1153,7 @@ Section DevLoops.
       iSplitL "Hdauth'".
       { iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdv'. }
       iFrame "Htie Hsa".
+      iSplitL "Htso"; [iApply (tso_interp_of_disk_idle with "Htso") |].
       iApply "IH".
     - (* The queue the driver published is MALFORMED, so the device may write
          anything anywhere.  This case is REFUTED, not handled: the lease's
@@ -1085,6 +1174,12 @@ Section DevLoops.
       exfalso. congruence.
     - (* the gateway latches the DISK's interrupt level -- the disk's own
          source, so this is the disk thread's business and not the UART's *)
+      (* A6.11: this arm's write set is [∅], so the log disjunct forces
+         [log' = log] and the memory is untouched -- the bundle comes
+         straight back ([RiscvExec.tso_interp_of_disk_idle] pays the disk
+         agent's pinned view). *)
+      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
       iInv "Hpinv" as ">Hbody" "Hclose".
       iDestruct "Hbody" as (p) "(Hp & %Hpok)".
       iDestruct (dev_interp_agree_plic with "Hdev Hp") as %Hp.
@@ -1100,12 +1195,21 @@ Section DevLoops.
       { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
       (* a latch moves only the PLIC: the FS tie is FRAMED *)
       iFrame "Htie Hsa".
+      iSplitL "Htso"; [iApply (tso_interp_of_disk_idle with "Htso") |].
       iApply "IH".
     - (* the totality stutter (RiscvLang §3c) *)
+      (* A6.11: this arm's write set is [∅], so the log disjunct forces
+         [log' = log] and the memory is untouched -- the bundle comes
+         straight back ([RiscvExec.tso_interp_of_disk_idle] pays the disk
+         agent's pinned view). *)
+      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev".
       iSplitL "Hdur"; [iExact "Hdur"|].
-      iFrame "Htie Hsa". iApply "IH".
+      iFrame "Htie Hsa".
+      iSplitL "Htso"; [iApply (tso_interp_of_disk_idle with "Htso") |].
+      iApply "IH".
   Qed.
 
   (* ------------------------------------------------------------------ *)

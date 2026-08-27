@@ -2562,7 +2562,7 @@ Section ProofCreateMain.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 3 -∗
     iref_slots ns -∗
     log_opS γ u Sb -∗
@@ -4762,7 +4762,7 @@ Section ProofCreateMain.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     (* ---- THE T_DIR SUB-BRANCH, PARKED (D0-b consumes it) ---- *)
     (∀ (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
        (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
@@ -6321,7 +6321,7 @@ Section ProofCreateMain.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
       cr_fail_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
                    cov logstart bmapstart inodestart nib ninodes size dev
@@ -7192,7 +7192,7 @@ Section ProofCreateMain.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
       cr_fail_mkdir_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
                    cov logstart bmapstart inodestart nib ninodes size dev
@@ -7791,7 +7791,7 @@ Section ProofCreateMain.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDm : CpuId =>
       cr_mkdir_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
                     cov logstart bmapstart inodestart nib ninodes size dev
@@ -10059,8 +10059,8 @@ Section ProofCreateMain.
     iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hfr".
     iDestruct "Hfr" as "(_ & _ & _ & _ & _ & _ & _ & _ & S9 & S10 & _)".
     iDestruct "S9" as (w9) "H9". iDestruct "S10" as (w10) "H10".
-    iDestruct (ctx_word_pointsto_aligned_p with "H9") as %Ha9.
-    iDestruct (ctx_word_pointsto_aligned_p with "H10") as %Ha10.
+    iDestruct (word_pointsto_aligned_p with "H9") as %Ha9.
+    iDestruct (word_pointsto_aligned_p with "H10") as %Ha10.
     iPureIntro. split; [exact Ha10 | exact Ha9].
   Qed.
 

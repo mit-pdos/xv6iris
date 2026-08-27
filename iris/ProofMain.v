@@ -110,8 +110,6 @@ Require Import LogDefs LogInv.
 Require Import FsReady FirstTok.
 Require Import WpLockAt.   (* [newlock_at] / [lock_free_tok] *)
 Require Import BioInitAt.  (* [bio_init_at] / [bio_free_tok] / [buf_raw] *)
-Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: bio_init_at's deposit *)
-Require Import CtxRecord.   (* [ctx_parked_inv]: the started deposit's record *)
 Require Import IcacheBoot IcacheEscrow InodeInv.
 Require Import IcacheRef.
 Require Import IrefSlots FsCfg FsBlocks.
@@ -572,7 +570,7 @@ Section ProofMain.
       iSplitR; [iExact "Hdoff" |].
       iSplitR; [iExact "Hdev" |].
       iSplitR; [iExists γtx; iExact "Htxl" | iExact "Hsub0"]. }
-    iMod (newlock ⊤ a_cons "cons"%string (λ ξ : CtxId, cons_res (XI := ξ))
+    iMod (newlock ⊤ a_cons "cons"%string <{ cons_res }>
             with "Hclnm Hclw Hclcpu Hring") as (γcl) "#Hconslk".
     iAssert (console_caps γd) as "#Hccaps".
     { rewrite /console_caps. iExists γtx, γcl.
@@ -1399,7 +1397,7 @@ Section ProofMain.
         pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
-        is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γv pd pav pu) -∗
+        is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
         disk_geom γv pd pav pu -∗
         (* ...AND THE OPEN-FILE TABLE'S LOCK, which is fileinit's output plus
            the resource the carve now hands over.  The two gnames are this
@@ -1479,18 +1477,11 @@ Section ProofMain.
     (* nothing between +0x92 and +0x9e touches a buffer.  Same idiom as the *)
     (* inode-cache interlude at the next seam.                             *)
     (* =================================================================== *)
-    (* THE RUNNING TOKEN IS BORROWED HERE.  Every escrow is a PARKED RECORD  *)
-    (* now, so its initial content is [TsoCtx.ctx_deposit]ed into the        *)
-    (* freshly minted context that record carries -- and a deposit runs at   *)
-    (* the depositor's own authority.  The token rides in [sie_cap]'s fourth *)
-    (* conjunct ([SieCapCtx.sie_cap_gpr_own_ctx_acc]) and goes straight back.*)
     iApply fupd_wp.
-    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrunbio Hcgbio]".
     iMod (bio_init_at fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) ⊤
             Hcov0
-            with "Hrunbio Hbiotok Hbclk Hbcnm Hbccpu Hbfresh Hbpay Hblru Hblkpool")
-      as "(Hrunbio & #Hbioctx & Hbslots)".
-    iDestruct ("Hcgbio" with "Hrunbio") as "Hcg".
+            with "Hbiotok Hbclk Hbcnm Hbccpu Hbfresh Hbpay Hblru Hblkpool")
+      as "[#Hbioctx Hbslots]".
     iModIntro.
     (* ---- +0x92 jal iinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x92)) (mword_of_int 1 : mword 5)
@@ -1591,7 +1582,7 @@ Section ProofMain.
     iIntros (mfi) "Hcg Hpc %Hcsfi Hftw Hftnm Hftc".
     iApply fupd_wp.
     iMod (ftable_res_boot ⊤ with "Hfents Hfdauth Hirfile") as (γf) "Hfres".
-    iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string (λ ξ : CtxId, ftable_res (XI := ξ) γf) with "Hftnm Hftw Hftc Hfres") as (γft) "#Hftable".
+    iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string <{ ftable_res γf }> with "Hftnm Hftw Hftc Hfres") as (γft) "#Hftable".
     iModIntro.
     (* [is_ftable γft γf] is [Hftable] at [ftable_addr]'s spelling *)
     iAssert (is_ftable γft γf) as "#Hftable'".
@@ -1675,7 +1666,7 @@ Section ProofMain.
        γ chosen here could never be shown equal to the field.  The free
        token [Hdllk] is kit 1's row; everything else is what the old
        [newlock] took, in the same order. *)
-    iMod (newlock_at ⊤ fsc_dlock d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γv pd pav pu)
+    iMod (newlock_at ⊤ fsc_dlock d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }>
             with "Hdllk Hdlnm Hdlkw Hdcpu HRdisk") as "#Hdlock".
     iModIntro.
     (* ---- +0x9e jal userinit ---- *)
@@ -1759,7 +1750,7 @@ Section ProofMain.
     { rewrite Huartq Hdiskq. iExact "Hdev". }
     iAssert (∃ pd' pav' pu' : mword 64,
                disk_geom fsc_disk pd' pav' pu' ∗
-               is_lock fsc_dlock d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) fsc_disk pd' pav' pu'))%I as "#Hdpair".
+               is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd' pav' pu' }>)%I as "#Hdpair".
     { rewrite Hdiskq. iExists pd, pav, pu. iFrame "Hgeom Hdlock". }
     (* THE DEVICE COMPLEMENT the park wants, at the ambient names: every
        member is in hand here and none is assumed. *)
@@ -1832,7 +1823,6 @@ Section ProofMain.
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (pd pav pu : mword 64)
       (root : mword 44) (pas : nat -> mword 44)
-      (xid : CtxId)
       (P : iProp Σ) `{!Persistent P} :
     (* the scheduler this block tail-calls enables interrupts at its loop head
        and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
@@ -1845,17 +1835,15 @@ Section ProofMain.
     cpu_own 0 false p0 false ∅ -∗
     trap_csrs KT1 -∗
     started_inv P -∗
-    ctx_parked_inv xid -∗
     □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
          (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
-         procs_inv (XI := xid) γs' -∗
+         procs_inv γs' -∗
          console_caps γd -∗
-         is_lock γk' d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γv pd' pav' pu') -∗
-         disk_geom (XI := xid) γv pd' pav' pu' -∗
+         is_lock γk' d_lock "virtio_disk"%string <{ disk_res γv pd' pav' pu' }> -∗
+         disk_geom γv pd' pav' pu' -∗
          kpt_inv root' -∗
-         ctx_word_pointsto xid
-           (mword_of_int KernelSyms.kernel_pagetable : mword 64) DfracDiscarded
+         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
            (zero_extend' 64 (concat_vec root' (zeros' 12 : mword 12))) -∗
          kmap_at tramp_vpn tramp_ppn KP_rx -∗
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas' i) KP_rw) -∗
@@ -1863,7 +1851,7 @@ Section ProofMain.
     printk_env γpr γd γv -∗
     procs_inv γs -∗
     console_caps γd -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γv pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
     disk_geom γv pd pav pu -∗
     kpt_inv root -∗
     (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
@@ -1873,55 +1861,12 @@ Section ProofMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hp0.
-    iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv #Hpkinv #Hwand".
+    iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv #Hwand".
     iIntros "#Hpenv #Hpinv #Hccaps #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
-    (* ================================================================== *)
-    (* THE DEPOSIT.  Everything main built is at THIS hart's context, and   *)
-    (* the record eight harts will read it from is at [xid] -- so the three *)
-    (* ξ-indexed rows ([procs_inv]'s per-slot [is_kstack], [disk_geom]'s    *)
-    (* three ring-page pointers, the [kernel_pagetable] word) are handed    *)
-    (* over with [TsoCtx.ctx_deposit], which raises the record's stamp to    *)
-    (* cover them.  The other six are ξ-free or closed handles and pass      *)
-    (* straight through the □-wand.                                          *)
-    (*                                                                       *)
-    (* IT HAPPENS HERE AND NOT IN THE WAND, and that is not a preference:    *)
-    (* [ctx_deposit] CONSUMES an [own_context], and nothing under a [□] can  *)
-    (* consume anything.  A deposit runs at the top level or not at all      *)
-    (* (§0.16′ step (ii)'s lesson, restated one layer up).  This is the last *)
-    (* point on main's boot arm that still holds its [sie_cap_gpr], hence     *)
-    (* its own thread-of-control token.                                      *)
-    (* ================================================================== *)
-    iApply fupd_wp.
-    iInv "Hpkinv" as ">Hpk" "Hclosepk".
-    iDestruct "Hpk" as (Td) "Hpk".
-    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    (* THE OBLIGATION IS APPLIED AS A TERM.  Instance search does not reach
-       through the [∗] to a payload whose rows are named at an explicit ξ
-       (§0.15′, measured: [Hint Extern] does not rescue it either), so the
-       three instances are composed by hand. *)
-    iMod (ctx_deposit
-            (λ ξ : CtxId,
-               procs_inv (XI := ξ) γs ∗
-               disk_geom (XI := ξ) γv pd pav pu ∗
-               ctx_word_pointsto ξ
-                 (mword_of_int KernelSyms.kernel_pagetable : mword 64)
-                 DfracDiscarded
-                 (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))))%I
-            (CtxMorph0 :=
-               ctx_morph_sep _ _ (procs_inv_morph γs)
-                 (ctx_morph_sep _ _ (disk_geom_morph γv pd pav pu)
-                    (ctx_morph_word _ _ _ _)))
-            cur_ctx xid Td with "Hrun Hpk [Hpinv Hgeom Hkptp]")
-      as "[Hrun Hdres]".
-    { iFrame "Hpinv Hgeom Hkptp". }
-    iDestruct "Hdres" as (Td') "(_ & Hpk & #Hpinvd & #Hgeomd & #Hkptpd)".
-    iDestruct ("Hcgb" with "Hrun") as "Hcg".
-    iMod ("Hclosepk" with "[Hpk]") as "_". { iNext. iExists Td'. iExact "Hpk". }
-    iModIntro.
     (* the deposit itself: everything main built, through the □-wand *)
     iAssert P as "#HP".
     { iApply ("Hwand" $! γpr γs γk pd pav pu root pas
-                with "Hpenv Hpinvd Hccaps Hdlock Hgeomd Hkinv Hkptpd Htramp Hkstx"). }
+                with "Hpenv Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx"). }
     (* The release sequence.  Note the shape: the address is materialized
        BEFORE the barrier and the store is the compressed [c.sw], so the
        fence separates the whole deposit from the store alone -- and it is
@@ -2064,10 +2009,9 @@ Section ProofMain.
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (xid : CtxId)
       (P : iProp Σ) `{!Persistent P}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 xid P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
     intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Himg Hp0.
@@ -2079,7 +2023,7 @@ Section ProofMain.
                       Hicovin & Hicovmeta & Hicovdata & Hiparse & Hiush & Hind & Hileq).
     assert (Hcov0 : (0 : Z) ∉ cov) by exact (FsBoot.fs_cov_in_0 _ _ Hicovin).
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
-    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hpkinv #Hwand Hlocks Hglobals".
+    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
     iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
     iIntros "#Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
@@ -2222,23 +2166,15 @@ Section ProofMain.
       iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv". }
     iDestruct (mn_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γtl γs pd pav pu
-                  Hnproc with "Hhw Hmin Htext") as "#Hkvs".
-    (* THE CAPS FAMILY IS PINNED, not left to unification: the goal is
-       [?C cur_ctx] against a seven-conjunct bundle, which is higher-order.
-       And [(XI := ...)] stays ambient here on purpose -- this hart IS the
-       installer, so its own context is the one the deposit is made at. *)
+                  Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
     iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
-                 (devintr_caps_fam γd γv γk γtl γs pd pav pu)
-                 kernelvec_tv_direct kernelvec_stvec_base
-                 with "Hq Hstvec [] [] []")
+                 kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
       as "Hintr".
-    { iApply devintr_caps_fam_morph. }
-    { iModIntro. iExact "Hcaps". }
     { iApply bi.later_intro. iExact "Hkvs". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started fsc_printk γk fsc_kalloc γs γd γv m5 (K - 2)%nat p0 pd pav pu
-              root pas xid P ltac:(lia) Hp0
-              with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hpkinv Hwand Hpenv
+              root pas P ltac:(lia) Hp0
+              with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hwand Hpenv
                     Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
     (* fold the boot cells and the freshly built handler resource into the
        [trap_csrs] the scheduler consumes. *)

@@ -131,7 +131,7 @@ Definition wp_write_head_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* ---- the checked-out batch's pieces write_head actually touches ---- *)
   (* the in-memory header, READ ONLY *)
   lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗

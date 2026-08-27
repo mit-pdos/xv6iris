@@ -117,8 +117,8 @@ Require Import SpecIalloc.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx.   (* memset's spec is CONVERTED (tso-port leg M) and
-   so is this caller's buffer (the M1 flip): the seam closed, so no shim *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -1155,7 +1155,7 @@ Section IallocClaim.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     is_itable2 gtl cn γfs γi cov logstart nib dev -∗
     itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗
@@ -1315,9 +1315,10 @@ Section IallocClaim.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /W3 upd_ne; [| regne]. exact (HW2thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iEval (rewrite -HW3a0) in "Hby".
-    (* memset's contract is context-indexed AND so is this caller's buffer
-       (the M1 flip): both sides are [ctx_pointsto] now, so the sweep-era
-       shim crossing that used to sit here is gone. *)
+    (* memset's contract is context-indexed; this caller is not yet
+       converted -- the buffer crosses through the shim at the ambient
+       context (the bundle carries the thread token). *)
+    iDestruct (ctx_buf_of_mem KT0 cur_ctx with "Hby") as "Hby".
     iApply (MS.wp_memset_sconf KT1 KT0 W3 (K - 8)%nat 64%nat
               (mword_of_int 0 : mword 64)
               (fun jj => dinode_bytes (ds !!! DinodeEnc.islot inum) !!! jj)
@@ -1325,6 +1326,7 @@ Section IallocClaim.
               ltac:(lia) ltac:(vm_compute; reflexivity) HW3a1 HW3a2
               with "Hcg Htext Hpc Hby").
     iIntros (CID5 Hq5 mM) "Hcg Hpc Hby %Hcsm".
+    iDestruct (ctx_buf_to_mem with "Hby") as "Hby".
     iEval (rewrite HW3a0) in "Hby".
     assert (Hpc94 : ret_pc (W3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ialloc + 0x94)) by (rewrite HW3ra; pcw).
@@ -2025,7 +2027,7 @@ Section IallocScan.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     is_itable2 gtl cn γfs γi cov logstart nib dev -∗
     itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗

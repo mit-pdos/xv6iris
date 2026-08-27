@@ -942,16 +942,6 @@ Section CurProc.
   Proof. rewrite /cur_proc /word_pointsto /mem_pointsto. apply _. Qed.
 End CurProc.
 
-(* the field's transport (tso-port M3): one word cell, and the only
-   context-indexed row of [CpuOwn.cpu_own] -- which the swtch deposit has
-   to hand to the resumed thread at ITS context (ProofSwtch.v). *)
-Global Instance cur_proc_morph `{!riscvGS Σ} `{CID : CpuId} (p : mword 64) :
-  CtxMorph (fun xi : CtxId => cur_proc (XI := xi) p).
-Proof.
-  iIntros (ξ ξ') "Hd H". rewrite /cur_proc.
-  iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]". iFrame.
-Qed.
-
 (* ===================================================================== *)
 (* THE PER-PROC HART TAG.                                                  *)
 (*                                                                        *)

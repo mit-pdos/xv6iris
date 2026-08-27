@@ -1032,7 +1032,7 @@ Section ProofKwait.
     arm_pay KT1 0 eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x94)) -∗
-    is_lock γk (proc_addr k) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr k)) -∗
+    is_lock γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> -∗
     locked γk CIDt -∗
     proc_lock_res γs γk (proc_addr k) -∗
     is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
@@ -1102,7 +1102,7 @@ Section ProofKwait.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr k)
       by (rewrite HU1a0; apply addv_sext0).
     (* ---- release(&pp->lock): level 2 -> 1, exit index still [false] ---- *)
-    iApply (Release.wp_release_sconf KT1 γk (proc_addr k) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr k)) U1 1%nat eb pme (trap_res eb + (K - 10))%nat _
+    iApply (Release.wp_release_sconf KT1 γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> U1 1%nat eb pme (trap_res eb + (K - 10))%nat _
               Hlkk ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1").
     (* the exit index of a release at level 1 is [false], so the hart is
@@ -1261,7 +1261,7 @@ Section ProofKwait.
     pc_is (mword_of_int (KW + 0x60)) -∗
     kalloc_env γa None -∗
     (* the child's lock, contents out, at ZOMBIE *)
-    is_lock γk (proc_addr k) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr k)) -∗
+    is_lock γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> -∗
     locked γk CIDp -∗
     p_state (proc_addr k) ↦₄ ZOMBIE -∗
     (* ZOMBIE is unclaimed, so the caller's lock share is the whole mirror --
@@ -1455,7 +1455,7 @@ Section ProofKwait.
     { iApply (proc_lock_res_intro γs γk (proc_addr k) UNUSED (zero_reg : mword 64)
                 with "Hstate Hpsg Hchan Hpub [Hdorm Hpark]").
       iApply (proc_slots_unused_intro γs (proc_addr k) with "Hdorm Hpark"). }
-    iApply (Release.wp_release_sconf KT1 γk (proc_addr k) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr k)) R3 1%nat eb pme (trap_res eb + (K - 10))%nat _
+    iApply (Release.wp_release_sconf KT1 γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> R3 1%nat eb pme (trap_res eb + (K - 10))%nat _
               Hlkk2 ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1").
     (* level 1 -> 1: pinned hart, so collapse rather than re-anchor *)
@@ -1588,7 +1588,7 @@ Section ProofKwait.
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x40)) -∗
     kalloc_env γa None -∗
-    is_lock γk (proc_addr k) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr k)) -∗
+    is_lock γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> -∗
     locked γk CIDf -∗
     p_state (proc_addr k) ↦₄ ZOMBIE -∗
     (* the whole mirror: ZOMBIE is unclaimed, so the lock's share is both
@@ -2246,7 +2246,7 @@ Section ProofKwait.
         assert (HS2 : kw_scan_regs S2 mm pme addr kk)
           by (rewrite /S2; apply kw_scan_regs_ncs;
               [vm_compute; reflexivity | exact HS1]).
-        iApply (Acquire.wp_acquire_sconf KT1 γk "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr kk)) S2 1%nat eb pme (trap_res eb + (K - 10))%nat false
+        iApply (Acquire.wp_acquire_sconf KT1 γk "proc"%string <{ proc_lock_res γs γk (proc_addr kk) }> S2 1%nat eb pme (trap_res eb + (K - 10))%nat false
                   ({["wait_lock"]} ∪ lks)
                   kw_ilvl1 ltac:(pose proof (kw_K10 K HK); lia) Hfresh_proc
                   with "Hcg Hown Htext Hpc [Hlkk]").
@@ -2383,7 +2383,7 @@ Section ProofKwait.
           iAssert (proc_lock_res γs γk (proc_addr kk)) with "[Hstate Hpsg Hchan Hpub Hslots]" as "HRk".
           { iApply (proc_lock_res_intro γs γk (proc_addr kk) st ch
                       with "Hstate Hpsg Hchan Hpub Hslots"). }
-          iApply (Release.wp_release_sconf KT1 γk (proc_addr kk) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr kk)) S5 1%nat eb pme (trap_res eb + (K - 10))%nat _
+          iApply (Release.wp_release_sconf KT1 γk (proc_addr kk) "proc"%string <{ proc_lock_res γs γk (proc_addr kk) }> S5 1%nat eb pme (trap_res eb + (K - 10))%nat _
                     Hlkc ltac:(pose proof (kw_K10 K HK); lia)
                     with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1").
           iApply wp_next_off_intro. iIntros (mrel) "Hcg Hpc %Hcsrel Hown".

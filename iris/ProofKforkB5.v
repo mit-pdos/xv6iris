@@ -79,7 +79,6 @@ Require Import SchedCtx.
 Require Import WaitInv.
 Require Import SpecProcinit.
 Require Import SpecForkretPark.
-Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park's deposit *)
 Require Import ParkCap.   (* [park_token] / [park_token_park] -- the park, as a resource *)
 Require Import UsertrapRes SyscParkEnv FsReady FileInv FirstTok DiskInv ProcDefs FsCfg.   (* the park's vocabulary *)
 Require Import SpecAcquire SpecRelease.
@@ -238,56 +237,29 @@ Section ProofKforkB5.
                  fsc_bmapstart icfg_ist icfg_nib fsc_size ks pid_c).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (FsReady.fgo_loggeom Hgeomok)]. }
-    (* THE RECORD-CARRIED HALF ONLY (the M2 split, UsertrapRes.v "THE
-       RESUMER'S HALF"): three pure ties, six context-FREE resources, and the
-       three pins.  [procs_inv], [devintr_caps_any], [is_ftable],
-       [console_ready] and [park_world] are NOT here any more -- they are
-       ξ-dependent, so the resumer supplies them ([park_globals]) or derives
-       them from its own [first_done]. *)
     iAssert (park_env N) as "#Henv".
     { iAssert (disk_geom fsc_disk pd pav pu) as "#Hgeom".
       { iDestruct "Hdcaps" as "(_ & _ & $ & _)". }
-      iAssert (TicksInv.is_tickslock γtl) as "#Htl".
-      { iDestruct "Hdcaps" as "(_ & _ & _ & _ & $ & _)". }
-      iDestruct "Hextra" as "(#Hnp & #Hpav & _ & _)".
       rewrite /park_env /ut_park_caps.
+      iSplitL; [| iExact "Hextra"].
       iSplitR; [iPureIntro; constructor; reflexivity|].
       iSplitR; [iPureIntro; reflexivity|].
-      iSplitR; [iPureIntro; reflexivity|].
-      iSplitR; [iExact "Hwl"|].
-      iSplitR; [iExact "Htl"|].
-      iSplitR; [iExact "Hnp"|].
-      iSplitR; [iExact "Hpav"|].
-      iSplitR; [iExact "Hwire"|].
-      iSplitR; [iExact "Htramp"|].
-      iSplitR; [iExact "Hks"|].
-      iSplitR; [iExact "Hgeom"|].
-      iExact "Hip1". }
-    (* ...and the resumer-supplied half, which the forking parent holds at
-       its own context (it is running on it). *)
-    iAssert (park_globals cur_ctx γs γft γf) as "#Hglobp".
-    { rewrite /park_globals.
-      iDestruct "Hdcaps" as "(_ & #Hcc & _ & _ & _ & _)".
-      iDestruct "Hworld" as (γtl' pd' pav' pu')
-        "(_ & _ & _ & _ & _ & _ & #Hcready & _ & _ & _ & _ & #Hipw)".
       iSplitR; [iExact "Hpinv"|].
+      iSplitR; [iExact "Hks"|].
+      iSplitR; [iExact "Hdcaps"|].
+      iSplitR; [iExact "Hwl"|].
       iSplitR; [iExact "Hft"|].
-      iSplitR; [iExact "Hcc"|].
-      iSplitR; [iExact "Hcready"|].
-      iExact "Hipw". }
+      iSplitR; [iExact "Hgeom"|].
+      iExact "Hworld". }
     iAssert (park_own N) with "[Hbsl]" as "Hown_park".
-    { rewrite /park_own. iExact "Hbsl". }
+    { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
     iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
-    (* the parker's own thread-of-control token, borrowed and handed back
-       -- see [ProofUserinit]'s note at the same call. *)
-    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrunpk Hcgpk]".
     iMod (park_token_park N rest Vc Hwf Hrest
-            with "Hrunpk Htoken Htext Hwire Htramp Hpinv Hglobp Hmk Hstack Henv Hown_park [Hks Hctx Hpriv Hfd Hirsp]")
-      as "[Hrunpk Hpctx]".
+            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park [Hks Hctx Hpriv Hfd Hirsp]")
+      as "Hpctx".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirsp".
       (* the two files each define forkret's entry; the constants are equal *)
       iExact "Hctx". }
-    iDestruct ("Hcgpk" with "Hrunpk") as "Hcg".
     iDestruct "Hheld" as "(Htok & Hpstcell & Hpwhole & Hpchan & Hppub)".
     iEval (rewrite kfkb5_pwhole_used) in "Hpwhole".
     iDestruct "Hpwhole" as "[Hplock Hpclaim]".
@@ -339,7 +311,7 @@ Section ProofKforkB5.
        for the call.  (The [rewrite -Hb] after the call does the reverse
        for what the release hands back.) *)
     iEval (rewrite Hb) in "Hcg".
-    iApply (RL.wp_release_sconf KT1 (CID := CID0) γl (proc_addr j) "proc"%string (λ ξ : CtxId, SchedCtx.proc_lock_res (XI := ξ) γs γl (proc_addr j)) M2 lvl eb pme (K - 8)%nat
+    iApply (RL.wp_release_sconf KT1 (CID := CID0) γl (proc_addr j) "proc"%string <{ SchedCtx.proc_lock_res γs γl (proc_addr j) }> M2 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka1 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc [Hpinv] Htok HRused Hown Hpay").
@@ -558,7 +530,7 @@ Section ProofKforkB5.
     assert (HM10a0 : M10 !!! Regidx Ra0 = (proc_addr j))
       by (rewrite /M10 upd_ne; [exact HM9a0 | vm_compute; discriminate]).
     iDestruct (cpu_own_transport CID6 CID8 lvl eb pme b ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (AQ.wp_acquire_sconf KT1 (CID := CID8) γl "proc"%string (λ ξ : CtxId, SchedCtx.proc_lock_res (XI := ξ) γs γl (proc_addr j))
+    iApply (AQ.wp_acquire_sconf KT1 (CID := CID8) γl "proc"%string <{ SchedCtx.proc_lock_res γs γl (proc_addr j) }>
               M10 lvl eb pme (K - 8)%nat b lks Hlvl (kfkb5_stack_ok K HK)
               Hfresh_proc
               with "Hcg Hown Htext Hpc [Hpinv]").
@@ -675,7 +647,7 @@ Section ProofKforkB5.
        for the call.  (The [rewrite -Hb] after the call does the reverse
        for what the release hands back.) *)
     iEval (rewrite Hb) in "Hcg".
-    iApply (RL.wp_release_sconf KT1 (CID := CID9) γl (proc_addr j) "proc"%string (λ ξ : CtxId, SchedCtx.proc_lock_res (XI := ξ) γs γl (proc_addr j)) M13 lvl eb pme (K - 8)%nat
+    iApply (RL.wp_release_sconf KT1 (CID := CID9) γl (proc_addr j) "proc"%string <{ SchedCtx.proc_lock_res γs γl (proc_addr j) }> M13 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka3 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc [Hpinv] Htok2 HR3 Hown Hpay").

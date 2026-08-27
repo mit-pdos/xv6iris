@@ -663,7 +663,7 @@ Section KexecDCommit.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }
     iIntros "Hw".
-    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hw".
+    iDestruct (word_pointsto_bytes with "Hw") as "Hw".
     iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
     iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.

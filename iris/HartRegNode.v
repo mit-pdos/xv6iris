@@ -175,19 +175,23 @@ Section regnode.
     destruct (hregread_at_inv r m Hat) as (ak & K & -> & Hres).
     rewrite (HC _ (Interface.RegRead r ak) K eq_refl).
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
-      cbv beta iota delta [mnode_step] in Hs. exact (proj2 (proj2 Hs)). }
-    iIntros (σ oth rv) "Hσ".
+    { intros oth0 h0 img0 σ0 log0 tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs.
+      cbv beta iota delta [mnode_step] in Hs.
+      exact (proj2 (proj2 (proj2 (proj2 Hs)))). }
+    (* a register node touches no memory-model state: the bundle goes back
+       exactly as it came ([RiscvExec.tso_interp_of_idle]) *)
+    iIntros (σ oth rv img log tv V) "%Htv Hσ Htso".
     iMod ("H" $! σ with "Hσ") as "H".
     iModIntro.
-    iExists (C (K (register_lookup r σ.(sregs)))), σ, rv.
+    iExists (C (K (register_lookup r σ.(sregs)))), σ, log, tv, rv.
     iSplitR.
     { iPureIntro. cbv beta iota delta [mnode_step]. auto. }
-    iNext. iIntros (m' σ' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
     cbv beta iota delta [mnode_step] in Hstep.
-    destruct Hstep as (-> & -> & ->).
+    destruct Hstep as (-> & -> & -> & -> & ->).
     rewrite -(Hres (register_lookup r σ.(sregs))).
-    iExact "H".
+    iMod "H" as "[Hσ HWP]". iModIntro. iFrame "Hσ HWP".
+    rewrite -Htv. iApply (tso_interp_of_idle with "Htso").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -212,19 +216,21 @@ Section regnode.
     destruct (hregwrite_val_at_inv r m v Hat) as (ak & K & -> & Hres).
     rewrite (HC _ (Interface.RegWrite r ak v) K eq_refl).
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
-      cbv beta iota delta [mnode_step] in Hs. exact (proj2 (proj2 Hs)). }
-    iIntros (σ oth rv) "Hσ".
+    { intros oth0 h0 img0 σ0 log0 tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs.
+      cbv beta iota delta [mnode_step] in Hs.
+      exact (proj2 (proj2 (proj2 (proj2 Hs)))). }
+    iIntros (σ oth rv img log tv V) "%Htv Hσ Htso".
     iMod ("H" $! σ with "Hσ") as "H".
     iModIntro.
-    iExists (C (K tt)), (set_reg σ r v), rv.
+    iExists (C (K tt)), (set_reg σ r v), log, tv, rv.
     iSplitR.
     { iPureIntro. cbv beta iota delta [mnode_step]. auto. }
-    iNext. iIntros (m' σ' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
     cbv beta iota delta [mnode_step] in Hstep.
-    destruct Hstep as (-> & -> & ->).
+    destruct Hstep as (-> & -> & -> & -> & ->).
     rewrite -Hres.
-    iExact "H".
+    iMod "H" as "[Hσ HWP]". iModIntro. iFrame "Hσ HWP".
+    rewrite -Htv. iApply (tso_interp_of_idle with "Htso").
   Qed.
 
   (* ------------------------------------------------------------------ *)

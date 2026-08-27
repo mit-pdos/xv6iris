@@ -372,7 +372,7 @@ Definition wp_readi_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* ONE slot unit.  bmap-with-no-allocation wants one and hands it back
      before readi's own bread takes it; brelse returns that one too. *)
   bslot -∗

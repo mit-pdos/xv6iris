@@ -302,26 +302,9 @@ Section SystemBoot.
     iAssert (fs_crash_seam cov (FsImg.sb_logstart sb)) as "#Hseam".
     { rewrite /fs_crash_seam. iModIntro.
       rewrite Hcp. iSplitL; iIntros "H"; iExact "H". }
-    (* THE BOOT HART'S THREAD OF CONTROL, MINTED BEFORE THE CARVE AND USED
-       AS ITS AMBIENT.  [boot_shared_alloc] runs ONCE, inside one fupd,
-       before any hart has a thread of control, and everything it hands the
-       BOOT hart -- [main_locks_raw], [main_globals_raw], [main_data_raw],
-       the dormant proc rows, the disk's and kpt's raw cells -- is
-       ξ-INDEXED and EXCLUSIVE.  A bundle carved at one ξ can serve at most
-       one hart's identity, so the carve has to happen AT the identity the
-       boot hart will run as; minting it here rather than inside the
-       primary's branch is what makes that true by construction.  (This is
-       the eight-hart adequacy trap of §0.16′ step (iv), a second time: that
-       one was answered for [BootChain.boot_hart_res]'s one row by a
-       ∀-context form, which is sound only for an EXCLUSIVE timestamp-0
-       cell; the boot supply is many such rows and pinning the carve is
-       cheaper and equally honest.)  The SECONDARIES need nothing ξ-indexed
-       from the carve -- [kernel_text], [kernel_data], [boot_hart_res] and
-       [started_inv] are all closed terms -- so one ambient serves. *)
-    iMod (own_context_boot (CID := 0%fin)) as (ξ0) "Hthr0".
-    iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES sb nib cov Hbf Himg with "Hres")
-      as (Hfd Hir Hpav Hbs HF γd γv xid)
-      "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hpkinv & #Hdev & #Hwinv &
+    iMod (boot_shared_alloc g XV6_DISK_BYTES sb nib cov Hbf Himg with "Hres")
+      as (Hfd Hir Hpav Hbs HF γd γv)
+      "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
@@ -360,12 +343,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hthr0 Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+    iSplitL "Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hthr0 Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+      iSplitL "Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -377,78 +360,27 @@ Section SystemBoot.
            unify", and the 400 GB divergence the deleted [adequacy_fscfg]
            was written to block). *)
         iDestruct "Hh0" as (iv) "Hh0".
-        (* THE BOOT HART'S THREAD OF CONTROL (tso-port leg M2) is [ξ0],
-           minted ABOVE -- before the carve, so that the whole boot supply
-           is carved at it (see the note there) -- and used as the AMBIENT
-           context of the chain below: that is what lets
-           [BootBridge.boot_bridge] take the token rather than mint it, and
-           hence what keeps every lemma in main's cone context-implicit.
-           ONE PER HART, not one for the system: [TsoCtx.own_context] is
-           exclusive, so the eight harts run at eight distinct [CtxId]s. *)
-        (* ROW BY ROW, NOT ONE [iApply … with "H1 … H30"], and this is a
-           PERFORMANCE fix, not a style one (tso-port.md §0.16′).  MEASURED:
-           with one mismatched premise in the list, the single [iApply] runs
-           past TWENTY-THREE MINUTES at 2 GB and never reports; the
-           [iSpecialize] chain below names the offending premise in 0.75 s.
-           [iApply] with a spec list builds the whole application and unifies
-           it against the goal in one go, so a mismatch deep in the list has
-           nowhere to fail fast; specializing one premise at a time gives the
-           unifier a head symbol to differ at.  §0.13′'s rule -- "a crawl IS
-           the signature of an unprovable crossing" -- applies to tactics as
-           well as to goals: never leave a 30-premise [iApply] as the place a
-           mismatch has to surface. *)
-        iPoseProof (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
-                  (g.(gregs) 0%fin) iv DfracDiscarded xid γd γv ps l0 b0 c0
+        (* THE BOOT HART'S THREAD OF CONTROL (tso-port leg M2), minted HERE
+           and used as the AMBIENT context of the whole chain below it
+           ([(XI := ξ0)]): that is what lets [BootBridge.boot_bridge] take
+           the token rather than mint it, and hence what keeps every lemma
+           in main's cone context-implicit.  ONE PER HART, not one for the
+           system: [TsoCtx.own_context] is exclusive, so the eight harts
+           must run at eight distinct [CtxId]s.  The mint sits under
+           [fupd_wp] because the era's own [={⊤}=∗] has already closed by
+           the time the harts' WPs are split apart. *)
+        iApply fupd_wp.
+        iMod (own_context_boot (CID := 0%fin)) as (ξ0) "Hthr0".
+        iModIntro.
+        iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
+                  (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
                   (v_disk (g.(gdev).(dvirtio))) sb nib cov XV6_DISK_BYTES
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
-                  Himg) as "HP".
-        iSpecialize ("HP" with "Htext").
-        iSpecialize ("HP" with "Hdata").
-        iSpecialize ("HP" with "Hh0").
-        iSpecialize ("HP" with "Hthr0").
-        (* THIS IS THE ONE THAT USED TO FAIL, and it was the M1 flip's
-           second multi-context invariant (tso-port.md §0.16′).
-           [StartedInv.started_inv] takes a PLAIN [iProp] and is handed
-           [SpecMainSecondary.main_deposit], which was ξ-INDEXED (through
-           [SchedCtx.procs_inv]) -- an [inv] over a ξ-indexed body that ALL
-           EIGHT harts need, each at its own [own_context_boot] identity.
-           That was structurally [BioInv.buf_escrow]'s refutation one layer
-           up, and ONE RULING covered both: the deposit is a PARKED RECORD
-           at a NAMED context [xid] ([BootShared.boot_shared_alloc] mints
-           it), so [main_deposit xid γd γv] is a CLOSED TERM and every hart
-           takes the SAME handle here; each absorbs the three ξ-indexed rows
-           into its own context after its acquire fence
-           ([ProofMainSecondary.ms_spin]).  The context is NAMED rather than
-           ∃-closed because the payload comes out under a [▷] and the absorb
-           has to happen at a SECOND open (tso-absorb-memo.md §5). *)
-        iSpecialize ("HP" with "Hstarted").
-        iSpecialize ("HP" with "Hpkinv").
-        iSpecialize ("HP" with "Hlk").
-        iSpecialize ("HP" with "Hgl").
-        iSpecialize ("HP" with "Hmfirst").
-        iSpecialize ("HP" with "Hmnext").
-        iSpecialize ("HP" with "Hpark").
-        iSpecialize ("HP" with "Hpst").
-        iSpecialize ("HP" with "Hpavail").
-        iSpecialize ("HP" with "Hfs").
-        iSpecialize ("HP" with "Hmir").
-        iSpecialize ("HP" with "Hirslot").
-        iSpecialize ("HP" with "Hirauth").
-        iSpecialize ("HP" with "Hcert").
-        iSpecialize ("HP" with "Hseam").
-        iSpecialize ("HP" with "Hdev").
-        iSpecialize ("HP" with "Hwinv").
-        iSpecialize ("HP" with "Htx").
-        iSpecialize ("HP" with "Hsent").
-        iSpecialize ("HP" with "Hlb").
-        iSpecialize ("HP" with "Hdlab").
-        iSpecialize ("HP" with "Hcfg").
-        iSpecialize ("HP" with "Hclaim").
-        iSpecialize ("HP" with "Hdone").
-        iSpecialize ("HP" with "Hkpt").
-        iSpecialize ("HP" with "Hkmap").
-        iSpecialize ("HP" with "Hpages").
-        iApply "HP". }
+                  Himg
+                  with "Htext Hdata Hh0 Hthr0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
+                        Hfs Hmir Hirslot Hirauth Hcert Hseam
+                        Hdev Hwinv Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
+                        Hpages"). }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)
       iApply (big_sepL_impl with "Hhrest").
       iIntros "!>" (k c _) "Hh".
@@ -459,7 +391,7 @@ Section SystemBoot.
       iMod (own_context_boot (CID := FS c)) as (ξc) "Hthrc".
       iModIntro.
       iApply (boot_hart_secondary (fileG0 := HF) (CID := FS c) (XI := ξc)
-                (g.(gregs) (FS c)) iv DfracDiscarded xid γd γv
+                (g.(gregs) (FS c)) iv DfracDiscarded γd γv
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
                 with "Htext Hdata Hh Hthrc Hstarted"). }
     iSplitR; [iApply (wp_uart_loop γd with "Hcert Huinv Hpinv") |].

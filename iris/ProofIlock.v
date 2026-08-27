@@ -729,7 +729,7 @@ Section IlockLoad.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
+    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
     il_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     i_dev ip ↦₄{DfracOwn (1/2)} dev -∗

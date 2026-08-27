@@ -573,7 +573,7 @@ Section CancelOfGen.
       iApply lock_finisher_destroy.
       iIntros "Hfrag HRx". iDestruct "HRx" as (ξ0) "HRx".
       iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
-      iDestruct (ctx_morph ξ0 cur_ctx with "Hdom HRx") as "[_ HRx]".
+      iMod (ctx_morph ξ0 cur_ctx with "Hdom HRx") as "[_ HRx]".
       iApply ("Hbuild" with "Hfrag HRx"). }
     iIntros (CIDg Hsg mr) "(Hword & Hcpu & HOut) Hcg Hpc %Hcs Hown".
     iSpecialize ("Hcont" $! CIDg with "[%]"); [exact Hsg|].

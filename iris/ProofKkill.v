@@ -283,7 +283,7 @@ Section ProofKkill.
       (* ---- acquire(&p->lock) ---- *)
       iDestruct (cpu_own_transport CIDk CIDb lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDb) γk "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr k)) M22 lvl eb pme av b lks
+      iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDb) γk "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> M22 lvl eb pme av b lks
                 ltac:(lia) ltac:(lia) Hno
                 with "Hcg Hown Htext Hpc [Hlockk]").
       all: try lkbelow.
@@ -420,7 +420,7 @@ Section ProofKkill.
              brings the release's [match lvl]-phrased continuation back to [b],
              which is what the code after the call is written against. *)
           iEval (rewrite Hbmatch) in "Hcg".
-          iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr k)) Mr4c lvl eb pme av
+          iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> Mr4c lvl eb pme av
                     ({["proc"]} ∪ lks)
                     Hlka2 ltac:(lia)
                     with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
@@ -708,7 +708,7 @@ Section ProofKkill.
         (* Nested release: same [b] vs [match lvl] reserve-spelling step as the
            +0x4c site above -- see the comment there. *)
         iEval (rewrite Hbmatch) in "Hcg".
-        iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γk (proc_addr k)) M2e lvl eb pme av
+        iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> M2e lvl eb pme av
                   ({["proc"]} ∪ lks)
                   Hlka1 ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").

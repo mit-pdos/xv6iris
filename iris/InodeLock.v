@@ -136,6 +136,11 @@ Qed.
 
 Section InodeLockRes.
   Context `{!riscvGS Σ}.
+  (* M1 stage 2: [inode_meta]/[inode_addrs] are ↦₄ towers, hence
+     context-indexed.  QUALIFIED because this file does not import
+     [TsoCtx] -- an unqualified [CurCtx] here would silently generalize a
+     fresh [CurCtx : Type] instead of binding the class. *)
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* the cells at NO particular value: what iget leaves behind, and what
      [IcacheEscrow.ic_unloaded] parks.  The length is what makes memmove's

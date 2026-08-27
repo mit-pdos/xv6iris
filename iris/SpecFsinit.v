@@ -409,7 +409,7 @@ Definition wp_fsinit_sconf_body
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* THIRTY-FIVE slot units.  initlog seals 32 of them into [log_state]'s
      pool and returns two; ireclaim needs three; so ONE is held back across
      the [jal initlog] at +0x4e.  See the header. *)

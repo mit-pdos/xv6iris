@@ -37,7 +37,6 @@ Require Import InstrBytes.
    below) stays raw; the boot chain converts at the hand-off to the first
    thread of control, which is the honest seam. *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* [stack_ktier_mono] rides the raw tier law *)
 Local Open Scope Z_scope.
 
 (* [pa_stk sp k] is the address [8*k] bytes below [sp] -- the base of the [k]-th
@@ -381,8 +380,10 @@ Section stack_own.
     assert (Hs : seq 0 8 = (0%nat :: seq 1 7)%list) by reflexivity.
     rewrite Hs. iDestruct "Hbs" as "[Hb0 _]".
     rewrite pa_add_0.
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
-    iDestruct (mem_canonical with "Hb0") as %Hc.
+    (* the canonicality conjunct rides INSIDE the ctx fact ([TsoCtx]'s
+       [ctx_pointsto_canonical], §6 amendment A6.8) -- no crossing, where
+       the SC-era file went through the shim to [mem_canonical]. *)
+    iDestruct (ctx_pointsto_canonical with "Hb0") as %Hc.
     iPureIntro.
     rewrite uint_unsigned. rewrite uint_unsigned in Hc.
     pose proof (bv_unsigned_in_range _ sp) as [Hlo Hhi'].
@@ -408,27 +409,6 @@ Section stack_own.
 
 End stack_own.
 
-(* THE REGION'S TRANSPORT (tso-port M3).  A stack region is a big-op of
-   word cells, so [ctx_morph_word] does all the work -- what it buys is the
-   parked kernel stack inside [ProcDefs.kstack_free] / a dormant slot, which
-   is what makes [SchedCtx.proc_lock_res] a transportable lock payload.
-   OUTSIDE the section, necessarily: the statement names two contexts, and
-   a section variable cannot be instantiated inside its own section.
-   The structural instances are applied AS TERMS: the [ctx_word_pointsto]
-   index sits under the class projection [cur_ctx], which instance search
-   will not unfold (the M3 recipe's rule 3). *)
-Global Instance stack_own_morph `{!riscvGS Σ} `{KTR : !CurKtier}
-    (sp : Arch.pa) (n : nat) :
-  CtxMorph (fun xi : CtxId => stack_own (XI := xi) sp n).
-Proof.
-  iIntros (ξ ξ') "Hd H". rewrite /stack_own.
-  iDestruct "H" as (ws) "[%Hlen H]".
-  iDestruct (ctx_morph_big_sepL ws
-      (fun i w xi => ctx_word_pointsto (KTR := KTR) xi (pa_stk sp (S i)) (DfracOwn 1) w)
-      (fun i x => ctx_morph_word _ _ _ _) ξ ξ' with "Hd H") as "[Hd H]".
-  iFrame "Hd". iExists ws. by iFrame.
-Qed.
-
 (* THE WEAKENING ALONG THE TIER ORDER.  A stack region is a big-op of
    [word_pointsto]s at one tier, and each of those weakens
    ([RiscvPtsto.word_ktier_mono]), so the region does -- which is what makes
@@ -439,7 +419,38 @@ Qed.
    its own section variables -- [stack_own (KTR := kt)] written above fails
    with "Wrong argument name KTR", the same rule the hart binder obeys
    (durable-notes, "CpuId IS A CLASS, SO A CROSSING NEEDS A NEW SECTION"). *)
+(* THE RE-INDEXING, HONEST (was SHIM-TIER; §6 amendment A6.8).  The SC-era
+   lemma was a bare implication [stack_own (XI := ξ) ⊢ stack_own (XI := ξ')]
+   -- FALSE at TSO, where a slot's justification is pinned to its context.
+   What IS true is the TRANSPORT: a region moves along a DOMINATION, and
+   [ctx_dom] is exactly what the swtch hand-off has in hand
+   ([TsoCtx.ctx_dom_to_parked] on the release side, [ctx_dom_of_parked] on
+   the acquire side).  So this is no longer a placeholder: it is
+   [CtxMorph] at the stack region, and its single call site ([ProofSwtch])
+   now has to SUPPLY the domination -- which is the M2 worklist entry the
+   old lemma was standing in for, made explicit in the statement.
 
+   [ctx_dom] is deliberately not persistent, so it goes in and comes back;
+   the update modality is [CtxMorph]'s (a dirty slot's fragment is
+   dropped, which is a ghost step). *)
+Lemma stack_own_reindex `{!riscvGS Σ} `{KTR : !CurKtier} (ξ ξ' : CtxId)
+    (sp : Arch.pa) (n : nat) :
+  ctx_dom ξ ξ' -∗ stack_own (XI := ξ) sp n ==∗
+  ctx_dom ξ ξ' ∗ stack_own (XI := ξ') sp n.
+Proof.
+  rewrite /stack_own. iIntros "Hd H". iDestruct "H" as (ws) "[%Hlen H]".
+  iMod (ctx_morph_big_sepL ws
+          (fun i w ξ0 => ctx_word_pointsto (KTR := KTR) ξ0
+                           (pa_stk sp (S i)) (DfracOwn 1) w)
+          (fun i x => ctx_morph_word _ _ _ _) ξ ξ' with "Hd H") as "[Hd H]".
+  iModIntro. iFrame "Hd". iExists ws. by iFrame.
+Qed.
+
+(* THE TIER WEAKENING, now WITHOUT a crossing: the tier pin is a pure
+   conjunct of the ctx byte too, so [TsoCtx.ctx_word_ktier_mono] weakens it
+   in place (§6 amendment A6.8).  The SC-era proof went ctx -> raw -> ctx
+   through the shim, which is a re-index the flip forbids -- it happened to
+   be a no-op only because both spellings meant the same thing. *)
 Lemma stack_ktier_mono `{!riscvGS Σ} `{XI : CurCtx} (kt kt' : ktier) `{!KtierLe kt kt'}
     (sp : Arch.pa) (n : nat) :
   stack_own (KTR := kt) sp n ⊢ stack_own (KTR := kt') sp n.
@@ -447,10 +458,7 @@ Proof.
   rewrite /stack_own. iIntros "H". iDestruct "H" as (ws) "[%Hlen H]".
   iExists ws. iSplitR; [done |].
   iApply (big_sepL_mono with "H"). iIntros (i w _) "H".
-  (* per-slot through the shim: the raw tier-weakening law, re-indexed *)
-  iDestruct (TsoCtxShim.ctx_word_to_mem with "H") as "H".
-  iApply TsoCtxShim.ctx_word_of_mem.
-  iApply (word_ktier_mono kt kt' with "H").
+  iApply (ctx_word_ktier_mono kt kt' with "H").
 Qed.
 
 (* [zero_reg] is the null pointer a C null test compares against. *)
@@ -498,12 +506,24 @@ Qed.
 
 Section stack_own_phys.
   Context `{!riscvGS Σ}.
+  (* A6.17: THE M-MODE BOOT STACK IS A LEDGER REGION.  The three M-mode
+     store leaves ([WpMmodeStore.wp_store_gpr] / [_gpr_tor] /
+     [wp_csdsp_gpr_tor]) owe the append's ghost steps, which need the
+     timestamp ELEMENTS -- a raw [↦ₚ₈] has none (A6.9) -- and the SOLO-ERA
+     escape is refuted (all eight harts run [start]/[timerinit], so
+     [TsoMemPa.all_own] fails at the second hart's first prologue save).
+     So the physical-tier stack carries the REGISTERED ledger word at the
+     ambient context, the same name and arity as before; [own_context]
+     already arrives (BootChain.boot_entry_bridge holds one token across the
+     whole M-mode bracket), and the residue itself is minted at adequacy. *)
+  Context `{XI : CurCtx}.
 
-  (* ===== PHYSICAL-tier stack ownership (M-mode boot owns ↦ₚ, uniform-
-     claims): the [↦ₚ₈] mirror of [stack_own], same lemma suite. ===== *)
+  (* ===== PHYSICAL-tier stack ownership (M-mode boot owns the ledger word,
+     uniform-claims): the [ctx_phys_word_pointsto] mirror of [stack_own],
+     same lemma suite. ===== *)
   Definition stack_own_phys (sp : Arch.pa) (n : nat) : iProp Σ :=
     (∃ ws : list (bv 64), ⌜length ws = n⌝ ∗
-       [∗ list] i ↦ w ∈ ws, phys_word_pointsto (pa_stk sp (S i)) (DfracOwn 1) w)%I.
+       [∗ list] i ↦ w ∈ ws, ctx_phys_word_pointsto XI (pa_stk sp (S i)) (DfracOwn 1) w)%I.
 
   Lemma stack_own_phys_0 (sp : Arch.pa) : stack_own_phys sp 0 ⊣⊢ emp.
   Proof.
@@ -548,7 +568,7 @@ Section stack_own_phys.
   Qed.
 
   Lemma stack_own_phys_1 (sp : Arch.pa) :
-    stack_own_phys sp 1 ⊣⊢ ∃ w : bv 64, phys_word_pointsto (pa_stk sp 1) (DfracOwn 1) w.
+    stack_own_phys sp 1 ⊣⊢ ∃ w : bv 64, ctx_phys_word_pointsto XI (pa_stk sp 1) (DfracOwn 1) w.
   Proof.
     rewrite /stack_own_phys. iSplit.
     - iIntros "H". iDestruct "H" as (ws) "[%Hlen H]".
@@ -559,7 +579,7 @@ Section stack_own_phys.
   Qed.
 
   Lemma stack_own_phys_1_intro (sp : Arch.pa) (w : bv 64) :
-    phys_word_pointsto (pa_stk sp 1) (DfracOwn 1) w ⊢ stack_own_phys sp 1.
+    ctx_phys_word_pointsto XI (pa_stk sp 1) (DfracOwn 1) w ⊢ stack_own_phys sp 1.
   Proof. rewrite stack_own_phys_1. iIntros "H". by iExists w. Qed.
 
   Lemma stack_own_phys_split_1 (sp : Arch.pa) (a n : nat) :
@@ -574,8 +594,8 @@ Section stack_own_phys.
 
   Lemma stack_own_phys_2_elim (sp : Arch.pa) :
     stack_own_phys sp 2 ⊢ ∃ w1 w2 : bv 64,
-      phys_word_pointsto (pa_stk sp 1) (DfracOwn 1) w1 ∗
-      phys_word_pointsto (pa_stk sp 2) (DfracOwn 1) w2.
+      ctx_phys_word_pointsto XI (pa_stk sp 1) (DfracOwn 1) w1 ∗
+      ctx_phys_word_pointsto XI (pa_stk sp 2) (DfracOwn 1) w2.
   Proof.
     rewrite (stack_own_phys_app sp 1 1) stack_own_phys_1.
     iIntros "[H1 H2]". iDestruct "H1" as (w1) "H1".
@@ -584,8 +604,8 @@ Section stack_own_phys.
   Qed.
 
   Lemma stack_own_phys_2_intro (sp : Arch.pa) (w1 w2 : bv 64) :
-    phys_word_pointsto (pa_stk sp 1) (DfracOwn 1) w1 -∗
-    phys_word_pointsto (pa_stk sp 2) (DfracOwn 1) w2 -∗
+    ctx_phys_word_pointsto XI (pa_stk sp 1) (DfracOwn 1) w1 -∗
+    ctx_phys_word_pointsto XI (pa_stk sp 2) (DfracOwn 1) w2 -∗
     stack_own_phys sp 2.
   Proof.
     iIntros "H1 H2". rewrite (stack_own_phys_app sp 1 1). iSplitL "H1".

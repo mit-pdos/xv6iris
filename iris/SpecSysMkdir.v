@@ -254,7 +254,7 @@ Definition wp_sys_mkdir_sconf_body
   gen_cert -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
+  is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region ialloc claims out of ---- *)
   is_itable2 gtl cn gfs gi cov logstart nib dev -∗

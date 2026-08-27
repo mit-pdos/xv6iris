@@ -95,16 +95,11 @@ Section ConsoleCaps.
      baseline its echo extends.  The ghost NAMES are existential: nothing
      above consoleintr names either lock, so binding them here keeps the
      bundle parameter-free in [γu] alone. *)
-  (* NO [CurCtx] BINDER: every row is a closed term since the M3 payload
-     sweep (the two lock handles carry CONVERTED payloads, the trace
-     baseline is ghost), and a binder the body never mentions is a phantom
-     -- it makes the bundle print as ξ-indexed and blocks
-     [ctx_morph_const] at every transport site. *)
-  Definition console_caps (γu : uart_names) : iProp Σ :=
+  Definition console_caps `{XI : CurCtx} (γu : uart_names) : iProp Σ :=
     (∃ γtx γc : gname,
        is_txlock γtx γu ∗ is_conslock γc ∗ uart_sent_sub γu [])%I.
 
-  Global Instance console_caps_persistent γu : Persistent (console_caps γu).
+  Global Instance console_caps_persistent `{XI : CurCtx} γu : Persistent (console_caps γu).
   Proof. rewrite /console_caps. apply _. Qed.
 
 End ConsoleCaps.

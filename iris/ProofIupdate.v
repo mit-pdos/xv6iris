@@ -994,7 +994,7 @@ Section ProofIupdateMain.
       procs_inv γs -∗
       dev_inv γu γd -∗
       disk_geom γd pd pav pu -∗
-      is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+      is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
       bslots 2 -∗
       log_epoch_lb γ v -∗
       log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗

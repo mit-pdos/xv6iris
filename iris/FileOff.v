@@ -68,17 +68,12 @@
    (Two files can name two DIFFERENT inodes, so "some inode's lock is held"
    is not a contradiction.)
 
-   The body therefore NAMES the inode -- as an ARGUMENT of
-   [FileInvDefs.off_hold], instantiated at [fc_ip C] by [file_payload].  It
-   used to hold HALF OF THE [f->ip] CELL instead and get the inode by
-   points-to agreement; that made the invariant's body ξ-indexed and forced a
-   CROSS-CONTEXT points-to JOIN at [ProofSysOpenParts.so_open_slot], which the
-   sealed surface has no law for.  See FileInvDefs.v's header (tso-port.md
-   §0.16′).  What replaces the agreement is the one the slot already ran:
-   [file_payload] is a function of [C], and two shares of one slot are forced
-   onto the same [C] by [FileInv.file_fields_agree] -- a points-to agreement on
-   the very [a_fip] cell, so the tie to memory is if anything tighter than
-   before, and it is paid where it was already being paid.
+   The body therefore holds, permanently, HALF OF THE [f->ip] CELL.  That is
+   the cheapest possible record -- no ghost, no redundant copy of the
+   pointer, and the arithmetic is invisible outside
+   [FileInvDefs.file_fields] (which holds the ip cell at half the nominal
+   fraction for exactly this reason).  Points-to agreement then hands a
+   reference holder "the invariant's inode is MY inode" for free.
 
    The MARKER a borrower parks is [off_mark ip] = [i_valid ip ↦₄ 1]:
 
@@ -118,31 +113,29 @@ Section FileOff.
   (*  OBLIGATION (a): the borrow, under the inode's lock                  *)
   (* ------------------------------------------------------------------ *)
 
-  (* CHECK OUT.  The [a_fip] share is a PASSENGER now and comes straight back
-     untouched: since the ruling it is the [ip] ARGUMENT of [off_hold], not a
-     fraction inside the invariant, that says which inode this borrow is under,
-     and this premise is what ties that argument to the borrower's own
-     reference at the call site (it is [file_fields]' cell, at [fc_ip C], which
-     is the same [C] [off_hold] was applied at).  What is surrendered is the
-     marker and one liveness unit.  The cinv token is likewise only an opening
-     credential and comes back untouched -- which is what lets a borrower hand
-     its whole [file_ref] back at the SAME fraction. *)
+  (* CHECK OUT.  The [a_fip] share is only READ (agreement does not consume
+     it) and comes straight back: it is the borrower's proof that the
+     invariant's inode is the one whose lock it holds.  What is surrendered
+     is the marker and one liveness unit.  The cinv token is likewise only
+     an opening credential and comes back untouched -- which is what lets a
+     borrower hand its whole [file_ref] back at the SAME fraction. *)
   Lemma off_checkout (γ γx : gname) (k : nat) (qc : Qp) (dq : dfrac)
       (ip : mword 64) (E : coPset) :
     ↑(offN .@ k) ⊆ E ->
-    off_hold γ k γx true ip qc -∗ a_fip k ↦₈{dq} ip -∗ off_mark ip -∗
+    off_hold γ k γx true qc -∗ a_fip k ↦₈{dq} ip -∗ off_mark ip -∗
     flive_tok γ k ={E}=∗
-    off_hold γ k γx true ip qc ∗ a_fip k ↦₈{dq} ip ∗
+    off_hold γ k γx true qc ∗ a_fip k ↦₈{dq} ip ∗
     ∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝.
   Proof.
     iIntros (HE) "[#Hinv Hoc] Hip Hmk Hlv".
     iMod (cinv_acc _ _ _ _ _ HE with "Hinv Hoc") as "(>Hbody & Hoc & Hclose)".
-    rewrite /off_content /off_body.
-    iDestruct "Hbody" as "[Hres | [Hmk' _]]"; last first.
+    iDestruct "Hbody" as (ip') "[Hip' Hd]".
+    iDestruct (ctx_word_pointsto_agree with "Hip Hip'") as %<-.
+    iDestruct "Hd" as "[Hres | [Hmk' _]]"; last first.
     { iExFalso. iApply (word4_pointsto_excl with "Hmk Hmk'"). }
     iDestruct "Hres" as (v) "[Hc %Hwf]".
-    iMod ("Hclose" with "[Hmk Hlv]") as "_".
-    { iNext. rewrite /off_content /off_body. iRight. iFrame. }
+    iMod ("Hclose" with "[Hip' Hmk Hlv]") as "_".
+    { iNext. iExists ip. iFrame "Hip'". iRight. iFrame. }
     iModIntro. iFrame "Hinv Hoc Hip". iExists v. iFrame. done.
   Qed.
 
@@ -153,18 +146,19 @@ Section FileOff.
       (ip : mword 64) (v : mword 32) (E : coPset) :
     ↑(offN .@ k) ⊆ E ->
     off_wf v ->
-    off_hold γ k γx true ip qc -∗ a_fip k ↦₈{dq} ip -∗ a_foff k ↦₄ v
+    off_hold γ k γx true qc -∗ a_fip k ↦₈{dq} ip -∗ a_foff k ↦₄ v
     ={E}=∗
-    off_hold γ k γx true ip qc ∗ a_fip k ↦₈{dq} ip ∗ off_mark ip ∗ flive_tok γ k.
+    off_hold γ k γx true qc ∗ a_fip k ↦₈{dq} ip ∗ off_mark ip ∗ flive_tok γ k.
   Proof.
     iIntros (HE Hwf) "[#Hinv Hoc] Hip Hc".
     iMod (cinv_acc _ _ _ _ _ HE with "Hinv Hoc") as "(>Hbody & Hoc & Hclose)".
-    rewrite /off_content /off_body.
-    iDestruct "Hbody" as "[Hres | [Hmk Hlv]]".
+    iDestruct "Hbody" as (ip') "[Hip' Hd]".
+    iDestruct (ctx_word_pointsto_agree with "Hip Hip'") as %<-.
+    iDestruct "Hd" as "[Hres | [Hmk Hlv]]".
     { iDestruct "Hres" as (v') "[Hc' _]".
       iExFalso. iApply (word4_pointsto_excl with "Hc Hc'"). }
-    iMod ("Hclose" with "[Hc]") as "_".
-    { iNext. rewrite /off_content /off_body. iLeft. iExists v. iFrame. done. }
+    iMod ("Hclose" with "[Hip' Hc]") as "_".
+    { iNext. iExists ip. iFrame "Hip'". iLeft. iExists v. iFrame. done. }
     iModIntro. iFrame "Hinv Hoc". iFrame.
   Qed.
 

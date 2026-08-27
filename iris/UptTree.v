@@ -38,6 +38,7 @@ Require Import SmodePte.
 Require Import UserTranslate.
 Require Import KptTree.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoMemPa.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
@@ -692,7 +693,8 @@ Section UptTranslateIris.
      callers pass [exec_translationMode_S_sv39], User callers
      [exec_translationMode_U_sv39]. *)
   Lemma utlb_inv_pt_translateAddr (uroot tfp : mword 44)
-      (um : gmap (mword 27) (mword 64)) (w va pa : mword 64) (σ : mstate) :
+      (um : gmap (mword 27) (mword 64)) (w va pa : mword 64) (σ : mstate)
+      (S : TsoMemPa.bytemap -> iProp Σ) :
     (forall (a d : mword 1) (mxr do_sum : bool),
        pte_check_ok acc p mxr do_sum (pte_set_ad w a d)) ->
     upt_leaf_at tfp um (svpn_of va) w ->
@@ -713,6 +715,18 @@ Section UptTranslateIris.
       = Some (p, σ) ->
     exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.24's payer, threaded at the memory-indexed (CHAINABLE) currency
+       and PERSISTENT -- see [KptTree.tlb_inv_pt_translateAddr_at].  A USER
+       page table is the [Some ξ] tier, so the caller discharges this with
+       [TsoCtx.ctx_store_win_ok] AND its own [own_context] -- it IS its own
+       page table. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um ==∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -720,10 +734,11 @@ Section UptTranslateIris.
       ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
       ⌜ (σ'.(sregs) = σ.(sregs) \/
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um.
   Proof.
     intros Hchk Hleaf Hcanon Hout Hmisa Hmenv Hhtif Hcp Htmk Heff Hss Hall.
-    iIntros "Hri Hgh Hinv".
+    iIntros "#Hpay Hsto Hri Hgh Hinv".
     iDestruct "Hinv" as (usatp tlbvec t)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hwf & %Hpmawimpl & Ht & Hpmp)".
     pose proof (Hpmawimpl _ Hall) as Hpmaw.
@@ -754,18 +769,33 @@ Section UptTranslateIris.
     pose proof (pma_allows_all_pte_read _ Hall) as Hpmar.
     assert (Htm : exec (translationMode p) σ = Some (Sv39, σ))
       by exact (Htmk usatp Hsatpv Hmode).
-    iMod (ptree_translateAddr_own acc p uroot t w va pa usatp
-            tlbvec p2 p1 a0 d0 σ
+    iAssert (∀ wnew : mword 64,
+               gen_heap_interp σ.(mem) -∗ S σ.(mem) -∗
+               pt_slot_own (Some TsoCtx.cur_ctx)
+                 (pt_addr0 p1 (svpn_of va)) (DfracOwn 1)
+                 (pte_set_ad w a0 d0) ==∗
+               gen_heap_interp (RiscvModelBytes.write_bytes σ.(mem)
+                                  (pt_addr0 p1 (svpn_of va)) 8 wnew) ∗
+               S (RiscvModelBytes.write_bytes σ.(mem)
+                    (pt_addr0 p1 (svpn_of va)) 8 wnew) ∗
+               pt_slot_own (Some TsoCtx.cur_ctx)
+                 (pt_addr0 p1 (svpn_of va)) (DfracOwn 1) wnew)%I
+      as "Hpay'".
+    { iIntros (wnew) "Hgh Hsto Hs".
+      iApply ("Hpay" $! σ.(mem) (pt_addr0 p1 (svpn_of va)) _ wnew
+                with "Hgh Hsto Hs"). }
+    iMod (ptree_translateAddr_own acc p (Some TsoCtx.cur_ctx) uroot t w va pa usatp
+            tlbvec p2 p1 a0 d0 σ S
             Hchk (upt_variant tfp um (svpn_of va) w Hwf Hleaf) Hcanon Hout Hbase Hmaps Htlbok
             Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
             HA' Hord' HR' HW' Hcov' Hpmar Hpmaw
-            with "Hri Hgh Htlb Ht")
-      as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hri & Hgh & Htlb & Ht)".
+            with "Hpay' Hsto Hri Hgh Htlb Ht")
+      as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hcur & Hri & Hgh & Htlb & Ht)".
     iModIntro. iExists σ'.
     iSplit; [iPureIntro; exact Htrans |].
     iSplit; [iPureIntro; exact Hmdev |].
     iSplit; [iPureIntro; exact Hsregs |].
-    iFrame "Hri Hgh".
+    iFrame "Hcur Hri Hgh".
     assert (Hspec' : upt_tree_spec uroot tfp um t').
     { destruct Htsh as [-> | (a1 & d1 & ->)]; [exact Hspec |].
       exact (upt_tree_spec_set_leaf uroot tfp um t (svpn_of va) w p2 p1 a0 d0 a1 d1
@@ -786,7 +816,8 @@ Section UptTranslateIrisAcc.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma utlb_inv_pt_translateAddr_tramp_fetch (uroot tfp : mword 44)
-      (um : gmap (mword 27) (mword 64)) (va pa : mword 64) (σ : mstate) :
+      (um : gmap (mword 27) (mword 64)) (va pa : mword 64) (σ : mstate)
+      (S : TsoMemPa.bytemap -> iProp Σ) :
     svpn_of va = tramp_vpn ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -801,6 +832,14 @@ Section UptTranslateIrisAcc.
       = Some (Supervisor, σ) ->
     exec (is_shadow_stack_access (InstructionFetch tt)) σ = Some (false, σ) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.24's payer, threaded through the wrapper unchanged. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um ==∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
@@ -808,6 +847,7 @@ Section UptTranslateIrisAcc.
       ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
       ⌜ (σ'.(sregs) = σ.(sregs) \/
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um.
   Proof.
     intros Hvpn Hcanon Hid Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
@@ -818,6 +858,7 @@ Section UptTranslateIrisAcc.
     { rewrite <- (tramp_variant_ppn ('b"1") ('b"1")) in Hid.
       rewrite pte_set_ad_ppn in Hid. exact Hid. }
     apply (utlb_inv_pt_translateAddr (InstructionFetch tt) Supervisor uroot tfp um pte_tramp va pa σ
+             S
              (fun a d mxr do_sum => tramp_variant_check_fetch a d mxr do_sum)
              (or_introl (conj Hvpn eq_refl))
              Hcanon Hout Hmisa Hmenv Hhtif Hcp
@@ -826,7 +867,8 @@ Section UptTranslateIrisAcc.
   Qed.
 
   Lemma utlb_inv_pt_translateAddr_tf_load (uroot tfp : mword 44)
-      (um : gmap (mword 27) (mword 64)) (va pa : mword 64) (σ : mstate) :
+      (um : gmap (mword 27) (mword 64)) (va pa : mword 64) (σ : mstate)
+      (S : TsoMemPa.bytemap -> iProp Σ) :
     svpn_of va = tf_vpn ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -841,6 +883,14 @@ Section UptTranslateIrisAcc.
       = Some (Supervisor, σ) ->
     exec (is_shadow_stack_access (Load Data)) σ = Some (false, σ) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.24's payer, threaded through the wrapper unchanged. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um ==∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) (Load Data)) σ
@@ -848,6 +898,7 @@ Section UptTranslateIrisAcc.
       ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
       ⌜ (σ'.(sregs) = σ.(sregs) \/
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um.
   Proof.
     intros Hvpn Hcanon Hid Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
@@ -858,6 +909,7 @@ Section UptTranslateIrisAcc.
     { rewrite <- (tf_variant_ppn tfp ('b"1") ('b"1")) in Hid.
       rewrite pte_set_ad_ppn in Hid. exact Hid. }
     apply (utlb_inv_pt_translateAddr (Load Data) Supervisor uroot tfp um (pte_tf tfp) va pa σ
+             S
              (fun a d mxr do_sum => tf_variant_check_load tfp a d mxr do_sum)
              (or_intror (or_introl (conj Hvpn eq_refl)))
              Hcanon Hout Hmisa Hmenv Hhtif Hcp

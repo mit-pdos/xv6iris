@@ -122,6 +122,7 @@ Qed.
 
 Section PtBytesIris.
   Context `{!riscvGS Σ}.
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* THE VIEW LEMMA.  [->p8] is [<align>] plus the eight byte cells, and
      [bytes_own] over [word_bytes] is those same eight cells -- the whole
@@ -136,11 +137,19 @@ Section PtBytesIris.
     by rewrite big_sepL_fmap.
   Qed.
 
-  (* the [DfracOwn 1] instance, which is the one the frame carries *)
+  (* the [DfracOwn 1] instance, which is the one the frame carries -- AT THE
+     LEDGER TIER since [bytes_own] moved there (tso-machine-flip.md §6
+     amendment A6.16).  [TsoCtx.ctx_phys_word_pointsto] is character for
+     character [↦ₚ₈] over the ledger byte, so this is the same equivalence
+     it always was: the eight keys are distinct. *)
   Lemma phys_word_bytes_own_full (a : Arch.pa) (w : bv 64) :
-    a ↦ₚ₈ w ⊣⊢
+    TsoCtx.ctx_phys_word_pointsto XI a (DfracOwn 1) w ⊣⊢
     ⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗ bytes_own (word_bytes a w).
-  Proof. apply phys_word_bytes_own. Qed.
+  Proof.
+    rewrite /TsoCtx.ctx_phys_word_pointsto /bytes_own /word_bytes.
+    rewrite big_sepM_list_to_map; [| apply word_bytes_keys_nodup ].
+    by rewrite big_sepL_fmap.
+  Qed.
 
 End PtBytesIris.
 
@@ -186,6 +195,7 @@ Qed.
 
 Section BytesOwnFacts.
   Context `{!riscvGS Σ}.
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* an owned byte cell is EXCLUSIVE, so two of them are at distinct
      addresses -- the one fact the disjointness below is made of *)
@@ -207,6 +217,7 @@ Section BytesOwnFacts.
     rewrite bi.pure_forall. iIntros (a). rewrite bi.pure_impl. iIntros (Ha).
     apply elem_of_dom in Ha as [b Hb].
     iDestruct (big_sepM_lookup _ _ _ _ Hb with "Hm") as "Hb".
+    iDestruct (TsoCtx.ctx_phys_pointsto_forget with "Hb") as "Hb".
     by iDestruct (phys_ram with "Hb") as %?.
   Qed.
 
@@ -231,6 +242,8 @@ Section BytesOwnFacts.
     destruct (m2 !! a) as [b2|] eqn:H2; [| iPureIntro; by right ].
     iDestruct (big_sepM_lookup _ _ _ _ H1 with "H1") as "Hb1".
     iDestruct (big_sepM_lookup _ _ _ _ H2 with "H2") as "Hb2".
+    iDestruct (TsoCtx.ctx_phys_pointsto_forget with "Hb1") as "Hb1".
+    iDestruct (TsoCtx.ctx_phys_pointsto_forget with "Hb2") as "Hb2".
     by iDestruct (phys_pointsto_ne with "Hb1 Hb2") as %?.
   Qed.
 
@@ -307,6 +320,7 @@ Qed.
 
 Section MapsUnion.
   Context `{!riscvGS Σ}.
+  Context `{XI : TsoCtx.CurCtx}.
 
   Lemma bytes_own_list_disj (l : list (gmap Arch.pa (bv 8))) :
     ([∗ list] m ∈ l, bytes_own m) ⊢ ⌜maps_disj l⌝.

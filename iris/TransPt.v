@@ -781,7 +781,8 @@ Section Pt2TranslateIris.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma tlb_inv_pt2_translateAddr (rc : mword 44) (Sp Sc : ptree -> Prop)
-      (w va pa : mword 64) (σ : mstate) :
+      (w va pa : mword 64) (σ : mstate)
+      (S : TsoMemPa.bytemap -> iProp Σ) :
     (forall (a d : mword 1) (mxr do_sum : bool),
        pte_check_ok acc Supervisor mxr do_sum (pte_set_ad w a d)) ->
     (forall a d : mword 1,
@@ -810,6 +811,19 @@ Section Pt2TranslateIris.
       = Some (Supervisor, σ) ->
     exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.24's payer, at the memory-indexed (chainable) currency and
+       PERSISTENT -- [UptTree.utlb_inv_pt_translateAddr]'s shape.  This
+       walker's A/D write-back is a real store to a LEDGER slot, so it owes
+       the era log's append and cannot be paid by [phys_word_pointsto_write]
+       (a gen_heap-only gate); the caller discharges it with
+       [TsoCtx.ctx_store_win_ok] and its own [own_context]. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt2 rc Sp Sc ==∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -817,11 +831,12 @@ Section Pt2TranslateIris.
       ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
       ⌜ (σ'.(sregs) = σ.(sregs) \/
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt2 rc Sp Sc.
   Proof.
     intros Hchk Hvar Hcanon Hout Hsel_p Hsel_c Hbase_c Hpres_p Hpres_c
            Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    iIntros "Hri Hgh Hinv".
+    iIntros "#Hpay Hsto Hri Hgh Hinv".
     iDestruct "Hinv" as (satp0 tlbvec tp tc)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hok2 & %HSp & %HSc & %Hpmawimpl & Htp & Htc & Hpmp)".
     pose proof (Hpmawimpl _ Hall) as Hpmaw.
@@ -873,7 +888,7 @@ Section Pt2TranslateIris.
       iSplit; [iPureIntro; exact Htrans |].
       iSplit; [iPureIntro; reflexivity |].
       iSplit; [iPureIntro; left; reflexivity |].
-      iFrame "Hri Hgh".
+      iFrame "Hsto Hri Hgh".
       iApply (tlb_inv_pt2_intro rc Sp Sc satp0 tlbvec tp tc
                 Hmode Hasid Hppn Hok2 HSp HSc Hpmawimpl
                 with "Hsatp Htlb Htp Htc Hpmp").
@@ -886,7 +901,7 @@ Section Pt2TranslateIris.
       iSplit; [iPureIntro; exact Htrans |].
       iSplit; [iPureIntro; reflexivity |].
       iSplit; [iPureIntro; right; eexists; reflexivity |].
-      iFrame "Hri Hgh".
+      iFrame "Hsto Hri Hgh".
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) tp tc tv').
       { apply (tlb_ok_pt2_fill_cur (mword_of_int 0) tp tc tlbvec vpn pc2 pc1
                  (pte_set_ad w ac dc) (pte_set_ad w ac dc) Hmaps_c
@@ -907,8 +922,8 @@ Section Pt2TranslateIris.
         by (rewrite Habs; exact (proj2 (proj2 (proj2 (Hvar a1 d1))))).
       iDestruct (ptree_own_path_upd (DfracOwn 1) tc vpn pc2 pc1 p0c Hmaps_c with "Htc")
         as "(Hs2 & Hs1 & Hs0 & Hrest)".
-      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 pc1 vpn) p0c w' with "Hgh Hs0")
-        as "[Hgh Hs0]".
+      iMod ("Hpay" $! σ.(mem) (pt_addr0 pc1 vpn) p0c w' with "Hgh Hsto Hs0")
+        as "(Hgh & Hsto & Hs0)".
       iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Htc".
       set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                     (Some (u_walk_entry vpn pc2 pc1 w' (mword_of_int 0)))).
@@ -921,7 +936,7 @@ Section Pt2TranslateIris.
       iSplit; [iPureIntro; exact Htrans |].
       iSplit; [iPureIntro; reflexivity |].
       iSplit; [iPureIntro; right; eexists; reflexivity |].
-      iFrame "Hri Hgh".
+      iFrame "Hsto Hri Hgh".
       assert (HSc' : Sc (ptree_set_leaf tc vpn w')).
       { rewrite Habs. exact (Hpres_c tc a1 d1 HSc). }
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) tp (ptree_set_leaf tc vpn w') tv').
@@ -948,8 +963,8 @@ Section Pt2TranslateIris.
         by (rewrite Habs; exact (proj2 (proj2 (proj2 (Hvar a1 d1))))).
       iDestruct (ptree_own_path_upd (DfracOwn 1) tp vpn pp2 pp1 p0p Hmaps_p with "Htp")
         as "(Hs2 & Hs1 & Hs0 & Hrest)".
-      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 pp1 vpn) p0p w' with "Hgh Hs0")
-        as "[Hgh Hs0]".
+      iMod ("Hpay" $! σ.(mem) (pt_addr0 pp1 vpn) p0p w' with "Hgh Hsto Hs0")
+        as "(Hgh & Hsto & Hs0)".
       iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Htp".
       set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                     (Some (u_walk_entry vpn pp2 pp1 w' (mword_of_int 0)))).
@@ -962,7 +977,7 @@ Section Pt2TranslateIris.
       iSplit; [iPureIntro; exact Htrans |].
       iSplit; [iPureIntro; reflexivity |].
       iSplit; [iPureIntro; right; eexists; reflexivity |].
-      iFrame "Hri Hgh".
+      iFrame "Hsto Hri Hgh".
       assert (HSp' : Sp (ptree_set_leaf tp vpn w')).
       { rewrite Habs. exact (Hpres_p tp a1 d1 HSp). }
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) (ptree_set_leaf tp vpn w') tc tv').
@@ -986,7 +1001,7 @@ Section Pt2TranslateIris.
       iSplit; [iPureIntro; exact Htrans |].
       iSplit; [iPureIntro; reflexivity |].
       iSplit; [iPureIntro; right; eexists; reflexivity |].
-      iFrame "Hri Hgh".
+      iFrame "Hsto Hri Hgh".
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) tp tc tv').
       { apply (tlb_ok_pt2_fill_prev (mword_of_int 0) tp tc tlbvec vpn pp2 pp1
                  (pte_set_ad w ap dp) (pte_set_ad w ap dp) Hmaps_p
@@ -1020,7 +1035,7 @@ Section Pt2TrampInst.
   Lemma pt2_tramp_fetch_habs (rc : mword 44) (Sp Sc : ptree -> Prop) :
     pt2_tramp_spec Sp -> pt2_tramp_spec Sc ->
     (forall t, Sc t -> pt_base t = rc) ->
-    forall (va pa : mword 64) (σ : mstate),
+    forall (va pa : mword 64) (σ : mstate) (S : TsoMemPa.bytemap -> iProp Σ),
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
     svpn_of va = tramp_vpn ->
@@ -1032,7 +1047,15 @@ Section Pt2TrampInst.
     register_lookup cur_privilege σ.(sregs) = Supervisor ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt2 rc Sp Sc ={⊤ ∖ ↑minstretN}=∗
+    (* A6.24's payer, threaded through the wrapper unchanged. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt2 rc Sp Sc ={⊤ ∖ ↑minstretN}=∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
         = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
@@ -1047,15 +1070,15 @@ Section Pt2TrampInst.
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt2 rc Sp Sc.
   Proof.
     intros (Hsel_p & Hpres_p) (Hsel_c & Hpres_c) Hbase_c
-           va pa σ Hcanon Hvpn Hid Lmisa Lmenv Lhtif Lpriv LSXL Lpma.
-    iIntros "Hri Hgh Hinv".
+           va pa σ S Hcanon Hvpn Hid Lmisa Lmenv Lhtif Lpriv LSXL Lpma.
+    iIntros "#Hpay Hsto Hri Hgh Hinv".
     assert (Hout : zero_extend' 64 (concat_vec
         ((autocast (T := mword) ((autocast (T := mword)
             (PPN_of_PTE (pte_tramp : mword 64))) : mword 44)) : mword 44)
         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
     { rewrite <- (tramp_variant_ppn ('b"1") ('b"1")) in Hid.
       rewrite pte_set_ad_ppn in Hid. exact Hid. }
-    iMod (tlb_inv_pt2_translateAddr (InstructionFetch tt) rc Sp Sc pte_tramp va pa σ
+    iMod (tlb_inv_pt2_translateAddr (InstructionFetch tt) rc Sp Sc pte_tramp va pa σ S
             (fun a d mxr do_sum => tramp_variant_check_fetch a d mxr do_sum)
             tramp_variant Hcanon Hout
             (fun t HS => match Hsel_p t HS with
@@ -1076,8 +1099,8 @@ Section Pt2TrampInst.
             Lmisa Lmenv Lhtif Lpriv LSXL
             (exec_effectivePrivilege_fetch _ _ σ)
             (exec_is_shadow_stack_fetch σ)
-            Lpma with "Hri Hgh Hinv")
-      as (σ') "(%Htr & %Hmdev & %Hsh & Hri & Hgh & Hinv)".
+            Lpma with "Hpay Hsto Hri Hgh Hinv")
+      as (σ') "(%Htr & %Hmdev & %Hsh & Hsto & Hri & Hgh & Hinv)".
     iDestruct (tlb_inv_pt2_open with "Hinv") as (satp1 tlbvec1 tp1 tc1)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %HSp1 & %HSc1 & %Hpmawimpl & Htp & Htc & Hpmp)".
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
@@ -1115,7 +1138,7 @@ Section Pt2TrampInstKcur.
 
   Lemma pt2_tramp_fetch_habs_kcur (rc : mword 44) (Sp : ptree -> Prop) :
     pt2_tramp_spec Sp ->
-    forall (va pa : mword 64) (σ : mstate),
+    forall (va pa : mword 64) (σ : mstate) (S : TsoMemPa.bytemap -> iProp Σ),
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
     svpn_of va = tramp_vpn ->
@@ -1127,7 +1150,28 @@ Section Pt2TrampInstKcur.
     register_lookup cur_privilege σ.(sregs) = Supervisor ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+    (* A6.24's payer, threaded through the wrapper unchanged. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    (* ...AND A SECOND PAYER, AT THE KERNEL TIER.  These two wrappers walk
+       BOTH trees: the previous/current user tree at the [Some ξ] tier and
+       the SHARED KERNEL tree at the [None] tier ([kptree_own]).  The
+       kernel tree's A/D write-back is a context-FREE ledger store (A6.20 --
+       its owner is a bare [inv], so it can name no context), so it needs its
+       own currency: [TsoCtx.ledger_store_win_ok] rather than
+       [ctx_store_win_ok].  Two payers, one per tier, is the honest shape. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.phys_ledger_word a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.phys_ledger_word a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
       (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kcur rc Sp) ={⊤ ∖ ↑minstretN}=∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
@@ -1140,11 +1184,12 @@ Section Pt2TrampInstKcur.
       ⌜ zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) = false ⌝ ∗
       ⌜ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) ('b"1") = true ⌝ ∗
       ⌜ (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) * 4)%Z ⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
       (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kcur rc Sp).
   Proof.
-    intros (Hsel_p & Hpres_p) va pa σ Hcanon Hvpn Hid Lmisa Lmenv Lhtif Lpriv LSXL Lpma.
-    iIntros "Hri Hgh [#Hclaim Hinv]".
+    intros (Hsel_p & Hpres_p) va pa σ S Hcanon Hvpn Hid Lmisa Lmenv Lhtif Lpriv LSXL Lpma.
+    iIntros "#Hpay #Hpayk Hsto Hri Hgh [#Hclaim Hinv]".
     iAssert (kmap_at (svpn_of va) tramp_ppn KP_rx) as "#Hclaimva".
     { rewrite Hvpn. iApply "Hclaim". }
     iDestruct (tlb_inv_pt2_kcur_open with "Hinv") as (satp0 tlbvec tp tc0)
@@ -1207,8 +1252,10 @@ Section Pt2TrampInstKcur.
     rewrite Hlf in Hmaps_c0.
     iDestruct (ptree_own_path_mem σ (DfracOwn 1) tp vpn pp2 pp1 _ Hmaps_p with "Hgh Htp")
       as %(Hsm2p & Hsm1p & Hsm0p).
-    iDestruct (ptree_own_path_mem σ (DfracOwn 1) t vpn pc2 pc1 _ Hmaps_c0 with "Hgh Ht")
-      as %(Hsm2c & Hsm1c & Hsm0c).
+    (* the CURRENT tree here is the KERNEL one ([kptree_own] = the [None]
+       tier), so the memory projection is taken at that tier explicitly. *)
+    iDestruct (ptree_own_path_mem_at None σ (DfracOwn 1) t vpn pc2 pc1 _ Hmaps_c0
+                 with "Hgh Ht") as %(Hsm2c & Hsm1c & Hsm0c).
     assert (Hbase_c : pt_base t = rc) by (rewrite Hbase; reflexivity).
     destruct (ptree2_translateAddr_cases (InstructionFetch tt) rc va pte_tramp pa satp0 tp t tlbvec
                 pp2 pp1 pc2 pc1 ap dp ac dc σ
@@ -1236,7 +1283,7 @@ Section Pt2TrampInstKcur.
       iSplit; [iPureIntro; exact Hord' |].
       iSplit; [iPureIntro; exact HX' |].
       iSplit; [iPureIntro; exact Hcov' |].
-      iFrame "Hri Hgh Hclaim".
+      iFrame "Hsto Hri Hgh Hclaim".
       iApply (tlb_inv_pt2_kcur_intro rc Sp satp0 tlbvec tp tc0
                 Hmode Hasid Hppn Hok2 HSp Hpmawimpl
                 with "Hsatp Htlb Htp Hpmp Hlb0 Hkinv").
@@ -1255,7 +1302,7 @@ Section Pt2TrampInstKcur.
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
-      iFrame "Hri Hgh Hclaim".
+      iFrame "Hsto Hri Hgh Hclaim".
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) tp t tv').
       { apply (tlb_ok_pt2_fill_cur (mword_of_int 0) tp t tlbvec vpn pc2 pc1
                  (pte_set_ad pte_tramp ac dc) (pte_set_ad pte_tramp ac dc) Hmaps_c0
@@ -1271,10 +1318,10 @@ Section Pt2TrampInstKcur.
         by exact (pte_set_ad_absorb pte_tramp ac dc a1 d1).
       pose proof (tramp_variant a1 d1) as (Hv' & Hl' & Hn' & Hp').
       rewrite <- Habs in Hv', Hl', Hn', Hp'.
-      iDestruct (ptree_own_path_upd (DfracOwn 1) t vpn pc2 pc1 p0c Hmaps_c0 with "Ht")
-        as "(Hs2 & Hs1 & Hs0 & Hrest)".
-      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 pc1 vpn) p0c w' with "Hgh Hs0")
-        as "[Hgh Hs0]".
+      iDestruct (ptree_own_path_upd_at None (DfracOwn 1) t vpn pc2 pc1 p0c Hmaps_c0
+                   with "Ht") as "(Hs2 & Hs1 & Hs0 & Hrest)".
+      iMod ("Hpayk" $! σ.(mem) (pt_addr0 pc1 vpn) p0c w' with "Hgh Hsto Hs0")
+        as "(Hgh & Hsto & Hs0)".
       iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Ht".
       set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                     (Some (u_walk_entry vpn pc2 pc1 w' (mword_of_int 0)))).
@@ -1301,7 +1348,7 @@ Section Pt2TrampInstKcur.
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
-      iFrame "Hri Hgh Hclaim".
+      iFrame "Hsto Hri Hgh Hclaim".
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) tp (ptree_set_leaf t vpn w') tv').
       { apply (tlb_ok_pt2_fill_cur (mword_of_int 0) tp (ptree_set_leaf t vpn w')
                  tlbvec vpn pc2 pc1 w' w'
@@ -1321,8 +1368,8 @@ Section Pt2TrampInstKcur.
       rewrite <- Habs in Hv', Hl', Hn', Hp'.
       iDestruct (ptree_own_path_upd (DfracOwn 1) tp vpn pp2 pp1 p0p Hmaps_p with "Htp")
         as "(Hs2 & Hs1 & Hs0 & Hrest)".
-      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 pp1 vpn) p0p w' with "Hgh Hs0")
-        as "[Hgh Hs0]".
+      iMod ("Hpay" $! σ.(mem) (pt_addr0 pp1 vpn) p0p w' with "Hgh Hsto Hs0")
+        as "(Hgh & Hsto & Hs0)".
       iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Htp".
       set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                     (Some (u_walk_entry vpn pp2 pp1 w' (mword_of_int 0)))).
@@ -1341,7 +1388,7 @@ Section Pt2TrampInstKcur.
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
-      iFrame "Hri Hgh Hclaim".
+      iFrame "Hsto Hri Hgh Hclaim".
       assert (HSp' : Sp (ptree_set_leaf tp vpn w')).
       { rewrite Habs. exact (Hpres_p' tp a1 d1 HSp). }
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) (ptree_set_leaf tp vpn w') t tv').
@@ -1371,7 +1418,7 @@ Section Pt2TrampInstKcur.
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
-      iFrame "Hri Hgh Hclaim".
+      iFrame "Hsto Hri Hgh Hclaim".
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) tp t tv').
       { apply (tlb_ok_pt2_fill_prev (mword_of_int 0) tp t tlbvec vpn pp2 pp1
                  (pte_set_ad pte_tramp ap dp) (pte_set_ad pte_tramp ap dp) Hmaps_p
@@ -1396,7 +1443,7 @@ Section Pt2TrampInstKprev.
   Lemma pt2_tramp_fetch_habs_kprev (rc kroot : mword 44) (Sc : ptree -> Prop) :
     pt2_tramp_spec Sc ->
     (forall t, Sc t -> pt_base t = rc) ->
-    forall (va pa : mword 64) (σ : mstate),
+    forall (va pa : mword 64) (σ : mstate) (S : TsoMemPa.bytemap -> iProp Σ),
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
     svpn_of va = tramp_vpn ->
@@ -1408,7 +1455,28 @@ Section Pt2TrampInstKprev.
     register_lookup cur_privilege σ.(sregs) = Supervisor ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+    (* A6.24's payer, threaded through the wrapper unchanged. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    (* ...AND A SECOND PAYER, AT THE KERNEL TIER.  These two wrappers walk
+       BOTH trees: the previous/current user tree at the [Some ξ] tier and
+       the SHARED KERNEL tree at the [None] tier ([kptree_own]).  The
+       kernel tree's A/D write-back is a context-FREE ledger store (A6.20 --
+       its owner is a bare [inv], so it can name no context), so it needs its
+       own currency: [TsoCtx.ledger_store_win_ok] rather than
+       [ctx_store_win_ok].  Two payers, one per tier, is the honest shape. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.phys_ledger_word a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.phys_ledger_word a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
       (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kprev rc kroot Sc) ={⊤ ∖ ↑minstretN}=∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
@@ -1421,11 +1489,12 @@ Section Pt2TrampInstKprev.
       ⌜ zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) = false ⌝ ∗
       ⌜ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) ('b"1") = true ⌝ ∗
       ⌜ (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) * 4)%Z ⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
       (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kprev rc kroot Sc).
   Proof.
-    intros (Hsel_c & Hpres_c) Hbc va pa σ Hcanon Hvpn Hid Lmisa Lmenv Lhtif Lpriv LSXL Lpma.
-    iIntros "Hri Hgh [#Hclaim Hinv]".
+    intros (Hsel_c & Hpres_c) Hbc va pa σ S Hcanon Hvpn Hid Lmisa Lmenv Lhtif Lpriv LSXL Lpma.
+    iIntros "#Hpay #Hpayk Hsto Hri Hgh [#Hclaim Hinv]".
     iAssert (kmap_at (svpn_of va) tramp_ppn KP_rx) as "#Hclaimva".
     { rewrite Hvpn. iApply "Hclaim". }
     iDestruct (tlb_inv_pt2_kprev_open with "Hinv") as (satp0 tlbvec tp0 tc)
@@ -1488,8 +1557,9 @@ Section Pt2TrampInstKprev.
                 = pte_set_ad pte_tramp ka kd)
       by (unfold kpt_leaf_pte_of; cbn [fst snd]; apply kperm_rx_tramp_variant).
     rewrite Hlf in Hmaps_p0.
-    iDestruct (ptree_own_path_mem σ (DfracOwn 1) t vpn kp2 kp1 _ Hmaps_p0 with "Hgh Ht")
-      as %(_ & _ & Hsm0k).
+    (* the PREVIOUS tree here is the KERNEL one ([None] tier) *)
+    iDestruct (ptree_own_path_mem_at None σ (DfracOwn 1) t vpn kp2 kp1 _ Hmaps_p0
+                 with "Hgh Ht") as %(_ & _ & Hsm0k).
     iDestruct (ptree_own_path_mem σ (DfracOwn 1) tc vpn uc2 uc1 _ Hmaps_c with "Hgh Htc")
       as %(Hsm2u & Hsm1u & Hsm0u).
     destruct (ptree2_translateAddr_cases (InstructionFetch tt) rc va pte_tramp pa satp0 t tc tlbvec
@@ -1518,7 +1588,7 @@ Section Pt2TrampInstKprev.
       iSplit; [iPureIntro; exact Hord' |].
       iSplit; [iPureIntro; exact HX' |].
       iSplit; [iPureIntro; exact Hcov' |].
-      iFrame "Hri Hgh Hclaim".
+      iFrame "Hsto Hri Hgh Hclaim".
       iApply (tlb_inv_pt2_kprev_intro rc kroot Sc satp0 tlbvec tp0 tc
                 Hmode Hasid Hppn Hok2 HSc Hpmawimpl
                 with "Hsatp Htlb Htc Hpmp Hlb0 Hkinv").
@@ -1538,7 +1608,7 @@ Section Pt2TrampInstKprev.
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
-      iFrame "Hri Hgh Hclaim".
+      iFrame "Hsto Hri Hgh Hclaim".
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) t tc tv').
       { apply (tlb_ok_pt2_fill_cur (mword_of_int 0) t tc tlbvec vpn uc2 uc1
                  (pte_set_ad pte_tramp ua ud) (pte_set_ad pte_tramp ua ud) Hmaps_c
@@ -1557,8 +1627,8 @@ Section Pt2TrampInstKprev.
       rewrite <- Habs in Hv', Hl', Hn', Hp'.
       iDestruct (ptree_own_path_upd (DfracOwn 1) tc vpn uc2 uc1 p0u Hmaps_c with "Htc")
         as "(Hs2 & Hs1 & Hs0 & Hrest)".
-      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 uc1 vpn) p0u w' with "Hgh Hs0")
-        as "[Hgh Hs0]".
+      iMod ("Hpay" $! σ.(mem) (pt_addr0 uc1 vpn) p0u w' with "Hgh Hsto Hs0")
+        as "(Hgh & Hsto & Hs0)".
       iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Htc".
       set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                     (Some (u_walk_entry vpn uc2 uc1 w' (mword_of_int 0)))).
@@ -1577,7 +1647,7 @@ Section Pt2TrampInstKprev.
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
-      iFrame "Hri Hgh Hclaim".
+      iFrame "Hsto Hri Hgh Hclaim".
       assert (HSc' : Sc (ptree_set_leaf tc vpn w')).
       { rewrite Habs. exact (Hpres_c' tc a1 d1 HSc). }
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) t (ptree_set_leaf tc vpn w') tv').
@@ -1600,10 +1670,10 @@ Section Pt2TrampInstKprev.
         by exact (pte_set_ad_absorb pte_tramp ka kd a1 d1).
       pose proof (tramp_variant a1 d1) as (Hv' & Hl' & Hn' & Hp').
       rewrite <- Habs in Hv', Hl', Hn', Hp'.
-      iDestruct (ptree_own_path_upd (DfracOwn 1) t vpn kp2 kp1 p0k Hmaps_p0 with "Ht")
+      iDestruct (ptree_own_path_upd_at None (DfracOwn 1) t vpn kp2 kp1 p0k Hmaps_p0 with "Ht")
         as "(Hs2 & Hs1 & Hs0 & Hrest)".
-      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 kp1 vpn) p0k w' with "Hgh Hs0")
-        as "[Hgh Hs0]".
+      iMod ("Hpayk" $! σ.(mem) (pt_addr0 kp1 vpn) p0k w' with "Hgh Hsto Hs0")
+        as "(Hgh & Hsto & Hs0)".
       iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Ht".
       set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                     (Some (u_walk_entry vpn kp2 kp1 w' (mword_of_int 0)))).
@@ -1630,7 +1700,7 @@ Section Pt2TrampInstKprev.
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
-      iFrame "Hri Hgh Hclaim".
+      iFrame "Hsto Hri Hgh Hclaim".
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) (ptree_set_leaf t vpn w') tc tv').
       { apply (tlb_ok_pt2_fill_prev (mword_of_int 0) (ptree_set_leaf t vpn w') tc
                  tlbvec vpn kp2 kp1 w' w'
@@ -1657,7 +1727,7 @@ Section Pt2TrampInstKprev.
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
       iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
-      iFrame "Hri Hgh Hclaim".
+      iFrame "Hsto Hri Hgh Hclaim".
       assert (Hok' : tlb_ok_pt2 (mword_of_int 0) t tc tv').
       { apply (tlb_ok_pt2_fill_prev (mword_of_int 0) t tc tlbvec vpn kp2 kp1
                  (pte_set_ad pte_tramp ka kd) (pte_set_ad pte_tramp ka kd) Hmaps_p0
@@ -1708,8 +1778,11 @@ Qed.
    window as one token (rwx-kmap §5f: "auth rides in pt_frame"). *)
 Section KptFrame.
   Context `{!riscvGS Σ}.
+  (* the KERNEL table is the CONTEXT-FREE tier (A6.20/A6.21): its owner is a
+     bare [inv] shared by every S-mode thread, so the frame is [None]-tiered
+     and this section needs no [CurCtx]. *)
   Definition kpt_frame (kroot : mword 44) : iProp Σ :=
-    (∃ M, pt_frame (kpt_tree_spec_gen kroot M) ∗ kmap_auth M)%I.
+    (∃ M, pt_frame_at None (kpt_tree_spec_gen kroot M) ∗ kmap_auth M)%I.
 End KptFrame.
 
 Lemma upt_pt2_tramp_spec (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :

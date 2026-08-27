@@ -325,11 +325,11 @@ Section ProofBpin.
         iAssert (b_dev (bpa k) ↦₄{DfracOwn (qr/2)} (devs k) ∗
                  b_dev (bpa k) ↦₄{DfracOwn (qr/2)} (devs k))%I
           with "[Hdev]" as "[Hdev1 Hdev2]".
-        { rewrite -word4_pointsto_frac_split Qp.div_2. iExact "Hdev". }
+        { rewrite -ctx_word4_pointsto_frac_split Qp.div_2. iExact "Hdev". }
         iAssert (b_blockno (bpa k) ↦₄{DfracOwn (qr/2)} (bnos k) ∗
                  b_blockno (bpa k) ↦₄{DfracOwn (qr/2)} (bnos k))%I
           with "[Hbno]" as "[Hbno1 Hbno2]".
-        { rewrite -word4_pointsto_frac_split Qp.div_2. iExact "Hbno". }
+        { rewrite -ctx_word4_pointsto_frac_split Qp.div_2. iExact "Hbno". }
         assert (Hsucc : Pos.to_nat (Pos.succ cnt) = (Pos.to_nat cnt + 1)%nat)
           by (rewrite Pos2Nat.inj_succ; lia).
         iEval (rewrite /bslot) in "Hbslot".
@@ -372,11 +372,11 @@ Section ProofBpin.
         iAssert (b_dev (bpa k) ↦₄{DfracOwn (1/4)} (devs k) ∗
                  b_dev (bpa k) ↦₄{DfracOwn (1/4)} (devs k))%I
           with "[Hdev]" as "[Hdev1 Hdev2]".
-        { rewrite -word4_pointsto_frac_split bp_quarter_half. iExact "Hdev". }
+        { rewrite -ctx_word4_pointsto_frac_split bp_quarter_half. iExact "Hdev". }
         iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/4)} (bnos k) ∗
                  b_blockno (bpa k) ↦₄{DfracOwn (1/4)} (bnos k))%I
           with "[Hbno]" as "[Hbno1 Hbno2]".
-        { rewrite -word4_pointsto_frac_split bp_quarter_half. iExact "Hbno". }
+        { rewrite -ctx_word4_pointsto_frac_split bp_quarter_half. iExact "Hbno". }
         iEval (rewrite /bslot) in "Hbslot".
         iAssert (bio_slot_res bn (<[k := ((1/4)%Qp, 1%positive)]> Mg) k (devs k) (bnos k))
           with "[Hcell Hbslot Hdev1 Hbno1]" as "Hslot".

@@ -78,7 +78,7 @@ Section UservecAllPt.
      build one (UsertrapRes.v, "THE PARK'S CHANNEL THROUGH THE MODULE
      TYPES"). *)
   Definition usertrap_res_bare_park
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
         (fun (h : CpuId) (Xc : CurCtx) => UT.usertrap_res_bare (CID := h) (XI := Xc))

@@ -50,8 +50,12 @@ Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
    of the thread of control that holds its facts -- see the block above
    [lock_inv]. *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* [lock_name_intro]: the raw name-field metadata is
-                         minted from a context-indexed store result *)
+(* [lock_name_intro] mints the deliberately-RAW name-field metadata
+   (tso-port.md §0.8' ruling 2) out of a context-indexed store result, so it
+   leaves the ledger through [TsoCtx.ctx_word_pointsto_forget] -- the named
+   one-way projection (§6 amendment A6.8), where the SC-era file used the
+   now-dead [TsoCtxShim.ctx_word_to_mem].  Sound and final: the field is
+   discarded one line later, so nothing will ever load it again. *)
 Local Open Scope Z_scope.
 
 
@@ -268,10 +272,10 @@ Section Lock.
      sits inside [lock_inv] under the invariant, so an ambient index here
      would drag a context into [is_lock] -- the persistent HANDLE -- and a
      handle minted at boot could not be stated at another thread.  ∃ is
-     also the true SC-era statement: the cell belongs to whichever hart
-     last stored it.  The window lemmas below trade it for the acting
-     hart's ambient form through the shim; at cutover those shim uses are
-     M4 worklist entries (lock-internal cells become racy-kit facts). *)
+     also the true statement: the cell belongs to whichever hart last
+     stored it.  The window lemmas below keep the ∃ ([lk_cpu_cell]); the
+     SC-era trade for the acting hart's ambient form died with the shim,
+     and recovering it is the M4 racy-kit entry spelled out there. *)
   Definition lk_cpu_res (st : lock_state) (lk : mword 64) (r : string) : iProp Σ :=
     ((∃ ξ : CtxId,
         ctx_word_pointsto ξ (lock_cpu lk) (DfracOwn 1) (lk_cpu_val st)) ∗
@@ -285,30 +289,42 @@ Section Lock.
   Global Instance lk_cpu_res_timeless st lk r : Timeless (lk_cpu_res st lk r).
   Proof. apply _. Qed.
 
-  (* the ∃-cell against the acting hart's ambient form, via the shim; the
-     SC-only step is the ∃-side ELIMINATION (a real TSO ledger fact is
-     pinned to its context), which is exactly the M4 seam. *)
-  Lemma lk_cpu_cell_acc (lk : mword 64) (v : mword 64) :
-    (∃ ξ : CtxId, ctx_word_pointsto ξ (lock_cpu lk) (DfracOwn 1) v)
-    ⊣⊢ lock_cpu lk ↦₈ v.
-  Proof.
-    iSplit.
-    - iIntros "[%ξ H]". iApply TsoCtxShim.ctx_word_of_mem.
-      iApply (TsoCtxShim.ctx_word_to_mem with "H").
-    - iIntros "H". iExists cur_ctx. iExact "H".
-  Qed.
+  (* THE OWNER CELL, NAMED (§6 amendment A6.8).  The SC-era file stated the
+     ∃-cell EQUAL to the acting hart's ambient form ([lk_cpu_cell_acc], via
+     the shim) and phrased the three unfold lemmas at that ambient form.
+     THE ELIMINATION DIRECTION IS FALSE AT TSO -- a ledger fact is pinned to
+     its context, and the ∃ hides WHICH, so nothing can dominate it -- so the
+     equation is gone and the unfold lemmas are stated at the cell itself.
+     [lk_cpu_cell_intro] is the surviving (trivial) half.
+
+     WHAT THE ELIMINATION NEEDS, so the M4 worklist entry is written down
+     rather than implied: the invariant must hold the cell's context PARKED
+     ([TsoCtx.ctx_parked ξ T]) beside the word, and the acquirer -- whose
+     AMO puts its view at the log top -- mints [ctx_dom ξ cur_ctx] from it
+     with [TsoCtx.ctx_dom_of_parked] and moves the word with
+     [ctx_morph_word].  That is the racy-kit design; it is the ONE reason
+     [lk_cpu_res] may not simply go ambient (an ambient index in the payload
+     would drag a context into the persistent [is_lock] handle).  The
+     failures at the leaves that read and write this cell
+     ([WpSconfLock]) are that entry. *)
+  Definition lk_cpu_cell (lk : mword 64) (v : mword 64) : iProp Σ :=
+    (∃ ξ : CtxId, ctx_word_pointsto ξ (lock_cpu lk) (DfracOwn 1) v)%I.
+
+  Lemma lk_cpu_cell_intro (lk : mword 64) (v : mword 64) :
+    lock_cpu lk ↦₈ v ⊢ lk_cpu_cell lk v.
+  Proof. iIntros "H". iExists cur_ctx. iExact "H". Qed.
 
   (* the free / window form: the whole cell at 0 and no fragment. *)
   Lemma lk_cpu_res_free (lk : mword 64) (r : string) :
-    lk_cpu_res None lk r ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
-  Proof. rewrite /lk_cpu_res /= lk_cpu_cell_acc. apply bi.sep_emp. Qed.
+    lk_cpu_res None lk r ⊣⊢ lk_cpu_cell lk (zero_reg : mword 64).
+  Proof. rewrite /lk_cpu_res /lk_cpu_cell /=. apply bi.sep_emp. Qed.
   Lemma lk_cpu_res_win (i : CPU) (lk : mword 64) (r : string) :
-    lk_cpu_res (Some (i, false)) lk r ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
-  Proof. rewrite /lk_cpu_res /= lk_cpu_cell_acc. apply bi.sep_emp. Qed.
+    lk_cpu_res (Some (i, false)) lk r ⊣⊢ lk_cpu_cell lk (zero_reg : mword 64).
+  Proof. rewrite /lk_cpu_res /lk_cpu_cell /=. apply bi.sep_emp. Qed.
   Lemma lk_cpu_res_held (i : CPU) (lk : mword 64) (r : string) :
     lk_cpu_res (Some (i, true)) lk r ⊣⊢
-    lock_cpu lk ↦₈ cpus_ptr i ∗ lk_in i r.
-  Proof. rewrite /lk_cpu_res /= lk_cpu_cell_acc. reflexivity. Qed.
+    lk_cpu_cell lk (cpus_ptr i) ∗ lk_in i r.
+  Proof. rewrite /lk_cpu_res /lk_cpu_cell /=. reflexivity. Qed.
 
   (* [s] -- the lock's NAME -- rather than a bare rank: [is_lock] already
      carries it, so instantiating with [lock_rank s] leaves no second degree
@@ -376,7 +392,7 @@ Section Lock.
     p ↦ₛ□ s -∗ lock_name_field lk ↦₈ p ==∗ lock_name lk s.
   Proof.
     iIntros "#Hs Hf".
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hf") as "Hf".
+    iDestruct (ctx_word_pointsto_forget with "Hf") as "Hf".
     iMod (word_pointsto_persist with "Hf") as "#Hfp".
     iModIntro. iExists p. by iFrame "Hfp Hs".
   Qed.

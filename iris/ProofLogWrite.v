@@ -2564,8 +2564,8 @@ Section ProofLogWrite.
           as "((%Hdd & %HDlk) & HDauth & HpD & Hcovb)".
         iDestruct "Href" as (q dv bv) "Href".
         rewrite /bref. iDestruct "Href" as "(Hrt & Hrdev & Hrbno)".
-        iDestruct (word4_pointsto_agree with "Hdevh Hrdev") as %Hdveq.
-        iDestruct (word4_pointsto_agree with "Hbnoc Hrbno") as %Hbveq.
+        iDestruct (ctx_word4_pointsto_agree with "Hdevh Hrdev") as %Hdveq.
+        iDestruct (ctx_word4_pointsto_agree with "Hbnoc Hrbno") as %Hbveq.
         subst dv bv.
         (* one pool unit becomes the caller's refund *)
         assert (Hpl : ((LOGBLOCKS - nl) + 2)%nat = (1 + ((LOGBLOCKS - S nl) + 2))%nat)

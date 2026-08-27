@@ -370,7 +370,6 @@ Require Import ConsoleInv.  (* [NDEV_max], [a_devsw_write] *)
 Require Import SpecFilewrite.
 From Kernel Require KernelSyms.
 Require Import TsoCtx.
-Require TsoCtxShim.   (* [fw_devidx]'s devsw slot is still RAW (M1 stage 2) *)
 
 Local Open Scope Z_scope.
 
@@ -1539,7 +1538,7 @@ Section ProofFilewrite.
     ic_sleeplocks (fwn_ic fn) -∗
     dev_inv (fwn_uart fn) (fwn_disk fn) -∗
     DiskInv.disk_geom (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
-    is_lock (fwn_dlock fn) DiskInv.d_lock "virtio_disk"%string (λ ξ : CtxId, DiskInv.disk_res (XI := ξ) (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) -∗
+    is_lock (fwn_dlock fn) DiskInv.d_lock "virtio_disk"%string <{ DiskInv.disk_res (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) }> -∗
     (* THE BITMAP'S INVARIANT -- persistent, so it rides with the rest of
        the persistent half rather than being loop-carried. *)
     BitmapInv.bitmap_inv (fwn_fs fn) (fwn_bmapstart fn) (fwn_cov fn)
@@ -1902,7 +1901,7 @@ Section ProofFilewrite.
     iAssert (off_mark (fc_ip Cf)) with "[Hvalid]" as "Hmark".
     { rewrite /off_mark P8. iExact "Hvalid". }
     iApply fupd_wp.
-    iMod (off_checkout gf γox kx qx (DfracOwn qx) (fc_ip Cf) ⊤
+    iMod (off_checkout gf γox kx qx (DfracOwn (qx/2)) (fc_ip Cf) ⊤
             ltac:(solve_ndisj) with "Hoh Hcip Hmark Hrlv")
       as "(Hoh & Hcip & Hoffc)".
     iModIntro.
@@ -2231,7 +2230,7 @@ Section ProofFilewrite.
     { intros r Hr N1. rewrite (Hxcs r Hr). exact (HW1cs r Hr N1). }
     (* ---- CHECK IN the cell and REBUILD the checked-out bundle ---- *)
     iApply fupd_wp.
-    iMod (off_checkin gf γox kx qx (DfracOwn qx) (fc_ip Cf) v2 ⊤
+    iMod (off_checkin gf γox kx qx (DfracOwn (qx/2)) (fc_ip Cf) v2 ⊤
             ltac:(solve_ndisj) Hwf2 with "Hoh Hcip Hcell")
       as "(Hoh & Hcip & Hmark & Hrlv)".
     (* THE MOVER (namei-pinned-lookup.md §9 W3, the file-write row): writei
@@ -3403,15 +3402,11 @@ Section ProofFilewrite.
                               = (mword_of_int (bv_unsigned (fc_major Cf)) : mword 64)).
              { rewrite HD4a5. apply fr_sext16_small. exact Hmj15. }
              iEval (rewrite /a_devsw_write /dev_major) in "Hslot".
-             (* stage 2: [fw_devidx] states the devsw slot with the RAW
-                [word_pointsto]; the flipped fact crosses through the shim. *)
-             iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
              iApply (fw_devidx (CID0 := CID16) D4 (K - 12)%nat
                        (bv_unsigned (fc_major Cf)) (fwn_wp fn (dev_major Cf)) (fwn_dqv fn (dev_major Cf)) pj b
                        (conj Hmj0 Hmj16) HD4a5m
                        with "Hcg Htext Hpc Hslot").
              iIntros (CID17 Hs17 Dr) "%Hdr Hcg Hpc Hslot".
-             iDestruct (TsoCtxShim.ctx_word_of_mem _ cur_ctx with "Hslot") as "Hslot".
              destruct Hdr as (HDra5 & HDrthr).
              iEval (rewrite -(_ : a_devsw_write (dev_major Cf)
                                   = mword_of_int (KernelSyms.devsw

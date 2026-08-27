@@ -244,7 +244,7 @@ Section FsReady.
      contract, every bundle and every continuation on the way, for a value
      that is fixed for the lifetime of the boot.
 
-     Discarding the fraction at the end of fsinit ([word4_pointsto_persist])
+     Discarding the fraction at the end of fsinit ([ctx_word4_pointsto_persist])
      retires that cost outright: the cells become persistent, they live here
      beside the invariants they describe, and [DfracDiscarded] instantiates
      the [dq] of every existing contract without any of them changing.  This
@@ -315,7 +315,7 @@ Section FsReady.
         [is_lock] is not covariant in its resource. *)
      (∃ pd pav pu : mword 64,
         disk_geom fsc_disk pd pav pu ∗
-        is_lock fsc_dlock d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) fsc_disk pd pav pu)) ∗
+        is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>) ∗
      is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                 icfg_nib icfg_dev ∗
      itable_inv ∗
@@ -403,7 +403,7 @@ Section FsReady.
      (* the same one conjunct [fs_ready] carries; see the note there *)
      (∃ pd pav pu : mword 64,
         disk_geom fsc_disk pd pav pu ∗
-        is_lock fsc_dlock d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) fsc_disk pd pav pu)) ∗
+        is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>) ∗
      is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                 icfg_nib icfg_dev ∗
      itable_inv ∗
@@ -532,7 +532,7 @@ Section FsReady.
     fs_ready -∗ dev_inv fsc_uart fsc_disk ∗
                 (∃ pd pav pu : mword 64,
                    disk_geom fsc_disk pd pav pu ∗
-                   is_lock fsc_dlock d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) fsc_disk pd pav pu)).
+                   is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>).
   Proof.
     rewrite /fs_ready.
     by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & $ & $ & _)".
@@ -630,7 +630,7 @@ Section FsReady.
        [disk_geom] at its own three beside this predicate. *)
     (∃ pd pav pu : mword 64,
        disk_geom fsc_disk pd pav pu ∗
-       is_lock fsc_dlock d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) fsc_disk pd pav pu)) ∗
+       is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>) ∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                icfg_nib icfg_dev ∗ itable_inv ∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗ ic_sleeplocks fsc_ic ∗
@@ -661,44 +661,3 @@ End FsReady.
    trap the in-section seals fix, one scope up. *)
 Typeclasses Opaque fs_ready.
 Typeclasses Opaque fs_ready_pre.
-
-(* ====================================================================== *)
-(* THE TRANSPORT OBLIGATION (tso-port M3 / the absorb tranche).            *)
-(*                                                                         *)
-(* [fs_ready] rides inside [FirstTok.first_tok], hence inside              *)
-(* [ProcInv.proc_priv], and the park has to DEPOSIT that block into the    *)
-(* child's freshly minted context -- so the whole chain owes [CtxMorph].    *)
-(* Since the escrow became a parked record, [bio_ctx] is a CLOSED TERM and *)
-(* EXACTLY ONE of the twenty-one conjuncts is still ξ-indexed: the ∃ row    *)
-(* carrying [DiskInv.disk_geom]'s three ring-page pointers (its lock handle *)
-(* beside it is closed, the payload being λ-converted).  The ∃ is applied   *)
-(* AS A TERM: instance search will not reach through [bi_exist] (§0.16′,    *)
-(* measured -- a [Hint Extern] does not rescue it), and [fs_ready] is       *)
-(* [Typeclasses Opaque] on top of that, which is why this is an explicit    *)
-(* instance rather than [apply _].                                          *)
-(*                                                                         *)
-(* OUTSIDE the section, because the instance quantifies the context the     *)
-(* section fixes.                                                           *)
-(* ====================================================================== *)
-Section FsReadyMorph.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId}.
-  Context `{ICFG : icfg}.
-
-  Global Instance fs_ready_morph : CtxMorph (λ ξ : CtxId, fs_ready (XI := ξ)).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /fs_ready.
-    iDestruct "H" as "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10
-                       & H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18
-                       & %H19 & H20 & H21)".
-    iDestruct "H10" as (pd pav pu) "[Hgeom Hdlk]".
-    iDestruct (disk_geom_morph fsc_disk pd pav pu ξ ξ' with "Hd Hgeom")
-      as "[Hd Hgeom]".
-    iFrame "Hd".
-    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H11 H12 H13 H14 H15 H16 H17 H18 H20 H21".
-    iFrame "%".
-    iExists pd, pav, pu. iFrame "Hgeom Hdlk".
-  Qed.
-
-End FsReadyMorph.

@@ -1,4 +1,7 @@
 (* RiscvExec.v -- the run/exec interpreters, determinism bridge, wp_exec_step. *)
+(* stdpp's [gmap]/[bv] BEFORE the model, exactly as RiscvPtsto.v does: the    *)
+(* memory-model interp bundle below is stated over [gmap Arch.pa (bv 8)].     *)
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map mono_nat.
 From iris.program_logic Require Import language weakestpre lifting.
@@ -6,6 +9,10 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto HartBlock.
+(* the TSO machine's pure layer and ghosts (tso-machine-flip.md): [pwmsg],
+   [flat]/[latest], [view_auth].  Import is not transitive, so requiring
+   RiscvPtsto does not put these in scope. *)
+Require Import TsoMemPa TsoGhost.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)
 (* and the nightly dead-import sweep skips [Require Export] lines.         *)
@@ -160,15 +167,27 @@ Qed.
 (* is what lets the whole-instruction certification data already in the tree *)
 (* (the [exec_*] catalogue, the decode bridge, every leaf's interpreter-run  *)
 (* fact) be CONSUMED by the node-granular adapter rather than re-derived.    *)
+(*                                                                          *)
+(* POST-FLIP (tso-machine-flip.md RULING 3) the bracket carries the SOLO     *)
+(* ERA with it: [mblock h img] is a chain of node steps each of which sees   *)
+(* the flat tie ([s.(mem) = flat img log]) and a log holding nothing but     *)
+(* hart [h]'s own messages -- exactly the situation of the boot bracket and  *)
+(* of the device-conformance tester, and exactly what collapses the plain    *)
+(* load's [tso_read] back onto [exec]'s flat read.  [exec] itself is         *)
+(* UNCHANGED: run/exec stay flat, which is the whole point of the ruling.    *)
 (* ---------------------------------------------------------------------- *)
 
-Corollary hart_block_exec (tick : bool) (s s' s'' : mstate) :
+(* [h] and [img] are left to inference rather than annotated: this file does
+   NOT Import [TsoMemPa] (Import is not transitive) nor stdpp's bitvector
+   notations, so neither [agent] nor [bv] is spellable here -- and [mblock]
+   pins both anyway. *)
+Corollary hart_block_exec h img (tick : bool) (s s' s'' : mstate) :
   exec (riscv_step tick) s = Some (tt, s'') ->
-  mblock (riscv_step tick, s) (Interface.Ret tt, s') ->
+  mblock h img (riscv_step tick, s) (Interface.Ret tt, s') ->
   s' = s''.
 Proof.
   intros He Hb. destruct (exec_run_det _ _ _ _ He) as [_ Huniq].
-  by destruct (Huniq _ _ (hart_block_run _ _ _ Hb)) as [_ ->].
+  by destruct (Huniq _ _ (hart_block_run _ _ _ _ _ Hb)) as [_ ->].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -238,6 +257,389 @@ Section WPDead.
   Qed.
 End WPDead.
 
+(* ====================================================================== *)
+(* 2c. THE MEMORY-MODEL INTERP BUNDLE, HART-LOCAL                          *)
+(*     (tso-machine-flip.md §6 amendment A6.1).                            *)
+(*                                                                         *)
+(* [RiscvPtsto.tso_interp_at] is stated at a [gstate]: its view authority   *)
+(* is at [avf g], the WHOLE per-agent view function.  A leaf works at       *)
+(* [mstate] and must never see [g], so the lifting rules hand it the        *)
+(* GSTATE-FREE repackaging below -- the same body with [gimg]/[gmem]/       *)
+(* [glog]/[avf g] abstracted, and [mm_ok]'s single pure conjunct restated   *)
+(* as the ties that mention only the abstracted arguments.                  *)
+(*                                                                         *)
+(* THE THIRD PURE TIE ([∀ h, NCPU ≤ h → V h = length log]) is not in        *)
+(* [mm_ok] and has to be here: it is RULING 2 / §4's "the bus-master        *)
+(* agents are PINNED TO THE TOP", true of [avf] by construction, and        *)
+(* without it a callback holding only an abstract [V] could not say what    *)
+(* the non-hart entries of its returned view function are -- which is       *)
+(* exactly what [vstep] below has to know.                                  *)
+(*                                                                         *)
+(* IT LIVES HERE, NOT IN RiscvPtsto.v, and so pays a [⊣⊢] rather than       *)
+(* being definitional: every leaf already Requires this file, and iterating *)
+(* on RiscvPtsto.v costs a ~20-minute rebuild per attempt.  IF THE [⊣⊢]     *)
+(* UNFOLDING EVER MEASURES AS A PROOF-PERFORMANCE HAZARD, moving            *)
+(* [tso_interp_of] into RiscvPtsto.v and defining [tso_interp_at] as its    *)
+(* instance at [avf g] is a MECHANICAL follow-up: the bodies are already    *)
+(* the same up to the pure conjunct.                                        *)
+(* ====================================================================== *)
+
+(* THE VIEW FUNCTION AFTER ONE AGENT'S STEP.  Agent [h] takes its new view;
+   the other HARTS keep theirs; every non-hart (bus-master) agent stays
+   pinned to the TOP OF THE NEW LOG -- which is why a store's append moves
+   the disk's view for free and no rule has to update it.  This is the
+   function the σ-callback owes its bundle back at, and the lifting rules
+   discharge [avf g' =₁ vstep …] against it ([avf_hart_node]). *)
+Definition vstep (h : agent) (tv' : nat) (log' : list pwmsg)
+    (V : agent -> nat) : agent -> nat :=
+  fun h' => if decide (h' = h) then tv'
+            else if lt_dec h' NCPU then V h' else length log'.
+
+(* the [gstate]-side computation the lifting rules must match: a hart node
+   moves ONE hart's view and possibly appends, and [avf] of the written-back
+   state is exactly [vstep] of [avf] of the old one.  Pointwise (no
+   functional extensionality; [tso_interp_of_ext] closes the gap). *)
+Lemma avf_hart_node (g : gstate) (cpu : CPU) (rs' : regstate)
+    (mem' : gmap Arch.pa (bv 8)) (d' : dev_state) (r' : option resv)
+    (log' : list pwmsg) (tv' : nat) (h' : agent) :
+  avf (GState (<[cpu := rs']> g.(gregs)) mem' d' g.(ggen) g.(gpow)
+         (<[cpu := r']> g.(gresv)) g.(gimg) log' (<[cpu := tv']> g.(gtv))) h'
+  = vstep (hart_agent cpu) tv' log' (avf g) h'.
+Proof.
+  rewrite /avf /vstep /hart_agent /insert /gtv_insert.
+  destruct (lt_dec h' NCPU) as [Hlt|Hge]; cbn [gtv glog].
+  (* [case_decide] and NOT [destruct (decide …)]: the two [decide]s carry
+     DIFFERENT [EqDecision] instances (the hart index's [fin], the agent's
+     [nat]), so a spelled-out [decide] fails to match the goal's term. *)
+  - assert (Hf : fin_to_nat (nat_to_fin Hlt) = h') by apply fin_to_nat_to_fin.
+    case_decide as Hd1; case_decide as Hd2; try done.
+    + exfalso. apply Hd2. rewrite -Hf. by rewrite Hd1.
+    + exfalso. apply Hd1, (inj fin_to_nat). by rewrite Hf.
+  - case_decide as Hd2; [|done].
+    exfalso. apply Hge. rewrite Hd2. apply fin_to_nat_lt.
+Qed.
+
+(* … and the DISK's (A6.2): a DMA step moves no hart's view, and the disk's
+   own is pinned to the top, so [vstep] at [disk_agent] and the new log's
+   length is the whole update -- and it is a no-op on the arm that appends
+   nothing. *)
+Lemma avf_disk_node (g : gstate) (mem' : gmap Arch.pa (bv 8))
+    (d' : dev_state) (log' : list pwmsg) (h' : agent) :
+  avf (GState g.(gregs) mem' d' g.(ggen) g.(gpow) g.(gresv)
+         g.(gimg) log' g.(gtv)) h'
+  = vstep disk_agent (length log') log' (avf g) h'.
+Proof.
+  rewrite /avf /vstep /disk_agent.
+  destruct (lt_dec h' NCPU) as [Hlt|Hge]; cbn [gtv glog].
+  - case_decide as Hd; [exfalso; lia|done].
+  - case_decide as Hd; done.
+Qed.
+
+(* the view function is UNCHANGED by a step that neither appends nor moves
+   the stepping agent's view -- the non-hart entries by the bundle's pinning
+   tie, which is exactly why that tie is in the bundle (A6.1). *)
+Lemma vstep_idle (V : agent -> nat) (log : list pwmsg) (h h' : agent) :
+  (∀ h0, (NCPU ≤ h0)%nat -> V h0 = length log) ->
+  vstep h (V h) log V h' = V h'.
+Proof.
+  intros Hpin. rewrite /vstep. case_decide as Hd; [by subst|].
+  destruct (lt_dec h' NCPU) as [|Hge]; [done|]. symmetry. apply Hpin. lia.
+Qed.
+
+(* the stepping agent's own entry of its own step's view function *)
+Lemma vstep_self (h : agent) (t : nat) (log : list pwmsg) (V : agent -> nat) :
+  vstep h t log V h = t.
+Proof. rewrite /vstep. by case_decide. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE GATE BRIDGE (tso-machine-flip.md §6 amendment A6.1 vs the step-4     *)
+(* kit).  [TsoCtx.ctx_load_ok] -- the load gate that discharges §6's        *)
+(* [Mobl_ram_plain] -- is stated at a [gstate] and [tso_interp_at]; A6.1    *)
+(* says a LEAF must never see a [gstate], so the leaf rules hand over       *)
+(* [tso_interp_of], the gstate-free bundle.  The two were designed against  *)
+(* different assumptions and meet here.                                     *)
+(*                                                                          *)
+(* They reconcile because [tso_interp_at] READS ONLY four fields of its     *)
+(* [gstate] -- [gimg], [gmem], [glog], [gtv] -- so the bundle can           *)
+(* RECONSTRUCT one, with the other five filled by anything.  The step that  *)
+(* makes it work is [avf (gs_of …) =₁ V], and that needs exactly the        *)
+(* bundle's THIRD pure tie (bus-master agents pinned to the top): [avf]     *)
+(* answers [length log] off the hart range, so without the tie [V] would be *)
+(* unconstrained there.  The tie was added for [vstep]'s idle case; it is   *)
+(* what makes the gate reachable at all.                                    *)
+(* ---------------------------------------------------------------------- *)
+Definition gs_of (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg)
+    (V : agent -> nat) (rs : regstate) (d : dev_state) : gstate :=
+  GState (fun _ => rs) mem d 0%nat true (fun _ => None) img log
+         (fun c => V (hart_agent c)).
+
+Lemma avf_gs_of (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg)
+    (V : agent -> nat) (rs : regstate) (d : dev_state) (h : agent) :
+  (∀ h', (NCPU ≤ h')%nat -> V h' = length log) ->
+  avf (gs_of img mem log V rs d) h = V h.
+Proof.
+  intros Hpin. rewrite /avf /gs_of /hart_agent. cbn [gtv glog].
+  destruct (lt_dec h NCPU) as [Hlt|Hge].
+  - f_equal. apply fin_to_nat_to_fin.
+  - symmetry. apply Hpin. lia.
+Qed.
+
+Section TsoBundle.
+  Context `{!riscvFixedGS Σ}.
+
+  Definition tso_interp_of (E : riscvEraGS)
+      (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg) (V : agent -> nat)
+      : iProp Σ :=
+    (∃ (TM : gmap Arch.pa nat) (LM : gmap nat pwmsg),
+       ghost_map_auth (era_ts_name E) 1 TM ∗
+       ⌜dom TM = dom mem⌝ ∗
+       ⌜∀ a t, TM !! a = Some t →
+          ∃ v, mem !! a = Some v ∧ latest img log a t v⌝ ∗
+       ghost_map_auth (era_logm_name E) 1 LM ∗
+       ⌜∀ i, LM !! i = log !! i⌝ ∗
+       mono_nat_auth_own (era_loglen_name E) 1 (length log) ∗
+       view_auth (era_view_name E) V ∗
+       ⌜mem = flat img log⌝ ∗
+       ⌜∀ h, (V h ≤ length log)%nat⌝ ∗
+       ⌜∀ h, (NCPU ≤ h)%nat -> V h = length log⌝)%I.
+
+  (* [viewUR] is a [discrete_funUR], so its [≡] IS pointwise equality --
+     which is why the bundle can be re-indexed by a pointwise-equal view
+     function without functional extensionality. *)
+  Lemma view_auth_ext (γ : gname) (V V' : agent -> nat) :
+    (∀ h, V h = V' h) -> view_auth γ V ⊣⊢ view_auth γ V'.
+  Proof.
+    intros HV. rewrite /view_auth.
+    assert (vf V ≡ vf V') as Heq by (intros h; by rewrite /vf HV).
+    by rewrite Heq.
+  Qed.
+
+  Lemma tso_interp_of_ext E img mem log (V V' : agent -> nat) :
+    (∀ h, V h = V' h) ->
+    tso_interp_of E img mem log V ⊣⊢ tso_interp_of E img mem log V'.
+  Proof.
+    intros HV. rewrite /tso_interp_of. iSplit.
+    - iIntros "H". iDestruct "H" as (TM LM)
+        "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6)".
+      iExists TM, LM.
+      rewrite -(view_auth_ext (era_view_name E) V V' HV).
+      iFrame "Hts Hlm Hll Hv". iPureIntro. split_and!; try done.
+      + intros h. rewrite -HV. apply H5.
+      + intros h Hh. rewrite -HV. by apply H6.
+    - iIntros "H". iDestruct "H" as (TM LM)
+        "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6)".
+      iExists TM, LM.
+      rewrite (view_auth_ext (era_view_name E) V V' HV).
+      iFrame "Hts Hlm Hll Hv". iPureIntro. split_and!; try done.
+      + intros h. rewrite HV. apply H5.
+      + intros h Hh. rewrite HV. by apply H6.
+  Qed.
+
+  (* THE SEAM, in one line: the era's TSO conjunct IS the bundle at the
+     machine's own image/cache/log and at [avf g]. *)
+  Lemma tso_interp_at_of (E : riscvEraGS) (g : gstate) :
+    tso_interp_at E g ⊣⊢
+    tso_interp_of E g.(gimg) g.(gmem) g.(glog) (avf g).
+  Proof.
+    rewrite /tso_interp_at /tso_interp_of. iSplit.
+    - iIntros "H". iDestruct "H" as (TM LM)
+        "(Hts & %Hdom & %Hlat & Hlm & %Hlm2 & Hll & Hv & %Hmm)".
+      destruct Hmm as [Hflat Htv].
+      iExists TM, LM. iFrame "Hts Hlm Hll Hv". iPureIntro.
+      split_and!; [exact Hdom|exact Hlat|exact Hlm2|exact Hflat| |].
+      + intros h. rewrite /avf. destruct (lt_dec h NCPU) as [Hlt|]; [|lia].
+        apply Htv.
+      + intros h Hh. rewrite /avf.
+        destruct (lt_dec h NCPU) as [Hlt|]; [lia|done].
+    - iIntros "H". iDestruct "H" as (TM LM)
+        "(Hts & %Hdom & %Hlat & Hlm & %Hlm2 & Hll & Hv & %Hflat & %HV & _)".
+      iExists TM, LM. iFrame "Hts Hlm Hll Hv". iPureIntro.
+      split_and!; [exact Hdom|exact Hlat|exact Hlm2|].
+      split; [exact Hflat|]. intros c. rewrite -(avf_hart g c). apply HV.
+  Qed.
+
+  Lemma tso_interp_of_mono E img mem log (V V' : agent -> nat) :
+    (∀ h, V h = V' h) ->
+    tso_interp_of E img mem log V -∗ tso_interp_of E img mem log V'.
+  Proof.
+    intros HV. rewrite (tso_interp_of_ext _ _ _ _ V V' HV). iIntros "$".
+  Qed.
+
+  (* THE IDLE RETURN: a node that neither appends nor moves this agent's view
+     gives the bundle back exactly as it got it.  What every register /
+     announce / MMIO leaf and the boundary rule use. *)
+  Lemma tso_interp_of_idle E img mem log (V : agent -> nat) (h : agent) :
+    tso_interp_of E img mem log V -∗
+    tso_interp_of E img mem log (vstep h (V h) log V).
+  Proof.
+    iIntros "H". iDestruct "H" as (TM LM)
+      "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6)".
+    iApply (tso_interp_of_mono E img mem log V (vstep h (V h) log V)
+              (fun h' => eq_sym (vstep_idle V log h h' H6))).
+    iExists TM, LM. iFrame "Hts Hlm Hll Hv". iPureIntro. by split_and!.
+  Qed.
+
+  (* the view bound, read off the bundle -- what makes an advance MONOTONE
+     rather than an arbitrary jump, and what every leaf needs before it can
+     move its own view *)
+  Lemma tso_interp_of_bound E img mem log (V : agent -> nat) :
+    tso_interp_of E img mem log V -∗ ⌜∀ h, (V h ≤ length log)%nat⌝.
+  Proof.
+    iIntros "H". iDestruct "H" as (TM LM) "(_&_&_&_&_&_&_&_&%Hb&_)".
+    iPureIntro. exact Hb.
+  Qed.
+
+  (* THE RECEIPT (tso-machine-flip.md §6 amendment A6.6).  The view
+     authority is open exactly once per leaf, and that is where [view_lb] is
+     BORN: minting it is an INCLUSION, not an update, so it is free and the
+     authority comes back untouched.  Persistent, so a consumer that does not
+     want the receipt simply drops it.  [TsoCtx.hart_view_lb] is the
+     Σ-surface wrapper over this; the leaf file states the machine-level
+     fact and does not import the context algebra to do it. *)
+  Lemma tso_interp_of_receipt E img mem log (V : agent -> nat) (h : agent) :
+    tso_interp_of E img mem log V -∗
+    tso_interp_of E img mem log V ∗
+    view_lb (era_view_name E) (era_loglen_name E) h (V h).
+  Proof.
+    iIntros "H". iDestruct "H" as (TM LM)
+      "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6)".
+    iDestruct (view_lb_get (era_view_name E) (era_loglen_name E) V
+                 (length log) h (H5 h) with "Hv Hll") as "(Hv & Hll & #Hrec)".
+    iFrame "Hrec". iExists TM, LM. iFrame "Hts Hlm Hll Hv". iPureIntro.
+    by split_and!.
+  Qed.
+
+  (* the same at a NAMED index -- the form the leaves use, so no [vstep]
+     ever has to be rewritten inside an Iris hypothesis *)
+  Lemma tso_interp_of_receipt_at E img mem log (V : agent -> nat) (h : agent)
+      (K : nat) :
+    V h = K ->
+    tso_interp_of E img mem log V -∗
+    tso_interp_of E img mem log V ∗
+    view_lb (era_view_name E) (era_loglen_name E) h K.
+  Proof. intros <-. apply tso_interp_of_receipt. Qed.
+
+  (* the bus-master pinning tie, read off the bundle -- the half of the
+     [avf] reconstruction that [mm_ok] does not carry *)
+  Lemma tso_interp_of_pin E img mem log (V : agent -> nat) :
+    tso_interp_of E img mem log V -∗
+    ⌜∀ h, (NCPU ≤ h)%nat -> V h = length log⌝.
+  Proof.
+    iIntros "H". iDestruct "H" as (TM LM) "(_&_&_&_&_&_&_&_&_&%Hp)".
+    iPureIntro. exact Hp.
+  Qed.
+
+  (* THE DISK'S IDLE RETURN (§6 amendments A6.2 + A6.11).  Five of
+     [disk_step]'s six arms write nothing, and after A6.11 they SAY so
+     ([W = ∅], hence [log' = log]); what they owe back is the bundle at
+     [vstep disk_agent (length log) log V], which is the bundle they were
+     given -- because [avf] pins every bus-master agent to the top, so
+     [V disk_agent] IS [length log] and [vstep] is the identity there.
+     Spelled once so [WpUart]'s four framing arms are one line each. *)
+  Lemma tso_interp_of_disk_idle E img mem log (V : agent -> nat) :
+    tso_interp_of E img mem log V -∗
+    tso_interp_of E img mem log (vstep disk_agent (length log) log V).
+  Proof.
+    iIntros "H". iDestruct (tso_interp_of_pin with "H") as %Hp.
+    rewrite -(Hp disk_agent (Nat.le_refl NCPU)).
+    iApply (tso_interp_of_idle with "H").
+  Qed.
+
+  (* THE BRIDGE ITSELF: the leaf's bundle IS the kit's [tso_interp_at], at a
+     reconstructed [gstate].  Both directions, so a gate can be applied and
+     the bundle handed back.  [rs]/[d] are arbitrary -- [tso_interp_at] never
+     looks at [gregs]/[gdev]/[ggen]/[gpow]/[gresv]. *)
+  Lemma tso_interp_of_at_gs E img mem log (V : agent -> nat)
+      (rs : regstate) (d : dev_state) :
+    (∀ h, (NCPU ≤ h)%nat -> V h = length log) ->
+    tso_interp_of E img mem log V ⊣⊢
+    tso_interp_at E (gs_of img mem log V rs d).
+  Proof.
+    intros Hpin. rewrite tso_interp_at_of. cbn [gimg gmem glog].
+    apply tso_interp_of_ext. intros h. symmetry. by apply avf_gs_of.
+  Qed.
+
+  (* THE MONOTONE ADVANCE: this agent's view moves forward, nothing else
+     changes.  What a PLAIN LOAD's drain and a DRAINING FENCE both do, and
+     the only ghost UPDATE the view authority ever needs on the hart side
+     ([TsoGhost.view_auth_update]; the receipt [hart_view_lb] is minted
+     separately, §6).  [h < NCPU] because a bus-master agent's view is
+     pinned to the top and may only move with the log. *)
+  Lemma tso_interp_of_advance E img mem log (V : agent -> nat)
+      (h : agent) (t : nat) :
+    (h < NCPU)%nat -> (V h ≤ t)%nat -> (t ≤ length log)%nat ->
+    tso_interp_of E img mem log V ==∗
+    tso_interp_of E img mem log (vstep h t log V).
+  Proof.
+    iIntros (Hh Hle Htop) "H". iDestruct "H" as (TM LM)
+      "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6)".
+    assert (Hmono : ∀ h', (V h' ≤ vstep h t log V h')%nat).
+    { intros h'. rewrite /vstep. case_decide as Hd; [by subst|].
+      destruct (lt_dec h' NCPU) as [|Hge]; [done|].
+      rewrite H6; [done|lia]. }
+    iMod (view_auth_update _ V (vstep h t log V) Hmono with "Hv") as "Hv".
+    iModIntro. iExists TM, LM. iFrame "Hts Hlm Hll Hv". iPureIntro.
+    split_and!; [done|done|done|done| |].
+    - intros h'. rewrite /vstep. case_decide as Hd; [exact Htop|].
+      destruct (lt_dec h' NCPU); [apply H5|lia].
+    - intros h' Hh'. rewrite /vstep. case_decide as Hd; [lia|].
+      destruct (lt_dec h' NCPU); [lia|done].
+  Qed.
+
+  (* "DRAIN, THEN READ MEMORY": the exclusive read's move -- the view goes to
+     the TOP and the receipt says so.  The one place an ACQUIRE receipt at the
+     top is honestly produced (the AMO/conditional write's success arm gets
+     its own by [tso_interp_of_receipt] on the post-append bundle, whose top
+     it already sits at). *)
+  Lemma tso_interp_of_top E img mem log (V : agent -> nat) (h : agent) :
+    (h < NCPU)%nat ->
+    tso_interp_of E img mem log V ==∗
+    tso_interp_of E img mem log (vstep h (length log) log V) ∗
+    view_lb (era_view_name E) (era_loglen_name E) h (length log).
+  Proof.
+    iIntros (Hh) "H".
+    iDestruct (tso_interp_of_bound with "H") as %Hb.
+    iMod (tso_interp_of_advance _ _ _ _ _ h (length log) Hh (Hb h)
+            (Nat.le_refl (length log)) with "H") as "H".
+    (* the receipt's index IS the top: [vstep] at the stepping agent *)
+    iDestruct (tso_interp_of_receipt_at _ _ _ _ _ h (length log)
+                 (vstep_self h (length log) log V) with "H") as "[H Hrec]".
+    iModIntro. iFrame "H Hrec".
+  Qed.
+
+  (* THE WRITE-BACK, in one step: the bundle a hart's σ-callback returns IS
+     the era's TSO conjunct at the written-back machine state.  This is where
+     [vstep] meets [avf] and the two are discharged against each other; both
+     hart lifting rules below use nothing else. *)
+  Lemma tso_interp_hart_wb (E : riscvEraGS) (g : gstate) (cpu : CPU)
+      (rs' : regstate) (mem' : gmap Arch.pa (bv 8)) (d' : dev_state)
+      (r' : option resv) (log' : list pwmsg) (tv' : nat) :
+    tso_interp_of E g.(gimg) mem' log' (vstep (hart_agent cpu) tv' log' (avf g))
+    -∗ tso_interp_at E (GState (<[cpu := rs']> g.(gregs)) mem' d' g.(ggen)
+                          g.(gpow) (<[cpu := r']> g.(gresv)) g.(gimg) log'
+                          (<[cpu := tv']> g.(gtv))).
+  Proof.
+    iIntros "H". rewrite tso_interp_at_of.
+    rewrite (tso_interp_of_ext _ _ _ _ _ _
+               (avf_hart_node g cpu rs' mem' d' r' log' tv')).
+    iExact "H".
+  Qed.
+
+  (* … and the disk's (A6.2).  Same shape; the disk agent's own view rides
+     the append, so [vstep disk_agent (length log') log'] is the whole move. *)
+  Lemma tso_interp_disk_wb (E : riscvEraGS) (g : gstate)
+      (mem' : gmap Arch.pa (bv 8)) (d' : dev_state) (log' : list pwmsg) :
+    tso_interp_of E g.(gimg) mem' log'
+      (vstep disk_agent (length log') log' (avf g))
+    -∗ tso_interp_at E (GState g.(gregs) mem' d' g.(ggen) g.(gpow) g.(gresv)
+                          g.(gimg) log' g.(gtv)).
+  Proof.
+    iIntros "H". rewrite tso_interp_at_of.
+    rewrite (tso_interp_of_ext _ _ _ _ _ _ (avf_disk_node g mem' d' log')).
+    iExact "H".
+  Qed.
+End TsoBundle.
+
 Section WPExec.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
@@ -280,13 +682,33 @@ Section WPExec.
      that CHANGES it (any RAM/MMIO write, the exclusive read, the [Ret]
      boundary) needs [wp_hart_step_resv] below instead: a [ghost_map] auth
      cannot be updated without its fragment. *)
+  (* THE MEMORY-MODEL CONTEXT (tso-machine-flip.md §6 amendment A6.1) rides
+     beside the reservation context and is ∀-quantified the same way: [img]
+     is the era image, [log] the write log, [V] the per-agent view function
+     and [tv] THIS hart's entry of it (handed over separately so a leaf can
+     name its own view without projecting [V]).  The callback gets the
+     ghosts as [tso_interp_of] -- the gstate-free bundle -- and owes it back
+     at the node's [log'] and at [vstep], the view function after this
+     hart's move.  A leaf that touches no memory returns it unchanged modulo
+     [vstep]'s no-op ([tso_interp_of_ext]); the load/store/barrier leaves are
+     where the four ghost steps live. *)
   Lemma wp_hart_step (m : M unit) :
-    (forall oth σ r m' σ' r', mnode_step oth σ r m m' σ' r' -> r' = r) ->
+    (forall oth h img σ log tv r m' σ' log' tv' r',
+       mnode_step oth h img σ log tv r m m' σ' log' tv' r' -> r' = r) ->
     gen_cert -∗
-    (∀ σ oth r, mstate_interp σ ={⊤,∅}=∗
-       ∃ m0 σ0 r0, ⌜mnode_step oth σ r m m0 σ0 r0⌝ ∗
-          ▷ (∀ m' σ' r', ⌜mnode_step oth σ r m m' σ' r'⌝ ={∅,⊤}=∗
+    (∀ σ oth r img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+       ∃ m0 σ0 log0 tv0 r0,
+         ⌜mnode_step oth (hart_agent cpu_id) img σ log tv r
+            m m0 σ0 log0 tv0 r0⌝ ∗
+          ▷ (∀ m' σ' log' tv' r',
+               ⌜mnode_step oth (hart_agent cpu_id) img σ log tv r
+                  m m' σ' log' tv' r'⌝ ={∅,⊤}=∗
                mstate_interp σ' ∗
+               tso_interp_of riscv_eraGS img σ'.(mem) log'
+                 (vstep (hart_agent cpu_id) tv' log' V) ∗
                WP (HartE gen_id cpu_id m' : expr riscv_lang))) -∗
     WP (HartE gen_id cpu_id m : expr riscv_lang).
   Proof.
@@ -328,33 +750,42 @@ Section WPExec.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Htso & Hresv & %Hrok)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
+    (* the era's TSO conjunct, re-indexed as the gstate-free bundle (A6.1) *)
+    iEval (rewrite tso_interp_at_of) in "Htso".
     iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev))
             (others_resv g.(gresv) cpu_id) (g.(gresv) cpu_id)
-            with "[Hri Hmem Hdev]") as (m0 σ0 r0) "(%Hwit & Hk)".
+            g.(gimg) g.(glog) (g.(gtv) cpu_id) (avf g)
+            with "[] [Hri Hmem Hdev] Htso") as (m0 σ0 log0 tv0 r0) "(%Hwit & Hk)".
+    { iPureIntro. apply avf_hart. }
     { rewrite /mstate_interp /=. iFrame "Hri Hmem Hdev". }
     iModIntro. iSplitR.
     { iPureIntro.
       exists [], (HartE gen_id cpu_id m0),
              (GState (<[cpu_id := σ0.(sregs)]> g.(gregs)) σ0.(mem) σ0.(mdev)
-                g.(ggen) g.(gpow) (<[cpu_id := r0]> g.(gresv))), [].
+                g.(ggen) g.(gpow) (<[cpu_id := r0]> g.(gresv))
+                g.(gimg) log0 (<[cpu_id := tv0]> g.(gtv))), [].
       left. exists gen_id, cpu_id, m. split_and!; try reflexivity.
-      left. split; [exact Hlive|]. by exists m0, σ0, r0. }
+      left. split; [exact Hlive|]. by exists m0, σ0, log0, tv0, r0. }
     iIntros (e2 g2 efs Hstep) "!>".
     destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
-      as (-> & -> & [(_ & (m2 & σ2 & r2 & Hnode & -> & ->)) | (Hnl & _)]);
+      as (-> & -> & [(_ & (m2 & σ2 & log2 & tv2 & r2 & Hnode & -> & ->))
+                    | (Hnl & _)]);
       last by exfalso.
     (* the hart moved no disk byte: the durable conjunct is FRAMED, at the
        post-state's own image ([RiscvLang.mnode_step_v_disk]) *)
-    pose proof (mnode_step_v_disk _ _ _ _ _ _ _ Hnode) as Hvd.
+    pose proof (mnode_step_v_disk _ _ _ _ _ _ _ _ _ _ _ _ _ Hnode) as Hvd.
     assert (Hdview2 : disk_view dmap (v_disk (dvirtio (mdev σ2))))
       by (rewrite Hvd; exact Hdview).
     assert (Hvd2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio (mdev σ2)))
       by (symmetry; exact Hvd).
-    iMod ("Hk" $! m2 σ2 r2 with "[//]") as "[(Hri' & Hmem' & Hdev') HWP]".
+    iMod ("Hk" $! m2 σ2 log2 tv2 r2 with "[//]")
+      as "[(Hri' & Hmem' & Hdev') [Htso' HWP]]".
     iDestruct ("Hclose" with "Hri'") as "Hgr'".
+    iDestruct (tso_interp_hart_wb _ g cpu_id σ2.(sregs) σ2.(mem) σ2.(mdev)
+                 r2 log2 tv2 with "Htso'") as "Htso2".
     iIntros "_ !>".
     iEval (rewrite /disk_fixed_interp Hvd2) in "Htie".
     rewrite /state_interp /power_interp /disk_fixed_interp
@@ -364,7 +795,7 @@ Section WPExec.
     iSplitR; [iPureIntro; exact Hdom|].
     rewrite Hpw. iExists riscv_eraGS.
     iSplitR; [iPureIntro; exact HRE|].
-    iFrame "Hgr' Hmem' Hdev'".
+    iFrame "Hgr' Hmem' Hdev' Htso2".
     iSplitL "Hdauth".
     { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview2. }
     (* the mirror: this rule's arms preserve the reservation, so the auth's
@@ -374,7 +805,7 @@ Section WPExec.
     { iEval (rewrite /resv_auth_at) in "Hresv".
       rewrite /resv_auth_at
         (resv_map_insert_id g.(gresv) cpu_id r2
-           (eq_sym (Hpres _ _ _ _ _ _ Hnode))).
+           (eq_sym (Hpres _ _ _ _ _ _ _ _ _ _ _ _ Hnode))).
       iFrame "Hresv". }
     iPureIntro.
     exact (prim_step_resv_ok _ _ _ _ _ _ Hstep Hrok).
@@ -389,11 +820,19 @@ Section WPExec.
   Lemma wp_hart_step_resv (m : M unit) (rr : option resv) :
     gen_cert -∗
     resv_frag cpu_id rr -∗
-    (∀ σ oth, ⌜forall rv, rr = Some rv -> rv ⊆ σ.(mem)⌝ -∗
-       mstate_interp σ ={⊤,∅}=∗
-       ∃ m0 σ0 r0, ⌜mnode_step oth σ rr m m0 σ0 r0⌝ ∗
-          ▷ (∀ m' σ' r', ⌜mnode_step oth σ rr m m' σ' r'⌝ ={∅,⊤}=∗
+    (∀ σ oth img log tv V, ⌜forall rv, rr = Some rv -> rv ⊆ σ.(mem)⌝ -∗
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+       ∃ m0 σ0 log0 tv0 r0,
+         ⌜mnode_step oth (hart_agent cpu_id) img σ log tv rr
+            m m0 σ0 log0 tv0 r0⌝ ∗
+          ▷ (∀ m' σ' log' tv' r',
+               ⌜mnode_step oth (hart_agent cpu_id) img σ log tv rr
+                  m m' σ' log' tv' r'⌝ ={∅,⊤}=∗
                mstate_interp σ' ∗
+               tso_interp_of riscv_eraGS img σ'.(mem) log'
+                 (vstep (hart_agent cpu_id) tv' log' V) ∗
                (resv_frag cpu_id r' -∗
                 WP (HartE gen_id cpu_id m' : expr riscv_lang)))) -∗
     WP (HartE gen_id cpu_id m : expr riscv_lang).
@@ -435,37 +874,45 @@ Section WPExec.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Htso & Hresv & %Hrok)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iDestruct (resv_frag_agree _ cpu_id rr with "Hresv Hfrag") as %Hrr.
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
+    iEval (rewrite tso_interp_at_of) in "Htso".
     iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev))
             (others_resv g.(gresv) cpu_id)
-            with "[] [Hri Hmem Hdev]") as (m0 σ0 r0) "(%Hwit & Hk)".
+            g.(gimg) g.(glog) (g.(gtv) cpu_id) (avf g)
+            with "[] [] [Hri Hmem Hdev] Htso") as (m0 σ0 log0 tv0 r0) "(%Hwit & Hk)".
     { iPureIntro. intros rv Hrv. apply (Hrok cpu_id). by rewrite Hrr. }
+    { iPureIntro. apply avf_hart. }
     { rewrite /mstate_interp /=. iFrame "Hri Hmem Hdev". }
     rewrite -Hrr in Hwit.
     iModIntro. iSplitR.
     { iPureIntro.
       exists [], (HartE gen_id cpu_id m0),
              (GState (<[cpu_id := σ0.(sregs)]> g.(gregs)) σ0.(mem) σ0.(mdev)
-                g.(ggen) g.(gpow) (<[cpu_id := r0]> g.(gresv))), [].
+                g.(ggen) g.(gpow) (<[cpu_id := r0]> g.(gresv))
+                g.(gimg) log0 (<[cpu_id := tv0]> g.(gtv))), [].
       left. exists gen_id, cpu_id, m. split_and!; try reflexivity.
-      left. split; [exact Hlive|]. by exists m0, σ0, r0. }
+      left. split; [exact Hlive|]. by exists m0, σ0, log0, tv0, r0. }
     iIntros (e2 g2 efs Hstep) "!>".
     destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
-      as (-> & -> & [(_ & (m2 & σ2 & r2 & Hnode & -> & ->)) | (Hnl & _)]);
+      as (-> & -> & [(_ & (m2 & σ2 & log2 & tv2 & r2 & Hnode & -> & ->))
+                    | (Hnl & _)]);
       last by exfalso.
     (* the hart moved no disk byte: the durable conjunct is FRAMED, at the
        post-state's own image ([RiscvLang.mnode_step_v_disk]) *)
-    pose proof (mnode_step_v_disk _ _ _ _ _ _ _ Hnode) as Hvd.
+    pose proof (mnode_step_v_disk _ _ _ _ _ _ _ _ _ _ _ _ _ Hnode) as Hvd.
     assert (Hdview2 : disk_view dmap (v_disk (dvirtio (mdev σ2))))
       by (rewrite Hvd; exact Hdview).
     assert (Hvd2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio (mdev σ2)))
       by (symmetry; exact Hvd).
     rewrite Hrr in Hnode.
-    iMod ("Hk" $! m2 σ2 r2 with "[//]") as "[(Hri' & Hmem' & Hdev') HWP]".
+    iMod ("Hk" $! m2 σ2 log2 tv2 r2 with "[//]")
+      as "[(Hri' & Hmem' & Hdev') [Htso' HWP]]".
     iDestruct ("Hclose" with "Hri'") as "Hgr'".
+    iDestruct (tso_interp_hart_wb _ g cpu_id σ2.(sregs) σ2.(mem) σ2.(mdev)
+                 r2 log2 tv2 with "Htso'") as "Htso2".
     iMod (resv_frag_update g.(gresv) cpu_id rr r2 with "Hresv Hfrag")
       as "[Hresv Hfrag]".
     iDestruct ("HWP" with "Hfrag") as "HWP".
@@ -478,7 +925,7 @@ Section WPExec.
     iSplitR; [iPureIntro; exact Hdom|].
     rewrite Hpw. iExists riscv_eraGS.
     iSplitR; [iPureIntro; exact HRE|].
-    iFrame "Hgr' Hmem' Hdev'".
+    iFrame "Hgr' Hmem' Hdev' Htso2".
     iSplitL "Hdauth".
     { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview2. }
     (* the mirror was moved to the post-state's map by the frag update;
@@ -508,14 +955,19 @@ Section WPExec.
   Proof.
     iIntros "#Hcert Hfrag H". rewrite /LoopE.
     iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
-    iIntros (σ oth) "_ Hsi".
+    iIntros (σ oth img log tv V) "_ %Htv Hsi Htso".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
-    iExists (riscv_step false), σ, None.
+    iExists (riscv_step false), σ, log, tv, None.
     iSplitR; [iPureIntro; by exists false|].
-    iNext. iIntros (m' σ' r') "%Hn".
-    destruct Hn as (tick & -> & -> & ->).
-    iMod "Hback" as "_". iModIntro. iFrame "Hsi". iIntros "Hfrag".
-    iApply ("H" with "Hfrag").
+    iNext. iIntros (m' σ' log' tv' r') "%Hn".
+    destruct Hn as (tick & -> & -> & -> & -> & ->).
+    iMod "Hback" as "_". iModIntro. iFrame "Hsi".
+    (* the boundary touches neither the log nor the view (an instruction
+       boundary is not a fence, tso-machine-flip.md §2): the bundle goes
+       back untouched. *)
+    iSplitL "Htso".
+    { rewrite -Htv. iApply (tso_interp_of_idle with "Htso"). }
+    iIntros "Hfrag". iApply ("H" with "Hfrag").
   Qed.
 
 End WPExec.
@@ -574,12 +1026,13 @@ Section WPDev.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Htso & Hresv & %Hrok)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
     { iPureIntro. exists [], (UartLoopE gen_id),
-        (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv)), [].
+        (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv)
+           g.(gimg) g.(glog) g.(gtv)), [].
       right; left. exists gen_id. split_and!; auto.
       left. split; [split; congruence|].
       eexists. split; [apply UartStepIdle|]. rewrite Hpw. done. }
@@ -603,7 +1056,10 @@ Section WPDev.
     iSplitR; [iPureIntro; exact Hdom|].
     rewrite Hpw. iExists riscv_eraGS.
     iSplitR; [iPureIntro; exact HRE|].
-    iFrame "Hgr' Hmem' Hdev'".
+    (* the TSO conjunct is FRAMED: a UART step moves neither the image, the
+       flat cache, the log nor any view, so [avf] of the written-back state
+       is [avf g] by conversion *)
+    iFrame "Hgr' Hmem' Hdev' Htso".
     iSplitL "Hdauth".
     { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview2. }
     (* the reservation mirror: a device step never touches [gresv], so the
@@ -629,14 +1085,41 @@ Section WPDev.
        and [state_interp] is the only thing that does.  The pure [n = gen + 1]
        is the live-era arithmetic ([start_count] at [gpow = true]); together
        they let the crash-side arm's [gen_started] be bounded from above. *)
-    (∀ gr m d n, ⌜n = (gen_id + 1)%nat⌝ -∗
+    (* THE TSO BUNDLE IS THREADED THROUGH TOO (tso-machine-flip.md §6
+       amendment A6.2).  The disk is an AGENT of the log: a DMA-writing step
+       appends its whole write set [W] as ONE authored message, so the four
+       ghost steps a hart's store owes ([Wobl_ram]) are owed here as well --
+       and they cannot be done by this rule, because the per-byte timestamp
+       FRAGMENTS for [W]'s addresses ride inside the CLIENT's own
+       [ctx_pointsto]s.  So the authority is handed to the callback exactly
+       as the image auth already is, and the callback owes it back at the
+       appended log.  The disk's own VIEW half is free: [avf] pins every
+       bus-master agent to the top, so [vstep disk_agent (length log') log']
+       is the whole move.
+       THE WRITE SET COMES OUT OF [disk_step] ITSELF (§6 amendment A6.11),
+       so the callback KNOWS which [W] it owes timestamps for -- and an arm
+       that writes nothing says [W = ∅], which is what lets four of the six
+       arms hand the bundle straight back.  Before A6.11 [W] was a separate
+       existential tied only by [W ∪ m = m'], and this rule was unprovable
+       downstream: every arm, [DiskStepIdle] included, admitted a non-empty
+       [W] of already-correct bytes and hence an unpayable append. *)
+    (∀ gr m d n img log V, ⌜n = (gen_id + 1)%nat⌝ -∗
        gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ∗
        disk_img_auth disk_img_name (v_disk (dvirtio d)) ∗
-       disk_fixed_auth (v_disk (dvirtio d)) ∗ start_auth n ={⊤,∅}=∗
-       ▷ (∀ d' m', ⌜disk_step d m d' m'⌝ ={∅,⊤}=∗
-            gregs_interp gr ∗ gen_heap_interp m' ∗ dev_interp d' ∗
+       disk_fixed_auth (v_disk (dvirtio d)) ∗ start_auth n ∗
+       tso_interp_of riscv_eraGS img m log V ={⊤,∅}=∗
+       ▷ (∀ d' (W : gmap Arch.pa (bv 8)) (log' : list pwmsg),
+            ⌜disk_step d m d' W⌝ -∗
+            (* [%list]: this file sits in [Z_scope] and the model's imports
+               leave [++] resolving to STRING append otherwise *)
+            ⌜(W = ∅ /\ log' = log)
+             \/ (W <> ∅ /\ log' = (log ++ [PWMsg W disk_agent])%list)⌝
+            ={∅,⊤}=∗
+            gregs_interp gr ∗ gen_heap_interp (W ∪ m) ∗ dev_interp d' ∗
             disk_img_auth disk_img_name (v_disk (dvirtio d')) ∗
             disk_fixed_auth (v_disk (dvirtio d')) ∗ start_auth n ∗
+            tso_interp_of riscv_eraGS img (W ∪ m) log'
+              (vstep disk_agent (length log') log' V) ∗
             WP (DiskLoop : expr riscv_lang))) -∗
     WP (DiskLoop : expr riscv_lang).
   Proof.
@@ -671,27 +1154,37 @@ Section WPDev.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Htso & Hresv & %Hrok)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iEval (rewrite /disk_fixed_interp) in "Htie".
+    iEval (rewrite tso_interp_at_of) in "Htso".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) (start_count g)
-            with "[] [$Hgr $Hmem $Hdev Hdauth Htie Hsauth]") as "Hk".
+            g.(gimg) g.(glog) (avf g)
+            with "[] [$Hgr $Hmem $Hdev Hdauth Htie Hsauth Htso]") as "Hk".
     { iPureIntro. rewrite /start_count Hpw Heq. lia. }
-    { iFrame "Htie Hsauth". iExists dmap. iFrame "Hdauth". iPureIntro.
+    { iFrame "Htie Hsauth Htso". iExists dmap. iFrame "Hdauth". iPureIntro.
       exact Hdview. }
     iModIntro. iSplitR.
     { iPureIntro. exists [], (DiskLoopE gen_id),
-        (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv)), [].
+        (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv)
+           g.(gimg) g.(glog) g.(gtv)), [].
       right; right; left. exists gen_id. split_and!; auto.
       left. split; [split; congruence|].
-      do 2 eexists. split; [apply DiskStepIdle|]. split; [done|].
-      rewrite Hpw. done. }
+      (* the idle self-loop appends NOTHING: [W = ∅], log unchanged *)
+      exists g.(gdev), ∅, g.(glog). split_and!.
+      - apply DiskStepIdle.
+      - by left.
+      - intros a _. by rewrite left_id_L.
+      - by rewrite left_id_L. }
     iIntros (e2 g2 efs Hstep) "!>".
     destruct (prim_step_disk_inv _ _ _ _ _ _ Hstep)
-      as (-> & -> & -> & [ (Hlive & d' & m' & Hdstep & _ & ->) | (Hnl & ->) ]);
+      as (-> & -> & -> & [ (Hlive & d' & W & log' & Hdstep & Hlog & _ & ->)
+                         | (Hnl & ->) ]);
       last by (exfalso; apply Hnl; split; congruence).
-    iMod ("Hk" $! d' m' with "[//]")
-      as "(Hgr' & Hmem' & Hdev' & Hdur' & Htie' & Hsauth' & HWP)".
+    iMod ("Hk" $! d' W log' with "[//] [//]")
+      as "(Hgr' & Hmem' & Hdev' & Hdur' & Htie' & Hsauth' & Htso' & HWP)".
+    iDestruct (tso_interp_disk_wb _ g (W ∪ g.(gmem)) d' log' with "Htso'")
+      as "Htso2".
     iIntros "_ !>". rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
     iFrame "Hgauth Hsauth' Htie' HWP".
@@ -700,7 +1193,7 @@ Section WPDev.
     iSplitR; [iPureIntro; exact Hdom|].
     rewrite Hpw. iExists riscv_eraGS.
     iSplitR; [iPureIntro; exact HRE|].
-    iFrame "Hgr' Hmem' Hdev'".
+    iFrame "Hgr' Hmem' Hdev' Htso2".
     iSplitL "Hdauth'".
     { iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdview'. }
     (* the reservation mirror: a device step never touches [gresv], so the
@@ -748,7 +1241,7 @@ Section WPDev.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Htso & Hresv & %Hrok)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
@@ -756,7 +1249,7 @@ Section WPDev.
         (GState (<[0%fin := register_set sig_seip
                     (bool_to_bit (dev_seip g.(gdev) (fin_to_nat (0%fin : CPU))))
                     (g.(gregs) 0%fin)]> g.(gregs)) g.(gmem) g.(gdev)
-           g.(ggen) g.(gpow) g.(gresv)), [].
+           g.(ggen) g.(gpow) g.(gresv) g.(gimg) g.(glog) g.(gtv)), [].
       right; right; right; left. exists gen_id. split_and!; auto.
       left. split; [split; congruence|].
       eexists. split; [apply (PlicStepWire _ _ 0%fin)|]. rewrite Hpw. done. }
@@ -768,13 +1261,14 @@ Section WPDev.
     iIntros "_ !>". rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
     iFrame "Hgauth Hsauth Htie HWP".
-    (* a PLIC step moves only registers: the image conjunct and the FS tie
-       are both FRAMED (the device state is literally unchanged) *)
+    (* a PLIC step moves only registers: the image conjunct, the FS tie and
+       the TSO conjunct are all FRAMED (the device state is literally
+       unchanged, and so are image/cache/log/views) *)
     iExists R. iFrame "HRauth".
     iSplitR; [iPureIntro; exact Hdom|].
     rewrite Hpw. iExists riscv_eraGS.
     iSplitR; [iPureIntro; exact HRE|].
-    iFrame "Hgr' Hmem' Hdev'".
+    iFrame "Hgr' Hmem' Hdev' Htso".
     iSplitL "Hdauth".
     { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
     (* the reservation mirror: a device step never touches [gresv], so the
@@ -784,6 +1278,13 @@ Section WPDev.
   Qed.
 
 End WPDev.
+
+(* THE POWER ARMS HAVE NO LIFTING RULE HERE, and the ERA WIPE
+   (tso-machine-flip.md §2's last bullet: [gimg := the reset memory],
+   [glog := []], [gtv := λ_, 0], [gmem := gimg]) LANDS WITH ADEQUACY
+   (§6 amendment A6.3, §7 step 6): a PowerOn allocates a FRESH era, so its
+   [tso_interp_at] is minted rather than updated, beside the other
+   initial-state ghosts.  Nothing in this file is missing on its account. *)
 
 (* Now that the Lang/Iris/Exec sections (which must share stdpp's bv_countable   *)
 (* with RiscvModelBytes for [mstate.mem]) are defined, bring in the model's      *)

@@ -483,7 +483,7 @@ Section SpecFileread.
      (* the disk fabric *)
      dev_inv (frn_uart fn) (frn_disk fn) ∗
      disk_geom (frn_disk fn) (frn_pd fn) (frn_pav fn) (frn_pu fn) ∗
-     is_lock (frn_dlock fn) d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) (frn_disk fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)) ∗
+     is_lock (frn_dlock fn) d_lock "virtio_disk"%string <{ disk_res (frn_disk fn) (frn_pd fn) (frn_pav fn) (frn_pu fn) }> ∗
      (* ONE slot unit: ilock's bread takes it and brelse gives it back;
         readi's does the same, one after the other *)
      bslot)%I.
@@ -641,8 +641,8 @@ Section SpecFileread.
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
       IcacheRef.ity_shot g ty ∗
       IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
-      off_hold γf k γx true (fc_ip Cf) q ∗
-      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ off_hold γf k γx true (fc_ip Cf) q -∗
+      off_hold γf k γx true q ∗
+      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ off_hold γf k γx true q -∗
          file_pay γf k q Cf).
   Proof.
     intros Hty. iIntros "(%pn & Hpn & Hpl)".

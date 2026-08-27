@@ -48,17 +48,9 @@ Section BreadEscrowLeaves.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
-  (* the escrow, in the raw [inv] shape [iInv] recognizes.  THE BODY IS THE
-     PARKED RECORD now -- [∃ ξ T, ctx_parked ξ T ∗ buf_escrow_body (XI := ξ)]
-     -- so every opener destructs one level further and re-closes with
-     [BioInv.buf_escrow_rec_intro].  Which of them then needs
-     [TsoCtx.ctx_absorb] is decided by WHAT IT TAKES OUT: the three recycler
-     stores and the mid-window peek touch only [↦₄] cells (stage 1 does not
-     flip those) and run AT the record's own ξ; only the checkout
-     ([ProofBread]'s [bread_tail]) and the park ([ProofBrelse]) move
-     [BufOwn.buf_own]'s 1024 flipped bytes, and those two absorb and deposit. *)
+  (* the escrow, in the raw [inv] shape [iInv] recognizes *)
   Lemma buf_escrow_inv (bn : bio_names) (V : bio_view Σ) (k : nat) :
-    buf_escrow bn V k -∗ inv bioN (buf_escrow_rec bn V k).
+    buf_escrow bn V k -∗ inv bioN (buf_escrow_body bn V k).
   Proof. iIntros "H". iExact "H". Qed.
 
 End BreadEscrowLeaves.
@@ -274,11 +266,11 @@ Section BreadScan.
       iAssert (b_dev (bpa k) ↦₄{DfracOwn (qr/2)} (devs k) ∗
                b_dev (bpa k) ↦₄{DfracOwn (qr/2)} (devs k))%I
         with "[Hdev]" as "[Hdev1 Hdev2]".
-      { rewrite -word4_pointsto_frac_split Qp.div_2. iExact "Hdev". }
+      { rewrite -ctx_word4_pointsto_frac_split Qp.div_2. iExact "Hdev". }
       iAssert (b_blockno (bpa k) ↦₄{DfracOwn (qr/2)} (bnos k) ∗
                b_blockno (bpa k) ↦₄{DfracOwn (qr/2)} (bnos k))%I
         with "[Hbno]" as "[Hbno1 Hbno2]".
-      { rewrite -word4_pointsto_frac_split Qp.div_2. iExact "Hbno". }
+      { rewrite -ctx_word4_pointsto_frac_split Qp.div_2. iExact "Hbno". }
       assert (Hsucc : Pos.to_nat (Pos.succ cnt) = (Pos.to_nat cnt + 1)%nat)
         by (rewrite Pos2Nat.inj_succ; lia).
       iEval (rewrite /bslot) in "Hbslot".
@@ -321,11 +313,11 @@ Section BreadScan.
       iAssert (b_dev (bpa k) ↦₄{DfracOwn (1/4)} (devs k) ∗
                b_dev (bpa k) ↦₄{DfracOwn (1/4)} (devs k))%I
         with "[Hdev]" as "[Hdev1 Hdev2]".
-      { rewrite -word4_pointsto_frac_split bd_quarter_half. iExact "Hdev". }
+      { rewrite -ctx_word4_pointsto_frac_split bd_quarter_half. iExact "Hdev". }
       iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/4)} (bnos k) ∗
                b_blockno (bpa k) ↦₄{DfracOwn (1/4)} (bnos k))%I
         with "[Hbno]" as "[Hbno1 Hbno2]".
-      { rewrite -word4_pointsto_frac_split bd_quarter_half. iExact "Hbno". }
+      { rewrite -ctx_word4_pointsto_frac_split bd_quarter_half. iExact "Hbno". }
       iEval (rewrite /bslot) in "Hbslot".
       iAssert (bio_slot_res bn (<[k := ((1/4)%Qp, 1%positive)]> M) k (devs k) (bnos k))
         with "[Hcell Hbslot Hdev1 Hbno1]" as "Hslot".
@@ -424,11 +416,11 @@ Section BreadScan.
     iAssert (b_dev (bpa k) ↦₄{DfracOwn (1/4)} dv ∗
              b_dev (bpa k) ↦₄{DfracOwn (1/4)} dv)%I
       with "[Hdev]" as "[Hdev1 Hdev2]".
-    { rewrite -word4_pointsto_frac_split bd_quarter_half. iExact "Hdev". }
+    { rewrite -ctx_word4_pointsto_frac_split bd_quarter_half. iExact "Hdev". }
     iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/4)} B ∗
              b_blockno (bpa k) ↦₄{DfracOwn (1/4)} B)%I
       with "[Hbno]" as "[Hbno1 Hbno2]".
-    { rewrite -word4_pointsto_frac_split bd_quarter_half. iExact "Hbno". }
+    { rewrite -ctx_word4_pointsto_frac_split bd_quarter_half. iExact "Hbno". }
     iEval (rewrite /bslot) in "Hbslot".
     iAssert (bio_slot_res bn (<[k := ((1/4)%Qp, 1%positive)]> M) k dv B)
       with "[Hcell Hbslot Hdev1 Hbno1]" as "Hslot".
@@ -519,12 +511,12 @@ Section BreadScan.
     iDestruct (escrow_open_free bn V k M devr HMk with "Hauth Hslot Hbody")
       as "(Hauth & Hslot & Hpark & Hclose)".
     iDestruct "Hpark" as (v de bno bs) "(Hvld & Hdev & Hbuf & Hpay & Hbmid)".
-    iDestruct (word4_pointsto_agree with "Hslot Hdev") as %Heq. subst de.
+    iDestruct (ctx_word4_pointsto_agree with "Hslot Hdev") as %Heq. subst de.
     iFrame "Hauth".
     iSplitL "Hslot Hdev".
-    { iApply (word4_pointsto_half_join with "Hslot Hdev"). }
+    { iApply (ctx_word4_pointsto_half_join with "Hslot Hdev"). }
     iIntros "Hfull".
-    iDestruct (word4_pointsto_half_split with "Hfull") as "[Hd1 Hd2]".
+    iDestruct (ctx_word4_pointsto_half_split with "Hfull") as "[Hd1 Hd2]".
     iSplitR "Hd2"; [| iExact "Hd2"].
     iApply "Hclose". rewrite /buf_parked.
     iExists v, dnew, bno, bs.
@@ -566,17 +558,17 @@ Section BreadScan.
     iDestruct (escrow_open_free bn V k M devr HMk with "Hauth Hdevr Hbody")
       as "(Hauth & Hdevr & Hpark & _)".
     iDestruct "Hpark" as (v de bno bs) "(Hvld & Hdev & Hbuf & Hpay & Hbmid)".
-    iDestruct (word4_pointsto_agree with "Hdevr Hdev") as %Heqd. subst de.
+    iDestruct (ctx_word4_pointsto_agree with "Hdevr Hdev") as %Heqd. subst de.
     rewrite /buf_own.
     iDestruct "Hbuf" as "(Hbno0 & Hdisk & %Hlen & Hdata)".
-    iDestruct (word4_pointsto_agree with "Hbno Hbno0") as %Heqb. subst bno.
+    iDestruct (ctx_word4_pointsto_agree with "Hbno Hbno0") as %Heqb. subst bno.
     iDestruct (buf_pay_evict bn V k M v devr (bnos k) bs HMk with "Hauth Hpay")
       as "[Hauth Hold]".
     iFrame "Hauth".
     iSplitL "Hbno Hbno0".
-    { iApply (word4_pointsto_half_join with "Hbno Hbno0"). }
+    { iApply (ctx_word4_pointsto_half_join with "Hbno Hbno0"). }
     iIntros "Hfull".
-    iDestruct (word4_pointsto_half_split with "Hfull") as "[Hb1 Hb2]".
+    iDestruct (ctx_word4_pointsto_half_split with "Hfull") as "[Hb1 Hb2]".
     (* the pool exchange, at the one instant [bnos] changes *)
     iDestruct (bio_pool_recycle V bnos (bfun_upd bnos k B) k (bnos k) B
                  Hk eq_refl (bfun_upd_eq bnos k B)
@@ -585,7 +577,7 @@ Section BreadScan.
     iDestruct ("Hpoolback" with "[Hold]") as "Hpool".
     { case_decide as Hc; [iDestruct "Hold" as "[_ $]" | done]. }
     (* and re-close as the mid-recycle window *)
-    iDestruct (word4_pointsto_half_join with "Hdevr Hdev") as "Hdevfull".
+    iDestruct (ctx_word4_pointsto_half_join with "Hdevr Hdev") as "Hdevfull".
     iSplitL "Hvld Hdevfull Hb1 Hdisk Hdata".
     { iApply (escrow_close_mid bn V k). rewrite /buf_mid.
       iExists (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)),
@@ -622,11 +614,11 @@ Section BreadScan.
     iDestruct "Hmid" as (vld bno bs) "(%Hpin & Hvld & Hdevfull & Hbuf)".
     rewrite /buf_own.
     iDestruct "Hbuf" as "(Hbno0 & Hdisk & %Hlen & Hdata)".
-    iDestruct (word4_pointsto_agree with "Hbno Hbno0") as %Heqb. subst bno.
+    iDestruct (ctx_word4_pointsto_agree with "Hbno Hbno0") as %Heqb. subst bno.
     iSplitL "Hvld"; [by iExists vld|].
     iFrame "Hbno".
     iIntros "Hvld".
-    iDestruct (word4_pointsto_half_split with "Hdevfull") as "[Hd1 Hd2]".
+    iDestruct (ctx_word4_pointsto_half_split with "Hdevfull") as "[Hd1 Hd2]".
     iSplitR "Hd2"; [| iExact "Hd2"].
     iAssert (buf_pay bn V k false (bv_dev V) B bs) with "[Hpool]" as "Hpay".
     { rewrite /buf_pay. case_decide as Hc; [| exfalso; exact (Hc HcovB)].

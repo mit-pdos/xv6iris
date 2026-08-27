@@ -32,7 +32,7 @@
 
    * THE FROZEN CELLS ARE PERSISTED BEFORE THE FIRST CALLEE.  log.start and
      log.dev are written at +0x2c / +0x30 and then discarded to
-     [DfracDiscarded] ([RiscvPtsto.word4_pointsto_persist]) on the spot --
+     [DfracDiscarded] ([RiscvPtsto.ctx_word4_pointsto_persist]) on the spot --
      which is exactly [LogInv.log_frozen], the context both committer-only
      helpers take (they run with no lock held, and at their call sites there
      is no lock yet).
@@ -1670,8 +1670,8 @@ Section ProofInitlog.
     { rgne. rewrite HT1s1. apply trunc32_sext64. }
     iEval (rewrite Hsv2) in "Hdevc".
     (* ---- FREEZE: the two cells go persistent, giving [log_frozen] ---- *)
-    iMod (word4_pointsto_persist with "Hstc") as "#Hstp".
-    iMod (word4_pointsto_persist with "Hdevc") as "#Hdvp".
+    iMod (ctx_word4_pointsto_persist with "Hstc") as "#Hstp".
+    iMod (ctx_word4_pointsto_persist with "Hdevc") as "#Hdvp".
     iAssert (log_frozen logstart dev) as "#Hfroz".
     { rewrite /log_frozen. iSplitL; [iExact "Hdvp" | iExact "Hstp"]. }
     assert (Hpp34 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x30) : mword 64) 4

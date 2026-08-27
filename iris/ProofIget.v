@@ -1333,7 +1333,7 @@ Section ProofIget.
                       with "Hbody Hgid HinT")
                 as "(Hincell & Hdcell & Hvld & Hraw & Hmt & Hgid1 & Hgid2)".
               iModIntro. iExists inumT. iFrame "Hincell". iIntros "Hincell".
-              iDestruct (word4_pointsto_half_split with "Hdcell") as "[Hd1 Hd2]".
+              iDestruct (ctx_word4_pointsto_half_split with "Hdcell") as "[Hd1 Hd2]".
               iDestruct "Hvld" as (wv) "Hvld".
               (* OPTION A (b)(ii): redeem a genuine pending entry to [imark]
                  pool-locally, converting the full pool shape to the [np] the

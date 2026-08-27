@@ -70,6 +70,8 @@ Require Import PtAdBits.
 Require Import Pt4kWalk.
 Require Import WpDecodeBridge.
 Require Import CommonWalk.
+(* A6.21: the PT-slot TIER INDEX lives here now; see [pt_slot_own]. *)
+Require Import TsoCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -898,9 +900,70 @@ Qed.
 Section PtTreeIris.
   Context `{!riscvGS Σ}.
 
+  (* ------------------------------------------------------------------ *)
+  (* THE PT-SLOT TIER INDEX (tso-machine-flip.md §6 amendment A6.21,      *)
+  (* ratified).  [pt_page_own_at]'s slots are ledger cells since the machine  *)
+  (* flip, and WHICH ledger is not uniform:                                *)
+  (*                                                                      *)
+  (*   [None]    the KERNEL page table -- owned by a BARE [inv]            *)
+  (*             ([KptShare.kpt_inv]) shared across every S-mode thread,   *)
+  (*             so its body may not name a context (tso-port.md §0.8'     *)
+  (*             ruling 2); read by the HARDWARE walker at [Read_ttw],     *)
+  (*             RULING 1's flat arm, so no load licence is ever wanted;   *)
+  (*             written by the Svadu A/D write-back, which owes the       *)
+  (*             append.  Context-free ledger ([TsoCtx.phys_ledger_word],  *)
+  (*             A6.20) is the only sound shape and also the cheapest.     *)
+  (*                                                                      *)
+  (*   [Some ξ]  a USER page table -- owned by a THREAD, read by SOFTWARE  *)
+  (*             ([walk]) at [Read_plain] through                          *)
+  (*             [WpSconfMem.wordw_pointsto], which needs a plain-load     *)
+  (*             licence.  That is the REGISTERED ledger word              *)
+  (*             ([TsoCtx.ctx_phys_word_pointsto], A6.16).                 *)
+  (*                                                                      *)
+  (* SOUNDNESS OF THE INDEX: [ctx_phys_word_ledger] proves [Some ξ ⊢ None],*)
+  (* so the registered tier is strictly stronger and the kernel invariant  *)
+  (* simply takes the weaker one.                                          *)
+  (*                                                                      *)
+  (* The index is CONCRETE at every real use ([Some cur_ctx] or [None]),   *)
+  (* so the match below always iota-reduces and no proof below has to know *)
+  (* it is there.  The old names survive as ambient-context NOTATIONS      *)
+  (* after this section, which is what keeps ~50 consumer files textually  *)
+  (* unchanged. *)
+  Context (PTT : option CtxId).
+
+  Definition pt_slot_own (a : Arch.pa) (dq : dfrac) (w : bv 64) : iProp Σ :=
+    match PTT with
+    | None => phys_ledger_word a dq w
+    | Some xi => ctx_phys_word_pointsto xi a dq w
+    end.
+
+  Global Instance pt_slot_own_timeless a dq w : Timeless (pt_slot_own a dq w).
+  Proof. rewrite /pt_slot_own. destruct PTT; apply _. Qed.
+
+  (* BOTH tiers forget to the raw physical word -- which is all the PURE
+     memory facts below ever wanted of a slot.  This is why the index costs
+     the walk lane nothing: only the two places that ACT on a slot (the
+     software walk's load, the A/D write-back's store) care which tier it
+     is. *)
+  Lemma pt_slot_own_forget a dq w :
+    pt_slot_own a dq w ⊢ phys_word_pointsto a dq w.
+  Proof.
+    rewrite /pt_slot_own. destruct PTT as [xi|].
+    - apply ctx_phys_word_pointsto_forget.
+    - apply phys_ledger_word_forget.
+  Qed.
+
+  Lemma pt_slot_own_ctx (xi : CtxId) a dq w :
+    PTT = Some xi -> pt_slot_own a dq w = ctx_phys_word_pointsto xi a dq w.
+  Proof. intros HP. by rewrite /pt_slot_own HP. Qed.
+
+  Lemma pt_slot_own_ker a dq w :
+    PTT = None -> pt_slot_own a dq w = phys_ledger_word a dq w.
+  Proof. intros HP. by rewrite /pt_slot_own HP. Qed.
+
   (* PERSISTENT per-node identity claim (uniform-claims PHYSICAL TIER): the
      node page's vpn maps to its own ppn at KP_rw in the kernel map, and the
-     page is kdata.  Carried inside [pt_page_own] so a software walk can turn a
+     page is kdata.  Carried inside [pt_page_own_at] so a software walk can turn a
      physical slot [↦ₚ₈] into a VA-tier [↦₈] (reconstruct [mem_pointsto]) with
      NOTHING but the tree itself -- [kmap_at] supplies the mapping, [node_kdata]
      the [addr_is_ram] + canonicality conjuncts [mem_pointsto] carries.
@@ -925,33 +988,33 @@ Section PtTreeIris.
 
   (* one node's page: the identity claim, plus all 512 slots (whatever words
      the description says). *)
-  Definition pt_page_own (dq : dfrac) (t : ptree) : iProp Σ :=
+  Definition pt_page_own_at (dq : dfrac) (t : ptree) : iProp Σ :=
     (pt_node_claim (pt_base t) ∗
      [∗ list] i ∈ seqZ 0 512,
-       u_pte_addr (pt_base t) (mword_of_int i) ↦ₚ₈{dq} pt_ents t (mword_of_int i))%I.
+       pt_slot_own (u_pte_addr (pt_base t) (mword_of_int i)) dq (pt_ents t (mword_of_int i)))%I.
 
-  Fixpoint ptree_own (lvl : nat) (dq : dfrac) (t : ptree) {struct lvl} : iProp Σ :=
-    (pt_page_own dq t ∗
+  Fixpoint ptree_own_at (lvl : nat) (dq : dfrac) (t : ptree) {struct lvl} : iProp Σ :=
+    (pt_page_own_at dq t ∗
      match lvl with
      | O => emp
      | S lvl' =>
          [∗ list] i ∈ seqZ 0 512,
            match pt_kids t (mword_of_int i) with
-           | Some c => ptree_own lvl' dq c
+           | Some c => ptree_own_at lvl' dq c
            | None => emp
            end
      end)%I.
 
   (* the children conjunct, as a named definition for the accessor lemmas *)
-  Definition pt_kids_own (lvl : nat) (dq : dfrac) (t : ptree) : iProp Σ :=
+  Definition pt_kids_own_at (lvl : nat) (dq : dfrac) (t : ptree) : iProp Σ :=
     ([∗ list] i ∈ seqZ 0 512,
        match pt_kids t (mword_of_int i) with
-       | Some c => ptree_own lvl dq c
+       | Some c => ptree_own_at lvl dq c
        | None => emp
        end)%I.
 
-  Lemma ptree_own_S (lvl : nat) (dq : dfrac) (t : ptree) :
-    ptree_own (S lvl) dq t ⊣⊢ pt_page_own dq t ∗ pt_kids_own lvl dq t.
+  Lemma ptree_own_S_at (lvl : nat) (dq : dfrac) (t : ptree) :
+    ptree_own_at (S lvl) dq t ⊣⊢ pt_page_own_at dq t ∗ pt_kids_own_at lvl dq t.
   Proof. reflexivity. Qed.
 
   (* TIMELESS: every leaf of the tree ownership is a points-to / a pure
@@ -959,14 +1022,14 @@ Section PtTreeIris.
      kernel page table live in an Iris [inv] (KptShare.v): opening the
      invariant yields the body under a [▷], and the A/D write-back needs
      the slot ownership NOW, in the same fupd. *)
-  Global Instance pt_page_own_timeless dq t : Timeless (pt_page_own dq t).
-  Proof. rewrite /pt_page_own /pt_node_claim. apply _. Qed.
+  Global Instance pt_page_own_timeless_at dq t : Timeless (pt_page_own_at dq t).
+  Proof. rewrite /pt_page_own_at /pt_node_claim. apply _. Qed.
 
-  Global Instance ptree_own_timeless lvl dq t : Timeless (ptree_own lvl dq t).
+  Global Instance ptree_own_timeless_at lvl dq t : Timeless (ptree_own_at lvl dq t).
   Proof.
     revert t. induction lvl as [| lvl IH]; intros t.
-    - rewrite /ptree_own. apply _.
-    - rewrite ptree_own_S /pt_kids_own.
+    - rewrite /ptree_own_at. apply _.
+    - rewrite ptree_own_S_at /pt_kids_own_at.
       apply bi.sep_timeless; [apply _ |].
       apply big_sepL_timeless. intros k i _.
       destruct (pt_kids t (mword_of_int i)); [apply IH | apply _].
@@ -976,39 +1039,41 @@ Section PtTreeIris.
      without opening the tree.  A caller that has just been handed a table
      ([SpecProcPagetable]'s post) and must show the returned pointer is not
      NULL has nothing else to argue from; [page_valid_ne_null] does the rest. *)
-  Lemma ptree_own_page_valid (lvl : nat) (dq : dfrac) (t : ptree) :
-    ptree_own lvl dq t ⊢ ⌜page_valid (page_base (pt_base t))⌝.
+  Lemma ptree_own_page_valid_at (lvl : nat) (dq : dfrac) (t : ptree) :
+    ptree_own_at lvl dq t ⊢ ⌜page_valid (page_base (pt_base t))⌝.
   Proof.
     destruct lvl as [| l];
-      [ rewrite /ptree_own | rewrite ptree_own_S ];
-      rewrite /pt_page_own /pt_node_claim;
+      [ rewrite /ptree_own_at | rewrite ptree_own_S_at ];
+      rewrite /pt_page_own_at /pt_node_claim;
       iIntros "[[(_ & %Hv & _) _] _]"; iPureIntro; exact Hv.
   Qed.
 
   (* ---- single-node slot accessor (update form) ---------------------- *)
-  Lemma pt_page_own_acc (dq : dfrac) (t : ptree) (i : mword 9) :
-    pt_page_own dq t ⊢
-      u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ents t i ∗
+  Lemma pt_page_own_acc_at (dq : dfrac) (t : ptree) (i : mword 9) :
+    pt_page_own_at dq t ⊢
+      pt_slot_own (u_pte_addr (pt_base t) i) dq (pt_ents t i) ∗
       (∀ w' : mword 64,
-         u_pte_addr (pt_base t) i ↦ₚ₈{dq} w' -∗
-         pt_page_own dq (pt_upd_ent t i w')).
+         pt_slot_own (u_pte_addr (pt_base t) i) dq w' -∗
+         pt_page_own_at dq (pt_upd_ent t i w')).
   Proof.
     pose proof (pt_bv9_range i) as Hir.
     assert (Hlk : seqZ 0 512 !! Z.to_nat (bv_unsigned i) = Some (bv_unsigned i)).
     { apply lookup_seqZ. split; lia. }
     iIntros "Hpg".
-    iEval (rewrite /pt_page_own) in "Hpg".
+    iEval (rewrite /pt_page_own_at) in "Hpg".
     iDestruct "Hpg" as "[#Hcl Hpg]".
     iEval (rewrite (big_sepL_delete _ _ _ _ Hlk)) in "Hpg".
     iDestruct "Hpg" as "[Hslot Hrest]".
     iEval (rewrite pt_mword9_id) in "Hslot".
     iFrame "Hslot".
     iIntros (w') "Hslot".
-    rewrite /pt_page_own.
+    rewrite /pt_page_own_at.
     iSplitR; [rewrite pt_upd_ent_base; iExact "Hcl" |].
     rewrite (big_sepL_delete
-               (fun _ j => (u_pte_addr (pt_base (pt_upd_ent t i w')) (mword_of_int j)
-                            ↦ₚ₈{dq} pt_ents (pt_upd_ent t i w') (mword_of_int j))%I)
+               (fun _ j => pt_slot_own
+                             (u_pte_addr (pt_base (pt_upd_ent t i w'))
+                                (mword_of_int j)) dq
+                             (pt_ents (pt_upd_ent t i w') (mword_of_int j)))
                _ _ _ Hlk).
     iSplitL "Hslot".
     { rewrite pt_mword9_id pt_upd_ent_base pt_upd_ent_same. iExact "Hslot". }
@@ -1026,48 +1091,48 @@ Section PtTreeIris.
   Qed.
 
   (* read-only form: restore the SAME description *)
-  Lemma pt_page_own_acc_ro (dq : dfrac) (t : ptree) (i : mword 9) :
-    pt_page_own dq t ⊢
-      u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ents t i ∗
-      (u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ents t i -∗ pt_page_own dq t).
+  Lemma pt_page_own_acc_ro_at (dq : dfrac) (t : ptree) (i : mword 9) :
+    pt_page_own_at dq t ⊢
+      pt_slot_own (u_pte_addr (pt_base t) i) dq (pt_ents t i) ∗
+      (pt_slot_own (u_pte_addr (pt_base t) i) dq (pt_ents t i) -∗ pt_page_own_at dq t).
   Proof.
     pose proof (pt_bv9_range i) as Hir.
     assert (Hlk : seqZ 0 512 !! Z.to_nat (bv_unsigned i) = Some (bv_unsigned i)).
     { apply lookup_seqZ. split; lia. }
     iIntros "Hpg".
-    iEval (rewrite /pt_page_own) in "Hpg".
+    iEval (rewrite /pt_page_own_at) in "Hpg".
     iDestruct "Hpg" as "[#Hcl Hpg]".
     iDestruct (big_sepL_lookup_acc _ _ _ _ Hlk with "Hpg") as "[Hslot Hrest]".
     iEval (rewrite pt_mword9_id) in "Hslot".
     iFrame "Hslot".
     iIntros "Hslot".
-    rewrite /pt_page_own. iFrame "Hcl".
+    rewrite /pt_page_own_at. iFrame "Hcl".
     iApply "Hrest". iEval (rewrite pt_mword9_id). iExact "Hslot".
   Qed.
 
   (* ---- single-node child accessor (update form) --------------------- *)
-  Lemma pt_kids_own_acc (lvl : nat) (dq : dfrac) (t : ptree) (i : mword 9) (c : ptree) :
+  Lemma pt_kids_own_acc_at (lvl : nat) (dq : dfrac) (t : ptree) (i : mword 9) (c : ptree) :
     pt_kids t i = Some c ->
-    pt_kids_own lvl dq t ⊢
-      ptree_own lvl dq c ∗
+    pt_kids_own_at lvl dq t ⊢
+      ptree_own_at lvl dq c ∗
       (∀ c' : ptree,
-         ptree_own lvl dq c' -∗
-         pt_kids_own lvl dq (pt_upd_kid t i (Some c'))).
+         ptree_own_at lvl dq c' -∗
+         pt_kids_own_at lvl dq (pt_upd_kid t i (Some c'))).
   Proof.
     intros Hk.
     pose proof (pt_bv9_range i) as Hir.
     assert (Hlk : seqZ 0 512 !! Z.to_nat (bv_unsigned i) = Some (bv_unsigned i)).
     { apply lookup_seqZ. split; lia. }
     iIntros "Hks".
-    iEval (rewrite /pt_kids_own (big_sepL_delete _ _ _ _ Hlk)) in "Hks".
+    iEval (rewrite /pt_kids_own_at (big_sepL_delete _ _ _ _ Hlk)) in "Hks".
     iDestruct "Hks" as "[Hc Hrest]".
     iEval (rewrite pt_mword9_id Hk) in "Hc".
     iFrame "Hc".
     iIntros (c') "Hc".
-    rewrite /pt_kids_own.
+    rewrite /pt_kids_own_at.
     rewrite (big_sepL_delete
                (fun _ j => (match pt_kids (pt_upd_kid t i (Some c')) (mword_of_int j) with
-                            | Some cc => ptree_own lvl dq cc
+                            | Some cc => ptree_own_at lvl dq cc
                             | None => emp end)%I)
                _ _ _ Hlk).
     iSplitL "Hc".
@@ -1084,17 +1149,17 @@ Section PtTreeIris.
   Qed.
 
   (* read-only child accessor *)
-  Lemma pt_kids_own_acc_ro (lvl : nat) (dq : dfrac) (t : ptree) (i : mword 9) (c : ptree) :
+  Lemma pt_kids_own_acc_ro_at (lvl : nat) (dq : dfrac) (t : ptree) (i : mword 9) (c : ptree) :
     pt_kids t i = Some c ->
-    pt_kids_own lvl dq t ⊢
-      ptree_own lvl dq c ∗ (ptree_own lvl dq c -∗ pt_kids_own lvl dq t).
+    pt_kids_own_at lvl dq t ⊢
+      ptree_own_at lvl dq c ∗ (ptree_own_at lvl dq c -∗ pt_kids_own_at lvl dq t).
   Proof.
     intros Hk.
     pose proof (pt_bv9_range i) as Hir.
     assert (Hlk : seqZ 0 512 !! Z.to_nat (bv_unsigned i) = Some (bv_unsigned i)).
     { apply lookup_seqZ. split; lia. }
     iIntros "Hks".
-    iEval (rewrite /pt_kids_own) in "Hks".
+    iEval (rewrite /pt_kids_own_at) in "Hks".
     iDestruct (big_sepL_lookup_acc _ _ _ _ Hlk with "Hks") as "[Hc Hrest]".
     iEval (rewrite pt_mword9_id Hk) in "Hc".
     iFrame "Hc".
@@ -1105,29 +1170,29 @@ Section PtTreeIris.
   (* ---- THE path accessors: peel the three slots a mapped vpn's walk   *)
   (*      reads.  Read-only form (restore the same tree), and the write- *)
   (*      back form (restore [ptree_set_leaf] with any new leaf word).   *)
-  Lemma ptree_own_path_ro (dq : dfrac) (t : ptree) (vpn : mword 27)
+  Lemma ptree_own_path_ro_at (dq : dfrac) (t : ptree) (vpn : mword 27)
       (p2 p1 p0 : mword 64) :
     ptree_maps t vpn p2 p1 p0 ->
-    ptree_own 2 dq t ⊢
-      pt_addr2 t vpn ↦ₚ₈{dq} p2 ∗
-      pt_addr1 p2 vpn ↦ₚ₈{dq} p1 ∗
-      pt_addr0 p1 vpn ↦ₚ₈{dq} p0 ∗
-      (pt_addr2 t vpn ↦ₚ₈{dq} p2 -∗
-       pt_addr1 p2 vpn ↦ₚ₈{dq} p1 -∗
-       pt_addr0 p1 vpn ↦ₚ₈{dq} p0 -∗
-       ptree_own 2 dq t).
+    ptree_own_at 2 dq t ⊢
+      pt_slot_own (pt_addr2 t vpn) dq p2 ∗
+      pt_slot_own (pt_addr1 p2 vpn) dq p1 ∗
+      pt_slot_own (pt_addr0 p1 vpn) dq p0 ∗
+      (pt_slot_own (pt_addr2 t vpn) dq p2 -∗
+       pt_slot_own (pt_addr1 p2 vpn) dq p1 -∗
+       pt_slot_own (pt_addr0 p1 vpn) dq p0 -∗
+       ptree_own_at 2 dq t).
   Proof.
     intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 & _).
     iIntros "[Hpg Hks]".
-    iDestruct (pt_page_own_acc_ro dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 Hpg]".
+    iDestruct (pt_page_own_acc_ro_at dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 Hpg]".
     rewrite He2.
-    iDestruct (pt_kids_own_acc_ro 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks") as "[Hc1 Hks]".
+    iDestruct (pt_kids_own_acc_ro_at 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks") as "[Hc1 Hks]".
     iDestruct "Hc1" as "[Hpg1 Hks1]".
-    iDestruct (pt_page_own_acc_ro dq c1 (vpn_idx 1 vpn) with "Hpg1") as "[Hs1 Hpg1]".
+    iDestruct (pt_page_own_acc_ro_at dq c1 (vpn_idx 1 vpn) with "Hpg1") as "[Hs1 Hpg1]".
     rewrite He1.
-    iDestruct (pt_kids_own_acc_ro 0 dq c1 (vpn_idx 1 vpn) c0 Hk1 with "Hks1") as "[Hc0 Hks1]".
+    iDestruct (pt_kids_own_acc_ro_at 0 dq c1 (vpn_idx 1 vpn) c0 Hk1 with "Hks1") as "[Hc0 Hks1]".
     iDestruct "Hc0" as "[Hpg0 Hemp]".
-    iDestruct (pt_page_own_acc_ro dq c0 (vpn_idx 0 vpn) with "Hpg0") as "[Hs0 Hpg0]".
+    iDestruct (pt_page_own_acc_ro_at dq c0 (vpn_idx 0 vpn) with "Hpg0") as "[Hs0 Hpg0]".
     rewrite He0.
     unfold pt_addr2, pt_addr1, pt_addr0.
     rewrite Hb1. rewrite Hb0.
@@ -1142,41 +1207,41 @@ Section PtTreeIris.
     iExact "Hemp".
   Qed.
 
-  Lemma ptree_own_path_upd (dq : dfrac) (t : ptree) (vpn : mword 27)
+  Lemma ptree_own_path_upd_at (dq : dfrac) (t : ptree) (vpn : mword 27)
       (p2 p1 p0 : mword 64) :
     ptree_maps t vpn p2 p1 p0 ->
-    ptree_own 2 dq t ⊢
-      pt_addr2 t vpn ↦ₚ₈{dq} p2 ∗
-      pt_addr1 p2 vpn ↦ₚ₈{dq} p1 ∗
-      pt_addr0 p1 vpn ↦ₚ₈{dq} p0 ∗
+    ptree_own_at 2 dq t ⊢
+      pt_slot_own (pt_addr2 t vpn) dq p2 ∗
+      pt_slot_own (pt_addr1 p2 vpn) dq p1 ∗
+      pt_slot_own (pt_addr0 p1 vpn) dq p0 ∗
       (∀ w' : mword 64,
-         pt_addr2 t vpn ↦ₚ₈{dq} p2 -∗
-         pt_addr1 p2 vpn ↦ₚ₈{dq} p1 -∗
-         pt_addr0 p1 vpn ↦ₚ₈{dq} w' -∗
-         ptree_own 2 dq (ptree_set_leaf t vpn w')).
+         pt_slot_own (pt_addr2 t vpn) dq p2 -∗
+         pt_slot_own (pt_addr1 p2 vpn) dq p1 -∗
+         pt_slot_own (pt_addr0 p1 vpn) dq w' -∗
+         ptree_own_at 2 dq (ptree_set_leaf t vpn w')).
   Proof.
     intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 & _).
     iIntros "[Hpg Hks]".
-    iDestruct (pt_page_own_acc_ro dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 Hpg]".
+    iDestruct (pt_page_own_acc_ro_at dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 Hpg]".
     rewrite He2.
-    iDestruct (pt_kids_own_acc 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks") as "[Hc1 Hks]".
+    iDestruct (pt_kids_own_acc_at 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks") as "[Hc1 Hks]".
     iDestruct "Hc1" as "[Hpg1 Hks1]".
-    iDestruct (pt_page_own_acc_ro dq c1 (vpn_idx 1 vpn) with "Hpg1") as "[Hs1 Hpg1]".
+    iDestruct (pt_page_own_acc_ro_at dq c1 (vpn_idx 1 vpn) with "Hpg1") as "[Hs1 Hpg1]".
     rewrite He1.
-    iDestruct (pt_kids_own_acc 0 dq c1 (vpn_idx 1 vpn) c0 Hk1 with "Hks1") as "[Hc0 Hks1]".
+    iDestruct (pt_kids_own_acc_at 0 dq c1 (vpn_idx 1 vpn) c0 Hk1 with "Hks1") as "[Hc0 Hks1]".
     iDestruct "Hc0" as "[Hpg0 Hemp]".
-    iDestruct (pt_page_own_acc dq c0 (vpn_idx 0 vpn) with "Hpg0") as "[Hs0 Hpg0]".
+    iDestruct (pt_page_own_acc_at dq c0 (vpn_idx 0 vpn) with "Hpg0") as "[Hs0 Hpg0]".
     rewrite He0.
     unfold pt_addr2, pt_addr1, pt_addr0.
     rewrite Hb1. rewrite Hb0.
     iFrame "Hs2 Hs1 Hs0".
     iIntros (w') "Hs2 Hs1 Hs0".
     unfold ptree_set_leaf. rewrite Hk2. rewrite Hk1.
-    rewrite ptree_own_S.
+    rewrite ptree_own_S_at.
     iSplitL "Hpg Hs2".
     { iApply "Hpg". iExact "Hs2". }
     iApply "Hks".
-    rewrite ptree_own_S.
+    rewrite ptree_own_S_at.
     iSplitL "Hpg1 Hs1".
     { iApply "Hpg1". iExact "Hs1". }
     iApply "Hks1".
@@ -1189,9 +1254,10 @@ Section PtTreeIris.
   (* ---- pure per-slot memory facts, extracted from ownership --------- *)
 
   Lemma slot_mem_of_own (sg : mstate) (a : Arch.pa) (dq : dfrac) (w : mword 64) :
-    gen_heap_interp sg.(mem) -∗ a ↦ₚ₈{dq} w -∗ ⌜pt_slot_mem sg a w⌝.
+    gen_heap_interp sg.(mem) -∗ pt_slot_own a dq w -∗ ⌜pt_slot_mem sg a w⌝.
   Proof.
     iIntros "Hm Hw".
+    iDestruct (pt_slot_own_forget with "Hw") as "Hw".
     iDestruct (phys_word_pointsto_aligned_p with "Hw") as %Hal.
     iDestruct (phys_word_pointsto_bytes with "Hw") as "Hb".
     iAssert (⌜forall j : nat, (N.of_nat j < 8)%N ->
@@ -1216,17 +1282,17 @@ Section PtTreeIris.
 
   (* the three slots of a mapped vpn's path, as pure memory facts (one
      extraction per step; every walk of that step consumes them) *)
-  Lemma ptree_own_path_mem (sg : mstate) (dq : dfrac) (t : ptree)
+  Lemma ptree_own_path_mem_at (sg : mstate) (dq : dfrac) (t : ptree)
       (vpn : mword 27) (p2 p1 p0 : mword 64) :
     ptree_maps t vpn p2 p1 p0 ->
-    gen_heap_interp sg.(mem) -∗ ptree_own 2 dq t -∗
+    gen_heap_interp sg.(mem) -∗ ptree_own_at 2 dq t -∗
     ⌜(pt_slot_mem sg (pt_addr2 t vpn) p2 /\
       pt_slot_mem sg (pt_addr1 p2 vpn) p1 /\
       pt_slot_mem sg (pt_addr0 p1 vpn) p0)%type⌝.
   Proof.
     intros Hmaps.
     iIntros "Hm Ht".
-    iDestruct (ptree_own_path_ro dq t vpn p2 p1 p0 Hmaps with "Ht")
+    iDestruct (ptree_own_path_ro_at dq t vpn p2 p1 p0 Hmaps with "Ht")
       as "(Hs2 & Hs1 & Hs0 & _)".
     iDestruct (slot_mem_of_own with "Hm Hs2") as %H2.
     iDestruct (slot_mem_of_own with "Hm Hs1") as %H1.
@@ -1236,10 +1302,10 @@ Section PtTreeIris.
 
   (* the stopping prefix of a BLOCKED vpn's walk, as pure memory facts:
      the walk reads owned slots down to the invalid word *)
-  Lemma ptree_own_blocked_mem (sg : mstate) (dq : dfrac) (t : ptree)
+  Lemma ptree_own_blocked_mem_at (sg : mstate) (dq : dfrac) (t : ptree)
       (vpn : mword 27) :
     ptree_blocks t vpn ->
-    gen_heap_interp sg.(mem) -∗ ptree_own 2 dq t -∗
+    gen_heap_interp sg.(mem) -∗ ptree_own_at 2 dq t -∗
     ⌜ ((exists w2, pt_slot_mem sg (pt_addr2 t vpn) w2 /\ pte_invalid w2)
        \/ (exists p2 w1,
              pt_slot_mem sg (pt_addr2 t vpn) p2 /\ pte_valid p2 /\ pte_ptr p2 /\
@@ -1255,29 +1321,29 @@ Section PtTreeIris.
       [ (Hk2 & Hinv2)
       | [ (c1 & Hk2 & Hk1 & Hv2 & Hn2 & Hb1 & Hinv1)
         | (c1 & c0 & Hk2 & Hk1 & Hv2 & Hn2 & Hv1 & Hn1 & Hb1 & Hb0 & Hinv0) ] ].
-    - iDestruct (pt_page_own_acc_ro dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 _]".
+    - iDestruct (pt_page_own_acc_ro_at dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 _]".
       iDestruct (slot_mem_of_own with "Hm Hs2") as %H2.
       iPureIntro. left. eexists. exact (conj H2 Hinv2).
-    - iDestruct (pt_page_own_acc_ro dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 _]".
+    - iDestruct (pt_page_own_acc_ro_at dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 _]".
       iDestruct (slot_mem_of_own with "Hm Hs2") as %H2.
-      iDestruct (pt_kids_own_acc_ro 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks")
+      iDestruct (pt_kids_own_acc_ro_at 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks")
         as "[[Hpg1 _] _]".
-      iDestruct (pt_page_own_acc_ro dq c1 (vpn_idx 1 vpn) with "Hpg1") as "[Hs1 _]".
+      iDestruct (pt_page_own_acc_ro_at dq c1 (vpn_idx 1 vpn) with "Hpg1") as "[Hs1 _]".
       iDestruct (slot_mem_of_own with "Hm Hs1") as %H1.
       iPureIntro. right; left.
       exists (pt_ents t (vpn_idx 2 vpn)), (pt_ents c1 (vpn_idx 1 vpn)).
       split; [exact H2 |]. split; [exact Hv2 |]. split; [exact Hn2 |].
       split; [| exact Hinv1].
       unfold pt_addr1. rewrite Hb1. exact H1.
-    - iDestruct (pt_page_own_acc_ro dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 _]".
+    - iDestruct (pt_page_own_acc_ro_at dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 _]".
       iDestruct (slot_mem_of_own with "Hm Hs2") as %H2.
-      iDestruct (pt_kids_own_acc_ro 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks")
+      iDestruct (pt_kids_own_acc_ro_at 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks")
         as "[[Hpg1 Hks1] _]".
-      iDestruct (pt_page_own_acc_ro dq c1 (vpn_idx 1 vpn) with "Hpg1") as "[Hs1 _]".
+      iDestruct (pt_page_own_acc_ro_at dq c1 (vpn_idx 1 vpn) with "Hpg1") as "[Hs1 _]".
       iDestruct (slot_mem_of_own with "Hm Hs1") as %H1.
-      iDestruct (pt_kids_own_acc_ro 0 dq c1 (vpn_idx 1 vpn) c0 Hk1 with "Hks1")
+      iDestruct (pt_kids_own_acc_ro_at 0 dq c1 (vpn_idx 1 vpn) c0 Hk1 with "Hks1")
         as "[[Hpg0 _] _]".
-      iDestruct (pt_page_own_acc_ro dq c0 (vpn_idx 0 vpn) with "Hpg0") as "[Hs0 _]".
+      iDestruct (pt_page_own_acc_ro_at dq c0 (vpn_idx 0 vpn) with "Hpg0") as "[Hs0 _]".
       iDestruct (slot_mem_of_own with "Hm Hs0") as %H0.
       iPureIntro. right; right.
       exists (pt_ents t (vpn_idx 2 vpn)), (pt_ents c1 (vpn_idx 1 vpn)),
@@ -1291,10 +1357,62 @@ Section PtTreeIris.
   (* ---- a PARKED page table: full ownership of a spec-constrained tree
      that is not currently installed in satp.  The satp-switch lemmas
      convert between an installed table's invariant and this frame.     *)
-  Definition pt_frame (S : ptree -> Prop) : iProp Σ :=
-    (∃ t : ptree, ⌜ S t ⌝ ∗ ptree_own 2 (DfracOwn 1) t)%I.
+  Definition pt_frame_at (S : ptree -> Prop) : iProp Σ :=
+    (∃ t : ptree, ⌜ S t ⌝ ∗ ptree_own_at 2 (DfracOwn 1) t)%I.
 
 End PtTreeIris.
+
+(* ===================================================================== *)
+(* THE TWO TIERS, BY NAME (A6.21).                                        *)
+(*                                                                       *)
+(* [pt_page_own]/[ptree_own]/... are the USER tier at the AMBIENT context, *)
+(* spelled as NOTATIONS so that [cur_ctx] is resolved AT THE USE SITE --   *)
+(* the same trick the M1 flip used for [↦ₘ], and what keeps every one of   *)
+(* the ~50 consumer files textually unchanged.  [kpt_*] are the KERNEL     *)
+(* tier ([None]), and [KptShare.kpt_body] is their one owner.             *)
+(* ===================================================================== *)
+(* the index is CONCRETE at every use, so these are [reflexivity]; they
+   exist because [iFrame] matches SYNTACTICALLY and will not iota-reduce a
+   slot on its own. *)
+(* THE SLOT'S OWN NOTATION.  The user tier is what ~50 consumer files mean
+   when they write a PT slot, and they used to write it [↦ₚ₈{dq}].  Giving
+   the tiered slot a notation of its own makes that conversion a TOKEN
+   substitution rather than a re-parenthesisation -- which matters, because
+   the old spelling is an infix and the new head is a prefix. *)
+Notation "a ↦ₚₜ{ dq } w" := (pt_slot_own (Some TsoCtx.cur_ctx) a dq w)
+  (at level 20, format "a  ↦ₚₜ{ dq }  w") : bi_scope.
+Notation "a ↦ₚₜ w" := (pt_slot_own (Some TsoCtx.cur_ctx) a (DfracOwn 1) w)
+  (at level 20, format "a  ↦ₚₜ  w") : bi_scope.
+Notation "a ↦ₖₜ{ dq } w" := (pt_slot_own None a dq w)
+  (at level 20, format "a  ↦ₖₜ{ dq }  w") : bi_scope.
+
+Lemma pt_slot_own_Some `{!riscvGS Σ} (xi : TsoCtx.CtxId)
+    (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+  pt_slot_own (Some xi) a dq w = TsoCtx.ctx_phys_word_pointsto xi a dq w.
+Proof. reflexivity. Qed.
+
+Lemma pt_slot_own_None `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+  pt_slot_own None a dq w = TsoCtx.phys_ledger_word a dq w.
+Proof. reflexivity. Qed.
+
+Notation pt_page_own           := (pt_page_own_at (Some TsoCtx.cur_ctx)).
+Notation ptree_own             := (ptree_own_at (Some TsoCtx.cur_ctx)).
+Notation pt_kids_own           := (pt_kids_own_at (Some TsoCtx.cur_ctx)).
+Notation pt_frame              := (pt_frame_at (Some TsoCtx.cur_ctx)).
+Notation pt_page_own_acc       := (pt_page_own_acc_at (Some TsoCtx.cur_ctx)).
+Notation pt_page_own_acc_ro    := (pt_page_own_acc_ro_at (Some TsoCtx.cur_ctx)).
+Notation pt_kids_own_acc       := (pt_kids_own_acc_at (Some TsoCtx.cur_ctx)).
+Notation pt_kids_own_acc_ro    := (pt_kids_own_acc_ro_at (Some TsoCtx.cur_ctx)).
+Notation ptree_own_S           := (ptree_own_S_at (Some TsoCtx.cur_ctx)).
+Notation ptree_own_page_valid  := (ptree_own_page_valid_at (Some TsoCtx.cur_ctx)).
+Notation ptree_own_path_ro     := (ptree_own_path_ro_at (Some TsoCtx.cur_ctx)).
+Notation ptree_own_path_upd    := (ptree_own_path_upd_at (Some TsoCtx.cur_ctx)).
+Notation ptree_own_path_mem    := (ptree_own_path_mem_at (Some TsoCtx.cur_ctx)).
+Notation ptree_own_blocked_mem := (ptree_own_blocked_mem_at (Some TsoCtx.cur_ctx)).
+
+Notation kpt_page_own          := (pt_page_own_at None).
+Notation kptree_own            := (ptree_own_at None).
+Notation kpt_kids_own          := (pt_kids_own_at None).
 
 (* ===================================================================== *)
 (* §7 TLB consistency MODULO A/D.  Every resident TLB entry is the walk   *)

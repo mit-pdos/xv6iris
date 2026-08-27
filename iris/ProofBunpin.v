@@ -349,8 +349,8 @@ Section ProofBunpin.
       iEval (rewrite /bio_slot_res HMk) in "Hslot".
       iDestruct "Hslot" as "(%Hcnt & Hcell & Hfd & Hqr)".
       iDestruct "Hqr" as (qr) "(%Htie & Hdev & Hbno)".
-      iDestruct (word4_pointsto_agree with "Hrdev Hdev") as %->.
-      iDestruct (word4_pointsto_agree with "Hrbno Hbno") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hrdev Hdev") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hrbno Hbno") as %->.
       iExists (mword_of_int (Z.pos cnt) : mword 32). iFrame "Hcell".
       iIntros "Hcell".
       iEval (rewrite (decr32_pos cnt Hcnt)) in "Hcell".
@@ -362,11 +362,11 @@ Section ProofBunpin.
         iEval (rewrite Hz0) in "Hcell".
         iAssert (b_dev (bpa k) ↦₄{DfracOwn (1/2)} (devs k))%I
           with "[Hrdev Hdev]" as "Hdev".
-        { rewrite -(bu_last_tie q qr Htie) word4_pointsto_frac_split.
+        { rewrite -(bu_last_tie q qr Htie) ctx_word4_pointsto_frac_split.
           iFrame "Hdev Hrdev". }
         iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (bnos k))%I
           with "[Hrbno Hbno]" as "Hbno".
-        { rewrite -(bu_last_tie q qr Htie) word4_pointsto_frac_split.
+        { rewrite -(bu_last_tie q qr Htie) ctx_word4_pointsto_frac_split.
           iFrame "Hbno Hrbno". }
         assert (Hdel : delete k Mg !! k = None) by apply lookup_delete.
         iAssert (bio_slot_res bn (delete k Mg) k (devs k) (bnos k))
@@ -403,10 +403,10 @@ Section ProofBunpin.
         iEval (rewrite Hzp) in "Hcell".
         iAssert (b_dev (bpa k) ↦₄{DfracOwn (qr + q)} (devs k))%I
           with "[Hrdev Hdev]" as "Hdev".
-        { rewrite word4_pointsto_frac_split. iFrame "Hdev Hrdev". }
+        { rewrite ctx_word4_pointsto_frac_split. iFrame "Hdev Hrdev". }
         iAssert (b_blockno (bpa k) ↦₄{DfracOwn (qr + q)} (bnos k))%I
           with "[Hrbno Hbno]" as "Hbno".
-        { rewrite word4_pointsto_frac_split. iFrame "Hbno Hrbno". }
+        { rewrite ctx_word4_pointsto_frac_split. iFrame "Hbno Hrbno". }
         assert (Hsucc : Pos.to_nat (Pos.succ cnt') = (Pos.to_nat cnt' + 1)%nat)
           by (rewrite Pos2Nat.inj_succ; lia).
         iEval (rewrite Hsucc bslots_op) in "Hfd".

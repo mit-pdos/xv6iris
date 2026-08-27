@@ -51,13 +51,22 @@ Require Import Pt4kWalk.
 Require Import SmodePte.
 Require Import KptGhost.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoMemPa.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section KptShare.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  (* A6.20/A6.21: NO [CurCtx] HERE, DELIBERATELY.  [kpt_body] is the body of
+     a BARE [inv] shared by every S-mode thread, and an invariant body may
+     not name a context (tso-port.md §0.8' ruling 2).  The tree it holds is
+     therefore at the CONTEXT-FREE ledger tier ([kptree_own] =
+     [PtTree.ptree_own_at None]): a PTE is read by the hardware walker at
+     [Read_ttw] -- RULING 1's flat arm -- so no plain-load licence is ever
+     wanted, and the Svadu A/D write-back's append is paid by
+     [TsoCtx.ledger_store_ok], which needs neither a context nor a token. *)
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* §1 The shared invariant.                                            *)
@@ -68,7 +77,7 @@ Section KptShare.
 
   Definition kpt_body (root_ppn : mword 44) : iProp Σ :=
     (∃ (t : ptree) (M : gmap (mword 27) (mword 44 * kperm)),
-       ptree_own 2 (DfracOwn 1) t ∗
+       kptree_own 2 (DfracOwn 1) t ∗
        kpt_lb t ∗
        kmap_auth M ∗
        ⌜ kpt_tree_spec_gen root_ppn M t ⌝)%I.
@@ -85,7 +94,7 @@ Section KptShare.
   Lemma kpt_inv_alloc (root_ppn : mword 44)
       (t : ptree) (M : gmap (mword 27) (mword 44 * kperm)) (E : coPset) :
     kpt_tree_spec_gen root_ppn M t ->
-    ptree_own 2 (DfracOwn 1) t -∗ kmap_auth M -∗ kpt_unset ={E}=∗
+    kptree_own 2 (DfracOwn 1) t -∗ kmap_auth M -∗ kpt_unset ={E}=∗
     kpt_inv root_ppn ∗ kpt_lb t.
   Proof.
     intros Hspec. iIntros "Ht HM Hunset".
@@ -244,11 +253,12 @@ End KptShare.
 
 Section KptShareTranslate.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma tlb_res_pt_translateAddr_at (root_ppn : mword 44) (va pa : mword 64)
-      (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset) :
+      (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset)
+      (S : TsoMemPa.bytemap -> iProp Σ) :
     ↑kptN ⊆ E ->
     (forall (a d : mword 1) (mxr do_sum : bool),
        pte_check_ok acc Supervisor mxr do_sum
@@ -266,6 +276,16 @@ Section KptShareTranslate.
       = Some (Supervisor, σ) ->
     exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.24's payer, threaded at the memory-indexed (CHAINABLE) currency
+       and PERSISTENT -- see [KptTree.tlb_inv_pt_translateAddr_at].  The
+       SHARED table is the [None] tier, so this is discharged with
+       [TsoCtx.ledger_store_ok] and needs no [own_context]. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.phys_ledger_word a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗ S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.phys_ledger_word a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     kmap_at (svpn_of va) ppn pc -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_res_pt root_ppn
     ={E}=∗
@@ -275,10 +295,11 @@ Section KptShareTranslate.
       ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
       ⌜ (σ'.(sregs) = σ.(sregs) \/
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_res_pt root_ppn.
   Proof.
     intros HE Hchk Hcanon Hid4k Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    iIntros "Hat Hri Hgh Hres".
+    iIntros "#Hpay Hsto Hat Hri Hgh Hres".
     iDestruct (tlb_res_pt_open with "Hres") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv)".
     iDestruct "Hsnap" as (t0) "(%Htlbok0 & #Hlb0)".
@@ -340,14 +361,27 @@ Section KptShareTranslate.
     assert (Hlf : kpt_leaf_pte_of vpn (ppn, pc) = mk_pte ppn (kperm_flags pc))
       by reflexivity.
     rewrite Hlf in Hmaps.
-    iMod (ptree_translateAddr_own acc Supervisor root_ppn t
+    iAssert (∀ wnew : mword 64,
+               gen_heap_interp σ.(mem) -∗ S σ.(mem) -∗
+               pt_slot_own None (pt_addr0 p1 vpn) (DfracOwn 1)
+                 (pte_set_ad (mk_pte ppn (kperm_flags pc)) a0 d0) ==∗
+               gen_heap_interp
+                 (RiscvModelBytes.write_bytes σ.(mem) (pt_addr0 p1 vpn) 8
+                    wnew) ∗
+               S (RiscvModelBytes.write_bytes σ.(mem) (pt_addr0 p1 vpn) 8
+                    wnew) ∗
+               pt_slot_own None (pt_addr0 p1 vpn) (DfracOwn 1) wnew)%I
+      as "Hpay'".
+    { iIntros (wnew) "Hgh Hsto Hs".
+      iApply ("Hpay" $! σ.(mem) (pt_addr0 p1 vpn) _ wnew with "Hgh Hsto Hs"). }
+    iMod (ptree_translateAddr_own acc Supervisor None root_ppn t
             (mk_pte ppn (kperm_flags pc)) va pa satp0
-            tlbvec p2 p1 a0 d0 σ
+            tlbvec p2 p1 a0 d0 σ S
             Hchk Hvar Hcanon Hout Hbase Hmaps Htlbok
             Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
             HA' Hord' HR' HW' Hcov' Hpmar Hpmaw
-            with "Hri Hgh Htlb Ht")
-      as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hri & Hgh & Htlb & Ht)".
+            with "Hpay' Hsto Hri Hgh Htlb Ht")
+      as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hcur & Hri & Hgh & Htlb & Ht)".
     (* ---- the write-back does NOT move the canonical table, so the
        snapshot is re-derived by a rewrite: no ghost update at all ---- *)
     assert (Hcan' : ptree_canon t = ptree_canon t').
@@ -370,7 +404,7 @@ Section KptShareTranslate.
     iSplit; [iPureIntro; exact Htrans |].
     iSplit; [iPureIntro; exact Hmdev |].
     iSplit; [iPureIntro; exact Hsregs |].
-    iFrame "Hri Hgh".
+    iFrame "Hcur Hri Hgh".
     iDestruct (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
                  HA Hord HX HW HR Hcov with "Hpc Hpa") as "Hpmp".
     iApply (tlb_res_pt_intro root_ppn satp0 tlbvec' t'

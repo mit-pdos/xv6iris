@@ -188,13 +188,16 @@ Section TrampText.
     (* the identity byte's own pin (KT0) says its pa IS its va, so the
        [pointsto] it carries is the one at [kpt_exec_pa va]. *)
     iDestruct (text_pointsto_acc (KTR := KT0) with "Hid")
-      as (ppn0) "(_ & _ & _ & %Hpin0 & Hp & _)".
+      as (ppn0) "(_ & _ & _ & %Hpin0 & Hp & #Hts & _)".
     apply ktier_pin_id in Hpin0.
     rewrite Hpin0.
-    (* re-key onto [va] under the trampoline claim; at KT1 the pin is [I]. *)
+    (* re-key onto [va] under the trampoline claim; at KT1 the pin is [I].
+       The pristine element travels with the byte: the KT1 va and the KT0
+       identity address name the SAME physical byte, so the element minted
+       for the image serves the trampoline mapping unchanged. *)
     rewrite /text_pointsto. iExists tramp_ppn.
     rewrite (tramp_svpn va Hin). rewrite (tramp_pa_of va Hin).
-    iFrame "Hk Hp". iPureIntro.
+    iFrame "Hk Hp Hts". iPureIntro.
     split; [exact (tramp_va_canonical va Hin) |
       split; [exact (tramp_pa_text va Hin) | exact I]].
   Qed.

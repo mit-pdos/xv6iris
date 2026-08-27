@@ -216,7 +216,7 @@ Lemma asl_word4_nonzero `{!riscvGS Σ} (a : mword 64) (dq : dfrac) (w : mword 32
   a ↦₄{dq} w ⊢ ⌜eq_vec a (zero_reg : mword 64) = false⌝.
 Proof.
   iIntros "H".
-  iDestruct (word4_pointsto_bytes with "H") as "Hbs".
+  iDestruct (ctx_word4_pointsto_bytes with "H") as "Hbs".
   iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbs") as "Hb0".
   { rewrite lookup_seq_lt; [reflexivity | lia]. }
   iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(_ & _ & %Hram & %Hid & _)".

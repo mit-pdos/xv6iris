@@ -96,7 +96,8 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
+Require Import RiscvModelBytes TsoMemPa.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import SmodeCore.
 Require Import KptPt UserBits.
@@ -113,7 +114,6 @@ Require Import SmodePte RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the claim-keyed writes cross the ctx/mem seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -357,82 +357,231 @@ Section SmodeCorePt.
   (* =================================================================== *)
   (* TIER-PRESERVING and TIER-GENERIC (sp-migration phase D): the window
      goes back in at the tier it came in at -- the re-mint below re-uses
-     the pin it destructured ([Hid]) rather than re-establishing one -- so
-     the [CurKtier] binder costs the statement nothing. *)
-  Lemma s_win_write `{KTR : !CurKtier} (va : mword 64) (ppn : mword 44) (gold gnew : nat -> bv 8) :
-    (uint va < 274877906944)%Z ->
-    forall (l : list nat),
-    Forall (fun j => (bv_unsigned (subrange_vec_dec va 11 0) + Z.of_nat j < 4096)%Z) l ->
-    forall (mm : _),
-    kmap_at (svpn_of va) ppn KP_rw -∗
-    gen_heap_interp (hG:=riscv_memGS) mm -∗
-    ([∗ list] j ∈ l, (pa_add va j) ↦ₘ (gold j)) ==∗
-    gen_heap_interp (hG:=riscv_memGS) (foldr (fun j acc => <[pa_add (pa_of ppn va) j := gnew j]> acc) mm l)
-      ∗ ([∗ list] j ∈ l, (pa_add va j) ↦ₘ (gnew j)).
+     the pin it destructured rather than re-establishing one -- so the
+     [CurKtier] binder costs the statement nothing.
+
+     A6.33 -- AND IT IS NOW A STORE-GATE USER, NOT A gen_heap EDIT.  The
+     old [s_win_write] changed the VALUE of a context-indexed byte with
+     [gen_heap_interp] alone, which post-flip is not a repair away: EVERY
+     value-changing law in [TsoCtx] takes [gen_heap_interp] AND
+     [tso_interp_at] TOGETHER (the interp's own tie relates the flat cell to
+     the ledger, so neither may move without the other) plus [own_context]
+     at the registered tier.  A6.18 predicted exactly this ("the store half
+     is the hidden half"); here it comes due.  The bundle is not a new
+     premise anywhere: [HartSMem.Wobl_ram] already HANDS it to the write
+     node's callback, which is where every one of these is used. *)
+
+  (* the pure per-byte side conditions, read off the window itself -- the
+     canonicality and the TIER PIN of each byte, which is what lets the
+     window go back in at the tier it came out of *)
+  Local Lemma win_pins `{KTR : !CurKtier} (a : mword 64) (ppn : mword 44)
+      (f : nat -> bv 8) (l : list nat) :
+    (uint a < 274877906944)%Z ->
+    Forall (fun j => (bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j < 4096)%Z) l ->
+    kmap_at (svpn_of a) ppn KP_rw -∗
+    ([∗ list] j ∈ l, (pa_add a j) ↦ₘ (f j)) -∗
+    ⌜Forall (fun j => (uint (pa_add a j) < 274877906944)%Z /\
+                      ktier_pin cur_ktier ppn (pa_add a j)) l⌝.
   Proof.
-    intros Hcan l. induction l as [|x xs IH]; intros Hall mm.
-    - iIntros "_ Hm _". iModIntro. simpl. iFrame.
+    intros Hcan. induction l as [|x xs IH]; intro Hall.
+    - iIntros "_ _". iPureIntro. constructor.
     - apply Forall_cons_1 in Hall as [Hx Hxs].
-      iIntros "#Hk Hm [Ha Hrest]".
-      iMod (IH Hxs mm with "Hk Hm Hrest") as "[Hm Hrest]".
-      iAssert (kmap_at (svpn_of (pa_add va x)) ppn KP_rw)%I as "#Hkx".
-      { rewrite (svpn_of_pa_add va x Hcan Hx). iExact "Hk". }
-      iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Ha") as "Ha".
-      iDestruct (mem_pointsto_pin (pa_add va x) (DfracOwn 1) (gold x) ppn with "Hkx Ha")
-        as "(%Hc & %Hd & %Hid & Hp & _)".
-      simpl foldr.
-      rewrite -(pa_of_pa_add ppn va x Hcan Hx).
-      iMod (gen_heap_update _ (pa_of ppn (pa_add va x)) (gold x) (gnew x) with "Hm Hp") as "[Hm Hp]".
-      iModIntro. iFrame "Hm". simpl. iFrame "Hrest".
-      iApply TsoCtxShim.ctx_pointsto_of_mem.
-      iExists ppn. iFrame "Hkx Hp". iPureIntro.
-      split; [exact Hc | split; [exact Hd | exact Hid]].
+      iIntros "#Hk [Hb Hrest]".
+      iDestruct (IH Hxs with "Hk Hrest") as %Hr.
+      iEval (rewrite (TsoCtx.ctx_pointsto_phys TsoCtx.cur_ctx (pa_add a x)
+                        (DfracOwn 1) (f x))) in "Hb".
+      iDestruct "Hb" as (ppn') "(#Hk' & %Hc & %Hp & _)".
+      rewrite (svpn_of_pa_add a x Hcan Hx).
+      iDestruct (kmap_at_agree with "Hk' Hk") as %[-> _].
+      iPureIntro. constructor; [exact (conj Hc Hp) | exact Hr].
   Qed.
 
-  (* 8-byte claim-keyed write: the VA replacement for the (now physical)
-     [word_pointsto_write], writing at [pa_of ppn va]. *)
-  Lemma word_pointsto_write_c `{KTR : !CurKtier} (mm : _) (va : mword 64)
-      (ppn : mword 44) (vold vnew : bv 64) :
+  (* the VA window IS the physical window at [pa_of ppn a], both ways *)
+  Local Lemma win_to_phys `{KTR : !CurKtier} (a : mword 64) (ppn : mword 44)
+      (f : nat -> bv 8) (l : list nat) :
+    (uint a < 274877906944)%Z ->
+    Forall (fun j => (bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j < 4096)%Z) l ->
+    kmap_at (svpn_of a) ppn KP_rw -∗
+    ([∗ list] j ∈ l, (pa_add a j) ↦ₘ (f j)) -∗
+    ([∗ list] j ∈ l, TsoCtx.ctx_phys_pointsto TsoCtx.cur_ctx
+                       (pa_add (pa_of ppn a) j) (DfracOwn 1) (f j)).
+  Proof.
+    intros Hcan. induction l as [|x xs IH]; intro Hall.
+    - iIntros "_ _". done.
+    - apply Forall_cons_1 in Hall as [Hx Hxs].
+      iIntros "#Hk [Hb Hrest]".
+      iDestruct (IH Hxs with "Hk Hrest") as "Hrest".
+      iFrame "Hrest".
+      iEval (rewrite (TsoCtx.ctx_pointsto_phys TsoCtx.cur_ctx (pa_add a x)
+                        (DfracOwn 1) (f x))) in "Hb".
+      iDestruct "Hb" as (ppn') "(#Hk' & %Hc & %Hp & Hph)".
+      rewrite (svpn_of_pa_add a x Hcan Hx).
+      iDestruct (kmap_at_agree with "Hk' Hk") as %[-> _].
+      rewrite (pa_of_pa_add ppn a x Hcan Hx). iExact "Hph".
+  Qed.
+
+  Local Lemma win_of_phys `{KTR : !CurKtier} (a : mword 64) (ppn : mword 44)
+      (f : nat -> bv 8) (l : list nat) :
+    (uint a < 274877906944)%Z ->
+    Forall (fun j => (bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j < 4096)%Z) l ->
+    Forall (fun j => (uint (pa_add a j) < 274877906944)%Z /\
+                     ktier_pin cur_ktier ppn (pa_add a j)) l ->
+    kmap_at (svpn_of a) ppn KP_rw -∗
+    ([∗ list] j ∈ l, TsoCtx.ctx_phys_pointsto TsoCtx.cur_ctx
+                       (pa_add (pa_of ppn a) j) (DfracOwn 1) (f j)) -∗
+    ([∗ list] j ∈ l, (pa_add a j) ↦ₘ (f j)).
+  Proof.
+    intros Hcan. induction l as [|x xs IH]; intros Hall Hpins.
+    - iIntros "_ _". done.
+    - apply Forall_cons_1 in Hall as [Hx Hxs].
+      apply Forall_cons_1 in Hpins as [[Hcx Hpx] Hpxs].
+      iIntros "#Hk [Hb Hrest]".
+      iDestruct (IH Hxs Hpxs with "Hk Hrest") as "Hrest".
+      iFrame "Hrest".
+      iEval (rewrite (TsoCtx.ctx_pointsto_phys TsoCtx.cur_ctx (pa_add a x)
+                        (DfracOwn 1) (f x))).
+      iExists ppn.
+      rewrite (svpn_of_pa_add a x Hcan Hx).
+      iFrame "Hk".
+      iSplitR; [iPureIntro; exact Hcx |].
+      iSplitR; [iPureIntro; exact Hpx |].
+      rewrite (pa_of_pa_add ppn a x Hcan Hx). iExact "Hb".
+  Qed.
+
+  (* THE CLAIM-KEYED WINDOW STORE, PAID.  One append over the whole window
+     (a store is ONE message, §1's payload ruling), through
+     [TsoCtx.ctx_store_win_ok] at [RiscvExec.gs_of] -- A6.1a's bridge, paid
+     once in each direction.  The conclusion is [HartSMem.Wobl_ram]'s tso
+     conjunct verbatim: a PLAIN store moves no view, so the [vstep] is at
+     the hart's own [tv]. *)
+  Lemma wordw_win_store_c `{KTR : !CurKtier} (n : N) {m : N}
+      (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg)
+      (V : agent -> nat) (a : mword 64) (ppn : mword 44) (vold vnew : bv m) :
+    (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
+    (uint a < 274877906944)%Z ->
+    Forall (fun j => (bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j < 4096)%Z)
+      (seq 0 (N.to_nat n)) ->
+    kmap_at (svpn_of a) ppn KP_rw -∗
+    gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n), (pa_add a j) ↦ₘ (nth_byte vold j)) ==∗
+    gen_heap_interp (hG:=riscv_memGS)
+      (write_bytes σ.(mem) (pa_of ppn a) n vnew) ∗
+    tso_interp_of riscv_eraGS img (write_bytes σ.(mem) (pa_of ppn a) n vnew)
+      (log ++ [PWMsg (snap_of (pa_of ppn a) n vnew) (hart_agent cpu_id)])%list
+      (vstep (hart_agent cpu_id) (V (hart_agent cpu_id))
+         (log ++ [PWMsg (snap_of (pa_of ppn a) n vnew) (hart_agent cpu_id)])%list V) ∗
+    TsoCtx.own_context TsoCtx.cur_ctx ∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n), (pa_add a j) ↦ₘ (nth_byte vnew j)).
+  Proof.
+    intros Hn Hcan Hall. iIntros "#Hk Hm Htso Hrun Hb".
+    iDestruct (win_pins a ppn (nth_byte vold) _ Hcan Hall with "Hk Hb") as %Hpins.
+    iDestruct (win_to_phys a ppn (nth_byte vold) _ Hcan Hall with "Hk Hb") as "Hb".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    set (pa := pa_of ppn a).
+    set (log' := (log ++ [PWMsg (snap_of pa n vnew) (hart_agent cpu_id)])%list).
+    set (V' := vstep (hart_agent cpu_id) (V (hart_agent cpu_id)) log' V).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+    { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
+      - exfalso. subst h. pose proof (fin_to_nat_lt cpu_id).
+        rewrite /hart_agent in Hh. lia.
+      - destruct (lt_dec h NCPU); [lia | reflexivity]. }
+    assert (Htvc : forall c : CPU, V' (hart_agent c) = V (hart_agent c)).
+    { intros c. rewrite /V' /vstep. case_decide as Hd.
+      - by rewrite Hd.
+      - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first reflexivity.
+        exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
+    iDestruct (tso_interp_of_bound with "Htso") as %Hbd.
+    assert (Htvmono : forall c : CPU,
+              (V (hart_agent c) <= V' (hart_agent c))%nat)
+      by (intros c; rewrite Htvc; lia).
+    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
+    { intros c. rewrite Htvc /log' length_app /=.
+      have := Hbd (hart_agent c). lia. }
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+               σ.(sregs) σ.(mdev) Hpin).
+    iMod (TsoCtx.ctx_store_win_ok
+            (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
+            (gs_of img (write_bytes σ.(mem) pa n vnew) log' V'
+               σ.(sregs) σ.(mdev))
+            TsoCtx.cur_ctx pa n vold vnew Hn eq_refl eq_refl eq_refl
+            Htvmono Htvtop with "Hm Htso Hrun Hb")
+      as "(Hm & Htso & Hrun & Hb)".
+    iModIntro. iFrame "Hm Hrun".
+    iSplitL "Htso".
+    { rewrite -(tso_interp_of_at_gs riscv_eraGS img
+                  (write_bytes σ.(mem) pa n vnew) log' V'
+                  σ.(sregs) σ.(mdev) Hpin').
+      iExact "Htso". }
+    iApply (win_of_phys a ppn (nth_byte vnew) _ Hcan Hall Hpins with "Hk Hb").
+  Qed.
+
+  (* 8-byte claim-keyed store, at the ledger.  [word_pointsto_write_c]'s
+     bundle-carrying successor; same name, new premises. *)
+  Lemma word_pointsto_write_c `{KTR : !CurKtier}
+      (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg)
+      (V : agent -> nat) (va : mword 64) (ppn : mword 44) (vold vnew : bv 64) :
     (uint va < 274877906944)%Z ->
     (bv_unsigned (subrange_vec_dec va 11 0) + 8 <= 4096)%Z ->
     kmap_at (svpn_of va) ppn KP_rw -∗
-    gen_heap_interp (hG:=riscv_memGS) mm -∗ va ↦₈ vold ==∗
-    gen_heap_interp (hG:=riscv_memGS) (write_bytes mm (pa_of ppn va) 8 vnew) ∗ va ↦₈ vnew.
+    gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
+    va ↦₈ vold ==∗
+    gen_heap_interp (hG:=riscv_memGS)
+      (write_bytes σ.(mem) (pa_of ppn va) 8 vnew) ∗
+    tso_interp_of riscv_eraGS img (write_bytes σ.(mem) (pa_of ppn va) 8 vnew)
+      (log ++ [PWMsg (snap_of (pa_of ppn va) 8 vnew) (hart_agent cpu_id)])%list
+      (vstep (hart_agent cpu_id) (V (hart_agent cpu_id))
+         (log ++ [PWMsg (snap_of (pa_of ppn va) 8 vnew) (hart_agent cpu_id)])%list V) ∗
+    TsoCtx.own_context TsoCtx.cur_ctx ∗ va ↦₈ vnew.
   Proof.
-    intros Hcan Hoff. iIntros "#Hk Hm Hw".
+    intros Hcan Hoff. iIntros "#Hk Hm Htso Hrun Hw".
     iDestruct (ctx_word_pointsto_aligned_p with "Hw") as %Hal.
     iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hb".
-    iMod (s_win_write va ppn (nth_byte vold) (nth_byte vnew) Hcan (seq 0 8)
-            ltac:(apply Forall_forall; intros j Hj; apply elem_of_list_In, elem_of_seq in Hj;
+    iMod (wordw_win_store_c 8 img σ log V va ppn vold vnew
+            ltac:(vm_compute; discriminate) Hcan
+            ltac:(apply Forall_forall; intros j Hj;
+                  apply elem_of_list_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hj8]; pose proof (Nat2Z.inj_lt j 8) as Hnz;
                   change (Z.of_nat 8) with 8%Z in Hnz; lia)
-            mm with "Hk Hm Hb") as "[Hm Hb]".
-    iModIntro. unfold write_bytes. change (N.to_nat 8) with 8%nat. iFrame "Hm".
-    iApply ctx_word_pointsto_intro; [exact Hal | ].
-    iExact "Hb".
+            with "Hk Hm Htso Hrun Hb") as "(Hm & Htso & Hrun & Hb)".
+    iModIntro. iFrame "Hm Htso Hrun".
+    iApply ctx_word_pointsto_intro; [exact Hal | iExact "Hb"].
   Qed.
 
-  (* 4-byte claim-keyed write (the width-4 analogue). *)
-  Lemma word4_pointsto_write_c `{KTR : !CurKtier} (mm : _) (va : mword 64)
-      (ppn : mword 44) (vold vnew : bv 32) :
+  (* 4-byte claim-keyed store (the width-4 analogue). *)
+  Lemma word4_pointsto_write_c `{KTR : !CurKtier}
+      (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg)
+      (V : agent -> nat) (va : mword 64) (ppn : mword 44) (vold vnew : bv 32) :
     (uint va < 274877906944)%Z ->
     (bv_unsigned (subrange_vec_dec va 11 0) + 4 <= 4096)%Z ->
     kmap_at (svpn_of va) ppn KP_rw -∗
-    gen_heap_interp (hG:=riscv_memGS) mm -∗ va ↦₄ vold ==∗
-    gen_heap_interp (hG:=riscv_memGS) (write_bytes mm (pa_of ppn va) 4 vnew) ∗ va ↦₄ vnew.
+    gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
+    va ↦₄ vold ==∗
+    gen_heap_interp (hG:=riscv_memGS)
+      (write_bytes σ.(mem) (pa_of ppn va) 4 vnew) ∗
+    tso_interp_of riscv_eraGS img (write_bytes σ.(mem) (pa_of ppn va) 4 vnew)
+      (log ++ [PWMsg (snap_of (pa_of ppn va) 4 vnew) (hart_agent cpu_id)])%list
+      (vstep (hart_agent cpu_id) (V (hart_agent cpu_id))
+         (log ++ [PWMsg (snap_of (pa_of ppn va) 4 vnew) (hart_agent cpu_id)])%list V) ∗
+    TsoCtx.own_context TsoCtx.cur_ctx ∗ va ↦₄ vnew.
   Proof.
-    intros Hcan Hoff. iIntros "#Hk Hm Hw".
-    iDestruct (word4_pointsto_aligned_p with "Hw") as %Hal.
-    iDestruct (word4_pointsto_bytes with "Hw") as "Hb".
-    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hb") as "Hb".
-    iMod (s_win_write va ppn (nth_byte vold) (nth_byte vnew) Hcan (seq 0 4)
-            ltac:(apply Forall_forall; intros j Hj; apply elem_of_list_In, elem_of_seq in Hj;
+    intros Hcan Hoff. iIntros "#Hk Hm Htso Hrun Hw".
+    iDestruct (ctx_word4_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (ctx_word4_pointsto_bytes with "Hw") as "Hb".
+    iMod (wordw_win_store_c 4 img σ log V va ppn vold vnew
+            ltac:(vm_compute; discriminate) Hcan
+            ltac:(apply Forall_forall; intros j Hj;
+                  apply elem_of_list_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hj4]; pose proof (Nat2Z.inj_lt j 4) as Hnz;
                   change (Z.of_nat 4) with 4%Z in Hnz; lia)
-            mm with "Hk Hm Hb") as "[Hm Hb]".
-    iModIntro. unfold write_bytes. change (N.to_nat 4) with 4%nat. iFrame "Hm".
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hb") as "Hb".
-    iApply word4_pointsto_intro; [exact Hal | iExact "Hb"].
+            with "Hk Hm Htso Hrun Hb") as "(Hm & Htso & Hrun & Hb)".
+    iModIntro. iFrame "Hm Htso Hrun".
+    iApply ctx_word4_pointsto_intro; [exact Hal | iExact "Hb"].
   Qed.
 
   (* =================================================================== *)
@@ -456,7 +605,8 @@ Section SmodeCorePt.
      ([sr_ktier_wit_kpt_share]), so every caller in the tree discharges it
      in one line and no function contract grows anything. *)
   Lemma s_regime_fetch `{KTR : !CurKtier} (R : s_regime) (σ : mstate)
-      (pc : mword 64) (r : FetchResult) (E : coPset) :
+      (pc : mword 64) (r : FetchResult) (E : coPset)
+      (S : TsoMemPa.bytemap -> iProp Σ) :
     ↑kptN ⊆ E ->
     register_lookup PC σ.(sregs) = pc ->
     register_lookup cur_privilege σ.(sregs) = Supervisor ->
@@ -465,6 +615,17 @@ Section SmodeCorePt.
     register_lookup htif_tohost_base σ.(sregs) = None ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.24/A6.30: the A/D write-back's payer, THREADED (nothing above this
+       face holds the memory-model bundle -- A6.30); memory-indexed so a
+       STRADDLING fetch, which translates twice, can chain it, and
+       persistent for the same reason. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.phys_ledger_word a (DfracOwn 1) wold ==∗
+         gen_heap_interp (write_bytes m a 8 wnew) ∗
+         S (write_bytes m a 8 wnew) ∗
+         TsoCtx.phys_ledger_word a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     sr_ktier_wit R cur_ktier -∗
     mstate_interp σ -∗
     sr_inv R -∗
@@ -474,11 +635,12 @@ Section SmodeCorePt.
       ⌜ σf.(mdev) = σ.(mdev) ⌝ ∗
       ⌜ forall rr, register_beq rr tlb = false ->
           register_lookup rr σf.(sregs) = register_lookup rr σ.(sregs) ⌝ ∗
+      S σf.(mem) ∗
       mstate_interp σf ∗
       sr_inv R.
   Proof.
     intros HE Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma.
-    iIntros "#Hwit [Hreg [Hmem Hdev]] Hinv Hbytes".
+    iIntros "#Hpay Hsto #Hwit [Hreg [Hmem Hdev]] Hinv Hbytes".
     assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
       by (rewrite Lmisa; vm_compute; reflexivity).
     iEval (rewrite /instr_bytes) in "Hbytes".
@@ -497,12 +659,12 @@ Section SmodeCorePt.
         iDestruct (text_canonical with "Hb0") as %Hcan.
         pose proof (off4_bound pc Hal) as Hoff. rewrite (uint_unsigned_n _) in Hoff.
         (* present the claim to the claim-keyed absorb: translate pc = pa_of ppn pc *)
-        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _
+        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _ S
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcan) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma Hid _ with "Hwit Hk Hreg Hmem Hinv")
-          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
+                Lpma Hid _ with "Hpay Hsto Hwit Hk Hreg Hmem Hinv")
+          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hsto & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iDestruct (s_fetch_chunk s1 pc pc 0 4 4 (nth_byte w) ppn
                      ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
@@ -537,7 +699,7 @@ Section SmodeCorePt.
         iSplit; [iPureIntro; exact Hmdev1 |].
         iSplit; [iPureIntro; exact Hpres1 |].
         rewrite /mstate_interp. rewrite Hmdev1.
-        iFrame "Hreg Hmem Hdev Hinv".
+        iFrame "Hsto Hreg Hmem Hdev Hinv".
       + (* 2-aligned but NOT 4-aligned: TWO chunks across TWO pages *)
         destruct (align2_not4_facts pc H2al Hal) as (_ & Hbit0 & Hbit1).
         assert (Hvah2 : is_aligned_vaddr (Virtaddr (add_vec_int pc 2)) 2 = true).
@@ -557,12 +719,12 @@ Section SmodeCorePt.
         iDestruct (text_canonical with "Hb2") as %Hcanh.
         pose proof (off_bound_div (add_vec_int pc 2) 2 ltac:(lia) ltac:(exists 2048; lia) Hvah2) as Hoffh. rewrite (uint_unsigned_n _) in Hoffh.
         (* absorb the LOW translation: pc -> pa_of ppnl pc, at [σ -> s1] *)
-        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppnl pc) ppnl KP_rx σ _
+        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppnl pc) ppnl KP_rx σ _ S
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcanl) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma Hidl _ with "Hwit Hkl Hreg Hmem Hinv")
-          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
+                Lpma Hidl _ with "Hpay Hsto Hwit Hkl Hreg Hmem Hinv")
+          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hsto & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         assert (L1pc : register_lookup PC s1.(sregs) = pc)
           by (rewrite (Hpres1 PC ltac:(vm_compute; reflexivity)); exact Lpc).
@@ -583,12 +745,12 @@ Section SmodeCorePt.
                      ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoffl Hcanl
                      with "Hmem Hkl Hbytes") as %(HbfL & Hraml0 & Hraml1).
         (* absorb the HIGH translation: pc+2 -> pa_of ppnh (pc+2), at [s1 -> s2] *)
-        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) (add_vec_int pc 2) (pa_of ppnh (add_vec_int pc 2)) ppnh KP_rx s1 _
+        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) (add_vec_int pc 2) (pa_of ppnh (add_vec_int pc 2)) ppnh KP_rx s1 _ S
                 (or_introl eq_refl) eq_refl (lo_canonical (add_vec_int pc 2) Hcanh) ltac:(reflexivity)
                 L1misa L1menv L1htif L1priv L1SXL
                 (exec_effectivePrivilege_fetch _ _ s1) (exec_is_shadow_stack_fetch s1)
-                L1pma Hidh _ with "Hwit Hkh Hreg Hmem Hinv")
-          as (s2) "(%Htr2 & %Hmdev2 & %Hsh2 & %Hgr2 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
+                L1pma Hidh _ with "Hpay Hsto Hwit Hkh Hreg Hmem Hinv")
+          as (s2) "(%Htr2 & %Hmdev2 & %Hsh2 & %Hgr2 & Hsto & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh2) as Hpres2.
         assert (Hpres12 : forall rr, register_beq rr tlb = false ->
                   register_lookup rr s2.(sregs) = register_lookup rr σ.(sregs)).
@@ -659,7 +821,7 @@ Section SmodeCorePt.
         iSplit; [iPureIntro; rewrite Hmdev2; exact Hmdev1 |].
         iSplit; [iPureIntro; exact Hpres12 |].
         rewrite /mstate_interp. rewrite Hmdev2 Hmdev1.
-        iFrame "Hreg Hmem Hdev Hinv".
+        iFrame "Hsto Hreg Hmem Hdev Hinv".
     - (* F_RVC h *)
       iDestruct "Hbytes" as "[%HisRVC Hbytes]".
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal.
@@ -671,12 +833,12 @@ Section SmodeCorePt.
         iDestruct (code_text with "Hb0") as (ppn) "(#Hk & %Htext0 & %Hid)".
         iDestruct (text_canonical with "Hb0") as %Hcan.
         pose proof (off4_bound pc Hal) as Hoff. rewrite (uint_unsigned_n _) in Hoff.
-        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _
+        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _ S
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcan) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma Hid _ with "Hwit Hk Hreg Hmem Hinv")
-          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
+                Lpma Hid _ with "Hpay Hsto Hwit Hk Hreg Hmem Hinv")
+          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hsto & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iDestruct (s_fetch_chunk s1 pc pc 0 4 4 (nth_byte w) ppn
                      ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
@@ -712,7 +874,7 @@ Section SmodeCorePt.
         iSplit; [iPureIntro; exact Hmdev1 |].
         iSplit; [iPureIntro; exact Hpres1 |].
         rewrite /mstate_interp. rewrite Hmdev1.
-        iFrame "Hreg Hmem Hdev Hinv".
+        iFrame "Hsto Hreg Hmem Hdev Hinv".
       + (* 2-aligned: one chunk, one 2-byte read *)
         iDestruct "Hbytes" as "#Hbytes".
         destruct (align2_not4_facts pc H2al Hal) as (_ & Hbit0 & Hbit1).
@@ -722,12 +884,12 @@ Section SmodeCorePt.
         iDestruct (code_text with "Hb0") as (ppn) "(#Hk & %Htext0 & %Hid)".
         iDestruct (text_canonical with "Hb0") as %Hcan.
         pose proof (off_bound_div pc 2 ltac:(lia) ltac:(exists 2048; lia) H2al) as Hoff. rewrite (uint_unsigned_n _) in Hoff.
-        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _
+        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _ S
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcan) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma Hid _ with "Hwit Hk Hreg Hmem Hinv")
-          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
+                Lpma Hid _ with "Hpay Hsto Hwit Hk Hreg Hmem Hinv")
+          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hsto & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iDestruct (s_fetch_chunk s1 pc pc 0 2 2 (nth_byte h) ppn
                      ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
@@ -763,7 +925,7 @@ Section SmodeCorePt.
         iSplit; [iPureIntro; exact Hmdev1 |].
         iSplit; [iPureIntro; exact Hpres1 |].
         rewrite /mstate_interp. rewrite Hmdev1.
-        iFrame "Hreg Hmem Hdev Hinv".
+        iFrame "Hsto Hreg Hmem Hdev Hinv".
     - (* F_Ext_Error *) done.
   Qed.
 
@@ -843,9 +1005,13 @@ Section SmodeCorePt.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pa 4 = Some bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pa 4 bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
            (Physaddr pa) 4 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -900,15 +1066,17 @@ Section SmodeCorePt.
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 4 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read 4 (mread_req pa) _
+    { iApply (swp_hart_ram_read_plain 4 (mread_req pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
                 (hread_req_at_read_ram pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ) "Hσ". iMod ("Hmem" $! σ with "Hσ") as "[%Hrb Hclose]".
+      iIntros (σ img log tv V) "%Htv Hσ Htso".
+      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
-      iMod "Hclose" as "Hσ". iModIntro. iFrame "Hσ".
+      iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
+      iIntros (tvn _ _) "_".
       rewrite hread_resume_read_ram. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
@@ -944,9 +1112,13 @@ Section SmodeCorePt.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pa 2 = Some bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pa 2 bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
            (Physaddr pa) 2 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -1001,15 +1173,17 @@ Section SmodeCorePt.
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 2 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read 2 (mread_req2 pa) _
+    { iApply (swp_hart_ram_read_plain 2 (mread_req2 pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
                 (hread_req_at_read_ram2 pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ) "Hσ". iMod ("Hmem" $! σ with "Hσ") as "[%Hrb Hclose]".
+      iIntros (σ img log tv V) "%Htv Hσ Htso".
+      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
-      iMod "Hclose" as "Hσ". iModIntro. iFrame "Hσ".
+      iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
+      iIntros (tvn _ _) "_".
       rewrite hread_resume_read_ram2. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
@@ -1029,6 +1203,44 @@ Section SmodeCorePt.
   (* the window is persistent, which is what lets it be discharged once   *)
   (* per fetch node without owning anything across the walk.              *)
   (* =================================================================== *)
+  (* A6.43's S-MODE HALF.  One byte of the window, at the TRANSLATED
+     address: the [pointsto] and the pristine element together.  Mirrors
+     [s_fetch_chunk]'s per-byte extraction exactly -- rewrite the claim onto
+     the page's own vpn, agree the page numbers, push [pa_of] through the
+     offset -- and the only new step is that [text_pointsto_acc] now hands
+     the element out beside the cell. *)
+  Local Lemma s_text_byte `{KTR : !CurKtier} (pc b : mword 64)
+      (lo Nw j : nat) (g : nat -> bv 8) (ppn : mword 44) :
+    (lo + j < Nw)%nat ->
+    (forall k : nat, pa_add pc (lo + k)%nat = pa_add b k) ->
+    (bv_unsigned (subrange_vec_dec b 11 0) + Z.of_nat j < 4096)%Z ->
+    (uint b < 274877906944)%Z ->
+    kmap_at (svpn_of b) ppn KP_rx -∗
+    ([∗ list] k ∈ seq 0 Nw, (pa_add pc k) ↦ₓ□ g k) -∗
+    phys_pointsto (pa_add (pa_of ppn b) j) DfracDiscarded (g (lo + j)%nat)
+    ∗ TsoCtx.pristine_byte (pa_add (pa_of ppn b) j).
+  Proof.
+    intros Hlt Hbase Hoffj Hcan.
+    iIntros "#Hk #Hbytes".
+    iDestruct (big_sepL_lookup _ _ (lo + j)%nat (lo + j)%nat with "Hbytes")
+      as "Hbj".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    iEval (rewrite (Hbase j)) in "Hbj".
+    iDestruct (text_pointsto_acc with "Hbj")
+      as (ppnj) "(#Hkj & _ & %Htx & _ & Hp & #Hts & _)".
+    iEval (rewrite (svpn_of_pa_add b j Hcan Hoffj)) in "Hkj".
+    iDestruct (kmap_at_agree with "Hkj Hk") as %[Heqp _].
+    rewrite Heqp in Htx. rewrite (pa_of_pa_add ppn b j Hcan Hoffj) in Htx.
+    iEval (rewrite Heqp (pa_of_pa_add ppn b j Hcan Hoffj)) in "Hp".
+    iEval (rewrite Heqp (pa_of_pa_add ppn b j Hcan Hoffj)) in "Hts".
+    rewrite /phys_pointsto /TsoCtx.pristine_byte /pristine_elem.
+    iFrame "Hp Hts". iPureIntro. exact (addr_is_text_ram _ Htx).
+  Qed.
+
+  (* A6.36/A6.43: the S-mode fetch's obligation is the VIEW-INDEXED one, and
+     the SAME persistent window pays it -- the text bytes are era-image
+     bytes, visible at every agent and every view.  The premises are
+     character for character [s_text_obl]'s old ones. *)
   Lemma s_text_obl `{KTR : !CurKtier} (pc b : mword 64) (lo Nw : nat) (n : N)
       (g : nat -> bv 8) (ppn : mword 44) (w : bv (8 * n)) :
     (lo + N.to_nat n <= Nw)%nat ->
@@ -1039,21 +1251,46 @@ Section SmodeCorePt.
     (forall j : nat, (N.of_nat j < n)%N -> g (lo + j)%nat = nth_byte w j) ->
     kmap_at (svpn_of b) ppn KP_rx -∗
     ([∗ list] j ∈ seq 0 Nw, (pa_add pc j) ↦ₓ□ g j) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-       ⌜read_bytes σ.(mem) (pa_of ppn b) n = Some w⌝ ∗
-       ▷ (|={∅,⊤}=> mstate_interp σ)).
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+       ⌜fobl_ram img log tv (pa_of ppn b) n w⌝ ∗
+       ▷ (|={∅,⊤}=> mstate_interp σ ∗
+            tso_interp_of riscv_eraGS img σ.(mem) log V)).
   Proof.
     intros Hlon Hlen Hbase Hoff Hcan Hg.
-    iIntros "#Hk #Hbytes" (σ) "Hσ".
+    assert (Hoffj : forall j : nat, (j < N.to_nat n)%nat ->
+              (bv_unsigned (subrange_vec_dec b 11 0) + Z.of_nat j < 4096)%Z).
+    { intros j Hj. eapply Z.lt_le_trans; [| exact Hoff].
+      apply Z.add_lt_mono_l. apply Nat2Z.inj_lt. exact Hj. }
+    iIntros "#Hk #Hbytes".
+    iAssert ([∗ list] j ∈ seq 0 (N.to_nat n),
+               phys_pointsto (pa_add (pa_of ppn b) j) DfracDiscarded
+                 (nth_byte w j))%I as "#Hp".
+    { iApply big_sepL_intro. iIntros "!>" (k j Hk).
+      apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+      rewrite <- (Hg k ltac:(lia)).
+      iDestruct (s_text_byte pc b lo Nw k g ppn ltac:(lia) Hbase
+                   (Hoffj k Hlt) Hcan with "Hk Hbytes") as "[$ _]". }
+    iAssert (TsoCtx.pristine_win (pa_of ppn b) (N.to_nat n))%I as "#Hpr".
+    { rewrite /TsoCtx.pristine_win. iApply big_sepL_intro.
+      iIntros "!>" (k j Hk).
+      apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+      iDestruct (s_text_byte pc b lo Nw k g ppn ltac:(lia) Hbase
+                   (Hoffj k Hlt) Hcan with "Hk Hbytes") as "[_ $]". }
+    iIntros (σ img log tv V) "%Htv Hσ Htso".
     rewrite /mstate_interp. iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
-    iDestruct (s_fetch_chunk σ pc b lo (N.to_nat n) Nw g ppn
-                 Hlon Hlen Hbase Hoff Hcan with "Hmem Hk Hbytes")
-      as %(Hbf & _ & _).
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+               σ.(sregs) σ.(mdev) Hpin).
+    iDestruct (TsoCtx.pristine_read_bytes_ok
+                 (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
+                 (pa_of ppn b) n w DfracDiscarded with "Hmem Htso Hp Hpr")
+      as %Hok.
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iSplitR.
-    { iPureIntro. apply read_bytes_of_bytes. intros j Hj.
-      rewrite <- (Hg j Hj). apply Hbf.
-      rewrite N2Nat.id. exact Hj. }
+    { iPureIntro. intros tv' _ _. exact (Hok (hart_agent cpu_id) tv'). }
     iNext. iMod "Hmask" as "_". iModIntro. by iFrame.
   Qed.
 
@@ -4078,7 +4315,8 @@ Section SmodeCorePt.
   (* restatement.                                                         *)
   (* =================================================================== *)
   Lemma tlb_inv_pt_fetch `{KTR : !CurKtier} (root_ppn : mword 44) (σ : mstate)
-      (pc : mword 64) (r : FetchResult) (E : coPset) :
+      (pc : mword 64) (r : FetchResult) (E : coPset)
+      (S : TsoMemPa.bytemap -> iProp Σ) :
     ↑kptN ⊆ E ->
     register_lookup PC σ.(sregs) = pc ->
     register_lookup cur_privilege σ.(sregs) = Supervisor ->
@@ -4087,6 +4325,17 @@ Section SmodeCorePt.
     register_lookup htif_tohost_base σ.(sregs) = None ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.24/A6.30: the A/D write-back's payer, THREADED (nothing above this
+       face holds the memory-model bundle -- A6.30); memory-indexed so a
+       STRADDLING fetch, which translates twice, can chain it, and
+       persistent for the same reason. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.phys_ledger_word a (DfracOwn 1) wold ==∗
+         gen_heap_interp (write_bytes m a 8 wnew) ∗
+         S (write_bytes m a 8 wnew) ∗
+         TsoCtx.phys_ledger_word a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     mstate_interp σ -∗
     tlb_res_pt root_ppn -∗
     instr_bytes pc r ={E}=∗
@@ -4095,6 +4344,7 @@ Section SmodeCorePt.
       ⌜ σf.(mdev) = σ.(mdev) ⌝ ∗
       ⌜ forall rr, register_beq rr tlb = false ->
           register_lookup rr σf.(sregs) = register_lookup rr σ.(sregs) ⌝ ∗
+      S σf.(mem) ∗
       mstate_interp σf ∗
       tlb_res_pt root_ppn.
   Proof.
@@ -4102,10 +4352,10 @@ Section SmodeCorePt.
        ([sr_ktier_wit_kpt_share]), so this restatement stays a one-liner and
        is itself tier-generic. *)
     intros HE Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma.
-    iIntros "Hsi Hinv Hb".
-    iApply (s_regime_fetch (kpt_share_regime root_ppn) σ pc r E
+    iIntros "#Hpay Hsto Hsi Hinv Hb".
+    iApply (s_regime_fetch (kpt_share_regime root_ppn) σ pc r E S
               HE Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
-              with "[] Hsi Hinv Hb").
+              with "Hpay Hsto [] Hsi Hinv Hb").
     iApply sr_ktier_wit_kpt_share.
   Qed.
 

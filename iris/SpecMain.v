@@ -183,7 +183,6 @@ Require Import WaitInv.   (* [wait_res] -- what wait_lock is over *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import CtxRecord.   (* [ctx_parked_inv]: the deposit record's token *)
 
 
 (* main's stack budget: its own 16-byte / 2-slot frame over its deepest
@@ -451,13 +450,6 @@ Section SpecMain.
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (* THE DEPOSIT'S CONTEXT, NAMED (tso-absorb-memo.md §5).  [P] is still
-         abstract here, but the □-wand's ξ-indexed premises are not: main
-         has to hand the deposit's rows over AT THE RECORD'S context, which
-         is [TsoCtx.ctx_deposit] and runs in [ProofMain.mn_grp_started] --
-         the one place on this arm that still holds its [sie_cap_gpr], hence
-         its own [own_context].  A deposit cannot run under the [□]. *)
-      (xid : CtxId)
       (P : iProp Σ) `{!Persistent P} :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
     (* the arm is decided by the ambient hart: [beqz a0] at main+0x14 takes
@@ -515,24 +507,15 @@ Section SpecMain.
        main applies this wand at the [started = 1] store, to the [pr] lock, the
        64 proc locks and the vdisk_lock it has just allocated. *)
     started_inv P -∗
-    (* THE RECORD'S OWN TOKEN, so the deposit at +0xa2 can raise its stamp. *)
-    ctx_parked_inv xid -∗
-    (* THE RECIPE, at the RECORD'S context.  The wand is pure packing -- it
-       has to be, being under a [□]: [TsoCtx.ctx_deposit] consumes an
-       [own_context], and nothing under a [□] can consume anything.  So the
-       deposit happens at the APPLICATION site ([ProofMain.mn_grp_started],
-       which holds the token inside its [sie_cap_gpr]) and the wand is
-       handed rows that are already at [xid]. *)
     □ (∀ (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64)
          (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
-         procs_inv (XI := xid) γs -∗
+         procs_inv γs -∗
          console_caps γd -∗
-         is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γv pd pav pu) -∗
-         disk_geom (XI := xid) γv pd pav pu -∗
+         is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
+         disk_geom γv pd pav pu -∗
          kpt_inv root -∗
-         ctx_word_pointsto xid
-           (mword_of_int KernelSyms.kernel_pagetable : mword 64) DfracDiscarded
+         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
            (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
          kmap_at tramp_vpn tramp_ppn KP_rx -∗
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
@@ -688,8 +671,7 @@ Module Type MAIN.
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (xid : CtxId)
       (P : iProp Σ) `{!Persistent P},
       wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 xid P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 P.
 End MAIN.

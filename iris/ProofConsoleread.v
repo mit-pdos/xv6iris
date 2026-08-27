@@ -762,7 +762,7 @@ Section ProofConsoleread.
       assert (N10 : r <> Ra0) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
       rewrite /X3 upd_ne; [| congruence]. rewrite /X2 upd_ne; [| congruence].
       rewrite /X1 upd_ne; [| congruence]. reflexivity. }
-    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string (λ ξ : CtxId, cons_res (XI := ξ)) X3
+    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> X3
               0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HX3lka
               ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -1916,7 +1916,7 @@ Section ProofConsoleread.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
-      iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string (λ ξ : CtxId, cons_res (XI := ξ)) K3
+      iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> K3
                 0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HK3lka
                 ltac:(lia)
                 with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -2049,7 +2049,7 @@ Section ProofConsoleread.
     assert (HcsS4 : callee_saved msp S4).
     { rewrite /S4 /S3. apply callee_saved_insert_r; [vm_compute; reflexivity|].
       apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
-    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string (λ ξ : CtxId, cons_res (XI := ξ)) S4
+    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> S4
               0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HS4lka
               ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -2132,7 +2132,7 @@ Section ProofConsoleread.
       apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
     iDestruct (cpu_own_transport CIDs1 CIDq1 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string (λ ξ : CtxId, cons_res (XI := ξ)) S7 0%nat true
+    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string <{ cons_res }> S7 0%nat true
               (proc_addr jp) (av - 12)%nat true lks cr_lvl0
               ltac:(lia)
               Hbelow
@@ -2763,7 +2763,7 @@ Section ProofConsoleread.
       rewrite /P6 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID CIDp17 0%nat true pj true ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string (λ ξ : CtxId, cons_res (XI := ξ)) P8 0%nat true pj
+    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string <{ cons_res }> P8 0%nat true pj
               (av - 12)%nat true lks cr_lvl0 ltac:(lia)
               Hbelow
               with "Hcg Hcnt Ht Hpc []").

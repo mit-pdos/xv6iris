@@ -272,7 +272,7 @@ Definition wp_ialloc_sconf_body
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
   bslots 2 -∗
@@ -459,7 +459,7 @@ Definition wp_ialloc_gen_body
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
   bslots 2 -∗

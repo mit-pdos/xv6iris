@@ -28,6 +28,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec HartSwp
         HartLift HartEvents.
+(* [pwmsg]/[snap_of]/[agent]/[hart_agent]: the store's threaded append
+   obligation (§6a below) is stated over the era's write log.  Import is not
+   transitive. *)
+Require Import TsoMemPa.
 Require Import ColdBoot.
 From Kernel Require KernelSyms.
 Require Import TsoCtx.
@@ -265,6 +269,12 @@ Lemma hp_fetch_ram : dev_addr (Interface.ReadReq.pa hp_reqf) = false.
 Proof. vm_cast_no_check (eq_refl false). Qed.
 Lemma hp_fetch_plain : ak_excl (Interface.ReadReq.access_kind hp_reqf) = false.
 Proof. vm_cast_no_check (eq_refl false). Qed.
+(* [hp_fetch_strong] IS GONE (tso-machine-flip.md A6.36).  It VM-checked that
+   the A6.7(B) Sail patch tagged this fetch [AK_ifetch] and so sent it to the
+   machine's strongly-ordered arm; the owner's overruling of RULING 1 deleted
+   that arm, the patch is parked, and the request this pilot collects is now
+   byte-for-byte a data load's.  [hp_fetch_plain] above ([ak_excl] false) is
+   the whole classification the machine still makes. *)
 Lemma hp_fetch_pa :
   Interface.ReadReq.pa hp_reqf
   = SailStdpp.Values.mword_of_int (KernelSyms.main + 0xb0).
@@ -315,7 +325,63 @@ Section pilot.
   (* 6a. The generic rule: silent stretch, RAM fetch-read pinned by      *)
   (*     owned bytes, silent stretch, RAM write into owned bytes, silent *)
   (*     tail to the boundary.                                           *)
+  (*                                                                     *)
+  (*  WHAT THE MACHINE FLIP CHANGED HERE, and why the shape moved        *)
+  (*  (tso-machine-flip.md §6; these two lemmas have no consumers, so    *)
+  (*  they were free to be re-cut rather than patched):                  *)
+  (*                                                                     *)
+  (*  - THE READ IS THE PLAIN ARM (A6.36, the owner's overruling of      *)
+  (*    RULING 1).  There is no strongly-ordered RAM read left: the       *)
+  (*    pilot's instruction FETCH advances this hart's view              *)
+  (*    nondeterministically and reads latest-visible wherever it lands, *)
+  (*    so the owed fact is the VIEW-INDEXED one and the owned bytes do  *)
+  (*    NOT pay it by themselves.  What pays it is that the bytes are    *)
+  (*    KERNEL TEXT: an era-image byte has timestamp 0 and is visible at *)
+  (*    every view, so the rule takes [TsoCtx.pristine_win] beside the   *)
+  (*    [↦ₚ] run and discharges through [TsoCtx.pristine_read_bytes_ok]. *)
+  (*    That pairing -- raw physical bytes plus a pristine receipt -- is  *)
+  (*    the whole cost of the overruling in one file.                     *)
+  (*                                                                     *)
+  (*  - THE WRITE'S LOG APPEND IS THREADED, NOT PAID.  A store now       *)
+  (*    APPENDS to the era's write log, and the four ghost steps that    *)
+  (*    go with the append (§6's [Wobl_ram]) cannot be done from the     *)
+  (*    [↦ₚ] bytes this rule owns: the per-byte timestamp FRAGMENTS ride *)
+  (*    inside a [TsoCtx.ctx_pointsto], and the phys tier is             *)
+  (*    deliberately raw (tso-port.md §0.8' ruling 6).  So the rule      *)
+  (*    takes the bundle move as a premise and hands it the machine's    *)
+  (*    own before/after states -- the same pass-through                 *)
+  (*    [HartMStore.wobl_ram] does one tier up.  The pilot therefore     *)
+  (*    still exercises every kit piece end to end, but it no longer     *)
+  (*    CLOSES the store's ledger half; that half is closed where the    *)
+  (*    ledger facts live.                                              *)
   (* ------------------------------------------------------------------ *)
+  (* THE TEXT PAYER for the fetch's plain obligation, stated OUTSIDE the
+     pilot's WP so the A6.1a [gstate] reconstruction rewrites in a small
+     goal: inside [wp_hart_rw_seq]'s proof the goal carries the model's
+     [let '(_,_,_) := _] loop patterns and [rewrite] refuses there
+     ("_pattern_value_ is used in conclusion").  Mirrors
+     [HartMFetch.fobl_ram_pristine]; kept local because this file is a
+     pilot and deliberately does not depend on the fetch tier. *)
+  Lemma hp_read_pristine (img : TsoMemPa.bytemap) (sg : mstate)
+      (log : list pwmsg) (V : agent -> nat)
+      (pa : Arch.pa) (n : N) {m : N} (w : bv m) (dq : dfrac) :
+    gen_heap_interp (hG := riscv_memGS) sg.(mem) -∗
+    tso_interp_of riscv_eraGS img sg.(mem) log V -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       phys_pointsto (pa_add pa j) dq (nth_byte w j)) -∗
+    TsoCtx.pristine_win pa (N.to_nat n) -∗
+    ⌜∀ tv' : nat, tso_read_bytes img log (hart_agent cpu_id) tv' pa n w⌝.
+  Proof.
+    iIntros "Hgh Htso Hb #Hpr".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log V
+               sg.(sregs) sg.(mdev) Hpin).
+    iDestruct (TsoCtx.pristine_read_bytes_ok
+                 (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
+                 pa n w dq with "Hgh Htso Hb Hpr") as %Hok.
+    iPureIntro. intros tv'. exact (Hok (hart_agent cpu_id) tv').
+  Qed.
+
   Lemma wp_hart_rw_seq (D : gset register) (n1 n2 n3 : nat)
       (x0 x1 x2 x3 : hcur)
       (nf : N) (reqf : Interface.ReadReq.t nf) (wf : bv (8 * nf))
@@ -335,8 +401,29 @@ Section pilot.
     hreg_frame x0.1 D -∗
     ([∗ list] j ∈ seq 0 (N.to_nat nf),
        (pa_add (Interface.ReadReq.pa reqf) j) ↦ₚ{dqf} nth_byte wf j) -∗
+    (* the text receipt: these fetch bytes are era-image bytes *)
+    TsoCtx.pristine_win (Interface.ReadReq.pa reqf) (N.to_nat nf) -∗
     ([∗ list] j ∈ seq 0 (N.to_nat nw),
        (pa_add (Interface.WriteReq.pa reqw) j) ↦ₚ nth_byte vold j) -∗
+    (* the store's APPEND, threaded (see the header): the bundle goes in at
+       the machine's flat cache and log and comes back at the written cache
+       and the appended log.  [wstore_tv] is [tv] here -- the pilot's store
+       is plain, so the view does not move. *)
+    (∀ (σw : mstate) (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+       (tv : nat) (V : agent -> nat),
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       tso_interp_of riscv_eraGS img σw.(mem) log V ==∗
+       tso_interp_of riscv_eraGS img
+         (write_bytes σw.(mem) (Interface.WriteReq.pa reqw) nw
+            (Interface.WriteReq.value reqw))
+         (log ++ [PWMsg (snap_of (Interface.WriteReq.pa reqw) nw
+                           (Interface.WriteReq.value reqw))
+                    (hart_agent cpu_id)])%list
+         (vstep (hart_agent cpu_id)
+            (wstore_tv (Interface.WriteReq.access_kind reqw) log tv)
+            (log ++ [PWMsg (snap_of (Interface.WriteReq.pa reqw) nw
+                              (Interface.WriteReq.value reqw))
+                       (hart_agent cpu_id)])%list V)) -∗
     ▷ (hreg_frame x3.1 D -∗
        ([∗ list] j ∈ seq 0 (N.to_nat nw),
           (pa_add (Interface.WriteReq.pa reqw) j) ↦ₚ
@@ -346,22 +433,24 @@ Section pilot.
     WP (HartE gen_id cpu_id x0.2 : expr riscv_lang).
   Proof.
     iIntros (Hx1 Hx2 Hx3 Hreqf Hdevf Hexf Hreqw Hdevw Htag)
-      "#Hcert Hfrag Hrf Hfetch Hold Hcont".
+      "#Hcert Hfrag Hrf Hfetch #Hpr Hold Hwobl Hcont".
     (* stretch 1 *)
     iApply (wp_hart_batch D n1 x0 with "Hcert Hrf").
     rewrite -Hx1. iIntros "Hrf".
-    (* the fetch read, pinned by the owned bytes *)
-    iApply (wp_hart_ram_read (fun m' : M unit => m') nf reqf x1.2 mctx_id
-              Hreqf Hdevf Hexf with "Hcert").
-    iIntros (σ) "Hσ". rewrite /mstate_interp.
+    (* THE FETCH READ, on the plain arm: the owed fact is the view-indexed
+       one, and the pristine receipt pays it at EVERY view (A6.36). *)
+    iApply (wp_hart_ram_read_plain (fun m' : M unit => m') nf reqf x1.2
+              mctx_id Hreqf Hdevf Hexf with "Hcert").
+    iIntros (σ imgf logf tvf Vf) "%Htvf Hσ Htso". rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
-    iDestruct (phys_read_bytes σ.(mem) (Interface.ReadReq.pa reqf) nf wf dqf
-                 with "Hmem Hfetch") as %Hrb.
+    iDestruct (hp_read_pristine imgf σ logf Vf (Interface.ReadReq.pa reqf)
+                 nf wf dqf with "Hmem Htso Hfetch Hpr") as %Hok.
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iExists wf.
-    iSplitR; [iPureIntro; exact Hrb|].
+    iSplitR; [iPureIntro; intros tv' _ _; exact (Hok tv')|].
     iNext. iMod "Hmask" as "_". iModIntro.
-    iSplitL "Hri Hmem Hdev"; [by iFrame|].
+    iSplitL "Hri Hmem Hdev"; [by iFrame|]. iFrame "Htso".
+    iIntros (tvn ? ?) "_".
     (* stretch 2 *)
     iApply (wp_hart_batch D n2 (hcur_read (bv_unsigned wf) x1)
               with "Hcert Hrf").
@@ -369,16 +458,20 @@ Section pilot.
     (* the store *)
     iApply (wp_hart_ram_write (fun m' : M unit => m') nw reqw x2.2 rr mctx_id
               Hreqw Hdevw with "Hcert Hfrag").
-    iIntros (σ') "Hσ". rewrite /mstate_interp.
+    iIntros (σ' img log tv V) "%Htv Hσ Htso". rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iNext. iMod "Hmask" as "_".
     iMod (phys_upd_window σ'.(mem) (Interface.WriteReq.pa reqw) nw vold
             (Interface.WriteReq.value reqw) with "Hmem Hold")
       as "[Hmem Hnew]".
+    iMod ("Hwobl" $! σ' img log tv V with "[//] Htso") as "Htso".
     iModIntro.
     iSplitL "Hri Hmem Hdev"; [by iFrame|].
-    iIntros "Hfrag".
+    iFrame "Htso".
+    (* the store is plain, so the receipt the rule mints says nothing this
+       hart did not already have (§6 amendment A6.6): dropped. *)
+    iIntros "Hfrag _".
     (* stretch 3 *)
     iApply (wp_hart_batch D n3 (hcur_write x2) with "Hcert Hrf").
     rewrite -Hx3. iIntros "Hrf".
@@ -393,13 +486,32 @@ Section pilot.
   (*     [reflexivity] in the definitions' own spelling; the projection  *)
   (*     facts are §5's VM-checked lemmas.  Nothing here computes.        *)
   (* ------------------------------------------------------------------ *)
+  (*  The store's append travels with it as the same premise 6a takes; it is
+      spelled at the CONCRETE request, so the instantiation is by [iExact]
+      and nothing about the pilot's cursor arithmetic is disturbed. *)
   Lemma wp_pilot_started_store (dqf : dfrac) (vold : bv 32) (rr : option resv) :
     gen_cert -∗
     resv_frag cpu_id rr -∗
     hreg_frame hp_rs0 hp_D -∗
     ([∗ list] j ∈ seq 0 4,
        (pa_add (Interface.ReadReq.pa hp_reqf) j) ↦ₚ{dqf} nth_byte hp_wf j) -∗
+    TsoCtx.pristine_win (Interface.ReadReq.pa hp_reqf) 4 -∗
     ([∗ list] j ∈ seq 0 4, (pa_add hp_flag j) ↦ₚ nth_byte vold j) -∗
+    (∀ (σw : mstate) (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+       (tv : nat) (V : agent -> nat),
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       tso_interp_of riscv_eraGS img σw.(mem) log V ==∗
+       tso_interp_of riscv_eraGS img
+         (write_bytes σw.(mem) (Interface.WriteReq.pa hp_reqw) 4
+            (Interface.WriteReq.value hp_reqw))
+         (log ++ [PWMsg (snap_of (Interface.WriteReq.pa hp_reqw) 4
+                           (Interface.WriteReq.value hp_reqw))
+                    (hart_agent cpu_id)])%list
+         (vstep (hart_agent cpu_id)
+            (wstore_tv (Interface.WriteReq.access_kind hp_reqw) log tv)
+            (log ++ [PWMsg (snap_of (Interface.WriteReq.pa hp_reqw) 4
+                              (Interface.WriteReq.value hp_reqw))
+                       (hart_agent cpu_id)])%list V)) -∗
     ▷ (hreg_frame hp_x3.1 hp_D -∗
        ([∗ list] j ∈ seq 0 4, (pa_add hp_flag j) ↦ₚ nth_byte hp_one j) -∗
        resv_frag cpu_id None -∗
@@ -410,12 +522,12 @@ Section pilot.
     have Hx2 : hp_x2 = hsil 600 hp_D (hcur_read (bv_unsigned hp_wf) hp_x1)
       by reflexivity.
     have Hx3 : hp_x3 = hsil 400 hp_D (hcur_write hp_x2) by reflexivity.
-    iIntros "#Hcert Hfrag Hrf Hfetch Hold Hcont".
+    iIntros "#Hcert Hfrag Hrf Hfetch #Hpr Hold Hwobl Hcont".
     iApply (wp_hart_rw_seq hp_D 400 600 400 hp_x0 hp_x1 hp_x2 hp_x3
               4 hp_reqf hp_wf 4 hp_reqw vold dqf rr
               Hx1 Hx2 Hx3 hp_fetch_req hp_fetch_ram hp_fetch_plain
               hp_store_req hp_store_ram hp_tail_ret
-              with "Hcert Hfrag Hrf Hfetch [Hold] [Hcont]").
+              with "Hcert Hfrag Hrf Hfetch Hpr [Hold] Hwobl [Hcont]").
     - rewrite hp_store_pa. iExact "Hold".
     - rewrite hp_store_pa hp_store_val. iExact "Hcont".
   Qed.

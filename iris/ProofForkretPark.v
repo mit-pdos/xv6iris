@@ -76,7 +76,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import RiscvExtras.
-Require Import StackOwn.   (* [stack_own] / [stack_own_morph]: the child's stack row *)
 Require Import IntrDefs.
 Require Import ProcGeom.
 Require Import ProcDefs.
@@ -124,12 +123,8 @@ Section Res.
      it; the entry exists so that whoever PARKS a never-run process can
      build one (UsertrapRes.v, "THE PARK'S CHANNEL THROUGH THE MODULE
      TYPES"). *)
-  (* [XI] IS SPELLED, and it must be LAST: an implicitly generalized binder
-     lands at the first [`{…}] group, which is not where the module type
-     wants it (§0.12′'s [ProofProcMapstacks] lesson, again). *)
   Definition usertrap_res_bare_park
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-      `{XIb : CurCtx}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
         (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc))
@@ -170,15 +165,15 @@ Proof. rewrite pstate_whole_split unclaimed_RUNNING. reflexivity. Qed.
 Theorem forkret_park_paid
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ)
-    (γs : list gname) (γft γf : gname) (pa ks : mword 64) (rest : list (mword 64))
+    (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) (av : nat) :
     forkret_park_paid_body (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) W
-      γs γft γf pa ks rest pid V av.
+      γs γf pa ks rest pid V av.
 Proof.
   cbv beta delta [forkret_park_paid_body].
   intros Hrest [j [Hpa Hj]] Hut.
   subst pa.
-  iIntros "Hrun Hpkg HW #Hks Hctx Hpriv Hfd Hirsp".
+  iIntros "Hpkg HW #Hks Hctx Hpriv Hfd Hirsp".
   (* THE CHILD'S THREAD OF CONTROL IS BORN HERE -- PARKED (tso-port ruling
      2d.4.1, realized by the checkpoint-0.5 repair).  A forked process's
      kernel thread is a NEW thread that has never run, so its mint is the
@@ -187,100 +182,25 @@ Proof.
      here.  The token goes straight into the record it is building; the
      dispatcher's resume ([TsoCtx.ctx_resume], via the p->lock acquire's
      view receipt) is what first ties it to a hart.  From there it moves
-     only by the swtch exchange, until a zombie park drops it. *)
+     only by the swtch exchange, until a zombie park drops it.  The mint
+     must precede the [iModIntro] below: that is the only update this
+     proof has. *)
   iMod (ctx_parked_alloc) as (XIc) "Hthr".
-  (* THE PACKAGE IS NOT UNDER A LATER ANY MORE -- its CLOSER ROW is, and
-     that is the whole of what the fixpoint needed (§0.16′ step (ii)).  It
-     has to be opened HERE, before the [iModIntro], because three of its
-     rows are about to be DEPOSITED and a deposit is an update that wants
-     its [ctx_dom] at the top level. *)
+  (* the package is under a later and is opened only past the context's
+     own [▷] -- which is what lets the token it names be a fixpoint *)
+  iModIntro. iNext.
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
-  (* ==================================================================== *)
-  (* THE PARK'S SECOND CROSSING.  SIX ROWS, ONE DEPOSIT.                    *)
-  (*                                                                       *)
-  (* Since the [XIp] reshape (§0.15′, SwtchCtx.v) a parked record's rows    *)
-  (* are the PARKED thread's own, so every row of the record this proof is  *)
-  (* building -- its save area, its stack, and everything its resume wand   *)
-  (* will hand to forkret -- is spelled at [XIc], the identity minted three *)
-  (* lines above.  This proof holds them at the PARKER's ξ, so it hands     *)
-  (* them over with [TsoCtx.ctx_deposit] ("a fork's hand-me-downs"), whose  *)
-  (* obligation is [CtxMorph] on each.  The stamp comes back RAISED to      *)
-  (* cover what was deposited, and the resumer's p->lock acquire is what    *)
-  (* pays it ([TsoCtx.ctx_resume]'s view receipt).                          *)
-  (*                                                                       *)
-  (* ALL SIX ARE PAYABLE NOW, and the last one to become so is the reason   *)
-  (* this tranche exists.  Five were proved payable a tranche earlier       *)
-  (* ([procs_inv], [park_globals], [is_kstack], [ctx_cells], [stack_own]).  *)
-  (* The sixth, [ProcInv.proc_priv], walks                                  *)
-  (*                                                                       *)
-  (*   proc_priv -> proc_priv_core -> FirstTok.first_tok                    *)
-  (*     -> (steady arm) FsReady.fs_ready       -> BioInv.bio_ctx           *)
-  (*     -> (boot arm)   FirstTok.first_boot_persist -> BioInv.bio_ctx      *)
-  (*     -> BioInv.buf_escrow                                               *)
-  (*                                                                       *)
-  (* and used to die there: [buf_escrow] was an [inv] over a ξ-INDEXED      *)
-  (* body, the ONE shape [CtxMorph] cannot cross (§0.12′: invariant bodies  *)
-  (* are not updatable, so no transport exists and none can be written).    *)
-  (* The escrow is a PARKED RECORD now -- the body at its own ∃-bound       *)
-  (* context, carrying that context's parked token, claimed by each opener  *)
-  (* with [TsoCtx.ctx_absorb] -- so [buf_escrow] and [bio_ctx] are CLOSED   *)
-  (* TERMS, [fs_ready] / [first_tok] / [proc_priv] carry [CtxMorph]         *)
-  (* instances, and the row goes through.  [TsoCtx.ctx_morph_or] is the     *)
-  (* structural instance the walk needed and did not have (three            *)
-  (* disjunctions on the path: the escrow's three arms, [first_tok]'s two,  *)
-  (* [ofile_slot]'s two).                                                   *)
-  (*                                                                       *)
-  (* THE OBLIGATION IS APPLIED AS A TERM.  Instance search does not reach   *)
-  (* through the [∗] to rows named at an explicit ξ (§0.15′/§0.16′,          *)
-  (* measured -- a [Hint Extern] does not rescue it), so the six instances  *)
-  (* are composed by hand.                                                  *)
-  (* ==================================================================== *)
-  iMod (ctx_deposit
-          (λ xi : CtxId,
-             procs_inv (XI := xi) γs ∗
-             UsertrapRes.park_globals xi γs γft γf ∗
-             is_kstack (XI := xi) (proc_addr j) ks ∗
-             proc_priv (XI := xi) γf (proc_addr j) pid V ∗
-             ctx_cells (XI := xi) (p_context (proc_addr j))
-               (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
-             stack_own (KTR := KT1) (XI := xi)
-               (add_vec ks (mword_of_int 4096)) av)%I
-          (CtxMorph0 :=
-             ctx_morph_sep _ _ (procs_inv_morph γs)
-               (ctx_morph_sep _ _ (park_globals_morph γs γft γf)
-                 (ctx_morph_sep _ _ (is_kstack_morph _ _)
-                   (ctx_morph_sep _ _ (proc_priv_morph _ _ _ _)
-                     (ctx_morph_sep _ _ (ctx_cells_morph _ _)
-                        (stack_own_morph _ _))))))
-          cur_ctx XIc 0
-          with "Hrun Hthr [Hctx Hpriv Hstk]")
-    as "[Hrun Hdep]".
-  (* row by row, not one [iFrame]: the globals row is an ∃ over a DISCARDED
-     cell and a named frame will not match it -- an ∃ does not frame against
-     an ∃ ([ParkCap.park_token_park] carries the same note, and [BootShared]
-     hit it twice more at the .bss carve). *)
-  { iSplitR; [iExact "Hpinv" |].
-    iSplitR; [iExact "Hglobp" |].
-    iSplitR; [iExact "Hks" |].
-    iSplitL "Hpriv"; [iExact "Hpriv" |].
-    iSplitL "Hctx"; [iExact "Hctx" |].
-    iExact "Hstk". }
-  iDestruct "Hdep" as (Tc)
-    "(_ & Hthr & #Hpinvc & #Hglobc & #Hksc & Hprivc & Hctxc & Hstkc)".
-  (* the parker's token goes straight back out; nothing downstream of the
-     park sees a difference. *)
-  iModIntro. iFrame "Hrun". iNext.
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".
   (* ---- the record: the cells allocproc left, and the free stack ---- *)
   rewrite /proc_ctx
           (valid_context_unfold (p_sched γs) None (p_context (proc_addr j)) (proc_addr j))
           /valid_context_pre.
-  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av, XIc, Tc.
+  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av, XIc,
+    0%nat.
   iSplit; [iPureIntro; cbn [length]; lia |].
   iSplit; [iPureIntro; apply ret_pc_aligned |].
-  (* ---- the record's rows, all at [XIc]: the DEPOSITED copies ---- *)
-  iFrame "Hctxc".
-  iSplitL "Hstkc"; [cbn [nth]; iExact "Hstkc" |].
+  iFrame "Hctx".
+  iSplitL "Hstk"; [cbn [nth]; iExact "Hstk" |].
   iSplitL "Hthr"; [iExact "Hthr" |].
   (* ================================================================== *)
   (* THE RESUME WAND -- forkret's precondition, assembled.               *)
@@ -295,9 +215,8 @@ Proof.
              ⌜pv_upt V' = pt'⌝ -∗
              ⌜ud_data pt' = ud_pas pt'⌝ -∗
              ⌜proc_pt_wf pt'⌝ -∗
-             UsertrapRes.park_globals Xc γs γft γf -∗
              UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
-             first_done (XI := Xc) -∗
+             first_done -∗
              W -∗
              TimerCap.timer_cap (CID := h) -∗
              forkret_yield (CID := h) (XI := Xc) γf (proc_addr j)
@@ -305,9 +224,8 @@ Proof.
              FR.usertrap_res_bare (CID := h) (XI := Xc) pt'
                (add_vec ks (mword_of_int 4096)))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h Xc pt' V') "%HV %Hnorm %Hptwf #Hglob #Htfk Hdone HW #Htc Hy".
-    iApply ("Hclose" $! h Xc pt' V'
-              with "[%] [%] [%] Hglob Htfk Hdone HW Htc Hy Hfd Hirsp");
+  { iIntros (h Xc pt' V') "%HV %Hnorm %Hptwf #Htfk Hdone HW #Htc Hy".
+    iApply ("Hclose" $! h Xc pt' V' with "[%] [%] [%] Htfk Hdone HW Htc Hy Hfd Hirsp");
       [exact HV | exact Hnorm | exact Hptwf]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
   iDestruct "Hpay" as (A' cret backr) "[Hrec Hpay]".
@@ -318,7 +236,7 @@ Proof.
      the resumer's own record ("Hrec") is that hart's parked scheduler --
      and a dispatching scheduler always leaves one, so [backr] is [true] and
      "Hrec" is a record rather than bare cells. *)
-  iDestruct (p_sched_at_proc γs XIc h A' j cret _ (proc_addr j) backr Hj with "Hpay")
+  iDestruct (p_sched_at_proc γs h A' j cret _ (proc_addr j) backr Hj with "Hpay")
     as "(%Htp & %Hcret & %Hpj & %HA & %Hbackr & Htc & Hrest)".
   iDestruct "Hrest" as (γl ch) "(%Hgl & Hheld & Htag)".
   subst cret A' backr.
@@ -333,11 +251,7 @@ Proof.
   iDestruct (cpu_claim_proc (CID := h) j Hj with "Hhlf2 Htag1") as "Hclm".
   (* ---- the lock resource: the raw context cells the wand handed back,
          and THAT hart's parked scheduler, which is [run_slot] ---- *)
-  (* AT [XIc], SPELLED: the wand handed the cells back at the RECORD's
-     context and the lock resource this builds is forkret's, which runs as
-     the record.  With the parker's ambient still in scope an unannotated
-     row would silently capture it (§0.8′ rule 3). *)
-  iAssert (own_ctx (XI := XIc) (p_context (proc_addr j))) with "[Hcells]" as "Hown".
+  iAssert (own_ctx (p_context (proc_addr j))) with "[Hcells]" as "Hown".
   { iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
     iFrame "Hcells". iPureIntro. cbn [length]. lia. }
   iDestruct (proc_slots_running_intro γs j h Hj with "Htag2 Hown Hrec Hmk")
@@ -364,65 +278,48 @@ Proof.
   (* ================================================================== *)
   (* forkret, at the resuming hart.                                      *)
   (* ================================================================== *)
-  iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γft γf pid V ks m av
+  iApply (FR.wp_forkret (CID := h) W j γs γl γf pid V ks m av
             (av - 6 - trap_res eb')%nat eb'
             Hj Hgl Hbud Hkx Hut Hsp
-          with "Htext Hwire Hkmap Hpc Hpinvc Hglobc Hcg Hcpu Htc Hclm
-                Hlocked HR Hksc Hprivc HW Hclose").
+          with "Htext Hwire Hkmap Hpc Hpinv Hcg Hcpu Htc Hclm
+                Hlocked HR Hks Hpriv HW Hclose").
 Qed.
-
 
 (* ===================================================================== *)
 (* THE TOKEN.  The cap above at [W := park_token γs], and the residue's     *)
 (* channel at the same [W] (forkret's [usertrap_res_bare_park]), tied      *)
 (* into [ParkCap.park_token]'s fixpoint by [park_token_intro_of].  The     *)
-(* [▷ CLOSER ROW] of the cap's package and the [▷ closer] of the channel   *)
-(* are what make the knot well-founded -- the package's own [▷] moved onto *)
-(* that row alone when the park started DEPOSITING three of its rows, and  *)
-(* nothing under a [▷] can be deposited (tso-port.md §0.17′).  See         *)
-(* ParkCap.v.                                                              *)
+(* [▷ package] of the cap and the [▷ closer] of the channel are what make  *)
+(* the knot well-founded: see ParkCap.v.                                   *)
 (* ===================================================================== *)
 Theorem park_token_intro
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (γs : list gname) :
     ⊢ park_token γs.
 Proof.
   iApply (park_token_intro_of (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) γs).
   { intros N av. exact (FR.usertrap_res_bare_park N av). }
   rewrite /park_cap. iModIntro.
-  iIntros (hp ξp γft γf pa ks rest pid V av) "%Hrest %Hj %Hav Hrun Hpkg HW Hchild".
+  iIntros (γf pa ks rest pid V av) "%Hrest %Hj %Hav Hpkg HW Hchild".
   iDestruct "Hchild" as "(#Hks & Hctx & Hpriv & Hfd & Hirsp)".
-  (* THE AMBIENT HART AND CONTEXT ARE BOTH ∀-BOUND HERE -- and the hart is
-     now bound for a REASON rather than for symmetry.  [park_cap] describes
-     a process that is NOT running, so neither [park_pkg] nor [proc_ctx]
-     names a hart or a ξ; but the cap consumes the PARKER's [own_context],
-     which is hart-ambient by construction ([TsoCtx.own_context]'s tie is to
-     the hart the thread runs on).  Quantifying [hp] beside [ξp] keeps the
-     TOKEN hart-free (and hence [SpecSyscall.syscall_env] hart-free) while
-     letting the deposit run at the parker's real hart. *)
-  iApply (forkret_park_paid (CID := hp) (XI := ξp)
-            (park_token γs) γs γft γf pa ks rest pid V av
-            Hrest Hj Hav with "Hrun [Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
-  iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
-  (* row by row, not one [iFrame]: the globals row is an ∃ over a discarded
-     cell and a named frame will not match it (ParkCap.park_token_park makes
-     the same move for the same reason). *)
-  iSplitR; [iExact "Htext"|].
-  iSplitR; [iExact "Hwire"|].
-  iSplitR; [iExact "Hkmap"|].
-  iSplitR; [iExact "Hpinv"|].
-  iSplitR; [iExact "Hglobp"|].
-  iSplitR; [iExact "Hmk"|].
-  iSplitL "Hstk"; [iExact "Hstk"|].
+  (* THE AMBIENT HART AND CONTEXT ARE BOTH ARBITRARY HERE, and for the same
+     reason: [park_cap] describes a process that is NOT running -- neither
+     [park_pkg] nor [proc_ctx] mentions a hart or a ξ (the record mints and
+     hides the child's own identity, [forkret_park_paid] above).  So the
+     two ambient parameters of the theorem being applied are vacuous, and
+     any witness will do; [CurCtx] has no default instance by design
+     (TsoCtx.v, ruling 1), so one must be named. *)
+  iApply (forkret_park_paid (CID := 0%fin) (XI := MkCtxId inhabitant inhabitant)
+            (park_token γs) γs γf pa ks rest pid V av
+            Hrest Hj Hav with "[Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
+  iNext. iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".
+  iFrame "Htext Hwire Hkmap Hpinv Hmk Hstk".
   (* the closer describes the CHILD, so its identity is ∀-quantified beside
      its hart on BOTH sides -- [park_pkg]'s wand and [forkret_park_pkg]'s --
-     and this hand-over just passes it through.  It is the one row still
-     under a [▷] on both sides (§0.16′ step (ii)). *)
-  iNext.
-  iIntros (h Xc pt' V') "%HV %Hnorm %Hptwf #Hglob #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
-  iApply ("Hclose" $! h Xc pt' V'
-            with "[%] [%] [%] Hglob Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
+     and this hand-over just passes it through. *)
+  iIntros (h Xc pt' V') "%HV %Hnorm %Hptwf #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
+  iApply ("Hclose" $! h Xc pt' V' with "[%] [%] [%] Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
     [exact HV | exact Hnorm | exact Hptwf].
 Qed.
 

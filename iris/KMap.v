@@ -225,16 +225,23 @@ Section KMap.
     iApply (mem_ident_phys (pa_add p (0 + k)%nat) dq b (Hstat (0 + k)%nat ltac:(lia)) with "Hb H").
   Qed.
 
+  (* THE PRISTINE PREMISE (tso-machine-flip.md A6.43).  [text_pointsto] now
+     carries the byte's timestamp element at 0 -- the resource that says
+     "era image, never written, readable at every view", which is what pays
+     a fetch's plain-arm obligation post-overruling.  This is the ONE place
+     [↦ₓ] is born from raw memory, so it is the one place that has to be
+     handed the element; its supplier is the era's initial-state ghost
+     allocation, the same one A6.10/A6.34 name. *)
   Lemma phys_ident_text (pa : mword 64) dq b :
     kmap_static (svpn_of pa) KP_rx ->
     addr_is_text pa -> (uint pa < 274877906944)%Z ->
-    kmap_static_claims -∗ pa ↦ₚ{dq} b -∗ pa ↦ₓ{dq} b.
+    kmap_static_claims -∗ pristine_elem pa -∗ pa ↦ₚ{dq} b -∗ pa ↦ₓ{dq} b.
   Proof.
-    iIntros (Hs Htx Hc) "#Hb H".
+    iIntros (Hs Htx Hc) "#Hb #Hts H".
     iDestruct (kmap_static_claims_at (svpn_of pa) KP_rx Hs with "Hb") as "#Hk0".
     iEval (rewrite /phys_pointsto) in "H". iDestruct "H" as "[Hp _]".
     rewrite /text_pointsto. iExists (kpt_leaf_ppn (svpn_of pa)).
-    rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp". iPureIntro.
+    rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp Hts". iPureIntro.
     (* TIER-GENERIC: an identity-mapped va satisfies the pin at EVERY tier,
        so this keeps its exact signature and serves whatever tier the
        caller's ambient instance selects (as [phys_to_mem_claim] does). *)

@@ -437,7 +437,7 @@ Definition wp_itrunc_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* THREE slot units, not two.  The indirect arm's bread holds ONE across
      the whole 256-entry loop -- the buffer stays checked out while the
      entries are freed -- and each nested bfree still wants the two its own
@@ -584,7 +584,7 @@ Definition wp_itrunc_gen_body
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   bslots 3 -∗
   (* THE TAIL FLUSH'S CREDIT, AS A RESOURCE AT A NAMED EPOCH (fs-log.md
      §G.20).  [cru] says "this inode's block is already in lh.block[]", and

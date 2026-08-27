@@ -694,14 +694,7 @@ Section UtDispatch.
      the whole walk where [intr_handler_spec kernelvec] is needed. *)
   Local Lemma ud_hold (N : ut_names) (V : pprivate)
       (ep sc st : mword 64) :
-    (* the M2 caps channel: the contract names kernelvec's credential family,
-       and this hart's own member goes into the folded resource. *)
-    □ devintr_caps (XI := cur_ctx) (un_u N) (un_v N) (un_k N) (un_tk N)
-        (un_s N) (un_pd N) (un_pav N) (un_pu N) -∗
-    intr_handler_spec KT1
-      (devintr_caps_fam (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
-         (un_pd N) (un_pav N) (un_pu N))
-      (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     cpu_own 0%nat false (un_pj N) false ∅ -∗
     cpu_claim (un_pj N) -∗
     sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ st -∗
@@ -712,7 +705,7 @@ Section UtDispatch.
     ut_env SY.syscall_env N V -∗
     ut_hold SY.syscall_env N V false ∅.
   Proof.
-    iIntros "#Hdc #Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Henv".
+    iIntros "#Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Henv".
     iAssert (ut_csrs_raw ep sc st)
       with "[Hep Hsc Hst Hstv Hq Hsret Hkpt]" as "Hraw".
     { rewrite /ut_csrs_raw.
@@ -725,12 +718,7 @@ Section UtDispatch.
     rewrite /ut_hold.
     iSplitL "Hcpu"; [iExact "Hcpu" |].
     iSplitL "Hraw".
-    { rewrite /trap_csrs_ext.
-      iApply (ut_csrs_raw_fold
-                (devintr_caps_fam (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
-                   (un_pd N) (un_pav N) (un_pu N))
-                ep sc st with "Hraw [] Hdc Hih").
-      iApply devintr_caps_fam_morph. }
+    { rewrite /trap_csrs_ext. iApply (ut_csrs_raw_fold with "Hraw Hih"). }
     iSplitL "Hclm"; [rewrite /cpu_claim_ext; iExact "Hclm" | iExact "Henv"].
   Qed.
 
@@ -787,7 +775,7 @@ Section UtDispatch.
     iDestruct (ut_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (KV.kernelvec_handler_spec (un_u N) (un_v N) (un_k N) (un_tk N)
                   (un_s N) (un_pd N) (un_pav N) (un_pu N) Hlen
-                  with "Hhw Hmin Htext") as "#Hih".
+                  with "Hhw Hmin Htext Hdc") as "#Hih".
     iDestruct "Hraw" as "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt)".
     (* ---- +0x30: csrr a4,scause ---- *)
     iApply (wp_csrr_scause_s_sconf (mword_of_int (UT + 0x30)) Ra4 m nx
@@ -852,7 +840,7 @@ Section UtDispatch.
       iAssert (ut_hold SY.syscall_env N V false ∅)
         with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
       { iApply (ud_hold N V ep sc st with
-                  "Hdc Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
+                  "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
         rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
       iApply (S.ut_90 N V pt ksp m0 D2 av nx
                 mie_v menvcfg0 ∅
@@ -952,7 +940,7 @@ Section UtDispatch.
         iAssert (ut_hold SY.syscall_env N V false ∅)
           with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
         { iApply (ud_hold N V ep sc st with
-                    "Hdc Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
+                    "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
           rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
         iApply (A.ut_e8 SY.syscall_env N V pt ksp m0 D4 av nx
                   mie_v menvcfg0 ∅
@@ -1028,7 +1016,7 @@ Section UtDispatch.
           iAssert (ut_hold SY.syscall_env N V false ∅)
             with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
           { iApply (ud_hold N V ep sc st with
-                      "Hdc Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
+                      "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
             rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
           iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D6 av nx
                     mie_v menvcfg0 ∅
@@ -1106,7 +1094,7 @@ Section UtDispatch.
              iAssert (ut_hold SY.syscall_env N V false ∅)
                with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
              { iApply (ud_hold N V ep sc st with
-                         "Hdc Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
+                         "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
              iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D8 av nx
                        mie_v menvcfg0 ∅
@@ -1127,7 +1115,7 @@ Section UtDispatch.
              iAssert (ut_hold SY.syscall_env N V false ∅)
                with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
              { iApply (ud_hold N V ep sc st with
-                         "Hdc Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
+                         "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
              iApply (A.ut_56 SY.syscall_env N V pt ksp m0 D8 av nx
                        mie_v menvcfg0 ∅
@@ -1204,7 +1192,7 @@ Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp). Qed.
 (* THE PARK'S PRODUCER, re-exported off the fit check.  See [Module Fits]
    above: it is proved under the same [SY], so this is a rename. *)
 Definition usertrap_res_bare_park
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (N : ut_names) (av : nat)
   : ut_park_intro_body
       (fun (h : CpuId) (Xc : CurCtx) => Fits.usertrap_res_bare (CID := h) (XI := Xc))

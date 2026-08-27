@@ -25,11 +25,14 @@ Require Import RiscvLang RiscvPtsto.
 Require Import KernelText.
 From Kernel Require KernelData KernelSyms.
 Require Import TsoCtx.
-(* the ONE seam import: [kernel_data_string]'s conclusion is the raw string
-   tower (↦ₛ does not flip until its own stage), so its bytes cross the
-   ctx/mem boundary here.  Dies with the shim; the leftover error at cutover
-   IS the "flip ↦ₛ" worklist entry. *)
-Require TsoCtxShim.
+(* THE ONE SEAM: [kernel_data_string]'s conclusion is the raw string tower
+   (↦ₛ does not flip until its own stage), so its bytes leave the ledger
+   here -- through [TsoCtx.ctx_pointsto_forget], the named one-way
+   projection (§6 amendment A6.8), where the SC-era file went through the
+   now-dead [TsoCtxShim.ctx_pointsto_to_mem].  The loss is real and
+   harmless HERE: an image byte is [DfracDiscarded], nobody ever loads it
+   through a context-indexed rule, and every consumer wants the string
+   tower.  It stays the "flip ↦ₛ" worklist entry. *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -164,7 +167,7 @@ Section KernelDataInv.
     (* a CONCRETE context, not the ambient one: the conclusion is the raw
        string tower, so using [cur_ctx] here would capture the section's
        [XI] into the lemma's arguments and shift every existing call site;
-       any context serves, since the shim discards it. *)
+       any context serves, since the projection below forgets it. *)
     iDestruct ("Hd" $! (MkCtxId inhabitant inhabitant)) as "#Hd'".
     rewrite /string_pointsto.
     iApply big_sepL_intro. iIntros "!>" (j b Hj).
@@ -173,7 +176,7 @@ Section KernelDataInv.
        the window the caller's [HR] bounds *)
     assert (Hjlt : (j < S (String.length s))%nat)
       by (rewrite <- cstring_bytes_length; eapply lookup_lt_Some, Hj).
-    iApply TsoCtxShim.ctx_pointsto_to_mem.
+    iApply ctx_pointsto_forget.
     iApply (big_sepM_lookup _ _ (A + Z.of_nat j)%Z b with "Hd'").
     apply kdata_ro_lookup; [by apply Hbytes | lia | lia].
   Qed.

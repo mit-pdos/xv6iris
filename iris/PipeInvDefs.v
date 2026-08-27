@@ -14,7 +14,7 @@
    the C code says it should be:
 
      is_pipe γl γp pi  :=  ⌜page_valid pi⌝ ∗
-                           inv lockN (lock_inv γl pi "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi)
+                           inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }>
                                       ∨ pipe_dead γl γp)
 
    persistent, and [pipe_res] owns every remaining byte of the page -- the
@@ -503,11 +503,7 @@ Section PipeInv.
      ([∗ list] j ∈ seq pipe_sizeof (pipe_pgbytes - pipe_sizeof),
         byte_any (pa_add pi j)))%I.
 
-  (* GLOBAL, not local: the [CtxMorph] block below sits OUTSIDE this
-     section, and an unsealed big-op sends instance search (and [iFrame])
-     crawling through its conjuncts -- the [KallocInv] [page_rest] lesson,
-     tso-port §0.8'. *)
-  Global Typeclasses Opaque pipe_data pipe_slack.
+  Typeclasses Opaque pipe_data pipe_slack.
 
   (* ---- the resource pi->lock protects: every byte of the page except the
      lock's own two WORDS (which belong to [lock_inv]).  The lock's NAME field
@@ -597,69 +593,6 @@ Section PipeInv.
     by iFrame.
   Qed.
 
-End PipeInv.
-
-(* ==================================================================
-   THE PAYLOAD'S CtxMorph INSTANCES (tso-port M3, §4 step 1), and
-   [is_pipe] over the CONVERTED payload.  Outside the section above
-   because each quantifies over the context that section fixes -- the
-   [KallocInv.v:388] template.  [pipe_res] is ▷-free, [inv]-free,
-   [cinv]-free and WP-free (11 rows of [↦₈]/[↦₄]/ghost/big-op), so the
-   transport is structural; the structural instances are applied AS
-   TERMS because instance search cannot do the higher-order big-op
-   unification (recipe rule 2).
-
-   CONSEQUENCE, and it is the point: [is_pipe] is a CLOSED term.  The
-   transport memo's §7 correction stands measured -- [is_pipe] was
-   never a second obstruction beside [off_hold], only an ordinary
-   [const_pay] payload one level deeper. *)
-Section PipeCtx.
-  Context `{!riscvGS Σ, !lockG Σ, !pipeG Σ}.
-  Context `{XI : CurCtx}.
-
-  Global Instance pipe_data_morph (pi : mword 64) (bs : list (bv 8)) :
-    CtxMorph (λ ξ0 : CtxId, pipe_data (XI := ξ0) pi bs).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /pipe_data.
-    iDestruct (ctx_morph_big_sepL bs
-                 (λ (j : nat) (b : bv 8) (ξ0 : CtxId),
-                    ctx_pointsto ξ0 (pa_add pi (pipe_data_off + j))
-                                 (DfracOwn 1) b)
-                 (λ i x, ctx_morph_pointsto _ _ _ _)
-                 ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame.
-  Qed.
-
-  Global Instance pipe_slack_morph (pi : mword 64) :
-    CtxMorph (λ ξ0 : CtxId, pipe_slack (XI := ξ0) pi).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /pipe_slack.
-    iDestruct "H" as "[H1 H2]".
-    iDestruct (ctx_morph_big_sepL (seq 4 4)
-                 (λ _ (j : nat) (ξ0 : CtxId),
-                    byte_any (XIk := ξ0) (pa_add pi j))
-                 (λ i x, byte_any_morph _)
-                 ξ ξ' with "Hd H1") as "[Hd H1]".
-    iDestruct (ctx_morph_big_sepL (seq pipe_sizeof (pipe_pgbytes - pipe_sizeof))
-                 (λ _ (j : nat) (ξ0 : CtxId),
-                    byte_any (XIk := ξ0) (pa_add pi j))
-                 (λ i x, byte_any_morph _)
-                 ξ ξ' with "Hd H2") as "[Hd H2]".
-    iFrame.
-  Qed.
-
-  Global Instance pipe_res_morph (γp : pipe_names) (pi : mword 64) :
-    CtxMorph (λ ξ0 : CtxId, pipe_res (XI := ξ0) γp pi).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /pipe_res.
-    iDestruct "H" as (nr nw ro wo vname bs)
-      "(Hnm & Hr & Hw & Hro & Hwo & Her & Hew & Hok & Hlen & Hdat & Hsl)".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hnm") as "[Hd Hnm]".
-    iDestruct (pipe_data_morph pi bs ξ ξ' with "Hd Hdat") as "[Hd Hdat]".
-    iDestruct (pipe_slack_morph pi ξ ξ' with "Hd Hsl") as "[Hd Hsl]".
-    iFrame "Hd". iExists nr, nw, ro, wo, vname, bs. iFrame.
-  Qed.
-
   (* ---- THE predicate: a well-formed [struct pipe] ----
 
      Persistent, so every holder of either end shares it.  [page_valid] is
@@ -667,15 +600,14 @@ Section PipeCtx.
      re-freeable, so it has to survive to pipeclose. *)
   Definition is_pipe (γl : gname) (γp : pipe_names) (pi : mword 64) : iProp Σ :=
     (⌜page_valid pi⌝ ∗
-     inv lockN (lock_inv γl pi "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi)
-                ∨ pipe_dead γl γp))%I.
+     inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> ∨ pipe_dead γl γp))%I.
 
   Global Instance is_pipe_persistent γl γp pi : Persistent (is_pipe γl γp pi).
   Proof. apply _. Qed.
 
   (* PERFORMANCE: seal it, for the same reason [WpLock.is_lock] is sealed --
      without this, every [iIntros "#Hpipe"] re-derives persistence by unfolding
-     into [lock_inv γl pi "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi)] and descending through [pipe_res]
+     into [lock_inv γl pi "pipe" <{ pipe_res γp pi }>] and descending through [pipe_res]
      instead of stopping at the instance above.  Worth 6.5 % of [ProofPiperead]
      on its own (104 s -> 97 s).  The three lemmas below are the interface. *)
   Global Typeclasses Opaque is_pipe.
@@ -683,14 +615,14 @@ Section PipeCtx.
   Lemma is_pipe_valid γl γp pi : is_pipe γl γp pi -∗ ⌜page_valid pi⌝.
   Proof. rewrite /is_pipe. by iIntros "[$ _]". Qed.
   Lemma is_pipe_inv γl γp pi :
-    is_pipe γl γp pi -∗ inv lockN (lock_inv γl pi "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi) ∨ pipe_dead γl γp).
+    is_pipe γl γp pi -∗ inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> ∨ pipe_dead γl γp).
   Proof. rewrite /is_pipe. by iIntros "[_ $]". Qed.
 
   (* what acquire / holding / release take.  The credential is left to the
      caller: a reference for acquire, the holder token for release. *)
   Lemma is_pipe_openable γl γp pi :
     is_pipe γl γp pi -∗
-    lock_openable γl pi "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi) (pipe_dead γl γp).
+    lock_openable γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp).
   Proof. iIntros "H". iApply lock_openable_of_dead. by iApply is_pipe_inv. Qed.
 
   (* ---- what a [struct file] of type FD_PIPE carries, ADDRESS-KEYED ----
@@ -710,4 +642,4 @@ Section PipeCtx.
      needs to SPLIT (nothing does today). *)
   Definition pipe_held (pi : mword 64) (w : bool) (q : Qp) : iProp Σ :=
     (∃ (γl : gname) (γp : pipe_names), is_pipe γl γp pi ∗ pipe_ref γp w q)%I.
-End PipeCtx.
+End PipeInv.

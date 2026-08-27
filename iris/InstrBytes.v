@@ -1031,17 +1031,33 @@ Section InstrBytes.
   (* Persistent, so it is re-provable every cycle -- which is what makes  *)
   (* a LOOP out of a leaf.                                                *)
   (* ------------------------------------------------------------------ *)
+  (* A6.43: the obligation is the VIEW-INDEXED one now (the fetch takes the
+     plain arm), and the SAME persistent text window pays it -- through
+     [HartLift2.text_tso_read_bytes], off the pristine element [↦ₓ] carries.
+     Nothing above this lemma moves: its premise is character for character
+     what it was. *)
   Lemma text_fetch_obl (pa : Arch.pa) (n : N) (w : bv (8 * n)) :
     ([∗ list] j ∈ seq 0 (N.to_nat n), (pa_add pa j) ↦ₓ□ nth_byte w j) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-       ⌜read_bytes σ.(mem) pa n = Some w⌝ ∗
-       ▷ (|={∅,⊤}=> mstate_interp σ)).
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+       ⌜HartMFetch.fobl_ram img log tv pa n w⌝ ∗
+       ▷ (|={∅,⊤}=> mstate_interp σ ∗
+            tso_interp_of riscv_eraGS img σ.(mem) log V)).
   Proof.
-    iIntros "#Htext" (σ) "Hσ". rewrite /mstate_interp.
+    iIntros "#Htext" (σ img log tv V) "%Htv Hσ Htso". rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
-    iDestruct (text_read_bytes σ.(mem) pa n w with "Hmem Htext") as %Hrb.
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+               σ.(sregs) σ.(mdev) Hpin).
+    iDestruct (text_tso_read_bytes
+                 (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev)) pa n w
+                 with "Hmem Htso Htext") as %Hok.
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
-    iSplitR; [done|]. iNext. iMod "Hmask" as "_". iModIntro. by iFrame.
+    iSplitR.
+    { iPureIntro. intros tv' _ _. exact (Hok (hart_agent cpu_id) tv'). }
+    iNext. iMod "Hmask" as "_". iModIntro. by iFrame.
   Qed.
 
   (* ==================================================================== *)

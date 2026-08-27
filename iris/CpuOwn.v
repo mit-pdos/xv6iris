@@ -104,8 +104,8 @@ Section CpuOwn.
     cpu_hart n eb p lks -∗ cpu_hart n' eb' p' lks' -∗ False.
   Proof.
     iIntros "(((_ & Hn & _ & _) & _) & _) (((_ & Hn' & _ & _) & _) & _)".
-    iDestruct (word4_pointsto_bytes with "Hn") as "Hb".
-    iDestruct (word4_pointsto_bytes with "Hn'") as "Hb'".
+    iDestruct (ctx_word4_pointsto_bytes with "Hn") as "Hb".
+    iDestruct (ctx_word4_pointsto_bytes with "Hn'") as "Hb'".
     cbn [seq]. iDestruct "Hb" as "[H0 _]". iDestruct "Hb'" as "[H0' _]".
     iDestruct (mem_pointsto_ne with "H0 H0'") as %Hne. done.
   Qed.
@@ -324,25 +324,6 @@ Section CpuOwn.
   Qed.
 
 End CpuOwn.
-
-(* THE BUNDLE'S TRANSPORT (tso-port M3).  Everything in [cpu_own] is a
-   [↦₄] cell, a register or a ghost -- context-CONSTANT at stage 1 -- except
-   [ProcGeom.cur_proc], one word cell.  The swtch deposit needs it: a parked
-   record's resume wand asks for [cpu_own] at the RECORD's own context
-   (SwtchCtx.v), and the resumer holds it at its own. *)
-(* NO [GenId] BINDER: [cpu_own] does not take one, so an instance that
-   bound one would leave an unresolvable evar wherever it is applied as a
-   term (measured on [ProcPtOwn.proc_pt_at_morph], which did exactly that). *)
-Global Instance cpu_own_morph `{!riscvGS Σ, !xv6G Σ} `{CID : CpuId}
-    (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :
-  CtxMorph (fun xi : CtxId => cpu_own (XI := xi) n eb p b lks).
-Proof.
-  iIntros (ξ ξ') "Hd H". rewrite /cpu_own. destruct b; [ by iFrame |].
-  rewrite /cpu_hart /cpu_priv /cpu_cells.
-  iDestruct "H" as "(((%Hb & Hnoff & Hint & Hproc) & Hlks) & Hcnt)".
-  iDestruct (cur_proc_morph p ξ ξ' with "Hd Hproc") as "[Hd Hproc]".
-  iFrame "Hd Hnoff Hint Hproc Hlks Hcnt". iPureIntro; exact Hb.
-Qed.
 
 (* ===================================================================== *)
 (* THE HART TRANSPORT -- what makes a [b]-GENERIC consumer able to carry  *)

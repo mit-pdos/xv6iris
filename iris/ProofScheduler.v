@@ -1104,7 +1104,7 @@ Section ProofScheduler.
          the in-lock carve [av - 12]; its exit is [n], the index the tail owes
          its caller. *)
       iEval (rewrite -Hn) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γl (proc_addr jj) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γl (proc_addr jj)) T1 0 ebx zero_reg n
+      iApply (Release.wp_release_sconf KT1 γl (proc_addr jj) "proc"%string <{ proc_lock_res γs γl (proc_addr jj) }> T1 0 ebx zero_reg n
                 {["proc"]}
                 Hlka ltac:(pose proof (sc_res_le ebx); lia)
                 with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -1260,7 +1260,7 @@ Section ProofScheduler.
          contract all carry. *)
       assert (Hnoproc : locks_below (∅ : gset string) "proc")
         by (exact (locks_below_empty "proc")).
-      iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γl (proc_addr jj)) M1 0 ebc zero_reg n ebc ∅
+      iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string <{ proc_lock_res γs γl (proc_addr jj) }> M1 0 ebc zero_reg n ebc ∅
                 ltac:(lia) ltac:(pose proof (sc_res_le ebc); lia) Hnoproc
                 with "Hcg Hcpu Htext Hpc [Hislock]").
       all: try lkbelow.
@@ -1510,7 +1510,7 @@ Section ProofScheduler.
            acquire produced -- the installed-handler resource rides inside
            them, so the dispatched thread's own intena retune runs under THIS
            hart's (canonical) SIE ghost with nothing extra threaded. *)
-        iPoseProof (p_sched_to_proc γs cur_ctx cpu_id jj γl ch Hjj Hgl
+        iPoseProof (p_sched_to_proc γs cpu_id jj γl ch Hjj Hgl
                       with "Hcsrs [Hlocked Hstate Hpg Hchan Hpub] Htag") as "HP".
         { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }
         (* the TARGET is proc jj's record, which is MIGRATABLE ([None]) -- any
@@ -1568,7 +1568,7 @@ Section ProofScheduler.
         pose proof (adm_pin_inv _ _ Hadm') as Hh. subst h.
         (* the resume side: the payload identifies the parking proc with jj *)
         iDestruct "Hresume" as (A' cret backp) "[Hvc' Hpay2]".
-        iDestruct (p_sched_at_cpu γs cur_ctx cpu_id A' jj cret (rget m' Rtp) backp Hjj with "Hpay2")
+        iDestruct (p_sched_at_cpu γs cpu_id A' jj cret (rget m' Rtp) backp Hjj with "Hpay2")
           as "(%Htpv & %Hcret & %HA' & Hcsrs & Hpay3)".
         subst A'.
         iDestruct "Hpay3" as (γl' st' ch') "[%Hfacts (Hheld' & Htag' & Hppay)]".

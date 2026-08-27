@@ -36,6 +36,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift.
 Require VirtioQueue.   (* [write_bytes_lookup]: the snapshot's per-byte hits *)
+(* [tso_read_bytes] (the plain load's obligation) and [view_lb] (the
+   receipt).  Import is not transitive.  NOTE what is NOT used from
+   [TsoCtx] here: the receipt is stated at the MACHINE level
+   ([TsoGhost.view_lb] at the era's names), and [TsoCtx.hart_view_lb] is the
+   Σ-surface wrapper over it -- tso-machine-flip.md §6 amendment A6.6. *)
+Require Import TsoMemPa TsoGhost.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 
@@ -72,39 +78,91 @@ Proof.
     rewrite (Hbytes j Hjn) in Hnone. congruence.
 Qed.
 
+(* THE STORE'S VIEW MOVE (tso-machine-flip.md §2), spelled once so the two
+   write rules share their shape and their receipt: a PLAIN store does NOT
+   move the author's view -- that is store buffering, and advancing it would
+   forbid SB -- while the AMO / conditional half takes the view PAST its own
+   append ("the drain includes my write"). *)
+Definition wstore_tv (ak : Interface.accessKind) (log : list pwmsg)
+    (tv : nat) : nat :=
+  if ak_excl ak then S (length log) else tv.
+
+(* [vstep] at the hart it moved: the premise [tso_interp_of_receipt_at] wants
+   when the plain read mints its receipt (A6.47 ruling 2). *)
+Lemma vstep_here (h : agent) (t : nat) (log : list pwmsg) (V : agent -> nat) :
+  vstep h t log V h = t.
+Proof. rewrite /vstep. case_decide as Hd; [reflexivity | congruence]. Qed.
+
 Section events.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
-  (* RAM READ, the plain one ([ak_excl = false]): never blocked, never    *)
-  (* reserving.  The exclusive twin follows it.                           *)
-  (*                                                                      *)
-  (* The caller's witness is a [read_bytes] fact -- the same shape        *)
-  (* [exec] pins reads with -- which both certifies the arm's ∃ and,      *)
-  (* via [read_bytes_spec] + [bv_eq_of_bytes], makes the read value       *)
-  (* UNIQUE, so the continuation runs at exactly [hread_resume w].        *)
+  (* THE STRONGLY-ORDERED RAM READ RULE IS GONE (RULING 1 overruled by the *)
+  (* owner, 2026-08-26).  It was §6's [Mobl_ram] -- a FLAT [read_bytes]    *)
+  (* obligation with no view advance -- and it was proven from the         *)
+  (* machine's strong RAM-read arm, which no longer exists: every          *)
+  (* non-exclusive read, implicit ones included, now takes the plain arm.  *)
+  (* It is NOT a derivable special case of the plain rule (a flat cell     *)
+  (* says nothing about what a view below the top sees), so it is deleted  *)
+  (* rather than deprecated.  Its instances -- the M-, S- and U-mode fetch *)
+  (* lanes and the PTE reads -- move to [wp_hart_ram_read_plain] and       *)
+  (* discharge [Mobl_ram_plain] from the PRISTINE tier (kernel text and    *)
+  (* boot-built PT mappings are timestamp-0 and read the same at every     *)
+  (* view), from store forwarding (a hart's own PT writes), or from the    *)
+  (* ctx tier (the user lanes).  The de-confliction project that wants a   *)
+  (* real strong arm back will restore this rule together with the parked  *)
+  (* Sail patch; see the flip note's rewritten RULING 1.                   *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_hart_ram_read {X : Type} (C : M X -> M unit)
+
+
+  (* ------------------------------------------------------------------ *)
+  (* RAM READ, THE PLAIN EXPLICIT ONE -- the arm the flip changed, and    *)
+  (* §6's [Mobl_ram_plain].  The machine advances this hart's view        *)
+  (* NONDETERMINISTICALLY (anywhere from where it is to the top of the    *)
+  (* log) and then reads latest-visible AT THAT VIEW, so a caller that    *)
+  (* wants to pin the value must own it AT EVERY REACHABLE VIEW: hence    *)
+  (* the ∀ [tv'] in the obligation, which is exactly what                 *)
+  (* [TsoCtx.twin_load_ok] concludes from [ctx_pointsto] + [own_context]. *)
+  (* The rule then pays the (monotone) view advance itself, so the        *)
+  (* caller hands the bundle back at the view it received.                *)
+  (*                                                                      *)
+  (* AND IT MINTS THE RECEIPT (A6.47 ruling 2).  The machine CHOOSES the   *)
+  (* advanced view [tvn], and the one moment that number is known with     *)
+  (* the view authority in hand is right after the step, inside this rule. *)
+  (* So the callback hands back a WP PARAMETERISED BY the receipt: the     *)
+  (* rule advances, mints [view_lb h tvn] (an inclusion, not an update --  *)
+  (* free), and applies.  A consumer that does not want it writes          *)
+  (* [iIntros (tvn _ _) "_"] and is otherwise unchanged; a consumer that   *)
+  (* DOES want it -- any message-passing read, the boot [started] flag     *)
+  (* first -- now has a minting site with no new machinery.  The step from *)
+  (* the VALUE read to a position ([tvn ≥ F] because the message that      *)
+  (* published this value sits at [F] and I did not write it) is           *)
+  (* per-proof and deliberately stays in the proofs.                       *)
+  (* ------------------------------------------------------------------ *)
+  Lemma wp_hart_ram_read_plain {X : Type} (C : M X -> M unit)
       (n : N) (req : Interface.ReadReq.t n) (m : M X) :
     mctx C ->
     hread_req_at n m = Some req ->
     dev_addr (Interface.ReadReq.pa req) = false ->
     ak_excl (Interface.ReadReq.access_kind req) = false ->
     gen_cert -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
        ∃ w : bv (8 * n),
-         ⌜read_bytes σ.(mem) (Interface.ReadReq.pa req) n = Some w⌝ ∗
+         ⌜∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+            tso_read_bytes img log (hart_agent cpu_id) tv'
+              (Interface.ReadReq.pa req) n w⌝ ∗
          ▷ (|={∅,⊤}=> mstate_interp σ ∗
-              WP (HartE gen_id cpu_id (C (hread_resume (bv_unsigned w) m))
-                  : expr riscv_lang))) -∗
+              tso_interp_of riscv_eraGS img σ.(mem) log V ∗
+              (∀ tvn : nat, ⌜(tv <= tvn)%nat⌝ -∗ ⌜(tvn <= length log)%nat⌝ -∗
+                 view_lb view_name loglen_name (hart_agent cpu_id) tvn -∗
+                 WP (HartE gen_id cpu_id (C (hread_resume (bv_unsigned w) m))
+                     : expr riscv_lang)))) -∗
     WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
   Proof.
-    (* Proof plan: via wp_hart_step.  Witness: the plain-read arm with
-       [read_bytes_spec] supplying the per-byte lookups.  Inversion: the
-       arm's ∃ w' has all bytes pinned by the same lookups, so
-       [bv_eq_of_bytes] gives w' = w; the continuation is [hread_req_at_inv]'s
-       K equation. *)
     iIntros (HC Hproj Hdev Hexcl) "#Hcert H".
     destruct (hread_req_at_inv _ _ _ Hproj) as (K & Hm & Hres).
     assert (Hg : C m = Interface.Next (Interface.MemRead n req)
@@ -112,30 +170,48 @@ Section events.
       by (rewrite Hm; exact (HC _ (Interface.MemRead n req) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
+    { intros oth0 h0 img0 σ0 log0 tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
       rewrite Hdev in Hs. cbn beta iota in Hs.
-      destruct Hs as [(_ & _ & _ & _ & _ & ->) | (Hex & _)]; [done|congruence]. }
-    iIntros (σ oth rv) "Hσ".
-    iMod ("H" $! σ with "Hσ") as (w) "[%Hrb Hk]".
-    iModIntro. iExists (C (K (inl (w, None)))), σ, rv.
+      destruct Hs as [(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)
+                     |(Hex & _)]; [done|congruence]. }
+    iIntros (σ oth rv img log tv V) "%Htv Hσ Htso".
+    (* the view's legal-position bound: what makes [tv] itself a legal
+       witness for the arm's [tvn], and the advance below monotone *)
+    iDestruct (tso_interp_of_bound with "Htso") as %Hb.
+    assert (Htvlen : (tv <= length log)%nat) by (rewrite -Htv; apply Hb).
+    iMod ("H" $! σ img log tv V with "[//] Hσ Htso") as (w) "[%Hrd Hk]".
+    iModIntro. iExists (C (K (inl (w, None)))), σ, log, tv, rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota.
       rewrite Hdev. cbn beta iota.
-      left. split; [exact Hexcl|]. exists w.
-      split; [exact (read_bytes_spec _ _ _ _ Hrb)|]. done. }
-    iNext. iIntros (m' σ' rv') "%Hstep".
+      left. split; [exact Hexcl|].
+      exists tv, w. split_and!; [lia|exact Htvlen| |done|done|done|done|done].
+      exact (Hrd tv (Nat.le_refl tv) Htvlen). }
+    iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
-    destruct Hstep as [(_ & w' & Hbytes' & -> & -> & ->) | (Hex & _)];
-      last congruence.
+    destruct Hstep as [(_ & tvn & w' & Hlo & Hhi & Hbytes' & -> & -> & ->
+                        & -> & ->)
+                      |(Hex & _)]; [|congruence].
     assert (w' = w) as ->.
     { apply bv_eq_of_bytes. intros j Hj.
-      pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
+      pose proof (Hrd tvn Hlo Hhi j Hj) as H0.
       pose proof (Hbytes' j Hj) as H1.
       rewrite H1 in H0. apply Some_inj in H0. exact H0. }
-    iMod "Hk" as "[Hσ HWP]". iModIntro.
-    rewrite -(Hres w). by iFrame.
+    iMod "Hk" as "(Hσ & Htso & HWP)".
+    (* THE DRAIN: the machine chose [tvn]; move the authority to it *)
+    assert (Hadv : (V (hart_agent cpu_id) <= tvn)%nat)
+      by (rewrite Htv; exact Hlo).
+    iMod (tso_interp_of_advance _ img σ.(mem) log V (hart_agent cpu_id) tvn
+            (fin_to_nat_lt cpu_id) Hadv Hhi with "Htso") as "Htso".
+    (* THE RECEIPT, minted at the view we just advanced to *)
+    iDestruct (tso_interp_of_receipt_at riscv_eraGS img σ.(mem) log
+                 (vstep (hart_agent cpu_id) tvn log V) (hart_agent cpu_id) tvn
+                 (vstep_here (hart_agent cpu_id) tvn log V)
+                 with "Htso") as "[Htso #Hrcpt]".
+    iModIntro. rewrite -(Hres w). iFrame "Hσ Htso".
+    iApply ("HWP" $! tvn with "[//] [//] Hrcpt").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -146,6 +222,16 @@ Section events.
   (* loop), and the rule sees σ BEFORE running the caller's premise, so on  *)
   (* the self-loop arm the premise survives and Löb closes it.              *)
   (* ------------------------------------------------------------------ *)
+  (* §6's [Wobl_ram]: the flat update AND the append.  The caller owes the  *)
+  (* bundle back at the APPENDED log -- that is where the four ghost steps  *)
+  (* live (γts to the new top over the footprint, γlogm persist, the        *)
+  (* mono_nat bump, the dirty-set insert), and they cannot be done here     *)
+  (* because the per-byte timestamp FRAGMENTS ride inside the caller's own  *)
+  (* [ctx_pointsto]s.  The view moves by [wstore_tv]: not at all for a      *)
+  (* plain store, past its own append for the AMO half.                     *)
+  (* THE RECEIPT (§6 amendment A6.6) is minted from the bundle the caller   *)
+  (* hands back -- it is the post-append top that the acquire needs -- and  *)
+  (* reaches the continuation beside the [resv_frag].                       *)
   Lemma wp_hart_ram_write {X : Type} (C : M X -> M unit)
       (n : N) (req : Interface.WriteReq.t n) (m : M X) (rr : option resv) :
     mctx C ->
@@ -153,18 +239,31 @@ Section events.
     dev_addr (Interface.WriteReq.pa req) = false ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp
               (MState σ.(sregs)
                  (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
                     (Interface.WriteReq.value req)) σ.(mdev)) ∗
+            tso_interp_of riscv_eraGS img
+              (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
+                 (Interface.WriteReq.value req))
+              (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                                (Interface.WriteReq.value req))
+                         (hart_agent cpu_id)])%list
+              (vstep (hart_agent cpu_id)
+                 (wstore_tv (Interface.WriteReq.access_kind req) log tv)
+                 (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                                   (Interface.WriteReq.value req))
+                            (hart_agent cpu_id)])%list V) ∗
             (resv_frag cpu_id None -∗
+             view_lb view_name loglen_name (hart_agent cpu_id)
+               (wstore_tv (Interface.WriteReq.access_kind req) log tv) -∗
              WP (HartE gen_id cpu_id (C (hwrite_resume m)) : expr riscv_lang)))) -∗
     WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
   Proof.
-    (* Proof plan: via wp_hart_step_resv; the write arm when the footprint is
-       free of other harts' reservations, the self-loop arm otherwise --
-       absorbed by Löb with the premise and the frag untouched. *)
     iIntros (HC Hproj Hdev) "#Hcert Hfrag H".
     destruct (hwrite_req_at_inv _ _ _ Hproj) as (K & Hm & Hres).
     assert (Hg : C m = Interface.Next (Interface.MemWrite n req)
@@ -173,37 +272,47 @@ Section events.
     rewrite Hg.
     iLöb as "IH".
     iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
-    iIntros (σ oth) "_ Hσ".
+    iIntros (σ oth img log tv V) "_ %Htv Hσ Htso".
     destruct (decide (footprint (Interface.WriteReq.pa req) n ## oth))
       as [Hfree|Hblocked].
     - (* the write *)
-      iMod ("H" $! σ with "Hσ") as "Hk".
+      iMod ("H" $! σ img log tv V with "[//] Hσ Htso") as "Hk".
       iModIntro.
       iExists (C (K (inl None))),
         (MState σ.(sregs)
            (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
-              (Interface.WriteReq.value req)) σ.(mdev)), None.
+              (Interface.WriteReq.value req)) σ.(mdev)),
+        (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                          (Interface.WriteReq.value req))
+                   (hart_agent cpu_id)])%list,
+        (wstore_tv (Interface.WriteReq.access_kind req) log tv), None.
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota. right. done. }
-      iNext. iIntros (m' σ' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
-      destruct Hstep as [(Hov & _) | (_ & -> & -> & ->)]; [done|].
-      iMod "Hk" as "[Hσ HWP]". iModIntro. iFrame "Hσ".
-      iIntros "Hfrag". rewrite -Hres. iApply ("HWP" with "Hfrag").
+      destruct Hstep as [(Hov & _) | (_ & -> & -> & -> & -> & ->)]; [done|].
+      iMod "Hk" as "(Hσ & Htso & HWP)".
+      iDestruct (tso_interp_of_receipt_at _ _ _ _ _ (hart_agent cpu_id)
+                   (wstore_tv (Interface.WriteReq.access_kind req) log tv)
+                   (vstep_self _ _ _ _) with "Htso") as "[Htso Hrec]".
+      iModIntro. iFrame "Hσ Htso".
+      iIntros "Hfrag". rewrite -Hres. iApply ("HWP" with "Hfrag Hrec").
     - (* blocked by another hart's reservation: self-loop, premise intact *)
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
       iExists (Interface.Next (Interface.MemWrite n req) (fun v => C (K v))),
-        σ, rr.
+        σ, log, tv, rr.
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota. left. done. }
-      iNext. iIntros (m' σ' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
-      destruct Hstep as [(_ & -> & -> & ->) | (Hfree & _)]; [|done].
+      destruct Hstep as [(_ & -> & -> & -> & -> & ->) | (Hfree & _)]; [|done].
       iMod "Hmask" as "_". iModIntro. iFrame "Hσ".
+      iSplitL "Htso".
+      { rewrite -Htv. iApply (tso_interp_of_idle with "Htso"). }
       iIntros "Hfrag". iApply ("IH" with "Hfrag H").
   Qed.
 
@@ -214,6 +323,14 @@ Section events.
   (* another hart reserves any of the bytes -- dropping the hart's own     *)
   (* stale reservation as it waits -- which Löb absorbs.                   *)
   (* ------------------------------------------------------------------ *)
+  (* "DRAIN, THEN READ MEMORY".  The read is still against the FLAT cache --
+     reading [s.(mem)] IS reading at the log top ([tso_read_top_flat]) -- so
+     the caller's obligation is today's [read_bytes] fact.  What is new is
+     the VIEW: the arm takes it to the top, and that is the one moment an
+     ACQUIRE RECEIPT is honestly produced, so the rule mints it and hands it
+     to the callback beside the (already advanced) bundle
+     (tso-machine-flip.md §6 amendment A6.6).  The receipt is persistent: a
+     caller that does not want it drops it. *)
   Lemma wp_hart_ram_read_excl {X : Type} (C : M X -> M unit)
       (n : N) (req : Interface.ReadReq.t n) (m : M X) (rr : option resv) :
     mctx C ->
@@ -222,10 +339,17 @@ Section events.
     ak_excl (Interface.ReadReq.access_kind req) = true ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log
+         (vstep (hart_agent cpu_id) (length log) log V) -∗
+       view_lb view_name loglen_name (hart_agent cpu_id) (length log) ={⊤,∅}=∗
        ∃ w : bv (8 * n),
          ⌜read_bytes σ.(mem) (Interface.ReadReq.pa req) n = Some w⌝ ∗
          ▷ (|={∅,⊤}=> mstate_interp σ ∗
+              tso_interp_of riscv_eraGS img σ.(mem) log
+                (vstep (hart_agent cpu_id) (length log) log V) ∗
               (resv_frag cpu_id (Some (snap_of (Interface.ReadReq.pa req) n w)) -∗
                WP (HartE gen_id cpu_id (C (hread_resume (bv_unsigned w) m))
                    : expr riscv_lang)))) -∗
@@ -241,44 +365,54 @@ Section events.
        every frag value *)
     iLöb as "IH" forall (rr).
     iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
-    iIntros (σ oth) "_ Hσ".
+    iIntros (σ oth img log tv V) "_ %Htv Hσ Htso".
     destruct (decide (footprint (Interface.ReadReq.pa req) n ## oth))
       as [Hfree|Hblocked].
-    - (* the read, now reserving *)
-      iMod ("H" $! σ with "Hσ") as (w) "[%Hrb Hk]".
-      iModIntro. iExists (C (K (inl (w, None)))), σ,
+    - (* the read, now reserving; the view goes to the top and the receipt
+         is born there *)
+      iMod (tso_interp_of_top _ img σ.(mem) log V (hart_agent cpu_id)
+              (fin_to_nat_lt cpu_id) with "Htso") as "[Htso #Hrec]".
+      iMod ("H" $! σ img log tv V with "[//] Hσ Htso Hrec") as (w) "[%Hrb Hk]".
+      iModIntro. iExists (C (K (inl (w, None)))), σ, log, (length log),
         (Some (snap_of (Interface.ReadReq.pa req) n w)).
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota.
         right. split; [exact Hexcl|]. right. split; [exact Hfree|].
         exists w. split; [exact (read_bytes_spec _ _ _ _ Hrb)|]. done. }
-      iNext. iIntros (m' σ' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
-      destruct Hstep as [(Hex & _) | (_ & [(Hov & _) | (_ & w' & Hbytes' & -> & -> & ->)])];
+      destruct Hstep as [(Hs1 & _)
+                        |(_ & [(Hov & _)
+                              |(_ & w' & Hbytes' & -> & -> & -> & -> & ->)])];
         [congruence|done|].
       assert (w' = w) as ->.
       { apply bv_eq_of_bytes. intros j Hj.
         pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
         pose proof (Hbytes' j Hj) as H1.
         rewrite H1 in H0. apply Some_inj in H0. exact H0. }
-      iMod "Hk" as "[Hσ HWP]". iModIntro. iFrame "Hσ".
+      iMod "Hk" as "(Hσ & Htso & HWP)". iModIntro. iFrame "Hσ Htso".
       iIntros "Hfrag". rewrite -(Hres w). iApply ("HWP" with "Hfrag").
-    - (* blocked: self-loop, own stale reservation dropped, premise intact *)
+    - (* blocked: self-loop, own stale reservation dropped, premise intact.
+         The view does NOT move on this arm -- a hart that is waiting has
+         drained nothing. *)
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
       iExists (Interface.Next (Interface.MemRead n req) (fun v => C (K v))),
-        σ, None.
+        σ, log, tv, None.
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota.
         right. split; [exact Hexcl|]. left. done. }
-      iNext. iIntros (m' σ' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
-      destruct Hstep as [(Hex & _) | (_ & [(_ & -> & -> & ->) | (Hfree & _)])];
+      destruct Hstep as [(Hs1 & _)
+                        |(_ & [(_ & -> & -> & -> & -> & ->) | (Hfree & _)])];
         [congruence| |done].
       iMod "Hmask" as "_". iModIntro. iFrame "Hσ".
+      iSplitL "Htso".
+      { rewrite -Htv. iApply (tso_interp_of_idle with "Htso"). }
       iIntros "Hfrag". iApply ("IH" with "Hfrag H").
   Qed.
 
@@ -299,13 +433,29 @@ Section events.
     Z.of_N n < 18446744073709551616 ->
     gen_cert -∗
     resv_frag cpu_id (Some (snap_of (Interface.WriteReq.pa req) n w)) -∗
-    (∀ σ, ⌜read_bytes σ.(mem) (Interface.WriteReq.pa req) n = Some w⌝ -∗
-       mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜read_bytes σ.(mem) (Interface.WriteReq.pa req) n = Some w⌝ -∗
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp
               (MState σ.(sregs)
                  (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
                     (Interface.WriteReq.value req)) σ.(mdev)) ∗
+            tso_interp_of riscv_eraGS img
+              (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
+                 (Interface.WriteReq.value req))
+              (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                                (Interface.WriteReq.value req))
+                         (hart_agent cpu_id)])%list
+              (vstep (hart_agent cpu_id)
+                 (wstore_tv (Interface.WriteReq.access_kind req) log tv)
+                 (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                                   (Interface.WriteReq.value req))
+                            (hart_agent cpu_id)])%list V) ∗
             (resv_frag cpu_id None -∗
+             view_lb view_name loglen_name (hart_agent cpu_id)
+               (wstore_tv (Interface.WriteReq.access_kind req) log tv) -∗
              WP (HartE gen_id cpu_id (C (hwrite_resume m)) : expr riscv_lang)))) -∗
     WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
   Proof.
@@ -318,39 +468,49 @@ Section events.
     iLöb as "IH".
     iApply (wp_hart_step_resv _ (Some (snap_of (Interface.WriteReq.pa req) n w))
               with "Hcert Hfrag").
-    iIntros (σ oth) "%Hok Hσ".
+    iIntros (σ oth img log tv V) "%Hok %Htv Hσ Htso".
     pose proof (snap_of_read_bytes _ _ _ _ Hn (Hok _ eq_refl)) as Hrb.
     destruct (decide (footprint (Interface.WriteReq.pa req) n ## oth))
       as [Hfree|Hblocked].
     - (* the write, at the pinned old value *)
-      iMod ("H" $! σ with "[//] Hσ") as "Hk".
+      iMod ("H" $! σ img log tv V with "[//] [//] Hσ Htso") as "Hk".
       iModIntro.
       iExists (C (K (inl None))),
         (MState σ.(sregs)
            (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
-              (Interface.WriteReq.value req)) σ.(mdev)), None.
+              (Interface.WriteReq.value req)) σ.(mdev)),
+        (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                          (Interface.WriteReq.value req))
+                   (hart_agent cpu_id)])%list,
+        (wstore_tv (Interface.WriteReq.access_kind req) log tv), None.
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota. right. done. }
-      iNext. iIntros (m' σ' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
-      destruct Hstep as [(Hov & _) | (_ & -> & -> & ->)]; [done|].
-      iMod "Hk" as "[Hσ HWP]". iModIntro. iFrame "Hσ".
-      iIntros "Hfrag". rewrite -Hres. iApply ("HWP" with "Hfrag").
+      destruct Hstep as [(Hov & _) | (_ & -> & -> & -> & -> & ->)]; [done|].
+      iMod "Hk" as "(Hσ & Htso & HWP)".
+      iDestruct (tso_interp_of_receipt_at _ _ _ _ _ (hart_agent cpu_id)
+                   (wstore_tv (Interface.WriteReq.access_kind req) log tv)
+                   (vstep_self _ _ _ _) with "Htso") as "[Htso Hrec]".
+      iModIntro. iFrame "Hσ Htso".
+      iIntros "Hfrag". rewrite -Hres. iApply ("HWP" with "Hfrag Hrec").
     - (* blocked (never, once reservations are pairwise disjoint -- but the
          rule need not know): self-loop, frag and premise intact *)
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
       iExists (Interface.Next (Interface.MemWrite n req) (fun v => C (K v))),
-        σ, (Some (snap_of (Interface.WriteReq.pa req) n w)).
+        σ, log, tv, (Some (snap_of (Interface.WriteReq.pa req) n w)).
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota. left. done. }
-      iNext. iIntros (m' σ' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
-      destruct Hstep as [(_ & -> & -> & ->) | (Hfree & _)]; [|done].
+      destruct Hstep as [(_ & -> & -> & -> & -> & ->) | (Hfree & _)]; [|done].
       iMod "Hmask" as "_". iModIntro. iFrame "Hσ".
+      iSplitL "Htso".
+      { rewrite -Htv. iApply (tso_interp_of_idle with "Htso"). }
       iIntros "Hfrag". iApply ("IH" with "Hfrag H").
   Qed.
 
@@ -382,24 +542,28 @@ Section events.
       by (rewrite Hm; exact (HC _ (Interface.MemRead n req) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
+    { intros oth0 h0 img0 σ0 log0 tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
       rewrite Hdev in Hs. cbn beta iota in Hs.
-      destruct Hs as (_ & _ & _ & _ & _ & ->). done. }
-    iIntros (σ oth rv) "Hσ".
+      destruct Hs as (_ & _ & _ & _ & _ & _ & _ & ->). done. }
+    (* strongly ordered (RULING 2): no log, no view action, so the bundle is
+       returned exactly as it came *)
+    iIntros (σ oth rv img log tv V) "%Htv Hσ Htso".
     iMod ("H" $! σ with "Hσ") as (w d') "[%Hdr Hk]".
-    iModIntro. iExists (C (K (inl (w, None)))), (MState σ.(sregs) σ.(mem) d'), rv.
+    iModIntro. iExists (C (K (inl (w, None)))), (MState σ.(sregs) σ.(mem) d'),
+      log, tv, rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota.
       rewrite Hdev. cbn beta iota.
       exists w, d'. done. }
-    iNext. iIntros (m' σ' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
-    destruct Hstep as (w' & d'' & Hdr' & -> & -> & ->).
+    destruct Hstep as (w' & d'' & Hdr' & -> & -> & -> & -> & ->).
     rewrite Hdr in Hdr'. injection Hdr' as <- <-.
     iMod "Hk" as "[Hσ HWP]". iModIntro.
-    rewrite -(Hres w). by iFrame.
+    rewrite -(Hres w). iFrame "Hσ HWP".
+    rewrite -Htv. iApply (tso_interp_of_idle with "Htso").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -431,19 +595,22 @@ Section events.
       by (rewrite Hm; exact (HC _ (Interface.MemWrite n req) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
-    iIntros (σ oth) "_ Hσ".
+    iIntros (σ oth img log tv V) "_ %Htv Hσ Htso".
     iMod ("H" $! σ with "Hσ") as (d') "[%Hdw Hk]".
-    iModIntro. iExists (C (K (inl None))), (MState σ.(sregs) σ.(mem) d'), None.
+    iModIntro. iExists (C (K (inl None))), (MState σ.(sregs) σ.(mem) d'),
+      log, tv, None.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota.
       rewrite Hdev. cbn beta iota.
       exists d'. done. }
-    iNext. iIntros (m' σ' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
-    destruct Hstep as (d'' & Hdw' & -> & -> & ->).
+    destruct Hstep as (d'' & Hdw' & -> & -> & -> & -> & ->).
     rewrite Hdw in Hdw'. injection Hdw' as <-.
     iMod "Hk" as "[Hσ HWP]". iModIntro. iFrame "Hσ".
+    iSplitL "Htso".
+    { rewrite -Htv. iApply (tso_interp_of_idle with "Htso"). }
     iIntros "Hfrag". rewrite -Hres. iApply ("HWP" with "Hfrag").
   Qed.
 
@@ -453,27 +620,38 @@ Section events.
   (* and the proof continues at the RESUME, still in [swp].               *)
   (* ------------------------------------------------------------------ *)
 
-  Lemma swp_hart_ram_read {X : Type} (n : N) (req : Interface.ReadReq.t n)
-      (m : M X) (Φ : X -> iProp Σ) :
+  Lemma swp_hart_ram_read_plain {X : Type} (n : N)
+      (req : Interface.ReadReq.t n) (m : M X) (Φ : X -> iProp Σ) :
     hread_req_at n m = Some req ->
     dev_addr (Interface.ReadReq.pa req) = false ->
     ak_excl (Interface.ReadReq.access_kind req) = false ->
     gen_cert -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
        ∃ w : bv (8 * n),
-         ⌜read_bytes σ.(mem) (Interface.ReadReq.pa req) n = Some w⌝ ∗
+         ⌜∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+            tso_read_bytes img log (hart_agent cpu_id) tv'
+              (Interface.ReadReq.pa req) n w⌝ ∗
          ▷ (|={∅,⊤}=> mstate_interp σ ∗
-              swp (hread_resume (bv_unsigned w) m) Φ)) -∗
+              tso_interp_of riscv_eraGS img σ.(mem) log V ∗
+              (∀ tvn : nat, ⌜(tv <= tvn)%nat⌝ -∗ ⌜(tvn <= length log)%nat⌝ -∗
+                 view_lb view_name loglen_name (hart_agent cpu_id) tvn -∗
+                 swp (hread_resume (bv_unsigned w) m) Φ))) -∗
     swp m Φ.
   Proof.
     iIntros (Hproj Hdev Hexcl) "#Hcert H".
     rewrite /swp. iIntros (C) "%HC Hcont".
-    iApply (wp_hart_ram_read C n req m HC Hproj Hdev Hexcl
+    iApply (wp_hart_ram_read_plain C n req m HC Hproj Hdev Hexcl
               with "Hcert [H Hcont]").
-    iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as (w) "[%Hrb Hk]".
+    iIntros (σ img log tv V) "%Htv Hσ Htso".
+    iMod ("H" $! σ img log tv V with "[//] Hσ Htso") as (w) "[%Hrd Hk]".
     iModIntro. iExists w. iSplitR; [done|]. iNext.
-    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ".
-    iApply (swp_use _ Φ C HC with "Hswp Hcont").
+    iMod "Hk" as "(Hσ & Htso & Hswp)". iModIntro. iFrame "Hσ Htso".
+    iIntros (tvn Hlo Hhi) "#Hrcpt".
+    iApply (swp_use _ Φ C HC with "[Hswp] Hcont").
+    iApply ("Hswp" $! tvn with "[//] [//] Hrcpt").
   Qed.
 
   Lemma swp_hart_ram_read_excl {X : Type} (n : N) (req : Interface.ReadReq.t n)
@@ -483,10 +661,17 @@ Section events.
     ak_excl (Interface.ReadReq.access_kind req) = true ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log
+         (vstep (hart_agent cpu_id) (length log) log V) -∗
+       view_lb view_name loglen_name (hart_agent cpu_id) (length log) ={⊤,∅}=∗
        ∃ w : bv (8 * n),
          ⌜read_bytes σ.(mem) (Interface.ReadReq.pa req) n = Some w⌝ ∗
          ▷ (|={∅,⊤}=> mstate_interp σ ∗
+              tso_interp_of riscv_eraGS img σ.(mem) log
+                (vstep (hart_agent cpu_id) (length log) log V) ∗
               (resv_frag cpu_id (Some (snap_of (Interface.ReadReq.pa req) n w)) -∗
                swp (hread_resume (bv_unsigned w) m) Φ))) -∗
     swp m Φ.
@@ -495,9 +680,11 @@ Section events.
     rewrite /swp. iIntros (C) "%HC Hcont".
     iApply (wp_hart_ram_read_excl C n req m rr HC Hproj Hdev Hexcl
               with "Hcert Hfrag [H Hcont]").
-    iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as (w) "[%Hrb Hk]".
+    iIntros (σ img log tv V) "%Htv Hσ Htso Hrec".
+    iMod ("H" $! σ img log tv V with "[//] Hσ Htso Hrec") as (w) "[%Hrb Hk]".
     iModIntro. iExists w. iSplitR; [done|]. iNext.
-    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ". iIntros "Hfrag".
+    iMod "Hk" as "(Hσ & Htso & Hswp)". iModIntro. iFrame "Hσ Htso".
+    iIntros "Hfrag".
     iApply (swp_use _ Φ C HC with "[Hswp Hfrag] Hcont"). by iApply "Hswp".
   Qed.
 
@@ -507,21 +694,42 @@ Section events.
     dev_addr (Interface.WriteReq.pa req) = false ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp
               (MState σ.(sregs)
                  (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
                     (Interface.WriteReq.value req)) σ.(mdev)) ∗
-            (resv_frag cpu_id None -∗ swp (hwrite_resume m) Φ))) -∗
+            tso_interp_of riscv_eraGS img
+              (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
+                 (Interface.WriteReq.value req))
+              (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                                (Interface.WriteReq.value req))
+                         (hart_agent cpu_id)])%list
+              (vstep (hart_agent cpu_id)
+                 (wstore_tv (Interface.WriteReq.access_kind req) log tv)
+                 (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                                   (Interface.WriteReq.value req))
+                            (hart_agent cpu_id)])%list V) ∗
+            (resv_frag cpu_id None -∗
+             view_lb view_name loglen_name (hart_agent cpu_id)
+               (wstore_tv (Interface.WriteReq.access_kind req) log tv) -∗
+             swp (hwrite_resume m) Φ))) -∗
     swp m Φ.
   Proof.
     iIntros (Hproj Hdev) "#Hcert Hfrag H".
     rewrite /swp. iIntros (C) "%HC Hcont".
     iApply (wp_hart_ram_write C n req m rr HC Hproj Hdev
               with "Hcert Hfrag [H Hcont]").
-    iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as "Hk". iModIntro. iNext.
-    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ". iIntros "Hfrag".
-    iApply (swp_use _ Φ C HC with "[Hswp Hfrag] Hcont"). by iApply "Hswp".
+    iIntros (σ img log tv V) "%Htv Hσ Htso".
+    iMod ("H" $! σ img log tv V with "[//] Hσ Htso") as "Hk".
+    iModIntro. iNext.
+    iMod "Hk" as "(Hσ & Htso & Hswp)". iModIntro. iFrame "Hσ Htso".
+    iIntros "Hfrag Hrec".
+    iApply (swp_use _ Φ C HC with "[Hswp Hfrag Hrec] Hcont").
+    by iApply ("Hswp" with "Hfrag Hrec").
   Qed.
 
   Lemma swp_hart_ram_write_cond {X : Type} (n : N) (req : Interface.WriteReq.t n)
@@ -531,23 +739,43 @@ Section events.
     Z.of_N n < 18446744073709551616 ->
     gen_cert -∗
     resv_frag cpu_id (Some (snap_of (Interface.WriteReq.pa req) n w)) -∗
-    (∀ σ, ⌜read_bytes σ.(mem) (Interface.WriteReq.pa req) n = Some w⌝ -∗
-       mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜read_bytes σ.(mem) (Interface.WriteReq.pa req) n = Some w⌝ -∗
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp
               (MState σ.(sregs)
                  (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
                     (Interface.WriteReq.value req)) σ.(mdev)) ∗
-            (resv_frag cpu_id None -∗ swp (hwrite_resume m) Φ))) -∗
+            tso_interp_of riscv_eraGS img
+              (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
+                 (Interface.WriteReq.value req))
+              (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                                (Interface.WriteReq.value req))
+                         (hart_agent cpu_id)])%list
+              (vstep (hart_agent cpu_id)
+                 (wstore_tv (Interface.WriteReq.access_kind req) log tv)
+                 (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                                   (Interface.WriteReq.value req))
+                            (hart_agent cpu_id)])%list V) ∗
+            (resv_frag cpu_id None -∗
+             view_lb view_name loglen_name (hart_agent cpu_id)
+               (wstore_tv (Interface.WriteReq.access_kind req) log tv) -∗
+             swp (hwrite_resume m) Φ))) -∗
     swp m Φ.
   Proof.
     iIntros (Hproj Hdev Hn) "#Hcert Hfrag H".
     rewrite /swp. iIntros (C) "%HC Hcont".
     iApply (wp_hart_ram_write_cond C n req m w HC Hproj Hdev Hn
               with "Hcert Hfrag [H Hcont]").
-    iIntros (σ) "%Hrb Hσ". iMod ("H" $! σ with "[//] Hσ") as "Hk".
+    iIntros (σ img log tv V) "%Hrb %Htv Hσ Htso".
+    iMod ("H" $! σ img log tv V with "[//] [//] Hσ Htso") as "Hk".
     iModIntro. iNext.
-    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ". iIntros "Hfrag".
-    iApply (swp_use _ Φ C HC with "[Hswp Hfrag] Hcont"). by iApply "Hswp".
+    iMod "Hk" as "(Hσ & Htso & Hswp)". iModIntro. iFrame "Hσ Htso".
+    iIntros "Hfrag Hrec".
+    iApply (swp_use _ Φ C HC with "[Hswp Hfrag Hrec] Hcont").
+    by iApply ("Hswp" with "Hfrag Hrec").
   Qed.
 
   Lemma swp_hart_dev_read {X : Type} (n : N) (req : Interface.ReadReq.t n)

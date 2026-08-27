@@ -476,7 +476,7 @@ Definition bm_gen_stmt
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* bread's own unit, held across everything and returned by brelse *)
   bslots 1 -∗
   bm_kit ak bn γfs cov logstart dev n Sb -∗
@@ -1246,7 +1246,7 @@ Section BmapTail.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bm_frame4 m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     i_dev ip ↦₄{dqd} dev -∗

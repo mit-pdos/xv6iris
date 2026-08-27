@@ -1491,6 +1491,11 @@ Proof. rewrite /ci_inums map_to_list_empty //. Qed.
 Section IcacheBootTable.
   Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}.
   Context `{GEN : GenId}.
+  (* M1 STAGE 2: this section's ↦₄ cells are context-indexed.  ONE SECTION
+     binder rather than the two inline ones this file used to carry -- the
+     [ientry_raw]/[ientry_raw_at] chain needs it too, and mixing the two
+     styles collides ("XI is already used"). *)
+  Context `{XI : CurCtx}.
 
   (* ONE itable ENTRY'S RAW CELLS -- what the loader leaves and iinit does
      not touch: the two identity words at arbitrary contents, the [valid]
@@ -1661,7 +1666,7 @@ Section IcacheBootTable.
          straight through.
      [icache_boot] below is this lemma plus the two mints, so there is one
      body and the old signature is a corollary. *)
-  Lemma icache_boot_at `{XI : CurCtx} (E : coPset) (γl : gname) (cn : ic_names)
+  Lemma icache_boot_at (E : coPset) (γl : gname) (cn : ic_names)
       (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
     (* THE COUNT AUTHORITY, at the empty table.  A PREMISE rather than an
@@ -1763,7 +1768,7 @@ Section IcacheBootTable.
       iDestruct "Hgd" as (v0 d0 n0) "Hgd".
       iMod (ic_id_set _ _ _ _ _ false (dvs k).1 (dvs k).2 with "Hgd") as "Hgd".
       iDestruct (ic_id_split_half with "Hgd") as "[Hgd1 Hgd2]".
-      iDestruct (word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
       iMod (inv_alloc icEscN E (ic_escrow_body cn γfs γi cov logstart k)
               with "[Hd Hn1 Hv Hmir Hmd Hgd1]") as "#Hinv".
       { iNext. rewrite /ic_escrow_body. iRight. iRight. iRight. iLeft.
@@ -1826,7 +1831,7 @@ Section IcacheBootTable.
      [icache_boot_at] overwrites the identification values, so the mint runs
      at [ic_dv_dummy] and [fun_of_big] never has to happen before it.  That
      is the same fact that makes the [_at] form possible at all. *)
-  Lemma icache_boot `{XI : CurCtx} (E : coPset) (γfs : fs_names) (γi : gname)
+  Lemma icache_boot (E : coPset) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
     own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) -∗
     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) -∗

@@ -1283,12 +1283,13 @@ Section InodeRes.
         { pose proof (Hal 0%nat ltac:(simpl; lia)) as Hz.
           rewrite Nat.mul_0_r pa_add_0 in Hz. exact Hz. }
         rewrite Nat.mul_0_r pa_add_0.
-        rewrite /word4_pointsto (bi.pure_True _ Ha0) bi.True_sep.
+        rewrite /ctx_word4_pointsto (bi.pure_True _ Ha0) bi.True_sep.
         apply big_sepL_proper. intros i jj Hj.
         apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
         rewrite (ind_bytes_cons_lo w l i Hlt).
-        (* HERMETIC SEAL: the ↦₄ tower's raw bytes against the flipped ↦ₘ *)
-        symmetry. apply TsoCtxShim.ctx_pointsto_shim.
+        (* M1 STAGE 2 LANDED: the ↦₄ tower's bytes ARE the flipped ↦ₘ --
+           the hermetic-seal crossing that used to sit here is gone. *)
+        reflexivity.
       + (* the tail, at base [a + 4] *)
         transitivity ([∗ list] j ∈ seq 0 (4 * length l)%nat,
                         pa_add (pa_add a 4%nat) j ↦ₘ (ind_bytes l !!! j))%I.
@@ -1311,7 +1312,7 @@ Section InodeRes.
     iDestruct (big_sepL_lookup
                  (fun (k : nat) (a : bv 32) => (i_addr ip k ↦₄ a)%I) l j (l !!! j)
                  (list_lookup_lookup_total_lt l j Hj) with "H") as "Hc".
-    iApply (word4_pointsto_aligned_p with "Hc").
+    iApply (ctx_word4_pointsto_aligned_p with "Hc").
   Qed.
 
   Lemma inode_addrs_aligned_all (ip : mword 64) (l : list (bv 32)) :

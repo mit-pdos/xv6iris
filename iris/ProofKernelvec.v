@@ -1423,19 +1423,10 @@ Section KernelvecHandler.
     kernelvec_handler_spec_body γu γv γdk γtl γs pd pav pu.
   Proof.
     cbv beta delta [kernelvec_handler_spec_body].
-    iIntros (Hgs) "#Hhw #Hinv #Htext".
+    iIntros (Hgs) "#Hhw #Hinv #Htext #Hcaps".
     iApply intr_handler_spec_intro.
     iModIntro.
-    (* [Hcaps] IS THE M2 CAPS PREMISE, per invocation (tso-port §0.10′ design
-       problem 2): the trapping thread hands its OWN device/proc credentials
-       in, at ITS OWN context [XIc] -- which is the context this whole handler
-       body then runs at (the entry's stack, [own_context] and cells are all
-       at [XIc]).  It arrives as the family member
-       [devintr_caps_fam … XIc]; [devintr_caps_fam_at] names it as the
-       ordinary [devintr_caps (XI := XIc) …] the callee's spec asks for. *)
-    iIntros (XIc m av p pc0 sc tv) "#Hcapsf %Hpc0 %Hsc Hentry Hnext".
-    iAssert (devintr_caps (XI := XIc) γu γv γdk γtl γs pd pav pu) as "#Hcaps".
-    { by iApply devintr_caps_fam_at. }
+    iIntros (XIc m av p pc0 sc tv) "%Hpc0 %Hsc Hentry Hnext".
     iEval (rewrite /ihs_entry_of) in "Hentry".
     (* [Hrcpt] is the KPT receipt (IntrDefs §6b), the tenth conjunct: the trap
        hands it over because the handler owes the ENABLED arm back, and the
@@ -1443,12 +1434,8 @@ Section KernelvecHandler.
        with it, inside [trap_csrs]) and comes back at the RESUMING hart. *)
     iDestruct "Hentry" as
       "(Hcg & Hsret & Hsepc & Hscause & Hstval & Hrcpt & Hcpu & Hclm & Hires & Hpc)".
-    (* [(XI := XIc)] IS SPELLED: these two bridges are stated at the AMBIENT
-       context, and since the M2 ruling [intr_res] -- and so [sie_cap_gpr] --
-       is context-indexed, so the section's ambient is the WRONG index here.
-       The entry is the trapping thread's, at [XIc]. *)
-    iEval (rewrite -(sie_cap_gpr_of_eq (XI := XIc))) in "Hcg".
-    iEval (rewrite -(intr_res_of_eq (XI := XIc))) in "Hires".
+    iEval (rewrite -sie_cap_gpr_of_eq) in "Hcg".
+    iEval (rewrite -intr_res_of_eq) in "Hires".
     (* ---- the bundle -> the raw cells the VC tier runs on ---- *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct "Hcap" as "(Hstk & Htr & Hq0 & Hctx & #Hwit0)".
@@ -1475,7 +1462,7 @@ Section KernelvecHandler.
        arm. *)
     iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
     { iEval (rewrite /intr_res) in "Hires".
-      iDestruct "Hires" as (h0 vb0 C0) "(_ & _ & _ & Hstv & _)".
+      iDestruct "Hires" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
       iDestruct "Hbstv" as (v0) "Hbstv".
       iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstv") as %[]. }
     iDestruct "Hkpt" as (root_ppn) "Htlbinv".
@@ -1726,7 +1713,7 @@ Section KernelvecHandler.
         [ exact HSIE0f | exact HXSf | exact HFSf | exact HVSf | exact HSDf | exact HMPPf ]. }
     iDestruct "Htrf" as "[(Hbit0f & Hbaref & Hbstvf) | (Hbit1f & Hkptf)]".
     { iEval (rewrite /intr_res) in "Hiresf".
-      iDestruct "Hiresf" as (h0 vb0 C0) "(_ & _ & _ & Hstv & _)".
+      iDestruct "Hiresf" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
       iDestruct "Hbstvf" as (v0) "Hbstvf".
       iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstvf") as %[]. }
     iDestruct "Hkptf" as (root_ppnf) "Htlbinvf".

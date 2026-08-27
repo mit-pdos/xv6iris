@@ -215,7 +215,7 @@ Definition wp_balloc_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* TWO slot units: the bitmap buffer is bread and log_written (log_write
      wants a free unit for its bpin) before it is brelsed, and bzero then
      does the same for the data block. *)
@@ -348,7 +348,7 @@ Definition wp_balloc_gen_body
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   bslots 2 -∗
   (* THE RESERVATION.  Two units must be in hand either way -- log_write's
      own "a unit in hand" requirement holds on the absorbing arm too. *)

@@ -62,6 +62,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock SleepLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+
+(* ====================================================================== *)
 Require Import LogInv.
 Require Export IcacheRef.   (* the geometry, the algebra, [inode_ref] *)
 Require Import InodeInv.
@@ -1384,6 +1386,8 @@ Section IcacheRefInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
+  (* M1 stage 2: the ↦₂/↦₄ cells here are context-indexed. *)
+  Context `{XI : CurCtx}.
 
   Definition icacheN : namespace := nroot .@ "icache".
 
@@ -2048,6 +2052,8 @@ Section IcacheRefInvReg.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
+  (* M1 stage 2: the ref words are ↦₄, hence context-indexed. *)
+  Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  THE PIN's TWO PURE FACTS                                           *)
@@ -3532,14 +3538,14 @@ Section IcacheTable.
   (* [inode_ident] and [inode_ref] are [IcacheRef.v]'s; only the JOIN
      helper below stayed, because [islot_rest_join] uses it. *)
   (* the fraction JOIN for one cell, as a wand.  A bare
-     [rewrite word4_pointsto_frac_split] at a call site rewrites the whole
+     [rewrite ctx_word4_pointsto_frac_split] at a call site rewrites the whole
      [envs_entails] -- hypotheses included -- and silently re-splits the very
      fragments being joined (durable-notes' proofmode rule); inside this
      lemma the two hypotheses' dfracs are bare variables, so the pattern
      matches the goal only. *)
   Local Lemma word4_frac_join (a : Arch.pa) (q1 q2 : Qp) (w : bv 32) :
     a ↦₄{DfracOwn q1} w -∗ a ↦₄{DfracOwn q2} w -∗ a ↦₄{DfracOwn (q1 + q2)} w.
-  Proof. iIntros "H1 H2". rewrite word4_pointsto_frac_split. iFrame. Qed.
+  Proof. iIntros "H1 H2". rewrite ctx_word4_pointsto_frac_split. iFrame. Qed.
 
   (* ---- THE IDENTITY BUDGET (design §13.1b, as corrected by §13.1e) ----
 
@@ -3673,8 +3679,8 @@ Section IcacheTable.
     destruct (1/2 - qt)%Qp as [q'|] eqn:Et.
     - apply Qp.sub_Some in Et.        (* 1/2 = qt + q' *)
       iIntros "[Hd Hn] (%d & %n & [Hd' Hn'])".
-      iDestruct (word4_pointsto_agree with "Hd Hd'") as %->.
-      iDestruct (word4_pointsto_agree with "Hn Hn'") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hd Hd'") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hn Hn'") as %->.
       iSplitL "Hd Hd'".
       + iDestruct (word4_frac_join with "Hd Hd'") as "H".
         iEval (rewrite -Et) in "H". iExact "H".

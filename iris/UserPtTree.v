@@ -1351,7 +1351,8 @@ Section UserPtTranslate.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma utlb_inv_pt_translateAddr_u (uroot tfp : mword 44)
-      (um : gmap (mword 27) (mword 64)) (w va pa : mword 64) (σ : mstate) :
+      (um : gmap (mword 27) (mword 64)) (w va pa : mword 64) (σ : mstate)
+      (S : TsoMemPa.bytemap -> iProp Σ) :
     um !! svpn_of va = Some w ->
     uleaf_ok acc w ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -1368,6 +1369,18 @@ Section UserPtTranslate.
       = Some (User, σ) ->
     exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.24's payer, threaded through the U-mode wrapper unchanged
+       (A6.27/A6.28; the template is [UptTree]'s two wrappers).  A user page
+       table is the [Some ξ] tier, so the discharge is
+       [TsoCtx.ctx_store_win_ok] at the caller's OWN context -- a process IS
+       its own page table. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um ==∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -1375,10 +1388,11 @@ Section UserPtTranslate.
       ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
       ⌜ (σ'.(sregs) = σ.(sregs) \/
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um.
   Proof.
     intros Hl Hchk Hcanon Hout Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    apply (utlb_inv_pt_translateAddr acc User uroot tfp um w va pa σ
+    apply (utlb_inv_pt_translateAddr acc User uroot tfp um w va pa σ S
              Hchk (or_intror (or_intror Hl))
              Hcanon Hout Hmisa Hmenv Hhtif Hcp
              (fun satp0 Hs Hm => exec_translationMode_U_sv39 satp0 σ HSXL Hs Hm)

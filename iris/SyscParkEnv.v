@@ -104,7 +104,7 @@ Section ParkWorld.
        dev_inv fsc_uart fsc_disk ∗
        console_caps fsc_uart ∗
        disk_geom fsc_disk pd pav pu ∗
-       is_lock fsc_dlock d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) fsc_disk pd pav pu) ∗
+       is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> ∗
        is_tickslock γtl ∗
        procs_inv γs ∗
        console_ready ∗

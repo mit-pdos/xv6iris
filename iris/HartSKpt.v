@@ -129,7 +129,7 @@ Section kptnode.
     iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
     iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan.
     destruct (kpt_maps_across t0 t vpn p2 p1 p0 Hcan Hmaps) as (q0 & Hm' & Hq).
-    iDestruct (ptree_own_path_mem σ (DfracOwn 1) t vpn p2 p1 q0 Hm'
+    iDestruct (ptree_own_path_mem_at None σ (DfracOwn 1) t vpn p2 p1 q0 Hm'
                  with "Hgh Ht") as %(H2 & H1 & H0).
     (* the addresses are the SNAPSHOT's, and they agree: [ptree_canon]
        preserves [pt_base], so the roots coincide. *)
@@ -268,10 +268,13 @@ Section kptnode.
      RAM-ness and the alignment ([slot_mem_of_own] takes the heap only for
      the BYTES).  This is what lets the walk's PMA/PMP premises be settled
      before the first node instead of inside it. *)
+  (* A6.27: the KERNEL table's slot is [PtTree]'s [None] tier, and BOTH
+     tiers forget to the raw physical word -- which is all this pure fact
+     ever wanted of a slot. *)
   Lemma kpt_addr_ok_own (dq : dfrac) (a w : mword 64) :
-    a ↦ₚ₈{dq} w -∗ ⌜kpt_addr_ok a⌝.
+    pt_slot_own None a dq w -∗ ⌜kpt_addr_ok a⌝.
   Proof.
-    iIntros "Hw".
+    iIntros "Hw". iDestruct (pt_slot_own_forget with "Hw") as "Hw".
     iDestruct (phys_word_pointsto_aligned_p with "Hw") as %Hal.
     iDestruct (phys_word_pointsto_bytes with "Hw") as "Hb".
     iAssert (⌜addr_is_ram (pa_add a 0)⌝)%I as %Hr0.
@@ -315,7 +318,7 @@ Section kptnode.
     destruct (pte_canon_inv _ _ Hcr) as (a1 & d1 & Hr0).
     rewrite pte_set_ad_absorb in Hr0.
     (* the three slots' address facts, off the tree's own points-to *)
-    iDestruct (ptree_own_path_ro (DfracOwn 1) t vpn q2 q1 _ Hmaps with "Ht")
+    iDestruct (ptree_own_path_ro_at None (DfracOwn 1) t vpn q2 q1 _ Hmaps with "Ht")
       as "(Hs2 & Hs1 & Hs0 & Hrest)".
     iDestruct (kpt_addr_ok_own with "Hs2") as %Ha2.
     iDestruct (kpt_addr_ok_own with "Hs1") as %Ha1.
@@ -442,6 +445,28 @@ Section kptnode.
     split; [exact Hrb |]. rewrite Hc. apply pte_canon_set_ad.
   Qed.
 
+  (* ...and the same fact AT [PtTreeAdue.xread_obl_ex], which is the shape
+     the walk's [_ex] translate seams take.  A6.30(b): a read moves nothing,
+     so the bundle and the view receipt are simply FRAMED -- a PTE read is
+     [Read_ttw], RULING 1's flat arm, and owes no ghost step at all.  The
+     bundle-FREE form above keeps its own consumer ([swp_read_pte_kpt_ex],
+     the leaf read node), which is why this is a wrapper and not a
+     restatement. *)
+  Lemma kpt_leaf_node_canon_obl (root_ppn : mword 44) (t0 : ptree)
+      (vpn : mword 27) (p2 p1 leaf0 : mword 64) (a0 d0 : mword 1) :
+    ptree_maps t0 vpn p2 p1 (pte_set_ad leaf0 a0 d0) ->
+    kpt_lb t0 -∗ kpt_inv root_ppn -∗
+    xread_obl_ex (pt_addr0 p1 vpn) (fun w => pte_canon w = pte_canon leaf0).
+  Proof.
+    intros Hmaps. rewrite /xread_obl_ex.
+    iIntros "#Hlb0 #Hkinv" (σ img log tv V) "%Htv Hσ Htso Hvlb".
+    iPoseProof (kpt_leaf_node_canon root_ppn t0 vpn p2 p1 leaf0 a0 d0 Hmaps
+                  with "Hlb0 Hkinv") as "H".
+    iMod ("H" $! σ with "Hσ") as "[Hex Hcl]".
+    iModIntro. iSplitL "Hex"; [iExact "Hex" |].
+    iNext. iMod "Hcl" as "Hσ". iModIntro. iFrame "Hσ Htso".
+  Qed.
+
   (* the LEAF READ at the frame, predicate-indexed: [swp_read_pte_kpt]'s twin
      over [PtTreeAdue.swp_checked_mem_read_pte8_ex]. *)
   Lemma swp_read_pte_kpt_ex (Drw Dro : gset register) (Df : register -> dfrac)
@@ -511,18 +536,20 @@ Section kptnode.
     (exists a d : mword 1,
        m0' = pte_set_ad (mk_pte ppn (kperm_flags kp)) a d) ->
     kmap_at vpn ppn kp -∗ kpt_lb t0 -∗ kpt_inv root_ppn -∗
-    (∀ σ, ⌜read_bytes σ.(mem) (pt_addr0 p1 vpn) 8 = Some m0⌝ -∗
-        mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) (pt_addr0 p1 vpn) 8
-                   (Interface.WriteReq.value
-                      (mwrite_req8_con (pt_addr0 p1 vpn)
-                         (autocast (T := mword) m0'))))
-                σ.(mdev)) ∗ True)).
+    (* A6.30(b): THE OBLIGATION RECEIVES THE BUNDLE, WHICH IS WHY THE A/D
+       WRITE-BACK IS PAYABLE HERE AND NOWHERE ABOVE.  [wpte_obl_at] is a
+       CALLBACK -- the walk hands it [tso_interp_of] -- so this seam holds
+       the slot AND the bundle at the same instant, which is exactly what
+       [TsoCtx.ledger_store_ok] needs (the interp's tie relates the flat
+       cell to the ledger, so neither moves without the other).  The [exec]
+       lane's translation lemmas can only THREAD a payer, because nothing
+       above them ever holds the bundle. *)
+    wpte_obl_at (pt_addr0 p1 vpn) m0
+      (mwrite_req8_con (pt_addr0 p1 vpn) (autocast (T := mword) m0')) True.
   Proof.
     intros Hmaps Hvar.
-    iIntros "#Hat #Hlb0 #Hkinv" (σ) "%Hrb (Hreg & Hgh & Hdev)".
+    rewrite /wpte_obl_at.
+    iIntros "#Hat #Hlb0 #Hkinv" (σ img log V) "%Hrb (Hreg & Hgh & Hdev) Htso".
     iMod (inv_acc ⊤ kptN with "Hkinv") as "[>Hbody Hclose]"; [ solve_ndisj | ].
     iEval (rewrite /kpt_body) in "Hbody".
     iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
@@ -534,11 +561,23 @@ Section kptnode.
     destruct Hvar as (a & d & Hm0').
     assert (Hset : m0' = pte_set_ad q0 a d)
       by (rewrite Hq0 pte_set_ad_absorb; exact Hm0').
-    (* the live leaf slot, at full ownership *)
-    iDestruct (ptree_own_path_upd (DfracOwn 1) t vpn p2 p1 q0 Hm' with "Ht")
-      as "(Hs2 & Hs1 & Hs0 & Hback)".
-    iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 p1 vpn) q0 m0'
-            with "Hgh Hs0") as "[Hgh Hs0]".
+    (* the live leaf slot, at full ownership and at the KERNEL tier *)
+    iDestruct (ptree_own_path_upd_at None (DfracOwn 1) t vpn p2 p1 q0 Hm'
+                 with "Ht") as "(Hs2 & Hs1 & Hs0 & Hback)".
+    iEval (rewrite pt_slot_own_None) in "Hs0".
+    iDestruct (TsoCtx.phys_ledger_word_aligned_p with "Hs0") as %Hal.
+    iDestruct (TsoCtx.phys_ledger_word_bytes with "Hs0") as "Hb0".
+    (* THE APPEND, paid by the context-free ledger gate.  The A/D write-back
+       is a CONDITIONAL write ([mwrite_req8_con] is [AV_exclusive]), so the
+       hart's view goes PAST its own append -- the [_ex] form. *)
+    iMod (wobl_ram_ledger_ex img σ log V 8
+            (mwrite_req8_con (pt_addr0 p1 vpn) (autocast (T := mword) m0'))
+            q0 ltac:(reflexivity) ltac:(vm_compute; discriminate)
+            with "Hgh Htso Hb0") as "(Hgh & Hobl & Hb0')".
+    iEval (cbn [Interface.WriteReq.value Interface.WriteReq.pa mwrite_req8_con];
+           rewrite TypeCasts.cast_N_refl autocast_id) in "Hb0'".
+    iDestruct (TsoCtx.phys_ledger_word_intro _ _ m0' Hal with "Hb0'") as "Hs0".
+    iEval (rewrite -pt_slot_own_None) in "Hs0".
     iDestruct ("Hback" $! m0' with "Hs2 Hs1 Hs0") as "Ht".
     (* the canonical table does not move, so the snapshot is a rewrite *)
     assert (Hcan' : ptree_canon (ptree_set_leaf t vpn m0') = ptree_canon t).
@@ -555,7 +594,7 @@ Section kptnode.
       iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
     iMod (fupd_mask_subseteq (∅ : coPset)) as "Hback2"; [ set_solver | ].
     iModIntro. iNext. iMod "Hback2" as "_". iModIntro.
-    iSplitL; [| done].
+    iSplitR "Hobl"; [| iSplitL "Hobl"; [iExact "Hobl" | done]].
     cbn [Interface.WriteReq.value mwrite_req8_con].
     rewrite TypeCasts.cast_N_refl autocast_id.
     iFrame "Hreg Hgh Hdev".
@@ -784,34 +823,23 @@ Section kptnode.
                ▷ (|={∅,⊤}=> mstate_interp σ))%I as "Hrdl".
     { iApply (kpt_leaf_node_canon root_ppn t0 (svpn_of va) p2 p1 _ a0 d0 Hmaps
                 with "Hlb0 Hkinv"). }
-    iAssert (∀ σ, mstate_interp σ ={⊤,∅}=∗
-               (∃ w : mword 64,
-                  ⌜read_bytes σ.(mem)
-                     (u_pte_addr (u_next_base p1) (subrange_vec_dec (svpn_of va) 8 0)) 8
-                     = Some w⌝ ∗
-                  ⌜pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp))⌝) ∗
-               ▷ (|={∅,⊤}=> mstate_interp σ))%I as "Hrdx".
-    { iApply (kpt_leaf_node_canon root_ppn t0 (svpn_of va) p2 p1 _ a0 d0 Hmaps
-                with "Hlb0 Hkinv"). }
+    iAssert (xread_obl_ex
+               (u_pte_addr (u_next_base p1) (subrange_vec_dec (svpn_of va) 8 0))
+               (fun w => pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp))))%I
+      as "Hrdx".
+    { iApply (kpt_leaf_node_canon_obl root_ppn t0 (svpn_of va) p2 p1 _ a0 d0
+                Hmaps with "Hlb0 Hkinv"). }
     (* the WRITE seam, in the shape the [_ex] write-back takes *)
     iAssert (∀ (w w' : mword 64),
                ⌜pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp))⌝ -∗
                ⌜update_PTE_Bits (autocast (T := mword) w : mword 64) acc = Some w'⌝ -∗
-               ∀ σ, ⌜read_bytes σ.(mem)
-                       (u_pte_addr (u_next_base p1) (subrange_vec_dec (svpn_of va) 8 0)) 8
-                       = Some w⌝ -∗
-                   mstate_interp σ ={⊤,∅}=∗
-                   ▷ (|={∅,⊤}=> mstate_interp
-                        (MState σ.(sregs)
-                           (write_bytes σ.(mem)
-                              (u_pte_addr (u_next_base p1)
-                                 (subrange_vec_dec (svpn_of va) 8 0)) 8
-                              (Interface.WriteReq.value
-                                 (mwrite_req8_con
-                                    (u_pte_addr (u_next_base p1)
-                                       (subrange_vec_dec (svpn_of va) 8 0))
-                                    (autocast (T := mword) w'))))
-                           σ.(mdev)) ∗ True))%I as "Hwr".
+               wpte_obl_at
+                 (u_pte_addr (u_next_base p1) (subrange_vec_dec (svpn_of va) 8 0))
+                 w
+                 (mwrite_req8_con
+                    (u_pte_addr (u_next_base p1)
+                       (subrange_vec_dec (svpn_of va) 8 0))
+                    (autocast (T := mword) w')) True)%I as "Hwr".
     { iIntros (w w') "%HPw %Hu".
       iApply (kpt_leaf_write_node root_ppn t0 (svpn_of va) ppn kp p2 p1 a0 d0
                 w w' Hmaps

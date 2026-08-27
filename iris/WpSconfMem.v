@@ -101,25 +101,30 @@ Section WpSconfMem.
      instance argument rides along, so every ambient spelling
      [wordw_pointsto width a dq w] is unchanged and an explicit-tier one is
      [wordw_pointsto (KTR := ktd) width a dq w]. *)
+  (* LEDGER MEMBERS (tso-machine-flip.md §6 amendment A6.18, ratified): the
+     rehearsal-era ruling made this window RAW because the only cost of a
+     ctx datum was crossing a seal for nothing.  Post-flip the S-mode data
+     nodes owe [Mobl_ram_plain] on a read and the append on a write, and
+     NEITHER is payable from a flat cell -- so the datum carries its ledger
+     residue.  THE CONTEXT IS THE SECTION'S AMBIENT [XI], so this is an
+     invisible binder: every exported statement below is textually
+     unchanged, and [own_context] arrives with the [sie_cap_gpr] they all
+     already take (tso-port.md §0.13': it is a conjunct of
+     [IntrDefs.sie_cap]). *)
   Definition wordw_pointsto `{KTR : !CurKtier} (width : Z) (a : Arch.pa) (dq : dfrac) (w : mword (8*width)) : iProp Σ :=
-    (* RAW members, deliberately (cutover rehearsal ruling): this window is
-       the LEAF-INTERIOR form -- it faces the raw ↦₂/↦₄ towers and the
-       gen_heap machinery on both sides -- and the two places it touches a
-       context-indexed fact go through the shim by name. *)
     (⌜is_aligned_paddr (Physaddr a) width = true⌝ ∗
-     [∗ list] j ∈ seq 0 (Z.to_nat width), mem_pointsto (pa_add a j) dq (nth_byte w j))%I.
+     [∗ list] j ∈ seq 0 (Z.to_nat width),
+        ctx_pointsto cur_ctx (pa_add a j) dq (nth_byte w j))%I.
 
-  (* the 8-byte window IS the (context-indexed) ↦₈ cell, THROUGH THE SHIM:
-     the leaf wrappers' statements are the flipped ↦₈ while the engine
-     machinery below is the raw window; one equivalence, setoid-rewritten
-     through each wrapper's statement (cutover rehearsal: this used to be a
-     SILENT delta-crossing). *)
-  Lemma wordw8_ctx `{KTR2 : !CurKtier} `{XI2 : CurCtx} (a : Arch.pa)
+  (* THE PAYOFF (A6.18): the 8-byte window simply IS the ↦₈ cell now -- no
+     shim, no crossing, no continuation adapter.  Kept only so the wrappers
+     that named it keep compiling; it is [reflexivity] up to [Z.to_nat]. *)
+  Lemma wordw8_ctx `{KTR2 : !CurKtier} (a : Arch.pa)
       (dq : dfrac) (v : mword 64) :
     wordw_pointsto (KTR := KTR2) 8 a dq v
     ⊣⊢ ctx_word_pointsto (KTR := KTR2) cur_ctx a dq v.
   Proof.
-    rewrite TsoCtxShim.ctx_word_shim /wordw_pointsto word_pointsto_unfold.
+    rewrite /wordw_pointsto ctx_word_pointsto_unfold.
     by change (Z.to_nat 8) with 8%nat.
   Qed.
 
@@ -151,7 +156,7 @@ Section WpSconfMem.
     a ↦ₘ{dq} b -∗ mem_claim a.
   Proof.
     iIntros "Hb".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb") as "Hb".
+    iDestruct (TsoCtx.ctx_pointsto_forget with "Hb") as "Hb".
     iDestruct (mem_pointsto_acc with "Hb")
       as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & _ & _)".
     iExists ppn. iFrame "Hk". done.
@@ -173,7 +178,6 @@ Section WpSconfMem.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hb") as "[Hb0 _]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
     iSplitR; [done|]. iApply (mem_pointsto_claim with "Hb0").
   Qed.
 

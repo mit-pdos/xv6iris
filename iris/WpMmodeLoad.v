@@ -31,6 +31,9 @@ Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdp
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import HartSwp HartLift HartSpan HartSpanChar HartMFrame HartMPmp
         HartMLoad.
+(* [pwmsg]/[agent]/[tso_read_bytes]: the read node's obligation is stated
+   over the era's write log.  Import is not transitive. *)
+Require Import TsoMemPa.
 Require Import TsoCtx.
 Import Defs.
 Import Defs.
@@ -234,6 +237,34 @@ Section LdFrames.
       rewrite H0 in H1. apply Some_inj in H1. exact H1.
     - exfalso. exact (read_bytes_ne σ.(mem) pa 8 w Hbytes Hrb).
   Qed.
+
+  (* THE READ NODE'S OBLIGATION, POST-FLIP (tso-machine-flip.md §6 amendment
+     A6.10).  [phys_word_read_bytes] above is the FLAT fact and it is no
+     longer what a plain data load owes: the machine advances this hart's
+     view nondeterministically and then reads latest-visible AT THAT VIEW,
+     so a flat cell says nothing.  What discharges it is the PRISTINE
+     receipt -- these eight bytes are era-image bytes (M-mode's only 8-byte
+     data load in this tree is [entry]'s [ld sp, stack0], a link-time
+     constant nothing ever stores to), and an image byte is visible to EVERY
+     agent at EVERY view.  So [TsoCtx.pristine_read_bytes_ok] concludes at
+     [∀ h tv] with no lower bound, and [HartMLoad.robl_ram] falls out by
+     [intros; apply].  THE PHYS TIER STAYS RAW (tso-port.md §0.8' ruling 6):
+     [phys_word_pointsto] is untouched and the receipt rides beside it,
+     persistent, costing its holder nothing.
+
+     IT IS SPELLED INLINE AT THE TWO CALL SITES rather than factored into a
+     lemma here, and that is forced: this file imports [SailStdpp.Base], so a
+     [gmap Arch.pa (bv 8)] BINDER written in it elaborates at the Sail key
+     instances and will not unify with [tso_interp_of]'s stdpp-keyed one (the
+     durable-notes binder trap; [BootCarve]'s header records the same).  The
+     [img] the obligation talks about is INTRODUCED FROM THE GOAL, so it
+     carries [HartMLoad]'s instances and the trap does not fire.
+
+     The [gs_of] step is the A6.1a bridge: this leaf holds [tso_interp_of]
+     (a leaf never sees a [gstate]) while the kit's gate is stated at
+     [tso_interp_at]; the bundle's bus-master pinning tie
+     ([tso_interp_of_pin]) is what lets one be rebuilt from the other. *)
+
 End LdFrames.
 
 (* from WpGprLoad.v *)
@@ -267,6 +298,10 @@ Section WpLdGpr.
     gpr_file m -∗
     instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
     phys_word_pointsto ea dq v -∗
+    (* THE IMAGE RECEIPT (§6 amendment A6.10).  Persistent, so it is not
+       handed back; it is what discharges the plain load's view-indexed
+       obligation while the phys tier stays raw. *)
+    pristine_win ea 8 -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
@@ -276,7 +311,7 @@ Section WpLdGpr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros offset ea Hpmp Hstat Hrd.
-    iIntros "Hmm Hpmpc Hpc Hfile Hinstr Hbw Hcont".
+    iIntros "Hmm Hpmpc Hpc Hfile Hinstr Hbw #Hpr Hcont".
     iDestruct (phys_word_pointsto_aligned_p with "Hbw") as %Halign.
     iDestruct (phys_word_pointsto_ram with "Hbw") as %Hram_ea.
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -335,12 +370,21 @@ Section WpLdGpr.
                   (ld_rs_pcfg ms0 mseccfg0 pmar0 pmpcfg0 pa0)
                   with "Hcert Hrw Hro").
       + (* the read node's obligation: the eight owned bytes ARE the value *)
-        iIntros (sg) "Hsi". rewrite /mstate_interp.
+        iIntros (sg img log tv V) "%Htv Hsi Htso". rewrite /mstate_interp.
         iDestruct "Hsi" as "(Hreg & Hmem & Hdev)".
-        iDestruct (phys_word_read_bytes sg ea v dq with "Hmem Hbw") as %Hrb.
+        iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+        iEval (rewrite (tso_interp_of_at_gs _ img sg.(mem) log V
+                          sg.(sregs) sg.(mdev) Hpin)) in "Htso".
+        iDestruct "Hbw" as "[#Hal Hbytes8]".
+        iDestruct (pristine_read_bytes_ok
+                     (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
+                     ea 8 v dq with "Hmem Htso Hbytes8 Hpr") as %Hrobl.
+        iEval (rewrite -(tso_interp_of_at_gs _ img sg.(mem) log V
+                           sg.(sregs) sg.(mdev) Hpin)) in "Htso".
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
-        iSplitR; [iPureIntro; exact Hrb|].
-        iNext. iMod "Hcl" as "_". iModIntro. iFrame "Hreg Hmem Hdev Hbw".
+        iSplitR; [iPureIntro; intros tv' _ _; apply Hrobl|].
+        iNext. iMod "Hcl" as "_". iModIntro.
+        iFrame "Hreg Hmem Hdev Htso". iFrame "Hal Hbytes8".
     - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hbw')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
@@ -353,6 +397,17 @@ End WpLdGpr.
 Section MmodeLoadTor.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+
+  (* [addr_is_ram] off the registered ledger word, via the raw forget
+     ([WpMmodeStore] carries the same one-liner for the store side). *)
+  Local Lemma ctx_phys_word_ram (xi : CtxId) (a : Arch.pa)
+      (dq : dfrac) (w : bv 64) :
+    ctx_phys_word_pointsto xi a dq w ⊢ ⌜addr_is_ram a⌝.
+  Proof.
+    iIntros "H".
+    iDestruct (ctx_phys_word_pointsto_forget with "H") as "H".
+    by iApply phys_word_pointsto_ram.
+  Qed.
 
   Lemma wp_ld_gpr_tor (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
       (imm : mword 12) (m : regfile) (v : bv 64)
@@ -370,20 +425,31 @@ Section MmodeLoadTor.
     pc_is pc -∗
     gpr_file m -∗
     instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    ea ↦ₚ₈{ dq } v -∗
+    (* A6.27: THE M-MODE 8-BYTE LOAD OF A WRITTEN CELL IS A LEDGER LOAD.
+       A6.10's pristine premise serves an IMAGE byte and CANNOT serve this
+       one: [timerinit]'s epilogue reloads the ra/s0 its own prologue stored,
+       and a pristine (discarded-timestamp) byte can never be stored to (the
+       store must UPDATE the timestamp element).  So this leaf takes the
+       REGISTERED ledger word plus the thread's token and discharges
+       [robl_ram] through [HartMLoad.robl_ram_ctx].  [wp_ld_gpr] keeps the
+       pristine shape -- [entry]'s [ld sp, stack0] is a link-time constant
+       and is the tree's only image-byte M-mode data load. *)
+    ctx_phys_word_pointsto cur_ctx ea dq v -∗
+    own_context cur_ctx -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      ea ↦ₚ₈{ dq } v -∗
+      ctx_phys_word_pointsto cur_ctx ea dq v -∗
+      own_context cur_ctx -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros offset ea Hpmp Hstat Htor Hrd.
-    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".
-    iDestruct (phys_word_pointsto_aligned_p with "Hbytes") as %Halign.
-    iDestruct (phys_word_pointsto_ram with "Hbytes") as %Hram_ea.
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hrun Hcont".
+    iDestruct (ctx_phys_word_pointsto_aligned_p with "Hbytes") as %Halign.
+    iDestruct (ctx_phys_word_ram with "Hbytes") as %Hram_ea.
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hpaddr" as "[Hpaddr_a Hpaddr_b]".
@@ -402,10 +468,11 @@ Section MmodeLoadTor.
               (mmode_config (DfracOwn (q/2)) ∗
                pmpcfg_n ↦ᵣ{DfracOwn (q/2)} pmpcfg0 ∗
                pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs ∗
-               phys_word_pointsto ea dq v)%I
+               ctx_phys_word_pointsto cur_ctx ea dq v ∗
+               own_context cur_ctx)%I
               Hpmp Hstat
               with "Hmm_wp Hpmpc_wp Hpc Hfile Hinstr
-                    [Hhs_k Hpriv_k Hms_k Hpmpc_k Hpaddr_a Hpaddr_b Hbytes]
+                    [Hhs_k Hpriv_k Hms_k Hpmpc_k Hpaddr_a Hpaddr_b Hbytes Hrun]
                     [Hcont]").
     - iIntros "Hf HPC HnPC".
       iAssert (hreg_frame_ro (ld_Df (DfracOwn (q/2)))
@@ -413,10 +480,12 @@ Section MmodeLoadTor.
         with "[Hms_k Hpriv_k Hpmpc_k Hpaddr_a]" as "Hro".
       { iApply ldt_frames. iFrame "Hpaddr_a". iApply ld_frames.
         iFrame "Hms_k Hpriv_k Hpmpc_k". iFrame "Hmseccfg Hpma Hhtif". }
-      iApply (swp_mono with "[HPC HnPC Hhs_k Hpaddr_b] [Hf Hro Hbytes]");
+      iApply (swp_mono with "[HPC HnPC Hhs_k Hpaddr_b] [Hf Hro Hbytes Hrun]");
         [| iApply (swp_execute_LOAD8 ∅ ldt_Dro (ld_Df (DfracOwn (q/2)))
                      (ld_rs ms0 mseccfg0 pmar0 pmpcfg0 pmpaddrs) imm rs1 rd
-                     false m v pmar0 (phys_word_pointsto ea dq v)
+                     false m v pmar0
+                     (ctx_phys_word_pointsto cur_ctx ea dq v ∗
+                      own_context cur_ctx)%I
                      ldt_disj ldt_in_mst ldt_in_priv ldt_in_sec ldt_in_pma
                      ldt_in_htif
                      (ld_rs_priv ms0 mseccfg0 pmar0 pmpcfg0 pmpaddrs)
@@ -425,7 +494,7 @@ Section MmodeLoadTor.
                      ltac:(rewrite ld_rs_mst; exact HMPRV)
                      ltac:(rewrite ld_rs_sec; exact Hseccfg1)
                      (pma_all_ram Hpma_all) Hram_ea Halign Hrd
-                     with "Hcert Hf [] Hro [] [Hbytes]") ].
+                     with "Hcert Hf [] Hro [] [Hbytes Hrun]") ].
       + iIntros (e) "(-> & Hf & _ & Hro & Hbytes)".
         iDestruct (ldt_frames with "Hro") as "[Hpaddr_a Hro]".
         iDestruct (ld_frames with "Hro")
@@ -446,18 +515,22 @@ Section MmodeLoadTor.
                   (ld_rs_paddr ms0 mseccfg0 pmar0 pmpcfg0 pmpaddrs)
                   (proj1 Htor) (proj1 (proj2 Htor)) Hord Hrange
                   with "Hcert Hrw Hro").
-      + (* the read node's obligation: the eight owned bytes ARE the value *)
-        iIntros (sg) "Hsi". rewrite /mstate_interp.
+      + (* the read node's obligation: the eight owned LEDGER bytes ARE the
+           value, at every view the hart can reach (A6.27) *)
+        iIntros (sg img log tv V) "%Htv Hsi Htso". rewrite /mstate_interp.
         iDestruct "Hsi" as "(Hreg & Hmem & Hdev)".
-        iDestruct (phys_word_read_bytes sg ea v dq with "Hmem Hbytes") as %Hrb.
+        iDestruct "Hbytes" as "[#Hal Hbytes8]".
+        iDestruct (robl_ram_ctx img sg log V cur_ctx ea v dq tv Htv
+                     with "Hmem Htso Hrun Hbytes8") as %Hrobl.
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
-        iSplitR; [iPureIntro; exact Hrb|].
-        iNext. iMod "Hcl" as "_". iModIntro. iFrame "Hreg Hmem Hdev Hbytes".
+        iSplitR; [iPureIntro; exact Hrobl|].
+        iNext. iMod "Hcl" as "_". iModIntro.
+        iFrame "Hreg Hmem Hdev Htso Hrun". iFrame "Hal Hbytes8".
     - iNext.
-      iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hpaddr' & Hbw')".
+      iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hpaddr' & Hbw' & Hrun')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
-      iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr' Hpc' Hf' Hbw'").
+      iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr' Hpc' Hf' Hbw' Hrun'").
 
   Qed.
 
@@ -476,20 +549,22 @@ Section MmodeLoadTor.
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (LOAD (imm, Regidx csp_rs1, Regidx rd, false, 8)) -∗
-    ea ↦ₚ₈{ dq } v -∗
+    ctx_phys_word_pointsto cur_ctx ea dq v -∗
+    own_context cur_ctx -∗
     ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      ea ↦ₚ₈{ dq } v -∗
+      ctx_phys_word_pointsto cur_ctx ea dq v -∗
+      own_context cur_ctx -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros imm ea Hpmp Hstat Htor Hrd.
-    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hrun Hcont".
     iApply (wp_ld_gpr_tor pc true csp_rs1 rd imm m v
               pmpcfg0 pmpaddrs q Hpmp Hstat Htor Hrd
-              with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont").
+              with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hrun Hcont").
   Qed.
 
   (* ---- c.sdsp rs2, uimm(sp), TOR-aware ---- *)

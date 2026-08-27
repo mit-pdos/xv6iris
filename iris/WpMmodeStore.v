@@ -386,6 +386,29 @@ Section WpStoreGpr.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
+  (* THE M-MODE STORE TARGET IS A LEDGER WORD NOW, NOT A RAW ONE
+     (tso-machine-flip.md §6 amendments A6.16 + A6.17).  A6.9's reading --
+     "the phys tier cannot store" -- is about the TIMESTAMP ELEMENTS, and
+     that is what [TsoCtx.ctx_phys_word_pointsto] adds; the tier is still
+     physical (M-mode has no translation), the resource just kept its
+     ledger residue.  The [own_context] premise beside it is free here and
+     A6.17 says why: [BootChain.boot_entry_bridge] already takes the token
+     before it enters the M-mode bracket and holds it across the whole of
+     start()/timerinit(), so there is exactly ONE token to thread and no
+     [iApply] anywhere is reshaped by it.
+
+     THE SOLO-ERA SHAPE WAS MEASURED AND REJECTED: all eight harts run
+     start(), so [TsoMemPa.all_own] fails at the second hart's first
+     prologue save.  See A6.17. *)
+  Local Lemma ctx_phys_word_ram (xi : TsoCtx.CtxId) (a : Arch.pa)
+      (dq : dfrac) (w : bv 64) :
+    TsoCtx.ctx_phys_word_pointsto xi a dq w ⊢ ⌜addr_is_ram a⌝.
+  Proof.
+    iIntros "H".
+    iDestruct (TsoCtx.ctx_phys_word_pointsto_forget with "H") as "H".
+    by iApply phys_word_pointsto_ram.
+  Qed.
+
   (* [instr]/[mmode_config]-formulated register-generic 8-byte STORE WP -- the
      write-dual of [wp_ld_gpr].  STORE reads TWO sources: rs1 (base address) and
      rs2 (data), each borrowed off [gpr_file] independently (so rs1 = rs2 is
@@ -410,18 +433,20 @@ Section WpStoreGpr.
     pc_is pc -∗
     gpr_file m -∗
     instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    ea ↦ₚ₈ vold -∗
+    ctx_phys_word_pointsto cur_ctx ea (DfracOwn 1) vold -∗
+    own_context cur_ctx -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
-      ea ↦ₚ₈ (m !!! Regidx rs2) -∗
+      ctx_phys_word_pointsto cur_ctx ea (DfracOwn 1) (m !!! Regidx rs2) -∗
+      own_context cur_ctx -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros offset ea Hpmp Hstat.
-    iIntros "Hmm Hpmpc Hpc Hfile Hinstr Hbw Hcont".
-    iDestruct (phys_word_pointsto_ram with "Hbw") as %Hram_ea.
+    iIntros "Hmm Hpmpc Hpc Hfile Hinstr Hbw Hrun Hcont".
+    iDestruct (ctx_phys_word_ram with "Hbw") as %Hram_ea.
     iDestruct "Hbw" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
@@ -436,14 +461,16 @@ Section WpStoreGpr.
               (STORE (imm, Regidx rs2, Regidx rs1, 8)) m m pmpcfg0
               (mmode_config (DfracOwn (q/2)) ∗
                pmpcfg_n ↦ᵣ{DfracOwn (q/2)} pmpcfg0 ∗
-               ea ↦ₚ₈ (m !!! Regidx rs2))%I
+               ctx_phys_word_pointsto cur_ctx ea (DfracOwn 1)
+                 (m !!! Regidx rs2) ∗
+               own_context cur_ctx)%I
               (pmp_all_off_allows_all _ Hpmp) Hstat
               with "Hmm_wp Hpmpc_wp Hpc Hfile Hinstr
-                    [Hhs_k Hpriv_k Hms_k Hpmpc_k Hbytes] [Hcont]").
-    2:{ iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hbw')".
+                    [Hhs_k Hpriv_k Hms_k Hpmpc_k Hbytes Hrun] [Hcont]").
+    2:{ iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hbw' & Hrun')".
         iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
         iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
-        iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hbw'"). }
+        iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hbw' Hrun'"). }
     iIntros "Hf HPC HnPC Hfrag".
     iDestruct (st_frames_in (DfracOwn (q/2)) ms0 mseccfg0 pmpcfg0 st_paddr0
                  pmar0 with "Hpriv_k Hms_k Hmseccfg Hpmpc_k Hpma Hhtif")
@@ -465,15 +492,19 @@ Section WpStoreGpr.
                          hreg_frame_ro (st_Df (DfracOwn (q/2)))
                            (st_rs ms0 mseccfg0 pmpcfg0 st_paddr0 pmar0)
                            st_Dro ∗
-                         ([∗ list] j ∈ seq 0 8,
-                            (pa_add ea j) ↦ₚ nth_byte (m !!! Regidx rs2) j) ∗
+                         (([∗ list] j ∈ seq 0 8,
+                             ctx_phys_pointsto cur_ctx (pa_add ea j)
+                               (DfracOwn 1) (nth_byte (m !!! Regidx rs2) j)) ∗
+                          own_context cur_ctx) ∗
                          resv_frag cpu_id None)%I) _
-              with "[Hf Hrw Hro Hbytes Hfrag] [-]").
+              with "[Hf Hrw Hro Hbytes Hrun Hfrag] [-]").
     { iApply (swp_vmem_write_gen8 ∅ st_Dro (st_Df (DfracOwn (q/2)))
                 (st_rs ms0 mseccfg0 pmpcfg0 st_paddr0 pmar0) (Regidx rs1)
                 (sign_extend' 64 imm) ea _ pmar0
-                ([∗ list] j ∈ seq 0 8,
-                   (pa_add ea j) ↦ₚ nth_byte (m !!! Regidx rs2) j)%I
+                (([∗ list] j ∈ seq 0 8,
+                    ctx_phys_pointsto cur_ctx (pa_add ea j) (DfracOwn 1)
+                      (nth_byte (m !!! Regidx rs2) j)) ∗
+                 own_context cur_ctx)%I
                 (gpr_file m) None
                 st_disj st_in_mst st_in_priv st_in_pma st_in_htif
                 (st_rs_priv _ _ _ _ _) (st_rs_pma _ _ _ _ _)
@@ -482,7 +513,7 @@ Section WpStoreGpr.
                 (st_hval_pmp_off (∅ ∪ st_Dro) ∅ _ pmpcfg0 ea st_in_pcfg
                    (st_rs_pcfg _ _ _ _ _) Hpmp)
                 (pma_all_ram Hpma_all) Hram_ea Hva Halign
-                with "Hcert Hfrag Hrw Hro Hf [] [Hbytes]").
+                with "Hcert Hfrag Hrw Hro Hf [] [Hbytes Hrun]").
       - (* the address stretch: rs1 out of [gpr_file], then a computed walk *)
         iIntros "HQ Hrw Hro".
         unfold get_transformed_data_addr.
@@ -511,14 +542,19 @@ Section WpStoreGpr.
                        with "Hcert Hrw Hro") ].
         iIntros (x) "(-> & Hrw & Hro)". by iFrame.
       - (* the memory obligation: the eight target bytes change hands *)
-        iIntros (sg) "Hsg". rewrite /mstate_interp.
+        iIntros (sg img log V) "Hsg Htso". rewrite /mstate_interp.
         iDestruct "Hsg" as "(Hri & Hmem & Hdev)".
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
         iNext. iMod "Hmask" as "_".
-        iMod (upd_window_8 sg.(mem) ea (m !!! Regidx rs2) vold
-                with "Hmem Hbytes") as "[Hmem Hbytes]".
-        iModIntro. rewrite st_write_value. by iFrame. }
-    iIntros (v0) "(-> & Hf & Hrw & Hro & Hbytes & Hfrag)". w_glue.
+        iMod (wobl_ram_ctx img sg log V cur_ctx 8
+                (mwrite_req8 ea (TypeCasts.autocast
+                   (@subrange_vec_dec 64 (m !!! Regidx rs2) (8 * 8 - 1) 0)))
+                vold ltac:(reflexivity) ltac:(vm_compute; discriminate)
+                with "Hmem Htso Hrun Hbytes")
+          as "(Hmem & Hobl & Hrun & Hbytes)".
+        iEval (rewrite st_write_value) in "Hbytes".
+        iModIntro. rewrite st_write_value. iFrame. }
+    iIntros (v0) "(-> & Hf & Hrw & Hro & [Hbytes Hrun] & Hfrag)". w_glue.
     iApply swp_ret.
     iDestruct (st_frames_out (DfracOwn (q/2)) ms0 mseccfg0 pmpcfg0 st_paddr0
                  pmar0 with "Hro") as "(Hpriv_k & Hms_k & _ & Hpmpc_k & _ & _)".
@@ -528,7 +564,8 @@ Section WpStoreGpr.
     { iFrame "Hhw Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro.
       exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
     iFrame "Hpmpc_k".
-    rewrite /phys_word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign.
+    iFrame "Hrun". rewrite /ctx_phys_word_pointsto. iFrame "Hbytes".
+    iPureIntro. exact Halign.
   Qed.
 End WpStoreGpr.
 
@@ -552,19 +589,21 @@ Section MmodeStoreTor.
     pc_is pc -∗
     gpr_file m -∗
     instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    ea ↦ₚ₈ vold -∗
+    ctx_phys_word_pointsto cur_ctx ea (DfracOwn 1) vold -∗
+    own_context cur_ctx -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
-      ea ↦ₚ₈ (m !!! Regidx rs2) -∗
+      ctx_phys_word_pointsto cur_ctx ea (DfracOwn 1) (m !!! Regidx rs2) -∗
+      own_context cur_ctx -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros offset ea Hpmp Hstat Htor.
-    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbw Hcont".
-    iDestruct (phys_word_pointsto_ram with "Hbw") as %Hram_ea.
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbw Hrun Hcont".
+    iDestruct (ctx_phys_word_ram with "Hbw") as %Hram_ea.
     iDestruct "Hbw" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
@@ -581,17 +620,19 @@ Section MmodeStoreTor.
               (mmode_config (DfracOwn (q/2)) ∗
                pmpcfg_n ↦ᵣ{DfracOwn (q/2)} pmpcfg0 ∗
                pmpaddr_n ↦ᵣ{DfracOwn (q/2)} pmpaddrs ∗
-               ea ↦ₚ₈ (m !!! Regidx rs2))%I
+               ctx_phys_word_pointsto cur_ctx ea (DfracOwn 1)
+                 (m !!! Regidx rs2) ∗
+               own_context cur_ctx)%I
               Hpmp Hstat
               with "Hmm_wp Hpmpc_wp Hpc Hfile Hinstr
-                    [Hhs_k Hpriv_k Hms_k Hpmpc_k Hpaddr_f Hbytes]
+                    [Hhs_k Hpriv_k Hms_k Hpmpc_k Hpaddr_f Hbytes Hrun]
                     [Hcont Hpaddr_k]").
     2:{ iNext. iIntros "Hmm' Hpmpc' Hpc' Hf'
-                        (Hmm_k' & Hpmpc_k' & Hpaddr_f' & Hbw')".
+                        (Hmm_k' & Hpmpc_k' & Hpaddr_f' & Hbw' & Hrun')".
         iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
         iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
         iCombine "Hpaddr_f' Hpaddr_k" as "Hpaddr''".
-        iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr'' Hpc' Hf' Hbw'"). }
+        iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr'' Hpc' Hf' Hbw' Hrun'"). }
     iIntros "Hf HPC HnPC Hfrag".
     iDestruct (st_frames_tor_in (DfracOwn (q/2)) ms0 mseccfg0 pmpcfg0 pmpaddrs
                  pmar0
@@ -614,15 +655,19 @@ Section MmodeStoreTor.
                          hreg_frame_ro (st_Df (DfracOwn (q/2)))
                            (st_rs ms0 mseccfg0 pmpcfg0 pmpaddrs pmar0)
                            st_Dro_tor ∗
-                         ([∗ list] j ∈ seq 0 8,
-                            (pa_add ea j) ↦ₚ nth_byte (m !!! Regidx rs2) j) ∗
+                         (([∗ list] j ∈ seq 0 8,
+                             ctx_phys_pointsto cur_ctx (pa_add ea j)
+                               (DfracOwn 1) (nth_byte (m !!! Regidx rs2) j)) ∗
+                          own_context cur_ctx) ∗
                          resv_frag cpu_id None)%I) _
-              with "[Hf Hrw Hro Hbytes Hfrag] [-]").
+              with "[Hf Hrw Hro Hbytes Hrun Hfrag] [-]").
     { iApply (swp_vmem_write_gen8 ∅ st_Dro_tor (st_Df (DfracOwn (q/2)))
                 (st_rs ms0 mseccfg0 pmpcfg0 pmpaddrs pmar0) (Regidx rs1)
                 (sign_extend' 64 imm) ea _ pmar0
-                ([∗ list] j ∈ seq 0 8,
-                   (pa_add ea j) ↦ₚ nth_byte (m !!! Regidx rs2) j)%I
+                (([∗ list] j ∈ seq 0 8,
+                    ctx_phys_pointsto cur_ctx (pa_add ea j) (DfracOwn 1)
+                      (nth_byte (m !!! Regidx rs2) j)) ∗
+                 own_context cur_ctx)%I
                 (gpr_file m) None
                 stt_disj stt_in_mst stt_in_priv stt_in_pma stt_in_htif
                 (st_rs_priv _ _ _ _ _) (st_rs_pma _ _ _ _ _)
@@ -632,7 +677,7 @@ Section MmodeStoreTor.
                    stt_in_pcfg stt_in_paddr (st_rs_pcfg _ _ _ _ _)
                    (st_rs_paddr _ _ _ _ _) Htor)
                 (pma_all_ram Hpma_all) Hram_ea Hva Halign
-                with "Hcert Hfrag Hrw Hro Hf [] [Hbytes]").
+                with "Hcert Hfrag Hrw Hro Hf [] [Hbytes Hrun]").
       - iIntros "HQ Hrw Hro".
         unfold get_transformed_data_addr.
         iApply (swp_bind_use
@@ -659,14 +704,19 @@ Section MmodeStoreTor.
                           ltac:(rewrite st_rs_sec; exact Hpmm))
                        with "Hcert Hrw Hro") ].
         iIntros (x) "(-> & Hrw & Hro)". by iFrame.
-      - iIntros (sg) "Hsg". rewrite /mstate_interp.
+      - iIntros (sg img log V) "Hsg Htso". rewrite /mstate_interp.
         iDestruct "Hsg" as "(Hri & Hmem & Hdev)".
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
         iNext. iMod "Hmask" as "_".
-        iMod (upd_window_8 sg.(mem) ea (m !!! Regidx rs2) vold
-                with "Hmem Hbytes") as "[Hmem Hbytes]".
-        iModIntro. rewrite st_write_value. by iFrame. }
-    iIntros (v0) "(-> & Hf & Hrw & Hro & Hbytes & Hfrag)". w_glue.
+        iMod (wobl_ram_ctx img sg log V cur_ctx 8
+                (mwrite_req8 ea (TypeCasts.autocast
+                   (@subrange_vec_dec 64 (m !!! Regidx rs2) (8 * 8 - 1) 0)))
+                vold ltac:(reflexivity) ltac:(vm_compute; discriminate)
+                with "Hmem Htso Hrun Hbytes")
+          as "(Hmem & Hobl & Hrun & Hbytes)".
+        iEval (rewrite st_write_value) in "Hbytes".
+        iModIntro. rewrite st_write_value. iFrame. }
+    iIntros (v0) "(-> & Hf & Hrw & Hro & [Hbytes Hrun] & Hfrag)". w_glue.
     iApply swp_ret.
     iDestruct (st_frames_tor_out (DfracOwn (q/2)) ms0 mseccfg0 pmpcfg0 pmpaddrs
                  pmar0 with "Hro")
@@ -677,7 +727,8 @@ Section MmodeStoreTor.
     { iFrame "Hhw Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro.
       exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
     iFrame "Hpmpc_k Hpaddr_f".
-    rewrite /phys_word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign.
+    iFrame "Hrun". rewrite /ctx_phys_word_pointsto. iFrame "Hbytes".
+    iPureIntro. exact Halign.
   Qed.
 
   (* ---- c.ldsp rd, uimm(sp), TOR-aware ---- *)
@@ -695,20 +746,22 @@ Section MmodeStoreTor.
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx csp_rs1, 8)) -∗
-    ea ↦ₚ₈ vold -∗
+    ctx_phys_word_pointsto cur_ctx ea (DfracOwn 1) vold -∗
+    own_context cur_ctx -∗
     ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
-      ea ↦ₚ₈ (m !!! Regidx rs2) -∗
+      ctx_phys_word_pointsto cur_ctx ea (DfracOwn 1) (m !!! Regidx rs2) -∗
+      own_context cur_ctx -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros imm ea Hpmp Hstat Htor.
-    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hrun Hcont".
     iApply (wp_store_gpr_tor pc true csp_rs1 rs2 imm m vold
               pmpcfg0 pmpaddrs q Hpmp Hstat Htor
-              with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont").
+              with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hrun Hcont").
   Qed.
 
 End MmodeStoreTor.

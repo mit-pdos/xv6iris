@@ -116,7 +116,7 @@ Definition wp_virtio_disk_rw_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* the caller's buffer and the disk block it names.
      BSIZE = 1024 and sector = blockno * 2, so the block's byte range on
      the disk starts at 1024 * blockno. *)

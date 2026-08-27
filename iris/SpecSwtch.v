@@ -50,7 +50,7 @@ Import Defs.
 
 
 Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (P : CtxId -d> CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+    (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
          mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
     (An Ao : ctx_adm)
     (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
@@ -106,7 +106,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Ge
   ▷ valid_context P An newc p -∗
   (* the payload's [A'] slot is always the RESUMER's record index, and the
      resumer of this crossing is the caller itself -- so it is [Ao]. *)
-  P cur_ctx cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back -∗
+  P cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back -∗
   (* THE CALLER'S CONTINUATION -- its record's contents -- and only at
      [back = true].  At [false] there is nothing to prove about a
      resumption that cannot happen, which is exactly the point: it is what
@@ -122,7 +122,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Ge
          ctx_cells oldc (callee_img m0) -∗
          (∃ (A' : ctx_adm) (cret : mword 64) (back' : bool),
             (if back' then ▷ valid_context P A' cret p else own_ctx cret) ∗
-            P cur_ctx h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back') -∗
+            P h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back') -∗
          WP (LoopE gen_id h : expr riscv_lang) )
    else emp) -∗
   WP (Loop : expr riscv_lang).
@@ -130,18 +130,10 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Ge
 Module Type SWTCH.
   Parameter wp_swtch_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (P : CtxId -d> CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-      (av : nat) (eb : bool) (p : mword 64) (back : bool)
-      (* THE DEPOSIT'S OBLIGATION.  The target record's rows are spelled at
-         the record's OWN context ([SwtchCtx.valid_context_pre]'s [XIp]), and
-         the caller holds this payload at its own -- so swtch hands it over
-         with [TsoCtx.ctx_deposit], whose premise is exactly this.  It is
-         resolved by instance search at every call site
-         ([SchedCtx.p_sched_morph] for the scheduler chain). *)
-      `{!CtxMorph (fun xi : CtxId =>
-           P xi cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back)},
+      (av : nat) (eb : bool) (p : mword 64) (back : bool),
       wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p back.
 End SWTCH.

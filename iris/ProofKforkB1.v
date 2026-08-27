@@ -171,7 +171,7 @@ Section KforkB1Proof.
     (∃ w8, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) w8) -∗
     proc_held cpu_id j γl USED ch -∗
     hart_at_any (proc_addr j) -∗
-    is_lock γl (proc_addr j) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γl (proc_addr j)) -∗
+    is_lock γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> -∗
     kalloc_env_at γa γk None -∗
     fp_rest (proc_addr j) V pid -∗
     fp_pt (proc_addr j) (pv_sz V) (Some P) -∗
@@ -306,7 +306,7 @@ Section KforkB1Proof.
        with no reserve summand at all (the arm is [b] there), so nothing needs
        undoing afterwards. *)
     iEval (rewrite -Hb) in "Hcg".
-    iApply (RL.wp_release_sconf KT1 γl (proc_addr j) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γl (proc_addr j)) T3 lvl eb pme (K - 8)%nat
+    iApply (RL.wp_release_sconf KT1 γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> T3 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka (kfkb1_K10 K HK)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").

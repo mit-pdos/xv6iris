@@ -2610,11 +2610,6 @@ Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI 
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
-    (* THE HANDLER'S CREDENTIAL FAMILY (IntrDefs' M2 ruling): the trap arm
-       hands back the installed contract, which now names the credentials it
-       wants; [C] is read off the [intr_res] the arm opened, so it is the
-       SAME family the resource carries and no site has to guess it. *)
-    (C : CtxId -d> iPropO Σ)
     (rs2 : regstate) : iProp Σ :=
   ((* --- RETIRE: the bundles, re-formed from the cells the landing frame
         gave back.  [cur_privilege] is NOT here: that cell stays in the
@@ -2648,8 +2643,7 @@ Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI 
                    sie_cap kt m (trap_res true + av) false p ∗
                    kpt_on cpu_id ∗ cpu_hart 0 false p ∅ ∗ cpu_claim p ∗
                    intr_res kt ∗
-                   □ C cur_ctx ∗
-                   intr_handler_spec kt C
+                   intr_handler_spec kt
                      (register_lookup (R_bitvector_64 nextPC) rs2) ∗
                    gpr_file (tp_pin m) ∗ resv_any cpu_id ∗
                    wp_next true p (fun CID =>
@@ -2683,7 +2677,7 @@ Proof.
      and therefore survives every later split, which is what lets the trap
      arm apply the contract in the cycle's continuation. *)
   iEval (rewrite /intr_res) in "Hires".
-  iDestruct "Hires" as (handler vb C) "(%Htvd & %Hsb & Hq4 & Hstv & #Hcm & #Hcaps & #Hsp)".
+  iDestruct "Hires" as (handler vb) "(%Htvd & %Hsb & Hq4 & Hstv & #Hsp)".
   iDestruct (sconf_to_cells with "Hsc") as (mst0 mdv0)
     "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie & Hmdl &
       Hmenv)".
@@ -2721,7 +2715,7 @@ Proof.
                rsx = wrap_post rs2 mi)
             (fun rsx => ∃ (rs2 : regstate) (mi : mword 64),
                ⌜intr_Q (minstret_inc_flag mc micfg Supervisor) rs2 /\
-                rsx = wrap_post rs2 mi⌝ ∗ intr_psi kt m av p pc0 is_rvc i b' R C rs2)%I
+                rsx = wrap_post rs2 mi⌝ ∗ intr_psi kt m av p pc0 is_rvc i b' R rs2)%I
             i_disj i_w_cy i_w_ti i_w_ip
             with "Hcert Hresv [-] []").
   { (* ==================== THE CYCLE'S BODY ==================== *)
@@ -2731,7 +2725,7 @@ Proof.
                   (s_rs pc0 pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
          (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tlbv)
                   (intr_Q (minstret_inc_flag mc micfg Supervisor))
-                  (intr_psi kt m av p pc0 is_rvc i b' R C)
+                  (intr_psi kt m av p pc0 is_rvc i b' R)
                   i_disj i_in_priv i_in_hart i_in_mc i_in_micfg i_w_mi
                   i_in_mi i_w_ms i_in_ms i_w_PC i_in_PC i_in_nPC
                   ltac:(by srs)
@@ -2816,7 +2810,7 @@ Proof.
                         swp (handle_interrupt ii pr)
                           (fun _ => hreg_frame rs2 i_Drw ∗
                                     hreg_frame_ro i_Df rs2 i_Dro ∗
-                                    intr_psi kt m av p pc0 is_rvc i b' R C rs2))%I
+                                    intr_psi kt m av p pc0 is_rvc i b' R rs2))%I
                       Hmisaval HSXL (proj1 Hmsf) Hmm Helpnp
                       (pma_all_ram Hpmaall) Hsatpf Hpmpf
                       with "Hcert Hinstr Hbit1 Hkinv Hsnap Hfrag
@@ -2906,10 +2900,10 @@ Proof.
             { rewrite /cpu_hart /intr_count. iFrame "Hcells Hcnt". }
             iFrame "Hclm".
             iSplitL "Hq4 Hstv".
-            { iApply (intr_res_intro handler ('b"0" : mword 1) C Htvd Hsb
-                        with "Hq4 Hstv Hcm Hcaps"). iNext. iExact "Hsp". }
+            { iApply (intr_res_intro handler ('b"0" : mword 1) Htvd Hsb
+                        with "Hq4 Hstv"). iNext. iExact "Hsp". }
             srs. rewrite Hsb.
-            iFrame "Hcaps Hsp Hfile Hwn".
+            iFrame "Hsp Hfile Hwn".
             iApply (resv_any_intro with "Hfrag").
             (* ---------- THE INSTRUCTION ---------- *)
             iIntros (tlbf) "HW Hbit1 Hsnap' Hresv' Hsrw Hsro".
@@ -2950,8 +2944,7 @@ Proof.
                           with "Hsatp Htlb Hpcfg Hpaddr Hsnap' Hkinv"). }
               rewrite /sie_arm.
               iFrame "Hq1 Hkpt Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu".
-              iApply (intr_res_intro handler vb C Htvd Hsb
-                        with "Hq4 Hstv Hcm Hcaps").
+              iApply (intr_res_intro handler vb Htvd Hsb with "Hq4 Hstv").
               iNext. iExact "Hsp". }
             iDestruct (wp_next_at true p _ CID0 (fun _ => eq_refl) with "Hwn")
               as "[Hobl Hcont]".
@@ -3115,15 +3108,14 @@ Proof.
       iDestruct "HTrap" as (sc mstT mdvT)
         "(%HscT & %HmsfT & %HmmT & HmsT & HhalfT & HtieT & HmieT &
           HmdlT & HmenvT & Hsret & HsepcT & HscauseT & HstvalT & HcapT &
-          #HkptT & HcpuT & HclmT & HiresT & #HcapsT & HspT & HfileT & HresvT &
-          Hwn)".
+          #HkptT & HcpuT & HclmT & HiresT & HspT & HfileT & HresvT & Hwn)".
       iAssert (sconf) with "[Hpriv3 HmsT HhalfT HtieT HmieT HmdlT HmenvT]"
         as "HscT".
       { iApply (sconf_of_cells mstT mdvT HmsfT HmmT
                   with "Hhw Hminv Hpriv3 HmsT HhalfT HtieT HmieT HmdlT
                         HmenvT"). }
       iApply ("Hmkpc" with "[-HresvT] HresvT"). iIntros "Hpc'".
-      iAssert (ihs_entry_of kt (ires_of (ihs kt) cur_ctx) m av p pc0 sc (zeros' 64)
+      iAssert (ihs_entry_of kt (ires_of (ihs kt)) m av p pc0 sc (zeros' 64)
                  (register_lookup (R_bitvector_64 nextPC) rs2))
         with "[Hhs3 HscT HcapT HfileT Hsret HsepcT HscauseT HstvalT HcpuT
                HclmT HiresT Hpc']" as "Hentry".
@@ -3131,12 +3123,9 @@ Proof.
         iFrame "Hhs3 HscT HcapT HfileT Hsret HsepcT HscauseT HstvalT HkptT
                 HcpuT HclmT Hpc'".
         iEval (rewrite intr_res_of_eq) in "HiresT". iExact "HiresT". }
-      (* THE M2 CAPS SUPPLY: [HcapsT] is THIS thread's credentials at THIS
-         thread's context, read off the [intr_res] the arm opened, and the
-         contract's ∀ is instantiated at exactly that context. *)
-      iApply (intr_handler_spec_apply C
+      iApply (intr_handler_spec_apply
                 (register_lookup (R_bitvector_64 nextPC) rs2) m av p pc0 sc
-                (zeros' 64) Hpc0 HscT with "HspT HcapsT Hentry").
+                (zeros' 64) Hpc0 HscT with "HspT Hentry").
       iIntros (c' Hs'). rewrite /ihs_post_of. iIntros "Hcg Hpc".
       iDestruct (wp_next_retarget CID0 c' true p _ Hs' with "Hwn") as "Hwn".
       iApply ("IH" $! c' with "Hcg Hpc [Hwn]"). iNext. iExact "Hwn". }

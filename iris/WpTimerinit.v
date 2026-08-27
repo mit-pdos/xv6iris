@@ -269,6 +269,10 @@ Section WpTimerinitThm.
     (* timerinit's 16-byte ra/s0 frame as the bottom two slots of
        [stack_own_phys sp0 n] (any depth n >= 2). *)
     stack_own_phys sp0 n -∗
+    (* A6.17: the M-mode store leaves take the token, and it is TAKEN, not
+       minted -- [BootChain.boot_entry_bridge] holds the one token across
+       the whole M-mode bracket and threads it down to here. *)
+    own_context cur_ctx -∗
     kernel_text -∗
     (* [mtime] lives in [clock_inv] and advances with the nondeterministic
        clock tick, so the continuation is ∀-quantified over the value [tv]
@@ -284,11 +288,12 @@ Section WpTimerinitThm.
       mcounteren ↦ᵣ legalize_mcounteren mcen0 (ti_mcen1 mcen0) -∗
       stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline tv) -∗
       stack_own_phys sp0 n -∗
+      own_context cur_ctx -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn2 Hpmp Htor_ra Htor_s0 Hsp Hra Hs0.
-    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hstc Hstk #Htext Hcont".
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hstc Hstk Hctx #Htext Hcont".
     iDestruct (stack_own_phys_split_1 sp0 2 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
     iDestruct (stack_own_phys_2_elim with "Htop") as (vold_ra vold_s0) "[Hstkra Hstks0]".
     assert (Hpra : ti_ea_ra sp0 = pa_stk sp0 1).
@@ -362,10 +367,11 @@ Section WpTimerinitThm.
       by (rewrite Hea_ra1; exact Htor_ra).
     iApply (wp_csdsp_gpr_tor ti_pc10 u10 ti_ra (ti_m1 m sp0) vold_ra pmpcfg1 pmpaddrs q
               Hpmp ltac:(boot_static) Htor10
-              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstkra]").
+              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstkra] Hctx").
     { iApply (ti_instr10 with "Htext"). }
     { rewrite Hea_ra1. iExact "Hstkra". }
-    iEval (rewrite P1 Hea_ra1 Lra1). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstkra".
+    iEval (rewrite P1 Hea_ra1 Lra1).
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstkra Hctx".
 
     (* ---- 11. c.sdsp s0, 0(sp) ---- *)
     assert (Hea_s01 : add_vec (ti_m1 m sp0 !!! Regidx csp_rs1)
@@ -377,10 +383,11 @@ Section WpTimerinitThm.
       by (rewrite Hea_s01; exact Htor_s0).
     iApply (wp_csdsp_gpr_tor ti_pc11 u11 ti_s0 (ti_m1 m sp0) vold_s0 pmpcfg1 pmpaddrs q
               Hpmp ltac:(boot_static) Htor11
-              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstks0]").
+              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstks0] Hctx").
     { iApply (ti_instr11 with "Htext"). }
     { rewrite Hea_s01. iExact "Hstks0". }
-    iEval (rewrite P2 Hea_s01 Ls01). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstks0".
+    iEval (rewrite P2 Hea_s01 Ls01).
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstks0 Hctx".
 
     (* ---- 12. c.addi4spn s0, sp, 16 ---- *)
     iApply (wp_addi_gpr ti_pc12 true csp_rs1 ti_s0 (caddi4spn_imm nz12) (ti_m1 m sp0) pmpcfg1 q
@@ -542,10 +549,11 @@ Section WpTimerinitThm.
       by (rewrite Hea_ra26; exact Htor_ra).
     iApply (wp_cldsp_gpr_tor ti_pc26 u10 ti_ra (ti_m24 m sp0 menv0 mcen0 tv) ra0
               pmpcfg1 pmpaddrs q Hpmp ltac:(boot_static) Htor26 Hnz_ra
-              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstkra]").
+              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstkra] Hctx").
     { iApply (ti_instr26 with "Htext"). }
     { rewrite Hea_ra26. iExact "Hstkra". }
-    iEval (rewrite P17 Hea_ra26). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstkra".
+    iEval (rewrite P17 Hea_ra26).
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstkra Hctx".
     iEval (change (<[Regidx ti_ra := regval_into_reg ra0]> (ti_m24 m sp0 menv0 mcen0 tv))
              with (ti_m26 m sp0 menv0 mcen0 tv ra0)) in "Hfile".
 
@@ -561,10 +569,11 @@ Section WpTimerinitThm.
       by (rewrite Hea_s027; exact Htor_s0).
     iApply (wp_cldsp_gpr_tor ti_pc27 u11 ti_s0 (ti_m26 m sp0 menv0 mcen0 tv ra0) s00
               pmpcfg1 pmpaddrs q Hpmp ltac:(boot_static) Htor27 Hnz_s0
-              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstks0]").
+              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstks0] Hctx").
     { iApply (ti_instr27 with "Htext"). }
     { rewrite Hea_s027. iExact "Hstks0". }
-    iEval (rewrite P18 Hea_s027). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstks0".
+    iEval (rewrite P18 Hea_s027).
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstks0 Hctx".
     iEval (change (<[Regidx ti_s0 := regval_into_reg s00]> (ti_m26 m sp0 menv0 mcen0 tv ra0))
              with (ti_m27 m sp0 menv0 mcen0 tv ra0 s00)) in "Hfile".
 
@@ -596,7 +605,7 @@ Section WpTimerinitThm.
     iEval (rewrite Hps0) in "Hstks0".
     iDestruct (stack_own_phys_2_intro with "Hstkra Hstks0") as "Htop".
     iDestruct (stack_own_phys_split_2 sp0 2 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" $! tv with "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hstc Hstk").
+    iApply ("Hcont" $! tv with "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hstc Hstk Hctx").
   Qed.
 
 End WpTimerinitThm.

@@ -91,6 +91,13 @@ Require Import LogDefs.
 Require Import SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+(* M1 STAGE 2: [inode_ident]'s two cells are the slot's identity, written
+   by iget into a recycled slot and read fractionally by every holder --
+   thread data, and the whole icache cluster above ([IcacheInv],
+   [IcacheEscrow]) holds HALVES OF THE SAME CELLS, so the tier has to be
+   decided here or the cluster disagrees with itself.  LAST, after
+   RiscvPtsto, as the replay runbook's pass 1 requires. *)
+Require Import TsoCtx.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 
@@ -2544,6 +2551,7 @@ Section IcacheRef.
   Context `{!riscvGS Σ, !icacheG Σ, !lockG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
+  Context `{XI : CurCtx}.
 
   (* An entry's IDENTITY -- the two cells iget writes into a recycled slot
      and nobody writes again while the slot is live.  Fractional, so a
@@ -2556,26 +2564,26 @@ Section IcacheRef.
     inode_ident k dq1 d1 n1 -∗ inode_ident k dq2 d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
   Proof.
     iIntros "[Hd1 Hn1] [Hd2 Hn2]".
-    iDestruct (word4_pointsto_agree with "Hd1 Hd2") as %->.
-    iDestruct (word4_pointsto_agree with "Hn1 Hn2") as %->.
+    iDestruct (ctx_word4_pointsto_agree with "Hd1 Hd2") as %->.
+    iDestruct (ctx_word4_pointsto_agree with "Hn1 Hn2") as %->.
     done.
   Qed.
 
   (* the fraction JOIN for one cell, as a wand.  A bare
-     [rewrite word4_pointsto_frac_split] at a call site rewrites the whole
+     [rewrite ctx_word4_pointsto_frac_split] at a call site rewrites the whole
      [envs_entails] -- hypotheses included -- and silently re-splits the very
      fragments being joined (durable-notes' proofmode rule); inside this
      lemma the two hypotheses' dfracs are bare variables, so the pattern
      matches the goal only. *)
   Local Lemma word4_frac_join (a : Arch.pa) (q1 q2 : Qp) (w : bv 32) :
     a ↦₄{DfracOwn q1} w -∗ a ↦₄{DfracOwn q2} w -∗ a ↦₄{DfracOwn (q1 + q2)} w.
-  Proof. iIntros "H1 H2". rewrite word4_pointsto_frac_split. iFrame. Qed.
+  Proof. iIntros "H1 H2". rewrite ctx_word4_pointsto_frac_split. iFrame. Qed.
 
   Lemma inode_ident_split k q1 q2 dev inum :
     inode_ident k (DfracOwn (q1 + q2)) dev inum ⊣⊢
     inode_ident k (DfracOwn q1) dev inum ∗ inode_ident k (DfracOwn q2) dev inum.
   Proof.
-    rewrite /inode_ident !word4_pointsto_frac_split.
+    rewrite /inode_ident !ctx_word4_pointsto_frac_split.
     iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
   Qed.
 
@@ -3022,6 +3030,7 @@ Section IcacheHeld.
   Context `{!riscvGS Σ, !icacheG Σ, !lockG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
+  Context `{XI : CurCtx}.
 
   (* A REFERENCE, KEYED BY THE POINTER a caller actually holds -- the form
      [FileInv]'s payload and [ProcInv.cwd_ref] carry, and the exact

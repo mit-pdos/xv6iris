@@ -386,7 +386,7 @@ Section ProofVirtioDiskRwE.
     kernel_text -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     vdrw_p5_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector bs_buf bs_disk
                  m0 kq lks -∗
     P4.vdrw_p4_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector bs_buf
@@ -522,7 +522,7 @@ Section ProofVirtioDiskRwE.
       iDestruct (arm_pay_ext_split eb (proc_addr j) with "Htc Hclm")
         as "[Hpay [Hextc Hextm]]".
       (* ================= release(&disk.vdisk_lock) ================= *)
-      iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) W4 0%nat eb (proc_addr j) (K - 12)%nat
+      iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> W4 0%nat eb (proc_addr j) (K - 12)%nat
                 ({["virtio_disk"]} ∪ lks)
                 HW4a0 ltac:(pose proof (vdrw_K10 K HK); lia)
                 with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
@@ -620,7 +620,7 @@ Section ProofVirtioDiskRwE.
       (* ================= acquire(&disk.vdisk_lock) ================= *)
       iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) eb
                    ltac:(wp_next_chain) with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) W7 0%nat eb (proc_addr j) (K - 12)%nat eb lks
+      iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string <{ disk_res γd pd pav pu }> W7 0%nat eb (proc_addr j) (K - 12)%nat eb lks
                 vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia)
                 with "Hcg Hown Htext Hpc []").
       all: try lkbelow.

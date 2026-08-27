@@ -54,7 +54,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values
         SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
+Require Import RiscvModelBytes TsoMemPa.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMPmp HartMFetch HartMFrame
         HartMLoad HartMStore.
@@ -1935,24 +1935,36 @@ Section snodes.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
+  (* THE S-MODE DATA READ IS THE Ztso ARM (tso-machine-flip.md §6
+     amendments A6.6(a) + A6.18): [read_ram Read_plain] is [ak_strong =
+     false], so what a node owes is [Mobl_ram_plain] -- a [tso_read_bytes]
+     fact at EVERY view the machine's drain may choose -- and NOT a
+     [read_bytes] against the flat cache.  The bundle rides in and back out
+     unchanged; the rule pays the view advance itself. *)
   Local Ltac node_read req Hproj Hres :=
-    let Hb := fresh in let Hcl := fresh in
     iIntros "#Hcert Hmem";
-    iApply (swp_hart_ram_read _ req _ _ Hproj ltac:(assumption)
+    iApply (swp_hart_ram_read_plain _ req _ _ Hproj ltac:(assumption)
               ltac:(reflexivity) with "Hcert [Hmem]");
-    iIntros (s) "Hs"; iMod ("Hmem" $! _ with "Hs") as "[%Hb Hcl]";
+    iIntros (s ? ? ? ?) "%Htv Hs Htso";
+    iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "[Hb Hcl]";
     iModIntro; iExists _;
-    iSplitR; [ iPureIntro; by apply read_bytes_of_bytes | ];
-    iNext; iMod "Hcl" as "[Hs HR]"; iModIntro; iFrame "Hs";
+    iSplitR "Hcl"; [ iExact "Hb" | ];
+    iNext; iMod "Hcl" as "(Hs & Htso & HR)"; iModIntro; iFrame "Hs Htso";
+    iIntros (tvn ? ?) "_";
     rewrite Hres; iApply swp_ret; by iFrame.
 
   Lemma swp_read_ram_node1 (pa : SailStdpp.Values.mword 64)
       (bytes : SailStdpp.Values.mword (8 * 1)) (R : iProp Σ) :
     dev_addr pa = false ->
     gen_cert -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜mem_bytes_at σ pa 1 bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+           tso_read_bytes img log (hart_agent cpu_id) tv' pa 1 bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
     swp (read_ram Read_plain (Physaddr pa) 1 false)
       (fun r => ⌜r = (bytes, default_meta)⌝ ∗ R).
   Proof.
@@ -1965,9 +1977,14 @@ Section snodes.
       (bytes : SailStdpp.Values.mword (8 * 2)) (R : iProp Σ) :
     dev_addr pa = false ->
     gen_cert -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜mem_bytes_at σ pa 2 bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+           tso_read_bytes img log (hart_agent cpu_id) tv' pa 2 bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
     swp (read_ram Read_plain (Physaddr pa) 2 false)
       (fun r => ⌜r = (bytes, default_meta)⌝ ∗ R).
   Proof.
@@ -1980,9 +1997,14 @@ Section snodes.
       (bytes : SailStdpp.Values.mword (8 * 4)) (R : iProp Σ) :
     dev_addr pa = false ->
     gen_cert -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜mem_bytes_at σ pa 4 bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+           tso_read_bytes img log (hart_agent cpu_id) tv' pa 4 bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
     swp (read_ram Read_plain (Physaddr pa) 4 false)
       (fun r => ⌜r = (bytes, default_meta)⌝ ∗ R).
   Proof.
@@ -1995,9 +2017,14 @@ Section snodes.
       (bytes : SailStdpp.Values.mword (8 * 8)) (R : iProp Σ) :
     dev_addr pa = false ->
     gen_cert -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜mem_bytes_at σ pa 8 bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+           tso_read_bytes img log (hart_agent cpu_id) tv' pa 8 bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
     swp (read_ram Read_plain (Physaddr pa) 8 false)
       (fun r => ⌜r = (bytes, default_meta)⌝ ∗ R).
   Proof.
@@ -2013,24 +2040,31 @@ Section snodes.
      inside [swp_hart_ram_read]'s own existential, so each [_ex] form costs
      only its statement. *)
   Local Ltac node_read_ex req Hproj Hres :=
-    let Hb := fresh in let Hcl := fresh in let bs := fresh "bs" in
+    let bs := fresh "bs" in
     iIntros "#Hcert Hmem";
-    iApply (swp_hart_ram_read _ req _ _ Hproj ltac:(assumption)
+    iApply (swp_hart_ram_read_plain _ req _ _ Hproj ltac:(assumption)
               ltac:(reflexivity) with "Hcert [Hmem]");
-    iIntros (s) "Hs"; iMod ("Hmem" $! _ with "Hs") as (bs) "[%Hb Hcl]";
+    iIntros (s ? ? ? ?) "%Htv Hs Htso";
+    iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as (bs) "[Hb Hcl]";
     iModIntro; iExists bs;
-    iSplitR; [ iPureIntro; by apply read_bytes_of_bytes | ];
-    iNext; iMod "Hcl" as "[Hs HR]"; iModIntro; iFrame "Hs";
+    iSplitR "Hcl"; [ iExact "Hb" | ];
+    iNext; iMod "Hcl" as "(Hs & Htso & HR)"; iModIntro; iFrame "Hs Htso";
+    iIntros (tvn ? ?) "_";
     rewrite (Hres bs); iApply swp_ret; iExists bs; by iFrame.
 
   Lemma swp_read_ram_node1_ex (pa : SailStdpp.Values.mword 64)
       (Rr : SailStdpp.Values.mword (8 * 1) -> iProp Σ) :
     dev_addr pa = false ->
     gen_cert -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ∃ bytes : SailStdpp.Values.mword (8 * 1),
-          ⌜mem_bytes_at σ pa 1 bytes⌝ ∗
-          ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes)) -∗
+          ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+             tso_read_bytes img log (hart_agent cpu_id) tv' pa 1 bytes⌝ ∗
+          ▷ (|={∅,⊤}=> mstate_interp σ ∗
+               tso_interp_of riscv_eraGS img σ.(mem) log V ∗ Rr bytes)) -∗
     swp (read_ram Read_plain (Physaddr pa) 1 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 1),
                   ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes).
@@ -2044,10 +2078,15 @@ Section snodes.
       (Rr : SailStdpp.Values.mword (8 * 2) -> iProp Σ) :
     dev_addr pa = false ->
     gen_cert -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ∃ bytes : SailStdpp.Values.mword (8 * 2),
-          ⌜mem_bytes_at σ pa 2 bytes⌝ ∗
-          ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes)) -∗
+          ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+             tso_read_bytes img log (hart_agent cpu_id) tv' pa 2 bytes⌝ ∗
+          ▷ (|={∅,⊤}=> mstate_interp σ ∗
+               tso_interp_of riscv_eraGS img σ.(mem) log V ∗ Rr bytes)) -∗
     swp (read_ram Read_plain (Physaddr pa) 2 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 2),
                   ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes).
@@ -2061,10 +2100,15 @@ Section snodes.
       (Rr : SailStdpp.Values.mword (8 * 4) -> iProp Σ) :
     dev_addr pa = false ->
     gen_cert -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ∃ bytes : SailStdpp.Values.mword (8 * 4),
-          ⌜mem_bytes_at σ pa 4 bytes⌝ ∗
-          ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes)) -∗
+          ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+             tso_read_bytes img log (hart_agent cpu_id) tv' pa 4 bytes⌝ ∗
+          ▷ (|={∅,⊤}=> mstate_interp σ ∗
+               tso_interp_of riscv_eraGS img σ.(mem) log V ∗ Rr bytes)) -∗
     swp (read_ram Read_plain (Physaddr pa) 4 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 4),
                   ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes).
@@ -2078,10 +2122,15 @@ Section snodes.
       (Rr : SailStdpp.Values.mword (8 * 8) -> iProp Σ) :
     dev_addr pa = false ->
     gen_cert -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ∃ bytes : SailStdpp.Values.mword (8 * 8),
-          ⌜mem_bytes_at σ pa 8 bytes⌝ ∗
-          ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes)) -∗
+          ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+             tso_read_bytes img log (hart_agent cpu_id) tv' pa 8 bytes⌝ ∗
+          ▷ (|={∅,⊤}=> mstate_interp σ ∗
+               tso_interp_of riscv_eraGS img σ.(mem) log V ∗ Rr bytes)) -∗
     swp (read_ram Read_plain (Physaddr pa) 8 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 8),
                   ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes).
@@ -2883,14 +2932,20 @@ Section swnodes.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
+  (* THE S-MODE DATA STORE OWES THE APPEND (§6's [Wobl_ram], A6.16): the
+     flat update AND one authored message, at the SAME view -- a plain store
+     is buffered, so [wstore_tv] is the identity here and the receipt the
+     rule hands back is dropped (it says nothing its holder did not already
+     have).  [HartMStore.wobl_ram_ctx] is the M-mode twin of what pays it. *)
   Local Ltac node_write req Hproj Hval Hres :=
     let Hcl := fresh in
     iIntros "#Hcert Hfrag Hmem";
     iApply (swp_hart_ram_write _ req _ _ _ Hproj ltac:(assumption)
               with "Hcert Hfrag [Hmem]");
-    iIntros (s) "Hs"; iMod ("Hmem" $! _ with "Hs") as "Hcl";
-    iModIntro; iNext; iMod "Hcl" as "[Hs HR]"; iModIntro;
-    rewrite Hval; iFrame "Hs"; iIntros "Hfrag";
+    iIntros (s ? ? ? ?) "%Htv Hs Htso";
+    iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "Hcl";
+    iModIntro; iNext; iMod "Hcl" as "(Hs & Htso & HR)"; iModIntro;
+    rewrite Hval; iFrame "Hs Htso"; iIntros "Hfrag _";
     rewrite Hres; iApply swp_ret; by iFrame.
 
   Lemma swp_write_ram_node1 (pa : SailStdpp.Values.mword 64)
@@ -2898,10 +2953,20 @@ Section swnodes.
     dev_addr pa = false ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
              (MState σ.(sregs)
-                (write_bytes σ.(mem) pa (Z.to_N 1) v) σ.(mdev)) ∗ R)) -∗
+                (write_bytes σ.(mem) pa (Z.to_N 1) v) σ.(mdev)) ∗
+             tso_interp_of riscv_eraGS img
+               (write_bytes σ.(mem) pa (Z.to_N 1) v)
+               (log ++ [PWMsg (snap_of pa (Z.to_N 1) v)
+                          (hart_agent cpu_id)])%list
+               (vstep (hart_agent cpu_id) tv
+                  (log ++ [PWMsg (snap_of pa (Z.to_N 1) v)
+                             (hart_agent cpu_id)])%list V) ∗ R)) -∗
     swp (write_ram Write_plain (Physaddr pa) 1 v tt)
       (fun r => ⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None).
   Proof.
@@ -2915,10 +2980,20 @@ Section swnodes.
     dev_addr pa = false ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
              (MState σ.(sregs)
-                (write_bytes σ.(mem) pa (Z.to_N 2) v) σ.(mdev)) ∗ R)) -∗
+                (write_bytes σ.(mem) pa (Z.to_N 2) v) σ.(mdev)) ∗
+             tso_interp_of riscv_eraGS img
+               (write_bytes σ.(mem) pa (Z.to_N 2) v)
+               (log ++ [PWMsg (snap_of pa (Z.to_N 2) v)
+                          (hart_agent cpu_id)])%list
+               (vstep (hart_agent cpu_id) tv
+                  (log ++ [PWMsg (snap_of pa (Z.to_N 2) v)
+                             (hart_agent cpu_id)])%list V) ∗ R)) -∗
     swp (write_ram Write_plain (Physaddr pa) 2 v tt)
       (fun r => ⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None).
   Proof.
@@ -2932,10 +3007,20 @@ Section swnodes.
     dev_addr pa = false ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
              (MState σ.(sregs)
-                (write_bytes σ.(mem) pa (Z.to_N 4) v) σ.(mdev)) ∗ R)) -∗
+                (write_bytes σ.(mem) pa (Z.to_N 4) v) σ.(mdev)) ∗
+             tso_interp_of riscv_eraGS img
+               (write_bytes σ.(mem) pa (Z.to_N 4) v)
+               (log ++ [PWMsg (snap_of pa (Z.to_N 4) v)
+                          (hart_agent cpu_id)])%list
+               (vstep (hart_agent cpu_id) tv
+                  (log ++ [PWMsg (snap_of pa (Z.to_N 4) v)
+                             (hart_agent cpu_id)])%list V) ∗ R)) -∗
     swp (write_ram Write_plain (Physaddr pa) 4 v tt)
       (fun r => ⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None).
   Proof.
@@ -2949,10 +3034,20 @@ Section swnodes.
     dev_addr pa = false ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
              (MState σ.(sregs)
-                (write_bytes σ.(mem) pa (Z.to_N 8) v) σ.(mdev)) ∗ R)) -∗
+                (write_bytes σ.(mem) pa (Z.to_N 8) v) σ.(mdev)) ∗
+             tso_interp_of riscv_eraGS img
+               (write_bytes σ.(mem) pa (Z.to_N 8) v)
+               (log ++ [PWMsg (snap_of pa (Z.to_N 8) v)
+                          (hart_agent cpu_id)])%list
+               (vstep (hart_agent cpu_id) tv
+                  (log ++ [PWMsg (snap_of pa (Z.to_N 8) v)
+                             (hart_agent cpu_id)])%list V) ∗ R)) -∗
     swp (write_ram Write_plain (Physaddr pa) 8 v tt)
       (fun r => ⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None).
   Proof.
@@ -3429,18 +3524,38 @@ Section instances.
 
   (* the RAM obligations: the state is handed back UNCHANGED at a read and
      with exactly the written bytes at a write *)
+  (* §6's [Mobl_ram_plain] at a FIXED value, at this file's Z width
+     (tso-machine-flip.md A6.18).  The NAME is kept -- every engine below
+     is abstract over it and every consumer names it, so the amendment is
+     invisible above this line. *)
   Definition Mobl_ram (width : Z) (pa : SailStdpp.Values.mword 64)
       (bytes : SailStdpp.Values.mword (8 * width)) (R : iProp Σ) : iProp Σ :=
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜mem_bytes_at σ pa width bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R))%I.
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+           tso_read_bytes img log (hart_agent cpu_id) tv' pa
+             (Z.to_N width) bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R))%I.
 
   Definition Wobl_ram (width : Z) (pa : SailStdpp.Values.mword 64)
       (v : SailStdpp.Values.mword (8 * width)) (R : iProp Σ) : iProp Σ :=
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
              (MState σ.(sregs)
-                (write_bytes σ.(mem) pa (Z.to_N width) v) σ.(mdev)) ∗ R))%I.
+                (write_bytes σ.(mem) pa (Z.to_N width) v) σ.(mdev)) ∗
+             tso_interp_of riscv_eraGS img
+               (write_bytes σ.(mem) pa (Z.to_N width) v)
+               (log ++ [PWMsg (snap_of pa (Z.to_N width) v)
+                          (hart_agent cpu_id)])%list
+               (vstep (hart_agent cpu_id) tv
+                  (log ++ [PWMsg (snap_of pa (Z.to_N width) v)
+                             (hart_agent cpu_id)])%list V) ∗ R))%I.
 
   (* the DEVICE obligations: the DEVICE state advances, and the value read is
      the one the device answered *)
@@ -3583,10 +3698,16 @@ Section instances.
   (* ---- THE EXISTENTIAL-VALUE OBLIGATIONS AND ENGINES ---- *)
   Definition Mobl_ram_ex (width : Z) (pa : SailStdpp.Values.mword 64)
       (Rr : SailStdpp.Values.mword (8 * width) -> iProp Σ) : iProp Σ :=
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ∃ bytes : SailStdpp.Values.mword (8 * width),
-          ⌜mem_bytes_at σ pa width bytes⌝ ∗
-          ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes))%I.
+          ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+             tso_read_bytes img log (hart_agent cpu_id) tv' pa
+               (Z.to_N width) bytes⌝ ∗
+          ▷ (|={∅,⊤}=> mstate_interp σ ∗
+               tso_interp_of riscv_eraGS img σ.(mem) log V ∗ Rr bytes))%I.
 
   Definition Mobl_dev1_ex (pa : SailStdpp.Values.mword 64)
       (Rr : SailStdpp.Values.mword (8 * 1) -> iProp Σ) : iProp Σ :=
@@ -3816,10 +3937,17 @@ Section samo_nodes.
     iApply (swp_hart_ram_read_excl 4 (mread_req4_racq pa) _ _ rr
               (hread_req_at_read_ram4_racq pa) Hdev ltac:(reflexivity)
               with "Hcert Hfrag [Hmem]").
-    iIntros (s) "Hs". iMod ("Hmem" $! s with "Hs") as "[%Hb Hcl]".
+    (* THE OBLIGATION IS UNCHANGED, and that is RULING 4 talking: an
+       exclusive read reads at the LOG TOP, i.e. off the flat cache, so the
+       caller still owes a [mem_bytes_at] fact and nothing else.  The rule
+       has already drained this hart's view and minted the receipt; the node
+       FRAMES the bundle and drops the receipt (a consumer that wants it
+       takes it from the leaf, A6.6(b)). *)
+    iIntros (s ? ? ? ?) "%Htv Hs Htso _".
+    iMod ("Hmem" $! s with "Hs") as "[%Hb Hcl]".
     iModIntro. iExists bytes.
     iSplitR; [ iPureIntro; by apply read_bytes_of_bytes | ].
-    iNext. iMod "Hcl" as "[Hs HR]". iModIntro. iFrame "Hs".
+    iNext. iMod "Hcl" as "[Hs HR]". iModIntro. iFrame "Hs Htso".
     iIntros "Hfrag". rewrite hread_resume_read_ram4_racq.
     iApply swp_ret. by iFrame.
   Qed.
@@ -3848,10 +3976,11 @@ Section samo_nodes.
     iApply (swp_hart_ram_read_excl 4 (mread_req4_racq pa) _ _ rr
               (hread_req_at_read_ram4_racq pa) Hdev ltac:(reflexivity)
               with "Hcert Hfrag [Hmem]").
-    iIntros (s) "Hs". iMod ("Hmem" $! s with "Hs") as (bytes) "[%Hb Hcl]".
+    iIntros (s ? ? ? ?) "%Htv Hs Htso _".
+    iMod ("Hmem" $! s with "Hs") as (bytes) "[%Hb Hcl]".
     iModIntro. iExists bytes.
     iSplitR; [ iPureIntro; by apply read_bytes_of_bytes | ].
-    iNext. iMod "Hcl" as "[Hs HR]". iModIntro. iFrame "Hs".
+    iNext. iMod "Hcl" as "[Hs HR]". iModIntro. iFrame "Hs Htso".
     iIntros "Hfrag". rewrite hread_resume_read_ram4_racq.
     iApply swp_ret. iExists bytes. by iFrame.
   Qed.
@@ -3865,10 +3994,20 @@ Section samo_nodes.
     dev_addr pa = false ->
     gen_cert -∗
     resv_frag cpu_id (Some (snap_of pa 4 old)) -∗
-    (∀ σ, ⌜read_bytes σ.(mem) pa 4 = Some old⌝ -∗
-        mstate_interp σ ={⊤,∅}=∗
+    (* THE CONDITIONAL WRITE APPENDS LIKE ANY OTHER STORE, and its view goes
+       PAST its own append ([ak_excl] is true here -- "the drain includes my
+       write"), which is what makes the AMO an acquire. *)
+    (∀ σ img log tv V, ⌜read_bytes σ.(mem) pa 4 = Some old⌝ -∗
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 v) σ.(mdev)) ∗ R)) -∗
+             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 v) σ.(mdev)) ∗
+             tso_interp_of riscv_eraGS img (write_bytes σ.(mem) pa 4 v)
+               (log ++ [PWMsg (snap_of pa 4 v) (hart_agent cpu_id)])%list
+               (vstep (hart_agent cpu_id) (S (length log))
+                  (log ++ [PWMsg (snap_of pa 4 v) (hart_agent cpu_id)])%list V)
+             ∗ R)) -∗
     swp (write_ram Write_RISCV_conditional (Physaddr pa) 4 v tt)
       (fun r => ⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None).
   Proof.
@@ -3876,10 +4015,11 @@ Section samo_nodes.
     iApply (swp_hart_ram_write_cond 4 (mwrite_req4_con pa v) _ _ old
               (hwrite_req_at_write_ram4_con pa v) Hdev ltac:(lia)
               with "Hcert Hfrag [Hmem]").
-    iIntros (s) "%Hrb Hs". iMod ("Hmem" $! s with "[//] Hs") as "Hcl".
-    iModIntro. iNext. iMod "Hcl" as "[Hs HR]". iModIntro.
-    rewrite mwrite_req4_con_value. iFrame "Hs".
-    iIntros "Hfrag". rewrite hwrite_resume_write_ram4_con.
+    iIntros (s ? ? ? ?) "%Hrb %Htv Hs Htso".
+    iMod ("Hmem" $! s _ _ _ _ with "[//] [//] Hs Htso") as "Hcl".
+    iModIntro. iNext. iMod "Hcl" as "(Hs & Htso & HR)". iModIntro.
+    rewrite mwrite_req4_con_value. iFrame "Hs Htso".
+    iIntros "Hfrag _". rewrite hwrite_resume_write_ram4_con.
     iApply swp_ret. by iFrame.
   Qed.
 
@@ -4348,10 +4488,20 @@ Section samo.
     resv_frag cpu_id (Some (snap_of pa 4 old)) -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, ⌜read_bytes σ.(mem) pa 4 = Some old⌝ -∗
-        mstate_interp σ ={⊤,∅}=∗
+    (* THE CONDITIONAL WRITE APPENDS LIKE ANY OTHER STORE, and its view goes
+       PAST its own append ([ak_excl] is true here -- "the drain includes my
+       write"), which is what makes the AMO an acquire. *)
+    (∀ σ img log tv V, ⌜read_bytes σ.(mem) pa 4 = Some old⌝ -∗
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 v) σ.(mdev)) ∗ R)) -∗
+             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 v) σ.(mdev)) ∗
+             tso_interp_of riscv_eraGS img (write_bytes σ.(mem) pa 4 v)
+               (log ++ [PWMsg (snap_of pa 4 v) (hart_agent cpu_id)])%list
+               (vstep (hart_agent cpu_id) (S (length log))
+                  (log ++ [PWMsg (snap_of pa 4 v) (hart_agent cpu_id)])%list V)
+             ∗ R)) -∗
     swp (checked_mem_write (Physaddr pa) 4 v amoacc PBMT_PMA Supervisor tt
            false false true)
       (fun r => ⌜r = Values.Ok true⌝ ∗
@@ -4459,10 +4609,20 @@ Section samo.
     resv_frag cpu_id (Some (snap_of pa 4 old)) -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, ⌜read_bytes σ.(mem) pa 4 = Some old⌝ -∗
-        mstate_interp σ ={⊤,∅}=∗
+    (* THE CONDITIONAL WRITE APPENDS LIKE ANY OTHER STORE, and its view goes
+       PAST its own append ([ak_excl] is true here -- "the drain includes my
+       write"), which is what makes the AMO an acquire. *)
+    (∀ σ img log tv V, ⌜read_bytes σ.(mem) pa 4 = Some old⌝ -∗
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 v) σ.(mdev)) ∗ R)) -∗
+             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 v) σ.(mdev)) ∗
+             tso_interp_of riscv_eraGS img (write_bytes σ.(mem) pa 4 v)
+               (log ++ [PWMsg (snap_of pa 4 v) (hart_agent cpu_id)])%list
+               (vstep (hart_agent cpu_id) (S (length log))
+                  (log ++ [PWMsg (snap_of pa 4 v) (hart_agent cpu_id)])%list V)
+             ∗ R)) -∗
     swp (mem_write_value (Physaddr pa) 4 v amoacc PBMT_PMA false false true)
       (fun r => ⌜r = Values.Ok true⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
@@ -4567,10 +4727,17 @@ Section samo.
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
         ⌜mem_bytes_at σ pa 4 bytes⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr)) -∗
-    (Rr -∗ ∀ σ, ⌜read_bytes σ.(mem) pa 4 = Some bytes⌝ -∗
-        mstate_interp σ ={⊤,∅}=∗
+    (Rr -∗ ∀ σ img log tv V, ⌜read_bytes σ.(mem) pa 4 = Some bytes⌝ -∗
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 sv) σ.(mdev)) ∗ R)) -∗
+             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 sv) σ.(mdev)) ∗
+             tso_interp_of riscv_eraGS img (write_bytes σ.(mem) pa 4 sv)
+               (log ++ [PWMsg (snap_of pa 4 sv) (hart_agent cpu_id)])%list
+               (vstep (hart_agent cpu_id) (S (length log))
+                  (log ++ [PWMsg (snap_of pa 4 sv) (hart_agent cpu_id)])%list V)
+             ∗ R)) -∗
     swp (execute_AMO AMOSWAP true false (Regidx rs2) (Regidx rs1) 4 (Regidx rd))
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                 gpr_file (<[Regidx rd
@@ -4770,10 +4937,16 @@ Section samo.
           ⌜mem_bytes_at σ pa 4 bytes⌝ ∗
           ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes)) -∗
     (∀ bytes : SailStdpp.Values.mword (8 * 4),
-       Rr bytes -∗ ∀ σ, ⌜read_bytes σ.(mem) pa 4 = Some bytes⌝ -∗
-        mstate_interp σ ={⊤,∅}=∗
+       Rr bytes -∗ ∀ σ img log tv V, ⌜read_bytes σ.(mem) pa 4 = Some bytes⌝ -∗
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 sv) σ.(mdev))
+             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 sv) σ.(mdev)) ∗
+             tso_interp_of riscv_eraGS img (write_bytes σ.(mem) pa 4 sv)
+               (log ++ [PWMsg (snap_of pa 4 sv) (hart_agent cpu_id)])%list
+               (vstep (hart_agent cpu_id) (S (length log))
+                  (log ++ [PWMsg (snap_of pa 4 sv) (hart_agent cpu_id)])%list V)
              ∗ R bytes)) -∗
     swp (execute_AMO AMOSWAP true false (Regidx rs2) (Regidx rs1) 4 (Regidx rd))
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
@@ -4963,10 +5136,16 @@ Section samo.
           ⌜mem_bytes_at σ pa 4 bytes⌝ ∗
           ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes)) -∗
     (∀ bytes : SailStdpp.Values.mword (8 * 4),
-       Rr bytes -∗ ∀ σ, ⌜read_bytes σ.(mem) pa 4 = Some bytes⌝ -∗
-        mstate_interp σ ={⊤,∅}=∗
+       Rr bytes -∗ ∀ σ img log tv V, ⌜read_bytes σ.(mem) pa 4 = Some bytes⌝ -∗
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
         ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 sv) σ.(mdev))
+             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 sv) σ.(mdev)) ∗
+             tso_interp_of riscv_eraGS img (write_bytes σ.(mem) pa 4 sv)
+               (log ++ [PWMsg (snap_of pa 4 sv) (hart_agent cpu_id)])%list
+               (vstep (hart_agent cpu_id) (S (length log))
+                  (log ++ [PWMsg (snap_of pa 4 sv) (hart_agent cpu_id)])%list V)
              ∗ R bytes)) -∗
     swp (execute_AMO AMOSWAP true false (Regidx rs2) (Regidx rs1) 4 (Regidx rd))
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗

@@ -150,6 +150,9 @@ Section UserBytesTree.
     rewrite /pt_page_own /pt_page_maps big_sepL_fmap.
     apply bi.sep_proper; [reflexivity |].
     apply big_sepL_proper. intros k i _.
+    (* the USER tier's slot IS [ctx_phys_word_pointsto] (PtTree's tiered
+       [pt_slot_own] at [Some ξ]); one iota step exposes it. *)
+    rewrite /pt_slot_own. cbn match.
     rewrite phys_word_bytes_own_full.
     rewrite (bi.pure_True _ (pte_addr_at_aligned8 (pt_base t) (mword_of_int i))).
     by rewrite left_id.

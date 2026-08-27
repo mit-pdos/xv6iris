@@ -10,6 +10,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang.
+Require Import TsoMemPa TsoGhost.  (* the TSO machine ghosts (tso-machine-flip.md) *)
 Require Export DiskImg.  (* [diskImgG]/[disk_img_auth]: the disk image map *)
 (* [disk_write]/[disk_wr]/[wr_apply]: the disk image and the pure write
    identity a crash permit is indexed by.  Safe to import here -- DiskImg.v
@@ -348,6 +349,15 @@ Record riscvEraGS := RiscvEraGS {
      across interference, so the reservation's SNAPSHOT plus [resv_ok] in
      [era_interp] is what supplies it. *)
   era_resv_name : gname;
+  (* THE TSO GHOST NAMES (tso-machine-flip.md par.4), all four PER-ERA --
+     the write log and the views die with RAM at a power edge, exactly
+     like the reservations; a fresh era re-mints them over the empty
+     log.  Their functor classes ride [riscvF_tsomemGS] below; the
+     interp conjunct is [tso_interp_at]. *)
+  era_ts_name : gname;      (* per-byte latest-write timestamps          *)
+  era_logm_name : gname;    (* the write log's entries, persisted        *)
+  era_loglen_name : gname;  (* mono-nat = length glog ([llb] receipts)   *)
+  era_view_name : gname;    (* auth of the per-agent views ([view_lb])   *)
 }.
 
 (* THE DURABLE FILE SYSTEM'S REMAINING GHOST NAMES (durable-disk 2c;
@@ -427,6 +437,9 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      ([riscvEraGS.era_resv_name] above), since reservations do not survive a
      power cycle -- [boot_shape] mints them all at [None]. *)
   riscvF_resvGS :: ghost_mapG Σ CPU (option resv);
+  (* the TSO machine ghosts' functor bundle (TsoGhost.v); the NAMES are
+     per-era (the four [era_*_name] fields above) *)
+  riscvF_tsomemGS :: tsoMemG Σ;
   (* THE DISK IMAGE's TYPING (claude-notes/design/crash.md): the class alone
      -- the NAME is per-era ([riscvEraGS.era_disk_name] above), because a
      fixed image map could not be re-minted after a crash.  This field is
@@ -556,6 +569,10 @@ Definition plic_name `{!riscvGS Σ} : gname := era_plic_name riscv_eraGS.
 Definition virtio_name `{!riscvGS Σ} : gname := era_virtio_name riscv_eraGS.
 Definition kmap_name `{!riscvGS Σ} : gname := era_kmap_name riscv_eraGS.
 Definition kpt_name `{!riscvGS Σ} : gname := era_kpt_name riscv_eraGS.
+Definition ts_name `{!riscvGS Σ} : gname := era_ts_name riscv_eraGS.
+Definition logm_name `{!riscvGS Σ} : gname := era_logm_name riscv_eraGS.
+Definition loglen_name `{!riscvGS Σ} : gname := era_loglen_name riscv_eraGS.
+Definition view_name `{!riscvGS Σ} : gname := era_view_name riscv_eraGS.
 Definition strans_name `{!riscvGS Σ} : CPU -> gname := era_strans_name riscv_eraGS.
 Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name riscv_eraGS.
 Definition spp_name `{!riscvGS Σ} : CPU -> gname := era_spp_name riscv_eraGS.
@@ -1477,6 +1494,39 @@ End mem_pointsto_share.
    three spellings below leave [KTR] to typeclass resolution -- the global
    default is KT0, so every existing text fact means exactly what it meant
    -- and an explicit tier is written [a ↦ₓ[kt]{dq} v]. *)
+(* THE TIMESTAMP CONJUNCT (tso-machine-flip.md's rewritten RULING 1, and
+   A6.10's pristine tier).  Post-overruling an instruction FETCH takes the
+   same nondeterministic-view arm as a plain data load, so a fetch site owes
+   a view-indexed [tso_read_bytes] fact and a bare points-to cannot pay it.
+   What pays it for kernel TEXT is that a text byte's latest write IS the era
+   image -- timestamp 0, visible at every agent and every view -- and the
+   RESOURCE that says so is the DISCARDED timestamp element.  It is carried
+   HERE, inside [text_pointsto], rather than threaded as a premise, and that
+   is the whole reason nothing above the fetch leaves moves: [kernel_text] is
+   a big-op of [↦ₓ□], [KernelText.kernel_window_pc] cuts a window out of it,
+   [InstrBytes.instr_bytes] holds the window, and all ~135 leaf sites are
+   textually unchanged.  DISCARDED is also exactly the right strength: it
+   says the byte can never be STORED to again (a store must UPDATE the
+   element), which is what "read-only forever" and "readable from anywhere"
+   both mean here -- one resource for both, and W^X for the text region as a
+   consequence rather than as an assumption.  THE ONE NEW OBLIGATION is at
+   the single place [↦ₓ] is born from raw memory ([KMap.phys_ident_text],
+   through [BootCarve.boot_text_persist]); the era's initial-state ghost
+   allocation is its supplier, the same one A6.10/A6.34 already name. *)
+(* NAMED so the [Arch.pa] key instances are fixed once.  A file that imports
+   [SailStdpp.Base] elaborates a FRESH binder of type [mword 64] at the Sail
+   key instances and it will not unify with the stdpp-keyed one (the binder
+   trap in durable-notes; the same reason [TsoMemPa.bytemap] exists). *)
+Definition pristine_elem `{!riscvGS Σ} (a : Arch.pa) : iProp Σ :=
+  (a ↪[ts_name]□ 0%nat)%I.
+
+Global Instance pristine_elem_persistent `{!riscvGS Σ} a :
+  Persistent (pristine_elem a).
+Proof. rewrite /pristine_elem. apply _. Qed.
+Global Instance pristine_elem_timeless `{!riscvGS Σ} a :
+  Timeless (pristine_elem a).
+Proof. rewrite /pristine_elem. apply _. Qed.
+
 Definition text_pointsto `{!riscvGS Σ} `{KTR : !CurKtier}
     (va : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
   (∃ ppn : mword 44,
@@ -1484,7 +1534,8 @@ Definition text_pointsto `{!riscvGS Σ} `{KTR : !CurKtier}
      ⌜(uint va < 274877906944)%Z⌝ ∗          (* 2^38: canonical, positive half *)
      ⌜addr_is_text (pa_of ppn va)⌝ ∗
      ⌜ktier_pin cur_ktier ppn va⌝ ∗          (* TIER PIN (see the note above) *)
-     pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn va) dq v)%I.
+     pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn va) dq v ∗
+     pristine_elem (pa_of ppn va))%I.         (* the pristine element *)
 Notation "a ↦ₓ{ dq } v" := (text_pointsto a dq v)
   (at level 20, format "a  ↦ₓ{ dq }  v") : bi_scope.
 (* discarded (persistent, duplicable) read-only code ownership. *)
@@ -2084,11 +2135,55 @@ Definition dev_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
    rather than beside the fixed conjuncts: it is per-era (see
    [era_disk_name]), so when the power is off there is no disk conjunct at
    all -- the era, and its image map, are gone. *)
+(* THE PER-AGENT VIEW FUNCTION of a machine state: harts at their [gtv],
+   every device agent pinned to the top (strongly-ordered DMA,
+   tso-machine-flip.md RULING 2). *)
+Definition avf (g : gstate) : agent -> nat :=
+  fun h => match lt_dec h NCPU with
+           | left H => g.(gtv) (nat_to_fin H)
+           | right _ => length g.(glog)
+           end.
+
+Lemma avf_hart (g : gstate) (c : CPU) : avf g (hart_agent c) = g.(gtv) c.
+Proof.
+  rewrite /avf /hart_agent.
+  destruct (lt_dec (fin_to_nat c) NCPU) as [H|H].
+  - f_equal. apply (inj fin_to_nat). by rewrite fin_to_nat_to_fin.
+  - exfalso. pose proof (fin_to_nat_lt c). lia.
+Qed.
+
+Lemma avf_disk (g : gstate) : avf g disk_agent = length g.(glog).
+Proof.
+  rewrite /avf /disk_agent. destruct (lt_dec NCPU NCPU); [lia|done].
+Qed.
+
+(* THE TSO MACHINE GHOSTS' INTERP (tso-machine-flip.md par.4): the
+   timestamp map, tied per-address to the LATEST write over the log; the
+   persisted log entries; the log length; and the per-agent view
+   authority.  [mm_ok] rides as the pure conjunct exactly like
+   [resv_ok].  gen_heap (the conjunct above it in [era_interp]) still
+   interprets [gmem] -- the FLAT cache -- so a [pointsto] fragment keeps
+   meaning "the flat byte" and the timestamp fragment beside it (inside
+   [TsoCtx.ctx_pointsto]) is what adds the justification axis. *)
+Definition tso_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
+    : iProp Σ :=
+  (∃ (TM : gmap Arch.pa nat) (LM : gmap nat pwmsg),
+     ghost_map_auth (era_ts_name E) 1 TM ∗
+     ⌜dom TM = dom g.(gmem)⌝ ∗
+     ⌜∀ a t, TM !! a = Some t →
+        ∃ v, g.(gmem) !! a = Some v ∧ latest g.(gimg) g.(glog) a t v⌝ ∗
+     ghost_map_auth (era_logm_name E) 1 LM ∗
+     ⌜∀ i, LM !! i = g.(glog) !! i⌝ ∗
+     mono_nat_auth_own (era_loglen_name E) 1 (length g.(glog)) ∗
+     view_auth (era_view_name E) (avf g) ∗
+     ⌜mm_ok g⌝)%I.
+
 Definition era_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) : iProp Σ :=
   (gregs_interp_at E g.(gregs) ∗
    gen_heap_interp (hG := era_memGS_of E) g.(gmem) ∗
    dev_interp_at E g.(gdev) ∗
    disk_dur_interp E g ∗
+   tso_interp_at E g ∗
    (* the reservation mirror and its snapshot invariant (design §3a).  The
       pure conjunct is a STEP invariant of the language, so every arm
       re-establishes it and no rule has to carry it. *)
@@ -2403,18 +2498,20 @@ Section Bridge.
       ⌜addr_is_text (pa_of ppn a)⌝ ∗
       ⌜ktier_pin cur_ktier ppn a⌝ ∗
       pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn a) dq b ∗
+      pristine_elem (pa_of ppn a) ∗
       (pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn a) dq b -∗ a ↦ₓ{dq} b).
   Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp)".
-    iExists ppn. iFrame "Hk Hp".
+    rewrite /text_pointsto. iIntros "H".
+    iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp & #Hts)".
+    iExists ppn. iFrame "Hk Hp Hts".
     iSplit; [iPureIntro; exact Hc|]. iSplit; [iPureIntro; exact Hd|].
     iSplit; [iPureIntro; exact Hi|].
-    iIntros "Hp". iExists ppn. by iFrame "Hk Hp".
+    iIntros "Hp". iExists ppn. by iFrame "Hk Hp Hts".
   Qed.
 
   Lemma text_canonical a dq b : a ↦ₓ{dq} b -∗ ⌜(uint a < 274877906944)%Z⌝.
   Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(_ & %Hc & _ & _ & _)".
+    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(_ & %Hc & _ & _ & _ & _)".
     iPureIntro; exact Hc.
   Qed.
 
@@ -2427,7 +2524,7 @@ Section Bridge.
       kmap_at (svpn_of a) ppn KP_rx ∗ ⌜addr_is_text (pa_of ppn a)⌝ ∗
       ⌜ktier_pin cur_ktier ppn a⌝.
   Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & %Hi & _)".
+    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & %Hi & _ & _)".
     iExists ppn. iFrame "Hk". iPureIntro; split; [exact Hd | exact Hi].
   Qed.
 
@@ -2437,7 +2534,7 @@ Section Bridge.
     a ↦ₓ{dq} b -∗ ∃ ppn : mword 44,
       kmap_at (svpn_of a) ppn KP_rx ∗ ⌜addr_is_ram (pa_of ppn a)⌝.
   Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & %Hi & _)".
+    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & %Hi & _ & _)".
     iExists ppn. iFrame "Hk". iPureIntro; exact (addr_is_text_ram _ Hd).
   Qed.
 
@@ -2446,7 +2543,7 @@ Section Bridge.
       kmap_at (svpn_of a) ppn KP_rx ∗ ⌜addr_is_text (pa_of ppn a)⌝ ∗
       ⌜mm !! (pa_of ppn a) = Some b⌝.
   Proof.
-    rewrite /text_pointsto. iIntros "Hm H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & _ & Hp)".
+    rewrite /text_pointsto. iIntros "Hm H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & _ & Hp & _)".
     iDestruct (gen_heap_valid with "Hm Hp") as %Hlk.
     iExists ppn. iFrame "Hk". iPureIntro. split; [exact Hd | exact Hlk].
   Qed.
@@ -2467,9 +2564,10 @@ Section Bridge.
      one (adequacy init persists the whole sub-etext image this way). *)
   Lemma text_pointsto_persist a dq b : a ↦ₓ{dq} b ==∗ a ↦ₓ□ b.
   Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp)".
+    rewrite /text_pointsto. iIntros "H".
+    iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp & #Hts)".
     iMod (pointsto_persist with "Hp") as "Hp". iModIntro. iExists ppn.
-    iFrame "Hk Hp". iPureIntro. split; [exact Hc | split; [exact Hd | exact Hi]].
+    iFrame "Hk Hp Hts". iPureIntro. split; [exact Hc | split; [exact Hd | exact Hi]].
   Qed.
 
   (* ---- the TIER algebra of the code family, mirroring [↦ₘ]'s ---- *)
@@ -2480,8 +2578,9 @@ Section Bridge.
   Lemma text_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} a dq b :
     a ↦ₓ[kt]{dq} b ⊢ a ↦ₓ[kt']{dq} b.
   Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hp & Hpt)".
-    iExists ppn. iFrame "Hk Hpt". iPureIntro.
+    rewrite /text_pointsto. iIntros "H".
+    iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hp & Hpt & #Hts)".
+    iExists ppn. iFrame "Hk Hpt Hts". iPureIntro.
     split; [exact Hc | split; [exact Hd | exact (ktier_pin_mono kt kt' ppn a Hp)]].
   Qed.
 
@@ -2494,8 +2593,8 @@ Section Bridge.
     a ↦ₓ[kt1]{dq1} b1 -∗ a ↦ₓ[kt2]{dq2} b2 -∗ ⌜b1 = b2⌝.
   Proof.
     rewrite /text_pointsto. iIntros "H1 H2".
-    iDestruct "H1" as (ppn1) "(Hk1 & _ & _ & _ & Hp1)".
-    iDestruct "H2" as (ppn2) "(Hk2 & _ & _ & _ & Hp2)".
+    iDestruct "H1" as (ppn1) "(Hk1 & _ & _ & _ & Hp1 & _)".
+    iDestruct "H2" as (ppn2) "(Hk2 & _ & _ & _ & Hp2 & _)".
     iDestruct (kmap_at_agree with "Hk1 Hk2") as %[-> _].
     by iDestruct (pointsto_agree with "Hp1 Hp2") as %->.
   Qed.
@@ -2642,12 +2741,14 @@ Section Bridge.
       ⌜(uint pa < 274877906944)%Z⌝ ∗ ⌜addr_is_text (pa_of ppn0 pa)⌝ ∗
       ⌜ktier_pin cur_ktier ppn0 pa⌝ ∗
       pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn0 pa) dq b ∗
+      pristine_elem (pa_of ppn0 pa) ∗
       (pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn0 pa) dq b -∗ pa ↦ₓ{dq} b).
   Proof.
     iIntros "#Hk0 H".
-    iDestruct (text_pointsto_acc with "H") as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp & Hcl)".
+    iDestruct (text_pointsto_acc with "H")
+      as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp & #Hts & Hcl)".
     iDestruct (kmap_at_agree with "Hk0 Hk") as %[<- _].
-    iFrame "Hp Hcl". iPureIntro. split; [exact Hc | split; [exact Hd | exact Hi]].
+    iFrame "Hp Hts Hcl". iPureIntro. split; [exact Hc | split; [exact Hd | exact Hi]].
   Qed.
 
 End Bridge.

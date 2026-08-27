@@ -1339,6 +1339,8 @@ Proof. rewrite /imark_key. lia. Qed.
    Xv6Cameras.v; what a caller holds is below. *)
 
 Section InodeRegion.
+  (* M1 stage 2: the ↦₂/↦₄ cells here are context-indexed. *)
+  Context `{XI : TsoCtx.CurCtx}.
   (* [fsLinkG] since durable-disk 2b-inode-4: [ireg_slot] parks the link
      RA's per-inum authority.  This file binds MEMBERS, not the bundle, so
      the class goes here beside [fsTopG]; every consumer that binds

@@ -70,7 +70,6 @@ Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsImg.          (* the image sweeps' vocabulary *)
 Require Import FsCfgBoot.      (* [fs_cfg_alloc] and the two boot kits *)
 Require Import TsoCtx.
-Require Import CtxRecord.   (* [ctx_parked_inv]: the deposit record's token *)
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:
@@ -264,17 +263,6 @@ Section BootBss.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             !irefslotG Σ}.
   Context `{GEN : GenId}.
-  (* ...BUT A [CurCtx] BINDER, since the M1 flip (tso-port.md §0.16′).  The
-     carve's outputs are read by ξ-INDEXED consumers -- [cpu_slot_raw] below
-     holds a [↦₈] cell and an [own_ctx], and [IntrDefs.cpu_cells] wants both
-     at the running hart's context -- while [BootCarve] sits BELOW the seam
-     and hands out the RAW [RiscvPtsto.word_pointsto].  So every cell that
-     crosses gets the phys→ctx mint [TsoCtxShim.ctx_word_of_mem], one named
-     crossing per cell, exactly as [BootCarveMain.v] does at ~60 sites.  This
-     file's carve had been stale since the flip because the deliberate [Abort]
-     in [ProofForkretPark.v] hid its whole cone from [make] (§0.12′'s
-     lesson). *)
-  Context `{XI : TsoCtx.CurCtx}.
 
   (* ---- the stack family.  The per-element shape is NAMED (a lambda [Φ]
          leaves the family's per-element goal a beta-redex [iApply] will not
@@ -313,19 +301,8 @@ Section BootBss.
          (pinned zero -- [cpu_own 0] is what the bridge produces) and
          [intena] at +124 (contents-existential: nothing reads it before
          push_off writes it). *)
-  (* THE [proc] CELL STAYS RAW HERE, and that is the eight-hart adequacy trap
-     answered (tso-port.md §0.16′).  It is a TIMESTAMP-0 boot-image cell and
-     it is the ONLY ξ-indexed row of [BootChain.boot_hart_res]; the carve runs
-     ONCE, before any hart has a thread of control, while each hart's chain
-     runs at ITS OWN [own_context_boot] identity.  So the cell crosses at the
-     CONSUMER, not here: [boot_hart_pre] turns it into
-     [∀ ξ, ProcGeom.cur_proc (XI := ξ) zero_reg] with the phys→ctx mint UNDER
-     the ∀, and [BootChain.boot_entry_bridge] instantiates at its own ambient.
-     The ∀ is sound exactly here and would not be elsewhere: the cell is
-     EXCLUSIVE, so the ∀ is not duplicable (it is not under a [□]), and it is
-     a t = 0 boot-image fact -- §0.4 item 6's one sanctioned case. *)
   Local Definition cpu_slot_raw (a : Arch.pa) : iProp Σ :=
-    (RiscvPtsto.word_pointsto a (DfracOwn 1) (zero_reg : mword 64) ∗
+    (a ↦₈ (zero_reg : mword 64) ∗
      own_ctx (add_vec a (mword_of_int 8 : mword 64)) ∗
      (add_vec a (mword_of_int 120 : mword 64)) ↦₄ noff_val 0 ∗
      (∃ iv : mword 32, (add_vec a (mword_of_int 124 : mword 64)) ↦₄ iv))%I.
@@ -409,24 +386,10 @@ Proof.
 Qed.
 
 Section BootBssChain.
-  (* NO [fileG] BINDER -- see [BootBss]; a [CurCtx] BINDER for the same
-     reason [BootBss] has one. *)
+  (* NO [fileG] BINDER -- see [BootBss]. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             !irefslotG Σ}.
   Context `{GEN : GenId}.
-  Context `{XI : TsoCtx.CurCtx}.
-
-  (* THE BYTE-RUN CROSSING, once.  [BootCarve]'s runs are RAW
-     [RiscvPtsto.mem_pointsto]; every consumer above the seam reads them as
-     [↦ₘ], the CONTEXT byte.  Stated over an arbitrary value function so the
-     two callers ([sb]'s 32 bytes, [disk.free]'s 8) share it. *)
-  Lemma boot_bytes_ctx (a : Arch.pa) (n : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 n, mem_pointsto (pa_add a j) (DfracOwn 1) (f j)) -∗
-    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j).
-  Proof.
-    iIntros "H". iApply (big_sepL_mono with "H"). intros k j _. iIntros "Hb".
-    iApply (TsoCtxShim.ctx_pointsto_of_mem with "Hb").
-  Qed.
 
   (* ONE hart's memory share, exactly as [BootChain.boot_hart_res] spells it
      (its stack slice and its four [cpus[h]] cells; the image word it also
@@ -440,8 +403,7 @@ Section BootBssChain.
     (stack_own_phys (mword_of_int (sp_of (fin_to_nat h))) boot_stack_depth ∗
      a_cpu_noff (cid_word_of h) ↦₄ noff_val 0 ∗
      (∃ iv : mword 32, a_cpu_int (cid_word_of h) ↦₄ iv) ∗
-     RiscvPtsto.word_pointsto (a_cpu_proc (cid_word_of h)) (DfracOwn 1)
-       (zero_reg : mword 64) ∗
+     a_cpu_proc (cid_word_of h) ↦₈ (zero_reg : mword 64) ∗
      own_ctx (a_cpu_ctx (cid_word_of h)))%I.
 
   (* the two families' per-element outputs, restated in the consumer's
@@ -457,12 +419,7 @@ Section BootBssChain.
     rewrite /boot_hart_bss a_cpu_ctx_cid a_cpu_noff_cid a_cpu_int_cid
             a_cpu_proc_cid.
     iSplitL "Hst"; [iExact "Hst" |].
-    (* ROW BY ROW, not one [iFrame]: the [own_ctx] row is an ∃ over a list of
-       CONTEXT words since the M1 flip, and [iFrame] will not match an ∃
-       against an ∃ (the same note [ParkCap.park_token_park] carries). *)
-    iSplitL "Hnoff"; [iExact "Hnoff" |].
-    iSplitL "Hint"; [iExact "Hint" |].
-    iSplitL "Hp"; [iExact "Hp" | iExact "Hctx"].
+    iFrame "Hnoff Hint Hp Hctx".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -531,13 +488,11 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hkpt H]".
     iDestruct (boot_ran_cell8 g KernelSyms.kernel_pagetable Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hkpt") as (vkpt) "Hkpt".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hkpt") as "Hkpt".
     iDestruct (bss_cut g (KernelSyms.kernel_pagetable + 8) KernelSyms.initproc
                  (KernelSyms.initproc + 8) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hip H]".
     iDestruct (boot_ran_cell8 g KernelSyms.initproc Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hip") as (vip) "Hip".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hip") as "Hip".
     (* ---- 0x8000a248 ticks: the tick counter tickslock protects.  main needs
            it to ALLOCATE that lock (is_tickslock = is_lock … ticks_res), which
            is what the handler contract's [tick_keeper] asks of the tick
@@ -595,7 +550,6 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zeq)
                  ltac:(intros j _; apply nth_byte_zero; zeq) with "Hcl Hkm")
       as "Hkm".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hkm") as "Hkm".
     iDestruct (bss_cut g (KernelSyms.kmem + 24 + 8) KernelSyms.pid_lock
                  (KernelSyms.pid_lock + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk5 H]".
@@ -623,16 +577,6 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hprocs H]".
     iDestruct (boot_procs_raw g Hmem with "Hcl Hprocs")
       as "[Hpr1 [Hpr2 Hpar]]".
-    (* the crossing, per slot: [BootCarveMain]'s carve is BELOW the seam and
-       hands out the RAW [word_pointsto], while [SchedCtx]'s p->lock resource
-       reads [p->chan] at the LOCK HOLDER's context.  One named mint per cell,
-       under the big-op (tso-port.md §0.16′). *)
-    iAssert ([∗ list] i ∈ seq 0 NPROC,
-               (∃ ch : SailStdpp.Values.mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
-               proc_pub (proc_addr i))%I with "[Hpr2]" as "Hpr2".
-    { iApply (big_sepL_mono with "Hpr2"). intros k i _.
-      iIntros "[Hc $]". iDestruct "Hc" as (ch) "Hc". iExists ch.
-      iApply (TsoCtxShim.ctx_word_of_mem with "Hc"). }
     (* the parent cells, gathered into wait_lock's resource.  The carve hands
        one existential per slot; [WaitInv.wait_res] is one list. *)
     iDestruct (WaitInv.wait_res_of_cells with "Hpar") as "Hwres".
@@ -669,8 +613,6 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hsbb H]".
     iDestruct (boot_ran_mem_run g KernelSyms.sb 32%nat Hmem ltac:(zlit)
                  ltac:(zlit) with "Hcl Hsbb") as "Hsbb".
-    (* the crossing, byte by byte: [SpecMain.main_sb_raw] is above the seam *)
-    iDestruct (boot_bytes_ctx with "Hsbb") as "Hsbb".
     iDestruct (bss_cut g (KernelSyms.sb + Z.of_nat 32%nat)
                  KernelSyms.itable (KernelSyms.itable + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk9 H]".
@@ -714,13 +656,11 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd1r H]".
     iDestruct (boot_ran_cell8 g (KernelSyms.devsw + 16) Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hd1r") as (vdr) "Hdr".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hdr") as "Hdr".
     iDestruct (bss_cut g (KernelSyms.devsw + 24)
                  (KernelSyms.devsw + 24) (KernelSyms.devsw + 32) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd1w H]".
     iDestruct (boot_ran_cell8 g (KernelSyms.devsw + 24) Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hd1w") as (vdw) "Hdw".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hdw") as "Hdw".
     iDestruct (bss_cut g (KernelSyms.devsw + 32)
                  (KernelSyms.devsw + 32) (KernelSyms.devsw + 40) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd2r H]".
@@ -833,28 +773,6 @@ Section BootBssChain.
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd9w")
       as "Hd9w".
-    (* THE EIGHTEEN CROSSINGS.  [BootCarve]'s [↦₈] is the RAW
-       [RiscvPtsto.word_pointsto]; [ConsoleInv.devsw_rest] is stated above the
-       seam, so each cell is minted with the phys→ctx shim, one named crossing
-       per cell ([BootCarveMain.v]'s pattern; tso-port.md §0.16′). *)
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd0r") as "Hd0r".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd0w") as "Hd0w".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd2r") as "Hd2r".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd2w") as "Hd2w".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd3r") as "Hd3r".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd3w") as "Hd3w".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd4r") as "Hd4r".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd4w") as "Hd4w".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd5r") as "Hd5r".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd5w") as "Hd5w".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd6r") as "Hd6r".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd6w") as "Hd6w".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd7r") as "Hd7r".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd7w") as "Hd7w".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd8r") as "Hd8r".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd8w") as "Hd8w".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd9r") as "Hd9r".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hd9w") as "Hd9w".
     (* the eighteen, as the [big_sepL] [ConsoleInv.devsw_rest] is.  The
        reduction lives in ConsoleInv.v; this file only applies the lemma. *)
     iDestruct (ConsoleInv.devsw_rest_intro with "Hd0r Hd0w Hd2r Hd2w Hd3r Hd3w Hd4r Hd4w Hd5r Hd5w Hd6r Hd6w Hd7r Hd7w Hd8r Hd8w Hd9r Hd9w") as "Hdevrest".
@@ -878,25 +796,21 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hdd H]".
     iDestruct (boot_ran_cell8 g KernelSyms.disk Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zeq) with "Hcl Hdd") as (vdd) "Hdd".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hdd") as "Hdd".
     iDestruct (bss_cut g (KernelSyms.disk + 8) (KernelSyms.disk + 8)
                  (KernelSyms.disk + 16) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hda H]".
     iDestruct (boot_ran_cell8 g (KernelSyms.disk + 8) Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hda") as (vda) "Hda".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hda") as "Hda".
     iDestruct (bss_cut g (KernelSyms.disk + 16) (KernelSyms.disk + 16)
                  (KernelSyms.disk + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hdu H]".
     iDestruct (boot_ran_cell8 g (KernelSyms.disk + 16) Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hdu") as (vdu) "Hdu".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hdu") as "Hdu".
     iDestruct (bss_cut g (KernelSyms.disk + 24) (KernelSyms.disk + 24)
                  (KernelSyms.disk + 24 + Z.of_nat 8%nat) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hdf H]".
     iDestruct (boot_ran_mem_run g (KernelSyms.disk + 24) 8%nat Hmem ltac:(zlit)
                  ltac:(zlit) with "Hcl Hdf") as "Hdf".
-    iDestruct (boot_bytes_ctx with "Hdf") as "Hdf".
     iDestruct (bss_cut g (KernelSyms.disk + 24 + Z.of_nat 8%nat)
                  (KernelSyms.disk + 32) (KernelSyms.disk + 34) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hdi H]".
@@ -1329,24 +1243,7 @@ Section BootAlloc.
     iExists iv.
     rewrite /boot_hart_res /strans_pending /sie_gname /sret_bits /spp_gname
             /spie_gname /cpu_ctx_free /cid_word.
-    (* [SchedCtx.cpu_ctx_free] ∃-QUANTIFIES THE SAVE AREA'S CONTEXT -- the
-       cells belong to no thread while the slot is free (§0.10′ ruling; the
-       eight-hart adequacy trap) -- so the boot carve, which holds them at its
-       own ambient, WITNESSES the ∃ here.  Row by row rather than one
-       [iFrame]: an ∃ does not frame against an ∃. *)
-    (* the [proc] cell crosses HERE, under the ∀ that makes
-       [BootChain.boot_hart_res] ξ-free (see [cpu_slot_raw]'s note) *)
-    iAssert (∀ ξ : CtxId, ProcGeom.cur_proc (XI := ξ) (zero_reg : mword 64))%I
-      with "[Hproc]" as "Hproc".
-    { iIntros (ξ). rewrite /ProcGeom.cur_proc.
-      iApply (TsoCtxShim.ctx_word_of_mem with "Hproc"). }
     iEval (rewrite /own_ctx) in "Hctx".
-    iDestruct "Hctx" as (vs) "[%Hvs Hc]".
-    iAssert (∃ (ws : list (mword 64)) (ξ : CtxId),
-               ⌜length ws = 14%nat⌝ ∗
-               ctx_cells (XI := ξ) (a_cpu_ctx (cid_word_of h)) ws)%I
-      with "[Hc]" as "Hctx".
-    { iExists vs, cur_ctx. iSplitR; [iPureIntro; exact Hvs |]. iExact "Hc". }
     iFrame "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
             Hmcen Hstc Htlb Hstvec Hsepc Hscause Hstval Hssc Hmse Hsse
             Hword Hstk
@@ -1369,26 +1266,11 @@ Section BootAlloc.
       (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) g
     ={⊤}=∗ ∃ (HFd : fdslotG Σ) (HIr : irefslotG Σ) (HPav : pavG Σ)
              (HBs : bioslotG Σ)
-             (HF : fileG Σ) (γd : uart_names) (γv : disk_names)
-             (* THE DEPOSIT'S CONTEXT, MINTED HERE (tso-absorb-memo.md §5).
-                [started_inv] is an [inv] over a ξ-INDEXED body that ALL
-                EIGHT harts must read, each at its own [own_context_boot]
-                identity -- the same shape [BioInv.buf_escrow] has one layer
-                down, and one ruling covers both.  The escrow can ∃-close
-                its context inside its own invariant; this one CANNOT (§5's
-                two-open [▷] problem), so the context is NAMED: minted here
-                with the pure [TsoCtx.ctx_parked_alloc], published as
-                [CtxRecord.ctx_parked_inv] inside the deposit itself, and
-                returned so the chain can state its rows at it. *)
-             (xid : CtxId),
+             (HF : fileG Σ) (γd : uart_names) (γv : disk_names),
       ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
       kernel_text ∗ kernel_data ∗
-      started_inv (main_deposit xid γd γv) ∗
-      (* the record's own token, published so the BOOT hart can deposit into
-         it ([ProofMain.mn_grp_started]); the SECONDARIES get their copy out
-         of [main_deposit] itself, which carries it as a conjunct. *)
-      ctx_parked_inv xid ∗
+      started_inv (main_deposit γd γv) ∗
       dev_inv γd γv ∗ wire_inv ∗ crash_inv ∗ gen_cert ∗
       (* --- one bundle per hart --- *)
       ([∗ list] c ∈ enum CPU,
@@ -1680,23 +1562,18 @@ Section BootAlloc.
             (fun c => register_lookup sig_meip (g.(gregs) c)) with "[Hpins]")
       as "#Hwinv".
     { iApply RiscvAdequacy.big_sepL_enum_to_set. iExact "Hpins". }
-    (* ---- the deposit's own context, and the token that lets eight harts
-           absorb from it ---- *)
-    iMod (ctx_parked_alloc) as (xid) "Hxpk".
-    iMod (ctx_parked_inv_alloc ⊤ xid 0 with "Hxpk") as "#Hxinv".
     (* ---- the handover channel, at the settled payload ---- *)
-    iMod (started_inv_alloc ⊤ (main_deposit xid γd γv) with "Hstartcell")
+    iMod (started_inv_alloc ⊤ (main_deposit γd γv) with "Hstartcell")
       as "#Hstarted".
     (* ================================================================ *)
     (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- now leaves in the
        postcondition: userinit is proven and its contract
        ([SpecUserinit.v]) takes exactly this. *)
-    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC), γd, γv, xid.
+    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC), γd, γv.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].
     iSplitR; [iExact "Hstarted" |].
-    iSplitR; [iExact "Hxinv" |].
     iSplitR; [iExact "Hdev" |].
     iSplitR; [iExact "Hwinv" |].
     iSplitR; [iExact "Hcinv" |].

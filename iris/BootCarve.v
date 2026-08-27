@@ -51,9 +51,14 @@ Require Import StackOwn.                (* [pa_stk] / [uint_pa_stk] / [stack_own
 Require Import KernelText.             (* the [kernel_text] bundle this produces *)
 Require Import KernelDataInv.          (* ... and the [kernel_data] one *)
 (* [Require] WITHOUT [Import]: this file's ↦-statements stay RAW (it is the
-   boot carve -- adequacy's side of the seam); the shim is named qualified,
-   only to mint the every-context [kernel_data] from the raw image bytes. *)
-Require TsoCtxShim.
+   boot carve -- adequacy's side of the seam); [TsoCtx] is named QUALIFIED,
+   only to mint the every-context [kernel_data] from the raw image bytes.
+   POST-FLIP that mint is no longer a conversion (the SC-era file used
+   [TsoCtxShim.ctx_pointsto_of_mem], which is FALSE at TSO and structurally
+   unreachable -- tso-machine-flip.md §6 amendment A6.9): it needs the
+   PRISTINE RECEIPT for each byte, which is A6.10's resource and which the
+   era's initial-state ghosts mint.  See [kernel_data_intro]. *)
+Require TsoCtx.
 From Kernel Require KernelInstrs KernelData.
 Local Open Scope Z_scope.
 
@@ -166,15 +171,23 @@ Section BootCarve.
      [text_pointsto_persist] freezes it.  [Hram] is the caller's "nothing
      outside RAM" fact -- [boot_facts]' second clause, or
      [riscv_system_adequacy]'s [Hram] premise. *)
+  (* THE PRISTINE PREMISE (A6.43): one timestamp element per text byte, at
+     0 and DISCARDED.  [text_pointsto] carries it now, so the carve has to be
+     handed it; the supplier is the era's initial-state ghost allocation,
+     which is where [kernel_data_intro]'s [pristine_va] premise and these
+     image bytes already come from.  Nothing here MINTS an element (A6.9). *)
   Lemma boot_text_persist (g : gstate) :
     (forall a b, g.(gmem) !! a = Some b -> addr_is_ram a) ->
-    kmap_static_claims -∗ boot_text_raw g
+    kmap_static_claims -∗
+    ([∗ map] a ↦ _ ∈ sub_text g, pristine_elem a) -∗
+    boot_text_raw g
     ==∗ ([∗ map] a ↦ b ∈ sub_text g, a ↦ₓ□ b).
   Proof.
-    iIntros (Hram) "#Hkbundle Ht".
+    iIntros (Hram) "#Hkbundle #Hts Ht".
     rewrite /boot_text_raw.
     iApply big_sepM_bupd. iApply (big_sepM_impl with "Ht").
     iIntros "!>" (a b Ha) "Hb".
+    iDestruct (big_sepM_lookup _ _ a b Ha with "Hts") as "#Htsa".
     apply map_lookup_filter_Some in Ha. destruct Ha as [Ha Hlt]. cbn in Hlt.
     pose proof (Hram a b Ha) as [Hlo _].
     assert (Htext : addr_is_text a) by (split; [exact Hlo | exact Hlt]).
@@ -182,7 +195,7 @@ Section BootCarve.
       by (unfold addr_is_text, text_end in Htext; lia).
     iApply text_pointsto_persist.
     iApply (phys_ident_text a (DfracOwn 1) b (text_svpn_class a Htext) Htext Hcanon
-              with "Hkbundle [Hb]").
+              with "Hkbundle Htsa [Hb]").
     rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_text_ram a Htext).
   Qed.
 
@@ -525,12 +538,29 @@ Section BootCarve.
      for the writable globals, the typed .bss cells and the page run.
      Nothing is left over that anything wants -- the range's non-[KernelData]
      bytes are padding. *)
+  (* THE SECOND PREMISE IS THE ERA'S OWN (§6 amendment A6.10).  A byte's
+     membership in [kernel_data] is a claim about the LOG, not about the
+     flat cache: the ∀-context form says "every thread of control, at every
+     view it can reach, reads this byte" -- and post-flip a raw [↦ₘ□] does
+     not say that.  What does is the PRISTINE RECEIPT, the byte's
+     latest-write timestamp pinned (discarded) at 0, i.e. "the era image
+     wrote this and nothing has since"; an image byte at timestamp 0 is
+     visible to every agent at every view unconditionally
+     ([TsoMemPa.read_down_0]), which is precisely the ∀ξ the resource needs
+     and precisely why the receipt costs no ghost step per context.
+     Discarded is also what makes the claim honest in the other direction:
+     the byte can never be stored to again, which is exactly what §T below
+     already enforces on the domain.
+     WHO SUPPLIES IT: the era's initial-state ghost allocation, beside the
+     image itself -- the same place [Hmem] comes from. *)
   Lemma kernel_data_intro (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
-    ([∗ map] a ↦ b ∈ ran_bytes g text_end rodata_end, a ↦ₘ□ b) -∗ kernel_data.
+    ([∗ map] a ↦ b ∈ ran_bytes g text_end rodata_end, a ↦ₘ□ b) -∗
+    ([∗ map] a ↦ _ ∈ ran_bytes g text_end rodata_end, TsoCtx.pristine_va a) -∗
+    kernel_data.
   Proof.
-    iIntros (Hmem) "#Hd". rewrite /kernel_data /kdata_ro.
+    iIntros (Hmem) "#Hd #Hpr". rewrite /kernel_data /kdata_ro.
     iIntros (ξ).
     iApply big_sepM_intro. iIntros "!>" (a b Hlk).
     apply map_lookup_filter_Some in Hlk. destruct Hlk as [Hlk [Hge Hlt]].
@@ -539,11 +569,19 @@ Section BootCarve.
     unfold KernelData.kernel_data_lo, KernelData.kernel_data_hi in Hr.
     assert (Hram : ram_lo <= a < ram_hi)
       by (unfold ram_lo, ram_hi, text_end in *; lia).
-    iApply TsoCtxShim.ctx_pointsto_of_mem.
-    iApply (big_sepM_lookup _ _ (pa_of_z a) b with "Hd").
-    rewrite /ran_bytes. apply map_lookup_filter_Some_2.
-    - rewrite <- (boot_byte_data a b Hge Hlk). exact (Hmem a Hram).
-    - cbn. rewrite (boot_uint_pa a Hram). lia.
+    (* the value is pinned to [b] IN THE PURE LOOKUP, never by a [rewrite] on
+       the Iris goal: the two hypotheses in scope are whole-range big-ops
+       over [ran_bytes], and a [rewrite] that walks the proofmode environment
+       through them does not terminate in any useful time (measured with
+       [coqc -time]: the stream stopped on exactly that sentence, at 14 GB).
+       Same discipline as [kdata_ro_lookup]'s note in KernelDataInv. *)
+    assert (Hran : ran_bytes g text_end rodata_end !! pa_of_z a = Some b).
+    { rewrite /ran_bytes. apply map_lookup_filter_Some_2.
+      - rewrite <- (boot_byte_data a b Hge Hlk). exact (Hmem a Hram).
+      - cbn. rewrite (boot_uint_pa a Hram). lia. }
+    iApply (TsoCtx.ctx_pointsto_of_pristine_va ξ (pa_of_z a) b).
+    - iApply (big_sepM_lookup _ _ (pa_of_z a) b Hran with "Hd").
+    - iApply (big_sepM_lookup _ _ (pa_of_z a) b Hran with "Hpr").
   Qed.
 
   (* ================================================================== *)

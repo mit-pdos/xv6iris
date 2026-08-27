@@ -57,7 +57,10 @@ Require Import RiscvExtras.
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the phys tier and the unflipped ↦₂/↦₄ towers cross the seam *)
+(* THE PHYS TIER AND THE UNFLIPPED ↦₂/↦₄ TOWERS CROSS THE SEAM HERE, and
+   after the machine flip the two directions are no longer symmetric
+   (tso-machine-flip.md §6 amendment A6.8/A6.9) -- see the block above
+   [mem_win_to_phys_raw]. *)
 
 Local Open Scope Z_scope.
 
@@ -353,7 +356,7 @@ Section DiskInv.
        b_disk (dc_buf v) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 0) ∗
        d_info_b (sl_head (dc_slot v)) ↦₈ (dc_buf v : SailStdpp.Values.mword 64) ∗
        phys_map (dc_pinr pav p v) ∗
-       phys_pointsto (vr_status (vs_req (dc_slot v))) (DfracOwn 1) byte_zero ∗
+       phys_ledger (vr_status (vs_req (dc_slot v))) (DfracOwn 1) byte_zero ∗
        disk_bytes γ (vs_sector_off (dc_slot v)) bs ∗
        (* THE SPENT CRASH PERMIT's token (PermInv.v).  It is named at the
           CLAIM's own slot, so a woken publisher -- whose claim fragment pins
@@ -468,18 +471,74 @@ Section DiskInv.
     phys_pointsto a dq b ⊢ ⌜addr_is_ram a⌝.
   Proof. rewrite /phys_pointsto. iIntros "[_ $]". Qed.
 
-  Lemma mem_win_to_phys (p : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8) :
+  (* ---- THE TWO DIRECTIONS ARE NO LONGER SYMMETRIC (the machine flip;
+     tso-machine-flip.md §6 amendments A6.8/A6.9).  Before it, this file's
+     bridges all ran through the VA-tier [↦ₘ], which the M1 flip had made
+     CONTEXT-indexed, and the shim silently crossed ctx<->raw at both ends.
+     Post-flip:
+
+       ctx -> raw  is [TsoCtx.ctx_pointsto_forget]: sound, one-way, and it
+                   DROPS the byte's latest-write timestamp fragment and its
+                   clean/dirty bit;
+       raw -> ctx  is IMPOSSIBLE above the interpretation.  The timestamp is
+                   a [ghost_map] element of [era_ts_name] and the era's tie
+                   is [dom TM = dom mem], so every byte's element was handed
+                   out once and there is no rule that can mint another.  A
+                   raw byte has left the ledger for good.
+
+     So the CORE of the window bridge is stated at the RAW fact in BOTH
+     directions -- it is a pure kmap/identity-mapping fact and never wanted a
+     context -- and the ctx entry point is a thin [_forget] wrapper on the
+     to-phys side only.  The four consumers that need a DMA-written byte back
+     IN the ledger are named at [phys_to_word8] / [phys_to_byte] below. ---- *)
+
+  Lemma mem_win_to_phys_raw (p : Arch.pa) (n : nat) (dq : dfrac)
+      (f : nat -> bv 8) :
     (forall j, (j < n)%nat -> kmap_static (svpn_of (pa_add p j)) KP_rw) ->
     kmap_static_claims -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add p j) ↦ₘ{dq} f j) -∗
+    ([∗ list] j ∈ seq 0 n, mem_pointsto (pa_add p j) dq (f j)) -∗
     ([∗ list] j ∈ seq 0 n, phys_pointsto (pa_add p j) dq (f j)).
   Proof.
     iIntros (Hstat) "#Hb Hbytes".
     iApply (big_sepL_impl with "Hbytes").
     iIntros "!>" (k x Hk) "H".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
     iApply (mem_ident_phys (pa_add p (0 + k)%nat) dq (f (0 + k)%nat)
+              (Hstat (0 + k)%nat ltac:(lia)) with "Hb H").
+  Qed.
+
+  (* THE WINDOW KEEPS ITS LEDGER NOW (A6.48 ruling 4), and that reverses the
+     sentence this bridge used to carry.  [↦ₘ] IS [ctx_pointsto], which
+     CONTAINS the byte's latest-write timestamp element; the old bridge threw
+     it away with [ctx_pointsto_forget] because the DMA tier was raw
+     [phys_pointsto].  Now the tier is [TsoCtx.phys_ledger], so the element
+     travels with the byte -- and that is exactly what lets the device's
+     completion pay its own log append.  A6.9's "a raw byte has left the
+     ledger for good" is unchanged as a statement; what changed is that the
+     lease never leaves the ledger in the first place. *)
+  Lemma ctx_ident_ledger (a : Arch.pa) (dq : dfrac) (b : bv 8) :
+    kmap_static (svpn_of a) KP_rw ->
+    kmap_static_claims -∗ a ↦ₘ{dq} b -∗ phys_ledger a dq b.
+  Proof.
+    iIntros (Hs) "#Hcl H".
+    iDestruct (ctx_pointsto_canonical with "H") as %Hc.
+    iDestruct (kmap_static_claims_at (svpn_of a) KP_rw Hs with "Hcl") as "#Hk0".
+    iDestruct (ctx_pointsto_to_phys cur_ctx (kpt_leaf_ppn (svpn_of a)) a dq b
+                 (pa_of_id a Hc) with "Hk0 H") as "H".
+    by iApply ctx_phys_pointsto_ledger.
+  Qed.
+
+  Lemma mem_win_to_phys (p : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8) :
+    (forall j, (j < n)%nat -> kmap_static (svpn_of (pa_add p j)) KP_rw) ->
+    kmap_static_claims -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add p j) ↦ₘ{dq} f j) -∗
+    ([∗ list] j ∈ seq 0 n, phys_ledger (pa_add p j) dq (f j)).
+  Proof.
+    iIntros (Hstat) "#Hb Hbytes".
+    iApply (big_sepL_impl with "Hbytes").
+    iIntros "!>" (k x Hk) "H".
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    iApply (ctx_ident_ledger (pa_add p (0 + k)%nat) dq (f (0 + k)%nat)
               (Hstat (0 + k)%nat ltac:(lia)) with "Hb H").
   Qed.
 
@@ -488,15 +547,18 @@ Section DiskInv.
     (forall j, (j < n)%nat ->
        (uint (pa_add p j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
     kmap_static_claims -∗
-    ([∗ list] j ∈ seq 0 n, phys_pointsto (pa_add p j) dq (f j)) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add p j) ↦ₘ{dq} f j).
+    ([∗ list] j ∈ seq 0 n, phys_ledger (pa_add p j) dq (f j)) -∗
+    ([∗ list] j ∈ seq 0 n, mem_pointsto (pa_add p j) dq (f j)).
   Proof.
     iIntros (Hstat Hcan) "#Hb Hbytes".
     iApply (big_sepL_impl with "Hbytes").
     iIntros "!>" (k x Hk) "H".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    (* the ledger element is DROPPED here, and that half of A6.9 stands: the
+       re-entry to the CONTEXT tier still needs a clean/dirty bit no law can
+       mint.  This direction lands at the RAW VA byte, as before. *)
+    iDestruct (phys_ledger_forget with "H") as "H".
     iDestruct (phys_pointsto_ram with "H") as %Hram.
-    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_ident_mem (pa_add p (0 + k)%nat) dq (f (0 + k)%nat)
               (Hstat (0 + k)%nat ltac:(lia)) Hram (Hcan (0 + k)%nat ltac:(lia))
               with "Hb H").
@@ -513,14 +575,21 @@ Section DiskInv.
     iIntros (Hj) "Hbytes".
     iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hbytes") as "Hb".
     { rewrite lookup_seq_lt; [reflexivity | exact Hj]. }
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb") as "Hb".
-    iApply (mem_canonical with "Hb").
+    (* the canonicality conjunct rides inside the ctx fact
+       ([TsoCtx.ctx_pointsto_canonical]) -- no crossing *)
+    iApply (ctx_pointsto_canonical with "Hb").
   Qed.
 
   (* ---- the WORD-granular bridges, both directions.  These are the ones
      the driver actually uses: it formats the descriptors with sd/sw/sh into
      [↦₈]/[↦₄]/[↦₂] and must hand the protocol [phys_word*]/[phys_pointsto]
-     byte windows; the reclaimed payoff travels the other way.  The
+     byte windows; the reclaimed payoff travels the other way.
+
+     AFTER M1 STAGE 2 ALL THREE WIDTHS ARE CTX, so all three [_to_phys]
+     directions forget and all three [phys_to_] directions are stated at
+     the RAW fact -- the ledger re-entry is the same missing gate for a
+     halfword as for a doubleword (§6 amendment A6.9, spelled out at
+     [phys_to_word8]).  The
      alignment premise is discharged at the call site from
      [virtio_pages_aligned] (or from the [↦₂]/[↦₄]/[↦₈] itself in the
      to-phys direction, where it is already carried). ---- *)
@@ -529,8 +598,9 @@ Section DiskInv.
     (forall j, (j < 2)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     kmap_static_claims -∗ a ↦₂ w -∗ phys_word2 a w.
   Proof.
+    (* M1 STAGE 2: [↦₂] is a CTX tower now, so the window LEAVES THE LEDGER
+       here, through the [_forget] entry point. *)
     iIntros (Hs) "#Hb [_ Hbytes]". rewrite /phys_word2.
-    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbytes") as "Hbytes".
     iApply (mem_win_to_phys a 2 (DfracOwn 1) (fun j => nth_byte w j) Hs
               with "Hb Hbytes").
   Qed.
@@ -540,12 +610,12 @@ Section DiskInv.
     (forall j, (j < 2)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < 2)%nat ->
        (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
-    kmap_static_claims -∗ phys_word2 a w -∗ a ↦₂ w.
+    kmap_static_claims -∗ phys_word2 a w -∗
+    word2_pointsto a (DfracOwn 1) w.
   Proof.
     iIntros (Hal Hs Hc) "#Hb Hbytes". rewrite /phys_word2.
     iDestruct (phys_win_to_mem a 2 (DfracOwn 1) (fun j => nth_byte w j) Hs Hc
                  with "Hb Hbytes") as "Hm".
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hm") as "Hm".
     rewrite /word2_pointsto. iFrame "Hm". iPureIntro. exact Hal.
   Qed.
 
@@ -553,8 +623,10 @@ Section DiskInv.
     (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     kmap_static_claims -∗ a ↦₄ w -∗ phys_word4 a w.
   Proof.
+    (* M1 STAGE 2: [↦₄] is a CTX tower now, so the window LEAVES THE LEDGER
+       here, through the [_forget] entry point -- which is what a DMA lease
+       is (§6 amendment A6.9). *)
     iIntros (Hs) "#Hb [_ Hbytes]". rewrite /phys_word4.
-    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbytes") as "Hbytes".
     iApply (mem_win_to_phys a 4 (DfracOwn 1) (fun j => nth_byte w j) Hs
               with "Hb Hbytes").
   Qed.
@@ -564,19 +636,19 @@ Section DiskInv.
     (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < 4)%nat ->
        (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
-    kmap_static_claims -∗ phys_word4 a w -∗ a ↦₄ w.
+    kmap_static_claims -∗ phys_word4 a w -∗
+    word4_pointsto a (DfracOwn 1) w.
   Proof.
     iIntros (Hal Hs Hc) "#Hb Hbytes". rewrite /phys_word4.
     iDestruct (phys_win_to_mem a 4 (DfracOwn 1) (fun j => nth_byte w j) Hs Hc
                  with "Hb Hbytes") as "Hm".
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hm") as "Hm".
     rewrite /word4_pointsto. iFrame "Hm". iPureIntro. exact Hal.
   Qed.
 
   (* the doubleword has no [phys_word8] in VirtioProto, so it bridges to the
      bare byte window (the same shape [phys_map]/[phys_list] consume) *)
   Definition phys_word8 (a : Arch.pa) (w : bv 64) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 8, phys_pointsto (pa_add a j) (DfracOwn 1) (nth_byte w j))%I.
+    ([∗ list] j ∈ seq 0 8, phys_ledger (pa_add a j) (DfracOwn 1) (nth_byte w j))%I.
 
   Lemma word8_to_phys (a : Arch.pa) (w : bv 64) :
     (forall j, (j < 8)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
@@ -587,37 +659,60 @@ Section DiskInv.
               with "Hb Hbytes").
   Qed.
 
+  (* THE LEDGER RE-ENTRY IS MISSING, AND IT IS MISSING ON PURPOSE
+     (tso-machine-flip.md §6 amendment A6.9).  The doubleword and the status
+     byte are the two windows whose consumers want the CONTEXT-indexed fact
+     back ([↦₈] and [↦ₘ] are flipped spellings), and raw -> ctx cannot be
+     proven above the interpretation -- see the block at
+     [mem_win_to_phys_raw].  Both are therefore stated at the RAW fact, so
+     the error lands at the four call sites that actually need a DMA-touched
+     byte to re-enter the ledger ([ProofVirtioDiskRwF] x3,
+     [ProofVirtioDiskIntr] x1), each of which is one worklist entry.
+
+     WHAT THOSE SITES WILL NEED, so the entry is written down rather than
+     implied: the lease must hold the window's context PARKED
+     ([TsoCtx.ctx_parked ξ T]) together with the timestamp fragments, the
+     DMA's own [wp_disk_step] callback must move those fragments to the
+     appended log (§6 amendment A6.2), and the reclaiming thread -- whose
+     lock acquire put its view at the log top -- mints [ctx_dom ξ cur_ctx]
+     with [TsoCtx.ctx_dom_of_parked] and re-registers the bytes through
+     [ctx_morph_word].  That is the ctx_dom handoff tso-port.md §1's
+     RULING 2 promised; nothing shorter is sound, because a byte the DEVICE
+     wrote is visible to a hart for exactly one reason -- the hart's view
+     passed the DMA's timestamp -- and only an acquire says so. *)
   Lemma phys_to_word8 (a : Arch.pa) (w : bv 64) :
     is_aligned_paddr (Physaddr a) 8 = true ->
     (forall j, (j < 8)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < 8)%nat ->
        (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
-    kmap_static_claims -∗ phys_word8 a w -∗ a ↦₈ w.
+    kmap_static_claims -∗ phys_word8 a w -∗ word_pointsto a (DfracOwn 1) w.
   Proof.
     iIntros (Hal Hs Hc) "#Hb Hbytes". rewrite /phys_word8.
     iDestruct (phys_win_to_mem a 8 (DfracOwn 1) (fun j => nth_byte w j) Hs Hc
                  with "Hb Hbytes") as "Hm".
-    rewrite /ctx_word_pointsto. iFrame "Hm". iPureIntro. exact Hal.
+    rewrite /word_pointsto. iFrame "Hm". iPureIntro. exact Hal.
   Qed.
 
   (* the single byte, for the status cell *)
   Lemma byte_to_phys (a : Arch.pa) (b : bv 8) :
     kmap_static (svpn_of a) KP_rw ->
-    kmap_static_claims -∗ a ↦ₘ b -∗ phys_pointsto a (DfracOwn 1) b.
+    kmap_static_claims -∗ a ↦ₘ b -∗ phys_ledger a (DfracOwn 1) b.
   Proof.
     iIntros (Hs) "#Hb H".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
-    iApply (mem_ident_phys a (DfracOwn 1) b Hs with "Hb H").
+    iApply (ctx_ident_ledger a (DfracOwn 1) b Hs with "Hb H").
   Qed.
 
+  (* the status byte's re-entry: RAW, for the reason spelled out at
+     [phys_to_word8] above *)
   Lemma phys_to_byte (a : Arch.pa) (b : bv 8) :
     kmap_static (svpn_of a) KP_rw ->
     (uint (a : SailStdpp.Values.mword 64) < 274877906944)%Z ->
-    kmap_static_claims -∗ phys_pointsto a (DfracOwn 1) b -∗ a ↦ₘ b.
+    kmap_static_claims -∗ phys_ledger a (DfracOwn 1) b -∗
+    mem_pointsto a (DfracOwn 1) b.
   Proof.
     iIntros (Hs Hc) "#Hb H".
+    iDestruct (phys_ledger_forget with "H") as "H".
     iDestruct (phys_pointsto_ram with "H") as %Hram.
-    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_ident_mem a (DfracOwn 1) b Hs Hram Hc with "Hb H").
   Qed.
 
@@ -771,131 +866,6 @@ Section DiskInv.
   Qed.
 
 End DiskInv.
-
-(* ====================================================================== *)
-(* THE PAYLOAD'S CtxMorph INSTANCES (tso-port M3, §4 step 1).             *)
-(*                                                                        *)
-(* Outside the section because each quantifies over the context that      *)
-(* section fixes -- the [KallocInv.v:388] template.  [disk_res] is        *)
-(* ▷-free, [inv]-free, [cinv]-free and WP-free; its ξ-dependence is       *)
-(* exactly the [↦ₘ]/[↦₈] cells (the free-cell bytes, the descriptor and   *)
-(* ops words, the info-block pointers).  Everything else -- the ring      *)
-(* slots ([↦₂]), the used index ([↦₂]), the b_disk flags ([↦₄]), the      *)
-(* phys tier and every ghost row -- is stage-2/raw, hence ξ-CONSTANT.     *)
-(*                                                                        *)
-(* The structural instances are applied AS TERMS: instance search cannot  *)
-(* do the higher-order big-op unification (recipe rule 2).  The two       *)
-(* windows are [big_sepM]s, which is what [TsoCtx.ctx_morph_big_sepM] is  *)
-(* for.                                                                   *)
-(* ====================================================================== *)
-Section DiskCtx.
-  Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{XI : CurCtx}.
-
-  Global Instance desc_entry_own_morph (pd : Arch.pa) (i : nat) :
-    CtxMorph (λ ξ0 : CtxId, desc_entry_own (XI := ξ0) pd i).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /desc_entry_own.
-    iDestruct "H" as (va vl vf vn) "(Ha & Hl & Hf & Hn)".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Ha") as "[Hd Ha]".
-    iFrame "Hd". iExists va, vl, vf, vn. iFrame.
-  Qed.
-
-  Global Instance ops_own_morph (i : nat) :
-    CtxMorph (λ ξ0 : CtxId, ops_own (XI := ξ0) i).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /ops_own.
-    iDestruct "H" as (t r s) "(Ht & Hr & Hs)".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hs") as "[Hd Hs]".
-    iFrame "Hd". iExists t, r, s. iFrame.
-  Qed.
-
-  Global Instance free_slot_res_morph (pd : Arch.pa) (i : nat) :
-    CtxMorph (λ ξ0 : CtxId, free_slot_res (XI := ξ0) pd i).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /free_slot_res.
-    iDestruct "H" as "(Hde & Hop & (%sb & Hst) & (%w & Hb))".
-    iDestruct (desc_entry_own_morph pd i ξ ξ' with "Hd Hde") as "[Hd Hde]".
-    iDestruct (ops_own_morph i ξ ξ' with "Hd Hop") as "[Hd Hop]".
-    iDestruct (ctx_morph_pointsto _ _ _ _ ξ ξ' with "Hd Hst") as "[Hd Hst]".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hb") as "[Hd Hb]".
-    iFrame "Hd Hde Hop".
-    iSplitL "Hst"; [iExists sb; iExact "Hst" | iExists w; iExact "Hb"].
-  Qed.
-
-  Global Instance flight_res_morph (γ : disk_names) (p : nat) (v : dclaim) :
-    CtxMorph (λ ξ0 : CtxId, flight_res (XI := ξ0) γ p v).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /flight_res.
-    iDestruct "H" as "(Hwf & Hrc & Hb & Hi)".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hi") as "[Hd Hi]".
-    iFrame.
-  Qed.
-
-  Global Instance parked_res_morph (γ : disk_names) (pav : Arch.pa)
-      (p : nat) (v : dclaim) :
-    CtxMorph (λ ξ0 : CtxId, parked_res (XI := ξ0) γ pav p v).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /parked_res.
-    iDestruct "H" as (bs) "(H1 & H2 & H3 & Hb & Hi & Hrest)".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hi") as "[Hd Hi]".
-    iFrame "Hd". iExists bs. iFrame.
-  Qed.
-
-  (* one element of the free-descriptor walk: the marker byte plus the
-     slot's own resources when the marker says FREE. *)
-  Global Instance free_arm_morph (pd : Arch.pa) (fr : nat -> bool) (i : nat) :
-    CtxMorph (λ ξ0 : CtxId,
-                if fr i then free_slot_res (XI := ξ0) pd i else emp)%I.
-  Proof. destruct (fr i); apply _. Qed.
-
-  Global Instance disk_res_morph (γ : disk_names)
-      (pd pav pu : SailStdpp.Values.mword 64) :
-    CtxMorph (λ ξ0 : CtxId, disk_res (XI := ξ0) γ pd pav pu).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /disk_res.
-    iDestruct "H" as (np nr fl pk tr fr)
-      "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & Hpub & Hlb & Hauth & Hused &
-        Hfl & Hpk & Hfree & Hring)".
-    iDestruct (ctx_morph_big_sepM fl
-                 (λ (p : nat) (v : dclaim) (ξ0 : CtxId),
-                    flight_res (XI := ξ0) γ p v)
-                 (λ p v, flight_res_morph γ p v)
-                 ξ ξ' with "Hd Hfl") as "[Hd Hfl]".
-    iDestruct (ctx_morph_big_sepM pk
-                 (λ (p : nat) (v : dclaim) (ξ0 : CtxId),
-                    parked_res (XI := ξ0) γ pav p v)
-                 (λ p v, parked_res_morph γ pav p v)
-                 ξ ξ' with "Hd Hpk") as "[Hd Hpk]".
-    iDestruct (ctx_morph_big_sepL (seq 0 8)
-                 (λ _ (i : nat) (ξ0 : CtxId),
-                    (ctx_pointsto ξ0 (d_free_cell i) (DfracOwn 1)
-                       (if fr i then Z_to_bv 8 1 else byte_zero) ∗
-                     (if fr i then free_slot_res (XI := ξ0) pd i else emp))%I)
-                 (λ _ i, ctx_morph_sep _ _ (ctx_morph_pointsto _ _ _ _)
-                                           (free_arm_morph pd fr i))
-                 ξ ξ' with "Hd Hfree") as "[Hd Hfree]".
-    iFrame "Hd". iExists np, nr, fl, pk, tr, fr. iFrame.
-  Qed.
-  (* THE GEOMETRY.  Three [↦₈□] cells written once by virtio_disk_init and
-     then discarded, plus a ghost and pure facts.  Discarded is NOT
-     context-free: the cells are written at WP time ([t > 0]), so a reader
-     at another context needs its own bound to dominate that timestamp --
-     i.e. a [ctx_dom], which is exactly what this class consumes.  (A
-     ∀-context form would be the unsound reading; tso-port.md §0.4 item 6.) *)
-  Global Instance disk_geom_morph (γ : disk_names)
-      (pd pav pu : SailStdpp.Values.mword 64) :
-    CtxMorph (λ ξ0 : CtxId, disk_geom (XI := ξ0) γ pd pav pu).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /disk_geom.
-    iDestruct "H" as "(H1 & H2 & H3 & %Hal & Hcfg & %Hk1 & %Hk2 & %Hk3)".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H3") as "[Hd H3]".
-    iFrame "Hd H1 H2 H3 Hcfg". iPureIntro. auto.
-  Qed.
-
-End DiskCtx.
 
 (* ====================================================================== *)
 (* The descriptor-triple counting argument (pure).                        *)

@@ -272,22 +272,11 @@ Section strans.
     resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) 8
-           = Some m0⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
-    (∀ σ, ⌜read_bytes σ.(mem) (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) 8
-             = Some m0⌝ -∗
-        mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem)
-                   (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) 8
-                   (Interface.WriteReq.value
-                      (mwrite_req8_con
-                         (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0))
-                         (autocast (T := mword) m0'))))
-                σ.(mdev)) ∗ R)) -∗
+    (* the write-back's two obligations, both pass-throughs to
+       [PtTreeAdue] (§6's [Mobl_ram]/[Wobl_ram] at the PTE) *)
+    xread_obl (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) m0 -∗
+    wpte_obl_at (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) m0
+      (mwrite_req8_con (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) (autocast (T := mword) m0')) R -∗
     swp (translate 39 asid root vpn acc p mxr do_sum tt)
       (fun r => ⌜r = Ok (autocast (T := mword)
                            ((autocast (T := mword) (PPN_of_PTE q0)) : mword 44),
@@ -510,22 +499,11 @@ Section strans.
          (fun r => ⌜r = Values.Ok pte0⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
     (* the write-back's re-read witness and its write *)
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) 8
-           = Some m0⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
-    (∀ σ, ⌜read_bytes σ.(mem) (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) 8
-             = Some m0⌝ -∗
-        mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem)
-                   (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) 8
-                   (Interface.WriteReq.value
-                      (mwrite_req8_con
-                         (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0))
-                         (autocast (T := mword) m0'))))
-                σ.(mdev)) ∗ R)) -∗
+    (* the write-back's two obligations, both pass-throughs to
+       [PtTreeAdue] (§6's [Mobl_ram]/[Wobl_ram] at the PTE) *)
+    xread_obl (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) m0 -∗
+    wpte_obl_at (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) m0
+      (mwrite_req8_con (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) (autocast (T := mword) m0')) R -∗
     swp (translate 39 asid root vpn acc p mxr do_sum tt)
       (fun r => ⌜r = Values.Ok (autocast (T := mword)
                        ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44),
@@ -818,26 +796,11 @@ Section strans.
     resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        (∃ w, ⌜read_bytes σ.(mem)
-                 (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) 8
-                 = Some w⌝ ∗ ⌜P0 w⌝) ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    xread_obl_ex (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) P0 -∗
     (∀ (w w' : mword 64), ⌜P0 w⌝ -∗
         ⌜update_PTE_Bits (autocast (T := mword) w : mword 64) acc = Some w'⌝ -∗
-        ∀ σ, ⌜read_bytes σ.(mem)
-                (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) 8
-                = Some w⌝ -∗
-        mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem)
-                   (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) 8
-                   (Interface.WriteReq.value
-                      (mwrite_req8_con
-                         (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0))
-                         (autocast (T := mword) w'))))
-                σ.(mdev)) ∗ True)) -∗
+        wpte_obl_at (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) w
+          (mwrite_req8_con (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)) (autocast (T := mword) w')) True) -∗
     swp (translate 39 asid root vpn acc p mxr do_sum tt)
       (fun r => ∃ rsf : regstate,
                 ⌜r = Ok (autocast (T := mword)
@@ -1049,26 +1012,11 @@ Section strans.
                         (subrange_vec_dec vpn 8 0))) 8)
          (fun r => ∃ q0, ⌜r = Values.Ok q0⌝ ∗ ⌜P0 q0⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        (∃ w, ⌜read_bytes σ.(mem)
-                 (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) 8
-                 = Some w⌝ ∗ ⌜P0 w⌝) ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    xread_obl_ex (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) P0 -∗
     (∀ (w w' : mword 64), ⌜P0 w⌝ -∗
         ⌜update_PTE_Bits (autocast (T := mword) w : mword 64) acc = Some w'⌝ -∗
-        ∀ σ, ⌜read_bytes σ.(mem)
-                (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) 8
-                = Some w⌝ -∗
-        mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem)
-                   (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) 8
-                   (Interface.WriteReq.value
-                      (mwrite_req8_con
-                         (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0))
-                         (autocast (T := mword) w'))))
-                σ.(mdev)) ∗ True)) -∗
+        wpte_obl_at (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) w
+          (mwrite_req8_con (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) (autocast (T := mword) w')) True) -∗
     swp (translate 39 asid root vpn acc p mxr do_sum tt)
       (fun r => ∃ (q0 q0f : mword 64), ⌜P0 q0⌝ ∗ ⌜P0 q0f⌝ ∗
                 ⌜r = Values.Ok (autocast (T := mword)

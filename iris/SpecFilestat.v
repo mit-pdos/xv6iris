@@ -275,7 +275,7 @@ Section SpecFilestat.
      (* the disk fabric *)
      dev_inv (fsn_uart fn) (fsn_disk fn) ∗
      disk_geom (fsn_disk fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn) ∗
-     is_lock (fsn_dlock fn) d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) (fsn_disk fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)) ∗
+     is_lock (fsn_dlock fn) d_lock "virtio_disk"%string <{ disk_res (fsn_disk fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn) }> ∗
      (* ONE slot unit: ilock's bread takes it and brelse gives it back *)
      bslot)%I.
 

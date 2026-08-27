@@ -123,8 +123,8 @@ Require Import SpecBalloc.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx.   (* memset's spec is CONVERTED (tso-port leg M) and
-   so is this caller's buffer (the M1 flip): the seam closed, so no shim *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -1519,7 +1519,7 @@ Section BallocBzero.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 2 -∗
     log_opS γ (S (if cr then S u else u)) (Sb ∪ {[bmapstart]}) -∗
     fsblock (fs_bytes γfs) bi bsD -∗
@@ -1821,14 +1821,16 @@ Section BallocBzero.
       rewrite /Z7 upd_ne; [| regne].
       exact (HZ6thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iEval (rewrite -HZ7a0) in "Hby".
-    (* memset's contract is context-indexed AND so is this caller's buffer
-       (the M1 flip): both sides are [ctx_pointsto] now, so the sweep-era
-       shim crossing that used to sit here is gone. *)
+    (* memset's contract is context-indexed; this caller is not yet
+       converted -- the buffer crosses through the shim at the ambient
+       context (the bundle carries the thread token). *)
+    iDestruct (ctx_buf_of_mem KT0 cur_ctx with "Hby") as "Hby".
     iApply (MS.wp_memset_sconf KT1 KT0 Z7 (K - 10)%nat 1024%nat
               (mword_of_int 0 : mword 64) (fun jj => bsD !!! jj) b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HZ7a1 HZ7a2
               with "Hcg Htext Hpc Hby").
     iIntros (CID10 Hq10 mM) "Hcg Hpc Hby %Hcs2".
+    iDestruct (ctx_buf_to_mem with "Hby") as "Hby".
     iEval (rewrite HZ7a0) in "Hby".
     assert (Hpc64 : ret_pc (Z7 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.balloc + 0x64)) by (rewrite HZ7ra; pcw).
@@ -2109,7 +2111,7 @@ Section BallocAlloc.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 1 -∗
     log_opS γ (2 + u) Sb -∗
     (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent, and the pool is
@@ -2587,7 +2589,7 @@ Section BallocScan.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 1 -∗
     log_opS γ (2 + u) Sb -∗
     bitmap_inv γfs bmapstart cov logstart size -∗
@@ -3439,7 +3441,7 @@ Section BallocMain.
       procs_inv γs -∗
       dev_inv γu γd -∗
       disk_geom γd pd pav pu -∗
-      is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+      is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
       bslots 2 -∗
       log_opS γ (2 + u) Sb -∗
       wp_next true pj (fun (CID : CpuId) =>

@@ -149,15 +149,8 @@ Section BioInitAt.
      built AT [bn_slk bn k] rather than gathered into a function, and the
      bcache lock needs no [newlock_delayed] because [bcache_res bn V] is
      statable before it is sealed. *)
-  (* THE RUNNING TOKEN IS BORROWED, not consumed, for the reason
-     [BioInv.bio_init] records: every escrow is a PARKED RECORD, so its
-     initial content is [ctx_deposit]ed into that record's freshly minted
-     context, and a deposit runs at the depositor's own authority.  The one
-     caller ([ProofMain], at main+0x8e) peels it out of its [sie_cap_gpr]
-     with [SieCapCtx.sie_cap_gpr_own_ctx_acc] and puts it straight back. *)
-  Lemma bio_init_at `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ) E :
+  Lemma bio_init_at (bn : bio_names) (V : bio_view Σ) E :
     (0 ∉ bv_cov V) ->
-    own_context cur_ctx -∗
     bio_free_tok bn -∗
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗
@@ -167,9 +160,9 @@ Section BioInitAt.
     ([∗ list] k ∈ seq 0 NBUF, buf_raw k) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
     ([∗ set] b ∈ bv_cov V, pool_blk V b) ={E}=∗
-    own_context cur_ctx ∗ bio_ctx bn V ∗ bslots BSLOTS_FS.
+    bio_ctx bn V ∗ bslots BSLOTS_FS.
   Proof.
-    iIntros (Hnc0) "Hrun (Hlkg & Hauth & Hsa & Hsf & Hbg) Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
+    iIntros (Hnc0) "(Hlkg & Hauth & Hsa & Hsf & Hbg) Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
     assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)
       by (vm_compute; reflexivity).
     (* every buffer's sleeplock, at its published gname pair, sealing exactly
@@ -195,7 +188,7 @@ Section BioInitAt.
     (* park every buffer's content in a fresh escrow, keeping the bcache half
        of dev/blockno and the refcnt cell for [bcache_res] *)
     iDestruct (big_sepL_sep_2 with "Hbufs Hmids") as "Hbm".
-    iAssert (([∗ list] k ∈ seq 0 NBUF, buf_parked (XI := XI) bn V k) ∗
+    iAssert (([∗ list] k ∈ seq 0 NBUF, |={E}=> buf_escrow bn V k) ∗
              ([∗ list] k ∈ seq 0 NBUF,
                 bio_slot_res bn ∅ k (mword_of_int 0 : mword 32)
                   (mword_of_int 0 : mword 32)))%I
@@ -203,18 +196,20 @@ Section BioInitAt.
     { rewrite -big_sepL_sep. iApply (big_sepL_mono with "Hbm").
       intros i k Hk. rewrite /buf_raw.
       iIntros "[(Hv & Hdk & Hdev & Hbno & Hrc & Hdata) Hmid]".
-      iDestruct (word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
-      iDestruct (word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
       iDestruct "Hdata" as (bs) "[%Hlen Hdata]".
       iSplitR "Hrc Hdev2 Hbno2".
-      - rewrite /buf_parked.
+      - rewrite /buf_escrow.
+        iApply (inv_alloc bioN E (buf_escrow_body bn V k)).
+        iNext. iLeft. rewrite /buf_parked.
         iExists false, (mword_of_int 0 : mword 32),
                 (mword_of_int 0 : mword 32), bs.
         rewrite Hpay0. cbv iota.
         iFrame "Hv Hdev1 Hmid". rewrite /buf_own.
         iFrame "Hbno1 Hdk Hdata". done.
       - rewrite /bio_slot_res lookup_empty. iFrame "Hrc Hdev2 Hbno2". }
-    iMod (escrow_alloc_seq bn V E NBUF 0 with "Hrun Hesc") as "[Hrun #Hescs]".
+    iMod (big_sepL_fupd with "Hesc") as "#Hescs".
     (* the initial pool covers the whole range: the zeroed slots claim only
        the uncovered 0 *)
     iAssert (bio_pool V (fun _ => (mword_of_int 0 : mword 32)))
@@ -255,7 +250,7 @@ Section BioInitAt.
     (* Split STRUCTURALLY before framing: a bare [iFrame] here searches
        [bio_ctx]'s big-op for each hypothesis (25 s of [BioInv]'s 46 s,
        measured 2026-08-03). *)
-    iModIntro. iSplitL "Hrun"; [iExact "Hrun" |]. rewrite /bio_ctx.
+    iModIntro. rewrite /bio_ctx.
     iSplitR "Hsf"; [| iExact "Hsf"].
     iSplitL "Hlock"; [iExact "Hlock" |].
     rewrite big_sepL_sep. iSplitL "Hsls"; [iExact "Hsls" | iExact "Hescs"].

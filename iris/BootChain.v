@@ -75,7 +75,6 @@ Require Import ProcAvail.
 Require Import FsCfgBoot IrefSlots LogDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import CtxRecord.   (* [ctx_parked_inv]: the deposit record's token *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -446,20 +445,8 @@ Section BootRun.
      a_cpu_noff cid_word ↦₄ noff_val 0 ∗
      a_cpu_int cid_word ↦₄ iv ∗
      (* the WHOLE [cpus[cid].proc] cell -- see [BootShared.boot_hart_bss].
-        It is private to this hart and goes into [IntrDefs.cpu_cells].
-
-        AT A ∀-QUANTIFIED CONTEXT, which is what makes this whole bundle
-        ξ-FREE (tso-port.md §0.16′).  It was the ONE ξ-indexed row here, and
-        the header of [boot_entry_bridge] below already says why that could
-        not stand: the carve runs ONCE, under one ambient, while the eight
-        harts run at eight DISTINCT [own_context_boot] identities, so a bundle
-        pinned at the carve's ξ can serve at most one of them.  The ∀ is sound
-        exactly here -- the cell is EXCLUSIVE (so the ∀ is not duplicable; it
-        is not under a [□]) and it is a TIMESTAMP-0 boot-image cell, §0.4
-        item 6's one sanctioned case.  [BootShared.boot_hart_pre] proves it by
-        doing the phys→ctx mint under the ∀; [boot_entry_bridge] instantiates
-        it at its own ambient. *)
-     (∀ ξ : CtxId, cur_proc (XI := ξ) zero_reg) ∗
+        It is private to this hart and goes into [IntrDefs.cpu_cells]. *)
+     cur_proc zero_reg ∗
      (* this hart's HELD-LOCK AUTHORITY at the empty set (LockSet.v), minted
         by adequacy beside the other per-hart ghosts.  It goes straight into
         [IntrDefs.cpu_priv] at the M->S bridge and is never named again. *)
@@ -526,10 +513,6 @@ Section BootRun.
               Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
               Hsepc & Hscause & Hstval & Hssc & Hmse & Hsse & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
               Hg4a & Hg4b & Hspp1 & Hspp2 & Hnoff & Hint & Hproc & Hlks & Hctx & _) Hthr Hcont".
-    (* the [proc] cell arrives ∀-CONTEXT (see [boot_hart_res]) -- this hart
-       takes it at its own ambient, which is the identity its [own_context]
-       names *)
-    iSpecialize ("Hproc" $! cur_ctx).
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
     iDestruct (mmode_config_persist with "Hmm") as "[[#Hhw #Hmin] Hmm]".
@@ -625,8 +608,7 @@ Section BootSecondary.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma boot_hart_secondary (rs : regstate)
-      (iv : mword 32) (dq : dfrac) (xid : CtxId)
-      (γd : uart_names) (γv : disk_names) :
+      (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names) :
     reset_regs cpu_id rs ->
     (* a SECONDARY hart: this is what makes main's [beqz a0] fall through *)
     (fin_to_nat cpu_id <> 0)%nat ->
@@ -636,7 +618,7 @@ Section BootSecondary.
     (* this hart's thread of control -- see [boot_entry_bridge] for why it is
        a premise and why it is not inside [boot_hart_res] *)
     own_context cur_ctx -∗
-    started_inv (main_deposit xid γd γv) -∗
+    started_inv (main_deposit γd γv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hnz.
@@ -644,7 +626,7 @@ Section BootSecondary.
     iIntros "#Htext #Hdata Hres Hthr #Hstarted".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres Hthr").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
-    iApply (MainSecondary.wp_main_secondary_sconf mf (kv_frame_slots + K_main)%nat zero_reg xid γd γv
+    iApply (MainSecondary.wp_main_secondary_sconf mf (kv_frame_slots + K_main)%nat zero_reg γd γv
               (register_lookup tlb rs)
               (cid_word_of_nz _ Hn Hnz)
               (cid_word_of_lt_dev _ Hn)
@@ -678,8 +660,7 @@ Section BootPrimary.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma boot_hart_primary (rs : regstate)
-      (iv : mword 32) (dq : dfrac) (xid : CtxId)
-      (γd : uart_names) (γv : disk_names)
+      (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names)
       (ps : list (mword 64)) (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (* the file system's boot-era mint, at the era's own disk: threaded
          straight through to [SpecMain]'s boot arm (fs-cfg-boot.md stage
@@ -710,11 +691,7 @@ Section BootPrimary.
     (* this hart's thread of control -- see [boot_entry_bridge] for why it is
        a premise and why it is not inside [boot_hart_res] *)
     own_context cur_ctx -∗
-    started_inv (main_deposit xid γd γv) -∗
-    (* THE DEPOSIT RECORD'S OWN TOKEN: main deposits its three ξ-indexed
-       rows into [xid] at the [started = 1] store, which raises the stamp
-       (tso-absorb-memo.md §5). *)
-    ctx_parked_inv xid -∗
+    started_inv (main_deposit γd γv) -∗
     (* --- the boot supply --- *)
     main_locks_raw -∗
     main_globals_raw -∗
@@ -767,7 +744,7 @@ Section BootPrimary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hz Hprun Hlen Hlive Himg.
-    iIntros "#Htext #Hdata Hres Hthr #Hstarted #Hpkinv Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
+    iIntros "#Htext #Hdata Hres Hthr #Hstarted Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
              Hfs Hmir Hirslot Hirauth #Hcert #Hseam
              #Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres Hthr").
@@ -777,28 +754,21 @@ Section BootPrimary.
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
               (mword_of_int 0x88000000 : mword 64) γd γv l0 b0 c0
               dk sb nib cov ndisk
-              (register_lookup tlb rs) xid (main_deposit xid γd γv)
+              (register_lookup tlb rs) (main_deposit γd γv)
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
               Hlive Himg eq_refl
-              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted Hpkinv [] Hlk Hgl
+              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted [] Hlk Hgl
                     Hfirst Hnext Hpark Hpst Hpav Hfs Hmir Hirslot Hirauth
                     Hcert Hseam
                     Hdev Hwire Htx Hsent Hlb Hdlab
                     Hcfg Hclaim Hdone Htimc Hraw Hkpt Hkmap Hpages").
-    (* THE DEPOSIT WAND: main's boot arm hands over exactly
-       [main_deposit_rows]' nine conjuncts at exactly its eight existential
-       witnesses, so the wand is intro + exists + frame and nothing else.
-       IT IS PURE PACKING, and it has to be: it sits under a [□], and
-       [TsoCtx.ctx_deposit] consumes an [own_context], which nothing under a
-       [□] can do.  So the rows arrive ALREADY AT [xid] -- [ProofMain]'s
-       [mn_grp_started] does the deposit, at the one point on main's boot arm
-       that still holds its [sie_cap_gpr] -- and the record's own token
-       invariant is framed in from this chain's premise. *)
+    (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
+       nine conjuncts at exactly its eight existential witnesses, so the wand
+       is intro + exists + frame and nothing else. *)
     iModIntro.
     iIntros (γpr γs γk pd pav pu root pas)
       "Hpr Hpi Hcc Hdl Hgeom Hkpti Hroot Htramp Hkst".
-    rewrite /main_deposit /main_deposit_rows.
-    iSplitR; [iExact "Hpkinv" |].
+    rewrite /main_deposit.
     iExists γpr, γk, γs, pd, pav, pu, root, pas.
     iFrame "Hpr Hpi Hcc Hdl Hgeom Hkpti Hroot Htramp Hkst".
   Qed.

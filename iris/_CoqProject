@@ -60,7 +60,6 @@ Ktier.v
 RiscvPtsto.v
 TsoCtx.v
 TsoCtxShim.v
-CtxRecord.v
 PermInv.v
 PageGeom.v
 KptExecMap.v
@@ -303,7 +302,6 @@ UserActiveClass.v
 ProofUser.v
 UserKernelBridge.v
 IntrDefs.v
-SieCapCtx.v
 LockRank.v
 LockSet.v
 WpIntrInv.v

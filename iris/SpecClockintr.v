@@ -86,22 +86,6 @@ Section SpecClockintr.
 
 End SpecClockintr.
 
-(* the keeper's transport (tso-port M3): a disjunction of a pure fact and
-   two lock handles, of which [procs_inv] is the context-indexed one (its
-   per-slot [is_kstack] cells).  Outside the section, which fixes the
-   context this quantifies. *)
-Global Instance tick_keeper_morph
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
-    `{GEN : GenId} `{CID : CpuId} (γl : gname) (γs : list gname) :
-  CtxMorph (fun xi : CtxId => tick_keeper (XI := xi) γl γs).
-Proof.
-  iIntros (ξ ξ') "Hd H". rewrite /tick_keeper.
-  iDestruct "H" as "[%Hnk | [Hlk Hpi]]".
-  - iFrame "Hd". iLeft. iPureIntro; exact Hnk.
-  - iDestruct (procs_inv_morph γs ξ ξ' with "Hd Hpi") as "[Hd Hpi]".
-    iFrame "Hd". iRight. iFrame.
-Qed.
-
 (* INTERRUPTS OFF, for two independent reasons -- neither of which is a
    convenience, and the contract was b-GENERIC until the explicit-CPUID sweep
    made them checkable.

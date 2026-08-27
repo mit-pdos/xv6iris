@@ -607,7 +607,7 @@ Definition wp_dirlookup_tree_body
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗

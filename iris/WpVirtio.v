@@ -38,6 +38,10 @@ From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
+(* A6.48 ruling 4: the DMA lease is a LEDGER lease now -- the device's write
+   set has to pay the era log's append, and the timestamp elements that pay it
+   ride inside the bytes the lease holds. *)
+Require Import TsoCtx.
 Require Import DevModel.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)
@@ -75,11 +79,17 @@ Section WpVirtio.
   (* ==================================================================== *)
 
   (* Ownership of a finite set of PHYSICAL bytes, as a map from address to
-     current contents.  [↦ₚ] is the right points-to: DMA is a physical-address
-     transaction, and it carries the [addr_is_ram] side condition, so a lease
-     can never name a device register. *)
+     current contents.  The tier is [TsoCtx.phys_ledger] -- the physical byte
+     WITH its latest-write timestamp element (A6.48 ruling 4).  A raw [↦ₚ]
+     was right while the device's write was invisible to the memory model;
+     post-flip the completion APPENDS to the era log, and the four ghost steps
+     that append owes ([Wobl_ram]) need exactly those elements.  [phys_ledger]
+     still carries [addr_is_ram] underneath, so a lease still cannot name a
+     device register.  It licenses no plain LOAD (no clean/dirty bit, A6.20),
+     which is correct: nothing reads a leased byte through the ledger -- the
+     driver reads it back through its own ctx tier after reclaim. *)
   Definition dma_own (dma : gmap Arch.pa (bv 8)) : iProp Σ :=
-    ([∗ map] a ↦ b ∈ dma, phys_pointsto a (DfracOwn 1) b)%I.
+    ([∗ map] a ↦ b ∈ dma, phys_ledger a (DfracOwn 1) b)%I.
 
   Global Instance phys_pointsto_timeless a dq b :
     Timeless (phys_pointsto a dq b).
@@ -95,37 +105,64 @@ Section WpVirtio.
     revert m. induction dma as [|a b dma' Hnew IH] using map_ind; iIntros (m) "Hm Hd".
     { iPureIntro. apply map_empty_subseteq. }
     rewrite /dma_own big_sepM_insert; [|exact Hnew].
-    iDestruct "Hd" as "[Hp Hd']".
+    iDestruct "Hd" as "[Hl Hd']".
+    iDestruct (phys_ledger_forget with "Hl") as "Hp".
     iEval (rewrite /phys_pointsto) in "Hp". iDestruct "Hp" as "[Hp _]".
     iDestruct (gen_heap_valid with "Hm Hp") as %Hma.
     iDestruct (IH m with "Hm Hd'") as %Hsub.
     iPureIntro. by apply insert_subseteq_l.
   Qed.
 
-  (* Overwrite the leased bytes the device just wrote.  The lease's DOMAIN is
-     unchanged (a write set inside the lease), so the same lease is handed
-     back with fresh contents. *)
-  Lemma dma_update (w m dma : gmap Arch.pa (bv 8)) :
+  (* THE LEASE IS AN ACCESSOR NOW, NOT AN UPDATER (A6.48 ruling 4, the
+     inside-out).  [dma_update] used to do the [gen_heap] write itself; it
+     cannot any more, because a device write APPENDS to the era log and
+     [TsoCtx.ledger_store_ok] moves [gen_heap_interp] and [tso_interp_at]
+     TOGETHER -- the interpretation's own tie relates the flat cell and the
+     timestamp element, so the two authorities cannot be split across two
+     lemmas.  So the lease hands its written-to bytes OUT at the ledger tier,
+     the CALLER performs the one store gate, and the wand takes the new bytes
+     back.  The domain is unchanged (a write set inside the lease), so the
+     same lease comes back with fresh contents. *)
+  Lemma dma_acc (w dma : gmap Arch.pa (bv 8)) :
     dom w ⊆ dom dma ->
-    gen_heap_interp m -∗ dma_own dma ==∗
-      gen_heap_interp (w ∪ m) ∗ dma_own (w ∪ dma).
+    dma_own dma -∗
+    ∃ old : gmap Arch.pa (bv 8), ⌜dom old = dom w⌝ ∗ ⌜old ⊆ dma⌝ ∗
+      ([∗ map] a ↦ b ∈ old, phys_ledger a (DfracOwn 1) b) ∗
+      (([∗ map] a ↦ b ∈ w, phys_ledger a (DfracOwn 1) b) -∗ dma_own (w ∪ dma)).
   Proof.
-    revert m dma.
-    induction w as [|a b w' Hnew IH] using map_ind; iIntros (m dma Hdom) "Hm Hd".
-    { rewrite !left_id_L. by iFrame. }
-    rewrite dom_insert_L in Hdom.
-    assert (Hdw : dom w' ⊆ dom dma) by set_solver.
-    assert (Ha : a ∈ dom dma) by set_solver.
-    iMod (IH m dma Hdw with "Hm Hd") as "[Hm Hd]".
-    assert (Ha' : a ∈ dom (w' ∪ dma)) by (rewrite dom_union_L; set_solver).
-    apply elem_of_dom in Ha' as [b0 Hb0].
-    rewrite /dma_own.
-    iDestruct (big_sepM_insert_acc _ _ a b0 Hb0 with "Hd") as "[Hp Hback]".
-    iEval (rewrite /phys_pointsto) in "Hp". iDestruct "Hp" as "[Hp %Hram]".
-    iMod (gen_heap_update _ a b0 b with "Hm Hp") as "[Hm Hp]".
-    iDestruct ("Hback" $! b with "[Hp]") as "Hd".
-    { rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact Hram. }
-    iModIntro. rewrite -!insert_union_l. iFrame "Hm Hd".
+    intros Hdom. iIntros "Hd".
+    iExists (filter (fun p => p.1 ∈ dom w) dma).
+    assert (Hsub : filter (fun p : Arch.pa * bv 8 => p.1 ∈ dom w) dma ⊆ dma)
+      by apply map_filter_subseteq.
+    assert (Hdomf : dom (filter (fun p : Arch.pa * bv 8 => p.1 ∈ dom w) dma)
+                    = dom w).
+    { apply set_eq. intros a. rewrite elem_of_dom. split.
+      - intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ Ha]. exact Ha.
+      - intros Ha. apply Hdom in Ha as Hd'. apply elem_of_dom in Hd' as [b Hb].
+        exists b. apply map_lookup_filter_Some. by split. }
+    iSplit; [by iPureIntro|]. iSplit; [by iPureIntro|].
+    rewrite /dma_own -{1}(map_filter_union_complement
+              (fun p : Arch.pa * bv 8 => p.1 ∈ dom w) dma).
+    rewrite big_sepM_union; last apply map_disjoint_filter_complement.
+    iDestruct "Hd" as "[$ Hrest]".
+    iIntros "Hnew". rewrite /dma_own.
+    (* the new bytes replace the old ones pointwise: [w ∪ dma] is [w] over
+       the filtered part and [dma] elsewhere *)
+    assert (Hwd : w ∪ dma
+              = w ∪ filter (fun p : Arch.pa * bv 8 => ¬ (p.1 ∈ dom w)) dma).
+    { apply map_eq. intros a. destruct (w !! a) as [b|] eqn:Hw.
+      - by rewrite !(lookup_union_Some_l _ _ _ _ Hw).
+      - rewrite !(lookup_union_r _ _ _ Hw).
+        assert (Hnin : ¬ (a ∈ dom w))
+          by (rewrite not_elem_of_dom; exact Hw).
+        destruct (dma !! a) as [b|] eqn:Hda.
+        + symmetry. apply map_lookup_filter_Some. by split.
+        + symmetry. apply map_lookup_filter_None. by left. }
+    rewrite Hwd big_sepM_union; last first.
+    { apply map_disjoint_dom. intros a Ha Hb.
+      apply elem_of_dom in Hb as [b Hb'].
+      apply map_lookup_filter_Some in Hb' as [_ Hnin]. exact (Hnin Ha). }
+    iFrame "Hnew Hrest".
   Qed.
 
   (* -- the lease itself -- *)
@@ -192,12 +229,20 @@ Section WpVirtio.
      and misses the control region (so the same control bytes are still pinned
      for the next request).  Nothing about the queue's contents is re-proved
      here -- that was discharged once, by the driver, when it took the lease. *)
-  Lemma virtio_lease_step (v : virtio_state) (m : gmap Arch.pa (bv 8))
+  (* ...and the same INSIDE OUT (A6.48 ruling 4): the lease no longer writes
+     the memory, it hands the write set's OLD bytes out at the ledger tier and
+     takes the NEW ones back.  [gen_heap_interp] goes in for [dma_agree]'s
+     pure fact and comes straight back untouched -- the one store gate that
+     moves it (and the era log with it) belongs to the caller. *)
+  Lemma virtio_lease_acc (v : virtio_state) (m : gmap Arch.pa (bv 8))
       (mv : vmem) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
     mem_view m mv ->
     virtio_req_step v mv = Some (v', w) ->
-    gen_heap_interp m -∗ virtio_lease v ==∗
-      gen_heap_interp (w ∪ m) ∗ virtio_lease v'.
+    gen_heap_interp m -∗ virtio_lease v -∗
+      gen_heap_interp m ∗
+      ∃ old : gmap Arch.pa (bv 8), ⌜dom old = dom w⌝ ∗
+        ([∗ map] a ↦ b ∈ old, phys_ledger a (DfracOwn 1) b) ∗
+        (([∗ map] a ↦ b ∈ w, phys_ledger a (DfracOwn 1) b) -∗ virtio_lease v').
   Proof.
     iIntros (Hview Hstep) "Hm Hl".
     iDestruct "Hl" as (ctl dma S ai) "(Hd & %Hctl & %Hok)".
@@ -207,8 +252,11 @@ Section WpVirtio.
       by (apply (mem_view_subseteq ctl m mv Hctlm Hview)).
     destruct (virtio_queue_ok_step v ctl (dom dma) S ai mv v' w Hok Hvctl Hstep)
       as (Hdw & Hdisj & Hok').
-    iMod (dma_update w m dma Hdw with "Hm Hd") as "[Hm Hd]".
-    iModIntro. iFrame "Hm".
+    iFrame "Hm".
+    iDestruct (dma_acc w dma Hdw with "Hd")
+      as (old) "(%Hdo & %Hos & Hold & Hback)".
+    iExists old. iFrame "Hold". iSplit; [by iPureIntro|].
+    iIntros "Hnew". iDestruct ("Hback" with "Hnew") as "Hd".
     iExists ctl, (w ∪ dma), S, ai.
     iFrame "Hd". iSplit.
     { iPureIntro. exact (virtio_ctl_union ctl w dma Hdisj Hctl). }

@@ -111,9 +111,13 @@ Section run.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pc 4 = Some w⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pc 4 w⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4) rs) Drw -∗
      hreg_frame_ro Df (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4) rs) Dro -∗
      swp (execute i)
@@ -196,9 +200,13 @@ Section run.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pc 4 = Some w⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pc 4 w⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4) rs) Drw -∗
      hreg_frame_ro Df (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4) rs) Dro -∗
      swp (execute i)
@@ -277,12 +285,20 @@ Section run.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pc 2 = Some ilo⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) (add_vec_int pc 2) 2 = Some ihi⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pc 2 ilo⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv (add_vec_int pc 2) 2 ihi⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4) rs) Drw -∗
      hreg_frame_ro Df (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4) rs) Dro -∗
      swp (execute i)
@@ -370,12 +386,20 @@ Section run.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pc 2 = Some ilo⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) (add_vec_int pc 2) 2 = Some ihi⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pc 2 ilo⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv (add_vec_int pc 2) 2 ihi⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4) rs) Drw -∗
      hreg_frame_ro Df (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4) rs) Dro -∗
      swp (execute i)
@@ -451,9 +475,13 @@ Section run.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pc 4 = Some w⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pc 4 w⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Drw -∗
      hreg_frame_ro Df (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Dro -∗
      swp (execute i)
@@ -539,9 +567,13 @@ Section run.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pc 4 = Some w⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pc 4 w⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Drw -∗
      hreg_frame_ro Df (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Dro -∗
      swp (execute i)
@@ -620,9 +652,13 @@ Section run.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pc 2 = Some h⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pc 2 h⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Drw -∗
      hreg_frame_ro Df (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Dro -∗
      swp (execute i)
@@ -709,9 +745,13 @@ Section run.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pc 2 = Some h⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pc 2 h⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Drw -∗
      hreg_frame_ro Df (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Dro -∗
      swp (execute i)

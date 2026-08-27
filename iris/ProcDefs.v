@@ -265,9 +265,9 @@ Section ProcDefs.
   Proof.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
-    iIntros "Hq1". rewrite /proc_priv_bare Hq word4_pointsto_frac_split.
+    iIntros "Hq1". rewrite /proc_priv_bare Hq ctx_word4_pointsto_frac_split.
     iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
 
@@ -376,113 +376,3 @@ Section ProcDefs.
   Qed.
 
 End ProcDefs.
-
-(* ===================================================================== *)
-(* THE SLOT'S TRANSPORT (tso-port M3).  [SchedCtx.proc_lock_res] is the   *)
-(* proc lock's payload, and the M3 sweep makes it a CONVERTED payload     *)
-(* (the acquirer re-indexes it to its own context along [ctx_dom]) rather *)
-(* than a constant embedding -- which is what makes the lock HANDLE, and  *)
-(* so [SchedCtx.procs_inv], a closed term.  These are the obligations     *)
-(* that sweep lands on the dormant block.                                 *)
-(*                                                                        *)
-(* OUTSIDE the section, because each names the context the section fixes; *)
-(* and the structural instances are applied AS TERMS throughout, because  *)
-(* the [↦₈]/[↦ₘ] notations put the index under the class projection       *)
-(* [cur_ctx], which instance search will not unfold (M3 recipe rule 3).   *)
-(* ===================================================================== *)
-Section ProcDefsMorph.
-  Context `{!riscvGS Σ}.
-
-  Global Instance pname_cells_morph (pa : mword 64) (dq : dfrac) (bs : list (bv 8)) :
-    CtxMorph (fun xi : CtxId => pname_cells (XI := xi) pa dq bs).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /pname_cells.
-    iDestruct "H" as "[%Hwf H]".
-    iDestruct (ctx_morph_big_sepL bs
-        (fun i b xi => ctx_pointsto xi (p_name pa i) dq b)
-        (fun i x => ctx_morph_pointsto _ _ _ _) ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame "Hd". by iFrame.
-  Qed.
-
-  Global Instance proc_fields_morph (pa : mword 64) (dq : dfrac) (V : pprivate) :
-    CtxMorph (fun xi : CtxId => proc_fields (XI := xi) pa dq V).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /proc_fields.
-    iDestruct "H" as "(H1 & H2 & %Hl & H3)".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
-    iDestruct (pname_cells_morph pa dq (pv_name V) ξ ξ' with "Hd H3") as "[Hd H3]".
-    iFrame. done.
-  Qed.
-
-  Global Instance ofile_cells_morph (pa : mword 64) (fs : list (mword 64)) :
-    CtxMorph (fun xi : CtxId => ofile_cells (XI := xi) pa fs).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /ofile_cells.
-    iDestruct (ctx_morph_big_sepL fs
-        (fun fd v xi => ctx_word_pointsto xi (p_ofile pa fd) (DfracOwn 1) v)
-        (fun i x => ctx_morph_word _ _ _ _) ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame.
-  Qed.
-
-  Global Instance is_kstack_morph (pa ks : mword 64) :
-    CtxMorph (fun xi : CtxId => is_kstack (XI := xi) pa ks).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /is_kstack.
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]". iFrame.
-  Qed.
-
-  Context `{!fdslotG Σ, !irefslotG Σ, !bioslotG Σ}.
-
-  Global Instance kstack_free_morph (pa : mword 64) :
-    CtxMorph (fun xi : CtxId => kstack_free (XI := xi) pa).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /kstack_free.
-    iDestruct "H" as (ks) "[H1 H2]".
-    iDestruct (is_kstack_morph pa ks ξ ξ' with "Hd H1") as "[Hd H1]".
-    iDestruct (stack_own_morph (KTR := KT1) _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
-    iFrame "Hd". iExists ks. iFrame.
-  Qed.
-
-  Global Instance proc_dormant_noctx_morph (pa : mword 64) (st : mword 32) :
-    CtxMorph (fun xi : CtxId => proc_dormant_noctx (XI := xi) pa st).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /proc_dormant_noctx.
-    iDestruct "H" as (V pid)
-      "(%Hf & Hpid & Hfl & Ho & Hs & Hsp & Hir & Hbs & Hkst & Haddr)".
-    iDestruct (proc_fields_morph pa (DfracOwn 1) V ξ ξ' with "Hd Hfl") as "[Hd Hfl]".
-    iDestruct (ofile_cells_morph pa (pv_ofile V) ξ ξ' with "Hd Ho") as "[Hd Ho]".
-    iDestruct (kstack_free_morph pa ξ ξ' with "Hd Hkst") as "[Hd Hkst]".
-    iAssert (ctx_dom ξ ξ' ∗
-             (if bool_decide (st = ZOMBIE)
-              then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
-                   proc_pt_at (XI := ξ') pa (pv_upt V) ∗
-                   tf_page (ud_tfp (pv_upt V)) (pv_tf V)
-              else ctx_word_pointsto ξ' (p_pagetable pa) (DfracOwn 1)
-                     (zero_reg : mword 64) ∗
-                   ctx_word_pointsto ξ' (p_trapframe pa) (DfracOwn 1)
-                     (zero_reg : mword 64)))%I
-      with "[Hd Haddr]" as "[Hd Haddr]".
-    { destruct (bool_decide (st = ZOMBIE)).
-      - iDestruct "Haddr" as "(%Hu & Hpt & Htf)".
-        iDestruct (proc_pt_at_morph pa (pv_upt V) ξ ξ' with "Hd Hpt") as "[Hd Hpt]".
-        iFrame "Hd". iSplitR; [iPureIntro; exact Hu|]. iFrame.
-      - iDestruct "Haddr" as "[H1 H2]".
-        iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
-        iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
-        iFrame. }
-    iFrame "Hd". iExists V, pid.
-    iSplitR; [iPureIntro; exact Hf|]. iFrame.
-  Qed.
-
-  Global Instance proc_dormant_morph (pa : mword 64) (st : mword 32) :
-    CtxMorph (fun xi : CtxId => proc_dormant (XI := xi) pa st).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite proc_dormant_split.
-    iDestruct "H" as "[Hn Hc]".
-    iDestruct (proc_dormant_noctx_morph pa st ξ ξ' with "Hd Hn") as "[Hd Hn]".
-    iDestruct (own_ctx_morph (p_context pa) ξ ξ' with "Hd Hc") as "[Hd Hc]".
-    iFrame "Hd". rewrite proc_dormant_split. iFrame.
-  Qed.
-
-End ProcDefsMorph.

@@ -278,7 +278,7 @@ Section ProofFiledup.
        moved us to CID9. *)
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "ftable"%string (λ ξ : CtxId, ftable_res (XI := ξ) γf) mA
+    iApply (Acquire.wp_acquire_sconf KT1 γl "ftable"%string <{ ftable_res γf }> mA
               n eb p (K - 4)%nat b lks
               HnZ ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -454,7 +454,7 @@ Section ProofFiledup.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Houtb) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 γl ftable_addr "ftable"%string (λ ξ : CtxId, ftable_res (XI := ξ) γf) D5
+    iApply (Release.wp_release_sconf KT1 γl ftable_addr "ftable"%string <{ ftable_res γf }> D5
               n eb p (K - 4)%nat
               ({["ftable"]} ∪ lks)
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)

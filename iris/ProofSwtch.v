@@ -66,11 +66,8 @@ Section ProofSwtch.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
-  (* CONTEXT-GENERIC, because a parked record's stack is stated at the
-     RECORD's own context ([SwtchCtx.valid_context_pre]'s [XIp]), not at the
-     resumer's ambient one. *)
-  Local Instance stack_own_timeless_local (xi : CtxId) (sp : mword 64) (n : nat) :
-    Timeless (stack_own (KTR := KT1) (XI := xi) sp n).
+  Local Instance stack_own_timeless_local (sp : mword 64) (n : nat) :
+    Timeless (stack_own (KTR := KT1) sp n).
   Proof.
     rewrite /stack_own. apply bi.exist_timeless. intros ws.
     apply bi.sep_timeless; [ apply _ | ].
@@ -91,13 +88,11 @@ Section ProofSwtch.
   Proof. unfold callee_img, ctx_regs, csp_rs1. cbn [map nth]. reflexivity. Qed.
 
   Lemma wp_swtch_sconf
-      (P : CtxId -d> CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-      (av : nat) (eb : bool) (p : mword 64) (back : bool)
-      `{!CtxMorph (fun xi : CtxId =>
-           P xi cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back)} :
+      (av : nat) (eb : bool) (p : mword 64) (back : bool) :
     wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p back.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
@@ -158,19 +153,8 @@ Section ProofSwtch.
        dominating the parked stamp.  The receipt is the shim's SC-only
        intro until the M2 sweep threads the honest one out of the p->lock
        acquire ([SpecAcquire]); the exchange itself is in its final shape. *)
-    (* THE RECORD'S ROWS ARE THE PARKED THREAD'S OWN, at [XIt]
-       (SwtchCtx.v).  Its stack stays there -- the resumed bundle is built
-       at [XIt] below and needs it exactly there -- but its SAVE AREA has to
-       come to THIS context for the block: the machine leaves read
-       [newc]'s fourteen words at the running hart's own index.  That is the
-       one direction the sealed surface has no law for (a resumer reading a
-       parked record's cells is entitled to by its p->lock acquire's
-       [ctx_dom], which is not threaded to this proof yet), so it crosses
-       through the shim -- the same M2 seam [SchedCtx.cpu_ctx_free]'s
-       ∃-context already records.  The way BACK is honest: the post-block
-       cells are DEPOSITED at [XIt] with [TsoCtx.ctx_deposit]. *)
-    iDestruct (ctx_cells_reindex XIt cur_ctx newc new_vs with "Hnewcells")
-      as "Hnewcells".
+    iMod (ctx_resume XIt Tt Tt (Nat.le_refl _) with "[] Hctx_t") as "Hctx_t".
+    { iApply hart_view_lb_any. }
     iModIntro.
     (* ---- the symbolic environment: 0..31 = [gpr_file]'s ACTUAL map
        [tp_pin m0] (its tp slot, index 4, is [cid_word_of cpu_id] by
@@ -253,53 +237,21 @@ Section ProofSwtch.
        the stamp is read off the token's own receipts).  In the no-return
        case the token is dropped instead -- the zombie park is the one
        place a thread's identity dies. *)
-    (* ---- THE DEPOSIT (tso-port M3).  Everything the target's resume wand
-       asks for that this thread holds AT ITS OWN CONTEXT goes over to the
-       record's [XIt] here, and it goes over by the one law written for it:
-       [TsoCtx.ctx_deposit], whose two premises are exactly what is in hand
-       -- this thread's running token (taken out of [sie_cap] above) and the
-       record's parked token.  The obligation is [CtxMorph] on the deposited
-       payload, and that is what the [XIp] reshape bought: [ctx_cells] is a
-       word run, [cpu_own]'s only indexed row is [cur_proc], and the chain
-       payload [P] carries its own instance (for [SchedCtx.p_sched] the
-       interesting row is [trap_csrs], whose credential family ships its
-       [IntrDefs.caps_morph] certificate).  NOTHING crosses under a [▷]:
-       since the reshape a parked record is a closed term. ---- *)
-    iAssert ((if back then ctx_cells oldc (callee_img m0) else emp) ∗
-             (if back then emp else own_ctx (XI := cur_ctx) oldc))%I
-      with "[Holdpart]" as "[Holdcells Holdslot]".
-    { destruct back.
-      - iFrame "Holdpart".
-      - iSplitR; [done|]. iExists (callee_img m0). iSplitR.
+    iMod (ctx_park with "Hctx") as (Tp) "Hctx".
+    iAssert (if back then valid_context P Ao oldc p else own_ctx oldc)
+      with "[Holdpart Hstk Hwold Hctx]" as "Hvoldc".
+    { destruct back; last first.
+      { iExists (callee_img m0). iSplitR.
         { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
         iExact "Holdpart". }
-    iMod (ctx_deposit
-            (fun xi : CtxId =>
-               (ctx_cells (XI := xi) newc new_vs ∗
-                cpu_own (XI := xi) 1 eb p false {["proc"]} ∗
-                P xi cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back ∗
-                (if back then emp else own_ctx (XI := xi) oldc))%I)
-            cur_ctx XIt Tt
-            with "Hctx Hctx_t [$Hnewpart $Hcpuown $HP $Holdslot]")
-      as "(Hctx & (%Tt' & %Hle_t & Hctx_t & (Hnewpart & Hcpuown & HP & Holdslot)))".
-    (* THE PARKER'S HALF OF THE EXCHANGE: this thread's running token,
-       taken out of the capability above, PARKS into the record it leaves
-       behind ([TsoCtx.ctx_park] -- one ghost step, no machine evidence:
-       the stamp is read off the token's own receipts).  In the no-return
-       case the token is dropped instead -- the zombie park is the one
-       place a thread's identity dies. *)
-    iMod (ctx_park with "Hctx") as (Tp) "Hctx".
-    iAssert (if back then valid_context P Ao oldc p else own_ctx (XI := XIt) oldc)
-      with "[Holdcells Holdslot Hstk Hwold Hctx]" as "Hvoldc".
-    { destruct back; last first.
-      { iExact "Holdslot". }
       rewrite (valid_context_unfold P Ao oldc p) /valid_context_pre.
       iExists (callee_img m0), av, cur_ctx, Tp.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
       iSplit.
       { iPureIntro. apply ret_pc_aligned. }
-      iFrame "Holdcells".
+      rewrite -/(ctx_cells oldc (callee_img m0)).
+      iFrame "Holdpart".
       iSplitL "Hstk".
       { rewrite (callee_img_nth1 m0 (mword_of_int 0)). iExact "Hstk". }
       iSplitL "Hctx"; [ iExact "Hctx" |].
@@ -362,19 +314,9 @@ Section ProofSwtch.
        our own [eb] (eb' := eb) -- no retune, no equation.  [sie_arm false p]
        is [intr_off_tok] by conversion now (an INDEX, not a disjunction), so
        building [sie_cap] at [false] needs no [iLeft]. ---- *)
-    (* RE-CONNECT THE TARGET'S CONTEXT TO THIS HART (tso-port checkpoint 0.4
-       items 2/5): the record's token is PARKED; resuming it here --
-       [TsoCtx.ctx_resume] -- ties it to this hart against a view receipt
-       dominating the parked stamp.  The receipt is the shim's SC-only
-       intro until the M2 sweep threads the honest one out of the p->lock
-       acquire ([SpecAcquire]); the exchange itself is in its final shape:
-       this thread's token parked into the record it left behind, the
-       target's comes out into the bundle the resumed thread receives. *)
-    iMod (ctx_resume XIt Tt' Tt' (Nat.le_refl _) with "[] Hctx_t") as "Hctx_t".
-    { iApply hart_view_lb_any. }
-    (* the target thread's stack came out of the record ALREADY at [XIt]:
-       a parked record's rows are its own thread's (SwtchCtx.v), so the
-       shim that used to re-index it here is gone. *)
+    (* the target thread's stack, re-indexed to ITS context: the swtch
+       hand-off is the M2 seam; SC crosses it through the shim. *)
+    iDestruct (stack_own_reindex _ XIt with "Hstk_t") as "Hstk_t".
     iAssert (sie_cap (XI := XIt) KT1 (vregs_den rho swtch_regs1) av_t false p)
       with "[Hstk_t Htr Hq0 Hctx_t]" as "Hcap_t".
     { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr Hwit Hctx_t". iExact "Hq0". }

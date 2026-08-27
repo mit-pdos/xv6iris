@@ -1348,6 +1348,11 @@ Qed.
 
 Section PtBuildIris.
   Context `{!riscvGS Σ}.
+  (* A6.21: a node is built at the USER tier ([Some cur_ctx]) -- a fresh
+     kalloc page is a THREAD's, and installing it in the shared kernel table
+     forgets the registration ([TsoCtx.ctx_phys_word_ledger]), which is
+     exactly right: it stops being any one thread's. *)
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* the Pt4kWalk address facts at PtTree's [u_pte_addr] spelling
      (identical definitions; [exact] bridges by conversion) *)
@@ -1406,7 +1411,7 @@ Section PtBuildIris.
   Lemma zero_page_to_node (lvl : nat) (dq : dfrac) (b : mword 44) :
     pt_node_claim b -∗
     ([∗ list] j ∈ seq 0 4096,
-       phys_pointsto
+       TsoCtx.ctx_phys_pointsto TsoCtx.cur_ctx
          (pa_add (zero_extend' 64 (concat_vec b (zeros' 12 : mword 12))) j)
          dq (mword_of_int 0 : mword 8))
     -∗ ptree_own lvl dq (pt_empty_node b).
@@ -1424,7 +1429,9 @@ Section PtBuildIris.
       cbn [Nat.add pt_base pt_ents pt_empty_node].
       replace (Z.of_nat k + 0) with (Z.of_nat k) by lia.
       iIntros "Hb".
-      iApply phys_word_pointsto_intro.
+      rewrite (pt_slot_own_ctx (Some TsoCtx.cur_ctx) TsoCtx.cur_ctx _ _ _
+                 eq_refl).
+      iApply TsoCtx.ctx_phys_word_pointsto_intro.
       { exact (u_pte_addr_aligned8 b (mword_of_int (Z.of_nat k))). }
       iApply (big_sepL_mono with "Hb").
       intros k' j Hkj. apply lookup_seq in Hkj. destruct Hkj as [-> Hjlt].
@@ -1498,8 +1505,8 @@ Section PtBuildIris.
 
   Lemma ptree_own_slot2_ro (dq : dfrac) (t : ptree) (vpn : mword 27) :
     ptree_own 2 dq t ⊢
-      pt_addr2 t vpn ↦ₚ₈{dq} pt_ents t (vpn_idx 2 vpn) ∗
-      (pt_addr2 t vpn ↦ₚ₈{dq} pt_ents t (vpn_idx 2 vpn) -∗ ptree_own 2 dq t).
+      pt_addr2 t vpn ↦ₚₜ{dq} pt_ents t (vpn_idx 2 vpn) ∗
+      (pt_addr2 t vpn ↦ₚₜ{dq} pt_ents t (vpn_idx 2 vpn) -∗ ptree_own 2 dq t).
   Proof.
     iIntros "[Hpg Hks]".
     iDestruct (pt_page_own_acc_ro dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 Hpg]".
@@ -1511,8 +1518,8 @@ Section PtBuildIris.
     pt_kids t (vpn_idx 2 vpn) = Some c1 ->
     u_next_base (pt_ents t (vpn_idx 2 vpn)) = pt_base c1 ->
     ptree_own 2 dq t ⊢
-      pt_addr1 (pt_ents t (vpn_idx 2 vpn)) vpn ↦ₚ₈{dq} pt_ents c1 (vpn_idx 1 vpn) ∗
-      (pt_addr1 (pt_ents t (vpn_idx 2 vpn)) vpn ↦ₚ₈{dq} pt_ents c1 (vpn_idx 1 vpn) -∗
+      pt_addr1 (pt_ents t (vpn_idx 2 vpn)) vpn ↦ₚₜ{dq} pt_ents c1 (vpn_idx 1 vpn) ∗
+      (pt_addr1 (pt_ents t (vpn_idx 2 vpn)) vpn ↦ₚₜ{dq} pt_ents c1 (vpn_idx 1 vpn) -∗
        ptree_own 2 dq t).
   Proof.
     intros Hk2 Hb1.
@@ -1535,9 +1542,9 @@ Section PtBuildIris.
   Lemma ptree_own_graft2 (dq : dfrac) (t : ptree) (vpn : mword 27) :
     pt_kids t (vpn_idx 2 vpn) = None ->
     ptree_own 2 dq t ⊢
-      pt_addr2 t vpn ↦ₚ₈{dq} pt_ents t (vpn_idx 2 vpn) ∗
+      pt_addr2 t vpn ↦ₚₜ{dq} pt_ents t (vpn_idx 2 vpn) ∗
       (∀ b : mword 44,
-       pt_addr2 t vpn ↦ₚ₈{dq} pt_ptr_pte b -∗
+      pt_addr2 t vpn ↦ₚₜ{dq} pt_ptr_pte b -∗
        ptree_own 1 dq (pt_empty_node b) -∗
        ptree_own 2 dq (pt_graft2 t vpn b)).
   Proof.
@@ -1560,9 +1567,9 @@ Section PtBuildIris.
     pt_kids c1 (vpn_idx 1 vpn) = None ->
     u_next_base (pt_ents t (vpn_idx 2 vpn)) = pt_base c1 ->
     ptree_own 2 dq t ⊢
-      pt_addr1 (pt_ents t (vpn_idx 2 vpn)) vpn ↦ₚ₈{dq} pt_ents c1 (vpn_idx 1 vpn) ∗
+      pt_addr1 (pt_ents t (vpn_idx 2 vpn)) vpn ↦ₚₜ{dq} pt_ents c1 (vpn_idx 1 vpn) ∗
       (∀ b : mword 44,
-       pt_addr1 (pt_ents t (vpn_idx 2 vpn)) vpn ↦ₚ₈{dq} pt_ptr_pte b -∗
+      pt_addr1 (pt_ents t (vpn_idx 2 vpn)) vpn ↦ₚₜ{dq} pt_ptr_pte b -∗
        ptree_own 0 dq (pt_empty_node b) -∗
        ptree_own 2 dq (pt_graft1 t vpn b)).
   Proof.
@@ -1592,9 +1599,9 @@ Section PtBuildIris.
     ptree_level0 t vpn p2 p1 w0 ->
     ptree_own 2 dq t ⊢
       pt_node_claim (u_next_base p1) ∗
-      pt_addr0 p1 vpn ↦ₚ₈{dq} w0 ∗
+      pt_addr0 p1 vpn ↦ₚₜ{dq} w0 ∗
       (∀ w' : mword 64,
-         pt_addr0 p1 vpn ↦ₚ₈{dq} w' -∗
+      pt_addr0 p1 vpn ↦ₚₜ{dq} w' -∗
          ptree_own 2 dq (ptree_set_leaf t vpn w')).
   Proof.
     intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 & _).
@@ -1632,8 +1639,8 @@ Section PtBuildIris.
     ptree_level0 t vpn p2 p1 w0 ->
     ptree_own 2 dq t ⊢
       pt_node_claim (u_next_base p1) ∗
-      pt_addr0 p1 vpn ↦ₚ₈{dq} w0 ∗
-      (pt_addr0 p1 vpn ↦ₚ₈{dq} w0 -∗ ptree_own 2 dq t).
+      pt_addr0 p1 vpn ↦ₚₜ{dq} w0 ∗
+      (pt_addr0 p1 vpn ↦ₚₜ{dq} w0 -∗ ptree_own 2 dq t).
   Proof.
     intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 & _).
     iIntros "[Hpg Hks]".
@@ -1664,8 +1671,8 @@ Section PtBuildIris.
   (* read node [t]'s own slot [i] (read-only), at ANY level [S lvl] *)
   Lemma ptree_own_cell_ro (lvl : nat) (dq : dfrac) (t : ptree) (i : mword 9) :
     ptree_own (S lvl) dq t ⊢
-      u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ents t i ∗
-      (u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ents t i -∗ ptree_own (S lvl) dq t).
+      u_pte_addr (pt_base t) i ↦ₚₜ{dq} pt_ents t i ∗
+      (u_pte_addr (pt_base t) i ↦ₚₜ{dq} pt_ents t i -∗ ptree_own (S lvl) dq t).
   Proof.
     iIntros "[Hpg Hks]".
     iDestruct (pt_page_own_acc_ro dq t i with "Hpg") as "[Hs Hclose]".
@@ -1692,9 +1699,9 @@ Section PtBuildIris.
   Lemma ptree_own_graft (lvl : nat) (dq : dfrac) (t : ptree) (i : mword 9) :
     pt_kids t i = None ->
     ptree_own (S lvl) dq t ⊢
-      u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ents t i ∗
+      u_pte_addr (pt_base t) i ↦ₚₜ{dq} pt_ents t i ∗
       (∀ b : mword 44,
-         u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ptr_pte b -∗
+      u_pte_addr (pt_base t) i ↦ₚₜ{dq} pt_ptr_pte b -∗
          ptree_own lvl dq (pt_empty_node b) -∗
          ptree_own (S lvl) dq (pt_graft t i b)).
   Proof.

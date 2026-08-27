@@ -3184,7 +3184,7 @@ Section ProcPt.
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     rewrite /byte_any /phys_byte_any. iDestruct "H" as (b) "H".
     iExists b.
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
+    iDestruct (TsoCtx.ctx_pointsto_forget with "H") as "H".
     iApply (mem_ident_phys (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
               (page_valid_kmap_static ppn (0 + k)%nat Hv ltac:(lia)) with "Hb H").
   Qed.
@@ -5097,17 +5097,3 @@ Section ProcPt.
      once. *)
 
 End ProcPt.
-
-(* the descriptor's transport (tso-port M3).  [proc_pt] is the address
-   space itself and lives entirely at the PHYSICAL tier, which does not
-   flip at stage 1 -- so it is already a closed term.  The two [struct
-   proc] words that name it are not, and they are the whole obligation. *)
-Global Instance proc_pt_at_morph `{!riscvGS Σ} (pa : mword 64) (P : uptd) :
-  CtxMorph (fun xi : CtxId => proc_pt_at (XI := xi) pa P).
-Proof.
-  iIntros (ξ ξ') "Hd H". rewrite /proc_pt_at.
-  iDestruct "H" as "(H1 & H2 & H3)".
-  iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
-  iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
-  iFrame.
-Qed.

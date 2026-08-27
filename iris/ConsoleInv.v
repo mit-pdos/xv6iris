@@ -213,50 +213,10 @@ Section ConsoleInv.
   Global Instance cons_res_timeless : Timeless cons_res.
   Proof. apply _. Qed.
 
-End ConsoleInv.
-
-(* ==================================================================
-   THE PAYLOAD'S CtxMorph INSTANCES (tso-port M3, §4 step 1) and the
-   lock handle over the CONVERTED payload.  Outside the section above
-   because each quantifies over the context that section fixes -- the
-   [KallocInv.v:388] template, line for line.  [cons_res] is ▷-free,
-   [inv]-free and WP-free: its three index words are [↦₄] (stage 2,
-   still unflipped, hence ξ-constant) and its ring is a [↦ₘ] big-op.
-   Consequence: [is_conslock] is a CLOSED term -- no [CurCtx] in its
-   type -- which is what §4's ordering needs of the console. *)
-Section ConsoleCtx.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{XI : CurCtx}.
-
-  (* Instance search cannot do the higher-order big-op unification, so the
-     structural instance is applied AS A TERM (recipe rule 2). *)
-  Global Instance cons_data_morph (bs : list (bv 8)) :
-    CtxMorph (λ ξ0 : CtxId, cons_data (XI := ξ0) bs).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /cons_data.
-    iDestruct (ctx_morph_big_sepL bs
-                 (λ (j : nat) (b : bv 8) (ξ0 : CtxId),
-                    ctx_pointsto ξ0 (pa_add a_cons (cons_buf_off + j))
-                                 (DfracOwn 1) b)
-                 (λ i x, ctx_morph_pointsto _ _ _ _)
-                 ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame.
-  Qed.
-
-  Global Instance cons_res_morph : CtxMorph (λ ξ0 : CtxId, cons_res (XI := ξ0)).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /cons_res.
-    iDestruct "H" as (r w e bs) "(Hr & Hw & He & Hlen & Hdat)".
-    iDestruct (cons_data_morph bs ξ ξ' with "Hd Hdat") as "[Hd Hdat]".
-    iFrame "Hd". iExists r, w, e, bs. iFrame.
-  Qed.
-
   (* THE WHOLE CREDENTIAL.  Persistent, singleton, and taken by value: a
-     caller of consoleread passes this and nothing else about the console.
-     The payload is spelled as a λ that NAMES its context (recipe rule 1):
-     the ring re-indexes to whichever context holds the lock. *)
+     caller of consoleread passes this and nothing else about the console. *)
   Definition is_conslock (γ : gname) : iProp Σ :=
-    is_lock γ a_cons "cons"%string (λ ξ : CtxId, cons_res (XI := ξ)).
+    is_lock γ a_cons "cons"%string <{ cons_res }>.
 
   Global Instance is_conslock_persistent γ : Persistent (is_conslock γ).
   Proof. apply _. Qed.
@@ -546,61 +506,7 @@ Section ConsoleCtx.
     intros Hlen Hlt. apply lookup_lt_is_Some_2. rewrite Hlen. exact Hlt.
   Qed.
 
-End ConsoleCtx.
-
-(* ==================================================================
-   THE CONSOLE BUNDLE'S TRANSPORT (tso-port.md §0.16′)
-
-   [devsw_table] / [console_inv] / [console_ready] are ξ-INDEXED -- the
-   devsw table is [NDEV_max + 1] pairs of [↦₈□] cells -- and the park has
-   to hand them to a freshly minted child context, so each needs a
-   [CtxMorph].  They are NOT convertible across two contexts (the cells are
-   discarded at WP time, t > 0: §0.4 item 6), and they do not have to be:
-   what a deposit wants is TRANSPORTABILITY (§0.15′'s rule).
-
-   Below the section that binds the ambient, for the usual reason (a
-   section variable cannot be instantiated inside the section that binds
-   it), and the structural instances go in AS TERMS -- instance search does
-   not do the higher-order big-op or ∃ unification (MEASURED: with
-   [ctx_morph_big_sepL]/[ctx_morph_exist] reachable by a [Hint Extern] that
-   [eapply]s them, [devsw_table] still does not resolve). *)
-Section ConsoleMorph.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-
-  Global Instance devsw_table_morph :
-    CtxMorph (λ ξ0 : CtxId, devsw_table (XI := ξ0)).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /devsw_table.
-    iDestruct (ctx_morph_big_sepL (seq 0 (Z.to_nat NDEV_max + 1))
-                 (λ (_ : nat) (i : nat) (ξ0 : CtxId),
-                    (ctx_word_pointsto ξ0 (a_devsw_read (Z.of_nat i))
-                       DfracDiscarded (devsw_read_val (Z.of_nat i)) ∗
-                     ctx_word_pointsto ξ0 (a_devsw_write (Z.of_nat i))
-                       DfracDiscarded (devsw_write_val (Z.of_nat i)))%I)
-                 (λ i x, ctx_morph_sep _ _
-                           (ctx_morph_word _ _ _ _) (ctx_morph_word _ _ _ _))
-                 ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame.
-  Qed.
-
-  Global Instance console_inv_morph (γ : gname) :
-    CtxMorph (λ ξ0 : CtxId, console_inv (XI := ξ0) γ).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /console_inv.
-    iDestruct "H" as "[Hlk Ht]".
-    iDestruct (devsw_table_morph ξ ξ' with "Hd Ht") as "[Hd Ht]".
-    iFrame.
-  Qed.
-
-  Global Instance console_ready_morph :
-    CtxMorph (λ ξ0 : CtxId, console_ready (XI := ξ0)).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /console_ready.
-    iDestruct "H" as (γ) "H".
-    iDestruct (console_inv_morph γ ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame "Hd". iExists γ. iExact "H".
-  Qed.
-End ConsoleMorph.
+End ConsoleInv.
 
 (* ---- the address arithmetic the load's base computation needs -------
 

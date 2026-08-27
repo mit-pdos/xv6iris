@@ -185,11 +185,25 @@ Section rekey.
      ambient bundle and no side condition.  (The claim-carrying twins
      [KMap.mem_ident_phys] / [RiscvPtsto.mem_to_phys_claim] both ask for
      something the pin already provides.) *)
+  (* A6.16, ctx-native: the KT0 datum's PHYSICAL LEDGER byte.  The raw
+     [↦ₚ] projection below drops the timestamp element and the clean/dirty
+     bit, and A6.9 says neither can be recovered -- so the rekey, which has
+     to hand a LOADABLE byte back at the KT1 va, must travel at this tier
+     and not at the raw one. *)
+  Lemma ctx_kt0_phys (va : mword 64) dq b :
+    va ↦ₘ[KT0]{dq} b ⊢ TsoCtx.ctx_phys_pointsto XI va dq b.
+  Proof.
+    iIntros "H".
+    iEval (rewrite (TsoCtx.ctx_pointsto_phys (KTR := KT0) XI va dq b)) in "H".
+    iDestruct "H" as (ppn) "(_ & _ & %Hpin & Hp)".
+    cbn in Hpin. by rewrite Hpin.
+  Qed.
+
   Lemma mem_kt0_phys (va : mword 64) dq b :
     va ↦ₘ[KT0]{dq} b ⊢ va ↦ₚ{dq} b.
   Proof.
     iIntros "H".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
+    iDestruct (TsoCtx.ctx_pointsto_forget with "H") as "H".
     iEval (rewrite /mem_pointsto) in "H".
     rewrite /phys_pointsto.
     iDestruct "H" as (ppn) "(_ & _ & %Hram & %Hpin & Hpt)".
@@ -208,15 +222,20 @@ Section rekey.
     (pa_add (kstack_va i) j) ↦ₘ[KT1]{dq} b.
   Proof.
     intros Hi Hkd Hj. iIntros "#Hcl H".
-    iDestruct (mem_kt0_phys with "H") as "Hp".
-    assert (Hram : addr_is_ram (pa_of ppn (pa_add (kstack_va i) j))).
-    { rewrite (kstack_va_pa_of ppn i j Hi Hj).
-      exact (kstack_ident_ram ppn j Hkd Hj). }
-    iApply TsoCtxShim.ctx_pointsto_of_mem.
-    iApply (phys_to_mem_map KT1 (pa_add (kstack_va i) j) ppn dq b
-              Hram (kstack_va_canon_add i j Hi Hj) I with "[] [Hp]").
-    - rewrite (kstack_va_svpn_add i j Hi Hj). iExact "Hcl".
-    - rewrite (kstack_va_pa_of ppn i j Hi Hj). iExact "Hp".
+    (* A6.16 verbatim: down to the PHYSICAL LEDGER byte at the KT0 side
+       (whose tier pin IS the identity, so the address does not move), and
+       back up at the KT1 va under this stack's own claim.  The registered
+       tier travels intact -- which is the whole point: the KT1 byte is
+       LOADED, so it needs the licence the raw crossing would have dropped. *)
+    iDestruct (ctx_kt0_phys with "H") as "Hp".
+    iEval (rewrite (TsoCtx.ctx_pointsto_phys (KTR := KT1) XI
+                      (pa_add (kstack_va i) j) dq b)).
+    iExists ppn.
+    rewrite (kstack_va_svpn_add i j Hi Hj).
+    iFrame "Hcl".
+    iSplitR; [iPureIntro; exact (kstack_va_canon_add i j Hi Hj) |].
+    iSplitR; [iPureIntro; exact I |].
+    rewrite (kstack_va_pa_of ppn i j Hi Hj). iExact "Hp".
   Qed.
 
   (* ...and eight of them, as one doubleword cell.  The KSTACK side's
@@ -225,11 +244,16 @@ Section rekey.
   Lemma kstack_word_rekey (i : nat) (ppn : mword 44) (o : nat) (w : bv 64) :
     (i < 64)%nat -> node_kdata ppn -> (o + 8 <= 4096)%nat -> (8 | Z.of_nat o) ->
     kmap_at (kstack_vpn i) ppn KP_rw -∗
-    word_pointsto (KTR := KT0) (pa_add (page_base ppn) o) (DfracOwn 1) w -∗
-    word_pointsto (KTR := KT1) (pa_add (kstack_va i) o) (DfracOwn 1) w.
+    (* A6.23: the WORD half leaves the raw [word_pointsto] tower too -- a
+       kernel stack word is thread data that is loaded AND stored, so it
+       must carry its ledger residue on both sides of the rekey. *)
+    TsoCtx.ctx_word_pointsto (KTR := KT0) XI (pa_add (page_base ppn) o)
+      (DfracOwn 1) w -∗
+    TsoCtx.ctx_word_pointsto (KTR := KT1) XI (pa_add (kstack_va i) o)
+      (DfracOwn 1) w.
   Proof.
     intros Hi Hkd Ho Hdvd. iIntros "#Hcl H".
-    rewrite /word_pointsto.
+    rewrite /TsoCtx.ctx_word_pointsto.
     iDestruct "H" as "[_ Hbs]".
     iSplitR.
     { iPureIntro. apply (kstack_va_aligned8 i o Hi); [lia | exact Hdvd]. }
@@ -237,8 +261,6 @@ Section rekey.
     iIntros "!>" (k j Hk) "Hb".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     rewrite !pa_add_add.
-    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb") as "Hb".
-    iApply TsoCtxShim.ctx_pointsto_to_mem.
     iApply (kstack_byte_rekey i ppn (o + (0 + k))%nat (DfracOwn 1) (nth_byte w (0 + k)%nat)
               Hi Hkd ltac:(lia) with "Hcl Hb").
   Qed.
@@ -265,7 +287,8 @@ Section ladder.
     ([∗ list] j ∈ seq 0 (8 * n), byte_any (pa_add p j)) ⊢
     ∃ ws : list (bv 64), ⌜length ws = n⌝ ∗
       ([∗ list] k ↦ w ∈ ws,
-         word_pointsto (KTR := KT0) (pa_add p (8 * k)%nat) (DfracOwn 1) w).
+         TsoCtx.ctx_word_pointsto (KTR := KT0) XI (pa_add p (8 * k)%nat)
+           (DfracOwn 1) w).
   Proof.
     induction n as [|n IH]; intro Hal.
     - iIntros "_". iExists []. by iSplit.
@@ -281,8 +304,7 @@ Section ladder.
       iExists (ws ++ [w])%list.
       iSplit; [iPureIntro; rewrite length_app Hlen /=; lia|].
       rewrite big_sepL_app big_sepL_singleton Hlen.
-      iFrame "Hws". rewrite Nat.add_0_r.
-      iApply (TsoCtxShim.ctx_word_to_mem with "Hw").
+      iFrame "Hws". rewrite Nat.add_0_r. iExact "Hw".
   Qed.
 
   (* forget the contents of an indexed run: [∗ list] over the values becomes
@@ -308,7 +330,8 @@ Section ladder.
       (ws : list (bv 64)) :
     length ws = n ->
     ([∗ list] k ↦ w ∈ ws,
-       word_pointsto (KTR := kt) (pa_add base (8 * k)%nat) (DfracOwn 1) w) ⊢
+       TsoCtx.ctx_word_pointsto (KTR := kt) XI (pa_add base (8 * k)%nat)
+         (DfracOwn 1) w) ⊢
     stack_own (KTR := kt) (pa_add base (8 * n)%nat) n.
   Proof.
     intro Hlen.
@@ -322,13 +345,14 @@ Section ladder.
     rewrite -Hlen.
     iIntros "H".
     iDestruct (bigsep_ws_seq
-                 (fun k w => word_pointsto (KTR := kt) (pa_add base (8 * k)%nat)
-                               (DfracOwn 1) w) ws with "H") as "H".
+                 (fun k w => TsoCtx.ctx_word_pointsto (KTR := kt) XI
+                               (pa_add base (8 * k)%nat) (DfracOwn 1) w)
+                 ws with "H") as "H".
     iApply (big_sepL_mono with "H").
     intros k j _. iIntros "H".
     assert (Hj : pa_add base (8 * j)%nat = add_vec_int base (8 * Z.of_nat j)).
     { unfold pa_add. rewrite Nat2Z.inj_mul. change (Z.of_nat 8) with 8. reflexivity. }
-    rewrite -Hj. iApply (TsoCtxShim.ctx_eslot_of_mem with "H").
+    rewrite -Hj. iExact "H".
   Qed.
 
 End ladder.
@@ -359,7 +383,8 @@ Section mint.
                        [exact Hkd | lia | exact Hd])
                  with "Hpg") as (ws) "[%Hlen Hws]".
     iAssert ([∗ list] k ↦ w ∈ ws,
-               word_pointsto (KTR := KT1) (pa_add (kstack_va i) (8 * k)%nat)
+               TsoCtx.ctx_word_pointsto (KTR := KT1) XI
+                 (pa_add (kstack_va i) (8 * k)%nat)
                  (DfracOwn 1) w)%I with "[Hws]" as "Hws".
     { iApply (big_sepL_impl with "Hws").
       iIntros "!>" (k w Hk) "Hw".

@@ -618,7 +618,7 @@ Section ProofConsoleintr.
       assert (N10 : r <> Ra0) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
       rewrite /X3 upd_ne; [| congruence]. rewrite /X2 upd_ne; [| congruence].
       rewrite /X1 upd_ne; [| congruence]. reflexivity. }
-    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string (λ ξ : CtxId, cons_res (XI := ξ)) X3
+    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> X3
               lvl eb pme (K - 6)%nat ({["cons"]} ∪ lks) HX3lka
               ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -2765,7 +2765,7 @@ Section ProofConsoleintr.
     (* ---- +0x014 acquire(&cons.lock) ---- *)
     iDestruct (cpu_own_transport CID CIDp9 lvl eb pme b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string (λ ξ : CtxId, cons_res (XI := ξ)) P5 lvl eb pme
+    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string <{ cons_res }> P5 lvl eb pme
               (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hbelow
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.

@@ -1466,7 +1466,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslots 2 -∗
     log_epoch_lb γ v -∗
@@ -2308,7 +2308,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 3 -∗
     (* THE GROUP CREDIT (fs-log.md §G.18's chain, §G.21's tier; [SpecIput]'s
        [wp_iput_gen_body] premise verbatim).  At [crz = false] this is [emp]
@@ -2467,7 +2467,7 @@ Section IputFreePath.
        keeps one half ([Hinh], with [Hidv]) and the SURPLUS half -- which this
        body used to drop on the floor -- is fed to the entry's re-assembly
        wand together with the borrowed [ic_id] and the FROZEN PARK. ---- *)
-    iDestruct (word4_pointsto_half_split with "Hnfull") as "[Hinh Hnsurp]".
+    iDestruct (ctx_word4_pointsto_half_split with "Hnfull") as "[Hinh Hnsurp]".
     iDestruct "Hlvq2" as (gr) "Hlvr".
     iDestruct (live_gen_agree with "Hlvr Hlvh") as %->.
     (* ================================================================
@@ -2516,8 +2516,8 @@ Section IputFreePath.
        park, where the ordinary path enters it too.
        ================================================================ *)
     iDestruct "Hvldx" as (w0) "Hva".
-    iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
-    iDestruct (word4_pointsto_half_join with "Hvb Hva") as "Hvld".
+    iDestruct (ctx_word4_pointsto_agree with "Hvb Hva") as %<-.
+    iDestruct (ctx_word4_pointsto_half_join with "Hvb Hva") as "Hvld".
     iMod (ic_dep_checkout cn k (DepFrz q dev inum) with "Hictok")
       as "[Hdep Hdepa]".
     iMod ("Hclose" with "[Hdepa Hfrg Hrident Hrcpt Hsele Hmt Hgida]") as "_".
@@ -3668,7 +3668,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 3 -∗
     log_epoch_lb γ v -∗
     log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
@@ -3785,7 +3785,7 @@ Section IputFreePath.
           RE-ASSEMBLY WAND.  [ip_free_locked] re-opens the HELD arm at its
           own 0x76 [ic_open_held] regardless, and that returns [i_inum ↦₄
           inum] WHOLE -- whose surplus half its body TODAY DROPS on the floor
-          (IputFreeLockedDev.v:586, [iDestruct (word4_pointsto_half_split
+          (IputFreeLockedDev.v:586, [iDestruct (ctx_word4_pointsto_half_split
           with "Hnfull") as "[Hinh _]"]).  Feeding that dropped half and the
           borrowed [ic_id] to this wand rebuilds both resources exactly.
           FLAGGED SEAM: ip_free_locked's premise list needs the matching
@@ -3974,11 +3974,11 @@ Section IputFreePath.
         iDestruct "Hrident" as "[Hrd Hrn]".
         iEval (rewrite /islot_rest_at Ert) in "Hrest".
         iDestruct "Hrest" as "[Htd Htn]".
-        iDestruct (word4_pointsto_frac_split (i_inum (ientry k)) q qr inum) as "[_ Hjn]".
+        iDestruct (ctx_word4_pointsto_frac_split (i_inum (ientry k)) q qr inum) as "[_ Hjn]".
         iDestruct ("Hjn" with "[$Hrn $Htn]") as "Hn2".
         iEval (rewrite -Hsum) in "Hn2".
-        iDestruct (word4_pointsto_half_join with "Hinh Hn2") as "Hnfull".
-        iDestruct (word4_pointsto_half_split with "Hvld") as "[Hva Hvb]".
+        iDestruct (ctx_word4_pointsto_half_join with "Hinh Hn2") as "Hnfull".
+        iDestruct (ctx_word4_pointsto_half_split with "Hvld") as "[Hva Hvb]".
         iMod ("Hclose" with "[Hidv Hnfull Hva Hmt Hgida]") as "_".
         { iApply bi.later_intro. iApply ic_close_held. rewrite /ic_held.
           iExists dev, inum, (valid_word true). iFrame. }
@@ -4353,12 +4353,12 @@ Section IputFreePath.
          so does the arm's liveness half (A⁗, §3.16). *)
       iDestruct (ic_payload_at_pack_np with "Hpayl") as "Hpayl".
       iDestruct "Hvldx" as (w0) "Hva".
-      iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
-      iDestruct (word4_pointsto_half_join with "Hvb Hva") as "Hvld".
+      iDestruct (ctx_word4_pointsto_agree with "Hvb Hva") as %<-.
+      iDestruct (ctx_word4_pointsto_half_join with "Hvb Hva") as "Hvld".
       (* the FULL inum cell splits back: the arm's half, our q, the table's qr *)
-      iDestruct (word4_pointsto_half_split with "Hnfull") as "[Hinh Hn2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hnfull") as "[Hinh Hn2]".
       iEval (rewrite Hsum) in "Hn2".
-      iDestruct (word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
+      iDestruct (ctx_word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
         as "[Hrn Htn]".
       iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hoff Hlvh Hmt Hgida]") as "_".
       { iApply bi.later_intro. iApply ic_close_parked.
@@ -4583,7 +4583,7 @@ Section IputFreePath.
       with "[Htd Hiu Hback Hrd Hcnt1]" as "Hwand".
     { iIntros "Hn2 Hgid2 Hpk".
       iEval (rewrite Hsum) in "Hn2".
-      iDestruct (word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
+      iDestruct (ctx_word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
         as "[Hrn Htn]".
       iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid2 Hcnt1 Hpk]") as "Hslots";
         [ intros i Hi; reflexivity | intros i Hi; reflexivity | | ].

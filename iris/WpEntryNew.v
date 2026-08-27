@@ -210,6 +210,14 @@ Section WpEntryNew.
     mhartid ↦ᵣ mhartid_in -∗
     (* the stack0 pointer word sitting at the load effective address *)
     entry_ld_ea ↦ₚ₈{ dq } v_stack0 -∗
+    (* ... and its IMAGE RECEIPT (tso-machine-flip.md §6 amendment A6.10).
+       [stack0] is a link-time constant: the loader wrote it and nothing in
+       the machine ever stores to it, so its latest write is timestamp 0 and
+       the load's view-indexed obligation is discharged with no context, no
+       view and no bound.  Persistent, so it is not handed back.  It is
+       threaded up to the boot theorem, where the era's initial-state ghosts
+       mint it beside the image itself. *)
+    TsoCtx.pristine_win entry_ld_ea 8 -∗
     (* the kernel text image: the eight decoded [instr] facts are derived from
        it inside the proof via the [entry_instr_*] constructors ([kernel_text]
        is persistent, so one copy feeds all eight) *)
@@ -224,7 +232,7 @@ Section WpEntryNew.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp)
-      "Hmm Hpmpc Hpc Hfile Hmh Hbytes #Htext Hcont".
+      "Hmm Hpmpc Hpc Hfile Hmh Hbytes #Hpr #Htext Hcont".
     pose proof (pmp_all_off_allows_all _ Hpmp) as HpmpU.
     (* the eight [instr] facts are closed as subgoals off the (persistent)
        text image at each leaf, never posed into the context *)
@@ -257,9 +265,11 @@ Section WpEntryNew.
       rewrite reg_ld_auipc.
       rewrite upd_eq. reflexivity. }
     iApply (wp_ld_gpr pc_e1 false i_ld i_ld imm_ld (m_auipc m) v_stack0 pmpcfg0 1%Qp
-              (dq := dq) Hpmp ltac:(boot_static) Hrd1 with "Hmm Hpmpc Hpc Hfile [] [Hbytes]").
+              (dq := dq) Hpmp ltac:(boot_static) Hrd1
+              with "Hmm Hpmpc Hpc Hfile [] [Hbytes] [Hpr]").
     { iApply (entry_instr_ld with "Htext"). }
     { rewrite Hea. iExact "Hbytes". }
+    { rewrite Hea. iExact "Hpr". }
     iEval (rewrite pc_e1_e2).
     iIntros "Hmm Hpmpc Hpc Hfile Hbytes".
     iEval (rewrite Hea) in "Hbytes".

@@ -38,6 +38,9 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
+(* A6.48 ruling 4: the byte tier of the whole protocol is [TsoCtx.phys_ledger]
+   now -- see [WpVirtio.dma_own]'s header. *)
+Require Import TsoCtx.
 Require Import VirtioModel.
 Require Import WpVirtio.
 Require Import VirtioQueue.
@@ -932,13 +935,13 @@ Section VirtioProto.
   (* -- byte-window sugar over the physical points-to -------------------- *)
 
   Definition phys_word2 (a : Arch.pa) (w : bv 16) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 2, phys_pointsto (pa_add a j) (DfracOwn 1) (nth_byte w j))%I.
+    ([∗ list] j ∈ seq 0 2, phys_ledger (pa_add a j) (DfracOwn 1) (nth_byte w j))%I.
   Definition phys_word4 (a : Arch.pa) (w : bv 32) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4, phys_pointsto (pa_add a j) (DfracOwn 1) (nth_byte w j))%I.
+    ([∗ list] j ∈ seq 0 4, phys_ledger (pa_add a j) (DfracOwn 1) (nth_byte w j))%I.
   Definition phys_map (mm : gmap Arch.pa (bv 8)) : iProp Σ :=
-    ([∗ map] a ↦ b ∈ mm, phys_pointsto a (DfracOwn 1) b)%I.
+    ([∗ map] a ↦ b ∈ mm, phys_ledger a (DfracOwn 1) b)%I.
   Definition phys_list (a : Arch.pa) (bs : list (bv 8)) : iProp Σ :=
-    ([∗ list] j ↦ b ∈ bs, phys_pointsto (pa_add a j) (DfracOwn 1) b)%I.
+    ([∗ list] j ↦ b ∈ bs, phys_ledger (pa_add a j) (DfracOwn 1) b)%I.
 
   (* -- byte windows <-> byte maps --------------------------------------- *)
 
@@ -949,7 +952,7 @@ Section VirtioProto.
   Lemma phys_map_idx_list (a : Arch.pa) (l : list nat) (f : nat -> bv 8) :
     NoDup l -> (forall j, j ∈ l -> Z.of_nat j < 18446744073709551616) ->
     phys_map (foldr (fun j acc => <[ pa_add a j := f j ]> acc) ∅ l)
-    ⊣⊢ ([∗ list] j ∈ l, phys_pointsto (pa_add a j) (DfracOwn 1) (f j)).
+    ⊣⊢ ([∗ list] j ∈ l, phys_ledger (pa_add a j) (DfracOwn 1) (f j)).
   Proof.
     induction l as [|i l IH]; intros Hnd Hb.
     - rewrite /phys_map big_sepM_empty big_sepL_nil. reflexivity.
@@ -974,7 +977,7 @@ Section VirtioProto.
   Lemma phys_map_range (a : Arch.pa) (n : nat) (f : nat -> bv 8) :
     Z.of_nat n < 18446744073709551616 ->
     phys_map (range_map a n f)
-    ⊣⊢ ([∗ list] j ∈ seq 0 n, phys_pointsto (pa_add a j) (DfracOwn 1) (f j)).
+    ⊣⊢ ([∗ list] j ∈ seq 0 n, phys_ledger (pa_add a j) (DfracOwn 1) (f j)).
   Proof.
     intro Hn. apply phys_map_idx_list; [ apply NoDup_seq | ].
     intros j Hj. apply elem_of_seq in Hj. lia.
@@ -996,7 +999,7 @@ Section VirtioProto.
       (bs : list (bv 8)) :
     bs = g <$> seq 0 n ->
     phys_list a bs
-    ⊣⊢ ([∗ list] j ∈ seq 0 n, phys_pointsto (pa_add a j) (DfracOwn 1) (g j)).
+    ⊣⊢ ([∗ list] j ∈ seq 0 n, phys_ledger (pa_add a j) (DfracOwn 1) (g j)).
   Proof.
     intros ->. rewrite /phys_list big_sepL_fmap.
     apply big_sepL_proper. intros k y Hk.
@@ -1036,9 +1039,7 @@ Section VirtioProto.
     iDestruct (IH with "H1 H2") as %Hdisj.
     destruct (m2 !! a) as [b2|] eqn:Hb2.
     - iDestruct (big_sepM_lookup _ _ a b2 Hb2 with "H2") as "Hb2".
-      rewrite /phys_pointsto.
-      iDestruct "Ha" as "[Ha _]". iDestruct "Hb2" as "[Hb2 _]".
-      iDestruct (pointsto_ne with "Ha Hb2") as %Hne.
+      iDestruct (phys_ledger_ne with "Ha Hb2") as %Hne.
       iPureIntro. destruct (Hne eq_refl).
     - iPureIntro. apply map_disjoint_insert_l. split; [exact Hb2 | exact Hdisj].
   Qed.
@@ -1063,7 +1064,7 @@ Section VirtioProto.
     assert (Heq : dma_own dma ⊣⊢ dma_own (mm ∪ (dma ∖ mm)))
       by (rewrite Hd; reflexivity).
     rewrite Heq /dma_own.
-    rewrite (big_sepM_union (fun a b => phys_pointsto a (DfracOwn 1) b)
+    rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b)
                mm (dma ∖ mm) Hdj).
     reflexivity.
   Qed.
@@ -1089,7 +1090,7 @@ Section VirtioProto.
     assert (Hdj' : mm' ##ₘ dma ∖ mm).
     { apply map_disjoint_dom. rewrite Hdom. by apply map_disjoint_dom. }
     rewrite Heq /dma_own.
-    rewrite (big_sepM_union (fun a b => phys_pointsto a (DfracOwn 1) b)
+    rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b)
                mm' (dma ∖ mm) Hdj').
     iFrame "Hmm' Hrest".
   Qed.
@@ -1531,7 +1532,7 @@ Section VirtioProto.
     rewrite phys_word2_map (phys_list_replicate (vc_used c) 4096 byte_zero H4k).
     iAssert (dma_own (vinit_dma c)) with "[Hidx Hpage]" as "Hdma".
     { rewrite /vinit_dma /dma_own.
-      rewrite (big_sepM_union (fun a b => phys_pointsto a (DfracOwn 1) b) _ _
+      rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b) _ _
                  (vinit_dma_disj c Hdisj)).
       iFrame "Hidx Hpage". }
     rewrite /virtio_proto.
@@ -1799,16 +1800,30 @@ Section VirtioProto.
     virtio_req_step v mv = Some (v', w) ->
     gen_heap_interp m -∗ disk_img_auth (dn_img γ) (v_disk v) -∗
     virtio_proto γ v ==∗
-      ∃ (kq : nat * gname) (wr : disk_wr),
+      ∃ (kq : nat * gname) (wr : disk_wr) (old : gmap Arch.pa (bv 8)),
         (* THE COMPLETION MOVES NO DISK BYTE (sector-atomic-disk.md): every
            sector of an OUT request's data landed at its own earlier step, so
            the index here is [None] in BOTH directions and the cell is at the
            sequential permit's LEAF -- nothing left to land. *)
         ⌜v_disk v' = wr_apply None (v_disk v)⌝ ∗
+        (* A6.48 ruling 4, THE INSIDE-OUT.  This lemma used to perform the
+           byte update itself and hand back [gen_heap_interp (w ∪ m)].  It
+           cannot: the completion APPENDS the write set to the era log, and
+           [TsoCtx.ledger_store_ok] moves [gen_heap_interp] and
+           [tso_interp_at] TOGETHER (the interpretation's own tie relates the
+           flat cell to the timestamp element), so the update belongs to the
+           one caller that holds both -- [WpUart]'s disk loop.  What the
+           protocol does instead is hand the write set's OLD bytes OUT at the
+           ledger tier and take the NEW ones back through the wand.
+           [gen_heap_interp m] goes in for [dma_agree]'s pure fact and comes
+           straight back UNTOUCHED. *)
+        ⌜dom old = dom w⌝ ∗
+        gen_heap_interp m ∗
+        ([∗ map] a ↦ b ∈ old, phys_ledger a (DfracOwn 1) b) ∗
         perm_pend (dn_perm γ) kq wr ∅ ∗
         (perm_done (dn_perm γ) kq wr -∗
-           gen_heap_interp (w ∪ m) ∗ disk_img_auth (dn_img γ) (v_disk v') ∗
-           virtio_proto γ v').
+           ([∗ map] a ↦ b ∈ w, phys_ledger a (DfracOwn 1) b) -∗
+           disk_img_auth (dn_img γ) (v_disk v') ∗ virtio_proto γ v').
   Proof.
     iIntros (Hview Hstep) "Hm Hauth Hp".
     iDestruct "Hauth" as (dmap) "[Hauth %Hdv]".
@@ -1900,7 +1915,8 @@ Section VirtioProto.
     assert (Hdv' : disk_view dmap (v_disk (vslot_post v sl)))
       by (rewrite vslot_post_disk; exact Hdv).
     (* the byte lease and the counters *)
-    iMod (dma_update _ m dma HwDdma with "Hm Hdma") as "[Hm Hdma]".
+    iDestruct (dma_acc _ dma HwDdma with "Hdma")
+      as (old) "(%Hdomold & %Holdsub & Hold & Hdmaback)".
     assert (Hle : (vp_nc pr <= S (vp_nc pr))%nat) by lia.
     iMod (mono_nat_own_update (S (vp_nc pr)) Hle with "Hnc") as "[Hnc _]".
     (* the frames: every OTHER done record survives *)
@@ -1953,10 +1969,12 @@ Section VirtioProto.
           * apply elem_of_union_r. exact Hc. }
     (* rebuild, AS THE ACCESSOR: the completing slot's pending token goes
        out, and the caller owes the spent one back at the same key. *)
-    iModIntro. iExists (vs_perm sl), (vs_wr sl).
+    iModIntro. iExists (vs_perm sl), (vs_wr sl), old.
     iSplitR; [iPureIntro; apply vslot_post_wr|].
-    iFrame "Hpend0". iIntros "Hdone0".
-    iFrame "Hm".
+    iSplitR; [by iPureIntro|].
+    iFrame "Hm Hold".
+    iFrame "Hpend0". iIntros "Hdone0 Hnew".
+    iDestruct ("Hdmaback" with "Hnew") as "Hdma".
     iSplitL "Hauth".
     { iExists dmap. iFrame "Hauth". iPureIntro. exact Hdv'. }
     rewrite /virtio_proto vslot_post_cfg vslot_post_cache vslot_post_taken
@@ -2384,8 +2402,8 @@ Section VirtioProto.
                              (nth_byte (wrap16 (S np))) ∪ dma))))
       with "[Hpin Hwrb Hdma]" as "Hdma".
     { rewrite /dma_own.
-      rewrite (big_sepM_union (fun a b => phys_pointsto a (DfracOwn 1) b) _ _ Hd1).
-      rewrite (big_sepM_union (fun a b => phys_pointsto a (DfracOwn 1) b) _ _ Hd2).
+      rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b) _ _ Hd1).
+      rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b) _ _ Hd2).
       iFrame "Hpin Hwrb Hdma". }
     (* the framing fact: everything old and outside the index field is intact *)
     assert (Hframe : forall x : Arch.pa, x ∈ dom dma ->
@@ -2713,7 +2731,7 @@ Section VirtioProto.
                 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))) ==∗
        virtio_proto γ v ∗ disk_pub γ np ∗ disk_done_lb γ (S p) ∗
        phys_map pin ∗
-       phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero ∗
+       phys_ledger (vr_status (vs_req sl)) (DfracOwn 1) byte_zero ∗
        (* the SPENT crash permits' tokens: each sector landing and the
           completion already ran their view shift and parked their receipt in
           [PermInv]; these are what the woken publisher presents to collect
@@ -2817,9 +2835,9 @@ Section VirtioProto.
     rewrite (dma_own_split _ dma HMMsub).
     iDestruct "Hdma" as "[Hmm Hdma]".
     rewrite {1}/phys_map.
-    rewrite (big_sepM_union (fun a b => phys_pointsto a (DfracOwn 1) b) _ _ HdPIN).
+    rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b) _ _ HdPIN).
     iDestruct "Hmm" as "[Hpin Hsb]".
-    rewrite (big_sepM_union (fun a b => phys_pointsto a (DfracOwn 1) b) _ _ HdSB).
+    rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b) _ _ HdSB).
     iDestruct "Hsb" as "[Hstm Hbuf]".
     rewrite big_sepM_singleton.
     (* the framing fact for the shrunk lease *)

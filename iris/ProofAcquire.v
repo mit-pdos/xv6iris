@@ -663,7 +663,7 @@ Section ProofAcquire.
        [twin_passed_get]). *)
     iDestruct "HRes" as (ξ0) "HRes".
     iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
-    iDestruct (ctx_morph ξ0 cur_ctx with "Hdom HRes") as "[_ HRes]".
+    iMod (ctx_morph ξ0 cur_ctx with "Hdom HRes") as "[_ HRes]".
     iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb".
     { iExists 0%nat. iApply hart_view_lb_any. }
     iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].

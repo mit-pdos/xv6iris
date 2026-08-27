@@ -51,6 +51,10 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMPmp.
 Require Import RiscvExtras RiscvFetchExec.
+(* [pwmsg]/[agent]/[tso_read_bytes]: [fobl_ram] below is stated over the
+   write log -- post-A6.36 an instruction fetch takes the same plain arm as
+   a data load and so reads THROUGH the log rather than off the flat cache *)
+Require Import TsoMemPa.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 
@@ -374,6 +378,15 @@ Proof.
 Qed.
 
 
+(* THE FETCH TWINS OF THE 4- AND 2-BYTE REQUESTS ARE GONE with the A6.7(B)
+   Sail patch (tso-machine-flip.md A6.36): the pinned model derives the read
+   kind from the acquire/release/reserved FLAGS alone, so an instruction
+   fetch reaches [read_ram] as [Read_plain] and builds the very same request
+   record as a data load.  [mread_req] / [mread_req2] above therefore serve
+   the fetch lane again, and the fetch owes the PLAIN obligation like every
+   other non-exclusive read. *)
+
+
 (* THE 8-BYTE TWINS, for the page walk's PTE read.  A third concrete
    instance rather than a width parameter, for the reason the 2-byte twins
    above already record: [ReadReq.t n] / [bv (8 * n)] are TYPE indices and a
@@ -431,6 +444,15 @@ Proof.
 Qed.
 
 
+(* THE WALK'S 8-BYTE [Read_ttw] TWIN IS GONE, with the Sail patch it needed
+   (tso-machine-flip.md A6.36).  The owner's overruling of RULING 1 removed
+   the access-kind distinction from the machine, the model was restored to
+   its pinned baseline, and [Read_ttw] is no longer a constructor of
+   [read_kind] -- so [mread_req8_ttw] and its two projection lemmas cannot
+   even be STATED here any more.  A page-table walk now builds the ordinary
+   [mread_req8] request at [Read_plain] and owes the PLAIN obligation like
+   every other non-exclusive read.  The de-confliction project restores both
+   the constructor and this block together with the parked patch. *)
 (* ...and the RESERVED 8-byte read, which is what the page walk's A/D
    write-back issues for its exclusive re-read of the leaf.
    [read_kind_of_flags false false true] is [Read_RISCV_reserved], which the
@@ -544,6 +566,59 @@ Section fetch.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
+  (* ------------------------------------------------------------------ *)
+  (* THE FETCH'S READ OBLIGATION (tso-machine-flip.md's rewritten        *)
+  (* RULING 1, as implemented by A6.36).  An instruction fetch is no     *)
+  (* longer distinguishable at the machine from a plain data load: the   *)
+  (* strongly-ordered RAM-read arm is gone, so a fetch advances this     *)
+  (* hart's view NONDETERMINISTICALLY and reads latest-visible at        *)
+  (* wherever it lands.  What a caller owes is therefore no longer a     *)
+  (* flat [read_bytes σ.(mem)] fact but this VIEW-INDEXED family --      *)
+  (* [HartMLoad.robl_ram] at the fetch widths, and the same             *)
+  (* pass-through discipline: nothing in this file owns a byte, so no    *)
+  (* lemma here DISCHARGES the obligation.                               *)
+  (*                                                                    *)
+  (* WHO PAYS IT.  Kernel TEXT is an era-image byte, never written, so   *)
+  (* its timestamp is 0 and it reads the same at every view: the payer   *)
+  (* is [TsoCtx.pristine_read_bytes_ok], whose conclusion is ∀ agent and *)
+  (* ∀ view with NO lower bound at all, so both premises below are free  *)
+  (* for it.  A fetch of a byte that IS written at run time (the trap    *)
+  (* vector copy, a future JIT) needs the ledger tier instead            *)
+  (* ([TsoCtx.ctx_phys_load_bytes_ok], cf. [HartMLoad.robl_ram_ctx]).    *)
+  (* ------------------------------------------------------------------ *)
+  Definition fobl_ram (img : TsoMemPa.bytemap) (log : list pwmsg)
+      (tv : nat) (pa : Arch.pa) (n : N) {m : N} (w : bv m) : Prop :=
+    ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+      tso_read_bytes img log (hart_agent cpu_id) tv' pa n w.
+
+  (* THE TEXT PAYER, and the mirror of [HartMLoad.robl_ram_ctx] one tier
+     down: a fetch of ERA-IMAGE bytes owes nothing beyond the pristine
+     receipt.  [TsoCtx.pristine_read_bytes_ok] concludes at EVERY agent and
+     EVERY view, so both of [fobl_ram]'s premises are discarded here -- which
+     is exactly the sense in which "kernel text is timestamp 0" survives the
+     overruling of RULING 1.  The A6.1a bridge ([tso_interp_of_pin] +
+     [tso_interp_of_at_gs] at [gs_of]) is what lets a LEAF, which never sees
+     a [gstate], reach a kit gate that is stated at one. *)
+  Lemma fobl_ram_pristine (img : TsoMemPa.bytemap) (sg : mstate)
+      (log : list pwmsg) (V : agent -> nat)
+      (pa : Arch.pa) (n : N) {m : N} (w : bv m) (dq : dfrac) (tv : nat) :
+    gen_heap_interp (hG := riscv_memGS) sg.(mem) -∗
+    tso_interp_of riscv_eraGS img sg.(mem) log V -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       phys_pointsto (pa_add pa j) dq (nth_byte w j)) -∗
+    TsoCtx.pristine_win pa (N.to_nat n) -∗
+    ⌜fobl_ram img log tv pa n w⌝.
+  Proof.
+    iIntros "Hgh Htso Hb #Hpr".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log V
+               sg.(sregs) sg.(mdev) Hpin).
+    iDestruct (TsoCtx.pristine_read_bytes_ok
+                 (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
+                 pa n w dq with "Hgh Htso Hb Hpr") as %Hok.
+    iPureIntro. intros tv' _ _. exact (Hok (hart_agent cpu_id) tv').
+  Qed.
+
   Lemma swp_checked_mem_read_ifetch4 (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (pa : SailStdpp.Values.mword 64)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
@@ -562,9 +637,13 @@ Section fetch.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pa 4 = Some bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pa 4 bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Machine
            (Physaddr pa) 4 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -584,6 +663,10 @@ Section fetch.
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     rewrite mbind_ret. cbn beta iota zeta.
     cbn [Phys_Mem_Access_Info_granule_size_exp Phys_Mem_Access_Info_splittable].
+    (* the read kind is back on [read_kind_of_flags] (A6.36 restored the model
+       to its pinned baseline), and at [aq = rl = res = false] that is
+       [Read_plain] -- an instruction fetch is byte-for-byte the same request
+       as a data load. *)
     cbn beta iota zeta delta [split_misaligned misaligned_order
       sys_misaligned_order_decreasing read_kind_of_flags].
     change (Instances.generic_eq CannotSplit CannotSplit) with true.
@@ -609,17 +692,27 @@ Section fetch.
                    ltac:(lia) HDhtif Hhtif Hram)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    (* [rk] is [Read_plain], so the request is the ordinary [mread_req]. *)
     iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 4 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read 4 (mread_req pa) _
+    (* THE ONE EVENT.  With no strong arm left this is the PLAIN rule, and
+       the obligation it asks for is the view-indexed [fobl_ram] -- which is
+       exactly what [Hmem] carries, so this is a hand-over and not a proof.
+       The last [reflexivity] is [ak_excl = false] at [Read_plain]. *)
+    { iApply (swp_hart_ram_read_plain 4 (mread_req pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
                 (hread_req_at_read_ram pa)
-                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
+                (addr_is_ram_not_dev pa Hram)
+                ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ) "Hσ". iMod ("Hmem" $! σ with "Hσ") as "[%Hrb Hclose]".
+      iIntros (σ img log tv V) "%Htv Hσ Htso".
+      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
-      iMod "Hclose" as "Hσ". iModIntro. iFrame "Hσ".
+      iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
+      (* the plain rule's receipt (A6.47 ruling 2): a FETCH has no use for
+         it -- text is pristine and needs no view fact -- so it is dropped. *)
+      iIntros (tvn _ _) "_".
       rewrite hread_resume_read_ram. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
@@ -647,9 +740,13 @@ Section fetch.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pa 2 = Some bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pa 2 bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Machine
            (Physaddr pa) 2 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -670,6 +767,8 @@ Section fetch.
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     rewrite mbind_ret. cbn beta iota zeta.
     cbn [Phys_Mem_Access_Info_granule_size_exp Phys_Mem_Access_Info_splittable].
+    (* as in the 4-byte proof: [read_kind_of_flags false false false] is
+       [Read_plain]. *)
     cbn beta iota zeta delta [split_misaligned misaligned_order
       sys_misaligned_order_decreasing read_kind_of_flags].
     change (Instances.generic_eq CannotSplit CannotSplit) with true.
@@ -695,17 +794,22 @@ Section fetch.
                    ltac:(lia) HDhtif Hhtif Hram)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    (* [rk] is [Read_plain], so the request is the ordinary [mread_req2]. *)
     iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 2 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read 2 (mread_req2 pa) _
+    (* as at width 4: the plain rule, and the obligation handed straight on. *)
+    { iApply (swp_hart_ram_read_plain 2 (mread_req2 pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
                 (hread_req_at_read_ram2 pa)
-                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
+                (addr_is_ram_not_dev pa Hram)
+                ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ) "Hσ". iMod ("Hmem" $! σ with "Hσ") as "[%Hrb Hclose]".
+      iIntros (σ img log tv V) "%Htv Hσ Htso".
+      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
-      iMod "Hclose" as "Hσ". iModIntro. iFrame "Hσ".
+      iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
+      iIntros (tvn _ _) "_".
       rewrite hread_resume_read_ram2. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
@@ -1315,9 +1419,13 @@ Section fetch.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pc 4 = Some w⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pc 4 w⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     swp (fetch tt)
       (fun r => ⌜r = (if isRVC (subrange_vec_dec w 15 0)
                       then F_RVC (subrange_vec_dec w 15 0)
@@ -1370,9 +1478,13 @@ Section fetch.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pc 2 = Some h⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pc 2 h⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     swp (fetch tt)
       (fun r => ⌜r = F_RVC h⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
@@ -1431,12 +1543,20 @@ Section fetch.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pc 2 = Some ilo⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) (add_vec_int pc 2) 2 = Some ihi⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv pc 2 ilo⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜fobl_ram img log tv (add_vec_int pc 2) 2 ihi⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     swp (fetch tt)
       (fun r => ⌜r = F_Base (concat_vec ihi ilo)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).

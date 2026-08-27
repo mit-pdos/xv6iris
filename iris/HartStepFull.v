@@ -874,14 +874,14 @@ Section stepfull.
     - (* ---- WAKE: hart_state := ACTIVE, then the ORDINARY retiring tail ---- *)
       iApply (swp_bind_use (run_hart_waiting 0 wr ib false) _ _ _
                 with "[Hany Hrw Hro] [-]").
-      { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+      { iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                   (run_hart_waiting 0 wr ib false)
-                  (MState (wrap_pre rs) ∅ dev0_state) _ _ (wrap_pre rs) ∅
+                  (MState (wrap_pre rs) ∅ dev0_state) _ _ (wrap_pre rs)
                   Hdisj HDr HDw (reg_agree_refl _ _) Hempty
                   (goodmb_run_hart_waiting Dr Dw wr ib _ ∅ Hip Hie Hhs) Hex
-                  with "Hcert Hany Hrw Hro Hemp"). }
+                  with "Hcert Hany Hrw Hro"). }
       iIntros (stv) "(-> & Hpost)".
-      iDestruct "Hpost" as (rs' mm') "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
+      iDestruct "Hpost" as (rs') "(%Hag & Hrw & Hro & Hany)".
       rewrite sregs_set_reg in Hag.
       assert (Hha : register_lookup hart_state rs' = HART_ACTIVE tt).
       { rewrite (Hag _ HDhart). apply register_lookup_set. }
@@ -974,14 +974,14 @@ Section stepfull.
     - (* ---- STAY: the whole cycle is the prelude's write; no tick, no bump ---- *)
       iApply (swp_bind_use (run_hart_waiting 0 wr ib false) _ _ _
                 with "[Hany Hrw Hro] [-]").
-      { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+      { iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                   (run_hart_waiting 0 wr ib false)
-                  (MState (wrap_pre rs) ∅ dev0_state) _ _ (wrap_pre rs) ∅
+                  (MState (wrap_pre rs) ∅ dev0_state) _ _ (wrap_pre rs)
                   Hdisj HDr HDw (reg_agree_refl _ _) Hempty
                   (goodmb_run_hart_waiting Dr Dw wr ib _ ∅ Hip Hie Hhs) Hex
-                  with "Hcert Hany Hrw Hro Hemp"). }
+                  with "Hcert Hany Hrw Hro"). }
       iIntros (stv) "(-> & Hpost)".
-      iDestruct "Hpost" as (rs' mm') "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
+      iDestruct "Hpost" as (rs') "(%Hag & Hrw & Hro & Hany)".
       cbn [sregs] in Hag.
       assert (Hhw : register_lookup hart_state rs' = HART_WAITING (wr, ib)).
       { rewrite (Hag _ HDhart).
