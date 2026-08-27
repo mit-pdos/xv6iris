@@ -3773,3 +3773,22 @@ the runbook replay, but decide with the validated tree in hand;
 `tso-flip-replay.md` stays as the fallback recipe); (iii) nothing in
 the current lane plan touches `main` — this ruling changes no
 in-flight work, only pins the ordering.
+
+### 0.24′ OWNER RULING (2026-08-27): the specific-binary U-mode tier is
+DEFERRED from the port; the generic user-mode safety proof stays
+
+For the T-leg (and hence the C-leg cutover), the port keeps the
+GENERIC user-mode safety tier — arbitrary-user-code safety
+(SpecUser/ProofUser and whatever user-translation/fetch machinery it
+and the kernel's own copyin/copyout/exec lanes consume) — and DEFERS
+the specific-binary proof tier (the init/sync/sh/echo certificates:
+UProof*/user-verified and any machinery consumed ONLY by them).
+Process: the implementing lane MEASURES the split first (which of the
+U-mode frontier files — UmodeFetch, UptWalkPt, UserMemPt, the ~18-site
+payer threading — sit in the generic tier's cone vs only the
+binary tier's), ports the generic-serving ones, and descopes the
+binary-only ones per the Aug-19 precedent (rows commented out of the
+flip workspace's _CoqProject with the ruling recorded in place and a
+reverse-dependency check that every consumer of a commented file is
+itself commented).  The deferred tier is re-ported after the cutover
+lands, as its own effort.
