@@ -415,6 +415,17 @@ without `Require Import FsCfg` PARSES — backtick generalization invents a
 fresh `fscfg : Type` — and fails far away with `Could not find an instance
 for "FsCfg.fscfg"`; the tell is `fscfg : Type` in the printed environment.
 
+**A SECOND TRIGGER FOR THE SAME BOMB: factoring a bundle into a shared
+`Definition` and understating its `` `{!…} `` binder list.** A row whose
+class is missing is an evar the same search then chases (`KexecOkQ.v`,
+300 GB, against 1.57 s with the right list) — while an EXTRA class fails
+cleanly instead, as "Could not find an instance". Derive the list from each
+row's defining module rather than from how the row reads: `proc_priv` is
+`ProcInv`'s and needs `fileG`/`fdslotG` though nothing in its spelling says
+file or fd. Keep `ulimit -v 25000000` on `coqc`/`make` while experimenting —
+about 7x the tree's largest legitimate file, so it never bites a real build.
+See optimization.md's ProofSysUnlink case study for the fold itself.
+
 ## `rewrite` CAN FAIL ON A SUBTERM THAT PRINTS CHARACTER-FOR-CHARACTER
 
 **"Found no subterm matching `X`" where `X` visibly IS a subterm of the goal

@@ -262,6 +262,10 @@ means restating the `` `{!riscvGS Σ, …} `` list by hand, and:
   evar and **DIVERGES**: `KexecOkQ.v` alone reached **300 GB** and had to be
   killed, against 1.57 s / 768 MB with the right list. There is no error
   message to read, and on a shared box it takes the machine with it.
+  This is durable-notes.md's "NAMING AN AMBIENT CLASS FIELD OUTSIDE ITS
+  CLASS'S SCOPE IS A MEMORY BOMB" (~190 GB, lane R1b) reached from a second
+  direction — same root cause, a class search with an unknown `Σ` — so if
+  either bites you, read both.
 
 So derive the list, do not guess it: for each row, open the module that
 defines it and copy that section's `Context`. The one that catches people is
