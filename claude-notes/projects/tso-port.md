@@ -3502,3 +3502,28 @@ OPEN:
    first (T2), start M1 only after 2c-body lands or with 2c's predicates
    audited as Σ-morphable (M5 item), and fold the M1 axis into the standing
    sweep scoreboards rather than running competing sweeps.
+
+### 0.21′ OWNER RULING (2026-08-27): ↦ₛ is redefined CONTEXT-RELATIVE at
+arbitrary timestamps; pristine/t=0 is a DERIVED special case, never the
+definition
+
+The pristine-tier spelling floated for ↦ₛ (flip-note A6.69's item 2)
+is OVERRULED as the definition: it hardcodes timestamp 0, and the
+kernel has dynamically-generated strings — safestrcpy at proc.c:290
+(kfork: np->name) and exec.c:132 (p->name) — whose proofs today
+bypass the string tower entirely via the ad-hoc pname_cells byte
+big-op (ProcDefs.v:52).  The ruled shape: ↦ₛ flips to a ctx string
+tower (ctx_string_pointsto ξ a dq s, the full law set, notation at
+cur_ctx per the M1 mechanism), covering arbitrary-timestamp string
+data uniformly; the lock handles' persistent string facts
+(lock_name/sl_name — A6.15's objection (a)) use the DERIVED
+context-free form instead: on main the ∀-context spelling (the
+kernel_data precedent, trivially mintable at SC), discharged at
+cutover via the twin's ⌜t = 0⌝ arm — i.e. the pristine content
+enters as the justification of the derived fact for rodata literals,
+not as ↦ₛ's meaning.  Optional follow-up in the same lane if cheap:
+unify pname_cells with the new tower (it IS a string fact carrying
+pname_wf).  This lane runs PARALLEL to the fliptree critical path,
+on the green main tree; the fliptree keeps ↦ₛ raw with its three
+named bridges until this lands and ports at cutover with the rest
+of M1.
