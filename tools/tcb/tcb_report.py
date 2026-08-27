@@ -42,6 +42,7 @@ TWO KNOWN GAPS, both in [Print All Dependencies] rather than here:
 
 Usage:
   tcb_report.py deps.out [--only iris] [--md] [--with-inductives]
+                         [--target Module.theorem]
 """
 import bisect, collections, os, re, subprocess, sys
 
@@ -188,6 +189,8 @@ def main():
     md = "--md" in sys.argv
     with_ind = "--with-inductives" in sys.argv
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else "iris"
+    target = (sys.argv[sys.argv.index("--target") + 1] if "--target" in sys.argv
+              else "SystemAdequacy.xv6_fs_adequacy_xv6Σ")
 
     index, repo_dirs = build_index()
     suffix = collections.defaultdict(list)
@@ -250,12 +253,13 @@ def main():
         print("  %-34s %4d defs  %5d / %5d lines" % ("TOTAL", tot_d, tot_c, tot_f))
         return
 
-    print("## Adequacy trusted base (`%s/`)" % only)
+    short = target.split(".")[-1]
+    print("## Trusted base of `%s` (`%s/`)" % (short, only))
     print()
-    print("`Print All Dependencies` on the **statement** of "
-          "`FsAdequacyImg.xv6_fs_adequacy_xv6Σ` — the definitions a reader must")
-    print("read for the theorem to say what they think it says. The proof cone is")
-    print("*not* here: Rocq's kernel checks it, so nothing a proof mentions needs trusting.")
+    print("`Print All Dependencies` on the **statement** of `%s` — the" % target)
+    print("definitions a reader must read for the theorem to say what they think it says.")
+    print("The proof cone is *not* here: Rocq's kernel checks it, so nothing a proof")
+    print("mentions needs trusting.")
     print()
     print("**%d of %d `%s/` files · %d definitions · %d lines** "
           "(%.1f%% of those files' %s lines; %.2f%% of `%s/`'s %s)"
@@ -297,6 +301,16 @@ def main():
     print("* This is a **report, not a check** — no baseline is diffed. A jump in the file")
     print("  count is the signal to look: it means a statement-level definition picked up")
     print("  a dependency on a new part of the tree.")
+    print("* Two theorems are reported and **neither trusted base contains the other**.")
+    print("  `xv6_power_adequacy_xv6Σ` leaves `phi` free, so its statement carries the")
+    print("  `Hphi` *hypothesis* — an iProp entailment — which puts the Iris ghost-state")
+    print("  layer in its base. `xv6_fs_adequacy_xv6Σ` has `phi` chosen and `Hphi`")
+    print("  discharged, so its statement is purely operational, but it alone reaches the")
+    print("  FS-consistency vocabulary `phi` names (`xv6_trace_pure`, `fs_boot_pure`,")
+    print("  `snap_ok` and its cone, the link-count definitions).")
+    print("* **Do not read containment off the file column.** Those FS-only definitions")
+    print("  live in files the general theorem reaches for other reasons, so the FILE sets")
+    print("  nest while the DEFINITION sets do not.")
     print()
     print("</details>")
     if unresolved:

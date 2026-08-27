@@ -22,8 +22,7 @@ from the DURABLE SNAPSHOT the previous era committed, delivered by
 `Hproj`/`Ppure`.  The durability property itself is exported at every
 reachable state: "the physical disk recovers to a committed view that IS a
 file system" is a conjunct of `fs_boot_pure`, which
-`SystemAdequacy.xv6_trace_invariant` and `FsAdequacyImg`'s two corollaries
-instantiate `phi` at.  What is LEFT is lane H (the value-first allocator)
+`SystemAdequacy.xv6_fs_adequacy_xv6Σ` instantiates `phi` at.  What is LEFT is lane H (the value-first allocator)
 and the cleanups below — no wall, and nothing the theorem waits on.
 
 ## Working rules (keep; they proved out)
@@ -96,7 +95,7 @@ and the cleanups below — no wall, and nothing the theorem waits on.
   coupling plus three per-object clauses at the END of `snap_bytes`
   (`sk_sbok`, `sk_reg`, `sk_slot` = `FsImg.fs_slot_inj`), all three
   discharged by `FsDurImg.img_snap_ok` and so witnessed at the literal
-  image by `FsAdequacyImg.fsimg_snap_ok`; `fs_state_of_ledger_era` is the
+  image by `SystemAdequacy.fsimg_snap_ok`; `fs_state_of_ledger_era` is the
   check that the same core applies at `FsBytesGamma.fs_gamma_L`, which is
   what lane E calls.
 - **Refutations kept as documentation:** `iris/FsDurRefute.v`,
@@ -107,12 +106,12 @@ and the cleanups below — no wall, and nothing the theorem waits on.
 - Image checks (14) `fs_region_bare` and (15) `fs_root_no_self` in
   `FsImg`/`FsImgCheck`, and (lane C-img) they are now the LAST two
   conjuncts of `FsCfgBoot.fs_boot_image_wf`, discharged in
-  `FsAdequacyImg.fsimg_image_wf` off those two citations.
+  `SystemAdequacy.fsimg_image_wf` off those two citations.
 - **The image's snapshot tie (lane C-img):** `FsDurImg.img_snap_ok`
   (`fs_boot_image_wf` ⊢ `snap_ok (img_state …) (fs_restrict … home)`),
   `img_P_dur_alloc`, `img_boot_P_fs_dur` (the boot point, `P_fs_alloc_clean`
   plus `P_dur` at the same `D0`), witnessed at the literal image by
-  `FsAdequacyImg.fsimg_snap_ok`.
+  `SystemAdequacy.fsimg_snap_ok`.
 - **The commit's snapshot step (lane C item 3, CE):** `FsCrash.P_fs`'s
   durable conjunct IS `FsDurSnap.P_dur (fr_D r)`; the two commit permits
   step it (`dsnap_step_of` inside their own `bupd`) off one PURE premise,
@@ -1331,7 +1330,7 @@ so it never wanted that shape.
   `fs_boot_image_wf`, last so no destructuring pattern moves; the sweep was
   four sites (`BootShared`, `ProofMain`, `FsDurImg`'s two lemmas — which
   therefore LOST their two extra premises — and the discharge in
-  `FsAdequacyImg.fsimg_image_wf`, two `FsImgCheck` citations, no new
+  `SystemAdequacy.fsimg_image_wf`, two `FsImgCheck` citations, no new
   computation).  The used-set coupling is W3/W4/W5 through three pure
   readings: `img_node_owns_slot` (a node's own block IS a `FsImg.fs_slot` of
   its record), `img_owned_block` (hence in `fs_inode_blocks`, hence in W3's
@@ -1347,7 +1346,7 @@ so it never wanted that shape.
   `img_boot_P_fs_dur`, which is `P_fs_alloc_clean` with `P_dur (fr_D r)`
   beside it at the same `D0`; W2 discharges its clean-log premise, so no
   caller gains one.  `FsCrash.v` is UNTOUCHED.  Non-vacuity at the literal
-  image: `FsAdequacyImg.fsimg_snap_ok`.  RETIRED (nothing consumed them):
+  image: `SystemAdequacy.fsimg_snap_ok`.  RETIRED (nothing consumed them):
   `FsDurImg`'s 3b' kind assignment `img_kinds*`/`img_region_*`/
   `img_dur_seed` and its `FsDurObj`/`FsDurWire` imports.
   STILL PRESENT AND SUPERSEDED: `fs_dur_of_image`/
@@ -2343,7 +2342,7 @@ so it never wanted that shape.
     lemmas, since the runtime mint window will want them.  The seven
     pinned-`/init` files are commented out of `iris/_CoqProject` (source
     kept, each with an off-the-build header); the list and the port's owner
-    are in `namei-pinned-lookup.md`'s banner.  `FsAdequacyImg`'s
+    are in `namei-pinned-lookup.md`'s banner.  `SystemAdequacy`'s
     `fsimg_at_every_era`, its bridge `fsimg_boot_image_eras` and the two
     corollaries over them (`xv6_power_adequacy_fsimg`,
     `xv6_fs_adequacy_xv6Σ`) are commented out for `Himg`'s reason — era 0's
@@ -2776,7 +2775,7 @@ so it never wanted that shape.
     cov` — every configuration reachable by any interleaving of power
     cycles, hart steps and device steps is reducible, and `phi` holds at
     it.  `xv6_fs_adequacy` is the same shape plus mkfs's `Hrec`.
-    `FsAdequacyImg.xv6_power_adequacy_fsimg` and `xv6_fs_adequacy_xv6Σ` are
+    `SystemAdequacy.xv6_power_adequacy_fsimg` and `xv6_fs_adequacy_xv6Σ` are
     back ON the build, each at one equation
     (`v_disk (g.(gdev).(dvirtio)) = fsimg_dk`).
 

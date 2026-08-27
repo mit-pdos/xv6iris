@@ -247,24 +247,49 @@ jobs:
         env:
           SWITCH: ${{ github.workspace }}
         run: |
+          # BOTH rungs below the general theorem, reported separately, and
+          # NEITHER TRUSTED BASE CONTAINS THE OTHER -- measured 2026-08-27:
+          # 605 definitions vs 446, sharing 428.
+          #   * 177 are power-only.  Leaving [phi] free means the statement
+          #     carries the [Hphi] HYPOTHESIS, an iProp entailment, so the
+          #     Iris ghost-state layer is in its trusted base (Xv6G,
+          #     RiscvAdequacy, RiscvPtsto, FdSlots, IrefSlots, FileInvDefs,
+          #     ProcAvail, FsDurRead, FsDurXfer, FsStateBitmap, FsStateDefs,
+          #     DiskImg).
+          #   * 18 are fs-only: the pure FS-consistency vocabulary that only
+          #     [phi] names -- xv6_trace_pure, fs_boot_pure, snap_ok and its
+          #     cone, the link-count definitions.
+          # AT FILE LEVEL IT LOOKS LIKE A SUPERSET AND IS NOT: those 18 live
+          # in files the general theorem reaches for other reasons.  Do not
+          # read containment off the file column.
+          #
+          # And note what the overlap means: [xv6_power_adequacy] is
+          # parametric in [phi] but NOT in the crash predicate -- [Hphi]'s
+          # type hardcodes [FsCrash.P_fs_named], so the FS's durability
+          # record is in the general statement whatever [phi] is.
           rc=0
-          ./tools/tcb/tcb-report.sh > "$RUNNER_TEMP/tcb.log" 2>&1 || rc=$?
-          if [ "$rc" -ne 0 ]; then
-            {
-              echo "## Adequacy trusted base (\`iris/\`)"
-              echo
-              echo "> :x: \`tools/tcb/tcb-report.sh\` failed (exit $rc)."
-              echo
-              echo '```'
-              tail -40 "$RUNNER_TEMP/tcb.log"
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit $rc
-          fi
-          python3 tools/tcb/tcb_report.py "$RUNNER_TEMP/tcb.log" --md \
-            >> "$GITHUB_STEP_SUMMARY"
+          for thm in SystemAdequacy.xv6_power_adequacy_xv6Σ \
+                     SystemAdequacy.xv6_fs_adequacy_xv6Σ; do
+            log="$RUNNER_TEMP/tcb-${thm##*.}.log"
+            if ./tools/tcb/tcb-report.sh "xv6iris.$thm" > "$log" 2>&1; then
+              python3 tools/tcb/tcb_report.py "$log" --md --target "$thm" \
+                >> "$GITHUB_STEP_SUMMARY"
+            else
+              rc=$?
+              {
+                echo "## Trusted base of \`${thm##*.}\` (\`iris/\`)"
+                echo
+                echo "> :x: \`tools/tcb/tcb-report.sh\` failed (exit $rc)."
+                echo
+                echo '```'
+                tail -40 "$log"
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
           rm -f tools/tcb/TcbSeed.v tools/tcb/TcbSeed.vo tools/tcb/TcbSeed.vos \
                 tools/tcb/TcbSeed.vok
+          exit $rc
 
       # ---- 3c. Build profile (iris/, informational) ----
       # Consumes the TIMED log + the .v.timing files + coqdep's .CoqMakefile.d +

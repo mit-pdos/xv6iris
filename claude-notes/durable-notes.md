@@ -2534,20 +2534,39 @@ The number goes up; that is the real one.
   the rule protects the user's machine, so relocation forward suffices —
   no re-verification owed.
 
-## The adequacy-print baseline (GR-36, 2026-08-16; NO assumed Link, and THREE since the `coq:`-binding change, both 2026-08-22)
+## The adequacy-print baseline (GR-36, 2026-08-16; NO assumed Link since 2026-08-22; THIRTEEN at the image since 2026-08-27)
 
-`Print Assumptions xv6_power_adequacy_xv6Σ` (SystemAdequacy.v, printed by
-every CI build since 85c21e9f) must show EXACTLY these three, and merge
-rounds diff against this list textually, not by count. The anchor stays
-IMAGE-FREE in `SystemAdequacy.v` (its `fs_boot_image_wf` premise
-undischarged): any constant naming `FsImgDisk.fsimg_dk` audits at baseline
-**+10** (PrimString/PrimInt63 primitives), so the image-discharged
-corollaries live in `FsAdequacyImg.v` and are NOT the audit target — see
-`SystemAssumptions.v`'s header.
+`Print Assumptions xv6_fs_adequacy_xv6Σ` (SystemAdequacy.v, printed by every
+CI build) must show EXACTLY these thirteen, and merge rounds diff against
+this list textually, not by count.
 
-1. `FunctionalExtensionality.functional_extensionality_dep`
-2. `xv6iris_extras.resv_matches`   (the LR/SC reservation predicate — arbitrary but fixed)
-3. `xv6iris_extras.resv_is_valid`  (same, for `valid_reservation`)
+**IT USED TO BE THREE, AND THE TARGET IS WHY.** The anchor was
+`xv6_power_adequacy_xv6Σ` with its `fs_boot_image_wf` premise UNDISCHARGED —
+a shorter list, but an audit of a CONDITIONAL statement. It is now the
+theorem with nothing left as a premise, whose statement names
+`FsImgDisk.fsimg_dk`; that constant is `PrimString`-backed
+(kernel-rocq/FsImgRaw.v's 2,048,000 bytes as one literal), so Rocq's
+primitives join the list. Those ten are NOT a regression and never were a
+hidden assumption — `FsImgCheck.v`'s `vm_compute` sweeps, `ElfKernel.v` and
+`ElfUser.v` all rest on them already; the old target simply never reached a
+constant that named one. `assumptions.ml` reports them because
+`Primitive _` has no body and its `get_constant_body` returns `None`, which
+the traversal classifies exactly like an axiom.
+
+**READ THE LIST BY WHERE EACH ENTRY COMES FROM**, which is the useful split:
+twelve are reachable from the STATEMENT (so they are what a reader of the
+theorem must accept), and exactly ONE comes only from the proof.
+
+From the STATEMENT (`tools/tcb/tcb-report.sh` prints these twelve on their own):
+
+1. `xv6iris_extras.resv_matches`   (the LR/SC reservation predicate — arbitrary but fixed)
+2. `xv6iris_extras.resv_is_valid`  (same, for `valid_reservation`)
+3. `PrimInt63.int` / 4. `.eqb` / 5. `.sub` / 6. `.lsl` / 7. `.lsr` / 8. `.land` / 9. `.lor`
+10. `PrimString.string` / 11. `.get` / 12. `.cat`
+
+From the PROOF only:
+
+13. `FunctionalExtensionality.functional_extensionality_dep`
 
 MEASURED 2026-08-22 on the GCP builder, full rebuild from the regenerated
 model then `make audit-only`: exactly those three, nothing else. Note the

@@ -11,13 +11,13 @@
 (*  every such conjunct gets a non-vacuity witness AT THE REAL INSTANCE,   *)
 (*  so here it is: [FsCfgBoot.fs_boot_image_wf] -- the ONE bundle both     *)
 (*  adequacy theorems already carry, discharged at the literal mkfs image  *)
-(*  by [FsAdequacyImg.fsimg_image_wf] -- yields it outright, with no new   *)
+(*  by [SystemAdequacy.fsimg_image_wf] -- yields it outright, with no new   *)
 (*  image sweep and no new computation on the adequacy cone.               *)
 (*                                                                        *)
 (*  IT IS ITS OWN FILE for [FsCollect.v]'s sake: [FsCollect] must stay a   *)
 (*  LEAF over the predicate layer (the commit's cone must not acquire the  *)
 (*  boot chain), and [fs_boot_image_wf] lives in [FsCfgBoot].  Same        *)
-(*  arrangement as [FsAdequacyImg] over [FsDurImg].                        *)
+(*  arrangement as [SystemAdequacy] over [FsDurImg].                        *)
 (* ====================================================================== *)
 
 From Stdlib Require Import ZArith Lia List.

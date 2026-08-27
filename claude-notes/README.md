@@ -162,7 +162,7 @@ first four were audited against the tree 2026-08-22):
   transaction ids gives "all inodes clean at commit").  **THE THEOREM IS
   TRUE**: `SystemAdequacy.xv6_power_adequacy` assumes the file system's
   image at `g`'s own disk ONCE and nothing about any later era, and
-  `FsAdequacyImg`'s two corollaries discharge that at the literal mkfs
+  `SystemAdequacy`'s two corollaries discharge that at the literal mkfs
   image and conclude, at EVERY reachable state of every power cycle, that
   the physical disk still recovers to a committed view that IS a file
   system.  Landed: the log's contract, the nested predicate, the whole era

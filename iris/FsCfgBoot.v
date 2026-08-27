@@ -2296,8 +2296,8 @@ End FsCfgBootEra.
 (*                                                                        *)
 (* IT COMPUTES NOTHING (ruling R3): the era fupd takes every image fact as  *)
 (* a hypothesis, and the literal-image discharge lives in                   *)
-(* [FsAdequacyImg.v] off [FsImgCheck]'s citations -- deliberately NOT on    *)
-(* this file's cone, nor on [SystemAdequacy]'s.                             *)
+(* [SystemAdequacy.v] off [FsImgCheck]'s citations -- deliberately NOT on   *)
+(* this file's cone.                                                        *)
 (* ---------------------------------------------------------------------- *)
 Definition fs_boot_image_wf (dk : Z -> bv 8) (ndisk : nat)
     (sb : fs_sb) (nib : nat) (cov : gset Z) : Prop :=

@@ -490,7 +490,7 @@ Proof.
 Qed.
 
 (* THE THREE CUT CLAUSES ARE INHABITED at the REAL instance, and their
-   witness is [FsAdequacyImg.fsimg_snap_ok] -- [snap_ok] at the literal
+   witness is [SystemAdequacy.fsimg_snap_ok] -- [snap_ok] at the literal
    mkfs image, unconditionally (plan section 7).  [FsDurImg.img_snap_ok]
    discharges [sk_sbok] off W1, [sk_reg] off "the region is exactly
    [[inodestart, bmapstart)]" and [sk_slot] off W4; the FREE inums, which

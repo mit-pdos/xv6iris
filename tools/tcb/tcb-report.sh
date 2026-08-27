@@ -41,7 +41,7 @@ SWITCH=${SWITCH:-/shared/xv6rocq}
 RUN=${RUN:-opam exec --switch=$SWITCH --}
 root=$(cd "$(dirname "$0")/../.." && pwd)
 here=$root/tools/tcb
-target=${1:-xv6iris.FsAdequacyImg.xv6_fs_adequacy_xv6Σ}
+target=${1:-xv6iris.SystemAdequacy.xv6_fs_adequacy_xv6Σ}
 flags=$(sed -n 's/^-arg //p;/^-[RQ] /p' "$root/iris/_CoqProject" | tr '\n' ' ')
 
 cat > "$here/TcbSeed.v" <<ROCQ

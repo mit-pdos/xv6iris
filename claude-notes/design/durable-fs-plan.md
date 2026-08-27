@@ -450,9 +450,9 @@ already puts those in `D`.
 assumes `fs_boot_image_wf` at `g`'s own disk ONCE, plus `ggen = 0` and
 `gpow = false`, and concludes that every configuration reachable by ANY
 interleaving of power cycles, hart steps and device steps is reducible and
-satisfies the client's `phi`.  `xv6_fs_adequacy` adds mkfs's recovery
-obligation; `FsAdequacyImg`'s two corollaries discharge the image at
-`FsImgDisk.fsimg_dk` and instantiate `phi` at
+satisfies the client's `phi`.  `xv6_power_adequacy_xv6Σ` discharges the
+image at `FsImgDisk.fsimg_dk` (the earliest rung that can), and
+`xv6_fs_adequacy_xv6Σ` instantiates `phi` at
 `SystemAdequacy.xv6_trace_pure`, so what they conclude at EVERY reachable
 state is that the physical disk still recovers to a committed view that IS a
 file system.  Nothing is assumed about any era but the first, and nothing

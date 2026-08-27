@@ -179,7 +179,7 @@ Section Wall.
 
   (* ...and the resource half IS inhabited at the tied form, so the
      refutation below is not vacuous.  A witness at the real mkfs image is
-     [FsAdequacyImg.fsimg_snap_ok] (not imported here: this file is a leaf
+     [SystemAdequacy.fsimg_snap_ok] (not imported here: this file is a leaf
      and that one's cone is the whole boot chain). *)
   Lemma fs_snap_res_inhabited (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
     snap_ok S D ->

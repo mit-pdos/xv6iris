@@ -58,11 +58,11 @@ rework is [`../completed/bio.md`](../completed/bio.md).
   EMPTY, deliberately — see item 2 below for what the postcondition is
   waiting on, and `SpecSysSync.v`'s header for why an "epoch advanced"
   post would not have been enough on its own.
-- **`xv6_fs_adequacy` / `xv6_fs_adequacy_xv6Σ` are proven**, with
-  `xv6_power_adequacy` untouched and BOTH axiom footprints identical (the
-  recorded ten). The crash slot carries `FsCrash.P_fs_named`; the theorem's
-  one hypothesis is mkfs's (`fs_recovery (fs_blocks (v_disk …)) D0 cov
-  logstart`). `xv6Σ` carries `fsCrashΣ`.
+- **`xv6_fs_adequacy_xv6Σ` is proven**, with `xv6_power_adequacy`
+  untouched. The crash slot carries `FsCrash.P_fs_named`; the theorem's one
+  hypothesis is now the HARDWARE setup (`v_disk … = FsImgDisk.fsimg_dk`),
+  mkfs's `Hrec` having gone with the redundant `xv6_fs_adequacy`
+  (2026-08-27). `xv6Σ` carries `fsCrashΣ`.
 - **All four steady-state WAL writes carry REAL durability fupds**
   (`fs_logfill_permit` / `fs_commit_permit` / `fs_install_permit` /
   `fs_clear_permit`); `crash_pred_indifferent` and

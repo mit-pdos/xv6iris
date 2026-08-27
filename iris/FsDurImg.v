@@ -27,7 +27,7 @@
 (* [FsCfgBoot] follows it): every image fact arrives as a HYPOTHESIS, in   *)
 (* [FsCfgBoot.fs_boot_image_wf]'s own vocabulary, and both adequacy        *)
 (* theorems already carry that bundle.  The literal-image discharge stays  *)
-(* in [FsImgCheck.v]/[FsAdequacyImg.v] and does not move.                  *)
+(* in [FsImgCheck.v]/[SystemAdequacy.v] and does not move.                  *)
 (*                                                                        *)
 (* THREE THINGS A READER SHOULD KNOW BEFORE ANYTHING ELSE.                 *)
 (*                                                                        *)
@@ -1755,9 +1755,9 @@ Qed.
 (*  THE IMAGE'S SNAPSHOT TIE.  Every premise is a conjunct of
     [FsCfgBoot.fs_boot_image_wf] -- (14)/(15) among them since this lane --
     so no consumer carries anything new, and the literal-image discharge
-    stays in [FsImgCheck]/[FsAdequacyImg] (ruling R3: this file computes
+    stays in [FsImgCheck]/[SystemAdequacy] (ruling R3: this file computes
     nothing).  Non-vacuity at the real image:
-    [FsAdequacyImg.fsimg_snap_ok].                                        *)
+    [SystemAdequacy.fsimg_snap_ok].                                        *)
 Theorem img_snap_ok (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (nib : nat)
     (cov : gset Z) :
   fs_boot_image_wf dk ndisk sb nib cov ->

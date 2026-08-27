@@ -2,7 +2,7 @@
 
 What fs.img MEANS: the pure semantics of an xv6 on-disk file system read off
 a block view, applied to the literal image mkfs built. Three deliverables:
-the top-level adequacy theorem (`FsAdequacyImg.xv6_fs_adequacy_xv6Σ`) now
+the top-level adequacy theorem (`SystemAdequacy.xv6_fs_adequacy_xv6Σ`) now
 assumes ONLY "the initial disk is the mkfs image" — its recovery hypothesis
 is PROVED, not taken; the image is proven well-formed (`fsimg_wf`, the
 durable-state reading the boot composition will consume); and the four
@@ -77,11 +77,21 @@ than one block's header read.
 
 ## The adequacy discharge
 
-`xv6_fs_adequacy` (generic) still takes mkfs's obligation as `Hrec`;
-`xv6_fs_adequacy_xv6Σ` now takes `v_disk (g.(gdev).(dvirtio)) =
-FsImgDisk.fsimg_dk` instead, pins `logstart := 2` (the image's own — checked
-against the parsed superblock in `FsImgCheck`), pins `D0 := fsimg_D0 cov`
-(a clean log replays nothing), keeps `cov` parametric, and PROVES `Hrec`.
+`SystemAdequacy.xv6_power_adequacy_xv6Σ` is where the image is discharged,
+and it is the EARLIEST rung that can: `Himg` needs the disk named, and
+naming it in `xv6_power_adequacy` would destroy that theorem's generality.
+It takes `v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk`, which pins
+`sb`/`nib`/`cov` to `fsimg_sb`/`fsimg_nib`/`fsimg_cov` and `logstart := 2`
+(the image's own — checked against the parsed superblock in `FsImgCheck`),
+and closes `Himg` with `fsimg_image_wf`.  Everything below it is IMAGE-FREE
+and still parametric in `phi`, which is the point: a client with some other
+pure trace property owes nothing about the image.
+
+There is no `Hrec` and no `D0`.  A second generic theorem `xv6_fs_adequacy`
+used to take mkfs's recovery obligation as a premise; it was
+`xv6_power_adequacy` with two premises its conclusion never used (provable
+from it by `intros; eapply xv6_power_adequacy; eassumption`), so it is gone
+along with the obligation.
 Its `Print Assumptions` = the system baseline (five Sail platform externs,
 `functional_extensionality_dep`, the two deliberately-unproven kernel
 functions) PLUS Rocq's `PrimString`/`PrimInt63` primitives — the latter are

@@ -501,7 +501,7 @@ the map is exactly `FsCrash.P_fs_alloc_clean`'s `fr_D`.
 `img_boot_P_fs_dur` is `P_fs_alloc_clean` with that premise DISCHARGED, so
 no caller gains one.  It is the only place the image decoder is read on the
 durable side.  Non-vacuity at the literal mkfs image:
-`FsAdequacyImg.fsimg_snap_ok`.
+`SystemAdequacy.fsimg_snap_ok`.
 
 **WHAT THE COMMIT COLLECTS** is `FsCollect.col_hand γfs γi ist nib sb sbb
 used I m Lb C home` — the era's pieces AS ALREADY COLLECTED — and
