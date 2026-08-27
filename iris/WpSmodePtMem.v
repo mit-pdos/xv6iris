@@ -979,6 +979,11 @@ Lemma store_data4 (w : SailStdpp.Values.mword 64) :
   = trunc32 w.
 Proof. reflexivity. Qed.
 
+(* Opts back out of [RiscvPtsto]'s [word_pointsto] seal: this file takes
+   page-table words apart byte by byte (same as [WpSmodePtLeaves]).
+   Local, so nothing above inherits the transparency. *)
+Local Typeclasses Transparent word_pointsto.
+
 Section WpSmodePtMemLeaves.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.

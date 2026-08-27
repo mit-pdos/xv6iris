@@ -50,6 +50,10 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
+(* Opts back out of [RiscvPtsto]'s [word_pointsto] seal: the leaf walk takes page-table words apart byte by byte.
+   Local, so nothing above this file inherits the transparency. *)
+Local Typeclasses Transparent word_pointsto.
+
 Section WpSmodePtGprEngine.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.

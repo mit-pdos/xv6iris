@@ -998,6 +998,9 @@ Section BioInv.
   Global Instance bio_ctx_persistent bn V : Persistent (bio_ctx bn V).
   Proof. apply _. Qed.
 
+
+
+
   Lemma bio_ctx_lock bn V :
     bio_ctx bn V -∗
     is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V).
@@ -1272,3 +1275,15 @@ Section BioInv.
   Qed.
 
 End BioInv.
+
+(* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md).
+   This is [is_lock] plus a [big_sepL] over NBUF, and it is a conjunct of
+   [FsReady.fs_ready_pre], so every frame in the FS cone unfolded it and
+   tried each candidate hypothesis against all thirty elements.  Measured
+   2026-08-27 by sealing it and nothing else: [ProofWritei] 84.3 s ->
+   75.0 s.  ([disk_res], sealed the same way, is worth only 1.0 s there --
+   size of the body is not what predicts this, being a big-op is.) *)
+Global Typeclasses Opaque bio_ctx.
+(* AT THE END OF THE FILE: this file's own lemmas take [bio_ctx] apart
+   ([iAndDestructChoice] at :1014), and they are the accessors every consumer
+   should use instead of unfolding it. *)

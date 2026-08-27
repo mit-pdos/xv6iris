@@ -2684,3 +2684,38 @@ Proof. rewrite /phys_pointsto. apply _. Qed.
 Global Instance phys_word_pointsto_timeless `{!riscvGS Σ} a dq w :
   Timeless (phys_word_pointsto a dq w).
 Proof. rewrite /phys_word_pointsto. apply _. Qed.
+
+(* The instances a consumer would otherwise re-derive BY UNFOLDING, declared
+   here so the seal below does not cost them.  Without these, three files fail
+   with "Cannot infer this placeholder of type Timeless (...)" -- the seal
+   stops [apply _] from reaching the [mem_pointsto]s underneath. *)
+Global Instance word_pointsto_timeless `{!riscvGS Σ} (ktr : CurKtier)
+    (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+  Timeless (word_pointsto (KTR := ktr) a dq w).
+Proof. rewrite /word_pointsto. apply _. Qed.
+
+(* the [ktier]-spelled twin, for the same reason [word_pointsto_discarded_
+   persistent'] has one: a goal that names the tier directly does not go
+   through [CurKtier]. *)
+Global Instance word_pointsto_timeless' `{!riscvGS Σ} (ktr : ktier)
+    (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+  Timeless (word_pointsto (KTR := ktr) a dq w).
+Proof. exact (word_pointsto_timeless ktr a dq w). Qed.
+
+(* ======================================================================= *)
+(* THE WORD POINTS-TO IS SEALED FOR EVERY FILE ABOVE THIS ONE.             *)
+(*                                                                         *)
+(* [word_pointsto] is [[∗ list] j ∈ seq 0 8, mem_pointsto ...] under a      *)
+(* transparent name, and it is the most widely named such constant in the   *)
+(* tree (110 files) -- so [iFrame]'s [Frame] search unfolds it and tries    *)
+(* every candidate hypothesis against all eight bytes.  Sealing it alone    *)
+(* took [SpecKexecB2] from 11.6 s to 7.8 s.                                 *)
+(*                                                                         *)
+(* AT THE END OF THE FILE, not beside the definition: this file's own       *)
+(* lemmas take the word APART ([iAndDestructChoice: cannot destruct] if the *)
+(* seal is in scope for them), and they are exactly the lemmas every        *)
+(* consumer should be using instead of unfolding it by hand.  [rewrite      *)
+(* /word_pointsto] and [unfold] are unaffected by the seal, so a site that  *)
+(* genuinely needs the bytes still has them.                                *)
+(* ======================================================================= *)
+Global Typeclasses Opaque word_pointsto.
