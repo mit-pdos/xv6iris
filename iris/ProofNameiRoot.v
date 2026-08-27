@@ -46,6 +46,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -103,7 +104,7 @@ Local Ltac regne :=
         | congruence ].
 
 Section ProofNameiRoot.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -114,12 +115,12 @@ Section ProofNameiRoot.
   Notation Ra2 := (mword_of_int 12 : mword 5).
 
   Lemma wp_namei_root
-      (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
+      (gtl : gname) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namei_root_body gtl cn gfs gi cov logstart inodestart nib dev dqp
+    : wp_namei_root_body gtl gfs gi cov logstart inodestart nib dev dqp
                          m n K eb p b lks Vpr.
   Proof.
     cbv beta delta [wp_namei_root_body].
@@ -280,7 +281,7 @@ Section ProofNameiRoot.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := b) (CIDa := CID) (CIDb := CID7)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_root gtl cn gfs gi cov logstart inodestart nib dev dqp
+    iApply (NX.wp_namex_root gtl gfs gi cov logstart inodestart nib dev dqp
               R5 n (K - 4)%nat eb p b lks
               Vpr Knx Hn Hdev Hnib Hroot Hnib0 HR5a1 Hbelow
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hitb2 Hitbl Hesc Hireg Hisl Hp0 Hp1").

@@ -119,6 +119,7 @@ Require Import SpecIreclaim.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -195,7 +196,7 @@ Definition irc_thr8 (m M : regfile) : Prop :=
 (* ===================================================================== *)
 Section IreclaimDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   (* ireclaim's 64-byte frame: ra@56 s0@48 s1@40 s2@32 s3@24 s4@16 s5@8 s6@0 *)
   Definition irc_frame (m : regfile) : iProp Σ :=
@@ -275,10 +276,10 @@ Section IreclaimDefs.
 
   (* the escrow family's projection -- ProofDirlink's [dl_esc_acc] restated,
      because a Proof file may not require another Proof file *)
-  Lemma irc_esc_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
+  Lemma irc_esc_acc (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart k
+    (ic_escrows fsc_ic γfs γi cov logstart -∗ ic_escrow fsc_ic γfs γi cov logstart k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -293,7 +294,7 @@ End IreclaimDefs.
 (* ===================================================================== *)
 Section IreclaimEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γfs : fs_names)
@@ -672,7 +673,7 @@ End IreclaimEpilogue.
 (* ===================================================================== *)
 Section IreclaimStep.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_step `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γfs : fs_names)
@@ -923,14 +924,14 @@ End IreclaimStep.
 (* ===================================================================== *)
 Section IreclaimOrphan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_orphan `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname) (γpr : gname)
+      (gtl : gname) (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (nib : nat)
       (dev inum bno : mword 32) (kk : nat)
@@ -995,10 +996,10 @@ Section IreclaimOrphan.
     fs_crash_seam cov logstart -∗
     gen_cert -∗
     ireg_inv γi γfs inodestart nib -∗
-    is_itable2 gtl cn γfs γi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrows cn γfs γi cov logstart -∗
-    ic_sleeplocks cn -∗
+    ic_escrows fsc_ic γfs γi cov logstart -∗
+    ic_sleeplocks fsc_ic -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -1332,7 +1333,7 @@ Section IreclaimOrphan.
          equation is its own [Hbnoeq]. *)
       split; [exact Hbnoeq | split; [exact Hdswf | exact Htnz]]. }
     iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-    iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart inodestart nib dev inum
+    iApply (IG.wp_iget_sconf gtl γfs γi cov logstart inodestart nib dev inum
               (BufL (uint bno) ds)
               O6 0%nat eb (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
@@ -1384,9 +1385,9 @@ Section IreclaimOrphan.
       rewrite (callee_saved_lookup Hcsig_cs c Hcs).
       exact (HO6thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     (* the two singletons the run's slot needs, projected out of the families *)
-    iDestruct (irc_esc_acc cn γfs γi cov logstart kslot Hkslot with "Hesc")
+    iDestruct (irc_esc_acc γfs γi cov logstart kslot Hkslot with "Hesc")
       as "#Hescrow".
-    iDestruct (ic_sleeplocks_lookup cn kslot Hkslot with "Hslks")
+    iDestruct (ic_sleeplocks_lookup fsc_ic kslot Hkslot with "Hslks")
       as (gil gisl) "#Hslk".
     (* ===== +0x48 c.mv s3,a0 : s3 := ip (the register is REUSED) ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x48)) Rs3 Ra0
@@ -1699,7 +1700,7 @@ Section IreclaimOrphan.
     (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)) *)
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
     iDestruct "Hshr" as (gsh) "Hshr".
-    iApply (IL.wp_ilock_tx_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gil gisl
+    iApply (IL.wp_ilock_tx_sconf γs j γl γu γd γk pd pav pu bn γfs γi gil gisl
               cov logstart inodestart nib kslot (q/2)%Qp gsh PlainK dev inum
               pidv dq dqs OC (K - 8)%nat eb b lks Vpr
               ltac:(lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
@@ -1812,7 +1813,7 @@ Section IreclaimOrphan.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (IU.wp_iunlock_tx_sconf γs γfs γi cn gil gisl cov logstart kslot
+    iApply (IU.wp_iunlock_tx_sconf γs γfs γi gil gisl cov logstart kslot
               (q/2)%Qp gsh dev inum dnl bml pidv dq OE (K - 8)%nat eb
               (proc_addr j) b lks Vpr
               ltac:(lia) Hkslot HOEa0
@@ -1940,7 +1941,7 @@ Section IreclaimOrphan.
        and ended after this call -- so half of it is what iput takes and the
        two rejoin below. *)
     iDestruct (log_tx_halve with "Htx") as (t0) "[Htx1 Htx2]".
-    iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
+    iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi gtl
               gil gisl cov logstart bmapstart inodestart nib size dev
               kslot q inum MAXOPBLOCKS Sb0 false false false e00 t0 (1/2)%Qp
               pidv dq dqb dqs OG (K - 8)%nat eb b lks Vpr false
@@ -2085,7 +2086,7 @@ End IreclaimOrphan.
 (* ===================================================================== *)
 Section IreclaimRelease.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_release `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat)
@@ -2279,14 +2280,14 @@ End IreclaimRelease.
 (* ===================================================================== *)
 Section IreclaimScan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_scan `{GEN : GenId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname) (γpr : gname)
+      (gtl : gname) (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (nib : nat) (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
@@ -2321,10 +2322,10 @@ Section IreclaimScan.
     fs_crash_seam cov logstart -∗
     gen_cert -∗
     ireg_inv γi γfs inodestart nib -∗
-    is_itable2 gtl cn γfs γi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrows cn γfs γi cov logstart -∗
-    ic_sleeplocks cn -∗
+    ic_escrows fsc_ic γfs γi cov logstart -∗
+    ic_sleeplocks fsc_ic -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -3021,7 +3022,7 @@ Section IreclaimScan.
           iDestruct (cpu_claim_ext_transport CID7 CID16 eb (proc_addr j)
                        ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
           iApply (irc_orphan (CID0 := CID16) γs j γl γu γd γk pd pav pu bn γ γfs
-                    γi cn gtl γpr cov logstart bmapstart inodestart ninodes size
+                    γi gtl γpr cov logstart bmapstart inodestart ninodes size
                     nib dev inum bno kk (diblk_bytes ds) bsd0 ds d0
                     fuel
                     pidv dq dqb dqs dqn m WD K eb b lks
@@ -3086,7 +3087,7 @@ End IreclaimScan.
 (* ===================================================================== *)
 Section IreclaimMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Lemma wp_ireclaim_sconf `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
@@ -3094,7 +3095,7 @@ Section IreclaimMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
@@ -3102,7 +3103,7 @@ Section IreclaimMain.
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
-      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
+      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi gtl γpr
                              cov logstart bmapstart inodestart ninodes nib size
                              dev pidv dq dqb dqs dqn m K eb b lks Vpr.
   Proof.
@@ -3597,7 +3598,7 @@ Section IreclaimMain.
     assert (Hunit1 : bv_unsigned (mword_of_int 1 : mword 32) = 1).
     { rewrite moi32_unsigned. apply bvw32_small.
       change (2^32)%Z with 4294967296%Z. lia. }
-    iPoseProof (irc_scan γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
+    iPoseProof (irc_scan γs j γl γu γd γk pd pav pu bn γ γfs γi gtl γpr
                   cov logstart bmapstart inodestart ninodes size nib dev
                   pidv dq dqb dqs dqn m K eb b lks
                   Vpr HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib

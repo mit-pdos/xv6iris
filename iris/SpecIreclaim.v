@@ -90,7 +90,7 @@
    ilock, iunlock and iput each take [is_sleeplock] for THEIR OWN entry, and
    a caller that knows its slot hands over exactly one.  ireclaim does not
    know its slot: [iget] chooses it at run time and the scan cannot name it in
-   advance.  So this contract takes [IcacheEscrow.ic_sleeplocks cn] -- the
+   advance.  So this contract takes [IcacheEscrow.ic_sleeplocks fsc_ic] -- the
    fifty-fold persistent family -- with [IcacheEscrow.ic_sleeplocks_lookup]
    to project the one the run picks.  There is one copy of each.
 
@@ -171,6 +171,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -182,14 +183,14 @@ Local Open Scope Z_scope.
 Notation K_ireclaim := (84%nat) (only parsing).
 Definition wp_ireclaim_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γi : gname)
-    (cn : ic_names) (gtl : gname)                     (* the icache + itable *)
+    (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z)
     (ninodes : Z) (nib : nat) (size : Z)
@@ -281,12 +282,12 @@ Definition wp_ireclaim_sconf_body
      only caller, hands it in and takes it back. *)
   ireg_boot -∗
   (* ---- THE ICACHE, as iget / ilock / iput take it ---- *)
-  is_itable2 gtl cn γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows cn γfs γi cov logstart -∗
+  ic_escrows fsc_ic γfs γi cov logstart -∗
   (* THE FIFTY ENTRY SLEEPLOCKS, as a family: the scan does not know which
      slot iget will pick.  [IcacheEscrow.ic_sleeplocks_lookup] projects it. *)
-  ic_sleeplocks cn -∗
+  ic_sleeplocks fsc_ic -∗
   (* itrunc's bitmap, through iput *)
   bitmap_inv γfs bmapstart cov logstart size -∗
   (* the caller's own pid cell (bread's / begin_op's acquiresleep records it) *)
@@ -338,13 +339,13 @@ Definition wp_ireclaim_sconf_body
 Module Type IRECLAIM.
   Parameter wp_ireclaim_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
@@ -352,7 +353,7 @@ Module Type IRECLAIM.
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
+      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi gtl γpr
                              cov logstart bmapstart inodestart ninodes nib size
                              dev pidv dq dqb dqs dqn m K eb b lks Vpr.
 End IRECLAIM.

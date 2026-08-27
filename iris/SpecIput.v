@@ -106,6 +106,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -127,14 +128,13 @@ Notation K_iput := (74%nat) (only parsing).
 Definition iput_units : nat := 3%nat.
 
 Definition wp_iput_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)          (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names) (gfs : fs_names) (gi : gname)
-    (cn : ic_names)                                   (* the icache's names  *)
     (gtl : gname)                                     (* itable.lock         *)
     (gil gisl : gname)                                (* ip->lock            *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -206,12 +206,12 @@ Definition wp_iput_sconf_body
   log_ctx g bn gfs cov logstart dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
   (* the itable spinlock over the v2 resource; §13.11's trailing device *)
-  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
   (* the [ref] words *)
   itable_inv -∗
   (* THIS slot's escrow -- iput knows its slot, so unlike iget it needs no
      ic_escrows family *)
-  ic_escrow cn gfs gi cov logstart k -∗
+  ic_escrow fsc_ic gfs gi cov logstart k -∗
   (* the inode region *)
   ireg_inv gi gfs inodestart nib -∗
   (* THE SEALED REGIME, AT THE RUNTIME ARM (iclaim-ledger.md §6′, RULING G;
@@ -233,7 +233,7 @@ Definition wp_iput_sconf_body
      the slot, keyed by the slot rather than by the lock -- which is what
      lets iput, at [ip->ref == 1], prove the lock free instead of blocking
      on it (claude-notes/projects/iput-acquiresleep.md). *)
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k)
                    (slh_tok (icfg_isl k)) -∗
   (* ---- THE REFERENCE BEING DESTROYED, WITH ITS PROVENANCE UNIT ----
      ONE ROW (SIMP-2): [inode_refp] IS this pair -- the reference and the
@@ -353,14 +353,13 @@ Definition ip_spend_w (w cru crz : bool) : nat :=
   (ip_bm w + (if orb cru crz then 0%nat else 1%nat))%nat.
 
 Definition wp_iput_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names) (gfs : fs_names) (gi : gname)
-    (cn : ic_names)
     (gtl : gname)
     (gil gisl : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -406,9 +405,9 @@ Definition wp_iput_gen_body
   panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
-  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrow cn gfs gi cov logstart k -∗
+  ic_escrow fsc_ic gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
   (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING G).
      iput's free path FREEZES the inode ([InodeRegion.ireg_freeze_au] at
@@ -428,7 +427,7 @@ Definition wp_iput_gen_body
      the slot, keyed by the slot rather than by the lock -- which is what
      lets iput, at [ip->ref == 1], prove the lock free instead of blocking
      on it (claude-notes/projects/iput-acquiresleep.md). *)
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k)
                    (slh_tok (icfg_isl k)) -∗
   (* the reference being destroyed, WITH its provenance unit: ONE ROW
      (SIMP-2), exactly as in the [_sconf] body above. *)
@@ -502,13 +501,13 @@ Definition wp_iput_gen_body
 
 Module Type IPUT.
   Parameter wp_iput_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
@@ -516,7 +515,7 @@ Module Type IPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+      wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev
                           k q inum n pidv dq dqb dqs m K eb b lks Vpr.
   (* the credited set-form contract; [wp_iput_sconf] is this at
@@ -525,13 +524,13 @@ Module Type IPUT.
      third unit [iput_units] counts) and at the birth epoch
      [LogInv.log_opS_named] opens; the paid-bitmap report is dropped. *)
   Parameter wp_iput_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
@@ -540,7 +539,7 @@ Module Type IPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool),
-      wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+      wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev
                        k q inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr rg.
 End IPUT.
