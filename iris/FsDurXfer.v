@@ -207,6 +207,49 @@ Section Runs.
       rewrite big_sepM_union; [done | exact (xr_disj_head r l Hd)].
   Qed.
 
+  (* ---------------------------------------------------------------- *)
+  (*  2c.  THE SOURCE'S OWN AUTHORITY, AND THE OUTPUT'S IDENTITY       *)
+  (*                                                                   *)
+  (*  (durable-disk lane H3.)  The transport MINTS its fresh map at the *)
+  (*  flattening of the SOURCE's runs, so whatever the source's own     *)
+  (*  authority says about those bytes is inherited by the output --    *)
+  (*  and that inheritance is the whole of the snapshot's IDENTITY      *)
+  (*  ([FsDurRead.snap_auth]).  [phi_agree] is the source authority as  *)
+  (*  a HYPOTHESIS, stated exactly as [FsStateDefs.phi_excl] is: the    *)
+  (*  era's instance satisfies it at its byte authority                 *)
+  (*  ([FsBytesGamma.fs_gamma_L], one [ghost_map_lookup]) and the       *)
+  (*  snapshot's at its own.  Nothing is computed and no value is       *)
+  (*  decoded: the output map is a SUBSET of the source's map, which is *)
+  (*  what every byte tie is later read through.                       *)
+  (* ---------------------------------------------------------------- *)
+
+  Definition phi_agree Γ (A : iProp Σ) (M : gmap Z (bv 8)) : Prop :=
+    forall (dq : dfrac) (a : Z) (v : bv 8),
+      (A ∗ fsΦ Γ dq a v) ⊢ ⌜M !! a = Some v⌝.
+
+  Lemma phi_map_in Γ (A : iProp Σ) (M : gmap Z (bv 8))
+      (Hag : phi_agree Γ A M) (N : gmap Z (bv 8)) :
+    A -∗ phi_map Γ N -∗ ⌜N ⊆ M⌝.
+  Proof.
+    iIntros "HA HN". rewrite /phi_map.
+    iAssert (⌜forall (a : Z) (v : bv 8), N !! a = Some v ->
+               M !! a = Some v⌝)%I with "[HA HN]" as %Hpt.
+    { rewrite bi.pure_forall. iIntros (a).
+      rewrite bi.pure_forall. iIntros (v).
+      rewrite bi.pure_impl. iIntros (Ha).
+      iDestruct (big_sepM_lookup _ _ a v Ha with "HN") as "Hav".
+      iApply (Hag (DfracOwn 1) a v with "[$HA $Hav]"). }
+    iPureIntro. by apply map_subseteq_spec.
+  Qed.
+
+  Lemma phi_runs_in Γ (A : iProp Σ) (M : gmap Z (bv 8))
+      (Hag : phi_agree Γ A M) (l : list xrun) :
+    xr_disj l -> A -∗ phi_runs Γ l -∗ ⌜xr_union l ⊆ M⌝.
+  Proof.
+    intros Hd. rewrite (phi_runs_union Γ l Hd).
+    iApply (phi_map_in Γ A M Hag).
+  Qed.
+
 End Runs.
 
 (* ====================================================================== *)
@@ -586,24 +629,46 @@ Section Xfer.
     done.
   Qed.
 
+  (* ...and its byte authority IS the [phi_agree] the transport wants, by
+     one [ghost_map_lookup].  So a snapshot is a legal SOURCE with its own
+     identity in hand, which is what the boot mint needs. *)
+  Lemma snap_gamma_agree (g gl gt : gname) (B : gmap Z (bv 8)) :
+    phi_agree (snap_gamma g gl gt) (ghost_map_auth g 1 B) B.
+  Proof.
+    intros dq a v. rewrite /snap_gamma /=.
+    iIntros "[Ha Hv]". iApply (ghost_map_lookup with "Ha Hv").
+  Qed.
+
   (* ---------------------------------------------------------------- *)
   (*  4a.  THE BYTE HALF                                               *)
   (* ---------------------------------------------------------------- *)
 
-  Lemma fs_footprint_xfer Γ (Hex : phi_excl Γ) S (gl gt : gname) :
-    fs_footprint Γ S ==∗
+  (* THE OUTPUT'S IDENTITY RIDES ALONG (durable-disk lane H3): the fresh map
+     is the flattening of the SOURCE's own runs, so the source's authority
+     -- as [phi_agree] -- names every one of its bytes in [M], and the
+     output map is a SUBSET of [M].  That subset IS what the snapshot's
+     byte ties are later read through ([FsDurRead.snap_auth]); nothing is
+     computed from [S] and no value is decoded. *)
+  Lemma fs_footprint_xfer Γ (Hex : phi_excl Γ) (A : iProp Σ)
+      (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) S (gl gt : gname) :
+    A -∗ fs_footprint Γ S ==∗
       ∃ (g : gname) (B : gmap Z (bv 8)),
-        fs_footprint Γ S ∗ ghost_map_auth g 1 B
+        ⌜B ⊆ M⌝ ∗ A ∗ fs_footprint Γ S ∗ ghost_map_auth g 1 B
         ∗ fs_footprint (snap_gamma g gl gt) S.
   Proof.
-    iIntros "Hf".
+    iIntros "HA Hf".
     iDestruct (fs_footprint_runs with "Hf") as (PM) "[%Hshape Hr]".
     iAssert (⌜xr_disj (xr_fs S PM)⌝ ∧ phi_runs Γ (xr_fs S PM))%I
       with "[Hr]" as "[%Hdisj Hr]".
     { iSplit; [iApply (phi_runs_disj Γ Hex with "Hr") | iExact "Hr"]. }
+    iAssert (⌜xr_union (xr_fs S PM) ⊆ M⌝ ∧ (A ∗ phi_runs Γ (xr_fs S PM)))%I
+      with "[HA Hr]" as "[%Hin [HA Hr]]".
+    { iSplit;
+        [iApply (phi_runs_in Γ A M Hag _ Hdisj with "HA Hr") | iFrame]. }
     rewrite (phi_runs_union Γ _ Hdisj).
     iMod (ghost_map_alloc (xr_union (xr_fs S PM))) as (g) "[Hba Hbe]".
     iModIntro. iExists g, (xr_union (xr_fs S PM)).
+    iSplitR; [by iPureIntro |]. iFrame "HA".
     iSplitL "Hr".
     { iApply (fs_footprint_of_runs Γ S PM Hshape).
       rewrite (phi_runs_union Γ _ Hdisj). iExact "Hr". }
@@ -617,16 +682,19 @@ Section Xfer.
   (*  4b.  THE WHOLE INSTANCE                                          *)
   (* ---------------------------------------------------------------- *)
 
-  Theorem fs_state_xfer Γ (Hex : phi_excl Γ) S :
-    fs_state Γ S ==∗
+  Theorem fs_state_xfer Γ (Hex : phi_excl Γ) (A : iProp Σ)
+      (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) S :
+    A -∗ fs_state Γ S ==∗
       ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
-        fs_state Γ S
+        ⌜B ⊆ M⌝
+        ∗ A
+        ∗ fs_state Γ S
         ∗ ghost_map_auth g 1 B
         ∗ ghost_map_auth gt 1 (fss_inodes S)
         ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
         ∗ fs_state (snap_gamma g gl gt) S.
   Proof.
-    iIntros "HS". iEval (rewrite fs_state_split fs_ghost_split) in "HS".
+    iIntros "HA HS". iEval (rewrite fs_state_split fs_ghost_split) in "HS".
     iDestruct "HS" as "(Hf & Hl & #Hp)".
     iAssert (⌜∃ f, link_elem_ok (fss_inodes S) f
                    /\ ✓ link_elem (fss_inodes S) f⌝
@@ -635,8 +703,10 @@ Section Xfer.
     destruct Hlv as (f & Hfok & Hfv).
     iMod (fs_boot_alloc_at (fss_inodes S) (fss_inodes S) f Hfok Hfv)
       as (gl gt) "(Hta & Htf & Hl')".
-    iMod (fs_footprint_xfer Γ Hex S gl gt with "Hf") as (g B) "(Hf & Hba & Hf')".
+    iMod (fs_footprint_xfer Γ Hex A M Hag S gl gt with "HA Hf")
+      as (g B) "(%Hin & HA & Hf & Hba & Hf')".
     iModIntro. iExists g, gl, gt, B.
+    iSplitR; [by iPureIntro |]. iFrame "HA".
     iSplitL "Hf Hl".
     { rewrite fs_state_split fs_ghost_split. iFrame "Hf Hl Hp". }
     iFrame "Hba Hta".
@@ -652,17 +722,20 @@ Section Xfer.
      has to be transported beside it).  ONE [own_alloc] at the source's own
      element PLUS that fragment -- [FsState.fs_boot_alloc_root_slack] --
      which is why the slack is never a pure clause of anything. *)
-  Theorem fs_state_xfer_tok Γ (Hex : phi_excl Γ) S (r : Z) (v : ity) :
-    fs_state Γ S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
+  Theorem fs_state_xfer_tok Γ (Hex : phi_excl Γ) (A : iProp Σ)
+      (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) S (r : Z) (v : ity) :
+    A -∗ fs_state Γ S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
       ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
-        fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)
+        ⌜B ⊆ M⌝
+        ∗ A
+        ∗ fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)
         ∗ ghost_map_auth g 1 B
         ∗ ghost_map_auth gt 1 (fss_inodes S)
         ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
         ∗ fs_state (snap_gamma g gl gt) S
         ∗ own gl (link_tok_elem r v).
   Proof.
-    iIntros "HS Ht". iEval (rewrite fs_state_split fs_ghost_split) in "HS".
+    iIntros "HA HS Ht". iEval (rewrite fs_state_split fs_ghost_split) in "HS".
     iDestruct "HS" as "(Hf & Hl & #Hp)".
     iAssert (⌜∃ f, link_elem_ok (fss_inodes S) f
                    /\ ✓ (link_elem (fss_inodes S) f ⋅ link_tok_elem r v)⌝
@@ -673,8 +746,10 @@ Section Xfer.
     destruct Hlv as (f & Hfok & Hfv).
     iMod (fs_boot_alloc_root_slack (fss_inodes S) f r v Hfok Hfv)
       as (gl gt) "(Hta & Htf & Hl' & Ht')".
-    iMod (fs_footprint_xfer Γ Hex S gl gt with "Hf") as (g B) "(Hf & Hba & Hf')".
+    iMod (fs_footprint_xfer Γ Hex A M Hag S gl gt with "HA Hf")
+      as (g B) "(%Hin & HA & Hf & Hba & Hf')".
     iModIntro. iExists g, gl, gt, B.
+    iSplitR; [by iPureIntro |]. iFrame "HA".
     iSplitL "Hf Hl".
     { rewrite fs_state_split fs_ghost_split. iFrame "Hf Hl Hp". }
     iFrame "Ht Hba Hta".

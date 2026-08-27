@@ -1,37 +1,36 @@
 (* ====================================================================== *)
-(*  FsDurXferWall.v -- WHY THE COMMIT'S SNAPSHOT IS STILL BUILT FROM A     *)
-(*  VALUE, AND WHAT WOULD HAVE TO CHANGE FIRST (durable-disk lane H2)      *)
+(*  FsDurXferWall.v -- WHAT A SNAPSHOT'S RESOURCES DO NOT SAY, AND WHY THE *)
+(*  COMMIT'S COLLECTION IS STILL NOT A TRANSPORT SOURCE                    *)
+(*  (durable-disk lanes H2 / H3)                                          *)
 (*                                                                        *)
-(*  Lane H built the RESOURCE TRANSPORT ([FsDurXfer.fs_state_xfer]) and    *)
-(*  its registry entry points ([FsDurSnap.fs_snap_alloc_xfer],             *)
-(*  [P_dur_alloc_xfer]), and lane H2 moved the COMMIT so that the file     *)
-(*  system builds its own epoch at its own ghost step and the WAL only     *)
-(*  installs it ([LogSnapLaw.snap_law_out], [FsDurSnap.dsnap_step_xfer]).  *)
-(*  What lane H2 did NOT do is make that epoch come out of the TRANSPORT   *)
-(*  rather than out of [P_dur_alloc], and it did not shrink [snap_ok].     *)
-(*  Two facts below are why; both are one-liners, and both are about the   *)
-(*  SHAPES, not about any proof.                                          *)
+(*  Lane H built the RESOURCE TRANSPORT ([FsDurXfer.fs_state_xfer]), lane  *)
+(*  H2 moved the COMMIT so that the file system builds its own epoch, and  *)
+(*  lane H3 gave the epoch an IDENTITY ([FsDurRead.snap_auth]: the byte    *)
+(*  authority stands at a map inside [LogDefs.fs_dbytes D]) and turned     *)
+(*  every CONTENT clause of [FsDurSnap.snap_ok] into a reading off the     *)
+(*  epoch's own resources ([FsDurSnap.fs_snap_read_ok]).  Two facts about  *)
+(*  the SHAPES are what is left; both are one-liners.                      *)
 (*                                                                        *)
-(*  (1)  THE EXPORTED CLAIM CANNOT BE READ OFF THE SNAPSHOT'S RESOURCES.   *)
-(*       [FsDurSnap.fs_snap Gamma g B D S] mentions the committed block    *)
-(*       map [D] in EXACTLY ONE PLACE -- the pure conjunct                 *)
-(*       [<pure snap_ok S D>].  Everything else (the byte authority at     *)
-(*       [B], the abstract map's authority and fragments, [fs_state])      *)
-(*       is a function of [S] alone.  So a "reading lemma" that recovers   *)
-(*       [snap_ok S D] from the resources would have to hold at EVERY [D], *)
-(*       including the empty map -- and [snap_ok S empty] is false         *)
-(*       ([sk_sb] wants block [SB_BNO]).  [snap_ok_not_readable] below.    *)
+(*  (1)  THE GEOMETRY IS NOT READABLE, AND THAT IS A FACT ABOUT            *)
+(*       [ghost_map], NOT A MISSING LEMMA.  An AUTHORITY may hold entries  *)
+(*       no fragment names, so the identity -- which says the snapshot's   *)
+(*       own bytes are INSIDE [fs_dbytes D] -- bounds nothing about [D]'s  *)
+(*       domain.  Grow [D] by one whole block above the state's own        *)
+(*       [size]: every resource of the epoch still holds                   *)
+(*       ([fs_snap_res_grow], and the identity is monotone because the     *)
+(*       flattening is), while [FsDurSnap.ss_dombelow] fails at that block *)
+(*       ([snap_shape_grow_absurd]).  [snap_shape_not_readable] is the two *)
+(*       together.                                                        *)
 (*                                                                        *)
-(*       The root cause is not a missing lemma: [D] is a VALUE the WAL     *)
-(*       computes from its own cache map, and relating a value to a        *)
-(*       resource is a pure statement by construction.  Making the tie     *)
-(*       derivable means giving [P_dur] a resource that PINS [D] -- a      *)
-(*       ledger of all of [D]'s bytes -- and the snapshot cannot own that  *)
-(*       beside [fs_state Gamma S] at full fraction (they would overlap on *)
-(*       every block [S] names, which [phi_excl] refutes).  So [snap_ok]   *)
-(*       stays a carried tie, and every clause the theorem exports         *)
-(*       ([SystemAdequacy.fs_boot_pure]) has to be MATERIALISED at each    *)
-(*       commit -- which is what [FsCollect.col_snap_ok_ex] does.          *)
+(*       So [FsDurSnap.snap_shape] -- block lengths, the map's range, the  *)
+(*       superblock's own geometry, which inums the region names, and the  *)
+(*       directory clauses at the region's width -- STAYS a carried pure   *)
+(*       conjunct.  Every clause of it is a CONFIGURATION fact both        *)
+(*       producers have for free ([FsCollect.col_geom] plus [col_hand]'s   *)
+(*       domain and directory rows at a commit; the mkfs geometry at era   *)
+(*       0), and none of it is about the file system's contents -- which   *)
+(*       is why the expensive half, the byte ties and the used-set         *)
+(*       coupling, no longer has to be materialised anywhere.              *)
 (*                                                                        *)
 (*  (2)  THE COMMIT'S COLLECTION IS NOT A LEGAL TRANSPORT SOURCE.          *)
 (*       [FsDurXfer.fs_state_xfer] takes [fs_state Gamma S], whose byte    *)
@@ -45,18 +44,17 @@
 (*       the full element as 3/4 + 1/4, promote the 3/4 again, and the     *)
 (*       two owners at one address are inconsistent.                      *)
 (*                                                                        *)
-(*       So a future lane that wants the transport at the commit has to    *)
+(*       So a lane that wants the transport AT THE COMMIT has to           *)
 (*       generalise it to a PER-OBJECT SHARE first (the disjointness       *)
 (*       survives: [phi_excl] is fraction-aware and any two shares whose   *)
 (*       doubles are invalid sum past one -- [FsCollect.dfrac_nvalid_pair] *)
-(*       is that arithmetic, already in tree).  Even then it buys nothing  *)
-(*       on its own while (1) stands: [fs_snap_alloc_xfer] takes           *)
-(*       [snap_ok S D] as a premise BESIDE the instance, so at the commit  *)
-(*       the transport is a strictly larger obligation than                *)
-(*       [P_dur_alloc].  (1) is the one to fix first.                     *)
+(*       is that arithmetic, already in tree), and make the collection     *)
+(*       ACCESSOR-shaped so the bundles go back to their invariants.  What *)
+(*       it then owes [FsDurSnap.P_dur_alloc_xfer] is [snap_shape] and     *)
+(*       nothing else, which [FsCollect.col_hand] already carries.         *)
 (* ====================================================================== *)
 
-From Stdlib Require Import ZArith List.
+From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list sets bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import dfrac.
@@ -68,69 +66,110 @@ Require Import DiskImg.       (* [diskImgG] -- IMPORTED, not merely required:
                                  Require is inert (durable-notes) *)
 Require Import LogDefs.        (* [fs_dbytes] *)
 Require Import FsImg.          (* [SB_BNO] *)
+Require Import FsDurBytes.     (* [dbytes_ok], [fs_dbytes_insert] *)
 Require Import FsStateDefs.    (* [phi_excl], [phi_frac], [dfrac_full_nvalid] *)
 Require Import FsState.        (* [fs_state], [top_frag] *)
 Require Import FsDurXfer.      (* [snap_gamma] *)
-Require Import FsDurSnap.      (* [snap_ok], [fs_snap], [fs_snap_alloc] *)
+Require Import FsDurRead.      (* [snap_auth] -- the epoch's IDENTITY *)
+Require Import FsDurSnap.      (* [snap_ok], [snap_shape], [fs_snap] *)
 
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
-(*  1.  THE EMPTY COMMITTED MAP IS NOT A FILE SYSTEM                       *)
+(*  1.  A BLOCK ABOVE THE STATE'S OWN SIZE IS NOT A FILE-SYSTEM BLOCK      *)
 (* ====================================================================== *)
 
-Lemma snap_ok_empty_absurd (S : fs_state_rec) : snap_ok S ∅ -> False.
+Lemma snap_shape_grow_absurd (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (b : Z) (bs : list (bv 8)) :
+  sb_size (fss_sb S) <= b ->
+  snap_shape S (<[b := bs]> D) -> False.
 Proof.
-  intros H. pose proof (sk_sb (sk_bytes H)) as Hsb.
-  rewrite lookup_empty in Hsb. discriminate.
+  intros Hb Hsh.
+  assert (Hin : is_Some (<[b := bs]> D !! b))
+    by (exists bs; apply lookup_insert).
+  pose proof (ss_dombelow Hsh b Hin) as [_ Hlt]. lia.
+Qed.
+
+(* ...and the flattening is MONOTONE in the block map, which is the whole
+   of (1): the identity is a subset and a subset bounds nothing above. *)
+Lemma fs_dbytes_grow (D : gmap Z (list (bv 8))) (b : Z) (bs : list (bv 8)) :
+  dbytes_ok (<[b := bs]> D) -> D !! b = None ->
+  fs_dbytes D ⊆ fs_dbytes (<[b := bs]> D).
+Proof.
+  intros Hok Hb.
+  rewrite (fs_dbytes_insert D b bs Hok Hb).
+  apply map_union_subseteq_r.
+  exact (fs_dbytes_disj_seq D b bs
+           (dbytes_ok_insert D b bs Hb Hok)
+           (dbytes_ok_head D b bs Hok) Hb).
 Qed.
 
 Section Wall.
   Context `{!diskImgG Σ, !fsLinkG Σ, !fsTopG Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
-  (* THE RESOURCE HALF of [FsDurSnap.fs_snap], verbatim minus the pure tie.
-     [D] does not occur in it -- that is the whole content of (1). *)
+  (* THE RESOURCE HALF of [FsDurSnap.fs_snap], verbatim minus the geometry *)
   Definition fs_snap_res Γ (g : gname) (B : gmap Z (bv 8))
-      (S : fs_state_rec) : iProp Σ :=
-    (ghost_map_auth g 1 B
+      (D : gmap Z (list (bv 8))) (S : fs_state_rec) : iProp Σ :=
+    (snap_auth g B D
      ∗ ghost_map_auth (γtop Γ) 1 (fss_inodes S)
      ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag Γ i n)
-     ∗ fs_state Γ S)%I.
+     ∗ fs_state Γ S
+     ∗ ∃ kv : ity, own (γlink Γ) (link_tok_elem ROOTINO kv))%I.
 
   Lemma fs_snap_split Γ g B D S :
-    fs_snap Γ g B D S ⊣⊢ fs_snap_res Γ g B S ∗ ⌜snap_ok S D⌝.
+    fs_snap Γ g B D S ⊣⊢ fs_snap_res Γ g B D S ∗ ⌜snap_shape S D⌝.
   Proof.
     rewrite /fs_snap /fs_snap_res. iSplit.
-    - iIntros "(H1 & H2 & H3 & H4 & %Hok)". iFrame. by iPureIntro.
-    - iIntros "((H1 & H2 & H3 & H4) & %Hok)". iFrame. by iPureIntro.
+    - iIntros "(H1 & H2 & H3 & H4 & H5 & %Hsh)". iFrame. by iPureIntro.
+    - iIntros "((H1 & H2 & H3 & H4 & H5) & %Hsh)". iFrame. by iPureIntro.
   Qed.
 
-  (* ...and the resource half IS inhabited, so the refutation below is not
-     vacuous.  A witness at the real mkfs image is
+  (* ...and the resource half IS inhabited at the tied form, so the
+     refutation below is not vacuous.  A witness at the real mkfs image is
      [FsAdequacyImg.fsimg_snap_ok] (not imported here: this file is a leaf
      and that one's cone is the whole boot chain). *)
   Lemma fs_snap_res_inhabited (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
     snap_ok S D ->
     ⊢ |==> ∃ g gl gt : gname,
-        fs_snap_res (snap_gamma g gl gt) g (fs_dbytes D) S.
+        fs_snap_res (snap_gamma g gl gt) g (fs_dbytes D) D S.
   Proof.
     intros Hok.
-    iMod (fs_snap_alloc S D Hok) as (g gl gt) "(Hba & Hta & Htf & Hst)".
-    iModIntro. iExists g, gl, gt. rewrite /fs_snap_res. iFrame.
+    iMod (fs_snap_alloc S D Hok) as (g gl gt) "H".
+    iModIntro. iExists g, gl, gt.
+    rewrite fs_snap_split. iDestruct "H" as "[$ _]".
   Qed.
 
-  (* (1), AS ONE LEMMA.  A reading of the exported tie off the snapshot's
-     resources would hold at every [D]; it therefore holds at the empty map,
-     which no state fits. *)
-  Lemma snap_ok_not_readable Γ (g : gname) (B : gmap Z (bv 8))
-      (S : fs_state_rec) :
-    (forall D : gmap Z (list (bv 8)), fs_snap_res Γ g B S ⊢ ⌜snap_ok S D⌝) ->
-    fs_snap_res Γ g B S ⊢ ⌜False⌝.
+  (* THE IDENTITY IS MONOTONE IN [D]: nothing the epoch owns notices a
+     block the footprint does not cover. *)
+  Lemma fs_snap_res_grow Γ g B (D : gmap Z (list (bv 8)))
+      (b : Z) (bs : list (bv 8)) S :
+    dbytes_ok (<[b := bs]> D) -> D !! b = None ->
+    fs_snap_res Γ g B D S ⊢ fs_snap_res Γ g B (<[b := bs]> D) S.
   Proof.
-    intros Hread. iIntros "H".
-    iDestruct (Hread ∅ with "H") as %Hok.
-    iPureIntro. exact (snap_ok_empty_absurd S Hok).
+    intros Hok Hb. rewrite /fs_snap_res /snap_auth.
+    iIntros "[Hau Hrest]". iDestruct "Hau" as "[Ha %Hsub]".
+    iSplitR "Hrest"; [| iExact "Hrest"].
+    iFrame "Ha". iPureIntro.
+    exact (transitivity Hsub (fs_dbytes_grow D b bs Hok Hb)).
+  Qed.
+
+  (* (1), AS ONE LEMMA.  A reading of the GEOMETRY off the epoch's
+     resources would survive growing [D] by a block above the state's own
+     size, and no state fits that. *)
+  Lemma snap_shape_not_readable Γ (g : gname) (B : gmap Z (bv 8))
+      (D : gmap Z (list (bv 8))) (S : fs_state_rec)
+      (b : Z) (bs : list (bv 8)) :
+    dbytes_ok (<[b := bs]> D) -> D !! b = None ->
+    sb_size (fss_sb S) <= b ->
+    (forall D' : gmap Z (list (bv 8)),
+       fs_snap_res Γ g B D' S ⊢ ⌜snap_shape S D'⌝) ->
+    fs_snap_res Γ g B D S ⊢ ⌜False⌝.
+  Proof.
+    intros Hok Hb Hsz Hread. iIntros "H".
+    rewrite (fs_snap_res_grow Γ g B D b bs S Hok Hb).
+    iDestruct (Hread (<[b := bs]> D) with "H") as %Hsh.
+    iPureIntro. exact (snap_shape_grow_absurd S D b bs Hsz Hsh).
   Qed.
 
   (* ==================================================================== *)

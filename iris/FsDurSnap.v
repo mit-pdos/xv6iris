@@ -82,6 +82,10 @@ Require Import FsDurBytes.    (* [fs_dbytes_blocks] -- Gamma-generically  *)
 Require Import FsDurXfer.     (* THE RESOURCE TRANSPORT (lane H): [snap_gamma],
                                  [fs_state_xfer] -- both ends of a transport
                                  are [fs_state]s and nothing is decoded *)
+Require Import FsDurRead.     (* THE SNAPSHOT'S BYTE IDENTITY (lane H3):
+                                 [snap_auth], and the readings off it --
+                                 [snap_blk_read_full], [snap_run_read],
+                                 [blk_run_overlap]                        *)
 Require Import RiscvPtsto.    (* [riscvGS] / [diskGhostG] -- IMPORTED, not
                                  merely required: a class reached through a
                                  transitive [Require] parses in a binder and
@@ -544,6 +548,98 @@ Definition sk_local {S D} (H : snap_ok S D) : snap_local S := proj2 H.
 Lemma snap_ok_intro (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
   snap_bytes S D -> snap_local S -> snap_ok S D.
 Proof. intros Hb Hl. exact (conj Hb Hl). Qed.
+
+(* ===================================================================== *)
+(*  1c'. THE GEOMETRY -- THE ONE HALF OF THE TIE NO RESOURCE PINS         *)
+(*       (durable-disk lane H3)                                           *)
+(*                                                                        *)
+(*  Everything else in [snap_ok] is a READING off a snapshot's own         *)
+(*  resources ([fs_snap_read_ok]): the byte ties by agreement with the     *)
+(*  epoch's authority at the committed view's bytes, the coupling and the  *)
+(*  two disjointness clauses off [FsStateDefs.phi_excl], the local clauses *)
+(*  off [FsStateInode.inode_owned].  These seven are NOT, and the reason   *)
+(*  is one fact about a [ghost_map]: an AUTHORITY may hold entries no      *)
+(*  fragment names, so nothing the snapshot owns bounds [D]'s domain or a  *)
+(*  block's length, and nothing it owns says which INUMS the state names.  *)
+(*  [FsDurXferWall.snap_shape_not_readable] is the refutation at the       *)
+(*  tied form.                                                            *)
+(*                                                                        *)
+(*  ALL SEVEN ARE CONFIGURATION FACTS and both producers have them for     *)
+(*  free: at a commit they are [FsCollect.col_geom] plus [col_hand]'s own  *)
+(*  domain and directory rows; at the image they are the mkfs geometry.    *)
+(*  Not one of them is about the file system's CONTENTS, which is why the  *)
+(*  used-set coupling and the byte ties -- the expensive half -- no longer *)
+(*  have to be materialised anywhere.                                     *)
+(*                                                                        *)
+(*  EVERY CLAUSE IS A CLAUSE OF [snap_bytes] VERBATIM, so                  *)
+(*  [snap_shape_of_ok] is seven projections and no producer pays anything  *)
+(*  new.                                                                  *)
+(* ===================================================================== *)
+Record snap_shape (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
+  MkSnapShape {
+  ss_bsz      : forall b bs, D !! b = Some bs -> length bs = BSIZE;
+  ss_dombelow : forall b, is_Some (D !! b) -> 0 <= b < sb_size (fss_sb S);
+  ss_sbok     : fs_sb_ok (fss_sb S);
+  ss_inum     : forall i n, fss_inodes S !! i = Some n -> 0 <= i < 2 ^ 32;
+  ss_reg      : forall i n, fss_inodes S !! i = Some n ->
+                  0 <= i /\ i `div` 16 < sb_bmapstart (fss_sb S)
+                                         - sb_inodestart (fss_sb S);
+  ss_regdom   : forall i, 0 <= i < 16 * (sb_ninodes (fss_sb S) / 16 + 1) ->
+                  is_Some (fss_inodes S !! i);
+  ss_dirloc   : forall i n, fss_inodes S !! i = Some n ->
+                  node_dir_local i (snap_nib S) n;
+}.
+
+Global Arguments ss_bsz {_ _} _.
+Global Arguments ss_dombelow {_ _} _.
+Global Arguments ss_sbok {_ _} _.
+Global Arguments ss_inum {_ _} _.
+Global Arguments ss_reg {_ _} _.
+Global Arguments ss_regdom {_ _} _.
+Global Arguments ss_dirloc {_ _} _.
+
+Lemma snap_shape_of_ok (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
+  snap_ok S D -> snap_shape S D.
+Proof.
+  intros H. pose proof (sk_bytes H) as Hb. split.
+  - exact (sk_bsz Hb).
+  - exact (sk_dombelow Hb).
+  - exact (sk_sbok Hb).
+  - exact (sk_inum Hb).
+  - exact (sk_reg Hb).
+  - exact (sk_regdom Hb).
+  - exact (sk_dirloc Hb).
+Qed.
+
+(* [sk_dom] is [ss_regdom] read below [ninodes]: mkfs rounds the count up
+   to a whole inode block, so the region's inum space contains it. *)
+Lemma snap_shape_dom (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
+  snap_shape S D ->
+  forall i, 0 <= i < sb_ninodes (fss_sb S) -> is_Some (fss_inodes S !! i).
+Proof.
+  intros Hs i Hi. apply (ss_regdom Hs).
+  pose proof (Z.div_mod (sb_ninodes (fss_sb S)) 16 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound (sb_ninodes (fss_sb S)) 16 ltac:(lia)).
+  lia.
+Qed.
+
+(* THE PER-INODE READING, as a record so that no clause of it is spelled
+   inside a [⌜ ⌝] (where [a + b] would parse as [sum] -- durable-notes.md,
+   the scope-stack trap). *)
+Record snap_inode_read (sb : fs_sb) (D : gmap Z (list (bv 8)))
+    (i : Z) (n : fs_node) : Prop := MkSnapInodeRead {
+  sir_rec  : exists bs, D !! (sb_inodestart sb + i `div` 16) = Some bs
+                        /\ rec_in_blk bs (64 * (i `mod` 16)) (fn_rec n);
+  sir_blk  : forall k bs, fn_blk n !! k = Some bs ->
+               D !! fn_naddr n k = Some bs;
+  sir_ind  : fn_indb n <> 0 -> D !! fn_indb n = Some (ind_bytes (fn_ent n));
+  sir_slot : fn_slot_inj n;
+}.
+
+Global Arguments sir_rec {_ _ _ _} _.
+Global Arguments sir_blk {_ _ _ _} _.
+Global Arguments sir_ind {_ _ _ _} _.
+Global Arguments sir_slot {_ _ _ _} _.
 
 (* THE PURE READING THE SPIKE USES: the state names every region inum, and
    for the named node the record's bytes are where they are.  Everything a
@@ -1958,60 +2054,46 @@ Section Snap.
     iModIntro. iExists g. iFrame.
   Qed.
 
-  (* THE TRANSPORT.  Inputs: the abstract state VALUE [S] and the pure tie
-     to the block map [D].  Output: a fresh family and the whole instance
-     at [S], with its own byte authority. *)
-  Theorem fs_snap_alloc S D :
-    snap_ok S D ->
-    ⊢ |==> ∃ g gl gt : gname,
-        ghost_map_auth g 1 (fs_dbytes D)
-        ∗ ghost_map_auth gt 1 (fss_inodes S)
-        ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
-        ∗ fs_state (snap_gamma g gl gt) S.
-  Proof.
-    intros Hok.
-    iMod (snap_bytes_alloc (fs_dbytes D)) as (g) "[Hba Hbe]".
-    destruct (sk_links_plain (sk_bytes Hok)) as (fpar & Hpok & Hpv).
-    iMod (fs_links_alloc (fss_inodes S) fpar Hpok Hpv) as (gl) "Hlinks".
-    iMod (ghost_map_alloc (fss_inodes S)) as (gt) "[Hta Htf]".
-    iModIntro. iExists g, gl, gt.
-    iDestruct (snap_ledger_of_elems g gl gt D (sk_bsz (sk_bytes Hok)) with "Hbe")
-      as "Hled".
-    iFrame "Hba Hta Htf".
-    iApply (fs_state_of_ledger (snap_gamma g gl gt) S D Hok with "Hled").
-    iExact "Hlinks".
-  Qed.
-
   (* ------------------------------------------------------------------ *)
   (*  7.  THE SNAPSHOT, AND THE EPOCH REGISTRY                            *)
   (* ------------------------------------------------------------------ *)
 
-  (* ONE epoch's durable instance: the byte authority it owns outright, the
-     abstract map's authority and every fragment, the nested predicate, and
-     the PURE tie to the committed block map.  Nothing outside [crashN]
-     ever holds a piece of it. *)
-  (* THE BYTE MAP IS THE EPOCH'S OWN AND IS NOT A FUNCTION OF [D]
-     (durable-disk lane H).  The value-first allocator minted it at
-     [fs_dbytes D] and CARVED the instance out of it; the transport mints it
-     at the flattening of the SOURCE INSTANCE'S own runs, which is smaller
-     (a record is 64 bytes of its region block, not the block).  Nothing
-     reads the map, so it is a parameter here and existential in [P_dur]. *)
+  (* ONE epoch's durable instance.  Its IDENTITY is [FsDurRead.snap_auth]:
+     the byte authority the epoch owns outright, standing at a map that
+     lies INSIDE the committed view's own flattening [LogDefs.fs_dbytes D].
+     That is an equation between two VALUES -- the WAL's block map and the
+     snapshot's own byte map -- and it is what turns every byte tie of
+     [snap_bytes] into a READING ([fs_snap_read_ok]) instead of a carried
+     fact.
+
+     THE REST IS THE INSTANCE: the abstract map's authority and every
+     fragment, the nested predicate, and the inode region's keep-alive
+     fragment at the root.  That fragment is OWNED rather than stated
+     because [sk_links]' slack is exactly about it -- no directory entry
+     accounts for the root's [nlink = 1] ([FsStateInode.ent_tokenless]
+     exempts a SELF record) -- so the family's slacked validity is read off
+     the resources ([FsState.fs_links_valid_tok]) like everything else.
+
+     THE ONE PURE CONJUNCT LEFT IS THE GEOMETRY [snap_shape], and section
+     1c' says why no resource can pin it.  Nothing outside [crashN] ever
+     holds a piece of any of this. *)
   Definition fs_snap Γ (g : gname) (B : gmap Z (bv 8)) D S : iProp Σ :=
-    (ghost_map_auth g 1 B
+    (snap_auth g B D
      ∗ ghost_map_auth (γtop Γ) 1 (fss_inodes S)
      ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag Γ i n)
      ∗ fs_state Γ S
-     ∗ ⌜snap_ok S D⌝)%I.
+     ∗ (∃ kv : ity, own (γlink Γ) (link_tok_elem ROOTINO kv))
+     ∗ ⌜snap_shape S D⌝)%I.
 
   Global Instance fs_snap_timeless `{!GTimeless Γ} g B D S :
     Timeless (fs_snap Γ g B D S).
   Proof. rewrite /fs_snap. apply _. Qed.
 
   (* THE REGISTRY: the CURRENT snapshot, at the committed block map [D].
-     The gname family and the state are existential -- an epoch is named
-     only by the map it stands at, which is what makes [P_dur] a function
-     of [D] alone and therefore droppable into [FsCrash.P_fs] with no
-     arity change. *)
+     The gname family, the byte map and the state are existential -- an
+     epoch is named only by the map it stands at, which is what makes
+     [P_dur] a function of [D] alone and therefore droppable into
+     [FsCrash.P_fs] with no arity change. *)
   Definition P_dur D : iProp Σ :=
     (∃ (g gl gt : gname) (B : gmap Z (bv 8)) (S : fs_state_rec),
        fs_snap (snap_gamma g gl gt) g B D S)%I.
@@ -2019,65 +2101,540 @@ Section Snap.
   Global Instance P_dur_timeless D : Timeless (P_dur D).
   Proof. rewrite /P_dur. apply _. Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  6.  THE VALUE-FIRST ALLOCATOR, WHICH IS THE IMAGE PATH'S            *)
+  (*                                                                      *)
+  (*  It mints the byte map at [fs_dbytes D] and CARVES the instance out   *)
+  (*  of it by [snap_ok]'s disjointness clauses; the identity is then      *)
+  (*  [reflexivity].  A caller that HAS a source instance never wants this *)
+  (*  -- it wants [P_dur_alloc_xfer], where nothing is carved -- so this   *)
+  (*  entry is for the ONE producer with no source instance at all: era 0, *)
+  (*  built from the mkfs image ([FsDurImg]).                              *)
+  (* ------------------------------------------------------------------ *)
+  Theorem fs_snap_alloc S D :
+    snap_ok S D ->
+    ⊢ |==> ∃ g gl gt : gname,
+        fs_snap (snap_gamma g gl gt) g (fs_dbytes D) D S.
+  Proof.
+    intros Hok.
+    iMod (snap_bytes_alloc (fs_dbytes D)) as (g) "[Hba Hbe]".
+    destruct (sk_links (sk_bytes Hok)) as (fpar & kv & Hpok & Hpv).
+    iMod (fs_boot_alloc_root_slack (fss_inodes S) fpar ROOTINO kv Hpok Hpv)
+      as (gl gt) "(Hta & Htf & Hlinks & Hkeep)".
+    iModIntro. iExists g, gl, gt.
+    iDestruct (snap_ledger_of_elems g gl gt D (sk_bsz (sk_bytes Hok)) with "Hbe")
+      as "Hled".
+    rewrite /fs_snap /snap_auth /top_frag /snap_gamma /=.
+    iFrame "Hba Hta Htf".
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitL "Hled Hlinks".
+    { iApply (fs_state_of_ledger (snap_gamma g gl gt) S D Hok with "Hled").
+      iExact "Hlinks". }
+    iSplitL "Hkeep"; [by iExists kv |].
+    iPureIntro. exact (snap_shape_of_ok S D Hok).
+  Qed.
+
   Lemma P_dur_alloc S D : snap_ok S D -> ⊢ |==> P_dur D.
   Proof.
     intros Hok.
-    iMod (fs_snap_alloc S D Hok) as (g gl gt) "(Hba & Hta & Htf & Hst)".
-    iModIntro. iExists g, gl, gt, (fs_dbytes D), S. rewrite /fs_snap. by iFrame.
+    iMod (fs_snap_alloc S D Hok) as (g gl gt) "Hsnap".
+    iModIntro. iExists g, gl, gt, (fs_dbytes D), S. iExact "Hsnap".
   Qed.
 
   (* ================================================================== *)
-  (*  6b.  THE SAME REGISTRY, FROM AN INSTANCE (durable-disk lane H)     *)
+  (*  7b.  THE READING (durable-disk lane H3)                            *)
   (*                                                                    *)
-  (*  [P_dur_alloc] above is the VALUE-FIRST entry: it takes the block   *)
-  (*  map and the whole of [snap_ok]'s disjointness/cut clauses, and     *)
-  (*  [fs_state_of_ledger] carves a freshly allocated byte map by them.  *)
-  (*  THE CARVE IS AN ARTIFACT OF THE INPUT TYPE.  Given a SOURCE        *)
-  (*  INSTANCE -- and both of the callers that matter have one (the      *)
-  (*  commit's collection at quiescence, plan section 4; the boot mint's *)
-  (*  lent snapshot, plan section 5) -- the fresh family is built by     *)
+  (*  [snap_ok S D] OFF THE SNAPSHOT'S OWN RESOURCES.  Nothing is        *)
+  (*  consumed -- every conclusion below is PURE, which is what lets the *)
+  (*  proofmode hand the resources back -- and nothing is supplied but   *)
+  (*  the geometry.  Read against [FsCollect.col_snap_bytes], which does *)
+  (*  the same readings at the ERA's view against the WAL's authority:   *)
+  (*  the split into "resources" and "geometry" is the same split there, *)
+  (*  which is why the commit pays nothing new for it.                   *)
+  (* ================================================================== *)
+
+  (* ---- the block legs of one inode ---- *)
+
+  Lemma snap_read_blks (g gl gt : gname) B D (n : fs_node) :
+    dblk_full D ->
+    snap_auth g B D -∗
+    ([∗ map] k ↦ bs ∈ fn_blk n,
+       blk_owned (snap_gamma g gl gt) (fn_naddr n k) bs) -∗
+    ⌜forall k bs, fn_blk n !! k = Some bs -> D !! fn_naddr n k = Some bs⌝.
+  Proof.
+    intros Hf. iIntros "Hau Hdat".
+    rewrite bi.pure_forall. iIntros (k).
+    rewrite bi.pure_forall. iIntros (bs).
+    rewrite bi.pure_impl. iIntros (Hk).
+    iDestruct (big_sepM_lookup _ _ k bs Hk with "Hdat") as "Hb".
+    iApply (snap_blk_read_full g gl gt B D (fn_naddr n k) bs Hf with "Hau Hb").
+  Qed.
+
+  Lemma snap_read_ind (g gl gt : gname) B D (n : fs_node) :
+    dblk_full D ->
+    snap_auth g B D -∗ ind_owned (snap_gamma g gl gt) n -∗
+    ⌜fn_indb n <> 0 -> D !! fn_indb n = Some (ind_bytes (fn_ent n))⌝.
+  Proof.
+    intros Hf. iIntros "Hau Hind".
+    rewrite bi.pure_impl. iIntros (Hnz).
+    rewrite /ind_owned (decide_False _ _ Hnz).
+    iApply (snap_blk_read_full g gl gt B D (fn_indb n)
+              (ind_bytes (fn_ent n)) Hf with "Hau Hind").
+  Qed.
+
+  Lemma snap_read_pool (g gl gt : gname) B D (nb : Z) (u : gset Z) :
+    dblk_full D ->
+    snap_auth g B D -∗ free_pool (snap_gamma g gl gt) nb u -∗
+    ⌜forall b, 0 <= b < nb -> b ∉ u -> is_Some (D !! b)⌝.
+  Proof.
+    intros Hf. iIntros "Hau Hpool".
+    rewrite bi.pure_forall. iIntros (b).
+    rewrite bi.pure_impl. iIntros (Hb).
+    rewrite bi.pure_impl. iIntros (Hnu).
+    assert (Hb' : Z.of_nat (Z.to_nat b) = b) by lia.
+    rewrite (free_pool_split (snap_gamma g gl gt) nb u (Z.to_nat b)); [| lia].
+    rewrite Hb' {1}/pool_elt (bool_decide_eq_false_2 _ Hnu).
+    iDestruct "Hpool" as "[Helt _]". iDestruct "Helt" as (bsx) "Helt".
+    rewrite blk_owned_1.
+    iApply (snap_blk_dom g gl gt B D (DfracOwn 1) b bsx Hf with "Hau Helt").
+  Qed.
+
+  (* ---- ONE inode's own slots are distinct: exclusivity, not a clause -- *)
+
+  Lemma inode_dat_owns Γ (n : fs_node) (b : Z) :
+    fn_owns n b -> inode_dat Γ n ⊢ ∃ bs, blk_owned Γ b bs.
+  Proof.
+    intros Hon. rewrite /inode_dat. iIntros "[Hd Hi]".
+    destruct Hon as [(k & [bs Hk] & <-) | [Hnz <-]].
+    - iDestruct (big_sepM_lookup _ _ k bs Hk with "Hd") as "Hb".
+      by iExists bs.
+    - rewrite /ind_owned (decide_False _ _ Hnz).
+      by iExists (ind_bytes (fn_ent n)).
+  Qed.
+
+  Lemma inode_phi_owns Γ (sb : fs_sb) (i : Z) (n : fs_node) (b : Z) :
+    fn_owns n b -> inode_phi Γ sb i n ⊢ ∃ bs, blk_owned Γ b bs.
+  Proof.
+    intros Hon. rewrite inode_phi_dat. iIntros "[_ Hd]".
+    iApply (inode_dat_owns Γ n b Hon with "Hd").
+  Qed.
+
+  Lemma inode_dat_slot_inj Γ (Hex : phi_excl Γ) (i : Z) (n : fs_node) :
+    inode_local i n -> inode_dat Γ n -∗ ⌜fn_slot_inj n⌝.
+  Proof.
+    intros Hloc. iIntros "Hd".
+    rewrite bi.pure_forall. iIntros (k).
+    rewrite bi.pure_forall. iIntros (j).
+    rewrite bi.pure_impl. iIntros (Hk).
+    rewrite bi.pure_impl. iIntros (Hj).
+    rewrite bi.pure_impl. iIntros (Hnz).
+    rewrite bi.pure_impl. iIntros (Heq).
+    destruct (decide (k = j)) as [-> | Hne]; [by iPureIntro |].
+    iExFalso.
+    assert (Hnzj : fn_slot n j <> 0) by (rewrite -Heq; exact Hnz).
+    rewrite /inode_dat. iDestruct "Hd" as "[Hdat Hind]".
+    destruct (decide (k = FS_MAXFILE)) as [HkM | HkM];
+      destruct (decide (j = FS_MAXFILE)) as [HjM | HjM].
+    - exfalso. apply Hne. rewrite HkM HjM //.
+    - (* k is the indirect block, j a data block *)
+      rewrite HkM fn_slot_ind in Hnz.
+      rewrite (fn_slot_data n j ltac:(lia)) in Hnzj.
+      rewrite HkM fn_slot_ind (fn_slot_data n j ltac:(lia)) in Heq.
+      destruct (proj2 (inl_blk_dom Hloc j ltac:(lia)) Hnzj) as [bsj Hbj].
+      iDestruct (big_sepM_lookup _ _ j bsj Hbj with "Hdat") as "Hbj".
+      rewrite /ind_owned (decide_False _ _ Hnz).
+      iEval (rewrite Heq) in "Hind".
+      iApply (blk_owned_excl Γ Hex (fn_naddr n j)
+                (ind_bytes (fn_ent n)) bsj with "Hind Hbj").
+    - (* k a data block, j the indirect block *)
+      rewrite (fn_slot_data n k ltac:(lia)) in Hnz.
+      rewrite HjM fn_slot_ind in Hnzj.
+      rewrite (fn_slot_data n k ltac:(lia)) HjM fn_slot_ind in Heq.
+      destruct (proj2 (inl_blk_dom Hloc k ltac:(lia)) Hnz) as [bsk Hbk].
+      iDestruct (big_sepM_lookup _ _ k bsk Hbk with "Hdat") as "Hbk".
+      rewrite /ind_owned (decide_False _ _ Hnzj).
+      iEval (rewrite Heq) in "Hbk".
+      iApply (blk_owned_excl Γ Hex (fn_indb n) bsk
+                (ind_bytes (fn_ent n)) with "Hbk Hind").
+    - (* two data blocks *)
+      rewrite (fn_slot_data n k ltac:(lia)) in Hnz.
+      rewrite (fn_slot_data n j ltac:(lia)) in Hnzj.
+      rewrite (fn_slot_data n k ltac:(lia))
+              (fn_slot_data n j ltac:(lia)) in Heq.
+      destruct (proj2 (inl_blk_dom Hloc k ltac:(lia)) Hnz) as [bsk Hbk].
+      destruct (proj2 (inl_blk_dom Hloc j ltac:(lia)) Hnzj) as [bsj Hbj].
+      assert (Hbj' : delete k (fn_blk n) !! j = Some bsj)
+        by (rewrite lookup_delete_ne; [exact Hbj | exact Hne]).
+      rewrite (big_sepM_delete _ (fn_blk n) k bsk Hbk).
+      iDestruct "Hdat" as "[Hbk Hrest]".
+      iDestruct (big_sepM_lookup _ _ j bsj Hbj' with "Hrest") as "Hbj".
+      iEval (rewrite Heq) in "Hbk".
+      iApply (blk_owned_excl Γ Hex (fn_naddr n j) bsk bsj with "Hbk Hbj").
+  Qed.
+
+  (* ---- the whole per-inode reading ---- *)
+
+  Lemma snap_read_inode (g gl gt : gname) B D (sb : fs_sb)
+      (i : Z) (n : fs_node) :
+    dblk_full D -> 0 <= i < 2 ^ 32 -> inode_local i n ->
+    snap_auth g B D -∗
+    inode_phi (snap_gamma g gl gt) sb i n -∗
+    ⌜snap_inode_read sb D i n⌝.
+  Proof.
+    intros Hf Hi Hloc. iIntros "Hau Hphi".
+    rewrite inode_phi_dat. iDestruct "Hphi" as "[Hrec Hdat]".
+    iDestruct (inode_dat_slot_inj (snap_gamma g gl gt)
+                 (snap_gamma_excl g gl gt) i n Hloc with "Hdat") as %Hslot.
+    rewrite /inode_dat. iDestruct "Hdat" as "[Hd Hi]".
+    iDestruct (snap_read_blks g gl gt B D n Hf with "Hau Hd") as %Hblk.
+    iDestruct (snap_read_ind g gl gt B D n Hf with "Hau Hi") as %Hind.
+    rewrite (rec_owned_sb (snap_gamma g gl gt) sb i (fn_rec n) Hi)
+            /rec_owned_at.
+    pose proof (Z.mod_pos_bound i 16 ltac:(lia)) as [Hm0 Hm1].
+    assert (Hlen64 : length (dinode_bytes (fn_rec n)) = 64%nat)
+      by exact (dinode_bytes_length (fn_rec n) (inl_rec_wf Hloc)).
+    iDestruct (snap_run_read_full g gl gt B D
+                 (sb_inodestart sb + i `div` 16) (64 * (i `mod` 16))
+                 (dinode_bytes (fn_rec n)) Hf ltac:(lia)
+                 ltac:(rewrite Hlen64; unfold BSZ; lia)
+                 ltac:(rewrite Hlen64; lia) with "Hau Hrec")
+      as %(cs & Hb & Hlencs & pre & post & Heq & Hpre).
+    iPureIntro. split.
+    - exists cs. split; [exact Hb |]. rewrite /rec_in_blk.
+      exists pre, post. split; [exact Heq | exact Hpre].
+    - exact Hblk.
+    - exact Hind.
+    - exact Hslot.
+  Qed.
+
+  Lemma snap_read_inodes (g gl gt : gname) B D (sb : fs_sb)
+      (I : gmap Z fs_node) :
+    dblk_full D ->
+    (forall i n, I !! i = Some n -> 0 <= i < 2 ^ 32) ->
+    (forall i n, I !! i = Some n -> inode_local i n) ->
+    snap_auth g B D -∗
+    ([∗ map] i ↦ n ∈ I, inode_phi (snap_gamma g gl gt) sb i n) -∗
+    ⌜forall i n, I !! i = Some n -> snap_inode_read sb D i n⌝.
+  Proof.
+    intros Hf Hrng Hloc. iIntros "Hau Hin".
+    rewrite bi.pure_forall. iIntros (i).
+    rewrite bi.pure_forall. iIntros (n).
+    rewrite bi.pure_impl. iIntros (Hi).
+    iDestruct (big_sepM_lookup _ _ i n Hi with "Hin") as "Hphi".
+    iApply (snap_read_inode g gl gt B D sb i n Hf (Hrng i n Hi) (Hloc i n Hi)
+              with "Hau Hphi").
+  Qed.
+
+  (* ---- the used-set coupling: three refutations off the [∗] ---- *)
+
+  Lemma fs_inodes_phi_disj Γ (Hex : phi_excl Γ) (sb : fs_sb)
+      (I : gmap Z fs_node) :
+    ([∗ map] i ↦ n ∈ I, inode_phi Γ sb i n) -∗
+    ⌜forall i n j m b, I !! i = Some n -> I !! j = Some m ->
+       fn_owns n b -> fn_owns m b -> i = j⌝.
+  Proof.
+    iIntros "Hin".
+    rewrite bi.pure_forall. iIntros (i).
+    rewrite bi.pure_forall. iIntros (n).
+    rewrite bi.pure_forall. iIntros (j).
+    rewrite bi.pure_forall. iIntros (m).
+    rewrite bi.pure_forall. iIntros (b).
+    rewrite bi.pure_impl. iIntros (Hi).
+    rewrite bi.pure_impl. iIntros (Hj).
+    rewrite bi.pure_impl. iIntros (Hon).
+    rewrite bi.pure_impl. iIntros (Hom).
+    destruct (decide (i = j)) as [-> | Hne]; [by iPureIntro |].
+    iExFalso.
+    assert (Hj' : delete i I !! j = Some m)
+      by (rewrite lookup_delete_ne; [exact Hj | exact Hne]).
+    rewrite (big_sepM_delete _ I i n Hi).
+    iDestruct "Hin" as "[Hi Hrest]".
+    iDestruct (big_sepM_lookup _ _ j m Hj' with "Hrest") as "Hj".
+    iDestruct (inode_phi_owns Γ sb i n b Hon with "Hi") as (bs1) "H1".
+    iDestruct (inode_phi_owns Γ sb j m b Hom with "Hj") as (bs2) "H2".
+    iApply (blk_owned_excl Γ Hex b bs1 bs2 with "H1 H2").
+  Qed.
+
+  Lemma fs_inodes_phi_used Γ (Hex : phi_excl Γ) (sb : fs_sb)
+      (I : gmap Z fs_node) (nb : Z) (u : gset Z) :
+    free_pool Γ nb u -∗
+    ([∗ map] i ↦ n ∈ I, inode_phi Γ sb i n) -∗
+    ⌜forall i n b, I !! i = Some n -> fn_owns n b -> 0 <= b < nb -> b ∈ u⌝.
+  Proof.
+    iIntros "Hpool Hin".
+    rewrite bi.pure_forall. iIntros (i).
+    rewrite bi.pure_forall. iIntros (n).
+    rewrite bi.pure_forall. iIntros (b).
+    rewrite bi.pure_impl. iIntros (Hi).
+    rewrite bi.pure_impl. iIntros (Hon).
+    rewrite bi.pure_impl. iIntros (Hb).
+    iDestruct (big_sepM_lookup _ _ i n Hi with "Hin") as "Hphi".
+    iDestruct (inode_phi_owns Γ sb i n b Hon with "Hphi") as (bs) "Hblk".
+    iApply (free_pool_used Γ Hex nb u b bs Hb with "Hpool Hblk").
+  Qed.
+
+  (* ONE inum's record run and ONE inum's own block, out of the same [∗].
+     They are different conjuncts even at the SAME inum, which is the case
+     that makes this a lemma rather than two [big_sepM_lookup]s. *)
+  Lemma inodes_owns_and_rec Γ (sb : fs_sb) (I : gmap Z fs_node)
+      (i z : Z) (n m : fs_node) (b : Z) :
+    I !! i = Some n -> I !! z = Some m -> fn_owns n b ->
+    ([∗ map] j ↦ x ∈ I, inode_phi Γ sb j x) ⊢
+      (∃ bs, blk_owned Γ b bs) ∗ rec_owned Γ sb z (fn_rec m).
+  Proof.
+    intros Hi Hz Hon.
+    destruct (decide (z = i)) as [Hzi | Hne].
+    - subst z. rewrite Hi in Hz. injection Hz as Hnm. subst m.
+      rewrite (big_sepM_lookup _ _ i n Hi) inode_phi_dat.
+      iIntros "[Hrec Hdat]". iSplitR "Hrec"; [| iExact "Hrec"].
+      iApply (inode_dat_owns Γ n b Hon with "Hdat").
+    - assert (Hiz : i <> z) by congruence.
+      assert (Hz' : delete i I !! z = Some m)
+        by (rewrite lookup_delete_ne; [exact Hz | exact Hiz]).
+      rewrite (big_sepM_delete _ I i n Hi).
+      rewrite (big_sepM_lookup _ _ z m Hz').
+      rewrite (inode_phi_owns Γ sb i n b Hon) inode_phi_dat.
+      iIntros "[Hb [Hrec _]]". iFrame "Hb Hrec".
+  Qed.
+
+  Lemma fs_owns_not_meta Γ (Hex : phi_excl Γ) (S : fs_state_rec) :
+    (forall j m, fss_inodes S !! j = Some m -> 0 <= j < 2 ^ 32) ->
+    (forall j m, fss_inodes S !! j = Some m -> inode_local j m) ->
+    blk_owned Γ SB_BNO (fss_sbb S) -∗
+    blk_owned Γ (sb_bmapstart (fss_sb S)) (bm_bytes BSIZE (fss_used S)) -∗
+    ([∗ map] j ↦ m ∈ fss_inodes S, inode_phi Γ (fss_sb S) j m) -∗
+    ⌜forall i n b, fss_inodes S !! i = Some n -> fn_owns n b ->
+       ~ snap_meta S b⌝.
+  Proof.
+    intros Hrng Hloc. iIntros "Hsbb Hbmb Hin".
+    rewrite bi.pure_forall. iIntros (i).
+    rewrite bi.pure_forall. iIntros (n).
+    rewrite bi.pure_forall. iIntros (b).
+    rewrite bi.pure_impl. iIntros (Hi).
+    rewrite bi.pure_impl. iIntros (Hon).
+    rewrite bi.pure_impl. iIntros (Hmeta).
+    destruct Hmeta as [-> | [-> | (z & [m Hz] & ->)]].
+    - iDestruct (big_sepM_lookup _ _ i n Hi with "Hin") as "Hphi".
+      iDestruct (inode_phi_owns Γ (fss_sb S) i n SB_BNO Hon with "Hphi")
+        as (bs) "Hblk".
+      iApply (blk_owned_excl Γ Hex SB_BNO (fss_sbb S) bs with "Hsbb Hblk").
+    - iDestruct (big_sepM_lookup _ _ i n Hi with "Hin") as "Hphi".
+      iDestruct (inode_phi_owns Γ (fss_sb S) i n
+                   (sb_bmapstart (fss_sb S)) Hon with "Hphi") as (bs) "Hblk".
+      iApply (blk_owned_excl Γ Hex (sb_bmapstart (fss_sb S))
+                (bm_bytes BSIZE (fss_used S)) bs with "Hbmb Hblk").
+    - rewrite (inodes_owns_and_rec Γ (fss_sb S) (fss_inodes S) i z n m
+                 _ Hi Hz Hon).
+      iDestruct "Hin" as "[Hblk Hrec]".
+      iDestruct "Hblk" as (bs) "Hblk".
+      rewrite (rec_owned_sb Γ (fss_sb S) z (fn_rec m) (Hrng z m Hz))
+              /rec_owned_at.
+      pose proof (Z.mod_pos_bound z 16 ltac:(lia)) as [Hm0 Hm1].
+      assert (Hlen64 : length (dinode_bytes (fn_rec m)) = 64%nat)
+        by exact (dinode_bytes_length (fn_rec m) (inl_rec_wf (Hloc z m Hz))).
+      rewrite blk_owned_1 byte_range_1.
+      iApply (blk_run_overlap Γ Hex (DfracOwn 1) (DfracOwn 1)
+                (sb_inodestart (fss_sb S) + z `div` 16) (64 * (z `mod` 16))
+                (dinode_bytes (fn_rec m)) bs (dfrac_full_nvalid _)
+                ltac:(lia) ltac:(rewrite Hlen64; unfold BSIZE_z; lia)
+                ltac:(rewrite Hlen64; lia) with "Hblk Hrec").
+  Qed.
+
+  Lemma fs_meta_used Γ (Hex : phi_excl Γ) (S : fs_state_rec) :
+    (forall j m, fss_inodes S !! j = Some m -> 0 <= j < 2 ^ 32) ->
+    (forall j m, fss_inodes S !! j = Some m -> inode_local j m) ->
+    blk_owned Γ SB_BNO (fss_sbb S) -∗
+    blk_owned Γ (sb_bmapstart (fss_sb S)) (bm_bytes BSIZE (fss_used S)) -∗
+    ([∗ map] j ↦ m ∈ fss_inodes S, inode_phi Γ (fss_sb S) j m) -∗
+    free_pool Γ (sb_size (fss_sb S)) (fss_used S) -∗
+    ⌜forall b, snap_meta S b -> 0 <= b < sb_size (fss_sb S) ->
+       b ∈ fss_used S⌝.
+  Proof.
+    intros Hrng Hloc. iIntros "Hsbb Hbmb Hin Hpool".
+    rewrite bi.pure_forall. iIntros (b).
+    rewrite bi.pure_impl. iIntros (Hmeta).
+    rewrite bi.pure_impl. iIntros (Hb).
+    destruct Hmeta as [-> | [-> | (z & [m Hz] & ->)]].
+    - iApply (free_pool_used Γ Hex (sb_size (fss_sb S)) (fss_used S)
+                SB_BNO (fss_sbb S) Hb with "Hpool Hsbb").
+    - iApply (free_pool_used Γ Hex (sb_size (fss_sb S)) (fss_used S)
+                (sb_bmapstart (fss_sb S)) (bm_bytes BSIZE (fss_used S)) Hb
+                with "Hpool Hbmb").
+    - iDestruct (big_sepM_lookup _ _ z m Hz with "Hin") as "Hphi".
+      rewrite inode_phi_dat. iDestruct "Hphi" as "[Hrec _]".
+      rewrite (rec_owned_sb Γ (fss_sb S) z (fn_rec m) (Hrng z m Hz))
+              /rec_owned_at.
+      pose proof (Z.mod_pos_bound z 16 ltac:(lia)) as [Hm0 Hm1].
+      assert (Hlen64 : length (dinode_bytes (fn_rec m)) = 64%nat)
+        by exact (dinode_bytes_length (fn_rec m) (inl_rec_wf (Hloc z m Hz))).
+      iApply (free_pool_used_run Γ Hex (sb_size (fss_sb S)) (fss_used S)
+                (sb_inodestart (fss_sb S) + z `div` 16) (64 * (z `mod` 16))
+                (dinode_bytes (fn_rec m)) Hb ltac:(lia)
+                ltac:(rewrite Hlen64; unfold BSIZE_z; lia)
+                ltac:(rewrite Hlen64; lia) with "Hpool Hrec").
+  Qed.
+
+  (* ---- THE READING ---- *)
+
+  Theorem fs_snap_read_ok (g gl gt : gname) B D S :
+    fs_snap (snap_gamma g gl gt) g B D S -∗ ⌜snap_ok S D⌝.
+  Proof.
+    (* [snap_auth] is itself a pair, so the epoch's identity comes off as
+       ONE hypothesis (a [&]-pattern would descend into it) *)
+    iIntros "[Hau Hrest]".
+    iDestruct "Hrest" as "(_ & _ & HS & Hkeep & %Hsh)".
+    pose proof (ss_bsz Hsh) as Hf.
+    pose proof (ss_inum Hsh) as Hrng.
+    iEval (rewrite fs_state_split fs_ghost_split) in "HS".
+    iDestruct "HS" as "(Hfp & Hlk & #Hp)".
+    rewrite /fs_pure. iDestruct "Hp" as "[%Hparse #Hlocs]".
+    iAssert (⌜forall i n, fss_inodes S !! i = Some n -> inode_local i n⌝)%I
+      with "[]" as %Hloc.
+    { rewrite bi.pure_forall. iIntros (i).
+      rewrite bi.pure_forall. iIntros (n).
+      rewrite bi.pure_impl. iIntros (Hi).
+      iDestruct (big_sepM_lookup _ _ i n Hi with "Hlocs") as %Hx.
+      by iPureIntro. }
+    rewrite /fs_footprint. iDestruct "Hfp" as "(Hsbb & Hin & Hbmb & Hpool)".
+    (* ---- the byte ties, by agreement with the epoch's own authority ---- *)
+    iDestruct (snap_blk_read_full g gl gt B D SB_BNO (fss_sbb S) Hf
+                 with "Hau Hsbb") as %Hsbv.
+    iDestruct (snap_blk_read_full g gl gt B D (sb_bmapstart (fss_sb S))
+                 (bm_bytes BSIZE (fss_used S)) Hf with "Hau Hbmb") as %Hbmv.
+    iDestruct (snap_read_inodes g gl gt B D (fss_sb S) (fss_inodes S)
+                 Hf Hrng Hloc with "Hau Hin") as %Hnodes.
+    iDestruct (snap_read_pool g gl gt B D (sb_size (fss_sb S)) (fss_used S)
+                 Hf with "Hau Hpool") as %Hpoolv.
+    (* ---- the used-set coupling, off the [∗] ---- *)
+    iDestruct (fs_inodes_phi_disj (snap_gamma g gl gt)
+                 (snap_gamma_excl g gl gt) (fss_sb S) (fss_inodes S)
+                 with "Hin") as %Hdisj.
+    iDestruct (fs_inodes_phi_used (snap_gamma g gl gt)
+                 (snap_gamma_excl g gl gt) (fss_sb S) (fss_inodes S)
+                 (sb_size (fss_sb S)) (fss_used S) with "Hpool Hin") as %Hused.
+    iDestruct (fs_owns_not_meta (snap_gamma g gl gt)
+                 (snap_gamma_excl g gl gt) S Hrng Hloc
+                 with "Hsbb Hbmb Hin") as %Hnotmeta.
+    iDestruct (fs_meta_used (snap_gamma g gl gt) (snap_gamma_excl g gl gt)
+                 S Hrng Hloc with "Hsbb Hbmb Hin Hpool") as %Hmetau.
+    (* ---- the link family's validity, slacked at the root ---- *)
+    iDestruct "Hkeep" as (kv) "Hkeep".
+    iDestruct (fs_links_valid_tok with "Hlk Hkeep") as %Hlinks.
+    iPureIntro. apply snap_ok_intro; [| exact Hloc].
+    split.
+    - exact (ss_bsz Hsh).
+    - exact Hsbv.
+    - exact Hparse.
+    - exact Hbmv.
+    - exact Hpoolv.
+    - exact (ss_inum Hsh).
+    - intros i n Hi. exact (inode_repr_of_local i n (Hloc i n Hi)).
+    - intros i n Hi. exact (sir_rec (Hnodes i n Hi)).
+    - intros i n k bs Hi Hk. exact (sir_blk (Hnodes i n Hi) k bs Hk).
+    - intros i n Hi Hnz. exact (sir_ind (Hnodes i n Hi) Hnz).
+    - exact (snap_shape_dom S D Hsh).
+    - destruct Hlinks as (f & Hfok & Hfv). exists f, kv. split; assumption.
+    - intros b Hb. apply (Hmetau b Hb).
+      destruct Hb as [-> | [-> | (z & [m Hz] & ->)]].
+      + apply (ss_dombelow Hsh). exists (fss_sbb S). exact Hsbv.
+      + apply (ss_dombelow Hsh).
+        exists (bm_bytes BSIZE (fss_used S)). exact Hbmv.
+      + apply (ss_dombelow Hsh).
+        destruct (sir_rec (Hnodes z m Hz)) as (cs & Hcs & _).
+        exists cs. exact Hcs.
+    - intros i n b Hi Hon.
+      assert (Hin : is_Some (D !! b)).
+      { destruct Hon as [(k & [bs Hk] & <-) | [Hnz <-]].
+        - exists bs. exact (sir_blk (Hnodes i n Hi) k bs Hk).
+        - exists (ind_bytes (fn_ent n)). exact (sir_ind (Hnodes i n Hi) Hnz). }
+      split.
+      + exact (Hused i n b Hi Hon (ss_dombelow Hsh b Hin)).
+      + exact (Hnotmeta i n b Hi Hon).
+    - exact Hdisj.
+    - exact (ss_sbok Hsh).
+    - exact (ss_reg Hsh).
+    - intros i n Hi. exact (sir_slot (Hnodes i n Hi)).
+    - exact (ss_regdom Hsh).
+    - exact (ss_dirloc Hsh).
+    - exact (ss_dombelow Hsh).
+  Qed.
+
+  (* ...and the same with the snapshot HANDED BACK, which is the form an
+     invariant's opener needs.  Nothing is spent: the conclusion is pure. *)
+  Lemma fs_snap_read_ok_keep (g gl gt : gname) B D S :
+    fs_snap (snap_gamma g gl gt) g B D S -∗
+    ⌜snap_ok S D⌝ ∗ fs_snap (snap_gamma g gl gt) g B D S.
+  Proof.
+    iIntros "H".
+    iDestruct (fs_snap_read_ok with "H") as %Hok.
+    iSplitR; [by iPureIntro | iExact "H"].
+  Qed.
+
+  (* ================================================================== *)
+  (*  6b.  THE REGISTRY, FROM AN INSTANCE (durable-disk lanes H / H3)    *)
+  (*                                                                    *)
+  (*  Given a SOURCE INSTANCE -- and both callers have one (the commit's *)
+  (*  collection at quiescence, plan section 4; the boot mint's lent     *)
+  (*  snapshot, section 5) -- the fresh family is built by               *)
   (*  [FsDurXfer.fs_state_xfer_tok]: each object's fresh elements come   *)
   (*  from THAT OBJECT'S own source fragments, so the [∗] shape is       *)
   (*  inherited object by object and NOTHING is split by a fact.  The    *)
-  (*  cut clauses ([sk_disj], [sk_own_used], [sk_meta_used], [sk_sbok],  *)
-  (*  [sk_reg], [sk_slot]) are not used here at all: what replaces them  *)
-  (*  is the source's own exclusivity, read INSIDE the transport.        *)
+  (*  IDENTITY comes with it: the output map is inside the SOURCE'S own  *)
+  (*  map ([FsDurXfer.phi_agree]), so a caller whose source authority    *)
+  (*  stands at the committed view's bytes gets [snap_auth] for free.    *)
   (*                                                                    *)
-  (*  [snap_ok] still rides as the registry's PURE tie, because that is  *)
-  (*  what every READER of the snapshot takes ([P_dur_tie] and its       *)
-  (*  consumers, out to [SystemAdequacy.fs_boot_pure]); shrinking it to  *)
-  (*  the byte agreements is a separate step and would weaken what the   *)
-  (*  theorem exports, so it is NOT done here.                          *)
+  (*  WHAT IS LEFT AS A PREMISE is the GEOMETRY and nothing else: no     *)
+  (*  byte tie, no disjointness clause, no used-set clause.             *)
   (* ================================================================== *)
 
-  Lemma fs_snap_alloc_xfer Γ (Hex : phi_excl Γ) S D (r : Z) (v : ity) :
-    snap_ok S D ->
-    fs_state Γ S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
-      fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)
+  Lemma fs_snap_alloc_xfer Γ (Hex : phi_excl Γ) (A : iProp Σ)
+      (D : gmap Z (list (bv 8))) (Hag : phi_agree Γ A (fs_dbytes D))
+      S (v : ity) :
+    snap_shape S D ->
+    A -∗ fs_state Γ S -∗ own (γlink Γ) (link_tok_elem ROOTINO v) ==∗
+      A ∗ fs_state Γ S ∗ own (γlink Γ) (link_tok_elem ROOTINO v)
       ∗ ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
-          fs_snap (snap_gamma g gl gt) g B D S
-          ∗ own gl (link_tok_elem r v).
+          fs_snap (snap_gamma g gl gt) g B D S.
   Proof.
-    intros Hok. iIntros "HS Ht".
-    iMod (fs_state_xfer_tok Γ Hex S r v with "HS Ht")
-      as (g gl gt B) "(HS & Ht & Hba & Hta & Htf & HS' & Ht')".
-    iModIntro. iFrame "HS Ht". iExists g, gl, gt, B.
-    rewrite /fs_snap. iFrame "Hba Hta Htf HS' Ht'". by iPureIntro.
+    intros Hsh. iIntros "HA HS Ht".
+    iMod (fs_state_xfer_tok Γ Hex A (fs_dbytes D) Hag S ROOTINO v
+            with "HA HS Ht")
+      as (g gl gt B) "(%Hin & HA & HS & Ht & Hba & Hta & Htf & HS' & Ht')".
+    (* THE EPOCH COMES OFF BY NAME AND [iFrame] NEVER GOES FIRST: [fs_snap]
+       is an existential over a [∗] whose head conjunct is a byte AUTHORITY
+       and whose fifth is an [own] at the fresh link family, so a bare
+       [iFrame] unifies the CALLER's [own (γlink Γ)] with the snapshot's
+       and leaves an unclosable goal (durable-disk lane H2's trap). *)
+    iAssert (∃ (g gl gt : gname) (B : gmap Z (bv 8)),
+               fs_snap (snap_gamma g gl gt) g B D S)%I
+      with "[Hba Hta Htf HS' Ht']" as "Hsnap".
+    { iExists g, gl, gt, B.
+      rewrite /fs_snap /snap_auth /snap_gamma /=.
+      iFrame "Hba Hta Htf HS'".
+      iSplitR; [by iPureIntro |].
+      iSplitL "Ht'"; [by iExists v | by iPureIntro]. }
+    iModIntro.
+    iSplitL "HA"; [iExact "HA" |].
+    iSplitL "HS"; [iExact "HS" |].
+    iSplitL "Ht"; [iExact "Ht" |]. iExact "Hsnap".
   Qed.
 
-  (* the registry, from an instance: the snapshot's own spare link fragment
-     is dropped (affine) -- it is the BOOT MINT that will want it back, and
-     the boot mint reads it off the snapshot's own resources the same way *)
-  Lemma P_dur_alloc_xfer Γ (Hex : phi_excl Γ) S D (r : Z) (v : ity) :
-    snap_ok S D ->
-    fs_state Γ S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
-      P_dur D ∗ fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v).
+  Lemma P_dur_alloc_xfer Γ (Hex : phi_excl Γ) (A : iProp Σ)
+      (D : gmap Z (list (bv 8))) (Hag : phi_agree Γ A (fs_dbytes D))
+      S (v : ity) :
+    snap_shape S D ->
+    A -∗ fs_state Γ S -∗ own (γlink Γ) (link_tok_elem ROOTINO v) ==∗
+      P_dur D ∗ A ∗ fs_state Γ S
+      ∗ own (γlink Γ) (link_tok_elem ROOTINO v).
   Proof.
-    intros Hok. iIntros "HS Ht".
-    iMod (fs_snap_alloc_xfer Γ Hex S D r v Hok with "HS Ht")
-      as "(HS & Ht & Hsnap)".
-    iDestruct "Hsnap" as (g gl gt B) "[Hsnap _]".
-    iModIntro. iFrame "HS Ht". iExists g, gl, gt, B, S. iExact "Hsnap".
+    intros Hsh. iIntros "HA HS Ht".
+    iMod (fs_snap_alloc_xfer Γ Hex A D Hag S v Hsh with "HA HS Ht")
+      as "(HA & HS & Ht & Hsnap)".
+    iDestruct "Hsnap" as (g gl gt B) "Hsnap".
+    iModIntro.
+    iSplitL "Hsnap"; [iExists g, gl, gt, B, S; iExact "Hsnap" |].
+    iSplitL "HA"; [iExact "HA" |].
+    iSplitL "HS"; [iExact "HS" |]. iExact "Ht".
   Qed.
 
   (* THE COMMIT'S STEP.  The previous epoch is DISCARDED (affine) and the
@@ -2112,22 +2669,24 @@ Section Snap.
   (*  8.  WHAT A CONSUMER READS OFF THE CURRENT SNAPSHOT                  *)
   (* ------------------------------------------------------------------ *)
 
-  (* the pure tie is persistent, so a receipt is a COPY and no borrowing
-     is needed -- which is what makes the non-persistence of the bundle
-     itself cost nothing *)
+  (* THE TIE IS A READING (durable-disk lane H3): the epoch's own resources
+     say it, so the receipt costs nothing and nothing is spent -- the
+     conclusion is pure and the snapshot stays whole. *)
   Lemma P_dur_tie D : P_dur D -∗ ∃ S, ⌜snap_ok S D⌝.
-  Proof. iIntros "H". iDestruct "H" as (g gl gt B S) "(_&_&_&_&%)". eauto. Qed.
+  Proof.
+    iIntros "H". iDestruct "H" as (g gl gt B S) "Hs".
+    iDestruct (fs_snap_read_ok with "Hs") as %Hok. eauto.
+  Qed.
 
   (* ...and the same with the snapshot HANDED BACK, which is the form an
      invariant's opener needs.  Everything the spike theorem reads off the
-     current snapshot goes through this plus the pure [snap_ok_inode]:
-     nothing is spent, because the tie is pure. *)
+     current snapshot goes through this plus the pure [snap_ok_inode]. *)
   Lemma P_dur_tie_keep D : P_dur D -∗ ∃ S, ⌜snap_ok S D⌝ ∗ P_dur D.
   Proof.
     iIntros "H". iDestruct "H" as (g gl gt B S) "Hs".
-    iDestruct "Hs" as "(Hba & Hta & Htf & Hst & %Hok)".
+    iDestruct (fs_snap_read_ok with "Hs") as %Hok.
     iExists S. iSplitR; [iPureIntro; exact Hok |].
-    iExists g, gl, gt, B, S. rewrite /fs_snap. by iFrame.
+    iExists g, gl, gt, B, S. iExact "Hs".
   Qed.
 
   (* THE SPIKE'S READING: at the current snapshot, every region inum is
@@ -2433,16 +2992,47 @@ End LedgerEra.
 (*  had [fs_state_of_ledger_era] beside it.                               *)
 (* ===================================================================== *)
 
+(* THE ERA'S BYTE AUTHORITY IS THE [phi_agree] THE TRANSPORT WANTS, by one
+   [ghost_map_lookup] -- so the transport's OUTPUT map is inside the era's
+   own, which is where a commit's snapshot identity comes from.
+
+   IT LIVES IN ITS OWN SECTION, at [FsBytesGamma.fs_gamma_L]'s OWN class
+   list and no other: with [diskImgG] also in scope there are TWO paths to
+   [ghost_mapG Sigma Z (bv 8)], and [ghost_map_lookup] then resolves to the
+   wrong one while the element keeps the era's (durable-notes.md, "one
+   bundle per ghost class"). *)
+Section EraAgree.
+  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ}.
+
+  (* the era's byte authority, NAMED HERE so that its [ghost_mapG] instance
+     is the one [fs_gamma_L]'s elements were elaborated at.  Spelled at a
+     use site where [diskImgG] is also in scope it would resolve to the
+     OTHER path and no agreement law would apply. *)
+  Definition fs_bytes_auth (γfs : fs_names) (Lb : gmap Z (bv 8)) : iProp Σ :=
+    ghost_map_auth (fs_bytes γfs) 1 Lb.
+
+  Lemma fs_gamma_L_agree (γfs : fs_names) (Lb : gmap Z (bv 8)) :
+    phi_agree (fs_gamma_L γfs) (fs_bytes_auth γfs Lb) Lb.
+  Proof.
+    intros dq a v. rewrite /fs_gamma_L /fs_bytes_auth /=.
+    iIntros "[Ha Hv]". iApply (ghost_map_lookup with "Ha Hv").
+  Qed.
+
+End EraAgree.
+
 Section XferEra.
   Context `{!riscvGS Σ, !diskImgG Σ, !diskGhostG Σ, !fsLogG Σ,
             !fsLinkG Σ, !fsTopG Σ}.
 
-  Lemma fs_state_xfer_era (γfs : fs_names) (S : fs_state_rec)
-      (r : Z) (v : ity) :
+  Lemma fs_state_xfer_era (γfs : fs_names) (Lb : gmap Z (bv 8))
+      (S : fs_state_rec) (r : Z) (v : ity) :
+    fs_bytes_auth γfs Lb -∗
     fs_state (fs_gamma_L γfs) S
     -∗ own (γlink (fs_gamma_L γfs)) (link_tok_elem r v) ==∗
       ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
-        fs_state (fs_gamma_L γfs) S
+        ⌜B ⊆ Lb⌝
+        ∗ fs_bytes_auth γfs Lb
+        ∗ fs_state (fs_gamma_L γfs) S
         ∗ own (γlink (fs_gamma_L γfs)) (link_tok_elem r v)
         ∗ ghost_map_auth g 1 B
         ∗ ghost_map_auth gt 1 (fss_inodes S)
@@ -2450,18 +3040,22 @@ Section XferEra.
         ∗ fs_state (snap_gamma g gl gt) S
         ∗ own gl (link_tok_elem r v).
   Proof.
-    exact (fs_state_xfer_tok (fs_gamma_L γfs) (fs_gamma_L_excl γfs) S r v).
+    exact (fs_state_xfer_tok (fs_gamma_L γfs) (fs_gamma_L_excl γfs)
+             (fs_bytes_auth γfs Lb) Lb (fs_gamma_L_agree γfs Lb) S r v).
   Qed.
 
   (* ...and the snapshot side is a source too, which is what the BOOT MINT
      needs: a durable instance transports onto fresh names exactly as the
-     era's does ([snap_gamma_excl] is the same one premise). *)
-  Lemma fs_state_xfer_snap (g0 gl0 gt0 : gname) (S : fs_state_rec)
-      (r : Z) (v : ity) :
+     era's does, with its own authority as the agreement. *)
+  Lemma fs_state_xfer_snap (g0 gl0 gt0 : gname) (B0 : gmap Z (bv 8))
+      (S : fs_state_rec) (r : Z) (v : ity) :
+    ghost_map_auth g0 1 B0 -∗
     fs_state (snap_gamma g0 gl0 gt0) S
     -∗ own gl0 (link_tok_elem r v) ==∗
       ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
-        fs_state (snap_gamma g0 gl0 gt0) S
+        ⌜B ⊆ B0⌝
+        ∗ ghost_map_auth g0 1 B0
+        ∗ fs_state (snap_gamma g0 gl0 gt0) S
         ∗ own gl0 (link_tok_elem r v)
         ∗ ghost_map_auth g 1 B
         ∗ ghost_map_auth gt 1 (fss_inodes S)
@@ -2470,7 +3064,8 @@ Section XferEra.
         ∗ own gl (link_tok_elem r v).
   Proof.
     exact (fs_state_xfer_tok (snap_gamma g0 gl0 gt0)
-             (snap_gamma_excl g0 gl0 gt0) S r v).
+             (snap_gamma_excl g0 gl0 gt0) (ghost_map_auth g0 1 B0) B0
+             (snap_gamma_agree g0 gl0 gt0 B0) S r v).
   Qed.
 
 End XferEra.
