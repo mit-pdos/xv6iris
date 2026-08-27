@@ -25,3 +25,6 @@ vtest-rocq/*.vok
 vtest-rocq/*.vos
 vtest-rocq/*.glob
 vtest-rocq/.*.aux
+
+# tools/tcb/tcb-report.sh generates this seed file on every run (see its header).
+tools/tcb/TcbSeed.v

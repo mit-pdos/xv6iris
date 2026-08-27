@@ -214,6 +214,58 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           exit $rc
 
+      # ---- 3b'. Trusted base of the adequacy statement (iris/) ----
+      # The other half of the audit above.  `Print Assumptions` answers "what
+      # does the PROOF assume"; this answers "what must a human READ for the
+      # statement to say what they think it says".  Rocq's kernel checks the
+      # proof, so nothing a proof mentions needs trusting -- but every
+      # definition the STATEMENT unfolds to does, and that set is what the
+      # report lists, per file and per line.
+      #
+      # The whole trick is the seed: tcb-report.sh points
+      # `Print All Dependencies` at a DEFINITION WHOSE BODY IS THE STATEMENT,
+      # not at the theorem (which would walk the proof cone -- the untrusted
+      # half).  ~3 s against the tree the previous steps built; it needs both
+      # the .vo (to Require FsAdequacyImg) and the .glob (to map definitions
+      # to source lines), which is why it runs after the iris build and before
+      # the profile step deletes its scratch.
+      #
+      # `--only iris` because that is the part a reader of this project
+      # reviews; the report footnotes the model-xv6iris/ and kernel-rocq/
+      # counts, which are the generated Sail model and the mkfs image bytes
+      # and are not "read" in the same sense.
+      #
+      # REPORT, NOT A CHECK: no baseline is diffed, same contract as the
+      # assumption audit.  What to watch is the FILE COUNT -- a jump means a
+      # statement-level definition picked up a dependency on a new part of the
+      # tree, which is the one way this number moves for a bad reason.  The
+      # step fails only if coqc does, and writes the summary either way.
+      - name: Adequacy trusted base (iris/, definitions the STATEMENT depends on)
+        # Both the shell driver and the Python reporter read $SWITCH; CI's is
+        # the project-local switch setup-ocaml built in the workspace, not the
+        # dev machine's /shared/xv6rocq that the scripts default to.
+        env:
+          SWITCH: ${{ github.workspace }}
+        run: |
+          rc=0
+          ./tools/tcb/tcb-report.sh > "$RUNNER_TEMP/tcb.log" 2>&1 || rc=$?
+          if [ "$rc" -ne 0 ]; then
+            {
+              echo "## Adequacy trusted base (\`iris/\`)"
+              echo
+              echo "> :x: \`tools/tcb/tcb-report.sh\` failed (exit $rc)."
+              echo
+              echo '```'
+              tail -40 "$RUNNER_TEMP/tcb.log"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit $rc
+          fi
+          python3 tools/tcb/tcb_report.py "$RUNNER_TEMP/tcb.log" --md \
+            >> "$GITHUB_STEP_SUMMARY"
+          rm -f tools/tcb/TcbSeed.v tools/tcb/TcbSeed.vo tools/tcb/TcbSeed.vos \
+                tools/tcb/TcbSeed.vok
+
       # ---- 3c. Build profile (iris/, informational) ----
       # Consumes the TIMED log + the .v.timing files + coqdep's .CoqMakefile.d +
       # the .vo mtimes to report the most expensive statements and files, the
