@@ -49,7 +49,6 @@ Require Import RiscvPtsto RiscvModelBytes.
 Require Import FsState.
 (* the four name records [fscfg] carries and this file must be able to spell *)
 Require Import WpUart.         (* [uart_names]  *)
-Require Import VirtioModel.    (* [disk_read]    *)
 Require Import DiskPtsto.      (* [disk_names]  *)
 Require Import FsBlocks.
 Require Import DinodeEnc.

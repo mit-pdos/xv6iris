@@ -95,7 +95,7 @@ Require Import BioDefs.
    [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
    [byte_range], both of which have live twins below, and the LAST import
    wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
-Require Import FsState.
+Require Import FsStateInode.
 Require Import FsBytesGamma.
 Require Import FsStateEra.
 Require Import FsBlocks LogInv.

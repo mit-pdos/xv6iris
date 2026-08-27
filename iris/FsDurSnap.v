@@ -73,7 +73,6 @@ Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import DirView.
 Require Import FsTree.
-Require Import InodeDefs.
 Require Import RiscvModelBytes.  (* [nth_byte] / [bv_eq_of_bytes] *)
 Require Import FsImg.
 Require Import LogDefs.       (* [fs_dbytes] -- the byte flattening       *)

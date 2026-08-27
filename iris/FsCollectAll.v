@@ -59,10 +59,7 @@ Require Import BioDefs.
 Require Import FsImg.
 Require Import DinodeEnc.      (* [dinode], [diblk_wf] *)
 Require Import BitmapEnc.
-Require Import BlockWords.
-Require Import DirView.        (* [T_DIR_z] *)
 Require Import LogDefs.
-Require Import FsWf.            (* [dv_of_D] *)
 Require Import FsBlocks.
 Require Import FsBytesGamma.
 Require Import FsStateDefs.
@@ -78,7 +75,6 @@ Require Import IcacheEscrow.
 Require Import FsDurXfer.       (* the run vocabulary: [xr_fs], [xf_shape] *)
 Require Import FsDurSnap.
 Require Import FsCollect.
-Require Import IregClean.
 Require Import FsDurQuiesce.    (* [esc_ns_still_open] *)
 Require Import LogSnapLaw.      (* [snap_law] -- what [log_ctx] parks *)
 

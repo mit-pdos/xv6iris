@@ -56,7 +56,6 @@ Require Import RiscvPtsto.
 Require Import FsBlocks.
 Require Import LogInv.
 Require Import DinodeEnc.
-Require Import DirView.
 Require Import IcacheRef.
 Require Import InodeRegion.
 Require Import FsStateLink.    (* [fsLinkG] -- capacity class, must be IMPORTed *)

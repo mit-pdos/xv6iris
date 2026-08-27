@@ -176,7 +176,6 @@ Require Import InodeRegion.
    C-8): fsinit is what carries the law down to [initlog], which is the one
    site that can compose it with block 1's park *)
 Require Import FsCollect.
-Require Import LogSnapLaw.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.

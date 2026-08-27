@@ -88,8 +88,6 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheEscrow.
-Require Import FsStateLink.    (* [fsLinkG] -- capacity class, must be IMPORTed *)
-Require Import FsStateInode.
 Require Import FsTree.         (* [dir_bname], [DOT] *)
 Require Import FsStateEra.     (* [ent_toks_borrow], [dir_first_hit_not_dot] *)
 Require Import FsBytesGamma.   (* [fs_gamma_L] *)

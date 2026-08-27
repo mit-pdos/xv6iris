@@ -114,9 +114,8 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import iprop ghost_map.
-Require Import BioDefs.
+Require Import Xv6Cameras.
 Require Import BitmapEnc.
-Require Import FsImg.
 Require Import RiscvPtsto.     (* [fs_dur_names] -- Gamma_D's two gnames  *)
 Require Import LogDefs.        (* [lm_logged], [fs_home_set], [fs_dbytes] *)
 Require Import FsDurBytes.     (* [fs_gamma_D]                            *)

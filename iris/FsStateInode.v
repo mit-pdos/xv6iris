@@ -35,7 +35,6 @@ Require Import BioDefs.
 Require Import RiscvModelBytes.
 Require Import BlockWords.
 Require Import DinodeEnc.
-Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeDefs.
 Require Import FsTree.

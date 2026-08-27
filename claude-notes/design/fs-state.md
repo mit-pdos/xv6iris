@@ -1555,10 +1555,10 @@ lines).  Note the trap that hid this: a single dead-code pass reports
 none of it, because the island and the suite reference each other — it
 takes the FIXPOINT (unreachable from any live root), not one pass.
 `FsWf.v` keeps `dv_of_D`, the junk-tolerant totalisation `FsCollect`,
-`FsCollectAll`, `FsCrash`, `LogSnapLaw` and `ProofEndOp` read, and keeps
-its seven now-code-unused imports: `FsCrash` writes qualified `FsImg.*`
-names without requiring `FsImg` itself, so dropping them needs the direct
-requires added there first.
+`FsCrash`, `LogSnapLaw` and `ProofEndOp` read, and nothing else — not even
+an import: the dead-import sweep dropped all seven project `Require`s and
+the whole-tree build confirmed it, so no downstream file was reaching
+`FsImg`/`FsTree` through this one (`FsCrash` gets `FsImg` via `FsDurSnap`).
 
 
 ## 6½. Link counts and types are ONE RA: the type register (RULING, lane G5)

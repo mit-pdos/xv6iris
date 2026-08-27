@@ -94,7 +94,6 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import SpecIunlock.  (* [wp_iunlock_dep_sconf_body] *)
 Require Import SpecIput.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

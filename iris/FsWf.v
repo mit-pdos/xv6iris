@@ -14,24 +14,13 @@
 (*                                                                          *)
 (* [dv_of_D] survives because it is not about well-formedness: it is the    *)
 (* totalisation every [FsImg] decoder wants, read by [FsCollect],           *)
-(* [FsCollectAll], [FsCrash], [LogSnapLaw] and [ProofEndOp].                *)
+(* [FsCrash], [LogSnapLaw] and [ProofEndOp].  With the theory gone this     *)
+(* file needs no project import of its own: the dead-import sweep dropped   *)
+(* all seven, and the whole-tree build confirms nothing reached [FsImg] or  *)
+(* [FsTree] THROUGH here ([FsCrash] gets [FsImg] via [FsDurSnap]).          *)
 (* ====================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
-(* The seven imports below are no longer used by this file's own code; they
-   are kept because downstream files reach these modules THROUGH this one --
-   e.g. [FsCrash] writes qualified [FsImg.*] names without requiring [FsImg]
-   itself.  Dropping them is a separate change that has to add the direct
-   requires there first; the nightly dead-import sweep will not do it, since
-   its per-file --verify cannot see a transitive-load break. *)
-Require Import BioDefs.
-Require Import DirentEnc.
-Require Import DinodeEnc.
-Require Import InodeDefs.
-Require Import DirView.
-Require Import FsTree.
-Require Import FsImg.
-
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)

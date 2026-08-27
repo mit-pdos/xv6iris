@@ -38,9 +38,6 @@ Require Import DiskImg.       (* [diskImgG] -- the fresh byte map's class *)
 Require Import BitmapEnc.
 Require Import BlockWords.
 Require Import DinodeEnc.
-Require Import DirView.
-Require Import FsTree.
-Require Import InodeDefs.
 Require Import FsImg.
 Require Import Xv6Cameras.
 Require Import FsDurBytes.    (* [big_sepM_map_seqZ_gen] *)

@@ -38,7 +38,6 @@ Require Import RiscvPtsto.
 Require Import FsBlocks.
 Require Import LogInv.
 Require Import DinodeEnc.
-Require Import DirView.
 Require Import IcacheRef.
 Require Import InodeInv.
 Require Import InodeRegion.

@@ -120,10 +120,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import FsStateLink.    (* [fsLinkG] -- capacity class, must be IMPORTed *)
-Require Import FsStateInode.
-Require Import FsStateEra.
-Require Import FsBytesGamma.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import FsTree.

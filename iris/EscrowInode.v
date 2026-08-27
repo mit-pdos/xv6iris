@@ -26,7 +26,6 @@ Require Import FsBytesGamma.
 Require Import IcacheRef.
 Require Import DirViewLend. (* N-4 PHASE B: the arm rides [dv_ride], not [dv_hold] *)
 Require Import EscrowDefs.
-Require Import InodeRegion.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Section EscrowInode.

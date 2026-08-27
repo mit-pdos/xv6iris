@@ -45,9 +45,9 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvModelBytes.
 Require Import FsState.
-Require Import FsStateDefs FsStateInode FsStateBitmap FsStateEra.
+Require Import FsStateInode FsStateBitmap FsStateEra.
 Require Import FsBlocks FsBytesGamma.
-Require Import DinodeEnc DirView FsTree.
+Require Import DinodeEnc FsTree.
 Require Import FsCrash LogDefs.
 Require Import InodeInv InodeLock InodeRegion.
 Require Import IcacheEscrow IcacheBoot.
@@ -57,7 +57,7 @@ Require Import FsDurSnap FsDurImg.
 Require Import WpUart.         (* [uart_names] *)
 Require Import VirtioModel.    (* [disk_read]  *)
 Require Import DiskPtsto.      (* [disk_names] *)
-Require Import WpLockAt SleepLock BioInitAt KallocInv IrefSlots BioDefs.
+Require Import WpLockAt BioInitAt KallocInv IrefSlots BioDefs.
 Require Import LogInv.
 Require Import FsCfg.
 Require Import FsBoot FsCfgBoot.

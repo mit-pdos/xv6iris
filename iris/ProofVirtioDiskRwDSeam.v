@@ -53,7 +53,7 @@ Require Import ProcGeom.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn FdSlots.
-Require Import DiskPtsto VirtioProto DiskInv.
+Require Import DiskPtsto DiskInv.
 Require Import WpUart.
 Require Import PermInv.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep SpecFreeDesc.
