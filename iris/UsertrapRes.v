@@ -115,10 +115,6 @@ Import Defs.
    sits BELOW [SpecSyscall] now (ParkCap.v says why), so it spells it out.
    Same term, so every consumer stated at [K_syscall] is unaffected. *)
 Notation K_usertrap := ((4 + kv_frame_slots + (4 + K_sys_exec))%nat) (only parsing).
-(* [Typeclasses Opaque] is compilation-local, so ProcDefs'/ProcInv's seal of
-   these three does not reach here; this file frames past [proc_priv]. *)
-Typeclasses Opaque tf_words tf_tail tf_page.
-
 Section UsertrapRes.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
