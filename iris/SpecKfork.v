@@ -117,8 +117,8 @@
    [kfork_post].
 
    What is left of the icache is only what the LOCK needs:
-   [IcacheEscrow.is_itable2 γil fsc_ic γfs γic cov logstart nib icfg_dev] (which drags
-   the disk and log fabric -- [γfs], [cov], [logstart], [nib] -- along) and
+   [IcacheEscrow.is_itable2 γil fsc_ic fsc_fs γic cov logstart nib icfg_dev] (which drags
+   the disk and log fabric -- [fsc_fs], [cov], [logstart], [nib] -- along) and
    [itable_inv].  No coherence side condition ties the caller's lock to
    [ProcInv.cwd_ref]'s reference: both are stated over the same canonical
    [IcacheInv.iref_name] by construction, so there is nothing left to
@@ -214,7 +214,7 @@ Definition kfork_post
 Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γk : gname * gname) (γp γw γl γf γil γic : gname)  (γs : list gname)
-    (γfs : fs_names) (cov : gset Z) (logstart : Z)
+    (cov : gset Z) (logstart : Z)
     (inodestart : Z) (nib : nat)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string) :=
@@ -242,7 +242,7 @@ Definition wp_kfork_sconf_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
-  is_itable2 γil fsc_ic γfs γic cov logstart nib icfg_dev -∗
+  is_itable2 γil fsc_ic fsc_fs γic cov logstart nib icfg_dev -∗
   itable_inv -∗
   (* THE INODE REGION, and it is here for ONE reason: kfork's
      [np->cwd = idup(p->cwd)].  idup's [ref++] became a ledger move in
@@ -251,7 +251,7 @@ Definition wp_kfork_sconf_body
      it through.  Persistent, and every FS-fabric caller already holds it
      (the dispatch's [sysc_fs_env]), so it costs a caller a frame and
      nothing else.  kfork reads no dinode and touches no log. *)
-  ireg_inv γic γfs inodestart nib -∗
+  ireg_inv γic fsc_fs inodestart nib -∗
   kalloc_env_at γa γk None -∗
   (* THE PROC TABLE'S SEALED REGIME.  kfork allocates a proc, so it needs
      [ProcAvail]'s authority to mint the new slot's allocation marker -- and
@@ -289,10 +289,10 @@ Module Type KFORK.
   Parameter wp_kfork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γk : gname * gname) (γp γw γl γf γil γic : gname) (γs : list gname)
-      (γfs : fs_names) (cov : gset Z) (logstart : Z)
+      (cov : gset Z) (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string),
-      wp_kfork_sconf_body γa γk γp γw γl γf γil γic γs γfs cov logstart
+      wp_kfork_sconf_body γa γk γp γw γl γf γil γic γs cov logstart
         inodestart nib m lvl K eb pme b pid_p Vp lks.
 End KFORK.

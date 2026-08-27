@@ -341,7 +341,7 @@ Definition fs_fabric
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64) (bn : bio_names)
-    (g : log_names) (gfs : fs_names) (gi : gname) (gtl : gname)
+    (g : log_names) (gi : gname) (gtl : gname)
     (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
     : iProp Σ :=
   (* THE AMBIENT KERNEL ENVIRONMENT, which every fs contract below this one
@@ -352,15 +352,15 @@ Definition fs_fabric
      kexec cone's dozen internal lemmas unchanged. *)
   (kernel_data ∗
    panic_env ∗
-   bio_ctx bn (fs_view gfs gd dev cov) ∗
-   log_ctx g bn gfs cov logstart dev ∗
+   bio_ctx bn (fs_view fsc_fs gd dev cov) ∗
+   log_ctx g bn fsc_fs cov logstart dev ∗
    fs_crash_seam cov logstart ∗
    gen_cert ∗
-   is_itable2 gtl fsc_ic gfs gi cov logstart nib dev ∗
+   is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev ∗
    itable_inv ∗
-   ic_escrows fsc_ic gfs gi cov logstart ∗
+   ic_escrows fsc_ic fsc_fs gi cov logstart ∗
    ic_sleeplocks fsc_ic ∗
-   ireg_inv gi gfs inodestart nib ∗
+   ireg_inv gi fsc_fs inodestart nib ∗
    (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2 RULING B, §6'' RULING
       G').  The kexec cone reaches iput (fileclose on the exec'ing process's
       table, and kexit's), whose free path FREEZES -- and §2.3's boot-shelter
@@ -386,8 +386,8 @@ Definition fs_fabric
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    gs gu gd gk pd pav pu bn g gfs gi gtl cov logstart inodestart nib dev :
-  Persistent (fs_fabric gs gu gd gk pd pav pu bn g gfs gi gtl
+    gs gu gd gk pd pav pu bn g gi gtl cov logstart inodestart nib dev :
+  Persistent (fs_fabric gs gu gd gk pd pav pu bn g gi gtl
                         cov logstart inodestart nib dev).
 Proof. apply _. Qed.
 
@@ -402,7 +402,7 @@ Definition wp_kexec_sconf_body
     (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gfs : fs_names) (gi : gname)
+    (g : log_names) (gi : gname)
     (gtl : gname)                       (* the itable's lock   *)
     (ga : gname) (gf : gname)                           (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -512,7 +512,7 @@ Definition wp_kexec_sconf_body
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  fs_fabric gs gu gd gk pd pav pu bn g gfs gi gtl
+  fs_fabric gs gu gd gk pd pav pu bn g gi gtl
             cov logstart inodestart nib dev -∗
   kalloc_env ga None -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -520,7 +520,7 @@ Definition wp_kexec_sconf_body
   (* THE BLOCK BITMAP'S INVARIANT (BitmapInv.v): persistent; namei's walk
      and the O-arm's iput/iunlockput free into it, and the B2 stage bundle
      [SpecKexecB2.kxc_res] carries it, so this is the row that funds them. *)
-  bitmap_inv gfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   (* THE PROCESS'S PRIVATE BLOCK.  p->pid, p->cwd and the cwd reference namei
      needs are all inside it (ProcInv.proc_priv_cwd_pid); so are the p->name
      bytes safestrcpy writes and the trapframe words the commit block writes. *)
@@ -588,7 +588,7 @@ Module Type KEXEC.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
+      (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -600,7 +600,7 @@ Module Type KEXEC.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gfs gi gtl
+      wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gi gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev plen pfun na avf alen aslen afun
                           pidv V dqb dqs dqa dqpv dqas m K eb b lks.

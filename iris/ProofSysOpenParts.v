@@ -101,6 +101,7 @@ Require Import SpecSysOpen.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -801,17 +802,17 @@ Section ProofSysOpenPublish.
 
   (* the open direction, one unfolding: [ic_loaded]'s [inode_addrs ∗
      ind_res] is itrunc's [inode_map]. *)
-  Lemma so_loaded_open (gfs : fs_names) (gi : gname) (cov : gset Z)
+  Lemma so_loaded_open (gi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
-    ic_loaded gfs gi cov logstart k inum dn bm -∗
+    ic_loaded fsc_fs gi cov logstart k inum dn bm -∗
     ∃ data : nat -> list (bv 8),
       ⌜inode_ok cov logstart dn bm data⌝ ∗ ⌜inode_rec_local dn⌝ ∗
       ⌜dir_ok icfg_nib dn data⌝ ∗
-      dlinks gfs (bv_unsigned inum) dn bm data ∗
+      dlinks fsc_fs (bv_unsigned inum) dn bm data ∗
       dinode_at gi inum dn ∗
       inode_meta (ientry k) dn ∗
-      inode_map gfs (ientry k) bm ∗
-      inode_blocks gfs bm data ∗
+      inode_map fsc_fs (ientry k) bm ∗
+      inode_blocks fsc_fs bm data ∗
       (* ...and the CONTENTS HOLD (namei-pinned-lookup.md §9 W2): unlike the
          three clauses this peel discards, the hold is a RESOURCE and the
          re-seal below cannot conjure it, so it must come out here. *)
@@ -820,7 +821,7 @@ Section ProofSysOpenPublish.
       (* ...and the era's abstract value (durable-disk 2b-inode-3): itrunc
          MOVES the record, so the walk retags it between this peel and the
          seal below ([InodeRegion.ireg_top_retag]). *)
-      top_frag (fs_gamma_L gfs) (bv_unsigned inum) (era_node dn bm data).
+      top_frag (fs_gamma_L fsc_fs) (bv_unsigned inum) (era_node dn bm data).
   Proof.
     iIntros "H".
     iDestruct (ic_loaded_open with "H") as (data)
@@ -847,15 +848,15 @@ Section ProofSysOpenPublish.
   Qed.
 
   (* ...and the close direction at itrunc's outputs. *)
-  Lemma so_trunc_loaded (gfs : fs_names) (gi : gname) (cov : gset Z)
+  Lemma so_trunc_loaded (gi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) :
     bv_unsigned (di_type dn) <> 0 ->
     bv_unsigned (di_type dn) <> T_DIR_z ->
     inode_rec_local dn ->
     dinode_at gi inum (di_trunc dn) -∗
     inode_meta (ientry k) (di_trunc dn) -∗
-    inode_map gfs (ientry k) bm_empty -∗
-    inode_blocks gfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
+    inode_map fsc_fs (ientry k) bm_empty -∗
+    inode_blocks fsc_fs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
     (* THE MOVER (namei-pinned-lookup.md §9 W3, itrunc's row): itrunc zeroed
        the bytes and truncated the record, so the caller [dv_set]s the hold
        it peeled to the truncated record's own value and hands it in here.
@@ -865,14 +866,14 @@ Section ProofSysOpenPublish.
     fv_ride (bv_unsigned inum)
             (fv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8))) -∗
     (* ...and the RETAGGED abstract value, at the truncated node *)
-    top_frag (fs_gamma_L gfs) (bv_unsigned inum)
+    top_frag (fs_gamma_L fsc_fs) (bv_unsigned inum)
              (era_node (di_trunc dn) bm_empty
                        (fun _ => replicate BSIZE (bv_0 8))) -∗
-    ic_loaded gfs gi cov logstart k inum (di_trunc dn) bm_empty.
+    ic_loaded fsc_fs gi cov logstart k inum (di_trunc dn) bm_empty.
   Proof.
     intros Hnz Hnd Hrl. iIntros "Hat Hmeta [Haddr Hind] Hblk Hdv Hfv Htop".
     assert (Hty : di_type (di_trunc dn) = di_type dn) by reflexivity.
-    iApply (ic_mk_loaded gfs gi cov logstart k inum (di_trunc dn) bm_empty
+    iApply (ic_mk_loaded fsc_fs gi cov logstart k inum (di_trunc dn) bm_empty
               (fun _ => replicate BSIZE (bv_0 8))
               (so_trunc_ok cov logstart dn Hnz)
               (* itrunc keeps the TYPE and zeroes the count and the size, so
@@ -888,7 +889,7 @@ Section ProofSysOpenPublish.
               (dir_uniq_not_dir (di_trunc dn) _
                  ltac:(rewrite Hty; exact Hnd))
               with "[] Hat Hmeta Haddr Hind Hblk Hdv Hfv Htop").
-    iApply (dlinks_not_dir gfs (bv_unsigned inum) (di_trunc dn) _ _).
+    iApply (dlinks_not_dir fsc_fs (bv_unsigned inum) (di_trunc dn) _ _).
     rewrite Hty. exact Hnd.
   Qed.
 
@@ -904,7 +905,7 @@ Definition so_al (sp0 : mword 64) : Prop :=
     is_aligned_paddr (Physaddr (pa_stk sp0 (22 - i)%nat)) 8 = true.
 
 Section ProofSysOpenFrame.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, FSC : fscfg}.
 
   Lemma so_frame_carve (sp0 : mword 64) :
     stack_own (KTR := KT1) sp0 24 -∗
@@ -1061,7 +1062,7 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac scidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section ProofSysOpenEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, FSC : fscfg}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

@@ -105,6 +105,7 @@ Require Import ProofDirlookupParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -148,7 +149,7 @@ Proof.
 Qed.
 
 Section DirlookupMsg.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
 
   Lemma dlk_msg_str :
@@ -330,7 +331,7 @@ Section ProofDirlookupMain.
       (m : regfile) (ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
-      (gfs : fs_names) (gi : gname) (dinum : mword 32) (dr : dinode)
+      (gi : gname) (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (CIDc : CpuId) : iProp Σ :=
     (∀ (mf : regfile) (found : bool) (kk : nat) (kslot : nat) (q : Qp),
        ⌜callee_saved m mf⌝ -∗
@@ -341,13 +342,13 @@ Section ProofDirlookupMain.
        pc_is ret_tgt -∗
        i_dev ip ↦₄{dqd} dev -∗
        inode_meta ip dn -∗
-       inode_map gfs ip bm -∗
-       inode_blocks gfs bm data -∗
+       inode_map fsc_fs ip bm -∗
+       inode_blocks fsc_fs bm data -∗
        ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
        proc_priv_bare pj pidv Vpr -∗
        bslot -∗
        (* the borrow, back verbatim on both arms (fs-fragments.md §7.1) *)
-       IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm data -∗
+       IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
        dinode_at gi dinum dr -∗
        (if found
         then ⌜dir_first data nrec s = Some kk
@@ -373,7 +374,7 @@ Section ProofDirlookupMain.
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
-      (gfs : fs_names) (gi : gname) (dinum : mword 32) (dr : dinode)
+      (gi : gname) (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (fuel : nat) (CIDl : CpuId) : iProp Σ :=
     (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8) (mt10 : mword 64),
        ⌜(S nrec - i <= fuel)%nat⌝ -∗
@@ -398,18 +399,18 @@ Section ProofDirlookupMain.
        ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ[KT1] dol jj) -∗
        i_dev ip ↦₄{dqd} dev -∗
        inode_meta ip dn -∗
-       inode_map gfs ip bm -∗
-       inode_blocks gfs bm data -∗
+       inode_map fsc_fs ip bm -∗
+       inode_blocks fsc_fs bm data -∗
        ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
        (if hasp then pf ↦₄[KT1] pofv else emp) -∗
        proc_priv_bare pj pidv Vpr -∗
        bslot -∗
        iref_slot -∗
-       IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm data -∗
+       IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
        dinode_at gi dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
          dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks Vpr
-           dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr bm CIDc) -∗
+           dq dqd dqn dev pofv pidv fn bn gi dinum dr bm CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition dl_latch_body
@@ -417,7 +418,7 @@ Section ProofDirlookupMain.
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
-      (gfs : fs_names) (gi : gname) (dinum : mword 32) (dr : dinode)
+      (gi : gname) (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (i : nat) (CIDp : CpuId) : iProp Σ :=
     (∀ (Mp : regfile) (dol' : nat -> bv 8) (mt10' : mword 64),
        ⌜dlk_regs m sp0 ip nb pf (16 * i) Mp⌝ -∗
@@ -440,18 +441,18 @@ Section ProofDirlookupMain.
        ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ[KT1] dol' jj) -∗
        i_dev ip ↦₄{dqd} dev -∗
        inode_meta ip dn -∗
-       inode_map gfs ip bm -∗
-       inode_blocks gfs bm data -∗
+       inode_map fsc_fs ip bm -∗
+       inode_blocks fsc_fs bm data -∗
        ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
        (if hasp then pf ↦₄[KT1] pofv else emp) -∗
        proc_priv_bare pj pidv Vpr -∗
        bslot -∗
        iref_slot -∗
-       IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm data -∗
+       IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
        dinode_at gi dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
          dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks Vpr
-           dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr bm CIDc) -∗
+           dq dqd dqn dev pofv pidv fn bn gi dinum dr bm CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_dirlookup_sconf
@@ -459,7 +460,7 @@ Section ProofDirlookupMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (gfs : fs_names) (gi : gname)
+      (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
@@ -471,7 +472,7 @@ Section ProofDirlookupMain.
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi gtl
+    : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gi gtl
                               ga gf cov logstart inodestart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
   Proof.
@@ -1266,7 +1267,7 @@ Section ProofDirlookupMain.
       iAssert (∀ fuel : nat,
         wp_next (CID0 := CID) true pj (fun CIDl : CpuId =>
           dl_loop_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b eb hasp lks Vpr
-            dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr bm fuel CIDl))%I
+            dq dqd dqn dev pofv pidv fn bn gi dinum dr bm fuel CIDl))%I
         with "[]" as "Hloop".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
         { iIntros (CIDl Hsl i Ml dol mt10)
@@ -1289,7 +1290,7 @@ Section ProofDirlookupMain.
         (* ------------- THE LATCH at +0x52 (both misses land here) ------- *)
         iAssert (wp_next (CID0 := CIDl) true pj (fun CIDp : CpuId =>
                    dl_latch_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b
-                     eb hasp lks Vpr dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr
+                     eb hasp lks Vpr dq dqd dqn dev pofv pidv fn bn gi dinum dr
                      bm i CIDp))%I
           with "[]" as "Hlatch".
         { iIntros (CIDp Hsp Mp dol' mt10')
@@ -1632,7 +1633,7 @@ Section ProofDirlookupMain.
         iPoseProof (ireg_inv_bytes with "Hireg") as "#Hrow".
         iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
         iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
-        iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn gfs ga gf
+        iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn ga gf
                   cov logstart dev ip bm data dn
                   false (16 * i)%nat 16%nat dol Vpr
                   pidv (DfracOwn 1) dqd L6 (K - 12)%nat eb b lks
@@ -2140,13 +2141,13 @@ Section ProofDirlookupMain.
                           block tie that used to ride beside it is gone: the
                           licence carries its own, SIMP-1.) *)
                        ⌜is_claim lic = false⌝
-                       ∗ iname gi gfs inodestart
+                       ∗ iname gi fsc_fs inodestart
                          (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                          lic
-                       ∗ (iname gi gfs inodestart
+                       ∗ (iname gi fsc_fs inodestart
                             (zero_extend' 32 (dir_inum data i : mword 16)
                              : mword 32) lic
-                          -∗ IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm
+                          -∗ IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm
                                 data
                              ∗ dinode_at gi dinum dr))%I
               with "[Hlinks Hdi]" as (lic) "(%Hlicfl & Hlic & Hlicback)".
@@ -2164,7 +2165,7 @@ Section ProofDirlookupMain.
                    count comes from the IN-CORE one ([Hnl0], already in hand
                    on this arm out of [dl_lic_live]) transported across
                    premise (6')'s equation [Hdrnl]. *)
-                { iApply (iname_held_intro gi gfs inodestart dinum dr Hdrnz
+                { iApply (iname_held_intro gi fsc_fs inodestart dinum dr Hdrnz
                             ltac:(rewrite Hdrnl; exact Hnl0) with "Hdi"). }
                 iIntros "Hl".
                 iDestruct (iname_held_alloc with "Hl") as "(_ & _ & Hdi)".
@@ -2182,7 +2183,7 @@ Section ProofDirlookupMain.
                   by (rewrite Hbi; exact Hsome).
                 iDestruct (IcacheEscrow.dlinks_open with "Hlinks")
                   as "(%D & [%Hdok %Hxact] & Hetk)".
-                iDestruct (ent_toks_borrow (fs_gamma_L gfs) (bv_unsigned dinum)
+                iDestruct (ent_toks_borrow (fs_gamma_L fsc_fs) (bv_unsigned dinum)
                              dn bm data i D Htyz Hnl0 Hfirsti Hnself
                              Hholes Hszb with "Hetk") as "(%tyb & Hp & Hback)".
                 iExists (LinkedL tyb).
@@ -2194,7 +2195,7 @@ Section ProofDirlookupMain.
                 iApply (IcacheEscrow.dlinks_intro _ _ _ _ _ D Hdok Hxact
                           with "Hetk"). }
             iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-            iApply (IG.wp_iget_sconf gtl gfs gi cov logstart inodestart nib dev
+            iApply (IG.wp_iget_sconf gtl gi cov logstart inodestart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       lic
                       N7 0%nat eb pj (K - 12)%nat b lks

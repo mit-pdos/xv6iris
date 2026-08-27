@@ -87,11 +87,11 @@ Section ProofSysFork.
   (* =================================================================== *)
   Lemma wp_sys_fork_sconf
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
-      (γfs : fs_names) (cov : gset Z) (logstart : Z)
+      (cov : gset Z) (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string)
-    : wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs γfs cov logstart
+    : wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cov logstart
                              inodestart nib m lvl av eb p b pid V lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
@@ -179,7 +179,7 @@ Section ProofSysFork.
        supplies -- so the pair is opened here and re-bundled on the way out. *)
     iDestruct "Henv" as (γk) "[#Hkalk #Hkaav]".
     iDestruct (kalloc_env_at_intro with "Hkalk Hkaav") as "#Henvn".
-    iApply (Kfork.wp_kfork_sconf γa γk γp γw γl γf γil γic γs γfs cov logstart
+    iApply (Kfork.wp_kfork_sconf γa γk γp γw γl γf γil γic γs cov logstart
               inodestart nib
               Bj lvl (av - 2)%nat eb p b pid V lks
               ltac:(lia) Hlvl ltac:(lkbelow)

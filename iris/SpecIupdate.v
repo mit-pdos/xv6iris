@@ -43,7 +43,7 @@
 
    THE FIVE SCALARS AND THE THIRTEEN ADDRS COME FROM DIFFERENT RESOURCES.
    [inode_meta ip dn] owns ip->type/major/minor/nlink/size at [dn]'s scalar
-   fields; ip->addrs[] is owned by [inode_map γfs ip bm] and NOT a second
+   fields; ip->addrs[] is owned by [inode_map fsc_fs ip bm] and NOT a second
    time by [inode_meta], so the premise [di_addrs dn = bm_cells bm] is what
    ties the record's addrs field to the cells memmove actually copies.  See
    the note on [InodeInv.inode_meta] for why the record rather than five
@@ -107,6 +107,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -119,13 +120,13 @@ Notation K_iupdate := (62%nat) (only parsing).
    lives in InodeInv.v, where ilock's contract can also name it. *)
 
 Definition wp_iupdate_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -221,21 +222,21 @@ Definition wp_iupdate_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS, so the caller
      keeps its own copies *)
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   (* the five metadata cells, and the thirteen addrs cells *)
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
+  inode_map fsc_fs ip bm -∗
   (* sb.inodestart, read once *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* THE INODE REGION, and THIS INUM'S on-disk record: the exclusive
      per-inum fragment that replaced the block half (design §11.3/§12).
      [dn0] is the STALE record -- it need not equal [dn]. *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
@@ -270,7 +271,7 @@ Definition wp_iupdate_sconf_body
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
-      inode_map γfs ip bm -∗
+      inode_map fsc_fs ip bm -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* THE FLUSH: this inum's on-disk record is now the in-memory one.
          CONDITIONAL since fs-icache §16.4: for an allocated [dn] this is
@@ -301,13 +302,13 @@ Definition wp_iupdate_sconf_body
 (*  the four files S3j sized.                                             *)
 (* ===================================================================== *)
 Definition wp_iupdate_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -398,21 +399,21 @@ Definition wp_iupdate_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS, so the caller
      keeps its own copies *)
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   (* the five metadata cells, and the thirteen addrs cells *)
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
+  inode_map fsc_fs ip bm -∗
   (* sb.inodestart, read once *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* THE INODE REGION, and THIS INUM'S on-disk record: the exclusive
      per-inum fragment that replaced the block half (design §11.3/§12).
      [dn0] is the STALE record -- it need not equal [dn]. *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
@@ -446,7 +447,7 @@ Definition wp_iupdate_gen_body
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
-      inode_map γfs ip bm -∗
+      inode_map fsc_fs ip bm -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* THE FLUSH: this inum's on-disk record is now the in-memory one.
          CONDITIONAL since fs-icache §16.4: for an allocated [dn] this is
@@ -477,13 +478,13 @@ Definition wp_iupdate_gen_body
 (*  [cru := false], so no existing caller moves.                          *)
 (* ===================================================================== *)
 Definition wp_iupdate_cred_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -577,21 +578,21 @@ Definition wp_iupdate_cred_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS, so the caller
      keeps its own copies *)
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   (* the five metadata cells, and the thirteen addrs cells *)
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
+  inode_map fsc_fs ip bm -∗
   (* sb.inodestart, read once *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* THE INODE REGION, and THIS INUM'S on-disk record: the exclusive
      per-inum fragment that replaced the block half (design §11.3/§12).
      [dn0] is the STALE record -- it need not equal [dn]. *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
@@ -625,7 +626,7 @@ Definition wp_iupdate_cred_body
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
-      inode_map γfs ip bm -∗
+      inode_map fsc_fs ip bm -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* THE FLUSH: this inum's on-disk record is now the in-memory one.
          CONDITIONAL since fs-icache §16.4: for an allocated [dn] this is
@@ -672,13 +673,13 @@ Definition wp_iupdate_cred_body
 (*  [wp_iupdate_gen] positionally).                                        *)
 (* ===================================================================== *)
 Definition wp_iupdate_credgen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -745,14 +746,14 @@ Definition wp_iupdate_credgen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
+  inode_map fsc_fs ip bm -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv γs -∗
@@ -781,7 +782,7 @@ Definition wp_iupdate_credgen_body
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
-      inode_map γfs ip bm -∗
+      inode_map fsc_fs ip bm -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       ireg_out γi inum dn -∗
       bslots 2 -∗
@@ -849,13 +850,13 @@ Definition wp_iupdate_credgen_body
 (*                                                                        *)
 (* ===================================================================== *)
 Definition wp_iupdate_link_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -923,14 +924,14 @@ Definition wp_iupdate_link_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
+  inode_map fsc_fs ip bm -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* THE FREEZE-PIN PREMISE, IN ITS RULING A-prime FORM (iclaim-ledger.md
      §3.9; [InodeRegion.ireg_write_link_reg]'s row).  The record whose count
@@ -975,7 +976,7 @@ Definition wp_iupdate_link_body
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
-      inode_map γfs ip bm -∗
+      inode_map fsc_fs ip bm -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* THE FLUSH, AND THE MINT.  The retagged fragment exactly as the
          other four bodies hand it back (the type is nonzero, so
@@ -996,7 +997,7 @@ Definition wp_iupdate_link_body
       (∃ v : ity,
          ⌜InodeRegion.ireg_reg_ok (bv_unsigned (di_type dn)) v
           /\ (forall w, oty = Some w -> v = w)⌝
-         ∗ FsStateLink.link_toks (FsBytesGamma.fs_gamma_L γfs)
+         ∗ FsStateLink.link_toks (FsBytesGamma.fs_gamma_L fsc_fs)
              (bv_unsigned inum)
              (FsStateLink.link_reps
                 (InodeRegion.ireg_dot_delta (bv_unsigned (di_type dn0))
@@ -1063,13 +1064,13 @@ Definition wp_iupdate_link_body
 (*                                                                        *)
 (* ===================================================================== *)
 Definition wp_iupdate_unlink_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -1121,14 +1122,14 @@ Definition wp_iupdate_unlink_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
+  inode_map fsc_fs ip bm -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* ...AND THE COUNTING RA's UNIT BESIDE IT (durable-disk 2b-inode-5),
      also consumed: this is the one flush in the kernel that LOWERS a
@@ -1138,7 +1139,7 @@ Definition wp_iupdate_unlink_body
   (* ...AND IT IS A PILE (lane G5): at rmdir's [ip->nlink--] the child's
      multiplicity crosses [2 -> 0] -- its name in the parent, and its own
      ["."] -- and everywhere else the delta is one. *)
-  FsStateLink.link_toks (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
+  FsStateLink.link_toks (FsBytesGamma.fs_gamma_L fsc_fs) (bv_unsigned inum)
     (FsStateLink.link_reps
        (InodeRegion.ireg_dot_delta (bv_unsigned (di_type dn))
           (bv_unsigned (di_nlink dn))) uty) -∗
@@ -1164,7 +1165,7 @@ Definition wp_iupdate_unlink_body
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
-      inode_map γfs ip bm -∗
+      inode_map fsc_fs ip bm -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* THE FLUSH, AND NOTHING MINTED (edit (iii)): the retagged fragment
          alone -- the type is nonzero, so this is [ireg_out] here -- and
@@ -1177,13 +1178,13 @@ Definition wp_iupdate_unlink_body
 
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1191,7 +1192,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+      wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γi
                             cov logstart inodestart nib dev ip inum dn dn0 bm u
                             pidv dq dqd dqn dqs m K eb b lks Vpr.
 
@@ -1199,13 +1200,13 @@ Module Type IUPDATE.
      set forgotten, kept as its own parameter so that every existing caller
      is unchanged (wp_bmap_gen / wp_balloc_gen's pattern) *)
   Parameter wp_iupdate_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1213,20 +1214,20 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+      wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γi
                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
                           pidv dq dqd dqn dqs m K eb b lks Vpr.
   (* the CREDITED set-form contract (S5a finding 3): the same walk with the
      unit returned when the op has already logged this inode's block.
      [wp_iupdate_gen] is its [cru := false] instance. *)
   Parameter wp_iupdate_cred :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1234,7 +1235,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+      wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb b lks Vpr.
   (* the credited set-form contract at itrunc's altitude: eb-generic, so a
@@ -1245,13 +1246,13 @@ Module Type IUPDATE.
      are derived from it through [LogInv.log_credit_own]; it is stated
      separately so neither of their arities moves. *)
   Parameter wp_iupdate_credgen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1259,7 +1260,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+      wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γi
                               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
                               pidv dq dqd dqn dqs m K eb b lks Vpr.
 
@@ -1269,13 +1270,13 @@ Module Type IUPDATE.
      any of the four would move a landed caller's arity, and this one's
      postcondition differs, not just its premises. *)
   Parameter wp_iupdate_link :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1284,7 +1285,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+      wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pin oty pidv dq dqd dqn dqs m K eb b lks Vpr.
 
@@ -1293,13 +1294,13 @@ Module Type IUPDATE.
      costs and carrying the zero-record receipt through log_write's own
      ghost step.  A sixth parameter for the fifth's reason. *)
   Parameter wp_iupdate_unlink :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1308,7 +1309,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+      wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γi
                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                              uty pidv dq dqd dqn dqs m K eb b lks Vpr.
 End IUPDATE.

@@ -121,6 +121,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FastSetSolver.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -149,7 +150,7 @@ Proof.
 Qed.
 
 Section ItruncSpec.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, FSC : fscfg}.
 
   (* "THE BITMAP BLOCK'S LOG SLOT IS PAID FOR, and u units remain for
      everything else."
@@ -302,13 +303,13 @@ Section ItruncSpec.
 End ItruncSpec.
 
 Definition wp_itrunc_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
@@ -409,25 +410,25 @@ Definition wp_itrunc_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written *)
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   (* the five scalars (ip->size is written), the thirteen addrs cells and
      the indirect block's own resource *)
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
+  inode_map fsc_fs ip bm -∗
   (* THE DATA BLOCKS, which is what actually gets freed *)
-  inode_blocks γfs bm data -∗
+  inode_blocks fsc_fs bm data -∗
   (* the two superblock fields, read and handed straight back *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* the bitmap, with its free pool *)
-  bitmap_inv γfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* the caller's own pid cell *)
   proc_priv_bare pj pidv Vpr -∗
@@ -470,8 +471,8 @@ Definition wp_itrunc_sconf_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* THE INODE IS EMPTY: no block, size zero *)
       inode_meta ip (di_trunc dn) -∗
-      inode_map γfs ip bm_empty -∗
-      inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
+      inode_map fsc_fs ip bm_empty -∗
+      inode_blocks fsc_fs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
       (* ...and every block it named is back in the pool *)
       (* the flush landed: this inum's on-disk record is the truncated
          inode *)
@@ -511,13 +512,13 @@ Definition wp_itrunc_sconf_body
 (*  every counted caller unmoved.                                         *)
 (* ===================================================================== *)
 Definition wp_itrunc_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
@@ -567,17 +568,17 @@ Definition wp_itrunc_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
-  inode_blocks γfs bm data -∗
+  inode_map fsc_fs ip bm -∗
+  inode_blocks fsc_fs bm data -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_inv γfs bmapstart cov logstart size -∗
-  ireg_inv γi γfs inodestart nib -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv γs -∗
@@ -616,8 +617,8 @@ Definition wp_itrunc_gen_body
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       inode_meta ip (di_trunc dn) -∗
-      inode_map γfs ip bm_empty -∗
-      inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
+      inode_map fsc_fs ip bm_empty -∗
+      inode_blocks fsc_fs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
       dinode_at γi inum (di_trunc dn) -∗
       bslots 3 -∗
       (* THE LEDGER, SET FORM.  The set only GROWS, it provably contains
@@ -647,13 +648,13 @@ Definition wp_itrunc_gen_body
 
 Module Type ITRUNC.
   Parameter wp_itrunc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -663,7 +664,7 @@ Module Type ITRUNC.
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+      wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γi
                            cov logstart bmapstart inodestart nib size dev
                            ip inum dn dn0 bm data u
                            pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
@@ -671,13 +672,13 @@ Module Type ITRUNC.
      [crb := cru := false], derived at the [log_op] existential's own
      witness. *)
   Parameter wp_itrunc_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -687,7 +688,7 @@ Module Type ITRUNC.
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+      wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γi
                          cov logstart bmapstart inodestart nib size dev
                          ip inum dn dn0 bm data u Sb crb cru e0
                          pidv dq dqd dqn dqb dqs m K eb b lks Vpr.

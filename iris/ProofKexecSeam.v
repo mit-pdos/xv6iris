@@ -381,7 +381,7 @@ Qed.
 (*  THE ELF BUFFER: CARVE AND UNCARVE, and the two field WINDOWS.          *)
 (* ===================================================================== *)
 Section KexecBFrame.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, FSC : fscfg}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the elf slots as 64 NAMED bytes, with the per-slot 8-alignment facts kept
@@ -476,7 +476,7 @@ End KexecBFrame.
 (*  THE FRAME FROM +0x0cc ONWARD.                                         *)
 (* ===================================================================== *)
 Section KexecBFrameB.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, FSC : fscfg}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   (* [ProofKexecA.kxc_frameA6] with (a) the ELF slots (47..54) taken OUT --
@@ -541,7 +541,7 @@ Section KexecBSeam.
      (convention 6): nine resources phases A and B both carry and neither
      looks inside.  Bundled here so the two output states below do not each
      spell them out. *)
-  Definition kxc_open (gfs : fs_names) (gi : gname) 
+  Definition kxc_open (gi : gname)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (pidv : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
@@ -552,7 +552,7 @@ Section KexecBSeam.
      i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev ∗
      i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf ∗
      i_valid (ientry kf) ↦₄ valid_word true ∗
-     ic_loaded gfs gi cov logstart kf inumf dnf bmf ∗
+     ic_loaded fsc_fs gi cov logstart kf inumf dnf bmf ∗
      ity_shot gyf (di_type dnf) ∗
      (* ...and the payload's freeze token (§3.9, RULING A-prime) *)
      ifreeze_off (bv_unsigned inumf) ∗
@@ -575,7 +575,7 @@ Section KexecBSeam.
   (* --------------------------------------------------------------- *)
   Definition kxc_at_1a2
       (jp : nat)
-      (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
+      (bn : bio_names) (g : log_names) (gi : gname)
       (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -612,13 +612,13 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open gfs gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+     kxc_open gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_opb g n2 ∗
      iref_slots 1 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
-     bitmap_inv gfs bmapstart cov logstart size ∗
+     bitmap_inv fsc_fs bmapstart cov logstart size ∗
      bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
@@ -657,7 +657,7 @@ Section KexecBSeam.
   (* --------------------------------------------------------------- *)
   Definition kxc_at_12c
       (jp : nat)
-      (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
+      (bn : bio_names) (g : log_names) (gi : gname)
       (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -697,13 +697,13 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open gfs gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+     kxc_open gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_opb g n2 ∗
      iref_slots 1 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
-     bitmap_inv gfs bmapstart cov logstart size ∗
+     bitmap_inv fsc_fs bmapstart cov logstart size ∗
      bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
@@ -730,7 +730,7 @@ Section KexecBSeam.
   (* --------------------------------------------------------------- *)
   Definition kxc_at_1a4
       (jp : nat)
-      (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
+      (bn : bio_names) (g : log_names) (gi : gname)
       (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -768,13 +768,13 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open gfs gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+     kxc_open gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_opb g n2 ∗
      iref_slots 1 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
-     bitmap_inv gfs bmapstart cov logstart size ∗
+     bitmap_inv fsc_fs bmapstart cov logstart size ∗
      bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
@@ -796,7 +796,7 @@ Section KexecBSeam.
   (* --------------------------------------------------------------- *)
   Definition kxc_at_1ae
       (jp : nat)
-      (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (bn : bio_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
@@ -827,7 +827,7 @@ Section KexecBSeam.
      iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
-     bitmap_inv gfs bmapstart cov logstart size ∗
+     bitmap_inv fsc_fs bmapstart cov logstart size ∗
      bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
@@ -879,7 +879,7 @@ Section KexecBSeam.
   (* INSIDE -- [kxc_res]'s phase-C analogue, minus the FS/icache pieces     *)
   (* phase B closed out at +0x1ae and plus [iref_slots 2] (both back). *)
   Definition kxc_c_res
-      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (jp : nat) (bn : bio_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
@@ -893,7 +893,7 @@ Section KexecBSeam.
     (iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
-     bitmap_inv gfs bmapstart cov logstart size ∗
+     bitmap_inv fsc_fs bmapstart cov logstart size ∗
      bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
@@ -912,7 +912,7 @@ Section KexecBSeam.
   (*  at the old size); [sz1] is the running stack top, [S1]'s own value.   *)
   (* --------------------------------------------------------------- *)
   Definition kxc_at_21a
-      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (jp : nat) (bn : bio_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
@@ -944,7 +944,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size
+     kxc_c_res jp bn ga gf cov logstart bmapstart inodestart size
                plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen)%I.
@@ -969,7 +969,7 @@ Section KexecBSeam.
   (*  for exactly this one use.  See claude-notes/kernel-defects.md.        *)
   (* --------------------------------------------------------------- *)
   Definition kxc_at_272
-      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (jp : nat) (bn : bio_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
@@ -1016,7 +1016,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size
+     kxc_c_res jp bn ga gf cov logstart bmapstart inodestart size
                plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen)%I.
@@ -1030,7 +1030,7 @@ Section KexecBSeam.
   (*  commit reads [elf.entry] out of it at +0x2f0.                         *)
   (* --------------------------------------------------------------- *)
   Definition kxc_d_res
-      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (jp : nat) (bn : bio_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
@@ -1043,7 +1043,7 @@ Section KexecBSeam.
     (iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
-     bitmap_inv gfs bmapstart cov logstart size ∗
+     bitmap_inv fsc_fs bmapstart cov logstart size ∗
      bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
@@ -1066,7 +1066,7 @@ Section KexecBSeam.
   (*  because +0x28e set it for the two [bad:] branches that no longer fire. *)
   (* --------------------------------------------------------------- *)
   Definition kxc_at_2a6
-      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (jp : nat) (bn : bio_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
@@ -1097,7 +1097,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_d_res jp bn gfs ga gf cov logstart bmapstart inodestart size
+     kxc_d_res jp bn ga gf cov logstart bmapstart inodestart size
                plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c)%I.

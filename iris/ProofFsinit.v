@@ -203,7 +203,7 @@ Section FsinitDefs.
      every split (claude-notes/optimization.md).  It is the contract's post,
      verbatim. *)
   Definition fsi_cont `{GEN : GenId} `{CID0 : CpuId}
-      (γfs : fs_names) (bn : bio_names)
+      (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (dev : mword 32)
       (v_magic v_size v_nblocks v_nlog : mword 32)
@@ -229,7 +229,7 @@ Section FsinitDefs.
         (* block 1's run does NOT come back (durable-disk lane C-3a): it is
            spent into [initlog]'s [SbPark] park and rides out inside the
            [log_ctx] below. *)
-        log_ctx icfg_log bn γfs cov logstart dev -∗
+        log_ctx icfg_log bn fsc_fs cov logstart dev -∗
         bslots 3 -∗
         iref_slot -∗
         ireg_boot -∗
@@ -286,7 +286,7 @@ Section FsinitEpilogue.
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
-      (j : nat) (bn : bio_names) (γfs : fs_names)
+      (j : nat) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (dev : mword 32)
       (v_magic v_size v_nblocks v_nlog : mword 32)
@@ -311,11 +311,11 @@ Section FsinitEpilogue.
     sb_logstart ↦₄ (mword_of_int logstart : mword 32) -∗
     InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
     BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
-    log_ctx icfg_log bn γfs cov logstart dev -∗
+    log_ctx icfg_log bn fsc_fs cov logstart dev -∗
     bslots 3 -∗
     iref_slot -∗
     ireg_boot -∗
-    fsi_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes
+    fsi_cont (CID0 := CID0) bn cov logstart bmapstart inodestart ninodes
              size dev v_magic v_size v_nblocks v_nlog pidv dq j
              m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
@@ -537,7 +537,7 @@ Section FsinitMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γfs : fs_names) (γi : gname)
+      (γi : gname)
       (gtl : gname)
       (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
@@ -557,7 +557,7 @@ Section FsinitMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb) :
-      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi gtl γpr
+      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γi gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
@@ -586,7 +586,7 @@ Section FsinitMain.
     set (bno := (mword_of_int 1 : mword 32)).
     assert (Hbnou : uint bno = 1) by (vm_compute; reflexivity).
     assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbnou; lia).
-    assert (Hbnocov : uint bno ∈ bv_cov (fs_view γfs γd dev cov))
+    assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd dev cov))
       by (rewrite Hbnou; exact H1cov).
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hgen
               Hmirror Hlfree #Hbinv Hfsb Hxo Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks #Hbm
@@ -610,19 +610,19 @@ Section FsinitMain.
     assert (Hcgeom' : col_geom sbrec (FsImg.sb_inodestart sbrec) nib
                         (fs_home_set cov logstart))
       by (rewrite (cg_ist Hcgeom); exact Hcgeom).
-    iAssert (ireg_reg γi γfs (FsImg.sb_inodestart sbrec) nib) as "#Hireg'".
+    iAssert (ireg_reg γi fsc_fs (FsImg.sb_inodestart sbrec) nib) as "#Hireg'".
     { rewrite (cg_ist Hcgeom). iExact "Hireg". }
-    iAssert (bitmap_reg γfs (FsImg.sb_bmapstart sbrec) cov logstart
+    iAssert (bitmap_reg fsc_fs (FsImg.sb_bmapstart sbrec) cov logstart
                (FsImg.sb_size sbrec)) as "#Hbm'".
     { rewrite Hbmq Hszq. iExact "Hbm". }
     iPoseProof (is_itable2_pool with "Hitb2") as "#Hpoolinv".
-    iAssert (□ (sb_park γfs sbrec -∗ snap_law icfg_log γfs cov logstart))%I
+    iAssert (□ (sb_park fsc_fs sbrec -∗ snap_law icfg_log fsc_fs cov logstart))%I
       as "#Hlawf".
     { iModIntro. iIntros "#Hpark".
-      iApply (fs_snap_law_build icfg_log fsc_ic γfs γi cov logstart nib sbrec
+      iApply (fs_snap_law_build icfg_log fsc_ic fsc_fs γi cov logstart nib sbrec
                 eq_refl Hcgeom'
                 with "Hireg' Hbm' Hesc Hpoolinv Hpark"). }
-    iAssert (fsi_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
+    iAssert (fsi_cont (CID0 := CID) bn cov logstart bmapstart inodestart
                ninodes size dev v_magic v_size v_nblocks v_nlog
                pidv dq j m K eb b lks Vpr)%I with "[Hcont]" as "Hcont";
       [rewrite /fsi_cont; iExact "Hcont" |].
@@ -820,7 +820,7 @@ Section FsinitMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID9) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-              (fs_view γfs γd dev cov) pidv dev bno dq
+              (fs_view fsc_fs γd dev cov) pidv dev bno dq
               M5 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
               HM5a0 HM5a1
@@ -863,7 +863,7 @@ Section FsinitMain.
     assert (Hb1nin : (1 : Z) ∉ (list_to_set (hdr_dec bs_hdr).2 : gset Z)).
     { rewrite elem_of_list_to_set. intros Hc.
       destruct (Hhdrok 1 Hc) as (_ & _ & Hne). apply Hne. reflexivity. }
-    iMod (fs_bytes_agree_exc ⊤ (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
+    iMod (fs_bytes_agree_exc ⊤ (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
             (fs_home_set cov logstart) Xv (list_to_set (hdr_dec bs_hdr).2)
             1 bs_sb bs0 logN_top Hb1nin
             with "Hbinv [$Hxo] Hfsb HpL")
@@ -1212,7 +1212,7 @@ Section FsinitMain.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID9) (CIDb := CID19) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev cov) kk
               pidv dev bno dq Q1 (K - 4)%nat eb (proc_addr j)
               bs_sb bsd0 d0 b lks Vpr
               ltac:(lia) Hkk HQ1a0
@@ -1449,9 +1449,9 @@ Section FsinitMain.
                  with "Hcont") as "Hcont".
     (* the boot dirty map is [false] on the covered range: the pure form
        the general initlog contract consumes (durable-disk stage D1) *)
-    iDestruct (initlog_dirty_all_false γfs D cov with "HauthD Hdirty")
+    iDestruct (initlog_dirty_all_false fsc_fs D cov with "HauthD Hdirty")
       as "(%HDall & HauthD & Hdirty)".
-    iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log γfs γpr
+    iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log fsc_fs γpr
               cov logstart dev sb_base bs_hdr Xv
               Mbrn L D
               vlock vname vcpu v_start v_dev v_nc v_n
@@ -1557,7 +1557,7 @@ Section FsinitMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
-              icfg_log γfs γi gtl γpr cov logstart bmapstart inodestart
+              icfg_log γi gtl γpr cov logstart bmapstart inodestart
               ninodes nib size dev pidv dq (DfracOwn 1) (DfracOwn 1)
               (DfracOwn 1) R1 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0
@@ -1582,7 +1582,7 @@ Section FsinitMain.
     { intros c Hcs N2' N8 N9 N18.
       rewrite (callee_saved_lookup Hcsir_cs c Hcs).
       exact (HR1thr c Hcs N2' N8 N9 N18). }
-    iApply (fsi_epilogue (CID0 := CID33) j bn γfs cov logstart bmapstart
+    iApply (fsi_epilogue (CID0 := CID33) j bn cov logstart bmapstart
               inodestart ninodes size dev v_magic v_size v_nblocks
               v_nlog pidv dq m mf K eb b lks Vpr HK Hmfsp Hmfthr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls

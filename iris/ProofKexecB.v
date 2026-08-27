@@ -154,6 +154,7 @@ Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -213,7 +214,7 @@ Section KexecBBody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
+      (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -267,20 +268,20 @@ Section KexecBBody.
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
         M90 !!! Regidx r = m !!! Regidx r) ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gfs gi gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gi gtl
               cov logstart inodestart nib dev -∗
     pc_is (mword_of_int (KXB + 0x090) : mword 64) -∗
     sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
-    kxc_open gfs gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+    kxc_open gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf -∗
     log_opb g n2 -∗
     iref_slots 1 -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_inv gfs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart cov logstart size -∗
     bslots 3 -∗
     kalloc_env ga None -∗
     proc_priv gf (proc_addr jp) pidv V -∗
@@ -314,7 +315,7 @@ Section KexecBBody.
     (* ---- OUTPUT 1: [elf.phnum = 0], the loop is skipped ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd) (w13 w67 : mword 64),
-        kxc_at_1a2 jp bn g gfs gi ga gf cov logstart bmapstart inodestart
+        kxc_at_1a2 jp bn g gi ga gf cov logstart bmapstart inodestart
                    nib size dev kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
@@ -351,7 +352,7 @@ Section KexecBBody.
     (* ---- OUTPUT 2: the phdr loop's body entry, at [i = 0], [sz = 0] ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd),
-        kxc_at_12c jp bn g gfs gi ga gf cov logstart bmapstart inodestart
+        kxc_at_12c jp bn g gi ga gf cov logstart bmapstart inodestart
                    nib size dev kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
@@ -1286,7 +1287,7 @@ Section KexecBBody.
                      (CID8 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID8 true (proc_addr jp) _ Hcr8
                    with "Hcont") as "Hcont".
-      iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi gtl
+      iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gi gtl
                 gilf gislf ga gf cov logstart bmapstart inodestart nib size
                 dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas

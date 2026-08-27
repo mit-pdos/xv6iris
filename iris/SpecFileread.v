@@ -274,7 +274,6 @@ Record fread_names := MkFReadNames {
   frn_pav        : mword 64;
   frn_pu         : mword 64;
   frn_bio        : bio_names;
-  frn_fs         : fs_names;
   frn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
   frn_cov        : gset Z;
   frn_logstart   : Z;
@@ -308,7 +307,6 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
     (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
-    (MkFsNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive)
     1%positive
     ∅ 0 0 (DfracOwn 1)
     (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
@@ -466,14 +464,14 @@ Section SpecFileread.
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
         IBLOCK inum (frn_inodestart fn) ∈ frn_cov fn⌝ ∗
      bio_ctx (frn_bio fn)
-       (fs_view (frn_fs fn) (frn_disk fn) icfg_dev (frn_cov fn)) ∗
+       (fs_view fsc_fs (frn_disk fn) icfg_dev (frn_cov fn)) ∗
      (* THE THREE PERSISTENT INVARIANTS SpecIlock / SpecIunlock take: the
         [ref] words, the entries' content escrows, the inode region -- the
         escrow at the FAMILY where it was per-slot. *)
      itable_inv ∗
-     ic_escrows fsc_ic (frn_fs fn) (frn_ireg fn) (frn_cov fn)
+     ic_escrows fsc_ic fsc_fs (frn_ireg fn) (frn_cov fn)
                 (frn_logstart fn) ∗
-     ireg_inv (frn_ireg fn) (frn_fs fn) (frn_inodestart fn) icfg_nib ∗
+     ireg_inv (frn_ireg fn) fsc_fs (frn_inodestart fn) icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
      sb_inodestart ↦₄{frn_dqs fn}
@@ -605,10 +603,10 @@ Section SpecFileread.
   Qed.
 
   (* the per-entry escrow, out of the family *)
-  Lemma ic_escrows_acc2 (γfs : fs_names) (γi : gname)
+  Lemma ic_escrows_acc2 (γi : gname)
       (cov : gset Z) (logstart : Z) (ik : nat) :
     (ik < NINODE)%nat ->
-    (ic_escrows fsc_ic γfs γi cov logstart -∗ ic_escrow fsc_ic γfs γi cov logstart ik
+    (ic_escrows fsc_ic fsc_fs γi cov logstart -∗ ic_escrow fsc_ic fsc_fs γi cov logstart ik
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.

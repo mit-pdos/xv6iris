@@ -110,7 +110,7 @@
    reason this contract's shape is what it is:
 
      [ip->ref++] is a ledger move, and RULING A (§3.1, A-AUs) gave every
-     UP-count the same premise -- a borrowed [IgetLic.iname γi γfs inum l].
+     UP-count the same premise -- a borrowed [IgetLic.iname γi fsc_fs inum l].
      idup's TWO call sites are both [idup(p->cwd)] (ProofKforkB4:365 and
      ProofNamex:5660) and NEITHER can produce a licence at ANY of the five
      constructors: [LinkedL] wants an [ipaid], [HeldL] and the region-side
@@ -136,7 +136,7 @@
    THE PRICE, AND IT IS EXACTLY SpecIget's (§3.19(d), the in-campaign
    precedent): the mover's up-count carries the ledger's [icnt] half, whose
    other half lives in [InodeRegion.ireg_slot], so this contract takes
-   [ireg_inv γi γfs inodestart nib] and the [inodestart] binder that goes
+   [ireg_inv γi fsc_fs inodestart nib] and the [inodestart] binder that goes
    with it -- and, because [ireg_inv]'s own type has [Xv6Cameras.logG] as a real
    instance argument (its [ireg_ep] carries a [log_epoch_lb], §G.13/§G.17),
    the Context gains [!logG Σ].  The handle is PERSISTENT, so it costs a
@@ -186,7 +186,7 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Notation K_idup := (14%nat) (only parsing).
 Definition wp_idup_sconf_body
     `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γl : gname) (γfs : fs_names) (γi : gname)
+    (γl : gname) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (k : nat) (dev : mword 32)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
@@ -211,14 +211,14 @@ Definition wp_idup_sconf_body
   sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_itable2 γl fsc_ic γfs γi cov logstart nib dev -∗
+  is_itable2 γl fsc_ic fsc_fs γi cov logstart nib dev -∗
   itable_inv -∗
   (* THE INODE REGION, and GHOST-ONLY (header, §3.19): the [ref++] carries
      the ledger's [icnt] half and the region owns the other one, so the
      mover ([IcacheInv.iref_upgrade_mir_store_au]) opens [↑iregN] around the
      same instruction.  No dinode is read.  Persistent, so it costs a caller
      a frame and nothing else. *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)
   iref_slot -∗
   (* ---- ONE ROW IN, TWO ROWS OUT (SIMP-2) ---------------------------
@@ -268,11 +268,11 @@ Definition wp_idup_sconf_body
 Module Type IDUP.
   Parameter wp_idup_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γl : gname) (γfs : fs_names) (γi : gname)
+      (γl : gname) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (dev : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_idup_sconf_body γl γfs γi cov logstart inodestart nib k dev
+      wp_idup_sconf_body γl γi cov logstart inodestart nib k dev
                          m n eb p K b lks.
 End IDUP.

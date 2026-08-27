@@ -530,7 +530,7 @@ Section ProofFilestat.
            "(%Hipk & %Hik & %Hinlt & #Hshot0 & Hshr0 & Hpayback)".
       assert (Hibcov : IBLOCK inm (fsn_inodestart fn) ∈ fsn_cov fn)
         by (apply Hgeo; exact Hinlt).
-      iDestruct (ic_escrows_acc2 (fsn_fs fn) (fsn_ireg fn)
+      iDestruct (ic_escrows_acc2 (fsn_ireg fn)
                    (fsn_cov fn) (fsn_logstart fn) ikk Hik with "Hescs")
         as "#Hesc".
       iDestruct (ic_sleeplocks_lookup fsc_ic ikk Hik with "Hslks")
@@ -670,7 +670,7 @@ Section ProofFilestat.
          payload's slice already does, so nothing has to be introduced here. *)
       iApply (Ilock.wp_ilock_dep_sconf γs j γlp (fsn_uart fn) (fsn_disk fn)
                 (fsn_dlock fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
-                (fsn_bio fn) (fsn_fs fn) (fsn_ireg fn)
+                (fsn_bio fn) (fsn_ireg fn)
                 gil gisl
                 (fsn_cov fn) (fsn_logstart fn) (fsn_inodestart fn)
                 icfg_nib ikk (ssh/2)%Qp gsh
@@ -908,7 +908,7 @@ Section ProofFilestat.
       iEval (rewrite Hipk) in "Hmeta".
       iEval (rewrite Hipk) in "Hidev".
       iEval (rewrite Hipk) in "Hinum".
-      iAssert (ic_dep_held (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn)
+      iAssert (ic_dep_held fsc_fs (fsn_ireg fn) (fsn_cov fn)
                  (fsn_logstart fn) (DepRd (ssh/2)%Qp icfg_dev inm gsh)
                  ikk inm dnl bml)%I
         with "[Hmeta Haddrs Hquarter]" as "Hlk".
@@ -975,7 +975,7 @@ Section ProofFilestat.
       iDestruct (proc_priv_core_bare_acc pj pidv V with "Hpriv") as "[Hppid Hpivbk2]".
       iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Iunlock.wp_iunlock_dep_sconf γs (fsn_fs fn) (fsn_ireg fn)
+      iApply (Iunlock.wp_iunlock_dep_sconf γs (fsn_ireg fn)
                 gil gisl
                 (fsn_cov fn) (fsn_logstart fn)
                 ikk (ssh/2)%Qp gsh (DepRd (ssh/2)%Qp icfg_dev inm gsh)

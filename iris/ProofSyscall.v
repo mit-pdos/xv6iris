@@ -157,8 +157,7 @@
        first of the two, about the count word the USER wrote.  Retiring
        them is not spec plumbing:
        - the MAXFILE half is a WEAKENING [SpecFileread.v]'s own header says
-         can be relaxed to `n < 2^31` ("mechanical: three uses in
-         ProofFileread.v"), and `sys_rw_count_lt` gives `< 2^31` free -- so
+         can be relaxed to `n < 2^31` ("mechanical: three uses in ProofFileread.v"), and `sys_rw_count_lt` gives `< 2^31` free -- so
          this half costs one afternoon in fileread;
        - `0 <= n` is readi's overflow arm.  xv6's `off + n < off` test at
          readi+0x026 is DEAD BY PREMISE today ([SpecReadi.v]'s COVERAGE
@@ -506,7 +505,6 @@ Record sysc_ties `{ICFG : icfg} `{FSC : fscfg}
   (* ---- the block layer and the disk fabric ---- *)
   sct_bn         : bn = fsc_bio;
   sct_bio        : fcn_bio fn = bn;
-  sct_fs         : fcn_fs fn = fsc_fs;
   sct_cov        : fcn_cov fn = fsc_cov;
   sct_logstart   : fcn_logstart fn = fsc_logst;
   sct_bmapstart  : fcn_bmapstart fn = fsc_bmapstart;
@@ -675,7 +673,6 @@ Section SyscallVocab.
     - exact (sct_kalloc _ _ _ T).
     - rewrite (sct_bio _ _ _ T). exact (sct_bn _ _ _ T).
     - exact (sct_log _ _ _ T).
-    - exact (sct_fs _ _ _ T).
     - exact (sct_cov _ _ _ T).
     - exact (sct_logstart _ _ _ T).
     - exact (sct_dev _ _ _ T).
@@ -715,12 +712,12 @@ Section SyscallVocab.
         ~ (DinodeEnc.IBLOCK inum (fcn_inodestart fn)
              ∈ log_region_set (fcn_logstart fn))⌝ ∗
      ⌜IcacheInv.cov_below (fcn_cov fn) (fcn_size fn)⌝ ∗
-     IcacheEscrow.is_itable2 (fcn_tlock fn) fsc_ic (fcn_fs fn) (fcn_ireg fn)
+     IcacheEscrow.is_itable2 (fcn_tlock fn) fsc_ic fsc_fs (fcn_ireg fn)
                 (fcn_cov fn) (fcn_logstart fn) (fcn_nib fn) (fcn_dev fn) ∗
      IcacheInv.itable_inv ∗
-     IcacheEscrow.ic_escrows fsc_ic (fcn_fs fn) (fcn_ireg fn) (fcn_cov fn)
+     IcacheEscrow.ic_escrows fsc_ic fsc_fs (fcn_ireg fn) (fcn_cov fn)
                 (fcn_logstart fn) ∗
-     InodeRegion.ireg_inv (fcn_ireg fn) (fcn_fs fn) (fcn_inodestart fn) (fcn_nib fn) ∗
+     InodeRegion.ireg_inv (fcn_ireg fn) fsc_fs (fcn_inodestart fn) (fcn_nib fn) ∗
      ireg_open ∗
      IcacheEscrow.ic_sleeplocks fsc_ic)%I.
   Proof.
@@ -739,7 +736,7 @@ Section SyscallVocab.
        actually OCCURS are in the chain: [fsc_bmapstart]/[fsc_size] reach
        this goal through no hypothesis (the pure rows below carry them out of
        [G] instead), and a rewrite with no subterm to hit is an error. *)
-    rewrite -(sct_fs _ _ _ T) -(sct_cov _ _ _ T) -(sct_logstart _ _ _ T)
+    rewrite -(sct_cov _ _ _ T) -(sct_logstart _ _ _ T)
             -(sct_ireg _ _ _ T) -(sct_tlock _ _ _ T)
             -(sct_inodestart _ _ _ T) -(sct_nib _ _ _ T) -(sct_dev _ _ _ T).
     iSplit; [ iPureIntro; reflexivity |].
@@ -807,8 +804,8 @@ Section SyscallVocab.
     ⌜log_geom_ok (fcn_cov fn) (fcn_logstart fn)⌝ ∗
     procs_inv (fcn_procs fn) ∗
     SpecPanic.panic_env ∗
-    BioInv.bio_ctx bn (fs_view (fcn_fs fn) (fcn_disk fn) (fcn_dev fn) (fcn_cov fn)) ∗
-    log_ctx (fcn_log fn) bn (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn) ∗
+    BioInv.bio_ctx bn (fs_view fsc_fs (fcn_disk fn) (fcn_dev fn) (fcn_cov fn)) ∗
+    log_ctx (fcn_log fn) bn fsc_fs (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn) ∗
     fs_crash_seam (fcn_cov fn) (fcn_logstart fn) ∗
     gen_cert ∗
     dev_inv (fcn_uart fn) (fcn_disk fn) ∗
@@ -858,7 +855,7 @@ Section SyscallVocab.
        so they are NOT re-spelled and each pure row below rewrites its own
        way (durable-notes.md's note on the un-scoped rewrite, at
        [sysc_arm_exit]). *)
-    rewrite -(sct_bn _ _ _ T) -(sct_fs _ _ _ T) -(sct_cov _ _ _ T)
+    rewrite -(sct_bn _ _ _ T) -(sct_cov _ _ _ T)
             -(sct_logstart _ _ _ T) -(sct_bmapstart _ _ _ T) -(sct_size _ _ _ T)
             -(sct_uart _ _ _ T) -(sct_disk _ _ _ T)
             (* [sct_dlock] IS NOT IN THIS CHAIN, and that is R1's doing:
@@ -1020,8 +1017,7 @@ Section SyscallVocab.
     fcn_dq fn = DfracOwn (1/4) ->
     sysc_ties (proc_addr (fcn_j fn)) (fcn_bio fn) fn.
   Proof.
-    intros [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hlog Hfs Hcov Hlogst Hdev
-            Hireg Htlock Hbms Hist Hnib Hsize] Hj Hplock Hdq.
+    intros [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hlog Hcov Hlogst Hdev Hireg Htlock Hbms Hist Hnib Hsize] Hj Hplock Hdq.
     (* [sct_bio] and [sct_pj] are [reflexivity] because the indices were
        READ OFF [fn]; everything else is one of the twenty-two hypotheses. *)
     constructor; try assumption; try reflexivity.
@@ -1046,7 +1042,7 @@ Section SyscallVocab.
     iDestruct "Hextra" as "(#Hnextpid & #Hpav & #Htick & #Hcons)".
     iDestruct "Hdone" as "[#Hcell #Hrdy]".
     pose proof Hties as Ht.
-    destruct Ht as [Huart Hdisk Hdlock _ _ _ _ _ _ _ _ _ _ _ _ _ _ _].
+    destruct Ht as [Huart Hdisk Hdlock _ _ _ _ _ _ _ _ _ _ _ _ _].
     (* the disk fabric, at [fn]'s pages rather than at [fs_ready]'s witness *)
     iDestruct (FsReady.fs_ready_disk with "Hrdy") as "[_ Hdex]".
     iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
@@ -1151,7 +1147,7 @@ Section SyscallVocab.
     kernel_data -∗ procs_inv γs -∗ syscall_env γf pj bn fn -∗
     SpecKexec.fs_fabric γs (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
       (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-      (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
+      (fcn_log fn) (fcn_ireg fn) (fcn_tlock fn)
       (fcn_cov fn) (fcn_logstart fn) (fcn_inodestart fn) (fcn_nib fn) (fcn_dev fn).
   Proof.
     iIntros "#Hdata #Hprocs #Henv".
@@ -1203,7 +1199,7 @@ Section SyscallVocab.
     sysc_fs_env pj bn fn -∗
     sb_bmapstart ↦₄□ (mword_of_int (fcn_bmapstart fn) : mword 32) ∗
     InodeInv.sb_inodestart ↦₄□ (mword_of_int (fcn_inodestart fn) : mword 32) ∗
-    bitmap_inv (fcn_fs fn) (fcn_bmapstart fn) (fcn_cov fn) (fcn_logstart fn)
+    bitmap_inv fsc_fs (fcn_bmapstart fn) (fcn_cov fn) (fcn_logstart fn)
                (fcn_size fn).
   Proof.
     iIntros "#Hfs".
@@ -1211,7 +1207,7 @@ Section SyscallVocab.
     iDestruct "Hfs" as "(_ & _ & _ & _ & #Hrdy)".
     iDestruct (FsReady.fs_ready_sb_four with "Hrdy") as "(_ & #Hisp & _ & #Hbmp)".
     iDestruct (FsReady.fs_ready_bitmap with "Hrdy") as "#Hbmi".
-    rewrite (sct_bmapstart _ _ _ T) (sct_inodestart _ _ _ T) (sct_fs _ _ _ T)
+    rewrite (sct_bmapstart _ _ _ T) (sct_inodestart _ _ _ T)
             (sct_cov _ _ _ T) (sct_logstart _ _ _ T) (sct_size _ _ _ T).
     iSplitR; [ iExact "Hbmp" |].
     iSplitR; [ iExact "Hisp" |].
@@ -1228,7 +1224,7 @@ Section SyscallVocab.
     fcn_bio fn = bn -> fcn_pid fn = pid -> fcn_dq fn = DfracOwn (1/4) ->
     fn = MkFCloseNames (fcn_procs fn) (fcn_j fn) (fcn_plock fn) (fcn_kmem fn)
            (fcn_kalloc fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-           (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_log fn) (fcn_fs fn)
+           (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_log fn)
            (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn) pid (DfracOwn (1/4))
            (fcn_ireg fn) (fcn_tlock fn) (fcn_bmapstart fn)
            (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn).
@@ -2177,7 +2173,7 @@ Section SyscallVocab.
      in the shape it takes for a NON-closer callee. *)
   Definition sysc_fstat_names (bn : bio_names) (fn : fclose_names) : fstat_names :=
     MkFStatNames (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_fs fn)
+      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
       (fcn_ireg fn) (fcn_cov fn) (fcn_logstart fn)
       (fcn_inodestart fn) DfracDiscarded.
 
@@ -2202,7 +2198,7 @@ Section SyscallVocab.
       : fread_names :=
     MkFReadNames (fcn_procs fn) (fcn_j fn) (fcn_plock fn)
       (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn) γc
-      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_fs fn)
+      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
       (fcn_ireg fn) (fcn_cov fn) (fcn_logstart fn)
       (fcn_inodestart fn) DfracDiscarded
       ConsoleInv.devsw_read_val (fun _ => DfracDiscarded).
@@ -2375,7 +2371,7 @@ Section SyscallVocab.
       (fn : fclose_names) : fwrite_names :=
     MkFWriteNames γs j γlp
       (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn) γl
-      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_log fn) (fcn_fs fn)
+      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_log fn)
       (fcn_ireg fn) γpr (fcn_cov fn) (fcn_logstart fn)
       (fcn_inodestart fn) (fcn_bmapstart fn) (fcn_size fn)
       DfracDiscarded DfracDiscarded DfracDiscarded
@@ -3098,7 +3094,7 @@ Section SyscallArms.
     iDestruct "Hfsenv" as "(_ & #Hprocs' & _)".
     (* ---- the call ---- *)
     iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf (fcn_tlock fn) (fcn_ireg fn)
-              (fcn_procs fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
+              (fcn_procs fn) (fcn_cov fn) (fcn_logstart fn)
               (fcn_inodestart fn) (fcn_nib fn)
               M 0%nat (av - 4)%nat true pj true pid V ∅
               ltac:(lia) sysc_noff0b
@@ -3227,7 +3223,7 @@ Section SyscallArms.
     iApply (SysExec.wp_sys_exec_sconf γf γa γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded v0 v1 pid V M (av - 4)%nat true true lks
@@ -3359,7 +3355,7 @@ Section SyscallArms.
               (fcn_procs fn) (fcn_j fn) (fcn_plock fn)
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn)
+              (fcn_log fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn) ip dqi
               (fcn_kmem fn) (fcn_kalloc fn)
               (fcn_ireg fn) (fcn_tlock fn)
@@ -3405,7 +3401,7 @@ Section SyscallArms.
         _ & _ & _ & #Hlog & _)".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    iApply (SysSync.wp_sys_sync_sconf γs j γl bn (fcn_log fn) (fcn_fs fn)
+    iApply (SysSync.wp_sys_sync_sconf γs j γl bn (fcn_log fn) fsc_fs
               (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn)
               M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma (locks_below_empty "log")
@@ -3737,7 +3733,7 @@ Section SyscallArms.
     iApply (SysChdir.wp_sys_chdir_sconf γf γa γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded v0 pid V M (av - 4)%nat true true ∅
@@ -3839,7 +3835,7 @@ Section SyscallArms.
     iApply (SysUnlink.wp_sys_unlink_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded DfracDiscarded v0 pid V M
@@ -3919,7 +3915,7 @@ Section SyscallArms.
     iApply (SysLink.wp_sys_link_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded DfracDiscarded v0 v1 pid V M
@@ -4232,7 +4228,7 @@ Section SyscallArms.
     iApply (SysMkdir.wp_sys_mkdir_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) fsc_ninodes (fcn_size fn)
               (fcn_dev fn) IREFSPARE
@@ -4326,7 +4322,7 @@ Section SyscallArms.
     iApply (SysMknod.wp_sys_mknod_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) fsc_ninodes (fcn_size fn)
               (fcn_dev fn) IREFSPARE
@@ -4433,7 +4429,7 @@ Section SyscallArms.
     iApply (SysOpen.wp_sys_open_sconf γft γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) fsc_ninodes (fcn_size fn)
               (fcn_dev fn) IREFSPARE

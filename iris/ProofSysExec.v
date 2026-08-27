@@ -121,6 +121,7 @@ Require Import SpecSysExec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -361,7 +362,7 @@ Proof. lia. Qed.
 (*  and the NULL the [bad:] free loop stops at is memset's own.            *)
 (* ===================================================================== *)
 Section SysExecZeros.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, FSC : fscfg}.
 
   Lemma sx_zero_slot (a : mword 64) (zb : bv 8) :
     (forall j, (j < 8)%nat -> nth_byte (mword_of_int 0 : mword 64) j = zb) ->
@@ -402,7 +403,7 @@ End SysExecZeros.
 (*  out-parameter cells.                                                  *)
 (* ===================================================================== *)
 Section SysExecFrame.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, FSC : fscfg}.
 
   Definition sx_alp (sp0 : mword 64) : Prop :=
     forall i, (i < 16)%nat ->
@@ -642,7 +643,7 @@ End SysExecFrame.
 (*  they arrive as premises rather than as loads. *)
 (* ===================================================================== *)
 Section SysExecEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, FSC : fscfg}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -1457,7 +1458,7 @@ End SysExecHead.
 (*  weaker will do.                                                       *)
 (* ===================================================================== *)
 Section SysExecSetup.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, FSC : fscfg}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1969,7 +1970,7 @@ End SysExecSetup.
 (*  the fall-through at [k = t = 32], where every slot has been freed.     *)
 (* ===================================================================== *)
 Section SysExecFree.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -3746,7 +3747,7 @@ End SysExecStep.
 (*  and each tail is three lines around it.                               *)
 (* ===================================================================== *)
 Section SysExecReload.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -4637,7 +4638,7 @@ Section SysExecBreak.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
+      (g : log_names) (gi : gname)
       (gtl : gname)
       (γa γf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -4666,12 +4667,12 @@ Section SysExecBreak.
     (jp < NPROC)%nat -> gs !! jp = Some gl ->
     b = true -> eb = true ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gfs gi gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gi gtl
               cov logstart inodestart nib dev -∗
     kalloc_env γa None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_inv gfs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart cov logstart size -∗
     bslots 3 -∗
     iref_slots 2 -∗
     sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
@@ -4845,7 +4846,7 @@ Section SysExecBreak.
     iEval (rewrite -HN6a0) in "Hpb".
     iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Kexec.wp_kexec_sconf gs jp gl gu gd gk pd pav pu bn g gfs gi gtl
+    iApply (Kexec.wp_kexec_sconf gs jp gl gu gd gk pd pav pu bn g gi gtl
               γa γf cov logstart bmapstart inodestart nib size dev
               plen pfun i (sx_avf pg i) alen (fun _ => 4096%nat) afun
               pid (upd_upt V P) dqb dqs (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
@@ -4966,7 +4967,7 @@ Section SysExecWhole.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
+      (g : log_names) (gi : gname)
       (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -4975,7 +4976,7 @@ Section SysExecWhole.
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
+      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gi
                              gtl cov logstart bmapstart inodestart nib
                              size dev dqb dqs v0 v1 pid V m K eb b lks.
   Proof.
@@ -5064,7 +5065,7 @@ Section SysExecWhole.
               with "Htext Hka Hbody").
     iIntros (CID3 Hq3 M3 P3 i3 pg3 al3 af3) "[Hbrk | Hbad]".
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
-      iApply (sx_break (CID0 := CID3) gs j gl gu gd gk pd pav pu bn g gfs gi
+      iApply (sx_break (CID0 := CID3) gs j gl gu gd gk pd pav pu bn g gi
                 gtl γa γf cov logstart bmapstart inodestart nib size dev
                 dqb dqs pid V K true true ∅ sp0 m plen pfun rst v59
                 M3 P3 i3 pg3 al3 af3

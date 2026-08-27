@@ -326,7 +326,7 @@ Definition namex_post
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
-    (g : log_names) (gfs : fs_names) (bn : bio_names)
+    (g : log_names) (bn : bio_names)
     (cov : gset Z) (logstart bmapstart inodestart size : Z)
     (plen : nat) (pfun : nat -> bv 8)
     (npar : bool) (n : nat) (pidv : mword 32)
@@ -376,7 +376,7 @@ Definition namex_postS
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
-    (g : log_names) (gfs : fs_names) (bn : bio_names)
+    (g : log_names) (bn : bio_names)
     (cov : gset Z) (logstart bmapstart inodestart size : Z)
     (plen : nat) (pfun : nat -> bv 8)
     (npar : bool) (n : nat) (Sb : gset Z) (pidv : mword 32)
@@ -445,7 +445,7 @@ Definition wp_namex_sconf_body
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gfs : fs_names) (gi : gname)
+    (g : log_names) (gi : gname)
     (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -518,18 +518,18 @@ Definition wp_namex_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view gfs gd dev cov) -∗
-  log_ctx g bn gfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
+  log_ctx g bn fsc_fs cov logstart dev -∗
   kalloc_env ga None -∗
   (* ---- THE ICACHE'S PERSISTENT SET.  The FAMILIES, not the singletons:
      namex's slots are dirlookup's outputs and cannot be named in advance,
      which is the same reason iget takes [ic_escrows] and dirlink defined
      [ic_sleeplocks]. ---- *)
-  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic gfs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv gi gfs inodestart nib -∗
+  ireg_inv gi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -547,7 +547,7 @@ Definition wp_namex_sconf_body
   (* ---- iput's / itrunc's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_inv gfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   (* ---- the caller's own pid cell (acquiresleep records it) ---- *)
   proc_priv_bare pj pidv Vpr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
@@ -582,7 +582,7 @@ Definition wp_namex_sconf_body
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
-               g gfs bn cov logstart bmapstart inodestart size
+               g bn cov logstart bmapstart inodestart size
                plen pfun npar n pidv dq dqb dqs dqpv Vpr) -∗
   WP (Loop : expr riscv_lang).
 
@@ -611,7 +611,7 @@ Definition wp_namex_gen_body
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gfs : fs_names) (gi : gname)
+    (g : log_names) (gi : gname)
     (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -690,18 +690,18 @@ Definition wp_namex_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view gfs gd dev cov) -∗
-  log_ctx g bn gfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
+  log_ctx g bn fsc_fs cov logstart dev -∗
   kalloc_env ga None -∗
   (* ---- THE ICACHE'S PERSISTENT SET.  The FAMILIES, not the singletons:
      namex's slots are dirlookup's outputs and cannot be named in advance,
      which is the same reason iget takes [ic_escrows] and dirlink defined
      [ic_sleeplocks]. ---- *)
-  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic gfs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv gi gfs inodestart nib -∗
+  ireg_inv gi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -719,7 +719,7 @@ Definition wp_namex_gen_body
   (* ---- iput's / itrunc's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_inv gfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   (* ---- the caller's own pid cell (acquiresleep records it) ---- *)
   proc_priv_bare pj pidv Vpr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
@@ -757,7 +757,7 @@ Definition wp_namex_gen_body
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_postS (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
-                g gfs bn cov logstart bmapstart inodestart size
+                g bn cov logstart bmapstart inodestart size
                 plen pfun npar n Sb pidv dq dqb dqs dqpv Vpr) -∗
   WP (Loop : expr riscv_lang).
 
@@ -769,7 +769,7 @@ Module Type NAMEX.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
+      (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -781,7 +781,7 @@ Module Type NAMEX.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
+      wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gi gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev plen pfun nfun npar n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -794,7 +794,7 @@ Module Type NAMEX.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
+      (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -806,7 +806,7 @@ Module Type NAMEX.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
+      wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl
                         ga gf cov logstart bmapstart inodestart nib
                         size dev plen pfun nfun npar n Sb
                         pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -866,7 +866,7 @@ Notation K_namex_root := (70%nat) (only parsing).
 Definition wp_namex_root_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (gtl : gname) (gfs : fs_names) (gi : gname)
+    (gtl : gname) (gi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
@@ -891,13 +891,13 @@ Definition wp_namex_root_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic gfs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
   (* the inode region -- iget's premise since iclaim-ledger.md §3.3, and
      GHOST-ONLY there (the recycle arm's peel and its 0 -> 1 count move).
      Persistent, relayed unchanged. *)
-  ireg_reg gi gfs inodestart nib -∗
+  ireg_reg gi fsc_fs inodestart nib -∗
   (* ...AND NOT [ireg_open].  THE CORNER'S REGIME PREMISE IS GONE, and its
      absence is the whole point of this contract for the boot caller.
      [ireg_open] is the SEALED regime -- [FsReady.fs_ready_seal] mints it by
@@ -934,11 +934,11 @@ Module Type NAMEX_ROOT.
   Parameter wp_namex_root :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (gtl : gname) (gfs : fs_names) (gi : gname)
+      (gtl : gname) (gi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namex_root_body gtl gfs gi cov logstart inodestart nib dev dqp
+      wp_namex_root_body gtl gi cov logstart inodestart nib dev dqp
                          m n K eb p b lks Vpr.
 End NAMEX_ROOT.

@@ -138,7 +138,7 @@ Section ProofIunlockMain.
 
   Lemma wp_iunlock_dep_sconf
       (gs : list gname)
-      (gfs : fs_names) (gi : gname)
+      (gi : gname)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
       (k : nat) (s : Qp) (g : gname) (d : ic_dep) (dev inum : mword 32)
@@ -146,7 +146,7 @@ Section ProofIunlockMain.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlock_dep_sconf_body gs gfs gi gil gisl cov logstart k s g d
+    : wp_iunlock_dep_sconf_body gs gi gil gisl cov logstart k s g d
                                 dev inum dn' bm' pidv dq m K eb p b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlock_dep_sconf_body].
@@ -436,7 +436,7 @@ Section ProofIunlockMain.
        is persistent, so it survives the close. *)
     iApply fupd_wp.
     iInv "Hesc" as ">Hbodyp" "Hclosep".
-    iDestruct (ic_open_out fsc_ic gfs gi cov logstart k d g true
+    iDestruct (ic_open_out fsc_ic fsc_fs gi cov logstart k d g true
                  Hdg with "Hbodyp Hvalid Hdep")
       as "(Hvalid & Hdep & Hborp)".
     iDestruct "Hborp" as (sbp) "[Hlvp Hbbackp]".
@@ -464,7 +464,7 @@ Section ProofIunlockMain.
          what rules out [ic_out]'s frozen alternative -- the free path's
          window, which parks its live mass in [islot2] and deposits
          a [DepFrz], so there would be no slice to borrow. *)
-      iDestruct (ic_open_out fsc_ic gfs gi cov logstart k d g true
+      iDestruct (ic_open_out fsc_ic fsc_fs gi cov logstart k d g true
                    Hdg with "Hbody Hvalid Hdep")
         as "(Hvalid & Hdep & Hbor)".
       iDestruct "Hbor" as (sb) "[Hlv Hbback]".
@@ -555,7 +555,7 @@ Section ProofIunlockMain.
        [DepRd], undoes the arm at the same stroke, so no bundleless out-arm is
        ever visible.  What comes back beside the share is [ic_dep_side d]. *)
     iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_swap_park_dep fsc_ic gfs gi cov logstart k d s dev inum g dn' bm'
+    iMod (ic_swap_park_dep fsc_ic fsc_fs gi cov logstart k d s dev inum g dn' bm'
             Hdshr with "Hbody Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz")
       as "(Hbody & Htok & Href & Hside)".
     iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
@@ -797,7 +797,7 @@ Section ProofIunlockMain.
      iunlock's own proof is re-run. *)
   Lemma wp_iunlock_tx_sconf
       (gs : list gname)
-      (gfs : fs_names) (gi : gname)
+      (gi : gname)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
       (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
@@ -805,7 +805,7 @@ Section ProofIunlockMain.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlock_tx_sconf_body gs gfs gi gil gisl cov logstart k s g dev
+    : wp_iunlock_tx_sconf_body gs gi gil gisl cov logstart k s g dev
                                inum dn' bm' pidv dq m K eb p b lks Vpr.
   Proof.
     apply wp_iunlock_tx_of_dep. intros d.

@@ -152,7 +152,7 @@ Section ProofNameiparentMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
+      (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -163,7 +163,7 @@ Section ProofNameiparentMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
+    : wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl
                                 ga gf cov logstart bmapstart inodestart nib
                                 size dev plen pfun nfun n Sb
                                 pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -349,7 +349,7 @@ Section ProofNameiparentMain.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi gtl
+    iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn g gi gtl
               ga gf cov logstart bmapstart inodestart nib size dev
               plen pfun nfun true n Sb pidv dq dqb dqs dqpv R5 (K - 2)%nat eb b
               _ Vpr Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
@@ -551,7 +551,7 @@ Section ProofNameiparentMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
+      (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -562,7 +562,7 @@ Section ProofNameiparentMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
+    : wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gi gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev plen pfun nfun n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -579,7 +579,7 @@ Section ProofNameiparentMain.
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct (log_op_openSt with "Hlog") as (Sb0) "Hlog".
-    iApply (wp_nameiparent_gen gs j gl gu gd gk pd pav pu bn g gfs gi gtl
+    iApply (wp_nameiparent_gen gs j gl gu gd gk pd pav pu bn g gi gtl
               ga gf cov logstart bmapstart inodestart nib
               size dev plen pfun nfun n Sb0
               pidv dq dqb dqs dqpv m K eb b

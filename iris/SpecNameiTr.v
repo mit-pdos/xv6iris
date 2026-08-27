@@ -171,7 +171,7 @@ Definition wp_namei_tr_body
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gfs : fs_names) (gi : gname)
+    (g : log_names) (gi : gname)
     (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -219,14 +219,14 @@ Definition wp_namei_tr_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view gfs gd dev cov) -∗
-  log_ctx g bn gfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
+  log_ctx g bn fsc_fs cov logstart dev -∗
   kalloc_env ga None -∗
-  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic gfs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv gi gfs inodestart nib -∗
+  ireg_inv gi fsc_fs inodestart nib -∗
   ireg_open -∗
   procs_inv gs -∗
   dev_inv gu gd -∗
@@ -234,7 +234,7 @@ Definition wp_namei_tr_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_inv gfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   proc_priv_bare pj pidv Vpr -∗
   inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -302,7 +302,7 @@ Module Type NAMEI_TR.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
+      (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -313,7 +313,7 @@ Module Type NAMEI_TR.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namei_tr_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
+      wp_namei_tr_body gs j gl gu gd gk pd pav pu bn g gi gtl
                        ga gf cov logstart bmapstart inodestart nib
                        size dev plen pfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.

@@ -189,7 +189,7 @@ Definition wp_ireclaim_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z)
@@ -260,8 +260,8 @@ Definition wp_ireclaim_sconf_body
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   (* end_op's crash seam and era certificate *)
   fs_crash_seam cov logstart -∗
   gen_cert -∗
@@ -272,7 +272,7 @@ Definition wp_ireclaim_sconf_body
   (* THE INODE REGION -- persistent.  ireclaim never claims and never writes
      a dinode, so [DinodeSlot.diblk_slot_acc] is all its scan needs and
      [InodeRegion.ireg_claim_au] never appears. *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   (* THE BOOT-SHELTER TOKEN (fs-fragments.md §7.12 / §7.1.7).  ireclaim's [iget]
      fires at a claim-SHAPED record (type ≠ 0, nlink 0); the licence alone does
      not exclude a mid-window claim box, and the exclusion is the boot-order
@@ -282,14 +282,14 @@ Definition wp_ireclaim_sconf_body
      only caller, hands it in and takes it back. *)
   ireg_boot -∗
   (* ---- THE ICACHE, as iget / ilock / iput take it ---- *)
-  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic γfs γi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi cov logstart -∗
   (* THE FIFTY ENTRY SLEEPLOCKS, as a family: the scan does not know which
      slot iget will pick.  [IcacheEscrow.ic_sleeplocks_lookup] projects it. *)
   ic_sleeplocks fsc_ic -∗
   (* itrunc's bitmap, through iput *)
-  bitmap_inv γfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   (* the caller's own pid cell (bread's / begin_op's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle and the disk fabric *)
@@ -344,7 +344,7 @@ Module Type IRECLAIM.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (gtl : gname)
       (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
@@ -353,7 +353,7 @@ Module Type IRECLAIM.
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi gtl γpr
+      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γi gtl γpr
                              cov logstart bmapstart inodestart ninodes nib size
                              dev pidv dq dqb dqs dqn m K eb b lks Vpr.
 End IRECLAIM.

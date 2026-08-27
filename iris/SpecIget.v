@@ -149,7 +149,7 @@
    block, and nothing in the scan can say the inum names a live inode.
    §20.17.5 answered that with a paragraph -- the enumeration of the six
    reasons a caller believes its inum -- and [IgetLic.v] makes it a type:
-   one binder [l : ilic] and one premise [iname γi γfs inodestart inum l].  The user's
+   one binder [l : ilic] and one premise [iname γi fsc_fs inodestart inum l].  The user's
    invariant ("the kernel will never invoke iget on inode numbers in
    directories in a disconnected subtree") is not statable about the
    machine's traces; it IS statable here, at DELIVERY, and that is why the
@@ -210,7 +210,7 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Notation K_iget := (58%nat) (only parsing).
 Definition wp_iget_sconf_body
     `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γl : gname) (γfs : fs_names) (γi : gname)
+    (γl : gname) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (dev inum : mword 32)
     (l : ilic)                                   (* THE LICENCE, §7.1 *)
@@ -237,16 +237,16 @@ Definition wp_iget_sconf_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
-  is_itable2 γl fsc_ic γfs γi cov logstart nib dev -∗
+  is_itable2 γl fsc_ic fsc_fs γi cov logstart nib dev -∗
   (* the [ref] words *)
   itable_inv -∗
   (* EVERY entry's content -- the scan cannot name its slot in advance *)
-  ic_escrows fsc_ic γfs γi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi cov logstart -∗
   (* THE INODE REGION, and GHOST-ONLY (header, §3.3): the recycle arm's peel
      refutes a standing freeze from [l] inside it, and its 0 -> 1 count move
      carries the ledger's [icnt] half.  Persistent, so it costs a caller a
      frame and nothing else. *)
-  ireg_reg γi γfs inodestart nib -∗
+  ireg_reg γi fsc_fs inodestart nib -∗
   (* "iget: no inodes" IS REACHABLE -- see the header *)
   (* ...and it is an ORDINARY CALL: [kernel_data] mints the literal and this
      is the console bundle printk needs.  Note the arm fires while iget
@@ -259,7 +259,7 @@ Definition wp_iget_sconf_body
      block tie (SIMP-1) -- the standalone block equation this contract used
      to state, and the [discriminate] it forced on every non-[BufL] caller,
      are both gone. *)
-  iname γi γfs inodestart inum l -∗
+  iname γi fsc_fs inodestart inum l -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (k : nat) (q : Qp),
     sie_cap_gpr KT1 mr K b p -∗
@@ -279,19 +279,19 @@ Definition wp_iget_sconf_body
        §5.1).  A caller that needs the halves gets them in one destruct. *)
     inode_refb (is_claim l) k q dev inum -∗
     (* ...and BACK, unspent and at the SAME [l] *)
-    iname γi γfs inodestart inum l -∗
+    iname γi fsc_fs inodestart inum l -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type IGET.
   Parameter wp_iget_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γl : gname) (γfs : fs_names) (γi : gname)
+      (γl : gname) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (dev inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_iget_sconf_body γl γfs γi cov logstart inodestart nib dev inum l
+      wp_iget_sconf_body γl γi cov logstart inodestart nib dev inum l
                          m n eb p K b lks.
 End IGET.

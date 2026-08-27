@@ -185,7 +185,7 @@ Definition wp_ialloc_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
@@ -245,15 +245,15 @@ Definition wp_ialloc_sconf_body
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   (* the two superblock fields, read and handed straight back *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* THE INODE REGION -- persistent, and the ONLY region resource in this
      contract.  The claim is [InodeRegion.ireg_claim_au] and it takes
      nothing; see the header. *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  §2.4's
      claim-pin clause makes [ireg_slot]'s [c = Some] arm exhibit
      [IcacheRef.ireg_open], so [InodeRegion.ireg_claim_au] -- the one mover
@@ -278,9 +278,9 @@ Definition wp_ialloc_sconf_body
      one of its own; brelse gives it back *)
   bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic γfs γi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi cov logstart -∗
   (* ONE ledger unit for the tail iget; RETURNED on the no-inodes arm *)
   iref_slot -∗
   (* THIS OPERATION'S RESERVATION: the one log_write the claim runs *)
@@ -385,7 +385,7 @@ Definition wp_ialloc_gen_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
@@ -445,15 +445,15 @@ Definition wp_ialloc_gen_body
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   (* the two superblock fields, read and handed straight back *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* THE INODE REGION -- persistent, and the ONLY region resource in this
      contract.  The claim is [InodeRegion.ireg_claim_au] and it takes
      nothing; see the header. *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  §2.4's
      claim-pin clause makes [ireg_slot]'s [c = Some] arm exhibit
      [IcacheRef.ireg_open], so [InodeRegion.ireg_claim_au] -- the one mover
@@ -478,9 +478,9 @@ Definition wp_ialloc_gen_body
      one of its own; brelse gives it back *)
   bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic γfs γi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi cov logstart -∗
   (* ONE ledger unit for the tail iget; RETURNED on the no-inodes arm *)
   iref_slot -∗
   (* THIS OPERATION'S RESERVATION, IN SET FORM: the one log_write the claim
@@ -556,7 +556,7 @@ Module Type IALLOC.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (gtl : gname)
       (γpr : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
@@ -566,7 +566,7 @@ Module Type IALLOC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
-      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi gtl γpr
+      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γi gtl γpr
                          cov logstart inodestart ninodes nib dev ty u Sb
                          pidv dq dqs dqn m K eb b lks Vpr t qt.
 
@@ -577,7 +577,7 @@ Module Type IALLOC.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (gtl : gname)
       (γpr : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
@@ -587,7 +587,7 @@ Module Type IALLOC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
-      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi gtl γpr
+      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γi gtl γpr
                            cov logstart inodestart ninodes nib dev ty u
                            pidv dq dqs dqn m K eb b lks Vpr t qt.
 End IALLOC.

@@ -146,7 +146,7 @@ Local Open Scope Z_scope.
    argstr 60, end_op 58, begin_op 26, argint 18. *)
 Notation K_sys_mknod := (144%nat) (only parsing).
 Section SpecSysMknod.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, FSC : fscfg}.
 
   (* sys_mknod's result: 0, or -1.  Nothing else reaches the caller -- the
      inode create returned was iunlockput inside, and [proc_priv] comes back
@@ -166,7 +166,7 @@ Definition wp_sys_mknod_sconf_body
     (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gfs : fs_names) (gi : gname)
+    (g : log_names) (gi : gname)
     (gtl : gname)                       (* the itable's lock   *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (ninodes : Z) (size : Z) (dev : mword 32)
@@ -231,8 +231,8 @@ Definition wp_sys_mknod_sconf_body
   (* ---- the two persistent credentials ialloc's printk arm needs ---- *)
   printk_env γpr gu gd -∗
   (* ---- the block layer ---- *)
-  bio_ctx bn (fs_view gfs gd dev cov) -∗
-  log_ctx g bn gfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
+  log_ctx g bn fsc_fs cov logstart dev -∗
   fs_crash_seam cov logstart -∗
   gen_cert -∗
   dev_inv gu gd -∗
@@ -240,11 +240,11 @@ Definition wp_sys_mknod_sconf_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region ialloc claims out of ---- *)
-  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic gfs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv gi gfs inodestart nib -∗
+  ireg_inv gi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
      borrowed and never spent; it rides the SAME channel [ireg_inv] does,
      down to [SpecCreate] -> [SpecIalloc] -> [InodeRegion.ireg_claim_au],
@@ -258,7 +258,7 @@ Definition wp_sys_mknod_sconf_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv gfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   (* argstr's page-table side, and create's (iget's ipool arm allocates) *)
   kalloc_env γa None -∗
   (* the running-thread bundle *)
@@ -309,7 +309,7 @@ Module Type SYSMKNOD.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
+      (g : log_names) (gi : gname)
       (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
@@ -319,7 +319,7 @@ Module Type SYSMKNOD.
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_mknod_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g gfs gi
+      wp_sys_mknod_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g gi
                               gtl cov logstart bmapstart inodestart nib
                               ninodes size dev ns dqb dqs dqbs dqn
                               v0 v1 v2 pid V m K eb b lks.

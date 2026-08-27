@@ -448,7 +448,7 @@ Definition wp_dirlink_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname) (γpr : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
@@ -556,24 +556,24 @@ Definition wp_dirlink_sconf_body
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   kalloc_env γa None -∗
   (* ---- THE LOCKED DIRECTORY ---- *)
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqf} dinum -∗
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
-  inode_blocks γfs bm data -∗
+  inode_map fsc_fs ip bm -∗
+  inode_blocks fsc_fs bm data -∗
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's f, strncpy's src) ---- *)
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- the superblock cells and the bitmap ---- *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv γfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -593,13 +593,13 @@ Definition wp_dirlink_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots 3 -∗
   (* ---- THE ICACHE ---- *)
-  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic γfs γi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi cov logstart -∗
   ic_sleeplocks fsc_ic -∗
   iref_slot -∗
   (* the borrowed ticket list, over the PRE-state *)
-  IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data -∗
+  IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
   log_op γ ncount -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
@@ -621,8 +621,8 @@ Definition wp_dirlink_sconf_body
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqf} dinum -∗
       inode_meta ip dn' -∗
-      inode_map γfs ip bm' -∗
-      inode_blocks γfs bm' data' -∗
+      inode_map fsc_fs ip bm' -∗
+      inode_blocks fsc_fs bm' data' -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -636,7 +636,7 @@ Definition wp_dirlink_sconf_body
       (* ...and the borrow, back VERBATIM -- at the PRE-state's [dn]/[data],
          which is what R13(ii) admits and what the caller's own re-park
          movers take. *)
-      IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data -∗
+      IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
       (* at most [dirlink_units] gone, and none gained *)
       ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       log_op γ n' -∗
@@ -723,7 +723,7 @@ Definition wp_dirlink_gen_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname) (γpr : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
@@ -838,24 +838,24 @@ Definition wp_dirlink_gen_body
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   kalloc_env γa None -∗
   (* ---- THE LOCKED DIRECTORY ---- *)
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqf} dinum -∗
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
-  inode_blocks γfs bm data -∗
+  inode_map fsc_fs ip bm -∗
+  inode_blocks fsc_fs bm data -∗
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's f, strncpy's src) ---- *)
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- the superblock cells and the bitmap ---- *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv γfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -875,13 +875,13 @@ Definition wp_dirlink_gen_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots 3 -∗
   (* ---- THE ICACHE ---- *)
-  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic γfs γi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi cov logstart -∗
   ic_sleeplocks fsc_ic -∗
   iref_slot -∗
   (* the borrowed ticket list, over the PRE-state *)
-  IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data -∗
+  IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
   log_opS γ ncount Sb -∗
   (* ...AND THE SHARE IPUT'S WINDOWS PARK (durable-disk B''-tx5).  dirlink
@@ -909,8 +909,8 @@ Definition wp_dirlink_gen_body
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqf} dinum -∗
       inode_meta ip dn' -∗
-      inode_map γfs ip bm' -∗
-      inode_blocks γfs bm' data' -∗
+      inode_map fsc_fs ip bm' -∗
+      inode_blocks fsc_fs bm' data' -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -924,7 +924,7 @@ Definition wp_dirlink_gen_body
       (* ...and the borrow, back VERBATIM -- at the PRE-state's [dn]/[data],
          which is what R13(ii) admits and what the caller's own re-park
          movers take. *)
-      IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data -∗
+      IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
       (* at most [dirlink_units] gone, and none gained *)
       ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       (* THE SET ONLY GROWS.  No ceiling -- SpecWritei's header's reason
@@ -1028,7 +1028,7 @@ Module Type DIRLINK.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (gtl : gname)
       (γa : gname) (γf : gname) (γpr : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
@@ -1042,7 +1042,7 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi gtl
+      wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ γi gtl
                             γa γf γpr cov logstart inodestart nib bmapstart
                             size dev ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
@@ -1058,7 +1058,7 @@ Module Type DIRLINK.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (gtl : gname)
       (γa : gname) (γf : gname) (γpr : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
@@ -1072,7 +1072,7 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi gtl
+      wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ γi gtl
                           γa γf γpr cov logstart inodestart nib bmapstart
                           size dev ip dinum bm data dn dn0 fn inum
                           ncount Sb tid qtx pidv dq dqd dqn dqs dqb dqbs dqf

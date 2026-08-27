@@ -108,7 +108,7 @@
    [SpecInitlog.wp_initlog_sconf] (whose whole struct-log bundle, era mirror
    and FsBlocks material ride straight through untouched) and
    [SpecIreclaim.wp_ireclaim_sconf].  Note the ORDER is load-bearing:
-   initlog is what PRODUCES [log_ctx icfg_log bn γfs cov logstart dev], and
+   initlog is what PRODUCES [log_ctx icfg_log bn fsc_fs cov logstart dev], and
    ireclaim CONSUMES it (begin_op / end_op / iput).  So the log context does
    not cross this contract's boundary as an input at all -- it is born at
    +0x4e and handed to the caller at the end.
@@ -255,7 +255,7 @@ Definition wp_fsinit_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γfs : fs_names) (γi : gname)
+    (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z)
@@ -396,7 +396,7 @@ Definition wp_fsinit_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
   (* initlog's crash seam, era certificate and the era's BORN-TRUE mirror
      half + swap receipt (durable-disk 1a) *)
   fs_crash_seam cov logstart -∗
@@ -417,20 +417,20 @@ Definition wp_fsinit_sconf_body
      spends it twice -- at the [readsb] crossing above +0x4e, which runs
      BEFORE recovery and so goes through the [b ∉ X] form, and inside
      [initlog], which is where the exception set is emptied and sealed. *)
-  fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
+  fs_bytes_inv (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
                (fs_home_set cov logstart) Xv -∗
-  fsblock (fs_bytes γfs) 1 bs_sb -∗
+  fsblock (fs_bytes fsc_fs) 1 bs_sb -∗
   (* THE BYTE VIEW'S EXCEPTION HANDLE (durable-disk lane E-except), from
      the era's mint, threaded straight into [initlog], which empties it and
      seals it into [LogInv.log_ctx].  fsinit itself spends it once, at the
      [readsb] crossing above +0x4e: block 1 is never in the exception set
      ([FsCrash.hdr_wf]'s block-1 row, lane E-blk1).  It is [∅] while the
      era's mint still reads the RAW home blocks. *)
-  exc_own (fs_exc γfs) (list_to_set (hdr_dec bs_hdr).2) -∗
+  exc_own (fs_exc fsc_fs) (list_to_set (hdr_dec bs_hdr).2) -∗
   ([∗ list] i ∈ seq 0 32, pa_add sb_base i ↦ₘ sb_old i) -∗
   (* ---- the icache's four persistent things, straight from
          [IcacheBoot.icache_boot] ---- *)
-  ireg_reg γi γfs inodestart nib -∗
+  ireg_reg γi fsc_fs inodestart nib -∗
   (* THE BOOT-SHELTER TOKEN (fs-fragments.md §7.12), from [icfg_alloc] through
      the boot chain: fsinit frames it across bread/memmove/initlog and hands it
      to ireclaim, which is the only reason it is safe there (§7.1.7).  Returned
@@ -438,12 +438,12 @@ Definition wp_fsinit_sconf_body
      returns and before [kexec("/init")] -- that seal is OWED to forkret's
      first branch. *)
   ireg_boot -∗
-  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic γfs γi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi cov logstart -∗
   ic_sleeplocks fsc_ic -∗
   (* itrunc's bitmap, through ireclaim's iput *)
-  bitmap_reg γfs bmapstart cov logstart size -∗
+  bitmap_reg fsc_fs bmapstart cov logstart size -∗
   (* ---- initlog's RAW struct log cells, threaded straight through ---- *)
   log_addr ↦₄ vlock -∗
   lock_name_field log_addr ↦₈ vname -∗
@@ -456,12 +456,12 @@ Definition wp_fsinit_sconf_body
   lh_n_pa ↦₄ v_n -∗
   ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w) -∗
   (* ---- initlog's FsBlocks material ---- *)
-  ghost_map_auth (fs_cache γfs) 1 L -∗
-  ghost_map_auth (fs_dirty γfs) 1 D -∗
-  ([∗ set] z ∈ cov, z ↪[fs_dirty γfs]{#(1/2)} false) -∗
-  fs_chalf γfs (log_hdr_bno logstart) bs_hdr -∗
+  ghost_map_auth (fs_cache fsc_fs) 1 L -∗
+  ghost_map_auth (fs_dirty fsc_fs) 1 D -∗
+  ([∗ set] z ∈ cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) -∗
+  fs_chalf fsc_fs (log_hdr_bno logstart) bs_hdr -∗
   ([∗ list] i ∈ seq 0 LOGBLOCKS,
-     ∃ bs : list (bv 8), fs_chalf γfs (log_slot_bno logstart i) bs) -∗
+     ∃ bs : list (bv 8), fs_chalf fsc_fs (log_slot_bno logstart i) bs) -∗
   (* the caller's own pid cell *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle and the disk fabric *)
@@ -515,10 +515,10 @@ Definition wp_fsinit_sconf_body
       (* THE LOG LAYER, BUILT by initlog at +0x4e and already USED by
          ireclaim at +0x54.  It does not cross the boundary as an input.
          AT [icfg_log], not existentially: this is [FsReady.fs_ready]'s log
-         conjunct, modulo the seal site's instantiation of [bn]/[γfs]/[cov]/
+         conjunct, modulo the seal site's instantiation of [bn]/[fsc_fs]/[cov]/
          [logstart] at [fsc_bio]/[fsc_fs]/[fsc_cov]/[fsc_logst] and
          [dev = icfg_dev], which premise (e) above already gives. *)
-      log_ctx icfg_log bn γfs cov logstart dev -∗
+      log_ctx icfg_log bn fsc_fs cov logstart dev -∗
       (* three, not two: see the header *)
       bslots 3 -∗
       iref_slot -∗
@@ -536,7 +536,7 @@ Module Type FSINIT.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γfs : fs_names) (γi : gname)
+      (γi : gname)
       (gtl : gname)
       (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
@@ -556,7 +556,7 @@ Module Type FSINIT.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb),
-      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi gtl γpr
+      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γi gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog

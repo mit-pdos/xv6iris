@@ -34,7 +34,7 @@
 
    ==== THE POSTCONDITION IS A FLAT BYTE-RANGE CLAIM ====================
 
-   [inode_blocks γfs bm data] is indexed by file BLOCK; writei is about a
+   [inode_blocks fsc_fs bm data] is indexed by file BLOCK; writei is about a
    byte RANGE that straddles blocks.  Stating the effect per block would
    force every caller to redo the straddle arithmetic, so the view is
    defined once ([file_byte] below) and the whole effect is ONE clause:
@@ -308,6 +308,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -512,7 +513,7 @@ Definition wp_writei_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -636,8 +637,8 @@ Definition wp_writei_sconf_body
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   (* either_copyin's user arm reaches copyin, which reaches vmfault/kalloc *)
   kalloc_env γa None -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS *)
@@ -646,18 +647,18 @@ Definition wp_writei_sconf_body
   (* the five metadata cells (ip->size is read AND written), the thirteen
      addrs cells and the indirect block, and the file's data blocks *)
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
-  inode_blocks γfs bm data -∗
+  inode_map fsc_fs ip bm -∗
+  inode_blocks fsc_fs bm data -∗
   (* sb.inodestart, read once inside iupdate *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* sb.size and sb.bmapstart, and THE BITMAP: bmap's interior balloc needs
      all three, and writei calls bmap once per straddled block *)
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv γfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* THE SOURCE, AND THE PID CELL THAT RIDES WITH IT.  On the user arm a
      virtual address into the running process's own space; on the kernel arm
@@ -761,8 +762,8 @@ Definition wp_writei_sconf_body
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn' -∗
-      inode_map γfs ip bm' -∗
-      inode_blocks γfs bm' data' -∗
+      inode_map fsc_fs ip bm' -∗
+      inode_blocks fsc_fs bm' data' -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -796,7 +797,7 @@ Definition wp_writei_gen_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γ : log_names) (γi : gname)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -910,8 +911,8 @@ Definition wp_writei_gen_body
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  log_ctx γ bn fsc_fs cov logstart dev -∗
   (* either_copyin's user arm reaches copyin, which reaches vmfault/kalloc *)
   kalloc_env γa None -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS *)
@@ -920,18 +921,18 @@ Definition wp_writei_gen_body
   (* the five metadata cells (ip->size is read AND written), the thirteen
      addrs cells and the indirect block, and the file's data blocks *)
   inode_meta ip dn -∗
-  inode_map γfs ip bm -∗
-  inode_blocks γfs bm data -∗
+  inode_map fsc_fs ip bm -∗
+  inode_blocks fsc_fs bm data -∗
   (* sb.inodestart, read once inside iupdate *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* sb.size and sb.bmapstart, and THE BITMAP: bmap's interior balloc needs
      all three, and writei calls bmap once per straddled block *)
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv γfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_inv γi fsc_fs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* THE SOURCE, AND THE PID CELL THAT RIDES WITH IT.  On the user arm a
      virtual address into the running process's own space; on the kernel arm
@@ -1045,8 +1046,8 @@ Definition wp_writei_gen_body
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn' -∗
-      inode_map γfs ip bm' -∗
-      inode_blocks γfs bm' data' -∗
+      inode_map fsc_fs ip bm' -∗
+      inode_blocks fsc_fs bm' data' -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1070,7 +1071,7 @@ Module Type WRITEI.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (γa : gname) (γf : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -1083,7 +1084,7 @@ Module Type WRITEI.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_writei_sconf_body ktb γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+      wp_writei_sconf_body ktb γs j γl γu γd γk pd pav pu bn γ γi γa γf
                            cov logstart inodestart nib bmapstart size dev γpr
                            ip inum bm data dn dn0
                            user off n src_bytes V ncount
@@ -1099,7 +1100,7 @@ Module Type WRITEI.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γi : gname)
       (γa : gname) (γf : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -1112,7 +1113,7 @@ Module Type WRITEI.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_writei_gen_body ktb γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+      wp_writei_gen_body ktb γs j γl γu γd γk pd pav pu bn γ γi γa γf
                          cov logstart inodestart nib bmapstart size dev γpr
                          ip inum bm data dn dn0
                          user off n src_bytes V ncount Sb

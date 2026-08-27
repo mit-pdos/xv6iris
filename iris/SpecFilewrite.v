@@ -264,7 +264,6 @@ Record fwrite_names := MkFWriteNames {
   fwn_pu         : mword 64;
   fwn_bio        : bio_names;
   fwn_log        : log_names;     (* begin_op / end_op                      *)
-  fwn_fs         : fs_names;
   fwn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
   fwn_pr         : gname;         (* balloc's printk credential             *)
   fwn_cov        : gset Z;
@@ -299,7 +298,6 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     (MkLogNames 1%positive 1%positive 1%positive 1%positive 1%positive)
-    (MkFsNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive)
     1%positive
     1%positive
     ∅ 0 0 0 0
@@ -461,10 +459,10 @@ Section SpecFilewrite.
         a hypothesis, never a functor (SpecBalloc.v's header) *)
      ⌜printk_gen_contract (kt := KT1) (fwn_pr fn) (fwn_uart fn) (fwn_disk fn)⌝ ∗
      bio_ctx (fwn_bio fn)
-       (fs_view (fwn_fs fn) (fwn_disk fn) icfg_dev (fwn_cov fn)) ∗
+       (fs_view fsc_fs (fwn_disk fn) icfg_dev (fwn_cov fn)) ∗
      (* THE LOG: begin_op mints the reservation, end_op spends it, and the
         loop does one transaction PER CHUNK *)
-     log_ctx (fwn_log fn) (fwn_bio fn) (fwn_fs fn) (fwn_cov fn)
+     log_ctx (fwn_log fn) (fwn_bio fn) fsc_fs (fwn_cov fn)
              (fwn_logstart fn) icfg_dev ∗
      (* end_op's crash seam and era certificate *)
      fs_crash_seam (fwn_cov fn) (fwn_logstart fn) ∗
@@ -475,9 +473,9 @@ Section SpecFilewrite.
      (* THE THREE PERSISTENT ICACHE INVARIANTS SpecIlock / SpecIunlock take,
         the escrow at the FAMILY where it was per-slot *)
      itable_inv ∗
-     ic_escrows fsc_ic (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
+     ic_escrows fsc_ic fsc_fs (fwn_ireg fn) (fwn_cov fn)
                 (fwn_logstart fn) ∗
-     ireg_inv (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) icfg_nib ∗
+     ireg_inv (fwn_ireg fn) fsc_fs (fwn_inodestart fn) icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
      (* THE LENT SHARE AND ITS GENERATION'S TYPE WITNESS ARE NOT HERE.
@@ -497,7 +495,7 @@ Section SpecFilewrite.
      sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fwn_bmapstart fn) : mword 32) ∗
      (* THE BITMAP's invariant (BitmapInv.v): the pool bmap -> balloc draws
         from; persistent, and it says nothing about which blocks are in use *)
-     bitmap_inv (fwn_fs fn) (fwn_bmapstart fn) (fwn_cov fn) (fwn_logstart fn)
+     bitmap_inv fsc_fs (fwn_bmapstart fn) (fwn_cov fn) (fwn_logstart fn)
                 (fwn_size fn) ∗
      (* the disk fabric *)
      dev_inv (fwn_uart fn) (fwn_disk fn) ∗

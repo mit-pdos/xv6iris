@@ -181,6 +181,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -240,7 +241,6 @@ Definition wp_readi_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γfs : fs_names)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (ip : mword 64)
@@ -323,14 +323,14 @@ Definition wp_readi_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
   (* THE BYTE VIEW'S ROW (durable-disk 1c-flip step 3).  readi is the one
      whole-block reader in the tree that holds NO log/region/bitmap
      invariant -- by design, it takes no [log_ctx] -- so the row it needs
      to turn "the buffer holds [bsl]" into "[bsl] is what my byte run says"
      comes in as its own premise.  Persistent, and every caller has one
      ([InodeRegion.ireg_inv_bytes]). *)
-  fs_bytes_any γfs -∗
+  fs_bytes_any fsc_fs -∗
   (* either_copyout's user arm reaches copyout, which reaches vmfault/kalloc *)
   kalloc_env γa None -∗
   (* ip->dev: read, never written -- a FRACTION *)
@@ -352,8 +352,8 @@ Definition wp_readi_sconf_body
      section 4), can call readi -- which is the whole point of the
      fraction.  The ADDRS cells inside [inode_map_q] are not shared:
      records park region-side at fraction 1 always. *)
-  inode_map_q γfs dq ip bm -∗
-  inode_blocks_q γfs dq bm data -∗
+  inode_map_q fsc_fs dq ip bm -∗
+  inode_blocks_q fsc_fs dq bm data -∗
   (* THE DESTINATION, AND THE PID CELL THAT RIDES WITH IT.  On the user arm a
      virtual address into the running process's own space; on the kernel arm
      the caller's own [n]-byte buffer, whose current contents are [dst_olds].
@@ -417,8 +417,8 @@ Definition wp_readi_sconf_body
       pc_is ret_tgt -∗
       i_dev ip ↦₄{dqd} dev -∗
       inode_meta ip dn -∗
-      inode_map_q γfs dq ip bm -∗
-      inode_blocks_q γfs dq bm data -∗
+      inode_map_q fsc_fs dq ip bm -∗
+      inode_blocks_q fsc_fs dq bm data -∗
       (* THE BYTES DELIVERED ARE THE FILE'S BYTES.  Exact on both ends: the
          untouched tail still holds what the caller put there.  The pid
          fraction goes back the way it came -- with the kernel arm's buffer,
@@ -440,7 +440,6 @@ Module Type READI.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γfs : fs_names)
       (γa : gname) (γf : gname)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64)
@@ -451,7 +450,7 @@ Module Type READI.
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_readi_sconf_body ktb γs j γl γu γd γk pd pav pu bn γfs γa γf
+      wp_readi_sconf_body ktb γs j γl γu γd γk pd pav pu bn γa γf
                           cov logstart dev ip bm data dn
                           user off n dst_olds V
                           pidv dq dqd m K eb b lks.

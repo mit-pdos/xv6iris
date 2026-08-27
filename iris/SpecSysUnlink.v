@@ -323,7 +323,7 @@ Definition wp_sys_unlink_sconf_body
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gfs : fs_names) (gi : gname)
+    (g : log_names) (gi : gname)
     (gtl : gname)                      (* the itable's lock   *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -386,8 +386,8 @@ Definition wp_sys_unlink_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   printk_env γpr gu gd -∗
   (* ---- the block layer ---- *)
-  bio_ctx bn (fs_view gfs gd dev cov) -∗
-  log_ctx g bn gfs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
+  log_ctx g bn fsc_fs cov logstart dev -∗
   fs_crash_seam cov logstart -∗
   gen_cert -∗
   dev_inv gu gd -∗
@@ -395,11 +395,11 @@ Definition wp_sys_unlink_sconf_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region the two flushes write ---- *)
-  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic gfs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv gi gfs inodestart nib -∗
+  ireg_inv gi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -414,7 +414,7 @@ Definition wp_sys_unlink_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-  bitmap_inv gfs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart cov logstart size -∗
   (* argstr's page-table side, and the walk's (iget's ipool arm allocates) *)
   kalloc_env γa None -∗
   (* the running-thread bundle *)
@@ -440,7 +440,7 @@ Module Type SYSUNLINK.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
+      (g : log_names) (gi : gname)
       (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -449,7 +449,7 @@ Module Type SYSUNLINK.
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_unlink_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g gfs
+      wp_sys_unlink_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g
                                gi gtl cov logstart bmapstart inodestart
                                nib size dev dqb dqs dqbs v0 pid V
                                m K eb b lks.

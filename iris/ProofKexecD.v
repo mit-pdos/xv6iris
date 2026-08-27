@@ -90,6 +90,7 @@ Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* durable-notes' rule: a goal over [proc_priv] carries [tf_page]'s
@@ -120,7 +121,7 @@ Notation KXD := KernelSyms.kexec (only parsing).
 (*  hart the previous iteration ended on).                                 *)
 (* ===================================================================== *)
 Section KexecDName.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
 
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -750,7 +751,7 @@ Section KexecDCommit.
   (*  [pa_add pv q'] instead.                                              *)
   (* ------------------------------------------------------------------- *)
   Definition kxd_res
-      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (jp : nat) (bn : bio_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
@@ -763,7 +764,7 @@ Section KexecDCommit.
     (iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
-     bitmap_inv gfs bmapstart cov logstart size ∗
+     bitmap_inv fsc_fs bmapstart cov logstart size ∗
      bslots 3 ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv Vc ∗
@@ -874,7 +875,7 @@ Section KexecDCommit.
   (* ------------------------------------------------------------------- *)
   Lemma kxd_commit
       (Q : mword 64 -> Prop)
-      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (jp : nat) (bn : bio_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
@@ -925,7 +926,7 @@ Section KexecDCommit.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
     kalloc_env ga None -∗
-    kxd_res jp bn gfs ga gf cov logstart bmapstart inodestart size
+    kxd_res jp bn ga gf cov logstart bmapstart inodestart size
             plen pfun na avf aslen afun pidv
             (upd_tf V (<[tf_arg_idx 1
                          := (mword_of_int (kxc_sp_final (uint sz1) alen c)
@@ -1910,7 +1911,7 @@ Section KexecDMain.
   (* =================================================================== *)
   Lemma kxd_phaseD
       (Q : mword 64 -> Prop)
-      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (jp : nat) (bn : bio_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
@@ -1940,7 +1941,7 @@ Section KexecDMain.
     m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
     m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 ->
     kernel_text -∗
-    kxc_at_2a6 jp bn gfs ga gf cov logstart bmapstart inodestart size
+    kxc_at_2a6 jp bn ga gf cov logstart bmapstart inodestart size
                plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 (m !!! Regidx Rs11) c -∗
@@ -2158,7 +2159,7 @@ Section KexecDMain.
     iAssert (∀ (last : mword 64),
                word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) last -∗
                ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
-               kxd_res jp bn gfs ga gf cov logstart bmapstart inodestart size
+               kxd_res jp bn ga gf cov logstart bmapstart inodestart size
                        plen pfun na avf aslen afun pidv
                        (upd_tf V (<[tf_arg_idx 1
                                     := (mword_of_int
@@ -2217,7 +2218,7 @@ Section KexecDMain.
                       (CID5 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID5 true (proc_addr jp) _ Hcr5
                    with "Hcont") as "Hcont".
-      iApply (kxd_commit (CID0 := CID5) Q jp bn gfs ga gf cov logstart bmapstart
+      iApply (kxd_commit (CID0 := CID5) Q jp bn ga gf cov logstart bmapstart
                 inodestart size plen pfun na avf alen aslen afun pidv V eb
                 dqb dqs dqa dqpv dqas m D3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0%nat
@@ -2362,7 +2363,7 @@ Section KexecDMain.
                       (CID9 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID9 true (proc_addr jp) _ Hcr9
                    with "Hcont") as "Hcont".
-      iApply (kxd_commit (CID0 := CID9) Q jp bn gfs ga gf cov logstart bmapstart
+      iApply (kxd_commit (CID0 := CID9) Q jp bn ga gf cov logstart bmapstart
                 inodestart size plen pfun na avf alen aslen afun pidv V eb
                 dqb dqs dqa dqpv dqas m Mf K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c q'
