@@ -2945,6 +2945,64 @@ so it never wanted that shape.
     exported claim must keep.  Nothing was deleted: the value-first
     allocator (`fs_state_of_ledger`, `blk_ledger_cut`, `ledger_carve`,
     `fp_*`) and `snap_bytes`' cut clauses all still have their two callers.
+
+  **AS LANDED — H2.  THE LAW HANDS DOWN THE EPOCH; THE TRANSPORT STILL HAS
+  NO CALL SITE, AND TWO SHAPES SAY WHY.**
+
+  Whole tree green, `make audit-only` at the three-entry baseline, the
+  theorem's statement and exported content untouched.
+
+  - **`LogSnapLaw.snap_law`'s conclusion is a RESOURCE.**
+    `snap_law_out C home` = `FsDurSnap.P_dur (fs_restrict (dv_of_D C)
+    home)`, and the FILE SYSTEM builds the epoch — inside
+    `FsCollectAll.fs_snap_law_build`, at the one ghost step where its six
+    invariant families are open — while the WAL's commit permits
+    (`FsCrash.fs_commit_L_sector0_rec`/`_seq_permit`) only swap the registry
+    over (`FsDurSnap.dsnap_step_xfer`).  The WAL allocates nothing durable
+    any more, and its permits take the epoch instead of `⌜∃ S, snap_ok S L⌝`.
+  - **`LogInv.v` was edited once**: its section `Context` gained `fsLinkG`
+    and `fsTopG` (`diskImgG` comes off `riscvGS`), and
+    `log_ctx_snap_law_of_ops`' conclusion is the resource.  Both classes are
+    `Xv6G.xv6G` members and `LogInv` sits below the bundle, so of the 91
+    files that name `log_ctx` NOT ONE gained a binder.  `snap_law_ok` is
+    deleted.
+  - **The WP-side threading is what was predicted, plus one rewrite.**
+    `ProofEndOp.eo_snap_law_of_auth`/`eo_open_snap_law` yield the resource;
+    `eo_commit` (`:1974`) and `eo_loop` (`:2725`) carry it as a spatial
+    premise across `end_op`'s lock release, and the copy loop's back edge is
+    one `iEval (rewrite -Hsnapmap) in "Hepoch"` off `eo_home_restrict_upd`.
+    **`iFrame` MUST NOT GO FIRST at the law's close**: `P_dur` is an
+    existential over a `∗` whose head conjunct is a byte AUTHORITY, so a
+    bare `iFrame` unifies the snapshot's fresh gname with the era's
+    `fs_bytes γfs` and leaves an unclosable goal — split the epoch off by
+    name first.
+  - **`dsnap_step_of` IS DELETED** (its `snap_ok` form had no caller left).
+    `dsnap_step_id`/`_trans` remain caller-less, as before this lane.
+  - **WALL — `iris/FsDurXferWall.v`, and it is about the SHAPES.**  Item 3
+    of the brief (make `snap_ok` a reading off the snapshot's resources) is
+    REFUTED: `FsDurSnap.fs_snap Γ g B D S` mentions `D` in exactly one
+    place, the pure conjunct `⌜snap_ok S D⌝`, so a reading off the resources
+    would hold at every `D`, hence at `∅`, which no state fits
+    (`snap_ok_not_readable` over `snap_ok_empty_absurd`; `fs_snap_split` is
+    the D-freeness, `fs_snap_res_inhabited` the non-vacuity).  The cause is
+    not a missing lemma — `D` is a VALUE the WAL computes, and `P_dur`
+    cannot own a ledger of it beside `fs_state Γ S` at full fraction.  And
+    the commit's collection is not a legal transport source either:
+    `FsCollect.col_bundle`'s share is existential with the single constraint
+    "the double is invalid", which `DfracOwn (3/4)` meets
+    (`dfrac_34_no_pair`) and which cannot be promoted to the full element
+    `fs_state` wants (`phi_no_promote`).  Consequences for whoever takes
+    this next: `snap_ok` must still be MATERIALISED at every commit
+    (`FsCollect.col_snap_ok_ex`, `pure_keep` and `col_snap_bytes` all keep
+    their caller, so item 4's deletions beyond `dsnap_step_of` cannot
+    happen), and the transport at the commit needs (a) a PER-OBJECT-share
+    source — the disjointness survives, `phi_excl` is fraction-aware — and
+    (b) an accessor-shaped collection, which `pure_keep` cannot give.  Even
+    with both, `fs_snap_alloc_xfer` takes `snap_ok S D` BESIDE the instance,
+    so it is a strictly larger obligation than `P_dur_alloc` until the first
+    wall is fixed.  **The first wall is the one to take: it is a question
+    about what `P_dur` owns, and it is upstream of everything else in
+    lane H.**
 - [ ] **Lane F — strengthening and receipts.**  Persistent snapshot
   copies as sync-style receipts (`sys_sync`'s spec — see the fs-syscall
   notes another session landed); the `P_log`/`P_fs` split as two

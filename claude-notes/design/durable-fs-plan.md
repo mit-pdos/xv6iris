@@ -150,18 +150,22 @@ live directory, unique names).  There is NO cross-inode pure clause:
   (the parked `Ψ D₀ Dc` and the `log_psi_*` laws are deleted — §4, §8).
 - **Commit** (`end_op` at `outstanding = 0`; WAL-internal.  LANDED):
   installs "`D := L`" (`FsCrash.fs_commit_L_*`) and, at the same ghost step,
-  allocates a FRESH snapshot at the new committed map and drops the old one
-  (`FsDurSnap.dsnap_step_of`, inside the permit's own `bupd`).  What makes
-  that step legal is a persistent, file-system-supplied law parked in
-  `log_ctx` (the WAL stays file-system-agnostic): given the byte authority
-  at `L` and "no transaction is open", it yields `∃ S, snap_ok S L` and
-  hands the authority back — it moves NO durable resource (§8's refutation
-  is about fupds that do).  It is `LogSnapLaw.snap_law`, `log_ctx`'s last
-  conjunct, read at the ledger by `LogInv.log_ctx_snap_law_of_ops`; it is
-  ARITY-FREE (the mask it runs in is closed over, with the one fact a
-  committer needs beside it — that `logN` is not in it), and it is supplied
-  at `initlog` MINUS block 1's park, since nobody owns block 1 until
-  `initlog` parks it.
+  installs a FRESH snapshot at the new committed map and drops the old one
+  (`FsDurSnap.dsnap_step_xfer`, inside the permit's own `bupd`).  **THE
+  EPOCH IS BUILT BY THE FILE SYSTEM, NOT BY THE WAL** (lane H2): what
+  `log_ctx` parks is a persistent, file-system-supplied law (the WAL stays
+  file-system-agnostic) which, given the byte authority at `L` and "no
+  transaction is open", HANDS DOWN `P_dur` at `L` and hands the authority
+  back.  It moves NO durable resource — the epoch is allocated, not carved
+  out of anything the WAL owns (§8's refutation is about fupds that MOVE
+  durable resources).  It is `LogSnapLaw.snap_law`, `log_ctx`'s
+  last-but-one conjunct, read at the ledger by
+  `LogInv.log_ctx_snap_law_of_ops`; it is ARITY-FREE (the mask it runs in
+  is closed over, with the one fact a committer needs beside it — that
+  `logN` is not in it), and it is supplied at `initlog` MINUS block 1's
+  park, since nobody owns block 1 until `initlog` parks it.  The cost is
+  `fsLinkG`/`fsTopG` on `LogInv`'s section; both are `Xv6G.xv6G` members,
+  so no contract that threads `log_ctx` gained a binder.
 
   **THE LAW IS RUN BEFORE THE LOCK IS RELEASED, AND THAT PLACEMENT IS
   FORCED.**  It needs the WAL's transaction authority, which lives inside
@@ -170,15 +174,15 @@ live directory, unique names).  There is NO cross-inode pure clause:
   the accounting critical section, at the one instant the ledger is provably
   empty (the commit arm IS `outstanding − 1 = 0`, and `log_res`'s
   cardinality tie empties the transaction map with it), and carries the
-  result down as a PURE hypothesis — which is exactly what a pure conclusion
-  is worth (`FsCollectAll.pure_keep` is the same observation one level
-  down).  Nothing resource-shaped crosses the release.  The batch is opened
-  there rather than after it, because naming the logged view needs the
-  checked-out cache authority; the copy loop then writes only log SLOTS, so
-  the map the hypothesis is stated at is literally the same term at the
-  write (`ProofEndOp.eo_home_restrict_upd`, riding `eo_loop`'s fuel
-  induction beside row (b)).  `ProofEndOp.eo_open_snap_law` over
-  `eo_snap_law_of_auth` is the reading.
+  epoch down IN THE WALK'S HAND (lane H2; it used to carry a pure `snap_ok`
+  as a Coq hypothesis).  The batch is opened there rather than after the
+  release because naming the logged view needs the checked-out cache
+  authority; the copy loop then writes only log SLOTS, so the map the epoch
+  stands at is literally the same term at the write
+  (`ProofEndOp.eo_home_restrict_upd`, one rewrite at `eo_loop`'s back edge
+  beside row (b)).  `ProofEndOp.eo_open_snap_law` over
+  `eo_snap_law_of_auth` is the reading; `eo_commit`/`eo_loop` are the two
+  statements that carry it.
 
   Its receipt is `FsCrash.fs_commit_receipt`: the committed view equals the
   logged view (`D' = L` at home maps, which is `fs_receipt_any`'s index) and
@@ -264,21 +268,44 @@ never at a value computed from `S`.  `FsDurSnap.fs_state_xfer_era` /
 `fs_state_xfer_snap` are the non-vacuity checks at the era's view and at
 the snapshot's.
 
-Neither call site has moved yet.  The COMMIT is WALLED by `log_ctx`'s cone:
-`LogSnapLaw.snap_law`'s conclusion is pure so that it can cross `end_op`'s
-lock release as a Coq hypothesis (§3), and making it hand down the
-transport's output puts `P_dur` — hence `fsLinkG`/`fsTopG` — into
-`LogInv`'s section (`iris/LogInv.v:383`, which binds neither and does not
-bind `xv6G`) and into `log_ctx_snap_law_of_ops`' conclusion
-(`iris/LogInv.v:1579`).  The WP-side threading itself is small: only
-`ProofEndOp.eo_commit` and `eo_loop` carry the pure tie.  The BOOT mint is
-not a substitution either — `FsCfgSnap.fs_cfg_alloc_snap` never builds
-`fs_state (fs_gamma_L γfs) S` at all (which is why
+`log_ctx`'s cone is no longer the obstacle: lane H2 made the law hand down
+`P_dur` (§3), so the WAL's commit permit no longer allocates anything and
+`dsnap_step_of` is deleted.  **BUT NEITHER CALL SITE USES THE TRANSPORT,
+AND TWO SHAPES SAY WHY** (`iris/FsDurXferWall.v`, machine-checked):
+
+- **The exported claim cannot be read off the snapshot's resources.**
+  `FsDurSnap.fs_snap Γ g B D S` mentions `D` in EXACTLY one place, its
+  pure conjunct `⌜snap_ok S D⌝`; everything else is a function of `S`
+  alone.  A reading lemma off the resources would therefore hold at every
+  `D`, including `∅`, which no state fits (`snap_ok_not_readable`,
+  `snap_ok_empty_absurd`).  The root cause is not a missing lemma: `D` is a
+  VALUE the WAL computes from its cache map, and tying a value to a
+  resource is a pure statement by construction — and `P_dur` cannot own a
+  ledger of `D` beside `fs_state Γ S` at full fraction, because the two
+  would overlap on every block `S` names.  So `snap_ok` stays CARRIED, and
+  every clause the theorem exports has to be materialised at each commit,
+  which is exactly what `FsCollect.col_snap_ok_ex` does.
+- **The commit's collection is not a legal transport source.**
+  `fs_state_xfer` takes byte legs at `DfracOwn 1`; quiescence yields
+  `FsCollect.col_bundle`, whose share is existential with the single
+  constraint "the double is invalid", because a read-locked inode has
+  handed a quarter away.  `DfracOwn (3/4)` satisfies that
+  (`dfrac_34_no_pair`) and cannot be promoted (`phi_no_promote`).  The
+  transport would first have to take a PER-OBJECT share — the disjointness
+  survives, since `phi_excl` is fraction-aware — and the collection would
+  have to become an accessor, which `FsCollectAll.pure_keep` cannot make it
+  (a pure conclusion is free; a resource one is not).
+
+And even with both fixed the transport buys nothing at the commit while the
+first wall stands: `fs_snap_alloc_xfer` takes `snap_ok S D` BESIDE the
+instance, so it is a strictly larger obligation than `P_dur_alloc`.  The
+BOOT mint is a separate rewrite — `FsCfgSnap.fs_cfg_alloc_snap` never
+builds `fs_state (fs_gamma_L γfs) S` at all (which is why
 `fs_state_of_ledger_era` has no caller); it distributes the pieces straight
-into region/bitmap/escrow/pool off the pure tie.  And SHRINKING `snap_ok`
-is downstream of both: `SystemAdequacy.fs_boot_pure` exports `∃ S, snap_ok
-S D` as the theorem's durability claim, so dropping `sk_disj` from it
-weakens what the theorem says.
+into region/bitmap/escrow/pool off the pure tie.  SHRINKING `snap_ok` is
+downstream of the first wall: `SystemAdequacy.fs_boot_pure` exports
+`∃ S, snap_ok S D` as the theorem's durability claim, so dropping
+`sk_disj` from it weakens what the theorem says.
 
 **THE COLLECTION IS `FsCollectAll.fs_collect_snap_ok`**, and what makes it
 possible is that its conclusion is PURE: an entailment `R ⊢ ⌜φ⌝` yields
@@ -453,6 +480,11 @@ compiles".
 - The pure delta LEDGER with a fold over an updated durable body: closed
   (`FsDurLedger.dled_fold_body`) but needed cross-write "hands" and the
   geometry equations; superseded by snapshots, where nothing is updated.
+- Reading the exported `snap_ok S D` off the snapshot's RESOURCES, and
+  sourcing the commit's transport from the quiescent collection: refuted
+  (`FsDurXferWall.v`) — `fs_snap`'s resource half does not mention `D` at
+  all, and the collection's bundles are at a three-quarter share that
+  cannot be promoted to the full element `fs_state` wants.  §4 has both.
 - A per-`log_write` accumulation of the bytes-match fact (`snap_bytes` as
   the WAL's parked payload, re-proven by every writer): refuted
   (`FsDurTrunc.v`) — `itrunc`'s window holds a record naming blocks whose
