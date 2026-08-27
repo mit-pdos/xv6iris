@@ -1,5 +1,27 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
+STEP 5, THE RULINGS TRANCHE (2026-08-27, latest session).  **CLEAN ROUND:
+1083 of 1333, RED 14.**  Four owner rulings executed and one gate found missing.
+**`BitmapInv` FLIPPED and the measured cost was ZERO consumer edits** —
+one section binder, `ProofWritei` green, none of the ~90 consumers moved;
+A6.58's raw-tower-owner table is now EMPTY.  **`↦ₛ` was OVERRULED
+mid-tranche** (§0.21′): the kernel has dynamically generated strings
+(`safestrcpy` at kfork/kexec), so pristine-as-definition is wrong; `↦ₛ`
+stays raw here and its three rodata shim references are marked *awaiting
+the §0.21′ port*.  Nothing was landed for it — which was the right outcome,
+since the shape this tranche was converging on (a SPLIT: `↦ₛ□` pristine,
+`↦ₛ{dq}` raw) is exactly what §0.21′'s single ctx tower replaces.  The
+virtio width-2 asymmetry is routed to the DMA lane; the phys notation twin
+is sequenced last, unstarted.  **THE PIN: `ProofKvminithart` and
+`ProofMainSecondary` are GREEN** (`KptShare.kpt_creds` as a persistent
+premise — A6.55's ruling one level down, the debt named on the unreached
+boot chain), **but `ProofMain` is blocked on a gate nobody ever wrote**:
+`kptb_unset` has no allocator, NOTHING moves a page table from `UTier ξ` to
+`KTier B` (the canon pin's PUBLICATION step — designed at A6.53, consumer
+side landed, producer side never written), and `kpt_bound` carries no
+`llb`.  One coherent owner item, and the single blocker on the whole boot
+tail.  **A6.70 is the record and the handoff.**
+
 STEP 5, THE PT-CELL / BOOT-CONE TRANCHE (2026-08-27, latest session).
 **THE PT-CELL STATEMENT HALF WAS THE CORK: 900 → 1080 of 1333, RED 16.**
 The clean-round bill is paid (`rm -f *.vo`, model checked, one full round):
@@ -6824,6 +6846,10 @@ ktier; `ProofVirtioDiskIntr` / `ProofVirtioDiskRwD` — the DMA lease lane;
 `UserMemPt`, `VcGenS`, `RiscvAdequacy`, `WpSconfLock` — A6.67's
 characterised list, unchanged.
 
+> **SUPERSEDED BY `tso-port.md` §0.21′ (owner, 3496cae8): `↦ₛ` is the MAIN
+> tree's lane and arrives at cutover.  The costing suggested below was not
+> done and must not be — see A6.70 ruling 2.**
+>
 > **`↦ₛ` HAS NOT FLIPPED, AND THAT IS THE RODATA THREE.**
 > `RiscvPtsto.string_pointsto` is still the raw byte tower, which is what
 > `ProofPrintk`'s two and `ProofSyscall`'s one cross on.  Its uses are 34
@@ -6846,6 +6872,185 @@ characterised list, unchanged.
    `tramp_tr_obl` six, `UserMemPt`'s window accessor, `UtResFits`.
 5. `VcGenS` — still six statements and an induction; `ProofSwtch`,
    `ProofAcquire` and `ProofRelease` sit behind it and `WpSconfLock`.
+6. The DMA/virtio lease lane; `WpSconfLock`'s M4 memo.
+
+
+### A6.70 THE FOUR RULINGS, EXECUTED — AND THE PIN'S PRODUCER SIDE IS A
+### GATE THAT WAS NEVER WRITTEN
+
+**CLEAN ROUND: 1083 of 1333, RED 14** (from A6.69's 1080/16) — `rm -f
+iris/*.vo`, model `.vo` checked fresh, one full `-j12 -k`, and the
+incremental round immediately before it agreed on BOTH the count and the
+red set, file for file.  No `Admitted`, no `Axiom`.  The movement is small
+because this tranche's content is decisions, not files.
+
+#### RULING 1 — `BitmapInv`: FLIPPED, AND THE MEASURED COST WAS ZERO
+
+The owner rule held exactly and the blast radius the estimate feared did
+not exist.  Only `Section BitmapAllocRes` (two cells, `sb_size` and
+`sb_bmapstart`) needed `Require TsoCtx` + `` Context `{XI : CurCtx} ``;
+**`ProofWritei` went green and not one of the ~90 consumers moved**,
+because every one of them already had a `CurCtx` in scope and was already
+reading the cells as ctx.  A6.58's raw-tower-owner table is now **empty**.
+
+> **THE GENERAL LESSON, and it is cheap to apply:** when a file's cells are
+> read as ctx by every consumer and raw by the file itself, the flip is one
+> section binder and the consumers do not move.  The expensive-looking
+> "~90 consumers" number was a count of MENTION sites, not of edits — the
+> same mistake A6.67's "count wrappers, not uses" corrects one tier over.
+
+#### RULING 2 — `↦ₛ`: **OVERRULED BY THE OWNER MID-TRANCHE.**  NOT
+#### EVALUATED TO A DECISION HERE, NOT FLIPPED, AND NO LONGER THIS TREE'S
+
+The instruction was to evaluate ONE shape — pristine-as-definition for
+`↦ₛ` — and flip on it if it held.  **The owner overruled the premise while
+the evaluation was in flight** (`tso-port.md` §0.21′, commit 3496cae8), on
+a ground the evaluation had already half-found: **the kernel has
+DYNAMICALLY GENERATED strings** — `safestrcpy` at kfork/kexec writes
+`p->name` at t > 0 — **and a t=0-hardcoded `↦ₛ` could never state their
+data.**  The evaluation's own scope limit (see below) was the same fact
+seen from one site; the owner's ruling is the general form of it.
+
+**THE DISPOSITION, and it is not this tree's work:** `↦ₛ` **stays RAW**
+here, with its three named bridges, and the three rodata shim references
+(`ProofPrintk` ×2, `ProofSyscall` ×1) stay in the residue ledger marked
+**"awaiting the §0.21′ port"**.  The proper redefinition — a CTX string
+tower at arbitrary timestamps, with pristine kept only as the DERIVED
+context-free form for the rodata / lock-handle sites — is being done on the
+MAIN tree by a parallel lane and ports at cutover.
+
+> **AND THE SHAPE THIS TRANCHE WAS TOLD TO TRY IS THE ONE TO AVOID.**  What
+> the evaluation was converging on was a SPLIT: `↦ₛ□` re-pointed at a
+> pristine definition, `↦ₛ{dq}` left raw, precisely because
+> `ProofSyscall.sysc_pname_app`'s `p_name pa 0 ↦ₛ{dq} nm` is written at
+> runtime and nothing pristine can be said about it.  **Two definitions
+> behind one notation family is exactly the thing §0.21′'s single ctx tower
+> replaces**, and it would have had to be unpicked at the port.  Landing
+> nothing was the right outcome.
+
+**TWO MEASUREMENTS FROM THE ABORTED EVALUATION ARE WORTH KEEPING, because
+the §0.21′ port will meet both:**
+
+- **THE IMPORT-ORDER FACT.**  `string_pointsto` lives in `RiscvPtsto.v`,
+  **BELOW `TsoCtx.v`**, so it cannot mention `ctx_pointsto` where it
+  stands.  A ctx string tower therefore either moves the definition above
+  the tower (and with it the `↦ₛ` notation family, 34 files) or splits
+  declaration from definition.  `pristine_elem` is the only ledger
+  vocabulary available at `RiscvPtsto.v`'s altitude (`:1535`), which is
+  why the pristine spelling looked forced from inside this tree.
+- **THE RECEIPTS ARE ALREADY IN THE CARVE'S HAND.**
+  `BootCarve.kernel_data_intro` (`:569`) takes
+  `[∗ map] a ↦ _ ∈ ran_bytes g text_end rodata_end, TsoCtx.pristine_va a`
+  and spends them through `ctx_pointsto_of_pristine_va` to build
+  `kernel_data`'s ∀ξ form; `KernelDataInv.kernel_data_string` (`:171`) then
+  instantiates ξ at a junk `MkCtxId inhabitant inhabitant` and FORGETS to
+  the raw tower.  **Whatever §0.21′ lands, the rodata half needs no new
+  supply — it needs the mint to stop discarding what it is handed.**
+
+#### RULING 3 — the virtio width-2 asymmetry: ROUTED, no code change
+
+`DiskInv.word2_to_phys` takes the CTX `↦₂`, `DiskInv.phys_to_word2` returns
+the RAW `word2_pointsto`, and `ProofVirtioDiskIntr:1165` /
+`ProofVirtioDiskRwD:686` do the round trip.  The re-entry needs the
+clean/dirty bit `phys_ledger` does not carry, so it is
+`phys_ledger_at`/`phys_ledger_pin`'s job — the DMA lease's own lane, as
+diagnosed and as ruled.  Both files stay red under that lane.
+
+#### RULING 4 — the phys notation twin: NOT STARTED, sequenced last
+
+As ruled.  It pairs naturally with the `↦ₛ□` flip above (same mechanism,
+same tree-wide re-meaning, same rebuild).
+
+#### THE PIN: TWO FILES GREEN, AND THE THIRD IS BLOCKED ON A MISSING GATE
+
+**`ProofKvminithart` and `ProofMainSecondary` ARE GREEN.**  The fix is
+A6.55's own ruling one level down: `KptShare.kpt_creds` — the pin's
+publication bound paired with THIS hart's receipt that its view has passed
+it — becomes a PREMISE of `SpecKvminithart.wp_kvminithart_sconf_body` and,
+above it, of `SpecMainSecondary.wp_main_secondary_sconf_body`.  It is
+persistent, so threading costs nothing; the call site then reads
+`iDestruct "Hcreds" as (Bc) "[#Hbdc #Hvlbc]"`, which is `SmodeCorePt`'s
+green shape (it takes the same pair out of `tlb_res_pt`).  The obligation
+lands where it belongs: a secondary hart's honest source is its own acquire
+of `started` — the spin is a plain load but the `__sync_synchronize` after
+it DRAINS (`RiscvLang.fence_drains`), so the hart emerges at the log top.
+**Named debt on the (unreached) boot chain, not a hidden assumption.**
+
+**`ProofMain` IS NOT, AND THE REASON IS A GATE NOBODY EVER WROTE.**  Three
+findings, one item:
+
+1. **`kptb_unset` HAS NO ALLOCATOR.**  `KptGhost.v` defines it, exactly two
+   places consume it (`KptShare.kpt_inv_alloc`, `tlb_inv_pt_share`), and
+   **nothing in the tree produces it** — while its twin `kpt_unset` has the
+   full chain `RiscvAdequacy:1292` (the `own_alloc`) → `:1052`
+   (`power_boot_res`) → `BootShared:1129` → `BootChain:741` →
+   `SpecMain:646` → `ProofMain:831`.  A6.63 added the RA and the functor
+   (`inG Σ kptbR`, `GFunctor kptbR`); the ERA MINT was never added.  **Same
+   class as A6.63's own finding: a record field is capacity you must also
+   allocate.**  This half is pure threading, five files.
+2. **NOTHING MOVES A TREE FROM `UTier ξ` TO `KTier B`.**  `kpt_inv_alloc`
+   wants `kptree_own B 2 (DfracOwn 1) t` = `ptree_own_at (KTier B) …`, and
+   `PtTree.pt_slot_own (KTier B) = phys_ledger_word_pin … B …`, whose
+   element arm is `Some (Sv, B)` — while `ctx_pointsto`, `ctx_phys_pointsto`
+   and `phys_ledger` all pin that option to `None` **by definition**
+   (`TsoCtx.v`'s own note says so, and says it is what keeps every store
+   gate sound).  So the move is a GHOST UPDATE against the interp — it must
+   discharge `TsoMemPa.pin_ok`, "from view B on, every agent's read of `a`
+   lands in `Sv`" — and **there is no lemma anywhere that performs it**
+   (`grep KTier` outside `PtTree.v` returns consumers only).  This is the
+   canon pin's PUBLICATION STEP: designed in A6.53, its consumer side
+   landed at A6.53–A6.55, its producer side never written.
+3. **AND THE BOUND NEEDS AN `llb` IT DOES NOT CARRY.**  For a secondary to
+   discharge `kpt_creds` from a top-of-log receipt it needs `B ≤ K`, i.e.
+   `B` a legal log position.  `kpt_bound` is agreement-only (`kptbR` is
+   `csum (excl unit) (agree nat)`); `llb loglen_name B` is what makes the
+   comparison free, exactly as `ctx_parked`'s stamp carries one.
+
+> **THIS IS ONE COHERENT DESIGN ITEM AND IT IS THE OWNER'S.**  The natural
+> shape is a publication gate at hart 0's fence, choosing `B` := the
+> publisher's OWN view bound so the receipt is free by construction and the
+> `llb` comes with it:
+> ```coq
+>   Lemma kptree_publish `{CID : CpuId} (g : gstate) (xi : CtxId) lvl (t : ptree) :
+>     (length g.(glog) <= g.(gtv) cpu_id)%nat ->
+>     tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+>     ptree_own_at (UTier xi) lvl (DfracOwn 1) t ==∗
+>     tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+>     ∃ B : nat, ptree_own_at (KTier B) lvl (DfracOwn 1) t ∗
+>                llb loglen_name B ∗ hart_view_lb B.
+> ```
+> It is at-the-top (hart 0 reaches `__sync_synchronize`, which
+> `RiscvLang.fence_drains` drains — A6.55 §5.6(b)'s own argument), it is
+> the interp-side dual of A6.68's `ctx_absorb_lb`, and the `pin_ok`
+> obligation is the real content: the slots are DfracOwn 1 and never
+> written again, which is what makes `Sv` a singleton from `B` on.
+> **Characterised, not paid — `ProofMain`, `BootShared`, `BootChain` and
+> the whole boot tail are behind it.**
+
+#### THE RED 14
+
+`BootCarveMain` (the 25 shim refs — A6.69's survey is the plan),
+`ProofPrintk` (2) and `ProofSyscall` (1) — the rodata residue, RAW and
+**awaiting the §0.21′ port**, no longer this tree's item; `ProofMain` — the pin's publication
+gate; `ProofVirtioDiskIntr` / `ProofVirtioDiskRwD` — the DMA lease lane;
+`ProofFilewrite` (one ktier), `UtResFits` (`ut_res_bare_park` missing),
+`UmodeFetch`, `UptWalkPt`, `UserMemPt`, `VcGenS`, `RiscvAdequacy`,
+`WpSconfLock` (the parked M4 entry).
+
+#### THE QUEUE
+
+1. **The canon pin's publication gate** (the three items above, one owner
+   decision).  It is the single blocker on the whole boot tail.
+2. **The boot 25**, per A6.69's survey — and `BootShared`'s dropped ledger
+   half is the same file the pin's `kptb_unset` threading touches, so the
+   two want to be one pass.
+3. **The phys notation twin**, against a green tree — a bottom-of-tree
+   re-meaning, sequenced last as ruled.  (`↦ₛ` is NOT here: it belongs to
+   the main tree's §0.21′ lane and arrives at cutover.)
+4. `RiscvAdequacy`'s power tail, `UmodeFetch` + `UptWalkPt`, the
+   `tramp_tr_obl` six, `UserMemPt`, `UtResFits`, `ProofFilewrite`.
+5. `VcGenS` (six statements and an induction) — `ProofSwtch`, `ProofAcquire`
+   and `ProofRelease` are behind it and `WpSconfLock`.
 6. The DMA/virtio lease lane; `WpSconfLock`'s M4 memo.
 
 
