@@ -40,6 +40,7 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import FdSlots.
+Require Import SchedCtx.  (* [procs_inv_len]: the accessor, not a destruct *)
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
@@ -429,7 +430,7 @@ Section ProofClockintr.
       iDestruct "Htk" as "[%Hno | (#Hlk & #Hpi)]".
       { rewrite Hth in Hno. discriminate. }
       iPoseProof "Hpi" as "Hpi2".
-      iDestruct "Hpi2" as "[%Hlen _]".
+      iDestruct (procs_inv_len with "Hpi2") as %Hlen.
       iDestruct (is_tickslock_lock with "Hlk") as "#Hlkl".
       assert (Hzero : eq_vec (rget mo a0_idx) (zero_reg : mword 64) = true)
         by (rgne; rewrite Hmoa0; exact Hth).

@@ -1144,7 +1144,7 @@ Section ProofAcquiresleep.
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbm.
     cbn [Nat.iter] in Hbm. subst b.
     (* derive proc j's own lock gname γpl from procs_inv (persistent, peek) *)
-    iAssert (⌜length γs = NPROC⌝)%I as %Hlen. { by iDestruct "Hpinv" as "[$ _]". }
+    iDestruct (procs_inv_len with "Hpinv") as %Hlen.
     destruct (lookup_lt_is_Some_2 γs j ltac:(rewrite Hlen; exact Hj)) as [γpl Hjpl].
     (* ===== PROLOGUE: 4-slot frame trade + saves ===== *)
     set (R1 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).

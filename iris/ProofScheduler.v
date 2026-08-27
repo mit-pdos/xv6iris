@@ -496,8 +496,7 @@ Section ProofScheduler.
     intros pcE Hp0 Hav. subst p0.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hfree Hcpu #Htext Hpc #Hprocs Hcsrs".
-    iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
-    { iDestruct "Hprocs" as "[%H _]". iPureIntro. exact H. }
+    iDestruct (procs_inv_len with "Hprocs") as %Hlen.
     (* split the entry cpu bundle: the proc cell comes out for the c->proc
        store the setup block performs.  [Hfree], the context save area, now
        arrives as its own premise (SpecScheduler.v hoisted it out of
