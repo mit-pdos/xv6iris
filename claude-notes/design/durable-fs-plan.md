@@ -107,7 +107,12 @@ live directory, unique names).  There is NO cross-inode pure clause:
   the directory clauses at the region's width).  That residue is
   irreducible for a reason about `ghost_map` — an authority may hold
   entries no fragment names, so nothing the epoch owns bounds `D`'s domain
-  (`FsDurXferWall.snap_shape_not_readable`).
+  (`FsDurXferWall.snap_shape_not_readable`) — and it does NOT shrink if
+  the tie is strengthened to an EQUALITY (lane H4): `fs_dbytes` is blind to
+  a block whose byte list is empty, so a padded `D` is indistinguishable
+  (`snap_shape_not_readable_eq`), and at a commit the equality is not even
+  provable, a LEAKED block (bit set, named by no inode — the design states
+  only "owned ⇒ used") being a block of `D` the footprint does not own.
 
 ## 3. The WAL's client-facing contracts
 
@@ -196,6 +201,16 @@ live directory, unique names).  There is NO cross-inode pure clause:
   beside row (b)).  `ProofEndOp.eo_open_snap_law` over
   `eo_snap_law_of_auth` is the reading; `eo_commit`/`eo_loop` are the two
   statements that carry it.
+
+  **WHAT THE FILE SYSTEM HANDS THE MINT IS A PACKAGE OF READINGS, NOT
+  `snap_ok`** (lane H4).  `FsDurSnap.snap_mint S D` is the geometry, the
+  local clauses, the superblock's parse, the link family's slacked
+  validity, and the RUNS row — the byte legs' shape, their pairwise
+  DISJOINTNESS and the fact that their union sits inside the committed
+  view's flattening.  Four of the five come off the collected resources
+  (`FsDurXfer.phi_runs_ex_disj` is `phi_excl`, `phi_runs_ex_in` is one
+  `ghost_map_lookup`), the fifth is the geometry, and nothing is
+  accumulated.  `P_dur_alloc_mint` takes it and no resource at all.
 
   Its receipt is `FsCrash.fs_commit_receipt`: the committed view equals the
   logged view (`D' = L` at home maps, which is `fs_receipt_any`'s index) and
@@ -286,18 +301,32 @@ the snapshot's.
 `P_dur` (§3), so the WAL's commit permit no longer allocates anything and
 `dsnap_step_of` is deleted.  Lane H3 then gave the epoch an IDENTITY and
 made the tie a READING, so what the transport owes at a commit is the
-GEOMETRY and nothing else.  **BUT THE COMMIT'S CALL SITE STILL HAS NOT
-MOVED, AND ONE SHAPE SAYS WHY** (`iris/FsDurXferWall.v`, machine-checked):
-`fs_state_xfer` takes byte legs at `DfracOwn 1`, while quiescence yields
-`FsCollect.col_bundle`, whose share is existential with the single
-constraint "the double is invalid" — a read-locked inode has handed a
-quarter away.  `DfracOwn (3/4)` satisfies that (`dfrac_34_no_pair`) and
-cannot be promoted (`phi_no_promote`).  The transport would first have to
-take a PER-OBJECT share — the disjointness survives, since `phi_excl` is
-fraction-aware — and the collection would have to become an ACCESSOR,
-which `FsCollectAll.pure_keep` cannot make it (a pure conclusion is free; a
-resource one is not).  Until then the commit goes on materialising
-`snap_ok` through `FsCollect.col_snap_ok_ex` and calling `P_dur_alloc`.
+GEOMETRY and nothing else.
+
+**AND THE COMMIT'S CALL SITE HAS NOW MOVED (lane H4) — TO THE MINT, NOT TO
+THE TRANSPORT.**  Quiescence never yields an `fs_state` and never will: the
+records sit REGION-side at fraction 1 while each inode's data legs arrive
+at THAT inode's own share, existentially bound with the single constraint
+"the double is invalid" (`FsCollect.col_bundle`; `DfracOwn (3/4)` satisfies
+it — `dfrac_34_no_pair` — and cannot be promoted — `phi_no_promote`).  Two
+shapes make such a source legal.  First, THE RUNS CARRY A SHARE PER RUN
+(`FsDurXfer.phi_runs_q`, and `phi_runs_ex` with the share existentially
+bound per object, which is what avoids a choice function over the inode
+map): the disjointness is read off `phi_excl` at MIXED shares
+(`dfrac_nvalid_pair`) and the union's place inside the source's own map
+POINTWISE off `phi_agree`.  The full-share machinery is not duplicated —
+`gamma_q Γ dq` is the view whose `fsΦ` ignores the dfrac it is handed, so
+every Γ-generic shape reads at a share with no new lemma.  Second, THE
+ALLOCATION HALF STANDS ALONE: everything `fs_footprint_xfer` does with its
+source is read PURE facts off it, so `fs_footprint_mint` /
+`fs_state_mint_runs` take those facts and NO RESOURCE AT ALL.  **So the
+collection never had to become an accessor** — the allocation runs after
+every invariant has closed, off facts, and `FsCollectAll.pure_keep` stays
+exactly as it was.  `FsCollectAll.col_hand_mint` is the reading
+(`col_hand ⊢ ⌜snap_mint …⌝`) and `fs_snap_law_build` calls
+`P_dur_alloc_mint`; `col_snap_bytes`/`col_snap_ok`/`col_snap_ok_ex` are
+deleted.  The value-first allocator keeps its ERA-0 callers and no other,
+so **`snap_ok` is handed IN nowhere but era 0's image path**.
 
 The BOOT mint is a separate rewrite: `FsCfgSnap.fs_cfg_alloc_snap` never
 builds `fs_state (fs_gamma_L γfs) S` at all (which is why

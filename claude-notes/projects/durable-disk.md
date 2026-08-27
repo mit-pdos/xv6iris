@@ -3070,6 +3070,104 @@ so it never wanted that shape.
     mint (`FsCfgSnap.fs_cfg_alloc_snap`) is untouched.  Nothing was
     deleted beyond the retired wall.
 
+  **AS LANDED — H4.  THE COMMIT MINTS ITS EPOCH OFF READINGS AND NOTHING
+  PURE IS ACCUMULATED; `snap_ok` IS NO LONGER HANDED IN ANYWHERE BUT ERA 0.
+  THE EQUALITY IDENTITY IS REFUTED, AND THE GEOMETRY RESIDUE IS FINAL.**
+
+  Whole tree green, `make audit-only` at the three-entry baseline, the
+  theorem's statement and exported content untouched.
+
+  - **ITEM 1 IS REFUTED, AT THE EQUALITY FORM ITSELF**
+    (`iris/FsDurXferWall.v`, machine-checked).  Making
+    `FsDurRead.snap_auth`'s tie an EQUALITY `B = fs_dbytes D` buys nothing,
+    because `LogDefs.fs_dbytes` is BLIND to a block whose byte list is
+    empty and therefore not injective: pad `D` with `b := []` and the
+    flattening is unchanged on the nose (`fs_dbytes_pad`), so the epoch's
+    resources at the two maps are LITERALLY INDISTINGUISHABLE
+    (`fs_snap_res_eq_pad` is an `⊣⊢`, where H3's growth witness could only
+    manage a one-way entailment), while `ss_bsz` fails at the padded block
+    (`snap_shape_pad_absurd`).  `snap_shape_not_readable_eq` is the two
+    together, `fs_snap_res_eq_inhabited` the non-vacuity.
+    AND THE EQUALITY IS NOT PROVABLE AT A COMMIT EITHER, for a reason about
+    xv6 rather than about ghost state: nothing in the design says a block
+    whose bitmap bit is SET belongs to some inode — `sk_own_used` and
+    `sk_meta_used` are both the "owned ⇒ used" direction — so a LEAKED
+    block (a crash between `balloc`'s bit and the record that names it) is
+    a block of `D` that `fs_footprint` does not own, and the footprint's
+    flattening is a PROPER subset.  `snap_shape` therefore stays a carried
+    pure conjunct, `snap_auth` stays at `⊆`, and item 4 (trimming
+    `col_geom`) is EMPTY: all eight clauses still have live uses — six feed
+    a `snap_shape` clause, `cg_nin` is the assembly's own "the root is a
+    region inum", and `cg_ist`/`cg_reg` are read outside the collection
+    (`SpecFsinit`, `ProofFsinit`, `FirstTok`) as well.
+
+  - **THE TRANSPORT IS SHARE-GENERIC** (`iris/FsDurXfer.v`).  `xqrun` is a
+    run with a share; `xq_at`/`xq_strip`/`xq_ok` and `phi_runs_q` are the
+    vocabulary, and `phi_runs_ex` is the same list with every share
+    EXISTENTIALLY bound — which is what avoids a choice function over the
+    inode map, `col_bundle`'s share being existential per inum.
+    `phi_runs_ex_disj` reads pairwise disjointness off
+    `FsStateDefs.phi_excl` alone at MIXED shares (`dfrac_nvalid_pair`,
+    moved down from `FsCollect` with its three companions so both files
+    see it); `phi_runs_ex_in` reads "the union sits inside the source's own
+    map" POINTWISE off `phi_agree`, needing no disjointness on the way in.
+    **The full-share machinery is not duplicated**: `gamma_q Γ dq` is the
+    view whose `fsΦ` ignores the dfrac it is handed, so every Γ-generic
+    shape (`byte_range`, `blk_owned`, `ind_owned`, `inode_phi`, the whole
+    runs correspondence) reads at a share with no new lemma.  `xr_dats`
+    splits an inode's block legs from its record's, because at a commit the
+    two arrive from different places at different shares.  So
+    `FsDurXferWall`'s SECOND wall (`dfrac_34_no_pair`, `phi_no_promote`) is
+    retired as an obstacle: it still says a 3/4 element is not a full one,
+    and nothing needs it to be.
+
+  - **THE ALLOCATION HALF STANDS ALONE, WHICH IS WHY THE COLLECTION NEVER
+    HAD TO BECOME AN ACCESSOR.**  Everything `fs_footprint_xfer` does with
+    its source instance is READ PURE FACTS off it, so `fs_footprint_mint` /
+    `fs_state_mint_runs` take those facts and NO RESOURCE AT ALL, and
+    `fs_footprint_xfer` is now their composition with the readings (its
+    statement is unchanged, and so are `fs_state_xfer`/`_tok`).
+    `FsDurSnap.snap_mint S D` is the premise package —
+    `snap_shape`, `snap_local`, the superblock's parse, the link family's
+    slacked validity, and the RUNS row (`xf_shape`, `xr_disj`,
+    `xr_union … ⊆ fs_dbytes D`) — and `fs_snap_alloc_mint` /
+    `P_dur_alloc_mint` are the entry points at it.  Not one byte tie, no
+    used-set coupling, no `sk_disj`, no cut clause: the disjointness a
+    linear ledger had to be CARVED by is the shape of a `∗`, read where the
+    `∗` is.  `FsCollectAll.pure_keep` therefore STAYS, and so does the
+    collection's destructive style — the allocation happens after every
+    invariant has closed, off facts, so there is nothing to hand back.
+
+  - **WHAT MOVED AT THE COMMIT.**  `FsCollect.col_snap_bytes`,
+    `col_snap_ok` and `col_snap_ok_ex` are DELETED.  In their place:
+    `col_snap_shape` (the seven geometry clauses, off `col_geom` and the
+    hand's domain and directory rows), `col_auth_dbytes` /
+    `bytes_le_dbytes` (the logged byte map is inside the committed view's
+    flattening, off `bytes_tie`/`bytes_dom`/`dom C = home`), `col_agree`
+    (the era's authority as the transport's `phi_agree`), `col_bundle_dats`
+    / `col_bundle_inum` / `col_inode_runs` (one inode's runs: its record
+    out of the REGION at fraction 1, its block legs out of its own bundle
+    at the bundle's share), and in `FsCollectAll` `col_recs_by_inum` (the
+    region's records re-indexed from (block, slot) to inum — the resource
+    does not move, `ireg_recs` IS the sixteen record runs) and
+    `col_hand_mint`.  `col_bodies_snap_ok`/`fs_collect_snap_ok` are
+    `col_bodies_mint`/`fs_collect_mint`, and `fs_snap_law_build` calls
+    `P_dur_alloc_mint`.  Those two and `col_hand_mint` are the only
+    statements that moved -- `snap_law`, `fs_snap_law_build`,
+    `FsCrash.fs_commit_receipt` and every WAL-side contract are untouched.
+
+  - **WHAT REMAINS.**  `FsDurSnap.P_dur_alloc` / `fs_snap_alloc` and the
+    value-first allocator (`fs_state_of_ledger`, `blk_ledger_cut`,
+    `ledger_carve`, `fp_*`) keep exactly TWO callers, both era 0's and both
+    lane H5's: `FsDurImg.img_P_dur_alloc` and `FsCrash.P_fs_alloc`, which
+    still take `∃ S, snap_ok S D0` off the mkfs image.  The BOOT mint
+    (`FsCfgSnap.fs_cfg_alloc_snap`) is untouched and still consumes
+    `snap_ok` off `P_dur_tie` — it never builds `fs_state (fs_gamma_L γfs) S`
+    at all, so moving it is a rewrite of that 480-line mint, not a
+    substitution.  `fs_snap_alloc_xfer`/`P_dur_alloc_xfer` keep their
+    `snap_shape` premise (item 1) and remain caller-less, as do
+    `fs_state_xfer`/`_tok` and the two non-vacuity checks.
+
 - [ ] **Lane F — strengthening and receipts.**  Persistent snapshot
   copies as sync-style receipts (`sys_sync`'s spec — see the fs-syscall
   notes another session landed); the `P_log`/`P_fs` split as two

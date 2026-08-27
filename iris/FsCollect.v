@@ -1256,7 +1256,8 @@ Section Collect.
               (xr_dats n) (dfrac_full_nvalid (DfracOwn 1))).
     iSplitR "Hdats"; [| iExact "Hdats"].
     rewrite -(rec_owned_sb (fs_gamma_L γfs) sb i (fn_rec n) Hi)
-            /rec_owned /xr_rec /xr_blk /xr_off /xr_bs /=.
+            (rec_owned_run (fs_gamma_L γfs) sb i n)
+            /phi_runs big_sepL_singleton -byte_range_1.
     iExact "Hrec".
   Qed.
 
