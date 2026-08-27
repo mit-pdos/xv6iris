@@ -7811,6 +7811,277 @@ for the causes now being sharper:
 6. `VcGenS`; the DMA/virtio lease lane; the phys notation twin (last).
 
 
+
+### A6.73 THE STRING TIER IS FLIPPED IN THIS TREE TOO — AND THE U-MODE
+### LANE TURNS OUT TO BE TWO FILES, NOT THREE, BECAUSE `UmodeFetch` IS
+### BINARY-TIER
+
+Three things landed in this tranche: the §0.22′ string port (queue item 1),
+the owner's §0.24′ U-mode descoping (arrived mid-tranche, measured and
+executed here), and M4's PURE layer.  The M4 Iris lanes are characterised
+below with two measurements the memo does not have.
+
+#### (1) THE §0.22′ PORT — MAIN'S SHAPE, PORTED, AND THE OWED ARM IS PAID
+
+Ported, not re-derived, exactly as the port obligation asked: `TsoCtx.v`
+declares a SECOND tower (`ctx_string_pointsto ξ a dq s := [∗ list] j ↦ b ∈
+cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b`) over its own sealed
+byte, re-declares all four `↦ₛ` spellings at it, and `RiscvPtsto`'s raw
+tower stays put.  The law set is the stage-2 word towers' adapted to
+strings, `_bytes_agree` deliberately weaker (byte-level — a string may be a
+proper prefix of another through an embedded NUL, which only
+`PrintkFmt.nonul`, far above `TsoCtx`, rules out), plus one law main does
+not have: **`ctx_string_pointsto_forget`**, this tree's shim-tier
+projection, stated for the same reason `ctx_word4_pointsto_forget` is.
+
+**THE ONE ARM THIS TREE OWED IS PAID, AND IT WAS SMALLER THAN A6.71
+PRICED IT.**  The arm is `ctx_string_all` at `⌜t = 0⌝` — the rodata
+literal's mint through the ctx byte's CLEAN-ARM `llb` disjunct — and the
+measurement is that **`kernel_data` in this tree was ALREADY minted that
+way**, one byte at a time, by `BootCarve` through
+`TsoCtx.ctx_pointsto_of_pristine_va_all` (a discarded image byte + its
+pristine receipt + `llb_0`, no update modality, no context).  So
+`kernel_data_string_all` needs no new mint at all: it keeps `kernel_data`'s
+own ∀ and hands it straight through, and the pristine receipts A6.71 said
+were "being discarded" were in fact already spent — one tier down.  What
+was owed was the STRING-tier spelling of that arm, and it is one lemma:
+
+```coq
+  Lemma ctx_string_all_of_pristine (a : Arch.pa) (s : string) :
+    string_pointsto a DfracDiscarded s -∗
+    ([∗ list] j ↦ _ ∈ cstring_bytes s, pristine_va (pa_add a j)) -∗
+    ctx_string_all a DfracDiscarded s.
+```
+
+recorded beside the byte mint for a producer that holds raw image bytes and
+their receipts directly.  `kernel_data_string_all` does not go through it,
+and saying so in the file is the point: **the timestamp-0 story JUSTIFIES
+the derived form; it is never the meaning of `↦ₛ`.**
+
+**THE SEAM COUNT WENT TO ZERO ON THE RODATA CHAIN.**
+`KernelDataInv.kernel_data_string`'s junk witness (`MkCtxId inhabitant
+inhabitant`) and its `ctx_pointsto_forget` crossing are both gone;
+`kernel_data_string` is now `kernel_data_string_all` instantiated at
+`cur_ctx`, statement character-identical.  `ProofPrintk`'s `pk_str_byte`
+and `pk_digits_data` crossings ceased to exist (the string's byte IS the
+load leaf's ctx slot, in BOTH directions — which a shim crossing never
+was), and `ProofSyscall`'s hand-rolled `sysc_name_addr` / `sysc_pname_app`
+retired into `ProcDefs`'s accessor family
+(`pname_addr` / `pname_pad` / `pname_bytes_split` / `pname_wf_cstring` /
+`pname_cells_borrow` / `pname_cells_return`), with kfork's `safestrcpy`
+source coming out of the borrow and `ssc_src_ok` discharged from the
+string's OWN NUL (`ProofKforkParts.kfk_src_of_string` /
+`kfk_src_ok_of_string`).
+
+`WpLock.lock_name` and `SleepLock.sl_name` carry `ctx_string_all`;
+**`is_lock` / `is_sleeplock` are character-identical and still CLOSED**, so
+the park rows did not move.  `SpecInitlock` / `SpecInitlockWrapper` /
+`SpecInitsleeplock` take the ∀ form and their callers mint with
+`kernel_data_string_all`.
+
+**FALLOUT: 42 FILES, AND IT IS MAIN'S FALLOUT PLUS EXACTLY ONE.**  Main's
+44-file change applies here almost verbatim — 41 of its hunks land, three
+(`ProofSysRead` / `ProofSysSbrk` / `ProofSysWrite`) are comment-only fixes
+to a `Require TsoCtxShim` line this tree no longer has — and main's four
+error classes reproduce file for file.  The one ADDITION is
+**`ProofProcdumpLoop`**, a binder-less `*Res` section whose `pdl_pkastr`
+speaks `pk_desc_res` — the class-1 fix (`Context \`{XI : CurCtx}.`, every
+statement text unchanged).  Main did not need it because its copy already
+carried the binder; **that is the only divergence the port found across 42
+files**, which is the strongest evidence yet that porting main's landed
+shape beats re-deriving it.
+
+#### (2) §0.24′ — THE U-MODE SPLIT, MEASURED, AND IT MOVES THE QUEUE
+
+The owner's ruling (commit `dc36835c`) reduces the U-mode lane: the GENERIC
+user-mode safety tier stays, the SPECIFIC-BINARY tier (init/sync/sh/echo
+certificates and machinery consumed only by them) is deferred.  Measured
+before threading anything, from `iris/.CoqMakefile.d`:
+
+**THE TIER IS ALREADY DEPENDENCY-CLOSED, AND `_CoqProject` ALREADY NAMES
+IT.**  Seed the reverse-dependency closure with `{UProof*, USpec*, UCode*}`
+(26 files) and iterate "every consumer of a descoped file is itself
+descoped" to a FIXPOINT: it terminates at **41 iris files (+ 4 `user-rocq`
+symbol files)** — and that set is *character for character* the block
+`_CoqProject` already delimits as `# --- BEGIN verified Umode WP tier ---`.
+So the reverse-dependency check the ruling asks for passes by construction:
+**no file outside the block consumes any file inside it**, and
+`SystemAdequacy` depends on NONE of them.  The descoping is therefore a
+comment sweep over a block that was written to be swept — the Aug-19
+precedent replayed, with the ruling recorded in place.
+
+> **THE RESULT THAT MOVES THE QUEUE: `UmodeFetch` IS IN THE BINARY TIER.**
+> All 37 of its consumers are `UProof*`/`USpec*`/`UCode*`/`Umode*`/
+> `WpUmode*`, and its own header says what it is — *"the CONCRETE-byte
+> instruction fetch of the VERIFIED user-mode tier"*.  The GENERIC tier's
+> fetch composer is the separate `UserFetchPt.v`, which sources from
+> `udata_own` and hands out an EXISTENTIAL word.  **So the U-mode payer
+> threading's frontier is TWO files — `UptWalkPt` and `UserMemPt` — not
+> three, and the ~125-file estimate behind them was inflated by the binary
+> cone.**  The generic remainder behind those two is `ProofUser`,
+> `UserMem*`/`UserFetchPt`/`Userret*`/`Uservec*`, `LinkMain`, `BootChain`,
+> `BootShared`, `FsAdequacyImg` and `SystemAdequacy`.
+
+The threading sites themselves are unchanged in kind — `UserMemPt:427` is a
+raw `↦ₚ` store gate fed a `ctx_phys_pointsto`, `UptWalkPt:679` is the
+`own_context` payer missing from a `translateAddr` obligation — and they
+stay on the queue at their generic sites.
+
+#### (3) M4: THE PURE LAYER IS IN, AND TWO THINGS THE MEMO DID NOT MEASURE
+
+`TsoMemPa.v` §12/§12b carries both probes **verbatim** — `own_last`,
+`writer_pin` and their three maintenance lemmas; `racy_read_split`,
+`racy_read_not_mine`, `racy_read_own`; `win_ok`, `find_top`,
+`read_down_win`, `find_top_spec`/`_max`, `racy_read_window`, `wpin`,
+`racy_read_window_pin`, `lkcpu_not_mine` — with the byte-layout
+computation recorded in the header as the reason the kit is WINDOW-shaped
+(the forgery it rules out is spelled: hart 1 assembles `0x80012468` from
+hart 3's byte 0 and hart 2's byte 1, both legal writes by their own
+authors).  Ruling 1 (delete `wp_cld_lkcpu_lockopen_s_sconf`) is deferred to
+the tranche that re-proves the file, since deleting a leaf out of a red
+file buys nothing.
+
+**MEASUREMENT A — THE MEMO'S "ONLY `notheld` GETS NEW KIT" IS TRUE OF THE
+LAW AND FALSE OF THE LEAF.**  All three surviving reads go through
+`WpSconfMem.wp_load_s_sconf_au`, whose datum premise is
+`wordw_pointsto width ea dqm v` = **the CTX word tower at `cur_ctx`**
+(`wordw8_ctx` is the identity), discharged by the Local lemma
+`wordw_pointsto_load_c`, which additionally consumes `own_context`.  A cell
+that lives in a SHARED invariant cannot be at the reader's ambient ξ, and
+`lk_cpu_res`'s `∃ ξ` is exactly the admission of that.  So the memo's
+"`lk_cpu_res` at `phys_ledger_word`" is not a reshape of one definition —
+**it forces a PHYS-DATUM sibling of the load AU**, `wp_load_s_sconf_au_phys`,
+identical to the existing one except that the one `iAssert` that runs
+`wordw_pointsto_load_c` runs `ledger_read_bytes_vis_ok` (holder) or the new
+`ledger_read_racy_ok` (`notheld`) instead.  It is CHEAPER in one respect
+worth recording: the phys form consumes no `own_context`, so A6.64's
+forty-argument hazard has one fewer payload spelling to keep in agreement —
+but A6.63's node-argument rule still applies to the node it passes.
+
+**MEASUREMENT B — THE `_exv` LANE IS SHALLOWER THAN §6 SAYS, BECAUSE THE
+HART TIER ALREADY HAS IT.**  `HartEvents.wp/swp_hart_ram_read_plain_ex`
+(A6.51) is ALREADY the value-after-view shape the racy read needs —
+`⌜∀ tv' ≥ tv, ∃ w, tso_read_bytes … w ∧ P w⌝`, with the value coming back
+FROM THE STEP together with `⌜P w⌝` and the view receipt — and
+`PtTreeAdue.v:985–1006` is a worked call site of it.  What is missing is
+only the S-mode wrapper tier:
+
+```coq
+  Mobl_ram_exv (width) (pa) (P : mword (8*width) -> Prop) (R : iProp Σ)
+    (* [Mobl_ram_ex]'s body with [∃ bytes] moved INSIDE the [∀ tv'] and
+       the resource made value-independent *)
+  swp_read_ram_node{1,2,4,8}_exv, swp_read_ram_node_w_exv
+  wp_load_s_sconf_au_exv     (* = wp_load_s_sconf_au through
+                                swp_execute_LOAD_S_gen_ex, which already
+                                takes its node AND its obligation as
+                                arguments — no new engine *)
+```
+
+`Mobl_ram_ex` itself must NOT be used for this: its `∃ bytes` sits outside
+the `∀ tv'`, i.e. it names one word good at every reachable view, which is
+`tso-pin-memo.md` §0's refuted shape and is false of any cell another hart
+writes.
+
+**WHAT REMAINS OF M4, in the memo's order, with the above folded in:**
+`TsoGhost`'s `ts_elem` window payload on byte 0 (`win_ok` + the
+window writer-pin + the per-agent `own_last`; all three are COVERAGE CLAIMS
+over the log, so `tso-pin-memo.md` §3 puts them in the interp, never in the
+invariant) → `ts_ok`'s growth → `TsoCtx`'s `ledger_read_racy_ok` and the
+author premise on `ledger_store_pin_ok` (the frame side condition
+`pm_tid m = h → msg_byte m a = None` is discharged from `ledger_store_ok`'s
+own `auth` argument, which is already there) → the `_exv` lane above → the
+phys-datum AU of measurement A → `WpLock`'s `lk_cpu_res` at
+`phys_ledger_word` plus the held arm's per-byte `ledger_vis` residue (the
+`ledger_msg_at` fragment `ledger_store_ok` hands back) → `WpSconfLock`
+(**3 red sites, not 1** — `lock_word`'s ∃-replay turned the two
+`wp_clw_lockopen_*` leaves red exactly as the memo predicted; the file's
+first error is now `wordw_claim_of` refusing `lock_word lk w`) →
+`ProofHolding`'s 2 call sites.  `lock_claims`' surviving
+`TsoCtxShim.ctx_word_of_mem` crossing is on the same path and dies with it.
+
+#### THE CLEAN ROUND, THE RED SET, AND THE QUEUE
+
+**CLEAN ROUND: 1088 of 1296, RED 9** — `rm -f iris/*.{vo,vok,vos,glob}`,
+`CoqMakefile` regenerated from the descoped `_CoqProject`, the model `.vo`
+verified fresh against its `.v` (19:11 over 18:37 — durable-notes' model-aware
+rule) and `kernel-rocq`'s likewise, one full `-j12 -k`.  No `Admitted`, no
+`admit`, no new `Axiom`; the ONE `Abort` outside `FastSetSolverTests` is still
+`UsertrapRes.ut_res_bare_park` (`:1768`), the named worklist entry.
+
+**AND THE CONFIRM ROUND AGREES FILE FOR FILE:** an incremental `-j12 -k`
+immediately after it recompiled **exactly nine targets — the nine red ones —
+and failed on all nine**, i.e. no green file needed rebuilding and the red
+set is identical.  That is the two-consecutive-rounds check A6.72 ran, and
+it also rules out the mtime artefact durable-notes warns about (a
+"Nothing to be done" round proves nothing; a round that rebuilds precisely
+the failures proves the rest is real).
+
+**THE GREEN COUNT AND THE RED SET BOTH RECONCILE EXACTLY, which is the
+check worth stating:** A6.72's 1089 green, minus the 3 rows the descoping
+removed that were already GREEN (`UmodeArith`, `UmodeCap`, `UmodeMem`), plus
+`ProofPrintk` and `ProofSyscall` = **1088**.  Red 12 − `ProofPrintk` −
+`ProofSyscall` − `UmodeFetch` (descoped) = **9**.  Nothing else moved in
+either direction, in either direction of the port.
+
+> **THE DENOMINATOR IS 1296 AND IT IS NOT 1333 − 41; SAY SO RATHER THAN
+> RECONCILE IT.**  Measured: `iris/` holds 1338 `.v` files, `_CoqProject`
+> listed 1337 of them (the omission is `SystemAssumptions.v`, deliberate —
+> durable-notes' `make audit` entry) and now lists 1296.  A6.72's stated
+> denominator of 1333 is four short of what this workspace measures, and
+> nothing in this tranche can account for the difference; treat 1296/1337
+> as the numbers of record and A6.72's 1333 as a count taken some other
+> way.
+
+**SHIM LEDGER: files naming `TsoCtxShim` 31 → 28, qualified uses 40 → 36** —
+`KernelDataInv` and `ProofSyscall` lost it entirely, `ProofPrintk` lost its two
+rodata crossings AND its now-dead `Require`.  **No shim use was ADDED**, so
+this port, like main's, is a tier flip that pays nothing for what it buys.
+**25 of the 36 remaining uses are in `BootCarveMain` alone** — which is why the
+boot 25 is worth its 3-file payoff.
+
+**THE RED 9**, with the cone behind each *recomputed after the descoping*:
+
+| file | behind it | cause |
+|---|---|---|
+| `WpSconfLock` | 160 | the M4 tranche — §(3) above is the brief |
+| `VcGenS` | 85 | six statements + an induction (A6.63's diagnosis) |
+| `ProofVirtioDiskRwD` | 66 | the DMA lease lane (A6.70 ruling 3) |
+| `UserMemPt` | 23 | the U-mode payer threading (**was 46**) |
+| `UtResFits` | 21 | `ut_res_bare_park`'s abort (M2 park protocol) |
+| `UptWalkPt` | 19 | the U-mode payer threading (**was 42**) |
+| `ProofVirtioDiskIntr` | 15 | the DMA lease lane |
+| `ProofMain` | 5 | the publication's last mile (A6.72 §(4)) |
+| `BootCarveMain` | 3 | the boot 25 |
+
+> **AND THE DESCOPING'S PAYOFF IS IN THAT TABLE, not just in the row count.**
+> The U-mode lane was priced at "~125 files behind three frontier files"; after
+> §0.24′ it is **42 behind two**, and `UmodeFetch`'s 37 left the port with it.
+> A6.71's estimate was not wrong — it was measuring the binary cone.
+
+**WHAT THE ROUND ALSO CAUGHT, and it is `make -k`'s recorded trap:** a
+failing target has its `.glob` deleted but **its stale `.vo` left in
+place**, so a green/red survey done with `test -f *.vo` reads a file that
+turned red in THIS round as green.  `ProofProcdumpLoop` was that file.  Any
+number in this note is from the LOG, and the closing one is from a clean
+tree.
+
+#### THE QUEUE, AS THE MEASUREMENTS NOW LEAVE IT
+
+1. **The M4 tranche** — §(3) above is its brief, and it now has the two
+   missing measurements (the phys-datum load AU; the `_exv` lane's real
+   depth).  Gates `WpSconfLock`'s cone and is the prerequisite of item 3.
+2. **The U-mode payer threading at its GENERIC sites** — `UptWalkPt` and
+   `UserMemPt` only, per §(2).  Independent.
+3. **The publication's last mile** — the third `strans_res_at`/`kpt_res_at`
+   arm (or pin-memo §5.6(a)'s two-armed tie); the gate and its site are
+   landed and waiting.  Behind M4.
+4. **The boot 25** in `BootCarveMain` (**25 of the tree's 36 remaining
+   qualified shim uses are in that one file** — the single largest shim
+   concentration left, which is what makes a 3-file payoff worth taking).
+5. `VcGenS`; the DMA/virtio lease lane; `UtResFits`' park protocol; the
+   phys notation twin (last).
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
