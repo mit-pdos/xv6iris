@@ -439,21 +439,12 @@ Section ProofNamexTrMain.
          pc_is ret_tgt -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
-
-  Definition nx_skip_body
-      (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
-      (pv : mword 64) (dqpv : dfrac) (fuel : nat) (CIDs : CpuId) : iProp Σ :=
-    (∀ (off : nat) (Ms : regfile),
-     ⌜(plen - off <= fuel)%nat⌝ -∗
-     ⌜(off < plen)%nat⌝ -∗
-     ⌜pfun off = SLASH⌝ -∗
-     ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
-     ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
-     sie_cap_gpr KT1 Ms (K - 12)%nat b (proc_addr j) -∗
-     pc_is (mword_of_int (NX + 0xfc)) -∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
-       ∀ (off' : nat) (Ms' : regfile),
+  (* the exit continuation of [nx_skip_body], named: inline it was
+     718 B, a third to a half of that block Delta at every
+     step of the walk (optimization.md, fold block continuations). *)
+  Definition nx_skip_exit
+      (j : nat) (b : bool) (K : nat) (plen : nat) (pfun : nat -> bv 8) (pv : mword 64) (dqpv : dfrac) (off : nat) (Ms : regfile) (CIDe : CpuId) : iProp Σ :=
+    (∀ (off' : nat) (Ms' : regfile),
          ⌜(off < off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
          ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
             pfun i = SLASH⌝ -∗
@@ -467,10 +458,10 @@ Section ProofNamexTrMain.
          pc_is (mword_of_int (NX + 0x106)) -∗
          ([∗ list] i ∈ seq 0 (S plen),
             pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-         WP (Loop : expr riscv_lang)) -∗
-     WP (Loop : expr riscv_lang))%I.
+         WP (Loop : expr riscv_lang))%I.
 
-  Definition nx_skip2_body
+
+  Definition nx_skip_body
       (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
       (pv : mword 64) (dqpv : dfrac) (fuel : nat) (CIDs : CpuId) : iProp Σ :=
     (∀ (off : nat) (Ms : regfile),
@@ -480,10 +471,16 @@ Section ProofNamexTrMain.
      ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
      ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
      sie_cap_gpr KT1 Ms (K - 12)%nat b (proc_addr j) -∗
-     pc_is (mword_of_int (NX + 0xb6)) -∗
+     pc_is (mword_of_int (NX + 0xfc)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
-       ∀ (off' : nat) (Ms' : regfile),
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId => nx_skip_exit j b K plen pfun pv dqpv off Ms CIDe) -∗
+     WP (Loop : expr riscv_lang))%I.
+  (* the exit continuation of [nx_skip2_body], named: inline it was
+     717 B, a third to a half of that block Delta at every
+     step of the walk (optimization.md, fold block continuations). *)
+  Definition nx_skip2_exit
+      (j : nat) (b : bool) (K : nat) (plen : nat) (pfun : nat -> bv 8) (pv : mword 64) (dqpv : dfrac) (off : nat) (Ms : regfile) (CIDe : CpuId) : iProp Σ :=
+    (∀ (off' : nat) (Ms' : regfile),
          ⌜(off < off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
          ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
             pfun i = SLASH⌝ -∗
@@ -497,21 +494,29 @@ Section ProofNamexTrMain.
          pc_is (mword_of_int (NX + 0xc0)) -∗
          ([∗ list] i ∈ seq 0 (S plen),
             pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-         WP (Loop : expr riscv_lang)) -∗
-     WP (Loop : expr riscv_lang))%I.
+         WP (Loop : expr riscv_lang))%I.
 
-  Definition nx_scan_body
+
+  Definition nx_skip2_body
       (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
       (pv : mword 64) (dqpv : dfrac) (fuel : nat) (CIDs : CpuId) : iProp Σ :=
-    (∀ (ii : nat) (Ms : regfile),
-     ⌜(plen - ii <= fuel)%nat⌝ -∗
-     ⌜(ii < plen)%nat⌝ -∗
-     ⌜Ms !!! Regidx Rs2 = pa_add pv ii⌝ -∗
+    (∀ (off : nat) (Ms : regfile),
+     ⌜(plen - off <= fuel)%nat⌝ -∗
+     ⌜(off < plen)%nat⌝ -∗
+     ⌜pfun off = SLASH⌝ -∗
+     ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
+     ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
      sie_cap_gpr KT1 Ms (K - 12)%nat b (proc_addr j) -∗
-     pc_is (mword_of_int (NX + 0x116)) -∗
+     pc_is (mword_of_int (NX + 0xb6)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
-       ∀ (e : nat) (Ms' : regfile),
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId => nx_skip2_exit j b K plen pfun pv dqpv off Ms CIDe) -∗
+     WP (Loop : expr riscv_lang))%I.
+  (* the exit continuation of [nx_scan_body], named: inline it was
+     626 B, a third to a half of that block Delta at every
+     step of the walk (optimization.md, fold block continuations). *)
+  Definition nx_scan_exit
+      (j : nat) (b : bool) (K : nat) (plen : nat) (pfun : nat -> bv 8) (pv : mword 64) (dqpv : dfrac) (ii : nat) (Ms : regfile) (CIDe : CpuId) : iProp Σ :=
+    (∀ (e : nat) (Ms' : regfile),
          ⌜(ii < e)%nat⌝ -∗ ⌜(e <= plen)%nat⌝ -∗
          ⌜forall jj : nat, (ii < jj)%nat -> (jj < e)%nat ->
             pfun jj <> SLASH⌝ -∗
@@ -523,8 +528,32 @@ Section ProofNamexTrMain.
          pc_is (mword_of_int (NX + 0x96)) -∗
          ([∗ list] i ∈ seq 0 (S plen),
             pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-         WP (Loop : expr riscv_lang)) -∗
+         WP (Loop : expr riscv_lang))%I.
+
+
+  Definition nx_scan_body
+      (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
+      (pv : mword 64) (dqpv : dfrac) (fuel : nat) (CIDs : CpuId) : iProp Σ :=
+    (∀ (ii : nat) (Ms : regfile),
+     ⌜(plen - ii <= fuel)%nat⌝ -∗
+     ⌜(ii < plen)%nat⌝ -∗
+     ⌜Ms !!! Regidx Rs2 = pa_add pv ii⌝ -∗
+     sie_cap_gpr KT1 Ms (K - 12)%nat b (proc_addr j) -∗
+     pc_is (mword_of_int (NX + 0x116)) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId => nx_scan_exit j b K plen pfun pv dqpv ii Ms CIDe) -∗
      WP (Loop : expr riscv_lang))%I.
+  (* the exit continuation of [nx_mid_body], named: inline it was
+     238 B, a third to a half of that block Delta at every
+     step of the walk (optimization.md, fold block continuations). *)
+  Definition nx_mid_exit
+      (j : nat) (b : bool) (K : nat) (plen : nat) (pfun : nat -> bv 8) (pv : mword 64) (dqpv : dfrac) (a : nat) (Ms : regfile) (CIDa : CpuId) : iProp Σ :=
+    (⌜(a = plen)%nat⌝ -∗
+       sie_cap_gpr KT1 Ms (K - 12)%nat b (proc_addr j) -∗
+       pc_is (mword_of_int (NX + 0x140)) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+       WP (Loop : expr riscv_lang))%I.
+
 
   Definition nx_mid_body
       (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
@@ -539,12 +568,7 @@ Section ProofNamexTrMain.
      pc_is (mword_of_int (NX + 0x106)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      (* EXIT A -- the string is exhausted, at +0x140 *)
-     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDa : CpuId =>
-       ⌜(a = plen)%nat⌝ -∗
-       sie_cap_gpr KT1 Ms (K - 12)%nat b (proc_addr j) -∗
-       pc_is (mword_of_int (NX + 0x140)) -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-       WP (Loop : expr riscv_lang)) -∗
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDa : CpuId => nx_mid_exit j b K plen pfun pv dqpv a Ms CIDa) -∗
      (* EXIT B -- an element starts at [a], at +0x116 *)
      wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDb : CpuId =>
        ∀ Ms' : regfile,
@@ -560,6 +584,23 @@ Section ProofNamexTrMain.
             pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
+  (* the exit continuation of [nx_head_body], named: inline it was
+     517 B, a third to a half of that block Delta at every
+     step of the walk (optimization.md, fold block continuations). *)
+  Definition nx_head_exit
+      (j : nat) (b : bool) (K : nat) (plen : nat) (pfun : nat -> bv 8) (pv : mword 64) (dqpv : dfrac) (off : nat) (Ms : regfile) (CIDa : CpuId) : iProp Σ :=
+    (∀ Ms' : regfile,
+         ⌜forall i : nat, (off <= i)%nat -> (i < plen)%nat ->
+            pfun i = SLASH⌝ -∗
+         ⌜Ms' !!! Regidx Rs1 = pa_add pv plen⌝ -∗
+         ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
+            Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+         sie_cap_gpr KT1 Ms' (K - 12)%nat b (proc_addr j) -∗
+         pc_is (mword_of_int (NX + 0x140)) -∗
+         ([∗ list] i ∈ seq 0 (S plen),
+            pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+         WP (Loop : expr riscv_lang))%I.
+
 
   Definition nx_head_body
       (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
@@ -572,18 +613,7 @@ Section ProofNamexTrMain.
      pc_is (mword_of_int (NX + 0xf4)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      (* EXIT A -- nothing but separators left, at +0x140 *)
-     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDa : CpuId =>
-       ∀ Ms' : regfile,
-         ⌜forall i : nat, (off <= i)%nat -> (i < plen)%nat ->
-            pfun i = SLASH⌝ -∗
-         ⌜Ms' !!! Regidx Rs1 = pa_add pv plen⌝ -∗
-         ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
-            Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
-         sie_cap_gpr KT1 Ms' (K - 12)%nat b (proc_addr j) -∗
-         pc_is (mword_of_int (NX + 0x140)) -∗
-         ([∗ list] i ∈ seq 0 (S plen),
-            pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-         WP (Loop : expr riscv_lang)) -∗
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDa : CpuId => nx_head_exit j b K plen pfun pv dqpv off Ms CIDa) -∗
      (* EXIT B -- an element starts at [a], at +0x116 *)
      wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDb : CpuId =>
        ∀ (a : nat) (Ms' : regfile),
@@ -602,19 +632,12 @@ Section ProofNamexTrMain.
             pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
-
-  Definition nx_trail_body
-      (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
-      (pv : mword 64) (dqpv : dfrac) (CIDs : CpuId) : iProp Σ :=
-    (∀ (off : nat) (Ms : regfile),
-     ⌜(off <= plen)%nat⌝ -∗
-     ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
-     ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
-     sie_cap_gpr KT1 Ms (K - 12)%nat b (proc_addr j) -∗
-     pc_is (mword_of_int (NX + 0xae)) -∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
-       ∀ (off' : nat) (Ms' : regfile),
+  (* the exit continuation of [nx_trail_body], named: inline it was
+     620 B, a third to a half of that block Delta at every
+     step of the walk (optimization.md, fold block continuations). *)
+  Definition nx_trail_exit
+      (j : nat) (b : bool) (K : nat) (plen : nat) (pfun : nat -> bv 8) (pv : mword 64) (dqpv : dfrac) (off : nat) (Ms : regfile) (CIDe : CpuId) : iProp Σ :=
+    (∀ (off' : nat) (Ms' : regfile),
          ⌜(off <= off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
          ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
             pfun i = SLASH⌝ -∗
@@ -626,7 +649,20 @@ Section ProofNamexTrMain.
          pc_is (mword_of_int (NX + 0xc0)) -∗
          ([∗ list] i ∈ seq 0 (S plen),
             pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-         WP (Loop : expr riscv_lang)) -∗
+         WP (Loop : expr riscv_lang))%I.
+
+
+  Definition nx_trail_body
+      (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
+      (pv : mword 64) (dqpv : dfrac) (CIDs : CpuId) : iProp Σ :=
+    (∀ (off : nat) (Ms : regfile),
+     ⌜(off <= plen)%nat⌝ -∗
+     ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
+     ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
+     sie_cap_gpr KT1 Ms (K - 12)%nat b (proc_addr j) -∗
+     pc_is (mword_of_int (NX + 0xae)) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId => nx_trail_exit j b K plen pfun pv dqpv off Ms CIDe) -∗
      WP (Loop : expr riscv_lang))%I.
 
   Definition nx_loop_body

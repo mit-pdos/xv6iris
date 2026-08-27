@@ -17,6 +17,7 @@ stays TRANSPARENT and the `iApply ("H" $! …)` sites unify through it.
 
 | what | measured |
 |---|---|
+| `ProofNamex` + `ProofNamexTr`: the six `nx_*_exit` inner continuations | 111.4 → 110.1 s and 92.2 → 90.7 s (−1.2 / −1.6 %) |
 | `ProofSysUnlink`: `sys_unlink_closer` + `su_w1/w2/w3_seam` | 153.7 s → 133.1 s (−13.4 %), `.vo` −14.8 % |
 | kexec: `KexecOkQ.kexec_closer`, 36 inline copies across 12 files | B3/C/A 166.6 s → 153.6 s (−7.8 %), `.vo` −7 to −10 % |
 
@@ -25,7 +26,7 @@ SEAMS were already folded (`ProofKexecSeam.kxc_at_12c`, used 7× in
 ProofKexecB3), and the return closer was the only inline continuation left in
 it. Nothing there is left to fold.
 
-## NEGATIVE RESULT: ProofPrintk, and the ranking rule it corrects
+## What predicts a win (and three negative results)
 
 **Folding `ProofPrintk`'s eleven identical `wp_printk_arm_*` exit
 continuations is worth NOTHING — do not redo it.** Measured on a quiet box
@@ -49,11 +50,20 @@ those is inside the noise of a 48 s file. Compare `ProofSysUnlink.su_w3`:
 **one** lemma, 26.5 s, with a 48 % item in its Δ — that is the regime where
 the fold pays.
 
-So rank by **that lemma's own `coqc -time` cost × its share**, never by the
-FILE's cost × the share. Getting this wrong is what put ProofPrintk at the top
-of the first draft of this list. `tools/`-free recipe: `coqc -time` the file,
-attribute each sentence to its enclosing `Lemma` by character offset (the
-offsets are BYTES), and sum.
+**THE PREDICTOR IS ABSOLUTE BYTES REMOVED FROM Δ, NOT SHARE**, times how long
+they sit there. Every result so far fits it and nothing else does:
+
+| | removed from Δ | result |
+|---|---|---|
+| ProofSysUnlink | ~6.5 kB, whole walk | **−13.4 %** |
+| kexec (B3/C/A) | ~0.8 kB, 67 s walk | **−7.8 %** |
+| ProofNamex/Tr | ~1 kB, part of the walk | −1.2 / −1.6 % |
+| ProofCopyout `co_loop` | 0.46 kB | nil (+0.5 %, `.vo` −4.0 %) |
+| ProofPrintk ×11 | 0.35 kB, 0.3–2.7 s lemmas | nil |
+
+**Below ~1 kB removed, do not bother** — share can read 30–50 % and still be
+worth nothing, because per-step cost is `|Δ|` ABSOLUTE. Attribute cost with
+`coqc -time` per enclosing `Lemma` (the `Chars` offsets are BYTES).
 
 ## Remaining, ranked — by LEMMA cost × share
 
@@ -62,7 +72,6 @@ continuation as a fraction of that lemma's statement.
 
 | file | build | the fold |
 |---|---|---|
-| **`ProofCopyout.v`** | `co_loop` **33.8 s**, 27.3 % | The biggest single-lemma prize left, and the only remaining one whose lemma cost is in the tens of seconds. Untried. |
 | `ProofIput.v` | `ip_free_entry` 16.3 s, 47.9 % | `ip_free_entry` **47.9 %** of a 16 kB statement (7663 B, 50 rows), `ip_free_offlock` 31 %. **MEASURE BEFORE EDITING** — optimization.md records that naming `ip_free_locked`'s closer here cost **+13 s**. These are two DIFFERENT and larger continuations than the one that regressed, so it is not settled either way; it is the one file that has already resisted this lever. |
 | `WpSconfCsr.v` | lemma cost not measured | `wp_csrr_sstatus_s_sconf` **89.5 %** and `wp_csrci_sstatus_x0_s_sconf` 78.3 % — the highest shares in the tree. A leaf/engine file, so per-proof step counts are lower than a walk's; expect less than the share suggests. |
 | `ProofSysExec.v` | `sx_step` 9.4 s, 50.2 % | ~4.7 s at best. The file is ~30 proofs; this is one of them. |
