@@ -4944,6 +4944,422 @@ was red or unreached.
    block, and the last thing between the tree and a shim-free grep.
 6. `RiscvAdequacy`'s element carve (A6.59) — the last structural piece.
 
+### A6.61 `WpSconfMem` WAS NEVER SLOW — IT WAS ONE SENTENCE, AND THE
+### OWNERS' TABLE IS WRONG BY TWO
+
+**THE HEADLINE, AND IT RETIRES A6.60's MEASUREMENT.**  A6.60 recorded
+post-flip `WpSconfMem.v` as "a ~20-minute single-file compile … working,
+not looping" and the next run killed it at 30 minutes (Error 143).  Both
+readings were guesses from OUTSIDE the process: the file had never been
+observed to FINISH, and "~20 minutes" was an in-flight extrapolation.
+`rocq compile -time` settles it, and the answer is not a slow file:
+
+> **Everything in `WpSconfMem.v` up to character 31216 — 530 lines, both
+> towers, the whole arithmetic preamble, 195 timed sentences — costs
+> 4.57 SECONDS IN TOTAL, and the slowest single sentence in it is
+> 0.665 s.  Then ONE sentence runs for the rest of the budget: the read
+> engine's leaf application at `WpSconfMem.v:530`, the first thing inside
+> its `2:{`.**  35 minutes of pegged CPU, RSS climbing to 1.34 GB and then
+> flat, killed.  It is not the file, not the towers and not the flip's
+> algebra.  It is one `iApply`.  (The file's other real cost is its
+> `Require` prefix, ~3 minutes of loading that `-time` does not attribute
+> to any sentence — worth knowing before blaming a proof.)
+
+**WHY, AND THE FIX IS THREE WORDS.**  A6.36's overruling made the S-mode
+load the PLAIN arm, so the leaf's `R` became the payload
+`own_context ∗ Ψ bs` — and A6.60 noted in passing that `R` "is now a
+lambda rather than a variable".  That passing remark WAS the bug.  The
+lambda was written out TWICE inside a forty-argument application, once on
+its own and once nested under `Mobl_ram_ex`:
+
+    (fun bs => TsoCtx.own_context TsoCtx.cur_ctx ∗ Ψ bs)%I
+    (Mobl_ram_ex width (pa_of ppn ea)
+       (fun bs => TsoCtx.own_context TsoCtx.cur_ctx ∗ Ψ bs)%I)
+
+Higher-order unification then has to guess the abstraction at both
+positions while it works through forty arguments.  Naming it once gives
+the leaf a RIGID HEAD:
+
+    set (Psic := (fun bs => TsoCtx.own_context TsoCtx.cur_ctx ∗ Ψ bs)%I).
+    …  Psic  …  (Mobl_ram_ex width (pa_of ppn ea) Psic)  …
+    (* after the node closes, for the post's iDestruct pattern: *)
+    rewrite /Psic.
+
+**AND THE `set` ALONE IS MEASURED INSUFFICIENT — DO NOT INHERIT THIS AS A
+SOLVED PROBLEM.**  With the `set` in place the same sentence was given a
+FULL HOUR and did not finish: same 1.34 → 1.39 GB RSS plateau, same
+non-termination, killed at 60 min.  The reason is that `set`'s local
+definition stays TRANSPARENT, so the unifier may still delta-unfold it and
+do exactly the guessing the naming was meant to prevent.  **The real fix
+is a RIGID head, not merely a named one:**
+
+    set (Psic := (fun bs => own_context cur_ctx ∗ Ψ bs)%I).
+    assert (HPsic : Psic = (fun bs => …)%I) by reflexivity.
+    clearbody Psic.
+
+then `rewrite HPsic` in the TWO places that need the `∗`-shape back — inside
+the RAM-obligation arm before its `iFrame "… Hctx HPsi"`, and after the node
+closes (where `rewrite /Psic` stands today).  With `clearbody` the unifier
+cannot unfold `Psic` at all.  Untried here: each attempt costs a
+30-minute-minimum compile and the budget was spent proving the `set` form
+insufficient.  The `set` is LEFT IN THE FILE with this analysis beside it.
+
+> **THE DURABLE RULE, and it generalises past this file.**  At the
+> forty-argument leaf applications (`swp_execute_LOAD_ram_*`,
+> `swp_execute_STORE_ram_*` and their `_ex` forms), **never pass `R` as a
+> lambda** — and when you name it, make it RIGID (`clearbody`), because a
+> transparent `set` is not enough.
+> The plain arm made every S-mode leaf's `R` a lambda, so this is a
+> STANDING hazard for the whole leaf tier, not a `WpSconfMem` quirk.  And
+> the diagnostic that found it is worth keeping: when a Rocq file appears
+> to hang, `rocq compile -time` piped to a log and read WHILE IT RUNS
+> names the sentence in the time it takes to reach it — here, four
+> minutes to convert "the S-mode data engine does not compile" into "line
+> 530 does not elaborate".  A6.60's "iterate on it with a whole-tree `-k`
+> sweep and read the error out of the log" is superseded: the `-k` sweep
+> tells you the file is red, `-time` tells you WHICH SENTENCE.
+
+**WHAT LANDED IN THIS TRANCHE.**
+
+- **`WpSmodePtMem` — DONE**, and it was exactly the copy of a worked proof
+  A6.60 promised.  47 mechanical edits across the four leaves
+  (`wp_clw_s_r_t` 4-byte load, `wp_ld_s_r_t` 8-byte load, `wp_csw_s_r_t`
+  4-byte store, `wp_sd_s_r_t` 8-byte store) and their four KT0
+  corollaries, taken straight off `WpSmodePtLeaves`'s diff: token in and
+  out of each statement, into the folded post, into the leaf's `R`, into
+  the obligation arm's spec list, and back out through the landing and the
+  continuation.  The load arms swap `s_mem_chunk` for
+  `SmodeCorePt.wordw_win_load_c` at their own width; the store arms swap
+  `word{,4}_pointsto_write_c`'s `sigma.(mem)` for the `img σ log V` bundle
+  and gain the `subst tv`.  **The file's last shim reference went with
+  it** — `wp_ld_s_r_t`'s `ctx_buf_forget` … `TsoCtxShim.ctx_buf_of_mem`
+  sandwich, whose return half is the FALSE direction — so the
+  `Require TsoCtxShim` is deleted too.
+- **The two REAL owner re-tierings — `BcacheInv` and `WaitInv`** (see the
+  table below), plus their 21 dependent crossings and the 22 matching
+  return-leg forgets, deleted across seven client files.  Seven files went
+  shim-free; `ProofKwait` keeps one unrelated `ctx_buf_of_mem` on
+  `p_xstate`.
+
+**WHAT WAS MEASURED AND DELIBERATELY NOT LANDED**, because in both cases
+A6.60's price is wrong by enough to change the decision:
+
+- **`UptWalkPt` / `tramp_tr_obl`.**  The DIRECTION is confirmed by the
+  compile error: `UptWalkPt.v:679` fails on `iSpecialize`, and the term it
+  cannot instantiate begins `own_context XI -∗ upt_res_pt … -∗ …` —
+  `swp_translate_upt` takes the token as its FIRST premise and the
+  □-obligation has none to give.  A6.60 priced the repair at "three
+  producers, two consumers, all of them pass-through".  **It is six files
+  — `TrampStepPt`, `Pt2WalkPt`, `TransPt`, `UptWalkPt`, `UservecExitPt`,
+  `UserretEntryPt` — and the pass-through claim is false at the point
+  that matters.**  Inside `TrampStepPt` the obligation is CONSUMED five
+  times (`iApply ("Htr" …)` at lines 635, 713, 742, 816, 878), all within
+  `tramp_run_hart_active_instr_S`, and each consumer must SUPPLY a token
+  it does not have: the payload `W` is framed AROUND the obligation by
+  `swp_mono`, so it cannot carry one.  That lemma therefore gains an
+  `own_context` premise, and the cascade runs out through
+  `wp_instr_tramp_pt` / `wp_instr_ktramp_pt_share` into the four
+  trap-handler files.  Its own tranche, against a green tree.  The
+  definition in `TrampStepPt.v` is left BYTE-IDENTICAL with the finding
+  recorded in a comment beside it.
+- **`UserMemPt`'s window store.**  A6.60 has the shape right — the
+  `foldr` over an arbitrary index list `l` becomes the window form,
+  because a store is ONE message — and both call sites already instantiate
+  `l := seq 0 (Z.to_nat k)`, so the caller side is free.  What A6.60 does
+  not say is that `TsoCtx.ctx_store_win_ok` needs `tso_interp_at` and a
+  gstate PAIR `g g'` with five side conditions, and `udata_own_upd`'s
+  callers (`UserMemPt.v:747`, `UserMemMis.v:651`) hand it
+  `gen_heap_interp m` and nothing else.  So the spec change is not one
+  statement, it is the interp bundle threaded through
+  `udata_own_store_g` to its own callers — and the proof needs a
+  window-accessor over `udata_own`'s `big_sepM` (extract `n` bytes at
+  consecutive addresses with a closing wand), which does not exist.  The
+  old proof's per-byte induction is exactly what the payload ruling
+  forbids, so it cannot be salvaged.  **Not a threading change and not a
+  one-lemma change: its own tranche.**
+- **`UmodeFetch`** is the remaining lane-4 half (the fetch obligation
+  gained `img`/`log`); its error at line 561 is inside the
+  `InstructionFetch` obligation arm, the same shape `WpSmodePtLeaves`
+  already worked, and it is the cheapest of the three.
+
+### THE OWNERS' TABLE IS WRONG BY TWO, AND THE TEST IS MECHANICAL
+
+A6.58 named five raw-tower owners.  The test is one line — does the file
+`Require Import TsoCtx` (in which case `↦ₘ/↦₂/↦₄/↦₈` are ALREADY the ctx
+towers, `TsoCtx.v:3421–3468`) or not — and it says **three, and one of the
+three is not the file A6.58 named**:
+
+| A6.58's owner | verdict | why |
+|---|---|---|
+| boot carve's frame slots (26) | **REAL** | `BootCarve.v:61` is `Require TsoCtx` QUALIFIED ONLY, deliberately; its statements are bare `gen_heap pointsto`, one tier BELOW `↦ₘ` |
+| `BcacheInv`'s LRU links (16) | **REAL — LANDED** | no TsoCtx import at all; `bcache_lru`/`bseg`/`blink_raw` held `↦₈` = `RiscvPtsto.word_pointsto` |
+| `ProcInv`'s proc-slot cells (9) | **NOT AN OWNER** | `ProcInv.v:90` already imports TsoCtx; every `↦₈`/`↦₄` in it is ctx today.  The real owner of the five `p_parent` sites is **`WaitInv.v`** (`parents_own`), which A6.58 never names |
+| `DiskInv` / devsw (4) | **NOT AN OWNER** | `VirtioDiskRwDefs` and `ConsoleInv` both import TsoCtx; the 3 survivors are a RAW KIT call (`InstrBytes.word_pointsto_join4`) and two explicit `word_pointsto` spellings inside `ProofFilewriteParts.fw_devidx`'s own statement |
+| buffer/string windows (12) | **NOT AN OWNER** | all import TsoCtx; the raw enters through kit, and the ctx twins mostly already exist |
+
+**SO THE RESIDUE IS NOT 70 DECISIONS ACROSS FIVE OWNERS.**  It is:
+
+- **21 sites — LANDED here** (`BcacheInv` 16 + `WaitInv` 5).  Both files
+  were single-section, used NO raw kit lemma by name and NO other flipped
+  notation, and neither is reachable from `TsoCtx` (which reaches only
+  `RiscvModelBytes`/`RiscvLang`/`RiscvPtsto`/`Ktier`/`TsoMemPa`/`TsoGhost`),
+  so the re-tiering is two lines each — `Require Import TsoCtx.` and a
+  `Context {XI : CurCtx}.` — and the 21 crossings plus 22 forgets delete.
+  **Contrary to A6.58, this half IS compile-validatable from here**: both
+  owners and all six of their downstream holders (`BreadLru`, `BioInv`,
+  `BioInitAt`, `FsBoot`, `FsCfgBoot`, `ProcGeom`) are green.
+- **26 sites — the boot carve, and it is the tranche's real design
+  question.**  All three boot files are in `ctx_convert.py`'s
+  `AMBIENT_BLACKLIST` BY NAME (lines 248–252) with the recorded reason
+  *"a phantom ambient here is the boot_hart_res/eight-hart lesson"*, and
+  `convert_ambient` also refuses any file without `Require Import TsoCtx`.
+  **The tool cannot do this owner and must not be made to**; it needs
+  explicit-ξ statements, or an owner ruling reversing the blacklist.
+- **~22 sites — a second MECHANICAL sweep**, and three kit items close
+  most of it: `ByteBuf.ctx_word_pointsto_join4` (exists, 6 sites),
+  `TsoCtx.ctx_word{2,4}_pointsto_bytes` (exist, 4 sites), and **one lemma
+  that exists nowhere in the tree — `ctx_pointsto_ktier_mono`**, the ctx
+  twin of `RiscvPtsto.v:1362 mem_ktier_mono` (4 sites:
+  `ProofCreateParts` ×2, `ProofForkretParts`, `ProofKexecTail`).  Plus 3
+  `↦ₛ` forgets and the 3 `⊣⊢`→`⊢` weakenings.
+- **`↦ₛ` — CONFIRMED IMMOVABLE, and it is exactly 3 sites**, not the
+  vaguer set A6.58 implies: `ProofSyscall.v:2068` (`sysc_pname_app`),
+  `ProofPrintk.v:1165` (`pk_str_byte`), `ProofPrintk.v:4429`
+  (`pk_digits_data`).  All three are `↦ₛ□`/`↦ₛ{dq}` over READ-ONLY
+  rodata, which is why a forget suffices.  The three `⊣⊢` that weaken are
+  `ProofSyscall.sysc_pname_app` (`:2058`) — whose BACKWARD use at
+  `ProofSyscall.v:4759` then stops typechecking, the one non-local
+  consequence — and `DinodeSlot`'s `bb2_cell` (`:516`) / `bb4_cell`
+  (`:528`), both `Local` and both consumed only by `dislot_acc_gen`.
+
+`TsoCtxShim.v` itself is 43 lines declaring ONE thing, `own_context_alloc`,
+and **no file in the tree references it**; the five names still in use
+(`ctx_word_of_mem`, `ctx_pointsto_of_mem`, `ctx_buf_of_mem`,
+`ctx_eslot_of_mem`, `ctx_pointsto_shim`) do not exist any more.  ~16 of the
+surviving `Require TsoCtxShim` lines are already pure dead weight.
+
+### THE ELEMENT CARVE — CHARACTERISED, FOR OWNER RATIFICATION
+
+Step 6's one remaining item (A6.59).  **The statement is NOT changed here.**
+This is the exact conjunct the system theorem's conclusion would gain, its
+place, and its cascade.  Nothing below is landed.
+
+**WHERE.**  `iris/RiscvAdequacy.v`, theorem `riscv_system_adequacy`
+(declared line 410), in the client's resource bundle opened at line 495 —
+inserted between lines 505 and 506, i.e. immediately after the existing
+`↦ₘ` data conjunct and before the `kmap_auth kmap_M0` one.  It is the
+THIRD conjunct of the bundle.
+
+**THE CONJUNCT, VERBATIM:**
+
+```coq
+       (* THE ELEMENT CARVE (tso-machine-flip.md A6.59).  [↦ₘ] is the FLAT
+          byte only ([mem_pointsto] = kmap claim + gen_heap [pointsto]); the
+          ledger element that goes with it lives in the era's [ts_name]
+          ghost_map, and THIS THEOREM'S [ghost_map_alloc] is its one and only
+          supplier (A6.9 -- nothing above the interp mints one).  The TEXT
+          half of that big-op is spent above: persisted into
+          [RiscvPtsto.pristine_elem] and folded into [↦ₓ□] by
+          [BootCarve.boot_text_persist].  This is the DATA half, at the same
+          index map as the [↦ₘ] conjunct above it, so the client pairs the
+          two byte-for-byte with [TsoCtx.ctx_phys_pointsto_of_elem] /
+          [TsoCtx.phys_ledger_of_elem], and it is [BootCarve.boot_led_ran]'s
+          content at [[text_end, ram_hi)] ([supra_text_ran], off [Hram]). *)
+       ([∗ map] a ↦ _ ∈ filter (fun p : Arch.pa * bv 8 => text_end <= uint p.1)
+                          g.(gmem), TsoCtx.ledger_elem0 a (DfracOwn 1)) ∗
+```
+
+Every name is checked against the tree: `TsoCtx.ledger_elem0`
+(`TsoCtx.v:2135`, `:= (a ↪[ts_name]{dq} (0%nat, None))%I`) sits in a
+section whose only binder is `Context {!riscvGS Σ}` — no `CurCtx`, no
+`CurKtier` — so it typechecks at the theorem's `forall HR : riscvGS Σ`
+binder; `TsoCtx` is reachable from `RiscvAdequacy` through
+`BootCarve.v:61`; and the `filter …` term is a literal copy of
+`RiscvAdequacy.v:504-505`, equal to `BootCarve.supra_text g`.
+
+**AND THE SUPPLY IS ALREADY THERE, ON THE FLOOR.**  `RiscvAdequacy.v:645`
+allocates `Htsfrags` from A6.59's `ghost_map_alloc` and **never mentions it
+again** (only `Htsauth` is used, at 750/780/784).  The carve is four proof
+lines at the 710–712 block: `big_sepM_fmap`, split at `text_end`, persist
+the text half, frame the data half into the bundle at 715/719.
+
+**THE CASCADE, and it names two ALREADY-STALE call sites:**
+
+1. `RiscvAdequacy.v` itself — and **line 711 is stale today**:
+   `iMod (@boot_text_persist Σ HR g Hram with "Hkbundle Htext")` passes two
+   resources while `BootCarve.boot_text_persist` (`BootCarve.v:184`)
+   already takes three, the middle one being
+   `([∗ map] a ↦ _ ∈ sub_text g, pristine_elem a)`.  The carve is what
+   fills that slot.
+2. `BootCarve.v` §9 — two new lemmas: an element twin of `boot_bytes_split`
+   (`:153`, proof verbatim: `map_filter_union_complement` + `supra_co_sub`),
+   and the persist `ledger_elem0 … (DfracOwn 1) ==∗ pristine_elem`
+   (`boot_ran_persist`'s shape at `:489`, with `ghost_map_elem_persist`) —
+   one `big_sepM_bupd`, since the two are the same key at `DfracOwn 1` vs
+   `DfracDiscarded`.  A third if the filter spelling is kept:
+   `supra_text_ran` (`:333`) must stop being `Local`.
+3. `RiscvAdequacy.riscv_device_adequacy` (`:838`) — one extra `_` in the
+   destructure at `:895`.
+4. `RiscvAdequacy.power_boot_res` (`:981`) + `wp_power_loop`'s PowerOn arm
+   (`:1304`) + `riscv_power_adequacy` (`:1507`).  **Note the era record
+   built at `:1270` is still short by ALL FIVE flip gnames** (`γkptb`,
+   `γts`, `γlogm`, `γloglen`, `γview`) — A6.59's four `iMod`s have to be
+   copied into that arm first.
+5. `BootShared.v` — `power_boot_res_unpack` (`:1121`, destructure `:1350`)
+   and `boot_shared_alloc`'s image block (`:1357-1373`), where **`:1358`
+   is stale in exactly the same way as `RiscvAdequacy.v:711`** and
+   **`:1373`'s `kernel_data_intro` is stale too** (`BootCarve.v:561`
+   already demands a second resource, `pristine_va` over
+   `[text_end, rodata_end)`).  Also `boot_hart_stack_raw` (`:275`) calls
+   `boot_stack_own_phys` with one resource at `:286` while
+   `BootCarve.v:1266` now takes two.
+6. `SystemAdequacy.xv6_boot_era` (`:264`, states it at `:287`, feeds
+   `boot_shared_alloc` at `:305`) and both `refine` sites (`:550`, `:709`)
+   — pass-through.
+7. `SpecEntry.v` — **no change, and it is the reason for the Dfrac
+   choice**: `wp_entry_boot_body` already takes `TsoCtx.pristine_win
+   mb_ld_ea 8`, and `mb_ld_ea` is in the DATA half, so those 8 persisted
+   elements must come out of this conjunct.
+
+**NOT in the cascade:** the log/loglen/view fragments.  `TsoGhost.llb`'s
+`⌜K = 0⌝` disjunct and `TsoCtx.ctx_phys_pointsto_of_elem`
+(`TsoCtx.v:2145`, `iLeft. iApply llb_0.`) make the clean arm free at
+timestamp 0, so **the element alone is the whole bill — the conclusion
+gains exactly ONE conjunct, not four.**
+
+**FIVE QUESTIONS FOR THE OWNER, and the carve should not land until they
+are answered:**
+
+1. **Index spelling** — the `filter …` form above (zips byte-for-byte with
+   the sibling `↦ₘ` row) or `boot_led_ran g text_end ram_hi`
+   (`BootCarve.v:1183`, the client's own vocabulary)?  Interconvertible
+   under `Hram` by `supra_text_ran`, which is `Local` today.  A6.59's "the
+   shape is fixed by `boot_led_ran`" reads as fixing the RESOURCE
+   (`ledger_elem0` at `DfracOwn 1`, one per byte), not the index term.
+2. **Who persists the read-only sub-range?**  `kernel_data_intro` wants
+   `pristine_va` over `[text_end, rodata_end)`.  Assumed above: the
+   conclusion hands the whole data half at `DfracOwn 1` and the client
+   persists (one new `BootCarve` lemma, conclusion stays one row).  The
+   alternative is a THREE-way conclusion.
+3. **Three names for one body** — `RiscvPtsto.pristine_elem` (`:1535`) and
+   `TsoCtx.pristine_byte` (`:1454`) are literally the same term under two
+   names in two files.  Alias one, or is the duplication deliberate tier
+   hygiene?
+4. **Is `power_boot_res`'s twin in this tranche?**  The carve's only real
+   consumer is on the power path (`BootShared.boot_shared_alloc`), so
+   shipping the conjunct into `riscv_system_adequacy` alone leaves it
+   consumed by nobody but a `_`.
+5. **Dfrac before persisting** — new persist lemma in `BootCarve` §9
+   (assumed), or fold `ghost_map_elem_persist` into `boot_text_persist`
+   and change an already-green statement in a green file?
+
+### THE ONE CASCADE `WpSmodePtMem` OPENS, AND IT IS NOT `WpSmodePtMemWrap`
+
+`WpSmodePtMemWrap` was already token-threaded and went GREEN against the
+finished leaves on its first compile — the four sp-relative wrappers cost
+nothing.  The bill lands one tier further out, and it was not on A6.60's
+list:
+
+> **`VcGenS.v` (1539 lines) contains ZERO `own_context` and calls the
+> sp-relative wrappers at four sites** (`wp_csdsp_gpr_s_r_t` /
+> `wp_cldsp_gpr_s_r_t`, lines 510, 544, 1006, 1041).  So
+> `wp_vc_block_s_den_r` (`:378`) — the block verification-condition lemma,
+> a big induction with a continuation — has to take and return the token,
+> and the cascade runs on to its five consumers: `IntrDefs`,
+> `ProofKernelvec`, `ProofSwtch`, `SRegime`, `WpSwtchVc`.  **That is the
+> scheduler/trap tier, and it is this tranche's real successor.**
+
+Threaded through an induction it is the same mechanical shape as the
+leaves, but it is six more files and it was reached only because the leaf
+statements finally moved.  Not landed here; characterised, like the two
+above it.
+
+### TWO PROCESS RULES THIS TRANCHE PAID FOR
+
+Both cost real time here and both are cheap to obey.
+
+**1. THE INVISIBLE STALENESS, and why A6.25's no-concurrent-make rule is
+about CORRECTNESS, not contention.**  Two sweeps overlapped this tranche
+(~02:05–02:19) while edits were landing.  The damage a concurrent make
+does is not a race on one `.vo` — it is that a `.vo` COMPLETED during the
+window is *newer than the source it disagrees with*, so `make` will never
+rebuild it and every number downstream is quietly wrong.  A6.60's
+`ProcDefs` note has the same shape but the benign polarity (`.vo` older
+than source; `make` self-heals).  **The rule: after any window in which a
+build overlapped an edit, delete every `iris/*.vo` whose mtime falls in
+that window (with its `.vok`/`.vos`/`.glob`/`.aux`) before the next
+`make`.**  Here that was 79 files and one minute — 731 `.vo` down to a
+trustworthy 652 — against a full clean measured in hours.  A whole-tree
+wipe is the wrong instrument for this; the window is.
+
+**2. THE `pgrep` TRAP, which ate two sweeps.**  `pgrep -f "make -f
+CoqMakefile"` and `pkill -f "rocqworker…"` MATCH THE POLLING SHELL'S OWN
+COMMAND LINE.  A predecessor's `until ! pgrep -f "make -f CoqMakefile"`
+waiter therefore never terminates (it is its own match), and a `pkill -f`
+on the same string kills the wrapper it is running inside — which is what
+produced two orphaned `WpSconfMem` workers reparented to init, running
+concurrently, attributable to nobody.  **Poll with `ps -eo pid,comm` and
+an anchored `^(make|rocqworker)$`, kill by PID, never by `-f` pattern.**
+
+### FRONTIER AND HANDOFF
+
+**THE CLOSING NUMBER: 731 of 1330 — AND IT IS A DIFFERENT KIND OF NUMBER
+FROM A6.60's 728.**  A6.60's was a floor taken while `WpSconfMem` was in
+flight and, as it turns out, with 79 `.vo` in the tree that had been built
+during a concurrent-sweep window.  This one is built from a TRUSTWORTHY
+FLOOR: those 79 were deleted with their `.vok`/`.vos`/`.glob`/`.aux`
+(731 → 652), the model `.vo` was checked to postdate its source per A6.39
+(19:11 vs 18:37), and the tree was rebuilt from there in one `make -j12 -k`
+with no other build running.  **731 is honest; 728 was not comparable.**
+
+It is still a FLOOR in the one way that matters: `WpSconfMem` never
+compiled, so its cone — roughly 600 files, including every `Proof*` — has
+still not had a first compile after the flip.
+
+**THE RED SET IS SEVEN, and every one is characterised:**
+
+| file | what it is |
+|---|---|
+| `WpSconfMem` | the one sentence, above.  Try `clearbody` next |
+| `UptWalkPt` | the `tramp_tr_obl` token — six files, not three |
+| `UserMemPt` | the window store — needs the interp bundle threaded and a new `big_sepM` window accessor |
+| `UmodeFetch` | the fetch obligation's `img`/`log`; the cheapest of the three |
+| `VcGenS` | NEWLY REACHED — the leaves' token reaching the VC generator; six more files |
+| `ProcInv` | the trapframe LEDGER page (A6.49); `iExact` at `:601` |
+| `TfPage36` | NEWLY REACHED, and its cheap fix is LANDED (the section's ambient binder, which had to be spelled `TsoCtx.CurCtx` — the file does not import TsoCtx, so a bare `CurCtx` silently declares a fresh `Type` variable and the error moves one line, not away).  Its residue is the same tier as `ProcInv`'s: `tf_words36`'s statement still spells the raw `↦ₚ₈`, and **TsoCtx declares no `↦ₚ₈` notation at all** — the ctx phys-word tower is only reachable as `TsoCtx.ctx_phys_word_pointsto`.  Settle `ProcInv` first; the two are one cascade |
+
+**WHAT IS VALIDATED AND WHAT IS NOT, precisely.**  Green and checked this
+tranche: `WpSmodePtMem` (with `WpSmodePtMemWrap` green on top of it),
+`BcacheInv`, `WaitInv`, `BreadLru`, `TrampStepPt` (restored byte-identical
+modulo comments), `FsLookup`, `ProcDefs`.  **NOT validated: the 21 deleted
+crossings and 22 deleted forgets in the seven owner-client files**
+(`ProofBinit`, `ProofBread`, `ProofBrelse`, `ProofKexit`, `ProofReparent`,
+`ProofKwait`, `ProofKforkB5`) — all seven sit in `WpSconfMem`'s cone and
+were never reached.  The owners moved and their accessors typecheck; the
+clients are a promise until that cone opens.
+
+`grep` for real `TsoCtxShim.<lemma>` sites is **down to ~50 across 26
+files** from A6.58's 181/A6.60's 70-plus-prose, and `TsoCtxShim.v`'s single
+declaration still has no caller anywhere.
+
+**FOR THE NEXT LANE, in the order they gate things:**
+
+1. Re-sweep behind `WpSconfMem`.  Its cone and the 35 shim-swept files
+   still have not had a first compile; expect a batch of newly-reached
+   M1-class fixes, one per file, per the standing rule.
+2. `UmodeFetch` (the cheapest of the three lane-4 halves), then
+   `WpSmodePtMemWrap`.
+3. The `tramp_tr_obl` token — SIX files, not three, and
+   `tramp_run_hart_active_instr_S` gains a premise (this note, above).
+4. `UserMemPt`'s window store — the interp bundle threaded to
+   `udata_own_store_g`'s callers plus a new `big_sepM` window accessor.
+   Not a one-lemma change.
+5. The boot carve's 26 sites — the blacklist ruling.
+6. The mechanical ~22, of which `ctx_pointsto_ktier_mono` is the one
+   lemma that must be written.
+7. The element carve, after the five questions are answered.
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
