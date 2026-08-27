@@ -5,10 +5,18 @@ Design of record: [`../design/durable-fs-plan.md`](../design/durable-fs-plan.md)
 predicate itself: [`../design/fs-state.md`](../design/fs-state.md) §0–§2
 and §7.  History (three days of rulings, refutations and lane reports —
 do NOT re-derive them): [`../completed/durable-disk-2026-08-23-to-25.md`](../completed/durable-disk-2026-08-23-to-25.md).
-Tree at handoff: `main` at the commit that lands this file; VM-green;
-`make audit-only` at the three-entry baseline (`xv6iris_extras.resv_matches`,
-`resv_is_valid`, `functional_extensionality_dep`); ZERO placeholder
-lemmas tree-wide.
+Tree at handoff: VM-green, ZERO placeholder lemmas tree-wide.
+
+**THE AUDIT BASELINE IS FOURTEEN ENTRIES, NOT THREE.**  `make audit-only`
+prints `Print Assumptions` of `SystemAdequacy.xv6_fs_adequacy_xv6Σ`, and
+since the ladder collapsed to three rungs that theorem DISCHARGES the
+literal mkfs image — so the hex dump's reader (`PStringBytes`) puts eight
+`PrimInt63.*` and three `PrimString.*` ROCQ PRIMITIVES beside the old three
+(`xv6iris_extras.resv_matches`, `resv_is_valid`,
+`functional_extensionality_dep`).  They are primitives of the logic, not
+assumed lemmas: nothing about the proof is hedged by them.  Compare against
+those fourteen, and do not read an older paragraph's "three-entry baseline"
+as a target.
 
 **Goal (owner):** xv6 correctness across crashes INCLUDING file-system
 consistency.  **THE THEOREM IS TRUE.**
@@ -3180,8 +3188,11 @@ never wanted that shape.
   ERA 0'S OWN FILE, AND THE BOOT MINT CANNOT BECOME A TRANSPORT -- MEASURED,
   NOT ABANDONED.**
 
-  Whole tree green, `make audit-only` at the three-entry baseline, the
-  theorem's statement and exported content untouched.
+  Whole tree green, `make audit-only` byte-identical to `origin/main`'s own
+  (the fourteen-entry set the header describes — checked by auditing
+  `origin/main` itself, since the ladder's collapse moved the baseline
+  upstream and H5 adds nothing to it), the theorem's statement and exported
+  content untouched.
 
   - **THE GEOMETRY SPLITS BY WHAT IT IS ABOUT, and five of `snap_shape`'s
     seven clauses were never about the committed view.**  `FsState.fs_geom`
