@@ -18,9 +18,8 @@ the only question is whether the model has a run that matches.
     tests/<area>_<name>.S   one test program (a `vtest:` directive in it
                             carries the repeat count and backend configs)
     vtest.py           builds the image, runs QEMU, captures, generates Rocq
-    vtest_status.py    which tests passed, against expected-pass.txt (CI's reporter)
-    ../../vtest-rocq/  the model side: harness + one .v per test,
-                       plus expected-pass.txt -- which of them CI requires
+    vtest_status.py    which tests passed, per area (CI's reporter)
+    ../../vtest-rocq/  the model side: harness + one .v per test
 
 ## Naming
 
@@ -50,8 +49,8 @@ masks one, a claim while another is pending.
     make vtest-check   check the model against the CHECKED-IN captures only
                        (no QEMU, no toolchain), stopping at the first red test
     make vtest-check-ci  the same captures, but compile EVERY test (-k) and
-                       report per test against vtest-rocq/expected-pass.txt
-                       -- this is what CI runs, on every push
+                       report the per-test result -- this is what CI runs,
+                       on every push
 
 `vtest-check` is deliberately outside `make proofs`: a red test must not break
 the proof build.  It needs only the ~20-file dependency cone of `RiscvExec` +
@@ -64,23 +63,18 @@ against the CHECKED-IN captures, so **CI never runs QEMU** and never looks for
 new hardware behaviours; it re-checks that the executions already recorded
 from real hardware are still executions the model ADMITS.
 
-Every test is compiled, the expected-red ones included, because seeing them in
-the run's step summary is the point; what decides the job is
-[`vtest-rocq/expected-pass.txt`](../../vtest-rocq/expected-pass.txt):
+**Every test must pass, and a red one fails the job.**  There is no list of
+expected reds and no need for one: a known divergence is pinned on BOTH sides
+and proved unequal (see [Recording a divergence](#recording-a-divergence)), so
+it is green today and goes red exactly when the model moves.  All 56 pass, the
+eleven open findings included -- the findings are theorems about the
+disagreement, not failures.
 
-- a bare name there is EXPECTED TO PASS, and its failure fails CI;
-- `!Name  reason` is KNOWN RED -- compiled, reported with its reason, not
-  fatal.  A known-red test that passes is reported too, so the row can be
-  un-`!`ed;
-- a test in `_CoqProject` that the file does not mention at all fails CI:
-  which of the two a new test is, is the author's call and not a default.
-
-There are no `!` rows today -- all 56 pass, the eleven open findings included,
-because a known divergence is pinned on BOTH sides (see [Recording a
-divergence](#recording-a-divergence)) rather than left red.  A `!` row is for
-a test that cannot be written that way.  `tools/vtest/vtest_status.py` is the
-reporter; its header has the rest, including why a passing test is judged by
-its `.vo` and why the target deletes them first.
+What the step adds over a plain `vtest-check` is the REPORT: all 56 are
+compiled (`-k`) before the verdict, so one red test does not hide the rest, and
+`tools/vtest/vtest_status.py` writes the per-area table with each failure's
+Rocq error into the run's step summary.  Its header has the rest, including why
+a passing test is judged by its `.vo` and why the target deletes them first.
 
 ## Observation channels
 

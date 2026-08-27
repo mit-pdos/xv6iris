@@ -6,8 +6,8 @@
 #   make vtest      regenerate the QEMU captures, then check the model
 #                   against them (needs qemu-system-riscv64 + the toolchain)
 #   make vtest-check  check the model against the CHECKED-IN captures only
-#   make vtest-check-ci  the same, but keep going and report per test against
-#                   vtest-rocq/expected-pass.txt (what CI runs)
+#   make vtest-check-ci  the same, but compile every test and report the
+#                   per-test result (what CI runs)
 #   make vtest-deps build just the ~14 iris/ files vtest needs (not all of iris)
 #   make audit      build, then Print Assumptions on the system theorem
 #   make audit-only the same audit, against an already-built tree
@@ -325,15 +325,18 @@ vtest-check: $(VTEST)/CoqMakefile
 
 vtest: vtest-gen vtest-check
 
-# WHAT CI RUNS, and it is `vtest-check` with the stopping rule moved.  Three
-# differences: `-k`, so one red test does not hide the other 55; make's exit
-# status is DISCARDED (the leading `-`); and tools/vtest/vtest_status.py decides
-# the verdict against $(VTEST)/expected-pass.txt -- a test listed there and
-# failing is a regression and fails here, a `!`-marked known-red one is
-# reported and forgiven, and an unlisted test is an error either way.  That is
-# the point of the split: a red conformance test is a FINDING about the model,
-# so which reds are expected has to be written down rather than inferred from
-# whether make came back 0.
+# WHAT CI RUNS, and it is `vtest-check` with the stopping rule moved.  Every
+# test must pass, here as there; what differs is that `-k` compiles them all
+# rather than stopping at the first red one, make's own status is DISCARDED
+# (the leading `-`), and tools/vtest/vtest_status.py reports the per-area
+# result -- naming each failure and its error -- and is what fails the target.
+# The report exists because with `-k` the failures are scattered through a long
+# log, and because CI puts it in the run's step summary.
+#
+# There is no list of expected-red tests, and none is wanted: a KNOWN
+# divergence from the hardware is pinned on BOTH sides and proved unequal (see
+# tools/vtest/README.md, "Recording a divergence"), which is green today and
+# goes red the day the model moves.  So every red test is news.
 #
 # IT DELETES THE .vo FIRST, and that is not tidiness -- it is what makes the
 # report's "this test passed" mean anything.  The report reads the filesystem,

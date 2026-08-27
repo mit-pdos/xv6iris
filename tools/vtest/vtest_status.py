@@ -1,29 +1,22 @@
 #!/usr/bin/env python3
-"""Which device-conformance tests (``vtest-rocq/``) passed, and which are known red.
+"""Which device-conformance tests (``vtest-rocq/``) passed, as a report.
 
 This is the reporter half of the CI step; the build is the other half.  CI
 compiles EVERY test in ``vtest-rocq/_CoqProject`` with ``make -k`` -- so one red
-test does not hide the rest -- and then runs this, which decides what the
-result means and prints the table.
+test does not hide the rest -- and then runs this, which turns the result into
+a per-area table naming each failure and its error, and exits nonzero if any
+test failed.
 
-WHY THE VERDICT IS NOT SIMPLY "make exited 0".  A red conformance test is a
-FINDING about the model, not a broken build (see ``tools/vtest/README.md``), and
-some of the findings are open by decision rather than by neglect.  So the
-expected outcome of the suite is recorded in ``vtest-rocq/expected-pass.txt``
-and this script compares against it:
-
-  * a bare name there is EXPECTED TO PASS -- its failure is a REGRESSION and
-    fails the build;
-  * ``!Name  reason`` is KNOWN RED -- still compiled, still reported, with the
-    reason next to it, but its failure is not fatal;
-  * a known-red test that PASSES is reported as such, loudly, since the list
-    is then stale -- but it does not fail the build either.
-
-Every test must appear in the manifest, exactly once.  A test in
-``_CoqProject`` that the manifest does not mention is an error rather than a
-silent default: a new test would otherwise arrive as "expected to pass" (a
-surprise regression the day it lands red) or as "known red" (uncovered
-forever), and which one it should be is the author's call.
+WHY A REPORTER AT ALL, when `make` already returns nonzero.  Two things it
+cannot do: with ``-k`` the failures are scattered through a 1900-line log, and
+GitHub's step summary is where a reader looks.  Every test failing is a
+failure, so there is no policy here -- no list of expected reds.  There is
+none to keep: the suite's convention (``tools/vtest/README.md``, "Recording a
+divergence") is that a KNOWN divergence is pinned on BOTH sides -- the model's
+wrong value, the hardware's value, and a ``<>`` between them -- which is green
+today and goes red the day the model moves.  So the eleven open findings are
+theorems about the disagreement rather than red tests, and a red test here is
+always news.
 
 WHAT COUNTS AS A PASS is the presence of ``<Name>.vo``.  A test is a
 ``vm_cast_no_check``d equation between the model's reached state and the
@@ -83,34 +76,6 @@ def split_tests(modules):
     return tests, [m for m in modules if m not in known]
 
 
-def read_manifest(path):
-    """(expected_pass, known_red, problems) from expected-pass.txt.
-
-    `known_red` maps the test name to its reason; a row with no reason is
-    accepted but flagged, since an unexplained exclusion is the thing this
-    file exists to prevent.
-    """
-    expected, red, problems = [], {}, []
-    with open(path) as f:
-        for lineno, line in enumerate(f, 1):
-            line = line.split("#", 1)[0].strip()
-            if not line:
-                continue
-            if line.startswith("!"):
-                parts = line[1:].split(None, 1)
-                name, reason = parts[0], parts[1].strip() if len(parts) > 1 else ""
-                if not reason:
-                    problems.append(f"expected-pass.txt:{lineno}: `!{name}` gives "
-                                    f"no reason for being known red")
-                red[name] = reason or "_no reason given_"
-            elif re.fullmatch(r"[A-Za-z0-9_]+", line):
-                expected.append(line)
-            else:
-                problems.append(f"expected-pass.txt:{lineno}: not a name, a "
-                                f"`!name reason` row, or a comment: {line!r}")
-    return expected, red, problems
-
-
 def build_errors(log_path):
     """module -> the first error Rocq or make reported for it."""
     errs = {}
@@ -148,14 +113,11 @@ def truncate(text, width=110):
     return text if len(text) <= width else text[:width - 1] + "…"
 
 
-def render(tests, expected, red, failed, errs, harness_missing, problems, md):
+def render(tests, failed, errs, harness_missing, md):
     """The report.  `md` picks GitHub-flavoured markdown over plain text."""
     out = []
     h1, h2, code = ("## ", "### ", "`") if md else ("== ", "-- ", "")
-
-    regressions = [t for t in tests if t in failed and t in expected]
-    red_failing = [t for t in tests if t in failed and t in red]
-    red_passing = [t for t in tests if t not in failed and t in red]
+    fails = [t for t in tests if t in failed]
 
     out.append(f"{h1}Device conformance ({code}vtest-rocq/{code})")
     out.append("")
@@ -164,7 +126,9 @@ def render(tests, expected, red, failed, errs, harness_missing, problems, md):
                f"here**, so this is a regression test of the model against "
                f"executions already recorded from real hardware.  A test passes "
                f"by COMPILING: it is an equation between the model's reached "
-               f"state and the capture.")
+               f"state and the capture.  A KNOWN divergence is not a red test -- "
+               f"it is pinned on both sides and proved unequal, so it goes red "
+               f"only when the model moves.")
     out.append("")
 
     if harness_missing:
@@ -173,79 +137,44 @@ def render(tests, expected, red, failed, errs, harness_missing, problems, md):
                    f"below is not a result about the model.")
         out.append("")
 
-    passed = len(tests) - len(failed)
-    verdict = (f"**{passed} of {len(tests)} pass.**  "
-               f"{len(red_failing)} known red, {len(regressions)} REGRESSED")
-    if red_passing:
-        verdict += f", {len(red_passing)} unexpectedly green"
-    out.append(verdict + ".")
+    out.append(f"**{len(tests) - len(fails)} of {len(tests)} pass.**"
+               + (f"  {len(fails)} FAILED." if fails else ""))
     out.append("")
 
     # Per-area counts.  The area is what the test is ABOUT (README's scheme).
-    out.append("| area | pass | known red | regressed |")
-    out.append("|---|---|---|---|")
+    out.append("| area | pass | failed |")
+    out.append("|---|---|---|")
     for a in AREAS + (["other"] if any(area_of(t) == "other" for t in tests) else []):
         ts = [t for t in tests if area_of(t) == a]
         if not ts:
             continue
         out.append(f"| `{a}` | {sum(1 for t in ts if t not in failed)}/{len(ts)} | "
-                   f"{sum(1 for t in ts if t in red_failing)} | "
-                   f"{sum(1 for t in ts if t in regressions)} |")
-    out.append(f"| **total** | **{passed}/{len(tests)}** | **{len(red_failing)}** | "
-               f"**{len(regressions)}** |")
+                   f"{sum(1 for t in ts if t in failed)} |")
+    out.append(f"| **total** | **{len(tests) - len(fails)}/{len(tests)}** | "
+               f"**{len(fails)}** |")
     out.append("")
 
-    if regressions and harness_missing:
+    if fails and harness_missing:
         # Naming all 56 here would be noise: they failed because the harness
         # did, and none of them says anything about the model.
-        out.append(f"{h2}:x: {len(regressions)} tests counted as failed")
+        out.append(f"{h2}:x: {len(fails)} tests counted as failed")
         out.append("")
         out.append("Every one of them is downstream of the harness above; fix "
                    "that and re-read this report.")
         out.append("")
-    elif regressions:
-        out.append(f"{h2}:x: REGRESSIONS -- expected to pass, did not")
+    elif fails:
+        out.append(f"{h2}:x: Failed")
         out.append("")
-        out.append("These fail the build.  Either the model changed under the "
-                   "test, or the capture did.")
+        out.append("Either the model changed under the test, or the capture "
+                   "did.  A divergence from the hardware is recorded by pinning "
+                   "both values (see the findings table in "
+                   f"{code}tools/vtest/README.md{code}), never by leaving a "
+                   "test red.")
         out.append("")
         out.append("| test | what the build said |")
         out.append("|---|---|")
-        for t in regressions:
+        for t in fails:
             out.append(f"| `{t}` | {truncate(errs.get(t, 'no error in the build log'))} |")
-        out.append("")
-
-    if red_failing:
-        out.append(f"{h2}Known red -- reported, not fatal")
-        out.append("")
-        out.append(f"Listed in {code}vtest-rocq/expected-pass.txt{code}; the "
-                   f"findings table in {code}tools/vtest/README.md{code} is the "
-                   f"authority on each.")
-        out.append("")
-        out.append("| test | why it is expected to fail | what the build said |")
-        out.append("|---|---|---|")
-        for t in red_failing:
-            out.append(f"| `{t}` | {red[t]} | "
-                       f"{truncate(errs.get(t, 'no error in the build log'), 70)} |")
-        out.append("")
-
-    if red_passing:
-        out.append(f"{h2}:warning: Unexpectedly green")
-        out.append("")
-        out.append(f"These are listed as known red and PASSED.  Drop the "
-                   f"{code}!{code} from their rows in "
-                   f"{code}vtest-rocq/expected-pass.txt{code} so a future "
-                   f"regression is caught: " +
-                   ", ".join(f"`{t}`" for t in red_passing) + ".")
-        out.append("")
-
-    # Manifest problems -- an unmentioned test included, which main() has
-    # already turned into a `problems` row (and a nonzero exit).
-    if problems:
-        out.append(f"{h2}:x: The manifest and the project file disagree")
-        out.append("")
-        for p in problems:
-            out.append(f"* {p}")
         out.append("")
 
     return "\n".join(out) + "\n"
@@ -262,23 +191,6 @@ def main():
     vtest = os.path.join(args.repo, "vtest-rocq")
     modules = coqproject_modules(os.path.join(vtest, "_CoqProject"))
     tests, harness = split_tests(modules)
-    expected, red, problems = read_manifest(os.path.join(vtest, "expected-pass.txt"))
-
-    stray = [n for n in list(expected) + list(red) if n not in tests]
-    for n in stray:
-        problems.append(f"expected-pass.txt names `{n}`, which is not a test in "
-                        f"vtest-rocq/_CoqProject")
-    for n in [n for n in expected if n in red]:
-        problems.append(f"expected-pass.txt lists `{n}` both ways")
-    # A test the manifest does not mention is an error, not a default -- see
-    # the header.  Counted here rather than only rendered, so it fails the run.
-    for t in tests:
-        if t not in expected and t not in red:
-            problems.append(f"`{t}` is a test in vtest-rocq/_CoqProject that "
-                            f"expected-pass.txt does not mention -- add it as a "
-                            f"bare name (expected to pass) or as "
-                            f"`!{t}  <reason>`")
-
     errs = build_errors(args.log)
 
     def did_not_build(name):
@@ -291,32 +203,23 @@ def main():
     failed = {t for t in tests if did_not_build(t)}
     harness_missing = [h for h in harness if did_not_build(h)]
 
-    report = render(tests, expected, red, failed, errs, harness_missing,
-                    problems, args.md)
+    report = render(tests, failed, errs, harness_missing, args.md)
     if args.out:
         with open(args.out, "w") as f:
             f.write(report)
     else:
         sys.stdout.write(report)
 
-    regressions = sorted(failed & set(expected))
-    rc = 0
     if harness_missing:
         print(f"vtest harness did not build: {', '.join(harness_missing)}",
               file=sys.stderr)
-        rc = 1
-    if regressions:
-        print(f"{len(regressions)} conformance test(s) expected to pass FAILED: "
-              f"{', '.join(regressions)}", file=sys.stderr)
-        rc = 1
-    if problems:
-        for p in problems:
-            print(p, file=sys.stderr)
-        rc = 1
-    if rc == 0:
-        print(f"{len(tests) - len(failed)}/{len(tests)} conformance tests pass; "
-              f"{len(failed)} known red.", file=sys.stderr)
-    return rc
+        return 1
+    if failed:
+        print(f"{len(failed)} conformance test(s) FAILED: "
+              f"{', '.join(sorted(failed))}", file=sys.stderr)
+        return 1
+    print(f"all {len(tests)} conformance tests pass.", file=sys.stderr)
+    return 0
 
 
 if __name__ == "__main__":

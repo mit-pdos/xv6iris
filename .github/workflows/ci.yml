@@ -403,16 +403,15 @@ jobs:
       # capture, so there is nothing to check after coqc.  See
       # tools/vtest/README.md and claude-notes/projects/device-conformance.md.
       #
-      # EVERY test is compiled, the expected-red ones included, and the verdict
-      # is not make's exit status: `make vtest-check-ci` runs the suite with
-      # `-k` (one red test does not hide the other 55), discards make's status,
-      # and lets tools/vtest/vtest_status.py decide against
-      # vtest-rocq/expected-pass.txt — a test listed there and failing is a
-      # REGRESSION and fails this step; a `!`-marked known-red one is reported
-      # in the summary with its reason and forgiven; a test in _CoqProject that
-      # the manifest does not mention at all is an error.  That split is the
-      # point: a red conformance test is a FINDING about the model, so which
-      # reds are expected has to be written down rather than inferred.
+      # EVERY test must pass, and every test is COMPILED before the verdict:
+      # `make vtest-check-ci` runs the suite with `-k` so one red test does not
+      # hide the other 55, then tools/vtest/vtest_status.py writes the
+      # per-area table — naming each failure and quoting its Rocq error — and
+      # is what fails the step.  There is no list of expected-red tests: a
+      # KNOWN divergence from the hardware is pinned on BOTH sides and proved
+      # unequal (tools/vtest/README.md, "Recording a divergence"), so it is
+      # green today and goes red the day the model moves.  All 56 pass, the
+      # eleven open findings included, and a red test here is always news.
       #
       # The build needs iris/'s .vo (RiscvExec + DevModel + ColdBoot and their
       # cone) and kernel-rocq/'s, both already on disk from the steps above —
@@ -434,12 +433,12 @@ jobs:
           make SWITCH="$GITHUB_WORKSPACE" vtest-check-ci \
             VTEST_LOG="$RUNNER_TEMP/vtest-check.log" || rc=$?
           # `|| rc=$?` and not a bare call: the reporter exits nonzero on a
-          # regression, and this job's shell is `bash -eo pipefail`, so an
+          # failing test, and this job's shell is `bash -eo pipefail`, so an
           # unguarded failure here would end the step before the annotation
           # below is printed.
           python3 tools/vtest/vtest_status.py --md \
             --log "$RUNNER_TEMP/vtest-check.log" >> "$GITHUB_STEP_SUMMARY" || rc=$?
           if [ "$rc" -ne 0 ]; then
-            echo "::error::A device-conformance test that is expected to pass did not, or vtest-rocq/expected-pass.txt is out of step with _CoqProject; see the step summary."
+            echo "::error::A device-conformance test failed; see the step summary for which and why."
           fi
           exit $rc
