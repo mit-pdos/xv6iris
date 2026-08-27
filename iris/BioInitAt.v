@@ -40,6 +40,7 @@ Require Import BcacheInv.
 Require Export BioInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SepThread.   (* A6.68: the token threaded through the NBUF *)
 Require Import Xv6G.
 Local Open Scope Z_scope.
 
@@ -149,8 +150,12 @@ Section BioInitAt.
      built AT [bn_slk bn k] rather than gathered into a function, and the
      bcache lock needs no [newlock_delayed] because [bcache_res bn V] is
      statable before it is sealed. *)
-  Lemma bio_init_at (bn : bio_names) (V : bio_view Σ) E :
+  (* A6.68: the honest creator deposit (A6.66) wants the running token; the
+     NBUF sleeplock loop threads it with [SepThread.big_sepL_fupd_thread]
+     because [own_context] is EXCLUSIVE ([BioInv.bio_init]'s shape). *)
+  Lemma bio_init_at `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ) E :
     (0 ∉ bv_cov V) ->
+    own_context cur_ctx -∗
     bio_free_tok bn -∗
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗
@@ -160,25 +165,33 @@ Section BioInitAt.
     ([∗ list] k ∈ seq 0 NBUF, buf_raw k) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
     ([∗ set] b ∈ bv_cov V, pool_blk V b) ={E}=∗
-    bio_ctx bn V ∗ bslots BSLOTS_FS.
+    own_context cur_ctx ∗ bio_ctx bn V ∗ bslots BSLOTS_FS.
   Proof.
-    iIntros (Hnc0) "(Hlkg & Hauth & Hsa & Hsf & Hbg) Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
+    iIntros (Hnc0) "Hrun (Hlkg & Hauth & Hsa & Hsf & Hbg) Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
     assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)
       by (vm_compute; reflexivity).
     (* every buffer's sleeplock, at its published gname pair, sealing exactly
        its checkout token; the recycle tokens come back out. *)
     iDestruct (big_sepL_sep_2 with "Hfresh Hbg") as "Hsl".
-    iAssert (([∗ list] k ∈ seq 0 NBUF, |={E}=>
-                is_sleeplock (fst (bn_slk bn k)) (snd (bn_slk bn k))
-                  (buf_lock (bnode k)) "buffer"%string (bown bn k)) ∗
-             ([∗ list] k ∈ seq 0 NBUF, bmid bn k))%I
-      with "[Hsl]" as "[Hsl Hmids]".
-    { rewrite -big_sepL_sep. iApply (big_sepL_mono with "Hsl").
-      intros i k Hk. iIntros "[Hf (Hp & Ho & Hm)]".
-      iFrame "Hm".
-      iApply (sl_fresh_new_at2 E (bn_slk bn k) (buf_lock (bnode k))
-                "buffer"%string (bown bn k) with "Hp Hf Ho"). }
-    iMod (big_sepL_fupd with "Hsl") as "#Hsls".
+    (* A6.68: SEQUENTIAL, not NBUF independent fupds. *)
+    iAssert ([∗ list] idx↦k ∈ seq 0 NBUF,
+               own_context cur_ctx -∗
+               (sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
+                (sl_free_pair (bn_slk bn k) ∗ lock_tok_excl (bn_own bn k) ∗
+                 lock_tok_excl (bn_mid bn k)))
+               ={E}=∗ own_context cur_ctx ∗
+               (is_sleeplock (fst (bn_slk bn k)) (snd (bn_slk bn k))
+                  (buf_lock (bnode k)) "buffer"%string (bown bn k) ∗
+                bmid bn k))%I
+      as "Hstep".
+    { iApply big_sepL_intro. iIntros "!>" (idx k _) "Hrun [Hf (Hp & Ho & Hm)]".
+      iMod (sl_fresh_new_at2 E (bn_slk bn k) (buf_lock (bnode k))
+              "buffer"%string (bown bn k) with "Hp Hf Hrun Ho") as "[Hrun Hlk]".
+      iModIntro. iFrame "Hrun Hlk Hm". }
+    iMod (big_sepL_fupd_thread E (own_context cur_ctx)
+            with "Hrun Hstep Hsl") as "[Hrun Hsl]".
+    iEval (rewrite big_sepL_sep) in "Hsl".
+    iDestruct "Hsl" as "[#Hsls Hmids]".
     (* every initial payload is empty: blockno 0 is uncovered *)
     assert (Hpay0 : forall k bs,
         buf_pay bn V k false (mword_of_int 0 : mword 32)
@@ -227,8 +240,8 @@ Section BioInitAt.
     (* and seal the bcache lock, at its published gname, over the assembled
        resource *)
     iMod (newlock_at E (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }>
-            with "Hlkg Hnm Hlkw Hcpu [Hauth Hsa Hslots Hlru Hpool]")
-      as "#Hlock".
+            with "Hlkg Hnm Hrun Hlkw Hcpu [Hauth Hsa Hslots Hlru Hpool]")
+      as "[Hrun #Hlock]".
     { rewrite /bcache_res /bcache_scan.
       iExists ∅, (rev (seq 0 NBUF)),
         (fun _ => (mword_of_int 0 : mword 32)),
@@ -250,7 +263,7 @@ Section BioInitAt.
     (* Split STRUCTURALLY before framing: a bare [iFrame] here searches
        [bio_ctx]'s big-op for each hypothesis (25 s of [BioInv]'s 46 s,
        measured 2026-08-03). *)
-    iModIntro. rewrite /bio_ctx.
+    iModIntro. iSplitL "Hrun"; [iExact "Hrun" |]. rewrite /bio_ctx.
     iSplitR "Hsf"; [| iExact "Hsf"].
     iSplitL "Hlock"; [iExact "Hlock" |].
     rewrite big_sepL_sep. iSplitL "Hsls"; [iExact "Hsls" | iExact "Hescs"].

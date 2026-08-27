@@ -455,7 +455,7 @@ Section IallocDefs.
      fresh box's only licence (ClaimL, §2.6's fourth row) and create's fill
      spends it at [ireg_withdraw].  Before this increment the AU's output
      was dropped at the claim site's [iIntros]. *)
-  Definition ia_arms (γ : log_names) (dev : mword 32)
+  Definition ia_arms `{XI : CurCtx} (γ : log_names) (dev : mword 32)
       (inodestart ninodes : Z) (nib : nat) (ty : mword 16) (u : nat)
       (Sb : gset Z) (av : mword 64) : iProp Σ :=
     ((* NO INODES: a0 = 0, the iget ledger unit unspent, the reservation
@@ -1315,10 +1315,9 @@ Section IallocClaim.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /W3 upd_ne; [| regne]. exact (HW2thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iEval (rewrite -HW3a0) in "Hby".
-    (* memset's contract is context-indexed; this caller is not yet
-       converted -- the buffer crosses through the shim at the ambient
-       context (the bundle carries the thread token). *)
-    iDestruct (ctx_buf_of_mem KT0 cur_ctx with "Hby") as "Hby".
+    (* A6.68: memset's contract is context-indexed AND so is the buffer
+       ([↦ₘ] is the ctx tower), so the two shim crossings that used to
+       bracket this call were IDENTITIES and are simply gone. *)
     iApply (MS.wp_memset_sconf KT1 KT0 W3 (K - 8)%nat 64%nat
               (mword_of_int 0 : mword 64)
               (fun jj => dinode_bytes (ds !!! DinodeEnc.islot inum) !!! jj)
@@ -1326,7 +1325,6 @@ Section IallocClaim.
               ltac:(lia) ltac:(vm_compute; reflexivity) HW3a1 HW3a2
               with "Hcg Htext Hpc Hby").
     iIntros (CID5 Hq5 mM) "Hcg Hpc Hby %Hcsm".
-    iDestruct (ctx_buf_to_mem with "Hby") as "Hby".
     iEval (rewrite HW3a0) in "Hby".
     assert (Hpc94 : ret_pc (W3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ialloc + 0x94)) by (rewrite HW3ra; pcw).

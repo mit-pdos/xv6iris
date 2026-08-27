@@ -91,6 +91,16 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
   (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□ root_b -∗
   (* the shared table, likewise persistent *)
   kpt_inv root -∗
+  (* A6.70: THE CANON PIN'S CREDENTIALS (A6.53 ruling 2 / A6.55).  The
+     switch re-seals this hart's translation slot at the KPT arm, and
+     [KptShare.tlb_res_pt] carries the pin's bound with THIS hart's receipt
+     that its view has passed it.  A hart coming off the Bare arm has
+     neither, so the obligation is a PREMISE -- which is exactly A6.55's
+     ruling one level up: the publisher's receipt is taken, not assumed.
+     Persistent, so it costs every caller nothing but the proof that its
+     hart really has seen the publication (hart 0 through its own fence,
+     a secondary through the [started] handshake). *)
+  KptShare.kpt_creds -∗
   ( ∀ (mr : regfile),
     sie_cap_gpr KT0 mr K false p -∗
     pc_is ret_tgt -∗

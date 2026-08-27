@@ -269,7 +269,7 @@ Qed.
 Section ProcdumpLoopRes.
   Context `{!riscvGS Σ}.
 
-  Lemma pdl_slot_mk (pa : mword 64) (dqs dqp dqn : dfrac)
+  Lemma pdl_slot_mk `{XI : CurCtx} (pa : mword 64) (dqs dqp dqn : dfrac)
       (st pid : mword 32) (nm : string) :
     nonul nm = true ->
     p_state pa ↦₄{dqs} st -∗ p_pid pa ↦₄{dqp} pid -∗
@@ -280,7 +280,7 @@ Section ProcdumpLoopRes.
     iSplit; [iPureIntro; exact Hnm|]. iFrame.
   Qed.
 
-  Lemma pdl_prefix_step (j : nat) :
+  Lemma pdl_prefix_step `{XI : CurCtx} (j : nat) :
     ([∗ list] k ∈ seq 0 j, proc_dump_slot (proc_addr k)) -∗
     proc_dump_slot (proc_addr j) -∗
     ([∗ list] k ∈ seq 0 (S j), proc_dump_slot (proc_addr k)).

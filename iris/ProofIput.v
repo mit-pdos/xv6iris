@@ -494,7 +494,7 @@ Section IputCommon.
      budget always leaves the table something -- which is what makes
      [islot_rest_join]'s premise dischargeable and the window's FULL inum
      cell assemblable. *)
-  Lemma ip_rest_sum (k : nat) (qt : Qp) (dev inum : mword 32) :
+  Lemma ip_rest_sum `{XI : CurCtx} (k : nat) (qt : Qp) (dev inum : mword 32) :
     islot_rest_at k qt dev inum -∗ ⌜∃ qr : Qp, (1/2)%Qp = (qt + qr)%Qp⌝.
   Proof.
     rewrite /islot_rest_at. destruct (1/2 - qt)%Qp as [q'|] eqn:Et.
@@ -3546,7 +3546,7 @@ Section IputFreePath.
   Proof. exact (valid_word_eqz v). Qed.
 
   (* ProofIput.ip_rest_sum / IputFreeLockedDev.ip_rest_sum *)
-  Lemma fe_rest_sum (kk : nat) (qt : Qp) (dv nu : mword 32) :
+  Lemma fe_rest_sum `{XI : CurCtx} (kk : nat) (qt : Qp) (dv nu : mword 32) :
     islot_rest_at kk qt dv nu -∗ ⌜∃ qr : Qp, (1/2)%Qp = (qt + qr)%Qp⌝.
   Proof.
     rewrite /islot_rest_at. destruct (1/2 - qt)%Qp as [q'|] eqn:Et.
@@ -3974,7 +3974,7 @@ Section IputFreePath.
         iDestruct "Hrident" as "[Hrd Hrn]".
         iEval (rewrite /islot_rest_at Ert) in "Hrest".
         iDestruct "Hrest" as "[Htd Htn]".
-        iDestruct (ctx_word4_pointsto_frac_split (i_inum (ientry k)) q qr inum) as "[_ Hjn]".
+        iDestruct (ctx_word4_pointsto_frac_split cur_ctx (i_inum (ientry k)) q qr inum) as "[_ Hjn]".
         iDestruct ("Hjn" with "[$Hrn $Htn]") as "Hn2".
         iEval (rewrite -Hsum) in "Hn2".
         iDestruct (ctx_word4_pointsto_half_join with "Hinh Hn2") as "Hnfull".
@@ -4358,7 +4358,7 @@ Section IputFreePath.
       (* the FULL inum cell splits back: the arm's half, our q, the table's qr *)
       iDestruct (ctx_word4_pointsto_half_split with "Hnfull") as "[Hinh Hn2]".
       iEval (rewrite Hsum) in "Hn2".
-      iDestruct (ctx_word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
+      iDestruct (ctx_word4_pointsto_frac_split cur_ctx (i_inum (ientry k)) q qr inum with "Hn2")
         as "[Hrn Htn]".
       iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hoff Hlvh Hmt Hgida]") as "_".
       { iApply bi.later_intro. iApply ic_close_parked.
@@ -4583,7 +4583,7 @@ Section IputFreePath.
       with "[Htd Hiu Hback Hrd Hcnt1]" as "Hwand".
     { iIntros "Hn2 Hgid2 Hpk".
       iEval (rewrite Hsum) in "Hn2".
-      iDestruct (ctx_word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
+      iDestruct (ctx_word4_pointsto_frac_split cur_ctx (i_inum (ientry k)) q qr inum with "Hn2")
         as "[Hrn Htn]".
       iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid2 Hcnt1 Hpk]") as "Hslots";
         [ intros i Hi; reflexivity | intros i Hi; reflexivity | | ].

@@ -695,7 +695,7 @@ Section ProofSysLinkBody.
   (* the escrow-family projection out of the boot families, at the copy
      THIS contract names ([ic_escrows] is IcacheEscrow's).  The sleeplock
      family's projection is [IcacheEscrow.ic_sleeplocks_lookup]. *)
-  Lemma sl_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Lemma sl_esc_acc `{XI : CurCtx} (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
@@ -723,7 +723,7 @@ Section ProofSysLinkBody.
      T_DIR into [di_type dnd = T_DIR] at the record ilock returns.  Pure
      resource algebra; its home is [IcacheRef.v] and it is here for that
      file's rebuild-cone reason. *)
-  Lemma sl_carve_gen (k : nat) (q s : Qp) (dev inum : mword 32) (g : gname) :
+  Lemma sl_carve_gen `{XI : CurCtx} (k : nat) (q s : Qp) (dev inum : mword 32) (g : gname) :
     inode_ref_gen k (q + s)%Qp dev inum g ⊣⊢
     inode_ref_short_gen k (q + s)%Qp q dev inum g ∗ inode_shr_gen k s dev inum g.
   Proof.
@@ -734,7 +734,7 @@ Section ProofSysLinkBody.
     - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
   Qed.
 
-  Lemma sl_shed_gen (k : nat) (q : Qp) (dev inum : mword 32) (g : gname) :
+  Lemma sl_shed_gen `{XI : CurCtx} (k : nat) (q : Qp) (dev inum : mword 32) (g : gname) :
     inode_ref_gen k q dev inum g ⊣⊢
     inode_ref_short_gen k (q/2 + q/2)%Qp (q/2)%Qp dev inum g ∗
     inode_shr_gen k (q/2)%Qp dev inum g.

@@ -1014,6 +1014,12 @@ Qed.
 Section FsLookupDots.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{ICFG : icfg}.
+  (* A6.58: [IcacheEscrow.ic_loaded] is context-indexed (its [dinode_at]
+     bytes are ledger bytes), and this is the ONE section of the file that
+     states a contract over it -- the other two only mention it in prose.
+     Without the binder its [XI] is an unresolved typeclass evar, which is
+     what the section's first such statement reports. *)
+  Context `{XI : CurCtx}.
 
   Lemma fdir_dots_index (γi : gname) (γfs : fs_names) (self dp : Z)
       (ents : gmap fname Z) (dn : dinode) (bm : blkmap)

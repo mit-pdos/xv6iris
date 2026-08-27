@@ -103,7 +103,6 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* ↦₄ split/join cross the seam *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -804,7 +803,7 @@ Section ProofSysOpenPublish.
 
   (* the open direction, one unfolding: [ic_loaded]'s [inode_addrs ∗
      ind_res] is itrunc's [inode_map]. *)
-  Lemma so_loaded_open (gfs : fs_names) (gi : gname) (cov : gset Z)
+  Lemma so_loaded_open `{XI : CurCtx} (gfs : fs_names) (gi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     ic_loaded gfs gi cov logstart k inum dn bm -∗
     ∃ data : nat -> list (bv 8),
@@ -850,7 +849,7 @@ Section ProofSysOpenPublish.
   Qed.
 
   (* ...and the close direction at itrunc's outputs. *)
-  Lemma so_trunc_loaded (gfs : fs_names) (gi : gname) (cov : gset Z)
+  Lemma so_trunc_loaded `{XI : CurCtx} (gfs : fs_names) (gi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) :
     bv_unsigned (di_type dn) <> 0 ->
     bv_unsigned (di_type dn) <> T_DIR_z ->
@@ -990,9 +989,8 @@ Section ProofSysOpenFrame.
     (pa_stk sp0 23) ↦₈[KT1] w ⊢
     (pa_stk sp0 23) ↦₄[KT1] word_lo w ∗ (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] word_hi w.
   Proof.
-    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses through the shim *)
-    iIntros "H". iDestruct (TsoCtxShim.ctx_word_to_mem with "H") as "H".
-    iDestruct (word_pointsto_split4 with "H") as "[Hlo Hhi]".
+    (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
+    iIntros "H".    iDestruct (ctx_word_pointsto_split4 with "H") as "[Hlo Hhi]".
     iFrame "Hlo Hhi".
   Qed.
 
@@ -1002,8 +1000,7 @@ Section ProofSysOpenFrame.
     (pa_stk sp0 23) ↦₈[KT1] word_of_words lo hi.
   Proof.
     intro Hal. iIntros "Hlo Hhi".
-    iApply TsoCtxShim.ctx_word_of_mem.
-    iApply (word_pointsto_join4 _ _ _ _ Hal with "Hlo Hhi").
+    iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal with "Hlo Hhi").
   Qed.
 
   (* the buffer, named as bytes and back: argstr / namei / create all speak

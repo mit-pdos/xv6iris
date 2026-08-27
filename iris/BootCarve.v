@@ -331,7 +331,11 @@ Section BootCarve.
   (* the bridge from §2's [text_end]-and-above half into the range
      vocabulary: with "nothing outside RAM" the half IS the range
      [text_end, ram_hi). *)
-  Local Lemma supra_text_ran (g : gstate) :
+  (* A6.63 / carve Q1: PROMOTED from [Local].  The system theorem's
+     conclusion speaks the CLIENT's vocabulary ([boot_led_ran]), and this is
+     the bridge between that and §2's [text_end]-and-above half, so it has
+     to be visible where the carve is discharged. *)
+  Lemma supra_text_ran (g : gstate) :
     (forall a b, g.(gmem) !! a = Some b -> addr_is_ram a) ->
     supra_text g = ran_bytes g text_end ram_hi.
   Proof.
@@ -1192,6 +1196,55 @@ Section BootCarve.
     iIntros "H".
     iDestruct (big_sepM_union with "H") as "[H1 H2]"; [apply ran_bytes_disj |].
     iFrame "H1 H2".
+  Qed.
+
+  (* ================================================================== *)
+  (* A6.63 THE ELEMENT CARVE (tso-machine-flip.md A6.61/A6.62, ruled       *)
+  (* Q1-Q5).  The era's [ghost_map_alloc] hands out ONE element per byte   *)
+  (* of [gmem] and A6.9 says nothing above the interp can mint another, so *)
+  (* this is where that big-op is cut at [text_end] -- exactly in step     *)
+  (* with [boot_bytes_split]'s cut of the raw bytes, so the two halves     *)
+  (* pair back up byte for byte.                                          *)
+  (* ================================================================== *)
+
+  (* the whole element half, as the allocation hands it over *)
+  Definition boot_led_all (g : gstate) : iProp Σ :=
+    ([∗ map] a ↦ _ ∈ g.(gmem), TsoCtx.ledger_elem0 a (DfracOwn 1))%I.
+
+  (* THE CUT, [boot_bytes_split]'s proof verbatim, landing the upper half
+     in the client's range vocabulary (Q1). *)
+  Lemma boot_led_all_split (g : gstate) :
+    (forall a b, g.(gmem) !! a = Some b -> addr_is_ram a) ->
+    boot_led_all g ⊢
+    ([∗ map] a ↦ _ ∈ sub_text g, TsoCtx.ledger_elem0 a (DfracOwn 1)) ∗
+    boot_led_ran g text_end ram_hi.
+  Proof.
+    intro Hram.
+    rewrite /boot_led_all /boot_led_ran -(supra_text_ran g Hram).
+    pose proof (map_filter_union_complement
+                  (fun p : Arch.pa * bv 8 => (uint p.1 < text_end)%Z) g.(gmem)) as Heq.
+    iIntros "H".
+    iAssert ([∗ map] a ↦ _ ∈ (sub_text g ∪ co_sub_text g),
+               TsoCtx.ledger_elem0 a (DfracOwn 1))%I with "[H]" as "H'".
+    { rewrite /sub_text /co_sub_text Heq. iExact "H". }
+    iDestruct (big_sepM_union with "H'") as "[Ht Hd]";
+      [rewrite /sub_text /co_sub_text; apply map_disjoint_filter_complement |].
+    iFrame "Ht".
+    rewrite (supra_co_sub g). iExact "Hd".
+  Qed.
+
+  (* THE TEXT HALF'S PERSIST (Q5: a NEW lemma here rather than churning
+     [boot_text_persist]'s already-green statement).  [pristine_elem] IS
+     [ledger_elem0] at [DfracDiscarded] -- same key, same value -- so this
+     is one [big_sepM_bupd] over [ghost_map_elem_persist]. *)
+  Lemma boot_led_text_persist (g : gstate) :
+    ([∗ map] a ↦ _ ∈ sub_text g, TsoCtx.ledger_elem0 a (DfracOwn 1))
+    ==∗ ([∗ map] a ↦ _ ∈ sub_text g, pristine_elem a).
+  Proof.
+    iIntros "H". iApply big_sepM_bupd. iApply (big_sepM_mono with "H").
+    iIntros (a b _) "He".
+    rewrite /TsoCtx.ledger_elem0 /pristine_elem.
+    by iMod (ghost_map_elem_persist with "He") as "$".
   Qed.
 
   (* THE RUN, [boot_ran_bytes]' induction over the range's LENGTH. *)

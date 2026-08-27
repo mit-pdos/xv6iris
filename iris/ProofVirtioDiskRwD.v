@@ -67,8 +67,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* ↦ₚ has not flipped (M1 stage 2): ctx bytes cross into
-                         the raw physical-identity laws *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -575,8 +573,12 @@ Section VdrwdMaps.
     phys_word8 a w ⊣⊢ phys_map (range_map a 8 (nth_byte w)).
   Proof. rewrite /phys_word8. symmetry. apply (phys_map_range a 8 (nth_byte w)). lia. Qed.
 
+  (* A6.69: [VirtioProto.phys_map] is a big-op of [TsoCtx.phys_ledger], so
+     the singleton bridge is stated at the LEDGER byte.  The raw
+     [phys_pointsto] would drop the timestamp element and could not be
+     re-entered (A6.9). *)
   Lemma vdrwd_pb_map (a : Arch.pa) (v : bv 8) :
-    phys_pointsto a (DfracOwn 1) v ⊣⊢ phys_map {[ a := v ]}.
+    phys_ledger a (DfracOwn 1) v ⊣⊢ phys_map {[ a := v ]}.
   Proof. rewrite /phys_map big_sepM_singleton. reflexivity. Qed.
 
 End VdrwdMaps.
@@ -1054,7 +1056,7 @@ Section VdrwdPinRes.
     iIntros "!>" (k x Hk) "Hx".
     (* [↦ₚ] has not flipped (M1 stage 2): the ctx byte crosses into the raw
        disassembly law *)
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hx") as "Hx".
+    iDestruct (TsoCtx.ctx_pointsto_forget with "Hx") as "Hx".
     iApply (mem_ident_phys (pa_add a k) (DfracOwn 1) x
               (Hs k ltac:(apply lookup_lt_Some in Hk; lia)) with "Hb Hx").
   Qed.

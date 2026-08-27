@@ -42,6 +42,7 @@ Require Import KernelRvcDecode.
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import CtxKMap.   (* [ctx_mem_page_to_phys]: the tower's identity disassembly *)
 Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
    leg M); this caller is not yet -- the shim marks the open seam *)
 Local Open Scope Z_scope.
@@ -1163,7 +1164,6 @@ Section KvmmakeBody.
               with "Hcg Htext Hpc [Hbuf]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
     iIntros (CID12 Hs12 mfin) "Hcg Hpc Hbytes %Hmcs".
-    iDestruct (ctx_buf_to_mem with "Hbytes") as "Hbytes".
     assert (Hret18 : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x18)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret18) in "Hpc".
@@ -1184,7 +1184,11 @@ Section KvmmakeBody.
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
-    iDestruct (mem_page_to_phys root0 (DfracOwn 1) (mword_of_int 0 : mword 8)
+    (* A6.68: [KMap] sits BELOW [TsoCtx], so its [mem_page_to_phys] would
+       drop the ledger residue and the return trip is the direction the
+       flip makes false.  [CtxKMap.ctx_mem_page_to_phys] is the same
+       identity disassembly carried out AT THE TOWER. *)
+    iDestruct (ctx_mem_page_to_phys cur_ctx root0 (DfracOwn 1) (mword_of_int 0 : mword 8)
                  ltac:(intros j Hj; apply kdata_svpn_class; apply page_in_range_addr_is_kdata; [exact Hpv | exact Hj])
                  with "Hkmapb Hbytes") as "Hbytes".
     iEval (rewrite -Hpbase) in "Hbytes".

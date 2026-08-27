@@ -48,7 +48,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import MemAccessGen.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the S-mode leaf's gen_heap seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -377,6 +376,13 @@ Section WpSmodePtLoad.
     pc_is pc -∗
     gpr_file m -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    (* A6.58: THE PLAIN LOAD'S PRICE.  A6.36's overruling made an S-mode
+       LOAD the PLAIN arm, whose obligation ([HartSMem.Mobl_ram]) is a
+       view-indexed family and not a flat read; the only thing that pays it
+       for a written byte is the running context's own bound, so the leaf
+       has to hold the token while it runs.  Threaded, not consumed: it
+       comes straight back in the continuation, beside the word. *)
+    TsoCtx.own_context XI -∗
     pa ↦₈[kt']{ dqm } v -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
@@ -387,6 +393,7 @@ Section WpSmodePtLoad.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
+      TsoCtx.own_context XI -∗
       pa ↦₈[kt']{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -396,7 +403,7 @@ Section WpSmodePtLoad.
        and a local definition is not syntactically it *)
     unfold pa, a8, ea in *. clear pa a8 ea.
     iIntros "#Hwit #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-             Hpc Hfile Hinstr Hbytes Hcont".
+             Hpc Hfile Hinstr Hrun Hbytes Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr
@@ -440,11 +447,12 @@ Section WpSmodePtLoad.
               (fun npc ms1 mdv1 => (⌜npc = add_vec_int pc 2⌝ ∗
                  ⌜ms1 = mstatus0⌝ ∗ ⌜mdv1 = mdv0⌝ ∗
                  gpr_file (<[Regidx rd := regval_into_reg v]> m) ∗
+                 TsoCtx.own_context XI ∗
                  (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                    ↦₈[kt']{ dqm } v)%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr
-                    [Hfile Hbytes] [Hcont]").
+                    [Hfile Hrun Hbytes] [Hcont]").
     - iIntros "Hpriv Hms Hmie Hmdl Hmenv Hslot Hclk HPC HnPC Hresv".
       (* THE SLOT STAYS FOLDED.  [sda_slot_acc_R] is the one place the two
          translation arms are told apart: it hands out an ABSTRACT write set
@@ -466,7 +474,8 @@ Section WpSmodePtLoad.
       2:{ iApply (swp_execute_LOAD_ram_S8 SD sda_Dro (sda_Df dq)
                     (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
                     imm rs1 rd false m (pa_of ppn (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))) pmar0 pcfg paddr v
-                    ((add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
+                    (TsoCtx.own_context XI ∗
+                     (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                        ↦₈[kt']{ dqm } v)%I (sr_swp_res R) rr
                     (sr_swp_mode R satp0)
                     Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
@@ -508,7 +517,7 @@ Section WpSmodePtLoad.
                        (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) 8
                        ltac:(lia) ltac:(exists 512; lia) Halign4)
                     Hrd
-                    with "Hcert Hfrag HRes Hfile Hrw Hro [] [Hbytes]").
+                    with "Hcert Hfrag HRes Hfile Hrw Hro [] [Hbytes Hrun]").
           - (* THE DATA TRANSLATION, the regime's own *)
             iIntros "Hfrag HRes Hrw Hro".
             iApply (sda_translate_D R SD kt kt' dq (Load Data) KP_rw mstatus0
@@ -522,22 +531,38 @@ Section WpSmodePtLoad.
                          (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn
                          tv' (or_intror (or_introl eq_refl)))
                       with "Hwit Hk Hcert Hfrag HRes Hrw Hro").
-          - (* THE RAM OBLIGATION, off the word the leaf owns *)
-            iIntros (sigma) "Hsi".
+          - (* THE RAM OBLIGATION, off the word the leaf owns.
+               A6.58: the obligation is [Mobl_ram]'s VIEW-INDEXED family
+               now, not a flat [read_bytes] against [sigma.(mem)], so
+               [s_mem_chunk] cannot pay it and the old shim crossing
+               ([ctx_buf_to_mem] then [ctx_buf_of_mem]) is doubly dead --
+               the return direction is FALSE at TSO.  What pays is
+               [SmodeCorePt.wordw_win_load_c], off the SAME window, through
+               the running context's bound.  Its conclusion is PURE, so the
+               window, the token and the interp bundle all survive the call
+               and go straight back out in the post. *)
+            iIntros (sigma img log tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-            iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hbytes") as "Hbytes".
-            iDestruct (s_mem_chunk (KTR := kt') sigma
-                         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
-                         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
-                         0 8 8 (nth_byte v)
-                         ppn dqm ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff
-                         Hcan with "Hmem Hk Hbytes") as %(Hbf & _ & _ & _).
+            iAssert (⌜forall tvr : nat, (V (hart_agent cpu_id) <= tvr)%nat ->
+                       TsoMemPa.tso_read_bytes img log (hart_agent cpu_id) tvr
+                         (pa_of ppn (add_vec (m !!! Regidx rs1)
+                                       (sign_extend' 64 imm))) 8 v⌝)%I
+              as %Hrb.
+            { iApply (wordw_win_load_c (KTR := kt') 8 img sigma log V
+                        (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
+                        ppn v dqm Hcan
+                        ltac:(apply Forall_forall; intros j Hj;
+                              apply elem_of_list_In, elem_of_seq in Hj;
+                              destruct Hj as [_ Hj8];
+                              pose proof (Nat2Z.inj_lt j 8) as Hnz;
+                              change (Z.of_nat 8) with 8%Z in Hnz; lia)
+                        with "Hk Hmem Htso Hrun Hbytes"). }
             iMod (fupd_mask_subseteq ∅) as "Hclose"; [set_solver|].
             iModIntro. iSplitR.
-            { iPureIntro. intros j Hj. apply Hbf. exact Hj. }
+            { iPureIntro. intros tvr Hlo _. rewrite -Htv in Hlo.
+              exact (Hrb tvr Hlo). }
             iNext. iMod "Hclose" as "_". iModIntro.
-            iFrame "Hreg Hmem Hdev".
-            iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbytes") as "Hbytes".
+            iFrame "Hreg Hmem Hdev Htso Hrun".
             rewrite /ctx_word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
       iIntros (e) "(-> & Hfile & Hland)".
       iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hany & Hword)".
@@ -581,12 +606,13 @@ Section WpSmodePtLoad.
       iExists mstatus0, mdv0, (add_vec_int pc 2).
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-      rewrite Hev. iFrame "Hfile Hword".
+      iDestruct "Hword" as "[Hrun Hword]".
+      rewrite Hev. iFrame "Hfile Hrun Hword".
     - iNext. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc
-         (-> & -> & -> & Hfile & Hword)".
+         (-> & -> & -> & Hfile & Hrun & Hword)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile
-                            Hword").
+                            Hrun Hword").
   Qed.
 
   (* THE KT0/KT0 COROLLARY -- the pre-phase-D statement, character for
@@ -622,6 +648,7 @@ Section WpSmodePtLoad.
     pc_is pc -∗
     gpr_file m -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    TsoCtx.own_context XI -∗
     pa ↦₈{ dqm } v -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
@@ -632,6 +659,7 @@ Section WpSmodePtLoad.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
+      TsoCtx.own_context XI -∗
       pa ↦₈{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -887,6 +915,13 @@ Section WpSmodePtStore.
     pc_is pc -∗
     gpr_file m -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
+    (* A6.58: THE STORE'S PRICE.  A store is one APPEND to the log
+       ([HartSMem.Wobl_ram]'s [vstep] and its [PWMsg]), and every
+       value-changing law in the kit moves [gen_heap_interp] and
+       [tso_interp_at] TOGETHER against the writer's registered context
+       ([SmodeCorePt.word_pointsto_write_c]).  So the leaf holds the token
+       across the write; it is threaded, not consumed. *)
+    TsoCtx.own_context XI -∗
     pa ↦₈[kt'] vold -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
@@ -897,6 +932,7 @@ Section WpSmodePtStore.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
+      TsoCtx.own_context XI -∗
       pa ↦₈[kt'] (m !!! Regidx rs2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -904,7 +940,7 @@ Section WpSmodePtStore.
     intros ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     unfold pa, a8, ea in *. clear pa a8 ea.
     iIntros "#Hwit #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-             Hpc Hfile Hinstr Hbytes Hcont".
+             Hpc Hfile Hinstr Hrun Hbytes Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iDestruct (ctx_word_pointsto_aligned_p (KTR := kt') with "Hbytes")
       as %Hpalign4.
@@ -947,11 +983,12 @@ Section WpSmodePtStore.
               mstatus0 mie_v mdv0 menvcfg0 mie_v menvcfg0
               (fun npc ms1 mdv1 => (⌜npc = add_vec_int pc 2⌝ ∗
                  ⌜ms1 = mstatus0⌝ ∗ ⌜mdv1 = mdv0⌝ ∗ gpr_file m ∗
+                 TsoCtx.own_context XI ∗
                  (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                    ↦₈[kt'] (m !!! Regidx rs2))%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr
-                    [Hfile Hword] [Hcont]").
+                    [Hfile Hrun Hword] [Hcont]").
     - iIntros "Hpriv Hms Hmie Hmdl Hmenv Hslot Hclk HPC HnPC Hresv".
       (* THE SLOT STAYS FOLDED.  [sda_slot_acc_R] is the one place the two
          translation arms are told apart: it hands out an ABSTRACT write set
@@ -976,7 +1013,8 @@ Section WpSmodePtStore.
                     (pa_of ppn (add_vec (m !!! Regidx rs1)
                                   (sign_extend' 64 imm)))
                     (m !!! Regidx rs2) pmar0 pcfg paddr
-                    ((add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
+                    (TsoCtx.own_context XI ∗
+                     (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                        ↦₈[kt'] (m !!! Regidx rs2))%I (sr_swp_res R) rr
                     (sr_swp_mode R satp0)
                     (store_data8 (m !!! Regidx rs2))
@@ -1018,7 +1056,7 @@ Section WpSmodePtStore.
                     (pa_aligned_div ppn
                        (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) 8
                        ltac:(lia) ltac:(exists 512; lia) Halign4)
-                    with "Hcert Hfrag HRes Hfile Hrw Hro [] [Hword]").
+                    with "Hcert Hfrag HRes Hfile Hrw Hro [] [Hword Hrun]").
           - iIntros "Hfrag HRes Hrw Hro".
             iApply (sda_translate_D R SD kt kt' dq (Store Data) KP_rw mstatus0
                       menvcfg0 satp0 pmar0 pcfg paddr tv'
@@ -1032,17 +1070,24 @@ Section WpSmodePtStore.
                          (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn
                          tv' (or_intror (or_intror (or_introl eq_refl))))
                       with "Hwit Hk Hcert Hfrag HRes Hrw Hro").
-          - iIntros (sigma) "Hsi".
+          - (* THE RAM WRITE NODE.  A6.33's rework, one tier over: the
+               store is a LEDGER APPEND, so the node takes the interp
+               bundle and the token and hands back the advanced pair.
+               [word_pointsto_write_c]'s conclusion IS [Wobl_ram]'s
+               post, modulo the arm's own naming of [tv]. *)
+            iIntros (sigma img log tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-            iMod (word_pointsto_write_c (KTR := kt') sigma.(mem)
+            iMod (word_pointsto_write_c (KTR := kt') img sigma log V
                     (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn
                     vold (m !!! Regidx rs2) Hcan Hoff
-                    with "Hk Hmem Hword") as "[Hmem Hword]".
+                    with "Hk Hmem Htso Hrun Hword")
+              as "(Hmem & Htso & Hrun & Hword)".
             iMod (fupd_mask_subseteq ∅) as "Hclose"; [set_solver|].
             iModIntro. iNext. iMod "Hclose" as "_". iModIntro.
-            iFrame "Hreg Hmem Hdev Hword". }
+            subst tv.
+            iFrame "Hreg Hmem Hdev Htso Hrun Hword". }
       iIntros (e) "(-> & Hfile & Hland)".
-      iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hword & Hfrag)".
+      iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & [Hrun Hword] & Hfrag)".
       iAssert (∃ tv2 : type_of_register tlb,
                  hreg_frame (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2)
                    SD ∗
@@ -1082,12 +1127,12 @@ Section WpSmodePtStore.
       iExists mstatus0, mdv0, (add_vec_int pc 2).
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-      iFrame "Hfile Hword".
+      iFrame "Hfile Hrun Hword".
     - iNext. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc
-         (-> & -> & -> & Hfile & Hword)".
+         (-> & -> & -> & Hfile & Hrun & Hword)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile
-                            Hword").
+                            Hrun Hword").
   Qed.
 
   (* THE KT0/KT0 COROLLARY -- statement character-identical to the
@@ -1120,6 +1165,7 @@ Section WpSmodePtStore.
     pc_is pc -∗
     gpr_file m -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
+    TsoCtx.own_context XI -∗
     pa ↦₈ vold -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
@@ -1130,6 +1176,7 @@ Section WpSmodePtStore.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
+      TsoCtx.own_context XI -∗
       pa ↦₈ (m !!! Regidx rs2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

@@ -54,9 +54,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeArgraw.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* ↦₄ has not flipped (M1 stage 2): the jump table's
-                         ctx bytes cross into the raw word4 tower *)
 Import Defs.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving
+                            ([ctx_word_pointsto_split4]/[_join4]) and the
+                            window forget ([ctx_buf_forget]) live here --
+                            the lowest file importing both [InstrBytes]'
+                            pure halves and [TsoCtx]'s tier. *)
 Local Open Scope Z_scope.
 
 Notation ar_ra := (mword_of_int 1 : mword 5).
@@ -250,10 +253,11 @@ Section ProofArgraw.
     assert (Hhi : ar_tbl + 4 * Z.of_nat i + Z.of_nat 4%nat <= rodata_end)
       by (unfold rodata_end, ar_tbl, KernelSyms.states_0, NARG in *; lia).
     pose proof (ar_tbl_bytes i Hi) as Hb.
-    unfold NARG in Hi. iIntros "#Hd". rewrite /word4_pointsto. iSplit.
+    unfold NARG in Hi. iIntros "#Hd". rewrite ctx_word4_pointsto_unfold. iSplit.
     { iPureIntro. destruct i as [|[|[|[|[|[|i']]]]]]; try lia; vm_compute; reflexivity. }
-    (* stage 2: [↦₄] is still the raw tower, [kernel_data] hands out ctx bytes *)
-    iApply TsoCtxShim.ctx_buf_to_mem.
+    (* A6.69: [↦₄] IS the ctx tower (M1 stage 2 landed) and [kernel_data]
+       hands out ctx bytes, so the crossing that used to sit here is the
+       identity and is gone.  The comment claiming otherwise was stale. *)
     iApply (kernel_data_window (ar_tbl + 4 * Z.of_nat i) (ar_entry i) 4%nat _ eq_refl
               Hle Hhi Hb with "Hd").
   Qed.

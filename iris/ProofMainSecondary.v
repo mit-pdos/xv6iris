@@ -613,10 +613,13 @@ Section ProofMainSecondary.
     disk_geom γv pd pav pu -∗
     (* this hart's timer capability, allocated in the boot chain *)
     timer_cap -∗
+    (* A6.70: the canon pin's credentials, this hart's -- kvminithart needs
+       them to seal the KPT arm.  See [SpecMainSecondary]'s own row. *)
+    KptShare.kpt_creds -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hdc Hcidne Hp0.
-    iIntros "Hcg #Htext Hpc Hfree Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hccaps #Hdlock #Hgeom #Htimc".
+    iIntros "Hcg #Htext Hpc Hfree Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hccaps #Hdlock #Hgeom #Htimc #Hcreds".
     (* ---- +0x32 jal kvminithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x32)) (mword_of_int 1 : mword 5)
               (mword_of_int 130 : mword 21) m n false
@@ -634,7 +637,7 @@ Section ProofMainSecondary.
     iEval (rewrite Htgtkh) in "Hpc".
     iApply (Kvminithart.wp_kvminithart_sconf Q1 0%nat n root tlbvec0 p0
               eq_refl ltac:(lia)
-              with "Hcg Hsbit Htext Hpc Htlb Hkptp Hkinv").
+              with "Hcg Hsbit Htext Hpc Htlb Hkptp Hkinv Hcreds").
     (* the KPT receipt is kept, not dropped -- see ProofMain.v's twin. *)
     iIntros (mkh) "Hcg Hpc %Hcskh #Hkpt Hstvec".
     (* ---- THE BOOT SEAM (ProofMain.mn_grp_kvm's twin): this hart's regime
@@ -755,7 +758,7 @@ Section ProofMainSecondary.
     cbv beta delta [wp_main_secondary_sconf_body].
     intros pcE Hcid Hdc HK Hp0.
     pose proof (ms_bounds K HK) as (Hc2 & Hn38 & Hn20).
-    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Htimc Hhart".
+    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Htimc #Hcreds Hhart".
     (* printk wants the ambient form; the scheduler join wants the generic one
        (its acquire does), so keep both. *)
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
@@ -773,7 +776,7 @@ Section ProofMainSecondary.
     iApply (ms_inithart_sched γd γv γs γk pd pav pu m3 (K - 2)%nat p0 root tlbvec0
               Hn20 Hdc Hcid Hp0
               with "Hcg Htext Hpc Hfree Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv
-                    Hccaps Hdlock Hgeom Htimc").
+                    Hccaps Hdlock Hgeom Htimc Hcreds").
   Qed.
 
 End ProofMainSecondary.

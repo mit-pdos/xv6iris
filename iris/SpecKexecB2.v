@@ -324,7 +324,7 @@ Section KexecB2Res.
   (*  one resource ilock published, and the re-assembly is the same      *)
   (*  eight-way [iSplitL] every time.                                     *)
   (* ------------------------------------------------------------------ *)
-  Lemma kxc_load_peel (gfs : fs_names) (gi : gname) (cov : gset Z)
+  Lemma kxc_load_peel `{XI : CurCtx} (gfs : fs_names) (gi : gname) (cov : gset Z)
       (logstart : Z) (kf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) :
     ic_loaded gfs gi cov logstart kf inumf dnf bmf ⊢
@@ -379,7 +379,7 @@ Section KexecB2Res.
     iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hind"].
   Qed.
 
-  Lemma kxc_load_seal (gfs : fs_names) (gi : gname) (cov : gset Z)
+  Lemma kxc_load_seal `{XI : CurCtx} (gfs : fs_names) (gi : gname) (cov : gset Z)
       (logstart : Z) (kf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) :
     inode_ok cov logstart dnf bmf datl ->
@@ -452,7 +452,7 @@ Section KexecB2Res.
   (*  [kxc_open], re-sealed.  The ten resources go back exactly as ilock  *)
   (*  published them; readi borrows three of them and returns all three.  *)
   (* ------------------------------------------------------------------ *)
-  Lemma kxc_open_intro (gfs : fs_names) (gi : gname) (cn : ic_names)
+  Lemma kxc_open_intro `{XI : CurCtx} (gfs : fs_names) (gi : gname) (cn : ic_names)
       (cov : gset Z) (logstart : Z) (dev pidv : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) :
@@ -570,7 +570,7 @@ Section KexecB2Res.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }
     iIntros "Hw".
-    iDestruct (word_pointsto_bytes with "Hw") as "Hw".
+    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hw".
     iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
     iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.

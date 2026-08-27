@@ -59,7 +59,6 @@ Require Import Pt4kWalk.
 Require Import PtTree.
 Require Import KvmMap.
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the KT0 identity-map peek crosses the ctx/mem seam *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.

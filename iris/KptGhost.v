@@ -27,6 +27,7 @@ From iris.algebra Require Import csum excl agree.
 From iris.base_logic.lib Require Import own.
 From iris.proofmode Require Import proofmode.
 Require Import RiscvPtsto.
+Require Import TsoMemPa TsoGhost.   (* A6.71: [llb] rides inside [kpt_bound] *)
 Require Import PtTree.
 
 Section KptGhost.
@@ -83,26 +84,46 @@ Section KptGhost.
   Definition kptb_unset : iProp Σ :=
     own kptb_name (Cinl (Excl ()) : kptbR).
 
+  (* A6.71 (A6.70 finding 3): THE BOUND CARRIES ITS OWN LOG-POSITION
+     RECEIPT.  [kptbR] is agreement-only, so [kpt_bound B] on its own says
+     nothing about where [B] sits in the log -- and a hart that wants
+     [KptShare.kpt_creds] out of a top-of-log receipt needs exactly
+     [B <= K].  [TsoGhost.llb] is what makes that comparison free
+     ([llb_valid] against the interp's length authority), it is PERSISTENT,
+     and it is what [TsoCtx.ctx_parked]'s stamp already carries for the
+     same reason.  Riding it INSIDE [kpt_bound] rather than beside it keeps
+     [kpt_creds] and [tlb_res_pt] at their recorded arities. *)
   Definition kpt_bound (B : nat) : iProp Σ :=
-    own kptb_name (Cinr (to_agree (B : leibnizO nat)) : kptbR).
+    (own kptb_name (Cinr (to_agree (B : leibnizO nat)) : kptbR) ∗
+     llb loglen_name B)%I.
 
   Global Instance kptb_unset_timeless : Timeless kptb_unset.
   Proof. apply _. Qed.
   Global Instance kpt_bound_timeless B : Timeless (kpt_bound B).
   Proof. apply _. Qed.
   Global Instance kpt_bound_persistent B : Persistent (kpt_bound B).
-  Proof. rewrite /kpt_bound. apply own_core_persistent, Cinr_core_id, _. Qed.
-
-  Lemma kptb_shoot (B : nat) : kptb_unset ==∗ kpt_bound B.
   Proof.
-    iIntros "H". iApply (own_update with "H").
-    apply cmra_update_exclusive. done.
+    rewrite /kpt_bound. apply bi.sep_persistent; [|apply _].
+    apply own_core_persistent, Cinr_core_id, _.
   Qed.
+
+  (* the shot takes the receipt: publication happens at a bound the
+     publisher's own view has reached, so [llb loglen_name B] is what it
+     already holds ([KptPublish.kptree_publish] hands both out together). *)
+  Lemma kptb_shoot (B : nat) : llb loglen_name B -∗ kptb_unset ==∗ kpt_bound B.
+  Proof.
+    iIntros "#Hllb H".
+    iMod (own_update with "H") as "$";
+      [apply cmra_update_exclusive; done | by iFrame "Hllb"].
+  Qed.
+
+  Lemma kpt_bound_llb (B : nat) : kpt_bound B -∗ llb loglen_name B.
+  Proof. by iIntros "[_ $]". Qed.
 
   Lemma kpt_bound_agree (B B' : nat) :
     kpt_bound B -∗ kpt_bound B' -∗ ⌜ B = B' ⌝.
   Proof.
-    iIntros "H1 H2".
+    iIntros "[H1 _] [H2 _]".
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
     rewrite -Cinr_op Cinr_valid to_agree_op_valid_L in Hv.
     by iPureIntro.

@@ -276,7 +276,7 @@ Section IreclaimDefs.
 
   (* the escrow family's projection -- ProofDirlink's [dl_esc_acc] restated,
      because a Proof file may not require another Proof file *)
-  Lemma irc_esc_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
+  Lemma irc_esc_acc `{XI : CurCtx} (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart k

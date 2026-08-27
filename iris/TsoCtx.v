@@ -1349,6 +1349,39 @@ Section ctx.
     iExists D. iFrame "Hat HT". by iPureIntro.
   Qed.
 
+  (* ---------------------------------------------------------------- *)
+  (* A6.66 THE ACQUIRE-SIDE GATE, and at THIS machine it is honest.      *)
+  (* [ctx_deposit] above is the release side and is INTERP-FREE (a       *)
+  (* parked target's stamp may be raised at will).  Its dual is not:     *)
+  (* claiming a parked record's facts INTO the running context needs the *)
+  (* at-the-top evidence, because the claimer must show its own view     *)
+  (* already covers the whole log -- that is [ctx_dom_of_parked]'s       *)
+  (* [length glog ≤ gtv cpu_id] premise, and it is what the AMO leaf     *)
+  (* actually establishes when it reads at the top.                      *)
+  (*                                                                     *)
+  (* THIS IS WHY THE FLIP MAKES THE LOCK KIT *BETTER*, NOT WORSE         *)
+  (* (tso-port.md §0.18′): at SC the same lemma is provable with         *)
+  (* [ctx_dom_unseal; done] and a CONJURED [hart_view_lb], because SC's  *)
+  (* [ctx_dom] is vacuous.  Here the receipt is real and the conjured    *)
+  (* lower bound has no role left at the acquire -- the interp supplies  *)
+  (* it.  The premise is therefore a STRENGTHENING of the statement and  *)
+  (* a WEAKENING of what the caller must invent.                         *)
+  (* ---------------------------------------------------------------- *)
+  Lemma ctx_absorb `{CID : CpuId} (R : CtxId -> iProp Σ) `{!CtxMorph R}
+      (g : gstate) (ξ ξ' : CtxId) (T : nat) :
+    (length g.(glog) <= g.(gtv) cpu_id)%nat ->
+    tso_interp_at riscv_eraGS g -∗
+    own_context ξ' -∗ ctx_parked ξ T -∗ R ξ ==∗
+    tso_interp_at riscv_eraGS g ∗ own_context ξ' ∗ ctx_parked ξ T ∗ R ξ'.
+  Proof.
+    iIntros (Htop) "Hint Hrun Hpk HR".
+    iMod (ctx_dom_of_parked g ξ ξ' T Htop with "Hint Hrun Hpk")
+      as "(Hint & Hrun & Hdom & Hback)".
+    iMod (ctx_morph with "Hdom HR") as "[Hdom HR]".
+    iModIntro. iFrame "Hint Hrun HR". by iApply "Hback".
+  Qed.
+
+
   (* THE LOAD GATE ([TsoCtxTwin2.twin_load_ok]): a running context's
      fact predicts the machine's plain load at EVERY admissible view
      advance of its hart -- both arms: a clean fact through the
@@ -1451,8 +1484,15 @@ Section ctx.
   (* of an image byte, [WpMmodeLoad]'s [phys_word_pointsto] leaf first   *)
   (* (see the amendment for the exact statement it wants).              *)
   (* ---------------------------------------------------------------- *)
-  Definition pristine_byte (a : Arch.pa) : iProp Σ :=
-    (a ↪[ts_name]□ (0%nat, None))%I.
+  (* A6.63 / carve Q3: THE ALIAS.  This was a character-for-character
+     duplicate of [RiscvPtsto.pristine_elem] under a second name, which is
+     how the two drift apart.  DIRECTION IS FIXED BY IMPORT ORDER: TsoCtx
+     imports RiscvPtsto, so [pristine_elem] is the definition and this is
+     the alias -- never the other way round.  Kept as a [Definition] (not a
+     [Notation]) so the two persistence/timeless instances below and every
+     existing [rewrite /pristine_byte] keep working; the bodies are
+     convertible, so no proof in the tree changes. *)
+  Definition pristine_byte (a : Arch.pa) : iProp Σ := pristine_elem a.
 
   Global Instance pristine_byte_persistent a : Persistent (pristine_byte a).
   Proof. rewrite /pristine_byte. apply _. Qed.
@@ -1683,6 +1723,35 @@ Section ctx.
               ctx_pointsto_unseal /ctx_pointsto_def.
       iDestruct "Hb" as "(%t & [Hpt %Hr] & Hts & Hbit)".
       iExists ppn, t. iFrame "Hk Hpt Hts Hbit". by iPureIntro.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (* A6.61: THE TIER WEAKENING, the ctx twin of                        *)
+  (* [RiscvPtsto.mem_ktier_mono].  It is the one kit item the owners'   *)
+  (* mechanical residue needed and the tree did not have: four sites    *)
+  (* ([ProofCreateParts] x2, [ProofForkretParts], [ProofKexecTail])     *)
+  (* reached KT1 from a KT0 datum by dropping to the raw tower, using   *)
+  (* [mem_ktier_mono] there and crossing back -- and the return leg is  *)
+  (* the direction the flip makes FALSE.                                *)
+  (*                                                                    *)
+  (* It is sound for EXACTLY the raw lemma's reason and no new one: of  *)
+  (* the seven conjuncts of [ctx_pointsto_def] only [ktier_pin] mentions*)
+  (* the tier, and it weakens ([ktier_pin_mono]; at KT1 there is nothing*)
+  (* to prove).  The timestamp, the ledger element and the clean/dirty  *)
+  (* bit are tier-BLIND -- which is why this is a weakening and not a   *)
+  (* re-mint, and why A6.9's prohibition is not in play.                *)
+  (* ---------------------------------------------------------------- *)
+  Lemma ctx_pointsto_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'}
+      (ξ : CtxId) (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    ctx_pointsto (KTR := kt) ξ a dq v ⊢ ctx_pointsto (KTR := kt') ξ a dq v.
+  Proof.
+    rewrite !ctx_pointsto_unseal /ctx_pointsto_def.
+    iIntros "(%ppn & %t & #Hk & %Hc & %Hr & %Hp & Hpt & Hts & Hbit)".
+    iExists ppn, t. iFrame "Hk Hpt Hts Hbit".
+    iPureIntro. split_and!.
+    - exact Hc.
+    - exact Hr.
+    - exact (ktier_pin_mono kt kt' ppn a Hp).
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -2150,6 +2219,47 @@ Section ctx.
     rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
     iExists 0%nat. iFrame "Hp He". iLeft. iApply llb_0.
   Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (* A6.63 THE READ-ONLY MINT, and it is what unblocks the last of the   *)
+  (* shim tail.  A rodata byte lives at the RAW tower ([↦ₛ]/[↦ₘ□],       *)
+  (* KernelDataInv's image bytes) but the load leaves now demand a CTX   *)
+  (* byte, and that direction is the one the flip makes false -- A6.62's *)
+  (* four residual sites ([ProofPrintk] x2, [ProofSyscall],              *)
+  (* [WpSconfLock]) are all this.                                        *)
+  (*                                                                     *)
+  (* It is payable, and for one reason: AT TIMESTAMP 0 THE CLEAN ARM IS  *)
+  (* FREE ([TsoGhost.llb_0]).  So a byte needs no new authority to enter *)
+  (* the tier -- it needs its LEDGER ELEMENT, and A6.9 says the era's    *)
+  (* initial allocation is the only supplier of those.  That allocation  *)
+  (* is the element carve, which is why this lemma could not be written  *)
+  (* before it and why the carve unblocks step 5's tail as well as       *)
+  (* step 6's (A6.62).                                                   *)
+  (*                                                                     *)
+  (* The caller supplies [ppn] with its [kmap_at] witness -- every leaf   *)
+  (* site already holds one -- so the element is indexed at the PHYSICAL  *)
+  (* address, exactly as [ctx_pointsto_def] holds it.                     *)
+  (* ---------------------------------------------------------------- *)
+  Lemma ctx_pointsto_of_ro `{KTR : !CurKtier} (ξ : CtxId) (a : Arch.pa)
+      (ppn : mword 44) (dq : dfrac) (v : bv 8) :
+    kmap_at (svpn_of a) ppn KP_rw -∗
+    mem_pointsto a dq v -∗
+    ledger_elem0 (pa_of ppn a) dq -∗
+    ctx_pointsto ξ a dq v.
+  Proof.
+    iIntros "#Hk Hm He".
+    rewrite /mem_pointsto.
+    iDestruct "Hm" as (ppn') "(#Hk' & %Hc & %Hr & %Hp & Hpt)".
+    iDestruct (kmap_at_agree with "Hk Hk'") as %[-> _].
+    rewrite ctx_pointsto_unseal /ctx_pointsto_def.
+    iExists ppn', 0%nat.
+    iSplitR; [iExact "Hk'" |].
+    iSplitR; [by iPureIntro |].
+    iSplitR; [by iPureIntro |].
+    iSplitR; [by iPureIntro |].
+    iFrame "Hpt He". iLeft. iApply llb_0.
+  Qed.
+
 
   (* the 8-byte tower, so a PT slot can be spelled at either tier *)
   Definition phys_ledger_word (a : Arch.pa) (dq : dfrac) (w : bv 64) : iProp Σ :=

@@ -30,6 +30,15 @@ From iris.base_logic.lib Require Import gen_heap.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
+Require Import TsoCtx.
+(* A6.61 THE RE-TIERING (A6.58's owner tranche, owner 3 -- and the owner is
+   THIS file, not ProcInv: ProcInv already imports TsoCtx and its slot cells
+   are ctx today).  [parents_own] held [p_parent] in the RAW word tower, so
+   the five [p_parent] accesses in kexit/reparent/kwait/kforkB5 each crossed
+   in through the shim, the direction the flip makes FALSE.  The owner moves
+   instead; the five crossings delete and their return legs (already
+   [ctx_word_pointsto_forget]) become identities.  No cycle: TsoCtx does not
+   reach ProcGeom. *)
 Require Import ProcGeom.
 Local Open Scope Z_scope.
 
@@ -108,6 +117,7 @@ Qed.
 (* ===================================================================== *)
 Section WaitInv.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* every proc's [parent] cell, at its slot's value.  The length conjunct is
      part of the resource rather than a caller premise: it is a fact about the

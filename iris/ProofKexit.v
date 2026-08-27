@@ -1163,10 +1163,9 @@ Section KexitPark.
               Mrp (trap_res b + av)%nat w false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [Hpcell]").
     { iApply (kxi_72 with "Htext"). }
-    { iEval (rewrite Hrgr19 Hrp_s3 p_parent_sext). iApply (TsoCtxShim.ctx_word_of_mem with "Hpcell"). }
+    { iEval (rewrite Hrgr19 Hrp_s3 p_parent_sext). iExact "Hpcell". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpcell".
     iEval (rewrite Hrgr19 Hrp_s3 p_parent_sext) in "Hpcell".
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hpcell") as "Hpcell".
     iDestruct ("Hpback" with "Hpcell") as "Hpar".
     set (P5 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg w]> Mrp).
     assert (Hpp76 : add_vec_int (mword_of_int (KX + 0x72) : mword 64) 4 = mword_of_int (KX + 0x76))

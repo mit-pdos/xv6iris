@@ -166,6 +166,17 @@ Section SpecMainSecondary.
        it because it is a member of [SpecDevintr.devintr_caps], which the
        handler contract closes over -- clockintr is on kerneltrap's cone. *)
     timer_cap -∗
+    (* A6.70: THE CANON PIN'S CREDENTIALS, this hart's
+       ([KptShare.kpt_creds] -- the publication bound plus THIS hart's
+       receipt that its view has passed it).  kvminithart needs it to seal
+       the KPT arm (SpecKvminithart.v), and a secondary hart's honest source
+       is its own acquire of [started]: the spin is a plain load but the
+       [__sync_synchronize] after it DRAINS ([RiscvLang.fence_drains]), so
+       the hart emerges at the log top and dominates any published bound.
+       Taking it as a premise here is A6.55's ruling one level down -- the
+       obligation is explicit rather than assumed -- and it is what the
+       started-handshake tranche has to discharge.  Persistent. *)
+    KptShare.kpt_creds -∗
     main_hart_raw tlbvec0 -∗
     WP (Loop : expr riscv_lang).
 

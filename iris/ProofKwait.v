@@ -102,6 +102,11 @@ Require Import TsoCtx.
 (* the WaitInv parent table is still the RAW word fact; the named
    crossings below are its shim seams (stage-2 worklist). *)
 Require Import TsoCtxShim.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving
+                            ([ctx_word_pointsto_split4]/[_join4]) and the
+                            window forget ([ctx_buf_forget]) live here --
+                            the lowest file importing both [InstrBytes]'
+                            pure halves and [TsoCtx]'s tier. *)
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
@@ -1318,10 +1323,9 @@ Section ProofKwait.
               (mword_of_int 56 : mword 12) Mr (trap_res eb + (K - 10))%nat pv false
               with "Hcg Hpc [] [Hcell]").
     { iApply (kwi_60 with "Htext"). }
-    { iEval (rewrite Hea60). iApply (TsoCtxShim.ctx_word_of_mem with "Hcell"). }
+    { iEval (rewrite Hea60). iExact "Hcell". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite Hea60 Hsv60) in "Hcell".
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
     iDestruct ("Hback" $! (zero_reg : mword 64) with "Hcell") as "Hps".
     assert (Hp64 : add_vec_int (mword_of_int (KW + 0x60) : mword 64) 4 = mword_of_int (KW + 0x64))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1864,9 +1868,9 @@ Section ProofKwait.
       (* the four source bytes: the child's [xstate] cell, as a byte buffer *)
       (* the alignment fact has to come out BEFORE the split: the four bytes
          no longer carry it, and the rebuild needs it (durable-notes). *)
-      iDestruct (word4_pointsto_aligned_p (p_xstate (proc_addr k)) (DfracOwn 1) xs
+      iDestruct (TsoCtx.ctx_word4_pointsto_aligned_p _ (p_xstate (proc_addr k)) (DfracOwn 1) xs
                    with "Hxstate") as %Halx.
-      iDestruct (word4_pointsto_bytes (p_xstate (proc_addr k)) (DfracOwn 1) xs
+      iDestruct (TsoCtx.ctx_word4_pointsto_bytes _ (p_xstate (proc_addr k)) (DfracOwn 1) xs
                    with "Hxstate") as "Hbytes".
       iApply (Copyout.wp_copyout_sconf KT0 γa F6 (pv_upt V) (pv_sz V) 4%nat
                 (fun i => nth_byte xs i) (DfracOwn 1)
@@ -1877,21 +1881,22 @@ Section ProofKwait.
                 kw_len4 Hszb kw_ilvl2
                 with "Hcg Hown Htext Hpc Hpt Henv [Hbytes]").
       all: try lkbelow.
-      (* stage 2: [word4_pointsto] is still the RAW byte tower while copyout's
-         source window is the flipped one -- the seam is named here. *)
-      { iEval (rewrite HF6a3).
-        iApply (TsoCtxShim.ctx_buf_of_mem KT0 cur_ctx (p_xstate (proc_addr k)) 4
-                  (fun i => nth_byte xs i) (DfracOwn 1) with "Hbytes"). }
+      (* A6.61: [↦₄] IS the flipped tower, so [ctx_word4_pointsto_bytes]
+         hands the run straight to copyout's context-indexed window -- the
+         seam named here was an identity, and its direction is the FALSE
+         one at TSO. *)
+      { iEval (rewrite HF6a3). iExact "Hbytes". }
       iApply wp_next_off_intro.
       iIntros (mco P') "Hcg Hown Hpc Hpt Hbytes %Hcsco %Hext %Hrv".
       assert (Hp5c : ret_pc (F6 !!! Regidx Rra) = mword_of_int (KW + 0x5c))
         by (rewrite HF6ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp5c) in "Hpc".
       iEval (rewrite HF6a3) in "Hbytes".
-      iDestruct (TsoCtxShim.ctx_buf_to_mem KT0 cur_ctx (p_xstate (proc_addr k)) 4
-                   (fun i => nth_byte xs i) (DfracOwn 1) with "Hbytes") as "Hbytes".
-      iDestruct (word4_pointsto_intro (p_xstate (proc_addr k)) (DfracOwn 1) xs Halx
-                   with "Hbytes") as "Hxstate".
+      (* A6.69: [proc_pub]'s cell is the CTX [↦₄], so the run never leaves
+         the tower -- the forget that used to sit here was the direction the
+         flip makes false, and it is gone. *)
+      iDestruct (ctx_word4_pointsto_intro cur_ctx (p_xstate (proc_addr k))
+                   (DfracOwn 1) xs Halx with "Hbytes") as "Hxstate".
       iDestruct ("Hback" $! P' with "[%] Hsz Hpg Hpt") as "Hpriv"; [exact Hext |].
       iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
       { iExists kl, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
@@ -2155,10 +2160,9 @@ Section ProofKwait.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] [Hcell]").
       { iApply (kwi_b2 with "Htext"). }
-      { iEval (rewrite Heab2). iApply (TsoCtxShim.ctx_word_of_mem with "Hcell"). }
+      { iEval (rewrite Heab2). iExact "Hcell". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
       iEval (rewrite Heab2) in "Hcell".
-      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
       iDestruct ("Hback" with "Hcell") as "Hps".
       set (S0 := <[Regidx Ra5 := regval_into_reg pv]> M).
       change (<[Regidx Ra5 := regval_into_reg pv]> M) with S0.

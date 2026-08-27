@@ -89,8 +89,6 @@ Require Import ProofFilereadParts.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the devsw slot is still a RAW word here; the [c.ld]
-                         leaf takes the ctx one *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -397,7 +395,7 @@ Qed.
 Section FwShare.
   Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg}.
 
-  Lemma fw_shr_gen_split (k : nat) (s1 s2 : Qp) (dev inum : mword 32) (g : gname) :
+  Lemma fw_shr_gen_split `{XI : CurCtx} (k : nat) (s1 s2 : Qp) (dev inum : mword 32) (g : gname) :
     inode_shr_gen k (s1 + s2)%Qp dev inum g ⊣⊢
     inode_shr_gen k s1 dev inum g ∗ inode_shr_gen k s2 dev inum g.
   Proof.
@@ -405,7 +403,7 @@ Section FwShare.
     iSplit; [iIntros "[[$ $] [[$ $] [$ $]]]" | iIntros "[($ & $ & $) ($ & $ & $)]"].
   Qed.
 
-  Lemma fw_shr_gen_halve (k : nat) (s : Qp) (dev inum : mword 32) (g : gname) :
+  Lemma fw_shr_gen_halve `{XI : CurCtx} (k : nat) (s : Qp) (dev inum : mword 32) (g : gname) :
     inode_shr_gen k s dev inum g ⊣⊢
     inode_shr_gen k (s/2)%Qp dev inum g ∗ inode_shr_gen k (s/2)%Qp dev inum g.
   Proof.
@@ -416,7 +414,7 @@ Section FwShare.
   (* THE PIN.  A retained generation-named half and the half iunlock gave
      back name ONE generation, so the returned share can be re-labelled at
      the caller's own [g] and the two rejoined. *)
-  Lemma fw_shr_regen (k : nat) (s1 s2 : Qp) (dev inum : mword 32) (g : gname) :
+  Lemma fw_shr_regen `{XI : CurCtx} (k : nat) (s1 s2 : Qp) (dev inum : mword 32) (g : gname) :
     inode_shr_gen k s1 dev inum g -∗ inode_shr k s2 dev inum -∗
     inode_shr_gen k (s1 + s2)%Qp dev inum g.
   Proof.
@@ -1164,7 +1162,17 @@ Section ProofFilewriteParts.
   (*  function pointers) -- S3a's decode note 2, and the one place where   *)
   (*  copying fileread's block would have been WRONG.                      *)
   (* =================================================================== *)
+  (* A6.71: THE DATUM'S TIER IS A PARAMETER, not [KT1].  The devsw table
+     is STATIC kernel data and [SpecFilewrite.filewrite_dev_env] states its
+     cell at the AMBIENT tier ([curktier_default] = [KT0]), while the
+     capability here is [KT1] -- so pinning the datum to [KT1] made the one
+     caller unable to supply it AND unable to give it back
+     ([ctx_word_ktier_mono] is one-way).  Taking [ktd] with [KtierLe ktd
+     KT1] is the leaf's own shape one tier up ([wp_cld_s_sconf] already
+     carries exactly this pair), it is a GENERALISATION rather than a
+     weakening, and it is what keeps the crossing out of the round trip. *)
   Lemma fw_devidx `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+      {ktd : ktier} `{!KtierLe ktd KT1}
       (Mt : regfile) (K : nat) (mj : Z) (slot : mword 64) (dq : dfrac)
       (p : mword 64) (b : bool) :
     (0 <= mj < 16)%Z ->
@@ -1172,7 +1180,8 @@ Section ProofFilewriteParts.
     sie_cap_gpr KT1 Mt K b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0x74) : mword 64) -∗
-    word_pointsto (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
+    ctx_word_pointsto (KTR := ktd) cur_ctx
+      (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx Ra5 = slot
@@ -1180,7 +1189,8 @@ Section ProofFilewriteParts.
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int (FW + 0x82) : mword 64) -∗
-        word_pointsto (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
+        ctx_word_pointsto (KTR := ktd) cur_ctx
+      (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1257,16 +1267,16 @@ Section ProofFilewriteParts.
         [| apply bv_eq; vm_compute; reflexivity].
       by rewrite fr_addv64_moi. }
     iEval (rewrite -Hpsl) in "Hslot".
-    (* the devsw slot is held RAW in this statement; the [c.ld] leaf takes and
-       returns the ctx word, so the crossing is at the call *)
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hslot") as "Hslot".
-    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0x80)) Ra5 Ra5
+    (* A6.61: the slot is held at the CTX tier in this statement now -- the
+       spelling here was the file's ONLY raw one (every other cell above
+       and below is [ctx_word_pointsto]) -- so the [c.ld] leaf takes it as
+       it stands and the crossing pair is gone. *)
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := ktd) (mword_of_int (FW + 0x80)) Ra5 Ra5
               (mword_of_int 8 : mword 12) D4 K slot b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hslot").
     { iApply (fwri_080 with "Htext"). }
     iIntros (CID5 Hq5) "Hcg Hpc Hslot". iEval (rewrite Hpsl) in "Hslot".
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
     set (D5 := <[Regidx Ra5 := regval_into_reg slot]> D4).
     assert (Hpp82 : add_vec_int (mword_of_int (FW + 0x80) : mword 64) 2
                     = mword_of_int (FW + 0x82)) by (apply bv_eq; vm_compute; reflexivity).

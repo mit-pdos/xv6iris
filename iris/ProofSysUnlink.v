@@ -503,7 +503,7 @@ Section ProofSysUnlinkBody.
   (* the two per-slot projections out of the boot families, at the copies
      THIS contract names ([ic_escrows] is IcacheEscrow's, [ic_sleeplocks]
      SpecDirlink's). *)
-  Lemma su_esc_acc `{GEN : GenId} (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Lemma su_esc_acc `{XI : CurCtx} `{GEN : GenId} (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
@@ -514,7 +514,7 @@ Section ProofSysUnlinkBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma su_slk_acc `{GEN : GenId} (cn : ic_names) (k : nat) :
+  Lemma su_slk_acc `{XI : CurCtx} `{GEN : GenId} (cn : ic_names) (k : nat) :
     (k < NINODE)%nat ->
     (ic_sleeplocks cn -∗
      ∃ gil gisl : gname,
@@ -538,7 +538,7 @@ Section ProofSysUnlinkBody.
      T_DIR into [di_type dnd = T_DIR] at the record ilock returns.  Pure
      resource algebra; its home is [IcacheRef.v] and it is here for that
      file's rebuild-cone reason. *)
-  Lemma su_carve_gen (k : nat) (q s : Qp) (dv inum : mword 32) (gy : gname) :
+  Lemma su_carve_gen `{XI : CurCtx} (k : nat) (q s : Qp) (dv inum : mword 32) (gy : gname) :
     inode_ref_gen k (q + s)%Qp dv inum gy ⊣⊢
     inode_ref_short_gen k (q + s)%Qp q dv inum gy ∗ inode_shr_gen k s dv inum gy.
   Proof.
@@ -549,7 +549,7 @@ Section ProofSysUnlinkBody.
     - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
   Qed.
 
-  Lemma su_shed_gen (k : nat) (q : Qp) (dv inum : mword 32) (gy : gname) :
+  Lemma su_shed_gen `{XI : CurCtx} (k : nat) (q : Qp) (dv inum : mword 32) (gy : gname) :
     inode_ref_gen k q dv inum gy ⊣⊢
     inode_ref_short_gen k (q/2 + q/2)%Qp (q/2)%Qp dv inum gy ∗
     inode_shr_gen k (q/2)%Qp dv inum gy.
@@ -605,9 +605,9 @@ Section ProofSysUnlinkBody.
                (fun j Hj => eq_sym (su_half_bytes_eq data i j Hj))).
     iSplit.
     - iIntros "H".
-      iApply (word2_pointsto_intro (KTR := KT1) a (DfracOwn 1) (dir_inum data i) Hal).
+      iApply (ctx_word2_pointsto_intro (KTR := KT1) cur_ctx a (DfracOwn 1) (dir_inum data i) Hal).
       iExact "H".
-    - iIntros "H". iApply (word2_pointsto_bytes (KTR := KT1) with "H").
+    - iIntros "H". iApply (ctx_word2_pointsto_bytes (KTR := KT1) cur_ctx with "H").
   Qed.
 
   Lemma su_name_acc `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
@@ -2242,7 +2242,7 @@ Section ProofSysUnlinkBody.
                         = mword_of_int (SU + 0x5e)) by pcw.
         iEval (rewrite Hpp5e) in "Hpc".
         (* the [off] cell, carved out of slot 27's UPPER word *)
-        iDestruct (word_pointsto_aligned_p with "H27") as %Hal27.
+        iDestruct (ctx_word_pointsto_aligned_p with "H27") as %Hal27.
         iDestruct (su_off_split sp0 w27 with "H27") as "[H27lo H27hi]".
         (* ===== +0x5e addi a2,s0,-212 -- &off ===== *)
         iApply (wp_addi4_s_sconf (CID := CID15) (mword_of_int (SU + 0x5e)) Ra2
@@ -4592,10 +4592,9 @@ Section ProofSysUnlinkBody.
       by (rewrite /A5 upd_ne; [exact HA4a2 | nz]).
     assert (HA5regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) A5)
       by (rewrite /A5; apply su_regs_caller; [exact Hcsra | exact HA4regs]).
-    (* memset's contract is context-indexed; this caller is not yet
-       converted -- the buffer crosses through the shim at the ambient
-       context (the bundle carries the thread token). *)
-    iDestruct (ctx_buf_of_mem KT1 cur_ctx with "HbD") as "HbD".
+    (* A6.68: memset's contract is context-indexed AND so is the buffer
+       ([↦ₘ] is the ctx tower), so the two shim crossings that used to
+       bracket this call were IDENTITIES and are simply gone. *)
     iApply (Memset.wp_memset_sconf KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
               (mword_of_int 0 : mword 64) bd b (proc_addr jx)
               K2 ltac:(vm_compute; reflexivity) HA5a1
@@ -4603,7 +4602,6 @@ Section ProofSysUnlinkBody.
               with "Hcg Htext Hpc [HbD]").
     { iEval (rewrite HA5a0). iExact "HbD". }
     iIntros (D6 Hd6 mms) "Hcg Hpc HbD %Hcsms".
-    iDestruct (ctx_buf_to_mem with "HbD") as "HbD".
     iEval (rewrite HA5a0) in "HbD".
     assert (Hpc98 : ret_pc (A5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x98)) by (rewrite HA5ra; pcw).
@@ -6144,10 +6142,9 @@ Section ProofSysUnlinkBody.
       by (rewrite /A5 upd_ne; [exact HA4a2 | nz]).
     assert (HA5regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) A5)
       by (rewrite /A5; apply su_regs_caller; [exact Hcsra | exact HA4regs]).
-    (* memset's contract is context-indexed; this caller is not yet
-       converted -- the buffer crosses through the shim at the ambient
-       context (the bundle carries the thread token). *)
-    iDestruct (ctx_buf_of_mem KT1 cur_ctx with "HbD") as "HbD".
+    (* A6.68: memset's contract is context-indexed AND so is the buffer
+       ([↦ₘ] is the ctx tower), so the two shim crossings that used to
+       bracket this call were IDENTITIES and are simply gone. *)
     iApply (Memset.wp_memset_sconf KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
               (mword_of_int 0 : mword 64) bd b (proc_addr jx)
               K2 ltac:(vm_compute; reflexivity) HA5a1
@@ -6155,7 +6152,6 @@ Section ProofSysUnlinkBody.
               with "Hcg Htext Hpc [HbD]").
     { iEval (rewrite HA5a0). iExact "HbD". }
     iIntros (D6 Hd6 mms) "Hcg Hpc HbD %Hcsms".
-    iDestruct (ctx_buf_to_mem with "HbD") as "HbD".
     iEval (rewrite HA5a0) in "HbD".
     assert (Hpc98 : ret_pc (A5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x98)) by (rewrite HA5ra; pcw).

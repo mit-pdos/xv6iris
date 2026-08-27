@@ -56,6 +56,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxAbsorbLb.   (* [ctx_dom_of_parked_lb]: the receipt-side mint *)
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the claimer's token *)
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -504,10 +506,28 @@ Section ProofScheduler.
        arrives as its own premise (SpecScheduler.v hoisted it out of
        [cpu_own]'s slot) rather than out of the bundle. *)
     iDestruct (sc_cpu_own_open with "Hcpu") as "(Hnoff & Hint & Hcnt & Hproc & Hlks & Hhcs)".
-    iDestruct "Hfree" as (ctx0 ξ0) "[%Hctx0len Hctx0]".
+    (* A6.68: THE M2 TRANSPORT, PAID HONESTLY.  The free save area is a
+       PARKED RECORD now (SchedCtx.cpu_ctx_free) and this proof holds the
+       kernel bundle, so it borrows its own running token
+       ([SieCapCtx.sie_cap_gpr_own_ctx_acc]), mints the domination from the
+       record against the hart's own receipt at [Tfr ≤ Tfr]
+       ([TsoCtxAbsorbLb.ctx_dom_of_parked_lb] -- interp-free, which is the
+       whole reason it can run HERE, outside every WP leaf), and re-indexes
+       the fourteen cells with the price [SwtchCtx.ctx_cells_reindex] was
+       always going to charge.  The record is abandoned after the claim,
+       exactly as the lock's per-publication record is. *)
+    iDestruct "Hfree" as (ctx0 ξ0 Tfr) "(%Hctx0len & Hpk0 & #HK0 & Hctx0)".
+    iApply fupd_wp.
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (ctx_dom_of_parked_lb ξ0 cur_ctx Tfr Tfr ltac:(lia) with "HK0 Hrun Hpk0")
+      as "(Hrun & Hdom & _)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iMod (ctx_cells_reindex ξ0 cur_ctx (a_cpu_ctx cid_word) ctx0
+            with "Hdom Hctx0") as "[_ Hctx0]".
+    iModIntro.
     iAssert (own_ctx (a_cpu_ctx cid_word)) with "[Hctx0]" as "Hown".
     { rewrite /own_ctx. iExists ctx0. iSplit; [iPureIntro; exact Hctx0len |].
-      iApply (ctx_cells_reindex ξ0 with "Hctx0"). }
+      iExact "Hctx0". }
     (* ------------------------------------------------------------------ *)
     (* Prologue: 80-byte frame (push 10), save ra/s0..s8.                  *)
     (* ------------------------------------------------------------------ *)

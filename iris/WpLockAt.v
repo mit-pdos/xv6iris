@@ -60,19 +60,26 @@ Section LockAt.
   (* [WpLock.newlock] with its [own_alloc] taken out: a free physical lock
      (word 0, cpu word 0), its name, its resource and the pre-minted ghost
      pair become THE lock at the gname the caller already published. *)
-  Lemma newlock_at E (γ : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) :
+  (* A6.67: the free arm is the parked record, so this creator DEPOSITS.
+     [own_context] in and straight back out -- the honest mint's price
+     (A6.66), paid once here for all seven [newlock_at] callers. *)
+  Lemma newlock_at `{CID : RiscvLang.CpuId} E (γ : gname) (lk : mword 64) (s : string)
+      (R : CtxId → iProp Σ) `{!CtxMorph R} :
     lock_free_tok γ -∗
     lock_name lk s -∗
+    own_context cur_ctx -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
-    R cur_ctx ={E}=∗ is_lock γ lk s R.
+    R cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
   Proof.
-    iIntros "[Ha Hf] #Hnm Hword Hcpu HR".
-    iAssert (∃ ξ : CtxId, R ξ)%I with "[HR]" as "HR"; first by iExists cur_ctx.
+    iIntros "[Ha Hf] #Hnm Hrun Hword Hcpu HR".
+    iMod (lock_pay_intro R with "Hrun HR") as "[Hrun HR]".
+    iFrame "Hrun".
     iMod (inv_alloc lockN E (lock_inv γ lk s R)
             with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iNext. iExists (mword_of_int 0 : mword 32), None.
-      rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
+      iDestruct (lock_word_intro with "Hword") as "Hword".
+      rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
       iLeft. iFrame "Hf HR". done. }
     iModIntro. iApply (is_lock_intro with "Hnm Hinv").
   Qed.

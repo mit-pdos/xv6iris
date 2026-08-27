@@ -53,6 +53,11 @@ Require Import TsoCtx.
 Require TsoCtxShim.   (* the epilogue's stack_own hand-back crosses to the
                          raw stack carve *)
 Local Open Scope Z_scope.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving
+                            ([ctx_word_pointsto_split4]/[_join4]) and the
+                            window forget ([ctx_buf_forget]) live here --
+                            the lowest file importing both [InstrBytes]'
+                            pure halves and [TsoCtx]'s tier. *)
 Import Defs.
 
 (* clean-context (mword-free) nat bounds *)
@@ -1159,7 +1164,7 @@ Section ProofPrintk.
        load leaf's ctx slot and back through the shim *)
     iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb") as "Hb".
     iFrame "Hb". iIntros "Hb". iApply "Hcl".
-    iApply (TsoCtxShim.ctx_pointsto_to_mem with "Hb").
+    iApply (TsoCtx.ctx_pointsto_forget with "Hb").
   Qed.
 
   Lemma wp_printk_setup `{CID0 : CpuId}
@@ -2187,10 +2192,8 @@ Section ProofPrintk.
     (* +0xe4 c.lw a0,0(a5) : the argument -- a 4-byte read of an 8-byte slot *)
     iDestruct (pk_va_acc sp0 m k Hk with "Hva") as "[Hslot Hvacl]".
     iDestruct (ctx_word_pointsto_aligned_p with "Hslot") as %Halv.
-    (* M1 stage 2: [↦₄] has not flipped, so the ctx word crosses to the
-       raw word tower for the split and comes back after the join. *)
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
-    iDestruct (word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
+    iDestruct (ctx_word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget D4 a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite HD4a5.
@@ -2204,8 +2207,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_d8 with "Htext"). }
     iIntros (CID6 Hst6) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
-    iDestruct (word_pointsto_join4 _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hslot") as "Hslot".
+    iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     rewrite word_of_words_id.
     iDestruct ("Hvacl" with "Hslot") as "Hva".
     set (D5 := <[Regidx a0_idx := regval_into_reg (sign_extend' 64 (pk_lo m k))]> D4).
@@ -3308,10 +3310,8 @@ Section ProofPrintk.
     (* the argument: the LOW half of the slot, read unsigned *)
     iDestruct (pk_va_acc sp0 m k Hk with "Hva") as "[Hslot Hvacl]".
     iDestruct (ctx_word_pointsto_aligned_p with "Hslot") as %Halv.
-    (* M1 stage 2: [↦₄] has not flipped, so the ctx word crosses to the
-       raw word tower for the split and comes back after the join. *)
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
-    iDestruct (word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
+    iDestruct (ctx_word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget S1 a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite HS1a5.
@@ -3325,8 +3325,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_116 with "Htext"). }
     iIntros (CID3 Hst3) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
-    iDestruct (word_pointsto_join4 _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hslot") as "Hslot".
+    iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     rewrite word_of_words_id.
     iDestruct ("Hvacl" with "Hslot") as "Hva".
     set (S2 := <[Regidx a0_idx := regval_into_reg (zero_extend' 64 (pk_lo m k))]> S1).
@@ -3450,10 +3449,8 @@ Section ProofPrintk.
     (* the argument: the LOW half of the slot, read unsigned *)
     iDestruct (pk_va_acc sp0 m k Hk with "Hva") as "[Hslot Hvacl]".
     iDestruct (ctx_word_pointsto_aligned_p with "Hslot") as %Halv.
-    (* M1 stage 2: [↦₄] has not flipped, so the ctx word crosses to the
-       raw word tower for the split and comes back after the join. *)
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
-    iDestruct (word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
+    iDestruct (ctx_word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget S1 a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite HS1a5.
@@ -3467,8 +3464,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_168 with "Htext"). }
     iIntros (CID3 Hst3) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
-    iDestruct (word_pointsto_join4 _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hslot") as "Hslot".
+    iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     rewrite word_of_words_id.
     iDestruct ("Hvacl" with "Hslot") as "Hva".
     set (S2 := <[Regidx a0_idx := regval_into_reg (zero_extend' 64 (pk_lo m k))]> S1).
@@ -3576,10 +3572,8 @@ Section ProofPrintk.
     (* the argument: the low half of the slot *)
     iDestruct (pk_va_acc sp0 m k Hk with "Hva") as "[Hslot Hvacl]".
     iDestruct (ctx_word_pointsto_aligned_p with "Hslot") as %Halv.
-    (* M1 stage 2: [↦₄] has not flipped, so the ctx word crosses to the
-       raw word tower for the split and comes back after the join. *)
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
-    iDestruct (word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
+    iDestruct (ctx_word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget V a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite Hva5.
@@ -3593,8 +3587,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_1fa with "Htext"). }
     iIntros (CID1 Hst1) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
-    iDestruct (word_pointsto_join4 _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hslot") as "Hslot".
+    iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     rewrite word_of_words_id.
     iDestruct ("Hvacl" with "Hslot") as "Hva".
     set (C1 := <[Regidx a0_idx := regval_into_reg (sign_extend' 64 (pk_lo m k))]> V).

@@ -130,6 +130,7 @@ Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import SepThread.   (* A6.68: the token threaded through the fifty *)
 
 Local Open Scope Z_scope.
 
@@ -1666,7 +1667,14 @@ Section IcacheBootTable.
          straight through.
      [icache_boot] below is this lemma plus the two mints, so there is one
      body and the old signature is a corollary. *)
-  Lemma icache_boot_at (E : coPset) (γl : gname) (cn : ic_names)
+  (* A6.68: the honest creator deposit (A6.66) wants the running token, and
+     this boot step builds FIFTY-ONE locks -- the itable spinlock plus one
+     sleeplock per entry.  The token is borrowed once and handed straight
+     back; the per-entry loop threads it with [SepThread.big_sepL_fupd_thread]
+     because [own_context] is EXCLUSIVE and the fifty steps cannot run
+     independently. *)
+  Lemma icache_boot_at `{CID : RiscvLang.CpuId}
+      (E : coPset) (γl : gname) (cn : ic_names)
       (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
     (* THE COUNT AUTHORITY, at the empty table.  A PREMISE rather than an
@@ -1713,8 +1721,10 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, ic_tok cn k) -∗
     ([∗ list] k ∈ seq 0 NINODE, ic_mid cn k) -∗
     ([∗ list] k ∈ seq 0 NINODE,
-       ∃ (v : bool) (d n : mword 32), ic_id cn k 1 v d n)
+       ∃ (v : bool) (d n : mword 32), ic_id cn k 1 v d n) -∗
+    own_context cur_ctx
     ={E}=∗
+      own_context cur_ctx ∗
       is_itable2 γl cn γfs γi cov logstart nib dv ∗
       itable_inv ∗
       ic_escrows cn γfs γi cov logstart ∗
@@ -1724,7 +1734,7 @@ Section IcacheBootTable.
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
     iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
-    iIntros "Hfree Htok Hmid Hgid".
+    iIntros "Hfree Htok Hmid Hgid Hrun".
     (* only the ZEROS are used: they are what [itable_body] parks for a free
        slot.  The [sl_free_tok]s beside them belong to whoever wants to build
        a lock AT [icfg_isl k], and this cache does not -- its locks carry
@@ -1791,7 +1801,7 @@ Section IcacheBootTable.
         rewrite /islot2 !lookup_empty. done. }
       rewrite ci_inums_empty difference_empty_L. iExact "Hpool". }
     iMod (newlock_at E γl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dv }>
-            with "Hfree Hnm Hlkw Hcpu Hres") as "#Hlock".
+            with "Hfree Hnm Hrun Hlkw Hcpu Hres") as "[Hrun #Hlock]".
     (* ---- the fifty inode sleeplocks, sealed over the checkout tokens ---- *)
     iDestruct (big_sepL_sep_2 with "Hsl Htok") as "Hsl".
     (* THE DEPOSIT IS KEYED BY THE SLOT, NOT BY THE LOCK.  What a holder
@@ -1800,18 +1810,24 @@ Section IcacheBootTable.
        the only reference, prove the lock free rather than block on it
        (claude-notes/projects/iput-acquiresleep.md).  The lock's OWN gname
        stays existential, so no consumer of [ic_sleeplocks] changes. *)
-    iAssert ([∗ list] k ∈ seq 0 NINODE,
-               |={E}=> ∃ γil γisl : gname,
+    (* A6.68: SEQUENTIAL, not fifty independent fupds -- each
+       [sl_fresh_new_gen] borrows the running token and returns it. *)
+    iAssert ([∗ list] idx↦k ∈ seq 0 NINODE,
+               own_context cur_ctx -∗
+               (sl_fresh (i_lock (ientry k)) "inode"%string ∗ ic_tok cn k)
+               ={E}=∗ own_context cur_ctx ∗
+               ∃ γil γisl : gname,
                  is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
                                   (ic_tok cn k) (slh_tok (icfg_isl k)))%I
-      with "[Hsl]" as "Hsl".
-    { iApply (big_sepL_mono with "Hsl"). intros idx k _.
-      iIntros "[Hf Ht]".
+      as "Hstep".
+    { iApply big_sepL_intro. iIntros "!>" (idx k _) "Hrun [Hf Ht]".
       iMod (sl_fresh_new_gen E _ _ _ (fun _ q => slh_tok (icfg_isl k) q)
-              with "Hf Ht") as (γil γisl) "[#Hlk _]".
-      iModIntro. iExists γil, γisl. iExact "Hlk". }
-    iMod (big_sepL_fupd with "Hsl") as "Hsl".
-    iModIntro.
+              with "Hf Hrun Ht") as "[Hrun Hgen]".
+      iDestruct "Hgen" as (γil γisl) "[#Hlk _]".
+      iModIntro. iFrame "Hrun". iExists γil, γisl. iExact "Hlk". }
+    iMod (big_sepL_fupd_thread E (own_context cur_ctx)
+            with "Hrun Hstep Hsl") as "[Hrun Hsl]".
+    iModIntro. iFrame "Hrun".
     (* structurally, NOT [iFrame "…"]: naming the four hypotheses fixes the
        context-side scan, but the GOAL still holds a fifty-slot big-op of
        sleeplocks over [ic_tok] and the whole [ic_escrows] family, and a
@@ -1831,7 +1847,8 @@ Section IcacheBootTable.
      [icache_boot_at] overwrites the identification values, so the mint runs
      at [ic_dv_dummy] and [fun_of_big] never has to happen before it.  That
      is the same fact that makes the [_at] form possible at all. *)
-  Lemma icache_boot (E : coPset) (γfs : fs_names) (γi : gname)
+  Lemma icache_boot `{CID : RiscvLang.CpuId}
+      (E : coPset) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
     own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) -∗
     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) -∗
@@ -1843,8 +1860,9 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, sl_fresh (i_lock (ientry k)) "inode"%string) -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗
-    ipool γfs γi cov logstart (region_inums nib)
-    ={E}=∗ ∃ (γl : gname) (cn : ic_names),
+    ipool γfs γi cov logstart (region_inums nib) -∗
+    own_context cur_ctx
+    ={E}=∗ own_context cur_ctx ∗ ∃ (γl : gname) (cn : ic_names),
       is_itable2 γl cn γfs γi cov logstart nib dv ∗
       itable_inv ∗
       ic_escrows cn γfs γi cov logstart ∗
@@ -1853,12 +1871,12 @@ Section IcacheBootTable.
            is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
-    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
+    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool Hrun".
     iMod lock_ghost_alloc as (γl) "Hfree".
     iMod (ic_names_alloc ic_dv_dummy) as (cn) "(Htok & Hmid & Hgid)".
     iDestruct (ic_id_forget cn false ic_dv_dummy with "Hgid") as "Hgid".
-    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hpool Hfree Htok Hmid Hgid") as "H".
-    iModIntro. iExists γl, cn. iExact "H".
+    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hpool Hfree Htok Hmid Hgid Hrun") as "[Hrun H]".
+    iModIntro. iFrame "Hrun". iExists γl, cn. iExact "H".
   Qed.
 
 End IcacheBootTable.

@@ -22,8 +22,6 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* [ctx_cells_reindex]: the free save area's ∃-context
-                         against a holder's ambient one (M2 seam) *)
 Local Open Scope Z_scope.
 
 (* struct-context field layout: field i (0..13) holds register [ctx_regs !! i]
@@ -293,30 +291,54 @@ Section SwtchCtx.
 
 End SwtchCtx.
 
-(* SHIM-TIER (dies at cutover): re-index a save area's cells between
-   contexts.  OUTSIDE the section, because the section's ambient [XI] fixes
-   the index it must vary.  SC-only -- the honest TSO transport of parked
-   cells is the M2 park/resume machinery; each use is an M2 worklist entry. *)
+(* THE SAVE AREA'S RE-INDEX, PAID (the machine flip; tso-machine-flip.md
+   §6 amendment A6.58).  OUTSIDE the section, because the section's ambient
+   [XI] fixes the index this must vary.
+
+   WHAT CHANGED AND WHY.  The SC-era body was [ctx_word_to_mem] followed by
+   [ctx_word_of_mem] -- a FREE re-index, and the flip refutes it exactly:
+   a [ctx_pointsto] carries its clean/dirty justification AT ITS OWN
+   CONTEXT ([TsoCtx]'s [llb (ctx_bound_name ξ) t] / dirty fragment), and
+   nothing above the interp can re-mint that elsewhere.  The honest law is
+   already in the kit and this payload is precisely what it is for:
+   [TsoCtx.CtxMorph] transports any structural payload along a
+   [ctx_dom ξ ξ'], and a save area is fourteen word cells and nothing else.
+
+   So the re-index KEEPS ITS NAME AND GAINS ITS PRICE -- one [ctx_dom]
+   token, which the park/resume protocol already mints
+   ([ctx_dom_to_parked] / [ctx_dom_of_parked]).  Its one caller
+   ([ProofScheduler]) is the M2 worklist entry that price creates; it is
+   NOT a quarantine, because the obligation is now stated in the type.
+
+   The morph fact is a plain lemma, not a [Global Instance]: it is applied
+   AS A TERM at the two uses below, which keeps it out of every downstream
+   file's instance search. *)
 Section CtxCellsReindex.
   Context `{!riscvGS Σ}.
 
+  Lemma ctx_cells_at_morph (c : mword 64) (off : Z) (vs : list (mword 64)) :
+    CtxMorph (λ ξ, ctx_cells_at (XI := ξ) c off vs).
+  Proof.
+    revert off. induction vs as [|v vs IH] => off; iIntros (ξ ξ') "Hd Hc".
+    - iModIntro. iFrame "Hd".
+    - iDestruct "Hc" as "[Hv Hrest]".
+      iMod (ctx_morph_word _ (add_vec c (mword_of_int off)) (DfracOwn 1) v
+              ξ ξ' with "Hd Hv") as "[Hd Hv]".
+      iMod (IH (off + 8) ξ ξ' with "Hd Hrest") as "[Hd Hrest]".
+      iModIntro. iFrame.
+  Qed.
+
   Lemma ctx_cells_at_reindex (ξ ξ' : CtxId) (c : mword 64) (off : Z)
       (vs : list (mword 64)) :
-    ctx_cells_at (XI := ξ) c off vs -∗ ctx_cells_at (XI := ξ') c off vs.
-  Proof.
-    revert off. induction vs as [|v vs IH] => off; simpl.
-    - auto.
-    - iIntros "[Hv Hrest]".
-      iSplitL "Hv".
-      { iDestruct (TsoCtxShim.ctx_word_to_mem with "Hv") as "Hv".
-        iApply (TsoCtxShim.ctx_word_of_mem with "Hv"). }
-      iApply (IH with "Hrest").
-  Qed.
+    ctx_dom ξ ξ' -∗ ctx_cells_at (XI := ξ) c off vs ==∗
+    ctx_dom ξ ξ' ∗ ctx_cells_at (XI := ξ') c off vs.
+  Proof. exact (ctx_cells_at_morph c off vs ξ ξ'). Qed.
 
   Lemma ctx_cells_reindex (ξ ξ' : CtxId) (c : mword 64)
       (vs : list (mword 64)) :
-    ctx_cells (XI := ξ) c vs -∗ ctx_cells (XI := ξ') c vs.
-  Proof. apply ctx_cells_at_reindex. Qed.
+    ctx_dom ξ ξ' -∗ ctx_cells (XI := ξ) c vs ==∗
+    ctx_dom ξ ξ' ∗ ctx_cells (XI := ξ') c vs.
+  Proof. exact (ctx_cells_at_reindex ξ ξ' c 0 vs). Qed.
 End CtxCellsReindex.
 
 Section Swconf.

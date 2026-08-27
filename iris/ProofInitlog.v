@@ -102,6 +102,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import TsoCtx.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the creator's borrow *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -542,7 +543,7 @@ Section InitlogDefs.
   Qed.
 
   (* the 30 header cells, re-formed from the decoded run and the junk tail *)
-  Lemma il_cells_join (bs : list (bv 8)) (nh : nat) :
+  Lemma il_cells_join `{XI : CurCtx} (bs : list (bv 8)) (nh : nat) :
     (nh <= LOGBLOCKS)%nat ->
     ([∗ list] i ↦ w ∈ il_W bs nh, lh_block i ↦₄ w) -∗
     ([∗ list] i ∈ seq nh (LOGBLOCKS - nh), ∃ wj : SailStdpp.Values.mword 32, lh_block i ↦₄ wj) -∗
@@ -571,7 +572,7 @@ Section InitlogDefs.
 
   (* the client's own [fs_chalf] half against the handle's machinery half
      pins the bytes bread returned -- for either payload polarity *)
-  Lemma il_pay_agree (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma il_pay_agree `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32) (z : Z)
       (bs bsl bsd : list (bv 8)) (d : bool) :
     uint bno = z ->
@@ -2705,8 +2706,13 @@ Section ProofInitlog.
        the caller already owns the free ghost state of -- the era fupd's
        [lock_ghost_alloc] minted it as [ln_lk γ], so this is a FILL, not a
        mint. *)
+    (* A6.68: the honest creator deposit (A6.66) wants the running token; this
+       proof holds the kernel bundle, so it borrows its own and puts it back
+       ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string <{ log_res (fs_dstep riscv_dview_name) γ bn γfs cov logstart }>
-            with "Hlkf Hlnm Hlock Hcpu Hres") as "#Hislk".
+            with "Hlkf Hlnm Hrun Hlock Hcpu Hres") as "[Hrun #Hislk]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iAssert (log_ctx γ bn γfs cov logstart dev)%I as "#Hctx".
     { rewrite /log_ctx. iExists (fs_dstep riscv_dview_name). rewrite /log_ctx_at.
       iSplitR; [iExact "Hislk"|].

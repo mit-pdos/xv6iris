@@ -644,6 +644,9 @@ Section SpecMain.
        the root cell.)  It is GLOBAL, not per-hart, so it travels beside the
        boot bridge rather than through it. *)
     kpt_unset -∗
+    (* A6.71: ...and the pin bound's one-shot beside it -- [kpt_inv_alloc]
+       takes both, and both are minted once at adequacy (A6.70 finding 1). *)
+    kptb_unset -∗
     (* the kernel-mapping auth, likewise a GLOBAL boot token minted at
        adequacy and spent in that same publication assembly in main's boot
        arm (it retires into [kpt_inv] with the tree, after minting the 65

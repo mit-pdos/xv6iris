@@ -79,7 +79,6 @@ Require Import SpecSysUnlink.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* ↦₄ has not flipped: word split/join cross the seam *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -1042,8 +1041,7 @@ Section ProofSysUnlinkFrame.
   Proof.
     (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses to the raw
        4-byte tower through the shim *)
-    iIntros "H". iDestruct (TsoCtxShim.ctx_word_to_mem with "H") as "H".
-    iDestruct (word_pointsto_split4 with "H") as "[Hlo Hhi]".
+    iIntros "H".    iDestruct (ctx_word_pointsto_split4 with "H") as "[Hlo Hhi]".
     iFrame "Hlo Hhi".
   Qed.
 
@@ -1053,8 +1051,7 @@ Section ProofSysUnlinkFrame.
     (pa_stk sp0 27) ↦₈[KT1] word_of_words lo hi.
   Proof.
     intro Hal. iIntros "Hlo Hhi".
-    iApply TsoCtxShim.ctx_word_of_mem.
-    iApply (word_pointsto_join4 _ _ _ _ Hal with "Hlo Hhi").
+    iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal with "Hlo Hhi").
   Qed.
 
 End ProofSysUnlinkFrame.

@@ -365,6 +365,7 @@ Qed.
 
 Section BoProps.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.   (* A6.68: [↦₄] is the context tower *)
 
   (* the log lock's batch, opened just for its [lh.n] cell *)
   Lemma bo_batch_lhn (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (bn : bio_names) (γfs : fs_names) (cov : gset Z)

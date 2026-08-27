@@ -62,9 +62,12 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* ↦₄ has not flipped (M1 stage 2): the frame slot's
-                         ctx word crosses to the raw ↦₄ halves and back *)
 Import Defs.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving
+                            ([ctx_word_pointsto_split4]/[_join4]) and the
+                            window forget ([ctx_buf_forget]) live here --
+                            the lowest file importing both [InstrBytes]'
+                            pure halves and [TsoCtx]'s tier. *)
 Local Open Scope Z_scope.
 
 
@@ -681,9 +684,8 @@ Section ProofArgfd.
       rewrite /M5 upd_ne; [| vm_compute; discriminate]. exact HM4s2. }
     (* the [int fd] local: the UPPER word of frame slot 5 *)
     iDestruct (ctx_word_pointsto_aligned_p with "Hs5") as %Hal5.
-    (* stage 2: the ↦₄ tower is still raw, so the ctx slot crosses here *)
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs5") as "Hs5".
-    iDestruct (word_pointsto_split4 with "Hs5") as "[Hs5lo Hs5hi]".
+    (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
+    iDestruct (ctx_word_pointsto_split4 with "Hs5") as "[Hs5lo Hs5hi]".
     iEval (rewrite -HM6a1) in "Hs5hi".
     (* argint reads the trapframe pointer AND page out of [proc_priv] *)
     iDestruct (proc_priv_ofile_len with "Hpriv") as %Hoflen.
@@ -1061,8 +1063,7 @@ Section ProofArgfd.
                       = mword_of_int (KernelSyms.argfd + 0x46))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjt) in "Hpc".
-        iDestruct (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
-        iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs5") as "Hs5".
+        iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
         assert (HDsp : D !!! Regidx csp_rs1 = pa_stk sp0 6)
           by (rewrite /D upd_ne; [exact HC5sp | vm_compute; discriminate]).
         assert (HDa0 : D !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64))
@@ -1153,8 +1154,7 @@ Section ProofArgfd.
         assert (Hpp46 : add_vec_int (mword_of_int (KernelSyms.argfd + 0x44) : mword 64) 2
                         = mword_of_int (KernelSyms.argfd + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp46) in "Hpc".
-        iDestruct (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
-        iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs5") as "Hs5".
+        iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
         assert (HE1sp : E1 !!! Regidx csp_rs1 = pa_stk sp0 6)
           by (rewrite /E1 upd_ne; [exact HC5sp | vm_compute; discriminate]).
         assert (HE1a0 : E1 !!! Regidx (mword_of_int 10 : mword 5) = (zero_reg : mword 64))
@@ -1220,8 +1220,7 @@ Section ProofArgfd.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjt2) in "Hpc".
       iEval (rewrite Haddrfd) in "Hs5hi".
-      iDestruct (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs5") as "Hs5".
+      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
       assert (HFsp : F !!! Regidx csp_rs1 = pa_stk sp0 6)
         by (rewrite /F upd_ne; [exact HA2sp | vm_compute; discriminate]).
       assert (HFa0 : F !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64))

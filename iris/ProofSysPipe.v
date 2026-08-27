@@ -26,7 +26,7 @@
      eight frame slots as points-tos and reads the branch conditions off
      them.  The two [int]s share ONE slot -- [fd1] in its low word, [fd0] in
      its high word -- so slot 8 spends most of the function split by
-     [InstrBytes.word_pointsto_split4] and is only rejoined for the epilogue.
+     [InstrBytes.ctx_word_pointsto_split4] and is only rejoined for the epilogue.
 
    * TWO BLOCKS APPEAR TWICE, so each is ONE lemma parameterized by its entry
      offset [a] and given its own [instr] facts and pc-successor equations:
@@ -127,8 +127,12 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* ↦₄ has not flipped: word split/join cross the seam *)
 Import Defs.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving
+                            ([ctx_word_pointsto_split4]/[_join4]) and the
+                            window forget ([ctx_buf_forget]) live here --
+                            the lowest file importing both [InstrBytes]'
+                            pure halves and [TsoCtx]'s tier. *)
 Local Open Scope Z_scope.
 
 
@@ -1146,9 +1150,8 @@ Section ProofSysPipe.
     (* ================================================================= *)
     (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses to the raw
        4-byte tower through the shim, and the epilogue's join crosses back. *)
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hb8") as "Hb8".
-    iDestruct (word_pointsto_aligned_p with "Hb8") as %Hal8.
-    iDestruct (word_pointsto_split4 with "Hb8") as "[Hlo Hhi]".
+    iDestruct (ctx_word_pointsto_aligned_p with "Hb8") as %Hal8.
+    iDestruct (ctx_word_pointsto_split4 with "Hb8") as "[Hlo Hhi]".
     (* BOTH BLOCK CONTINUATIONS MOVE WITH sys_pipe's OWN CROSSING, to the
        literal [true]: every path that reaches them has crossed pipealloc or
        [sp_close2], whose crossings are [true] and carry no chain fact at
@@ -1184,8 +1187,8 @@ Section ProofSysPipe.
            ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w6 ∗
            ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) w7) -∗
         (∃ lo hi : mword 32,
-           word4_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) lo ∗
-           word4_pointsto (KTR := KT1) (pa_add (pa_stk sp0 8) 4) (DfracOwn 1) hi) -∗
+           TsoCtx.ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) lo ∗
+           TsoCtx.ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_add (pa_stk sp0 8) 4) (DfracOwn 1) hi) -∗
         sys_pipe_post γf p pid (upd_upt V P') res -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hb1 Hb2 Hb3 Hb4]" as "Hepi".
@@ -1193,8 +1196,7 @@ Section ProofSysPipe.
       iIntros (CIDE HsE mj P' res) "(%Hjsp & %Hja5 & %Hjthr) %Hext Hcg Hcpu Hextc Hextm Hpc Hiru Hpenv Hfenv Hrest Hslot8 Hpost".
       iDestruct "Hrest" as (w5 w6 w7) "(Hb5 & Hb6 & Hb7)".
       iDestruct "Hslot8" as (lo hi) "[Hlo Hhi]".
-      iDestruct (word_pointsto_join4 _ _ _ _ Hal8 with "Hlo Hhi") as "Hb8".
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hb8") as "Hb8".
+      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal8 with "Hlo Hhi") as "Hb8".
       iApply (sp_epi (CID0 := CIDE) m mj av res sp0 ra0 s00 s10 u4 w5 w6 w7
                 (word_of_words lo hi) p b
                 Hav8 eq_refl eq_refl eq_refl eq_refl Hjsp Hja5 Hjthr
@@ -2281,8 +2283,8 @@ Section ProofSysPipe.
     (* the [int fd0] cell AS copyout's four-byte source buffer *)
     iDestruct "Hhi" as "[%Halhi Hbufhi]".
     iEval (rewrite -HA6a3) in "Hbufhi".
-    (* copyout's source window is context-indexed; ↦₄'s byte run is not *)
-    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbufhi") as "Hbufhi".
+    (* A6.61: [↦₄] IS the context tower, so its byte run already IS
+       copyout's context-indexed window -- the crossing was an identity. *)
     iDestruct (cpu_own_transport CID48 CID60 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Copyout.wp_copyout_sconf KT1 γa A6
@@ -2294,9 +2296,8 @@ Section ProofSysPipe.
               with "Hcg Hcpu Htext Hpc Hpt Henva Hbufhi").
     all: try lkbelow.
     iIntros (CID61 Hcr61 B0 Pa) "Hcg Hcpu Hpc Hpt Hbufhi %HcsB0 %Hext1 %Hret1".
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hbufhi") as "Hbufhi".
     iEval (rewrite HA6a3) in "Hbufhi".
-    iDestruct (word4_pointsto_intro _ _ _ Halhi with "Hbufhi") as "Hhi".
+    iDestruct (ctx_word4_pointsto_intro _ _ _ _ Halhi with "Hbufhi") as "Hhi".
     assert (Hpc62 : ret_pc (A6 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x62))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc62) in "Hpc".
@@ -2343,9 +2344,9 @@ Section ProofSysPipe.
         ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) v -∗
         ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
         ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
-        word4_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1)
+        TsoCtx.ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1)
           (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) -∗
-        word4_pointsto (KTR := KT1) (pa_add (pa_stk sp0 8) 4) (DfracOwn 1)
+        TsoCtx.ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_add (pa_stk sp0 8) 4) (DfracOwn 1)
           (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) -∗
         WP (Loop : expr riscv_lang)))%I).
     (* EPI and T7C are offered as a CONJUNCTION, the pipealloc idiom: exactly
@@ -2753,8 +2754,8 @@ Section ProofSysPipe.
     (* the [int fd1] cell AS the second copyout's buffer *)
     iDestruct "Hlo" as "[%Hallo Hbuflo]".
     iEval (rewrite -HC7a3) in "Hbuflo".
-    (* copyout's source window is context-indexed; ↦₄'s byte run is not *)
-    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbuflo") as "Hbuflo".
+    (* A6.61: [↦₄] IS the context tower, so its byte run already IS
+       copyout's context-indexed window -- the crossing was an identity. *)
     iDestruct (cpu_own_transport CID61 CID75 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Copyout.wp_copyout_sconf KT1 γa C7 Pa
@@ -2765,9 +2766,8 @@ Section ProofSysPipe.
               with "Hcg Hcpu Htext Hpc Hpt Henvb Hbuflo").
     all: try lkbelow.
     iIntros (CID76 Hcr76 D0 Pb) "Hcg Hcpu Hpc Hpt Hbuflo %HcsD0 %Hext2 %Hret2".
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hbuflo") as "Hbuflo".
     iEval (rewrite HC7a3) in "Hbuflo".
-    iDestruct (word4_pointsto_intro _ _ _ Hallo with "Hbuflo") as "Hlo".
+    iDestruct (ctx_word4_pointsto_intro _ _ _ _ Hallo with "Hbuflo") as "Hlo".
     assert (Hpc7a : ret_pc (C7 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x7a))
       by (rewrite HC7ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc7a) in "Hpc".

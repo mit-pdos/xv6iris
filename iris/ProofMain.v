@@ -127,6 +127,7 @@ Require Import WaitInv.   (* [wait_res] -- what main finally brings wait_lock up
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the creators' borrow *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -544,8 +545,13 @@ Section ProofMain.
     iPoseProof (uart_sent_sub_nil γd l0 with "Hsent") as "#Hsub0".
     (* [newlock_at] at [fsc_printk], not [newlock] with a fresh γ *)
     rewrite /fs_kit_printk.
-    iMod (newlock_at ⊤ fsc_printk (mword_of_int KernelSyms.pr) "pr"%string <{ pr_res γd }> with "Hkprintk Hprnm Hprw Hprcpu []") as "#Hprlk".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (newlock_at ⊤ fsc_printk (mword_of_int KernelSyms.pr) "pr"%string <{ pr_res γd }> with "Hkprintk Hprnm Hrun Hprw Hprcpu []") as "[Hrun #Hprlk]".
     { rewrite /pr_res. done. }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* ---- THE OTHER TWO [newlock]s, and this is the point of the group.
        consoleinit has just run [initlock] on cons.lock and, through uartinit,
        on tx_lock; both come back as [WpLock.newlock]'s raw material, and both
@@ -557,9 +563,15 @@ Section ProofMain.
        consoleintr takes both locks.  Nothing consumed it before consoleintr
        was proven, which is why the two steps sat here un-taken. ---- *)
     iDestruct "Hlkfresh" as "(Htxw & #Htxnm & Htxcpu)".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock ⊤ UartTxInv.a_tx_lock "uart"%string <{ tx_res γd }>
-            with "Htxnm Htxw Htxcpu [Htx]") as (γtx) "#Htxinv".
+            with "Htxnm Hrun Htxw Htxcpu [Htx]") as "[Hrun Htxi0]".
     { iApply (tx_res_intro γd l0 with "Htx"). }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Htxi0" as (γtx) "#Htxinv".
     (* [is_txlock]'s two halves are exactly [Htxinv]/[Hdoff] -- the same pair
        [console_caps] below folds inline -- so mint it once here and feed
        both consumers (LinkPrintk.v needs the witness to invoke the real
@@ -570,8 +582,14 @@ Section ProofMain.
       iSplitR; [iExact "Hdoff" |].
       iSplitR; [iExact "Hdev" |].
       iSplitR; [iExists γtx; iExact "Htxl" | iExact "Hsub0"]. }
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock ⊤ a_cons "cons"%string <{ cons_res }>
-            with "Hclnm Hclw Hclcpu Hring") as (γcl) "#Hconslk".
+            with "Hclnm Hrun Hclw Hclcpu Hring") as "[Hrun Hcl0]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hcl0" as (γcl) "#Hconslk".
     iAssert (console_caps γd) as "#Hccaps".
     { rewrite /console_caps. iExists γtx, γcl.
       iSplitR; [iExact "Htxl" |].
@@ -811,6 +829,10 @@ Section ProofMain.
     (∃ kpt0 : mword 64,
        (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0) -∗
     strans_pending -∗ tlb ↦ᵣ tlbvec0 -∗ kpt_unset -∗
+    (* A6.71 / A6.70 finding 1: the pin bound's one-shot, minted at
+       adequacy beside [kpt_unset] and spent in the SAME publication
+       assembly ([KptShare.kpt_inv_alloc] takes both). *)
+    kptb_unset -∗
     kmap_auth kmap_M0 -∗
     lk_raw pid_lock_addr -∗ lk_raw wait_lock_addr -∗
     (* ...AND WHAT wait_lock IS OVER, so that this group can bring it UP the
@@ -886,7 +908,7 @@ Section ProofMain.
     intros Hn Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt".
-    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs Hbss Hparks Hpst Hcont".
+    iIntros "Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs Hbss Hparks Hpst Hcont".
     iDestruct "Hlkmem" as (vkl vkn vkc) "(Hkw & Hkn & Hkc)".
     iDestruct "Hkpt" as (kpt0) "Hkpt".
     (* ---- +0x6e jal kinit ---- *)
@@ -1051,7 +1073,13 @@ Section ProofMain.
                                 proc_pub (proc_addr i))) ∗ hart_full i (0%fin : CPU))%I)
                  (fun _ i => pstate_full i UNUSED)
                  (seq 0 NPROC) with "Hin Hpst") as "Hin".
-    iMod (procs_inv_alloc ⊤ with "Hin Hbank") as (γs) "#Hpinv".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (procs_inv_alloc ⊤ with "Hin Hbank Hrun") as "[Hrun Hpi0]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hpi0" as (γs) "#Hpinv".
     (* ---- ASSEMBLY 2b: the nextpid LOCK.  procinit's [lk_fresh] plus the
            .data cell IS [WpLock.newlock]'s premise list at
            [SpecAllocpid.nextpid_res], and the result is what allocproc --
@@ -1060,17 +1088,29 @@ Section ProofMain.
            writable .data words; see [KernelDataInv]'s header. ---- *)
     iDestruct (lk_fresh_pieces pid_lock_addr "nextpid"%string with "Hlpidf")
       as "(#Hpnm & Hpw & Hpc0)".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock ⊤ alp_pid_lock "nextpid"%string <{ nextpid_res }>
-            with "Hpnm Hpw Hpc0 [Hnpid]") as (γp) "#Hpidlock".
+            with "Hpnm Hrun Hpw Hpc0 [Hnpid]") as "[Hrun Hpid0]".
     { rewrite /nextpid_res. iExact "Hnpid". }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hpid0" as (γp) "#Hpidlock".
     (* ---- ASSEMBLY 2c: the wait_lock, and it is the SAME move.  procinit
            initialises the lock's three words exactly as it does pid_lock's;
            what was missing until [BootCarveMain] stopped dropping the
            [p_parent] cells was a resource for it to be over. ---- *)
     iDestruct (lk_fresh_pieces wait_lock_addr "wait_lock"%string with "Hlwaitf")
       as "(#Hwnm & Hww & Hwc0)".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock ⊤ wait_lock_addr "wait_lock"%string <{ wait_res }>
-            with "Hwnm Hww Hwc0 Hwres") as (γw) "#Hwaitlock".
+            with "Hwnm Hrun Hww Hwc0 Hwres") as "[Hrun Hwl0]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hwl0" as (γw) "#Hwaitlock".
     iModIntro.
     iApply ("Hcont" $! γp γw γs mpr (pt_base t) pas
               with "Hcg Hpc Hfree Hcpu Hkenv Hkmem Hpinv Hpidlock Hwaitlock
@@ -1145,8 +1185,14 @@ Section ProofMain.
     (* a fupd in front of a [WP (Loop)] goal: the tree's idiom is to peel it
        with [fupd_wp] first (ProofIupdate.v records the same). *)
     iApply fupd_wp.
-    iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string <{ ticks_res }> with "Htn2 Htw2 Htc2 [Hticks]") as (γtl) "#Htl".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string <{ ticks_res }> with "Htn2 Hrun Htw2 Htc2 [Hticks]") as "[Hrun Htl0]".
     { iApply (ticks_res_intro t0 with "Hticks"). }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Htl0" as (γtl) "#Htl".
     iModIntro.
     assert (Hretti : ret_pc (T1 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x82) : mword 64)).
@@ -1478,10 +1524,15 @@ Section ProofMain.
     (* inode-cache interlude at the next seam.                             *)
     (* =================================================================== *)
     iApply fupd_wp.
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (bio_init_at fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) ⊤
             Hcov0
-            with "Hbiotok Hbclk Hbcnm Hbccpu Hbfresh Hbpay Hblru Hblkpool")
-      as "[#Hbioctx Hbslots]".
+            with "Hrun Hbiotok Hbclk Hbcnm Hbccpu Hbfresh Hbpay Hblru Hblkpool")
+      as "(Hrun & #Hbioctx & Hbslots)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
     (* ---- +0x92 jal iinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x92)) (mword_of_int 1 : mword 5)
@@ -1542,11 +1593,16 @@ Section ProofMain.
          [acur] application. *)
       rewrite /inode_lock /inode_lock_base /inode_stride.
       rewrite inode_lock_is_ientry_lock. iIntros "H"; iExact "H". }
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (icache_boot_at ⊤ fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov
             fsc_logst icfg_nib icfg_dev
             with "Hiref Hlivef Hislg Hitw Hitnm Hitcpu Hslf Hient Hirauth
-                  Hipool Hitfree Hictok Hicmid Hicid")
-      as "(#Hitl & #Hitinv & #Hesc & Hicsl)".
+                  Hipool Hitfree Hictok Hicmid Hicid Hrun")
+      as "(Hrun & #Hitl & #Hitinv & #Hesc & Hicsl)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
     (* ---- +0x96 jal fileinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x96)) (mword_of_int 1 : mword 5)
@@ -1582,7 +1638,13 @@ Section ProofMain.
     iIntros (mfi) "Hcg Hpc %Hcsfi Hftw Hftnm Hftc".
     iApply fupd_wp.
     iMod (ftable_res_boot ⊤ with "Hfents Hfdauth Hirfile") as (γf) "Hfres".
-    iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string <{ ftable_res γf }> with "Hftnm Hftw Hftc Hfres") as (γft) "#Hftable".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string <{ ftable_res γf }> with "Hftnm Hrun Hftw Hftc Hfres") as "[Hrun Hft0]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hft0" as (γft) "#Hftable".
     iModIntro.
     (* [is_ftable γft γf] is [Hftable] at [ftable_addr]'s spelling *)
     iAssert (is_ftable γft γf) as "#Hftable'".
@@ -1666,8 +1728,13 @@ Section ProofMain.
        γ chosen here could never be shown equal to the field.  The free
        token [Hdllk] is kit 1's row; everything else is what the old
        [newlock] took, in the same order. *)
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock_at ⊤ fsc_dlock d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }>
-            with "Hdllk Hdlnm Hdlkw Hdcpu HRdisk") as "#Hdlock".
+            with "Hdllk Hdlnm Hrun Hdlkw Hdcpu HRdisk") as "[Hrun #Hdlock]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
     (* ---- +0x9e jal userinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x9e)) (mword_of_int 1 : mword 5)
@@ -2026,7 +2093,7 @@ Section ProofMain.
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
     iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
-    iIntros "#Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
+    iIntros "#Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     (* THE [tx_busy] CELL IS GONE from the bundle: ae96fd0 deleted the flag, so
@@ -2124,7 +2191,7 @@ Section ProofMain.
     iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
               with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt
-                    Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs
+                    Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs
                     Hbss Hparks Hpst").
     iIntros (γp γw γs m3 root pas)
       "Hcg Hpc Hfree Hcpu Hkenv #Hkmem #Hpinv #Hpidlock #Hwaitlock Hkpt Hstvec

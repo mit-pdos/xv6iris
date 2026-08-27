@@ -73,6 +73,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import TsoCtx.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the creator's borrow *)
 Local Open Scope Z_scope.
 
 
@@ -1533,8 +1534,15 @@ Section ProofPipealloc.
     (* the pipe is born.  The lock's name field goes INTO the pipe rather than
        being sealed away: it is 8 bytes of the page pipeclose has to free. *)
     iApply fupd_wp.
+    (* A6.68: the honest creator deposit (A6.66) wants the running token; this
+       proof holds the kernel bundle, so it borrows its own and puts it back
+       ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (new_pipe ⊤ pi _ bs Hpv Hbslen
-            with "Hlkn Hlkw Hlkc Hnr Hnw Hro Hwo Hdat Hslack") as (γpl γp) "(#Hpipe & Hrd & Hwr)".
+            with "Hlkn Hlkw Hlkc Hnr Hnw Hro Hwo Hdat Hslack Hrun")
+      as "[Hrun Hnew]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hnew" as (γpl γp) "(#Hpipe & Hrd & Hwr)".
     iModIntro.
 
     (* ---- the eight unlocked stores into the two struct files ---- *)

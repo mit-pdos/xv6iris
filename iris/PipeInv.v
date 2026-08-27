@@ -268,7 +268,8 @@ Section PipeInv.
      Note the data buffer is NOT zeroed by pipealloc -- [bs] is whatever kalloc
      handed over -- which is exactly right: no byte of it is readable until
      nwrite has passed it. *)
-  Lemma new_pipe E (pi : mword 64) (vname : mword 64) (bs : list (bv 8)) :
+  Lemma new_pipe `{CID : RiscvLang.CpuId} E (pi : mword 64) (vname : mword 64)
+      (bs : list (bv 8)) :
     page_valid pi ->
     length bs = PIPESIZE ->
     lock_name_field pi ↦₈ vname -∗
@@ -279,23 +280,27 @@ Section PipeInv.
     a_popen pi false ↦₄ (mword_of_int 1 : mword 32) -∗
     a_popen pi true ↦₄ (mword_of_int 1 : mword 32) -∗
     pipe_data pi bs -∗
-    pipe_slack pi
-    ={E}=∗ ∃ (γl : gname) (γp : pipe_names),
+    pipe_slack pi -∗
+    own_context cur_ctx
+    ={E}=∗ own_context cur_ctx ∗ ∃ (γl : gname) (γp : pipe_names),
              is_pipe γl γp pi ∗ pipe_ref γp false 1 ∗ pipe_ref γp true 1.
   Proof.
-    iIntros (Hpv Hlen) "Hnm Hword Hcpu Hnr Hnw Hro Hwo Hdata Hslack".
+    iIntros (Hpv Hlen) "Hnm Hword Hcpu Hnr Hnw Hro Hwo Hdata Hslack Hrun".
     (* the lock's state gname FIRST: [pipe_dead] mentions it. *)
     iMod (newlock_d E pi with "Hword Hcpu") as (γl) "Hmake".
     iMod pipe_ends_alloc as (γp) "(Hrd & Hwr & Hm0 & Hm1)".
-    iMod ("Hmake" $! (<{ pipe_res γp pi }>) (pipe_dead γl γp)
-            with "[Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "#Hlk".
+    (* A6.67: the DELAYED form takes [CtxMorph] as a pure premise and the
+       running token beside the payload (A6.66); both come straight back. *)
+    iMod ("Hmake" $! (<{ pipe_res γp pi }>) (pipe_dead γl γp) with "[%] Hrun
+            [Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "[Hrun #Hlk]".
+    { apply _. }
     { iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
               (mword_of_int 1 : mword 32), (mword_of_int 1 : mword 32), vname, bs.
       iFrame "Hnm Hnr Hnw Hro Hwo Hdata Hslack".
       iSplitL "Hm0"; [by iApply (pipe_endstate_open_intro _ _ _ pflag_one_open with "Hm0")|].
       iSplitL "Hm1"; [by iApply (pipe_endstate_open_intro _ _ _ pflag_one_open with "Hm1")|].
       iSplit; [iPureIntro; exact pipe_count_ok_00 | done]. }
-    iModIntro. iExists γl, γp.
+    iModIntro. iFrame "Hrun". iExists γl, γp.
     rewrite /is_pipe. iFrame "Hrd Hwr".
     iSplit; [done|]. iExact "Hlk".
   Qed.

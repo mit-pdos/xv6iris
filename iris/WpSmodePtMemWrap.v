@@ -52,6 +52,7 @@ Section WpSmodePtMemWrap.
     sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (LOAD (imm, sp, Regidx rd, false, 8)) -∗
+    TsoCtx.own_context XI -∗
     pa ↦₈[kt']{ dqm } v -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -59,6 +60,7 @@ Section WpSmodePtMemWrap.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
+      TsoCtx.own_context XI -∗
       pa ↦₈[kt']{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -98,6 +100,7 @@ Section WpSmodePtMemWrap.
     sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (LOAD (imm, sp, Regidx rd, false, 8)) -∗
+    TsoCtx.own_context XI -∗
     pa ↦₈{ dqm } v -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -105,6 +108,7 @@ Section WpSmodePtMemWrap.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
+      TsoCtx.own_context XI -∗
       pa ↦₈{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -143,6 +147,7 @@ Section WpSmodePtMemWrap.
     sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (STORE (imm, Regidx rs2, sp, 8)) -∗
+    TsoCtx.own_context XI -∗
     pa ↦₈[kt'] vold -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -150,6 +155,7 @@ Section WpSmodePtMemWrap.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
+      TsoCtx.own_context XI -∗
       pa ↦₈[kt'] (m !!! Regidx rs2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -187,6 +193,7 @@ Section WpSmodePtMemWrap.
     sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (STORE (imm, Regidx rs2, sp, 8)) -∗
+    TsoCtx.own_context XI -∗
     pa ↦₈ vold -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -194,6 +201,7 @@ Section WpSmodePtMemWrap.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
+      TsoCtx.own_context XI -∗
       pa ↦₈ (m !!! Regidx rs2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

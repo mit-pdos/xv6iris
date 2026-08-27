@@ -104,16 +104,22 @@ Section KptShare.
      ruling 2 / pin-memo §5.6(b)): the table arrives ALREADY pinned at [B]
      -- minted at the exclusive tier by [TsoCtx.ledger_pin_mint] before the
      drain -- and publication only shoots the agreement. *)
+  (* A6.71: the shot's own log-position receipt.  [KptGhost.kpt_bound] now
+     carries [llb loglen_name B] (A6.70 finding 3), so publication has to
+     exhibit it -- and every publisher already does: the exclusive bundle
+     carries [view_lb ... B] and [TsoGhost.view_lb_llb] projects it, while
+     [KptPublish.kptree_publish] hands the two out together. *)
   Lemma kpt_inv_alloc (root_ppn : mword 44) (B : nat)
       (t : ptree) (M : gmap (mword 27) (mword 44 * kperm)) (E : coPset) :
     kpt_tree_spec_gen root_ppn M t ->
     kptree_own B 2 (DfracOwn 1) t -∗ kmap_auth M -∗
+    llb loglen_name B -∗
     kpt_unset -∗ kptb_unset ={E}=∗
     kpt_inv root_ppn ∗ kpt_lb t ∗ kpt_bound B.
   Proof.
-    intros Hspec. iIntros "Ht HM Hunset Hbunset".
+    intros Hspec. iIntros "Ht HM #Hllb Hunset Hbunset".
     iMod (kpt_shoot t with "Hunset") as "#Hlb".
-    iMod (kptb_shoot B with "Hbunset") as "#Hbd".
+    iMod (kptb_shoot B with "Hllb Hbunset") as "#Hbd".
     iMod (inv_alloc kptN _ (kpt_body root_ppn) with "[Ht HM]") as "#Hinv".
     { iNext. iExists t, M, B. iFrame "Ht HM Hlb Hbd". iPureIntro. exact Hspec. }
     iModIntro. iFrame "Hinv Hlb Hbd".
@@ -283,7 +289,8 @@ Section KptShare.
     iIntros "Hinv Hnone Hbnone".
     iDestruct (tlb_inv_pt_open with "Hinv") as (satp0 tlbvec t M B)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hok & %Hspec & HM & Ht & #Hvlb & Hpmp)".
-    iMod (kpt_inv_alloc root_ppn B t M E Hspec with "Ht HM Hnone Hbnone")
+    iDestruct (view_lb_llb with "Hvlb") as "#Hllb".
+    iMod (kpt_inv_alloc root_ppn B t M E Hspec with "Ht HM Hllb Hnone Hbnone")
       as "(#Hkinv & #Hlb & #Hbd)".
     iModIntro.
     iApply (tlb_res_pt_intro root_ppn satp0 tlbvec t B Hmode Hasid Hppn Hok

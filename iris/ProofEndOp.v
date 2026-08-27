@@ -772,7 +772,7 @@ Section EndOpDefs.
   (* the OPENED batch: log_state taken apart, with the log-region client
      halves SPLIT at the copy loop's cursor [t] (the prefix is at the
      contents the loop has already written, the suffix is still opaque). *)
-  Definition eo_open (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+  Definition eo_open `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (W : list (mword 32))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (Lw : nat -> list (bv 8)) (t : nat) : iProp Σ :=
@@ -790,7 +790,7 @@ Section EndOpDefs.
         ∃ bs, fs_chalf γfs (log_slot_bno logstart i) bs) ∗
      bslots ((LOGBLOCKS - n) + 2)%nat)%I.
 
-  Lemma eo_open_of_batch (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
+  Lemma eo_open_of_batch `{XI : CurCtx} (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (LB : gset Z) (pend : gset Z) :
     log_state Psi bn γfs cov logstart n LB pend -∗
@@ -854,7 +854,7 @@ Section EndOpDefs.
      chained: the arithmetic belongs at the site that HOLDS the chain, not
      inside the packing lemma.  At the [n = 0] fast deposit it is the
      checkout's own row, unchanged. *)
-  Lemma eo_open_to_batch (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
+  Lemma eo_open_to_batch `{XI : CurCtx} (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (Lw : nat -> list (bv 8)) (pend : gset Z) (M : log_mirror) :
@@ -895,7 +895,7 @@ Section EndOpDefs.
   (* ---- the payload's pieces, extracted / re-assembled without a case
      split leaking into the whole-function proof ---- *)
 
-  Lemma eo_pay_split (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma eo_pay_split `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
@@ -908,7 +908,7 @@ Section EndOpDefs.
     - rewrite /fs_mclean. iIntros "[[$ $] _]"; try done.
   Qed.
 
-  Lemma eo_pay_mk (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma eo_pay_mk `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bs : list (bv 8)) (d : bool) :
     (uint bno ↪[fs_cache γfs]{#(1/2)} bs) -∗
@@ -925,7 +925,7 @@ Section EndOpDefs.
      committer can learn a HOME block's bytes (there is no client [fs_chalf]
      for a home block on this side).  Pure conclusion, so the [iDestruct]
      keeps the payload. *)
-  Lemma eo_pay_bs_auth (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma eo_pay_bs_auth `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) (L : gmap Z (list (bv 8))) :
     ghost_map_auth (fs_cache γfs) 1 L -∗
@@ -1824,7 +1824,7 @@ Section EndOpBlocks.
     iApply (big_sepL_mono with "Ha"). intros i w Hw. iIntros "H". iExists _. iExact "H".
   Qed.
 
-  Lemma eo_cells_junk (W : list (mword 32)) (n : nat) :
+  Lemma eo_cells_junk `{XI : CurCtx} (W : list (mword 32)) (n : nat) :
     n = length W ->
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
     ([∗ list] i ∈ seq 0 n, ∃ junk : mword 32, lh_block i ↦₄ junk).

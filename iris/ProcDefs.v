@@ -73,12 +73,26 @@ Section ProcDefs.
   Definition ofile_cells (pa : mword 64) (fs : list (mword 64)) : iProp Σ :=
     ([∗ list] fd ↦ v ∈ fs, p_ofile pa fd ↦₈ v)%I.
 
+  (* A6.58: THE TRAPFRAME PAGE IS A LEDGER PAGE, and the tier is FORCED,
+     not chosen -- exactly as A6.49 measured for the other four user-memory
+     files.  Its supplier is [ProcPtOwn.phys_page_words8] / [phys_byte_any],
+     which hand out [TsoCtx.ctx_phys_word_pointsto] / [ctx_phys_pointsto]
+     because the era's allocation is the only source of the byte's
+     timestamp element; the raw [↦ₚ₈]/[↦ₚ] the SC text used here cannot be
+     re-entered from them (A6.9).  So the two cells move tier and NOTHING
+     else in the definition changes: the context is the ambient [XI], the
+     addresses and the shape are identical, and [Typeclasses Opaque] below
+     still keeps the 4 KiB big-op folded for [iFrame]. *)
   Definition tf_words (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
-    ([∗ list] i ↦ w ∈ ws, tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w)%I.
+    ([∗ list] i ↦ w ∈ ws,
+       TsoCtx.ctx_phys_word_pointsto XI (tf_pa tfp (8 * Z.of_nat i))
+         (DfracOwn 1) w)%I.
 
   Definition tf_tail (tfp : mword 44) : iProp Σ :=
     ([∗ list] j ∈ seq (Z.to_nat TFBYTES) (4096 - Z.to_nat TFBYTES),
-       ∃ b : bv 8, pa_add (page_base tfp) j ↦ₚ b)%I.
+       ∃ b : bv 8,
+         TsoCtx.ctx_phys_pointsto XI (pa_add (page_base tfp) j)
+           (DfracOwn 1) b)%I.
 
   Definition tf_page (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
     (⌜length ws = TFWORDS⌝ ∗ tf_words tfp ws ∗ tf_tail tfp)%I.

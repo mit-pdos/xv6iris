@@ -1165,6 +1165,22 @@ Section PtTreeIris.
     - apply ctx_phys_word_pointsto_forget.
   Qed.
 
+  (* A6.65 THE PURE FACTS, AT THE SLOT'S OWN TIER.  A6.49's ledger-page move
+     made [pt_slot_own] the PT tower, and the ~six walk-lane proofs that
+     wanted [addr_is_ram] off a slot were still applying
+     [phys_word_pointsto_ram] to it -- a RAW law on a tiered cell.  The
+     conclusion is PURE, so this composes the forget above with the raw law
+     and costs the caller nothing: it does not consume the slot (a pure
+     conclusion is persistent), which is exactly why the walk lane can keep
+     using it inline. *)
+  Lemma pt_slot_own_ram a dq w :
+    pt_slot_own a dq w ⊢ ⌜addr_is_ram a⌝.
+  Proof. rewrite pt_slot_own_forget. apply phys_word_pointsto_ram. Qed.
+
+  Lemma pt_slot_own_ram7 a dq w :
+    pt_slot_own a dq w ⊢ ⌜addr_is_ram (pa_add a 7)⌝.
+  Proof. rewrite pt_slot_own_forget. apply phys_word_pointsto_ram7. Qed.
+
   Lemma pt_slot_own_ctx (xi : CtxId) a dq w :
     PTT = UTier xi -> pt_slot_own a dq w = ctx_phys_word_pointsto xi a dq w.
   Proof. intros HP. by rewrite /pt_slot_own HP. Qed.

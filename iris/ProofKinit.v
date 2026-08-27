@@ -41,6 +41,7 @@ Require Import SpecKinit.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the creator's borrow *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -231,8 +232,14 @@ Section ProofKinit.
     iAssert (kmem_res γk fl) with "[Hflw Hauth]" as "HR".
     { iApply (kmem_res_close γk fl nullp []). rewrite /word_at.
       iSplitL "Hflw"; [iExact "Hflw" |]. iSplitR "Hauth"; [iPureIntro; reflexivity | iExact "Hauth"]. }
+    (* A6.68: the honest creator deposit (A6.66) wants the running token.
+       This proof is holding the kernel bundle, so it BORROWS its own --
+       [SieCapCtx.sie_cap_gpr_own_ctx_acc] -- and puts it straight back; no
+       spec premise of this function changes shape. *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock_at ⊤ γl lk "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk fl)
-            with "Hlkfree Hlnm Hlock Hcpu HR") as "#Hkmem".
+            with "Hlkfree Hlnm Hrun Hlock Hcpu HR") as "[Hrun #Hkmem]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
     pose proof Hilcs as Hilcs_full. unfold callee_saved in Hilcs.
     destruct Hilcs as (Hilsp & Hils0 & Hils1 & Hils2 & Hils3 & Hils4 & Hils5 & Hils6 & Hils7 & Hils8 & Hils9 & Hils10 & Hils11).

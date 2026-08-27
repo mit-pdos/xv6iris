@@ -134,8 +134,6 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* BcacheInv's LRU link cells are still the RAW word
-                         tower: each link load crosses the ctx seam. *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -1827,7 +1825,6 @@ Section BreadBlocks.
       iEval (rewrite Hord2 (bcur_fwd_split d kk post)) in "Hlru".
       iDestruct (bcache_lru_prev_acc bhead (bnode kk) (map bnode d) (map bnode post)
                    with "Hlru") as "[Hprev Hrelink]".
-                   iDestruct (TsoCtxShim.ctx_word_of_mem with "Hprev") as "Hprev".
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bread + 0x7e)) Rs1 Rs1 (mword_of_int 72 : mword 12)
                 B1 (trap_res eb + (K - 6))%nat (List.last (map bnode d) bhead) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1837,7 +1834,6 @@ Section BreadBlocks.
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hprev".
       iEval (rewrite HB1s1g) in "Hprev".
-      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hprev") as "Hprev".
       iDestruct ("Hrelink" with "Hprev") as "Hlru".
       iEval (rewrite -(bcur_fwd_split d kk post) -Hord2) in "Hlru".
       set (B2 := <[Regidx Rs1 := regval_into_reg (List.last (map bnode d) bhead)]> B1).
@@ -2056,7 +2052,6 @@ Section BreadBlocks.
     { rgne. rewrite /Q1 upd_eq. unfold regval_into_reg.
       rewrite /bprev /bhead /bnode /acur. apply bv_eq; vm_compute; reflexivity. }
     iDestruct (bcache_lru_head_prev_acc bhead (map bnode ord) with "Hlru") as "[Hhpc Hrelink]".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hhpc") as "Hhpc".
     iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bread + 0x68)) Rs1 Rs1 (mword_of_int 2270 : mword 12)
               Q1 (trap_res eb + (K - 6))%nat (List.last (map bnode ord) bhead) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2066,7 +2061,6 @@ Section BreadBlocks.
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hhpc".
     iEval (rewrite Hhp) in "Hhpc".
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hhpc") as "Hhpc".
     iDestruct ("Hrelink" with "Hhpc") as "Hlru".
     set (Q2 := <[Regidx Rs1 := regval_into_reg (List.last (map bnode ord) bhead)]> Q1).
     assert (HQ2s1 : Q2 !!! Regidx Rs1 = List.last (map bnode ord) bhead)
@@ -2293,7 +2287,6 @@ Section BreadBlocks.
       iEval (rewrite Hord2 (bcur_fwd_split done kk r)) in "Hlru".
       iDestruct (bcache_lru_next_acc bhead (bnode kk) (map bnode done) (map bnode r)
                    with "Hlru") as "[Hnextc Hrelink]".
-                   iDestruct (TsoCtxShim.ctx_word_of_mem with "Hnextc") as "Hnextc".
       assert (Hxs1g : rget Mx Rs1 = bnode kk) by (rgne; exact Hxs1).
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bread + 0x36)) Rs1 Rs1 (mword_of_int 80 : mword 12)
                 Mx (trap_res eb + (K - 6))%nat (List.hd bhead (map bnode r)) false
@@ -2304,7 +2297,6 @@ Section BreadBlocks.
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hnextc".
       iEval (rewrite Hxs1g) in "Hnextc".
-      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hnextc") as "Hnextc".
       iDestruct ("Hrelink" with "Hnextc") as "Hlru".
       iEval (rewrite -(bcur_fwd_split done kk r) -Hord2) in "Hlru".
       set (G1 := <[Regidx Rs1 := regval_into_reg (List.hd bhead (map bnode r))]> Mx).
@@ -2887,7 +2879,6 @@ Section ProofBread.
     { rgne. rewrite /W1 upd_eq. unfold regval_into_reg.
       rewrite /bnext /bhead /bnode /acur. apply bv_eq; vm_compute; reflexivity. }
     iDestruct (bcache_lru_head_next_acc bhead (map bnode ord) with "Hlru") as "[Hhnc Hrelink]".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hhnc") as "Hhnc".
     iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bread + 0x22)) Rs1 Rs1 (mword_of_int 2348 : mword 12)
               W1 (trap_res eb + (K - 6))%nat (List.hd bhead (map bnode ord)) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2897,7 +2888,6 @@ Section ProofBread.
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hhnc".
     iEval (rewrite Hhn) in "Hhnc".
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hhnc") as "Hhnc".
     iDestruct ("Hrelink" with "Hhnc") as "Hlru".
     set (W2 := <[Regidx Rs1 := regval_into_reg (List.hd bhead (map bnode ord))]> W1).
     assert (HW2s1 : W2 !!! Regidx Rs1 = List.hd bhead (map bnode ord))

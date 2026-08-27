@@ -739,6 +739,9 @@ Section BootPrimary.
     ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
     disk_done_lb γv 0%nat -∗
     kpt_unset -∗
+    (* A6.71: ...and the pin bound's one-shot beside it -- [kpt_inv_alloc]
+       takes both, and both are minted once at adequacy (A6.70 finding 1). *)
+    kptb_unset -∗
     kmap_auth kmap_M0 -∗
     ([∗ list] p ∈ ps, page_own p) -∗
     WP (Loop : expr riscv_lang).
@@ -746,7 +749,7 @@ Section BootPrimary.
     intros Hreset Hz Hprun Hlen Hlive Himg.
     iIntros "#Htext #Hdata Hres Hthr #Hstarted Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
              Hfs Hmir Hirslot Hirauth #Hcert #Hseam
-             #Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
+             #Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkptb Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres Hthr").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
     iApply (Main.wp_main_boot_sconf mf (kv_frame_slots + K_main)%nat zero_reg ps

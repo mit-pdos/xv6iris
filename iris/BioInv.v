@@ -81,6 +81,7 @@ Require Import BcacheInv.
 Require Export BioDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SepThread.   (* A6.68: the token threaded through the NBUF *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
@@ -1142,8 +1143,14 @@ Section BioInv.
      for the log layer, the mkfs image's content against the logged-view
      ghost), and 0 must be outside the covered range because every zeroed
      blockno cell claims it. *)
-  Lemma bio_init (V : bio_view Σ) E :
+  (* A6.68: the honest creator deposit (A6.66) wants the running token, and
+     this boot step builds NBUF+1 locks.  Borrowed once and handed straight
+     back; the per-buffer loop threads it with
+     [SepThread.big_sepL_fupd_thread], because [own_context] is EXCLUSIVE and
+     the NBUF steps cannot run as independent fupds. *)
+  Lemma bio_init `{CID : RiscvLang.CpuId} (V : bio_view Σ) E :
     (0 ∉ bv_cov V) ->
+    own_context cur_ctx -∗
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗
     add_vec bcache_addr (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈
@@ -1165,9 +1172,10 @@ Section BioInv.
        function takes the authority in and hands the fragments straight back
        out -- the same total, one step earlier. *)
     bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
+    own_context cur_ctx ∗
     ∃ bn : bio_names, bio_ctx bn V ∗ bslots BSLOTS_FS.
   Proof.
-    iIntros (Hnc0) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf".
+    iIntros (Hnc0) "Hrun Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf".
     assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)
       by (vm_compute; reflexivity).
     (* the NBUF checkout tokens and the NBUF recycle tokens, as functions *)
@@ -1181,15 +1189,31 @@ Section BioInv.
       as (γlk) "Hmk".
     (* every buffer's sleeplock, sealing exactly its checkout token *)
     iDestruct (big_sepL_sep_2 with "Hfresh Htoks") as "Hsl".
+    (* A6.68: SEQUENTIAL, not NBUF independent fupds -- each
+       [sl_fresh_new] borrows the running token and returns it. *)
+    iAssert ([∗ list] idx↦k ∈ seq 0 NBUF,
+               own_context cur_ctx -∗
+               (sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
+                lock_tok_excl (fown k))
+               ={E}=∗ own_context cur_ctx ∗
+               (∃ p : gname * gname,
+                  is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
+                    "buffer"%string (lock_tok_excl (fown k))))%I
+      as "Hstep".
+    { iApply big_sepL_intro. iIntros "!>" (idx k _) "Hrun [Hf Ht]".
+      iMod (sl_fresh_new E (buf_lock (bnode k)) "buffer"%string
+              (lock_tok_excl (fown k)) with "Hf Hrun Ht") as "[Hrun Hlk]".
+      iDestruct "Hlk" as (γl γsl) "Hlk".
+      iModIntro. iFrame "Hrun". iExists (γl, γsl). iExact "Hlk". }
+    iMod (big_sepL_fupd_thread E (own_context cur_ctx)
+            with "Hrun Hstep Hsl") as "[Hrun Hsl]".
+    (* re-wrap: [seq_fun_alloc] takes a list of fupds *)
     iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ p : gname * gname,
                is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
                  "buffer"%string (lock_tok_excl (fown k)))%I
       with "[Hsl]" as "Hsl".
     { iApply (big_sepL_mono with "Hsl"). intros i k Hk.
-      iIntros "[Hf Ht]".
-      iMod (sl_fresh_new E (buf_lock (bnode k)) "buffer"%string
-              (lock_tok_excl (fown k)) with "Hf Ht") as (γl γsl) "Hlk".
-      iModIntro. iExists (γl, γsl). iExact "Hlk". }
+      iIntros "H". by iModIntro. }
     iMod (seq_fun_alloc E
             (fun k p => is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
                           "buffer"%string (lock_tok_excl (fown k)))
@@ -1243,8 +1267,9 @@ Section BioInv.
           apply Hnc0. rewrite -Hu0. exact Hb. }
       rewrite Hc0. iExact "Hpool". }
     (* and seal the bcache lock over the assembled resource *)
-    iMod ("Hmk" $! (<{ bcache_res bn V }>) with "[Hauth Hsa Hslots Hlru Hpool]")
-      as "#Hlock".
+    iMod ("Hmk" $! (<{ bcache_res bn V }>) with "[%] Hrun [Hauth Hsa Hslots Hlru Hpool]")
+      as "[Hrun #Hlock]".
+    { apply _. }
     { rewrite /bcache_res /bcache_scan.
       iExists ∅, (rev (seq 0 NBUF)),
         (fun _ => (mword_of_int 0 : mword 32)),
@@ -1268,7 +1293,7 @@ Section BioInv.
        each named hypothesis: the two frames here were 25 s of the file's
        46 s (measured 2026-08-03).  [iSplitR]/[iExact] name both sides, so
        nothing is searched. *)
-    iModIntro. iExists bn. rewrite /bio_ctx.
+    iModIntro. iSplitL "Hrun"; [iExact "Hrun" |]. iExists bn. rewrite /bio_ctx.
     iSplitR "Hsf"; [| iExact "Hsf"].
     iSplitL "Hlock"; [iExact "Hlock" |].
     rewrite big_sepL_sep. iSplitL "Hsls"; [iExact "Hsls" | iExact "Hescs"].

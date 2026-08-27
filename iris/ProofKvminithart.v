@@ -52,7 +52,7 @@ Section KvminithartBody.
   Proof.
     unfold wp_kvminithart_sconf_body.
     intros Hlvl HK.
-    iIntros "Hcg Hbit #Htext Hpc Htlb #Hcell #Hkinv Hcont".
+    iIntros "Hcg Hbit #Htext Hpc Htlb #Hcell #Hkinv #Hcreds Hcont".
     (* the snapshot off the shared invariant, taken UP FRONT: both
        sfence.vma's leave the TLB empty, so any tree will do for the
        re-entry coherence. *)
@@ -232,10 +232,14 @@ Section KvminithartBody.
       iIntros (satp0) "Hsatpc Hpmp Hstv Hbit Hbit2".
       iEval (rewrite (satp_legalized_sv39 satp0 (kvi_satp_word root)
                         (kvi_satp_mode root))) in "Hsatpc".
-      iDestruct (tlb_res_pt_intro root (kvi_satp_word root) tlbz1 t0
+      (* A6.70: the pin's bound and this hart's receipt come off the
+         (persistent) credentials premise -- [SmodeCorePt]'s green shape,
+         which reads them out of [tlb_res_pt] the same way. *)
+      iDestruct "Hcreds" as (Bc) "[#Hbdc #Hvlbc]".
+      iDestruct (tlb_res_pt_intro root (kvi_satp_word root) tlbz1 t0 Bc
                    (kvi_satp_mode root) (kvi_satp_asid root) (kvi_satp_ppn root)
                    (tlb_ok_pt_empty (mword_of_int 0) t0 tlbz1 (fun vpn' => Hnone1 _ (tlb_hash_range vpn')))
-                   with "Hsatpc Htlb Hlbt [Hpmp] Hkinv") as "Htlbinv".
+                   with "Hsatpc Htlb Hlbt Hbdc Hvlbc [Hpmp] Hkinv") as "Htlbinv".
       { iApply (pmp_config_reindex (mword_of_int 0) root with "Hpmp"). }
       iMod (strans_flip with "Hbit Hbit2") as "[Hbitkpt2 #Hbitkpt]".
       iDestruct (strans_inv_intro root with "Hbitkpt2 Htlbinv") as "Htr".

@@ -66,7 +66,6 @@ Require Import DirView.
 Require Import SpecReadi.
 From Kernel Require KernelSyms.
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the ↦₂ tower crosses the seam *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -384,13 +383,17 @@ Section DlkBuf.
     rewrite (bb_ext a 2 (fun j => file_byte data (16 * i + j)%nat)
                         (fun j => nth_byte (dir_inum data i) j)
                (fun j Hj => eq_sym (dlk_half_bytes_eq data i j Hj))).
+    (* A6.61: the statement's RHS is ALREADY the ctx word ([↦₂] is
+       [ctx_word2_pointsto cur_ctx]), so both directions are identities and
+       the forget/shim round trip was gratuitous -- and its return leg is
+       the direction the flip makes FALSE.  The [⊣⊢] stands. *)
     iSplit.
     - iIntros "H".
-      iDestruct (TsoCtxShim.ctx_buf_to_mem with "H") as "H".
-      iApply (word2_pointsto_intro a (DfracOwn 1) (dir_inum data i) Hal). iExact "H".
+      iApply (TsoCtx.ctx_word2_pointsto_intro TsoCtx.cur_ctx a (DfracOwn 1)
+                (dir_inum data i) Hal). iExact "H".
     - iIntros "H".
-      iDestruct (word2_pointsto_bytes with "H") as "H".
-      iApply (TsoCtxShim.ctx_buf_of_mem with "H").
+      iDestruct (TsoCtx.ctx_word2_pointsto_bytes _ with "H") as "H".
+      iExact "H".
   Qed.
 
   Lemma dlk_name_acc (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :

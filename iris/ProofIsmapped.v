@@ -405,7 +405,7 @@ Section ProofIsmapped.
       { exact Hcs. } { exact Hpay2. } }
     (* ---- walk returned the L0 slot address: read it ---- *)
     iDestruct (ptree_own_level0_ro dq t vpn p2 p1 w0 Hl0 with "Hptree") as "(#Hcl0 & Hcell & Hclose)".
-    iDestruct (phys_word_pointsto_ram with "Hcell") as %Hslotram.
+    iDestruct (pt_slot_own_ram with "Hcell") as %Hslotram.
     (* the slot is owned PHYSICALLY ([↦ₚ₈]); the load goes THROUGH
        translation, so convert to the VA tier via the node's own claim. *)
     iDestruct (pt_slot_phys_to_mem (u_next_base p1) (vpn_idx 0 vpn) dq w0

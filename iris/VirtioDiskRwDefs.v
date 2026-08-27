@@ -31,7 +31,7 @@ Require Import SpecFreeDesc.
 Require Import SpecVirtioDiskRw.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TsoCtx.
-Require TsoCtxShim.   (* ↦₄ joins cross the seam *)
+Require Import ByteBuf.  (* A6.61: the ctx tower's own 8<->4 halving *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
@@ -567,13 +567,13 @@ Section VdrwbDefs.
   Proof.
     intros Hal11 Hal12. iIntros "(Hx0 & Hx1 & Hx2 & Hxp)".
     iDestruct "Hxp" as (vp) "Hxp".
-    iDestruct (word_pointsto_join4 (pa_stk sp0 12) (DfracOwn 1) v0 v1 Hal12
+    iDestruct (ctx_word_pointsto_join4 TsoCtx.cur_ctx (pa_stk sp0 12) (DfracOwn 1) v0 v1 Hal12
                  with "Hx0 Hx1") as "H12".
-    iDestruct (word_pointsto_join4 (pa_stk sp0 11) (DfracOwn 1) v2 vp Hal11
+    iDestruct (ctx_word_pointsto_join4 TsoCtx.cur_ctx (pa_stk sp0 11) (DfracOwn 1) v2 vp Hal11
                  with "Hx2 Hxp") as "H11".
     rewrite /vdrw_scratch. iExists (word_of_words v2 vp), (word_of_words v0 v1).
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "H11") as "H11".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "H12") as "H12".
+    (* A6.61: the join stays in tier ([ByteBuf.ctx_word_pointsto_join4]);
+       the two crossings were a round trip and the return leg is FALSE. *)
     iFrame "H11 H12".
   Qed.
 

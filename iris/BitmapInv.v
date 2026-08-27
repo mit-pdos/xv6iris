@@ -94,6 +94,7 @@ Require Import Riscv.rv64d_types.
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import TsoCtx.   (* A6.70: the two superblock cells are the CTX tower *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
@@ -636,6 +637,14 @@ Record bm_alloc := MkBmAlloc {
 
 Section BitmapAllocRes.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  (* A6.70, OWNER-RULED: THE FILE THAT OWNS THE CELLS TAKES THE FLIP.  This
+     file did not import [TsoCtx], so its two [↦₄]s were the RAW tower while
+     every one of ~90 consumers -- all of which do import it -- read the
+     same two cells as the CONTEXT one.  [ProofWritei] is where the seam
+     first bit ([ProofBmap.wp_bmap_gen] states its premise at the tower and
+     was handed the raw cell).  The owner was the one out of step; this is
+     A6.58's raw-tower-owner table's last row. *)
+  Context `{XI : TsoCtx.CurCtx}.
 
   Definition bm_alloc_res (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (a : bm_alloc) : iProp Σ :=

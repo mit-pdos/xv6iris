@@ -58,15 +58,18 @@ Section TicksInv.
   (* ---- construction (the "newlock" ghost step): what a caller does with
      trapinit's postcondition -- the freshly zeroed lock word and its
      persistent name, plus the counter cell, become the tickslock. *)
-  Lemma new_tickslock E (t : mword 32) :
+  (* A6.67: the creator's honest deposit (A6.66) wants the running token;
+     it is handed straight back, so a caller that has one loses nothing. *)
+  Lemma new_tickslock `{CID : RiscvLang.CpuId} E (t : mword 32) :
     lock_name a_tickslock "time"%string -∗
+    own_context cur_ctx -∗
     a_tickslock ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu a_tickslock ↦₈ (zero_reg : mword 64) -∗
-    a_ticks ↦₄ t ={E}=∗ ∃ γl : gname, is_tickslock γl.
+    a_ticks ↦₄ t ={E}=∗ own_context cur_ctx ∗ ∃ γl : gname, is_tickslock γl.
   Proof.
-    iIntros "#Hnm Hlkw Hcpu Hticks".
+    iIntros "#Hnm Hrun Hlkw Hcpu Hticks".
     iApply (newlock E a_tickslock "time"%string <{ ticks_res }>
-              with "Hnm Hlkw Hcpu [Hticks]").
+              with "Hnm Hrun Hlkw Hcpu [Hticks]").
     iApply (ticks_res_intro with "Hticks").
   Qed.
 

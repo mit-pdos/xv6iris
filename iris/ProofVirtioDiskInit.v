@@ -719,10 +719,10 @@ Section VdiLease.
     iDestruct "Hidx" as "(Hi0 & Hi1 & _)".
     (* [mem_bytes_notin] is a RAW law; the lease's bytes are ctx facts, and
        the conclusion is pure, so the crossing is one-way *)
-    iDestruct (TsoCtxShim.ctx_buf_to_mem _ _ pu 4096 (fun _ : nat => byte_zero)
+    iDestruct (ctx_buf_forget _ pu 4096 (fun _ : nat => byte_zero)
                  (DfracOwn 1) with "Hpu") as "Hpu".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hi0") as "Hi0".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hi1") as "Hi1".
+    iDestruct (TsoCtx.ctx_pointsto_forget with "Hi0") as "Hi0".
+    iDestruct (TsoCtx.ctx_pointsto_forget with "Hi1") as "Hi1".
     iDestruct (mem_bytes_notin pu (pa_add (pa_add pav 2%nat) 0%nat) 0 4096
                  (DfracOwn 1) (fun _ : nat => byte_zero) _ with "Hpu Hi0") as %Hn0.
     iDestruct (mem_bytes_notin pu (pa_add (pa_add pav 2%nat) 1%nat) 0 4096
@@ -2153,9 +2153,8 @@ Section ProofVirtioDiskInit.
     assert (Hp118 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x116) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x118)) by pcs.
     iEval (rewrite Hp118) in "Hpc".
     iDestruct (ctx_word_pointsto_aligned_p with "Hdesc") as %Haldesc.
-    (* stage 2: the ↦₄ tower is still raw, so the cell crosses here and back *)
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hdesc") as "Hdesc".
-    iDestruct (word_pointsto_split4 with "Hdesc") as "[Hdlo Hdhi]".
+    (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
+    iDestruct (ctx_word_pointsto_split4 with "Hdesc") as "[Hdlo Hdhi]".
     assert (Hdad0 : add_vec (H2 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = disk_desc)
       by (rewrite HH2s1; bvc).
     iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x118)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) H2 (K - 4)%nat (word_lo pd) false
@@ -2193,8 +2192,7 @@ Section ProofVirtioDiskInit.
     assert (HH4a4 : H4 !!! Regidx (mword_of_int 14 : mword 5) = sign_extend' 64 (word_hi pd : mword 32)) by (peel; reflexivity).
     assert (HH4a5 : H4 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; exact HH3a5).
     assert (HH4s1 : H4 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact HH3s1).
-    iDestruct (word_pointsto_join4 _ _ _ _ Haldesc with "Hdlo Hdhi") as "Hdesc".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hdesc") as "Hdesc".
+    iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Haldesc with "Hdlo Hdhi") as "Hdesc".
     iEval (rewrite vdi_word_join) in "Hdesc".
     assert (Hp120 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x11e) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x120)) by pcs.
     iEval (rewrite Hp120) in "Hpc".

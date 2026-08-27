@@ -143,14 +143,14 @@ Section NameiTrDefs.
   (* [IcacheRef.inode_held] with the inum EXPOSED -- the pinned package.
      Same four conjuncts, one new pure tie; [inode_held_at_held] recovers
      the landed shape so every existing consumer composes unchanged. *)
-  Definition inode_held_at (v : mword 64) (z : Z) : iProp Σ :=
+  Definition inode_held_at `{XI : CurCtx} (v : mword 64) (z : Z) : iProp Σ :=
     (∃ (k : nat) (q : Qp) (inum : mword 32),
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜bv_unsigned inum = z⌝ ∗
        inode_refp k q icfg_dev inum)%I.
 
-  Lemma inode_held_at_held (v : mword 64) (z : Z) :
+  Lemma inode_held_at_held `{XI : CurCtx} (v : mword 64) (z : Z) :
     inode_held_at v z ⊢ inode_held v.
   Proof.
     iIntros "H". iDestruct "H" as (k q inum) "(%&%&%&%&Hr)".

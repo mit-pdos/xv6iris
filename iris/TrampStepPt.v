@@ -406,6 +406,21 @@ Section TrampFetchPt.
              misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv) s_Drw -∗
           hreg_frame_ro Df (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
              misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv) s_Dro -∗
+          (* A6.61 / lane 2, MEASURED AND NOT LANDED HERE.  At TSO the
+             walk's A/D write-back is a ledger append, and
+             [UptWalkPt.swp_translate_upt] already takes [own_context] as
+             its FIRST premise -- which is precisely what [UptWalkPt.v:679]
+             fails on.  The token must therefore become a parameter of this
+             ∀ (a □-obligation cannot capture one).  A6.60 priced that at
+             "3 producers, 2 consumers, all pass-through"; the measurement
+             says SIX files -- TrampStepPt, Pt2WalkPt, TransPt, UptWalkPt,
+             UservecExitPt, UserretEntryPt -- and the five [iApply "Htr"]
+             sites BELOW (in [tramp_run_hart_active_instr_S]) are where it
+             stops being pass-through: they must SUPPLY a token, so that
+             lemma gains an [own_context] premise and the cascade runs out
+             through [wp_instr_tramp_pt] / [wp_instr_ktramp_pt_share] into
+             the four trap-handler files.  Its own tranche, against a
+             green tree.  See A6.61. *)
           swp (translateAddr (Virtaddr va) (InstructionFetch tt))
             (fun r => ⌜r = Values.Ok (Physaddr pax, PBMT_PMA, init_ext_ptw)⌝ ∗
                       ∃ tv' : type_of_register tlb,

@@ -137,7 +137,7 @@ Section WpSconfLock.
                  with "Hword") as "#Hc4".
     iEval (rewrite /lk_cpu_res) in "Hcpu". iDestruct "Hcpu" as "[Hcell Hfr]".
     iEval (rewrite lk_cpu_cell_acc) in "Hcell".
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
+    iDestruct (TsoCtx.ctx_word_pointsto_forget with "Hcell") as "Hcell".
     iDestruct (wordw_claim_of (KTR := KT0) 8 (lock_cpu lk) (DfracOwn 1)
                  (lk_cpu_val st) ltac:(lia) with "Hcell") as "#Hc8".
     iMod ("Hclose" with "[Hword Hcell Hfr Hg Hbr]") as "_".

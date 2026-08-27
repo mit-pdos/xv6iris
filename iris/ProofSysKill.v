@@ -42,8 +42,12 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* ↦₄ split/join cross the seam *)
 Import Defs.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving
+                            ([ctx_word_pointsto_split4]/[_join4]) and the
+                            window forget ([ctx_buf_forget]) live here --
+                            the lowest file importing both [InstrBytes]'
+                            pure halves and [TsoCtx]'s tier. *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -98,13 +102,11 @@ Section ProofSysKill.
     iDestruct "S3" as (w3) "Hb3". iDestruct "S4" as (u4) "Hb4".
     (* the local [pid] is the upper half of slot 3 *)
     iDestruct (ctx_word_pointsto_aligned_p with "Hb3") as %Hal3.
-    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses through the shim *)
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hb3") as "Hb3".
-    iDestruct (word_pointsto_split4 with "Hb3") as "[Hb3lo Hb3hi]".
+    (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
+    iDestruct (ctx_word_pointsto_split4 with "Hb3") as "[Hb3lo Hb3hi]".
     iAssert (∀ nv : bv 32, pa_add (pa_stk sp0 3) 4 ↦₄[KT1] nv -∗ ∃ w, pa_stk sp0 3 ↦₈[KT1] w)%I
       with "[Hb3lo]" as "Hjoin3".
-    { iIntros (nv) "Hhi". iExists _. iApply TsoCtxShim.ctx_word_of_mem.
-      iApply (word_pointsto_join4 _ _ _ _ Hal3 with "Hb3lo Hhi"). }
+    { iIntros (nv) "Hhi". iExists _. iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal3 with "Hb3lo Hhi"). }
     (* the two save-slot addresses, as the c.sdsp displacements compute them *)
     assert (Hpa : forall u k : nat, (k + u = 4)%nat -> (u < 4)%nat ->
               add_vec (M1 !!! Regidx csp_rs1)

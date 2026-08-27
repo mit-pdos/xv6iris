@@ -89,7 +89,6 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* stack slots cross the ctx/mem seam at the AU cells *)
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
@@ -1022,8 +1021,11 @@ Section ProofBrelse.
     iEval (rewrite /bio_slot_res HMk) in "Hslot".
     iDestruct "Hslot" as "(%Hcnt & Hcell & Hfd & Hqr)".
     iDestruct "Hqr" as (qr) "(%Htie & Hdev & Hbno)".
-    iDestruct (word4_pointsto_agree with "Hrdev Hdev") as %->.
-    iDestruct (word4_pointsto_agree with "Hrbno Hbno") as %->.
+    (* A6.68: [↦₄] is the CONTEXT tower, so the agreement is the tower's
+       ([TsoCtx.ctx_word4_pointsto_agree], which holds across DIFFERENT
+       contexts -- a value is a value). *)
+    iDestruct (ctx_word4_pointsto_agree with "Hrdev Hdev") as %->.
+    iDestruct (ctx_word4_pointsto_agree with "Hrbno Hbno") as %->.
     (* the three instructions of the decrement, run in both arms *)
     assert (Hpa : add_vec (rget mQ Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                   = brefcnt k).
@@ -1088,11 +1090,11 @@ Section ProofBrelse.
       iMod (bio_last_ref_step bn Mg k q HMk with "Hauth Hrtok") as "Hauth".
       iAssert (b_dev (bpa k) ↦₄{DfracOwn (1/2)} (devs k))%I
         with "[Hrdev Hdev]" as "Hdev".
-      { rewrite -(br_last_tie q qr Htie) word4_pointsto_frac_split.
+      { rewrite -(br_last_tie q qr Htie) ctx_word4_pointsto_frac_split.
         iFrame "Hdev Hrdev". }
       iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (bnos k))%I
         with "[Hrbno Hbno]" as "Hbno".
-      { rewrite -(br_last_tie q qr Htie) word4_pointsto_frac_split.
+      { rewrite -(br_last_tie q qr Htie) ctx_word4_pointsto_frac_split.
         iFrame "Hbno Hrbno". }
       assert (Hdel : delete k Mg !! k = None) by apply lookup_delete.
       iAssert (bio_slot_res bn (delete k Mg) k (devs k) (bnos k))
@@ -1132,10 +1134,6 @@ Section ProofBrelse.
       (* BcacheInv's LRU cells are still the RAW word tower: the four cells
          the unlink/splice touches cross the ctx seam here and cross back
          when the list closes. *)
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hbp") as "Hbp".
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hbn") as "Hbn".
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hpn") as "Hpn".
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hsp") as "Hsp".
       (* +0x34 c.ld a4,80(s1) : a4 := b->next *)
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x34)) Ra4 Rs1 (mword_of_int 80 : mword 12)
                 D2 (trap_res b + (K - 4))%nat (List.hd bhead (map bnode o2)) false
@@ -1215,14 +1213,10 @@ Section ProofBrelse.
       iIntros "Hcg Hpc Hpn".
       iEval (rgpeel) in "Hpn".
       iEval (rewrite HE3a5 HE3a4) in "Hpn".
-      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hpn") as "Hpn".
-      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hsp") as "Hsp".
       iDestruct ("Hrelink" with "Hpn Hsp") as "Hlru".
       (* ---- reinsert after the head ---- *)
       iDestruct (bcache_lru_splice bhead (map bnode o1 ++ map bnode o2)%list with "Hlru")
         as "(Hhn & Hhp & Hsplice)".
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hhn") as "Hhn".
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hhp") as "Hhp".
       assert (Hpp3e : add_vec_int (mword_of_int (KernelSyms.brelse + 0x3c) : mword 64) 2 = mword_of_int (KernelSyms.brelse + 0x3e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3e) in "Hpc".
@@ -1383,10 +1377,6 @@ Section ProofBrelse.
       iIntros "Hcg Hpc Hhn".
       iEval (rgpeel) in "Hhn".
       iEval (rewrite HE9hn HE9s1) in "Hhn".
-      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hhn") as "Hhn".
-      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hhp") as "Hhp".
-      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hbn") as "Hbn".
-      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hbp") as "Hbp".
       iDestruct ("Hsplice" $! (bnode k) with "Hhn Hhp Hbn Hbp") as "Hlru".
       (* ---- the new order, still a permutation of [seq 0 NBUF] ---- *)
       assert (Hord' : (k :: (o1 ++ o2))%list ≡ₚ seq 0 NBUF).
@@ -1511,10 +1501,10 @@ Section ProofBrelse.
       iMod (bio_decr_step bn Mg k q qt cnt' qr' HMk Hsub with "Hauth Hrtok") as "Hauth".
       iAssert (b_dev (bpa k) ↦₄{DfracOwn (qr + q)} (devs k))%I
         with "[Hrdev Hdev]" as "Hdev".
-      { rewrite word4_pointsto_frac_split. iFrame "Hdev Hrdev". }
+      { rewrite ctx_word4_pointsto_frac_split. iFrame "Hdev Hrdev". }
       iAssert (b_blockno (bpa k) ↦₄{DfracOwn (qr + q)} (bnos k))%I
         with "[Hrbno Hbno]" as "Hbno".
-      { rewrite word4_pointsto_frac_split. iFrame "Hbno Hrbno". }
+      { rewrite ctx_word4_pointsto_frac_split. iFrame "Hbno Hrbno". }
       assert (Hsucc : Pos.to_nat (Pos.succ cnt') = (Pos.to_nat cnt' + 1)%nat)
         by (rewrite Pos2Nat.inj_succ; lia).
       iEval (rewrite Hsucc bslots_op) in "Hfd".

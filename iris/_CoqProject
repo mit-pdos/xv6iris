@@ -9,6 +9,7 @@
 -arg -w
 -arg -notation-overridden
 SetShrink.v
+SepThread.v
 FastSetSolver.v
 FastSetSolverTests.v
 BvShift.v
@@ -30,6 +31,7 @@ HartBlock.v
 HartSwp.v
 HartLift.v
 HartEvents.v
+HartBarrier.v
 HartRegNode.v
 HartSpan.v
 HartSpanChar.v
@@ -60,6 +62,9 @@ Ktier.v
 RiscvPtsto.v
 TsoCtx.v
 TsoCtxShim.v
+TsoCtxAbsorbLb.v
+CtxKMap.v
+CtxPinMint.v
 PermInv.v
 PageGeom.v
 KptExecMap.v
@@ -227,6 +232,7 @@ PlicPlan.v
 WpUart.v
 RiscvAdequacy.v
 CommonWalk.v
+KptPublish.v
 DecodeTotalU.v
 DecodeSetU.v
 UserExec.v
@@ -302,6 +308,7 @@ UserActiveClass.v
 ProofUser.v
 UserKernelBridge.v
 IntrDefs.v
+SieCapCtx.v
 LockRank.v
 LockSet.v
 WpIntrInv.v
@@ -316,6 +323,7 @@ WpSconfMem.v
 WpSmodeHalf.v
 WpSconfBtype.v
 WpSconfCtl.v
+WpSconfFencePub.v
 WpSconfLock.v
 SpecUart.v
 ProofUart.v

@@ -212,13 +212,16 @@ Qed.
    conjunct, at the IDENTITY address given by its fourth), and RAM starts at
    [ram_base = 0x80000000].  So the premise is discharged where the resource
    is, and no caller of acquiresleep has to carry it. *)
-Lemma asl_word4_nonzero `{!riscvGS Σ} (a : mword 64) (dq : dfrac) (w : mword 32) :
+Lemma asl_word4_nonzero `{!riscvGS Σ} `{XI : CurCtx} (a : mword 64) (dq : dfrac) (w : mword 32) :
   a ↦₄{dq} w ⊢ ⌜eq_vec a (zero_reg : mword 64) = false⌝.
 Proof.
   iIntros "H".
   iDestruct (ctx_word4_pointsto_bytes with "H") as "Hbs".
   iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbs") as "Hb0".
   { rewrite lookup_seq_lt; [reflexivity | lia]. }
+  (* A6.68: [↦₄] is the CONTEXT tower now, so the raw byte law wants the
+     forgetful projection first ([WpSconfMem.mem_pointsto_claim]'s shape). *)
+  iDestruct (TsoCtx.ctx_pointsto_forget with "Hb0") as "Hb0".
   iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(_ & _ & %Hram & %Hid & _)".
   iPureIntro.
   rewrite Hid pa_add_0 in Hram.

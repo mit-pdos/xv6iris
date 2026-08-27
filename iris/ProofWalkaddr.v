@@ -634,7 +634,7 @@ Section ProofWalkaddr.
       { left. split; [exact Ha0z |]. right. left. exact Hnone. } }
     (* ---- walk returned the L0 slot address: read it ---- *)
     iDestruct (ptree_own_level0_ro dq t vpn p2 p1 w0 Hl0 with "Hptree") as "(#Hcl0 & Hcell & Hclose)".
-    iDestruct (phys_word_pointsto_ram with "Hcell") as %Hslotram.
+    iDestruct (pt_slot_own_ram with "Hcell") as %Hslotram.
     iDestruct (pt_slot_phys_to_mem (u_next_base p1) (vpn_idx 0 vpn) dq w0
                  with "Hcl0 Hcell") as "Hcell".
     assert (Ha0nz : mw !!! Regidx (mword_of_int 10 : mword 5) <> mword_of_int 0).

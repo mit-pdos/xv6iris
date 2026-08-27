@@ -21,6 +21,7 @@ Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv.
 Require Import KMap.   (* mem_page_to_phys: kalloc-page ↦ₘ → ↦ₚ for the PT node *)
+Require Import CtxKMap.   (* A6.68: the same disassembly AT THE CONTEXT TOWER *)
 Require Import WpLock.
 Require Import CommonWalk PtTree.
 Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys / pt_node_claim_from_static *)
@@ -41,6 +42,11 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
    leg M); this caller is not yet -- the shim marks the open seam *)
 Import Defs.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving
+                            ([ctx_word_pointsto_split4]/[_join4]) and the
+                            window forget ([ctx_buf_forget]) live here --
+                            the lowest file importing both [InstrBytes]'
+                            pure halves and [TsoCtx]'s tier. *)
 Local Open Scope Z_scope.
 
 
@@ -987,10 +993,11 @@ Section ProofWalk.
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
-    (* [KMap] is BELOW the seam -- its [↦ₘ] is the raw byte -- so the memset
-       window crosses out of the context here, by name. *)
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hbytes") as "Hbytes".
-    iDestruct (mem_page_to_phys (mr !!! Regidx (mword_of_int 10 : mword 5)) (DfracOwn 1) (mword_of_int 0 : mword 8)
+    (* A6.68: [KMap] is BELOW the seam -- its [↦ₘ]/[↦ₚ] are the RAW families
+       -- so the crossing runs through [CtxKMap.ctx_mem_page_to_phys], the
+       same identity disassembly carried out AT THE TOWER.  The window does
+       NOT leave the context: [ptree_own] is the ctx phys tier now. *)
+    iDestruct (ctx_mem_page_to_phys cur_ctx (mr !!! Regidx (mword_of_int 10 : mword 5)) (DfracOwn 1) (mword_of_int 0 : mword 8)
                  ltac:(intros j Hj; apply kdata_svpn_class;
                        apply page_in_range_addr_is_kdata; [exact Hpv | exact Hj])
                  with "Hkmapb Hbytes") as "Hbytes".

@@ -592,7 +592,9 @@ Section SleepLock.
     iModIntro. iExists γ. iFrame "Hauth". iExists 1%Qp. iFrame.
   Qed.
 
-  Lemma new_sleeplock_gen_at E (γ : gname) (slk : mword 64) (s : string)
+  (* A6.67: the honest creator deposit (A6.66) takes the running token and
+     hands it straight back. *)
+  Lemma new_sleeplock_gen_at `{CID : RiscvLang.CpuId} E (γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) (H : Qp -> iProp Σ) :
     sl_free_tok γ -∗
     lock_name (sl_lk slk) "sleep lock"%string -∗
@@ -601,18 +603,22 @@ Section SleepLock.
     sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    R ={E}=∗ ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
+    own_context cur_ctx -∗
+    R ={E}=∗ own_context cur_ctx ∗ ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
   Proof.
-    iIntros "Hfree #Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
+    iIntros "Hfree #Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
     iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
     iMod (newlock E (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>
-            with "Hlnm Hlkw Hcpu [Hw Htok Hha HR]") as (γl) "#Hlk".
+            with "Hlnm Hrun Hlkw Hcpu [Hw Htok Hha HR]") as "[Hrun Hlk]".
     { iApply (sl_res_close_free with "Hw Htok Hha HR"). }
-    iModIntro. iExists γl.
+    iDestruct "Hlk" as (γl) "#Hlk".
+    iModIntro. iFrame "Hrun". iExists γl.
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
   Qed.
 
-  Lemma new_sleeplock_gen E (slk : mword 64) (s : string) (R : iProp Σ)
+  (* A6.67: the honest creator deposit (A6.66) takes the running token and
+     hands it straight back. *)
+  Lemma new_sleeplock_gen `{CID : RiscvLang.CpuId} E (slk : mword 64) (s : string) (R : iProp Σ)
       (H : gname -> Qp -> iProp Σ) :
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
@@ -620,9 +626,10 @@ Section SleepLock.
     sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    R ={E}=∗ ∃ γl γ : gname, is_sleeplock_gen γl γ slk s R (H γ) ∗ slh_auth γ None.
+    own_context cur_ctx -∗
+    R ={E}=∗ own_context cur_ctx ∗ ∃ γl γ : gname, is_sleeplock_gen γl γ slk s R (H γ) ∗ slh_auth γ None.
   Proof.
-    iIntros "#Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
+    iIntros "#Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
     iMod (own_alloc (((●E (1%Qp : leibnizO Qp), ε) : slhUR)
                      ⋅ ((◯E (1%Qp : leibnizO Qp), ε) : slhUR)
                      ⋅ ((ε, ● (None : optionUR ufracR)) : slhUR))) as (γ) "Hg".
@@ -630,26 +637,31 @@ Section SleepLock.
       split; [ by apply excl_auth_valid | by apply auth_auth_valid ]. }
     iDestruct "Hg" as "[[Hha Htok] Hauth]".
     iMod (newlock E (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R (H γ) }>
-            with "Hlnm Hlkw Hcpu [Hw Htok Hha Hpid HR]") as (γl) "#Hlk".
+            with "Hlnm Hrun Hlkw Hcpu [Hw Htok Hha Hpid HR]") as "[Hrun Hlk]".
     { iApply (sl_res_close_free with "Hw [Htok Hpid] Hha HR").
       iFrame "Htok Hpid". }
-    iModIntro. iExists γl, γ. iFrame "Hauth".
+    iDestruct "Hlk" as (γl) "#Hlk".
+    iModIntro. iFrame "Hrun". iExists γl, γ. iFrame "Hauth".
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
   Qed.
 
-  Lemma new_sleeplock E (slk : mword 64) (s : string) (R : iProp Σ) :
+  (* A6.67: the honest creator deposit (A6.66) takes the running token and
+     hands it straight back. *)
+  Lemma new_sleeplock `{CID : RiscvLang.CpuId} E (slk : mword 64) (s : string) (R : iProp Σ) :
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    R ={E}=∗ ∃ γl γ : gname, is_sleeplock γl γ slk s R.
+    own_context cur_ctx -∗
+    R ={E}=∗ own_context cur_ctx ∗ ∃ γl γ : gname, is_sleeplock γl γ slk s R.
   Proof.
-    iIntros "#Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
+    iIntros "#Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
     iMod (new_sleeplock_gen E slk s R (fun _ => sl_untracked)
-            with "Hlnm Hsnm Hlkw Hcpu Hw Hpid HR") as (γl γ) "[#Hsl _]".
-    iModIntro. iExists γl, γ. iExact "Hsl".
+            with "Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR") as "[Hrun Hgen]".
+    iDestruct "Hgen" as (γl γ) "[#Hsl _]".
+    iModIntro. iFrame "Hrun". iExists γl, γ. iExact "Hsl".
   Qed.
 
   (* ---- the two ends of initsleeplock, bundled.
@@ -685,41 +697,47 @@ Section SleepLock.
   (* the ghost step from initsleeplock's output to a usable sleeplock: the cpu
      word of the inner spinlock goes INTO [lock_inv] (WpLock.v owns both lock
      words). *)
-  Lemma sl_fresh_new_gen E (slk : mword 64) (s : string) (R : iProp Σ)
-      (H : gname -> Qp -> iProp Σ) :
-    sl_fresh slk s -∗ R ={E}=∗
+  Lemma sl_fresh_new_gen `{CID : RiscvLang.CpuId} E (slk : mword 64) (s : string)
+      (R : iProp Σ) (H : gname -> Qp -> iProp Σ) :
+    sl_fresh slk s -∗ own_context cur_ctx -∗ R ={E}=∗ own_context cur_ctx ∗
     ∃ γl γ : gname, is_sleeplock_gen γl γ slk s R (H γ) ∗ slh_auth γ None.
   Proof.
-    iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) HR".
-    iApply (new_sleeplock_gen E slk s R H with "Hlnm Hsnm Hlkw Hcpu Hw Hpid HR").
+    iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
+    iApply (new_sleeplock_gen E slk s R H with "Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
 
-  Lemma sl_fresh_new E (slk : mword 64) (s : string) (R : iProp Σ) :
-    sl_fresh slk s -∗ R ={E}=∗ ∃ γl γ : gname, is_sleeplock γl γ slk s R.
+  Lemma sl_fresh_new `{CID : RiscvLang.CpuId} E (slk : mword 64) (s : string)
+      (R : iProp Σ) :
+    sl_fresh slk s -∗ own_context cur_ctx -∗ R ={E}=∗ own_context cur_ctx ∗
+    ∃ γl γ : gname, is_sleeplock γl γ slk s R.
   Proof.
-    iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) HR".
-    iApply (new_sleeplock E slk s R with "Hlnm Hsnm Hlkw Hcpu Hw Hpid HR").
+    iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
+    iApply (new_sleeplock E slk s R with "Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
 
   (* [sl_fresh_new_gen] at a PRE-ALLOCATED gname -- what an array
      initializer (iinit over itable.inode[]) uses when the gnames had to be
      fixed before the locks were built.  See [new_sleeplock_gen_at]. *)
-  Lemma sl_fresh_new_gen_at E (γ : gname) (slk : mword 64) (s : string)
-      (R : iProp Σ) (H : Qp -> iProp Σ) :
-    sl_free_tok γ -∗ sl_fresh slk s -∗ R ={E}=∗
-    ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
+  Lemma sl_fresh_new_gen_at `{CID : RiscvLang.CpuId} E (γ : gname)
+      (slk : mword 64) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) :
+    sl_free_tok γ -∗ sl_fresh slk s -∗ own_context cur_ctx -∗ R ={E}=∗
+    own_context cur_ctx ∗ ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
   Proof.
-    iIntros "Hfree (Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) HR".
+    iIntros "Hfree (Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
     iApply (new_sleeplock_gen_at E γ slk s R H
-              with "Hfree Hlnm Hsnm Hlkw Hcpu Hw Hpid HR").
+              with "Hfree Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
 
   (* the TRACKED end: the caller keeps the authoritative zero and hands out
      shares from it.  [slh_auth γ None] in hand is exactly the evidence the
      non-blocking acquiresleep asks for. *)
-  Lemma sl_fresh_new_tok E (slk : mword 64) (s : string) (R : iProp Σ) :
-    sl_fresh slk s -∗ R ={E}=∗
+  Lemma sl_fresh_new_tok `{CID : RiscvLang.CpuId} E (slk : mword 64)
+      (s : string) (R : iProp Σ) :
+    sl_fresh slk s -∗ own_context cur_ctx -∗ R ={E}=∗ own_context cur_ctx ∗
     ∃ γl γ : gname, is_sleeplock_tok γl γ slk s R ∗ slh_auth γ None.
-  Proof. iIntros "Hf HR". iApply (sl_fresh_new_gen E slk s R slh_tok with "Hf HR"). Qed.
+  Proof.
+    iIntros "Hf Hrun HR".
+    iApply (sl_fresh_new_gen E slk s R slh_tok with "Hf Hrun HR").
+  Qed.
 
 End SleepLock.

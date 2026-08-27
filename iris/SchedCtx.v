@@ -84,8 +84,21 @@ Definition cpu_ctx_free `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} : iProp Σ 
      ∃-quantified (an ambient binder here is the eight-hart adequacy trap
      this file's header records; the scheduler's park/resume proofs trade
      the ∃ for their own ambient through the shim -- the M2 seam). *)
-  (∃ (vs : list (mword 64)) (ξ : CtxId),
-     ⌜ length vs = 14%nat ⌝ ∗ ctx_cells (XI := ξ) (a_cpu_ctx cid_word) vs)%I.
+  (* A6.68: IT IS A PARKED RECORD NOW, not a bare ∃.  The scheduler that
+     finds the area free has to move its 14 cells into ITS OWN context, and
+     at the real machine nothing dominates a bare ∃ξ -- the SC-era trade
+     was the shim's [ctx_dom_sc] and it is gone.  What makes the move
+     honest is the lock kit's own idiom one tier up (tso-port.md §0.18′):
+     the slot carries the record's TOKEN and, beside it, THIS HART's
+     receipt that its view has passed the record's stamp.  The absorb is
+     then [TsoCtxAbsorbLb.ctx_dom_of_parked_lb] at [T ≤ T], reflexivity.
+     At boot the stamp is 0 and [TsoGhost.view_lb_0] gives the receipt for
+     nothing; every later publication (a park into this slot) stamps at a
+     position its own hart has already passed. *)
+  (∃ (vs : list (mword 64)) (ξ : CtxId) (T : nat),
+     ⌜ length vs = 14%nat ⌝ ∗
+     TsoCtx.ctx_parked ξ T ∗ TsoCtx.hart_view_lb T ∗
+     ctx_cells (XI := ξ) (a_cpu_ctx cid_word) vs)%I.
 
 (* [cpus[h].proc = 0] and [cpus[h].proc = &proc[j]] are the two live values
    of the field, and they are DISJOINT: proc[] does not start at address 0. *)

@@ -222,17 +222,20 @@ Section SfenceLeaf.
                 (bool_decide_eq_true_2 _ Htlb_in) Hpriv HTVM)
       as (tv & Hex & Hprop & Hgm).
     iIntros "#Hcert Hany Hrw Hro".
-    (* [bytes_own ∅] is [emp], hence persistent: it lands in the □ context *)
-    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) with "[]" as "#Hemp";
-      [ by rewrite /bytes_own big_sepM_empty |].
+    (* A6.22: THIS WALK OWNS NO BYTES, SO IT NEEDS NO THREAD IDENTITY.
+       The flip gave [swp_hmrun_of_exec] an [own_context XI] premise (the
+       byte tier is context-indexed now); at [mm := ∅] there is no byte to
+       index, and [HartMemRun.swp_hmrun_of_exec_reg] is the sanctioned
+       register-only instance that mints and drops a throwaway identity
+       internally.  Using it is what keeps this leaf's STATEMENT fixed. *)
     iApply (swp_mono _ _ _ with "[] [-]"); last first.
-    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+    { iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                 (execute (SFENCE_VMA (zreg, zreg))) (MState rs ∅ dev0_state)
-                _ _ rs ∅ Hdisj HDr_in HDw_in (reg_agree_refl _ _)
+                _ _ rs Hdisj HDr_in HDw_in (reg_agree_refl _ _)
                 (map_empty_subseteq _) (Hgm ∅) Hex
-                with "Hcert Hany Hrw Hro Hemp"). }
+                with "Hcert Hany Hrw Hro"). }
     iIntros (v) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs' mm') "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs') "(%Hag & Hrw & Hro & Hany)".
     iSplitR; [done|].
     iExists rs', tv. iFrame "Hrw Hro Hany".
     iSplitR; [| iPureIntro; exact Hprop].
@@ -389,8 +392,14 @@ Section SfenceLeaf.
       iDestruct (strans_inv_acc_kpt with "Hkptr Htr")
         as (root) "(Hres & Htrback)".
       iDestruct (tlb_res_pt_open with "Hres") as (ksatp tlbv)
-        "(Hsatp & %HkMode & %Hkasid & %Hkppn & Htlbc & Hsnap & Hpmp & #Hkinv)".
+        "(Hsatp & %HkMode & %Hkasid & %Hkppn & Htlbc & Hsnap & Hpmp & #Hkinv
+          & #Hcr)".
       iDestruct "Hsnap" as (kt3) "(_ & #Hlb3)".
+      (* A6.55: the reader's credentials ride in the residue as ONE
+         persistent conjunct.  The flush re-seals the arm at the SAME
+         credentials it opened it with -- an empty TLB coheres with any
+         tree, and nothing here moves the kernel tree's bound. *)
+      iDestruct "Hcr" as (Bc) "[#Hbdc #Hvlbc]".
       iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
@@ -422,10 +431,10 @@ Section SfenceLeaf.
         as "(Htlbc & Hpriv & Hms)".
       (* re-seal the arm at the flushed vector, at the residue's OWN
          snapshot -- an empty TLB is coherent with any tree. *)
-      iDestruct (tlb_res_pt_intro root ksatp tv kt3 HkMode Hkasid Hkppn
+      iDestruct (tlb_res_pt_intro root ksatp tv kt3 Bc HkMode Hkasid Hkppn
                    (tlb_ok_pt_empty (mword_of_int 0) kt3 tv
                       (fun vpn' => Hflush _ (tlb_hash_range vpn')))
-                   with "Hsatp Htlbc Hlb3 Hpmp Hkinv") as "Hres".
+                   with "Hsatp Htlbc Hlb3 Hbdc Hvlbc Hpmp Hkinv") as "Hres".
       iDestruct ("Htrback" with "Hres") as "Htr".
       iSplitR; [done|].
       iExists (add_vec_int pc 4), ms0, m, n.

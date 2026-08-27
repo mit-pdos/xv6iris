@@ -672,7 +672,7 @@ Section InstallTransDefs.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈[KT1] (m !!! Regidx Rs8 : mword 64))%I.
 
   (* what the caller still owns when the loop is done / at the epilogue *)
-  Definition it_out (bn : bio_names) (γfs : fs_names) (logstart : Z)
+  Definition it_out `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool) : iProp Σ :=
@@ -690,7 +690,7 @@ Section InstallTransDefs.
 
   (* the payload's two agreements, both with a PURE conclusion so the
      [iDestruct] keeps the payload itself (durable-notes) *)
-  Lemma it_pay_bs (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma it_pay_bs `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd bs0 : list (bv 8)) (d : bool) :
     fs_chalf γfs (uint bno) bs0 -∗
@@ -707,7 +707,7 @@ Section InstallTransDefs.
      unobtainable on this side (SpecInstallTrans.v's header), so its bytes
      are read out of the AUTHORITY install_trans holds instead.  Pure
      conclusion, so the payload survives the [iDestruct]. *)
-  Lemma it_pay_bs_auth (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma it_pay_bs_auth `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) (L : gmap Z (list (bv 8))) :
     ghost_map_auth (fs_cache γfs) 1 L -∗
@@ -721,7 +721,7 @@ Section InstallTransDefs.
       iDestruct (ghost_map_lookup with "Ha Hm") as %Hlk. done.
   Qed.
 
-  Lemma it_pay_d (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma it_pay_d `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d db : bool) :
     (uint bno) ↪[fs_dirty γfs]{#(1/2)} db -∗
@@ -735,7 +735,7 @@ Section InstallTransDefs.
   Qed.
 
   (* the DIRTY payload taken apart: the L-half, the dirty half and the pin *)
-  Lemma it_pay_open (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma it_pay_open `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd true -∗
@@ -745,7 +745,7 @@ Section InstallTransDefs.
   Proof. rewrite /bio_pay /fs_view /= /fs_mdirty. iIntros "[[$ $] $]". Qed.
 
   (* ... and re-formed CLEAN, once the write has made disk = bytes *)
-  Lemma it_pay_clean (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma it_pay_clean `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl : list (bv 8)) :
     (uint bno) ↪[fs_cache γfs]{#(1/2)} bsl -∗
@@ -759,7 +759,7 @@ Section InstallTransDefs.
   (* the payload's dirty bit read off the AUTHORITY -- the recovering arm
      holds no dirty half of its own (nothing is pinned in a fresh era), so
      the polarity comes from the map install_trans is holding whole *)
-  Lemma it_pay_d_auth (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma it_pay_d_auth `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) (D : gmap Z bool) :
     ghost_map_auth (fs_dirty γfs) 1 D -∗
@@ -774,7 +774,7 @@ Section InstallTransDefs.
   Qed.
 
   (* the CLEAN payload taken apart: the L-half and the dirty half *)
-  Lemma it_pay_open_clean (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma it_pay_open_clean `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd false -∗
@@ -796,7 +796,7 @@ Section InstallTransDefs.
   (* Both arms re-form the payload CLEAN at the slot's logged content,    *)
   (* which is what the closing brelse deposits.                           *)
   (* ================================================================== *)
-  Lemma it_ghost_step (recovering : bool)
+  Lemma it_ghost_step `{XI : CurCtx} (recovering : bool)
       (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k2 : nat)
       (t : nat) (W : list (mword 32)) (w : mword 32)

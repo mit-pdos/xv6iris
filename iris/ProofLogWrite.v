@@ -429,7 +429,7 @@ Section LogWriteDefs.
   (* ---- the payload's two halves, extracted / re-assembled without a
      case split leaking into the whole-function proof ---- *)
 
-  Lemma lw_pay_split (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma lw_pay_split `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
@@ -442,7 +442,7 @@ Section LogWriteDefs.
     - rewrite /fs_mclean. iIntros "[[$ $] $]".
   Qed.
 
-  Lemma lw_pay_mk (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma lw_pay_mk `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bs bsd : list (bv 8)) :
     uint bno ↪[fs_cache γfs]{#(1/2)} bs -∗

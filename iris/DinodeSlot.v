@@ -66,9 +66,6 @@ Require Import InodeInv.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* M1 stage 2: [↦₂]/[↦₄] have NOT flipped, so the
-                         dinode field cells are still the RAW tower and each
-                         byte of [bb2_cell]/[bb4_cell] crosses the ctx seam. *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -520,10 +517,16 @@ Section IupdateRes.
     ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ f j) ⊣⊢ a ↦₂ w.
   Proof.
     intros Hal Hf.
-    rewrite /word2_pointsto (bi.pure_True _ Hal) bi.True_sep.
+    (* A6.61 CORRECTION to A6.58's disposition: this is NOT a [⊣⊢] that
+       weakens.  BOTH sides are the CONTEXT tower already -- [↦ₘ] is
+       [ctx_pointsto cur_ctx] and [↦₍2₎] is [ctx_word2_pointsto cur_ctx] --
+       so the per-byte step is an IDENTITY and the shim call was a tier
+       move for no reason (A6.60's "identities, deleted" class).  The
+       [⊣⊢] STANDS; only the unfold had to name the ctx definition. *)
+    rewrite (TsoCtx.ctx_word2_pointsto_unfold) (bi.pure_True _ Hal) bi.True_sep.
     apply big_sepL_proper. intros i jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l Hf;
-      [apply TsoCtxShim.ctx_pointsto_shim | lia].
+      [reflexivity | lia].
   Qed.
 
   Local Lemma bb4_cell (a : mword 64) (w : bv 32) (f : nat -> bv 8) :
@@ -532,10 +535,16 @@ Section IupdateRes.
     ([∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ f j) ⊣⊢ a ↦₄ w.
   Proof.
     intros Hal Hf.
-    rewrite /word4_pointsto (bi.pure_True _ Hal) bi.True_sep.
+    (* A6.61 CORRECTION to A6.58's disposition: this is NOT a [⊣⊢] that
+       weakens.  BOTH sides are the CONTEXT tower already -- [↦ₘ] is
+       [ctx_pointsto cur_ctx] and [↦₍4₎] is [ctx_word4_pointsto cur_ctx] --
+       so the per-byte step is an IDENTITY and the shim call was a tier
+       move for no reason (A6.60's "identities, deleted" class).  The
+       [⊣⊢] STANDS; only the unfold had to name the ctx definition. *)
+    rewrite (TsoCtx.ctx_word4_pointsto_unfold) (bi.pure_True _ Hal) bi.True_sep.
     apply big_sepL_proper. intros i jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l Hf;
-      [apply TsoCtxShim.ctx_pointsto_shim | lia].
+      [reflexivity | lia].
   Qed.
 
   (* THE SLOT, at an abstract naming function.  Out at [d], back at any

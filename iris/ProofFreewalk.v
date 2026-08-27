@@ -319,23 +319,26 @@ Section ProofFreewalk.
 
   (* the subtree hanging off slot [i] of a level-[lvl] node (nothing at
      level 0, and nothing where the description claims no child) *)
-  Definition fw_slot (lvl : nat) (t : ptree) (i : mword 9) : iProp Σ :=
+  Definition fw_slot `{XI : CurCtx} (lvl : nat) (t : ptree) (i : mword 9) : iProp Σ :=
     match fw_kid lvl t i with
     | Some lc => ptree_own (fst lc) (DfracOwn 1) (snd lc)
     | None => emp
     end%I.
 
   (* slots [0, d): whatever the loop left in them *)
-  Definition fw_done (b : mword 44) (d : Z) : iProp Σ :=
-    ([∗ list] i ∈ seqZ 0 d, ∃ w : mword 64, u_pte_addr b (mword_of_int i) ↦ₚ₈ w)%I.
+  (* A6.69: a PT page's slots are the [↦ₚₜ] tower ([PtTree.pt_slot_own] at
+     the ambient context, A6.49) -- [pt_page_own] has held them there since
+     the ledger-page move and these three statements were the raw residue. *)
+  Definition fw_done `{XI : CurCtx} (b : mword 44) (d : Z) : iProp Σ :=
+    ([∗ list] i ∈ seqZ 0 d, ∃ w : mword 64, u_pte_addr b (mword_of_int i) ↦ₚₜ w)%I.
 
   (* slots [d, 512): still the description's words, and still their subtrees *)
-  Definition fw_todo (lvl : nat) (t : ptree) (d : Z) : iProp Σ :=
+  Definition fw_todo `{XI : CurCtx} (lvl : nat) (t : ptree) (d : Z) : iProp Σ :=
     ([∗ list] i ∈ seqZ d (512 - d),
-       u_pte_addr (pt_base t) (mword_of_int i) ↦ₚ₈ pt_ents t (mword_of_int i)
+       u_pte_addr (pt_base t) (mword_of_int i) ↦ₚₜ pt_ents t (mword_of_int i)
        ∗ fw_slot lvl t (mword_of_int i))%I.
 
-  Lemma fw_open (lvl : nat) (t : ptree) :
+  Lemma fw_open `{XI : CurCtx} (lvl : nat) (t : ptree) :
     ptree_own lvl (DfracOwn 1) t ⊢ pt_node_claim (pt_base t) ∗ fw_todo lvl t 0.
   Proof.
     rewrite /fw_todo. replace (512 - 0) with 512 by lia.
@@ -350,10 +353,10 @@ Section ProofFreewalk.
       destruct (pt_kids t (mword_of_int j)); reflexivity.
   Qed.
 
-  Lemma fw_todo_cons (lvl : nat) (t : ptree) (d : Z) :
+  Lemma fw_todo_cons `{XI : CurCtx} (lvl : nat) (t : ptree) (d : Z) :
     0 <= d < 512 ->
     fw_todo lvl t d ⊢
-      (u_pte_addr (pt_base t) (mword_of_int d) ↦ₚ₈ pt_ents t (mword_of_int d)
+      (u_pte_addr (pt_base t) (mword_of_int d) ↦ₚₜ pt_ents t (mword_of_int d)
        ∗ fw_slot lvl t (mword_of_int d))
       ∗ fw_todo lvl t (d + 1).
   Proof.
@@ -365,9 +368,9 @@ Section ProofFreewalk.
     iIntros "[Hh Ht]". iFrame "Hh Ht".
   Qed.
 
-  Lemma fw_done_snoc (b : mword 44) (d : Z) :
+  Lemma fw_done_snoc `{XI : CurCtx} (b : mword 44) (d : Z) :
     0 <= d ->
-    fw_done b d ∗ (∃ w : mword 64, u_pte_addr b (mword_of_int d) ↦ₚ₈ w)
+    fw_done b d ∗ (∃ w : mword 64, u_pte_addr b (mword_of_int d) ↦ₚₜ w)
     ⊢ fw_done b (d + 1).
   Proof.
     intros Hd. rewrite /fw_done.

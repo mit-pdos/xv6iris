@@ -101,6 +101,29 @@ Class tsoMemG Σ := TsoMemG {
   tsomem_dirtyG :: ghost_mapG Σ (nat * Arch.pa) unit;
 }.
 
+(* ---------------------------------------------------------------------- *)
+(* A6.63' THE FUNCTOR AND ITS [subG], which the flip needed and did not     *)
+(* have.  Without these, [RiscvAdequacy]'s [riscvGpreS] cannot carry the    *)
+(* TSO ghosts, and the era record's positional [_] for [riscvF_tsomemGS]    *)
+(* has no instance to resolve against -- which is exactly the error the     *)
+(* adequacy file has been carrying ("Could not find an instance for         *)
+(* ?riscvF_tsomemGS : tsoMemG Σ").                                          *)
+(*                                                                          *)
+(* NOTE what is deliberately ABSENT, matching the class above: NO           *)
+(* [mono_natΣ].  The log length and the per-context bounds are mono-nats,   *)
+(* but a second [mono_natG] beside [riscvF_genGS] would make resolution     *)
+(* ambiguous; [riscvΣ] already carries the one [mono_natΣ] the whole tree   *)
+(* shares.                                                                  *)
+(* ---------------------------------------------------------------------- *)
+Definition tsoMemΣ : gFunctors :=
+  #[ ghost_mapΣ Arch.pa TsoMemPa.ts_elem;
+     ghost_mapΣ nat TsoMemPa.pwmsg;
+     GFunctor (authR viewUR);
+     ghost_mapΣ (nat * Arch.pa) unit ].
+
+Global Instance subG_tsoMemG {Σ} : subG tsoMemΣ Σ -> tsoMemG Σ.
+Proof. solve_inG. Qed.
+
 Section ghosts.
   Context {Σ : gFunctors} `{!tsoMemG Σ} `{!mono_natG Σ}.
 
@@ -194,6 +217,20 @@ Section ghosts.
       than an update). *)
   Definition view_auth (γv : gname) (tvs : agent → nat) : iProp Σ :=
     own γv (● vf tvs ⋅ ◯ vf tvs).
+
+  (** THE ERA'S MINT (tso-machine-flip.md §6 amendment A6.58, the
+      [RiscvAdequacy] inventory's fourth allocation).  Auth AND fragment at
+      the same value, so the whole authority is one [own_alloc] with no
+      update: [vf tvs] is valid pointwise ([max_natUR] has no invalid
+      element) and includes itself, which is exactly [auth_both_valid].
+      Stated at an ARBITRARY view function so a later era can be born at
+      the view its predecessor left. *)
+  Lemma view_auth_alloc (tvs : agent → nat) :
+    ⊢ |==> ∃ γv : gname, view_auth γv tvs.
+  Proof.
+    iApply own_alloc. apply auth_both_valid_discrete.
+    split; [reflexivity | intros h; done].
+  Qed.
 
   Lemma view_auth_frag γv tvs h K :
     (K ≤ tvs h)%nat → view_auth γv tvs -∗ own γv (◯ vone h K).

@@ -59,8 +59,9 @@ Require Import KptGhost.   (* kptN: the accessor-mask premise below *)
 Require Import SRegime.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoMemPa.  (* [agent]/[pwmsg]/[bytemap]: the era log's vocabulary
+                             (A6.58 -- the write node speaks it now) *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the leaf's gen_heap seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -200,58 +201,128 @@ Section WpSconfMem.
      non-straddling VA window it overwrites the ACTUAL translated physical
      bytes at [pa_of ppn a] in step with the heap.  Width-agnostic via
      [s_win_write]. *)
-  Local Lemma wordw_pointsto_write_c `{KTR : !CurKtier} (width : Z) (mm : _) (a : mword 64)
+  (* A6.58: THE LEDGER APPEND, at the generic width.  Two things changed
+     under this wrapper and neither is a repair:
+
+       - [wordw_pointsto]'s bytes ARE the context-indexed bytes already
+         (A6.18's payoff, the definition three screens up), so the shim
+         crossings the SC text had around the write ([ctx_buf_of_mem] /
+         [ctx_buf_to_mem]) were IDENTITIES at this site and are simply
+         gone -- which is A6.57's "identities now" theory holding exactly
+         where the tier already moved, and nowhere else;
+
+       - [SmodeCorePt.s_win_write] is GONE (A6.33): a store is one APPEND,
+         so no value-changing law may move [gen_heap_interp] without
+         [tso_interp_of] and the writer's [own_context] beside it.  Its
+         successor [wordw_win_store_c] has exactly this shape, and
+         [HartSMem.Wobl_ram] is what HANDS the bundle to the write node,
+         so nothing new is demanded of the leaf's caller. *)
+  (* A6.63'' THE CpuId RE-PARK (tso-port.md §0.20′, found by the M-leg lane
+     on main and back-ported here BEFORE this file next compiles).
+     [own_context] is CpuId-INDEXED, and this helper's callers run INSIDE
+     [rename CID into CID0; iIntros (CID Hs)] -- the instruction obligation
+     binds a FRESH CpuId and the capability's token is at THAT one, while
+     typeclass resolution inside the section silently finds the SECTION
+     instance [CID].  A section variable cannot be instantiated from inside
+     its own section, so the helper takes its own binder.
+     POST-FLIP IT IS NEEDED TWICE: it names the token's hart AND the
+     appended message's AUTHOR ([hart_agent cpu_id]).  The failure mode is
+     [iExact] refusing two terms that PRINT IDENTICALLY; only
+     [Local Set Printing All] shows [@own_context Σ _ CID …] vs [… CID0 …]. *)
+  Local Lemma wordw_pointsto_write_c `{KTR : !CurKtier} {CIDw : CpuId}
+      (width : Z)
+      (img : bytemap) (σ : mstate) (log : list pwmsg)
+      (V : agent -> nat) (a : mword 64)
       (ppn : mword 44) (vold vnew : mword (8*width)) :
     0 < width ->
     (uint a < 274877906944)%Z ->
     (bv_unsigned (subrange_vec_dec a 11 0) + width <= 4096)%Z ->
     kmap_at (svpn_of a) ppn KP_rw -∗
-    gen_heap_interp (hG:=riscv_memGS) mm -∗ wordw_pointsto width a (DfracOwn 1) vold ==∗
-    gen_heap_interp (hG:=riscv_memGS) (write_bytes mm (pa_of ppn a) (Z.to_N width) vnew) ∗
+    gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
+    wordw_pointsto width a (DfracOwn 1) vold ==∗
+    gen_heap_interp (hG:=riscv_memGS)
+      (write_bytes σ.(mem) (pa_of ppn a) (Z.to_N width) vnew) ∗
+    tso_interp_of riscv_eraGS img
+      (write_bytes σ.(mem) (pa_of ppn a) (Z.to_N width) vnew)
+      (log ++ [PWMsg (snap_of (pa_of ppn a) (Z.to_N width) vnew)
+                 (hart_agent (@cpu_id CIDw))])%list
+      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
+         (log ++ [PWMsg (snap_of (pa_of ppn a) (Z.to_N width) vnew)
+                    (hart_agent (@cpu_id CIDw))])%list V) ∗
+    TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
     wordw_pointsto width a (DfracOwn 1) vnew.
   Proof.
-    intros Hw0 Hcan Hoff. iIntros "#Hk Hm Hw". rewrite /wordw_pointsto.
+    intros Hw0 Hcan Hoff. iIntros "#Hk Hm Htso Hrun Hw".
+    rewrite /wordw_pointsto.
     iDestruct "Hw" as "(%Hal & Hb)".
-    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hb") as "Hb".
-    iMod (s_win_write a ppn (nth_byte vold) (nth_byte vnew) Hcan (seq 0 (Z.to_nat width))
-            ltac:(apply Forall_forall; intros j Hj; apply elem_of_list_In, elem_of_seq in Hj;
+    assert (Hwn : N.to_nat (Z.to_N width) = Z.to_nat width)
+      by apply Z_N_nat.
+    iEval (rewrite -Hwn) in "Hb".
+    iMod (wordw_win_store_c (CID := CIDw) (Z.to_N width) img σ log V a ppn vold vnew
+            ltac:(pose proof (bv_unsigned_in_range _
+                    (subrange_vec_dec a 11 0)) as [Hlo0 _];
+                  rewrite Hwn; lia) Hcan
+            ltac:(rewrite Hwn; apply Forall_forall; intros j Hj;
+                  apply elem_of_list_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hjw];
                   assert (Hjz : Z.of_nat j < width) by
-                    (rewrite <- (Z2Nat.id width) by lia; apply Nat2Z.inj_lt; exact Hjw);
+                    (rewrite <- (Z2Nat.id width) by lia;
+                     apply Nat2Z.inj_lt; exact Hjw);
                   lia)
-            mm with "Hk Hm Hb") as "[Hm Hb]".
-    iModIntro. iSplitL "Hm".
-    - unfold write_bytes. replace (N.to_nat (Z.to_N width)) with (Z.to_nat width) by lia. iFrame "Hm".
-    - iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hb") as "Hb".
-      iFrame "Hb". iPureIntro. exact Hal.
+            with "Hk Hm Htso Hrun Hb") as "(Hm & Htso & Hrun & Hb)".
+    iModIntro. iFrame "Hm Htso Hrun".
+    iEval (rewrite Hwn) in "Hb". iFrame "Hb". iPureIntro. exact Hal.
   Qed.
 
-  (* claim-keyed single-byte write (width-1 store): writes at [pa_of ppn a]. *)
-  Local Lemma mem_pointsto_write_c `{KTR : !CurKtier} (mm : _) (a : mword 64)
-      (ppn : mword 44) (vold vnew : bv 8) :
+  (* A6.58: THE READ TWIN.  A6.36's overruling made every S-mode LOAD the
+     PLAIN arm, so what a leaf owes is [HartSMem.Mobl_ram]'s VIEW-INDEXED
+     family and not a flat [read_bytes] -- which is why [s_mem_chunk] no
+     longer pays it here.  [SmodeCorePt.wordw_win_load_c] does, off the
+     same window, and its conclusion is PURE: the window, the token and the
+     interp bundle all survive, which is what lets an ATOMIC-UPDATE leaf
+     run it inside the update and still hand the cell back. *)
+  (* A6.63'': same CpuId re-park as the write helper above. *)
+  Local Lemma wordw_pointsto_load_c `{KTR : !CurKtier} {CIDw : CpuId}
+      (width : Z)
+      (img : bytemap) (σ : mstate) (log : list pwmsg)
+      (V : agent -> nat) (a : mword 64) (ppn : mword 44)
+      (v : mword (8*width)) (dq : dfrac) :
+    0 < width ->
     (uint a < 274877906944)%Z ->
+    (bv_unsigned (subrange_vec_dec a 11 0) + width <= 4096)%Z ->
     kmap_at (svpn_of a) ppn KP_rw -∗
-    gen_heap_interp (hG:=riscv_memGS) mm -∗ a ↦ₘ vold ==∗
-    gen_heap_interp (hG:=riscv_memGS) (write_bytes mm (pa_of ppn a) 1 vnew) ∗ a ↦ₘ (nth_byte vnew 0).
+    gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
+    wordw_pointsto width a dq v -∗
+    ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+       tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+         (pa_of ppn a) (Z.to_N width) v⌝.
   Proof.
-    intros Hcan. iIntros "#Hk Hm Hw".
-    assert (Hoff0 : (bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat 0 < 4096)%Z).
-    { change (Z.of_nat 0) with 0%Z. rewrite Z.add_0_r.
-      pose proof (off_bound_div a 1 ltac:(lia) ltac:(exists 4096; lia)
-        ltac:(unfold is_aligned_vaddr; rewrite Z.rem_1_r; reflexivity)) as H1.
-      rewrite (uint_unsigned_n _) in H1. lia. }
-    iAssert ([∗ list] j ∈ (cons 0%nat nil), (pa_add a j) ↦ₘ (nth_byte vold j))%I with "[Hw]" as "Hw'".
-    { iEval (rewrite big_sepL_singleton pa_add_0 nth_byte0_id). iExact "Hw". }
-    iMod (s_win_write a ppn (nth_byte vold) (nth_byte vnew) Hcan (cons 0%nat nil)
-            ltac:(constructor; [exact Hoff0 | constructor])
-            mm with "Hk Hm Hw'") as "[Hm Hb]".
-    iModIntro. iSplitL "Hm".
-    - replace (write_bytes mm (pa_of ppn a) 1 vnew)
-        with (foldr (fun j acc => <[pa_add (pa_of ppn a) j := nth_byte vnew j]> acc) mm (cons 0%nat nil)).
-      2:{ cbn [foldr]. rewrite write_bytes_1 pa_add_0. reflexivity. }
-      iExact "Hm".
-    - iDestruct "Hb" as "[Hb _]". rewrite pa_add_0. iExact "Hb".
+    intros Hw0 Hcan Hoff. iIntros "#Hk Hm Htso Hrun Hw".
+    rewrite /wordw_pointsto. iDestruct "Hw" as "(%Hal & Hb)".
+    assert (Hwn : N.to_nat (Z.to_N width) = Z.to_nat width)
+      by apply Z_N_nat.
+    iEval (rewrite -Hwn) in "Hb".
+    iApply (wordw_win_load_c (KTR := KTR) (CID := CIDw) (Z.to_N width) img σ log V a ppn v dq
+              Hcan
+              ltac:(rewrite Hwn; apply Forall_forall; intros j Hj;
+                    apply elem_of_list_In, elem_of_seq in Hj;
+                    destruct Hj as [_ Hjw];
+                    assert (Hjz : Z.of_nat j < width) by
+                      (rewrite <- (Z2Nat.id width) by lia;
+                       apply Nat2Z.inj_lt; exact Hjw);
+                    lia)
+              with "Hk Hm Htso Hrun Hb").
   Qed.
+
+  (* THE WIDTH-1 WRITE WRAPPER IS GONE (A6.58).  It had NO caller -- the
+     byte leaves go through [wordw_pointsto_write_c] at [width := 1] like
+     every other width -- and it was stated over [s_win_write], the
+     gen_heap-only law A6.33 deleted.  Reviving it would have meant
+     re-deriving the ledger append for a shape nothing asks for. *)
 
   (* ------------------------------------------------------------------- *)
   (* The width/RVC-generic load in ATOMIC-UPDATE form: the cell need NOT   *)
@@ -464,17 +535,68 @@ Section WpSconfMem.
       assert (Hea : add_vec (tp_pin (CID := CID) m !!! Regidx rs1)
                       (sign_extend' 64 imm) = ea)
         by (rewrite Lpin_rs1; reflexivity).
-      (* [Hctx] -- the thread-of-control token -- travels with the rest of
-         the capability into the POST side of the [swp_mono], which is where
-         [sie_cap] is rebuilt; the [swp] side never touches it. *)
+      (* A6.58: [Hctx] goes DOWN to the read node.  Even a plain LOAD is
+         paid from the running context's own bound now
+         ([wordw_pointsto_load_c]), so the token travels with the access
+         and comes back inside the leaf's payload; [sie_cap] is rebuilt
+         from it in the post exactly as before. *)
+      (* A6.64 THIS SENTENCE ONCE DID NOT ELABORATE AT ALL.  KEEP THE
+         THREE PAYLOAD SPELLINGS BELOW IN AGREEMENT.
+
+         History, because the fix is not what it looks like: this [iApply]
+         was killed at 35, 60 and 57 minutes across three sessions, while
+         the 195 sentences before it cost 4.57 s in total.  Two diagnoses
+         were wrong -- it is NOT that the payload was a duplicated lambda
+         (naming it changed nothing), and NOT that the name had to be rigid
+         ([clearbody] changed nothing; the RSS plateau matched the
+         transparent run to 0.016%).
+
+         THE ACTUAL CAUSE: the payload was spelled DIFFERENTLY at three
+         positions of the same forty-argument application --
+           * the leaf's [R]           : [Psic] (= own_context ∗ Ψ bs)
+           * the obligation argument  : [Mobl_ram_ex … Psic]
+           * the NODE argument        : [swp_read_ram_node_w_ex … Ψ]
+         The node still handed the PRE-FLIP payload, so unification had to
+         discover the relation between [Ψ] and [own_context ∗ Ψ] through
+         forty arguments, and diverged.  With the three in agreement the
+         application elaborates in 0.042 s and the file compiles in 4.74 s.
+
+         THE RULE: when threading the token into a leaf, move the NODE
+         argument too.  A6.58's recipe does not say so, so every S-mode
+         leaf that took the token carries this hazard until its node is
+         checked.
+
+         The [set] below is kept because it makes the three spellings easy
+         to compare by eye -- not because naming is the fix.  The
+         [iPoseProof]/[iApply] split is kept for the same reason: it bills
+         elaboration separately from goal unification, which is the only
+         thing that localises this failure. *)
+      (* A6.63'': the token in the leaf's payload is at the FRESH CpuId the
+         obligation bound, not the section's -- see the helpers above. *)
+      set (Psic := (fun bs => TsoCtx.own_context (CID := CID) TsoCtx.cur_ctx ∗ Ψ bs)%I).
+      assert (HPsic : Psic
+                = (fun bs => TsoCtx.own_context (CID := CID) TsoCtx.cur_ctx ∗ Ψ bs)%I)
+        by reflexivity.
+      clearbody Psic.
+      (* A6.63''' THE SPLIT SAID *ELABORATION*, NOT GOAL UNIFICATION -- the
+         [iPoseProof] alone, which never looks at the goal, is what runs
+         forever.  So the remaining suspect is the OTHER computed argument:
+         [Mobl_ram_ex] applied to [Psic].  Hoist it too, for the same
+         rigid-head reason. *)
       iApply (swp_mono (CID := CID)
-                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hctx Hclose] [-]").
-      2:{ iApply (swp_execute_LOAD_ram_Sw_ex (CID := CID) width Hvw Hwdvd Huintw
+                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
+      2:{ (* A6.63' THE SPLIT EXPERIMENT (see the note above this proof).
+             [iPoseProof] elaborates the forty-argument application;
+             [iApply] then only has to unify an already-built term with
+             the goal.  [-time] bills the two sentences separately, which
+             is the one measurement that says which half is the cost. *)
+          iPoseProof (swp_execute_LOAD_ram_Sw_ex (CID := CID) width Hvw Hwdvd Huintw
                     SD sda_Dro (sda_Df (DfracOwn 1))
                     (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                     imm rs1 rd uns (tp_pin (CID := CID) m) (pa_of ppn ea)
                     pmar0 pcfg paddr
-                    Ψ (Mobl_ram_ex width (pa_of ppn ea) Ψ)
+                    Psic
+                    (Mobl_ram_ex width (pa_of ppn ea) Psic)
                     (sr_swp_res (strans_regime (CID := CID))) rr
                     (sr_swp_mode (strans_regime (CID := CID)) satp0)
                     Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
@@ -504,9 +626,10 @@ Section WpSconfMem.
                     ltac:(rewrite Hea; exact Halign)
                     (pa_aligned_div ppn ea width Hw0 Hwdvd Halign)
                     Hrd
-                    (swp_read_ram_node_w_ex (CID := CID) width (pa_of ppn ea) Ψ
+                    (swp_read_ram_node_w_ex (CID := CID) width (pa_of ppn ea) Psic
                        Hvw (addr_is_ram_not_dev _ Hkd0))
-                    with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HAU]").
+                    ) as "Hleaf".
+          iApply ("Hleaf" with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HAU Hctx]").
           - (* the data translation *)
             iIntros "Hfrag HRes Hrw Hro".
             rewrite Hea.
@@ -520,30 +643,45 @@ Section WpSconfMem.
             + exact I.
             + exact Hcan.
             + exact Hid.
-          - (* the RAM read node: the caller's atomic update, opened HERE *)
-            iIntros (sigma) "Hsi".
+          - (* the RAM read node: the caller's atomic update, opened HERE.
+               A6.58: the node receives the era's log bundle and hands it
+               back UNCHANGED (a plain load moves no view, so [V] returns
+               as [V]), and the obligation is now the view-indexed family
+               [wordw_pointsto_load_c] pays. *)
+            iIntros (sigma img log tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
             iMod "HAU" as (v) "[Hbw Hcl]".
-            iEval (rewrite /wordw_pointsto) in "Hbw".
-            iDestruct "Hbw" as "[%Hal1 Hb]".
-            iDestruct (s_mem_chunk (KTR := ktd) sigma ea ea 0 (Z.to_nat width)
-                         (Z.to_nat width) (nth_byte v) ppn dqm
-                         ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff' Hcan
-                         with "Hmem Hk Hb") as %(Hbf & _ & _ & _).
-            iMod ("Hcl" with "[Hb]") as "HPsi".
-            { rewrite /wordw_pointsto. iFrame "Hb". iPureIntro. exact Hal1. }
+            (* A6.63'': the read obligation is at the FRESH CpuId too --
+               [wordw_pointsto_load_c] now concludes at [@cpu_id CID], and
+               the ambient spelling here would print identically while
+               failing to unify (tso-port.md §0.20′). *)
+            iAssert (⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
+                       tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
+                         (pa_of ppn ea) (Z.to_N width) v⌝)%I as %Hrb.
+            { iApply (wordw_pointsto_load_c (KTR := ktd) (CIDw := CID) width img sigma log V
+                        ea ppn v dqm Hw0 Hcan Hoff
+                        with "Hk Hmem Htso Hctx Hbw"). }
+            iMod ("Hcl" with "Hbw") as "HPsi".
             iMod "Hb1" as "_".
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
             iModIntro. iExists v.
             iSplitR.
-            { iPureIntro. intros j Hj. apply Hbf. lia. }
+            { iPureIntro. intros tvr Hlo _. rewrite -Htv in Hlo.
+              exact (Hrb tvr Hlo). }
             iNext. iMod "Hb2" as "_". iModIntro.
-            iFrame "Hreg Hmem Hdev HPsi". }
+            (* [Psic] is RIGID (clearbody), so the ∗-shape has to be given
+               back explicitly before the frame *)
+            rewrite HPsic. cbn beta.
+            iFrame "Hreg Hmem Hdev Htso Hctx HPsi". }
+      (* the node has closed, so the payload goes back to its ∗-shape for
+         the post's [iDestruct] pattern *)
+      rewrite HPsic. cbn beta.
       (* ---- the post ---- *)
       iIntros (e) "(-> & Hpost)".
       iDestruct "Hpost" as (v) "(Hfile & Hland)".
-      iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hany & HPsi)".
+      iDestruct "Hland" as (rsf)
+        "(%Hshape & Hrw & Hro & HRes & Hany & [Hctx HPsi])".
       iSplitR; [done|].
       iAssert (∃ tv2 : type_of_register tlb,
                hreg_frame (CID := CID)
@@ -809,13 +947,15 @@ Section WpSconfMem.
                unfold is_aligned_vaddr; rewrite Z.rem_1_r; reflexivity | ].
       change (Z.to_nat 1) with 1%nat.
       rewrite big_sepL_singleton pa_add_0 nth_byte0_id.
-      iApply (TsoCtxShim.ctx_pointsto_to_mem with "Hbyte"). }
+      (* A6.58: [wordw_pointsto]'s byte IS the ctx byte (A6.18), so the
+         SC-era crossing here was already an identity.  Deleted, not
+         replaced. *)
+      iExact "Hbyte". }
     iIntros (CID1 Hs1) "Hcg Hpc Hbw".
     iEval (rewrite /wordw_pointsto) in "Hbw".
     iDestruct "Hbw" as "(_ & Hbw)".
     iEval (change (Z.to_nat 1) with 1%nat;
            rewrite big_sepL_singleton pa_add_0 nth_byte0_id) in "Hbw".
-    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hbw") as "Hbw".
     iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
@@ -1134,17 +1274,21 @@ Section WpSconfMem.
               = returnM Supervisor)
               by (rewrite Lmst;
                   exact (effectivePrivilege_mprv0 (Store Data) _ Supervisor HMPRV)).
-      (* [Hctx] -- the thread-of-control token -- travels with the rest of
-         the capability into the POST side of the [swp_mono], which is where
-         [sie_cap] is rebuilt; the [swp] side never touches it. *)
+      (* A6.58: [Hctx] -- the thread-of-control token -- NO LONGER travels
+         with the rest of the capability into the POST side.  A store is a
+         LEDGER APPEND now, and every value-changing law takes the writer's
+         own context ([wordw_pointsto_write_c] above), so the token goes
+         DOWN to the write node and comes back inside the leaf's payload;
+         [sie_cap] is rebuilt from it in the post exactly as before. *)
       iApply (swp_mono (CID := CID)
-                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hctx Hclose] [-]").
+                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
       2:{ iApply (swp_execute_STORE_ram_Sw (CID := CID) width Hvw Hwdvd Huintw
                     SD sda_Dro (sda_Df (DfracOwn 1))
                     (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                     imm rs2 rs1 (tp_pin (CID := CID) m) (pa_of ppn ea) sv
                     pmar0 pcfg paddr
-                    Ψ (sr_swp_res (strans_regime (CID := CID))) rr
+                    (TsoCtx.own_context (CID := CID) TsoCtx.cur_ctx ∗ Ψ)%I
+                    (sr_swp_res (strans_regime (CID := CID))) rr
                     (sr_swp_mode (strans_regime (CID := CID)) satp0)
                     Lsv
                     Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
@@ -1171,7 +1315,7 @@ Section WpSconfMem.
                     HA Hord HW Hcov (pma_all_ram Hpma_all) Hkd0
                     ltac:(rewrite Hea; exact Halign)
                     (pa_aligned_div ppn ea width Hw0 Hwdvd Halign)
-                    with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HAU]").
+                    with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HAU Hctx]").
           - (* the data translation *)
         iIntros "Hfrag HRes Hrw Hro".
         rewrite Hea.
@@ -1182,21 +1326,30 @@ Section WpSconfMem.
         + exact eq_refl.
         + exact Hcan.
         + exact Hid.
-          - (* the RAM write node: the caller's atomic update, opened HERE *)
-            iIntros (sigma) "Hsi".
+          - (* the RAM write node: the caller's atomic update, opened HERE.
+               A6.58: the node now receives the era's log bundle beside the
+               machine state and hands back the ADVANCED one -- the append
+               this store IS.  §0.17' is respected: no deposit or absorb
+               runs inside the update; the token is a plain resource
+               threaded through it. *)
+            iIntros (sigma img log tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
             iMod "HAU" as (vold) "[Hbw Hcl]".
-            iMod (wordw_pointsto_write_c (KTR := ktd) width sigma.(mem) ea ppn
-                vold sv Hw0 Hcan Hoff with "Hk Hmem Hbw") as "[Hmem Hbw]".
+            iMod (wordw_pointsto_write_c (KTR := ktd) (CIDw := CID) width img sigma log V
+                ea ppn vold sv Hw0 Hcan Hoff
+                with "Hk Hmem Htso Hctx Hbw")
+              as "(Hmem & Htso & Hctx & Hbw)".
             iMod ("Hcl" with "Hbw") as "HPsi".
             iMod "Hb1" as "_".
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
             iModIntro. iNext. iMod "Hb2" as "_". iModIntro.
-            iFrame "Hreg Hmem Hdev HPsi". }
+            subst tv.
+            iFrame "Hreg Hmem Hdev Htso Hctx HPsi". }
       (* ---- the post ---- *)
       iIntros (e) "(-> & Hfile & Hland)".
-      iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & HPsi & Hfrag)".
+      iDestruct "Hland" as (rsf)
+        "(%Hshape & Hrw & Hro & HRes & [Hctx HPsi] & Hfrag)".
       iSplitR; [done|].
       iAssert (∃ tv2 : type_of_register tlb,
                  hreg_frame (CID := CID)
@@ -1552,7 +1705,12 @@ Section WpSconfMem.
 
   Lemma wordw1_byte `{KTR : !CurKtier} (a : Arch.pa) (dq : dfrac)
       (w : mword (8*1)) :
-    wordw_pointsto 1 a dq w ⊣⊢ mem_pointsto a dq w.
+    (* A6.63'': [wordw_pointsto] is built from [ctx_pointsto cur_ctx]
+       (line 118), so the one-byte window IS the CONTEXT byte, not the raw
+       [mem_pointsto].  Stating the raw one made this [⊣⊢] false in the
+       return direction at TSO; at the ctx tower both directions are
+       identities. *)
+    wordw_pointsto 1 a dq w ⊣⊢ ctx_pointsto cur_ctx a dq w.
   Proof.
     rewrite /wordw_pointsto. change (Z.to_nat 1) with 1%nat.
     rewrite big_sepL_singleton pa_add_0 nth_byte0_id.
@@ -1592,12 +1750,11 @@ Section WpSconfMem.
               ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_1 eq_refl
               with "Hcg Hpc Hinstr [Hbyte] [Hcont]").
-    { iApply (wordw1_byte (KTR := ktd) ea (DfracOwn 1) vold).
-      iApply (TsoCtxShim.ctx_pointsto_to_mem with "Hbyte"). }
+    { iApply (wordw1_byte (KTR := ktd) ea (DfracOwn 1) vold). iExact "Hbyte". }
     iIntros (CID1 Hs1) "Hcg Hpc Hbw".
     iApply ("Hcont" $! CID1 with "[%] Hcg Hpc [Hbw]"); [ exact Hs1 | ].
     iEval (rewrite (wordw1_byte (KTR := ktd) ea (DfracOwn 1) storeval)) in "Hbw".
-    iApply (TsoCtxShim.ctx_pointsto_of_mem with "Hbw").
+    iExact "Hbw".
   Qed.
 
   (* ------------------------------------------------------------------- *)

@@ -406,7 +406,7 @@ Section ProofSysOpenBody.
   (* ---- the two field reads the walk makes into the LOCKED record, as
      accessors: [ic_loaded] is carried whole across the block and opened
      for exactly one halfword at a time. ---- *)
-  Local Lemma so_meta_acc (gfs : fs_names) (gi : gname) (cov : gset Z)
+  Local Lemma so_meta_acc `{XI : CurCtx} (gfs : fs_names) (gi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     ic_loaded gfs gi cov logstart k inum dn bm -∗
     inode_meta (ientry k) dn ∗
@@ -421,7 +421,7 @@ Section ProofSysOpenBody.
               Hdoc Hduq with "Hl Hd Hm Ha Hr Hb Hv Hw Ht").
   Qed.
 
-  Local Lemma so_type_acc (ip : mword 64) (dn : dinode) :
+  Local Lemma so_type_acc `{XI : CurCtx} (ip : mword 64) (dn : dinode) :
     inode_meta ip dn -∗
     i_type ip ↦₂ di_type dn ∗ (i_type ip ↦₂ di_type dn -∗ inode_meta ip dn).
   Proof.
@@ -429,7 +429,7 @@ Section ProofSysOpenBody.
     iIntros "Hty". iFrame "Hty Hmaj Hmin Hnl Hsz".
   Qed.
 
-  Local Lemma so_maj_acc (ip : mword 64) (dn : dinode) :
+  Local Lemma so_maj_acc `{XI : CurCtx} (ip : mword 64) (dn : dinode) :
     inode_meta ip dn -∗
     i_major ip ↦₂ di_major dn ∗ (i_major ip ↦₂ di_major dn -∗ inode_meta ip dn).
   Proof.
@@ -2257,7 +2257,7 @@ Section ProofSysOpenBody.
 
   (* the per-slot projection out of the boot family, at the copy the
      syscall's contract names ([ProofSysMkdir.md_esc_acc]'s twin). *)
-  Local Lemma so_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Local Lemma so_esc_acc `{XI : CurCtx} (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
@@ -2272,7 +2272,7 @@ Section ProofSysOpenBody.
      arm never needs either: [create_locked] carries both names itself.  It
      is the else arm, which locks an inode namei merely NAMED, that has to
      project them. *)
-  Local Lemma so_slk_acc (cn : ic_names) (k : nat) :
+  Local Lemma so_slk_acc `{XI : CurCtx} (cn : ic_names) (k : nat) :
     (k < NINODE)%nat ->
     (ic_sleeplocks cn -∗
      ∃ gil gisl : gname,
@@ -3497,7 +3497,7 @@ Section ProofSysOpenBody.
   (*  never spilled, which rides through arbitrary and is rejoined at    *)
   (*  every exit.  [Hal23] -- the split's own alignment side condition,  *)
   (*  which slot 23 is outside [so_al]'s range for -- comes off the      *)
-  (*  carve's points-to itself, [word_pointsto_aligned_p].               *)
+  (*  carve's points-to itself, [ctx_word_pointsto_aligned_p].               *)
   (*                                                                    *)
   (*  THE SHRINK-WRAPPED s1 SAVE IS WHAT MAKES THE CARVE ARM-DEPENDENT:  *)
   (*  [c.sdsp s1,168] is BELOW ARM 0's branch, so ARM 0 leaves slot 3    *)
@@ -3581,7 +3581,7 @@ Section ProofSysOpenBody.
     iDestruct (so_frame_carve sp0 with "Hframe")
       as "(%Hal & [%u1 Hf1] & [%u2 Hf2] & [%u3 Hf3] & [%u4 Hf4] & [%u5 Hf5] &
            [%u6 Hf6] & Hbytes & [%u23 H23] & [%u24 H24])".
-    iDestruct (word_pointsto_aligned_p with "H23") as %Hal23.
+    iDestruct (ctx_word_pointsto_aligned_p with "H23") as %Hal23.
     iDestruct (so_omode_split sp0 u23 with "H23") as "[H23lo H23hi]".
     assert (Hc1 : add_vec (M1 !!! Regidx csp_rs1 : mword 64)
                     (zero_extend' 64 (concat_vec (mword_of_int 23 : mword 6) ('b"000")))

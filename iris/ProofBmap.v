@@ -170,7 +170,7 @@ Section BmapKit.
      have to be threaded back out -- and only the two lemmas that actually
      reach a balloc call site take it.  [None] is the no-alloc caller, which
      never allocates and so never printks. *)
-  Definition bm_prk (ak : option bm_alloc) (γu : uart_names)
+  Definition bm_prk `{XI : CurCtx} (ak : option bm_alloc) (γu : uart_names)
       (γd : disk_names) : iProp Σ :=
     match ak with
     | Some a => (⌜printk_gen_contract (kt := KT1) (ba_pr a) γu γd⌝ ∗
@@ -178,10 +178,10 @@ Section BmapKit.
     | None => emp%I
     end.
 
-  Global Instance bm_prk_persistent ak γu γd : Persistent (bm_prk ak γu γd).
+  Global Instance bm_prk_persistent `{XI : CurCtx} ak γu γd : Persistent (bm_prk ak γu γd).
   Proof. destruct ak; apply _. Qed.
 
-  Lemma bm_prk_elim (a : bm_alloc) (ak : option bm_alloc)
+  Lemma bm_prk_elim `{XI : CurCtx} (a : bm_alloc) (ak : option bm_alloc)
       (γu : uart_names) (γd : disk_names) :
     ak = Some a ->
     bm_prk ak γu γd -∗
@@ -189,7 +189,7 @@ Section BmapKit.
       kernel_data ∗ printk_env (ba_pr a) γu γd.
   Proof. intros ->. rewrite /bm_prk. iIntros "H". iExact "H". Qed.
 
-  Lemma bm_prk_none (γu : uart_names) (γd : disk_names) :
+  Lemma bm_prk_none `{XI : CurCtx} (γu : uart_names) (γd : disk_names) :
     ⊢ bm_prk None γu γd.
   Proof. rewrite /bm_prk. done. Qed.
 
@@ -208,7 +208,7 @@ Section BmapKit.
      explicit.  It costs one
      binder on each of the four interior lemmas, all of which already carry
      [n] in exactly the same in/out positions. *)
-  Definition bm_kit (ak : option bm_alloc) (bn : bio_names) (γfs : fs_names)
+  Definition bm_kit `{XI : CurCtx} (ak : option bm_alloc) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat) (Sb : gset Z)
       : iProp Σ :=
     match ak with
@@ -224,7 +224,7 @@ Section BmapKit.
     | None => emp%I
     end.
 
-  Lemma bm_kit_elim (γ : log_names) (bms sz : Z) (dqb dqs : dfrac)
+  Lemma bm_kit_elim `{XI : CurCtx} (γ : log_names) (bms sz : Z) (dqb dqs : dfrac)
       (γpr : gname) (ak : option bm_alloc) (bn : bio_names)
       (γfs : fs_names) (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat)
       (Sb : gset Z) :
@@ -237,7 +237,7 @@ Section BmapKit.
       bitmap_inv γfs bms cov logstart sz.
   Proof. intros ->. rewrite /bm_kit. iIntros "H". iExact "H". Qed.
 
-  Lemma bm_kit_intro (γ : log_names) (bms sz : Z) (dqb dqs : dfrac)
+  Lemma bm_kit_intro `{XI : CurCtx} (γ : log_names) (bms sz : Z) (dqb dqs : dfrac)
       (γpr : gname) (ak : option bm_alloc) (bn : bio_names)
       (γfs : fs_names) (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat)
       (Sb : gset Z) :
@@ -256,7 +256,7 @@ Section BmapKit.
     iSplitL "E"; [iExact "E"|]. iExact "F".
   Qed.
 
-  Lemma bm_kit_none (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+  Lemma bm_kit_none `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (dev : mword 32) (n : nat) (Sb : gset Z) :
     ⊢ bm_kit None bn γfs cov logstart dev n Sb.
   Proof. rewrite /bm_kit. done. Qed.

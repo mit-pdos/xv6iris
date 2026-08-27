@@ -103,6 +103,7 @@ Require Import SpecMain.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import CtxKMap.   (* A6.69: the identity re-entry AT THE TOWER *)
 Require Import TsoCtx.
 Require TsoCtxShim.   (* the boot-side phys→ctx word mint *)
 Local Open Scope Z_scope.
@@ -162,23 +163,27 @@ Section BootStack.
      it out of.  Boot is Bare until kvminithart, so the pin costs nothing --
      and it is one of the two places in the tree where a concrete tier is a
      FACT rather than a parameter (the other is [sie_cap_intro_bare]). *)
+  (* A6.69: [StackOwn.stack_own_phys] is built from
+     [TsoCtx.ctx_phys_word_pointsto] since the ledger-page move, so this
+     bridge never leaves the tower: its premise is the CONTEXT's physical
+     word and the crossing is the identity re-entry
+     ([CtxKMap.ctx_phys_word_ident_mem]).  The old raw route
+     ([phys_ident_mem] + the shim's [ctx_pointsto_of_mem]) dropped the
+     ledger residue and its return leg is the direction the flip makes
+     false -- which is why the shim use here was never replaceable in
+     place. *)
   Lemma phys_word_to_word `{XI : CurCtx} (a : mword 64) (dq : dfrac) (w : bv 64) :
     (forall j : nat, (j < 8)%nat -> addr_is_kdata (pa_add a j)) ->
-    kmap_static_claims -∗ a ↦ₚ₈{dq} w -∗ a ↦₈{dq} w.
+    kmap_static_claims -∗
+    TsoCtx.ctx_phys_word_pointsto XI a dq w -∗ a ↦₈{dq} w.
   Proof.
     iIntros (Hkd) "#Hcl Hw".
-    iDestruct (phys_word_pointsto_aligned_p with "Hw") as %Hal.
-    iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
-    iApply (ctx_word_pointsto_intro _ a dq w Hal).
-    iApply (big_sepL_impl with "Hbs").
-    iIntros "!>" (k x Hk) "H".
-    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    pose proof (Hkd (0 + k)%nat ltac:(lia)) as Hka.
-    iApply TsoCtxShim.ctx_pointsto_of_mem.
-    iApply (phys_ident_mem (pa_add a (0 + k)%nat) dq (nth_byte w (0 + k)%nat)
-              (kdata_svpn_class _ Hka) (addr_is_kdata_ram _ Hka)
-              ltac:(unfold addr_is_kdata, text_end, ram_base, ram_size in Hka; lia)
-              with "Hcl H").
+    iApply (ctx_phys_word_ident_mem XI a dq w
+              (fun j Hj => kdata_svpn_class _ (Hkd j Hj))
+              (fun j Hj => ltac:(pose proof (Hkd j Hj) as Hka;
+                                 unfold addr_is_kdata, text_end, ram_base,
+                                        ram_size in Hka; lia))
+              with "Hcl Hw").
   Qed.
 
   Lemma stack_own_phys_to_stack `{XI : CurCtx} (sp : mword 64) (n : nat) :

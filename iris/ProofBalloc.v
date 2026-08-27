@@ -1821,16 +1821,14 @@ Section BallocBzero.
       rewrite /Z7 upd_ne; [| regne].
       exact (HZ6thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iEval (rewrite -HZ7a0) in "Hby".
-    (* memset's contract is context-indexed; this caller is not yet
-       converted -- the buffer crosses through the shim at the ambient
-       context (the bundle carries the thread token). *)
-    iDestruct (ctx_buf_of_mem KT0 cur_ctx with "Hby") as "Hby".
+    (* A6.68: memset's contract is context-indexed AND so is the buffer
+       ([↦ₘ] is the ctx tower), so the two shim crossings that used to
+       bracket this call were IDENTITIES and are simply gone. *)
     iApply (MS.wp_memset_sconf KT1 KT0 Z7 (K - 10)%nat 1024%nat
               (mword_of_int 0 : mword 64) (fun jj => bsD !!! jj) b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HZ7a1 HZ7a2
               with "Hcg Htext Hpc Hby").
     iIntros (CID10 Hq10 mM) "Hcg Hpc Hby %Hcs2".
-    iDestruct (ctx_buf_to_mem with "Hby") as "Hby".
     iEval (rewrite HZ7a0) in "Hby".
     assert (Hpc64 : ret_pc (Z7 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.balloc + 0x64)) by (rewrite HZ7ra; pcw).

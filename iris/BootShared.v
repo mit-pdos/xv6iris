@@ -1127,6 +1127,8 @@ Section BootAlloc.
       ([∗ map] vpn ↦ pc ∈ kmap_M0,
          ghost_map_elem kmap_name vpn (DfracOwn 1) pc) ∗
       kpt_unset ∗
+      (* A6.71: the pin bound's one-shot (A6.70 finding 1) *)
+      kptb_unset ∗
       ([∗ list] c ∈ enum CPU, hart_strans c) ∗
       ([∗ list] c ∈ enum CPU, hart_sie c) ∗
       ([∗ list] c ∈ enum CPU, hart_spp c) ∗
@@ -1301,7 +1303,7 @@ Section BootAlloc.
          ⌜virtio_live c0 = false⌝ ∗ disk_cfg_is γv (DfracOwn (1/2)) c0) ∗
       ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) ∗
       disk_done_lb γv 0%nat ∗
-      kpt_unset ∗ kmap_auth kmap_M0 ∗
+      kpt_unset ∗ kptb_unset ∗ kmap_auth kmap_M0 ∗
       (* THE BOOT MINT IS GONE FROM THIS INTERFACE, and that is stage (d2b):
          [disk_bytes γv 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk)]
          used to leave here and be dropped by the one caller.  It is now

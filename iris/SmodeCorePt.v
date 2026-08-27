@@ -397,14 +397,18 @@ Section SmodeCorePt.
   Qed.
 
   (* the VA window IS the physical window at [pa_of ppn a], both ways *)
+  (* FRACTION-GENERIC (the machine flip, A6.58): the store side calls it at
+     [DfracOwn 1] and the READ side ([wordw_win_load_c] below) at whatever
+     fraction the leaf holds, so [dq] is IMPLICIT -- every existing
+     positional call site is unmoved. *)
   Local Lemma win_to_phys `{KTR : !CurKtier} (a : mword 64) (ppn : mword 44)
-      (f : nat -> bv 8) (l : list nat) :
+      (f : nat -> bv 8) {dq : dfrac} (l : list nat) :
     (uint a < 274877906944)%Z ->
     Forall (fun j => (bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j < 4096)%Z) l ->
     kmap_at (svpn_of a) ppn KP_rw -∗
-    ([∗ list] j ∈ l, (pa_add a j) ↦ₘ (f j)) -∗
+    ([∗ list] j ∈ l, (pa_add a j) ↦ₘ{dq} (f j)) -∗
     ([∗ list] j ∈ l, TsoCtx.ctx_phys_pointsto TsoCtx.cur_ctx
-                       (pa_add (pa_of ppn a) j) (DfracOwn 1) (f j)).
+                       (pa_add (pa_of ppn a) j) dq (f j)).
   Proof.
     intros Hcan. induction l as [|x xs IH]; intro Hall.
     - iIntros "_ _". done.
@@ -413,7 +417,7 @@ Section SmodeCorePt.
       iDestruct (IH Hxs with "Hk Hrest") as "Hrest".
       iFrame "Hrest".
       iEval (rewrite (TsoCtx.ctx_pointsto_phys TsoCtx.cur_ctx (pa_add a x)
-                        (DfracOwn 1) (f x))) in "Hb".
+                        dq (f x))) in "Hb".
       iDestruct "Hb" as (ppn') "(#Hk' & %Hc & %Hp & Hph)".
       rewrite (svpn_of_pa_add a x Hcan Hx).
       iDestruct (kmap_at_agree with "Hk' Hk") as %[-> _].
@@ -582,6 +586,85 @@ Section SmodeCorePt.
             with "Hk Hm Htso Hrun Hb") as "(Hm & Htso & Hrun & Hb)".
     iModIntro. iFrame "Hm Htso Hrun".
     iApply ctx_word4_pointsto_intro; [exact Hal | iExact "Hb"].
+  Qed.
+
+  (* =================================================================== *)
+  (* THE CLAIM-KEYED WINDOW LOAD, PAID -- the READ twin of                *)
+  (* [wordw_win_store_c] (tso-machine-flip.md §6 amendment A6.58).         *)
+  (*                                                                      *)
+  (* WHY IT EXISTS.  A6.36's overruling deleted the strongly-ordered read  *)
+  (* arm, so an S-mode LOAD is [HartEvents]' PLAIN arm and its leaf owes   *)
+  (* [HartSMem.Mobl_ram]'s VIEW-INDEXED family -- what the load may return *)
+  (* at every view the hart can legally land on -- and not a flat          *)
+  (* [read_bytes] against [σ.(mem)].  That is precisely the shape the old  *)
+  (* [s_mem_chunk] could not produce (it reads the flat cache), which is   *)
+  (* the read-side half of A6.18's prediction coming due one tier over     *)
+  (* from [HartSKpt].                                                      *)
+  (*                                                                      *)
+  (* WHAT PAYS IT.  The leaf owns a VA byte window at its own tier;        *)
+  (* [win_to_phys] is what turns it into the ledger's PHYSICAL window (one *)
+  (* [kmap_at_agree] per byte, the non-straddling premise doing the work), *)
+  (* and [TsoCtx.ctx_phys_load_bytes_ok] answers from the running          *)
+  (* context's bound.                                                      *)
+  (*                                                                      *)
+  (* EVERYTHING HERE IS PURE, so the window, the token AND the interp      *)
+  (* bundle all come back -- which is why a leaf may run this INSIDE the   *)
+  (* arm's [={⊤,∅}=>] and still hand the window back in its post.  (The    *)
+  (* store twin cannot: it consumes and re-mints, and appends a message.)  *)
+  (* =================================================================== *)
+  Lemma wordw_win_load_c `{KTR : !CurKtier} (n : N) {m : N}
+      (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg)
+      (V : agent -> nat) (a : mword 64) (ppn : mword 44) (v : bv m)
+      (dq : dfrac) :
+    (uint a < 274877906944)%Z ->
+    Forall (fun j => (bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j < 4096)%Z)
+      (seq 0 (N.to_nat n)) ->
+    kmap_at (svpn_of a) ppn KP_rw -∗
+    gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n), (pa_add a j) ↦ₘ{dq} (nth_byte v j)) -∗
+    ⌜forall tv' : nat, (V (hart_agent cpu_id) <= tv')%nat ->
+       TsoMemPa.tso_read_bytes img log (hart_agent cpu_id) tv'
+         (pa_of ppn a) n v⌝.
+  Proof.
+    intros Hcan Hall. iIntros "#Hk Hm Htso Hrun Hb".
+    iDestruct (win_to_phys a ppn (nth_byte v) _ Hcan Hall with "Hk Hb") as "Hb".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+               σ.(sregs) σ.(mdev) Hpin).
+    iDestruct (TsoCtx.ctx_phys_load_bytes_ok
+                 (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
+                 TsoCtx.cur_ctx (pa_of ppn a) n v dq with "Hm Htso Hrun Hb")
+      as %Hok.
+    iPureIntro. intros tv' Htv'. apply Hok. cbn [gtv gs_of]. lia.
+  Qed.
+
+  (* the 8-byte instance, in the shape the S-mode LOAD leaves call it at:
+     the word cell itself, with its alignment fact doing the offset bound. *)
+  Lemma word_pointsto_load_c `{KTR : !CurKtier}
+      (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg)
+      (V : agent -> nat) (va : mword 64) (ppn : mword 44) (v : bv 64)
+      (dq : dfrac) :
+    (uint va < 274877906944)%Z ->
+    (bv_unsigned (subrange_vec_dec va 11 0) + 8 <= 4096)%Z ->
+    kmap_at (svpn_of va) ppn KP_rw -∗
+    gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
+    va ↦₈{dq} v -∗
+    ⌜forall tv' : nat, (V (hart_agent cpu_id) <= tv')%nat ->
+       TsoMemPa.tso_read_bytes img log (hart_agent cpu_id) tv'
+         (pa_of ppn va) 8 v⌝.
+  Proof.
+    intros Hcan Hoff. iIntros "#Hk Hm Htso Hrun Hw".
+    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hb".
+    iApply (wordw_win_load_c 8 img σ log V va ppn v dq Hcan
+              ltac:(apply Forall_forall; intros j Hj;
+                    apply elem_of_list_In, elem_of_seq in Hj;
+                    destruct Hj as [_ Hj8]; pose proof (Nat2Z.inj_lt j 8) as Hnz;
+                    change (Z.of_nat 8) with 8%Z in Hnz; lia)
+              with "Hk Hm Htso Hrun Hb").
   Qed.
 
   (* =================================================================== *)
