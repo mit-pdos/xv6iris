@@ -564,6 +564,13 @@ worth 20× on individual files.
 
 ### ProofIput RESISTS ALL FOUR OF THIS FILE'S LEVERS (measured 2026-08-27)
 
+**Except the fold, on a DIFFERENT continuation — 68.0 s → 63.6 s (−6.5 %),
+`.vo` −5.4 %, later the same day.** What regressed below is
+`ip_free_locked`'s closer; `ip_free_entry` carries two more (1.7 kB and
+7.6 kB, the largest inline continuation in the tree) and naming those pays.
+Do not read "this file resists the lever" as "this file resists it
+everywhere" — the unit is the continuation, not the file.
+
 `ProofIput.v` is 113 s in the build and 2.3x the tree's median cost per
 sentence, so it reads like a textbook RULE ONE file. It is not fixable by the
 rules above, and here is what was tried so nobody re-runs it:

@@ -21,6 +21,7 @@ stays TRANSPARENT and the `iApply ("H" $! …)` sites unify through it.
 | `ProofDirlink`: `dl_scan_exit` + `dl_after_exit` (6.3 kB into a 36.2 s lemma) | 41.7 → 38.5 s (**−7.7 %**), `.vo` −9.9 % |
 | `ProofKforkB6`: three `kfk_pro_exit*` (8.5 kB of a 12.6 kB statement) | 17.6 → 13.6 s (**−23.0 %**), `.vo` −35.1 % |
 | `ProofKexecA`: `kxc_a2_exit1` (3.0 kB into a 23.5 s lemma) | 28.7 → 26.7 s (**−7.0 %**), `.vo` −12.4 % |
+| `ProofIput`: `ip_entry_exit1/2` (1.7 + 7.6 kB into a 15.6 s lemma) | 68.0 → 63.6 s (**−6.5 %**), `.vo` −5.4 % |
 | `ProofSysUnlink`: `sys_unlink_closer` + `su_w1/w2/w3_seam` | 153.7 s → 133.1 s (−13.4 %), `.vo` −14.8 % |
 | kexec: `KexecOkQ.kexec_closer`, 36 inline copies across 12 files | B3/C/A 166.6 s → 153.6 s (−7.8 %), `.vo` −7 to −10 % |
 
@@ -77,8 +78,7 @@ anything:
 
 | candidate | bytes × lemma | note |
 |---|---|---|
-| `ProofIput.ip_free_entry` | 7.7 kB × 15.6 s | the largest inline continuation left in the tree |
-| `ProofIput.ip_free_locked` | 3.9 kB × 23.7 s | **this is the one that regressed +13 s**; see below |
+| `ProofIput.ip_free_locked` | 3.9 kB × 23.7 s | the ONLY one left, and it is the continuation that regressed +13 s once. `ip_free_entry`, in the same file, paid −6.5 %, so it is worth an A/B — but on its own. |
 
 Everything else on the ≥1 kB list fails on the carrying lemma being cheap, and
 `WpSconfCsr.wp_csrr_sstatus_s_sconf` is the cautionary one: **89.5 % share, the

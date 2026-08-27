@@ -3702,6 +3702,179 @@ Section IputFreePath.
     intros Hwf Hda. rewrite /dinode_wf Hda /bm_cells length_app.
     rewrite (blkmap_wf_dir_len _ _ _ Hwf). reflexivity.
   Qed.
+  (* exit continuation 2 of [ip_free_entry], named: inline it was
+     7568 B carried in Delta at every step of that walk
+     (optimization.md, fold block continuations).  The forall stays
+     OUTSIDE so the call sites can still instantiate it. *)
+  Definition ip_entry_exit2 `{GEN : GenId} `{CIDa : CpuId}
+      (γ : log_names) (bmapstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32) (k : nat) (q : Qp) (inum : mword 32) (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32)) (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat) (tid : nat) (qtx : Qp) (pidv : mword 32) (dqb : dfrac) (dqs : dfrac) (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Vpr : pprivate) (rg : bool) (ip : mword 64) (pj : mword 64) (sp0 : mword 64) (spd : mword 64) (M5 : regfile) (g1 : gname) (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) : iProp Σ :=
+    (⌜bv_unsigned (di_type dn) <> 0⌝ -∗
+       ⌜bv_unsigned (di_nlink dn) = 0⌝ -∗
+       ⌜dinode_wf dn⌝ -∗
+       ⌜blkmap_wf fsc_cov fsc_logst bm⌝ -∗
+       ⌜forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE⌝ -∗
+       ⌜di_addrs dn = bm_cells bm⌝ -∗
+       ⌜spd = M5 !!! Regidx csp_rs1⌝ -∗
+       ⌜M5 !!! Regidx Ra0 = (i_lock ip : mword 64)⌝ -∗
+       ⌜M5 !!! Regidx Rs1 = (ip : mword 64)⌝ -∗
+       ⌜M5 !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64)⌝ -∗
+       ⌜M5 !!! Regidx Rs3 = (i_lock ip : mword 64)⌝ -∗
+       ⌜M5 !!! Regidx Rs4 = (sign_extend' 64 dev : mword 64)⌝ -∗
+       (* s5..s11 untouched: what the integration's end-to-end callee_saved
+          chain needs beyond FreeLocked's own callee_saved *)
+       ⌜M5 !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5) /\
+        M5 !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5) /\
+        M5 !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5) /\
+        M5 !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5) /\
+        M5 !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5) /\
+        M5 !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5) /\
+        M5 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)⌝ -∗
+       sie_cap_gpr KT1 M5 (trap_res eb + (K - 6))%nat false pj -∗
+       cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
+       arm_pay KT1 0 eb pj -∗
+       trap_csrs_ext KT1 eb -∗
+       cpu_claim_ext eb pj -∗
+       pc_is (mword_of_int (KernelSyms.iput + 0x5a) : mword 64) -∗
+       locked fsc_itlock cpu_id -∗
+       itable_half Mt -∗
+       iref_slots_auth -∗
+       isl_pool Mt -∗
+       ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums nib ∖ ci_inums ci) ∅ -∗
+       (* ================================================================
+          THE WINDOW'S i_inum SPLIT -- the ONE place this Exit B is NOT
+          byte-identical to [ip_free_locked]'s entry, and it is FORCED, not
+          a proof-engineering choice.  See the header's EXIT B note.
+
+          At 0x5a the payload is OUT, so the escrow is on its HELD arm, and
+          [IcacheEscrow.ic_held] owns [i_inum] AT DFRAC 1 by design -- "both
+          [ic_mid_arm] and [ic_held] are refuted by a FULL [i_inum] cell"
+          (IcacheEscrow.v, the §17.3 (A) note above [ic_parked]).  That whole
+          cell is the arm's own 1/2 PLUS the closer's [q] PLUS the table's
+          [1/2 - q], i.e. exactly the two shares that live inside
+          [inode_ref k q dev inum] and inside [islot2 fsc_ic Mt ci k]'s
+          [islot_rest_at].  So NEITHER of those two resources exists here:
+          each is short precisely its [i_inum] share, and no other escrow arm
+          accepts "payload out, i_inum at a half" (PARKED holds the payload,
+          MID holds [i_inum] whole too, OUT needs a deposit the sleeplock has
+          not minted yet, EMPTY needs a dead slot).
+
+          What is handed instead is the pieces that DO exist plus the
+          RE-ASSEMBLY WAND.  [ip_free_locked] re-opens the HELD arm at its
+          own 0x76 [ic_open_held] regardless, and that returns [i_inum ↦₄
+          inum] WHOLE -- whose surplus half its body TODAY DROPS on the floor
+          (IputFreeLockedDev.v:586, [iDestruct (word4_pointsto_half_split
+          with "Hnfull") as "[Hinh _]"]).  Feeding that dropped half and the
+          borrowed [ic_id] to this wand rebuilds both resources exactly.
+          FLAGGED SEAM: ip_free_locked's premise list needs the matching
+          three-line repair before the two lemmas can be composed.
+          ================================================================ *)
+       ⌜ci !! k = Some (dev, inum)⌝ -∗
+       iref_tok k q -∗
+       ic_id fsc_ic k (1/4) true dev inum -∗
+       (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
+        ic_id fsc_ic k (1/4) true dev inum -∗
+        (* ...AND THE ARM's FIFTH CONJUNCT (A⁗, §3.16): the caller supplies
+           the FROZEN PARK it builds out of the mint's mirror half and the two
+           live slices it is about to stop needing.  It cannot be built here:
+           the mint has already flipped the bit, so nothing but the park
+           itself satisfies [islot2]'s live arm from +0x50 on. *)
+        frz_park k (bv_unsigned inum) -∗
+          ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic Mt ci i0) ∗
+          IcacheRef.inode_ident k (DfracOwn q) dev inum) -∗
+       ic_payload_at fsc_fs fsc_ireg fsc_cov fsc_logst k inum g1 dn bm -∗
+       live_gen k (1/2) g1 -∗
+       (* ---- WHAT THE MINT LEFT STANDING (iclaim-ledger.md §3.16, A⁗) ----
+          §3.14's token slot is gone from this seam: the free path no longer
+          hands the disjunction on unresolved, it hands on the THREE things
+          the mint at +0x50 produced.
+
+          [ifreeze_pre] is kept IN HAND all the way to +0x8a -- it decides the
+          escrow arm's tail at the +0x70 park and at the eviction
+          ([IcacheEscrow.ic_payload_arm_decide_frz]), it pins the count across
+          the lock-free span (B1, [IcacheInv.icnt_freeze_forces_one]) and it
+          is what [iref_close_last_freeze_store_au] steps.
+          The RECEIPT is what the +0x5e window exit parks in the escrow's
+          FROZEN alternative, and the last close takes it home.
+          The MIRROR's half UP is what [islot2]'s FROZEN PARK selects on --
+          the park the re-assembly wand above demands. *)
+       (* THE INDEX NAMES THE PARKED SHARE (durable-disk C-6): the mint at
+          +0x50 lends the freeze clause HALF of the caller's own share, and
+          the pair [(tid, qtx/2)] is what lets the off-lock deposit hand back
+          exactly that element: two halves of one element are not the
+          whole.  The other half is the window's, below. *)
+       ifreeze_pre ((rg, (tid, (qtx/2)%Qp)) : frzidx) (bv_unsigned inum) -∗
+       frzown (bv_unsigned inum) -∗
+       frzm_h (bv_unsigned inum) true -∗
+       (* ...AND THE SELECTOR's OFF HALF (RULING R-e, iclaim-ledger.md §5⁗⁗).
+          [frz_park_ref1_off] peeled it out of [islot2]'s live arm at the
+          +0x3a window-entering read; the two Exit-A arms put it straight back
+          ([frz_park_intro_off]), and on THIS arm the mint has already flipped
+          the bit, so it must ride out to [ip_free_locked]'s +0x62 re-park,
+          which is the one thing that can spend it. *)
+       IcacheRef.frzsel k (1/2)%Qp false -∗
+       i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       proc_priv_bare pj pidv Vpr -∗
+       bslots 3 -∗
+       log_epoch_lb γ v -∗
+       log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
+       log_opSe γ u Sb e0 -∗
+       (* ...AND THE WINDOW'S PIN (durable-disk B''-tx5): on THIS arm the
+          share stays parked in [ic_held] across [acquiresleep], so what
+          crosses the seam is the half that NAMES it -- [ip_free_locked]'s
+          +0x5e exit rejoins the two and takes the share back. *)
+       hpn_h k (Some (tid, (qtx/2)%Qp)) -∗
+       pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
+       pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
+       pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx Rs1) -∗
+       pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx Rs2) -∗
+       pa_stk sp0 5 ↦₈[KT1] (m !!! Regidx Rs3) -∗
+       pa_stk sp0 6 ↦₈[KT1] (m !!! Regidx Rs4) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  (* exit continuation 1 of [ip_free_entry], named: inline it was
+     1652 B carried in Delta at every step of that walk
+     (optimization.md, fold block continuations).  The forall stays
+     OUTSIDE so the call sites can still instantiate it. *)
+  Definition ip_entry_exit1 `{GEN : GenId} `{CIDa : CpuId}
+      (γ : log_names) (bmapstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32) (k : nat) (q : Qp) (inum : mword 32) (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32)) (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat) (tid : nat) (qtx : Qp) (pidv : mword 32) (dqb : dfrac) (dqs : dfrac) (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Vpr : pprivate) (rg : bool) (pj : mword 64) (sp0 : mword 64) (spd : mword 64) (M' : regfile) (vg4' : mword 64) (vg5' : mword 64) (vg6' : mword 64) : iProp Σ :=
+    (⌜iput_regs m M' spd k⌝ -∗
+       ⌜M' !!! Regidx Ra5 = sign_extend' 64 (iref_word Mt k)⌝ -∗
+       sie_cap_gpr KT1 M' (trap_res eb + (K - 6))%nat false pj -∗
+       cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
+       arm_pay KT1 0 eb pj -∗
+       trap_csrs_ext KT1 eb -∗
+       cpu_claim_ext eb pj -∗
+       pc_is (mword_of_int (KernelSyms.iput + 0x20) : mword 64) -∗
+       locked fsc_itlock cpu_id -∗
+       itable_half Mt -∗
+       iref_slots_auth -∗
+       isl_pool Mt -∗
+       ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic Mt ci i0) -∗
+       ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums nib ∖ ci_inums ci) ∅ -∗
+       IcacheRef.inode_ref k q dev inum -∗
+       (* RULING G: both Exit-A arms turn back BEFORE the +0x50 mint, so the
+          regime the caller lent has not been spent and comes straight back. *)
+       ireg_regime rg -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       proc_priv_bare pj pidv Vpr -∗
+       bslots 3 -∗
+       log_epoch_lb γ v -∗
+       log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
+       log_opSe γ u Sb e0 -∗
+       (* the share comes HOME on both Exit-A arms: the [valid = 0] one never
+          entered the window, and the [nlink /= 0] undo left it (B''-tx5). *)
+       tid ↪[ln_tx icfg_log]{#qtx} () -∗
+       pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
+       pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
+       pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx Rs1) -∗
+       pa_stk sp0 4 ↦₈[KT1] vg4' -∗
+       pa_stk sp0 5 ↦₈[KT1] vg5' -∗
+       pa_stk sp0 6 ↦₈[KT1] vg6' -∗
+       WP (Loop : expr riscv_lang))%I.
+
 
   (* ==========================================================================
      ip_free_entry.  Entry at iput+0x3a: itable.lock HELD, ref==1 known
@@ -3837,41 +4010,7 @@ Section IputFreePath.
     ((* ===== EXIT A: pc +0x20, the ip_tail seam (valid==0 OR nlink!=0);
        the bundle goes back UNTOUCHED, the payload is re-parked ===== *)
      (∀ (M' : regfile) (vg4' vg5' vg6' : mword 64),
-       ⌜iput_regs m M' spd k⌝ -∗
-       ⌜M' !!! Regidx Ra5 = sign_extend' 64 (iref_word Mt k)⌝ -∗
-       sie_cap_gpr KT1 M' (trap_res eb + (K - 6))%nat false pj -∗
-       cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
-       arm_pay KT1 0 eb pj -∗
-       trap_csrs_ext KT1 eb -∗
-       cpu_claim_ext eb pj -∗
-       pc_is (mword_of_int (KernelSyms.iput + 0x20) : mword 64) -∗
-       locked fsc_itlock cpu_id -∗
-       itable_half Mt -∗
-       iref_slots_auth -∗
-       isl_pool Mt -∗
-       ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic Mt ci i0) -∗
-       ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums nib ∖ ci_inums ci) ∅ -∗
-       IcacheRef.inode_ref k q dev inum -∗
-       (* RULING G: both Exit-A arms turn back BEFORE the +0x50 mint, so the
-          regime the caller lent has not been spent and comes straight back. *)
-       ireg_regime rg -∗
-       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-       proc_priv_bare pj pidv Vpr -∗
-       bslots 3 -∗
-       log_epoch_lb γ v -∗
-       log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
-       log_opSe γ u Sb e0 -∗
-       (* the share comes HOME on both Exit-A arms: the [valid = 0] one never
-          entered the window, and the [nlink /= 0] undo left it (B''-tx5). *)
-       tid ↪[ln_tx icfg_log]{#qtx} () -∗
-       pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
-       pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
-       pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx Rs1) -∗
-       pa_stk sp0 4 ↦₈[KT1] vg4' -∗
-       pa_stk sp0 5 ↦₈[KT1] vg5' -∗
-       pa_stk sp0 6 ↦₈[KT1] vg6' -∗
-       WP (Loop : expr riscv_lang))
+       ip_entry_exit1 (CIDa := CID0) γ bmapstart inodestart nib dev k q inum Mt ci u Sb cru e0 v tid qtx pidv dqb dqs m K eb lks Vpr rg pj sp0 spd M' vg4' vg5' vg6')
      ∧
      (* ===== EXIT B: pc +0x5a, byte-compatible with ip_free_locked's ENTRY
        (IputFreeLockedDev.v:247).  dn/bm/data/g1 are the body's discoveries
@@ -3879,130 +4018,7 @@ Section IputFreePath.
        premise list verbatim ===== *)
     (∀ (M5 : regfile) (g1 : gname) (dn : dinode) (bm : blkmap)
        (data : nat -> list (bv 8)),
-       ⌜bv_unsigned (di_type dn) <> 0⌝ -∗
-       ⌜bv_unsigned (di_nlink dn) = 0⌝ -∗
-       ⌜dinode_wf dn⌝ -∗
-       ⌜blkmap_wf fsc_cov fsc_logst bm⌝ -∗
-       ⌜forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE⌝ -∗
-       ⌜di_addrs dn = bm_cells bm⌝ -∗
-       ⌜spd = M5 !!! Regidx csp_rs1⌝ -∗
-       ⌜M5 !!! Regidx Ra0 = (i_lock ip : mword 64)⌝ -∗
-       ⌜M5 !!! Regidx Rs1 = (ip : mword 64)⌝ -∗
-       ⌜M5 !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64)⌝ -∗
-       ⌜M5 !!! Regidx Rs3 = (i_lock ip : mword 64)⌝ -∗
-       ⌜M5 !!! Regidx Rs4 = (sign_extend' 64 dev : mword 64)⌝ -∗
-       (* s5..s11 untouched: what the integration's end-to-end callee_saved
-          chain needs beyond FreeLocked's own callee_saved *)
-       ⌜M5 !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5) /\
-        M5 !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5) /\
-        M5 !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5) /\
-        M5 !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5) /\
-        M5 !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5) /\
-        M5 !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5) /\
-        M5 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)⌝ -∗
-       sie_cap_gpr KT1 M5 (trap_res eb + (K - 6))%nat false pj -∗
-       cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
-       arm_pay KT1 0 eb pj -∗
-       trap_csrs_ext KT1 eb -∗
-       cpu_claim_ext eb pj -∗
-       pc_is (mword_of_int (KernelSyms.iput + 0x5a) : mword 64) -∗
-       locked fsc_itlock cpu_id -∗
-       itable_half Mt -∗
-       iref_slots_auth -∗
-       isl_pool Mt -∗
-       ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums nib ∖ ci_inums ci) ∅ -∗
-       (* ================================================================
-          THE WINDOW'S i_inum SPLIT -- the ONE place this Exit B is NOT
-          byte-identical to [ip_free_locked]'s entry, and it is FORCED, not
-          a proof-engineering choice.  See the header's EXIT B note.
-
-          At 0x5a the payload is OUT, so the escrow is on its HELD arm, and
-          [IcacheEscrow.ic_held] owns [i_inum] AT DFRAC 1 by design -- "both
-          [ic_mid_arm] and [ic_held] are refuted by a FULL [i_inum] cell"
-          (IcacheEscrow.v, the §17.3 (A) note above [ic_parked]).  That whole
-          cell is the arm's own 1/2 PLUS the closer's [q] PLUS the table's
-          [1/2 - q], i.e. exactly the two shares that live inside
-          [inode_ref k q dev inum] and inside [islot2 fsc_ic Mt ci k]'s
-          [islot_rest_at].  So NEITHER of those two resources exists here:
-          each is short precisely its [i_inum] share, and no other escrow arm
-          accepts "payload out, i_inum at a half" (PARKED holds the payload,
-          MID holds [i_inum] whole too, OUT needs a deposit the sleeplock has
-          not minted yet, EMPTY needs a dead slot).
-
-          What is handed instead is the pieces that DO exist plus the
-          RE-ASSEMBLY WAND.  [ip_free_locked] re-opens the HELD arm at its
-          own 0x76 [ic_open_held] regardless, and that returns [i_inum ↦₄
-          inum] WHOLE -- whose surplus half its body TODAY DROPS on the floor
-          (IputFreeLockedDev.v:586, [iDestruct (word4_pointsto_half_split
-          with "Hnfull") as "[Hinh _]"]).  Feeding that dropped half and the
-          borrowed [ic_id] to this wand rebuilds both resources exactly.
-          FLAGGED SEAM: ip_free_locked's premise list needs the matching
-          three-line repair before the two lemmas can be composed.
-          ================================================================ *)
-       ⌜ci !! k = Some (dev, inum)⌝ -∗
-       iref_tok k q -∗
-       ic_id fsc_ic k (1/4) true dev inum -∗
-       (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-        ic_id fsc_ic k (1/4) true dev inum -∗
-        (* ...AND THE ARM's FIFTH CONJUNCT (A⁗, §3.16): the caller supplies
-           the FROZEN PARK it builds out of the mint's mirror half and the two
-           live slices it is about to stop needing.  It cannot be built here:
-           the mint has already flipped the bit, so nothing but the park
-           itself satisfies [islot2]'s live arm from +0x50 on. *)
-        frz_park k (bv_unsigned inum) -∗
-          ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic Mt ci i0) ∗
-          IcacheRef.inode_ident k (DfracOwn q) dev inum) -∗
-       ic_payload_at fsc_fs fsc_ireg fsc_cov fsc_logst k inum g1 dn bm -∗
-       live_gen k (1/2) g1 -∗
-       (* ---- WHAT THE MINT LEFT STANDING (iclaim-ledger.md §3.16, A⁗) ----
-          §3.14's token slot is gone from this seam: the free path no longer
-          hands the disjunction on unresolved, it hands on the THREE things
-          the mint at +0x50 produced.
-
-          [ifreeze_pre] is kept IN HAND all the way to +0x8a -- it decides the
-          escrow arm's tail at the +0x70 park and at the eviction
-          ([IcacheEscrow.ic_payload_arm_decide_frz]), it pins the count across
-          the lock-free span (B1, [IcacheInv.icnt_freeze_forces_one]) and it
-          is what [iref_close_last_freeze_store_au] steps.
-          The RECEIPT is what the +0x5e window exit parks in the escrow's
-          FROZEN alternative, and the last close takes it home.
-          The MIRROR's half UP is what [islot2]'s FROZEN PARK selects on --
-          the park the re-assembly wand above demands. *)
-       (* THE INDEX NAMES THE PARKED SHARE (durable-disk C-6): the mint at
-          +0x50 lends the freeze clause HALF of the caller's own share, and
-          the pair [(tid, qtx/2)] is what lets the off-lock deposit hand back
-          exactly that element: two halves of one element are not the
-          whole.  The other half is the window's, below. *)
-       ifreeze_pre ((rg, (tid, (qtx/2)%Qp)) : frzidx) (bv_unsigned inum) -∗
-       frzown (bv_unsigned inum) -∗
-       frzm_h (bv_unsigned inum) true -∗
-       (* ...AND THE SELECTOR's OFF HALF (RULING R-e, iclaim-ledger.md §5⁗⁗).
-          [frz_park_ref1_off] peeled it out of [islot2]'s live arm at the
-          +0x3a window-entering read; the two Exit-A arms put it straight back
-          ([frz_park_intro_off]), and on THIS arm the mint has already flipped
-          the bit, so it must ride out to [ip_free_locked]'s +0x62 re-park,
-          which is the one thing that can spend it. *)
-       IcacheRef.frzsel k (1/2)%Qp false -∗
-       i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) -∗
-       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-       proc_priv_bare pj pidv Vpr -∗
-       bslots 3 -∗
-       log_epoch_lb γ v -∗
-       log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
-       log_opSe γ u Sb e0 -∗
-       (* ...AND THE WINDOW'S PIN (durable-disk B''-tx5): on THIS arm the
-          share stays parked in [ic_held] across [acquiresleep], so what
-          crosses the seam is the half that NAMES it -- [ip_free_locked]'s
-          +0x5e exit rejoins the two and takes the share back. *)
-       hpn_h k (Some (tid, (qtx/2)%Qp)) -∗
-       pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
-       pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
-       pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx Rs1) -∗
-       pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx Rs2) -∗
-       pa_stk sp0 5 ↦₈[KT1] (m !!! Regidx Rs3) -∗
-       pa_stk sp0 6 ↦₈[KT1] (m !!! Regidx Rs4) -∗
-       WP (Loop : expr riscv_lang))) -∗
+       ip_entry_exit2 (CIDa := CID0) γ bmapstart inodestart nib dev k q inum Mt ci u Sb cru e0 v tid qtx pidv dqb dqs m K eb lks Vpr rg ip pj sp0 spd M5 g1 dn bm data)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros ip pj sp0 spd HK HKit Hk Hu3 Hcrb Hgeom Hsize Hbmpos Hbmcov Hbmlog
