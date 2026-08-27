@@ -167,11 +167,6 @@ Qed.
 Lemma ientry_sentinel : ientry NINODE = (mword_of_int KernelSyms.log : mword 64).
 Proof. rewrite /ientry. apply bv_eq. vm_compute. reflexivity. Qed.
 
-(* iinit's loop cursor walks the SLEEPLOCKS, not the entries *)
-Lemma ientry_lock_0 :
-  i_lock (ientry 0) = (mword_of_int (KernelSyms.itable + 40) : mword 64).
-Proof. rewrite /i_lock /ientry. apply bv_eq. vm_compute. reflexivity. Qed.
-
 (* AN ENTRY ADDRESS IS NEVER NULL -- the geometry alone says so, and it is
    what kills the null tests in ilock / iunlock, and what lets [cwd_ref]
    distinguish "no working directory" from "a reference to entry k". *)
@@ -285,13 +280,11 @@ Qed.
    [f] (the freeze phase, below) and [rc] (the claim-flavoured reference
    count, RULING R) sit above them in the same element.
 
-   THE LINK LEDGER USED TO LIVE HERE TOO, and lane G6 deleted it: four
-   counting columns [wl]/[wdu]/[wdt]/[g] carrying "live directory records
-   naming this inum", with fragments [ilink]/[ilinkd]/[ilinkdp]/[igrey] and
-   a parent register [p].  Link counts and types are ONE separate RA now --
-   [Xv6Cameras.fsLinkUR], an [auth (gmultiset ity)] per inum, whose
-   fragments ARE the counted dirents (design/fs-state.md §6½) -- and nothing
-   in a walk reads a ledger column.
+   LINK COUNTS AND TYPES ARE NOT IN THIS ELEMENT.  They are ONE SEPARATE
+   RA -- [Xv6Cameras.fsLinkUR], an [auth (gmultiset ity)] per inum whose
+   fragments ARE the counted dirents (design/fs-state.md §6½), with the
+   authority in [InodeRegion.ireg_lnk] beside the record and the fragments
+   in the directories' payloads.
 
    Filed as a [gmap] under ONE ambient gname ([icfg_link] below) rather
    than one gname per inum, for [icfg_iref]'s reason: a per-inum name
@@ -398,11 +391,9 @@ Definition frz_reg (ph : frz) : option frzidx :=
    definition and every landed literal below is therefore BYTE-IDENTICAL
    (they all sit at [f = None]), and only the AUTHORITY's spelling
    ([link_auth]) grows the column. *)
-(* LANE G6 NARROWED THE ELEMENT to [c] and [r] (plus [f] and [rc] above
-   them).  Through G5 it also carried the OLD LINK LEDGER's four counting
-   columns [wl]/[wdu]/[wdt]/[g] and the parent register [p]; link counts
-   and types are ONE separate RA now (fs-state.md §6½) and nothing reads a
-   ledger column.  The defaulted-alias layering below is unchanged. *)
+(* THE ELEMENT IS [c] and [r] (plus [f] and [rc] above them) and nothing
+   else: link counts and types are ONE separate RA (fs-state.md §6½), not a
+   column here.  The defaulted-alias layering below is unchanged. *)
 Definition lelem0 (c : ctyUR) (r : nat) : linkElemUR0 := (c, r).
 
 Definition lelemc (c : ctyUR) (r : nat) (f : frzUR) (rc : nat)
@@ -1246,8 +1237,6 @@ Section IcacheLink.
 
   Lemma ireg_regime_true : ireg_regime true = ireg_open.
   Proof. reflexivity. Qed.
-  Lemma ireg_regime_false : ireg_regime false = ireg_boot.
-  Proof. reflexivity. Qed.
 
   (* the two refutations the old un-indexed disjunction gave, at the index:
      a holder of the exclusive boot token refutes EITHER arm. *)
@@ -1260,13 +1249,6 @@ Section IcacheLink.
       iApply (ity_pending_excl with "H1 H2").
   Qed.
 
-  Lemma ireg_regime_disj (rg : bool) :
-    ireg_regime rg -∗ (ireg_open ∨ ireg_boot).
-  Proof.
-    rewrite /ireg_regime. destruct rg;
-      [ iIntros "H"; iLeft; iExact "H" | iIntros "H"; iRight; iExact "H" ].
-  Qed.
-
   Definition link_auth_e (z : Z) (a : linkElemUR) : iProp Σ :=
     own icfg_link ({[ z := ● a ]} : linkUR).
   Definition link_frag_e (z : Z) (b : linkElemUR) : iProp Σ :=
@@ -1276,9 +1258,6 @@ Section IcacheLink.
       (f : frzUR) (rc : nat) : iProp Σ :=
     link_auth_e z (lelemc c r f rc).
 
-  (* THE REFERENCE LICENCE.  Through G5 four LEDGER colours stood beside it
-     ([ilink] / [ilinkd] / [ilinkdp]+[iparent] / [igrey]); lane G6 deleted
-     them with the ledger they belonged to (fs-state.md §6½). *)
   (* THE CLAIM, TYPED (iclaim-ledger.md §5.2(a)).  [ty] is the type
      [ialloc] wrote into the box it claimed; [ireg_claim_au] mints the token
      at its own record's type and [ireg_withdraw] pays the equation back at
@@ -1340,9 +1319,6 @@ Section IcacheLink.
      which is exactly RULING C''s conversion. *)
   Lemma runit_any_intro (z : Z) : runit false z -∗ runit_any z.
   Proof. iIntros "H". iExact "H". Qed.
-
-  Lemma runit_any_plain (z : Z) : runit_any z ⊣⊢ runit_plain z.
-  Proof. reflexivity. Qed.
 
   (* the two columns' bumps, named, so the movers' statements stay readable
      and the arithmetic side conditions are [destruct b]-shaped *)
@@ -1489,16 +1465,6 @@ Section IcacheLink.
         [discriminate | discriminate]. }
     apply Some_included_exclusive in Hc; [| apply _ | exact Hcv].
     apply leibniz_equiv in Hc. rewrite -Hc. reflexivity.
-  Qed.
-
-  Lemma iclaim_excl (z : Z) (ty ty' : bv 16) (t t' : nat) (q q' : Qp) :
-    iclaim z ty t q -∗ iclaim z ty' t' q' -∗ False.
-  Proof.
-    rewrite /iclaim /link_frag_e. iIntros "H1 H2".
-    iDestruct (own_valid_2 with "H1 H2") as %Hv.
-    rewrite singleton_op singleton_valid -auth_frag_op auth_frag_valid in Hv.
-    iPureIntro. rewrite /lelem /lelemf /lelemc /lelem0 in Hv.
-    destruct Hv as [[[Hc _] _] _]. cbn in Hc. exact Hc.
   Qed.
 
   (* the f column's inclusion, unpacked by hand rather than through
@@ -1796,10 +1762,6 @@ Section IcacheLink.
     by rewrite -frac_agree_op Qp.half_half.
   Qed.
 
-  Lemma icnt_join (z : Z) (n : nat) :
-    icnt_half z n -∗ icnt_half z n -∗ icnt_full z n.
-  Proof. iIntros "H1 H2". rewrite icnt_split. iFrame. Qed.
-
   (* ===================================================================== *)
   (*  THE FREEZE RECEIPT [frzown] (iclaim-ledger.md §3.14 as built)         *)
   (* ===================================================================== *)
@@ -1891,10 +1853,6 @@ Section IcacheLink.
     by rewrite -frac_agree_op Qp.half_half.
   Qed.
 
-  Lemma frzm_join (z : Z) (b : bool) :
-    frzm_h z b -∗ frzm_h z b -∗ frzm_full z b.
-  Proof. iIntros "H1 H2". rewrite frzm_split. iFrame. Qed.
-
   (* ===================================================================== *)
   (*  THE LOCK-WINDOW PIN [hpn] (durable-disk B''-tx5)                      *)
   (* ===================================================================== *)
@@ -1936,19 +1894,6 @@ Section IcacheLink.
     rewrite singleton_op singleton_valid in Hv.
     apply frac_agree_op_valid_L in Hv as [_ Ho].
     by iPureIntro.
-  Qed.
-
-  Lemma hpn_update (k : nat) (o o' : option (nat * Qp)) :
-    hpn_h k o -∗ hpn_h k o ==∗ hpn_h k o' ∗ hpn_h k o'.
-  Proof.
-    rewrite /hpn_h /hpn_at. iIntros "H1 H2".
-    iCombine "H1 H2" as "H".
-    iMod (own_update _ _
-            (({[ k := to_frac_agree (1/2) (o' : leibnizO (option (nat * Qp))) ]} : hpnUR)
-             ⋅ ({[ k := to_frac_agree (1/2) (o' : leibnizO (option (nat * Qp))) ]} : hpnUR))
-           with "H") as "[$ $]"; [| done].
-    rewrite !singleton_op -!frac_agree_op !Qp.half_half.
-    apply singleton_update, cmra_update_exclusive. done.
   Qed.
 
   Definition hpn_full (k : nat) (o : option (nat * Qp)) : iProp Σ :=
@@ -2131,10 +2076,6 @@ Section IcacheRefGhost.
   Lemma live_frac_halve k q :
     live_frac k q -∗ live_frac k (q/2)%Qp ∗ live_frac k (q/2)%Qp.
   Proof. iIntros "H". rewrite -live_frac_split Qp.div_2. iFrame. Qed.
-
-  Lemma live_gen_halve k q g :
-    live_gen k q g -∗ live_gen k (q/2)%Qp g ∗ live_gen k (q/2)%Qp g.
-  Proof. iIntros "H". rewrite -live_gen_split Qp.div_2. iFrame. Qed.
 
   Lemma live_gen_bound k s1 g1 s2 g2 :
     live_gen k s1 g1 -∗ live_gen k s2 g2 -∗ ⌜(s1 + s2 ≤ 1)%Qp⌝.
@@ -2390,14 +2331,6 @@ Section IcacheRef.
       (dev inum : mword 32) : iProp Σ :=
     (iref_tok k q ∗ inode_ident k (DfracOwn q) dev inum)%I.
 
-  (* two references to one entry see the same inode -- for free, from the
-     fractional cells; no [agree] ghost is needed *)
-  Lemma inode_ref_agree k q1 d1 n1 q2 d2 n2 :
-    inode_ref k q1 d1 n1 -∗ inode_ref k q2 d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
-  Proof.
-    iIntros "[_ H1] [_ H2]". iApply (inode_ident_agree with "H1 H2").
-  Qed.
-
   (* ================================================================== *)
   (*  SHARES: what a reference can lend out, and what it costs it        *)
   (* ================================================================== *)
@@ -2465,14 +2398,6 @@ Section IcacheRef.
   Proof.
     rewrite /inode_shr_gen /inode_shr_gen_bare.
     iSplit; [iIntros "($ & $ & $)" | iIntros "[[$ $] $]"].
-  Qed.
-
-  Lemma inode_ref_gen_bare_split k q dev inum g :
-    inode_ref_gen k q dev inum g ⊣⊢
-    inode_ref_gen_bare k q dev inum g ∗ slh_tok (icfg_isl k) q.
-  Proof.
-    rewrite /inode_ref_gen /inode_ref_gen_bare.
-    iSplit; [iIntros "($ & $ & $ & $)" | iIntros "[($ & $ & $) $]"].
   Qed.
 
   Global Instance inode_shr_gen_bare_timeless k s dev inum g :
@@ -2625,12 +2550,6 @@ Section IcacheRef.
     inode_shr k s1 d1 n1 -∗ inode_shr k s2 d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
   Proof.
     iIntros "[H1 _] [H2 _]". iApply (inode_ident_agree with "H1 H2").
-  Qed.
-
-  Lemma inode_ref_shr_agree k q s d1 n1 d2 n2 :
-    inode_ref k q d1 n1 -∗ inode_shr k s d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
-  Proof.
-    iIntros "[_ H1] [H2 _]". iApply (inode_ident_agree with "H1 H2").
   Qed.
 
   (* ...and the same for a SHORT parent, which is what the gather at a
