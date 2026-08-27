@@ -12,7 +12,8 @@
                         only ever put mapped vas in an image).
      [umem pt M]        ownership of the process image [M] -- a gmap keyed by
                         USER VIRTUAL address (same keying as the dumped
-                        [sync_bytes]) -- realized as the same [↦ₚ] bytes the
+                        [sync_bytes]) -- realized as the same
+                        [ctx_phys_pointsto XI] bytes the
                         safety tier's [UserPtTree.umem_own] holds.  The two
                         are now the SAME definition up to the domain
                         constraint the safety tier carries.
@@ -39,6 +40,8 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import CommonWalk.
 Require Import UserPtTree.
+Require Import TsoCtx.   (* A6.49: [CurCtx] must be in scope for §2's
+                            ledger-tier byte -- see the note there. *)
 Require Import WpDecodeBridge DecodeTotalU.
 Local Open Scope Z_scope.
 Import Defs.
@@ -68,14 +71,16 @@ Section UmodeMem.
      bss and stack are all just entries (the dumped [sync_bytes]/[sync_data]
      unioned with the zero bss and the stack page's bytes). *)
   Definition umem (pt : uptd) (M : gmap Z (bv 8)) : iProp Σ :=
-    ([∗ map] va ↦ b ∈ M, (uva_pa pt va : Arch.pa) ↦ₚ b)%I.
+    ([∗ map] va ↦ b ∈ M,
+       TsoCtx.ctx_phys_pointsto XI (uva_pa pt va : Arch.pa) (DfracOwn 1) b)%I.
 
   (* read access to one byte *)
   Lemma umem_lookup_acc (pt : uptd) (M : gmap Z (bv 8)) (va : Z) (b : bv 8) :
     M !! va = Some b ->
     umem pt M -∗
-    ((uva_pa pt va : Arch.pa) ↦ₚ b ∗
-     ((uva_pa pt va : Arch.pa) ↦ₚ b -∗ umem pt M)).
+    (TsoCtx.ctx_phys_pointsto XI (uva_pa pt va : Arch.pa) (DfracOwn 1) b ∗
+     (TsoCtx.ctx_phys_pointsto XI (uva_pa pt va : Arch.pa) (DfracOwn 1) b -∗
+      umem pt M)).
   Proof.
     iIntros (Hl) "HM".
     iApply (big_sepM_lookup_acc with "HM"). exact Hl.
@@ -86,8 +91,10 @@ Section UmodeMem.
   Lemma umem_insert_acc (pt : uptd) (M : gmap Z (bv 8)) (va : Z) (b : bv 8) :
     M !! va = Some b ->
     umem pt M -∗
-    ((uva_pa pt va : Arch.pa) ↦ₚ b ∗
-     (∀ b' : bv 8, (uva_pa pt va : Arch.pa) ↦ₚ b' -∗ umem pt (<[va := b']> M))).
+    (TsoCtx.ctx_phys_pointsto XI (uva_pa pt va : Arch.pa) (DfracOwn 1) b ∗
+     (∀ b' : bv 8,
+        TsoCtx.ctx_phys_pointsto XI (uva_pa pt va : Arch.pa) (DfracOwn 1) b' -∗
+        umem pt (<[va := b']> M))).
   Proof.
     iIntros (Hl) "HM".
     iDestruct (big_sepM_insert_acc with "HM") as "[Hb Hrest]"; [exact Hl |].
@@ -295,8 +302,9 @@ Section UmodeMemBridge.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE INJECTIVITY, OUT OF THE OWNERSHIP.  Two distinct image keys own
-     two [↦ₚ] cells; [PtBytes.phys_pointsto_ne] (the exclusivity of the
-     physical points-to) says their addresses differ.  Nothing is assumed. *)
+     two REGISTERED physical cells; [TsoCtx.ctx_phys_pointsto_ne] (the
+     exclusivity of the ledger byte, A6.49) says their addresses differ.
+     Nothing is assumed. *)
   Lemma umem_inj (pt : uptd) (M : gmap Z (bv 8)) :
     umem pt M ⊢ ⌜forall va1 va2 : Z,
         va1 ∈ dom M -> va2 ∈ dom M ->
@@ -312,7 +320,7 @@ Section UmodeMemBridge.
     assert (Hb2' : delete va1 M !! va2 = Some b2).
     { rewrite (lookup_delete_ne M va1 va2 Hne). exact Hb2. }
     iDestruct (big_sepM_lookup _ _ _ _ Hb2' with "HM") as "Hb2".
-    iDestruct (phys_pointsto_ne with "Hb1 Hb2") as %Hpne.
+    iDestruct (TsoCtx.ctx_phys_pointsto_ne with "Hb1 Hb2") as %Hpne.
     iPureIntro. exfalso. exact (Hpne Heq).
   Qed.
 

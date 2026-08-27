@@ -499,6 +499,7 @@ Section UmodeFetchWord.
     iIntros (Hl Hnc HM) "Hmem HM".
     iDestruct (umem_lookup_acc pt M (uint pc + Z.of_nat j) b HM with "HM")
       as "[Hb Hback]".
+    iDestruct (TsoCtx.ctx_phys_pointsto_forget with "Hb") as "Hb".
     iDestruct (phys_valid with "Hmem Hb") as %Hv.
     iDestruct (phys_ram with "Hb") as %Hr.
     iPureIntro.

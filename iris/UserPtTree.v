@@ -138,7 +138,13 @@ Qed.
 (*                        address (the keying the descoped verified tier *)
 (*                        already used, [UmodeMem.umem]);                *)
 (*   [umem_own P M]       ownership of exactly those bytes, realized as  *)
-(*                        the [↦ₚ] cells at the translated addresses;   *)
+(*                        the [ctx_phys_pointsto XI] cells at the       *)
+(*                        translated addresses -- the LEDGER tier, not  *)
+(*                        raw [↦ₚ] (A6.49: [HartMemRun.bytes_own] moved *)
+(*                        there when the plain load and the store both  *)
+(*                        started owing the era log, and the UserBytes  *)
+(*                        bridge is a re-keying, so the two tiers must  *)
+(*                        agree);                                        *)
 (*   [user_pt_inv P M]    the tree invariant + [umem_own P M] + the two  *)
 (*                        pure side conditions;                          *)
 (*   [user_pt_any P]      [∃ M, user_pt_inv P M] -- what the USER-       *)
@@ -1039,7 +1045,8 @@ Section UserPtInv.
      decomposition; a flat pa-set dedups pages shared by several vpns. *)
   Definition udata_own (data : gset Arch.pa) : iProp Σ :=
     (∃ dm : gmap Arch.pa (bv 8),
-       ⌜dom dm = data⌝ ∗ [∗ map] a ↦ b ∈ dm, a ↦ₚ b)%I.
+       ⌜dom dm = data⌝ ∗
+       [∗ map] a ↦ b ∈ dm, TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) b)%I.
 
   (* ------------------------------------------------------------------ *)
   (* §3d THE ABSTRACT STATE and the bundle.                              *)
@@ -1050,7 +1057,8 @@ Section UserPtInv.
      says "this is ALL of the user's memory", not "some of it". *)
   Definition umem_own (P : uptd) (M : gmap Z (bv 8)) : iProp Σ :=
     (⌜dom M = uva_dom P⌝ ∗
-     [∗ map] va ↦ b ∈ M, (uva_pa P va : Arch.pa) ↦ₚ b)%I.
+     [∗ map] va ↦ b ∈ M,
+       TsoCtx.ctx_phys_pointsto XI (uva_pa P va : Arch.pa) (DfracOwn 1) b)%I.
 
   Definition umem_any (P : uptd) : iProp Σ := (∃ M, umem_own P M)%I.
 
@@ -1068,8 +1076,10 @@ Section UserPtInv.
   Lemma umem_own_acc (P : uptd) (M : gmap Z (bv 8)) (va : Z) (b : bv 8) :
     M !! va = Some b ->
     umem_own P M -∗
-    ((uva_pa P va : Arch.pa) ↦ₚ b ∗
-     (∀ b' : bv 8, (uva_pa P va : Arch.pa) ↦ₚ b' -∗ umem_own P (<[va := b']> M))).
+    (TsoCtx.ctx_phys_pointsto XI (uva_pa P va : Arch.pa) (DfracOwn 1) b ∗
+     (∀ b' : bv 8,
+        TsoCtx.ctx_phys_pointsto XI (uva_pa P va : Arch.pa) (DfracOwn 1) b' -∗
+        umem_own P (<[va := b']> M))).
   Proof.
     iIntros (Hl) "[%Hdom HM]".
     iDestruct (big_sepM_insert_acc with "HM") as "[Hb Hrest]"; [exact Hl |].
@@ -1087,11 +1097,15 @@ Section UserPtInv.
      the map into a big-op over the address space. *)
   Lemma umem_any_set (P : uptd) :
     umem_any P ⊣⊢
-    ([∗ set] va ∈ uva_dom P, ∃ b : bv 8, (uva_pa P va : Arch.pa) ↦ₚ b).
+    ([∗ set] va ∈ uva_dom P, ∃ b : bv 8,
+       TsoCtx.ctx_phys_pointsto XI (uva_pa P va : Arch.pa) (DfracOwn 1) b).
   Proof.
     rewrite /umem_any /umem_own.
     symmetry.
-    apply (bigset_gather (fun va b => ((uva_pa P va : Arch.pa) ↦ₚ b)%I) (uva_dom P)).
+    apply (bigset_gather
+             (fun va b =>
+                TsoCtx.ctx_phys_pointsto XI (uva_pa P va : Arch.pa) (DfracOwn 1) b)
+             (uva_dom P)).
   Qed.
 
   (* THE USER-EXECUTION PT BUNDLE: the tree invariant + the process's
@@ -1169,14 +1183,19 @@ Section UserPtInv.
     (forall j, (j < n)%nat -> is_Some (M !! (a + Z.of_nat j)%Z)) ->
     umem_own P M -∗
       ([∗ list] j ∈ seq 0 n,
-         (uva_pa P (a + Z.of_nat j)%Z : Arch.pa) ↦ₚ (M !!! (a + Z.of_nat j)%Z)) ∗
+         TsoCtx.ctx_phys_pointsto XI (uva_pa P (a + Z.of_nat j)%Z : Arch.pa)
+           (DfracOwn 1) (M !!! (a + Z.of_nat j)%Z)) ∗
       (∀ bs : nat -> bv 8,
          ([∗ list] j ∈ seq 0 n,
-            (uva_pa P (a + Z.of_nat j)%Z : Arch.pa) ↦ₚ bs j) -∗
+            TsoCtx.ctx_phys_pointsto XI (uva_pa P (a + Z.of_nat j)%Z : Arch.pa)
+              (DfracOwn 1) (bs j)) -∗
          umem_own P (umem_write M a n bs)).
   Proof.
     intros Hsome. iIntros "[%Hdom HM]".
-    rewrite (bigM_window (fun va b => ((uva_pa P va : Arch.pa) ↦ₚ b)%I) M a n Hsome).
+    rewrite (bigM_window
+               (fun va b =>
+                  TsoCtx.ctx_phys_pointsto XI (uva_pa P va : Arch.pa) (DfracOwn 1) b)
+               M a n Hsome).
     iDestruct "HM" as "[Hwin Hrest]".
     iFrame "Hwin".
     iIntros (bs) "Hwin'".
@@ -1185,7 +1204,9 @@ Section UserPtInv.
       by (intros j Hj; rewrite (umem_write_lookup_in M a n bs j Hj); eauto).
     iSplitR.
     { iPureIntro. rewrite <- Hdom. exact (umem_write_dom M a n bs Hsome). }
-    rewrite (bigM_window (fun va b => ((uva_pa P va : Arch.pa) ↦ₚ b)%I)
+    rewrite (bigM_window
+               (fun va b =>
+                  TsoCtx.ctx_phys_pointsto XI (uva_pa P va : Arch.pa) (DfracOwn 1) b)
                (umem_write M a n bs) a n Hsome').
     rewrite (umem_del_write M a n bs). iFrame "Hrest".
     iApply (big_sepL_mono with "Hwin'"). intros i j Hj.
@@ -1284,10 +1305,12 @@ Section UserPtInv.
     (forall j, (j < n)%nat -> uva_mapped P (a + Z.of_nat j)%Z) ->
     umem_lazy P sz M -∗
       ([∗ list] j ∈ seq 0 n,
-         (uva_pa P (a + Z.of_nat j)%Z : Arch.pa) ↦ₚ (M !!! (a + Z.of_nat j)%Z)) ∗
+         TsoCtx.ctx_phys_pointsto XI (uva_pa P (a + Z.of_nat j)%Z : Arch.pa)
+           (DfracOwn 1) (M !!! (a + Z.of_nat j)%Z)) ∗
       (∀ bs : nat -> bv 8,
          ([∗ list] j ∈ seq 0 n,
-            (uva_pa P (a + Z.of_nat j)%Z : Arch.pa) ↦ₚ bs j) -∗
+            TsoCtx.ctx_phys_pointsto XI (uva_pa P (a + Z.of_nat j)%Z : Arch.pa)
+              (DfracOwn 1) (bs j)) -∗
          umem_lazy P sz (umem_write M a n bs)).
   Proof.
     intros Hmap. iIntros "H".

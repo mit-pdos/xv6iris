@@ -110,6 +110,14 @@ Proof. solve_decision. Defined.
    the A/D-canonical table. *)
 Definition kptR : cmra := csumR (exclR unitO) (agreeR (leibnizO ptree)).
 
+(* A6.53 RULING 2: the kernel PT's canon-pin PUBLICATION BOUND, one-shot
+   and then persistent, exactly [kptR]'s shape one payload over.  It is an
+   AGREEMENT and not an order for the same reason [kptR] is: the bound is
+   fixed at publication and never moves (the A/D write-back keeps the pin,
+   it does not re-mint it), so a reader that carries [kpt_bound B] and one
+   that reads [B] out of an opening are talking about the same number. *)
+Definition kptbR : cmra := csumR (exclR unitO) (agreeR (leibnizO nat)).
+
 (* THE PER-CPU HELD-LOCK SET (LockSet.v, claude-notes/design/kernel-proofs.md):
    an authority over the set of RANKS -- lock-order levels, [LockRank.v] -- of
    the spinlocks this hart currently holds.  The authority rides in
@@ -192,6 +200,10 @@ Record riscvEraGS := RiscvEraGS {
      [kmap_name] does: the residue rides inside [sie_cap]/[intr_frame], so a
      class would have to be threaded through every sconf-tier file. *)
   era_kpt_name : gname;
+  (* ...and the canon pin's publication BOUND, shot at the same moment and
+     for the same table (A6.53 ruling 2).  Beside [era_kpt_name] rather
+     than in a class, for the reason that one is here. *)
+  era_kptb_name : gname;
   (* the S-mode translation ONE-SHOT (Bare -> kernel PT installed): a ghost
      name tracking which arm of [strans_inv] the capability's translation
      slot is in.  A pending half held outside the slot is the "still-Bare
@@ -399,6 +411,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscvF_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   riscvF_kptGS :: inG Σ kptR;
+  riscvF_kptbGS :: inG Σ kptbR;
   (* the per-hart held-lock set's functor (LockSet.v).  A FIELD rather than a
      standalone class: [cpu_locks] sits inside [IntrDefs.cpu_hart], so a class
      would have to be bound in every sconf-tier section in the tree. *)
@@ -555,6 +568,7 @@ Definition riscv_kmapGS `{!riscvGS Σ} :
     (@SailStdpp.Instances.Decidable_eq_mword 27)
     (@SailStdpp.Instances.Countable_mword 27) := riscvF_kmapGS.
 Definition riscv_kptGS `{!riscvGS Σ} : inG Σ kptR := riscvF_kptGS.
+Definition riscv_kptbGS `{!riscvGS Σ} : inG Σ kptbR := riscvF_kptbGS.
 Definition riscv_lockSetGS `{!riscvGS Σ} : inG Σ lockSetR := riscvF_lockSetGS.
 Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ CPU := riscvF_parkGS.
 Definition riscv_pstateGS `{!riscvGS Σ} : ghost_varG Σ (SailStdpp.Values.mword 32) :=
@@ -569,6 +583,7 @@ Definition plic_name `{!riscvGS Σ} : gname := era_plic_name riscv_eraGS.
 Definition virtio_name `{!riscvGS Σ} : gname := era_virtio_name riscv_eraGS.
 Definition kmap_name `{!riscvGS Σ} : gname := era_kmap_name riscv_eraGS.
 Definition kpt_name `{!riscvGS Σ} : gname := era_kpt_name riscv_eraGS.
+Definition kptb_name `{!riscvGS Σ} : gname := era_kptb_name riscv_eraGS.
 Definition ts_name `{!riscvGS Σ} : gname := era_ts_name riscv_eraGS.
 Definition logm_name `{!riscvGS Σ} : gname := era_logm_name riscv_eraGS.
 Definition loglen_name `{!riscvGS Σ} : gname := era_loglen_name riscv_eraGS.
@@ -1518,7 +1533,7 @@ End mem_pointsto_share.
    key instances and it will not unify with the stdpp-keyed one (the binder
    trap in durable-notes; the same reason [TsoMemPa.bytemap] exists). *)
 Definition pristine_elem `{!riscvGS Σ} (a : Arch.pa) : iProp Σ :=
-  (a ↪[ts_name]□ 0%nat)%I.
+  (a ↪[ts_name]□ (0%nat, None))%I.
 
 Global Instance pristine_elem_persistent `{!riscvGS Σ} a :
   Persistent (pristine_elem a).
@@ -2167,11 +2182,15 @@ Qed.
    [TsoCtx.ctx_pointsto]) is what adds the justification axis. *)
 Definition tso_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
     : iProp Σ :=
-  (∃ (TM : gmap Arch.pa nat) (LM : gmap nat pwmsg),
+  (∃ (TM : gmap Arch.pa ts_elem) (LM : gmap nat pwmsg),
      ghost_map_auth (era_ts_name E) 1 TM ∗
      ⌜dom TM = dom g.(gmem)⌝ ∗
-     ⌜∀ a t, TM !! a = Some t →
-        ∃ v, g.(gmem) !! a = Some v ∧ latest g.(gimg) g.(glog) a t v⌝ ∗
+     (* THE ELEMENT'S TIE, one conjunct (tso-pin-memo.md §5.1): the LATEST
+        half is the old statement verbatim at [e.1]; the PIN half is
+        vacuous at [None] and is [TsoMemPa.pin_ok] -- the walk's discharge
+        CONCLUSION, stored where the step relation can maintain it. *)
+     ⌜∀ a e, TM !! a = Some e →
+        ts_ok g.(gimg) g.(gmem) g.(glog) a e⌝ ∗
      ghost_map_auth (era_logm_name E) 1 LM ∗
      ⌜∀ i, LM !! i = g.(glog) !! i⌝ ∗
      mono_nat_auth_own (era_loglen_name E) 1 (length g.(glog)) ∗

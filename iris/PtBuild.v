@@ -1429,7 +1429,7 @@ Section PtBuildIris.
       cbn [Nat.add pt_base pt_ents pt_empty_node].
       replace (Z.of_nat k + 0) with (Z.of_nat k) by lia.
       iIntros "Hb".
-      rewrite (pt_slot_own_ctx (Some TsoCtx.cur_ctx) TsoCtx.cur_ctx _ _ _
+      rewrite (pt_slot_own_ctx (UTier TsoCtx.cur_ctx) TsoCtx.cur_ctx _ _ _
                  eq_refl).
       iApply TsoCtx.ctx_phys_word_pointsto_intro.
       { exact (u_pte_addr_aligned8 b (mword_of_int (Z.of_nat k))). }

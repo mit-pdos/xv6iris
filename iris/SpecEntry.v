@@ -126,9 +126,20 @@ Definition wp_entry_boot_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI 
   stimecmp ↦ᵣ stimecmp0 -∗
   (* the per-CPU stack0 pointer word _entry loads *)
   mb_ld_ea ↦ₚ₈{ dq } v_stack0 -∗
+  (* ... and its IMAGE RECEIPT (tso-machine-flip.md A6.10/A6.49).  [stack0]
+     is a link-time constant: the loader wrote it and nothing in the machine
+     ever stores to it, so the load's view-indexed obligation is discharged
+     with no context, no view and no bound.  Persistent, so it is not handed
+     back; its supplier is the era's initial-state ghost allocation. *)
+  TsoCtx.pristine_win mb_ld_ea 8 -∗
   (* start()'s 4-slot frame (own ra/s0 + child timerinit's ra/s0) as the
      bottom four slots of [stack_own_phys sp0 n] (any depth n >= 4). *)
   stack_own_phys sp0 n -∗
+  (* A6.17/A6.28/A6.49: the M-mode boot stack is a LEDGER region, so start()'s
+     two prologue stores owe the era log's append and therefore take the
+     running token.  [BootChain.boot_entry_bridge] holds one across the whole
+     M-mode bracket; it is handed straight back below. *)
+  own_context cur_ctx -∗
   kernel_text -∗
   ( ∀ (Mf : regfile)
       (msf satpf medelegf midelegf mief menvcfgf stimecmpf : mword 64)
@@ -176,6 +187,7 @@ Definition wp_entry_boot_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI 
     stimecmp ↦ᵣ stimecmpf -∗
     mb_ld_ea ↦ₚ₈{ dq } v_stack0 -∗
     stack_own_phys sp0 n -∗
+    own_context cur_ctx -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

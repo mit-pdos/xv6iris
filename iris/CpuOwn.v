@@ -107,7 +107,7 @@ Section CpuOwn.
     iDestruct (ctx_word4_pointsto_bytes with "Hn") as "Hb".
     iDestruct (ctx_word4_pointsto_bytes with "Hn'") as "Hb'".
     cbn [seq]. iDestruct "Hb" as "[H0 _]". iDestruct "Hb'" as "[H0' _]".
-    iDestruct (mem_pointsto_ne with "H0 H0'") as %Hne. done.
+    iDestruct (TsoCtx.ctx_pointsto_ne with "H0 H0'") as %Hne. done.
   Qed.
 
   Lemma cpu_own_arm_excl (n n' : nat) (eb eb' : bool) (p p' : mword 64)

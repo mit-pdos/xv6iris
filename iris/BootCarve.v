@@ -92,6 +92,11 @@ Qed.
 
 Section BootCarve.
   Context `{!riscvGS Σ}.
+  (* A6.49: [StackOwn.stack_own_phys] is [TsoCtx.ctx_phys_word_pointsto XI]
+     -- the M-mode boot stack is a LEDGER region (A6.17/A6.28) -- so the
+     carve that produces it needs the ambient context.  Only the lemmas
+     that mention it pick the binder up. *)
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* the raw memory conjunct's shape, named once: a per-byte [pointsto] at
      full ownership, exactly what [gen_heap_init_names] mints. *)
@@ -1162,15 +1167,112 @@ Section BootCarve.
     rewrite zstride_fmap big_sepL_fmap. iExact "H".
   Qed.
 
+  (* ================================================================== *)
+  (* §9  THE ELEMENT HALF OF THE CARVE (A6.49).                          *)
+  (*                                                                     *)
+  (* [stack_own_phys] is [TsoCtx.ctx_phys_word_pointsto XI], and a        *)
+  (* REGISTERED physical byte is a raw one PLUS its ledger element        *)
+  (* ([TsoCtx.ctx_phys_pointsto_of_elem]).  Nothing here MINTS an         *)
+  (* element -- A6.9 stands: [TsoCtx.ledger_elem0] is handed out exactly  *)
+  (* once, by the era's initial-state ghost allocation (the same supplier *)
+  (* as [boot_raw_bytes] itself and as A6.10's pristine receipts), so     *)
+  (* this family only CUTS that big-op in step with [boot_raw_ran]'s and  *)
+  (* pairs the two back up.  The new premise's supplier is therefore      *)
+  (* [BootShared] / [RiscvAdequacy].                                     *)
+  (* ================================================================== *)
+  Definition boot_led_ran (g : gstate) (lo hi : Z) : iProp Σ :=
+    ([∗ map] a ↦ _ ∈ ran_bytes g lo hi, TsoCtx.ledger_elem0 a (DfracOwn 1))%I.
+
+  (* THE CUT, [boot_ran_split]'s proof verbatim. *)
+  Lemma boot_led_split (g : gstate) (lo mid hi : Z) :
+    lo <= mid -> mid <= hi ->
+    boot_led_ran g lo hi ⊢ boot_led_ran g lo mid ∗ boot_led_ran g mid hi.
+  Proof.
+    intros H1 H2. rewrite /boot_led_ran (ran_bytes_union g lo mid hi H1 H2).
+    iIntros "H".
+    iDestruct (big_sepM_union with "H") as "[H1 H2]"; [apply ran_bytes_disj |].
+    iFrame "H1 H2".
+  Qed.
+
+  (* THE RUN, [boot_ran_bytes]' induction over the range's LENGTH. *)
+  Lemma boot_led_bytes (g : gstate) (lo : Z) (n : nat) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    ram_lo <= lo -> lo + Z.of_nat n <= ram_hi ->
+    boot_led_ran g lo (lo + Z.of_nat n)
+    ⊢ [∗ list] a ∈ zrun lo n, TsoCtx.ledger_elem0 (pa_of_z a) (DfracOwn 1).
+  Proof.
+    intro Hmem. revert lo. induction n as [|k IH]; intros lo Hlo Hhi.
+    - iIntros "_". done.
+    - assert (Hsplit : lo + Z.of_nat (S k) = lo + 1 + Z.of_nat k) by lia.
+      assert (H1 : lo <= lo + 1) by lia.
+      assert (H2 : lo + 1 <= lo + 1 + Z.of_nat k) by lia.
+      assert (Hlo1 : ram_lo <= lo + 1) by lia.
+      assert (Hhi1 : lo + 1 + Z.of_nat k <= ram_hi) by lia.
+      assert (Hain : ram_lo <= lo < ram_hi) by lia.
+      rewrite Hsplit.
+      iIntros "H".
+      iDestruct (boot_led_split g lo (lo + 1) (lo + 1 + Z.of_nat k) H1 H2
+                   with "H") as "[H1 H2]".
+      change (zrun lo (S k)) with (lo :: zrun (lo + 1) k).
+      iSplitL "H1".
+      + rewrite /boot_led_ran (ran_bytes_one g lo Hmem Hain) big_sepM_singleton.
+        iExact "H1".
+      + iApply (IH (lo + 1) Hlo1 Hhi1 with "H2").
+  Qed.
+
+  (* THE WORD's eight elements, [boot_ran_word]'s byte extraction at the
+     element: the run, re-indexed by [pa_add] exactly as the bytes are. *)
+  Lemma boot_led_word (g : gstate) (base : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    ram_lo <= base -> base + 8 <= ram_hi ->
+    boot_led_ran g base (base + 8)
+    ⊢ [∗ list] j ∈ seq 0 8,
+        TsoCtx.ledger_elem0 (pa_add (pa_of_z base) j) (DfracOwn 1).
+  Proof.
+    intros Hmem Hlo Hhi.
+    assert (E8 : base + 8 = base + Z.of_nat 8%nat) by (cbn; lia).
+    assert (Hhi8 : base + Z.of_nat 8%nat <= ram_hi) by (cbn; lia).
+    rewrite E8. iIntros "H".
+    iDestruct (boot_led_bytes g base 8%nat Hmem Hlo Hhi8 with "H") as "H".
+    rewrite zrun_fmap big_sepL_fmap.
+    iApply (big_sepL_impl with "H"). iIntros "!>" (kk i Hk) "Hb".
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    rewrite pa_add_mword. iExact "Hb".
+  Qed.
+
+  (* THE PAIRING: a raw boot word plus its eight elements IS the registered
+     physical word [stack_own_phys] is built out of. *)
+  Lemma boot_ctx_phys_word (g : gstate) (base : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    ram_lo <= base -> base + 8 <= ram_hi -> base mod 8 = 0 ->
+    boot_raw_ran g base (base + 8) -∗ boot_led_ran g base (base + 8) -∗
+    ∃ w : bv 64, TsoCtx.ctx_phys_word_pointsto XI (pa_of_z base) (DfracOwn 1) w.
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "Hr Hl".
+    iDestruct (boot_ran_word g base Hmem Hlo Hhi Hal with "Hr") as (w) "Hw".
+    iDestruct (boot_led_word g base Hmem Hlo Hhi with "Hl") as "Hl".
+    iDestruct (phys_word_pointsto_aligned_p with "Hw") as %Hal8.
+    iDestruct (phys_word_pointsto_bytes with "Hw") as "Hw".
+    iExists w.
+    iApply (TsoCtx.ctx_phys_word_pointsto_intro _ _ _ _ Hal8).
+    iCombine "Hw Hl" as "H". rewrite -big_sepL_sep.
+    iApply (big_sepL_impl with "H"). iIntros "!>" (kk j _) "[Hp He]".
+    iApply (TsoCtx.ctx_phys_pointsto_of_elem with "Hp He").
+  Qed.
+
   Lemma boot_stack_own_phys (g : gstate) (sp : mword 64) (n : nat) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     ram_lo + 8 * Z.of_nat n <= uint sp -> uint sp <= ram_hi ->
     uint sp mod 8 = 0 ->
-    boot_raw_ran g (uint sp - 8 * Z.of_nat n) (uint sp) ⊢ stack_own_phys sp n.
+    boot_raw_ran g (uint sp - 8 * Z.of_nat n) (uint sp) -∗
+    boot_led_ran g (uint sp - 8 * Z.of_nat n) (uint sp) -∗ stack_own_phys sp n.
   Proof.
     intro Hmem. induction n as [|k IH]; intros Hlo Hhi Hal.
-    - iIntros "_". rewrite /stack_own_phys. iExists []. by iSplitR.
+    - iIntros "_ _". rewrite /stack_own_phys. iExists []. by iSplitR.
     - assert (HSk : (S k = k + 1)%nat) by lia.
       assert (Hd1 : uint sp - 8 * Z.of_nat (S k)
                     <= uint sp - 8 * Z.of_nat (S k) + 8) by lia.
@@ -1183,14 +1285,16 @@ Section BootCarve.
       assert (Hstk8 : 8 * Z.of_nat (S k) <= uint sp) by (unfold ram_lo in Hlo; lia).
       assert (Hstk : pa_of_z (uint sp - 8 * Z.of_nat (S k)) = pa_stk sp (S k)).
       { rewrite <- (uint_pa_stk sp (S k) Hstk8). apply pa_of_z_uint. }
-      iIntros "H".
+      iIntros "H Hle".
       iDestruct (boot_ran_split g _ (uint sp - 8 * Z.of_nat (S k) + 8) (uint sp)
                    Hd1 Hd2 with "H") as "[Hw Hrest]".
-      iDestruct (boot_ran_word g (uint sp - 8 * Z.of_nat (S k)) Hmem Hwlo Hwhi
-                   (z_mod8_sub _ _ Hal) with "Hw") as (w) "Hw".
-      iEval (rewrite Hmid) in "Hrest".
+      iDestruct (boot_led_split g _ (uint sp - 8 * Z.of_nat (S k) + 8) (uint sp)
+                   Hd1 Hd2 with "Hle") as "[Hwe Hreste]".
+      iDestruct (boot_ctx_phys_word g (uint sp - 8 * Z.of_nat (S k)) Hmem Hwlo Hwhi
+                   (z_mod8_sub _ _ Hal) with "Hw Hwe") as (w) "Hw".
+      iEval (rewrite Hmid) in "Hrest". iEval (rewrite Hmid) in "Hreste".
       rewrite HSk (stack_own_phys_app sp k 1).
-      iSplitL "Hrest"; [iApply (IH Hklo Hhi Hal with "Hrest") |].
+      iSplitL "Hrest Hreste"; [iApply (IH Hklo Hhi Hal with "Hrest Hreste") |].
       iApply (stack_own_phys_1_intro (pa_stk sp k) w).
       rewrite (pa_stk_assoc sp k 1) -HSk -Hstk. iExact "Hw".
   Qed.

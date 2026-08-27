@@ -283,6 +283,10 @@ Section UptWalk.
         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
            (Z.sub pagesize_bits 1) 0)) = pa ->
     gen_cert -∗ resv_frag cpu_id rr -∗
+    (* A6.28/A6.55: the user tree's slots are LEDGER words, so the walk's
+       own A/D write-back owes the era log's append and therefore takes the
+       running token; it is handed straight back. *)
+    TsoCtx.own_context XI -∗
     upt_res_pt uroot tfp um tlbv -∗
     hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
     swp (translateAddr (Virtaddr va) acc)
@@ -291,6 +295,7 @@ Section UptWalk.
                   ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                   upt_res_pt uroot tfp um (register_lookup tlb rsf) ∗
+                  TsoCtx.own_context XI ∗
                   resv_any cpu_id).
   Proof.
     intros Hdisjf HDr HDw Hacc Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV
@@ -298,7 +303,7 @@ Section UptWalk.
            Hcanon Hout.
     pose proof Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
     pose proof Hpmpok as (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "#Hcert Hfrag Hres Hrw Hro".
+    iIntros "#Hcert Hfrag Hrun Hres Hrw Hro".
     iDestruct "Hres" as (t) "(%Hok & %Hspec & %Hwfm & Htree)".
     iDestruct (ptree_own_bytes 2 t with "Htree") as "(#Hclaims & %Hdisj & Hmm)".
     iDestruct (bytes_own_ram with "Hmm") as %Hram.
@@ -543,10 +548,11 @@ Section UptWalk.
                    (MState rs (ptree_bytes 2 t) dev0_state) _ _ rs
                    (ptree_bytes 2 t) Hdisjf HDr HDw (fun r _ => eq_refl)
                    ltac:(reflexivity) Htrg Htr
-                   with "Hcert [Hfrag] Hrw Hro Hmm") ].
+                   with "Hcert [Hfrag] Hrw Hro Hrun Hmm") ].
     2:{ iExists rr. iExact "Hfrag". }
     iIntros (v) "(-> & Hf)".
-    iDestruct "Hf" as (rs' mm') "(%Hag' & %Hsub' & %Hdom' & Hrw & Hro & Hmm' & Hany)".
+    iDestruct "Hf" as (rs' mm')
+      "(%Hag' & %Hsub' & %Hdom' & Hrw & Hro & Hrun & Hmm' & Hany)".
     assert (Hmmeq : mm' = ptree_bytes 2 t')
       by exact (u_map_eq mm' (ptree_bytes 2 t') Hsub'
                   ltac:(rewrite Hdom' Hdomt; reflexivity)).
@@ -558,7 +564,7 @@ Section UptWalk.
     rewrite (hreg_frame_ro_ext Df rs' rsf Dro
                (fun r Hr => Hag' r (elem_of_union_r _ _ _ Hr))).
     iSplitR; [iPureIntro; exact Hfile |].
-    iFrame "Hrw Hro Hany".
+    iFrame "Hrw Hro Hany Hrun".
     iExists t'.
     iSplitR; [iPureIntro; exact Hok' |].
     iSplitR; [iPureIntro; exact Hspec' |].
@@ -1115,6 +1121,7 @@ Section UptData.
                   ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                   upt_res_pt uroot tfp um (register_lookup tlb rsf) ∗
+                  TsoCtx.own_context XI ∗
                   resv_any cpu_id).
   Proof.
     intros Hacc Hdisjf HDr HDw Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV Hsatp

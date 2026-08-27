@@ -672,6 +672,88 @@ Section store.
     iExact "Htso".
   Qed.
 
+  (* THE PINNED TWIN (A6.53): the Svadu A/D write-back's own payer.  Same
+     append, same view move, and ONE extra premise -- each written byte
+     lands in its offset's allowed set, which at the kernel PT slot is
+     [PtTree.pte_slot_set_mem_set_ad].  The pin's bound and sets are
+     UNCHANGED, so the slot comes back pinned and the shared table stays
+     canon-INVARIANT under its own write-back. *)
+  Lemma wobl_ram_ledger_pin_ex (img : gmap Arch.pa (bv 8)) (sg : mstate)
+      (log : list pwmsg) (V : agent -> nat)
+      (n : N) (req : Interface.WriteReq.t n) (vold : bv (8 * n))
+      (B : nat) (Sf : nat -> TsoMemPa.byteset)
+      (Sg : Arch.pa -> TsoMemPa.byteset) :
+    ak_excl (Interface.WriteReq.access_kind req) = true ->
+    (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
+    (forall j : nat, (j < N.to_nat n)%nat ->
+       Sg (pa_add (Interface.WriteReq.pa req) j) = Sf j) ->
+    (forall j : nat, (j < N.to_nat n)%nat ->
+       nth_byte (Interface.WriteReq.value req) j ∈ Sf j) ->
+    gen_heap_interp (hG := riscv_memGS) sg.(mem) -∗
+    tso_interp_of riscv_eraGS img sg.(mem) log V -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n), ∃ t : nat,
+       TsoCtx.phys_ledger_pin (pa_add (Interface.WriteReq.pa req) j)
+         (DfracOwn 1) (nth_byte vold j) t B (Sf j)) ==∗
+    gen_heap_interp (hG := riscv_memGS)
+      (write_bytes sg.(mem) (Interface.WriteReq.pa req) n
+         (Interface.WriteReq.value req)) ∗
+    wobl_ram img sg log V n req ∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n), ∃ t : nat,
+       TsoCtx.phys_ledger_pin (pa_add (Interface.WriteReq.pa req) j)
+         (DfracOwn 1) (nth_byte (Interface.WriteReq.value req) j) t B (Sf j)).
+  Proof.
+    intros Hex Hn HS Hin. iIntros "Hgh Htso Hb".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    set (pa := Interface.WriteReq.pa req).
+    set (val := Interface.WriteReq.value req).
+    set (log' := (log ++ [PWMsg (snap_of pa n val) (hart_agent cpu_id)])%list).
+    set (V' := vstep (hart_agent cpu_id)
+                 (wstore_tv (Interface.WriteReq.access_kind req) log
+                    (V (hart_agent cpu_id))) log' V).
+    assert (Hw : wstore_tv (Interface.WriteReq.access_kind req) log
+                   (V (hart_agent cpu_id)) = S (length log))
+      by (rewrite /wstore_tv Hex; reflexivity).
+    assert (Hlen' : length log' = S (length log))
+      by (rewrite /log' length_app /=; lia).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+    { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
+      - exfalso. subst h. pose proof (fin_to_nat_lt cpu_id).
+        rewrite /hart_agent in Hh. lia.
+      - destruct (lt_dec h NCPU); [lia | reflexivity]. }
+    iDestruct (tso_interp_of_bound with "Htso") as %Hb.
+    assert (Htvmono : forall c : CPU,
+              (V (hart_agent c) <= V' (hart_agent c))%nat).
+    { intros c. rewrite /V' /vstep.
+      pose proof (Hb (hart_agent c)) as Hbc.
+      case_decide as Hd.
+      - rewrite Hw. lia.
+      - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first lia.
+        exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
+    assert (Htvtop : forall c : CPU,
+              (V' (hart_agent c) <= length log')%nat).
+    { intros c. rewrite /V' /vstep.
+      pose proof (Hb (hart_agent c)) as Hbc.
+      case_decide as Hd.
+      - rewrite Hw Hlen'. lia.
+      - destruct (lt_dec (hart_agent c) NCPU) as [|Hge].
+        + rewrite Hlen'. lia.
+        + exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log V
+               sg.(sregs) sg.(mdev) Hpin).
+    iMod (TsoCtx.ledger_store_win_pin_ok
+            (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
+            (gs_of img (write_bytes sg.(mem) pa n val) log' V'
+               sg.(sregs) sg.(mdev))
+            pa n vold val B Sf Sg Hn HS Hin eq_refl eq_refl eq_refl
+            Htvmono Htvtop with "Hgh Htso Hb") as "(Hgh & Htso & Hb)".
+    iModIntro. iFrame "Hgh Hb".
+    rewrite /wobl_ram.
+    rewrite -(tso_interp_of_at_gs riscv_eraGS img
+                (write_bytes sg.(mem) pa n val) log' V'
+                sg.(sregs) sg.(mdev) Hpin').
+    iExact "Htso".
+  Qed.
+
   Lemma wobl_ram_ctx (img : gmap Arch.pa (bv 8)) (sg : mstate)
       (log : list pwmsg) (V : agent -> nat) (xi : TsoCtx.CtxId)
       (n : N) (req : Interface.WriteReq.t n) (vold : bv (8 * n)) :

@@ -188,7 +188,6 @@ Section DiskBoot.
     rewrite (bb_ext a 2 (fun _ => byte_zero)
                (fun j => nth_byte (mword_of_int 0 : mword 16) j) Hfg).
     iIntros "H".
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "H") as "H".
     iApply (word2_pointsto_intro a (DfracOwn 1) _ Hal). iExact "H".
   Qed.
 

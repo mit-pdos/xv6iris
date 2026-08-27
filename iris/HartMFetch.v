@@ -591,6 +591,23 @@ Section fetch.
     ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
       tso_read_bytes img log (hart_agent cpu_id) tv' pa n w.
 
+  (* THE VALUE-AFTER-VIEW OBLIGATION (tso-pin-memo.md §0; A6.51's rule
+     pair).  [fobl_ram] quantifies ONE [w] good at EVERY reachable view,
+     which is FALSE of a slot that a completed A/D write-back sits above:
+     a reader below the write-back's timestamp reads the OLD word and one
+     above it the NEW one.  So the ∃ moves INSIDE, and what a caller pins
+     is a PREDICATE.  This is exactly [HartEvents.wp_hart_ram_read_plain_ex]'s
+     first premise, and [fobl_ram_ex_of] is why no existing payer moves. *)
+  Definition fobl_ram_ex (img : TsoMemPa.bytemap) (log : list pwmsg)
+      (tv : nat) (pa : Arch.pa) (n : N) {m : N} (P : bv m -> Prop) : Prop :=
+    ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+      ∃ w : bv m, tso_read_bytes img log (hart_agent cpu_id) tv' pa n w /\ P w.
+
+  Lemma fobl_ram_ex_of (img : TsoMemPa.bytemap) (log : list pwmsg)
+      (tv : nat) (pa : Arch.pa) (n : N) {m : N} (w : bv m) (P : bv m -> Prop) :
+    fobl_ram img log tv pa n w -> P w -> fobl_ram_ex img log tv pa n P.
+  Proof. intros Hf HP tv' Hlo Hhi. exists w. split; [by apply Hf | exact HP]. Qed.
+
   (* THE TEXT PAYER, and the mirror of [HartMLoad.robl_ram_ctx] one tier
      down: a fetch of ERA-IMAGE bytes owes nothing beyond the pristine
      receipt.  [TsoCtx.pristine_read_bytes_ok] concludes at EVERY agent and

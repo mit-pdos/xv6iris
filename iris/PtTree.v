@@ -897,6 +897,209 @@ Proof.
   rewrite Hm. exact Hi.
 Qed.
 
+(* ===================================================================== *)
+(* THE PT-SLOT TIER INDEX (A6.21, grown by A6.53 ruling 1).               *)
+(*                                                                       *)
+(*   [KTier B]  the SHARED KERNEL table: context-free ledger words, canon *)
+(*              PINNED at publication bound [B] (tso-pin-memo.md §5).     *)
+(*   [UTier xi] a PROCESS table: registered ledger words at xi.           *)
+(*                                                                       *)
+(* The index is CONCRETE at every real use, so the match below always     *)
+(* iota-reduces and no proof has to know it is there. *)
+(* ===================================================================== *)
+Inductive ptier : Type :=
+| KTier (B : nat)
+| UTier (xi : TsoCtx.CtxId).
+
+(* ===================================================================== *)
+(* THE KERNEL SLOT'S ALLOWED BYTES (tso-pin-memo.md §2/§5.5; A6.53).      *)
+(*                                                                       *)
+(* A canon-pinned kernel PT slot allows, per byte offset, exactly what    *)
+(* the Svadu A/D write-back can put there: byte 0 ranges over the         *)
+(* FOUR-element A/D class of the slot's own word and bytes 1..7 are       *)
+(* singletons, because [pte_set_ad] touches bits 6 and 7 and nothing      *)
+(* else ([PtAdBits.pte_set_ad_nth_byte_high]).  Two properties make the   *)
+(* pin work, and both are below: the family is INVARIANT under the        *)
+(* write-back (so a slot's pin survives its own store), and membership at *)
+(* every offset forces canon-equality (so the walk's certificate falls    *)
+(* out of the pin's tie by [PtAdBits.pte_bytes_canon]).                   *)
+(* ===================================================================== *)
+
+Definition pte_ad_byte0 (w : mword 64) : TsoMemPa.byteset :=
+  TsoMemPa.byteset_of4
+    (nth_byte (pte_set_ad w (mword_of_int 0) (mword_of_int 0)) 0%nat)
+    (nth_byte (pte_set_ad w (mword_of_int 0) (mword_of_int 1)) 0%nat)
+    (nth_byte (pte_set_ad w (mword_of_int 1) (mword_of_int 0)) 0%nat)
+    (nth_byte (pte_set_ad w (mword_of_int 1) (mword_of_int 1)) 0%nat).
+
+(* the model's leaf classifier as a boolean, and its A/D stability -- it
+   reads exactly X, W and R, all three untouched by [pte_set_ad]. *)
+Definition pte_nonleafb (w : mword 64) : bool :=
+  pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec w 7 0)).
+
+Lemma pte_nonleafb_set_ad (w : mword 64) (a d : mword 1) :
+  pte_nonleafb (pte_set_ad w a d) = pte_nonleafb w.
+Proof.
+  unfold pte_nonleafb, pte_is_non_leaf.
+  rewrite (pte_set_ad_flag_X w a d) (pte_set_ad_flag_W w a d)
+          (pte_set_ad_flag_R w a d).
+  reflexivity.
+Qed.
+
+Lemma pte_nonleafb_leaf (w : mword 64) : pte_nonleafb w = false <-> pte_leaf w.
+Proof. rewrite /pte_nonleafb /pte_leaf. reflexivity. Qed.
+
+(* THE ALLOWED-BYTE FAMILY, AND IT IS CONDITIONED ON LEAF-NESS (A6.55).
+   §1's measurement -- "A/D is defined only on LEAF PTEs, and the tree
+   agrees: every write path targets [pt_addr0 p1 vpn] and nothing else" --
+   is what lets an INTERIOR slot pin to eight SINGLETONS and so be read at
+   its EXACT value.  That is the property tso-pin-memo §5.5 claimed for
+   levels 2 and 1 and A6.54 reported lost: it is not lost, it just does
+   not come from [ledger_read_at_ok] + [⌜t ≤ B⌝] (which cannot apply to a
+   pinned element at all).  It comes from the SET. *)
+Definition pte_slot_set (w : mword 64) (j : nat) : TsoMemPa.byteset :=
+  if Nat.eqb j 0
+  then (if pte_nonleafb w
+        then TsoMemPa.byteset_sing (nth_byte w 0%nat)
+        else pte_ad_byte0 w)
+  else TsoMemPa.byteset_sing (nth_byte w j).
+
+Lemma pte_ad_byte0_set_ad (w : mword 64) (a d : mword 1) :
+  nth_byte (pte_set_ad w a d) 0%nat ∈ pte_ad_byte0 w.
+Proof.
+  rewrite /pte_ad_byte0 TsoMemPa.elem_of_byteset_of4.
+  destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
+    tauto.
+Qed.
+
+Lemma pte_ad_byte0_inv (w : mword 64) (b : bv 8) :
+  b ∈ pte_ad_byte0 w ->
+  exists a d : mword 1, b = nth_byte (pte_set_ad w a d) 0%nat.
+Proof.
+  rewrite /pte_ad_byte0 TsoMemPa.elem_of_byteset_of4.
+  intros [-> | [-> | [-> | ->]]]; eauto.
+Qed.
+
+(* THE INVARIANCE: a write-back does not move the family, so the pinned
+   element's payload is UNCHANGED by its own store. *)
+Lemma pte_slot_set_set_ad (w : mword 64) (a d : mword 1) (j : nat) :
+  pte_leaf w -> (j < 8)%nat ->
+  pte_slot_set (pte_set_ad w a d) j = pte_slot_set w j.
+Proof.
+  intros Hlf Hj. rewrite /pte_slot_set. destruct (Nat.eqb j 0) eqn:Hj0.
+  - rewrite pte_nonleafb_set_ad (proj2 (pte_nonleafb_leaf w) Hlf).
+    rewrite /pte_ad_byte0 !pte_set_ad_absorb //.
+  - apply Nat.eqb_neq in Hj0.
+    by rewrite (pte_set_ad_nth_byte_high w a d j ltac:(lia)).
+Qed.
+
+(* THE STORE'S SIDE CONDITION: every write-back byte of a LEAF slot is
+   allowed.  The leaf premise is exactly §1's measurement, and it is
+   available at the only site that discharges this -- the walk's O3 arm,
+   whose [Hvar] gives [pte_leaf] of the variant. *)
+Lemma pte_slot_set_mem_set_ad (w : mword 64) (a d : mword 1) (j : nat) :
+  pte_leaf w -> (j < 8)%nat ->
+  nth_byte (pte_set_ad w a d) j ∈ pte_slot_set w j.
+Proof.
+  intros Hlf Hj. rewrite /pte_slot_set. destruct (Nat.eqb j 0) eqn:Hj0.
+  - apply Nat.eqb_eq in Hj0. subst j.
+    rewrite (proj2 (pte_nonleafb_leaf w) Hlf). apply pte_ad_byte0_set_ad.
+  - apply Nat.eqb_neq in Hj0.
+    rewrite (pte_set_ad_nth_byte_high w a d j ltac:(lia)).
+    apply TsoMemPa.byteset_sing_in.
+Qed.
+
+(* THE READ'S CONCLUSION AT AN INTERIOR SLOT: all eight sets are
+   singletons, so the value is EXACT. *)
+Lemma pte_slot_set_exact (w w' : mword 64) :
+  pte_nonleafb w = true ->
+  (forall j : nat, (j < 8)%nat -> nth_byte w' j ∈ pte_slot_set w j) ->
+  forall j : nat, (j < 8)%nat -> nth_byte w' j = nth_byte w j.
+Proof.
+  intros Hnl H j Hj. pose proof (H j Hj) as Hm.
+  rewrite /pte_slot_set in Hm.
+  destruct (Nat.eqb j 0) eqn:Hj0.
+  - apply Nat.eqb_eq in Hj0. subst j.
+    rewrite Hnl in Hm. by apply TsoMemPa.elem_of_byteset_sing in Hm.
+  - by apply TsoMemPa.elem_of_byteset_sing in Hm.
+Qed.
+
+Lemma pte_slot_set_nonleaf_sing (w : mword 64) (j : nat) :
+  pte_nonleafb w = true ->
+  pte_slot_set w j = TsoMemPa.byteset_sing (nth_byte w j).
+Proof.
+  intros Hnl. rewrite /pte_slot_set. destruct (Nat.eqb j 0) eqn:Hj0.
+  - apply Nat.eqb_eq in Hj0. subst j. by rewrite Hnl.
+  - reflexivity.
+Qed.
+
+(* THE READ'S CONCLUSION AT A LEAF: membership at every offset forces
+   canon-equality (tso-pin-memo §5.5's reassembly, via
+   [PtAdBits.pte_bytes_canon]).  Stated unconditionally: at an interior
+   slot it holds a fortiori, since the value is exact. *)
+Lemma pte_slot_set_canon (w w' : mword 64) :
+  (forall j : nat, (j < 8)%nat -> nth_byte w' j ∈ pte_slot_set w j) ->
+  pte_canon w' = pte_canon w.
+Proof.
+  intros H. destruct (pte_nonleafb w) eqn:Hnl.
+  - assert (Hw : w' = w).
+    { apply (bv_eq_of_bytes (n := 8%N)). intros j Hj.
+      apply (pte_slot_set_exact w w' Hnl H). lia. }
+    by rewrite Hw.
+  - assert (H0 : nth_byte w' 0%nat ∈ pte_ad_byte0 w).
+    { have := H 0%nat ltac:(lia). rewrite /pte_slot_set /= Hnl. done. }
+    destruct (pte_ad_byte0_inv w _ H0) as (a & d & Hb0).
+    apply (pte_bytes_canon w w' a d Hb0).
+    intros j Hj. have := H j ltac:(lia). rewrite /pte_slot_set.
+    destruct (Nat.eqb j 0) eqn:Hj0.
+    { apply Nat.eqb_eq in Hj0. lia. }
+    by rewrite TsoMemPa.elem_of_byteset_sing.
+Qed.
+
+(* ...and therefore the family is determined by the CANON CLASS of a LEAF,
+   which is what lets a value-generic payer wand keep the pin. *)
+Lemma pte_slot_set_eq_of_mem (w w' : mword 64) :
+  pte_leaf w ->
+  (forall j : nat, (j < 8)%nat -> nth_byte w' j ∈ pte_slot_set w j) ->
+  forall j : nat, (j < 8)%nat -> pte_slot_set w' j = pte_slot_set w j.
+Proof.
+  intros Hlf H. pose proof (pte_slot_set_canon w w' H) as Hc.
+  destruct (pte_canon_inv w w' Hc) as (a & d & ->).
+  intros j Hj. by apply pte_slot_set_set_ad.
+Qed.
+
+(* THE WRITE-BACK'S SIDE CONDITION, named once: the slot being written is a
+   LEAF (§1: A/D is defined only on leaves, and every write path in the tree
+   targets [pt_addr0 p1 vpn]) and the new word is allowed at every byte.
+   This is what the payer wand carries; it is TIER-GENERIC (the [UTier] arm
+   ignores it) and it is exactly what the pinned store gate needs. *)
+Definition pte_wb_ok (wold wnew : mword 64) : Prop :=
+  pte_leaf wold /\
+  forall j : nat, (j < 8)%nat -> nth_byte wnew j ∈ pte_slot_set wold j.
+
+Lemma pte_wb_ok_set_ad (w : mword 64) (a d : mword 1) :
+  pte_leaf w -> pte_wb_ok w (pte_set_ad w a d).
+Proof.
+  intros Hlf. split; [exact Hlf |].
+  intros j Hj. by apply pte_slot_set_mem_set_ad.
+Qed.
+
+Lemma pte_wb_ok_mem (wold wnew : mword 64) :
+  pte_wb_ok wold wnew ->
+  forall j : nat, (j < 8)%nat -> nth_byte wnew j ∈ pte_slot_set wold j.
+Proof. by intros [_ Hm]. Qed.
+
+(* the pin's payload does not move: the written word's family IS the old
+   one, which is why a slot survives its own write-back pinned. *)
+Lemma pte_wb_ok_sets (wold wnew : mword 64) :
+  pte_wb_ok wold wnew ->
+  forall j : nat, (j < 8)%nat -> pte_slot_set wnew j = pte_slot_set wold j.
+Proof. intros [Hlf Hm]. by apply pte_slot_set_eq_of_mem. Qed.
+
+Lemma pte_wb_ok_canon (wold wnew : mword 64) :
+  pte_wb_ok wold wnew -> pte_canon wnew = pte_canon wold.
+Proof. intros [_ Hm]. by apply pte_slot_set_canon. Qed.
+
 Section PtTreeIris.
   Context `{!riscvGS Σ}.
 
@@ -929,12 +1132,21 @@ Section PtTreeIris.
   (* it is there.  The old names survive as ambient-context NOTATIONS      *)
   (* after this section, which is what keeps ~50 consumer files textually  *)
   (* unchanged. *)
-  Context (PTT : option CtxId).
+  (* A6.53 RULING 1: the index CARRIES the kernel tier's canon-pin bound.
+     [KTier B] is the shared kernel table, whose slots are pinned at [B]
+     with their own words' [pte_slot_set] family; [UTier ξ] is a process
+     table, registered at ξ as before.  The bound rides in the index rather
+     than in an ∃ inside the arm because the port's standing rule is that
+     indices are named explicitly (§0.7' rule 1, and A6.21's [option CtxId]
+     precedent) -- and because an ∃ would force [KptGhost] BELOW this file
+     to state the agreement.  Measured cost: 40 explicit-index sites in
+     seven files; the ~50 consumer files behind the notations do not move. *)
+  Context (PTT : ptier).
 
   Definition pt_slot_own (a : Arch.pa) (dq : dfrac) (w : bv 64) : iProp Σ :=
     match PTT with
-    | None => phys_ledger_word a dq w
-    | Some xi => ctx_phys_word_pointsto xi a dq w
+    | KTier B => phys_ledger_word_pin a dq w B (pte_slot_set w)
+    | UTier xi => ctx_phys_word_pointsto xi a dq w
     end.
 
   Global Instance pt_slot_own_timeless a dq w : Timeless (pt_slot_own a dq w).
@@ -948,17 +1160,18 @@ Section PtTreeIris.
   Lemma pt_slot_own_forget a dq w :
     pt_slot_own a dq w ⊢ phys_word_pointsto a dq w.
   Proof.
-    rewrite /pt_slot_own. destruct PTT as [xi|].
+    rewrite /pt_slot_own. destruct PTT as [B|xi].
+    - apply phys_ledger_word_pin_forget.
     - apply ctx_phys_word_pointsto_forget.
-    - apply phys_ledger_word_forget.
   Qed.
 
   Lemma pt_slot_own_ctx (xi : CtxId) a dq w :
-    PTT = Some xi -> pt_slot_own a dq w = ctx_phys_word_pointsto xi a dq w.
+    PTT = UTier xi -> pt_slot_own a dq w = ctx_phys_word_pointsto xi a dq w.
   Proof. intros HP. by rewrite /pt_slot_own HP. Qed.
 
-  Lemma pt_slot_own_ker a dq w :
-    PTT = None -> pt_slot_own a dq w = phys_ledger_word a dq w.
+  Lemma pt_slot_own_ker (B : nat) a dq w :
+    PTT = KTier B ->
+    pt_slot_own a dq w = phys_ledger_word_pin a dq w B (pte_slot_set w).
   Proof. intros HP. by rewrite /pt_slot_own HP. Qed.
 
   (* PERSISTENT per-node identity claim (uniform-claims PHYSICAL TIER): the
@@ -1379,40 +1592,46 @@ End PtTreeIris.
    the tiered slot a notation of its own makes that conversion a TOKEN
    substitution rather than a re-parenthesisation -- which matters, because
    the old spelling is an infix and the new head is a prefix. *)
-Notation "a ↦ₚₜ{ dq } w" := (pt_slot_own (Some TsoCtx.cur_ctx) a dq w)
+Notation "a ↦ₚₜ{ dq } w" := (pt_slot_own (UTier TsoCtx.cur_ctx) a dq w)
   (at level 20, format "a  ↦ₚₜ{ dq }  w") : bi_scope.
-Notation "a ↦ₚₜ w" := (pt_slot_own (Some TsoCtx.cur_ctx) a (DfracOwn 1) w)
+Notation "a ↦ₚₜ w" := (pt_slot_own (UTier TsoCtx.cur_ctx) a (DfracOwn 1) w)
   (at level 20, format "a  ↦ₚₜ  w") : bi_scope.
-Notation "a ↦ₖₜ{ dq } w" := (pt_slot_own None a dq w)
-  (at level 20, format "a  ↦ₖₜ{ dq }  w") : bi_scope.
+(* NOTE the spacing: a fused "]{" token would break ghost_map's [↪[γ]]
+   tree-wide (durable-notes' lexer rule, and it DID -- [KstackOwn]'s
+   [↦ₘ[KT0]{dq}] stopped parsing).  So this mirrors [↦ₘ[kt] dq v]'s
+   "] dq" shape rather than [↦ₘ{dq}]'s. *)
+Notation "a ↦ₖₜ[ B ] dq w" := (pt_slot_own (KTier B) a dq w)
+  (at level 20, format "a  ↦ₖₜ[ B ]  dq  w") : bi_scope.
 
 Lemma pt_slot_own_Some `{!riscvGS Σ} (xi : TsoCtx.CtxId)
     (a : Arch.pa) (dq : dfrac) (w : bv 64) :
-  pt_slot_own (Some xi) a dq w = TsoCtx.ctx_phys_word_pointsto xi a dq w.
+  pt_slot_own (UTier xi) a dq w = TsoCtx.ctx_phys_word_pointsto xi a dq w.
 Proof. reflexivity. Qed.
 
-Lemma pt_slot_own_None `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac) (w : bv 64) :
-  pt_slot_own None a dq w = TsoCtx.phys_ledger_word a dq w.
+Lemma pt_slot_own_None `{!riscvGS Σ} (B : nat)
+    (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+  pt_slot_own (KTier B) a dq w
+  = TsoCtx.phys_ledger_word_pin a dq w B (pte_slot_set w).
 Proof. reflexivity. Qed.
 
-Notation pt_page_own           := (pt_page_own_at (Some TsoCtx.cur_ctx)).
-Notation ptree_own             := (ptree_own_at (Some TsoCtx.cur_ctx)).
-Notation pt_kids_own           := (pt_kids_own_at (Some TsoCtx.cur_ctx)).
-Notation pt_frame              := (pt_frame_at (Some TsoCtx.cur_ctx)).
-Notation pt_page_own_acc       := (pt_page_own_acc_at (Some TsoCtx.cur_ctx)).
-Notation pt_page_own_acc_ro    := (pt_page_own_acc_ro_at (Some TsoCtx.cur_ctx)).
-Notation pt_kids_own_acc       := (pt_kids_own_acc_at (Some TsoCtx.cur_ctx)).
-Notation pt_kids_own_acc_ro    := (pt_kids_own_acc_ro_at (Some TsoCtx.cur_ctx)).
-Notation ptree_own_S           := (ptree_own_S_at (Some TsoCtx.cur_ctx)).
-Notation ptree_own_page_valid  := (ptree_own_page_valid_at (Some TsoCtx.cur_ctx)).
-Notation ptree_own_path_ro     := (ptree_own_path_ro_at (Some TsoCtx.cur_ctx)).
-Notation ptree_own_path_upd    := (ptree_own_path_upd_at (Some TsoCtx.cur_ctx)).
-Notation ptree_own_path_mem    := (ptree_own_path_mem_at (Some TsoCtx.cur_ctx)).
-Notation ptree_own_blocked_mem := (ptree_own_blocked_mem_at (Some TsoCtx.cur_ctx)).
+Notation pt_page_own           := (pt_page_own_at (UTier TsoCtx.cur_ctx)).
+Notation ptree_own             := (ptree_own_at (UTier TsoCtx.cur_ctx)).
+Notation pt_kids_own           := (pt_kids_own_at (UTier TsoCtx.cur_ctx)).
+Notation pt_frame              := (pt_frame_at (UTier TsoCtx.cur_ctx)).
+Notation pt_page_own_acc       := (pt_page_own_acc_at (UTier TsoCtx.cur_ctx)).
+Notation pt_page_own_acc_ro    := (pt_page_own_acc_ro_at (UTier TsoCtx.cur_ctx)).
+Notation pt_kids_own_acc       := (pt_kids_own_acc_at (UTier TsoCtx.cur_ctx)).
+Notation pt_kids_own_acc_ro    := (pt_kids_own_acc_ro_at (UTier TsoCtx.cur_ctx)).
+Notation ptree_own_S           := (ptree_own_S_at (UTier TsoCtx.cur_ctx)).
+Notation ptree_own_page_valid  := (ptree_own_page_valid_at (UTier TsoCtx.cur_ctx)).
+Notation ptree_own_path_ro     := (ptree_own_path_ro_at (UTier TsoCtx.cur_ctx)).
+Notation ptree_own_path_upd    := (ptree_own_path_upd_at (UTier TsoCtx.cur_ctx)).
+Notation ptree_own_path_mem    := (ptree_own_path_mem_at (UTier TsoCtx.cur_ctx)).
+Notation ptree_own_blocked_mem := (ptree_own_blocked_mem_at (UTier TsoCtx.cur_ctx)).
 
-Notation kpt_page_own          := (pt_page_own_at None).
-Notation kptree_own            := (ptree_own_at None).
-Notation kpt_kids_own          := (pt_kids_own_at None).
+Notation kpt_page_own B        := (pt_page_own_at (KTier B)).
+Notation kptree_own B          := (ptree_own_at (KTier B)).
+Notation kpt_kids_own B        := (pt_kids_own_at (KTier B)).
 
 (* ===================================================================== *)
 (* §7 TLB consistency MODULO A/D.  Every resident TLB entry is the walk   *)

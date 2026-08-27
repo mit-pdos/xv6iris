@@ -91,7 +91,7 @@ Section sframes.
       ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗
       sret_tie mst0 ∗
       tlb_snap_ok tlbv ∗
-      kpt_inv root_ppn.
+      kpt_inv root_ppn ∗ kpt_creds.
   Proof.
     iIntros "Hhs Hsc Hpc Htlb".
     iDestruct "Hsc" as "(#Hhw & #Hmi_inv & Hpriv & Hmst & Hmie & Hmenv)".
@@ -103,7 +103,7 @@ Section sframes.
     iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
     iDestruct "Htlb" as (satp0 tlbv)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlbc & Hsnap & Hpmp & Hkpt)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlbc & Hsnap & Hpmp & Hkpt & #Hcreds)".
     iDestruct "Hpmp" as (pcfg paddr)
       "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -129,7 +129,7 @@ Section sframes.
           s_rs_senv s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
         iFrame "Hpriv Hmstatus Hhs Hpcfg Hpaddr Hsatp Hmie Hmdl Hmenvc".
         by iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv".
-      + iFrame.
+      + iFrame. iFrame "Hcreds".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -171,12 +171,12 @@ Section sframes.
     ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) -∗
     sret_tie mst0 -∗
     tlb_snap_ok tlbv -∗
-    kpt_inv root_ppn -∗
+    kpt_inv root_ppn -∗ kpt_creds -∗
     resv_any cpu_id -∗
     hart_state ↦ᵣ HART_ACTIVE tt ∗ sconf ∗ pc_is npc ∗ tlb_res_pt root_ppn.
   Proof.
     intros Hmsf Hmm Hmenvval Hmode Hasid Hppn HA Hord HX HW HR Hcov.
-    iIntros "#Hhw #Hmi_inv Hrw Hro Hsie Hsret Hsnap Hkpt Hresv".
+    iIntros "#Hhw #Hmi_inv Hrw Hro Hsie Hsret Hsnap Hkpt #Hcreds Hresv".
     rewrite s_rw_split s_ro_split.
     rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip
       s_rs_tlb.
@@ -201,7 +201,7 @@ Section sframes.
       iSplitL "Hms Hmi".
       { iExists ms, bmi, mc, micfg. by iFrame "Hms Hmi Hmc Hmicfg". }
       iExists cy, ti, ip. by iFrame. }
-    iExists satp0, tlbv. iFrame "Hsatp Htlbc Hsnap Hkpt".
+    iExists satp0, tlbv. iFrame "Hsatp Htlbc Hsnap Hkpt Hcreds".
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iExists pcfg, paddr. by iFrame "Hpcfg Hpaddr".
   Qed.
@@ -388,14 +388,14 @@ Section sframes.
     ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) -∗
     sret_tie mst0 -∗
     tlb_snap_ok tlbv' -∗
-    kpt_inv root_ppn -∗
+    kpt_inv root_ppn -∗ kpt_creds -∗
     resv_any cpu_id -∗
     ▷ (hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf -∗ pc_is npc -∗
        tlb_res_pt root_ppn -∗ Psi -∗ WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hmsf Hmm Hmenvval Hmode Hasid Hppn HA Hord HX HW HR Hcov.
-    iIntros "#Hhw #Hmi_inv Hrw Hro Hbody Hsie Hsret Hsnap Hkpt Hfrag Hcont".
+    iIntros "#Hhw #Hmi_inv Hrw Hro Hbody Hsie Hsret Hsnap Hkpt #Hcreds Hfrag Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iApply (swp_exec_step_decode_execute s_Drw s_Dro (s_Df (DfracOwn 1))
               (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -423,7 +423,7 @@ Section sframes.
                      (minstret_inc_flag mc micfg Supervisor) _ _ _ mst0 mc micfg
                      misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 menv0 pcfg paddr
                      tlbv' Hmsf Hmm Hmenvval Hmode Hasid Hppn HA Hord HX HW HR
-                     Hcov with "Hhw Hmi_inv Hrw Hro Hsie Hsret Hsnap Hkpt Hfrag")
+                     Hcov with "Hhw Hmi_inv Hrw Hro Hsie Hsret Hsnap Hkpt Hcreds Hfrag")
           as "(Hhs & Hsc & Hpc & Htlb)".
         iApply ("Hcont" with "Hhs Hsc Hpc Htlb HPsi"). }
     iIntros "Hfrag Hrw Hro".
@@ -1263,7 +1263,7 @@ Section sframes.
       (* the non-cells, back untouched, as [s_frames_intro] does *)
       ghost_var γ (1/2) (_get_Mstatus_SIE mst0) ∗
       tlb_snap_ok tlbv ∗
-      kpt_inv root_ppn.
+      kpt_inv root_ppn ∗ kpt_creds.
   Proof.
     iIntros "Hsm Hpc Htlb".
     iDestruct "Hsm" as "(#Hhw & #Hminv & Hhs & Hpriv & Hmst & Hmie & Hmenv)".
@@ -1276,7 +1276,7 @@ Section sframes.
     iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
     iDestruct "Htlb" as (satp0 tlbv)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlbc & Hsnap & Hpmp & Hkpt)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlbc & Hsnap & Hpmp & Hkpt & #Hcreds)".
     iDestruct "Hpmp" as (pcfg paddr)
       "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -1302,7 +1302,7 @@ Section sframes.
           s_rs_senv s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
         iFrame "Hpriv Hmstatus Hhs Hpcfg Hpaddr Hsatp Hmiec Hmdlc Hmenvc".
         by iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv".
-      + iFrame.
+      + iFrame. iFrame "Hcreds".
   Qed.
 
 

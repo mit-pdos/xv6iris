@@ -619,12 +619,13 @@ Section SmodeCorePt.
        face holds the memory-model bundle -- A6.30); memory-indexed so a
        STRADDLING fetch, which translates twice, can chain it, and
        persistent for the same reason. *)
-    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64) (B : nat),
+         ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
          gen_heap_interp m -∗ S m -∗
-         TsoCtx.phys_ledger_word a (DfracOwn 1) wold ==∗
+         PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
          gen_heap_interp (write_bytes m a 8 wnew) ∗
          S (write_bytes m a 8 wnew) ∗
-         TsoCtx.phys_ledger_word a (DfracOwn 1) wnew) -∗
+         PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
     S σ.(mem) -∗
     sr_ktier_wit R cur_ktier -∗
     mstate_interp σ -∗
@@ -1230,11 +1231,18 @@ Section SmodeCorePt.
       as (ppnj) "(#Hkj & _ & %Htx & _ & Hp & #Hts & _)".
     iEval (rewrite (svpn_of_pa_add b j Hcan Hoffj)) in "Hkj".
     iDestruct (kmap_at_agree with "Hkj Hk") as %[Heqp _].
-    rewrite Heqp in Htx. rewrite (pa_of_pa_add ppn b j Hcan Hoffj) in Htx.
-    iEval (rewrite Heqp (pa_of_pa_add ppn b j Hcan Hoffj)) in "Hp".
-    iEval (rewrite Heqp (pa_of_pa_add ppn b j Hcan Hoffj)) in "Hts".
-    rewrite /phys_pointsto /TsoCtx.pristine_byte /pristine_elem.
-    iFrame "Hp Hts". iPureIntro. exact (addr_is_text_ram _ Htx).
+    (* A6.55 (SmodeCorePt's re-port, first compile): the agreement is
+       [ppnj = ppn], so the normalisation runs at [ppnj] and the GOAL is
+       brought to it -- the old text rewrote the HYPOTHESES at [ppn], which
+       is a no-op and left [iFrame] nothing to match. *)
+    rewrite (pa_of_pa_add ppnj b j Hcan Hoffj) in Htx.
+    iEval (rewrite (pa_of_pa_add ppnj b j Hcan Hoffj)) in "Hp".
+    iEval (rewrite (pa_of_pa_add ppnj b j Hcan Hoffj)) in "Hts".
+    rewrite <- Heqp.
+    iSplitL "Hp".
+    { rewrite /phys_pointsto. iFrame "Hp". iPureIntro.
+      exact (addr_is_text_ram _ Htx). }
+    rewrite /TsoCtx.pristine_byte. iExact "Hts".
   Qed.
 
   (* A6.36/A6.43: the S-mode fetch's obligation is the VIEW-INDEXED one, and
@@ -1270,7 +1278,7 @@ Section SmodeCorePt.
                  (nth_byte w j))%I as "#Hp".
     { iApply big_sepL_intro. iIntros "!>" (k j Hk).
       apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-      rewrite <- (Hg k ltac:(lia)).
+      rewrite Nat.add_0_l. rewrite <- (Hg k ltac:(lia)).
       iDestruct (s_text_byte pc b lo Nw k g ppn ltac:(lia) Hbase
                    (Hoffj k Hlt) Hcan with "Hk Hbytes") as "[$ _]". }
     iAssert (TsoCtx.pristine_win (pa_of ppn b) (N.to_nat n))%I as "#Hpr".
@@ -4329,12 +4337,13 @@ Section SmodeCorePt.
        face holds the memory-model bundle -- A6.30); memory-indexed so a
        STRADDLING fetch, which translates twice, can chain it, and
        persistent for the same reason. *)
-    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64) (B : nat),
+         ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
          gen_heap_interp m -∗ S m -∗
-         TsoCtx.phys_ledger_word a (DfracOwn 1) wold ==∗
+         PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
          gen_heap_interp (write_bytes m a 8 wnew) ∗
          S (write_bytes m a 8 wnew) ∗
-         TsoCtx.phys_ledger_word a (DfracOwn 1) wnew) -∗
+         PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
     S σ.(mem) -∗
     mstate_interp σ -∗
     tlb_res_pt root_ppn -∗
@@ -4361,8 +4370,10 @@ Section SmodeCorePt.
 
   (* the Sv39-kernel regime's residue as a function of the tlb value:
      [SRegime.kpt_swp_res root_ppn rs] with the file's [tlb] read off. *)
+  (* A6.55: ...and the pin credentials, as [SRegime.kpt_res_at] carries
+     them -- this residue is [tlb_res_pt]'s per-instruction face. *)
   Definition spt_res_pt (root_ppn : mword 44) (tv : type_of_register tlb)
-    : iProp Σ := (tlb_snap_ok tv ∗ kpt_inv root_ppn)%I.
+    : iProp Σ := (tlb_snap_ok tv ∗ kpt_inv root_ppn ∗ kpt_creds)%I.
 
   (* ==================================================================== *)
   (* wp_instr_s_config_tlbinv_pt -- the Sv39-kernel instance, on the       *)
@@ -4442,7 +4453,7 @@ Section SmodeCorePt.
     iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Htlbres
              Hpc Hinstr Htr Hex Hcont".
     iDestruct "Htlbres" as (satp0 tlbv)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlbc & Hsnap & Hpmp & #Hkpt)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlbc & Hsnap & Hpmp & #Hkpt & #Hcreds)".
     iDestruct "Hpmp" as (pcfg paddr)
       "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iApply (wp_instr_s_config_regime (spt_res_pt root_ppn) pc is_rvc i
@@ -4453,19 +4464,20 @@ Section SmodeCorePt.
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
                     Hpcfg Hpaddr Htlbc [Hsnap] Hpc Hinstr [Htr] [Hex]
                     [Hcont]").
-    - rewrite /spt_res_pt. iFrame "Hsnap Hkpt".
+    - rewrite /spt_res_pt. iFrame "Hsnap Hkpt Hcreds".
     - iApply ("Htr" $! satp0 pcfg paddr).
     - iApply ("Hex" $! satp0 pcfg paddr).
     - iNext. iIntros (npc ms1 mdv1 tv1)
         "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
          HRes Hpc HRl".
-      iDestruct "HRes" as "[Hsnap _]".
+      iDestruct "HRes" as "(Hsnap & _ & #Hcr)".
       iDestruct "Hsnap" as (t0) "[%Hok #Hlb]".
+      iDestruct "Hcr" as (Bc) "[#Hbdc #Hvlbc]".
       iApply ("Hcont" $! npc ms1 mdv1 with
                 "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
                  [Hsatp Htlbc Hpcfg Hpaddr] Hpc HRl").
-      iApply (tlb_res_pt_intro root_ppn satp0 tv1 t0 Hmode Hasid Hppn Hok
-                with "Hsatp Htlbc Hlb [Hpcfg Hpaddr] Hkpt").
+      iApply (tlb_res_pt_intro root_ppn satp0 tv1 t0 Bc Hmode Hasid Hppn Hok
+                with "Hsatp Htlbc Hlb Hbdc Hvlbc [Hpcfg Hpaddr] Hkpt").
       iApply (pmp_config_intro root_ppn pcfg paddr HA Hord HX HW HR Hcov
                 with "Hpcfg Hpaddr").
   Qed.

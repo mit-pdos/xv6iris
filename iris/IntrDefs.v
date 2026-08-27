@@ -1305,12 +1305,14 @@ Section IntrDefsBase.
       ↑kptN ⊆ E ->
       (* A6.24/A6.30: the A/D write-back's payer, THREADED (the exec lane
          never holds the bundle -- see A6.30). *)
-      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64)
+             (B : nat),
+             ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
              gen_heap_interp m -∗ S m -∗
-             TsoCtx.phys_ledger_word a (DfracOwn 1) wold ==∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
              gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
              S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
-             TsoCtx.phys_ledger_word a (DfracOwn 1) wnew) -∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
         S σ.(mem) -∗
         kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ={E}=∗
@@ -1395,12 +1397,14 @@ Section IntrDefsBase.
       ↑kptN ⊆ E ->
       (* A6.24/A6.30: the A/D write-back's payer, THREADED (the exec lane
          never holds the bundle -- see A6.30). *)
-      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64)
+             (B : nat),
+             ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
              gen_heap_interp m -∗ S m -∗
-             TsoCtx.phys_ledger_word a (DfracOwn 1) wold ==∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
              gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
              S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
-             TsoCtx.phys_ledger_word a (DfracOwn 1) wnew) -∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
         S σ.(mem) -∗
         kpt_on cpu_id -∗ kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ={E}=∗

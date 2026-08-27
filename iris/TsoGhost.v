@@ -75,8 +75,17 @@ Qed.
    [tsomem_natG]/[tsomem_dirtyG]; their NAMES ride in [TsoCtx.CtxId]. *)
 Class tsoMemG Σ := TsoMemG {
   (* the per-byte timestamp of the latest write; fragments ride inside
-     [ctx_pointsto] at the fact's own dq, beside gen_heap's byte *)
-  tsomem_tsG :: ghost_mapG Σ Arch.pa nat;
+     [ctx_pointsto] at the fact's own dq, beside gen_heap's byte.
+     THE ELEMENT CARRIES THE PIN (tso-pin-memo.md §5.2, ruling 2): the
+     value is [(t, None)] for an ordinary byte and [(t, Some (Sv, B))]
+     for a CANON-PINNED one -- the confinement payload of
+     [TsoMemPa.pin_ok].  Carrying it in the ELEMENT rather than in a
+     gate's premises is what keeps every existing store gate sound with
+     no new premise (the sealed definitions pin the option to [None], so
+     the interp's frame arm applies definitionally) and what avoids the
+     142-site / 36-file [kpt_inv] arity sweep: the bound rides here, not
+     in the invariant. *)
+  tsomem_tsG :: ghost_mapG Σ Arch.pa TsoMemPa.ts_elem;
   (* the log entries, persisted at append — "log[i] = m" is stable
      because the log is append-only; the dirty author-tie rides here *)
   tsomem_logmG :: ghost_mapG Σ nat pwmsg;

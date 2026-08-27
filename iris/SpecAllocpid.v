@@ -55,6 +55,7 @@ Definition alp_nextpid  : mword 64 := mword_of_int KernelSyms.nextpid.
 
 Section SpecAllocpid.
   Context `{!riscvGS Σ}.
+  Context `{XI : TsoCtx.CurCtx}.   (* A6.55: [↦₄] is the ctx byte tower *)
 
   (* everything <pid_lock> protects: the counter, value unconstrained. *)
   Definition nextpid_res : iProp Σ :=

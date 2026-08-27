@@ -2925,7 +2925,8 @@ Section ProcPt.
 
   (* one physical byte, contents existential (the [↦ₚ] analogue of
      KallocInv's [byte_any]) *)
-  Definition phys_byte_any (a : Arch.pa) : iProp Σ := (∃ b : bv 8, a ↦ₚ b)%I.
+  Definition phys_byte_any (a : Arch.pa) : iProp Σ :=
+    (∃ b : bv 8, TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) b)%I.
 
   (* a whole physical page.  Tier-neutral by construction: no va inside. *)
   Definition phys_page_own (ppn : mword 44) : iProp Σ :=
@@ -2956,7 +2957,8 @@ Section ProcPt.
 
   Lemma phys_bytes_word8 (a : mword 64) :
     is_aligned_paddr (Physaddr a) 8 = true ->
-    ([∗ list] j ∈ seq 0 8, phys_byte_any (pa_add a j)) ⊢ ∃ w : mword 64, a ↦ₚ₈ w.
+    ([∗ list] j ∈ seq 0 8, phys_byte_any (pa_add a j)) ⊢
+    ∃ w : mword 64, TsoCtx.ctx_phys_word_pointsto XI a (DfracOwn 1) w.
   Proof.
     intro Hal. rewrite /phys_byte_any.
     change (seq 0 8) with [0;1;2;3;4;5;6;7]%nat.
@@ -2968,7 +2970,7 @@ Section ProcPt.
     set (bs := [b0;b1;b2;b3;b4;b5;b6;b7]).
     set (w := Z_to_bv 64 (assemble_bytes bs) : mword 64).
     iExists w.
-    rewrite /phys_word_pointsto.
+    rewrite TsoCtx.ctx_phys_word_pointsto_unfold.
     iSplitR; [iPureIntro; exact Hal|].
     assert (E0 : nth_byte w 0%nat = b0) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
     assert (E1 : nth_byte w 1%nat = b1) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
@@ -2983,15 +2985,17 @@ Section ProcPt.
   Qed.
 
   Lemma phys_word8_bwin (a : mword 64) (w : mword 64) :
-    a ↦ₚ₈ w ⊢ [∗ list] j ∈ seq 0 8, phys_byte_any (pa_add a j).
+    TsoCtx.ctx_phys_word_pointsto XI a (DfracOwn 1) w ⊢
+    [∗ list] j ∈ seq 0 8, phys_byte_any (pa_add a j).
   Proof.
-    rewrite phys_word_pointsto_bytes. apply big_sepL_mono.
+    rewrite TsoCtx.ctx_phys_word_pointsto_bytes. apply big_sepL_mono.
     intros k j _. iIntros "H". by iExists (nth_byte w j).
   Qed.
 
   Lemma phys_page_field8 (p : mword 64) (o : nat) :
     page_valid p -> (o + 8 <= 4096)%nat -> (8 | Z.of_nat o) ->
-    ([∗ list] j ∈ seq o 8, phys_byte_any (pa_add p j)) ⊢ ∃ w : mword 64, pa_add p o ↦ₚ₈ w.
+    ([∗ list] j ∈ seq o 8, phys_byte_any (pa_add p j)) ⊢
+    ∃ w : mword 64, TsoCtx.ctx_phys_word_pointsto XI (pa_add p o) (DfracOwn 1) w.
   Proof.
     intros Hpv Ho Hdvd. rewrite phys_bwin_rebase.
     apply phys_bytes_word8. apply (page_off_aligned p o 8 Hpv ltac:(lia) ltac:(lia));
@@ -2999,14 +3003,15 @@ Section ProcPt.
   Qed.
 
   Lemma phys_page_field8_back (p : mword 64) (o : nat) (w : mword 64) :
-    pa_add p o ↦ₚ₈ w ⊢ [∗ list] j ∈ seq o 8, phys_byte_any (pa_add p j).
+    TsoCtx.ctx_phys_word_pointsto XI (pa_add p o) (DfracOwn 1) w ⊢
+    [∗ list] j ∈ seq o 8, phys_byte_any (pa_add p j).
   Proof. rewrite phys_bwin_rebase. apply phys_word8_bwin. Qed.
 
   Lemma phys_page_words8 (p : mword 64) (n : nat) :
     page_valid p -> (8 * n <= 4096)%nat ->
     ([∗ list] j ∈ seq 0 (8 * n), phys_byte_any (pa_add p j)) ⊢
     ∃ ws : list (mword 64), ⌜length ws = n⌝ ∗
-      ([∗ list] i ↦ w ∈ ws, pa_add p (8 * i)%nat ↦ₚ₈ w).
+      ([∗ list] i ↦ w ∈ ws, TsoCtx.ctx_phys_word_pointsto XI (pa_add p (8 * i)%nat) (DfracOwn 1) w).
   Proof.
     intro Hpv. induction n as [|n IH]; intro Hn.
     - iIntros "_". iExists []. by iSplit.
@@ -3024,7 +3029,7 @@ Section ProcPt.
   Qed.
 
   Lemma phys_page_words8_back (p : mword 64) (ws : list (mword 64)) :
-    ([∗ list] i ↦ w ∈ ws, pa_add p (8 * i)%nat ↦ₚ₈ w) ⊢
+    ([∗ list] i ↦ w ∈ ws, TsoCtx.ctx_phys_word_pointsto XI (pa_add p (8 * i)%nat) (DfracOwn 1) w) ⊢
     [∗ list] j ∈ seq 0 (8 * length ws), phys_byte_any (pa_add p j).
   Proof.
     induction ws as [|w ws IH] using rev_ind; [ by iIntros "_" | ].
@@ -3144,7 +3149,7 @@ Section ProcPt.
     intros Hwf Hinj.
     rewrite umem_any_set.
     rewrite (bigset_gather_reindex (uva_pa P) (uva_dom P) (u_data_pa P)
-               (fun (a : Arch.pa) (b : bv 8) => (a ↦ₚ b)%I)
+               (fun (a : Arch.pa) (b : bv 8) => TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) b)
                (uva_dom_inj P (uva_pa_inj_of_wf P Hwf Hinj)) (u_data_pa_img P)).
     rewrite /udata_own. iSplit.
     - iIntros "H". iDestruct "H" as (dm) "[%Hd Hm]". iExists dm. iFrame "Hm".
@@ -3173,6 +3178,41 @@ Section ProcPt.
   (* single constant byte value across the page and so does not fit       *)
   (* [page_own]'s per-byte existential contents.                          *)
   (* ------------------------------------------------------------------ *)
+  (* ---------------------------------------------------------------- *)
+  (* THE TIER CROSSING, AND IT IS AN ISOMORPHISM (A6.49).  The user      *)
+  (* tier's physical byte is [TsoCtx.ctx_phys_pointsto] -- the LEDGER    *)
+  (* byte, not the raw [↦ₚ] one -- because [HartMemRun.bytes_own] is,    *)
+  (* and [UserBytes] only RE-KEYS between them.  So the kalloc/kfree     *)
+  (* boundary and the copy windows cross with [TsoCtx]'s                 *)
+  (* [ctx_pointsto_to_phys] / [ctx_pointsto_of_phys] pair, the same one  *)
+  (* [KptTree] uses for a PT slot: the timestamp element and the         *)
+  (* clean/dirty bit ride through untouched, in BOTH directions.  The    *)
+  (* old route (forget to the raw byte, re-mint on the way back) cannot  *)
+  (* come back -- A6.9 -- and does not have to.                          *)
+  (* ---------------------------------------------------------------- *)
+  Lemma ctx_ident_phys (a : Arch.pa) (dq : dfrac) (b : bv 8) :
+    kmap_static (svpn_of a) KP_rw ->
+    kmap_static_claims -∗ a ↦ₘ{dq} b -∗ TsoCtx.ctx_phys_pointsto XI a dq b.
+  Proof.
+    iIntros (Hs) "#Hcl H".
+    iDestruct (TsoCtx.ctx_pointsto_canonical with "H") as %Hc.
+    iDestruct (kmap_static_claims_at (svpn_of a) KP_rw Hs with "Hcl") as "#Hk0".
+    iApply (TsoCtx.ctx_pointsto_to_phys XI (kpt_leaf_ppn (svpn_of a)) a dq b
+              (pa_of_id a Hc) with "Hk0 H").
+  Qed.
+
+  Lemma phys_ident_ctx (a : Arch.pa) (dq : dfrac) (b : bv 8) :
+    kmap_static (svpn_of a) KP_rw -> (uint a < 274877906944)%Z ->
+    kmap_static_claims -∗ TsoCtx.ctx_phys_pointsto XI a dq b -∗ a ↦ₘ{dq} b.
+  Proof.
+    iIntros (Hs Hc) "#Hcl H".
+    iDestruct (kmap_static_claims_at (svpn_of a) KP_rw Hs with "Hcl") as "#Hk0".
+    iApply (TsoCtx.ctx_pointsto_of_phys XI (kpt_leaf_ppn (svpn_of a)) a dq b
+              (pa_of_id a Hc) Hc
+              (ktier_pin_of_id cur_ktier (kpt_leaf_ppn (svpn_of a)) a
+                 (pa_of_id a Hc)) with "Hk0 H").
+  Qed.
+
   Lemma page_own_to_phys (ppn : mword 44) :
     page_valid (page_base ppn) ->
     kmap_static_claims -∗ page_own (page_base ppn) -∗ phys_page_own ppn.
@@ -3184,8 +3224,7 @@ Section ProcPt.
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     rewrite /byte_any /phys_byte_any. iDestruct "H" as (b) "H".
     iExists b.
-    iDestruct (TsoCtx.ctx_pointsto_forget with "H") as "H".
-    iApply (mem_ident_phys (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
+    iApply (ctx_ident_phys (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
               (page_valid_kmap_static ppn (0 + k)%nat Hv ltac:(lia)) with "Hb H").
   Qed.
 
@@ -3200,10 +3239,8 @@ Section ProcPt.
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     rewrite /byte_any /phys_byte_any. iDestruct "H" as (b) "H".
     iExists b.
-    iApply TsoCtxShim.ctx_pointsto_of_mem.
-    iApply (phys_ident_mem (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
+    iApply (phys_ident_ctx (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
               (page_valid_kmap_static ppn (0 + k)%nat Hv ltac:(lia))
-              (page_valid_ram ppn (0 + k)%nat Hv ltac:(lia))
               (page_valid_canon ppn (0 + k)%nat Hv ltac:(lia)) with "Hb H").
   Qed.
 
@@ -3224,9 +3261,7 @@ Section ProcPt.
     iDestruct "H2" as "[Hb2 _]".
     rewrite /phys_byte_any.
     iDestruct "Hb1" as (b1) "Hb1". iDestruct "Hb2" as (b2) "Hb2".
-    rewrite /phys_pointsto.
-    iDestruct "Hb1" as "[Hp1 _]". iDestruct "Hb2" as "[Hp2 _]".
-    iDestruct (pointsto_ne with "Hp1 Hp2") as %Hne.
+    iDestruct (TsoCtx.ctx_phys_pointsto_ne with "Hb1 Hb2") as %Hne.
     iPureIntro. exact (Hne eq_refl).
   Qed.
 
@@ -3354,15 +3389,15 @@ Section ProcPt.
     ([∗ list] j ∈ seq 0 n,
        (pa_add (pa_add (page_base ppn) off) j : Arch.pa) ↦ₘ f j) -∗
     ([∗ list] j ∈ seq 0 n,
-       (pa_add (page_base ppn) (off + j)%nat : Arch.pa) ↦ₚ f j).
+       TsoCtx.ctx_phys_pointsto XI (pa_add (page_base ppn) (off + j)%nat : Arch.pa)
+         (DfracOwn 1) (f j)).
   Proof.
     intros Hv Hn. iIntros "#Hb H".
     iApply (big_sepL_impl with "H").
     iIntros "!>" (k x Hx) "Hj".
     apply lookup_seq in Hx as [-> Hlt]. rewrite Nat.add_0_l.
     iEval (rewrite pa_add_add) in "Hj".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hj") as "Hj".
-    iApply (mem_ident_phys (pa_add (page_base ppn) (off + k)%nat) (DfracOwn 1) (f k)
+    iApply (ctx_ident_phys (pa_add (page_base ppn) (off + k)%nat) (DfracOwn 1) (f k)
               (page_valid_kmap_static ppn (off + k)%nat Hv ltac:(lia)) with "Hb Hj").
   Qed.
 
@@ -3385,7 +3420,8 @@ Section ProcPt.
       (ppn : mword 44) (bs : nat -> bv 8) :
     upt_map_wf P.(ud_um) -> um_inj P.(ud_um) ->
     umem_own P M -∗
-    ([∗ list] j ∈ seq 0 4096, (pa_add (page_base ppn) j : Arch.pa) ↦ₚ bs j) -∗
+    ([∗ list] j ∈ seq 0 4096,
+       TsoCtx.ctx_phys_pointsto XI (pa_add (page_base ppn) j : Arch.pa) (DfracOwn 1) (bs j)) -∗
     ⌜ppn ∉ um_ppns P.(ud_um)⌝.
   Proof.
     intros Hwf Hinj. iIntros "Hm Hp".
@@ -3603,7 +3639,8 @@ Section ProcPt.
     page_valid (page_base ppn) -> (off + n <= 4096)%nat ->
     kmap_static_claims -∗
     ([∗ list] j ∈ seq 0 n,
-       (pa_add (page_base ppn) (off + j)%nat : Arch.pa) ↦ₚ f j) -∗
+       TsoCtx.ctx_phys_pointsto XI (pa_add (page_base ppn) (off + j)%nat : Arch.pa)
+         (DfracOwn 1) (f j)) -∗
     ([∗ list] j ∈ seq 0 n,
        (pa_add (pa_add (page_base ppn) off) j : Arch.pa) ↦ₘ f j).
   Proof.
@@ -3612,10 +3649,8 @@ Section ProcPt.
     iIntros "!>" (k x Hx) "Hj".
     apply lookup_seq in Hx as [-> Hlt]. rewrite Nat.add_0_l.
     rewrite pa_add_add.
-    iApply TsoCtxShim.ctx_pointsto_of_mem.
-    iApply (phys_ident_mem (pa_add (page_base ppn) (off + k)%nat) (DfracOwn 1) (f k)
+    iApply (phys_ident_ctx (pa_add (page_base ppn) (off + k)%nat) (DfracOwn 1) (f k)
               (page_valid_kmap_static ppn (off + k)%nat Hv ltac:(lia))
-              (page_valid_ram ppn (off + k)%nat Hv ltac:(lia))
               (page_valid_canon ppn (off + k)%nat Hv ltac:(lia)) with "Hb Hj").
   Qed.
 
@@ -3746,7 +3781,8 @@ Section ProcPt.
               (uva_mapped (uptd_delete P vpn) va <-> uva_mapped P va)).
     { intros va Hnin. rewrite uva_mapped_delete.
       split; [intros (Hm & _); exact Hm | intros Hm; split; [exact Hm | exact Hnin]]. }
-    rewrite (bigM_window (fun va b => ((uva_pa P va : Arch.pa) ↦ₚ b)%I)
+    rewrite (bigM_window
+               (fun va b => TsoCtx.ctx_phys_pointsto XI (uva_pa P va : Arch.pa) (DfracOwn 1) b)
                Mp (bv_unsigned vpn * 4096)%Z 4096 Hsome).
     iDestruct "Hmp" as "[Hwin Hrest]".
     iSplitL "Hwin".
@@ -3858,7 +3894,8 @@ Section ProcPt.
               (uva_mapped (uptd_delete P vpn) va <-> uva_mapped P va)).
     { intros va Hnin. rewrite uva_mapped_delete.
       split; [intros (Hm & _); exact Hm | intros Hm; split; [exact Hm | exact Hnin]]. }
-    rewrite (bigM_window (fun va b => ((uva_pa P va : Arch.pa) ↦ₚ b)%I)
+    rewrite (bigM_window
+               (fun va b => TsoCtx.ctx_phys_pointsto XI (uva_pa P va : Arch.pa) (DfracOwn 1) b)
                Mp (bv_unsigned vpn * 4096)%Z 4096 Hsome).
     iDestruct "Hmp" as "[Hwin Hrest]".
     iSplitL "Hwin".
@@ -3995,8 +4032,10 @@ Section ProcPt.
     (forall j, (j < 4096)%nat -> bs j = bv_0 8) ->
     umem_lazy P sz M -∗
     ([∗ list] j ∈ seq 0 4096,
-       (uva_pa (uptd_insert_perm P perm vpn r) (bv_unsigned vpn * 4096 + Z.of_nat j)%Z
-          : Arch.pa) ↦ₚ bs j) -∗
+       TsoCtx.ctx_phys_pointsto XI
+         (uva_pa (uptd_insert_perm P perm vpn r)
+            (bv_unsigned vpn * 4096 + Z.of_nat j)%Z : Arch.pa)
+         (DfracOwn 1) (bs j)) -∗
     umem_lazy (uptd_insert_perm P perm vpn r) sz M.
   Proof.
     intros Hwf Hn Hlive Hzero.
@@ -4014,11 +4053,13 @@ Section ProcPt.
       apply Hnm. apply elem_of_upage_dom. eauto. }
     iEval (rewrite (bigL_page_map
              (fun (va : Z) (b : bv 8) =>
-                ((uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa) ↦ₚ b)%I) vpn bs))
+                (TsoCtx.ctx_phys_pointsto XI (uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa)
+                   (DfracOwn 1) b)) vpn bs))
       in "Hpg".
     (* the old bytes transfer: [uva_pa] does not move off the new page *)
     iAssert ([∗ map] va ↦ b ∈ Mp,
-               (uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa) ↦ₚ b)%I
+               TsoCtx.ctx_phys_pointsto XI (uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa)
+                 (DfracOwn 1) b)%I
       with "[Hm]" as "Hm".
     { iApply (big_sepM_impl with "Hm"). iIntros "!>" (va bb Hva) "Hj".
       rewrite (uva_pa_insert_old_perm P perm vpn r va Hwf Hn
@@ -4072,8 +4113,10 @@ Section ProcPt.
        uva_live sz (bv_unsigned vpn * 4096 + Z.of_nat j)%Z) ->
     umem_lazy P sz M -∗
     ([∗ list] j ∈ seq 0 4096,
-       (uva_pa (uptd_insert_perm P perm vpn r) (bv_unsigned vpn * 4096 + Z.of_nat j)%Z
-          : Arch.pa) ↦ₚ bs j) -∗
+       TsoCtx.ctx_phys_pointsto XI
+         (uva_pa (uptd_insert_perm P perm vpn r)
+            (bv_unsigned vpn * 4096 + Z.of_nat j)%Z : Arch.pa)
+         (DfracOwn 1) (bs j)) -∗
     umem_lazy (uptd_insert_perm P perm vpn r) sz
               (umem_write M (bv_unsigned vpn * 4096)%Z 4096 bs).
   Proof.
@@ -4101,11 +4144,13 @@ Section ProcPt.
       intros j Hj Heq. apply Hnin. apply elem_of_upage_dom. eauto. }
     iEval (rewrite (bigL_page_map
              (fun (va : Z) (b : bv 8) =>
-                ((uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa) ↦ₚ b)%I) vpn bs))
+                (TsoCtx.ctx_phys_pointsto XI (uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa)
+                   (DfracOwn 1) b)) vpn bs))
       in "Hpg".
     (* the old bytes transfer: [uva_pa] does not move off the new page *)
     iAssert ([∗ map] va ↦ b ∈ Mp,
-               (uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa) ↦ₚ b)%I
+               TsoCtx.ctx_phys_pointsto XI (uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa)
+                 (DfracOwn 1) b)%I
       with "[Hm]" as "Hm".
     { iApply (big_sepM_impl with "Hm"). iIntros "!>" (va bb Hva) "Hj".
       rewrite (uva_pa_insert_old_perm P perm vpn r va Hwf Hn
@@ -4167,8 +4212,10 @@ Section ProcPt.
     (forall j, (j < 4096)%nat -> bs j = bv_0 8) ->
     umem_lazy P sz M -∗
     ([∗ list] j ∈ seq 0 4096,
-       (uva_pa (uptd_insert P vpn r) (bv_unsigned vpn * 4096 + Z.of_nat j)%Z
-          : Arch.pa) ↦ₚ bs j) -∗
+       TsoCtx.ctx_phys_pointsto XI
+         (uva_pa (uptd_insert P vpn r)
+            (bv_unsigned vpn * 4096 + Z.of_nat j)%Z : Arch.pa)
+         (DfracOwn 1) (bs j)) -∗
     umem_lazy (uptd_insert P vpn r) sz M.
   Proof. exact (umem_lazy_fault_perm P 22 sz M vpn r bs). Qed.
 
@@ -4200,8 +4247,9 @@ Section ProcPt.
     (* the page's bytes, at the PHYSICAL tier and indexed by the vas the
        new leaf translates: [uva_pa] at the GROWN descriptor *)
     iAssert ([∗ list] j ∈ seq 0 4096,
-               (pa_add (page_base (pte_ppn (vmfault_pte r))) (0 + j)%nat
-                  : Arch.pa) ↦ₚ bs j)%I with "[Hpg]" as "Hpg".
+               TsoCtx.ctx_phys_pointsto XI
+                 (pa_add (page_base (pte_ppn (vmfault_pte r))) (0 + j)%nat
+                    : Arch.pa) (DfracOwn 1) (bs j))%I with "[Hpg]" as "Hpg".
     { iApply (win_mem_to_phys (pte_ppn (vmfault_pte r)) 0 4096 bs Hvp
                 ltac:(lia) with "Hb [Hpg]").
       iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".
@@ -4288,8 +4336,9 @@ Section ProcPt.
     (* the page's bytes, at the PHYSICAL tier and indexed by the vas the
        new leaf translates: [uva_pa] at the GROWN descriptor *)
     iAssert ([∗ list] j ∈ seq 0 4096,
-               (pa_add (page_base (pte_ppn (uvm_pte perm r))) (0 + j)%nat
-                  : Arch.pa) ↦ₚ bs j)%I with "[Hpg]" as "Hpg".
+               TsoCtx.ctx_phys_pointsto XI
+                 (pa_add (page_base (pte_ppn (uvm_pte perm r))) (0 + j)%nat
+                    : Arch.pa) (DfracOwn 1) (bs j))%I with "[Hpg]" as "Hpg".
     { iApply (win_mem_to_phys (pte_ppn (uvm_pte perm r)) 0 4096 bs Hvp
                 ltac:(lia) with "Hb [Hpg]").
       iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".
@@ -4370,8 +4419,9 @@ Section ProcPt.
     (* the page's bytes, at the PHYSICAL tier and indexed by the vas the
        new leaf translates: [uva_pa] at the GROWN descriptor *)
     iAssert ([∗ list] j ∈ seq 0 4096,
-               (pa_add (page_base (pte_ppn (uvm_pte perm r))) (0 + j)%nat
-                  : Arch.pa) ↦ₚ bs j)%I with "[Hpg]" as "Hpg".
+               TsoCtx.ctx_phys_pointsto XI
+                 (pa_add (page_base (pte_ppn (uvm_pte perm r))) (0 + j)%nat
+                    : Arch.pa) (DfracOwn 1) (bs j))%I with "[Hpg]" as "Hpg".
     { iApply (win_mem_to_phys (pte_ppn (uvm_pte perm r)) 0 4096 bs Hvp
                 ltac:(lia) with "Hb [Hpg]").
       iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".

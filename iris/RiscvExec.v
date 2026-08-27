@@ -390,11 +390,11 @@ Section TsoBundle.
   Definition tso_interp_of (E : riscvEraGS)
       (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg) (V : agent -> nat)
       : iProp Σ :=
-    (∃ (TM : gmap Arch.pa nat) (LM : gmap nat pwmsg),
+    (∃ (TM : gmap Arch.pa ts_elem) (LM : gmap nat pwmsg),
        ghost_map_auth (era_ts_name E) 1 TM ∗
        ⌜dom TM = dom mem⌝ ∗
-       ⌜∀ a t, TM !! a = Some t →
-          ∃ v, mem !! a = Some v ∧ latest img log a t v⌝ ∗
+       (* one conjunct; see [RiscvPtsto.tso_interp_at]'s note *)
+       ⌜∀ a e, TM !! a = Some e → ts_ok img mem log a e⌝ ∗
        ghost_map_auth (era_logm_name E) 1 LM ∗
        ⌜∀ i, LM !! i = log !! i⌝ ∗
        mono_nat_auth_own (era_loglen_name E) 1 (length log) ∗

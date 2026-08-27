@@ -123,6 +123,7 @@ Local Open Scope Z_scope.
 
 Section ProcdumpView.
   Context `{!riscvGS Σ}.
+  Context `{XI : TsoCtx.CurCtx}.   (* A6.55: [↦₄] is the ctx byte tower *)
 
   (* ------------------------------------------------------------------ *)
   (* ONE slot's worth of the racy-debug read permission.                 *)

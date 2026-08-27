@@ -931,7 +931,9 @@ Section pteread.
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
         mstate_interp σ -∗
         tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        (∃ w, ⌜fobl_ram img log tv pa 8 w⌝ ∗ ⌜P w⌝) ∗
+        (* A6.51: the ∃ is INSIDE the ∀ view -- a slot with a completed
+           A/D write-back above the reader has two values, not one. *)
+        ⌜fobl_ram_ex img log tv pa 8 P⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ ∗
              tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     swp (checked_mem_read (Load PageTableEntry) PBMT_PMA Supervisor
@@ -984,18 +986,18 @@ Section pteread.
     (* the plain arm -- see the pinned twin above. *)
     iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 8 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read_plain 8 (mread_req8 pa) _
+    { iApply (swp_hart_ram_read_plain_ex 8 (mread_req8 pa) _
                 (fun r => (∃ w, ⌜r = (w, default_meta)⌝ ∗ ⌜P w⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
+                P
                 (hread_req_at_read_ram8 pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
       iIntros (σ img log tv V) "%Htv Hσ Htso".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[Hw Hclose]".
-      iDestruct "Hw" as (w) "[%Hrd %HP]".
-      iModIntro. iExists w. iSplitR; [done|]. iNext.
+      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
+      iModIntro. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
-      iIntros (tvn _ _) "_".
+      iIntros (tvn w) "%Hlo %Hhi %Hrd' %HP _".
       rewrite hread_resume_read_ram8. iApply swp_ret. iExists w.
       by iFrame. }
     iIntros (v) "(%w & -> & %HP & Hrw & Hro)". cbn beta iota zeta.

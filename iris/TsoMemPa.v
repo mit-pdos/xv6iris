@@ -549,3 +549,141 @@ Proof.
     + rewrite union_None_l. move => Hb. destruct (IH Hb) as [t Hl].
       exists t. apply latest_app_frame; [rewrite /msg_byte Hm //|done].
 Qed.
+
+(* ===================================================================== *)
+(* §10  THE CANON PIN'S PURE LAYER (tso-pin-memo.md §5, ruling 2).        *)
+(*                                                                       *)
+(* [pin_ok img log a B Sv] is the DISCHARGE CONCLUSION the kernel-PT walk *)
+(* wants, stated where it can be maintained: "from view [B] on, EVERY     *)
+(* agent's read of [a] lands in [Sv]".  It is not a history, not a list   *)
+(* of messages and not a timestamp comparison -- which is why the walk's  *)
+(* final lemma is a one-liner off it and why (i)'s inv-local history      *)
+(* big-op (unprovable without the log auth) is not needed.                *)
+(*                                                                       *)
+(* The three laws are the pin's whole life cycle: MINT (at publication,   *)
+(* off the address's latest write -- exactly A6.47's refuted [t ≤ B] tie, *)
+(* true as a CREATION obligation and false only as a standing one),       *)
+(* PRESERVE (an append whose byte at [a] is in [Sv]), and FRAME (an       *)
+(* append that misses [a], free, no premise).                            *)
+(* ===================================================================== *)
+
+Definition pin_ok (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+    (a : Arch.pa) (B : nat) (Sv : gset (bv 8)) : Prop :=
+  (* [Sv] is [byteset] below; stated at the raw type here because the
+     definition PRECEDES the name (the name is §11's, beside [ts_elem]). *)
+  forall (h : agent) (tv' : nat), (B <= tv')%nat ->
+    exists b, tso_read img log h tv' a = Some b /\ b ∈ Sv.
+
+Lemma pin_ok_mint img log a B Sv t v :
+  latest img log a t v -> (t <= B)%nat -> v ∈ Sv -> pin_ok img log a B Sv.
+Proof.
+  move => Hlat HtB Hv h tv' HB. exists v. split; [|exact Hv].
+  apply (tso_read_of_latest _ _ _ _ _ t); [exact Hlat|].
+  apply visibleb_below. lia.
+Qed.
+
+(* the frame law the preservation step needs: [read_down_app_below] asks
+   [t ≤ tv], which a reader BELOW the append does not have. *)
+Lemma read_down_app_frame img log m h tv a t :
+  (t <= length log)%nat ->
+  read_down img (log ++ [m]) h tv a t = read_down img log h tv a t.
+Proof.
+  elim: t => [|t IH] Hlen; first by rewrite !read_down_0.
+  rewrite !read_down_S.
+  have Hlk : (log ++ [m]) !! t = log !! t by apply lookup_app_l; lia.
+  have Hvis : visibleb h tv (log ++ [m]) (S t) = visibleb h tv log (S t)
+    by rewrite /visibleb Hlk.
+  rewrite Hvis {1}/log_byte /= Hlk.
+  case: (visibleb h tv log (S t)) => /=; last by apply IH; lia.
+  case: (log !! t) => [m0|]; last by apply IH; lia.
+  case: (msg_byte m0 a) => [b|] //. apply IH; lia.
+Qed.
+
+Lemma pin_ok_app img log m a B Sv :
+  pin_ok img log a B Sv ->
+  (msg_byte m a = None \/ exists b, msg_byte m a = Some b /\ b ∈ Sv) ->
+  pin_ok img (log ++ [m]) a B Sv.
+Proof.
+  move => Hpin Hm h tv' HB.
+  rewrite /tso_read length_app /= Nat.add_1_r read_down_S.
+  rewrite log_byte_top.
+  case Hv : (visibleb h tv' (log ++ [m]) (S (length log))) => /=.
+  - case: Hm => [-> | [b [-> Hb]]].
+    + rewrite read_down_app_frame //.
+      have [b [Hr Hb]] := Hpin h tv' HB. by exists b.
+    + by exists b.
+  - rewrite read_down_app_frame //.
+    have [b [Hr Hb]] := Hpin h tv' HB. by exists b.
+Qed.
+
+Lemma pin_ok_app_frame img log m a B Sv :
+  pin_ok img log a B Sv -> msg_byte m a = None ->
+  pin_ok img (log ++ [m]) a B Sv.
+Proof. move => Hpin Hm. apply pin_ok_app; [done|by left]. Qed.
+
+(* the pin's bound only ever moves UP with a later reader, so a receipt
+   above [B] is as good as one at it. *)
+Lemma pin_ok_mono img log a B B' Sv :
+  pin_ok img log a B Sv -> (B <= B')%nat -> pin_ok img log a B' Sv.
+Proof. move => Hpin Hle h tv' HB'. apply Hpin. lia. Qed.
+
+(* ===================================================================== *)
+(* §11  THE TIMESTAMP GHOST'S ELEMENT, AND WHAT THE INTERP TIES IT TO.    *)
+(*                                                                       *)
+(* NAMED HERE, and not spelled at the two interp sites, for the reason    *)
+(* [bytemap] exists (durable-notes' binder trap): [gset (bv 8)] picks its *)
+(* [Countable] instance from whatever the ambient file imported, and the  *)
+(* two resulting types print identically while refusing to unify.  One    *)
+(* name, elaborated once, in the file that owns the pure layer.           *)
+(*                                                                       *)
+(* ONE conjunct, not two: [ts_ok] bundles the LATEST tie (which every     *)
+(* ordinary byte has) with the PIN tie (which only a pinned element has,  *)
+(* vacuous at [None]), so the ~20 positional destructurings of the interp *)
+(* across [RiscvExec] / [HartLift] / [HartSpan] / [TsoCtx] do not move.   *)
+(* ===================================================================== *)
+
+(* NAMED for the binder trap, exactly as [bytemap] is: a file that imports
+   [SailStdpp.Values] elaborates [gset (bv 8)] at [Instances.Countable_mword]
+   and it will not unify with the stdpp-keyed one, while both print the same.
+   Every consumer of the pin -- [TsoGhost], [TsoCtx], [PtTree]'s slot sets --
+   spells THIS. *)
+Definition byteset : Type := gset (bv 8).
+
+Definition ts_elem : Type := nat * option (byteset * nat).
+
+Definition ts_ok (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg)
+    (a : Arch.pa) (e : ts_elem) : Prop :=
+  (exists v, mem !! a = Some v /\ latest img log a e.1 v)
+  /\ (forall (Sv : byteset) (B : nat), e.2 = Some (Sv, B) -> pin_ok img log a B Sv).
+
+Lemma ts_ok_latest img mem log a e :
+  ts_ok img mem log a e -> exists v, mem !! a = Some v /\ latest img log a e.1 v.
+Proof. by move => [H _]. Qed.
+
+Lemma ts_ok_pin img mem log a e Sv B :
+  ts_ok img mem log a e -> e.2 = Some (Sv, B) -> pin_ok img log a B Sv.
+Proof. move => [_ H]. by apply H. Qed.
+
+(* the UNPINNED element: exactly the old tie, and nothing more to prove *)
+Lemma ts_ok_unpinned img mem log a t v :
+  mem !! a = Some v -> latest img log a t v -> ts_ok img mem log a (t, None).
+Proof. move => Hm Hl. split; [by exists v | by move => Sv B]. Qed.
+
+(* the two set SHAPES the pin's consumers need, built HERE so the [gset]
+   instance is the one [ts_elem] was elaborated at (the binder trap again:
+   a consumer that imports [SailStdpp.Values] would build a different one
+   from the same notation). *)
+Definition byteset_sing (b : bv 8) : byteset := {[ b ]}.
+Definition byteset_of4 (b0 b1 b2 b3 : bv 8) : byteset := {[ b0; b1; b2; b3 ]}.
+
+Lemma elem_of_byteset_sing (b b' : bv 8) : b ∈ byteset_sing b' <-> b = b'.
+Proof. rewrite /byteset_sing elem_of_singleton //. Qed.
+
+Lemma byteset_sing_in (b : bv 8) : b ∈ byteset_sing b.
+Proof. by apply elem_of_byteset_sing. Qed.
+
+Lemma elem_of_byteset_of4 (b b0 b1 b2 b3 : bv 8) :
+  b ∈ byteset_of4 b0 b1 b2 b3 <-> (b = b0 \/ b = b1 \/ b = b2 \/ b = b3).
+Proof.
+  rewrite /byteset_of4 !elem_of_union !elem_of_singleton. tauto.
+Qed.

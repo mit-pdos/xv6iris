@@ -419,11 +419,16 @@ Section WpSmodePtLoad.
       as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
-    iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0")
-      as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
-    iDestruct ("Href0" with "Hp0") as "Hb0".
-    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
+    (* A6.55: the CLAIM is read straight off the ctx byte -- the old text
+       forgot to the raw [↦ₘ] and re-minted, which A6.9 forbids and the
+       sealed tier does not need ([ctx_pointsto_phys] exposes the ppn, the
+       canonicality and the pin without leaving the tier). *)
+    iDestruct (TsoCtx.ctx_pointsto_phys (KTR := kt') with "Hb0")
+      as (ppn) "(#Hk & %Hcan & %Hid & Hp0)".
+    iDestruct (TsoCtx.ctx_phys_pointsto_ram with "Hp0") as %Hkd0.
+    iAssert (TsoCtx.ctx_pointsto (KTR := kt') _ _ _ _) with "[Hp0]" as "Hb0".
+    { rewrite (TsoCtx.ctx_pointsto_phys (KTR := kt')).
+      iExists ppn. iFrame "Hk Hp0". iSplit; by iPureIntro. }
     iEval (rewrite -(pa_add_0
              (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)))) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -922,11 +927,16 @@ Section WpSmodePtStore.
       as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
-    iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0")
-      as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
-    iDestruct ("Href0" with "Hp0") as "Hb0".
-    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
+    (* A6.55: the CLAIM is read straight off the ctx byte -- the old text
+       forgot to the raw [↦ₘ] and re-minted, which A6.9 forbids and the
+       sealed tier does not need ([ctx_pointsto_phys] exposes the ppn, the
+       canonicality and the pin without leaving the tier). *)
+    iDestruct (TsoCtx.ctx_pointsto_phys (KTR := kt') with "Hb0")
+      as (ppn) "(#Hk & %Hcan & %Hid & Hp0)".
+    iDestruct (TsoCtx.ctx_phys_pointsto_ram with "Hp0") as %Hkd0.
+    iAssert (TsoCtx.ctx_pointsto (KTR := kt') _ _ _ _) with "[Hp0]" as "Hb0".
+    { rewrite (TsoCtx.ctx_pointsto_phys (KTR := kt')).
+      iExists ppn. iFrame "Hk Hp0". iSplit; by iPureIntro. }
     iEval (rewrite -(pa_add_0
              (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)))) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".

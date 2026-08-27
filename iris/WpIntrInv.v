@@ -1483,7 +1483,7 @@ Section IntrEngine.
     pmp_facts pcfg paddr ->
     gen_cert -∗
     instr pc0 is_rvc i -∗
-    strans_kpt -∗ kpt_inv root_ppn -∗ tlb_snap_ok tlbv -∗
+    strans_kpt -∗ kpt_inv root_ppn -∗ kpt_creds -∗ tlb_snap_ok tlbv -∗
     resv_frag cpu_id None -∗
     W -∗
     hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -1533,7 +1533,7 @@ Section IntrEngine.
     { right. rewrite /kpt_satp_ok Hroot. split_and!; assumption. }
     assert (Hpok : pmp_ent0_ok pcfg paddr)
       by (rewrite /pmp_ent0_ok; split_and!; apply Hpmpf).
-    iIntros "#Hcert Hinstr Hbit #Hkinv Hsnap Hfrag HW Hrw Hro Hqi Hex".
+    iIntros "#Hcert Hinstr Hbit #Hkinv #Hcreds Hsnap Hfrag HW Hrw Hro Hqi Hex".
     iApply (swp_run_hart_active_instr_S_res pc0 msr bmi cy ti ip mst0 pcfg
               paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv
               is_rvc i Q Rr W Qi
@@ -1541,7 +1541,7 @@ Section IntrEngine.
               with "Hcert Hinstr [Hbit Hsnap] Hfrag HW Hrw Hro [Hqi] [Hex]").
     - rewrite /strans_res_at. iRight. iFrame "Hbit".
       iSplitR; [iPureIntro; exact Hmode |].
-      rewrite /kpt_res_at Hroot. iFrame "Hsnap Hkinv".
+      rewrite /kpt_res_at Hroot. iFrame "Hsnap Hkinv Hcreds".
     - iIntros (ii pr) "%Hd HW HRes Hfrag Hrw Hro".
       iDestruct "HRes" as "[(_ & _ & %Hbad) | (Hbit & _ & Hsnap & _)]".
       { exfalso. rewrite /bare_satp_ok Hmode in Hbad.
@@ -1904,14 +1904,14 @@ Section IntrEngine.
       ⌜ satp_facts satp0 root_ppn ⌝ ∗ ⌜ pmp_facts pcfg paddr ⌝ ∗
       satp ↦ᵣ satp0 ∗ tlb ↦ᵣ tlbv ∗
       pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
-      tlb_snap_ok tlbv ∗ kpt_inv root_ppn.
+      tlb_snap_ok tlbv ∗ kpt_inv root_ppn ∗ kpt_creds.
   Proof.
     iIntros "H". iDestruct "H" as (satp0 tlbv)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv & #Hcreds)".
     iDestruct "Hpmp" as (pcfg paddr)
       "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iExists satp0, tlbv, pcfg, paddr.
-    iFrame "Hsatp Htlb Hpcfg Hpaddr Hsnap Hkinv".
+    iFrame "Hsatp Htlb Hpcfg Hpaddr Hsnap Hkinv Hcreds".
     iPureIntro. split.
     - rewrite /satp_facts. split_and!; assumption.
     - rewrite /pmp_facts. split_and!; assumption.
@@ -1923,11 +1923,11 @@ Section IntrEngine.
     satp_facts satp0 root_ppn -> pmp_facts pcfg paddr ->
     satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
     pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-    tlb_snap_ok tlbv -∗ kpt_inv root_ppn -∗ tlb_res_pt root_ppn.
+    tlb_snap_ok tlbv -∗ kpt_inv root_ppn -∗ kpt_creds -∗ tlb_res_pt root_ppn.
   Proof.
     intros (Hmode & Hasid & Hppn) (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "Hsatp Htlb Hpcfg Hpaddr Hsnap #Hkinv".
-    iExists satp0, tlbv. iFrame "Hsatp Htlb Hsnap Hkinv".
+    iIntros "Hsatp Htlb Hpcfg Hpaddr Hsnap #Hkinv #Hcreds".
+    iExists satp0, tlbv. iFrame "Hsatp Htlb Hsnap Hkinv Hcreds".
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iApply (pmp_config_intro root_ppn pcfg paddr HA Hord HX HW HR Hcov
               with "Hpcfg Hpaddr").
@@ -2683,7 +2683,7 @@ Proof.
       Hmenv)".
   iDestruct (ghost_var_agree with "Hhalf Hq1") as %HSIE1.
   iDestruct (tlb_res_to_cells with "Htlbres") as (satp0 tlbv pcfg paddr)
-    "(%Hsatpf & %Hpmpf & Hsatp & Htlb & Hpcfg & Hpaddr & Hsnap & #Hkinv)".
+    "(%Hsatpf & %Hpmpf & Hsatp & Htlb & Hpcfg & Hpaddr & Hsnap & #Hkinv & #Hcreds)".
   iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
   iDestruct "Hmr" as (msr bmi mc micfg) "(Hmsr & Hmi & #Hmc & #Hmicfg)".
   iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
@@ -2813,7 +2813,7 @@ Proof.
                                     intr_psi kt m av p pc0 is_rvc i b' R rs2))%I
                       Hmisaval HSXL (proj1 Hmsf) Hmm Helpnp
                       (pma_all_ram Hpmaall) Hsatpf Hpmpf
-                      with "Hcert Hinstr Hbit1 Hkinv Hsnap Hfrag
+                      with "Hcert Hinstr Hbit1 Hkinv Hcreds Hsnap Hfrag
                             [$Hbody $Hhalf $Htie $Hstk $Hq1 $Hq4 $Hstv
                              $Hsepcx $Hscausex $Hstvalx $Hsppc $Hclm $Hcpu
                              $Hfile $Hctx]
@@ -2893,7 +2893,7 @@ Proof.
                           (conj Hmode (conj Hasid Hppn))
                           (conj HA (conj Hord (conj HX (conj HW
                              (conj HR Hcov)))))
-                          with "Hsatp Htlb Hpcfg Hpaddr Hsnap' Hkinv"). }
+                          with "Hsatp Htlb Hpcfg Hpaddr Hsnap' Hkinv Hcreds"). }
               rewrite /sie_arm. iExact "Hq1". }
             iFrame "Hkpt".
             iSplitL "Hcells Hcnt".
@@ -2941,7 +2941,7 @@ Proof.
                           (conj Hmode (conj Hasid Hppn))
                           (conj HA (conj Hord (conj HX (conj HW
                              (conj HR Hcov)))))
-                          with "Hsatp Htlb Hpcfg Hpaddr Hsnap' Hkinv"). }
+                          with "Hsatp Htlb Hpcfg Hpaddr Hsnap' Hkinv Hcreds"). }
               rewrite /sie_arm.
               iFrame "Hq1 Hkpt Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu".
               iApply (intr_res_intro handler vb Htvd Hsb with "Hq4 Hstv").

@@ -776,7 +776,8 @@ Section UserBytesData.
     intros Hinj. iIntros "H".
     rewrite umem_any_set.
     rewrite (bigset_gather_reindex (uva_pa P) (uva_dom P) (u_data_pa P)
-               (fun (a : Arch.pa) (b : bv 8) => (a ↦ₚ b)%I)
+               (fun (a : Arch.pa) (b : bv 8) =>
+                  TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) b)
                (uva_dom_inj P Hinj) (u_data_pa_img P)).
     iDestruct "H" as (md) "[%Hdom Hmd]".
     iExists md. rewrite /bytes_own. iFrame "Hmd". done.
@@ -790,7 +791,8 @@ Section UserBytesData.
     intros Hinj Hdom. iIntros "Hmd".
     rewrite umem_any_set.
     rewrite (bigset_gather_reindex (uva_pa P) (uva_dom P) (u_data_pa P)
-               (fun (a : Arch.pa) (b : bv 8) => (a ↦ₚ b)%I)
+               (fun (a : Arch.pa) (b : bv 8) =>
+                  TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) b)
                (uva_dom_inj P Hinj) (u_data_pa_img P)).
     iExists md. rewrite /bytes_own. iFrame "Hmd". done.
   Qed.

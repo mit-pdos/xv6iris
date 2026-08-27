@@ -140,7 +140,7 @@ End UmodeFrames.
 (* ===================================================================== *)
 Section UmodeCap.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)

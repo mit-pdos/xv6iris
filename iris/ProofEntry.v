@@ -54,7 +54,7 @@ Section ProofEntry.
     cbv beta delta [wp_entry_boot_body].
     intros pcE pcMain Hsp0 Hn4 Hpmp Hmenv0 Hmie0 Hmdl0 Hbnd_ra Hbnd_s0.
     iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen
-             Hstc Hstk Hstko #Htext Hcont".
+             Hstc Hstk #Hpr Hstko Hrun #Htext Hcont".
     (* The contract's premises are stated in [MbootVocab]'s vocabulary; the
        three M-mode lemmas want their own.  Convert once, here: this file is
        the only place the two spellings meet. *)
@@ -63,10 +63,12 @@ Section ProofEntry.
     rewrite <- (ti_ea_ra_mb sp0) in Hbnd_ra.
     rewrite <- (ti_ea_s0_mb sp0) in Hbnd_s0.
     iEval (rewrite <- entry_ld_ea_mb) in "Hstk".
+    iAssert (TsoCtx.pristine_win entry_ld_ea 8) as "#Hpr'";
+      first by rewrite entry_ld_ea_mb.
     (* ---- _entry: reset -> jal start (PC = 0x80000058) ---- *)
     iEval (change pcE with pc_e0) in "Hpc".
     iApply (wp_entry m v_stack0 mhartid_in pmpcfg0 (dq := dq) Hpmp
-              with "Hmm Hpcf Hpc Hfile Hmh Hstk Htext").
+              with "Hmm Hpcf Hpc Hfile Hmh Hstk Hpr' Htext").
     iIntros "Hmm Hpcf Hpc Hfile Hmh Hstk".
     iEval (change pc_start with st_pc30) in "Hpc".
     (* wp_start's entry-file lookups over _entry's output map *)
@@ -88,10 +90,10 @@ Section ProofEntry.
               Hn4 Hpmp HlpeE (eq_trans (m_jal_sp m v_stack0 mhartid_in) Hsp0) HEra HEs0
               Hbnd_ra Hbnd_s0
               with "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
-                    Hmcen Hstc Hstko Htext [Hcont Hstk]").
+                    Hmcen Hstc Hstko Hrun Htext [Hcont Hstk]").
     iIntros (tv ms0 HoIE HoPRV HoSXL HoKF)
       "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
-       Hmenv Hmcen Hstc Hstko".
+       Hmenv Hmcen Hstc Hstko Hrun".
     (* ---- <main>, in S-mode: the composed continuation ----
        Here the M-mode symbolic execution is DISCHARGED into facts: the client
        is handed the post-state as eleven opaque values plus the eight things
@@ -114,7 +116,7 @@ Section ProofEntry.
                        (legalize_mcounteren mcounteren0 (ti_mcen1 mcounteren0))
                        (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00)
               with "[] Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede
-                    Hmdl Hmie Hmenv Hmcen Hstc Hstk Hstko").
+                    Hmdl Hmie Hmenv Hmcen Hstc Hstk Hstko Hrun").
     iPureIntro. split_and!.
     - exact (st_mout_sp _ _ _ _ _ _ _ _ _).
     - exact (st_mout_tp _ _ _ _ _ _ _ _ _).

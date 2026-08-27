@@ -71,6 +71,44 @@ Section KptGhost.
   Lemma kpt_lb_canon (t t' : ptree) :
     ptree_canon t = ptree_canon t' -> kpt_lb t -∗ kpt_lb t'.
   Proof. intros He. rewrite /kpt_lb He. iIntros "H". iExact "H". Qed.
+  (* ---------------------------------------------------------------- *)
+  (* THE CANON PIN'S PUBLICATION BOUND (tso-pin-memo.md §5.4; A6.53      *)
+  (* ruling 2).  [kpt_lb]'s shape, one payload over: shot once, at the   *)
+  (* moment the kernel table's slots are pinned, and PERSISTENT after.   *)
+  (* A reader carries it in its translation residue and matches it       *)
+  (* against the [B] it finds in the invariant's slots -- which is what  *)
+  (* lets the bound ride in the resource instead of in [kpt_inv]'s arity *)
+  (* (142 mention sites across 36 files, not paid).                      *)
+  (* ---------------------------------------------------------------- *)
+  Definition kptb_unset : iProp Σ :=
+    own kptb_name (Cinl (Excl ()) : kptbR).
+
+  Definition kpt_bound (B : nat) : iProp Σ :=
+    own kptb_name (Cinr (to_agree (B : leibnizO nat)) : kptbR).
+
+  Global Instance kptb_unset_timeless : Timeless kptb_unset.
+  Proof. apply _. Qed.
+  Global Instance kpt_bound_timeless B : Timeless (kpt_bound B).
+  Proof. apply _. Qed.
+  Global Instance kpt_bound_persistent B : Persistent (kpt_bound B).
+  Proof. rewrite /kpt_bound. apply own_core_persistent, Cinr_core_id, _. Qed.
+
+  Lemma kptb_shoot (B : nat) : kptb_unset ==∗ kpt_bound B.
+  Proof.
+    iIntros "H". iApply (own_update with "H").
+    apply cmra_update_exclusive. done.
+  Qed.
+
+  Lemma kpt_bound_agree (B B' : nat) :
+    kpt_bound B -∗ kpt_bound B' -∗ ⌜ B = B' ⌝.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite -Cinr_op Cinr_valid to_agree_op_valid_L in Hv.
+    by iPureIntro.
+  Qed.
+
+
 End KptGhost.
 
 (* THE NAMESPACE of the shared kernel page table's invariant (the body is
@@ -82,4 +120,9 @@ Definition kptN : namespace := nroot .@ "kpt".
 (* allocation of the ghost NAME at adequacy, at the unset value *)
 Lemma kpt_ghost_alloc `{!inG Σ kptR} :
   ⊢ |==> ∃ γ : gname, own γ (Cinl (Excl ()) : kptR).
+Proof. iApply own_alloc. done. Qed.
+
+(* the same, for the pin's bound (A6.53 ruling 2) *)
+Lemma kptb_ghost_alloc `{!inG Σ kptbR} :
+  ⊢ |==> ∃ γ : gname, own γ (Cinl (Excl ()) : kptbR).
 Proof. iApply own_alloc. done. Qed.

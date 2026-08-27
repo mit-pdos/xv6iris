@@ -45,6 +45,8 @@ Require Import KptGhost KptShare.
 Require Import HartSwp HartLift HartSpan HartMStore.
 Require Import WpDecodeBridge.
 Require Import CommonWalk HartSTrans.
+Require Import TsoMemPa TsoGhost HartMFetch.  (* A6.55: [pwmsg]/[agent],
+   [view_lb], [fobl_ram]/[fobl_ram_ex] -- the pin's read path names all three *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 
@@ -108,6 +110,105 @@ Section kptnode.
     exists q0. split; [exact Hm' | symmetry; exact Heq].
   Qed.
 
+  (* ---------------------------------------------------------------- *)
+  (* THE PIN'S PAYER AT THE INTERP SEAM (A6.55).                        *)
+  (*                                                                    *)
+  (* A6.36 put the walk's PTE read on the PLAIN arm, so what a node owes *)
+  (* is no longer a fact about the FLAT cache ([read_bytes σ.(mem)]) but *)
+  (* [HartMFetch.fobl_ram] -- the value at every view the machine may     *)
+  (* advance the reader to.  This is the bridge, run exactly as          *)
+  (* [HartMFetch.fobl_ram_text] runs it ([tso_interp_of_pin] +           *)
+  (* [tso_interp_of_at_gs] at [gs_of]), off the slot's PINNED ledger word *)
+  (* and the hart's [view_lb] at the pin's bound.                        *)
+  (* ---------------------------------------------------------------- *)
+  Lemma kpt_slot_bytes_pin (img mem : TsoMemPa.bytemap) (log : list TsoMemPa.pwmsg)
+      (V : TsoMemPa.agent -> nat) (tv B : nat) (rs : regstate) (d : dev_state)
+      (a : Arch.pa) (w : mword 64) :
+    V (hart_agent cpu_id) = tv ->
+    tso_interp_of riscv_eraGS img mem log V -∗
+    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    pt_slot_own (KTier B) a (DfracOwn 1) w -∗
+    ⌜forall tv' : nat, (tv <= tv')%nat -> forall j : nat, (j < 8)%nat ->
+       exists b, tso_read img log (hart_agent cpu_id) tv' (pa_add a j) = Some b
+                 /\ b ∈ pte_slot_set w j⌝ ∗
+    tso_interp_of riscv_eraGS img mem log V ∗
+    pt_slot_own (KTier B) a (DfracOwn 1) w.
+  Proof.
+    intros Htv. iIntros "Htso #Hlb Hs".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    iEval (rewrite (pt_slot_own_None B)) in "Hs".
+    iDestruct (TsoCtx.phys_ledger_word_pin_aligned_p with "Hs") as %Hal.
+    iDestruct (TsoCtx.phys_ledger_word_pin_bytes with "Hs") as "Hb".
+    rewrite (tso_interp_of_at_gs riscv_eraGS img mem log V rs d Hpin).
+    iDestruct (TsoCtx.ledger_read_pin_bytes_ok
+                 (gs_of img mem log V rs d) a 8 (DfracOwn 1)
+                 (fun j => nth_byte w j) B (pte_slot_set w)
+                 with "Htso Hlb Hb") as %Hok.
+    rewrite -(tso_interp_of_at_gs riscv_eraGS img mem log V rs d Hpin).
+    iFrame "Htso".
+    iSplitR.
+    { iPureIntro. intros tv' Hlo j Hj.
+      exact (Hok (hart_agent cpu_id) tv' ltac:(cbn; rewrite Htv; exact Hlo) j Hj). }
+    rewrite (pt_slot_own_None B).
+    iApply (TsoCtx.phys_ledger_word_pin_intro _ _ _ _ _ Hal with "Hb").
+  Qed.
+
+  (* the byte-set conclusion, reassembled into a WORD.  At an INTERIOR slot
+     every set is a singleton and the word is EXACT ([pte_slot_set_exact],
+     off [ptree_maps]' own [pte_ptr]); at the LEAF it is canon-equal
+     ([pte_slot_set_canon], i.e. tso-pin-memo §5.5's reassembly). *)
+  (* the byte-set conclusion, reassembled into a WORD.  At an INTERIOR slot
+     every set is a singleton and the word is EXACT ([pte_slot_set_nonleaf_sing],
+     available off [ptree_maps]' own [pte_ptr] conjunct) -- which is
+     tso-pin-memo §5.5's claim for levels 2 and 1, RESTORED (A6.55); at the
+     LEAF it is canon-equal, which is §5.5's reassembly. *)
+  Lemma fobl_of_sets (img : TsoMemPa.bytemap) (log : list TsoMemPa.pwmsg)
+      (tv : nat) (a : Arch.pa) (w : mword 64) :
+    (forall tv' : nat, (tv <= tv')%nat -> forall j : nat, (j < 8)%nat ->
+       exists b, tso_read img log (hart_agent cpu_id) tv' (pa_add a j) = Some b
+                 /\ b ∈ pte_slot_set w j) ->
+    pte_nonleafb w = true ->
+    fobl_ram img log tv a 8 w.
+  Proof.
+    intros Hok Hnl tv' Hlo _ j Hj.
+    destruct (Hok tv' Hlo j ltac:(lia)) as (b & Hr & Hs).
+    rewrite (pte_slot_set_nonleaf_sing w j Hnl) in Hs.
+    apply TsoMemPa.elem_of_byteset_sing in Hs. by rewrite Hr Hs.
+  Qed.
+
+  Lemma fobl_ex_of_sets (img : TsoMemPa.bytemap) (log : list TsoMemPa.pwmsg)
+      (tv : nat) (a : Arch.pa) (w : mword 64) :
+    (forall tv' : nat, (tv <= tv')%nat -> forall j : nat, (j < 8)%nat ->
+       exists b, tso_read img log (hart_agent cpu_id) tv' (pa_add a j) = Some b
+                 /\ b ∈ pte_slot_set w j) ->
+    fobl_ram_ex img log tv a 8
+      (fun w' : mword 64 => pte_canon w' = pte_canon w).
+  Proof.
+    intros Hok tv' Hlo _.
+    destruct (Hok tv' Hlo 0%nat ltac:(lia)) as (b0 & Hr0 & Hs0).
+    destruct (Hok tv' Hlo 1%nat ltac:(lia)) as (b1 & Hr1 & Hs1).
+    destruct (Hok tv' Hlo 2%nat ltac:(lia)) as (b2 & Hr2 & Hs2).
+    destruct (Hok tv' Hlo 3%nat ltac:(lia)) as (b3 & Hr3 & Hs3).
+    destruct (Hok tv' Hlo 4%nat ltac:(lia)) as (b4 & Hr4 & Hs4).
+    destruct (Hok tv' Hlo 5%nat ltac:(lia)) as (b5 & Hr5 & Hs5).
+    destruct (Hok tv' Hlo 6%nat ltac:(lia)) as (b6 & Hr6 & Hs6).
+    destruct (Hok tv' Hlo 7%nat ltac:(lia)) as (b7 & Hr7 & Hs7).
+    set (bs := [b0;b1;b2;b3;b4;b5;b6;b7]).
+    set (w' := Z_to_bv 64 (assemble_bytes bs) : mword 64).
+    assert (Hnb : forall j : nat, (j < 8)%nat -> nth_byte w' j = bs !!! j)
+      by (intros j Hj; apply nth_byte_assemble8; [reflexivity | lia]).
+    exists w'. split.
+    - intros j Hj. assert (Hj8 : (j < 8)%nat) by lia.
+      rewrite (Hnb j Hj8).
+      destruct j as [|[|[|[|[|[|[|[|k]]]]]]]]; try lia; subst bs; cbn;
+        [ exact Hr0 | exact Hr1 | exact Hr2 | exact Hr3
+        | exact Hr4 | exact Hr5 | exact Hr6 | exact Hr7 ].
+    - apply pte_slot_set_canon. intros j Hj. rewrite (Hnb j Hj).
+      destruct j as [|[|[|[|[|[|[|[|k]]]]]]]]; try lia; subst bs; cbn;
+        [ exact Hs0 | exact Hs1 | exact Hs2 | exact Hs3
+        | exact Hs4 | exact Hs5 | exact Hs6 | exact Hs7 ].
+  Qed.
+
   (* ONE OPENING: the three slots of [vpn]'s path as pure memory facts about
      [σ], with the invariant closed again before returning.  Used once per
      read node; nothing is held across. *)
@@ -126,10 +227,10 @@ Section kptnode.
     intros HE Hmaps. iIntros "#Hlb0 #Hkinv Hgh".
     iMod (inv_acc E kptN with "Hkinv") as "[>Hbody Hclose]"; [ exact HE | ].
     iEval (rewrite /kpt_body) in "Hbody".
-    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct "Hbody" as (t M B) "(Ht & #Hlbt & #Hbd & HM & %Hspec)".
     iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan.
     destruct (kpt_maps_across t0 t vpn p2 p1 p0 Hcan Hmaps) as (q0 & Hm' & Hq).
-    iDestruct (ptree_own_path_mem_at None σ (DfracOwn 1) t vpn p2 p1 q0 Hm'
+    iDestruct (ptree_own_path_mem_at (KTier B) σ (DfracOwn 1) t vpn p2 p1 q0 Hm'
                  with "Hgh Ht") as %(H2 & H1 & H0).
     (* the addresses are the SNAPSHOT's, and they agree: [ptree_canon]
        preserves [pt_base], so the roots coincide. *)
@@ -137,7 +238,7 @@ Section kptnode.
     { change (pt_base (ptree_canon t0) = pt_base (ptree_canon t)).
       rewrite Hcan. reflexivity. }
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+    { iNext. iExists t, M, B. iFrame "Ht HM Hlbt Hbd". iPureIntro. exact Hspec. }
     iModIntro. iFrame "Hgh". iExists q0. iPureIntro.
     unfold pt_addr2. rewrite Hbase.
     split; [exact H2 |]. split; [exact H1 |]. split; [exact H0 | exact Hq].
@@ -148,6 +249,132 @@ Section kptnode.
     pt_slot_mem σ a w -> read_bytes σ.(mem) a 8 = Some w.
   Proof.
     intros (Hbytes & _ & _ & _). exact (read_bytes_of_bytes σ.(mem) a 8 w Hbytes).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (* THE PATH'S THREE OBLIGATIONS, off ONE opening (A6.55).             *)
+  (* ---------------------------------------------------------------- *)
+  Lemma kpt_path_obl (root_ppn : mword 44) (t0 : ptree) (vpn : mword 27)
+      (p2 p1 p0 : mword 64) (B : nat)
+      (img mem : TsoMemPa.bytemap) (log : list TsoMemPa.pwmsg) (V : TsoMemPa.agent -> nat)
+      (tv : nat) (rs : regstate) (d : dev_state) (E : coPset) :
+    ↑kptN ⊆ E ->
+    V (hart_agent cpu_id) = tv ->
+    ptree_maps t0 vpn p2 p1 p0 ->
+    kpt_bound B -∗
+    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    kpt_lb t0 -∗ kpt_inv root_ppn -∗
+    tso_interp_of riscv_eraGS img mem log V ={E}=∗
+      ⌜fobl_ram img log tv (pt_addr2 t0 vpn) 8 p2⌝ ∗
+      ⌜fobl_ram img log tv (pt_addr1 p2 vpn) 8 p1⌝ ∗
+      ⌜fobl_ram_ex img log tv (pt_addr0 p1 vpn) 8
+         (fun w => pte_canon w = pte_canon p0)⌝ ∗
+      tso_interp_of riscv_eraGS img mem log V.
+  Proof.
+    intros HE Htv Hmaps. iIntros "#Hbd #Hvlb #Hlb0 #Hkinv Htso".
+    iMod (inv_acc E kptN with "Hkinv") as "[>Hbody Hclose]"; [ exact HE | ].
+    iEval (rewrite /kpt_body) in "Hbody".
+    iDestruct "Hbody" as (t M B') "(Ht & #Hlbt & #Hbd' & HM & %Hspec)".
+    iDestruct (kpt_bound_agree B B' with "Hbd Hbd'") as %<-.
+    iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan.
+    destruct (kpt_maps_across t0 t vpn p2 p1 p0 Hcan Hmaps) as (q0 & Hm' & Hq).
+    assert (Hbase : pt_base t0 = pt_base t).
+    { change (pt_base (ptree_canon t0) = pt_base (ptree_canon t)).
+      rewrite Hcan. reflexivity. }
+    (* the two INTERIOR slots are [pte_ptr] by [ptree_maps]' own conjuncts,
+       which is what makes their reads EXACT (A6.55) *)
+    assert (Hptr : pte_ptr p2 /\ pte_ptr p1).
+    { destruct Hm' as (c1 & c0 & _ & _ & _ & _ & _ & _ & _ & _ & Hx & _ & Hy & _).
+      split; assumption. }
+    destruct Hptr as (Hn2 & Hn1).
+    iDestruct (ptree_own_path_ro_at (KTier B) (DfracOwn 1) t vpn p2 p1 q0 Hm'
+                 with "Ht") as "(Hs2 & Hs1 & Hs0 & Hback)".
+    iDestruct (kpt_slot_bytes_pin img mem log V tv B rs d _ p2 Htv
+                 with "Htso Hvlb Hs2") as "(%Hok2 & Htso & Hs2)".
+    iDestruct (kpt_slot_bytes_pin img mem log V tv B rs d _ p1 Htv
+                 with "Htso Hvlb Hs1") as "(%Hok1 & Htso & Hs1)".
+    iDestruct (kpt_slot_bytes_pin img mem log V tv B rs d _ q0 Htv
+                 with "Htso Hvlb Hs0") as "(%Hok0 & Htso & Hs0)".
+    iDestruct ("Hback" with "Hs2 Hs1 Hs0") as "Ht".
+    iMod ("Hclose" with "[Ht HM]") as "_".
+    { iNext. iExists t, M, B. iFrame "Ht HM Hlbt Hbd'". iPureIntro. exact Hspec. }
+    iModIntro. iFrame "Htso". iPureIntro. split_and!.
+    - unfold pt_addr2. rewrite Hbase.
+      exact (fobl_of_sets img log tv (pt_addr2 t vpn) p2 Hok2 Hn2).
+    - exact (fobl_of_sets img log tv (pt_addr1 p2 vpn) p1 Hok1 Hn1).
+    - rewrite <- Hq.
+      exact (fobl_ex_of_sets img log tv (pt_addr0 p1 vpn) q0 Hok0).
+  Qed.
+
+  (* the three obligations at the shape [PtTreeAdue]'s post-overruling read
+     lemmas take (A6.36: the walk's PTE read is on the PLAIN arm) *)
+  Definition kpt_obl (a : Arch.pa) (w : mword 64) : iProp Σ :=
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗ mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+       ⌜fobl_ram img log tv a 8 w⌝ ∗
+       ▷ (|={∅,⊤}=> mstate_interp σ ∗
+            tso_interp_of riscv_eraGS img σ.(mem) log V))%I.
+
+  Definition kpt_obl_ex (a : Arch.pa) (P : mword 64 -> Prop) : iProp Σ :=
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗ mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+       ⌜fobl_ram_ex img log tv a 8 P⌝ ∗
+       ▷ (|={∅,⊤}=> mstate_interp σ ∗
+            tso_interp_of riscv_eraGS img σ.(mem) log V))%I.
+
+  Lemma kpt_pte2_obl (root_ppn : mword 44) (t0 : ptree) (vpn : mword 27)
+      (p2 p1 p0 : mword 64) (B : nat) :
+    ptree_maps t0 vpn p2 p1 p0 ->
+    kpt_bound B -∗
+    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    kpt_lb t0 -∗ kpt_inv root_ppn -∗ kpt_obl (pt_addr2 t0 vpn) p2.
+  Proof.
+    intros Hmaps. rewrite /kpt_obl.
+    iIntros "#Hbd #Hvlb #Hlb0 #Hkinv" (σ img log tv V) "%Htv Hσ Htso".
+    iMod (kpt_path_obl root_ppn t0 vpn p2 p1 p0 B img σ.(mem) log V tv
+            σ.(sregs) σ.(mdev) ⊤ ltac:(solve_ndisj) Htv Hmaps
+            with "Hbd Hvlb Hlb0 Hkinv Htso") as "(%H2 & _ & _ & Htso)".
+    iMod (fupd_mask_subseteq (∅ : coPset)) as "Hback"; [ set_solver | ].
+    iModIntro. iSplitR; [done|].
+    iNext. iMod "Hback" as "_". iModIntro. iFrame "Hσ Htso".
+  Qed.
+
+  Lemma kpt_pte1_obl (root_ppn : mword 44) (t0 : ptree) (vpn : mword 27)
+      (p2 p1 p0 : mword 64) (B : nat) :
+    ptree_maps t0 vpn p2 p1 p0 ->
+    kpt_bound B -∗
+    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    kpt_lb t0 -∗ kpt_inv root_ppn -∗ kpt_obl (pt_addr1 p2 vpn) p1.
+  Proof.
+    intros Hmaps. rewrite /kpt_obl.
+    iIntros "#Hbd #Hvlb #Hlb0 #Hkinv" (σ img log tv V) "%Htv Hσ Htso".
+    iMod (kpt_path_obl root_ppn t0 vpn p2 p1 p0 B img σ.(mem) log V tv
+            σ.(sregs) σ.(mdev) ⊤ ltac:(solve_ndisj) Htv Hmaps
+            with "Hbd Hvlb Hlb0 Hkinv Htso") as "(_ & %H1 & _ & Htso)".
+    iMod (fupd_mask_subseteq (∅ : coPset)) as "Hback"; [ set_solver | ].
+    iModIntro. iSplitR; [done|].
+    iNext. iMod "Hback" as "_". iModIntro. iFrame "Hσ Htso".
+  Qed.
+
+  Lemma kpt_leaf_obl (root_ppn : mword 44) (t0 : ptree) (vpn : mword 27)
+      (p2 p1 leaf0 : mword 64) (a0 d0 : mword 1) (B : nat) :
+    ptree_maps t0 vpn p2 p1 (pte_set_ad leaf0 a0 d0) ->
+    kpt_bound B -∗
+    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    kpt_lb t0 -∗ kpt_inv root_ppn -∗
+    kpt_obl_ex (pt_addr0 p1 vpn) (fun w => pte_canon w = pte_canon leaf0).
+  Proof.
+    intros Hmaps. rewrite /kpt_obl_ex.
+    iIntros "#Hbd #Hvlb #Hlb0 #Hkinv" (σ img log tv V) "%Htv Hσ Htso".
+    iMod (kpt_path_obl root_ppn t0 vpn p2 p1 _ B img σ.(mem) log V tv
+            σ.(sregs) σ.(mdev) ⊤ ltac:(solve_ndisj) Htv Hmaps
+            with "Hbd Hvlb Hlb0 Hkinv Htso") as "(_ & _ & %H0 & Htso)".
+    iMod (fupd_mask_subseteq (∅ : coPset)) as "Hback"; [ set_solver | ].
+    iModIntro. iSplitR.
+    { iPureIntro. revert H0. rewrite pte_canon_set_ad. done. }
+    iNext. iMod "Hback" as "_". iModIntro. iFrame "Hσ Htso".
   Qed.
 
   (* THE READ NODE, for a slot whose value is PINNED across openings -- i.e.
@@ -271,8 +498,8 @@ Section kptnode.
   (* A6.27: the KERNEL table's slot is [PtTree]'s [None] tier, and BOTH
      tiers forget to the raw physical word -- which is all this pure fact
      ever wanted of a slot. *)
-  Lemma kpt_addr_ok_own (dq : dfrac) (a w : mword 64) :
-    pt_slot_own None a dq w -∗ ⌜kpt_addr_ok a⌝.
+  Lemma kpt_addr_ok_own (B : nat) (dq : dfrac) (a w : mword 64) :
+    pt_slot_own (KTier B) a dq w -∗ ⌜kpt_addr_ok a⌝.
   Proof.
     iIntros "Hw". iDestruct (pt_slot_own_forget with "Hw") as "Hw".
     iDestruct (phys_word_pointsto_aligned_p with "Hw") as %Hal.
@@ -303,7 +530,7 @@ Section kptnode.
     intros HE. iIntros "#Hat #Hlb0 #Hkinv".
     iMod (inv_acc E kptN with "Hkinv") as "[>Hbody Hclose]"; [ exact HE | ].
     iEval (rewrite /kpt_body) in "Hbody".
-    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct "Hbody" as (t M B) "(Ht & #Hlbt & #Hbd & HM & %Hspec)".
     iDestruct (kmap_at_lookup with "HM Hat") as %HMlk.
     iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan.
     pose proof Hspec as Hsp. destruct Hsp as (Hbase & Hall).
@@ -318,7 +545,7 @@ Section kptnode.
     destruct (pte_canon_inv _ _ Hcr) as (a1 & d1 & Hr0).
     rewrite pte_set_ad_absorb in Hr0.
     (* the three slots' address facts, off the tree's own points-to *)
-    iDestruct (ptree_own_path_ro_at None (DfracOwn 1) t vpn q2 q1 _ Hmaps with "Ht")
+    iDestruct (ptree_own_path_ro_at (KTier B) (DfracOwn 1) t vpn q2 q1 _ Hmaps with "Ht")
       as "(Hs2 & Hs1 & Hs0 & Hrest)".
     iDestruct (kpt_addr_ok_own with "Hs2") as %Ha2.
     iDestruct (kpt_addr_ok_own with "Hs1") as %Ha1.
@@ -331,7 +558,7 @@ Section kptnode.
     assert (Ha2' : kpt_addr_ok (pt_addr2 t0 vpn))
       by (unfold pt_addr2; rewrite Hb0; exact Ha2).
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+    { iNext. iExists t, M, B. iFrame "Ht HM Hlbt Hbd". iPureIntro. exact Hspec. }
     iModIntro. iExists q2, q1, a1, d1. iPureIntro. rewrite <- Hr0.
     exact (conj Hbt0 (conj Hm0 (conj Ha2' (conj Ha1 Ha0)))).
   Qed.
@@ -395,9 +622,11 @@ Section kptnode.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) a 8 = Some w⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (* A6.55: the POST-OVERRULING obligation.  The walk's PTE read is on
+       the PLAIN arm, so what it owes is [fobl_ram] at the hart's own view
+       and the interp bundle rides through -- not a fact about the flat
+       cache. *)
+    kpt_obl a w -∗
     swp (read_pte (Physaddr a) 8)
       (fun r => ⌜r = Values.Ok w⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
@@ -492,9 +721,7 @@ Section kptnode.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        (∃ w, ⌜read_bytes σ.(mem) a 8 = Some w⌝ ∗ ⌜P w⌝) ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    kpt_obl_ex a P -∗
     swp (read_pte (Physaddr a) 8)
       (fun r => ∃ w, ⌜r = Values.Ok w⌝ ∗ ⌜P w⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
@@ -552,7 +779,7 @@ Section kptnode.
     iIntros "#Hat #Hlb0 #Hkinv" (σ img log V) "%Hrb (Hreg & Hgh & Hdev) Htso".
     iMod (inv_acc ⊤ kptN with "Hkinv") as "[>Hbody Hclose]"; [ solve_ndisj | ].
     iEval (rewrite /kpt_body) in "Hbody".
-    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct "Hbody" as (t M B) "(Ht & #Hlbt & #Hbd & HM & %Hspec)".
     iDestruct (kmap_at_lookup with "HM Hat") as %HMlk.
     iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan.
     destruct (kpt_maps_across t0 t vpn p2 p1 _ Hcan Hmaps) as (q0 & Hm' & Hq).
@@ -561,23 +788,63 @@ Section kptnode.
     destruct Hvar as (a & d & Hm0').
     assert (Hset : m0' = pte_set_ad q0 a d)
       by (rewrite Hq0 pte_set_ad_absorb; exact Hm0').
+    (* the live leaf IS a leaf -- §1's measurement, and what the pinned
+       store gate's side condition is conditioned on *)
+    assert (Hlf0 : pte_leaf q0) by (rewrite Hq0; apply kperm_variant_leaf).
     (* the live leaf slot, at full ownership and at the KERNEL tier *)
-    iDestruct (ptree_own_path_upd_at None (DfracOwn 1) t vpn p2 p1 q0 Hm'
+    iDestruct (ptree_own_path_upd_at (KTier B) (DfracOwn 1) t vpn p2 p1 q0 Hm'
                  with "Ht") as "(Hs2 & Hs1 & Hs0 & Hback)".
-    iEval (rewrite pt_slot_own_None) in "Hs0".
-    iDestruct (TsoCtx.phys_ledger_word_aligned_p with "Hs0") as %Hal.
-    iDestruct (TsoCtx.phys_ledger_word_bytes with "Hs0") as "Hb0".
-    (* THE APPEND, paid by the context-free ledger gate.  The A/D write-back
-       is a CONDITIONAL write ([mwrite_req8_con] is [AV_exclusive]), so the
-       hart's view goes PAST its own append -- the [_ex] form. *)
-    iMod (wobl_ram_ledger_ex img σ log V 8
+    (* the slot's ADDRESS facts, off the slot itself -- what rules out
+       wraparound in the offset/address bridge below *)
+    iDestruct (kpt_addr_ok_own B (DfracOwn 1) (pt_addr0 p1 vpn) q0
+                 with "Hs0") as %Haok.
+    assert (Hnw : forall j : nat, (j < 8)%nat ->
+              (uint (pt_addr0 p1 vpn) + Z.of_nat j < 18446744073709551616)%Z).
+    { intros j Hj. destruct Haok as ((_ & Hh) & _ & _).
+      unfold ram_base, ram_size in Hh. lia. }
+    iEval (rewrite (pt_slot_own_None B)) in "Hs0".
+    iDestruct (TsoCtx.phys_ledger_word_pin_aligned_p with "Hs0") as %Hal.
+    iDestruct (TsoCtx.phys_ledger_word_pin_bytes with "Hs0") as "Hb0".
+    (* THE OFFSET -> ADDRESS BRIDGE (A6.55).  The word tower states its
+       allowed sets by BYTE OFFSET, the store gate's footprint map states
+       them by ADDRESS; an 8-byte slot inside RAM cannot wrap, so the
+       offset is recoverable from the address. *)
+    set (Sg := fun a' : Arch.pa =>
+                 pte_slot_set q0 (Z.to_nat (uint a' - uint (pt_addr0 p1 vpn)))).
+    assert (HSg : forall j : nat, (j < 8)%nat ->
+              Sg (pa_add (pt_addr0 p1 vpn) j) = pte_slot_set q0 j).
+    { intros j Hj. subst Sg. cbn beta.
+      rewrite (uint_pa_add (pt_addr0 p1 vpn) j (Hnw j Hj)).
+      replace (uint (pt_addr0 p1 vpn) + Z.of_nat j - uint (pt_addr0 p1 vpn))
+        with (Z.of_nat j) by lia.
+      by rewrite Nat2Z.id. }
+    (* THE APPEND, paid by the PINNED context-free ledger gate.  The A/D
+       write-back is a CONDITIONAL write ([mwrite_req8_con] is
+       [AV_exclusive]), so the hart's view goes PAST its own append -- the
+       [_ex] form -- and the pin's bound and sets are UNCHANGED, which is
+       what keeps the shared table canon-INVARIANT under its own store. *)
+    iMod (wobl_ram_ledger_pin_ex img σ log V 8
             (mwrite_req8_con (pt_addr0 p1 vpn) (autocast (T := mword) m0'))
-            q0 ltac:(reflexivity) ltac:(vm_compute; discriminate)
+            q0 B (pte_slot_set q0) Sg
+            ltac:(reflexivity) ltac:(vm_compute; discriminate)
+            ltac:(cbn [Interface.WriteReq.pa mwrite_req8_con]; exact HSg)
+            ltac:(cbn [Interface.WriteReq.value mwrite_req8_con];
+                  rewrite TypeCasts.cast_N_refl autocast_id;
+                  intros j Hj; rewrite Hset;
+                  apply pte_slot_set_mem_set_ad;
+                  [ exact Hlf0 | lia ])
             with "Hgh Htso Hb0") as "(Hgh & Hobl & Hb0')".
     iEval (cbn [Interface.WriteReq.value Interface.WriteReq.pa mwrite_req8_con];
            rewrite TypeCasts.cast_N_refl autocast_id) in "Hb0'".
-    iDestruct (TsoCtx.phys_ledger_word_intro _ _ m0' Hal with "Hb0'") as "Hs0".
-    iEval (rewrite -pt_slot_own_None) in "Hs0".
+    iDestruct (TsoCtx.phys_ledger_word_pin_intro _ _ m0' _ _ Hal with "Hb0'")
+      as "Hs0".
+    iDestruct (TsoCtx.phys_ledger_word_pin_sets _ _ m0' B (pte_slot_set q0)
+                 (pte_slot_set m0')
+                 ltac:(intros j Hj; rewrite Hset;
+                       symmetry; apply pte_slot_set_set_ad;
+                       [ exact Hlf0 | lia ])
+                 with "Hs0") as "Hs0".
+    iEval (rewrite -(pt_slot_own_None B)) in "Hs0".
     iDestruct ("Hback" $! m0' with "Hs2 Hs1 Hs0") as "Ht".
     (* the canonical table does not move, so the snapshot is a rewrite *)
     assert (Hcan' : ptree_canon (ptree_set_leaf t vpn m0') = ptree_canon t).
@@ -590,8 +857,8 @@ Section kptnode.
                Hspec Hm' HMlk).
       exists a1, d1. exact Hq0. }
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iNext. iExists (ptree_set_leaf t vpn m0'), M.
-      iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
+    { iNext. iExists (ptree_set_leaf t vpn m0'), M, B.
+      iFrame "Ht HM Hlb' Hbd". iPureIntro. exact Hspec'. }
     iMod (fupd_mask_subseteq (∅ : coPset)) as "Hback2"; [ set_solver | ].
     iModIntro. iNext. iMod "Hback2" as "_". iModIntro.
     iSplitR "Hobl"; [| iSplitL "Hobl"; [iExact "Hobl" | done]].
@@ -629,7 +896,7 @@ Section kptnode.
       (ppn : mword 44) (kp : kperm)
       (tlbvec : vec (option TLB_Entry) (2 ^ 6))
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (rr : option resv) :
+      (paddr : type_of_register pmpaddr_n) (rr : option resv) (B : nat) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -688,6 +955,14 @@ Section kptnode.
          (pte_set_ad (mk_pte ppn (kperm_flags kp)) a d)) ->
     kmap_at (svpn_of va) ppn kp -∗
     kpt_inv root_ppn -∗
+    (* A6.55: the reader's copy of the canon pin's publication bound, and a
+       receipt that its own view is at or past it.  The bound rides in
+       [KptShare.tlb_res_pt]; the RECEIPT is A6.41's open question for hart
+       0 and the boot MP receipt for a secondary -- stating it here is what
+       makes that a premise of the walk rather than an assumption inside
+       it. *)
+    kpt_bound B -∗
+    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
     tlb_snap_ok tlbvec -∗
     gen_cert -∗
     resv_frag cpu_id rr -∗
@@ -705,7 +980,7 @@ Section kptnode.
       HDb Hag HDlc Haglc Hcp Hsatp Htlb Hhtif Hpma Hpcfg Hpaddr Hmstag
       Hmisa Hmenv HPBMTE HADUE Heff Heffg Hss Hssg Htm Htmg Hppn Hasid
       Hcanon Hident HA Hord HR HW Hcov Hpallow Hchk.
-    iIntros "#Hat #Hkinv Hsnap #Hcert Hfrag Hrw Hro".
+    iIntros "#Hat #Hkinv #Hbd #Hvlb Hsnap #Hcert Hfrag Hrw Hro".
     (* NOT [set_solver] (optimization.md): a single membership in a union of
        two [gset register] VARIABLES costs ~24 s whatever the override does --
        it was the sixth most expensive statement in the tree.  [HWtlb] is
@@ -799,30 +1074,21 @@ Section kptnode.
               with "Hcert Hrw Hro [Hfrag]").
     iIntros (mxr do_sum) "Hrw Hro".
     (* the read seams *)
-    iAssert (∀ σ, mstate_interp σ ={⊤,∅}=∗
-               ⌜read_bytes σ.(mem)
-                  (u_pte_addr root_ppn (subrange_vec_dec (svpn_of va) 26 18)) 8
-                  = Some p2⌝ ∗
-               ▷ (|={∅,⊤}=> mstate_interp σ))%I as "Hrd2".
+    iAssert (kpt_obl (u_pte_addr root_ppn
+                        (subrange_vec_dec (svpn_of va) 26 18)) p2)%I as "Hrd2".
     { rewrite <- Ha2.
-      iApply (kpt_pte2_node root_ppn t0 (svpn_of va) p2 p1 _ Hmaps
-                with "Hlb0 Hkinv"). }
-    iAssert (∀ σ, mstate_interp σ ={⊤,∅}=∗
-               ⌜read_bytes σ.(mem)
-                  (u_pte_addr (u_next_base p2) (subrange_vec_dec (svpn_of va) 17 9)) 8
-                  = Some p1⌝ ∗
-               ▷ (|={∅,⊤}=> mstate_interp σ))%I as "Hrd1".
-    { iApply (kpt_pte1_node root_ppn t0 (svpn_of va) p2 p1 _ Hmaps
-                with "Hlb0 Hkinv"). }
-    iAssert (∀ σ, mstate_interp σ ={⊤,∅}=∗
-               (∃ w : mword 64,
-                  ⌜read_bytes σ.(mem)
-                     (u_pte_addr (u_next_base p1) (subrange_vec_dec (svpn_of va) 8 0)) 8
-                     = Some w⌝ ∗
-                  ⌜pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp))⌝) ∗
-               ▷ (|={∅,⊤}=> mstate_interp σ))%I as "Hrdl".
-    { iApply (kpt_leaf_node_canon root_ppn t0 (svpn_of va) p2 p1 _ a0 d0 Hmaps
-                with "Hlb0 Hkinv"). }
+      iApply (kpt_pte2_obl root_ppn t0 (svpn_of va) p2 p1 _ B Hmaps
+                with "Hbd Hvlb Hlb0 Hkinv"). }
+    iAssert (kpt_obl (u_pte_addr (u_next_base p2)
+                        (subrange_vec_dec (svpn_of va) 17 9)) p1)%I as "Hrd1".
+    { iApply (kpt_pte1_obl root_ppn t0 (svpn_of va) p2 p1 _ B Hmaps
+                with "Hbd Hvlb Hlb0 Hkinv"). }
+    iAssert (kpt_obl_ex (u_pte_addr (u_next_base p1)
+                           (subrange_vec_dec (svpn_of va) 8 0))
+               (fun w => pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp))))%I
+      as "Hrdl".
+    { iApply (kpt_leaf_obl root_ppn t0 (svpn_of va) p2 p1 _ a0 d0 B Hmaps
+                with "Hbd Hvlb Hlb0 Hkinv"). }
     iAssert (xread_obl_ex
                (u_pte_addr (u_next_base p1) (subrange_vec_dec (svpn_of va) 8 0))
                (fun w => pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp))))%I

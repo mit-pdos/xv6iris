@@ -770,21 +770,22 @@ Section UptTranslateIris.
     assert (Htm : exec (translationMode p) σ = Some (Sv39, σ))
       by exact (Htmk usatp Hsatpv Hmode).
     iAssert (∀ wnew : mword 64,
+               ⌜pte_wb_ok (pte_set_ad w a0 d0) wnew⌝ -∗
                gen_heap_interp σ.(mem) -∗ S σ.(mem) -∗
-               pt_slot_own (Some TsoCtx.cur_ctx)
+               pt_slot_own (UTier TsoCtx.cur_ctx)
                  (pt_addr0 p1 (svpn_of va)) (DfracOwn 1)
                  (pte_set_ad w a0 d0) ==∗
                gen_heap_interp (RiscvModelBytes.write_bytes σ.(mem)
                                   (pt_addr0 p1 (svpn_of va)) 8 wnew) ∗
                S (RiscvModelBytes.write_bytes σ.(mem)
                     (pt_addr0 p1 (svpn_of va)) 8 wnew) ∗
-               pt_slot_own (Some TsoCtx.cur_ctx)
+               pt_slot_own (UTier TsoCtx.cur_ctx)
                  (pt_addr0 p1 (svpn_of va)) (DfracOwn 1) wnew)%I
       as "Hpay'".
-    { iIntros (wnew) "Hgh Hsto Hs".
+    { iIntros (wnew) "%Hcn Hgh Hsto Hs".
       iApply ("Hpay" $! σ.(mem) (pt_addr0 p1 (svpn_of va)) _ wnew
                 with "Hgh Hsto Hs"). }
-    iMod (ptree_translateAddr_own acc p (Some TsoCtx.cur_ctx) uroot t w va pa usatp
+    iMod (ptree_translateAddr_own acc p (UTier TsoCtx.cur_ctx) uroot t w va pa usatp
             tlbvec p2 p1 a0 d0 σ S
             Hchk (upt_variant tfp um (svpn_of va) w Hwf Hleaf) Hcanon Hout Hbase Hmaps Htlbok
             Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
