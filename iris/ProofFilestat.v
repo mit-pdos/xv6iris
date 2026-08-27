@@ -187,11 +187,11 @@ Section ProofFilestat.
   Lemma wp_filestat_sconf
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
-      (k : nat) (q : Qp) (Cf : fcontent)
+      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb b lks.
+    : wp_filestat_sconf_body γa γf γs j γlp k q Cf st fn pidv V m K eb b lks.
   Proof.
     cbv beta delta [wp_filestat_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb Hbelow.
@@ -525,7 +525,7 @@ Section ProofFilestat.
          FD_INODE payload, which is a generation-named slice of exactly this
          inode.  The per-slot escrow and sleeplock then come out of the two
          families by the slot the payload named. ---- *)
-      iDestruct (filestat_pay_carve γf k q Cf Hin with "Hrpay")
+      iDestruct (filestat_pay_carve γf k q Cf _ Hin with "Hrpay")
         as (ikk inm ssh gsh tysh)
            "(%Hipk & %Hik & %Hinlt & #Hshot0 & Hshr0 & Hpayback)".
       assert (Hibcov : IBLOCK inm (fsn_inodestart fn) ∈ fsc_cov)

@@ -133,7 +133,8 @@ Section SpecPipealloc.
         ⌜(k0 < NFILE)%nat /\ (k1 < NFILE)%nat⌝ ∗
         ⌜pipe_file pi false C0⌝ ∗ ⌜pipe_file pi true C1⌝ ∗
         pf0 ↦₈[KT1] fnode k0 ∗ pf1 ↦₈[KT1] fnode k1 ∗
-        file_ref γf k0 1 C0 ∗ file_ref γf k1 1 C1))%I.
+        file_ref γf k0 1 C0 (FdOpen FdPipe) ∗
+        file_ref γf k1 1 C1 (FdOpen FdPipe)))%I.
 
 End SpecPipealloc.
 

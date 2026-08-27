@@ -776,7 +776,7 @@ Section ProofSysClose.
       iDestruct (proc_priv_bare_ofile γf p pid V fd fv Hlk with "Hpriv")
         as "(Hpbare & Hslot & Hback)".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]"; [by exfalso; apply Hfvnz|].
-      iDestruct "Href" as (k q Cf) "((%Hfv & %Hklt & %Hty) & Href & Hst)".
+      iDestruct "Href" as (k q Cf stf) "((%Hfv & %Hklt & %Hty) & Href & Hst)".
       (* ---- +0x2c: sd x0,0(a0) -- p->ofile[fd] = 0 ---- *)
       assert (Haddrof : forall CID' : CpuId,
                 add_vec (rget (CID := CID') C4 (mword_of_int 10 : mword 5))
@@ -854,7 +854,7 @@ Section ProofSysClose.
          remaining tie premise is for *)
       iDestruct (fileclose_loop_open fn on n eb p Cf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
-      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on D n eb p (av - 4)%nat b lks pid V
+      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf stf fn on D n eb p (av - 4)%nat b lks pid V
                 ltac:(lia) Hn HDa0
                 Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hpbare Hiru Hfcenv").
@@ -888,7 +888,7 @@ Section ProofSysClose.
          after [ProcInv]'s auth/frag split without holding [fd_frags_any]. *)
       iDestruct (fd_frags_any_acc (pv_fdg V) fd Hfdlt with "Hfrag")
         as (stq) "[Hfr Hfrback]".
-      iMod (fd_st_move _ fd (fdstate_of Cf) stq FdClosed with "Hst Hfr")
+      iMod (fd_st_move _ fd stf stq FdClosed with "Hst Hfr")
         as "[Hst Hfr]".
       iDestruct ("Hfrback" with "Hfr") as "Hfrag".
       iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot Hst]")

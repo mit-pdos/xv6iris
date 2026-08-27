@@ -82,11 +82,26 @@ Section FileInv.
     file_fields k q C -∗ a_fip k ↦₈{DfracOwn (q/2)} fc_ip C.
   Proof. iIntros "(_ & _ & _ & _ & $ & _)". Qed.
 
-  Lemma file_ref_agree γ k q1 C1 q2 C2 :
-    file_ref γ k q1 C1 -∗ file_ref γ k q2 C2 -∗ ⌜C1 = C2⌝.
+  (* Two references onto one slot agree on the CONTENT for free (genuine
+     points-to fractions) and on the STATE because the payload's names ghost
+     makes them agree on [fp_inum] -- which is the whole reason the inum is
+     carried there rather than being conjured at each holder.  So two
+     descriptors onto one file report the same thing to their user, and
+     filedup's two shares cannot drift apart. *)
+  Lemma file_ref_agree γ k q1 C1 st1 q2 C2 st2 :
+    file_ref γ k q1 C1 st1 -∗ file_ref γ k q2 C2 st2 -∗ ⌜C1 = C2 /\ st1 = st2⌝.
   Proof.
-    iIntros "(_ & H1 & _) (_ & H2 & _)".
-    by iApply (file_fields_agree with "H1 H2").
+    iIntros "(_ & H1 & Hp1 & _) (_ & H2 & Hp2 & _)".
+    iDestruct (file_fields_agree with "H1 H2") as %<-.
+    by iDestruct (file_pay_st_agree with "Hp1 Hp2") as %<-.
+  Qed.
+
+  (* the content half alone, which is all most callers were after. *)
+  Lemma file_ref_agree_c γ k q1 C1 st1 q2 C2 st2 :
+    file_ref γ k q1 C1 st1 -∗ file_ref γ k q2 C2 st2 -∗ ⌜C1 = C2⌝.
+  Proof.
+    iIntros "H1 H2".
+    by iDestruct (file_ref_agree with "H1 H2") as %[? ?].
   Qed.
 
   (* the split filedup performs and fileclose undoes. *)
@@ -348,12 +363,18 @@ Section FileInv.
   (* filealloc: [ref = 0] -> [ref = 1].  Allocate the authority entry at
      (1,1) and hand the invariant's WHOLE content fraction out as the
      exclusive reference. *)
+  (* [FdClosed] IS THE ONLY STATE A FRESHLY ALLOCATED FILE CAN HAVE, and
+     that is what [fc_type C = FD_NONE] buys here: filealloc hands its caller
+     an untyped [struct file], so no descriptor may name it yet.  sys_open
+     and sys_pipe retype it before installing it, and THAT is where the
+     descriptor's state becomes open. *)
   Lemma file_alloc_step γ M k C :
-    M !! k = None ->
+    M !! k = None -> fc_type C = FD_NONE ->
     ftable_auth γ M -∗ file_fields k 1 C -∗ file_pay γ k 1 C ==∗
-    ftable_auth γ (<[k := (1%Qp, 1%positive)]> M) ∗ file_ref γ k 1 C.
+    ftable_auth γ (<[k := (1%Qp, 1%positive)]> M) ∗ file_ref γ k 1 C FdClosed.
   Proof.
-    iIntros (HM) "[Ha Hl] Hf Hp".
+    iIntros (HM Hty) "[Ha Hl] Hf Hp".
+    iDestruct (file_pay_st_none _ _ _ _ Hty with "Hp") as "Hp".
     rewrite /ftable_auth /fref_tok.
     assert (Hml : Mcount M !! k = None)
       by (rewrite Mcount_lookup HM; reflexivity).
@@ -372,11 +393,11 @@ Section FileInv.
   (* filedup: [ref++].  The new reference's fraction comes out of the
      CALLER's -- nothing is conjured, which is exactly why the invariant's
      leftover [file_rest γ k qt] is untouched. *)
-  Lemma file_dup_step γ M k q C qt (n : positive) :
+  Lemma file_dup_step γ M k q C st qt (n : positive) :
     M !! k = Some (qt, n) ->
-    ftable_auth γ M -∗ file_ref γ k q C ==∗
+    ftable_auth γ M -∗ file_ref γ k q C st ==∗
     ftable_auth γ (<[k := (qt, Pos.succ n)]> M) ∗
-    file_ref γ k (q/2)%Qp C ∗ file_ref γ k (q/2)%Qp C.
+    file_ref γ k (q/2)%Qp C st ∗ file_ref γ k (q/2)%Qp C st.
   Proof.
     iIntros (HM) "[Ha Hl] (Hf & Hc & Hp & Hlv)".
     rewrite /ftable_auth /fref_tok.
@@ -405,7 +426,7 @@ Section FileInv.
     iDestruct "Hfrag" as "[Hfa Hfb]".
     (* and the content fraction, and the payload, likewise *)
     iEval (rewrite -{1}(Qp.div_2 q) file_fields_frac_split) in "Hc".
-    iEval (rewrite -{1}(Qp.div_2 q) file_pay_split) in "Hp".
+    iEval (rewrite -{1}(Qp.div_2 q) file_pay_st_split) in "Hp".
     iDestruct "Hc" as "[Hca Hcb]". iDestruct "Hp" as "[Hpa Hpb]".
     iFrame.
   Qed.
@@ -414,14 +435,15 @@ Section FileInv.
      SOMEWHERE, and it goes back into the authority's outstanding total (and,
      on the points-to side, into [file_rest]).  That is why the frac component
      tracks outstanding fraction rather than being pinned at 1. *)
-  Lemma file_close_step γ M k q C qt (n : positive) (qr : Qp) :
+  Lemma file_close_step γ M k q C st qt (n : positive) (qr : Qp) :
     M !! k = Some (qt, Pos.succ n) ->
     (qt - q)%Qp = Some qr ->
-    ftable_auth γ M -∗ file_ref γ k q C ==∗
+    ftable_auth γ M -∗ file_ref γ k q C st ==∗
     ftable_auth γ (<[k := (qr, n)]> M) ∗ file_fields k q C ∗
     file_pay γ k q C.
   Proof.
     iIntros (HM Hsub) "[Ha Hl] (Hf & Hc & Hp & Hlv)".
+    iDestruct (file_pay_st_pay with "Hp") as "Hp".
     rewrite /ftable_auth /fref_tok.
     assert (Hml : Mcount M !! k = Some (Pos.succ n))
       by (rewrite Mcount_lookup HM; reflexivity).
@@ -519,13 +541,14 @@ Section FileInv.
      GHOST half above instead, because it has to cancel the off-borrow cinv
      first (the refutation reads the entry this step deletes) and by then it
      holds the joined fraction rather than [qt]. *)
-  Lemma file_close_last_step γ M k C (qt : Qp) :
+  Lemma file_close_last_step γ M k C st (qt : Qp) :
     M !! k = Some (qt, 1%positive) ->
-    ftable_auth γ M -∗ file_ref γ k qt C ==∗
+    ftable_auth γ M -∗ file_ref γ k qt C st ==∗
     ftable_auth γ (delete k M) ∗ file_fields k qt C ∗
     file_pay γ k qt C.
   Proof.
     iIntros (HM) "Hauth (Hf & Hc & Hp & Hlv)".
+    iDestruct (file_pay_st_pay with "Hp") as "Hp".
     iMod (file_close_last_ghost γ M k qt HM with "Hauth Hf Hlv") as "$".
     iModIntro. iFrame.
   Qed.
@@ -737,7 +760,7 @@ Section FileGhostAlloc.
         iFrame "Hip2 Hoff". iPureIntro. exact off_wf_zero. }
       iMod (fpay_tok_update γ k pn
               (MkFPNames (fp_lock pn) (fp_pipe pn) (fp_icv pn) (fp_iq pn)
-                 (fp_ig pn) γx) with "Htok") as "Htok".
+                 (fp_ig pn) γx (fp_inum pn)) with "Htok") as "Htok".
       iModIntro.
       rewrite /fslot lookup_empty.
       iSplitL "Href"; [iExact "Href"|].
@@ -749,7 +772,7 @@ Section FileGhostAlloc.
         iFrame "Hty Hrd Hwr Hpp Hmj". iExact "Hip1". }
       rewrite /file_pay /file_payload.
       iExists (MkFPNames (fp_lock pn) (fp_pipe pn) (fp_icv pn) (fp_iq pn)
-                 (fp_ig pn) γx).
+                 (fp_ig pn) γx (fp_inum pn)).
       iSplitL "Htok"; [iExact "Htok"|].
       iSplitL "Hu".
       { rewrite (file_core_none 1 _ (MkFContent FD_NONE r w pp ip mj) eq_refl).

@@ -2858,43 +2858,65 @@ Section IcacheHeld.
      to, because that is what carries sys_open's "this fd is not a writable
      directory" to filewrite: the payload's [ity_shot] and ilock's are the
      same one-shot exactly when the two slices name the same generation. *)
-  Definition inode_shr_held_gen (v : mword 64) (s : Qp) (g : gname) : iProp Σ :=
-    (∃ (k : nat) (inum : mword 32),
+  (* ...WITH ITS INUM NAMED.  This predicate used to leave the inum ∃-bound,
+     which was always a strange thing to hold -- a share of SOME inode, whose
+     number the holder could not say -- and nothing was buying anything by
+     it: the share already pins the inum, through [inode_ident]'s points-to
+     on the entry's own [i_inum] cell, so the quantifier hid a fact the
+     resource carried anyway.  Naming it is what lets a file descriptor's
+     user-visible state say WHICH FILE it is open on
+     ([FdSlots.FdInode], [FileInvDefs.fdstate_of]), and that is the only
+     reason it had not been named before.
+
+     [inode_shr_held] (no generation) still hides its indices: it is the
+     forgetful view, and the [_forget] lemma below is the one-way door.  *)
+  Definition inode_shr_held_gen (v : mword 64) (s : Qp) (g : gname)
+      (inum : mword 32) : iProp Σ :=
+    (∃ k : nat,
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
        inode_shr_gen k s icfg_dev inum g)%I.
 
-  Lemma inode_shr_held_gen_forget v s g :
-    inode_shr_held_gen v s g -∗ inode_shr_held v s.
+  Lemma inode_shr_held_gen_forget v s g inum :
+    inode_shr_held_gen v s g inum -∗ inode_shr_held v s.
   Proof.
     rewrite /inode_shr_held_gen /inode_shr_held.
-    iIntros "(%k & %inum & %Hv & %Hk & %Hb & Hs)".
+    iIntros "(%k & %Hv & %Hk & %Hb & Hs)".
     iExists k, inum. iFrame "%".
     rewrite inode_shr_gen_intro. iExists g. iExact "Hs".
   Qed.
 
-  Lemma inode_shr_held_gen_split v s1 s2 g :
-    inode_shr_held_gen v (s1 + s2)%Qp g ⊣⊢
-    inode_shr_held_gen v s1 g ∗ inode_shr_held_gen v s2 g.
+  (* the inum bound, read off a share without taking it apart -- what a
+     caller that must state its own postcondition at the inum wants *)
+  Lemma inode_shr_held_gen_bound v s g inum :
+    inode_shr_held_gen v s g inum -∗
+    ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝.
+  Proof. iIntros "(%k & _ & _ & $ & _)". Qed.
+
+  (* THE SPLIT.  Both halves name the SAME inum, which is the point of naming
+     it at all: a file's inum is fixed for the life of its reference, so
+     filedup's two shares describe one file rather than two unrelated ones. *)
+  Lemma inode_shr_held_gen_split v s1 s2 g inum :
+    inode_shr_held_gen v (s1 + s2)%Qp g inum ⊣⊢
+    inode_shr_held_gen v s1 g inum ∗ inode_shr_held_gen v s2 g inum.
   Proof.
     rewrite /inode_shr_held_gen /inode_shr_gen. iSplit.
-    - iIntros "(%k & %inum & %Hv & %Hk & %Hb & (Hid & Hlv & Hs))".
+    - iIntros "(%k & %Hv & %Hk & %Hb & (Hid & Hlv & Hs))".
       rewrite inode_ident_split live_gen_split slh_tok_split.
       iDestruct "Hid" as "[Hid1 Hid2]". iDestruct "Hlv" as "[Hl1 Hl2]".
       iDestruct "Hs" as "[Hs1 Hs2]".
-      iSplitL "Hid1 Hl1 Hs1"; iExists k, inum; by iFrame.
-    - iIntros "[(%k1 & %n1 & %Hv1 & %Hk1 & %Hb1 & (Hid1 & Hl1 & Hs1))
-                (%k2 & %n2 & %Hv2 & %Hk2 & %Hb2 & (Hid2 & Hl2 & Hs2))]".
+      iSplitL "Hid1 Hl1 Hs1"; iExists k; by iFrame.
+    - iIntros "[(%k1 & %Hv1 & %Hk1 & %Hb1 & (Hid1 & Hl1 & Hs1))
+                (%k2 & %Hv2 & %Hk2 & %Hb2 & (Hid2 & Hl2 & Hs2))]".
       assert (Hkk : k1 = k2).
       { apply ientry_inj; [lia | lia |]. rewrite -Hv1 -Hv2. reflexivity. }
       subst k2.
-      iDestruct (inode_ident_agree with "Hid1 Hid2") as %[_ ->].
-      iExists k1, n2. iFrame "%".
+      iExists k1. iFrame "%".
       rewrite inode_ident_split live_gen_split slh_tok_split. iFrame.
   Qed.
 
-  Global Instance inode_shr_held_gen_timeless v s g :
-    Timeless (inode_shr_held_gen v s g).
+  Global Instance inode_shr_held_gen_timeless v s g inum :
+    Timeless (inode_shr_held_gen v s g inum).
   Proof. apply _. Qed.
 
   Global Instance inode_shr_held_timeless v s : Timeless (inode_shr_held v s).

@@ -1438,7 +1438,7 @@ Section ProofFilewrite.
   (* =================================================================== *)
   Local Lemma fw_loop `{CID0 : CpuId}
       (ga gf : gname) (gs : list gname) (jx : nat) (glp : gname)
-      (kx : nat) (qx : Qp) (Cf : fcontent) (fn : fwrite_names)
+      (kx : nat) (qx : Qp) (Cf : fcontent) (stx : fdstate) (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool)
       (sp0 w12 pj : mword 64) (lks : gset string) :
@@ -1517,7 +1517,7 @@ Section ProofFilewrite.
     word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) (m !!! Regidx Rs8) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) (m !!! Regidx Rs9) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
-    file_ref gf kx qx Cf -∗
+    file_ref gf kx qx Cf stx -∗
     proc_priv_core pj pidv (upd_upt V PI) -∗
     KvmSpec.kalloc_env ga None -∗
     (* ---- the PERSISTENT half of [filewrite_fs_env] ---- *)
@@ -1558,7 +1558,7 @@ Section ProofFilewrite.
         sie_cap_gpr KT1 mf K b pj -∗
         cpu_own 0%nat eb pj b lks -∗
         InstrBytes.pc_is (ret_pc (m !!! Regidx Rra)) -∗
-        file_ref gf kx qx Cf -∗
+        file_ref gf kx qx Cf stx -∗
         proc_priv_core pj pidv (upd_upt V P') -∗
         filewrite_env_out fn Cf -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1730,7 +1730,7 @@ Section ProofFilewrite.
        once per ITERATION because the loop threads the reference whole; the
        names below are local to the iteration and everything derived from
        them is re-derived on the next one. ---- *)
-    iDestruct (fileread_pay_carve gf kx qx Cf (or_introl Htyi) with "Hrpay")
+    iDestruct (fileread_pay_carve gf kx qx Cf _ (or_introl Htyi) with "Hrpay")
       as (ik inum sh g ty γox)
          "(%P8 & %P9 & %P5 & %P10 & #Hty & Hshr & Hoh & Hpayback)".
     assert (P3 : IBLOCK inum (fwn_inodestart fn) ∈ fsc_cov)
@@ -2444,7 +2444,7 @@ Section ProofFilewrite.
       by (rewrite (Heocs csp_rs1 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HB0sp).
     (* THE REFERENCE, back whole -- nothing below this point touches it *)
-    iAssert (file_ref gf kx qx Cf)
+    iAssert (file_ref gf kx qx Cf stx)
       with "[Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]" as "Href".
     { rewrite /file_ref /file_fields.
       iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
@@ -2668,11 +2668,11 @@ Section ProofFilewrite.
 
   Lemma wp_filewrite_sconf
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (k : nat) (q : Qp) (Cf : fcontent) (fn : fwrite_names)
+      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate) (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool)
       (lks : gset string)
-    : wp_filewrite_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
+    : wp_filewrite_sconf_body γa γf γs j γlp k q Cf st fn pidv V m K eb n b lks.
   Proof.
     cbv beta delta [wp_filewrite_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb Hclog
@@ -3090,7 +3090,7 @@ Section ProofFilewrite.
            a0 is the return, and [c.j +0xa2] goes straight to [fw_epi]. *)
         assert (Htyp : fc_type Cf = FD_PIPE)
           by (apply eq_vec_true_iff; exact Hp1).
-        iDestruct "Hrpay" as (pn) "[Hpn Hpl]".
+        iDestruct "Hrpay" as (pn) "(%Hstp & Hpn & Hpl)".
         iEval (rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
                [| reflexivity]) in "Hpl".
         (* the entry's iref unit rides the pipe arm now ([file_core]); it is
@@ -3220,9 +3220,9 @@ Section ProofFilewrite.
         { by apply fw_ret_of_pipe. }
         { exact Hrv. }
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
-        { rewrite /file_ref /file_fields /file_pay.
+        { rewrite /file_ref /file_fields /file_pay_st.
           iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrlv".
-          iExists pn. iFrame "Hpn".
+          iExists pn. iSplitR; [iPureIntro; exact Hstp|]. iFrame "Hpn".
           rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
             [| reflexivity].
           iFrame "Hpipe Hpref Hiru Hoh". }
@@ -4277,7 +4277,7 @@ Section ProofFilewrite.
                     One transport, exactly as the -1 exit does before [Hcont]. *)
                  iDestruct (cpu_own_transport CID CID28 0%nat eb pj b
                               ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-                 iApply (fw_loop (CID0 := CID28) γa γf γs j γlp k q Cf fn pidv V
+                 iApply (fw_loop (CID0 := CID28) γa γf γs j γlp k q Cf st fn pidv V
                            m K eb n b sp0 w12 pj lks
                            HK Hk Hj Hgs Hlens Hfnj Hfnps Hn01 Heb Htyi Hwb Hspm
                            ltac:(reflexivity)

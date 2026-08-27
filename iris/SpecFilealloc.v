@@ -65,7 +65,7 @@ Section SpecFilealloc.
     (⌜r = (zero_reg : mword 64)⌝ ∗ fd_slot
      ∨ ∃ (k : nat) (Cf : fcontent),
          ⌜(k < NFILE)%nat /\ r = fnode k /\ fc_type Cf = FD_NONE⌝ ∗
-         file_ref γf k 1 Cf)%I.
+         file_ref γf k 1 Cf FdClosed)%I.
 
 End SpecFilealloc.
 

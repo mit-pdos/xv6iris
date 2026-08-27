@@ -916,12 +916,12 @@ Section ProofSysRead.
       (* ---- THE B1 SEAM.  Lend the descriptor's reference out of the block,
          keep the core for fileread, and settle the loan when it returns. ---- *)
       iDestruct (proc_priv_lend γf pj pidv V fd fv Hlk Hfvnz with "Hpriv")
-        as (kk qq Cf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
+        as (kk qq Cf stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
       iDestruct (read_env_frame γf fn Cf with "Henv Hdev") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Fileread.wp_fileread_sconf γa γf γs j γlp kk qq Cf fn pidv V
+      iApply (Fileread.wp_fileread_sconf γa γf γs j γlp kk qq Cf stf fn pidv V
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
                 _ ltac:(lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 (sys_rw_count_range v2) Heb
@@ -936,7 +936,7 @@ Section ProofSysRead.
         by (rewrite Hlk Hfvk; reflexivity).
       (* the SAME file goes back, so the SAME authority does: this arm moves
          no descriptor's state and needs no fd-state fragment. *)
-      iDestruct (proc_ofiles_repay γf (pv_fdg V) pj (pv_ofile V) ∅ fd kk qq Cf
+      iDestruct (proc_ofiles_repay γf (pv_fdg V) pj (pv_ofile V) ∅ fd kk qq Cf stf
                    ltac:(apply not_elem_of_empty) Hlkk Hkk Hty
                    with "[Howe] Href Hauth") as "Howe".
       { rewrite (union_empty_r_L {[fd]}). iExact "Howe". }

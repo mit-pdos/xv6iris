@@ -624,9 +624,10 @@ Section SpecFileread.
      fileread uses only the first six outputs; filewrite needs [ty] and the
      [fc_wbool] implication as well, which is why the GROWN form lives here
      rather than a second, smaller copy living in SpecFilewrite. *)
-  Lemma fileread_pay_carve (γf : gname) (k : nat) (q : Qp) (Cf : fcontent) :
+  Lemma fileread_pay_carve (γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
+      (st : fdstate) :
     fc_type Cf = FD_INODE \/ fc_type Cf = FD_DEVICE ->
-    file_pay γf k q Cf -∗
+    file_pay_st γf k q Cf st -∗
     ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16)
       (γx : gname),
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
@@ -636,9 +637,9 @@ Section SpecFileread.
       IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
       off_hold γf k γx true q ∗
       (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ off_hold γf k γx true q -∗
-         file_pay γf k q Cf).
+         file_pay_st γf k q Cf st).
   Proof.
-    intros Hty. iIntros "(%pn & Hpn & Hpl)".
+    intros Hty. iIntros "(%pn & %Hst & Hpn & Hpl)".
     assert (Hnp : bool_decide (fc_type Cf = FD_PIPE) = false).
     { apply bool_decide_eq_false_2.
       destruct Hty as [Hc | Hc]; rewrite Hc; by vm_compute. }
@@ -651,9 +652,9 @@ Section SpecFileread.
     assert (Harm : file_armed Cf = true) by (rewrite /file_armed; exact Hyes).
     rewrite /file_payload /file_core Hnp Hyes Harm /inode_pay.
     iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
-    iDestruct "Hs" as (ik inum) "(%Hipk & %Hik & %Hinb & Hshr)".
+    iDestruct "Hs" as (ik) "(%Hipk & %Hik & %Hinb & Hshr)".
     iDestruct "Hwt" as (ty) "[#Hshot %Hnd]".
-    iExists ik, inum, (q * fp_iq pn)%Qp, (fp_ig pn), ty, (fp_ocv pn).
+    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty, (fp_ocv pn).
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [iExact "Hshot"|].
     (* [iExact], not [iFrame]: both sides are the same FOLDED
@@ -661,11 +662,11 @@ Section SpecFileread.
        instance search does not see through the definition. *)
     iSplitL "Hshr"; [iExact "Hshr"|].
     iSplitL "Hop"; [iExact "Hop"|].
-    iIntros "Hshr Hop". iExists pn. iFrame "Hpn".
+    iIntros "Hshr Hop". iExists pn. iFrame "%". iFrame "Hpn".
     rewrite /file_payload /file_core Hnp Hyes Harm /inode_pay.
     iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
-    iSplitL "Hshr"; [iExists ik, inum; iFrame "%"; iExact "Hshr"|].
+    iSplitL "Hshr"; [iExists ik; iFrame "%"; iExact "Hshr"|].
     iExists ty. iSplitR; [iExact "Hshot"|]. done.
   Qed.
 
@@ -677,7 +678,7 @@ Definition wp_fileread_sconf_body
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
-    (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
+    (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate) (* the borrowed reference *)
     (fn : fread_names)                           (* the heavy arms' ghosts  *)
     (pidv : mword 32) (V : pprivate)
     (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string) :=
@@ -718,7 +719,7 @@ Definition wp_fileread_sconf_body
      already in every caller's hand, so neither costs the caller anything. *)
   panic_env -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
-  file_ref γf k q Cf -∗
+  file_ref γf k q Cf st -∗
   (* ambient, because three of the four arms copy into user memory *)
   proc_priv_core pj pidv V -∗
   kalloc_env γa None -∗
@@ -742,7 +743,7 @@ Definition wp_fileread_sconf_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      file_ref γf k q Cf -∗
+      file_ref γf k q Cf st -∗
       proc_priv_core pj pidv (upd_upt V P') -∗
       fileread_env_out fn Cf -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -755,9 +756,9 @@ Module Type FILEREAD.
 
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
-      (k : nat) (q : Qp) (Cf : fcontent)
+      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
       (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
-      wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
+      wp_fileread_sconf_body γa γf γs j γlp k q Cf st fn pidv V m K eb n b lks.
 End FILEREAD.

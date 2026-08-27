@@ -403,10 +403,10 @@ Section ProofFileread.
 
   Lemma wp_fileread_sconf 
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (k : nat) (q : Qp) (Cf : fcontent) (fn : fread_names)
+      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate) (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
-    : wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
+    : wp_fileread_sconf_body γa γf γs j γlp k q Cf st fn pidv V m K eb n b lks.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn Heb Hbelow.
@@ -1008,7 +1008,7 @@ Section ProofFileread.
            exactly piperead's premise pair. *)
         assert (Htyp : fc_type Cf = FD_PIPE)
           by (apply eq_vec_true_iff; exact Hp1).
-        iDestruct "Hrpay" as (pn) "[Hpn Hpl]".
+        iDestruct "Hrpay" as (pn) "(%Hstp & Hpn & Hpl)".
         iEval (rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
                [| reflexivity]) in "Hpl".
         (* the entry's iref unit rides the pipe arm now ([file_core]); it is
@@ -1187,9 +1187,9 @@ Section ProofFileread.
         { exact Hretpr. }
         { exact Hrv. }
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
-        { rewrite /file_ref /file_fields /file_pay.
+        { rewrite /file_ref /file_fields /file_pay_st.
           iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrlv".
-          iExists pn. iFrame "Hpn".
+          iExists pn. iSplitR; [iPureIntro; exact Hstp|]. iFrame "Hpn".
           rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
             [| reflexivity].
           iFrame "Hpipe Hpref Hiru Hoh". }
@@ -1881,7 +1881,7 @@ Section ProofFileread.
                 escrow and sleeplock then come out of the two families by
                 the slot the payload named, and the off-borrow invariant out
                 of the off FAMILY by the slot THIS CONTRACT names. ---- *)
-             iDestruct (fileread_pay_carve γf k q Cf (or_introl Htyi)
+             iDestruct (fileread_pay_carve γf k q Cf _ (or_introl Htyi)
                           with "Hrpay")
                as (ikk inm ssh gsh ty0 γox)
                   "(%Hipk & %Hik & %Hinlt & %Hnd0 & #Hshot0 & Hshr0 & Hoh &

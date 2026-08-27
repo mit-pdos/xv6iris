@@ -522,7 +522,7 @@ Definition wp_fileclose_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γfl γf : gname)            (* ftable.lock, ftable  *)
-    (k : nat) (q : Qp) (Cf : fcontent)                (* the reference        *)
+    (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate) (* the reference        *)
     (fn : fclose_names) (on : option nat)              (* the arms' ghosts   *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string)
@@ -556,7 +556,7 @@ Definition wp_fileclose_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γfl γf -∗
   panic_env -∗
-  file_ref γf k q Cf -∗
+  file_ref γf k q Cf st -∗
   (* THE RUNNING THREAD'S PROCESS BLOCK, in and straight back out.  The FS
      arm reaches iput -> itrunc/iupdate -> bread -> acquiresleep, which
      records its holder ([lk->pid = myproc()->pid]); acquiresleep takes the
@@ -610,9 +610,9 @@ Module Type FILECLOSE.
   Parameter wp_fileclose_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γfl γf : gname)
-      (k : nat) (q : Qp) (Cf : fcontent)
+      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string) (pidv : mword 32) (Vpr : pprivate),
-      wp_fileclose_sconf_body γfl γf k q Cf fn on m n eb p K b lks pidv Vpr.
+      wp_fileclose_sconf_body γfl γf k q Cf st fn on m n eb p K b lks pidv Vpr.
 End FILECLOSE.

@@ -75,7 +75,7 @@ Local Open Scope Z_scope.
 (* ------------------------------------------------------------------ *)
 
 Definition wp_filedup_sconf_body `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
-    (k : nat) (q : Qp) (Cf : fcontent)
+    (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool)
     (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filedup in
@@ -94,7 +94,7 @@ Definition wp_filedup_sconf_body `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ
   (* THE precondition that makes [f->ref++] safe: the duplicate needs a
      descriptor to live in, and there are only FDSLOTS of those. *)
   fd_slot -∗
-  file_ref γf k q Cf -∗
+  file_ref γf k q Cf st -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr KT1 mr K b p -∗
@@ -102,16 +102,16 @@ Definition wp_filedup_sconf_body `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = fnode k ⌝ -∗
-    file_ref γf k (q/2)%Qp Cf -∗
-    file_ref γf k (q/2)%Qp Cf -∗
+    file_ref γf k (q/2)%Qp Cf st -∗
+    file_ref γf k (q/2)%Qp Cf st -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type FILEDUP.
   Parameter wp_filedup_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
-      (k : nat) (q : Qp) (Cf : fcontent)
+      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool)
       (lks : gset string),
-      wp_filedup_sconf_body γl γf k q Cf m n eb p K b lks.
+      wp_filedup_sconf_body γl γf k q Cf st m n eb p K b lks.
 End FILEDUP.
