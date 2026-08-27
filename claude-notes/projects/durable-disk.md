@@ -77,27 +77,28 @@ and the cleanups below — no wall, and nothing the theorem waits on.
   image's node map, `ftop_inv` at `ftopN`); links = the counting RA in
   the region (`ireg_lnk`) with tokens in the payload (`dlinks` →
   `ent_toks`), boot validity free, root's self-record exemption.
-- **The durable side (lanes 4, 4b):** `iris/FsDurSnap.v` — `fs_snap_alloc`
-  (the allocator-transport, Γ-generic core `fs_state_of_ledger`),
-  `P_dur D`, `dsnap_step_of`, `snap_ok = snap_bytes ∧ snap_local` with
-  the used-set coupling and the local frame (`snap_bytes_frame`,
-  `snap_untouched_of_free/_of_own`), encoder injectivity
-  (`dinode_bytes_inj`, `rec_in_blk_inj`, `snap_bytes_node_inj`), the spike
-  readings (`P_dur_node_of_slot`, `snap_dir_entry_of_first`).
-  `iris/FsDurBytes.v` (the byte-map flattening), `iris/FsDurImg.v` (the
-  image instance; adapt to `snap_ok`), `iris/FsDurLedger.v` (entry
-  constructors — era-side content; its fold is superseded).
-  Lane 4c as landed: the durable byte points-to is EXCLUSIVE
+- **The durable side (lanes 4, 4b, H–H5):** `iris/FsDurSnap.v` is the
+  REGISTRY — `fs_snap Γ g B D S`, `P_dur D`, the mint off readings
+  (`snap_mint`, `fs_snap_alloc_mint`, `P_dur_alloc_mint`), the reading back
+  out (`fs_snap_read_ok`), the commit's swap (`dsnap_step_xfer`),
+  `snap_ok = snap_bytes ∧ snap_local`, encoder injectivity
+  (`dinode_bytes_inj`, `rec_in_blk_inj`) and the spike readings
+  (`P_dur_node_of_slot`, `snap_dir_entry_of_first`).  `iris/FsDurXfer.v` is
+  the transport and its allocation half; `iris/FsDurRead.v` the epoch's
+  identity; `iris/FsDurAlloc.v` the VALUE-FIRST carve (`fp_slot`'s slot
+  algebra, `blk_ledger_cut`, `ledger_carve`, `fs_state_of_ledger`,
+  `fs_snap_alloc`, `P_dur_alloc`), whose one caller is era 0's
+  `FsDurImg.img_fs_snap_alloc`.  `iris/FsDurBytes.v` (the byte-map
+  flattening), `iris/FsDurImg.v` (the image instance),
+  `iris/FsDurLedger.v` (entry constructors — era-side content; its fold is
+  superseded).  The durable byte points-to is EXCLUSIVE
   (`snap_gamma_excl` is `phi_excl`, so `free_pool_used`/`blk_owned_ne`
-  read on the durable side too), and the core takes a LINEAR ledger —
-  `blk_ledger_cut` names the footprint slot by slot (`fp_slot`/`fp_list`)
-  and `ledger_carve` spends it, the disjointness coming from the used-set
-  coupling plus three per-object clauses at the END of `snap_bytes`
-  (`sk_sbok`, `sk_reg`, `sk_slot` = `FsImg.fs_slot_inj`), all three
-  discharged by `FsDurImg.img_snap_ok` and so witnessed at the literal
-  image by `SystemAdequacy.fsimg_snap_ok`; `fs_state_of_ledger_era` is the
-  check that the same core applies at `FsBytesGamma.fs_gamma_L`, which is
-  what lane E calls.
+  read on the durable side too), which is what lets every disjointness
+  clause be READ rather than carried; what the carve still spends is the
+  used-set coupling plus three per-object clauses at the END of
+  `snap_bytes` (`sk_sbok`, `sk_reg`, `sk_slot` = `FsImg.fs_slot_inj`), all
+  discharged by `FsDurImg.img_snap_ok` and witnessed at the literal image
+  by `SystemAdequacy.fsimg_snap_ok`.
 - **Refutations kept as documentation:** `iris/FsDurRefute.v`,
   `iris/FsDurDefer.v`, `iris/FsDurTrunc.v` (the per-write accumulation of
   `snap_bytes`' used-set coupling — lane B's finding, plan §4, §8);
@@ -143,8 +144,8 @@ deleting it is a sweep of `Pc`'s arity through `RiscvAdequacy`/
 GONE with lane CE: `LogDefs.fs_dview`/`fs_dview_rebase`,
 `FsDurBytes.fs_dview_dbelems`/`fs_dview_dbytes`, and `FsDurImg`'s
 resource-MOVING image conversion `fs_dur_of_image`/`fs_dur_view_of_image`
-(section 10) — the boot mint runs the allocator core at the ERA's own view,
-so it never wanted that shape.
+(section 10) — the boot mint distributes the era's pieces off facts and
+never wanted that shape.
 
 ## The lanes, in order (each is one green checkpoint; specs cite the plan)
 
@@ -2209,10 +2210,11 @@ so it never wanted that shape.
   IS a file system — the citable form; `D' = L` at home maps is the permit's
   own `fs_receipt_any` index) and `P_fs_dur_acc` (the snapshot lent out with
   a wand back — the channel a boot mint takes).  THE SNAPSHOT'S STATE IS
-  EXISTENTIAL in the law and that costs nothing: `snap_bytes_node_inj` /
-  `_sb_inj` / `_used_agree` make the state a function of the map, so "the new
-  snapshot's `S` is the `ftop` map restricted to the region" is recoverable
-  node by node rather than carried.
+  EXISTENTIAL in the law and that costs nothing: the encoding is injective at
+  every field (`rec_in_blk_inj`, `ind_bytes_inj`, `bm_bytes` read bit by
+  bit), so the state is a function of the map and "the new snapshot's `S` is
+  the `ftop` map restricted to the region" is recoverable node by node
+  rather than carried.
 
   CONTRACTS WHOSE STATEMENT CHANGED: `FsCrash.P_fs`; `P_fs_alloc` /
   `P_fs_alloc_clean` (+ `∃ S, snap_ok S D0`, discharged at era 0 by
@@ -3173,6 +3175,96 @@ so it never wanted that shape.
     substitution.  `fs_snap_alloc_xfer`/`P_dur_alloc_xfer` keep their
     `snap_shape` premise (item 1) and remain caller-less, as do
     `fs_state_xfer`/`_tok` and the two non-vacuity checks.
+
+  **AS LANDED — H5.  THE SNAPSHOT CARRIES ONE PURE CLAUSE, THE CARVE IS
+  ERA 0'S OWN FILE, AND THE BOOT MINT CANNOT BECOME A TRANSPORT -- MEASURED,
+  NOT ABANDONED.**
+
+  Whole tree green, `make audit-only` at the three-entry baseline, the
+  theorem's statement and exported content untouched.
+
+  - **THE GEOMETRY SPLITS BY WHAT IT IS ABOUT, and five of `snap_shape`'s
+    seven clauses were never about the committed view.**  `FsState.fs_geom`
+    (new, four rows: `fg_sbok` = `FsImg.fs_sb_ok (fss_sb S)`, `fg_reg` = a
+    named inum's record block sits in the region, `fg_regdom` = every region
+    inum is named, `fg_dirloc` = `node_dir_local i (fs_nib S) n`) is
+    `fs_state`'s LAST conjunct, so it is a READING at BOTH instances
+    (`fs_state_geom` / `fs_pure_geom`) and the durable snapshot carries none
+    of it.  `inode_local i n` takes an inum and a node, so nothing per-inode
+    can say how the inode MAP and the SUPERBLOCK fit together, and
+    `sb_owned`'s parse says the bytes DECODE to `fss_sb S` and not that its
+    fields make sense -- an all-zero block parses.  `fs_geom_inum` derives
+    the old `ss_inum` from `fg_reg` + `sbo_ushort` and `fs_geom_dom` is the
+    old `snap_shape_dom`, so no clause of `snap_ok` was weakened.  The cost
+    is one row in `fs_state`/`fs_ghost`/`fs_pure` (six files name any of
+    them), one premise on `FsDurXfer.fs_state_mint_runs`, and the retag
+    wand `FsState.fs_state_inode_acc` taking the new node's directory
+    clauses -- `fg_dirloc` is the only row an insert at a live key breaks.
+  - **`ss_bsz` IS THE WAL'S FACT AND LEFT ALTOGETHER.**  "Every block of
+    `D` is a whole block" names no inode, no block role and no bitmap bit.
+    `fs_snap_read_ok` / `P_dur_tie` / `_keep` / `P_dur_inode` /
+    `P_dur_node_of_slot` take `FsDurRead.dblk_full D` as a premise, and
+    `FsCrash`'s two readers discharge it off the recovery record:
+    `fs_install_full` is one induction (`fs_install` only ever inserts
+    values of `P`, `fs_restrict` holds nothing else -- no `NoDup`, no
+    `hdr_wf`), `fs_recovery_dblk_full`/`_blocks_full` the two readings.
+  - **`ss_dombelow` STAYS, and the reason is the SAME wall H3 recorded.**
+    It is the only bridge between the boot configuration's FIXED `cov` and
+    the era's own `size`, and no resource bounds `D`'s domain
+    (`FsDurXferWall.snap_shape_not_readable`, unchanged).  The WAL cannot
+    supply it either: that would need "block 1 never changes across a power
+    cycle", a machine-level invariant this tree does not have.  So
+    `snap_shape` is a one-clause record; `snap_shape_pad_absurd` is now
+    `snap_shape_grow_absurd` at the EMPTY run, and the equality wall stands
+    with a `sb_size (fss_sb S) <= b` premise instead of none.
+  - **THE CARVE IS `iris/FsDurAlloc.v` AND HAS ONE CALLER.**  `fp_slot`'s
+    slot algebra, `blk_ledger`, `ledger_carve`, `blk_ledger_cut`,
+    `fs_state_of_ledger`, `fs_snap_alloc`, `P_dur_alloc` -- moved out of
+    `FsDurSnap`, which is now the REGISTRY and nothing else.  Its caller is
+    `FsDurImg.img_fs_snap_alloc`/`img_P_dur_alloc`, in a section at the
+    THREE classes `P_dur` needs (the top-level theorem builds era 0's epoch
+    before it has a `riscvGS`).  **`FsCrash.P_fs_alloc`/`_alloc_clean` take
+    the epoch as a RESOURCE** (`⊢ |==> P_dur D0`) instead of
+    `⌜∃ S, snap_ok S D0⌝`: the crash predicate does not know how a file
+    system is built out of bytes, and `SystemAdequacy`'s era-0 site passes
+    `img_P_dur_alloc`.
+  - **DELETED, all caller-less**: `fs_state_of_ledger_era`/`_excl`,
+    `blk_ledger_of_home`, `fs_state_xfer_era`/`_snap`, `fs_bytes_auth`/
+    `fs_gamma_L_agree`, `dsnap_step_id`/`_trans`, `fs_snap_alloc_xfer`/
+    `P_dur_alloc_xfer`, the one-block FRAME family (`snap_untouched`/`_but`/
+    `_of_free`/`_of_own`, `snap_bytes_frame`, `snap_ok_frame`) and the three
+    state-injectivity lemmas (`snap_bytes_sb_inj`/`_node_inj`/`_used_agree`,
+    whose lesson is folded into plan section 8); and twenty-six
+    image-routing lemmas out of `FsCfgBoot.v` (2442 -> 1186 lines),
+    computed as a fixpoint over "no reference outside its own body".
+    `img_node`/`img_nodes`/`img_inode_*` stay -- `FsDurImg` and
+    `FsCollectImg` read them, and they are era 0's only decoder.
+  - **WALL -- THE BOOT MINT CANNOT BECOME A TRANSPORT, and it is not a
+    matter of effort.**  Three measurements, any one of which is enough.
+    (i) The era's byte AUTHORITY is minted at the WHOLE home map
+    (`FsBoot.fs_boot_ghosts`, which `FsBlocks.fs_bytes_inv`'s row demands),
+    not at the file system's footprint, so its elements arrive as one flat
+    `∗` and must be split by pure facts whatever the mint does.  (ii) The
+    inode region wants WHOLE BLOCKS (`InodeRegion.ireg_recs`, ruling (i))
+    while `fs_state` holds a record as a 64-byte RUN, so building
+    `fs_state (fs_gamma_L γfs) S` and re-distributing it would carve each
+    region block into sixteen records and glue them back -- strictly more
+    work than the four peels `fs_cfg_alloc_snap` does today.  (iii) The
+    boot fupd reaches the crash predicate only as a PURE projection:
+    `RiscvAdequacy`'s `Hproj` is non-destructive by construction
+    (`iris/RiscvAdequacy.v:1464`), `Pc` lives in `crashN` and
+    `BootShared.boot_shared_alloc` receives the invariant NAME, so lending
+    `P_dur` through `FsCrash.P_fs_dur_acc` would buy the mint FACTS -- which
+    is exactly what `fs_boot_pure` already carries.
+  - **WHAT REMAINS.**  `FsCfgSnap.fs_cfg_alloc_snap` still takes
+    `snap_ok S D` as a Coq premise (`iris/FsCfgSnap.v:832`).  It spends
+    fifteen of `snap_bytes`' clauses plus `snap_local`, so restating that
+    premise as a differently-named record is a RENAME with no content, and
+    it was not done.  What did change is the provenance: `snap_ok` is
+    CARRIED by nothing -- it is derived at `P_dur_tie` from the epoch's own
+    resources plus `ss_dombelow` and the WAL's `dblk_full` -- and it is
+    handed IN nowhere but era 0's image allocator.  Lane H's box stays
+    open on that one premise alone.
 
 - [ ] **Lane F — strengthening and receipts.**  Persistent snapshot
   copies as sync-style receipts (`sys_sync`'s spec — see the fs-syscall
