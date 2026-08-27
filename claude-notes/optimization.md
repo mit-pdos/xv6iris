@@ -17,6 +17,21 @@ so the last line in the log is the stalling sentence. If the slow line is a
   min of two interleaved runs — never by diffing per-file times between two
   parallel builds. Run-to-run variance on a 30 s file is ±10 s in **both**
   directions, so untouched files routinely "improve" by 10 s.
+- **"Isolated" MEANS CHECK `uptime` FIRST — this box is shared, and a busy one
+  INVERTS an A/B, not merely widens it.** At load 13.5 the `Strategy opaque`
+  arm of `ProofIput` read 118.4 s / 119.3 s against a 122.0 s baseline, i.e. a
+  clean 3 % win with the per-tactic breakdown agreeing (`Qed` 23.3 → 21.1 s);
+  the same interleaved A/B at load 3.4 read **+11 s and +17 s the other way**.
+  The same file's baseline read 290 s and 338 s on one afternoon. Min-of-N is
+  the guard that survives this, because contention only ever ADDS — a single
+  reading, or two readings taken hours apart, prove nothing at all.
+- **Per-file wall from two DIFFERENT parallel builds is not a comparison
+  either, and it will hand you a large fake win.** `ProofIput` reads 112 s in a
+  full 1327-file build and 80 s in a 396-file incremental one with nothing about
+  the file changed — GC pressure tracks the width of the build, so even the
+  `user` column moves. Confirm any cross-build delta with an isolated A/B
+  before believing it; that one would have been reported as a 32 s improvement
+  from an unrelated commit.
 - **`iris/.lia.cache` MAKES A WARM MEASUREMENT LIE, BY UP TO 9×.** micromega
   persists every `lia` certificate in a per-DIRECTORY `.lia.cache` (with
   `.nia.cache` beside it), both gitignored and both excluded from the VM push,
@@ -417,6 +432,40 @@ worth 20× on individual files.
   The name-free branch must use `match` (not `lazymatch`) over the hypotheses so
   it picks the right one of the six-to-nine disequalities a transport carries —
   an Ltac body cannot mention a hypothesis its own `injection` introduced.
+
+### ProofIput RESISTS ALL FOUR OF THIS FILE'S LEVERS (measured 2026-08-27)
+
+`ProofIput.v` is 113 s in the build and 2.3x the tree's median cost per
+sentence, so it reads like a textbook RULE ONE file. It is not fixable by the
+rules above, and here is what was tried so nobody re-runs it:
+
+- **Naming the closer made it SLOWER.** `ip_free_locked`'s +0x30 continuation
+  was 60 rows spelled inline and measured **31.7 % of Δ** at a mid-walk dump
+  (2472 B of 7.6 kB, biggest entry by 2.5x) — a bigger share than the
+  `ProofForkret` case that bought −24 %. One `Definition` for it did exactly
+  what it should to the context (Δ 7.6 kB → 5.4 kB, `Hcont` 31.7 % → **3.0 %**)
+  and cost the file **+13 s**, confirmed on a second reading. The regression is
+  +8.5 s inside `ip_free_locked` itself, spread UNIFORMLY across every tactic at
+  identical call counts (`iApply` +25 %, `iMod` +24 %, `iDestruct` +20 %): the
+  per-step delta-unfold of a **28-argument** constant costs more than the
+  smaller Δ saves. Its CALLER improved (`wp_iput_gen` −3.0 s), which is the tell
+  — a fold helps whoever SUPPLIES the closer and hurts whoever USES it.
+- **Sealing that constant does not rescue it, either way.** `Typeclasses
+  Opaque` and `Strategy opaque` both fail identically at
+  *"iSpecialize: cannot instantiate"*, and the `iEval (rewrite /X)` repair puts
+  the expansion straight back into Δ, which is the thing being removed.
+- **`Strategy opaque [rget] [tp_pin] [rf_upd]` is a REGRESSION here**, +11 to
+  +17 s over two interleaved pairs, even though the mechanism is real
+  elsewhere (`ProofPipewrite` keeps the same three lines for −6 %).
+- **Hoisting inline `ltac:` is not available**: the file's 247 splices cost
+  0.18–0.27 s each (27.9 s total, max sentence 1.65 s), against the ~1.55 s per
+  splice that made the same edit worth 28 s in `ProofSysUnlink`.
+
+**AND THE FIRST THREE READINGS SAID THE OPPOSITE, because the box was loaded.**
+The `Strategy` arm measured 118.4 s / 119.3 s against a 122.0 s baseline at load
+13.5 — a 3 % "win" — and reversed to +11/+17 s once the same interleaved A/B ran
+at load 3.4. A single reading on a shared machine is worth nothing here; take
+`uptime` before believing an A/B, and interleave.
 
 ### `lia` IS A GENERAL-PURPOSE CLOSER TOO, AND 180 HYPOTHESES IS A LARGE CONTEXT
 
