@@ -276,8 +276,12 @@ experimenting**: `ulimit -v 25000000` before `coqc`/`make` is ~7x the largest
 legitimate file in the tree, so it never bites a real build and turns this
 failure into a fast one.
 
-**AND THE PRIZE IS PER LEMMA, NOT PER FILE — measured 2026-08-27, do not
-redo it.** `ProofPrintk`'s eleven `wp_printk_arm_*` exit continuations are
+**THE PRIZE IS ABSOLUTE BYTES OFF Δ, NOT THE SHARE — measured 2026-08-27,
+do not redo these.** Below ~1 kB removed it is worth nothing however good the
+share looks: `ProofCopyout.co_loop` (0.46 kB, 27 % of a 33.8 s lemma) came out
+flat at +0.5 % though its `.vo` fell 4.0 %, and `ProofNamex`/`NamexTr`
+(~1 kB) bought only −1.2 / −1.6 %. Against `ProofSysUnlink`'s ~6.5 kB for
+−13.4 %.** `ProofPrintk`'s eleven `wp_printk_arm_*` exit continuations are
 character-for-character identical and 35–43 % of each statement, which reads
 exactly like this section's shape. Folding all eleven measured **48.40 s →
 48.44 s** (`.vo` −0.18 %) on a quiet box, two reps interleaved: nothing.
