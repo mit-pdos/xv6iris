@@ -84,12 +84,17 @@ live directory, unique names).  There is NO cross-inode pure clause:
   `ireg_lnk` in the region (the authority), tokens in the payloads
   (`dlinks` → `ent_toks`).  ALL of this is LANDED (stage 2b).
 - **Durable instance** (over fresh names): held whole, immutable.
-  `FsDurSnap.fs_snap_alloc` allocates one from a VALUE and pure facts
-  (§4); `FsDurSnap.P_dur D` is the snapshot as a function of `D` alone, and
+  `FsDurSnap.P_dur D` is the snapshot as a function of `D` alone, and
   it IS `FsCrash.P_fs`'s last conjunct, at `fr_D r` — arity-free, since the
   gname family is existential.  The cost is two capacity classes
   (`fsLinkG`/`fsTopG`) on `FsCrash`'s sections, which every consumer already
-  has out of `Xv6G.xv6G`.
+  has out of `Xv6G.xv6G`.  **THE ALLOCATOR IS A RESOURCE TRANSPORT**
+  (`iris/FsDurXfer.v`, lane H): `fs_state Γ S ==∗ fs_state Γ S ∗ fs_state Γ' S`
+  over a fresh `Γ'`, with `phi_excl Γ` as its ONLY premise —
+  `FsDurSnap.fs_snap_alloc_xfer`/`P_dur_alloc_xfer` are the registry's
+  entry points at it.  Both ends of a transport are `fs_state`s and nothing
+  is computed from `S`; §4 says why the value-first form that survives
+  beside it is a mistake and what still blocks its two call sites.
 
 ## 3. The WAL's client-facing contracts
 
@@ -237,10 +242,43 @@ the file system's own invariants at the one moment they are all clean:
   §5's boot mint runs in the other direction.
 
 There is NO cross-inode pure clause anywhere and no obligation on any
-writer beyond owning the bytes it writes.  `FsDurSnap.snap_bytes` keeps
-its used-set coupling clauses (`sk_own_used`, `sk_disj`) because the
-allocator needs them to SPLIT a linear ledger; at the commit they are
-read off the ∗, at boot off the snapshot.
+writer beyond owning the bytes it writes.  `FsDurSnap.snap_bytes` still
+carries its used-set coupling clauses (`sk_own_used`, `sk_disj`) and its
+three cut clauses, because the VALUE-FIRST allocator
+(`fs_state_of_ledger`, `blk_ledger_cut`, `ledger_carve`) needs them to
+SPLIT a linear ledger; at the commit they are read off the ∗, at boot off
+the snapshot.
+
+**THE VALUE-FIRST ALLOCATOR IS A MISTAKE, AND THE TRANSPORT THAT REPLACES
+IT IS BUILT (lane H, `iris/FsDurXfer.v`).**  The carve is an artifact of
+the input TYPE: a byte map is ONE linear resource and the file system is a
+`∗` of many, so splitting it needs a pure fact saying where the objects
+are.  With an INSTANCE as input there is nothing to split — each object's
+fresh elements are minted from THAT OBJECT'S own source fragments, so the
+`∗` shape is inherited object by object, and the one fact the mint needs
+(no two objects name one byte) is read off the SOURCE'S OWN EXCLUSIVITY
+inside the lemma (`phi_runs_disj` over `phi_excl`; two full fragments at
+one address are inconsistent).  The link family is one `own_alloc` at the
+source's own element read off its resources (`FsState.fs_links_valid_tok`),
+never at a value computed from `S`.  `FsDurSnap.fs_state_xfer_era` /
+`fs_state_xfer_snap` are the non-vacuity checks at the era's view and at
+the snapshot's.
+
+Neither call site has moved yet.  The COMMIT is WALLED by `log_ctx`'s cone:
+`LogSnapLaw.snap_law`'s conclusion is pure so that it can cross `end_op`'s
+lock release as a Coq hypothesis (§3), and making it hand down the
+transport's output puts `P_dur` — hence `fsLinkG`/`fsTopG` — into
+`LogInv`'s section (`iris/LogInv.v:383`, which binds neither and does not
+bind `xv6G`) and into `log_ctx_snap_law_of_ops`' conclusion
+(`iris/LogInv.v:1579`).  The WP-side threading itself is small: only
+`ProofEndOp.eo_commit` and `eo_loop` carry the pure tie.  The BOOT mint is
+not a substitution either — `FsCfgSnap.fs_cfg_alloc_snap` never builds
+`fs_state (fs_gamma_L γfs) S` at all (which is why
+`fs_state_of_ledger_era` has no caller); it distributes the pieces straight
+into region/bitmap/escrow/pool off the pure tie.  And SHRINKING `snap_ok`
+is downstream of both: `SystemAdequacy.fs_boot_pure` exports `∃ S, snap_ok
+S D` as the theorem's durability claim, so dropping `sk_disj` from it
+weakens what the theorem says.
 
 **THE COLLECTION IS `FsCollectAll.fs_collect_snap_ok`**, and what makes it
 possible is that its conclusion is PURE: an entailment `R ⊢ ⌜φ⌝` yields

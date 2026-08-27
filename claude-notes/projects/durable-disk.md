@@ -2888,6 +2888,63 @@ so it never wanted that shape.
   allocator, deliberately, to keep this cleanup out of the critical path
   to `Himg`; once `Himg` is closed THIS LANE IS MANDATORY — both call
   sites move to the transport and the carve is deleted.
+
+  **AS LANDED — H.  THE TRANSPORT IS BUILT AND PROVEN; NEITHER CALL SITE
+  MOVED, AND THE COMMIT'S IS WALLED BY `log_ctx`'S CONE.**
+
+  Whole tree green, `make audit-only` at the three-entry baseline, the
+  theorem's statement untouched.
+
+  - **`iris/FsDurXfer.v` is the transport** (fs-ghost-state.md §2b, plan
+    §2/§4).  `fs_state_xfer` / `fs_state_xfer_tok`: `fs_state Γ S ==∗
+    fs_state Γ S ∗ fs_state Γ' S` over a fresh `Γ'`, ONE premise
+    (`phi_excl Γ`), nothing computed from `S`.  The byte half names the
+    instance's own runs (`xr_fs`, `xr_rec`/`xr_dat`/`xr_ind`/`xr_pool`),
+    flattens them with `phi_runs_union`, and `ghost_map_alloc`s that map —
+    so the fresh elements come back in the SAME `∗` shape.  **The carve is
+    gone because the disjointness is not a clause**: `phi_runs_disj` reads
+    it off `phi_excl` alone (`phi_map_disj`: two full fragments at one
+    address are inconsistent).  The link half is one `own_alloc` at the
+    source's own element (`FsState.fs_links_valid_tok`, which also carries
+    the root's keep-alive fragment across); the top map is
+    `ghost_map_alloc` at `fss_inodes S`.  `fs_footprint_runs` /
+    `fs_footprint_of_runs` are the Γ-generic scatter/gather pair; their
+    side conditions (`xf_shape`) are produced by the scatter, never
+    supplied.
+  - **`FsDurSnap` is the registry at it.**  `fs_snap` now takes its byte
+    map as a PARAMETER (the transport's is the footprint's flattening, not
+    `fs_dbytes D`) and `P_dur D` quantifies it existentially — nothing
+    reads it.  `fs_snap_alloc_xfer` / `P_dur_alloc_xfer` are the
+    instance-taking entry points; `fs_state_xfer_era` / `fs_state_xfer_snap`
+    are the two non-vacuity checks (the era's non-`□`-able full element and
+    the snapshot's are both legal sources).  `snap_gamma` /
+    `snap_gamma_gtimeless` / `snap_gamma_excl` moved to `FsDurXfer`.
+  - **WALL — the COMMIT cannot move without editing `LogInv.v`.**
+    `LogSnapLaw.snap_law` is `log_ctx`'s last conjunct and its conclusion is
+    PURE precisely so it can cross `end_op`'s lock release as a Coq
+    hypothesis (plan §3).  Handing the transport's output down puts `P_dur`
+    — hence `fsLinkG`/`fsTopG` — into `LogSnapLaw`'s section, hence into
+    `LogInv`'s: `iris/LogInv.v:383` binds `riscvGS, lockG, diskGhostG,
+    bioG, bioslotG, fsLogG, logG` and NOT `xv6G`, so neither class resolves
+    at `snap_law γ γfs cov logstart` (`iris/LogInv.v:1301`), and
+    `log_ctx_snap_law_of_ops` (`iris/LogInv.v:1579`) states the pure
+    conclusion itself.  The WP-side threading is SMALL — only
+    `ProofEndOp.eo_commit` (`:2015`) and `eo_loop` (`:2769`) carry the tie
+    in their statements — so whoever is allowed to touch `LogInv` closes
+    this in one lane.
+  - **The BOOT mint is not a substitution either.**
+    `FsCfgSnap.fs_cfg_alloc_snap` never builds `fs_state (fs_gamma_L γfs) S`
+    at all (which is why `FsDurSnap.fs_state_of_ledger_era` has NO caller);
+    it distributes region/bitmap/escrow/pool straight off the pure tie.
+    Moving it to the transport is a rewrite of that 480-line mint.
+  - **`snap_ok` WAS DELIBERATELY NOT SHRUNK.**  `SystemAdequacy.fs_boot_pure`
+    exports `∃ S, snap_ok S D` as the theorem's durability claim, so
+    dropping `sk_disj` ("no two inodes share a block") from it weakens what
+    the theorem SAYS even though the text is unchanged.  The shrink is
+    downstream of both call-site moves and needs an owner ruling on what the
+    exported claim must keep.  Nothing was deleted: the value-first
+    allocator (`fs_state_of_ledger`, `blk_ledger_cut`, `ledger_carve`,
+    `fp_*`) and `snap_bytes`' cut clauses all still have their two callers.
 - [ ] **Lane F — strengthening and receipts.**  Persistent snapshot
   copies as sync-style receipts (`sys_sync`'s spec — see the fs-syscall
   notes another session landed); the `P_log`/`P_fs` split as two

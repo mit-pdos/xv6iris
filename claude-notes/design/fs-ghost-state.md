@@ -254,14 +254,82 @@ of a durable `fs_state` mean something.
 
 | piece | type / home | meaning |
 |---|---|---|
-| `FsDurSnap.snap_gamma g gl gt` | a `fs_view_names Σ` (`FsStateDefs.v`'s record) at three FRESH gnames | the snapshot's Γ: `fsΦ dq a v := a ↪[g]{dq} v` at a fresh element of the tree's unique `ghost_mapG Σ Z (bv 8)`, the link family at `gl`, the abstract map at `gt`.  `snap_gamma_excl` IS `phi_excl`, so `FsStateBitmap.free_pool_used` and `FsStateDefs.blk_owned_ne` read on the durable side exactly as they do at the era's view. |
-| `fs_snap Γ g D S` | one epoch's whole instance | the byte authority at `fs_dbytes D`, `γtop Γ`'s authority at `fss_inodes S`, every `top_frag`, `fs_state Γ S`, and the pure `⌜snap_ok S D⌝`.  Timeless whenever `Γ` is. |
-| `P_dur D` | `∃ g gl gt S, fs_snap (snap_gamma g gl gt) g D S` | THE REGISTRY: the CURRENT snapshot, at the committed block map alone.  The names and the state are existential — an epoch is named only by the map it stands at, which is what makes `P_dur` a function of `D` and therefore droppable into `FsCrash.P_fs` with NO arity change. |
+| `FsDurXfer.snap_gamma g gl gt` | a `fs_view_names Σ` (`FsStateDefs.v`'s record) at three FRESH gnames | the snapshot's Γ: `fsΦ dq a v := a ↪[g]{dq} v` at a fresh element of the tree's unique `ghost_mapG Σ Z (bv 8)`, the link family at `gl`, the abstract map at `gt`.  `snap_gamma_excl` IS `phi_excl`, so `FsStateBitmap.free_pool_used` and `FsStateDefs.blk_owned_ne` read on the durable side exactly as they do at the era's view. |
+| `fs_snap Γ g B D S` | one epoch's whole instance | the byte authority at `B`, `γtop Γ`'s authority at `fss_inodes S`, every `top_frag`, `fs_state Γ S`, and the pure `⌜snap_ok S D⌝`.  Timeless whenever `Γ` is.  **`B` IS A PARAMETER, not `fs_dbytes D`**: the value-first allocator mints it at the whole of `fs_dbytes D` and carves the instance out of it, the TRANSPORT mints it at the flattening of the source instance's own runs (a record is 64 bytes of its region block, not the block).  Nothing reads it. |
+| `P_dur D` | `∃ g gl gt B S, fs_snap (snap_gamma g gl gt) g B D S` | THE REGISTRY: the CURRENT snapshot, at the committed block map alone.  The names, the byte map and the state are existential — an epoch is named only by the map it stands at, which is what makes `P_dur` a function of `D` and therefore droppable into `FsCrash.P_fs` with NO arity change. |
 | `P_dur_alloc S D` | `FsDurSnap.v` | `snap_ok S D` in, `P_dur D` out under a `bupd`.  The snapshot needs NO resource from anyone — a VALUE and pure facts.  It runs `fs_snap_alloc`, which allocates all three families in one update over the Γ-generic core `fs_state_of_ledger`. |
+| `fs_snap_alloc_xfer` / `P_dur_alloc_xfer` | `FsDurSnap.v` | THE SAME REGISTRY, FROM AN INSTANCE (see the transport block below): `phi_excl Γ` and `fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)` in, `P_dur D` out with the source HANDED BACK.  No cut clause of `snap_bytes` is used — the disjointness the value-first allocator carves by is read off the source's own exclusivity inside `FsDurXfer`.  `snap_ok S D` still rides as the registry's pure tie, because that is what every READER takes. |
 | `dsnap_step_of S' D D'` | `FsDurSnap.v` | the commit's step: from `snap_ok S' D'`, `P_dur D ==∗ P_dur D'`.  The old epoch is DISCARDED and the new one allocated; no ghost is updated, so the step needs nothing from the old instance and nothing from the era but the value and the facts.  `dsnap_step_id`/`_trans` are the readings a non-committing step takes. |
 | `P_dur_tie` / `P_dur_tie_keep` / `P_dur_inode` / `P_dur_node_of_slot` | `FsDurSnap.v` | what a consumer READS off the current snapshot.  The tie is pure, so a receipt is a COPY and nothing is borrowed: `P_dur_node_of_slot` turns a byte fact about the committed map's inode slot into a fact about the durable file system's inode, and `snap_dir_entry_of_first` does the same for a directory entry.  These are the readings the spike theorem is stated at. |
 
-**THE ALLOCATOR TAKES A LINEAR LEDGER.**  `fs_state_of_ledger Γ S D` is the
+**THE RESOURCE TRANSPORT (`iris/FsDurXfer.v`, lane H).**  BOTH ENDS OF A
+TRANSPORT ARE `fs_state`s, and nothing is computed from `S` but the state
+itself:
+
+```
+fs_state_xfer_tok Γ (Hex : phi_excl Γ) S r v :
+  fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v) ==∗
+    fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)
+    ∗ ∃ g gl gt B, ghost_map_auth g 1 B ∗ ghost_map_auth gt 1 (fss_inodes S)
+                   ∗ top_frags ∗ fs_state (snap_gamma g gl gt) S
+                   ∗ own gl (link_tok_elem r v)
+```
+
+Its ONLY premise is `phi_excl Γ`.  Three allocations and not one decode:
+
+* the BYTE map.  `fs_footprint Γ S` IS a `∗` of byte runs, one per object,
+  and `xr_fs S PM` names them (`xr_rec`/`xr_dat`/`xr_ind` per inode, the
+  superblock's and the bitmap's blocks, and the free pool's `PM` — the
+  pool's bytes are EXISTENTIAL in the predicate, so the walk collects them
+  into a map read off the source's own resources).  `fs_footprint_runs` /
+  `fs_footprint_of_runs` are that correspondence, Γ-GENERICALLY and in both
+  directions; its only side conditions (`xf_shape`: block lengths and the
+  pool's domain) are produced by the scatter, never supplied.  Then
+  `phi_runs_disj` reads PAIRWISE DISJOINTNESS of the runs' flat maps off
+  `phi_excl` ALONE — two full fragments at one address are inconsistent —
+  `phi_runs_union` turns the `∗` of the runs into the `∗` of ONE map, and
+  `ghost_map_alloc` at that map hands the fresh elements back in the SAME
+  `∗` shape.  **Nothing is carved and no disjointness clause is stated,
+  maintained or supplied**: each object's fresh elements come from THAT
+  OBJECT'S own source fragments, which is why `sk_disj` and the three cut
+  clauses have no role here at all.
+* the LINK family: ONE `own_alloc` at the SOURCE'S own element, read off
+  its resources by `FsState.fs_links_valid` / `fs_links_valid_tok` — the
+  choice function is the gather's, never a function of `S`.  The `_tok`
+  form is what carries the root's keep-alive fragment across, so `sk_links`'
+  slack is not what a transport needs.
+* the TOP map: `ghost_map_alloc` at `fss_inodes S`, the index of both ends.
+
+`FsDurSnap.fs_state_xfer_era` and `fs_state_xfer_snap` are the two
+NON-VACUITY CHECKS, stated rather than described: the transport applies
+VERBATIM at `FsBytesGamma.fs_gamma_L` (the era's full, non-`□`-able
+element — the commit's collection is a legal source) and at `snap_gamma`
+(the durable side — the boot mint's lent snapshot is a legal source).
+
+**THE TWO CALL SITES HAVE NOT MOVED YET**, and one of them is WALLED:
+
+* the COMMIT.  `LogSnapLaw.snap_law` is `LogInv.log_ctx`'s last conjunct
+  and its conclusion is PURE precisely so that it can cross `end_op`'s lock
+  release as a Coq hypothesis (plan §3).  Handing the transport's output
+  down instead means `snap_law`'s conclusion mentions `P_dur`, hence
+  `fsLinkG`/`fsTopG` on `LogSnapLaw`'s section, hence on `LogInv`'s
+  (`iris/LogInv.v:383`, whose `Context` binds neither and which does not
+  bind `xv6G`) and on `log_ctx_snap_law_of_ops`' conclusion
+  (`iris/LogInv.v:1579`).  Only `ProofEndOp.eo_commit` and `eo_loop` carry
+  the pure tie in their statements, so the WP-side threading is two lemmas
+  — the block is the `log_ctx` cone, not the proof.
+* the BOOT mint.  `FsCfgSnap.fs_cfg_alloc_snap` never builds
+  `fs_state (fs_gamma_L γfs) S` at all: it distributes the pieces straight
+  into region/bitmap/escrow/pool off the pure tie, which is why
+  `fs_state_of_ledger_era` has no caller.  Moving it to the transport is a
+  rewrite of that mint, not a substitution.
+
+Shrinking `snap_ok` to the byte agreements is DOWNSTREAM of both moves and
+was deliberately NOT done: `SystemAdequacy.fs_boot_pure` exports `∃ S,
+snap_ok S D` as the durability claim of the theorem, so dropping `sk_disj`
+("no two inodes share a block") from it weakens what the theorem says.
+
+**THE VALUE-FIRST ALLOCATOR TAKES A LINEAR LEDGER.**  `fs_state_of_ledger Γ S D` is the
 Γ-generic core — `snap_ok S D` plus the ledger of `D`'s byte elements in,
 `fs_state Γ S` out.  `blk_ledger_cut` names the footprint slot by slot
 (`fp_slot`/`fp_list`) and `ledger_carve` spends it; what makes the carve

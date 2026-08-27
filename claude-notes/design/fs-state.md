@@ -1235,6 +1235,14 @@ and at every commit.
 
 `iris/FsDurSnap.v` is the ruling's core, Γ-generic and source-agnostic.
 
+> RETIRED (lane H): "the transport is an allocation FROM A VALUE" was the
+> mistake.  The transport is `iris/FsDurXfer.v` — `fs_state Γ S ==∗
+> fs_state Γ S ∗ fs_state Γ' S`, both ends `fs_state`s, `phi_excl Γ` its
+> only premise — and the disjointness this section reads as a pure clause
+> is read off the source's own exclusivity inside it.  See
+> [`durable-fs-plan.md`](durable-fs-plan.md) §2/§4 and
+> [`fs-ghost-state.md`](fs-ghost-state.md) §2b; nothing below is current.
+
 - **`snap_ok S D`, the pure tie.**  A state and a committed block map agree
   at the state's FOOTPRINT: the superblock's block and its parse, the
   bitmap block at `bm_bytes` of the used set, every free block below the

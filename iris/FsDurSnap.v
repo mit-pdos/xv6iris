@@ -79,6 +79,9 @@ Require Import FsImg.
 Require Import LogDefs.       (* [fs_dbytes] -- the byte flattening       *)
 Require Import Xv6Cameras.
 Require Import FsDurBytes.    (* [fs_dbytes_blocks] -- Gamma-generically  *)
+Require Import FsDurXfer.     (* THE RESOURCE TRANSPORT (lane H): [snap_gamma],
+                                 [fs_state_xfer] -- both ends of a transport
+                                 are [fs_state]s and nothing is decoded *)
 Require Import RiscvPtsto.    (* [riscvGS] / [diskGhostG] -- IMPORTED, not
                                  merely required: a class reached through a
                                  transitive [Require] parses in a binder and
@@ -1922,25 +1925,9 @@ Section Snap.
   Implicit Types S : fs_state_rec.
   Implicit Types D : gmap Z (list (bv 8)).
 
-  (* the FULL element, exactly as the era's [FsBytesGamma.fs_gamma_L] is *)
-  Definition snap_gamma (g gl gt : gname) : fs_view_names Σ :=
-    MkFsView (fun (dq : dfrac) (a : Z) (v : bv 8) => (a ↪[g]{dq} v)%I) gl gt.
-
-  Global Instance snap_gamma_gtimeless g gl gt :
-    GTimeless (snap_gamma g gl gt).
-  Proof. intros dq a v. rewrite /snap_gamma /=. apply _. Qed.
-
-  (* two owners of one byte is [False].  [FsStateDefs.phi_excl]'s consumers
-     -- [FsStateBitmap.free_pool_used], hence xv6's "freeing free block"
-     panic arm, and [FsStateDefs.blk_owned_ne] -- therefore read on the
-     durable side exactly as they do at the era's view. *)
-  Lemma snap_gamma_excl g gl gt : phi_excl (snap_gamma g gl gt).
-  Proof.
-    intros a v w dq1 dq2. rewrite /snap_gamma /=.
-    iIntros "[H1 H2]".
-    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
-    done.
-  Qed.
+  (* [snap_gamma], [snap_gamma_gtimeless] and [snap_gamma_excl] are
+     [FsDurXfer]'s: the transport allocates the fresh family, so the family
+     record belongs beside it. *)
 
   (* ------------------------------------------------------------------ *)
   (*  6.  THE ALLOCATOR = THE TRANSPORT                                   *)
@@ -2003,15 +1990,21 @@ Section Snap.
      abstract map's authority and every fragment, the nested predicate, and
      the PURE tie to the committed block map.  Nothing outside [crashN]
      ever holds a piece of it. *)
-  Definition fs_snap Γ (g : gname) D S : iProp Σ :=
-    (ghost_map_auth g 1 (fs_dbytes D)
+  (* THE BYTE MAP IS THE EPOCH'S OWN AND IS NOT A FUNCTION OF [D]
+     (durable-disk lane H).  The value-first allocator minted it at
+     [fs_dbytes D] and CARVED the instance out of it; the transport mints it
+     at the flattening of the SOURCE INSTANCE'S own runs, which is smaller
+     (a record is 64 bytes of its region block, not the block).  Nothing
+     reads the map, so it is a parameter here and existential in [P_dur]. *)
+  Definition fs_snap Γ (g : gname) (B : gmap Z (bv 8)) D S : iProp Σ :=
+    (ghost_map_auth g 1 B
      ∗ ghost_map_auth (γtop Γ) 1 (fss_inodes S)
      ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag Γ i n)
      ∗ fs_state Γ S
      ∗ ⌜snap_ok S D⌝)%I.
 
-  Global Instance fs_snap_timeless `{!GTimeless Γ} g D S :
-    Timeless (fs_snap Γ g D S).
+  Global Instance fs_snap_timeless `{!GTimeless Γ} g B D S :
+    Timeless (fs_snap Γ g B D S).
   Proof. rewrite /fs_snap. apply _. Qed.
 
   (* THE REGISTRY: the CURRENT snapshot, at the committed block map [D].
@@ -2020,8 +2013,8 @@ Section Snap.
      of [D] alone and therefore droppable into [FsCrash.P_fs] with no
      arity change. *)
   Definition P_dur D : iProp Σ :=
-    (∃ (g gl gt : gname) (S : fs_state_rec),
-       fs_snap (snap_gamma g gl gt) g D S)%I.
+    (∃ (g gl gt : gname) (B : gmap Z (bv 8)) (S : fs_state_rec),
+       fs_snap (snap_gamma g gl gt) g B D S)%I.
 
   Global Instance P_dur_timeless D : Timeless (P_dur D).
   Proof. rewrite /P_dur. apply _. Qed.
@@ -2030,7 +2023,61 @@ Section Snap.
   Proof.
     intros Hok.
     iMod (fs_snap_alloc S D Hok) as (g gl gt) "(Hba & Hta & Htf & Hst)".
-    iModIntro. iExists g, gl, gt, S. rewrite /fs_snap. by iFrame.
+    iModIntro. iExists g, gl, gt, (fs_dbytes D), S. rewrite /fs_snap. by iFrame.
+  Qed.
+
+  (* ================================================================== *)
+  (*  6b.  THE SAME REGISTRY, FROM AN INSTANCE (durable-disk lane H)     *)
+  (*                                                                    *)
+  (*  [P_dur_alloc] above is the VALUE-FIRST entry: it takes the block   *)
+  (*  map and the whole of [snap_ok]'s disjointness/cut clauses, and     *)
+  (*  [fs_state_of_ledger] carves a freshly allocated byte map by them.  *)
+  (*  THE CARVE IS AN ARTIFACT OF THE INPUT TYPE.  Given a SOURCE        *)
+  (*  INSTANCE -- and both of the callers that matter have one (the      *)
+  (*  commit's collection at quiescence, plan section 4; the boot mint's *)
+  (*  lent snapshot, plan section 5) -- the fresh family is built by     *)
+  (*  [FsDurXfer.fs_state_xfer_tok]: each object's fresh elements come   *)
+  (*  from THAT OBJECT'S own source fragments, so the [∗] shape is       *)
+  (*  inherited object by object and NOTHING is split by a fact.  The    *)
+  (*  cut clauses ([sk_disj], [sk_own_used], [sk_meta_used], [sk_sbok],  *)
+  (*  [sk_reg], [sk_slot]) are not used here at all: what replaces them  *)
+  (*  is the source's own exclusivity, read INSIDE the transport.        *)
+  (*                                                                    *)
+  (*  [snap_ok] still rides as the registry's PURE tie, because that is  *)
+  (*  what every READER of the snapshot takes ([P_dur_tie] and its       *)
+  (*  consumers, out to [SystemAdequacy.fs_boot_pure]); shrinking it to  *)
+  (*  the byte agreements is a separate step and would weaken what the   *)
+  (*  theorem exports, so it is NOT done here.                          *)
+  (* ================================================================== *)
+
+  Lemma fs_snap_alloc_xfer Γ (Hex : phi_excl Γ) S D (r : Z) (v : ity) :
+    snap_ok S D ->
+    fs_state Γ S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
+      fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)
+      ∗ ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
+          fs_snap (snap_gamma g gl gt) g B D S
+          ∗ own gl (link_tok_elem r v).
+  Proof.
+    intros Hok. iIntros "HS Ht".
+    iMod (fs_state_xfer_tok Γ Hex S r v with "HS Ht")
+      as (g gl gt B) "(HS & Ht & Hba & Hta & Htf & HS' & Ht')".
+    iModIntro. iFrame "HS Ht". iExists g, gl, gt, B.
+    rewrite /fs_snap. iFrame "Hba Hta Htf HS' Ht'". by iPureIntro.
+  Qed.
+
+  (* the registry, from an instance: the snapshot's own spare link fragment
+     is dropped (affine) -- it is the BOOT MINT that will want it back, and
+     the boot mint reads it off the snapshot's own resources the same way *)
+  Lemma P_dur_alloc_xfer Γ (Hex : phi_excl Γ) S D (r : Z) (v : ity) :
+    snap_ok S D ->
+    fs_state Γ S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
+      P_dur D ∗ fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v).
+  Proof.
+    intros Hok. iIntros "HS Ht".
+    iMod (fs_snap_alloc_xfer Γ Hex S D r v Hok with "HS Ht")
+      as "(HS & Ht & Hsnap)".
+    iDestruct "Hsnap" as (g gl gt B) "[Hsnap _]".
+    iModIntro. iFrame "HS Ht". iExists g, gl, gt, B, S. iExact "Hsnap".
   Qed.
 
   (* THE COMMIT'S STEP.  The previous epoch is DISCARDED (affine) and the
@@ -2063,7 +2110,7 @@ Section Snap.
      is needed -- which is what makes the non-persistence of the bundle
      itself cost nothing *)
   Lemma P_dur_tie D : P_dur D -∗ ∃ S, ⌜snap_ok S D⌝.
-  Proof. iIntros "H". iDestruct "H" as (g gl gt S) "(_&_&_&_&%)". eauto. Qed.
+  Proof. iIntros "H". iDestruct "H" as (g gl gt B S) "(_&_&_&_&%)". eauto. Qed.
 
   (* ...and the same with the snapshot HANDED BACK, which is the form an
      invariant's opener needs.  Everything the spike theorem reads off the
@@ -2071,10 +2118,10 @@ Section Snap.
      nothing is spent, because the tie is pure. *)
   Lemma P_dur_tie_keep D : P_dur D -∗ ∃ S, ⌜snap_ok S D⌝ ∗ P_dur D.
   Proof.
-    iIntros "H". iDestruct "H" as (g gl gt S) "Hs".
+    iIntros "H". iDestruct "H" as (g gl gt B S) "Hs".
     iDestruct "Hs" as "(Hba & Hta & Htf & Hst & %Hok)".
     iExists S. iSplitR; [iPureIntro; exact Hok |].
-    iExists g, gl, gt, S. rewrite /fs_snap. by iFrame.
+    iExists g, gl, gt, B, S. rewrite /fs_snap. by iFrame.
   Qed.
 
   (* THE SPIKE'S READING: at the current snapshot, every region inum is
@@ -2365,3 +2412,59 @@ Section LedgerEra.
   Proof. exact (fs_gamma_L_excl γfs). Qed.
 
 End LedgerEra.
+
+(* ===================================================================== *)
+(*  10.  THE TRANSPORT'S NON-VACUITY CHECK, AT THE ERA'S OWN VIEW         *)
+(*       (durable-disk lane H)                                            *)
+(*                                                                        *)
+(*  [FsBytesGamma.fs_gamma_L]'s points-to is the FULL element of the era's *)
+(*  logged byte view, and it is not [□]-able.  That the transport applies  *)
+(*  there VERBATIM -- same statement, no extra hypothesis, the one         *)
+(*  premise discharged by [FsBytesGamma.fs_gamma_L_excl] -- is what makes  *)
+(*  the commit's collection at quiescence a legal SOURCE (plan section 4)  *)
+(*  and the durable snapshot a legal source for the boot mint (section 5). *)
+(*  So the check is STATED, not described, exactly as [fs_state_of_ledger] *)
+(*  had [fs_state_of_ledger_era] beside it.                               *)
+(* ===================================================================== *)
+
+Section XferEra.
+  Context `{!riscvGS Σ, !diskImgG Σ, !diskGhostG Σ, !fsLogG Σ,
+            !fsLinkG Σ, !fsTopG Σ}.
+
+  Lemma fs_state_xfer_era (γfs : fs_names) (S : fs_state_rec)
+      (r : Z) (v : ity) :
+    fs_state (fs_gamma_L γfs) S
+    -∗ own (γlink (fs_gamma_L γfs)) (link_tok_elem r v) ==∗
+      ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
+        fs_state (fs_gamma_L γfs) S
+        ∗ own (γlink (fs_gamma_L γfs)) (link_tok_elem r v)
+        ∗ ghost_map_auth g 1 B
+        ∗ ghost_map_auth gt 1 (fss_inodes S)
+        ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
+        ∗ fs_state (snap_gamma g gl gt) S
+        ∗ own gl (link_tok_elem r v).
+  Proof.
+    exact (fs_state_xfer_tok (fs_gamma_L γfs) (fs_gamma_L_excl γfs) S r v).
+  Qed.
+
+  (* ...and the snapshot side is a source too, which is what the BOOT MINT
+     needs: a durable instance transports onto fresh names exactly as the
+     era's does ([snap_gamma_excl] is the same one premise). *)
+  Lemma fs_state_xfer_snap (g0 gl0 gt0 : gname) (S : fs_state_rec)
+      (r : Z) (v : ity) :
+    fs_state (snap_gamma g0 gl0 gt0) S
+    -∗ own gl0 (link_tok_elem r v) ==∗
+      ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
+        fs_state (snap_gamma g0 gl0 gt0) S
+        ∗ own gl0 (link_tok_elem r v)
+        ∗ ghost_map_auth g 1 B
+        ∗ ghost_map_auth gt 1 (fss_inodes S)
+        ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
+        ∗ fs_state (snap_gamma g gl gt) S
+        ∗ own gl (link_tok_elem r v).
+  Proof.
+    exact (fs_state_xfer_tok (snap_gamma g0 gl0 gt0)
+             (snap_gamma_excl g0 gl0 gt0) S r v).
+  Qed.
+
+End XferEra.
