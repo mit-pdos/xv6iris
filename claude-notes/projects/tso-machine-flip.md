@@ -1,6 +1,15 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
-STEP 5, THE RE-RULING (2026-08-26, latest session).  A6.37(b) is
+STEP 5, THE UNGATED TRANCHE (2026-08-26, latest session).  **`WpUart` is
+GREEN — A6.28/A6.29's DMA-completion append is PAID** (the lease flips to
+`phys_ledger`, `virtio_proto_step` turns inside out, the disk loop runs
+`ledger_store_ok` at `disk_agent`), and the A6.27/A6.28 threading is
+through: `UserPtTree` (377 dependents), `WpStartNew`, `TransPt` — the last
+of which needed TWO payers, one per page-table tier.  `HartSKpt` and its
+tier stayed PARKED on the history ruling, untouched.  **A6.48 is the
+handoff.**
+
+STEP 5, THE RE-RULING (2026-08-26, same session, earlier).  A6.37(b) is
 WITHDRAWN by the owner; **A6.47 rulings 1 and 2 are LANDED and green with
 ZERO fallout** — the author export (`ledger_msg_at` / `ledger_vis` /
 `ledger_read_vis_ok`, ONE gate for hart 0 and the secondaries) and the
@@ -3641,6 +3650,146 @@ this project has.
    "read 1 at `tvn`; the message publishing 1 is at `F`; I am not its
    author; hence `F ≤ tvn`; hence `view_lb h F` by `view_lb_le`" — no
    machinery, only the per-proof step the ruling left in the proofs.
+
+### A6.48 THE UNGATED TRANCHE: `WpUart` IS CLOSED, AND THE PT THREADING
+### IS THROUGH — WITH ONE MEASUREMENT THAT WAS NOT IN THE PLAN
+
+Ruling 3's refutation went to a design-analysis lane; `HartSKpt` and
+everything behind it stayed parked and UNTOUCHED, exactly as A6.45/A6.47
+characterise them.  What follows is the ungated work.
+
+**(1) `WpUart` IS GREEN.  A6.28/A6.29's DMA-completion append is PAID.**
+The restructure was smaller than A6.29 feared, because the whole byte
+family bottoms out in three definitions and the update happens in exactly
+ONE place.
+
+- **The lease flips tier in three lines.**  `WpVirtio.dma_own`,
+  `VirtioProto.phys_map` / `phys_list` (and `phys_word2`/`phys_word4`) go
+  from `phys_pointsto` to `TsoCtx.phys_ledger`.  A blanket rename inside
+  `VirtioProto.v` (16 occurrences) needed **exactly one proof fix** —
+  `phys_map_disj`, which unfolded the points-to to reach `pointsto_ne`;
+  the sealed tier wants a law, so `TsoCtx` gained `phys_ledger_ne` (and
+  `phys_ledger_ram`, its companion).  Every other lemma in that family is
+  big-op algebra and did not notice.
+- **`dma_update` becomes `dma_acc`, and `virtio_proto_step` turns inside
+  out.**  The old shape handed back `gen_heap_interp (w ∪ m)` — it did the
+  write.  It cannot, because `ledger_store_ok` moves `gen_heap_interp` and
+  `tso_interp_at` TOGETHER.  The new shape hands the write set's OLD bytes
+  out at the ledger tier and takes the NEW ones back:
+
+      virtio_proto_step … ==∗
+        ∃ kq wr (old : gmap Arch.pa (bv 8)),
+          ⌜v_disk v' = wr_apply None (v_disk v)⌝ ∗ ⌜dom old = dom w⌝ ∗
+          gen_heap_interp m ∗                       (* in and back, UNTOUCHED *)
+          ([∗ map] a ↦ b ∈ old, phys_ledger a (DfracOwn 1) b) ∗
+          perm_pend (dn_perm γ) kq wr ∅ ∗
+          (perm_done (dn_perm γ) kq wr -∗
+             ([∗ map] a ↦ b ∈ w, phys_ledger a (DfracOwn 1) b) -∗
+             disk_img_auth (dn_img γ) (v_disk v') ∗ virtio_proto γ v')
+
+  `WpVirtio.virtio_lease_acc` is the same reshape one tier down.
+- **`WpUart.wp_disk_loop` performs the store**, in one `iAssert` that
+  produces `gen_heap_interp (w ∪ m)`, the bundle at the appended log and
+  the new bytes; A6.11's log disjunct picks the arm
+  (`tso_interp_of_disk_idle` when `W = ∅`, `ledger_store_ok` at
+  `disk_agent` otherwise, through the A6.1a `gs_of` bridge).
+- **AND THE LEASE NEVER LEAVES THE LEDGER IN THE FIRST PLACE.**
+  `DiskInv.mem_win_to_phys` used to `ctx_pointsto_forget` the driver's
+  window on the way to the device tier.  It does not any more:
+  `ctx_ident_ledger` (new, in `DiskInv`) takes `↦ₘ` → `ctx_phys_pointsto`
+  → `phys_ledger` through `ctx_pointsto_to_phys` + the static claim, so
+  the timestamp element travels with the byte — which is the whole reason
+  the completion can pay its own append.  A6.9's sentence is unchanged as
+  a statement (raw → ctx is still impossible); what changed is that this
+  path was never raw.  The reverse bridges (`phys_win_to_mem`,
+  `phys_to_byte`) `phys_ledger_forget` at the top and land at the raw VA
+  byte as before.
+- **ONE SPURIOUS BINDER FOUND BY THE DISK.**  `ledger_store_ok` carried
+  `` `{CID : CpuId} `` and never used it — the author is a parameter.  The
+  disk agent is not a hart and has no ambient `cpu_id` to offer, so the
+  binder had to go; it failed as an unresolved `CpuId` at `Qed`, i.e. as
+  "attempt to save an incomplete proof" with NO focused goals, which
+  `Unshelve` is what diagnoses.
+
+**(2) THE A6.27/A6.28 THREADING IS THROUGH: `UserPtTree`, `WpStartNew`,
+`TransPt` are all green.**
+
+- `UserPtTree.utlb_inv_pt_translateAddr_u` just needed `UptTree`'s
+  template — the `S`-payer parameter plus the `□` wand and `S σ.(mem)` /
+  `S σ'.(mem)`.  **This is the highest-leverage file in the tranche: 377
+  dependents.**
+- `WpStartNew.wp_start` gains `own_context cur_ctx`, threaded in and back
+  out, because the M-mode boot stack is a ledger region (A6.17) and its
+  two prologue stores owe the append.
+- **`TransPt` needed TWO payers, and that was not in the plan.**  Its
+  `_kcur` / `_kprev` wrappers walk BOTH trees — the user tree at the
+  `Some ξ` tier and the SHARED KERNEL tree at the `None` tier
+  (`kptree_own`).  A kernel-tree A/D write-back is a context-FREE ledger
+  store (A6.20: its owner is a bare `inv`, so it can name no context), so
+  it needs its own currency at `TsoCtx.phys_ledger_word`, not
+  `ctx_phys_word_pointsto`.  **Two payers, one per tier, in one lemma** is
+  the honest shape, and the tier-generic `_at` forms
+  (`ptree_own_path_mem_at None`, `ptree_own_path_upd_at None`) are what
+  the proof needed at the kernel sites.  `TransPt.kpt_frame` was also
+  still spelled at the ctx tier and is now `pt_frame_at None`.
+
+**(3) `BootCarve` — NOT ATTEMPTED, and here is the scoped shape** so the
+next lane does not re-derive it.  `boot_stack_own_phys` must produce
+`stack_own_phys` = `ctx_phys_word_pointsto XI`, and
+`ctx_phys_pointsto_of_elem` builds that from `phys_pointsto` +
+`ledger_elem0`.  So the carve needs an ELEMENT big-op over the same
+`ran_bytes` map, split in step with `boot_raw_ran`:
+
+    boot_led_ran g lo hi := [∗ map] a ↦ _ ∈ ran_bytes g lo hi,
+                              ledger_elem0 a (DfracOwn 1)
+    boot_led_split  — [boot_ran_split]'s proof verbatim
+                      (ran_bytes_union + big_sepM_union + ran_bytes_disj)
+    boot_led_word   — [boot_ran_word]'s byte extraction at the element
+
+plus a `CurCtx` binder on `boot_stack_own_phys` and the pointwise
+conversion.  Its supplier is the era's initial-state ghost allocation, so
+the new premise lands on `BootShared` / `RiscvAdequacy` — both already
+red.  It is ~60 lines of big-op work and it is the only reason `BootCarve`
+is red.
+
+**WHAT `WpUart` GOING GREEN REVEALED, and it is the useful measurement.**
+Closing one deep file opened a cone that had never been compiled, and the
+new red files are NOT new breakage — they are files reached for the first
+time, each with an M1-class error the flip left in them.  Fixed as they
+surfaced: `FileInvDefs` (`mem_pointsto_ne` on a `↦₄` tower → the twin
+`ctx_pointsto_ne`), `FileInv` (two `ctx_word{2,4}_pointsto_frac_split`
+calls missing the `ξ` placeholder).  **The rule: after a deep file goes
+green, budget one cheap M1 fix per newly-reached file, and expect the red
+COUNT to rise while the green count rises faster.**
+
+**THE CLOSING MODEL-AWARE CLEAN REBUILD: 542 ATTEMPTED, 535 `.vo`, 7
+ERRORS** (`iris/*.vo` deleted first; `ls -la model-xv6iris/*.v *.vo`
+checked FIRST per A6.39 — the model `.vo` at 19:11 postdates its source at
+18:37; 542 − 7 = 535, self-consistent).
+
+> **535 of 1330, SEVEN red, up from A6.47's 516/6.**  The red COUNT rose
+> and the green count rose faster, which is A6.25's rule running the
+> favourable way for once: `WpUart` and `UserPtTree` were both frontier
+> files, so closing them exposed tiers that had never been compiled at
+> all.  Every one of the four new red files is a first-time-reached file
+> with an M1-class error, not a regression.
+
+**STILL RED, and what each is:**
+
+- `HartSKpt` — PARKED on the history-invariant ruling (A6.45/A6.47), with
+  `SmodeCorePt`'s unverified re-port behind it.  Untouched.
+- `BootCarve` — A6.34, scoped above.
+- `ProofEntry` — one premise: `wp_start` now takes `own_context cur_ctx`,
+  so its boot-chain caller must supply it (`BootChain.boot_entry_bridge`
+  holds one).  Same family as (2), one file further up.
+- `ProcPtOwn` / `UmodeMem` / `UserBytes` / `UserMemPt` — the user-memory
+  tier, newly reached behind `UserPtTree` and each an independent
+  M1/tier-spelling item: `ProcPtOwn` still calls the deleted
+  `TsoCtxShim.ctx_pointsto_of_mem`; `UserBytes` needed
+  `rewrite /pt_slot_own; cbn match` to expose the `Some ξ` tier at
+  `pt_page_own_maps` (landed) and has a second `bytes_own`-tier framing
+  step left.  **These four gate the 377-file cone under `UserPtTree` and
+  are the cheapest large win available.**
 
 ## 7. Order of work
 
