@@ -73,7 +73,11 @@ things, and the answer differs:
 - [ ] **W — the first increment's AU specs (after A).**  mknod →
   unlink → write, in that order (§9 Q6: spike-adjacent first, hardest
   in-memory arm second, per-chunk honesty third).  open/read/close/
-  fstat/chdir after, mechanical.
+  fstat/chdir after, mechanical.  NOTE (2026-08-27): the fd-state ghost
+  landed upstream (`FdSlots.fd_frags` beside `ut_own`; `fdstate` =
+  open-or-closed + `fdtype`, two-halves algebra, commits 28d707dc +
+  3199a1b6) — the descriptor arms of these specs speak THAT carrier;
+  the campaign does not mint its own fd ghost.
 - [ ] **P — the /init pin port (after D; independent of S0).**  Era 0's
   exec-of-`/init` re-derived on the spec abstract state from era-0
   snapshot facts (era 0's snapshot IS the mkfs image: `fs_boot_pure` +
