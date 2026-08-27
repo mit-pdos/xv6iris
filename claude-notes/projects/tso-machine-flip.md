@@ -1,5 +1,31 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
+STEP 5, THE M2 TRANSPORT TRANCHE (2026-08-27, latest session).  **THE M2
+TRANSPORT IS PAID FOR THE FIRST TIME, AND THE GATE IT NEEDED IS ONE A6.66
+SAID DID NOT EXIST.**  `ctx_absorb`'s interp premise makes it unusable at
+every M2 site (§0.17′ cuts both ways: `own_context` is only in hand OUTSIDE
+a WP leaf, `tso_interp_at` only INSIDE one), and the interp was never
+necessary — `TsoCtx.ctx_resume` already claims a parked record on a RECEIPT
+alone.  `iris/TsoCtxAbsorbLb.v` proves the receipt-side pair
+(`ctx_dom_of_parked_lb` / `ctx_absorb_lb`, no admits), which is
+`tso-port.md` §0.18′'s statement character for character — fictional on
+main, real here.  `SchedCtx.cpu_ctx_free` becomes a PARKED RECORD with the
+hart's own receipt beside it and **`ProofScheduler` is GREEN**;
+`ctx_cells_reindex` is the price and is NOT dead.  A6.67's ring was ten
+files, not eight, and its real work is the boot ARRAY initializers
+(`iris/SepThread.v`'s `big_sepL_fupd_thread`: `own_context` is exclusive, so
+NBUF/NINODE lock creations must run in sequence).  `iris/CtxKMap.v` closes
+A6.62's `ctx_phys` window for three files; `iris/SieCapCtx.v` is ported
+from main.  `WpSconfLock` is REFILED: its blocker is the M4 racy owner cell,
+not the rodata residue, which is why `ProofAcquire`/`ProofRelease` are
+UNREACHED rather than red.  Shim: **still exactly 30 code references in five
+files, verified — no tombstone.**  **901 of 1334, RED 14** (up from 875 of
+1330, red 34) — TWO IDENTICAL INCREMENTAL `-k` SWEEPS at the same number,
+with the model `.vo` checked to postdate its source first (A6.39); NOT a
+`rm -f iris/*.vo` clean round, which this session did not have the wall
+clock for and which the next tranche should pay before quoting 901.  **A6.68 is
+the record and the handoff.**
+
 STEP 5, THE SHIM-TAIL TRANCHE (2026-08-27, latest session).  **THE DELETED
 SHIM'S TAIL IS MEASURED AND MOSTLY GONE, AND THE PLAIN ARM'S PRICE IS PAID
 AT THE S-MODE LEAVES.**  Of the 181 real shim uses, **111 converted
@@ -6068,6 +6094,15 @@ is the load-bearing part: **`length glog ≤ gtv cpu_id` is the AT-THE-TOP
 condition, and it is exactly what the AMO leaf establishes when it reads at
 the top** (A6.6's receipt ruling).
 
+> **PARTLY REFUTED BY A6.68, and the refutation is in this block's own
+> terms.**  The interp premise is right FOR THE ACQUIRE LEAF and wrong as a
+> general claim: it makes `ctx_absorb` unusable at every M2 transport site,
+> because those are ghost steps OUTSIDE every WP leaf and `tso_interp_at` is
+> only in hand inside one.  `TsoCtxAbsorbLb.ctx_absorb_lb` is the same law
+> against a persistent `hart_view_lb` receipt, is equally honest (it is
+> `ctx_resume`'s evidence), and is what pays `ProofScheduler`.  Both forms
+> stay; they are for different SITES, not different strengths.
+>
 > **COMPARE THE SAME LEMMA ON MAIN** (`WpLock`'s reference at HEAD): its
 > proof is `rewrite ctx_dom_unseal /ctx_dom_def. done.` and its statement
 > takes a `hart_view_lb K` that the caller CONJURES with
@@ -6216,6 +6251,11 @@ named —
 | the boot carve | 26 (`BootCarveMain` 25, `BootBridge` 1) | the hand-written explicit-ξ tranche; the CARVE now supplies its elements (A6.63), so this is unblocked work, not a dependency |
 | the `↦ₛ`/rodata four | 4 (`ProofPrintk` ×2, `ProofSyscall`, `WpSconfLock`) | `ctx_pointsto_of_ro`'s consumers — the kit lemma exists (A6.63), the sites are not yet moved |
 
+> **A6.68 REFILES `WpSconfLock` OUT OF THIS TABLE.**  Its shim use is real
+> but it is not the blocker: the file's FIRST error is `lk_cpu_cell_acc`,
+> which `WpLock.v` deleted on purpose as the M4 racy-owner-cell entry.  The
+> rodata group is three sites, not four.
+
 **Nothing on the LOCK's path is in that list any more**, which is the
 tranche's real result: A6.66's claim that the transport is honest end to
 end survived contact with all four choke points.  When those 30 go, the
@@ -6232,11 +6272,297 @@ references.
    from the record, `ProofScheduler` following.  **These are now possible**
    (A6.65 recorded them as impossible; `ctx_absorb` is what changed).
    Delete `ctx_cells_reindex` if it goes dead.
+   > **A6.68, MEASURED: half true.**  `ProofScheduler` is paid and green —
+   > but with `ctx_absorb_lb` (receipt), not `ctx_absorb` (interp), which
+   > has no site outside a WP leaf.  The other four are UNREACHED, not
+   > payable: `ProofAcquire`/`ProofRelease` sit behind `WpSconfLock`, whose
+   > blocker is the M4 racy owner cell, and `ProofSwtch` behind `VcGenS`.
+   > **`ctx_cells_reindex` is NOT dead** — it is the price, and
+   > `ProofScheduler` is the site that pays it.
 3. The boot 26 (needs the word/buffer twins of `ctx_pointsto_of_ro`), then
    the four rodata sites — and then the shim's tombstone.
 4. `RiscvAdequacy`'s power tail, `UmodeFetch` (7 sites, 2 files), the
    `tramp_tr_obl` six, `UserMemPt`'s window accessor.
 5. `VcGenS` — characterize-only; re-run A6.65's node-argument grep after it.
+
+
+### A6.68 THE M2 TRANSPORT IS PAID — AND THE GATE IT NEEDED WAS AN
+### INTERP-FREE RECEIPT ABSORB, WHICH A6.66 SAID DID NOT EXIST
+
+**CLOSING NUMBER: 901 of 1334, RED 14** (up from 875 of 1330, red 34; the
+denominator moved because this tranche adds four files).  Two identical
+INCREMENTAL `-k` sweeps at the same number; model `.vo` checked to postdate
+its source first (A6.39); no `Admitted`, no `Abort`, no `Axiom`.
+**HONEST QUALIFIER: this is not a clean number.**  A `rm -f iris/*.vo`
+round was not run — the incremental base is A6.67's, which was itself
+clean, and every file this tranche edited recompiled from source in the
+sweeps; but A6.38's rule says only a clean rebuild counts after a machine
+change, and no machine change happened here.  Pay the clean round at the
+head of the next tranche and correct 901 if it moves.
+
+#### THE HEADLINE, AND IT IS A REFUTATION OF A6.66 IN ITS OWN TERMS
+
+A6.66 landed `TsoCtx.ctx_absorb` against the interp and called the premise
+"why the flip makes the lock kit *better*".  A6.67 then queued the five M2
+sites as "now possible".  **They were not, and the reason is A6.66's own
+premise.**  §0.17′'s measured rule cuts both ways:
+
+> `own_context` is only in hand OUTSIDE a WP leaf.  `tso_interp_at` is only
+> in hand INSIDE one.  **A transport that wants both in one hand has no
+> site.**
+
+Every M2 transport is a ghost step in the middle of a whole-function proof
+— `ProofScheduler:510` is an `iAssert` at the top of `wp_scheduler_sconf`,
+before the first instruction — so `ctx_absorb`'s interp is unreachable
+there, permanently.
+
+**AND THE INTERP WAS NEVER NECESSARY.**  `TsoCtx.ctx_resume` already claims
+a parked context's facts on a RECEIPT alone — `(T ≤ K) → hart_view_lb K -∗
+ctx_parked ξ T ==∗ own_context ξ` — with no interp, because a stamp is a
+legal log position and a hart whose view has passed it has seen every write
+the record published.  The same evidence justifies the `ctx_dom` mint.
+**Landed, proved, no admits: `iris/TsoCtxAbsorbLb.v`.**
+
+```coq
+  Lemma ctx_dom_of_parked_lb `{CID : CpuId} (ξ ξ' : CtxId) (T K : nat) :
+    (T <= K)%nat ->
+    hart_view_lb K -∗ own_context ξ' -∗ ctx_parked ξ T ==∗
+    own_context ξ' ∗ ctx_dom ξ ξ' ∗ (ctx_dom ξ ξ' -∗ ctx_parked ξ T).
+
+  Lemma ctx_absorb_lb `{CID : CpuId} (R : CtxId -> iProp Σ) `{!CtxMorph R}
+      (ξ ξ' : CtxId) (T K : nat) :
+    (T <= K)%nat ->
+    own_context ξ' -∗ hart_view_lb K -∗ ctx_parked ξ T -∗ R ξ ==∗
+    own_context ξ' ∗ ctx_parked ξ T ∗ R ξ'.
+```
+
+It is `ctx_dom_of_parked`'s proof with the interp's two uses replaced: the
+`llb_valid` "T is a legal log position" comes out of the record's own
+`llb T`, and the bound-raise target is `max B' T` under the JOINED receipt
+`max K' K` rather than `gtv cpu_id`.  **The join is a case split, not an
+algebra step** — the max IS one of the two and `view_lb` is persistent
+(`view_lb_max`, three lines).  **`ctx_absorb_lb` is `tso-port.md` §0.18′'s
+statement character for character** — main's shape, which every M2 site was
+written against; there it is fictional (SC's `ctx_dom` is vacuous), here it
+is real.
+
+> **THE CORRECTED RULING.**  `ctx_absorb` (interp) and `ctx_absorb_lb`
+> (receipt) are BOTH honest and they are for different SITES, not different
+> strengths: the interp form is for a claim made inside a lock leaf, where
+> the AMO's at-the-top fact is what you have; the receipt form is for a
+> ghost step outside every leaf, where a persistent `hart_view_lb` is what
+> you have.  A6.66's "the interp supplies it and `hart_view_lb_any` has no
+> role left" is right ABOUT THE ACQUIRE LEAF and wrong as a general claim.
+> **Keep both.**
+
+**WHY ITS OWN FILE:** it is a forty-line derivation off `TsoCtx.v`'s PUBLIC
+unseal lemmas and needs nothing new from the kit, while `TsoCtx.v` is under
+the whole tree.  Fold it into the gate block at cutover — the `SieCapCtx.v`
+precedent, same reason, recorded in the file's header.
+
+#### `ProofScheduler` IS GREEN, AND THE PRICE IS ONE DEFINITION
+
+A6.58 predicted this file, A6.65 recorded it as unpayable.  It is paid, and
+the shape is the lock kit's own idiom one tier up: **`SchedCtx.cpu_ctx_free`
+is a PARKED RECORD now**, not a bare `∃ ξ`:
+
+```coq
+  (∃ (vs : list (mword 64)) (ξ : CtxId) (T : nat),
+     ⌜ length vs = 14%nat ⌝ ∗
+     TsoCtx.ctx_parked ξ T ∗ TsoCtx.hart_view_lb T ∗
+     ctx_cells (XI := ξ) (a_cpu_ctx cid_word) vs)%I.
+```
+
+The receipt rides beside the token because the slot is HART-INDEXED
+(`cid_word`): whoever last published into this cpu's save area was running
+on this cpu, so "this hart's view has passed T" is a persistent fact it
+could hand over.  **At boot the stamp is 0 and `TsoGhost.view_lb_0` gives
+the receipt for nothing.**  `ProofScheduler`'s site is then five sentences:
+borrow the token (`SieCapCtx.sie_cap_gpr_own_ctx_acc`), mint the domination
+at `T ≤ T` (reflexivity), pay `SwtchCtx.ctx_cells_reindex`, hand the token
+back, abandon the record.
+
+> **`ctx_cells_reindex` IS NOT DEAD — A6.67's "delete it if it goes dead" is
+> answered NO.** It is the price, and this is the site that pays it.
+
+**THE COST, NAMED:** `cpu_ctx_free` has ten consumers; the only GREEN ones
+were `SchedCtx` (the definition) and `SpecScheduler` (a premise slot).  The
+eight PRODUCERS — `BootChain`, `BootShared`, `BootBridge`, `ProofMain`,
+`ProofMainSecondary`, `SpecMain`, `SpecMainSecondary`, `CpuOwn` (comment
+only) — are all behind the boot cascade and unreached, so they owe a
+`ctx_parked_alloc` + `view_lb_0` pair each when that cascade opens.  That is
+the honest bill and it is three lines apiece.
+
+#### THE EIGHT-FILE RING WAS TEN, AND THE ARRAY INITIALIZERS ARE THE REAL WORK
+
+A6.67's ring landed, plus what it opened: **`SleepLockAt`, `ProofKinit`,
+`IcacheBoot`, `BioInv`, `BioInitAt`, `FsBoot`, `ProofAcquiresleep`,
+`ProofBeginOp`, `ProofPipealloc`, `ProofInitlog`.**  Two idioms, and only
+one of them is the three-line edit A6.67 promised:
+
+1. **A proof holding the kernel bundle BORROWS its own token.**
+   `SieCapCtx.sie_cap_gpr_own_ctx_acc` — **ported verbatim from main**,
+   which already has this file; the fliptree did not.  Used at `ProofKinit`,
+   `ProofInitlog`, `ProofPipealloc`, `ProofScheduler`.  Its own header
+   argues why it is not in `IntrDefs.v`; that argument holds here too.
+2. **A BOOT ARRAY INITIALIZER CANNOT DISTRIBUTE THE TOKEN, AND THIS IS THE
+   ONE THING A6.67's ESTIMATE MISSED.**  `IcacheBoot` builds NINODE inode
+   sleeplocks, `BioInv` / `BioInitAt` build NBUF buffer sleeplocks, and the
+   existing idiom is `big_sepL_mono` into a list of INDEPENDENT fupds.
+   `own_context` is EXCLUSIVE (`own_context_excl`), so the fifty steps must
+   run in SEQUENCE.  Landed as `iris/SepThread.v`, one lemma, no tree
+   dependencies at all:
+
+```coq
+  Lemma big_sepL_fupd_thread {A} (E : coPset) (Res : PROP)
+      (Phi Psi : nat -> A -> PROP) (l : list A) :
+    Res -∗
+    ([∗ list] k↦x ∈ l, Res -∗ Phi k x ={E}=∗ Res ∗ Psi k x) -∗
+    ([∗ list] k↦x ∈ l, Phi k x) ={E}=∗ Res ∗ [∗ list] k↦x ∈ l, Psi k x.
+```
+
+   Stated for an arbitrary `BiFUpd PROP` and an arbitrary linear `Res` on
+   purpose: a generic statement cannot drift from the kit, and the same
+   shape is what any exclusive boot authority would want.  **The rewrite at
+   a call site is: state the per-element step as a `big_sepL_intro`'d wand,
+   thread, then re-wrap for whatever collector follows** (`seq_fun_alloc`
+   takes a list of fupds, so `BioInv` re-wraps with a one-line
+   `big_sepL_mono`).
+
+> **THE WRAPPER-CHAIN LESSON, EXTENDED.**  A6.67 said count WRAPPERS, not
+> uses.  Add: **count LOOPS separately.**  A wrapper is three lines; a
+> boot loop over an array is a threading lemma plus a restructured
+> `iAssert`, and the two `bio_init` forms plus `icache_boot_at` were three
+> of the ten files in this ring.
+
+#### THE `↦ₚ` WINDOW: A6.62's "`ctx_phys` WINDOW" ITEM IS ONE MISSING TWIN
+
+`ProofWalk`, `ProofKvmmake` and `ProofUvmcreate` all did the same thing to
+a freshly-memset page: forget it out of the context (`ctx_buf_forget`), use
+`KMap.mem_page_to_phys`, and hand the result to `zero_page_to_node` — which
+now wants `ctx_phys_pointsto cur_ctx`.  **`KMap.v` sits BELOW `TsoCtx.v`, so
+its `↦ₘ`/`↦ₚ` are the RAW families**, and the return trip is the direction
+the flip makes false.  The content of the crossing at the tower is already
+`TsoCtx.ctx_pointsto_phys` (a `⊣⊢`); what the raw lemma adds is IDENTITY.
+Landed as `iris/CtxKMap.v`:
+
+```coq
+  Lemma ctx_mem_ident_phys (xi : CtxId) (pa : mword 64) dq b :
+    kmap_static (svpn_of pa) KP_rw ->
+    kmap_static_claims -∗ ctx_pointsto xi pa dq b -∗ ctx_phys_pointsto xi pa dq b.
+  Lemma ctx_mem_page_to_phys (xi : CtxId) (p : mword 64) dq b : (* the 4096 fold *)
+```
+
+`mem_ident_phys`'s proof verbatim with the ledger residue carried through
+instead of forgotten (`kmap_at_agree` against the static bundle, then
+`KptPt.pa_of_id`).  Three files green off two lemmas.
+
+> **AND THE OPPOSITE DIAGNOSIS WAS ALSO RIGHT ONCE, WHICH IS THE TRAP.**
+> The SAME `ctx_buf_of_mem`/`ctx_buf_to_mem` pair around a **memset** call
+> (`ProofBalloc`, `ProofIalloc`, `ProofSysUnlink` ×2) is a pure IDENTITY
+> now — memset's contract is context-indexed and so is the buffer — and the
+> right edit there is to DELETE both lines.  **The test is whose `↦ₘ` the
+> next consumer means**: a consumer above `TsoCtx` (memset) wants the ctx
+> family and the crossing is dead; a consumer below it (`KMap`, `PtTree`)
+> wants the raw family and the crossing is real.  Deleting the pair at the
+> `KMap` sites cost one compile before this was seen.
+
+#### THE MECHANICAL RESIDUE: A MISSING `` `{XI : CurCtx} `` ON ONE DECLARATION
+
+Sixteen files were red on nothing but this, all first-time-reached behind
+the ring.  The convention in the `Proof*Defs` sections is a PER-DECLARATION
+binder (not a section binder — several sections mix declarations that have
+their own, and a section binder then collides with `XI is already used`), so
+the fix is `Lemma foo `{XI : CurCtx} …` on the one declaration the error
+names, repeated until the file is green.  **It is a fixpoint, not a single
+pass**: `ProofInstallTrans` needed eight, `ProofEndOp` and `ProofBmap` six.
+Automated with a build-parse-patch loop; the loop is worth rebuilding for
+the next tranche, and its two real bugs are worth recording — take the
+`File` line CLOSEST to the error (the notation warnings emit their own
+`File` lines at the top of every file), and check the error BLOCK for
+`CurCtx`, not just the `Error:` line, because the message is often
+`Could not find an instance for the following existential variables:` with
+`?XI : CurCtx` three lines down.
+
+Files: `ProofBmap`, `ProofEndOp`, `ProofFilewriteParts`, `ProofInitlog`,
+`ProofInstallTrans`, `ProofIput`, `ProofLogWrite`, `ProofProcdumpLoop`,
+`ProofWriteHead`, `ProofSysSync`, `ProofBeginOp`, `ProofAcquiresleep`,
+`ProofFreewalk` (partial).  Three one-off neighbours in the same class:
+`ProofAcquiresleep.asl_word4_nonzero` needed `ctx_pointsto_forget` before
+`mem_pointsto_acc`; `ProofBrelse` needed `ctx_word4_pointsto_agree` /
+`ctx_word4_pointsto_frac_split` for the raw ones; `ProofIput` had three
+`ctx_word4_pointsto_frac_split` calls missing the now-explicit `ξ`.
+
+#### THE SHIM IS STILL NOT RETIRABLE, AND THE COUNT HAS NOT MOVED
+
+Verified by grep before writing anything: **30 code references, in the same
+five files** — `BootCarveMain` 25, `BootBridge` 1, `ProofPrintk` 2,
+`ProofSyscall` 1, `WpSconfLock` 1.  Nothing this tranche touched was on the
+shim's path.  Writing the tombstone now would be a lie about 30 live
+references, exactly as A6.67 said.  (23 files still carry a bare
+`Require TsoCtxShim` line with no use; those are free to drop, but the
+A6.64 comment-balance rule applies to any script that does it.)
+
+#### `WpSconfLock` IS BLOCKED ON THE M4 RACY CELL, NOT ON THE ↦ₛ RESIDUE —
+#### AND THAT IS WHY `ProofAcquire`/`ProofRelease` ARE STILL UNREACHED
+
+A6.67 filed `WpSconfLock` under "the `↦ₛ`/rodata four".  **Measured: its
+first error is `lk_cpu_cell_acc`, which `WpLock.v` DELETED on purpose**
+(its own comment: "THE ELIMINATION DIRECTION IS FALSE AT TSO … the failures
+at the leaves that read and write this cell are that [M4] entry").  Two
+sites:
+
+- **`lock_claims` (`:139`) is payable and is not the blocker in principle.**
+  It only wants `wordw_claim 8 (lock_cpu lk)` — an ADDRESS claim, which is
+  context-free (`mem_claim` is `kmap_at` + canonicality + RAM + tier pin,
+  and `mem_pointsto_claim` reaches it through `ctx_pointsto_forget`).  A
+  claim lemma that reads off a `ctx_word_pointsto` at ANY `ξ` retires this
+  site AND the `TsoCtxShim.ctx_word_of_mem` beside it.  Not landed.
+- **`wp_ld_lkcpu_lockopen_gen` (`:432`) is the real M4 entry.**  The leaf
+  hands the invariant's cell to a plain-load atomic update at `cur_ctx` and
+  promises the value read IS the ledger's.  At TSO that is false without
+  synchronisation, and `holding()`'s read of `lk->cpu` genuinely races.  No
+  receipt exists at a plain load, so neither absorb form applies.
+
+**So `ProofAcquire` ×2, `ProofRelease` and `ProofSwtch` are UNREACHED, not
+red**: `ProofAcquire`/`ProofRelease` sit behind `WpSconfLock`, `ProofSwtch`
+behind `VcGenS`.  A6.67's "five M2 sites, now possible" is therefore half
+true — the fifth (`ProofScheduler`) is paid; the other four need their
+gates opened first, and the gate is not the transport.
+
+#### THE RED 14, CLASSIFIED
+
+| class | files |
+|---|---|
+| the M4 racy owner cell | `WpSconfLock` |
+| the `VcGenS` cascade (characterize-only, unchanged from A6.63) | `VcGenS` |
+| the PT-cell tier's STATEMENT half (A6.65 queue 1) | `ProcInv`, `TfPage36` |
+| `UmodeFetch` (7 sites / 2 files, the □ obligations) | `UmodeFetch`, `UptWalkPt` |
+| the `ctx_phys` window at the USER tier | `UserMemPt` |
+| the `↦ₛ`/rodata residue | `ProofPrintk` |
+| `RiscvAdequacy`'s power tail | `RiscvAdequacy` |
+| newly reached, one-offs | `ProofFreewalk` (`↦ₚₜ` framing), `ProofKvminithart` (`kvi_satp_mode` type), `ProofVirtioDiskIntr` (`wordw_pointsto 2` vs `word2_pointsto`), `ProofVirtioDiskRw` (`word4_pointsto` framing), `ProofVirtioDiskRwD` (`phys_ledger` vs `↦ₚ`) |
+
+`VcGenS:510` is still exactly A6.63's diagnosis: `wp_csdsp_gpr_s_r_t` wants
+`own_context ?XI` and the block lemma does not take one, so the token has to
+be threaded through `revert st. induction prog` in all six statements.  The
+node-argument grep (A6.65) must be re-run after that tranche.
+
+#### THE QUEUE
+
+1. **`ProcInv` / `TfPage36`** — the PT-cell tier's statement half; it gates
+   `ProofSyscall`, `BootCarveMain` and the whole boot cone, so it is the
+   largest single unblocker left.
+2. **`WpSconfLock`** — write the context-free `wordw_claim` reader for
+   `lock_claims`, then decide the M4 racy-read law.  `ProofAcquire`,
+   `ProofRelease` are behind it.
+3. **The boot 26** (needs the word/buffer twins of `ctx_pointsto_of_ro`),
+   then the four rodata sites, then the shim's tombstone.
+4. **`VcGenS`** — six statements and an induction; `ProofSwtch` is behind it.
+5. `RiscvAdequacy`'s power tail, `UmodeFetch`, the `tramp_tr_obl` six,
+   `UserMemPt`'s window accessor.
+6. When the boot cascade opens: the eight `cpu_ctx_free` producers owe a
+   `ctx_parked_alloc` + `view_lb_0` pair each.
 
 
 ## 7. Order of work
