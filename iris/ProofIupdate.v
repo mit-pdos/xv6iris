@@ -134,8 +134,8 @@ Section IupdateDefs.
      step pays out.  Four landed contracts take
      [InodeRegion.ireg_out γi inum dn] -- the retagged fragment, or the
      marker at a type-0 flush -- and the fifth takes
-     [dinode_at γi inum dn ∗ ilink (bv_unsigned inum)], the ordinary payout
-     plus the ledger fragment [ip->nlink++] buys.  So [Pout] is a parameter
+     [dinode_at γi inum dn] beside the [FsStateLink.link_tok] the flushed
+     [ip->nlink++] buys.  So [Pout] is a parameter
      of the continuation and the ghost step is a PREMISE, rather than the
      walk being cloned once per payout. *)
 
@@ -2234,8 +2234,8 @@ Qed.
   (* THE LINK-MINTING SEAL (design fs-icache.md §20.18, stage C2).  The
      credited seal's plumbing with ONE substitution: [iu_step_link] fills
      the region's ghost step instead of [iu_step_out], so the payout is the
-     retagged fragment PLUS the [ilink] the flushed [nlink++] pays for.
-     Nothing else about the walk changes -- [InodeRegion.ireg_write_link]'s
+     retagged fragment PLUS the link token the flushed [nlink++] pays for.
+     Nothing else about the walk changes -- [InodeRegion.ireg_write_link_reg]'s
      fupd is byte-for-byte [ireg_write_au]'s -- which is exactly what the
      [Pout] parameter was introduced to make visible. *)
   Lemma wp_iupdate_link
@@ -2310,9 +2310,9 @@ Qed.
 
   (* THE LINK-SPENDING SEAL (design fs-icache.md §20.18, stage C4).  The
      link-minting seal's plumbing with ONE substitution again --
-     [iu_step_unlink] fills the region's ghost step -- plus the [ilink] and
-     the receipt choice threaded into it.  The walk itself is untouched:
-     [InodeRegion.ireg_write_unlink]'s fupd is the atomic update's shape,
+     [iu_step_unlink] fills the region's ghost step -- plus the link token
+     and the receipt choice threaded into it.  The walk itself is untouched:
+     [InodeRegion.ireg_write_unlink_reg]'s fupd is the atomic update's shape,
      and that is the whole of what [SpecLogWrite]'s C4 edit bought. *)
   Lemma wp_iupdate_unlink
       (γs : list gname) (j : nat) (γl : gname)

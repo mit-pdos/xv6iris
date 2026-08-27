@@ -761,7 +761,7 @@ Section ProofSysOpenPublish.
      ever states the truncated record's [inode_ok].  The two lemmas below
      are that gap, and both halves of the record's own obligation are free
      because the guard at +0xae is [ip->type == T_FILE]:
-     [DirView.dir_ok_not_dir] and [DirLinks.dir_links_not_dir] discharge
+     [DirView.dir_ok_not_dir] and [IcacheEscrow.dlinks_not_dir] discharge
      the directory clauses outright, and itrunc's own outputs
      ([bm_empty], the all-zero data) discharge the rest.  [di_trunc] keeps
      [type] and [nlink], so the type clause is the caller's premise

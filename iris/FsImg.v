@@ -2277,52 +2277,38 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(*  11b.  W9 -- THE LINK LEDGER'S PER-INUM TICKET COUNTS                   *)
+(*  11b.  W9 -- THE PER-INUM COUNT OF LINK FRAGMENTS THE IMAGE DEMANDS     *)
 (* ====================================================================== *)
 
-(*  WHY THIS CONJUNCT EXISTS.  [DirLinks.dir_links] -- the resource twin
-    the icache's two payloads carry beside [DirView.dir_ok] -- holds ONE
-    LEDGER FRAGMENT per TICKET-BEARING record of a directory, and boot's
-    only constructor for it is [DirLinks.dir_links_of_plain], whose
-    fragments are all plain [IcacheRef.ilink].  A plain fragment is a unit
-    of the ledger's [wl] column, and the region's slot clause
-    ([InodeRegion.ireg_link_ok], (L1)) bounds that column by the record's
-    OWN [di_nlink].  So before boot can mint the fragments it has to KNOW,
-    per inum, how many the image demands -- and that number is a fact about
-    the image's directory CONTENTS which no decoding lemma supplies.  This
-    section computes it and W9 checks the three inequalities the region
-    invariant and [dir_links_of_plain] need.
+(*  WHY THIS CONJUNCT EXISTS.  A directory's payload holds ONE fragment of
+    its TARGET's link register per ticket-bearing record it contains
+    ([IcacheEscrow.dlinks], i.e. [FsStateInode.ent_toks_x]; fs-state.md
+    §6½), and every such fragment is drawn out of that target's region-side
+    authority ([InodeRegion.ireg_lnk]), which is tied to the target's own
+    [di_nlink].  So before boot can mint the fragments it has to KNOW, per
+    inum, how many the image demands -- and that number is a fact about the
+    image's directory CONTENTS which no decoding lemma supplies.  This
+    section computes it and W9 checks the inequalities the region invariant
+    and the boot's mint need.
 
-    THE TICKET DISCIPLINE IS COPIED, NOT GUESSED.  [DirLinks.dir_link_at]
-    reads
-
-        if dir_liveb data k
-           && negb (bool_decide (bv_unsigned (dir_inum data k) = self))
-        then ilink (bv_unsigned (dir_inum data k)) ∨ (grey ...) else emp
-
-    so a record bears a ticket exactly when it is LIVE and does NOT name
-    its own home.  [fs_rec_ticket] below is that guard verbatim: the SELF
-    EXEMPTION covers both dot records of any directory (["."] names the
-    home by W8, and [".."] names it too at the root), and a FREE record
-    (inum 0) carries nothing at all.
+    THE TICKET DISCIPLINE.  A record bears a ticket exactly when it is LIVE
+    and does NOT name its own home; [fs_rec_ticket] below is that guard.
+    The SELF EXEMPTION covers both dot records of any directory (["."]
+    names the home by W8, and [".."] names it too at the root), and a FREE
+    record (inum 0) carries nothing at all.  It is the image-level cousin
+    of [FsStateInode.ent_tokenless] and NOT the same guard -- conjunct (15)
+    below is exactly that difference, and why it has to be checked too.
 
     WHAT W9 CHECKS, per inum [z] of [0 .. ninodes):
 
-      (L1) the count is at most [z]'s own [di_nlink] -- [ireg_link_ok]'s
-           first clause at [wl = fs_link_count];
-      (T)  if [z] is a DIRECTORY then the count is ZERO, its [di_nlink] is
-           exactly ONE, and [z] IS the root.  All three are forced, and all
-           three are true of every mkfs image:
-             * zero, because [InodeRegion.ireg_dir_wl0] says a directory's
-               PLAIN column is empty (a record naming a directory pays in
-               the d-flavoured column, and boot mints no d-fragment);
-             * [nlink = 1], because [DirView.dlc_bound] at the all-false
-               flavour map reads [nlink <= 1] ([dlc_bound_le1]), and the
-               region's keep-alive token then needs [0 < nlink];
-             * [z = ROOTINO], because [dir_links_of_plain]'s third premise
-               is exactly the root exclusion of [DirLinks.dir_par_tie] --
-               mkfs lays down one directory and it is the root, which is
-               the computational fact DirLinks' own header charters.
+      (a) the count is at most [z]'s own [di_nlink] -- [z]'s own authority
+          has to cover every fragment the image hands out at it;
+      (b) if [z] is a DIRECTORY then the count is ZERO, its [di_nlink] is
+          exactly ONE, and [z] IS the root.  All three are true of every
+          mkfs image, which lays down exactly ONE directory: nothing in the
+          image names it but its own two dot records, both self-exempt, so
+          no payload owes a fragment at it, and mkfs writes its [di_nlink]
+          as one.
 
     COST: one pass over the [ninodes] records to find the directories (the
     same read W3/W6/W8 already do) plus one [O(nrec)] pass over each
@@ -2330,7 +2316,7 @@ Qed.
     ticket list per inum.  The ticket list is [let]-bound so it is built
     ONCE for the whole sweep.                                              *)
 
-(* ONE RECORD'S TICKET, [DirLinks.dir_link_at]'s guard verbatim *)
+(* ONE RECORD'S TICKET: LIVE, and not naming its own home *)
 Definition fs_rec_ticket (P : Z -> list (bv 8)) (self : Z) (dn : dinode)
     (k : nat) : option Z :=
   let data := fs_data_of P dn in
@@ -2340,7 +2326,7 @@ Definition fs_rec_ticket (P : Z -> list (bv 8)) (self : Z) (dn : dinode)
 
 (* ...one DIRECTORY's tickets, in record order.  [omap] rather than a
    [filter]+[map] so that the list a resource-side [big_sepL] walks and the
-   record indices [dir_link_at] is stated at line up by ONE induction
+   record indices the entry fragments are stated at line up by ONE induction
    ([FsCfgBoot.big_sepL_omap_mono]). *)
 Definition fs_dir_tickets (P : Z -> list (bv 8)) (self : Z) (dn : dinode)
   : list Z :=
@@ -2366,7 +2352,7 @@ Definition fs_tick_count (L : list Z) (z : Z) : nat :=
   length (List.filter (fun t => bool_decide (t = z)) L).
 
 (* **THE COUNT**: how many ticket-bearing records of the image name [z].
-   This is the [w_z] the boot ledger's authority stands at. *)
+   This is how many fragments of [z]'s register the boot hands out. *)
 Definition fs_link_count (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) : nat :=
   fs_tick_count (fs_all_tickets P sb) z.
 
@@ -3341,7 +3327,7 @@ Proof.
     + rewrite Nat2Z.inj_sub by exact Hdd. lia.
 Qed.
 
-(* ---- THE DURABLE-STATE SHARPENING OF (L1) ----------------------------
+(* ---- THE DURABLE-STATE SHARPENING OF W9's BOUND ----------------------
    [fs_links_wf] records only [count <= nlink] for a non-directory (its
    directory arm is mkfs's own [z = ROOTINO] pin), but the durable
    invariant [FsWf.fs_durable_wf_body] needs the EQUALITY: a live
@@ -3386,9 +3372,8 @@ Qed.
 
 (*  WHY THIS CONJUNCT EXISTS.  Two counting disciplines meet at the boot
     composition and they exempt DIFFERENT records.  [fs_rec_ticket] above
-    is [DirLinks.dir_link_at]'s guard: a record bears a ticket exactly when
-    it is LIVE and does NOT name its own home -- a SELF exemption under ANY
-    name.  [FsStateInode.ent_tokenless] exempts only ["."] (under any
+    says a record bears a ticket exactly when it is LIVE and does NOT name
+    its own home -- a SELF exemption under ANY name.  [FsStateInode.ent_tokenless] exempts only ["."] (under any
     target) and [".."] (when the directory is orphaned or the entry names
     the home).  A root record called "foo" pointing at the root therefore
     owes a link token and pays no ticket, and nothing in [fsimg_wf] rules
@@ -3572,7 +3557,7 @@ Qed.
    free.  That is what keeps [IcacheBoot.ireg_alloc]'s premises stated over
    [region_inums] rather than over two ranges. *)
 
-(* (L1) -- [InodeRegion.ireg_link_ok]'s first clause at [wl = the count] *)
+(* [z]'s authority covers the fragments the image hands out at it *)
 Lemma fsimg_wf_link_le (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
   fsimg_wf P sb = true ->
   Z.of_nat (fs_link_count P sb z)
@@ -3588,7 +3573,7 @@ Proof.
     lia.
 Qed.
 
-(* [InodeRegion.ireg_dir_wl0]: a DIRECTORY's plain column is empty *)
+(* no record of a mkfs image names a DIRECTORY *)
 Lemma fsimg_wf_link_dir (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
   fsimg_wf P sb = true ->
   bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z ->
@@ -3601,9 +3586,8 @@ Proof.
   - exact (fs_link_count_out P sb z (fsimg_wf_dirs P sb H) Hout).
 Qed.
 
-(* [DirView.dlc_bound] at the all-false flavour map ([dlc_bound_le1]) AND
-   the root's keep-alive token: a live image directory has EXACTLY one
-   link. *)
+(* a live image directory has EXACTLY one link -- mkfs's own [nlink = 1],
+   and the region's keep-alive token needs [0 < nlink]. *)
 Lemma fsimg_wf_dir_nlink (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
   fsimg_wf P sb = true -> 0 <= z < sb_ninodes sb ->
   bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z ->
@@ -3614,9 +3598,8 @@ Proof.
                                 (fsimg_wf_links P sb H) Hz) Hty))).
 Qed.
 
-(* [DirLinks.dir_links_of_plain]'s ROOT EXCLUSION: mkfs lays down exactly
-   one directory and it is the root, so [DirLinks.dir_par_tie]'s guard is
-   false at every image directory and boot owes no parent register. *)
+(* THE ROOT EXCLUSION: mkfs lays down exactly one directory and it is the
+   root, so no image directory has a parent entry to account for. *)
 Lemma fsimg_wf_dir_root (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
   fsimg_wf P sb = true -> 0 <= z < sb_ninodes sb ->
   bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z -> z = ROOTINO.

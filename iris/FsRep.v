@@ -14,15 +14,13 @@
                  element) plus [InodeInv.inode_blocks];
       the EDGES  the payload's own entry units, verbatim -- **there is NO
                  separate edge resource and none may be created**
-                 (§2(ii)).  The unit says WHO IS POINTED AT (and, since
-                 lane G5, what TYPE the target is); the (source, name) half
+                 (§2(ii)).  The unit says WHO IS POINTED AT (and what
+                 TYPE the target is); the (source, name) half
                  is carried by the BYTES, i.e. by [fnode i (NDir ents)].
                  Out-edges are owned by the source node, which is exactly
                  the fragment locality this layer wants, already paid for.
-                 (Through G5 the carrier was [DirLinks.dir_links], the old
-                 flavoured ledger; lane G6 deleted it and the type register
-                 [FsStateInode.ent_toks] carries the same reading --
-                 design/fs-state.md §6½.)
+                 The carrier is the type register's per-entry fragments,
+                 [FsStateInode.ent_toks] (design/fs-state.md §6½).
 
     **NO NEW AUTHORITY, NO NEW GHOST NAME, NO NEW INVARIANT** (R3).  Three
     §20.9 death certificates cover every home a whole-tree authority could
@@ -49,10 +47,8 @@
     namex's postcondition.
 
     Second consequence, from §20.9(h)/(i): **an edge of [t] may point at a
-    node that is not in [t]** -- under the old ledger because the edge
-    ticket kept a GREY disjunct that asserted nothing, and under the type
-    register because a fragment says its target is allocated and typed, not
-    that the target is in this fragment of the tree.  [fs_closed] is false
+    node that is not in [t]** -- a fragment says its target is allocated
+    and typed, not that the target is in this fragment of the tree.  [fs_closed] is false
     in general and is not defined here.  FRAGMENTS-WITH-HOLES is the only
     consistent top-level shape.
 
@@ -168,8 +164,8 @@ Section FsRep.
 
   (* A NODE IS ALLOCATED.  [FsTree.node_rep_alloc] lifted: whoever holds an
      [fnode] holds a record whose type is nonzero.  This is what a consumer
-     that wants allocatedness reads off the tree instead of chasing a
-     ledger fragment. *)
+     that wants allocatedness reads off the tree instead of chasing a link
+     fragment. *)
   Lemma fnode_alloc (γi : gname) (γfs : fs_names) (i : Z) (n : fsnode) :
     fnode γi γfs i n -∗
       ∃ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
@@ -185,13 +181,12 @@ Section FsRep.
   (*  2.  THE EDGES -- THE PAYLOAD'S OWN UNITS, VERBATIM                 *)
   (* ------------------------------------------------------------------ *)
 
-  (* NOTHING HERE ANY MORE (durable-disk lane G, slices 6f and 6c).  The
-     tree layer used to restate [DirLinks.dir_links] under the name
-     [fedges], with an accessor [fedges_acc] handing out one record's
-     ticket.  Neither had a consumer -- [fnode_dotdot] below supplies the
-     index, but no proof in the tree ever asked for the ticket -- so both
-     went at 6f, and the ledger they restated went at G6.  The edge map
-     itself belongs to the byte layer. *)
+  (* NOTHING HERE, AND THAT IS THE DESIGN (R3 above).  A directory's
+     out-edges ARE its entry records: the (source, name) half is the bytes
+     and the target half is the payload's own type-register fragments
+     ([FsStateInode.ent_toks]).  The tree layer restates neither; it reads
+     the index off the bytes ([fnode_dotdot] below) and asks for no
+     fragment. *)
 
   (* ------------------------------------------------------------------ *)
   (*  3.  READING AN ENTRY OFF A DIRECTORY NODE                          *)

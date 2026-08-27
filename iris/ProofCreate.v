@@ -630,9 +630,9 @@ Proof.
   rewrite bv_zero_extend_unsigned; [ reflexivity | cbn; lia ].
 Qed.
 
-(* ...and the 32-bit widening the GREY MINT wants: [DirView.dir_inum] is a
-   [bv 16] and [InodeRegion.ireg_link_grey] is stated at the region's own
-   [bv 32] inum, so the T_DIR [fail:] sibling crosses the two here. *)
+(* ...and the 32-bit widening the region's movers want: [DirView.dir_inum]
+   is a [bv 16] and the region is stated at its own [bv 32] inum, so the
+   T_DIR [fail:] sibling crosses the two here. *)
 Lemma cr_bzext32_16 (h : bv 16) :
   bv_unsigned (bv_zero_extend 32 h) = bv_unsigned h.
 Proof. rewrite bv_zero_extend_unsigned; [ reflexivity | cbn; lia ]. Qed.
@@ -830,40 +830,6 @@ Proof.
     [discriminate H | reflexivity].
 Qed.
 
-(* ---- (iv-ter) THE CHILD MINT'S FLAVOUR (V2's count clause).
-   [ip->nlink = 1; iupdate(ip)] at +0xc4 mints the one ledger unit that
-   the parent's new record will hold, and that record's TARGET is the
-   child -- whose type is the [ty] this call was made with.  So the unit
-   is d-flavoured ([IcacheRef.ilinkd], V1) exactly when create is making a
-   DIRECTORY, and the parent's count clause
-   ([DirView.dlc_bound]) can then pay for the [dp->nlink++] at +0x134.
-
-   IT IS A FUNCTION OF [ty] BECAUSE THE MINT RUNS BEFORE THE BRANCH.  The
-   [beq] at +0xca is where the walk splits; +0xc4 is four instructions
-   earlier and has one [wp_iupdate_link] to apply, so the flavour index it
-   passes must be a term both arms reduce.  Each arm then rewrites it with
-   its own decision ([cr_flav_dir] / [cr_flav_file]) at the deposit.
-
-   NO NEW GATE.  The contract's premise at [Some tt] is the flushed
-   record's TYPE, and create has it from the fresh-type fact it already
-   carries ([di_type dnc = ty], ProofCreateFreshTy's span) -- the same
-   fact ARM C-OK-DIR's existing [Htyc] is. *)
-(* TAGGED SINCE V5' INCREMENT P.  The child's mint at +0xc4 now carries the
-   PARENT's inum: [Some (Some dpv)] pays out [IcacheRef.ilinkdp ip dpv] --
-   the unit the parent's name record will hold, whose tag says whose child
-   this is -- TOGETHER WITH [IcacheRef.iparent ip dpv], the half that goes
-   into the CHILD's own [DirLinks.dir_par_tie] beside the [".."] bytes.
-   Both inums are in create's hand at +0xc4 ([dind] is the arm's parameter),
-   which is why this is the site: it is the last instant at which the two
-   are related by anything the walk knows.
-
-   IT IS STILL A FUNCTION OF [ty] ALONE at the flavour's decision -- the
-   [beq] at +0xca is four instructions below and the mint must pass a term
-   both arms reduce -- and the FILE arm's [None] is byte-identical to what
-   it was, so every landed non-directory discharge is unchanged (R6). *)
-Definition cr_flav (ty : mword 16) (dpv : Z) : option (option Z) :=
-  if decide (ty = SpecDirlookup.T_DIR) then Some (Some dpv) else None.
-
 (* THE REGISTER VALUE THE FILL CHOOSES, and how many fragments it mints
    (lane G5).  At a DIRECTORY the child's value is [TDir dp] -- which is
    what lets [dp]'s own name record for the child assert "my target's
@@ -937,43 +903,6 @@ Proof. intro H. rewrite /cr_delta decide_True; [reflexivity | exact H]. Qed.
 Lemma cr_delta_file (ty : mword 16) :
   ty <> SpecDirlookup.T_DIR -> cr_delta ty = 1%nat.
 Proof. intro H. rewrite /cr_delta decide_False; [reflexivity | exact H]. Qed.
-
-Lemma cr_flav_dir (ty : mword 16) (dpv : Z) :
-  ty = SpecDirlookup.T_DIR -> cr_flav ty dpv = Some (Some dpv).
-Proof. intro H. rewrite /cr_flav decide_True; [reflexivity | exact H]. Qed.
-
-Lemma cr_flav_file (ty : mword 16) (dpv : Z) :
-  ty <> SpecDirlookup.T_DIR -> cr_flav ty dpv = None.
-Proof. intro H. rewrite /cr_flav decide_False; [reflexivity | exact H]. Qed.
-
-Lemma cr_flav_ty (ty : mword 16) (dpv : Z) (od : option Z) :
-  cr_flav ty dpv = Some od -> ty = SpecDirlookup.T_DIR.
-Proof.
-  rewrite /cr_flav.
-  destruct (decide (ty = SpecDirlookup.T_DIR)) as [H | H];
-    [intros _; exact H | discriminate].
-Qed.
-
-(* the mirror reading, for (T1')'s premise at the plain mint *)
-Lemma cr_flav_nty (ty : mword 16) (dpv : Z) :
-  cr_flav ty dpv = None -> ty <> SpecDirlookup.T_DIR.
-Proof.
-  rewrite /cr_flav.
-  destruct (decide (ty = SpecDirlookup.T_DIR)) as [H | H];
-    [discriminate | intros _; exact H].
-Qed.
-
-(* ...and the TAG a tagged mint carries is the parameter, which is what
-   [DirLinks.dir_links_dirlink_d]'s [self]-shaped premise needs.
-   ([cr_flav_ntag], which refuted the tagged arm outright while create had
-   no tagged mint, is RETIRED by this increment.) *)
-Lemma cr_flav_tag (ty : mword 16) (dpv pv : Z) :
-  cr_flav ty dpv = Some (Some pv) -> pv = dpv.
-Proof.
-  rewrite /cr_flav.
-  destruct (decide (ty = SpecDirlookup.T_DIR)) as [H | H]; intro Hc;
-    [congruence | discriminate Hc].
-Qed.
 
 (* ---- (iv-bis) THE NLINK_MAX GATE AT +0x30..+0x3c (xv6 117c0e7).
    [c.lui a4,0xffff8] then [c.addi a4,a4,1] put -32767 in a4, [c.add
@@ -1063,10 +992,9 @@ Lemma cr_bltz_m1 :
   zopz0zI_s (mword_of_int (-1) : mword 64) (zero_reg : mword 64) = true.
 Proof. vm_compute. reflexivity. Qed.
 
-(* ---- (vi) writei's RECORD AT THE SIZE [DirLinks.dir_links_dirlink] AND
-   [DirView.dir_ok_dirlink] BOTH ASK FOR.  [SpecWritei.wi_dinode] installs
-   [max(size, off+tot)] as a 32-bit literal; the two re-park lemmas want it
-   read back over [Z].  The side condition is the only place the walk has to
+(* ---- (vi) writei's RECORD AT THE SIZE [DirView.dir_ok_dirlink] ASKS
+   FOR.  [SpecWritei.wi_dinode] installs [max(size, off+tot)] as a 32-bit
+   literal; the re-park lemma wants it read back over [Z].  The side condition is the only place the walk has to
    know that the append slot is inside the file. *)
 Lemma cr_wi_size_max (dn : dinode) (bm' : blkmap) (off tot : nat) :
   (Z.of_nat (off + tot) < 2 ^ 32)%Z ->
@@ -2240,7 +2168,7 @@ Section ProofCreateMain.
   (*  T_DIR sub-branch (+0xf8..+0x144: the two interior [dirlink]s on the  *)
   (*  child, the parent's [dirlink], its [nlink++] and its [iupdate]).     *)
   (*  D0-b consumes it.  Note what it is handed and what it is NOT: the    *)
-  (*  child's [ilink] ticket is UNDEPOSITED -- +0xc4 minted it and the     *)
+  (*  child's link fragment is UNDEPOSITED -- +0xc4 minted it and the      *)
   (*  non-directory arm spends it at +0xd8, so on this branch it is still  *)
   (*  in hand and the mkdir arm's own [dirlink(dp,name)] at +0x12c is      *)
   (*  what spends it.                                                     *)
@@ -2249,12 +2177,11 @@ Section ProofCreateMain.
   (*  +0xdc (the other three entries are behind the T_DIR branch and       *)
   (*  therefore inside [cr_mkdir_body]), so a LINEAR premise is right and  *)
   (*  D0-b will re-shape it into the persistent four-entry form.  It is    *)
-  (*  handed the parent's [dir_links] AT THE ENTRY INDICES together with   *)
-  (*  the undeposited [ilink] and dirlink's own range clause, and NOT a    *)
-  (*  re-parked payload: at [tot = 1] neither [DirLinks.dir_link_at_       *)
-  (*  dirlink] (which wants [2 <= tot]) nor [dir_links_dirlink_nop] (which *)
-  (*  wants [tot = 0]) applies, and that hole is DirLinks' own recorded    *)
-  (*  S5i gap, not something this arm may paper over.                     *)
+  (*  handed the parent's [dlinks] AT THE ENTRY INDICES together with     *)
+  (*  the undeposited fragment and dirlink's own range clause, and NOT a   *)
+  (*  re-parked payload: at [0 < tot < 16] a partial record has gone LIVE  *)
+  (*  wanting a fragment this arm does not have, so no re-park exists at   *)
+  (*  all -- which is why dirlink's atomicity clause is what it relies on. *)
   (* ------------------------------------------------------------------- *)
   Definition cr_mkdir_body
       (γs : list gname) (j : nat) (γl : gname)
@@ -2294,8 +2221,8 @@ Section ProofCreateMain.
           [ty = T_DIR], so [cr_alloc_body]'s implication collapses to the
           bound itself.  It is what [SpecIupdate.wp_iupdate_link] takes at
           +0x140 beside the [sh]'s own value, and without it the flush --
-          hence the whole arm, since the [ilink dind] it mints is the only
-          ticket for the [".."] written at +0x11a -- is unprovable. *)
+          hence the whole arm, since the fragment at [dind] it mints is the
+          only one for the [".."] written at +0x11a -- is unprovable. *)
        ⌜di_nlink dn <> (mword_of_int 32767 : mword 16)⌝ -∗
        ⌜inode_ok cov logstart dn bm data⌝ -∗
        ⌜dir_ok nib dn data⌝ -∗
@@ -2496,11 +2423,10 @@ Section ProofCreateMain.
           [SpecDirlink]'s append arm.  The [bltz] at +0xdc having fired says
           [tot < 16]; with dirlink's ATOMICITY clause (relayed from
           [SpecWritei.wi16_atomic], D0-c) that IS [tot = 0], and the arm
-          needs the sharper form: it re-parks the parent's [dir_links] with
-          [DirLinks.dir_links_dirlink_nop] before +0x158's [iunlockput(dp)],
-          and at [0 < tot < 16] no re-park exists ([dir_link_at_dirlink]
-          wants a ticket, and the one [ilink] in hand is what +0x14c
-          spends).  The RE-PARK is still the body's own work, as before --
+          needs the sharper form: it re-parks the parent's [dlinks]
+          unchanged before +0x158's [iunlockput(dp)], and at [0 < tot < 16]
+          no re-park exists (a partial record has gone live wanting a
+          fragment, and the one in hand is what +0x14c spends).  The RE-PARK is still the body's own work, as before --
           what changed is that it is now possible. *)
        ⌜tot = 0%nat⌝ -∗
        (* NO CLAUSE ABOUT THE BITMAP.  The block bitmap is the persistent
@@ -2562,7 +2488,7 @@ Section ProofCreateMain.
        ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
        ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nsl jj) -∗
        (* THE LOCKED PARENT, in pieces, at the POST-dirlink indices --
-          with [dir_links] still at the ENTRY ones and the ticket in hand *)
+          with [dlinks] still at the ENTRY ones and the fragment in hand *)
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
@@ -5453,7 +5379,7 @@ Section ProofCreateMain.
       destruct (decide (ty = SpecDirlookup.T_DIR)) as [Htdir | Htdir].
       + (* ============================================================ *)
         (*  +0xca TAKEN: the whole T_DIR sub-branch, PARKED.  The child's *)
-        (*  [ilink] is UNDEPOSITED here -- +0xc4 minted it and this arm's  *)
+        (*  fragment is UNDEPOSITED here -- +0xc4 minted it and this arm's *)
         (*  own [dirlink(dp,name)] at +0x12c is what spends it.            *)
         (* ============================================================ *)
         iApply (wp_beq_taken_s_sconf (mword_of_int (CK + 0xca))
@@ -6216,10 +6142,9 @@ Section ProofCreateMain.
                split; [rewrite cr_setf_nlink; vm_compute; reflexivity |].
                intros _. exact (cr_setf_fresh_made dnc ty major minor
                                   Hfresh Htyc). }
-             (* the CHILD is not a directory on this arm, so its record
-                ledger is [emp] at either dinode and the flush's [nlink]
-                bump -- which would break [dir_link_at]'s grey disjunct on
-                a real directory -- is invisible here. *)
+             (* the CHILD is not a directory on this arm, so its [dlinks]
+                is [emp] at either dinode ([dlinks_not_dir]) and the
+                flush's [nlink] bump is invisible to it. *)
              iAssert (dlinks γfs (bv_unsigned cinum)
                         (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                         bmc datc)
@@ -6589,9 +6514,9 @@ Section ProofCreateMain.
   (*      RECEIPT PREMISE ON THE LEFT (fs-log.md §G.23's C4): the record  *)
   (*      it writes has [nlink = 0], so the witness route is the only     *)
   (*      one, and its two ambient ties are create's own premises.  The   *)
-  (*      [ilink] the +0xc4 mint made is what pays for the decrement --   *)
+  (*      fragment the +0xc4 mint made is what pays for the decrement -- *)
   (*      it is consumed here, which is why the parent's re-park below    *)
-  (*      may not want a ticket.                                          *)
+  (*      may not want one.                                               *)
   (*                                                                      *)
   (*  (2) THE FREEING PUT AT +0x152 RUNS ON [cru], NOT ON [crz].          *)
   (*      [SpecIput.ip_spend_w] is [ip_bm w + (if cru || crz then 0 else  *)
@@ -6874,7 +6799,7 @@ Section ProofCreateMain.
     assert (HG4regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                         (ientry kslot) ty major minor G4)
       by (rewrite /G4; apply cr_regs3_caller; [exact Hcsra | exact HG3regs]).
-    (* the child's payload, at the ZEROED record: its own [dir_links] is
+    (* the child's payload, at the ZEROED record: its own [dlinks] is
        [emp] (it is not a directory -- this is the non-T_DIR arm), and the
        flush handed the region's fragment back retagged. *)
     iAssert (dlinks γfs (bv_unsigned cinum)
@@ -7047,9 +6972,9 @@ Section ProofCreateMain.
                         (ientry kslot) ty major minor G6)
       by (rewrite /G6; apply cr_regs3_caller; [exact Hcsra | exact HG5regs]).
     (* THE PARENT'S RE-PARK.  [tot = 0]: no byte and no record moved, so
-       the whole big-op rides ([DirLinks.dir_links_dirlink_nop]) and no
-       ticket is wanted -- which is the only reason this arm exists, since
-       the one [ilink] it had was spent by the flush at +0x14c. *)
+       the whole big-op rides unchanged and no fragment is wanted -- which
+       is the only reason this arm exists, since the one it had was spent
+       by the flush at +0x14c. *)
     assert (Hszcap : bv_unsigned (di_size dn)
                      <= Z.of_nat MAXFILE * Z.of_nat BSIZE)
       by exact (proj1 (proj2 (proj2 (proj2 (proj2 Hiok))))).
@@ -7344,8 +7269,8 @@ Section ProofCreateMain.
        ⌜ty = SpecDirlookup.T_DIR⌝ -∗
        (* THE PARENT, at whatever record the entry reached [fail:] with --
           and ALREADY RE-PARKED.  All three entries sit BEFORE the +0x134
-          [lhu], so the count is the entry one and the walk's own
-          [dir_links_dirlink_nop] has put the ledger back. *)
+          [lhu], so the count is the entry one and the walk has already
+          put the entry fragments back. *)
        ⌜(kd < NINODE)%nat⌝ -∗
        ⌜bv_unsigned dind < 16 * Z.of_nat nib⌝ -∗
        ⌜di_type dp = SpecDirlookup.T_DIR⌝ -∗
@@ -7431,7 +7356,7 @@ Section ProofCreateMain.
        (* the parent's PROVENANCE UNIT (item 7a-wire): the iunlockput that
           closes it spends the unit that rode with the reference. *)
        runit_any (bv_unsigned dind) -∗
-       (* THE LOCKED CHILD -- WITHOUT its [dir_links] (see the header) *)
+       (* THE LOCKED CHILD -- WITHOUT its [dlinks] (see the header) *)
        is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
                     (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
        sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv -∗
@@ -8097,15 +8022,15 @@ Section ProofCreateMain.
   (*  -- its premises are all persistent, so one lemma serves three        *)
   (*  mutually exclusive branches with no extra hypothesis.                *)
   (*                                                                      *)
-  (*  THE TWO INTERIOR LINKS' TICKETS.  The [ "." ] record names the child *)
-  (*  ITSELF and is therefore ticket-free ([DirLinks.                      *)
-  (*  dir_link_at_dirlink_self]); the [ ".." ] record names the PARENT and *)
-  (*  its ticket is the [ilink dind] the +0x140 flush mints -- so the      *)
-  (*  child's re-park is DEFERRED across the whole rest of the arm and     *)
-  (*  completed after the mint.  The parent's own round trip across the    *)
-  (*  [++] is [DirLinks.dir_links_live] out and [dir_links_of_ilink] back; *)
-  (*  the return leg takes no hypothesis, which is exactly why it crosses  *)
-  (*  an [nlink] change by construction.                                   *)
+  (*  THE TWO INTERIOR LINKS' FRAGMENTS.  The [ "." ] record names the     *)
+  (*  child ITSELF, and its fragment is the child's OWN self-unit out of   *)
+  (*  the pile the fill minted; the [ ".." ] record names the PARENT and    *)
+  (*  its fragment is the one the +0x140 flush mints -- so the child's     *)
+  (*  re-park is DEFERRED across the whole rest of the arm and completed   *)
+  (*  after the mint.  The parent's own round trip across the [++] opens   *)
+  (*  its [dlinks] and re-seals it with the exactness equation restored    *)
+  (*  ([IcacheEscrow.dlinks_open] / [dlinks_intro]), which is what lets it *)
+  (*  cross an [nlink] change at all.                                      *)
   (* =================================================================== *)
   Lemma cr_mkdir_half
       (γs : list gname) (j : nat) (γl : gname)
@@ -9153,9 +9078,9 @@ Section ProofCreateMain.
         assert (Hq122 : add_vec_int (mword_of_int (CK + 0x11e) : mword 64) 4
                         = mword_of_int (CK + 0x122)) by pcw.
         iEval (rewrite Hq122) in "Hpc".
-        (* THE DEFERRED RE-PARK: slot ONE names the PARENT, whose [ilink] is
-           minted only by the +0x140 flush, so the child's ledger stays at
-           [dc1]/[dat1] until then and the range clause travels with it. *)
+        (* THE DEFERRED RE-PARK: slot ONE names the PARENT, whose fragment
+           is minted only by the +0x140 flush, so the child's [dlinks] stays
+           at [dc1]/[dat1] until then and the range clause travels with it. *)
         (* THE CHILD'S RECORD-ONLY FACTS AFTER ITS OWN TWO LINKS
            (durable-disk 2b-inode-3): the type rode both [dirlink]s, the
            count is still the literal 1, and the size is 32 -- two whole
@@ -9538,12 +9463,11 @@ Section ProofCreateMain.
             with "[Hity Himaj Himin Hinl Hisz]" as "Hmeta".
           { rewrite /inode_meta cr_setf_type cr_setf_major cr_setf_minor
                     cr_setf_nlink cr_setf_size /i_nlink. iFrame. }
-          (* THE PARENT'S LEDGER ACROSS THE DEPOSIT AND THE [++], IN ONE
-             STEP (V2).  The record at the append slot becomes live and
-             d-flavoured -- so [DirView.dlc_bound]'s right-hand side rises
-             by exactly one, which is what the raised count on its left
-             costs.  The [++] itself is crossed by [dlc_bv_add1_le], with
-             no (L4) and no guard: the clause is an inequality. *)
+          (* THE PARENT'S FRAGMENTS ACROSS THE DEPOSIT AND THE [++], IN
+             ONE STEP.  The record at the append slot becomes live and
+             MARKED, so the parent's marker set grows by exactly one --
+             which is what the raised count on the other side of
+             [FsStateInode.node_exact] costs. *)
           (* optimization.md's rule, as everywhere else in this walk: every
              one of the eight side facts is a NAMED assert with the context
              cleared to what it needs, never an inline [ltac:] in argument
@@ -9571,14 +9495,12 @@ Section ProofCreateMain.
                                    (dir_nrec (bv_unsigned (di_size dn)))
                                  + tot3)))
             by (clear -Hp3szmax; rewrite cr_setf_size; exact Hp3szmax).
-          (* THE FUSED DEPOSIT IS DEFERRED PAST THE FLUSH (V4).
-             [dir_links_dirlink_d]'s nlink premise is the EXACT [+1] now
-             ([dlc_lower] rides in the payload), and the only honest
+          (* THE FUSED DEPOSIT IS DEFERRED PAST THE FLUSH.  The re-seal's
+             exactness equation wants the EXACT [+1], and the only honest
              source of "the [++] did not wrap" is the flush's own nonzero
              read-back -- so the deposit fires three instructions below,
-             right after [ireg_tok_nz], with the record and the
-             ticket both still in hand.  Nothing in between touches
-             either. *)
+             right after [ireg_tok_nz], with the record and the fragment
+             both still in hand.  Nothing in between touches either. *)
           (* ===== +0x13e c.mv a0,s1 ================================= *)
           iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x13e)) Ra0 Rs1 V2
                     (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
@@ -10329,9 +10251,9 @@ Section ProofCreateMain.
         * (* =========================================================== *)
           (*  FAIL ENTRY 3 (+0x130 taken): the PARENT's own [dirlink]     *)
           (*  fell short.  This entry sits BEFORE the +0x134 [lhu], so    *)
-          (*  the parent's count is still its entry one and the ledger    *)
-          (*  goes back through [dir_links_dirlink_nop] -- available      *)
-          (*  because dirlink's atomicity at [tot < 16] IS [tot = 0].     *)
+          (*  the parent's count is still its entry one and its entry     *)
+          (*  fragments go back unchanged -- available because dirlink's  *)
+          (*  atomicity at [tot < 16] IS [tot = 0].                       *)
           (* =========================================================== *)
           assert (Htot30 : tot3 = 0%nat).
           { destruct Hatom3 as [Hz | H16];
@@ -10435,7 +10357,7 @@ Section ProofCreateMain.
           iModIntro.
           (* THE ["."] UNIT COMES BACK OUT OF THE CHILD'S PAYLOAD (lane
              G5).  [cr_fail_mkdir_body] takes the child WITHOUT its
-             [dir_links] and mints a fresh grey one, so this walk is the
+             [dlinks] and re-mints one itself, so this walk is the
              last holder of the child's own tokens -- and the
              [ip->nlink = 0] flush below still needs the WHOLE pile the
              fill minted, one of whose units this arm's
@@ -10561,7 +10483,7 @@ Section ProofCreateMain.
         iModIntro.
         (* THE ["."] UNIT COMES BACK OUT OF THE CHILD'S PAYLOAD (lane
            G5).  [cr_fail_mkdir_body] takes the child WITHOUT its
-           [dir_links] and mints a fresh grey one, so this walk is the
+           [dlinks] and re-mints one itself, so this walk is the
            last holder of the child's own tokens -- and the
            [ip->nlink = 0] flush below still needs the WHOLE pile the
            fill minted, one of whose units this arm's

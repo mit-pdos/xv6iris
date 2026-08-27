@@ -110,8 +110,7 @@ Definition fs_rtick (P : Z -> list (bv 8)) (sb : fs_sb) (rd : gset Z)
 
 (* W9's general clause: every live inum's [nlink] IS its reachable-ticket
    count -- plus one at the root, whose extra link (mkfs's own) no record
-   pays for.  Self-tickets are excluded by [fs_rec_ticket]'s guard exactly
-   as the resource ledger's [DirLinks.dir_link_at] excludes them, so a
+   pays for.  Self-tickets are excluded by [fs_rec_ticket]'s guard, so a
    non-root directory's count is [1 (parent's entry) + #child-dirs
    (their ".." records)] -- exactly xv6's [nlink] discipline (create's
    [dp->nlink++] for "..", no self-count for ".").  A committed orphan

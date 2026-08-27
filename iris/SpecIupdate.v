@@ -164,10 +164,10 @@ Definition wp_iupdate_sconf_body
      equation, since none of them ever moves the type field. *)
   InodeRegion.di_type_stable dn dn0 ->
   (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f).  The link
-     ledger's (L1) will cap the live directory records naming this inum by
-     that inum's [nlink], so the region's flush must refuse to LOWER it:
+     register caps the fragments outstanding at this inum by that inum's
+     [nlink], so the region's flush must refuse to LOWER it:
      sys_unlink's decrement is the one writer that does, and it goes
-     through [InodeRegion.ireg_write_unlink], which pays for the drop by
+     through [InodeRegion.ireg_write_unlink_reg], which pays for the drop by
      consuming a fragment.  Travels exactly as [di_type_stable] does, and
      for the same reason: the record the REGION holds at iupdate's seam is
      the STALE [dn0].  Every caller discharges it with
@@ -346,10 +346,10 @@ Definition wp_iupdate_gen_body
      equation, since none of them ever moves the type field. *)
   InodeRegion.di_type_stable dn dn0 ->
   (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f).  The link
-     ledger's (L1) will cap the live directory records naming this inum by
-     that inum's [nlink], so the region's flush must refuse to LOWER it:
+     register caps the fragments outstanding at this inum by that inum's
+     [nlink], so the region's flush must refuse to LOWER it:
      sys_unlink's decrement is the one writer that does, and it goes
-     through [InodeRegion.ireg_write_unlink], which pays for the drop by
+     through [InodeRegion.ireg_write_unlink_reg], which pays for the drop by
      consuming a fragment.  Travels exactly as [di_type_stable] does, and
      for the same reason: the record the REGION holds at iupdate's seam is
      the STALE [dn0].  Every caller discharges it with
@@ -528,10 +528,10 @@ Definition wp_iupdate_cred_body
      equation, since none of them ever moves the type field. *)
   InodeRegion.di_type_stable dn dn0 ->
   (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f).  The link
-     ledger's (L1) will cap the live directory records naming this inum by
-     that inum's [nlink], so the region's flush must refuse to LOWER it:
+     register caps the fragments outstanding at this inum by that inum's
+     [nlink], so the region's flush must refuse to LOWER it:
      sys_unlink's decrement is the one writer that does, and it goes
-     through [InodeRegion.ireg_write_unlink], which pays for the drop by
+     through [InodeRegion.ireg_write_unlink_reg], which pays for the drop by
      consuming a fragment.  Travels exactly as [di_type_stable] does, and
      for the same reason: the record the REGION holds at iupdate's seam is
      the STALE [dn0].  Every caller discharges it with
@@ -807,11 +807,12 @@ Definition wp_iupdate_credgen_body
 (*                                                                        *)
 (*  [ip->nlink++; iupdate(ip)] -- create's [dp->nlink++] at +0x128,        *)
 (*  mkdir's [".."] payment and sys_link's own increment.  §20.6's table    *)
-(*  calls it the ledger moving in the same ghost step as the count that    *)
-(*  pays for it: (L1) grows on BOTH sides at once, which is what keeps     *)
-(*  the region's cap an inequality nobody has to re-argue, and it is why   *)
-(*  the mint cannot be a separate fupd the caller fires beside an ordinary *)
-(*  flush -- between the two the invariant would hold [w = nlink + 1].     *)
+(*  calls it the register moving in the same ghost step as the count that  *)
+(*  pays for it: authority and fragments grow on BOTH sides at once, which *)
+(*  is what keeps the region's cap an inequality nobody has to re-argue,   *)
+(*  and it is why the mint cannot be a separate fupd the caller fires      *)
+(*  beside an ordinary flush -- between the two there would be one more    *)
+(*  fragment outstanding than the count allows.                            *)
 (*                                                                        *)
 (*  IT IS [wp_iupdate_cred_body] WITH TWO EDITS AND NOTHING ELSE.          *)
 (*    (i) [InodeRegion.di_nlink_stable dn dn0] -- "nlink does not fall" -- *)
@@ -824,9 +825,9 @@ Definition wp_iupdate_credgen_body
 (*        premise itself for why the Z form is unsuppliable and what       *)
 (*        derives it (InodeRegion's (L4), the twelfth stop).               *)
 (*   (ii) the post's [InodeRegion.ireg_out γi inum dn] becomes             *)
-(*        [dinode_at γi inum dn ∗ ilink (bv_unsigned inum)].  With a       *)
-(*        nonzero type [ireg_out] IS [dinode_at], so this is the same      *)
-(*        payout plus the minted fragment -- the ticket a written          *)
+(*        [dinode_at γi inum dn] beside the [FsStateLink.link_tok] pile.   *)
+(*        With a nonzero type [ireg_out] IS [dinode_at], so this is the    *)
+(*        same payout plus the minted fragments -- what a written          *)
 (*        directory record needs (§20.10's finding 1) and the one thing    *)
 (*        no landed contract in the tree could produce.                    *)
 (*                                                                        *)
@@ -845,11 +846,6 @@ Definition wp_iupdate_credgen_body
 (*  contracts stay byte-stable.  [cru]-credited and [eb := true], i.e.     *)
 (*  cut to create's altitude -- a syscall runs with an enabled base, and   *)
 (*  no nlink-raising flush in the kernel runs anywhere else.               *)
-(*                                                                        *)
-(*  THE OPTION-FLAVOUR INDEX [fl] IS GONE (lane G6).  Through G5 this     *)
-(*  body also paid out one unit of the OLD link ledger, at a flavour the  *)
-(*  caller chose ([IcacheRef.ilink_fl]); the ledger is deleted and the     *)
-(*  register pile below is the whole payout.                              *)
 (*                                                                        *)
 (* ===================================================================== *)
 Definition wp_iupdate_link_body
@@ -893,7 +889,7 @@ Definition wp_iupdate_link_body
      /\ InodeRegion.ireg_reg_ok (bv_unsigned (di_type dn)) v) ->
   (* THE INCREMENT ITSELF, in place of [di_nlink_stable]: this flush RAISES
      the count by exactly one, and that one unit is what pays for the
-     [ilink] the post hands out (§20.6's mkdir/sys_link rows).
+     fragments the post hands out (§20.6's mkdir/sys_link rows).
 
      STATED AT THE MACHINE'S OWN WIDTH, AND THAT IS FORCED (fs-sysfile.md's
      twelfth stop).  The Z-level equation
@@ -937,7 +933,7 @@ Definition wp_iupdate_link_body
   ireg_inv γi γfs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* THE FREEZE-PIN PREMISE, IN ITS RULING A-prime FORM (iclaim-ledger.md
-     §3.9; [InodeRegion.ireg_write_link_fl]'s row).  The record whose count
+     §3.9; [InodeRegion.ireg_write_link_reg]'s row).  The record whose count
      this flush RAISES must not be mid-free -- a freeze is precisely the
      state whose whole purpose is to make this flush impossible -- and there
      are exactly two ways to show it is not.
@@ -983,11 +979,9 @@ Definition wp_iupdate_link_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* THE FLUSH, AND THE MINT.  The retagged fragment exactly as the
          other four bodies hand it back (the type is nonzero, so
-         [ireg_out] is [dinode_at] here), plus the ONE ledger fragment the
-         raised count pays for.  It travels to the [dirlink] that deposits
-         it in a directory's [DirLinks.dir_links].  AT THE CALLER'S OWN
-         FLAVOUR: [None] reduces to [ilink] by iota, so no landed caller's
-         continuation moves a character. *)
+         [ireg_out] is [dinode_at] here), plus the fragments the raised
+         count pays for.  They travel to the [dirlink] that files them in a
+         directory's [FsStateInode.ent_toks]. *)
       dinode_at γi inum dn -∗
       (* ...AND THE COUNTING RA's OWN UNIT (durable-disk 2b-inode-5), which
          is what the [dirlink] that follows files in the directory's
@@ -1028,9 +1022,9 @@ Definition wp_iupdate_link_body
 (*        OLD count is the new one plus one.  This is the only            *)
 (*        nlink-LOWERING flush in the kernel, which is exactly why         *)
 (*        [wp_iupdate_gen]'s [di_nlink_stable] may stand unweakened.       *)
-(*   (ii) [ilink (bv_unsigned inum)] moves from the POST to the PREMISE:   *)
-(*        the drop is PAID FOR by consuming one ledger fragment, so (L1)   *)
-(*        falls on both sides in the same ghost step and no fragment ever  *)
+(*   (ii) the link fragment moves from the POST to the PREMISE: the drop   *)
+(*        is PAID FOR by consuming one, so authority and fragments fall    *)
+(*        on both sides in the same ghost step and no fragment ever        *)
 (*        outlives the count that backs it.                               *)
 (*  (iii) the payout is [dinode_at γi inum dn] alone -- the retagged       *)
 (*        fragment, which with a nonzero type is what [ireg_out] is.       *)
@@ -1067,9 +1061,6 @@ Definition wp_iupdate_link_body
 (*  [cru]-credited and [eb := true], cut to create's altitude, exactly as  *)
 (*  the fifth is.                                                         *)
 (*                                                                        *)
-(*  THE FLAVOUR INDEX IS GONE (lane G6): through G5 this body also SPENT  *)
-(*  one unit of the old link ledger ([IcacheRef.ilink_fl]) beside the      *)
-(*  register pile.  The ledger is deleted; the pile is the whole spend.    *)
 (* ===================================================================== *)
 Definition wp_iupdate_unlink_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
@@ -1102,8 +1093,8 @@ Definition wp_iupdate_unlink_body
      stay out of that corner while a fragment is being spent. *)
   bv_unsigned (di_type dn) <> 0 ->
   (* THE DECREMENT, the flip of the fifth body's increment: the OLD count
-     is the new one plus one, and the [ilink] premise below is what pays
-     for it.
+     is the new one plus one, and the link-fragment premise below is what
+     pays for it.
 
      DELIBERATELY STILL IN Z FORM, and the asymmetry with its sibling is
      the point (the twelfth stop's ruling asked for the call).  The
@@ -1177,7 +1168,7 @@ Definition wp_iupdate_unlink_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* THE FLUSH, AND NOTHING MINTED (edit (iii)): the retagged fragment
          alone -- the type is nonzero, so this is [ireg_out] here -- and
-         the [ilink] that went in is GONE, spent by the count it paid. *)
+         the fragment that went in is GONE, spent by the count it paid. *)
       dinode_at γi inum dn -∗
       bslots 2 -∗
       log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
@@ -1273,7 +1264,7 @@ Module Type IUPDATE.
                               pidv dq dqd dqn dqs m K eb b lks Vpr.
 
   (* the LINK-MINTING contract (design §20.18 stage C2): the credited walk
-     at a flush that RAISES [nlink] by one, paying out the [ilink] fragment
+     at a flush that RAISES [nlink] by one, paying out the link fragment
      that raise buys.  A fifth parameter for the fourth's reason -- widening
      any of the four would move a landed caller's arity, and this one's
      postcondition differs, not just its premises. *)
@@ -1298,7 +1289,7 @@ Module Type IUPDATE.
                            pin oty pidv dq dqd dqn dqs m K eb b lks Vpr.
 
   (* the LINK-SPENDING contract (design §20.18 stage C4): the credited walk
-     at a flush that LOWERS [nlink] by one, spending the [ilink] that drop
+     at a flush that LOWERS [nlink] by one, spending the fragment that drop
      costs and carrying the zero-record receipt through log_write's own
      ghost step.  A sixth parameter for the fifth's reason. *)
   Parameter wp_iupdate_unlink :

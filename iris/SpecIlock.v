@@ -416,9 +416,9 @@ Definition wp_ilock_dep_sconf_body
          [ic_loaded].  [SpecIunlock]'s precondition takes it back.
 
          WHY THE CONTRACT GREW (§3.9's ruling, and its price): the freeze
-         pin's premise on [InodeRegion.ireg_write_link_fl] is FALSE at
+         pin's premise on [InodeRegion.ireg_write_link_reg] is FALSE at
          create's fresh child ([fresh_shape] pins the pre-count at zero) and
-         unavailable at sys_link's [ip->nlink++] (no guard, no ilink in
+         unavailable at sys_link's [ip->nlink++] (no guard, no link token in
          hand); IIIc refuted every cheaper route.  The honest supply is this
          token, and a checked-out holder is exactly who has it.
 
@@ -658,9 +658,9 @@ Definition wp_ilock_tx_sconf_body
          [ic_loaded].  [SpecIunlock]'s precondition takes it back.
 
          WHY THE CONTRACT GREW (§3.9's ruling, and its price): the freeze
-         pin's premise on [InodeRegion.ireg_write_link_fl] is FALSE at
+         pin's premise on [InodeRegion.ireg_write_link_reg] is FALSE at
          create's fresh child ([fresh_shape] pins the pre-count at zero) and
-         unavailable at sys_link's [ip->nlink++] (no guard, no ilink in
+         unavailable at sys_link's [ip->nlink++] (no guard, no link token in
          hand); IIIc refuted every cheaper route.  The honest supply is this
          token, and a checked-out holder is exactly who has it.
 

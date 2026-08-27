@@ -112,15 +112,15 @@
    where the fragment campaign's delete half is finally spent.  Three facts,
    because they are what the walk is:
 
-   * THE ZEROING COLLAPSES A TICKET.  [memset(&de,0,16)] then
+   * THE ZEROING RELEASES A FRAGMENT.  [memset(&de,0,16)] then
      [writei(dp,0,&de,off,16)] at +0x8a..+0xa4 is the exact inverse of
-     dirlink's append: [DirLinks.dir_links_unlink] fires CALLER-SIDE on the
-     record [dirlookup] found and RELEASES one [InodeRegion.ilink ip],
-     which the [ip->nlink--; iupdate(ip)] at +0xbe..+0xca then CONSUMES
-     through [SpecIupdate.wp_iupdate_unlink].  Nothing colour-shaped crosses
+     dirlink's append: [FsStateEra.ent_toks_unlink] fires CALLER-SIDE on the
+     record [dirlookup] found and RELEASES one [FsStateLink.link_tok] at
+     [ip], which the [ip->nlink--; iupdate(ip)] at +0xbe..+0xca then
+     CONSUMES through [SpecIupdate.wp_iupdate_unlink].  Nothing else crosses
      this interface in either direction.
    * ITS HOME-LIVE PREMISE COMES FROM THE PAYLOAD, NOT FROM A GUARD.
-     [dir_links_unlink] wants [di_nlink dp <> 0] of the HOME, and unlike
+     The release wants [di_nlink dp <> 0] of the HOME, and unlike
      create and namex sys_unlink has no [nlink == 0] re-check to walk.  What
      supplies it is [DirView.dir_orphan_clean] (fs-fragments-campaign.md,
      PASS 2): an ORPHANED directory's live records are exactly "." and "..",
@@ -129,11 +129,10 @@
      home cannot be orphaned.  The clause is a property of THIS binary and
      of no earlier one: it was refuted by sys_link's unguarded [dirlink]
      until f60ff58 gave sys_link create's orphan re-check.
-   * THE T_DIR ARM's [dp->nlink--] SPENDS THE CHILD's ".." TICKET.  The only
-     [ilink dp] in the system lives inside [ip]'s own [dir_links], at the
-     index of [ip]'s "..", and [DirView.dir_dots_ix] +
-     [FsLookup.fdir_dots_index] + [DirLinks.dir_links_dotdot_out] are what
-     name it.  That clause is guarded on [T_DIR] AND [di_nlink ip <> 0], and
+   * THE T_DIR ARM's [dp->nlink--] SPENDS THE CHILD's ".." FRAGMENT.  The
+     only fragment of [dp]'s register in the system lives inside [ip]'s own
+     [ent_toks], at the index of [ip]'s "..", and [DirView.dir_dots_ix]
+     beside [FsStateEra.ent_toks_era_borrow_at] is what names it.  That clause is guarded on [T_DIR] AND [di_nlink ip <> 0], and
      the liveness is the kernel's own [if (ip->nlink < 1) panic] at +0x7c --
      walked before the zeroing, like the two namecmp refusals.  In exchange
      the clause HANDS BACK [2 <= dir_nrec (di_size ip)], so the isdirempty

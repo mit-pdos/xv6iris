@@ -473,8 +473,8 @@ Qed.
 
 (* WHAT THE FALL-THROUGH BUYS, and it is the whole point of the guard: a
    signed-positive count is a NONZERO count, which is
-   [DirView.dir_dots_ix]'s guard and [DirLinks.dir_link_at_unlink]'s
-   home-live premise in the other direction. *)
+   [DirView.dir_dots_ix]'s guard and the entry release's home-live premise
+   in the other direction. *)
 Lemma su_signed_pos_nz (h : mword 16) : (0 < bv_signed h)%Z ->
   bv_unsigned h <> 0%Z.
 Proof.
@@ -753,7 +753,7 @@ Qed.
    Z one: the OLD count is the new one plus one.  Sound at BOTH flushes
    because the [blez] at +0x7c is walked before either -- for [ip] the
    count is literally the one the guard tested, and for [dp] it is the one
-   [IregLinkNz.ireg_tok_nz] reads off the [ilink] the ".." record's ticket
+   [IregLinkNz.ireg_tok_nz] reads off the fragment the ".." record
    supplies. *)
 Lemma su_nlink_decr (h : mword 16) :
   bv_unsigned h <> 0%Z ->

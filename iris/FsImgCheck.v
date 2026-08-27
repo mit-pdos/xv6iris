@@ -211,31 +211,30 @@ Proof.
            (fsimg_wf_root fsimg_P fsimg_sb fsimg_wf_ok)).
 Qed.
 
-(* ---- W9, cited: the LINK LEDGER's per-inum ticket counts ------------- *)
+(* ---- W9, cited: the per-inum link-fragment counts -------------------- *)
 
-(*  [IcacheBoot.ireg_alloc]'s stage-B ledger premise stands at [W z =
+(*  [IcacheBoot.ireg_alloc]'s stage-B premise stands at [N z =
     FsImg.fs_link_count P sb z] -- the number of ticket-bearing records of
-    the image that name [z] -- and the region invariant then owes (L1)
-    ([InodeRegion.ireg_link_ok]) and [ireg_dir_wl0] at that value.  Both are
-    W9 of [fsimg_wf_ok], so NO new computation lands here; W9's own sweep is
-    what added ~+20 s to this file's [vm_compute]. *)
+    the image that name [z] -- and the region invariant then owes, at that
+    value, that [z]'s own [di_nlink] covers it and that a directory's is
+    zero.  Both are W9 of [fsimg_wf_ok], so NO new computation lands here;
+    W9's own sweep is what added ~+20 s to this file's [vm_compute]. *)
 
-(* (L1): no inum has more tickets than links *)
+(* no inum has more fragments outstanding at it than links *)
 Lemma fsimg_link_le (z : Z) :
   Z.of_nat (fs_link_count fsimg_P fsimg_sb z)
     <= bv_unsigned (di_nlink (fs_dinode fsimg_P fsimg_sb z)).
 Proof. exact (fsimg_wf_link_le fsimg_P fsimg_sb z fsimg_wf_ok). Qed.
 
-(* [ireg_dir_wl0]: a DIRECTORY's plain column is empty -- the root's ["."]
-   and [".."] are both SELF records and bear no ticket *)
+(* nothing names a DIRECTORY of this image -- the root's ["."] and [".."]
+   are both SELF records and bear no ticket *)
 Lemma fsimg_link_dir (z : Z) :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb z)) = T_DIR_z ->
   fs_link_count fsimg_P fsimg_sb z = 0%nat.
 Proof. exact (fsimg_wf_link_dir fsimg_P fsimg_sb z fsimg_wf_ok). Qed.
 
-(* [DirLinks.dir_links_of_plain]'s [DirView.dlc_bound] premise and its ROOT
-   EXCLUSION: every live image directory has exactly one link and IS the
-   root (mkfs lays down one directory) *)
+(* every live image directory has exactly one link and IS the root (mkfs
+   lays down one directory) *)
 Lemma fsimg_dir_nlink (z : Z) :
   0 <= z < sb_ninodes fsimg_sb ->
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb z)) = T_DIR_z ->

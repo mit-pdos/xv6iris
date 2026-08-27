@@ -498,9 +498,9 @@ Qed.
    replaced -- and every pure clause a re-park owes ([InodeLock.inode_ok],
    [DirView.dir_ok]) reads only the type, the size and the addrs, so all
    three ride the change by [reflexivity].  The RESOURCE clause
-   ([DirLinks.dir_links]) does not, and its move is
-   [IregLinkNz.dir_links_nlink_drop]: at a nonzero count the grey colour is
-   refuted, and an [ilink] ticket says nothing about the home record. *)
+   ([IcacheEscrow.dlinks]) does not -- it reads the count through
+   [FsStateInode.node_exact] -- but both sys_link re-parks are at
+   NON-directories, where [dlinks_not_dir] discharges it outright. *)
 Definition sl_setnl (dn : dinode) (nl : mword 16) : dinode :=
   MkDinode (di_type dn) (di_major dn) (di_minor dn) nl (di_size dn)
            (di_addrs dn).
@@ -534,8 +534,8 @@ Proof. unfold dir_ok, sl_setnl. cbn. exact (fun H => H). Qed.
 (* ...and the ".." index clause across the same store.  [sl_setnl] moves only
    the COUNT, and [dir_dots_ix] is guarded on it, so unlike [dir_ok] this
    one is not a [cbn]: the congruence needs the home to be live, which both
-   sys_link re-parks have in hand -- the tail from the [ilink] it is about to
-   spend, ARM E from [ip] not being a directory at all. *)
+   sys_link re-parks have in hand -- the tail from the link token it is about
+   to spend, ARM E from [ip] not being a directory at all. *)
 Lemma sl_setnl_ddix (self : Z) (dn : dinode) (data : nat -> list (bv 8))
     (nl : mword 16) :
   bv_unsigned (di_nlink dn) <> 0 ->

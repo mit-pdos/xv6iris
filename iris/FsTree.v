@@ -25,9 +25,9 @@
          state would need a coercion at every one of them;
       2. hard links make files MULTI-PARENT, so an inductive [Tree] is
          already wrong at the leaves -- the object is a DAG;
-      3. [".."] has to be IN [ents] rather than derived: [dir_link_at] is
-         keyed by record INDEX and is name-blind, and nothing in the model
-         places [".."] at index 1 (fs-icache.md §20.17.4(b));
+      3. [".."] has to be IN [ents] rather than derived: the on-disk
+         records are keyed by record INDEX, and nothing in the model places
+         [".."] at index 1 (fs-icache.md §20.17.4(b));
       4. xv6 has no rename, so the only shape movers are insert-edge and
          delete-edge -- there is no tree surgery to be structural about.
 
@@ -103,8 +103,8 @@ Definition fname := list (bv 8).
 Global Instance fname_eq_dec : EqDecision fname := _.
 Global Instance fname_countable : Countable fname := _.
 
-(* The two names xv6 gives every directory.  [DOT] is the self-record the
-   ledger deliberately exempts ("No ip->nlink++ for '.'"), and [DOTDOT] is
+(* The two names xv6 gives every directory.  [DOT] is the self-record xv6
+   deliberately does not count ("No ip->nlink++ for '.'"), and [DOTDOT] is
    the parent link whose LOCATION the model has no fact about -- see
    [FsRep.v]'s [fnode_dotdot], which is the whole reason this layer pays
    for itself.
@@ -1224,8 +1224,7 @@ Qed.
    halfword), and those may well duplicate a live name.  [SpecDirlink]'s
    [dl_post] already relays [SpecWritei.wi16_atomic] -- [tot = 0 \/
    tot = 16] at this call's single-block window -- so the premise costs a
-   caller one [destruct], and the same clause is what [dir_link_at]'s
-   re-park needed before it.  At [tot = 0] nothing moved at all; at
+   caller one [destruct].  At [tot = 0] nothing moved at all; at
    [tot = 16] the guard dirlink itself applies ([dir_first data nrec s =
    None]) is what pays. *)
 Lemma dir_uniq_dirlink (dn dn' : dinode)

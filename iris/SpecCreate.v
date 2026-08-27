@@ -112,7 +112,7 @@
    `nx_nlz_ne`, hoisted there by stage B' precisely so both walkers can
    name them).  The FALL-THROUGH is the interesting half: it hands the walk
    `bv_unsigned (di_nlink dn) <> 0` at the SAME `dn` that `ic_loaded` names
-   in its `dinode_at` and quantifies its `dir_links` over -- which is the
+   in its `dinode_at` and quantifies its `dlinks` over -- which is the
    raw material §20.17's step 4/5 consume.
 
    ==== THE DECODE (PRE-9da28f5 OFFSETS -- SEE ABOVE) =====================

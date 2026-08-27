@@ -2113,11 +2113,12 @@ Section ProofDirlookupMain.
                     record names the home itself -- a lookup of ["."] -- there
                     is NO ticket to lend: xv6 deliberately does not count the
                     self record ("No ip->nlink++ for '.': avoid cyclic ref
-                    count"), so [dir_link_at]'s guard is false there.  The
-                    home's own [dinode_at] is licence (c) and is a strictly
-                    better witness.  Otherwise the ticket at index [i] is
-                    licence (a), borrowed by [dir_links_borrow] and re-sealed
-                    by its wand.
+                    count"), so there is nothing to lend.  The home's own
+                    [dinode_at] is licence (c) and is a strictly better
+                    witness.  Otherwise the fragment at index [i] is licence
+                    (a), borrowed out of the payload's [ent_toks]
+                    ([FsStateEra.ent_toks_borrow]) and re-sealed by its
+                    wand.
 
                 Nothing is spent either way: iget returns the licence at the
                 SAME [l], and the closing wand puts the payload back exactly as

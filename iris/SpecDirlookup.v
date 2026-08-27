@@ -107,21 +107,20 @@
 
    THREE THINGS COME IN AND GO BACK OUT VERBATIM, ON BOTH ARMS (R13(ii)):
 
-   [IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data] -- the payload's
-   per-record ticket list PAIRED WITH the home's name-keyed entry units
-   big-op, over the PRE-state (there is no post-state: dirlookup writes
-   nothing).  At the matched index it is the payment unit that founds licence
-   (a).  Nothing is spent: the ticket is lent to [iget] and handed straight
-   back, which is why the borrow costs the six call sites nothing but a
+   [IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data] -- the home's
+   name-keyed entry fragments ([FsStateInode.ent_toks_x]), over the
+   PRE-state (there is no post-state: dirlookup writes nothing).  At the
+   matched name it is the payment unit that founds licence (a).  Nothing is
+   spent: the fragment is lent to [iget] and handed straight back, which is why the borrow costs the six call sites nothing but a
    [iFrame] -- every one of them holds it already, out of
    [IcacheEscrow.ic_loaded].
 
    [dinode_at γi dinum dr] -- the HOME's own record, which is licence (c) at
    the SELF record.  A lookup of ["."] returns the inum of the very
-   directory the caller has locked, and the self record carries NO ticket
-   (the source comment is "No ip->nlink++ for '.': avoid cyclic ref count",
-   and [DirLinks.dir_link_at]'s guard is false there) -- so the ticket list
-   cannot found that iget and the home's own record must.  This is why the
+   directory the caller has locked, and the self record carries no fragment
+   of ANOTHER inum's register (the source comment is "No ip->nlink++ for
+   '.': avoid cyclic ref count") -- so the entry fragments do not found that
+   iget and the home's own record must.  This is why the
    contract gains an inum parameter [dinum] it never reads.  The record is a
    SEPARATE binder [dr] rather than the in-core [dn], because dirlink's inner
    lookup holds the region's own (possibly stale) copy [dn0] and not the
@@ -129,15 +128,17 @@
    nonzero type, which is premise (6).
 
    THE PURE PREMISE IS A DISJUNCTION, AND THAT IS FORCED (§7.5.6).  The
-   ticket at the matched index is [ilink]-coloured only under a LIVE home
-   ([DirLinks.dir_link_at_live]) -- and a bare "the home's count is nonzero"
+   matched record's fragment is a witness only under a LIVE home -- an
+   orphan's dot records are tokenless ([FsStateInode.ent_tokenless]) and
+   under [dir_orphan_clean] it has no other live record -- and a bare "the
+   home's count is nonzero"
    premise is UNSUPPLIABLE at sys_unlink, which does nameiparent, ilock(dp),
    dirlookup(dp,name,&off) with no [dp->nlink == 0] re-check anywhere.  The
    right disjunct is what sys_unlink brings instead: its two [namecmp]
    refusals at sysfile.c:220-221 mean the name it is looking up is neither
    ["."] nor [".."], and under [dir_orphan_clean] an ORPHANED directory's
    live records are all dot records -- so the matched record is not live,
-   the found arm is vacuous, and the ticket is only ever cashed under a live
+   the found arm is vacuous, and the fragment is only ever cashed under a live
    home.  [dl_lic_live] below is that argument in five lines; the supplier
    table is §7.5.6's.
 

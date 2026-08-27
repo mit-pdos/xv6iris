@@ -633,11 +633,9 @@ Definition ctyUR : ucmra := optionUR ctyR.
    first [apply prod_local_update'] of every chain re-discovers the
    structure by unification and does not terminate in five minutes; with the
    atom the same chains are ~1 s.
-   NARROWED BY LANE G6 to [c] (the typed claim) and [r] (the plain
-   reference count).  Through G5 it also carried the OLD LINK LEDGER's four
-   counting columns [wl]/[wdu]/[wdt]/[g] and the parent register [p];
-   link counts and types are now ONE separate RA (fs-state.md §6½,
-   [Xv6Cameras.fsLinkUR]) and nothing reads a ledger column any more. *)
+   It carries [c] (the typed claim) and [r] (the plain reference count)
+   and nothing else: link counts and types are ONE SEPARATE RA
+   (fs-state.md §6½, [Xv6Cameras.fsLinkUR]), not a column here. *)
 Definition linkElemUR0 : ucmra := prodUR ctyUR natUR.
 
 Definition linkElemUR1 : ucmra := prodUR linkElemUR0 frzUR.

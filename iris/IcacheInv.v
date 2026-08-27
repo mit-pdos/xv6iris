@@ -85,7 +85,7 @@ Require Import InodeRegion.
 (* iclaim-ledger.md §3.1's licence table -- the up-count movers refute a
    standing [FrzPre] with [IgetLic.iname_not_frozen] instead of with a
    freeze token they cannot have (RULING A's custody clause).  No cycle:
-   [IgetLic] sits over [InodeRegion]/[IcacheRef]/[DirLinks] and knows
+   [IgetLic] sits over [InodeRegion]/[IcacheRef] and knows
    nothing of the itable. *)
 Require Import IgetLic.
 Require Import IrefSlots.

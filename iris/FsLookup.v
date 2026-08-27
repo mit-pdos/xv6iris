@@ -504,7 +504,7 @@ End FsLookup.
            and the tree keys it at [dpi : Z]; [FsRep.inum_of_unsigned] is
            the round trip and this is its premise.  It IS the tree's own
            [FsTree.fs_inums_ok] at one node, so every client has it.
-     (iv)  [DirLinks.dir_links dpi dn data]            -- NOT sanctioned,
+     (iv)  [IcacheEscrow.dlinks γfs dpi dn bm data]    -- NOT sanctioned,
            and it is the substantive one: a RESOURCE, the directory's
            out-edges.  §1.3 makes edges a primitive client-held fragment
            beside the node, so a client of this triple does hold it -- but
@@ -855,9 +855,10 @@ End FsLookupAu.
 
 (*  THE SEAM, AND WHY IT TAKES TWO HALVES.
 
-    S7's [dp->nlink--] must consume one [ilink dp], and the only one in the
-    system sits in the CHILD's [dir_links], at the index of the child's
-    [".."] record.  Two facts are needed and neither can state the other:
+    rmdir's [dp->nlink--] must be paid by one fragment of [dp]'s register
+    ([FsStateLink.link_tok]), and the only one in the system sits in the
+    CHILD's own [ent_toks], at the index of the child's [".."] record.  Two
+    facts are needed and neither can state the other:
 
       the PAYLOAD half  [DirView.dir_dots_ix self dn data] -- a LIVE
         directory's record 0 is a live ["."] naming [self] and its record 1
@@ -868,8 +869,8 @@ End FsLookupAu.
 
       the TREE half  [ents !! DOTDOT = Some dp] -- a conjunct of
         [FsRep.fnode ip (NDir ents)] -- says WHAT it names.  It cannot say
-        where: [DirLinks.dir_link_at] is keyed by record INDEX and is
-        name-blind (fs-icache.md §20.17.4(b)).
+        where: the payload is a run of INDEXED records and carries no
+        name-to-index map (fs-icache.md §20.17.4(b)).
 
     **[dir_names_unique] IS WHAT JOINS THEM**, and this is the third place
     R2's amendment pays for itself.  Under the invariant any-match is
@@ -891,8 +892,7 @@ End FsLookupAu.
         record count;
       - the record-0 facts come free, so the ["."] edge is readable at the
         tree too ([node_dots_index]'s [ents !! DOT = Some self]) -- the
-        self-loop the ledger deliberately does not file a [dir_links] unit
-        against, now visible as an ordinary entry;
+        self-loop, now visible as an ordinary entry;
       - [self <> 0] falls out ([DirView.dir_dots_ix_self]), which is the
         fact create's [".."] establishment could not get anywhere else.
 
@@ -993,10 +993,9 @@ Qed.
    record 0's ["."] names the node's own inum.  Both payloads have the inum
    in hand, so it costs no arity at any call site.
 
-   THE LAST CONJUNCT IS [DirLinks.dir_links_dotdot_out]'s OWN PREMISE,
-   discharged AT THE TREE: the extraction refuses a node whose [".."] names
-   itself (the root), and "the parent is not the child" is a statement the
-   tree can make and the bytes cannot. *)
+   THE LAST CONJUNCT SAYS THE PARENT IS NOT THE CHILD, discharged AT THE
+   TREE: the extraction refuses a node whose [".."] names itself (the
+   root), and that is a statement the tree can make and the bytes cannot. *)
 Section FsLookupDots.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{ICFG : icfg}.

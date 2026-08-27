@@ -33,7 +33,7 @@
    nameiparent returns the parent UNLOCKED, so a concurrent rmdir can zero
    [dp->nlink] before the [ilock(dp)] at +0x80; a [dirlink] into an orphan
    then appends a record the parent's own [itrunc] discards WITHOUT
-   dropping [ip->nlink], stranding this walk's [ilink].  create has
+   dropping [ip->nlink], stranding this walk's link token.  create has
    re-checked since 9da28f5 and namex since 03e5422a; sys_link did not, and
    that -- not the model -- is what refuted the STRONG isdirempty
    invariant (fs-fragments-campaign.md).  The guard is ARM E2 and its walk
@@ -667,7 +667,7 @@ Lemma sl_cwd_upt (V : pprivate) (P : uptd) : pv_cwd (upd_upt V P) = pv_cwd V.
 Proof. reflexivity. Qed.
 
 (* [di_type dn <> T_DIR] at the sixteen-bit width, read as the Z-level
-   disequality [DirView] / [DirLinks] state their type tests at *)
+   disequality [DirView] states its type tests at *)
 Lemma sl_tdir_zne (t : mword 16) :
   t <> (mword_of_int 1 : mword 16) -> bv_unsigned t <> T_DIR_z.
 Proof.
@@ -1850,8 +1850,8 @@ Section ProofSysLinkBody.
                              [ip->nlink == 0] guard (ARM D is the NLINK_MAX
                              test alone, and ARM E2's zero test is about [dp],
                              after this mint), [InodeLock.inode_ok] carries no
-                             [nlink] conjunct, and this walk holds no [ilink]
-                             for [ip] -- [namei]'s licence is borrowed and
+                             [nlink] conjunct, and this walk holds no link
+                             token for [ip] -- [namei]'s licence is borrowed and
                              returned at the iget (IgetLic §7.1.6), so
                              [IregLinkNz.ireg_tok_nz] has no fragment to read.
                              [Hfrz] is [ip]'s own freeze token, handed over by
@@ -2288,7 +2288,7 @@ Section ProofSysLinkBody.
                    (*  rmdir can zero its link count in the window before this      *)
                    (*  [ilock(dp)]; a [dirlink] into an orphan then appends a        *)
                    (*  record that the parent's own [itrunc] later discards WITHOUT  *)
-                   (*  dropping [ip->nlink], stranding this walk's [ilink] forever.  *)
+                   (*  dropping [ip->nlink], stranding this walk's token forever.   *)
                    (*  create has re-checked for exactly that since 9da28f5; this is *)
                    (*  the same guard, given to sys_link, and it is what makes       *)
                    (*  fs-fragments-campaign.md's STRONG isdirempty invariant true   *)

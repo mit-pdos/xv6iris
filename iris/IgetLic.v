@@ -82,12 +82,9 @@ Local Open Scope Z_scope.
                       allocatedness witness §20 exists for, and it is the
                       licence every [dirlookup] delivers at a record that is
                       not the home's own.
-                      THE CONSTRUCTOR CARRIES NO DATA any more (2b-inode-5,
-                      step 3): a counting unit has no flavour, so the
-                      [option (option Z)] index that used to pin WHICH of
-                      [ilink] / [ilinkd] / [ilinkdp] the caller was lending
-                      dies with the three-column ledger it indexed.
-      [GreyL]    (b)  DELETED -- see the tombstone below.
+                      THE CONSTRUCTOR CARRIES THE FRAGMENT'S VALUE and no
+                      flavour index: a fragment is [{[ty]}] at the target's
+                      key and there is no column to name.
       [HeldL]    (c)  the caller already holds the record, exclusively.  A
                       lookup of ["."] is the worked instance: it returns the
                       inum of the directory the caller has locked, whose own
@@ -115,9 +112,7 @@ Local Open Scope Z_scope.
                       rather than an assumption: root's [".."] is a SELF
                       record and therefore tokenless, so root's [nlink = 1]
                       is unaccounted for and the region parks the one unit
-                      that nothing spends.
-      (the two deleted licences, [GreyL] and [SpanL], are tombstoned
-      below.)                                                             *)
+                      that nothing spends.                              *)
 
 (*  THREE CONSTRUCTORS CARRY DATA, AND THAT IS FORCED BY "THE SAME [l]".
     §7.1.1 wrote (a), (c) and (e) with the licence's content hidden behind a
@@ -126,11 +121,10 @@ Local Open Scope Z_scope.
     lends [dinode_at γi inum dn] and gets back [∃ d, dinode_at γi inum d],
     which no walk can put back into its payload.  The borrow is only a
     borrow if the index pins the content, so the record, the record LIST and
-    the payment FLAVOUR are constructor arguments.  The enumeration is still
-    closed and still seven constructors, [destruct l] is still exhaustive,
-    and the two standing greps are unaffected. *)
+    the payment FLAVOUR are constructor arguments.  The enumeration is
+    closed and [destruct l] is exhaustive. *)
 Inductive ilic :=
-  (* (a) CARRIES THE FRAGMENT'S VALUE since lane G5: the type register's
+  (* (a) CARRIES THE FRAGMENT'S VALUE: the type register's
      fragment is [{[ty]}] at the target's key, and the licence is BORROWED
      -- the walk that lends it out of its directory's [ent_toks] has to put
      the SAME unit back, so the value cannot be hidden behind an
@@ -142,31 +136,14 @@ Inductive ilic :=
   | RootL.
 
 (*  ===================================================================== *)
-(*  TWO TOMBSTONES: [SpanL] and [GreyL] ARE DELETED                        *)
+(*  WHAT CLOSES THE ENUMERATION: THE REFUTATION OBLIGATION                 *)
 (*  ===================================================================== *)
 (*
-    [SpanL] IS GONE, DELETED PER ITS OWN SCHEDULE.  The R14 header that
-    stood here said in as many words: "IT DELETES.  [SpanL] goes away when
-    F1.5c mints an [iclaim] (the site becomes [ClaimL], no signature moves
-    -- that is why (d) is kept)".  F1.5c is
-    claude-notes/projects/iclaim-ledger.md, whose §2.4 executes exactly that
-    -- [InodeRegion.ireg_claim_au] now mints [iclaim] -- so the one
-    permitted site ([ProofIalloc.v]'s iget, §7.1.7's window) becomes a
-    [ClaimL] site and the transitional [⌜True⌝] licence has nothing left to
-    license.  The standing audit [grep -n "SpanL" iris/Proof*.v] is
-    satisfied by construction from here: the constructor does not exist.
-
-    [GreyL] IS GONE TOO, AND ITS DELETION IS REQUIRED RATHER THAN
-    HOUSEKEEPING (iclaim-ledger.md §2.6's licence table).  Its audit
-    ("[grep -n "GreyL" iris/Proof*.v] must be empty") had held on the lane
-    since R14, so no site moves.  What forces the deletion is the free-side
-    wall: at an in-transition box (f = Some or c = Some) EVERY licence must
-    be refutable, and [GreyL] is not -- a grave-[".."] grey legitimately
-    survives the free ([IcacheRef.igrey]'s charter: "it carries no
-    allocatedness, and that is the point").  With the new mint obligation an
-    undeletable [GreyL] would make iget's own proof unclosable.  The [g]
-    column and the [igrey] FRAGMENT both stay: the ledger's grave-[".."]
-    state is untouched, only the LICENCE dies.                             *)
+    EVERY constructor has to be REFUTABLE at an IN-TRANSITION box
+    ([f = Some] or [c = Some]) -- that is what [iname_not_frozen] below
+    discharges row by row, and it is the reason the list is these five and
+    no more.  A licence that could legitimately survive a free cannot be
+    added: it would make iget's own proof unclosable.                      *)
 
 Section IgetLic.
   Context `{!riscvGS Σ, !xv6G Σ}.
@@ -176,27 +153,24 @@ Section IgetLic.
   (*  LICENCE (a)'s CARRIER: ONE COUNTING UNIT                            *)
   (* ------------------------------------------------------------------ *)
 
-  (*  §7.1.1 spelt licence (a) as [ilink z], V5' split it by FLAVOUR into
-      [DirLinks.dlc_tick self k (F k) z], and 2b-inode-5 collapses the whole
-      family back to ONE proposition: [FsStateLink.link_tok Γ z], the
-      counting RA's unit at the TARGET inum.  There is no flavour left to
-      index -- a unit is a unit -- so [LinkedL] carries no argument, and the
-      lending is not "the payload's ticket at record k" but "one of the
-      home's entry units", peeled by [FsStateEra.ent_toks_borrow] and put
-      back by its wand.
+  (*  LICENCE (a) IS ONE PROPOSITION: [FsStateLink.link_tok Γ z], the
+      type register's unit at the TARGET inum.  There is no flavour to
+      index, so the lending is not "the payload's ticket at record k" but
+      "one of the home's entry units", peeled by
+      [FsStateEra.ent_toks_borrow] and put back by its wand.
 
       WHY THE BORROW IS NOT HERE.  [ent_toks] is keyed by NAME, so the peel
       needs [FsTree.dir_view_lookup] at the record the scan WON on; that is
       an era-side fact and it lives beside the other per-move lemmas in
       [FsStateEra].  What is left here is the licence itself.
 
-      WHY (L1) IS NOT READ HERE EITHER.  The bound the licence needs is
+      WHY NO COLUMN BOUND IS READ HERE EITHER.  The bound the licence needs is
       [1 <= #tokens ⟹ 1 <= nlink], and the RA proves it OUTRIGHT
       ([FsStateLink.link_auth_toks_le]) against the authority the region
       parks at the target's own slot ([InodeRegion.ireg_lnk]).  So the
       reading below opens [iregN] once and applies
-      [InodeRegion.ireg_lnk_tok_nz]; there is no ledger column to consult
-      and no invariant to maintain. *)
+      [InodeRegion.ireg_lnk_tok_nz]; there is nothing else to consult and
+      no invariant to maintain. *)
 
   (* THE FLAVOUR OF THE UNIT A LICENCE MINTS (§5'.2): the [ClaimL] iget --
      ialloc's own, into its own claim box -- mints [runit_claim]; every other
@@ -544,7 +518,7 @@ Section IgetLic.
                       its LEFT disjunct.  This is the one row that was
                       already provable under the count-only pin (IIIb's
                       finding), and it is unchanged.
-        [RootL]       the root clause is (L1) MADE STRICT, so it delivers
+        [RootL]       the region's own keep-alive token delivers
                       [1 <= di_nlink d] outright and the collision is the
                       first row's.                                        *)
   Lemma iname_not_frozen (γi : gname) (γfs : fs_names) (inodestart : Z)

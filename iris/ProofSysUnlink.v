@@ -91,10 +91,10 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import FsTree.
 Require Import IcacheEscrow.
-Require Import IregLinkNz.   (* V5' increment W: the root refutation at a
-                                released TOKEN ([ireg_tok_root_min2]) and the
-                                [dl_root]/[ireg_root] bridge, which is what
-                                opens [dir_links_dotdot_out]'s tie leg *)
+Require Import IregLinkNz.   (* the nonzero-count reading at a held token
+                                ([ireg_tok_nz]) and the agreement of two
+                                fragments of one register
+                                ([ireg_toks_agree]), which is (D1) *)
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import UserPtTree.
@@ -234,7 +234,7 @@ Lemma su_dotdotaddr :
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* [di_type dn = T_DIR] at the sixteen-bit width, read as the Z-level
-   equality [DirView] / [DirLinks] state their type tests at.  The
+   equality [DirView] states its type tests at.  The
    [ity_shot] agreement gives the left form and every payload clause wants
    the right one. *)
 Lemma su_tdir_zof (t : mword 16) :
@@ -3611,9 +3611,9 @@ Section ProofSysUnlinkBody.
     (* ---- THE SEAM at +0x8a, indexed by [isdir], [ip]'s bundle ∀-bound.
        [s3x] and the [be] buffer are existential because the isdirempty
        loop moves both; slot 5 is FILLED (this block's own save).  The
-       payload at [true] is T_DIR + [dir_dots_only] + the raw dead-scan
-       (verbatim [su_dir_links_orphan]'s third premise); at [false] it is
-       the type disequality W5-FILE's [dir_links_not_dir] route reads. ---- *)
+       payload at [true] is T_DIR + [dir_dots_only] + the raw dead-scan;
+       at [false] it is the type disequality W5-FILE's [dlinks_not_dir]
+       route reads. ---- *)
     (∀ (CIDs : CpuId) (M3 : regfile) (s3x : mword 64) (bex : nat -> bv 8)
        (isdir : bool) (gili gisli gyi : gname) (si qsi : Qp)
        (dni : dinode) (bmi : blkmap) (dati : nat -> list (bv 8)),
@@ -4251,9 +4251,9 @@ Section ProofSysUnlinkBody.
   (*  W5-FILE: +0x8a .. +0xe0 at the +0x8a seam's [isdir = false].       *)
   (*                                                                     *)
   (*    memset(&de,0,16) ; writei(dp,0,&de,off,16)  -- the zeroing.      *)
-  (*    VERDICT #3 (home-live) and VERDICT #1 ([dir_links_unlink] +      *)
-  (*    [dinode_at_excl] + the [b = true] refutation through             *)
-  (*    [IregDirBit.ireg_dirbit_ty]) both fire at the writei.            *)
+  (*    VERDICT #3 (home-live) and VERDICT #1                          *)
+  (*    ([FsStateEra.ent_toks_unlink] + [dinode_at_excl]) both fire at   *)
+  (*    the writei.                                                     *)
   (*    Then the +0xb4 T_DIR test FALLS (this arm's payload),            *)
   (*    iunlockput(dp) CREDITED off [wi16_post]'s membership trio,       *)
   (*    ip->nlink-- / iupdate(ip) at the LEFT receipt (a FILE's          *)
@@ -5856,10 +5856,10 @@ Section ProofSysUnlinkBody.
   (* ================================================================== *)
   (*  W5-DIR: the same span at the seam's [isdir = true] -- the shared    *)
   (*  zeroing, the +0xb4 test TAKEN into the +0x146 tail (dp->nlink--,   *)
-  (*  iupdate(dp) CREDITED, spending the child's [".."] ticket out of     *)
-  (*  [dir_links_dotdot_out]), the rejoin at +0xb8, and [ip]'s orphan     *)
-  (*  re-park ([ireg_link_grey] + [su_dir_links_orphan] fed by            *)
-  (*  [dir_links_empty_nlink] + the blez).  TAKES TWO NAMED PREMISES the  *)
+  (*  iupdate(dp) CREDITED, spending the child's [".."] fragment out of   *)
+  (*  its own [ent_toks]), the rejoin at +0xb8, and [ip]'s orphan re-park *)
+  (*  ([FsStateEra.ent_toks_era_orphan] + the blez).  TAKES TWO NAMED     *)
+  (*  PREMISES the                                                       *)
   (*  model cannot yet supply -- see the statement's banner and           *)
   (*  fs-sysfile.md S7-unlink W5.  The seal is STOPPED on them.           *)
   (* ================================================================== *)
@@ -5943,25 +5943,20 @@ Section ProofSysUnlinkBody.
        ARE GONE (V5' increment W).  For the record, since this lemma's
        statement is where they stood for three increments:
          (D1) [bv_unsigned (dir_inum dati 1) = bv_unsigned dinum] -- the
-              child's [".."] names the parent.  Derived at the zeroing:
-              the released ticket is the TAGGED parent-record unit
-              [ilinkdp ip dp] (the tag is dp's own inum, off the payload's
-              [self] parameter), the child's payload hands out the other
-              half of the same register through
-              [DirLinks.dir_links_dotdot_out]'s tie, and
-              [IcacheRef.iparent_agree] collapses the two values -- no
-              region open, no tree fragment.  The root exclusion the tie's
-              guard wants comes from [IregLinkNz.ireg_tok_root_min2]
-              against FINDING 3's [nlink ip = 1].
+              child's [".."] names the parent.  Derived at the zeroing off
+              the TYPE REGISTER: the parent's name record for the child
+              carries [TDir dp] and the child's own ["."] fragment carries
+              [TDir p], and [IregLinkNz.ireg_toks_agree] against the
+              child's authority collapses the two, so [p = dp] and the
+              child's [".."] is a fragment of [dp]'s register.  One region
+              open, no tree fragment.
          (D2) [2 <= bv_unsigned (di_nlink dnd)] -- a directory holding a
-              live subdirectory entry has at least two links.  Derived off
-              the PARENT REGISTER since G3, AFTER (D1) and still before the
-              zeroing: the child's [".."] is an up-pointing unit standing
-              in [dp]'s own register, borrowed out of [ip]'s [ent_toks]
-              ([FsStateEra.ent_toks_era_borrow_at]) and read by
-              [IregLinkNz.ireg_par_up_min2] against [InodeRegion]'s (U2).
-              (D1) is what names that unit [dp]'s, which is why the two
-              readings run in this order.
+              live subdirectory entry has at least two links.  Read off the
+              PARENT's own per-directory exactness
+              ([FsStateInode.node_exact]) once (D1) has shown the removed
+              name is MARKED, i.e. in the parent's marker set: the count is
+              the marker set's size plus one.  That is why the two readings
+              run in this order, and both are before the zeroing.
        ==== *)
     sie_cap_gpr KT1 M3 (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
@@ -6701,8 +6696,7 @@ Section ProofSysUnlinkBody.
     (* FINDING 3, READ AT THE CHILD (durable-disk G5/G6).  [isdirempty] has
        just reported that its live records are its two dots, so nothing in
        it can be MARKED ([ent_dset_ok] admits neither dot name) and its
-       EXACT count stands at ONE.  Until G6 this came off the old ledger's
-       count clause ([DirLinks.dir_links_empty_nlink]). *)
+       EXACT count stands at ONE. *)
     assert (Hnl1 : bv_unsigned (di_nlink dni) = 1).
     { assert (HDi0 : Di = ∅)
         by exact (FsStateEra.ent_dset_ok_dots_only dni bmi dati Di
@@ -6745,15 +6739,12 @@ Section ProofSysUnlinkBody.
                       : mword 64)) 31 0)))) = di_size dnd)
       by (rewrite su_setnl_size; exact Hsz'v).
     (* ===================================================================
-       (D1) AND (D2) FALL HERE, IN THAT ORDER (durable-disk G3).  The old
-       order ran (D2) first, off the ledger's [DirView.dlc_lower] counting
-       [dp]'s d-flavoured record; (D2) now comes off the PARENT REGISTER
-       instead, and the unit it reads is the CHILD's [".."] -- so (D1),
-       which is what names that [".."]'s target, has to come first.
+       (D1) AND (D2) FALL HERE, IN THAT ORDER.  (D2) reads the parent's
+       exactness at the MARKED name, and it is (D1) that shows the name is
+       marked -- so (D1) comes first.
 
-       Nothing else moves: both readings are still BEFORE the zeroing's
-       ghost move, and each borrows its unit out of an [ent_toks] and
-       hands it straight back.
+       Both readings are BEFORE the zeroing's ghost move, and each borrows
+       its unit out of an [ent_toks] and hands it straight back.
        =================================================================== *)
     iDestruct (dlinks_open with "Hdlnkd")
       as "(%Dd & [%Hdokd %Hxactd] & Hetkd)".
@@ -7696,9 +7687,9 @@ Section ProofSysUnlinkBody.
       by (rewrite /E2; apply su_regs_caller; [exact Hcsra | exact HE1regs]).
     (* [ip]'s bundle, RE-MINTED AS THE ORPHAN: the count reached ZERO,
        records 2.. are dead (the isdirempty loop's own conclusion), record
-       0 is the self record, and record 1 goes back GREY -- FINDING 3's
-       re-park, [su_dir_links_orphan] fed by [dir_links_empty_nlink] (V2)
-       + the [blez]'s [1 <=] *)
+       0 is the self record, and record 1 goes back TOKENLESS -- an
+       orphan's dots owe nothing ([FsStateEra.ent_toks_era_orphan]), fed by
+       FINDING 3 and the [blez]'s [1 <=] *)
     iDestruct "Hmapi" as "[Haddrsi Hindi]".
     assert (Hnl2z : bv_unsigned (di_nlink (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dni : mword 16)

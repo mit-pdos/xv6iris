@@ -36,7 +36,7 @@
    most one walk unit, which leaves [iput_units] with six to spare.  The
    CREDITED form is the success tail's business and is applied in the walk.
 
-   NOTHING HERE SPENDS AN [ilink].  The zeroing at +0x8a..+0xa4 is what
+   NOTHING HERE SPENDS A LINK TOKEN.  The zeroing at +0x8a..+0xa4 is what
    releases one, and it is below every branch in this file. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -749,7 +749,7 @@ Section ProofSysUnlinkTails.
   (*  zeroing [writei], so no arm has logged [IBLOCK dp] and none holds a *)
   (*  credit -- the COUNTED [wp_iunlockput_sconf] is what it calls, and   *)
   (*  [SysUnlinkBudget.su_bad_early_closes] is the ledger's word that the *)
-  (*  three are there.  It holds no [ilink] either: the release happens   *)
+  (*  three are there.  It holds no token either: the release happens    *)
   (*  at the zeroing and every branch into [bad:] is above it.            *)
   (*                                                                     *)
   (*  s2 AND s3 ARE ALREADY WHATEVER THE ENTRY MADE THEM.  ARM D reloads  *)

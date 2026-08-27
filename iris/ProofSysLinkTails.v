@@ -25,7 +25,7 @@
    whole of begin_op's ten less the namei walk's at most one, so
    [iput_units] is in hand with six to spare and end_op takes [log_op] at
    any count ([SysLinkBudget]'s ledger stops mattering above the
-   dirlink).  Neither arm has an [ilink] to spend either -- both branch
+   dirlink).  Neither arm has a link token to spend either -- both branch
    BEFORE the [nlink++] mints one.
 
    THE SLOT-3 RELOAD IS PART OF EACH TAIL, not of the epilogue: the two
@@ -338,8 +338,8 @@ Section ProofSysLinkTails.
   (*  test at +0x4c; ARM D is the NLINK_MAX guard at +0x58 -- the arm     *)
   (*  the kernel gained in 117c0e7, and the one whose FALL-THROUGH is     *)
   (*  what makes [SpecIupdate.wp_iupdate_link]'s disequality premise      *)
-  (*  suppliable.  Neither arm has minted an [ilink] (both branch above   *)
-  (*  the [nlink++]), so neither carries a ledger fragment and the        *)
+  (*  suppliable.  Neither arm has minted a link token (both branch      *)
+  (*  above the [nlink++]), so neither carries a fragment and the         *)
   (*  COUNTED iunlockput is what both call.                               *)
   (* ================================================================== *)
   Lemma sl_tail_c `{GEN : GenId} `{CID0 : CpuId}
@@ -1010,12 +1010,12 @@ Section ProofSysLinkTails.
   (*                                                                     *)
   (*  THREE THINGS ABOUT IT.                                             *)
   (*                                                                     *)
-  (*  (1) THE RECORD IS A FRESH EXISTENTIAL AND THE LEDGER IS WHAT        *)
+  (*  (1) THE RECORD IS A FRESH EXISTENTIAL AND THE TOKEN IS WHAT        *)
   (*  CROSSES.  +0x6c unlocked [ip] and this arm re-locks it, so the      *)
   (*  record the [lhu] reads is NOT the one the guard at +0x58 tested --  *)
   (*  another thread may hold the sleeplock in between.  The nonzero      *)
   (*  count [wp_iupdate_unlink]'s Z premise needs therefore cannot come   *)
-  (*  from the walk; it comes from the FRAGMENT, through (L1), by         *)
+  (*  from the walk; it comes from the FRAGMENT, by                       *)
   (*  [IregLinkNz.ireg_tok_nz].  That is the whole reason the token       *)
   (*  exists, exercised here for the first time.                          *)
   (*                                                                     *)
@@ -1414,12 +1414,9 @@ Section ProofSysLinkTails.
     { intros c Hc N2 N8 N9 N18. rewrite (callee_saved_lookup Hcsiu c Hc).
       exact (HP4thr c Hc N2 N8 N9 N18). }
     (* THE PAYLOAD, RE-PARKED AT THE LOWERED RECORD.  Everything pure rides
-       ([sl_setnl] moves one halfword); the ledger big-op rides by
-       [IregLinkNz.dir_links_nlink_drop], whose whole content is that at a
-       nonzero count no ticket in it can be grey. *)
-    (* ...and the whole conjunct is free at a NON-directory: it owns no
-       records, so neither the ledger big-op nor the counting RA's tokens
-       have anything in them (durable-disk 2b-inode-5). *)
+       ([sl_setnl] moves one halfword), and the [dlinks] conjunct is free at
+       a NON-directory: it owns no records, so it holds no fragment at all
+       ([IcacheEscrow.dlinks_not_dir]). *)
     iClear "Hdlnk".
     iAssert (dlinks gfs (bv_unsigned inum) dn' bm dat) as "Hdlnk".
     { iApply (dlinks_not_dir gfs (bv_unsigned inum) dn' bm dat).
@@ -1973,7 +1970,7 @@ Section ProofSysLinkTails.
   (*  been logged since nameiparent -- so both are [false] outright and   *)
   (*  the closure premise loses its credit hypothesis.                    *)
   (*                                                                     *)
-  (*  WHAT IT IS NOT is a route that reaches [bad:] with no [ilink] to    *)
+  (*  WHAT IT IS NOT is a route that reaches [bad:] with no token to      *)
   (*  spend.  The [ip->nlink++] is at +0x5e, well ABOVE nameiparent, so   *)
   (*  the fragment is live on this arm exactly as on E and F and the      *)
   (*  tail's [ip->nlink--] consumes it back.  (Read the disassembly, not  *)

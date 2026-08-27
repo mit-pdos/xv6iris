@@ -1,7 +1,6 @@
 (* ======================================================================= *)
-(*  IregLinkNz.v -- "AN OUTSTANDING [ilink] MEANS A NONZERO COUNT", stated   *)
-(*  at a record the caller NAMES, plus the one [dir_links] move that fact    *)
-(*  unlocks.                                                                *)
+(*  IregLinkNz.v -- "AN OUTSTANDING LINK TOKEN MEANS A NONZERO COUNT",      *)
+(*  stated at a record the caller NAMES.                                    *)
 (* ======================================================================= *)
 
 (*  WHY THIS FILE EXISTS.
@@ -22,19 +21,12 @@
     lock.  The token is what crosses that window, and [ireg_tok_nz] is the
     accessor that reads it.
 
-    [dir_links_nlink_drop] is the resource consequence at the same record.
-    [DirLinks.dir_link_at]'s GREY disjunct carries [di_nlink dn = 0] as its
-    own home condition (§20.17.4), so a record whose count is nonzero is
-    necessarily paying with an [ilink] -- and the whole payload therefore
-    survives a count change untouched.  Without it a re-park after a
-    [nlink--] would have to case on a colour it can refute.
-
-    HOME.  Both belong in [InodeRegion.v] / [DirLinks.v] respectively; they
-    are here because those two files sit under ~350 dependents apiece and an
-    additive lemma inside either costs that cone on every iteration
-    (durable-notes, "the rebuild cone is the dev-loop cost").  Fold them back
-    at a milestone.  Nothing here is sys_link-specific -- sys_unlink's
-    [dp->nlink--] wants exactly the same pair. *)
+    HOME.  This belongs in [InodeRegion.v]; it is here because that file
+    sits under ~350 dependents and an additive lemma inside it costs that
+    cone on every iteration (durable-notes, "the rebuild cone is the
+    dev-loop cost").  Fold it back at a milestone.  Nothing here is
+    sys_link-specific -- sys_unlink's [dp->nlink--] wants the same
+    reading. *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -62,22 +54,17 @@ Section IregLinkNz.
   (*  "A HELD TOKEN MEANS A NONZERO COUNT", AT A RECORD THE CALLER NAMES  *)
   (* ------------------------------------------------------------------ *)
 
-  (* THE COUNTING RA's READING, and it REPLACES the old ledger's (durable-
-     disk lane G, slice 6b).  This used to be [ireg_link_nz] / [_fl]: an
-     [IcacheRef.ilink] (resp. [ilink_fl]) bounded the ledger's [wl+wdu+wdt]
-     below, and (L1) turned that into [1 <= di_nlink].  The same fact off
-     the counting RA is [InodeRegion.ireg_lnk_tok_nz] -- one outstanding
-     [FsStateLink.link_tok] at [z] bounds [z]'s own [di_nlink] below, by
-     the RA's own law -- and it is FLAVOUR-BLIND, so the two old spellings
-     collapse into this one.  Every walk that used to present a colour
-     already holds the token beside it ([SpecIupdate.wp_iupdate_link] pays
-     both out and [_unlink] takes the token back), so no caller gained a
-     premise.
+  (* THE COUNTING RA's READING: [InodeRegion.ireg_lnk_tok_nz] -- one
+     outstanding [FsStateLink.link_tok] at [z] bounds [z]'s own [di_nlink]
+     below, by the RA's own law.  It is FLAVOUR-BLIND, so there is ONE
+     spelling and no cross-product; a walk that spends a count holds the
+     token beside it ([SpecIupdate.wp_iupdate_link] pays it out and
+     [_unlink] takes it back).
 
      Mask-preserving, and everything goes back: the token is BORROWED,
      exactly as the fragment was, because the caller still has to spend it
-     at the flush this fact licences ([ireg_tok_root_min2] below borrows
-     its token the same way). *)
+     at the flush this fact licences ([ireg_tok_root_le] below borrows its
+     token the same way). *)
   (* TWO FRAGMENTS AT ONE INUM AGREE (durable-disk G5, (D1)'s walk lemma).
      The authority is a UNIFORM multiset, so any two held fragments carry
      the SAME value -- and the value is the record's kind.  rmdir reads the
@@ -248,12 +235,12 @@ Section IregLinkNz.
     iDestruct (ireg_boot_open_excl with "Hboot Hopen") as %[].
   Qed.
 
-  (* THE ROOT'S MINIMUM AT A HELD TOKEN (S7-unlink's dir arm, (D1) step 2):
-     the region's unspendable keep-alive token plus ANY token the caller
-     holds put the root's count at TWO or more -- so a directory whose count
-     is ONE is not the root, which is what lets [dir_links_dotdot_out]'s V5'
-     extension name a create-episode for [ip].  FINDING 3's [nlink ip = 1]
-     is the consumer.
+  (* THE ROOT'S MINIMUM AT A HELD TOKEN: the region's unspendable
+     keep-alive token plus ANY token the caller holds put the root's count
+     at TWO or more -- so a directory whose count is ONE is not the root.
+     It is the register's own reading and nothing in this kernel spends it:
+     rmdir's (D1) comes off [ireg_toks_agree] below with no root case at
+     all.
 
      The content is [InodeRegion.ireg_lnk_root_min2], read at the slot's own
      [ireg_lnk]; this is its ACCESSOR, and the token is BORROWED and handed
@@ -324,8 +311,8 @@ Section IregLinkNz.
      [mword_of_int 1] and the two sides are convertible.
 
      A walk that has to say "this inum is (not) the root" -- namex's
-     absolute walk, or [ireg_tok_root_min2]'s consumer -- rewrites with this
-     and is done. *)
+     absolute walk, or [ireg_tok_root_le]'s -- rewrites with this and is
+     done. *)
   Lemma ireg_root_ROOTINO : bv_unsigned ROOTINO = ireg_root.
   Proof. vm_compute. reflexivity. Qed.
 

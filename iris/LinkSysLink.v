@@ -10,12 +10,12 @@
    THE TWO THINGS THE COMPOSITION RESTS ON, both recorded at the point of
    use in SpecSysLink.v's header and machine-checked in SysLinkBudget.v:
 
-   - the LEDGER FRAGMENT is minted and settled inside this function.  The
+   - the LINK FRAGMENT is minted and settled inside this function.  The
      [ip->nlink++; iupdate(ip)] at +0x5e..+0x66 mints one
-     [InodeRegion.ilink] against the count that pays for it; the success
-     arm DEPOSITS it into the parent's [DirLinks.dir_links] at the dirlink,
-     caller-side; every route to [bad:] CONSUMES it back at the
-     [ip->nlink--].  Nothing colour-shaped crosses this interface.
+     [FsStateLink.link_tok] at [ip] against the count that pays for it; the
+     success arm DEPOSITS it into the parent's [IcacheEscrow.dlinks] at the
+     dirlink, caller-side; every route to [bad:] CONSUMES it back at the
+     [ip->nlink--].  Nothing else crosses this interface.
    - dirlink's FOUND arm is payable only through [SpecDirlink]'s separate
      found-arm clause.  sys_link cannot refute that arm the way create does
      -- it never looks the name up before linking it -- and seven from the

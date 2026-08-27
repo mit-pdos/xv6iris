@@ -65,23 +65,23 @@
 
    sys_link is the first SYSCALL-level consumer of the CREDITED iupdate
    pair ([SpecIupdate.wp_iupdate_link] / [wp_iupdate_unlink]) and of the
-   kernel's NLINK_MAX guard arm, so its walk is where the whole link-ledger
+   kernel's NLINK_MAX guard arm, so its walk is where the whole link
    contract layer is exercised end to end.  Two facts about that, because
    they are what the walk is:
 
-   * THE LEDGER FRAGMENT IS MINTED AND SETTLED INSIDE THIS FUNCTION.  The
+   * THE LINK FRAGMENT IS MINTED AND SETTLED INSIDE THIS FUNCTION.  The
      [ip->nlink++; iupdate(ip)] at +0x5e..+0x66 mints one
-     [InodeRegion.ilink] against the count that pays for it; on the success
-     path the [dirlink] at +0x9c lets the caller DEPOSIT it into the
-     parent's [DirLinks.dir_links] ([dir_links_dirlink], caller-side --
-     design/fs-icache.md 20.18 ruling 1 keeps every ledger resource OUT of
-     [SpecDirlink]); on every route to [bad:] the [ip->nlink--; iupdate(ip)]
-     at +0xfa..+0x106 CONSUMES it back.  Nothing colour-shaped crosses this
+     [FsStateLink.link_tok] at [ip] against the count that pays for it; on
+     the success path the [dirlink] at +0x9c lets the caller DEPOSIT it into
+     the parent's [IcacheEscrow.dlinks], caller-side --
+     design/fs-icache.md 20.18 ruling 1 keeps every link resource OUT of
+     [SpecDirlink]; on every route to [bad:] the [ip->nlink--; iupdate(ip)]
+     at +0xfa..+0x106 CONSUMES it back.  Nothing else crosses this
      interface in either direction.
    * THE ORPHAN GUARD IS WHAT MAKES THE DEPOSIT LEGAL.  The [lh a5,74(s2)]
      / [c.beqz] at +0x84..+0x88 -- create's re-check, given to sys_link at
      f60ff58 -- refuses to [dirlink] into a parent a concurrent rmdir has
-     orphaned, which would strand the [ilink] above in a directory whose
+     orphaned, which would strand the fragment above in a directory whose
      [itrunc] discards records without dropping counts.  Its arm is ARM E2,
      a plain [iunlockput(dp); goto bad;], so nothing about it reaches this
      contract except that the [-1] disjunct now has one more way to happen.

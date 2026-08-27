@@ -72,10 +72,10 @@
    the first syscall whose path length is unbounded and whose tail still
    has to pay for an inode free.
 
-   NO COLOUR-LEDGER RESOURCE APPEARS HERE (design/fs-icache.md 20.18
-   ruling 1).  sys_chdir writes no directory record -- it reads a type field
-   and swaps a pointer -- so there is no link-ledger move to make and no
-   [dir_links] obligation to carry.
+   NO LINK RESOURCE APPEARS HERE (design/fs-icache.md 20.18 ruling 1).
+   sys_chdir writes no directory record -- it reads a type field and swaps a
+   pointer -- so there is no count to move and no [IcacheEscrow.dlinks]
+   obligation to carry.
 
    ==== WHAT ITS CALLER MUST HOLD ======================================
 

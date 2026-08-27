@@ -19,21 +19,20 @@
    WHAT THE COMPOSITION RESTS ON, recorded at the point of use in
    SpecSysUnlink.v's header and machine-checked in SysUnlinkBudget.v:
 
-   - the LEDGER FRAGMENTS are released and settled inside this function.
-     The zeroing's [writei] releases the removed record's ticket
-     caller-side ([DirLinks.dir_links_unlink]); the FILE arm spends it at
-     [ip->nlink--], and the T_DIR arm spends the child's [".."] ticket at
-     [dp->nlink--] and the TAGGED parent-record unit -- both halves of the
-     child's parent register -- at [ip->nlink--], which RESETS the register
-     before the inum can be reclaimed.  Nothing colour-shaped crosses this
-     interface.
+   - the LINK FRAGMENTS are released and settled inside this function.
+     The zeroing's [writei] releases the removed record's fragment
+     caller-side, out of the parent's [IcacheEscrow.dlinks]; the FILE arm
+     spends it at [ip->nlink--], and the T_DIR arm spends the child's
+     [".."] fragment at [dp->nlink--] and the removed name record's own
+     fragment at [ip->nlink--], which empties the child's register before
+     the inum can be reclaimed.  Nothing else crosses this interface.
    - the two facts the T_DIR arm needs about the shape of the filesystem --
      (D1) the child's [".."] names the parent, and (D2) a directory holding
      a live subdirectory entry has at least two links -- are DERIVED inside
-     the walk, from the ledger's own parent register and its (T1')/lower
-     count clauses.  They are not premises and they are not axioms; the
-     campaign record is claude-notes/projects/fs-fragments-campaign.md,
-     V4 and V5'. *)
+     the walk: (D1) from [IregLinkNz.ireg_toks_agree] against the child's
+     own ["."] fragment, and (D2) from the parent payload's per-directory
+     exactness ([FsStateInode.node_exact]).  They are not premises and they
+     are not axioms. *)
 From Stdlib Require Import ZArith List.
 (* the whole-function memset spec [MEMSET] is [MemsetArray]
    (LinkMemsetArray), not [LinkMemset.Memset] -- the latter is the
