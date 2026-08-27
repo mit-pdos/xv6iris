@@ -7517,6 +7517,300 @@ explains.
    notation twin (A6.70 ruling 4, still last).
 
 
+### A6.72 THE BARRIER LEAF IS WRITTEN AND THE GATE RUNS AT A FENCE — AND
+### THE PUBLICATION'S LAST MILE IS A THIRD ARM IN THE REGIME, WHICH THE
+### SAME RULING PARKS
+
+Owner ruling of 2026-08-27 (commit `53124a5c`), executed in order.  Items 1
+and the gate's own half are **LANDED AND GREEN**; item 2's remaining cost is
+measured below and it collides with the ruling's own `WpSconfLock` park.
+
+#### (1) `iris/HartBarrier.v` — A6.5's LEAF, AT LAST
+
+`HartLift.v:139` has named it as missing since the lifting port
+("§6's barrier leaf is a SEPARATE rule over the same node, for the proof
+that wants the acquire receipt").  It is now three definitions and two
+rules:
+
+```coq
+  hbar_at / hbar_resume / hbar_at_inv            (* HartLift's F8 style *)
+
+  pub_step (P Q : iProp Σ) :=
+    ∀ g : gstate,
+      ⌜(own_pub (hart_agent cpu_id) g.(glog) <= g.(gtv) cpu_id)%nat⌝ -∗
+      hart_view_lb (g.(gtv) cpu_id) -∗
+      gen_heap_interp g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗ P ==∗
+      gen_heap_interp g.(gmem) ∗ tso_interp_at riscv_eraGS g ∗ Q
+
+  wp_hart_barrier / swp_hart_barrier :
+    mctx C -> hbar_at m = Some bk -> fence_drains bk = true ->
+    gen_cert -∗ pub_step P Q -∗ P -∗ ▷ (Q -∗ …) -∗ …
+```
+
+**THE SHAPE IS A BUPD, NOT A CALLBACK, and that is the design content.**  A
+memory leaf hands the client the bundle inside its own mask-changing fupd
+because the client must ANSWER the event (what value was read, was the write
+blocked).  A barrier has no answer: the step is deterministic and
+state-preserving except for the view.  So the rule does the whole mask dance
+itself — advance (`tso_interp_of_advance`), mint (`tso_interp_of_receipt_at`),
+bridge to the `gstate` face (`tso_interp_of_at_gs`, A6.1a's bridge, the same
+one `HartMStore.wobl_ram_ledger` pays in both directions) — and runs the
+client's bupd at the DRAINED view.  Nothing below `gstate` reaches the
+client.
+
+#### (2) THE PREMISE IS THE DRAIN, NOT THE LOG TOP — AND A6.70's RECORDED
+#### STATEMENT ASKED FOR THE WRONG ONE
+
+This is the tranche's real correction, and it is what makes a FENCE serve at
+all.  Under Ztso `fence_post` takes the view to `max tv (own_pub h log)` —
+**the author's own last message, NOT the top of the log.**  A6.70's
+`kptree_publish` demanded `length glog ≤ gtv cpu_id`, which only an AMO
+delivers, and which at the fence would have needed `TsoMemPa.all_own` — a
+fact about OTHER agents that no client can hold and that A6.4's boot bracket
+exists to state.
+
+**It is not needed.**  What a publisher must show of a byte is that its
+timestamp is under the bound, and a byte registered to the context the hart
+is RUNNING has exactly two possibilities, which are `TsoMemPa.visibleb`'s own
+two arms one tier up:
+
+- **CLEAN**: `llb (ctx_bound_name ξ) t`, so `t ≤ B_ξ ≤ K ≤ gtv cpu_id`
+  through the token's own receipt;
+- **DIRTY**: an entry of the token's dirty set, and `TsoGhost.dirty_ok` says
+  a dirty entry is either under `B_ξ` too **or is THIS HART'S OWN MESSAGE** —
+  whose index is under `own_pub`, which the drain has carried the view past.
+
+`CtxPinMint.ctx_phys_ts_own` is that sentence; `own_pub_ge` (the `foldr Nat.max`
+lower bound, two lines, kept in the leaf rather than in `TsoMemPa`) is the
+only pure step stdpp lacked.
+
+> **AND IT VINDICATES A6.70's `own_context` PARAMETER.**  A6.71 reported the
+> token as "threaded, not consumed — not needed at all".  **That was true
+> only of the log-top form.**  At the drain the token is exactly what pays
+> the bound, so the recorded statement was right and A6.71's amendment 2 is
+> WITHDRAWN.  `kptree_publish_bare` is deleted with it.
+
+#### (3) `iris/WpSconfFencePub.v` — `fence rw,rw` AS A PUBLICATION POINT
+
+`swp_barrier_pub` → `swp_execute_FENCE_pub_S` → `wp_fence_pub_s_sconf`,
+mirroring `WpSconfCtl`'s fence chain with a `pub_step` threaded through.
+Two things worth keeping:
+
+- **rw,rw IS SPELLED CONCRETELY, and a generic pred/succ rule would be
+  FALSE.**  Only four of the model's nine barrier kinds drain
+  (`fence_drains`: the W→R edges) and the dispatch's fallback arm is not a
+  barrier at all.  The nine-way chain is decided here once by
+  `fence_rw_bits`: bits [1:0] of both effective sets are `11` at EITHER
+  value of the FIOM CSR bit, so the arm is `Barrier_RISCV_rw_rw`.
+- **THE LEAF GOES THROUGH `WpSmodeIntr.wp_instr_s_sconf`, NOT
+  `WpSconfEngine.wp_instr_s_gen`, AND THAT IS FORCED.**  The generic
+  engine's step obligation is stated at a **∀-BOUND hart**, and `pub_step`
+  is hart-indexed twice over (its receipt is `hart_view_lb` at THIS hart;
+  the token it spends is `own_context`, which A6.64 found is `CpuId`-indexed
+  too).  So the publishing leaf takes the lower funnel and collapses the
+  binder with `WpNext.wp_next_off_intro` — the `WpSconfSfence` precedent,
+  same reason (`tlb ↦ᵣ` there, the token here).  **It therefore requires
+  `b = false`**, which costs the one caller nothing: `__sync_synchronize`
+  runs in main's boot arm with interrupts off.
+
+> **THE GENERAL RULE, and it is worth carrying past this file:** a leaf that
+> consumes a HART-INDEXED resource cannot go through a ∀-hart engine.  The
+> tell is `Wrong argument name CID` or a `(CID := CIDn)` that will not
+> typecheck; the fix is the lower funnel plus `wp_next_off_intro`, and the
+> price is `b = false`.
+
+#### (4) THE LAST MILE: HART 0 MUST **WALK** BEFORE IT DRAINS, AND THE ONLY
+#### PLACE THAT CAN LIVE IS A THIRD ARM IN THE REGIME
+
+The ruling's item 2 — publish at `__sync_synchronize`, hart 0's pre-fence
+walks at its own UTier table — is right about WHERE the walks discharge and
+is blocked on WHERE THE SLOT SAYS SO.  Measured, in this order:
+
+1. **`main()` has no fence between `kvminit()` and `kvminithart()`.**  The
+   drain is `__sync_synchronize`, six calls later.
+2. **`sfence.vma` cannot serve.**  Re-checked at the model, not from the
+   note: `execute_SFENCE_VMA` bottoms out in `flush_TLB` and emits no
+   `Interface.Barrier` at all.  A6.41 stands.
+3. **No AMO serves either.**  `acquire`'s `amoswap` DOES put the view at the
+   log top (`wp_hart_ram_read_excl`), and `kalloc` runs one per allocation —
+   but `proc_mapstacks`/`kvmmap` write PTEs AFTER the last `kalloc`, so the
+   slots' timestamps are above every AMO in `kvminit`.
+4. **So hart 0 crosses `csrw satp` with an undrained view and walks on its
+   very next instruction fetch** — which is pin-memo §5.6's problem
+   statement verbatim.
+
+`SpecKvminithart` splitting is therefore **not the cost**; it is a
+consequence.  The cost is that hart 0's window must hold the EXCLUSIVE table
+(`KptTree.tlb_inv_pt`, whose `translateAddr` absorption already exists at
+`KptTree.v:1325`) inside its translation slot, and the slot has no arm for
+it: `IntrDefs.strans_res_at` is Bare ∨ KPT, and `SRegime.kpt_res_at` is
+`tlb_snap_ok ∗ kpt_inv ∗ kpt_creds` — every conjunct persistent, none of
+them ownable pre-publication.  **pin-memo §5.6(b) says this in one clause
+("hart 0's window discharges at the exclusive tier with `ledger_vis_own`")
+and prices it as "`ProofMain`'s publication moves", which is an
+underestimate.**
+
+> **THE MEASUREMENT: 14 FILES, ~110 MENTION SITES** —
+> `IntrDefs`, `SRegime`, `WpSmodeIntr`, `WpIntrInv`, `WpSconfMem`,
+> `SmodeCorePt`, `TrampStepPt`, `UservecExitPt`, `UserretEntryPt`,
+> `ProofUart`, `WpPlic`, `WpVirtioDev`, `WpSmodeWfi`, **`WpSconfLock`**.
+>
+> **AND THE LAST ROW IS THE STOP.**  `WpSconfLock` is the parked M4 entry
+> and the same ruling says "do not touch it before the memo lands".  A third
+> arm in `strans_res_at` cannot avoid it.  **So item 2's remainder is
+> blocked on the M4 memo, not on a decision this lane can take** — and it is
+> blocked on the ONE file whose cone (160) makes it the critical path
+> anyway, which is consistent rather than accidental.
+
+**THE ALTERNATIVE, PRICED SO IT IS NOT RE-PROPOSED BLIND.**  pin-memo §5.6's
+option (a) — make the pin's tie two-armed like `TsoCtx.ledger_vis`
+(`B ≤ tv' ∨ h = A`, with `A` the pin's recorded author) — needs no regime
+arm, and hart 0's pre-drain walks discharge by store forwarding exactly as
+its A6.41 story says.  Its cost is the mirror image: `TsoMemPa.ts_elem`
+gains the author, the interp's tie and `pin_ok`'s three laws change (all
+under the whole tree), and **every boot PT-construction store site must KEEP
+the author fragment `ledger_store_ok` hands back** (`BootCarve` / `TransPt` /
+`KptTree`).  The memo recommended (b); (b) is now measured; the choice is
+the owner's with both numbers on the table.
+
+#### WHAT THIS UNBLOCKS IMMEDIATELY, AND WHAT IT DOES NOT
+
+The gate and its site are DONE: `kptree_publish` is stated in `pub_step`'s
+shape, character for character, so the moment hart 0's window has a home the
+publication is one `iApply`.  `ProofMain` stays red on the same line
+(`:996`, the `kpt_inv_alloc` call), now for a NAMED and MEASURED reason
+rather than for a missing lemma.
+
+#### (5) THE `lock_word` ∃-REPLAY — A LATENT FALSITY, FIXED
+#### (`tso-port.md` §0.19′'s ruling; the M4 memo's ruling 4)
+
+Raised from outside this lane and it was real: `WpLock.lock_word lk v` was
+`(lk ↦₄ v)` under the section's AMBIENT `CurCtx`, which makes `lock_inv` —
+and therefore **`is_lock`, the PERSISTENT HANDLE** — ξ-indexed.  §0.12′'s
+park record carries three lock handles (wait / ticks / nextpid) across a
+∀-quantified resume context precisely because `is_lock` is a CLOSED TERM, so
+the ambient index falsified the park rows outright.  It was latent only
+because the `WpSconfLock` cone (160 files, every `is_lock` client and the
+park rows among them) is unreached.
+
+**Landed at main's shape:**
+
+```coq
+  Definition lock_word (lk : mword 64) (v : mword 32) : iProp Σ :=
+    (∃ ξ : CtxId, ctx_word4_pointsto ξ lk (DfracOwn 1) v)%I.
+  Lemma lock_word_intro (lk : mword 64) (v : mword 32) : lk ↦₄ v ⊢ lock_word lk v.
+```
+
+**MEASURED COST: SIX SITES IN TWO FILES**, all of them the INTRODUCTION leg
+(`WpLock` ×5 — `lock_finisher_close`, the Timeless instance and the three
+`newlock`-family mints — and `WpLockAt` ×1); `SpecPanic`'s only mention is a
+comment.  Every one is `iDestruct (lock_word_intro with "Hword")` in front
+of an `iFrame` that was already there.  **The client-facing spellings do not
+move**: the creators still take, and the destroyers still hand back,
+`lk ↦₄ 0` at the caller's own context.
+
+> **AND ONE HALF OF MAIN'S LEMMA DELIBERATELY DOES NOT PORT.**  Main states
+> `lock_word_acc` as a `⊣⊢` and proves the ∃-ELIMINATION with
+> `TsoCtxShim.ctx_word4_{to,of}_mem` — sound at SC, where `ctx` is
+> degenerate, and **FALSE at this machine**: a cell at an unknown ξ licenses
+> no load at ours.  So this tree gets the introduction leg only, and the
+> elimination is the M4 racy-owner-cell entry
+> (`WpSconfLock.wp_ld_lkcpu_lockopen_gen` is its twin one field over).  The
+> note is in the definition's own header so nobody re-derives it by
+> accident.
+
+#### THE M4 MEMO IS RATIFIED, AND IT IS THE SUCCESSOR'S BRIEF
+
+`claude-notes/projects/tso-m4-memo.md` (owner, commit `ebcef079`), both
+probes green, four rulings — recorded here because the tranche sequences by
+cone size and `WpSconfLock` gates **160 files, the largest in the red set**:
+
+1. **DELETE `wp_cld_lkcpu_lockopen_s_sconf`** — zero consumers, both trees.
+2. **THE SPLIT.**  Stores + the AMO ride the parked-record/absorb idiom
+   (already ratified at §0.18′ / A6.66); the two HOLDER reads ride
+   `ledger_vis_own` + `view_lb_0` at `phys_ledger_word` and need **no new
+   law** — the held arm already carries the store gate's `ledger_msg_at`
+   fragment.  **Only `notheld` gets new kit.**
+3. **THE RACY KIT**: `own_last` plus the WINDOW-shaped writer-pin, with all
+   three coverage claims (`win_ok`, the writer-pin, `own_last`) in ONE
+   `ts_elem` option payload on BYTE 0 — no second ghost map.  The
+   byte-keyed form is REJECTED, with the layout computation as the recorded
+   reason.  The memo's §6 mechanical list IS the implementation order:
+   `TsoMemPa`'s probed lemmas verbatim → `TsoGhost` → the `ts_ok` growth →
+   `TsoCtx`'s gates → the `Mobl_ram_exv` S-mode lane (**minding A6.63's
+   node-argument rule**) → `WpLock` / `WpSconfLock` / `ProofHolding`.
+4. **The `lock_word` ∃-replay** — done above.
+
+**THE ACCEPTANCE TEST IS STATED AND IT IS SHARP:** the exported surface
+(`SpecAcquire` / `SpecRelease` / `SpecHolding` / `is_lock` / `locked`) does
+NOT move.
+
+> **AND IT INTERLOCKS WITH (4) ABOVE.**  The publication's last mile wants a
+> third arm in `strans_res_at`, whose blast radius includes `WpSconfLock`;
+> the M4 tranche is the one that opens that file.  So the two are not two
+> queue items competing for position — **M4 is the prerequisite of the
+> publication's last mile**, and taking M4 by cone size also unblocks the
+> boot tail's real cork.  That is why the ordering below puts it where it
+> does.
+
+#### THE CLEAN ROUND, THE RED 12, AND THE QUEUE
+
+**CLEAN ROUND: 1089 of 1333, RED 12** (from A6.71's 1087/12).  `rm -f
+iris/*.{vo,vok,vos,glob}`, model and `kernel-rocq` `.vo` verified fresh, one
+full `-j12 -k`.  The two new files are the whole movement; **the RED SET IS
+UNCHANGED, file for file.**
+
+> **AND THE `lock_word` REPLAY'S OWN ACCEPTANCE TEST PASSED SEPARATELY,
+> WHICH IS THE MEASUREMENT WORTH KEEPING.**  The incremental round that
+> followed it rebuilt `WpLock`'s WHOLE 657-FILE CONE from source and
+> produced **exactly the same twelve red files** — no client moved, no
+> spelling moved.  A definition inside a persistent handle changing from an
+> ambient index to an ∃ is invisible to every consumer, which is the
+> property that made the bug latent and the fix cheap.
+
+**THE RED 12**, with the file count behind each, unchanged from A6.71 except
+for the causes now being sharper:
+
+| file | behind it | cause |
+|---|---|---|
+| `WpSconfLock` | 160 | the M4 tranche — **memo ratified, `tso-m4-memo.md`** |
+| `VcGenS` | 85 | six statements + an induction (A6.63's diagnosis) |
+| `ProofPrintk` | 68 | 2 rodata shim refs — the §0.22′ port |
+| `ProofVirtioDiskRwD` | 66 | the DMA lease lane (A6.70 ruling 3) |
+| `UserMemPt` | 46 | the U-mode payer threading |
+| `UptWalkPt` | 42 | the U-mode payer threading |
+| `UmodeFetch` | 37 | the U-mode payer threading |
+| `UtResFits` | 21 | `ut_res_bare_park`'s abort (M2 park protocol) |
+| `ProofVirtioDiskIntr` | 15 | the DMA lease lane |
+| `ProofSyscall` | 11 | 1 rodata shim ref — the §0.22′ port |
+| `ProofMain` | 5 | the publication's last mile (§(4) above) |
+| `BootCarveMain` | 3 | the boot 25 |
+
+#### THE QUEUE, RE-ORDERED BY WHAT THE MEASUREMENTS SAY
+
+1. **The §0.22′ string-tier port** (A6.71's cross-lane section has the
+   recipe).  Independent of everything below, largest payoff of the
+   independent items (`ProofPrintk` 68 + `ProofSyscall` 11 + the last rodata
+   shim), and it is the only FLIP queued — which is what A6.69's
+   one-flip-at-a-time rule was waiting for.
+2. **The M4 tranche**, to `tso-m4-memo.md` §6's mechanical order.  Gates
+   160 files and is the PREREQUISITE of item 4: the publication's last mile
+   needs a third arm in `strans_res_at`, and `WpSconfLock` is in that arm's
+   blast radius.  Acceptance test: the exported lock surface does not move.
+3. **The U-mode walk lane's `S`/payer threading** — 18 sites, five files,
+   ~125 behind them, template green and adjacent (A6.71).  Independent.
+4. **The publication's last mile** — the exclusive arm (or pin-memo
+   §5.6(a)'s two-armed tie; both priced in §(4) above).  `ProofMain`,
+   `BootChain`, `BootShared` and the boot tail behind it.  **The gate and
+   its site are landed and waiting**; this is the only piece left.
+5. **The boot 25** in `BootCarveMain`: the VA-tier `_ctx` cell family in
+   `BootCarve` (built on `CtxKMap`'s landed `_ro_static` three) plus a
+   `boot_led_ran` premise on the thirteen carve lemmas, split in lockstep
+   with `boot_raw_ran`.  Small payoff (3 files) but it retires 25 of the 29
+   dangling shim names.
+6. `VcGenS`; the DMA/virtio lease lane; the phys notation twin (last).
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
