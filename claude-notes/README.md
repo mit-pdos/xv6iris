@@ -193,6 +193,11 @@ first four were audited against the tree 2026-08-22):
   −46 % wall / −61 % `Qed` / −69 % proof term on the reference conversion. The
   file is the mechanical recipe, the traps, and the scoreboard for the
   remaining 214 files.
+- **[`continuation-folds.md`](projects/continuation-folds.md)** — the tree-wide
+  survey for optimization.md's "fold the block continuation" lever: where the
+  shape still occurs, what each instance is worth, and the expensive files that
+  are NOT instances. ProofSysUnlink (−13.4 %) and the kexec cone (−7.8 %) are
+  landed; `ProofPrintk`'s fourteen lemmas are the richest one left.
 - **[`device-conformance.md`](projects/device-conformance.md)** — the
   device semantics differentially tested against QEMU: one bare-metal image
   run on both machines, the model side EXHIBITING one execution by
