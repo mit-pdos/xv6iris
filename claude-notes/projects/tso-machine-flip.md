@@ -8563,6 +8563,117 @@ The ledger now offers everything the leaves need.  In order:
 160-file cone opens — sweep it and report the honest number when it does.
 
 
+### A6.77 THE SIBLING AU IS A GENERALISATION IN PLACE, NOT A COPY — AND
+### THAT IS THE MEASUREMENT THAT REPLACES A6.74's ESTIMATE
+
+Item (1) of the leaf tier is LANDED AND GREEN, additively.  Items (2)–(4)
+are one atomic unit and are the handoff; §"WHY IT STOPS HERE" says why they
+could not be split.
+
+#### (1) `wp_load_s_sconf_au_dat` — ONE BINDER, ONE PREMISE, ONE TACTIC
+
+A6.74 §(3) priced the phys-datum sibling as "identical to the existing one
+except that the one `iAssert` runs a different gate", and estimated it as a
+~250-line copy of the hazard file's biggest proof.  **The copy is not
+needed.**  Measured: the entire ctx-specific content of
+`wp_load_s_sconf_au`'s 326-line proof is that ONE `iAssert` (the
+`wordw_pointsto_load_c` call).  So the datum abstracts IN PLACE:
+
+```coq
+  Lemma wp_load_s_sconf_au_dat … (Dat : mword (8*width) -> iProp Σ) :
+    …
+    (forall (CIDw : CpuId) img sigma log V (ppn : mword 44) v,
+       (uint ea < 274877906944)%Z ->
+       (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
+       kmap_at (svpn_of ea) ppn KP_rw -∗
+       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
+       Dat v -∗
+       ⌜forall tvr, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+          tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+            (pa_of ppn ea) (Z.to_N width) v⌝) ->
+    … Dat v ∗ (Dat v ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v) … 
+```
+
+and **`wp_load_s_sconf_au` survives below it, character-identical, as the
+instance at `wordw_pointsto`** — so its ~15 in-file wrappers and every
+consumer in the tree are untouched.  One leaf, every route; nothing below
+`gstate` reaches the client (A6.72's barrier-leaf rule holds by
+construction, since the premise is discharged *inside*).
+
+> **`Hload`'s CONCLUSION IS PURE, AND THAT IS LOAD-BEARING.**  It takes the
+> caller's `own_context` without consuming it, because the proof mode
+> keeps every hypothesis handed to a pure assertion — the same property
+> `WpSconfLock`'s evidence premises already rely on.  A phys-datum instance
+> simply ignores that argument: **the ledger tier needs no token**, which
+> is the one respect in which the phys route is CHEAPER than the ctx one,
+> not dearer (A6.64's hazard has one fewer payload spelling to keep in
+> agreement).
+
+**THREE PRE-FLIGHT ITEMS, and each one bit exactly where the coordinator
+said it would:**
+
+- **the `CIDw` binder (A6.64).**  `Hload` must be stated at a `∀`-bound
+  `CIDw` and the discharge applied at `CID` — the ambient spelling prints
+  identically and fails to unify.
+- **`ea` must be spelled `ea`, not its body.**  Writing
+  `add_vec (rget m rs1) (sign_extend' 64 imm)` in the premise makes
+  `iSpecialize` fail against the goal's `kmap_at (svpn_of ea)` — the two
+  print differently and are convertible, and the proof mode wants the
+  former.
+- **an implicit that leaves the statement must leave the binder list.**
+  `{dqm : dfrac}` became uninferrable the moment `Dat` replaced
+  `wordw_pointsto … dqm`; the error (`Cannot infer the implicit parameter
+  dqm`) names the lemma, not the removed occurrence.
+- and the address facts the CLAIM yields inside the leaf (`Hcan`, `Hoff`)
+  have to be handed ON to `Hload`: the wrapper cannot supply them, since
+  they are derived from the claim the leaf opens.
+
+**COST: 281 files rebuilt (`WpSconfMem`'s cone), red set unchanged.**
+
+#### WHY IT STOPS HERE
+
+Items (2)–(4) are **one atomic unit**: reshaping `WpLock.lk_cpu_res` to
+`phys_ledger_word` + the `wpay` fragments turns all three `WpSconfLock`
+leaves red at once, and `ProofHolding`'s two sites follow them.  There is
+no intermediate state in which the tree is green, so starting it without
+the budget to finish would leave a red tree — which is exactly what the
+one-flip-at-a-time discipline forbids.  Item (1) was separable *because it
+is additive*, and it was taken for that reason.
+
+**1088 of 1296, RED 9 — UNCHANGED**, over the round that rebuilt the AU's
+cone.  No `Admitted`, no `admit`; the one `Abort` is still
+`UsertrapRes.ut_res_bare_park`.
+
+#### HANDOFF: THE ATOMIC REMAINDER
+
+Everything below it is landed and waiting — the `_exv` nodes, all four read
+gates, the store gate, and now the datum-parametric AU.
+
+1. **`WpLock.lk_cpu_res` at `phys_ledger_word`**: the `∃ ξ` goes away, the
+   cell becomes eight `phys_ledger_wpay` fragments naming one
+   `(base, 8, z, cp, own)`, and the held arm keeps the `ledger_vis` residue
+   (`ledger_store_ok`'s `ledger_msg_at` fragment).  Give the lock WORD a
+   degenerate `tw_n = 4` payload in the same edit: `ledger_win_img_cover`
+   then supplies `ledger_read_any_ok`'s premise for it, closing A6.75
+   §(3)'s named residual.
+2. **`WpSconfLock`**: `wp_ld_lkcpu_lockopen_gen` and the two
+   `wp_clw_lockopen_*` leaves move to `wp_load_s_sconf_au_dat` with
+   `Dat := ` the ledger fragments and `Hload := ` the route's gate —
+   holder `ledger_read_bytes_vis_ok`, `notheld`
+   `ledger_read_racy_word_ok`, free path `ledger_read_any_ok`.  Delete
+   `wp_cld_lkcpu_lockopen_s_sconf` (memo ruling 1).  Stores/AMO on the
+   parked record and `ledger_store_wpay_ok`.  `lock_claims`' surviving
+   `TsoCtxShim.ctx_word_of_mem` dies here (it exists only to put the
+   ∃-cell back).
+3. **`ProofHolding`**'s 2 call sites, statements unchanged.
+
+**ACCEPTANCE, unchanged:** the exported lock surface does not move, and
+`WpSconfLock`'s 160-file cone opens — sweep it and report the honest number
+when it does.
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
