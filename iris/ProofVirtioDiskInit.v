@@ -2153,9 +2153,13 @@ Section ProofVirtioDiskInit.
     assert (Hp118 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x116) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x118)) by pcs.
     iEval (rewrite Hp118) in "Hpc".
     iDestruct (ctx_word_pointsto_aligned_p with "Hdesc") as %Haldesc.
-    (* stage 2: the ↦₄ tower is still raw, so the cell crosses here and back *)
+    (* M1 stage 2: [word_pointsto_split4] is InstrBytes' RAW law, so the
+       8-byte cell leaves the ledger for the split and the half that faces
+       the flipped 4-byte leaf comes back through the shim. *)
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hdesc") as "Hdesc".
     iDestruct (word_pointsto_split4 with "Hdesc") as "[Hdlo Hdhi]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hdlo") as "Hdlo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hdhi") as "Hdhi".
     assert (Hdad0 : add_vec (H2 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = disk_desc)
       by (rewrite HH2s1; bvc).
     iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x118)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) H2 (K - 4)%nat (word_lo pd) false
@@ -2193,6 +2197,8 @@ Section ProofVirtioDiskInit.
     assert (HH4a4 : H4 !!! Regidx (mword_of_int 14 : mword 5) = sign_extend' 64 (word_hi pd : mword 32)) by (peel; reflexivity).
     assert (HH4a5 : H4 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; exact HH3a5).
     assert (HH4s1 : H4 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact HH3s1).
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hdlo") as "Hdlo".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hdhi") as "Hdhi".
     iDestruct (word_pointsto_join4 _ _ _ _ Haldesc with "Hdlo Hdhi") as "Hdesc".
     iDestruct (TsoCtxShim.ctx_word_of_mem with "Hdesc") as "Hdesc".
     iEval (rewrite vdi_word_join) in "Hdesc".

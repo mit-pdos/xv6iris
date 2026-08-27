@@ -567,6 +567,13 @@ Section VdrwbDefs.
   Proof.
     intros Hal11 Hal12. iIntros "(Hx0 & Hx1 & Hx2 & Hxp)".
     iDestruct "Hxp" as (vp) "Hxp".
+    (* M1 stage 2: [word_pointsto_join4] is InstrBytes' RAW law, so the four
+       flipped halves leave the ledger for the join and the doubleword comes
+       back through [ctx_word_of_mem] below. *)
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hx0") as "Hx0".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hx1") as "Hx1".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hx2") as "Hx2".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hxp") as "Hxp".
     iDestruct (word_pointsto_join4 (pa_stk sp0 12) (DfracOwn 1) v0 v1 Hal12
                  with "Hx0 Hx1") as "H12".
     iDestruct (word_pointsto_join4 (pa_stk sp0 11) (DfracOwn 1) v2 vp Hal11

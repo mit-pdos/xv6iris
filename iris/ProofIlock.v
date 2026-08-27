@@ -2333,7 +2333,7 @@ Section ProofIlockMain.
     iApply fupd_wp.
     iMod (iref_live_gen_load_au ⊤ k s g ltac:(solve_ndisj) Hk
             with "Hitbl Hrt") as (vp) "[Hcellp Hbackp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry k))
                  (DfracOwn 1) vp ltac:(lia) with "Hcellp") as "#Hclaim0".
     iMod ("Hbackp" with "Hcellp") as "[%Hbp Hrt]".
     iModIntro.

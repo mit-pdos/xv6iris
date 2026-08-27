@@ -92,6 +92,21 @@ Require Import SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
+(* M1 FLIP, STAGE 2 (tso-machine-flip.md A6.15).  This file OWNS the two
+   identity cells ([i_dev]/[i_inum], the [↦₄] pair inside [inode_ident]) and
+   they are held in HALVES by IcacheEscrow's arms and by IcacheInv's
+   [islot_rest] -- both of which import TsoCtx.  After the [↦₄] flip a ctx
+   arm would meet a raw [inode_ident], which is not a seam that can be
+   crossed: it is ONE TIER DISAGREEING WITH ITSELF.  The cheapest place to
+   decide the cluster's tier is the file that owns the cells, so this file
+   takes the flip.  (The alternative -- a per-file [Notation] re-declaring
+   [↦₄] raw in IcacheInv/IcacheEscrow -- only moves the disagreement, since
+   InodeInv's [i_size] IS ctx and IcacheEscrow holds both families; and a
+   NON-Local [Notation] escapes to importers and silently un-flips theirs.)
+   The import must come LAST, after RiscvPtsto, for the notations to flip. *)
+Require Import TsoCtx.
+Require TsoCtxShim.   (* the ∃-context wrapper's SC-only elimination; see the
+                         [IcacheHeldAny] section at the end of the file *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -2544,6 +2559,7 @@ Section IcacheRef.
   Context `{!riscvGS Σ, !icacheG Σ, !lockG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
+  Context `{XI : CurCtx}.   (* M1 stage 2: [inode_ident]'s two [↦₄] cells *)
 
   (* An entry's IDENTITY -- the two cells iget writes into a recycled slot
      and nobody writes again while the slot is live.  Fractional, so a
@@ -2556,26 +2572,26 @@ Section IcacheRef.
     inode_ident k dq1 d1 n1 -∗ inode_ident k dq2 d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
   Proof.
     iIntros "[Hd1 Hn1] [Hd2 Hn2]".
-    iDestruct (word4_pointsto_agree with "Hd1 Hd2") as %->.
-    iDestruct (word4_pointsto_agree with "Hn1 Hn2") as %->.
+    iDestruct (ctx_word4_pointsto_agree with "Hd1 Hd2") as %->.
+    iDestruct (ctx_word4_pointsto_agree with "Hn1 Hn2") as %->.
     done.
   Qed.
 
   (* the fraction JOIN for one cell, as a wand.  A bare
-     [rewrite word4_pointsto_frac_split] at a call site rewrites the whole
+     [rewrite ctx_word4_pointsto_frac_split] at a call site rewrites the whole
      [envs_entails] -- hypotheses included -- and silently re-splits the very
      fragments being joined (durable-notes' proofmode rule); inside this
      lemma the two hypotheses' dfracs are bare variables, so the pattern
      matches the goal only. *)
   Local Lemma word4_frac_join (a : Arch.pa) (q1 q2 : Qp) (w : bv 32) :
     a ↦₄{DfracOwn q1} w -∗ a ↦₄{DfracOwn q2} w -∗ a ↦₄{DfracOwn (q1 + q2)} w.
-  Proof. iIntros "H1 H2". rewrite word4_pointsto_frac_split. iFrame. Qed.
+  Proof. iIntros "H1 H2". rewrite ctx_word4_pointsto_frac_split. iFrame. Qed.
 
   Lemma inode_ident_split k q1 q2 dev inum :
     inode_ident k (DfracOwn (q1 + q2)) dev inum ⊣⊢
     inode_ident k (DfracOwn q1) dev inum ∗ inode_ident k (DfracOwn q2) dev inum.
   Proof.
-    rewrite /inode_ident !word4_pointsto_frac_split.
+    rewrite /inode_ident !ctx_word4_pointsto_frac_split.
     iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
   Qed.
 
@@ -3022,6 +3038,7 @@ Section IcacheHeld.
   Context `{!riscvGS Σ, !icacheG Σ, !lockG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
+  Context `{XI : CurCtx}.   (* M1 stage 2, through [inode_refp] *)
 
   (* A REFERENCE, KEYED BY THE POINTER a caller actually holds -- the form
      [FileInv]'s payload and [ProcInv.cwd_ref] carry, and the exact
@@ -3234,3 +3251,127 @@ Section IcacheHeld.
   Qed.
 
 End IcacheHeld.
+
+(* ===================================================================== *)
+(*  M1 FLIP, STAGE 2: THE ∃-CONTEXT WRAPPER FOR THE cinv BODY.            *)
+(*                                                                        *)
+(*  [FileInvDefs.inode_pay] holds [cinv fileipN γx (inode_held_short v Q)] *)
+(*  and §0.16′'s whole point is that [inode_pay] -- hence [file_core],     *)
+(*  [file_payload], [file_pay] and the ftable payload's [CtxMorph] -- is a *)
+(*  CLOSED TERM.  Since stage 2 [inode_ident]'s two cells are [↦₄] and     *)
+(*  therefore context-indexed, so [inode_held_short] is; an invariant body *)
+(*  is not updatable, so no transport can repair a ξ-indexed one           *)
+(*  (tso-port.md §0.12′).  The ∃ closes the body again -- the same answer  *)
+(*  [WpLock.lk_cpu_res], [WpLock.lock_word] and [FileInvDefs.off_cell]     *)
+(*  give -- and, as there, the ∃-ELIMINATION is the SC-only step and the   *)
+(*  M4 racy-kit worklist entry.                                           *)
+(*                                                                        *)
+(*  The section binds NO ambient [CurCtx]: the wrapper must never capture  *)
+(*  one (§0.8′ rule 3).                                                    *)
+(* ===================================================================== *)
+Section IcacheHeldAny.
+  Context `{!riscvGS Σ, !icacheG Σ, !lockG Σ}.
+  Context `{GEN : GenId}.
+  Context `{ICFG : icfg}.
+
+  Definition inode_held_short_any (v : mword 64) (s : Qp) : iProp Σ :=
+    (∃ ξ : CtxId, inode_held_short (XI := ξ) v s)%I.
+
+  Global Instance inode_held_short_any_timeless v s :
+    Timeless (inode_held_short_any v s).
+  Proof. rewrite /inode_held_short_any. apply _. Qed.
+
+  Lemma inode_held_short_any_intro `{XI : CurCtx} (v : mword 64) (s : Qp) :
+    inode_held_short v s -∗ inode_held_short_any v s.
+  Proof. iIntros "H". iExists cur_ctx. iExact "H". Qed.
+
+  (* THE ∃-ELIMINATION, and it is the SC-only half.  At TSO a ledger fact is
+     pinned to its context and the ∃ hides WHICH, so nothing can dominate it;
+     the honest form is the borrow window's [TsoCtx.ctx_absorb] against the
+     opener's own [own_context] and hart receipt, exactly as the bcache
+     escrow does (§0.17′).  Quarantined through the shim until that sweep. *)
+  Lemma inode_held_short_any_elim `{XI : CurCtx} (v : mword 64) (s : Qp) :
+    inode_held_short_any v s -∗ inode_held_short v s.
+  Proof.
+    iIntros "[%ξ H]". rewrite /inode_held_short.
+    iDestruct "H" as (k qt qi inum) "(%Hv & %Hk & %Hb & %Hq & [Hrs Hru])".
+    iExists k, qt, qi, inum. iFrame "%".
+    rewrite /inode_refp_short /inode_ref_short.
+    iDestruct "Hrs" as "(Hfrag & Hlv & Hid & Hsl)".
+    rewrite /inode_ident. iDestruct "Hid" as "[Hd Hi]".
+    iDestruct (TsoCtxShim.ctx_word4_reindex _ ξ cur_ctx with "Hd") as "Hd".
+    iDestruct (TsoCtxShim.ctx_word4_reindex _ ξ cur_ctx with "Hi") as "Hi".
+    iFrame "Hru Hfrag Hlv Hsl Hd Hi".
+  Qed.
+
+  (* ---- THE TRANSPORTS.  [inode_ident]'s two cells are [↦₄], so everything
+     over them re-indexes along [ctx_dom] rather than being ξ-constant; these
+     are what [FileInvDefs]'s payload chain needs (M1 flip, stage 2). ---- *)
+  Global Instance inode_ident_morph (k : nat) (dq : dfrac) (dev inum : mword 32) :
+    CtxMorph (λ ξ, inode_ident (XI := ξ) k dq dev inum).
+  Proof.
+    iIntros (ξ ξ') "Hd [Hdv Hin]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdv") as "[Hd Hdv]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hin") as "[Hd Hin]".
+    iFrame.
+  Qed.
+
+  Global Instance inode_shr_gen_morph (k : nat) (s : Qp) (dev inum : mword 32)
+      (g : gname) :
+    CtxMorph (λ ξ, inode_shr_gen (XI := ξ) k s dev inum g).
+  Proof.
+    iIntros (ξ ξ') "Hd (Hid & Hlv & Hsl)".
+    iDestruct (inode_ident_morph k (DfracOwn s) dev inum ξ ξ'
+                 with "Hd Hid") as "[Hd Hid]".
+    iFrame.
+  Qed.
+
+  Global Instance inode_shr_held_gen_morph (v : mword 64) (s : Qp) (g : gname) :
+    CtxMorph (λ ξ, inode_shr_held_gen (XI := ξ) v s g).
+  Proof.
+    iIntros (ξ ξ') "Hd (%k & %inum & %Hv & %Hk & %Hb & Hs)".
+    iDestruct (inode_shr_gen_morph k s icfg_dev inum g ξ ξ'
+                 with "Hd Hs") as "[Hd Hs]".
+    iFrame "Hd". iExists k, inum. by iFrame.
+  Qed.
+
+  Global Instance inode_ref_gen_bare_morph (k : nat) (q : Qp)
+      (dev inum : mword 32) (g : gname) :
+    CtxMorph (λ ξ, inode_ref_gen_bare (XI := ξ) k q dev inum g).
+  Proof.
+    iIntros (ξ ξ') "Hd (Hf & Hlv & Hid)".
+    iDestruct (inode_ident_morph k (DfracOwn q) dev inum ξ ξ'
+                 with "Hd Hid") as "[Hd Hid]".
+    iFrame.
+  Qed.
+
+  Global Instance inode_refp_morph (k : nat) (q : Qp) (dev inum : mword 32) :
+    CtxMorph (λ ξ, inode_refp (XI := ξ) k q dev inum).
+  Proof.
+    iIntros (ξ ξ') "Hd [[Htok Hid] Hru]". rewrite /inode_refp /inode_ref.
+    iDestruct (inode_ident_morph k (DfracOwn q) dev inum ξ ξ'
+                 with "Hd Hid") as "[Hd Hid]".
+    iFrame.
+  Qed.
+
+  Global Instance inode_held_morph (v : mword 64) :
+    CtxMorph (λ ξ, inode_held (XI := ξ) v).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /inode_held.
+    iDestruct "H" as (k q inum) "(%H1 & %H2 & %H3 & Hr)".
+    iDestruct (inode_refp_morph k q icfg_dev inum ξ ξ'
+                 with "Hd Hr") as "[Hd Hr]".
+    iFrame "Hd". iExists k, q, inum. by iFrame.
+  Qed.
+
+  Global Instance inode_shr_gen_bare_morph (k : nat) (s : Qp)
+      (dev inum : mword 32) (g : gname) :
+    CtxMorph (λ ξ, inode_shr_gen_bare (XI := ξ) k s dev inum g).
+  Proof.
+    iIntros (ξ ξ') "Hd (Hid & Hlv)".
+    iDestruct (inode_ident_morph k (DfracOwn s) dev inum ξ ξ'
+                 with "Hd Hid") as "[Hd Hid]".
+    iFrame.
+  Qed.
+
+End IcacheHeldAny.

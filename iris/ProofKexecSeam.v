@@ -432,22 +432,17 @@ Section KexecBFrame.
     rewrite (bb_split3 (KTR := KT1) a o 2 r n f (DfracOwn 1) Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
-    { iApply (word2_pointsto_intro (KTR := KT1) _ _ _ Hal).
-      (* stage 2: [word2_pointsto] is still the RAW byte tower while this run
-         is the flipped (ctx) one -- the seam is named here. *)
-      iDestruct (TsoCtxShim.ctx_buf_to_mem KT1 cur_ctx (pa_add a o) 2
-                   (fun j => f (o + j)%nat) (DfracOwn 1) with "Hmid") as "Hmid".
+    { iApply (ctx_word2_pointsto_intro (KTR := KT1) _ _ _ _ Hal).
+      (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 16 f o 2 ii ltac:(lia) Hlt). reflexivity. }
     (* the FIRST [rewrite] already split the run inside the giveback wand's
        conclusion too, so there is nothing left to split here. *)
     iIntros "Hw".
-    iDestruct (word2_pointsto_bytes with "Hw") as "Hw".
+    iDestruct (ctx_word2_pointsto_bytes with "Hw") as "Hw".
     iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
-    (* stage 2 again, the other way: raw halfword bytes back into the run *)
-    iApply (TsoCtxShim.ctx_buf_of_mem KT1 cur_ctx (pa_add a o) 2
-              (fun j => f (o + j)%nat) (DfracOwn 1)).
+    (* ...and the other way, likewise GONE. *)
     iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
     rewrite (le_at_nth_byte 16 f o 2 ii ltac:(lia) Hlt). reflexivity.
@@ -466,20 +461,15 @@ Section KexecBFrame.
     rewrite (bb_split3 a o 4 r n f (DfracOwn 1) Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
-    { iApply (word4_pointsto_intro (KTR := KT1) _ _ _ Hal).
-      (* stage 2: [word4_pointsto] is still the RAW byte tower while this run
-         is the flipped (ctx) one -- the seam is named here. *)
-      iDestruct (TsoCtxShim.ctx_buf_to_mem KT1 cur_ctx (pa_add a o) 4
-                   (fun j => f (o + j)%nat) (DfracOwn 1) with "Hmid") as "Hmid".
+    { iApply (ctx_word4_pointsto_intro (KTR := KT1) _ _ _ _ Hal).
+      (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 32 f o 4 ii ltac:(lia) Hlt). reflexivity. }
     iIntros "Hw".
-    iDestruct (word4_pointsto_bytes with "Hw") as "Hw".
+    iDestruct (ctx_word4_pointsto_bytes with "Hw") as "Hw".
     iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
-    (* stage 2 again, the other way: raw word bytes back into the run *)
-    iApply (TsoCtxShim.ctx_buf_of_mem KT1 cur_ctx (pa_add a o) 4
-              (fun j => f (o + j)%nat) (DfracOwn 1)).
+    (* ...and the other way, likewise GONE. *)
     iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
     rewrite (le_at_nth_byte 32 f o 4 ii ltac:(lia) Hlt). reflexivity.

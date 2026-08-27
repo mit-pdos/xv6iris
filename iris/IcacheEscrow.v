@@ -227,13 +227,13 @@ Section IcacheEscrow.
      timeless -- but several are guarded by a [decide], so the instances
      have to be discharged by hand rather than found. *)
 
-  Global Instance word2_pointsto_timeless (ktr : CurKtier) (a : Arch.pa) (dq : dfrac) (w : bv 16) :
+  Global Instance ctx_word2_pointsto_timeless (ktr : CurKtier) (a : Arch.pa) (dq : dfrac) (w : bv 16) :
     Timeless (word2_pointsto (KTR := ktr) a dq w).
-  Proof. rewrite /word2_pointsto. apply _. Qed.
+  Proof. rewrite /ctx_word2_pointsto. apply _. Qed.
 
-  Global Instance word2_pointsto_timeless' (ktr : ktier) (a : Arch.pa) (dq : dfrac) (w : bv 16) :
+  Global Instance ctx_word2_pointsto_timeless' (ktr : ktier) (a : Arch.pa) (dq : dfrac) (w : bv 16) :
     Timeless (word2_pointsto (KTR := ktr) a dq w).
-  Proof. exact (word2_pointsto_timeless ktr a dq w). Qed.
+  Proof. exact (ctx_word2_pointsto_timeless ktr a dq w). Qed.
 
   Global Instance inode_meta_timeless (ip : mword 64) (d : dinode) :
     Timeless (inode_meta ip d).
@@ -269,11 +269,11 @@ Section IcacheEscrow.
     a ↦₄ w1 -∗ a ↦₄{dq} w2 -∗ False.
   Proof.
     iIntros "H1 H2".
-    rewrite !word4_pointsto_unfold.
+    rewrite !ctx_word4_pointsto_unfold.
     iDestruct "H1" as "[_ H1]". iDestruct "H2" as "[_ H2]".
     change (seq 0 4) with ([0; 1; 2; 3]%nat).
     iDestruct "H1" as "[Hb1 _]". iDestruct "H2" as "[Hb2 _]".
-    iDestruct (mem_pointsto_ne with "Hb1 Hb2") as %Hne.
+    iDestruct (ctx_pointsto_ne with "Hb1 Hb2") as %Hne.
     iPureIntro. exact (Hne eq_refl).
   Qed.
 
@@ -1457,7 +1457,7 @@ Section IcacheEscrow.
      THE IDENTITY FRACTION IS NOT DECORATION EITHER: the +0x70 park has to
      pin the arm's existentially-bound [dev]/[inum] to the cells it is putting
      back, and on the LEFT that pin is [ic_dep_own_ident]'s.  Here it is this
-     conjunct, read with [word4_pointsto_agree] exactly as there.  It is a
+     conjunct, read with [ctx_word4_pointsto_agree] exactly as there.  It is a
      FRACTION, not the ½ discriminator halves: itrunc keeps those.
 
      AND IT IS STATED AT THE DESCRIPTOR, exactly as [ic_dep_own] is.  The
@@ -1924,8 +1924,8 @@ Section IcacheEscrow.
     iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
     - iDestruct "Hpk" as (dev' inum' v ga)
         "(Hid & Hin & Hvld & Hpay & Hmid & Hgid)".
-      iDestruct (word4_pointsto_agree with "Hrd Hid") as %<-.
-      iDestruct (word4_pointsto_agree with "Hrn Hin") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hrd Hid") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hrn Hin") as %<-.
       iDestruct ("Hresb" with "[$Hrd $Hrn]") as "Hown".
       rewrite /ic_payload_arm.
       iDestruct "Hpay" as "[(Hpay & Hoff & Hhalf) | Hrcpt]"; last first.
@@ -2029,8 +2029,8 @@ Section IcacheEscrow.
           cbn in Hdg. discriminate. }
       iDestruct "Hres" as "[Hown Hhalf]".
       iDestruct (ic_dep_own_ident with "Hown") as (f) "[[Hrd Hrn] Hresb]".
-      iDestruct (word4_pointsto_agree with "Hrd Hid") as %->.
-      iDestruct (word4_pointsto_agree with "Hrn Hin") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hrd Hid") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hrn Hin") as %->.
       iDestruct ("Hresb" with "[$Hrd $Hrn]") as "Hown".
       (* THE PARKED ARM'S 1/2 COMES BACK OUT OF THE DESCRIPTOR (§17.3 (A1)):
          a parker holds no [live_frac] of its own, so the descriptor's
@@ -2194,8 +2194,8 @@ Section IcacheEscrow.
     - iDestruct "Hpk" as (dev' inum' v ga)
         "(Hidv & Hin & Hvld & Hpay & Hmidt & Hgid)".
       iDestruct "Hid" as "[Hidd Hidn]".
-      iDestruct (word4_pointsto_agree with "Hidd Hidv") as %<-.
-      iDestruct (word4_pointsto_agree with "Hidn Hin") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hidd Hidv") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hidn Hin") as %<-.
       iModIntro. iFrame "Hhalf Htok Hidd Hidn".
       iSplitR "".
       { iExists v, ga. iFrame. }
@@ -2295,8 +2295,8 @@ Section IcacheEscrow.
     - iDestruct "Hpk" as (dev' inum' v ga)
         "(Hidv & Hin & Hvld & Hpay & Hmidt & Hgid)".
       iDestruct "Hid" as "[Hidd Hidn]".
-      iDestruct (word4_pointsto_agree with "Hidd Hidv") as %<-.
-      iDestruct (word4_pointsto_agree with "Hidn Hin") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hidd Hidv") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hidn Hin") as %<-.
       iModIntro. iFrame "Hhalf Hfrq Hsel Hidd Hidn".
       iSplitR "".
       { iExists v, ga. iFrame. }
@@ -2389,7 +2389,7 @@ Section IcacheEscrow.
       iDestruct (ic_id_agree with "Hgf Hgt") as %(Hc & _ & _). discriminate.
     - iDestruct "Hvg" as (devA inum' w) "(Hidv & Hin & Hvld & Hraw & Hmidt & Hgf')".
       iDestruct (ic_id_agree with "Hgf Hgf'") as %(_ & <- & <-).
-      iDestruct (word4_pointsto_half_join with "HinT Hin") as "Hin".
+      iDestruct (ctx_word4_pointsto_half_join with "HinT Hin") as "Hin".
       iMod (ic_id_flip cn k false true devT inumT devN inumN with "Hgf Hgf'")
         as "[Hg1 Hg2]".
       iModIntro. iFrame "Hin Hidv Hraw Hmidt Hg1 Hg2".
@@ -2522,7 +2522,7 @@ Section IcacheEscrow.
     iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt".
     iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
       as "[Hgf1 Hgf2]".
-    iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
+    iDestruct (ctx_word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
     (* the payload splits into the cells the empty arm keeps and the bundle
        the pool takes back *)
     iAssert (inode_raw (ientry k) ∗ ipool_shape_np γfs γi cov logstart inum)%I
@@ -2684,7 +2684,7 @@ Section IcacheEscrow.
     iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hrc".
     iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
       as "[Hgf1 Hgf2]".
-    iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
+    iDestruct (ctx_word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
     iModIntro.
     iSplitR "Hgf2 Hrc"; [| iSplitL "Hgf2"; [iExact "Hgf2" | iExact "Hrc"]].
     iApply ic_close_empty. rewrite /ic_empty_arm.
@@ -2745,7 +2745,7 @@ Section IcacheEscrow.
     iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hcnt Hmir #Hesc Htk Hdv Hfv Htop".
     iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
       as "[Hgf1 Hgf2]".
-    iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
+    iDestruct (ctx_word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
     iModIntro.
     iSplitR "Hgf2 Hcnt Hmir Htk Hdv Hfv Htop";
       [| iSplitL "Hgf2"; [iExact "Hgf2" |]].
@@ -2824,8 +2824,8 @@ Section IcacheEscrow.
     iDestruct "Hid" as "[Hrd Hrn]".
     iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
     - iDestruct "Hpk" as (dev' inum' v ga) "(Hidv & Hin & Hvld & Hpay & Hmid & Hgid)".
-      iDestruct (word4_pointsto_agree with "Hrd Hidv") as %<-.
-      iDestruct (word4_pointsto_agree with "Hrn Hin") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hrd Hidv") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hrn Hin") as %<-.
       iDestruct (ic_payload_arm_decide_frz with "Hpre Hpay") as "(Hpre & Hrc & Hsel)".
       iFrame "Hpre Hrd Hrn Htok Hrc Hsel".
       iExists v. iFrame.
@@ -2899,7 +2899,7 @@ Section IcacheEscrow.
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum.
   Proof.
     iIntros "Hmt Hgid Hid Hin Hvld Hpay Hlv Hpend Hoff".
-    iDestruct (word4_pointsto_half_split with "Hin") as "[Hin1 Hin2]".
+    iDestruct (ctx_word4_pointsto_half_split with "Hin") as "[Hin1 Hin2]".
     iSplitR "Hin2"; [| iExact "Hin2"].
     iLeft. rewrite /ic_parked.
     iExists dev, inum, false, g.
@@ -3037,11 +3037,11 @@ Section IcacheEscrow.
     a ↦₄ w1 -∗ a ↦₄{dq} w2 -∗ False.
   Proof.
     iIntros "H1 H2".
-    rewrite !word4_pointsto_unfold.
+    rewrite !ctx_word4_pointsto_unfold.
     iDestruct "H1" as "[_ H1]". iDestruct "H2" as "[_ H2]".
     change (seq 0 4) with ([0; 1; 2; 3]%nat).
     iDestruct "H1" as "[Hb1 _]". iDestruct "H2" as "[Hb2 _]".
-    iDestruct (mem_pointsto_ne with "Hb1 Hb2") as %Hne.
+    iDestruct (ctx_pointsto_ne with "Hb1 Hb2") as %Hne.
     iPureIntro. exact (Hne eq_refl).
   Qed.
 
@@ -3502,14 +3502,304 @@ Section IcacheEscrow.
        ([∗ list] k ∈ seq 0 NINODE, islot2 cn M ci k) ∗
        ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci))%I.
 
+End IcacheEscrow.
+
+(* ===================================================================== *)
+(*  M1 FLIP, STAGE 2: THE itable2 LOCK'S PAYLOAD IS λ-CONVERTED, for the  *)
+(*  reason [IcacheInv.itable_pay] records -- the slot arms hold            *)
+(*  [inode_ident] halves, which are [↦₄] cells since the flip.  The        *)
+(*  section binds no ambient the λ could capture (§0.8′ rule 3).           *)
+(* ===================================================================== *)
+(* ===================================================================== *)
+(*  M1 FLIP, STAGE 2: THE ESCROW BODY'S TRANSPORT AND ITS INVARIANT.       *)
+(*                                                                        *)
+(*  The five arms hold [i_dev]/[i_inum]/[i_valid] and (through             *)
+(*  [inode_raw]) the dinode field cells -- all [↦₄]/[↦₂], hence            *)
+(*  context-indexed since the flip.  [ic_escrow] is a BARE [inv] over the  *)
+(*  body, so [FsReady.fs_ready]'s [CtxMorph] cannot get at it by           *)
+(*  transport: invariant bodies are not updatable (tso-port.md §0.12′).    *)
+(*  What DOES cross is Iris's [inv_iff]: at SC the body at two contexts is *)
+(*  provably EQUIVALENT (the shim's [ctx_dom_sc] against the body's own    *)
+(*  [CtxMorph], both directions), and [inv_iff] rewrites the handle.       *)
+(*  THAT EQUIVALENCE IS THE SC-ONLY STEP and dies with the shim; the       *)
+(*  honest form is the escrow-as-parked-record idiom [BioInv.buf_escrow]   *)
+(*  already runs (§0.17′), and converting this escrow to it is the M4      *)
+(*  worklist entry.                                                        *)
+(* ===================================================================== *)
+Section IcacheEscrowMorph.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
+  Context `{GEN : GenId}.
+  Context `{ICFG : icfg}.
+
+  Global Instance ic_unloaded_morph (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (k : nat) (inum : mword 32) :
+    CtxMorph (λ ξ : CtxId, ic_unloaded (XI := ξ) γfs γi cov logstart k inum).
+  Proof.
+    iIntros (ξ ξ') "Hd [Hraw Hp]". rewrite /ic_unloaded.
+    iDestruct (inode_raw_morph (ientry k) ξ ξ' with "Hd Hraw") as "[Hd Hraw]".
+    iFrame.
+  Qed.
+
+  Global Instance ic_loaded_morph (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (k : nat) (inum : mword 32)
+      (dn : dinode) (bm : blkmap) :
+    CtxMorph (λ ξ : CtxId, ic_loaded (XI := ξ) γfs γi cov logstart k inum dn bm).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ic_loaded.
+    iDestruct "H" as (data)
+      "(%H1 & %H2 & %H3 & %H4 & %H5 & Hdl & Hera & Hmeta & Haddr & Hdv & Hfv)".
+    iDestruct (inode_meta_morph (ientry k) dn ξ ξ'
+                 with "Hd Hmeta") as "[Hd Hmeta]".
+    iDestruct (inode_addrs_morph (ientry k) (bm_cells bm) ξ ξ'
+                 with "Hd Haddr") as "[Hd Haddr]".
+    iFrame "Hd". iExists data. by iFrame.
+  Qed.
+
+  Global Instance ic_payload_np_morph (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (k : nat) (inum : mword 32)
+      (g : gname) (v : bool) :
+    CtxMorph (λ ξ : CtxId, ic_payload_np (XI := ξ) γfs γi cov logstart k inum g v).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ic_payload_np. destruct v.
+    { iDestruct "H" as (dn bm) "[Hl Hty]".
+      iDestruct (ic_loaded_morph γfs γi cov logstart k inum dn bm ξ ξ'
+                   with "Hd Hl") as "[Hd Hl]".
+      iFrame "Hd". iExists dn, bm. iFrame. }
+    iDestruct "H" as "[Hu Hty]".
+    iDestruct (ic_unloaded_morph γfs γi cov logstart k inum ξ ξ'
+                 with "Hd Hu") as "[Hd Hu]".
+    iFrame.
+  Qed.
+
+  Global Instance ic_payload_arm_morph (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (k : nat) (inum : mword 32)
+      (g : gname) (v : bool) :
+    CtxMorph (λ ξ : CtxId, ic_payload_arm (XI := ξ) γfs γi cov logstart k inum g v).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ic_payload_arm.
+    iDestruct "H" as "[[Hp Hrest] | Hfrz]"; [| iFrame ].
+    iDestruct (ic_payload_np_morph γfs γi cov logstart k inum g v ξ ξ'
+                 with "Hd Hp") as "[Hd Hp]".
+    iFrame "Hd". iLeft. iFrame.
+  Qed.
+
+  Global Instance ic_dep_own_morph (k : nat) (d : ic_dep) (dev inum : mword 32) :
+    CtxMorph (λ ξ : CtxId, ic_dep_own (XI := ξ) k d dev inum).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ic_dep_own.
+    destruct d as [|q dv nu g|s dv nu g|qf dv nu]; [ iFrame | | | iFrame ].
+    - iDestruct "H" as "[%Hp H]".
+      iDestruct (inode_ref_gen_bare_morph k q dev inum g ξ ξ'
+                   with "Hd H") as "[Hd H]".
+      iFrame "Hd". by iFrame.
+    - iDestruct "H" as "[%Hp H]".
+      iDestruct (inode_shr_gen_bare_morph k s dev inum g ξ ξ'
+                   with "Hd H") as "[Hd H]".
+      iFrame "Hd". by iFrame.
+  Qed.
+
+  Global Instance ic_dep_res_morph (k : nat) (d : ic_dep) (dev inum : mword 32) :
+    CtxMorph (λ ξ : CtxId, ic_dep_res (XI := ξ) k d dev inum).
+  Proof.
+    iIntros (ξ ξ') "Hd [Ho Hh]". rewrite /ic_dep_res.
+    iDestruct (ic_dep_own_morph k d dev inum ξ ξ' with "Hd Ho") as "[Hd Ho]".
+    iFrame.
+  Qed.
+
+  Global Instance ic_out_frz_morph (k : nat) (d : ic_dep) (dev inum : mword 32) :
+    CtxMorph (λ ξ : CtxId, ic_out_frz (XI := ξ) k d dev inum).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ic_out_frz.
+    destruct d as [|q dv nu g|s dv nu g|qf dv nu]; try (iFrame; done).
+    iDestruct "H" as "(%Hp & Hf & Hid & Hrest)".
+    iDestruct (inode_ident_morph k (DfracOwn qf) dev inum ξ ξ'
+                 with "Hd Hid") as "[Hd Hid]".
+    iFrame "Hd". by iFrame.
+  Qed.
+
+  Global Instance ic_parked_morph (cn : ic_names) (γfs : fs_names)
+      (γi : gname) (cov : gset Z) (logstart : Z) (k : nat) :
+    CtxMorph (λ ξ : CtxId, ic_parked (XI := ξ) cn γfs γi cov logstart k).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ic_parked.
+    iDestruct "H" as (dev inum v g) "(Hdv & Hin & Hvl & Harm & Hmid & Hid)".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdv") as "[Hd Hdv]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hin") as "[Hd Hin]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hvl") as "[Hd Hvl]".
+    iDestruct (ic_payload_arm_morph γfs γi cov logstart k inum g v ξ ξ'
+                 with "Hd Harm") as "[Hd Harm]".
+    iFrame "Hd". iExists dev, inum, v, g. iFrame.
+  Qed.
+
+  Global Instance ic_out_morph (cn : ic_names) (k : nat) :
+    CtxMorph (λ ξ : CtxId, ic_out (XI := ξ) cn k).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ic_out.
+    iDestruct "H" as (dd dev inum) "(Hdep & Harm & Hmid & Hid)".
+    iAssert (ctx_dom ξ ξ' ∗
+             (ic_dep_res (XI := ξ') k dd dev inum
+              ∨ ic_out_frz (XI := ξ') k dd dev inum))%I
+      with "[Hd Harm]" as "[Hd Harm]".
+    { iDestruct "Harm" as "[H|H]".
+      - iDestruct (ic_dep_res_morph k dd dev inum ξ ξ' with "Hd H") as "[Hd H]".
+        iFrame "Hd". iLeft. iExact "H".
+      - iDestruct (ic_out_frz_morph k dd dev inum ξ ξ' with "Hd H") as "[Hd H]".
+        iFrame "Hd". iRight. iExact "H". }
+    iFrame "Hd". iExists dd, dev, inum. iFrame.
+  Qed.
+
+  Global Instance ic_mid_arm_morph (cn : ic_names) (γfs : fs_names)
+      (γi : gname) (cov : gset Z) (logstart : Z) (k : nat) :
+    CtxMorph (λ ξ : CtxId, ic_mid_arm (XI := ξ) cn γfs γi cov logstart k).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ic_mid_arm.
+    iDestruct "H" as (dev inum w) "(Hdv & Hin & Hvl & Hun & Hid)".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdv") as "[Hd Hdv]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hin") as "[Hd Hin]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hvl") as "[Hd Hvl]".
+    iDestruct (ic_unloaded_morph γfs γi cov logstart k inum ξ ξ'
+                 with "Hd Hun") as "[Hd Hun]".
+    iFrame "Hd". iExists dev, inum, w. iFrame.
+  Qed.
+
+  Global Instance ic_empty_arm_morph (cn : ic_names) (k : nat) :
+    CtxMorph (λ ξ : CtxId, ic_empty_arm (XI := ξ) cn k).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ic_empty_arm.
+    iDestruct "H" as (dev inum w) "(Hdv & Hin & Hvl & Hraw & Hmid & Hid)".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdv") as "[Hd Hdv]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hin") as "[Hd Hin]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hvl") as "[Hd Hvl]".
+    iDestruct (inode_raw_morph (ientry k) ξ ξ' with "Hd Hraw") as "[Hd Hraw]".
+    iFrame "Hd". iExists dev, inum, w. iFrame.
+  Qed.
+
+  Global Instance ic_held_morph (cn : ic_names) (k : nat) :
+    CtxMorph (λ ξ : CtxId, ic_held (XI := ξ) cn k).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ic_held.
+    iDestruct "H" as (dev inum w) "(Hdv & Hin & Hvl & Hmid & Hid)".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdv") as "[Hd Hdv]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hin") as "[Hd Hin]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hvl") as "[Hd Hvl]".
+    iFrame "Hd". iExists dev, inum, w. iFrame.
+  Qed.
+
+  Global Instance ic_escrow_body_morph (cn : ic_names) (γfs : fs_names)
+      (γi : gname) (cov : gset Z) (logstart : Z) (k : nat) :
+    CtxMorph (λ ξ : CtxId, ic_escrow_body (XI := ξ) cn γfs γi cov logstart k).
+  Proof.
+    rewrite /ic_escrow_body.
+    exact (ctx_morph_or _ _ (ic_parked_morph cn γfs γi cov logstart k)
+             (ctx_morph_or _ _ (ic_out_morph cn k)
+                (ctx_morph_or _ _ (ic_mid_arm_morph cn γfs γi cov logstart k)
+                   (ctx_morph_or _ _ (ic_empty_arm_morph cn k)
+                      (ic_held_morph cn k))))).
+  Qed.
+
+  (* THE SC-ONLY EQUIVALENCE AND THE INVARIANT REWRITE.  See the block
+     above: [ctx_dom_sc] is the shim's, so each use is an M4 entry. *)
+  Lemma ic_escrow_body_reindex (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (k : nat) (ξ ξ' : CtxId) :
+    ic_escrow_body (XI := ξ) cn γfs γi cov logstart k -∗
+    ic_escrow_body (XI := ξ') cn γfs γi cov logstart k.
+  Proof.
+    iIntros "H".
+    iDestruct (ctx_morph ξ ξ' with "[] H") as "[_ $]".
+    iApply TsoCtxShim.ctx_dom_sc.
+  Qed.
+
+  Global Instance ic_escrow_morph (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (k : nat) :
+    CtxMorph (λ ξ : CtxId, ic_escrow (XI := ξ) cn γfs γi cov logstart k).
+  Proof.
+    iIntros (ξ ξ') "Hd #Hinv". rewrite /ic_escrow. iFrame "Hd".
+    iApply (inv_iff with "Hinv").
+    iIntros "!> !>". iSplit.
+    - iIntros "H". iApply (ic_escrow_body_reindex with "H").
+    - iIntros "H". iApply (ic_escrow_body_reindex with "H").
+  Qed.
+
+  Global Instance ic_escrows_morph (cn : ic_names) (γfs : fs_names)
+      (γi : gname) (cov : gset Z) (logstart : Z) :
+    CtxMorph (λ ξ : CtxId, ic_escrows (XI := ξ) cn γfs γi cov logstart).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ic_escrows.
+    iApply (ctx_morph_big_sepL (seq 0 NINODE)
+              (λ _ (k : nat) (ξ0 : CtxId),
+                 ic_escrow (XI := ξ0) cn γfs γi cov logstart k)
+              (λ _ k, ic_escrow_morph cn γfs γi cov logstart k)
+              ξ ξ' with "Hd H").
+  Qed.
+
+End IcacheEscrowMorph.
+
+Section IcacheTable2Pay.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
+  Context `{GEN : GenId}.
+  Context `{ICFG : icfg}.
+
+  Global Instance islot_empty_morph (cn : ic_names) (k : nat) :
+    CtxMorph (λ ξ : CtxId, islot_empty (XI := ξ) cn k).
+  Proof.
+    iIntros (ξ ξ') "Hd (%dev & %inum & Hc & Hid)". rewrite /islot_empty.
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hc") as "[Hd Hc]".
+    iFrame "Hd". iExists dev, inum. iFrame.
+  Qed.
+
+  Global Instance islot2_morph (cn : ic_names) (M : gmap nat (Qp * positive))
+      (ci : gmap nat (mword 32 * mword 32)) (k : nat) :
+    CtxMorph (λ ξ : CtxId, islot2 (XI := ξ) cn M ci k).
+  Proof.
+    rewrite /islot2. destruct (M !! k) as [[q n]|]; destruct (ci !! k) as [[dev inum]|];
+      try (iIntros (ξ ξ') "Hd H"; iFrame; done).
+    - iIntros (ξ ξ') "Hd (Hr & Hs & Hid & Hcnt & Hfrz)".
+      iDestruct (islot_rest_at_morph k q dev inum ξ ξ' with "Hd Hr")
+        as "[Hd Hr]".
+      iFrame.
+    - iIntros (ξ ξ') "Hd H".
+      iApply (islot_empty_morph cn k ξ ξ' with "Hd H").
+  Qed.
+
+  Global Instance itable_res2_morph (cn : ic_names) (γfs : fs_names)
+      (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
+    CtxMorph (λ ξ : CtxId, itable_res2 (XI := ξ) cn γfs γi cov logstart nib dv).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /itable_res2.
+    iDestruct "H" as (M ci) "(Hh & %Hw1 & %Hw2 & Hsa & Hpool & Hsl & Hip)".
+    iDestruct (ctx_morph_big_sepL (seq 0 NINODE)
+                 (λ _ (k : nat) (ξ0 : CtxId), islot2 (XI := ξ0) cn M ci k)
+                 (λ _ k, islot2_morph cn M ci k)
+                 ξ ξ' with "Hd Hsl") as "[Hd Hsl]".
+    iFrame "Hd". iExists M, ci. by iFrame.
+  Qed.
+
+  Definition itable_pay2 (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32)
+      : CtxId -> iProp Σ :=
+    λ ξ : CtxId, itable_res2 (XI := ξ) cn γfs γi cov logstart nib dv.
+
+  Global Instance itable_pay2_morph cn γfs γi cov logstart nib dv :
+    CtxMorph (itable_pay2 cn γfs γi cov logstart nib dv).
+  Proof. rewrite /itable_pay2. apply _. Qed.
+
   Definition is_itable2 (γl : gname) (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) : iProp Σ :=
-    is_lock γl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dv }>.
+    is_lock γl itable_lock "itable"%string
+      (itable_pay2 cn γfs γi cov logstart nib dv).
 
   Global Instance is_itable2_persistent γl cn γfs γi cov logstart nib dv :
     Persistent (is_itable2 γl cn γfs γi cov logstart nib dv).
   Proof. apply _. Qed.
+
+End IcacheTable2Pay.
+
+Section IcacheEscrow2.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
+  Context `{GEN : GenId}.
+  Context `{ICFG : icfg}.
+  Context `{XI : CurCtx}.
 
   (* the slot accessor a WRITER needs: BOTH pure maps may come back changed,
      provided they changed only at [k].  [IcacheInv.islots_acc_upd]'s shape
@@ -3589,7 +3879,7 @@ Section IcacheEscrow.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-End IcacheEscrow.
+End IcacheEscrow2.
 
 (* ===================================================================== *)
 (*  7.  ALLOCATION OF THE TOKEN FAMILIES                                  *)

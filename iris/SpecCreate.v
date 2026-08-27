@@ -463,7 +463,7 @@ Section CreateSpec.
      caller re-form and spend the reference.  Factored out because
      sys_open, sys_mkdir and sys_mknod all consume it and none of them
      should have to re-spell it. *)
-  Definition create_locked (cn : ic_names) (γfs : fs_names) (γi : gname)
+  Definition create_locked `{XI : CurCtx} (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (pidv : mword 32)
       (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
@@ -498,7 +498,7 @@ Section CreateSpec.
      site in ProofCreate.v -- [iSplitL]/[iExact] is free, the same fix as
      [IcacheEscrow.ic_mk_loaded] for the same reason (optimization.md,
      "Framing"). *)
-  Lemma create_locked_mk cn γfs γi cov logstart dev pidv k qi s g inum dn bm
+  Lemma create_locked_mk `{XI : CurCtx} cn γfs γi cov logstart dev pidv k qi s g inum dn bm
       γil γisl :
     is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
     sleeplocked_q γisl s (i_lock (ientry k)) pidv -∗

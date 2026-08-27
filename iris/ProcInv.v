@@ -14,7 +14,7 @@
      process (sys_getpid, acquiresleep).  That is FileInv's discipline 2, and
      it takes the same answer: a points-to FRACTION, half resident in the lock
      resource, half travelling with the runner.  Agreement between the halves
-     is [word4_pointsto_agree] -- no ghost algebra.
+     is [ctx_word4_pointsto_agree] -- no ghost algebra.
    * [sz]/[pagetable]/[trapframe]/[ofile]/[cwd]/[name] are written by the
      running process with NO lock held (sys_sbrk's [myproc()->sz += n],
      sys_chdir, fdalloc, exec).  So the invariant can retain no fraction of
@@ -1188,13 +1188,13 @@ Section ProcInv.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]".
     iFrame "Hcwd Hq1". iIntros (v') "Hcwd Hq1".
     rewrite /proc_priv_nocwd /proc_fields.
     cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
     iSplitR; [done|]. iSplitR; [done|].
-    rewrite Hq word4_pointsto_frac_split. iFrame "Hq1 Hq2".
+    rewrite Hq ctx_word4_pointsto_frac_split. iFrame "Hq1 Hq2".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
     iFrame.
@@ -1226,9 +1226,9 @@ Section ProcInv.
   Proof.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
-    iIntros "Hq1". rewrite /proc_priv_nocwd Hq word4_pointsto_frac_split.
+    iIntros "Hq1". rewrite /proc_priv_nocwd Hq ctx_word4_pointsto_frac_split.
     iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
 
@@ -1339,9 +1339,9 @@ Section ProcInv.
   Proof.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
-    iIntros "Hq1". rewrite /proc_priv /proc_priv_core Hq word4_pointsto_frac_split.
+    iIntros "Hq1". rewrite /proc_priv /proc_priv_core Hq ctx_word4_pointsto_frac_split.
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
@@ -1458,7 +1458,7 @@ Section ProcInv.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]".
     iSplitL "Hcwd"; [iExact "Hcwd"|].
     (* [iExact], not [iFrame] -- see [proc_priv_cwd]. *)
@@ -1469,7 +1469,7 @@ Section ProcInv.
     cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|].
-    rewrite Hq word4_pointsto_frac_split. iFrame "Hq1 Hq2".
+    rewrite Hq ctx_word4_pointsto_frac_split. iFrame "Hq1 Hq2".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
     iSplitL "Hpt"; [iExact "Hpt"|].
@@ -1690,9 +1690,9 @@ Section ProcInv.
   Proof.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
-    iIntros "Hq1". rewrite /proc_priv_core Hq word4_pointsto_frac_split.
+    iIntros "Hq1". rewrite /proc_priv_core Hq ctx_word4_pointsto_frac_split.
     iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
 
@@ -1904,7 +1904,7 @@ Section ProcInv.
   Proof.
     iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) [%Hlen Ho]]".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hq1 Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
@@ -1913,7 +1913,7 @@ Section ProcInv.
     iSplitR "Ho".
     { iSplitR; [iPureIntro; exact Hszb|].
       iSplitR; [iPureIntro; exact Hbel|].
-      rewrite Hq word4_pointsto_frac_split.
+      rewrite Hq ctx_word4_pointsto_frac_split.
       iFrame "Hq1 Hq2 Hf Hpt Htfp Hc Hft". }
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
@@ -2025,28 +2025,28 @@ Section ProcInv.
     proc_priv γf pa pid V -∗ p_pid pa ↦₄{dq} pid' -∗ ⌜pid = pid'⌝.
   Proof.
     iIntros "[(_ & _ & Hpid & _) _] Hother".
-    iApply (word4_pointsto_agree with "Hpid Hother").
+    iApply (ctx_word4_pointsto_agree with "Hpid Hother").
   Qed.
 
   (* The two halves of [p->pid], joined and split ([RiscvPtsto]'s
-     [word4_pointsto_half] is the 1/2 + 1/2 split itself).  allocproc is the one
+     [ctx_word4_pointsto_half] is the 1/2 + 1/2 split itself).  allocproc is the one
      function that holds BOTH -- the invariant's permanent half out of
      [SchedCtx.proc_pub] and the dormant block's -- and so the one function
      that may WRITE the cell.  Joining first tells it the two halves agree,
-     which is what [word4_pointsto_agree] is for; splitting after the store
+     which is what [ctx_word4_pointsto_agree] is for; splitting after the store
      is what hands one half back to the invariant and one to [proc_priv]. *)
   Lemma p_pid_join (pa : mword 64) (p1 p2 : mword 32) :
     p_pid pa ↦₄{DfracOwn (1/2)} p1 -∗ p_pid pa ↦₄{DfracOwn (1/2)} p2 -∗
     ⌜p1 = p2⌝ ∗ p_pid pa ↦₄ p1.
   Proof.
     iIntros "H1 H2".
-    iDestruct (word4_pointsto_agree with "H1 H2") as %<-.
-    iSplit; [done|]. rewrite word4_pointsto_half. iFrame.
+    iDestruct (ctx_word4_pointsto_agree with "H1 H2") as %<-.
+    iSplit; [done|]. rewrite ctx_word4_pointsto_half. iFrame.
   Qed.
 
   Lemma p_pid_split (pa : mword 64) (v : mword 32) :
     p_pid pa ↦₄ v -∗ p_pid pa ↦₄{DfracOwn (1/2)} v ∗ p_pid pa ↦₄{DfracOwn (1/2)} v.
-  Proof. rewrite word4_pointsto_half. iIntros "$". Qed.
+  Proof. rewrite ctx_word4_pointsto_half. iIntros "$". Qed.
 
   (* =================================================================== *)
   (* The DORMANT shape: what the lock invariant holds at UNUSED/ZOMBIE.   *)
@@ -2063,7 +2063,7 @@ Section ProcInv.
   (* [pid] is existential here rather than an index: the invariant's OWN half
      of the cell is always resident (SchedCtx's [proc_pub]), and two halves of
      the same points-to agree for free, so indexing would only duplicate a
-     fact [word4_pointsto_agree] already gives.  Keeping [st] and [pid] both
+     fact [ctx_word4_pointsto_agree] already gives.  Keeping [st] and [pid] both
      out makes [proc_slots] a function of the state alone, which is what makes
      [proc_slots_recast] hold in BOTH directions within a guard class. *)
   (* ------------------------------------------------------------------- *)
@@ -2434,6 +2434,10 @@ Section ProcInvMorph.
     iFrame "Hd Hs". done.
   Qed.
 
+  Global Instance cwd_ref_morph (v : mword 64) :
+    CtxMorph (λ ξ : CtxId, cwd_ref (XI := ξ) v).
+  Proof. rewrite /cwd_ref. apply _. Qed.
+
   Global Instance proc_priv_core_morph (pa : mword 64) (pid : mword 32)
       (V : pprivate) :
     CtxMorph (λ ξ : CtxId, proc_priv_core (XI := ξ) pa pid V).
@@ -2444,6 +2448,10 @@ Section ProcInvMorph.
       as "[Hd Hf]".
     iDestruct (proc_pt_at_morph pa (pv_upt V) ξ ξ' with "Hd Hpt") as "[Hd Hpt]".
     iDestruct (first_tok_morph ξ ξ' with "Hd Hft") as "[Hd Hft]".
+    (* [p_pid] is a [↦₄] cell: ξ-indexed since M1 stage 2 *)
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hpid") as "[Hd Hpid]".
+    (* the cwd reference carries [inode_ident]'s two [↦₄] cells *)
+    iDestruct (cwd_ref_morph (pv_cwd V) ξ ξ' with "Hd Hcwd") as "[Hd Hcwd]".
     iFrame "Hd Hpid Hf Hpt Htfp Hcwd Hft". done.
   Qed.
 

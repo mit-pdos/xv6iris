@@ -53,7 +53,7 @@ Section SleepLockAt.
   Proof.
     iIntros "[Hlfree Hfree] #Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
     iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
-    iMod (newlock_at E p.1 (sl_lk slk) "sleep lock"%string <{ sl_res_gen p.2 slk R H }>
+    iMod (newlock_at E p.1 (sl_lk slk) "sleep lock"%string (λ ξ : CtxId, sl_res_gen (XI := ξ) p.2 slk R H)
             with "Hlfree Hlnm Hlkw Hcpu [Hw Htok Hha HR]") as "#Hlk".
     { iApply (sl_res_close_free with "Hw Htok Hha HR"). }
     iModIntro. iApply (is_sleeplock_gen_intro with "Hsnm Hlk").

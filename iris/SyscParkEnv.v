@@ -72,7 +72,7 @@ Section SyscParkEnv.
      carries it: nothing outside allocpid ever names it, and a parker that
      had to thread it would be threading a name it cannot otherwise use. *)
   Definition sysc_park_extra (γtk : gname) : iProp Σ :=
-    ((∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }>) ∗
+    ((∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ))) ∗
      procs_avail None ∗
      is_tickslock γtk ∗
      console_ready)%I.
@@ -110,7 +110,7 @@ Section ParkWorld.
        console_ready ∗
        (* [sysc_park_extra]'s other two rows, so that this bundle covers all
           of it: the nextpid lock and the sealed slot ledger *)
-       (∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }>) ∗
+       (∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ))) ∗
        procs_avail None ∗
        wire_inv ∗
        kmap_at tramp_vpn tramp_ppn KP_rx ∗

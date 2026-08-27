@@ -881,7 +881,7 @@ Section ProofSysChdirBody.
   (* the two per-slot projections out of the boot families, at the copies
      THIS contract names ([ic_escrows] is IcacheEscrow's, [ic_sleeplocks]
      SpecDirlink's -- see the worklist's trap 3). *)
-  Lemma sc_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Lemma sc_esc_acc `{XI : CurCtx} (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k

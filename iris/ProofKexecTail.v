@@ -399,30 +399,30 @@ Section KexecAFrame.
   Lemma kxc_word4_of_named (a : Arch.pa) (g : nat -> bv 8) :
     is_aligned_paddr (Physaddr a) 4 = true ->
     ([∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ[KT1] g j) ⊢
-    word4_pointsto (KTR := KT1) a (DfracOwn 1) (Z_to_bv 32 (le_at g 0 4)).
+    ctx_word4_pointsto (KTR := KT1) cur_ctx a (DfracOwn 1) (Z_to_bv 32 (le_at g 0 4)).
   Proof.
     intro Hal. iIntros "H".
-    iApply (word4_pointsto_intro (KTR := KT1) a (DfracOwn 1) _ Hal).
+    iApply (ctx_word4_pointsto_intro (KTR := KT1) cur_ctx a (DfracOwn 1) _ Hal).
     iApply (big_sepL_impl with "H"). iIntros "!>" (i j Hij) "Hb".
     assert (Hj : (j < 4)%nat).
     { apply lookup_seq in Hij. lia. }
     rewrite (le_at_nth_byte 32 g 0 4 j ltac:(lia) Hj).
-    (* stage 2: the ↦₄ tower is still raw, so its bytes cross the seam. *)
-    cbn [Nat.add]. iApply (TsoCtxShim.ctx_pointsto_to_mem with "Hb").
+    (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
+    cbn [Nat.add]. iExact "Hb".
   Qed.
 
   Lemma kxc_named_of_word4 (a : Arch.pa) (g : nat -> bv 8) :
-    word4_pointsto (KTR := KT1) a (DfracOwn 1) (Z_to_bv 32 (le_at g 0 4)) ⊢
+    ctx_word4_pointsto (KTR := KT1) cur_ctx a (DfracOwn 1) (Z_to_bv 32 (le_at g 0 4)) ⊢
     [∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ[KT1] g j.
   Proof.
-    rewrite (word4_pointsto_unfold (KTR := KT1)). iIntros "[_ H]".
+    rewrite (ctx_word4_pointsto_unfold (KTR := KT1)). iIntros "[_ H]".
     iApply (big_sepL_impl with "H"). iIntros "!>" (i j Hij) "Hb".
     assert (Hj : (j < 4)%nat).
     { apply lookup_seq in Hij. lia. }
     assert (Hw : (8 * Z.of_nat 4 <= Z.of_N 32)%Z) by lia.
     iEval (rewrite (le_at_nth_byte 32 g 0 4 j Hw Hj); cbn [Nat.add]) in "Hb".
-    (* stage 2: raw ↦₄ bytes back into the flipped ↦ₘ run. *)
-    iApply (TsoCtxShim.ctx_pointsto_of_mem with "Hb").
+    (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
+    iExact "Hb".
   Qed.
 
   (* ---- the 50-slot middle (14..63) as ustack | elf | ph+2 ---- *)

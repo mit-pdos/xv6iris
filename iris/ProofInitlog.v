@@ -32,7 +32,7 @@
 
    * THE FROZEN CELLS ARE PERSISTED BEFORE THE FIRST CALLEE.  log.start and
      log.dev are written at +0x2c / +0x30 and then discarded to
-     [DfracDiscarded] ([RiscvPtsto.word4_pointsto_persist]) on the spot --
+     [DfracDiscarded] ([RiscvPtsto.ctx_word4_pointsto_persist]) on the spot --
      which is exactly [LogInv.log_frozen], the context both committer-only
      helpers take (they run with no lock held, and at their call sites there
      is no lock yet).
@@ -542,7 +542,7 @@ Section InitlogDefs.
   Qed.
 
   (* the 30 header cells, re-formed from the decoded run and the junk tail *)
-  Lemma il_cells_join (bs : list (bv 8)) (nh : nat) :
+  Lemma il_cells_join `{XI : CurCtx} (bs : list (bv 8)) (nh : nat) :
     (nh <= LOGBLOCKS)%nat ->
     ([∗ list] i ↦ w ∈ il_W bs nh, lh_block i ↦₄ w) -∗
     ([∗ list] i ∈ seq nh (LOGBLOCKS - nh), ∃ wj : SailStdpp.Values.mword 32, lh_block i ↦₄ wj) -∗
@@ -571,7 +571,7 @@ Section InitlogDefs.
 
   (* the client's own [fs_chalf] half against the handle's machinery half
      pins the bytes bread returned -- for either payload polarity *)
-  Lemma il_pay_agree (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma il_pay_agree `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32) (z : Z)
       (bs bsl bsd : list (bv 8)) (d : bool) :
     uint bno = z ->
@@ -1670,8 +1670,8 @@ Section ProofInitlog.
     { rgne. rewrite HT1s1. apply trunc32_sext64. }
     iEval (rewrite Hsv2) in "Hdevc".
     (* ---- FREEZE: the two cells go persistent, giving [log_frozen] ---- *)
-    iMod (word4_pointsto_persist with "Hstc") as "#Hstp".
-    iMod (word4_pointsto_persist with "Hdevc") as "#Hdvp".
+    iMod (ctx_word4_pointsto_persist with "Hstc") as "#Hstp".
+    iMod (ctx_word4_pointsto_persist with "Hdevc") as "#Hdvp".
     iAssert (log_frozen logstart dev) as "#Hfroz".
     { rewrite /log_frozen. iSplitL; [iExact "Hdvp" | iExact "Hstp"]. }
     assert (Hpp34 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x30) : mword 64) 4
@@ -2705,7 +2705,7 @@ Section ProofInitlog.
        the caller already owns the free ghost state of -- the era fupd's
        [lock_ghost_alloc] minted it as [ln_lk γ], so this is a FILL, not a
        mint. *)
-    iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string <{ log_res (fs_dstep riscv_dview_name) γ bn γfs cov logstart }>
+    iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string (log_pay (fs_dstep riscv_dview_name) γ bn γfs cov logstart)
             with "Hlkf Hlnm Hlock Hcpu Hres") as "#Hislk".
     iAssert (log_ctx γ bn γfs cov logstart dev)%I as "#Hctx".
     { rewrite /log_ctx. iExists (fs_dstep riscv_dview_name). rewrite /log_ctx_at.

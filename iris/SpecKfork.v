@@ -239,7 +239,7 @@ Definition wp_kfork_sconf_body
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+  is_lock γp alp_pid_lock "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ)) -∗
   is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
   is_ftable γl γf -∗
   is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗

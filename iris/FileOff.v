@@ -137,12 +137,20 @@ Section FileOff.
   Proof.
     iIntros (HE) "[#Hinv Hoc] Hip Hmk Hlv".
     iMod (cinv_acc _ _ _ _ _ HE with "Hinv Hoc") as "(>Hbody & Hoc & Hclose)".
-    rewrite /off_content /off_body.
+    (* M1 stage 2: the invariant's two cells are ∃-CONTEXT ([off_cell] /
+       [off_mark]); the borrow window takes them out at the acting thread's
+       ambient form and puts them back.  The rewrites are SCOPED to the
+       hypotheses -- the [cinv] handle names the ∃-form and must not move.
+       See FileInvDefs' block above [off_cell]. *)
+    iEval (rewrite /off_content /off_body off_resident_acc off_mark_acc)
+      in "Hbody".
+    iEval (rewrite off_mark_acc) in "Hmk".
     iDestruct "Hbody" as "[Hres | [Hmk' _]]"; last first.
     { iExFalso. iApply (word4_pointsto_excl with "Hmk Hmk'"). }
     iDestruct "Hres" as (v) "[Hc %Hwf]".
     iMod ("Hclose" with "[Hmk Hlv]") as "_".
-    { iNext. rewrite /off_content /off_body. iRight. iFrame. }
+    { iNext. iEval (rewrite /off_content /off_body off_mark_acc).
+      iRight. iFrame. }
     iModIntro. iFrame "Hinv Hoc Hip". iExists v. iFrame. done.
   Qed.
 
@@ -159,13 +167,15 @@ Section FileOff.
   Proof.
     iIntros (HE Hwf) "[#Hinv Hoc] Hip Hc".
     iMod (cinv_acc _ _ _ _ _ HE with "Hinv Hoc") as "(>Hbody & Hoc & Hclose)".
-    rewrite /off_content /off_body.
+    iEval (rewrite /off_content /off_body off_resident_acc off_mark_acc)
+      in "Hbody".
     iDestruct "Hbody" as "[Hres | [Hmk Hlv]]".
     { iDestruct "Hres" as (v') "[Hc' _]".
       iExFalso. iApply (word4_pointsto_excl with "Hc Hc'"). }
     iMod ("Hclose" with "[Hc]") as "_".
-    { iNext. rewrite /off_content /off_body. iLeft. iExists v. iFrame. done. }
-    iModIntro. iFrame "Hinv Hoc". iFrame.
+    { iNext. iEval (rewrite /off_content /off_body off_resident_acc).
+      iLeft. iExists v. iFrame. done. }
+    iModIntro. iFrame "Hinv Hoc". rewrite off_mark_acc. iFrame.
   Qed.
 
 End FileOff.

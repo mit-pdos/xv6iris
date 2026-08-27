@@ -338,7 +338,7 @@ Section CftHelpers.
 
   (* the escrow-family accessor and the slot split.  The sleeplock family's
      accessor is [IcacheEscrow.ic_sleeplocks_lookup], beside the definition. *)
-  Lemma cft_esc_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
+  Lemma cft_esc_acc `{XI : CurCtx} (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart k

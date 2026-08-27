@@ -684,6 +684,8 @@ Section ProofArgfd.
     (* stage 2: the ↦₄ tower is still raw, so the ctx slot crosses here *)
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs5") as "Hs5".
     iDestruct (word_pointsto_split4 with "Hs5") as "[Hs5lo Hs5hi]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs5lo") as "Hs5lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs5hi") as "Hs5hi".
     iEval (rewrite -HM6a1) in "Hs5hi".
     (* argint reads the trapframe pointer AND page out of [proc_priv] *)
     iDestruct (proc_priv_ofile_len with "Hpriv") as %Hoflen.
@@ -1061,6 +1063,8 @@ Section ProofArgfd.
                       = mword_of_int (KernelSyms.argfd + 0x46))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjt) in "Hpc".
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5lo") as "Hs5lo".
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5hi") as "Hs5hi".
         iDestruct (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
         iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs5") as "Hs5".
         assert (HDsp : D !!! Regidx csp_rs1 = pa_stk sp0 6)
@@ -1153,6 +1157,8 @@ Section ProofArgfd.
         assert (Hpp46 : add_vec_int (mword_of_int (KernelSyms.argfd + 0x44) : mword 64) 2
                         = mword_of_int (KernelSyms.argfd + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp46) in "Hpc".
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5lo") as "Hs5lo".
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5hi") as "Hs5hi".
         iDestruct (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
         iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs5") as "Hs5".
         assert (HE1sp : E1 !!! Regidx csp_rs1 = pa_stk sp0 6)
@@ -1220,6 +1226,8 @@ Section ProofArgfd.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjt2) in "Hpc".
       iEval (rewrite Haddrfd) in "Hs5hi".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5lo") as "Hs5lo".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5hi") as "Hs5hi".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
       iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs5") as "Hs5".
       assert (HFsp : F !!! Regidx csp_rs1 = pa_stk sp0 6)

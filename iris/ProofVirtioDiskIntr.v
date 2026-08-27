@@ -1162,7 +1162,7 @@ Section VtDevRam.
     iEval (rewrite Haddrp) in "Hw2p".
     iDestruct (phys_to_word2 (pa_add pu 2%nat) (wrap16 ncp) Halign Hst2 Hcan2
                  with "Hkm Hw2p") as "Hcellp".
-    iDestruct (wordw_claim_of (KTR := KT0) 2 (pa_add pu 2%nat) (DfracOwn 1)
+    iDestruct (ctx_word2_claim (KTR2 := KT0) (pa_add pu 2%nat) (DfracOwn 1)
                  (wrap16 ncp : SailStdpp.Values.mword 16) ltac:(lia)
                  with "Hcellp") as "#Hcl".
     iDestruct (word2_to_phys (pa_add pu 2%nat) (wrap16 ncp) Hst2
@@ -1196,8 +1196,8 @@ Section VtDevRam.
                    with "Hkm Hw2") as "Hcell".
       iModIntro. iExists (wrap16 nc : SailStdpp.Values.mword 16).
       iSplitL "Hcell".
-      { rewrite Hea. iExact "Hcell". }
-      iIntros "Hcell". iEval (rewrite Hea) in "Hcell".
+      { rewrite Hea -(wordw2_ctx (KTR2 := KT0)). iExact "Hcell". }
+      iIntros "Hcell". iEval (rewrite (wordw2_ctx (KTR2 := KT0)) Hea) in "Hcell".
       iDestruct (word2_to_phys (pa_add pu 2%nat) (wrap16 nc) Hst2 with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
       iDestruct ("Hback" with "Hw2") as "[Hproto Hpub]".
@@ -1311,7 +1311,7 @@ Section VtDevRam.
     iDestruct (phys_to_word4 (used_elem_pa (v_cfg vstp) p)
                  (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))))
                  Halignp Hst4p Hcan4p with "Hkm Hw4p") as "Hcellp".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (used_elem_pa (v_cfg vstp) p)
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (used_elem_pa (v_cfg vstp) p)
                  (DfracOwn 1) (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))))
                  ltac:(lia) with "Hcellp") as "#Hclaim0".
     iDestruct (word4_to_phys (used_elem_pa (v_cfg vstp) p)
@@ -1355,8 +1355,10 @@ Section VtDevRam.
                    Halign Hst4 Hcan4 with "Hkm Hw4") as "Hcell".
       iModIntro.
       iExists (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))) : SailStdpp.Values.mword 32).
-      iSplitL "Hcell". { rewrite Hea Haddr. iExact "Hcell". }
-      iIntros "Hcell". iEval (rewrite Hea Haddr) in "Hcell".
+      iSplitL "Hcell".
+      { rewrite Hea Haddr -(wordw4_ctx (KTR2 := KT0)). iExact "Hcell". }
+      iIntros "Hcell".
+      iEval (rewrite (wordw4_ctx (KTR2 := KT0)) Hea Haddr) in "Hcell".
       iDestruct (word4_to_phys (used_elem_pa (v_cfg vst) p)
                    (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))) Hst4
                    with "Hkm Hcell") as "Hw4".

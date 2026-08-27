@@ -110,6 +110,73 @@ Section shim.
     word_pointsto (KTR := KTR) a dq w.
   Proof. rewrite ctx_word_shim. auto. Qed.
 
+  (* THE 2- AND 4-BYTE WORD BRIDGES (M1 flip stage 2): the flipped
+     [↦₂]/[↦₄] against the kit's raw word facts.  Same charter as
+     [ctx_word_shim] above -- the leaf/gen_heap conversion, one line, dead
+     at cutover with the file. *)
+  Lemma ctx_word2_shim (KTR : CurKtier) (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (w : bv 16) :
+    ctx_word2_pointsto (KTR := KTR) ξ a dq w
+    ⊣⊢ word2_pointsto (KTR := KTR) a dq w.
+  Proof.
+    rewrite /ctx_word2_pointsto word2_pointsto_unfold.
+    apply bi.sep_proper; [done|].
+    apply big_opL_proper. intros ? j ?. apply ctx_pointsto_shim.
+  Qed.
+
+  Lemma ctx_word2_of_mem (KTR : CurKtier) (ξ : CtxId) a dq w :
+    word2_pointsto (KTR := KTR) a dq w -∗
+    ctx_word2_pointsto (KTR := KTR) ξ a dq w.
+  Proof. rewrite ctx_word2_shim. auto. Qed.
+
+  Lemma ctx_word2_to_mem (KTR : CurKtier) (ξ : CtxId) a dq w :
+    ctx_word2_pointsto (KTR := KTR) ξ a dq w -∗
+    word2_pointsto (KTR := KTR) a dq w.
+  Proof. rewrite ctx_word2_shim. auto. Qed.
+
+  Lemma ctx_word4_shim (KTR : CurKtier) (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (w : bv 32) :
+    ctx_word4_pointsto (KTR := KTR) ξ a dq w
+    ⊣⊢ word4_pointsto (KTR := KTR) a dq w.
+  Proof.
+    rewrite /ctx_word4_pointsto word4_pointsto_unfold.
+    apply bi.sep_proper; [done|].
+    apply big_opL_proper. intros ? j ?. apply ctx_pointsto_shim.
+  Qed.
+
+  Lemma ctx_word4_of_mem (KTR : CurKtier) (ξ : CtxId) a dq w :
+    word4_pointsto (KTR := KTR) a dq w -∗
+    ctx_word4_pointsto (KTR := KTR) ξ a dq w.
+  Proof. rewrite ctx_word4_shim. auto. Qed.
+
+  Lemma ctx_word4_to_mem (KTR : CurKtier) (ξ : CtxId) a dq w :
+    ctx_word4_pointsto (KTR := KTR) ξ a dq w -∗
+    word4_pointsto (KTR := KTR) a dq w.
+  Proof. rewrite ctx_word4_shim. auto. Qed.
+
+  (* THE 4-BYTE CELL RE-INDEX (M1 flip stage 2; the sibling of
+     [SwtchCtx.ctx_cells_reindex] and [StackOwn.stack_own_reindex]).
+
+     WHY IT EXISTS, and it is a NEW worklist entry that stage 2 creates.  An
+     escrow-backed cell comes out of the record at the RECORD's ξ, and the
+     store leaf's atomic update wants it at the ACTING thread's.  The honest
+     transport is [TsoCtx.ctx_absorb], but §0.17′'s measured rule forbids it
+     here: no absorb and no deposit can run inside a [wp_..._au_...], because
+     the bundle carrying [own_context] has already gone to the leaf, and the
+     escrow at a recycler store must be opened INSIDE the update (the store
+     and the swap are one atomic step).  So the SC-only re-index stands in,
+     quarantined here; at cutover each use is a racy-kit entry, and the fix
+     is the state-indexed held arm §0.18′ prices. *)
+  Lemma ctx_word4_reindex (KTR : CurKtier) (ξ ξ' : CtxId) a dq w :
+    ctx_word4_pointsto (KTR := KTR) ξ a dq w -∗
+    ctx_word4_pointsto (KTR := KTR) ξ' a dq w.
+  Proof. rewrite !ctx_word4_shim. auto. Qed.
+
+  Lemma ctx_word2_reindex (KTR : CurKtier) (ξ ξ' : CtxId) a dq w :
+    ctx_word2_pointsto (KTR := KTR) ξ a dq w -∗
+    ctx_word2_pointsto (KTR := KTR) ξ' a dq w.
+  Proof. rewrite !ctx_word2_shim. auto. Qed.
+
   (* the ∃-slot forms the stack-frame hand-offs trade in (a frame slot
      whose value nobody names) *)
   Lemma ctx_eslot_of_mem (KTR : CurKtier) (ξ : CtxId) (a : Arch.pa) :

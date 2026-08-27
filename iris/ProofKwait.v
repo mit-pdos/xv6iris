@@ -1864,9 +1864,9 @@ Section ProofKwait.
       (* the four source bytes: the child's [xstate] cell, as a byte buffer *)
       (* the alignment fact has to come out BEFORE the split: the four bytes
          no longer carry it, and the rebuild needs it (durable-notes). *)
-      iDestruct (word4_pointsto_aligned_p (p_xstate (proc_addr k)) (DfracOwn 1) xs
+      iDestruct (ctx_word4_pointsto_aligned_p _ (p_xstate (proc_addr k)) (DfracOwn 1) xs
                    with "Hxstate") as %Halx.
-      iDestruct (word4_pointsto_bytes (p_xstate (proc_addr k)) (DfracOwn 1) xs
+      iDestruct (ctx_word4_pointsto_bytes _ (p_xstate (proc_addr k)) (DfracOwn 1) xs
                    with "Hxstate") as "Hbytes".
       iApply (Copyout.wp_copyout_sconf KT0 γa F6 (pv_upt V) (pv_sz V) 4%nat
                 (fun i => nth_byte xs i) (DfracOwn 1)
@@ -1877,21 +1877,16 @@ Section ProofKwait.
                 kw_len4 Hszb kw_ilvl2
                 with "Hcg Hown Htext Hpc Hpt Henv [Hbytes]").
       all: try lkbelow.
-      (* stage 2: [word4_pointsto] is still the RAW byte tower while copyout's
-         source window is the flipped one -- the seam is named here. *)
-      { iEval (rewrite HF6a3).
-        iApply (TsoCtxShim.ctx_buf_of_mem KT0 cur_ctx (p_xstate (proc_addr k)) 4
-                  (fun i => nth_byte xs i) (DfracOwn 1) with "Hbytes"). }
+      (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
+      { iEval (rewrite HF6a3). iExact "Hbytes". }
       iApply wp_next_off_intro.
       iIntros (mco P') "Hcg Hown Hpc Hpt Hbytes %Hcsco %Hext %Hrv".
       assert (Hp5c : ret_pc (F6 !!! Regidx Rra) = mword_of_int (KW + 0x5c))
         by (rewrite HF6ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp5c) in "Hpc".
       iEval (rewrite HF6a3) in "Hbytes".
-      iDestruct (TsoCtxShim.ctx_buf_to_mem KT0 cur_ctx (p_xstate (proc_addr k)) 4
-                   (fun i => nth_byte xs i) (DfracOwn 1) with "Hbytes") as "Hbytes".
-      iDestruct (word4_pointsto_intro (p_xstate (proc_addr k)) (DfracOwn 1) xs Halx
-                   with "Hbytes") as "Hxstate".
+      iDestruct (ctx_word4_pointsto_intro _ (p_xstate (proc_addr k)) (DfracOwn 1)
+                   xs Halx with "Hbytes") as "Hxstate".
       iDestruct ("Hback" $! P' with "[%] Hsz Hpg Hpt") as "Hpriv"; [exact Hext |].
       iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
       { iExists kl, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }

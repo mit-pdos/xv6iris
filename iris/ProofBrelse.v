@@ -289,7 +289,7 @@ Section ProofBrelse.
     sie_cap_gpr KT1 M (trap_res eb + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.brelse + 0x60) : mword 64) -∗
-    is_lock (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> -∗
+    is_lock (bn_lk bn) bcache_addr "bcache"%string (λ ξ : CtxId, bcache_res (XI := ξ) bn V) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_res bn V -∗
     cpu_own 1%nat eb p false ({["bcache"]} ∪ lks) -∗
@@ -374,7 +374,7 @@ Section ProofBrelse.
       by (rewrite (HT3thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HMsp).
     assert (HT3ra : T3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.brelse + 0x68) : mword 64) 4)
       by (rewrite /T3; apply upd_eq).
-    iApply (Rl.wp_release_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> T3
+    iApply (Rl.wp_release_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string (λ ξ : CtxId, bcache_res (XI := ξ) bn V) T3
               0%nat eb p (K - 4)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HT3a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -980,7 +980,7 @@ Section ProofBrelse.
       by (rewrite /U3; apply upd_eq).
     iDestruct (cpu_own_transport CID15 CID18 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Aq.wp_acquire_sconf KT1 (bn_lk bn) "bcache"%string <{ bcache_res bn V }> U3
+    iApply (Aq.wp_acquire_sconf KT1 (bn_lk bn) "bcache"%string (λ ξ : CtxId, bcache_res (XI := ξ) bn V) U3
               0%nat b p (K - 4)%nat b lks
               ltac:(vm_compute; reflexivity) ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -1015,8 +1015,8 @@ Section ProofBrelse.
     iEval (rewrite /bio_slot_res HMk) in "Hslot".
     iDestruct "Hslot" as "(%Hcnt & Hcell & Hfd & Hqr)".
     iDestruct "Hqr" as (qr) "(%Htie & Hdev & Hbno)".
-    iDestruct (word4_pointsto_agree with "Hrdev Hdev") as %->.
-    iDestruct (word4_pointsto_agree with "Hrbno Hbno") as %->.
+    iDestruct (ctx_word4_pointsto_agree with "Hrdev Hdev") as %->.
+    iDestruct (ctx_word4_pointsto_agree with "Hrbno Hbno") as %->.
     (* the three instructions of the decrement, run in both arms *)
     assert (Hpa : add_vec (rget mQ Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                   = brefcnt k).
@@ -1081,11 +1081,11 @@ Section ProofBrelse.
       iMod (bio_last_ref_step bn Mg k q HMk with "Hauth Hrtok") as "Hauth".
       iAssert (b_dev (bpa k) ↦₄{DfracOwn (1/2)} (devs k))%I
         with "[Hrdev Hdev]" as "Hdev".
-      { rewrite -(br_last_tie q qr Htie) word4_pointsto_frac_split.
+      { rewrite -(br_last_tie q qr Htie) ctx_word4_pointsto_frac_split.
         iFrame "Hdev Hrdev". }
       iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (bnos k))%I
         with "[Hrbno Hbno]" as "Hbno".
-      { rewrite -(br_last_tie q qr Htie) word4_pointsto_frac_split.
+      { rewrite -(br_last_tie q qr Htie) ctx_word4_pointsto_frac_split.
         iFrame "Hbno Hrbno". }
       assert (Hdel : delete k Mg !! k = None) by apply lookup_delete.
       iAssert (bio_slot_res bn (delete k Mg) k (devs k) (bnos k))
@@ -1504,10 +1504,10 @@ Section ProofBrelse.
       iMod (bio_decr_step bn Mg k q qt cnt' qr' HMk Hsub with "Hauth Hrtok") as "Hauth".
       iAssert (b_dev (bpa k) ↦₄{DfracOwn (qr + q)} (devs k))%I
         with "[Hrdev Hdev]" as "Hdev".
-      { rewrite word4_pointsto_frac_split. iFrame "Hdev Hrdev". }
+      { rewrite ctx_word4_pointsto_frac_split. iFrame "Hdev Hrdev". }
       iAssert (b_blockno (bpa k) ↦₄{DfracOwn (qr + q)} (bnos k))%I
         with "[Hrbno Hbno]" as "Hbno".
-      { rewrite word4_pointsto_frac_split. iFrame "Hbno Hrbno". }
+      { rewrite ctx_word4_pointsto_frac_split. iFrame "Hbno Hrbno". }
       assert (Hsucc : Pos.to_nat (Pos.succ cnt') = (Pos.to_nat cnt' + 1)%nat)
         by (rewrite Pos2Nat.inj_succ; lia).
       iEval (rewrite Hsucc bslots_op) in "Hfd".

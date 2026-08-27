@@ -657,6 +657,11 @@ Section PipeCtx.
     iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hnm") as "[Hd Hnm]".
     iDestruct (pipe_data_morph pi bs ξ ξ' with "Hd Hdat") as "[Hd Hdat]".
     iDestruct (pipe_slack_morph pi ξ ξ' with "Hd Hsl") as "[Hd Hsl]".
+    (* the four counter/open cells became [↦₄] ctx cells at M1 stage 2 *)
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hr") as "[Hd Hr]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hw") as "[Hd Hw]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hro") as "[Hd Hro]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hwo") as "[Hd Hwo]".
     iFrame "Hd". iExists nr, nw, ro, wo, vname, bs. iFrame.
   Qed.
 

@@ -2074,6 +2074,7 @@ Section ProofFileread.
              { rewrite /inode_map. iFrame. }
              (* ---- CHECK OUT the offset cell ---- *)
              iApply fupd_wp.
+             iEval (rewrite -off_mark_acc) in "Hvalid".
              iMod (off_checkout γf γox k q (DfracOwn q) (fc_ip Cf) ⊤
                      ltac:(solve_ndisj) with "Hoh Hcip Hvalid Hrlv")
                as "(Hoh & Hcip & Hoffc)".
@@ -2379,7 +2380,8 @@ Section ProofFileread.
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview Hfview". }
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
-                  with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
+                  with "[Hvalid]" as "Hvalid";
+                  [rewrite -Hipk -off_mark_acc; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
                 (* ---- +0x4e c.ld a0,24(s1) ; +0x50 jal ra,iunlock ---- *)
                 assert (Hpip3 : add_vec (rget M1 Rs1)
@@ -2662,7 +2664,8 @@ Section ProofFileread.
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview Hfview". }
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
-                  with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
+                  with "[Hvalid]" as "Hvalid";
+                  [rewrite -Hipk -off_mark_acc; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
                 (* ---- +0x4e c.ld a0,24(s1) ; +0x50 jal ra,iunlock ---- *)
                 assert (Hpip3 : add_vec (rget M4 Rs1)

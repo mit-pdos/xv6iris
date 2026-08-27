@@ -220,6 +220,19 @@ Section SchedCtxChain.
   (* THE PAYLOAD HALVES' TRANSPORT (tso-port M3).  Both are ordinary cells
      and ghosts; the structural instances are applied AS TERMS (M3 recipe
      rule 3 -- the [↦₈] notation hides the index under [cur_ctx]). *)
+  (* [p_killed] / [p_xstate] / [p_pid] are [↦₄] cells: ξ-indexed since M1
+     stage 2, so the public triple needs its own transport. *)
+  Global Instance proc_pub_morph (pa : mword 64) :
+    CtxMorph (fun xi : CtxId => proc_pub (XI := xi) pa).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /proc_pub.
+    iDestruct "H" as (kl xs pid) "(Hk & Hx & Hp)".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hk") as "[Hd Hk]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hx") as "[Hd Hx]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hp") as "[Hd Hp]".
+    iFrame "Hd". iExists kl, xs, pid. iFrame.
+  Qed.
+
   Global Instance proc_held_morph (i : CPU) (j : nat) (γl : gname)
       (st : mword 32) (ch : mword 64) :
     CtxMorph (fun xi : CtxId => proc_held (XI := xi) i j γl st ch).
@@ -227,6 +240,8 @@ Section SchedCtxChain.
     iIntros (ξ ξ') "Hd H". rewrite /proc_held.
     iDestruct "H" as "(Hl & Hst & Hpw & Hch & Hpub)".
     iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hch") as "[Hd Hch]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hst") as "[Hd Hst]".
+    iDestruct (proc_pub_morph (proc_addr j) ξ ξ' with "Hd Hpub") as "[Hd Hpub]".
     iFrame.
   Qed.
 
@@ -940,6 +955,9 @@ Section SchedCtxMorph.
     iDestruct "H" as (st ch) "(Hst & Hpl & Hch & Hpub & Hsl)".
     iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hch") as "[Hd Hch]".
     iDestruct (proc_slots_morph pa st ξ ξ' with "Hd Hsl") as "[Hd Hsl]".
+    (* [p_state] and the public triple are [↦₄]: ξ-indexed since stage 2 *)
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hst") as "[Hd Hst]".
+    iDestruct (proc_pub_morph pa ξ ξ' with "Hd Hpub") as "[Hd Hpub]".
     iFrame "Hd". iExists st, ch. iFrame.
   Qed.
 

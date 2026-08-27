@@ -772,7 +772,7 @@ Section EndOpDefs.
   (* the OPENED batch: log_state taken apart, with the log-region client
      halves SPLIT at the copy loop's cursor [t] (the prefix is at the
      contents the loop has already written, the suffix is still opaque). *)
-  Definition eo_open (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+  Definition eo_open `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (W : list (mword 32))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (Lw : nat -> list (bv 8)) (t : nat) : iProp Σ :=
@@ -790,7 +790,7 @@ Section EndOpDefs.
         ∃ bs, fs_chalf γfs (log_slot_bno logstart i) bs) ∗
      bslots ((LOGBLOCKS - n) + 2)%nat)%I.
 
-  Lemma eo_open_of_batch (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
+  Lemma eo_open_of_batch `{XI : CurCtx} (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (LB : gset Z) (pend : gset Z) :
     log_state Psi bn γfs cov logstart n LB pend -∗
@@ -854,7 +854,7 @@ Section EndOpDefs.
      chained: the arithmetic belongs at the site that HOLDS the chain, not
      inside the packing lemma.  At the [n = 0] fast deposit it is the
      checkout's own row, unchanged. *)
-  Lemma eo_open_to_batch (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
+  Lemma eo_open_to_batch `{XI : CurCtx} (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (Lw : nat -> list (bv 8)) (pend : gset Z) (M : log_mirror) :
@@ -895,7 +895,7 @@ Section EndOpDefs.
   (* ---- the payload's pieces, extracted / re-assembled without a case
      split leaking into the whole-function proof ---- *)
 
-  Lemma eo_pay_split (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma eo_pay_split `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
@@ -908,7 +908,7 @@ Section EndOpDefs.
     - rewrite /fs_mclean. iIntros "[[$ $] _]"; try done.
   Qed.
 
-  Lemma eo_pay_mk (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma eo_pay_mk `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bs : list (bv 8)) (d : bool) :
     (uint bno ↪[fs_cache γfs]{#(1/2)} bs) -∗
@@ -925,7 +925,7 @@ Section EndOpDefs.
      committer can learn a HOME block's bytes (there is no client [fs_chalf]
      for a home block on this side).  Pure conclusion, so the [iDestruct]
      keeps the payload. *)
-  Lemma eo_pay_bs_auth (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma eo_pay_bs_auth `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) (L : gmap Z (list (bv 8))) :
     ghost_map_auth (fs_cache γfs) 1 L -∗
@@ -1429,7 +1429,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa4)  j pidv dq m K eb eb lks Vpr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string <{ log_res Psi γ bn γfs cov logstart }> E4 0%nat eb (proc_addr j)
+    iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string (log_pay Psi γ bn γfs cov logstart) E4 0%nat eb (proc_addr j)
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -1732,7 +1732,7 @@ Section EndOpBlocks.
       assert (Hpe : op_pending om = ∅)
         by (rewrite Hommt; exact op_pending_empty).
       rewrite Hpe. iExact "Hbatch". }
-    iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }> G2 0%nat eb (proc_addr j)
+    iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string (log_pay Psi γ bn γfs cov logstart) G2 0%nat eb (proc_addr j)
               (K - 8)%nat
               ({["log"]} ∪ lks)
               ltac:(rewrite HG2a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
@@ -1824,7 +1824,7 @@ Section EndOpBlocks.
     iApply (big_sepL_mono with "Ha"). intros i w Hw. iIntros "H". iExists _. iExact "H".
   Qed.
 
-  Lemma eo_cells_junk (W : list (mword 32)) (n : nat) :
+  Lemma eo_cells_junk `{XI : CurCtx} (W : list (mword 32)) (n : nat) :
     n = length W ->
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
     ([∗ list] i ∈ seq 0 n, ∃ junk : mword 32, lh_block i ↦₄ junk).
@@ -4127,7 +4127,7 @@ Section EndOpBlocks.
               G3 !!! Regidx c = (m !!! Regidx c : mword 64)).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /G3 upd_ne; [| regne]. exact (HG2thr c Hcs N2 N8 N9 N18). }
-    iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }> G3 0%nat eb (proc_addr j)
+    iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string (log_pay Psi γ bn γfs cov logstart) G3 0%nat eb (proc_addr j)
               (K - 8)%nat
               ({["log"]} ∪ lks)
               ltac:(rewrite HG3a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
@@ -4468,7 +4468,7 @@ Section ProofEndOp.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (eo_cont_shift (CIDa := CID) (CIDb := CID10)  j pidv dq m K eb eb lks Vpr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string <{ log_res Psi γ bn γfs cov logstart }> R6 0%nat eb (proc_addr j)
+    iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string (log_pay Psi γ bn γfs cov logstart) R6 0%nat eb (proc_addr j)
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -4842,7 +4842,7 @@ Section ProofEndOp.
                 U5 !!! Regidx c = (m !!! Regidx c : mword 64)).
       { intros c Hcs N2 N8 N9 N18.
         rewrite /U5 upd_ne; [| regne]. exact (HU4thr c Hcs N2 N8 N9 N18). }
-      iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }> U5 0%nat eb (proc_addr j) (K - 8)%nat
+      iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string (log_pay Psi γ bn γfs cov logstart) U5 0%nat eb (proc_addr j) (K - 8)%nat
                 ({["log"]} ∪ lks)
                 ltac:(rewrite HU5a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
                 ltac:(pose proof (eo_Klk K HK); lia)

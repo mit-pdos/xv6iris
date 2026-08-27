@@ -354,10 +354,16 @@ Section ProofMainSecondary.
     iApply fupd_wp.
     iMod (inv_acc ⊤ startedN with "Hsinv") as "[Hbody Hclose]"; [ solve_ndisj | ].
     iDestruct "Hbody" as (vpk) "[>Hword Hrest]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 started_addr (DfracOwn 1) vpk
+    (* M1 stage 2: the invariant body carries the ∃-CONTEXT cell
+       ([StartedInv.started_cell]) so that the body is a CLOSED term -- the
+       adequacy proof hands this one persistent handle to every hart at its
+       OWN identity.  Pay [started_cell_acc] to read the claim off it and put
+       it straight back. *)
+    iEval (rewrite started_cell_acc) in "Hword".
+    iDestruct (ctx_word4_claim (KTR2 := KT0) started_addr (DfracOwn 1) vpk
                  ltac:(lia) with "Hword") as "#Hstcl".
     iMod ("Hclose" with "[Hword Hrest]") as "_".
-    { iNext. iExists vpk. iFrame "Hword Hrest". }
+    { iNext. iExists vpk. rewrite started_cell_acc. iFrame "Hword Hrest". }
     iModIntro.
     iApply (wp_load_s_sconf_au (kt := KT0) (ktd := KT0) 4 true false (mword_of_int (KernelSyms.main + 0x16))
               (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
@@ -372,8 +378,15 @@ Section ProofMainSecondary.
     { iApply (mni_16 with "Htext"). }
     { rewrite Ha4. iExact "Hstcl". }
     { rewrite Ha4.
-      iApply (started_inv_load_au (⊤ ∖ ↑minstretN) (main_deposit xid γd γv)
-                ltac:(solve_ndisj) with "Hsinv"). }
+      (* M1 stage 2: see the twin in ProofMain -- the adapter is applied to
+         the RE-INTRO'd fact, not under the update's binder. *)
+      iPoseProof (started_inv_load_au (⊤ ∖ ↑minstretN) (main_deposit xid γd γv)
+                    ltac:(solve_ndisj) with "Hsinv") as "Hau".
+      iMod "Hau" as (v0) "[Hw Hcl]". iModIntro. iExists v0.
+      iEval (rewrite -wordw4_ctx) in "Hw".
+      iSplitL "Hw"; [ iExact "Hw" | ].
+      iIntros "Hw". iEval (rewrite wordw4_ctx) in "Hw".
+      iApply ("Hcl" with "Hw"). }
     iIntros (v).
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc HPsi".

@@ -1083,7 +1083,7 @@ Proof.
      process, on its next trip through forkret -- needs the DISCARDED form.
      Discarding here is also what makes the two arms of the token provably
      exclusive from now on ([first_tok_boot_excl]). *)
-  iMod (word4_pointsto_persist with "Hf1") as "#Hfirst0".
+  iMod (ctx_word4_pointsto_persist with "Hf1") as "#Hfirst0".
   assert (Hcp3c : add_vec_int (mword_of_int (FR + 0x38) : mword 64) 4
                   = mword_of_int (FR + 0x3c)) by pcw.
   iEval (rewrite Hcp3c) in "Hpc".
@@ -1093,10 +1093,10 @@ Proof.
   (* the four cells [FsReady.fs_sb_cells] wants are DISCARDED, not owned:
      they are read-only for the lifetime of the boot, and kexec takes its
      two at whatever fraction the caller has. *)
-  iMod (word4_pointsto_persist with "Hni") as "#Hni".
-  iMod (word4_pointsto_persist with "Hist") as "#Hist".
-  iMod (word4_pointsto_persist with "Hsz") as "#Hsz".
-  iMod (word4_pointsto_persist with "Hbms") as "#Hbms".
+  iMod (ctx_word4_pointsto_persist with "Hni") as "#Hni".
+  iMod (ctx_word4_pointsto_persist with "Hist") as "#Hist".
+  iMod (ctx_word4_pointsto_persist with "Hsz") as "#Hsz".
+  iMod (ctx_word4_pointsto_persist with "Hbms") as "#Hbms".
   iAssert (fs_sb_cells) as "#Hsbc".
   { rewrite /fs_sb_cells. iFrame "Hni Hist Hsz Hbms". }
   iDestruct (first_persist_pre with "[] Hka Hlctx Hsbc") as "Hpre".

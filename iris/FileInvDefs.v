@@ -612,7 +612,7 @@ Qed.
 
 (* Timelessness of the word points-to the off invariant puts in its body --
    typeclass search does not unfold a [Definition] on its own, exactly as
-   [RiscvPtsto.word4_pointsto_timeless]'s comment says. *)
+   [RiscvPtsto.ctx_word4_pointsto_timeless]'s comment says. *)
 Global Instance word_pointsto_timeless' `{!riscvGS Σ} (ktr : CurKtier) (a : Arch.pa) (dq : dfrac)
     (w : bv 64) : Timeless (word_pointsto (KTR := ktr) a dq w).
 Proof. rewrite /word_pointsto. apply _. Qed.
@@ -877,7 +877,9 @@ Section FileInv.
      [inode_pay_split]'s distributivity is untouched. *)
   Definition inode_pay (γx : gname) (Q : Qp) (g : gname) (v : mword 64)
       (wr : bool) (q : Qp) : iProp Σ :=
-    (cinv fileipN γx (inode_held_short v Q) ∗ cinv_own γx q ∗
+    (* M1 stage 2: the cinv body is the ∃-CONTEXT wrapper, so [inode_pay]'s
+       HANDLE stays a closed term.  See IcacheRef's [IcacheHeldAny]. *)
+    (cinv fileipN γx (inode_held_short_any v Q) ∗ cinv_own γx q ∗
      inode_shr_held_gen v (q * Q)%Qp g ∗
      ∃ ty : bv 16, ity_shot g ty ∗ ⌜wr = true -> bv_unsigned ty <> T_DIR_z⌝)%I.
 
@@ -904,6 +906,7 @@ Section FileInv.
     iIntros (HE) "(#Hi & Hown & Hs & _)".
     iMod (cinv_cancel with "Hi Hown") as "H"; [exact HE|].
     iMod "H". iModIntro. rewrite Qp.mul_1_l.
+    iDestruct (inode_held_short_any_elim with "H") as "H".
     iDestruct (inode_shr_held_gen_forget with "Hs") as "Hs".
     iApply (inode_held_gather with "H Hs").
   Qed.
@@ -949,9 +952,9 @@ Section FileInv.
     ={E}=∗ ∃ γx : gname, inode_pay γx Q g v wr 1.
   Proof.
     iIntros (Hwr) "Hsh Hs #Hty".
-    iMod (cinv_alloc E fileipN (inode_held_short v Q) with "[Hsh]")
+    iMod (cinv_alloc E fileipN (inode_held_short_any v Q) with "[Hsh]")
       as (γx) "[#Hi Hown]".
-    { by iNext. }
+    { iNext. iApply (inode_held_short_any_intro with "Hsh"). }
     iModIntro. iExists γx. rewrite /inode_pay Qp.mul_1_l.
     iFrame "Hi Hown Hs". iExists ty. iFrame "Hty". iPureIntro. exact Hwr.
   Qed.
@@ -1007,16 +1010,52 @@ Section FileInv.
     a ↦₄ w1 -∗ a ↦₄{dq} w2 -∗ False.
   Proof.
     iIntros "H1 H2".
-    rewrite !word4_pointsto_unfold.
+    rewrite !ctx_word4_pointsto_unfold.
     iDestruct "H1" as "[_ H1]". iDestruct "H2" as "[_ H2]".
     change (seq 0 4) with ([0; 1; 2; 3]%nat).
     iDestruct "H1" as "[Hb1 _]". iDestruct "H2" as "[Hb2 _]".
-    iDestruct (mem_pointsto_ne with "Hb1 Hb2") as %Hne.
+    iDestruct (ctx_pointsto_ne with "Hb1 Hb2") as %Hne.
     iPureIntro. exact (Hne eq_refl).
   Qed.
 
+  (* THE INVARIANT'S TWO CELLS ARE ∃-CONTEXT (M1 flip, STAGE 2; the header's
+     "STAGE 2" paragraph is what this implements).  [a_foff] and the borrow
+     marker sit inside [off_hold]'s CANCELLABLE INVARIANT, so an ambient index
+     on either would make [off_hold] -- and with it [file_pay] and
+     [ftable_res]'s payload -- ξ-dependent in the STATEMENT, and §0.16′'s
+     whole point is that they are CLOSED TERMS.  Invariant bodies are not
+     updatable, so no transport could repair that (tso-port.md §0.12′).  ∃ is
+     the same answer [WpLock.lk_cpu_res] and [lock_word] give for the same
+     question, and it is also the true statement: the cell belongs to whichever
+     thread last stored it.  The ∃-ELIMINATION is the SC-only step, and it is
+     paid at exactly the two places §0.16′ predicted -- [FileOff.off_checkout]
+     / [off_checkin], the borrow window under [ip->lock]. *)
+  Definition off_cell (k : nat) (v : mword 32) : iProp Σ :=
+    (∃ ξ : CtxId, ctx_word4_pointsto ξ (a_foff k) (DfracOwn 1) v)%I.
+
   Definition off_resident (k : nat) : iProp Σ :=
-    (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I.
+    (∃ v : mword 32, off_cell k v ∗ ⌜off_wf v⌝)%I.
+
+  (* the ∃-ELIMINATION at the acting thread's ambient form.  SC-only in the
+     forward direction (a ledger fact is pinned to its context and the ∃
+     hides which), so each use is an M4 racy-kit entry; the honest form is
+     the borrow window's [TsoCtx.ctx_absorb] against the opener's own
+     [own_context], exactly as the bcache escrow does (§0.17′). *)
+  Lemma off_cell_acc (k : nat) (v : mword 32) :
+    off_cell k v ⊣⊢ a_foff k ↦₄ v.
+  Proof.
+    iSplit.
+    - iIntros "[%ξ H]".
+      iApply (TsoCtxShim.ctx_word4_reindex _ ξ cur_ctx with "H").
+    - iIntros "H". iExists cur_ctx. iExact "H".
+  Qed.
+
+  Lemma off_resident_acc (k : nat) :
+    off_resident k ⊣⊢ (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝).
+  Proof.
+    rewrite /off_resident. apply bi.exist_proper. intros v.
+    by rewrite off_cell_acc.
+  Qed.
 
   (* the borrower's marker: the inode's [valid] flag, which ilock hands out
      at 1 and which no fs.c callee below ilock touches.  It is EXCLUSIVE, it
@@ -1025,7 +1064,18 @@ Section FileInv.
      pinned at 1 -- so what a borrower takes back on return is provably what
      it parked.  See FileOff.v's header for the full argument. *)
   Definition off_mark (ip : mword 64) : iProp Σ :=
-    (i_valid ip ↦₄ (mword_of_int 1 : mword 32))%I.
+    (∃ ξ : CtxId,
+       ctx_word4_pointsto ξ (i_valid ip) (DfracOwn 1)
+         (mword_of_int 1 : mword 32))%I.
+
+  Lemma off_mark_acc (ip : mword 64) :
+    off_mark ip ⊣⊢ i_valid ip ↦₄ (mword_of_int 1 : mword 32).
+  Proof.
+    iSplit.
+    - iIntros "[%ξ H]".
+      iApply (TsoCtxShim.ctx_word4_reindex _ ξ cur_ctx with "H").
+    - iIntros "H". iExists cur_ctx. iExact "H".
+  Qed.
 
   (* THE BODY.  It NAMES the inode that governs this slot's offset -- which is
      how two borrowers of one slot exclude each other (both would have to hold
@@ -1050,7 +1100,7 @@ Section FileInv.
      exists.  (The general rule is in claude-notes/optimization.md.) *)
   Global Instance off_body_timeless γ k ip : Timeless (off_body γ k ip).
   Proof.
-    rewrite /off_body /off_resident /off_mark.
+    rewrite /off_body /off_resident /off_cell /off_mark.
     apply bi.or_timeless.
     - apply bi.exist_timeless; intro v.
       apply bi.sep_timeless; [apply _ | apply _].
@@ -1061,7 +1111,14 @@ Section FileInv.
      back.  [off_body]'s resident disjunct IS this.  [f->ip] is NOT here any
      more: it rides the reference whole ([file_fields]). *)
   Definition off_raw (k : nat) : iProp Σ :=
-    (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I.
+    (∃ v : mword 32, off_cell k v ∗ ⌜off_wf v⌝)%I.
+
+  Lemma off_raw_acc (k : nat) :
+    off_raw k ⊣⊢ (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝).
+  Proof.
+    rewrite /off_raw. apply bi.exist_proper. intros v.
+    by rewrite off_cell_acc.
+  Qed.
 
   Lemma off_raw_body (γ : gname) (k : nat) (ip : mword 64) :
     off_raw k -∗ off_body γ k ip.
@@ -1072,7 +1129,7 @@ Section FileInv.
 
   Global Instance off_raw_timeless k : Timeless (off_raw k).
   Proof.
-    rewrite /off_raw.
+    rewrite /off_raw /off_cell.
     apply bi.exist_timeless; intro v.
     apply bi.sep_timeless; [apply _ | apply _].
   Qed.
@@ -1370,6 +1427,55 @@ End FileInv.
 Section FileMorph.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ}.
+  Context `{ICFG : icfg}.
+
+  (* ---- THE PAYLOAD CHAIN'S TRANSPORT (M1 flip, STAGE 2).  §0.16′ measured
+     [inode_pay] / [file_core] / [file_payload] / [file_pay] as CLOSED TERMS;
+     they stopped being closed at the flip, because [IcacheRef.inode_ident]'s
+     two cells are [↦₄].  They stay TRANSPORTABLE, which is all
+     [ftable_res_morph] needs -- what had to stay closed is the two cinv
+     BODIES, and both were closed by an ∃ ([IcacheRef.inode_held_short_any],
+     [off_cell]/[off_mark]). ---- *)
+  Global Instance inode_pay_morph (γx : gname) (Q : Qp) (g : gname)
+      (v : mword 64) (wr : bool) (q : Qp) :
+    CtxMorph (λ ξ0 : CtxId, inode_pay (XI := ξ0) γx Q g v wr q).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /inode_pay.
+    iDestruct "H" as "(#Hci & Hown & Hs & Hty)".
+    iDestruct (inode_shr_held_gen_morph v (q * Q)%Qp g ξ ξ'
+                 with "Hd Hs") as "[Hd Hs]".
+    iFrame "Hd Hci Hown Hs Hty".
+  Qed.
+
+  Global Instance file_core_morph (q : Qp) (pn : fpnames) (C : fcontent) :
+    CtxMorph (λ ξ0 : CtxId, file_core (XI := ξ0) q pn C).
+  Proof.
+    rewrite /file_core.
+    destruct (bool_decide (fc_type C = FD_PIPE));
+      [ iIntros (ξ ξ') "Hd H"; iFrame |].
+    destruct (bool_decide (fc_type C = FD_INODE) || bool_decide (fc_type C = FD_DEVICE));
+      [| iIntros (ξ ξ') "Hd H"; iFrame ].
+    iIntros (ξ ξ') "Hd H".
+    iApply (inode_pay_morph (fp_icv pn) (fp_iq pn) (fp_ig pn) (fc_ip C)
+              (fc_wbool C) q ξ ξ' with "Hd H").
+  Qed.
+
+  Global Instance file_payload_morph (γ : gname) (k : nat) (q : Qp)
+      (pn : fpnames) (C : fcontent) :
+    CtxMorph (λ ξ0 : CtxId, file_payload (XI := ξ0) γ k q pn C).
+  Proof.
+    iIntros (ξ ξ') "Hd [Hc Ho]". rewrite /file_payload.
+    iDestruct (file_core_morph q pn C ξ ξ' with "Hd Hc") as "[Hd Hc]".
+    iFrame.
+  Qed.
+
+  Global Instance file_pay_morph (γ : gname) (k : nat) (q : Qp) (C : fcontent) :
+    CtxMorph (λ ξ0 : CtxId, file_pay (XI := ξ0) γ k q C).
+  Proof.
+    iIntros (ξ ξ') "Hd [%pn [Htok Hp]]". rewrite /file_pay.
+    iDestruct (file_payload_morph γ k q pn C ξ ξ' with "Hd Hp") as "[Hd Hp]".
+    iFrame "Hd". iExists pn. iFrame.
+  Qed.
 
   Global Instance file_fields_morph (k : nat) (q : Qp) (C : fcontent) :
     CtxMorph (λ ξ0 : CtxId, file_fields (XI := ξ0) k q C).
@@ -1380,6 +1486,10 @@ Section FileMorph.
     iDestruct (ctx_morph_pointsto _ _ _ _ ξ ξ' with "Hd Hwr") as "[Hd Hwr]".
     iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hpp") as "[Hd Hpp]".
     iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hip") as "[Hd Hip]".
+    (* the type word and the major number are [↦₄]/[↦₂]: ξ-indexed since
+       M1 stage 2 *)
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hty") as "[Hd Hty]".
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hmj") as "[Hd Hmj]".
     iFrame.
   Qed.
 
@@ -1390,6 +1500,7 @@ Section FileMorph.
     destruct (1 - q)%Qp as [q'|]; [| iFrame ].
     iDestruct "H" as (C) "[Hf Hp]".
     iDestruct (file_fields_morph k q' C ξ ξ' with "Hd Hf") as "[Hd Hf]".
+    iDestruct (file_pay_morph γ k q' C ξ ξ' with "Hd Hp") as "[Hd Hp]".
     iFrame "Hd". iExists C. iFrame.
   Qed.
 
@@ -1401,9 +1512,13 @@ Section FileMorph.
     destruct (M !! k) as [[q n]|].
     - iDestruct "H" as "(%Hn & Hr & Hrest & Hfd)".
       iDestruct (file_rest_morph γ k q ξ ξ' with "Hd Hrest") as "[Hd Hrest]".
+      (* the refcount cell is [↦₄]: ξ-indexed since M1 stage 2 *)
+      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hr") as "[Hd Hr]".
       iFrame. done.
     - iDestruct "H" as "[Hr (%C & %Ht & Hf & Hp)]".
       iDestruct (file_fields_morph k 1 C ξ ξ' with "Hd Hf") as "[Hd Hf]".
+      iDestruct (file_pay_morph γ k 1 C ξ ξ' with "Hd Hp") as "[Hd Hp]".
+      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hr") as "[Hd Hr]".
       iFrame "Hd Hr". iExists C. iFrame. done.
   Qed.
 End FileMorph.

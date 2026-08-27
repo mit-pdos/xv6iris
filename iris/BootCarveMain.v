@@ -524,6 +524,7 @@ Section BootCarveMain.
     rewrite /lk_raw /lock_name_field /lk_cpu E8 E16 !off_of_z.
     iDestruct (TsoCtxShim.ctx_word_of_mem with "H1") as "H1".
     iDestruct (TsoCtxShim.ctx_word_of_mem with "H2") as "H2".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H0") as "H0".
     iExists vlock, vname, vcpu. iFrame "H0 H1 H2".
   Qed.
 
@@ -592,6 +593,13 @@ Section BootCarveMain.
     iEval (rewrite (Hcell 156 ltac:(apply bv_eq; vm_compute; reflexivity))) in "Hw".
     iEval (rewrite (Hcell 160 ltac:(apply bv_eq; vm_compute; reflexivity))) in "He".
     rewrite /cons_res /a_cons_r /a_cons_w /a_cons_e.
+    (* M1 stage 2: [BootCarve] and this file are BOOT TIER and stay RAW
+       (the eight-hart adequacy trap, tso-flip-replay.md pass 2.3), so the
+       [↦₄]/[↦₂] cells cross into the flipped families here, exactly where
+       the [↦₈] ones already did. *)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hr") as "Hr".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hw") as "Hw".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "He") as "He".
     iExists rr, ww, ee, bs. iFrame "Hr Hw He Hb". iPureIntro. exact Hlen.
   Qed.
 
@@ -679,6 +687,9 @@ Section BootCarveMain.
     iDestruct (TsoCtxShim.ctx_word_of_mem with "H2") as "H2".
     iDestruct (TsoCtxShim.ctx_word_of_mem with "H3") as "H3".
     iDestruct (TsoCtxShim.ctx_word_of_mem with "H4") as "H4".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H0") as "H0".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H5") as "H5".
     iExists vlocked, vlk, vpid, vlkname, vcpu, vname.
     iFrame "H0 H1 H2 H3 H4 H5".
   Qed.
@@ -825,6 +836,8 @@ Section BootCarveMain.
     iDestruct "Hi" as "[Hb Hs]".
     iDestruct "Ho" as (t r s) "(Ht & Hr & Hos)".
     iDestruct (TsoCtxShim.ctx_word_of_mem with "Hos") as "Hos".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Ht") as "Ht".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hr") as "Hr".
     iDestruct (TsoCtxShim.ctx_eslot_of_mem with "Hb") as "Hb".
     iDestruct "Hs" as (sb) "Hsb".
     iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hsb") as "Hsb".
@@ -989,13 +1002,18 @@ Section BootCarveMain.
      byte, while [BioInitAt] imports it and reads the same run as CONTEXT
      facts at its ambient ξ.  Under the permeable seal the whole body
      converted in one step; hermetically sealed, the run crosses BY NAME,
-     one byte at a time.  The five ↦₄ cells are still raw on both sides
-     (stage 2 of the flip) and need no crossing. *)
+     one byte at a time.  SINCE M1 STAGE 2 the five [↦₄] cells cross the
+     same way, for the same reason. *)
   Lemma bpay_raw_buf_raw `{XI : TsoCtx.CurCtx} (k : nat) :
     bpay_raw (pa_of_z (buf_base + buf_stride * Z.of_nat k)) ⊢ buf_raw k.
   Proof.
     rewrite /bpay_raw /buf_raw.
     iIntros "(H0 & H1 & H2 & H3 & H4 & Hd)".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H0") as "H0".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H2") as "H2".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H3") as "H3".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H4") as "H4".
     iSplitL "H0"; [iExact "H0" |]. iSplitL "H1"; [iExact "H1" |].
     iSplitL "H2"; [iExact "H2" |]. iSplitL "H3"; [iExact "H3" |].
     iSplitL "H4"; [iExact "H4" |].
@@ -1245,6 +1263,15 @@ Section BootCarveMain.
     (* [i_dev]'s displacement is 0, so [off_of_z] leaves [pa_of_z (A + 0)] *)
     rewrite E0 E4 E8 E16 E64 E68 E70 E72 E74 E76 !off_of_z Z.add_0_r.
     iSplitL "Hs"; [iExact "Hs" |].
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H0") as "H0".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H2") as "H2".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H3") as "H3".
+    iDestruct (TsoCtxShim.ctx_word2_of_mem _ TsoCtx.cur_ctx with "H4") as "H4".
+    iDestruct (TsoCtxShim.ctx_word2_of_mem _ TsoCtx.cur_ctx with "H5") as "H5".
+    iDestruct (TsoCtxShim.ctx_word2_of_mem _ TsoCtx.cur_ctx with "H6") as "H6".
+    iDestruct (TsoCtxShim.ctx_word2_of_mem _ TsoCtx.cur_ctx with "H7") as "H7".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H8") as "H8".
     iSplitL "H0"; [iExists vdev; iExact "H0" |].
     iSplitL "H1"; [iExists vinum; iExact "H1" |].
     iSplitL "H2"; [iExact "H2" |].
@@ -1255,7 +1282,9 @@ Section BootCarveMain.
       iSplitL "H4"; [iExact "H4" |]. iSplitL "H5"; [iExact "H5" |].
       iSplitL "H6"; [iExact "H6" |]. iSplitL "H7"; [iExact "H7" |].
       iExact "H8". }
-    iExists l. iSplitR; [iPureIntro; exact Hlen |]. iExact "Hl".
+    iExists l. iSplitR; [iPureIntro; exact Hlen |].
+    iApply (big_sepL_mono with "Hl"). iIntros (j a _) "Ha".
+    iApply (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Ha").
   Qed.
 
   (* the NINODE entries: the family, at the itable's stride and anchored at
@@ -1438,9 +1467,9 @@ Section BootCarveMain.
   (* THE NAMED BRIDGE [file_node_raw] -> [FileInvDefs.fentry_raw], the
      [bpay_raw_buf_raw] situation exactly: the addresses agree definitionally
      ([fnode k] is [pa_of_z (file_base + file_stride * k)], and the seven
-     [foff_of] offsets are the [a_f…] names), the ↦₄/↦₂ cells are the same
-     raw fact on both sides (stage 2), and the CROSSING is the two ↦ₘ bytes
-     and the two ↦₈ slots: raw here (this file does not import TsoCtx),
+     [foff_of] offsets are the [a_f…] names), and the CROSSING is every
+     cell -- the two ↦ₘ bytes, the two ↦₈ slots and (SINCE M1 STAGE 2) the
+     ↦₄/↦₂ ones: raw here (this file does not import TsoCtx),
      context-indexed in [FileInvDefs] (which does).  Whole-body conversion
      closed this under the permeable seal; now it is four named shim uses. *)
   Lemma file_node_raw_fentry `{XI : TsoCtx.CurCtx} (k : nat) :
@@ -1449,6 +1478,9 @@ Section BootCarveMain.
   Proof.
     rewrite /file_node_raw /fentry_raw.
     iIntros "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H0") as "H0".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H6") as "H6".
     iSplitL "H0"; [iExact "H0" |].
     iSplitL "H1"; [iExact "H1" |].
     iSplitL "H2"; [ iDestruct "H2" as (r) "H2"; iExists r;
@@ -1458,7 +1490,8 @@ Section BootCarveMain.
     iSplitL "H4"; [ iApply (TsoCtxShim.ctx_eslot_of_mem with "H4") |].
     iSplitL "H5"; [ iApply (TsoCtxShim.ctx_eslot_of_mem with "H5") |].
     iSplitL "H6"; [iExact "H6" |].
-    iExact "H7".
+    iDestruct "H7" as (mj) "H7". iExists mj.
+    iApply (TsoCtxShim.ctx_word2_of_mem _ TsoCtx.cur_ctx with "H7").
   Qed.
 
   (* the NFILE entries, as [FileInv.ftable_res_boot] takes them. *)
@@ -1648,9 +1681,17 @@ Section BootCarveMain.
             l_dev_of_z l_ncommit_of_z lh_n_of_z log_lk_of_z.
     iDestruct (TsoCtxShim.ctx_word_of_mem with "Hn") as "Hn".
     iDestruct (TsoCtxShim.ctx_word_of_mem with "Hc") as "Hc".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hw") as "Hw".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hst") as "Hst".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hdv") as "Hdv".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hout") as "Hout".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hcmt") as "Hcmt".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hnc") as "Hnc".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hn2") as "Hn2".
     iFrame "Hw Hn Hc Hst Hdv Hout Hcmt Hnc Hn2".
     iApply (big_sepL_mono with "Hblk"). iIntros (n i _) "Hi".
-    rewrite lh_block_of_z. iExact "Hi".
+    rewrite lh_block_of_z. iDestruct "Hi" as (w) "Hi". iExists w.
+    iApply (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hi").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -2097,6 +2138,7 @@ Section BootCarveMain.
             E48 E72 E80 E88 !off_of_z.
     iSplitL "Hlk Hst Hks Hpid1 Hsz Hcwd Hnm Hof Hctx Hpg Htf".
     { iExists vst, vks.
+      iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hst") as "Hst".
       iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hst"; [iExact "Hst" |].
       iSplitL "Hks"; [iExact "Hks" |].
       iExists (MkPPriv (zero_reg : mword 64)
@@ -2106,6 +2148,7 @@ Section BootCarveMain.
       cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
       iSplitR; [iPureIntro; split_and!;
                 [reflexivity | reflexivity | vm_compute; discriminate] |].
+      iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hpid1") as "Hpid1".
       iSplitL "Hpid1"; [iExact "Hpid1" |].
       iSplitL "Hsz Hcwd Hnm".
       { iSplitL "Hsz"; [iExact "Hsz" |]. iSplitL "Hcwd"; [iExact "Hcwd" |].
@@ -2115,7 +2158,10 @@ Section BootCarveMain.
     iSplitR "Hpar"; [| iExists vpar; iExact "Hpar"].
     iSplitL "Hch"; [iExists vch; iExact "Hch" |].
     iExists vkl, vxs, vpid.
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hkl") as "Hkl".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hxs") as "Hxs".
     iSplitL "Hkl"; [iExact "Hkl" |]. iSplitL "Hxs"; [iExact "Hxs" |].
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hpid2") as "Hpid2".
     iExact "Hpid2".
   Qed.
 

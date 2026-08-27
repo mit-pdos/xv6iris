@@ -180,10 +180,15 @@ Section WpSmodeHalf.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw2_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_load_s_sconf_gen_u (kt := kt) (ktd := ktd) 2 false true pc rd rs1 imm m n v (zero_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 (data2_ext_2_unsigned v) Hrd Hrdok
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw2_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
   (* lh rd, imm(rs1) -- SIGN-extended halfword load (falls out of the same
@@ -210,10 +215,15 @@ Section WpSmodeHalf.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw2_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_load_s_sconf_gen_u (kt := kt) (ktd := ktd) 2 false false pc rd rs1 imm m n v (sign_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 (data2_ext_2 v) Hrd Hrdok
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw2_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
   (* sh rs2, imm(rs1) -- halfword store.  Writes no register, so (like
@@ -244,10 +254,15 @@ Section WpSmodeHalf.
     assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw2_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_store_s_sconf_gen (kt := kt) (ktd := ktd) 2 false pc rs2 rs1 imm m n vold (trunc16 (rget m rs2)) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2 (store_ext_2 (rget m rs2))
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw2_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
   (* ------------------------------------------------------------------- *)

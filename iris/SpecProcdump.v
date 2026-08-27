@@ -123,6 +123,7 @@ Local Open Scope Z_scope.
 
 Section ProcdumpView.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.   (* M1 stage 2: the two [↦₄] slot cells *)
 
   (* ------------------------------------------------------------------ *)
   (* ONE slot's worth of the racy-debug read permission.                 *)

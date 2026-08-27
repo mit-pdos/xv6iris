@@ -455,7 +455,7 @@ Section IallocDefs.
      fresh box's only licence (ClaimL, §2.6's fourth row) and create's fill
      spends it at [ireg_withdraw].  Before this increment the AU's output
      was dropped at the claim site's [iIntros]. *)
-  Definition ia_arms (γ : log_names) (dev : mword 32)
+  Definition ia_arms `{XI : CurCtx} (γ : log_names) (dev : mword 32)
       (inodestart ninodes : Z) (nib : nat) (ty : mword 16) (u : nat)
       (Sb : gset Z) (av : mword 64) : iProp Σ :=
     ((* NO INODES: a0 = 0, the iget ledger unit unspent, the reservation

@@ -716,7 +716,7 @@ Section UsertrapRes.
      (* ---- ξ-FREE RESOURCES: safe to carry across the park ---- *)
      is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
      is_tickslock (un_tk N) ∗
-     (∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }>) ∗
+     (∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ))) ∗
      procs_avail None ∗
      wire_inv ∗
      kmap_at tramp_vpn tramp_ppn KP_rx ∗

@@ -2191,6 +2191,9 @@ Section ProofPrintk.
        raw word tower for the split and comes back after the join. *)
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
     iDestruct (word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    (* M1 stage 2: the halves face a flipped [↦₄] leaf, so the LO half
+       crosses back into the ledger for the load and out again for the join. *)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hlo") as "Hlo".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget D4 a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite HD4a5.
@@ -2204,6 +2207,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_d8 with "Htext"). }
     iIntros (CID6 Hst6) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hlo") as "Hlo".
     iDestruct (word_pointsto_join4 _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     iDestruct (TsoCtxShim.ctx_word_of_mem with "Hslot") as "Hslot".
     rewrite word_of_words_id.
@@ -3312,6 +3316,9 @@ Section ProofPrintk.
        raw word tower for the split and comes back after the join. *)
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
     iDestruct (word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    (* M1 stage 2: the halves face a flipped [↦₄] leaf, so the LO half
+       crosses back into the ledger for the load and out again for the join. *)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hlo") as "Hlo".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget S1 a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite HS1a5.
@@ -3325,6 +3332,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_116 with "Htext"). }
     iIntros (CID3 Hst3) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hlo") as "Hlo".
     iDestruct (word_pointsto_join4 _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     iDestruct (TsoCtxShim.ctx_word_of_mem with "Hslot") as "Hslot".
     rewrite word_of_words_id.
@@ -3454,6 +3462,9 @@ Section ProofPrintk.
        raw word tower for the split and comes back after the join. *)
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
     iDestruct (word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    (* M1 stage 2: the halves face a flipped [↦₄] leaf, so the LO half
+       crosses back into the ledger for the load and out again for the join. *)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hlo") as "Hlo".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget S1 a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite HS1a5.
@@ -3467,6 +3478,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_168 with "Htext"). }
     iIntros (CID3 Hst3) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hlo") as "Hlo".
     iDestruct (word_pointsto_join4 _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     iDestruct (TsoCtxShim.ctx_word_of_mem with "Hslot") as "Hslot".
     rewrite word_of_words_id.
@@ -3580,6 +3592,9 @@ Section ProofPrintk.
        raw word tower for the split and comes back after the join. *)
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
     iDestruct (word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    (* M1 stage 2: the halves face a flipped [↦₄] leaf, so the LO half
+       crosses back into the ledger for the load and out again for the join. *)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hlo") as "Hlo".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget V a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite Hva5.
@@ -3593,6 +3608,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_1fa with "Htext"). }
     iIntros (CID1 Hst1) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hlo") as "Hlo".
     iDestruct (word_pointsto_join4 _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     iDestruct (TsoCtxShim.ctx_word_of_mem with "Hslot") as "Hslot".
     rewrite word_of_words_id.

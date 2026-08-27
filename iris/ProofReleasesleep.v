@@ -237,7 +237,7 @@ Section ProofReleasesleep.
        moved to a fresh one, so acquire wants it at CID10. *)
     iDestruct (cpu_own_transport CID CID10 0%nat b pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string <{ sl_res_gen γsl slk R H }> Kacq
+    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string (λ ξ : CtxId, sl_res_gen (XI := ξ) γsl slk R H) Kacq
               0%nat b pme (av - 4)%nat b lks
               ltac:(lia)
               ltac:(lia)
@@ -382,7 +382,7 @@ Section ProofReleasesleep.
     (* rebuild the FREE sl_res: zeroed word + token + zeroed pid + R. *)
     iDestruct (sl_res_close_free γsl slk R H q with "Hslkw Hslk Hha HRcaller") as "HRsl".
     (* release(&slk->lk): intr_count 1 -> 0. *)
-    iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γsl slk R H }> Krel
+    iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string (λ ξ : CtxId, sl_res_gen (XI := ξ) γsl slk R H) Krel
               0%nat b pme (av - 4)%nat
               ({["sleep lock"%string]} ∪ lks)
               ltac:(rewrite HKrela0; apply addv_sext0)

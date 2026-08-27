@@ -238,7 +238,7 @@ Section ProofAllocpid.
        hart (CID1..CID8), so acquire wants it at CID8. *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf KT1 γp "nextpid"%string <{ nextpid_res }> A4 n eb p (av - 4)%nat b lks
+    iApply (Acquire.wp_acquire_sconf KT1 γp "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ)) A4 n eb p (av - 4)%nat b lks
               Hn ltac:(pose proof (apid_K10 av Hav); lia) Hbelow
               with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
@@ -412,7 +412,7 @@ Section ProofAllocpid.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 γp alp_pid_lock "nextpid"%string <{ nextpid_res }> B7 n eb p (av - 4)%nat
+    iApply (Release.wp_release_sconf KT1 γp alp_pid_lock "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ)) B7 n eb p (av - 4)%nat
               ({["nextpid"]} ∪ lks)
               Hlka ltac:(pose proof (apid_K10 av Hav); lia)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").

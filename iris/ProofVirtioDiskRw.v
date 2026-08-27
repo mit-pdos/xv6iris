@@ -1249,6 +1249,11 @@ Section ProofVirtioDiskRw.
     iEval (rewrite word_pointsto_split4) in "H11".
     iEval (rewrite word_pointsto_split4) in "H12".
     iDestruct "H11" as "[H11lo H11hi]". iDestruct "H12" as "[H12lo H12hi]".
+    (* M1 stage 2: the four halves face a flipped 4-byte statement *)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H11lo") as "H11lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H11hi") as "H11hi".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H12lo") as "H12lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H12hi") as "H12hi".
     iExists (word_lo w12), (word_hi w12), (word_lo w11), (word_hi w11).
     iFrame "H12lo H12hi H11lo H11hi".
   Qed.

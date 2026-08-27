@@ -1283,12 +1283,13 @@ Section InodeRes.
         { pose proof (Hal 0%nat ltac:(simpl; lia)) as Hz.
           rewrite Nat.mul_0_r pa_add_0 in Hz. exact Hz. }
         rewrite Nat.mul_0_r pa_add_0.
-        rewrite /word4_pointsto (bi.pure_True _ Ha0) bi.True_sep.
+        rewrite /ctx_word4_pointsto (bi.pure_True _ Ha0) bi.True_sep.
         apply big_sepL_proper. intros i jj Hj.
         apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
         rewrite (ind_bytes_cons_lo w l i Hlt).
-        (* HERMETIC SEAL: the ↦₄ tower's raw bytes against the flipped ↦ₘ *)
-        symmetry. apply TsoCtxShim.ctx_pointsto_shim.
+        (* M1 STAGE 2 PAYOFF: the tower's bytes and [↦ₘ] are the same family
+           now, so the hermetic-seal crossing that used to sit here is gone. *)
+        reflexivity.
       + (* the tail, at base [a + 4] *)
         transitivity ([∗ list] j ∈ seq 0 (4 * length l)%nat,
                         pa_add (pa_add a 4%nat) j ↦ₘ (ind_bytes l !!! j))%I.
@@ -1311,7 +1312,7 @@ Section InodeRes.
     iDestruct (big_sepL_lookup
                  (fun (k : nat) (a : bv 32) => (i_addr ip k ↦₄ a)%I) l j (l !!! j)
                  (list_lookup_lookup_total_lt l j Hj) with "H") as "Hc".
-    iApply (word4_pointsto_aligned_p with "Hc").
+    iApply (ctx_word4_pointsto_aligned_p with "Hc").
   Qed.
 
   Lemma inode_addrs_aligned_all (ip : mword 64) (l : list (bv 32)) :
@@ -1354,6 +1355,40 @@ Section InodeRes.
   Qed.
 
 End InodeRes.
+
+(* ===================================================================== *)
+(*  THE INODE CELLS' TRANSPORT (M1 flip, STAGE 2).  [inode_meta]'s five    *)
+(*  fields and [inode_addrs]' thirteen are [↦₂]/[↦₄] cells and became      *)
+(*  context-indexed at the flip; the escrow arms that hold them need them  *)
+(*  transportable.  No ambient [CurCtx] here (§0.8′ rule 3).               *)
+(* ===================================================================== *)
+Section InodeResMorph.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  Global Instance inode_meta_morph (ip : mword 64) (d : dinode) :
+    CtxMorph (λ ξ : CtxId, inode_meta (XI := ξ) ip d).
+  Proof.
+    iIntros (ξ ξ') "Hd (Ht & Hmj & Hmi & Hnl & Hsz)". rewrite /inode_meta.
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Ht") as "[Hd Ht]".
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hmj") as "[Hd Hmj]".
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hmi") as "[Hd Hmi]".
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hnl") as "[Hd Hnl]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hsz") as "[Hd Hsz]".
+    iFrame.
+  Qed.
+
+  Global Instance inode_addrs_morph (ip : mword 64) (l : list (bv 32)) :
+    CtxMorph (λ ξ : CtxId, inode_addrs (XI := ξ) ip l).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /inode_addrs.
+    iApply (ctx_morph_big_sepL l
+              (λ (j : nat) (a : bv 32) (ξ0 : CtxId),
+                 ctx_word4_pointsto ξ0 (i_addr ip j) (DfracOwn 1) a)
+              (λ j a, ctx_morph_word4 _ _ _ _)
+              ξ ξ' with "Hd H").
+  Qed.
+
+End InodeResMorph.
 
 (*  THE 268-ELEMENT BIG-OP MUST NEVER BE UNFOLDED BY INSTANCE SEARCH.
     [inode_blocks] is a [big_sepL] over [seq 0 MAXFILE], and [iFrame]'s

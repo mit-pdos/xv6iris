@@ -248,6 +248,10 @@ Section ConsoleCtx.
     iIntros (ξ ξ') "Hd H". rewrite /cons_res.
     iDestruct "H" as (r w e bs) "(Hr & Hw & He & Hlen & Hdat)".
     iDestruct (cons_data_morph bs ξ ξ' with "Hd Hdat") as "[Hd Hdat]".
+    (* the three ring counters became [↦₄] ctx cells at M1 stage 2 *)
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hr") as "[Hd Hr]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hw") as "[Hd Hw]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd He") as "[Hd He]".
     iFrame "Hd". iExists r, w, e, bs. iFrame.
   Qed.
 

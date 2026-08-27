@@ -396,6 +396,7 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 Section FwShare.
   Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg}.
+  Context `{XI : CurCtx}.   (* M1 stage 2: [inode_ident]'s two [↦₄] cells *)
 
   Lemma fw_shr_gen_split (k : nat) (s1 s2 : Qp) (dev inum : mword 32) (g : gname) :
     inode_shr_gen k (s1 + s2)%Qp dev inum g ⊣⊢

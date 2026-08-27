@@ -265,9 +265,9 @@ Section ProcDefs.
   Proof.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
-    iIntros "Hq1". rewrite /proc_priv_bare Hq word4_pointsto_frac_split.
+    iIntros "Hq1". rewrite /proc_priv_bare Hq ctx_word4_pointsto_frac_split.
     iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
 
@@ -450,6 +450,8 @@ Section ProcDefsMorph.
     iIntros (ξ ξ') "Hd H". rewrite /proc_dormant_noctx.
     iDestruct "H" as (V pid)
       "(%Hf & Hpid & Hfl & Ho & Hs & Hsp & Hir & Hbs & Hkst & Haddr)".
+    (* [p_pid] is [↦₄]: context-indexed since M1 stage 2 *)
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hpid") as "[Hd Hpid]".
     iDestruct (proc_fields_morph pa (DfracOwn 1) V ξ ξ' with "Hd Hfl") as "[Hd Hfl]".
     iDestruct (ofile_cells_morph pa (pv_ofile V) ξ ξ' with "Hd Ho") as "[Hd Ho]".
     iDestruct (kstack_free_morph pa ξ ξ' with "Hd Hkst") as "[Hd Hkst]".

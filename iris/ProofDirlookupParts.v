@@ -66,7 +66,6 @@ Require Import DirView.
 Require Import SpecReadi.
 From Kernel Require KernelSyms.
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the ↦₂ tower crosses the seam *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -386,11 +385,11 @@ Section DlkBuf.
                (fun j Hj => eq_sym (dlk_half_bytes_eq data i j Hj))).
     iSplit.
     - iIntros "H".
-      iDestruct (TsoCtxShim.ctx_buf_to_mem with "H") as "H".
-      iApply (word2_pointsto_intro a (DfracOwn 1) (dir_inum data i) Hal). iExact "H".
+      (* M1 STAGE 2 PAYOFF: both crossings here are GONE. *)
+      iApply (ctx_word2_pointsto_intro _ a (DfracOwn 1) (dir_inum data i) Hal).
+      iExact "H".
     - iIntros "H".
-      iDestruct (word2_pointsto_bytes with "H") as "H".
-      iApply (TsoCtxShim.ctx_buf_of_mem with "H").
+      iDestruct (ctx_word2_pointsto_bytes with "H") as "H". iExact "H".
   Qed.
 
   Lemma dlk_name_acc (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :

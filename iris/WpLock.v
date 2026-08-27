@@ -220,9 +220,46 @@ Section Lock.
   (* ---- the physical fields ------------------------------------------- *)
 
   (* the physical 4-byte little-endian lock word at address [lk]: the 4-byte
-     word points-to [↦₄] (which also bundles the 4-byte alignment of [lk]). *)
+     word points-to (which also bundles the 4-byte alignment of [lk]).
+
+     ∃-CONTEXT, and the M1 flip's STAGE 2 is where that became a decision
+     rather than an accident.  The cell is exactly [lk_cpu_res]'s owner
+     word one field over, and it takes the same shape for the same reason
+     (tso-port.md §0.8′ ruling 2: lock metadata raw, lock-internal CELLS
+     ∃-context):
+
+     1. AN AMBIENT INDEX HERE WOULD DRAG A CONTEXT INTO [is_lock].  This
+        cell sits inside [lock_inv], hence inside the PERSISTENT handle,
+        and a boot-minted [is_lock] could then not be stated at another
+        thread.  tso-port.md §0.12′'s park record carries three lock
+        handles (wait / ticks / nextpid) across a ∀-quantified resume
+        context PRECISELY because [is_lock] is a closed term; an ambient
+        index would falsify that, and no payload conversion could repair
+        it.  The ∃ closes the term again, and it is also the TRUE
+        statement: the word belongs to whichever hart last stored it.
+     2. RAW WAS CONSIDERED AND IS WRONG AT CUTOVER.  The lock word is only
+        ever READ exclusively (acquire's [amoswap.w.aq] takes the machine's
+        exclusive arm, which reads flat memory at the top of the log), so a
+        raw cell would discharge every load -- but release's word clear is
+        a STORE, and a store owes [Wobl_ram], whose γts update needs the
+        cell's timestamp element.  A cell with no ledger residue cannot be
+        stored to (tso-machine-flip.md A6.16).  So the residue stays.
+
+     The client-facing spellings do NOT move: the creators still take, and
+     the destroyers still hand back, [lk ↦₄ 0] at the caller's own context.
+     [lock_word_acc] is the bridge, and its ∃-ELIMINATION direction is the
+     SC-only step -- the same M4 racy-kit entry [lk_cpu_cell_acc] names. *)
   Definition lock_word (lk : mword 64) (v : mword 32) : iProp Σ :=
-    (lk ↦₄ v)%I.
+    (∃ ξ : CtxId, ctx_word4_pointsto ξ lk (DfracOwn 1) v)%I.
+
+  Lemma lock_word_acc (lk : mword 64) (v : mword 32) :
+    lock_word lk v ⊣⊢ lk ↦₄ v.
+  Proof.
+    iSplit.
+    - iIntros "[%ξ H]". iApply TsoCtxShim.ctx_word4_of_mem.
+      iApply (TsoCtxShim.ctx_word4_to_mem with "H").
+    - iIntros "H". iExists cur_ctx. iExact "H".
+  Qed.
 
   (* ===================================================================
      THE OWNER FIELD, AND THE HELD-SET FRAGMENT BESIDE IT.
@@ -599,7 +636,7 @@ Section Lock.
     iIntros "[Hclose _] Hauth Hfrag Hword Hcpu HR".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
     iNext. iExists (mword_of_int 0 : mword 32), None.
-    rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Hauth".
+    rewrite lock_word_acc lk_cpu_res_free. iFrame "Hword Hcpu Hauth".
     iLeft. by iFrame "Hfrag HR".
   Qed.
 
@@ -630,7 +667,7 @@ Section Lock.
   (* [mem_pointsto]'s and [word4_pointsto]'s [Timeless] instances now live in
      RiscvPtsto.v, beside the definitions. *)
   Global Instance lock_word_timeless lk v : Timeless (lock_word lk v).
-  Proof. rewrite /lock_word /word4_pointsto. apply _. Qed.
+  Proof. rewrite /lock_word. apply _. Qed.
 
   (* ---- lock construction (the "newlock" ghost step) ------------------ *)
 
@@ -653,7 +690,7 @@ Section Lock.
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ.
     iExists (mword_of_int 0 : mword 32), None.
-    rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
+    rewrite lock_word_acc lk_cpu_res_free. iFrame "Hword Hcpu Ha".
     iLeft. iFrame "Hf HR". done.
   Qed.
 
@@ -676,7 +713,7 @@ Section Lock.
     iMod (lock_pay_intro R with "HR") as "HR".
     iApply (inv_alloc lockN E (lock_inv γ lk s R ∨ D)).
     iNext. iLeft. iExists (mword_of_int 0 : mword 32), None.
-    rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
+    rewrite lock_word_acc lk_cpu_res_free. iFrame "Hword Hcpu Ha".
     iLeft. iFrame "Hf HR". done.
   Qed.
 
@@ -722,7 +759,7 @@ Section Lock.
     iMod (lock_pay_intro R with "HR") as "HR".
     iMod (inv_alloc lockN E (lock_inv γ lk s R) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iNext. iExists (mword_of_int 0 : mword 32), None.
-      rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
+      rewrite lock_word_acc lk_cpu_res_free. iFrame "Hword Hcpu Ha".
       iLeft. iFrame "Hf HR". done. }
     iModIntro. iApply (is_lock_intro with "Hnm Hinv").
   Qed.

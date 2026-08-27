@@ -443,8 +443,23 @@ Section BootRun.
         so nothing here depends on which value that is. *)
      sret_bits ('b"0" : mword 1) ('b"0" : mword 1) ∗
      sret_bits ('b"0" : mword 1) ('b"0" : mword 1) ∗
-     a_cpu_noff cid_word ↦₄ noff_val 0 ∗
-     a_cpu_int cid_word ↦₄ iv ∗
+     (* THE cpus[cid] noff/intena CELLS, AT A ∀-QUANTIFIED CONTEXT, for
+        EXACTLY the [proc] row's reason below and by the SAME ruling.  They
+        were raw ([↦₄] over [RiscvPtsto]) until M1 stage 2 flipped the 4-byte
+        family (tso-port.md §0.19′); the flip would otherwise have made this
+        whole bundle ξ-INDEXED again and re-opened the eight-hart adequacy
+        trap -- [BootShared.boot_shared_alloc] carves all eight bundles under
+        ONE ambient while the harts run at eight distinct
+        [own_context_boot] identities, so a pinned bundle serves at most one
+        of them (it failed exactly there, at [SystemAdequacy]'s
+        [boot_hart_secondary], and it failed by CRAWLING).  The ∀ is sound
+        here for the [proc] row's two reasons: both cells are EXCLUSIVE (so
+        the ∀ is not duplicable -- it is not under a [□]) and both are
+        TIMESTAMP-0 boot-image cells, §0.4 item 6's one sanctioned case. *)
+     (∀ ξ : CtxId,
+        ctx_word4_pointsto ξ (a_cpu_noff cid_word) (DfracOwn 1) (noff_val 0)) ∗
+     (∀ ξ : CtxId,
+        ctx_word4_pointsto ξ (a_cpu_int cid_word) (DfracOwn 1) iv) ∗
      (* the WHOLE [cpus[cid].proc] cell -- see [BootShared.boot_hart_bss].
         It is private to this hart and goes into [IntrDefs.cpu_cells].
 
@@ -530,6 +545,9 @@ Section BootRun.
        takes it at its own ambient, which is the identity its [own_context]
        names *)
     iSpecialize ("Hproc" $! cur_ctx).
+    (* ...and so do the two [cpus[cid]] words, since M1 stage 2 *)
+    iSpecialize ("Hnoff" $! cur_ctx).
+    iSpecialize ("Hint" $! cur_ctx).
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
     iDestruct (mmode_config_persist with "Hmm") as "[[#Hhw #Hmin] Hmm]".

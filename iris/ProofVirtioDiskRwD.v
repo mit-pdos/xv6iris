@@ -681,7 +681,7 @@ Section VdrwdLeaves.
     iEval (rewrite Haddrp) in "Hw2p".
     iDestruct (phys_to_word2 (pa_add pav 2%nat) (wrap16 np) Halign Hst2 Hcan2
                  with "Hkm Hw2p") as "Hcellp".
-    iDestruct (wordw_claim_of (KTR := KT0) 2 (pa_add pav 2%nat) (DfracOwn 1)
+    iDestruct (ctx_word2_claim (KTR2 := KT0) (pa_add pav 2%nat) (DfracOwn 1)
                  (wrap16 np : SailStdpp.Values.mword 16) ltac:(lia)
                  with "Hcellp") as "#Hcl".
     iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 np) Hst2
@@ -717,8 +717,8 @@ Section VdrwdLeaves.
                    with "Hkm Hw2") as "Hcell".
       iModIntro. iExists (wrap16 np : SailStdpp.Values.mword 16).
       iSplitL "Hcell".
-      { rewrite Hea. iExact "Hcell". }
-      iIntros "Hcell". iEval (rewrite Hea) in "Hcell".
+      { rewrite Hea -(wordw2_ctx (KTR2 := KT0)). iExact "Hcell". }
+      iIntros "Hcell". iEval (rewrite (wordw2_ctx (KTR2 := KT0)) Hea) in "Hcell".
       iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 np) Hst2 with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
       iDestruct ("Hback" with "Hw2") as "[Hproto Hpub]".
@@ -799,7 +799,7 @@ Section VdrwdLeaves.
     iEval (rewrite Haddrp) in "Hw2p".
     iDestruct (phys_to_word2 (pa_add pav 2%nat) (wrap16 np) Halign Hst2 Hcan2
                  with "Hkm Hw2p") as "Hcellp".
-    iDestruct (wordw_claim_of (KTR := KT0) 2 (pa_add pav 2%nat) (DfracOwn 1)
+    iDestruct (ctx_word2_claim (KTR2 := KT0) (pa_add pav 2%nat) (DfracOwn 1)
                  (wrap16 np : SailStdpp.Values.mword 16) ltac:(lia)
                  with "Hcellp") as "#Hcl".
     iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 np) Hst2
@@ -839,8 +839,8 @@ Section VdrwdLeaves.
                    with "Hkm Hw2") as "Hcell".
       iModIntro. iExists (wrap16 np : SailStdpp.Values.mword 16).
       iSplitL "Hcell".
-      { rewrite Hea. iExact "Hcell". }
-      iIntros "Hcell". iEval (rewrite Hea) in "Hcell".
+      { rewrite Hea -(wordw2_ctx (KTR2 := KT0)). iExact "Hcell". }
+      iIntros "Hcell". iEval (rewrite (wordw2_ctx (KTR2 := KT0)) Hea) in "Hcell".
       iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 (S np)) Hst2
                    with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".

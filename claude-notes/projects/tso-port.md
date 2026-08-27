@@ -2,15 +2,19 @@
 
 ## 0. CHECKPOINT — READ THIS FIRST
 
-**THE TREE IS FULLY GREEN (2026-08-26).  RED SET EMPTY.  READ §0.17′ AND
-§0.18′ FIRST** — §0.17′ is the landing note for the last blocker class (the
+**THE TREE IS FULLY GREEN (2026-08-27).  RED SET EMPTY.  READ §0.19′,
+§0.17′ AND §0.18′ FIRST** — §0.19′ is M1 STAGE 2 (`↦₂`/`↦₄` flipped; M1
+closes) and is where the current shim ledger, the six λ-converted payloads,
+the four re-closed invariant bodies and the deliberately-raw tiers are
+recorded; — §0.17′ is the landing note for the last blocker class (the
 two `inv`s over ξ-indexed bodies), for `ProofForkretPark.forkret_park_paid`
 (now `Qed`), and for the second half of the eight-hart adequacy trap that
 only a green park could reveal; §0.18′ is the LOCK KIT's convergence on the
 same parked-record idiom (release = `ctx_deposit`, acquire = `ctx_absorb`,
 `ctx_dom` off the lock's transport path, zero client files).
 §0.10′–§0.16′ below are the road to them and are history where they
-conflict.
+conflict; §0.19′ amends §0.12′'s park table and §0.14′'s payload
+measurements where the flip moved them.
 
 **Where the tree is.** Legs T and M are LANDED on branch `tso`.
 `iris/TsoMem.v` is the minimal Ztso machine; `TsoLitmus.v` its 8
@@ -1001,6 +1005,19 @@ So §0.12′'s "already ξ-free and need nothing" row (`wait_res`,
 measurement teaches: *a payload is ξ-dependent iff it holds a `↦ₘ`/`↦₈`
 cell; `↦₄`/`↦₂` rows, the phys tier and every ghost row are ξ-constant
 at stage 1.*  Read the payload's LEAVES, not its size.
+
+> **SUPERSEDED AT STAGE 2 (§0.19′).**  The "already ξ-free" verdicts above
+> are all *"at stage 1"*, and stage 2 flipped `↦₄`/`↦₂`.  SIX of these
+> payloads went ξ-INDEXED and were λ-converted then: `ticks_res`,
+> `nextpid_res`, `sl_res_gen`/`sl_res`, `bcache_res`, `log_res`,
+> `itable_res`/`itable_res2`.  Only `wait_res`, `tx_res` and `<{ emp }>`
+> are still closed terms on their own.  The park rows are UNAFFECTED —
+> a λ-converted payload makes the `is_lock` HANDLE closed again, so
+> `ut_park_caps` still carries `wait` / `ticks` / `nextpid` and not one
+> line of `UsertrapRes` / `UtResFits` / `ParkCap` changed.  The rule
+> restated for the finished surface: *a payload is ξ-dependent iff it
+> holds ANY memory cell outside the deliberately-raw tiers
+> (`↦ₓ`/`↦ᵣ`/`↦ₚ`/`↦ₛ`); only ghost rows are ξ-constant.*
 
 Conversions followed §0.7′ verbatim (payload λ names its ξ; `CtxMorph`
 instances export beside the sealed definition, structural instances
@@ -2204,6 +2221,246 @@ No `Admitted`, no `Abort`, no `Axiom`.**
 smaller and better-defined job: FIVE `hart_view_lb_any` sites, all wanting
 the same thing (tie a record's stamp to the claiming hart's view), and TWO
 `ctx_dom_sc` uses, neither on a running transport.
+
+### 0.19′ M1 STAGE 2 IS LANDED — ↦₂/↦₄ ARE CONTEXT-INDEXED, AND M1 CLOSES (2026-08-27)
+
+Replays `tso-machine-flip.md`'s A6.15 on THIS tree.  The tower and the
+notation flip are A6.15's verbatim; **the FALLOUT is not, and the difference
+is the whole content of this section**: A6.15 was measured in the flip
+workspace, a copy of the tree from BEFORE §0.11′–§0.18′, so it never met the
+park protocol, the λ-payload sweep, or §0.16′'s closed-term rulings.  On this
+tree the same flip walks straight into them.
+
+#### THE TOWERS AND THE NOTATIONS
+
+`TsoCtx.v` gained `ctx_word2_pointsto` and `ctx_word4_pointsto`, each
+character-for-character the in-tree 8-byte tower at width 2/4, with
+`_unfold` / `_aligned_p` / `_bytes` / `_intro` / `Timeless` (+ the `ktier`-typed
+`_timeless'`) / discarded-`Persistent` (+ `_discarded_persistent'`) /
+`_frac_split` / `_half` / `_half_split` / `_half_join` / `_persist` /
+`_agree` (cross-context) / `_ktier_mono`, plus `ctx_morph_word2` /
+`ctx_morph_word4` beside `ctx_morph_word`, and one new byte law the two
+`ktier_mono`s run on: **`ctx_ktier_mono`** (`mem_ktier_mono`'s image, a LAW of
+the surface, not a shim).  All four dfrac spellings of `↦₂` and `↦₄` are
+re-declared at the towers, bracket form and `dq custom dfrac at level 1`
+included.  Neither tower is sealed, for the 8-byte one's reason.
+
+`TsoCtxShim.v` gained `ctx_word{2,4}_shim` / `_of_mem` / `_to_mem` (the
+gen_heap bridges) and **`ctx_word{2,4}_reindex`** — the SC-only ξ→ξ' re-index,
+new in this stage; the SHIM LEDGER below says where its twenty uses are and why
+each is an M4 entry.
+
+**`↦ₛ` DOES NOT FLIP.**  A6.15's two reasons transfer unchanged and are
+recorded beside the stage-2 notations in `TsoCtx.v`.  After this stage the
+deliberately-raw tiers are exactly **`↦ₓ` (text), `↦ᵣ` (registers), `↦ₚ`
+(the physical/image tier) and `↦ₛ` (strings)**.
+
+#### THE WAVE: 31 ROUNDS, NOT A6.15's 14
+
+A6.15 measured 14 rounds with ONE new error file per round.  Here it took
+**31 full VM rounds**, with peaks of 22 red files.  The extra classes are all
+CONSEQUENCES OF WORK THAT LANDED AFTER THE FLIP WORKSPACE WAS COPIED:
+
+| class | A6.15 | here |
+|---|---|---|
+| `word{2,4}_pointsto_<law>` → the `ctx_` twin (+ a leading ξ `_`) | yes | yes, ~25 files |
+| `?XI : CurCtx` binders on decls/sections | yes | yes, ~40 decls |
+| genuine gen_heap seams (leaf/boot) → shim | yes | yes, and MORE (below) |
+| crossings DELETED, not converted | yes (PageFields, ByteBuf, InodeInv) | yes, plus DinodeSlot, DiskBoot, ProofArgraw, ProofDirlookupParts, ProofFilestatParts, ProofFsinit, ProofKexecSeam, ProofKexecTail, ProofDirlink, ProofKwait, ProofSysUnlink, ProofSysPipe |
+| **λ-CONVERTED PAYLOADS** | none | SIX (below) |
+| **closed terms that had to be re-closed** | flagged as an open question | FOUR `inv` bodies + `boot_hart_res`; one cost a 33-minute crawl |
+| **`CtxMorph` chains that had to be built** | none | ~30 instances across 8 files |
+
+#### THE PAYLOAD CONSEQUENCE, AND THE PARK ROWS
+
+§0.12′ classified `wait_res` / `ticks_res` / `nextpid_res` as record-carried
+*because* `is_lock γ lk s R` was a closed term for them.  The flip moves that
+ground.  MEASURED, per payload:
+
+| payload | before | after the flip | what was done |
+|---|---|---|---|
+| `WaitInv.wait_res` | ξ-free (`↦₈` under a file that does NOT import TsoCtx) | **still ξ-free** | nothing |
+| `TicksInv.ticks_res` | ξ-free (`a_ticks ↦₄`) | ξ-INDEXED | λ-converted; `is_tickslock` moved below the section |
+| `SpecAllocpid.nextpid_res` | ξ-free (`alp_nextpid ↦₄`) | ξ-INDEXED | λ-converted at all 9 `<{ }>` sites; section gained the binder |
+| `SleepLock.sl_res_gen` | ξ-free | ξ-INDEXED (the `locked` word and the `pid` cell) | λ-converted; the file SPLIT into `SleepLock` / `SleepLockHandle` (no ambient) / `SleepLockRes` |
+| `BioInv.bcache_res` | ξ-free (§0.14′'s measurement) | ξ-INDEXED (`bio_slot_res` is all `↦₄`) | λ-converted, 15 sites |
+| `LogInv.log_res` | ξ-free | ξ-INDEXED (three counters + the header cells) | λ-converted via a new `log_pay`; the section SPLIT so the λ is spellable |
+| `IcacheInv.itable_res`, `IcacheEscrow.itable_res2` | ξ-free | ξ-INDEXED (the `inode_ident` halves) | λ-converted via `itable_pay` / `itable_pay2`; both sections split |
+
+**THE PARK ROWS SURVIVE, AND THE EXPECTED OUTCOME IS THE ONE THAT HAPPENED.**
+`ut_park_caps`'s three lock handles (`wait`, `ticks`, `nextpid`) are still
+CLOSED TERMS and still ride in the record: the wait lock never moved, and the
+other two are closed again *because* their payloads were λ-converted.  Not one
+line of `UsertrapRes.v`, `UtResFits.v` or `ParkCap.v` changed, and
+`ut_res_bare_park` / `usertrap_res_bare_park` are green untouched.  §0.12′'s
+table needs one edit and no re-ruling: the reason those three rows cross is
+now "their payloads are λ-converted", the same sentence the console, pipe,
+disk and ftable rows already carry.
+
+**AND ONE RULING THE FLIP FORCED AT THE LOCK ITSELF.**  `WpLock.lock_word` —
+the 4-byte `lk->locked` cell inside `lock_inv` — would have become
+AMBIENT-indexed, which drags a context into the persistent `is_lock` handle
+and would have falsified the park rows outright, with no payload conversion
+able to repair it.  It is now **∃-CONTEXT**, exactly like `lk_cpu_res`'s owner
+cell and for §0.8′ ruling 2's reason, with `lock_word_acc` as the bridge; every
+client-facing spelling (`lk ↦₄ 0` in and out of the creators/destroyers) is
+unchanged.  RAW was considered and REJECTED on a cutover argument worth
+keeping: the lock word is only ever READ exclusively (both `amoswap`s take the
+machine's exclusive arm, which reads flat memory at the top of the log), but
+release's word clear is a STORE, and a store owes `Wobl_ram`, whose γts update
+needs the cell's timestamp element — a cell with no ledger residue cannot be
+stored to (`tso-machine-flip.md` A6.16).
+
+#### FOUR BARE `inv` BODIES HAD TO BE RE-CLOSED, AND ONE COST 33 MINUTES
+
+A6.15 flagged "ctx facts inside a bare `inv`" as a STANDING QUESTION it did
+not have to answer.  On this tree it is not a question, it is the blocker
+class, because `FsReady.fs_ready` and `FirstTok.first_boot_persist` carry
+those handles and owe `CtxMorph`.  The rule that came out of it, and it is the
+same rule three times over: **an `inv`/`cinv` body must be a CLOSED TERM, so
+its cells go ∃-CONTEXT with a named `_acc` equation, and the ∃-ELIMINATION is
+the SC-only step.**
+
+- `IcacheInv.itable_body` — `iref_cells` became `[∗ list] k, iref_cell k …`
+  with `iref_cell_acc`; every accessor keeps its old statement through
+  `iref_cells_acc_eq`.
+- `FileInvDefs.off_content` — `off_cell` and `off_mark` are ∃ now, with
+  `off_cell_acc` / `off_resident_acc` / `off_raw_acc` / `off_mark_acc`.  This
+  is EXACTLY the stage-2 work `FileInvDefs.v`'s own header predicted
+  (§0.16′ step (i)), landing where it said it would — `FileOff`'s two borrow
+  lemmas — except that the header's "their `ctx_dom` premise" is, for now, the
+  shim's re-index: `ctx_dom`'s honest producer left the lock's transport path
+  at §0.18′, so the honest form is the borrow window's `ctx_absorb`, an M4
+  entry.
+- `IcacheEscrow.ic_escrow_body` — NOT re-closed, and this is the one place a
+  different answer was cheaper and is also honest: the body keeps its ambient
+  index and the HANDLE is transported by **Iris's `inv_iff`** against a
+  two-way `ic_escrow_body_reindex`, which is `TsoCtxShim.ctx_dom_sc` applied to
+  the body's own (new) `CtxMorph`.  That buys `ic_escrows_morph` for
+  `fs_ready` and `first_boot_persist` at the cost of ZERO changes at the ~27
+  opener sites.  Each use of the equivalence is an M4 entry; the honest form
+  is the escrow-as-parked-record idiom `BioInv.buf_escrow` already runs.
+- `StartedInv.started_body` — **the 33-minute crawl.**  `started_inv` is a
+  bare `inv` and the ADEQUACY proof hands the SAME persistent handle to every
+  hart at its OWN freshly-minted identity (`SystemAdequacy`'s per-secondary
+  `own_context_boot`).  With an ambient index in the body that hand-off is a
+  FALSE goal, and it failed the way §0.8′'s landmine says: by CRAWLING.
+  `SystemAdequacy.v` went from **3.6 s** (optimization.md's measured number,
+  without `Print Assumptions`) to **33 minutes and still running** on one
+  `iApply (boot_hart_secondary …)`.  `started_cell` + `started_cell_acc` closes
+  the body; `ProofMain` / `ProofMainSecondary` pay `started_cell_acc` at their
+  two peek-opens of the invariant.
+
+**AND THE SAME SENTENCE HID A SECOND CROSSING — THE EIGHT-HART ADEQUACY TRAP,
+A THIRD TIME.**  Closing `started_body` did not fix the crawl, it only moved
+the failure: `BootChain.boot_hart_res` carries `cpus[cid].noff` and
+`cpus[cid].intena`, and those are `↦₄`.  §0.16′ step (iv) had already made
+that bundle a CLOSED TERM (the `proc` row is `∀ ξ, cur_proc (XI := ξ)`,
+minted under the ∀ by `BootShared.boot_hart_pre`) precisely because
+`boot_shared_alloc` carves all eight bundles under ONE ambient while the harts
+run at eight distinct `own_context_boot` identities — and stage 2's flip
+silently un-closed it.  Fixed by the ruling that was already there: both cells
+stay RAW in `BootShared.cpu_slot_raw` / `boot_hart_bss` and cross **under the
+∀**, beside `proc`, in `boot_hart_pre`; `boot_entry_bridge` instantiates all
+three at `cur_ctx`.  Sound for `proc`'s two reasons — exclusive (so the ∀ is
+not duplicable, it is not under a `□`) and timestamp-0 boot-image cells,
+§0.4 item 6's one sanctioned case.  `SystemAdequacy.v` is back at seconds.
+**THE STANDING LESSON:** every `∀ ξ`-quantified or ∃-context row that an
+earlier stage introduced is a row a LATER tier flip can silently re-index —
+when a family flips, re-read the closed-term bundles that mention its width,
+not only the files that fail.
+  **THE DIAGNOSTIC RULE, restated because it earned it:** a build round whose
+  only remaining worker has been alive for tens of minutes is not a slow file,
+  it is a false ξ-crossing; `ps -o pid,etime,rss -C rocqworker --sort=-etime`
+  finds it and `coqc -time` names the sentence — and if the sentence is one
+  big `iApply`, split it into `iPoseProof` + one `iSpecialize` per premise:
+  the crawl becomes an ordinary "cannot instantiate" error naming the row.
+
+Also re-closed, though not an `inv`: **`IcacheRef.inode_held_short_any`**, the
+∃-context wrapper for `FileInvDefs.inode_pay`'s `cinv` body.  §0.16′'s whole
+point is that `inode_pay` / `file_core` / `file_payload` / `file_pay` are
+closed terms; after the icache flip the CINV BODY had to be closed by an ∃
+while the four wrappers stayed ξ-indexed-but-TRANSPORTABLE (a `CtxMorph` chain
+`inode_ident → inode_shr_gen → inode_shr_held_gen → inode_pay → file_core →
+file_payload → file_pay`, all new).
+
+#### THE ICACHE CLUSTER: A6.15's RULING HOLDS, ITS COST DOES NOT
+
+A6.15's decision — flip `IcacheRef`, the file that OWNS `inode_ident`'s two
+`↦₄` cells, rather than re-declare `↦₄` raw per file — is RE-DERIVED and
+TAKEN here for the same reason (a `Local Notation` only moves the
+disagreement, and a non-`Local` one silently un-flips importers).  Eleven
+files follow it, as A6.15 said.  What A6.15 could not see is the CASCADE
+above: on this tree the same ruling drags in `inode_held_short_any`, the
+`file_pay` morph chain, `itable_pay`/`itable_pay2`, and `ic_escrows_morph`.
+The ruling still looks right — the alternative is the whole fs-invariant
+cluster raw, and then every leaf that reads an inode cell is a seam — but the
+price is an order of magnitude larger than A6.15 records, and a re-run should
+budget for it.
+
+**`BreadLru` IS GENUINELY MIXED, exactly as A6.15 says.**  It takes the flip
+(the import, plus a binder on `Section BreadSlots` for `bio_slot_res`'s `↦₄`
+cells) and its SIX `bcache_lru` link words — `BcacheInv`'s, which stays raw —
+now spell `word_pointsto` explicitly.  Re-derived, not assumed: the six are in
+`Section BreadLru`, at `bnext`/`bprev`, and they are `↦₈`, not `↦₄`.
+
+`BitmapInv` is a file A6.15 does not mention and that this tree needs: its
+`bm_alloc_res` holds the two frozen superblock cells at `↦₄`, so it takes the
+import and a section binder.
+
+#### THE BOOT TIER STAYS RAW, AND THAT IS WHERE THE SHIM GREW
+
+`BootCarve` / `BootCarveMain` / `BootShared` are boot tier and keep the raw
+notations (the eight-hart adequacy trap; they talk through qualified
+`TsoCtx.…` names).  Their `↦₈` cells already crossed through
+`ctx_word_of_mem`; the `↦₄`/`↦₂` ones now cross the same way, ~50 sites.
+**A route that looked cheaper was tried and REVERTED**: flipping
+`BootCarve`'s five cell lemmas to yield the ctx form directly would have made
+all 50 call sites work unchanged, but `BootCarveMain`'s own intermediate
+definitions (`dinfo_raw`, `dops_raw`, `file_node_raw`, `bpay_raw`) are stated
+with the RAW notation, so the mismatch just moves inside that file.  The
+boundary belongs where the `↦₈` boundary already is.
+
+#### SHIM LEDGER
+
+| | before | after |
+|---|---|---|
+| files naming `TsoCtxShim` | 76 | 73 |
+| `TsoCtxShim.<lemma>` uses | 275 | 399 |
+
+The file count went DOWN and the use count went UP, and both numbers are the
+story.  NINE files lost the shim entirely — `ByteBuf`, `DinodeSlot`,
+`DiskBoot`, `InodeInv`, `PageFields`, `ProofArgraw`, `ProofDirlookupParts`,
+`ProofFilestatParts`, `ProofFsinit` — because their crossings were
+`↦₂`/`↦₄`-vs-`↦ₘ` seams that simply CEASED TO EXIST (A6.15's payoff, and it
+reproduced).  SIX files gained it — `FileInvDefs`, `IcacheEscrow`,
+`IcacheInv`, `IcacheRef`, `ProofAcquiresleep`, `StartedInv` — every one for an
+∃-context elimination this stage introduced.  The +124 uses are almost entirely
+the boot tier's new `↦₄`/`↦₂` crossings (75 `ctx_word4_of_mem`, 51
+`ctx_word4_to_mem`, 6 `ctx_word2_of_mem`) plus 20 `ctx_word4_reindex`.  **The reindex uses ARE the new M4 worklist**, and they sit in six
+files: `ProofBread` (14, across the three recycler `wp_…_au_…` windows — no
+absorb can run inside one, §0.17′'s rule), `FileInvDefs` (2,
+`off_cell_acc`/`off_mark_acc`), `IcacheRef` (2,
+`inode_held_short_any_intro`/`_elim`), `IcacheInv` (1, `iref_cell_acc`) and
+`StartedInv` (1, `started_cell_acc`).  `WpLock.lock_word_acc` needs none: its
+∃ is eliminated inside the file that owns the cell.
+
+#### WHAT M1 LEAVES BEHIND
+
+M1 is COMPLETE.  Deliberately raw, with the reasons recorded at their
+definitions: **`↦ₓ`** (kernel text — timestamp-0, context-free by the port's
+ruling), **`↦ᵣ`** (registers — per-hart machine state), **`↦ₚ`** (the physical
+tier — image bytes, the pristine gate's tier, the DMA window's flat half) and
+**`↦ₛ`** (strings — A6.15's two reasons, transferred verbatim).
+
+**RED SET: EMPTY.**  A CLEAN 1331-file VM round at exit 0 with zero errors,
+and a green incremental round on either side of it.  No `Admitted`, no
+`admit`, no new `Axiom`.  129 `.v` files changed; the only exported
+client-visible statements that MOVED are the ones A6.15's rulings move (the
+icache owner flip and its `file_pay` chain) plus the five ∃-context cells
+(`lock_word`, `iref_cell`, `off_cell`/`off_mark`, `started_cell`,
+`inode_held_short_any`), each of which keeps its old spelling available
+through a named `_acc` equation.
 
 ---
 

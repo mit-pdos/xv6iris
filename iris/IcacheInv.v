@@ -631,6 +631,7 @@ Section IcacheGhost.
     iFrame "Hslot".
     iApply (big_sepL_impl with "Hrest").
     iIntros "!>" (j x Hjx) "H".
+
     destruct (decide (j = k)) as [->|Hne]; [iExact "H"|].
     apply lookup_seq in Hjx as [Hx _].
     assert (Hxk : x <> k) by lia.
@@ -706,6 +707,7 @@ Section IcacheGhost.
     iFrame "Hslot".
     iApply (big_sepL_impl with "Hrest").
     iIntros "!>" (j x Hjx) "H".
+
     destruct (decide (j = k)) as [->|Hne]; [iExact "H"|].
     apply lookup_seq in Hjx as [Hx _].
     assert (Hxk : x <> k) by lia.
@@ -1384,11 +1386,46 @@ Section IcacheRefInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.   (* M1 stage 2: [iref_cells]' [↦₄] refcount cells *)
 
   Definition icacheN : namespace := nroot .@ "icache".
 
+  (* THE REF WORDS ARE ∃-CONTEXT (M1 flip, STAGE 2), and for the third time
+     the same reason: [iref_cells] sits inside [itable_body], which is a BARE
+     [inv]'s body, and an invariant body that names a context can only be
+     used by a thread AT that context -- while invariant bodies are not
+     updatable, so no transport exists (tso-port.md §0.12′).  ∃ closes it,
+     exactly as [WpLock.lk_cpu_res] / [lock_word] / [FileInvDefs.off_cell] do.
+     Every accessor below keeps its OLD statement, at the acting thread's
+     ambient form, through [iref_cell_acc] -- whose ∃-ELIMINATION is the
+     SC-only step and the M4 racy-kit worklist entry. *)
+  Definition iref_cell (k : nat) (v : mword 32) : iProp Σ :=
+    (∃ ξ : CtxId, ctx_word4_pointsto ξ (i_ref (ientry k)) (DfracOwn 1) v)%I.
+
+  Lemma iref_cell_acc (k : nat) (v : mword 32) :
+    iref_cell k v ⊣⊢ i_ref (ientry k) ↦₄ v.
+  Proof.
+    iSplit.
+    - iIntros "[%ξ H]".
+      iApply (TsoCtxShim.ctx_word4_reindex _ ξ cur_ctx with "H").
+    - iIntros "H". iExists cur_ctx. iExact "H".
+  Qed.
+
+  Global Instance iref_cell_timeless k v : Timeless (iref_cell k v).
+  Proof. rewrite /iref_cell. apply _. Qed.
+
   Definition iref_cells (M : gmap nat (Qp * positive)) : iProp Σ :=
-    ([∗ list] k ∈ seq 0 NINODE, i_ref (ientry k) ↦₄ iref_word M k)%I.
+    ([∗ list] k ∈ seq 0 NINODE, iref_cell k (iref_word M k))%I.
+
+  (* the whole big-op at the acting thread's ambient form: what every
+     accessor below states, and the ONE place the ∃-elimination is paid. *)
+  Lemma iref_cells_acc_eq (M : gmap nat (Qp * positive)) :
+    iref_cells M ⊣⊢
+    ([∗ list] k ∈ seq 0 NINODE, i_ref (ientry k) ↦₄ iref_word M k).
+  Proof.
+    rewrite /iref_cells. apply big_sepL_proper.
+    intros ? k _. apply iref_cell_acc.
+  Qed.
 
   (* The invariant's half of the authority sits BESIDE the cells, so the
      cells and the counts can never disagree, and a thread holding the
@@ -1415,7 +1452,7 @@ Section IcacheRefInv.
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ iref_word M k -∗ iref_cells M).
   Proof.
-    intros Hk. rewrite /iref_cells.
+    intros Hk. rewrite !iref_cells_acc_eq.
     iApply (big_sepL_lookup_acc
               (fun (_ : nat) (j : nat) => (i_ref (ientry j) ↦₄ iref_word M j)%I)
               (seq 0 NINODE) k k (seq_ninode_lookup k Hk)).
@@ -1436,7 +1473,7 @@ Section IcacheRefInv.
          i_ref (ientry k) ↦₄ iref_word (<[k := e]> M) k -∗
          iref_cells (<[k := e]> M)).
   Proof.
-    intros Hk. rewrite /iref_cells. iIntros "Hc".
+    intros Hk. rewrite !iref_cells_acc_eq. iIntros "Hc".
     iDestruct (big_sepL_delete _ (seq 0 NINODE) k k (seq_ninode_lookup k Hk)
                 with "Hc") as "[Hcell Hrest]".
     iFrame "Hcell". iIntros (e) "Hcell".
@@ -1444,10 +1481,12 @@ Section IcacheRefInv.
     iFrame "Hcell".
     iApply (big_sepL_impl with "Hrest").
     iIntros "!>" (j x Hjx) "H".
+    rewrite ?iref_cell_acc.
     destruct (decide (j = k)) as [->|Hne]; [iExact "H"|].
     apply lookup_seq in Hjx as [Hx _].
     assert (Hxk : k <> x) by lia.
-    rewrite /iref_word lookup_insert_ne; [iExact "H" | exact Hxk].
+    rewrite /iref_word lookup_insert_ne; [| exact Hxk].
+    rewrite ?iref_cell_acc. iExact "H".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1540,19 +1579,21 @@ Section IcacheRefInv.
       (i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32) -∗
        iref_cells (delete k M)).
   Proof.
-    intros Hk. rewrite /iref_cells. iIntros "Hc".
+    intros Hk. rewrite !iref_cells_acc_eq. iIntros "Hc".
     iDestruct (big_sepL_delete _ (seq 0 NINODE) k k (seq_ninode_lookup k Hk)
                 with "Hc") as "[Hcell Hrest]".
     iFrame "Hcell". iIntros "Hcell".
     iApply (big_sepL_delete _ (seq 0 NINODE) k k (seq_ninode_lookup k Hk)).
     iSplitL "Hcell".
-    { rewrite /iref_word lookup_delete. iExact "Hcell". }
+    { rewrite /iref_word lookup_delete ?iref_cell_acc. iExact "Hcell". }
     iApply (big_sepL_impl with "Hrest").
     iIntros "!>" (j x Hjx) "H".
+    rewrite ?iref_cell_acc.
     destruct (decide (j = k)) as [->|Hne]; [iExact "H"|].
     apply lookup_seq in Hjx as [Hx _].
     assert (Hxk : k <> x) by lia.
-    rewrite /iref_word lookup_delete_ne; [iExact "H" | exact Hxk].
+    rewrite /iref_word lookup_delete_ne; [| exact Hxk].
+    rewrite ?iref_cell_acc. iExact "H".
   Qed.
 
   (* THE TWO CLOSE WRITES ([iref_close_store_au], [iref_close_last_store_au])
@@ -2048,6 +2089,7 @@ Section IcacheRefInvReg.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.   (* M1 stage 2 *)
 
   (* ------------------------------------------------------------------ *)
   (*  THE PIN's TWO PURE FACTS                                           *)
@@ -3532,14 +3574,14 @@ Section IcacheTable.
   (* [inode_ident] and [inode_ref] are [IcacheRef.v]'s; only the JOIN
      helper below stayed, because [islot_rest_join] uses it. *)
   (* the fraction JOIN for one cell, as a wand.  A bare
-     [rewrite word4_pointsto_frac_split] at a call site rewrites the whole
+     [rewrite ctx_word4_pointsto_frac_split] at a call site rewrites the whole
      [envs_entails] -- hypotheses included -- and silently re-splits the very
      fragments being joined (durable-notes' proofmode rule); inside this
      lemma the two hypotheses' dfracs are bare variables, so the pattern
      matches the goal only. *)
   Local Lemma word4_frac_join (a : Arch.pa) (q1 q2 : Qp) (w : bv 32) :
     a ↦₄{DfracOwn q1} w -∗ a ↦₄{DfracOwn q2} w -∗ a ↦₄{DfracOwn (q1 + q2)} w.
-  Proof. iIntros "H1 H2". rewrite word4_pointsto_frac_split. iFrame. Qed.
+  Proof. iIntros "H1 H2". rewrite ctx_word4_pointsto_frac_split. iFrame. Qed.
 
   (* ---- THE IDENTITY BUDGET (design §13.1b, as corrected by §13.1e) ----
 
@@ -3619,11 +3661,73 @@ Section IcacheTable.
        itable_half M ∗ ⌜icM_wf M⌝ ∗ iref_slots_auth ∗
        [∗ list] k ∈ seq 0 NINODE, islot M k)%I.
 
+End IcacheTable.
+
+(* ===================================================================== *)
+(*  M1 FLIP, STAGE 2: THE itable LOCK'S PAYLOAD IS λ-CONVERTED.           *)
+(*  [islot]'s slot shares are [IcacheRef.inode_ident] halves -- [↦₄] cells *)
+(*  since the flip -- so [itable_res] names a context and the constant     *)
+(*  embedding would make the persistent HANDLE ξ-dependent and             *)
+(*  non-transportable.  The section binds no ambient the λ could capture.  *)
+(* ===================================================================== *)
+Section IcacheTablePay.
+  Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
+  Context `{ICFG : icfg}.
+  Context `{GEN : GenId}.
+
+  Global Instance islot_rest_at_morph (k : nat) (q : Qp) (dev inum : mword 32) :
+    CtxMorph (λ ξ : CtxId, islot_rest_at (XI := ξ) k q dev inum).
+  Proof.
+    rewrite /islot_rest_at. destruct (1/2 - q)%Qp as [q'|].
+    - apply (inode_ident_morph k (DfracOwn q') dev inum).
+    - iIntros (ξ ξ') "Hd H". iFrame.
+  Qed.
+
+  Global Instance islot_morph (M : gmap nat (Qp * positive)) (k : nat) :
+    CtxMorph (λ ξ : CtxId, islot (XI := ξ) M k).
+  Proof.
+    rewrite /islot /islot_rest /islot_free /islot_free_at.
+    destruct (M !! k) as [[q n]|].
+    - iIntros (ξ ξ') "Hd [(%dev & %inum & Hr) Hs]".
+      iDestruct (islot_rest_at_morph k q dev inum ξ ξ' with "Hd Hr")
+        as "[Hd Hr]".
+      iFrame "Hd Hs". iExists dev, inum. iExact "Hr".
+    - iIntros (ξ ξ') "Hd (%dev & %inum & Hr)".
+      iDestruct (inode_ident_morph k (DfracOwn (1/2)) dev inum ξ ξ'
+                   with "Hd Hr") as "[Hd Hr]".
+      iFrame "Hd". iExists dev, inum. iExact "Hr".
+  Qed.
+
+  Global Instance itable_res_morph : CtxMorph (λ ξ : CtxId, itable_res (XI := ξ)).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /itable_res.
+    iDestruct "H" as (M) "(Hh & %Hwf & Hsa & Hsl)".
+    iDestruct (ctx_morph_big_sepL (seq 0 NINODE)
+                 (λ _ (k : nat) (ξ0 : CtxId), islot (XI := ξ0) M k)
+                 (λ _ k, islot_morph M k)
+                 ξ ξ' with "Hd Hsl") as "[Hd Hsl]".
+    iFrame "Hd". iExists M. by iFrame.
+  Qed.
+
+  Definition itable_pay : CtxId -> iProp Σ :=
+    λ ξ : CtxId, itable_res (XI := ξ).
+
+  Global Instance itable_pay_morph : CtxMorph itable_pay.
+  Proof. rewrite /itable_pay. apply _. Qed.
+
   Definition is_itable (γl : gname) : iProp Σ :=
-    is_lock γl itable_lock "itable"%string <{ itable_res }>.
+    is_lock γl itable_lock "itable"%string itable_pay.
 
   Global Instance is_itable_persistent γl : Persistent (is_itable γl).
   Proof. apply _. Qed.
+
+End IcacheTablePay.
+
+Section IcacheTable2.
+  Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
+  Context `{ICFG : icfg}.
+  Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* The lock resource's slot accessor, in the form a WRITER needs: the map
      may come back CHANGED, provided it changed only at [k].  Same shape and
@@ -3648,6 +3752,7 @@ Section IcacheTable.
     iFrame "Hslot".
     iApply (big_sepL_impl with "Hrest").
     iIntros "!>" (j x Hjx) "H".
+
     destruct (decide (j = k)) as [->|Hne]; [iExact "H"|].
     apply lookup_seq in Hjx as [Hx _].
     assert (Hxk : x <> k) by lia.
@@ -3673,8 +3778,8 @@ Section IcacheTable.
     destruct (1/2 - qt)%Qp as [q'|] eqn:Et.
     - apply Qp.sub_Some in Et.        (* 1/2 = qt + q' *)
       iIntros "[Hd Hn] (%d & %n & [Hd' Hn'])".
-      iDestruct (word4_pointsto_agree with "Hd Hd'") as %->.
-      iDestruct (word4_pointsto_agree with "Hn Hn'") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hd Hd'") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hn Hn'") as %->.
       iSplitL "Hd Hd'".
       + iDestruct (word4_frac_join with "Hd Hd'") as "H".
         iEval (rewrite -Et) in "H". iExact "H".
@@ -3685,4 +3790,4 @@ Section IcacheTable.
       iIntros "_ (%d0 & %n0 & [])".
   Qed.
 
-End IcacheTable.
+End IcacheTable2.

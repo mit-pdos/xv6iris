@@ -268,6 +268,7 @@ Qed.
 
 Section ProcdumpLoopRes.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.   (* M1 stage 2: [SpecProcdump.proc_dump_slot] *)
 
   Lemma pdl_slot_mk (pa : mword 64) (dqs dqp dqn : dfrac)
       (st pid : mword 32) (nm : string) :

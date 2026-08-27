@@ -277,7 +277,7 @@ Section ProofBpin.
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bpin + 0x14) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 (bn_lk bn) "bcache"%string <{ bcache_res bn V }> mA
+    iApply (Acquire.wp_acquire_sconf KT1 (bn_lk bn) "bcache"%string (λ ξ : CtxId, bcache_res (XI := ξ) bn V) mA
               n eb p (K - 4)%nat b lks
               Hnoffpos ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -325,11 +325,11 @@ Section ProofBpin.
         iAssert (b_dev (bpa k) ↦₄{DfracOwn (qr/2)} (devs k) ∗
                  b_dev (bpa k) ↦₄{DfracOwn (qr/2)} (devs k))%I
           with "[Hdev]" as "[Hdev1 Hdev2]".
-        { rewrite -word4_pointsto_frac_split Qp.div_2. iExact "Hdev". }
+        { rewrite -ctx_word4_pointsto_frac_split Qp.div_2. iExact "Hdev". }
         iAssert (b_blockno (bpa k) ↦₄{DfracOwn (qr/2)} (bnos k) ∗
                  b_blockno (bpa k) ↦₄{DfracOwn (qr/2)} (bnos k))%I
           with "[Hbno]" as "[Hbno1 Hbno2]".
-        { rewrite -word4_pointsto_frac_split Qp.div_2. iExact "Hbno". }
+        { rewrite -ctx_word4_pointsto_frac_split Qp.div_2. iExact "Hbno". }
         assert (Hsucc : Pos.to_nat (Pos.succ cnt) = (Pos.to_nat cnt + 1)%nat)
           by (rewrite Pos2Nat.inj_succ; lia).
         iEval (rewrite /bslot) in "Hbslot".
@@ -372,11 +372,11 @@ Section ProofBpin.
         iAssert (b_dev (bpa k) ↦₄{DfracOwn (1/4)} (devs k) ∗
                  b_dev (bpa k) ↦₄{DfracOwn (1/4)} (devs k))%I
           with "[Hdev]" as "[Hdev1 Hdev2]".
-        { rewrite -word4_pointsto_frac_split bp_quarter_half. iExact "Hdev". }
+        { rewrite -ctx_word4_pointsto_frac_split bp_quarter_half. iExact "Hdev". }
         iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/4)} (bnos k) ∗
                  b_blockno (bpa k) ↦₄{DfracOwn (1/4)} (bnos k))%I
           with "[Hbno]" as "[Hbno1 Hbno2]".
-        { rewrite -word4_pointsto_frac_split bp_quarter_half. iExact "Hbno". }
+        { rewrite -ctx_word4_pointsto_frac_split bp_quarter_half. iExact "Hbno". }
         iEval (rewrite /bslot) in "Hbslot".
         iAssert (bio_slot_res bn (<[k := ((1/4)%Qp, 1%positive)]> Mg) k (devs k) (bnos k))
           with "[Hcell Hbslot Hdev1 Hbno1]" as "Hslot".
@@ -519,7 +519,7 @@ Section ProofBpin.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> D5
+    iApply (Release.wp_release_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string (λ ξ : CtxId, bcache_res (XI := ξ) bn V) D5
               n eb p (K - 4)%nat
               ({["bcache"]} ∪ lks)
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)

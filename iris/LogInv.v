@@ -1095,6 +1095,102 @@ Section LogInv.
           ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
           log_state Psi bn γfs cov logstart n LB (op_pending om)))%I.
 
+End LogInv.
+
+(* ===================================================================== *)
+(*  M1 FLIP, STAGE 2: THE LOG LOCK'S PAYLOAD IS λ-CONVERTED.              *)
+(*                                                                        *)
+(*  [log_state]'s header cells and [log_res]'s three counter cells are     *)
+(*  [↦₄], so the payload stopped being a closed term at the flip.  Under   *)
+(*  the constant embedding [<{ log_res … }>] the lock HANDLE would become  *)
+(*  ξ-dependent and NON-TRANSPORTABLE -- an [is_lock] over an invariant    *)
+(*  body is not updatable (tso-port.md §0.12′) -- and [FsReady.fs_ready],  *)
+(*  which carries [log_ctx], would lose its [CtxMorph].  The λ-conversion  *)
+(*  (§0.7′ recipe rule 1) makes the handle a CLOSED TERM again, exactly as *)
+(*  it did for the console, the pipe, the disk, the ftable and (this       *)
+(*  stage) the sleeplock, the bcache, the tick and the nextpid locks.      *)
+(*                                                                        *)
+(*  The section binds NO ambient [CurCtx]: a λ that could capture one is   *)
+(*  the silent-drop hazard (§0.8′ rule 3).                                 *)
+(* ===================================================================== *)
+Section LogPay.
+  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !bioslotG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{GEN : GenId}.
+
+  Global Instance log_state_morph (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
+      (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+      (logstart : Z) (n : nat) (LB pend : gset Z) :
+    CtxMorph (λ ξ : CtxId, log_state (XI := ξ) Psi bn γfs cov logstart n LB pend).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /log_state.
+    iDestruct "H" as (W L D M)
+      "(%H1 & %H2 & %H3 & %H4 & Hn & Hblk & Hjunk & Hrest)".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hn") as "[Hd Hn]".
+    iDestruct (ctx_morph_big_sepL W
+                 (λ (i : nat) (w : SailStdpp.Values.mword 32) (ξ0 : CtxId),
+                    ctx_word4_pointsto ξ0 (lh_block i) (DfracOwn 1) w)
+                 (λ i w, ctx_morph_word4 _ _ _ _)
+                 ξ ξ' with "Hd Hblk") as "[Hd Hblk]".
+    iDestruct (ctx_morph_big_sepL (seq n (LOGBLOCKS - n))
+                 (λ _ (i : nat) (ξ0 : CtxId),
+                    (∃ junk : SailStdpp.Values.mword 32,
+                       ctx_word4_pointsto ξ0 (lh_block i) (DfracOwn 1) junk)%I)
+                 (λ _ i, ctx_morph_exist _ (λ junk, ctx_morph_word4 _ _ _ _))
+                 ξ ξ' with "Hd Hjunk") as "[Hd Hjunk]".
+    iFrame "Hd". iExists W, L, D, M. by iFrame.
+  Qed.
+
+  Global Instance log_res_morph (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
+      (γ : log_names) (bn : bio_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) :
+    CtxMorph (λ ξ : CtxId, log_res (XI := ξ) Psi γ bn γfs cov logstart).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /log_res.
+    iDestruct "H" as (out cmt nc om E X)
+      "(Hout & Hcmt & Hnc & Hops & %Hs1 & %Hs2 & %Hs3 & %Hs4 & Hep & %Hs5
+        & Hlg & %Hs6 & %Hs7 & Harm)".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hout") as "[Hd Hout]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hcmt") as "[Hd Hcmt]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hnc") as "[Hd Hnc]".
+    iAssert (ctx_dom ξ ξ' ∗
+             (if cmt then emp
+              else ∃ (n : nat) (LB : gset Z),
+                ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
+                ⌜forall i e, om !! i = Some e -> e.1.2 ⊆ LB⌝ ∗
+                ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
+                log_state (XI := ξ') Psi bn γfs cov logstart n LB (op_pending om)))%I
+      with "[Hd Harm]" as "[Hd Harm]".
+    { destruct cmt; [ by iFrame |].
+      iDestruct "Harm" as (n LB) "(%Ha & %Hb & %Hc & Hst)".
+      iDestruct (log_state_morph Psi bn γfs cov logstart n LB (op_pending om)
+                   ξ ξ' with "Hd Hst") as "[Hd Hst]".
+      iFrame "Hd". iExists n, LB. by iFrame. }
+    iFrame "Hd". iExists out, cmt, nc, om, E, X.
+    iFrame "Hout Hcmt Hnc Hops Hep Hlg Harm".
+    iSplit; [by iPureIntro|]. iSplit; [by iPureIntro|].
+    iSplit; [by iPureIntro|]. iSplit; [by iPureIntro|].
+    iSplit; [by iPureIntro|]. iSplit; [by iPureIntro|].
+    by iPureIntro.
+  Qed.
+
+  (* THE PAYLOAD, NAMING ITS CONTEXT.  Every [is_lock]/acquire/release
+     mention of the log lock spells THIS instead of [<{ log_res … }>]. *)
+  Definition log_pay (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
+      (γ : log_names) (bn : bio_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) : CtxId -> iProp Σ :=
+    λ ξ : CtxId, log_res (XI := ξ) Psi γ bn γfs cov logstart.
+
+  Global Instance log_pay_morph Psi γ bn γfs cov logstart :
+    CtxMorph (log_pay Psi γ bn γfs cov logstart).
+  Proof. rewrite /log_pay. apply _. Qed.
+
+End LogPay.
+
+Section LogInvCtx.
+  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !bioslotG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{XI : CurCtx}.
+  Context `{GEN : GenId}.
+
   (* the persistent bundle every log function shares: the sealed lock and
      the two cells initlog wrote once and froze *)
   (* THE Psi-NAMED FORM.  [log_ctx] below is its existential closure, so the
@@ -1109,7 +1205,7 @@ Section LogInv.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (dev : SailStdpp.Values.mword 32) : iProp Σ :=
-    (is_lock (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }> ∗
+    (is_lock (ln_lk γ) log_addr "log"%string (log_pay Psi γ bn γfs cov logstart) ∗
      l_dev ↦₄□ dev ∗
      l_start ↦₄□ (mword_of_int logstart : mword 32) ∗
      (* THE ERA'S SWAP RECEIPT (phase C2b/D1 stage 3).  [initlog]'s swap
@@ -1154,7 +1250,7 @@ Section LogInv.
 
   Lemma log_ctx_at_lock Psi γ bn γfs cov logstart dev :
     log_ctx_at Psi γ bn γfs cov logstart dev -∗
-    is_lock (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }>.
+    is_lock (ln_lk γ) log_addr "log"%string (log_pay Psi γ bn γfs cov logstart).
   Proof. rewrite /log_ctx_at. iIntros "($ & _)". Qed.
 
   Lemma log_ctx_at_psi Psi γ bn γfs cov logstart dev :
@@ -1597,4 +1693,38 @@ Section LogInv.
     iModIntro. iExists γ. iFrame.
   Qed.
 
-End LogInv.
+End LogInvCtx.
+
+(* ===================================================================== *)
+(*  THE CONTEXT BUNDLE'S TRANSPORT (M1 flip, STAGE 2).                    *)
+(*  [log_ctx_at] is ξ-INDEXED -- its two frozen [↦₄□] cells are -- but it  *)
+(*  is TRANSPORTABLE, which is what [FsReady.fs_ready_morph] needs.  What  *)
+(*  had to become closed is the lock HANDLE, and [log_pay] did that.      *)
+(* ===================================================================== *)
+Section LogCtxMorph.
+  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !bioslotG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{GEN : GenId}.
+
+  Global Instance log_ctx_at_morph (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
+      (γ : log_names) (bn : bio_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (dev : SailStdpp.Values.mword 32) :
+    CtxMorph (λ ξ : CtxId, log_ctx_at (XI := ξ) Psi γ bn γfs cov logstart dev).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /log_ctx_at.
+    iDestruct "H" as "(#Hlk & Hdv & Hst & Hrest)".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdv") as "[Hd Hdv]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hst") as "[Hd Hst]".
+    iFrame "Hd Hlk Hdv Hst Hrest".
+  Qed.
+
+  Global Instance log_ctx_morph (γ : log_names) (bn : bio_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (dev : SailStdpp.Values.mword 32) :
+    CtxMorph (λ ξ : CtxId, log_ctx (XI := ξ) γ bn γfs cov logstart dev).
+  Proof.
+    iIntros (ξ ξ') "Hd [%Psi H]". rewrite /log_ctx.
+    iDestruct (log_ctx_at_morph Psi γ bn γfs cov logstart dev ξ ξ'
+                 with "Hd H") as "[Hd H]".
+    iFrame "Hd". iExists Psi. iExact "H".
+  Qed.
+
+End LogCtxMorph.

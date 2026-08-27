@@ -436,7 +436,7 @@ Section WriteHeadDefs.
   (* ---------------------------------------------------------------- *)
   (*  the payload, split into pieces that survive the write            *)
   (* ---------------------------------------------------------------- *)
-  Lemma wh_pay_split (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma wh_pay_split `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
@@ -449,7 +449,7 @@ Section WriteHeadDefs.
     - rewrite /fs_mclean. iIntros "[[$ $] _]"; try done.
   Qed.
 
-  Lemma wh_pay_mk (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma wh_pay_mk `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bs : list (bv 8)) (d : bool) :
     (uint bno ↪[fs_cache γfs]{#(1/2)} bs) -∗

@@ -1044,6 +1044,8 @@ Section ProofSysUnlinkFrame.
        4-byte tower through the shim *)
     iIntros "H". iDestruct (TsoCtxShim.ctx_word_to_mem with "H") as "H".
     iDestruct (word_pointsto_split4 with "H") as "[Hlo Hhi]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hlo") as "Hlo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hhi") as "Hhi".
     iFrame "Hlo Hhi".
   Qed.
 
@@ -1054,6 +1056,8 @@ Section ProofSysUnlinkFrame.
   Proof.
     intro Hal. iIntros "Hlo Hhi".
     iApply TsoCtxShim.ctx_word_of_mem.
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hlo") as "Hlo".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hhi") as "Hhi".
     iApply (word_pointsto_join4 _ _ _ _ Hal with "Hlo Hhi").
   Qed.
 

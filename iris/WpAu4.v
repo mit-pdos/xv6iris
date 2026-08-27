@@ -123,12 +123,22 @@ Section Au4Leaves.
               = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
       by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hclaim HAU Hcont".
+    (* M1 stage 2: the client states the window in the flipped 4-byte
+       family, the leaf interior in wordw_pointsto 4.  The adapter is
+       WpSconfMem.wordw4_ctx, and it has to be applied to the RE-INTRO'd
+       fact rather than under the update's binder (the setoid rewrite
+       leaves undefined evars there). *)
     iApply (wp_load_s_sconf_au (kt := kt) (ktd := KT0) 4 cmp false pc rd rs1 imm m av
               (fun w => sign_extend' 64 w) Ψ Em b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm
-              with "Hcg Hpc Hinstr Hclaim HAU Hcont").
+              with "Hcg Hpc Hinstr Hclaim [HAU] Hcont").
+    iMod "HAU" as (v) "[Hw Hcl]". iModIntro. iExists v.
+    iEval (rewrite -wordw4_ctx) in "Hw".
+    iSplitL "Hw"; [ iExact "Hw" | ].
+    iIntros "Hw". iEval (rewrite wordw4_ctx) in "Hw".
+    iApply ("Hcl" with "Hw").
   Qed.
 
   (* [sw rs2, imm(rs1)], same discipline. *)
@@ -170,12 +180,22 @@ Section Au4Leaves.
     assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hclaim HAU Hcont".
+    (* M1 stage 2: the client states the window in the flipped 4-byte
+       family, the leaf interior in wordw_pointsto 4.  The adapter is
+       WpSconfMem.wordw4_ctx, and it has to be applied to the RE-INTRO'd
+       fact rather than under the update's binder (the setoid rewrite
+       leaves undefined evars there). *)
     iApply (wp_store_s_sconf_au (kt := kt) (ktd := KT0) 4 cmp pc rs2 rs1 imm m av
               (trunc32 (rget m rs2)) Ψ Em b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (rget m rs2)) HkptEm
-              with "Hcg Hpc Hinstr Hclaim HAU Hcont").
+              with "Hcg Hpc Hinstr Hclaim [HAU] Hcont").
+    iMod "HAU" as (vold) "[Hw Hcl]". iModIntro. iExists vold.
+    iEval (rewrite -wordw4_ctx) in "Hw".
+    iSplitL "Hw"; [ iExact "Hw" | ].
+    iIntros "Hw". iEval (rewrite wordw4_ctx) in "Hw".
+    iApply ("Hcl" with "Hw").
   Qed.
 
 End Au4Leaves.

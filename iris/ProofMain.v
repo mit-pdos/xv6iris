@@ -866,7 +866,7 @@ Section ProofMain.
         (* THE nextpid LOCK, built here out of procinit's [lk_fresh] and the
            cell above.  Persistent.  allocproc takes it, so kfork, sys_fork
            and -- at its real contract -- userinit all do. *)
-        is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+        is_lock γp alp_pid_lock "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ)) -∗
         (* THE wait_lock, built the same way and for the first time.  Every
            consumer in the tree takes it -- kexit, kwait, reparent, the
            syscall environment -- and nothing has ever built one; see
@@ -1062,7 +1062,7 @@ Section ProofMain.
            writable .data words; see [KernelDataInv]'s header. ---- *)
     iDestruct (lk_fresh_pieces pid_lock_addr "nextpid"%string with "Hlpidf")
       as "(#Hpnm & Hpw & Hpc0)".
-    iMod (newlock ⊤ alp_pid_lock "nextpid"%string <{ nextpid_res }>
+    iMod (newlock ⊤ alp_pid_lock "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ))
             with "Hpnm Hpw Hpc0 [Hnpid]") as (γp) "#Hpidlock".
     { rewrite /nextpid_res. iExact "Hnpid". }
     (* ---- ASSEMBLY 2c: the wait_lock, and it is the SAME move.  procinit
@@ -1147,7 +1147,7 @@ Section ProofMain.
     (* a fupd in front of a [WP (Loop)] goal: the tree's idiom is to peel it
        with [fupd_wp] first (ProofIupdate.v records the same). *)
     iApply fupd_wp.
-    iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string <{ ticks_res }> with "Htn2 Htw2 Htc2 [Hticks]") as (γtl) "#Htl".
+    iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string (λ ξ : CtxId, ticks_res (XI := ξ)) with "Htn2 Htw2 Htc2 [Hticks]") as (γtl) "#Htl".
     { iApply (ticks_res_intro t0 with "Hticks"). }
     iModIntro.
     assert (Hretti : ret_pc (T1 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
@@ -1328,7 +1328,7 @@ Section ProofMain.
     (* ...and the [nextpid] lock, for the same reason and to the same place:
        userinit's real contract takes it (allocproc's own premise), the weak
        one does not.  Persistent, so carrying it costs a frame. *)
-    is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+    is_lock γp alp_pid_lock "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ)) -∗
     kalloc_env_at fsc_kalloc fsc_kpages (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
@@ -1996,10 +1996,16 @@ Section ProofMain.
     iApply fupd_wp.
     iMod (inv_acc ⊤ startedN with "Hsinv") as "[Hbody Hclose]"; [ solve_ndisj | ].
     iDestruct "Hbody" as (vpk) "[>Hword Hrest]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 started_addr (DfracOwn 1) vpk
+    (* M1 stage 2: the invariant body carries the ∃-CONTEXT cell
+       ([StartedInv.started_cell]) so that the body is a CLOSED term -- the
+       adequacy proof hands this one persistent handle to every hart at its
+       OWN identity.  Pay [started_cell_acc] to read the claim off it and put
+       it straight back. *)
+    iEval (rewrite started_cell_acc) in "Hword".
+    iDestruct (ctx_word4_claim (KTR2 := KT0) started_addr (DfracOwn 1) vpk
                  ltac:(lia) with "Hword") as "#Hstcl".
     iMod ("Hclose" with "[Hword Hrest]") as "_".
-    { iNext. iExists vpk. iFrame "Hword Hrest". }
+    { iNext. iExists vpk. rewrite started_cell_acc. iFrame "Hword Hrest". }
     iModIntro.
     iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 4 true (mword_of_int (KernelSyms.main + 0xb0))
               (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
@@ -2013,8 +2019,16 @@ Section ProofMain.
     { iApply (mni_b0 with "Htext"). }
     { rewrite Hsa. iExact "Hstcl". }
     { rewrite Hsa Hsvst.
-      iApply (started_inv_store_au (⊤ ∖ ↑minstretN) P ltac:(solve_ndisj)
-                with "Hsinv HP"). }
+      (* M1 stage 2: [StartedInv]'s cell is [↦₄], the leaf interior is
+         [wordw_pointsto 4]; the adapter has to be applied to the RE-INTRO'd
+         fact, not under the update's binder (WpSconfMem.wordw4_ctx). *)
+      iPoseProof (started_inv_store_au (⊤ ∖ ↑minstretN) P ltac:(solve_ndisj)
+                    with "Hsinv HP") as "Hau".
+      iMod "Hau" as (vold) "[Hw Hcl]". iModIntro. iExists vold.
+      iEval (rewrite -wordw4_ctx) in "Hw".
+      iSplitL "Hw"; [ iExact "Hw" | ].
+      iIntros "Hw". iEval (rewrite wordw4_ctx) in "Hw".
+      iApply ("Hcl" with "Hw"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc _".
     iEval (change (if true then 2%Z else 4%Z) with 2%Z) in "Hpc".

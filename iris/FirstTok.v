@@ -517,7 +517,7 @@ Section FirstTok.
     first_addr ↦₄□ (mword_of_int 0 : mword 32) -∗ False.
   Proof.
     iIntros "H1 H2".
-    iDestruct (word4_pointsto_agree with "H1 H2") as %Hv.
+    iDestruct (ctx_word4_pointsto_agree with "H1 H2") as %Hv.
     exfalso. revert Hv. vm_compute. discriminate.
   Qed.
 
@@ -748,8 +748,12 @@ Section FirstTokMorph.
     iDestruct "H9" as (pd pav pu) "[Hgeom Hdlk]".
     iDestruct (disk_geom_morph fsc_disk pd pav pu ξ ξ' with "Hd Hgeom")
       as "[Hd Hgeom]".
-    iFrame "Hd".
-    iFrame "H1 H2 H3 H5 H6 H7 H8 H10 H11 H12 H13 H14 H15 H16".
+    (* the icache escrows are bare [inv]s over ξ-indexed bodies since M1
+       stage 2 (IcacheEscrow's [ic_escrows_morph]). *)
+    iDestruct (ic_escrows_morph fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
+                 ξ ξ' with "Hd H12") as "[Hd H12]".
+    iFrame "Hd H12".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H10 H11 H13 H14 H15 H16".
     iFrame "%".
     iExists pd, pav, pu. iFrame "Hgeom Hdlk".
   Qed.
@@ -768,6 +772,20 @@ Section FirstTokMorph.
       as "[Hd Hsb]".
     iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hnm") as "[Hd Hnm]".
     iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hcpu") as "[Hd Hcpu]".
+    (* the log header's own [↦₄] cells became ξ-indexed at M1 stage 2 *)
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hlk") as "[Hd Hlk]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hst") as "[Hd Hst]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hout") as "[Hd Hout]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hcmt") as "[Hd Hcmt]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hnc") as "[Hd Hnc]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hn") as "[Hd Hn]".
+    iDestruct (ctx_morph_big_sepL (seq 0 LOGBLOCKS)
+                 (λ _ (i : nat) (ξ0 : CtxId),
+                    (∃ w : mword 32,
+                       ctx_word4_pointsto ξ0 (lh_block i) (DfracOwn 1) w)%I)
+                 (λ _ i, ctx_morph_exist _ (λ w, ctx_morph_word4 _ _ _ _))
+                 ξ ξ' with "Hd Hlh") as "[Hd Hlh]".
     iFrame "Hd".
     iExists dk, sb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu, sb_old.
     iFrame "Hg Hsb Hlk Hnm Hcpu Hst Hdev Hout Hcmt Hnc Hn Hlh Hmb Hir Hbs".
@@ -780,8 +798,11 @@ Section FirstTokMorph.
     iDestruct "H" as "[(Hc & Hp & Hka & Hfi) | [Hc Hr]]".
     - iDestruct (first_boot_persist_morph ξ ξ' with "Hd Hp") as "[Hd Hp]".
       iDestruct (first_fsinit_morph ξ ξ' with "Hd Hfi") as "[Hd Hfi]".
+      (* the [first] flag is a [↦₄] cell: ξ-indexed since M1 stage 2 *)
+      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hc") as "[Hd Hc]".
       iFrame "Hd". iLeft. iFrame "Hc Hp Hka Hfi".
     - iDestruct (fs_ready_morph ξ ξ' with "Hd Hr") as "[Hd Hr]".
+      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hc") as "[Hd Hc]".
       iFrame "Hd". iRight. iFrame "Hc Hr".
   Qed.
 

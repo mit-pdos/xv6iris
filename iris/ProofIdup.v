@@ -356,7 +356,7 @@ Section ProofIdup.
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dev }> mA
+    iApply (Acquire.wp_acquire_sconf KT1 γl "itable"%string (itable_pay2 cn γfs γi cov logstart nib dev) mA
               n eb p (K - 4)%nat b lks
               HnZ ltac:(lia)
               Hfresh
@@ -459,7 +459,7 @@ Section ProofIdup.
     iApply fupd_wp.
     iMod (iref_load_locked_au ⊤ M k ltac:(solve_ndisj) Hk with "Hinv Hhalf")
       as "[Hcellp Hbackp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry k))
                  (DfracOwn 1) (iref_word M k) ltac:(lia) with "Hcellp")
       as "#Hclaim0".
     iMod ("Hbackp" with "Hcellp") as "Hhalf".
@@ -664,7 +664,7 @@ Section ProofIdup.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Houtb) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dev }> D5
+    iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string (itable_pay2 cn γfs γi cov logstart nib dev) D5
               n eb p (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)

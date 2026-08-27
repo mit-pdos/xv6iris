@@ -230,7 +230,7 @@ Section ProofFreeproc.
     iEval (rewrite Hpaj) in "Hpid2".
     (* the two halves name the same word; settle it ONCE, at the top, so the
        tail block can just join them. *)
-    iDestruct (word4_pointsto_agree with "Hpid Hpid2") as %Hpideq.
+    iDestruct (ctx_word4_pointsto_agree with "Hpid Hpid2") as %Hpideq.
     subst pid2.
 
     (* ================================================================= *)
@@ -400,7 +400,7 @@ Section ProofFreeproc.
       iEval (rewrite Hq2a) in "Hpc".
       (* +0x2a sw zero,48(s1) : p->pid = 0.  BOTH halves are needed -- one
          came in with the block, the other out of [proc_pub]. *)
-      iDestruct (word4_pointsto_half_join with "Hpid Hpid2") as "Hpidf".
+      iDestruct (ctx_word4_pointsto_half_join with "Hpid Hpid2") as "Hpidf".
       iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x2a)) Rs1
                 (mword_of_int 48 : mword 12) me (K - 4)%nat pid false
                 with "Hcg Hpc [] [Hpidf]").
@@ -408,7 +408,7 @@ Section ProofFreeproc.
       { iEval (rgne; rewrite Hmes1 fr_off_48). iExact "Hpidf". }
       iIntros (CIDz3 Hsz3) "Hcg Hpc Hpidf".
       iEval (rgne; rewrite Hmes1 fr_off_48) in "Hpidf".
-      iDestruct (word4_pointsto_half_split with "Hpidf") as "[Hpid Hpid2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hpidf") as "[Hpid Hpid2]".
       assert (Hq2e : add_vec_int (mword_of_int (FR + 0x2a) : mword 64) 4 = mword_of_int (FR + 0x2e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq2e) in "Hpc".

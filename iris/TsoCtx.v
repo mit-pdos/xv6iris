@@ -453,6 +453,256 @@ Section ctx.
     iPureIntro. apply (bv_eq_of_bytes (n:=8)). intros j Hj. apply Hb. lia.
   Qed.
 
+  (* the byte-level tier weakening, the engine both stage-2 towers'
+     [ktier_mono] runs on ([RiscvPtsto.mem_ktier_mono]'s image).  Stated
+     here rather than in the shim because it is a LAW of the surface: a
+     fact registered to ξ at a narrow tier is the same fact at a wider
+     one, at every instantiation. *)
+  Lemma ctx_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} ξ a dq v :
+    ctx_pointsto (KTR := kt) ξ a dq v ⊢ ctx_pointsto (KTR := kt') ξ a dq v.
+  Proof.
+    rewrite !ctx_pointsto_unseal. iIntros "H".
+    iApply (mem_ktier_mono kt kt' with "H").
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (* M1 STAGE 2: the 2- and 4-byte ctx towers                          *)
+  (* ---------------------------------------------------------------- *)
+
+  (* ---- the 2-BYTE tower ([↦₂]) ---------------------------------------
+     Character-for-character the 8-byte tower above at width 2; the two
+     differ only in the alignment constant and the byte count, which is why
+     stage 2 costs nothing beyond re-declaring the notations.  NOT SEALED,
+     for the reason [ctx_word_pointsto] is not: a tower OVER the sealed byte
+     leaks nothing, and the tree's proofs destruct and frame the word shape
+     structurally. *)
+  Definition ctx_word2_pointsto `{KTR : !CurKtier} (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (w : bv 16) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr a) 2 = true⌝ ∗
+     [∗ list] j ∈ seq 0 2, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j))%I.
+
+  Section ctx_word2.
+    Context `{KTR : !CurKtier}.
+
+    Lemma ctx_word2_pointsto_unfold ξ a dq w :
+      ctx_word2_pointsto ξ a dq w ⊣⊢
+      ⌜is_aligned_paddr (Physaddr a) 2 = true⌝ ∗
+      ([∗ list] j ∈ seq 0 2, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j)).
+    Proof. reflexivity. Qed.
+
+    Lemma ctx_word2_pointsto_aligned_p ξ a dq w :
+      ctx_word2_pointsto ξ a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 2 = true⌝.
+    Proof. iIntros "[$ _]". Qed.
+
+    Lemma ctx_word2_pointsto_bytes ξ a dq w :
+      ctx_word2_pointsto ξ a dq w ⊢
+      [∗ list] j ∈ seq 0 2, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j).
+    Proof. iIntros "[_ $]". Qed.
+
+    Lemma ctx_word2_pointsto_intro ξ a dq w :
+      is_aligned_paddr (Physaddr a) 2 = true ->
+      ([∗ list] j ∈ seq 0 2, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j))
+      ⊢ ctx_word2_pointsto ξ a dq w.
+    Proof. iIntros (Hal) "H". by iFrame. Qed.
+
+    Global Instance ctx_word2_pointsto_timeless ξ a dq w :
+      Timeless (ctx_word2_pointsto ξ a dq w).
+    Proof. rewrite /ctx_word2_pointsto. apply _. Qed.
+
+    Global Instance ctx_word2_pointsto_discarded_persistent ξ a w :
+      Persistent (ctx_word2_pointsto ξ a DfracDiscarded w).
+    Proof. rewrite /ctx_word2_pointsto. apply _. Qed.
+
+    Lemma ctx_word2_pointsto_frac_split ξ a q1 q2 w :
+      ctx_word2_pointsto ξ a (DfracOwn (q1 + q2)) w ⊣⊢
+      ctx_word2_pointsto ξ a (DfracOwn q1) w ∗
+      ctx_word2_pointsto ξ a (DfracOwn q2) w.
+    Proof.
+      rewrite /ctx_word2_pointsto (ctx_bytes_frac_split ξ a 0 2 q1 q2 w).
+      iSplit; [iIntros "[#$ [$ $]]" | iIntros "[[#$ $] [_ $]]"].
+    Qed.
+
+    (* the HALF split/join, the form the escrow and fraction protocols use *)
+    Lemma ctx_word2_pointsto_half ξ a w :
+      ctx_word2_pointsto ξ a (DfracOwn 1) w ⊣⊢
+      ctx_word2_pointsto ξ a (DfracOwn (1/2)) w ∗
+      ctx_word2_pointsto ξ a (DfracOwn (1/2)) w.
+    Proof. rewrite -ctx_word2_pointsto_frac_split Qp.div_2. reflexivity. Qed.
+
+    Lemma ctx_word2_pointsto_half_split ξ a w :
+      ctx_word2_pointsto ξ a (DfracOwn 1) w -∗
+      ctx_word2_pointsto ξ a (DfracOwn (1/2)) w ∗
+      ctx_word2_pointsto ξ a (DfracOwn (1/2)) w.
+    Proof. rewrite ctx_word2_pointsto_half. iIntros "$". Qed.
+
+    Lemma ctx_word2_pointsto_half_join ξ a w :
+      ctx_word2_pointsto ξ a (DfracOwn (1/2)) w -∗
+      ctx_word2_pointsto ξ a (DfracOwn (1/2)) w -∗
+      ctx_word2_pointsto ξ a (DfracOwn 1) w.
+    Proof. iIntros "H1 H2". rewrite ctx_word2_pointsto_half. iFrame "H1 H2". Qed.
+
+    Lemma ctx_word2_pointsto_persist ξ a dq w :
+      ctx_word2_pointsto ξ a dq w ==∗
+      ctx_word2_pointsto ξ a DfracDiscarded w.
+    Proof.
+      iIntros "[#Hal H]".
+      iAssert (|==> [∗ list] j ∈ seq 0 2,
+        ctx_pointsto ξ (pa_add a j) DfracDiscarded (nth_byte w j))%I
+        with "[H]" as ">H".
+      { iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+        iIntros "!>" (k j Hj) "Hb". by iApply ctx_pointsto_persist. }
+      iModIntro. by iFrame "Hal H".
+    Qed.
+  End ctx_word2.
+
+  Lemma ctx_word2_pointsto_agree {kt1 kt2 : ktier} (ξ1 ξ2 : CtxId)
+      a dq1 w1 dq2 w2 :
+    ctx_word2_pointsto (KTR := kt1) ξ1 a dq1 w1 -∗
+    ctx_word2_pointsto (KTR := kt2) ξ2 a dq2 w2 -∗ ⌜w1 = w2⌝.
+  Proof.
+    iIntros "[_ H1] [_ H2]".
+    iDestruct (ctx_bytes_agree ξ1 ξ2 a 0 2 with "H1 H2") as %Hb.
+    iPureIntro. apply (bv_eq_of_bytes (n:=2)). intros j Hj. apply Hb. lia.
+  Qed.
+
+  (* the [ktier]-typed twins of the two instances above.  [RiscvPtsto]'s
+     tower carries the same pair, and for the same reason: a site whose tier
+     is a bare [ktier] value rather than the [CurKtier] class does not see
+     the class-typed instance. *)
+  Global Instance ctx_word2_pointsto_timeless' (ktr : ktier) (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (w : bv 16) :
+    Timeless (ctx_word2_pointsto (KTR := ktr) ξ a dq w).
+  Proof. exact (ctx_word2_pointsto_timeless (KTR := ktr) ξ a dq w). Qed.
+
+  Global Instance ctx_word2_pointsto_discarded_persistent' (ktr : ktier)
+      (ξ : CtxId) (a : Arch.pa) (w : bv 16) :
+    Persistent (ctx_word2_pointsto (KTR := ktr) ξ a DfracDiscarded w).
+  Proof. exact (ctx_word2_pointsto_discarded_persistent (KTR := ktr) ξ a w). Qed.
+
+  Lemma ctx_word2_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} ξ a dq w :
+    ctx_word2_pointsto (KTR := kt) ξ a dq w ⊢
+    ctx_word2_pointsto (KTR := kt') ξ a dq w.
+  Proof.
+    rewrite /ctx_word2_pointsto. iIntros "[$ H]".
+    iApply (big_sepL_mono with "H").
+    iIntros (k j _) "H". iApply (ctx_ktier_mono kt kt' with "H").
+  Qed.
+
+  (* ---- the 4-BYTE tower ([↦₄]) ---------------------------------------
+     Character-for-character the 8-byte tower above at width 4. *)
+  Definition ctx_word4_pointsto `{KTR : !CurKtier} (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (w : bv 32) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr a) 4 = true⌝ ∗
+     [∗ list] j ∈ seq 0 4, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j))%I.
+
+  Section ctx_word4.
+    Context `{KTR : !CurKtier}.
+
+    Lemma ctx_word4_pointsto_unfold ξ a dq w :
+      ctx_word4_pointsto ξ a dq w ⊣⊢
+      ⌜is_aligned_paddr (Physaddr a) 4 = true⌝ ∗
+      ([∗ list] j ∈ seq 0 4, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j)).
+    Proof. reflexivity. Qed.
+
+    Lemma ctx_word4_pointsto_aligned_p ξ a dq w :
+      ctx_word4_pointsto ξ a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 4 = true⌝.
+    Proof. iIntros "[$ _]". Qed.
+
+    Lemma ctx_word4_pointsto_bytes ξ a dq w :
+      ctx_word4_pointsto ξ a dq w ⊢
+      [∗ list] j ∈ seq 0 4, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j).
+    Proof. iIntros "[_ $]". Qed.
+
+    Lemma ctx_word4_pointsto_intro ξ a dq w :
+      is_aligned_paddr (Physaddr a) 4 = true ->
+      ([∗ list] j ∈ seq 0 4, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j))
+      ⊢ ctx_word4_pointsto ξ a dq w.
+    Proof. iIntros (Hal) "H". by iFrame. Qed.
+
+    Global Instance ctx_word4_pointsto_timeless ξ a dq w :
+      Timeless (ctx_word4_pointsto ξ a dq w).
+    Proof. rewrite /ctx_word4_pointsto. apply _. Qed.
+
+    Global Instance ctx_word4_pointsto_discarded_persistent ξ a w :
+      Persistent (ctx_word4_pointsto ξ a DfracDiscarded w).
+    Proof. rewrite /ctx_word4_pointsto. apply _. Qed.
+
+    Lemma ctx_word4_pointsto_frac_split ξ a q1 q2 w :
+      ctx_word4_pointsto ξ a (DfracOwn (q1 + q2)) w ⊣⊢
+      ctx_word4_pointsto ξ a (DfracOwn q1) w ∗
+      ctx_word4_pointsto ξ a (DfracOwn q2) w.
+    Proof.
+      rewrite /ctx_word4_pointsto (ctx_bytes_frac_split ξ a 0 4 q1 q2 w).
+      iSplit; [iIntros "[#$ [$ $]]" | iIntros "[[#$ $] [_ $]]"].
+    Qed.
+
+    (* the HALF split/join, the form the escrow and fraction protocols
+       use ([word4_pointsto_half*]'s images) *)
+    Lemma ctx_word4_pointsto_half ξ a w :
+      ctx_word4_pointsto ξ a (DfracOwn 1) w ⊣⊢
+      ctx_word4_pointsto ξ a (DfracOwn (1/2)) w ∗
+      ctx_word4_pointsto ξ a (DfracOwn (1/2)) w.
+    Proof. rewrite -ctx_word4_pointsto_frac_split Qp.div_2. reflexivity. Qed.
+
+    Lemma ctx_word4_pointsto_half_split ξ a w :
+      ctx_word4_pointsto ξ a (DfracOwn 1) w -∗
+      ctx_word4_pointsto ξ a (DfracOwn (1/2)) w ∗
+      ctx_word4_pointsto ξ a (DfracOwn (1/2)) w.
+    Proof. rewrite ctx_word4_pointsto_half. iIntros "$". Qed.
+
+    Lemma ctx_word4_pointsto_half_join ξ a w :
+      ctx_word4_pointsto ξ a (DfracOwn (1/2)) w -∗
+      ctx_word4_pointsto ξ a (DfracOwn (1/2)) w -∗
+      ctx_word4_pointsto ξ a (DfracOwn 1) w.
+    Proof. iIntros "H1 H2". rewrite ctx_word4_pointsto_half. iFrame "H1 H2". Qed.
+
+    Lemma ctx_word4_pointsto_persist ξ a dq w :
+      ctx_word4_pointsto ξ a dq w ==∗
+      ctx_word4_pointsto ξ a DfracDiscarded w.
+    Proof.
+      iIntros "[#Hal H]".
+      iAssert (|==> [∗ list] j ∈ seq 0 4,
+        ctx_pointsto ξ (pa_add a j) DfracDiscarded (nth_byte w j))%I
+        with "[H]" as ">H".
+      { iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+        iIntros "!>" (k j Hj) "Hb". by iApply ctx_pointsto_persist. }
+      iModIntro. by iFrame "Hal H".
+    Qed.
+  End ctx_word4.
+
+  Lemma ctx_word4_pointsto_agree {kt1 kt2 : ktier} (ξ1 ξ2 : CtxId)
+      a dq1 w1 dq2 w2 :
+    ctx_word4_pointsto (KTR := kt1) ξ1 a dq1 w1 -∗
+    ctx_word4_pointsto (KTR := kt2) ξ2 a dq2 w2 -∗ ⌜w1 = w2⌝.
+  Proof.
+    iIntros "[_ H1] [_ H2]".
+    iDestruct (ctx_bytes_agree ξ1 ξ2 a 0 4 with "H1 H2") as %Hb.
+    iPureIntro. apply (bv_eq_of_bytes (n:=4)). intros j Hj. apply Hb. lia.
+  Qed.
+
+  (* the [ktier]-typed twins of the two instances above.  [RiscvPtsto]'s
+     tower carries the same pair, and for the same reason: a site whose tier
+     is a bare [ktier] value rather than the [CurKtier] class does not see
+     the class-typed instance. *)
+  Global Instance ctx_word4_pointsto_timeless' (ktr : ktier) (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (w : bv 32) :
+    Timeless (ctx_word4_pointsto (KTR := ktr) ξ a dq w).
+  Proof. exact (ctx_word4_pointsto_timeless (KTR := ktr) ξ a dq w). Qed.
+
+  Global Instance ctx_word4_pointsto_discarded_persistent' (ktr : ktier)
+      (ξ : CtxId) (a : Arch.pa) (w : bv 32) :
+    Persistent (ctx_word4_pointsto (KTR := ktr) ξ a DfracDiscarded w).
+  Proof. exact (ctx_word4_pointsto_discarded_persistent (KTR := ktr) ξ a w). Qed.
+
+  Lemma ctx_word4_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} ξ a dq w :
+    ctx_word4_pointsto (KTR := kt) ξ a dq w ⊢
+    ctx_word4_pointsto (KTR := kt') ξ a dq w.
+  Proof.
+    rewrite /ctx_word4_pointsto. iIntros "[$ H]".
+    iApply (big_sepL_mono with "H").
+    iIntros (k j _) "H". iApply (ctx_ktier_mono kt kt' with "H").
+  Qed.
+
   (* ---------------------------------------------------------------- *)
   (* Transport: the ONLY ways a fact changes context                   *)
   (* ---------------------------------------------------------------- *)
@@ -616,6 +866,30 @@ Section ctx.
     iFrame "Hd". iSplit; [done|]. iExact "H".
   Qed.
 
+  (* the 2-byte cell's transport obligation *)
+  Global Instance ctx_morph_word2 (kt : ktier) a dq w :
+    CtxMorph (λ ξ, ctx_word2_pointsto (KTR := kt) ξ a dq w).
+  Proof.
+    iIntros (ξ ξ') "Hd [%Hal H]".
+    iDestruct (ctx_morph_big_sepL (seq 0 2)
+            (λ _ j ξ0, ctx_pointsto (KTR := kt) ξ0 (pa_add a j) dq (nth_byte w j))
+            (λ i x, ctx_morph_pointsto _ _ _ _)
+            ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame "Hd". iSplit; [done|]. iExact "H".
+  Qed.
+
+  (* the 4-byte cell's transport obligation *)
+  Global Instance ctx_morph_word4 (kt : ktier) a dq w :
+    CtxMorph (λ ξ, ctx_word4_pointsto (KTR := kt) ξ a dq w).
+  Proof.
+    iIntros (ξ ξ') "Hd [%Hal H]".
+    iDestruct (ctx_morph_big_sepL (seq 0 4)
+            (λ _ j ξ0, ctx_pointsto (KTR := kt) ξ0 (pa_add a j) dq (nth_byte w j))
+            (λ i x, ctx_morph_pointsto _ _ _ _)
+            ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame "Hd". iSplit; [done|]. iExact "H".
+  Qed.
+
   (* The composition acid test: a lock-payload-shaped assertion is
      morphable by typeclass search alone.  If this ever needs a manual
      proof, an instance regressed. *)
@@ -760,9 +1034,11 @@ Global Typeclasses Transparent CurCtx.
    IS the seam.  The spellings are character-identical, which is the
    whole point: statement text above the seam does not change, its
    MEANING does.  [↦c] becomes a synonym and is retired by attrition.
-   Stage 2 flips [↦₄]/[↦₂]/[↦ₛ]/[↦ₚ]; [↦ₓ] (text) and [↦ᵣ] (registers)
-   NEVER flip -- text is timestamp-0 context-free by the port's ruling,
-   and registers are per-hart machine state. *)
+   Stage 2 (below, after the payload wrapper) flips [↦₄]/[↦₂]; [↦ₛ] was
+   ASSESSED THERE AND DELIBERATELY LEFT RAW, and [↦ₚ] stays raw with it
+   (image bytes and the DMA window's flat half).  [↦ₓ] (text) and [↦ᵣ]
+   (registers) NEVER flip -- text is timestamp-0 context-free by the
+   port's ruling, and registers are per-hart machine state. *)
 Notation "a ↦ₘ{ dq } v" := (ctx_pointsto cur_ctx a dq v)
   (at level 20, format "a  ↦ₘ{ dq }  v") : bi_scope.
 Notation "a ↦ₘ□ v" := (ctx_pointsto cur_ctx a DfracDiscarded v)
@@ -783,13 +1059,76 @@ Notation "a ↦₈[ kt ] dq w" := (ctx_word_pointsto (KTR := kt) cur_ctx a dq w)
   (at level 20, kt at level 50, dq custom dfrac at level 1,
    format "a  ↦₈[ kt ] dq  w") : bi_scope.
 
+(* ================================================================== *)
+(* M1 STAGE 2: the [↦₂] and [↦₄] families.  Same mechanism as stage 1 --
+   the spellings are character-identical, the MEANING becomes the
+   context-indexed tower, and import order decides (a file that imports
+   this one after RiscvPtsto parses the flipped meaning; the kit below
+   never imports it and keeps the raw one).  All four dfrac spellings of
+   each family are re-declared, bracket form included, with the modifiers
+   copied EXACTLY -- an omitted [dq custom dfrac at level 1] leaves the
+   ε-dq spellings parsing raw, silently.
+
+   A FILE THAT NEEDS ONE FAMILY RAW while importing this one spells the
+   raw name out ([word4_pointsto]) -- it must NOT re-declare the notation,
+   because a non-[Local] [Notation] ESCAPES to importers and silently
+   un-flips their [↦₄] too (measured in the flip workspace: it broke
+   IcacheEscrow, which imports IcacheInv after TsoCtx).  Any per-file tier
+   override must be [Local Notation].
+
+   [↦ₛ] IS DELIBERATELY NOT FLIPPED; see the block after the seal. *)
+Notation "a ↦₂{ dq } w" := (ctx_word2_pointsto cur_ctx a dq w)
+  (at level 20, format "a  ↦₂{ dq }  w") : bi_scope.
+Notation "a ↦₂ w" := (ctx_word2_pointsto cur_ctx a (DfracOwn 1) w)
+  (at level 20, format "a  ↦₂  w") : bi_scope.
+Notation "a ↦₂□ w" := (ctx_word2_pointsto cur_ctx a DfracDiscarded w)
+  (at level 20, format "a  ↦₂□  w") : bi_scope.
+Notation "a ↦₂[ kt ] dq w" := (ctx_word2_pointsto (KTR := kt) cur_ctx a dq w)
+  (at level 20, kt at level 50, dq custom dfrac at level 1,
+   format "a  ↦₂[ kt ] dq  w") : bi_scope.
+
+Notation "a ↦₄{ dq } w" := (ctx_word4_pointsto cur_ctx a dq w)
+  (at level 20, format "a  ↦₄{ dq }  w") : bi_scope.
+Notation "a ↦₄ w" := (ctx_word4_pointsto cur_ctx a (DfracOwn 1) w)
+  (at level 20, format "a  ↦₄  w") : bi_scope.
+Notation "a ↦₄□ w" := (ctx_word4_pointsto cur_ctx a DfracDiscarded w)
+  (at level 20, format "a  ↦₄□  w") : bi_scope.
+Notation "a ↦₄[ kt ] dq w" := (ctx_word4_pointsto (KTR := kt) cur_ctx a dq w)
+  (at level 20, kt at level 50, dq custom dfrac at level 1,
+   format "a  ↦₄[ kt ] dq  w") : bi_scope.
+
+(* WHY [↦ₛ] STAYS RAW (the stage-2 assessment; tso-machine-flip.md §6
+   amendment A6.15, and it transfers to this tree unchanged).  It was
+   listed with [↦₂]/[↦₄] and it is the one that must NOT move, for two
+   independent reasons:
+
+   1. IT WOULD PUT A CONTEXT INSIDE [is_lock].  [WpLock.lock_name] is
+      [∃ p, word_pointsto (lock_name_field lk) □ p ∗ p ↦ₛ□ s], and
+      [lock_name] is half of the PERSISTENT lock handle.  Flipping [↦ₛ]
+      makes the handle ξ-dependent IN THE STATEMENT -- not as the artifact
+      of the constant embedding that tso-port.md §0.11′ measured -- and a
+      boot-minted [is_lock] then cannot be stated at another thread.  That
+      is tso-port.md §0.8′ ruling 2, the root both design problems were
+      routed around.
+   2. IT WOULD BUY NOTHING.  Every string fact in this tree is a DISCARDED
+      image literal (lock names, panic messages).  A discarded byte can
+      never owe [Wobl_ram], and its load obligation is discharged by the
+      PRISTINE (timestamp-0) gate, which needs no context at all.  The
+      ledger index would be dead weight on 37 files.
+
+   Net: flipping it removes ONE forget (in [kernel_data_string]), ADDS one
+   (in [lock_name_intro]), puts a binder on 37 files and a real ξ in the
+   lock handle.  [↦ₛ] therefore LEAVES the stage-2 list and joins
+   [↦ₓ]/[↦ᵣ]/[↦ₚ] as deliberately raw. *)
+
 (* The seal.  [ctx_dom] and [hart_view_lb] stay opaque too: nothing above
    this file may learn they are [True] at SC, and nothing may learn
    [ctx_parked] ignores its stamp. *)
 Global Typeclasses Opaque own_context ctx_parked hart_view_lb
   ctx_pointsto ctx_dom.
 Global Opaque own_context ctx_parked hart_view_lb ctx_pointsto ctx_dom.
-(* [ctx_word_pointsto] is NOT sealed at all: it is a tower OVER the sealed
+(* [ctx_word_pointsto] -- and its stage-2 siblings [ctx_word2_pointsto] /
+   [ctx_word4_pointsto] -- are NOT sealed at all: each is a tower OVER the sealed
    byte fact, so exposing its ⌜aligned⌝ ∗ big-op shape leaks nothing about
    SC-degeneracy -- and the tree's pre-flip proofs destruct/frame the word
    shape structurally (that worked when [word_pointsto] was transparent, and

@@ -503,7 +503,7 @@ Section ProofSysUnlinkBody.
   (* the two per-slot projections out of the boot families, at the copies
      THIS contract names ([ic_escrows] is IcacheEscrow's, [ic_sleeplocks]
      SpecDirlink's). *)
-  Lemma su_esc_acc `{GEN : GenId} (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Lemma su_esc_acc `{XI : CurCtx} `{GEN : GenId} (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
@@ -538,7 +538,7 @@ Section ProofSysUnlinkBody.
      T_DIR into [di_type dnd = T_DIR] at the record ilock returns.  Pure
      resource algebra; its home is [IcacheRef.v] and it is here for that
      file's rebuild-cone reason. *)
-  Lemma su_carve_gen (k : nat) (q s : Qp) (dv inum : mword 32) (gy : gname) :
+  Lemma su_carve_gen `{XI : CurCtx} (k : nat) (q s : Qp) (dv inum : mword 32) (gy : gname) :
     inode_ref_gen k (q + s)%Qp dv inum gy ⊣⊢
     inode_ref_short_gen k (q + s)%Qp q dv inum gy ∗ inode_shr_gen k s dv inum gy.
   Proof.
@@ -549,7 +549,7 @@ Section ProofSysUnlinkBody.
     - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
   Qed.
 
-  Lemma su_shed_gen (k : nat) (q : Qp) (dv inum : mword 32) (gy : gname) :
+  Lemma su_shed_gen `{XI : CurCtx} (k : nat) (q : Qp) (dv inum : mword 32) (gy : gname) :
     inode_ref_gen k q dv inum gy ⊣⊢
     inode_ref_short_gen k (q/2 + q/2)%Qp (q/2)%Qp dv inum gy ∗
     inode_shr_gen k (q/2)%Qp dv inum gy.
@@ -605,15 +605,12 @@ Section ProofSysUnlinkBody.
                (fun j Hj => eq_sym (su_half_bytes_eq data i j Hj))).
     iSplit.
     - iIntros "H".
-      iApply (word2_pointsto_intro (KTR := KT1) a (DfracOwn 1) (dir_inum data i) Hal).
-      (* stage 2: [word2_pointsto] is still the RAW byte tower while these
-         bytes are the flipped (ctx) ones -- the seam is named here. *)
-      iApply (ctx_buf_to_mem KT1 cur_ctx a 2
-                (fun j => nth_byte (dir_inum data i) j) (DfracOwn 1) with "H").
+      iApply (ctx_word2_pointsto_intro (KTR := KT1) cur_ctx a (DfracOwn 1)
+                (dir_inum data i) Hal).
+      (* M1 STAGE 2 PAYOFF: both crossings here are GONE. *)
+      iExact "H".
     - iIntros "H".
-      iApply (ctx_buf_of_mem KT1 cur_ctx a 2
-                (fun j => nth_byte (dir_inum data i) j) (DfracOwn 1)).
-      iApply (word2_pointsto_bytes (KTR := KT1) with "H").
+      iApply (ctx_word2_pointsto_bytes (KTR := KT1) with "H").
   Qed.
 
   Lemma su_name_acc `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :

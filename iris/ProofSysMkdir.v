@@ -739,7 +739,7 @@ Section ProofSysMkdirBody.
   (* the per-slot projection out of the boot family, at the copy THIS
      contract names ([ic_escrows] is IcacheEscrow's -- see fs-sysfile's
      trap 3 on the four [ic_sleeplocks] copies, which bites the same way). *)
-  Lemma md_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Lemma md_esc_acc `{XI : CurCtx} (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k

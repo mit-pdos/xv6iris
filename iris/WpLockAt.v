@@ -73,7 +73,7 @@ Section LockAt.
     iMod (inv_alloc lockN E (lock_inv γ lk s R)
             with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iNext. iExists (mword_of_int 0 : mword 32), None.
-      rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
+      rewrite lock_word_acc lk_cpu_res_free. iFrame "Hword Hcpu Ha".
       iLeft. iFrame "Hf HR". done. }
     iModIntro. iApply (is_lock_intro with "Hnm Hinv").
   Qed.

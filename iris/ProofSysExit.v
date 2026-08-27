@@ -169,6 +169,8 @@ Section ProofSysExit.
     (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses through the shim *)
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hb3") as "Hb3".
     iDestruct (word_pointsto_split4 with "Hb3") as "[Hb3lo Hb3hi]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hb3lo") as "Hb3lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hb3hi") as "Hb3hi".
     (* the two save-slot addresses, as the c.sdsp displacements compute them *)
     assert (Hpa : forall u k : nat, (k + u = 4)%nat -> (u < 4)%nat ->
               add_vec (M1 !!! Regidx csp_rs1)
@@ -326,6 +328,8 @@ Section ProofSysExit.
       rewrite /B1 upd_ne; [| vm_compute; discriminate].
       rewrite (proj1 HcsAi). exact HA4sp. }
     iEval (rewrite Haddrn) in "Hb3hi".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hb3lo") as "Hb3lo".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hb3hi") as "Hb3hi".
     iDestruct (word_pointsto_join4 (pa_stk sp0 3) (DfracOwn 1) _ _ Hal3
                  with "Hb3lo Hb3hi") as "Hb3".
     iDestruct (TsoCtxShim.ctx_word_of_mem with "Hb3") as "Hb3".

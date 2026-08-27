@@ -398,7 +398,7 @@ Section ProofSysOpenBody.
   (* ---- the two field reads the walk makes into the LOCKED record, as
      accessors: [ic_loaded] is carried whole across the block and opened
      for exactly one halfword at a time. ---- *)
-  Local Lemma so_meta_acc (gfs : fs_names) (gi : gname) (cov : gset Z)
+  Local Lemma so_meta_acc `{XI : CurCtx} (gfs : fs_names) (gi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     ic_loaded gfs gi cov logstart k inum dn bm -∗
     inode_meta (ientry k) dn ∗
@@ -413,7 +413,7 @@ Section ProofSysOpenBody.
               Hdoc Hduq with "Hl Hd Hm Ha Hr Hb Hv Hw Ht").
   Qed.
 
-  Local Lemma so_type_acc (ip : mword 64) (dn : dinode) :
+  Local Lemma so_type_acc `{XI : CurCtx} (ip : mword 64) (dn : dinode) :
     inode_meta ip dn -∗
     i_type ip ↦₂ di_type dn ∗ (i_type ip ↦₂ di_type dn -∗ inode_meta ip dn).
   Proof.
@@ -421,7 +421,7 @@ Section ProofSysOpenBody.
     iIntros "Hty". iFrame "Hty Hmaj Hmin Hnl Hsz".
   Qed.
 
-  Local Lemma so_maj_acc (ip : mword 64) (dn : dinode) :
+  Local Lemma so_maj_acc `{XI : CurCtx} (ip : mword 64) (dn : dinode) :
     inode_meta ip dn -∗
     i_major ip ↦₂ di_major dn ∗ (i_major ip ↦₂ di_major dn -∗ inode_meta ip dn).
   Proof.
@@ -2248,7 +2248,7 @@ Section ProofSysOpenBody.
 
   (* the per-slot projection out of the boot family, at the copy the
      syscall's contract names ([ProofSysMkdir.md_esc_acc]'s twin). *)
-  Local Lemma so_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Local Lemma so_esc_acc `{XI : CurCtx} (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k

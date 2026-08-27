@@ -101,9 +101,12 @@ Section ProofSysKill.
     (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses through the shim *)
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hb3") as "Hb3".
     iDestruct (word_pointsto_split4 with "Hb3") as "[Hb3lo Hb3hi]".
+    (* M1 stage 2: the HI half faces flipped 4-byte statements from here on *)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hb3hi") as "Hb3hi".
     iAssert (∀ nv : bv 32, pa_add (pa_stk sp0 3) 4 ↦₄[KT1] nv -∗ ∃ w, pa_stk sp0 3 ↦₈[KT1] w)%I
       with "[Hb3lo]" as "Hjoin3".
     { iIntros (nv) "Hhi". iExists _. iApply TsoCtxShim.ctx_word_of_mem.
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hhi") as "Hhi".
       iApply (word_pointsto_join4 _ _ _ _ Hal3 with "Hb3lo Hhi"). }
     (* the two save-slot addresses, as the c.sdsp displacements compute them *)
     assert (Hpa : forall u k : nat, (k + u = 4)%nat -> (u < 4)%nat ->

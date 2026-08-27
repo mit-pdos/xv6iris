@@ -95,6 +95,11 @@ Require Import Riscv.rv64d_types.
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+(* M1 flip, STAGE 2: [bm_alloc_res]'s two frozen superblock cells are [↦₄]
+   and meet the flipped family at every consumer, so this file takes the
+   flip.  The import must be LAST (after RiscvPtsto) for the notations to
+   re-point. *)
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -636,6 +641,7 @@ Record bm_alloc := MkBmAlloc {
 
 Section BitmapAllocRes.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.   (* M1 stage 2: the two [↦₄] superblock cells *)
 
   Definition bm_alloc_res (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (a : bm_alloc) : iProp Σ :=

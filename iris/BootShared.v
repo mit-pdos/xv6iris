@@ -327,8 +327,16 @@ Section BootBss.
   Local Definition cpu_slot_raw (a : Arch.pa) : iProp Σ :=
     (RiscvPtsto.word_pointsto a (DfracOwn 1) (zero_reg : mword 64) ∗
      own_ctx (add_vec a (mword_of_int 8 : mword 64)) ∗
-     (add_vec a (mword_of_int 120 : mword 64)) ↦₄ noff_val 0 ∗
-     (∃ iv : mword 32, (add_vec a (mword_of_int 124 : mword 64)) ↦₄ iv))%I.
+     (* THE noff/intena CELLS STAY RAW HERE TOO, for [proc]'s reason above:
+        M1 stage 2 flipped the 4-byte family, and if these two crossed at the
+        carve's ambient the whole of [BootChain.boot_hart_res] would be
+        ξ-indexed again.  They cross at the CONSUMER, under the ∀
+        ([boot_hart_pre]), exactly as [proc] does. *)
+     RiscvPtsto.word4_pointsto (add_vec a (mword_of_int 120 : mword 64))
+       (DfracOwn 1) (noff_val 0) ∗
+     (∃ iv : mword 32,
+        RiscvPtsto.word4_pointsto (add_vec a (mword_of_int 124 : mword 64))
+          (DfracOwn 1) iv))%I.
 
   Lemma boot_cpu_slot_raw (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
@@ -438,8 +446,12 @@ Section BootBssChain.
      stores to memory it already owns. *)
   Definition boot_hart_bss (h : CPU) : iProp Σ :=
     (stack_own_phys (mword_of_int (sp_of (fin_to_nat h))) boot_stack_depth ∗
-     a_cpu_noff (cid_word_of h) ↦₄ noff_val 0 ∗
-     (∃ iv : mword 32, a_cpu_int (cid_word_of h) ↦₄ iv) ∗
+     (* RAW, and see [cpu_slot_raw]: since M1 stage 2 these two cross under
+        the ∀ in [boot_hart_pre], with [proc]. *)
+     RiscvPtsto.word4_pointsto (a_cpu_noff (cid_word_of h)) (DfracOwn 1)
+       (noff_val 0) ∗
+     (∃ iv : mword 32,
+        RiscvPtsto.word4_pointsto (a_cpu_int (cid_word_of h)) (DfracOwn 1) iv) ∗
      RiscvPtsto.word_pointsto (a_cpu_proc (cid_word_of h)) (DfracOwn 1)
        (zero_reg : mword 64) ∗
      own_ctx (a_cpu_ctx (cid_word_of h)))%I.
@@ -942,6 +954,7 @@ Section BootBssChain.
     (* ================================================================ *)
     (* everything is carved; assemble.                                   *)
     (* ================================================================ *)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hst") as "Hst".
     iSplitL "Hst"; [iExact "Hst" |].
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
@@ -966,6 +979,7 @@ Section BootBssChain.
       iSplitL "Hfda"; [iExact "Hfda" |].
       iSplitL "Hbss"; [iExact "Hbss" |].
       iSplitL "Hip"; [iExists vip; iExact "Hip" |].
+      iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Htk") as "Htk".
       iSplitL "Htk"; [iExists vtk; rewrite /a_ticks; iExact "Htk" |].
       iSplitL "Hbsl"; [iExact "Hbsl" |].
       iSplitL "Hbln"; [iExact "Hbln" |].
@@ -985,6 +999,7 @@ Section BootBssChain.
       iSplitL "Hdf".
       { iExists (fun j : nat => boot_byte (KernelSyms.disk + 24 + Z.of_nat j)).
         rewrite disk_free_of_z. iExact "Hdf". }
+      iDestruct (TsoCtxShim.ctx_word2_of_mem _ TsoCtx.cur_ctx with "Hdi") as "Hdi".
       iSplitL "Hdi"; [rewrite d_used_idx_of_z; iExact "Hdi" |].
       iSplitL "Hslots"; [iExact "Hslots" |].
       iExact "Hring". }
@@ -1103,7 +1118,7 @@ Proof.
     vm_compute; apply (f_equal Some), bv_eq; reflexivity.
 Qed.
 
-Definition main_data_raw `{!riscvGS Σ} : iProp Σ :=
+Definition main_data_raw `{XI : CurCtx} `{!riscvGS Σ} : iProp Σ :=
   ((pa_of_z KernelSyms.first_1) ↦₄ (mword_of_int 1 : mword 32) ∗
    (∃ w : bv 32, (pa_of_z KernelSyms.nextpid)  ↦₄ w))%I.
 
@@ -1340,6 +1355,18 @@ Section BootAlloc.
       with "[Hproc]" as "Hproc".
     { iIntros (ξ). rewrite /ProcGeom.cur_proc.
       iApply (TsoCtxShim.ctx_word_of_mem with "Hproc"). }
+    (* ...and so do [noff] and [intena], since M1 stage 2 flipped the 4-byte
+       family (tso-port.md §0.19′): they were RAW rows of this bundle and are
+       context words now, so they cross under the ∀ exactly as [proc] does and
+       for the same two reasons (exclusive, timestamp-0). *)
+    iAssert (∀ ξ : CtxId,
+               ctx_word4_pointsto ξ (a_cpu_noff (cid_word_of h)) (DfracOwn 1)
+                 (noff_val 0))%I with "[Hnoff]" as "Hnoff".
+    { iIntros (ξ). iApply (TsoCtxShim.ctx_word4_of_mem with "Hnoff"). }
+    iAssert (∀ ξ : CtxId,
+               ctx_word4_pointsto ξ (a_cpu_int (cid_word_of h)) (DfracOwn 1)
+                 iv)%I with "[Hint]" as "Hint".
+    { iIntros (ξ). iApply (TsoCtxShim.ctx_word4_of_mem with "Hint"). }
     iEval (rewrite /own_ctx) in "Hctx".
     iDestruct "Hctx" as (vs) "[%Hvs Hc]".
     iAssert (∃ (ws : list (mword 64)) (ξ : CtxId),
@@ -1704,7 +1731,11 @@ Section BootAlloc.
     iSplitL "Hres"; [iExact "Hres" |].
     iSplitL "Hlocks"; [iExact "Hlocks" |].
     iSplitL "Hglobals"; [iExact "Hglobals" |].
-    iSplitL "Hfirst Hnext"; [rewrite /main_data_raw; iFrame "Hfirst Hnext" |].
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hfirst") as "Hfirst".
+    iDestruct "Hnext" as (wnp) "Hnext".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hnext") as "Hnext".
+    iSplitL "Hfirst Hnext";
+      [ rewrite /main_data_raw; iFrame "Hfirst"; iExists wnp; iExact "Hnext" |].
     iSplitL "Hpark"; [iExact "Hpark" |].
     iSplitL "Hpst"; [iExact "Hpst" |].
     iSplitL "Hprocsavail"; [iExact "Hprocsavail" |].

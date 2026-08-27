@@ -649,11 +649,11 @@ Section DlBuf.
   Proof.
     intro Hal. iIntros "H".
     iExists (Z_to_bv (16%N) (assemble_bytes [g 0%nat; g 1%nat])).
-    iApply (word2_pointsto_intro (KTR := KT1) a (DfracOwn 1) _ Hal).
+    iApply (ctx_word2_pointsto_intro (KTR := KT1) cur_ctx a (DfracOwn 1) _ Hal).
     rewrite (bb_ext (KTR := KT1) a 2 g
                (fun j => nth_byte (Z_to_bv (16%N) (assemble_bytes [g 0%nat; g 1%nat])) j)).
-    (* stage 2: [↦₂] is still the raw tower, so the ctx bytes cross here *)
-    - iApply (TsoCtxShim.ctx_buf_to_mem with "H").
+    (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
+    - iExact "H".
     - intros j Hj. destruct j as [| [| j]]; [| | exfalso; lia].
       + symmetry.
         rewrite (nth_byte_assemble_len (16%N) [g 0%nat; g 1%nat] 0%nat);
@@ -2166,17 +2166,14 @@ Section ProofDirlinkMain.
                         = mword_of_int (DK + 0x80)) by pcw.
         iEval (rewrite Hqq80) in "Hpc".
         (* ---- the sixteen bytes ARE [dirent_bytes (de_of_name inum s)] ---- *)
-        iDestruct (word2_pointsto_bytes (KTR := KT1) with "Hdehi") as "Hdehi".
+        iDestruct (ctx_word2_pointsto_bytes (KTR := KT1) with "Hdehi") as "Hdehi".
         iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
                    ↦ₘ[KT1] (dirent_bytes (de_of_name inum s) !!! jj))%I
           with "[Hdehi Hdenm]" as "Hsrc".
         { rewrite (dlk_de_split (KTR := KT1) (pa_stk sp0 10)
                      (fun jj => dirent_bytes (de_of_name inum s) !!! jj)).
           iSplitL "Hdehi".
-          - (* stage 2: [word2_pointsto_bytes] is a RAW law, the buffer is ctx *)
-            iDestruct (TsoCtxShim.ctx_buf_of_mem KT1 cur_ctx (pa_stk sp0 10) 2%nat
-                         (fun jj => nth_byte inum jj) (DfracOwn 1) with "Hdehi")
-              as "Hdehi".
+          - (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
             rewrite (bb_ext (KTR := KT1) (pa_stk sp0 10) 2
                        (fun jj => nth_byte inum jj)
                        (fun jj => dirent_bytes (de_of_name inum s) !!! jj)

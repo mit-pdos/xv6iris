@@ -203,8 +203,8 @@ Section BioInitAt.
     { rewrite -big_sepL_sep. iApply (big_sepL_mono with "Hbm").
       intros i k Hk. rewrite /buf_raw.
       iIntros "[(Hv & Hdk & Hdev & Hbno & Hrc & Hdata) Hmid]".
-      iDestruct (word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
-      iDestruct (word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
       iDestruct "Hdata" as (bs) "[%Hlen Hdata]".
       iSplitR "Hrc Hdev2 Hbno2".
       - rewrite /buf_parked.
@@ -231,7 +231,7 @@ Section BioInitAt.
       rewrite Hc0. iExact "Hpool". }
     (* and seal the bcache lock, at its published gname, over the assembled
        resource *)
-    iMod (newlock_at E (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }>
+    iMod (newlock_at E (bn_lk bn) bcache_addr "bcache"%string (λ ξ : CtxId, bcache_res (XI := ξ) bn V)
             with "Hlkg Hnm Hlkw Hcpu [Hauth Hsa Hslots Hlru Hpool]")
       as "#Hlock".
     { rewrite /bcache_res /bcache_scan.

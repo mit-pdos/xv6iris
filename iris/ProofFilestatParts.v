@@ -62,7 +62,6 @@ Require Import CodeFilestat.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* ↦₄/↦₂ have not flipped; ctx bytes cross here *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -217,11 +216,7 @@ Section FilestatParts.
     iIntros "(H0 & H1 & H2 & H3 & _)".
     iDestruct "H0" as (b0) "H0". iDestruct "H1" as (b1) "H1".
     iDestruct "H2" as (b2) "H2". iDestruct "H3" as (b3) "H3".
-    (* ↦₄ has not flipped yet (M1 stage 2): the ctx bytes cross here *)
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H0") as "H0".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H1") as "H1".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H2") as "H2".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H3") as "H3".
+    (* M1 STAGE 2 PAYOFF: the four crossings that sat here are GONE. *)
     set (W := Z_to_bv 32 (assemble_bytes [b0;b1;b2;b3]) : bv 32).
     assert (Hw0 : b0 = nth_byte W 0%nat) by (symmetry; apply fst_nth_byte4; lia).
     assert (Hw1 : b1 = nth_byte W 1%nat) by (symmetry; apply fst_nth_byte4; lia).
@@ -229,7 +224,7 @@ Section FilestatParts.
     assert (Hw3 : b3 = nth_byte W 3%nat) by (symmetry; apply fst_nth_byte4; lia).
     iEval (rewrite Hw0) in "H0". iEval (rewrite Hw1) in "H1".
     iEval (rewrite Hw2) in "H2". iEval (rewrite Hw3) in "H3".
-    iExists W. iApply word4_pointsto_intro; [exact Hal |].
+    iExists W. iApply ctx_word4_pointsto_intro; [exact Hal |].
     cbn [seq]. iFrame "H0 H1 H2 H3". done.
   Qed.
 
@@ -240,13 +235,12 @@ Section FilestatParts.
     intro Hal. rewrite /bytes_own. cbn [seq].
     iIntros "(H0 & H1 & _)".
     iDestruct "H0" as (b0) "H0". iDestruct "H1" as (b1) "H1".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H0") as "H0".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H1") as "H1".
+    (* M1 STAGE 2 PAYOFF: the two crossings that sat here are GONE. *)
     set (W := Z_to_bv 16 (assemble_bytes [b0;b1]) : bv 16).
     assert (Hw0 : b0 = nth_byte W 0%nat) by (symmetry; apply fst_nth_byte2; lia).
     assert (Hw1 : b1 = nth_byte W 1%nat) by (symmetry; apply fst_nth_byte2; lia).
     iEval (rewrite Hw0) in "H0". iEval (rewrite Hw1) in "H1".
-    iExists W. iApply word2_pointsto_intro; [exact Hal |].
+    iExists W. iApply ctx_word2_pointsto_intro; [exact Hal |].
     cbn [seq]. iFrame "H0 H1". done.
   Qed.
 
@@ -328,21 +322,19 @@ Section FilestatParts.
   Lemma fst_w4_bytes `{XI : CurCtx} (a : Arch.pa) (w : mword 32) :
     a ↦₄ w ⊢ bytes_own (DfracOwn 1) a 4.
   Proof.
-    iIntros "Hw". iDestruct (word4_pointsto_bytes with "Hw") as "Hbs".
+    iIntros "Hw". iDestruct (ctx_word4_pointsto_bytes with "Hw") as "Hbs".
     rewrite /bytes_own. iApply (big_sepL_impl with "Hbs").
-    (* ↦₄ has not flipped yet (M1 stage 2): the raw bytes cross here *)
-    iIntros "!>" (kk jj Hk) "Hb". iExists (nth_byte w jj).
-    by iApply (TsoCtxShim.ctx_pointsto_of_mem with "Hb").
+    (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
+    iIntros "!>" (kk jj Hk) "Hb". iExists (nth_byte w jj). iExact "Hb".
   Qed.
 
   Lemma fst_w2_bytes `{XI : CurCtx} (a : Arch.pa) (w : mword 16) :
     a ↦₂ w ⊢ bytes_own (DfracOwn 1) a 2.
   Proof.
-    iIntros "Hw". iDestruct (word2_pointsto_bytes with "Hw") as "Hbs".
+    iIntros "Hw". iDestruct (ctx_word2_pointsto_bytes with "Hw") as "Hbs".
     rewrite /bytes_own. iApply (big_sepL_impl with "Hbs").
-    (* ↦₂ has not flipped yet (M1 stage 2): the raw bytes cross here *)
-    iIntros "!>" (kk jj Hk) "Hb". iExists (nth_byte w jj).
-    by iApply (TsoCtxShim.ctx_pointsto_of_mem with "Hb").
+    (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
+    iIntros "!>" (kk jj Hk) "Hb". iExists (nth_byte w jj). iExact "Hb".
   Qed.
 
   Lemma fst_stat_bytes `{XI : CurCtx} (st : mword 64) (dev ino : mword 32) (ty nl : mword 16)

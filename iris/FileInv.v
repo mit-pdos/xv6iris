@@ -64,12 +64,12 @@ Section FileInv.
     rewrite /file_fields.
     iIntros "(Ht1 & Hr1 & Hw1 & Hp1 & Hi1 & Hm1)".
     iIntros "(Ht2 & Hr2 & Hw2 & Hp2 & Hi2 & Hm2)".
-    iDestruct (word4_pointsto_agree with "Ht1 Ht2") as %E1.
+    iDestruct (ctx_word4_pointsto_agree with "Ht1 Ht2") as %E1.
     iDestruct (ctx_pointsto_agree with "Hr1 Hr2") as %E2.
     iDestruct (ctx_pointsto_agree with "Hw1 Hw2") as %E3.
     iDestruct (ctx_word_pointsto_agree with "Hp1 Hp2") as %E4.
     iDestruct (ctx_word_pointsto_agree with "Hi1 Hi2") as %E5.
-    iDestruct (word2_pointsto_agree with "Hm1 Hm2") as %E7.
+    iDestruct (ctx_word2_pointsto_agree with "Hm1 Hm2") as %E7.
     iPureIntro. destruct C1, C2; cbn in *. congruence.
   Qed.
 
@@ -93,11 +93,11 @@ Section FileInv.
     file_fields k (q1 + q2) C ⊣⊢ file_fields k q1 C ∗ file_fields k q2 C.
   Proof.
     rewrite /file_fields.
-    rewrite (word4_pointsto_frac_split (a_ftype k)).
+    rewrite (ctx_word4_pointsto_frac_split _ (a_ftype k)).
     rewrite (ctx_pointsto_frac_split _ (a_freadable k)).
     rewrite (ctx_pointsto_frac_split _ (a_fwritable k)).
     rewrite (ctx_word_pointsto_frac_split _ (a_fpipe k)).
-    rewrite (word2_pointsto_frac_split (a_fmajor k)).
+    rewrite (ctx_word2_pointsto_frac_split _ (a_fmajor k)).
     rewrite (ctx_word_pointsto_frac_split _ (a_fip k)).
     iSplit.
     - iIntros "([A1 B1] & [A2 B2] & [A3 B3] & [A4 B4] & [A5 B5] & [A6 B6])".

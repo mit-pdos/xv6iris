@@ -528,6 +528,8 @@ Section ProofSysClose.
     (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses through the shim *)
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs3") as "Hs3".
     iDestruct (word_pointsto_split4 with "Hs3") as "[Hs3lo Hs3hi]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs3lo") as "Hs3lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs3hi") as "Hs3hi".
     iEval (rewrite -HM6a1) in "Hs3hi".
     iEval (rewrite -HM6a2) in "Hs4".
     (* ---- argfd(0, &fd, &f) ---- *)
@@ -615,6 +617,8 @@ Section ProofSysClose.
       (* nothing was written: rejoin the two halves of frame slot 3 *)
       iEval (rewrite HM6a1) in "Hfdcell".
       iEval (rewrite HM6a2) in "Hfcell".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs3lo") as "Hs3lo".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hfdcell") as "Hfdcell".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".
       iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs3") as "Hs3".
       iApply (sc_tail (CID0 := CID11) m A7 av (mword_of_int (-1) : mword 64) sp0 ra0 s00 _ w4 b p
@@ -889,6 +893,8 @@ Section ProofSysClose.
         as "Hpriv".
       { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hfdslot". }
       (* rejoin frame slot 3 *)
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs3lo") as "Hs3lo".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hfdcell") as "Hfdcell".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".
       iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs3") as "Hs3".
       (* the epilogue's register facts *)

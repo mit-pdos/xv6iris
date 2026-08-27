@@ -328,7 +328,7 @@ Section ProofSysSbrk.
     pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x58) : mword 64) -∗
     proc_priv γf p pid V -∗
     kalloc_env γa None -∗
-    word4_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) nw -∗
+    ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) nw -∗
     wp_next (CID0 := CID0) b p (fun (CID1 : CpuId) =>
       ∀ (Mf : regfile) (P' : uptd) (szv' rv : mword 64),
         ⌜Mf !!! Regidx csp_rs1 = pa_stk sp0 6⌝ -∗
@@ -344,7 +344,7 @@ Section ProofSysSbrk.
         cpu_own 0%nat eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x64) : mword 64) -∗
         proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗
-        word4_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) nw -∗
+        ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) nw -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -612,6 +612,8 @@ Section ProofSysSbrk.
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs5") as "Hs5".
     iDestruct (word_pointsto_aligned_p with "Hs5") as %Hal5.
     iDestruct (word_pointsto_split4 with "Hs5") as "[Hs5lo Hs5hi]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hs5lo") as "Hs5lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hs5hi") as "Hs5hi".
     (* ---- +0x0a: addi a1,s0,-40 -- a1 := &n ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.sys_sbrk + 0x0a))
               Ra1 Rs0 (mword_of_int 0xfd8 : mword 12) M2 (av - 6)%nat b
@@ -993,6 +995,8 @@ Section ProofSysSbrk.
         + left. split; [exact Hrv | split; [exact Hp | exact Hs]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
         iApply TsoCtxShim.ctx_word_of_mem;
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5lo") as "Hs5lo".
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5hi") as "Hs5hi".
         iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ---- t <> SBRK_EAGER: look at the sign of n ---- *)
     assert (Hnoteager : ~ sbrk_eager v1).
@@ -1078,6 +1082,8 @@ Section ProofSysSbrk.
         + left. split; [exact Hrv | split; [exact Hp | exact Hs]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
         iApply TsoCtxShim.ctx_word_of_mem;
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5lo") as "Hs5lo".
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5hi") as "Hs5hi".
         iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ================================================================= *)
     (*  THE LAZY PATH: n >= 0 and t <> SBRK_EAGER.                        *)
@@ -1235,6 +1241,8 @@ Section ProofSysSbrk.
       - left. split; [reflexivity | split; reflexivity].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
         iApply TsoCtxShim.ctx_word_of_mem;
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5lo") as "Hs5lo".
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5hi") as "Hs5hi".
         iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ---- it fits ---- *)
     assert (Hfits : (bv_unsigned (add_vec (pv_sz V) (sbrk_arg v0)) <= 274877898752)%Z).
@@ -1447,6 +1455,8 @@ Section ProofSysSbrk.
       rewrite uint_unsigned uvm_maxsz_val. rewrite -Hsum. exact Hfits.
     - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
       iApply TsoCtxShim.ctx_word_of_mem;
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5lo") as "Hs5lo".
+        iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs5hi") as "Hs5hi".
         iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi").
   Qed.
 

@@ -208,7 +208,7 @@ Section BmapKit.
      explicit.  It costs one
      binder on each of the four interior lemmas, all of which already carry
      [n] in exactly the same in/out positions. *)
-  Definition bm_kit (ak : option bm_alloc) (bn : bio_names) (γfs : fs_names)
+  Definition bm_kit `{XI : CurCtx} (ak : option bm_alloc) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat) (Sb : gset Z)
       : iProp Σ :=
     match ak with
@@ -224,7 +224,7 @@ Section BmapKit.
     | None => emp%I
     end.
 
-  Lemma bm_kit_elim (γ : log_names) (bms sz : Z) (dqb dqs : dfrac)
+  Lemma bm_kit_elim `{XI : CurCtx} (γ : log_names) (bms sz : Z) (dqb dqs : dfrac)
       (γpr : gname) (ak : option bm_alloc) (bn : bio_names)
       (γfs : fs_names) (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat)
       (Sb : gset Z) :
@@ -237,7 +237,7 @@ Section BmapKit.
       bitmap_inv γfs bms cov logstart sz.
   Proof. intros ->. rewrite /bm_kit. iIntros "H". iExact "H". Qed.
 
-  Lemma bm_kit_intro (γ : log_names) (bms sz : Z) (dqb dqs : dfrac)
+  Lemma bm_kit_intro `{XI : CurCtx} (γ : log_names) (bms sz : Z) (dqb dqs : dfrac)
       (γpr : gname) (ak : option bm_alloc) (bn : bio_names)
       (γfs : fs_names) (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat)
       (Sb : gset Z) :
@@ -256,7 +256,7 @@ Section BmapKit.
     iSplitL "E"; [iExact "E"|]. iExact "F".
   Qed.
 
-  Lemma bm_kit_none (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+  Lemma bm_kit_none `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (dev : mword 32) (n : nat) (Sb : gset Z) :
     ⊢ bm_kit None bn γfs cov logstart dev n Sb.
   Proof. rewrite /bm_kit. done. Qed.

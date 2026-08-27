@@ -123,6 +123,30 @@ Section WpSconfMem.
     by change (Z.to_nat 8) with 8%nat.
   Qed.
 
+  (* the same bridge at widths 4 and 2 (M1 flip, STAGE 2): the leaf interior
+     stays at [wordw_pointsto], the CLIENT-facing statement is the flipped
+     [↦₄]/[↦₂], and these two are the adapters at the seam.  Same shape and
+     same reason as [wordw8_ctx]; each is used twice per leaf, once on the
+     way in and once inside the continuation. *)
+  Lemma wordw4_ctx `{KTR2 : !CurKtier} `{XI2 : CurCtx} (a : Arch.pa)
+      (dq : dfrac) (v : mword 32) :
+    wordw_pointsto (KTR := KTR2) 4 a dq v
+    ⊣⊢ ctx_word4_pointsto (KTR := KTR2) cur_ctx a dq v.
+  Proof.
+    rewrite TsoCtxShim.ctx_word4_shim /wordw_pointsto /word4_pointsto.
+    by change (Z.to_nat 4) with 4%nat.
+  Qed.
+
+  Lemma wordw2_ctx `{KTR2 : !CurKtier} `{XI2 : CurCtx} (a : Arch.pa)
+      (dq : dfrac) (v : mword 16) :
+    wordw_pointsto (KTR := KTR2) 2 a dq v
+    ⊣⊢ ctx_word2_pointsto (KTR := KTR2) cur_ctx a dq v.
+  Proof.
+    rewrite TsoCtxShim.ctx_word2_shim /wordw_pointsto /word2_pointsto.
+    by change (Z.to_nat 2) with 2%nat.
+  Qed.
+
+
   (* THE ADDRESS CLAIM, AND WHY THE ATOMIC-UPDATE FORMS TAKE IT.
      Per node, an access TRANSLATES before it reads, and the translation
      needs the window's claim -- its [ppn], canonicality, RAM-ness and tier
@@ -175,6 +199,32 @@ Section WpSconfMem.
     iEval (rewrite pa_add_0) in "Hb0".
     iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
     iSplitR; [done|]. iApply (mem_pointsto_claim with "Hb0").
+  Qed.
+
+  (* the ADDRESS CLAIM straight off a flipped cell (M1 stage 2).  Every
+     invariant-backed caller of the atomic-update leaves reads its claim off
+     a [↦₄]/[↦₂] cell it has just peeked at, so the adapter is folded into
+     the claim lemma rather than spelled at each of the six call sites. *)
+  Lemma ctx_word4_claim `{KTR2 : !CurKtier} `{XI2 : CurCtx} (a : Arch.pa)
+      (dq : dfrac) (w : mword 32) :
+    (0 < 4)%Z ->
+    ctx_word4_pointsto (KTR := KTR2) cur_ctx a dq w -∗
+    wordw_claim (KTR := KTR2) 4 a.
+  Proof.
+    intros _.
+    rewrite -(wordw4_ctx (KTR2 := KTR2)).
+    iApply (wordw_claim_of (KTR := KTR2) 4 a dq w ltac:(lia)).
+  Qed.
+
+  Lemma ctx_word2_claim `{KTR2 : !CurKtier} `{XI2 : CurCtx} (a : Arch.pa)
+      (dq : dfrac) (w : mword 16) :
+    (0 < 2)%Z ->
+    ctx_word2_pointsto (KTR := KTR2) cur_ctx a dq w -∗
+    wordw_claim (KTR := KTR2) 2 a.
+  Proof.
+    intros _.
+    rewrite -(wordw2_ctx (KTR2 := KTR2)).
+    iApply (wordw_claim_of (KTR := KTR2) 2 a dq w ltac:(lia)).
   Qed.
 
   Local Lemma write_bytes_1 (mm : _) (pa : Arch.pa) (v : bv 8) :
@@ -854,10 +904,15 @@ Section WpSconfMem.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw4_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_load_s_sconf_ugen (ktd := ktd) 4 false pc rd rs1 imm m n v (zero_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 (data2_ext_4_unsigned v) Hrd Hrdok
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw4_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
   (* [SrcOk rs1]: the base register's read, see the family note above
@@ -945,10 +1000,15 @@ Section WpSconfMem.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw4_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_load_s_sconf_gen (ktd := ktd) 4 true pc rd rs1 imm m n v (sign_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 (data2_ext_4 v) Hrd Hrdok
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw4_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
   (* [SrcOk rs1]: the base register's read, see the family note above
@@ -972,10 +1032,15 @@ Section WpSconfMem.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw4_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_load_s_sconf_gen (ktd := ktd) 4 false pc rd rs1 imm m n v (sign_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 (data2_ext_4 v) Hrd Hrdok
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw4_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
 
@@ -1414,10 +1479,15 @@ Section WpSconfMem.
     assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw4_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_store_s_sconf_gen (ktd := ktd) 4 true pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (rget m rs2))
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw4_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
   (* [SrcOk rs1] for the ADDRESS base and [SrcOk rs2] for the STORED VALUE:
@@ -1447,10 +1517,15 @@ Section WpSconfMem.
     assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw4_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_store_s_sconf_gen (ktd := ktd) 4 false pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (rget m rs2))
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw4_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
 
@@ -1827,12 +1902,17 @@ Section WpSconfMem.
               : mword (8*4)) = storeval).
     { unfold storeval, rget. rewrite Hx0. rewrite (store_ext_4 zero_reg).
       apply bv_eq. vm_compute. reflexivity. }
+    iEval (rewrite -(wordw4_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_store_s_sconf_gen (ktd := ktd) 4 false pc
               (mword_of_int 0 : mword 5) rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia)
               ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 Hsv
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw4_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
   (* ------------------------------------------------------------------- *)

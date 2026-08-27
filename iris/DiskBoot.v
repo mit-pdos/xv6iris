@@ -60,7 +60,6 @@ Require Import RiscvExtras.
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* zeroed-window words: ↦₄ has not flipped yet *)
 
 Local Open Scope Z_scope.
 
@@ -172,8 +171,7 @@ Section DiskBoot.
     rewrite (bb_ext a 4 (fun _ => byte_zero)
                (fun j => nth_byte (mword_of_int 0 : mword 32) j) Hfg).
     iIntros "H".
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "H") as "H".
-    iApply (word4_pointsto_intro a (DfracOwn 1) _ Hal). iExact "H".
+    iApply (ctx_word4_pointsto_intro _ a (DfracOwn 1) _ Hal). iExact "H".
   Qed.
 
   Local Lemma zbytes_word2 (a : Arch.pa) :
@@ -188,8 +186,7 @@ Section DiskBoot.
     rewrite (bb_ext a 2 (fun _ => byte_zero)
                (fun j => nth_byte (mword_of_int 0 : mword 16) j) Hfg).
     iIntros "H".
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "H") as "H".
-    iApply (word2_pointsto_intro a (DfracOwn 1) _ Hal). iExact "H".
+    iApply (ctx_word2_pointsto_intro _ a (DfracOwn 1) _ Hal). iExact "H".
   Qed.
 
   (* ==================================================================== *)

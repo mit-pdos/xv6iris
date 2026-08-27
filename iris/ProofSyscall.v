@@ -951,7 +951,7 @@ Section SyscallVocab.
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf : gname) : iProp Σ :=
     (∃ (γp γw γft γtk : gname),
-       is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> ∗
+       is_lock γp alp_pid_lock "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ)) ∗
        procs_avail None ∗
        is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
        is_ftable γft γf ∗
@@ -1122,7 +1122,7 @@ Section SyscallVocab.
     ∃ (γa γp γw γft γtk γpr : gname)
       (γud : uart_names) (γvd : disk_names),
       kalloc_env γa None ∗
-      is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> ∗
+      is_lock γp alp_pid_lock "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ)) ∗
       procs_avail None ∗
       is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
       is_ftable γft γf ∗

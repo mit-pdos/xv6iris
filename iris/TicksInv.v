@@ -45,19 +45,49 @@ Section TicksInv.
   Lemma ticks_res_intro (t : mword 32) : a_ticks ↦₄ t -∗ ticks_res.
   Proof. iIntros "H". iExists t. iFrame "H". Qed.
 
+
+  (* ---- construction (the "newlock" ghost step): what a caller does with
+     trapinit's postcondition -- the freshly zeroed lock word and its
+     persistent name, plus the counter cell, become the tickslock. *)
+End TicksInv.
+
+(* ===================================================================== *)
+(*  THE HANDLE, IN A SECTION THAT BINDS NO [CurCtx] (M1 flip, stage 2).   *)
+(*                                                                        *)
+(*  [ticks_res] is the counter cell, and the counter cell is [↦₄], so the  *)
+(*  payload stopped being a closed term at the flip.  It is therefore      *)
+(*  λ-CONVERTED (§0.7′ recipe rule 1) rather than constant-embedded, which *)
+(*  keeps [is_tickslock] a CLOSED TERM -- what tso-port.md §0.12′'s park   *)
+(*  record needs in order to carry the tick lock across a ∀-quantified     *)
+(*  resume context.  The section binds no ambient the λ could capture.     *)
+(* ===================================================================== *)
+Section TicksHandle.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  Global Instance ticks_res_morph : CtxMorph (λ ξ : CtxId, ticks_res (XI := ξ)).
+  Proof.
+    iIntros (ξ ξ') "Hd [%t Ht]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Ht") as "[Hd Ht]".
+    iFrame "Hd". iExists t. iExact "Ht".
+  Qed.
+
   Definition is_tickslock (γl : gname) : iProp Σ :=
-    is_lock γl a_tickslock "time"%string <{ ticks_res }>.
+    is_lock γl a_tickslock "time"%string (λ ξ : CtxId, ticks_res (XI := ξ)).
 
   Global Instance is_tickslock_persistent γl : Persistent (is_tickslock γl).
   Proof. apply _. Qed.
 
   Lemma is_tickslock_lock γl :
-    is_tickslock γl -∗ is_lock γl a_tickslock "time"%string <{ ticks_res }>.
+    is_tickslock γl -∗
+    is_lock γl a_tickslock "time"%string (λ ξ : CtxId, ticks_res (XI := ξ)).
   Proof. iIntros "$". Qed.
 
-  (* ---- construction (the "newlock" ghost step): what a caller does with
-     trapinit's postcondition -- the freshly zeroed lock word and its
-     persistent name, plus the counter cell, become the tickslock. *)
+End TicksHandle.
+
+Section TicksNew.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
+
   Lemma new_tickslock E (t : mword 32) :
     lock_name a_tickslock "time"%string -∗
     a_tickslock ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -65,9 +95,10 @@ Section TicksInv.
     a_ticks ↦₄ t ={E}=∗ ∃ γl : gname, is_tickslock γl.
   Proof.
     iIntros "#Hnm Hlkw Hcpu Hticks".
-    iApply (newlock E a_tickslock "time"%string <{ ticks_res }>
+    iApply (newlock E a_tickslock "time"%string
+              (λ ξ : CtxId, ticks_res (XI := ξ))
               with "Hnm Hlkw Hcpu [Hticks]").
     iApply (ticks_res_intro with "Hticks").
   Qed.
 
-End TicksInv.
+End TicksNew.

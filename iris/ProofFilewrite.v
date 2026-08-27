@@ -1900,7 +1900,7 @@ Section ProofFilewrite.
     { rewrite /inode_map. iFrame. }
     (* ---- CHECK OUT the offset cell ---- *)
     iAssert (off_mark (fc_ip Cf)) with "[Hvalid]" as "Hmark".
-    { rewrite /off_mark P8. iExact "Hvalid". }
+    { rewrite off_mark_acc P8. iExact "Hvalid". }
     iApply fupd_wp.
     iMod (off_checkout gf γox kx qx (DfracOwn qx) (fc_ip Cf) ⊤
             ltac:(solve_ndisj) with "Hoh Hcip Hmark Hrlv")
@@ -2255,7 +2255,7 @@ Section ProofFilewrite.
     iModIntro.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
       with "[Hmark]" as "Hvalid".
-    { rewrite -P8. iExact "Hmark". }
+    { rewrite -P8 -off_mark_acc. iExact "Hmark". }
     iAssert (ic_loaded (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
                (fwn_logstart fn) ik inum dn' bm')
       with "[Hdnat Hmeta Hmap Hblocks Hdview Hfview Htop]" as "Hlk".

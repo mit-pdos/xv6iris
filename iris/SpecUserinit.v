@@ -204,7 +204,7 @@ Definition wp_userinit_sconf_body
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
   procs_inv γs -∗
-  is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+  is_lock γp alp_pid_lock "nextpid"%string (λ ξ : CtxId, nextpid_res (XI := ξ)) -∗
   (* ---- THE SIX PARK ROWS (claude-notes/projects/forkret-park.md §3 E3).
      All persistent, none read here: they are what the first process's
      trap loop needs of the kernel BEYOND the file system (which forkret's

@@ -440,7 +440,7 @@ Section ProofIunlockMain.
     iDestruct "Hborp" as (sbp) "[Hlvp Hbbackp]".
     iMod (iref_live_load_au (⊤ ∖ ↑icEscN) k sbp
             ltac:(solve_ndisj) Hk with "Hitbl Hlvp") as (vp) "[Hcellp Hclp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k)) (DfracOwn 1) vp
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry k)) (DfracOwn 1) vp
                  ltac:(lia) with "Hcellp") as "#Hclaim0".
     iMod ("Hclp" with "Hcellp") as "[%Hbp Hlvp]".
     iMod ("Hclosep" with "[Hbbackp Hlvp]") as "_".

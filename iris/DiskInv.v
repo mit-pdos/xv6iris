@@ -57,7 +57,7 @@ Require Import RiscvExtras.
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the phys tier and the unflipped ↦₂/↦₄ towers cross the seam *)
+Require TsoCtxShim.   (* the phys tier crosses the seam (the ↦₂/↦₄ towers no longer do -- M1 stage 2) *)
 
 Local Open Scope Z_scope.
 
@@ -530,7 +530,6 @@ Section DiskInv.
     kmap_static_claims -∗ a ↦₂ w -∗ phys_word2 a w.
   Proof.
     iIntros (Hs) "#Hb [_ Hbytes]". rewrite /phys_word2.
-    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbytes") as "Hbytes".
     iApply (mem_win_to_phys a 2 (DfracOwn 1) (fun j => nth_byte w j) Hs
               with "Hb Hbytes").
   Qed.
@@ -545,8 +544,7 @@ Section DiskInv.
     iIntros (Hal Hs Hc) "#Hb Hbytes". rewrite /phys_word2.
     iDestruct (phys_win_to_mem a 2 (DfracOwn 1) (fun j => nth_byte w j) Hs Hc
                  with "Hb Hbytes") as "Hm".
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hm") as "Hm".
-    rewrite /word2_pointsto. iFrame "Hm". iPureIntro. exact Hal.
+    rewrite /ctx_word2_pointsto. iFrame "Hm". iPureIntro. exact Hal.
   Qed.
 
   Lemma word4_to_phys (a : Arch.pa) (w : bv 32) :
@@ -554,7 +552,6 @@ Section DiskInv.
     kmap_static_claims -∗ a ↦₄ w -∗ phys_word4 a w.
   Proof.
     iIntros (Hs) "#Hb [_ Hbytes]". rewrite /phys_word4.
-    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbytes") as "Hbytes".
     iApply (mem_win_to_phys a 4 (DfracOwn 1) (fun j => nth_byte w j) Hs
               with "Hb Hbytes").
   Qed.
@@ -569,8 +566,7 @@ Section DiskInv.
     iIntros (Hal Hs Hc) "#Hb Hbytes". rewrite /phys_word4.
     iDestruct (phys_win_to_mem a 4 (DfracOwn 1) (fun j => nth_byte w j) Hs Hc
                  with "Hb Hbytes") as "Hm".
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hm") as "Hm".
-    rewrite /word4_pointsto. iFrame "Hm". iPureIntro. exact Hal.
+    rewrite /ctx_word4_pointsto. iFrame "Hm". iPureIntro. exact Hal.
   Qed.
 
   (* the doubleword has no [phys_word8] in VirtioProto, so it bridges to the
@@ -779,9 +775,9 @@ End DiskInv.
 (* section fixes -- the [KallocInv.v:388] template.  [disk_res] is        *)
 (* ▷-free, [inv]-free, [cinv]-free and WP-free; its ξ-dependence is       *)
 (* exactly the [↦ₘ]/[↦₈] cells (the free-cell bytes, the descriptor and   *)
-(* ops words, the info-block pointers).  Everything else -- the ring      *)
-(* slots ([↦₂]), the used index ([↦₂]), the b_disk flags ([↦₄]), the      *)
-(* phys tier and every ghost row -- is stage-2/raw, hence ξ-CONSTANT.     *)
+(* ops words, the info-block pointers) AND -- since M1 STAGE 2 -- the     *)
+(* ring slots ([↦₂]), the used index ([↦₂]) and the b_disk flags ([↦₄]).  *)
+(* Only the phys tier and the ghost rows are ξ-CONSTANT now.              *)
 (*                                                                        *)
 (* The structural instances are applied AS TERMS: instance search cannot  *)
 (* do the higher-order big-op unification (recipe rule 2).  The two       *)
@@ -798,6 +794,9 @@ Section DiskCtx.
     iIntros (ξ ξ') "Hd H". rewrite /desc_entry_own.
     iDestruct "H" as (va vl vf vn) "(Ha & Hl & Hf & Hn)".
     iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Ha") as "[Hd Ha]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hl") as "[Hd Hl]".
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hf") as "[Hd Hf]".
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hn") as "[Hd Hn]".
     iFrame "Hd". iExists va, vl, vf, vn. iFrame.
   Qed.
 
@@ -807,6 +806,8 @@ Section DiskCtx.
     iIntros (ξ ξ') "Hd H". rewrite /ops_own.
     iDestruct "H" as (t r s) "(Ht & Hr & Hs)".
     iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hs") as "[Hd Hs]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Ht") as "[Hd Ht]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hr") as "[Hd Hr]".
     iFrame "Hd". iExists t, r, s. iFrame.
   Qed.
 
@@ -829,6 +830,7 @@ Section DiskCtx.
     iIntros (ξ ξ') "Hd H". rewrite /flight_res.
     iDestruct "H" as "(Hwf & Hrc & Hb & Hi)".
     iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hi") as "[Hd Hi]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hb") as "[Hd Hb]".
     iFrame.
   Qed.
 
@@ -839,6 +841,7 @@ Section DiskCtx.
     iIntros (ξ ξ') "Hd H". rewrite /parked_res.
     iDestruct "H" as (bs) "(H1 & H2 & H3 & Hb & Hi & Hrest)".
     iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hi") as "[Hd Hi]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hb") as "[Hd Hb]".
     iFrame "Hd". iExists bs. iFrame.
   Qed.
 
@@ -848,6 +851,34 @@ Section DiskCtx.
     CtxMorph (λ ξ0 : CtxId,
                 if fr i then free_slot_res (XI := ξ0) pd i else emp)%I.
   Proof. destruct (fr i); apply _. Qed.
+
+  (* the avail-ring slots: [↦₂] cells since M1 stage 2, so no longer
+     ξ-constant.  One arm per slot, guarded by the occupancy test. *)
+  Global Instance ring_slot_arm_morph (pav : Arch.pa) (occ : gset nat) (j : nat) :
+    CtxMorph (λ ξ0 : CtxId,
+                if bool_decide (j ∈ occ) then emp
+                else (∃ w : SailStdpp.Values.mword 16,
+                        ctx_word2_pointsto ξ0 (d_ring pav j) (DfracOwn 1) w))%I.
+  Proof.
+    destruct (bool_decide (j ∈ occ)).
+    - iIntros (ξ ξ') "Hd _". by iFrame.
+    - iIntros (ξ ξ') "Hd [%w H]".
+      iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]".
+      iFrame "Hd". iExists w. iExact "H".
+  Qed.
+
+  Global Instance ring_slots_res_morph (pav : Arch.pa) (occ : gset nat) :
+    CtxMorph (λ ξ0 : CtxId, ring_slots_res (XI := ξ0) pav occ).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ring_slots_res.
+    iApply (ctx_morph_big_sepL (seq 0 8)
+              (λ _ (j : nat) (ξ0 : CtxId),
+                 if bool_decide (j ∈ occ) then emp
+                 else (∃ w : SailStdpp.Values.mword 16,
+                         ctx_word2_pointsto ξ0 (d_ring pav j) (DfracOwn 1) w))%I
+              (λ _ j, ring_slot_arm_morph pav occ j)
+              ξ ξ' with "Hd H").
+  Qed.
 
   Global Instance disk_res_morph (γ : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) :
@@ -875,6 +906,9 @@ Section DiskCtx.
                  (λ _ i, ctx_morph_sep _ _ (ctx_morph_pointsto _ _ _ _)
                                            (free_arm_morph pd fr i))
                  ξ ξ' with "Hd Hfree") as "[Hd Hfree]".
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hused") as "[Hd Hused]".
+    iDestruct (ring_slots_res_morph pav (mod8 (dom fl)) ξ ξ'
+                 with "Hd Hring") as "[Hd Hring]".
     iFrame "Hd". iExists np, nr, fl, pk, tr, fr. iFrame.
   Qed.
   (* THE GEOMETRY.  Three [↦₈□] cells written once by virtio_disk_init and

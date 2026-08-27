@@ -1505,14 +1505,14 @@ Section IcacheBootTable.
      byte-carve ([BootCarveMain.boot_inode_entries]) produces the entries as
      an [ArrCursor] family, whose per-element predicate is applied to the
      element's address and cannot mention the index at all. *)
-  Definition ientry_raw_at (ip : mword 64) : iProp Σ :=
+  Definition ientry_raw_at `{XI : CurCtx} (ip : mword 64) : iProp Σ :=
     ((∃ dev : mword 32, i_dev ip ↦₄ dev) ∗
      (∃ inum : mword 32, i_inum ip ↦₄ inum) ∗
      i_ref ip ↦₄ (mword_of_int 0 : mword 32) ∗
      (∃ w : mword 32, i_valid ip ↦₄ w) ∗
      inode_raw ip)%I.
 
-  Definition ientry_raw (k : nat) : iProp Σ := ientry_raw_at (ientry k).
+  Definition ientry_raw `{XI : CurCtx} (k : nat) : iProp Σ := ientry_raw_at (ientry k).
 
   (* [BioInv.tok_fun_alloc]'s trick in the other direction: a big-op of
      EXISTENTIALS over [seq j n] yields ONE function of the index.  The
@@ -1565,7 +1565,7 @@ Section IcacheBootTable.
      [rewrite !big_sepL_sep]): the repeated form goes on to split the
      BYTE big-op inside [word4_pointsto] and leaves a hypothesis nothing
      matches. *)
-  Local Lemma ientry_raw_split :
+  Local Lemma ientry_raw_split `{XI : CurCtx} :
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k)
     ⊢ ([∗ list] k ∈ seq 0 NINODE, ∃ dev : mword 32, i_dev (ientry k) ↦₄ dev) ∗
       ([∗ list] k ∈ seq 0 NINODE, ∃ inum : mword 32, i_inum (ientry k) ↦₄ inum) ∗
@@ -1581,12 +1581,12 @@ Section IcacheBootTable.
     rewrite big_sepL_sep. done.
   Qed.
 
-  Local Lemma iref_cells_boot :
+  Local Lemma iref_cells_boot `{XI : CurCtx} :
     ([∗ list] k ∈ seq 0 NINODE,
        i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32))
       ⊢ iref_cells ∅.
   Proof.
-    rewrite /iref_cells. apply big_sepL_mono. intros idx k _.
+    rewrite iref_cells_acc_eq. apply big_sepL_mono. intros idx k _.
     rewrite /iref_word lookup_empty //.
   Qed.
 
@@ -1763,7 +1763,7 @@ Section IcacheBootTable.
       iDestruct "Hgd" as (v0 d0 n0) "Hgd".
       iMod (ic_id_set _ _ _ _ _ false (dvs k).1 (dvs k).2 with "Hgd") as "Hgd".
       iDestruct (ic_id_split_half with "Hgd") as "[Hgd1 Hgd2]".
-      iDestruct (word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
       iMod (inv_alloc icEscN E (ic_escrow_body cn γfs γi cov logstart k)
               with "[Hd Hn1 Hv Hmir Hmd Hgd1]") as "#Hinv".
       { iNext. rewrite /ic_escrow_body. iRight. iRight. iRight. iLeft.
@@ -1785,7 +1785,7 @@ Section IcacheBootTable.
       { iApply (big_sepL_mono with "Hslots"). intros idx k _.
         rewrite /islot2 !lookup_empty. done. }
       rewrite ci_inums_empty difference_empty_L. iExact "Hpool". }
-    iMod (newlock_at E γl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dv }>
+    iMod (newlock_at E γl itable_lock "itable"%string (itable_pay2 cn γfs γi cov logstart nib dv)
             with "Hfree Hnm Hlkw Hcpu Hres") as "#Hlock".
     (* ---- the fifty inode sleeplocks, sealed over the checkout tokens ---- *)
     iDestruct (big_sepL_sep_2 with "Hsl Htok") as "Hsl".

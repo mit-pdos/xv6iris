@@ -565,7 +565,7 @@ Section HalfWords.
     rewrite Hf big_sepL_fmap. reflexivity.
   Qed.
 
-  Lemma word4_pointsto_split2 (a : Arch.pa) (dq : dfrac) (w : mword 32) :
+  Lemma word4_pointsto_split2 `{XI : CurCtx} (a : Arch.pa) (dq : dfrac) (w : mword 32) :
     a ↦₄{dq} w ⊢ a ↦₂{dq} hw_lo w ∗ (pa_add a 2) ↦₂{dq} hw_hi w.
   Proof.
     iIntros "[%Hal Hbs]".
@@ -584,7 +584,7 @@ Section HalfWords.
       rewrite pa_add_add. rewrite nth_byte_hw_hi; [reflexivity | lia].
   Qed.
 
-  Lemma word4_pointsto_join2 (a : Arch.pa) (dq : dfrac) (lo hi : mword 16) :
+  Lemma word4_pointsto_join2 `{XI : CurCtx} (a : Arch.pa) (dq : dfrac) (lo hi : mword 16) :
     is_aligned_paddr (Physaddr a) 4 = true ->
     a ↦₂{dq} lo -∗ (pa_add a 2) ↦₂{dq} hi -∗ a ↦₄{dq} hw_join lo hi.
   Proof.
@@ -975,7 +975,7 @@ Section ProofSysMknodBody.
   (* the per-slot projection out of the boot family, at the copy THIS
      contract names ([ic_escrows] is IcacheEscrow's -- see fs-sysfile's
      trap 3 on the four [ic_sleeplocks] copies, which bites the same way). *)
-  Lemma mn_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Lemma mn_esc_acc `{XI : CurCtx} (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
@@ -1051,6 +1051,8 @@ Section ProofSysMknodBody.
     (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses through the shim *)
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hf19") as "Hf19".
     iDestruct (word_pointsto_split4 with "Hf19") as "[Hmin Hmaj]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hmin") as "Hmin".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hmaj") as "Hmaj".
     assert (Hc1 : add_vec (M1 !!! Regidx csp_rs1 : mword 64)
                     (zero_extend' 64 (concat_vec (mword_of_int 19 : mword 6) ('b"000")))
                   = pa_stk sp0 1) by (rewrite HM1sp; apply mn_frm1).
@@ -1557,6 +1559,8 @@ Section ProofSysMknodBody.
                    (aligned8_aligned4 _ Hal19) with "Hminlo Hminhi") as "Hmin".
       iDestruct (word4_pointsto_join2 (KTR := KT1) _ _ _ _
                    (aligned8_aligned4_hi _ Hal19) with "Hmajlo Hmajhi") as "Hmaj".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hmin") as "Hmin".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hmaj") as "Hmaj".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
       iDestruct (TsoCtxShim.ctx_word_of_mem with "Hf19") as "Hf19".
       (* ============ +0x3a c.li a1,3 : T_DEVICE ============ *)
@@ -1914,6 +1918,8 @@ Section ProofSysMknodBody.
                         (sign_extend' 64 (mword_of_int 42 : mword 13))
                       = mword_of_int (MN + 0x58)) by pcw.
       iEval (rewrite Htg58) in "Hpc".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hmin") as "Hmin".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hmaj") as "Hmaj".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
       iDestruct (TsoCtxShim.ctx_word_of_mem with "Hf19") as "Hf19".
       iDestruct (proc_priv_bare_acc gf pj pid (upd_upt V P') with "Hpriv")

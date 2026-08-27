@@ -686,6 +686,21 @@ Section FsReadyMorph.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
 
+  (* the four frozen superblock cells are [↦₄□]: ξ-indexed since M1 stage 2
+     (a DISCARDED cell is not context-free -- it was written at WP time, so
+     a reader at another context needs its own bound to dominate that
+     timestamp; tso-port.md §0.4 item 6, exactly as [disk_geom]'s three). *)
+  Global Instance fs_sb_cells_morph :
+    CtxMorph (λ ξ : CtxId, fs_sb_cells (XI := ξ)).
+  Proof.
+    iIntros (ξ ξ') "Hd (H1 & H2 & H3 & H4)". rewrite /fs_sb_cells.
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd H3") as "[Hd H3]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd H4") as "[Hd H4]".
+    iFrame.
+  Qed.
+
   Global Instance fs_ready_morph : CtxMorph (λ ξ : CtxId, fs_ready (XI := ξ)).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /fs_ready.
@@ -695,8 +710,18 @@ Section FsReadyMorph.
     iDestruct "H10" as (pd pav pu) "[Hgeom Hdlk]".
     iDestruct (disk_geom_morph fsc_disk pd pav pu ξ ξ' with "Hd Hgeom")
       as "[Hd Hgeom]".
-    iFrame "Hd".
-    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H11 H12 H13 H14 H15 H16 H17 H18 H20 H21".
+    (* the log's context bundle carries two frozen [↦₄□] cells: ξ-indexed
+       since M1 stage 2, and transportable (LogInv's [log_ctx_morph]). *)
+    iDestruct (log_ctx_morph icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev
+                 ξ ξ' with "Hd H6") as "[Hd H6]".
+    (* the icache escrows are bare [inv]s over ξ-indexed bodies since M1
+       stage 2; [IcacheEscrow.ic_escrows_morph] rewrites the handles with
+       [inv_iff] against the body's own equivalence. *)
+    iDestruct (ic_escrows_morph fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
+                 ξ ξ' with "Hd H13") as "[Hd H13]".
+    iDestruct (fs_sb_cells_morph ξ ξ' with "Hd H20") as "[Hd H20]".
+    iFrame "Hd H6 H13 H20".
+    iFrame "H1 H2 H3 H5 H7 H8 H9 H11 H12 H14 H15 H16 H17 H18 H21".
     iFrame "%".
     iExists pd, pav, pu. iFrame "Hgeom Hdlk".
   Qed.

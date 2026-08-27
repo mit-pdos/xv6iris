@@ -136,6 +136,11 @@ Qed.
 
 Section InodeLockRes.
   Context `{!riscvGS Σ}.
+  (* M1 stage 2: [InodeInv.inode_meta]/[inode_addrs] hold [↦₄] cells and are
+     context-indexed since the flip.  QUALIFIED, because this file does not
+     import TsoCtx (an unqualified [CurCtx] here would silently generalise a
+     fresh [CurCtx : Type]). *)
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* the cells at NO particular value: what iget leaves behind, and what
      [IcacheEscrow.ic_unloaded] parks.  The length is what makes memmove's
@@ -145,3 +150,21 @@ Section InodeLockRes.
      (∃ l : list (bv 32), ⌜length l = 13%nat⌝ ∗ inode_addrs ip l))%I.
 
 End InodeLockRes.
+
+Section InodeLockResMorph.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  (* M1 stage 2: [inode_raw] is the two cell bundles, hence transportable
+     rather than ξ-constant.  QUALIFIED [TsoCtx.CtxId], since this file
+     does not import TsoCtx. *)
+  Global Instance inode_raw_morph (ip : mword 64) :
+    TsoCtx.CtxMorph (λ ξ : TsoCtx.CtxId, inode_raw (XI := ξ) ip).
+  Proof.
+    iIntros (ξ ξ') "Hd [[%d Hm] (%l & %Hl & Ha)]". rewrite /inode_raw.
+    iDestruct (inode_meta_morph ip d ξ ξ' with "Hd Hm") as "[Hd Hm]".
+    iDestruct (inode_addrs_morph ip l ξ ξ' with "Hd Ha") as "[Hd Ha]".
+    iFrame "Hd". iSplitL "Hm"; [iExists d; iExact "Hm"|].
+    iExists l. by iFrame.
+  Qed.
+
+End InodeLockResMorph.

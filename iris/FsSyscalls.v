@@ -406,7 +406,7 @@ Section FsBundles.
      (S3) is a statement about this bundle's [ns] and nothing else.  (The
      block bitmap is NOT a consumable: [BitmapInv.bitmap_inv] is a
      persistent conjunct of [fs_ready].) *)
-  Definition fs_res (bn : bio_names)
+  Definition fs_res `{XI : CurCtx} (bn : bio_names)
       (bmapstart inodestart ninodes size : Z)
       (ns : nat) (dqb dqs dqbs dqn : dfrac) : iProp Σ :=
     (bslots 3 ∗
