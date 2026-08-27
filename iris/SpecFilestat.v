@@ -214,7 +214,8 @@ Record fstat_names := MkFStatNames {
   fsn_pav        : mword 64;
   fsn_pu         : mword 64;
   fsn_bio        : bio_names;
-  fsn_inodestart : Z;
+  (* [fsn_inodestart] IS GONE (rank 1c): the inode region's first block is
+     ambient, so a threaded copy carried nothing. *)
   fsn_dqs        : dfrac;         (* sb.inodestart                          *)
 }.
 
@@ -228,7 +229,7 @@ Global Instance fstat_names_inhabited : Inhabited fstat_names :=
     (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
-    0 (DfracOwn 1)).
+    (DfracOwn 1)).
 
 Section SpecFilestat.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -246,12 +247,12 @@ Section SpecFilestat.
      ([filestat_pay_carve] below). *)
   Definition filestat_fs_env (fn : fstat_names) : iProp Σ :=
     (⌜log_geom_ok fsc_cov fsc_logst⌝ ∗
-     ⌜0 <= fsn_inodestart fn⌝ ∗
+     ⌜0 <= icfg_ist⌝ ∗
      (* EVERY inum the region covers has its block inside [fsc_cov] -- the
         quantified form, since the reference names the inum existentially *)
      ⌜forall inum : mword 32,
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-        IBLOCK inum (fsn_inodestart fn) ∈ fsc_cov⌝ ∗
+        IBLOCK inum icfg_ist ∈ fsc_cov⌝ ∗
      bio_ctx (fsn_bio fn)
        (fs_view fsc_fs (fsn_disk fn) icfg_dev fsc_cov) ∗
      (* the three persistent invariants SpecIlock v3 / SpecIunlock v3 take,
@@ -259,11 +260,11 @@ Section SpecFilestat.
      itable_inv ∗
      ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov
                 fsc_logst ∗
-     ireg_inv fsc_ireg fsc_fs (fsn_inodestart fn) icfg_nib ∗
+     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
      sb_inodestart ↦₄{fsn_dqs fn}
-       (mword_of_int (fsn_inodestart fn) : mword 32) ∗
+       (mword_of_int icfg_ist : mword 32) ∗
      (* the disk fabric *)
      dev_inv (fsn_uart fn) (fsn_disk fn) ∗
      disk_geom (fsn_disk fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn) ∗
@@ -278,7 +279,7 @@ Section SpecFilestat.
      what made the old [inode_shr] return ungatherable). *)
   Definition filestat_fs_out (fn : fstat_names) : iProp Σ :=
     (sb_inodestart ↦₄{fsn_dqs fn}
-       (mword_of_int (fsn_inodestart fn) : mword 32) ∗
+       (mword_of_int icfg_ist : mword 32) ∗
      bslot)%I.
 
   (* ---- and the two, selected by the file's type ---- *)

@@ -214,7 +214,6 @@ Definition kfork_post
 Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γk : gname * gname) (γp γw γl γf : gname)  (γs : list gname)
-    (inodestart : Z) (nib : nat)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfork in
@@ -241,7 +240,7 @@ Definition wp_kfork_sconf_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   (* THE INODE REGION, and it is here for ONE reason: kfork's
      [np->cwd = idup(p->cwd)].  idup's [ref++] became a ledger move in
@@ -250,7 +249,7 @@ Definition wp_kfork_sconf_body
      it through.  Persistent, and every FS-fabric caller already holds it
      (the dispatch's [sysc_fs_env]), so it costs a caller a frame and
      nothing else.  kfork reads no dinode and touches no log. *)
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   kalloc_env_at γa γk None -∗
   (* THE PROC TABLE'S SEALED REGIME.  kfork allocates a proc, so it needs
      [ProcAvail]'s authority to mint the new slot's allocation marker -- and
@@ -288,9 +287,8 @@ Module Type KFORK.
   Parameter wp_kfork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γk : gname * gname) (γp γw γl γf : gname) (γs : list gname)
-      (inodestart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string),
       wp_kfork_sconf_body γa γk γp γw γl γf γs
-        inodestart nib m lvl K eb pme b pid_p Vp lks.
+ m lvl K eb pme b pid_p Vp lks.
 End KFORK.

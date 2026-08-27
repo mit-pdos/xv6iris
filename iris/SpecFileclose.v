@@ -160,8 +160,9 @@ Record fclose_names := MkFCloseNames {
   fcn_pav      : mword 64;
   fcn_pu       : mword 64;
   fcn_bio      : bio_names;
-  fcn_log      : log_names;
-  fcn_dev      : mword 32;
+  (* [fcn_log] / [fcn_dev] ARE GONE (rank 1c): the log's names and the
+     file system's device are ambient, so a threaded copy had nothing to
+     do but carry an equation. *)
   fcn_pid      : mword 32;        (* the caller's own pid cell              *)
   fcn_dq       : dfrac;
   (* ---- C6b: iput's own indices.  Everything below is the INODE CACHE and
@@ -171,8 +172,7 @@ Record fclose_names := MkFCloseNames {
      are: one equation at the caller ([SpecKexit]'s [fn = MkFCloseNames
      ...]) instead of a dozen coherence conjuncts. *)
   fcn_bmapstart : Z;
-  fcn_inodestart : Z;
-  fcn_nib      : nat;             (* inode blocks in the region             *)
+  (* ...and so are [fcn_inodestart] / [fcn_nib], for the same reason. *)
   fcn_size     : Z;               (* the bitmap's covered size              *)
 }.
 
@@ -191,9 +191,8 @@ Global Instance fclose_names_inhabited : Inhabited fclose_names :=
     (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
-    (MkLogNames 1%positive 1%positive 1%positive 1%positive 1%positive)
-    (mword_of_int 0) (mword_of_int 0) (DfracOwn 1)
-    0 0 0%nat 0).
+    (mword_of_int 0) (DfracOwn 1)
+    0 0).
 
 Section SpecFileclose.
   (* NOTE [icacheG] is NOT here: [fileG] carries it (FileInv.v's header --
@@ -266,11 +265,7 @@ Section SpecFileclose.
     fct_kmem   : fcn_kmem fn = fsc_kalloc;
     fct_kalloc : fcn_kalloc fn = fsc_kpages;
     fct_bio    : fcn_bio fn = fsc_bio;
-    fct_log    : fcn_log fn = icfg_log;
-    fct_dev    : fcn_dev fn = icfg_dev;
     fct_bms    : fcn_bmapstart fn = fsc_bmapstart;
-    fct_ist    : fcn_inodestart fn = icfg_ist;
-    fct_nib    : fcn_nib fn = icfg_nib;
     fct_size   : fcn_size fn = fsc_size;
   }.
 

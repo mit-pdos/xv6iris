@@ -1886,7 +1886,7 @@ Section ProofFileread.
                as (ikk inm ssh gsh ty0 γox)
                   "(%Hipk & %Hik & %Hinlt & %Hnd0 & #Hshot0 & Hshr0 & Hoh &
                     Hpayback)".
-             assert (Hibcov : IBLOCK inm (frn_inodestart fn) ∈ fsc_cov)
+             assert (Hibcov : IBLOCK inm icfg_ist ∈ fsc_cov)
                by (apply Hgeo; exact Hinlt).
              iDestruct (ic_escrows_acc2
                           ikk Hik with "Hescs")
@@ -2013,10 +2013,10 @@ Section ProofFileread.
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn)
                        gil gisl
-                       (frn_inodestart fn)
-                       icfg_nib ikk (ssh/2)%Qp gsh
+
+ ikk (ssh/2)%Qp gsh
                        (DepRd (ssh/2)%Qp icfg_dev inm gsh) (ShotK ty0)
-                       icfg_dev inm
+ inm
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb b
                        _ V (fr_av_ilock K HK) eq_refl
@@ -2292,7 +2292,7 @@ Section ProofFileread.
              iApply (Readi.wp_readi_sconf KT0 γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) γa γf
-                       icfg_dev (fc_ip Cf)
+ (fc_ip Cf)
                        bml data dnl
                        true (Z.to_nat (bv_unsigned v)) (Z.to_nat n)
                        (fun _ => (mword_of_int 0 : mword 8)) V

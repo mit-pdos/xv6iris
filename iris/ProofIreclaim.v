@@ -215,7 +215,7 @@ Section IreclaimDefs.
      keeps, so nothing about it flows back out of ireclaim. *)
   Definition irc_cont `{GEN : GenId} `{CID0 : CpuId}
       (bn : bio_names)
-      (bmapstart inodestart ninodes size : Z)
+      (bmapstart ninodes size : Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac) (j : nat)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (* the LITERAL [true], matching the contract's crossing: this function
@@ -229,7 +229,7 @@ Section IreclaimDefs.
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         bslots 3 -∗
@@ -243,8 +243,7 @@ Section IreclaimDefs.
      without a [wp_next_shift]. *)
   Definition irc_loop `{GEN : GenId}
       (bn : bio_names)
-      (bmapstart inodestart ninodes size : Z)
-      (dev : mword 32)
+      (bmapstart ninodes size : Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac) (j : nat)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) (fuel : nat) : iProp Σ :=
     (∀ (Mn : regfile) (inumn : mword 32) (CIDn : CpuId),
@@ -254,7 +253,7 @@ Section IreclaimDefs.
        ⌜irc_thr8 m Mn⌝ -∗
        ⌜Mn !!! Regidx Rs1 = (sign_extend' 64 inumn : mword 64)⌝ -∗
        ⌜Mn !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64)⌝ -∗
-       ⌜Mn !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64)⌝ -∗
+       ⌜Mn !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64)⌝ -∗
        ⌜Mn !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64)⌝ -∗
        sie_cap_gpr KT1 Mn (K - 8)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
@@ -264,13 +263,13 @@ Section IreclaimDefs.
        irc_frame m -∗
        proc_priv_bare (proc_addr j) pidv Vpr -∗
        sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        bslots 3 -∗
        iref_slot -∗
        bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
        ireg_boot -∗
-       irc_cont (CID0 := CIDn) bn bmapstart inodestart ninodes
+       irc_cont (CID0 := CIDn) bn bmapstart ninodes
                 size pidv dq dqb dqs dqn j m K eb b lks Vpr -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -298,7 +297,7 @@ Section IreclaimEpilogue.
 
   Local Lemma irc_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names)
-      (bmapstart inodestart ninodes size : Z)
+      (bmapstart ninodes size : Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m M : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
@@ -313,12 +312,12 @@ Section IreclaimEpilogue.
     irc_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+    sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots 3 -∗
     iref_slot -∗
     ireg_boot -∗
-    irc_cont (CID0 := CID0) bn bmapstart inodestart ninodes size
+    irc_cont (CID0 := CID0) bn bmapstart ninodes size
              pidv dq dqb dqs dqn j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -677,8 +676,8 @@ Section IreclaimStep.
 
   Local Lemma irc_step `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names)
-      (bmapstart inodestart ninodes size : Z)
-      (dev : mword 32) (inum : mword 32) (fuel : nat)
+      (bmapstart ninodes size : Z)
+ (inum : mword 32) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m Ml : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
@@ -689,7 +688,7 @@ Section IreclaimStep.
     irc_thr8 m Ml ->
     Ml !!! Regidx Rs1 = (sign_extend' 64 inum : mword 64) ->
     Ml !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64) ->
-    Ml !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64) ->
+    Ml !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64) ->
     Ml !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64) ->
     sie_cap_gpr KT1 Ml (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
@@ -700,15 +699,15 @@ Section IreclaimStep.
     irc_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+    sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots 3 -∗
     iref_slot -∗
     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
     ireg_boot -∗
-    irc_loop bn bmapstart inodestart ninodes size dev
+    irc_loop bn bmapstart ninodes size
              pidv dq dqb dqs dqn j m K eb b lks Vpr fuel -∗
-    irc_cont (CID0 := CID0) bn bmapstart inodestart ninodes size
+    irc_cont (CID0 := CID0) bn bmapstart ninodes size
              pidv dq dqb dqs dqn j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -755,7 +754,7 @@ Section IreclaimStep.
       reflexivity. }
     assert (HS1s4 : S1 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /S1 upd_ne; [exact Hs4 | nz]).
-    assert (HS1s5 : S1 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HS1s5 : S1 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /S1 upd_ne; [exact Hs5 | nz]).
     assert (HS1s6 : S1 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /S1 upd_ne; [exact Hs6 | nz]).
@@ -790,7 +789,7 @@ Section IreclaimStep.
       by (rewrite /S2 upd_ne; [exact HS1s1 | nz]).
     assert (HS2s4 : S2 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /S2 upd_ne; [exact HS1s4 | nz]).
-    assert (HS2s5 : S2 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HS2s5 : S2 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /S2 upd_ne; [exact HS1s5 | nz]).
     assert (HS2s6 : S2 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /S2 upd_ne; [exact HS1s6 | nz]).
@@ -824,7 +823,7 @@ Section IreclaimStep.
       by (rewrite /S3 upd_ne; [exact HS2s1 | nz]).
     assert (HS3s4 : S3 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /S3 upd_ne; [exact HS2s4 | nz]).
-    assert (HS3s5 : S3 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HS3s5 : S3 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /S3 upd_ne; [exact HS2s5 | nz]).
     assert (HS3s6 : S3 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /S3 upd_ne; [exact HS2s6 | nz]).
@@ -860,7 +859,7 @@ Section IreclaimStep.
       iDestruct (cpu_claim_ext_transport CID0 CID4 eb (proc_addr j)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iApply (irc_epilogue (CID0 := CID4) j bn bmapstart
-                inodestart ninodes size pidv dq dqb dqs dqn
+ ninodes size pidv dq dqb dqs dqn
                 m S3 K eb b lks Vpr HK HS3sp HS3thr
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl
                       Hiref Hboot [Hcont]").
@@ -930,24 +929,23 @@ Section IreclaimOrphan.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (γ : log_names)
+      (bn : bio_names)
       (γpr : gname)
-      (bmapstart inodestart ninodes size : Z)
-      (nib : nat)
-      (dev inum bno : mword 32) (kk : nat)
+      (bmapstart ninodes size : Z)
+      (inum bno : mword 32) (kk : nat)
       (bs bsd0 : list (bv 8)) (ds : list dinode) (d0 : bool) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m Ml : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 <= inodestart ->
-    ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+    0 <= icfg_ist ->
+    ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
     0 < size <= BPB ->
     0 <= bmapstart ->
     bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set fsc_logst) ->
     cov_below fsc_cov size ->
-    ninodes <= 16 * Z.of_nat nib ->
+    ninodes <= 16 * Z.of_nat icfg_nib ->
     ninodes < 2 ^ 31 ->
     printk_gen_contract (kt := KT1) γpr γu γd ->
     (j < NPROC)%nat ->
@@ -965,25 +963,19 @@ Section IreclaimOrphan.
     bs = diblk_bytes ds ->
     diblk_wf ds ->
     bv_unsigned (di_type (ds !!! DinodeEnc.islot inum)) <> 0 ->
-    uint bno = IBLOCK inum inodestart ->
+    uint bno = IBLOCK inum icfg_ist ->
     irc_sp m Ml ->
     irc_thr8 m Ml ->
     Ml !!! Regidx Rs1 = (sign_extend' 64 inum : mword 64) ->
     Ml !!! Regidx Rs2 = bnode kk ->
     Ml !!! Regidx Rs3 = (sign_extend' 64 inum : mword 64) ->
     Ml !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64) ->
-    Ml !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64) ->
+    Ml !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64) ->
     Ml !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64) ->
     (* irc_orphan's cone: printk ("pr", 14), iget/iput ("itable", 2),
        begin_op/end_op ("log", 3), ilock ("bcache", 4), iunlock
        ("sleep lock", 6) -- "itable" is the lowest. *)
     locks_below lks "log" ->
-    (* THE AMBIENT LOG, named (durable-disk B''-tx): this walk write-locks
-       an inode inside its own transaction, and the escrow's write arm parks
-       a share of [icfg_log]'s element -- the escrow has no [log_names]
-       parameter.  [ProofFsinit] instantiates this contract AT [icfg_log], so
-       the discharge is [eq_refl]. *)
-    γ = icfg_log ->
     sie_cap_gpr KT1 Ml (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -991,12 +983,12 @@ Section IreclaimOrphan.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0x38) : mword 64) -∗
     printk_env γpr γu γd -∗
-    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-    log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
+    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
-    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
@@ -1007,25 +999,25 @@ Section IreclaimOrphan.
     irc_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+    sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots 2 -∗
     iref_slot -∗
     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
     ireg_boot -∗
-    bio_locked bn (fs_view fsc_fs γd dev fsc_cov) kk pidv dev bno bs bsd0 d0 -∗
-    irc_loop bn bmapstart inodestart ninodes size dev
+    bio_locked bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk pidv icfg_dev bno bs bsd0 d0 -∗
+    irc_loop bn bmapstart ninodes size
              pidv dq dqb dqs dqn j m K eb b lks Vpr fuel -∗
-    irc_cont (CID0 := CID0) bn bmapstart inodestart ninodes size
+    irc_cont (CID0 := CID0) bn bmapstart ninodes size
              pidv dq dqb dqs dqn j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31 Hpk
            Hj Hgl Hfuel Hinum Hkk Hbseq Hdswf Htnz Hbnoeq
-           Hsp Hthr Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hbelow Hclog.
+           Hsp Hthr Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hbelow.
     pose proof HK as HK'. 
     pose proof irc_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
-    assert (Hnibin : bv_unsigned inum < 16 * Z.of_nat nib) by lia.
+    assert (Hnibin : bv_unsigned inum < 16 * Z.of_nat icfg_nib) by lia.
     destruct (Hblk inum Hnibin) as [Hibcov Hiblog].
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hlctx
               #Hseam #Hgen #Hireg #Hitb2 #Hitbl #Hesc #Hslks #Hprocs
@@ -1053,7 +1045,7 @@ Section IreclaimOrphan.
       by (rewrite /O1 upd_ne; [exact Hs3 | nz]).
     assert (HO1s4 : O1 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /O1 upd_ne; [exact Hs4 | nz]).
-    assert (HO1s5 : O1 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HO1s5 : O1 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /O1 upd_ne; [exact Hs5 | nz]).
     assert (HO1s6 : O1 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /O1 upd_ne; [exact Hs6 | nz]).
@@ -1083,7 +1075,7 @@ Section IreclaimOrphan.
       by (rewrite /O2 upd_ne; [exact HO1s3 | nz]).
     assert (HO2s4 : O2 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /O2 upd_ne; [exact HO1s4 | nz]).
-    assert (HO2s5 : O2 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HO2s5 : O2 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /O2 upd_ne; [exact HO1s5 | nz]).
     assert (HO2s6 : O2 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /O2 upd_ne; [exact HO1s6 | nz]).
@@ -1122,7 +1114,7 @@ Section IreclaimOrphan.
       by (rewrite /O3 upd_ne; [exact HO2s3 | nz]).
     assert (HO3s4 : O3 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /O3 upd_ne; [exact HO2s4 | nz]).
-    assert (HO3s5 : O3 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HO3s5 : O3 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /O3 upd_ne; [exact HO2s5 | nz]).
     assert (HO3s6 : O3 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /O3 upd_ne; [exact HO2s6 | nz]).
@@ -1170,7 +1162,7 @@ Section IreclaimOrphan.
     assert (HmPs4 : mP !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite (callee_saved_lookup Hcspk_cs Rs4 ltac:(vm_compute; reflexivity));
           exact HO3s4).
-    assert (HmPs5 : mP !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmPs5 : mP !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcspk_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HO3s5).
     assert (HmPs6 : mP !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
@@ -1201,7 +1193,7 @@ Section IreclaimOrphan.
       by (rewrite /O4 upd_ne; [exact HmPs3 | nz]).
     assert (HO4s4 : O4 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /O4 upd_ne; [exact HmPs4 | nz]).
-    assert (HO4s5 : O4 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HO4s5 : O4 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /O4 upd_ne; [exact HmPs5 | nz]).
     assert (HO4s6 : O4 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /O4 upd_ne; [exact HmPs6 | nz]).
@@ -1221,7 +1213,7 @@ Section IreclaimOrphan.
     iIntros (CID6 Hq6) "Hcg Hpc".
     set (O5 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget O4 Rs5))]> O4).
-    assert (HO5a0 : O5 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64)).
+    assert (HO5a0 : O5 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /O5 upd_eq. rgne. rewrite HO4s5. apply add_vec_zero_l. }
     assert (HO5a1 : O5 !!! Regidx Ra1 = (sign_extend' 64 inum : mword 64))
       by (rewrite /O5 upd_ne; [exact HO4a1 | nz]).
@@ -1231,7 +1223,7 @@ Section IreclaimOrphan.
       by (rewrite /O5 upd_ne; [exact HO4s2 | nz]).
     assert (HO5s4 : O5 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /O5 upd_ne; [exact HO4s4 | nz]).
-    assert (HO5s5 : O5 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HO5s5 : O5 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /O5 upd_ne; [exact HO4s5 | nz]).
     assert (HO5s6 : O5 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /O5 upd_ne; [exact HO4s6 | nz]).
@@ -1257,7 +1249,7 @@ Section IreclaimOrphan.
                        (sign_extend' 64 (mword_of_int 2095530 : mword 21))
                      = mword_of_int KernelSyms.iget) by pcw.
     iEval (rewrite Htgtig) in "Hpc".
-    assert (HO6a0 : O6 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HO6a0 : O6 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /O6 upd_ne; [exact HO5a0 | nz]).
     assert (HO6a1 : O6 !!! Regidx Ra1 = (sign_extend' 64 inum : mword 64))
       by (rewrite /O6 upd_ne; [exact HO5a1 | nz]).
@@ -1270,7 +1262,7 @@ Section IreclaimOrphan.
       by (rewrite /O6 upd_ne; [exact HO5s2 | nz]).
     assert (HO6s4 : O6 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /O6 upd_ne; [exact HO5s4 | nz]).
-    assert (HO6s5 : O6 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HO6s5 : O6 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /O6 upd_ne; [exact HO5s5 | nz]).
     assert (HO6s6 : O6 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /O6 upd_ne; [exact HO5s6 | nz]).
@@ -1325,7 +1317,7 @@ Section IreclaimOrphan.
        [Hboot], threaded here and taken straight back below -- BORROWED,
        exactly like the block half beside it. *)
     iPoseProof (log_ctx_seal with "Hlctx") as "#Hbseal".
-    iAssert (iname fsc_ireg fsc_fs inodestart inum (BufL (uint bno) ds))
+    iAssert (iname fsc_ireg fsc_fs icfg_ist inum (BufL (uint bno) ds))
       with "[HpL Hboot]" as "Hlic".
     { rewrite /iname /fs_chalf -Hbseq. iFrame "HpL Hboot Hbseal". iPureIntro.
       (* THE BLOCK TIE, discharged HERE and only here (SIMP-1): this walk is
@@ -1333,7 +1325,7 @@ Section IreclaimOrphan.
          equation is its own [Hbnoeq]. *)
       split; [exact Hbnoeq | split; [exact Hdswf | exact Htnz]]. }
     iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-    iApply (IG.wp_iget_sconf inodestart nib dev inum
+    iApply (IG.wp_iget_sconf inum
               (BufL (uint bno) ds)
               O6 0%nat eb (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
@@ -1353,7 +1345,7 @@ Section IreclaimOrphan.
     iEval (rewrite /iname /fs_chalf -Hbseq) in "Hlic".
     iDestruct "Hlic" as "(HpL & _ & _ & _ & Hboot & _)".
     iDestruct ("Hlkback" with "HpL") as "Hlk".
-    iAssert (bio_locked bn (fs_view fsc_fs γd dev fsc_cov) kk pidv dev bno bs bsd0 d0)
+    iAssert (bio_locked bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk pidv icfg_dev bno bs bsd0 d0)
       with "[Hlk]" as "Hlk"; [rewrite /bio_locked; iExact "Hlk" |].
     destruct Higfacts as (Hcsig & Hkslot & HmIa0).
     assert (Hpc48 : ret_pc (O6 !!! Regidx Rra : mword 64)
@@ -1370,7 +1362,7 @@ Section IreclaimOrphan.
     assert (HmIs4 : mI !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite (callee_saved_lookup Hcsig_cs Rs4 ltac:(vm_compute; reflexivity));
           exact HO6s4).
-    assert (HmIs5 : mI !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmIs5 : mI !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsig_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HO6s5).
     assert (HmIs6 : mI !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
@@ -1404,7 +1396,7 @@ Section IreclaimOrphan.
       by (rewrite /O7 upd_ne; [exact HmIs2 | nz]).
     assert (HO7s4 : O7 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /O7 upd_ne; [exact HmIs4 | nz]).
-    assert (HO7s5 : O7 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HO7s5 : O7 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /O7 upd_ne; [exact HmIs5 | nz]).
     assert (HO7s6 : O7 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /O7 upd_ne; [exact HmIs6 | nz]).
@@ -1432,7 +1424,7 @@ Section IreclaimOrphan.
       by (rewrite /O8 upd_ne; [exact HO7s3 | nz]).
     assert (HO8s4 : O8 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /O8 upd_ne; [exact HO7s4 | nz]).
-    assert (HO8s5 : O8 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HO8s5 : O8 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /O8 upd_ne; [exact HO7s5 | nz]).
     assert (HO8s6 : O8 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /O8 upd_ne; [exact HO7s6 | nz]).
@@ -1469,7 +1461,7 @@ Section IreclaimOrphan.
       by (rewrite /O9 upd_ne; [exact HO8s3 | nz]).
     assert (HO9s4 : O9 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /O9 upd_ne; [exact HO8s4 | nz]).
-    assert (HO9s5 : O9 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HO9s5 : O9 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /O9 upd_ne; [exact HO8s5 | nz]).
     assert (HO9s6 : O9 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /O9 upd_ne; [exact HO8s6 | nz]).
@@ -1487,8 +1479,8 @@ Section IreclaimOrphan.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID7) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev fsc_cov) kk
-              pidv dev bno dq O9 (K - 8)%nat eb (proc_addr j)
+    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk
+              pidv icfg_dev bno dq O9 (K - 8)%nat eb (proc_addr j)
               bs bsd0 d0 b lks Vpr ltac:(lia) Hkk HO9a0
               (* brelse's bound is "bcache"(4); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
@@ -1511,7 +1503,7 @@ Section IreclaimOrphan.
     assert (HmRs4 : mR !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite (callee_saved_lookup Hcsr_cs Rs4 ltac:(vm_compute; reflexivity));
           exact HO9s4).
-    assert (HmRs5 : mR !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmRs5 : mR !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsr_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HO9s5).
     assert (HmRs6 : mR !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
@@ -1560,7 +1552,7 @@ Section IreclaimOrphan.
       by (rewrite /OA upd_ne; [exact HmRs3 | nz]).
     assert (HOAs4 : OA !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /OA upd_ne; [exact HmRs4 | nz]).
-    assert (HOAs5 : OA !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HOAs5 : OA !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /OA upd_ne; [exact HmRs5 | nz]).
     assert (HOAs6 : OA !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /OA upd_ne; [exact HmRs6 | nz]).
@@ -1578,7 +1570,7 @@ Section IreclaimOrphan.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID14) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (BO.wp_begin_op_sconf γs j γl bn γ fsc_fs fsc_cov fsc_logst dev pidv dq
+    iApply (BO.wp_begin_op_sconf γs j γl bn icfg_log fsc_fs fsc_cov fsc_logst icfg_dev pidv dq
               OA (K - 8)%nat eb b lks Vpr
               ltac:(lia) Hj Hgl
               (* begin_op's bound is "log"(3); irc_orphan's own is
@@ -1594,7 +1586,7 @@ Section IreclaimOrphan.
        half, which is all [log_write] ever wanted.  Nothing between the lock
        and the unlock writes here, so the budget just travels. *)
     iDestruct (log_op_split with "Hop") as "[Hopb Htx]".
-    iEval (rewrite Hclog) in "Htx".
+
     assert (Hpc58 : ret_pc (OA !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x58))
       by (rewrite HOAra; pcw).
@@ -1609,7 +1601,7 @@ Section IreclaimOrphan.
     assert (HmBs4 : mB !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite (callee_saved_lookup Hcsbo_cs Rs4 ltac:(vm_compute; reflexivity));
           exact HOAs4).
-    assert (HmBs5 : mB !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmBs5 : mB !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsbo_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HOAs5).
     assert (HmBs6 : mB !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
@@ -1641,7 +1633,7 @@ Section IreclaimOrphan.
       by (rewrite /OB upd_ne; [exact HmBs3 | nz]).
     assert (HOBs4 : OB !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /OB upd_ne; [exact HmBs4 | nz]).
-    assert (HOBs5 : OB !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HOBs5 : OB !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /OB upd_ne; [exact HmBs5 | nz]).
     assert (HOBs6 : OB !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /OB upd_ne; [exact HmBs6 | nz]).
@@ -1678,7 +1670,7 @@ Section IreclaimOrphan.
       by (rewrite /OC upd_ne; [exact HOBs3 | nz]).
     assert (HOCs4 : OC !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /OC upd_ne; [exact HOBs4 | nz]).
-    assert (HOCs5 : OC !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HOCs5 : OC !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /OC upd_ne; [exact HOBs5 | nz]).
     assert (HOCs6 : OC !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /OC upd_ne; [exact HOBs6 | nz]).
@@ -1701,7 +1693,7 @@ Section IreclaimOrphan.
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
     iDestruct "Hshr" as (gsh) "Hshr".
     iApply (IL.wp_ilock_tx_sconf γs j γl γu γd γk pd pav pu bn gil gisl
-              inodestart nib kslot (q/2)%Qp gsh PlainK dev inum
+ kslot (q/2)%Qp gsh PlainK inum
               pidv dq dqs OC (K - 8)%nat eb b lks Vpr
               ltac:(lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
               HOCa0
@@ -1729,7 +1721,7 @@ Section IreclaimOrphan.
     assert (HmLs4 : mL !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite (callee_saved_lookup Hcsil_cs Rs4 ltac:(vm_compute; reflexivity));
           exact HOCs4).
-    assert (HmLs5 : mL !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmLs5 : mL !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsil_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HOCs5).
     assert (HmLs6 : mL !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
@@ -1758,7 +1750,7 @@ Section IreclaimOrphan.
       by (rewrite /OD upd_ne; [exact HmLs3 | nz]).
     assert (HODs4 : OD !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /OD upd_ne; [exact HmLs4 | nz]).
-    assert (HODs5 : OD !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HODs5 : OD !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /OD upd_ne; [exact HmLs5 | nz]).
     assert (HODs6 : OD !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /OD upd_ne; [exact HmLs6 | nz]).
@@ -1795,7 +1787,7 @@ Section IreclaimOrphan.
       by (rewrite /OE upd_ne; [exact HODs3 | nz]).
     assert (HOEs4 : OE !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /OE upd_ne; [exact HODs4 | nz]).
-    assert (HOEs5 : OE !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HOEs5 : OE !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /OE upd_ne; [exact HODs5 | nz]).
     assert (HOEs6 : OE !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /OE upd_ne; [exact HODs6 | nz]).
@@ -1814,7 +1806,7 @@ Section IreclaimOrphan.
     iDestruct (wp_next_shift (b := true) (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IU.wp_iunlock_tx_sconf γs gil gisl kslot
-              (q/2)%Qp gsh dev inum dnl bml pidv dq OE (K - 8)%nat eb
+              (q/2)%Qp gsh icfg_dev inum dnl bml pidv dq OE (K - 8)%nat eb
               (proc_addr j) b lks Vpr
               ltac:(lia) Hkslot HOEa0
               (* iunlock's bound is "sleep lock"(6); irc_orphan's own is
@@ -1826,7 +1818,7 @@ Section IreclaimOrphan.
     iIntros (CID21 Hq21 mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr Htx".
     (* ...AND THE WRITE ARM COMES HOME inside [iunlock] (B''-tx): the
        descriptor named the share, so the token is whole again. *)
-    iEval (rewrite -Hclog) in "Htx".
+
     iDestruct (log_opb_op with "Hopb Htx") as "Hop".
     iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
     assert (Hpc64 : ret_pc (OE !!! Regidx Rra : mword 64)
@@ -1834,7 +1826,7 @@ Section IreclaimOrphan.
       by (rewrite HOEra; pcw).
     iEval (rewrite Hpc64) in "Hpc".
     (* THE GATHER: the share comes back at the fraction it left at *)
-    iDestruct (inode_ref_gather kslot (q/2)%Qp (q/2)%Qp dev inum
+    iDestruct (inode_ref_gather kslot (q/2)%Qp (q/2)%Qp icfg_dev inum
                  with "Hkeep Hshr") as "Href".
     iEval (rewrite Qp.div_2) in "Href".
     pose proof Hcsiu as Hcsiu_cs.
@@ -1847,7 +1839,7 @@ Section IreclaimOrphan.
     assert (HmUs4 : mU !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite (callee_saved_lookup Hcsiu_cs Rs4 ltac:(vm_compute; reflexivity));
           exact HOEs4).
-    assert (HmUs5 : mU !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmUs5 : mU !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsiu_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HOEs5).
     assert (HmUs6 : mU !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
@@ -1874,7 +1866,7 @@ Section IreclaimOrphan.
       by (rewrite /OF upd_ne; [exact HmUs1 | nz]).
     assert (HOFs4 : OF !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /OF upd_ne; [exact HmUs4 | nz]).
-    assert (HOFs5 : OF !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HOFs5 : OF !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /OF upd_ne; [exact HmUs5 | nz]).
     assert (HOFs6 : OF !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /OF upd_ne; [exact HmUs6 | nz]).
@@ -1909,7 +1901,7 @@ Section IreclaimOrphan.
       by (rewrite /OG upd_ne; [exact HOFs1 | nz]).
     assert (HOGs4 : OG !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /OG upd_ne; [exact HOFs4 | nz]).
-    assert (HOGs5 : OG !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HOGs5 : OG !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /OG upd_ne; [exact HOFs5 | nz]).
     assert (HOGs6 : OG !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /OG upd_ne; [exact HOFs6 | nz]).
@@ -1941,11 +1933,11 @@ Section IreclaimOrphan.
        and ended after this call -- so half of it is what iput takes and the
        two rejoin below. *)
     iDestruct (log_tx_halve with "Htx") as (t0) "[Htx1 Htx2]".
-    iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn γ
-              gil gisl bmapstart inodestart nib size dev
+    iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn
+              gil gisl bmapstart size
               kslot q inum MAXOPBLOCKS Sb0 false false false e00 t0 (1/2)%Qp
               pidv dq dqb dqs OG (K - 8)%nat eb b lks Vpr false
-              ltac:(lia) Hclog Hkslot ltac:(discriminate) ltac:(discriminate)
+              ltac:(lia) Hkslot ltac:(discriminate) ltac:(discriminate)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hst Hibcov Hiblog Hnibin Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0
@@ -1964,7 +1956,7 @@ Section IreclaimOrphan.
     iIntros (CID24 Hq24 mQ n' Sb' wf) "%Hcsip Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbb Hsbi
                                       Hsl %Hssub %Hwbm %Hwc %Hbnd
                                       Hop Htx1 Hiref Hboot".
-    iDestruct (log_tx_join γ t0 with "Htx1 Htx2") as "Htx".
+    iDestruct (log_tx_join icfg_log t0 with "Htx1 Htx2") as "Htx".
     iDestruct (log_opS_op with "Hop Htx") as "Hop".
     assert (Hpc6a : ret_pc (OG !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x6a))
@@ -1977,7 +1969,7 @@ Section IreclaimOrphan.
     assert (HmQs4 : mQ !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite (callee_saved_lookup Hcsip_cs Rs4 ltac:(vm_compute; reflexivity));
           exact HOGs4).
-    assert (HmQs5 : mQ !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmQs5 : mQ !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsip_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HOGs5).
     assert (HmQs6 : mQ !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
@@ -2011,7 +2003,7 @@ Section IreclaimOrphan.
       by (rewrite /OH upd_ne; [exact HmQs1 | nz]).
     assert (HOHs4 : OH !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /OH upd_ne; [exact HmQs4 | nz]).
-    assert (HOHs5 : OH !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HOHs5 : OH !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /OH upd_ne; [exact HmQs5 | nz]).
     assert (HOHs6 : OH !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /OH upd_ne; [exact HmQs6 | nz]).
@@ -2029,8 +2021,8 @@ Section IreclaimOrphan.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID23) (CIDb := CID25) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (EO.wp_end_op_sconf γs j γl γu γd γk pd pav pu bn γ fsc_fs fsc_cov fsc_logst
-              dev n' pidv dq OH (K - 8)%nat eb b lks Vpr
+    iApply (EO.wp_end_op_sconf γs j γl γu γd γk pd pav pu bn icfg_log fsc_fs fsc_cov fsc_logst
+              icfg_dev n' pidv dq OH (K - 8)%nat eb b lks Vpr
               ltac:(lia) Hgeom Hj Hgl
               (* end_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
@@ -2050,7 +2042,7 @@ Section IreclaimOrphan.
     assert (HmEs4 : mE !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite (callee_saved_lookup Hcseo_cs Rs4 ltac:(vm_compute; reflexivity));
           exact HOHs4).
-    assert (HmEs5 : mE !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmEs5 : mE !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcseo_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HOHs5).
     assert (HmEs6 : mE !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
@@ -2065,8 +2057,8 @@ Section IreclaimOrphan.
       rewrite (callee_saved_lookup Hcseo_cs c Hcs).
       exact (HOHthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     (* ===== FALL into the step at +0x6e ===== *)
-    iApply (irc_step (CID0 := CID26) j bn bmapstart inodestart
-              ninodes size dev inum fuel pidv dq dqb dqs dqn
+    iApply (irc_step (CID0 := CID26) j bn bmapstart
+              ninodes size inum fuel pidv dq dqb dqs dqn
               m mE K eb b lks Vpr HK Hn31
               Hfuel Hinum HmEsp HmEthr
               HmEs1 HmEs4 HmEs5 HmEs6
@@ -2092,8 +2084,8 @@ Section IreclaimRelease.
       (γs : list gname) (j : nat)
       (γd : disk_names)
       (bn : bio_names)
-      (bmapstart inodestart ninodes size : Z)
-      (dev inum bno : mword 32) (kk : nat)
+      (bmapstart ninodes size : Z)
+      (inum bno : mword 32) (kk : nat)
       (bs bsd0 : list (bv 8)) (d0 : bool) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m Ml : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
@@ -2107,7 +2099,7 @@ Section IreclaimRelease.
     Ml !!! Regidx Rs1 = (sign_extend' 64 inum : mword 64) ->
     Ml !!! Regidx Rs2 = bnode kk ->
     Ml !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64) ->
-    Ml !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64) ->
+    Ml !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64) ->
     Ml !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64) ->
     (* irc_release's only lock-touching callee is brelse, at "bcache" (4). *)
     locks_below lks "log" ->
@@ -2117,21 +2109,21 @@ Section IreclaimRelease.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0xaa) : mword 64) -∗
-    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
     procs_inv γs -∗
     irc_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+    sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots 2 -∗
     iref_slot -∗
     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
     ireg_boot -∗
-    bio_locked bn (fs_view fsc_fs γd dev fsc_cov) kk pidv dev bno bs bsd0 d0 -∗
-    irc_loop bn bmapstart inodestart ninodes size dev
+    bio_locked bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk pidv icfg_dev bno bs bsd0 d0 -∗
+    irc_loop bn bmapstart ninodes size
              pidv dq dqb dqs dqn j m K eb b lks Vpr fuel -∗
-    irc_cont (CID0 := CID0) bn bmapstart inodestart ninodes size
+    irc_cont (CID0 := CID0) bn bmapstart ninodes size
              pidv dq dqb dqs dqn j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2153,7 +2145,7 @@ Section IreclaimRelease.
       by (rewrite /V1 upd_ne; [exact Hs1 | nz]).
     assert (HV1s4 : V1 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /V1 upd_ne; [exact Hs4 | nz]).
-    assert (HV1s5 : V1 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HV1s5 : V1 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /V1 upd_ne; [exact Hs5 | nz]).
     assert (HV1s6 : V1 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /V1 upd_ne; [exact Hs6 | nz]).
@@ -2188,7 +2180,7 @@ Section IreclaimRelease.
       by (rewrite /V2 upd_ne; [exact HV1s1 | nz]).
     assert (HV2s4 : V2 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite /V2 upd_ne; [exact HV1s4 | nz]).
-    assert (HV2s5 : V2 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HV2s5 : V2 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /V2 upd_ne; [exact HV1s5 | nz]).
     assert (HV2s6 : V2 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
       by (rewrite /V2 upd_ne; [exact HV1s6 | nz]).
@@ -2206,8 +2198,8 @@ Section IreclaimRelease.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev fsc_cov) kk
-              pidv dev bno dq V2 (K - 8)%nat eb (proc_addr j)
+    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk
+              pidv icfg_dev bno dq V2 (K - 8)%nat eb (proc_addr j)
               bs bsd0 d0 b lks Vpr ltac:(lia) Hkk HV2a0
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
@@ -2225,7 +2217,7 @@ Section IreclaimRelease.
     assert (HmRs4 : mR !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
       by (rewrite (callee_saved_lookup Hcsr_cs Rs4 ltac:(vm_compute; reflexivity));
           exact HV2s4).
-    assert (HmRs5 : mR !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmRs5 : mR !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsr_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HV2s5).
     assert (HmRs6 : mR !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
@@ -2257,8 +2249,8 @@ Section IreclaimRelease.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID2 CID4 eb (proc_addr j)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (irc_step (CID0 := CID4) j bn bmapstart inodestart
-              ninodes size dev inum fuel pidv dq dqb dqs dqn
+    iApply (irc_step (CID0 := CID4) j bn bmapstart
+              ninodes size inum fuel pidv dq dqb dqs dqn
               m mR K eb b lks Vpr HK Hn31 Hfuel Hinum HmRsp HmRthr
               HmRs1 HmRs4 HmRs5 HmRs6
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
@@ -2286,23 +2278,22 @@ Section IreclaimScan.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (γ : log_names)
+      (bn : bio_names)
       (γpr : gname)
-      (bmapstart inodestart ninodes size : Z)
-      (nib : nat) (dev : mword 32)
+      (bmapstart ninodes size : Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 <= inodestart ->
-    ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+    0 <= icfg_ist ->
+    ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
     0 < size <= BPB ->
     0 <= bmapstart ->
     bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set fsc_logst) ->
     cov_below fsc_cov size ->
     1 < ninodes ->
-    ninodes <= 16 * Z.of_nat nib ->
+    ninodes <= 16 * Z.of_nat icfg_nib ->
     ninodes < 2 ^ 31 ->
     printk_gen_contract (kt := KT1) γpr γu γd ->
     (j < NPROC)%nat ->
@@ -2310,19 +2301,14 @@ Section IreclaimScan.
     (* irc_scan reaches irc_step (no lock), irc_orphan ("itable", 2) and
        irc_release ("bcache", 4) every turn; "itable" is the lowest. *)
     locks_below lks "log" ->
-    (* THE AMBIENT LOG, named (durable-disk B''-tx): [irc_orphan]
-       write-locks an inode inside its own transaction and the escrow's
-       write arm parks a share of [icfg_log]'s element.  [ProofFsinit]
-       instantiates this walk AT [icfg_log]. *)
-    γ = icfg_log ->
     kernel_text -∗ kernel_data -∗
     printk_env γpr γu γd -∗
-    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-    log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
+    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
-    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
@@ -2331,11 +2317,11 @@ Section IreclaimScan.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     ∀ fuel : nat,
-      irc_loop bn bmapstart inodestart ninodes size dev
+      irc_loop bn bmapstart ninodes size
                pidv dq dqb dqs dqn j m K eb b lks Vpr fuel.
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31
-           Hpk Hj Hgl Hbelow Hclog.
+           Hpk Hj Hgl Hbelow.
     pose proof HK as HK'. 
     pose proof Hgeom as [Hcovok Hlogsub].
     iIntros "#Htext #Hkdata #Hpenv #Hbio #Hlctx #Hseam #Hgen #Hireg
@@ -2362,17 +2348,17 @@ Section IreclaimScan.
       rewrite Hm32 in Hinum32.
       assert (Hinum31 : bv_unsigned inum < 2147483648)
         by (change (2^31)%Z with 2147483648%Z in Hn31; lia).
-      assert (Hnib : bv_unsigned inum < 16 * Z.of_nat nib) by lia.
+      assert (Hnib : bv_unsigned inum < 16 * Z.of_nat icfg_nib) by lia.
       destruct (Hblk inum Hnib) as [Hcov Hlog].
       destruct (Hcovok _ Hcov) as [Hibpos Hiblt].
-      assert (Hib : 0 <= IBLOCK inum inodestart < 2147483648)
+      assert (Hib : 0 <= IBLOCK inum icfg_ist < 2147483648)
         by (change (2 ^ 31)%Z with 2147483648%Z in Hiblt; lia).
-      set (bno := (mword_of_int (IBLOCK inum inodestart) : mword 32)).
-      assert (Hbno : uint bno = IBLOCK inum inodestart).
+      set (bno := (mword_of_int (IBLOCK inum icfg_ist) : mword 32)).
+      assert (Hbno : uint bno = IBLOCK inum icfg_ist).
       { rewrite /bno bb_uint32 moi32_unsigned. apply bvw32_small.
         change (2^32)%Z with 4294967296%Z. lia. }
       assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbno; lia).
-      assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd dev fsc_cov))
+      assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd icfg_dev fsc_cov))
         by (rewrite Hbno; exact Hcov).
       assert (Hslotz : Z.of_nat (DinodeEnc.islot inum) = bv_unsigned inum `mod` 16).
       { rewrite /DinodeEnc.islot Z2Nat.id; [reflexivity |].
@@ -2397,7 +2383,7 @@ Section IreclaimScan.
         by (rewrite /W1 upd_ne; [exact Hs1 | nz]).
       assert (HW1s4 : W1 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /W1 upd_ne; [exact Hs4 | nz]).
-      assert (HW1s5 : W1 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HW1s5 : W1 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /W1 upd_ne; [exact Hs5 | nz]).
       assert (HW1s6 : W1 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /W1 upd_ne; [exact Hs6 | nz]).
@@ -2429,7 +2415,7 @@ Section IreclaimScan.
         by (rewrite /W2 upd_ne; [exact HW1s3 | nz]).
       assert (HW2s4 : W2 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /W2 upd_ne; [exact HW1s4 | nz]).
-      assert (HW2s5 : W2 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HW2s5 : W2 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /W2 upd_ne; [exact HW1s5 | nz]).
       assert (HW2s6 : W2 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /W2 upd_ne; [exact HW1s6 | nz]).
@@ -2450,15 +2436,15 @@ Section IreclaimScan.
       iEval (rewrite -Hsbiadr) in "Hsbi".
       iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ireclaim + 0x84)) Ra5 Rs4
                 (mword_of_int 24 : mword 12) W2 (K - 8)%nat
-                (mword_of_int inodestart : mword 32) b
+                (mword_of_int icfg_ist : mword 32) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hsbi").
       { iApply (irci_84 with "Htext"). }
       iIntros (CID3 Hq3) "Hcg Hpc Hsbi".
       iEval (rewrite Hsbiadr) in "Hsbi".
       set (W3 := <[Regidx Ra5 := regval_into_reg
-                    (sign_extend' 64 (mword_of_int inodestart : mword 32))]> W2).
+                    (sign_extend' 64 (mword_of_int icfg_ist : mword 32))]> W2).
       assert (HW3a5 : W3 !!! Regidx Ra5
-                      = (sign_extend' 64 (mword_of_int inodestart : mword 32) : mword 64))
+                      = (sign_extend' 64 (mword_of_int icfg_ist : mword 32) : mword 64))
         by (rewrite /W3; apply upd_eq).
       assert (HW3a1 : W3 !!! Regidx Ra1
                       = (mword_of_int (bv_unsigned inum / 16) : mword 64))
@@ -2469,7 +2455,7 @@ Section IreclaimScan.
         by (rewrite /W3 upd_ne; [exact HW2s3 | nz]).
       assert (HW3s4 : W3 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /W3 upd_ne; [exact HW2s4 | nz]).
-      assert (HW3s5 : W3 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HW3s5 : W3 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /W3 upd_ne; [exact HW2s5 | nz]).
       assert (HW3s6 : W3 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /W3 upd_ne; [exact HW2s6 | nz]).
@@ -2494,14 +2480,14 @@ Section IreclaimScan.
       assert (HW4a1 : W4 !!! Regidx Ra1 = (sign_extend' 64 bno : mword 64)).
       { rewrite /W4 upd_eq. rgne. rgne. rewrite HW3a1 HW3a5.
         rewrite /bno. rewrite ds_add_vec32_comm.
-        apply (iu_addw_ibl inum inodestart Hst Hib). }
+        apply (iu_addw_ibl inum icfg_ist Hst Hib). }
       assert (HW4s1 : W4 !!! Regidx Rs1 = (sign_extend' 64 inum : mword 64))
         by (rewrite /W4 upd_ne; [exact HW3s1 | nz]).
       assert (HW4s3 : W4 !!! Regidx Rs3 = (sign_extend' 64 inum : mword 64))
         by (rewrite /W4 upd_ne; [exact HW3s3 | nz]).
       assert (HW4s4 : W4 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /W4 upd_ne; [exact HW3s4 | nz]).
-      assert (HW4s5 : W4 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HW4s5 : W4 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /W4 upd_ne; [exact HW3s5 | nz]).
       assert (HW4s6 : W4 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /W4 upd_ne; [exact HW3s6 | nz]).
@@ -2521,7 +2507,7 @@ Section IreclaimScan.
       iIntros (CID5 Hq5) "Hcg Hpc".
       set (W5 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (rget W4 Rs5))]> W4).
-      assert (HW5a0 : W5 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64)).
+      assert (HW5a0 : W5 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64)).
       { rewrite /W5 upd_eq. rgne. rewrite HW4s5. apply add_vec_zero_l. }
       assert (HW5a1 : W5 !!! Regidx Ra1 = (sign_extend' 64 bno : mword 64))
         by (rewrite /W5 upd_ne; [exact HW4a1 | nz]).
@@ -2531,7 +2517,7 @@ Section IreclaimScan.
         by (rewrite /W5 upd_ne; [exact HW4s3 | nz]).
       assert (HW5s4 : W5 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /W5 upd_ne; [exact HW4s4 | nz]).
-      assert (HW5s5 : W5 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HW5s5 : W5 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /W5 upd_ne; [exact HW4s5 | nz]).
       assert (HW5s6 : W5 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /W5 upd_ne; [exact HW4s6 | nz]).
@@ -2557,7 +2543,7 @@ Section IreclaimScan.
                          (sign_extend' 64 (mword_of_int 2094696 : mword 21))
                        = mword_of_int KernelSyms.bread) by pcw.
       iEval (rewrite Htgtbr) in "Hpc".
-      assert (HW6a0 : W6 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+      assert (HW6a0 : W6 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /W6 upd_ne; [exact HW5a0 | nz]).
       assert (HW6a1 : W6 !!! Regidx Ra1 = (sign_extend' 64 bno : mword 64))
         by (rewrite /W6 upd_ne; [exact HW5a1 | nz]).
@@ -2570,7 +2556,7 @@ Section IreclaimScan.
         by (rewrite /W6 upd_ne; [exact HW5s3 | nz]).
       assert (HW6s4 : W6 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /W6 upd_ne; [exact HW5s4 | nz]).
-      assert (HW6s5 : W6 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HW6s5 : W6 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /W6 upd_ne; [exact HW5s5 | nz]).
       assert (HW6s6 : W6 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /W6 upd_ne; [exact HW5s6 | nz]).
@@ -2590,7 +2576,7 @@ Section IreclaimScan.
                    with "Hcont") as "Hcont".
       iDestruct (iu_slots_split 2 1 with "Hsl") as "[Hsl Hsl1]".
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-                (fs_view fsc_fs γd dev fsc_cov) pidv dev bno dq
+                (fs_view fsc_fs γd icfg_dev fsc_cov) pidv icfg_dev bno dq
                 W6 (K - 8)%nat eb b lks Vpr
                 ltac:(lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
                 HW6a0 HW6a1
@@ -2616,7 +2602,7 @@ Section IreclaimScan.
       assert (HmBs4 : mB !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite (callee_saved_lookup Hcsb_cs Rs4 ltac:(vm_compute; reflexivity));
             exact HW6s4).
-      assert (HmBs5 : mB !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HmBs5 : mB !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite (callee_saved_lookup Hcsb_cs Rs5 ltac:(vm_compute; reflexivity));
             exact HW6s5).
       assert (HmBs6 : mB !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
@@ -2635,12 +2621,12 @@ Section IreclaimScan.
       iDestruct (iu_held_k with "Hheld") as %Hkk.
       iDestruct (ds_held_L with "Hheld") as "[HpL Hheldback0]".
       iApply fupd_wp.
-      iEval (rewrite Hbno (ireg_bi_iblock inum inodestart)) in "HpL".
-      iMod (ireg_read_blk ⊤ fsc_ireg fsc_fs inodestart nib (ireg_bi inum) bs0
-              ltac:(solve_ndisj) logN_top (ireg_bi_lt inum nib Hnib)
+      iEval (rewrite Hbno (ireg_bi_iblock inum icfg_ist)) in "HpL".
+      iMod (ireg_read_blk ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib (ireg_bi inum) bs0
+              ltac:(solve_ndisj) logN_top (ireg_bi_lt inum icfg_nib Hnib)
               with "Hireg HpL") as "(%Hex & HpL)".
       iModIntro.
-      iEval (rewrite -(ireg_bi_iblock inum inodestart) -Hbno) in "HpL".
+      iEval (rewrite -(ireg_bi_iblock inum icfg_ist) -Hbno) in "HpL".
       iDestruct ("Hheldback0" with "HpL") as "Hheld".
       destruct Hex as (ds & Hdswf & Hbs0).
       subst bs0.
@@ -2677,7 +2663,7 @@ Section IreclaimScan.
         by (rewrite /W7 upd_ne; [exact HmBs3 | nz]).
       assert (HW7s4 : W7 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /W7 upd_ne; [exact HmBs4 | nz]).
-      assert (HW7s5 : W7 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HW7s5 : W7 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /W7 upd_ne; [exact HmBs5 | nz]).
       assert (HW7s6 : W7 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /W7 upd_ne; [exact HmBs6 | nz]).
@@ -2709,7 +2695,7 @@ Section IreclaimScan.
         by (rewrite /W8 upd_ne; [exact HW7s3 | nz]).
       assert (HW8s4 : W8 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /W8 upd_ne; [exact HW7s4 | nz]).
-      assert (HW8s5 : W8 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HW8s5 : W8 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /W8 upd_ne; [exact HW7s5 | nz]).
       assert (HW8s6 : W8 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /W8 upd_ne; [exact HW7s6 | nz]).
@@ -2746,7 +2732,7 @@ Section IreclaimScan.
         by (rewrite /W9 upd_ne; [exact HW8s3 | nz]).
       assert (HW9s4 : W9 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /W9 upd_ne; [exact HW8s4 | nz]).
-      assert (HW9s5 : W9 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HW9s5 : W9 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /W9 upd_ne; [exact HW8s5 | nz]).
       assert (HW9s6 : W9 !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /W9 upd_ne; [exact HW8s6 | nz]).
@@ -2782,7 +2768,7 @@ Section IreclaimScan.
         by (rewrite /WA upd_ne; [exact HW9s3 | nz]).
       assert (HWAs4 : WA !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /WA upd_ne; [exact HW9s4 | nz]).
-      assert (HWAs5 : WA !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HWAs5 : WA !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /WA upd_ne; [exact HW9s5 | nz]).
       assert (HWAs6 : WA !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /WA upd_ne; [exact HW9s6 | nz]).
@@ -2813,7 +2799,7 @@ Section IreclaimScan.
         by (rewrite /WB upd_ne; [exact HWAs3 | nz]).
       assert (HWBs4 : WB !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /WB upd_ne; [exact HWAs4 | nz]).
-      assert (HWBs5 : WB !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HWBs5 : WB !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /WB upd_ne; [exact HWAs5 | nz]).
       assert (HWBs6 : WB !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /WB upd_ne; [exact HWAs6 | nz]).
@@ -2869,7 +2855,7 @@ Section IreclaimScan.
         by (rewrite /WC upd_ne; [exact HWBs3 | nz]).
       assert (HWCs4 : WC !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /WC upd_ne; [exact HWBs4 | nz]).
-      assert (HWCs5 : WC !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HWCs5 : WC !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /WC upd_ne; [exact HWBs5 | nz]).
       assert (HWCs6 : WC !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
         by (rewrite /WC upd_ne; [exact HWBs6 | nz]).
@@ -2910,7 +2896,7 @@ Section IreclaimScan.
         iEval (rewrite Hins) in "Hbb".
         iDestruct ("Hbbback" $! ds with "[%] Hbb") as "Hbuf"; [exact Hdswf |].
         iDestruct ("Hheldback" $! (diblk_bytes ds) with "Hbuf") as "Hheld".
-        iAssert (bio_locked bn (fs_view fsc_fs γd dev fsc_cov) kk pidv dev bno
+        iAssert (bio_locked bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk pidv icfg_dev bno
                    (diblk_bytes ds) bsd0 d0) with "[Hheld]" as "Hlk";
           [rewrite /bio_locked; iExact "Hheld" |].
         iDestruct (cpu_own_transport CID7 CID14 0 eb (proc_addr j) b
@@ -2920,7 +2906,7 @@ Section IreclaimScan.
         iDestruct (cpu_claim_ext_transport CID7 CID14 eb (proc_addr j)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
         iApply (irc_release (CID0 := CID14) γs j γd bn bmapstart
-                  inodestart ninodes size dev inum bno kk
+ ninodes size inum bno kk
                   (diblk_bytes ds) bsd0 d0 fuel pidv dq dqb dqs dqn
                   m WC K eb b lks Vpr HK Hn31 Hfuel Hinum Hkk HWCsp HWCthr
                   HWCs1 HWCs2 HWCs4 HWCs5 HWCs6
@@ -2974,7 +2960,7 @@ Section IreclaimScan.
           by (rewrite /WD upd_ne; [exact HWCs3 | nz]).
         assert (HWDs4 : WD !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
           by (rewrite /WD upd_ne; [exact HWCs4 | nz]).
-        assert (HWDs5 : WD !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+        assert (HWDs5 : WD !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
           by (rewrite /WD upd_ne; [exact HWCs5 | nz]).
         assert (HWDs6 : WD !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64))
           by (rewrite /WD upd_ne; [exact HWCs6 | nz]).
@@ -2995,7 +2981,7 @@ Section IreclaimScan.
         iEval (rewrite Hins) in "Hbb".
         iDestruct ("Hbbback" $! ds with "[%] Hbb") as "Hbuf"; [exact Hdswf |].
         iDestruct ("Hheldback" $! (diblk_bytes ds) with "Hbuf") as "Hheld".
-        iAssert (bio_locked bn (fs_view fsc_fs γd dev fsc_cov) kk pidv dev bno
+        iAssert (bio_locked bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk pidv icfg_dev bno
                    (diblk_bytes ds) bsd0 d0) with "[Hheld]" as "Hlk";
           [rewrite /bio_locked; iExact "Hheld" |].
         (* ===== +0xa8 c.beqz a5,-112 : an ORPHAN? ===== *)
@@ -3021,9 +3007,9 @@ Section IreclaimScan.
                        ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
           iDestruct (cpu_claim_ext_transport CID7 CID16 eb (proc_addr j)
                        ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-          iApply (irc_orphan (CID0 := CID16) γs j γl γu γd γk pd pav pu bn γ
-                    γpr bmapstart inodestart ninodes size
-                    nib dev inum bno kk (diblk_bytes ds) bsd0 ds d0
+          iApply (irc_orphan (CID0 := CID16) γs j γl γu γd γk pd pav pu bn
+                    γpr bmapstart ninodes size
+ inum bno kk (diblk_bytes ds) bsd0 ds d0
                     fuel
                     pidv dq dqb dqs dqn m WD K eb b lks
                     Vpr HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31
@@ -3033,7 +3019,7 @@ Section IreclaimScan.
                        [c.beqz] at +0xa2 has just refuted a zero type for. *)
                     eq_refl Hdswf Ht0 Hbno HWDsp HWDthr
                     HWDs1 HWDs2 HWDs3 HWDs4 HWDs5 HWDs6
-                    Hbelow Hclog
+                    Hbelow
                     with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hlctx
                           Hseam Hgen Hireg Hitb2 Hitbl Hesc Hslks Hprocs Hdevi
                           Hdgeom Hdlock Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
@@ -3060,7 +3046,7 @@ Section IreclaimScan.
           iDestruct (cpu_claim_ext_transport CID7 CID16 eb (proc_addr j)
                        ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
           iApply (irc_release (CID0 := CID16) γs j γd bn bmapstart
-                    inodestart ninodes size dev inum bno kk
+ ninodes size inum bno kk
                     (diblk_bytes ds) bsd0 d0 fuel pidv dq dqb dqs dqn
                     m WD K eb b lks Vpr HK Hn31 Hfuel Hinum Hkk HWDsp HWDthr
                     HWDs1 HWDs2 HWDs4 HWDs5 HWDs6
@@ -3094,21 +3080,19 @@ Section IreclaimMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
       (γpr : gname)
-      (bmapstart inodestart : Z)
-      (ninodes : Z) (nib : nat) (size : Z)
-      (dev : mword 32)
+      (bmapstart : Z)
+      (ninodes : Z) (size : Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
-      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γpr
-                             bmapstart inodestart ninodes nib size
-                             dev pidv dq dqb dqs dqn m K eb b lks Vpr.
+      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γpr
+                             bmapstart ninodes size
+ pidv dq dqb dqs dqn m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_ireclaim_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb
-           Hn1 Hnnib Hn31 Hpk Hj Hgl Ha0 Hbelow Hclog.
+           Hn1 Hnnib Hn31 Hpk Hj Hgl Ha0 Hbelow.
     pose proof HK as HK'. 
     assert (Hnsext : (sign_extend' 64 (mword_of_int ninodes : mword 32) : mword 64)
                      = mword_of_int ninodes)
@@ -3126,7 +3110,7 @@ Section IreclaimMain.
               #Hseam #Hgen Hsbn Hsbi Hsbb #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks
               #Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hiref Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
-    iAssert (irc_cont (CID0 := CID) bn bmapstart inodestart
+    iAssert (irc_cont (CID0 := CID) bn bmapstart
                ninodes size pidv dq dqb dqs dqn j m K eb b lks Vpr)%I
       with "[Hcont]" as "Hcont"; [rewrite /irc_cont; iExact "Hcont" |].
     (* ===== +0x00 auipc a4,0x1d ===== *)
@@ -3180,7 +3164,7 @@ Section IreclaimMain.
       by (rewrite /R3; apply upd_eq).
     assert (HR3a4 : R3 !!! Regidx Ra4 = (mword_of_int ninodes : mword 64))
       by (rewrite /R3 upd_ne; [exact HR2a4 | nz]).
-    assert (HR3a0 : R3 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64)).
+    assert (HR3a0 : R3 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /R3 upd_ne; [| nz]. rewrite /R2 upd_ne; [| nz].
       rewrite /R1 upd_ne; [exact Ha0 | nz]. }
     assert (HR3sp0 : (R3 !!! Regidx csp_rs1 : mword 64)
@@ -3245,7 +3229,7 @@ Section IreclaimMain.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /R4 upd_ne; [| regne]. rewrite /R3 upd_ne; [| regne].
       rewrite /R2 upd_ne; [| regne]. rewrite /R1 upd_ne; [reflexivity | regne]. }
-    assert (HR4a0 : R4 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HR4a0 : R4 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /R4 upd_ne; [exact HR3a0 | nz]).
     assert (HR4a5 : R4 !!! Regidx Ra5
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64))
@@ -3416,7 +3400,7 @@ Section IreclaimMain.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /R5 upd_ne; [| regne].
       exact (HR4thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
-    assert (HR5a0 : R5 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HR5a0 : R5 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /R5 upd_ne; [exact HR4a0 | nz]).
     assert (HR5a5 : R5 !!! Regidx Ra5
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64))
@@ -3431,7 +3415,7 @@ Section IreclaimMain.
     iIntros (CID15 Hq15) "Hcg Hpc".
     set (R6 := <[Regidx Rs5 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget R5 Ra0))]> R5).
-    assert (HR6s5 : R6 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64)).
+    assert (HR6s5 : R6 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /R6 upd_eq. rgne. rewrite HR5a0. apply add_vec_zero_l. }
     assert (HR6a5 : R6 !!! Regidx Ra5
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64))
@@ -3455,7 +3439,7 @@ Section IreclaimMain.
     assert (HR7s1 : R7 !!! Regidx Rs1
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64)).
     { rewrite /R7 upd_eq. rgne. rewrite HR6a5. apply add_vec_zero_l. }
-    assert (HR7s5 : R7 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HR7s5 : R7 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /R7 upd_ne; [exact HR6s5 | nz]).
     assert (HR7sp : irc_sp m R7)
       by (rewrite /irc_sp /R7 upd_ne; [exact HR6sp | nz]).
@@ -3482,7 +3466,7 @@ Section IreclaimMain.
     assert (HR8s1 : R8 !!! Regidx Rs1
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64))
       by (rewrite /R8 upd_ne; [exact HR7s1 | nz]).
-    assert (HR8s5 : R8 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HR8s5 : R8 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /R8 upd_ne; [exact HR7s5 | nz]).
     assert (HR8sp : irc_sp m R8)
       by (rewrite /irc_sp /R8 upd_ne; [exact HR7sp | nz]).
@@ -3507,7 +3491,7 @@ Section IreclaimMain.
     assert (HR9s1 : R9 !!! Regidx Rs1
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64))
       by (rewrite /R9 upd_ne; [exact HR8s1 | nz]).
-    assert (HR9s5 : R9 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HR9s5 : R9 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /R9 upd_ne; [exact HR8s5 | nz]).
     assert (HR9sp : irc_sp m R9)
       by (rewrite /irc_sp /R9 upd_ne; [exact HR8sp | nz]).
@@ -3536,7 +3520,7 @@ Section IreclaimMain.
     assert (HRAs1 : RA !!! Regidx Rs1
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64))
       by (rewrite /RA upd_ne; [exact HR9s1 | nz]).
-    assert (HRAs5 : RA !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HRAs5 : RA !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /RA upd_ne; [exact HR9s5 | nz]).
     assert (HRAsp : irc_sp m RA)
       by (rewrite /irc_sp /RA upd_ne; [exact HR9sp | nz]).
@@ -3563,7 +3547,7 @@ Section IreclaimMain.
     assert (HRBs1 : RB !!! Regidx Rs1
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64))
       by (rewrite /RB upd_ne; [exact HRAs1 | nz]).
-    assert (HRBs5 : RB !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HRBs5 : RB !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /RB upd_ne; [exact HRAs5 | nz]).
     assert (HRBsp : irc_sp m RB)
       by (rewrite /irc_sp /RB upd_ne; [exact HRAsp | nz]).
@@ -3597,11 +3581,11 @@ Section IreclaimMain.
     assert (Hunit1 : bv_unsigned (mword_of_int 1 : mword 32) = 1).
     { rewrite moi32_unsigned. apply bvw32_small.
       change (2^32)%Z with 4294967296%Z. lia. }
-    iPoseProof (irc_scan γs j γl γu γd γk pd pav pu bn γ γpr
-                  bmapstart inodestart ninodes size nib dev
+    iPoseProof (irc_scan γs j γl γu γd γk pd pav pu bn γpr
+                  bmapstart ninodes size
                   pidv dq dqb dqs dqn m K eb b lks
                   Vpr HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib
-                  Hn31 Hpk Hj Hgl Hbelow Hclog
+                  Hn31 Hpk Hj Hgl Hbelow
                   with "Htext Hkdata Hpenv Hbio Hlctx Hseam Hgen Hireg
                         Hitb2 Hitbl Hesc Hslks Hprocs Hdevi Hdgeom Hdlock")
       as "Hscan".

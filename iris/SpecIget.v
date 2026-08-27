@@ -210,8 +210,7 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Notation K_iget := (58%nat) (only parsing).
 Definition wp_iget_sconf_body
     `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (inodestart : Z) (nib : nat)
-    (dev inum : mword 32)
+    (inum : mword 32)
     (l : ilic)                                   (* THE LICENCE, §7.1 *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
@@ -223,10 +222,10 @@ Definition wp_iget_sconf_body
   (Z.of_nat n + 3 < 2 ^ 31)%Z ->
   (* the requested inum is inside the inode region: [ipool_acc]'s premise on
      the recycle arm, and the ONLY constraint on either argument *)
-  bv_unsigned inum < 16 * Z.of_nat nib ->
+  bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
   (* a0 = dev, a1 = inum, sign-extended -- the scan's 64-bit [bne]s at
      +0x4c / +0x52 compare them against the [c.lw] of a cell *)
-  m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 dev : mword 64) ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 icfg_dev : mword 64) ->
   m !!! Regidx (mword_of_int 11 : mword 5) = (sign_extend' 64 inum : mword 64) ->
   (* THE FRESHNESS PREMISE: iget acquires and releases [itable.lock]
      internally (balanced -- [lks] is unchanged across the whole call), so
@@ -236,7 +235,7 @@ Definition wp_iget_sconf_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   (* the [ref] words *)
   itable_inv -∗
   (* EVERY entry's content -- the scan cannot name its slot in advance *)
@@ -245,7 +244,7 @@ Definition wp_iget_sconf_body
      refutes a standing freeze from [l] inside it, and its 0 -> 1 count move
      carries the ledger's [icnt] half.  Persistent, so it costs a caller a
      frame and nothing else. *)
-  ireg_reg fsc_ireg fsc_fs inodestart nib -∗
+  ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* "iget: no inodes" IS REACHABLE -- see the header *)
   (* ...and it is an ORDINARY CALL: [kernel_data] mints the literal and this
      is the console bundle printk needs.  Note the arm fires while iget
@@ -258,7 +257,7 @@ Definition wp_iget_sconf_body
      block tie (SIMP-1) -- the standalone block equation this contract used
      to state, and the [discriminate] it forced on every non-[BufL] caller,
      are both gone. *)
-  iname fsc_ireg fsc_fs inodestart inum l -∗
+  iname fsc_ireg fsc_fs icfg_ist inum l -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (k : nat) (q : Qp),
     sie_cap_gpr KT1 mr K b p -∗
@@ -276,20 +275,19 @@ Definition wp_iget_sconf_body
        spelled alone: [inode_refb] is the pair, and it is the shape
        [inode_held] and both rest homes already wanted (ghost-simplification
        §5.1).  A caller that needs the halves gets them in one destruct. *)
-    inode_refb (is_claim l) k q dev inum -∗
+    inode_refb (is_claim l) k q icfg_dev inum -∗
     (* ...and BACK, unspent and at the SAME [l] *)
-    iname fsc_ireg fsc_fs inodestart inum l -∗
+    iname fsc_ireg fsc_fs icfg_ist inum l -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type IGET.
   Parameter wp_iget_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (inodestart : Z) (nib : nat)
-      (dev inum : mword 32)
+      (inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_iget_sconf_body inodestart nib dev inum l
+      wp_iget_sconf_body inum l
                          m n eb p K b lks.
 End IGET.

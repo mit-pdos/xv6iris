@@ -319,6 +319,7 @@ Require Import WpUart.
 Require Import BioInv.
 Require Import LogInv.
 Require Import BitmapInv.
+Require Import FsCfg.   (* [fscfg]: [bm_paidS] is at the AMBIENT log *)
 Require Import SpecItrunc.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
@@ -332,7 +333,7 @@ Notation Ra0 := (mword_of_int 10 : mword 5).
 Notation Ra1 := (mword_of_int 11 : mword 5).
 
 Section ItruncDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg}.
 
   (* itrunc's 48-byte frame: ra@40 s0@32 s1@24 s2@16 s3@8, and slot 6 (@0)
      which the DIRECT path never touches -- [sd s4,0(sp)] is at +0x50,
@@ -375,7 +376,7 @@ Section ItruncDefs.
       (w : nat) (k : nat) : iProp Σ :=
     (inode_map γfs ip (bm_dir_zeroed bm k) ∗
      inode_blocks γfs (bm_dir_zeroed bm k) data ∗
-     bm_paidS γ bmapstart crb w Sb e0)%I.
+     bm_paidS bmapstart crb w Sb e0)%I.
 
   (* Opened and closed by LEMMA, never by [rewrite /it_dir_state]: the Iris
      context is part of the goal term, so unfolding the definition in the
@@ -389,7 +390,7 @@ Section ItruncDefs.
     it_dir_state γ γfs ip bm data cov logstart bmapstart size bn crb Sb e0 w k -∗
       inode_map γfs ip (bm_dir_zeroed bm k) ∗
       inode_blocks γfs (bm_dir_zeroed bm k) data ∗
-      bm_paidS γ bmapstart crb w Sb e0.
+      bm_paidS bmapstart crb w Sb e0.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma it_dir_state_close (γ : log_names) (γfs : fs_names)
@@ -399,7 +400,7 @@ Section ItruncDefs.
       (w : nat) (k : nat) :
     inode_map γfs ip (bm_dir_zeroed bm k) -∗
     inode_blocks γfs (bm_dir_zeroed bm k) data -∗
-    bm_paidS γ bmapstart crb w Sb e0 -∗
+    bm_paidS bmapstart crb w Sb e0 -∗
     it_dir_state γ γfs ip bm data cov logstart bmapstart size bn crb Sb e0 w k.
   Proof. iIntros "A B D". rewrite /it_dir_state. iFrame "A B D". Qed.
 
@@ -424,7 +425,7 @@ Section ItruncDefs.
       (cov : gset Z) (logstart bmapstart size : Z)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat) (q : nat) : iProp Σ :=
     (it_ent_res γfs bm data q ∗
-     bm_paidS γ bmapstart crb w Sb e0)%I.
+     bm_paidS bmapstart crb w Sb e0)%I.
 
   (* THE ONE STEP bfree TAKES, and why the loops never case-split.
 
@@ -441,12 +442,12 @@ Section ItruncDefs.
      and a loop that frees an unknown number of blocks carries the single
      assertion unchanged.  This is the whole payoff of the absorption
      credit being a positive client-held claim. *)
-  Lemma bm_paid_use (γ : log_names) (bmapstart : Z) (u : nat) :
-    bm_paid γ bmapstart u -∗ ∃ (cr : bool) (u' : nat) (Sb : gset Z),
+  Lemma bm_paid_use (bmapstart : Z) (u : nat) :
+    bm_paid bmapstart u -∗ ∃ (cr : bool) (u' : nat) (Sb : gset Z),
       ⌜cr = true -> bmapstart ∈ Sb⌝ ∗
       ⌜(if cr then S u' else u') = S u⌝ ∗
-      log_opS γ (S u') Sb ∗
-      (log_opS γ (S u) (Sb ∪ {[bmapstart]}) -∗ bm_paid γ bmapstart u).
+      log_opS icfg_log (S u') Sb ∗
+      (log_opS icfg_log (S u) (Sb ∪ {[bmapstart]}) -∗ bm_paid bmapstart u).
   Proof.
     rewrite /bm_paid. iIntros "[H|H]".
     - (* already paid: present the credit, keep the unit *)
@@ -476,14 +477,14 @@ Section ItruncDefs.
 
      The two [set_solver]s are inside a small definitional lemma, which is
      where they belong (S3l's rule); do not lift one to a call site. *)
-  Lemma bm_paidS_use (γ : log_names) (bmapstart : Z) (crb : bool)
+  Lemma bm_paidS_use (bmapstart : Z) (crb : bool)
       (u : nat) (Sb : gset Z) (e0 : nat) :
-    bm_paidS γ bmapstart crb u Sb e0 -∗ ∃ (cr : bool) (u' : nat) (Sb0 : gset Z),
+    bm_paidS bmapstart crb u Sb e0 -∗ ∃ (cr : bool) (u' : nat) (Sb0 : gset Z),
       ⌜cr = true -> bmapstart ∈ Sb0⌝ ∗
       ⌜(if cr then S u' else u') = S u⌝ ∗
       ⌜Sb ⊆ Sb0⌝ ∗
-      log_opSe γ (S u') Sb0 e0 ∗
-      (log_opSe γ (S u) (Sb0 ∪ {[bmapstart]}) e0 -∗ bm_paidS γ bmapstart crb u Sb e0).
+      log_opSe icfg_log (S u') Sb0 e0 ∗
+      (log_opSe icfg_log (S u) (Sb0 ∪ {[bmapstart]}) e0 -∗ bm_paidS bmapstart crb u Sb e0).
   Proof.
     rewrite /bm_paidS. iIntros "[H|[%Hc H]]".
     - (* already paid: present the credit, keep the unit *)
@@ -607,7 +608,7 @@ Section ItruncDefs.
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat) (q : nat) :
     it_ent_state γ γfs bm data cov logstart bmapstart size crb Sb e0 w q -∗
       it_ent_res γfs bm data q ∗
-      bm_paidS γ bmapstart crb w Sb e0.
+      bm_paidS bmapstart crb w Sb e0.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma it_ent_state_close (γ : log_names) (γfs : fs_names) (bm : blkmap)
@@ -615,7 +616,7 @@ Section ItruncDefs.
       (logstart bmapstart size : Z)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat) (q : nat) :
     it_ent_res γfs bm data q -∗
-    bm_paidS γ bmapstart crb w Sb e0 -∗
+    bm_paidS bmapstart crb w Sb e0 -∗
     it_ent_state γ γfs bm data cov logstart bmapstart size crb Sb e0 w q.
   Proof. iIntros "A C". rewrite /it_ent_state. iFrame "A C". Qed.
 

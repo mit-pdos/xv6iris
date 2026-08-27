@@ -333,7 +333,7 @@ Section ProofSysWrite.
     : wp_sys_write_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_write_sconf_body].
-    intros pcE pj ret_tgt Hav Hj Hgs Hlens Hfj Hfprocs Hflog
+    intros pcE pj ret_tgt Hav Hj Hgs Hlens Hfj Hfprocs
            Harg0 Harg1 Harg2 Hwp Hdq Heb.
     (* every budget, or [lia] cannot see past [filewrite_stack] -- it is an
        expression, not a literal, on purpose (SpecSysWrite.v). *)
@@ -947,7 +947,7 @@ Section ProofSysWrite.
       iApply (Filewrite.wp_filewrite_sconf γa γf γs j γlp kk qq Cf stf fn pidv V
                 S4 (av - 6)%nat eb (sys_rw_count v2) b lks
                 ltac:(lia) Hkk Hj Hgs Hlens
-                Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb Hflog
+                Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P')

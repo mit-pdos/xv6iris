@@ -531,18 +531,15 @@ End FsLookup.
 Definition wp_dirlookup_tree_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode)
     (dpi : Z) (ents : gmap fname Z)                   (* THE TREE-LEVEL NODE *)
-
     (fn : nat -> bv 8)                                (* the caller's name   *)
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
     (pidv : mword 32) (dq dqd dqn : dfrac)
@@ -567,7 +564,7 @@ Definition wp_dirlookup_tree_body
      (durable-disk 2b-inode-5, step 3) *)
   blk_holes_zero bm data ->
   (* (3) iget's argument bound, over the records *)
-  dir_inums_ok data nrec nib ->
+  dir_inums_ok data nrec icfg_nib ->
   (* (4) THE LICENCE PREMISES -- see the FINDING in the header *)
   (bv_unsigned (di_nlink dn) <> 0
    \/ (s <> dot_name /\ s <> dotdot_name)) ->
@@ -583,10 +580,10 @@ Definition wp_dirlookup_tree_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
   kalloc_env γa None -∗
   (* ---- THE LOCKED DIRECTORY: the cells, and THE NODE FRAGMENT ---- *)
-  i_dev ip ↦₄{dqd} dev -∗
+  i_dev ip ↦₄{dqd} icfg_dev -∗
   inode_meta ip dn -∗
   inode_map fsc_fs ip bm -∗
   fdir dpi ents dn bm data -∗
@@ -603,13 +600,13 @@ Definition wp_dirlookup_tree_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* the inode region: iget's premise since iclaim-ledger.md §3.3, relayed
      verbatim.  The tree layer neither reads nor names a dinode through it
      -- the hit arm's iget opens it ghost-only, on the ledger columns. *)
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   iref_slot -∗
   (* the directory's OUT-EDGES, borrowed for the licence and returned
      verbatim on both arms (§1.3 makes them a client-held fragment) --
@@ -629,7 +626,7 @@ Definition wp_dirlookup_tree_body
          [ents] is the SAME map it went in at.  That is (LP1): the lock
          froze the node for the whole call, so the answer below is the
          answer at the linearization point. *)
-      i_dev ip ↦₄{dqd} dev -∗
+      i_dev ip ↦₄{dqd} icfg_dev -∗
       inode_meta ip dn -∗
       inode_map fsc_fs ip bm -∗
       fdir dpi ents dn bm data -∗
@@ -645,7 +642,7 @@ Definition wp_dirlookup_tree_body
             ⌜dir_first data nrec s = Some k
              /\ (kslot < NINODE)%nat
              /\ (mf !!! Regidx (mword_of_int 10 : mword 5) : mword 64) = ientry kslot⌝ ∗
-            inode_ref kslot q dev
+            inode_ref kslot q icfg_dev
               (zero_extend' 32 (dir_inum data k : mword 16) : mword 32) ∗
             (* the minted provenance unit (item 7a-wire) *)
             runit_any
@@ -676,7 +673,6 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γa : gname) (γf : gname)
-      (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode)
@@ -687,7 +683,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
       wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn
-                             γa γf inodestart nib dev ip bm data dn
+                             γa γf ip bm data dn
                              dpi ents fn hasp pofv pidv dq dqd dqn
                              m K eb b lks Vpr.
   Proof.
@@ -709,7 +705,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       with "[Hedges]" as "Hedges".
     { rewrite Hkeq. iExact "Hedges". }
     iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn
-              γa γf inodestart nib dev ip (inum_of dpi) bm data dn dn
+              γa γf ip (inum_of dpi) bm data dn dn
               fn hasp pofv
               pidv dq dqd dqn m K eb b lks Vpr
               HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb Hholes

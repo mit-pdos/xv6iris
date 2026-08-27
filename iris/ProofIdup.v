@@ -156,8 +156,7 @@ Section ProofIdup.
      callers already hold -- and this core is derived-from, not stated by,
      [SpecIdup].  The derivation below is the whole of the difference. *)
   Local Lemma wp_idup_core
-      (inodestart : Z) (nib : nat)
-      (k : nat) (s : Qp) (dev inum : mword 32)
+      (k : nat) (s : Qp) (inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string) :
     let pcE : mword 64 := mword_of_int KernelSyms.idup in
@@ -170,11 +169,11 @@ Section ProofIdup.
     sie_cap_gpr KT1 m K b p -∗
     cpu_own n eb p b lks -∗
     kernel_text -∗ pc_is pcE -∗
-    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
-    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+    ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     iref_slot -∗
-    inode_shr k s dev inum -∗
+    inode_shr k s icfg_dev inum -∗
     runit_any (bv_unsigned inum) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr,
@@ -183,8 +182,8 @@ Section ProofIdup.
       pc_is ret_tgt -∗
       ⌜ callee_saved m mr
         /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
-      inode_shr k s dev inum -∗
-      (∃ qn : Qp, inode_ref k qn dev inum) -∗
+      inode_shr k s icfg_dev inum -∗
+      (∃ qn : Qp, inode_ref k qn icfg_dev inum) -∗
       runit_any (bv_unsigned inum) -∗
       runit_any (bv_unsigned inum) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -355,7 +354,7 @@ Section ProofIdup.
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 fsc_itlock "itable"%string (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) mA
+    iApply (Acquire.wp_acquire_sconf KT1 fsc_itlock "itable"%string (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) mA
               n eb p (K - 4)%nat b lks
               HnZ ltac:(lia)
               Hfresh
@@ -420,8 +419,8 @@ Section ProofIdup.
        speaks about it, and [IcacheEscrow.ic_ci_wf]'s third clause is exactly
        the bound the region-coupled mover wants -- read off the very
        [ci !! k] the mint already consulted. *)
-    assert (Hinb : bv_unsigned inum < 16 * Z.of_nat nib).
-    { destruct Hciwf as (_ & _ & Hrange & _). exact (Hrange k (dev, inum) Hcik). }
+    assert (Hinb : bv_unsigned inum < 16 * Z.of_nat icfg_nib).
+    { destruct Hciwf as (_ & _ & Hrange & _). exact (Hrange k (icfg_dev, inum) Hcik). }
     (* THE FROZEN PARK, DECIDED **OFF** BY THE CALLER'S OWN SHARE -- §2.6b's
        sentence, and the whole reason this proof needs no licence
        ([IcacheInv.frz_park_shr_off]).  If the park were UP it would hold the
@@ -541,7 +540,7 @@ Section ProofIdup.
       (* THE LICENCE-FREE UP-COUNT (iclaim-ledger.md §3.13/§3.19): the mirror
          half decided [false] above stands in for the [iname] no cwd holder
          can produce. *)
-      iMod (iref_upgrade_mir_store_au (⊤ ∖ ↑minstretN) fsc_ireg fsc_fs inodestart nib
+      iMod (iref_upgrade_mir_store_au (⊤ ∖ ↑minstretN) fsc_ireg fsc_fs icfg_ist icfg_nib
               M k inum false qt (qr/2)%Qp s cnt
               ltac:(solve_ndisj) ltac:(solve_ndisj) Hinb HMk Hqv Hno
               with "Hinv Hrinv Hhalf Hrlive Hisl Hmir Hru Hicnt")
@@ -561,7 +560,7 @@ Section ProofIdup.
        straight through -- neither of its two slices moved -- and what does
        get split is the TABLE's retained identity: half to the new reference,
        half back into [islot_rest_at] at the grown [qt]. *)
-    iDestruct (inode_ident_split k (qr/2) (qr/2) dev inum) as "[Hsplit _]".
+    iDestruct (inode_ident_split k (qr/2) (qr/2) icfg_dev inum) as "[Hsplit _]".
     iEval (rewrite Qp.div_2) in "Hsplit".
     iDestruct ("Hsplit" with "Hrest") as "[Hid1 Hid2]".
     iDestruct ("Hback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ci
@@ -574,7 +573,7 @@ Section ProofIdup.
     { rewrite /islot2 lookup_insert Hcik. iFrame "Hiu Hgid Hicnt".
       iSplitR "Hmir Hsel"; [| iApply (frz_park_intro_off with "Hmir Hsel") ].
       rewrite /islot_rest_at (id_frac_rest qt qr Hhalfsum). iFrame. }
-    iAssert (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
+    iAssert (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
     { iExists (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M), ci.
       iFrame "Hhalf Hiauth Hpool Hipool".
       iSplitR; [| iSplitR; [| iExact "Hslots"]].
@@ -663,7 +662,7 @@ Section ProofIdup.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Houtb) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) D5
+    iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) D5
               n eb p (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)
@@ -851,15 +850,14 @@ Section ProofIdup.
      half stays behind as the short parent, exactly as before, but now
      inside the contract instead of at every call site. *)
   Lemma wp_idup_sconf
-      (inodestart : Z) (nib : nat)
-      (k : nat) (dev : mword 32)
+      (k : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_idup_sconf_body inodestart nib k dev
+    : wp_idup_sconf_body k
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_idup_sconf_body].
-    intros pcE ret_tgt HK HnZ Hk Ha0 Hdev Hfresh. subst dev.
+    intros pcE ret_tgt HK HnZ Hk Ha0 Hfresh.
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hrinv Hislot Hheld Hcont".
     iDestruct "Hheld" as (k0 q inum) "(%Hent & %Hk0 & %Hinb & Href & Hru)".
     assert (Hkk : k0 = k).
@@ -869,8 +867,8 @@ Section ProofIdup.
        mover needs; the count fragment stays with the short parent. *)
     rewrite inode_ref_shed.
     iDestruct "Href" as "[Hkeep Hshr]".
-    iApply (wp_idup_core inodestart nib
-              k (q/2)%Qp icfg_dev inum m n eb p K b lks
+    iApply (wp_idup_core
+              k (q/2)%Qp inum m n eb p K b lks
               HK HnZ Hk Ha0 Hfresh
               with "Hcg Hcnt Htext Hpc Hlock Hinv Hrinv Hislot Hshr Hru
                     [Hcont Hkeep]").

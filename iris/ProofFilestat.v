@@ -528,7 +528,7 @@ Section ProofFilestat.
       iDestruct (filestat_pay_carve γf k q Cf _ Hin with "Hrpay")
         as (ikk inm ssh gsh tysh)
            "(%Hipk & %Hik & %Hinlt & #Hshot0 & Hshr0 & Hpayback)".
-      assert (Hibcov : IBLOCK inm (fsn_inodestart fn) ∈ fsc_cov)
+      assert (Hibcov : IBLOCK inm icfg_ist ∈ fsc_cov)
         by (apply Hgeo; exact Hinlt).
       iDestruct (ic_escrows_acc2
                    ikk Hik with "Hescs")
@@ -672,10 +672,10 @@ Section ProofFilestat.
                 (fsn_dlock fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
                 (fsn_bio fn)
                 gil gisl
-                (fsn_inodestart fn)
-                icfg_nib ikk (ssh/2)%Qp gsh
+
+ ikk (ssh/2)%Qp gsh
                 (DepRd (ssh/2)%Qp icfg_dev inm gsh) (ShotK tysh)
-                icfg_dev inm
+ inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb b
                 _ V (fst_av_ilock K HK) eq_refl

@@ -996,8 +996,8 @@ Proof.
                ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
   iApply (FS.wp_fsinit_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
             fsc_bio fsc_printk
-            fsc_bmapstart icfg_ist fsc_ninodes icfg_nib
-            fsc_size icfg_dev
+            fsc_bmapstart fsc_ninodes
+            fsc_size
             v_magic (mword_of_int fsc_size) v_nblocks
             (mword_of_int fsc_ninodes) v_nlog (mword_of_int fsc_logst)
             (mword_of_int icfg_ist) (mword_of_int fsc_bmapstart)
@@ -1017,7 +1017,7 @@ Proof.
                them and hands it to initlog *)
             Hcgeom Hbmq Hszq
             Hmagic eq_refl eq_refl eq_refl eq_refl
-            Hn1 Hnnib Hn31 eq_refl eq_refl Hdev Hnib0
+            Hn1 Hnnib Hn31 Hdev Hnib0
             Hist0 Hiregb Hsize Hbm0 Hbmcov Hbmlog Hcovb
             Hhdrbnd Hhdrnd Hhdrok Hxvslot HLdk Hpkc Hjlt Hgl
             HB6a0 ltac:(lkbelow)
@@ -1295,9 +1295,8 @@ Proof.
   iDestruct (fs_ready_panic with "Hfsr") as "#Hpenv2".
   iDestruct (fs_ready_region with "Hfsr") as "[_ #Hropen]".
   iDestruct (fs_ready_kalloc with "Hfsr") as "#Hkaenv".
-  iAssert (fs_fabric γs fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio icfg_log
-             icfg_ist
-             icfg_nib icfg_dev) as "#Hfab".
+  iAssert (fs_fabric γs fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio)
+    as "#Hfab".
   (* ...and the same row-by-row build, for the same measured reason: this
      named [iFrame] over the fabric's sixteen definition-valued rows was
      61.0 s. *)
@@ -1317,10 +1316,7 @@ Proof.
     iSplitR; [iExact "Hpinv" |].
     iSplitR; [iExact "Hdevi" |].
     iSplitR; [iExact "Hdgeom" |].
-    iSplitR; [iExact "Hdlock" |].
-    (* the fabric's last conjunct (durable-disk B''-tx): this assembly is AT
-       [icfg_log] literally. *)
-    iPureIntro; reflexivity. }
+    iExact "Hdlock". }
   (* ---- the process block, put back together: the token is the steady
          arm now, so this is [proc_priv] again rather than the deficit ---- *)
   iAssert (proc_priv γf p pid V) with "[Hpbare Hcwd Hofiles]" as "Hpriv".
@@ -1361,15 +1357,15 @@ Proof.
   iDestruct (cpu_claim_ext_transport CIDf1 CIDb19 eb p
                ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
   iApply (KX.wp_kexec_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-            fsc_bio icfg_log
-            fsc_kalloc γf fsc_bmapstart icfg_ist icfg_nib
-            fsc_size icfg_dev
+            fsc_bio
+            fsc_kalloc γf fsc_bmapstart
+            fsc_size
             5%nat fkr_init_bytes 1%nat fkr_argv
             (fun _ => 5%nat) (fun _ => 6%nat) (fun _ => fkr_init_bytes)
             pid V
             DfracDiscarded DfracDiscarded (DfracOwn 1) DfracDiscarded DfracDiscarded
             D5 av2 eb eb ∅
-            Hkx eq_refl eq_refl eq_refl eq_refl Hdev Hnib0 Hlg Hsize Hbm0
+            Hkx Hdev Hnib0 Hlg Hsize Hbm0
             Hbmcov Hbmlog Hist0 Hcovb Hiregb
             fkr_init_path_cstr ltac:(kxarith)
             fkr_argv_nonnull fkr_argv_null ltac:(kxarith)

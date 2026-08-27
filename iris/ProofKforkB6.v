@@ -227,7 +227,7 @@ Section KforkPrologue.
      4614 B in Delta at every step of that walk
      (optimization.md, fold block continuations). *)
   Definition kfk_pro_exit3
-      (γa : gname) (γk : gname * gname) (γw : gname) (γl : gname) (γf : gname) (γs : list gname) (nib : nat) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Vp : pprivate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
+      (γa : gname) (γk : gname * gname) (γw : gname) (γl : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Vp : pprivate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
         (pid_c : mword 32) (ch : mword 64) (Vc' : pprivate)
         (tfsrc tfdst : mword 44),
@@ -302,7 +302,7 @@ Section KforkPrologue.
         kalloc_env_at γa γk None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         is_ftable γl γf -∗
-        is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
+        is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
         itable_inv -∗
         R -∗
         WP (Loop : expr riscv_lang))%I.
@@ -399,7 +399,6 @@ Section KforkPrologue.
      quantified, never [fsc_kpages]. *)
   Lemma kfk_prologue
       (γa : gname) (γk : gname * gname) (γp γw γl γf : gname) (γs : list gname)
-      (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
       (R : iProp Σ) (lks : gset string) :
@@ -423,7 +422,7 @@ Section KforkPrologue.
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γl γf -∗
-    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
     kalloc_env_at γa γk on -∗
     (* the proc table's sealed regime -- what allocproc mints the new slot's
@@ -469,7 +468,7 @@ Section KforkPrologue.
        the leaves run so far -- it was simply never surfaced. *)
     (∀ CIDh : CpuId,
        ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
-       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit3 γa γk γw γl γf γs nib m lvl K eb pme b pid_p Vp R lks sp0 ra0 s00 s10 s50 CID)) -∗
+       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit3 γa γk γw γl γf γs m lvl K eb pme b pid_p Vp R lks sp0 ra0 s00 s10 s50 CID)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 ra0 s00 s10 s50 HK Hlvl Hbelow.

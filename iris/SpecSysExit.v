@@ -98,19 +98,16 @@ Definition wp_sys_exit_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names)
-    (dev : mword 32)
     (ip : mword 64) (dqi : dfrac)                     (* the initproc cell   *)
     (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
-    (bmapstart inodestart : Z) (nib : nat) (size : Z)
+    (bmapstart : Z) (size : Z)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
     (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_exit in
   let pj := proc_addr j in
-  fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ
-         dev pid (DfracOwn (1/4))
-         bmapstart inodestart nib size ->
+  fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn
+         pid (DfracOwn (1/4)) bmapstart size ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* the syscall argument, out of the trapframe page [proc_priv] carries *)
@@ -156,8 +153,8 @@ Definition wp_sys_exit_sconf_body
     (kmem_res γka (mword_of_int (KernelSyms.kmem + 24))) -∗
   kalloc_avail γka on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] inside kexit *)
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-  log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   fs_crash_seam fsc_cov fsc_logst -∗
   gen_cert -∗
   dev_inv γu γd -∗
@@ -193,16 +190,14 @@ Module Type SYSEXIT.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
-      (dev : mword 32)
       (ip : mword 64) (dqi : dfrac)
       (γkl : gname) (γka : gname * gname)
-      (bmapstart inodestart : Z) (nib : nat) (size : Z)
+      (bmapstart : Z) (size : Z)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string),
-      wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ
-                             dev ip dqi γkl γka
-                             bmapstart inodestart nib size
+      wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn
+ ip dqi γkl γka
+                             bmapstart size
                              on fn m av eb b pid V v0 lks.
 End SYSEXIT.

@@ -175,24 +175,23 @@ Section ProofNameiTrMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (ga : gname) (gf : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
       (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namei_tr_body gs j gl gu gd gk pd pav pu bn g
-                       ga gf bmapstart inodestart nib
-                       size dev plen pfun n Sb P Pmiss
+    : wp_namei_tr_body gs j gl gu gd gk pd pav pu bn
+                       ga gf bmapstart
+                       size plen pfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_namei_tr_body].
     intros pcE pjv pv ret_tgt pl L
-           HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+           HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
            Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hpfun0 Hbud Hj Hgs.
     destruct (nam_kb K HK) as (Knx & K4 & Kpop).
     (* N3d trap 1's whole-function fix: fold [proc_addr j] into every
@@ -379,10 +378,10 @@ Section ProofNameiTrMain.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_tr gs j gl gu gd gk pd pav pu bn g
-              ga gf bmapstart inodestart nib size dev
+    iApply (NX.wp_namex_tr gs j gl gu gd gk pd pav pu bn
+              ga gf bmapstart size
               plen pfun nfun n Sb P Pmiss pidv dq dqb dqs dqpv R5 (K - 4)%nat eb b
-              _ Vpr Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+              _ Vpr Knx Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hpfun0 Hbud Hj Hgs
               ltac:(rewrite HR5a1; exact nami_a1_true)
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl

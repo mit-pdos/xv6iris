@@ -263,9 +263,9 @@ Record fwrite_names := MkFWriteNames {
   fwn_pav        : mword 64;
   fwn_pu         : mword 64;
   fwn_bio        : bio_names;
-  fwn_log        : log_names;     (* begin_op / end_op                      *)
+  (* [fwn_log] and [fwn_inodestart] ARE GONE (rank 1c): the log's names and
+     the inode region's first block are ambient. *)
   fwn_pr         : gname;         (* balloc's printk credential             *)
-  fwn_inodestart : Z;
   fwn_bmapstart  : Z;             (* the bitmap, for bmap -> balloc          *)
   fwn_size       : Z;             (* sb.size                                *)
   fwn_dqs        : dfrac;         (* sb.inodestart                          *)
@@ -294,9 +294,8 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
     (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
-    (MkLogNames 1%positive 1%positive 1%positive 1%positive 1%positive)
     1%positive
-    0 0 0
+    0 0
     (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
     (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
 
@@ -436,17 +435,17 @@ Section SpecFilewrite.
      reference at the call ([SpecFileread.fileread_pay_carve]). *)
   Definition filewrite_fs_env (γf : gname) (fn : fwrite_names) : iProp Σ :=
     (⌜log_geom_ok fsc_cov fsc_logst⌝ ∗
-     ⌜0 <= fwn_inodestart fn⌝ ∗
+     ⌜0 <= icfg_ist⌝ ∗
      (* EVERY inum the region covers has its block inside [cov] *)
      ⌜forall inum : mword 32,
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-        IBLOCK inum (fwn_inodestart fn) ∈ fsc_cov⌝ ∗
+        IBLOCK inum icfg_ist ∈ fsc_cov⌝ ∗
      (* ...and none of those blocks is one of the log's own slots.  writei's
         iupdate flushes the inode's block, and this is iupdate's premise,
         quantified for the same reason as the one above. *)
      ⌜forall inum : mword 32,
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-        ~ (IBLOCK inum (fwn_inodestart fn)
+        ~ (IBLOCK inum icfg_ist
              ∈ log_region_set fsc_logst)⌝ ∗
      (* the bitmap's geometry, forwarded through bmap to balloc *)
      ⌜bitmap_geom_ok fsc_cov fsc_logst (fwn_bmapstart fn)
@@ -458,7 +457,7 @@ Section SpecFilewrite.
        (fs_view fsc_fs (fwn_disk fn) icfg_dev fsc_cov) ∗
      (* THE LOG: begin_op mints the reservation, end_op spends it, and the
         loop does one transaction PER CHUNK *)
-     log_ctx (fwn_log fn) (fwn_bio fn) fsc_fs fsc_cov
+     log_ctx icfg_log (fwn_bio fn) fsc_fs fsc_cov
              fsc_logst icfg_dev ∗
      (* end_op's crash seam and era certificate *)
      fs_crash_seam fsc_cov fsc_logst ∗
@@ -471,7 +470,7 @@ Section SpecFilewrite.
      itable_inv ∗
      ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov
                 fsc_logst ∗
-     ireg_inv fsc_ireg fsc_fs (fwn_inodestart fn) icfg_nib ∗
+     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
      (* THE LENT SHARE AND ITS GENERATION'S TYPE WITNESS ARE NOT HERE.
@@ -486,7 +485,7 @@ Section SpecFilewrite.
         condition together, and takes the share back. *)
      (* sb.inodestart (iupdate), sb.size and sb.bmapstart (bmap -> balloc) *)
      sb_inodestart ↦₄{fwn_dqs fn}
-       (mword_of_int (fwn_inodestart fn) : mword 32) ∗
+       (mword_of_int icfg_ist : mword 32) ∗
      sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fwn_size fn) : mword 32) ∗
      sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fwn_bmapstart fn) : mword 32) ∗
      (* THE BITMAP's invariant (BitmapInv.v): the pool bmap -> balloc draws
@@ -510,7 +509,7 @@ Section SpecFilewrite.
      And nothing about the bitmap: its invariant is persistent. *)
   Definition filewrite_fs_out (fn : fwrite_names) : iProp Σ :=
     (sb_inodestart ↦₄{fwn_dqs fn}
-       (mword_of_int (fwn_inodestart fn) : mword 32) ∗
+       (mword_of_int icfg_ist : mword 32) ∗
      sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fwn_size fn) : mword 32) ∗
      sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fwn_bmapstart fn) : mword 32) ∗
      bslots 3)%I.
@@ -572,7 +571,6 @@ End SpecFilewrite.
 
 Definition wp_filewrite_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate) (* the borrowed reference *)
@@ -606,18 +604,6 @@ Definition wp_filewrite_sconf_body
   - 2 ^ 31 <= n < 2 ^ 31 ->
   (* PARKING PREMISE (hart-generic scheduler protocol): every arm sleeps. *)
   eb = true ->
-  (* filewrite's FD_INODE arm is the whole cone: begin_op/end_op ("log", 3),
-     ilock ("bcache", 4), iunlock ("sleep lock", 6) -- "log" is the lowest,
-     so one premise there covers the whole cone via [locks_below_mono]. *)
-  (* THE AMBIENT LOG, named (durable-fs-plan.md section 3, [ilock];
-     durable-disk B''-tx).  The FD_INODE arm write-locks its inode inside
-     its own transaction, and the escrow's write arm parks a share of
-     [icfg_log]'s element -- the escrow carries no [log_names] parameter.
-     It joins [fwn_j]/[fwn_procs] as one more equation the record takes
-     rather than derives; [ProofSyscall]'s [sysc_ties] already proves it
-     ([sct_log]).  It sits BEFORE the rank premise because every caller
-     discharges that one by [lkbelow] at the end. *)
-  fwn_log fn = icfg_log ->
   locks_below lks "log" ->
   sie_cap_gpr KT1 m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
@@ -662,7 +648,6 @@ Definition wp_filewrite_sconf_body
 Module Type FILEWRITE.
   Parameter wp_filewrite_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)

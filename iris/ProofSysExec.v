@@ -4638,10 +4638,9 @@ Section SysExecBreak.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (γa γf : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (dqb dqs : dfrac)
       (pid : mword 32) (V : pprivate)
       (K : nat) (eb b : bool) (lks : gset string)
@@ -4653,24 +4652,23 @@ Section SysExecBreak.
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     (plen < 128)%nat -> bb_cstr pfun plen ->
     sx_alp sp0 ->
-    dev = icfg_dev -> nib = icfg_nib -> g = icfg_log -> inodestart = icfg_ist ->
-    dev = ROOTDEV -> (0 < nib)%nat ->
+    icfg_dev = ROOTDEV -> (0 < icfg_nib)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < size <= BPB ->
     0 <= bmapstart ->
     bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set fsc_logst) ->
-    0 <= inodestart ->
+    0 <= icfg_ist ->
     cov_below fsc_cov size ->
-    ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+    ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
     (jp < NPROC)%nat -> gs !! jp = Some gl ->
     b = true -> eb = true ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn g
-              inodestart nib dev -∗
+    fs_fabric gs gu gd gk pd pav pu bn
+ -∗
     kalloc_env γa None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+    sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
     bslots 3 -∗
     iref_slots 2 -∗
@@ -4686,14 +4684,14 @@ Section SysExecBreak.
         cpu_own 0 eb (proc_addr jp) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         iref_slots 2 -∗
         proc_priv γf (proc_addr jp) pid V' -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlb Hsp0 Hplen Hpcstr Halp Hdev Hnib Hg Hist Hroot Hnib0
+    intros HK Hlb Hsp0 Hplen Hpcstr Halp Hroot Hnib0
            Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl Hbt Hebt.
     destruct (sx_kb K HK) as (Kkx & Kar & Kaa & Kfa & Kfs & K14 & K2 & K60 & Kpop).
     iIntros "#Htext #Hfab #Hka Hbmp Hisp #Hbmr Hbs Hir Hst".
@@ -4845,12 +4843,12 @@ Section SysExecBreak.
     iEval (rewrite -HN6a0) in "Hpb".
     iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Kexec.wp_kexec_sconf gs jp gl gu gd gk pd pav pu bn g
-              γa γf bmapstart inodestart nib size dev
+    iApply (Kexec.wp_kexec_sconf gs jp gl gu gd gk pd pav pu bn
+              γa γf bmapstart size
               plen pfun i (sx_avf pg i) alen (fun _ => 4096%nat) afun
               pid (upd_upt V P) dqb dqs (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
               N6 (K - 60)%nat eb b lks
-              Kkx Hdev Hnib Hg Hist Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
+              Kkx Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
               Hcb Hireg Hpcstr ltac:(lia)
               ltac:(intros j Hj; rewrite (sx_avf_lt pg i j Hj);
                     exact (proj1 (Hok j Hj)))
@@ -4966,20 +4964,19 @@ Section SysExecWhole.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (dqb dqs : dfrac)
       (v0 v1 : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g
-                             bmapstart inodestart nib
-                             size dev dqb dqs v0 v1 pid V m K eb b lks.
+      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn
+                             bmapstart
+                             size dqb dqs v0 v1 pid V m K eb b lks.
   Proof.
     cbv beta zeta delta [wp_sys_exec_sconf_body].
-    intros HK Hdev Hnib Hg Hist Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
+    intros HK Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
            Hcb Hireg Hjp Hgl Hebt Harg0 Harg1.
     subst eb.
     iIntros "Hcg Hcnt Htcx Hccx #Htext #Hdata Hpc #Hfab Hbmp Hisp #Hbmr
@@ -5063,11 +5060,11 @@ Section SysExecWhole.
               with "Htext Hka Hbody").
     iIntros (CID3 Hq3 M3 P3 i3 pg3 al3 af3) "[Hbrk | Hbad]".
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
-      iApply (sx_break (CID0 := CID3) gs j gl gu gd gk pd pav pu bn g
-                γa γf bmapstart inodestart nib size dev
+      iApply (sx_break (CID0 := CID3) gs j gl gu gd gk pd pav pu bn
+                γa γf bmapstart size
                 dqb dqs pid V K true true ∅ sp0 m plen pfun rst v59
                 M3 P3 i3 pg3 al3 af3
-                HK Hlb eq_refl Hplen Hpcstr Halp Hdev Hnib Hg Hist Hroot Hnib0
+                HK Hlb eq_refl Hplen Hpcstr Halp Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
                 with "Htext Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hbrk").
       iIntros (CID4 Hq4 mf V' entry spv szv')

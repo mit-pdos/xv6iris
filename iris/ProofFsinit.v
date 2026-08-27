@@ -204,8 +204,7 @@ Section FsinitDefs.
      verbatim. *)
   Definition fsi_cont `{GEN : GenId} `{CID0 : CpuId}
       (bn : bio_names)
-      (bmapstart inodestart ninodes size : Z)
-      (dev : mword 32)
+      (bmapstart ninodes size : Z)
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (pidv : mword 32) (dq : dfrac) (j : nat)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
@@ -224,12 +223,12 @@ Section FsinitDefs.
         InodeInv.sb_ninodes ↦₄ (mword_of_int ninodes : mword 32) -∗
         sb_nlog ↦₄ v_nlog -∗
         sb_logstart ↦₄ (mword_of_int fsc_logst : mword 32) -∗
-        InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
+        InodeInv.sb_inodestart ↦₄ (mword_of_int icfg_ist : mword 32) -∗
         BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
         (* block 1's run does NOT come back (durable-disk lane C-3a): it is
            spent into [initlog]'s [SbPark] park and rides out inside the
            [log_ctx] below. *)
-        log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst dev -∗
+        log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
         bslots 3 -∗
         iref_slot -∗
         ireg_boot -∗
@@ -287,8 +286,7 @@ Section FsinitEpilogue.
 
   Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names)
-      (bmapstart inodestart ninodes size : Z)
-      (dev : mword 32)
+      (bmapstart ninodes size : Z)
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
@@ -309,14 +307,14 @@ Section FsinitEpilogue.
     InodeInv.sb_ninodes ↦₄ (mword_of_int ninodes : mword 32) -∗
     sb_nlog ↦₄ v_nlog -∗
     sb_logstart ↦₄ (mword_of_int fsc_logst : mword 32) -∗
-    InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
+    InodeInv.sb_inodestart ↦₄ (mword_of_int icfg_ist : mword 32) -∗
     BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst dev -∗
+    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
     bslots 3 -∗
     iref_slot -∗
     ireg_boot -∗
-    fsi_cont (CID0 := CID0) bn bmapstart inodestart ninodes
-             size dev v_magic v_size v_nblocks v_nlog pidv dq j
+    fsi_cont (CID0 := CID0) bn bmapstart ninodes
+             size v_magic v_size v_nblocks v_nlog pidv dq j
              m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -538,9 +536,8 @@ Section FsinitMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γpr : gname)
-      (bmapstart inodestart : Z)
-      (ninodes : Z) (nib : nat) (size : Z)
-      (dev : mword 32)
+      (bmapstart : Z)
+      (ninodes : Z) (size : Z)
       (v_magic v_size v_nblocks v_ninodes v_nlog
        v_logstart v_inodestart v_bmapstart : mword 32)
       (bs_sb : list (bv 8))
@@ -556,8 +553,8 @@ Section FsinitMain.
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb) :
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γpr
-                           bmapstart inodestart ninodes nib size
-                           dev
+                           bmapstart ninodes size
+
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
                            bs_hdr Xv Mbrn L D vlock vname vcpu v_start v_dev v_nc v_n
@@ -567,7 +564,7 @@ Section FsinitMain.
     intros pcE pj ret_tgt HK Hgeom H1cov H1log Himg Hsbparse Hsbok
            Hcgeom Hbmq Hszq
            Hmagic Hvni Hvis Hvbs Hvls
-           Hn1 Hnnib Hn31 Hdevc Hnibc Hdevr Hnib0 Hist0 Hblk Hsize Hbm0 Hbmcov
+           Hn1 Hnnib Hn31 Hdevr Hnib0 Hist0 Hblk Hsize Hbm0 Hbmcov
            Hbmlog Hcovb Hhdrbnd Hhdrnd Hhdrok Hxvslot HLmir Hpk Hj Hgl Ha0 Hbelow.
     subst v_ninodes. subst v_inodestart. subst v_bmapstart.
     subst v_logstart.
@@ -576,7 +573,7 @@ Section FsinitMain.
     assert (Hfimg : forall jj, (jj < 32)%nat ->
               bs_sb !!! jj
               = sb_image v_magic v_size v_nblocks (mword_of_int ninodes)
-                  v_nlog (mword_of_int fsc_logst) (mword_of_int inodestart)
+                  v_nlog (mword_of_int fsc_logst) (mword_of_int icfg_ist)
                   (mword_of_int bmapstart) !!! jj).
     { intros jj Hjj. rewrite -Himg. symmetry.
       apply (fsi_take_total bs_sb 32 jj Hjj). }
@@ -584,7 +581,7 @@ Section FsinitMain.
     set (bno := (mword_of_int 1 : mword 32)).
     assert (Hbnou : uint bno = 1) by (vm_compute; reflexivity).
     assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbnou; lia).
-    assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd dev fsc_cov))
+    assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd icfg_dev fsc_cov))
       by (rewrite Hbnou; exact H1cov).
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hgen
               Hmirror Hlfree #Hbinv Hfsb Hxo Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks #Hbm
@@ -605,10 +602,10 @@ Section FsinitMain.
        own, minted in the same ghost step as the log lock's seal, so what
        goes down to [initlog] is the WAND and initlog composes the two.
        Nothing else about the file system crosses into the WAL. *)
-    assert (Hcgeom' : col_geom sbrec (FsImg.sb_inodestart sbrec) nib
+    assert (Hcgeom' : col_geom sbrec (FsImg.sb_inodestart sbrec) icfg_nib
                         (fs_home_set fsc_cov fsc_logst))
       by (rewrite (cg_ist Hcgeom); exact Hcgeom).
-    iAssert (ireg_reg fsc_ireg fsc_fs (FsImg.sb_inodestart sbrec) nib) as "#Hireg'".
+    iAssert (ireg_reg fsc_ireg fsc_fs (FsImg.sb_inodestart sbrec) icfg_nib) as "#Hireg'".
     { rewrite (cg_ist Hcgeom). iExact "Hireg". }
     iAssert (bitmap_reg fsc_fs (FsImg.sb_bmapstart sbrec) fsc_cov fsc_logst
                (FsImg.sb_size sbrec)) as "#Hbm'".
@@ -617,11 +614,11 @@ Section FsinitMain.
     iAssert (□ (sb_park fsc_fs sbrec -∗ snap_law icfg_log fsc_fs fsc_cov fsc_logst))%I
       as "#Hlawf".
     { iModIntro. iIntros "#Hpark".
-      iApply (fs_snap_law_build icfg_log fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib sbrec
+      iApply (fs_snap_law_build icfg_log fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib sbrec
                 eq_refl Hcgeom'
                 with "Hireg' Hbm' Hesc Hpoolinv Hpark"). }
-    iAssert (fsi_cont (CID0 := CID) bn bmapstart inodestart
-               ninodes size dev v_magic v_size v_nblocks v_nlog
+    iAssert (fsi_cont (CID0 := CID) bn bmapstart
+               ninodes size v_magic v_size v_nblocks v_nlog
                pidv dq j m K eb b lks Vpr)%I with "[Hcont]" as "Hcont";
       [rewrite /fsi_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi sp,sp,-32 : the 4-slot frame ===== *)
@@ -637,7 +634,7 @@ Section FsinitMain.
       by (rewrite /fsi_sp /M1 upd_eq; apply stk_push_32).
     assert (HM1thr : fsi_thr4 m M1).
     { intros c Hcs N2 N8 N9 N18. rewrite /M1 upd_ne; [reflexivity | regne]. }
-    assert (HM1a0 : M1 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HM1a0 : M1 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /M1 upd_ne; [exact Ha0 | nz]).
     assert (HM1ra : (M1 !!! Regidx Rra : mword 64) = (m !!! Regidx Rra : mword 64))
       by (rewrite /M1 upd_ne; [reflexivity | nz]).
@@ -733,7 +730,7 @@ Section FsinitMain.
     assert (HM2thr : fsi_thr4 m M2).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /M2 upd_ne; [| regne]. exact (HM1thr c Hcs N2 N8 N9 N18). }
-    assert (HM2a0 : M2 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HM2a0 : M2 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /M2 upd_ne; [exact HM1a0 | nz]).
     assert (Hpp0c : add_vec_int (mword_of_int (KernelSyms.fsinit + 0xa) : mword 64) 2
                     = mword_of_int (KernelSyms.fsinit + 0xc)) by pcw.
@@ -745,9 +742,9 @@ Section FsinitMain.
     iIntros (CID7 Hq7) "Hcg Hpc".
     set (M3 := <[Regidx Rs2 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget M2 Ra0))]> M2).
-    assert (HM3s2 : M3 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64)).
+    assert (HM3s2 : M3 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /M3 upd_eq. rgne. rewrite HM2a0. apply add_vec_zero_l. }
-    assert (HM3a0 : M3 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HM3a0 : M3 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /M3 upd_ne; [exact HM2a0 | nz]).
     assert (HM3sp : fsi_sp m M3)
       by (rewrite /fsi_sp /M3 upd_ne; [exact HM2sp | nz]).
@@ -768,9 +765,9 @@ Section FsinitMain.
                   (sign_extend' 64 bno : mword 64)]> M3).
     assert (HM4a1 : M4 !!! Regidx Ra1 = (sign_extend' 64 bno : mword 64))
       by (rewrite /M4; apply upd_eq).
-    assert (HM4a0 : M4 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HM4a0 : M4 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /M4 upd_ne; [exact HM3a0 | nz]).
-    assert (HM4s2 : M4 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HM4s2 : M4 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /M4 upd_ne; [exact HM3s2 | nz]).
     assert (HM4sp : fsi_sp m M4)
       by (rewrite /fsi_sp /M4 upd_ne; [exact HM3sp | nz]).
@@ -793,11 +790,11 @@ Section FsinitMain.
                        (sign_extend' 64 (mword_of_int 2094620 : mword 21))
                      = mword_of_int KernelSyms.bread) by pcw.
     iEval (rewrite Htgtbr) in "Hpc".
-    assert (HM5a0 : M5 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HM5a0 : M5 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /M5 upd_ne; [exact HM4a0 | nz]).
     assert (HM5a1 : M5 !!! Regidx Ra1 = (sign_extend' 64 bno : mword 64))
       by (rewrite /M5 upd_ne; [exact HM4a1 | nz]).
-    assert (HM5s2 : M5 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HM5s2 : M5 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /M5 upd_ne; [exact HM4s2 | nz]).
     assert (HM5sp : fsi_sp m M5)
       by (rewrite /fsi_sp /M5 upd_ne; [exact HM4sp | nz]).
@@ -818,7 +815,7 @@ Section FsinitMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID9) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-              (fs_view fsc_fs γd dev fsc_cov) pidv dev bno dq
+              (fs_view fsc_fs γd icfg_dev fsc_cov) pidv icfg_dev bno dq
               M5 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
               HM5a0 HM5a1
@@ -835,7 +832,7 @@ Section FsinitMain.
       by (rewrite HM5ra; pcw).
     iEval (rewrite Hpc14) in "Hpc".
     pose proof Hcsb as Hcsb_cs.
-    assert (HmBs2 : mB !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HmBs2 : mB !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsb_cs Rs2 ltac:(vm_compute; reflexivity));
           exact HM5s2).
     assert (HmBsp : fsi_sp m mB).
@@ -888,7 +885,7 @@ Section FsinitMain.
     { rewrite /N1 upd_eq. rgne. rewrite HmBa0. apply add_vec_zero_l. }
     assert (HN1a0 : N1 !!! Regidx Ra0 = bnode kk)
       by (rewrite /N1 upd_ne; [exact HmBa0 | nz]).
-    assert (HN1s2 : N1 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HN1s2 : N1 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /N1 upd_ne; [exact HmBs2 | nz]).
     assert (HN1sp : fsi_sp m N1)
       by (rewrite /fsi_sp /N1 upd_ne; [exact HmBsp | nz]).
@@ -914,7 +911,7 @@ Section FsinitMain.
       by (rewrite /N2 upd_ne; [exact HN1a0 | nz]).
     assert (HN2s1 : N2 !!! Regidx Rs1 = bnode kk)
       by (rewrite /N2 upd_ne; [exact HN1s1 | nz]).
-    assert (HN2s2 : N2 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HN2s2 : N2 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /N2 upd_ne; [exact HN1s2 | nz]).
     assert (HN2sp : fsi_sp m N2)
       by (rewrite /fsi_sp /N2 upd_ne; [exact HN1sp | nz]).
@@ -941,7 +938,7 @@ Section FsinitMain.
       by (rewrite /N3 upd_ne; [exact HN2a0 | nz]).
     assert (HN3s1 : N3 !!! Regidx Rs1 = bnode kk)
       by (rewrite /N3 upd_ne; [exact HN2s1 | nz]).
-    assert (HN3s2 : N3 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HN3s2 : N3 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /N3 upd_ne; [exact HN2s2 | nz]).
     assert (HN3sp : fsi_sp m N3)
       by (rewrite /fsi_sp /N3 upd_ne; [exact HN2sp | nz]).
@@ -970,7 +967,7 @@ Section FsinitMain.
       by (rewrite /N4 upd_ne; [exact HN3a2 | nz]).
     assert (HN4s1 : N4 !!! Regidx Rs1 = bnode kk)
       by (rewrite /N4 upd_ne; [exact HN3s1 | nz]).
-    assert (HN4s2 : N4 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HN4s2 : N4 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /N4 upd_ne; [exact HN3s2 | nz]).
     assert (HN4sp : fsi_sp m N4)
       by (rewrite /fsi_sp /N4 upd_ne; [exact HN3sp | nz]).
@@ -997,7 +994,7 @@ Section FsinitMain.
       by (rewrite /N5 upd_ne; [exact HN4a2 | nz]).
     assert (HN5s1 : N5 !!! Regidx Rs1 = bnode kk)
       by (rewrite /N5 upd_ne; [exact HN4s1 | nz]).
-    assert (HN5s2 : N5 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HN5s2 : N5 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /N5 upd_ne; [exact HN4s2 | nz]).
     assert (HN5sp : fsi_sp m N5)
       by (rewrite /fsi_sp /N5 upd_ne; [exact HN4sp | nz]).
@@ -1028,7 +1025,7 @@ Section FsinitMain.
       by (rewrite /N6 upd_ne; [exact HN5a2 | nz]).
     assert (HN6s1 : N6 !!! Regidx Rs1 = bnode kk)
       by (rewrite /N6 upd_ne; [exact HN5s1 | nz]).
-    assert (HN6s2 : N6 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HN6s2 : N6 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /N6 upd_ne; [exact HN5s2 | nz]).
     assert (HN6sp : fsi_sp m N6)
       by (rewrite /fsi_sp /N6 upd_ne; [exact HN5sp | nz]).
@@ -1055,7 +1052,7 @@ Section FsinitMain.
     assert (HmMs1 : mM !!! Regidx Rs1 = bnode kk)
       by (rewrite (callee_saved_lookup Hcsmm_cs Rs1 ltac:(vm_compute; reflexivity));
           exact HN6s1).
-    assert (HmMs2 : mM !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HmMs2 : mM !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsmm_cs Rs2 ltac:(vm_compute; reflexivity));
           exact HN6s2).
     assert (HmMsp : fsi_sp m mM).
@@ -1131,7 +1128,7 @@ Section FsinitMain.
                        rewrite (fsi_img _ _ _ _ _ _ _ _ 5%nat jj
                                   ltac:(lia) Hjj); reflexivity)
                  with "W5") as "Hls".
-    iDestruct (fsi_word4 sb_base (6 * 4)%nat (mword_of_int inodestart : mword 32)
+    iDestruct (fsi_word4 sb_base (6 * 4)%nat (mword_of_int icfg_ist : mword 32)
                  (fun jj => bs_sb !!! jj)
                  ltac:(vm_compute; reflexivity)
                  ltac:(intros jj Hjj;
@@ -1167,7 +1164,7 @@ Section FsinitMain.
                   (add_vec (zero_reg : mword 64) (rget mM Rs1))]> mM).
     assert (HQ0a0 : Q0 !!! Regidx Ra0 = bnode kk).
     { rewrite /Q0 upd_eq. rgne. rewrite HmMs1. apply add_vec_zero_l. }
-    assert (HQ0s2 : Q0 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HQ0s2 : Q0 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /Q0 upd_ne; [exact HmMs2 | nz]).
     assert (HQ0sp : fsi_sp m Q0)
       by (rewrite /fsi_sp /Q0 upd_ne; [exact HmMsp | nz]).
@@ -1192,7 +1189,7 @@ Section FsinitMain.
     iEval (rewrite Htgtbl) in "Hpc".
     assert (HQ1a0 : Q1 !!! Regidx Ra0 = bnode kk)
       by (rewrite /Q1 upd_ne; [exact HQ0a0 | nz]).
-    assert (HQ1s2 : Q1 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HQ1s2 : Q1 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /Q1 upd_ne; [exact HQ0s2 | nz]).
     assert (HQ1sp : fsi_sp m Q1)
       by (rewrite /fsi_sp /Q1 upd_ne; [exact HQ0sp | nz]).
@@ -1210,8 +1207,8 @@ Section FsinitMain.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID9) (CIDb := CID19) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev fsc_cov) kk
-              pidv dev bno dq Q1 (K - 4)%nat eb (proc_addr j)
+    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk
+              pidv icfg_dev bno dq Q1 (K - 4)%nat eb (proc_addr j)
               bs_sb bsd0 d0 b lks Vpr
               ltac:(lia) Hkk HQ1a0
               (* brelse's bound is "bcache"(4); fsinit's own is
@@ -1226,7 +1223,7 @@ Section FsinitMain.
       by (rewrite HQ1ra; pcw).
     iEval (rewrite Hpc30) in "Hpc".
     pose proof Hcsbl as Hcsbl_cs.
-    assert (HmRs2 : mR !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HmRs2 : mR !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsbl_cs Rs2 ltac:(vm_compute; reflexivity));
           exact HQ1s2).
     assert (HmRsp : fsi_sp m mR).
@@ -1250,7 +1247,7 @@ Section FsinitMain.
                     = add_vec (mword_of_int (KernelSyms.fsinit + 0x30) : mword 64)
                         (auipc_off (mword_of_int 29 : mword 20)))
       by (rewrite /Q2; apply upd_eq).
-    assert (HQ2s2 : Q2 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HQ2s2 : Q2 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /Q2 upd_ne; [exact HmRs2 | nz]).
     assert (HQ2sp : fsi_sp m Q2)
       by (rewrite /fsi_sp /Q2 upd_ne; [exact HmRsp | nz]).
@@ -1277,7 +1274,7 @@ Section FsinitMain.
     assert (HQ3a4 : Q3 !!! Regidx Ra4 = (mword_of_int 0x10203040 : mword 64)).
     { rewrite /Q3 upd_eq. rewrite (ds_sext_small v_magic ltac:(rewrite Hmagic;
         unfold FSMAGIC; lia)). rewrite Hmagic. unfold FSMAGIC. reflexivity. }
-    assert (HQ3s2 : Q3 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HQ3s2 : Q3 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /Q3 upd_ne; [exact HQ2s2 | nz]).
     assert (HQ3sp : fsi_sp m Q3)
       by (rewrite /fsi_sp /Q3 upd_ne; [exact HQ2sp | nz]).
@@ -1301,7 +1298,7 @@ Section FsinitMain.
       by (rewrite /Q4; apply upd_eq).
     assert (HQ4a4 : Q4 !!! Regidx Ra4 = (mword_of_int 0x10203040 : mword 64))
       by (rewrite /Q4 upd_ne; [exact HQ3a4 | nz]).
-    assert (HQ4s2 : Q4 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HQ4s2 : Q4 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /Q4 upd_ne; [exact HQ3s2 | nz]).
     assert (HQ4sp : fsi_sp m Q4)
       by (rewrite /fsi_sp /Q4 upd_ne; [exact HQ3sp | nz]).
@@ -1324,7 +1321,7 @@ Section FsinitMain.
     { rewrite /Q5 upd_eq. rgne. rewrite HQ4a5. pcw. }
     assert (HQ5a4 : Q5 !!! Regidx Ra4 = (mword_of_int 0x10203040 : mword 64))
       by (rewrite /Q5 upd_ne; [exact HQ4a4 | nz]).
-    assert (HQ5s2 : Q5 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HQ5s2 : Q5 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /Q5 upd_ne; [exact HQ4s2 | nz]).
     assert (HQ5sp : fsi_sp m Q5)
       by (rewrite /fsi_sp /Q5 upd_ne; [exact HQ4sp | nz]).
@@ -1358,7 +1355,7 @@ Section FsinitMain.
                     = add_vec (mword_of_int (KernelSyms.fsinit + 0x44) : mword 64)
                         (auipc_off (mword_of_int 29 : mword 20)))
       by (rewrite /Q6; apply upd_eq).
-    assert (HQ6s2 : Q6 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HQ6s2 : Q6 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /Q6 upd_ne; [exact HQ5s2 | nz]).
     assert (HQ6sp : fsi_sp m Q6)
       by (rewrite /fsi_sp /Q6 upd_ne; [exact HQ5sp | nz]).
@@ -1379,7 +1376,7 @@ Section FsinitMain.
                      (sign_extend' 64 (mword_of_int 826 : mword 12)))]> Q6).
     assert (HQ7a1 : Q7 !!! Regidx Ra1 = sb_base).
     { rewrite /Q7 upd_eq. rgne. rewrite HQ6a1. rewrite /sb_base. pcw. }
-    assert (HQ7s2 : Q7 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HQ7s2 : Q7 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /Q7 upd_ne; [exact HQ6s2 | nz]).
     assert (HQ7sp : fsi_sp m Q7)
       by (rewrite /fsi_sp /Q7 upd_ne; [exact HQ6sp | nz]).
@@ -1396,11 +1393,11 @@ Section FsinitMain.
     iIntros (CID28 Hq28) "Hcg Hpc".
     set (Q8 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget Q7 Rs2))]> Q7).
-    assert (HQ8a0 : Q8 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64)).
+    assert (HQ8a0 : Q8 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /Q8 upd_eq. rgne. rewrite HQ7s2. apply add_vec_zero_l. }
     assert (HQ8a1 : Q8 !!! Regidx Ra1 = sb_base)
       by (rewrite /Q8 upd_ne; [exact HQ7a1 | nz]).
-    assert (HQ8s2 : Q8 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HQ8s2 : Q8 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /Q8 upd_ne; [exact HQ7s2 | nz]).
     assert (HQ8sp : fsi_sp m Q8)
       by (rewrite /fsi_sp /Q8 upd_ne; [exact HQ7sp | nz]).
@@ -1423,11 +1420,11 @@ Section FsinitMain.
                        (sign_extend' 64 (mword_of_int 1630 : mword 21))
                      = mword_of_int KernelSyms.initlog) by pcw.
     iEval (rewrite Htgtil) in "Hpc".
-    assert (HQ9a0 : Q9 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HQ9a0 : Q9 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /Q9 upd_ne; [exact HQ8a0 | nz]).
     assert (HQ9a1 : Q9 !!! Regidx Ra1 = sb_base)
       by (rewrite /Q9 upd_ne; [exact HQ8a1 | nz]).
-    assert (HQ9s2 : Q9 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HQ9s2 : Q9 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /Q9 upd_ne; [exact HQ8s2 | nz]).
     assert (HQ9sp : fsi_sp m Q9)
       by (rewrite /fsi_sp /Q9 upd_ne; [exact HQ8sp | nz]).
@@ -1450,7 +1447,7 @@ Section FsinitMain.
     iDestruct (initlog_dirty_all_false fsc_fs D fsc_cov with "HauthD Hdirty")
       as "(%HDall & HauthD & Hdirty)".
     iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log fsc_fs γpr
-              fsc_cov fsc_logst dev sb_base bs_hdr Xv
+              fsc_cov fsc_logst icfg_dev sb_base bs_hdr Xv
               Mbrn L D
               vlock vname vcpu v_start v_dev v_nc v_n
               pidv dq (DfracOwn 1) Q9 (K - 4)%nat eb b lks Vpr
@@ -1487,7 +1484,7 @@ Section FsinitMain.
       by (rewrite HQ9ra; pcw).
     iEval (rewrite Hpc52) in "Hpc".
     pose proof Hcsil as Hcsil_cs.
-    assert (HmIs2 : mI !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HmIs2 : mI !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsil_cs Rs2 ltac:(vm_compute; reflexivity));
           exact HQ9s2).
     assert (HmIsp : fsi_sp m mI).
@@ -1508,7 +1505,7 @@ Section FsinitMain.
     iIntros (CID31 Hq31) "Hcg Hpc".
     set (R0 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget mI Rs2))]> mI).
-    assert (HR0a0 : R0 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64)).
+    assert (HR0a0 : R0 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /R0 upd_eq. rgne. rewrite HmIs2. apply add_vec_zero_l. }
     assert (HR0sp : fsi_sp m R0)
       by (rewrite /fsi_sp /R0 upd_ne; [exact HmIsp | nz]).
@@ -1531,7 +1528,7 @@ Section FsinitMain.
                        (sign_extend' 64 (mword_of_int 2096868 : mword 21))
                      = mword_of_int KernelSyms.ireclaim) by pcw.
     iEval (rewrite Htgtir) in "Hpc".
-    assert (HR1a0 : R1 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HR1a0 : R1 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /R1 upd_ne; [exact HR0a0 | nz]).
     assert (HR1sp : fsi_sp m R1)
       by (rewrite /fsi_sp /R1 upd_ne; [exact HR0sp | nz]).
@@ -1555,12 +1552,12 @@ Section FsinitMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
-              icfg_log γpr bmapstart inodestart
-              ninodes nib size dev pidv dq (DfracOwn 1) (DfracOwn 1)
+ γpr bmapstart
+              ninodes size pidv dq (DfracOwn 1) (DfracOwn 1)
               (DfracOwn 1) R1 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0
               Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31 Hpk Hj Hgl HR1a0
-              Hbelow eq_refl
+              Hbelow
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hkdata Hpenv Hbio Hlctx Hseam
                     Hgen Hni Hist Hbms HiregS Hboot Hitb2 Hitbl Hesc Hslks HbmS Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl3 Hiref").
@@ -1581,7 +1578,7 @@ Section FsinitMain.
       rewrite (callee_saved_lookup Hcsir_cs c Hcs).
       exact (HR1thr c Hcs N2' N8 N9 N18). }
     iApply (fsi_epilogue (CID0 := CID33) j bn bmapstart
-              inodestart ninodes size dev v_magic v_size v_nblocks
+ ninodes size v_magic v_size v_nblocks
               v_nlog pidv dq m mf K eb b lks Vpr HK Hmfsp Hmfthr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls
                     Hist Hbms Hlctx Hsl3 Hiref Hboot [Hcont]").

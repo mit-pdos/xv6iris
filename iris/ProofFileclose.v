@@ -1502,14 +1502,14 @@ Section ProofFileclose.
           iApply (Iput.wp_iput_sconf (CID := CIDf5) (fcn_procs fn) (fcn_j fn)
                     (fcn_plock fn) fsc_uart fsc_disk fsc_dlock
                     pdd pavd pud fsc_bio
-                    icfg_log
+
                     gil gisl
                     fsc_bmapstart
-                    icfg_ist icfg_nib fsc_size
-                    icfg_dev kk qq inum MAXOPBLOCKS
+ fsc_size
+ kk qq inum MAXOPBLOCKS
                     pidv (fcn_dq fn) DfracDiscarded DfracDiscarded
                     B3 (K - 8)%nat eb b lks Vpr
-                    ltac:(lia) eq_refl Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
+                    ltac:(lia) Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
                     Hist0 Hiblk Hiblog Hinumb Hcovb
                     ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
                     ltac:(rewrite HB3a0; exact Hipe)

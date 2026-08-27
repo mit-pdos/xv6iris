@@ -263,15 +263,13 @@ End SpecSysOpen.
 Definition wp_sys_open_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γfl γf : gname) (γa : gname) (γpr : gname)   (* ftable lock + ghost, kalloc, printk *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names)
-    (bmapstart inodestart : Z) (nib : nat)
-    (ninodes : Z) (size : Z) (dev : mword 32)
+    (bmapstart : Z)
+    (ninodes : Z) (size : Z)
     (ns : nat)                                          (* the iref ledger     *)
     (dqb dqs dqbs dqn : dfrac)
     (v vom : mword 64)                       (* syscall arguments 0 and 1   *)
@@ -282,28 +280,23 @@ Definition wp_sys_open_sconf_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_sys_open <= K)%nat ->
-  (* ---- the icache's ambient ties, threaded verbatim to create / namei ---- *)
-  dev = icfg_dev ->
-  nib = icfg_nib ->
-  g = icfg_log ->
-  inodestart = icfg_ist ->
-  dev = ROOTDEV ->
-  (0 < nib)%nat ->
+  icfg_dev = ROOTDEV ->
+  (0 < icfg_nib)%nat ->
   (* ---- the block-layer geometry, threaded to create / itrunc / iunlockput ---- *)
   log_geom_ok fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
+  0 <= icfg_ist ->
   cov_below fsc_cov size ->
   bitmap_geom_ok fsc_cov fsc_logst bmapstart size ->
-  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* ---- ialloc's three geometry premises, and mkfs's [ushort] tie ---- *)
   1 < ninodes ->
-  ninodes <= 16 * Z.of_nat nib ->
+  ninodes <= 16 * Z.of_nat icfg_nib ->
   ninodes < 2 ^ 31 ->
-  16 * Z.of_nat nib <= 2 ^ 16 ->
+  16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
   (* ---- ialloc's no-inodes arm calls printk, not panic ---- *)
   printk_gen_contract (kt := KT1) γpr gu gd ->
   (* ---- the reference allowance: create's own ---- *)
@@ -335,8 +328,8 @@ Definition wp_sys_open_sconf_body
   (* ---- the open-file table: filealloc, fdalloc and fileclose ---- *)
   is_ftable γfl γf -∗
   (* ---- the block layer ---- *)
-  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
-  log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   fs_crash_seam fsc_cov fsc_logst -∗
   gen_cert -∗
   dev_inv gu gd -∗
@@ -344,11 +337,11 @@ Definition wp_sys_open_sconf_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region ialloc / itrunc claim out of ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
      borrowed and never spent; it rides the SAME channel [ireg_inv] does,
      down to [SpecCreate] -> [SpecIalloc] -> [InodeRegion.ireg_claim_au],
@@ -359,7 +352,7 @@ Definition wp_sys_open_sconf_body
   ireg_open -∗
   (* ---- the FOUR superblock cells (create reads all of them) ---- *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
@@ -391,7 +384,7 @@ Definition wp_sys_open_sconf_body
       pc_is ret_tgt -∗
       bslots 3 -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       (* NO ORDERING on the free pool: create ALLOCATES (balloc under
@@ -420,17 +413,16 @@ Module Type SYSOPEN.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
-      (bmapstart inodestart : Z) (nib : nat)
-      (ninodes : Z) (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (ninodes : Z) (size : Z)
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v vom : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_open_sconf_body γfl γf γa γpr gs j gl gu gd gk pd pav pu bn g
-                             bmapstart inodestart nib
-                             ninodes size dev ns dqb dqs dqbs dqn v vom
+      wp_sys_open_sconf_body γfl γf γa γpr gs j gl gu gd gk pd pav pu bn
+                             bmapstart
+                             ninodes size ns dqb dqs dqbs dqn v vom
                              pid V m K eb b lks.
 End SYSOPEN.

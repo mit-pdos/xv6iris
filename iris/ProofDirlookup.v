@@ -330,7 +330,7 @@ Section ProofDirlookupMain.
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
-      (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
+      (pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
       (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (CIDc : CpuId) : iProp Σ :=
     (∀ (mf : regfile) (found : bool) (kk : nat) (kslot : nat) (q : Qp),
@@ -340,7 +340,7 @@ Section ProofDirlookupMain.
        trap_csrs_ext KT1 eb -∗
        cpu_claim_ext eb pj -∗
        pc_is ret_tgt -∗
-       i_dev ip ↦₄{dqd} dev -∗
+       i_dev ip ↦₄{dqd} icfg_dev -∗
        inode_meta ip dn -∗
        inode_map fsc_fs ip bm -∗
        inode_blocks fsc_fs bm data -∗
@@ -354,7 +354,7 @@ Section ProofDirlookupMain.
         then ⌜dir_first data nrec s = Some kk
               /\ (kslot < NINODE)%nat
               /\ mf !!! Regidx Ra0 = ientry kslot⌝ ∗
-             inode_ref kslot q dev
+             inode_ref kslot q icfg_dev
                (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32) ∗
              (* the minted provenance unit (item 7a-wire) *)
              runit_any
@@ -373,7 +373,7 @@ Section ProofDirlookupMain.
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
-      (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
+      (pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
       (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (fuel : nat) (CIDl : CpuId) : iProp Σ :=
     (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8) (mt10 : mword 64),
@@ -397,7 +397,7 @@ Section ProofDirlookupMain.
        (pa_stk sp0 9) ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) -∗
        (pa_stk sp0 10) ↦₈[KT1] mt10 -∗
        ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ[KT1] dol jj) -∗
-       i_dev ip ↦₄{dqd} dev -∗
+       i_dev ip ↦₄{dqd} icfg_dev -∗
        inode_meta ip dn -∗
        inode_map fsc_fs ip bm -∗
        inode_blocks fsc_fs bm data -∗
@@ -410,14 +410,14 @@ Section ProofDirlookupMain.
        dinode_at fsc_ireg dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
          dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks Vpr
-           dq dqd dqn dev pofv pidv fn bn dinum dr bm CIDc) -∗
+           dq dqd dqn pofv pidv fn bn dinum dr bm CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition dl_latch_body
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
-      (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
+      (pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
       (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (i : nat) (CIDp : CpuId) : iProp Σ :=
     (∀ (Mp : regfile) (dol' : nat -> bv 8) (mt10' : mword 64),
@@ -439,7 +439,7 @@ Section ProofDirlookupMain.
        (pa_stk sp0 9) ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) -∗
        (pa_stk sp0 10) ↦₈[KT1] mt10' -∗
        ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ[KT1] dol' jj) -∗
-       i_dev ip ↦₄{dqd} dev -∗
+       i_dev ip ↦₄{dqd} icfg_dev -∗
        inode_meta ip dn -∗
        inode_map fsc_fs ip bm -∗
        inode_blocks fsc_fs bm data -∗
@@ -452,7 +452,7 @@ Section ProofDirlookupMain.
        dinode_at fsc_ireg dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
          dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks Vpr
-           dq dqd dqn dev pofv pidv fn bn dinum dr bm CIDc) -∗
+           dq dqd dqn pofv pidv fn bn dinum dr bm CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_dirlookup_sconf
@@ -461,7 +461,6 @@ Section ProofDirlookupMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (ga : gname) (gf : gname)
-      (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode) (dr : dinode)
@@ -471,7 +470,7 @@ Section ProofDirlookupMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn
-                              ga gf inodestart nib dev ip dinum bm data dn dr
+                              ga gf ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_dirlookup_sconf_body].
@@ -1265,7 +1264,7 @@ Section ProofDirlookupMain.
       iAssert (∀ fuel : nat,
         wp_next (CID0 := CID) true pj (fun CIDl : CpuId =>
           dl_loop_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b eb hasp lks Vpr
-            dq dqd dqn dev pofv pidv fn bn dinum dr bm fuel CIDl))%I
+            dq dqd dqn pofv pidv fn bn dinum dr bm fuel CIDl))%I
         with "[]" as "Hloop".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
         { iIntros (CIDl Hsl i Ml dol mt10)
@@ -1288,7 +1287,7 @@ Section ProofDirlookupMain.
         (* ------------- THE LATCH at +0x52 (both misses land here) ------- *)
         iAssert (wp_next (CID0 := CIDl) true pj (fun CIDp : CpuId =>
                    dl_latch_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b
-                     eb hasp lks Vpr dq dqd dqn dev pofv pidv fn bn dinum dr
+                     eb hasp lks Vpr dq dqd dqn pofv pidv fn bn dinum dr
                      bm i CIDp))%I
           with "[]" as "Hlatch".
         { iIntros (CIDp Hsp Mp dol' mt10')
@@ -1632,7 +1631,7 @@ Section ProofDirlookupMain.
         iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
         iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
         iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn ga gf
-                  dev ip bm data dn
+ ip bm data dn
                   false (16 * i)%nat 16%nat dol Vpr
                   pidv (DfracOwn 1) dqd L6 (K - 12)%nat eb b lks
                   ltac:(lia) Hlg Hbmwf Hbmcov Hszb
@@ -2030,17 +2029,17 @@ Section ProofDirlookupMain.
             (* +0x8a lw a0,0(s2) : dp->dev *)
             iEval (rewrite /i_dev) in "Hidev".
             iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DL + 0x8a)) Ra0 Rs2
-                      (mword_of_int 0 : mword 12) N5 (K - 12)%nat dev b
+                      (mword_of_int 0 : mword 12) N5 (K - 12)%nat icfg_dev b
                       ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hidev]").
             { iApply (dli_8a with "Htext"). }
             { iEval (rgne; rewrite HN5s2). iExact "Hidev". }
             iIntros (CIDB16 HqB16) "Hcg Hpc Hidev".
             iEval (rgne; rewrite HN5s2; rewrite -/(i_dev ip)) in "Hidev".
             set (N6 := <[Regidx Ra0 := regval_into_reg
-                          (sign_extend' 64 dev : mword 64)]> N5).
+                          (sign_extend' 64 icfg_dev : mword 64)]> N5).
             assert (HN6regs : dlk_regs m sp0 ip nb pf (16 * i) N6).
             { rewrite /N6. apply dlk_regs_caller; [exact Hcsa0x | exact HN5regs]. }
-            assert (HN6a0 : N6 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+            assert (HN6a0 : N6 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
               by (rewrite /N6; apply upd_eq).
             assert (HN6a1 : N6 !!! Regidx Ra1
                             = (zero_extend' 64 (dir_inum data i : mword 16) : mword 64))
@@ -2063,7 +2062,7 @@ Section ProofDirlookupMain.
                           (add_vec_int (mword_of_int (DL + 0x8e) : mword 64) 4)]> N6).
             assert (HN7regs : dlk_regs m sp0 ip nb pf (16 * i) N7).
             { rewrite /N7. apply dlk_regs_caller; [exact Hcsrax | exact HN6regs]. }
-            assert (HN7a0 : N7 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+            assert (HN7a0 : N7 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
               by (rewrite /N7 upd_ne; [exact HN6a0 | nz]).
             assert (HN7a1 : N7 !!! Regidx Ra1
                             = (zero_extend' 64 (dir_inum data i : mword 16) : mword 64))
@@ -2073,7 +2072,7 @@ Section ProofDirlookupMain.
               by (rewrite /N7; apply upd_eq).
             assert (Hinumb : bv_unsigned
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
-                      < 16 * Z.of_nat nib).
+                      < 16 * Z.of_nat icfg_nib).
             { rewrite (dlk_zext32_unsigned (dir_inum data i)).
               exact (Hinums i Hilt Hlive). }
             (* TWO HOPS, not one: the chain is composed link by link at the
@@ -2139,10 +2138,10 @@ Section ProofDirlookupMain.
                           block tie that used to ride beside it is gone: the
                           licence carries its own, SIMP-1.) *)
                        ⌜is_claim lic = false⌝
-                       ∗ iname fsc_ireg fsc_fs inodestart
+                       ∗ iname fsc_ireg fsc_fs icfg_ist
                          (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                          lic
-                       ∗ (iname fsc_ireg fsc_fs inodestart
+                       ∗ (iname fsc_ireg fsc_fs icfg_ist
                             (zero_extend' 32 (dir_inum data i : mword 16)
                              : mword 32) lic
                           -∗ IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm
@@ -2163,7 +2162,7 @@ Section ProofDirlookupMain.
                    count comes from the IN-CORE one ([Hnl0], already in hand
                    on this arm out of [dl_lic_live]) transported across
                    premise (6')'s equation [Hdrnl]. *)
-                { iApply (iname_held_intro fsc_ireg fsc_fs inodestart dinum dr Hdrnz
+                { iApply (iname_held_intro fsc_ireg fsc_fs icfg_ist dinum dr Hdrnz
                             ltac:(rewrite Hdrnl; exact Hnl0) with "Hdi"). }
                 iIntros "Hl".
                 iDestruct (iname_held_alloc with "Hl") as "(_ & _ & Hdi)".
@@ -2193,7 +2192,7 @@ Section ProofDirlookupMain.
                 iApply (IcacheEscrow.dlinks_intro _ _ _ _ _ D Hdok Hxact
                           with "Hetk"). }
             iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-            iApply (IG.wp_iget_sconf inodestart nib dev
+            iApply (IG.wp_iget_sconf
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       lic
                       N7 0%nat eb pj (K - 12)%nat b lks

@@ -97,10 +97,10 @@ Definition kxc_b2_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-    (bn : bio_names) (g : log_names)
+    (bn : bio_names)
     (gilf gislf : gname) (ga gf : gname)
-    (bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32) 
+    (bmapstart : Z)
+    (size : Z) 
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
@@ -117,22 +117,21 @@ Definition kxc_b2_body
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
+  0 <= icfg_ist ->
   cov_below fsc_cov size ->
-  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (jp < NPROC)%nat ->
   gs !! jp = Some gl ->
-  dev = icfg_dev ->
   m !!! Regidx csp_rs1 = sp0 ->
   m !!! Regidx Rra = ra0 ->
   m !!! Regidx Rs0 = s00 ->
   m !!! Regidx Rs1 = s10 ->
   m !!! Regidx Rs2 = s20 ->
   kernel_text -∗
-  fs_fabric gs gu gd gk pd pav pu bn g
-            inodestart nib dev -∗
-  kxc_at_12c jp bn g ga gf bmapstart inodestart nib
-             size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
+  fs_fabric gs gu gd gk pd pav pu bn
+ -∗
+  kxc_at_12c jp bn ga gf bmapstart
+             size kf qf sf gyf inumf dnf bmf gilf gislf n2
              plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -141,11 +140,11 @@ Definition kxc_b2_body
              w67 ef P i szv -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
-         eb eb ∅ dqb dqs bmapstart inodestart na alen plen pv dqpv pfun
+         eb eb ∅ dqb dqs bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (M' : regfile) (P' : uptd) (szv' : mword 64),
-      kxc_at_1ae jp bn ga gf bmapstart inodestart size
+      kxc_at_1ae jp bn ga gf bmapstart size
                  plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -154,7 +153,7 @@ Definition kxc_b2_body
                  w67 ef P' szv' (m !!! Regidx Rs11) -∗
       wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
         KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
-             eb eb ∅ dqb dqs bmapstart inodestart na alen plen pv dqpv
+             eb eb ∅ dqb dqs bmapstart na alen plen pv dqpv
              pfun av dqa avf aslen dqas afun) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -167,10 +166,10 @@ Definition kxc_b2z_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-    (bn : bio_names) (g : log_names)
+    (bn : bio_names)
     (gilf gislf : gname) (ga gf : gname)
-    (bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32) 
+    (bmapstart : Z)
+    (size : Z) 
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
@@ -187,16 +186,16 @@ Definition kxc_b2z_body
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
+  0 <= icfg_ist ->
   cov_below fsc_cov size ->
-  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (jp < NPROC)%nat ->
   gs !! jp = Some gl ->
   kernel_text -∗
-  fs_fabric gs gu gd gk pd pav pu bn g
-            inodestart nib dev -∗
-  kxc_at_1a2 jp bn g ga gf bmapstart inodestart nib
-             size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
+  fs_fabric gs gu gd gk pd pav pu bn
+ -∗
+  kxc_at_1a2 jp bn ga gf bmapstart
+             size kf qf sf gyf inumf dnf bmf gilf gislf n2
              plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -205,7 +204,7 @@ Definition kxc_b2z_body
              w67 ef P -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (M' : regfile),
-      kxc_at_1ae jp bn ga gf bmapstart inodestart size
+      kxc_at_1ae jp bn ga gf bmapstart size
                  plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -221,10 +220,10 @@ Module Type KEXECB3.
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names)
+      (bn : bio_names)
       (gilf gislf : gname) (ga gf : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) 
+      (bmapstart : Z)
+      (size : Z) 
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -234,8 +233,8 @@ Module Type KEXECB3.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64),
-    kxc_b2_body Q gs jp gl gu gd gk pd pav pu bn g gilf gislf
-      ga gf bmapstart inodestart nib size dev
+    kxc_b2_body Q gs jp gl gu gd gk pd pav pu bn gilf gislf
+      ga gf bmapstart size
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
       ef P i szv.
@@ -244,10 +243,10 @@ Module Type KEXECB3.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names)
+      (bn : bio_names)
       (gilf gislf : gname) (ga gf : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) 
+      (bmapstart : Z)
+      (size : Z) 
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -257,8 +256,8 @@ Module Type KEXECB3.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd),
-    kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gilf gislf
-      ga gf bmapstart inodestart nib size dev
+    kxc_b2z_body gs jp gl gu gd gk pd pav pu bn gilf gislf
+      ga gf bmapstart size
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w13 w67 ef P.
 End KEXECB3.
