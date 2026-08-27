@@ -541,7 +541,7 @@ Section ProofPipealloc.
     set (PF1 := ((pf1 ↦₈[KT1] (zero_reg : mword 64) ∗ fd_slot)
                  ∨ (∃ (k1 : nat) (Cf1 : fcontent),
                       ⌜(k1 < NFILE)%nat /\ fc_type Cf1 = FD_NONE⌝ ∗
-                      pf1 ↦₈[KT1] fnode k1 ∗ file_ref γf k1 1 Cf1))%I).
+                      pf1 ↦₈[KT1] fnode k1 ∗ file_ref γf k1 1 Cf1 FdClosed))%I).
     set (T8 := (wp_next (CID0 := CID) true p (fun (CIDt : CpuId) =>
         ∀ (Mt : regfile),
         ⌜ Mt !!! Regidx csp_rs1 = spr
@@ -581,7 +581,7 @@ Section ProofPipealloc.
         cpu_own n eb p b lks -∗
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb p -∗
-        file_ref γf k0 1 Cf0 -∗
+        file_ref γf k0 1 Cf0 FdClosed -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈[KT1] w4 ∗ pa_stk sp0 5 ↦₈[KT1] w5) -∗
         (∃ w : mword 64, pf0 ↦₈[KT1] w) -∗
         PF1 -∗
@@ -597,7 +597,7 @@ Section ProofPipealloc.
                  (⌜x = (zero_reg : mword 64)⌝ ∗ fd_slot
                   ∨ ∃ (k1 : nat) (Cf1 : fcontent),
                       ⌜(k1 < NFILE)%nat /\ x = fnode k1 /\ fc_type Cf1 = FD_NONE⌝ ∗
-                      file_ref γf k1 1 Cf1))%I
+                      file_ref γf k1 1 Cf1 FdClosed))%I
         with "[Hcell1]" as (x) "[Hcell1 Hx]".
       { rewrite /PF1. iDestruct "Hcell1" as "[[H Hu]|H]".
         - iExists (zero_reg : mword 64). iFrame "H". iLeft. by iFrame "Hu".
@@ -737,7 +737,7 @@ Section ProofPipealloc.
                      with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDt CIDt5 eb p ltac:(ext_chain Hbf)
                      with "Hextm") as "Hextm".
-        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on U4 n eb p (K - 6)%nat b lks pidv Vpr
+        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 _ inhabitant on U4 n eb p (K - 6)%nat b lks pidv Vpr
                   ltac:(lia) Hnoffpos HU4a0 Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hftab Hpe Href1 Hpbare Hiru []").
         all: try lkbelow.
@@ -817,7 +817,7 @@ Section ProofPipealloc.
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDu CIDu1 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
-      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on V1 n eb p (K - 6)%nat b lks pidv Vpr
+      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 _ inhabitant on V1 n eb p (K - 6)%nat b lks pidv Vpr
                 ltac:(lia) Hnoffpos HV1a0 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hftab Hpe Href0 Hpbare Hiru []").
       all: try lkbelow.
@@ -1590,24 +1590,30 @@ Section ProofPipealloc.
        it -- it only has to keep the name when it overwrites [fpnames]. *)
     (* the untyped file's payload IS the entry's iref unit ([file_core_none]);
        retyping to FD_PIPE moves it into the pipe arm, so it is NOT dropped. *)
-    iDestruct "Hpay0" as (pn0) "[Hpn0 [Hiru0 Hoh0]]".
+    iDestruct "Hpay0" as (pn0) "(_ & Hpn0 & Hiru0 & Hoh0)".
     iEval (rewrite (file_core_none 1 pn0 Cf0 Hk0ty)) in "Hiru0".
-    iDestruct "Hpay1" as (pn1) "[Hpn1 [Hiru1 Hoh1]]".
+    iDestruct "Hpay1" as (pn1) "(_ & Hpn1 & Hiru1 & Hoh1)".
     iEval (rewrite (file_core_none 1 pn1 Cf1 Hk1ty)) in "Hiru1".
     iEval (rewrite (file_armed_none Cf0 Hk0ty)) in "Hoh0".
     iEval (rewrite (file_armed_none Cf1 Hk1ty)) in "Hoh1".
     iMod (fpay_tok_update γf k0 pn0
-            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn0))
+            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn0)
+               (fp_inum pn0))
             with "Hpn0") as "Hpn0".
     iMod (fpay_tok_update γf k1 pn1
-            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn1))
+            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn1)
+               (fp_inum pn1))
             with "Hpn1") as "Hpn1".
-    iAssert (file_pay γf k0 1
+    iAssert (file_pay_st γf k0 1
                (MkFContent FD_PIPE (mword_of_int 1 : mword 8)
                   (mword_of_int 0 : mword 8) pi
-                  (fc_ip Cf0) (fc_major Cf0)))
+                  (fc_ip Cf0) (fc_major Cf0)) (FdOpen FdPipe))
       with "[Hpn0 Hrd Hiru0 Hoh0]" as "Hpay0".
-    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn0)).
+    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn0)
+                 (fp_inum pn0)).
+      (* the retype IS the descriptor's state change: a pipe end reports
+         [FdOpen FdPipe], and [fp_inum] is meaningless on this arm *)
+      iSplitR; [iPureIntro; symmetry; apply fdstate_of_pipe; reflexivity|].
       iFrame "Hpn0".
       rewrite /file_payload /file_core /fc_wbool;
         cbn [fc_type fc_pipe fc_writable].
@@ -1622,12 +1628,14 @@ Section ProofPipealloc.
       iSplitL "Hrd Hiru0";
         [iSplitR; [iExact "Hpipe" | iSplitL "Hrd"; [iExact "Hrd" | iExact "Hiru0"]]
         | iExact "Hoh0"]. }
-    iAssert (file_pay γf k1 1
+    iAssert (file_pay_st γf k1 1
                (MkFContent FD_PIPE (mword_of_int 0 : mword 8)
                   (mword_of_int 1 : mword 8) pi
-                  (fc_ip Cf1) (fc_major Cf1)))
+                  (fc_ip Cf1) (fc_major Cf1)) (FdOpen FdPipe))
       with "[Hpn1 Hwr Hiru1 Hoh1]" as "Hpay1".
-    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn1)).
+    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn1)
+                 (fp_inum pn1)).
+      iSplitR; [iPureIntro; symmetry; apply fdstate_of_pipe; reflexivity|].
       iFrame "Hpn1".
       rewrite /file_payload /file_core /fc_wbool;
         cbn [fc_type fc_pipe fc_writable].

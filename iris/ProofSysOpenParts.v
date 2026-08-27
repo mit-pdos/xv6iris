@@ -645,7 +645,7 @@ Section ProofSysOpenPublish.
   Lemma so_open_slot (E : coPset) (gf : gname) (kf : nat) (Cf : fcontent) :
     ↑(offN .@ kf) ⊆ E ->
     fc_type Cf = FD_NONE ->
-    file_ref gf kf 1 Cf ={E}=∗
+    file_ref gf kf 1 Cf FdClosed ={E}=∗
     ∃ (pn : fpnames) (voff : mword 32),
       ⌜off_wf voff⌝ ∗
       iref_slot ∗
@@ -659,7 +659,7 @@ Section ProofSysOpenPublish.
       a_foff kf      ↦₄ voff.
   Proof.
     intros HE Ht.
-    iIntros "(Href & Hflds & (%pn & Hnames & Hcore & Hoff) & Hlive)".
+    iIntros "(Href & Hflds & (%pn & _ & Hnames & Hcore & Hoff) & Hlive)".
     rewrite (file_armed_none Cf Ht).
     iMod (off_hold_cancel_raw E gf kf (fp_ocv pn) HE with "Hoff") as "Hraw".
     iMod "Hraw" as "(%ipold & %voff & Hip2 & Hoffc & %Hwf)".
@@ -705,7 +705,7 @@ Section ProofSysOpenPublish.
     (* the two cells the publisher wrote with the UNARMED cinv cancelled *)
     a_fip kf ↦₈{DfracOwn (1/2)} (ientry kk) -∗
     a_foff kf ↦₄ voff -∗
-    |={E}=> file_ref gf kf 1 C.
+    |={E}=> file_ref gf kf 1 C (fdstate_of inum C).
   Proof.
     intros HEi HEo Hkk Hinb Hip Hty Hwrb Hdir Hwf.
     iIntros "Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hip Hoff".
@@ -720,13 +720,13 @@ Section ProofSysOpenPublish.
       iSplitR; [iPureIntro; exact Hinb|].
       iSplitR; [iPureIntro; reflexivity|]. iFrame "Hru".
       iApply (inode_ref_short_gen_forget with "Hkeep"). }
-    iAssert (inode_shr_held_gen (ientry kk) s gy) with "[Hshr]" as "Hs".
-    { iExists kk, inum.
+    iAssert (inode_shr_held_gen (ientry kk) s gy inum) with "[Hshr]" as "Hs".
+    { iExists kk.
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hkk|].
       iSplitR; [iPureIntro; exact Hinb|]. iExact "Hshr". }
     (* ---- the FD-type witness, and it is [so_pay_witness] ---- *)
-    iMod (inode_pay_alloc E (ientry kk) s gy (fc_wbool C) ty
+    iMod (inode_pay_alloc E (ientry kk) s gy inum (fc_wbool C) ty
             (so_pay_witness om ty C Hwrb Hdir) with "Hsh Hs Hshot")
       as (gx) "Hpay".
     (* ---- the off cinv, re-armed ---- *)
@@ -734,7 +734,7 @@ Section ProofSysOpenPublish.
     { iExists (ientry kk), voff. iFrame "Hip Hoff". iPureIntro. exact Hwf. }
     (* ---- ONE names update installs both ---- *)
     iMod (fpay_tok_update gf kf pn
-            (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy go) with "Hnames")
+            (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy go inum) with "Hnames")
       as "Hnames".
     iModIntro.
     (* ---- and that is [file_ref] ---- *)
@@ -745,9 +745,10 @@ Section ProofSysOpenPublish.
     assert (Hnp : bool_decide (fc_type C = FD_PIPE) = false).
     { apply bool_decide_false. destruct Hty as [Ht | Ht]; rewrite Ht;
         intro Hc; by vm_compute in Hc. }
-    rewrite /file_ref /file_pay /file_payload /file_core.
+    rewrite /file_ref /file_pay_st /file_payload /file_core.
     iFrame "Href Hflds Hlive".
-    iExists (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy go).
+    iExists (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy go inum).
+    cbn [fp_inum]. iSplitR; [done|].
     iFrame "Hnames". rewrite Harm Hnp.
     assert (Hor : (bool_decide (fc_type C = FD_INODE)
                    || bool_decide (fc_type C = FD_DEVICE))%bool = true)

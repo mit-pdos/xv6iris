@@ -575,7 +575,7 @@ Definition wp_filewrite_sconf_body
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
-    (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
+    (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate) (* the borrowed reference *)
     (fn : fwrite_names)                          (* the heavy arms' ghosts  *)
     (pidv : mword 32) (V : pprivate)
     (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string) :=
@@ -631,7 +631,7 @@ Definition wp_filewrite_sconf_body
      this path [filewrite_env] reduces to [emp]. *)
   panic_env -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
-  file_ref γf k q Cf -∗
+  file_ref γf k q Cf st -∗
   (* ambient, because three of the four arms copy FROM user memory *)
   proc_priv_core pj pidv V -∗
   kalloc_env γa None -∗
@@ -653,7 +653,7 @@ Definition wp_filewrite_sconf_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      file_ref γf k q Cf -∗
+      file_ref γf k q Cf st -∗
       proc_priv_core pj pidv (upd_upt V P') -∗
       filewrite_env_out fn Cf -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -665,9 +665,9 @@ Module Type FILEWRITE.
 
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
-      (k : nat) (q : Qp) (Cf : fcontent)
+      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
       (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
-      wp_filewrite_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
+      wp_filewrite_sconf_body γa γf γs j γlp k q Cf st fn pidv V m K eb n b lks.
 End FILEWRITE.

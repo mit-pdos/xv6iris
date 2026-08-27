@@ -113,9 +113,9 @@ Section ProofFiledup.
   Qed.
 
   Lemma wp_filedup_sconf
-      (γl γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
+      (γl γf : gname) (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string)
-    : wp_filedup_sconf_body γl γf k q Cf m n eb p K b lks.
+    : wp_filedup_sconf_body γl γf k q Cf st m n eb p K b lks.
   Proof.
     cbv beta delta [wp_filedup_sconf_body].
     intros pcE ret_tgt HK HnZ Ha0 Hbelow.
@@ -376,7 +376,7 @@ Section ProofFiledup.
       f_equal. rewrite Pos2Z.inj_succ. lia. }
     iEval (rewrite Hstv) in "Hcell".
     (* the ghost step: one more reference, the caller's fraction halved *)
-    iMod (file_dup_step γf Mg k q Cf qt cnt HMk with "Hauth [Hrtok Hrfields]") as "(Hauth & Href1 & Href2)".
+    iMod (file_dup_step γf Mg k q Cf st qt cnt HMk with "Hauth [Hrtok Hrfields]") as "(Hauth & Href1 & Href2)".
     { rewrite /file_ref /fref_tok. iFrame "Hrtok Hrfields". }
     iDestruct ("Hback" $! (<[k := (qt, Pos.succ cnt)]> Mg) with "[%] [Hcell Hrest Hfd]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | congruence]. }

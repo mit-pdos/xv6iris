@@ -112,8 +112,9 @@ Definition file_fields k dq C : iProp Σ :=          (* the 7 non-ref cells *)
   a_ftype k ↦₄{dq} fc_type C ∗ a_freadable k ↦ₘ{dq} fc_readable C ∗ … .
 
 (* THE predicate: holding one reference on file slot [k]. *)
-Definition file_ref γ k q C : iProp Σ :=
-  fref_tok γ k q ∗ file_fields k (DfracOwn q) C ∗ file_pay γ k q C.
+Definition file_ref γ k q C st : iProp Σ :=
+  fref_tok γ k q ∗ file_fields k (DfracOwn q) C ∗ file_pay_st γ k q C st
+  ∗ flive_tok γ k.
 ```
 
 `file_ref` is the unit of ownership everywhere: a process's `p->ofile[fd]`, a
@@ -122,10 +123,28 @@ properties:
 
 - **not persistent, not duplicable** — duplication is `filedup`, which must run
   under the lock and bump the physical count;
-- **agreement**: `file_ref γ k q1 C1 ∗ file_ref γ k q2 C2 ⊢ ⌜C1 = C2⌝` (from
-  fractional points-to agreement) — so two fds onto the same file see the same
-  `type`/`ip`/… , for free;
-- **`file_ref γ k 1 C` is writable** — the exclusive/uninitialized state.
+- **agreement**: `file_ref γ k q1 C1 st1 ∗ file_ref γ k q2 C2 st2 ⊢ ⌜C1 = C2
+  ∧ st1 = st2⌝` — the content half for free from fractional points-to
+  agreement, the state half from the payload's names ghost (`fpay_tok_agree`)
+  — so two fds onto the same file see the same `type`/`ip`/… AND report the
+  same thing to their user;
+- **`file_ref γ k 1 C st` is writable** — the exclusive/uninitialized state.
+
+`st : FdSlots.fdstate` is the **user-visible state of any descriptor naming
+this file**, and it is REDUNDANT: `file_ref_state` recovers `st = fdstate_of
+inum C` for the payload's inum.  It is carried anyway because it is the only
+place the INODE NUMBER can live at an altitude a descriptor can read — the
+number is not a `struct file` field, so `fcontent` cannot hold it, and
+`file_pay` quantifies it away.  `proc-struct.md`'s "The fd-state ghost" has the
+full chain; the short version is that `ProcInv.ofile_slot` reads
+
+```coq
+file_ref γf k q C st ∗ fd_st_auth γd fd st
+```
+
+and the descriptor's ghost is the reference's own index.  A reference and the
+fd authority that came out with it therefore cannot be recombined across
+different files.
 
 ### `file_payload`: the thing the file is a reference *to*
 

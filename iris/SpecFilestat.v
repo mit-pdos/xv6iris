@@ -395,17 +395,18 @@ Section SpecFilestat.
      list is UNCHANGED, which is why [ProofFilestat]'s two other uses of it
      do not move.  This is [SpecFileread.fileread_pay_carve]'s fifth output,
      restated at the smaller carve. *)
-  Lemma filestat_pay_carve (γf : gname) (k : nat) (q : Qp) (Cf : fcontent) :
+  Lemma filestat_pay_carve (γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
+      (st : fdstate) :
     fstat_has_inode Cf ->
-    file_pay γf k q Cf -∗
+    file_pay_st γf k q Cf st -∗
     ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16),
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
       IcacheRef.ity_shot g ty ∗
       IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
-      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ file_pay γf k q Cf).
+      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ file_pay_st γf k q Cf st).
   Proof.
-    intros Hty. iIntros "(%pn & Hpn & Hpl)".
+    intros Hty. iIntros "(%pn & %Hst & Hpn & Hpl)".
     assert (Hnp : bool_decide (fc_type Cf = FD_PIPE) = false).
     { apply bool_decide_eq_false_2.
       destruct Hty as [Hc | Hc]; rewrite Hc; by vm_compute. }
@@ -420,20 +421,20 @@ Section SpecFilestat.
        never touches [f->off], so the token is simply carried across and put
        back -- one slot in the pattern and one [iExact]. *)
     iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
-    iDestruct "Hs" as (ik inum) "(%Hipk & %Hik & %Hinb & Hshr)".
+    iDestruct "Hs" as (ik) "(%Hipk & %Hik & %Hinb & Hshr)".
     iDestruct "Hwt" as (ty) "[#Hshot %Hnd]".
-    iExists ik, inum, (q * fp_iq pn)%Qp, (fp_ig pn), ty.
+    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty.
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [iExact "Hshot"|].
     (* [iExact], not [iFrame]: both sides are the same FOLDED
        [IcacheRef.inode_shr_gen] and conversion closes it, while the [Frame]
        instance search does not see through the definition. *)
     iSplitL "Hshr"; [iExact "Hshr"|].
-    iIntros "Hshr". iExists pn. iFrame "Hpn".
+    iIntros "Hshr". iExists pn. iFrame "%". iFrame "Hpn".
     rewrite /file_payload /file_core Hnp Hyes /inode_pay.
     iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
-    iSplitL "Hshr"; [iExists ik, inum; iFrame "%"; iExact "Hshr"|].
+    iSplitL "Hshr"; [iExists ik; iFrame "%"; iExact "Hshr"|].
     iExists ty. iSplitR; [iExact "Hshot"|]. done.
   Qed.
 
@@ -450,7 +451,7 @@ Definition wp_filestat_sconf_body
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
-    (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
+    (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate) (* the borrowed reference *)
     (fn : fstat_names)                           (* the inode arm's ghosts  *)
     (pidv : mword 32) (V : pprivate)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :=
@@ -480,7 +481,7 @@ Definition wp_filestat_sconf_body
   (* filestat itself never panics; ilock and iunlock do, and this is theirs *)
   panic_env -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
-  file_ref γf k q Cf -∗
+  file_ref γf k q Cf st -∗
   (* ambient: myproc runs first, and the surviving arm copies out *)
   proc_priv_core pj pidv V -∗
   kalloc_env γa None -∗
@@ -500,7 +501,7 @@ Definition wp_filestat_sconf_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      file_ref γf k q Cf -∗
+      file_ref γf k q Cf st -∗
       proc_priv_core pj pidv (upd_upt V P') -∗
       filestat_env_out fn Cf -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -513,9 +514,9 @@ Module Type FILESTAT.
 
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
-      (k : nat) (q : Qp) (Cf : fcontent)
+      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb b lks.
+      wp_filestat_sconf_body γa γf γs j γlp k q Cf st fn pidv V m K eb b lks.
 End FILESTAT.

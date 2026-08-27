@@ -400,8 +400,8 @@ Section ProofSysOpenBody.
        sys_open's contract takes [fd_frags_any] at all. *)
     iDestruct (fd_frags_any_acc (pv_fdg V) fd Hfdlt with "Hfrag")
       as (stq) "[Hfr Hfrback]".
-    iMod (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 C FdClosed stq
-                 Hfdlt Hlen Hkf (fdstate_of_open C (or_intror Htyor))
+    iMod (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 C _ FdClosed stq
+                 Hfdlt Hlen Hkf (fdstate_of_open _ C (or_intror Htyor))
                  with "Hcore Howe Href Hauth Hfr") as "[Hpriv Hfr]".
     iDestruct ("Hfrback" with "Hfr") as "Hfrag".
     iModIntro.
@@ -1598,7 +1598,7 @@ Section ProofSysOpenBody.
       iApply (Tails.so_tail_f (CID0 := CID10) gfl gf gs jx gl gu gd gk pd pav
                 pu bn g gil gisl bmapstart
                 inodestart icfg_nib size icfg_dev kk qi s gy inum dn bm
-                kf 1%Qp Cf inhabitant None u pidv
+                kf 1%Qp Cf _ inhabitant None u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp V
                 HKup HKeo HKfc HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog

@@ -126,9 +126,24 @@ Definition fdslotUR : ucmra := authUR natUR.
 (* file.h's four [type] codes, minus FD_NONE, which is not a state a
    DESCRIPTOR can be in: a descriptor either names a typed file or is
    closed.  [FdDevice]'s [major] is what distinguishes the console
-   (CONSOLE = 1) from any other device file. *)
+   (CONSOLE = 1) from any other device file.
+
+   [FdInode] CARRIES ITS INUM, because "fd 3 is open on an inode" is not
+   what a client wants to know -- it wants to know WHICH FILE, and on this
+   file system a file IS its inum.  It is not free: [fcontent] records
+   [f->ip], the itable ENTRY, and an entry is recycled, so the inum has to
+   come from the inode reference the file holds.  It does
+   ([IcacheRef.inode_shr_held_gen], through [FileInvDefs.inode_pay], the
+   [fp_inum] field of [fpnames], and [FileInvDefs.file_ref]'s state index)
+   -- the share already pinned it, through a points-to on the entry's own
+   [i_inum] cell; naming it is what this costs.
+
+   A [Z], like [FdDevice]'s major and for the same reason: these are the
+   numbers a USER program reads, and the machine widths belong on the
+   kernel side of the boundary.  [FileInvDefs.fdstate_of] does the
+   [bv_unsigned]. *)
 Inductive fdtype :=
-| FdInode
+| FdInode (inum : Z)
 | FdPipe
 | FdDevice (major : Z).
 

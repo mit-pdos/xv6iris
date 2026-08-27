@@ -814,7 +814,7 @@ Section ProofFilealloc.
         rewrite /F1 upd_eq. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hstv) in "Hcell".
       (* the ghost step: the slot enters the authority at (1,1) *)
-      iMod (file_alloc_step γf Mg i Cf HMgi with "Hauth Hfields Hfpay") as "[Hauth Href]".
+      iMod (file_alloc_step γf Mg i Cf HMgi HCtype with "Hauth Hfields Hfpay") as "[Hauth Href]".
       iDestruct ("Hback" $! (<[i := (1%Qp, 1%positive)]> Mg) with "[%] [Hcell Hfdslot]") as "Hslots".
       { intros k Hk. rewrite lookup_insert_ne; [reflexivity | regne]. }
       { rewrite /fslot lookup_insert. rewrite file_rest_full.

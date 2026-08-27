@@ -732,7 +732,7 @@ Section ProofSysDup.
        reference, so the reference comes out first and the array goes in
        holed. *)
     iDestruct (proc_priv_lend γf p pid V fd0 fv Hlk0 Hfvnz with "Hpriv")
-      as (k q Cf) "((%Hfvk & %Hklt & %Hty) & Href & Hauth0 & Hcore & Hof)".
+      as (k q Cf stf) "((%Hfvk & %Hklt & %Hty) & Href & Hauth0 & Hcore & Hof)".
     iDestruct (cpu_own_transport CID9 CID16 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     iApply (Fdalloc.wp_fdalloc_sconf γf k {[fd0]} B4 (av - 6)%nat n eb p pid V b lks
@@ -825,7 +825,7 @@ Section ProofSysDup.
       (* NOT [set_solver]: it runs naive_solver over the WHOLE context, which
          here is ~200 hypotheses of large mword terms -- 106 s for [fd0 not in
          {}].  See claude-notes/optimization.md. *)
-      iDestruct (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile V) ∅ fd0 k q Cf
+      iDestruct (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile V) ∅ fd0 k q Cf stf
                    ltac:(apply not_elem_of_empty)
                    ltac:(rewrite Hlk0 Hfvk; reflexivity) Hklt Hty
                    with "[Hof] Href Hauth0") as "Hof".
@@ -992,7 +992,7 @@ Section ProofSysDup.
     iDestruct (cpu_own_transport CID17 CID22 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     (* THE UNIT fdalloc RELEASED IS WHAT PAYS FOR THE HIGHER COUNT *)
-    iApply (Filedup.wp_filedup_sconf γl γf k q Cf G2 n eb p (av - 6)%nat b lks
+    iApply (Filedup.wp_filedup_sconf γl γf k q Cf _ G2 n eb p (av - 6)%nat b lks
               ltac:(lia) Hn ltac:(rewrite HG2a0 Hfvk; reflexivity) Hftno
               with "Hcg Hcpu Htext Hpc Hftab Hunit Href").
     all: try lkbelow.
@@ -1021,17 +1021,17 @@ Section ProofSysDup.
        and that move is what this syscall spends the fragment bundle on. *)
     iDestruct (fd_frags_any_acc (pv_fdg V) fd1 Hfd1N with "Hfrag")
       as (stq) "[Hfr Hfrback]".
-    iMod (fd_st_move _ fd1 FdClosed stq (fdstate_of Cf) with "Hauth1 Hfr")
+    iMod (fd_st_move _ fd1 FdClosed stq stf with "Hauth1 Hfr")
       as "[Hauth1 Hfr]".
     iDestruct ("Hfrback" with "Hfr") as "Hfrag".
     iDestruct (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile (upd_ofile V fd1 (fnode k)))
-                 {[fd0]} fd1 k (q/2)%Qp Cf
+                 {[fd0]} fd1 k (q/2)%Qp Cf stf
                  ltac:(apply not_elem_of_singleton_2; exact Hne01)
                  Hlk1 Hklt Hty with "Hof Href0 Hauth1") as "Hof".
     (* the SOURCE keeps its state: the authority the loan took out goes back
        exactly as it came, so no second bundle access is needed. *)
     iDestruct (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile (upd_ofile V fd1 (fnode k)))
-                 ∅ fd0 k (q/2)%Qp Cf ltac:(apply not_elem_of_empty) Hlk0' Hklt Hty
+                 ∅ fd0 k (q/2)%Qp Cf stf ltac:(apply not_elem_of_empty) Hlk0' Hklt Hty
                  with "[Hof] Href1 Hauth0") as "Hof".
     { rewrite (union_empty_r_L {[fd0]}). iExact "Hof". }
     iDestruct (proc_priv_join with "[Hcore] Hof") as "Hpriv".

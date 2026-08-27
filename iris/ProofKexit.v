@@ -773,7 +773,7 @@ Section KexitLoop.
           intro r; apply rf_to_gmap_dom.
         + apply (kx_nulled_skip cwdv); [exact Hnul|]. rewrite -Hv0. exact Hv.
       - (* FALL: this descriptor names a file -- close it and null the cell *)
-        iDestruct "Hpay" as "[[%Hz0 _] | (%kf & %q & %Cf & (%Hfn & %Hkf & %Hty) & Href & Hst)]".
+        iDestruct "Hpay" as "[[%Hz0 _] | (%kf & %q & %Cf & %stf & (%Hfn & %Hkf & %Hty) & Href & Hst)]".
         { exfalso. rewrite Hz0 in Hz. rewrite eq_vec_refl in Hz. discriminate. }
         assert (Hzf : eq_vec (rget (CID := CIDl) M3e (mword_of_int 10 : mword 5)) zero_reg = false)
           by (rewrite Hrgl10 HM3e_10; exact Hz).
@@ -821,7 +821,7 @@ Section KexitLoop.
         iDestruct "Hpenv" as (onk) "Hpenv".
         iDestruct (fileclose_loop_open fn onk 0%nat eb pj Cf
                      with "Hpenv Hfenv") as "[Hfcenv Hfcback]".
-        iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk M42 0 eb pj av b lks pid V
+        iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf stf fn onk M42 0 eb pj av b lks pid V
                   ltac:(lia) ltac:(lia) HM42a0 Hfresh
                   with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpe Href [Hpbare] Hiru Hfcenv").
         all: try lkbelow.
@@ -870,7 +870,7 @@ Section KexitLoop.
            authority. *)
         iDestruct (fd_frags_any_acc (pv_fdg V) fd ltac:(unfold NOFILE in *; lia)
                      with "Hfrag") as (stq) "[Hfr Hfrback]".
-        iMod (fd_st_move _ fd (fdstate_of Cf) stq FdClosed with "Hst Hfr")
+        iMod (fd_st_move _ fd stf stq FdClosed with "Hst Hfr")
           as "[Hst Hfr]".
         iDestruct ("Hfrback" with "Hfr") as "Hfrag".
         iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot Hst]") as "Hpriv".

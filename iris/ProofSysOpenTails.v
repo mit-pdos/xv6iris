@@ -1687,7 +1687,7 @@ Section ProofSysOpenTails.
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
-      (kf : nat) (qf : Qp) (Cf : fcontent)
+      (kf : nat) (qf : Qp) (Cf : fcontent) (stf : fdstate)
       (fn : fclose_names) (on : option nat)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
@@ -1723,7 +1723,7 @@ Section ProofSysOpenTails.
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0x126)) -∗
     panic_env -∗
     is_ftable gfl gf -∗
-    file_ref gf kf qf Cf -∗
+    file_ref gf kf qf Cf stf -∗
     fileclose_env fn on 0 eb (proc_addr jx) Cf -∗
     bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
@@ -1855,7 +1855,7 @@ Section ProofSysOpenTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (Fileclose.wp_fileclose_sconf (CID := CID2) gfl gf kf qf Cf fn on
+    iApply (Fileclose.wp_fileclose_sconf (CID := CID2) gfl gf kf qf Cf stf fn on
               M2 0%nat eb (proc_addr jx) (K - 24)%nat b lks
               pidv Vpr HKfc so_noff0 HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)

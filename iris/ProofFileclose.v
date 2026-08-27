@@ -143,11 +143,11 @@ Section ProofFileclose.
   Qed.
 
   Lemma wp_fileclose_sconf  (γfl γf : gname)
-      (k : nat) (q : Qp) (Cf : fcontent)
+      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string) (pidv : mword 32) (Vpr : pprivate)
-    : wp_fileclose_sconf_body γfl γf k q Cf fn on m n eb p K b lks pidv Vpr.
+    : wp_fileclose_sconf_body γfl γf k q Cf st fn on m n eb p K b lks pidv Vpr.
   Proof.
     cbv beta delta [wp_fileclose_sconf_body].
     intros pcE ret_tgt HK HnZ Ha0 Hbelow.
@@ -466,7 +466,7 @@ Section ProofFileclose.
       (* ---- the ghost step: the departing share goes home ---- *)
       destruct (proj1 (Qp.lt_sum q qt) (Hqlt Hmany)) as [qr Hqr].
       assert (Hsub : (qt - q)%Qp = Some qr) by (apply Qp.sub_Some; exact Hqr).
-      iMod (file_close_step γf Mg k q Cf qt n' qr
+      iMod (file_close_step γf Mg k q Cf st qt n' qr
               ltac:(rewrite -Hsucc; exact HMk) Hsub
               with "Hauth [Hrtok Hrfields Hrpay Hrlv]") as "(Hauth & Hfl & Hpy)".
       { rewrite /file_ref /fref_tok. iFrame "Hrtok Hrfields Hrpay Hrlv". }
@@ -626,6 +626,7 @@ Section ProofFileclose.
              whole OUTSTANDING total; the invariant's leftover makes it the
              whole slot ([file_rest_join]).  Doing it here, before the reads,
              is what puts every content cell at fraction 1. ---- *)
+      iDestruct (file_pay_st_pay with "Hrpay") as "Hrpay".
       iDestruct (file_rest_join γf k q Cf Hqt1 with "Hrfields Hrpay Hrest")
         as "[Hfl Hpy]".
       iDestruct "Hpy" as (pn) "[Hpn Hpl]".
@@ -644,7 +645,7 @@ Section ProofFileclose.
         as "(Hauth & Hrlv & Hraw)".
       iMod (off_hold_alloc ⊤ γf k false with "Hraw") as (γo0) "Hoh0".
       set (pn0 := MkFPNames (fp_lock pn) (fp_pipe pn) (fp_icv pn) (fp_iq pn)
-                    (fp_ig pn) γo0).
+                    (fp_ig pn) γo0 (fp_inum pn)).
       iMod (fpay_tok_update γf k pn pn0 with "Hpn") as "Hpn".
       iMod (file_close_last_ghost γf Mg k q HMk with "Hauth Hrtok Hrlv")
         as "Hauth".
@@ -1322,8 +1323,8 @@ Section ProofFileclose.
              performs, and the whole point of the payload being a
              cancellable invariant rather than a fraction of the reference
              (which does not exist -- see [FileInv.inode_pay]). *)
-          iAssert (inode_pay (fp_icv pn) (fp_iq pn) (fp_ig pn) (fc_ip Cf)
-                     (fc_wbool Cf) 1) with "[Hcore]" as "Hpl".
+          iAssert (inode_pay (fp_icv pn) (fp_iq pn) (fp_ig pn) (fp_inum pn)
+                     (fc_ip Cf) (fc_wbool Cf) 1) with "[Hcore]" as "Hpl".
           { rewrite /file_core bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib. iExact "Hcore". }
           iApply fupd_wp.
@@ -1331,8 +1332,8 @@ Section ProofFileclose.
              reference SHORT by [fp_iq pn] and the payload's own arm at
              [1 * fp_iq pn] is the exact complement, so what comes out is
              canonical and iput can spend it. *)
-          iMod (inode_pay_cancel ⊤ (fp_icv pn) (fp_iq pn) (fp_ig pn) (fc_ip Cf)
-                  (fc_wbool Cf) ltac:(solve_ndisj) with "Hpl") as "Hheld".
+          iMod (inode_pay_cancel ⊤ (fp_icv pn) (fp_iq pn) (fp_ig pn) (fp_inum pn)
+                  (fc_ip Cf) (fc_wbool Cf) ltac:(solve_ndisj) with "Hpl") as "Hheld".
           iDestruct "Hheld" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href & Hru)".
           iModIntro.
           rewrite /fileclose_fs_env /fileclose_fs_env_nopid.

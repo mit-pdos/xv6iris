@@ -1037,7 +1037,7 @@ pointers.  So the user-visible state is carried as GHOST STATE beside the
 array:
 
 ```coq
-Inductive fdtype  := FdInode | FdPipe | FdDevice (major : Z).
+Inductive fdtype  := FdInode (inum : Z) | FdPipe | FdDevice (major : Z).
 Inductive fdstate := FdClosed | FdOpen (t : fdtype).
 ```
 
@@ -1046,6 +1046,11 @@ other device file.  There is no `FD_NONE` state: a descriptor either names a
 typed file or is closed, and `FileInvDefs.fdstate_of` maps an untyped
 `fcontent` to `FdClosed` precisely so that "the cell is non-null" and "the
 ghost says open" are ONE clause rather than two.
+
+**`FdInode` carries its inum**, because "fd 3 is open on an inode" is not what
+a client wants to know — it wants to know WHICH FILE, and on this file system
+a file IS its inum.  That one argument is what made increment 3 more than a
+constructor change; see "Where the inum comes from" below.
 
 `ProcInv.ofile_slot_agree` is what the whole thing is for, and it is a real
 lemma rather than a vacuous one: a holder of ONE descriptor's fragment learns
@@ -1107,26 +1112,75 @@ that moves the ghost without the cell, or the cell without the ghost:
 
 | cell | ghost | who pays |
 |---|---|---|
-| `v = 0` | `fd_st_both γd fd FdClosed` | the null disjunct |
-| `v = fnode k` | `fd_st_both γd fd (fdstate_of C)`, with `fdstate_of C ≠ FdClosed` | the file disjunct |
+| `v = 0` | `fd_st_auth γd fd FdClosed` | the null disjunct |
+| `v = fnode k` | `file_ref γf k q C st ∗ fd_st_auth γd fd st`, with `st ≠ FdClosed` | the file disjunct |
 
-The `fdstate_of C ≠ FdClosed` clause is the statement that **a descriptor
-never names an untyped file** — true of xv6, since filealloc's fresh
-`FD_NONE` file reaches a descriptor only after sys_open or pipealloc has set
-`f->type`.  It has to be stated here because it is what makes "non-null" and
-"open" the same fact.  Producers pay it with `FileInvDefs.fdstate_of_open`.
+The fd's ghost is **the reference's own state index**, not a function applied
+to the reference — one variable occurring twice in one predicate, so no step
+can move one occurrence without the other.
+
+The `st ≠ FdClosed` clause is the statement that **a descriptor never names an
+untyped file** — true of xv6, since filealloc's fresh `FD_NONE` file gets
+`FdClosed` (`FileInv.file_alloc_step` demands `fc_type C = FD_NONE` and says
+so) and reaches a descriptor only after sys_open or pipealloc has retyped it.
+It has to be stated here because it is what makes "non-null" and "open" the
+same fact.
+
+### Where the inum comes from
+
+`fcontent` cannot supply it.  What `struct file` records is `f->ip`, the
+itable ENTRY, and entries are RECYCLED — so the pointer does not name a file
+across time, and `fcontent` (which mirrors the struct's fields, and whose
+`file_fields_agree` is proved FROM the points-tos) has no honest place to put
+a number that is not a field.  The inum lives one layer down, in the inode
+reference the file parks in `f->ip`.
+
+So the chain that ties `FdInode inum` to the machine is:
+
+```
+ofile_slot          fd_st_auth γd fd st   ∧   file_ref γf k q C st
+FileInvDefs.file_ref            st = fdstate_of (fp_inum pn) C
+FileInvDefs.file_core           inode_pay … (fp_inum pn) …
+FileInvDefs.inode_pay           inode_shr_held_gen (fc_ip C) _ g (fp_inum pn)
+IcacheRef.inode_shr_gen         inode_ident k' _ icfg_dev (fp_inum pn)
+                                  = i_inum (ientry k') ↦ fp_inum pn
+```
+
+The bottom line is a POINTS-TO on the entry's own `i_inum` cell, so the ghost
+cannot drift from the inode the file actually holds, and two holders of one
+file agree on it for the same reason they agree on the rest of `pn`
+(`fpay_tok_agree`).  `IcacheRef.inode_shr_held_gen` used to leave the inum
+∃-bound; **it was changed in place rather than duplicated**, because a share
+of "some inode, number unknown" was never worth holding — the resource
+already pinned the number, the quantifier just hid it.
+
+Device files hold an inode reference too and are NOT given their inum: a
+device fd's identity to its user is the driver behind it (`fc_major`), and the
+inode it was opened through is a mount detail.  `FileInvDefs.fdstate_of` is
+the single site that would change if that turns out to be wanted.
+
+### Why the state rides on `file_ref`
+
+`file_ref γ k q C st` — five arguments, the last redundant (`file_ref_state`
+recovers `st = fdstate_of inum C`).  The redundancy is the point: `st` is *a
+place to put the inum* at the altitude a descriptor can read it, and once it
+is there `ofile_slot` needs no projection function at all.
+
+The index rides INSIDE the payload (`file_pay_st` occupies exactly the slot
+`file_pay` used to) rather than as a fifth conjunct or a leading existential.
+That is what kept the change to ~30 files: the ~40 sites in `ProofFileread`,
+`ProofFilewrite` and `ProofFilestat` that take a reference apart and put it
+back see the same four-way shape they always did.
 
 ### The loan window
 
-A LENT descriptor (`ofile_lent_or_slot`, `fd ∈ D`) carries `∃ st, fd_st_both
-γd fd st` rather than a pinned state.  A loan is a window inside ONE syscall —
-`proc_priv` is `D = ∅`, so no loan survives a return — and during it the array
-does not know the type of the file that will come back.  Both halves stay
-inside, so `proc_ofiles_repay` re-pins the ghost to the returning file's actual
-`fcontent` in one step; **that is why the repay is an update (`==∗`) and why it
-demands the typedness clause `proc_ofiles_lend` hands out.**  Once the fragment
-is held outside, its own value pins `st` here through `fd_st_agree` and the
-existential costs nothing.
+`ProcInv.proc_ofiles_lend` hands the descriptor's AUTHORITY out with the
+reference, so a LENT descriptor (`ofile_lent_or_slot`, `fd ∈ D`) carries no
+ghost at all.  Both the reference and the authority name `st`, so a borrower
+**cannot return a reference to a different file than the one the fd's ghost
+still claims** — a bare reference plus a free-floating authority could, and
+nothing would catch it.  A loan is a window inside ONE syscall (`proc_priv` is
+`D = ∅`, so no loan survives a return).
 
 ### The five sites that move a descriptor's state
 
@@ -1137,7 +1191,7 @@ existential costs nothing.
 | the settle (`sys_open`, `sys_pipe` ×2, `sys_dup`) | `FdClosed → FdOpen t` | **yes** |
 | `sys_close`, `kexit`, `sys_pipe`'s undo tails | `FdOpen t → FdClosed` | **yes** |
 | `kfork` | child `FdClosed → FdOpen t` | **yes** (the child's) |
-| `sys_read` / `sys_write` / `sys_fstat` | none — same file back | **no** |
+| `sys_read` / `sys_write` / `sys_fstat` | none — same file back, at the same `st` | **no** |
 | death (`kexit`; kfork's freeproc path; allocproc's failure tails) | dropped | — |
 
 **THE LAST TWO ROWS ARE THE POINT, and they are what shaped the deficit.**

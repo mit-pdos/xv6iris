@@ -262,14 +262,31 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    [cinv_own] at its own fraction, which is why the token rides [file_payload]
    proportionally ([off_hold]).  See [off_hold] for why it is UNARMED until
    the slot is typed. *)
+(* [fp_inum] IS THE FILE'S INODE NUMBER, and it is [fp_iq]'s exact status one
+   field over: a per-slot CONSTANT fixed when the file is published and
+   unchanged for the file's life.  It is here rather than in [fcontent]
+   because it is not a [struct file] field -- what the C struct records is
+   [f->ip], the itable ENTRY, and entries are RECYCLED, so the pointer does
+   not name a file across time.  The inum does.
+
+   IT IS TIED, not merely recorded: [file_core]'s inode arm states
+   [inode_pay] at THIS inum, and [inode_pay] carries
+   [IcacheRef.inode_shr_held_gen] at it -- whose [inode_ident] is a
+   points-to on the entry's own [i_inum] cell.  So the field cannot drift
+   from the machine, and two holders of one file agree on it for the same
+   reason they agree on the rest of [pn] ([fpay_tok_agree]).
+
+   On a PIPE or a free slot it is meaningless and unconstrained, exactly as
+   [fp_pipe] is on an inode file.  It reaches a descriptor only through
+   [file_ref]'s state index, which ignores it off the FD_INODE arm. *)
 Record fpnames := MkFPNames
   { fp_lock : gname; fp_pipe : pipe_names; fp_icv : gname; fp_iq : Qp;
-    fp_ig : gname; fp_ocv : gname }.
+    fp_ig : gname; fp_ocv : gname; fp_inum : mword 32 }.
 
 Global Instance fpnames_inhabited : Inhabited fpnames :=
   populate (MkFPNames 1%positive
               (MkPipeNames 1%positive 1%positive 1%positive 1%positive)
-              1%positive 1%Qp 1%positive 1%positive).
+              1%positive 1%Qp 1%positive 1%positive (mword_of_int 0)).
 
 Definition fpayUR : ucmra :=
   gmapUR nat (prodR fracR (agreeR (leibnizO fpnames))).
@@ -446,35 +463,55 @@ Record fcontent := MkFContent {
    because that is the honest reading -- an untyped [struct file] is what
    filealloc hands back before its caller has decided what the file IS, and
    a descriptor may not name one.  [ProcInv.ofile_slot] states exactly that
-   as [fdstate_of C <> FdClosed] on its file disjunct, so "the descriptor is
-   open" and "the file it names is typed" are ONE clause rather than two.
+   as [st <> FdClosed] on its file disjunct, so "the descriptor is open" and
+   "the file it names is typed" are ONE clause rather than two.
+
+   It is stated ONCE, at [file_ref]'s definition, and every holder of a
+   reference carries the answer as an index rather than recomputing it --
+   see the note there for why the reference is what has to carry it.
 
    [fc_readable] / [fc_writable] are deliberately not read here: this
    increment tracks only whether a descriptor is open and what KIND of file
    it names.  Adding the mode later is a field on [fdtype], not a change of
-   shape. *)
-Definition fdstate_of (C : fcontent) : fdstate :=
+   shape.
+
+   THE INUM IS A PARAMETER RATHER THAN A FIELD OF [C], and that asymmetry
+   with [fc_major] is the whole reason this function is not a function of
+   the file alone.  [fc_major] is a [struct file] field, so a reference
+   carries it in its points-tos; the inum is not -- what the struct records
+   is [f->ip], the itable ENTRY, and entries are recycled.  The number lives
+   one layer down, in the reference the file parks there, and it reaches a
+   descriptor through [fp_inum] and [file_ref]'s state index.  Off the
+   FD_INODE arm it is ignored, exactly as [fc_major] is off FD_DEVICE.
+
+   DEVICE FILES ARE NOT GIVEN THEIR INUM even though they hold an inode
+   reference too and could be.  A device fd's identity to its user is the
+   driver behind it, which is [fc_major]; the inode it was opened through is
+   a mount detail.  If that turns out to be wanted it is another argument on
+   the [FdDevice] arm, and this is the only site that would change. *)
+Definition fdstate_of (inum : mword 32) (C : fcontent) : fdstate :=
   if bool_decide (fc_type C = FD_PIPE) then FdOpen FdPipe
-  else if bool_decide (fc_type C = FD_INODE) then FdOpen FdInode
+  else if bool_decide (fc_type C = FD_INODE)
+       then FdOpen (FdInode (bv_unsigned inum))
   else if bool_decide (fc_type C = FD_DEVICE)
        then FdOpen (FdDevice (bv_unsigned (fc_major C)))
        else FdClosed.
 
-Lemma fdstate_of_pipe (C : fcontent) :
-  fc_type C = FD_PIPE -> fdstate_of C = FdOpen FdPipe.
+Lemma fdstate_of_pipe (inum : mword 32) (C : fcontent) :
+  fc_type C = FD_PIPE -> fdstate_of inum C = FdOpen FdPipe.
 Proof. intro H. rewrite /fdstate_of bool_decide_true //. Qed.
 
-Lemma fdstate_of_inode (C : fcontent) :
-  fc_type C = FD_INODE -> fdstate_of C = FdOpen FdInode.
+Lemma fdstate_of_inode (inum : mword 32) (C : fcontent) :
+  fc_type C = FD_INODE -> fdstate_of inum C = FdOpen (FdInode (bv_unsigned inum)).
 Proof.
   intro H. rewrite /fdstate_of bool_decide_false; [by rewrite bool_decide_true|].
   rewrite H. unfold FD_INODE, FD_PIPE. intro Hc.
   apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
 Qed.
 
-Lemma fdstate_of_device (C : fcontent) :
+Lemma fdstate_of_device (inum : mword 32) (C : fcontent) :
   fc_type C = FD_DEVICE ->
-  fdstate_of C = FdOpen (FdDevice (bv_unsigned (fc_major C))).
+  fdstate_of inum C = FdOpen (FdDevice (bv_unsigned (fc_major C))).
 Proof.
   intro H. rewrite /fdstate_of bool_decide_false.
   2:{ rewrite H. unfold FD_DEVICE, FD_PIPE. intro Hc.
@@ -485,19 +522,20 @@ Proof.
 Qed.
 
 (* the three ways a descriptor's file can be typed, as ONE fact -- what
-   every producer of an [ofile_slot] file disjunct actually has to pay. *)
-Lemma fdstate_of_open (C : fcontent) :
+   every producer of an [ofile_slot] file disjunct actually has to pay.
+   Note it holds at EVERY inum: openness does not depend on which file. *)
+Lemma fdstate_of_open (inum : mword 32) (C : fcontent) :
   fc_type C = FD_PIPE \/ fc_type C = FD_INODE \/ fc_type C = FD_DEVICE ->
-  fdstate_of C <> FdClosed.
+  fdstate_of inum C <> FdClosed.
 Proof.
   intros [H|[H|H]].
-  - rewrite (fdstate_of_pipe C H). discriminate.
-  - rewrite (fdstate_of_inode C H). discriminate.
-  - rewrite (fdstate_of_device C H). discriminate.
+  - rewrite (fdstate_of_pipe inum C H). discriminate.
+  - rewrite (fdstate_of_inode inum C H). discriminate.
+  - rewrite (fdstate_of_device inum C H). discriminate.
 Qed.
 
-Lemma fdstate_of_none (C : fcontent) :
-  fc_type C = FD_NONE -> fdstate_of C = FdClosed.
+Lemma fdstate_of_none (inum : mword 32) (C : fcontent) :
+  fc_type C = FD_NONE -> fdstate_of inum C = FdClosed.
 Proof.
   intro H. rewrite /fdstate_of !bool_decide_false //; rewrite H;
     [ unfold FD_NONE, FD_DEVICE | unfold FD_NONE, FD_INODE
@@ -872,15 +910,20 @@ Section FileInv.
 
      Everything here is PERSISTENT except the cinv token and the share, so
      [inode_pay_split]'s distributivity is untouched. *)
-  Definition inode_pay (γx : gname) (Q : Qp) (g : gname) (v : mword 64)
-      (wr : bool) (q : Qp) : iProp Σ :=
+  (* [inum] IS NAMED HERE, and that is the only change the fd-state ghost
+     needed of this layer: the slice this payload carries already pinned the
+     inum through [inode_ident], it was simply ∃-bound.  Naming it costs the
+     consumers that do not care nothing -- an [∃ inum] in front of the
+     payload is exactly what they used to have. *)
+  Definition inode_pay (γx : gname) (Q : Qp) (g : gname) (inum : mword 32)
+      (v : mword 64) (wr : bool) (q : Qp) : iProp Σ :=
     (cinv fileipN γx (inode_held_short v Q) ∗ cinv_own γx q ∗
-     inode_shr_held_gen v (q * Q)%Qp g ∗
+     inode_shr_held_gen v (q * Q)%Qp g inum ∗
      ∃ ty : bv 16, ity_shot g ty ∗ ⌜wr = true -> bv_unsigned ty <> T_DIR_z⌝)%I.
 
-  Lemma inode_pay_split γx Q g v wr q1 q2 :
-    inode_pay γx Q g v wr (q1 + q2) ⊣⊢
-    inode_pay γx Q g v wr q1 ∗ inode_pay γx Q g v wr q2.
+  Lemma inode_pay_split γx Q g inum v wr q1 q2 :
+    inode_pay γx Q g inum v wr (q1 + q2) ⊣⊢
+    inode_pay γx Q g inum v wr q1 ∗ inode_pay γx Q g inum v wr q2.
   Proof.
     rewrite /inode_pay cinv_own_fractional Qp.mul_add_distr_r
             inode_shr_held_gen_split.
@@ -895,8 +938,8 @@ Section FileInv.
      makes it a WHOLE one -- the cinv gives back the parent short by [Q] and
      the closer's own arm is [1 * Q], the exact complement. *)
   Lemma inode_pay_cancel (E : coPset) (γx : gname) (Q : Qp) (g : gname)
-      (v : mword 64) (wr : bool) :
-    ↑fileipN ⊆ E -> inode_pay γx Q g v wr 1 ={E}=∗ inode_held v.
+      (inum : mword 32) (v : mword 64) (wr : bool) :
+    ↑fileipN ⊆ E -> inode_pay γx Q g inum v wr 1 ={E}=∗ inode_held v.
   Proof.
     iIntros (HE) "(#Hi & Hown & Hs & _)".
     iMod (cinv_cancel with "Hi Hown") as "H"; [exact HE|].
@@ -912,22 +955,28 @@ Section FileInv.
      reference: the type witness sys_open must supply is keyed on a gname it
      cannot name until the shed has happened. *)
   Local Lemma inode_shr_held_gen_intro (v : mword 64) (s : Qp) :
-    inode_shr_held v s -∗ ∃ g : gname, inode_shr_held_gen v s g.
+    inode_shr_held v s -∗ ∃ (g : gname) (inum : mword 32),
+      inode_shr_held_gen v s g inum.
   Proof.
     rewrite /inode_shr_held /inode_shr_held_gen.
     iIntros "(%k & %inum & %Hv & %Hk & %Hb & Hs)".
     rewrite inode_shr_gen_intro. iDestruct "Hs" as (g) "Hs".
-    iExists g, k, inum. by iFrame.
+    iExists g, inum, k. by iFrame.
   Qed.
 
+  (* the shed hands back the INUM as well, and this is where sys_open learns
+     it: the number it records in [fp_inum] -- hence the one a descriptor's
+     [FdSlots.FdInode] reports to user space -- is read off the very
+     reference being installed, not passed down from namei's caller.  That
+     is what makes the field impossible to get wrong. *)
   Lemma inode_held_shed_gen (v : mword 64) :
-    inode_held v -∗ ∃ (s : Qp) (g : gname),
-      inode_held_short v s ∗ inode_shr_held_gen v s g.
+    inode_held v -∗ ∃ (s : Qp) (g : gname) (inum : mword 32),
+      inode_held_short v s ∗ inode_shr_held_gen v s g inum.
   Proof.
     iIntros "H".
     iDestruct (inode_held_shed with "H") as (s) "[Hsh Hs]".
-    iDestruct (inode_shr_held_gen_intro with "Hs") as (g) "Hs".
-    iExists s, g. iFrame.
+    iDestruct (inode_shr_held_gen_intro with "Hs") as (g inum) "Hs".
+    iExists s, g, inum. iFrame.
   Qed.
 
   (* ...and the inverse of the cancel, for whoever PUBLISHES an FD_INODE file
@@ -940,10 +989,10 @@ Section FileInv.
      T_DIR inode on the open-existing one), and only then installs the
      names. *)
   Lemma inode_pay_alloc (E : coPset) (v : mword 64) (Q : Qp) (g : gname)
-      (wr : bool) (ty : bv 16) :
+      (inum : mword 32) (wr : bool) (ty : bv 16) :
     (wr = true -> bv_unsigned ty <> T_DIR_z) ->
-    inode_held_short v Q -∗ inode_shr_held_gen v Q g -∗ ity_shot g ty
-    ={E}=∗ ∃ γx : gname, inode_pay γx Q g v wr 1.
+    inode_held_short v Q -∗ inode_shr_held_gen v Q g inum -∗ ity_shot g ty
+    ={E}=∗ ∃ γx : gname, inode_pay γx Q g inum v wr 1.
   Proof.
     iIntros (Hwr) "Hsh Hs #Hty".
     iMod (cinv_alloc E fileipN (inode_held_short v Q) with "[Hsh]")
@@ -1197,7 +1246,8 @@ Section FileInv.
      then is_pipe (fp_lock pn) (fp_pipe pn) (fc_pipe C) ∗
           pipe_ref (fp_pipe pn) (fc_wbool C) q ∗ iref_frac q
      else if bool_decide (fc_type C = FD_INODE) || bool_decide (fc_type C = FD_DEVICE)
-     then inode_pay (fp_icv pn) (fp_iq pn) (fp_ig pn) (fc_ip C) (fc_wbool C) q
+     then inode_pay (fp_icv pn) (fp_iq pn) (fp_ig pn) (fp_inum pn) (fc_ip C)
+            (fc_wbool C) q
      else iref_frac q)%I.
 
   (* AN UNTYPED SLOT'S PAYLOAD IS EXACTLY ITS IREF UNIT.  What filealloc
@@ -1274,15 +1324,117 @@ Section FileInv.
       iExists pn1. rewrite fpay_tok_split file_payload_split. iFrame.
   Qed.
 
+  (* ---- THE PAYLOAD, INDEXED BY THE STATE IT GIVES A DESCRIPTOR ----
+
+     [file_pay] quantifies the names, which is right for the ftable
+     invariant: it parks whatever fraction is not out and has no business
+     knowing what file lives there.  A HOLDER does have that business -- see
+     [file_ref] below -- so this is the same payload with the descriptor's
+     view of it pulled out of the quantifier.
+
+     WHY [st] AND NOT [fp_inum].  The inum alone would do the job, but every
+     consumer would then have to apply [fdstate_of] itself, and the FD_NONE
+     and FD_PIPE arms would carry a number that means nothing.  [st] is what
+     the consumers actually want, and it is the same fact. *)
+  Definition file_pay_st (γ : gname) (k : nat) (q : Qp) (C : fcontent)
+      (st : fdstate) : iProp Σ :=
+    (∃ pn, ⌜st = fdstate_of (fp_inum pn) C⌝ ∗ fpay_tok γ k q pn ∗
+           file_payload γ k q pn C)%I.
+
+  Lemma file_pay_st_pay γ k q C st :
+    file_pay_st γ k q C st -∗ file_pay γ k q C.
+  Proof. iIntros "(%pn & _ & Hn & Hp)". iExists pn. iFrame. Qed.
+
+  Lemma file_pay_st_intro γ k q C :
+    file_pay γ k q C -∗ ∃ st, file_pay_st γ k q C st.
+  Proof.
+    iIntros "(%pn & Hn & Hp)".
+    iExists (fdstate_of (fp_inum pn) C), pn. by iFrame.
+  Qed.
+
+  (* an UNTYPED payload gives [FdClosed] and there is nothing to choose:
+     what filealloc needs to know about the file it just handed out. *)
+  Lemma file_pay_st_none γ k q C :
+    fc_type C = FD_NONE ->
+    file_pay γ k q C -∗ file_pay_st γ k q C FdClosed.
+  Proof.
+    iIntros (Hty) "(%pn & Hn & Hp)". iExists pn. iFrame.
+    iPureIntro. by rewrite (fdstate_of_none _ C Hty).
+  Qed.
+
+  (* THE SPLIT, at ONE state: filedup's two shares describe one file.  It is
+     the names ghost that makes this true rather than merely stated
+     ([fpay_tok_agree]), same as for the content. *)
+  Lemma file_pay_st_split γ k q1 q2 C st :
+    file_pay_st γ k (q1 + q2) C st ⊣⊢
+    file_pay_st γ k q1 C st ∗ file_pay_st γ k q2 C st.
+  Proof.
+    rewrite /file_pay_st. iSplit.
+    - iIntros "(%pn & %Hi & Hn & Hp)".
+      rewrite fpay_tok_split file_payload_split.
+      iDestruct "Hn" as "[Hn1 Hn2]". iDestruct "Hp" as "[Hp1 Hp2]".
+      iSplitL "Hn1 Hp1"; iExists pn; by iFrame.
+    - iIntros "[(%pn1 & %Hi1 & Hn1 & Hp1) (%pn2 & %Hi2 & Hn2 & Hp2)]".
+      iDestruct (fpay_tok_agree with "Hn1 Hn2") as %<-.
+      iExists pn1. rewrite fpay_tok_split file_payload_split. by iFrame.
+  Qed.
+
+  Lemma file_pay_st_agree γ k q1 st1 q2 st2 C :
+    file_pay_st γ k q1 C st1 -∗ file_pay_st γ k q2 C st2 -∗ ⌜st1 = st2⌝.
+  Proof.
+    iIntros "(%pn1 & -> & Hn1 & _) (%pn2 & -> & Hn2 & _)".
+    by iDestruct (fpay_tok_agree with "Hn1 Hn2") as %<-.
+  Qed.
+
   (* ---- THE predicate: holding one reference on file slot [k] ----
 
      The unit of ownership everywhere a [struct file *] is held: a process's
      p->ofile[fd], a syscall's local [struct file *f], pipealloc's two
      half-built files.  It is NOT persistent and NOT duplicable -- duplicating
      it is filedup, which must run under ftable.lock and bump the physical
-     count.  [file_ref γ k 1 C] is the exclusive (writable) state. *)
-  Definition file_ref (γ : gname) (k : nat) (q : Qp) (C : fcontent) : iProp Σ :=
-    (fref_tok γ k q ∗ file_fields k q C ∗ file_pay γ k q C ∗ flive_tok γ k)%I.
+     count.  [file_ref γ k 1 C st] is the exclusive (writable) state.
+
+     ---- WHY [st] IS AN ARGUMENT ------------------------------------------
+
+     [st] is THE USER-VISIBLE STATE OF ANY DESCRIPTOR NAMING THIS FILE
+     ([FdSlots.fdstate]), and a reference carries it because a reference is
+     precisely what a descriptor holds.  [ProcInv.ofile_slot] then reads
+
+         file_ref γf k q C st ∗ fd_st_auth γd fd st
+
+     -- the fd's ghost is the reference's own index, not a function applied
+     to it -- and "this descriptor is open" is literally [st <> FdClosed].
+
+     It is REDUNDANT and that is deliberate: [st] is [fdstate_of inum C] for
+     the payload's inum, so it adds no information to the reference.  What it
+     adds is A PLACE TO PUT THE INUM.  The type and major number are [struct
+     file] fields, so [C] has them; the inode NUMBER is not -- the struct
+     holds [f->ip], the itable ENTRY, and entries are recycled, so the
+     pointer does not name a file across time.  The number lives one layer
+     down in [fp_inum], under [file_pay]'s quantifier, and indexing the
+     reference is what lifts it out to where a descriptor can state it.
+
+     THE CONSEQUENCE FOR THE LOAN WINDOW.  [ProcInv.proc_ofiles_lend] hands
+     a descriptor's ghost authority out WITH the reference; because both name
+     [st], a syscall cannot put back a reference to a DIFFERENT file than the
+     one the fd's ghost still claims.  A bare reference plus a free-floating
+     authority could, and nothing would catch it.
+
+     THE INDEX RIDES IN THE PAYLOAD, not as a fifth conjunct or a leading
+     existential, and that is why adding it left the ~40 sites that take a
+     reference apart and put it back alone: [file_pay_st] occupies exactly
+     the slot [file_pay] used to, so the four-way shape below is what it
+     always was. *)
+  Definition file_ref (γ : gname) (k : nat) (q : Qp) (C : fcontent)
+      (st : fdstate) : iProp Σ :=
+    (fref_tok γ k q ∗ file_fields k q C ∗ file_pay_st γ k q C st ∗
+     flive_tok γ k)%I.
+
+  (* the redundancy, made available: every [fc_type]-to-[st] bridge in the
+     tree goes through this plus an [fdstate_of_*] lemma. *)
+  Lemma file_ref_state γ k q C st :
+    file_ref γ k q C st -∗ ∃ inum : mword 32, ⌜st = fdstate_of inum C⌝.
+  Proof. iIntros "(_ & _ & (%pn & %Hst & _) & _)". by iExists (fp_inum pn). Qed.
 
   (* ---- the ftable lock's resource ----
 
