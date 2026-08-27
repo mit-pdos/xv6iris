@@ -68,7 +68,13 @@ Require Import LogDefs.           (* [log_mirror_born]: kit-2's row (B) *)
 Require Import BioDefs.        (* [fs_blocks] *)
 Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsImg.          (* the image sweeps' vocabulary *)
-Require Import FsCfgBoot.      (* [fs_cfg_alloc] and the two boot kits *)
+Require Import FsCfgBoot.      (* the two boot kits *)
+(* THE ERA MINT (durable-disk lane E-mint): the file system's instance is
+   minted from the DURABLE SNAPSHOT ([FsCfgSnap.fs_cfg_alloc_snap]); what
+   runs here is its era-0 reading, which is the same mint applied to
+   [FsDurImg.img_snap_ok].  That is the ONE place the image is still
+   spent. *)
+Require Import FsCfgSnap.      (* [fs_cfg_alloc_img] *)
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:
@@ -1327,6 +1333,11 @@ Section BootAlloc.
         (v_disk (g.(gdev).(dvirtio))) sb nib cov γd γv.
   Proof.
     intros Hbf Himg.
+    (* KEPT WHOLE beside its projections: the era mint takes the BUNDLE now
+       (durable-disk lane E-mint), because [FsDurImg.img_snap_ok] does.
+       Under a DIFFERENT name, because [Himg] is reused below for the era's
+       disk-image gname equation once this [destruct] has cleared it. *)
+    pose proof Himg as Hbfimg.
     destruct Himg as (Hwf & Hrw & Hnin & Hnib32 & Hnib0 & Hnibeq &
                       Hcovin & Hcovmeta & Hcovdata & Hparse & Hush & Hnd & Hleq &
                       Hbare & Hnoself).
@@ -1495,9 +1506,8 @@ Section BootAlloc.
        boot chain now, so there is no pin to drop and no mask premise to
        thread (the mask was [dv_lend_mint]'s).  See
        claude-notes/projects/namei-pinned-lookup.md's banner. *)
-    iMod (fs_cfg_alloc γd γv (v_disk (g.(gdev).(dvirtio))) ndisk sb cov nib ⊤
-            Hwf Hrw Hbare Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata
-            with "Hdimg Hbsauth Hbslots") as (ICFG FSC) "Hfs".
+    iMod (fs_cfg_alloc_img γd γv (v_disk (g.(gdev).(dvirtio))) ndisk sb cov
+            nib ⊤ Hbfimg with "Hdimg Hbsauth Hbslots") as (ICFG FSC) "Hfs".
     (* durable-disk 2b-inode-3 / 2b-inode-4: NEITHER ERA GHOST ARRIVES HERE
        ANY MORE.  The top map's authority is [InodeRegion.ftop_inv] (carried
        by [ireg_inv]) and its per-inum fragments are the free pool's; the
