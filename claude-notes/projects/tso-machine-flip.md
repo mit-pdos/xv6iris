@@ -1,6 +1,19 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
-STEP 5, THE PIN'S MACHINE HALF (2026-08-26, latest session).  **The
+STEP 5, THE A6.52 RULINGS (2026-08-26, latest session).  Both are
+IMPLEMENTED and green: **`PtTree`'s tier index now CARRIES the kernel
+tier's canon-pin bound** (`ptier := KTier B | UTier ξ`, option β — the
+measured 40-site sweep, and it cost ZERO net red), **`kpt_bound` has its
+own era gname**, and with them the A/D write-back's gate
+(`ledger_store_win_pin_ok` → `HartMStore.wobl_ram_ledger_pin_ex`) and the
+PT read's value-after-view obligation (`fobl_ram_ex`, threaded through
+`PtTreeAdue`).  **`HartSKpt` is down to ONE named gate** — its read lane
+is still stated over the flat cache, which is A6.36's overruling catching
+up with the file — and **the memo's "levels 2/1 verbatim" claim is
+REFUTED by measurement** (A6.54).  Clean rebuild **551 of 1330, FOUR
+red**.  A6.53–A6.54 are the record; **A6.54 is the handoff**.
+
+STEP 5, THE PIN'S MACHINE HALF (2026-08-26, earlier same session).  **The
 canon pin is BUILT AND GREEN from `TsoMemPa` up to `TsoCtx`** — the
 element-carried `ts_elem`, the one-conjunct `ts_ok` interp tie, the four
 pinned gates (`ledger_pin_mint` / `ledger_read_pin_ok` /
@@ -4133,6 +4146,201 @@ spelling); fixing it and re-running the sweep on the clean base gives
 - `RiscvAdequacy` — §7 step 6, newly reached behind `BootCarve`.
 - `UserMemPt` — the user store lane owes the append (A6.49).
 - `UmodeFetch` — the user-translation S-payer, unstarted (A6.52).
+
+### A6.53 THE A6.52 RULINGS, IMPLEMENTED — THE INDEX CARRIES THE BOUND,
+### THE BOUND HAS ITS OWN GNAME, AND THE WRITE-BACK'S GATE IS BUILT
+
+**RULING 1 (option β, the richer index) — LANDED, and the measurement
+held.**  `PtTree` gained
+
+    Inductive ptier := KTier (B : nat) | UTier (xi : TsoCtx.CtxId).
+
+    pt_slot_own a dq w := match PTT with
+      | KTier B  => TsoCtx.phys_ledger_word_pin a dq w B (pte_slot_set w)
+      | UTier xi => TsoCtx.ctx_phys_word_pointsto xi a dq w
+      end
+
+`pt_slot_own_forget` stays a one-liner at both arms
+(`phys_ledger_word_pin_forget` is the new one), `_ctx` is unchanged and
+`_ker` gains the bound.  The notations moved with it: `↦ₚₜ` is
+`UTier cur_ctx`, `kpt_page_own` / `kptree_own` / `kpt_kids_own` became
+PARAMETERISED notations taking `B`, and the slot notation is
+`a ↦ₖₜ[ B ] dq w`.
+
+> **AND THE LEXER TRAP FIRED, exactly where durable-notes says it does.**
+> The first spelling was `a ↦ₖₜ[ B ]{ dq } w`, which creates a fused `]{`
+> token — and `KstackOwn`'s `va ↦ₘ[KT0]{dq} b` stopped parsing with
+> *"Syntax error: ']' expected after [term level 50]"*, two hundred files
+> away.  The rule in durable-notes ("a fused `]{` token would break
+> ghost_map's `↪[γ]` tree-wide") is about `↦ₘ[kt]`'s OWN shape and it is
+> right: the fix is to mirror `↦ₘ[kt] dq v`'s `"] dq"` spacing.
+
+**THE SET FAMILY IS A PARAMETER AT `TsoCtx` AND A DEFINITION AT
+`PtTree`** — naming `pte_canon` at the machine layer is the layering
+violation candidate (iv) was rejected for.  `TsoCtx.phys_ledger_word_pin`
+takes `Sf : nat -> TsoMemPa.byteset`; `PtTree` supplies
+
+    pte_ad_byte0 w := the FOUR-element A/D class of w's byte 0
+    pte_slot_set w j := if j =? 0 then pte_ad_byte0 w
+                        else byteset_sing (nth_byte w j)
+
+with the four laws that make the pin work: `pte_slot_set_set_ad` (the
+family is INVARIANT under the write-back, so a slot's pin survives its own
+store), `pte_slot_set_mem_set_ad` (the store gate's side condition),
+`pte_slot_set_canon` (membership at every offset forces canon-equality —
+this is §5.5's reassembly, now consumed), and `pte_slot_set_eq_of_mem`
+(the family is determined by the CANON CLASS, which is what lets the
+payer wand stay value-generic).
+
+**THE PAYER WAND'S SIDE CONDITION IS TIER-GENERIC, and that is the shape
+that made the sweep cheap.**  `ptree_translateAddr_own`'s payer gained one
+premise:
+
+    ⌜pte_canon wnew = pte_canon (pte_set_ad w a0 d0)⌝ -∗ …
+
+At the `UTier` arm it is ignored; at `KTier` it is exactly what
+`pte_canon_inv` + `pte_slot_set_mem_set_ad` need.  The walk only ever
+writes an A/D variant, so every discharge is `pte_canon_set_ad`.  The four
+outer chainable wands (`KptTree`, `KptShare`, `TransPt` ×2, and
+`SmodeCorePt` ×2 behind them) moved from `TsoCtx.phys_ledger_word` to
+`pt_slot_own (KTier B)` with the same premise.
+
+**`kpt_inv`'s ARITY DID NOT MOVE, as designed.**  `kpt_body` existentially
+quantifies `B` and carries `kpt_bound B` beside `kpt_lb t`; a reader
+learns `B` by opening and matches it against its own copy.  The ∃ is in
+the INVARIANT BODY, which is the memo's §5.4 shape — not inside
+`pt_slot_own`'s arm, which is what ruling 1 forbade.  `tlb_inv_pt` (the
+exclusive bundle) carries the bound existentially too, and
+`tlb_inv_pt_share` is where the agreement is shot.
+
+**RULING 2 — `kpt_bound` HAS ITS OWN ERA GNAME.**  `RiscvPtsto` gained
+`kptbR := csumR (exclR unitO) (agreeR (leibnizO nat))`, the functor field
+`riscvF_kptbGS`, the era field `era_kptb_name` and the accessor
+`kptb_name`; `KptGhost` gained `kptb_unset` / `kpt_bound` /
+`kptb_shoot` / `kpt_bound_agree` / `kptb_ghost_alloc` — `kpt_lb`'s shape,
+one payload over, ~30 lines as predicted.  `tlb_res_pt` carries
+`∃ B, kpt_bound B` (persistent, so the residue pays nothing).
+
+**THE READ AND WRITE GATES ARE BUILT AND GREEN.**  `TsoCtx` gained the
+window forms the walk actually applies —
+
+    phys_ledger_word_pin (+ _unfold/_aligned_p/_bytes/_intro/_forget/_sets)
+    phys_ledger_pin_win_map      the [big_sepM_foldr_ins] regrouping,
+                                 offset-keyed sets re-keyed to addresses
+    ledger_store_win_pin_ok      the A/D write-back's window gate
+
+— and `HartMStore` gained `wobl_ram_ledger_pin_ex`, `wobl_ram_ledger_ex`'s
+pinned twin at the `AV_exclusive` (conditional-store) arm, which is the
+form `HartSKpt`'s `wpte_obl_at` seam consumes.
+
+**AND THE VALUE-AFTER-VIEW OBLIGATION IS THREADED THROUGH THE PT READ.**
+`HartMFetch` gained
+
+    fobl_ram_ex img log tv pa n P :=
+      ∀ tv', tv ≤ tv' -> tv' ≤ length log ->
+        ∃ w, tso_read_bytes img log (hart_agent cpu_id) tv' pa n w ∧ P w
+    fobl_ram_ex_of : fobl_ram … w -> P w -> fobl_ram_ex … P
+
+and `PtTreeAdue.swp_checked_mem_read_pte8_ex`'s obligation moved from the
+WRONG nesting `(∃ w, ⌜fobl_ram …⌝ ∗ ⌜P w⌝)` to `⌜fobl_ram_ex …⌝`, its
+proof now running on `swp_hart_ram_read_plain_ex`.  **That is the last
+kit-side piece of the pin's read path.**
+
+### A6.54 HANDOFF: `HartSKpt` IS DOWN TO ONE NAMED GATE — AND THE MEMO'S
+### "LEVELS 2/1 VERBATIM" IS REFUTED BY MEASUREMENT
+
+**WHERE `HartSKpt` STOPS, exactly.**  After A6.53 the file's only error is
+`:410`, and it is the obligation SHAPE and nothing else:
+
+    swp_checked_mem_read_pte8 wants  ⌜HartMFetch.fobl_ram img log tv a 8 w⌝
+    kpt_slot_node supplies           ⌜read_bytes σ.(mem) a 8 = Some w⌝
+
+i.e. the whole `HartSKpt` read lane is still stated over the FLAT cache.
+That is not an oversight of the pin work: it is A6.36's overruling
+catching up with this file.  `PtTreeAdue.xread_obl` / `xread_obl_ex`
+(`:557` / `:572`) are the PRE-overruling shape — they take the reader's
+view already advanced to the top (`vstep … (length log)` plus
+`view_lb … (length log)`) and conclude about `read_bytes σ.(mem)`, which
+was sound only while a PTE read was RULING 1's flat `Read_ttw` arm.  It is
+the plain arm now.
+
+**THE TRANCHE, and it is the last one on the pin's critical path:**
+
+1. Restate `PtTreeAdue.xread_obl_ex` at `fobl_ram_ex` (drop the top-view
+   receipt; it is no longer what the rule gives).
+2. Re-derive `HartSKpt`'s five node lemmas — `kpt_open_slots`,
+   `kpt_slot_node`, `kpt_pte2_node`, `kpt_pte1_node`, `kpt_leaf_node{,_canon}`
+   — off the PINNED resource rather than off `gen_heap_interp`:
+   open `kpt_inv`, take the slot at `pt_slot_own (KTier B)`, apply
+   `TsoCtx.ledger_read_pin_bytes_ok` (through the A6.1a bridge
+   `tso_interp_of_pin` + `tso_interp_of_at_gs` at `gs_of`, exactly as
+   `HartMFetch.fobl_ram_text` runs it), and reassemble with
+   `PtTree.pte_slot_set_canon`.  The eight bytes are destructed one at a
+   time and the word is `Z_to_bv 64 (assemble_bytes […])` +
+   `PageGeom.nth_byte_assemble8` — `ProcPtOwn.phys_bytes_word8` is the
+   worked precedent for that shape.
+3. Port the write-back at `HartSKpt:565–579` to
+   `HartMStore.wobl_ram_ledger_pin_ex` (built, A6.53).  **One small gap
+   named here so it is not re-discovered:** that gate's `Sg` is
+   ADDRESS-keyed while the word tower's `Sf` is OFFSET-keyed, and the call
+   site has to supply the bridge `∀ j < 8, Sg (pa_add pa j) = Sf j`.  For
+   an 8-aligned slot `Sg := fun a => pte_slot_set q0 (Z.to_nat (uint a mod 8))`
+   works; the arithmetic fact it needs
+   (`uint (pa_add pa j) mod 8 = j` for `j < 8` at an 8-aligned `pa`) does
+   not exist yet and is the one lemma to add.  Alternatively give
+   `ledger_store_win_pin_ok` an offset-keyed twin.
+4. `Pt2WalkPt` (`:971/978/987/996/1339`) consumes the node lemmas and
+   moves with them.
+
+> **THE REFUTATION, and it is a real one.**  tso-pin-memo §5.5 says
+> *"Levels 2/1 keep `kpt_slot_node` verbatim on `ledger_read_at_ok` +
+> `⌜t ≤ B⌝`."*  **That cannot stand at the tier ruling 1 chose.**  Under
+> `KTier B` EVERY slot of the kernel tree is pinned, so an interior slot's
+> `ts_name` element is `Some (Sv, B)` — and `phys_ledger_at`, hence
+> `ledger_read_at_ok`, is by DEFINITION the `None` element.  It does not
+> apply to an interior slot at all.  Worse, nothing carries `t ≤ B` to the
+> read site: `ledger_pin_mint` has it as a PREMISE, but the resource does
+> not record it, and it is genuinely false of the leaf after a write-back.
+>
+> So an interior read yields what the pin gives — `pte_canon`-equality,
+> not the exact word.  **That is sound for the walk**: `pte_set_ad_ppn`
+> and `pte_set_ad_flag_*` say the PPN and the permission flags are
+> canon-invariant, so `pt_addr1 p2 vpn` / `pt_addr0 p1 vpn` and every
+> `pte_check_ok` are unchanged.  The cost is that `kpt_pte2_node` and
+> `kpt_pte1_node` WEAKEN from an exact value to the canon predicate, and
+> their consumers absorb it — which the `_ex` (predicate-indexed) read
+> lemmas were built for.  **Do not try to recover exactness by carrying
+> `⌜t ≤ B⌝`: it would have to be per-slot, and the leaf's is false.**
+
+**STILL RED, and what each is** (closing rebuild below):
+
+- `HartSKpt` — the tranche above.  Behind it: `SmodeCorePt`'s unverified
+  re-port (its two payer wands are already moved to the pinned tier, so it
+  will compile as soon as `HartSKpt` does) and the S-mode PT tier.
+  **Still no A6.18-style verdict.**
+- `RiscvAdequacy` — §7 step 6, and its bill is now three items:
+  `era_ts_name` (never allocated, A6.50), `era_kptb_name` (A6.53), and the
+  pre-existing `riscvEraGS`-arity failure at `:600`.  It is the first
+  honest contact with step 6 and deserves its own inventory pass.
+- `UserMemPt` — the user store lane owes the append (A6.49).
+- `UmodeFetch` — the user-translation S-payer, unstarted (A6.52); 14 call
+  sites across `UmodeFetch`/`UserFetchPt`/`UserMemMis`/`UserMemPt`, and
+  the design question (what `S` IS for a user access) is untouched.
+
+**THE CLOSING MODEL-AWARE CLEAN REBUILD: 555 ATTEMPTED, 551 `.vo`, 4
+ERRORS** (`iris/*.vo` deleted first; `ls -la --time-style=full-iso
+model-xv6iris/*.v *.vo` checked FIRST per A6.39 — the model `.vo` at
+19:11:34 postdates its source at 18:37:36; 555 − 4 = 551,
+self-consistent).
+
+> **551 of 1330, FOUR red — the same number as A6.50's, with the WHOLE
+> ruling-1/ruling-2 tranche landed inside it.**  Seven more files changed
+> shape (`PtTree`'s index, `RiscvPtsto`'s functor and era record,
+> `KptGhost`, `KptTree`, `KptShare`, `TransPt`, `HartMStore`) and the red
+> COUNT did not move: `PtFree` and `KstackOwn` were reached, fixed and
+> closed inside the same sweep.  An index change at the bottom of a
+> 1330-file tree costing zero net red is the measurement that ruling 1's
+> option (β) was the right call.
 
 ## 7. Order of work
 
