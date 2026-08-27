@@ -1145,7 +1145,7 @@ Section ProofInitlog.
       (γfs : fs_names) (γpr : gname)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
       (bs_hdr : list (bv 8))
-      (Bh : nat -> list (bv 8))
+      (Xv : Z -> list (bv 8))
       (M : log_mirror)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (vlock : mword 32) (vname vcpu : mword 64)
@@ -1155,16 +1155,16 @@ Section ProofInitlog.
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (bs_sb : list (bv 8)) (sbrec : fs_sb)
     : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γpr
-                            cov logstart dev sb bs_hdr Bh M L D
+                            cov logstart dev sb bs_hdr Xv M L D
                             vlock vname vcpu v_start v_dev v_nc v_n
                             pidv dq dqs m K eb b lks Vpr bs_sb sbrec.
   Proof.
     cbv beta delta [wp_initlog_sconf_body].
     intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Hbnd Hndup Hin Hpk
-           Hma0 Hma1 HDf HLmir Hbelow Hsbok Hsbparse.
+           Hma0 Hma1 HDf HLmir Hbelow Hsbok Hsbparse Hxvslot.
     destruct Hgeom as [Hcovok Hlogsub].
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam
-              #Hpenvpk Hhomes #Hcert Hmirf
+              #Hpenvpk #Hcert Hmirf
               Hlfree
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk #Hbrow Hxo HLauth HDauth Hcovf Hfsb
@@ -1174,16 +1174,6 @@ Section ProofInitlog.
        already earned.  There is no boot swap here any more; every write
        below is a value-chained one. *)
     iDestruct "Hmirf" as "[Hmirh #Hswlb]".
-    (* THE SEAL (durable-disk lane E-except).  The exception set is empty
-       here -- the era's mint reads the raw home blocks -- so the handle is
-       spent for the certificate right away, and [log_ctx] carries it out.
-       When the mint moves to [FsCrash.fr_D] this is where the recovering
-       install's shrink lands, and the seal fires after the loop. *)
-    iMod (exc_seal (fs_exc γfs) with "Hxo") as "#Hseal".
-    (* the home-set-free form install_trans takes *)
-    iAssert (fs_bytes_any γfs) as "#Hbany".
-    { rewrite /fs_bytes_any /fs_bytes_row. iFrame "Hseal".
-      iExists (fs_home_set cov logstart). iExact "Hbrow". }
     (* THE eb-GUARD-TO-b-GUARD BRIDGE.  The complement's transports carry an
        [eb]-indexed guard and every chain fact a straight-line stretch
        produces is [b]-indexed; at level 0 [cpu_own_eb_agree] gives [eb = b]
@@ -2048,18 +2038,14 @@ Section ProofInitlog.
                 (fun i => fs_chalf γfs (log_slot_bno logstart i) (ys !!! i))
                 ltac:(rewrite il_W_length length_seq; reflexivity)
                 with "Hslotfst"). }
-    (* the entries' home halves, re-indexed at the write set *)
-    iEval (rewrite -(il_W_uint bs_hdr)) in "Hhomes".
+    (* the per-entry rows the recovering install takes: ONLY the log
+       copies now (durable-disk lane E-except -- the home byte runs stay
+       inside the era's file-system instance) *)
     iAssert ([∗ list] i ↦ w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1),
-               fsblock (fs_bytes γfs) (uint w) (Bh i))%I with "[Hhomes]" as "Hhomes".
-    { iEval (change (map uint ?l) with (uint <$> l)) in "Hhomes".
-      iEval (rewrite big_sepL_fmap) in "Hhomes". iExact "Hhomes". }
-    (* the per-entry rows the recovering install takes *)
-    iAssert ([∗ list] i ↦ w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1),
-               fs_chalf γfs (log_slot_bno logstart i) (ys !!! i) ∗
-               fsblock (fs_bytes γfs) (uint w) (Bh i))%I
-      with "[Hslotfst Hhomes]" as "Hents".
-    { rewrite big_sepL_sep. iSplitL "Hslotfst"; [iExact "Hslotfst" | iExact "Hhomes"]. }
+               fs_chalf γfs (log_slot_bno logstart i) (ys !!! i) ∗ emp)%I
+      with "[Hslotfst]" as "Hents".
+    { rewrite big_sepL_sep. iSplitL "Hslotfst"; [iExact "Hslotfst" |].
+      iApply big_sepL_intro. iModIntro. iIntros (k y Hy). iEmpIntro. }
     (* the entries are covered home blocks *)
     assert (Hwok' : forall w : mword 32, w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1) ->
               uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)).
@@ -2104,18 +2090,37 @@ Section ProofInitlog.
     { intros _ w Hw. apply HDf. exact (proj1 (Hwok' w Hw)). }
     assert (Hpkg : true = true -> printk_gen_contract (kt := KT1) γpr γu γd).
     { intros _. exact Hpk. }
+    (* THE EXCEPTION SET NAMES EVERY ENTRY (durable-disk lane E-except): the
+       header's write set IS the set, and [Xv] holds slot [i]'s content
+       there -- which [Hysmir] says is what the copy loop read. *)
+    assert (Hexcg : true = true ->
+              forall (i : nat) (w : SailStdpp.Values.mword 32),
+                il_W bs_hdr ((hdr_dec bs_hdr).1) !! i = Some w ->
+                uint w ∈ (list_to_set (hdr_dec bs_hdr).2 : gset Z) /\
+                Xv (uint w) = (fun k : nat => ys !!! k) i).
+    { intros _ i w Hi.
+      assert (Hwsi : (hdr_dec bs_hdr).2 !! i = Some (uint w)).
+      { rewrite -(il_W_uint bs_hdr).
+        exact (it_map_lookup (il_W bs_hdr ((hdr_dec bs_hdr).1)) i w Hi). }
+      assert (Hklt : (i < LOGBLOCKS)%nat).
+      { apply lookup_lt_Some in Hi. rewrite il_W_length in Hi. lia. }
+      split.
+      - apply elem_of_list_to_set. eapply elem_of_list_lookup_2. exact Hwsi.
+      - rewrite (Hxvslot i (uint w) Hwsi). symmetry. exact (Hysmir i Hklt). }
     iApply (InstallTrans.wp_install_trans_sconf γs j γl γu γd γk pd pav pu bn γfs γpr
               cov logstart dev true ((hdr_dec bs_hdr).1)
               (il_W bs_hdr ((hdr_dec bs_hdr).1))
-              (fun k : nat => ys !!! k) Bh L D pidv dq
+              (fun k : nat => ys !!! k)
+              (fs_home_set cov logstart) Xv (list_to_set (hdr_dec bs_hdr).2)
+              L D pidv dq
               C2 (K - 6)%nat eb b
               (fun i : nat =>
                  log_mirror_half (lm_install M ((hdr_dec bs_hdr).2)
                                     (fun k : nat => ys !!! k) i))
               _ Vpr HKit Hgeomok Hj Hgl
-              HC2a0 Hshapeg Hnodupg Hwok' HLwg HDg
+              HC2a0 Hshapeg Hnodupg Hwok' HLwg HDg Hexcg
               Hbelow Hpkg
-              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv [] Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hcells Hbany HLauth HDauth
+              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv [] Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hcells Hbrow Hxo HLauth HDauth
                     Hents Hs2 [] [Hmirh]").
     all: try lkbelow.
     { iModIntro. iExact "Hpenvpk". }
@@ -2157,7 +2162,16 @@ Section ProofInitlog.
       iNext. iExact "Hmi". }
     { iNext. iExact "Hmirh". }
     iIntros (CID30 Hs30 mI) "%Hcs3 Hcg Hcnt Hextc Hclmc Hpc Hppid
-                             Hncell Hcells HLauth HDauth Hents Hs2 HRcust".
+                             Hncell Hcells HLauth HDauth Hxo Hents Hs2 HRcust".
+    (* RECOVERY IS DONE (durable-disk lane E-except): every entry has been
+       landed, so the residue is empty and the handle is spent for the
+       PERMANENT certificate that [LogInv.log_ctx] carries out. *)
+    assert (Hxempty : (list_to_set (hdr_dec bs_hdr).2 : gset Z)
+                        ∖ list_to_set (map uint (il_W bs_hdr ((hdr_dec bs_hdr).1)))
+                      = ∅).
+    { rewrite (il_W_uint bs_hdr). set_solver. }
+    iEval (rewrite Hxempty) in "Hxo".
+    iMod (exc_seal (fs_exc γfs) with "Hxo") as "#Hseal".
     assert (Hpc68 : ret_pc (C2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x68)).
     { rewrite HC2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2218,7 +2232,7 @@ Section ProofInitlog.
     { iApply (il_cells_join bs_hdr ((hdr_dec bs_hdr).1) Hbnd
                 with "Hcells Hjunk"). }
     iEval (rewrite big_sepL_sep) in "Hents".
-    iDestruct "Hents" as "[Hslotfst Hhomes]".
+    iDestruct "Hents" as "[Hslotfst _]".
     (* the slots, back under their existential for the batch *)
     iAssert ([∗ list] i ∈ seq 0 LOGBLOCKS,
                ∃ bs0 : list (bv 8), fs_chalf γfs (log_slot_bno logstart i) bs0)%I
@@ -2239,20 +2253,6 @@ Section ProofInitlog.
         apply lookup_seq in Hy as [-> _].
         rewrite length_seq.
         iIntros "H". iExists _. iExact "H". }
-    (* THE INSTALLED HOME HALVES, AT THE SLOTS' CONTENTS -- recovery's
-       completeness claim, named rather than existentially closed.  The
-       install returned each entry's run at [ys !!! i], and [Hysmir] is
-       what says that is the era's picture of log slot [i]. *)
-    iAssert ([∗ list] i ↦ bb ∈ (hdr_dec bs_hdr).2,
-               fsblock (fs_bytes γfs) bb (lm_view M (log_slot_bno logstart i)))%I
-      with "[Hhomes]" as "Hhomesout".
-    { iEval (rewrite -(il_W_uint bs_hdr)).
-      iEval (change (map uint ?l) with (uint <$> l)).
-      iEval (rewrite big_sepL_fmap).
-      iApply (big_sepL_mono with "Hhomes"). intros k y Hy.
-      assert (Hklt : (k < LOGBLOCKS)%nat).
-      { apply lookup_lt_Some in Hy. rewrite il_W_length in Hy. lia. }
-      rewrite -(Hysmir k Hklt). iIntros "H". iExact "H". }
     assert (Hpp70 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x6c) : mword 64) 4
                     = mword_of_int (KernelSyms.initlog + 0x70))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -2722,7 +2722,7 @@ Section ProofInitlog.
       iSplitR; [iExact "Hdvp"|].
       iSplitR; [iExact "Hstp"|].
       iSplitR; [iExact "Hswlb"|].
-      iSplitR; [iExact "Hbrow"|].
+      iSplitR; [iExists Xv; iExact "Hbrow"|].
       iSplitR; [iExact "Hsbparked"|].
       iSplitR; [| iExact "Hseal"].
       (* THE FILE SYSTEM'S LAW (durable-disk C-8).  The caller handed it in
@@ -2743,7 +2743,7 @@ Section ProofInitlog.
     iDestruct (cpu_claim_ext_transport CID34 CID41 eb pj
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclmc") as "Hclmc".
     iSpecialize ("Hcont" $! CID41 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbf Hs2 Hhomesout Hctx").
+    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbf Hs2 Hctx").
     { unfold callee_saved. repeat split; assumption. }
   Qed.
 

@@ -547,6 +547,7 @@ Section FsinitMain.
       (bs_sb : list (bv 8))
       (sb_old : nat -> bv 8)
       (bs_hdr : list (bv 8))
+      (Xv : Z -> list (bv 8))
       (Mbrn : log_mirror)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (vlock : mword 32) (vname vcpu : mword 64)
@@ -560,7 +561,7 @@ Section FsinitMain.
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
-                           bs_hdr Mbrn L D vlock vname vcpu v_start v_dev v_nc v_n
+                           bs_hdr Xv Mbrn L D vlock vname vcpu v_start v_dev v_nc v_n
                            pidv dq m K eb b lks Vpr sbrec.
   Proof.
     cbv beta delta [wp_fsinit_sconf_body].
@@ -568,7 +569,7 @@ Section FsinitMain.
            Hcgeom Hbmq Hszq
            Hmagic Hvni Hvis Hvbs Hvls
            Hn1 Hnnib Hn31 Hdevc Hnibc Hdevr Hnib0 Hist0 Hblk Hsize Hbm0 Hbmcov
-           Hbmlog Hcovb Hhdr0 HLmir Hpk Hj Hgl Ha0 Hbelow.
+           Hbmlog Hcovb Hhdrbnd Hhdrnd Hhdrok Hxvslot HLmir Hpk Hj Hgl Ha0 Hbelow.
     subst v_ninodes. subst v_inodestart. subst v_bmapstart.
     subst v_logstart.
     pose proof HK as HK'. 
@@ -587,7 +588,7 @@ Section FsinitMain.
     assert (Hbnocov : uint bno ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Hbnou; exact H1cov).
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hgen
-              Hmirror Hlfree Hfsb Hxo Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks #Hbm
+              Hmirror Hlfree #Hbinv Hfsb Hxo Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks #Hbm
               Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hiref Hcont".
@@ -598,7 +599,6 @@ Section FsinitMain.
        put into [LogInv.log_ctx]; block 1's own read needs the home-set-free
        form. *)
     iPoseProof (bitmap_inv_bytes_at with "Hbm") as "#Hbrow".
-    iDestruct (bitmap_inv_bytes_at with "Hbm") as (Xv) "#Hbinv".
     (* THE FILE SYSTEM'S LAW, MINUS BLOCK 1'S PARK (durable-disk C-8).  It
        is assembled out of the four invariants fsinit already holds, read at
        the record block 1 DECODES to rather than at the config numbers --
@@ -859,9 +859,12 @@ Section FsinitMain.
        set -- it is outside the on-disk header's write set at all
        ([FsCrash.hdr_wf]'s block-1 row, lane E-blk1) -- so the crossing is
        the [b ∉ X] form. *)
-    assert (Hb1nin : (1 : Z) ∉ (∅ : gset Z)) by (apply not_elem_of_empty).
+    assert (Hb1nin : (1 : Z) ∉ (list_to_set (hdr_dec bs_hdr).2 : gset Z)).
+    { rewrite elem_of_list_to_set. intros Hc.
+      destruct (Hhdrok 1 Hc) as (_ & _ & Hne). apply Hne. reflexivity. }
     iMod (fs_bytes_agree_exc ⊤ (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
-            (fs_home_set cov logstart) Xv ∅ 1 bs_sb bs0 logN_top Hb1nin
+            (fs_home_set cov logstart) Xv (list_to_set (hdr_dec bs_hdr).2)
+            1 bs_sb bs0 logN_top Hb1nin
             with "Hbinv [$Hxo] Hfsb HpL")
       as "(%Hbs0 & Hxo & Hfsb & HpL)".
     iModIntro.
@@ -1447,24 +1450,16 @@ Section FsinitMain.
        the general initlog contract consumes (durable-disk stage D1) *)
     iDestruct (initlog_dirty_all_false γfs D cov with "HauthD Hdirty")
       as "(%HDall & HauthD & Hdirty)".
-    (* the clean image's header decode is empty, so the three header
-       well-formedness premises and the home-halves row are all trivial *)
-    iAssert ([∗ list] i ↦ b0 ∈ (hdr_dec bs_hdr).2,
-               fsblock (fs_bytes γfs) b0
-                 ((fun _ : nat => ([] : list (bv 8))) i))%I
-      as "Hnilhomes".
-    { rewrite (hdr_dec_zero bs_hdr Hhdr0). cbn. done. }
     iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log γfs γpr
-              cov logstart dev sb_base bs_hdr (fun _ : nat => ([] : list (bv 8)))
+              cov logstart dev sb_base bs_hdr Xv
               Mbrn L D
               vlock vname vcpu v_start v_dev v_nc v_n
               pidv dq (DfracOwn 1) Q9 (K - 4)%nat eb b lks Vpr
               bs_sb sbrec
               ltac:(lia) Hgeom Hj Hgl
-              ltac:(rewrite (hdr_dec_zero bs_hdr Hhdr0); cbn; unfold LOGBLOCKS; lia)
-              ltac:(rewrite (hdr_dec_zero bs_hdr Hhdr0); cbn; constructor)
-              ltac:(rewrite (hdr_dec_zero bs_hdr Hhdr0); cbn;
-                    intros b0 Hb0; destruct (not_elem_of_nil b0 Hb0))
+              Hhdrbnd Hhdrnd
+              ltac:(intros b0 Hb0; destruct (Hhdrok b0 Hb0) as (Hc & Hl & _);
+                    exact (conj Hc Hl))
               Hpk
               HQ9a0 HQ9a1 HDall HLmir
               (* initlog's bound is "bcache"(4); fsinit's own is
@@ -1472,15 +1467,15 @@ Section FsinitMain.
               ltac:(lkbelow)
               (* block 1's two pure facts, straight from the contract
                  (durable-disk lane C-3a) *)
-              Hsbok Hsbparse
+              Hsbok Hsbparse Hxvslot
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hseam
-                    Hpenv Hnilhomes Hgen Hmirror
+                    Hpenv Hgen Hmirror
                     Hlfree
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hls Hlock0 Hlname Hlcpu
-                    Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk Hbrow Hxo HauthL HauthD
+                    Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk Hbinv Hxo HauthL HauthD
                     Hdirty Hhdr Hlslots Hsl34 Hfsb Hlawf").
     all: try lkbelow.
-    iIntros (CID30 Hq30 mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 _ Hlctx".
+    iIntros (CID30 Hq30 mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 Hlctx".
     (* RECOVERY IS DONE (durable-disk lane E-except): [initlog] has sealed
        the byte view's exception set into [LogInv.log_ctx], so the region
        and the bitmap can be upgraded from their PowerOn forms to the ones

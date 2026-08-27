@@ -188,7 +188,11 @@ Definition wp_initlog_sconf_body
     (γfs : fs_names) (γpr : gname)   (* the "pr" lock: recovery's printk *)
     (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
     (bs_hdr : list (bv 8))
-    (Bh : nat -> list (bv 8))   (* the entries' CRASHED home contents *)
+    (* THE BYTE VIEW'S RECORD ON THE EXCEPTION SET (durable-disk lane
+       E-except): what the era's logged view [L] holds at the pending home
+       blocks.  It replaces the entries' CRASHED home contents, which the
+       caller used to have to own across this call and cannot. *)
+    (Xv : Z -> list (bv 8))
     (M : log_mirror)            (* the era's BORN-TRUE picture (1a) *)
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (* the raw struct log cells initlog is handed *)
@@ -254,6 +258,15 @@ Definition wp_initlog_sconf_body
      [FsImgCheck.fsimg_parse_sb] already discharges at the literal image. *)
   fs_sb_ok sbrec ->
   fs_parse_sb (fun _ => bs_sb) = Some sbrec ->
+  (* THE EXCEPTION SET'S VALUES ARE THE SLOTS' (durable-disk lane
+     E-except).  The era's byte view was minted at [FsCrash.fr_D], so at a
+     pending home block it holds the LOGGED value -- log slot [i]'s content,
+     which the era's born-true mirror names.  This is what lets the
+     recovering install restore [FsBlocks.bytes_tie] block by block without
+     owning one byte run. *)
+  (forall (i : nat) (b : Z),
+     (hdr_dec bs_hdr).2 !! i = Some b ->
+     Xv b = lm_view M (log_slot_bno logstart i)) ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR -- claude-notes/completed/
@@ -279,11 +292,6 @@ Definition wp_initlog_sconf_body
   fs_crash_seam cov logstart -∗
   (* the printk credential (persistent; the recovery arm's diagnostic) *)
   printk_env γpr γu γd -∗
-  (* THE ENTRIES' HOME CLIENT HALVES, at whatever the crash left there.
-     At boot the log layer still holds every covered block's client half;
-     recovery is the one pass that moves them (to the slots' logged
-     contents, under the same existential the slots arrive with). *)
-  ([∗ list] i ↦ b ∈ (hdr_dec bs_hdr).2, fsblock (fs_bytes γfs) b (Bh i)) -∗
   (* the era certificate: the swap installs custody AT [gen_id], and the
      registry element + started lower bound are exactly what identifies it *)
   gen_cert -∗
@@ -331,7 +339,8 @@ Definition wp_initlog_sconf_body
      needs it twice -- the RECOVERING install moves each home block's byte
      run ([ProofInstallTrans]'s recovering arm), and [LogInv.log_ctx] --
      which initlog is what builds -- carries it out to every log client. *)
-  fs_bytes_at γfs (fs_home_set cov logstart) -∗
+  fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
+               (fs_home_set cov logstart) Xv -∗
   (* THE BYTE VIEW'S EXCEPTION HANDLE (durable-disk lane E-except).  The
      era's mint hands the WAL the set of home blocks on which the byte view
      and the buffer cache disagree -- the pending blocks of a dirty on-disk
@@ -340,7 +349,7 @@ Definition wp_initlog_sconf_body
      out to every client of the log layer.  It is [∅] while the era's mint
      still reads the RAW home blocks; opening that window is what deletes
      [SpecFsinit]'s clean-header premise. *)
-  exc_own (fs_exc γfs) ∅ -∗
+  exc_own (fs_exc γfs) (list_to_set (hdr_dec bs_hdr).2) -∗
   ghost_map_auth (fs_cache γfs) 1 L -∗
   ghost_map_auth (fs_dirty γfs) 1 D -∗
   (* the LOG SIDE's dirty halves, over the whole covered range, all false:
@@ -400,15 +409,6 @@ Definition wp_initlog_sconf_body
       pa_add sb 20 ↦₄{dqs} (mword_of_int logstart : mword 32) -∗
       (* only initlog's own working pair: the other 32 are the batch's pool *)
       bslots 2 -∗
-      (* THE ENTRIES' HOME HALVES BACK, AT THE INSTALLED CONTENTS, NAMED.
-         This is recovery's COMPLETENESS claim in the form a boot mint can
-         consume: entry [i]'s home block holds log slot [i]'s content, which
-         the era's born-true mirror names, which is exactly [FsCrash.fr_D]'s
-         value there ([fs_install] writes the slot's bytes at the home
-         block).  It used to be an existential, which said only that the
-         run still existed. *)
-      ([∗ list] i ↦ b ∈ (hdr_dec bs_hdr).2,
-         fsblock (fs_bytes γfs) b (lm_view M (log_slot_bno logstart i))) -∗
       (* THE LOG LAYER, BUILT -- AT THE CALLER'S OWN [γ].  Everything else
          initlog was handed is now sealed inside the "log" spinlock's
          resource.  No existential: the names came in, so the boot client
@@ -430,7 +430,7 @@ Module Type INITLOG.
       (γfs : fs_names) (γpr : gname)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
       (bs_hdr : list (bv 8))
-      (Bh : nat -> list (bv 8))
+      (Xv : Z -> list (bv 8))
       (M : log_mirror)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (vlock : mword 32) (vname vcpu : mword 64)
@@ -440,7 +440,7 @@ Module Type INITLOG.
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (bs_sb : list (bv 8)) (sbrec : fs_sb),
       wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γpr
-                            cov logstart dev sb bs_hdr Bh M L D
+                            cov logstart dev sb bs_hdr Xv M L D
                             vlock vname vcpu v_start v_dev v_nc v_n
                             pidv dq dqs m K eb b lks Vpr bs_sb sbrec.
 End INITLOG.

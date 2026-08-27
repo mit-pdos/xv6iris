@@ -268,6 +268,10 @@ Definition wp_fsinit_sconf_body
     (sb_old : nat -> bv 8)                     (* the .bss bytes memmove kills *)
     (* ---- initlog's own bundle, threaded verbatim ---- *)
     (bs_hdr : list (bv 8))
+    (* THE BYTE VIEW'S RECORD ON THE EXCEPTION SET (durable-disk lane
+       E-except): what the era's logged view holds at the pending home
+       blocks.  Threaded straight into [initlog]. *)
+    (Xv : Z -> list (bv 8))
     (M : log_mirror)            (* the era's BORN-TRUE picture (1a) *)
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (vlock : mword 32) (vname vcpu : mword 64)
@@ -345,62 +349,26 @@ Definition wp_fsinit_sconf_body
   bmapstart ∈ cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   cov_below cov size ->
-  (* (g) THE CLEAN-IMAGE PREMISE, AND WHY IT IS STILL HERE (lane E-recover's
-         measurement; durable-fs-plan.md section 5).  It says the on-disk log
-         header reads n = 0, so read_head's copy loop and install_trans's
-         recovery pass are both dead.  IT IS AS REFUTABLE AS [Himg] -- any
-         trace with a mid-commit crash boots on a dirty log -- so it may not
-         survive; but it cannot be deleted HERE, and the obstruction is not
-         in this file.
-
-         [SpecInitlog] has been general in n since durable-disk 1a: its copy
-         loop is live, [SpecInstallTrans] carries both arms at any n, and the
-         recovering install MOVES the logged view [L] entry by entry from the
-         crashed bytes to the slots' logged bytes.  The price is that initlog
-         takes the ENTRIES' HOME BYTE RUNS across the call.  fsinit is the
-         only caller, and at a dirty log it cannot supply them:
-
-           - a pending home block is any covered home block, so the pending
-             set is NOT confined to [FirstTok]'s coverage remainder (the
-             blocks the era mint did not spend).  The log's whole purpose is
-             to write blocks the file system owns;
-           - and the remainder is not a route in any case: [FsCfgBoot]'s own
-             note on [fs_kit_spent] says what is left in it is "whatever
-             [cov] holds that the file system's own geometry does not name
-             -- AT THE LITERAL IMAGE, NOTHING".  The era mint spends block 1,
-             the log region, the inode region, the bitmap block AND the whole
-             free pool, and every live inode's blocks;
-           - every home block's byte run therefore sits inside the era's
-             file-system instance -- [InodeRegion.ireg_recs], the icache
-             escrows, the pool, [BitmapInv.bitmap_inv] -- and nothing short
-             of the commit's collection at quiescence takes one back out.
-
-         THE TWO EXITS, both of them rulings above this file:
-
-           (1) THE ERA'S BYTE VIEW IS MINTED AT [FsCrash.fr_D], not at the
-               crashed bytes.  Then recovery is a ghost no-op on [L] and
-               initlog needs no home runs -- but the CACHE map and the
-               physical disk still read the crashed bytes on the pending set,
-               so [FsBlocks.bytes_tie] (not [BioInv.pool_blk]: the disk and
-               the cache still agree) is false there until the recovering
-               install's bwrites land.  That exception set is WAL-owned, it
-               lives in [fs_bytes_body], the recovering install shrinks it
-               block by block, and it must be SEALED empty before any
-               crossing lemma ([fs_bytes_agree] and its four siblings) is
-               sound.  The seal has to reach all three carriers of the byte
-               row -- [LogInv.log_ctx], [BitmapInv.bitmap_inv],
-               [InodeRegion.ireg_inv] -- and the last two are minted at
-               PowerOn, before recovery has run.
-           (2) THE FILE-SYSTEM INSTANCE IS MINTED AFTER RECOVERY, inside
-               fsinit between initlog's return and ireclaim's call, out of
-               the whole home ledger threaded through this contract at the
-               crashed bytes.  Then [L] moves during recovery exactly as it
-               does today, no exception set exists, and this premise is
-               simply deleted.
-
-         Either way the ruling is about WHERE THE ERA'S INSTANCE IS BORN, and
-         it is [FsCfgBoot]/[BootShared]'s, not this file's. *)
-  hdr_n bs_hdr = 0 ->
+  (* (g) THE ON-DISK HEADER IS WELL FORMED, AND THAT IS ALL (durable-disk
+         lane E-except; the CLEAN-IMAGE premise [hdr_n bs_hdr = 0] IS GONE).
+         These are [FsCrash.hdr_wf]'s three clauses at the header block's
+         content, plus its block-1 row: the decoded write set is bounded by
+         the log region, duplicate-free, and names covered HOME blocks other
+         than the superblock.  At a clean image the decode is empty and all
+         of them are trivial; at a real crash they are what the durable
+         header invariant delivers, and recovery is what consumes them --
+         [initlog]'s copy loop runs, [install_trans] lands every entry (and
+         SHRINKS the byte view's exception set as it goes), and the closing
+         [write_head] clears the log. *)
+  ((hdr_dec bs_hdr).1 <= LOGBLOCKS)%nat ->
+  NoDup (hdr_dec bs_hdr).2 ->
+  (forall b : Z, b ∈ (hdr_dec bs_hdr).2 ->
+     b ∈ cov /\ b ∉ log_region_set logstart /\ b <> FsImg.SB_BNO) ->
+  (* (g'') THE EXCEPTION SET'S VALUES ARE THE SLOTS' (durable-disk lane
+         E-except), threaded verbatim into [initlog]. *)
+  (forall (i : nat) (b : Z),
+     (hdr_dec bs_hdr).2 !! i = Some b ->
+     Xv b = lm_view M (log_slot_bno logstart i)) ->
   (* (g') THE ERA'S TWO READINGS OF ONE IMAGE (durable-disk 1a): the logged
          view and the era's born-true mirror agree on the covered range.
          Threaded verbatim into [initlog], where it is what makes the boot
@@ -445,6 +413,12 @@ Definition wp_fsinit_sconf_body
   (* IN: block 1's client half, which is what pins the bytes bread returns
      to the image; and 32 bytes of RAW .bss at [&sb], which is all the
      superblock is until +0x26 runs. *)
+  (* THE BYTE VIEW'S ROW, NAMED (durable-disk lane E-except): fsinit
+     spends it twice -- at the [readsb] crossing above +0x4e, which runs
+     BEFORE recovery and so goes through the [b ∉ X] form, and inside
+     [initlog], which is where the exception set is emptied and sealed. *)
+  fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
+               (fs_home_set cov logstart) Xv -∗
   fsblock (fs_bytes γfs) 1 bs_sb -∗
   (* THE BYTE VIEW'S EXCEPTION HANDLE (durable-disk lane E-except), from
      the era's mint, threaded straight into [initlog], which empties it and
@@ -452,7 +426,7 @@ Definition wp_fsinit_sconf_body
      [readsb] crossing above +0x4e: block 1 is never in the exception set
      ([FsCrash.hdr_wf]'s block-1 row, lane E-blk1).  It is [∅] while the
      era's mint still reads the RAW home blocks. *)
-  exc_own (fs_exc γfs) ∅ -∗
+  exc_own (fs_exc γfs) (list_to_set (hdr_dec bs_hdr).2) -∗
   ([∗ list] i ∈ seq 0 32, pa_add sb_base i ↦ₘ sb_old i) -∗
   (* ---- the icache's four persistent things, straight from
          [IcacheBoot.icache_boot] ---- *)
@@ -573,6 +547,7 @@ Module Type FSINIT.
       (bs_sb : list (bv 8))
       (sb_old : nat -> bv 8)
       (bs_hdr : list (bv 8))
+      (Xv : Z -> list (bv 8))
       (M : log_mirror)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (vlock : mword 32) (vname vcpu : mword 64)
@@ -586,6 +561,6 @@ Module Type FSINIT.
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
-                           bs_hdr M L D vlock vname vcpu v_start v_dev v_nc v_n
+                           bs_hdr Xv M L D vlock vname vcpu v_start v_dev v_nc v_n
                            pidv dq m K eb b lks Vpr sbrec.
 End FSINIT.

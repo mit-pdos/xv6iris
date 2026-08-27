@@ -607,10 +607,43 @@ Section InstallTransDefs.
   (* install_trans's own [wp_next] obligation, NAMED and anchored at an
      explicit hart (durable-notes: a whole-function post must not be
      spelled inline). *)
+  (* THE EXCEPTION SET'S RESIDUE AT THE CURSOR (durable-disk lane
+     E-except): the entries the recovering install has NOT yet landed.  The
+     loop's handle stands here, and each entry's [bwrite] takes one block
+     out of it. *)
+  Definition it_exc_rest (Xexc : gset Z) (W : list (mword 32)) (t : nat)
+      : gset Z :=
+    Xexc ∖ list_to_set (map uint (take t W)).
+
+  Lemma it_exc_rest_S (Xexc : gset Z) (W : list (mword 32)) (t : nat)
+      (w : mword 32) :
+    W !! t = Some w ->
+    it_exc_rest Xexc W (S t) = it_exc_rest Xexc W t ∖ {[uint w]}.
+  Proof.
+    intros Hw. rewrite /it_exc_rest (take_S_r W t w Hw) map_app.
+    rewrite list_to_set_app_L. cbn [map list_to_set]. set_solver.
+  Qed.
+
+  Lemma it_exc_rest_in (Xexc : gset Z) (W : list (mword 32)) (t : nat)
+      (w : mword 32) :
+    NoDup (map uint W) -> W !! t = Some w -> uint w ∈ Xexc ->
+    uint w ∈ it_exc_rest Xexc W t.
+  Proof.
+    intros Hnd Hw Hin. rewrite /it_exc_rest elem_of_difference.
+    split; [exact Hin |]. rewrite elem_of_list_to_set.
+    exact (it_nodup_take W t w Hnd Hw).
+  Qed.
+
+  Lemma it_exc_rest_all (Xexc : gset Z) (W : list (mword 32)) (n : nat) :
+    n = length W ->
+    it_exc_rest Xexc W n = Xexc ∖ list_to_set (map uint W).
+  Proof. intros ->. rewrite /it_exc_rest take_ge; [done | lia]. Qed.
+
   Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
+      (Xexc : gset Z)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool)
@@ -630,9 +663,12 @@ Section InstallTransDefs.
           (if recovering then it_rec_L W Lw L else L) -∗
         ghost_map_auth (fs_dirty γfs) 1
           (if recovering then D else dirty_clear D (map uint W)) -∗
+        (if recovering
+         then exc_own (fs_exc γfs) (Xexc ∖ list_to_set (map uint W))
+         else emp) -∗
         ([∗ list] i ↦ w ∈ W,
            fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
-           (if recovering then fsblock (fs_bytes γfs) (uint w) (Lw i)
+           (if recovering then emp
             else (uint w) ↪[fs_dirty γfs]{#(1/2)} false)) -∗
         bslots (2 + (if recovering then 0%nat else length W)) -∗
         ▷ R -∗
@@ -643,14 +679,15 @@ Section InstallTransDefs.
       (j : nat) (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
+      (Xexc : gset Z)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool)
       (R : iProp Σ) (lks : gset string) (Vpr : pprivate) :
     (* the guard is at the LITERAL [true] now, matching it_cont's own index *)
     (true = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
-    it_cont (CID0 := CIDa)  j bn γfs logstart recovering n W Lw L D pidv dq m K eb b R lks Vpr -∗
-    it_cont (CID0 := CIDb)  j bn γfs logstart recovering n W Lw L D pidv dq m K eb b R lks Vpr.
+    it_cont (CID0 := CIDa)  j bn γfs logstart recovering n W Lw Xexc L D pidv dq m K eb b R lks Vpr -∗
+    it_cont (CID0 := CIDb)  j bn γfs logstart recovering n W Lw Xexc L D pidv dq m K eb b R lks Vpr.
   Proof.
     intros Hs. rewrite /it_cont /wp_next.
     iIntros "H" (CID2 Hs2). iApply "H". iPureIntro.
@@ -674,6 +711,7 @@ Section InstallTransDefs.
   Definition it_out (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
+      (Xexc : gset Z)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool) : iProp Σ :=
     (lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) ∗
      ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) ∗
@@ -681,9 +719,12 @@ Section InstallTransDefs.
        (if recovering then it_rec_L W Lw L else L) ∗
      ghost_map_auth (fs_dirty γfs) 1
        (if recovering then D else dirty_clear D (map uint W)) ∗
+     (if recovering
+      then exc_own (fs_exc γfs) (Xexc ∖ list_to_set (map uint W))
+      else emp) ∗
      ([∗ list] i ↦ w ∈ W,
         fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
-        (if recovering then fsblock (fs_bytes γfs) (uint w) (Lw i)
+        (if recovering then emp
          else (uint w) ↪[fs_dirty γfs]{#(1/2)} false)) ∗
      bslots (2 + (if recovering then 0%nat else length W)))%I.
 
@@ -799,7 +840,8 @@ Section InstallTransDefs.
       (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k2 : nat)
       (t : nat) (W : list (mword 32)) (w : mword 32)
-      (Lw Bh : nat -> list (bv 8))
+      (Lw : nat -> list (bv 8))
+      (home : gset Z) (Xv : Z -> list (bv 8)) (Xexc : gset Z)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (bs2 bsd2 : list (bv 8)) (d2 : bool) :
     NoDup (map uint W) ->
@@ -807,51 +849,60 @@ Section InstallTransDefs.
     (recovering = false -> L !! uint w = Some (Lw t)) ->
     (recovering = true -> D !! uint w = Some false) ->
     (recovering = true -> length (Lw t) = BSIZE) ->
-    fs_bytes_any γfs -∗
+    (recovering = true -> uint w ∈ Xexc /\ Xv (uint w) = Lw t) ->
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs) home Xv -∗
     ghost_map_auth (fs_cache γfs) 1
       (if recovering then it_rec_L_upto W Lw L t else L) -∗
     ghost_map_auth (fs_dirty γfs) 1
       (if recovering then D else dirty_clear D (map uint (take t W))) -∗
-    (if recovering then fsblock (fs_bytes γfs) (uint w) (Bh t)
+    (if recovering
+     then exc_own (fs_exc γfs) (it_exc_rest Xexc W t)
+     else emp) -∗
+    (if recovering then emp
      else (uint w) ↪[fs_dirty γfs]{#(1/2)} true) -∗
     bio_pay bn (fs_view γfs γd dev cov) k2 dev w bs2 bsd2 d2 ={⊤}=∗
-    ⌜bs2 = (if recovering then Bh t else Lw t)⌝ ∗
     ghost_map_auth (fs_cache γfs) 1
       (if recovering then it_rec_L_upto W Lw L (S t) else L) ∗
     ghost_map_auth (fs_dirty γfs) 1
       (if recovering then D else dirty_clear D (map uint (take (S t) W))) ∗
     bio_pay bn (fs_view γfs γd dev cov) k2 dev w (Lw t) (Lw t) false ∗
-    (if recovering then fsblock (fs_bytes γfs) (uint w) (Lw t)
+    (if recovering
+     then exc_own (fs_exc γfs) (it_exc_rest Xexc W (S t))
+     else emp) ∗
+    (if recovering then emp
      else (uint w) ↪[fs_dirty γfs]{#(1/2)} false) ∗
     (if recovering then emp else ∃ q : Qp, bref bn k2 q dev w).
   Proof.
-    intros Hnd Hw HLw HD Hlen. iIntros "#Hrow HauthL HauthD Hsnd Hpay".
+    intros Hnd Hw HLw HD Hlen Hexc.
+    iIntros "#Hbinv HauthL HauthD Hxo Hsnd Hpay".
     destruct recovering; cbv iota.
     - (* RECOVERY: the L update at the home block's key.  The home block's
          parked cache half is inside the byte view's invariant now, so the
          crossing is [fsblock_update] rather than [fs_chalf_update] -- and
          it is what LEARNS the payload's bytes, so [it_pay_bs] is not
          needed on this arm any more. *)
-      iDestruct "Hrow" as "[Hrow0 #Hseal]".
-      iDestruct "Hrow0" as (home Xv) "#Hbinv".
+      destruct (Hexc eq_refl) as [Hwin Hxvw].
       iDestruct (it_pay_d_auth with "HauthD Hpay") as %Hd2.
       rewrite (HD eq_refl) in Hd2. injection Hd2 as <-.
       iDestruct (it_pay_open_clean with "Hpay") as "[HLhalf Hdhalf]".
-      iMod (fsblock_update ⊤ (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
-              home Xv (it_rec_L_upto W Lw L t) (uint w) (Bh t) (Lw t) bs2
-              logN_top (Hlen eq_refl)
-              with "Hbinv Hseal HauthL Hsnd HLhalf")
-        as "((%Hbs2 & _) & HauthL & Hsnd & HLhalf)".
+      iMod (fsblock_install_exc ⊤ (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
+              home Xv (it_rec_L_upto W Lw L t) (it_exc_rest Xexc W t) (uint w)
+              bs2 logN_top
+              (it_exc_rest_in Xexc W t w Hnd Hw Hwin)
+              ltac:(rewrite Hxvw; exact (Hlen eq_refl))
+              with "Hbinv Hxo HauthL HLhalf")
+        as "(_ & Hxo & HauthL & HLhalf)".
+      iEval (rewrite Hxvw) in "HauthL". iEval (rewrite Hxvw) in "HLhalf".
       iEval (rewrite -(it_rec_L_upto_S W Lw L t w Hw)) in "HauthL".
+      iEval (rewrite -(it_exc_rest_S Xexc W t w Hw)) in "Hxo".
       iModIntro.
-      iSplitR; [iPureIntro; exact Hbs2 |].
       iSplitL "HauthL"; [iExact "HauthL"|].
       iSplitL "HauthD"; [iExact "HauthD"|].
       iSplitL "HLhalf Hdhalf"; [iApply (it_pay_clean with "HLhalf Hdhalf")|].
-      iSplitL "Hsnd"; [iExact "Hsnd"|].
-      iEmpIntro.
+      iSplitL "Hxo"; [iExact "Hxo"|].
+      iSplitR; [iEmpIntro|]. iEmpIntro.
     - (* COMMIT: the dirty flip, the pin reference out for the bunpin *)
-      iClear "Hrow".
+      iClear "Hbinv". iClear "Hxo".
       iDestruct (it_pay_d with "Hsnd Hpay") as %->.
       iDestruct (it_pay_bs_auth with "HauthL Hpay") as %Hlk2.
       pose proof (HLw eq_refl) as Hlw2. rewrite Hlk2 in Hlw2.
@@ -862,10 +913,10 @@ Section InstallTransDefs.
         as "(%Hflip & HauthD & Hdn1 & Hdn2)".
       iEval (rewrite (it_dirty_flip_step D W t w Hnd Hw)) in "HauthD".
       iModIntro.
-      iSplitR; [done|].
       iSplitL "HauthL"; [iExact "HauthL"|].
       iSplitL "HauthD"; [iExact "HauthD"|].
       iSplitL "HLhalf Hdn1"; [iApply (it_pay_clean with "HLhalf Hdn1")|].
+      iSplitR; [iEmpIntro|].
       iSplitL "Hdn2"; [iExact "Hdn2"|].
       iExact "Hbref".
   Qed.
@@ -888,15 +939,15 @@ Section InstallTransDefs.
   (* the pending suffix, re-indexed at the next cursor: [t + S i] and
      [S t + i] are equal but NOT convertible (plus recurses on the left). *)
   Lemma it_rest_shift (recovering : bool) (γfs : fs_names) (logstart : Z)
-      (Lw Bh : nat -> list (bv 8))
+      (Lw : nat -> list (bv 8))
       (t : nat) (l : list (mword 32)) :
     ([∗ list] i ↦ v ∈ l,
        fs_chalf γfs (log_slot_bno logstart ((t + S i)%nat)) (Lw ((t + S i)%nat)) ∗
-       (if recovering then fsblock (fs_bytes γfs) (uint v) (Bh ((t + S i)%nat))
+       (if recovering then emp
         else (uint v) ↪[fs_dirty γfs]{#(1/2)} true))
     ⊢ ([∗ list] i ↦ v ∈ l,
        fs_chalf γfs (log_slot_bno logstart ((S t + i)%nat)) (Lw ((S t + i)%nat)) ∗
-       (if recovering then fsblock (fs_bytes γfs) (uint v) (Bh ((S t + i)%nat))
+       (if recovering then emp
         else (uint v) ↪[fs_dirty γfs]{#(1/2)} true)).
   Proof.
     apply big_sepL_mono. intros k y _.
@@ -1295,6 +1346,7 @@ Section InstallTransBlocks.
       (j : nat) (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
+      (Xexc : gset Z)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (R : iProp Σ) (lks : gset string) (Vpr : pprivate) :
@@ -1311,9 +1363,9 @@ Section InstallTransBlocks.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
-    it_out bn γfs logstart recovering n W Lw L D -∗
+    it_out bn γfs logstart recovering n W Lw Xexc L D -∗
     ▷ R -∗
-    it_cont (CID0 := CID0)  j bn γfs logstart recovering n W Lw L D pidv dq m K eb eb R lks Vpr -∗
+    it_cont (CID0 := CID0)  j bn γfs logstart recovering n W Lw Xexc L D pidv dq m K eb eb R lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs9 Hs10 Hs11.
@@ -1696,17 +1748,18 @@ Section InstallTransBlocks.
         exact Hs11. }
       split_and!; assumption. }
     rewrite /it_out.
-    iDestruct "Hout" as "(Hncell & Hblks & HauthL & HauthD & Hents & Hslots)".
+    iDestruct "Hout" as "(Hncell & Hblks & HauthL & HauthD & Hxo & Hents & Hslots)".
     iDestruct (cpu_own_transport CID0 CID12 0%nat eb (proc_addr j) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CID12 eb (proc_addr j) ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CID12 eb (proc_addr j) ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (it_cont_shift (CIDa := CID0) (CIDb := CID12)  j bn γfs logstart recovering n W Lw L D
+    iDestruct (it_cont_shift (CIDa := CID0) (CIDb := CID12)  j bn γfs logstart recovering n W Lw
+                 Xexc L D
                  pidv dq m K eb eb R lks Vpr ltac:(wp_next_chain) with "Hcont") as "Hcont".
     rewrite /it_cont.
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P11 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hncell Hblks
-                                 HauthL HauthD Hents Hslots HR").
+                                 HauthL HauthD Hxo Hents Hslots HR").
     exact Hcs.
   Qed.
 
@@ -1723,7 +1776,7 @@ Section InstallTransBlocks.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
-      (Bh : nat -> list (bv 8))
+      (home : gset Z) (Xv : Z -> list (bv 8)) (Xexc : gset Z)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (R : nat -> iProp Σ) (lks : gset string) (Vpr : pprivate) :
@@ -1738,6 +1791,9 @@ Section InstallTransBlocks.
      forall (i : nat) (w : mword 32), W !! i = Some w -> L !! uint w = Some (Lw i)) ->
     (recovering = true ->
      forall w : mword 32, w ∈ W -> D !! uint w = Some false) ->
+    (recovering = true ->
+     forall (i : nat) (w : mword 32),
+       W !! i = Some w -> uint w ∈ Xexc /\ Xv (uint w) = Lw i) ->
     (recovering = true -> printk_gen_contract (kt := KT1) γpr γu γd) ->
     forall (CID0 : CpuId) (t : nat) (M : regfile),
     (t < n)%nat ->
@@ -1766,18 +1822,21 @@ Section InstallTransBlocks.
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
     (* the byte view's row -- see [SpecInstallTrans] *)
-    fs_bytes_any γfs -∗
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs) home Xv -∗
+    (if recovering
+     then exc_own (fs_exc γfs) (it_exc_rest Xexc W t)
+     else emp) -∗
     ghost_map_auth (fs_cache γfs) 1
       (if recovering then it_rec_L_upto W Lw L t else L) -∗
     ghost_map_auth (fs_dirty γfs) 1
       (if recovering then D else dirty_clear D (map uint (take t W))) -∗
     ([∗ list] i ↦ w ∈ take t W,
        fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
-       (if recovering then fsblock (fs_bytes γfs) (uint w) (Lw i)
+       (if recovering then emp
         else (uint w) ↪[fs_dirty γfs]{#(1/2)} false)) -∗
     ([∗ list] i ↦ w ∈ drop t W,
        fs_chalf γfs (log_slot_bno logstart ((t + i)%nat)) (Lw ((t + i)%nat)) ∗
-       (if recovering then fsblock (fs_bytes γfs) (uint w) (Bh ((t + i)%nat))
+       (if recovering then emp
         else (uint w) ↪[fs_dirty γfs]{#(1/2)} true)) -∗
     bslots (2 + (if recovering then 0%nat else t)) -∗
     (* the per-entry crash permits, and the resource they thread *)
@@ -1785,16 +1844,16 @@ Section InstallTransBlocks.
          ⌜W !! i = Some w⌝ -∗ ⌜length (Lw i) = 1024%nat⌝ -∗ ▷ R i -∗
          disk_seq_permit gen_id (Some ((1024 * uint w)%Z, Lw i)) (R (S i))) -∗
     ▷ R t -∗
-    it_cont (CID0 := CID0)  j bn γfs logstart recovering n W Lw L D pidv dq m K eb eb (R n) lks Vpr -∗
+    it_cont (CID0 := CID0)  j bn γfs logstart recovering n W Lw Xexc L D pidv dq m K eb eb (R n) lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw HD Hpk.
+    intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw HD Hexc Hpk.
     destruct Hshape as [HnW Hn30].
     destruct Hgeom as [Hcovok Hlogsub].
     induction fuel as [|fuel IH]; intros CID0 t M Ht Hfuel Hregs Hbelow.
     { exfalso. exact (it_fuel_absurd t n Ht Hfuel). }
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hpenvpk #Hbio #Hlfz Hppid #Hprocs".
-    iIntros "#Hdev #Hgeo #Hdlock Hframe Hncell Hblks #Hrow HauthL HauthD Hdone Hrest Hslots".
+    iIntros "#Hdev #Hgeo #Hdlock Hframe Hncell Hblks #Hbinv Hxo HauthL HauthD Hdone Hrest Hslots".
     iIntros "#Hperm HR Hcont".
     iDestruct "Hlfz" as "[#Hdevc #Hstc]".
     (* ---- the entry at the cursor, and every bound its two breads need ---- *)
@@ -2317,13 +2376,15 @@ Section InstallTransBlocks.
        move / dirty flip, the payload re-formed clean at the installed
        content ---- *)
     iApply fupd_wp.
-    iMod (it_ghost_step recovering bn γfs γd dev cov k2 t W w Lw Bh L D
+    iMod (it_ghost_step recovering bn γfs γd dev cov k2 t W w Lw
+            home Xv Xexc L D
             bs2 bsd2 d2 Hnd Hw
             (fun Hr => HLw Hr t w Hw)
             (fun Hr => HD Hr w (it_lookup_elem W t w Hw))
             (fun _ => Hlen1)
-            with "Hrow HauthL HauthD Hsnd Hpay2")
-      as "(%Hbs2v & HauthL & HauthD & Hpay2c & Hsnd2 & Hbref)".
+            (fun Hr => Hexc Hr t w Hw)
+            with "Hbinv HauthL HauthD Hxo Hsnd Hpay2")
+      as "(HauthL & HauthD & Hpay2c & Hxo & Hsnd2 & Hbref)".
     iModIntro.
     (* the lbuf pointer survives to the brelse pair *)
     assert (Hmf4s2 : mf4 !!! Regidx Rs2 = bnode k1).
@@ -2472,14 +2533,14 @@ Section InstallTransBlocks.
     iDestruct ("Hblkback" with "Hblk") as "Hblks".
     iAssert ([∗ list] i ↦ v ∈ take (S t) W,
                fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
-               (if recovering then fsblock (fs_bytes γfs) (uint v) (Lw i)
+               (if recovering then emp
                 else (uint v) ↪[fs_dirty γfs]{#(1/2)} false))%I
       with "[Hdone Hfblog Hsnd2]" as "Hdone".
     { rewrite (take_S_r W t w Hw) big_sepL_app (it_take_len W t (it_lt_len_le t n W Ht HnW)).
       iSplitL "Hdone"; [iExact "Hdone"|].
       rewrite big_sepL_singleton Nat.add_0_r.
       iEval (rewrite Hubnol) in "Hfblog". iFrame "Hfblog Hsnd2". }
-    iDestruct (it_rest_shift recovering γfs logstart Lw Bh t (drop (S t) W)
+    iDestruct (it_rest_shift recovering γfs logstart Lw t (drop (S t) W)
                  with "Hrest") as "Hrest".
     iAssert (bslots (2 + (if recovering then 0%nat else S t)))
       with "[Hslots Hu3 Hu4 Hu5]" as "Hslots".
@@ -2598,13 +2659,14 @@ Section InstallTransBlocks.
       iDestruct (trap_csrs_ext_transport CIDb3 CIDa30 eb (proc_addr j) ltac:(wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDb3 CIDa30 eb (proc_addr j) ltac:(wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (it_cont_shift (CIDa := CID0) (CIDb := CIDa30)  j bn γfs logstart recovering n W
-                   Lw L D pidv dq m K eb eb (R n) lks Vpr ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (it_epi (CID0 := CIDa30)  j bn γfs logstart recovering n W Lw L D pidv dq m B16 K eb (R n) lks Vpr
+                   Lw Xexc L D pidv dq m K eb eb (R n) lks Vpr ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      iApply (it_epi (CID0 := CIDa30)  j bn γfs logstart recovering n W Lw Xexc L D pidv dq m B16 K eb (R n) lks Vpr
                 HK HB16sp HB16s9 HB16s10 HB16s11
                 with "Hcg Htext Hpc Hframe Hcnt Hextc Hextm Hppid
-                      [Hncell Hblks HauthL HauthD Hdone Hslots] HR Hcont").
+                      [Hncell Hblks HauthL HauthD Hxo Hdone Hslots] HR Hcont").
+      iEval (rewrite (it_exc_rest_all Xexc W n HnW)) in "Hxo".
       rewrite /it_out /it_rec_L -HnW.
-      iFrame "Hncell Hblks HauthL HauthD Hdone Hslots".
+      iFrame "Hncell Hblks HauthL HauthD Hxo Hdone Hslots".
     + (* ---- another entry: back to +0x6c ---- *)
       iApply (wp_bge_fall_s_sconf (mword_of_int (KernelSyms.install_trans + 0x68)) (mword_of_int 74 : mword 13)
                 Ra5 Rs3 B16 (K - 10)%nat eb
@@ -2624,11 +2686,11 @@ Section InstallTransBlocks.
       iDestruct (trap_csrs_ext_transport CIDb3 CIDa30 eb (proc_addr j) ltac:(wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDb3 CIDa30 eb (proc_addr j) ltac:(wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (it_cont_shift (CIDa := CID0) (CIDb := CIDa30)  j bn γfs logstart recovering n W
-                   Lw L D pidv dq m K eb eb (R n) lks Vpr ltac:(wp_next_chain) with "Hcont") as "Hcont".
+                   Lw Xexc L D pidv dq m K eb eb (R n) lks Vpr ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IH CIDa30 (S t) B16 (it_more t n Ht Hmore) (it_fuel_step t n fuel Hfuel)
                 HB16regs Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hpenvpk Hbio [] Hppid Hprocs
-                      Hdev Hgeo Hdlock Hframe Hncell Hblks Hrow HauthL HauthD Hdone Hrest
+                      Hdev Hgeo Hdlock Hframe Hncell Hblks Hbinv Hxo HauthL HauthD Hdone Hrest
                       Hslots Hperm HR Hcont").
       rewrite /log_frozen. iFrame "Hdevc Hstc".
   Qed.
@@ -2650,22 +2712,23 @@ Section ProofInstallTrans.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
-      (Bh : nat -> list (bv 8))
+      (home : gset Z) (Xv : Z -> list (bv 8)) (Xexc : gset Z)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (R : nat -> iProp Σ) (lks : gset string) (Vpr : pprivate)
     : wp_install_trans_sconf_body γs j γl γu γd γk pd pav pu bn γfs γpr
-                                  cov logstart dev recovering n W Lw Bh L D
+                                  cov logstart dev recovering n W Lw
+                                  home Xv Xexc L D
                                   pidv dq m K eb b R lks Vpr.
   Proof.
     cbv beta delta [wp_install_trans_sconf_body].
-    intros pcE pj ret_tgt HK Hgeom Hj Hgl Ha0 Hshape Hnd Hwok HLw HD Hbelow Hpk.
+    intros pcE pj ret_tgt HK Hgeom Hj Hgl Ha0 Hshape Hnd Hwok HLw HD Hexc Hbelow Hpk.
     destruct Hshape as [HnW Hn30].
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hpenvpk #Hbio #Hlfz Hppid #Hprocs".
-    iIntros "#Hdev #Hgeo #Hdlock Hncell Hblks #Hrow HauthL HauthD Hents Hslots #Hperm HR Hcont".
+    iIntros "#Hdev #Hgeo #Hdlock Hncell Hblks #Hbinv Hxo HauthL HauthD Hents Hslots #Hperm HR Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbe. cbn in Hbe. subst b.
-    iAssert (it_cont (CID0 := CID)  j bn γfs logstart recovering n W Lw L D pidv dq m K eb eb (R n) lks Vpr)
+    iAssert (it_cont (CID0 := CID)  j bn γfs logstart recovering n W Lw Xexc L D pidv dq m K eb eb (R n) lks Vpr)
       with "[Hcont]" as "Hcont".
     { rewrite /it_cont. iExact "Hcont". }
     (* ===== +0x00 auipc a5,0x1f ===== *)
@@ -2756,14 +2819,18 @@ Section ProofInstallTrans.
       iDestruct (trap_csrs_ext_transport CID CID4 eb (proc_addr j) ltac:(wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID CID4 eb (proc_addr j) ltac:(wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (it_cont_shift (CIDa := CID) (CIDb := CID4)  j bn γfs logstart recovering n []
-                   Lw L D pidv dq m K eb eb (R n) lks Vpr ltac:(wp_next_chain) with "Hcont") as "Hcont".
+                   Lw Xexc L D pidv dq m K eb eb (R n) lks Vpr ltac:(wp_next_chain) with "Hcont") as "Hcont".
       rewrite /it_cont.
       iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
       iEval (rewrite HeqL HeqD Heqs) in "Hcont".
+      (* at [W = []] the exception set does not move either *)
+      assert (HeqX : Xexc ∖ list_to_set (map uint ([] : list (mword 32))) = Xexc)
+        by (cbn [map list_to_set]; set_solver).
+      iEval (rewrite HeqX) in "Hcont".
       (* the threaded resource is at the cursor, and this arm's cursor is 0 *)
       rewrite Hn0.
       iApply ("Hcont" $! R2 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hncell Hblks
-                                   HauthL HauthD Hents Hslots HR").
+                                   HauthL HauthD Hxo Hents Hslots HR").
       exact HR2cs.
     - (* ---- n > 0: recovering = false, and the whole loop runs ---- *)
       assert (Hnp : (0 < n)%nat) by exact (it_pos n Hnpos).
@@ -3240,12 +3307,18 @@ Section ProofInstallTrans.
       iDestruct (trap_csrs_ext_transport CID CIDq12 eb (proc_addr j) ltac:(wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID CIDq12 eb (proc_addr j) ltac:(wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (it_cont_shift (CIDa := CID) (CIDb := CIDq12)  j bn γfs logstart recovering n W
-                   Lw L D pidv dq m K eb eb (R n) lks Vpr ltac:(wp_next_chain) with "Hcont") as "Hcont".
+                   Lw Xexc L D pidv dq m K eb eb (R n) lks Vpr ltac:(wp_next_chain) with "Hcont") as "Hcont".
       assert (HQ11regs : it_lregs recovering m Q11 0%nat).
       { rewrite /it_lregs. split_and!; assumption. }
+      assert (HeqX0 : it_exc_rest Xexc W 0 = Xexc)
+        by (rewrite /it_exc_rest take_0 /=; set_solver).
+      iAssert (if recovering
+               then exc_own (fs_exc γfs) (it_exc_rest Xexc W 0)
+               else emp)%I with "[Hxo]" as "Hxo".
+      { rewrite HeqX0. iExact "Hxo". }
       iAssert ([∗ list] i ↦ w ∈ take 0 W,
                  fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
-                 (if recovering then fsblock (fs_bytes γfs) (uint w) (Lw i)
+                 (if recovering then emp
                   else (uint w) ↪[fs_dirty γfs]{#(1/2)} false))%I as "Hdone".
       { done. }
       (* at a FIXED flag the loop's cursor-0 rows are the entry rows by
@@ -3254,18 +3327,18 @@ Section ProofInstallTrans.
          literal *)
       destruct recovering.
       + iApply (it_loop n γs j γl γu γd γk pd pav pu bn γfs γpr cov logstart dev
-                  true n W Lw Bh L D pidv dq m K eb R lks Vpr
-                  HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok HLw HD Hpk
+                  true n W Lw home Xv Xexc L D pidv dq m K eb R lks Vpr
+                  HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok HLw HD Hexc Hpk
                   CIDq12 0%nat Q11 Hnp (it_fuel0 n) HQ11regs Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hpenvpk Hbio Hlfz Hppid Hprocs
-                        Hdev Hgeo Hdlock Hframe Hncell Hblks Hrow HauthL HauthD Hdone Hents
+                        Hdev Hgeo Hdlock Hframe Hncell Hblks Hbinv Hxo HauthL HauthD Hdone Hents
                         Hslots Hperm HR Hcont").
       + iApply (it_loop n γs j γl γu γd γk pd pav pu bn γfs γpr cov logstart dev
-                  false n W Lw Bh L D pidv dq m K eb R lks Vpr
-                  HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok HLw HD Hpk
+                  false n W Lw home Xv Xexc L D pidv dq m K eb R lks Vpr
+                  HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok HLw HD Hexc Hpk
                   CIDq12 0%nat Q11 Hnp (it_fuel0 n) HQ11regs Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hpenvpk Hbio Hlfz Hppid Hprocs
-                        Hdev Hgeo Hdlock Hframe Hncell Hblks Hrow HauthL HauthD Hdone Hents
+                        Hdev Hgeo Hdlock Hframe Hncell Hblks Hbinv Hxo HauthL HauthD Hdone Hents
                         Hslots Hperm HR Hcont").
   Qed.
 

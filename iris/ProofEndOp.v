@@ -2053,6 +2053,10 @@ Section EndOpBlocks.
     (* the byte view's row, for install_trans's recovering arm (unused on
        the commit path, but the contract is arm-agnostic) *)
     iPoseProof (log_ctx_bytes_any with "Hlctx") as "#Hbinv".
+    (* install_trans takes the byte view's row NAMED (durable-disk lane
+       E-except); the commit arm never uses it. *)
+    iPoseProof (log_ctx_bytes with "Hlctx") as "#Hbrow0".
+    iDestruct "Hbrow0" as (Xv0) "#Hbinvh".
     rewrite /eo_open.
     iDestruct "Hopen" as
       "(Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hdone & Hrest & Hpool)".
@@ -2282,7 +2286,8 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (IT.wp_install_trans_sconf γs j γl γu γd γk pd pav pu bn γfs
               1%positive
-              cov logstart dev false n W Lw (fun _ => [])
+              cov logstart dev false n W Lw
+              (fs_home_set cov logstart) Xv0 ∅
               (<[log_hdr_bno logstart := bs1]> L) D
               pidv dq A3 (K - 8)%nat eb eb
               (fun i : nat =>
@@ -2295,13 +2300,16 @@ Section EndOpBlocks.
                     exact (conj Hc Hl))
               (fun _ => HLw')
               ltac:(intros Hab; discriminate)
+              ltac:(intros Hab; discriminate)
               ltac:(lkbelow)
               ltac:(intros Hab; discriminate)
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv [] Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW Hbinv HauthL HauthD Hent Hu2
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv [] Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW Hbinvh [] HauthL HauthD Hent Hu2
                     [] [Hmirc]").
     all: try lkbelow.
     (* the recovering arm's printk credential: nothing at recovering = 0 *)
     { iModIntro. iEmpIntro. }
+    (* the recovering arm's exception handle: nothing at recovering = 0 *)
+    { iEmpIntro. }
     (* THE INSTALL fupds, one per entry, out of one generator: each reads the
        committed header picture out of the mirror half and hands it straight
        back, because recovery re-installs a logged block from its slot no
@@ -2321,7 +2329,7 @@ Section EndOpBlocks.
                 with "Hseam Hregc Hswlb"). }
     { iNext. iExact "Hmirc". }
     iIntros (CIDb2 Hsb2 mf2) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hppid
-                              Hncell HW HauthL HauthD Hent Hu2 >Hmirc".
+                              Hncell HW HauthL HauthD _ Hent Hu2 >Hmirc".
     assert (Hpc10e : ret_pc (A3 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x10e)).
     { rewrite HA3ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc10e) in "Hpc".

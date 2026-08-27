@@ -273,7 +273,10 @@ Definition wp_install_trans_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (recovering : bool)
     (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
-    (Bh : nat -> list (bv 8))
+    (* THE BYTE VIEW'S OWN PARAMETERS (durable-disk lane E-except): the
+       invariant's home set and its record [Xv] of what the LOGGED view
+       holds on the exception set, and the exception set itself. *)
+    (home : gset Z) (Xv : Z -> list (bv 8)) (Xexc : gset Z)
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
@@ -309,6 +312,14 @@ Definition wp_install_trans_sconf_body
      is read off the authority install_trans holds whole *)
   (recovering = true ->
    forall w : SailStdpp.Values.mword 32, w ∈ W -> D !! uint w = Some false) ->
+  (* THE EXCEPTION SET NAMES EVERY ENTRY, AT THE SLOT'S LOGGED VALUE
+     (durable-disk lane E-except).  It is the on-disk header's write set --
+     the blocks whose byte view was minted at [FsCrash.fr_D] while the
+     cache still reads the crashed disk -- and [Xv] is what the byte view
+     holds there, which is exactly what this pass is about to write. *)
+  (recovering = true ->
+   forall (i : nat) (w : SailStdpp.Values.mword 32),
+     W !! i = Some w -> uint w ∈ Xexc /\ Xv (uint w) = Lw i) ->
   (* install_trans directly breads/bwrites/brelses/bunpins, all against
      "bcache" (4); it takes no lock of its own and calls no other function
      with a lower bound, so this is the one premise its whole cone needs. *)
@@ -363,7 +374,14 @@ Definition wp_install_trans_sconf_body
      opening [logN] for the crossing; the row is persistent and both
      callers have one (end_op off [LogInv.log_ctx], initlog off fsinit's
      own). *)
-  fs_bytes_any γfs -∗
+  fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs) home Xv -∗
+  (* THE WAL'S EXCEPTION HANDLE, on the recovering arm only (durable-disk
+     lane E-except).  The recovering install is what SHRINKS the byte
+     view's exception set: each home [bwrite] lands the logged value in the
+     cache, which restores [FsBlocks.bytes_tie] AT THAT BLOCK, and the
+     handle comes out at the residue.  The commit arm moves nothing there
+     (the tie already holds) and supplies [emp]. *)
+  (if recovering then exc_own (fs_exc γfs) Xexc else emp) -∗
   ghost_map_auth (fs_cache γfs) 1 L -∗
   (* the pinned-set authority: exactly W's entries go back to false at
      commit time; nothing moves at recovery (nothing is pinned in a fresh
@@ -379,7 +397,7 @@ Definition wp_install_trans_sconf_body
          covered block's client half, and the L update is what moves it. *)
   ([∗ list] i ↦ w ∈ W,
      fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
-     (if recovering then fsblock (fs_bytes γfs) (uint w) (Bh i)
+     (if recovering then emp
       else (uint w) ↪[fs_dirty γfs]{#(1/2)} true)) -∗
   (* two slot units: it holds lbuf and dbuf at the same time *)
   bslots 2 -∗
@@ -436,9 +454,15 @@ Definition wp_install_trans_sconf_body
         (if recovering then it_rec_L W Lw L else L) -∗
       ghost_map_auth (fs_dirty γfs) 1
         (if recovering then D else dirty_clear D (map uint W)) -∗
+      (* the exception set's RESIDUE: every entry has been landed, so the
+         WAL's handle comes back at [Xexc] minus the whole write set --
+         which is [∅] when the caller is [initlog] (durable-disk E-except) *)
+      (if recovering
+       then exc_own (fs_exc γfs) (Xexc ∖ list_to_set (map uint W))
+       else emp) -∗
       ([∗ list] i ↦ w ∈ W,
          fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
-         (if recovering then fsblock (fs_bytes γfs) (uint w) (Lw i)
+         (if recovering then emp
           else (uint w) ↪[fs_dirty γfs]{#(1/2)} false)) -∗
       (* the two units back, PLUS -- at commit time -- one per entry: each
          bunpin frees the pin unit log_write's bpin absorbed.  The bunpin
@@ -461,12 +485,13 @@ Module Type INSTALL_TRANS.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
-      (Bh : nat -> list (bv 8))
+      (home : gset Z) (Xv : Z -> list (bv 8)) (Xexc : gset Z)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (R : nat -> iProp Σ) (lks : gset string) (Vpr : pprivate),
       wp_install_trans_sconf_body γs j γl γu γd γk pd pav pu bn γfs γpr
-                                  cov logstart dev recovering n W Lw Bh L D
+                                  cov logstart dev recovering n W Lw
+                                  home Xv Xexc L D
                                   pidv dq m K eb b R lks Vpr.
 End INSTALL_TRANS.

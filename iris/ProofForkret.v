@@ -918,6 +918,35 @@ Proof.
      built [L] from the era's disk, which is the same disk the era's mirror
      was born at.  Threaded straight through fsinit into initlog. *)
   iDestruct "Hauths" as (L D) "(%HLdk & HauthL & HauthD)".
+  (* THE BYTE VIEW'S ROW, NAMED (durable-disk lane E-except): fsinit takes
+     it so that [initlog] can name what the logged view holds on the
+     exception set.  At a clean on-disk header that set is EMPTY and the
+     record is unconstrained; the three header rows below are
+     [FsCrash.hdr_wf] read off [hdr_dec_zero]. *)
+  iDestruct (BitmapInv.bitmap_inv_bytes_at with "Hbits") as (Xv) "#Hbinvf".
+  assert (Hhdrbnd : ((hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).1
+                     <= LOGBLOCKS)%nat)
+    by (rewrite (hdr_dec_zero _ Hhdr0); cbn; unfold LOGBLOCKS; lia).
+  assert (Hhdrnd : NoDup (hdr_dec (FsCrash.fs_blocks dk
+                                     (log_hdr_bno fsc_logst))).2)
+    by (rewrite (hdr_dec_zero _ Hhdr0); cbn; constructor).
+  assert (Hhdrok : forall b0 : Z,
+            b0 ∈ (hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).2 ->
+            b0 ∈ fsc_cov /\ b0 ∉ log_region_set fsc_logst /\
+            b0 <> FsImg.SB_BNO).
+  { rewrite (hdr_dec_zero _ Hhdr0). cbn.
+    intros b0 Hb0. destruct (not_elem_of_nil b0 Hb0). }
+  assert (Hxvslot : forall (i : nat) (b0 : Z),
+            (hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).2 !! i
+              = Some b0 ->
+            Xv b0 = lm_view (FsCrash.mirror_of (FsCrash.fs_blocks dk))
+                      (log_slot_bno fsc_logst i)).
+  { rewrite (hdr_dec_zero _ Hhdr0). cbn. intros i b0 Hi. discriminate. }
+  assert (Hxempty : (list_to_set
+                       (hdr_dec (FsCrash.fs_blocks dk
+                                   (log_hdr_bno fsc_logst))).2 : gset Z) = ∅)
+    by (rewrite (hdr_dec_zero _ Hhdr0); cbn; set_solver).
+  iEval (rewrite -Hxempty) in "Hxo".
   (* fsinit borrows one reference unit and gives it back; kexec wants two,
      which is why the token carries two. *)
   iDestruct (iref_slots_split 1 1 with "Hirs2") as "[Hirs1 Hirs1b]".
@@ -983,7 +1012,7 @@ Proof.
             (mword_of_int fsc_ninodes) v_nlog (mword_of_int fsc_logst)
             (mword_of_int icfg_ist) (mword_of_int fsc_bmapstart)
             (FsCrash.fs_blocks dk 1) sb_old
-            (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))
+            (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst)) Xv
             (FsCrash.mirror_of (FsCrash.fs_blocks dk)) L D
             vlock vname vcpu v_start v_dev v_nc v_n
             pid (DfracOwn 1) B6 av2 eb eb ∅ V
@@ -999,10 +1028,11 @@ Proof.
             Hcgeom Hbmq Hszq
             Hmagic eq_refl eq_refl eq_refl eq_refl
             Hn1 Hnnib Hn31 eq_refl eq_refl Hdev Hnib0
-            Hist0 Hiregb Hsize Hbm0 Hbmcov Hbmlog Hcovb Hhdr0 HLdk Hpkc Hjlt Hgl
+            Hist0 Hiregb Hsize Hbm0 Hbmcov Hbmlog Hcovb
+            Hhdrbnd Hhdrnd Hhdrok Hxvslot HLdk Hpkc Hjlt Hgl
             HB6a0 ltac:(lkbelow)
             with "Hcg Hcpu Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hseam Hgen
-                  Hmirf Hlfree Hb1 Hxo Hsbraw Hireg Hboot Hitb2 Hitbl Hesc Hslks
+                  Hmirf Hlfree Hbinvf Hb1 Hxo Hsbraw Hireg Hboot Hitb2 Hitbl Hesc Hslks
                   Hbits Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc
                   Hlhn Hlhblk HauthL HauthD Hdirty Hhdr Hlslots Hpbare Hpinv
                   Hdevi Hdgeom Hdlock Hsl35 Hirs1").
