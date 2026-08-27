@@ -32,7 +32,17 @@ is **`initlock`'s own `lk->cpu = 0` store** (`initlock + 0x0e`,
 prerequisite is the boot-25 lane, re-entered as a **timestamp-0** lane
 (`ctx_pointsto` hides `t`, so the witness must come from the carve, where
 `BootCarve.boot_ctx_phys_word` already builds the honest cell with no
-shim).  **A6.78 and A6.79 together are the record and the handoff.**
+shim).  **THEN THE CARVE'S TIMESTAMP-0 EXIT WAS BUILT** (A6.80):
+`BootCarve.boot_ledger_at0_word` hands the mint its input straight off
+the carve (`ledger_elem0` IS `phys_ledger_at … 0`'s element, so the
+bridge is `iFrame`), and `boot_ctx_of_mem_{byte,word,word4}` are the
+honest replacements for the shim's dead raw→ctx conversions.  **The boot
+25 is then a RESTRUCTURING, not a thread**: eleven of its thirteen
+lemmas can take `boot_led_ran` beside `boot_raw_ran`, but
+`bpay_raw_buf_raw` and `file_node_raw_fentry` take no range at all — they
+convert already-carved raw BUNDLES — so the carve has to build ctx cells
+directly and those two lemmas die with their raw bundle definitions.
+**A6.78, A6.79 and A6.80 together are the record and the handoff.**
 
 STEP 5, THE RULINGS TRANCHE (2026-08-27, latest session).  **CLEAN ROUND:
 1083 of 1333, RED 14.**  Four owner rulings executed and one gate found missing.
@@ -9096,6 +9106,148 @@ Items 3–5 remain ONE atomic unit; 1 and 2 are separable and additive, and
 **ACCEPTANCE, unchanged:** `SpecAcquire` / `SpecRelease` / `SpecHolding` /
 `is_lock` / `locked` / `lock_openable` do not move, and `WpSconfLock`'s
 160-file cone opens.
+
+
+### A6.80 THE CARVE'S TIMESTAMP-0 EXIT IS BUILT — AND THE BOOT 25 IS A
+### RESTRUCTURING, NOT A THREAD, WHICH IS THE MEASUREMENT THAT MATTERS
+
+Executing the coordinator's ratification of A6.79 (commit `d33057e0`),
+items 1 and 2.  **Item 1's REUSABLE HALF IS LANDED** — the carve now has
+the honest raw→ctx producers the shim's dead conversions stood in for,
+AND the timestamp-0 exit the mint consumes.  **Item 1's remainder and item
+2 are measured below and were not started**, for a reason the discipline
+names: item 2's reshape moves GREEN files, and there was not budget to
+land it in one pass.
+
+**CLEAN ROUND: 1088 of 1296, RED 9 — UNCHANGED.**  No `Admitted`, no
+`admit`, no new `Axiom`; the one `Abort` is still
+`UsertrapRes.ut_res_bare_park`.
+
+#### (1) LANDED: THE MINT'S CARVE INPUT, AND IT IS DEFINITIONAL
+
+```coq
+  (* TsoCtx *)
+  Lemma phys_ledger_at0_of_elem a dq v :
+    phys_pointsto a dq v -∗ ledger_elem0 a dq -∗ phys_ledger_at a dq v 0%nat.
+  Lemma phys_ledger_at0_elem a dq v :
+    phys_ledger_at a dq v 0%nat ⊢ phys_pointsto a dq v ∗ ledger_elem0 a dq.
+
+  (* BootCarve *)
+  Lemma boot_ledger_at0_word (g : gstate) (base : Z) : … ->
+    boot_raw_ran g base (base + 8) -∗ boot_led_ran g base (base + 8) -∗
+    ∃ w : bv 64, [∗ list] j ∈ seq 0 8,
+      TsoCtx.phys_ledger_at (pa_add (pa_of_z base) j) (DfracOwn 1)
+        (nth_byte w j) 0%nat.
+```
+
+**`ledger_elem0` IS `phys_ledger_at … 0`'s element**, so the bridge is
+`iFrame` and the carve exit is `boot_ctx_phys_word` with ONE pairing
+lemma swapped.  A6.79 said the witness "has to come from the carve
+because `ctx_pointsto` hides `t`"; this is that exit, and it cost four
+lines plus a comment.  **The supply side was already threaded** —
+`RiscvAdequacy` hands the boot client `BootCarve.boot_led_ran g text_end
+ram_hi` beside the raw bytes (its own line 540), so nothing above the
+carve moves to reach it.
+
+**ALSO LANDED: the honest replacements for the shim's raw→ctx
+conversions**, `BootCarve.boot_ctx_of_mem_{byte,word,word4}`:
+
+```coq
+  Lemma boot_ctx_of_mem_byte (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    addr_is_kdata a ->
+    kmap_static_claims -∗ a ↦ₘ{dq} v -∗ TsoCtx.ledger_elem0 a dq -∗
+    TsoCtx.ctx_pointsto XI a dq v.
+```
+
+off `TsoCtx.ctx_pointsto_of_ro` over the carve's identity map.  **They
+take TWO resources and that is the whole point**: a ctx byte carries the
+address's ledger element and a raw one has none, which is why
+`TsoCtxShim.ctx_*_of_mem` was false at this machine and why its use sites
+are not lines that can be deleted.  At timestamp 0 the CLEAN arm is free
+(`llb_0`), so no context authority is needed and the cell is born at any
+ξ — A6.63's reason, re-used.
+
+#### (2) THE BOOT 25, INVENTORIED — AND TWO SITES HAVE NOWHERE TO THREAD
+
+25 shim calls, **13 lemmas**, measured:
+
+| lemma | word | byte | eslot | buf |
+|---|---|---|---|---|
+| `boot_lk_raw` (:525) | 2 | | | |
+| `boot_cons_res` (:584) | | | | 1 |
+| `boot_sl_raw` (:679) | 3 | | | |
+| `boot_disk_slots` (:827) | 1 | 1 | 1 | |
+| **`bpay_raw_buf_raw`** (:1005) | | 1 | | |
+| **`file_node_raw_fentry`** (:1455) | | 2 | 2 | |
+| `boot_log_raw` (:1649) | 2 | | | |
+| `boot_ctx_cells` (:1778) | 1 | | | |
+| `boot_ofile_cells` (:1880) | 1 | | | |
+| `boot_proc_name` (:1917) | | 1 | | |
+| `boot_proc_slot` (:2076) | 5 | | | |
+| `boot_page_own` (:2193) | | 1 | | |
+
+Eleven of the thirteen take a `boot_raw_ran` range and can take a
+`boot_led_ran` beside it — those are the thread the approval described.
+**The two in bold cannot: they take NO range at all.**
+`bpay_raw_buf_raw` and `file_node_raw_fentry` are pure BUNDLE
+CONVERSIONS — they receive an already-carved *raw* bundle
+(`bpay_raw` / `file_node_raw`) and hand back its *ctx* twin — so there is
+no place in their statements for an element run to arrive.
+
+> **AND THAT IS THE MEASUREMENT THAT REPLACES "THREAD IT THROUGH".**  The
+> carve's raw/ctx split exists because the SC-era shim made the crossing
+> free, so the file could carve RAW everywhere and convert per bundle at
+> the end.  With the crossing costing an element, the conversion has to
+> move to where the elements are — i.e. **the carve must build the CTX
+> cells directly and the two conversion lemmas disappear**, taking their
+> raw bundle definitions with them.  That is a restructuring of
+> `BootCarveMain`'s raw/ctx layering, not a rename, and it is why the
+> lane is worth its own pass rather than being folded into item 2.
+> The eleven range-taking lemmas are mechanical; these two are the design.
+
+#### (3) ITEM 2, MEASURED — AND WHY IT WAS NOT STARTED
+
+The mint runs at `initlock`'s `lk->cpu = 0` (A6.79 §(2)), so the cpu word
+must reach it at the exposed timestamp.  Measured:
+
+- **`SpecInitlock` takes the three lock fields DIRECTLY** (`c_name ↦₈
+  vname`, `c_cpu ↦₈ vcpu`; post `c_cpu ↦₈ 0`), not a bundle — so the
+  contract change is two conjuncts, and the post becomes the wpay
+  payload.
+- **`lk_raw` is DESTRUCTURED IN EXACTLY ONE PLACE** in the whole tree
+  (`BootCarveMain:524`, its producer).  Its other 60 mentions across 11
+  files are applications, which do not move.  `lk_fresh` is the same
+  shape (49 mentions, 13 files).  **So growing the cpu conjunct is the
+  `ts_ok` pattern again — cheap at the mentions, real at the two ends.**
+- The two ends are `boot_lk_raw` (RED already) and initlock's callers —
+  `ProofInitlock`, `ProofProcinit`, `ProofConsoleinit`, `ProofUartinit`,
+  `SpecMain`, `SpecConsoleinit`, `SpecUartinit`, `SpecProcinit` — **and
+  those are GREEN.**
+
+**That is why it stopped here.**  The BootCarve work above is additive and
+`BootCarveMain` is already red, so neither could regress the number; item
+2 reshapes a definition that eight GREEN files produce or consume, and
+its largest single piece — a mint-then-store variant of the store AU, the
+`Wobl_ram` twin of this round's `wp_load_s_sconf_au_exv` — is a ~350-line
+leaf of its own.  Starting it without budget to finish would leave green
+files red, which is the one thing the standing discipline forbids.
+
+#### HANDOFF
+
+1. **The boot-25 restructuring** — the eleven range-taking lemmas take
+   `boot_led_ran` beside `boot_raw_ran` and use
+   `boot_ctx_of_mem_{byte,word,word4}`; `bpay_raw_buf_raw` and
+   `file_node_raw_fentry` die together with their raw bundle definitions,
+   the carve building ctx cells directly.  `BootCarveMain` greens and the
+   shim ledger drops to **`WpSconfLock`'s `lock_claims`, one ref**.
+2. **Item 2**: `SpecInitlock`'s two conjuncts + `lk_raw`/`lk_fresh`'s cpu
+   field at the exposed timestamp (`boot_ledger_at0_word` is the
+   producer, landed), the mint-then-store leaf, and initlock's eight
+   caller files — **one pass, they are green**.
+3–5. Unchanged (A6.78's corrected leaf list), still one atomic unit.
+
+**ACCEPTANCE, unchanged:** the exported lock surface does not move, and
+`WpSconfLock`'s 160-file cone opens.
 
 
 ## 7. Order of work
