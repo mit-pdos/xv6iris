@@ -86,7 +86,7 @@ Section ChainStates.
   Proof.
     intros Hi Hk Hrng.
     rewrite /fs_state /fs_inodes /free_bitmap /free_bitmap_at.
-    iIntros "(_ & Hin & Hbm & Hpool)".
+    iIntros "(_ & Hin & (Hbm & Hpool) & _)".
     iDestruct (big_sepM_lookup _ _ i n Hi with "Hin") as "Hio".
     rewrite /inode_owned /inode_phi.
     iDestruct "Hio" as "((_ & Hb & _) & _)".
@@ -269,7 +269,10 @@ Section RelaxedChainState.
      ∗ fs_inodes Γ (fss_sb S) (fss_inodes S)
      ∗ blk_owned Γ (sb_bmapstart (fss_sb S)) (bm_bytes BSIZE (fss_used S))
      ∗ free_pool_at Γ (sb_size (fss_sb S)) p
-     ∗ dbin Γ Bin)%I.
+     ∗ dbin Γ Bin
+     (* [fs_state]'s own last conjunct rides along unchanged: the step below
+        moves the BITMAP's bits, and the geometry does not read them *)
+     ∗ ⌜fs_geom S⌝)%I.
 
   (* THE ENDPOINTS ARE UNCHANGED *)
   Lemma fs_state_mid_of_state Γ S :
@@ -279,8 +282,8 @@ Section RelaxedChainState.
     rewrite /fs_state /fs_state_mid /free_bitmap /free_bitmap_at /dbin.
     rewrite big_sepM_empty free_pool_at_of_pool.
     iSplit.
-    - iIntros "(Hsb & Hin & Hbm & Hpool)". iFrame.
-    - iIntros "(Hsb & Hin & Hbm & Hpool & _)". iFrame.
+    - iIntros "(Hsb & Hin & (Hbm & Hpool) & %Hgeo)". by iFrame.
+    - iIntros "(Hsb & Hin & Hbm & Hpool & _ & %Hgeo)". by iFrame.
   Qed.
 
   (* THE STEP [fs_state] CANNOT TAKE: the bitmap block's bytes move to the
@@ -295,8 +298,9 @@ Section RelaxedChainState.
                                  (fss_inodes S) u') p Bin).
   Proof.
     rewrite /fs_state_mid. cbn [fss_sb fss_sbb fss_inodes fss_used].
-    iIntros "(Hsb & Hin & $ & Hpool & Hbin)".
-    iIntros (u') "Hbm". iFrame.
+    iIntros "(Hsb & Hin & $ & Hpool & Hbin & %Hgeo)".
+    iIntros (u') "Hbm". iFrame. iPureIntro.
+    destruct Hgeo as [Ha Hb Hc Hd]. by split.
   Qed.
 
 End RelaxedChainState.

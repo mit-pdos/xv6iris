@@ -1121,6 +1121,13 @@ Section Xfer.
     xf_shape S PM -> xr_disj (xr_fs S PM) ->
     fs_parse_sb (fun _ => fss_sbb S) = Some (fss_sb S) ->
     (forall i n, fss_inodes S !! i = Some n -> inode_local i n) ->
+    (* THE MAP'S OWN GEOMETRY (durable-disk lane H5): the superblock's
+       layout and the region's inum column, domain and directory clauses.
+       It is [fs_state]'s last conjunct, so a mint owes it exactly as it
+       owes the parse; both producers read it off their own source
+       ([FsDurSnap.fs_geom_of_ok] at the image, [FsCollect.col_fs_geom] at
+       a commit). *)
+    fs_geom S ->
     link_elem_ok (fss_inodes S) f ->
     ✓ (link_elem (fss_inodes S) f ⋅ link_tok_elem ROOTINO v) ->
     ⊢ |==> ∃ g gl gt : gname,
@@ -1130,7 +1137,7 @@ Section Xfer.
         ∗ fs_state (snap_gamma g gl gt) S
         ∗ own gl (link_tok_elem ROOTINO v).
   Proof.
-    intros Hshape Hdisj Hparse Hloc Hfok Hfv.
+    intros Hshape Hdisj Hparse Hloc Hgeo Hfok Hfv.
     iMod (fs_boot_alloc_root_slack (fss_inodes S) f ROOTINO v Hfok Hfv)
       as (gl gt) "(Hta & Htf & Hl & Ht)".
     iMod (fs_footprint_mint S PM gl gt Hshape Hdisj) as (g) "[Hba Hf]".
@@ -1141,6 +1148,7 @@ Section Xfer.
     rewrite fs_state_split fs_ghost_split. iFrame "Hf".
     iSplitL "Hl"; [rewrite /snap_gamma /=; iExact "Hl" |].
     rewrite /fs_pure. iSplitR; [by iPureIntro |].
+    iSplitR; [| by iPureIntro].
     iApply big_sepM_intro. iIntros "!>" (i n Hi).
     iPureIntro. exact (Hloc i n Hi).
   Qed.

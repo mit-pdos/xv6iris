@@ -59,6 +59,90 @@ Record fs_state_rec := MkFsS {
   fss_used   : gset Z;                (* the bitmap's SET bits (in use)   *)
 }.
 
+(* ------------------------------------------------------------------ *)
+(*  1a.  THE GEOMETRY -- WHAT IT MEANS FOR THE MAP TO BE A REGION      *)
+(*       (durable-disk lane H5)                                        *)
+(*                                                                     *)
+(*  [inode_local] says what ONE inode is; these four say how the inode *)
+(*  MAP and the SUPERBLOCK fit together, and they are the last thing a *)
+(*  consumer of a file system needs that no per-inode clause gives:    *)
+(*                                                                     *)
+(*  - [fg_sbok] -- the superblock's own layout ([FsImg.fs_sb_ok]).     *)
+(*    [sb_owned]'s parse says the bytes DECODE to [fss_sb]; it does    *)
+(*    not say the fields make sense, and nothing about the resources   *)
+(*    can (an all-zero block parses).                                  *)
+(*  - [fg_reg] / [fg_regdom] -- the named inums are EXACTLY the        *)
+(*    region's.  A [ghost_map] authority may hold entries no fragment  *)
+(*    names and a [∗] over a map says nothing about which keys are     *)
+(*    there, so this is a fact about the map, not about the ghosts.    *)
+(*  - [fg_dirloc] -- every directory's entries point INSIDE the        *)
+(*    region, its dots are at records 0 and 1, and an orphan holds     *)
+(*    only dots.  It is per-inode but needs the region's WIDTH, which  *)
+(*    [inode_local i n] (an inum and a node and nothing else) cannot   *)
+(*    see; [IcacheEscrow.ipool_alloc] and [ic_loaded] take all three.  *)
+(*                                                                     *)
+(*  THEY LIVE IN [fs_state] (as its last, pure conjunct) RATHER THAN   *)
+(*  ON THE SNAPSHOT, because they are true of a FILE SYSTEM and not of *)
+(*  a committed view: stated here they are a READING at BOTH instances *)
+(*  ([fs_state_geom]) and the durable snapshot carries nothing about   *)
+(*  them.  What the snapshot still has to carry is only what relates   *)
+(*  the state to [D] ([FsDurSnap.snap_shape]).                         *)
+(* ------------------------------------------------------------------ *)
+
+(* the region's width off [S]'s own superblock: mkfs rounds [ninodes] up to
+   a whole inode block, so the region is [ninodes/16 + 1] blocks and the
+   inum space is [16 *] that.  At the boot configuration it IS
+   [IcacheRef.icfg_nib]. *)
+Definition fs_nib (S : fs_state_rec) : nat :=
+  Z.to_nat (sb_ninodes (fss_sb S) / 16 + 1).
+
+Record fs_geom (S : fs_state_rec) : Prop := MkFsGeom {
+  fg_sbok   : fs_sb_ok (fss_sb S);
+  fg_reg    : forall i n, fss_inodes S !! i = Some n ->
+                0 <= i /\ i `div` 16 < sb_bmapstart (fss_sb S)
+                                       - sb_inodestart (fss_sb S);
+  fg_regdom : forall i, 0 <= i < 16 * (sb_ninodes (fss_sb S) / 16 + 1) ->
+                is_Some (fss_inodes S !! i);
+  fg_dirloc : forall i n, fss_inodes S !! i = Some n ->
+                node_dir_local i (fs_nib S) n;
+}.
+
+Global Arguments fg_sbok {_} _.
+Global Arguments fg_reg {_} _.
+Global Arguments fg_regdom {_} _.
+Global Arguments fg_dirloc {_} _.
+
+(* THE INUM BOUND, DERIVED.  [fg_reg] puts a named inum's record block
+   inside the region and [FsImg.sbo_ushort] caps the region's inum space at
+   [2^16], so no named inum can leave a [ushort] -- let alone [2^32].  This
+   used to be a clause of its own ([snap_bytes]' [sk_inum]). *)
+Lemma fs_geom_inum (S : fs_state_rec) (i : Z) (n : fs_node) :
+  fs_geom S -> fss_inodes S !! i = Some n -> 0 <= i < 2 ^ 32.
+Proof.
+  intros Hg Hi.
+  pose proof (fg_reg Hg i n Hi) as [Hi0 Hlt].
+  pose proof (fg_sbok Hg) as Hsb.
+  pose proof (sbo_bmapstart _ Hsb) as Hbm.
+  pose proof (sbo_ushort _ Hsb) as Hus.
+  pose proof (sbo_ninodes _ Hsb) as Hni. unfold ROOTINO in Hni.
+  assert (Hdiv : 0 <= sb_ninodes (fss_sb S) / 16)
+    by (apply Z.div_pos; lia).
+  pose proof (Z.div_mod i 16 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound i 16 ltac:(lia)) as Hmb.
+  lia.
+Qed.
+
+(* [fg_regdom] read below [ninodes]: mkfs rounds the count up to a whole
+   inode block, so the region's inum space contains it. *)
+Lemma fs_geom_dom (S : fs_state_rec) (i : Z) :
+  fs_geom S -> 0 <= i < sb_ninodes (fss_sb S) -> is_Some (fss_inodes S !! i).
+Proof.
+  intros Hg Hi. apply (fg_regdom Hg).
+  pose proof (Z.div_mod (sb_ninodes (fss_sb S)) 16 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound (sb_ninodes (fss_sb S)) 16 ltac:(lia)).
+  lia.
+Qed.
+
 Section FsState.
   Context `{!fsLinkG Σ, !fsTopG Σ}.
   Implicit Types Γ : fs_view_names Σ.
@@ -78,10 +162,14 @@ Section FsState.
   Definition fs_inodes Γ (sb : fs_sb) (I : gmap Z fs_node) : iProp Σ :=
     ([∗ map] i ↦ n ∈ I, inode_owned Γ sb i n)%I.
 
+  (* LAST, so no destructuring pattern above the first three conjuncts
+     moves (durable-notes.md, "when a new conjunct goes into a predicate
+     forty proofs destructure, put it LAST"). *)
   Definition fs_state Γ S : iProp Σ :=
     (sb_owned Γ (fss_sb S) (fss_sbb S)
      ∗ fs_inodes Γ (fss_sb S) (fss_inodes S)
-     ∗ free_bitmap Γ (fss_sb S) (fss_used S))%I.
+     ∗ free_bitmap Γ (fss_sb S) (fss_used S)
+     ∗ ⌜fs_geom S⌝)%I.
 
   (* fs-state.md section 4.  [γtop] is the abstract map a holder of one
      [inode_owned] carries a fragment of; that fragment is how it updates
@@ -166,7 +254,8 @@ Section FsState.
 
   Definition fs_ghost Γ S : iProp Σ :=
     (⌜fs_parse_sb (fun _ => fss_sbb S) = Some (fss_sb S)⌝
-     ∗ [∗ map] i ↦ n ∈ fss_inodes S, inode_ghost Γ i n)%I.
+     ∗ ([∗ map] i ↦ n ∈ fss_inodes S, inode_ghost Γ i n)
+     ∗ ⌜fs_geom S⌝)%I.
 
   Global Instance fs_footprint_timeless `{!GTimeless Γ} S :
     Timeless (fs_footprint Γ S).
@@ -186,8 +275,8 @@ Section FsState.
             /free_bitmap /free_bitmap_at /inode_owned.
     rewrite big_sepM_sep.
     iSplit.
-    - iIntros "((Hsb & %Hp) & [Hphi Hg] & Hbm & Hpool)". by iFrame.
-    - iIntros "((Hsb & Hphi & Hbm & Hpool) & %Hp & Hg)". by iFrame.
+    - iIntros "((Hsb & %Hp) & [Hphi Hg] & (Hbm & Hpool) & %Hgeo)". by iFrame.
+    - iIntros "((Hsb & Hphi & Hbm & Hpool) & %Hp & Hg & %Hgeo)". by iFrame.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -286,7 +375,8 @@ Section FsState.
 
   Definition fs_pure S : iProp Σ :=
     (⌜fs_parse_sb (fun _ => fss_sbb S) = Some (fss_sb S)⌝
-     ∗ [∗ map] i ↦ n ∈ fss_inodes S, ⌜inode_local i n⌝)%I.
+     ∗ ([∗ map] i ↦ n ∈ fss_inodes S, ⌜inode_local i n⌝)
+     ∗ ⌜fs_geom S⌝)%I.
 
   Global Instance fs_pure_persistent S : Persistent (fs_pure S).
   Proof. rewrite /fs_pure. apply _. Qed.
@@ -310,8 +400,8 @@ Section FsState.
     { intros i n _. rewrite inode_ghost_iff //. }
     rewrite big_sepM_sep.
     iSplit.
-    - iIntros "(%Hp & Hl & Hc)". by iFrame.
-    - iIntros "(Hl & %Hp & Hc)". by iFrame.
+    - iIntros "(%Hp & (Hl & Hc) & %Hgeo)". by iFrame.
+    - iIntros "(Hl & %Hp & Hc & %Hgeo)". by iFrame.
   Qed.
 
   (* THE ONE PLACE the whole-state counting fact is ever produced: it is
@@ -649,6 +739,15 @@ Section FsState.
     rewrite fs_state_split fs_ghost_split. iIntros "H1 H2 H3". iFrame.
   Qed.
 
+  (* THE GEOMETRY IS A READING, AT EITHER INSTANCE (durable-disk lane H5).
+     Nothing is spent -- the conclusion is pure -- so a snapshot's consumer
+     and a commit's collection read it the same way. *)
+  Lemma fs_state_geom Γ S : fs_state Γ S -∗ ⌜fs_geom S⌝.
+  Proof. rewrite /fs_state. iIntros "(_ & _ & _ & $)". Qed.
+
+  Lemma fs_pure_geom S : fs_pure S -∗ ⌜fs_geom S⌝.
+  Proof. rewrite /fs_pure. iIntros "(_ & _ & $)". Qed.
+
   (* ---------------------------------------------------------------- *)
   (*  6.  THE MINT                                                     *)
   (*                                                                   *)
@@ -715,19 +814,39 @@ Section FsState.
     iIntros (n') "Hn". by iApply "H".
   Qed.
 
+  (* THE RETAG OWES THE NEW NODE'S DIRECTORY CLAUSES (durable-disk lane
+     H5): [fs_geom]'s first three rows are about the superblock and the
+     map's DOMAIN, which an [insert] at a key already there does not move,
+     but [fg_dirloc] is about the node's CONTENT.  Every mover in the tree
+     has it -- it is what [IcacheEscrow]'s deposit arms re-prove -- so the
+     wand takes it. *)
   Lemma fs_state_inode_acc Γ S i n :
     fss_inodes S !! i = Some n ->
     fs_state Γ S ⊢
       inode_owned Γ (fss_sb S) i n
-      ∗ (∀ n', inode_owned Γ (fss_sb S) i n'
+      ∗ (∀ n', ⌜node_dir_local i (fs_nib S) n'⌝ -∗
+               inode_owned Γ (fss_sb S) i n'
                     -∗ fs_state Γ (MkFsS (fss_sb S) (fss_sbb S)
                                          (<[i := n']> (fss_inodes S))
                                          (fss_used S))).
   Proof.
     intros Hi. rewrite /fs_state.
-    iIntros "(Hsb & Hin & Hbm)".
+    iIntros "(Hsb & Hin & Hbm & %Hgeo)".
     iDestruct (fs_inodes_acc _ _ _ i n Hi with "Hin") as "[$ Hin]".
-    iIntros (n') "Hn". iFrame "Hsb Hbm". by iApply "Hin".
+    iIntros (n') "%Hdl Hn". iFrame "Hsb Hbm".
+    iSplitL; [by iApply "Hin" |]. iPureIntro.
+    destruct Hgeo as [Hsbok Hreg Hdom Hdlo]. split; simpl.
+    - exact Hsbok.
+    - intros j m Hj. destruct (decide (j = i)) as [-> | Hne].
+      + exact (Hreg i n Hi).
+      + rewrite lookup_insert_ne // in Hj. exact (Hreg j m Hj).
+    - intros j Hj. destruct (Hdom j Hj) as [m Hm].
+      destruct (decide (j = i)) as [-> | Hne].
+      * exists n'. by rewrite lookup_insert.
+      * exists m. by rewrite lookup_insert_ne.
+    - intros j m Hj. destruct (decide (j = i)) as [-> | Hne].
+      + rewrite lookup_insert in Hj. injection Hj as <-. exact Hdl.
+      + rewrite lookup_insert_ne // in Hj. exact (Hdlo j m Hj).
   Qed.
 
 End FsState.

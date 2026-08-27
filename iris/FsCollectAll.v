@@ -667,6 +667,10 @@ Section CollectAll.
              ∧ col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m
                  Lb C home)%I with "[Hhand]" as "[%Hsh Hhand]".
     { iSplit; [iApply (col_snap_shape with "Hhand") | iExact "Hhand"]. }
+    iAssert (⌜fs_geom (col_state sb sbb I used)⌝
+             ∧ col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m
+                 Lb C home)%I with "[Hhand]" as "[%Hgeo Hhand]".
+    { iSplit; [iApply (col_fs_geom with "Hhand") | iExact "Hhand"]. }
     iDestruct "Hhand" as "(%Hg & %Hdi & Hau & Hsb & Hbm & Hrec & Hb & Hlk
                            & Hkeep & %Hdirloc)".
     (* ---- the superblock's parse and its block's width ---- *)
@@ -763,6 +767,7 @@ Section CollectAll.
                  (col_agree γfs Lb C home) _ with "Hau Hex") as %Hin.
     iPureIntro. split.
     - exact Hsh.
+    - exact Hgeo.
     - rewrite /snap_local /col_state /=. exact Hloc.
     - rewrite /col_state /=. exact Hparse.
     - destruct Hlinks as (f & Hfok & Hfv). exists f, kv.

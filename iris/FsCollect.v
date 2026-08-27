@@ -1149,12 +1149,10 @@ Section Collect.
 
   (* ---- the GEOMETRY, off the boot configuration and the domain rows --- *)
 
-  (* [FsDurSnap.snap_shape]'s seven clauses, and they are [col_snap_bytes]'
-     seven verbatim: the block width off the view, the range off [cg_size],
-     the superblock off [cg_sbok], the inum bounds off the domain row and
-     [cg_wide], the region column off [cg_reg]/[cg_ist], the region's own
-     inums off [cg_width], and the directory clauses off the payloads'
-     row at [cg_icfg]'s width.  Nothing here is about CONTENT. *)
+  (* [FsDurSnap.snap_shape]'s ONE remaining clause (durable-disk lane H5):
+     the ledger's keys are real blocks of this state, off [cg_size].  What
+     used to ride beside it is either gone (the block width, now the WAL's
+     own premise) or moved onto the instance ([col_fs_geom] below). *)
   Lemma col_snap_shape γfs γi (ist : Z) (nib : nat) (sb : fs_sb)
       (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
       (m : gmap Z dinode) (Lb : gmap Z (bv 8))
@@ -1162,18 +1160,29 @@ Section Collect.
     col_hand γfs γi ist nib sb sbb used I m Lb C home -∗
     ⌜snap_shape (col_state sb sbb I used) (col_view C home)⌝.
   Proof.
-    iIntros "(%Hg & %Hdi & Hau & _ & _ & _ & _ & _ & _ & %Hdirloc)".
-    iDestruct (col_auth_pure with "Hau") as %[HdomC Hlens].
+    iIntros "(%Hg & _ & _ & _ & _ & _ & _ & _ & _ & _)".
     iPureIntro. split; rewrite /col_state /=.
-    - exact (col_view_len C home HdomC Hlens).
-    - intros b [bs Hbs]. rewrite /col_view in Hbs.
-      apply fs_restrict_lookup_Some in Hbs as [Hh _].
-      exact (cg_size Hg b Hh).
+    intros b [bs Hbs]. rewrite /col_view in Hbs.
+    apply fs_restrict_lookup_Some in Hbs as [Hh _].
+    exact (cg_size Hg b Hh).
+  Qed.
+
+  (* ...and [FsState.fs_geom], the FILE SYSTEM's own geometry, which is
+     what [fs_state]'s last conjunct asks a mint for: the superblock off
+     [cg_sbok], the region column off [cg_reg]/[cg_ist] and the domain row,
+     the region's own inums off [cg_width], and the directory clauses off
+     the payloads' row at [cg_icfg]'s width.  Nothing here is about
+     CONTENT, and nothing here mentions [D]. *)
+  Lemma col_fs_geom γfs γi (ist : Z) (nib : nat) (sb : fs_sb)
+      (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
+      (m : gmap Z dinode) (Lb : gmap Z (bv 8))
+      (C : gmap Z (list (bv 8))) (home : gset Z) :
+    col_hand γfs γi ist nib sb sbb used I m Lb C home -∗
+    ⌜fs_geom (col_state sb sbb I used)⌝.
+  Proof.
+    iIntros "(%Hg & %Hdi & _ & _ & _ & _ & _ & _ & _ & %Hdirloc)".
+    iPureIntro. split; rewrite /col_state /=.
     - exact (cg_sbok Hg).
-    - intros i n Hi.
-      assert (Hir : 0 <= i < 16 * Z.of_nat nib)
-        by (apply Hdi; apply elem_of_dom; exists n; exact Hi).
-      pose proof (cg_wide Hg). lia.
     - intros i n Hi.
       assert (Hir : 0 <= i < 16 * Z.of_nat nib)
         by (apply Hdi; apply elem_of_dom; exists n; exact Hi).
@@ -1182,8 +1191,8 @@ Section Collect.
       pose proof (cg_reg Hg). pose proof (cg_ist Hg). lia.
     - intros i Hi. apply elem_of_dom. apply Hdi.
       pose proof (cg_width Hg). lia.
-    - assert (Hw : snap_nib (col_state sb sbb I used) = icfg_nib).
-      { rewrite /snap_nib /col_state /=.
+    - assert (Hw : fs_nib (col_state sb sbb I used) = icfg_nib).
+      { rewrite /fs_nib /col_state /=.
         pose proof (cg_width Hg) as Hcw. pose proof (cg_icfg Hg) as Hci.
         rewrite -Hcw Nat2Z.id. exact Hci. }
       rewrite /col_state /= in Hw. rewrite Hw. exact Hdirloc.

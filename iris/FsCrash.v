@@ -691,6 +691,50 @@ Qed.
 
 (* Installing over a map that ALREADY holds the logged values is a no-op --
    which is what makes the final header CLEAR preserve the durable state. *)
+(* ====================================================================== *)
+(*  EVERY BLOCK OF THE COMMITTED VIEW IS A WHOLE BLOCK (durable-disk lane  *)
+(*  H5).  [FsDurRead.dblk_full] used to ride the snapshot as a carried     *)
+(*  pure conjunct ([FsDurSnap]'s [ss_bsz]); it is not a fact about the     *)
+(*  file system at all but about the WAL's own map, and here it is one     *)
+(*  induction: [fs_install] only ever inserts values of [P], and           *)
+(*  [fs_restrict] holds nothing else.  No [NoDup] and no [hdr_wf] needed.  *)
+(* ====================================================================== *)
+Lemma fs_install_full (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) :
+  (forall b, length (P b) = BSIZE) ->
+  (forall b bs, D !! b = Some bs -> length bs = BSIZE) ->
+  forall b bs, fs_install P ls W D !! b = Some bs -> length bs = BSIZE.
+Proof.
+  intros HP HD. rewrite /fs_install.
+  generalize (seq 0 (length W)) as l. intros l.
+  induction l as [| a l IH]; simpl; [exact HD |].
+  rewrite /fs_install_step. destruct (W !! a) as [b0 |] eqn:Hb0; [| exact IH].
+  intros b bs Hbs. destruct (decide (b = b0)) as [-> | Hne].
+  - rewrite lookup_insert in Hbs. injection Hbs as <-. exact (HP _).
+  - rewrite lookup_insert_ne in Hbs; [| exact (not_eq_sym Hne)].
+    exact (IH b bs Hbs).
+Qed.
+
+Lemma fs_recovery_dblk_full (P : Z -> list (bv 8))
+    (D : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z) :
+  (forall b, length (P b) = BSIZE) -> fs_recovery P D cov ls ->
+  forall b bs, D !! b = Some bs -> length bs = BSIZE.
+Proof.
+  intros HP Hrec. rewrite /fs_recovery in Hrec. rewrite Hrec.
+  apply (fs_install_full P ls _ _ HP).
+  intros b bs Hbs. apply fs_restrict_lookup_Some in Hbs as [_ ->]. exact (HP b).
+Qed.
+
+(* ...AT THE MACHINE'S OWN BLOCK FUNCTION, which is the form both readers
+   use ([FsCrash.fs_blocks_length] is the width). *)
+Lemma fs_recovery_blocks_full (dk : Z -> bv 8)
+    (D : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z) :
+  fs_recovery (fs_blocks dk) D cov ls ->
+  forall b bs, D !! b = Some bs -> length bs = BSIZE.
+Proof.
+  exact (fs_recovery_dblk_full (fs_blocks dk) D cov ls (fs_blocks_length dk)).
+Qed.
+
 Lemma fs_install_idem (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
     (D : gmap Z (list (bv 8))) :
   NoDup W ->
@@ -2136,11 +2180,10 @@ Section fs_crash.
 
      THE STATE IS DETERMINED BY THE MAP, which is why the existential [S]
      here (and inside [FsDurSnap.P_dur], where the WAL cannot name the file
-     system's own abstract state) loses nothing: any two states
-     that fit the same committed bytes have the same record, entry array and
-     block map at every inum ([FsDurSnap.snap_bytes_node_inj]), the same
-     superblock ([snap_bytes_sb_inj]) and the same used bits
-     ([snap_bytes_used_agree]). *)
+     system's own abstract state) loses nothing: the state is DETERMINED by
+     the map, since the encoding is injective at every field
+     ([FsDurSnap.rec_in_blk_inj], [ind_bytes_inj], [bm_bytes] read bit by
+     bit) -- see durable-fs-plan.md section 8. *)
   Lemma fs_commit_receipt γs γv Γd cov ls dk :
     P_fs γs γv Γd cov ls dk -∗
       ∃ (D : gmap Z (list (bv 8))) (S : fs_state_rec),
@@ -2148,7 +2191,9 @@ Section fs_crash.
         P_fs γs γv Γd cov ls dk.
   Proof.
     rewrite /P_fs. iIntros "Hp". iDestruct "Hp" as (r) "(Hh & %Hwf & Harm & Hdur)".
-    iDestruct (P_dur_tie_keep with "Hdur") as (S Hok) "Hdur".
+    iDestruct (P_dur_tie_keep (fr_D r)
+                 (fs_recovery_blocks_full dk (fr_D r) cov ls (proj1 Hwf))
+                 with "Hdur") as (S Hok) "Hdur".
     iExists (fr_D r), S. iSplitR; [iPureIntro; exact (proj1 Hwf) |].
     iSplitR; [iPureIntro; exact Hok |].
     iExists r. iFrame "Hh Harm Hdur". iPureIntro. exact Hwf.
@@ -2215,7 +2260,9 @@ Section fs_crash.
     rewrite /P_fs_rec_named /P_fs.
     iIntros "H". iDestruct "H" as (γs) "[_ H]".
     iDestruct "H" as (r) "(_ & %Hwf & _ & Hdur)".
-    iDestruct (P_dur_tie with "Hdur") as (S) "%Hok".
+    iDestruct (P_dur_tie (fr_D r)
+                 (fs_recovery_blocks_full dk (fr_D r) cov ls (proj1 Hwf))
+                 with "Hdur") as (S) "%Hok".
     iPureIntro. destruct Hwf as (Hrec & _ & Hhdr).
     exists (fr_D r). split_and!; [assumption | assumption |].
     exists S. exact Hok.

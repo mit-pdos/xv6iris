@@ -878,7 +878,11 @@ Section Ledger.
         iExists DD. iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
         iApply (ent_toks_of_at Γ i (fn_dd n) (fn_orphan n) DD
                   (dir_entries n) tyf Hentok with "Ht").
-    - (* the bitmap block and the free pool *)
+    - (* the bitmap block and the free pool -- and, last, the map's own
+         GEOMETRY, which at the image is four projections of [snap_ok]
+         ([FsDurSnap.fs_geom_of_ok]) *)
+      iSplitL "Hbm Hpool";
+        last (iPureIntro; exact (fs_geom_of_ok S D (conj Hok Hloc))).
       rewrite /free_bitmap /free_bitmap_at. iSplitL "Hbm".
       + iEval (rewrite fp_bmap_blk fp_bmap_off (fp_bmap_bs S D)) in "Hbm".
         rewrite (blk_owned_run Γ (sb_bmapstart (fss_sb S))

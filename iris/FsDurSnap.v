@@ -425,8 +425,7 @@ Global Arguments sk_dombelow {_ _} _.
    the one [sk_dirloc]'s [DirView.dir_ok] is bounded by; at the boot
    configuration it IS [IcacheRef.icfg_nib]
    ([FirstTok.col_geom_of_config]'s own hypothesis). *)
-Definition snap_nib (S : fs_state_rec) : nat :=
-  Z.to_nat (sb_ninodes (fss_sb S) / 16 + 1).
+Definition snap_nib (S : fs_state_rec) : nat := fs_nib S.
 
 (* THE MINT-SIDE READING (durable-disk lane E-clauses).  The three
    [DirView] premises [IcacheEscrow.ipool_alloc] takes, off the snapshot's
@@ -442,7 +441,7 @@ Lemma snap_node_dir_local (S : fs_state_rec) (D : gmap Z (list (bv 8)))
 Proof.
   intros Hb Hi Hw.
   assert (Hnib : nib = snap_nib S).
-  { rewrite /snap_nib -Hw Nat2Z.id //. }
+  { rewrite /snap_nib /fs_nib -Hw Nat2Z.id //. }
   rewrite Hnib. exact (sk_dirloc Hb i n Hi).
 Qed.
 
@@ -567,50 +566,27 @@ Proof. intros Hb Hl. exact (conj Hb Hl). Qed.
 (* ===================================================================== *)
 Record snap_shape (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
   MkSnapShape {
-  ss_bsz      : forall b bs, D !! b = Some bs -> length bs = BSIZE;
   ss_dombelow : forall b, is_Some (D !! b) -> 0 <= b < sb_size (fss_sb S);
-  ss_sbok     : fs_sb_ok (fss_sb S);
-  ss_inum     : forall i n, fss_inodes S !! i = Some n -> 0 <= i < 2 ^ 32;
-  ss_reg      : forall i n, fss_inodes S !! i = Some n ->
-                  0 <= i /\ i `div` 16 < sb_bmapstart (fss_sb S)
-                                         - sb_inodestart (fss_sb S);
-  ss_regdom   : forall i, 0 <= i < 16 * (sb_ninodes (fss_sb S) / 16 + 1) ->
-                  is_Some (fss_inodes S !! i);
-  ss_dirloc   : forall i n, fss_inodes S !! i = Some n ->
-                  node_dir_local i (snap_nib S) n;
 }.
 
-Global Arguments ss_bsz {_ _} _.
 Global Arguments ss_dombelow {_ _} _.
-Global Arguments ss_sbok {_ _} _.
-Global Arguments ss_inum {_ _} _.
-Global Arguments ss_reg {_ _} _.
-Global Arguments ss_regdom {_ _} _.
-Global Arguments ss_dirloc {_ _} _.
 
 Lemma snap_shape_of_ok (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
   snap_ok S D -> snap_shape S D.
+Proof. intros H. split. exact (sk_dombelow (sk_bytes H)). Qed.
+
+(* ...and its FILE-SYSTEM half, which is [FsState.fs_geom] and lives on the
+   instance rather than on the snapshot (durable-disk lane H5): the
+   superblock's layout, the region's inum column and domain, and the
+   directory clauses at the region's width. *)
+Lemma fs_geom_of_ok (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
+  snap_ok S D -> fs_geom S.
 Proof.
   intros H. pose proof (sk_bytes H) as Hb. split.
-  - exact (sk_bsz Hb).
-  - exact (sk_dombelow Hb).
   - exact (sk_sbok Hb).
-  - exact (sk_inum Hb).
   - exact (sk_reg Hb).
   - exact (sk_regdom Hb).
   - exact (sk_dirloc Hb).
-Qed.
-
-(* [sk_dom] is [ss_regdom] read below [ninodes]: mkfs rounds the count up
-   to a whole inode block, so the region's inum space contains it. *)
-Lemma snap_shape_dom (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
-  snap_shape S D ->
-  forall i, 0 <= i < sb_ninodes (fss_sb S) -> is_Some (fss_inodes S !! i).
-Proof.
-  intros Hs i Hi. apply (ss_regdom Hs).
-  pose proof (Z.div_mod (sb_ninodes (fss_sb S)) 16 ltac:(lia)) as Hdm.
-  pose proof (Z.mod_pos_bound (sb_ninodes (fss_sb S)) 16 ltac:(lia)).
-  lia.
 Qed.
 
 (* THE PER-INODE READING, as a record so that no clause of it is spelled
@@ -939,7 +915,7 @@ Section Snap.
      exempts a SELF record) -- so the family's slacked validity is read off
      the resources ([FsState.fs_links_valid_tok]) like everything else.
 
-     THE ONE PURE CONJUNCT LEFT IS THE GEOMETRY [snap_shape], and section
+     THE ONE PURE CONJUNCT LEFT IS [snap_shape], and section
      1c' says why no resource can pin it.  Nothing outside [crashN] ever
      holds a piece of any of this. *)
   Definition fs_snap Γ (g : gname) (B : gmap Z (bv 8)) D S : iProp Σ :=
@@ -991,6 +967,7 @@ Section Snap.
   Record snap_mint (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
     MkSnapMint {
     sm_shape : snap_shape S D;
+    sm_geom  : fs_geom S;
     sm_local : snap_local S;
     sm_parse : fs_parse_sb (fun _ => fss_sbb S) = Some (fss_sb S);
     sm_links : exists (f : link_choice) (v : ity),
@@ -1002,6 +979,7 @@ Section Snap.
   }.
 
   Global Arguments sm_shape {_ _} _.
+  Global Arguments sm_geom {_ _} _.
   Global Arguments sm_local {_ _} _.
   Global Arguments sm_parse {_ _} _.
   Global Arguments sm_links {_ _} _.
@@ -1016,7 +994,7 @@ Section Snap.
     destruct (sm_links Hm) as (f & v & Hfok & Hfv).
     destruct (sm_runs Hm) as (PM & Hshape & Hdisj & Hin).
     iMod (fs_state_mint_runs S PM f v Hshape Hdisj (sm_parse Hm) (sm_local Hm)
-            Hfok Hfv) as (g gl gt) "(Hba & Hta & Htf & HS & Ht)".
+            (sm_geom Hm) Hfok Hfv) as (g gl gt) "(Hba & Hta & Htf & HS & Ht)".
     iModIntro. iExists g, gl, gt, (xr_union (xr_fs S PM)).
     rewrite /fs_snap /snap_auth.
     iFrame "Hba". iSplitR; [by iPureIntro |].
@@ -1367,18 +1345,24 @@ Section Snap.
 
   (* ---- THE READING ---- *)
 
+  (* THE BLOCK WIDTH IS THE WAL'S FACT, NOT THE SNAPSHOT'S (durable-disk
+     lane H5): "every block of [D] is a whole block" says nothing about any
+     inode, any block role or any bitmap bit, and both readers have it off
+     the committed view's own construction ([FsCrash.fs_recovery_dblk_full]
+     at the crash predicate, the cache map's length row at a commit).  So it
+     is a PREMISE here rather than a carried conjunct. *)
   Theorem fs_snap_read_ok (g gl gt : gname) B D S :
+    dblk_full D ->
     fs_snap (snap_gamma g gl gt) g B D S -∗ ⌜snap_ok S D⌝.
   Proof.
     (* [snap_auth] is itself a pair, so the epoch's identity comes off as
        ONE hypothesis (a [&]-pattern would descend into it) *)
-    iIntros "[Hau Hrest]".
+    intros Hf. iIntros "[Hau Hrest]".
     iDestruct "Hrest" as "(_ & _ & HS & Hkeep & %Hsh)".
-    pose proof (ss_bsz Hsh) as Hf.
-    pose proof (ss_inum Hsh) as Hrng.
     iEval (rewrite fs_state_split fs_ghost_split) in "HS".
     iDestruct "HS" as "(Hfp & Hlk & #Hp)".
-    rewrite /fs_pure. iDestruct "Hp" as "[%Hparse #Hlocs]".
+    rewrite /fs_pure. iDestruct "Hp" as "(%Hparse & #Hlocs & %Hgeo)".
+    pose proof (fun i n Hi => fs_geom_inum S i n Hgeo Hi) as Hrng.
     iAssert (⌜forall i n, fss_inodes S !! i = Some n -> inode_local i n⌝)%I
       with "[]" as %Hloc.
     { rewrite bi.pure_forall. iIntros (i).
@@ -1413,17 +1397,17 @@ Section Snap.
     iDestruct (fs_links_valid_tok with "Hlk Hkeep") as %Hlinks.
     iPureIntro. apply snap_ok_intro; [| exact Hloc].
     split.
-    - exact (ss_bsz Hsh).
+    - exact Hf.
     - exact Hsbv.
     - exact Hparse.
     - exact Hbmv.
     - exact Hpoolv.
-    - exact (ss_inum Hsh).
+    - exact Hrng.
     - intros i n Hi. exact (inode_repr_of_local i n (Hloc i n Hi)).
     - intros i n Hi. exact (sir_rec (Hnodes i n Hi)).
     - intros i n k bs Hi Hk. exact (sir_blk (Hnodes i n Hi) k bs Hk).
     - intros i n Hi Hnz. exact (sir_ind (Hnodes i n Hi) Hnz).
-    - exact (snap_shape_dom S D Hsh).
+    - intros i Hi. exact (fs_geom_dom S i Hgeo Hi).
     - destruct Hlinks as (f & Hfok & Hfv). exists f, kv. split; assumption.
     - intros b Hb. apply (Hmetau b Hb).
       destruct Hb as [-> | [-> | (z & [m Hz] & ->)]].
@@ -1442,22 +1426,23 @@ Section Snap.
       + exact (Hused i n b Hi Hon (ss_dombelow Hsh b Hin)).
       + exact (Hnotmeta i n b Hi Hon).
     - exact Hdisj.
-    - exact (ss_sbok Hsh).
-    - exact (ss_reg Hsh).
+    - exact (fg_sbok Hgeo).
+    - exact (fg_reg Hgeo).
     - intros i n Hi. exact (sir_slot (Hnodes i n Hi)).
-    - exact (ss_regdom Hsh).
-    - exact (ss_dirloc Hsh).
+    - exact (fg_regdom Hgeo).
+    - exact (fg_dirloc Hgeo).
     - exact (ss_dombelow Hsh).
   Qed.
 
   (* ...and the same with the snapshot HANDED BACK, which is the form an
      invariant's opener needs.  Nothing is spent: the conclusion is pure. *)
   Lemma fs_snap_read_ok_keep (g gl gt : gname) B D S :
+    dblk_full D ->
     fs_snap (snap_gamma g gl gt) g B D S -∗
     ⌜snap_ok S D⌝ ∗ fs_snap (snap_gamma g gl gt) g B D S.
   Proof.
-    iIntros "H".
-    iDestruct (fs_snap_read_ok with "H") as %Hok.
+    intros Hf. iIntros "H".
+    iDestruct (fs_snap_read_ok _ _ _ _ _ _ Hf with "H") as %Hok.
     iSplitR; [by iPureIntro | iExact "H"].
   Qed.
 
@@ -1486,19 +1471,20 @@ Section Snap.
   (* THE TIE IS A READING (durable-disk lane H3): the epoch's own resources
      say it, so the receipt costs nothing and nothing is spent -- the
      conclusion is pure and the snapshot stays whole. *)
-  Lemma P_dur_tie D : P_dur D -∗ ∃ S, ⌜snap_ok S D⌝.
+  Lemma P_dur_tie D : dblk_full D -> P_dur D -∗ ∃ S, ⌜snap_ok S D⌝.
   Proof.
-    iIntros "H". iDestruct "H" as (g gl gt B S) "Hs".
-    iDestruct (fs_snap_read_ok with "Hs") as %Hok. eauto.
+    intros Hf. iIntros "H". iDestruct "H" as (g gl gt B S) "Hs".
+    iDestruct (fs_snap_read_ok _ _ _ _ _ _ Hf with "Hs") as %Hok. eauto.
   Qed.
 
   (* ...and the same with the snapshot HANDED BACK, which is the form an
      invariant's opener needs.  Everything the spike theorem reads off the
      current snapshot goes through this plus the pure [snap_ok_inode]. *)
-  Lemma P_dur_tie_keep D : P_dur D -∗ ∃ S, ⌜snap_ok S D⌝ ∗ P_dur D.
+  Lemma P_dur_tie_keep D :
+    dblk_full D -> P_dur D -∗ ∃ S, ⌜snap_ok S D⌝ ∗ P_dur D.
   Proof.
-    iIntros "H". iDestruct "H" as (g gl gt B S) "Hs".
-    iDestruct (fs_snap_read_ok with "Hs") as %Hok.
+    intros Hf. iIntros "H". iDestruct "H" as (g gl gt B S) "Hs".
+    iDestruct (fs_snap_read_ok _ _ _ _ _ _ Hf with "Hs") as %Hok.
     iExists S. iSplitR; [iPureIntro; exact Hok |].
     iExists g, gl, gt, B, S. iExact "Hs".
   Qed.
@@ -1507,13 +1493,14 @@ Section Snap.
      named, its node satisfies the local clauses, and its record's bytes
      are the ones the committed map holds at its slot. *)
   Lemma P_dur_inode D (i : Z) :
+    dblk_full D ->
     P_dur D -∗
       ∃ S, ⌜snap_ok S D⌝
            ∗ ⌜snap_inum_ok S i -> snap_inode_at S D i⌝
            ∗ P_dur D.
   Proof.
-    iIntros "H".
-    iDestruct (P_dur_tie_keep with "H") as (S Hok) "HP".
+    intros Hf. iIntros "H".
+    iDestruct (P_dur_tie_keep D Hf with "H") as (S Hok) "HP".
     iExists S. iFrame "HP". iSplitR; [iPureIntro; exact Hok |].
     iPureIntro. intros Hi. exact (snap_ok_inode S D i Hok Hi).
   Qed.
@@ -1523,15 +1510,15 @@ Section Snap.
      SYSTEM's inode.  This is what the snapshot registry adds over the flat
      byte blob, and it is the reading [mknod_durable] is stated at. *)
   Lemma P_dur_node_of_slot D (i : Z) (dn : dinode) :
-    dinode_wf dn ->
+    dblk_full D -> dinode_wf dn ->
     P_dur D -∗
       ∃ S, ⌜snap_ok S D⌝
            ∗ ⌜snap_inum_ok S i -> snap_slot_holds S D i dn ->
               snap_node_is S i dn⌝
            ∗ P_dur D.
   Proof.
-    iIntros (Hwf) "H".
-    iDestruct (P_dur_tie_keep with "H") as (S Hok) "HP".
+    iIntros (Hf Hwf) "H".
+    iDestruct (P_dur_tie_keep D Hf with "H") as (S Hok) "HP".
     iExists S. iFrame "HP". iSplitR; [iPureIntro; exact Hok |].
     iPureIntro. intros Hi Hslot.
     exact (snap_ok_node_of_slot S D i dn Hok Hi Hwf Hslot).

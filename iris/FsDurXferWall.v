@@ -147,16 +147,16 @@ Proof.
   rewrite left_id_L //.
 Qed.
 
-(* ...and a padded map is no file system's: an empty block is not a whole
-   block ([FsDurSnap.ss_bsz]). *)
+(* ...and a padded map is no file system's: pad ABOVE the state's own size
+   and the map names a block that is no block of this era
+   ([FsDurSnap.ss_dombelow]).  Until lane H5 this went through [ss_bsz] --
+   an empty block is not a whole block -- but the block WIDTH is the WAL's
+   fact and no longer rides the snapshot at all, so the refutation is now
+   [snap_shape_grow_absurd] at the empty run. *)
 Lemma snap_shape_pad_absurd (S : fs_state_rec) (D : gmap Z (list (bv 8)))
     (b : Z) :
-  snap_shape S (<[b := []]> D) -> False.
-Proof.
-  intros Hsh.
-  pose proof (ss_bsz Hsh b [] (lookup_insert D b [])) as Hlen.
-  simpl in Hlen. unfold BSIZE in Hlen. lia.
-Qed.
+  sb_size (fss_sb S) <= b -> snap_shape S (<[b := []]> D) -> False.
+Proof. exact (snap_shape_grow_absurd S D b []). Qed.
 
 Section Wall.
   Context `{!diskImgG Σ, !fsLinkG Σ, !fsTopG Σ}.
@@ -266,15 +266,15 @@ Section Wall.
      no state fits that. *)
   Lemma snap_shape_not_readable_eq Γ (g : gname)
       (D : gmap Z (list (bv 8))) (b : Z) (S : fs_state_rec) :
-    dbytes_ok D -> D !! b = None ->
+    dbytes_ok D -> D !! b = None -> sb_size (fss_sb S) <= b ->
     (forall D' : gmap Z (list (bv 8)),
        fs_snap_res_eq Γ g (fs_dbytes D) D' S ⊢ ⌜snap_shape S D'⌝) ->
     fs_snap_res_eq Γ g (fs_dbytes D) D S ⊢ ⌜False⌝.
   Proof.
-    intros Hok Hb Hread. iIntros "H".
+    intros Hok Hb Hsz Hread. iIntros "H".
     rewrite (fs_snap_res_eq_pad Γ g D b S Hok Hb).
     iDestruct (Hread (<[b := []]> D) with "H") as %Hsh.
-    iPureIntro. exact (snap_shape_pad_absurd S D b Hsh).
+    iPureIntro. exact (snap_shape_pad_absurd S D b Hsz Hsh).
   Qed.
 
   (* (1), AS ONE LEMMA.  A reading of the GEOMETRY off the epoch's
