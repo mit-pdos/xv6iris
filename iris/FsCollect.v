@@ -302,6 +302,7 @@ Require Import FsState.       (* [fs_state_rec], [fs_links], [sb_owned]     *)
 Require Import FsStateEra.    (* [inode_owned_era_q]                        *)
 Require Import EscrowDefs.    (* [reg_full] / [reg_half] / [region_pending] *)
 Require Import InodeRegion.   (* [dinode_at], [ireg_recs], [ireg_couple]    *)
+Require Import FsDurXfer.     (* [dfrac_nvalid_pair], the run vocabulary    *)
 Require Import FsDurSnap.     (* [snap_bytes], [snap_local], [snap_ok]      *)
 
 Local Open Scope Z_scope.
@@ -318,77 +319,11 @@ Local Open Scope Z_scope.
 (*  as "3/4 + 3/4 > 1, which is why the reader's share is a quarter".      *)
 (* ====================================================================== *)
 
-(* TWO SHARES THAT EACH EXCEED A HALF CANNOT BOTH FIT INSIDE ONE, twice:
-   the strict half (two [DfracOwn]s, whose sum must merely be [<= 1]) and
-   the non-strict one (a [DfracBoth] on either side, whose sum must be
-   [< 1]).  Both are the same contradiction -- if the sum fitted, each
-   share would have to be smaller than the other. *)
-Lemma qp_no_pair_lt (q1 q2 : Qp) :
-  (1 < q1 + q1)%Qp -> (1 < q2 + q2)%Qp -> (q1 + q2 ≤ 1)%Qp -> False.
-Proof.
-  intros H1 H2 Hle.
-  assert (Ha : (q2 < q1)%Qp).
-  { apply (proj2 (Qp.add_lt_mono_l q2 q1 q1)).
-    exact (Qp.le_lt_trans _ _ _ Hle H1). }
-  assert (Hb : (q1 < q2)%Qp).
-  { apply (proj2 (Qp.add_lt_mono_l q1 q2 q2)).
-    rewrite (Qp.add_comm q2 q1).
-    exact (Qp.le_lt_trans _ _ _ Hle H2). }
-  exact (proj1 (Qp.lt_nge q2 q1) Ha (Qp.lt_le_incl _ _ Hb)).
-Qed.
-
-Lemma qp_no_pair_le (q1 q2 : Qp) :
-  (1 ≤ q1 + q1)%Qp -> (1 ≤ q2 + q2)%Qp -> (q1 + q2 < 1)%Qp -> False.
-Proof.
-  intros H1 H2 Hlt.
-  assert (Ha : (q2 < q1)%Qp).
-  { apply (proj2 (Qp.add_lt_mono_l q2 q1 q1)).
-    exact (Qp.lt_le_trans _ _ _ Hlt H1). }
-  assert (Hb : (q1 < q2)%Qp).
-  { apply (proj2 (Qp.add_lt_mono_l q1 q2 q2)).
-    rewrite (Qp.add_comm q2 q1).
-    exact (Qp.lt_le_trans _ _ _ Hlt H2). }
-  exact (proj1 (Qp.lt_nge q2 q1) Ha (Qp.lt_le_incl _ _ Hb)).
-Qed.
-
-(* A SHARE WHOSE DOUBLE IS INVALID owns more than a half and is not the
-   bare discarded knowledge (which doubles to itself). *)
-Lemma dfrac_nvalid_shape (dq : dfrac) :
-  ~ ✓ (dq ⋅ dq) ->
-  exists q : Qp,
-    (dq = DfracOwn q /\ (1 < q + q)%Qp)
-    \/ (dq = DfracBoth q /\ (1 ≤ q + q)%Qp).
-Proof.
-  destruct dq as [q | | q]; intros Hn.
-  - exists q. left. split; [reflexivity |].
-    apply (proj2 (Qp.lt_nge 1 (q + q))). intros Hc. apply Hn.
-    rewrite dfrac_op_own. apply dfrac_valid_own. exact Hc.
-  - exfalso. apply Hn. rewrite dfrac_op_discarded.
-    exact dfrac_valid_discarded.
-  - exists q. right. split; [reflexivity |].
-    apply (proj2 (Qp.le_ngt 1 (q + q))). intros Hc. apply Hn.
-    apply dfrac_valid. cbn. exact Hc.
-Qed.
-
-Lemma dfrac_nvalid_pair (dq1 dq2 : dfrac) :
-  ~ ✓ (dq1 ⋅ dq1) -> ~ ✓ (dq2 ⋅ dq2) -> ~ ✓ (dq1 ⋅ dq2).
-Proof.
-  intros H1 H2 Hv.
-  destruct (dfrac_nvalid_shape dq1 H1) as (q1 & [[-> Hq1] | [-> Hq1]]);
-    destruct (dfrac_nvalid_shape dq2 H2) as (q2 & [[-> Hq2] | [-> Hq2]]).
-  - apply dfrac_valid in Hv. cbn in Hv.
-    exact (qp_no_pair_lt q1 q2 Hq1 Hq2 Hv).
-  - apply dfrac_valid in Hv. cbn in Hv.
-    exact (qp_no_pair_le q1 q2 (Qp.lt_le_incl _ _ Hq1) Hq2 Hv).
-  - apply dfrac_valid in Hv. cbn in Hv.
-    exact (qp_no_pair_le q1 q2 Hq1 (Qp.lt_le_incl _ _ Hq2) Hv).
-  - apply dfrac_valid in Hv. cbn in Hv.
-    exact (qp_no_pair_le q1 q2 Hq1 Hq2 Hv).
-Qed.
-
-(* ...and the one reading of it the collection runs. *)
-Lemma dfrac_full_pair (dq : dfrac) : ~ ✓ (DfracOwn 1 ⋅ dq).
-Proof. exact (dfrac_full_nvalid dq). Qed.
+(* [qp_no_pair_lt] / [qp_no_pair_le] / [dfrac_nvalid_shape] /
+   [dfrac_nvalid_pair] / [dfrac_full_pair] MOVED DOWN TO [FsDurXfer]
+   (durable-disk lane H4): the share-generic transport reads its
+   disjointness at two different objects' shares, and that is the same
+   arithmetic.  This file sees them through [FsDurSnap]'s [Require]. *)
 
 (* ====================================================================== *)
 (*  0a. A RECORD SITS AT ITS SLOT OF ITS BLOCK                             *)

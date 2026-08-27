@@ -2142,6 +2142,71 @@ Section Snap.
   Qed.
 
   (* ================================================================== *)
+  (*  6a.  THE MINT'S PREMISE (durable-disk lane H4)                     *)
+  (*                                                                    *)
+  (*  WHAT A PRODUCER WITH NO SOURCE INSTANCE OWES, and it is NOT        *)
+  (*  [snap_ok].  Four of the five rows are read off the producer's own  *)
+  (*  resources and nothing accumulates them: the superblock's parse and *)
+  (*  every inode's local clauses come off the collected payloads, the   *)
+  (*  link family's slacked validity off [FsState.fs_links_valid_tok],   *)
+  (*  and the RUNS row -- the shape of the byte legs, their pairwise     *)
+  (*  DISJOINTNESS and the fact that their union sits inside the         *)
+  (*  committed view's own flattening -- off                             *)
+  (*  [FsDurXfer.phi_runs_ex_disj] / [phi_runs_ex_in], which are         *)
+  (*  [FsStateDefs.phi_excl] and one [ghost_map_lookup] and nothing      *)
+  (*  else.  The fifth is the GEOMETRY, which no resource pins           *)
+  (*  ([FsDurXferWall], sections 1 and 1b).                              *)
+  (*                                                                    *)
+  (*  WHAT IS NOT HERE is the whole expensive half of [snap_bytes]: no   *)
+  (*  byte tie, no used-set coupling, no [sk_disj], no cut clause.  The  *)
+  (*  disjointness a linear ledger had to be CARVED by is now the shape  *)
+  (*  of a [∗], read where the [∗] is.                                   *)
+  (* ================================================================== *)
+  Record snap_mint (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
+    MkSnapMint {
+    sm_shape : snap_shape S D;
+    sm_local : snap_local S;
+    sm_parse : fs_parse_sb (fun _ => fss_sbb S) = Some (fss_sb S);
+    sm_links : exists (f : link_choice) (v : ity),
+                 link_elem_ok (fss_inodes S) f
+                 /\ ✓ (link_elem (fss_inodes S) f ⋅ link_tok_elem ROOTINO v);
+    sm_runs  : exists PM : gmap Z (list (bv 8)),
+                 xf_shape S PM /\ xr_disj (xr_fs S PM)
+                 /\ xr_union (xr_fs S PM) ⊆ fs_dbytes D;
+  }.
+
+  Global Arguments sm_shape {_ _} _.
+  Global Arguments sm_local {_ _} _.
+  Global Arguments sm_parse {_ _} _.
+  Global Arguments sm_links {_ _} _.
+  Global Arguments sm_runs {_ _} _.
+
+  Theorem fs_snap_alloc_mint S D :
+    snap_mint S D ->
+    ⊢ |==> ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
+        fs_snap (snap_gamma g gl gt) g B D S.
+  Proof.
+    intros Hm.
+    destruct (sm_links Hm) as (f & v & Hfok & Hfv).
+    destruct (sm_runs Hm) as (PM & Hshape & Hdisj & Hin).
+    iMod (fs_state_mint_runs S PM f v Hshape Hdisj (sm_parse Hm) (sm_local Hm)
+            Hfok Hfv) as (g gl gt) "(Hba & Hta & Htf & HS & Ht)".
+    iModIntro. iExists g, gl, gt, (xr_union (xr_fs S PM)).
+    rewrite /fs_snap /snap_auth.
+    iFrame "Hba". iSplitR; [by iPureIntro |].
+    iFrame "Hta Htf HS".
+    iSplitL "Ht"; [by iExists v |].
+    iPureIntro. exact (sm_shape Hm).
+  Qed.
+
+  Lemma P_dur_alloc_mint S D : snap_mint S D -> ⊢ |==> P_dur D.
+  Proof.
+    intros Hm.
+    iMod (fs_snap_alloc_mint S D Hm) as (g gl gt B) "Hsnap".
+    iModIntro. iExists g, gl, gt, B, S. iExact "Hsnap".
+  Qed.
+
+  (* ================================================================== *)
   (*  7b.  THE READING (durable-disk lane H3)                            *)
   (*                                                                    *)
   (*  [snap_ok S D] OFF THE SNAPSHOT'S OWN RESOURCES.  Nothing is        *)
