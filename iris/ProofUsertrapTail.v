@@ -144,7 +144,7 @@ Section ProofUsertrapTail.
     iPoseProof (SpecPrintk.printk_env_panic with "Hpk") as "#Hpe".
     iApply (KE.wp_kexit_sconf (un_ft N) (un_f N) (un_w N) (un_s N) (un_j N) (un_l N)
               (un_u N) (un_v N) (un_k N) (un_pd N) (un_pav N) (un_pu N)
-              (un_bn N) (un_lg N) (un_logstart N) (un_dev N)
+              (un_bn N) (un_lg N) (un_dev N)
               (un_ip N) (un_dqi N) (un_kl N) (un_ka N)
               (un_i N) (un_tl N) (un_bmapstart N) (un_inodestart N)
               (un_nib N) (un_size N)

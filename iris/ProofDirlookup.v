@@ -463,7 +463,7 @@ Section ProofDirlookupMain.
       (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
-      (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode) (dr : dinode)
@@ -473,7 +473,7 @@ Section ProofDirlookupMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gi gtl
-                              ga gf logstart inodestart nib dev ip dinum bm data dn dr
+                              ga gf inodestart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_dirlookup_sconf_body].
@@ -1634,7 +1634,7 @@ Section ProofDirlookupMain.
         iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
         iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
         iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn ga gf
-                  logstart dev ip bm data dn
+                  dev ip bm data dn
                   false (16 * i)%nat 16%nat dol Vpr
                   pidv (DfracOwn 1) dqd L6 (K - 12)%nat eb b lks
                   ltac:(lia) Hlg Hbmwf Hbmcov Hszb
@@ -2195,7 +2195,7 @@ Section ProofDirlookupMain.
                 iApply (IcacheEscrow.dlinks_intro _ _ _ _ _ D Hdok Hxact
                           with "Hetk"). }
             iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-            iApply (IG.wp_iget_sconf gtl gi logstart inodestart nib dev
+            iApply (IG.wp_iget_sconf gtl gi inodestart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       lic
                       N7 0%nat eb pj (K - 12)%nat b lks

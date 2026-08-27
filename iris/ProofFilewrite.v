@@ -1458,7 +1458,7 @@ Section ProofFilewrite.
     pj = proc_addr jx ->
     (* ---- [filewrite_fs_env]'s ten PURE fields.  Pure, hence free: they
        are Coq hypotheses and cost the induction nothing. ---- *)
-    log_geom_ok fsc_cov (fwn_logstart fn) ->
+    log_geom_ok fsc_cov fsc_logst ->
     (0 <= fwn_inodestart fn)%Z ->
     (* the REGION-WIDE geometry, quantified: the inum is existential in the
        reference and only the carve names it (fs-sysfile S4c) *)
@@ -1468,8 +1468,8 @@ Section ProofFilewrite.
     (forall inum : mword 32,
        (bv_unsigned inum < 16 * Z.of_nat icfg_nib)%Z ->
        IBLOCK inum (fwn_inodestart fn)
-         ∉ log_region_set (fwn_logstart fn)) ->
-    BitmapInv.bitmap_geom_ok fsc_cov (fwn_logstart fn)
+         ∉ log_region_set fsc_logst) ->
+    BitmapInv.bitmap_geom_ok fsc_cov fsc_logst
       (fwn_bmapstart fn) (fwn_size fn) ->
     SpecPrintk.printk_gen_contract (kt := KT1) (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) ->
     (* the ambient log, named -- the escrow's write arm parks at [icfg_log]
@@ -1524,8 +1524,8 @@ Section ProofFilewrite.
     bio_ctx (fwn_bio fn)
       (fs_view fsc_fs (fwn_disk fn) icfg_dev fsc_cov) -∗
     log_ctx (fwn_log fn) (fwn_bio fn) fsc_fs fsc_cov
-      (fwn_logstart fn) icfg_dev -∗
-    fs_crash_seam fsc_cov (fwn_logstart fn) -∗
+      fsc_logst icfg_dev -∗
+    fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     KernelDataInv.kernel_data -∗
     SpecPrintk.printk_env (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) -∗
@@ -1533,7 +1533,7 @@ Section ProofFilewrite.
     (* the FAMILIES, since the slot is the carve's output and not the
        caller's to name *)
     ic_escrows fsc_ic fsc_fs (fwn_ireg fn) fsc_cov
-      (fwn_logstart fn) -∗
+      fsc_logst -∗
     ireg_inv (fwn_ireg fn) fsc_fs (fwn_inodestart fn) icfg_nib -∗
     ic_sleeplocks fsc_ic -∗
     dev_inv (fwn_uart fn) (fwn_disk fn) -∗
@@ -1543,7 +1543,7 @@ Section ProofFilewrite.
     (* THE BITMAP'S INVARIANT -- persistent, so it rides with the rest of
        the persistent half rather than being loop-carried. *)
     BitmapInv.bitmap_inv fsc_fs (fwn_bmapstart fn) fsc_cov
-      (fwn_logstart fn) (fwn_size fn) -∗
+      fsc_logst (fwn_size fn) -∗
     (* ---- the EXCLUSIVE half ---- *)
     filewrite_fs_out fn -∗
     (* ---- and the contract's own continuation ---- *)
@@ -1736,10 +1736,10 @@ Section ProofFilewrite.
     assert (P3 : IBLOCK inum (fwn_inodestart fn) ∈ fsc_cov)
       by (apply P3q; exact P5).
     assert (P4 : IBLOCK inum (fwn_inodestart fn)
-                   ∉ log_region_set (fwn_logstart fn))
+                   ∉ log_region_set fsc_logst)
       by (apply P4q; exact P5).
     iDestruct (ic_escrows_acc2 (fwn_ireg fn)
-                 (fwn_logstart fn) ik P9 with "Hescs") as "#Hesc".
+                 ik P9 with "Hescs") as "#Hesc".
     iDestruct (ic_sleeplocks_lookup fsc_ic ik P9 with "Hslks")
       as (gil gisl) "#Hslk2".
     (* =================================================================
@@ -1771,7 +1771,7 @@ Section ProofFilewrite.
    iDestruct (cpu_own_transport CID0 CIDa1 0%nat eb (proc_addr jx) b 
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (BeginOp.wp_begin_op_sconf gs jx glp (fwn_bio fn) (fwn_log fn)
-              fsc_fs fsc_cov (fwn_logstart fn) icfg_dev
+              fsc_fs fsc_cov fsc_logst icfg_dev
               pidv (DfracOwn (1/4)) D1 (K - 12)%nat eb b
               _ (upd_upt V PI) (fw_av_begin_op K HK) Hjp Hgsj
               Hbelow
@@ -1855,7 +1855,7 @@ Section ProofFilewrite.
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_ireg fn)
               gil gisl
-              (fwn_logstart fn) (fwn_inodestart fn)
+              (fwn_inodestart fn)
               icfg_nib ik (sh / 2)%Qp g (ShotK ty)
               icfg_dev inum
               pidv (DfracOwn (1/4)) (fwn_dqs fn)
@@ -2066,7 +2066,7 @@ Section ProofFilewrite.
     iApply (Writei.wp_writei_gen KT0 gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_log fn) (fwn_ireg fn) ga gf
-              (fwn_logstart fn) (fwn_inodestart fn) icfg_nib
+              (fwn_inodestart fn) icfg_nib
               (fwn_bmapstart fn) (fwn_size fn) icfg_dev
               (fwn_pr fn)
               (ientry ik) inum
@@ -2136,7 +2136,7 @@ Section ProofFilewrite.
               mwi !!! Regidx Ra0 = (mword_of_int rz : mword 64)
               /\ (-1 <= rz <= c)%Z
               /\ (bv_unsigned v + rz <= Z.of_nat MAXFILE * Z.of_nat BSIZE)%Z
-              /\ inode_ok fsc_cov (fwn_logstart fn) dn' bm' data'
+              /\ inode_ok fsc_cov fsc_logst dn' bm' data'
               /\ dir_ok icfg_nib dn' data'
               /\ di_type dn' = di_type dnl
               /\ di_nlink dn' = di_nlink dnl
@@ -2264,7 +2264,7 @@ Section ProofFilewrite.
        two dot clauses are vacuous. *)
     assert (Hlocw : inode_local (bv_unsigned inum) (era_node dn' bm' data')).
     { apply (inode_local_of_ok_rec (bv_unsigned inum) fsc_cov
-               (fwn_logstart fn) dn' bm' data' Hiok2 Hrl2).
+               fsc_logst dn' bm' data' Hiok2 Hrl2).
       - exact (dir_uniq_not_dir dn' data' Hnodir').
       - exact (dir_dots_ix_not_dir (bv_unsigned inum) dn' data' Hnodir'). }
     iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned inum)
@@ -2276,7 +2276,7 @@ Section ProofFilewrite.
       with "[Hmark]" as "Hvalid".
     { rewrite -P8. iExact "Hmark". }
     iAssert (ic_loaded fsc_fs (fwn_ireg fn) fsc_cov
-               (fwn_logstart fn) ik inum dn' bm')
+               fsc_logst ik inum dn' bm')
       with "[Hdnat Hmeta Hmap Hblocks Hdview Hfview Htop]" as "Hlk".
     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map. iExists data'.
       iSplitR; [iPureIntro; exact Hiok2 |].
@@ -2341,7 +2341,6 @@ Section ProofFilewrite.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Iunlock.wp_iunlock_tx_sconf gs (fwn_ireg fn)
               gil gisl
-              (fwn_logstart fn)
               ik (sh / 2)%Qp g icfg_dev
               inum dn' bm'
               pidv (DfracOwn (1/4)) X2 (K - 12)%nat eb (proc_addr jx) b lks
@@ -2410,7 +2409,7 @@ Section ProofFilewrite.
     iApply (EndOp.wp_end_op_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_log fn) fsc_fs
-              fsc_cov (fwn_logstart fn) icfg_dev n'
+              fsc_cov fsc_logst icfg_dev n'
               pidv (DfracOwn (1/4)) X3 (K - 12)%nat eb b lks (upd_upt (upd_upt V PI) P')
               (fw_av_end_op K HK) P1 Hjp Hgsj
               Hbelow

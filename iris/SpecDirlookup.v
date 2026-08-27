@@ -260,7 +260,7 @@ Definition wp_dirlookup_sconf_body
     (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (dinum : mword 32)                (* the HOME's inum     *)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode) (dr : dinode)                       (* in-core / REGION    *)
@@ -281,8 +281,8 @@ Definition wp_dirlookup_sconf_body
      at +0x46 is NOT refuted -- it is a live arm, see the header. *)
   di_type dn = T_DIR ->
   (* (2) readi's own threading, verbatim *)
-  log_geom_ok fsc_cov logstart ->
-  blkmap_wf fsc_cov logstart bm ->
+  log_geom_ok fsc_cov fsc_logst ->
+  blkmap_wf fsc_cov fsc_logst bm ->
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   (* (2') ...and the payload's hole clause, which licence (a)'s borrow needs
@@ -378,9 +378,9 @@ Definition wp_dirlookup_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi fsc_cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
   (* ---- THE INODE REGION, and it is iget's premise, not dirlookup's own
      (iclaim-ledger.md §3.3's contract-set widening, increment IIIe).  The
      hit arm's [iget] opens it GHOST-ONLY, on the ledger's [icnt] and freeze
@@ -456,7 +456,7 @@ Module Type DIRLOOKUP.
       (γi : gname)
       (gtl : gname)
       (γa : gname) (γf : gname)
-      (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode) (dr : dinode)
@@ -466,6 +466,6 @@ Module Type DIRLOOKUP.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_dirlookup_sconf_body γs j γl γu γd γk pd pav pu bn γi gtl
-                              γa γf logstart inodestart nib dev ip dinum bm data dn dr
+                              γa γf inodestart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
 End DIRLOOKUP.

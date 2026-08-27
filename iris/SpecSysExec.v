@@ -187,7 +187,7 @@ Definition wp_sys_exec_sconf_body
     (bn : bio_names)
     (g : log_names) (gi : gname)
     (gtl : gname)                       (* the itable's lock   *)
-    (logstart bmapstart inodestart : Z) (nib : nat)
+    (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (dqb dqs : dfrac)
     (v0 v1 : mword 64)                        (* syscall arguments 0 and 1 *)
@@ -206,14 +206,14 @@ Definition wp_sys_exec_sconf_body
   dev = ROOTDEV ->
   (0 < nib)%nat ->
   (* ---- the block-layer geometry, threaded verbatim to kexec ---- *)
-  log_geom_ok fsc_cov logstart ->
+  log_geom_ok fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set logstart) ->
+  ~ (bmapstart ∈ log_region_set fsc_logst) ->
   0 <= inodestart ->
   cov_below fsc_cov size ->
-  ireg_blocks_ok inodestart nib fsc_cov logstart ->
+  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   (* kexec's own premise, inherited: the FS layer's contracts are callable
@@ -239,10 +239,10 @@ Definition wp_sys_exec_sconf_body
   (* ---- the file system, as kexec's own bundle: thirteen persistent
          resources this function only relays ---- *)
   fs_fabric gs gu gd gk pd pav pu bn g gi gtl
-            logstart inodestart nib dev -∗
+            inodestart nib dev -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   bslots 3 -∗
   (* the loop's own [kalloc]s, argstr's page faults, and kexec's page-table
      builder all run in the UNCOUNTED regime *)
@@ -286,7 +286,7 @@ Module Type SYSEXEC.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname)
-      (logstart bmapstart inodestart : Z) (nib : nat)
+      (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (dqb dqs : dfrac)
       (v0 v1 : mword 64)
@@ -294,6 +294,6 @@ Module Type SYSEXEC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gi
-                             gtl logstart bmapstart inodestart nib
+                             gtl bmapstart inodestart nib
                              size dev dqb dqs v0 v1 pid V m K eb b lks.
 End SYSEXEC.

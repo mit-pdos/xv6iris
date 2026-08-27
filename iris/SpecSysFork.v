@@ -34,7 +34,7 @@
    allocator at [kalloc_env _ None], and four persistent handles: the
    process table, the nextpid and wait_lock spinlocks, the ftable and the
    itable.  The last two travel with the FS fabric ([fsc_fs], [fsc_cov],
-   [logstart], [nib]) because [IcacheEscrow.is_itable2]'s resource does;
+   [fsc_logst], [nib]) because [IcacheEscrow.is_itable2]'s resource does;
    kfork does no I/O and touches no log, and inherits them only because its
    [idup] call takes the itable lock.  A syscall dispatcher that already
    holds the fs fabric -- which every FS syscall does -- pays nothing extra.
@@ -93,7 +93,6 @@ Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γp γw γl γf γil γic : gname) (γs : list gname)
-    (logstart : Z)
     (inodestart : Z) (nib : nat)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
     (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string) :=
@@ -111,7 +110,7 @@ Definition wp_sys_fork_sconf_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
-  is_itable2 γil fsc_ic fsc_fs γic fsc_cov logstart nib icfg_dev -∗
+  is_itable2 γil fsc_ic fsc_fs γic fsc_cov fsc_logst nib icfg_dev -∗
   itable_inv -∗
   (* the inode region, and it travels with the fs fabric for the SAME reason
      the itable does -- kfork's [np->cwd = idup(p->cwd)], whose [ref++] is a
@@ -160,10 +159,9 @@ Module Type SYSFORK.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
-      (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs logstart
+      wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs
                              inodestart nib m lvl av eb p b pid V lks.
 End SYSFORK.

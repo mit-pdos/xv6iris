@@ -1889,7 +1889,7 @@ Section ProofFileread.
              assert (Hibcov : IBLOCK inm (frn_inodestart fn) ∈ fsc_cov)
                by (apply Hgeo; exact Hinlt).
              iDestruct (ic_escrows_acc2 (frn_ireg fn)
-                          (frn_logstart fn) ikk Hik with "Hescs")
+                          ikk Hik with "Hescs")
                as "#Hesc".
              iDestruct (ic_sleeplocks_lookup fsc_ic ikk Hik with "Hslks")
                as (gil gisl) "#Hslk".
@@ -2013,7 +2013,7 @@ Section ProofFileread.
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_ireg fn)
                        gil gisl
-                       (frn_logstart fn) (frn_inodestart fn)
+                       (frn_inodestart fn)
                        icfg_nib ikk (ssh/2)%Qp gsh
                        (DepRd (ssh/2)%Qp icfg_dev inm gsh) (ShotK ty0)
                        icfg_dev inm
@@ -2086,7 +2086,7 @@ Section ProofFileread.
                 never holds a bundleless arm for this call. *)
              iEval (rewrite /ic_dep_held /=) in "Hlk".
              iDestruct "Hlk" as (data) "(%Hiok & %Hloc & Hmeta & Haddrs & Hquarter)".
-             pose proof (FsStateEra.node_shape_ok_of_inode_ok fsc_cov (frn_logstart fn)
+             pose proof (FsStateEra.node_shape_ok_of_inode_ok fsc_cov fsc_logst
                            dnl bml data Hiok) as Hsh.
              iDestruct (FsStateEra.inode_rd_era_era_node_to fsc_fs (DfracOwn (1/4))
                           inm dnl bml data Hsh Hloc with "Hquarter")
@@ -2292,7 +2292,7 @@ Section ProofFileread.
              iApply (Readi.wp_readi_sconf KT0 γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) γa γf
-                       (frn_logstart fn) icfg_dev (fc_ip Cf)
+                       icfg_dev (fc_ip Cf)
                        bml data dnl
                        true (Z.to_nat (bv_unsigned v)) (Z.to_nat n)
                        (fun _ => (mword_of_int 0 : mword 8)) V
@@ -2406,7 +2406,7 @@ Section ProofFileread.
                    ghost step (durable-disk B''-tx3); nothing is unshed
                    first. *)
                 iAssert (ic_dep_held fsc_fs (frn_ireg fn) fsc_cov
-                           (frn_logstart fn) (DepRd (ssh/2)%Qp icfg_dev inm gsh)
+                           fsc_logst (DepRd (ssh/2)%Qp icfg_dev inm gsh)
                            ikk inm dnl bml)%I
                   with "[Hmeta Haddrs Hquarter]" as "Hlk".
                 { rewrite /ic_dep_held /=.
@@ -2471,7 +2471,6 @@ Section ProofFileread.
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
                 iApply (Iunlock.wp_iunlock_dep_sconf γs (frn_ireg fn)
                           gil gisl
-                          (frn_logstart fn)
                           ikk (ssh/2)%Qp gsh
                           (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm
                           dnl bml
@@ -2695,7 +2694,7 @@ Section ProofFileread.
                    ghost step (durable-disk B''-tx3); nothing is unshed
                    first. *)
                 iAssert (ic_dep_held fsc_fs (frn_ireg fn) fsc_cov
-                           (frn_logstart fn) (DepRd (ssh/2)%Qp icfg_dev inm gsh)
+                           fsc_logst (DepRd (ssh/2)%Qp icfg_dev inm gsh)
                            ikk inm dnl bml)%I
                   with "[Hmeta Haddrs Hquarter]" as "Hlk".
                 { rewrite /ic_dep_held /=.
@@ -2760,7 +2759,6 @@ Section ProofFileread.
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
                 iApply (Iunlock.wp_iunlock_dep_sconf γs (frn_ireg fn)
                           gil gisl
-                          (frn_logstart fn)
                           ikk (ssh/2)%Qp gsh
                           (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm
                           dnl bml

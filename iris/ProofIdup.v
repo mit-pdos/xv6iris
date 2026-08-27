@@ -157,7 +157,7 @@ Section ProofIdup.
      [SpecIdup].  The derivation below is the whole of the difference. *)
   Local Lemma wp_idup_core
       (γl : gname) (γi : gname)
-      (logstart : Z) (inodestart : Z) (nib : nat)
+      (inodestart : Z) (nib : nat)
       (k : nat) (s : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string) :
@@ -171,7 +171,7 @@ Section ProofIdup.
     sie_cap_gpr KT1 m K b p -∗
     cpu_own n eb p b lks -∗
     kernel_text -∗ pc_is pcE -∗
-    is_itable2 γl fsc_ic fsc_fs γi fsc_cov logstart nib dev -∗
+    is_itable2 γl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ireg_inv γi fsc_fs inodestart nib -∗
     iref_slot -∗
@@ -356,7 +356,7 @@ Section ProofIdup.
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "itable"%string (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev) mA
+    iApply (Acquire.wp_acquire_sconf KT1 γl "itable"%string (itable_res2 fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev) mA
               n eb p (K - 4)%nat b lks
               HnZ ltac:(lia)
               Hfresh
@@ -575,7 +575,7 @@ Section ProofIdup.
     { rewrite /islot2 lookup_insert Hcik. iFrame "Hiu Hgid Hicnt".
       iSplitR "Hmir Hsel"; [| iApply (frz_park_intro_off with "Hmir Hsel") ].
       rewrite /islot_rest_at (id_frac_rest qt qr Hhalfsum). iFrame. }
-    iAssert (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev) with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
+    iAssert (itable_res2 fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev) with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
     { iExists (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M), ci.
       iFrame "Hhalf Hiauth Hpool Hipool".
       iSplitR; [| iSplitR; [| iExact "Hslots"]].
@@ -664,7 +664,7 @@ Section ProofIdup.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Houtb) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev) D5
+    iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string (itable_res2 fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev) D5
               n eb p (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)
@@ -853,11 +853,11 @@ Section ProofIdup.
      inside the contract instead of at every call site. *)
   Lemma wp_idup_sconf
       (γl : gname) (γi : gname)
-      (logstart : Z) (inodestart : Z) (nib : nat)
+      (inodestart : Z) (nib : nat)
       (k : nat) (dev : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_idup_sconf_body γl γi logstart inodestart nib k dev
+    : wp_idup_sconf_body γl γi inodestart nib k dev
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_idup_sconf_body].
@@ -871,7 +871,7 @@ Section ProofIdup.
        mover needs; the count fragment stays with the short parent. *)
     rewrite inode_ref_shed.
     iDestruct "Href" as "[Hkeep Hshr]".
-    iApply (wp_idup_core γl γi logstart inodestart nib
+    iApply (wp_idup_core γl γi inodestart nib
               k (q/2)%Qp icfg_dev inum m n eb p K b lks
               HK HnZ Hk Ha0 Hfresh
               with "Hcg Hcnt Htext Hpc Hlock Hinv Hrinv Hislot Hshr Hru

@@ -431,7 +431,7 @@ Section ProofIget.
 
      Folded as [ig_loop_body]/[ig_step_body] (parameterized by every
      lemma-binder/proof-local name each body mentions -- [γl fsc_ic fsc_fs γi fsc_cov
-     logstart nib dev inum n eb p C K b macq spr M ci], plus [TAILC] threaded
+     fsc_logst nib dev inum n eb p C K b macq spr M ci], plus [TAILC] threaded
      as an explicit [iProp Σ] parameter rather than folded itself; [fuel]/[j]
      kept as explicit [ig_loop_body] parameters per RULE 3, the innermost
      [Mr]/[Ms] as an internal [∀]), MEASURED, folding broke at TWO
@@ -463,12 +463,12 @@ Section ProofIget.
 
   Lemma wp_iget_sconf
       (γl : gname) (γi : gname)
-      (logstart : Z) (inodestart : Z) (nib : nat)
+      (inodestart : Z) (nib : nat)
       (dev inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_iget_sconf_body γl γi logstart inodestart nib dev inum l
+    : wp_iget_sconf_body γl γi inodestart nib dev inum l
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
@@ -678,7 +678,7 @@ Section ProofIget.
     iDestruct (cpu_own_transport CID CID13 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf KT1 γl "itable"%string
-              (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev) mA
+              (itable_res2 fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev) mA
               n eb p (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
@@ -1035,7 +1035,7 @@ Section ProofIget.
       iref_slots_auth -∗
       isl_pool M -∗
       ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic M ci i0) -∗
-      ipool fsc_fs γi fsc_cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
+      ipool fsc_fs γi fsc_cov fsc_logst (region_inums nib ∖ ci_inums ci) ∅ -∗
       iref_slot -∗
       (* THE LICENCE rides the scan (increment IIIe): it is spent at whichever
          exit the scan takes, so it can no longer sit inside [TAILC]. *)
@@ -1074,7 +1074,7 @@ Section ProofIget.
         iref_slots_auth -∗
         isl_pool M -∗
         ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic M ci i0) -∗
-        ipool fsc_fs γi fsc_cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
+        ipool fsc_fs γi fsc_cov fsc_logst (region_inums nib ∖ ci_inums ci) ∅ -∗
         iref_slot -∗
         iname γi fsc_fs inodestart inum l -∗
         TAILC -∗
@@ -1232,7 +1232,7 @@ Section ProofIget.
             assert (Hnotin : bv_unsigned inum ∉ ci_inums ci).
             { apply elem_of_difference in Hzin. tauto. }
             iDestruct (big_sepL_lookup
-                         (fun (_ : nat) (i0 : nat) => ic_escrow fsc_ic fsc_fs γi fsc_cov logstart i0)
+                         (fun (_ : nat) (i0 : nat) => ic_escrow fsc_ic fsc_fs γi fsc_cov fsc_logst i0)
                          (seq 0 NINODE) e e
                          ltac:(apply lookup_seq; split; [lia | exact He])
                          with "Hescs") as "#Hesc".
@@ -1271,7 +1271,7 @@ Section ProofIget.
                rather than joining the pool's in for a full unit. *)
             iApply fupd_wp.
             iInv "Hesc" as ">Hbodyp" "Hclosep".
-            iDestruct (ic_open_empty_dev_peek fsc_ic fsc_fs γi fsc_cov logstart e (1/4)
+            iDestruct (ic_open_empty_dev_peek fsc_ic fsc_fs γi fsc_cov fsc_logst e (1/4)
                          devT inumT with "Hbodyp Hgid") as "(Hcellp & Hgid & Hcbp)".
             iDestruct (wordw_claim_of (KTR := KT0) 4 (i_dev (ientry e))
                          (DfracOwn 1) devT ltac:(lia) with "Hcellp") as "#Hclaim1".
@@ -1292,11 +1292,11 @@ Section ProofIget.
                  beside the partition, so the two are ONE ghost step.  The
                  slot is NOT LIVE on either side of the re-tag, so the
                  partition itself does not move ([ipool_id_lend]). *)
-              iMod (ipool_id_lend (⊤ ∖ ↑minstretN) fsc_ic fsc_fs γi fsc_cov logstart nib
+              iMod (ipool_id_lend (⊤ ∖ ↑minstretN) fsc_ic fsc_fs γi fsc_cov fsc_logst nib
                       e devT inumT ltac:(solve_ndisj) He with "Hpinv Hgid")
                 as "[Hgid Hidback]".
               iInv "Hesc" as ">Hbody" "Hclose2".
-              iMod (ic_open_empty_dev fsc_ic fsc_fs γi fsc_cov logstart e devT inumT dev
+              iMod (ic_open_empty_dev fsc_ic fsc_fs γi fsc_cov fsc_logst e devT inumT dev
                       with "Hbody Hgid") as "(Hcell & Hgid & Hcb)".
               iModIntro. iExists devT. iFrame "Hcell". iIntros "Hcell".
               iMod ("Hclose2" with "[Hcb Hcell]") as "_";
@@ -1353,7 +1353,7 @@ Section ProofIget.
                        iname γi fsc_fs inodestart inum l ∗
                        (* the lock's pool, ONE ENTRY SHORTER: the take now
                           happens inside this update (see the note above) *)
-                       ipool fsc_fs γi fsc_cov logstart
+                       ipool fsc_fs γi fsc_cov fsc_logst
                          (region_inums nib ∖ ci_inums ci
                           ∖ {[bv_unsigned inum]}) ∅)%I
                       (⊤ ∖ ↑minstretN ∖ ↑ipoolN ∖ ↑(icEscN .@ e)) false
@@ -1377,7 +1377,7 @@ Section ProofIget.
                  shape, the count half at 0, the mirror and the [ifreeze_off]
                  token, all spent at +0x78 -- plus the borrowed licence. *)
               iMod (ipool_take_lend (⊤ ∖ ↑minstretN) fsc_ic fsc_fs γi inodestart fsc_cov
-                      logstart nib (region_inums nib ∖ ci_inums ci) e inum
+                      fsc_logst nib (region_inums nib ∖ ci_inums ci) e inum
                       dev inumT l
                       ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj)
                       ltac:(solve_ndisj) He Hzin Hnib
@@ -1385,7 +1385,7 @@ Section ProofIget.
                 as "(Hlic & Hbundle & Hicnt0 & Hmir0 & Hfoff & Hpool & Hgid &
                      Hidback)".
               iInv "Hesc" as ">Hbody" "Hclose2".
-              iMod (ic_open_empty_free fsc_ic fsc_fs γi fsc_cov logstart e dev inumT dev inum
+              iMod (ic_open_empty_free fsc_ic fsc_fs γi fsc_cov fsc_logst e dev inumT dev inum
                       with "Hbody Hgid HinT")
                 as "(Hincell & Hdcell & Hvld & Hraw & Hmt & Hgid1 & Hgid2 & Hpin)".
               iModIntro. iExists inumT. iFrame "Hincell". iIntros "Hincell".
@@ -1393,7 +1393,7 @@ Section ProofIget.
               iDestruct "Hvld" as (wv) "Hvld".
               iMod ("Hclose2" with "[Hd1 Hincell Hvld Hraw Hbundle Hgid1 Hpin]") as "_".
               { iApply bi.later_intro. iApply ic_close_mid.
-                iApply (ic_mk_mid_arm fsc_ic fsc_fs γi fsc_cov logstart e dev inum wv
+                iApply (ic_mk_mid_arm fsc_ic fsc_fs γi fsc_cov fsc_logst e dev inum wv
                           with "Hd1 Hincell Hvld [Hraw Hbundle] Hgid1 Hpin").
                 iApply (ic_mk_unloaded with "Hraw Hbundle"). }
               iMod ("Hidback" $! dev inum with "[%] Hgid2") as "Hgid2";
@@ -1515,14 +1515,14 @@ Section ProofIget.
        move, so the mid arm's valid cell can be looked at and put back. *)
             iApply fupd_wp.
             iInv "Hesc" as ">Hbodyp" "Hclosep".
-            iDestruct (ic_open_mid fsc_ic fsc_fs γi fsc_cov logstart e with "Hmt Hbodyp")
+            iDestruct (ic_open_mid fsc_ic fsc_fs γi fsc_cov fsc_logst e with "Hmt Hbodyp")
               as "[Hmt Harmp]".
             iDestruct "Harmp" as (devp inump wvp)
               "(Hd1p & Hincellp & Hvldp & Hpayp & Hgid1p & Hpinp)".
             iDestruct (wordw_claim_of (KTR := KT0) 4 (i_valid (ientry e))
                          (DfracOwn 1) wvp ltac:(lia) with "Hvldp") as "#Hclaim4".
             iMod ("Hclosep" with "[Hd1p Hincellp Hvldp Hpayp Hgid1p Hpinp]") as "_".
-            { iNext. iApply (ic_close_mid fsc_ic fsc_fs γi fsc_cov logstart e).
+            { iNext. iApply (ic_close_mid fsc_ic fsc_fs γi fsc_cov fsc_logst e).
               (* NAMED, in the goal's conjunct order (optimization.md,
                  "Never bare iFrame in a large context"): [ic_mid_arm]'s
                  fourth conjunct is [ic_unloaded], whose pool bundle is an ∃
@@ -1543,7 +1543,7 @@ Section ProofIget.
             { rewrite Hpa7c. iExact "Hclaim4". }
             { rewrite Hpa7c Hsv7c.
               iInv "Hesc" as ">Hbody" "Hclose2".
-              iDestruct (ic_open_mid fsc_ic fsc_fs γi fsc_cov logstart e with "Hmt Hbody")
+              iDestruct (ic_open_mid fsc_ic fsc_fs γi fsc_cov fsc_logst e with "Hmt Hbody")
                 as "[Hmt Harm]".
               iDestruct "Harm" as (dev' inum' wv)
                 "(Hd1 & Hincell & Hvld & Hpay & Hgid1 & Hpin)".
@@ -1553,7 +1553,7 @@ Section ProofIget.
                  (design §17.6 (1)/(3)): it was minted with the [sw 1] at
                  +0x78, carried by hand across MID, and until §17.6 it was
                  simply dropped at this line. *)
-              iDestruct (ic_close_mid_to_parked fsc_ic fsc_fs γi fsc_cov logstart e dev inum gnew
+              iDestruct (ic_close_mid_to_parked fsc_ic fsc_fs γi fsc_cov fsc_logst e dev inum gnew
                            with "Hmt Hgid1 Hd1 Hincell Hvld Hpay Hlvh Hpend Hfoff Hpin")
                 as "[Hbody Hinhalf]".
               iMod ("Hclose2" with "[Hbody]") as "_"; [by iNext |].
@@ -1580,7 +1580,7 @@ Section ProofIget.
               iFrame "Hidd Hidn Hgid2 Hicnt1".
               iSplitR "Hmir0 Hsel";
                 [iExact "Hislot" | iApply (frz_park_intro_off with "Hmir0 Hsel")]. }
-            iAssert (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev)
+            iAssert (itable_res2 fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev)
               with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
             { iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M), (<[e := (dev, inum)]> ci).
               iFrame "Hhalf Hiauth".
@@ -1688,7 +1688,7 @@ Section ProofIget.
                acquire/release pair compose back to [N]. *)
             iEval (rewrite Houtb) in "Hcg".
             iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string
-                      (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev) V4
+                      (itable_res2 fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev) V4
                       n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
                       with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -2101,7 +2101,7 @@ Section ProofIget.
             [| iApply (frz_park_intro_off with "Hmirj Hselj")].
           rewrite /islot_rest_at (ig_frac_rest qj qj' ltac:(by apply Qp.sub_Some)).
           rewrite /inode_ident. iFrame. }
-        iAssert (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev)
+        iAssert (itable_res2 fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev)
           with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
         { iExists (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M), ci.
           iFrame "Hhalf Hiauth Hpool Hipool".
@@ -2187,7 +2187,7 @@ Section ProofIget.
         (* same re-spelling as the HIT arm above. *)
         iEval (rewrite Houtb) in "Hcg".
         iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string
-                  (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev) L7
+                  (itable_res2 fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev) L7
                   n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
                   with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").

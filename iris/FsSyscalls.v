@@ -175,7 +175,7 @@ Local Open Scope Z_scope.
     [ICFG] and at [@file_icfg _ fileG0], print identically and do not
     unify. *)
 Record fs_geom `{ICFG : icfg, FSC : fscfg}
-    (fsc_cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (fsc_cov : gset Z) (fsc_logst bmapstart inodestart : Z) (nib : nat)
     (ninodes size : Z) (dev : mword 32) (glog : log_names) : Prop := MkFsGeom {
   fg_dev      : dev = icfg_dev;
   fg_nib      : nib = icfg_nib;
@@ -183,15 +183,15 @@ Record fs_geom `{ICFG : icfg, FSC : fscfg}
   fg_ist      : inodestart = icfg_ist;
   fg_rootdev  : dev = ROOTDEV;
   fg_nib_pos  : (0 < nib)%nat;
-  fg_loggeom  : log_geom_ok fsc_cov logstart;
+  fg_loggeom  : log_geom_ok fsc_cov fsc_logst;
   fg_size     : 0 < size <= BPB;
   fg_bm_nn    : 0 <= bmapstart;
   fg_bm_cov   : bmapstart ∈ fsc_cov;
-  fg_bm_out   : ~ (bmapstart ∈ log_region_set logstart);
+  fg_bm_out   : ~ (bmapstart ∈ log_region_set fsc_logst);
   fg_ist_nn   : 0 <= inodestart;
   fg_covbelow : cov_below fsc_cov size;
-  fg_bmgeom   : bitmap_geom_ok fsc_cov logstart bmapstart size;
-  fg_iblocks  : ireg_blocks_ok inodestart nib fsc_cov logstart;
+  fg_bmgeom   : bitmap_geom_ok fsc_cov fsc_logst bmapstart size;
+  fg_iblocks  : ireg_blocks_ok inodestart nib fsc_cov fsc_logst;
   fg_nin_lo   : 1 < ninodes;
   fg_nin_hi   : ninodes <= 16 * Z.of_nat nib;
   fg_nin_31   : ninodes < 2 ^ 31;
@@ -265,20 +265,20 @@ Section FsBundles.
      bitmap is why.  [BitmapInv.bitmap_inv] is a conjunct of [fs_ready] at
      the AMBIENT geometry ([fsc_bmapstart], [fsc_size]); every fs contract
      that takes it -- [SpecSysMkdir], [SpecSysChdir] -- spells it at the
-     CALLER's [bmapstart]/[size], exactly as it spells [fsc_cov]/[logstart] at
+     CALLER's [bmapstart]/[size], exactly as it spells [fsc_cov]/[fsc_logst] at
      the caller's.  Those two already ride here as equations, so the bitmap
      row costs exactly what every other row costs: two more of the same. *)
   Definition fs_world (γpr γa : gname) (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names) (glog : log_names)
       (γi : gname) (gtl : gname)
-      (logstart bmapstart inodestart : Z) (nib : nat)
+      (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       : iProp Σ :=
     (⌜γpr = fsc_printk⌝ ∗ ⌜γa = fsc_kalloc⌝ ∗
      ⌜γu = fsc_uart⌝ ∗ ⌜γd = fsc_disk⌝ ∗ ⌜γk = fsc_dlock⌝ ∗
      ⌜bn = fsc_bio⌝ ∗ ⌜glog = icfg_log⌝ ∗ ⌜γi = fsc_ireg⌝ ∗ ⌜gtl = fsc_itlock⌝ ∗
-     ⌜logstart = fsc_logst⌝ ∗ ⌜inodestart = icfg_ist⌝ ∗
+     ⌜inodestart = icfg_ist⌝ ∗
      ⌜nib = icfg_nib⌝ ∗ ⌜dev = icfg_dev⌝ ∗
      ⌜bmapstart = fsc_bmapstart⌝ ∗ ⌜size = fsc_size⌝ ∗
      disk_geom γd pd pav pu ∗
@@ -286,9 +286,9 @@ Section FsBundles.
      FsReady.fs_ready)%I.
 
   Global Instance fs_world_persistent γpr γa γs γu γd γk pd pav pu bn glog
-      γi gtl logstart bmapstart inodestart nib size dev :
+      γi gtl bmapstart inodestart nib size dev :
     Persistent (fs_world γpr γa γs γu γd γk pd pav pu bn glog γi gtl
-                         logstart bmapstart inodestart nib size dev).
+                         bmapstart inodestart nib size dev).
   Proof. rewrite /fs_world. apply _. Qed.
 
   (* THE UNPACK, at the caller's names.  This is what the [γs] parameter's
@@ -297,18 +297,18 @@ Section FsBundles.
      its callee spells them.  The substitution happens here, once, instead
      of in every consumer. *)
   Lemma fs_world_all γpr γa γs γu γd γk pd pav pu bn glog
-      γi gtl logstart bmapstart inodestart nib size dev :
+      γi gtl bmapstart inodestart nib size dev :
     fs_world γpr γa γs γu γd γk pd pav pu bn glog γi gtl
-             logstart bmapstart inodestart nib size dev -∗
+             bmapstart inodestart nib size dev -∗
     kernel_text ∗ kernel_data ∗
     printk_env γpr γu γd ∗ ⌜printk_gen_contract (kt := KT1) γpr γu γd⌝ ∗
     bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) ∗
-    log_ctx glog bn fsc_fs fsc_cov logstart dev ∗
-    fs_crash_seam fsc_cov logstart ∗ gen_cert ∗
+    log_ctx glog bn fsc_fs fsc_cov fsc_logst dev ∗
+    fs_crash_seam fsc_cov fsc_logst ∗ gen_cert ∗
     dev_inv γu γd ∗ disk_geom γd pd pav pu ∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) ∗
-    is_itable2 gtl fsc_ic fsc_fs γi fsc_cov logstart nib dev ∗ itable_inv ∗
-    ic_escrows fsc_ic fsc_fs γi fsc_cov logstart ∗ ic_sleeplocks fsc_ic ∗
+    is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev ∗ itable_inv ∗
+    ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst ∗ ic_sleeplocks fsc_ic ∗
     ireg_inv γi fsc_fs inodestart nib ∗ ireg_open ∗
     kalloc_env γa None ∗
     (* ...and the two rows SIMP-3 added to the predicate: the image's own
@@ -323,7 +323,7 @@ Section FsBundles.
        persistent conjunct of [fs_ready] now (BitmapInv.v), so it comes out
        here like every other invariant and NOTHING about the free pool
        crosses a call any more. *)
-    bitmap_inv fsc_fs bmapstart fsc_cov logstart size.
+    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size.
   Proof.
     rewrite /fs_world.
     (* SEVENTEEN equations now -- the icache's went with [cn] itself
@@ -335,7 +335,7 @@ Section FsBundles.
        [fs_ready], whose own disk conjunct is the existential this predicate
        replaced -- and it is dropped ([_] at slot 10). *)
     iIntros "(-> & -> & -> & -> & -> & -> & -> & -> & -> & -> & -> & ->
-              & -> & -> & ->
+              & -> & ->
               & #Hgeom & #Hdlock & Hw)".
     iDestruct (FsReady.fs_ready_all with "Hw") as
       "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & _ & H11 & H12 & H13
@@ -382,20 +382,20 @@ Section FsBundles.
   Lemma fs_world_ready γs pd pav pu :
     fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
              pd pav pu fsc_bio icfg_log fsc_ireg
-             fsc_itlock fsc_logst fsc_bmapstart icfg_ist
+             fsc_itlock fsc_bmapstart icfg_ist
              icfg_nib fsc_size icfg_dev
     ⊢ FsReady.fs_ready.
   Proof.
     rewrite /fs_world.
     by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _
-                 & _ & _ & _ & _ & _ & _ & _ & $)".
+                 & _ & _ & _ & _ & _ & _ & $)".
   Qed.
 
   Lemma fs_ready_world γs :
     FsReady.fs_ready ⊢
     ∃ pd pav pu, fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
                    pd pav pu fsc_bio icfg_log fsc_ireg
-                   fsc_itlock fsc_logst fsc_bmapstart icfg_ist
+                   fsc_itlock fsc_bmapstart icfg_ist
                    icfg_nib fsc_size icfg_dev.
   Proof.
     iIntros "#H".
@@ -460,7 +460,7 @@ Definition wp_sys_mkdir_friendly_body
     (bn : bio_names)
     (glog : log_names) (γi : gname)
     (gtl : gname)                        (* the itable's lock   *)
-    (logstart bmapstart inodestart : Z) (nib : nat)
+    (bmapstart inodestart : Z) (nib : nat)
     (ninodes size : Z) (dev : mword 32)
     (ns : nat)
     (dqb dqs dqbs dqn : dfrac)
@@ -471,7 +471,7 @@ Definition wp_sys_mkdir_friendly_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_sys_mkdir <= K)%nat ->
-  fs_geom fsc_cov logstart bmapstart inodestart nib ninodes size dev glog ->
+  fs_geom fsc_cov fsc_logst bmapstart inodestart nib ninodes size dev glog ->
   (create_slots <= ns)%nat ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
@@ -480,7 +480,7 @@ Definition wp_sys_mkdir_friendly_body
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
   fs_world γpr γa γs γu γd γk pd pav pu bn glog γi gtl
-           logstart bmapstart inodestart nib size dev -∗
+           bmapstart inodestart nib size dev -∗
   (* [procs_inv] left [fs_ready] (FsCfg.v's header): a PROCESS resource,
      persistent, and every caller already holds it. *)
   procs_inv γs -∗
@@ -517,7 +517,7 @@ Module FsSysMkdir (M : SYSMKDIR).
       (bn : bio_names)
       (glog : log_names) (γi : gname)
       (gtl : gname)
-      (logstart bmapstart inodestart : Z) (nib : nat)
+      (bmapstart inodestart : Z) (nib : nat)
       (ninodes size : Z) (dev : mword 32)
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
@@ -525,7 +525,7 @@ Module FsSysMkdir (M : SYSMKDIR).
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
       wp_sys_mkdir_friendly_body γf γa γpr γs j γl γu γd γk pd pav pu bn
-                                 glog γi gtl logstart bmapstart
+                                 glog γi gtl bmapstart
                                  inodestart nib ninodes size dev ns
                                  dqb dqs dqbs dqn v pid V m K b lks.
   Proof.
@@ -552,7 +552,7 @@ Module FsSysMkdir (M : SYSMKDIR).
         Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc & #Hbmi)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
     iApply (M.wp_sys_mkdir_sconf γf γa γpr γs j γl γu γd γk pd pav pu bn
-              glog γi gtl logstart bmapstart inodestart nib
+              glog γi gtl bmapstart inodestart nib
               ninodes size dev ns dqb dqs dqbs dqn v pid V m K true
               b lks
               HK Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
@@ -632,7 +632,7 @@ Definition wp_sys_chdir_friendly_body
     (bn : bio_names)
     (glog : log_names) (γi : gname)
     (gtl : gname)
-    (logstart bmapstart inodestart : Z) (nib : nat)
+    (bmapstart inodestart : Z) (nib : nat)
     (ninodes size : Z) (dev : mword 32)
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)
@@ -642,7 +642,7 @@ Definition wp_sys_chdir_friendly_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_sys_chdir <= K)%nat ->
-  fs_geom fsc_cov logstart bmapstart inodestart nib ninodes size dev glog ->
+  fs_geom fsc_cov fsc_logst bmapstart inodestart nib ninodes size dev glog ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   pv_tf V !! tf_arg_idx 0 = Some v ->
@@ -650,7 +650,7 @@ Definition wp_sys_chdir_friendly_body
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
   fs_world γpr γa γs γu γd γk pd pav pu bn glog γi gtl
-           logstart bmapstart inodestart nib size dev -∗
+           bmapstart inodestart nib size dev -∗
   (* [procs_inv] left [fs_ready] (FsCfg.v's header): a PROCESS resource,
      persistent, and every caller already holds it. *)
   procs_inv γs -∗
@@ -684,14 +684,14 @@ Module FsSysChdir (M : SYSCHDIR).
       (bn : bio_names)
       (glog : log_names) (γi : gname)
       (gtl : gname)
-      (logstart bmapstart inodestart : Z) (nib : nat)
+      (bmapstart inodestart : Z) (nib : nat)
       (ninodes size : Z) (dev : mword 32)
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
       wp_sys_chdir_friendly_body γf γa γpr γs j γl γu γd γk pd pav pu bn
-                                 glog γi gtl logstart bmapstart
+                                 glog γi gtl bmapstart
                                  inodestart nib ninodes size dev
                                  dqb dqs dqbs dqn v pid V m K b lks.
   Proof.
@@ -719,7 +719,7 @@ Module FsSysChdir (M : SYSCHDIR).
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
     iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
     iApply (M.wp_sys_chdir_sconf γf γa γs j γl γu γd γk pd pav pu bn
-              glog γi gtl logstart bmapstart inodestart nib
+              glog γi gtl bmapstart inodestart nib
               size dev dqb dqs v pid V m K true b lks
               HK Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hib Hj Hgs eq_refl Htf

@@ -572,12 +572,12 @@ Section ProofSysMkdirM1Tail.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names)
-      (logstart : Z) (dev : mword 32)
+      (dev : mword 32)
       (u : nat) (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (bf : nat -> bv 8) (Vpr : pprivate) :
     (K_end_op <= K - 18)%nat -> (18 <= K)%nat -> ((K - 18) + 18 = K)%nat ->
-    log_geom_ok fsc_cov logstart ->
+    log_geom_ok fsc_cov fsc_logst ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     lks = ∅ ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
@@ -591,8 +591,8 @@ Section ProofSysMkdirM1Tail.
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (MD + 0x40)) -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev fsc_cov) -∗
-    log_ctx g bn gfs fsc_cov logstart dev -∗
-    fs_crash_seam fsc_cov logstart -∗
+    log_ctx g bn gfs fsc_cov fsc_logst dev -∗
+    fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
@@ -648,7 +648,7 @@ Section ProofSysMkdirM1Tail.
     iDestruct (cpu_claim_ext_transport CID0 CID1 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
-              g gfs fsc_cov logstart dev u pidv dq M1 (K - 18)%nat eb b lks
+              g gfs fsc_cov fsc_logst dev u pidv dq M1 (K - 18)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(lkbelow)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
@@ -737,9 +737,9 @@ Section ProofSysMkdirBody.
      contract names ([ic_escrows] is IcacheEscrow's -- see fs-sysfile's
      trap 3 on the four [ic_sleeplocks] copies, which bites the same way). *)
   Lemma md_esc_acc (gi : gname)
-      (logstart : Z) (k : nat) :
+      (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows fsc_ic fsc_fs gi fsc_cov logstart -∗ ic_escrow fsc_ic fsc_fs gi fsc_cov logstart k
+    (ic_escrows fsc_ic fsc_fs gi fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -755,7 +755,7 @@ Section ProofSysMkdirBody.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname)
-      (logstart bmapstart inodestart : Z) (nib : nat)
+      (bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
@@ -764,7 +764,7 @@ Section ProofSysMkdirBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
     wp_sys_mkdir_sconf_body gf ga gpr gs j gl gu gd gk pd pav pu bn g gi
-                            gtl logstart bmapstart inodestart nib
+                            gtl bmapstart inodestart nib
                             ninodes size dev ns dqb dqs dqbs dqn v
                             pid V m K eb b lks.
   Proof.
@@ -881,7 +881,7 @@ Section ProofSysMkdirBody.
     iDestruct (proc_priv_bare_acc gf pj pid V with "Hpriv") as "[Hpbare Hpback0]".
     iDestruct (cpu_own_transport CID0 CID5 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (BeginOp.wp_begin_op_sconf (CID := CID5) gs j gl bn g fsc_fs fsc_cov logstart
+    iApply (BeginOp.wp_begin_op_sconf (CID := CID5) gs j gl bn g fsc_fs fsc_cov fsc_logst
               dev pid (DfracOwn (1/4)) M3 (K - 18)%nat eb b lks
               V ltac:(lia) Hj Hgl (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hpc Hlog Hpbare Hprocs").
@@ -1189,7 +1189,7 @@ Section ProofSysMkdirBody.
       iDestruct (cpu_own_transport CID11 CID17 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Create.wp_create_sconf (CID := CID17) gs j gl gu gd gk pd pav pu
-                bn g gi gtl ga gf gpr logstart bmapstart inodestart
+                bn g gi gtl ga gf gpr bmapstart inodestart
                 nib ninodes size dev pk bf
                 SpecDirlookup.T_DIR (mword_of_int 0) (mword_of_int 0)
                 (upd_upt V P') MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
@@ -1267,7 +1267,7 @@ Section ProofSysMkdirBody.
            erased reference, so weaken it back here.  One line, and the
            name is what sys_open's O_CREATE arm needs kept. *)
         iDestruct (inode_ref_short_gen_forget with "Href") as "Href".
-        iDestruct (md_esc_acc gi logstart kk ltac:(lia)
+        iDestruct (md_esc_acc gi kk ltac:(lia)
                      with "Hescrows") as "#Hesc".
         (* CREATE'S PAYOUT IS THE ARMED DESCRIPTOR (durable-disk B''-tx2):
            the escrow parked half of the transaction's element at create's
@@ -1281,7 +1281,7 @@ Section ProofSysMkdirBody.
         iDestruct (cpu_own_transport CID18 CID20 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID20) gs j gl gu gd gk
-                  pd pav pu bn g gi gtl gil gisl logstart bmapstart
+                  pd pav pu bn g gi gtl gil gisl bmapstart
                   inodestart nib size dev kk qi ss gy inum dn bm un1
                   pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks
                   (upd_upt V P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -1335,7 +1335,7 @@ Section ProofSysMkdirBody.
         iDestruct (cpu_own_transport CID21 CID22 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (EndOp.wp_end_op_sconf (CID := CID22) gs j gl gu gd gk pd pav pu
-                  bn g fsc_fs fsc_cov logstart dev n2 pid (DfracOwn (1/4))
+                  bn g fsc_fs fsc_cov fsc_logst dev n2 pid (DfracOwn (1/4))
                   P1 (K - 18)%nat eb b lks
                   (upd_upt V P') ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
@@ -1418,7 +1418,7 @@ Section ProofSysMkdirBody.
         iDestruct (cpu_own_transport CID18 CID19 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (md_m1_tail (CID0 := CID19) gs j gl gu gd gk pd pav pu bn g fsc_fs
-                  logstart dev un1 pid (DfracOwn (1/4))
+                  dev un1 pid (DfracOwn (1/4))
                   m mcr sp0 K eb b lks bf1
                   (upd_upt V P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) Hcrsp Hcrthr Hal
@@ -1457,7 +1457,7 @@ Section ProofSysMkdirBody.
       iDestruct (cpu_own_transport CID11 CID12 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (md_m1_tail (CID0 := CID12) gs j gl gu gd gk pd pav pu bn g fsc_fs
-                logstart dev MAXOPBLOCKS pid (DfracOwn (1/4))
+                dev MAXOPBLOCKS pid (DfracOwn (1/4))
                 m mas sp0 K eb b lks bf
                 (upd_upt V P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                 ltac:(reflexivity) Hassp Hasthr Hal

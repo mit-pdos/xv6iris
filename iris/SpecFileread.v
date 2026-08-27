@@ -275,7 +275,6 @@ Record fread_names := MkFReadNames {
   frn_pu         : mword 64;
   frn_bio        : bio_names;
   frn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
-  frn_logstart   : Z;
   frn_inodestart : Z;
   frn_dqs        : dfrac;         (* sb.inodestart                          *)
   (* THE DEVICE TABLE'S READ COLUMN, AS FUNCTIONS OF THE MAJOR.  Scalars
@@ -307,7 +306,7 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     1%positive
-    0 0 (DfracOwn 1)
+    0 (DfracOwn 1)
     (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
 
 (* THE DUPLICATE [!icacheG Σ] IS GONE, and it had to be: [fileG] BUNDLES
@@ -455,7 +454,7 @@ Section SpecFileread.
      The per-inode pieces come out of the reference at the call
      ([fileread_pay_carve] below). *)
   Definition fileread_fs_env (γf : gname) (fn : fread_names) : iProp Σ :=
-    (⌜log_geom_ok fsc_cov (frn_logstart fn)⌝ ∗
+    (⌜log_geom_ok fsc_cov fsc_logst⌝ ∗
      ⌜0 <= frn_inodestart fn⌝ ∗
      (* EVERY inum the region covers has its block inside [fsc_cov] -- the
         quantified form, since the reference names the inum existentially *)
@@ -469,7 +468,7 @@ Section SpecFileread.
         escrow at the FAMILY where it was per-slot. *)
      itable_inv ∗
      ic_escrows fsc_ic fsc_fs (frn_ireg fn) fsc_cov
-                (frn_logstart fn) ∗
+                fsc_logst ∗
      ireg_inv (frn_ireg fn) fsc_fs (frn_inodestart fn) icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
@@ -603,9 +602,9 @@ Section SpecFileread.
 
   (* the per-entry escrow, out of the family *)
   Lemma ic_escrows_acc2 (γi : gname)
-      (logstart : Z) (ik : nat) :
+      (ik : nat) :
     (ik < NINODE)%nat ->
-    (ic_escrows fsc_ic fsc_fs γi fsc_cov logstart -∗ ic_escrow fsc_ic fsc_fs γi fsc_cov logstart ik
+    (ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs γi fsc_cov fsc_logst ik
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.

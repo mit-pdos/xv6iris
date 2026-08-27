@@ -211,7 +211,7 @@ Notation K_iget := (58%nat) (only parsing).
 Definition wp_iget_sconf_body
     `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (γi : gname)
-    (logstart : Z) (inodestart : Z) (nib : nat)
+    (inodestart : Z) (nib : nat)
     (dev inum : mword 32)
     (l : ilic)                                   (* THE LICENCE, §7.1 *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
@@ -237,11 +237,11 @@ Definition wp_iget_sconf_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
-  is_itable2 γl fsc_ic fsc_fs γi fsc_cov logstart nib dev -∗
+  is_itable2 γl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
   (* the [ref] words *)
   itable_inv -∗
   (* EVERY entry's content -- the scan cannot name its slot in advance *)
-  ic_escrows fsc_ic fsc_fs γi fsc_cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
   (* THE INODE REGION, and GHOST-ONLY (header, §3.3): the recycle arm's peel
      refutes a standing freeze from [l] inside it, and its 0 -> 1 count move
      carries the ledger's [icnt] half.  Persistent, so it costs a caller a
@@ -287,11 +287,11 @@ Module Type IGET.
   Parameter wp_iget_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (γi : gname)
-      (logstart : Z) (inodestart : Z) (nib : nat)
+      (inodestart : Z) (nib : nat)
       (dev inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_iget_sconf_body γl γi logstart inodestart nib dev inum l
+      wp_iget_sconf_body γl γi inodestart nib dev inum l
                          m n eb p K b lks.
 End IGET.

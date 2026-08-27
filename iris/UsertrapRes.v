@@ -455,7 +455,6 @@ Section UsertrapRes.
     un_pr : gname;                    (* the pr lock (printk-general)        *)
     un_bn : bio_names;
     un_lg : log_names;
-    un_logstart : Z;
     un_dev : mword 32;
     un_ip  : mword 64;                (* the initproc pointer's value        *)
     un_dqi : dfrac;
@@ -478,7 +477,7 @@ Section UsertrapRes.
   Definition un_fn (N : ut_names) : fclose_names :=
     MkFCloseNames (un_s N) (un_j N) (un_l N) (un_kl N) (un_ka N)
       (un_u N) (un_v N) (un_k N) (un_pd N) (un_pav N) (un_pu N)
-      (un_bn N) (un_lg N) (un_logstart N) (un_dev N)
+      (un_bn N) (un_lg N) (un_dev N)
       (un_pid N) (DfracOwn (1/4))
       (un_i N) (un_tl N) (un_bmapstart N) (un_inodestart N)
       (un_nib N) (un_size N).
@@ -495,7 +494,7 @@ Section UsertrapRes.
     (un_j N < NPROC)%nat /\
     un_s N !! un_j N = Some (un_l N) /\
     length (un_s N) = NPROC /\
-    log_geom_ok fsc_cov (un_logstart N).
+    log_geom_ok fsc_cov fsc_logst.
 
   (* ------------------------------------------------------------------- *)
   (* THE DEVICE COMPLEMENT, MINUS ITS ONE PER-HART MEMBER.                 *)
@@ -610,8 +609,8 @@ Section UsertrapRes.
      is_lock (un_k N) d_lock "virtio_disk"%string
        (disk_res (un_v N) (un_pd N) (un_pav N) (un_pu N)) ∗
      bio_ctx (un_bn N) (fs_view fsc_fs (un_v N) (un_dev N) fsc_cov) ∗
-     log_ctx (un_lg N) (un_bn N) fsc_fs fsc_cov (un_logstart N) (un_dev N) ∗
-     fs_crash_seam fsc_cov (un_logstart N) ∗
+     log_ctx (un_lg N) (un_bn N) fsc_fs fsc_cov fsc_logst (un_dev N) ∗
+     fs_crash_seam fsc_cov fsc_logst ∗
      gen_cert ∗
      dev_inv (un_u N) (un_v N) ∗
      disk_geom (un_v N) (un_pd N) (un_pav N) (un_pu N) ∗
@@ -693,11 +692,11 @@ Section UsertrapRes.
        than at [un_fn]'s projections of them, so every [rewrite] below is
        syntactic.  [Hties] itself is kept whole: it is conjunct 17. *)
     pose proof Hties as Ht.
-    destruct Ht as [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hlog Hlogst Hdevn Hireg Htlock Hbms Hist Hnib Hsize].
+    destruct Ht as [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hlog Hdevn Hireg Htlock Hbms Hist Hnib Hsize].
     cbn [un_fn fcn_uart fcn_disk fcn_dlock fcn_kmem fcn_kalloc fcn_bio
-         fcn_log fcn_logstart fcn_dev fcn_ireg
+         fcn_log fcn_dev fcn_ireg
          fcn_tlock fcn_bmapstart fcn_inodestart fcn_nib fcn_size]
-      in Huart, Hdisk, Hdlock, Hkmem, Hkalloc, Hbio, Hlog, Hlogst, Hdevn, Hireg, Htlock, Hbms, Hist, Hnib, Hsize.
+      in Huart, Hdisk, Hdlock, Hkmem, Hkalloc, Hbio, Hlog, Hdevn, Hireg, Htlock, Hbms, Hist, Hnib, Hsize.
     (* THE DISK FABRIC, and it is the only row that is not a copy: the
        record's three pages are identified with [fs_ready]'s witness by the
        persistent cells both [disk_geom]s read. *)
@@ -726,9 +725,9 @@ Section UsertrapRes.
     iSplitR; [rewrite Hbio Hdisk Hdevn;
               iApply (fs_ready_bio with "Hfs")|].
     iSplitR.
-    { rewrite Hlog Hbio Hlogst Hdevn.
+    { rewrite Hlog Hbio Hdevn.
       iApply (fs_ready_log with "Hfs"). }
-    iSplitR; [rewrite Hlogst; iApply (fs_ready_seam with "Hfs")|].
+    iSplitR; [ iApply (fs_ready_seam with "Hfs")|].
     iSplitR; [iApply (fs_ready_gen with "Hfs")|].
     iSplitR; [rewrite Huart Hdisk; iExact "Hdinv"|].
     iSplitR; [iExact "Hdg"|].

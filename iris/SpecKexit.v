@@ -153,7 +153,7 @@ Definition wp_kexit_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names)
-    (logstart : Z) (dev : mword 32)
+    (dev : mword 32)
     (ip : mword 64) (dqi : dfrac)                     (* the initproc cell   *)
     (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
     (γi : gname) (γtl : gname)        (* the itable's lock   *)
@@ -168,13 +168,13 @@ Definition wp_kexit_sconf_body
      than fifteen coherence conjuncts, and it computes away in the proof.  The
      pid fraction is the quarter [ProcInv.proc_priv_pid_ofile] lends. *)
   fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ
-         logstart dev pid (DfracOwn (1/4))
+         dev pid (DfracOwn (1/4))
          γi γtl bmapstart inodestart nib size ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (K_kexit <= av)%nat ->
   (* the covered range's block-number bounds, and the log's own storage *)
-  log_geom_ok fsc_cov logstart ->
+  log_geom_ok fsc_cov fsc_logst ->
   (* THE PROCESS HAS A WORKING DIRECTORY.  [begin_op(); iput(p->cwd);] is
      unconditional in xv6 -- there is no null test -- so a caller that
      cannot exhibit one is calling iput on a null pointer.  IT IS NOT A
@@ -239,8 +239,8 @@ Definition wp_kexit_sconf_body
   kalloc_avail γka on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] *)
   bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
-  fs_crash_seam fsc_cov logstart -∗
+  log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
+  fs_crash_seam fsc_cov fsc_logst -∗
   gen_cert -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -322,7 +322,7 @@ Module Type KEXIT.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (logstart : Z) (dev : mword 32)
+      (dev : mword 32)
       (ip : mword 64) (dqi : dfrac)
       (γkl : gname) (γka : gname * gname)
       (γi : gname) (γtl : gname)
@@ -331,7 +331,7 @@ Module Type KEXIT.
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate),
       wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ
-                          logstart dev ip dqi γkl γka
+                          dev ip dqi γkl γka
                           γi γtl bmapstart inodestart nib size
                           on fn m av eb b lks pid V.
 End KEXIT.

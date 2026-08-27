@@ -32,7 +32,7 @@
    of the eight ARE the addresses BitmapInv.v and InodeInv.v already name --
    SpecFsinit's [sb_size_addr] / [sb_ninodes_addr] / [sb_inodestart_addr] /
    [sb_bmapstart_addr] prove that by [reflexivity] -- so the cells born here
-   are handed to initlog (its [sb + 20] logstart fraction) and to ireclaim
+   are handed to initlog (its [sb + 20] fsc_logst fraction) and to ireclaim
    (ninodes / inodestart / bmapstart) without a single re-anchoring step.
 
    THE PANIC ARM AT +0x40 IS DEAD, and it is a REAL panic (not one of the
@@ -204,7 +204,7 @@ Section FsinitDefs.
      verbatim. *)
   Definition fsi_cont `{GEN : GenId} `{CID0 : CpuId}
       (bn : bio_names)
-      (logstart bmapstart inodestart ninodes size : Z)
+      (bmapstart inodestart ninodes size : Z)
       (dev : mword 32)
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (pidv : mword 32) (dq : dfrac) (j : nat)
@@ -223,13 +223,13 @@ Section FsinitDefs.
         sb_nblocks ↦₄ v_nblocks -∗
         InodeInv.sb_ninodes ↦₄ (mword_of_int ninodes : mword 32) -∗
         sb_nlog ↦₄ v_nlog -∗
-        sb_logstart ↦₄ (mword_of_int logstart : mword 32) -∗
+        sb_logstart ↦₄ (mword_of_int fsc_logst : mword 32) -∗
         InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
         BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
         (* block 1's run does NOT come back (durable-disk lane C-3a): it is
            spent into [initlog]'s [SbPark] park and rides out inside the
            [log_ctx] below. *)
-        log_ctx icfg_log bn fsc_fs fsc_cov logstart dev -∗
+        log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst dev -∗
         bslots 3 -∗
         iref_slot -∗
         ireg_boot -∗
@@ -287,7 +287,7 @@ Section FsinitEpilogue.
 
   Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names)
-      (logstart bmapstart inodestart ninodes size : Z)
+      (bmapstart inodestart ninodes size : Z)
       (dev : mword 32)
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (pidv : mword 32) (dq : dfrac)
@@ -308,14 +308,14 @@ Section FsinitEpilogue.
     sb_nblocks ↦₄ v_nblocks -∗
     InodeInv.sb_ninodes ↦₄ (mword_of_int ninodes : mword 32) -∗
     sb_nlog ↦₄ v_nlog -∗
-    sb_logstart ↦₄ (mword_of_int logstart : mword 32) -∗
+    sb_logstart ↦₄ (mword_of_int fsc_logst : mword 32) -∗
     InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
     BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov logstart dev -∗
+    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst dev -∗
     bslots 3 -∗
     iref_slot -∗
     ireg_boot -∗
-    fsi_cont (CID0 := CID0) bn logstart bmapstart inodestart ninodes
+    fsi_cont (CID0 := CID0) bn bmapstart inodestart ninodes
              size dev v_magic v_size v_nblocks v_nlog pidv dq j
              m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
@@ -540,7 +540,7 @@ Section FsinitMain.
       (γi : gname)
       (gtl : gname)
       (γpr : gname)
-      (logstart bmapstart inodestart : Z)
+      (bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
       (dev : mword 32)
       (v_magic v_size v_nblocks v_ninodes v_nlog
@@ -558,7 +558,7 @@ Section FsinitMain.
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb) :
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γi gtl γpr
-                           logstart bmapstart inodestart ninodes nib size
+                           bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
@@ -578,7 +578,7 @@ Section FsinitMain.
     assert (Hfimg : forall jj, (jj < 32)%nat ->
               bs_sb !!! jj
               = sb_image v_magic v_size v_nblocks (mword_of_int ninodes)
-                  v_nlog (mword_of_int logstart) (mword_of_int inodestart)
+                  v_nlog (mword_of_int fsc_logst) (mword_of_int inodestart)
                   (mword_of_int bmapstart) !!! jj).
     { intros jj Hjj. rewrite -Himg. symmetry.
       apply (fsi_take_total bs_sb 32 jj Hjj). }
@@ -608,21 +608,21 @@ Section FsinitMain.
        goes down to [initlog] is the WAND and initlog composes the two.
        Nothing else about the file system crosses into the WAL. *)
     assert (Hcgeom' : col_geom sbrec (FsImg.sb_inodestart sbrec) nib
-                        (fs_home_set fsc_cov logstart))
+                        (fs_home_set fsc_cov fsc_logst))
       by (rewrite (cg_ist Hcgeom); exact Hcgeom).
     iAssert (ireg_reg γi fsc_fs (FsImg.sb_inodestart sbrec) nib) as "#Hireg'".
     { rewrite (cg_ist Hcgeom). iExact "Hireg". }
-    iAssert (bitmap_reg fsc_fs (FsImg.sb_bmapstart sbrec) fsc_cov logstart
+    iAssert (bitmap_reg fsc_fs (FsImg.sb_bmapstart sbrec) fsc_cov fsc_logst
                (FsImg.sb_size sbrec)) as "#Hbm'".
     { rewrite Hbmq Hszq. iExact "Hbm". }
     iPoseProof (is_itable2_pool with "Hitb2") as "#Hpoolinv".
-    iAssert (□ (sb_park fsc_fs sbrec -∗ snap_law icfg_log fsc_fs fsc_cov logstart))%I
+    iAssert (□ (sb_park fsc_fs sbrec -∗ snap_law icfg_log fsc_fs fsc_cov fsc_logst))%I
       as "#Hlawf".
     { iModIntro. iIntros "#Hpark".
-      iApply (fs_snap_law_build icfg_log fsc_ic fsc_fs γi fsc_cov logstart nib sbrec
+      iApply (fs_snap_law_build icfg_log fsc_ic fsc_fs γi fsc_cov fsc_logst nib sbrec
                 eq_refl Hcgeom'
                 with "Hireg' Hbm' Hesc Hpoolinv Hpark"). }
-    iAssert (fsi_cont (CID0 := CID) bn logstart bmapstart inodestart
+    iAssert (fsi_cont (CID0 := CID) bn bmapstart inodestart
                ninodes size dev v_magic v_size v_nblocks v_nlog
                pidv dq j m K eb b lks Vpr)%I with "[Hcont]" as "Hcont";
       [rewrite /fsi_cont; iExact "Hcont" |].
@@ -864,7 +864,7 @@ Section FsinitMain.
     { rewrite elem_of_list_to_set. intros Hc.
       destruct (Hhdrok 1 Hc) as (_ & _ & Hne). apply Hne. reflexivity. }
     iMod (fs_bytes_agree_exc ⊤ (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
-            (fs_home_set fsc_cov logstart) Xv (list_to_set (hdr_dec bs_hdr).2)
+            (fs_home_set fsc_cov fsc_logst) Xv (list_to_set (hdr_dec bs_hdr).2)
             1 bs_sb bs0 logN_top Hb1nin
             with "Hbinv [$Hxo] Hfsb HpL")
       as "(%Hbs0 & Hxo & Hfsb & HpL)".
@@ -1124,7 +1124,7 @@ Section FsinitMain.
                        rewrite (fsi_img _ _ _ _ _ _ _ _ 4%nat jj
                                   ltac:(lia) Hjj); reflexivity)
                  with "W4") as "Hnl".
-    iDestruct (fsi_word4 sb_base (5 * 4)%nat (mword_of_int logstart : mword 32)
+    iDestruct (fsi_word4 sb_base (5 * 4)%nat (mword_of_int fsc_logst : mword 32)
                  (fun jj => bs_sb !!! jj)
                  ltac:(vm_compute; reflexivity)
                  ltac:(intros jj Hjj;
@@ -1452,7 +1452,7 @@ Section FsinitMain.
     iDestruct (initlog_dirty_all_false fsc_fs D fsc_cov with "HauthD Hdirty")
       as "(%HDall & HauthD & Hdirty)".
     iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log fsc_fs γpr
-              fsc_cov logstart dev sb_base bs_hdr Xv
+              fsc_cov fsc_logst dev sb_base bs_hdr Xv
               Mbrn L D
               vlock vname vcpu v_start v_dev v_nc v_n
               pidv dq (DfracOwn 1) Q9 (K - 4)%nat eb b lks Vpr
@@ -1557,7 +1557,7 @@ Section FsinitMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
-              icfg_log γi gtl γpr logstart bmapstart inodestart
+              icfg_log γi gtl γpr bmapstart inodestart
               ninodes nib size dev pidv dq (DfracOwn 1) (DfracOwn 1)
               (DfracOwn 1) R1 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0
@@ -1582,7 +1582,7 @@ Section FsinitMain.
     { intros c Hcs N2' N8 N9 N18.
       rewrite (callee_saved_lookup Hcsir_cs c Hcs).
       exact (HR1thr c Hcs N2' N8 N9 N18). }
-    iApply (fsi_epilogue (CID0 := CID33) j bn logstart bmapstart
+    iApply (fsi_epilogue (CID0 := CID33) j bn bmapstart
               inodestart ninodes size dev v_magic v_size v_nblocks
               v_nlog pidv dq m mf K eb b lks Vpr HK Hmfsp Hmfthr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls

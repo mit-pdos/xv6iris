@@ -137,7 +137,7 @@ Definition wp_iput_sconf_body
     (g : log_names) (gi : gname)
     (gtl : gname)                                     (* itable.lock         *)
     (gil gisl : gname)                                (* ip->lock            *)
-    (logstart bmapstart inodestart : Z) (nib : nat)
+    (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (k : nat) (q : Qp) (inum : mword 32)
     (n : nat)
@@ -162,15 +162,15 @@ Definition wp_iput_sconf_body
      makes the 64-bit pointer and the slot the same thing *)
   (k < NINODE)%nat ->
   (* the covered range's block-number bounds, and the log's own storage *)
-  log_geom_ok fsc_cov logstart ->
+  log_geom_ok fsc_cov fsc_logst ->
   (* --- itrunc's geometry, threaded verbatim (SpecItrunc.v) --- *)
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set logstart) ->
+  ~ (bmapstart ∈ log_region_set fsc_logst) ->
   0 <= inodestart ->
   IBLOCK inum inodestart ∈ fsc_cov ->
-  ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+  ~ (IBLOCK inum inodestart ∈ log_region_set fsc_logst) ->
   (* the inum is one the inode REGION covers: ireg_read / ipool_acc *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
   (* bfree's per-slot range fact, via IcacheInv.blkmap_slot_inrange *)
@@ -203,15 +203,15 @@ Definition wp_iput_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
-  log_ctx g bn fsc_fs fsc_cov logstart dev -∗
+  log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
   (* the itable spinlock over the v2 resource; §13.11's trailing device *)
-  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
   (* the [ref] words *)
   itable_inv -∗
   (* THIS slot's escrow -- iput knows its slot, so unlike iget it needs no
      ic_escrows family *)
-  ic_escrow fsc_ic fsc_fs gi fsc_cov logstart k -∗
+  ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst k -∗
   (* the inode region *)
   ireg_inv gi fsc_fs inodestart nib -∗
   (* THE SEALED REGIME, AT THE RUNTIME ARM (iclaim-ledger.md §6′, RULING G;
@@ -250,7 +250,7 @@ Definition wp_iput_sconf_body
   (* ---- itrunc / iupdate's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   (* the caller's own pid cell (acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
@@ -362,7 +362,7 @@ Definition wp_iput_gen_body
     (g : log_names) (gi : gname)
     (gtl : gname)
     (gil gisl : gname)
-    (logstart bmapstart inodestart : Z) (nib : nat)
+    (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (k : nat) (q : Qp) (inum : mword 32)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -381,14 +381,14 @@ Definition wp_iput_gen_body
   (* the two absorption credits, travelling to itrunc unchanged *)
   (crb = true -> bmapstart ∈ Sb) ->
   (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
-  log_geom_ok fsc_cov logstart ->
+  log_geom_ok fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set logstart) ->
+  ~ (bmapstart ∈ log_region_set fsc_logst) ->
   0 <= inodestart ->
   IBLOCK inum inodestart ∈ fsc_cov ->
-  ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+  ~ (IBLOCK inum inodestart ∈ log_region_set fsc_logst) ->
   bv_unsigned inum < 16 * Z.of_nat nib ->
   cov_below fsc_cov size ->
   (iput_units <= n)%nat ->
@@ -404,10 +404,10 @@ Definition wp_iput_gen_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
-  log_ctx g bn fsc_fs fsc_cov logstart dev -∗
-  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
+  log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrow fsc_ic fsc_fs gi fsc_cov logstart k -∗
+  ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst k -∗
   ireg_inv gi fsc_fs inodestart nib -∗
   (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING G).
      iput's free path FREEZES the inode ([InodeRegion.ireg_freeze_au] at
@@ -434,7 +434,7 @@ Definition wp_iput_gen_body
   inode_refp k q dev inum -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
   dev_inv gu gd -∗
@@ -508,7 +508,7 @@ Module Type IPUT.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname) (gil gisl : gname)
-      (logstart bmapstart inodestart : Z) (nib : nat)
+      (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat)
@@ -516,7 +516,7 @@ Module Type IPUT.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gi gtl gil gisl
-                          logstart bmapstart inodestart nib size dev
+                          bmapstart inodestart nib size dev
                           k q inum n pidv dq dqb dqs m K eb b lks Vpr.
   (* the credited set-form contract; [wp_iput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
@@ -531,7 +531,7 @@ Module Type IPUT.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname) (gil gisl : gname)
-      (logstart bmapstart inodestart : Z) (nib : nat)
+      (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -540,6 +540,6 @@ Module Type IPUT.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool),
       wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl gil gisl
-                       logstart bmapstart inodestart nib size dev
+                       bmapstart inodestart nib size dev
                        k q inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr rg.
 End IPUT.

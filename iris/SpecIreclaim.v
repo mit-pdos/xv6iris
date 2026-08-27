@@ -192,7 +192,7 @@ Definition wp_ireclaim_sconf_body
     (γ : log_names) (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
-    (logstart bmapstart inodestart : Z)
+    (bmapstart inodestart : Z)
     (ninodes : Z) (nib : nat) (size : Z)
     (dev : mword 32)
     (pidv : mword 32) (dq dqb dqs dqn : dfrac)
@@ -203,19 +203,19 @@ Definition wp_ireclaim_sconf_body
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_ireclaim <= K)%nat ->
   (* bread's / the log's block-number arithmetic, and the log's own storage *)
-  log_geom_ok fsc_cov logstart ->
+  log_geom_ok fsc_cov fsc_logst ->
   0 <= inodestart ->
   (* EVERY inum the region covers lives in a covered HOME block that is not
      log storage: bread's premise, ilock's and iput's.  The scan cannot know
      which inum it stops at, so the premise is the quantified one
      ([InodeInv.ireg_blocks_ok]) -- and it delivers BOTH conjuncts iput
      wants. *)
-  ireg_blocks_ok inodestart nib fsc_cov logstart ->
+  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
   (* ---- itrunc's geometry, threaded through iput verbatim ---- *)
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set logstart) ->
+  ~ (bmapstart ∈ log_region_set fsc_logst) ->
   cov_below fsc_cov size ->
   (* ---- THE THREE GEOMETRY PREMISES -- SpecIalloc.v's, verbatim.
      [1 < ninodes] kills the [bgeu a5,a4] at +0x0a, the empty-region exit
@@ -261,9 +261,9 @@ Definition wp_ireclaim_sconf_body
   kernel_data -∗
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
+  log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
   (* end_op's crash seam and era certificate *)
-  fs_crash_seam fsc_cov logstart -∗
+  fs_crash_seam fsc_cov fsc_logst -∗
   gen_cert -∗
   (* the three superblock fields, read and handed straight back *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -282,14 +282,14 @@ Definition wp_ireclaim_sconf_body
      only caller, hands it in and takes it back. *)
   ireg_boot -∗
   (* ---- THE ICACHE, as iget / ilock / iput take it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi fsc_cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
   (* THE FIFTY ENTRY SLEEPLOCKS, as a family: the scan does not know which
      slot iget will pick.  [IcacheEscrow.ic_sleeplocks_lookup] projects it. *)
   ic_sleeplocks fsc_ic -∗
   (* itrunc's bitmap, through iput *)
-  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   (* the caller's own pid cell (bread's / begin_op's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle and the disk fabric *)
@@ -347,13 +347,13 @@ Module Type IRECLAIM.
       (γ : log_names) (γi : gname)
       (gtl : gname)
       (γpr : gname)
-      (logstart bmapstart inodestart : Z)
+      (bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
       (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γi gtl γpr
-                             logstart bmapstart inodestart ninodes nib size
+                             bmapstart inodestart ninodes nib size
                              dev pidv dq dqb dqs dqn m K eb b lks Vpr.
 End IRECLAIM.

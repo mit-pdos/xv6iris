@@ -702,7 +702,7 @@ Section ProofUserinit.
                          _ & _ & _ & _ & %Hg)".
       iPureIntro. exact Hg. }
     pose (N := MkUtNames γft γf γw γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-                 γtl fsc_printk fsc_bio icfg_log fsc_logst icfg_dev
+                 γtl fsc_printk fsc_bio icfg_log icfg_dev
                  iv1 DfracDiscarded fsc_kalloc fsc_kpages fsc_ireg fsc_itlock
                  fsc_bmapstart icfg_ist icfg_nib fsc_size ks pid).
     assert (Hwf : ut_wf N).

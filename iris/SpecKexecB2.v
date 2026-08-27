@@ -288,7 +288,7 @@ Section KexecB2Res.
   Definition kxc_res
       (jp : nat) (bn : bio_names) (g : log_names) (gi : gname)
       (gf : gname)
-      (logstart bmapstart inodestart : Z)
+      (bmapstart inodestart : Z)
       (size : Z) (dev : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) (n2 : nat)
@@ -299,13 +299,13 @@ Section KexecB2Res.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) : iProp Σ :=
-    (kxc_open gi logstart dev pidv kf qf sf gyf inumf dnf bmf
+    (kxc_open gi dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_opb g n2 ∗
      iref_slots 1 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
-     bitmap_inv fsc_fs bmapstart fsc_cov logstart size ∗
+     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size ∗
      bslots 3 ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
@@ -324,11 +324,11 @@ Section KexecB2Res.
   (*  eight-way [iSplitL] every time.                                     *)
   (* ------------------------------------------------------------------ *)
   Lemma kxc_load_peel (gi : gname)
-      (logstart : Z) (kf : nat) (inumf : mword 32)
+      (kf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) :
-    ic_loaded fsc_fs gi fsc_cov logstart kf inumf dnf bmf ⊢
+    ic_loaded fsc_fs gi fsc_cov fsc_logst kf inumf dnf bmf ⊢
     ∃ datl : nat -> list (bv 8),
-      ⌜inode_ok fsc_cov logstart dnf bmf datl⌝ ∗
+      ⌜inode_ok fsc_cov fsc_logst dnf bmf datl⌝ ∗
       (* durable-disk 2b-inode-3: the payload's record-only facts and the
          era's abstract value ride the same self-cancelling bracket the two
          contents holds do -- readi moves no byte, so the node does not
@@ -379,9 +379,9 @@ Section KexecB2Res.
   Qed.
 
   Lemma kxc_load_seal (gi : gname)
-      (logstart : Z) (kf : nat) (inumf : mword 32)
+      (kf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) :
-    inode_ok fsc_cov logstart dnf bmf datl ->
+    inode_ok fsc_cov fsc_logst dnf bmf datl ->
     inode_rec_local dnf ->
     dir_ok icfg_nib dnf datl ->
     dir_dots_ix (bv_unsigned inumf) dnf datl ->
@@ -397,11 +397,11 @@ Section KexecB2Res.
     dv_ride (bv_unsigned inumf) (dv_of dnf datl) -∗
     fv_ride (bv_unsigned inumf) (fv_of dnf datl) -∗
     top_frag (fs_gamma_L fsc_fs) (bv_unsigned inumf) (era_node dnf bmf datl) -∗
-    ic_loaded fsc_fs gi fsc_cov logstart kf inumf dnf bmf.
+    ic_loaded fsc_fs gi fsc_cov fsc_logst kf inumf dnf bmf.
   Proof.
     intros Hok Hrl Hdok Hddix Hdoc Hduq. rewrite /inode_map.
     iIntros "Hdlk Hdiat Hmeta [Haddrs Hind] Hbl Hdv Hfv Htop".
-    iApply (ic_mk_loaded fsc_fs gi fsc_cov logstart kf inumf dnf bmf datl
+    iApply (ic_mk_loaded fsc_fs gi fsc_cov fsc_logst kf inumf dnf bmf datl
               Hok Hrl Hdok Hddix Hdoc Hduq
               with "Hdlk Hdiat Hmeta Haddrs Hind Hbl Hdv Hfv Htop").
   Qed.
@@ -452,7 +452,7 @@ Section KexecB2Res.
   (*  published them; readi borrows three of them and returns all three.  *)
   (* ------------------------------------------------------------------ *)
   Lemma kxc_open_intro (gi : gname)
-      (logstart : Z) (dev pidv : mword 32)
+      (dev pidv : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) :
     is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
@@ -461,13 +461,13 @@ Section KexecB2Res.
     i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
     i_valid (ientry kf) ↦₄ valid_word true -∗
-    ic_loaded fsc_fs gi fsc_cov logstart kf inumf dnf bmf -∗
+    ic_loaded fsc_fs gi fsc_cov fsc_logst kf inumf dnf bmf -∗
     ity_shot gyf (di_type dnf) -∗
     (* ...and the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned inumf) -∗
     inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
     runit_any (bv_unsigned inumf) -∗
-    kxc_open gi logstart dev pidv kf qf sf gyf inumf dnf bmf
+    kxc_open gi dev pidv kf qf sf gyf inumf dnf bmf
              gilf gislf.
   Proof.
     rewrite /kxc_open.
@@ -590,7 +590,7 @@ Definition kxc_bad324_body
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names) (gi : gname)
     (gtl : gname) (gilf gislf : gname) (ga gf : gname)
-    (logstart bmapstart inodestart : Z) (nib : nat)
+    (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
@@ -603,14 +603,14 @@ Definition kxc_bad324_body
     (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
-  log_geom_ok fsc_cov logstart ->
+  log_geom_ok fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set logstart) ->
+  ~ (bmapstart ∈ log_region_set fsc_logst) ->
   0 <= inodestart ->
   cov_below fsc_cov size ->
-  ireg_blocks_ok inodestart nib fsc_cov logstart ->
+  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
   bv_unsigned inumf < 16 * Z.of_nat nib ->
   (iput_units <= n2)%nat ->
   (jp < NPROC)%nat ->
@@ -637,14 +637,14 @@ Definition kxc_bad324_body
   kernel_text -∗
   pc_is (mword_of_int (KXB + 0x31e) : mword 64) -∗
   fs_fabric gs gu gd gk pd pav pu bn g gi gtl
-            logstart inodestart nib dev -∗
-  kxc_open gi logstart dev pidv kf qf sf gyf inumf dnf bmf
+            inodestart nib dev -∗
+  kxc_open gi dev pidv kf qf sf gyf inumf dnf bmf
            gilf gislf -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* THE BLOCK BITMAP'S INVARIANT: persistent, and NOT droppable here --
      this block's [kxc_bad64] runs iunlockput, whose iput frees into it. *)
-  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   kalloc_env ga None -∗
   proc_pt P -∗
   proc_priv gf (proc_addr jp) pidv V -∗
@@ -698,7 +698,7 @@ Definition kxc_ls_body
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names) (gi : gname)
     (gtl : gname) (gilf gislf : gname) (ga gf : gname)
-    (logstart bmapstart inodestart : Z) (nib : nat)
+    (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
@@ -712,14 +712,14 @@ Definition kxc_ls_body
     (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
-  log_geom_ok fsc_cov logstart ->
+  log_geom_ok fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set logstart) ->
+  ~ (bmapstart ∈ log_region_set fsc_logst) ->
   0 <= inodestart ->
   cov_below fsc_cov size ->
-  ireg_blocks_ok inodestart nib fsc_cov logstart ->
+  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
   bv_unsigned inumf < 16 * Z.of_nat nib ->
   (iput_units <= n2)%nat ->
   (jp < NPROC)%nat ->
@@ -760,9 +760,9 @@ Definition kxc_ls_body
   kernel_text -∗
   pc_is (mword_of_int (KXB + 0x0f6) : mword 64) -∗
   fs_fabric gs gu gd gk pd pav pu bn g gi gtl
-            logstart inodestart nib dev -∗
+            inodestart nib dev -∗
   kalloc_env ga None -∗
-  kxc_res jp bn g gi gf logstart bmapstart inodestart size dev
+  kxc_res jp bn g gi gf bmapstart inodestart size dev
           kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
           aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
           (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -814,7 +814,7 @@ Definition kxc_ls_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb (proc_addr jp) -∗
       pc_is (mword_of_int (KXB + 0x116) : mword 64) -∗
-      kxc_res jp bn g gi gf logstart bmapstart inodestart size dev
+      kxc_res jp bn g gi gf bmapstart inodestart size dev
               kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
               aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
               (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -853,7 +853,7 @@ Module Type KEXECB2.
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gi : gname)
       (gtl : gname) (gilf gislf : gname) (ga gf : gname)
-      (logstart bmapstart inodestart : Z) (nib : nat)
+      (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
@@ -865,7 +865,7 @@ Module Type KEXECB2.
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string),
     kxc_bad324_body Q gs jp gl gu gd gk pd pav pu bn g gi gtl gilf gislf
-      ga gf logstart bmapstart inodestart nib size dev
+      ga gf bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P szf eb lks.
@@ -877,7 +877,7 @@ Module Type KEXECB2.
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gi : gname)
       (gtl : gname) (gilf gislf : gname) (ga gf : gname)
-      (logstart bmapstart inodestart : Z) (nib : nat)
+      (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
@@ -890,7 +890,7 @@ Module Type KEXECB2.
       (ef : nat -> bv 8) (P : uptd)
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string),
     kxc_ls_body Q gs jp gl gu gd gk pd pav pu bn g gi gtl gilf gislf
-      ga gf logstart bmapstart inodestart nib size dev
+      ga gf bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P ip va fz po eb lks.

@@ -178,7 +178,7 @@ Section ProofNameiTrMain.
       (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
-      (logstart bmapstart inodestart : Z) (nib : nat)
+      (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
@@ -187,7 +187,7 @@ Section ProofNameiTrMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_namei_tr_body gs j gl gu gd gk pd pav pu bn g gi gtl
-                       ga gf logstart bmapstart inodestart nib
+                       ga gf bmapstart inodestart nib
                        size dev plen pfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
@@ -381,7 +381,7 @@ Section ProofNameiTrMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (NX.wp_namex_tr gs j gl gu gd gk pd pav pu bn g gi gtl
-              ga gf logstart bmapstart inodestart nib size dev
+              ga gf bmapstart inodestart nib size dev
               plen pfun nfun n Sb P Pmiss pidv dq dqb dqs dqpv R5 (K - 4)%nat eb b
               _ Vpr Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hpfun0 Hbud Hj Hgs
