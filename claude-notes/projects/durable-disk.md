@@ -4119,14 +4119,101 @@ the rows below and in `design/fs-ghost-state.md`).
   - `IcacheEscrow` / `IcacheInv` / `IcacheBoot` / `FsCollectAll` KEEP their
     `cn`, permanently: de-threading is a CONTRACT-SURFACE move and those
     live below `FsCfg`.  `ic_sleeplocks_lookup` stays the sole accessor.
-  - **WHAT STAGE 1b OWES** (nothing of `cn` is left): the OTHER threaded
-    constants, on the same 88-file surface and by the same closed-cut rule —
-    `γfs cov logstart γi gtl nib inodestart dev g`.  The three tie
-    records are the meter: seventeen equations left in `fs_world`,
-    twenty-three fields in `sysc_ties`, seventeen in `fclose_ties`.
-    Each constant is its own closed cut and must be swept whole; expect the
-    same group-B cure to be a no-op now (those 16 files have no standalone
-    `ICFG` left).
+  **AS LANDED — R1b: THE FIVE PER-BOOT CONSTANTS ABOVE THE WAL CUT.  Whole
+  tree green, `make audit-only` identical BY NAME to a pre-change run of the
+  same tree (the thirteen entries), and `SystemAdequacy.v` /
+  `SystemAssumptions.v` are byte-identical — the audited theorem never named
+  any of the five.**
+
+  - **THE FIVE NAMES, AND WHAT EACH COST** (files / binder positions, measured
+    on the pre-change tree over the 93 contract files this slice touches):
+    `gfs`/`γfs : fs_names` → `fsc_fs` (90 / 375), `cov : gset Z` → `fsc_cov`
+    (93 / 355), `logstart : Z` → `fsc_logst` (91 / 358),
+    `gi`/`γi`/`γic : gname` → `fsc_ireg` (86 / 306), and the itable lock
+    (`gtl`, `γtl`, `γl` in iget/idup, `γil` in kfork) → `fsc_itlock`
+    (70 / 190).  382 declarations lost at least one parameter; **37 `Module
+    Type`s** and 56 of their `Parameter`s changed statement — `CREATE DIRLINK
+    DIRLOOKUP FSINIT IALLOC IDUP IGET ILOCK IPUT IRECLAIM ITRUNC IUNLOCK
+    IUNLOCKPUT IUPDATE KEXEC KEXECB2 KEXECB3 KEXIT KFORK NAMEI NAMEIPARENT
+    NAMEI_ROOT NAMEI_TR NAMEX NAMEX_ROOT NAMEX_TR READI SYSCHDIR SYSEXEC
+    SYSEXIT SYSFORK SYSLINK SYSMKDIR SYSMKNOD SYSOPEN SYSUNLINK WRITEI` —
+    and none gained a premise.
+  - **THE FIVE SHARE ONE CUT SET**, which is why they share one build: the
+    same 93 files bind them, so de-threading one and not the next only moves
+    where the equation sits.  The branch still carries one commit per name
+    (the split is textual, and the tree it ends at is the tree that built).
+  - **THE WAL KEEPS ITS BINDERS, AND THAT IS THE FREE DIRECTION.**  An FS
+    contract that calls `log_write` / `begin_op` / `end_op` / `bmap` /
+    `balloc` / `bfree` / `bread` INSTANTIATES those contracts' own `gfs`,
+    `cov`, `logstart` at the fields.  `log_ctx`, `bio_ctx`, `is_itable2`,
+    `ic_escrows`, `ireg_inv`, `ireg_reg`, `iname`, `bitmap_inv` and
+    `fs_crash_seam` keep their arities for the same reason: they live below
+    `FsCfg` and the contracts spell them at the field.
+  - **FIFTEEN TIES DIED, five per record**, and the meter now reads:
+    `FsSyscalls.fs_world` 17 → **12** equations (printk, kalloc, uart, disk,
+    dlock, bio, `icfg_log`, `icfg_ist`, `icfg_nib`, `icfg_dev`, bmapstart,
+    size), `ProofSyscall.sysc_ties` 22 → **17** fields,
+    `SpecFileclose.fclose_ties` 17 → **12**.
+  - **THE FIVE NAMES RECORDS LOSE THE FIVE FIELDS**, and had to:
+    `fclose_names` 25 → 20, `fread_names` 19 → 15, `fwrite_names` 25 → 21,
+    `fstat_names` 13 → 9, `UsertrapRes.ut_names` 32 → 27.  Keeping them was
+    the forbidden alternative for the same reason `cn` could not stay:
+    fileread / filewrite / filestat have NO tie record, so their proofs
+    could not have shown `frn_fs fn = fsc_fs` at the de-threaded `iunlock`
+    they call — the contract would have had to GAIN the equation.
+  - **WHAT IS GENUINELY PER-CALL AND STAYS THREADED.**  The bio layer's
+    `dev`; `SpecStati`'s `dev`/`inum`; the per-slot sleeplock pair
+    `gil`/`gisl` (always bound together, which is how they are told apart
+    from the itable lock).  On the BOOT side the era's own coverage stays and
+    is tied by an explicit premise — `FirstTok.fs_geom_ok_of_snap` /
+    `first_fsinit_pures_of_snap` take `fsc_cov = cov`, `FsCfgBoot` supplies
+    it, `SpecMain` / `ProofMain` / `SystemAdequacy` state the image's
+    numbers.  Below the contract surface the PURE geometry lemmas keep it
+    too (`WriteiBudget`, `ProofItruncParts`, `Proof*Parts`' arithmetic):
+    a contract proof INSTANTIATES them, which costs nothing.
+  - **WHICH GNAME IS THE ITABLE LOCK IS A STRUCTURAL QUESTION, NOT A NAMING
+    ONE.**  Four spellings occur and three of them mean something else in
+    other files (`gl` is the running process's slot lock, `gil` a per-slot
+    inode sleeplock, `γl` the ftable lock in kfork).  The identification that
+    holds: the argument `IcacheEscrow.is_itable2` takes, or the one the
+    `"itable"` acquire/release is applied at, propagated along contract
+    applications into the files that only pass it through.
+  - **A DE-THREADED NAME OUTSIDE THE CLASS'S SCOPE IS A MEMORY BOMB, NOT A
+    TYPE ERROR — AND IT IS THE ONE THING THIS SLICE GOT WRONG TWICE.**  A pure
+    lemma at file top level (`SpecDirlink.ireg_blocks_ok`,
+    `ProofWritei.wi_ad_of_alloced_any`, `ProofFilewrite.fw_inode_ok_rebuild`)
+    has no `fscfg` in scope, so `fsc_cov` sends typeclass search after
+    `fileG Σ` with `Σ` unknown and it does not come back: two of them reached
+    **190 GB** before they were killed, and the build log says only
+    `Error 143` — no Coq error, no slow-sentence trail unless you compile the
+    file alone with `-time`.  THE RULE: de-thread a declaration ONLY where the
+    class is already reachable (an enclosing `Context` carrying `fileG` or
+    `ICFG : icfg`, or the declaration's own binder group).  A declaration
+    outside that scope is below the contract surface by construction — a pure
+    fact a contract INSTANTIATES — and keeps its parameters.  The checker is a
+    grep: no `fsc_*` may occur in a declaration with no `fscfg` in scope.
+  - **A NAME BOUND AT TWO TYPES IN ONE FILE IS A RENAME HAZARD.**
+    `SpecFsinit.sb_image` binds a WORD called `logstart` (the superblock's
+    fifth cell) that has nothing to do with the ambient block number; it is
+    `wlogstart` now.  The checker is one grep over binder groups.
+  - **THE `FsCfg` CURE**: seventeen files gained `Require Import FsCfg` and
+    sixty-eight binder groups gained an `FSC : fscfg` beside their
+    `ICFG : icfg`.  ONE instance path per scope, never two (ProbeR1a.v) — and
+    the import must sit BEFORE the first use, which `ProofFilewrite` is the
+    witness for: its own `Require` block sits two hundred lines BELOW a lemma
+    that names a field.
+  - **FIVE FILES `iris/_CoqProject` DOES NOT LIST ARE STALE AND WERE LEFT
+    ALONE**: `DirViewPin NameiInitPinned ProofKexecPinned ProofKexecPinnedA
+    SpecKexecPinned`.  They still thread `cn` and still call `kxc_open` at
+    the pre-R1a arity, so they were already out of sync before this slice;
+    editing them half-way would only deepen it.  Whoever revives the pinned
+    corner ports them across ranks 1a and 1b together.
+  - **WHAT STAGE 3 STILL OWES**: `dev nib inodestart glog` — the 288 `icfg_*`
+    ties (`icfg_log` 106 sites / 51 files, `icfg_dev` 64, `icfg_nib` 62,
+    `icfg_ist` 56), which are the ten remaining rows of `fs_world` minus
+    bmapstart/size, and `SpecKexec.fs_fabric`'s `⌜g = icfg_log⌝`.  The three
+    tie records stay the meter: twelve equations in `fs_world`, seventeen
+    fields in `sysc_ties`, twelve in `fclose_ties`.
 - [ ] **EV — the era-vocabulary unification** (approved): five staged
   lanes; three of the four holders are already predicate-vocabulary; the
   payoff is the commit handing a real `fs_state` to the transport.  Runs

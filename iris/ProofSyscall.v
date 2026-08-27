@@ -654,7 +654,7 @@ Section SyscallVocab.
   Proof. rewrite /sysc_fs_env. apply _. Qed.
 
   (* THE CLOSER'S OWN TIE RECORD, out of the dispatch's.  [fclose_ties] is
-     [SpecFileclose]'s eighteen-equation statement of "this [fclose_names]
+     [SpecFileclose]'s twelve-equation statement of "this [fclose_names]
      names the ambient file system"; [sysc_ties] says the same and more (the
      three process facts, the [bn] equation, the pid fraction), so this is a
      projection with one composition in it -- [fcn_bio] goes through [bn]. *)
@@ -3310,7 +3310,7 @@ Section SyscallArms.
       "(_ & _ & _ & _ & _ & _ & %Hdq & %Hbio & %Hpja & %Hjn & %Hlk & %Hlg &
         #Hpi & #Hpanic & #Hbio' & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
         #Hdlock & #Hkmem & #Hka & _)".
-    (* THE TWO ROWS THAT REPLACED [fileclose_ic_env fn]: the eighteen-equation
+    (* THE TWO ROWS THAT REPLACED [fileclose_ic_env fn]: the twelve-equation
        tie record and the ONE predicate every fs fact is a projection of.
        Both persistent, both already in hand -- the ties come off
        [sysc_ties], which says everything [fclose_ties] does and more. *)

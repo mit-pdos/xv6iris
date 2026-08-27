@@ -261,13 +261,14 @@ Section FsBundles.
      ambient form gets it back by [FsReady.disk_geom_agree].  The two forms
      are interderivable, [fs_world_all]'s statement is unchanged, and so is
      every contract below that takes [pd]/[pav]/[pu] as parameters. *)
-  (* TWO MORE TIES THAN THE EIGHTEEN CONSTITUENTS NEED, and the block
-     bitmap is why.  [BitmapInv.bitmap_inv] is a conjunct of [fs_ready] at
-     the AMBIENT geometry ([fsc_bmapstart], [fsc_size]); every fs contract
-     that takes it -- [SpecSysMkdir], [SpecSysChdir] -- spells it at the
-     CALLER's [bmapstart]/[size], exactly as it spells [fsc_cov]/[fsc_logst] at
-     the caller's.  Those two already ride here as equations, so the bitmap
-     row costs exactly what every other row costs: two more of the same. *)
+  (* TWELVE EQUATIONS, AND THE BLOCK BITMAP IS WHY TWO OF THEM ARE HERE.
+     [BitmapInv.bitmap_inv] is a conjunct of [fs_ready] at the AMBIENT
+     geometry ([fsc_bmapstart], [fsc_size]); every fs contract that takes it
+     -- [SpecSysMkdir], [SpecSysChdir] -- still spells it at the CALLER's
+     [bmapstart]/[size], so those two ride here as equations.  The coverage
+     set and the log's start no longer do: rank 1's second slice made them
+     ambient, and a contract that names [fsc_cov]/[fsc_logst] directly has
+     nothing left to tie. *)
   Definition fs_world (γpr γa : gname) (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names) (glog : log_names)
@@ -324,10 +325,9 @@ Section FsBundles.
     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size.
   Proof.
     rewrite /fs_world.
-    (* SEVENTEEN equations now -- the icache's went with [cn] itself
-       (rank 1, the [cn] slice: the contracts read [fsc_ic] off the class,
-       so no caller threads a copy for an equation to tie) -- and the disk
-       fabric arrives as
+    (* TWELVE equations -- everything rank 1 has made ambient reads off the
+       class instead, so no caller threads a copy for an equation to tie --
+       and the disk fabric arrives as
        two RESOURCES at the caller's own [pd]/[pav]/[pu] (R1).  So the two
        disk rows of the conclusion come from them rather than from
        [fs_ready], whose own disk conjunct is the existential this predicate

@@ -1910,7 +1910,7 @@ Section ProofKexit.
     iIntros "#Hbio #Hlog #Hseam #Hgen #Hdev #Hgeo #Hdlk Hbsl %Hties #Hrdy".
     iIntros "Hinit Hsp Hir Hpriv".
     (* ---- THE TIES, AND THE FILE SYSTEM THEY POINT AT ----
-       [fclose_ties] says kexit's own eighteen threaded names ARE the ambient
+       [fclose_ties] says kexit's own twelve threaded names ARE the ambient
        ones, and every one of them is a BINDER of this lemma -- so the
        equations are not rewritten, they are [subst]ed, and the whole body
        below runs at [FsCfg]/[IcacheRef]'s fields.  What used to arrive as

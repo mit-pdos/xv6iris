@@ -1344,7 +1344,7 @@ Section ProofFileclose.
           subst n. subst p.
           (* ---- THE TIES, DESTRUCTED ONCE ----
              [fclose_ties] says [fn]'s own names ARE the ambient ones, so the
-             whole FS arm below is spelled AMBIENTLY and the eighteen
+             whole FS arm below is spelled AMBIENTLY and the twelve
              equations are used only where a resource ARRIVES at [fn]'s
              spelling ([Hbsl]) or has to LEAVE at it (the postcondition's
              [fileclose_fs_out]).  That is [FsSyscalls.fs_world_all]'s idiom

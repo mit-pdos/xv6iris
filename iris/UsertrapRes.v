@@ -686,7 +686,7 @@ Section UsertrapRes.
     ut_park_caps N -∗ FsReady.fs_ready -∗ ut_caps N.
   Proof.
     iIntros "(%Hties & %Hpr & #Hprocs & #Hkst & #Hdev & #Hwl & #Hft & #Hdg & #Hpw) #Hfs".
-    (* the eighteen field equations, spelled at the RECORD's fields rather
+    (* the twelve field equations, spelled at the RECORD's fields rather
        than at [un_fn]'s projections of them, so every [rewrite] below is
        syntactic.  [Hties] itself is kept whole: it is conjunct 17. *)
     pose proof Hties as Ht.
