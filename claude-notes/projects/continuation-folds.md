@@ -25,18 +25,61 @@ SEAMS were already folded (`ProofKexecSeam.kxc_at_12c`, used 7× in
 ProofKexecB3), and the return closer was the only inline continuation left in
 it. Nothing there is left to fold.
 
-## Remaining, ranked
+## NEGATIVE RESULT: ProofPrintk, and the ranking rule it corrects
+
+**Folding `ProofPrintk`'s eleven identical `wp_printk_arm_*` exit
+continuations is worth NOTHING — do not redo it.** Measured on a quiet box
+(load < 1), two reps each, interleaved:
+
+| arm | wall | `.vo` |
+|---|---|---|
+| baseline | 48.40 s | 4,392,544 |
+| eleven arm tails folded | 48.44 s | 4,384,779 (−0.18 %) |
+
+The rows were character-for-character identical at all eleven sites and 35–43 %
+of each statement, which is why it looked like the best remaining target. It
+is not, and the reason is the rule:
+
+> **`|Δ| × steps` is PER PROOF. A continuation repeated across many CHEAP
+> lemmas is not the same prize as one that sits in a single expensive walk.**
+
+Those eleven lemmas cost **15.6 s of the file's 46.5 s between them** — 0.3 to
+2.7 s each. Taking 40 % off the Δ of a 0.8 s proof saves ~0.3 s, and eleven of
+those is inside the noise of a 48 s file. Compare `ProofSysUnlink.su_w3`:
+**one** lemma, 26.5 s, with a 48 % item in its Δ — that is the regime where
+the fold pays.
+
+So rank by **that lemma's own `coqc -time` cost × its share**, never by the
+FILE's cost × the share. Getting this wrong is what put ProofPrintk at the top
+of the first draft of this list. `tools/`-free recipe: `coqc -time` the file,
+attribute each sentence to its enclosing `Lemma` by character offset (the
+offsets are BYTES), and sum.
+
+## Remaining, ranked — by LEMMA cost × share
 
 Per-lemma cost from isolated `coqc -time`; share is the largest inline
 continuation as a fraction of that lemma's statement.
 
 | file | build | the fold |
 |---|---|---|
-| **`ProofPrintk.v`** | 60 s | **14 lemmas, one shape.** `wp_printk_prologue` 66 %, `wp_printk_setup` 48 %, and a dozen `wp_printk_arm_*` at 35–43 %, all 7–19 rows. The arm continuations already come in three near-identical variant groups differing in one pure clause (`+2` vs `+3`), so ONE definition parameterised over that clause serves them all. The richest remaining target. |
-| `ProofIput.v` | 79 s | `ip_free_entry` **47.9 %** of a 16 kB statement (7663 B, 50 rows), `ip_free_offlock` 31 %. **MEASURE BEFORE EDITING** — optimization.md records that naming `ip_free_locked`'s closer here cost **+13 s**. These are two DIFFERENT and larger continuations than the one that regressed, so it is not settled either way; it is the one file that has already resisted this lever. |
-| `WpSconfCsr.v` | 34 s | `wp_csrr_sstatus_s_sconf` **89.5 %** and `wp_csrci_sstatus_x0_s_sconf` 78.3 % — the highest shares in the tree. A leaf/engine file, so per-proof step counts are lower than a walk's; expect less than the share suggests. |
-| `ProofSysExec.v` | 51 s | `sx_setup` 63.2 %. But the file is ~30 proofs and this is one of them — high share, small prize. |
-| `ProofInitlog.v` | 44 s | `il_hd` 47 %. |
+| **`ProofCopyout.v`** | `co_loop` **33.8 s**, 27.3 % | The biggest single-lemma prize left, and the only remaining one whose lemma cost is in the tens of seconds. Untried. |
+| `ProofIput.v` | `ip_free_entry` 16.3 s, 47.9 % | `ip_free_entry` **47.9 %** of a 16 kB statement (7663 B, 50 rows), `ip_free_offlock` 31 %. **MEASURE BEFORE EDITING** — optimization.md records that naming `ip_free_locked`'s closer here cost **+13 s**. These are two DIFFERENT and larger continuations than the one that regressed, so it is not settled either way; it is the one file that has already resisted this lever. |
+| `WpSconfCsr.v` | lemma cost not measured | `wp_csrr_sstatus_s_sconf` **89.5 %** and `wp_csrci_sstatus_x0_s_sconf` 78.3 % — the highest shares in the tree. A leaf/engine file, so per-proof step counts are lower than a walk's; expect less than the share suggests. |
+| `ProofSysExec.v` | `sx_step` 9.4 s, 50.2 % | ~4.7 s at best. The file is ~30 proofs; this is one of them. |
+| `ProofKforkB6.v` | `kfk_prologue` 15.2 s, 39.1 % | ~5.9 s. One lemma, one seam — the cleanest small one. |
+| `ProofInitlog.v` | lemma cost not measured | `il_hd` 47 % of statement. |
+
+## Already folded — and one that only LOOKS like duplication
+
+`ProofNamex.v` is where optimization.md's "fold block continuations" rule was
+first written down, and it and `ProofNamexTr.v` (120 s each, the #2 and #5
+files) already carry nine `nx_*_body` definitions apiece. A span-level survey
+flags eleven ~1 kB blocks shared between the two files — but those are the
+BODIES OF THOSE DEFINITIONS, restated in NamexTr rather than imported from
+Namex. That is source duplication, not Δ: both files already pay the folded
+cost, so hoisting them into a shared file is a tidiness change with no
+measurable win. Do not read a cross-file span match as a fold opportunity
+without checking whether both sides are already named.
 
 ## Not instances — do not go looking here
 

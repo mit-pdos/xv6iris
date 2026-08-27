@@ -276,6 +276,18 @@ experimenting**: `ulimit -v 25000000` before `coqc`/`make` is ~7x the largest
 legitimate file in the tree, so it never bites a real build and turns this
 failure into a fast one.
 
+**AND THE PRIZE IS PER LEMMA, NOT PER FILE — measured 2026-08-27, do not
+redo it.** `ProofPrintk`'s eleven `wp_printk_arm_*` exit continuations are
+character-for-character identical and 35–43 % of each statement, which reads
+exactly like this section's shape. Folding all eleven measured **48.40 s →
+48.44 s** (`.vo` −0.18 %) on a quiet box, two reps interleaved: nothing.
+`|Δ| × steps` is per PROOF, and those eleven lemmas are 15.6 s of that file
+between them — 0.3–2.7 s each, so 40 % off a 0.8 s proof's Δ is ~0.3 s and
+eleven of them is noise. `su_w3` is the contrasting case: ONE lemma at 26.5 s
+with a 48 % entry. **Rank candidates by the lemma's own `coqc -time` cost
+times its share, never by the file's cost times the share** — the file-level
+metric is what put ProofPrintk top of the list.
+
 **Still on the table in this file, not done**: its seven `iNext`s are 3.5 s at
 495 ms each, against the ~60 ms `iApply bi.later_intro` costs — which the same
 file already uses at thirteen other sites. See "Modalities and rewriting".
