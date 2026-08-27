@@ -1,8 +1,21 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
-STEP 5, THE READ-SIDE TRANCHE (2026-08-26, latest session).  **The model
-`.vo` had never been rebuilt after A6.36 reverted its source, so A6.38's
-number was measured against the PATCHED machine and is VOID (A6.39).**
+STEP 5, THE RE-RULING (2026-08-26, latest session).  A6.37(b) is
+WITHDRAWN by the owner; **A6.47 rulings 1 and 2 are LANDED and green with
+ZERO fallout** — the author export (`ledger_msg_at` / `ledger_vis` /
+`ledger_read_vis_ok`, ONE gate for hart 0 and the secondaries) and the
+plain arm's receipt mint (the callback hands back a WP parameterised by
+`view_lb h tvn`; ten call sites drop it in one line).  **Ruling 3 is
+STOPPED on a measured falsity: `kpt_body`'s `⌜t ≤ B⌝` tie is refuted by
+the Svadu A/D write-back**, and the honest replacement is a per-address
+history fact — now expressible, thanks to ruling 1, but real machinery
+that wants its own ruling.  Ruling 4 (`WpUart`) is scoped, not started.
+**A6.47 is the handoff.**
+
+STEP 5, THE READ-SIDE TRANCHE (2026-08-26, same session, earlier).  **The
+model `.vo` had never been rebuilt after A6.36 reverted its source, so
+A6.38's number was measured against the PATCHED machine and is VOID
+(A6.39).**
 On the real pinned model: the read-side re-port is landed
 (`HartMFetch` + `HartPilot`, A6.40), the whole A6.7(B) revert tail is
 absorbed, A6.42's `ledger_read_ok` kit is in `TsoCtx`, `↦ₓ` now carries
@@ -3473,6 +3486,161 @@ work.
 3. `TransPt`/`UserPtTree`/`WpStartNew` (A6.27/A6.28) and `BootCarve`
    (A6.34) are independent of all of that and can be worked in parallel.
 4. `WpUart` last, on its own ruling.
+
+### A6.47 THE OWNER'S RE-RULING: (b) WITHDRAWN, (a) RATIFIED, THE PLAIN
+### ARM MINTS — BOTH LANDED, AND RULING 3's PREMISE IS REFUTED
+
+A6.37(b) is WITHDRAWN by the owner as refuted by A6.41's measurement (its
+premise was that an arm existed to change).  Four rulings came back; the
+first two are implemented and green, the third is stopped on a measured
+falsity, the fourth is scoped.
+
+**RULING 1 — THE AUTHOR EXPORT, LANDED.**  `TsoCtx` gains, all additive
+over ghosts that already existed:
+
+    ledger_msg_at i m  :=  i ↪[logm_name]□ m            (persistent, timeless)
+
+    ledger_vis h B t   :=  ⌜(t ≤ B)%nat⌝
+                        ∨ ∃ i m, ⌜t = S i⌝ ∗ ledger_msg_at i m ∗ ⌜pm_tid m = h⌝
+      (+ ledger_vis_below / ledger_vis_own / ledger_vis_mono)
+
+    ledger_read_vis_ok `{CID} (g : gstate) a dq v (t B : nat) :
+      gen_heap_interp g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗
+      view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+      ledger_vis (hart_agent cpu_id) B t -∗
+      phys_ledger_at a dq v t -∗
+      ⌜∀ tv', (g.(gtv) cpu_id <= tv')%nat ->
+         tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv' a = Some v⌝
+      (+ ledger_read_bytes_vis_ok, the window form)
+
+**`ledger_vis`'s two arms ARE `TsoMemPa.visibleb`'s two**, which is what
+makes this ONE gate for both routes — the thing the withdrawn (b) wanted
+and this delivers without touching the machine: a secondary uses
+`ledger_vis_below` with the boot receipt, hart 0 uses `ledger_vis_own` with
+the author fragment its own store handed back, and nothing downstream has
+to know which.  (`view_lb_0` makes the receipt free at `B = 0`, i.e. the
+pure-forwarding case.)  Structurally it is `TsoGhost.dirty_ok`'s
+disjunction lifted off the dirty set — the twin already had this shape for
+the CONTEXT's dirty bytes; ruling 1 is that same idea made available
+without a context.
+
+The producer side moved with it.  `ledger_store_bytes` and `ledger_store_ok`
+now return the window at the NEW timestamp (`phys_ledger_at … (S (length
+g.(glog)))`) and **`ledger_store_ok` keeps the persistent log fragment it
+used to discard** (`ghost_map_insert_persist … as "[Hm #Hmsg]"` — the
+fragment was always minted, it was just thrown away) and hands it back as
+`ledger_msg_at (length g.(glog)) (PWMsg Pnew auth)`.  `ledger_store_win_ok`
+is UNCHANGED (it weakens back internally with `phys_ledger_at_ledger`, so
+its existing `Wobl_ram` payers do not move) and a strengthened
+`ledger_store_win_at_ok` sits beside it for the writers that want the tie.
+
+**RULING 2 — THE PLAIN ARM'S RECEIPT, LANDED, AND THE SHAPE IS THE
+INTERESTING PART.**  The receipt cannot be handed to the callback: the
+machine picks `tvn` in `mnode_step`, which runs AFTER the callback's first
+fupd, and the callback has already given the bundle away by then.  It also
+cannot be handed to the callback's returned bundle, because the rule
+advances that bundle afterwards.  What works is to make the callback hand
+back a WP **parameterised by** the receipt:
+
+    ▷ (|={∅,⊤}=> mstate_interp σ ∗ tso_interp_of riscv_eraGS img σ.(mem) log V ∗
+         (∀ tvn : nat, ⌜(tv <= tvn)%nat⌝ -∗ ⌜(tvn <= length log)%nat⌝ -∗
+            view_lb view_name loglen_name (hart_agent cpu_id) tvn -∗
+            WP …))
+
+The rule then advances, mints with `tso_interp_of_receipt_at` at
+`vstep_here` (a one-line pure lemma added to `HartEvents`), and applies.
+**A consumer that does not want it writes `iIntros (tvn _ _) "_"` and is
+otherwise unchanged** — which is exactly what the ten existing call sites
+did (`HartMFetch` ×2, `HartMLoad`, `HartMemRun`, `HartPilot`, `HartSMem`'s
+two `Local Ltac`s, `SmodeCorePt` ×2, `PtTreeAdue` ×2).  The
+value-implies-position step stays in the proofs, per the ruling.
+
+**RULING 3 — STOPPED, BECAUSE `⌜t ≤ B⌝` IS FALSE.**  The tie A6.37
+specified for `kpt_body` says every kernel-PT slot's LATEST write is at or
+below the boot bound.  **The Svadu A/D write-back refutes it**: it is a
+real store to a PT slot, performed by whichever hart took the access, at a
+timestamp far above `B`.  After one of them, a slot's `phys_ledger_at`
+timestamp `t` exceeds `B`, and `ledger_read_vis_ok` — which needs
+`t ≤ B ≤ gtv` — no longer applies to any OTHER hart, which has neither the
+bound nor the author fragment.
+
+A6.37's justification for not needing history ("the A/D write-back is
+itself a `ledger_store_ok` under the same `kptN` invariant, so it cannot
+interleave inside an opening") is true and does not help: it rules out
+interleaving DURING an opening, not a reader whose view predates a
+COMPLETED write-back.  And the reader is not in trouble semantically — it
+reads an older version, which is `pte_canon`-equal, which is all the
+certificate claims (`kpt_leaf_node_canon`).  The gap is that
+`phys_ledger_at` only knows the LATEST write, so the ledger gate cannot
+say anything about the older one.
+
+> **WHAT THE HONEST INVARIANT IS: a per-address HISTORY fact.**  "Every
+> message ever appended that touches this slot is canon-equal to the
+> pinned value."  It is now EXPRESSIBLE without new machinery, because
+> ruling 1 exported `ledger_msg_at`: a growing big-op
+> `[∗ list] i ∈ seq 0 W, ∃ m, ledger_msg_at i m ∗ ⌜a ∈ dom (pm_map m) →
+> pte_canon (…) = pte_canon w⌝` over the log prefix, re-established at
+> each `ledger_store_ok` (which now hands its own message back, so the new
+> element is free) and carried in `kpt_body` beside `kpt_lb`.  That is
+> real machinery, it is the piece A6.37 said was unnecessary, and it
+> should be ruled on before it is built.
+
+**AND THE ARITY COST WAS MEASURED TOO**, because A6.37 also asked for `B`
+as a parameter of `kpt_inv`: `kpt_inv` has ~130 mention sites across **35
+files** (`SpecMain`, `TransPt`, `UsertrapRes`, `UservecExitPt`, `WpSFrames`
+… ), most of them spec files that carry it as a persistent hypothesis.
+An arity change there is a tree-wide sweep, and it should not be paid
+until the invariant's CONTENT is settled — the history fact above may want
+a different parameterisation (a bound is the wrong shape for a history).
+
+**RULING 4 — SCOPED, NOT STARTED, and the shape is measured.**  The
+broader approval is recorded: internal restructuring of
+`virtio_proto_step` and the lease family is PRE-APPROVED, and the stop
+condition is only a conformance-suite statement move.  What the work is:
+
+  - `VirtioProto.phys_map` / `phys_list` and `WpVirtio.dma_own` are
+    `[∗ map] a ↦ b ∈ …, phys_pointsto a (DfracOwn 1) b` — the flip is to
+    `TsoCtx.phys_ledger`, and it is the ~185 occurrences;
+  - `VirtioProto.virtio_proto_step` (`:1795`) hands back
+    `perm_done … -∗ gen_heap_interp (w ∪ m) ∗ disk_img_auth … ∗ virtio_proto γ v'`
+    — i.e. it PERFORMS the gen_heap update.  That is what cannot stand:
+    `ledger_store_ok` moves `gen_heap_interp` and `tso_interp_at`
+    TOGETHER (the interp's own tie relates the flat cell to the ledger
+    element), so the update has to happen at the caller.  Inside out means
+    handing the write set's OLD bytes out as `phys_ledger` and taking the
+    NEW ones back, with `WpUart.wp_disk_loop` doing the
+    `ledger_store_ok` between.
+
+Not started because it is a multi-file restructuring of a 2000-line
+protocol file and half of it is worse than none.  Nothing gates it now.
+
+**THE NUMBER: the red set did NOT move, and that is the result.**  The
+sweep after rulings 1+2 rebuilt 418 files and produced the SAME six red
+(`BootCarve`, `HartSKpt`, `TransPt`, `UserPtTree`, `WpStartNew`,
+`WpUart`) — so both rulings landed with zero collateral, which is what a
+receipt that a consumer may drop and an export that nobody yet consumes
+should cost.  **The closing MODEL-AWARE CLEAN REBUILD reproduces it
+exactly: 522 attempted, 516 `.vo`, 6 errors** (`iris/*.vo` deleted first;
+`ls -la model-xv6iris/*.v *.vo` checked FIRST per A6.39 — the model `.vo`
+postdates its source — and the three counts are self-consistent,
+522 − 6 = 516).  Two independent builds, one incremental and one clean,
+agreeing on the same 516/6 is the strongest form of the integrity check
+this project has.
+
+**WHERE THE NEXT LANE PICKS UP, revised:**
+
+1. **The history-invariant ruling** (ruling 3's replacement, above).  It
+   is the only thing gating `HartSKpt` and therefore the entire S-mode PT
+   tier (`SRegime` → `SmodeCorePt` → `IntrDefs` → …), including the
+   unverified `SmodeCorePt` re-port A6.46 flags.
+2. `WpUart` (ruling 4, pre-approved, ungated).
+3. `TransPt` / `UserPtTree` / `WpStartNew` (A6.27/A6.28) and `BootCarve`
+   (A6.34) — independent of both, and independent of each other.
+4. The flag-read receipt itself is now cheap: `wp_hart_ram_read_plain`
+   mints `view_lb h tvn`, so the boot MP proof is
+   "read 1 at `tvn`; the message publishing 1 is at `F`; I am not its
+   author; hence `F ≤ tvn`; hence `view_lb h F` by `view_lb_le`" — no
+   machinery, only the per-proof step the ruling left in the proofs.
 
 ## 7. Order of work
 
