@@ -8082,6 +8082,228 @@ tree.
    phys notation twin (last).
 
 
+### A6.74 THE `_exv` LANE IS BUILT AND GREEN — AND THE WINDOW PAYLOAD
+### CANNOT LIVE ON BYTE 0, WHICH IS A CORRECTION TO M4 RULING 3, NOT A
+### DETAIL
+
+Continuing the M4 Iris half on the coordinator's ratification of A6.73's
+two measurements (commit `d6c857b0`).  Item (B) is LANDED; item (A) is
+designed and priced below; and the step before both — the `ts_elem` window
+payload — turned out to have a maintenance obligation the memo's shape
+cannot discharge, which is the entry worth reading first.
+
+#### (1) LANDED: `Mobl_ram_exv` AND THE FOUR `_exv` NODES
+
+`HartSMem.v` gains `swp_read_ram_node{1,2,4,8}_exv`, `Mobl_ram_exv` and the
+width dispatcher `swp_read_ram_node_w_exv`.  The obligation is
+`Mobl_ram_ex`'s body with the `∃ bytes` moved INSIDE the `∀ tv'` and the
+resource made value-INDEPENDENT:
+
+```coq
+  Definition Mobl_ram_exv (width : Z) (pa : mword 64)
+      (P : mword (8 * width) -> Prop) (R : iProp Σ) : iProp Σ :=
+    (∀ σ img log tv V, ⌜V (hart_agent cpu_id) = tv⌝ -∗ mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜forall tv', (tv <= tv')%nat -> (tv' <= length log)%nat ->
+           exists bytes, tso_read_bytes img log (hart_agent cpu_id) tv' pa
+                           (Z.to_N width) bytes /\ P bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗ tso_interp_of … ∗ R))%I.
+```
+
+`R` is not value-indexed on purpose: a racy leaf's continuation wants
+`⌜P c⌝ ∗ T`, and a value-indexed `Rr` would have to be chosen before the
+step it is about.  A6.73's measurement B held exactly — the cost was the
+statements: `HartEvents.swp_hart_ram_read_plain_ex` is already this shape
+one tier down, so each node is one `Ltac` invocation.
+
+> **TWO `Ltac` PAPER CUTS, both of which report something else, and both
+> already in the file's neighbourhood as a precedent.**  (i) A name a
+> tactic introduces inside an `Ltac` body is NOT reachable by its literal
+> spelling later in that body — `iIntros (tvn w) … rewrite (Hres w)` fails
+> with *"The reference w was not found"*, which reads like a missing
+> lemma.  `let bs := fresh "bs" in` at the top is the fix, and it is why
+> `node_read_ex` was written that way.  (ii) The rule's predicate `P` must
+> be passed EXPLICITLY (`node_read_exv … P`): left as `_` it stays an evar
+> that the goal never determines, and the failure surfaces four tactics
+> later as `No such assumption` on a pure side goal.  Prefer anonymous
+> intro patterns plus `assumption` over named ones inside an `Ltac`.
+
+Validated: the file compiles standalone, and the round over its cone leaves
+**the same nine red files, unchanged** — the lane is purely additive.
+
+#### (2) THE CORRECTION: THE WINDOW PAYLOAD IS PER-BYTE, BECAUSE BYTE 0'S
+#### MAINTENANCE OBLIGATION IS UNDISCHARGEABLE
+
+The M4 memo's ruling 3 puts all three coverage claims "in ONE `ts_elem`
+option payload on BYTE 0 — no second ghost map", and §8 adds that
+`win_ok`'s maintenance "is a per-store side condition of the same shape as
+the pin's (`vnew ∈ Sv`)".  **The first half is right about the ghost map
+and wrong about the byte; the second half is false, and the two are the
+same fact.**
+
+`win_ok` says every timestamp writes the WHOLE window at `a` or none of it.
+Hang it on byte 0's element and its FRAME arm — the arm every store in the
+tree that is not the lock's must take — needs
+
+> the appended message does not write SOME of `a … a+n-1` while missing
+> byte 0,
+
+which is a fact about a SET of addresses.  The pin's frame arm is free
+because `pin_ok_app_frame`'s side condition is `msg_byte m a = None`, i.e.
+`a ∉ dom Pnew`, and `ledger_store_ok` knows that per address.  It does NOT
+know disjointness from a window whose extent lives inside the interp's
+existential `TM`, and no caller can state it: the window's addresses are
+not visible from the store site.  Carried honestly, it becomes a premise on
+`ledger_store_ok` — i.e. on every store in the tree — which is exactly the
+"exemption in a definition is a premise on every consumer" trap
+durable-notes prices.
+
+**THE FIX MAKES THE OBLIGATION PER-BYTE AGAIN, and it costs nothing else.**
+Put the payload on EVERY byte of the window and state the writer-pin AT
+THAT BYTE but ABOUT the window:
+
+```coq
+  Record ts_win := TsWin {
+    tw_base : Arch.pa;  tw_n : nat;  tw_j : nat;      (* this byte's offset *)
+    tw_z    : nat -> bv 8;                            (* the CLEAR word *)
+    tw_cp   : agent -> nat -> bv 8;                   (* each author's word *)
+    tw_own  : agent -> option nat;                    (* per-agent own-last *)
+  }.
+
+  Definition win_ok1 img log (a : Arch.pa) (W : ts_win) : Prop :=
+    a = pa_add (tw_base W) (tw_j W) /\ (tw_j W < tw_n W)%nat
+    (* (1) ANY message touching THIS byte writes the WHOLE window, with a
+       word allowed for its author.  Frame condition: [msg_byte m a = None]
+       -- the pin's, exactly. *)
+    /\ (forall i m, log !! i = Some m -> is_Some (msg_byte m a) ->
+          (forall k, (k < tw_n W)%nat ->
+             msg_byte m (pa_add (tw_base W) k) = Some (tw_z W k))
+          \/ (forall k, (k < tw_n W)%nat ->
+             msg_byte m (pa_add (tw_base W) k) = Some (tw_cp W (pm_tid m) k)))
+    (* (2) the era image covers the window: [win_ok]'s [t = 0] arm *)
+    /\ (forall k, (k < tw_n W)%nat -> is_Some (img !! pa_add (tw_base W) k))
+    (* (3) per agent, at THIS byte *)
+    /\ (forall h t, tw_own W h = Some t ->
+          (t <= length log)%nat
+          /\ (forall tv, visibleb h tv log t = true)
+          /\ log_byte img log t a = Some (tw_z W (tw_j W))
+          /\ own_last log h a t).
+```
+
+**AND `win_ok` IS THEN A THEOREM, NOT A CONJUNCT.**  From `n` copies of
+`win_ok1` agreeing on `(base, n, z, cp, own)`, the window's all-or-none
+property follows: at `t = 0` by (2); at `t = S i` because if the message
+writes ANY window byte `k`, byte `k`'s own copy of (1) forces it to write
+all of them; above the log both arms are `None`.  `wpin` is byte 0's copy
+of (1) verbatim.  So `TsoMemPa.win_ok` / `wpin` stay exactly as §12b
+states them and become the ASSEMBLY step the reader runs, which is where
+they belong — the reader holds all `n` bytes (`phys_ledger_word` is
+eight `phys_ledger`s) and the lock's resource is what asserts the `n`
+copies agree.
+
+> **THE GENERAL RULE, and it is the third time this port has paid for it:**
+> *a coverage claim's home is decided by its FRAME condition, not by its
+> content.*  `tso-pin-memo.md` §3 put these claims in the interp rather
+> than an invariant because they quantify over the log; this section says
+> WHERE in the interp — at the finest key whose frame arm the store gate
+> can already discharge.  A claim about `n` addresses parked on one of them
+> is a claim no framing store can pay.
+
+Cost of the corrected shape versus the memo's: identical ghost surface
+(one option payload in the existing `ts_elem`, no second map), `n` elements
+updated per lock store instead of one — and `ledger_store_ok` already
+updates every address of `Pnew` coherently, so that is free.  The lock's
+own store gate (`ledger_store_win_ok`, the twin of `ledger_store_pin_ok`)
+is what preserves the payload across the eight bytes it writes.
+
+#### (3) ITEM (A), THE PHYS-DATUM SIBLING AU — DESIGNED, AND ITS SHAPE IS
+#### A6.47 RULING 1'S AGAIN
+
+`wp_load_s_sconf_au`'s datum is `wordw_pointsto` (the CTX word tower at
+`cur_ctx`) and its obligation is discharged by the Local
+`wordw_pointsto_load_c`, which also consumes `own_context`.  The sibling
+must not simply swap in `phys_ledger_word`, because the three lock reads
+discharge by three DIFFERENT routes (holder = `ledger_vis_own` +
+`view_lb_0`; `notheld` = the racy kit; free-path = neither).  **So the
+leaf takes the ledger resource as a PARAMETER and one gate premise:**
+
+```coq
+    (Res : iProp Σ)                        (* whatever the client holds *)
+    (∀ g, gen_heap_interp g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗ Res -∗
+       ⌜∀ tv', (g.(gtv) cpu_id <= tv')%nat ->
+          ∃ w, tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv'
+                 pa (Z.to_N width) w ∧ P w⌝) ->
+```
+
+— one leaf, both routes, nothing downstream knowing which, exactly as
+A6.47 ruling 1 did for `ledger_read_vis_ok`.  **Nothing below `gstate`
+reaches the client** (A6.72's barrier-leaf rule); the `tso_interp_of` ↔
+`tso_interp_at` step stays inside, on `tso_interp_of_at_gs`.  Mind
+A6.63's node-argument rule and A6.64's `CIDw` binder: this is the file and
+the sentence where the 35/60/57-minute elaborations happened, and the phys
+form has one FEWER payload spelling to keep in agreement (it consumes no
+`own_context`), which helps rather than hurts.
+
+> **AND A THIRD KIT ITEM THE MEMO DOES NOT LIST, found while sizing this.**
+> The memo's site table marks `wp_clw_lockopen_s_sconf` (the free-path word
+> read) "receipt in hand? no" and treats that as costing nothing.  At the
+> real machine "no receipt" still owes a READ RESULT: the leaf must exhibit
+> `∃ w, tso_read_bytes … w` at every reachable view even when it concludes
+> nothing about `w`.  That is payable, and cheaply — `read_down` bottoms
+> out at the era image and the image covers RAM — but it is a gate that
+> does not exist: call it `ledger_read_any_ok`, `P := fun _ => True`, from
+> `addr_is_ram` plus the interp's image coverage.  Both "any value" leaves
+> (`wp_clw_lockopen_s_sconf`, and `wp_cld_lkcpu_lockopen_s_sconf` if it
+> were not being deleted) need it, and it is the honest reason ruling 1's
+> deletion is worth taking: it removes one of the two customers.
+
+#### THE NUMBER, AND WHAT IT PROVES ABOUT THE LANE
+
+**1088 of 1296, RED 9 — UNCHANGED from A6.73**, over a round that rebuilt
+`HartSMem`'s 290-file cone from source.  That is the acceptance test for an
+additive lane and it passed exactly: new statements, no client movement, no
+red-set movement in either direction.
+
+#### HANDOFF: M4'S REMAINING ORDER, WITH THE TWO CORRECTIONS FOLDED IN
+
+The coordinator's order stands; §(2) and §(3) above replace two of its
+steps' contents, and one step is added.
+
+1. **`TsoMemPa`'s `ts_win` / `ts_pay` and `ts_ok`'s growth** — §(2)'s
+   PER-BYTE shape, not byte 0's.  `ts_elem` becomes `nat * ts_pay` with
+   `ts_pay := TsPay { tp_pin : option (byteset * nat); tp_win : option
+   ts_win }`, which keeps `e.1` (~20 positional sites) and moves only
+   `e.2`; `(t, None)` becomes `(t, ts_pay_none)`.  `ts_ok` gains a THIRD
+   bullet (`∀ W, tp_win e = Some W -> win_ok1 img log a W`) — LAST, per
+   durable-notes' new-conjunct rule, so the ~20 destructurings do not move.
+   The assembly lemma (`n` copies of `win_ok1` ⟹ `win_ok` + `wpin`) is the
+   only genuinely new proof and §(2) has its argument in full.
+   Sites: `TsoMemPa`, `RiscvPtsto`, `RiscvExec`, `TsoCtx`, `CtxPinMint`,
+   `DiskInv` — the pin memo's measured six.
+2. **`TsoCtx`'s gates**: `ledger_read_racy_ok` (the `n`-copy assembly plus
+   `lkcpu_not_mine`, then the byte-to-word step: a differing byte at `k`
+   makes the assembled word differ, via `bv_eq_of_bytes`);
+   `ledger_read_any_ok` (§(3)'s footnote); `ledger_store_win_ok` (the
+   payload-preserving twin of `ledger_store_pin_ok`); the author premise on
+   `ledger_store_pin_ok`, whose side condition `pm_tid m = h ->
+   msg_byte m a = None` comes straight off `ledger_store_ok`'s existing
+   `auth` argument.
+3. **The phys-datum sibling AU** — §(3)'s parametric-`Res` shape.
+4. **`WpLock`'s `lk_cpu_res` at `phys_ledger_word`** plus the held arm's
+   per-byte `ledger_vis` residue (the `ledger_msg_at` fragment
+   `ledger_store_ok` already hands back), and the eight-copy `ts_win`
+   agreement the reader assembles from.
+5. **`WpSconfLock`**: delete the dead leaf; the two holder reads on
+   `ledger_vis_own` + `view_lb_0`; `notheld` on the racy kit; the free-path
+   read on `ledger_read_any_ok`; the stores/AMO on the parked record.
+   `lock_claims`' surviving `TsoCtxShim.ctx_word_of_mem` dies here.
+6. **`ProofHolding`**'s 2 call sites, statements unchanged.
+
+**ACCEPTANCE, unchanged:** `SpecAcquire` / `SpecRelease` / `SpecHolding` /
+`is_lock` / `locked` / `lock_openable` do not move, and `WpSconfLock`'s
+160-file cone opens.
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
