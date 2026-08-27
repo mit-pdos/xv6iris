@@ -402,6 +402,19 @@ then fails with an `ElemOf Z <your record type>` instance error that
 names the wrong cause entirely. Take `f` explicitly (see
 `FsDurSnap.NoDup_fmap_inj`) or hand `NoDup_elements` its set.
 
+## NAMING AN AMBIENT CLASS FIELD OUTSIDE ITS CLASS'S SCOPE IS A MEMORY BOMB, NOT AN ERROR
+
+A top-level pure lemma that mentions `fsc_cov`/`icfg_dev`/any `fscfg`/`icfg`
+field OUTSIDE a `Context`/binder group carrying the class (`fileG Σ`, or
+`ICFG : icfg`/`FSC : fscfg`) sends typeclass search after `fileG Σ` with `Σ`
+unknown — it does not fail, it runs until the machine dies (~190 GB,
+`SpecDirlink.ireg_blocks_ok` / `ProofWritei.wi_ad_of_alloced_any` at lane
+R1b). Declarations below the contract surface keep their parameters; the
+contract INSTANTIATES them at the field. And a file that names `fscfg`
+without `Require Import FsCfg` PARSES — backtick generalization invents a
+fresh `fscfg : Type` — and fails far away with `Could not find an instance
+for "FsCfg.fscfg"`; the tell is `fscfg : Type` in the printed environment.
+
 ## `rewrite` CAN FAIL ON A SUBTERM THAT PRINTS CHARACTER-FOR-CHARACTER
 
 **"Found no subterm matching `X`" where `X` visibly IS a subterm of the goal
