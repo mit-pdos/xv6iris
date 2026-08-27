@@ -300,9 +300,9 @@ home byte range) is the architecture, not an accident.
 ### 4½a. AS BUILT (3a'): the ruling's TWO WALLS, and the one decoupling
 ### that removes the first
 
-`iris/FsDurRefute.v` carries every claim below as a COMPILED LEMMA; read it
-before re-opening this design.  Nothing here is a proof difficulty — each
-is a statement about what a resource can possibly say.
+Every claim below was machine-checked before this ruling was written; read
+it before re-opening this design.  Nothing here is a proof difficulty —
+each is a statement about what a resource can possibly say.
 
 **(A) THE CHAIN HAS NO INTERMEDIATE OBJECT AT A `bfree`.**  §4½ (3) composes
 the accessors IN WRITE ORDER, one link per `log_write`, and each link hands
@@ -314,9 +314,8 @@ an IFF, so an inode owns every block its RECORD names.  xv6 clears the bit
 one `log_write` BEFORE it writes the record that stops naming the block —
 `itrunc` calls `bfree` on each address and only then `iupdate`s — so between
 those two writes the block has two owners and no `S` exists.
-`FsDurRefute.fs_state_stale_free_False` is that, off
-`fs_state_inode_block_used` ("an inode's own block is marked used", itself a
-consequence of the `∗` and not a clause).
+The refutation runs off "an inode's own block is marked used", itself a
+consequence of the `∗` and not a clause.
 
   - **The IN-TRANSIT BIN CANNOT REPAIR IT.**  The conflict is between two
     conjuncts of `fs_state` that BOTH claim the block; a bin adds an owner,
@@ -338,7 +337,7 @@ consequence of the `∗` and not a clause).
 
 **(B) THE ACCESSOR STILL FORCES OWNERSHIP, AND THE AU QUANTIFIES OVER THE
 INDEX.**  §4's `step_forces_the_element`, read at one BLOCK, is
-`FsDurRefute.dstep_block_forces_ownership`: any `Q` supporting the byte
+"the step forces ownership at the block": any `Q` supporting the byte
 auth's move at a byte of block `b` is refuted by an OUTSIDE holder of that
 byte, so `Q` must own block `b`.  Moving the ownership from the writer's hand
 into `P_wf` does not remove the obligation, it relocates it — and
@@ -359,10 +358,9 @@ avoid, arriving through the quantifier instead of through the body.
     the whole durable byte map — §0's forbidden shape, reached from the
     other side.
 
-**(C) THE ONE DECOUPLING THAT REMOVES (A).**  `FsDurRefute`'s
-`free_pool_at Γ nb p` is `free_pool` with the owned set given EXPLICITLY
-rather than read off the used set; `fs_state_mid Γ S p Bin` is `fs_state`
-over it with the bin beside it.  Two lemmas are the argument:
+**(C) THE ONE DECOUPLING THAT REMOVES (A).**  A relaxed `free_pool` with
+the owned set given EXPLICITLY rather than read off the used set, and an
+`fs_state` over it with the in-transit bin beside it.  Two lemmas are the argument:
 
   - `fs_state_mid_of_state` — at the ENDPOINT (pool exactly the complement of
     the used set, bin empty) the relaxed predicate IS `fs_state`, so the
@@ -392,7 +390,7 @@ close) are downstream of both and were not attempted.
 
 ## 4¾. RULING (owner, 2026-08-24): DEFERRED JUSTIFICATION — the transaction, not the write, is the unit of durable justification
 
-Issued after 3a′'s machine-checked refutation (`FsDurRefute.v`): the strict
+Issued after 3a′'s machine-checked refutation: the strict
 predicate cannot be the per-`log_write` intermediate (xv6 frees the bitmap
 bit one logged write before the record stops naming the block), and a
 ∀-quantified per-write obligation re-imports completeness through the
@@ -414,7 +412,7 @@ quantifier.  The fix is the transaction discipline itself:
    justified TOGETHER, at the moment the ownership transfer is coherent.
 4. **Consequences:** the strict `fs_state` is the ONLY durable object —
    the in-transit bin and the explicit-pool relaxation (§4½'s residuals,
-   `FsDurRefute` §C) are unnecessary and not built; the per-write
+   §4½a (C)) are unnecessary and not built; the per-write
    obligation is pinned (the AU hands the writer `D_justified`'s tie to
    the logged view; its era byte elements pin it at its object) — no ∀
    over durable maps; `P_wf` stays standalone-structured (§4½ (2)) with
@@ -429,9 +427,8 @@ place.
 ### 4¾a. AS BUILT (3a-def): the row that works, and the wall TWO OPEN
 ### TRANSACTIONS put in front of transaction-granular justification
 
-`iris/FsDurDefer.v` carries every claim below as a COMPILED LEMMA, in
-`FsDurRefute`'s shape (statements about what a resource can say, not proof
-difficulties).  §4¾ never mentions concurrency; `LogInv.log_res` permits
+Every claim below was machine-checked, in §4½a's shape (statements about
+what a resource can say, not proof difficulties).  §4¾ never mentions concurrency; `LogInv.log_res` permits
 `out ≤ 3`, and xv6's open transactions share blocks constantly — the bitmap
 block (two `balloc`s), an inode block (two `ialloc`s, or an `ialloc` beside
 another op's `iupdate`), a directory's data block.  Everything below is
@@ -442,7 +439,7 @@ for "`D_justified` overlaid with the open ops' deferred maps".  No
 order-free overlay FUNCTION can serve, because the ledger is a `gmap nat _`
 and records no order while `lm_logged L` depends on the write order:
 two ops each writing one home block once leave the SAME ledger under both
-orders (`FsDurDefer.dfr_ledger_order_blind` — and the rest of the entry
+orders (the ledger is ORDER-BLIND — and the rest of the entry
 matches too, if the block is already in `lh.block[]`, since both writes then
 take `log_write`'s ABSORB path and neither spends a budget unit), so the row
 would have to equal two different logged views.  That is
@@ -459,7 +456,7 @@ SEQUENCE NUMBER (which does defeat the refutation and then reduces to
 eviction, below, meeting the same wall).
 
 The row that works states the overlay pointwise and needs no union, no order
-and no disjointness hypothesis (`FsDurDefer.dfr_row`):
+and no disjointness hypothesis:
 
 ```
 (a) ∀ i d b v, om !! i = Some d → d !! b = Some v → lm_logged L cov ls !! b = Some v
@@ -508,15 +505,15 @@ the logged view and `Ψ`'s index is what `P_wf` is stated at — which is
 §4½a's wall (A) again, arriving through the ledger.  Put the deferral INSIDE
 the client's payload instead: the client keeps its own per-op deferral
 ledger at its own gname, `Ψ D₀ Dc` carries whatever intermediate object it
-likes (`FsDurRefute` §C's relaxed pool and its bin are both available there,
+likes (§4½a (C)'s relaxed pool and its bin are both available there,
 and neither is ever a `P_wf`), and the only thing the LOG adds is a
 QUIESCENCE TOKEN so that `log_psi_commit` is demanded at `out = 0` only,
 where the client must collapse its intermediate object to a real
 `fs_state`.  Then no `op_entry` field, no `log_state` row and no two-arm AU
 exist at all, and the log's interface is §5 unchanged.
 
-**THE FOUR SHAPES, as type-checked terms** (`FsDurDefer.v` §4, so the next
-lane starts from terms rather than a paraphrase): `P_wf_strict` (§4½ (2)'s
+**THE FOUR SHAPES, as type-checked terms** (they were written as terms so
+the next lane starts from terms rather than a paraphrase): `P_wf_strict` (§4½ (2)'s
 standalone body — `∃ S`, the top auth, the top FRAGMENTS, `fs_state Γ_D S`;
 the fragments are in it because `FsState.inode_owned` carries none and an
 authority with no elements cannot be retagged), `dstep_strict` with
@@ -530,7 +527,7 @@ empty deferred map), and `commit_conclusion` (`dstep_strict … D₀
 
 ## 4⅞. RULING (owner, 2026-08-24): OBJECT-GRANULAR pending, batch-scope durability, modularity by ∗
 
-Issued over 3a-def's concurrency wall (`FsDurDefer.v`).  Four decisions:
+Issued over 3a-def's concurrency wall (§4¾a).  Four decisions:
 
 1. **A transaction's durable promise is about its OBJECTS, never its
    blocks.**  Objects inside a shared block (bitmap bits, inode slots,
@@ -565,7 +562,7 @@ Issued over 3a-def's concurrency wall (`FsDurDefer.v`).  Four decisions:
    boundaries; the relaxed shapes live only inside the pending pool's
    intermediates.
 
-VALIDATION FIRST (the FsDurRefute/FsDurDefer style): the per-object
+VALIDATION FIRST (§4½a/§4¾a's style): the per-object
 pending-pool algebra incl. same-object recomposition; the encode-bridge's
 per-write maintenance at the shared bitmap under two interleaved ops; the
 quiescence composition.  Then the implementation lane.
@@ -573,9 +570,8 @@ quiescence composition.  Then the implementation lane.
 ### 4⅞a. AS VALIDATED (3a-val): the ruling STANDS, with one repair to the
 ### bit object's RESOURCE reading and one interface obligation on the era
 
-`iris/FsDurObj.v` carries every claim below as a COMPILED LEMMA, in
-`FsDurRefute`/`FsDurDefer`'s shape (statements about what a resource can
-say, not proof difficulties).  Every stated theorem prints `Closed under
+Every claim below was machine-checked, in §4½a/§4¾a's shape (statements
+about what a resource can say, not proof difficulties).  Every stated theorem prints `Closed under
 the global context`.  Nothing in the tree moved; `P_wf`'s body is still
 `LogDefs.fs_dview` and the eleven suppliers are untouched.
 
@@ -599,7 +595,7 @@ quiescence `dpool_run`/`dpool_run_frame`, with a CONCRETE instance at the
 shared bitmap (`dpool_run_bitmap_alloc`/`_free`, off `FsStateBitmap`'s own
 `bitmap_alloc`/`bitmap_free`).  **`dobj_3adef_scenario_handled` is §4¾a's
 wall scenario in one statement**, and its FIRST conjunct is
-`FsDurDefer.dfr_ledger_order_blind` applied unchanged: same ledger, same
+§4¾a's order-blindness applied unchanged: same ledger, same
 pool, same final values, **and the same final block BYTES** — the conjunct
 the block-level ledger could not have, because its target `lm_logged L`
 moves with the write order and the encoder of the objects' values does
@@ -656,7 +652,7 @@ order-free.
 
 **THE CLOSE.**  `dobj_close`: `D' = lm_logged L cov ls` at HOME MAPS, from
 "every home block's bytes are its objects' final values encoded" on both
-sides; `dobj_close_dstep` reads it into `FsDurDefer.commit_conclusion`.  No
+sides; `dobj_close_dstep` reads it into §4¾a's commit conclusion.  No
 `fs_restrict` arithmetic outside `lm_logged`'s own definition.
 
 **THE MODULARITY THEOREM, and the audit that backs it.**  A client deposits
@@ -807,7 +803,7 @@ side condition to the whole content.
    INODE block: the writer's spliced bytes encode the block's sixteen slot
    values, fifteen of which it does not know, and the only handle on them is
    `K` at its own block. The repair is `⌜Dc !! b = Some oldbs⌝` — exactly
-   `FsDurDefer.lw_arm_justify`'s `Dj !! b = Lg !! b`, landed there and
+   §4¾a's arm-justification tie `Dj !! b = Lg !! b`, landed there and
    needed here. `Psi_dec_write_tied` is that form. It is NOT §4½a's wall (B):
    the tie is at ONE block and the log reads it off row (b).
 
@@ -1025,7 +1021,7 @@ Issued over 3b's finding that the kinds/geometry tie is degenerate
 (§4⅞c) and 3b''s stop.  The kinds design is REJECTED.  The ruling, verbatim:
 
 > **the durable body stays the STRUCTURED `fs_state Γ_D S`
-> (`FsDurDefer.P_wf_strict` + top auth/fragments): roles are structural,
+> (`P_wf_strict` + top auth/fragments): roles are structural,
 > disjointness is ownership, nothing lifted to pure — `kinds_of_state`,
 > `dwire_geom`, the kind map and every role-proving obligation are
 > DELETED.  The payload `Ψ D₀ Dc` is a PURE per-object DELTA LEDGER: for
@@ -1041,9 +1037,8 @@ Issued over 3b's finding that the kinds/geometry tie is degenerate
 
 ### 5′a. AS BUILT (3c): the fold theorem stands, and it needs THREE geometry equations
 
-`iris/FsDurLedger.v` carries every claim below as a COMPILED LEMMA, in
-`FsDurRefute`/`FsDurDefer`/`FsDurObj`'s style; the five stated theorems
-print `Closed under the global context`.  Nothing else in the tree moved:
+Every claim below was machine-checked, in §4½a/§4¾a/§4⅞a's style; the five
+stated theorems printed `Closed under the global context`.  Nothing else in the tree moved:
 `P_wf`'s body is still `LogDefs.fs_dview`, the nine suppliers are
 untouched, and `LogInv`/`SpecLogWrite`/`SpecEndOp`/`FsCrash`/`ProofInitlog`
 are untouched.
@@ -1646,8 +1641,9 @@ kept, headers pointing here); `IcacheEscrow.dlinks` is
 `fl` parameter and the three flavour premises (`InodeRegion.ireg_write_link_fl`
 /`_unlink_fl` are `ireg_write_link_reg`/`_unlink_reg`); the boot's stage-B
 mint (`IcacheBoot.link_boot_mint_w`) and its two image premises went with
-them.  `iris/FsBootWall.v` is CLOSED — the wall it recorded was exactly
-these objects.  The two pure `mword 16` increment facts `DirLinks` happened
+them.  The BOOT WALL those objects put in front of a post-crash mint is
+closed with them: the old ledger's columns were not a function of the
+image's bytes, so no boot could produce them.  The two pure `mword 16` increment facts `DirLinks` happened
 to hold live on as `InodeRegion.nlink_add1_le`/`_nz_eq`.
 
 ## 7. As built — stage 2a (`FsState*.v`, 2026-08-23)
@@ -1742,8 +1738,8 @@ Where the built shape differs from §2, and why:
 - **What `fs_state` does NOT carry, and why the durable snapshot does.**
   `snap_shape`'s surviving clause — every block of the committed map lies
   below `sb_size (fss_sb S)` — is a fact about `D` and cannot be a reading:
-  a `ghost_map` AUTHORITY may hold entries no fragment names
-  (`iris/FsDurXferWall.v`).  It is also the only bridge between the boot
+  a `ghost_map` AUTHORITY may hold entries no fragment names.  It is also
+  the only bridge between the boot
   configuration's fixed `cov` and the era's own `size`, which is why it
   cannot be supplied by the WAL either.
 - **The link family's validity is READ OFF the durable instance.**
@@ -2078,7 +2074,7 @@ the shape as proposed by 2c-body, kept for the record.
   elements.
 
 **AND THE ACCESSOR RULING THAT REPLACED IT HAS ITS OWN TWO WALLS** —
-§4½a, machine-checked in `iris/FsDurRefute.v`.  Read both before proposing a
+§4½a, machine-checked when it was issued.  Read both before proposing a
 third body: the first wall is about the CHAIN's intermediate object and the
 second is the ownership obligation arriving through the AU's `∀ Dc` instead
 of through the body.

@@ -389,8 +389,8 @@ What is LEFT is one clause, and both producers still have it for free:
 `FsCollect.col_snap_shape` off `cg_size` at a commit (`col_fs_geom` is the
 other four), the mkfs geometry at era 0.
 
-**WHY THE GEOMETRY CANNOT ALSO BE A READING** (`iris/FsDurXferWall.v`,
-machine-checked, and it is a fact about `ghost_map` rather than a missing
+**WHY THE GEOMETRY CANNOT ALSO BE A READING** (machine-checked when the
+shape was refuted, and it is a fact about `ghost_map` rather than a missing
 lemma): an AUTHORITY may hold entries no fragment names, so an identity
 that says the epoch's bytes are INSIDE `fs_dbytes D` bounds nothing about
 `D`'s domain.  Grow `D` by one whole block above the state's own `size` and
@@ -490,7 +490,7 @@ disturb it and why it is not carried through one.  `snap_bytes` is a
 * `sk_disj` — no two nodes share a block.
 * `sk_sbok` / `sk_reg` / `sk_slot` — the three CUT clauses a LINEAR ledger needs on top of the coupling: the superblock's own geometry (`FsImg.fs_sb_ok`), "every named inum sits in the region", and `FsImg.fs_slot_inj` ("one node never names one block twice").
 * `sk_regdom` — the region's TAIL inums are named too: every `i` in `[0, 16·(ninodes/16 + 1))` has a node.  The width is spelled off `S`'s OWN superblock, because a `snap_bytes` clause is a function of `S` and `D` alone.
-* `sk_dirloc` — the three DIRECTORY clauses every escrow payload carries, at the node: `FsStateInode.node_dir_local i (snap_nib S) n` = `DirView.dir_ok` (every live entry's inum is inside the region) ∧ `dir_dots_ix` (a LIVE directory's records 0 and 1 POSITIONALLY are the dots — stronger than `inl_dir_dot`/`inl_dir_dotdot`, which are about the name→inum view) ∧ `dir_orphan_clean` (an orphan directory holds only dot records).  **It is here and not in `inode_local` because `dir_ok` needs the region's WIDTH** and `inode_local i n` takes an inum and a node and nothing else; a `snap_bytes` clause may read `S`'s superblock, exactly as `sk_regdom`/`sk_reg` do.  `IcacheEscrow.ipool_alloc` takes all three, so a boot mint that re-founds the pool needs them; `FsDurSnap.snap_node_dir_local` is that reading.
+* `sk_dirloc` — the three DIRECTORY clauses every escrow payload carries, at the node: `FsStateInode.node_dir_local i (fs_nib S) n` = `DirView.dir_ok` (every live entry's inum is inside the region) ∧ `dir_dots_ix` (a LIVE directory's records 0 and 1 POSITIONALLY are the dots — stronger than `inl_dir_dot`/`inl_dir_dotdot`, which are about the name→inum view) ∧ `dir_orphan_clean` (an orphan directory holds only dot records).  **It is here and not in `inode_local` because `dir_ok` needs the region's WIDTH** and `inode_local i n` takes an inum and a node and nothing else; a `snap_bytes` clause may read `S`'s superblock, exactly as `sk_regdom`/`sk_reg` do.  `IcacheEscrow.ipool_alloc` takes all three, so a boot mint that re-founds the pool needs them; `FsDurSnap.snap_node_dir_local` is that reading.
 
 `sk_meta_used`/`sk_own_used`/`sk_disj` are THE ONE SANCTIONED whole-state
 pure clause (plan §4), and nothing ever CARRIES them: they are read off the
@@ -498,7 +498,7 @@ pure clause (plan §4), and nothing ever CARRIES them: they are read off the
 invalid) — at a commit off the era's, at any reader off the epoch's
 (`fs_inodes_phi_disj`, `fs_inodes_phi_used`, `fs_owns_not_meta`,
 `fs_meta_used`, all in `FsDurSnap`) — and never maintained by any writer;
-`iris/FsDurTrunc.v` is the refutation of maintaining them per write.  The encoder injectivity the
+maintaining them PER WRITE is refuted (plan §8).  The encoder injectivity the
 readings rest on is `dinode_bytes_inj` and `rec_in_blk_inj`.
 
 **IT IS `FsCrash.P_fs`'s LAST CONJUNCT, AT `fr_D r`.**  Arity-free: `P_dur`
@@ -607,35 +607,31 @@ the region.  `snap_local` needs no supplier of its own: it is
 `inode_owned_era_q`'s own last conjunct, gathered by
 `FsCollect.col_bundles_local`.
 
-**THE KEPT REFUTATIONS**, one line each, because each closes a shape
-somebody will otherwise re-derive:
+**THE REFUTED SHAPES**, one line each, because each closes a shape
+somebody will otherwise re-derive.  The Coq files that held them are
+deleted; what survives is the rule:
 
-* `iris/FsDurTrunc.v` — a per-`log_write` accumulation of `snap_bytes`'
-  used-set coupling has no witness: `bfree_used_coupling_refuted` at
-  `itrunc`'s window (a record naming blocks whose bits are clear) and
-  `record_write_disj_refuted` at the record writers.
-* `iris/IcacheTxRefute.v` — an escrow arm parking a FRACTION of `log_tx`
-  cannot re-identify its transaction: `tx_two_halves_no_whole` exhibits a
-  reachable two-transaction state satisfying the arm twice and containing
-  no whole token at any id.  This is why `DepTx` carries `(t, q)` as
-  FIELDS.
-* `iris/IcacheTxArm.v` — an armed registry keyed by TRANSACTION needs the
-  WHOLE token (`arm_needs_whole`, `arm_state_reachable`), which a walk that
-  has parked a share in an escrow can never supply.  This is why the
-  registry is keyed by an ARM ID.
-* `iris/FsDurQuiesce.v` — where the era parks its bundles is what blocks
-  the collection: `ns_not_reopenable` (one namespace opens once, so fifty
-  escrows at a shared `icEscN` could never be open at one ghost step) with
-  `esc_ns_disjoint`/`esc_ns_still_open`, the induction that works at
-  `icEscN .@ k`.
-* `iris/FsDurXferWall.v` — the two shapes that keep the commit's epoch
-  value-built (lane H2): `fs_snap`'s resource half does not mention `D` at
-  all (`snap_ok_not_readable`), and the quiescent collection's bundles sit
-  at a three-quarter share that cannot become the full element `fs_state`
-  wants (`dfrac_34_no_pair`, `phi_no_promote`).
-* `iris/FsDurRefute.v`, `iris/FsDurDefer.v` — deposited client fupds moving
-  durable resources, and per-transaction deferred WRITE SETS in the WAL's
-  ledger; plan §8.
+* A per-`log_write` accumulation of `snap_bytes`' used-set coupling has no
+  witness — `itrunc`'s window holds a record naming blocks whose bits are
+  clear, and the record writers overlap.  The fact is collected at
+  quiescence and never carried.
+* An escrow arm parking a FRACTION of `log_tx` cannot re-identify its
+  transaction: a reachable two-transaction state satisfies the arm twice
+  and contains no whole token at any id.  This is why `DepTx` carries
+  `(t, q)` as FIELDS.
+* An armed registry keyed by TRANSACTION needs the WHOLE token, which a
+  walk that has parked a share in an escrow can never supply.  This is why
+  the registry is keyed by an ARM ID and a walk arms BY SHARE.
+* Where the era parks its bundles is what blocks the collection: one
+  namespace opens once, so fifty escrows at a shared `icEscN` could never
+  be open at one ghost step.  The induction that works is at `icEscN .@ k`
+  (`FsCollectAll.ns_not_reopenable`/`esc_ns_disjoint`/`esc_ns_still_open`).
+* The two shapes that keep the commit's epoch value-built (lane H2):
+  `fs_snap`'s resource half does not mention `D` at all, and the quiescent
+  collection's bundles sit at a three-quarter share that cannot become the
+  full element `fs_state` wants.
+* Deposited client fupds moving durable resources, and per-transaction
+  deferred WRITE SETS in the WAL's ledger; plan §8.
 
 **THE BOOT MINT CONSUMES THIS SIDE (lane E-mint).**  The era's file-system
 instance is no longer decoded out of `fs.img`: `FsCfgSnap.fs_cfg_alloc_snap`
@@ -651,9 +647,8 @@ root slack and `FsStateInode.inl_bare_free` all have a CONSUMER, which is
 plan §7's definition of done for them.  What still spends the image is one
 lemma, `FsCfgSnap.fs_cfg_alloc_img` = the mint at `FsDurImg.img_snap_ok`;
 it is era 0's snapshot producer and nothing else.  The mint still runs at
-PowerOn inside `BootShared.boot_shared_alloc` — `iris/FsBootWall.v` records
-why it cannot yet move into `fsinit` (userinit's `namei("/")` takes the
-root's pool row first) and the two exits.
+PowerOn inside `BootShared.boot_shared_alloc`: it cannot yet move into
+`fsinit`, because userinit's `namei("/")` takes the root's pool row first.
 
 ## 3. The inode region (`InodeRegion.v`, invariant `iregN`, gname `γi`)
 
@@ -716,10 +711,10 @@ nothing in a walk reads a column.  Deleted with them: `ireg_link_ok`'s (L1)
 first conjunct, `SpecIupdate`'s `fl : option (option Z)` index and its three
 flavour premises on both link bodies, `IcacheBoot`'s stage-B mint
 (`link_boot_mint_w`) and its two image premises (`image_link_le`,
-`image_dir_wl0`), and the files `DirLinks.v` / `IregDirBit.v` (kept as
-sources, off `_CoqProject`).  `IcacheRef.link_agree` now reports the `r`
-column alone.  `iris/FsBootWall.v` is the record of the boot wall those
-columns were the whole of, and it is CLOSED.
+`image_dir_wl0`), and the files `DirLinks.v` / `IregDirBit.v` (deleted).  `IcacheRef.link_agree` now reports the `r`
+column alone.  The BOOT WALL those columns were the whole of is closed with
+them: the columns were not a function of the image's bytes, so no boot
+could mint them for a post-crash image.
 
 ### 3b′. The TYPE REGISTER's per-inum AUTHORITY — `ireg_lnk`
 
@@ -845,9 +840,9 @@ parent side has to know the target's TYPE.
   column reads `FrzOff`, so the CORPSE — the MARKED slot between iput's
   eviction and its off-lock deposit, at which the inum has no bundle
   anywhere — is unreachable at a commit (`FsCollect.col_corpse_no_ops`).
-  The pair is in the INDEX and not existential for
-  `IcacheTxRefute.tx_two_halves_no_whole`'s reason: iput's spec names
-  `(tid, q)` and must get that element back.
+  The pair is in the INDEX and not existential because two halves of one
+  element are not the whole: iput's spec names `(tid, q)` and must get that
+  element back.
 - `ireg_frzc z f` — the **receipt + mirror** conjunct: `(⌜f is FrzPre⌝ ∨
   frzown z)` — the receipt `frzown` is region-parked at every phase except
   `FrzPre`, so "receipt in a thread's hand" ⟺ "this column reads FrzPre"
@@ -927,7 +922,7 @@ redeems (escrow → the element → the ledger row's `imark`, pool arm→normal,
 | `ipool_ext γfs γi cov ls z` | the pending / await row (`pool_pending` / `pool_await` beside `∃ n, top_frag`).  NOT Timeless — both alternatives hold `EscrowInode.escA_inv`, an `inv` — which is why it cannot live in an invariant and stays under the itable lock. |
 | `ipool_inv cn γfs γi cov ls nib` | `inv ipoolN (ipool_body …)`, `ipoolN = nroot .@ "ipool"`.  The body is `∃ O X T ids K, ⌜length ids = NINODE⌝ ∗ ⌜region_inums nib = O ∪ X ∪ dom T ∪ ic_live_inums ids⌝ ∗ ⌜dom K = X⌝ ∗ ipool_key O ∗ ipool_xkey X ∗ ipool_tkey T ∗ ipool_transit T ∗ ic_ids cn ids ∗ ipool_rows … O ∗ ipool_ckey K ∗ ipool_corpse γi K` — TIMELESS, so `iInv .. as ">"` keeps working at both consumers, and the commit opens it ONCE and holds every ordinary bundle beside all fifty slot escrows. |
 | `ipool_ckey K` / `ipool_corpse γi K` (C-7) | the CORPSE LEDGER, `K : gmap Z icorpse` with `⌜dom K = X⌝`: `ghost_map_auth icfg_pcrp 1 K` (WHOLE, here) beside one row per in-transition inum — `CrpPre t q` parks `t ↪[ln_tx icfg_log]{#q} tt` (refuted at a commit, `ipool_corpse_no_ops`) and `CrpDep` parks `InodeRegion.imark`, which is what `FsCollect.col_free_slot_acc` turns into that inum's free bundle.  A `ghost_map` and not `ipool_tkey`'s paired `ghost_var` because the off-lock deposit holds neither half of `icfg_pext`: its ELEMENT (`EscrowDefs.crp_elem`, carried from `ipool_put_corpse` to `ireg_free_deposit_au`) is what locates the row. |
-| `ipool_tkey T` / `ipool_transit T` (C-4) | the TRANSIT LEDGER, `T : gmap Z (nat * Qp)`: `ghost_var icfg_ptrn (1/2) T` (one half here, one in `ipool`) beside `[∗ map] z ↦ (t, q) ∈ T, t ↪[ln_tx icfg_log]{#q} tt`.  `(t, q)` are FIELDS for `ic_dep`'s reason verbatim — `ipool_put` has to hand the walk back exactly the element it parked, and an existentially-keyed share cannot be re-identified (`IcacheTxRefute.tx_two_halves_no_whole`). |
+| `ipool_tkey T` / `ipool_transit T` (C-4) | the TRANSIT LEDGER, `T : gmap Z (nat * Qp)`: `ghost_var icfg_ptrn (1/2) T` (one half here, one in `ipool`) beside `[∗ map] z ↦ (t, q) ∈ T, t ↪[ln_tx icfg_log]{#q} tt`.  `(t, q)` are FIELDS for `ic_dep`'s reason verbatim — `ipool_put` has to hand the walk back exactly the element it parked, and an existentially-keyed share cannot be re-identified (two halves of one element are not the whole). |
 | `ipool γfs γi cov ls P T` | what the itable LOCK keeps, in the old `ipool`'s own position and at `itable_res2`'s unchanged arity: `∃ O, ⌜O ⊆ P⌝ ∗ ipool_key O ∗ ipool_xkey (P ∖ O) ∗ ipool_tkey T ∗ [∗ set] z ∈ P ∖ O, ipool_ext … z`.  `T` is the TRANSIT LEDGER — the one inum a walk is carrying between an eviction's identity flip and its deposit, with the share it parked — and it is `∅` in `itable_res2`, because that walk holds the lock throughout. |
 
 **Every region inum owns exactly one `top_frag`, always**: tied on the pool's
@@ -1082,8 +1077,8 @@ or the ghost map cannot grow.  Keyed by INUM that is exactly the fact
 nobody can produce — "no other walk holds this inode" is the inode LOCK's
 property, invisible at `ftopN`.  Keyed by TRANSACTION it costs the arming
 walk its WHOLE token, and a walk that has parked a share of the same token
-in an escrow can then never arm at all (`IcacheTxArm.arm_needs_whole`).
-Keyed by an arm id both objections vanish, and what the parked share still
+in an escrow can then never arm at all (a walk arms BY SHARE, never by
+the whole token).  Keyed by an arm id both objections vanish, and what the parked share still
 buys is the ONE thing the commit reads off the registry.  The price is that
 a receipt carries a SET of inums rather than one, which costs the arming
 walk one extra ghost step (`ireg_arm_more`) and nothing else.
@@ -1114,7 +1109,7 @@ neither is on the other's cone, while `ProofEndOp` is on neither.
 **ONE NAMESPACE PER SLOT, AND IT IS LOAD-BEARING.**  `ic_escrow cn γfs γi
 cov ls k` is `inv (icEscN .@ k) (ic_escrow_body … k)`: `inv N P` opens once
 per namespace, so fifty escrows at a single `icEscN` could never be open at
-one ghost step (`FsDurQuiesce.ns_not_reopenable`), and the commit has to ∗
+one ghost step (`FsCollectAll.ns_not_reopenable`), and the commit has to ∗
 every cached inode's bundle together.  `ic_escrow_ns_disjoint` and
 `ic_escrow_ns_sub` are the two facts, and NO CALLER PAYS: `↑icEscN` still
 covers the family, so a mask that merely excludes it is unchanged, and only
@@ -1142,14 +1137,14 @@ a descriptor the commit meets is one of these.
 
 | constructor | what it is |
 |---|---|
-| `DepTx s dev inum g t q` | **THE WRITE ARM.**  The caller's generation-named credential plus the transaction whose write lock this is: the OUT arm PARKS the share `t ↪[ln_tx icfg_log]{#q} tt`, so `end_op` — which consumes the whole element — cannot run while any inode of the transaction is write-locked, and a commit refutes the arm outright at an empty `ln_tx` authority (`ic_out_no_write_arm`, core `ic_dep_own_tx_no_ops`).  `(t, q)` are FIELDS: `ic_deposit` is a `ghost_var` whose other half the holder carries, so the descriptor pins the arm's transaction and share to the holder's and the park hands back exactly what the checkout parked (`IcacheTxRefute.tx_two_halves_no_whole` is why an existentially-keyed share could not). |
+| `DepTx s dev inum g t q` | **THE WRITE ARM.**  The caller's generation-named credential plus the transaction whose write lock this is: the OUT arm PARKS the share `t ↪[ln_tx icfg_log]{#q} tt`, so `end_op` — which consumes the whole element — cannot run while any inode of the transaction is write-locked, and a commit refutes the arm outright at an empty `ln_tx` authority (`ic_out_no_write_arm`, core `ic_dep_own_tx_no_ops`).  `(t, q)` are FIELDS: `ic_deposit` is a `ghost_var` whose other half the holder carries, so the descriptor pins the arm's transaction and share to the holder's and the park hands back exactly what the checkout parked (an existentially-keyed share could not: two halves of one element are not the whole). |
 | `IcacheEscrow.ic_tx_dep cn k s dev inum g` | the ½/½ BUNDLE a converted walk actually carries: `∃ t, ic_deposit cn k (DepTx s dev inum g t (1/2)) ∗ t ↪[ln_tx icfg_log]{#(1/2)} tt`.  It stands exactly where a bare `ic_deposit cn k d` stands, at the same arguments, so the walk-stage conjuncts are position-stable and no stage lemma gained a binder; the id is DETERMINED by the residue the holder keeps, which is what lets it be closed existentially at both ends.  **It cannot be used twice at one transaction**: its invariant is "the arm holds `q` and the holder holds `q` beside it", which forces `q = ½` for the two to rejoin into a whole element, so two of them at one `t` claim 2 and the pair is unsatisfiable — the two walks holding two write locks at once carry two `ic_tx_dep_at` at a QUARTER each instead. |
 | `DepRd s dev inum g` | **THE READ ARM.**  `ic_dep_own` at `DepRd` is the write arm's minus the parked share — the credential does not change — and what distinguishes it is what the escrow KEEPS: `ic_rd_arm` is the five pure clauses, `dlinks`, `inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n` (record proxy `dinode_at` included, so a read-locker cannot move a record — `ireg_write_au` takes it) and the two contents holds, at an existential `(dn, bm, data)`.  The HOLDER carries `ic_rd_held`: `inode_ok`, `inode_local`, the metadata and addrs CELLS at fraction 1 (the design keeps in-memory cells there) and `FsStateEra.inode_rd_era γfs (DfracOwn (1/4)) inum n`.  `ic_loaded_shed`/`ic_rd_join` are the two directions.  Its two users are `fileread` and `filestat` — the only `ilock` callers holding no transaction. |
 | `DepFrz q dev inum t qt` | iput's freeze window (+0x5e..+0x70), the one checked-out arm that carries no ordinary deposit at all: what it holds is `ic_out_frz` — the reference's count fragment, its identity fraction, the freeze receipt AND the parked share `t ↪[ln_tx icfg_log]{#qt} tt`.  `(t, qt)` are FIELDS for `DepTx`'s reason verbatim (the descriptor is in iput's hand across that window), and the share is what makes `ic_out_frz_no_ops` refute the arm at a commit. |
 
 **THE RE-IDENTIFICATION IS THE WHOLE DIFFERENCE BETWEEN THE LOCK ARMS.**  A
-transaction's id is determined by nothing the escrow holds
-(`IcacheTxRefute.tx_two_halves_no_whole`), so the write arm had to write
+transaction's id is determined by nothing the escrow holds (and two halves
+of one element are not the whole), so the write arm had to write
 `(t, q)` into the descriptor.  An inode's NODE is determined: the reader's
 quarter of `top_frag` pins it — `FsStateEra.inode_rd_era_agree` gives the
 two nodes equal and `era_node_pair_inj` turns that into the PAIR equal

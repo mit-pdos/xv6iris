@@ -6,6 +6,13 @@ report, every refutation, every ruling and addendum.  NOT current
 guidance.  The design of record is `design/durable-fs-plan.md`; the live
 worklist is `projects/durable-disk.md`.
 
+EVERY REFUTATION FILE NAMED BELOW IS DELETED — `iris/FsDurRefute.v`,
+`FsDurDefer.v`, `FsDurTrunc.v`, `FsDurXferWall.v`, `FsDurQuiesce.v`,
+`IcacheTxRefute.v`, `IcacheTxArm.v`, `FsBootWall.v`, and with them
+`FsDurWire.v`, `FsDurObj.v`, `FsDurLedger.v`, `FsParRefute.v`.  Read a
+citation of one as "(file deleted)"; the RULES they closed are in
+`design/durable-fs-plan.md` §8 and `design/fs-ghost-state.md`.
+
 ---
 
 # durable-disk — the worklist under ruling 3 (rewritten from the tree, 2026-08-23)

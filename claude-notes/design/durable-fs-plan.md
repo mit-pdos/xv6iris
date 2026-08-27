@@ -3,9 +3,8 @@
 STATUS: DESIGN OF RECORD, ruled by the owner 2026-08-25 after three days
 of machine-checked refutations (archived with their lane reports in
 [`../completed/durable-disk-2026-08-23-to-25.md`](../completed/durable-disk-2026-08-23-to-25.md);
-the refutations themselves are Coq files: `iris/FsDurRefute.v`,
-`iris/FsDurDefer.v`, and the walls recorded in `iris/FsDurWire.v`'s and
-`iris/FsDurLedger.v`'s headers).  The live worklist is
+the Coq files that held them are deleted and §8 below carries their
+lessons).  The live worklist is
 [`../projects/durable-disk.md`](../projects/durable-disk.md).  This file
 supersedes the accreted rulings §4½–§4⁹ of
 [`fs-state.md`](fs-state.md); `fs-state.md` §0–§2 (the guiding rule and
@@ -109,10 +108,10 @@ live directory, unique names).  There is NO cross-inode pure clause:
   `ss_dombelow`, "every block of `D` lies below `sb_size (fss_sb S)`".
   That residue is irreducible for a reason about `ghost_map` — an
   authority may hold entries no fragment names, so nothing the epoch owns
-  bounds `D`'s domain (`FsDurXferWall.snap_shape_not_readable`) — and it
+  bounds `D`'s domain — and it
   does NOT shrink if the tie is strengthened to an EQUALITY (lane H4):
   `fs_dbytes` is blind to a block whose byte list is empty, so a padded `D`
-  is indistinguishable (`snap_shape_not_readable_eq`), and at a commit the
+  is indistinguishable, and at a commit the
   equality is not even provable, a LEAKED block (bit set, named by no inode
   — the design states only "owned ⇒ used") being a block of `D` the
   footprint does not own.  It is also the ONLY bridge between the fixed
@@ -247,8 +246,8 @@ are the encoding of `S`, every inode of `S` is well-formed, no two share
 a block".  NOTHING MAINTAINS THAT FACT INCREMENTALLY.  It is false in the
 middle of an operation on the byte side exactly as on the local side
 (`itrunc` frees blocks one `log_write` at a time and rewrites the record
-once, at its tail `iupdate`; `FsDurTrunc.v` is the machine-checked
-refutation of a per-write accumulation, §8), and every such state
+once, at its tail `iupdate`; a per-write accumulation of the fact is
+refuted, §8), and every such state
 belongs to an inode that is LOCKED.  So the commit RECONSTRUCTS it from
 the file system's own invariants at the one moment they are all clean:
 
@@ -265,7 +264,7 @@ the file system's own invariants at the one moment they are all clean:
   fragment, its link authority and entry tokens, and `inode_local`) sits
   in its cache-slot escrow (`ic_loaded`; one invariant PER SLOT at
   `icEscN .@ k`, so the commit can open all fifty at once — lane B′; a
-  single shared namespace opens only once, `FsDurQuiesce.ns_not_reopenable`)
+  single shared namespace opens only once, `FsCollectAll.ns_not_reopenable`)
   or, uncached, in the pool (`IcacheEscrow.ipool` — its own invariant at
   per-inum namespaces, lane B′; it must NOT sit in the itable spinlock's
   resource `itable_res2`, which only a lock holder reaches and the commit
@@ -417,7 +416,7 @@ the header says `n = 0` and `D` is the raw home blocks, or `n > 0` and
 `D`, and `install_trans` moves only the physical home blocks toward `D`.
 Real `n > 0` recovery IS PROVEN at the log layer.  The mint cannot wait
 for `fsinit`: `userinit` runs before it and its `namei("/")` takes the
-root's pool row into a slot escrow (`FsBootWall.boot_empty_pool_refuted`),
+root's pool row into a slot escrow,
 so the pool must be stocked at PowerOn.  Hence at PowerOn the era's byte
 view `L` is minted EQUAL TO `D` and the file-system instance from the
 snapshot at `D` (`FsCfgSnap.fs_cfg_alloc_snap`; era 0's snapshot comes
@@ -463,7 +462,7 @@ snapshot's superblock are one record.
 
 **THE BOOT'S PREMISE, AS BUILT (lane E-himg).**  What a boot takes is
 `FsCfgBoot.fs_boot_snap_wf`, and it is NOT an image hypothesis: the era's
-`sb`/`nib` ARE the snapshot's own (`fss_sb S`, `snap_nib S`), the committed
+`sb`/`nib` ARE the snapshot's own (`fss_sb S`, `fs_nib S`), the committed
 view rides as a total BLOCK VIEW (`FsCrash.fs_rec_view P D`, whose exception
 set is the header's write set `hdr_wset P ls`), and the whole of it is read
 off `SystemAdequacy.fs_boot_pure` at every era.  Two rows CANNOT come from
@@ -535,7 +534,6 @@ GONE: `LogInv.log_psi_*` and the parked `Ψ D₀ Dc`;
 `LogDefs.fs_dview`/`fs_dstep` and `FsDurImg`'s resource-MOVING image
 conversion `fs_dur_of_image`/`fs_dur_view_of_image` (the boot mint runs the
 allocator core at the era's own view, not through an image conversion).
-`FsDurRefute.v`/`FsDurDefer.v` stay as the documented refutations.
 
 ## 7. The vacuity discipline (why the tie cannot silently go empty)
 
@@ -554,13 +552,13 @@ compiles".
 
 - Deposited client fupds moving durable resources: refuted — a fupd over
   fragments alone is not frame-preserving against the authority that
-  necessarily sits in the crash predicate (`FsDurRefute`); a fupd over
+  necessarily sits in the crash predicate; a fupd over
   the whole body ∀-quantified over states is undischargeable at
   mid-batch two-owner states (the `itrunc` window) and kills modularity;
   a ∀-auth-quantified one is the library lemma (informationally empty).
 - Per-transaction deferred WRITE SETS in the WAL's ledger: refuted by
   concurrency — the ledger is order-blind while a shared block's final
-  bytes are order-dependent (`FsDurDefer`); forcing agreement evicts one
+  bytes are order-dependent; forcing agreement evicts one
   transaction's obligation onto another.
 - Pure decode ties over bytes with a KIND MAP: rejected by the owner
   (re-imports pure role/disjointness reasoning) and twice found
@@ -570,12 +568,12 @@ compiles".
   geometry equations; superseded by snapshots, where nothing is updated.
 - Reading the exported `snap_ok S D` off the snapshot's RESOURCES, and
   sourcing the commit's transport from the quiescent collection: refuted
-  (`FsDurXferWall.v`) — `fs_snap`'s resource half does not mention `D` at
+  — `fs_snap`'s resource half does not mention `D` at
   all, and the collection's bundles are at a three-quarter share that
   cannot be promoted to the full element `fs_state` wants.  §4 has both.
 - A per-`log_write` accumulation of the bytes-match fact (`snap_bytes` as
-  the WAL's parked payload, re-proven by every writer): refuted
-  (`FsDurTrunc.v`) — `itrunc`'s window holds a record naming blocks whose
+  the WAL's parked payload, re-proven by every writer): refuted —
+  `itrunc`'s window holds a record naming blocks whose
   bits are clear, so no abstract state fits the logged bytes; every
   mid-operation state is a LOCKED inode's, which is why the fact is
   collected at quiescence (§4) and never carried.
@@ -594,3 +592,20 @@ compiles".
   determinacy out (`snap_bytes_sb_inj`/`_node_inj`/`_used_agree`) never
   acquired a caller and are deleted — state the determinacy where a
   theorem needs it, not as a standing exhibit.
+- A parked SHARE of a transaction's token closed under an existential:
+  refuted — two halves of one `ghost_map` element rejoin into the whole
+  only at the SAME key, so a share that is handed back has to be handed
+  back at a NAMED `(t, q)`.  That is why every ledger that parks one
+  (`Xv6Cameras.ic_dep`/`ctyval`/`frzidx`, `InodeRegion.ireg_cpin`/`ireg_fsh`)
+  carries the pair as FIELDS, while `LogInv.log_tx` — which never hands a
+  share back — closes the id existentially.
+- An ARM that demands the WHOLE transaction token: refuted — a walk that
+  has already parked a share of that token (which a transactional `ilock`
+  does) could then never arm at all.  A walk arms BY SHARE, and the
+  registry is keyed by a fresh ARM ID rather than by the transaction, so
+  the arm needs no freshness argument.
+- Boot-minting the OLD link ledger for a post-crash image: refuted — the
+  ledger's columns are not a function of the image's bytes, so a boot that
+  re-founds an era from a durable snapshot cannot produce them.  What the
+  boot builds instead is `FsCfgBoot.ent_toks_of_region` plus §9's single
+  value function, and the ledger itself is gone.

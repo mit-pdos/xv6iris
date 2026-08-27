@@ -412,7 +412,7 @@ The full account is `fs-state.md` §4 and §7:
 
 
 **AND THE HOME-VIEW ACCESSOR RULING (fs-state.md §4½) DOES NOT LIFT IT
-EITHER — TWO WALLS, BOTH MACHINE-CHECKED (3a', `iris/FsDurRefute.v`).**
+EITHER — TWO WALLS, BOTH MACHINE-CHECKED (3a').**
 Making durable write permission the client's per-block accessor moves the
 ownership obligation, it does not remove it. The full account with the
 lemma names is fs-state.md §4½a; the two headlines:
@@ -429,8 +429,7 @@ lemma names is fs-state.md §4½a; the two headlines:
   one, so `fs_state` remains a correct invariant of the committed view and
   fails only as the per-write intermediate. The decoupling that removes
   this wall — the free pool's owned set stated EXPLICITLY rather than read
-  off the bitmap's bytes — is `FsDurRefute`'s `free_pool_at` /
-  `fs_state_mid`, and it costs `FsStateBitmap.free_pool_used`, i.e. the
+  off the bitmap's bytes — costs `FsStateBitmap.free_pool_used`, i.e. the
   argument that kills xv6's freeing-a-free-block panic.
 - **The AU quantifies over the index.** `SpecLogWrite`'s premise is
   `∀ D₀ Dc, Ψ D₀ Dc ==∗ Ψ D₀ (<[b := bs]> Dc)`, so a supplier owes "`P_wf`
@@ -441,8 +440,8 @@ lemma names is fs-state.md §4½a; the two headlines:
   a fact about the whole durable map.
 
 **AND DEFERRED JUSTIFICATION (fs-state.md §4¾) LIFTS WALL (B) AND MEETS A
-THIRD — TWO OPEN TRANSACTIONS SHARING ONE BLOCK (3a-def,
-`iris/FsDurDefer.v`).** Deferring to `end_op` does pin `Dj`: the row's
+THIRD — TWO OPEN TRANSACTIONS SHARING ONE BLOCK (3a-def).**
+Deferring to `end_op` does pin `Dj`: the row's
 off-the-deferred-domain clause hands the writer `⌜Dj !! b = lm_logged L !! b⌝`
 at its own block, so the `∀ Dc` obligation is gone. What it does not survive
 is concurrency, which the ruling does not mention and `LogInv.log_res`

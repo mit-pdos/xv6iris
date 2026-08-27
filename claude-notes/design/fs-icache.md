@@ -16,6 +16,17 @@ Read [`fs-inode.md`](fs-inode.md)'s "`ilock` / `iunlock` — the LOAD, and
 the icache seam" first: the sleeplock-side of an entry is settled there and
 is not restated here.
 
+## BANNER — THE POOL'S ROWS
+
+**`ipool_shape` NO LONGER EXISTS; a pool entry is one of TWO ROWS.**  The
+ordinary row `IcacheEscrow.ipool_ord` (the count half, the freeze-mirror
+half, `ipool_shape_np`'s allocated/marker arms and the unfrozen token) is
+Timeless; the in-transition row `ipool_ext` (the same two ledger halves
+beside the pending or the await arm) is not, and that split is what lets
+the pool live in an invariant at all.  Read every `ipool_shape` below as
+"a pool row": its ALLOCATED and FREE arms are `ipool_shape_np`'s, its
+PENDING and AWAIT arms are `ipool_ext`'s.
+
 ## BANNER — `ic_loaded`'s PAYLOAD
 
 **`ic_loaded`'s OWNERSHIP is the in-era bundle.**  Everything below in this

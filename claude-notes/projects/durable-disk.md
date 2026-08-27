@@ -7,16 +7,18 @@ and §7.  History (three days of rulings, refutations and lane reports —
 do NOT re-derive them): [`../completed/durable-disk-2026-08-23-to-25.md`](../completed/durable-disk-2026-08-23-to-25.md).
 Tree at handoff: VM-green, ZERO placeholder lemmas tree-wide.
 
-**THE AUDIT BASELINE IS FOURTEEN ENTRIES, NOT THREE.**  `make audit-only`
+**THE AUDIT BASELINE IS THIRTEEN ENTRIES, NOT THREE.**  `make audit-only`
 prints `Print Assumptions` of `SystemAdequacy.xv6_fs_adequacy_xv6Σ`, and
 since the ladder collapsed to three rungs that theorem DISCHARGES the
-literal mkfs image — so the hex dump's reader (`PStringBytes`) puts eight
-`PrimInt63.*` and three `PrimString.*` ROCQ PRIMITIVES beside the old three
-(`xv6iris_extras.resv_matches`, `resv_is_valid`,
+literal mkfs image — so the hex dump's reader (`PStringBytes`) puts SEVEN
+`PrimInt63.*` (`int`, `eqb`, `sub`, `lsl`, `lsr`, `land`, `lor`) and THREE
+`PrimString.*` (`string`, `get`, `cat`) ROCQ PRIMITIVES beside the old
+three (`xv6iris_extras.resv_matches`, `resv_is_valid`,
 `functional_extensionality_dep`).  They are primitives of the logic, not
-assumed lemmas: nothing about the proof is hedged by them.  Compare against
-those fourteen, and do not read an older paragraph's "three-entry baseline"
-as a target.
+assumed lemmas: nothing about the proof is hedged by them.  Diff against
+those thirteen BY NAME, not by count, and do not read an older paragraph's
+"three-entry baseline" as a target.  `iris/SystemAssumptions.v`'s own
+header carries the same list.
 
 **Goal (owner):** xv6 correctness across crashes INCLUDING file-system
 consistency.  **THE THEOREM IS TRUE.**
@@ -107,11 +109,12 @@ and the cleanups below — no wall, and nothing the theorem waits on.
   `snap_bytes` (`sk_sbok`, `sk_reg`, `sk_slot` = `FsImg.fs_slot_inj`), all
   discharged by `FsDurImg.img_snap_ok` and witnessed at the literal image
   by `SystemAdequacy.fsimg_snap_ok`.
-- **Refutations kept as documentation:** `iris/FsDurRefute.v`,
-  `iris/FsDurDefer.v`, `iris/FsDurTrunc.v` (the per-write accumulation of
-  `snap_bytes`' used-set coupling — lane B's finding, plan §4, §8);
-  `iris/FsDurQuiesce.v` (lane C's finding: where the era parks its bundles
-  is what blocks the collection at quiescence).
+- **The refuted shapes are recorded in plan §8 and fs-ghost-state.md, not
+  in the tree:** the Coq files that held them are deleted.  The three the
+  durable side turns on are the per-write accumulation of `snap_bytes`'
+  used-set coupling (lane B), where the era parks its bundles (lane C:
+  a shared namespace opens once, so the collection needs `icEscN .@ k`)
+  and the epoch's value-built transport (lane H2).
 - Image checks (14) `fs_region_bare` and (15) `fs_root_no_self` in
   `FsImg`/`FsImgCheck`, and (lane C-img) they are now the LAST two
   conjuncts of `FsCfgBoot.fs_boot_image_wf`, discharged in
@@ -144,8 +147,8 @@ and the cleanups below — no wall, and nothing the theorem waits on.
 
 ## STILL PRESENT BUT SUPERSEDED (delete when their consumers move)
 
-`RiscvPtsto.fs_dur_names`' `fdn_bmap/ist/nin` (only consumer:
-`FsDurLedger`'s superseded fold) and `riscv_dview_name` (the `gamma_v`
+`RiscvPtsto.fs_dur_names`' `fdn_bmap/ist/nin` (their only consumer, the
+old ledger's fold, is deleted) and `riscv_dview_name` (the `gamma_v`
 parameter `FsCrash.P_fs`/`fs_crash_seam` still thread and nothing reads;
 deleting it is a sweep of `Pc`'s arity through `RiscvAdequacy`/
 `SystemAdequacy`, both slow serial files, so it was left for a cleanup lane).
@@ -154,6 +157,16 @@ GONE with lane CE: `LogDefs.fs_dview`/`fs_dview_rebase`,
 resource-MOVING image conversion `fs_dur_of_image`/`fs_dur_view_of_image`
 (section 10) — the boot mint distributes the era's pieces off facts and
 never wanted that shape.
+
+STALE COMMENT REFERENCES, measured after S1: fifteen citations in live
+sources still name files an earlier sweep deleted — `DirLinks` (six, in
+`IcacheBoot`/`FsStateEra`/`IcacheEscrow`/`InodeRegion`), `FsDurWire` (three)
+and `FsDurObj`/`FsDurLedger` (three) in `RiscvPtsto`/`FsStateDefs`/
+`FsDurImg`.  `ipool_shape` is also still the notes' vocabulary for a pool
+entry in `design/fs-icache.md` (21), `design/fs-fragments.md` (7) and
+`projects/durable-disk.md` (5); the definition is gone and the rows are
+`IcacheEscrow.ipool_ord`/`ipool_ext`, which `design/fs-icache.md`'s new
+banner says once rather than 21 times.
 
 ## The lanes, in order (each is one green checkpoint; specs cite the plan)
 
@@ -270,7 +283,7 @@ never wanted that shape.
   defaults.  `ilock` today still withdraws the whole bundle and registers
   nothing; B′ is where `ic_out` splits into "out for reading at ¼" and "out
   for writing".
-- [x] **Lane B — CLOSED BY REFUTATION** (`iris/FsDurTrunc.v`): the
+- [x] **Lane B — CLOSED BY REFUTATION**: the
   per-write accumulation of `snap_bytes` as the WAL's payload has no
   witness at `bfree`'s `log_write` (`itrunc`'s window) and `sk_disj` dies
   at the record writers; plan §4 and §8 record the ruling that replaced
@@ -321,7 +334,7 @@ never wanted that shape.
   `inode_bytes_era_blk_read`.
 
   **THE ESCROW ARMS AND THE ONE `ilock` SPEC DID NOT LAND, AND THE WRITE
-  ARM IS REFUTED AS SPECIFIED** (`iris/IcacheTxRefute.v`, compiled).
+  ARM IS REFUTED AS SPECIFIED** (machine-checked).
   Parking a FRACTION of `LogInv.log_tx` in the checked-out entry cannot be
   undone at `iunlock`: `log_tx γ = ∃ t, t ↪[ln_tx γ] ()` closes the id
   existentially (lane A did that on purpose — the ledger tie is
@@ -465,8 +478,8 @@ never wanted that shape.
   but the uncached halves live on the very rows whose presence is the
   question.
 
-  **THE WRITE ARM IS A SECOND WALL** (`iris/IcacheTxArm.v`, compiled:
-  `arm_needs_whole`, `arm_state_reachable`).  B′'s recommended `DepTx` fix
+  **THE WRITE ARM IS A SECOND WALL** (machine-checked: an arm keyed by
+  TRANSACTION needs the WHOLE token, at a reachable state).  B′'s recommended `DepTx` fix
   DOES close the re-identification — the descriptor pins `(t, q)` between
   arm and holder, so `iunlock` recovers exactly what `ilock` parked — but a
   transaction that has PARKED a share of `LogInv.log_tx` can never supply a
@@ -688,7 +701,7 @@ never wanted that shape.
 
   THE RE-IDENTIFICATION IS A QUARTER OF `top_frag`, AND THAT IS THE WHOLE
   DIFFERENCE BETWEEN THE TWO ARMS.  A transaction's id is determined by
-  nothing the escrow holds (`IcacheTxRefute.tx_two_halves_no_whole`), so the
+  nothing the escrow holds (two halves of one element are not the whole), so the
   write arm had to write `(t, q)` into the descriptor; an inode's NODE is
   determined — so `FsStateEra.inode_owned_era_q` takes the share on the
   abstract fragment too (`FsState.top_frag_q`, with `top_frag` its `DfracOwn
@@ -1382,8 +1395,7 @@ never wanted that shape.
   `fs_crash_seam` and `P_fs` are byte-stable.
 
   **THE REST OF LANE C IS BLOCKED, AND NOT AT THE PROOF LEVEL**
-  (`iris/FsDurQuiesce.v` is the finding, with its two machine-checked
-  namespace facts).  `P_fs`'s conjunct, the commit permits and the receipt
+  (the finding rests on two machine-checked namespace facts).  `P_fs`'s conjunct, the commit permits and the receipt
   all hang off `dsnap_step_of`, which needs `snap_ok S L`, which only the
   collection at quiescence produces — and the collection is unstatable
   against the escrow AS IT IS, for two reasons that are both about WHERE the
@@ -1392,7 +1404,7 @@ never wanted that shape.
   1. **The fifty cache escrows share ONE namespace.**
      `IcacheEscrow.ic_escrow … k` is `inv icEscN (ic_escrow_body … k)` for
      every slot, so at most one is open at a time
-     (`FsDurQuiesce.ns_not_reopenable`).  `snap_bytes`' `sk_disj` and
+     (`FsCollectAll.ns_not_reopenable`).  `snap_bytes`' `sk_disj` and
      `sk_own_used` are read off the ∗ between TWO inodes, so the commit must
      hold every bundle at once.  Fix: allocate at `icEscN .@ k`
      (`esc_ns_disjoint`/`esc_ns_still_open` are the induction step that then
@@ -1710,7 +1722,7 @@ never wanted that shape.
   ledger `T`, `IcacheEscrow.ipool_tkey` is its two halves (one in
   `ipool_body`, one in `ipool`) and `ipool_transit T` the shares, one per
   inum in transit.  `(t, q)` are FIELDS for `Xv6Cameras.ic_dep`'s reason
-  verbatim (`IcacheTxRefute.tx_two_halves_no_whole`): `ipool_put` has to
+  verbatim (two halves of one element are not the whole): `ipool_put` has to
   hand the walk back EXACTLY the element it parked, and an existentially
   keyed share cannot be re-identified.  The row is
   `region_inums nib = O ∪ X ∪ dom T ∪ ic_live_inums ids` and the body stays
@@ -1859,7 +1871,7 @@ never wanted that shape.
   transaction and its share, `ireg_fsh`'s two window arms park it beside the
   regime, `ireg_freeze_au` takes it and `EscrowDeposit.ireg_free_deposit_au`
   returns it; the pair must be in the INDEX (not existential) for
-  `IcacheTxRefute.tx_two_halves_no_whole`'s reason, and the index is exactly
+  the two-halves reason, and the index is exactly
   where the freezer's own `ifreeze_pre`/`ifreeze_post` fragment already
   re-identifies it.  MEASURED: widening `Xv6Cameras.frz`'s `rg` from `bool`
   to `bool * (nat * Qp)` leaves every `FrzPre rg`/`FrzPost rg` site
@@ -2307,8 +2319,7 @@ never wanted that shape.
     region's authority and each directory's `ent_toks`, so `FsCfgBoot`'s ~350
     lines of image ticket routing — `dir_links_of_*`, `ent_toks_of_*`,
     `big_sepS_tick_route` — would have no reader left).  MEASURED, not built.
-    What is NOT reachable is the OLD ledger, and `iris/FsBootWall.v` is the
-    machine-checked statement: `IcacheBoot.ipool_alloc`'s per-inum bundle
+    What is NOT reachable is the OLD ledger, machine-checked: `IcacheBoot.ipool_alloc`'s per-inum bundle
     wants `IcacheEscrow.dlinks`, whose first conjunct is
     `DirLinks.dir_links`, and boot's only directory constructor is the
     ALL-PLAIN stock `DirLinks.dir_links_of_plain` — at `F = λ _, false` the
@@ -2386,7 +2397,7 @@ never wanted that shape.
     a node and nothing else, while `DirView.dir_ok` needs the region's
     WIDTH.  A `snap_bytes` clause may read `S`'s own superblock (`sk_regdom`,
     `sk_reg`, `sk_own_used` all do), so all three travel there at
-    `snap_nib S = ninodes/16 + 1`.  The second consequence is that the ~25
+    `fs_nib S = ninodes/16 + 1`.  The second consequence is that the ~25
     `FsStateEra.inode_local_of_ok_rec` call sites -- ProofCreate,
     ProofSysLink*, ProofSysUnlink*, ProofIlock, ProofSysOpen, ProofFilewrite,
     IcacheEscrow, IcacheBoot -- do not move at all.
@@ -2610,8 +2621,8 @@ never wanted that shape.
     escrow's MID arm (`ProofIget.v` ~:1378, `IcacheEscrow.ipool_take_lend`).
     `IcacheEscrow.ipool_body`'s partition row, at the three EMPTY keys
     `IcacheBoot.icache_boot_at` is handed, forces the ordinary index to BE
-    the whole region: `iris/FsBootWall.v`'s `boot_pool_index_forced` /
-    `boot_pool_holds_root` / `boot_empty_pool_refuted`.  A pool row is not a
+    the whole region (machine-checked: the index is forced, it holds the
+    root, and an empty pool is refuted).  A pool row is not a
     marker -- `ipool_ord` carries `ipool_shape_np`, whose allocated arm is
     the inode's whole era-side bundle.
     So the mint stays at PowerOn inside `boot_shared_alloc`, and
@@ -2620,7 +2631,7 @@ never wanted that shape.
     `fs_cfg_alloc_snap`'s premise wants.  E-recover's wall is unchanged.
     `xv6_power_adequacy` / `Himg` / `fs_boot_image_eras` were not touched.
 
-    **THE TWO EXITS**, written out in `FsBootWall.v`'s new header, are the
+    **THE TWO EXITS** are the
     owner's to choose; both consume `fs_cfg_alloc_snap` exactly as it
     stands and differ only in the fupd it runs in.
       (1) MINT `L` AT `D` AND KEEP THE MINT AT PowerOn.  Nothing about the
@@ -2773,7 +2784,7 @@ never wanted that shape.
          and `Himg`/`fs_boot_image_eras` go with `boot_hart_primary`'s use.
 
     Until they land `Himg` stays and `xv6_power_adequacy` is still vacuous.
-    Machine-checked record: `iris/FsBootWall.v`'s second banner, exit (1).
+    Machine-checked record: exit (1).
     **AS LANDED (E-himg): THE THEOREM.  `Himg` IS DELETED, AND THE DATA
     COVERAGE CORNER WAS NEVER READ.**
 
@@ -2834,7 +2845,7 @@ never wanted that shape.
     `wp_main_boot_sconf_body` / `mn_grp_fs`, with two extra parameters (the
     state `S` and the byte view `Pb`).  Its nine rows: the era's `sb`/`nib`
     ARE `S`'s (so nothing is existential — the caller instantiates them at
-    `fss_sb S` / `snap_nib S`), `snap_ok` at `fs_restrict Pb home`, `Pb`'s
+    `fss_sb S` / `fs_nib S`), `snap_ok` at `fs_restrict Pb home`, `Pb`'s
     length, `hdr_wf`, where `Pb` agrees with the raw disk and where it
     holds the logged slot, and the two ERA-INDEPENDENT rows about `cov`
     (`fs_cov_in`, `log_region_set ls ⊆ cov`) that a per-era snapshot
@@ -2888,7 +2899,7 @@ never wanted that shape.
   facts about the committed view `D` itself (block size, `dom D` below
   `sb_size`) are the WAL's, supplied where consumed.  The predicate needs
   nothing about `D`'s domain, and the `=` identity is neither provable
-  (resources are affine) nor needed (`FsDurXferWall`).
+  (resources are affine) nor needed.
 - [ ] **Lane H — THE VALUE-FIRST ALLOCATOR IS A MISTAKE TO CLEAN UP
   (owner ruling; first cleanup after the theorem).**  As built, the commit
   MATERIALISES a pure disjointness fact: `FsCollectAll.fs_collect_snap_ok`
@@ -3005,7 +3016,7 @@ never wanted that shape.
     name first.
   - **`dsnap_step_of` IS DELETED** (its `snap_ok` form had no caller left).
     `dsnap_step_id`/`_trans` remain caller-less, as before this lane.
-  - **WALL — the SHAPES, in `iris/FsDurXferWall.v`.**  Item 3 of H2's
+  - **WALL — the SHAPES.**  Item 3 of H2's
     brief (make `snap_ok` a reading off the snapshot's resources) needed
     the snapshot to OWN something that pins `D`; lane H3 gave it one
     (`FsDurRead.snap_auth`) and the wall's first half is retired there.
@@ -3061,8 +3072,7 @@ never wanted that shape.
     `fs_state_xfer_snap` are the non-vacuity checks at both instances.
     `fs_snap_alloc_xfer`/`P_dur_alloc_xfer` now take `snap_shape` and
     NOTHING else — no byte tie, no cut clause, no used-set clause.
-  - **`iris/FsDurXferWall.v`'s first wall is RETIRED and replaced by a
-    sharper one.**  `snap_ok_not_readable`/`snap_ok_empty_absurd` are
+  - **H2's first wall is RETIRED and replaced by a sharper one.**  `snap_ok_not_readable`/`snap_ok_empty_absurd` are
     deleted (the tied form defeats them).  What stands is
     `snap_shape_not_readable`: grow `D` by one whole block above the
     state's own `size` and every resource of the epoch still holds
@@ -3094,7 +3104,7 @@ never wanted that shape.
   theorem's statement and exported content untouched.
 
   - **ITEM 1 IS REFUTED, AT THE EQUALITY FORM ITSELF**
-    (`iris/FsDurXferWall.v`, machine-checked).  Making
+    (machine-checked).  Making
     `FsDurRead.snap_auth`'s tie an EQUALITY `B = fs_dbytes D` buys nothing,
     because `LogDefs.fs_dbytes` is BLIND to a block whose byte list is
     empty and therefore not injective: pad `D` with `b := []` and the
@@ -3133,7 +3143,7 @@ never wanted that shape.
     runs correspondence) reads at a share with no new lemma.  `xr_dats`
     splits an inode's block legs from its record's, because at a commit the
     two arrive from different places at different shares.  So
-    `FsDurXferWall`'s SECOND wall (`dfrac_34_no_pair`, `phi_no_promote`) is
+    H2's SECOND wall (a 3/4 element does not promote) is
     retired as an obstacle: it still says a 3/4 element is not a full one,
     and nothing needs it to be.
 
@@ -3222,7 +3232,7 @@ never wanted that shape.
   - **`ss_dombelow` STAYS, and the reason is the SAME wall H3 recorded.**
     It is the only bridge between the boot configuration's FIXED `cov` and
     the era's own `size`, and no resource bounds `D`'s domain
-    (`FsDurXferWall.snap_shape_not_readable`, unchanged).  The WAL cannot
+    (unchanged: an authority may hold entries no fragment names).  The WAL cannot
     supply it either: that would need "block 1 never changes across a power
     cycle", a machine-level invariant this tree does not have.  So
     `snap_shape` is a one-clause record; `snap_shape_pad_absurd` is now
@@ -3737,7 +3747,7 @@ never wanted that shape.
 
     `FsDurBytes.v` STAYS (`FsDurImg`/`FsCrash` import it).  `DirLinks.v`
     cannot go before `IcacheEscrow.dlinks` loses its conjunct, and that
-    single edit is what unblocks `FsBootWall`'s (a)/(b)/(c).
+    single edit is what unblocks the boot wall's (a)/(b)/(c).
 
   **AS LANDED — G6: THE DEMOLITION, IN FULL.  GREEN (branch
   `lane-g6-demolition`, whole `iris/` tree; `make audit-only` at the
@@ -3809,12 +3819,10 @@ never wanted that shape.
     `ProofCreate.cr_grey_links`/`cr_grey_dir_links`.  The two pure
     `mword 16` increment facts `DirLinks` happened to carry live on as
     `InodeRegion.nlink_add1_le`/`nlink_add1_nz_eq`.
-  - **`FsBootWall.v` IS CLOSED** and restated as the record of a wall that
-    no longer exists: its two theorems quantified over `dlc_bound` and
-    `ireg_dir_wl0` and are deleted with them, and the header now says what
-    the boot builds INSTEAD (`FsCfgBoot.ent_toks_of_region` + `FsDurImg`
-    §9's single value function `fv`).  The file stays in `_CoqProject` as a
-    comment-only module.
+  - **THE BOOT WALL IS CLOSED**: its two theorems quantified over
+    `dlc_bound` and `ireg_dir_wl0` and are deleted with them.  What the
+    boot builds instead is `FsCfgBoot.ent_toks_of_region` + `FsDurImg` §9's
+    single value function `fv`.
   - **Footprint, measured on this branch:** `IcacheRef` 100 `lelem*` sites,
     `InodeRegion` ~240 column sites, and FIVE files outside the brief's list
     that destructure `ireg_slot` and therefore had to move mechanically:
@@ -3849,17 +3857,66 @@ never wanted that shape.
     closes the enumeration (every constructor must be refutable at an
     in-transition box).  `ProofCreate.cr_flav` and its five lemmas are
     deleted with the flavour index they served.
-  - **`FsLookup.fdir_dots_index` is now caller-less** — its consumer was
-    `dir_links_dotdot_out`.  Kept; it is the payload/tree seam's own
-    reading.
-  - **BLOCKED ON LANE H, and that is all that is left of this item:**
-    `FsBoot.fs_boot_bundle` (still caller-less); the `eo_minst`/
-    `lm_install` unification (`ProofEndOp`/`LogInv`/`ProofInitlog`); and
-    all three 2c-img relocations, whose sources are `FsDurImg.v`/
-    `FsDurBytes.v` and whose destinations are `FsStateDefs.v`/
-    `FsStateInode.v`/`LogDefs.v`.  One more nit for whoever is next in
-    `SystemAdequacy.v`: its audit paragraph still says "the eight-entry
-    baseline"; the baseline is three.
+  **AS LANDED — S1: THE SWEEP.  Whole tree green, `make audit-only` at the
+  measured baseline (see below).  NOTHING OF LANE G REMAINS EXCEPT THE
+  `eo_minst`/`lm_install` UNIFICATION.**
+
+  - **Deleted, each re-measured by grep over `iris/*.v` with comments
+    stripped and each cascade re-measured after its head went:**
+    `FsBoot.fs_boot_bundle`; `FsLookup.fdir_dots_index` with the pure chain
+    it was the only reader of (`node_dots_index`, `node_dots_first`);
+    `FsCfgBoot.fs_cfg_iregN_top`, `img_ity`/`img_ity_ok`,
+    `dir_entry_names_nodup` with its chain (`dir_wins_names_nodup`,
+    `dir_entry_fst`, `dir_wins_bname_ne`);
+    `InodeRegion.dv_lend_mint`/`fv_lend_mint`;
+    `IcacheEscrow.ipool_shape` with `ipool_ord_shape`/`ipool_ext_shape`/
+    `ipool_shape_arms`, and the two EAGER evictions `ic_close_to_empty`/
+    `_await` (the split `_late`/`_frz` + `ipool_shape_await` forms are what
+    `ProofIput` uses).  `ipool_no_timeless_check` is restated over
+    `ipool_ext`, the row that actually is not Timeless.
+    `FsDurSnap.snap_nib` was an alias of `FsState.fs_nib`; its five uses
+    spell `fs_nib`.  `Xv6Cameras.fsLogG` loses `fsown_inG` and `fsLogΣ`
+    its `ghost_mapΣ Z unit` — the per-block ownership token it typed went
+    with `blk_own`, and nothing asks for a `Z`-keyed unit map.
+  - **THE EIGHT REFUTATION FILES ARE OUT OF THE TREE** (owner ruling):
+    `FsDurXferWall`, `FsDurRefute`, `FsDurDefer`, `FsDurTrunc`,
+    `FsDurQuiesce`, `IcacheTxRefute`, `IcacheTxArm`, `FsBootWall`.
+    `FsDurQuiesce`'s three LIVE namespace lemmas (`ns_not_reopenable`,
+    `esc_ns_disjoint`, `esc_ns_still_open`) moved verbatim into
+    `FsCollectAll.v` above its section — its only consumer.  The 24 comment
+    citations of the eight in live sources now state the RULE, not the
+    file, and the notes sweep did the same across `design/` and
+    `projects/`; `completed/` carries one banner instead.
+  - **The three 2c-img relocations landed**: `big_sepM_map_seqZ_gen`
+    `FsDurBytes` → `FsStateDefs`; `big_sepL_seq_chunks` `FsDurImg` →
+    `FsStateInode` beside `big_sepL_seq0`; `fs_restrict_keys` +
+    `big_sepM_fs_restrict` `FsDurImg` → `LogDefs` beside `fs_restrict`.
+    `FsBlocks`' `big_sepM_map_seqZ` twin CANNOT die with the move, and that
+    is the durable fact: `FsBlocks` defines its own `byte_range`/
+    `byte_range_q`, so importing `FsStateDefs` there shadows the block
+    layer's names.
+  - **SKIPPED, both measured.**  (i) The `FsDurSnap` `Require Export
+    FsState` "shadowing" is not what forces the qualified names.
+    `FirstTok`/`SpecMain`/`BootChain`/`ProofMain` never `Require` `FsState`
+    or `FsDurSnap` at all — they reach the names transitively, so they must
+    qualify — and the fix is not free: `FsState` and `FsBlocks` are TWIN
+    NAMESPACES (`fs_view`, `byte_range`, `blk_owned`, `link_auth`), so
+    importing `FsState` into `FirstTok` and `ProofMain` breaks their two
+    `fs_view` sites.  Someone at the seam has to qualify one side; today it
+    is `FsState`.  `FirstTok` also qualifies `FsImg.`/`FsBoot.`/`FsDurSnap.`
+    by house style, so unqualifying one of the four would make it
+    inconsistent.  (ii) The stdpp-`NoDup` / `List.NoDup` split cannot be
+    unified by moving one premise: the bridge count is CONSERVED.
+    `hdr_dec`'s duplicate-freedom is consumed at BOTH inductives —
+    `ProofInitlog` reads `LogInv`'s `⌜NoDup (map uint W)⌝` at Stdlib's in
+    its own scope while `ProofEndOp` reads the same conjunct at stdpp's
+    `base.NoDup` — so `SpecFsinit`'s premise changing sides only moves the
+    `NoDup_ListNoDup` call from `ProofForkret` to `ProofFsinit`.  The real
+    fix is `LogDefs`' own rule, already written there: state the premise as
+    the INJECTIVITY it is used through.  That is a design change, not a
+    cleanup.
+  - **`SystemAssumptions.v`'s header needed no correction**: it says
+    THIRTEEN and lists ten primitives, which is what the audit prints.
 
 ## Sizing notes for whoever runs the lanes
 
