@@ -207,7 +207,7 @@ Definition wp_ilock_dep_sconf_body
     (bn : bio_names)
     (gi : gname)                      (* fs blocks + region  *)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+    (logstart : Z) (inodestart : Z) (nib : nat)
     (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (dev inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
@@ -257,12 +257,12 @@ Definition wp_ilock_dep_sconf_body
 
   (* the covered range's block-number bounds: bread's 2^31 arithmetic
      premise, and 0 is never a client block *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   (* the superblock field is a real block number, so the [addw] that forms
      IBLOCK cannot wrap *)
   0 <= inodestart ->
   (* the inode's own block is a covered HOME block: bread's premise *)
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   (* the inum is inside the inode region: [ireg_read]'s premise *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
   (j < NPROC)%nat ->
@@ -287,11 +287,11 @@ Definition wp_ilock_dep_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
+  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
   (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,
      the inode region *)
   itable_inv -∗
-  ic_escrow fsc_ic fsc_fs gi cov logstart k -∗
+  ic_escrow fsc_ic fsc_fs gi fsc_cov logstart k -∗
   ireg_inv gi fsc_fs inodestart nib -∗
   (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
   (* THE ENTRY'S SLEEPLOCK -- TRACKED, and at the cache's canonical gname
@@ -390,7 +390,7 @@ Definition wp_ilock_dep_sconf_body
       i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
-      ic_dep_held fsc_fs gi cov logstart d k inum dn bm -∗
+      ic_dep_held fsc_fs gi fsc_cov logstart d k inum dn bm -∗
       (* THE FD-TYPE WITNESS (design fs-icache.md 17.6 (5), ratified 17.7).
          PERSISTENT, ADDITIVE, and ignored by every caller that does not
          write: this generation's one-shot, spent by the fill against the
@@ -466,7 +466,7 @@ Definition wp_ilock_tx_sconf_body
     (bn : bio_names)
     (gi : gname)                      (* fs blocks + region  *)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+    (logstart : Z) (inodestart : Z) (nib : nat)
     (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
@@ -481,12 +481,12 @@ Definition wp_ilock_tx_sconf_body
 
   (* the covered range's block-number bounds: bread's 2^31 arithmetic
      premise, and 0 is never a client block *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   (* the superblock field is a real block number, so the [addw] that forms
      IBLOCK cannot wrap *)
   0 <= inodestart ->
   (* the inode's own block is a covered HOME block: bread's premise *)
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   (* the inum is inside the inode region: [ireg_read]'s premise *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
   (j < NPROC)%nat ->
@@ -511,11 +511,11 @@ Definition wp_ilock_tx_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
+  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
   (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,
      the inode region *)
   itable_inv -∗
-  ic_escrow fsc_ic fsc_fs gi cov logstart k -∗
+  ic_escrow fsc_ic fsc_fs gi fsc_cov logstart k -∗
   ireg_inv gi fsc_fs inodestart nib -∗
   (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
   (* THE ENTRY'S SLEEPLOCK -- TRACKED, and at the cache's canonical gname
@@ -631,7 +631,7 @@ Definition wp_ilock_tx_sconf_body
       i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
-      ic_loaded fsc_fs gi cov logstart k inum dn bm -∗
+      ic_loaded fsc_fs gi fsc_cov logstart k inum dn bm -∗
       (* THE FD-TYPE WITNESS (design fs-icache.md 17.6 (5), ratified 17.7).
          PERSISTENT, ADDITIVE, and ignored by every caller that does not
          write: this generation's one-shot, spent by the fill against the
@@ -703,17 +703,17 @@ Lemma wp_ilock_tx_of_dep
     (bn : bio_names)
     (gi : gname)
     (gil gisl : gname)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+    (logstart : Z) (inodestart : Z) (nib : nat)
     (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :
   (forall d : ic_dep,
      wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gi gil gisl
-                             cov logstart inodestart nib k s g d o dev inum
+                             logstart inodestart nib k s g d o dev inum
                              pidv dq dqs m K eb b lks Vpr) ->
   wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gi gil gisl
-                         cov logstart inodestart nib k s g o dev inum
+                         logstart inodestart nib k s g o dev inum
                          pidv dq dqs m K eb b lks Vpr.
 Proof.
   cbv beta delta [wp_ilock_tx_sconf_body wp_ilock_dep_sconf_body].
@@ -754,13 +754,13 @@ Module Type ILOCK.
       (bn : bio_names)
       (gi : gname)
       (gil gisl : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gi gil gisl
-                              cov logstart inodestart nib k s g d o dev inum
+                              logstart inodestart nib k s g d o dev inum
                               pidv dq dqs m K eb b lks Vpr.
   (* THE TRANSACTIONAL FORM (durable-disk B''-tx).  Same C function, same
      proof; what selects it is whether the caller brings [LogInv.log_tx].
@@ -774,12 +774,12 @@ Module Type ILOCK.
       (bn : bio_names)
       (gi : gname)
       (gil gisl : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gi gil gisl
-                             cov logstart inodestart nib k s g o dev inum
+                             logstart inodestart nib k s g o dev inum
                              pidv dq dqs m K eb b lks Vpr.
 End ILOCK.

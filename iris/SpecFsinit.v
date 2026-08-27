@@ -108,7 +108,7 @@
    [SpecInitlog.wp_initlog_sconf] (whose whole struct-log bundle, era mirror
    and FsBlocks material ride straight through untouched) and
    [SpecIreclaim.wp_ireclaim_sconf].  Note the ORDER is load-bearing:
-   initlog is what PRODUCES [log_ctx icfg_log bn fsc_fs cov logstart dev], and
+   initlog is what PRODUCES [log_ctx icfg_log bn fsc_fs fsc_cov logstart dev], and
    ireclaim CONSUMES it (begin_op / end_op / iput).  So the log context does
    not cross this contract's boundary as an input at all -- it is born at
    +0x4e and handed to the caller at the end.
@@ -258,7 +258,7 @@ Definition wp_fsinit_sconf_body
     (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
-    (cov : gset Z) (logstart bmapstart inodestart : Z)
+    (logstart bmapstart inodestart : Z)
     (ninodes : Z) (nib : nat) (size : Z)
     (dev : mword 32)
     (* ---- the image's block 1, field by field ---- *)
@@ -286,9 +286,9 @@ Definition wp_fsinit_sconf_body
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_fsinit <= K)%nat ->
   (* ---- bread's / the log's block-number arithmetic ---- *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   (* THE SUPERBLOCK'S OWN BLOCK: block 1, covered, and not log storage *)
-  (1 : Z) ∈ cov ->
+  (1 : Z) ∈ fsc_cov ->
   ~ ((1 : Z) ∈ log_region_set logstart) ->
   (* ================================================================== *)
   (*  THE IMAGE PREMISES.  Everything below is a claim about what mkfs   *)
@@ -318,7 +318,7 @@ Definition wp_fsinit_sconf_body
           are consumed here and nowhere else: fsinit builds the file
           system's law out of the invariants it already holds and hands it
           to [initlog], which parks it in [LogInv.log_ctx]. *)
-  col_geom sbrec inodestart nib (fs_home_set cov logstart) ->
+  col_geom sbrec inodestart nib (fs_home_set fsc_cov logstart) ->
   FsImg.sb_bmapstart sbrec = bmapstart ->
   FsImg.sb_size sbrec = size ->
   (* (b) the magic, which is what refutes the LIVE panic arm at +0x40 *)
@@ -343,12 +343,12 @@ Definition wp_fsinit_sconf_body
   (* (f) the inode region's block geometry, and itrunc's, threaded to
          ireclaim *)
   0 <= inodestart ->
-  ireg_blocks_ok inodestart nib cov logstart ->
+  ireg_blocks_ok inodestart nib fsc_cov logstart ->
   0 < size <= BPB ->
   0 <= bmapstart ->
-  bmapstart ∈ cov ->
+  bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
-  cov_below cov size ->
+  cov_below fsc_cov size ->
   (* (g) THE ON-DISK HEADER IS WELL FORMED, AND THAT IS ALL (durable-disk
          lane E-except; the CLEAN-IMAGE premise [hdr_n bs_hdr = 0] IS GONE).
          These are [FsCrash.hdr_wf]'s three clauses at the header block's
@@ -363,7 +363,7 @@ Definition wp_fsinit_sconf_body
   ((hdr_dec bs_hdr).1 <= LOGBLOCKS)%nat ->
   NoDup (hdr_dec bs_hdr).2 ->
   (forall b : Z, b ∈ (hdr_dec bs_hdr).2 ->
-     b ∈ cov /\ b ∉ log_region_set logstart /\ b <> FsImg.SB_BNO) ->
+     b ∈ fsc_cov /\ b ∉ log_region_set logstart /\ b <> FsImg.SB_BNO) ->
   (* (g'') THE EXCEPTION SET'S VALUES ARE THE SLOTS' (durable-disk lane
          E-except), threaded verbatim into [initlog]. *)
   (forall (i : nat) (b : Z),
@@ -373,7 +373,7 @@ Definition wp_fsinit_sconf_body
          view and the era's born-true mirror agree on the covered range.
          Threaded verbatim into [initlog], where it is what makes the boot
          [log_state] pack's row (b) provable. *)
-  (forall b : Z, b ∈ cov -> L !! b = Some (lm_view M b)) ->
+  (forall b : Z, b ∈ fsc_cov -> L !! b = Some (lm_view M b)) ->
   (* ---- ireclaim's printk, as a hypothesis and not a functor ---- *)
   printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
@@ -396,10 +396,10 @@ Definition wp_fsinit_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
   (* initlog's crash seam, era certificate and the era's BORN-TRUE mirror
      half + swap receipt (durable-disk 1a) *)
-  fs_crash_seam cov logstart -∗
+  fs_crash_seam fsc_cov logstart -∗
   gen_cert -∗
   log_mirror_born M -∗
   (* THE LOG'S FOUR GNAMES, AT THEIR GENESIS VALUES, AND THEY ARE
@@ -418,7 +418,7 @@ Definition wp_fsinit_sconf_body
      BEFORE recovery and so goes through the [b ∉ X] form, and inside
      [initlog], which is where the exception set is emptied and sealed. *)
   fs_bytes_inv (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
-               (fs_home_set cov logstart) Xv -∗
+               (fs_home_set fsc_cov logstart) Xv -∗
   fsblock (fs_bytes fsc_fs) 1 bs_sb -∗
   (* THE BYTE VIEW'S EXCEPTION HANDLE (durable-disk lane E-except), from
      the era's mint, threaded straight into [initlog], which empties it and
@@ -438,12 +438,12 @@ Definition wp_fsinit_sconf_body
      returns and before [kexec("/init")] -- that seal is OWED to forkret's
      first branch. *)
   ireg_boot -∗
-  is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi fsc_cov logstart -∗
   ic_sleeplocks fsc_ic -∗
   (* itrunc's bitmap, through ireclaim's iput *)
-  bitmap_reg fsc_fs bmapstart cov logstart size -∗
+  bitmap_reg fsc_fs bmapstart fsc_cov logstart size -∗
   (* ---- initlog's RAW struct log cells, threaded straight through ---- *)
   log_addr ↦₄ vlock -∗
   lock_name_field log_addr ↦₈ vname -∗
@@ -458,7 +458,7 @@ Definition wp_fsinit_sconf_body
   (* ---- initlog's FsBlocks material ---- *)
   ghost_map_auth (fs_cache fsc_fs) 1 L -∗
   ghost_map_auth (fs_dirty fsc_fs) 1 D -∗
-  ([∗ set] z ∈ cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) -∗
+  ([∗ set] z ∈ fsc_cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) -∗
   fs_chalf fsc_fs (log_hdr_bno logstart) bs_hdr -∗
   ([∗ list] i ∈ seq 0 LOGBLOCKS,
      ∃ bs : list (bv 8), fs_chalf fsc_fs (log_slot_bno logstart i) bs) -∗
@@ -515,10 +515,10 @@ Definition wp_fsinit_sconf_body
       (* THE LOG LAYER, BUILT by initlog at +0x4e and already USED by
          ireclaim at +0x54.  It does not cross the boundary as an input.
          AT [icfg_log], not existentially: this is [FsReady.fs_ready]'s log
-         conjunct, modulo the seal site's instantiation of [bn]/[fsc_fs]/[cov]/
+         conjunct, modulo the seal site's instantiation of [bn]/[fsc_fs]/[fsc_cov]/
          [logstart] at [fsc_bio]/[fsc_fs]/[fsc_cov]/[fsc_logst] and
          [dev = icfg_dev], which premise (e) above already gives. *)
-      log_ctx icfg_log bn fsc_fs cov logstart dev -∗
+      log_ctx icfg_log bn fsc_fs fsc_cov logstart dev -∗
       (* three, not two: see the header *)
       bslots 3 -∗
       iref_slot -∗
@@ -539,7 +539,7 @@ Module Type FSINIT.
       (γi : gname)
       (gtl : gname)
       (γpr : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z)
+      (logstart bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
       (dev : mword 32)
       (v_magic v_size v_nblocks v_ninodes v_nlog
@@ -557,7 +557,7 @@ Module Type FSINIT.
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb),
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γi gtl γpr
-                           cov logstart bmapstart inodestart ninodes nib size
+                           logstart bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old

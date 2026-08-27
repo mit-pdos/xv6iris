@@ -310,7 +310,7 @@ Definition wp_itrunc_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γi : gname)
-    (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
+    (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -323,15 +323,15 @@ Definition wp_itrunc_sconf_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_itrunc <= K)%nat ->
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   (* ONE BITMAP BLOCK -- the fact that makes the budget work at all *)
   0 < size <= BPB ->
   0 <= bmapstart ->
-  bmapstart ∈ cov ->
+  bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   (* the inode's own block, for the closing iupdate *)
   0 <= inodestart ->
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
   (* the inum is one the inode REGION covers -- iupdate's premise, which
      replaced the block-half premise and its [diblk_wf ds] (design §11.3) *)
@@ -358,13 +358,13 @@ Definition wp_itrunc_sconf_body
      covered home block, and -- via injectivity -- that the 269 frees are
      269 DISTINCT blocks, so the free pool really does grow by
      [bm_blocks bm] *)
-  blkmap_wf cov logstart bm ->
+  blkmap_wf fsc_cov logstart bm ->
   (* EVERY BLOCK THE INODE NAMES IS IN RANGE FOR THE BITMAP.  bfree needs
      [0 <= b < size] of every block it frees.  That used to be taken slot
      by slot, as an owed hypothesis the model could not supply; it is not
      owed any more.  [blkmap_wf] ALREADY says every block the inode names
-     is in [cov], so all that is missing is ONE PURE GEOMETRY FACT relating
-     [cov] to the file system's size -- of exactly the same character as
+     is in [fsc_cov], so all that is missing is ONE PURE GEOMETRY FACT relating
+     [fsc_cov] to the file system's size -- of exactly the same character as
      [log_geom_ok], and supplied from the same place.  The per-slot fact is
      then [IcacheInv.blkmap_slot_inrange], a two-line corollary, and no
      invariant moves (claude-notes/design/fs-icache.md §6(i);
@@ -375,7 +375,7 @@ Definition wp_itrunc_sconf_body
      [ind_res]), and bfree derives the bit-is-set fact from that run itself
      ([FsStateBitmap.free_pool_used]).  Demanding it here would have made
      the contract uncallable by iput, which has no source for it. *)
-  cov_below cov size ->
+  cov_below fsc_cov size ->
   (* EVERY DATA BLOCK IS A BLOCK'S WORTH OF BYTES.  bfree demands it of the
      block it frees, and [inode_blocks] does not carry it: the bundle names
      contents but says nothing about their length.  Like the range premise
@@ -410,8 +410,8 @@ Definition wp_itrunc_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written *)
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
@@ -425,7 +425,7 @@ Definition wp_itrunc_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* the bitmap, with its free pool *)
-  bitmap_inv fsc_fs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
   ireg_inv γi fsc_fs inodestart nib -∗
@@ -519,7 +519,7 @@ Definition wp_itrunc_gen_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γi : gname)
-    (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
+    (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -539,20 +539,20 @@ Definition wp_itrunc_gen_body
      handed straight to [bm_paidS_intro]'s paid disjunct, never to a group
      claimant. *)
   (crb = true -> bmapstart ∈ Sb) ->
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 < size <= BPB ->
   0 <= bmapstart ->
-  bmapstart ∈ cov ->
+  bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   0 <= inodestart ->
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
   bv_unsigned inum < 16 * Z.of_nat nib ->
   bv_unsigned (di_type dn) <> 0 ->
   di_type_stable dn dn0 ->
   di_nlink_stable dn dn0 ->
-  blkmap_wf cov logstart bm ->
-  cov_below cov size ->
+  blkmap_wf fsc_cov logstart bm ->
+  cov_below fsc_cov size ->
   (forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE) ->
   di_addrs dn = bm_cells bm ->
   (j < NPROC)%nat ->
@@ -568,8 +568,8 @@ Definition wp_itrunc_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   inode_meta ip dn -∗
@@ -577,7 +577,7 @@ Definition wp_itrunc_gen_body
   inode_blocks fsc_fs bm data -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
   ireg_inv γi fsc_fs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   proc_priv_bare pj pidv Vpr -∗
@@ -655,7 +655,7 @@ Module Type ITRUNC.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -665,7 +665,7 @@ Module Type ITRUNC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γi
-                           cov logstart bmapstart inodestart nib size dev
+                           logstart bmapstart inodestart nib size dev
                            ip inum dn dn0 bm data u
                            pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
   (* the credited set-form contract; [wp_itrunc_sconf] is this at
@@ -679,7 +679,7 @@ Module Type ITRUNC.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -689,7 +689,7 @@ Module Type ITRUNC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γi
-                         cov logstart bmapstart inodestart nib size dev
+                         logstart bmapstart inodestart nib size dev
                          ip inum dn dn0 bm data u Sb crb cru e0
                          pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
 End ITRUNC.

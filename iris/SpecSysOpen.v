@@ -267,7 +267,7 @@ Definition wp_sys_open_sconf_body
     (bn : bio_names)
     (g : log_names) (gi : gname)
     (gtl : gname)                       (* the itable's lock   *)
-    (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (logstart bmapstart inodestart : Z) (nib : nat)
     (ninodes : Z) (size : Z) (dev : mword 32)
     (ns : nat)                                          (* the iref ledger     *)
     (dqb dqs dqbs dqn : dfrac)
@@ -287,15 +287,15 @@ Definition wp_sys_open_sconf_body
   dev = ROOTDEV ->
   (0 < nib)%nat ->
   (* ---- the block-layer geometry, threaded to create / itrunc / iunlockput ---- *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 < size <= BPB ->
   0 <= bmapstart ->
-  bmapstart ∈ cov ->
+  bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   0 <= inodestart ->
-  cov_below cov size ->
-  bitmap_geom_ok cov logstart bmapstart size ->
-  ireg_blocks_ok inodestart nib cov logstart ->
+  cov_below fsc_cov size ->
+  bitmap_geom_ok fsc_cov logstart bmapstart size ->
+  ireg_blocks_ok inodestart nib fsc_cov logstart ->
   (* ---- ialloc's three geometry premises, and mkfs's [ushort] tie ---- *)
   1 < ninodes ->
   ninodes <= 16 * Z.of_nat nib ->
@@ -332,18 +332,18 @@ Definition wp_sys_open_sconf_body
   (* ---- the open-file table: filealloc, fdalloc and fileclose ---- *)
   is_ftable γfl γf -∗
   (* ---- the block layer ---- *)
-  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
-  log_ctx g bn fsc_fs cov logstart dev -∗
-  fs_crash_seam cov logstart -∗
+  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+  log_ctx g bn fsc_fs fsc_cov logstart dev -∗
+  fs_crash_seam fsc_cov logstart -∗
   gen_cert -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region ialloc / itrunc claim out of ---- *)
-  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi fsc_cov logstart -∗
   ic_sleeplocks fsc_ic -∗
   ireg_inv gi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
@@ -359,7 +359,7 @@ Definition wp_sys_open_sconf_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
   (* argstr's page-table side, and create's / namei's (iget's ipool arm
      allocates) *)
   kalloc_env γa None -∗
@@ -417,7 +417,7 @@ Module Type SYSOPEN.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
@@ -426,7 +426,7 @@ Module Type SYSOPEN.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_open_sconf_body γfl γf γa γpr gs j gl gu gd gk pd pav pu bn g
-                             gi gtl cov logstart bmapstart inodestart nib
+                             gi gtl logstart bmapstart inodestart nib
                              ninodes size dev ns dqb dqs dqbs dqn v vom
                              pid V m K eb b lks.
 End SYSOPEN.

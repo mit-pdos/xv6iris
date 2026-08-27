@@ -88,7 +88,7 @@ Section ItruncCont.
 
   Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
       (γ : log_names) (γi : gname) (bn : bio_names)
-      (cov : gset Z) (logstart bmapstart inodestart size : Z)
+      (logstart bmapstart inodestart size : Z)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (u : nat) (Sbf : gset Z)
@@ -195,7 +195,7 @@ Section ItruncTail.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart bmapstart inodestart size : Z) (nib : nat)
+      (logstart bmapstart inodestart size : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -203,9 +203,9 @@ Section ItruncTail.
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m M : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Vpr : pprivate) :
     (K_itrunc <= K)%nat ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 <= inodestart ->
-    IBLOCK inum inodestart ∈ cov ->
+    IBLOCK inum inodestart ∈ fsc_cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     bv_unsigned (di_type dn) <> 0 ->
@@ -227,8 +227,8 @@ Section ItruncTail.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-    log_ctx γ bn fsc_fs cov logstart dev -∗
+    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+    log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
     procs_inv γs -∗
     it_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
@@ -249,7 +249,7 @@ Section ItruncTail.
        a RESOURCE at the walk's own birth epoch (fs-log.md §G.20) *)
     log_credit γ cru Sb0 e0 (IBLOCK inum inodestart) -∗
     log_opSe γ (S u) Sb0 e0 -∗
-    it_cont (CID0 := CID0) γ γi bn cov logstart bmapstart inodestart size
+    it_cont (CID0 := CID0) γ γi bn logstart bmapstart inodestart size
             dev ip inum dn bm (if cru then S u else u)
             (Sb0 ∪ {[IBLOCK inum inodestart]})
             pidv dq dqd dqn dqb dqs j m K b eb lks Vpr -∗
@@ -364,7 +364,7 @@ Section ItruncTail.
        birth epoch NAMED, because a credit is only sound against the epoch
        of the op presenting it.  iupdate's own post re-closes the epoch. *)
     iApply (IU.wp_iupdate_credgen γs j γl γu γd γk pd pav pu bn γ γi
-              cov logstart inodestart nib dev ip inum (di_trunc dn) dn0
+              logstart inodestart nib dev ip inum (di_trunc dn) dn0
               bm_empty u Sb0 cru e0 0%nat
               pidv dq dqd dqn dqs T1 (K - 6)%nat eb b
               _ Vpr HKiu Hgeom Hist Hicov Hilog Hnib
@@ -675,7 +675,7 @@ Section ItruncDLoop.
   (* what the loop hands on at +0x32, once every direct entry is gone *)
   Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} 
       (γ : log_names) (bn : bio_names)
-      (cov : gset Z) (logstart bmapstart size : Z)
+      (logstart bmapstart size : Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
@@ -693,7 +693,7 @@ Section ItruncDLoop.
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         bslots 2 -∗
-        it_dir_state γ fsc_fs ip bm data cov logstart bmapstart size bn
+        it_dir_state γ fsc_fs ip bm data fsc_cov logstart bmapstart size bn
                      crb Sb e0 w NDIRECT -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -702,19 +702,19 @@ Section ItruncDLoop.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names)
-      (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
+      (logstart bmapstart size : Z) (dev : mword 32)
       (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat)
       (m : regfile) (K : nat) (b : bool) (eb : bool) (fuel : nat) (lks : gset string) (Vpr : pprivate) :
     (K_itrunc <= K)%nat ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 < size <= BPB ->
     0 <= bmapstart ->
-    bmapstart ∈ cov ->
+    bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
-    blkmap_wf cov logstart bm ->
+    blkmap_wf fsc_cov logstart bm ->
     (forall i : nat, (i <= MAXFILE)%nat -> bv_unsigned (bm_slot bm i) <> 0 ->
        bv_unsigned (bm_slot bm i) < size) ->
     (forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE) ->
@@ -738,21 +738,21 @@ Section ItruncDLoop.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x20) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-    log_ctx γ bn fsc_fs cov logstart dev -∗
+    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+    log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
     procs_inv γs -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     i_dev ip ↦₄{dqd} dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     (* THE BITMAP'S INVARIANT: persistent, so the loop carries nothing
        bitmap-shaped and bfree's frees leave no trace in the invariant *)
-    bitmap_inv fsc_fs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots 2 -∗
-    it_dir_state γ fsc_fs ip bm data cov logstart bmapstart size bn crb Sb e0 w k -∗
-    it_dexit (CID0 := CID0) γ bn cov logstart bmapstart size dev
+    it_dir_state γ fsc_fs ip bm data fsc_cov logstart bmapstart size bn crb Sb e0 w k -∗
+    it_dexit (CID0 := CID0) γ bn logstart bmapstart size dev
              ip bm data pidv dq dqd dqb jx crb Sb e0 w m K b eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -828,7 +828,7 @@ Section ItruncDLoop.
       iEval (cbn [bm_dir bm_ind bm_ent bm_dir_zeroed]) in "Hmap".
       assert (Hsk : bm_dir_zeroed bm (S k) = bm_dir_zeroed bm k)
         by (apply bm_dir_zeroed_skip; [lia | exact Hzero]).
-      iAssert (it_dir_state γ fsc_fs ip bm data cov logstart bmapstart size
+      iAssert (it_dir_state γ fsc_fs ip bm data fsc_cov logstart bmapstart size
                             bn crb Sb e0 w (S k))
         with "[Hmap Hblks Hpaid]" as "Hst".
       { iApply (it_dir_state_close with "[Hmap] [Hblks] Hpaid");
@@ -1060,7 +1060,7 @@ Section ItruncDLoop.
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
       assert (HKbf : (K_bfree <= K - 6)%nat) by (lia).
       iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ fsc_fs
-                cov logstart bmapstart size dev
+                fsc_cov logstart bmapstart size dev
                 (bm_dir bm !!! k : mword 32) (data k) u' cr Sq e0
                 pidv dq dqb L3 (K - 6)%nat eb b
                 _ Vpr HKbf Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -1127,7 +1127,7 @@ Section ItruncDLoop.
       iEval (rewrite Hstep) in "Hmap".
       iDestruct ("Hback" with "[Hop]") as "Hpaid";
         [ rewrite Hbud; iExact "Hop" |].
-      iAssert (it_dir_state γ fsc_fs ip bm data cov logstart bmapstart size
+      iAssert (it_dir_state γ fsc_fs ip bm data fsc_cov logstart bmapstart size
                             bn crb Sb e0 w (S k))
         with "[Hmap Hblks Hpaid]" as "Hst".
       { iApply (it_dir_state_close with "Hmap Hblks Hpaid"). }
@@ -1247,7 +1247,7 @@ Section ItruncELoop.
 
   Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} 
       (γ : log_names) (bn : bio_names) (γd : disk_names)
-      (cov : gset Z) (logstart bmapstart size : Z)
+      (logstart bmapstart size : Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
@@ -1267,7 +1267,7 @@ Section ItruncELoop.
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         bslots 2 -∗
         buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
-        it_ent_state γ fsc_fs bm data cov logstart bmapstart size
+        it_ent_state γ fsc_fs bm data fsc_cov logstart bmapstart size
                      crb Sb e0 w NINDIRECT -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -1276,19 +1276,19 @@ Section ItruncELoop.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names)
-      (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
+      (logstart bmapstart size : Z) (dev : mword 32)
       (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
       (pidv : mword 32) (dq dqd dqb : dfrac) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat)
       (m : regfile) (K : nat) (b : bool) (eb : bool) (fuel : nat) (lks : gset string) (Vpr : pprivate) :
     (K_itrunc <= K)%nat ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 < size <= BPB ->
     0 <= bmapstart ->
-    bmapstart ∈ cov ->
+    bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
-    blkmap_wf cov logstart bm ->
+    blkmap_wf fsc_cov logstart bm ->
     (forall i : nat, (i <= MAXFILE)%nat -> bv_unsigned (bm_slot bm i) <> 0 ->
        bv_unsigned (bm_slot bm i) < size) ->
     (forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE) ->
@@ -1314,21 +1314,21 @@ Section ItruncELoop.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x6c) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-    log_ctx γ bn fsc_fs cov logstart dev -∗
+    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+    log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
     procs_inv γs -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     i_dev ip ↦₄{dqd} dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     (* THE BITMAP'S INVARIANT: persistent; see [it_dloop] *)
-    bitmap_inv fsc_fs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots 2 -∗
     buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
-    it_ent_state γ fsc_fs bm data cov logstart bmapstart size crb Sb e0 w q -∗
-    it_eexit (CID0 := CID0) γ bn γd cov logstart bmapstart size dev
+    it_ent_state γ fsc_fs bm data fsc_cov logstart bmapstart size crb Sb e0 w q -∗
+    it_eexit (CID0 := CID0) γ bn γd logstart bmapstart size dev
              ip bm data kk dsk pidv dq dqd dqb jx crb Sb e0 w m K b eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1403,7 +1403,7 @@ Section ItruncELoop.
     destruct (decide (bv_unsigned (bm_ent bm !!! q : mword 32) = 0))
       as [Hzero|Hnzero].
     - (* ---------- SKIP ---------- *)
-      iAssert (it_ent_state γ fsc_fs bm data cov logstart bmapstart size crb Sb e0 w (S q))
+      iAssert (it_ent_state γ fsc_fs bm data fsc_cov logstart bmapstart size crb Sb e0 w (S q))
         with "[Hres Hpaid]" as "Hst".
       { iApply (it_ent_state_close with "Hres Hpaid"). }
       iApply (wp_cbeqz_taken_s_sconf (mword_of_int (IT + 0x6e))
@@ -1617,7 +1617,7 @@ Section ItruncELoop.
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
       assert (HKbf : (K_bfree <= K - 6)%nat) by (lia).
       iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ fsc_fs
-                cov logstart bmapstart size dev
+                fsc_cov logstart bmapstart size dev
                 (bm_ent bm !!! q : mword 32) (data (NDIRECT + q)%nat) u' cr Sq e0
                 pidv dq dqb E3 (K - 6)%nat eb b
                 _ Vpr HKbf Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -1660,7 +1660,7 @@ Section ItruncELoop.
         rewrite /E3 upd_ne; [| nz]. exact HE2s4. }
       iDestruct ("Hback" with "[Hop]") as "Hpaid";
         [ rewrite Hbud; iExact "Hop" |].
-      iAssert (it_ent_state γ fsc_fs bm data cov logstart bmapstart size crb Sb e0 w (S q))
+      iAssert (it_ent_state γ fsc_fs bm data fsc_cov logstart bmapstart size crb Sb e0 w (S q))
         with "[Hres Hpaid]" as "Hst".
       { iApply (it_ent_state_close with "Hres Hpaid"). }
       (* ===== +0x78 c.j : back to the increment ===== *)
@@ -1782,7 +1782,7 @@ Section ItruncIArm.
   (* what the arm hands to the tail: the inode names nothing at all *)
   Definition it_armexit `{GEN : GenId} `{CID0 : CpuId}
       (γ : log_names) (bn : bio_names)
-      (cov : gset Z) (logstart bmapstart size : Z)
+      (logstart bmapstart size : Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat)
@@ -1809,18 +1809,18 @@ Section ItruncIArm.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names)
-      (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
+      (logstart bmapstart size : Z) (dev : mword 32)
       (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat)
       (m M : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Vpr : pprivate) :
     (K_itrunc <= K)%nat ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 < size <= BPB ->
-    0 <= bmapstart -> bmapstart ∈ cov ->
+    0 <= bmapstart -> bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
-    blkmap_wf cov logstart bm ->
+    blkmap_wf fsc_cov logstart bm ->
     (forall i : nat, (i <= MAXFILE)%nat -> bv_unsigned (bm_slot bm i) <> 0 ->
        bv_unsigned (bm_slot bm i) < size) ->
     (forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE) ->
@@ -1845,14 +1845,14 @@ Section ItruncIArm.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x50) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-    log_ctx γ bn fsc_fs cov logstart dev -∗
+    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+    log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
     procs_inv γs -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     i_dev ip ↦₄{dqd} dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     (* THE BITMAP'S INVARIANT: persistent; see [it_dloop] *)
-    bitmap_inv fsc_fs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -1862,7 +1862,7 @@ Section ItruncIArm.
     inode_map fsc_fs ip (bm_dir_zeroed bm NDIRECT) -∗
     it_ent_res fsc_fs bm data 0 -∗
     bm_paidS γ bmapstart crb w Sb e0 -∗
-    it_armexit (CID0 := CID0) γ bn cov logstart bmapstart size dev
+    it_armexit (CID0 := CID0) γ bn logstart bmapstart size dev
                ip bm pidv dq dqd dqb jx crb Sb e0 w m K b eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1986,7 +1986,7 @@ Section ItruncIArm.
     assert (Huc : uint (bm_ind bm : mword 32) = bv_unsigned (bm_ind bm))
       by apply bb_uint32.
     assert (Hicov32 : uint (bm_ind bm : mword 32)
-                      ∈ bv_cov (fs_view fsc_fs γd dev cov))
+                      ∈ bv_cov (fs_view fsc_fs γd dev fsc_cov))
       by (rewrite Huc; exact Hicov).
     iDestruct (cpu_own_transport CID0 CID3 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1997,7 +1997,7 @@ Section ItruncIArm.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
     iApply (BR.wp_bread_sconf γs jx γl γu γd γk pd pav pu bn
-              (fs_view fsc_fs γd dev cov) pidv dev (bm_ind bm : mword 32) dq
+              (fs_view fsc_fs γd dev fsc_cov) pidv dev (bm_ind bm : mword 32) dq
               A1 (K - 6)%nat eb b lks Vpr
               HKbr
               ltac:(rewrite Huc;
@@ -2024,7 +2024,7 @@ Section ItruncIArm.
     (* the agreement is fraction-generic (lane B''-blk); itrunc WRITES, so
        it holds the run whole and crosses back at once *)
     iDestruct (fsblock_q_1_to _ _ _ _ eq_refl with "Hindblk") as "Hindblk".
-    iMod (bm_held_content ⊤ bn fsc_fs γd (DfracOwn 1) dev cov kk pidv dev
+    iMod (bm_held_content ⊤ bn fsc_fs γd (DfracOwn 1) dev fsc_cov kk pidv dev
             (bm_ind bm : mword 32) _ _ _ _ _ logN_top
             with "Hrow Hindblk Hheld")
       as "(%Hbsl & Hindblk & Hheld)".
@@ -2141,7 +2141,7 @@ Section ItruncIArm.
     iEval (rewrite Hbsl) in "Hbuf".
     (* the entry bundle arrives at cursor 0 already -- the conversion from
        inode_blocks happens in the assembly, not here *)
-    iAssert (it_ent_state γ fsc_fs bm data cov logstart bmapstart size crb Sb e0 w 0)
+    iAssert (it_ent_state γ fsc_fs bm data fsc_cov logstart bmapstart size crb Sb e0 w 0)
       with "[Hres Hpaid]" as "Hst".
     { iApply (it_ent_state_close with "Hres Hpaid"). }
     (* Hcnt came back from bread at CID4, not from the pre-call transport *)
@@ -2152,7 +2152,7 @@ Section ItruncIArm.
     iDestruct (cpu_claim_ext_transport CID4 CID8 eb (proc_addr jx)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (it_eloop (CID0 := CID8) γs jx γl γu γd γk pd pav pu bn γ
-              cov logstart bmapstart size dev ip bm data kk
+              logstart bmapstart size dev ip bm data kk
               (mword_of_int 0 : mword 32) pidv dq dqd dqb crb Sb e0 w m K b eb NINDIRECT lks
               Vpr HK ltac:(split; [exact Hcovok | exact Hlogsub]) Hsize Hbm0
               Hbmcov Hbmlog Hwf Hrange Hblen
@@ -2229,7 +2229,7 @@ Section ItruncIArm.
     (* Hcnt arrived with the loop's exit at CID9 *)
     iDestruct (cpu_own_transport CID9 CID11 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev fsc_cov) kk
               pidv dev (bm_ind bm : mword 32) dq B1 (K - 6)%nat eb
               (proc_addr jx) (ind_bytes (bm_ent bm)) bsd0 d0 b lks Vpr
               HKbl Hkk HB1a0
@@ -2365,7 +2365,7 @@ Section ItruncIArm.
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
     assert (HKbf2 : (K_bfree <= K - 6)%nat) by (lia).
     iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ fsc_fs
-              cov logstart bmapstart size dev
+              fsc_cov logstart bmapstart size dev
               (bm_ind bm : mword 32) (ind_bytes (bm_ent bm)) u' cr Sq e0
               pidv dq dqb C2 (K - 6)%nat eb b lks Vpr
               HKbf2 ltac:(split; [exact Hcovok | exact Hlogsub]) Hsize Hbm0
@@ -2517,7 +2517,7 @@ Section ItruncMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -2527,7 +2527,7 @@ Section ItruncMain.
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γi
-                         cov logstart bmapstart inodestart nib size dev
+                         logstart bmapstart inodestart nib size dev
                          ip inum dn dn0 bm data u Sb crb cru e0
                          pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
   Proof.
@@ -2543,7 +2543,7 @@ Section ItruncMain.
               bv_unsigned (bm_slot bm i) <> 0 ->
               bv_unsigned (bm_slot bm i) < size).
     { intros i Hi Hnz.
-      exact (proj2 (blkmap_slot_inrange cov logstart size bm
+      exact (proj2 (blkmap_slot_inrange fsc_cov logstart size bm
                       (proj1 Hgeom) Hbelow Hwf i Hi Hnz)). }
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinum Hmeta Hmap
               Hblks Hsbb Hsbi #Hbmi #Hireg Hdn Hppid #Hprocs #Hdevi
@@ -2778,7 +2778,7 @@ Section ItruncMain.
     (* the loop's state at cursor 0: the map is [bm] itself *)
     assert (Hz0 : bm_dir_zeroed bm 0 = bm) by apply bm_dir_zeroed_0.
     iDestruct (bm_paidS_intro γ bmapstart crb u Sb e0 Hcrb with "Hop") as "Hpaid".
-    iAssert (it_dir_state γ fsc_fs ip bm data cov logstart bmapstart size
+    iAssert (it_dir_state γ fsc_fs ip bm data fsc_cov logstart bmapstart size
                           bn crb Sb e0 u 0)
       with "[Hmap Hblks Hpaid]" as "Hst".
     { iApply (it_dir_state_close with "[Hmap] [Hblks] Hpaid");
@@ -2796,7 +2796,7 @@ Section ItruncMain.
     iDestruct (cpu_claim_ext_transport CID CID11x eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (it_dloop (CID0 := CID11x) γs j γl γu γd γk pd pav pu bn γ
-              cov logstart bmapstart size dev ip bm data
+              logstart bmapstart size dev ip bm data
               pidv dq dqd dqb crb Sb e0 u m K b eb NDIRECT lks
               Vpr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hj Hgl
               0%nat Q3 ltac:(unfold NDIRECT; lia) ltac:(lia)
@@ -2860,7 +2860,7 @@ Section ItruncMain.
          THIS is what blkmap_wf's third clause is for: no indirect block
          means no entries, so the direct-zeroed map IS bm_empty and there
          is nothing left to free. *)
-      pose proof (blkmap_wf_no_ind cov logstart bm Hwf Hnoind) as Hentzero.
+      pose proof (blkmap_wf_no_ind fsc_cov logstart bm Hwf Hnoind) as Hentzero.
       assert (Hisempty : bm_dir_zeroed bm NDIRECT = bm_empty).
       { rewrite /bm_dir_zeroed /bm_empty.
         rewrite (drop_ge (bm_dir bm) NDIRECT); [| lia].
@@ -2898,7 +2898,7 @@ Section ItruncMain.
       iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID14x)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (it_tail (CID0 := CID14x) γs j γl γu γd γk pd pav pu bn γ γi
-                cov logstart bmapstart inodestart size nib dev ip inum
+                logstart bmapstart inodestart size nib dev ip inum
                 dn dn0 bm
                 n1 Sq cru e0 pidv dq dqd dqn dqb dqs m R0 K b eb lks
                 Vpr HK
@@ -2963,7 +2963,7 @@ Section ItruncMain.
       iDestruct (cpu_claim_ext_transport CID12x CID14y eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iApply (it_iarm (CID0 := CID14y) γs j γl γu γd γk pd pav pu bn γ
-                cov logstart bmapstart size dev ip bm data
+                logstart bmapstart size dev ip bm data
                 pidv dq dqd dqb crb Sb e0 u m R0 K b eb lks
                 Vpr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hyesind
                 Hj Hgl HR0sp HR0thr HR0s3 HR0a1 Hlkbelow
@@ -2985,7 +2985,7 @@ Section ItruncMain.
       iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID15y)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (it_tail (CID0 := CID15y) γs j γl γu γd γk pd pav pu bn γ γi
-                cov logstart bmapstart inodestart size nib dev ip inum
+                logstart bmapstart inodestart size nib dev ip inum
                 dn dn0 bm
                 n3 Sr cru e0 pidv dq dqd dqn dqb dqs m Mz K b eb lks
                 Vpr HK
@@ -3033,7 +3033,7 @@ Section ItruncMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -3042,7 +3042,7 @@ Section ItruncMain.
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γi
-                           cov logstart bmapstart inodestart nib size dev
+                           logstart bmapstart inodestart nib size dev
                            ip inum dn dn0 bm data u
                            pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
   Proof.
@@ -3061,7 +3061,7 @@ Section ItruncMain.
     iPoseProof (log_credit_own γ false Sb0 e0 (IBLOCK inum inodestart)
                   ltac:(discriminate)) as "#Hcru".
     iApply (wp_itrunc_gen γs j γl γu γd γk pd pav pu bn γ γi
-              cov logstart bmapstart inodestart nib size dev
+              logstart bmapstart inodestart nib size dev
               ip inum dn dn0 bm data u Sb0 false false e0
               pidv dq dqd dqn dqb dqs m K eb b lks
               Vpr HK ltac:(discriminate)

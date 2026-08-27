@@ -427,7 +427,7 @@ Section IupdateTail.
       (γs : list gname) (j : nat)
       (γd : disk_names) (bn : bio_names)
       (γ : log_names)
-      (cov : gset Z) (logstart : Z) (inodestart : Z)
+      (logstart : Z) (inodestart : Z)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (ds : list dinode) (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
@@ -446,7 +446,7 @@ Section IupdateTail.
     diblk_wf ds ->
     dinode_wf dn ->
     uint bno = IBLOCK inum inodestart ->
-    IBLOCK inum inodestart ∈ cov ->
+    IBLOCK inum inodestart ∈ fsc_cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     (* iu_tail reaches log_write ("log", 3) and brelse ("bcache", 4); log is
        the lower of the two, so one premise at its rank covers both via
@@ -462,8 +462,8 @@ Section IupdateTail.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.iupdate + 0x66) : mword 64) -∗
-    bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-    log_ctx γ bn fsc_fs cov logstart dev -∗
+    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+    log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
     procs_inv γs -∗
     iu_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
@@ -489,7 +489,7 @@ Section IupdateTail.
        walk learned it at its own bread), so the premise is the AU itself
        rather than [iu_region_step]'s quantified form. *)
     iu_region_au γ inodestart inum dn ds e0 Pout -∗
-    bio_held bn (fs_view fsc_fs γd dev cov) kk pidv dev bno
+    bio_held bn (fs_view fsc_fs γd dev fsc_cov) kk pidv dev bno
        (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 -∗
     iu_cont (CID0 := CID0) bn γ inodestart ip inum dn bm
             (if cru then S u else u)
@@ -583,7 +583,7 @@ Section IupdateTail.
        move exactly this inode's 64 bytes of the buffer, so what it hands
        [log_write] is the sub-range form, and the shape obligation is the
        encoding fact [InodeRegion.diblk_bytes_splice]. *)
-    iApply (LW.wp_log_write_au_range bn γ fsc_fs γd cov logstart dev kk pidv bno
+    iApply (LW.wp_log_write_au_range bn γ fsc_fs γd fsc_cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
               (64 * islot inum)%nat 64%nat (dinode_bytes dn)
               cru Sb e0 v (⊤ ∖ ↑iregN) Pout
@@ -671,7 +671,7 @@ Section IupdateTail.
     iDestruct (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat) by (lia).
-    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev fsc_cov) kk
               pidv dev bno dq T3 (K - 4)%nat eb (proc_addr j)
               (diblk_bytes (<[islot inum := dn]> ds)) bsd true b
               lks Vpr HKbl Hkk HT3a0
@@ -935,7 +935,7 @@ Section ProofIupdateMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -947,9 +947,9 @@ Section ProofIupdateMain.
       let pj := proc_addr j in
       let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
       (K_iupdate <= K)%nat ->
-      log_geom_ok cov logstart ->
+      log_geom_ok fsc_cov logstart ->
       0 <= inodestart ->
-      IBLOCK inum inodestart ∈ cov ->
+      IBLOCK inum inodestart ∈ fsc_cov ->
       ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
       bv_unsigned inum < 16 * Z.of_nat nib ->
       di_addrs dn = bm_cells bm ->
@@ -967,8 +967,8 @@ Section ProofIupdateMain.
       cpu_claim_ext eb pj -∗
       kernel_text -∗ kernel_data -∗ pc_is pcE -∗
       panic_env -∗
-      bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-      log_ctx γ bn fsc_fs cov logstart dev -∗
+      bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+      log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
@@ -1025,7 +1025,7 @@ Section ProofIupdateMain.
     { rewrite /bno bb_uint32 moi32_unsigned. apply bvw32_small.
       change (2^32)%Z with 4294967296%Z. lia. }
     assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbno; lia).
-    assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd dev cov))
+    assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd dev fsc_cov))
       by (rewrite Hbno; exact Hcov).
     (* the slot index *)
     pose proof (bv_unsigned_in_range _ inum) as [Hinum0 Hinum1].
@@ -1381,7 +1381,7 @@ Section ProofIupdateMain.
     assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
     iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-              (fs_view fsc_fs γd dev cov) pidv dev bno dq
+              (fs_view fsc_fs γd dev fsc_cov) pidv dev bno dq
               RA (K - 4)%nat eb b
               lks Vpr HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HRAa0 HRAa1
               (* bread's bound is "bcache"(4); iupdate's own is "log"(3),
@@ -1991,7 +1991,7 @@ Section ProofIupdateMain.
        step, which cannot build it. *)
     iDestruct ("Hstep" $! ds with "[%] Hdn") as "Hau";
       [exact Hdswf |].
-    iApply (iu_tail (CID0 := CID36) γs j γd bn γ cov logstart inodestart
+    iApply (iu_tail (CID0 := CID36) γs j γd bn γ logstart inodestart
               dev
               ip inum dn bm ds u Sb cru e0 v kk bno bsd0 d0 Pout
               pidv dq dqd dqn dqs m mM K eb b lks
@@ -2013,7 +2013,7 @@ Qed.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -2022,7 +2022,7 @@ Qed.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γi
-                          cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
+                          logstart inodestart nib dev ip inum dn dn0 bm u Sb
                           pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iupdate_gen_body].
@@ -2050,7 +2050,7 @@ Qed.
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb false e0 0%nat
+              logstart inodestart nib dev ip inum dn dn0 bm u Sb false e0 0%nat
               (ireg_out γi inum dn)
               pidv dq dqd dqn dqs m K eb b lks
               Vpr HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
@@ -2078,7 +2078,7 @@ Qed.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -2087,7 +2087,7 @@ Qed.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γi
-                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
+                              logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
                               pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iupdate_credgen_body].
@@ -2099,7 +2099,7 @@ Qed.
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
+              logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
               (ireg_out γi inum dn)
               pidv dq dqd dqn dqs m K eb b lks
               Vpr HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
@@ -2126,7 +2126,7 @@ Qed.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -2135,7 +2135,7 @@ Qed.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γi
-                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                           logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iupdate_cred_body].
@@ -2155,7 +2155,7 @@ Qed.
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
+              logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
               (ireg_out γi inum dn)
               pidv dq dqd dqn dqs m K true b lks
               Vpr HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
@@ -2188,7 +2188,7 @@ Qed.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -2197,7 +2197,7 @@ Qed.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γi
-                            cov logstart inodestart nib dev ip inum dn dn0 bm u
+                            logstart inodestart nib dev ip inum dn dn0 bm u
                             pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iupdate_sconf_body].
@@ -2214,7 +2214,7 @@ Qed.
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb0 false e0 0%nat
+              logstart inodestart nib dev ip inum dn dn0 bm u Sb0 false e0 0%nat
               (ireg_out γi inum dn)
               pidv dq dqd dqn dqs m K eb b lks
               Vpr HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
@@ -2245,7 +2245,7 @@ Qed.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -2255,7 +2255,7 @@ Qed.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γi
-                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                           logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pin oty pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iupdate_link_body].
@@ -2278,7 +2278,7 @@ Qed.
                   Hup
                   with "Hireg Hpin") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
+              logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
               (dinode_at γi inum dn ∗
                (∃ v : ity,
           ⌜ireg_reg_ok (bv_unsigned (di_type dn)) v
@@ -2321,7 +2321,7 @@ Qed.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -2331,7 +2331,7 @@ Qed.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γi
-                             cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                             logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                              uty pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iupdate_unlink_body].
@@ -2355,7 +2355,7 @@ Qed.
                   (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hnl
                   with "Hireg Htok Hrc") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
+              logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
               (dinode_at γi inum dn)%I
               pidv dq dqd dqn dqs m K true b lks Vpr
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow

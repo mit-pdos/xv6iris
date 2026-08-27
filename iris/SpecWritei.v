@@ -128,7 +128,7 @@
 
    ==== ...AND THE TWO CONJUNCTS A RE-PARKER NEEDS ======================
 
-   [IcacheEscrow.ic_loaded] carries [InodeLock.inode_ok cov logstart dn' bm'
+   [IcacheEscrow.ic_loaded] carries [InodeLock.inode_ok fsc_cov logstart dn' bm'
    data'], whose SEVEN conjuncts a caller that re-parks the inode after the
    write has to rebuild.  Five of them are the clauses above (blkmap_wf,
    bm_covers, di_addrs, [di_type] -- which [wi_dinode] keeps definitionally
@@ -515,7 +515,7 @@ Definition wp_writei_sconf_body
     (bn : bio_names)
     (γ : log_names) (γi : gname)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+    (logstart : Z) (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
     (γpr : gname)
     (ip : mword 64) (inum : mword 32)
@@ -535,10 +535,10 @@ Definition wp_writei_sconf_body
      one for the bitmap block and one for iupdate.  See the header. *)
   (wi_cost_bmonly off n <= ncount)%nat ->
   (* the covered range's block-number bounds, and the log's own storage *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   (* the inode's own block, exactly as iupdate takes it *)
   0 <= inodestart ->
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
   (* the inum is one the inode REGION covers -- iupdate's premise, which
      replaced the block-half premise and its [diblk_wf ds] (design §11.3) *)
@@ -567,7 +567,7 @@ Definition wp_writei_sconf_body
      holds the two as ONE record with a nonzero type. *)
   di_nlink_stable dn dn0 ->
   (* the file's block map, and the normalisation of its holes *)
-  blkmap_wf cov logstart bm ->
+  blkmap_wf fsc_cov logstart bm ->
   blk_holes_zero bm data ->
   (* EVERY BLOCK BELOW THE FILE'S SIZE IS ALLOCATED.  Threaded in and back
      out at the NEW size -- see the header. *)
@@ -591,7 +591,7 @@ Definition wp_writei_sconf_body
   (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
   bv_unsigned (di_size dn) < 2 ^ 31 ->
   (* the bitmap's geometry, forwarded through bmap to balloc *)
-  bitmap_geom_ok cov logstart bmapstart size ->
+  bitmap_geom_ok fsc_cov logstart bmapstart size ->
   (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as a
      hypothesis, never a functor.  See SpecBalloc.v's header. *)
   printk_gen_contract (kt := KT1) γpr γu γd ->
@@ -637,8 +637,8 @@ Definition wp_writei_sconf_body
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   (* either_copyin's user arm reaches copyin, which reaches vmfault/kalloc *)
   kalloc_env γa None -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS *)
@@ -655,7 +655,7 @@ Definition wp_writei_sconf_body
      all three, and writei calls bmap once per straddled block *)
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
   ireg_inv γi fsc_fs inodestart nib -∗
@@ -709,7 +709,7 @@ Definition wp_writei_sconf_body
       ⌜callee_saved m mf⌝ -∗
       (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows, across every bmap
          the loop performs. *)
-      ⌜blkmap_wf cov logstart bm'⌝ -∗
+      ⌜blkmap_wf fsc_cov logstart bm'⌝ -∗
       ⌜blk_holes_zero bm' data'⌝ -∗
       ⌜di_addrs dn' = bm_cells bm'⌝ -∗
       ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
@@ -799,7 +799,7 @@ Definition wp_writei_gen_body
     (bn : bio_names)
     (γ : log_names) (γi : gname)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+    (logstart : Z) (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
     (γpr : gname)
     (ip : mword 64) (inum : mword 32)
@@ -819,10 +819,10 @@ Definition wp_writei_gen_body
      one for the bitmap block and one for iupdate.  See the header. *)
   (wi_cost_bmonly off n <= ncount)%nat ->
   (* the covered range's block-number bounds, and the log's own storage *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   (* the inode's own block, exactly as iupdate takes it *)
   0 <= inodestart ->
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
   (* the inum is one the inode REGION covers -- iupdate's premise, which
      replaced the block-half premise and its [diblk_wf ds] (design §11.3) *)
@@ -851,7 +851,7 @@ Definition wp_writei_gen_body
      holds the two as ONE record with a nonzero type. *)
   di_nlink_stable dn dn0 ->
   (* the file's block map, and the normalisation of its holes *)
-  blkmap_wf cov logstart bm ->
+  blkmap_wf fsc_cov logstart bm ->
   blk_holes_zero bm data ->
   (* EVERY BLOCK BELOW THE FILE'S SIZE IS ALLOCATED.  Threaded in and back
      out at the NEW size -- see the header. *)
@@ -875,7 +875,7 @@ Definition wp_writei_gen_body
   (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
   bv_unsigned (di_size dn) < 2 ^ 31 ->
   (* the bitmap's geometry, forwarded through bmap to balloc *)
-  bitmap_geom_ok cov logstart bmapstart size ->
+  bitmap_geom_ok fsc_cov logstart bmapstart size ->
   (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as a
      hypothesis, never a functor.  See SpecBalloc.v's header. *)
   printk_gen_contract (kt := KT1) γpr γu γd ->
@@ -911,8 +911,8 @@ Definition wp_writei_gen_body
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   (* either_copyin's user arm reaches copyin, which reaches vmfault/kalloc *)
   kalloc_env γa None -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS *)
@@ -929,7 +929,7 @@ Definition wp_writei_gen_body
      all three, and writei calls bmap once per straddled block *)
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
   ireg_inv γi fsc_fs inodestart nib -∗
@@ -982,7 +982,7 @@ Definition wp_writei_gen_body
       ⌜callee_saved m mf⌝ -∗
       (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows, across every bmap
          the loop performs. *)
-      ⌜blkmap_wf cov logstart bm'⌝ -∗
+      ⌜blkmap_wf fsc_cov logstart bm'⌝ -∗
       ⌜blk_holes_zero bm' data'⌝ -∗
       ⌜di_addrs dn' = bm_cells bm'⌝ -∗
       ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
@@ -1073,7 +1073,7 @@ Module Type WRITEI.
       (bn : bio_names)
       (γ : log_names) (γi : gname)
       (γa : gname) (γf : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
       (γpr : gname)
       (ip : mword 64) (inum : mword 32)
@@ -1085,7 +1085,7 @@ Module Type WRITEI.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_writei_sconf_body ktb γs j γl γu γd γk pd pav pu bn γ γi γa γf
-                           cov logstart inodestart nib bmapstart size dev γpr
+                           logstart inodestart nib bmapstart size dev γpr
                            ip inum bm data dn dn0
                            user off n src_bytes V ncount
                            pidv dq dqd dqn dqs dqb dqbs m K eb b lks.
@@ -1102,7 +1102,7 @@ Module Type WRITEI.
       (bn : bio_names)
       (γ : log_names) (γi : gname)
       (γa : gname) (γf : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
       (γpr : gname)
       (ip : mword 64) (inum : mword 32)
@@ -1114,7 +1114,7 @@ Module Type WRITEI.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_writei_gen_body ktb γs j γl γu γd γk pd pav pu bn γ γi γa γf
-                         cov logstart inodestart nib bmapstart size dev γpr
+                         logstart inodestart nib bmapstart size dev γpr
                          ip inum bm data dn dn0
                          user off n src_bytes V ncount Sb
                          pidv dq dqd dqn dqs dqb dqbs m K eb b lks.

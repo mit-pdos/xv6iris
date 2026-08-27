@@ -63,6 +63,7 @@ Require Import ProofKexecSeam.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -98,7 +99,7 @@ Definition kxc_b2_body
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names) (gi : gname)
     (gtl : gname) (gilf gislf : gname) (ga gf : gname)
-    (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32) 
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
@@ -111,14 +112,14 @@ Definition kxc_b2_body
     (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 < size <= BPB ->
   0 <= bmapstart ->
-  bmapstart ∈ cov ->
+  bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   0 <= inodestart ->
-  cov_below cov size ->
-  ireg_blocks_ok inodestart nib cov logstart ->
+  cov_below fsc_cov size ->
+  ireg_blocks_ok inodestart nib fsc_cov logstart ->
   (jp < NPROC)%nat ->
   gs !! jp = Some gl ->
   dev = icfg_dev ->
@@ -129,8 +130,8 @@ Definition kxc_b2_body
   m !!! Regidx Rs2 = s20 ->
   kernel_text -∗
   fs_fabric gs gu gd gk pd pav pu bn g gi gtl
-            cov logstart inodestart nib dev -∗
-  kxc_at_12c jp bn g gi ga gf cov logstart bmapstart inodestart nib
+            logstart inodestart nib dev -∗
+  kxc_at_12c jp bn g gi ga gf logstart bmapstart inodestart nib
              size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
              plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
@@ -161,7 +162,7 @@ Definition kxc_b2_body
         WP (Loop : expr riscv_lang)) -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (M' : regfile) (P' : uptd) (szv' : mword 64),
-      kxc_at_1ae jp bn ga gf cov logstart bmapstart inodestart size
+      kxc_at_1ae jp bn ga gf logstart bmapstart inodestart size
                  plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -202,7 +203,7 @@ Definition kxc_b2z_body
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names) (gi : gname)
     (gtl : gname) (gilf gislf : gname) (ga gf : gname)
-    (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32) 
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
@@ -215,20 +216,20 @@ Definition kxc_b2z_body
     (ef : nat -> bv 8) (P : uptd) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 < size <= BPB ->
   0 <= bmapstart ->
-  bmapstart ∈ cov ->
+  bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   0 <= inodestart ->
-  cov_below cov size ->
-  ireg_blocks_ok inodestart nib cov logstart ->
+  cov_below fsc_cov size ->
+  ireg_blocks_ok inodestart nib fsc_cov logstart ->
   (jp < NPROC)%nat ->
   gs !! jp = Some gl ->
   kernel_text -∗
   fs_fabric gs gu gd gk pd pav pu bn g gi gtl
-            cov logstart inodestart nib dev -∗
-  kxc_at_1a2 jp bn g gi ga gf cov logstart bmapstart inodestart nib
+            logstart inodestart nib dev -∗
+  kxc_at_1a2 jp bn g gi ga gf logstart bmapstart inodestart nib
              size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
              plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
@@ -238,7 +239,7 @@ Definition kxc_b2z_body
              w67 ef P -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (M' : regfile),
-      kxc_at_1ae jp bn ga gf cov logstart bmapstart inodestart size
+      kxc_at_1ae jp bn ga gf logstart bmapstart inodestart size
                  plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -256,7 +257,7 @@ Module Type KEXECB3.
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gi : gname)
       (gtl : gname) (gilf gislf : gname) (ga gf : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) 
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
@@ -268,7 +269,7 @@ Module Type KEXECB3.
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64),
     kxc_b2_body Q gs jp gl gu gd gk pd pav pu bn g gi gtl gilf gislf
-      ga gf cov logstart bmapstart inodestart nib size dev
+      ga gf logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
       ef P i szv.
@@ -279,7 +280,7 @@ Module Type KEXECB3.
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gi : gname)
       (gtl : gname) (gilf gislf : gname) (ga gf : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) 
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
@@ -291,7 +292,7 @@ Module Type KEXECB3.
       (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd),
     kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gi gtl gilf gislf
-      ga gf cov logstart bmapstart inodestart nib size dev
+      ga gf logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w13 w67 ef P.
 End KEXECB3.

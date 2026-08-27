@@ -342,7 +342,7 @@ Definition fs_fabric
     (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64) (bn : bio_names)
     (g : log_names) (gi : gname) (gtl : gname)
-    (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
+    (logstart inodestart : Z) (nib : nat) (dev : mword 32)
     : iProp Σ :=
   (* THE AMBIENT KERNEL ENVIRONMENT, which every fs contract below this one
      now also asks for by name: the .rodata image the panic literals come
@@ -352,13 +352,13 @@ Definition fs_fabric
      kexec cone's dozen internal lemmas unchanged. *)
   (kernel_data ∗
    panic_env ∗
-   bio_ctx bn (fs_view fsc_fs gd dev cov) ∗
-   log_ctx g bn fsc_fs cov logstart dev ∗
-   fs_crash_seam cov logstart ∗
+   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) ∗
+   log_ctx g bn fsc_fs fsc_cov logstart dev ∗
+   fs_crash_seam fsc_cov logstart ∗
    gen_cert ∗
-   is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev ∗
+   is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev ∗
    itable_inv ∗
-   ic_escrows fsc_ic fsc_fs gi cov logstart ∗
+   ic_escrows fsc_ic fsc_fs gi fsc_cov logstart ∗
    ic_sleeplocks fsc_ic ∗
    ireg_inv gi fsc_fs inodestart nib ∗
    (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2 RULING B, §6'' RULING
@@ -386,9 +386,9 @@ Definition fs_fabric
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    gs gu gd gk pd pav pu bn g gi gtl cov logstart inodestart nib dev :
+    gs gu gd gk pd pav pu bn g gi gtl logstart inodestart nib dev :
   Persistent (fs_fabric gs gu gd gk pd pav pu bn g gi gtl
-                        cov logstart inodestart nib dev).
+                        logstart inodestart nib dev).
 Proof. apply _. Qed.
 
 (* ===================================================================== *)
@@ -405,7 +405,7 @@ Definition wp_kexec_sconf_body
     (g : log_names) (gi : gname)
     (gtl : gname)                       (* the itable's lock   *)
     (ga : gname) (gf : gname)                           (* kalloc, file table  *)
-    (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (plen : nat) (pfun : nat -> bv 8)                   (* the path buffer     *)
     (na : nat) (avf : nat -> mword 64)                  (* argv[0 .. na]       *)
@@ -433,14 +433,14 @@ Definition wp_kexec_sconf_body
   inodestart = icfg_ist ->
   dev = ROOTDEV ->
   (0 < nib)%nat ->
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 < size <= BPB ->
   0 <= bmapstart ->
-  bmapstart ∈ cov ->
+  bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   0 <= inodestart ->
-  cov_below cov size ->
-  ireg_blocks_ok inodestart nib cov logstart ->
+  cov_below fsc_cov size ->
+  ireg_blocks_ok inodestart nib fsc_cov logstart ->
   (* ---- the path ---- *)
   bb_cstr pfun plen ->
   (Z.of_nat plen < 2 ^ 31)%Z ->
@@ -513,14 +513,14 @@ Definition wp_kexec_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   fs_fabric gs gu gd gk pd pav pu bn g gi gtl
-            cov logstart inodestart nib dev -∗
+            logstart inodestart nib dev -∗
   kalloc_env ga None -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* THE BLOCK BITMAP'S INVARIANT (BitmapInv.v): persistent; namei's walk
      and the O-arm's iput/iunlockput free into it, and the B2 stage bundle
      [SpecKexecB2.kxc_res] carries it, so this is the row that funds them. *)
-  bitmap_inv fsc_fs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
   (* THE PROCESS'S PRIVATE BLOCK.  p->pid, p->cwd and the cwd reference namei
      needs are all inside it (ProcInv.proc_priv_cwd_pid); so are the p->name
      bytes safestrcpy writes and the trapframe words the commit block writes. *)
@@ -591,7 +591,7 @@ Module Type KEXEC.
       (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
@@ -601,7 +601,7 @@ Module Type KEXEC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gi gtl
-                          ga gf cov logstart bmapstart inodestart nib
+                          ga gf logstart bmapstart inodestart nib
                           size dev plen pfun na avf alen aslen afun
                           pidv V dqb dqs dqa dqpv dqas m K eb b lks.
 End KEXEC.

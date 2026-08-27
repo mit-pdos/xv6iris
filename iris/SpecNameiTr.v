@@ -174,7 +174,7 @@ Definition wp_namei_tr_body
     (g : log_names) (gi : gname)
     (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
-    (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (n : nat) (Sb : gset Z)
@@ -196,14 +196,14 @@ Definition wp_namei_tr_body
   inodestart = icfg_ist ->
   dev = ROOTDEV ->
   (0 < nib)%nat ->
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 < size <= BPB ->
   0 <= bmapstart ->
-  bmapstart ∈ cov ->
+  bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   0 <= inodestart ->
-  cov_below cov size ->
-  ireg_blocks_ok inodestart nib cov logstart ->
+  cov_below fsc_cov size ->
+  ireg_blocks_ok inodestart nib fsc_cov logstart ->
   bb_cstr pfun plen ->
   (Z.of_nat plen < 2 ^ 31)%Z ->
   (* ABSOLUTE PATHS ONLY (ruling Q-c): the walk starts at the root and the
@@ -219,12 +219,12 @@ Definition wp_namei_tr_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
-  log_ctx g bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+  log_ctx g bn fsc_fs fsc_cov logstart dev -∗
   kalloc_env ga None -∗
-  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi fsc_cov logstart -∗
   ic_sleeplocks fsc_ic -∗
   ireg_inv gi fsc_fs inodestart nib -∗
   ireg_open -∗
@@ -234,7 +234,7 @@ Definition wp_namei_tr_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
   proc_priv_bare pj pidv Vpr -∗
   inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -305,7 +305,7 @@ Module Type NAMEI_TR.
       (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
@@ -314,7 +314,7 @@ Module Type NAMEI_TR.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namei_tr_body gs j gl gu gd gk pd pav pu bn g gi gtl
-                       ga gf cov logstart bmapstart inodestart nib
+                       ga gf logstart bmapstart inodestart nib
                        size dev plen pfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
 End NAMEI_TR.

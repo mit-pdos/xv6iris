@@ -188,7 +188,7 @@ Definition wp_ialloc_sconf_body
     (γ : log_names) (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
+    (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
     (dev : mword 32) (ty : mword 16)
     (u : nat)
     (pidv : mword 32) (dq dqs dqn : dfrac)
@@ -201,13 +201,13 @@ Definition wp_ialloc_sconf_body
   (K_ialloc <= K)%nat ->
   (* bread's / log_write's block-number arithmetic, and the log's own
      storage *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 <= inodestart ->
   (* EVERY inum the region covers lives in a covered HOME block: bread's
      premise and log_write's, for the inum the scan happens to stop at.
      The scan cannot know it in advance, so the premise is the quantified
      one ([InodeInv.ireg_blocks_ok]). *)
-  ireg_blocks_ok inodestart nib cov logstart ->
+  ireg_blocks_ok inodestart nib fsc_cov logstart ->
   (* THE THREE GEOMETRY PREMISES -- see the header *)
   1 < ninodes ->
   ninodes <= 16 * Z.of_nat nib ->
@@ -245,8 +245,8 @@ Definition wp_ialloc_sconf_body
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   (* the two superblock fields, read and handed straight back *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -278,9 +278,9 @@ Definition wp_ialloc_sconf_body
      one of its own; brelse gives it back *)
   bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi fsc_cov logstart -∗
   (* ONE ledger unit for the tail iget; RETURNED on the no-inodes arm *)
   iref_slot -∗
   (* THIS OPERATION'S RESERVATION: the one log_write the claim runs *)
@@ -388,7 +388,7 @@ Definition wp_ialloc_gen_body
     (γ : log_names) (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
+    (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
     (dev : mword 32) (ty : mword 16)
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
@@ -401,13 +401,13 @@ Definition wp_ialloc_gen_body
   (K_ialloc <= K)%nat ->
   (* bread's / log_write's block-number arithmetic, and the log's own
      storage *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 <= inodestart ->
   (* EVERY inum the region covers lives in a covered HOME block: bread's
      premise and log_write's, for the inum the scan happens to stop at.
      The scan cannot know it in advance, so the premise is the quantified
      one ([InodeInv.ireg_blocks_ok]). *)
-  ireg_blocks_ok inodestart nib cov logstart ->
+  ireg_blocks_ok inodestart nib fsc_cov logstart ->
   (* THE THREE GEOMETRY PREMISES -- see the header *)
   1 < ninodes ->
   ninodes <= 16 * Z.of_nat nib ->
@@ -445,8 +445,8 @@ Definition wp_ialloc_gen_body
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   (* the two superblock fields, read and handed straight back *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -478,9 +478,9 @@ Definition wp_ialloc_gen_body
      one of its own; brelse gives it back *)
   bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi fsc_cov logstart -∗
   (* ONE ledger unit for the tail iget; RETURNED on the no-inodes arm *)
   iref_slot -∗
   (* THIS OPERATION'S RESERVATION, IN SET FORM: the one log_write the claim
@@ -559,7 +559,7 @@ Module Type IALLOC.
       (γ : log_names) (γi : gname)
       (gtl : gname)
       (γpr : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
@@ -567,7 +567,7 @@ Module Type IALLOC.
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
       wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γi gtl γpr
-                         cov logstart inodestart ninodes nib dev ty u Sb
+                         logstart inodestart ninodes nib dev ty u Sb
                          pidv dq dqs dqn m K eb b lks Vpr t qt.
 
   Parameter wp_ialloc_sconf :
@@ -580,7 +580,7 @@ Module Type IALLOC.
       (γ : log_names) (γi : gname)
       (gtl : gname)
       (γpr : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
@@ -588,6 +588,6 @@ Module Type IALLOC.
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
       wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γi gtl γpr
-                           cov logstart inodestart ninodes nib dev ty u
+                           logstart inodestart ninodes nib dev ty u
                            pidv dq dqs dqn m K eb b lks Vpr t qt.
 End IALLOC.

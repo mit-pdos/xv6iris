@@ -97,7 +97,7 @@ Section ProofIunlockputMain.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
@@ -107,7 +107,7 @@ Section ProofIunlockputMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl
-                                 gil gisl cov logstart bmapstart inodestart nib
+                                 gil gisl logstart bmapstart inodestart nib
                                  size dev k qi s gy d inum dn' bm' n Sb crb cru
                                  crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
@@ -269,7 +269,7 @@ Section ProofIunlockputMain.
     (* "sleep lock" outranks "itable": weaken [Hfresh]'s bound. *)
     assert (Hfresh_sl : locks_below lks "sleep lock")
       by lkbelow.
-    iApply (IU.wp_iunlock_dep_sconf gs gi gil gisl cov logstart k s gy d dev inum
+    iApply (IU.wp_iunlock_dep_sconf gs gi gil gisl logstart k s gy d dev inum
               dn' bm' pidv dq R4 (K - 4)%nat eb pj b lks Vpr
               ltac:(lia) Hdsh Hk ltac:(rewrite HR4a0; exact Hipe)
               Hfresh_sl
@@ -361,7 +361,7 @@ Section ProofIunlockputMain.
        the index, and this is it at [rg := true]. *)
     iEval (rewrite -ireg_regime_true) in "Hropen".
     iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gi gtl gil gisl
-              cov logstart bmapstart inodestart nib size dev
+              logstart bmapstart inodestart nib size dev
               k (qi + s)%Qp inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs R6 (K - 4)%nat eb b lks Vpr true
               ltac:(lia) Hclog Hk Hcrb Hcru
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
@@ -596,7 +596,7 @@ Section ProofIunlockputMain.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
@@ -605,7 +605,7 @@ Section ProofIunlockputMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g gi
-                                   gtl gil gisl cov logstart bmapstart
+                                   gtl gil gisl logstart bmapstart
                                    inodestart nib size dev k qi s gy d inum
                                    dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
@@ -619,7 +619,7 @@ Section ProofIunlockputMain.
     rewrite {1}/log_opb. iDestruct "Hlogop" as (Sb0) "Hlogop".
     iDestruct (log_opS_named with "Hlogop") as (e00) "Hlogop".
     iApply (wp_iunlockput_dep_gen gs j gl gu gd gk pd pav pu bn g gi gtl gil gisl
-              cov logstart bmapstart inodestart nib size dev
+              logstart bmapstart inodestart nib size dev
               k qi s gy d inum dn' bm' n Sb0 false false false e00 tid qtx
               pidv dq dqb dqs m K eb b lks Vpr
               HK Hdsh Hk ltac:(discriminate) ltac:(discriminate)
@@ -656,7 +656,7 @@ Section ProofIunlockputMain.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
@@ -665,7 +665,7 @@ Section ProofIunlockputMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g gi gtl
-                                  gil gisl cov logstart bmapstart inodestart
+                                  gil gisl logstart bmapstart inodestart
                                   nib size dev k qi s gy inum dn' bm' n
                                   pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
@@ -680,7 +680,7 @@ Section ProofIunlockputMain.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
@@ -689,7 +689,7 @@ Section ProofIunlockputMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl
-                                gil gisl cov logstart bmapstart inodestart nib
+                                gil gisl logstart bmapstart inodestart nib
                                 size dev k qi s gy inum dn' bm' n Sb crb cru
                                 crz e0 pidv dq dqb dqs m K eb b lks Vpr.
   Proof.

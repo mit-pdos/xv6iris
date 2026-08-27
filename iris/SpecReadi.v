@@ -242,7 +242,7 @@ Definition wp_readi_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (cov : gset Z) (logstart : Z) (dev : mword 32)
+    (logstart : Z) (dev : mword 32)
     (ip : mword 64)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode)
@@ -257,8 +257,8 @@ Definition wp_readi_sconf_body
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_readi <= K)%nat ->
   (* the covered range's block-number bounds, and the log's own storage *)
-  log_geom_ok cov logstart ->
-  blkmap_wf cov logstart bm ->
+  log_geom_ok fsc_cov logstart ->
+  blkmap_wf fsc_cov logstart bm ->
   (* EVERY BLOCK BELOW THE SIZE IS ALLOCATED -- what makes every interior
      bmap call a BMAP_NOALLOC one, and hence what keeps readi out of the
      log entirely.  See the header. *)
@@ -323,7 +323,7 @@ Definition wp_readi_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
   (* THE BYTE VIEW'S ROW (durable-disk 1c-flip step 3).  readi is the one
      whole-block reader in the tree that holds NO log/region/bitmap
      invariant -- by design, it takes no [log_ctx] -- so the row it needs
@@ -441,7 +441,7 @@ Module Type READI.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γa : gname) (γf : gname)
-      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (logstart : Z) (dev : mword 32)
       (ip : mword 64)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode)
@@ -451,7 +451,7 @@ Module Type READI.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_readi_sconf_body ktb γs j γl γu γd γk pd pav pu bn γa γf
-                          cov logstart dev ip bm data dn
+                          logstart dev ip bm data dn
                           user off n dst_olds V
                           pidv dq dqd m K eb b lks.
 End READI.

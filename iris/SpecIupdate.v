@@ -127,7 +127,7 @@ Definition wp_iupdate_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γi : gname)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (u : nat)
@@ -141,14 +141,14 @@ Definition wp_iupdate_sconf_body
   (* the covered range's block-number bounds (bread's 2^31 arithmetic
      premise, and 0 is never a client block) and the fact that the log's own
      storage is covered *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   (* the superblock field is a real block number, so the [addw] that forms
-     IBLOCK cannot wrap: with [IBLOCK ... ∈ cov] this bounds the sum by
+     IBLOCK cannot wrap: with [IBLOCK ... ∈ fsc_cov] this bounds the sum by
      2^31 (log_geom_ok's [cov_ok]) *)
   0 <= inodestart ->
   (* the inode's own block is a covered HOME block: bread's premise, and
      log_write's *)
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
   (* the inum is one the region covers: [nib] inode blocks, sixteen inums
      each.  This replaces the old [diblk_wf ds] premise -- the region owns
@@ -222,8 +222,8 @@ Definition wp_iupdate_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS, so the caller
      keeps its own copies *)
   i_dev ip ↦₄{dqd} dev -∗
@@ -309,7 +309,7 @@ Definition wp_iupdate_gen_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γi : gname)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (u : nat) (Sb : gset Z)
@@ -323,14 +323,14 @@ Definition wp_iupdate_gen_body
   (* the covered range's block-number bounds (bread's 2^31 arithmetic
      premise, and 0 is never a client block) and the fact that the log's own
      storage is covered *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   (* the superblock field is a real block number, so the [addw] that forms
-     IBLOCK cannot wrap: with [IBLOCK ... ∈ cov] this bounds the sum by
+     IBLOCK cannot wrap: with [IBLOCK ... ∈ fsc_cov] this bounds the sum by
      2^31 (log_geom_ok's [cov_ok]) *)
   0 <= inodestart ->
   (* the inode's own block is a covered HOME block: bread's premise, and
      log_write's *)
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
   (* the inum is one the region covers: [nib] inode blocks, sixteen inums
      each.  This replaces the old [diblk_wf ds] premise -- the region owns
@@ -399,8 +399,8 @@ Definition wp_iupdate_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS, so the caller
      keeps its own copies *)
   i_dev ip ↦₄{dqd} dev -∗
@@ -485,7 +485,7 @@ Definition wp_iupdate_cred_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γi : gname)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (u : nat) (Sb : gset Z) (cru : bool)
@@ -505,14 +505,14 @@ Definition wp_iupdate_cred_body
   (* the covered range's block-number bounds (bread's 2^31 arithmetic
      premise, and 0 is never a client block) and the fact that the log's own
      storage is covered *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   (* the superblock field is a real block number, so the [addw] that forms
-     IBLOCK cannot wrap: with [IBLOCK ... ∈ cov] this bounds the sum by
+     IBLOCK cannot wrap: with [IBLOCK ... ∈ fsc_cov] this bounds the sum by
      2^31 (log_geom_ok's [cov_ok]) *)
   0 <= inodestart ->
   (* the inode's own block is a covered HOME block: bread's premise, and
      log_write's *)
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
   (* the inum is one the region covers: [nib] inode blocks, sixteen inums
      each.  This replaces the old [diblk_wf ds] premise -- the region owns
@@ -578,8 +578,8 @@ Definition wp_iupdate_cred_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS, so the caller
      keeps its own copies *)
   i_dev ip ↦₄{dqd} dev -∗
@@ -680,7 +680,7 @@ Definition wp_iupdate_credgen_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γi : gname)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat)
@@ -706,9 +706,9 @@ Definition wp_iupdate_credgen_body
      It travels beside [log_opSe] (the birth epoch NAMED) and not
      [log_opS] (it buried), because the credit is only sound against the
      epoch of the op presenting it -- §G.9 finding 1. *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 <= inodestart ->
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
   bv_unsigned inum < 16 * Z.of_nat nib ->
   InodeRegion.di_type_stable dn dn0 ->
@@ -746,8 +746,8 @@ Definition wp_iupdate_credgen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   inode_meta ip dn -∗
@@ -857,7 +857,7 @@ Definition wp_iupdate_link_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γi : gname)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (u : nat) (Sb : gset Z) (cru : bool)
@@ -870,9 +870,9 @@ Definition wp_iupdate_link_body
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_iupdate <= K)%nat ->
   (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 <= inodestart ->
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
   bv_unsigned inum < 16 * Z.of_nat nib ->
   InodeRegion.di_type_stable dn dn0 ->
@@ -924,8 +924,8 @@ Definition wp_iupdate_link_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   inode_meta ip dn -∗
@@ -1071,7 +1071,7 @@ Definition wp_iupdate_unlink_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γi : gname)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (u : nat) (Sb : gset Z) (cru : bool) (uty : ity)
@@ -1083,9 +1083,9 @@ Definition wp_iupdate_unlink_body
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_iupdate <= K)%nat ->
   (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 <= inodestart ->
-  IBLOCK inum inodestart ∈ cov ->
+  IBLOCK inum inodestart ∈ fsc_cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
   bv_unsigned inum < 16 * Z.of_nat nib ->
   InodeRegion.di_type_stable dn dn0 ->
@@ -1122,8 +1122,8 @@ Definition wp_iupdate_unlink_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-  log_ctx γ bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   inode_meta ip dn -∗
@@ -1185,7 +1185,7 @@ Module Type IUPDATE.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat)
@@ -1193,7 +1193,7 @@ Module Type IUPDATE.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γi
-                            cov logstart inodestart nib dev ip inum dn dn0 bm u
+                            logstart inodestart nib dev ip inum dn dn0 bm u
                             pidv dq dqd dqn dqs m K eb b lks Vpr.
 
   (* the SET-FORM contract; [wp_iupdate_sconf] above is its instance with the
@@ -1207,7 +1207,7 @@ Module Type IUPDATE.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z)
@@ -1215,7 +1215,7 @@ Module Type IUPDATE.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γi
-                          cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
+                          logstart inodestart nib dev ip inum dn dn0 bm u Sb
                           pidv dq dqd dqn dqs m K eb b lks Vpr.
   (* the CREDITED set-form contract (S5a finding 3): the same walk with the
      unit returned when the op has already logged this inode's block.
@@ -1228,7 +1228,7 @@ Module Type IUPDATE.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool)
@@ -1236,7 +1236,7 @@ Module Type IUPDATE.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γi
-                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                           logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb b lks Vpr.
   (* the credited set-form contract at itrunc's altitude: eb-generic, so a
      pure pass-through caller can hand its own complements through, and
@@ -1253,7 +1253,7 @@ Module Type IUPDATE.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat)
@@ -1261,7 +1261,7 @@ Module Type IUPDATE.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γi
-                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
+                              logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
                               pidv dq dqd dqn dqs m K eb b lks Vpr.
 
   (* the LINK-MINTING contract (design §20.18 stage C2): the credited walk
@@ -1277,7 +1277,7 @@ Module Type IUPDATE.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool)
@@ -1286,7 +1286,7 @@ Module Type IUPDATE.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γi
-                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                           logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pin oty pidv dq dqd dqn dqs m K eb b lks Vpr.
 
   (* the LINK-SPENDING contract (design §20.18 stage C4): the credited walk
@@ -1301,7 +1301,7 @@ Module Type IUPDATE.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool)
@@ -1310,6 +1310,6 @@ Module Type IUPDATE.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γi
-                             cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                             logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                              uty pidv dq dqd dqn dqs m K eb b lks Vpr.
 End IUPDATE.

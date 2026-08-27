@@ -1086,15 +1086,15 @@ Section ReadiLoop.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γf γa : gname)
-      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (logstart : Z) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n nc szn : nat) (dst_olds : nat -> bv 8)
       (V : pprivate) (usv : mword 64)
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
     (K_readi <= K)%nat ->
-    log_geom_ok cov logstart ->
-    blkmap_wf cov logstart bm ->
+    log_geom_ok fsc_cov logstart ->
+    blkmap_wf fsc_cov logstart bm ->
     bm_covers bm (Z.of_nat szn) ->
     (szn <= MAXFILE * BSIZE)%nat ->
     (Z.of_nat off + Z.of_nat n < 2 ^ 32) ->
@@ -1127,7 +1127,7 @@ Section ReadiLoop.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (RI + 0x7c) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
     (* see [SpecReadi] -- readi holds no invariant of its own *)
     fs_bytes_any fsc_fs -∗
     kalloc_env γa None -∗
@@ -1151,7 +1151,7 @@ Section ReadiLoop.
     intros HK Hgeom Hwf Hcov Hszmax Hsum Hncn Hoffnc Hncdef Husv Hj Hgl Hbelow.
     pose proof HK as HK'. 
     change (2 ^ 32)%Z with 4294967296%Z in Hsum.
-    assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
+    assert (Hgeom0 : log_geom_ok fsc_cov logstart) by exact Hgeom.
     destruct Hgeom as [Hcovok Hlogsub].
     pose proof Hszmax as Hszmax2.
     rewrite rd_maxfile_val rd_bsize_val in Hszmax2.
@@ -1176,14 +1176,14 @@ Section ReadiLoop.
       rewrite -Hfbne in H1. rewrite -Hfbne in H2. split; assumption. }
     destruct Hcovpair as [Hfbnlt Hbnzz].
     pose proof Hfbnlt as Hfbn268. rewrite rd_maxfile_val in Hfbn268.
-    destruct (blkmap_wf_get_cov cov logstart bm fbn Hwf Hfbnlt Hbnzz)
+    destruct (blkmap_wf_get_cov fsc_cov logstart bm fbn Hwf Hfbnlt Hbnzz)
       as [Hbcov Hblog].
     destruct (Hcovok _ Hbcov) as [Hbpos Hblt].
     change (2 ^ 31)%Z with 2147483648%Z in Hblt.
     assert (Hubno : uint (blkmap_get bm fbn : mword 32)
                     = bv_unsigned (blkmap_get bm fbn)) by apply bb_uint32.
     assert (Hbcov' : uint (blkmap_get bm fbn : mword 32)
-                     ∈ bv_cov (fs_view fsc_fs γd dev cov))
+                     ∈ bv_cov (fs_view fsc_fs γd dev fsc_cov))
       by (rewrite Hubno; exact Hbcov).
     assert (Hblt' : (uint (blkmap_get bm fbn : mword 32) < 2147483648)%Z)
       by (rewrite Hubno; exact Hblt).
@@ -1270,7 +1270,7 @@ Section ReadiLoop.
                  with "Hcont") as "Hcont".
     assert (HKbm : (K_bmap <= K - 14)%nat) by (lia).
     iApply (BM.wp_bmap_noalloc_sconf γs j γl γu γd γk pd pav pu bn fsc_fs
-              cov logstart dev ip bm data fbn pidv dq dqd
+              fsc_cov logstart dev ip bm data fbn pidv dq dqd
               A3 (K - 14)%nat eb b
               _ (if user then upd_upt V PI else V) HKbm Hgeom0 Hfbnlt Hwf Hbnzz Hj Hgl HA3a0 HA3a1
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hrow Hidev Hmap Hblocks Hppid
@@ -1403,7 +1403,7 @@ Section ReadiLoop.
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     assert (HKbr : (K_bread <= K - 14)%nat) by (lia).
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-              (fs_view fsc_fs γd dev cov) pidv dev (blkmap_get bm fbn)
+              (fs_view fsc_fs γd dev fsc_cov) pidv dev (blkmap_get bm fbn)
               (rd_q user dq)
               B3 (K - 14)%nat eb b lks (if user then upd_upt V PI else V)
               HKbr Hblt' eq_refl Hbcov'
@@ -1456,7 +1456,7 @@ Section ReadiLoop.
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (rd_held_k with "Hheld") as %Hkklt.
     iApply fupd_wp.
-    iMod (rd_held_content ⊤ bn fsc_fs γd dq dev cov _ pidv dev _
+    iMod (rd_held_content ⊤ bn fsc_fs γd dq dev fsc_cov _ pidv dev _
             _ _ _ _ _ logN_top with "Hrow Hfsb1 Hheld")
       as "(%Hbs0eq & Hfsb1 & Hheld)".
     iModIntro.
@@ -1932,7 +1932,7 @@ Section ReadiLoop.
                      (m !!! Regidx Ra2 : mword 64) n
                      (rd_delivered data dst_olds off (tot + mm)%nat)
                      with "Hdst2") as "[Hppid Hdstback]".
-        iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev cov) kkb
+        iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev fsc_cov) kkb
                   pidv dev (blkmap_get bm fbn) (rd_q user dq) F2 (K - 14)%nat eb
                   (proc_addr j) (data fbn) bsdB dB b lks (if user then upd_upt V P2 else V)
                   HKbl Hkklt HF2a0 Hbelow
@@ -2219,7 +2219,7 @@ Section ReadiLoop.
                      (m !!! Regidx Ra2 : mword 64) n
                      (rd_delivered data dst_olds off (tot + mm)%nat)
                      with "Hdst2") as "[Hppid Hdstback]".
-        iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev cov) kkb
+        iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev fsc_cov) kkb
                   pidv dev (blkmap_get bm fbn) (rd_q user dq) J2 (K - 14)%nat eb
                   (proc_addr j) (data fbn) bsdB dB b lks (if user then upd_upt V P2 else V)
                   HKbl Hkklt HJ2a0 Hbelow
@@ -2453,7 +2453,7 @@ Section ReadiMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γa : gname) (γf : gname)
-      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (logstart : Z) (dev : mword 32)
       (ip : mword 64)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode)
@@ -2463,7 +2463,7 @@ Section ReadiMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_readi_sconf_body ktb γs j γl γu γd γk pd pav pu bn γa γf
-                          cov logstart dev ip bm data dn
+                          logstart dev ip bm data dn
                           user off n dst_olds V pidv dq dqd m K eb b lks.
   Proof.
     cbv beta delta [wp_readi_sconf_body].
@@ -2471,7 +2471,7 @@ Section ReadiMain.
            Ha0 Ha1 Ha3 Ha4 Hbelow.
     pose proof HK as HK'. 
     change (2 ^ 32)%Z with 4294967296%Z in Hoff32.
-    assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
+    assert (Hgeom0 : log_geom_ok fsc_cov logstart) by exact Hgeom.
     assert (HmbZ : Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)
       by (vm_compute; reflexivity).
     remember (Z.to_nat (bv_unsigned (di_size dn))) as szn eqn:Hszne.
@@ -3278,7 +3278,7 @@ Section ReadiMain.
       iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CIDu9) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       iApply (rd_loop (CID0 := CIDu9)  γs j γl γu γd γk pd pav pu bn γf γa
-                cov logstart dev ip bm data dn user off n nc szn dst_olds V
+                logstart dev ip bm data dn user off n nc szn dst_olds V
                 (m !!! Regidx Ra1 : mword 64) pidv dq dqd m K eb b lks
                 HK Hgeom0 Hwf Hcov Hsznmax
                 ltac:(change (2 ^ 32)%Z with 4294967296%Z; exact Hsum)

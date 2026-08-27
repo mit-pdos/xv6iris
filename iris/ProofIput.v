@@ -697,7 +697,7 @@ Section IputTail.
   Lemma ip_tail_exit `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (j : nat) (bn : bio_names) (g : log_names) (gi : gname)
       (gtl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) (Sb Sb' : gset Z)
       (k n n' : nat) (spf : bool -> nat) (wb crb0 : bool)
       (tid : nat) (qtx : Qp)
@@ -726,7 +726,7 @@ Section IputTail.
     kernel_text -∗
     (* durable-disk B''-esc: the itable credential, which bundles the free
        pool's own invariant beside the spinlock. *)
-    is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x24) : mword 64) -∗
     sie_cap_gpr KT1 D (trap_res eb + (K - 6))%nat false pj -∗
     cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
@@ -739,7 +739,7 @@ Section IputTail.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
     locked gtl cpu_id -∗
-    itable_res2 fsc_ic fsc_fs gi cov logstart nib dev -∗
+    itable_res2 fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
     iref_slot -∗
     (* RULING G (iclaim-ledger.md §6′): the REGIME, borrowed and returned.
        Nothing in this tail touches it -- the freeze is the free path's -- but
@@ -845,7 +845,7 @@ Section IputTail.
     assert (HD5sp : D5 !!! Regidx csp_rs1 = spd)
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HDsp).
     iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
-              (itable_res2 fsc_ic fsc_fs gi cov logstart nib dev) D5
+              (itable_res2 fsc_ic fsc_fs gi fsc_cov logstart nib dev) D5
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -910,7 +910,7 @@ Section IputTail.
   Lemma ip_tail `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (j : nat) (bn : bio_names) (g : log_names) (gi : gname)
       (gtl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) (Sb Sb' : gset Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
@@ -944,9 +944,9 @@ Section IputTail.
     kernel_text -∗
     (* durable-disk B''-esc: the itable credential, which bundles the free
        pool's own invariant beside the spinlock. *)
-    is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow fsc_ic fsc_fs gi cov logstart k -∗
+    ic_escrow fsc_ic fsc_fs gi fsc_cov logstart k -∗
     (* THE REGION, NEW AT §2.2/§2.3: every count move now reaches the [icnt]
        half that rides in [InodeRegion.ireg_slot], so both close AUs take the
        region invariant and open it beside [itable_inv].  Persistent. *)
@@ -963,7 +963,7 @@ Section IputTail.
     iref_slots_auth -∗
     isl_pool Mt -∗
     ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic Mt ci i0) -∗
-    ipool fsc_fs gi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
+    ipool fsc_fs gi fsc_cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
     IcacheRef.inode_ref k q dev inum -∗
     (* THE CLOSING REFERENCE's PROVENANCE UNIT (RULING R, item 7a-wire): both
        close AUs surrender it in the ghost step that moves the count, which is
@@ -1138,13 +1138,13 @@ Section IputTail.
          [ipool_put] hands it straight back at the same [(tid, qtx)] -- which
          is what makes the transit part of the partition REFUTABLE at a
          commit ([IcacheEscrow.ipool_transit_no_ops]). *)
-      iMod (ipool_evict_lend ⊤ fsc_ic fsc_fs gi cov logstart nib
+      iMod (ipool_evict_lend ⊤ fsc_ic fsc_fs gi fsc_cov logstart nib
               (region_inums nib ∖ ci_inums ci) k (bv_unsigned inum) dev inum
               tid qtx
               ltac:(solve_ndisj) Hk eq_refl with "Hpinv Hpool Hgid")
         as "(Hpool & Hgid & Hidback)".
       iInv "Hesc" as ">Hbody" "Hclose".
-      iMod (ic_open_auth_ref fsc_ic fsc_fs gi cov logstart k
+      iMod (ic_open_auth_ref fsc_ic fsc_fs gi fsc_cov logstart k
               (⊤ ∖ ↑ipoolN ∖ ↑(icEscN .@ k))
               Mt qt qt dev inum ltac:(solve_ndisj) HMk
               with "Hinv Hbody Hhalf Hrtok Hrident")
@@ -1165,7 +1165,7 @@ Section IputTail.
          at zero, the mirror down, the unfrozen token -- do not exist until
          the [sw] has fired, so what comes back here is the wand that takes
          them (IcacheEscrow's [ic_close_to_empty_late], §3.16's ordering). *)
-      iMod (ic_close_to_empty_late fsc_ic fsc_fs gi cov logstart k v ga dev inum
+      iMod (ic_close_to_empty_late fsc_ic fsc_fs gi fsc_cov logstart k v ga dev inum
               with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hpayl Hmt Hpin")
         as "(Hbody & Hgidf & Hbundle)".
       iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
@@ -1222,7 +1222,7 @@ Section IputTail.
          the pool row and decides the side itself, so nothing above this
          line changes. *)
       iApply fupd_wp.
-      iMod (ipool_put_ord ⊤ fsc_ic fsc_fs gi cov logstart nib
+      iMod (ipool_put_ord ⊤ fsc_ic fsc_fs gi fsc_cov logstart nib
               (region_inums nib ∖ ci_inums ci) (bv_unsigned inum) tid qtx
               ltac:(solve_ndisj) ltac:(apply ip_notin_diff; exact Hincid)
               with "Hpinv [Hbundle] Hpool") as "[Hpool Htx]".
@@ -1235,7 +1235,7 @@ Section IputTail.
         apply ip_pool_set; [exact Hinreg | exact Hincid]. }
       iEval (rewrite -Hpoolset) in "Hpool".
       iEval (rewrite Hp1) in "Hiu".
-      iApply (ip_tail_exit CID0 j bn g gi gtl cov logstart bmapstart inodestart
+      iApply (ip_tail_exit CID0 j bn g gi gtl logstart bmapstart inodestart
                 nib size dev Sb Sb' k n n' spf wb crb0 tid qtx pidv dq dqb dqs m D2 K eb sp0 vg4 vg5 vg6 lks Vpr rg
                 HK Hanch Hsp0 HD2regs Hlo Hhi Hssub Hwm Hwc Hfresh
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hiu Hgreg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 Hppid Hbms Hins Hbslots Hop Htx Hcont] Hiu Hgreg
@@ -1316,7 +1316,7 @@ Section IputTail.
       { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
       { intros i Hi. reflexivity. }
       { rewrite /islot2 lookup_insert Hcik. iFrame. }
-      iApply (ip_tail_exit CID0 j bn g gi gtl cov logstart bmapstart inodestart
+      iApply (ip_tail_exit CID0 j bn g gi gtl logstart bmapstart inodestart
                 nib size dev Sb Sb' k n n' spf wb crb0 tid qtx pidv dq dqb dqs m D2 K eb sp0 vg4 vg5 vg6 lks Vpr rg
                 HK Hanch Hsp0 HD2regs Hlo Hhi Hssub Hwm Hwc Hfresh
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hislot Hgreg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 Hppid Hbms Hins Hbslots Hop Htx Hcont] Hislot Hgreg
@@ -1400,12 +1400,12 @@ Section IputFreePath.
 
   (* [iu_held_L], inlined (ProofIupdate-module-local otherwise). *)
   Lemma ipo_held_L (bn : bio_names) (γd : disk_names)
-      (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
+      (dev : mword 32) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) :
-    bio_held bn (fs_view fsc_fs γd dev cov) k pidv dv bno bs bsl bsd d -∗
+    bio_held bn (fs_view fsc_fs γd dev fsc_cov) k pidv dv bno bs bsl bsd d -∗
       (uint bno ↪[fs_cache fsc_fs]{#(1/2)} bsl) ∗
       ((uint bno ↪[fs_cache fsc_fs]{#(1/2)} bsl) -∗
-       bio_held bn (fs_view fsc_fs γd dev cov) k pidv dv bno bs bsl bsd d).
+       bio_held bn (fs_view fsc_fs γd dev fsc_cov) k pidv dv bno bs bsl bsd d).
   Proof.
     rewrite /bio_held /bio_pay /fs_view /=.
     iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
@@ -1447,7 +1447,7 @@ Section IputFreePath.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γi : gname)
-      (cov : gset Z) (logstart inodestart : Z) (nib : nat)
+      (logstart inodestart : Z) (nib : nat)
       (dev : mword 32) (inum : mword 32) (dn : dinode)
       (ge gr gd : gname)
       (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
@@ -1464,9 +1464,9 @@ Section IputFreePath.
        the literal level 0 -- so the premise this lemma used to carry for it
        was vacuous and is gone.  (It read as a bound on [u] purely because
        the two arguments happen to share a name at the call site.) *)
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 <= inodestart ->
-    IBLOCK inum inodestart ∈ cov ->
+    IBLOCK inum inodestart ∈ fsc_cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     dinode_wf dn ->
@@ -1491,8 +1491,8 @@ Section IputFreePath.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KernelSyms.iput + 0xa8) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-    log_ctx γ bn fsc_fs cov logstart dev -∗
+    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+    log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
     ireg_inv γi fsc_fs inodestart nib -∗
     dinode_at γi inum dn -∗
     (* ---- THE LEDGER's UNCACHED CAPITAL IS NOT HERE (iclaim-ledger.md IVd),
@@ -1526,7 +1526,7 @@ Section IputFreePath.
        SPENT: the marker this walk's region open takes off the MARKED arm
        goes in, and the share comes back out.  The element is what locates
        the row, because this tail holds no half of [IcacheRef.icfg_pext]. *)
-    ipool_inv fsc_ic fsc_fs γi cov logstart nib -∗
+    ipool_inv fsc_ic fsc_fs γi fsc_cov logstart nib -∗
     crp_elem (bv_unsigned inum) (CrpPre t q) -∗
     proc_priv_bare pj pidv Vpr -∗
     procs_inv γs -∗
@@ -1603,7 +1603,7 @@ Section IputFreePath.
     { rewrite /bno bb_uint32 moi32_unsigned. apply bvw32_small.
       change (2^32)%Z with 4294967296%Z. lia. }
     assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbno; lia).
-    assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd dev cov))
+    assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd dev fsc_cov))
       by (rewrite Hbno; exact Hcov).
     pose proof (bv_unsigned_in_range _ inum) as [Hinum0 Hinum1].
     assert (Hm32 : bv_modulus (MachineWord.MachineWord.Z_idx 32) = 4294967296)
@@ -1655,7 +1655,7 @@ Section IputFreePath.
                  with "Hcont") as "Hcont".
     (* ===== bread ===== *)
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-              (fs_view fsc_fs γd dev cov) pidv dev bno dq
+              (fs_view fsc_fs γd dev fsc_cov) pidv dev bno dq
               R0 K eb b
               lks Vpr HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HR0a0 HR0a1
               ltac:(lkbelow)
@@ -1843,7 +1843,7 @@ Section IputFreePath.
                     = add_vec_int (mword_of_int (KernelSyms.iput + 0xba) : mword 64) 4)
       by (rewrite /R5; apply upd_eq).
     (* ---- the deposit's AU, adapted to log_write's anchor form ---- *)
-    iPoseProof (ireg_free_deposit_au ⊤ fsc_ic γi fsc_fs inodestart cov logstart nib
+    iPoseProof (ireg_free_deposit_au ⊤ fsc_ic γi fsc_fs inodestart fsc_cov logstart nib
                   inum dn dn' (diblk_bytes ds) ge gr gd rg t q
                   ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj)
                   ltac:(solve_ndisj)
@@ -1884,7 +1884,7 @@ Section IputFreePath.
         [ exact (dinode_bytes_length dn' Hdn'wf)
         | exact (diblk_bytes_splice ds (DinodeEnc.islot inum) dn'
                    Hdswf Hdn'wf Hslot16) ]. }
-    iApply (LW.wp_log_write_au_range bn γ fsc_fs γd cov logstart dev kk pidv bno
+    iApply (LW.wp_log_write_au_range bn γ fsc_fs γd fsc_cov logstart dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds) bsd0 d0 u
               (64 * DinodeEnc.islot inum)%nat 64%nat (dinode_bytes dn')
               cru Sb e0 v (⊤ ∖ ↑iregN)
@@ -1970,7 +1970,7 @@ Section IputFreePath.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID21) (CIDb := CID24) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev fsc_cov) kk
               pidv dev bno dq T1 K eb pj
               (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) bsd0 true b
               lks Vpr HKbl Hkk HT1a0 ltac:(lkbelow)
@@ -2189,7 +2189,7 @@ Section IputFreePath.
       (bn : bio_names)
       (γ : log_names) (γi : gname)
       (gtl gil gisl g1 : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
@@ -2216,19 +2216,19 @@ Section IputFreePath.
     (* the vacuous [Z.of_nat u + 2 < 2^31] is GONE: log_write's bound is on
        the CPU NESTING LEVEL and the off-lock tail calls it at level 0. *)
     (crb = true -> bmapstart ∈ Sb) ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 < size <= BPB ->
-    0 <= bmapstart -> bmapstart ∈ cov ->
+    0 <= bmapstart -> bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     0 <= inodestart ->
-    IBLOCK inum inodestart ∈ cov ->
+    IBLOCK inum inodestart ∈ fsc_cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     bv_unsigned (di_type dn) <> 0 ->
     bv_unsigned (di_nlink dn) = 0 ->
     dinode_wf dn ->
-    blkmap_wf cov logstart bm ->
-    cov_below cov size ->
+    blkmap_wf fsc_cov logstart bm ->
+    cov_below fsc_cov size ->
     (forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE) ->
     di_addrs dn = bm_cells bm ->
     icM_wf Mt ->
@@ -2252,17 +2252,17 @@ Section IputFreePath.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KernelSyms.iput + 0x5a) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-    log_ctx γ bn fsc_fs cov logstart dev -∗
+    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+    log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
     (* the itable, HELD *)
-    is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs γi fsc_cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow fsc_ic fsc_fs γi cov logstart k -∗
+    ic_escrow fsc_ic fsc_fs γi fsc_cov logstart k -∗
     locked gtl cpu_id -∗
     itable_half Mt -∗
     iref_slots_auth -∗
     isl_pool Mt -∗
-    ipool fsc_fs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
+    ipool fsc_fs γi fsc_cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
     (* ================================================================
        THE WINDOW'S i_inum SPLIT -- the entry can NOT ask for the islot2
        big-op and [inode_ref] here, and the reason is forced, not a
@@ -2316,7 +2316,7 @@ Section IputFreePath.
        the dir-link ledger, the disk-data cells and the well-formedness).
        The body UNPACKS [ic_payload_at] -> inode_meta/map/blocks/i_dev/i_inum
        to feed itrunc after the deposit is placed. *)
-    ic_payload_at fsc_fs γi cov logstart k inum g1 dn bm -∗
+    ic_payload_at fsc_fs γi fsc_cov logstart k inum g1 dn bm -∗
     live_gen k (1/2) g1 -∗
     (* the checkout's OTHER half of the valid cell (the prologue's), joined
        with ic_open_held's half at the +0x70 ip->valid=0 store *)
@@ -2379,7 +2379,7 @@ Section IputFreePath.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent, so nothing
        bitmap-shaped comes back on any arm. *)
-    bitmap_inv fsc_fs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
     proc_priv_bare pj pidv Vpr -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
@@ -2558,7 +2558,7 @@ Section IputFreePath.
       [iExists g1; iExact "Hlvh" |].
     iInv "Hesc" as ">Hbody" "Hclose".
     iAssert (live_frac k q) with "[Hlvq]" as "Hlvqf"; [ iExists ga'; iExact "Hlvq" |].
-    iMod (ic_open_held fsc_ic fsc_fs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
+    iMod (ic_open_held fsc_ic fsc_fs γi fsc_cov logstart k (⊤ ∖ ↑(icEscN .@ k))
             Mt q (1/4) ga' g1 dev inum dn bm ltac:(solve_ndisj) HMk1
             with "Hitinv Hbody Hhalf Hfrg Hlvqf Hlvh Hgid Hvb Hpayl")
       as "(Hhalf & Hfrg & Hlvq2 & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida & Hpintx)".
@@ -2625,10 +2625,10 @@ Section IputFreePath.
       as "[Hdep Hdepa]".
     iMod ("Hclose" with "[Hdepa Hfrg Hrident Hrcpt Hsele Htx Hmt Hgida Hpinr]") as "_".
     { iApply bi.later_intro.
-      iApply (ic_close_out_frz fsc_ic fsc_fs γi cov logstart k dev inum q tid qtx
+      iApply (ic_close_out_frz fsc_ic fsc_fs γi fsc_cov logstart k dev inum q tid qtx
                 with "Hdepa Hfrg Hrident Hrcpt Hsele Htx Hmt Hgida Hpinr"). }
     iModIntro.
-    iAssert (itable_res2 fsc_ic fsc_fs γi cov logstart nib dev)
+    iAssert (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev)
       with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
     { iExists Mt, ci. iFrame. iPureIntro. split; assumption. }
     (* ===== +0x5e auipc a0 ; +0x62 addi a0,a0,1306 ; +0x66 jal release ===== *)
@@ -2679,7 +2679,7 @@ Section IputFreePath.
     { intros c Hcs. rewrite /H3 upd_ne; [| regne].
       rewrite /H2 upd_ne; [| regne]. rewrite /H1 upd_ne; [reflexivity | regne]. }
     iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
-              (itable_res2 fsc_ic fsc_fs γi cov logstart nib dev) H3
+              (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev) H3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HH3a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hitlk] Htok HRres Hcnt Hpay").
@@ -2787,7 +2787,7 @@ Section IputFreePath.
     iModIntro.
     (* ===== itrunc ===== *)
     iApply (IT.wp_itrunc_gen γs j γl γu γd γk pd pav pu bn γ γi
-              cov logstart bmapstart inodestart nib size dev
+              logstart bmapstart inodestart nib size dev
               (ip : mword 64) inum dn dn bm data2 uit Sb crb (cru || crz)%bool e0
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs J2 (K - 6)%nat
               eb eb lks Vpr
@@ -2876,7 +2876,7 @@ Section IputFreePath.
     (* ---- THE PARK: OUT's frozen alternative -> [ic_parked]'s (IVd) ---- *)
     iApply fupd_wp.
     iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_swap_park_frz fsc_ic fsc_fs γi cov logstart k false q dev inum tid qtx
+    iMod (ic_swap_park_frz fsc_ic fsc_fs γi fsc_cov logstart k false q dev inum tid qtx
             with "Hbody Hdep Hidv Hinh Hvld")
       as "(Hbody & Hictok & Hfrg & Hrident & Hhpn)".
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
@@ -2993,7 +2993,7 @@ Section IputFreePath.
     iDestruct (cpu_own_transport CIDrs CIDm9 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf KT1 gtl "itable"%string
-              (itable_res2 fsc_ic fsc_fs γi cov logstart nib dev) J9
+              (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev) J9
               0%nat eb pj (K - 6)%nat eb lks ltac:(lia) ltac:(lia) Hitbelow
               with "Hcg Hcnt Htext Hpc [Hitlk]").
     all: try lkbelow.
@@ -3164,13 +3164,13 @@ Section IputFreePath.
        deposits is an AWAIT row, which cannot live in the pool's invariant
        at all ([EscrowInode.escA_inv] is an [inv]).  That is the residue
        section 5c of [IcacheEscrow] records. *)
-    iMod (ipool_evict_lend ⊤ fsc_ic fsc_fs γi cov logstart nib
+    iMod (ipool_evict_lend ⊤ fsc_ic fsc_fs γi fsc_cov logstart nib
             (region_inums nib ∖ ci_inums ci2) k (bv_unsigned inum) dev inum
             tid qtx
             ltac:(solve_ndisj) Hk eq_refl with "Hpinv Hpool Hgid")
       as "(Hpool & Hgid & Hidback)".
     iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_open_auth_frz fsc_ic fsc_fs γi cov logstart k
+    iMod (ic_open_auth_frz fsc_ic fsc_fs γi fsc_cov logstart k
             (⊤ ∖ ↑ipoolN ∖ ↑(icEscN .@ k))
             Mt2 q q dev inum ltac:(solve_ndisj) Hk HMk2
             with "Hitinv Hbody Hhalf Hfrg Hselp Hrident")
@@ -3201,10 +3201,10 @@ Section IputFreePath.
       - iExists (di_trunc dn). iExact "Hmeta".
       - iExists (bm_cells bm_empty). iSplitR;
           [iPureIntro; rewrite /bm_cells length_app
-             (blkmap_wf_dir_len cov logstart bm_empty (bm_empty_wf cov logstart));
+             (blkmap_wf_dir_len fsc_cov logstart bm_empty (bm_empty_wf fsc_cov logstart));
            reflexivity |].
         iExact "Haddrs". }
-    iMod (ic_close_to_empty_frz fsc_ic fsc_fs γi cov logstart k vv dev inum
+    iMod (ic_close_to_empty_frz fsc_ic fsc_fs γi fsc_cov logstart k vv dev inum
             with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hraw Hmt Hpinr Hrcpt")
       as "(Hbody & Hgidf & Hrcpt)".
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
@@ -3325,7 +3325,7 @@ Section IputFreePath.
        itrunc has zeroed this record's bytes, but the AWAIT arm is byte-less
        and forgets the value; the next fill of this inum re-ties it off the
        record it reads.  So the freer parks what it has and proves nothing. *)
-    iDestruct (ipool_shape_await fsc_fs γi cov logstart inum ge gr gd rg
+    iDestruct (ipool_shape_await fsc_fs γi fsc_cov logstart inum ge gr gd rg
                  with "Hcnt0 Hfzp Hescr Htkr [Hdv2] [Hfv2]") as "Hgap";
       [by iExists (dv_of dn data2) | by iExists (fv_of dn data2) |].
     (* the AWAIT row stays on the LOCK's side of the split (durable-disk
@@ -3336,7 +3336,7 @@ Section IputFreePath.
        [ipool_evict_lend] took does NOT come home here -- it moves into that
        row, where a commit refutes it -- and what comes out instead is the
        row's element, which travels to the off-lock deposit. *)
-    iMod (ipool_put_corpse ⊤ fsc_ic fsc_fs γi cov logstart nib
+    iMod (ipool_put_corpse ⊤ fsc_ic fsc_fs γi fsc_cov logstart nib
             (region_inums nib ∖ ci_inums ci2) (bv_unsigned inum) tid qtx
             ltac:(solve_ndisj) ltac:(apply fl_notin_diff; exact Hincid)
             with "Hpinv [Hgap] Hpool") as "[Hpool Hcel]".
@@ -3348,7 +3348,7 @@ Section IputFreePath.
       rewrite (fl_ci_inums_delete ci2 k dev inum Hcik2 Hinj).
       apply fl_pool_set; [exact Hinreg | exact Hincid]. }
     iEval (rewrite -Hpoolset) in "Hpool".
-    iAssert (itable_res2 fsc_ic fsc_fs γi cov logstart nib dev)
+    iAssert (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev)
       with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres3".
     { iExists (delete k Mt2), (delete k ci2). iFrame. iPureIntro. split.
       { destruct Hwf2 as [Hdom Hcnt']. split.
@@ -3413,7 +3413,7 @@ Section IputFreePath.
     { intros c Hcs. rewrite /G3 upd_ne; [| regne].
       rewrite /G2 upd_ne; [| regne]. rewrite /G1 upd_ne; [reflexivity | regne]. }
     iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
-              (itable_res2 fsc_ic fsc_fs γi cov logstart nib dev) G3
+              (itable_res2 fsc_ic fsc_fs γi fsc_cov logstart nib dev) G3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HG3a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hitlk] Htok HRres3 Hcnt Hpay").
@@ -3610,7 +3610,7 @@ Section IputFreePath.
                  ltac:(wp_next_chain) with "Hclm") as "Hclm".
     (* ===== +0xa8 .. j 0x30 : ip_free_offlock ===== *)
     iApply (ip_free_offlock γs j γl γu γd γk pd pav pu bn γ γi
-              cov logstart inodestart nib dev inum dn2 ge gr gd
+              logstart inodestart nib dev inum dn2 ge gr gd
               uoff Sb' true e0' e0' pidv dq dqs
               sp0 vra vs0 vs1 vs2 vs3 vs4 P5 (K - 6)%nat eb eb lks Vpr rg
               tid qtx
@@ -3698,8 +3698,8 @@ Section IputFreePath.
   (* THE HEADER'S FLAGGED SEAM, RESOLVED: [dinode_wf] IS extractable from the
      payload -- [inode_ok]'s [di_addrs dn = bm_cells bm] plus [blkmap_wf]'s
      direct-cell count.  Same derivation as IcacheEscrow.v:1519. *)
-  Lemma fe_dinode_wf (cov : gset Z) (logstart : Z) (dn : dinode) (bm : blkmap) :
-    blkmap_wf cov logstart bm -> di_addrs dn = bm_cells bm -> dinode_wf dn.
+  Lemma fe_dinode_wf (logstart : Z) (dn : dinode) (bm : blkmap) :
+    blkmap_wf fsc_cov logstart bm -> di_addrs dn = bm_cells bm -> dinode_wf dn.
   Proof.
     intros Hwf Hda. rewrite /dinode_wf Hda /bm_cells length_app.
     rewrite (blkmap_wf_dir_len _ _ _ Hwf). reflexivity.
@@ -3719,7 +3719,7 @@ Section IputFreePath.
       (bn : bio_names)
       (γ : log_names) (γi : gname)
       (gtl gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
       (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
@@ -3742,15 +3742,15 @@ Section IputFreePath.
     (3 <= u)%nat ->
     (* the vacuous [Z.of_nat u + 2 < 2^31] is GONE (see [ip_free_locked]) *)
     (crb = true -> bmapstart ∈ Sb) ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 < size <= BPB ->
-    0 <= bmapstart -> bmapstart ∈ cov ->
+    0 <= bmapstart -> bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     0 <= inodestart ->
-    IBLOCK inum inodestart ∈ cov ->
+    IBLOCK inum inodestart ∈ fsc_cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    cov_below cov size ->
+    cov_below fsc_cov size ->
     icM_wf Mt ->
     ic_ci_wf Mt ci nib dev ->
     (* FREE-PATH GUARD: the +0x1c branch was TAKEN -- this is the last ref. *)
@@ -3769,17 +3769,17 @@ Section IputFreePath.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x3a) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
-    log_ctx γ bn fsc_fs cov logstart dev -∗
-    is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
+    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+    log_ctx γ bn fsc_fs fsc_cov logstart dev -∗
+    is_itable2 gtl fsc_ic fsc_fs γi fsc_cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow fsc_ic fsc_fs γi cov logstart k -∗
+    ic_escrow fsc_ic fsc_fs γi fsc_cov logstart k -∗
     locked gtl cpu_id -∗
     itable_half Mt -∗
     iref_slots_auth -∗
     isl_pool Mt -∗
     ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic Mt ci i0) -∗
-    ipool fsc_fs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
+    ipool fsc_fs γi fsc_cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
     IcacheRef.inode_ref k q dev inum -∗
     is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k)
                      (slh_tok (icfg_isl k)) -∗
@@ -3805,7 +3805,7 @@ Section IputFreePath.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent, so nothing
        bitmap-shaped comes back on any arm. *)
-    bitmap_inv fsc_fs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
     proc_priv_bare pj pidv Vpr -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
@@ -3852,7 +3852,7 @@ Section IputFreePath.
        iref_slots_auth -∗
        isl_pool Mt -∗
        ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic Mt ci i0) -∗
-       ipool fsc_fs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
+       ipool fsc_fs γi fsc_cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
        IcacheRef.inode_ref k q dev inum -∗
        (* RULING G: both Exit-A arms turn back BEFORE the +0x50 mint, so the
           regime the caller lent has not been spent and comes straight back. *)
@@ -3884,7 +3884,7 @@ Section IputFreePath.
        ⌜bv_unsigned (di_type dn) <> 0⌝ -∗
        ⌜bv_unsigned (di_nlink dn) = 0⌝ -∗
        ⌜dinode_wf dn⌝ -∗
-       ⌜blkmap_wf cov logstart bm⌝ -∗
+       ⌜blkmap_wf fsc_cov logstart bm⌝ -∗
        ⌜forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE⌝ -∗
        ⌜di_addrs dn = bm_cells bm⌝ -∗
        ⌜spd = M5 !!! Regidx csp_rs1⌝ -∗
@@ -3912,7 +3912,7 @@ Section IputFreePath.
        itable_half Mt -∗
        iref_slots_auth -∗
        isl_pool Mt -∗
-       ipool fsc_fs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
+       ipool fsc_fs γi fsc_cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
        (* ================================================================
           THE WINDOW'S i_inum SPLIT -- the ONE place this Exit B is NOT
           byte-identical to [ip_free_locked]'s entry, and it is FORCED, not
@@ -3954,7 +3954,7 @@ Section IputFreePath.
         frz_park k (bv_unsigned inum) -∗
           ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic Mt ci i0) ∗
           IcacheRef.inode_ident k (DfracOwn q) dev inum) -∗
-       ic_payload_at fsc_fs γi cov logstart k inum g1 dn bm -∗
+       ic_payload_at fsc_fs γi fsc_cov logstart k inum g1 dn bm -∗
        live_gen k (1/2) g1 -∗
        (* ---- WHAT THE MINT LEFT STANDING (iclaim-ledger.md §3.16, A⁗) ----
           §3.14's token slot is gone from this seam: the free path no longer
@@ -4098,7 +4098,7 @@ Section IputFreePath.
        have to decide either the way the read below does. *)
     iApply fupd_wp.
     iInv "Hesc" as ">Hbodyp" "Hclosep".
-    iMod (ic_open_auth_ref fsc_ic fsc_fs γi cov logstart k
+    iMod (ic_open_auth_ref fsc_ic fsc_fs γi fsc_cov logstart k
             (⊤ ∖ ↑(icEscN .@ k)) Mt q q dev inum
             ltac:(solve_ndisj) HMk1 with "Hitinv Hbodyp Hhalf Hrtok Hrident")
       as "(Hhalf & Hrtok & Hrident & Harmp & Hparkp)".
@@ -4108,7 +4108,7 @@ Section IputFreePath.
       as "#Hclaim3a".
     iMod ("Hclosep" with "[Hparkp Hidvp Hinhp Hvldp Hpaylp Hmtp Hgidap]") as "_".
     { iApply bi.later_intro. iApply "Hparkp".
-      iApply (ic_mk_parked_arm fsc_ic fsc_fs γi cov logstart k dev inum vp gap
+      iApply (ic_mk_parked_arm fsc_ic fsc_fs γi fsc_cov logstart k dev inum vp gap
                 with "Hidvp Hinhp Hvldp Hpaylp Hmtp Hgidap"). }
     iModIntro.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x3a)) Ra4 Rs1
@@ -4130,7 +4130,7 @@ Section IputFreePath.
                               comes out is the payload, the inum's UNFROZEN
                               token -- which is exactly what the MINT at +0x50
                               consumes -- and the arm's liveness half. *)
-                           ic_payload_np fsc_fs γi cov logstart k inum ga true ∗
+                           ic_payload_np fsc_fs γi fsc_cov logstart k inum ga true ∗
                            ifreeze_off (bv_unsigned inum) ∗
                            live_gen k (1/2) ga) ∗
                         (* THE WINDOW HAS BEEN ENTERED (durable-disk
@@ -4150,7 +4150,7 @@ Section IputFreePath.
     { rewrite Hpa3a. iExact "Hclaim3a". }
     { rewrite Hpa3a.
       iInv "Hesc" as ">Hbody" "Hclose".
-      iMod (ic_open_auth_ref fsc_ic fsc_fs γi cov logstart k
+      iMod (ic_open_auth_ref fsc_ic fsc_fs γi fsc_cov logstart k
               (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k)) Mt q q dev inum
               ltac:(solve_ndisj) HMk1 with "Hitinv Hbody Hhalf Hrtok Hrident")
         as "(Hhalf & Hrtok & Hrident & Harm & _)".
@@ -4203,7 +4203,7 @@ Section IputFreePath.
            re-parked exactly as it came out, undecided. *)
         iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hmt Hgida]") as "_".
         { iApply bi.later_intro. iApply ic_close_parked.
-          iApply (ic_mk_parked_arm fsc_ic fsc_fs γi cov logstart k dev inum false ga
+          iApply (ic_mk_parked_arm fsc_ic fsc_fs γi fsc_cov logstart k dev inum false ga
                     with "Hidv Hinh Hvld Hpayl Hmt Hgida"). }
         iModIntro. iExists false. iFrame. done. }
     iIntros (wvld).
@@ -4371,7 +4371,7 @@ Section IputFreePath.
        +0x50 spends. *)
     iEval (rewrite /ic_payload_np) in "Hpayl".
     iDestruct "Hpayl" as (dn bm) "Hpayl".
-    iAssert (ic_payload_at fsc_fs γi cov logstart k inum ga dn bm) with "[Hpayl]" as "Hpayl";
+    iAssert (ic_payload_at fsc_fs γi fsc_cov logstart k inum ga dn bm) with "[Hpayl]" as "Hpayl";
       [ rewrite /ic_payload_at; iExact "Hpayl" |].
     (* ===================================================================
        +0x46 lw s2,4(s1) : ip->inum.  THE REORDER'S NEW AU.  The stale pin
@@ -4399,7 +4399,7 @@ Section IputFreePath.
        WHOLE, which is exactly why this load is an AU at all. *)
     iApply fupd_wp.
     iInv "Hesc" as ">Hbodyp" "Hclosep".
-    iMod (ic_open_held fsc_ic fsc_fs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
+    iMod (ic_open_held fsc_ic fsc_fs γi fsc_cov logstart k (⊤ ∖ ↑(icEscN .@ k))
             Mt q (1/4) ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
             with "Hitinv Hbodyp Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
       as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidvp & Hnfullp
@@ -4416,7 +4416,7 @@ Section IputFreePath.
               (fun w => (⌜w = inum⌝ ∗ itable_half Mt ∗ iref_frag k q ∗ live_frac k q ∗
                          live_gen k (1/2) ga ∗ ic_id fsc_ic k (1/4) true dev inum ∗
                          i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) ∗
-                         ic_payload_at fsc_fs γi cov logstart k inum ga dn bm)%I)
+                         ic_payload_at fsc_fs γi fsc_cov logstart k inum ga dn bm)%I)
               (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k)) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc [] [] [Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl]").
@@ -4424,7 +4424,7 @@ Section IputFreePath.
     { rewrite Hpa46. iExact "Hclaim46". }
     { rewrite Hpa46.
       iInv "Hesc" as ">Hbody" "Hclose".
-      iMod (ic_open_held fsc_ic fsc_fs γi cov logstart k (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k))
+      iMod (ic_open_held fsc_ic fsc_fs γi fsc_cov logstart k (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k))
               Mt q (1/4) ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
               with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
         as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida & Hpintx)".
@@ -4535,7 +4535,7 @@ Section IputFreePath.
       (* ---- the UNDO: HELD -> PARKED, nothing retyped, no generation bump ---- *)
       iApply fupd_wp.
       iInv "Hesc" as ">Hbody" "Hclose".
-      iAssert (ic_payload_at fsc_fs γi cov logstart k inum ga dn bm)
+      iAssert (ic_payload_at fsc_fs γi fsc_cov logstart k inum ga dn bm)
         with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk Htop
                Hdv Hfv]" as "Hpayl".
       { rewrite /ic_payload_at.
@@ -4544,7 +4544,7 @@ Section IputFreePath.
                   with "Hdlk Hdat [Hmty Hmmaj Hmmin Hmnl Hmsz] Haddrs Hind
                         Hblks Hdv Hfv Htop").
         rewrite /inode_meta. iFrame. }
-      iMod (ic_open_held fsc_ic fsc_fs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
+      iMod (ic_open_held fsc_ic fsc_fs γi fsc_cov logstart k (⊤ ∖ ↑(icEscN .@ k))
               Mt q (1/4) ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
               with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
         as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida & Hpintx)".
@@ -4572,7 +4572,7 @@ Section IputFreePath.
         as "[Hrn Htn]".
       iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hoff Hlvh Hpin Hmt Hgida]") as "_".
       { iApply bi.later_intro. iApply ic_close_parked.
-        iApply (ic_mk_parked_arm fsc_ic fsc_fs γi cov logstart k dev inum true ga
+        iApply (ic_mk_parked_arm fsc_ic fsc_fs γi fsc_cov logstart k dev inum true ga
                   with "Hidv Hinh Hvld [Hpayl Hoff Hlvh Hpin] Hmt Hgida").
         rewrite /ic_payload_arm. iLeft. iFrame "Hpayl Hoff Hlvh Hpin". }
       iModIntro.
@@ -4775,7 +4775,7 @@ Section IputFreePath.
     iEval (rewrite Hpp5a) in "Hpc".
     (* ===== 0x5a: ip_free_locked's ENTRY.  Re-pack the payload, mint the
        re-assembly wand, hand the bundle over. ===== *)
-    iAssert (ic_payload_at fsc_fs γi cov logstart k inum ga dn bm)
+    iAssert (ic_payload_at fsc_fs γi fsc_cov logstart k inum ga dn bm)
       with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk Htop
              Hdv Hfv]" as "Hpayl".
     { rewrite /ic_payload_at.
@@ -4810,7 +4810,7 @@ Section IputFreePath.
                     Hppid Hbslots Hvlb Hcrd Hop Hhpn Hr1 Hr2 Hr3 Hg4 Hg5 Hg6").
     { exact Htyne. }
     { exact (fe_nlink_zero (di_nlink dn) Hnl0). }
-    { exact (fe_dinode_wf cov logstart dn bm Hbmwf Hdiaddrs). }
+    { exact (fe_dinode_wf logstart dn bm Hbmwf Hdiaddrs). }
     { exact Hbmwf. }
     { exact Hsized. }
     { exact Hdiaddrs. }
@@ -4869,7 +4869,7 @@ Section ProofIput.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -4878,7 +4878,7 @@ Section ProofIput.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool)
     : wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl gil gisl
-                       cov logstart bmapstart inodestart nib size dev
+                       logstart bmapstart inodestart nib size dev
                        k q inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr rg.
   Proof.
     cbv beta delta [wp_iput_gen_body].
@@ -5082,7 +5082,7 @@ Section ProofIput.
     iDestruct (cpu_own_transport CID CID9 0%nat eb pj eb ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf KT1 gtl "itable"%string
-              (itable_res2 fsc_ic fsc_fs gi cov logstart nib dev) mA
+              (itable_res2 fsc_ic fsc_fs gi fsc_cov logstart nib dev) mA
               0%nat eb pj (K - 6)%nat eb lks
               ltac:(lia) ltac:(lia)
               ltac:(lkbelow)
@@ -5199,7 +5199,7 @@ Section ProofIput.
       (* the epoch is FORGOTTEN at the close arms' seam: [ip_tail] is stated
          over [log_opS] and nothing past this point compares epochs. *)
       iDestruct (log_opSe_opS with "Hop") as "Hop".
-      iApply (ip_tail (CID := CIDacq) CID j bn icfg_log gi gtl cov logstart bmapstart
+      iApply (ip_tail (CID := CIDacq) CID j bn icfg_log gi gtl logstart bmapstart
                 inodestart nib size dev Sb Sb k q inum Mt ci n n
                 (fun w => ip_spend_w w cru crz) false crb tid qtx pidv dq dqb dqs
                 m E2 K eb sp0 vg4 vg5 vg6 lks Vpr rg
@@ -5240,7 +5240,7 @@ Section ProofIput.
     assert (Hitne : "itable"%string ∉ lks)
       by exact (locks_below_not_elem _ _ Hitbelow).
     iApply (ip_free_entry gs j gl gu gd gk pd pav pu bn icfg_log gi gtl gil gisl
-              cov logstart bmapstart inodestart nib size dev
+              logstart bmapstart inodestart nib size dev
               k q inum Mt ci n Sb crb cru e0 0%nat tid qtx pidv dq dqb dqs
               vg4 vg5 vg6 m E2 K eb lks Vpr rg
               HK ltac:(lia) Hk ltac:(lia) Hcrb
@@ -5268,7 +5268,7 @@ Section ProofIput.
       (* the epoch is FORGOTTEN at the close arms' seam: [ip_tail] is stated
          over [log_opS] and nothing past this point compares epochs. *)
       iDestruct (log_opSe_opS with "Hop") as "Hop".
-      iApply (ip_tail (CID := CIDacq) CID j bn icfg_log gi gtl cov logstart bmapstart
+      iApply (ip_tail (CID := CIDacq) CID j bn icfg_log gi gtl logstart bmapstart
                 inodestart nib size dev Sb Sb k q inum Mt ci n n
                 (fun w => ip_spend_w w cru crz) false crb tid qtx pidv dq dqb dqs
                 m M' K eb sp0 vg4' vg5' vg6' lks Vpr rg
@@ -5312,7 +5312,7 @@ Section ProofIput.
       iEval (rewrite -Hf3) in "Hr8".  iEval (rewrite -Hf4) in "Hg4".
       iEval (rewrite -Hf5) in "Hg5".  iEval (rewrite -Hf6) in "Hg6".
       iApply (ip_free_locked gs j gl gu gd gk pd pav pu bn icfg_log gi gtl gil gisl g1
-                cov logstart bmapstart inodestart nib size dev
+                logstart bmapstart inodestart nib size dev
                 k q inum dn bm data Mt ci n Sb crb cru crz false e0 0%nat tid (qtx/2)%Qp
                 pidv dq dqb dqs
                 spr (m !!! Regidx Rra) (m !!! Regidx Rs0) (m !!! Regidx Rs1)
@@ -5400,7 +5400,7 @@ Section ProofIput.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat)
@@ -5408,7 +5408,7 @@ Section ProofIput.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gi gtl gil gisl
-                          cov logstart bmapstart inodestart nib size dev
+                          logstart bmapstart inodestart nib size dev
                           k q inum n pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iput_sconf_body].
@@ -5432,7 +5432,7 @@ Section ProofIput.
        proposition at [rg := true], and it is not given back. *)
     iEval (rewrite -ireg_regime_true) in "Hropen".
     iApply (wp_iput_gen gs j gl gu gd gk pd pav pu bn icfg_log gi gtl gil gisl
-              cov logstart bmapstart inodestart nib size dev
+              logstart bmapstart inodestart nib size dev
               k q inum n Sb0 false false false e00 t0 (1/2)%Qp pidv dq dqb dqs m K eb b lks Vpr true
               HK eq_refl Hk ltac:(discriminate) ltac:(discriminate)
               Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog

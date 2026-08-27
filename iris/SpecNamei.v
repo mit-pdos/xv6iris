@@ -93,7 +93,7 @@ Definition wp_namei_sconf_body
     (g : log_names) (gi : gname)
     (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
-    (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (n : nat)
@@ -115,14 +115,14 @@ Definition wp_namei_sconf_body
   inodestart = icfg_ist ->
   dev = ROOTDEV ->
   (0 < nib)%nat ->
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 < size <= BPB ->
   0 <= bmapstart ->
-  bmapstart ∈ cov ->
+  bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   0 <= inodestart ->
-  cov_below cov size ->
-  ireg_blocks_ok inodestart nib cov logstart ->
+  cov_below fsc_cov size ->
+  ireg_blocks_ok inodestart nib fsc_cov logstart ->
   bb_cstr pfun plen ->
   (* the length fits int: the sext.w at +0x90 truncates [len = s2 - s1], and
      without this bound the [blt]-against-13 stops deciding [len <= 13] (and
@@ -142,12 +142,12 @@ Definition wp_namei_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
-  log_ctx g bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+  log_ctx g bn fsc_fs fsc_cov logstart dev -∗
   kalloc_env ga None -∗
-  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi fsc_cov logstart -∗
   ic_sleeplocks fsc_ic -∗
   ireg_inv gi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
@@ -165,7 +165,7 @@ Definition wp_namei_sconf_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
   proc_priv_bare pj pidv Vpr -∗
   inode_held (pv_cwd Vpr) -∗
   (* ---- THE PATH RIDES THE CALLER'S FRACTION [dqpv]; THE NAME BUFFER STAYS
@@ -232,7 +232,7 @@ Definition wp_namei_gen_body
     (g : log_names) (gi : gname)
     (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
-    (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (n : nat) (Sb : gset Z)
@@ -254,14 +254,14 @@ Definition wp_namei_gen_body
   inodestart = icfg_ist ->
   dev = ROOTDEV ->
   (0 < nib)%nat ->
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 < size <= BPB ->
   0 <= bmapstart ->
-  bmapstart ∈ cov ->
+  bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   0 <= inodestart ->
-  cov_below cov size ->
-  ireg_blocks_ok inodestart nib cov logstart ->
+  cov_below fsc_cov size ->
+  ireg_blocks_ok inodestart nib fsc_cov logstart ->
   bb_cstr pfun plen ->
   (* the length fits int: the sext.w at +0x90 truncates [len = s2 - s1], and
      without this bound the [blt]-against-13 stops deciding [len <= 13] (and
@@ -283,12 +283,12 @@ Definition wp_namei_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
-  log_ctx g bn fsc_fs cov logstart dev -∗
+  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+  log_ctx g bn fsc_fs fsc_cov logstart dev -∗
   kalloc_env ga None -∗
-  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi fsc_cov logstart -∗
   ic_sleeplocks fsc_ic -∗
   ireg_inv gi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
@@ -306,7 +306,7 @@ Definition wp_namei_gen_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
   proc_priv_bare pj pidv Vpr -∗
   inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -367,7 +367,7 @@ Module Type NAMEI.
       (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat)
@@ -375,7 +375,7 @@ Module Type NAMEI.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namei_sconf_body gs j gl gu gd gk pd pav pu bn g gi gtl
-                          ga gf cov logstart bmapstart inodestart nib
+                          ga gf logstart bmapstart inodestart nib
                           size dev plen pfun n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
   (* the set-form contract; the counted one is this at the [log_op]
@@ -390,7 +390,7 @@ Module Type NAMEI.
       (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
@@ -398,7 +398,7 @@ Module Type NAMEI.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namei_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl
-                          ga gf cov logstart bmapstart inodestart nib
+                          ga gf logstart bmapstart inodestart nib
                           size dev plen pfun n Sb
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
 End NAMEI.
@@ -424,7 +424,7 @@ Definition wp_namei_root_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gtl : gname) (gi : gname)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -444,9 +444,9 @@ Definition wp_namei_root_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi fsc_cov logstart -∗
   (* the inode region -- iget's premise since iclaim-ledger.md §3.3, and
      GHOST-ONLY there (the recycle arm's peel and its 0 -> 1 count move).
      Persistent, relayed unchanged. *)
@@ -477,10 +477,10 @@ Module Type NAMEI_ROOT.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gtl : gname) (gi : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namei_root_body gtl gi cov logstart inodestart nib dev dqp
+      wp_namei_root_body gtl gi logstart inodestart nib dev dqp
                          m n K eb p b lks Vpr.
 End NAMEI_ROOT.

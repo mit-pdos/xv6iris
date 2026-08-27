@@ -266,7 +266,6 @@ Record fwrite_names := MkFWriteNames {
   fwn_log        : log_names;     (* begin_op / end_op                      *)
   fwn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
   fwn_pr         : gname;         (* balloc's printk credential             *)
-  fwn_cov        : gset Z;
   fwn_logstart   : Z;
   fwn_inodestart : Z;
   fwn_bmapstart  : Z;             (* the bitmap, for bmap -> balloc          *)
@@ -300,7 +299,7 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
     (MkLogNames 1%positive 1%positive 1%positive 1%positive 1%positive)
     1%positive
     1%positive
-    ∅ 0 0 0 0
+    0 0 0 0
     (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
     (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
 
@@ -439,12 +438,12 @@ Section SpecFilewrite.
      witness, which used to sit at the end of this bundle -- come out of the
      reference at the call ([SpecFileread.fileread_pay_carve]). *)
   Definition filewrite_fs_env (γf : gname) (fn : fwrite_names) : iProp Σ :=
-    (⌜log_geom_ok (fwn_cov fn) (fwn_logstart fn)⌝ ∗
+    (⌜log_geom_ok fsc_cov (fwn_logstart fn)⌝ ∗
      ⌜0 <= fwn_inodestart fn⌝ ∗
      (* EVERY inum the region covers has its block inside [cov] *)
      ⌜forall inum : mword 32,
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-        IBLOCK inum (fwn_inodestart fn) ∈ fwn_cov fn⌝ ∗
+        IBLOCK inum (fwn_inodestart fn) ∈ fsc_cov⌝ ∗
      (* ...and none of those blocks is one of the log's own slots.  writei's
         iupdate flushes the inode's block, and this is iupdate's premise,
         quantified for the same reason as the one above. *)
@@ -453,19 +452,19 @@ Section SpecFilewrite.
         ~ (IBLOCK inum (fwn_inodestart fn)
              ∈ log_region_set (fwn_logstart fn))⌝ ∗
      (* the bitmap's geometry, forwarded through bmap to balloc *)
-     ⌜bitmap_geom_ok (fwn_cov fn) (fwn_logstart fn) (fwn_bmapstart fn)
+     ⌜bitmap_geom_ok fsc_cov (fwn_logstart fn) (fwn_bmapstart fn)
                      (fwn_size fn)⌝ ∗
      (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as
         a hypothesis, never a functor (SpecBalloc.v's header) *)
      ⌜printk_gen_contract (kt := KT1) (fwn_pr fn) (fwn_uart fn) (fwn_disk fn)⌝ ∗
      bio_ctx (fwn_bio fn)
-       (fs_view fsc_fs (fwn_disk fn) icfg_dev (fwn_cov fn)) ∗
+       (fs_view fsc_fs (fwn_disk fn) icfg_dev fsc_cov) ∗
      (* THE LOG: begin_op mints the reservation, end_op spends it, and the
         loop does one transaction PER CHUNK *)
-     log_ctx (fwn_log fn) (fwn_bio fn) fsc_fs (fwn_cov fn)
+     log_ctx (fwn_log fn) (fwn_bio fn) fsc_fs fsc_cov
              (fwn_logstart fn) icfg_dev ∗
      (* end_op's crash seam and era certificate *)
-     fs_crash_seam (fwn_cov fn) (fwn_logstart fn) ∗
+     fs_crash_seam fsc_cov (fwn_logstart fn) ∗
      gen_cert ∗
      (* balloc's two PERSISTENT printk credentials *)
      kernel_data ∗
@@ -473,7 +472,7 @@ Section SpecFilewrite.
      (* THE THREE PERSISTENT ICACHE INVARIANTS SpecIlock / SpecIunlock take,
         the escrow at the FAMILY where it was per-slot *)
      itable_inv ∗
-     ic_escrows fsc_ic fsc_fs (fwn_ireg fn) (fwn_cov fn)
+     ic_escrows fsc_ic fsc_fs (fwn_ireg fn) fsc_cov
                 (fwn_logstart fn) ∗
      ireg_inv (fwn_ireg fn) fsc_fs (fwn_inodestart fn) icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
@@ -495,7 +494,7 @@ Section SpecFilewrite.
      sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fwn_bmapstart fn) : mword 32) ∗
      (* THE BITMAP's invariant (BitmapInv.v): the pool bmap -> balloc draws
         from; persistent, and it says nothing about which blocks are in use *)
-     bitmap_inv fsc_fs (fwn_bmapstart fn) (fwn_cov fn) (fwn_logstart fn)
+     bitmap_inv fsc_fs (fwn_bmapstart fn) fsc_cov (fwn_logstart fn)
                 (fwn_size fn) ∗
      (* the disk fabric *)
      dev_inv (fwn_uart fn) (fwn_disk fn) ∗

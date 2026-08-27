@@ -140,13 +140,13 @@ Section ProofSysLinkTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (logstart : Z) (dev : mword 32)
       (u : nat) (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 : mword 64)
       (bnm bw bo : nat -> bv 8) (Vpr : pprivate) :
     (K_end_op <= K - 38)%nat -> (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     lks = ∅ ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
@@ -159,9 +159,9 @@ Section ProofSysLinkTails.
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xbc)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
-    log_ctx g bn fsc_fs cov logstart dev -∗
-    fs_crash_seam cov logstart -∗
+    bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+    log_ctx g bn fsc_fs fsc_cov logstart dev -∗
+    fs_crash_seam fsc_cov logstart -∗
     gen_cert -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
@@ -224,7 +224,7 @@ Section ProofSysLinkTails.
     iDestruct (cpu_claim_ext_transport CID0 CID1 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
-              g fsc_fs cov logstart dev u pidv dq M1 (K - 38)%nat eb b lks
+              g fsc_fs fsc_cov logstart dev u pidv dq M1 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
@@ -349,7 +349,7 @@ Section ProofSysLinkTails.
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gi : gname)
       (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
@@ -360,16 +360,16 @@ Section ProofSysLinkTails.
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
     (kk < NINODE)%nat ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 < size <= BPB ->
     0 <= bmapstart ->
-    bmapstart ∈ cov ->
+    bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     0 <= inodestart ->
-    IBLOCK inum inodestart ∈ cov ->
+    IBLOCK inum inodestart ∈ fsc_cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    cov_below cov size ->
+    cov_below fsc_cov size ->
     (iput_units <= u)%nat ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     (* THE AMBIENT LOG, named (durable-disk B''-tx): this stage holds a
@@ -388,13 +388,13 @@ Section ProofSysLinkTails.
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xc6)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
-    log_ctx g bn fsc_fs cov logstart dev -∗
-    fs_crash_seam cov logstart -∗
+    bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+    log_ctx g bn fsc_fs fsc_cov logstart dev -∗
+    fs_crash_seam fsc_cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow fsc_ic fsc_fs gi cov logstart kk -∗
+    ic_escrow fsc_ic fsc_fs gi fsc_cov logstart kk -∗
     ireg_inv gi fsc_fs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
@@ -403,7 +403,7 @@ Section ProofSysLinkTails.
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
-    ic_loaded fsc_fs gi cov logstart kk inum dn bm -∗
+    ic_loaded fsc_fs gi fsc_cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
     (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
        iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
@@ -414,7 +414,7 @@ Section ProofSysLinkTails.
     runit_any (bv_unsigned inum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -509,7 +509,7 @@ Section ProofSysLinkTails.
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gi gtl gil gisl cov logstart bmapstart
+              pd pav pu bn g gi gtl gil gisl logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 38)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -564,7 +564,7 @@ Section ProofSysLinkTails.
     iDestruct (cpu_claim_ext_transport CID3 CID4 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
-              g fsc_fs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
+              g fsc_fs fsc_cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
@@ -678,7 +678,7 @@ Section ProofSysLinkTails.
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gi : gname)
       (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
@@ -689,16 +689,16 @@ Section ProofSysLinkTails.
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
     (kk < NINODE)%nat ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 < size <= BPB ->
     0 <= bmapstart ->
-    bmapstart ∈ cov ->
+    bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     0 <= inodestart ->
-    IBLOCK inum inodestart ∈ cov ->
+    IBLOCK inum inodestart ∈ fsc_cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    cov_below cov size ->
+    cov_below fsc_cov size ->
     (iput_units <= u)%nat ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     (* THE AMBIENT LOG, named (durable-disk B''-tx): this stage holds a
@@ -717,13 +717,13 @@ Section ProofSysLinkTails.
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xd6)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
-    log_ctx g bn fsc_fs cov logstart dev -∗
-    fs_crash_seam cov logstart -∗
+    bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+    log_ctx g bn fsc_fs fsc_cov logstart dev -∗
+    fs_crash_seam fsc_cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow fsc_ic fsc_fs gi cov logstart kk -∗
+    ic_escrow fsc_ic fsc_fs gi fsc_cov logstart kk -∗
     ireg_inv gi fsc_fs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
@@ -732,7 +732,7 @@ Section ProofSysLinkTails.
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
-    ic_loaded fsc_fs gi cov logstart kk inum dn bm -∗
+    ic_loaded fsc_fs gi fsc_cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
     (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
        iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
@@ -743,7 +743,7 @@ Section ProofSysLinkTails.
     runit_any (bv_unsigned inum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -838,7 +838,7 @@ Section ProofSysLinkTails.
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gi gtl gil gisl cov logstart bmapstart
+              pd pav pu bn g gi gtl gil gisl logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 38)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -893,7 +893,7 @@ Section ProofSysLinkTails.
     iDestruct (cpu_claim_ext_transport CID3 CID4 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
-              g fsc_fs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
+              g fsc_fs fsc_cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
@@ -1036,7 +1036,7 @@ Section ProofSysLinkTails.
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gi : gname)
       (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (ty : mword 16)
@@ -1052,16 +1052,16 @@ Section ProofSysLinkTails.
     (kk < NINODE)%nat ->
     g = icfg_log ->
     inodestart = icfg_ist ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 < size <= BPB ->
     0 <= bmapstart ->
-    bmapstart ∈ cov ->
+    bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     0 <= inodestart ->
-    IBLOCK inum inodestart ∈ cov ->
+    IBLOCK inum inodestart ∈ fsc_cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    cov_below cov size ->
+    cov_below fsc_cov size ->
     IBLOCK inum inodestart ∈ Sb ->
     (iput_units <= S u)%nat ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
@@ -1082,13 +1082,13 @@ Section ProofSysLinkTails.
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xf4)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
-    log_ctx g bn fsc_fs cov logstart dev -∗
-    fs_crash_seam cov logstart -∗
+    bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+    log_ctx g bn fsc_fs fsc_cov logstart dev -∗
+    fs_crash_seam fsc_cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow fsc_ic fsc_fs gi cov logstart kk -∗
+    ic_escrow fsc_ic fsc_fs gi fsc_cov logstart kk -∗
     ireg_inv gi fsc_fs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
@@ -1105,7 +1105,7 @@ Section ProofSysLinkTails.
     FsStateLink.link_tok (fs_gamma_L fsc_fs) (bv_unsigned inum) uty -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -1202,7 +1202,7 @@ Section ProofSysLinkTails.
        escrow for that window. *)
     iEval (rewrite Hglog) in "Htx".
     iApply (Ilock.wp_ilock_tx_sconf (CID := CID2) gs jx gl gu gd gk pd pav pu bn
-              gi gil gisl cov logstart inodestart nib kk s gy PlainK
+              gi gil gisl logstart inodestart nib kk s gy PlainK
               dev inum
               pidv dq dqs M2 (K - 38)%nat eb b lks
               Vpr HKil Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HM2a0
@@ -1380,11 +1380,11 @@ Section ProofSysLinkTails.
     assert (Haddreq : di_addrs dn' = bm_cells bm).
     { rewrite /dn' sl_setnl_addrs. exact (proj1 (proj2 (proj2 Hiok))). }
     assert (Hdirlen : length (bm_dir bm) = NDIRECT)
-      by exact (blkmap_wf_dir_len cov logstart bm (proj1 Hiok)).
+      by exact (blkmap_wf_dir_len fsc_cov logstart bm (proj1 Hiok)).
     iDestruct (cpu_own_transport CID3 CID8 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iupdate.wp_iupdate_unlink (CID := CID8) gs jx gl gu gd gk pd pav pu
-              bn g gi cov logstart inodestart nib dev (ientry kk) inum
+              bn g gi logstart inodestart nib dev (ientry kk) inum
               dn' dn bm u Sb true uty pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               P4 (K - 38)%nat eb b lks
               Vpr HKiup ltac:(intros _; exact Hmem) Hgeom Hist0 Hiblk Hiblog Hinb
@@ -1440,8 +1440,8 @@ Section ProofSysLinkTails.
        well-formed, and these are the four facts the re-pack below proves
        anyway -- a link count is the one column [sl_setnl] moves. *)
     assert (Hloc' : inode_local (bv_unsigned inum) (era_node dn' bm dat)).
-    { apply (inode_local_of_ok_rec (bv_unsigned inum) cov logstart dn' bm dat).
-      - exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok).
+    { apply (inode_local_of_ok_rec (bv_unsigned inum) fsc_cov logstart dn' bm dat).
+      - exact (sl_setnl_inode_ok fsc_cov logstart dn bm dat _ Hiok).
       - apply (inode_rec_local_same_type dn dn' Hrl_dat
                  (sl_setnl_type dn _));
           [ pose proof (proj1 (proj2 Hrl_dat)); lia
@@ -1455,10 +1455,10 @@ Section ProofSysLinkTails.
             ltac:(solve_ndisj) Hloc' with "[] Htop") as "Htop";
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
-    iAssert (ic_loaded fsc_fs gi cov logstart kk inum dn' bm)
+    iAssert (ic_loaded fsc_fs gi fsc_cov logstart kk inum dn' bm)
       with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop]" as "Hload".
     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dat.
-      iSplitR; [iPureIntro; exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok) |].
+      iSplitR; [iPureIntro; exact (sl_setnl_inode_ok fsc_cov logstart dn bm dat _ Hiok) |].
       (* [sl_setnl] moves the COUNT and nothing else, so the type and the
          size ride, the new count is BELOW one the region already bounded
          ([Hdec]) and the directory clause is vacuous at a non-directory
@@ -1525,7 +1525,7 @@ Section ProofSysLinkTails.
     iDestruct (cpu_own_transport CID9 CID11 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID11) gs jx gl gu gd gk
-              pd pav pu bn g gi gtl gil gisl cov logstart bmapstart
+              pd pav pu bn g gi gtl gil gisl logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn' bm (S u) pidv dq
               dqb dqs Q2 (K - 38)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -1574,7 +1574,7 @@ Section ProofSysLinkTails.
     iDestruct (cpu_own_transport CID12 CID13 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (EndOp.wp_end_op_sconf (CID := CID13) gs jx gl gu gd gk pd pav pu bn
-              g fsc_fs cov logstart dev n2 pidv dq Q3 (K - 38)%nat eb b lks
+              g fsc_fs fsc_cov logstart dev n2 pidv dq Q3 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
@@ -1705,7 +1705,7 @@ Section ProofSysLinkTails.
       (bn : bio_names) (g : log_names) (gi : gname)
       (gtl : gname)
       (gil gisl : gname) (gild gisld : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (ty : mword 16)
@@ -1723,19 +1723,19 @@ Section ProofSysLinkTails.
     (kk < NINODE)%nat -> (kd < NINODE)%nat ->
     g = icfg_log ->
     inodestart = icfg_ist ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 < size <= BPB ->
     0 <= bmapstart ->
-    bmapstart ∈ cov ->
+    bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     0 <= inodestart ->
-    IBLOCK inum inodestart ∈ cov ->
+    IBLOCK inum inodestart ∈ fsc_cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    IBLOCK dinum inodestart ∈ cov ->
+    IBLOCK dinum inodestart ∈ fsc_cov ->
     ~ (IBLOCK dinum inodestart ∈ log_region_set logstart) ->
     bv_unsigned dinum < 16 * Z.of_nat nib ->
-    cov_below cov size ->
+    cov_below fsc_cov size ->
     (crb = true -> bmapstart ∈ Sb) ->
     (cru = true -> IBLOCK dinum inodestart ∈ Sb) ->
     IBLOCK inum inodestart ∈ Sb ->
@@ -1765,14 +1765,14 @@ Section ProofSysLinkTails.
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xee)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
-    log_ctx g bn fsc_fs cov logstart dev -∗
-    fs_crash_seam cov logstart -∗
+    bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+    log_ctx g bn fsc_fs fsc_cov logstart dev -∗
+    fs_crash_seam fsc_cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow fsc_ic fsc_fs gi cov logstart kk -∗
-    ic_escrow fsc_ic fsc_fs gi cov logstart kd -∗
+    ic_escrow fsc_ic fsc_fs gi fsc_cov logstart kk -∗
+    ic_escrow fsc_ic fsc_fs gi fsc_cov logstart kd -∗
     ireg_inv gi fsc_fs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
@@ -1793,7 +1793,7 @@ Section ProofSysLinkTails.
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
     i_valid (ientry kd) ↦₄ valid_word true -∗
-    ic_loaded fsc_fs gi cov logstart kd dinum dnd bmd -∗
+    ic_loaded fsc_fs gi fsc_cov logstart kd dinum dnd bmd -∗
     ity_shot gyd (di_type dnd) -∗
     (* ...and the parent payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
@@ -1802,7 +1802,7 @@ Section ProofSysLinkTails.
     runit_any (bv_unsigned dinum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -1895,7 +1895,7 @@ Section ProofSysLinkTails.
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iunlockput.wp_iunlockput_tx_gen (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gi gtl gild gisld cov logstart bmapstart
+              pd pav pu bn g gi gtl gild gisld logstart bmapstart
               inodestart nib size dev kd qd sd gyd dinum dnd bmd
               n Sb crb cru false e0 pidv dq dqb dqs
               M2 (K - 38)%nat eb b lks
@@ -1932,7 +1932,7 @@ Section ProofSysLinkTails.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (sl_tail_bad (CID0 := CID3) gs jx gl gu gd gk pd pav pu bn g gi
-              gtl gil gisl cov logstart bmapstart inodestart nib size dev
+              gtl gil gisl logstart bmapstart inodestart nib size dev
               kk qi s gy inum ty u1 Sb1 uty pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               Vpr HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
@@ -1984,7 +1984,7 @@ Section ProofSysLinkTails.
       (bn : bio_names) (g : log_names) (gi : gname)
       (gtl : gname)
       (gil gisl : gname) (gild gisld : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (ty : mword 16)
@@ -2002,19 +2002,19 @@ Section ProofSysLinkTails.
     (kk < NINODE)%nat -> (kd < NINODE)%nat ->
     g = icfg_log ->
     inodestart = icfg_ist ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 < size <= BPB ->
     0 <= bmapstart ->
-    bmapstart ∈ cov ->
+    bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     0 <= inodestart ->
-    IBLOCK inum inodestart ∈ cov ->
+    IBLOCK inum inodestart ∈ fsc_cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    IBLOCK dinum inodestart ∈ cov ->
+    IBLOCK dinum inodestart ∈ fsc_cov ->
     ~ (IBLOCK dinum inodestart ∈ log_region_set logstart) ->
     bv_unsigned dinum < 16 * Z.of_nat nib ->
-    cov_below cov size ->
+    cov_below fsc_cov size ->
     IBLOCK inum inodestart ∈ Sb ->
     (iput_units <= n)%nat ->
     (* THE LEDGER'S CLOSURE, over the ONE figure the parent's free reports.
@@ -2043,14 +2043,14 @@ Section ProofSysLinkTails.
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xe6)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
-    log_ctx g bn fsc_fs cov logstart dev -∗
-    fs_crash_seam cov logstart -∗
+    bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+    log_ctx g bn fsc_fs fsc_cov logstart dev -∗
+    fs_crash_seam fsc_cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow fsc_ic fsc_fs gi cov logstart kk -∗
-    ic_escrow fsc_ic fsc_fs gi cov logstart kd -∗
+    ic_escrow fsc_ic fsc_fs gi fsc_cov logstart kk -∗
+    ic_escrow fsc_ic fsc_fs gi fsc_cov logstart kd -∗
     ireg_inv gi fsc_fs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
@@ -2071,7 +2071,7 @@ Section ProofSysLinkTails.
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
     i_valid (ientry kd) ↦₄ valid_word true -∗
-    ic_loaded fsc_fs gi cov logstart kd dinum dnd bmd -∗
+    ic_loaded fsc_fs gi fsc_cov logstart kd dinum dnd bmd -∗
     ity_shot gyd (di_type dnd) -∗
     (* ...and the parent payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
@@ -2080,7 +2080,7 @@ Section ProofSysLinkTails.
     runit_any (bv_unsigned dinum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -2173,7 +2173,7 @@ Section ProofSysLinkTails.
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iunlockput.wp_iunlockput_tx_gen (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gi gtl gild gisld cov logstart bmapstart
+              pd pav pu bn g gi gtl gild gisld logstart bmapstart
               inodestart nib size dev kd qd sd gyd dinum dnd bmd
               n Sb false false false e0 pidv dq dqb dqs
               M2 (K - 38)%nat eb b lks
@@ -2230,7 +2230,7 @@ Section ProofSysLinkTails.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (sl_tail_bad (CID0 := CID4) gs jx gl gu gd gk pd pav pu bn g gi
-              gtl gil gisl cov logstart bmapstart inodestart nib size dev
+              gtl gil gisl logstart bmapstart inodestart nib size dev
               kk qi s gy inum ty u1 Sb1 uty pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               Vpr HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0

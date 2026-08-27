@@ -325,7 +325,7 @@ Definition wp_sys_unlink_sconf_body
     (bn : bio_names)
     (g : log_names) (gi : gname)
     (gtl : gname)                      (* the itable's lock   *)
-    (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (dqb dqs dqbs : dfrac)
     (v0 : mword 64)                           (* syscall argument 0         *)
@@ -347,15 +347,15 @@ Definition wp_sys_unlink_sconf_body
   dev = ROOTDEV ->
   (0 < nib)%nat ->
   (* ---- the block-layer geometry ---- *)
-  log_geom_ok cov logstart ->
+  log_geom_ok fsc_cov logstart ->
   0 < size <= BPB ->
   0 <= bmapstart ->
-  bmapstart ∈ cov ->
+  bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   0 <= inodestart ->
-  cov_below cov size ->
-  bitmap_geom_ok cov logstart bmapstart size ->
-  ireg_blocks_ok inodestart nib cov logstart ->
+  cov_below fsc_cov size ->
+  bitmap_geom_ok fsc_cov logstart bmapstart size ->
+  ireg_blocks_ok inodestart nib fsc_cov logstart ->
   (* mkfs's [ushort] geometry: the zeroed record's [de.inum] is a halfword
      and [dirlookup]'s answer is read back against the region's inum range,
      so the two have to agree on the width.  create's and sys_link's premise
@@ -386,18 +386,18 @@ Definition wp_sys_unlink_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   printk_env γpr gu gd -∗
   (* ---- the block layer ---- *)
-  bio_ctx bn (fs_view fsc_fs gd dev cov) -∗
-  log_ctx g bn fsc_fs cov logstart dev -∗
-  fs_crash_seam cov logstart -∗
+  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+  log_ctx g bn fsc_fs fsc_cov logstart dev -∗
+  fs_crash_seam fsc_cov logstart -∗
   gen_cert -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region the two flushes write ---- *)
-  is_itable2 gtl fsc_ic fsc_fs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs gi fsc_cov logstart -∗
   ic_sleeplocks fsc_ic -∗
   ireg_inv gi fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
@@ -414,7 +414,7 @@ Definition wp_sys_unlink_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart cov logstart size -∗
+  bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
   (* argstr's page-table side, and the walk's (iget's ipool arm allocates) *)
   kalloc_env γa None -∗
   (* the running-thread bundle *)
@@ -442,7 +442,7 @@ Module Type SYSUNLINK.
       (bn : bio_names)
       (g : log_names) (gi : gname)
       (gtl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (dqb dqs dqbs : dfrac)
       (v0 : mword 64)
@@ -450,7 +450,7 @@ Module Type SYSUNLINK.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_unlink_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g
-                               gi gtl cov logstart bmapstart inodestart
+                               gi gtl logstart bmapstart inodestart
                                nib size dev dqb dqs dqbs v0 pid V
                                m K eb b lks.
 End SYSUNLINK.

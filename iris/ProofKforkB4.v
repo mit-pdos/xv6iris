@@ -216,7 +216,7 @@ Section KforkB4Proof.
      and [ProofKforkB3.kfkb3_fd_loop]. *)
   Lemma kfk_b4
       (γf γil γic : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (logstart : Z) (inodestart : Z) (nib : nat)
       (pid_p pid_c : mword 32) (Vp Vc : pprivate)
       (pme npa : mword 64)
       (m : regfile) (rsv K lvl : nat) (eb : bool) (lks : gset string) :
@@ -242,7 +242,7 @@ Section KforkB4Proof.
     cpu_own lvl eb pme false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
-    is_itable2 γil fsc_ic fsc_fs γic cov logstart nib icfg_dev -∗
+    is_itable2 γil fsc_ic fsc_fs γic fsc_cov logstart nib icfg_dev -∗
     itable_inv -∗
     (* THE INODE REGION -- pure pass-through to the [idup] below, whose
        [ref++] became a ledger move in increment IVe (iclaim-ledger.md
@@ -367,7 +367,7 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
-    iApply (ID.wp_idup_sconf γil γic cov logstart inodestart nib
+    iApply (ID.wp_idup_sconf γil γic logstart inodestart nib
               ck cdev M1 lvl eb pme (rsv + (K - 8))%nat false lks
               (* the callee's bound is stated with a NAMED constant, so go through
                  [etransitivity] rather than [lia]: [exact] converts the name to

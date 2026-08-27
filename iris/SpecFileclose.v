@@ -161,7 +161,6 @@ Record fclose_names := MkFCloseNames {
   fcn_pu       : mword 64;
   fcn_bio      : bio_names;
   fcn_log      : log_names;
-  fcn_cov      : gset Z;
   fcn_logstart : Z;
   fcn_dev      : mword 32;
   fcn_pid      : mword 32;        (* the caller's own pid cell              *)
@@ -196,7 +195,7 @@ Global Instance fclose_names_inhabited : Inhabited fclose_names :=
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     (MkLogNames 1%positive 1%positive 1%positive 1%positive 1%positive)
-    ∅ 0 (mword_of_int 0) (mword_of_int 0) (DfracOwn 1)
+    0 (mword_of_int 0) (mword_of_int 0) (DfracOwn 1)
     1%positive
     1%positive 0 0 0%nat 0).
 
@@ -242,9 +241,9 @@ Section SpecFileclose.
      put [ProcInv] into [FsReady]'s dependency cone. *)
 
   Lemma ic_escrows_acc (γi : gname)
-      (cov : gset Z) (logstart : Z) (k : nat) :
+      (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows fsc_ic fsc_fs γi cov logstart -∗ ic_escrow fsc_ic fsc_fs γi cov logstart k
+    (ic_escrows fsc_ic fsc_fs γi fsc_cov logstart -∗ ic_escrow fsc_ic fsc_fs γi fsc_cov logstart k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -272,7 +271,6 @@ Section SpecFileclose.
     fct_kalloc : fcn_kalloc fn = fsc_kpages;
     fct_bio    : fcn_bio fn = fsc_bio;
     fct_log    : fcn_log fn = icfg_log;
-    fct_cov    : fcn_cov fn = fsc_cov;
     fct_logst  : fcn_logstart fn = fsc_logst;
     fct_dev    : fcn_dev fn = icfg_dev;
     fct_ireg   : fcn_ireg fn = fsc_ireg;

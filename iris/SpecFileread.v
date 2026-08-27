@@ -275,7 +275,6 @@ Record fread_names := MkFReadNames {
   frn_pu         : mword 64;
   frn_bio        : bio_names;
   frn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
-  frn_cov        : gset Z;
   frn_logstart   : Z;
   frn_inodestart : Z;
   frn_dqs        : dfrac;         (* sb.inodestart                          *)
@@ -308,7 +307,7 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     1%positive
-    ∅ 0 0 (DfracOwn 1)
+    0 0 (DfracOwn 1)
     (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
 
 (* THE DUPLICATE [!icacheG Σ] IS GONE, and it had to be: [fileG] BUNDLES
@@ -456,20 +455,20 @@ Section SpecFileread.
      The per-inode pieces come out of the reference at the call
      ([fileread_pay_carve] below). *)
   Definition fileread_fs_env (γf : gname) (fn : fread_names) : iProp Σ :=
-    (⌜log_geom_ok (frn_cov fn) (frn_logstart fn)⌝ ∗
+    (⌜log_geom_ok fsc_cov (frn_logstart fn)⌝ ∗
      ⌜0 <= frn_inodestart fn⌝ ∗
-     (* EVERY inum the region covers has its block inside [cov] -- the
+     (* EVERY inum the region covers has its block inside [fsc_cov] -- the
         quantified form, since the reference names the inum existentially *)
      ⌜forall inum : mword 32,
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-        IBLOCK inum (frn_inodestart fn) ∈ frn_cov fn⌝ ∗
+        IBLOCK inum (frn_inodestart fn) ∈ fsc_cov⌝ ∗
      bio_ctx (frn_bio fn)
-       (fs_view fsc_fs (frn_disk fn) icfg_dev (frn_cov fn)) ∗
+       (fs_view fsc_fs (frn_disk fn) icfg_dev fsc_cov) ∗
      (* THE THREE PERSISTENT INVARIANTS SpecIlock / SpecIunlock take: the
         [ref] words, the entries' content escrows, the inode region -- the
         escrow at the FAMILY where it was per-slot. *)
      itable_inv ∗
-     ic_escrows fsc_ic fsc_fs (frn_ireg fn) (frn_cov fn)
+     ic_escrows fsc_ic fsc_fs (frn_ireg fn) fsc_cov
                 (frn_logstart fn) ∗
      ireg_inv (frn_ireg fn) fsc_fs (frn_inodestart fn) icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
@@ -604,9 +603,9 @@ Section SpecFileread.
 
   (* the per-entry escrow, out of the family *)
   Lemma ic_escrows_acc2 (γi : gname)
-      (cov : gset Z) (logstart : Z) (ik : nat) :
+      (logstart : Z) (ik : nat) :
     (ik < NINODE)%nat ->
-    (ic_escrows fsc_ic fsc_fs γi cov logstart -∗ ic_escrow fsc_ic fsc_fs γi cov logstart ik
+    (ic_escrows fsc_ic fsc_fs γi fsc_cov logstart -∗ ic_escrow fsc_ic fsc_fs γi fsc_cov logstart ik
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.

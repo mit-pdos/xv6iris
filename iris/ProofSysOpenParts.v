@@ -767,9 +767,9 @@ Section ProofSysOpenPublish.
      ([bm_empty], the all-zero data) discharge the rest.  [di_trunc] keeps
      [type] and [nlink], so the type clause is the caller's premise
      verbatim. *)
-  Lemma so_trunc_ok (cov : gset Z) (logstart : Z) (dn : dinode) :
+  Lemma so_trunc_ok (logstart : Z) (dn : dinode) :
     bv_unsigned (di_type dn) <> 0 ->
-    inode_ok cov logstart (di_trunc dn) bm_empty
+    inode_ok fsc_cov logstart (di_trunc dn) bm_empty
              (fun _ => replicate BSIZE (bv_0 8)).
   Proof.
     intro Hty. rewrite /inode_ok /di_trunc. cbn [di_type di_size di_addrs].
@@ -802,11 +802,11 @@ Section ProofSysOpenPublish.
 
   (* the open direction, one unfolding: [ic_loaded]'s [inode_addrs ∗
      ind_res] is itrunc's [inode_map]. *)
-  Lemma so_loaded_open (gi : gname) (cov : gset Z)
+  Lemma so_loaded_open (gi : gname)
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
-    ic_loaded fsc_fs gi cov logstart k inum dn bm -∗
+    ic_loaded fsc_fs gi fsc_cov logstart k inum dn bm -∗
     ∃ data : nat -> list (bv 8),
-      ⌜inode_ok cov logstart dn bm data⌝ ∗ ⌜inode_rec_local dn⌝ ∗
+      ⌜inode_ok fsc_cov logstart dn bm data⌝ ∗ ⌜inode_rec_local dn⌝ ∗
       ⌜dir_ok icfg_nib dn data⌝ ∗
       dlinks fsc_fs (bv_unsigned inum) dn bm data ∗
       dinode_at gi inum dn ∗
@@ -848,7 +848,7 @@ Section ProofSysOpenPublish.
   Qed.
 
   (* ...and the close direction at itrunc's outputs. *)
-  Lemma so_trunc_loaded (gi : gname) (cov : gset Z)
+  Lemma so_trunc_loaded (gi : gname)
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) :
     bv_unsigned (di_type dn) <> 0 ->
     bv_unsigned (di_type dn) <> T_DIR_z ->
@@ -869,13 +869,13 @@ Section ProofSysOpenPublish.
     top_frag (fs_gamma_L fsc_fs) (bv_unsigned inum)
              (era_node (di_trunc dn) bm_empty
                        (fun _ => replicate BSIZE (bv_0 8))) -∗
-    ic_loaded fsc_fs gi cov logstart k inum (di_trunc dn) bm_empty.
+    ic_loaded fsc_fs gi fsc_cov logstart k inum (di_trunc dn) bm_empty.
   Proof.
     intros Hnz Hnd Hrl. iIntros "Hat Hmeta [Haddr Hind] Hblk Hdv Hfv Htop".
     assert (Hty : di_type (di_trunc dn) = di_type dn) by reflexivity.
-    iApply (ic_mk_loaded fsc_fs gi cov logstart k inum (di_trunc dn) bm_empty
+    iApply (ic_mk_loaded fsc_fs gi fsc_cov logstart k inum (di_trunc dn) bm_empty
               (fun _ => replicate BSIZE (bv_0 8))
-              (so_trunc_ok cov logstart dn Hnz)
+              (so_trunc_ok logstart dn Hnz)
               (* itrunc keeps the TYPE and zeroes the count and the size, so
                  the three record-only facts ride (durable-disk
                  2b-inode-3) *)

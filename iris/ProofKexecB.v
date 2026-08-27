@@ -217,7 +217,7 @@ Section KexecBBody.
       (g : log_names) (gi : gname)
       (gtl : gname)
       (ga : gname) (gf : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
@@ -240,14 +240,14 @@ Section KexecBBody.
          [elf.phoff] out of exactly the same run. *)
       (ef : nat -> bv 8) :
     (K_kexec <= K)%nat ->
-    log_geom_ok cov logstart ->
+    log_geom_ok fsc_cov logstart ->
     0 < size <= BPB ->
     0 <= bmapstart ->
-    bmapstart ∈ cov ->
+    bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     0 <= inodestart ->
-    cov_below cov size ->
-    ireg_blocks_ok inodestart nib cov logstart ->
+    cov_below fsc_cov size ->
+    ireg_blocks_ok inodestart nib fsc_cov logstart ->
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
     (kf < NINODE)%nat ->
@@ -269,19 +269,19 @@ Section KexecBBody.
         M90 !!! Regidx r = m !!! Regidx r) ->
     kernel_text -∗
     fs_fabric gs gu gd gk pd pav pu bn g gi gtl
-              cov logstart inodestart nib dev -∗
+              logstart inodestart nib dev -∗
     pc_is (mword_of_int (KXB + 0x090) : mword 64) -∗
     sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
-    kxc_open gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+    kxc_open gi logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf -∗
     log_opb g n2 -∗
     iref_slots 1 -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart cov logstart size -∗
+    bitmap_inv fsc_fs bmapstart fsc_cov logstart size -∗
     bslots 3 -∗
     kalloc_env ga None -∗
     proc_priv gf (proc_addr jp) pidv V -∗
@@ -315,7 +315,7 @@ Section KexecBBody.
     (* ---- OUTPUT 1: [elf.phnum = 0], the loop is skipped ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd) (w13 w67 : mword 64),
-        kxc_at_1a2 jp bn g gi ga gf cov logstart bmapstart inodestart
+        kxc_at_1a2 jp bn g gi ga gf logstart bmapstart inodestart
                    nib size dev kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
@@ -352,7 +352,7 @@ Section KexecBBody.
     (* ---- OUTPUT 2: the phdr loop's body entry, at [i = 0], [sz = 0] ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd),
-        kxc_at_12c jp bn g gi ga gf cov logstart bmapstart inodestart
+        kxc_at_12c jp bn g gi ga gf logstart bmapstart inodestart
                    nib size dev kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
@@ -1288,7 +1288,7 @@ Section KexecBBody.
       iDestruct (wp_next_retarget CID0 CID8 true (proc_addr jp) _ Hcr8
                    with "Hcont") as "Hcont".
       iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gi gtl
-                gilf gislf ga gf cov logstart bmapstart inodestart nib size
+                gilf gislf ga gf logstart bmapstart inodestart nib size
                 dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                 m B1 K eb lks sp0 ra0 s00 s10 s20 pv av

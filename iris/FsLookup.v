@@ -539,7 +539,7 @@ Definition wp_dirlookup_tree_body
     (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode)
@@ -561,8 +561,8 @@ Definition wp_dirlookup_tree_body
   (* (1) IS GONE -- see the header.  panic("dirlookup read") at +0x46 is
      still a LIVE arm, discharged inside the landed proof. *)
   (* (2) readi's own threading, verbatim *)
-  log_geom_ok cov logstart ->
-  blkmap_wf cov logstart bm ->
+  log_geom_ok fsc_cov logstart ->
+  blkmap_wf fsc_cov logstart bm ->
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   (* (2') the payload's hole clause, owed to licence (a)'s borrow
@@ -585,7 +585,7 @@ Definition wp_dirlookup_tree_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev cov) -∗
+  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
   kalloc_env γa None -∗
   (* ---- THE LOCKED DIRECTORY: the cells, and THE NODE FRAGMENT ---- *)
   i_dev ip ↦₄{dqd} dev -∗
@@ -605,9 +605,9 @@ Definition wp_dirlookup_tree_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi cov logstart -∗
+  ic_escrows fsc_ic fsc_fs γi fsc_cov logstart -∗
   (* the inode region: iget's premise since iclaim-ledger.md §3.3, relayed
      verbatim.  The tree layer neither reads nor names a dinode through it
      -- the hit arm's iget opens it ghost-only, on the ledger columns. *)
@@ -680,7 +680,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (γi : gname)
       (gtl : gname)
       (γa : gname) (γf : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode)
@@ -691,7 +691,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
       wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn γi gtl
-                             γa γf cov logstart inodestart nib dev ip bm data dn
+                             γa γf logstart inodestart nib dev ip bm data dn
                              dpi ents fn hasp pofv pidv dq dqd dqn
                              m K eb b lks Vpr.
   Proof.
@@ -713,7 +713,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       with "[Hedges]" as "Hedges".
     { rewrite Hkeq. iExact "Hedges". }
     iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γi gtl
-              γa γf cov logstart inodestart nib dev ip (inum_of dpi) bm data dn dn
+              γa γf logstart inodestart nib dev ip (inum_of dpi) bm data dn dn
               fn hasp pofv
               pidv dq dqd dqn m K eb b lks Vpr
               HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb Hholes
@@ -952,16 +952,16 @@ Section FsLookupDots.
     unfold bv_modulus in H. cbn in H. lia.
   Qed.
 
-  Lemma ic_loaded_fdir (gi : gname) (cov : gset Z)
+  Lemma ic_loaded_fdir (gi : gname)
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     bv_unsigned (di_type dn) = T_DIR_z ->
-    ic_loaded fsc_fs gi cov logstart k inum dn bm -∗
+    ic_loaded fsc_fs gi fsc_cov logstart k inum dn bm -∗
       ∃ data : nat -> list (bv 8),
         fdir gi (bv_unsigned inum)
              (dir_view data (dnrec dn)) dn bm data ∗
         (fdir gi (bv_unsigned inum)
               (dir_view data (dnrec dn)) dn bm data -∗
-         ic_loaded fsc_fs gi cov logstart k inum dn bm).
+         ic_loaded fsc_fs gi fsc_cov logstart k inum dn bm).
   Proof.
     intros Hty.
     iIntros "H". iDestruct (ic_loaded_open with "H") as (data)
@@ -978,25 +978,25 @@ Section FsLookupDots.
       iPureIntro. exact Hrep. }
     iIntros "Hfd". rewrite /fdir inum_of_self.
     iDestruct "Hfd" as "(Hdiat & Hblocks & _)".
-    iApply (ic_mk_loaded fsc_fs gi cov logstart k inum dn bm data
+    iApply (ic_mk_loaded fsc_fs gi fsc_cov logstart k inum dn bm data
               Hiok Hrl Hdok Hddix Hdoc Hduq
               with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdv Hfv Htop").
   Qed.
 
   (* ...and the [fnode] form, which is what a client of F1b asks for. *)
-  Lemma ic_loaded_fnode (gi : gname) (cov : gset Z)
+  Lemma ic_loaded_fnode (gi : gname)
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     bv_unsigned (di_type dn) = T_DIR_z ->
-    ic_loaded fsc_fs gi cov logstart k inum dn bm -∗
+    ic_loaded fsc_fs gi fsc_cov logstart k inum dn bm -∗
       ∃ data : nat -> list (bv 8),
         fnode gi fsc_fs (bv_unsigned inum)
               (NDir (dir_view data (dnrec dn))) ∗
         (fdir gi (bv_unsigned inum)
               (dir_view data (dnrec dn)) dn bm data -∗
-         ic_loaded fsc_fs gi cov logstart k inum dn bm).
+         ic_loaded fsc_fs gi fsc_cov logstart k inum dn bm).
   Proof.
     intros Hty. iIntros "H".
-    iDestruct (ic_loaded_fdir gi cov logstart k inum dn bm Hty with "H")
+    iDestruct (ic_loaded_fdir gi logstart k inum dn bm Hty with "H")
       as (data) "[Hfd Hback]".
     iExists data. iSplitR "Hback"; [| iExact "Hback"].
     iApply (fdir_fnode with "Hfd").

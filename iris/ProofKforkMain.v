@@ -426,7 +426,7 @@ Section KforkArms.
   (* =================================================================== *)
   Lemma kfork_arm3
       (γa : gname) (γk : gname * gname) (γf γil γic γw γl : gname) (γs : list gname)
-      (cov : gset Z) (logstart : Z)
+      (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Vp : pprivate)
@@ -490,7 +490,7 @@ Section KforkArms.
     kalloc_env_at γa γk None -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γl γf -∗
-    is_itable2 γil fsc_ic fsc_fs γic cov logstart nib icfg_dev -∗
+    is_itable2 γil fsc_ic fsc_fs γic fsc_cov logstart nib icfg_dev -∗
     itable_inv -∗
     (* the region handle, straight through to [B4.kfk_b4]'s [idup]
        (iclaim-ledger.md §3.19); persistent, and this arm reads no dinode *)
@@ -607,7 +607,7 @@ Section KforkArms.
     - iApply wp_next_off_intro. iIntros (Mx2) "%Hregs2 Hsc Hown Hpcx Hpvx Hpvcx".
       destruct Hregs2 as (Hd1 & Hd2 & Hd3 & Hd4 & Hd5).
       (* ---- ProofKforkB4: idup / safestrcpy / pid read ---- *)
-      iApply (B4.kfk_b4 γf γil γic cov logstart inodestart nib
+      iApply (B4.kfk_b4 γf γil γic logstart inodestart nib
                 pid_p pid_c Vp
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
                 Mx2 (trap_res b) K (S lvl) eb ({["proc"]} ∪ lks)
@@ -716,12 +716,12 @@ Section KforkMain.
      allocator gname, so nothing here may pin the pair at [fsc_kpages]. *)
   Lemma wp_kfork_sconf
       (γa : gname) (γk : gname * gname) (γp γw γl γf γil γic : gname) (γs : list gname)
-      (cov : gset Z) (logstart : Z)
+      (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string)
  :
-    wp_kfork_sconf_body γa γk γp γw γl γf γil γic γs cov logstart
+    wp_kfork_sconf_body γa γk γp γw γl γf γil γic γs logstart
       inodestart nib m lvl K eb pme b pid_p Vp lks.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
@@ -733,7 +733,7 @@ Section KforkMain.
     (* [B6.kfk_prologue] is still generic in the allocator's count; kfork
        pins it at [None] here, which is what collapses its Hcont10a
        disjunction and, with it, two of [kfork_post]'s three arms. *)
-    iApply (B6.kfk_prologue γa γk γp γw γl γf γil γic γs cov logstart nib
+    iApply (B6.kfk_prologue γa γk γp γw γl γf γil γic γs logstart nib
               m lvl K eb pme None b
               pid_p Vp
               (wp_next b pme (fun (CID : CpuId) =>
@@ -792,7 +792,7 @@ Section KforkMain.
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       destruct Htfs as (Htfsrc & Htfdst).
       iApply (kfork_arm3 (CID0 := CID3) γa γk γf γil γic γw γl γs
-                cov logstart inodestart nib m K lvl eb b pme
+                logstart inodestart nib m K lvl eb b pme
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
                 Mt npa j γl2 pid_c ch Vc' tfsrc tfdst lks

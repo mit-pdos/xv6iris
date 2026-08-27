@@ -108,7 +108,7 @@ Definition wp_iunlock_dep_sconf_body
     (gs : list gname)
     (gi : gname)
     (gil gisl : gname)
-    (cov : gset Z) (logstart : Z)
+    (logstart : Z)
     (k : nat) (s : Qp) (g : gname) (d : ic_dep) (dev inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
@@ -137,7 +137,7 @@ Definition wp_iunlock_dep_sconf_body
   kernel_text -∗ pc_is pcE -∗
   (* the [ref] words, and the entry's content escrow *)
   itable_inv -∗
-  ic_escrow fsc_ic fsc_fs gi cov logstart k -∗
+  ic_escrow fsc_ic fsc_fs gi fsc_cov logstart k -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k)
                    (slh_tok (icfg_isl k)) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
@@ -153,7 +153,7 @@ Definition wp_iunlock_dep_sconf_body
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
-  ic_dep_held fsc_fs gi cov logstart d k inum dn' bm' -∗
+  ic_dep_held fsc_fs gi fsc_cov logstart d k inum dn' bm' -∗
   (* THE GENERATION'S TYPE WITNESS, back where it came from (design
      fs-icache.md 17.6 (5), ratified 17.7).  [ic_payload]'s TRUE polarity is
      what this park rebuilds, so the witness for the record being parked is
@@ -203,7 +203,7 @@ Definition wp_iunlock_tx_sconf_body
     (gs : list gname)
     (gi : gname)
     (gil gisl : gname)
-    (cov : gset Z) (logstart : Z)
+    (logstart : Z)
     (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
@@ -226,7 +226,7 @@ Definition wp_iunlock_tx_sconf_body
   kernel_text -∗ pc_is pcE -∗
   (* the [ref] words, and the entry's content escrow *)
   itable_inv -∗
-  ic_escrow fsc_ic fsc_fs gi cov logstart k -∗
+  ic_escrow fsc_ic fsc_fs gi fsc_cov logstart k -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k)
                    (slh_tok (icfg_isl k)) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
@@ -248,7 +248,7 @@ Definition wp_iunlock_tx_sconf_body
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
-  ic_loaded fsc_fs gi cov logstart k inum dn' bm' -∗
+  ic_loaded fsc_fs gi fsc_cov logstart k inum dn' bm' -∗
   (* THE GENERATION'S TYPE WITNESS, back where it came from (design
      fs-icache.md 17.6 (5), ratified 17.7).  [ic_payload]'s TRUE polarity is
      what this park rebuilds, so the witness for the record being parked is
@@ -293,16 +293,16 @@ Lemma wp_iunlock_tx_of_dep
     (gs : list gname)
     (gi : gname)
     (gil gisl : gname)
-    (cov : gset Z) (logstart : Z)
+    (logstart : Z)
     (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) (Vpr : pprivate) :
   (forall d : ic_dep,
-     wp_iunlock_dep_sconf_body gs gi gil gisl cov logstart k s g d
+     wp_iunlock_dep_sconf_body gs gi gil gisl logstart k s g d
                                dev inum dn' bm' pidv dq m K eb p b lks Vpr) ->
-  wp_iunlock_tx_sconf_body gs gi gil gisl cov logstart k s g dev inum
+  wp_iunlock_tx_sconf_body gs gi gil gisl logstart k s g dev inum
                            dn' bm' pidv dq m K eb p b lks Vpr.
 Proof.
   cbv beta delta [wp_iunlock_tx_sconf_body wp_iunlock_dep_sconf_body].
@@ -332,13 +332,13 @@ Module Type IUNLOCK.
       (gs : list gname)
       (gi : gname)
       (gil gisl : gname)
-      (cov : gset Z) (logstart : Z)
+      (logstart : Z)
       (k : nat) (s : Qp) (g : gname) (d : ic_dep) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlock_dep_sconf_body gs gi gil gisl cov logstart k s g d
+      wp_iunlock_dep_sconf_body gs gi gil gisl logstart k s g d
                                 dev inum dn' bm' pidv dq m K eb p b lks Vpr.
   (* the transactional form -- [ProofIunlock] defines it by
      [wp_iunlock_tx_of_dep]. *)
@@ -348,12 +348,12 @@ Module Type IUNLOCK.
       (gs : list gname)
       (gi : gname)
       (gil gisl : gname)
-      (cov : gset Z) (logstart : Z)
+      (logstart : Z)
       (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlock_tx_sconf_body gs gi gil gisl cov logstart k s g dev
+      wp_iunlock_tx_sconf_body gs gi gil gisl logstart k s g dev
                                inum dn' bm' pidv dq m K eb p b lks Vpr.
 End IUNLOCK.
