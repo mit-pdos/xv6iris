@@ -1369,6 +1369,7 @@ CodeSyscall.v
 FsDurBytes.v
 FsDurSnap.v
 FsDurImg.v
+FsCfgSnap.v
 # OFF THE BUILD (durable-disk G5): the per-object durable LEDGER and its
 # object row, superseded by the snapshot (design/fs-state.md §4⁹); and the
 # refutation of the G2/G3 PARENT register, whose shape no longer exists.
