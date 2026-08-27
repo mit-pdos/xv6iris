@@ -173,6 +173,20 @@ per-milestone record):
 
 ## The durable disk: ONE fixed gname, owned by the crash predicate (ruled 2026-08-22)
 
+> **BANNER (durable-disk S2).  THE FIXED-LAYER ROSTER IS FIVE GNAMES AND NO
+> BUNDLE.**  `riscv_dview_name` (the committed BYTE view `γ_D`) and
+> `riscv_fsdur : fs_dur_names` are DELETED from `riscvFixedGS`, and
+> `RiscvPtsto.fs_dur_names` with them.  Everything below that reads them as
+> live — the bundle rule, the `HPc`-hands-the-record-back-existentially
+> argument, `Γ_D` as a `MkFsView` at those gnames, `P_fs`'s `γv` parameter —
+> is the PRE-SNAPSHOT design.  Under lane CE's snapshot ruling the durable
+> half of `FsCrash.P_fs` is `FsDurSnap.P_dur (fr_D r)`, a function of the
+> committed map over its OWN existentially bound ghost names, so no client
+> names a durable instance and nothing read either field.  `P_fs` /
+> `P_fs_rec_named` / `P_fs_named` lost `γv` and `Γd`; `Pc` is four gnames;
+> `boot_fixedGS` takes seven arguments.  `fs_crash_seam` is arity-free and
+> did not move.
+
 **Ruling (owner, 2026-08-22), replacing the per-era re-minted image below.**
 Three principles, in order of force:
 

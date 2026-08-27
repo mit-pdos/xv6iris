@@ -475,7 +475,7 @@ Section IcacheEscrow.
      TYPE, which is a fact about another inum's REGION record and therefore
      cannot be a [Prop] over [data] (§20.1, §20.9(a)).  It is timeless, so
      the [Timeless] instance below survives verbatim.  (Through G5 the
-     conjunct was the old flavoured ledger [DirLinks.dir_links] carried
+     conjunct was the one the old flavoured link ledger carried
      beside it; G6 deleted the ledger.)
 
      ...AND THE ".." INDEX CLAUSE (fs-icache §20.17.4, fs-fragments R9).
@@ -525,7 +525,7 @@ Section IcacheEscrow.
      §6½): one per entry of this directory that names another inum, drawn
      out of that inum's region-side authority at the [iupdate] that raised
      its count.  Through 2b-inode-5..G5 it rode BESIDE the old flavoured
-     ledger [DirLinks.dir_links], so that the ~forty payload sites which
+     flavoured link ledger, so that the ~forty payload sites which
      only pass the conjunct through never moved; G6 deleted that first
      conjunct and the payloads keep their arity again.
 

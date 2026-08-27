@@ -101,9 +101,9 @@ Require Import FsDurBytes.
 (* THE DURABLE SIDE, AND IT IS THE SNAPSHOT ONE (durable-disk lane C):
    [snap_ok] / [P_dur] / [P_dur_alloc].  It re-exports [FsState], so it
    comes after [FsDurBytes] for the same collision reason.  The 3b' object
-   and kind algebras ([FsDurObj]/[FsDurWire]) are NOT imported any more --
-   the pure-kinds tie they carry is the REJECTED design (plan section 8),
-   and section 11's header says what replaced it here. *)
+   and kind algebras are gone from the tree altogether -- the pure-kinds
+   tie they carried is the REJECTED design (plan section 8), and section
+   11's header says what replaced it here. *)
 Require Import FsDurXfer.   (* [snap_gamma] -- the fresh family record era 0's
                                own allocator names in its conclusion *)
 Require Import FsDurSnap.

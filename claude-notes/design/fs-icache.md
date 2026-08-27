@@ -303,6 +303,15 @@ Definition itable_res γ := ∃ M, itable_half γ M ∗ ⌜icM_wf M⌝ ∗ [∗ 
 Definition is_itable γl γ := is_lock γl itable_lock "itable" (itable_res γ).
 ```
 
+**THAT v1 SHAPE IS SKETCH ONLY, AND IT IS OUT OF THE TREE** (S2 deleted
+`IcacheInv.is_itable`/`itable_res`/`islot`/`islot_free`/`islots_acc_upd`,
+which had no consumer left).  §13.2 is what stands:
+`IcacheEscrow.itable_res2` / `is_itable2` / `islot2`, which add the pure
+slot→(dev,inum) map `ci`, the uncached POOL and the slot share
+authorities.  `islot_rest`/`islot_rest_at`/`islot_free_at` and
+`islot_rest_join` survive in `IcacheInv.v` and are what `islot2` is built
+out of.
+
 `icM_wf M` is two clauses: every live slot is in range, and every count is
 `< 2^31`. The count bound is not bookkeeping — it is what makes the `lw` +
 `sext.w` the code performs mean the count, and it is what kills `ilock`'s
@@ -1781,7 +1790,7 @@ cells.
 
 ### 13.4 What breaks and what stays
 
-`ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`
+`ProofIdup` consumes `is_itable2`/`itable_res2` and is proven — the `ci`
 map and the pool ride through its critical section untouched (it moves
 only the ref word and `M`), so its repair is re-framing, not re-proving.
 `InodeLock.inode_parked`/`inode_key`/`inode_locked` retire once

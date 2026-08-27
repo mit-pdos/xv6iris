@@ -1221,7 +1221,8 @@ Qed.
 (* THE MACHINE'S [++], CROSSED WITH NO GUARD AT ALL.  A sixteen-bit
    increment raises the value by at most one -- true even at the wrap, which
    lands at zero.  (Lane G6 moved this pair and the one below here from
-   [DirLinks.dlc_bv_add1_le] / [_nz_eq]: they are arithmetic about
+   the old link ledger's [dlc_bv_add1_le] / [_nz_eq]: they are arithmetic
+   about
    [di_nlink]'s width and have nothing to do with the ledger that file
    carried.) *)
 Lemma nlink_add1_le (h : mword 16) :

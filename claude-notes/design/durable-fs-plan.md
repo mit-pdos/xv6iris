@@ -499,8 +499,13 @@ about the header being clean; `Himg` / `fs_boot_image_eras` /
 `mknod`'s transaction, after its commit the CURRENT snapshot's inode
 table at `inum` is `create_made ty major minor` and the parent's
 directory entries contain `(name ↦ inum)` — read off the snapshot via
-`P_dur_node_of_slot`/`snap_dir_entry_of_first` (LANDED readings) from
-`D' = L` plus `mknod`'s own facts about `L` at its objects.  The
+`FsDurSnap.P_dur_tie_keep` and the pure clauses of `snap_ok` from
+`D' = L` plus `mknod`'s own facts about `L` at its objects.  (The
+spike-shaped readings `P_dur_node_of_slot`/`snap_dir_entry_of_first` and
+their `snap_slot_holds`/`snap_node_is`/`snap_dir_entry`/`snap_inode_at`/
+`snap_inum_ok` vocabulary were written ahead of the spike and never
+consumed; S2 deleted them, and whoever writes the spike restates what it
+actually needs.)  The
 bytes-level statement is a corollary.  Later theorems read any effect
 the same way.
 
@@ -525,10 +530,10 @@ lessons).
 
 Deleted once consumers are re-pointed: `FsDurWire`'s `P_wf_dec`/`Psi_dec`/
 `kinds_of_state`/`dwire_geom`/`psi_*` (the rejected pure-kinds tie),
-`RiscvPtsto.fdn_bmap/ist/nin` and `riscv_dview_name` (geometry equations
-become by-construction; `fdn_*`'s only consumer left is `FsDurLedger`'s
-superseded fold, and `riscv_dview_name`'s deletion is a sweep of `Pc`'s
-arity through `RiscvAdequacy`/`SystemAdequacy`), `FsDurLedger`'s fold family
+(DONE at S2: `RiscvPtsto.fs_dur_names` in whole — `fdn_link`/`fdn_top`/
+`fdn_bmap`/`fdn_ist`/`fdn_nin` — and both fixed-layer fields
+`riscv_dview_name`/`riscv_fsdur`, with the `Pc`-arity sweep through
+`RiscvAdequacy`/`SystemAdequacy` it needed, plus `FsDurBytes.fs_gamma_D`), `FsDurLedger`'s fold family
 (its entry constructors are era-side content — keep if consumed).  ALREADY
 GONE: `LogInv.log_psi_*` and the parked `Ψ D₀ Dc`;
 `LogDefs.fs_dview`/`fs_dstep` and `FsDurImg`'s resource-MOVING image

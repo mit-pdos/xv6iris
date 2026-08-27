@@ -19,7 +19,7 @@
    lane B').  [fsΦ] takes a [dfrac], and so do the two block shapes, in the
    [_q] forms below; [byte_range] and [blk_owned] are the [DfracOwn 1]
    READINGS of them and their text has not moved, which is why the durable
-   instance (FsDurBytes/FsDurImg/FsDurObj/FsDurSnap/FsDurLedger and
+   instance (FsDurBytes/FsDurImg/FsDurSnap/FsDurAlloc and
    FsStateBitmap -- about seventy-five uses, all at fraction 1 by plan
    section 1) is untouched by the index.  What wants a fraction is exactly
    the ERA instance's data and indirect blocks, so that [ilock] without a

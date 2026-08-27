@@ -386,9 +386,9 @@ Qed.
 
 (* THE LEDGER'S BOOT MINT IS GONE (durable-disk G6).  Stage B used to bump
    each per-inum authority [W z] times off [IcacheRef.link_boot_split]'s
-   all-plain map, so that the OLD LINK LEDGER's [DirLinks.dir_links] had a
-   producer at boot -- one [IcacheRef.ilink] per live non-self record of
-   every image directory.  There is no such ledger any more (fs-state.md
+   all-plain map, so that the OLD LINK LEDGER had a producer at boot --
+   one per-inum flavoured count per live non-self record of every image
+   directory.  There is no such ledger any more (fs-state.md
    §6½): what a directory's payload carries is the TYPE REGISTER's
    fragments, and those are routed out of [ireg_lnks_of_image]'s per-inum
    piles by [FsCfgBoot.ent_toks_of_region].  [ireg_alloc] below takes its
@@ -1201,22 +1201,14 @@ Section IcacheBootPool.
      about the IMAGE ON DISK, so the boot client owes it and this lemma
      cannot manufacture it.  mkfs images satisfy it. *)
 
-  (* WHAT V2's COUNT CLAUSE ADDS HERE, AND WHY IT IS NOT A NEW PREMISE.
-     [DirLinks.dir_links] now carries [DirView.dlc_bound] over an
-     existential flavour map, so the client's [dir_links] bundle below is
-     one conjunct stronger than it was.  It costs the client ONE
-     COMPUTATIONAL FACT about the image and nothing else -- every image
-     directory has [nlink <= 1] -- because the region's boot authorities
-     are ALL-PLAIN ([ireg_alloc] takes [link_auth z 0 0 0 0 None 0 None]), so
-     the stock is built at [F = fun _ => false], where the clause's
-     right-hand side is [1 + 0].  That is true of mkfs: it writes
-     [nlink = 1] into the root and creates no subdirectory, so no image
-     directory is ever named by a [".."] it did not write itself.
-     [DirLinks.dir_links_of_plain] is the constructor
-     ([DirView.dlc_bound_le1] discharges the clause from the fact), and it
-     is why no signature here moves: the obligation lands inside a resource
-     the client was already producing, exactly as (L3)/(L4) landed inside
-     [ireg_alloc]'s ∀-over-decodings slot. *)
+  (* THE OLD LINK LEDGER'S COUNT CLAUSE IS NOT AN OBLIGATION HERE ANY MORE
+     (durable-disk G6).  It used to bound each image directory's flavoured
+     count and cost the client ONE COMPUTATIONAL FACT about the image --
+     every image directory has [nlink <= 1], true of mkfs, which writes
+     [nlink = 1] into the root and creates no subdirectory.  With the
+     ledger gone what the boot builds is [FsCfgBoot.ent_toks_of_region] +
+     [FsDurImg] section 9's value function, off the region's ALL-PLAIN boot
+     authorities ([ireg_alloc] takes [link_auth z 0 0 0 0 None 0 None]). *)
   Lemma ipool_shape_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) :

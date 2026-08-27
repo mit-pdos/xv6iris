@@ -203,34 +203,6 @@ Proof.
   destruct (decide (b ∈ s)) as [Hb|Hb]; [|reflexivity]. by rewrite (HP b Hb).
 Qed.
 
-(* the restriction's key list is the set's elements, in order: [fs_restrict]
-   is [set_to_map], i.e. [list_to_map] over a fmap of [elements]. *)
-Lemma fs_restrict_keys (P : Z -> list (bv 8)) (S : gset Z) :
-  ((fun b : Z => (b, P b)) <$> elements S).*1 = elements S.
-Proof.
-  rewrite -list_fmap_compose.
-  rewrite (list_fmap_ext _ id); [apply list_fmap_id | intros; reflexivity].
-Qed.
-
-(* ...and THE RESTRICTED VIEW AS A BIG-OP OVER ITS SET, which is that key
-   list with [NoDup_elements]. *)
-Section FsRestrictBigOp.
-  Context {Σ : gFunctors}.
-
-  Lemma big_sepM_fs_restrict (Phi : Z -> list (bv 8) -> iProp Σ)
-      (P : Z -> list (bv 8)) (S : gset Z) :
-    ([∗ map] b ↦ bs ∈ fs_restrict P S, Phi b bs)
-    ⊣⊢ ([∗ set] b ∈ S, Phi b (P b)).
-  Proof.
-    rewrite /fs_restrict /set_to_map.
-    assert (Hnd : base.NoDup (((fun b : Z => (b, P b)) <$> elements S).*1))
-      by (rewrite fs_restrict_keys; apply NoDup_elements).
-    rewrite (big_sepM_list_to_map Phi _ Hnd).
-    rewrite big_sepL_fmap /=.
-    rewrite big_sepS_elements //.
-  Qed.
-
-End FsRestrictBigOp.
 
 Lemma fs_install_nil (P : Z -> list (bv 8)) (logstart : Z)
     (D : gmap Z (list (bv 8))) :
