@@ -266,6 +266,54 @@ Definition sys_unlink_slots : nat := 2%nat.
 Definition sys_unlink_ret (r : mword 64) : Prop :=
   r = (mword_of_int (-1) : mword 64) \/ r = (zero_reg : mword 64).
 
+(* THE RETURN CONTINUATION, NAMED ONCE.
+
+   claude-notes/optimization.md, "Seal a whole-function proof's
+   continuation": spelled inline this is fifteen rows, and a mid-walk dump of
+   [Delta] in ProofSysUnlink measured it at 879 printed characters --
+   7.5 % of the Iris context inside W3 and 13-15 % inside W5, at EVERY step
+   of the walk, in every block lemma, plus one more copy inside each block's
+   own seam continuation.  It was written out TEN times (this contract and
+   nine statements in ProofSysUnlink.v).  One [Definition] names it in all
+   ten.
+
+   It stays TRANSPARENT on purpose (same section's rule 1): the tails apply
+   it with [iApply ("Hcont" $! ...)], which unifies through a transparent
+   constant and fails through an opaque one.
+
+   It is defined OUTSIDE any [Section] because it is a premise of the
+   module-type contract below and its rows are applied at the hart the
+   caller picks; see the same note's last paragraph. *)
+Definition sys_unlink_closer
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    (gf : gname) (pj : mword 64) (pid : mword 32) (V : pprivate)
+    (m : regfile) (ret_tgt : mword 64) (K : nat) (eb b : bool)
+    (lks : gset string) (dqb dqs dqbs : dfrac)
+    (bmapstart inodestart size : Z) : iProp Σ :=
+  (∀ (mf : regfile) (P' : uptd),
+      ⌜callee_saved m mf⌝ -∗
+      (* the page table may have GROWN: argstr's fetchstr faults user pages
+         in.  [uptd_ext] is argstr's own report, relayed. *)
+      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      sie_cap_gpr KT1 mf K b pj -∗
+      cpu_own 0 eb pj b lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
+      pc_is ret_tgt -∗
+      bslots 3 -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+      (* NO ORDERING on the free pool: the zeroing's writei can ALLOCATE and
+         every iunlockput can FREE (itrunc).  See the header. *)
+      (* the allowance, whole: see the header's reference ledger *)
+      iref_slots sys_unlink_slots -∗
+      (* the process block, at the same everything but the page table *)
+      proc_priv gf pj pid (upd_upt V P') -∗
+      ⌜sys_unlink_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
+      WP (Loop : expr riscv_lang))%I.
+
 Definition wp_sys_unlink_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
@@ -378,29 +426,10 @@ Definition wp_sys_unlink_sconf_body
      one of its ten distinct callees, so it can return on another hart
      whatever SIE was doing.
      Vacuous at [true], so consuming it costs the caller nothing. *)
+  (* the return continuation, named: see [sys_unlink_closer] above *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (P' : uptd),
-      ⌜callee_saved m mf⌝ -∗
-      (* the page table may have GROWN: argstr's fetchstr faults user pages
-         in.  [uptd_ext] is argstr's own report, relayed. *)
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr KT1 mf K b pj -∗
-      cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext KT1 eb -∗
-      cpu_claim_ext eb pj -∗
-      pc_is ret_tgt -∗
-      bslots 3 -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-      (* NO ORDERING on the free pool: the zeroing's writei can ALLOCATE and
-         every iunlockput can FREE (itrunc).  See the header. *)
-      (* the allowance, whole: see the header's reference ledger *)
-      iref_slots sys_unlink_slots -∗
-      (* the process block, at the same everything but the page table *)
-      proc_priv γf pj pid (upd_upt V P') -∗
-      ⌜sys_unlink_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-      WP (Loop : expr riscv_lang)) -∗
+    sys_unlink_closer (CID := CID) γf pj pid V m ret_tgt K eb b lks
+                      dqb dqs dqbs bmapstart inodestart size) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type SYSUNLINK.

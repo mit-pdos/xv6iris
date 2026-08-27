@@ -167,6 +167,91 @@ fixes `CID` those rows do not take a `CID` argument yet — the error is
 own `` `{!riscvGS Σ, …} `{GEN : GenId} `` binders at top level, exactly as the
 contract body beside it already does.
 
+### ProofSysUnlink: the two CONTINUATIONS were 55 % of Δ (measured 2026-08-27)
+
+`ProofSysUnlink.v` was the tree's most expensive file, and it is the worked
+example for this whole section — the diagnosis, the two folds, and why it lands on the
+opposite side of the ledger from `ProofIput` below.
+
+**The profile says RULE ONE and nothing else.** Isolated `coqc -time`, 151.8 s
+over 4832 sentences, no sentence above 10.9 s (a `Qed`):
+
+| head | total | n | avg |
+|---|---|---|---|
+| `iApply` | 41.8 s | 402 | 104 ms |
+| `Qed` | 38.9 s | 63 | 618 ms |
+| `iDestruct` | 16.7 s | 215 | 77 ms |
+| `iIntros` | 15.9 s | 225 | 71 ms |
+| `rewrite` | 6.3 s | 330 | 19 ms |
+| `set` | 5.9 s | 102 | 58 ms |
+| `iEval` | 4.2 s | 329 | 13 ms |
+| `iNext` | 3.5 s | 7 | **495 ms** |
+| `assert` | 2.7 s | 786 | 3 ms |
+
+82 s of proofmode steps plus 39 s of `Qed` is 80 % of the file, and both are
+priced by `|Δ|`. **The 786 `assert`s, which look like the problem, are 2.7 s
+total** — do not chase them.
+
+**Δ, dumped and ranked** (`Unset Printing Notations. Set Printing Depth 250.
+Show.` on a copy with the other blocks `Admitted`, then split on the quoted
+names — the `Esnoc` scaffolding has to be stripped first or the last
+intuitionistic row absorbs the whole spatial-env prefix and reads ~1.3 kB too
+big):
+
+| point | hyps | Δ | biggest | second |
+|---|---|---|---|---|
+| `su_w3` @+0x84 | 87 | 11.7 kB | `Hseamk` 5626 (**48 %**) | `Hcont` 879 (7.5 %) |
+| `su_w5_dir` @+0xae | 84 | 6.5 kB | `Hcont` 879 (**13.4 %**) | `Hmetai` 429 |
+| `su_w5_dir` @+0xca | 71 | 5.8 kB | `Hcont` 879 (**15.2 %**) | `Hetki` 268 |
+
+Two entries, both continuations, both spelled inline:
+
+- **`Hcont`, the RETURN continuation** — fifteen rows, written out TEN times
+  (the contract in `SpecSysUnlink.v` and nine block-lemma statements), and a
+  further copy inside each block's own seam.
+- **`Hseamk`, the block's fall-through seam** — 58 / 96 / 121 source lines in
+  W1 / W2 / W3, one per block, inert in Δ for the whole walk and applied twice
+  at the end.
+
+Everything else is a flat tail of ~100–150-character rows: the two 20-row
+open-inode bundles, the 15-row stack frame, the ambient fs fabric. **Do not
+fold those.** The walk consumes them row by row, so a bundle would have to be
+taken apart at every callee call and the cost would move rather than go — see
+"Extracting a persistent fact out of a bundle" below.
+
+Both folds are DROP-IN. `Definition sys_unlink_closer` in `SpecSysUnlink.v`
+(outside the `Section`, because it is a premise of the module-type contract)
+and one `Definition su_wN_seam` per block beside its lemma, all TRANSPARENT.
+**Not one line of proof script changed** — `iApply ("Hcont" $! …)`,
+`iApply ("Hseamk" $! …)` and the `iIntros` that discharges the seam goal in
+`wp_sys_unlink_sconf` all unify straight through a transparent constant.
+
+Isolated `coqc`, arms interleaved, box at load 2–3:
+
+| arm | wall | `.vo` | peak RSS |
+|---|---|---|---|
+| baseline | 153.7 s (153.7 / 154.9 / 155.3) | 8,941,931 | 3.24 GB |
+| + `sys_unlink_closer` | 147.4 s | 8,513,058 (−4.8 %) | 3.07 GB |
+| + the three seams | **133.1 s (−13.4 %)** (133.3 / 133.1 / 153.0) | 7,616,840 (**−14.8 %**) | 3.02 GB |
+
+Min of three, arms interleaved. The one 153.0 s seam reading is the shared box,
+not the arm: the other two agree to 0.15 % and the closer arm's own pair
+(147.4 / 158.9) straddles it the same way at load 20. Contention only ADDS —
+take the min, never the mean.
+
+**`su_w3_seam` is a 58-ARGUMENT constant and it pays, where `ProofIput`'s
+28-argument closer cost +13 s.** Argument count is not the predictor. What
+separates them is the SHARE of Δ removed against the number of steps that
+carry it: `ProofIput`'s fold took Δ 7.6 → 5.4 kB in a file whose per-step cost
+was already modest, while here W3's Δ goes 11.7 → ~6 kB under a 402-`iApply`,
+63-`Qed` walk. Rank Δ first; fold the row that is tens of percent of it, and
+only that row. (The 6 kB is arithmetic on the printed sizes, not a second
+dump — what was measured is the wall and the `.vo`.)
+
+**Still on the table in this file, not done**: its seven `iNext`s are 3.5 s at
+495 ms each, against the ~60 ms `iApply bi.later_intro` costs — which the same
+file already uses at thirteen other sites. See "Modalities and rewriting".
+
 ### Do not pose instruction facts AT ALL — close them as subgoals
 
 **This supersedes "pose late" for `instr` facts, and it is a bigger win than
@@ -720,7 +805,8 @@ and it did not move.
   pay. Ranked by how many other files name them, the top unsealed iProp
   definitions are `pc_is` (483 files), `sie_cap_gpr` (418), `wp_next` (415),
   `instr` (332) -- and none of them has a big-op body. Sealing `pc_is` and
-  `sie_cap_gpr` in `ProofSysUnlink`, the tree's most expensive file, measured
+  `sie_cap_gpr` in `ProofSysUnlink`, then the tree's most expensive file (see
+  the case study above; it is 133 s now), measured
   **150.36 s -> 151.49 s**: no gain, slightly negative. `wp_next` cannot be
   sealed at all -- it is the WP continuation former that every proof
   `iIntros` THROUGH, so the seal fails at `iIntro: cannot turn (wp_next ...)`.

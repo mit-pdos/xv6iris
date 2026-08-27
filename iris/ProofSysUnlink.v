@@ -35,7 +35,24 @@
 
    The [(CID0 := CIDs)] annotation on a [wp_next] written inside a binder
    is MANDATORY -- written bare, instance resolution anchors it at the
-   innermost [CpuId] and the guard degrades to a tautology. *)
+   innermost [CpuId] and the guard degrades to a tautology.
+
+   ==== THE TWO CONTINUATIONS ARE NAMED ================================
+
+   This file's cost was never a hot sentence -- it was |Delta|, RULE ONE in
+   claude-notes/optimization.md.  A mid-walk dump found 87 hypotheses / 11.7
+   kB, of which TWO entries, both continuations spelled inline, were 55 %:
+   the block's own fall-through seam ([su_wN_seam] beside each block lemma)
+   and the RETURN continuation ([SpecSysUnlink.sys_unlink_closer], which was
+   written out ten times -- the contract and nine statements here).  Naming
+   both, all TRANSPARENT, changed no proof script and took the file
+
+     153.7 s -> 133.1 s (-13.4 %), .vo 8.94 MB -> 7.62 MB (-14.8 %)
+
+   isolated, min of three interleaved runs.  The optimization note's
+   ProofSysUnlink case study has the full ranking and the two negative
+   results (do NOT fold the open-inode bundles or the frame; they are
+   consumed row by row). *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -665,6 +682,81 @@ Section ProofSysUnlinkBody.
   (*  [w] pay-bit the zeroing's writei needs downstream; the [ok = false] *)
   (*  arm hands the whole allowance back and ARM B retires the op.        *)
   (* ================================================================== *)
+  (* W1'S SEAM, NAMED -- the same fold as [su_w3_seam] below, whose header
+     carries the measurement (W3's seam was 48 % of [Delta] at a mid-walk
+     dump).  Spelled inline this one was 58 lines.
+
+     TRANSPARENT on purpose: the [iApply ("Hseamk" $! ...)] sites and the
+     [iIntros] that discharges this goal in [wp_sys_unlink_sconf] unify
+     straight through a transparent constant, so NOT ONE LINE of proof script
+     changed.  [CIDs] is an explicit binder because the body writes
+     [wp_next (CID0 := CIDs)], and its other rows resolve their [CpuId]
+     instance to the innermost one. *)
+  Definition su_w1_seam `{GEN : GenId} `{CIDs : CpuId}
+      (gf : gname) (jx : nat) (g : log_names) (cov : gset Z) (logstart : Z)
+      (bmapstart : Z) (inodestart : Z) (size : Z) (dqb : dfrac)
+      (dqs : dfrac) (dqbs : dfrac) (pid : mword 32) (V : pprivate)
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
+      (Ms : regfile) (P1 : uptd) (n1 : nat) (Sb1 : gset Z) (w1 : bool)
+      (dpv : mword 64) (nf : nat -> bv 8) (bp1 : nat -> bv 8)
+      (bnm0 : nat -> bv 8) (bd0 : nat -> bv 8) (be0 : nat -> bv 8)
+      (w4 : mword 64) (w5 : mword 64) (w6 : mword 64) (w27 : mword 64)
+      (w30 : mword 64) : iProp Σ :=
+    (⌜su_al (m !!! Regidx csp_rs1 : mword 64)⌝ -∗
+       ⌜su_regs m (m !!! Regidx csp_rs1 : mword 64) dpv
+                (m !!! Regidx Rs2 : mword 64) (m !!! Regidx Rs3 : mword 64) Ms⌝ -∗
+       (* [a0] STILL HOLDS [dp] AT THE SEAM, and it has to be said: [su_regs]
+          pins the five CALLEE-SAVED registers and [a0] is not one of them,
+          so the [c.mv s1,a0] at +0x2c leaves the fact true and unexported.
+          W2's [ilock(dp)] reads [a0], so this is its first premise.  (Found
+          by the seal, which is the first consumer to compose W1 with W2.) *)
+       ⌜(Ms !!! Regidx Ra0 : mword 64) = dpv⌝ -∗
+       ⌜uptd_ext (pv_upt V) P1⌝ -∗
+       ⌜(su_u1 w1 <= n1)%nat⌝ -∗
+       ⌜w1 = true -> bmapstart ∈ Sb1⌝ -∗
+       ⌜dpv <> (zero_reg : mword 64)⌝ -∗
+       sie_cap_gpr KT1 Ms (K - 30) b (proc_addr jx) -∗
+       cpu_own 0 eb (proc_addr jx) b lks -∗
+       pc_is (mword_of_int (SU + 0x30)) -∗
+       fs_crash_seam cov logstart -∗
+       gen_cert -∗
+       bslots 3 -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+       proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
+       iref_slots 1 -∗
+       inode_held_ty dpv T_DIR -∗
+       log_opS g n1 Sb1 -∗
+       (* the transaction token rides beside the budget: this walk ends the
+          operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
+       log_tx g -∗
+       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 4) ↦₈[KT1] w4 -∗
+       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 5) ↦₈[KT1] w5 -∗
+       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 6) ↦₈[KT1] w6 -∗
+       ([∗ list] jj ∈ seq 0 16,
+          pa_add (pa_stk (m !!! Regidx csp_rs1 : mword 64) 8) jj ↦ₘ[KT1] bd0 jj) -∗
+       ([∗ list] jj ∈ seq 0 14,
+          pa_add (pa_stk (m !!! Regidx csp_rs1 : mword 64) 10) jj ↦ₘ[KT1] nf jj) -∗
+       ([∗ list] jj ∈ seq 0 2,
+          pa_add (pa_add (pa_stk (m !!! Regidx csp_rs1 : mword 64) 10) 14) jj
+            ↦ₘ[KT1] bnm0 (14 + jj)%nat) -∗
+       ([∗ list] jj ∈ seq 0 128,
+          pa_add (pa_stk (m !!! Regidx csp_rs1 : mword 64) 26) jj ↦ₘ[KT1] bp1 jj) -∗
+       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 27) ↦₈[KT1] w27 -∗
+       ([∗ list] jj ∈ seq 0 16,
+          pa_add (pa_stk (m !!! Regidx csp_rs1 : mword 64) 29) jj ↦ₘ[KT1] be0 jj) -∗
+       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 30) ↦₈[KT1] w30 -∗
+       (* the caller's own exit, handed BACK *)
+       wp_next (CID0 := CIDs) true (proc_addr jx) (fun (CIDx : CpuId) =>
+         SpecSysUnlink.sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid V m
+           (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
+           dqb dqs dqbs bmapstart inodestart size) -∗
+       WP (Loop : expr riscv_lang))%I.
+
   Lemma su_w1 `{GEN : GenId} `{CID0 : CpuId}
       (gf ga : gname)
       (gs : list gname) (jx : nat) (gl : gname)
@@ -729,90 +821,14 @@ Section ProofSysUnlinkBody.
        (n1 : nat) (Sb1 : gset Z) (w1 : bool) (dpv : mword 64)
        (nf bp1 bnm0 bd0 be0 : nat -> bv 8)
        (w4 w5 w6 w27 w30 : mword 64),
-       ⌜su_al (m !!! Regidx csp_rs1 : mword 64)⌝ -∗
-       ⌜su_regs m (m !!! Regidx csp_rs1 : mword 64) dpv
-                (m !!! Regidx Rs2 : mword 64) (m !!! Regidx Rs3 : mword 64) Ms⌝ -∗
-       (* [a0] STILL HOLDS [dp] AT THE SEAM, and it has to be said: [su_regs]
-          pins the five CALLEE-SAVED registers and [a0] is not one of them,
-          so the [c.mv s1,a0] at +0x2c leaves the fact true and unexported.
-          W2's [ilock(dp)] reads [a0], so this is its first premise.  (Found
-          by the seal, which is the first consumer to compose W1 with W2.) *)
-       ⌜(Ms !!! Regidx Ra0 : mword 64) = dpv⌝ -∗
-       ⌜uptd_ext (pv_upt V) P1⌝ -∗
-       ⌜(su_u1 w1 <= n1)%nat⌝ -∗
-       ⌜w1 = true -> bmapstart ∈ Sb1⌝ -∗
-       ⌜dpv <> (zero_reg : mword 64)⌝ -∗
-       sie_cap_gpr KT1 Ms (K - 30) b (proc_addr jx) -∗
-       cpu_own 0 eb (proc_addr jx) b lks -∗
-       pc_is (mword_of_int (SU + 0x30)) -∗
-       fs_crash_seam cov logstart -∗
-       gen_cert -∗
-       bslots 3 -∗
-       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-       proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
-       iref_slots 1 -∗
-       inode_held_ty dpv T_DIR -∗
-       log_opS g n1 Sb1 -∗
-       (* the transaction token rides beside the budget: this walk ends the
-          operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
-       log_tx g -∗
-       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 4) ↦₈[KT1] w4 -∗
-       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 5) ↦₈[KT1] w5 -∗
-       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 6) ↦₈[KT1] w6 -∗
-       ([∗ list] jj ∈ seq 0 16,
-          pa_add (pa_stk (m !!! Regidx csp_rs1 : mword 64) 8) jj ↦ₘ[KT1] bd0 jj) -∗
-       ([∗ list] jj ∈ seq 0 14,
-          pa_add (pa_stk (m !!! Regidx csp_rs1 : mword 64) 10) jj ↦ₘ[KT1] nf jj) -∗
-       ([∗ list] jj ∈ seq 0 2,
-          pa_add (pa_add (pa_stk (m !!! Regidx csp_rs1 : mword 64) 10) 14) jj
-            ↦ₘ[KT1] bnm0 (14 + jj)%nat) -∗
-       ([∗ list] jj ∈ seq 0 128,
-          pa_add (pa_stk (m !!! Regidx csp_rs1 : mword 64) 26) jj ↦ₘ[KT1] bp1 jj) -∗
-       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 27) ↦₈[KT1] w27 -∗
-       ([∗ list] jj ∈ seq 0 16,
-          pa_add (pa_stk (m !!! Regidx csp_rs1 : mword 64) 29) jj ↦ₘ[KT1] be0 jj) -∗
-       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 30) ↦₈[KT1] w30 -∗
-       (* the caller's own exit, handed BACK *)
-       wp_next (CID0 := CIDs) true (proc_addr jx) (fun (CIDx : CpuId) =>
-         ∀ (mf : regfile) (P' : uptd),
-             ⌜callee_saved m mf⌝ -∗
-             ⌜uptd_ext (pv_upt V) P'⌝ -∗
-             sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
-             cpu_own 0 eb (proc_addr jx) b lks -∗
-             trap_csrs_ext KT1 eb -∗
-             cpu_claim_ext eb (proc_addr jx) -∗
-             pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-             bslots 3 -∗
-             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-             sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-             sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-             iref_slots SpecSysUnlink.sys_unlink_slots -∗
-             proc_priv gf (proc_addr jx) pid (upd_upt V P') -∗
-             ⌜sys_unlink_ret (mf !!! Regidx Ra0 : mword 64)⌝ -∗
-             WP (Loop : expr riscv_lang)) -∗
-       WP (Loop : expr riscv_lang)) -∗
+       su_w1_seam (CIDs := CIDs)
+          gf jx g cov logstart bmapstart inodestart size dqb dqs dqbs pid V
+          m K eb b lks Ms P1 n1 Sb1 w1 dpv nf bp1 bnm0 bd0 be0 w4 w5 w6 w27
+          w30) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (P' : uptd),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜uptd_ext (pv_upt V) P'⌝ -∗
-          sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
-          cpu_own 0 eb (proc_addr jx) b lks -∗
-          trap_csrs_ext KT1 eb -∗
-          cpu_claim_ext eb (proc_addr jx) -∗
-          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots 3 -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-          iref_slots SpecSysUnlink.sys_unlink_slots -∗
-          proc_priv gf (proc_addr jx) pid (upd_upt V P') -∗
-          ⌜sys_unlink_ret (mf !!! Regidx Ra0 : mword 64)⌝ -∗
-          WP (Loop : expr riscv_lang)) -∗
+      SpecSysUnlink.sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid V m
+        (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
+        dqb dqs dqbs bmapstart inodestart size) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
@@ -1517,22 +1533,9 @@ Section ProofSysUnlinkBody.
     ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] be jj) -∗
     (pa_stk sp0 30) ↦₈[KT1] w30 -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (P' : uptd),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜uptd_ext (pv_upt V) P'⌝ -∗
-          sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
-          cpu_own 0 eb (proc_addr jx) b lks -∗
-          trap_csrs_ext KT1 eb -∗
-          cpu_claim_ext eb (proc_addr jx) -∗
-          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots 3 -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-          iref_slots SpecSysUnlink.sys_unlink_slots -∗
-          proc_priv gf (proc_addr jx) pidv (upd_upt V P') -∗
-          ⌜sys_unlink_ret (mf !!! Regidx Ra0 : mword 64)⌝ -∗
-          WP (Loop : expr riscv_lang)) -∗
+      SpecSysUnlink.sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pidv V m
+        (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
+        dqb dqs dqbs bmapstart inodestart size) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
@@ -1602,6 +1605,122 @@ Section ProofSysUnlinkBody.
   (*  dirlookup, so the bundle ilock returned has never been opened and   *)
   (*  [su_tail_bad] takes it as it stands.  ARM D has, and repacks.       *)
   (* ================================================================== *)
+  (* W2'S SEAM, NAMED -- the same fold as [su_w3_seam] below, whose header
+     carries the measurement (W3's seam was 48 % of [Delta] at a mid-walk
+     dump).  Spelled inline this one was 96 lines.
+
+     TRANSPARENT on purpose: the [iApply ("Hseamk" $! ...)] sites and the
+     [iIntros] that discharges this goal in [wp_sys_unlink_sconf] unify
+     straight through a transparent constant, so NOT ONE LINE of proof script
+     changed.  [CIDs] is an explicit binder because the body writes
+     [wp_next (CID0 := CIDs)], and its other rows resolve their [CpuId]
+     instance to the innermost one. *)
+  Definition su_w2_seam `{GEN : GenId} `{CIDs : CpuId}
+      (gf : gname) (jx : nat) (g : log_names) (gfs : fs_names) (gi : gname)
+      (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z)
+      (nib : nat) (size : Z) (dev : mword 32) (dqb : dfrac) (dqs : dfrac)
+      (dqbs : dfrac) (pid : mword 32) (V : pprivate) (P1 : uptd) (n1 : nat)
+      (Sb1 : gset Z) (nf : nat -> bv 8) (bnm0 : nat -> bv 8)
+      (bp : nat -> bv 8) (bd : nat -> bv 8) (be : nat -> bv 8)
+      (w5 : mword 64) (w6 : mword 64) (w30 : mword 64) (m : regfile)
+      (sp0 : mword 64) (K : nat) (eb : bool) (b : bool) (lks : gset string)
+      (M2 : regfile) (kd : nat) (ks : nat) (kk : nat) (gild : gname)
+      (gisld : gname) (gyd : gname) (qdi : Qp) (sd : Qp) (qs : Qp)
+      (dinum : mword 32) (dnd : dinode) (bmd : blkmap)
+      (datd : nat -> list (bv 8)) (lo : bv 32) (t : nat) : iProp Σ :=
+    (⌜su_regs m sp0 (ientry kd) (ientry ks)
+                (m !!! Regidx Rs3 : mword 64) M2⌝ -∗
+       ⌜(kd < NINODE)%nat⌝ -∗
+       ⌜(ks < NINODE)%nat⌝ -∗
+       ⌜bv_unsigned dinum < 16 * Z.of_nat nib⌝ -∗
+       ⌜di_type dnd = SpecDirlookup.T_DIR⌝ -∗
+       ⌜inode_ok cov logstart dnd bmd datd⌝ -∗
+       (* durable-disk 2b-inode-3: the payload's record-only facts *)
+       ⌜inode_rec_local dnd⌝ -∗
+       ⌜dir_ok icfg_nib dnd datd⌝ -∗
+       ⌜dir_dots_ix (bv_unsigned dinum) dnd datd⌝ -∗
+       ⌜dir_orphan_clean dnd datd⌝ -∗
+       ⌜dir_uniq dnd datd⌝ -∗
+       ⌜bname 14 nf <> dot_name⌝ -∗
+       ⌜bname 14 nf <> dotdot_name⌝ -∗
+       ⌜dir_first datd (dir_nrec (bv_unsigned (di_size dnd)))
+                  (bname 14 nf) = Some kk⌝ -∗
+       (* the [a0 = ip] W3's [ilock] call reads, and slot 27's own
+          alignment (taken off the points-to at the split; the join at the
+          epilogue needs it back) *)
+       ⌜(M2 !!! Regidx Ra0 : mword 64) = ientry ks⌝ -∗
+       ⌜is_aligned_paddr (Physaddr (pa_stk sp0 27)) 8 = true⌝ -∗
+       sie_cap_gpr KT1 M2 (K - 30) b (proc_addr jx) -∗
+       cpu_own 0 eb (proc_addr jx) b lks -∗
+       pc_is (mword_of_int (SU + 0x72)) -∗
+       fs_crash_seam cov logstart -∗
+       gen_cert -∗
+       bslots 3 -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+       proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
+       (* ---- [dp], LOCKED and OPEN ---- *)
+       is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
+                        (ic_tok fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
+       sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
+       ic_deposit fsc_ic kd (DepTx sd dev dinum gyd t (1/2)) -∗
+       i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
+       i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
+       i_valid (ientry kd) ↦₄ valid_word true -∗
+       dlinks gfs (bv_unsigned dinum) dnd bmd datd -∗
+       dinode_at gi dinum dnd -∗
+       inode_meta (ientry kd) dnd -∗
+       inode_addrs (ientry kd) (bm_cells bmd) -∗
+       ind_res gfs bmd -∗
+       inode_blocks gfs bmd datd -∗
+       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
+       dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
+       fv_ride (bv_unsigned dinum) (fv_of dnd datd) -∗
+       (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
+       top_frag (fs_gamma_L gfs) (bv_unsigned dinum)
+                (era_node dnd bmd datd) -∗
+       ity_shot gyd (di_type dnd) -∗
+       (* the payload's freeze token (§3.9, RULING A-prime) *)
+       ifreeze_off (bv_unsigned dinum) -∗
+       inode_ref_short kd (qdi + sd)%Qp qdi dev dinum -∗
+       (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+       runit_any (bv_unsigned dinum) -∗
+       (* ---- [ip], REFERENCED (dirlookup's iget) ---- *)
+       inode_ref ks qs dev
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
+       (* ...with the unit that iget minted with it (item 7a-wire) *)
+       runit_any
+         (bv_unsigned
+            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
+       log_opS g n1 Sb1 -∗
+       (* the transaction token rides beside the budget: this walk ends the
+          operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
+       t ↪[ln_tx g]{#(1/2)} tt -∗
+       (* ---- the frame, with slot 4 filled and slot 27 SPLIT ---- *)
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] w5 -∗
+       (pa_stk sp0 6) ↦₈[KT1] w6 -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 8) jj ↦ₘ[KT1] bd jj) -∗
+       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
+       ([∗ list] jj ∈ seq 0 2,
+          pa_add (pa_add (pa_stk sp0 10) 14) jj ↦ₘ[KT1] bnm0 (14 + jj)%nat) -∗
+       ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 26) jj ↦ₘ[KT1] bp jj) -∗
+       (pa_stk sp0 27) ↦₄[KT1] lo -∗
+       (pa_add (pa_stk sp0 27) 4) ↦₄[KT1]
+         (mword_of_int (Z.of_nat (16 * kk)) : mword 32) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] be jj) -∗
+       (pa_stk sp0 30) ↦₈[KT1] w30 -∗
+       (* the caller's own exit, handed BACK *)
+       wp_next (CID0 := CIDs) true (proc_addr jx) (fun (CIDx : CpuId) =>
+         SpecSysUnlink.sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid V m
+           (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
+           dqb dqs dqbs bmapstart inodestart size) -∗
+       WP (Loop : expr riscv_lang))%I.
+
   Lemma su_w2 `{GEN : GenId} `{CID0 : CpuId}
       (gf ga : gname)
       (gs : list gname) (jx : nat) (gl : gname)
@@ -1695,128 +1814,14 @@ Section ProofSysUnlinkBody.
        (kd ks kk : nat) (gild gisld gyd : gname) (qdi sd qs : Qp)
        (dinum : mword 32) (dnd : dinode) (bmd : blkmap)
        (datd : nat -> list (bv 8)) (lo : bv 32) (t : nat),
-       ⌜su_regs m sp0 (ientry kd) (ientry ks)
-                (m !!! Regidx Rs3 : mword 64) M2⌝ -∗
-       ⌜(kd < NINODE)%nat⌝ -∗
-       ⌜(ks < NINODE)%nat⌝ -∗
-       ⌜bv_unsigned dinum < 16 * Z.of_nat nib⌝ -∗
-       ⌜di_type dnd = SpecDirlookup.T_DIR⌝ -∗
-       ⌜inode_ok cov logstart dnd bmd datd⌝ -∗
-       (* durable-disk 2b-inode-3: the payload's record-only facts *)
-       ⌜inode_rec_local dnd⌝ -∗
-       ⌜dir_ok icfg_nib dnd datd⌝ -∗
-       ⌜dir_dots_ix (bv_unsigned dinum) dnd datd⌝ -∗
-       ⌜dir_orphan_clean dnd datd⌝ -∗
-       ⌜dir_uniq dnd datd⌝ -∗
-       ⌜bname 14 nf <> dot_name⌝ -∗
-       ⌜bname 14 nf <> dotdot_name⌝ -∗
-       ⌜dir_first datd (dir_nrec (bv_unsigned (di_size dnd)))
-                  (bname 14 nf) = Some kk⌝ -∗
-       (* the [a0 = ip] W3's [ilock] call reads, and slot 27's own
-          alignment (taken off the points-to at the split; the join at the
-          epilogue needs it back) *)
-       ⌜(M2 !!! Regidx Ra0 : mword 64) = ientry ks⌝ -∗
-       ⌜is_aligned_paddr (Physaddr (pa_stk sp0 27)) 8 = true⌝ -∗
-       sie_cap_gpr KT1 M2 (K - 30) b (proc_addr jx) -∗
-       cpu_own 0 eb (proc_addr jx) b lks -∗
-       pc_is (mword_of_int (SU + 0x72)) -∗
-       fs_crash_seam cov logstart -∗
-       gen_cert -∗
-       bslots 3 -∗
-       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-       proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
-       (* ---- [dp], LOCKED and OPEN ---- *)
-       is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                        (ic_tok fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
-       sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
-       ic_deposit fsc_ic kd (DepTx sd dev dinum gyd t (1/2)) -∗
-       i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
-       i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
-       i_valid (ientry kd) ↦₄ valid_word true -∗
-       dlinks gfs (bv_unsigned dinum) dnd bmd datd -∗
-       dinode_at gi dinum dnd -∗
-       inode_meta (ientry kd) dnd -∗
-       inode_addrs (ientry kd) (bm_cells bmd) -∗
-       ind_res gfs bmd -∗
-       inode_blocks gfs bmd datd -∗
-       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
-       fv_ride (bv_unsigned dinum) (fv_of dnd datd) -∗
-       (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
-       top_frag (fs_gamma_L gfs) (bv_unsigned dinum)
-                (era_node dnd bmd datd) -∗
-       ity_shot gyd (di_type dnd) -∗
-       (* the payload's freeze token (§3.9, RULING A-prime) *)
-       ifreeze_off (bv_unsigned dinum) -∗
-       inode_ref_short kd (qdi + sd)%Qp qdi dev dinum -∗
-       (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
-       runit_any (bv_unsigned dinum) -∗
-       (* ---- [ip], REFERENCED (dirlookup's iget) ---- *)
-       inode_ref ks qs dev
-         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
-       (* ...with the unit that iget minted with it (item 7a-wire) *)
-       runit_any
-         (bv_unsigned
-            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
-       log_opS g n1 Sb1 -∗
-       (* the transaction token rides beside the budget: this walk ends the
-          operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
-       t ↪[ln_tx g]{#(1/2)} tt -∗
-       (* ---- the frame, with slot 4 filled and slot 27 SPLIT ---- *)
-       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈[KT1] w5 -∗
-       (pa_stk sp0 6) ↦₈[KT1] w6 -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 8) jj ↦ₘ[KT1] bd jj) -∗
-       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
-       ([∗ list] jj ∈ seq 0 2,
-          pa_add (pa_add (pa_stk sp0 10) 14) jj ↦ₘ[KT1] bnm0 (14 + jj)%nat) -∗
-       ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 26) jj ↦ₘ[KT1] bp jj) -∗
-       (pa_stk sp0 27) ↦₄[KT1] lo -∗
-       (pa_add (pa_stk sp0 27) 4) ↦₄[KT1]
-         (mword_of_int (Z.of_nat (16 * kk)) : mword 32) -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] be jj) -∗
-       (pa_stk sp0 30) ↦₈[KT1] w30 -∗
-       (* the caller's own exit, handed BACK *)
-       wp_next (CID0 := CIDs) true (proc_addr jx) (fun (CIDx : CpuId) =>
-         ∀ (mf : regfile) (P' : uptd),
-             ⌜callee_saved m mf⌝ -∗
-             ⌜uptd_ext (pv_upt V) P'⌝ -∗
-             sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
-             cpu_own 0 eb (proc_addr jx) b lks -∗
-             trap_csrs_ext KT1 eb -∗
-             cpu_claim_ext eb (proc_addr jx) -∗
-             pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-             bslots 3 -∗
-             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-             sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-             sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-             iref_slots SpecSysUnlink.sys_unlink_slots -∗
-             proc_priv gf (proc_addr jx) pid (upd_upt V P') -∗
-             ⌜sys_unlink_ret (mf !!! Regidx Ra0 : mword 64)⌝ -∗
-             WP (Loop : expr riscv_lang)) -∗
-       WP (Loop : expr riscv_lang)) -∗
+       su_w2_seam (CIDs := CIDs)
+          gf jx g gfs gi cov logstart bmapstart inodestart nib size dev dqb
+          dqs dqbs pid V P1 n1 Sb1 nf bnm0 bp bd be w5 w6 w30 m sp0 K eb b
+          lks M2 kd ks kk gild gisld gyd qdi sd qs dinum dnd bmd datd lo t) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (P' : uptd),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜uptd_ext (pv_upt V) P'⌝ -∗
-          sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
-          cpu_own 0 eb (proc_addr jx) b lks -∗
-          trap_csrs_ext KT1 eb -∗
-          cpu_claim_ext eb (proc_addr jx) -∗
-          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots 3 -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-          iref_slots SpecSysUnlink.sys_unlink_slots -∗
-          proc_priv gf (proc_addr jx) pid (upd_upt V P') -∗
-          ⌜sys_unlink_ret (mf !!! Regidx Ra0 : mword 64)⌝ -∗
-          WP (Loop : expr riscv_lang)) -∗
+      SpecSysUnlink.sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid V m
+        (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
+        dqb dqs dqbs bmapstart inodestart size) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -3468,6 +3473,155 @@ Section ProofSysUnlinkBody.
   (*  [true] and the process address is not zero), never by               *)
   (*  [wp_next_chain].                                                   *)
   (* ================================================================== *)
+  (* W3'S SEAM, NAMED.  claude-notes/optimization.md, "Fold block
+     continuations into named definitions" and the ProofSysUnlink case study
+     beside it.  Spelled inline this was 121 lines, and a mid-walk dump of
+     [Delta] here measured it as the single largest entry in the context by
+     an order of magnitude: 5626 of 11722 printed characters, 48 %.  It is
+     inert for the whole walk and applied only at the block's exits, which is
+     exactly the row a fold should take -- the rows AROUND it (the two
+     open-inode bundles, the frame) are consumed one at a time and must stay
+     spelled out.
+
+     TRANSPARENT on purpose: the [iApply ("Hseamk" $! ...)] sites and the
+     [iIntros] that discharges this goal in [wp_sys_unlink_sconf] unify
+     straight through a transparent constant, so NOT ONE LINE of proof script
+     changed.  [CIDs] is an explicit binder because the body writes
+     [wp_next (CID0 := CIDs)], and its other rows resolve their [CpuId]
+     instance to the innermost one. *)
+  Definition su_w3_seam `{GEN : GenId} `{CIDs : CpuId}
+      (gf : gname) (jx : nat) (g : log_names) (gfs : fs_names) (gi : gname)
+      (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z)
+      (size : Z) (dev : mword 32) (dqb : dfrac) (dqs : dfrac) (dqbs : dfrac)
+      (pid : mword 32) (V : pprivate) (P1 : uptd) (n1 : nat) (Sb1 : gset Z)
+      (kd : nat) (ks : nat) (kk : nat) (gild : gname) (gisld : gname)
+      (gyd : gname) (qdi : Qp) (sd : Qp) (dinum : mword 32) (dnd : dinode)
+      (bmd : blkmap) (datd : nat -> list (bv 8)) (lo : bv 32)
+      (nf : nat -> bv 8) (bnm0 : nat -> bv 8) (bp : nat -> bv 8)
+      (bd : nat -> bv 8) (w6 : mword 64) (w30 : mword 64) (m : regfile)
+      (sp0 : mword 64) (K : nat) (eb : bool) (b : bool) (lks : gset string)
+      (t : nat) (M3 : regfile) (s3x : mword 64) (bex : nat -> bv 8)
+      (isdir : bool) (gili : gname) (gisli : gname) (gyi : gname) (si : Qp)
+      (qsi : Qp) (dni : dinode) (bmi : blkmap) (dati : nat -> list (bv 8)) : iProp Σ :=
+    (⌜su_regs m sp0 (ientry kd) (ientry ks) s3x M3⌝ -∗
+       ⌜bv_unsigned (di_nlink dni) <> 0⌝ -∗
+       ⌜inode_ok cov logstart dni bmi dati⌝ -∗
+       (* durable-disk 2b-inode-3: the child's record-only facts *)
+       ⌜inode_rec_local dni⌝ -∗
+       ⌜dir_ok icfg_nib dni dati⌝ -∗
+       ⌜dir_dots_ix (bv_unsigned (zero_extend' 32
+            (dir_inum datd kk : mword 16) : mword 32)) dni dati⌝ -∗
+       ⌜dir_orphan_clean dni dati⌝ -∗
+       ⌜dir_uniq dni dati⌝ -∗
+       ⌜if isdir
+        then bv_unsigned (di_type dni) = T_DIR_z
+             /\ dir_dots_only dni dati
+             /\ (forall k : nat, (2 <= k)%nat ->
+                   (k < dir_nrec (bv_unsigned (di_size dni)))%nat ->
+                   dir_inum dati k = bv_0 16)
+        else bv_unsigned (di_type dni) <> T_DIR_z⌝ -∗
+       sie_cap_gpr KT1 M3 (K - 30) b (proc_addr jx) -∗
+       cpu_own 0 eb (proc_addr jx) b lks -∗
+       pc_is (mword_of_int (SU + 0x8a)) -∗
+       fs_crash_seam cov logstart -∗
+       gen_cert -∗
+       bslots 3 -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+       proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
+       (* ---- [dp], unchanged ---- *)
+       is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
+                        (ic_tok fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
+       sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
+       ic_deposit fsc_ic kd (DepTx sd dev dinum gyd t (1/4)) -∗
+       i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
+       i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
+       i_valid (ientry kd) ↦₄ valid_word true -∗
+       dlinks gfs (bv_unsigned dinum) dnd bmd datd -∗
+       dinode_at gi dinum dnd -∗
+       inode_meta (ientry kd) dnd -∗
+       inode_addrs (ientry kd) (bm_cells bmd) -∗
+       ind_res gfs bmd -∗
+       inode_blocks gfs bmd datd -∗
+       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
+       dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
+       fv_ride (bv_unsigned dinum) (fv_of dnd datd) -∗
+       (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
+       top_frag (fs_gamma_L gfs) (bv_unsigned dinum)
+                (era_node dnd bmd datd) -∗
+       ity_shot gyd (di_type dnd) -∗
+       (* the payload's freeze token (§3.9, RULING A-prime) *)
+       ifreeze_off (bv_unsigned dinum) -∗
+       inode_ref_short kd (qdi + sd)%Qp qdi dev dinum -∗
+       (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+       runit_any (bv_unsigned dinum) -∗
+       (* ---- [ip], LOCKED and OPEN ---- *)
+       is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
+                        (ic_tok fsc_ic ks) (slh_tok (icfg_isl ks)) -∗
+       sleeplocked_q gisli si (i_lock (ientry ks)) pid -∗
+       ic_deposit fsc_ic ks (DepTx si dev
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi
+         t (1/4)) -∗
+       i_dev (ientry ks) ↦₄{DfracOwn (1/2)} dev -∗
+       i_inum (ientry ks) ↦₄{DfracOwn (1/2)}
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
+       i_valid (ientry ks) ↦₄ valid_word true -∗
+       dlinks gfs (bv_unsigned (zero_extend' 32
+           (dir_inum datd kk : mword 16) : mword 32)) dni bmi dati -∗
+       dinode_at gi
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) dni -∗
+       inode_meta (ientry ks) dni -∗
+       inode_addrs (ientry ks) (bm_cells bmi) -∗
+       ind_res gfs bmi -∗
+       inode_blocks gfs bmi dati -∗
+       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
+       dv_ride (bv_unsigned (zero_extend' 32
+           (dir_inum datd kk : mword 16) : mword 32)) (dv_of dni dati) -∗
+       fv_ride (bv_unsigned (zero_extend' 32
+           (dir_inum datd kk : mword 16) : mword 32)) (fv_of dni dati) -∗
+       (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
+       top_frag (fs_gamma_L gfs) (bv_unsigned (zero_extend' 32
+           (dir_inum datd kk : mword 16) : mword 32))
+                (era_node dni bmi dati) -∗
+       ity_shot gyi (di_type dni) -∗
+       (* the payload's freeze token (§3.9, RULING A-prime) *)
+       ifreeze_off (bv_unsigned
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
+       inode_ref_short ks (qsi + si)%Qp qsi dev
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
+       (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+       runit_any
+         (bv_unsigned
+            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
+       log_opS g n1 Sb1 -∗
+       (* the transaction token rides beside the budget: this walk ends the
+          operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
+       t ↪[ln_tx g]{#(1/2)} tt -∗
+       (* ---- the frame, slot 5 FILLED ---- *)
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[KT1] w6 -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 8) jj ↦ₘ[KT1] bd jj) -∗
+       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
+       ([∗ list] jj ∈ seq 0 2,
+          pa_add (pa_add (pa_stk sp0 10) 14) jj ↦ₘ[KT1] bnm0 (14 + jj)%nat) -∗
+       ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 26) jj ↦ₘ[KT1] bp jj) -∗
+       (pa_stk sp0 27) ↦₄[KT1] lo -∗
+       (pa_add (pa_stk sp0 27) 4) ↦₄[KT1]
+         (mword_of_int (Z.of_nat (16 * kk)) : mword 32) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] bex jj) -∗
+       (pa_stk sp0 30) ↦₈[KT1] w30 -∗
+       (* the caller's own exit, handed BACK *)
+       wp_next (CID0 := CIDs) true (proc_addr jx) (fun (CIDx : CpuId) =>
+         SpecSysUnlink.sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid V m
+           (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
+           dqb dqs dqbs bmapstart inodestart size) -∗
+       WP (Loop : expr riscv_lang))%I.
+
   Lemma su_w3 `{GEN : GenId} `{CID0 : CpuId}
       (gf ga : gname)
       (gs : list gname) (jx : nat) (gl : gname)
@@ -3618,154 +3772,15 @@ Section ProofSysUnlinkBody.
     (∀ (CIDs : CpuId) (M3 : regfile) (s3x : mword 64) (bex : nat -> bv 8)
        (isdir : bool) (gili gisli gyi : gname) (si qsi : Qp)
        (dni : dinode) (bmi : blkmap) (dati : nat -> list (bv 8)),
-       ⌜su_regs m sp0 (ientry kd) (ientry ks) s3x M3⌝ -∗
-       ⌜bv_unsigned (di_nlink dni) <> 0⌝ -∗
-       ⌜inode_ok cov logstart dni bmi dati⌝ -∗
-       (* durable-disk 2b-inode-3: the child's record-only facts *)
-       ⌜inode_rec_local dni⌝ -∗
-       ⌜dir_ok icfg_nib dni dati⌝ -∗
-       ⌜dir_dots_ix (bv_unsigned (zero_extend' 32
-            (dir_inum datd kk : mword 16) : mword 32)) dni dati⌝ -∗
-       ⌜dir_orphan_clean dni dati⌝ -∗
-       ⌜dir_uniq dni dati⌝ -∗
-       ⌜if isdir
-        then bv_unsigned (di_type dni) = T_DIR_z
-             /\ dir_dots_only dni dati
-             /\ (forall k : nat, (2 <= k)%nat ->
-                   (k < dir_nrec (bv_unsigned (di_size dni)))%nat ->
-                   dir_inum dati k = bv_0 16)
-        else bv_unsigned (di_type dni) <> T_DIR_z⌝ -∗
-       sie_cap_gpr KT1 M3 (K - 30) b (proc_addr jx) -∗
-       cpu_own 0 eb (proc_addr jx) b lks -∗
-       pc_is (mword_of_int (SU + 0x8a)) -∗
-       fs_crash_seam cov logstart -∗
-       gen_cert -∗
-       bslots 3 -∗
-       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-       proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
-       (* ---- [dp], unchanged ---- *)
-       is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                        (ic_tok fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
-       sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
-       ic_deposit fsc_ic kd (DepTx sd dev dinum gyd t (1/4)) -∗
-       i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
-       i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
-       i_valid (ientry kd) ↦₄ valid_word true -∗
-       dlinks gfs (bv_unsigned dinum) dnd bmd datd -∗
-       dinode_at gi dinum dnd -∗
-       inode_meta (ientry kd) dnd -∗
-       inode_addrs (ientry kd) (bm_cells bmd) -∗
-       ind_res gfs bmd -∗
-       inode_blocks gfs bmd datd -∗
-       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
-       fv_ride (bv_unsigned dinum) (fv_of dnd datd) -∗
-       (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
-       top_frag (fs_gamma_L gfs) (bv_unsigned dinum)
-                (era_node dnd bmd datd) -∗
-       ity_shot gyd (di_type dnd) -∗
-       (* the payload's freeze token (§3.9, RULING A-prime) *)
-       ifreeze_off (bv_unsigned dinum) -∗
-       inode_ref_short kd (qdi + sd)%Qp qdi dev dinum -∗
-       (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
-       runit_any (bv_unsigned dinum) -∗
-       (* ---- [ip], LOCKED and OPEN ---- *)
-       is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
-                        (ic_tok fsc_ic ks) (slh_tok (icfg_isl ks)) -∗
-       sleeplocked_q gisli si (i_lock (ientry ks)) pid -∗
-       ic_deposit fsc_ic ks (DepTx si dev
-         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi
-         t (1/4)) -∗
-       i_dev (ientry ks) ↦₄{DfracOwn (1/2)} dev -∗
-       i_inum (ientry ks) ↦₄{DfracOwn (1/2)}
-         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
-       i_valid (ientry ks) ↦₄ valid_word true -∗
-       dlinks gfs (bv_unsigned (zero_extend' 32
-           (dir_inum datd kk : mword 16) : mword 32)) dni bmi dati -∗
-       dinode_at gi
-         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) dni -∗
-       inode_meta (ientry ks) dni -∗
-       inode_addrs (ientry ks) (bm_cells bmi) -∗
-       ind_res gfs bmi -∗
-       inode_blocks gfs bmi dati -∗
-       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_ride (bv_unsigned (zero_extend' 32
-           (dir_inum datd kk : mword 16) : mword 32)) (dv_of dni dati) -∗
-       fv_ride (bv_unsigned (zero_extend' 32
-           (dir_inum datd kk : mword 16) : mword 32)) (fv_of dni dati) -∗
-       (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
-       top_frag (fs_gamma_L gfs) (bv_unsigned (zero_extend' 32
-           (dir_inum datd kk : mword 16) : mword 32))
-                (era_node dni bmi dati) -∗
-       ity_shot gyi (di_type dni) -∗
-       (* the payload's freeze token (§3.9, RULING A-prime) *)
-       ifreeze_off (bv_unsigned
-         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
-       inode_ref_short ks (qsi + si)%Qp qsi dev
-         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
-       (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
-       runit_any
-         (bv_unsigned
-            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
-       log_opS g n1 Sb1 -∗
-       (* the transaction token rides beside the budget: this walk ends the
-          operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
-       t ↪[ln_tx g]{#(1/2)} tt -∗
-       (* ---- the frame, slot 5 FILLED ---- *)
-       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈[KT1] w6 -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 8) jj ↦ₘ[KT1] bd jj) -∗
-       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
-       ([∗ list] jj ∈ seq 0 2,
-          pa_add (pa_add (pa_stk sp0 10) 14) jj ↦ₘ[KT1] bnm0 (14 + jj)%nat) -∗
-       ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 26) jj ↦ₘ[KT1] bp jj) -∗
-       (pa_stk sp0 27) ↦₄[KT1] lo -∗
-       (pa_add (pa_stk sp0 27) 4) ↦₄[KT1]
-         (mword_of_int (Z.of_nat (16 * kk)) : mword 32) -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] bex jj) -∗
-       (pa_stk sp0 30) ↦₈[KT1] w30 -∗
-       (* the caller's own exit, handed BACK *)
-       wp_next (CID0 := CIDs) true (proc_addr jx) (fun (CIDx : CpuId) =>
-         ∀ (mf : regfile) (P' : uptd),
-             ⌜callee_saved m mf⌝ -∗
-             ⌜uptd_ext (pv_upt V) P'⌝ -∗
-             sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
-             cpu_own 0 eb (proc_addr jx) b lks -∗
-             trap_csrs_ext KT1 eb -∗
-             cpu_claim_ext eb (proc_addr jx) -∗
-             pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-             bslots 3 -∗
-             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-             sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-             sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-             iref_slots SpecSysUnlink.sys_unlink_slots -∗
-             proc_priv gf (proc_addr jx) pid (upd_upt V P') -∗
-             ⌜sys_unlink_ret (mf !!! Regidx Ra0 : mword 64)⌝ -∗
-             WP (Loop : expr riscv_lang)) -∗
-       WP (Loop : expr riscv_lang)) -∗
+       su_w3_seam (CIDs := CIDs)
+          gf jx g gfs gi cov logstart bmapstart inodestart size dev dqb dqs
+          dqbs pid V P1 n1 Sb1 kd ks kk gild gisld gyd qdi sd dinum dnd bmd
+          datd lo nf bnm0 bp bd w6 w30 m sp0 K eb b lks t M3 s3x bex isdir
+          gili gisli gyi si qsi dni bmi dati) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (P' : uptd),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜uptd_ext (pv_upt V) P'⌝ -∗
-          sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
-          cpu_own 0 eb (proc_addr jx) b lks -∗
-          trap_csrs_ext KT1 eb -∗
-          cpu_claim_ext eb (proc_addr jx) -∗
-          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots 3 -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-          iref_slots SpecSysUnlink.sys_unlink_slots -∗
-          proc_priv gf (proc_addr jx) pid (upd_upt V P') -∗
-          ⌜sys_unlink_ret (mf !!! Regidx Ra0 : mword 64)⌝ -∗
-          WP (Loop : expr riscv_lang)) -∗
+      SpecSysUnlink.sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid V m
+        (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
+        dqb dqs dqbs bmapstart inodestart size) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -4445,22 +4460,9 @@ Section ProofSysUnlinkBody.
     ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] bex jj) -∗
     (pa_stk sp0 30) ↦₈[KT1] w30 -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (P' : uptd),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜uptd_ext (pv_upt V) P'⌝ -∗
-          sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
-          cpu_own 0 eb (proc_addr jx) b lks -∗
-          trap_csrs_ext KT1 eb -∗
-          cpu_claim_ext eb (proc_addr jx) -∗
-          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots 3 -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-          iref_slots SpecSysUnlink.sys_unlink_slots -∗
-          proc_priv gf (proc_addr jx) pid (upd_upt V P') -∗
-          ⌜sys_unlink_ret (mf !!! Regidx Ra0 : mword 64)⌝ -∗
-          WP (Loop : expr riscv_lang)) -∗
+      SpecSysUnlink.sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid V m
+        (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
+        dqb dqs dqbs bmapstart inodestart size) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hglog Hprk Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov
@@ -6102,22 +6104,9 @@ Section ProofSysUnlinkBody.
     ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] bex jj) -∗
     (pa_stk sp0 30) ↦₈[KT1] w30 -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (P' : uptd),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜uptd_ext (pv_upt V) P'⌝ -∗
-          sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
-          cpu_own 0 eb (proc_addr jx) b lks -∗
-          trap_csrs_ext KT1 eb -∗
-          cpu_claim_ext eb (proc_addr jx) -∗
-          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots 3 -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-          iref_slots SpecSysUnlink.sys_unlink_slots -∗
-          proc_priv gf (proc_addr jx) pid (upd_upt V P') -∗
-          ⌜sys_unlink_ret (mf !!! Regidx Ra0 : mword 64)⌝ -∗
-          WP (Loop : expr riscv_lang)) -∗
+      SpecSysUnlink.sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid V m
+        (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
+        dqb dqs dqbs bmapstart inodestart size) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hglog Hprk Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov
