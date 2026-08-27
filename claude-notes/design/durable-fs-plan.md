@@ -266,52 +266,31 @@ recovery record, read off the crash predicate's `P_dur` (`P_fs_dur_acc`,
 `P_dur_tie` — pure content, so it rides `riscv_power_adequacy`'s
 `Hproj`/`Ppure` with no new parameter).
 
-**Ghost-wise recovery is a NO-OP, and the mint runs AFTER it (RULING).**
-`D` is a pure function of the raw disk — the header says `n = 0` and `D`
-is the raw home blocks, or `n > 0` and `D` is the raw disk with the
-batch installed — the snapshot describes `D`, and `install_trans` moves
-only the physical home blocks toward `D`.  Real `n > 0` recovery IS
-PROVEN at the log layer (`SpecInitlog` takes `hdr_wf`, its copy loop is
-live, `SpecInstallTrans` is general); what `initlog` does to the era's
-byte view is MOVE `L` on the pending home blocks from the crashed bytes
-to the logged ones, so its caller must OWN those runs across the call.
-Hence the era's file-system instance is minted inside `fsinit`, after
-`initlog` returns and before `ireclaim`: at PowerOn the block layer and
-the WAL are minted as today (`L` at the raw disk, every home run in the
-boot thread's hand), `fsinit` hands `initlog` the pending runs and gets
-them back at `D`, and the mint from the snapshot then finds every run
-equal to `D` — no exception set, no change to the WAL's ties.  The
-icache's slot escrows and pool are sealed EMPTY at PowerOn (`iinit`
-needs only the lock) and stocked by the same mint; `fs_ready_establish`
-already runs after `fsinit`, so every downstream credential comes from
-`fsinit`'s post.  `SpecFsinit`'s clean-header premise disappears with
-the ownership it stood in for.  One small fact the mint needs under any
-placement: the log's write set never names block 1 (`fsinit` reads the
-superblock off the raw disk before recovery; `sb_park`'s full-fraction
-run refutes any `log_write` at block 1 — a row of `log_state`).
-
-**THE PLACEMENT HALF OF THAT RULING IS REFUTED (lane E-mint, machine-checked
-in `iris/FsBootWall.v`).**  "The icache's slot escrows and pool are sealed
-EMPTY at PowerOn and stocked by the same mint" cannot hold: `userinit` runs
-at main+0x9e, BEFORE `fsinit` (which is forkret's arm), and its
-`p->cwd = namei("/")` is one `iget(ROOTDEV, ROOTINO)` that MOVES the inum's
-pool row into the slot escrow (`IcacheEscrow.ipool_take_lend`), so
-`ipool_body`'s partition row — at the three empty keys `icache_boot_at` is
-handed — forces the ordinary index to BE the whole region
-(`boot_pool_index_forced`, `boot_pool_holds_root`,
-`boot_empty_pool_refuted`).  A pool row is not a marker: its allocated arm
-is the inode's whole era-side bundle.  What IS built and is
-placement-independent is the mint reading the SNAPSHOT rather than the
-image — `FsCfgSnap.fs_cfg_alloc_snap`, with `fs_cfg_alloc_img` (the era-0
-corollary, off `FsDurImg.img_snap_ok`) as its one image-spending caller.
-It currently runs where `fs_cfg_alloc` ran, at PowerOn, which keeps
-`SpecFsinit`'s `hdr_n = 0`.  The two exits — (1) mint `L` at `D` with a
-WAL-owned exception set inside `FsBlocks.fs_bytes_body` that
-`install_trans` shrinks, plus a "recovery is done" seal on ~28 readers of
-`bytes_tie`; (2) a third, content-free arm on `ipool_shape_np` with the
-fsinit mint filling the pool AND the fifty escrows — are written out in
-`FsBootWall.v`'s header and are the owner's to choose.  Both consume
-`fs_cfg_alloc_snap` unchanged.
+**Ghost-wise recovery is a NO-OP, and the mint runs AT POWERON (RULING,
+corrected by lane E-mint).**  `D` is a pure function of the raw disk —
+the header says `n = 0` and `D` is the raw home blocks, or `n > 0` and
+`D` is the raw disk with the batch installed — the snapshot describes
+`D`, and `install_trans` moves only the physical home blocks toward `D`.
+Real `n > 0` recovery IS PROVEN at the log layer.  The mint cannot wait
+for `fsinit`: `userinit` runs before it and its `namei("/")` takes the
+root's pool row into a slot escrow (`FsBootWall.boot_empty_pool_refuted`),
+so the pool must be stocked at PowerOn.  Hence at PowerOn the era's byte
+view `L` is minted EQUAL TO `D` and the file-system instance from the
+snapshot at `D` (`FsCfgSnap.fs_cfg_alloc_snap`; era 0's snapshot comes
+from the image, `fs_cfg_alloc_img`), and the pre-install window at a
+dirty header — the ≤ LOGSIZE pending home blocks read raw on the physical
+disk and in the empty buffer cache's pool while `L = D` says the installed
+value — is the WAL's to carry: an EXCEPTION SET inside
+`FsBlocks.fs_bytes_body` (`bytes_tie` excepted on the pending set, whose
+logged values the log region holds and the mirror knows), which
+`install_trans` shrinks block by block and `write_head`'s `n := 0`
+empties; the byte-view readers (`fs_bytes_agree*`, `fsblock_update`,
+`byte_range_log_update`) run only after recovery, which the WAL seals as
+"recovery done".  `BioInv.pool_blk` (disk cell = cache half), the mirror
+row and `SpecInitlog`'s `lm_view` row stay true throughout.
+`SpecFsinit`'s clean-header premise disappears with the window.  Block
+1 is never logged (`FsCrash.fs_recovery_sb_raw`), so `fsinit`'s raw
+`readsb` and the snapshot's superblock are one record.
 
 **The theorem** (the spike, `mknod_durable`): for the batch containing a
 `mknod`'s transaction, after its commit the CURRENT snapshot's inode
