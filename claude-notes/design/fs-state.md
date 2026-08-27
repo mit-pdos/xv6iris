@@ -93,6 +93,7 @@ boot mint (stage H1 of the worklist); there is no image decoding at boot.
 
 ```
 fs_state   Γ S        := sb_owned Γ S.sb ∗ fs_inodes Γ S.inodes ∗ free_bitmap Γ S.free
+                         ∗ ⌜fs_geom S⌝                         (* §7: the map-vs-superblock rows *)
 fs_inodes  Γ I        := [∗ map] i ↦ n ∈ I, inode_owned Γ i n          (* the one ∗-iteration *)
 inode_owned Γ i n     := rec_owned Γ i n.rec
                          ∗ [∗ k ∈ slots n] blk_owned Γ (addr n k) (blocks n k)
@@ -1705,6 +1706,22 @@ Where the built shape differs from §2, and why:
   `FsImg.fs_parse_sb`), and `fs_footprint` has to be a function of `S`
   alone, which an existential over the bytes would break.  `sb_owned`'s one
   local clause is `fs_parse_sb (λ _, bs) = Some sb`.
+- **`fs_state` has a fourth, PURE conjunct: `fs_geom S`** (durable-disk lane
+  H5).  Four rows — `fg_sbok` (`FsImg.fs_sb_ok (fss_sb S)`), `fg_reg` (a
+  named inum's record block is inside the region), `fg_regdom` (every region
+  inum is named) and `fg_dirloc` (`node_dir_local i (fs_nib S) n`) — and
+  they are the ONE thing §0's local rule cannot supply: `inode_local i n`
+  takes an inum and a node, so nothing per-inode can say how the inode MAP
+  and the SUPERBLOCK fit together, and `sb_owned`'s parse says the bytes
+  DECODE to `fss_sb S`, not that its fields make sense (an all-zero block
+  parses).  It is stated here rather than on the durable snapshot because it
+  is a fact about a FILE SYSTEM and not about any committed view, so both
+  instances have it and `fs_state_geom` is the reading.  It rides `fs_ghost`
+  and `fs_pure` in lockstep so the two splits keep holding, it is LAST so no
+  destructuring pattern above it moves, and `fs_geom_inum` /`fs_geom_dom`
+  derive the inum bound and the below-`ninodes` domain from it.  The only
+  row a retag can break is `fg_dirloc` (the node's own content), so
+  `fs_state_inode_acc`'s wand takes it.
 - **`free_bitmap Γ sb u` is indexed by the USED set**, matching
   `BitmapEnc.bm_bytes`' argument; §2's `F` is the free set.  The pool is a
   `big_sepL` over `seqZ 0 (sb_size sb)` whose element is `emp` at a set bit
@@ -1722,6 +1739,13 @@ Where the built shape differs from §2, and why:
   the target `fsΦ`, its gname fields being unread (`fs_footprint_gname`).
   `fs_view_mint` is the same with `γtop`'s auth allocated at `S`'s inode map
   and one `top_frag` handed back per inode (§4).
+- **What `fs_state` does NOT carry, and why the durable snapshot does.**
+  `snap_shape`'s surviving clause — every block of the committed map lies
+  below `sb_size (fss_sb S)` — is a fact about `D` and cannot be a reading:
+  a `ghost_map` AUTHORITY may hold entries no fragment names
+  (`iris/FsDurXferWall.v`).  It is also the only bridge between the boot
+  configuration's fixed `cov` and the era's own `size`, which is why it
+  cannot be supplied by the WAL either.
 - **The link family's validity is READ OFF the durable instance.**
   `fs_links_valid : fs_links g I -∗ ⌜✓ link_elem I⌝` gathers the whole
   family into one `own` and applies `own_valid`.  That is the ONLY place the

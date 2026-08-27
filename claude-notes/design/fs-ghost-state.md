@@ -264,15 +264,14 @@ of a durable `fs_state` mean something.
 |---|---|---|
 | `FsDurXfer.snap_gamma g gl gt` | a `fs_view_names Σ` (`FsStateDefs.v`'s record) at three FRESH gnames | the snapshot's Γ: `fsΦ dq a v := a ↪[g]{dq} v` at a fresh element of the tree's unique `ghost_mapG Σ Z (bv 8)`, the link family at `gl`, the abstract map at `gt`.  `snap_gamma_excl` IS `phi_excl`, so `FsStateBitmap.free_pool_used` and `FsStateDefs.blk_owned_ne` read on the durable side exactly as they do at the era's view. |
 | `FsDurRead.snap_auth g B D` | the epoch's IDENTITY | `ghost_map_auth g 1 B ∗ ⌜B ⊆ fs_dbytes D⌝` — the byte authority, and ONE equation between two VALUES saying it stands at the committed view's bytes.  SEALED (`Typeclasses Opaque`): it is one hypothesis at every reader.  It is not a consistency clause — it names no inode, no block role and no bitmap bit — and it is what turns every BYTE TIE of `snap_bytes` into a reading. |
-| `fs_snap Γ g B D S` | one epoch's whole instance | `snap_auth g B D`, `γtop Γ`'s authority at `fss_inodes S`, every `top_frag`, `fs_state Γ S`, the inode region's KEEP-ALIVE fragment at the root (`∃ kv, own (γlink Γ) (link_tok_elem ROOTINO kv)` — owned, not stated, which is how `sk_links`' slack becomes a reading), and the pure `⌜snap_shape S D⌝`.  Timeless whenever `Γ` is.  **`B` IS A PARAMETER, not `fs_dbytes D`**: the value-first allocator mints it at the whole of `fs_dbytes D`, the TRANSPORT at the flattening of the source instance's own runs (a record is 64 bytes of its region block, not the block).  Nothing reads it — the identity is the subset, not the value. |
+| `fs_snap Γ g B D S` | one epoch's whole instance | `snap_auth g B D`, `γtop Γ`'s authority at `fss_inodes S`, every `top_frag`, `fs_state Γ S`, the inode region's KEEP-ALIVE fragment at the root (`∃ kv, own (γlink Γ) (link_tok_elem ROOTINO kv)` — owned, not stated, which is how `sk_links`' slack becomes a reading), and the pure `⌜snap_shape S D⌝` — which since lane H5 is ONE clause, "every block of `D` is below `sb_size (fss_sb S)`".  Timeless whenever `Γ` is.  **`B` IS A PARAMETER, not `fs_dbytes D`**: the value-first allocator mints it at the whole of `fs_dbytes D`, the TRANSPORT at the flattening of the source instance's own runs (a record is 64 bytes of its region block, not the block).  Nothing reads it — the identity is the subset, not the value. |
 | `P_dur D` | `∃ g gl gt B S, fs_snap (snap_gamma g gl gt) g B D S` | THE REGISTRY: the CURRENT snapshot, at the committed block map alone.  The names, the byte map and the state are existential — an epoch is named only by the map it stands at, which is what makes `P_dur` a function of `D` and therefore droppable into `FsCrash.P_fs` with NO arity change. |
-| `P_dur_alloc S D` | `FsDurSnap.v` | `snap_ok S D` in, `P_dur D` out under a `bupd`.  The VALUE-FIRST entry: no resource from anyone, a value and pure facts.  It runs `fs_snap_alloc`, which allocates all three families in one update over the Γ-generic core `fs_state_of_ledger` and gets the identity by `reflexivity` (`B = fs_dbytes D`).  Since lane H4 its ONLY callers are ERA 0's — `FsDurImg.img_P_dur_alloc` and `FsCrash.P_fs_alloc`, both off the mkfs image; **`snap_ok` is handed IN nowhere else in the tree**. |
-| `snap_mint S D` | `FsDurSnap.v` (lane H4) | WHAT A PRODUCER WITH NO SOURCE INSTANCE OWES, and it is NOT `snap_ok`: `snap_shape` (`sm_shape`), `snap_local` (`sm_local`), the superblock's parse (`sm_parse`), the link family's SLACKED validity (`sm_links`), and the RUNS row (`sm_runs`: some `PM` with `xf_shape S PM`, `xr_disj (xr_fs S PM)` and `xr_union (xr_fs S PM) ⊆ fs_dbytes D`).  Four of the five are READINGS off the producer's own resources and nothing accumulates them; the fifth is the geometry, which no resource pins.  No byte tie, no used-set coupling, no `sk_disj`, no cut clause — the disjointness a linear ledger had to be CARVED by is the shape of a `∗`, read where the `∗` is. |
+| `P_dur_alloc S D` | **`FsDurAlloc.v`** (lane H5) | `snap_ok S D` in, `P_dur D` out under a `bupd`.  The VALUE-FIRST entry: no resource from anyone, a value and pure facts.  It runs `fs_snap_alloc`, which allocates all three families in one update over the Γ-generic core `fs_state_of_ledger` and gets the identity by `reflexivity` (`B = fs_dbytes D`).  **Its ONE caller in the tree is `FsDurImg.img_fs_snap_alloc`/`img_P_dur_alloc`**, era 0's, off the mkfs image — which is why the whole carve (`fp_slot`'s slot algebra, `blk_ledger`, `ledger_carve`, `blk_ledger_cut`, `fs_state_of_ledger`) lives in its own file above `FsDurSnap` rather than in the registry. |
+| `snap_mint S D` | `FsDurSnap.v` (lane H4) | WHAT A PRODUCER WITH NO SOURCE INSTANCE OWES, and it is NOT `snap_ok`: `snap_shape` (`sm_shape`, one clause), `FsState.fs_geom` (`sm_geom`), `snap_local` (`sm_local`), the superblock's parse (`sm_parse`), the link family's SLACKED validity (`sm_links`), and the RUNS row (`sm_runs`: some `PM` with `xf_shape S PM`, `xr_disj (xr_fs S PM)` and `xr_union (xr_fs S PM) ⊆ fs_dbytes D`).  Four of the five are READINGS off the producer's own resources and nothing accumulates them; the fifth is the geometry, which no resource pins.  No byte tie, no used-set coupling, no `sk_disj`, no cut clause — the disjointness a linear ledger had to be CARVED by is the shape of a `∗`, read where the `∗` is. |
 | `fs_snap_alloc_mint` / `P_dur_alloc_mint` | `FsDurSnap.v` (lane H4) | `snap_mint S D` in, the epoch / `P_dur D` out under a `bupd`, over `FsDurXfer.fs_state_mint_runs` and no resource at all.  THIS IS THE COMMIT'S ENTRY. |
-| `fs_snap_alloc_xfer` / `P_dur_alloc_xfer` | `FsDurSnap.v` | THE SAME REGISTRY, FROM AN INSTANCE (see the transport block below): `phi_excl Γ`, a source authority with `phi_agree Γ A (fs_dbytes D)`, `snap_shape S D`, and `fs_state Γ S ∗ own (γlink Γ) (link_tok_elem ROOTINO v)` in; `P_dur D` out with the source HANDED BACK.  **No byte tie, no disjointness clause and no used-set clause is a premise** — the disjointness is read off the source's own exclusivity inside `FsDurXfer`, and the identity is inherited from the source's authority.  What is left is the GEOMETRY and nothing else. |
-| `dsnap_step_xfer D D'` | `FsDurSnap.v` | the commit's step: `P_dur D' -∗ P_dur D ==∗ P_dur D'`.  The old epoch is DISCARDED and the NEXT ONE COMES IN FROM THE FILE SYSTEM (lane H2) — the WAL allocates nothing and reads nothing out of the old instance.  Its value-first predecessor `dsnap_step_of` (`snap_ok S' D'` in, the epoch built inside the permit) is DELETED.  `dsnap_step_id`/`_trans` are the readings a non-committing step takes, and have no caller. |
-| `fs_snap_read_ok` / `_keep` | `FsDurSnap.v` | **THE READING**: `fs_snap Γ g B D S -∗ ⌜snap_ok S D⌝`, nothing consumed (a pure conclusion is free).  Every byte tie by agreement with the epoch's own authority through the identity; the used-set coupling, `sk_disj` and `sk_slot` off `phi_excl` at `snap_gamma`; `snap_local`/`sk_repr`/`sk_parse` off `fs_state`'s own ghost half; `sk_links` off `fs_links_valid_tok` with the root's keep-alive fragment; `sk_dom` off `ss_regdom`.  The only inputs are the epoch's resources and `snap_shape`. |
-| `P_dur_tie` / `P_dur_tie_keep` / `P_dur_inode` / `P_dur_node_of_slot` | `FsDurSnap.v` | what a consumer READS off the current snapshot — all four go through `fs_snap_read_ok`, and their statements have not moved.  `P_dur_node_of_slot` turns a byte fact about the committed map's inode slot into a fact about the durable file system's inode, and `snap_dir_entry_of_first` does the same for a directory entry.  These are the readings the spike theorem is stated at. |
+| `dsnap_step_xfer D D'` | `FsDurSnap.v` | the commit's step: `P_dur D' -∗ P_dur D ==∗ P_dur D'`.  The old epoch is DISCARDED and the NEXT ONE COMES IN FROM THE FILE SYSTEM (lane H2) — the WAL allocates nothing and reads nothing out of the old instance.  Its value-first predecessor `dsnap_step_of` (`snap_ok S' D'` in, the epoch built inside the permit) is DELETED.  `dsnap_step_id`/`_trans` had no caller and are deleted (lane H5). |
+| `fs_snap_read_ok` / `_keep` | `FsDurSnap.v` | **THE READING**: `dblk_full D → fs_snap Γ g B D S -∗ ⌜snap_ok S D⌝`, nothing consumed (a pure conclusion is free).  Every byte tie by agreement with the epoch's own authority through the identity; the used-set coupling, `sk_disj` and `sk_slot` off `phi_excl` at `snap_gamma`; `snap_local`/`sk_repr`/`sk_parse` off `fs_state`'s own ghost half; `sk_sbok`/`sk_reg`/`sk_regdom`/`sk_dirloc`/`sk_dom`/`sk_inum` off `FsState.fs_geom`, which is `fs_state`'s own last conjunct; `sk_links` off `fs_links_valid_tok` with the root's keep-alive fragment.  The only inputs are the epoch's resources, the WAL's `dblk_full D`, and `ss_dombelow`. |
+| `P_dur_tie` / `P_dur_tie_keep` / `P_dur_inode` / `P_dur_node_of_slot` | `FsDurSnap.v` | what a consumer READS off the current snapshot — all four go through `fs_snap_read_ok` and all four take its `dblk_full D` premise, which `FsCrash`'s two readers discharge off the recovery record (`fs_recovery_blocks_full`).  `P_dur_node_of_slot` turns a byte fact about the committed map's inode slot into a fact about the durable file system's inode, and `snap_dir_entry_of_first` does the same for a directory entry.  These are the readings the spike theorem is stated at. |
 
 **THE RESOURCE TRANSPORT (`iris/FsDurXfer.v`, lane H).**  BOTH ENDS OF A
 TRANSPORT ARE `fs_state`s, and nothing is computed from `S` but the state
@@ -322,15 +321,14 @@ allocations and not one decode:
   rather than a carried clause.
 * the TOP map: `ghost_map_alloc` at `fss_inodes S`, the index of both ends.
 
-`FsDurSnap.fs_state_xfer_era` and `fs_state_xfer_snap` are the two
-NON-VACUITY CHECKS, stated rather than described: the transport applies at
-`FsBytesGamma.fs_gamma_L` against the era's own byte authority (the full,
-non-`□`-able element — the commit's collection is a legal source) and at
-`snap_gamma` against a snapshot's (the boot mint's lent snapshot is a legal
-source).  **`FsDurSnap.fs_bytes_auth` names the era's authority in a
-section WITHOUT `diskImgG`**, because with both class paths in scope
-`ghost_map_auth (fs_bytes γfs) 1 Lb` resolves to the other one and no
-agreement law then applies (durable-notes, "one bundle per ghost class").
+`FsCollect.col_agree` is what a caller supplies for `phi_agree` at the era's
+byte authority, and it is stated in `FsCollect` **so that the element and
+the authority are elaborated at one and the same `ghost_mapG` path**: with
+`diskImgG` also in scope there are two paths to `ghost_mapG Σ Z (bv 8)` and
+`ghost_map_lookup` resolves to the wrong one (durable-notes, "one bundle per
+ghost class").  The era-side and snapshot-side non-vacuity checks
+`fs_state_xfer_era`/`_snap` had no caller and are deleted (lane H5); the
+transport's live entry is the MINT.
 
 **THE LAW HANDS DOWN THE EPOCH (lane H2), BUT NEITHER CALL SITE USES THE
 TRANSPORT.**  `LogSnapLaw.snap_law`'s conclusion is now
@@ -353,21 +351,43 @@ GEOMETRY as its one pure conjunct.  `fs_snap_read_ok` derives the whole of
 `FsCollect.col_snap_bytes` already makes at the era's view, which is why the
 commit pays nothing new for it.
 
+**AND THE GEOMETRY IS DOWN TO ONE CLAUSE (lane H5), because five of its
+seven are not facts about `D` at all and the sixth is not a fact about the
+file system.**
+
 ```
-snap_shape S D :=  ss_bsz       every block of D is a whole block
-                   ss_dombelow  every block of D is below sb_size (fss_sb S)
-                   ss_sbok      fs_sb_ok (fss_sb S)
-                   ss_inum      a named inum is below 2^32
-                   ss_reg       a named inum sits in the region
-                   ss_regdom    every region inum is named
-                   ss_dirloc    node_dir_local i (snap_nib S) n
+snap_shape S D :=  ss_dombelow  every block of D is below sb_size (fss_sb S)
+
+FsState.fs_geom S :=  fg_sbok    fs_sb_ok (fss_sb S)
+                      fg_reg     a named inum sits in the region
+                      fg_regdom  every region inum is named
+                      fg_dirloc  node_dir_local i (fs_nib S) n
 ```
 
-Every clause of it is a clause of `snap_bytes` VERBATIM
-(`snap_shape_of_ok` is seven projections), every one is a CONFIGURATION
-fact rather than a fact about the file system's contents, and both
-producers have it for free: `FsCollect.col_geom` plus `col_hand`'s domain
-and directory rows at a commit, the mkfs geometry at era 0.
+`fs_geom` is **`fs_state`'s own last conjunct**, so it is a READING at BOTH
+instances (`fs_state_geom`, `fs_pure_geom`) and the durable snapshot carries
+none of it: `inode_local` says what ONE inode is, and these four say how the
+inode MAP and the SUPERBLOCK fit together — the one thing about a file
+system no per-inode clause gives, and exactly what `IcacheBoot.ireg_alloc` /
+`IcacheEscrow.ipool_alloc` need to re-found a region.  `fs_geom_inum`
+derives the old `ss_inum` from `fg_reg` + `FsImg.sbo_ushort` and
+`fs_geom_dom` is the old `snap_shape_dom`, so no clause of `snap_ok` was
+weakened.  It costs one row in `fs_state`/`fs_ghost`/`fs_pure` and one
+premise on `FsDurXfer.fs_state_mint_runs`; `FsState.fs_state_inode_acc`'s
+wand takes the retagged node's directory clauses, `fg_dirloc` being the only
+row an insert at a live key can break.
+
+`ss_bsz` — "every block of `D` is a whole block" — is the WAL's fact and not
+the snapshot's: it names no inode, no block role and no bitmap bit.  It is
+now a PREMISE of `fs_snap_read_ok`, and both readers have it for free
+(`FsCrash.fs_install_full` / `fs_recovery_dblk_full` /
+`fs_recovery_blocks_full`, one induction: `fs_install` only ever inserts
+values of `P` and `fs_restrict` holds nothing else — no `NoDup`, no
+`hdr_wf`).
+
+What is LEFT is one clause, and both producers still have it for free:
+`FsCollect.col_snap_shape` off `cg_size` at a commit (`col_fs_geom` is the
+other four), the mkfs geometry at era 0.
 
 **WHY THE GEOMETRY CANNOT ALSO BE A READING** (`iris/FsDurXferWall.v`,
 machine-checked, and it is a fact about `ghost_map` rather than a missing
@@ -378,6 +398,11 @@ every resource of the epoch still holds (`fs_snap_res_grow`, because the
 flattening is monotone — `fs_dbytes_grow`), while `ss_dombelow` fails at
 that block (`snap_shape_grow_absurd`).  `snap_shape_not_readable` is the
 two together; `fs_snap_res_inhabited` is the non-vacuity at the tied form.
+**This is why `ss_dombelow` did NOT move onto the instance with the other
+five** (lane H5): it is the only bridge between the FIXED `cov` and the
+era's own `size`, and nothing the epoch owns bounds `D`'s domain.  Supplying
+it from the WAL instead would need "block 1 never changes across a power
+cycle", a machine-level invariant this tree does not have.
 
 **AND STRENGTHENING THE IDENTITY TO AN EQUALITY DOES NOT CHANGE IT (lane
 H4).**  `fs_dbytes` is BLIND to a block whose byte list is empty and
@@ -386,7 +411,9 @@ at such a block: pad `D` with `b := []` and the flattening is unchanged on
 the nose (`fs_dbytes_pad`), so the epoch's resources at the two maps are
 LITERALLY INDISTINGUISHABLE — `fs_snap_res_eq_pad` is an `⊣⊢` where the
 growth witness above manages only a one-way entailment — while `ss_bsz`
-fails at the padded block (`snap_shape_pad_absurd`).
+fails above the state's own size (`snap_shape_pad_absurd`, which since
+lane H5 is `snap_shape_grow_absurd` at the EMPTY run — the block width no
+longer rides the snapshot, so the refutation goes through `ss_dombelow`).
 `snap_shape_not_readable_eq` is the two together.  **And the equality is
 not PROVABLE at a commit either**, for a reason about xv6 rather than about
 ghost state: nothing says a block whose bitmap bit is SET belongs to some
@@ -472,8 +499,7 @@ invalid) — at a commit off the era's, at any reader off the epoch's
 (`fs_inodes_phi_disj`, `fs_inodes_phi_used`, `fs_owns_not_meta`,
 `fs_meta_used`, all in `FsDurSnap`) — and never maintained by any writer;
 `iris/FsDurTrunc.v` is the refutation of maintaining them per write.  The encoder injectivity the
-readings rest on is `dinode_bytes_inj`, `rec_in_blk_inj`,
-`snap_bytes_node_inj`.
+readings rest on is `dinode_bytes_inj` and `rec_in_blk_inj`.
 
 **IT IS `FsCrash.P_fs`'s LAST CONJUNCT, AT `fr_D r`.**  Arity-free: `P_dur`
 is a function of the map and its gname family is existential, so the
@@ -482,8 +508,10 @@ is a function of the map and its gname family is existential, so the
 two sections, which every consumer has out of `Xv6G.xv6G`.  What a reader
 takes off it: `FsCrash.fs_commit_receipt` ("the disk recovers to a `D`, and
 `D` IS a file system") and `P_fs_dur_acc` (the snapshot lent out with a wand
-back — the channel the boot mint will take).  `P_fs_alloc` gained exactly one
-PURE premise, `∃ S, snap_ok S D0`.
+back — the channel the boot mint will take).  `P_fs_alloc` takes era 0's epoch as a
+RESOURCE, `⊢ |==> P_dur D0` (lane H5): the crash predicate does not know how
+a file system is built out of bytes, and **nothing at or below it takes
+`snap_ok` as a premise any more**.
 
 **AND IT REACHES THE WHOLE EXECUTION AS A PURE FACT.**
 `FsCrash.P_fs_rec_named_wf`/`P_fs_project` read `∃ S, snap_ok S D` off it
@@ -497,7 +525,8 @@ the CSL-free operational semantics can reach, across every power cycle.
 `FsCfgBoot.fs_boot_image_wf` ALONE yields `snap_ok (img_state …)
 (fs_restrict … home)` — the state is the decoder already in the tree and
 the map is exactly `FsCrash.P_fs_alloc_clean`'s `fr_D`.
-`img_P_dur_alloc` produces `P_dur D0` off that bundle alone, and
+`img_fs_snap_alloc`/`img_P_dur_alloc` produce era 0's epoch off that bundle
+alone — the tree's ONE call of the value-first allocator — and
 `img_boot_P_fs_dur` is `P_fs_alloc_clean` with that premise DISCHARGED, so
 no caller gains one.  It is the only place the image decoder is read on the
 durable side.  Non-vacuity at the literal mkfs image:
@@ -507,8 +536,9 @@ durable side.  Non-vacuity at the literal mkfs image:
 used I m Lb C home` — the era's pieces AS ALREADY COLLECTED — and
 `FsCollectAll.col_hand_mint` reads `FsDurSnap.snap_mint` off it (lane H4;
 `col_snap_bytes`/`col_snap_ok`/`col_snap_ok_ex`, which read the whole of
-`snap_ok`, are DELETED).  Its parts: `col_snap_shape` (the seven geometry
-clauses, off `col_geom` and the hand's domain and directory rows),
+`snap_ok`, are DELETED).  Its parts: `col_snap_shape` (one clause, off `cg_size`) and `col_fs_geom`
+(`FsState.fs_geom`'s four, off `col_geom` and the hand's domain and
+directory rows),
 `col_auth_dbytes`/`bytes_le_dbytes` (the logged byte map is inside the
 committed view's flattening, off `bytes_tie`/`bytes_dom`/`dom C = home`),
 `col_agree` (the era's authority AS the transport's `phi_agree`, stated in
