@@ -223,158 +223,12 @@ Section KforkPrologue.
   Lemma kfk_priv_close_id (V : pprivate) :
     upd_pt (upd_sz V (pv_sz V)) (pv_upt V) (pv_tf V) = V.
   Proof. destruct V; reflexivity. Qed.
-
-  (* =================================================================== *)
-  (*  THE BLOCK.                                                          *)
-  (* =================================================================== *)
-  (* [γk] IS A PARAMETER.  The allocator arrives as the NAMED bundle
-     [KvmSpec.kalloc_env_at γa γk on] (that is what allocproc's contract
-     takes), but kfork is uncounted and reached only from [sys_fork], which
-     holds a generic allocator gname -- so the count/seal pair is universally
-     quantified, never [fsc_kpages]. *)
-  Lemma kfk_prologue
-      (γa : gname) (γk : gname * gname) (γp γw γl γf : gname) (γs : list gname)
-      (nib : nat)
-      (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
-      (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
-      (R : iProp Σ) (lks : gset string) :
-    let sp0 : mword 64 := m !!! Regidx csp_rs1 in
-    let ra0 : mword 64 := m !!! Regidx Rra in
-    let s00 : mword 64 := m !!! Regidx Rs0 in
-    let s10 : mword 64 := m !!! Regidx Rs1 in
-    let s50 : mword 64 := m !!! Regidx Rs5 in
-    (K_kfork <= K)%nat ->
-    (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
-    (* this block's only lock-touching callee is allocproc, whose own bound
-       is at "proc" (11) -- uvmcopy's kalloc calls run while np->lock is
-       already held, but rank above "proc" follows by [locks_below_mono]
-       and its own contract does not yet expose the premise. *)
-    locks_below lks "proc" ->
-    sie_cap_gpr KT1 m K b pme -∗
-    cpu_own lvl eb pme b lks -∗
-    kernel_text -∗
-    pc_is (mword_of_int KF : mword 64) -∗
-    procs_inv γs -∗
-    is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
-    is_ftable γl γf -∗
-    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
-    itable_inv -∗
-    kalloc_env_at γa γk on -∗
-    (* the proc table's sealed regime -- what allocproc mints the new slot's
-       marker out of.  Persistent, so it costs the three continuations
-       nothing. *)
-    procs_avail None -∗
-    proc_priv γf pme pid_p Vp -∗
-    (* THE CALLER'S EXIT, THREADED -- kwait's [kw_exit_fn] recipe.  The three
-       continuations below are three DIFFERENT closures and exactly one of
-       them runs, but a caller has only ONE exit and it is linear, so making
-       each closure capture its own copy is unsound by typing (claude-notes,
-       S10: "splitting it into two closures instead is unsound-by-typing:
-       whichever arm does not run would have to drop one").  So the exit
-       rides through as an abstract [R] and each continuation receives it
-       back as its LAST argument. *)
-    R -∗
-    (* ---- Hcont10a : allocproc found no free slot ---- *)
-    wp_next b pme (fun (CID : CpuId) =>
-      ∀ (Mt : regfile),
-        ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
-        ⌜ forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
-            r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r ⌝ -∗
-        sie_cap_gpr KT1 Mt (K - 8)%nat b pme -∗
-        (* [cpu_own] is handed on, not dropped.  Both of allocproc_post's
-           not-found arms return it at the CALLER's level and index, and
-           [SpecKfork.kfork_post] needs it unconditionally -- an affine BI
-           lets a proof drop it silently, which is exactly how it went
-           missing from this continuation the first time. *)
-        cpu_own lvl eb pme b lks -∗
-        kernel_text -∗
-        pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
-        kfk_frame sp0 ra0 s00 s10 s50 -∗
-        proc_priv γf pme pid_p Vp -∗
-        ( kalloc_env_at γa γk on
-          ∨ (∃ n : nat, ⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝ ∗
-             kalloc_env_at γa γk None) ) -∗
-        R -∗
-        WP (Loop : expr riscv_lang)) -∗
-    (* ---- Hcont7c : uvmcopy failed ---- *)
-    (* [wp_next]'s own reference hart is bound EXPLICITLY (rather than left to
-       resolve at this Section's [CID0]): once allocproc's found arm commits
-       to [b = false] the hart is pinned from THAT hart on, which need not be
-       [CID0] if the entry [b] was [true] and a migration happened inside
-       myproc/allocproc.  The caller instantiates [CIDh] at whichever hart is
-       ambient the moment it reaches this exit. *)
-    (* THE CROSSING PREMISE IS NOT OPTIONAL.  Without it this antecedent is
-       "prove the continuation at a hart nobody has said anything about":
-       [wp_next _ false _ K] is [K CIDh] ([WpNext.wp_next_off]), so supplying
-       it means proving [K CIDh] for an ADVERSARIAL [CIDh], and the caller's
-       own exit continuation is anchored at [CID0] with no way to re-anchor.
-       The fact is true and this proof already has it -- [wp_next_chain] over
-       the leaves run so far -- it was simply never surfaced. *)
-    (∀ CIDh : CpuId,
-       ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
-       wp_next (CID0 := CIDh) false pme (fun (CID : CpuId) =>
-      ∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
-        (pid_c : mword 32) (ch : mword 64) (Vc : pprivate),
-        ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
-        ⌜ Mt !!! Regidx Rs4 = npa ⌝ -∗
-        ⌜ Mt !!! Regidx Rs5 = pme ⌝ -∗
-        ⌜ Mt !!! Regidx Ra0 = (mword_of_int (-1) : mword 64) ⌝ -∗
-        ⌜ forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
-            r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r ⌝ -∗
-        (* [npa = proc_addr j] is what lets the caller apply a block stated
-           over [proc_addr j] (ProofKforkB1) to the [npa] this hands out.
-           Inside, [npa] IS [proc_addr j] by [set]; the binder is free, so
-           without this equation the caller has an opaque pointer. *)
-        ⌜ npa = proc_addr j /\ (j < NPROC)%nat /\ γs !! j = Some γl2 /\
-          pv_ofile Vc = replicate NOFILE (zero_reg : mword 64) /\
-          pv_cwd Vc = (zero_reg : mword 64) ⌝ -∗
-        (* IN-LOCK EXIT: allocproc returned holding np->lock, so the index
-           carries the trap reserve of the arm the caller will eventually
-           return at ([trap_res b]) -- exactly [SpecAllocproc]'s found-arm
-           index, propagated. *)
-        sie_cap_gpr KT1 Mt (trap_res b + (K - 8))%nat false pme -∗
-        kernel_text -∗
-        pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
-        (* slot 6 PINNED: s4 was spilled at +0x1a and the uvmcopy-failure
-           tail reloads it at +0x8a, so that exit has to know which value it
-           gets back.  Slots 4/5 stay existential -- s2/s3 are spilled only
-           at +0x30/+0x32, i.e. after uvmcopy has already SUCCEEDED, so on
-           this path they were never written. *)
-        (∃ w4 w5 : mword 64,
-           kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
-        proc_priv γf pme pid_p Vp -∗
-        proc_priv_nocwd γf npa pid_c Vc -∗
-        SchedCtx.proc_held cpu_id j γl2 USED ch -∗
-        ProcGeom.hart_at_any npa -∗
-        FdSlots.fd_slots FDSPARE -∗
-        IrefSlots.iref_slots (1 + IREFSPARE) -∗
-        (* the child's bio allowance, on the same argument as the stack: this
-           exit frees the slot, so the three units go back into freeproc's
-           block ([ProcDefs.proc_dormant] owns three at every state). *)
-        bslots 3 -∗
-        SwtchCtx.own_ctx (p_context npa) -∗
-        (* the child's kernel stack, exactly as allocproc handed it out: this
-           exit frees the slot, so the page goes straight back into
-           freeproc's block ([SpecFreeproc.fp_rest]). *)
-        ProcDefs.kstack_free npa -∗
-        IntrDefs.arm_pay KT1 lvl eb pme -∗
-        cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
-        kalloc_env_at γa γk None -∗
-        R -∗
-        WP (Loop : expr riscv_lang))) -∗
-    (* ---- Hcont4a : uvmcopy succeeded -- the trapframe copy loop's head --- *)
-    (* THE CROSSING PREMISE IS NOT OPTIONAL.  Without it this antecedent is
-       "prove the continuation at a hart nobody has said anything about":
-       [wp_next _ false _ K] is [K CIDh] ([WpNext.wp_next_off]), so supplying
-       it means proving [K CIDh] for an ADVERSARIAL [CIDh], and the caller's
-       own exit continuation is anchored at [CID0] with no way to re-anchor.
-       The fact is true and this proof already has it -- [wp_next_chain] over
-       the leaves run so far -- it was simply never surfaced. *)
-    (∀ CIDh : CpuId,
-       ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
-       wp_next (CID0 := CIDh) false pme (fun (CID : CpuId) =>
-      ∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
+  (* exit continuation 3 of [kfk_prologue], named: inline it was
+     4614 B in Delta at every step of that walk
+     (optimization.md, fold block continuations). *)
+  Definition kfk_pro_exit3
+      (γa : gname) (γk : gname * gname) (γw : gname) (γl : gname) (γf : gname) (γs : list gname) (nib : nat) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Vp : pprivate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
+    (∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
         (pid_c : mword 32) (ch : mword 64) (Vc' : pprivate)
         (tfsrc tfdst : mword 44),
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
@@ -451,7 +305,171 @@ Section KforkPrologue.
         is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
         itable_inv -∗
         R -∗
-        WP (Loop : expr riscv_lang))) -∗
+        WP (Loop : expr riscv_lang))%I.
+
+  (* exit continuation 2 of [kfk_prologue], named: inline it was
+     2790 B in Delta at every step of that walk
+     (optimization.md, fold block continuations). *)
+  Definition kfk_pro_exit2
+      (γa : gname) (γk : gname * gname) (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Vp : pprivate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
+    (∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
+        (pid_c : mword 32) (ch : mword 64) (Vc : pprivate),
+        ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
+        ⌜ Mt !!! Regidx Rs4 = npa ⌝ -∗
+        ⌜ Mt !!! Regidx Rs5 = pme ⌝ -∗
+        ⌜ Mt !!! Regidx Ra0 = (mword_of_int (-1) : mword 64) ⌝ -∗
+        ⌜ forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
+            r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r ⌝ -∗
+        (* [npa = proc_addr j] is what lets the caller apply a block stated
+           over [proc_addr j] (ProofKforkB1) to the [npa] this hands out.
+           Inside, [npa] IS [proc_addr j] by [set]; the binder is free, so
+           without this equation the caller has an opaque pointer. *)
+        ⌜ npa = proc_addr j /\ (j < NPROC)%nat /\ γs !! j = Some γl2 /\
+          pv_ofile Vc = replicate NOFILE (zero_reg : mword 64) /\
+          pv_cwd Vc = (zero_reg : mword 64) ⌝ -∗
+        (* IN-LOCK EXIT: allocproc returned holding np->lock, so the index
+           carries the trap reserve of the arm the caller will eventually
+           return at ([trap_res b]) -- exactly [SpecAllocproc]'s found-arm
+           index, propagated. *)
+        sie_cap_gpr KT1 Mt (trap_res b + (K - 8))%nat false pme -∗
+        kernel_text -∗
+        pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
+        (* slot 6 PINNED: s4 was spilled at +0x1a and the uvmcopy-failure
+           tail reloads it at +0x8a, so that exit has to know which value it
+           gets back.  Slots 4/5 stay existential -- s2/s3 are spilled only
+           at +0x30/+0x32, i.e. after uvmcopy has already SUCCEEDED, so on
+           this path they were never written. *)
+        (∃ w4 w5 : mword 64,
+           kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
+        proc_priv γf pme pid_p Vp -∗
+        proc_priv_nocwd γf npa pid_c Vc -∗
+        SchedCtx.proc_held cpu_id j γl2 USED ch -∗
+        ProcGeom.hart_at_any npa -∗
+        FdSlots.fd_slots FDSPARE -∗
+        IrefSlots.iref_slots (1 + IREFSPARE) -∗
+        (* the child's bio allowance, on the same argument as the stack: this
+           exit frees the slot, so the three units go back into freeproc's
+           block ([ProcDefs.proc_dormant] owns three at every state). *)
+        bslots 3 -∗
+        SwtchCtx.own_ctx (p_context npa) -∗
+        (* the child's kernel stack, exactly as allocproc handed it out: this
+           exit frees the slot, so the page goes straight back into
+           freeproc's block ([SpecFreeproc.fp_rest]). *)
+        ProcDefs.kstack_free npa -∗
+        IntrDefs.arm_pay KT1 lvl eb pme -∗
+        cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
+        kalloc_env_at γa γk None -∗
+        R -∗
+        WP (Loop : expr riscv_lang))%I.
+
+  (* exit continuation 1 of [kfk_prologue], named: inline it was
+     1033 B in Delta at every step of that walk
+     (optimization.md, fold block continuations). *)
+  Definition kfk_pro_exit1
+      (γa : gname) (γk : gname * gname) (γf : gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
+    (∀ (Mt : regfile),
+        ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
+        ⌜ forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
+            r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r ⌝ -∗
+        sie_cap_gpr KT1 Mt (K - 8)%nat b pme -∗
+        (* [cpu_own] is handed on, not dropped.  Both of allocproc_post's
+           not-found arms return it at the CALLER's level and index, and
+           [SpecKfork.kfork_post] needs it unconditionally -- an affine BI
+           lets a proof drop it silently, which is exactly how it went
+           missing from this continuation the first time. *)
+        cpu_own lvl eb pme b lks -∗
+        kernel_text -∗
+        pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
+        kfk_frame sp0 ra0 s00 s10 s50 -∗
+        proc_priv γf pme pid_p Vp -∗
+        ( kalloc_env_at γa γk on
+          ∨ (∃ n : nat, ⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝ ∗
+             kalloc_env_at γa γk None) ) -∗
+        R -∗
+        WP (Loop : expr riscv_lang))%I.
+
+
+  (* =================================================================== *)
+  (*  THE BLOCK.                                                          *)
+  (* =================================================================== *)
+  (* [γk] IS A PARAMETER.  The allocator arrives as the NAMED bundle
+     [KvmSpec.kalloc_env_at γa γk on] (that is what allocproc's contract
+     takes), but kfork is uncounted and reached only from [sys_fork], which
+     holds a generic allocator gname -- so the count/seal pair is universally
+     quantified, never [fsc_kpages]. *)
+  Lemma kfk_prologue
+      (γa : gname) (γk : gname * gname) (γp γw γl γf : gname) (γs : list gname)
+      (nib : nat)
+      (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
+      (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
+      (R : iProp Σ) (lks : gset string) :
+    let sp0 : mword 64 := m !!! Regidx csp_rs1 in
+    let ra0 : mword 64 := m !!! Regidx Rra in
+    let s00 : mword 64 := m !!! Regidx Rs0 in
+    let s10 : mword 64 := m !!! Regidx Rs1 in
+    let s50 : mword 64 := m !!! Regidx Rs5 in
+    (K_kfork <= K)%nat ->
+    (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+    (* this block's only lock-touching callee is allocproc, whose own bound
+       is at "proc" (11) -- uvmcopy's kalloc calls run while np->lock is
+       already held, but rank above "proc" follows by [locks_below_mono]
+       and its own contract does not yet expose the premise. *)
+    locks_below lks "proc" ->
+    sie_cap_gpr KT1 m K b pme -∗
+    cpu_own lvl eb pme b lks -∗
+    kernel_text -∗
+    pc_is (mword_of_int KF : mword 64) -∗
+    procs_inv γs -∗
+    is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_ftable γl γf -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
+    itable_inv -∗
+    kalloc_env_at γa γk on -∗
+    (* the proc table's sealed regime -- what allocproc mints the new slot's
+       marker out of.  Persistent, so it costs the three continuations
+       nothing. *)
+    procs_avail None -∗
+    proc_priv γf pme pid_p Vp -∗
+    (* THE CALLER'S EXIT, THREADED -- kwait's [kw_exit_fn] recipe.  The three
+       continuations below are three DIFFERENT closures and exactly one of
+       them runs, but a caller has only ONE exit and it is linear, so making
+       each closure capture its own copy is unsound by typing (claude-notes,
+       S10: "splitting it into two closures instead is unsound-by-typing:
+       whichever arm does not run would have to drop one").  So the exit
+       rides through as an abstract [R] and each continuation receives it
+       back as its LAST argument. *)
+    R -∗
+    (* ---- Hcont10a : allocproc found no free slot ---- *)
+    wp_next b pme (fun CID : CpuId => kfk_pro_exit1 γa γk γf m lvl K eb pme on b pid_p Vp R lks sp0 ra0 s00 s10 s50 CID) -∗
+    (* ---- Hcont7c : uvmcopy failed ---- *)
+    (* [wp_next]'s own reference hart is bound EXPLICITLY (rather than left to
+       resolve at this Section's [CID0]): once allocproc's found arm commits
+       to [b = false] the hart is pinned from THAT hart on, which need not be
+       [CID0] if the entry [b] was [true] and a migration happened inside
+       myproc/allocproc.  The caller instantiates [CIDh] at whichever hart is
+       ambient the moment it reaches this exit. *)
+    (* THE CROSSING PREMISE IS NOT OPTIONAL.  Without it this antecedent is
+       "prove the continuation at a hart nobody has said anything about":
+       [wp_next _ false _ K] is [K CIDh] ([WpNext.wp_next_off]), so supplying
+       it means proving [K CIDh] for an ADVERSARIAL [CIDh], and the caller's
+       own exit continuation is anchored at [CID0] with no way to re-anchor.
+       The fact is true and this proof already has it -- [wp_next_chain] over
+       the leaves run so far -- it was simply never surfaced. *)
+    (∀ CIDh : CpuId,
+       ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
+       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit2 γa γk γf γs m lvl K eb pme b pid_p Vp R lks sp0 ra0 s00 s10 s50 CID)) -∗
+    (* ---- Hcont4a : uvmcopy succeeded -- the trapframe copy loop's head --- *)
+    (* THE CROSSING PREMISE IS NOT OPTIONAL.  Without it this antecedent is
+       "prove the continuation at a hart nobody has said anything about":
+       [wp_next _ false _ K] is [K CIDh] ([WpNext.wp_next_off]), so supplying
+       it means proving [K CIDh] for an ADVERSARIAL [CIDh], and the caller's
+       own exit continuation is anchored at [CID0] with no way to re-anchor.
+       The fact is true and this proof already has it -- [wp_next_chain] over
+       the leaves run so far -- it was simply never surfaced. *)
+    (∀ CIDh : CpuId,
+       ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
+       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit3 γa γk γw γl γf γs nib m lvl K eb pme b pid_p Vp R lks sp0 ra0 s00 s10 s50 CID)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 ra0 s00 s10 s50 HK Hlvl Hbelow.
