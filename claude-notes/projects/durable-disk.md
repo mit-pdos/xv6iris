@@ -4214,6 +4214,123 @@ the rows below and in `design/fs-ghost-state.md`).
     bmapstart/size, and `SpecKexec.fs_fabric`'s `⌜g = icfg_log⌝`.  The three
     tie records stay the meter: twelve equations in `fs_world`, seventeen
     fields in `sysc_ties`, twelve in `fclose_ties`.
+
+  **AS LANDED — R1c: THE FOUR `icfg` CONSTANTS.  Whole tree green,
+  `make audit-only` identical BY NAME to a pre-change run of the same tree
+  (the thirteen entries), and `SystemAdequacy.v` / `SystemAssumptions.v` are
+  byte-identical — the audited theorem never named any of the four.**
+
+  - **THE FOUR NAMES, MEASURED OVER THE 102 FILES THIS SLICE TOUCHES.**
+    `dev : mword 32` → `icfg_dev` (binder groups 304 → 7),
+    `nib : nat` → `icfg_nib` (256 → 3), `inodestart : Z` → `icfg_ist`
+    (310 → 6), `g`/`γ`/`glog : log_names` → `icfg_log` (259 → 6).  The bare
+    tokens go 2093 → 191, 1314 → 47, 1804 → 65: what is left is PROSE about
+    xv6's own C parameters (`iget(uint dev, uint inum)` and friends) plus the
+    pure lemmas listed below.  **288 declarations lost at least one
+    parameter**, and **41 `Module Type`s changed statement** — `CREATE
+    DIRLINK DIRLOOKUP FILECLOSE FILEREAD FILESTAT FILEWRITE FSINIT IALLOC
+    IDUP IGET ILOCK IPUT IRECLAIM ITRUNC IUNLOCKPUT IUPDATE KEXEC KEXECB2
+    KEXECB3 KEXIT KFORK NAMEI NAMEIPARENT NAMEI_ROOT NAMEI_TR NAMEX
+    NAMEX_ROOT NAMEX_TR READI SYSCHDIR SYSEXEC SYSEXIT SYSFORK SYSLINK
+    SYSMKDIR SYSMKNOD SYSOPEN SYSUNLINK SYSWRITE WRITEI` — none of which
+    gained a premise.
+  - **THE CUT IS THE SAME 90-ODD FILES FOR ALL FOUR**, as it was for R1a's
+    `cn` and R1b's five: they occur in the same binder groups, so they are
+    one build.  What made it ONE PASS rather than four is that the tie
+    equations only become deletable when BOTH sides are ambient.
+  - **183 TIE PREMISES DIED, on 103 declarations**, each with the `intros`
+    name it was given and the positional argument every caller fed it.  The
+    hypothesis was invariably spent on a `rewrite`/`subst` that Rocq REFUSES
+    once both sides print the same (`all matches of the RHS … are equal to
+    the LHS`), so **116 rewrites went with the premises** — the tactic and
+    the premise are one edit, not two.  What is left of the shape is nine
+    honest per-call identity facts: `ProofIget`'s scan comparing a slot's
+    `di`/`dj` against `icfg_dev`, and `ProofIput`'s three
+    `⌜cdev = icfg_dev ∧ cinum = inum⌝` reads off the entry's own cells.
+  - **THE BUNDLES LOSE THEIR MATCHING ROWS.**  `FsSyscalls.fs_world` 12 → **8**
+    equations (printk, kalloc, uart, disk, dlock, bio, bmapstart, size — the
+    six DEVICE/ALLOCATOR names and the two bitmap numbers, which are stage
+    4's, not this slice's: the plan's "12 → 2" counted them as `icfg`-shaped
+    and they are not).  `FsSyscalls.fs_geom` loses four parameters and its
+    `fg_dev`/`fg_nib`/`fg_log`/`fg_ist` fields; `SpecKexec.fs_fabric` loses
+    four parameters and its `⌜g = icfg_log⌝` last conjunct (and
+    `ProofKexecTail.fs_fabric_mk` the `[%]` slot every caller filled);
+    `ProofSyscall.sysc_ties` 17 → **13** fields, `SpecFileclose.fclose_ties`
+    12 → **8**.  `sysc_fs_env_all` and `sysc_ic_env_of_ready` lose the four
+    and two rows their thirty-two destruct patterns opened.
+  - **FIVE NAMES RECORDS LOSE THE FIELDS THAT ONLY CARRIED A COPY DOWN**, and
+    had to, for R1a's reason: `fclose_names` (`fcn_log`, `fcn_dev`,
+    `fcn_inodestart`, `fcn_nib`), `fread_names` and `fstat_names`
+    (`_inodestart`), `fwrite_names` (`fwn_log`, `fwn_inodestart`),
+    `UsertrapRes.ut_names` (`un_lg`, `un_dev`, `un_inodestart`, `un_nib`).
+  - **ONE PREMISE THAT WENT VACUOUS RATHER THAN REDUNDANT.**
+    `SpecIupdate.wp_iupdate_unlink`'s receipt,
+    `⌜g = icfg_log⌝ ∗ ⌜inodestart = icfg_ist⌝ ∨ ⌜nlink ≠ 0⌝`, had a left
+    disjunct that is now `True`, so the premise is gone and
+    `ProofIupdate.iu_step_unlink` takes the WITNESS route outright — its
+    vacuous arm is deleted, and the seven callers stop passing the `[]`.
+    Same for the `crz` bundle of `iput`/`iunlockput`: `nlz_obs … ∗ ⌜g =
+    icfg_log⌝ ∗ ⌜inodestart = icfg_ist⌝` is the observation alone now.
+  - **WHAT STAYS THREADED, AND WHY.**  Everything below `FsCfg` and the whole
+    WAL: an FS contract INSTANTIATES `log_ctx` / `bio_ctx` / `is_itable2` /
+    `ireg_inv` / `IcacheRef.inode_ref*` / `InodeRegion.ireg_obs_*` at the
+    fields, which costs nothing and is why `InodeRegion`'s five
+    `⌜γ = icfg_log⌝` premises stay and are discharged by `eq_refl`.  The bio
+    layer's per-call `dev`; `SpecStati`'s `dev`/`inum`, read out of the
+    entry's cells; the boot side's era numbers (`FirstTok`, `FsCfgBoot`,
+    `FsCfgSnap`, `SpecMain`/`ProofMain`, `SystemAdequacy`, `IcacheBoot`,
+    `FsCollect*`).
+  - **AND THE PURE LEMMAS WITH NO `icfg` IN SCOPE KEEP THEIR PARAMETERS** —
+    R1b's memory bomb, and the checker for it is now written down (below).
+    Six declarations are in that class and were left alone:
+    `SpecWritei.wi16_post` / `wi16_spend_any`, `SpecDirlink.dl16_post` /
+    `ireg_blocks_ok`, `ProofWritei.wi16_pre_spend` / `wi16_pre_join`; two
+    more in `ProofFilewrite` (`fw_dir_ok_wi`, `fw_dir_ok_same`).  The
+    contract instantiates them at `icfg_ist`/`icfg_nib`.
+  - **FIVE SECTIONS GAINED `ICFG : icfg`** beside an existing `FSC : fscfg`
+    (never beside a `fileG` — ProbeR1a's two-path trap):
+    `SpecItrunc.ItruncSpec`, `ProofIalloc.IallocBytes`,
+    `ProofSysChdir/Mkdir/MknodM1Tail`, plus `ProofItruncParts.ItruncDefs`
+    (which also gained `Require Import FsCfg`).  The tell that one is needed
+    is NOT a memory bomb but a plain *"Cannot infer the implicit parameter
+    icfg"*: `fscfg` in scope terminates the search.
+  - **THE CHECKER** (`0 declarations out of scope`): for every declaration in
+    `_CoqProject`, if its text names `icfg_*` then `icfg` or `fileG` must be
+    in its own binder group or an enclosing `Context`; likewise `fsc_*` and
+    `fscfg`; and a file naming `fsc_*` must require `FsCfg`.  Exactly three
+    exemptions, all structural: `FsCfg` itself, and the two ALLOCATORS
+    (`IcacheRef.icfg_alloc`, `FsCfgSnap.fs_cfg_alloc_snap`) which bind the
+    instance existentially INSIDE the statement.
+  - **THE TWO SURVEY TRAPS, both worth copying.**  (i) A grep for
+    `(inodestart : Z)` misses `(bmapstart inodestart : Z)`: `ProofKexecC`,
+    `ProofKexecD` and `ProofKexec`'s tail were missing from the first cut and
+    surfaced only as a type error at the call.  Size the cut with a BINDER
+    PARSER, not a grep.  (ii) A `Lemma X : forall …, X_body …` puts every
+    binder after the `:`, so a header-only parser gives it zero parameters —
+    `ProofCreateFreshTy.create_fresh_ty` is the witness, and it is applied
+    with an eta-expanded hypothesis (`fun CIDx => IA.wp_ialloc_gen (CID :=
+    CIDx)`) whose type must lose the same binders in the same places.
+  - **NOTHING GOT SLOWER, MEASURED** (standalone `rocq compile`, same VM,
+    against `origin/main` at the same base -- the six heaviest files in the
+    cut): `ProofCreate` 140.9 -> 141.5 s, `ProofSysUnlink` 131.3 -> 131.3,
+    `ProofSysOpen` 61.4 -> 62.2, `ProofIput` 67.6 -> 68.1, `ProofSyscall`
+    45.6 -> 44.8, `ProofKexecC` 48.3 -> 48.1; peak RSS flat to -2 %.  Every
+    delta is inside the noise, which is the expected answer: dropping a
+    parameter shortens the statement without changing a single proof step.
+  - **THE KEXEC CONE FOLDED WHILE THIS RAN, AND THE TWO MEET IN ONE ARGUMENT.**
+    `KexecOkQ.kexec_closer` — the continuation-folds lane's name for the
+    exit continuation the kexec cone used to inline — took
+    `bmapstart inodestart`, and it loses `inodestart` here like everything
+    else.  That is the whole of the rebase: nine files, thirty-two hunks, all
+    the same shape (upstream's folded call vs this slice's inlined
+    continuation), resolved by taking the FOLD and dropping its argument.
+  - **WHAT STAGE 4 STILL OWES**: the bundle collapse proper.  `fs_world` →
+    `fs_ready` + `fs_ready_disk` (its eight remaining equations are the six
+    device/allocator names `γpr γa γu γd γk bn` and `bmapstart`/`size`);
+    `fs_world_all`'s 25-second `iSplit` chain; `FsSyscalls.fs_geom` (now
+    fifteen fields) dies in favour of `FsReady.fs_geom_ok`;
+    `sysc_ties` → four process fields; `fclose_names` 20 → 8 fields and
+    `fclose_ties` dies; `fs_fabric` still takes eight names.
 - [ ] **EV — the era-vocabulary unification** (approved): five staged
   lanes; three of the four holders are already predicate-vocabulary; the
   payoff is the commit handing a real `fs_state` to the transport.  Runs
