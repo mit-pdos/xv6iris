@@ -764,7 +764,7 @@ Section ProofSysUnlinkTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -806,7 +806,7 @@ Section ProofSysUnlinkTails.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -933,7 +933,7 @@ Section ProofSysUnlinkTails.
        release of the walk, so the ARMED contract (B''-tx4) brings the whole
        element home in the ghost step that parks the payload. *)
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gtl gil gisl bmapstart
+              pd pav pu bn g gil gisl bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 30)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -1102,7 +1102,7 @@ Section ProofSysUnlinkTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -1143,7 +1143,7 @@ Section ProofSysUnlinkTails.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -1247,7 +1247,7 @@ Section ProofSysUnlinkTails.
     iDestruct (cpu_claim_ext_transport CID0 CID1 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (su_tail_bad (CID0 := CID1) gs jx gl gu gd gk pd pav pu bn g
-              gtl gil gisl bmapstart inodestart nib size dev
+              gil gisl bmapstart inodestart nib size dev
               kk qi s gy inum dn bm u pidv dq dqb dqs m M1 sp0 K eb b lks
               (m !!! Regidx Rs2 : mword 64) w5 w6 w27 w30 bd bnm bp be
               Vpr HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -1286,7 +1286,6 @@ Section ProofSysUnlinkTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname)
       (gil gisl : gname) (gili gisli : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -1333,7 +1332,7 @@ Section ProofSysUnlinkTails.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ki -∗
@@ -1485,7 +1484,7 @@ Section ProofSysUnlinkTails.
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gtl gili gisli bmapstart
+              pd pav pu bn g gili gisli bmapstart
               inodestart nib size dev ki qip si gyi
               (DepTx si dev inumi gyi t (1/4)%Qp) inumi dni bmi u SbE
               false false false eE _ _ pidv
@@ -1603,7 +1602,7 @@ Section ProofSysUnlinkTails.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID6)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (su_tail_bad (CID0 := CID6) gs jx gl gu gd gk pd pav pu bn g
-              gtl gil gisl bmapstart inodestart nib size dev
+              gil gisl bmapstart inodestart nib size dev
               kk qi s gy inum dn bm n2 pidv dq dqb dqs m P2 sp0 K eb b
               lks (m !!! Regidx Rs2 : mword 64) (m !!! Regidx Rs3 : mword 64)
               w6 w27 w30 bd bnm bp be

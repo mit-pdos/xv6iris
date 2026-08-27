@@ -1283,7 +1283,6 @@ Section ProofDirlinkMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (ga : gname) (gf : gname) (gpr : gname)
       (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -1296,7 +1295,7 @@ Section ProofDirlinkMain.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_dirlink_gen_body gs j gl gu gd gk pd pav pu bn g gtl
+    : wp_dirlink_gen_body gs j gl gu gd gk pd pav pu bn g
                           ga gf gpr inodestart nib bmapstart
                           size dev ip dinum bm data dn dn0 fn inum
                           ncount Sb tid qtx pidv dq dqd dqn dqs dqb dqbs dqf
@@ -1772,7 +1771,7 @@ Section ProofDirlinkMain.
     iDestruct (dl_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
    iDestruct (cpu_own_transport CID CID12 0%nat eb (proc_addr j) b 
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk pd pav pu bn gtl
+    iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk pd pav pu bn
               ga gf inodestart nib dev ip dinum bm data dn dn0 fn
               false (mword_of_int 0 : mword 32)
               pidv dq dqd dqn R7 (K - 10)%nat eb b _ Vpr
@@ -1869,7 +1868,7 @@ Section ProofDirlinkMain.
          The birth epoch is opened for the reservation and never named
          again: at [crz = false] iput makes no epoch-ordered claim. *)
       iDestruct (log_opS_named with "Hop") as (edl) "Hop".
-      iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gtl
+      iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g
                 gil gisl bmapstart inodestart nib size dev
                 kslot qq (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32)
                 ncount Sb false false false edl tid qtx pidv dq dqb dqs E1 (K - 10)%nat eb b lks Vpr true
@@ -3503,7 +3502,6 @@ Section ProofDirlinkMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (ga : gname) (gf : gname) (gpr : gname)
       (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -3516,7 +3514,7 @@ Section ProofDirlinkMain.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_dirlink_sconf_body gs j gl gu gd gk pd pav pu bn g gtl
+    : wp_dirlink_sconf_body gs j gl gu gd gk pd pav pu bn g
                             ga gf gpr inodestart nib bmapstart
                             size dev ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
@@ -3544,7 +3542,7 @@ Section ProofDirlinkMain.
        seven dominates it at every pair of booleans. *)
     assert (Hncg : forall crb ind : bool, (dl_need crb ind <= ncount)%nat)
       by (intros crb ind; exact (Nat.le_trans _ _ _ (dl_need_le crb ind) Hnc)).
-    iApply (wp_dirlink_gen gs j gl gu gd gk pd pav pu bn g gtl
+    iApply (wp_dirlink_gen gs j gl gu gd gk pd pav pu bn g
               ga gf gpr inodestart nib bmapstart size dev
               ip dinum bm data dn dn0 fn inum ncount Sb0 t0 (1/2)%Qp
               pidv dq dqd dqn dqs dqb dqbs dqf m K eb b lks Vpr

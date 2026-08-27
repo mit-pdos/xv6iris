@@ -126,14 +126,13 @@ Section ProofSysExit.
       (dev : mword 32)
       (ip : mword 64) (dqi : dfrac)
       (γkl : gname) (γka : gname * gname)
-      (γtl : gname)
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string)
     : wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ
                              dev ip dqi γkl γka
-                             γtl bmapstart inodestart nib size
+                             bmapstart inodestart nib size
                              on fn m av eb b pid V v0 lks.
   Proof.
     cbv beta delta [wp_sys_exit_sconf_body].
@@ -339,7 +338,7 @@ Section ProofSysExit.
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Kexit.wp_kexit_sconf γft γf γw γs j γl γu γd γk pd pav pu bn γ
               dev ip dqi γkl γka
-              γtl bmapstart inodestart nib size
+              bmapstart inodestart nib size
               on fn B2 (av - 4)%nat eb b lks pid V
               Hfn Hj Hgl (sex_Kke av Hav) Hgeo Hbelow
               with "Hcg Hcl4 Hcpu [] [] Htext Hdata Hpc Hprocs Hpenv Hlk

@@ -170,7 +170,6 @@ Record fclose_names := MkFCloseNames {
      They are fields rather than parameters for the same reason the rest
      are: one equation at the caller ([SpecKexit]'s [fn = MkFCloseNames
      ...]) instead of a dozen coherence conjuncts. *)
-  fcn_tlock    : gname;           (* itable.lock                            *)
   fcn_bmapstart : Z;
   fcn_inodestart : Z;
   fcn_nib      : nat;             (* inode blocks in the region             *)
@@ -194,7 +193,7 @@ Global Instance fclose_names_inhabited : Inhabited fclose_names :=
        (fun _ => 1%positive))
     (MkLogNames 1%positive 1%positive 1%positive 1%positive 1%positive)
     (mword_of_int 0) (mword_of_int 0) (DfracOwn 1)
-    1%positive 0 0 0%nat 0).
+    0 0 0%nat 0).
 
 Section SpecFileclose.
   (* NOTE [icacheG] is NOT here: [fileG] carries it (FileInv.v's header --
@@ -269,7 +268,6 @@ Section SpecFileclose.
     fct_bio    : fcn_bio fn = fsc_bio;
     fct_log    : fcn_log fn = icfg_log;
     fct_dev    : fcn_dev fn = icfg_dev;
-    fct_tlock  : fcn_tlock fn = fsc_itlock;
     fct_bms    : fcn_bmapstart fn = fsc_bmapstart;
     fct_ist    : fcn_inodestart fn = icfg_ist;
     fct_nib    : fcn_nib fn = icfg_nib;

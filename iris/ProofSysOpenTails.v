@@ -581,7 +581,7 @@ Section ProofSysOpenTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -623,7 +623,7 @@ Section ProofSysOpenTails.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -749,7 +749,7 @@ Section ProofSysOpenTails.
        the ARMED contract (B''-tx4), which retires the descriptor in the
        ghost step that parks the payload and hands the whole token back. *)
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gtl gil gisl bmapstart
+              pd pav pu bn g gil gisl bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 24)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -932,7 +932,7 @@ Section ProofSysOpenTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -974,7 +974,7 @@ Section ProofSysOpenTails.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -1100,7 +1100,7 @@ Section ProofSysOpenTails.
        the ARMED contract (B''-tx4), which retires the descriptor in the
        ghost step that parks the payload and hands the whole token back. *)
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gtl gil gisl bmapstart
+              pd pav pu bn g gil gisl bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 24)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -1283,7 +1283,7 @@ Section ProofSysOpenTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -1324,7 +1324,7 @@ Section ProofSysOpenTails.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -1446,7 +1446,7 @@ Section ProofSysOpenTails.
        the ARMED contract (B''-tx4), which retires the descriptor in the
        ghost step that parks the payload and hands the whole token back. *)
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gtl gil gisl bmapstart
+              pd pav pu bn g gil gisl bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 24)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -1682,7 +1682,7 @@ Section ProofSysOpenTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -1729,7 +1729,7 @@ Section ProofSysOpenTails.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -1909,7 +1909,7 @@ Section ProofSysOpenTails.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (so_tail_e (CID0 := CID4) gs jx gl gu gd gk pd pav pu bn g
-              gtl gil gisl bmapstart inodestart nib size dev
+              gil gisl bmapstart inodestart nib size dev
               kk qi s gy inum dn bm u pidv dq dqb dqs m P1 sp0 K eb b lks
               (m !!! Regidx Rs3 : mword 64) w6 w23 w24 bp
               Vpr HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0

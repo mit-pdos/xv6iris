@@ -1125,7 +1125,6 @@ Section ProofNamexMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -1136,7 +1135,7 @@ Section ProofNamexMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gtl
+    : wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g
                         ga gf bmapstart inodestart nib
                         size dev plen pfun nfun npar n Sb
                         pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -2690,7 +2689,7 @@ Section ProofNamexMain.
                iDestruct (log_tx_halve with "Htx") as (tnx) "[Htxa Htxb]".
                iEval (rewrite -Htlog) in "Htxa".
                iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g
-                         gtl gilp gislp bmapstart inodestart
+                         gilp gislp bmapstart inodestart
                          nib size dev pk pq pinum ncur Scur wc false
                          false enxA tnx (1/2)%Qp pidv dq dqb dqs
                          T2 (K - 12)%nat eb b
@@ -3370,7 +3369,7 @@ Section ProofNamexMain.
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn g gtl gilk gislk
+                               bn g gilk gislk
                                bmapstart inodestart nib size dev
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
@@ -3967,7 +3966,7 @@ Section ProofNamexMain.
                            by (destruct Hiok as (_ & _ & _ & _ & _ & Hq & _);
                                exact Hq).
                          iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk
-                                   pd pav pu bn gtl ga gf
+                                   pd pav pu bn ga gf
                                    inodestart nib dev (ientry ik) iinum
                                    bml datl dnl dnl
                                    nf' false (mword_of_int 0 : mword 32)
@@ -4189,7 +4188,7 @@ Section ProofNamexMain.
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn g gtl gilk gislk
+                                     pd pav pu bn g gilk gislk
                                      bmapstart inodestart nib
                                      size dev ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
@@ -4420,7 +4419,7 @@ Section ProofNamexMain.
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn g gtl gilk gislk
+                                     pd pav pu bn g gilk gislk
                                      bmapstart inodestart nib
                                      size dev ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
@@ -4731,7 +4730,7 @@ Section ProofNamexMain.
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn g gtl gilk gislk
+                               bn g gilk gislk
                                bmapstart inodestart nib size dev
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
@@ -5522,7 +5521,7 @@ Section ProofNamexMain.
       iAssert (iname fsc_ireg fsc_fs inodestart ROOTINO RootL) as "Hlicr";
         [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
       iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-      iApply (IG.wp_iget_sconf gtl inodestart nib dev ROOTINO
+      iApply (IG.wp_iget_sconf inodestart nib dev ROOTINO
                 RootL
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
@@ -5821,7 +5820,7 @@ Section ProofNamexMain.
          its [ref++] is a ledger move, so it takes the region handle this
          walk already carries -- persistent, and the same [Hireg] the iget
          above was given. *)
-      iApply (ID.wp_idup_sconf gtl inodestart nib
+      iApply (ID.wp_idup_sconf inodestart nib
                 ck dev B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kid ltac:(vm_compute; reflexivity) Hckl HB3a0 Hdev
                 ltac:(lkbelow)
@@ -6016,7 +6015,6 @@ Section ProofNamexMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -6027,7 +6025,7 @@ Section ProofNamexMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gtl
+    : wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g
                           ga gf bmapstart inodestart nib
                           size dev plen pfun nfun npar n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -6043,7 +6041,7 @@ Section ProofNamexMain.
        now takes the TOKEN with it (durable-disk B''-tx), so the seal hands
        the pair over rather than framing the token past the walk. *)
     iDestruct (log_op_openSt with "Hlog") as (Sb0) "Hlog".
-    iApply (wp_namex_gen gs j gl gu gd gk pd pav pu bn g gtl
+    iApply (wp_namex_gen gs j gl gu gd gk pd pav pu bn g
               ga gf bmapstart inodestart nib size dev
               plen pfun nfun npar n Sb0 pidv dq dqb dqs dqpv m K eb b lks Vpr
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov

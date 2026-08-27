@@ -777,7 +777,6 @@ Section ProofNamexTrMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -788,7 +787,7 @@ Section ProofNamexTrMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_tr_body gs j gl gu gd gk pd pav pu bn g gtl
+    : wp_namex_tr_body gs j gl gu gd gk pd pav pu bn g
                        ga gf bmapstart inodestart nib
                        size dev plen pfun nfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -2864,7 +2863,7 @@ Section ProofNamexTrMain.
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn g gtl gilk gislk
+                               bn g gilk gislk
                                bmapstart inodestart nib size dev
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
@@ -3212,7 +3211,7 @@ Section ProofNamexTrMain.
                            by (destruct Hiok as (_ & _ & _ & _ & _ & Hq & _);
                                exact Hq).
                          iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk
-                                   pd pav pu bn gtl ga gf
+                                   pd pav pu bn ga gf
                                    inodestart nib dev (ientry ik) iinum
                                    bml datl dnl dnl
                                    nf' false (mword_of_int 0 : mword 32)
@@ -3476,7 +3475,7 @@ Section ProofNamexTrMain.
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn g gtl gilk gislk
+                                     pd pav pu bn g gilk gislk
                                      bmapstart inodestart nib
                                      size dev ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
@@ -3734,7 +3733,7 @@ Section ProofNamexTrMain.
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn g gtl gilk gislk
+                                     pd pav pu bn g gilk gislk
                                      bmapstart inodestart nib
                                      size dev ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
@@ -3979,7 +3978,7 @@ Section ProofNamexTrMain.
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn g gtl gilk gislk
+                               bn g gilk gislk
                                bmapstart inodestart nib size dev
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
@@ -4777,7 +4776,7 @@ Section ProofNamexTrMain.
       iAssert (iname fsc_ireg fsc_fs inodestart ROOTINO RootL) as "Hlicr";
         [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
       iPoseProof (InodeRegion.ireg_inv_reg with "Hireg") as "#Hiregr".
-      iApply (IG.wp_iget_sconf gtl inodestart nib dev ROOTINO
+      iApply (IG.wp_iget_sconf inodestart nib dev ROOTINO
                 RootL
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)

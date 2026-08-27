@@ -92,7 +92,7 @@ Notation K_sys_fork := ((K_kfork + 2)%nat) (only parsing).
 Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa γp γw γl γf γil : gname) (γs : list gname)
+    (γa γp γw γl γf : gname) (γs : list gname)
     (inodestart : Z) (nib : nat)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
     (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string) :=
@@ -110,7 +110,7 @@ Definition wp_sys_fork_sconf_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
-  is_itable2 γil fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
   itable_inv -∗
   (* the inode region, and it travels with the fs fabric for the SAME reason
      the itable does -- kfork's [np->cwd = idup(p->cwd)], whose [ref++] is a
@@ -158,10 +158,10 @@ Module Type SYSFORK.
   Parameter wp_sys_fork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa γp γw γl γf γil : gname) (γs : list gname)
+      (γa γp γw γl γf : gname) (γs : list gname)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_sys_fork_sconf_body γa γp γw γl γf γil γs
+      wp_sys_fork_sconf_body γa γp γw γl γf γs
                              inodestart nib m lvl av eb p b pid V lks.
 End SYSFORK.

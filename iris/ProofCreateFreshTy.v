@@ -132,7 +132,7 @@ Definition create_fresh_ty_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names)
-    (gtl : gname) (γpr : gname)
+    (γpr : gname)
     (inodestart : Z) (ninodes : Z) (nib : nat)
     (dev : mword 32) (ty : mword 16)
     (kd : nat) (dqp : dfrac)                     (* the LOCKED PARENT's slot *)
@@ -197,14 +197,14 @@ Definition create_fresh_ty_body
      (γu' : uart_names) (γd' : disk_names) (γk' : gname)
      (pd' pav' pu' : mword 64) (bn' : bio_names)
      (γ' : log_names)
-     (gtl' : gname) (γpr' : gname)
+     (γpr' : gname)
      (inodestart' ninodes' : Z) (nib' : nat)
      (dev' : mword 32) (ty' : mword 16) (u' : nat) (Sb' : gset Z)
      (pidv' : mword 32) (dq' dqs' dqn' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string) (Vpr' : pprivate) (t' : nat) (qt' : Qp),
      wp_ialloc_gen_body (CID := CIDa) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
-                        γ' gtl' γpr' inodestart'
+                        γ' γpr' inodestart'
                         ninodes' nib' dev' ty' u' Sb' pidv' dq' dqs' dqn'
                         m' K' eb' b' lks' Vpr' t' qt') ->
   (forall `{CIDl : CpuId}
@@ -230,7 +230,7 @@ Definition create_fresh_ty_body
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
   log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
@@ -406,7 +406,7 @@ Lemma create_fresh_ty :
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl : gname) (γpr : gname)
+      (γpr : gname)
       (inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
       (kd : nat) (dqp : dfrac)
@@ -414,7 +414,7 @@ Lemma create_fresh_ty :
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ gtl γpr
+      create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γpr
                            inodestart ninodes nib dev ty kd dqp
                            u Sb t qt qc pidv dq dqs dqn Ma K eb b lks Vpr.
 Proof.
@@ -505,7 +505,7 @@ Proof.
   iDestruct (cft_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
   iDestruct (cpu_own_transport CID CID3 0%nat eb (proc_addr j) b
                ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-  iApply (Hia CID3 γs j γl γu γd γk pd pav pu bn γ gtl γpr
+  iApply (Hia CID3 γs j γl γu γd γk pd pav pu bn γ γpr
             inodestart ninodes nib dev ty u Sb pidv dq dqs dqn A3 K eb b lks Vpr
             t qc
             HKia Hlg Hist Hiregb Hn1 Hn2 Hn3 Htynz Htyk Hpkc Hj Hgs HA3a0 HA3a1 Heb

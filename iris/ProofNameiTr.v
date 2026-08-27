@@ -176,7 +176,6 @@ Section ProofNameiTrMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -186,7 +185,7 @@ Section ProofNameiTrMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namei_tr_body gs j gl gu gd gk pd pav pu bn g gtl
+    : wp_namei_tr_body gs j gl gu gd gk pd pav pu bn g
                        ga gf bmapstart inodestart nib
                        size dev plen pfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -380,7 +379,7 @@ Section ProofNameiTrMain.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_tr gs j gl gu gd gk pd pav pu bn g gtl
+    iApply (NX.wp_namex_tr gs j gl gu gd gk pd pav pu bn g
               ga gf bmapstart inodestart nib size dev
               plen pfun nfun n Sb P Pmiss pidv dq dqb dqs dqpv R5 (K - 4)%nat eb b
               _ Vpr Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov

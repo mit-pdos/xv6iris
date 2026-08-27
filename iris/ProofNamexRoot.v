@@ -124,12 +124,11 @@ Section ProofNamexRoot.
   Notation Rs10 := (mword_of_int 26 : mword 5).
 
   Lemma wp_namex_root
-      (gtl : gname)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_root_body gtl inodestart nib dev dqp
+    : wp_namex_root_body inodestart nib dev dqp
                          m n K eb p b lks Vpr.
   Proof.
     cbv beta delta [wp_namex_root_body].
@@ -521,7 +520,7 @@ Section ProofNamexRoot.
        -- which is exactly why it costs this walk nothing. *)
     iAssert (iname fsc_ireg fsc_fs inodestart ROOTINO RootL) as "Hlic";
       [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
-    iApply (IG.wp_iget_sconf gtl inodestart nib dev ROOTINO
+    iApply (IG.wp_iget_sconf inodestart nib dev ROOTINO
               RootL
               A3 n eb p (K - 12)%nat b lks
               Kig Hn Hrino HA3a0 HA3a1 Hbelow

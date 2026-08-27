@@ -916,7 +916,6 @@ Section ProofSysChdirBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (dqb dqs : dfrac)
@@ -925,7 +924,7 @@ Section ProofSysChdirBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
     wp_sys_chdir_sconf_body gf ga gs j gl gu gd gk pd pav pu bn g
-                            gtl bmapstart inodestart nib
+                            bmapstart inodestart nib
                             size dev dqb dqs v pid V m K eb b lks.
   Proof.
     cbv beta delta [wp_sys_chdir_sconf_body].
@@ -1417,7 +1416,7 @@ Section ProofSysChdirBody.
       iDestruct (cpu_own_transport CID15 CID19 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Namei.wp_namei_gen (CID := CID19) gs j gl gu gd gk pd pav pu bn
-                g gtl ga gf bmapstart inodestart nib
+                g ga gf bmapstart inodestart nib
                 size dev pk bf MAXOPBLOCKS Sb0
                 pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                 N1 (K - 20)%nat eb b lks
@@ -1839,7 +1838,7 @@ Section ProofSysChdirBody.
           iDestruct (cpu_own_transport CID30 CID32 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (Iput.wp_iput_sconf (CID := CID32) gs j gl gu gd gk pd pav pu bn
-                    g gtl gilc gislc bmapstart inodestart
+                    g gilc gislc bmapstart inodestart
                     nib size dev kc qc inumc n1 pid (DfracOwn (1/4)) dqb dqs
                     P6 (K - 20)%nat eb b lks
                     (upd_upt V P') ltac:(lia) Hclog Hkc Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -2111,7 +2110,7 @@ Section ProofSysChdirBody.
           iDestruct (cpu_own_transport CID24 CID29 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID29) gs j gl gu gd gk
-                    pd pav pu bn g gtl gil gisl bmapstart
+                    pd pav pu bn g gil gisl bmapstart
                     inodestart nib size dev kk (qq/2)%Qp (qq/2)%Qp gsh inum
                     dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                     Q1 (K - 20)%nat eb b lks

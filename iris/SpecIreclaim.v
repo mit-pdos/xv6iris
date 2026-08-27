@@ -190,7 +190,6 @@ Definition wp_ireclaim_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names)
-    (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (bmapstart inodestart : Z)
     (ninodes : Z) (nib : nat) (size : Z)
@@ -282,7 +281,7 @@ Definition wp_ireclaim_sconf_body
      only caller, hands it in and takes it back. *)
   ireg_boot -∗
   (* ---- THE ICACHE, as iget / ilock / iput take it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* THE FIFTY ENTRY SLEEPLOCKS, as a family: the scan does not know which
@@ -345,7 +344,6 @@ Module Type IRECLAIM.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl : gname)
       (γpr : gname)
       (bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
@@ -353,7 +351,7 @@ Module Type IRECLAIM.
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ gtl γpr
+      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γpr
                              bmapstart inodestart ninodes nib size
                              dev pidv dq dqb dqs dqn m K eb b lks Vpr.
 End IRECLAIM.

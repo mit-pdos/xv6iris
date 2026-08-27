@@ -754,7 +754,6 @@ Section ProofSysMkdirBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
       (ns : nat)
@@ -764,7 +763,7 @@ Section ProofSysMkdirBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
     wp_sys_mkdir_sconf_body gf ga gpr gs j gl gu gd gk pd pav pu bn g
-                            gtl bmapstart inodestart nib
+                            bmapstart inodestart nib
                             ninodes size dev ns dqb dqs dqbs dqn v
                             pid V m K eb b lks.
   Proof.
@@ -1189,7 +1188,7 @@ Section ProofSysMkdirBody.
       iDestruct (cpu_own_transport CID11 CID17 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Create.wp_create_sconf (CID := CID17) gs j gl gu gd gk pd pav pu
-                bn g gtl ga gf gpr bmapstart inodestart
+                bn g ga gf gpr bmapstart inodestart
                 nib ninodes size dev pk bf
                 SpecDirlookup.T_DIR (mword_of_int 0) (mword_of_int 0)
                 (upd_upt V P') MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
@@ -1281,7 +1280,7 @@ Section ProofSysMkdirBody.
         iDestruct (cpu_own_transport CID18 CID20 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID20) gs j gl gu gd gk
-                  pd pav pu bn g gtl gil gisl bmapstart
+                  pd pav pu bn g gil gisl bmapstart
                   inodestart nib size dev kk qi ss gy inum dn bm un1
                   pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks
                   (upd_upt V P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0

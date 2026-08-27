@@ -1114,7 +1114,6 @@ Section IallocClaim.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names)
-      (gtl : gname)
       (inodestart ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
       (inum : mword 32) (ds : list dinode) (u : nat) (Sb : gset Z)
@@ -1165,7 +1164,7 @@ Section IallocClaim.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     iref_slot -∗
@@ -1750,7 +1749,7 @@ Section IallocClaim.
         It is create's [ilock(ip)] that finally spends it, at
         [InodeRegion.ireg_withdraw]. *)
     iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-    iApply (IG.wp_iget_sconf gtl inodestart nib dev inum
+    iApply (IG.wp_iget_sconf inodestart nib dev inum
               (ClaimL ty t qt)
               WA 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity)
@@ -1994,7 +1993,7 @@ Section IallocScan.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names)
-      (gtl : gname) (γpr : gname)
+      (γpr : gname)
       (inodestart ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16) (u : nat) (Sb : gset Z)
       (t : nat) (qt : Qp)
@@ -2029,7 +2028,7 @@ Section IallocScan.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     (* ONE turn of the loop, at any surviving [inum], under any fuel that
@@ -2577,7 +2576,7 @@ Section IallocScan.
         iDestruct (cpu_own_transport CID6 CID13 0 true (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (ia_claim (CID0 := CID13) γs j γl γu γd γk pd pav pu bn γ
-                  gtl inodestart ninodes nib dev ty inum ds u Sb
+                  inodestart ninodes nib dev ty inum ds u Sb
                   t qt kk bno bsd0 d0 pidv dq dqs dqn m GA K b lks
                   Vpr HK Hgeom HGAsp HGAthr HGAs1 HGAs3 HGAs5 HGAs6 HGAs2 Hkk
                   Hbno Hcov Hlog Hnib Hdswf Ht0 Hty Htyk Hinum Hslotal
@@ -2862,7 +2861,6 @@ Section IallocMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl : gname)
       (γpr : gname)
       (inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
@@ -2871,7 +2869,7 @@ Section IallocMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp) :
-      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ gtl γpr
+      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γpr
                          inodestart ninodes nib dev ty u Sb
                          pidv dq dqs dqn m K eb b lks Vpr t qt.
   Proof.
@@ -3315,7 +3313,7 @@ Section IallocMain.
     { rewrite moi32_unsigned. apply bvw32_small.
       change (2^32)%Z with 4294967296%Z. lia. }
     iPoseProof (ia_scan (CIDe := CID19) γs j γl γu γd γk pd pav pu bn γ
-                  gtl γpr inodestart ninodes nib dev ty u Sb
+                  γpr inodestart ninodes nib dev ty u Sb
                   t qt pidv dq dqs dqn m K b lks
                   Vpr HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Hbelow
                   with "Htext Hkdata Hpenv Hbio Hlctx Hireg Hiopen Hprocs
@@ -3348,7 +3346,6 @@ Section IallocMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl : gname)
       (γpr : gname)
       (inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
@@ -3357,7 +3354,7 @@ Section IallocMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp) :
-      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ gtl γpr
+      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γpr
                            inodestart ninodes nib dev ty u
                            pidv dq dqs dqn m K eb b lks Vpr t qt.
   Proof.
@@ -3369,7 +3366,7 @@ Section IallocMain.
               #Hitb2 #Hitbl #Hesc Hiref Hop Htxc Hcont".
     iDestruct (log_op_openS with "Hop") as (Sb) "[HopS Htx]".
     iApply (wp_ialloc_gen (CID := CID) γs j γl γu γd γk pd pav pu bn γ
-              gtl γpr inodestart ninodes nib dev ty u Sb
+              γpr inodestart ninodes nib dev ty u Sb
               pidv dq dqs dqn m K eb b lks
               Vpr t qt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Ha0 Ha1 Heb Hbelow
               with "Hcg Hcnt Htext Hpc Hkdata Hpenv Hbio Hlctx

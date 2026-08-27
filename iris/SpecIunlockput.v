@@ -167,7 +167,6 @@ Definition wp_iunlockput_dep_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names)
-    (gtl : gname)                                      (* itable.lock         *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -238,7 +237,7 @@ Definition wp_iunlockput_dep_sconf_body
   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
   log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
   ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -324,7 +323,6 @@ Definition wp_iunlockput_dep_gen_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names)
-    (gtl : gname)                                      (* itable.lock         *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -399,7 +397,7 @@ Definition wp_iunlockput_dep_gen_body
   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
   log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
   ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -503,7 +501,6 @@ Definition wp_iunlockput_tx_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names)
-    (gtl : gname)                                      (* itable.lock         *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -559,7 +556,7 @@ Definition wp_iunlockput_tx_sconf_body
   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
   log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
   ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -644,7 +641,6 @@ Definition wp_iunlockput_tx_gen_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names)
-    (gtl : gname)                                      (* itable.lock         *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -703,7 +699,7 @@ Definition wp_iunlockput_tx_gen_body
   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
   log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
   ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -810,7 +806,7 @@ Section IunlockputOfDep.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -821,11 +817,11 @@ Section IunlockputOfDep.
       (b : bool) (lks : gset string) (Vpr : pprivate) :
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
        wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g
-                                    gtl gil gisl bmapstart
+                                    gil gisl bmapstart
                                     inodestart nib size dev k qi s gy d inum
                                     dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks
                                     Vpr) ->
-    wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g gtl
+    wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g
                                 gil gisl bmapstart inodestart nib
                                 size dev k qi s gy inum dn' bm' n
                                 pidv dq dqb dqs m K eb b lks Vpr.
@@ -863,7 +859,7 @@ Section IunlockputOfDep.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -874,11 +870,11 @@ Section IunlockputOfDep.
       (b : bool) (lks : gset string) (Vpr : pprivate) :
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
        wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g
-                                  gtl gil gisl bmapstart
+                                  gil gisl bmapstart
                                   inodestart nib size dev k qi s gy d inum
                                   dn' bm' n Sb crb cru crz e0 tid qtx
                                   pidv dq dqb dqs m K eb b lks Vpr) ->
-    wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g gtl
+    wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g
                               gil gisl bmapstart inodestart nib
                               size dev k qi s gy inum dn' bm' n Sb crb cru
                               crz e0 pidv dq dqb dqs m K eb b lks Vpr.
@@ -926,7 +922,7 @@ Module Type IUNLOCKPUT.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
@@ -936,7 +932,7 @@ Module Type IUNLOCKPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gtl
+      wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g
                                  gil gisl bmapstart inodestart
                                  nib size dev k qi s gy d inum dn' bm' n Sb
                                  crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks
@@ -950,7 +946,7 @@ Module Type IUNLOCKPUT.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -959,7 +955,7 @@ Module Type IUNLOCKPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g gtl
+      wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g
                                   gil gisl bmapstart inodestart
                                   nib size dev k qi s gy inum dn' bm' n
                                   pidv dq dqb dqs m K eb b lks Vpr.
@@ -970,7 +966,7 @@ Module Type IUNLOCKPUT.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -979,7 +975,7 @@ Module Type IUNLOCKPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g gtl
+      wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g
                                 gil gisl bmapstart inodestart nib
                                 size dev k qi s gy inum dn' bm' n Sb crb cru
                                 crz e0 pidv dq dqb dqs m K eb b lks Vpr.

@@ -696,7 +696,6 @@ Section IputTail.
 
   Lemma ip_tail_exit `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (j : nat) (bn : bio_names) (g : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) (Sb Sb' : gset Z)
       (k n n' : nat) (spf : bool -> nat) (wb crb0 : bool)
@@ -726,7 +725,7 @@ Section IputTail.
     kernel_text -∗
     (* durable-disk B''-esc: the itable credential, which bundles the free
        pool's own invariant beside the spinlock. *)
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x24) : mword 64) -∗
     sie_cap_gpr KT1 D (trap_res eb + (K - 6))%nat false pj -∗
     cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
@@ -738,7 +737,7 @@ Section IputTail.
        directly.  See claude-notes/completed/eb-generic-sweep.md. *)
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
-    locked gtl cpu_id -∗
+    locked fsc_itlock cpu_id -∗
     itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     iref_slot -∗
     (* RULING G (iclaim-ledger.md §6′): the REGIME, borrowed and returned.
@@ -844,7 +843,7 @@ Section IputTail.
       rewrite /D3 upd_ne; [reflexivity | regne]. }
     assert (HD5sp : D5 !!! Regidx csp_rs1 = spd)
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HDsp).
-    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
+    iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
               (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) D5
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity) ltac:(lia)
@@ -909,7 +908,6 @@ Section IputTail.
   (* ---- THE TAIL PROPER: +0x20 (the re-read) .. +0x24 (the close) ---- *)
   Lemma ip_tail `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (j : nat) (bn : bio_names) (g : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) (Sb Sb' : gset Z)
       (k : nat) (q : Qp) (inum : mword 32)
@@ -944,7 +942,7 @@ Section IputTail.
     kernel_text -∗
     (* durable-disk B''-esc: the itable credential, which bundles the free
        pool's own invariant beside the spinlock. *)
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
     (* THE REGION, NEW AT §2.2/§2.3: every count move now reaches the [icnt]
@@ -958,7 +956,7 @@ Section IputTail.
     (* pure pass-through, exactly as in [ip_tail_exit] above *)
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
-    locked gtl cpu_id -∗
+    locked fsc_itlock cpu_id -∗
     itable_half Mt -∗
     iref_slots_auth -∗
     isl_pool Mt -∗
@@ -1235,7 +1233,7 @@ Section IputTail.
         apply ip_pool_set; [exact Hinreg | exact Hincid]. }
       iEval (rewrite -Hpoolset) in "Hpool".
       iEval (rewrite Hp1) in "Hiu".
-      iApply (ip_tail_exit CID0 j bn g gtl bmapstart inodestart
+      iApply (ip_tail_exit CID0 j bn g bmapstart inodestart
                 nib size dev Sb Sb' k n n' spf wb crb0 tid qtx pidv dq dqb dqs m D2 K eb sp0 vg4 vg5 vg6 lks Vpr rg
                 HK Hanch Hsp0 HD2regs Hlo Hhi Hssub Hwm Hwc Hfresh
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hiu Hgreg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 Hppid Hbms Hins Hbslots Hop Htx Hcont] Hiu Hgreg
@@ -1316,7 +1314,7 @@ Section IputTail.
       { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
       { intros i Hi. reflexivity. }
       { rewrite /islot2 lookup_insert Hcik. iFrame. }
-      iApply (ip_tail_exit CID0 j bn g gtl bmapstart inodestart
+      iApply (ip_tail_exit CID0 j bn g bmapstart inodestart
                 nib size dev Sb Sb' k n n' spf wb crb0 tid qtx pidv dq dqb dqs m D2 K eb sp0 vg4 vg5 vg6 lks Vpr rg
                 HK Hanch Hsp0 HD2regs Hlo Hhi Hssub Hwm Hwc Hfresh
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hislot Hgreg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 Hppid Hbms Hins Hbslots Hop Htx Hcont] Hislot Hgreg
@@ -2188,7 +2186,7 @@ Section IputFreePath.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl gil gisl g1 : gname)
+      (gil gisl g1 : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
@@ -2255,10 +2253,10 @@ Section IputFreePath.
     bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
     log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
     (* the itable, HELD *)
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
-    locked gtl cpu_id -∗
+    locked fsc_itlock cpu_id -∗
     itable_half Mt -∗
     iref_slots_auth -∗
     isl_pool Mt -∗
@@ -2678,7 +2676,7 @@ Section IputFreePath.
                        H3 !!! Regidx c = mfa !!! Regidx c).
     { intros c Hcs. rewrite /H3 upd_ne; [| regne].
       rewrite /H2 upd_ne; [| regne]. rewrite /H1 upd_ne; [reflexivity | regne]. }
-    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
+    iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
               (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) H3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HH3a0; reflexivity) ltac:(lia)
@@ -2992,7 +2990,7 @@ Section IputFreePath.
       rewrite /J8 upd_ne; [| regne]. rewrite /J7 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CIDrs CIDm9 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 gtl "itable"%string
+    iApply (Acquire.wp_acquire_sconf KT1 fsc_itlock "itable"%string
               (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) J9
               0%nat eb pj (K - 6)%nat eb lks ltac:(lia) ltac:(lia) Hitbelow
               with "Hcg Hcnt Htext Hpc [Hitlk]").
@@ -3412,7 +3410,7 @@ Section IputFreePath.
                        G3 !!! Regidx c = F1 !!! Regidx c).
     { intros c Hcs. rewrite /G3 upd_ne; [| regne].
       rewrite /G2 upd_ne; [| regne]. rewrite /G1 upd_ne; [reflexivity | regne]. }
-    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
+    iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
               (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) G3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HG3a0; reflexivity) ltac:(lia)
@@ -3718,7 +3716,7 @@ Section IputFreePath.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
@@ -3771,10 +3769,10 @@ Section IputFreePath.
     panic_env -∗
     bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
     log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
-    locked gtl cpu_id -∗
+    locked fsc_itlock cpu_id -∗
     itable_half Mt -∗
     iref_slots_auth -∗
     isl_pool Mt -∗
@@ -3847,7 +3845,7 @@ Section IputFreePath.
        trap_csrs_ext KT1 eb -∗
        cpu_claim_ext eb pj -∗
        pc_is (mword_of_int (KernelSyms.iput + 0x20) : mword 64) -∗
-       locked gtl cpu_id -∗
+       locked fsc_itlock cpu_id -∗
        itable_half Mt -∗
        iref_slots_auth -∗
        isl_pool Mt -∗
@@ -3908,7 +3906,7 @@ Section IputFreePath.
        trap_csrs_ext KT1 eb -∗
        cpu_claim_ext eb pj -∗
        pc_is (mword_of_int (KernelSyms.iput + 0x5a) : mword 64) -∗
-       locked gtl cpu_id -∗
+       locked fsc_itlock cpu_id -∗
        itable_half Mt -∗
        iref_slots_auth -∗
        isl_pool Mt -∗
@@ -4868,7 +4866,7 @@ Section ProofIput.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
@@ -4877,7 +4875,7 @@ Section ProofIput.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool)
-    : wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gtl gil gisl
+    : wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gil gisl
                        bmapstart inodestart nib size dev
                        k q inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr rg.
   Proof.
@@ -5081,7 +5079,7 @@ Section ProofIput.
                 [ reflexivity | vm_compute; reflexivity | nz | nz | nz ] ]. }
     iDestruct (cpu_own_transport CID CID9 0%nat eb pj eb ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 gtl "itable"%string
+    iApply (Acquire.wp_acquire_sconf KT1 fsc_itlock "itable"%string
               (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) mA
               0%nat eb pj (K - 6)%nat eb lks
               ltac:(lia) ltac:(lia)
@@ -5199,7 +5197,7 @@ Section ProofIput.
       (* the epoch is FORGOTTEN at the close arms' seam: [ip_tail] is stated
          over [log_opS] and nothing past this point compares epochs. *)
       iDestruct (log_opSe_opS with "Hop") as "Hop".
-      iApply (ip_tail (CID := CIDacq) CID j bn icfg_log gtl bmapstart
+      iApply (ip_tail (CID := CIDacq) CID j bn icfg_log bmapstart
                 inodestart nib size dev Sb Sb k q inum Mt ci n n
                 (fun w => ip_spend_w w cru crz) false crb tid qtx pidv dq dqb dqs
                 m E2 K eb sp0 vg4 vg5 vg6 lks Vpr rg
@@ -5239,7 +5237,7 @@ Section ProofIput.
       [ iApply log_credit_own; exact Hcru |].
     assert (Hitne : "itable"%string ∉ lks)
       by exact (locks_below_not_elem _ _ Hitbelow).
-    iApply (ip_free_entry gs j gl gu gd gk pd pav pu bn icfg_log gtl gil gisl
+    iApply (ip_free_entry gs j gl gu gd gk pd pav pu bn icfg_log gil gisl
               bmapstart inodestart nib size dev
               k q inum Mt ci n Sb crb cru e0 0%nat tid qtx pidv dq dqb dqs
               vg4 vg5 vg6 m E2 K eb lks Vpr rg
@@ -5268,7 +5266,7 @@ Section ProofIput.
       (* the epoch is FORGOTTEN at the close arms' seam: [ip_tail] is stated
          over [log_opS] and nothing past this point compares epochs. *)
       iDestruct (log_opSe_opS with "Hop") as "Hop".
-      iApply (ip_tail (CID := CIDacq) CID j bn icfg_log gtl bmapstart
+      iApply (ip_tail (CID := CIDacq) CID j bn icfg_log bmapstart
                 inodestart nib size dev Sb Sb k q inum Mt ci n n
                 (fun w => ip_spend_w w cru crz) false crb tid qtx pidv dq dqb dqs
                 m M' K eb sp0 vg4' vg5' vg6' lks Vpr rg
@@ -5311,7 +5309,7 @@ Section ProofIput.
       iEval (rewrite -Hf1) in "Hr24". iEval (rewrite -Hf2) in "Hr16".
       iEval (rewrite -Hf3) in "Hr8".  iEval (rewrite -Hf4) in "Hg4".
       iEval (rewrite -Hf5) in "Hg5".  iEval (rewrite -Hf6) in "Hg6".
-      iApply (ip_free_locked gs j gl gu gd gk pd pav pu bn icfg_log gtl gil gisl g1
+      iApply (ip_free_locked gs j gl gu gd gk pd pav pu bn icfg_log gil gisl g1
                 bmapstart inodestart nib size dev
                 k q inum dn bm data Mt ci n Sb crb cru crz false e0 0%nat tid (qtx/2)%Qp
                 pidv dq dqb dqs
@@ -5399,7 +5397,7 @@ Section ProofIput.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
@@ -5407,7 +5405,7 @@ Section ProofIput.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gtl gil gisl
+    : wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gil gisl
                           bmapstart inodestart nib size dev
                           k q inum n pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
@@ -5431,7 +5429,7 @@ Section ProofIput.
        [ireg_open] itself; the indexed form the gen contract keeps is that
        proposition at [rg := true], and it is not given back. *)
     iEval (rewrite -ireg_regime_true) in "Hropen".
-    iApply (wp_iput_gen gs j gl gu gd gk pd pav pu bn icfg_log gtl gil gisl
+    iApply (wp_iput_gen gs j gl gu gd gk pd pav pu bn icfg_log gil gisl
               bmapstart inodestart nib size dev
               k q inum n Sb0 false false false e00 t0 (1/2)%Qp pidv dq dqb dqs m K eb b lks Vpr true
               HK eq_refl Hk ltac:(discriminate) ltac:(discriminate)

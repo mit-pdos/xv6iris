@@ -435,7 +435,6 @@ Section KexecMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -446,7 +445,7 @@ Section KexecMain.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-    wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gtl
+    wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g
                         ga gf bmapstart inodestart nib
                         size dev plen pfun na avf alen aslen afun
                         pidv V dqb dqs dqa dqpv dqas m K eb b lks.
@@ -479,7 +478,7 @@ Section KexecMain.
                  with "Hcont") as "Hcont".
     (* ---- PHASE A: +0x000 .. +0x090, and two of the eight [bad:] tails ---- *)
     iApply (PA.kxc_phaseA (CID0 := CID0) QT gs jp gl gu gd gk pd pav pu bn g
-              gtl ga gf bmapstart inodestart nib size dev
+              ga gf bmapstart inodestart nib size dev
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m K eb eb ∅
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
@@ -526,7 +525,7 @@ Section KexecMain.
       iSplitL "Hiref"; [iExact "Hiref" | iExact "Hru"]. }
     (* ---- PHASE B1: +0x090 .. +0x0cc, plus the +0x31c tail ---- *)
     iApply (PB.kxc_b1 (CID0 := CIDa) QT gs jp gl gu gd gk pd pav pu bn g
-              gtl ga gf bmapstart inodestart nib size dev
+              ga gf bmapstart inodestart nib size dev
               kf qf sf gyf inumf dnf bmf gilf gislf n2
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m M90 K eb eb ∅
@@ -541,7 +540,7 @@ Section KexecMain.
     - (* ---- OUTPUT 1: elf.phnum = 0, the phdr loop is skipped ---- *)
       iIntros (CIDz) "%Hsz1". iIntros (Mz Pz w13z w67z) "Hst1a2 Hcont".
       iApply (PB3.kxc_b2z (CID0 := CIDz) gs jp gl gu gd gk pd pav pu bn g
-                gtl gilf gislf ga gf bmapstart inodestart
+                gilf gislf ga gf bmapstart inodestart
                 nib size dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
                 m Mz K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
@@ -569,7 +568,7 @@ Section KexecMain.
     - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
       iIntros (CIDl) "%Hsl". iIntros (Ml Pl) "Hst12c Hcont".
       iApply (PB3.kxc_b2 (CID0 := CIDl) QT gs jp gl gu gd gk pd pav pu bn g
-                gtl gilf gislf ga gf bmapstart inodestart
+                gilf gislf ga gf bmapstart inodestart
                 nib size dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
                 m Ml K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)

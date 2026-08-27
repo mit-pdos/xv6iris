@@ -522,7 +522,6 @@ Record sysc_ties `{ICFG : icfg} `{FSC : fscfg}
      equations were there to buy.  [sysc_fs_env_all]'s statement, and hence
      every arm below, is unchanged. *)
   (* ---- the inode cache, the region and the log ---- *)
-  sct_tlock      : fcn_tlock fn = fsc_itlock;
   sct_log        : fcn_log fn = icfg_log;
   sct_inodestart : fcn_inodestart fn = icfg_ist;
   sct_nib        : fcn_nib fn = icfg_nib;
@@ -671,7 +670,6 @@ Section SyscallVocab.
     - rewrite (sct_bio _ _ _ T). exact (sct_bn _ _ _ T).
     - exact (sct_log _ _ _ T).
     - exact (sct_dev _ _ _ T).
-    - exact (sct_tlock _ _ _ T).
     - exact (sct_bmapstart _ _ _ T).
     - exact (sct_inodestart _ _ _ T).
     - exact (sct_nib _ _ _ T).
@@ -706,7 +704,7 @@ Section SyscallVocab.
         ~ (DinodeEnc.IBLOCK inum (fcn_inodestart fn)
              ∈ log_region_set fsc_logst)⌝ ∗
      ⌜IcacheInv.cov_below fsc_cov (fcn_size fn)⌝ ∗
-     IcacheEscrow.is_itable2 (fcn_tlock fn) fsc_ic fsc_fs fsc_ireg
+     IcacheEscrow.is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg
                 fsc_cov fsc_logst (fcn_nib fn) (fcn_dev fn) ∗
      IcacheInv.itable_inv ∗
      IcacheEscrow.ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov
@@ -730,7 +728,7 @@ Section SyscallVocab.
        actually OCCURS are in the chain: [fsc_bmapstart]/[fsc_size] reach
        this goal through no hypothesis (the pure rows below carry them out of
        [G] instead), and a rewrite with no subterm to hit is an error. *)
-    rewrite -(sct_tlock _ _ _ T)
+    rewrite
             -(sct_inodestart _ _ _ T) -(sct_nib _ _ _ T) -(sct_dev _ _ _ T).
     iSplit; [ iPureIntro; reflexivity |].
     iSplit; [ iPureIntro; reflexivity |].
@@ -856,7 +854,7 @@ Section SyscallVocab.
                So there is no [fsc_dlock] left anywhere in [Δ] or the
                conclusion, and the rewrite would fail with "does not match
                any subterm".  The tie itself stays on the record -- a
-               consumer still reads [fcn_dlock fn = fsc_dlock]. *) -(sct_tlock _ _ _ T)
+               consumer still reads [fcn_dlock fn = fsc_dlock]. *)
             -(sct_log _ _ _ T) -(sct_inodestart _ _ _ T) -(sct_nib _ _ _ T)
             -(sct_dev _ _ _ T) -(sct_kmem _ _ _ T) -(sct_kalloc _ _ _ T).
     (* assembled conjunct by conjunct rather than with a named [iFrame]: the
@@ -1007,7 +1005,7 @@ Section SyscallVocab.
     fcn_dq fn = DfracOwn (1/4) ->
     sysc_ties (proc_addr (fcn_j fn)) (fcn_bio fn) fn.
   Proof.
-    intros [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hlog Hdev Htlock Hbms Hist Hnib Hsize] Hj Hplock Hdq.
+    intros [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hlog Hdev Hbms Hist Hnib Hsize] Hj Hplock Hdq.
     (* [sct_bio] and [sct_pj] are [reflexivity] because the indices were
        READ OFF [fn]; everything else is one of the twenty-two hypotheses. *)
     constructor; try assumption; try reflexivity.
@@ -1032,7 +1030,7 @@ Section SyscallVocab.
     iDestruct "Hextra" as "(#Hnextpid & #Hpav & #Htick & #Hcons)".
     iDestruct "Hdone" as "[#Hcell #Hrdy]".
     pose proof Hties as Ht.
-    destruct Ht as [Huart Hdisk Hdlock _ _ _ _ _ _ _ _ _ _].
+    destruct Ht as [Huart Hdisk Hdlock _ _ _ _ _ _ _ _ _].
     (* the disk fabric, at [fn]'s pages rather than at [fs_ready]'s witness *)
     iDestruct (FsReady.fs_ready_disk with "Hrdy") as "[_ Hdex]".
     iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
@@ -1137,7 +1135,7 @@ Section SyscallVocab.
     kernel_data -∗ procs_inv γs -∗ syscall_env γf pj bn fn -∗
     SpecKexec.fs_fabric γs (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
       (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-      (fcn_log fn) (fcn_tlock fn)
+      (fcn_log fn)
       (fcn_inodestart fn) (fcn_nib fn) (fcn_dev fn).
   Proof.
     iIntros "#Hdata #Hprocs #Henv".
@@ -1215,7 +1213,7 @@ Section SyscallVocab.
            (fcn_kalloc fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
            (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_log fn)
            (fcn_dev fn) pid (DfracOwn (1/4))
-           (fcn_tlock fn) (fcn_bmapstart fn)
+           (fcn_bmapstart fn)
            (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn).
   Proof. intros <- <- <-. destruct fn; reflexivity. Qed.
 
@@ -3080,7 +3078,7 @@ Section SyscallArms.
        stated there, so the callee is instantiated there too *)
     iDestruct "Hfsenv" as "(_ & #Hprocs' & _)".
     (* ---- the call ---- *)
-    iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf (fcn_tlock fn)
+    iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf
               (fcn_procs fn)
               (fcn_inodestart fn) (fcn_nib fn)
               M 0%nat (av - 4)%nat true pj true pid V ∅
@@ -3210,7 +3208,7 @@ Section SyscallArms.
     iApply (SysExec.wp_sys_exec_sconf γf γa γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_tlock fn)
+              (fcn_log fn)
               (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded v0 v1 pid V M (av - 4)%nat true true lks
@@ -3345,7 +3343,6 @@ Section SyscallArms.
               (fcn_log fn)
               (fcn_dev fn) ip dqi
               (fcn_kmem fn) (fcn_kalloc fn)
-              (fcn_tlock fn)
               (fcn_bmapstart fn) (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn)
               None fn
               M (av - 4)%nat true true pid V v0 ∅
@@ -3720,7 +3717,7 @@ Section SyscallArms.
     iApply (SysChdir.wp_sys_chdir_sconf γf γa γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_tlock fn)
+              (fcn_log fn)
               (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded v0 pid V M (av - 4)%nat true true ∅
@@ -3822,7 +3819,7 @@ Section SyscallArms.
     iApply (SysUnlink.wp_sys_unlink_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_tlock fn)
+              (fcn_log fn)
               (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded DfracDiscarded v0 pid V M
@@ -3902,7 +3899,7 @@ Section SyscallArms.
     iApply (SysLink.wp_sys_link_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_tlock fn)
+              (fcn_log fn)
               (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded DfracDiscarded v0 v1 pid V M
@@ -4215,7 +4212,7 @@ Section SyscallArms.
     iApply (SysMkdir.wp_sys_mkdir_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_tlock fn)
+              (fcn_log fn)
               (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) fsc_ninodes (fcn_size fn)
               (fcn_dev fn) IREFSPARE
@@ -4309,7 +4306,7 @@ Section SyscallArms.
     iApply (SysMknod.wp_sys_mknod_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_tlock fn)
+              (fcn_log fn)
               (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) fsc_ninodes (fcn_size fn)
               (fcn_dev fn) IREFSPARE
@@ -4416,7 +4413,7 @@ Section SyscallArms.
     iApply (SysOpen.wp_sys_open_sconf γft γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_tlock fn)
+              (fcn_log fn)
               (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) fsc_ninodes (fcn_size fn)
               (fcn_dev fn) IREFSPARE

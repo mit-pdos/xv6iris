@@ -186,7 +186,6 @@ Definition wp_ialloc_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names)
-    (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (inodestart : Z) (ninodes : Z) (nib : nat)
     (dev : mword 32) (ty : mword 16)
@@ -278,7 +277,7 @@ Definition wp_ialloc_sconf_body
      one of its own; brelse gives it back *)
   bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* ONE ledger unit for the tail iget; RETURNED on the no-inodes arm *)
@@ -386,7 +385,6 @@ Definition wp_ialloc_gen_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names)
-    (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (inodestart : Z) (ninodes : Z) (nib : nat)
     (dev : mword 32) (ty : mword 16)
@@ -478,7 +476,7 @@ Definition wp_ialloc_gen_body
      one of its own; brelse gives it back *)
   bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* ONE ledger unit for the tail iget; RETURNED on the no-inodes arm *)
@@ -557,7 +555,6 @@ Module Type IALLOC.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl : gname)
       (γpr : gname)
       (inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
@@ -566,7 +563,7 @@ Module Type IALLOC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
-      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ gtl γpr
+      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γpr
                          inodestart ninodes nib dev ty u Sb
                          pidv dq dqs dqn m K eb b lks Vpr t qt.
 
@@ -578,7 +575,6 @@ Module Type IALLOC.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl : gname)
       (γpr : gname)
       (inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
@@ -587,7 +583,7 @@ Module Type IALLOC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
-      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ gtl γpr
+      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γpr
                            inodestart ninodes nib dev ty u
                            pidv dq dqs dqn m K eb b lks Vpr t qt.
 End IALLOC.

@@ -430,7 +430,7 @@ Section ProofIget.
      (1)).
 
      Folded as [ig_loop_body]/[ig_step_body] (parameterized by every
-     lemma-binder/proof-local name each body mentions -- [γl fsc_ic fsc_fs fsc_ireg fsc_cov
+     lemma-binder/proof-local name each body mentions -- [fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov
      fsc_logst nib dev inum n eb p C K b macq spr M ci], plus [TAILC] threaded
      as an explicit [iProp Σ] parameter rather than folded itself; [fuel]/[j]
      kept as explicit [ig_loop_body] parameters per RULE 3, the innermost
@@ -462,13 +462,12 @@ Section ProofIget.
      [iAssert]s below; this file gets no RULE ONE win. *)
 
   Lemma wp_iget_sconf
-      (γl : gname)
       (inodestart : Z) (nib : nat)
       (dev inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_iget_sconf_body γl inodestart nib dev inum l
+    : wp_iget_sconf_body inodestart nib dev inum l
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
@@ -677,7 +676,7 @@ Section ProofIget.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID13 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "itable"%string
+    iApply (Acquire.wp_acquire_sconf KT1 fsc_itlock "itable"%string
               (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) mA
               n eb p (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -1030,7 +1029,7 @@ Section ProofIget.
       pc_is (mword_of_int (KernelSyms.iget + 0x44) : mword 64) -∗
       cpu_own (S n) eb p false ({["itable"]} ∪ lks) -∗
       arm_pay KT1 n eb p -∗
-      locked γl cpu_id -∗
+      locked fsc_itlock cpu_id -∗
       itable_half M -∗
       iref_slots_auth -∗
       isl_pool M -∗
@@ -1069,7 +1068,7 @@ Section ProofIget.
         pc_is (mword_of_int (KernelSyms.iget + 0x3c) : mword 64) -∗
         cpu_own (S n) eb p false ({["itable"]} ∪ lks) -∗
         arm_pay KT1 n eb p -∗
-        locked γl cpu_id -∗
+        locked fsc_itlock cpu_id -∗
         itable_half M -∗
         iref_slots_auth -∗
         isl_pool M -∗
@@ -1687,7 +1686,7 @@ Section ProofIget.
                are the same bool.  Pure re-spelling; it is what makes the
                acquire/release pair compose back to [N]. *)
             iEval (rewrite Houtb) in "Hcg".
-            iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string
+            iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
                       (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) V4
                       n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
@@ -2186,7 +2185,7 @@ Section ProofIget.
           by (rewrite (HL7thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HL3sp).
         (* same re-spelling as the HIT arm above. *)
         iEval (rewrite Houtb) in "Hcg".
-        iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string
+        iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
                   (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) L7
                   n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)

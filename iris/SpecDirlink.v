@@ -449,7 +449,6 @@ Definition wp_dirlink_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names)
-    (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname) (γpr : gname)
     (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -593,7 +592,7 @@ Definition wp_dirlink_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots 3 -∗
   (* ---- THE ICACHE ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
@@ -724,7 +723,6 @@ Definition wp_dirlink_gen_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names)
-    (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname) (γpr : gname)
     (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -875,7 +873,7 @@ Definition wp_dirlink_gen_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots 3 -∗
   (* ---- THE ICACHE ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
@@ -1029,7 +1027,6 @@ Module Type DIRLINK.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl : gname)
       (γa : gname) (γf : gname) (γpr : gname)
       (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -1042,7 +1039,7 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ gtl
+      wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ
                             γa γf γpr inodestart nib bmapstart
                             size dev ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
@@ -1059,7 +1056,6 @@ Module Type DIRLINK.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl : gname)
       (γa : gname) (γf : gname) (γpr : gname)
       (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -1072,7 +1068,7 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ gtl
+      wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ
                           γa γf γpr inodestart nib bmapstart
                           size dev ip dinum bm data dn dn0 fn inum
                           ncount Sb tid qtx pidv dq dqd dqn dqs dqb dqbs dqf

@@ -996,7 +996,6 @@ Section ProofSysMknodBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
       (ns : nat)
@@ -1006,7 +1005,7 @@ Section ProofSysMknodBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
     wp_sys_mknod_sconf_body gf ga gpr gs j gl gu gd gk pd pav pu bn g
-                            gtl bmapstart inodestart nib
+                            bmapstart inodestart nib
                             ninodes size dev ns dqb dqs dqbs dqn v0 v1 v2
                             pid V m K eb b lks.
   Proof.
@@ -1658,7 +1657,7 @@ Section ProofSysMknodBody.
       iDestruct (cpu_own_transport CID19 CID25 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Create.wp_create_sconf (CID := CID25) gs j gl gu gd gk pd pav pu
-                bn g gtl ga gf gpr bmapstart inodestart
+                bn g ga gf gpr bmapstart inodestart
                 nib ninodes size dev pk bf
                 SpecCreate.T_DEVICE (hw_lo (arg_int32 v1)) (hw_lo (arg_int32 v2))
                 (upd_upt V P') MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
@@ -1750,7 +1749,7 @@ Section ProofSysMknodBody.
         iDestruct (cpu_own_transport CID26 CID28 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID28) gs j gl gu gd gk
-                  pd pav pu bn g gtl gil gisl bmapstart
+                  pd pav pu bn g gil gisl bmapstart
                   inodestart nib size dev kk qi ss gy inum dn bm un1
                   pid (DfracOwn (1/4)) dqb dqs P0 (K - 20)%nat eb b lks
                   (upd_upt V P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0

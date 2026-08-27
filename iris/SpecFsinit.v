@@ -255,7 +255,6 @@ Definition wp_fsinit_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (bmapstart inodestart : Z)
     (ninodes : Z) (nib : nat) (size : Z)
@@ -437,7 +436,7 @@ Definition wp_fsinit_sconf_body
      returns and before [kexec("/init")] -- that seal is OWED to forkret's
      first branch. *)
   ireg_boot -∗
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
@@ -535,7 +534,6 @@ Module Type FSINIT.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (gtl : gname)
       (γpr : gname)
       (bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
@@ -554,7 +552,7 @@ Module Type FSINIT.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb),
-      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn gtl γpr
+      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γpr
                            bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog

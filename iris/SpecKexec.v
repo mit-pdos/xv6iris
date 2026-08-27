@@ -341,7 +341,7 @@ Definition fs_fabric
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64) (bn : bio_names)
-    (g : log_names) (gtl : gname)
+    (g : log_names)
     (inodestart : Z) (nib : nat) (dev : mword 32)
     : iProp Σ :=
   (* THE AMBIENT KERNEL ENVIRONMENT, which every fs contract below this one
@@ -356,7 +356,7 @@ Definition fs_fabric
    log_ctx g bn fsc_fs fsc_cov fsc_logst dev ∗
    fs_crash_seam fsc_cov fsc_logst ∗
    gen_cert ∗
-   is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev ∗
+   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev ∗
    itable_inv ∗
    ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗
    ic_sleeplocks fsc_ic ∗
@@ -386,8 +386,8 @@ Definition fs_fabric
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    gs gu gd gk pd pav pu bn g gtl inodestart nib dev :
-  Persistent (fs_fabric gs gu gd gk pd pav pu bn g gtl
+    gs gu gd gk pd pav pu bn g inodestart nib dev :
+  Persistent (fs_fabric gs gu gd gk pd pav pu bn g
                         inodestart nib dev).
 Proof. apply _. Qed.
 
@@ -403,7 +403,6 @@ Definition wp_kexec_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names)
-    (gtl : gname)                       (* the itable's lock   *)
     (ga : gname) (gf : gname)                           (* kalloc, file table  *)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -512,7 +511,7 @@ Definition wp_kexec_sconf_body
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  fs_fabric gs gu gd gk pd pav pu bn g gtl
+  fs_fabric gs gu gd gk pd pav pu bn g
             inodestart nib dev -∗
   kalloc_env ga None -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -589,7 +588,6 @@ Module Type KEXEC.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -600,7 +598,7 @@ Module Type KEXEC.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gtl
+      wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g
                           ga gf bmapstart inodestart nib
                           size dev plen pfun na avf alen aslen afun
                           pidv V dqb dqs dqa dqpv dqas m K eb b lks.

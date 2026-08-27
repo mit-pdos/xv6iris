@@ -271,14 +271,12 @@ Section FsBundles.
   Definition fs_world (γpr γa : gname) (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names) (glog : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       : iProp Σ :=
     (⌜γpr = fsc_printk⌝ ∗ ⌜γa = fsc_kalloc⌝ ∗
      ⌜γu = fsc_uart⌝ ∗ ⌜γd = fsc_disk⌝ ∗ ⌜γk = fsc_dlock⌝ ∗
-     ⌜bn = fsc_bio⌝ ∗ ⌜glog = icfg_log⌝ ∗ ⌜gtl = fsc_itlock⌝ ∗
-     ⌜inodestart = icfg_ist⌝ ∗
+     ⌜bn = fsc_bio⌝ ∗ ⌜glog = icfg_log⌝ ∗ ⌜inodestart = icfg_ist⌝ ∗
      ⌜nib = icfg_nib⌝ ∗ ⌜dev = icfg_dev⌝ ∗
      ⌜bmapstart = fsc_bmapstart⌝ ∗ ⌜size = fsc_size⌝ ∗
      disk_geom γd pd pav pu ∗
@@ -286,8 +284,8 @@ Section FsBundles.
      FsReady.fs_ready)%I.
 
   Global Instance fs_world_persistent γpr γa γs γu γd γk pd pav pu bn glog
-      gtl bmapstart inodestart nib size dev :
-    Persistent (fs_world γpr γa γs γu γd γk pd pav pu bn glog gtl
+      bmapstart inodestart nib size dev :
+    Persistent (fs_world γpr γa γs γu γd γk pd pav pu bn glog
                          bmapstart inodestart nib size dev).
   Proof. rewrite /fs_world. apply _. Qed.
 
@@ -297,8 +295,8 @@ Section FsBundles.
      its callee spells them.  The substitution happens here, once, instead
      of in every consumer. *)
   Lemma fs_world_all γpr γa γs γu γd γk pd pav pu bn glog
-      gtl bmapstart inodestart nib size dev :
-    fs_world γpr γa γs γu γd γk pd pav pu bn glog gtl
+      bmapstart inodestart nib size dev :
+    fs_world γpr γa γs γu γd γk pd pav pu bn glog
              bmapstart inodestart nib size dev -∗
     kernel_text ∗ kernel_data ∗
     printk_env γpr γu γd ∗ ⌜printk_gen_contract (kt := KT1) γpr γu γd⌝ ∗
@@ -307,7 +305,7 @@ Section FsBundles.
     fs_crash_seam fsc_cov fsc_logst ∗ gen_cert ∗
     dev_inv γu γd ∗ disk_geom γd pd pav pu ∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) ∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev ∗ itable_inv ∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev ∗ itable_inv ∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗ ic_sleeplocks fsc_ic ∗
     ireg_inv fsc_ireg fsc_fs inodestart nib ∗ ireg_open ∗
     kalloc_env γa None ∗
@@ -335,7 +333,6 @@ Section FsBundles.
        [fs_ready], whose own disk conjunct is the existential this predicate
        replaced -- and it is dropped ([_] at slot 10). *)
     iIntros "(-> & -> & -> & -> & -> & -> & -> & -> & -> & -> & -> & ->
-              & ->
               & #Hgeom & #Hdlock & Hw)".
     iDestruct (FsReady.fs_ready_all with "Hw") as
       "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & _ & H11 & H12 & H13
@@ -382,20 +379,20 @@ Section FsBundles.
   Lemma fs_world_ready γs pd pav pu :
     fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
              pd pav pu fsc_bio icfg_log
-             fsc_itlock fsc_bmapstart icfg_ist
+             fsc_bmapstart icfg_ist
              icfg_nib fsc_size icfg_dev
     ⊢ FsReady.fs_ready.
   Proof.
     rewrite /fs_world.
     by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _
-                 & _ & _ & _ & _ & _ & $)".
+                 & _ & _ & _ & _ & $)".
   Qed.
 
   Lemma fs_ready_world γs :
     FsReady.fs_ready ⊢
     ∃ pd pav pu, fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
                    pd pav pu fsc_bio icfg_log
-                   fsc_itlock fsc_bmapstart icfg_ist
+                   fsc_bmapstart icfg_ist
                    icfg_nib fsc_size icfg_dev.
   Proof.
     iIntros "#H".
@@ -459,7 +456,6 @@ Definition wp_sys_mkdir_friendly_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (glog : log_names)
-    (gtl : gname)                        (* the itable's lock   *)
     (bmapstart inodestart : Z) (nib : nat)
     (ninodes size : Z) (dev : mword 32)
     (ns : nat)
@@ -479,7 +475,7 @@ Definition wp_sys_mkdir_friendly_body
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
-  fs_world γpr γa γs γu γd γk pd pav pu bn glog gtl
+  fs_world γpr γa γs γu γd γk pd pav pu bn glog
            bmapstart inodestart nib size dev -∗
   (* [procs_inv] left [fs_ready] (FsCfg.v's header): a PROCESS resource,
      persistent, and every caller already holds it. *)
@@ -516,7 +512,6 @@ Module FsSysMkdir (M : SYSMKDIR).
       (pd pav pu : mword 64)
       (bn : bio_names)
       (glog : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (ninodes size : Z) (dev : mword 32)
       (ns : nat)
@@ -525,7 +520,7 @@ Module FsSysMkdir (M : SYSMKDIR).
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
       wp_sys_mkdir_friendly_body γf γa γpr γs j γl γu γd γk pd pav pu bn
-                                 glog gtl bmapstart
+                                 glog bmapstart
                                  inodestart nib ninodes size dev ns
                                  dqb dqs dqbs dqn v pid V m K b lks.
   Proof.
@@ -552,7 +547,7 @@ Module FsSysMkdir (M : SYSMKDIR).
         Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc & #Hbmi)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
     iApply (M.wp_sys_mkdir_sconf γf γa γpr γs j γl γu γd γk pd pav pu bn
-              glog gtl bmapstart inodestart nib
+              glog bmapstart inodestart nib
               ninodes size dev ns dqb dqs dqbs dqn v pid V m K true
               b lks
               HK Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
@@ -631,7 +626,6 @@ Definition wp_sys_chdir_friendly_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (glog : log_names)
-    (gtl : gname)
     (bmapstart inodestart : Z) (nib : nat)
     (ninodes size : Z) (dev : mword 32)
     (dqb dqs dqbs dqn : dfrac)
@@ -649,7 +643,7 @@ Definition wp_sys_chdir_friendly_body
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
-  fs_world γpr γa γs γu γd γk pd pav pu bn glog gtl
+  fs_world γpr γa γs γu γd γk pd pav pu bn glog
            bmapstart inodestart nib size dev -∗
   (* [procs_inv] left [fs_ready] (FsCfg.v's header): a PROCESS resource,
      persistent, and every caller already holds it. *)
@@ -683,7 +677,6 @@ Module FsSysChdir (M : SYSCHDIR).
       (pd pav pu : mword 64)
       (bn : bio_names)
       (glog : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (ninodes size : Z) (dev : mword 32)
       (dqb dqs dqbs dqn : dfrac)
@@ -691,7 +684,7 @@ Module FsSysChdir (M : SYSCHDIR).
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
       wp_sys_chdir_friendly_body γf γa γpr γs j γl γu γd γk pd pav pu bn
-                                 glog gtl bmapstart
+                                 glog bmapstart
                                  inodestart nib ninodes size dev
                                  dqb dqs dqbs dqn v pid V m K b lks.
   Proof.
@@ -719,7 +712,7 @@ Module FsSysChdir (M : SYSCHDIR).
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
     iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
     iApply (M.wp_sys_chdir_sconf γf γa γs j γl γu γd γk pd pav pu bn
-              glog gtl bmapstart inodestart nib
+              glog bmapstart inodestart nib
               size dev dqb dqs v pid V m K true b lks
               HK Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hib Hj Hgs eq_refl Htf

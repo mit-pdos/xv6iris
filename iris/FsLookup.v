@@ -536,7 +536,6 @@ Definition wp_dirlookup_tree_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64)
@@ -604,7 +603,7 @@ Definition wp_dirlookup_tree_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* the inode region: iget's premise since iclaim-ledger.md §3.3, relayed
@@ -676,7 +675,6 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (gtl : gname)
       (γa : gname) (γf : gname)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64)
@@ -688,7 +686,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
-      wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn gtl
+      wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn
                              γa γf inodestart nib dev ip bm data dn
                              dpi ents fn hasp pofv pidv dq dqd dqn
                              m K eb b lks Vpr.
@@ -710,7 +708,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
     iAssert (dlinks fsc_fs (bv_unsigned (inum_of dpi)) dn bm data)
       with "[Hedges]" as "Hedges".
     { rewrite Hkeq. iExact "Hedges". }
-    iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn gtl
+    iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn
               γa γf inodestart nib dev ip (inum_of dpi) bm data dn dn
               fn hasp pofv
               pidv dq dqd dqn m K eb b lks Vpr

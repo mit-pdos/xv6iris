@@ -186,7 +186,6 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Notation K_idup := (14%nat) (only parsing).
 Definition wp_idup_sconf_body
     `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γl : gname)
     (inodestart : Z) (nib : nat)
     (k : nat) (dev : mword 32)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
@@ -211,7 +210,7 @@ Definition wp_idup_sconf_body
   sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_itable2 γl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   (* THE INODE REGION, and GHOST-ONLY (header, §3.19): the [ref++] carries
      the ledger's [icnt] half and the region owns the other one, so the
@@ -268,11 +267,10 @@ Definition wp_idup_sconf_body
 Module Type IDUP.
   Parameter wp_idup_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γl : gname)
       (inodestart : Z) (nib : nat)
       (k : nat) (dev : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_idup_sconf_body γl inodestart nib k dev
+      wp_idup_sconf_body inodestart nib k dev
                          m n eb p K b lks.
 End IDUP.

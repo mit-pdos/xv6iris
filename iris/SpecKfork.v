@@ -117,7 +117,7 @@
    [kfork_post].
 
    What is left of the icache is only what the LOCK needs:
-   [IcacheEscrow.is_itable2 γil fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev] (which drags
+   [IcacheEscrow.is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev] (which drags
    the disk and log fabric -- [fsc_fs], [fsc_cov], [fsc_logst], [nib] -- along) and
    [itable_inv].  No coherence side condition ties the caller's lock to
    [ProcInv.cwd_ref]'s reference: both are stated over the same canonical
@@ -213,7 +213,7 @@ Definition kfork_post
 
 Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γk : gname * gname) (γp γw γl γf γil : gname)  (γs : list gname)
+    (γa : gname) (γk : gname * gname) (γp γw γl γf : gname)  (γs : list gname)
     (inodestart : Z) (nib : nat)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string) :=
@@ -241,7 +241,7 @@ Definition wp_kfork_sconf_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
-  is_itable2 γil fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
   itable_inv -∗
   (* THE INODE REGION, and it is here for ONE reason: kfork's
      [np->cwd = idup(p->cwd)].  idup's [ref++] became a ledger move in
@@ -287,10 +287,10 @@ Definition wp_kfork_sconf_body
 Module Type KFORK.
   Parameter wp_kfork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γk : gname * gname) (γp γw γl γf γil : gname) (γs : list gname)
+      (γa : gname) (γk : gname * gname) (γp γw γl γf : gname) (γs : list gname)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string),
-      wp_kfork_sconf_body γa γk γp γw γl γf γil γs
+      wp_kfork_sconf_body γa γk γp γw γl γf γs
         inodestart nib m lvl K eb pme b pid_p Vp lks.
 End KFORK.

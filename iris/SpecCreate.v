@@ -541,7 +541,6 @@ Definition wp_create_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names)
-    (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname) (γpr : gname)           (* kalloc, ftable, printk *)
     (bmapstart inodestart : Z) (nib : nat)
     (ninodes : Z) (size : Z) (dev : mword 32)
@@ -627,7 +626,7 @@ Definition wp_create_sconf_body
   log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
   kalloc_env γa None -∗
   (* ---- THE ICACHE, THE ITABLE AND THE INODE REGION ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
@@ -766,7 +765,6 @@ Module Type CREATE.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl : gname)
       (γa : gname) (γf : gname) (γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
@@ -778,7 +776,7 @@ Module Type CREATE.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ gtl
+      wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ
                            γa γf γpr bmapstart inodestart nib
                            ninodes size dev plen pfun ty major minor
                            V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.

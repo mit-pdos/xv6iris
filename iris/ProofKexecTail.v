@@ -1245,7 +1245,7 @@ Section KexecAExit.
   (*  where the context is exactly the thirteen pieces and nothing else,  *)
   (*  the same search is a no-op; a caller then writes one [iApply].      *)
   (* =================================================================== *)
-  Lemma fs_fabric_mk gs gu gd gk pd pav pu bn g gtl
+  Lemma fs_fabric_mk gs gu gd gk pd pav pu bn g
       inodestart nib dev :
     (* the fabric's last conjunct (durable-disk B''-tx), FIRST in the wand
        chain so a caller writes it as one [[%]] slot *)
@@ -1256,7 +1256,7 @@ Section KexecAExit.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
@@ -1266,7 +1266,7 @@ Section KexecAExit.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gtl
+    fs_fabric gs gu gd gk pd pav pu bn g
               inodestart nib dev.
   Proof.
     iIntros "%Hclogf Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hropen
@@ -1433,7 +1433,7 @@ Section KexecABad.
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gil gisl : gname) (ga gf : gname)
+      (gil gisl : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (* [gy]: the GENERATION the caller's share names (SpecIlock v5 /
@@ -1478,7 +1478,7 @@ Section KexecABad.
     cpu_claim_ext eb (proc_addr jp) -∗
     kernel_text -∗
     pc_is (mword_of_int (KXA + 0x064) : mword 64) -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gtl
+    fs_fabric gs gu gd gk pd pav pu bn g
               inodestart nib dev -∗
     is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
     (* ---- the open inode: exactly SpecIunlockput's input ---- *)
@@ -1595,7 +1595,7 @@ Section KexecABad.
     iDestruct (cpu_claim_ext_transport CID0 CIDj1 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iApply (Iunlockput.wp_iunlockput_tx_sconf gs jp gl gu gd gk pd pav pu bn g
-              gtl gil gisl bmapstart inodestart nib size dev
+              gil gisl bmapstart inodestart nib size dev
               k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
               B2 (K - 68)%nat eb eb lks V
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc

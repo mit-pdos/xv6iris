@@ -210,7 +210,6 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Notation K_iget := (58%nat) (only parsing).
 Definition wp_iget_sconf_body
     `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γl : gname)
     (inodestart : Z) (nib : nat)
     (dev inum : mword 32)
     (l : ilic)                                   (* THE LICENCE, §7.1 *)
@@ -237,7 +236,7 @@ Definition wp_iget_sconf_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
-  is_itable2 γl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   (* the [ref] words *)
   itable_inv -∗
   (* EVERY entry's content -- the scan cannot name its slot in advance *)
@@ -286,12 +285,11 @@ Definition wp_iget_sconf_body
 Module Type IGET.
   Parameter wp_iget_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γl : gname)
       (inodestart : Z) (nib : nat)
       (dev inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_iget_sconf_body γl inodestart nib dev inum l
+      wp_iget_sconf_body inodestart nib dev inum l
                          m n eb p K b lks.
 End IGET.

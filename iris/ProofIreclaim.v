@@ -931,7 +931,7 @@ Section IreclaimOrphan.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names)
-      (gtl : gname) (γpr : gname)
+      (γpr : gname)
       (bmapstart inodestart ninodes size : Z)
       (nib : nat)
       (dev inum bno : mword 32) (kk : nat)
@@ -996,7 +996,7 @@ Section IreclaimOrphan.
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     ireg_inv fsc_ireg fsc_fs inodestart nib -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
@@ -1333,7 +1333,7 @@ Section IreclaimOrphan.
          equation is its own [Hbnoeq]. *)
       split; [exact Hbnoeq | split; [exact Hdswf | exact Htnz]]. }
     iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-    iApply (IG.wp_iget_sconf gtl inodestart nib dev inum
+    iApply (IG.wp_iget_sconf inodestart nib dev inum
               (BufL (uint bno) ds)
               O6 0%nat eb (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
@@ -1941,7 +1941,7 @@ Section IreclaimOrphan.
        and ended after this call -- so half of it is what iput takes and the
        two rejoin below. *)
     iDestruct (log_tx_halve with "Htx") as (t0) "[Htx1 Htx2]".
-    iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn γ gtl
+    iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn γ
               gil gisl bmapstart inodestart nib size dev
               kslot q inum MAXOPBLOCKS Sb0 false false false e00 t0 (1/2)%Qp
               pidv dq dqb dqs OG (K - 8)%nat eb b lks Vpr false
@@ -2287,7 +2287,7 @@ Section IreclaimScan.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names)
-      (gtl : gname) (γpr : gname)
+      (γpr : gname)
       (bmapstart inodestart ninodes size : Z)
       (nib : nat) (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
@@ -2322,7 +2322,7 @@ Section IreclaimScan.
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     ireg_inv fsc_ireg fsc_fs inodestart nib -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
@@ -3022,7 +3022,7 @@ Section IreclaimScan.
           iDestruct (cpu_claim_ext_transport CID7 CID16 eb (proc_addr j)
                        ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
           iApply (irc_orphan (CID0 := CID16) γs j γl γu γd γk pd pav pu bn γ
-                    gtl γpr bmapstart inodestart ninodes size
+                    γpr bmapstart inodestart ninodes size
                     nib dev inum bno kk (diblk_bytes ds) bsd0 ds d0
                     fuel
                     pidv dq dqb dqs dqn m WD K eb b lks
@@ -3095,7 +3095,6 @@ Section IreclaimMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (gtl : gname)
       (γpr : gname)
       (bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
@@ -3103,7 +3102,7 @@ Section IreclaimMain.
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
-      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ gtl γpr
+      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γpr
                              bmapstart inodestart ninodes nib size
                              dev pidv dq dqb dqs dqn m K eb b lks Vpr.
   Proof.
@@ -3598,7 +3597,7 @@ Section IreclaimMain.
     assert (Hunit1 : bv_unsigned (mword_of_int 1 : mword 32) = 1).
     { rewrite moi32_unsigned. apply bvw32_small.
       change (2^32)%Z with 4294967296%Z. lia. }
-    iPoseProof (irc_scan γs j γl γu γd γk pd pav pu bn γ gtl γpr
+    iPoseProof (irc_scan γs j γl γu γd γk pd pav pu bn γ γpr
                   bmapstart inodestart ninodes size nib dev
                   pidv dq dqb dqs dqn m K eb b lks
                   Vpr HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib

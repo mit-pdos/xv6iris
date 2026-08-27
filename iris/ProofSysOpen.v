@@ -1143,7 +1143,7 @@ Section ProofSysOpenBody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -1194,7 +1194,7 @@ Section ProofSysOpenBody.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -1395,7 +1395,7 @@ Section ProofSysOpenBody.
       iDestruct (cpu_claim_ext_transport CID3 CID5 eb (proc_addr jx)
                    ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
       iApply (Tails.so_tail_e (CID0 := CID5) gs jx gl gu gd gk pd pav pu bn g
-                gtl gil gisl bmapstart inodestart
+                gil gisl bmapstart inodestart
                 icfg_nib size icfg_dev kk qi s gy inum dn bm u pidv
                 (DfracOwn (1/4)) dqb dqs m M2 sp0 K eb b lks w5 w6
                 (word_of_words lo om) w24 bp V
@@ -1569,7 +1569,7 @@ Section ProofSysOpenBody.
       iDestruct (cpu_claim_ext_transport CID8 CID10 eb (proc_addr jx)
                    ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
       iApply (Tails.so_tail_f (CID0 := CID10) gfl gf gs jx gl gu gd gk pd pav
-                pu bn g gtl gil gisl bmapstart
+                pu bn g gil gisl bmapstart
                 inodestart icfg_nib size icfg_dev kk qi s gy inum dn bm
                 kf 1%Qp Cf inhabitant None u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w6
@@ -1929,7 +1929,7 @@ Section ProofSysOpenBody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -1980,7 +1980,7 @@ Section ProofSysOpenBody.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -2125,7 +2125,7 @@ Section ProofSysOpenBody.
       iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (so_alloc (CID0 := CID3) gfl gf gs jx gl gu gd gk pd pav pu bn g
-                gtl gil gisl bmapstart inodestart
+                gil gisl bmapstart inodestart
                 icfg_nib size icfg_dev kk qi s gy inum dn bm om lo nsj u
                 pidv dqb dqs V m M2 sp0 K eb b lks w4 w5 w6 w24 bp
                 HKfull Hkk eq_refl eq_refl Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -2229,7 +2229,7 @@ Section ProofSysOpenBody.
       iDestruct (cpu_claim_ext_transport CID0 CID6 eb (proc_addr jx)
                    ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
       iApply (Tails.so_tail_d (CID0 := CID6) gs jx gl gu gd gk pd pav pu bn g
-                gtl gil gisl bmapstart inodestart
+                gil gisl bmapstart inodestart
                 icfg_nib size icfg_dev kk qi s gy inum dn bm u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w4 w5 w6
                 (word_of_words lo om) w24 bp V
@@ -2278,7 +2278,7 @@ Section ProofSysOpenBody.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID6)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (so_alloc (CID0 := CID6) gfl gf gs jx gl gu gd gk pd pav pu bn g
-              gtl gil gisl bmapstart inodestart
+              gil gisl bmapstart inodestart
               icfg_nib size icfg_dev kk qi s gy inum dn bm om lo nsj u
               pidv dqb dqs V m M4 sp0 K eb b lks w4 w5 w6 w24 bp
               HKfull Hkk eq_refl eq_refl Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -2392,7 +2392,6 @@ Section ProofSysOpenBody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (ninodes size : Z) (dev : mword 32)
       (plen : nat) (bp : nat -> bv 8)
@@ -2441,7 +2440,7 @@ Section ProofSysOpenBody.
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     kalloc_env ga None -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
@@ -2631,7 +2630,7 @@ Section ProofSysOpenBody.
     iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Create.wp_create_sconf (CID := CID5) gs jx gl gu gd gk pd pav pu bn
-              g gtl ga gf gpr bmapstart inodestart nib
+              g ga gf gpr bmapstart inodestart nib
               ninodes size dev plen bp
               SpecCreate.T_FILE (mword_of_int 0) (mword_of_int 0)
               V MAXOPBLOCKS Sb ns pidv dqb dqs dqbs dqn
@@ -2801,7 +2800,7 @@ Section ProofSysOpenBody.
       { cbn in Hns1.
         unfold sys_open_slots, create_slots in *. lia. } }
     iApply (so_join (CID0 := CID8) gfl gf gs jx gl gu gd gk pd pav pu bn g
-              gtl gil gisl bmapstart inodestart nib
+              gil gisl bmapstart inodestart nib
               size dev kk qi ss gy inum dn bm om lo ns1 u1 pidv dqb dqs
               V m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
               HKfull Hkk Hdevc Hnibc ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -2857,7 +2856,6 @@ Section ProofSysOpenBody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (ninodes size : Z) (dev : mword 32)
       (plen : nat) (bp : nat -> bv 8)
@@ -2906,7 +2904,7 @@ Section ProofSysOpenBody.
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     kalloc_env ga None -∗
-    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
@@ -3033,7 +3031,7 @@ Section ProofSysOpenBody.
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Namei.wp_namei_gen (CID := CID2) gs jx gl gu gd gk pd pav pu bn
-              g gtl ga gf bmapstart inodestart nib
+              g ga gf bmapstart inodestart nib
               size dev plen bp MAXOPBLOCKS Sb
               pidv (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
               N2 (K - 24)%nat eb b lks V
@@ -3374,7 +3372,7 @@ Section ProofSysOpenBody.
         { exact Hcsf. }
         { unfold sys_open_slots, create_slots in *. lia. } }
       iApply (so_join (CID0 := CID10) gfl gf gs jx gl gu gd gk pd pav pu bn g
-                gtl gil gisl bmapstart inodestart nib
+                gil gisl bmapstart inodestart nib
                 size dev kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm om lo
                 (ns - 1)%nat n1 pidv dqb dqs V m Q2 sp0 K eb b lks w4 w5 w6 w24
                 bp1
@@ -3461,7 +3459,7 @@ Section ProofSysOpenBody.
         { exact Hcsf. }
         { unfold sys_open_slots, create_slots in *. lia. } }
       iApply (so_alloc (CID0 := CID12) gfl gf gs jx gl gu gd gk pd pav pu bn g
-                gtl gil gisl bmapstart inodestart nib
+                gil gisl bmapstart inodestart nib
                 size dev kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm om lo
                 (ns - 1)%nat n1 pidv dqb dqs V m Q3 sp0 K eb b lks w4 w5 w6 w24
                 bp1
@@ -3497,7 +3495,7 @@ Section ProofSysOpenBody.
     iDestruct (cpu_own_transport CID7 CID12 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Tails.so_tail_c (CID0 := CID12) gs jx gl gu gd gk pd pav pu bn g
-              gtl gil gisl bmapstart inodestart nib
+              gil gisl bmapstart inodestart nib
               size dev kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm n1 pidv
               (DfracOwn (1/4)) dqb dqs m Q3 sp0 K eb b lks w4 w5 w6
               (word_of_words lo om) w24 bp1 V
@@ -3572,7 +3570,6 @@ Section ProofSysOpenBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
       (ns : nat)
@@ -3582,7 +3579,7 @@ Section ProofSysOpenBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
     wp_sys_open_sconf_body gfl gf ga gpr gs j gl gu gd gk pd pav pu bn g
-                           gtl bmapstart inodestart nib
+                           bmapstart inodestart nib
                            ninodes size dev ns dqb dqs dqbs dqn v vom
                            pid V m K eb b lks.
   Proof.
@@ -4238,7 +4235,7 @@ Section ProofSysOpenBody.
       iDestruct (wp_next_shift (b := true) (CIDa := CID21) (CIDb := CID22)
                    ltac:(wp_next_chain) with "Hcont0") as "Hcont0".
       iApply (so_entry_n (CID0 := CID22) gfl gf ga gpr gs j gl gu gd gk pd pav
-                pu bn g gtl bmapstart inodestart nib
+                pu bn g bmapstart inodestart nib
                 ninodes size dev pk bf (arg_int32 vom) (word_lo u23) ns Sb0
                 pid dqb dqs dqbs dqn (upd_upt V P') m S2 sp0 K eb b lks
                 u4 u5 u6 u24
@@ -4269,7 +4266,7 @@ Section ProofSysOpenBody.
     iDestruct (wp_next_shift (b := true) (CIDa := CID21) (CIDb := CID22)
                  ltac:(wp_next_chain) with "Hcont0") as "Hcont0".
     iApply (so_entry_c (CID0 := CID22) gfl gf ga gpr gs j gl gu gd gk pd pav
-              pu bn g gtl bmapstart inodestart nib
+              pu bn g bmapstart inodestart nib
               ninodes size dev pk bf (arg_int32 vom) (word_lo u23) ns Sb0
               pid dqb dqs dqbs dqn (upd_upt V P') m S2 sp0 K eb b lks
               u4 u5 u6 u24

@@ -135,7 +135,6 @@ Definition wp_iput_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names)
-    (gtl : gname)                                     (* itable.lock         *)
     (gil gisl : gname)                                (* ip->lock            *)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -206,7 +205,7 @@ Definition wp_iput_sconf_body
   log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
   (* the itable spinlock over the v2 resource; §13.11's trailing device *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   (* the [ref] words *)
   itable_inv -∗
   (* THIS slot's escrow -- iput knows its slot, so unlike iget it needs no
@@ -360,7 +359,6 @@ Definition wp_iput_gen_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names)
-    (gtl : gname)
     (gil gisl : gname)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -405,7 +403,7 @@ Definition wp_iput_gen_body
   panic_env -∗
   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
   log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
   ireg_inv fsc_ireg fsc_fs inodestart nib -∗
@@ -507,7 +505,7 @@ Module Type IPUT.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
@@ -515,7 +513,7 @@ Module Type IPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gtl gil gisl
+      wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gil gisl
                           bmapstart inodestart nib size dev
                           k q inum n pidv dq dqb dqs m K eb b lks Vpr.
   (* the credited set-form contract; [wp_iput_sconf] is this at
@@ -530,7 +528,7 @@ Module Type IPUT.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname) (gil gisl : gname)
+      (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
@@ -539,7 +537,7 @@ Module Type IPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool),
-      wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gtl gil gisl
+      wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gil gisl
                        bmapstart inodestart nib size dev
                        k q inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr rg.
 End IPUT.

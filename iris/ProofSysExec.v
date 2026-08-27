@@ -4639,7 +4639,6 @@ Section SysExecBreak.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (γa γf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -4667,7 +4666,7 @@ Section SysExecBreak.
     (jp < NPROC)%nat -> gs !! jp = Some gl ->
     b = true -> eb = true ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gtl
+    fs_fabric gs gu gd gk pd pav pu bn g
               inodestart nib dev -∗
     kalloc_env γa None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -4846,7 +4845,7 @@ Section SysExecBreak.
     iEval (rewrite -HN6a0) in "Hpb".
     iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Kexec.wp_kexec_sconf gs jp gl gu gd gk pd pav pu bn g gtl
+    iApply (Kexec.wp_kexec_sconf gs jp gl gu gd gk pd pav pu bn g
               γa γf bmapstart inodestart nib size dev
               plen pfun i (sx_avf pg i) alen (fun _ => 4096%nat) afun
               pid (upd_upt V P) dqb dqs (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
@@ -4968,7 +4967,6 @@ Section SysExecWhole.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (dqb dqs : dfrac)
@@ -4977,7 +4975,7 @@ Section SysExecWhole.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
       wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g
-                             gtl bmapstart inodestart nib
+                             bmapstart inodestart nib
                              size dev dqb dqs v0 v1 pid V m K eb b lks.
   Proof.
     cbv beta zeta delta [wp_sys_exec_sconf_body].
@@ -5066,7 +5064,7 @@ Section SysExecWhole.
     iIntros (CID3 Hq3 M3 P3 i3 pg3 al3 af3) "[Hbrk | Hbad]".
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
       iApply (sx_break (CID0 := CID3) gs j gl gu gd gk pd pav pu bn g
-                gtl γa γf bmapstart inodestart nib size dev
+                γa γf bmapstart inodestart nib size dev
                 dqb dqs pid V K true true ∅ sp0 m plen pfun rst v59
                 M3 P3 i3 pg3 al3 af3
                 HK Hlb eq_refl Hplen Hpcstr Halp Hdev Hnib Hg Hist Hroot Hnib0

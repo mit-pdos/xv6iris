@@ -446,7 +446,6 @@ Definition wp_namex_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names)
-    (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -525,7 +524,7 @@ Definition wp_namex_sconf_body
      namex's slots are dirlookup's outputs and cannot be named in advance,
      which is the same reason iget takes [ic_escrows] and dirlink defined
      [ic_sleeplocks]. ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
@@ -612,7 +611,6 @@ Definition wp_namex_gen_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names)
-    (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -697,7 +695,7 @@ Definition wp_namex_gen_body
      namex's slots are dirlookup's outputs and cannot be named in advance,
      which is the same reason iget takes [ic_escrows] and dirlink defined
      [ic_sleeplocks]. ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
@@ -770,7 +768,6 @@ Module Type NAMEX.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -781,7 +778,7 @@ Module Type NAMEX.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gtl
+      wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g
                           ga gf bmapstart inodestart nib
                           size dev plen pfun nfun npar n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -795,7 +792,6 @@ Module Type NAMEX.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -806,7 +802,7 @@ Module Type NAMEX.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gtl
+      wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g
                         ga gf bmapstart inodestart nib
                         size dev plen pfun nfun npar n Sb
                         pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -866,7 +862,6 @@ Notation K_namex_root := (70%nat) (only parsing).
 Definition wp_namex_root_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (gtl : gname)
     (inodestart : Z) (nib : nat) (dev : mword 32)
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
@@ -891,7 +886,7 @@ Definition wp_namex_root_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* the inode region -- iget's premise since iclaim-ledger.md §3.3, and
@@ -934,11 +929,10 @@ Module Type NAMEX_ROOT.
   Parameter wp_namex_root :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (gtl : gname)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namex_root_body gtl inodestart nib dev dqp
+      wp_namex_root_body inodestart nib dev dqp
                          m n K eb p b lks Vpr.
 End NAMEX_ROOT.

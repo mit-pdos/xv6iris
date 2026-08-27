@@ -537,7 +537,6 @@ Section FsinitMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (gtl : gname)
       (γpr : gname)
       (bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
@@ -556,7 +555,7 @@ Section FsinitMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb) :
-      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn gtl γpr
+      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γpr
                            bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
@@ -1556,7 +1555,7 @@ Section FsinitMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
-              icfg_log gtl γpr bmapstart inodestart
+              icfg_log γpr bmapstart inodestart
               ninodes nib size dev pidv dq (DfracOwn 1) (DfracOwn 1)
               (DfracOwn 1) R1 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0

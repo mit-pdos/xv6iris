@@ -98,7 +98,7 @@ Definition kxc_b2_body
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names)
-    (gtl : gname) (gilf gislf : gname) (ga gf : gname)
+    (gilf gislf : gname) (ga gf : gname)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32) 
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -129,7 +129,7 @@ Definition kxc_b2_body
   m !!! Regidx Rs1 = s10 ->
   m !!! Regidx Rs2 = s20 ->
   kernel_text -∗
-  fs_fabric gs gu gd gk pd pav pu bn g gtl
+  fs_fabric gs gu gd gk pd pav pu bn g
             inodestart nib dev -∗
   kxc_at_12c jp bn g ga gf bmapstart inodestart nib
              size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
@@ -202,7 +202,7 @@ Definition kxc_b2z_body
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names)
-    (gtl : gname) (gilf gislf : gname) (ga gf : gname)
+    (gilf gislf : gname) (ga gf : gname)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32) 
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -227,7 +227,7 @@ Definition kxc_b2z_body
   (jp < NPROC)%nat ->
   gs !! jp = Some gl ->
   kernel_text -∗
-  fs_fabric gs gu gd gk pd pav pu bn g gtl
+  fs_fabric gs gu gd gk pd pav pu bn g
             inodestart nib dev -∗
   kxc_at_1a2 jp bn g ga gf bmapstart inodestart nib
              size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
@@ -256,7 +256,7 @@ Module Type KEXECB3.
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gilf gislf : gname) (ga gf : gname)
+      (gilf gislf : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) 
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -268,7 +268,7 @@ Module Type KEXECB3.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64),
-    kxc_b2_body Q gs jp gl gu gd gk pd pav pu bn g gtl gilf gislf
+    kxc_b2_body Q gs jp gl gu gd gk pd pav pu bn g gilf gislf
       ga gf bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
@@ -279,7 +279,7 @@ Module Type KEXECB3.
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gilf gislf : gname) (ga gf : gname)
+      (gilf gislf : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) 
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -291,7 +291,7 @@ Module Type KEXECB3.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd),
-    kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gtl gilf gislf
+    kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gilf gislf
       ga gf bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w13 w67 ef P.

@@ -215,7 +215,6 @@ Section KexecBBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -268,7 +267,7 @@ Section KexecBBody.
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
         M90 !!! Regidx r = m !!! Regidx r) ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gtl
+    fs_fabric gs gu gd gk pd pav pu bn g
               inodestart nib dev -∗
     pc_is (mword_of_int (KXB + 0x090) : mword 64) -∗
     sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
@@ -1287,7 +1286,7 @@ Section KexecBBody.
                      (CID8 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID8 true (proc_addr jp) _ Hcr8
                    with "Hcont") as "Hcont".
-      iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gtl
+      iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g
                 gilf gislf ga gf bmapstart inodestart nib size
                 dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas

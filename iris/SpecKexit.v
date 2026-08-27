@@ -156,7 +156,6 @@ Definition wp_kexit_sconf_body
     (dev : mword 32)
     (ip : mword 64) (dqi : dfrac)                     (* the initproc cell   *)
     (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
-    (γtl : gname)        (* the itable's lock   *)
     (bmapstart inodestart : Z) (nib : nat) (size : Z)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
@@ -169,7 +168,7 @@ Definition wp_kexit_sconf_body
      pid fraction is the quarter [ProcInv.proc_priv_pid_ofile] lends. *)
   fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ
          dev pid (DfracOwn (1/4))
-         γtl bmapstart inodestart nib size ->
+         bmapstart inodestart nib size ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (K_kexit <= av)%nat ->
@@ -325,13 +324,12 @@ Module Type KEXIT.
       (dev : mword 32)
       (ip : mword 64) (dqi : dfrac)
       (γkl : gname) (γka : gname * gname)
-      (γtl : gname)
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate),
       wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ
                           dev ip dqi γkl γka
-                          γtl bmapstart inodestart nib size
+                          bmapstart inodestart nib size
                           on fn m av eb b lks pid V.
 End KEXIT.

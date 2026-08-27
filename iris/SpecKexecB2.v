@@ -589,7 +589,7 @@ Definition kxc_bad324_body
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names)
-    (gtl : gname) (gilf gislf : gname) (ga gf : gname)
+    (gilf gislf : gname) (ga gf : gname)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -636,7 +636,7 @@ Definition kxc_bad324_body
   cpu_claim_ext eb (proc_addr jp) -∗
   kernel_text -∗
   pc_is (mword_of_int (KXB + 0x31e) : mword 64) -∗
-  fs_fabric gs gu gd gk pd pav pu bn g gtl
+  fs_fabric gs gu gd gk pd pav pu bn g
             inodestart nib dev -∗
   kxc_open dev pidv kf qf sf gyf inumf dnf bmf
            gilf gislf -∗
@@ -697,7 +697,7 @@ Definition kxc_ls_body
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names)
-    (gtl : gname) (gilf gislf : gname) (ga gf : gname)
+    (gilf gislf : gname) (ga gf : gname)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -759,7 +759,7 @@ Definition kxc_ls_body
   cpu_claim_ext eb (proc_addr jp) -∗
   kernel_text -∗
   pc_is (mword_of_int (KXB + 0x0f6) : mword 64) -∗
-  fs_fabric gs gu gd gk pd pav pu bn g gtl
+  fs_fabric gs gu gd gk pd pav pu bn g
             inodestart nib dev -∗
   kalloc_env ga None -∗
   kxc_res jp bn g gf bmapstart inodestart size dev
@@ -852,7 +852,7 @@ Module Type KEXECB2.
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gilf gislf : gname) (ga gf : gname)
+      (gilf gislf : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -864,7 +864,7 @@ Module Type KEXECB2.
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string),
-    kxc_bad324_body Q gs jp gl gu gd gk pd pav pu bn g gtl gilf gislf
+    kxc_bad324_body Q gs jp gl gu gd gk pd pav pu bn g gilf gislf
       ga gf bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
@@ -876,7 +876,7 @@ Module Type KEXECB2.
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names)
-      (gtl : gname) (gilf gislf : gname) (ga gf : gname)
+      (gilf gislf : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -889,7 +889,7 @@ Module Type KEXECB2.
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string),
-    kxc_ls_body Q gs jp gl gu gd gk pd pav pu bn g gtl gilf gislf
+    kxc_ls_body Q gs jp gl gu gd gk pd pav pu bn g gilf gislf
       ga gf bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67

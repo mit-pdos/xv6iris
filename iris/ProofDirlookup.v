@@ -460,7 +460,6 @@ Section ProofDirlookupMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (gtl : gname)
       (ga : gname) (gf : gname)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (dinum : mword 32)
@@ -471,7 +470,7 @@ Section ProofDirlookupMain.
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gtl
+    : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn
                               ga gf inodestart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
   Proof.
@@ -2194,7 +2193,7 @@ Section ProofDirlookupMain.
                 iApply (IcacheEscrow.dlinks_intro _ _ _ _ _ D Hdok Hxact
                           with "Hetk"). }
             iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-            iApply (IG.wp_iget_sconf gtl inodestart nib dev
+            iApply (IG.wp_iget_sconf inodestart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       lic
                       N7 0%nat eb pj (K - 12)%nat b lks

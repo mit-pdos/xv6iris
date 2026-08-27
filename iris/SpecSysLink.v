@@ -215,7 +215,6 @@ Definition wp_sys_link_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names)
-    (gtl : gname)                      (* the itable's lock   *)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (dqb dqs dqbs : dfrac)
@@ -285,7 +284,7 @@ Definition wp_sys_link_sconf_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region the two flushes write ---- *)
-  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
@@ -351,7 +350,6 @@ Module Type SYSLINK.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names)
-      (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (dqb dqs dqbs : dfrac)
@@ -360,7 +358,7 @@ Module Type SYSLINK.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_link_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g
-                             gtl bmapstart inodestart nib
+                             bmapstart inodestart nib
                              size dev dqb dqs dqbs v0 v1 pid V
                              m K eb b lks.
 End SYSLINK.

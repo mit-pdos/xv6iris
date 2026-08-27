@@ -1351,7 +1351,7 @@ Section ProofFileclose.
              with the substitution going the other way: there the ties are
              [->]d into the ambient predicate, here the callees are
              instantiated at the ambient names directly. *)
-          destruct Hties as [Ht_uart Ht_disk Ht_dlock Ht_kmem Ht_kalloc Ht_bio Ht_log Ht_dev Ht_tlock Ht_bms Ht_ist Ht_nib Ht_size].
+          destruct Hties as [Ht_uart Ht_disk Ht_dlock Ht_kmem Ht_kalloc Ht_bio Ht_log Ht_dev Ht_bms Ht_ist Ht_nib Ht_size].
           (* the [fcn_bio] tie has nothing to rewrite in a [bslots] any
              more: the slot supply is at the CANONICAL ghost name, so the
              count no longer mentions the bio record at all. *)
@@ -1502,7 +1502,7 @@ Section ProofFileclose.
                     (fcn_plock fn) fsc_uart fsc_disk fsc_dlock
                     pdd pavd pud fsc_bio
                     icfg_log
-                    fsc_itlock gil gisl
+                    gil gisl
                     fsc_bmapstart
                     icfg_ist icfg_nib fsc_size
                     icfg_dev kk qq inum MAXOPBLOCKS
