@@ -1,5 +1,23 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
+STEP 5, THE SHIM-TAIL TRANCHE (2026-08-27, latest session).  **THE DELETED
+SHIM'S TAIL IS MEASURED AND MOSTLY GONE, AND THE PLAIN ARM'S PRICE IS PAID
+AT THE S-MODE LEAVES.**  Of the 181 real shim uses, **111 converted
+mechanically** and **the 70 survivors are ALL the raw→ctx direction** — one
+decision per raw-tower OWNER, five owners, characterised in A6.58's table.
+The kit the sweep needed is two lemmas in `ByteBuf`
+(`ctx_word_pointsto_split4`/`_join4`, plus `ctx_buf_forget`); the dominant
+"↦₄ has not flipped yet" comment at the call sites is STALE — it has.  The
+other half of the tranche is A6.36's overruling reaching the S-mode leaves:
+a LOAD is the PLAIN arm, so `SmodeCorePt.wordw_win_load_c` (the read twin of
+`wordw_win_store_c`, PURE, hence runnable inside an atomic update) is what
+pays `Mobl_ram`, and every S-mode memory leaf now threads `own_context`.
+Five of A6.57's nine red are addressed, `RiscvAdequacy`'s five allocations
+are LANDED (A6.59) with `TsoGhost.view_auth_alloc` as the one new lemma, and
+step 6's remaining bill is ONE item — the element carve, which changes the
+adequacy theorem's CONCLUSION and is therefore its own tranche.
+A6.58–A6.60 are the record; **A6.60 is the handoff**.
+
 STEP 5, THE PIN'S CONSUMER HALF (2026-08-27, latest session).  **THE PIN
 IS DONE END TO END, `HartSKpt` IS GREEN, AND `SmodeCorePt`'s A6.18 VERDICT
 IS IN** (A6.56: four errors in 4,480 lines, only TWO of them genuine
@@ -4593,6 +4611,297 @@ re-running the sweep on that clean base gives
 **Nothing on that list is a design question.**  The pin's design work is
 finished; what is left is threading, one inventory, and one large but
 uniform grep.
+
+### A6.58 THE SHIM TAIL IS ONE RESIDUE, NOT SIXTY-THREE DECISIONS — AND
+### THE PLAIN ARM'S PRICE IS A TOKEN AT EVERY S-MODE LEAF
+
+A6.57 handed over "240 references across 63 files, decided per site".  The
+measurement is in and it is far sharper than that:
+
+> **181 of the 240 are real lemma uses** (the other 59 are `Require
+> TsoCtxShim.` lines and prose mentions).  **111 of the 181 convert
+> MECHANICALLY**, by rules with exact replacements; **70 survive, and every
+> single survivor is an `_of_mem` or `_shim`** — the raw→ctx direction, the
+> one the flip makes FALSE.  So the tail is not sixty-three decisions.  It
+> is one scripted sweep plus **one decision per RAW-TOWER OWNER**, and
+> there are five owners.
+
+**WHY THE MECHANICAL HALF EXISTS AT ALL, AND IT IS A STALE COMMENT.**
+Nearly every converted site carries some spelling of
+
+    (* ↦₄ has not flipped yet (M1 stage 2): the ctx word crosses here *)
+
+and **it HAS flipped**: `TsoCtx`'s notation block declares `↦₂`/`↦₄` as the
+context-indexed towers, and has since this workspace's `TsoCtx.v` was
+written.  The client files never learned.  So the SC-era route — drop to
+raw with the shim, do the halving, come back — is UNNECESSARY in its
+forward direction and FALSE in its return one, and the repair is the same
+algebra one tier up.  A6.57's "identities now" theory was therefore HALF
+right, and the half it got right is exactly the half where the tier had
+already moved: `WpSconfMem`'s `wordw_pointsto` (A6.18's payoff) really did
+make its crossings identities, and they are simply deleted.
+
+**THE KIT THE SWEEP NEEDED, and where it had to live.**  The ctx tower had
+no 8↔4 halving: `InstrBytes.word_pointsto_split4`/`_join4` sit BELOW
+`TsoCtx`, so their `↦₈`/`↦₄` are the raw towers and the file cannot import
+the kit.  The halving is now stated one tier up, in **`ByteBuf.v`** — the
+lowest file importing BOTH `InstrBytes` (whose half-byte lemmas are pure,
+hence tier-blind) and `TsoCtx`, and one that every consumer of the raw pair
+already imports:
+
+    ctx_word_pointsto_split4 / ctx_word_pointsto_join4   (ξ EXPLICIT)
+    ctx_buf_forget      -- [ctx_buf_to_mem]'s honest one-way successor
+
+Both proofs are the raw ones VERBATIM.  Nothing new had to be proved; the
+ctx tower is a byte window exactly as the raw one is.
+
+**AND THE SWEEP'S ONE NON-LOCAL EFFECT**: thirteen converted files did not
+import `ByteBuf`, so the sweep adds the `Require` — checked against the
+dependency graph first, and all thirteen are safely above it (`ByteBuf`
+reaches only `InstrBytes` / `KallocInv` / `TsoCtx`, none of which reaches a
+`Proof*` or an S-mode leaf).  That check is worth re-running before the
+owners' tranche adds more.
+
+**THE FIVE RAW-TOWER OWNERS — the whole residue, and it is a RE-TIERING,
+not a bridge.**  Every survivor has one shape: an invariant holds a word
+cell in the RAW tower, an ordinary `c.ld`/`c.sd` leaf takes and returns a
+CTX word, so each access crossed in and out.  The `out` direction is now
+`ctx_word_pointsto_forget`; the `in` direction cannot be repaired AT THE
+SITE, because a `ctx_pointsto` carries a timestamp fragment and a
+clean/dirty bit that the era's allocation handed out once (A6.9).  **The
+owner has to move tier.**
+
+| owner | sites | files |
+|---|---|---|
+| the boot carve's frame slots | 25+1 | `BootCarveMain`, `BootBridge` |
+| `BcacheInv`'s LRU links | 16 | `ProofBinit` `ProofBread` `ProofBrelse` |
+| `ProcInv`'s proc-slot cells | 9 | `ProofKexit` `ProofReparent` `ProofKwait` `ProofSysKill` `ProofSysPause` `ProofSysOpenParts` `ProofSysUnlinkParts` `ProofKforkB5` `ProofForkretParts` |
+| `DiskInv` / the devsw slot | 4 | `VirtioDiskRwDefs` `ProofFilewriteParts` |
+| the buffer/string windows | 12 | `ProofSysPipe` `ProofDirlink` `ProofDirlookupParts` `ProofCreateParts` `ProofSyscall` `DinodeSlot` `ProofKexecTail` `ProofPrintk` |
+| the near-frontier leaves | 2 | `WpSmodePtMem` `WpSconfLock` |
+
+That re-tiering is `tools/ctx_convert.py`'s `ambient` pass on the owner
+files plus their accessor lemmas, and it is **its own tranche**: the owners
+are green today and every consumer above them is past the frontier, so it
+cannot be compile-validated from here.  **`↦ₛ` is the one owner that must
+NOT move** (A6.15's ruling — `WpLock.lock_name` sits inside the persistent
+lock handle); its sites take the forget, and the `⊣⊢` statements that
+crossed both ways (`ProofSyscall.sysc_pname_app`, `DinodeSlot`'s two)
+weaken to `⊢`.
+
+**AND THE OTHER HALF OF THIS TRANCHE: THE PLAIN ARM'S PRICE, PAID AT THE
+S-MODE LEAVES.**  A6.36's overruling deleted the strongly-ordered read arm,
+so an S-mode LOAD is `HartEvents`' PLAIN arm and what its leaf owes is
+`HartSMem.Mobl_ram`'s VIEW-INDEXED family — what the load may return at
+every view the hart can legally land on — and not a flat `read_bytes`
+against `σ.(mem)`.  `SmodeCorePt.s_mem_chunk` cannot pay that, which is the
+READ-side half of A6.18's prediction coming due one tier below `HartSKpt`.
+What landed:
+
+    SmodeCorePt.wordw_win_load_c    the READ twin of [wordw_win_store_c]:
+                                    [win_to_phys] (now fraction-generic)
+                                    then [TsoCtx.ctx_phys_load_bytes_ok]
+    SmodeCorePt.word_pointsto_load_c   its 8-byte instance
+    WpSconfMem.wordw_pointsto_load_c   the width-generic wrapper
+
+**Its conclusion is PURE, and that is the whole design point**: the window,
+the token and the interp bundle all survive the call, so an ATOMIC-UPDATE
+leaf (`WpSconfMem`'s load) can run it INSIDE the update and still hand the
+cell back.  The store twin cannot — it consumes, re-mints and appends.
+
+**THE CONSEQUENCE IS A TOKEN AT EVERY S-MODE MEMORY LEAF, and it is the
+A6.27/A6.28 threading finally reaching the leaves.**  `wp_cld_s_r_t` /
+`wp_csd_s_r_t` (and their KT0 corollaries, and `WpSmodePtMemWrap`'s four
+sp-relative wrappers) take `own_context XI` and hand it back beside the
+word; `WpSconfMem`'s two engines stop framing `Hctx` into the POST side of
+their `swp_mono` and send it DOWN to the node instead, getting it back
+inside the leaf's payload (`R := own_context ∗ Ψ`).  §0.17′ is respected
+throughout: no deposit or absorb runs inside a `wp_..._au_...`; the token
+is a plain resource threaded through it.
+
+Three more measurements from the same tranche, each a stop the SC text hid:
+
+- **`WpSconfSfence` needed NO token at all.**  A6.22's rule applies exactly:
+  the flush runs at `mm := ∅`, and `HartMemRun.swp_hmrun_of_exec_reg` is the
+  sanctioned register-only instance that mints and drops a throwaway
+  identity internally.  Using it is what keeps that leaf's STATEMENT fixed.
+- **`SwtchCtx.ctx_cells_reindex` was a FREE re-index and is now a PRICED
+  one.**  Its SC body was `ctx_word_to_mem` then `ctx_word_of_mem`; the
+  honest law was already in the kit (`TsoCtx.CtxMorph` along a `ctx_dom`),
+  and a save area is fourteen word cells and nothing else, so the lemma
+  keeps its name and gains one `ctx_dom ξ ξ'` premise.  Its single caller
+  (`ProofScheduler`) is the M2 worklist entry that price creates — and it
+  is NOT a quarantine, because the obligation is now in the type.
+- **`WpSconfMem.mem_pointsto_write_c` had no caller** and was stated over
+  the deleted `s_win_write`; deleted rather than re-derived.
+
+**NEWLY REACHED, ONE M1-CLASS FIX EACH** (the standing rule held): `ProcInv`
+— the trapframe page is a LEDGER page and the tier is FORCED, not chosen,
+exactly as A6.49 measured for the other four user-memory files
+(`ProcDefs.tf_words`/`tf_tail` move to `ctx_phys_word_pointsto` /
+`ctx_phys_pointsto`, and the file's own VA↔phys bridge becomes A6.14's
+identity-mapping isomorphism `ctx_pointsto_to_phys`/`_of_phys` instead of a
+raw crossing); `FsLookup` — one missing `CurCtx` section binder, reported as
+an unresolved typeclass evar at the section's first `ic_loaded` contract.
+
+### A6.59 `RiscvAdequacy`: THE FIVE ALLOCATIONS ARE LANDED, AND STEP 6'S
+### REMAINING BILL IS THE ELEMENT CARVE
+
+A6.57's inventory (i)–(iii) is **implemented**, in the record's own field
+order, and the theorem now fixes the era's TSO initial state:
+
+    kptb_ghost_alloc                       -> γkptb      (A6.53)
+    ghost_map_alloc ((λ _, (0, None)) <$> gmem)  -> γts
+    ghost_map_alloc_empty (nat -> pwmsg)   -> γlogm
+    mono_nat_own_alloc 0                   -> γloglen
+    TsoGhost.view_auth_alloc (avf g)       -> γview      (NEW lemma)
+
+`view_auth_alloc` is the one piece that did not exist: auth AND fragment at
+the same value, so the whole authority is ONE `own_alloc` with no update
+(`vf tvs` is valid pointwise and includes itself — `auth_both_valid`).  It
+is stated at an arbitrary view function so a later era can be born at the
+view its predecessor left.
+
+**THE THREE NEW HYPOTHESES, and they are one fact in three places.**  The
+Ztso gstate carries three fields the SC one did not, and this theorem is
+where their initial values are fixed: `glog = []`, `gimg = gmem`,
+`gtv c = 0`.  Together they are exactly A6.57 item (ii)'s derivation:
+`ts_ok` at the empty log is `latest img [] a 0 v`, i.e. `img = gmem`, and
+`mm_ok`'s `gmem = flat gimg glog` is then `flat img [] = img`
+definitionally, with `gtv c ≤ length glog` forced to 0.  They are
+HYPOTHESES because this is the single-generation form; the power-cycle form
+will get them from `boot_shape`, whose post-power state has an empty log by
+construction.
+
+**AND ONE MEASUREMENT THAT WAS NOT IN THE INVENTORY**: `riscvFixedGS` gained
+TWO class slots under the flip (`riscvF_kptbGS`, `riscvF_tsomemGS`), so the
+`RiscvFixedGS` constructor's positional underscore runs are 11 and 3, not
+10 and 2.  The error names it as a type mismatch eleven fields away
+(`Hmpre : gen_heapGpreS … while it is expected to have type ghost_varG Σ
+log_mirror`) — worth knowing before reading it as a real mismatch.
+
+**WHAT STEP 6 STILL OWES, and it is ONE item, not four.**  A6.57's (iv)
+(`BootCarve.boot_led_ran`, `SpecEntry`'s two) is not a separate bill: it is
+the same one.  The era's timestamp allocation hands back a big-op of
+`ledger_elem0` FRAGMENTS — one per byte of `gmem` — and they have to be
+
+- **cut at `text_end` in step with the bytes**, the text half PERSISTED into
+  `RiscvPtsto.pristine_elem` (which is literally `a ↪[ts_name]□ (0,None)`)
+  and handed to `BootCarve.boot_text_persist`, whose new premise is exactly
+  that big-op;
+- the DATA half handed to the client, which is a **new conjunct of the
+  adequacy theorem's conclusion** — and therefore a change to every caller
+  (`riscv_device_adequacy`, `SystemAdequacy`, `SpecMain`).
+
+That conclusion change is the reason this is a tranche of its own and not a
+tail of this one.  Nothing in it is a design question; the shape is fixed by
+`boot_led_ran` (which already exists, already cuts, and already pairs the
+elements back up with `boot_raw_ran`) and by `boot_text_persist`'s premise.
+Beyond it, step 6's remaining structural pieces are unchanged from §7: the
+eight per-hart mints and the power-cycle era's re-allocation.
+
+### A6.60 FRONTIER AND HANDOFF AFTER THE SHIM-TAIL TRANCHE
+
+**WHAT WENT GREEN IN THIS TRANCHE** (each was one of A6.57's nine):
+`DiskBoot` (the zeroed-window words rebuild with `ctx_word4_pointsto_intro`
+directly — the shim crossing there was a tier move for no reason),
+`SwtchCtx` (A6.58's priced re-index), `WpSconfSfence` (A6.22's
+register-only instance, statement unmoved), `WpSmodePtLeaves` (the plain
+arm's price, both leaves).  `WpSconfMem` is the fifth and is the tranche's
+one long pole.
+
+> **AND ITS COST IS A MEASUREMENT WORTH RECORDING**: post-flip
+> `WpSconfMem.v` is a **~20-minute single-file compile** (steady ~1.2 GB
+> RSS, memory growing linearly — it is working, not looping).  Both of its
+> engines moved in this tranche (the read node to `wordw_pointsto_load_c`,
+> the write node to the ledger append) and each is a forty-argument leaf
+> application whose `R` is now a lambda rather than a variable.  Practical
+> consequence for anyone working this file: **it cannot be checked inside a
+> ten-minute worker budget**, so iterate on it with a whole-tree `-k` sweep
+> and read the error out of the log, never with a timed single-file make.
+
+**STILL RED, and what each is:**
+
+- `UptWalkPt` — lane 2, and its price is now known exactly.
+  `swp_translate_upt` already TAKES and RETURNS `own_context XI` (the user
+  tree's slots are ledger words, so its A/D write-back owes the append);
+  what is missing is the token in `TrampStepPt.tramp_tr_obl`, the □-obligation
+  the walk is packaged as.  A □-obligation cannot capture a token, so the
+  token has to be a parameter of its inner ∀ — taken and returned — which
+  moves `tramp_tr_obl` itself.  **That is a change to a GREEN file**
+  (`TrampStepPt`), with three producers (`UptWalkPt.utramp_tr_obl`,
+  `Pt2WalkPt`'s two kernel ones) and two consumers, all of them
+  pass-through.  Cheap, but not local.
+- `UserMemPt` — lane 4.  `udata_own` is a big-op of `ctx_phys_pointsto`
+  (A6.49's forced tier) and `udata_own_upd` still updates it with
+  `phys_update`, the gen_heap-only law.  The successor is
+  `TsoCtx.ctx_store_win_ok`, and the STATEMENT has to change shape with it:
+  a store is ONE message (§1's payload ruling), so the update cannot stay a
+  `foldr` over an arbitrary index list `l` — it becomes the window form over
+  `write_bytes … n`.  **That is the one place in the user tier where the
+  flip forces a spec change rather than a threading change.**
+- `UmodeFetch` — lane 4's other half; the fetch obligation gained the
+  `img`/`log` parameters and the file still passes a leaf-map hypothesis
+  where a `bytemap → iProp` is expected.
+- `WpSmodePtMem` — the 1/2/4-byte twin of `WpSmodePtLeaves`.  **Its claim
+  half is DONE**: all four leaves now read the ppn, the canonicality and the
+  tier pin straight off the ctx byte (A6.55's `ctx_pointsto_phys` +
+  `ctx_phys_pointsto_ram`) instead of forgetting to `↦ₘ` and re-minting, so
+  two of its three shim references are gone.  What is left is the same
+  token threading `WpSmodePtLeaves` took — four statements in and out, the
+  folded post, the leaf's `R`, and the obligation arm — with
+  `SmodeCorePt.wordw_win_load_c` / `word{,4}_pointsto_write_c` at the leaf's
+  width.  It is a copy of a worked proof, and it is the cheapest red file
+  on this list.
+- `WpSmodePtMemWrap`, `ProcInv`, `FsLookup`, `RiscvAdequacy` — all four are
+  EDITED and unverified: the sweep had already given up on them when the
+  fixes landed.  Their next compile is the first real news about them.
+
+**THE SHIM TAIL'S LEDGER, closing:**
+
+| class | sites | disposition |
+|---|---|---|
+| the stale stage-2 crossings | 45 | the ctx tower's own algebra (`ByteBuf`'s new `split4`/`join4`, `ctx_word{2,4}_pointsto_*`) |
+| the honest FORGETS | 46 | `ctx_pointsto_forget` / `ctx_word_pointsto_forget` / `ByteBuf.ctx_buf_forget` |
+| the identities (A6.18's tier already moved) | 17 | deleted |
+| **the raw-tower RE-ENTRY** | **70** | **the five owners' re-tiering — its own tranche** |
+| the M2 lock/park quarantine | 4 | `ProofAcquire` ×2, `ProofRelease`, `ProofSwtch` — `ctx_dom_sc` / `hart_view_lb_any`, exactly the sites the shim's header nominates |
+
+`grep -l 'TsoCtxShim\.[a-z]'` is down from 47 files to 26, and of the 129
+remaining mentions **52 are `Require` lines and seven are prose** (`ByteBuf` ×2, `BootCarve`, `KernelDataInv`,
+`ProcInv`, `WpLock`, `TsoCtx` — each naming the dead lemma it replaced) and
+one is `own_context_alloc`, which **has no caller left in the tree at all**:
+`TsoCtxShim.v` is now dead weight and can be deleted the moment the
+quarantine's four sites are paid.
+
+**THE CLOSING MODEL-AWARE NUMBER: 728 of 1330** (`ls -la --time-style=full-iso
+model-xv6iris/*.v *.vo` checked FIRST per A6.39 — the model `.vo` at
+19:11:34 postdates its source at 18:37:36), **up from A6.57's 663**, with
+`WpSconfMem` still inside its ~20-minute compile when the count was taken.
+That number therefore UNDERSTATES the tranche: `WpSconfMem` gates a large
+`Proof*` cone, and the 35 files the shim sweep edited get their first
+compile behind it.  Read it as a floor, not a frontier.
+
+**SWEEP-INTEGRITY NOTE, and it resolves itself.**  `ProcDefs.v` was GREEN
+when its two trapframe cells were re-tiered, so its `.vo` is now older than
+its source and anything compiled against it in the tail of that run was
+compiled against the OLD interface.  `make` fixes this on its own — the
+next run rebuilds `ProcDefs` and, by timestamp, its whole cone — but the
+number to trust is the one from a run started AFTER that edit, not the one
+above.  Nothing else in the tranche has this shape: every other edited file
+was red or unreached.
+
+**FOR THE NEXT LANE, in the order they gate things:**
+
+1. Re-sweep.  `WpSconfMem` opens a large cone and the 35 shimfix-edited
+   files get their first compile; expect a batch of newly-reached
+   M1-class fixes, one per file, per the standing rule.
+2. `WpSmodePtMem` (worked precedent, mechanical) and `WpSmodePtMemWrap`.
+3. The `tramp_tr_obl` token (lane 2) — small, but it moves a green file.
+4. `UserMemPt`'s window-shaped store (the one forced spec change).
+5. The five owners' re-tiering (A6.58's table) — the largest remaining
+   block, and the last thing between the tree and a shim-free grep.
+6. `RiscvAdequacy`'s element carve (A6.59) — the last structural piece.
 
 ## 7. Order of work
 
