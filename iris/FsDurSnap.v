@@ -2086,21 +2086,15 @@ Section Snap.
      facts. *)
   Definition dsnap_step D D' : iProp Σ := (P_dur D ==∗ P_dur D')%I.
 
-  Lemma dsnap_step_of S' D D' : snap_ok S' D' -> ⊢ dsnap_step D D'.
-  Proof.
-    intros Hok. rewrite /dsnap_step. iIntros "_".
-    iApply (P_dur_alloc S' D' Hok).
-  Qed.
-
-  (* ...AND THE SAME STEP FROM AN INSTANCE ALREADY IN HAND (durable-disk
-     lane H2).  [dsnap_step_of] takes the VALUE and the pure tie and builds
-     the next epoch inside the WAL's permit; that is the value-first entry,
-     and at the commit it is wrong for the reason plan section 4 gives.
-     [dsnap_step_xfer] takes the next epoch ITSELF -- the file system builds
-     it, at its own ghost step, where its invariants are open -- and the WAL
-     only swaps the registry over.  The old epoch is DISCARDED (affine),
-     exactly as before; nothing is read out of it, which is why the step
-     needs no premise about [D] at all. *)
+  (* THE STEP TAKES THE NEXT EPOCH ITSELF (durable-disk lane H2).  Its
+     predecessor [dsnap_step_of] took the VALUE and the pure tie and built
+     the epoch inside the WAL's permit -- the value-first entry, wrong at
+     the commit for the reason plan section 4 gives -- and is DELETED: the
+     file system now builds its own epoch at its own ghost step, where its
+     invariants are open ([FsCollectAll.fs_snap_law_build]), and the WAL
+     only swaps the registry over.  The old epoch is DISCARDED (affine);
+     nothing is read out of it, which is why the step needs no premise
+     about [D] at all. *)
   Lemma dsnap_step_xfer D D' : P_dur D' -∗ dsnap_step D D'.
   Proof. rewrite /dsnap_step. iIntros "H _". by iModIntro. Qed.
 

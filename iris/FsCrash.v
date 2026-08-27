@@ -1951,7 +1951,7 @@ Section fs_crash.
           ONE copy of the file-system predicate over its OWN, existentially
           quantified ghost names, describing the committed map [fr_D r] --
           never updated: at each group commit the WAL drops it and allocates
-          a fresh one ([FsDurSnap.dsnap_step_of]).  It is indexed by
+          a fresh one ([FsDurSnap.dsnap_step_xfer]).  It is indexed by
           [fr_D r] alone, so a permit that does not move the committed view
           frames it untouched and the COMMIT is the one write that advances
           it -- exactly ruling 2's "commit is the only write kind that moves

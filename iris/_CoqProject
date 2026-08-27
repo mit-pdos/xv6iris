@@ -1378,6 +1378,7 @@ FsCfgSnap.v
 # FsDurLedger.v
 # FsDurObj.v
 # FsParRefute.v
+FsDurXferWall.v
 FsDurRefute.v
 FsDurDefer.v
 FsDurTrunc.v
