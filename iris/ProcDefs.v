@@ -81,7 +81,13 @@ Section ProcDefs.
   Definition tf_page (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
     (⌜length ws = TFWORDS⌝ ∗ tf_words tfp ws ∗ tf_tail tfp)%I.
 
-  Typeclasses Opaque tf_words tf_tail tf_page.
+  (* GLOBAL (2026-08-27).  This was bare -- i.e. compilation-local -- and
+     ProcInv.v repeated it for that reason.  The profile then showed the same
+     1.5-2.1 s frame in FIVE more files that never got a repeat
+     (ProofSyscall, ProofKforkB5, ProofUserinit, ProofAllocproc,
+     UserActiveClass), which is the uniformity tell for one shared conjunct.
+     Sealing once here is the [inode_blocks] fix again. *)
+  Global Typeclasses Opaque tf_words tf_tail tf_page.
 
   Context `{!fdslotG Σ, !irefslotG Σ, !bioslotG Σ}.
 

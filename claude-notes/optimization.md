@@ -691,9 +691,25 @@ and it did not move.
     comment records it. The consequence nobody had drawn: **every other file
     in the tree still sees those three transparent**, and a local repeat is
     worth ~8 s in a file that frames past `proc_priv` (measured on
-    `UsertrapRes`). It is worth a repeat line where the profile says so; it
-    was NOT worth sealing globally once that file's frames were rewritten as
-    chains (below), which is the same "measure before sealing" rule.
+    `UsertrapRes`).
+
+    **THAT SEAL IS NOW `Global` (2026-08-27), and the old advice here -- a
+    repeat line where the profile says so, not a global seal -- was wrong on
+    the measurement.** Five more files carried the same 1.5-2.1 s frame and
+    never got a repeat, which is the uniformity tell for one shared conjunct.
+    One `Global` line in `ProcDefs.v` (and `UsertrapRes`'s local repeat
+    dropped as redundant) measured, isolated, min of two runs:
+    | file | before | after |
+    |---|---|---|
+    | `ProofAllocproc` | 35.74 s | **26.77 s** |
+    | `ProofSyscall` | 48.36 s | 47.17 s |
+    | `UserActiveClass` | 8.92 s | 8.45 s |
+    | `ProofUserinit` | 13.59 s | 13.49 s |
+    | `ProofKforkB5` | 8.44 s | 8.64 s (no benefit) |
+    `ProofAllocproc` is nine tenths of it, so the lesson is not "seal
+    everything globally" -- it is that a LOCAL seal hides the size of the
+    prize, because the files that would have paid for a repeat never appear
+    in the profile as a cluster until you look for one.
   - `rewrite /X` and `unfold X` are unaffected by the seal, so the sites that
     genuinely take the big-op apart keep working, and a `Timeless` instance
     proved `rewrite /X. apply _.` still goes through. Nothing in 1293 files
