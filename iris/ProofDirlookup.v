@@ -239,7 +239,7 @@ Qed.
 
 Section ProofDirlookupMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
@@ -460,7 +460,7 @@ Section ProofDirlookupMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (dinum : mword 32)
@@ -471,7 +471,7 @@ Section ProofDirlookupMain.
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
+    : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi gtl
                               ga gf cov logstart inodestart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
   Proof.
@@ -2194,7 +2194,7 @@ Section ProofDirlookupMain.
                 iApply (IcacheEscrow.dlinks_intro _ _ _ _ _ D Hdok Hxact
                           with "Hetk"). }
             iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-            iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev
+            iApply (IG.wp_iget_sconf gtl gfs gi cov logstart inodestart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       lic
                       N7 0%nat eb pj (K - 12)%nat b lks

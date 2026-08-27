@@ -94,6 +94,7 @@ Require Import ProofNamex.    (* READ-ONLY REUSE: its top-level pure lemmas *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -105,7 +106,7 @@ Set Printing Depth 40.
 
 Section NamexTrHops.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ}.
 
   (* PEEL THE HEAD HOP.  [nx_hops_from .. k] is the big-op over
      [drop k (path_elems pl)] at shifted indices; when the walk knows the
@@ -200,7 +201,7 @@ Notation Rs10 := (mword_of_int 26 : mword 5).
 
 Section ProofNamexTrMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
@@ -226,9 +227,9 @@ Section ProofNamexTrMain.
   (* the escrow-family accessor, restated locally since the walk's slots are
      dirlookup's outputs.  The sleeplock family's accessor is
      [IcacheEscrow.ic_sleeplocks_lookup]. *)
-  Lemma nx_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Lemma nx_esc_acc (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) : (k < NINODE)%nat ->
-    (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
+    (ic_escrows fsc_ic gfs gi cov logstart -∗ ic_escrow fsc_ic gfs gi cov logstart k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -776,7 +777,7 @@ Section ProofNamexTrMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -787,7 +788,7 @@ Section ProofNamexTrMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_tr_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_namex_tr_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                        ga gf cov logstart bmapstart inodestart nib
                        size dev plen pfun nfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -2562,9 +2563,9 @@ Section ProofNamexTrMain.
                    assert (Hib' : bv_unsigned iinum < 16 * Z.of_nat nib)
                      by (rewrite Hnib; exact Hib).
                    destruct (Hiregb iinum Hib') as [Hibc Hibl].
-                   iDestruct (nx_esc_acc cn gfs gi cov logstart ik Hik
+                   iDestruct (nx_esc_acc gfs gi cov logstart ik Hik
                                 with "Hesc") as "#Hesck".
-                   iDestruct (ic_sleeplocks_lookup cn ik Hik with "Hslks")
+                   iDestruct (ic_sleeplocks_lookup fsc_ic ik Hik with "Hslks")
                      as (gilk gislk) "#Hslkk".
                    iDestruct (nx_bs3_split bn with "Hbslot")
                      as "[Hbs1 Hbs2]".
@@ -2641,7 +2642,7 @@ Section ProofNamexTrMain.
                       descriptor conjunct home. *)
                    iEval (rewrite Htlog) in "Htx".
                    iApply (IL.wp_ilock_tx_sconf gs j gl gu gd gk pd pav pu bn
-                             gfs gi cn gilk gislk cov logstart inodestart nib
+                             gfs gi gilk gislk cov logstart inodestart nib
                              ik (iq/2)%Qp gsh PlainK dev iinum pidv dq dqs
                              V2 (K - 12)%nat eb b lks Vpr
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
@@ -2863,7 +2864,7 @@ Section ProofNamexTrMain.
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn g gfs gi cn gtl gilk gislk cov logstart
+                               bn g gfs gi gtl gilk gislk cov logstart
                                bmapstart inodestart nib size dev
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
@@ -3211,7 +3212,7 @@ Section ProofNamexTrMain.
                            by (destruct Hiok as (_ & _ & _ & _ & _ & Hq & _);
                                exact Hq).
                          iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk
-                                   pd pav pu bn gfs gi cn gtl ga gf cov
+                                   pd pav pu bn gfs gi gtl ga gf cov
                                    logstart inodestart nib dev (ientry ik) iinum
                                    bml datl dnl dnl
                                    nf' false (mword_of_int 0 : mword 32)
@@ -3475,7 +3476,7 @@ Section ProofNamexTrMain.
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn g gfs gi cn gtl gilk gislk
+                                     pd pav pu bn g gfs gi gtl gilk gislk
                                      cov logstart bmapstart inodestart nib
                                      size dev ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
@@ -3733,7 +3734,7 @@ Section ProofNamexTrMain.
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn g gfs gi cn gtl gilk gislk
+                                     pd pav pu bn g gfs gi gtl gilk gislk
                                      cov logstart bmapstart inodestart nib
                                      size dev ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
@@ -3978,7 +3979,7 @@ Section ProofNamexTrMain.
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn g gfs gi cn gtl gilk gislk cov logstart
+                               bn g gfs gi gtl gilk gislk cov logstart
                                bmapstart inodestart nib size dev
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
@@ -4776,7 +4777,7 @@ Section ProofNamexTrMain.
       iAssert (iname gi gfs inodestart ROOTINO RootL) as "Hlicr";
         [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
       iPoseProof (InodeRegion.ireg_inv_reg with "Hireg") as "#Hiregr".
-      iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev ROOTINO
+      iApply (IG.wp_iget_sconf gtl gfs gi cov logstart inodestart nib dev ROOTINO
                 RootL
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)

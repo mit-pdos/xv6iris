@@ -74,6 +74,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -82,14 +83,14 @@ Local Open Scope Z_scope.
 Notation K_nameiparent := (114%nat) (only parsing).
 Definition wp_nameiparent_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names) (gfs : fs_names) (gi : gname)
-    (cn : ic_names) (gtl : gname)                      (* the icache + itable *)
+    (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -144,10 +145,10 @@ Definition wp_nameiparent_sconf_body
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   kalloc_env ga None -∗
-  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows cn gfs gi cov logstart -∗
-  ic_sleeplocks cn -∗
+  ic_escrows fsc_ic gfs gi cov logstart -∗
+  ic_sleeplocks fsc_ic -∗
   ireg_inv gi gfs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
@@ -225,14 +226,14 @@ Definition wp_nameiparent_sconf_body
 (* ===================================================================== *)
 Definition wp_nameiparent_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names) (gfs : fs_names) (gi : gname)
-    (cn : ic_names) (gtl : gname)                      (* the icache + itable *)
+    (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -289,10 +290,10 @@ Definition wp_nameiparent_gen_body
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   kalloc_env ga None -∗
-  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows cn gfs gi cov logstart -∗
-  ic_sleeplocks cn -∗
+  ic_escrows fsc_ic gfs gi cov logstart -∗
+  ic_sleeplocks fsc_ic -∗
   ireg_inv gi gfs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
@@ -371,13 +372,13 @@ Definition wp_nameiparent_gen_body
 Module Type NAMEIPARENT.
   Parameter wp_nameiparent_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -387,7 +388,7 @@ Module Type NAMEIPARENT.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                                 ga gf cov logstart bmapstart inodestart nib
                                 size dev plen pfun nfun n
                                 pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -395,13 +396,13 @@ Module Type NAMEIPARENT.
      existential's own witness. *)
   Parameter wp_nameiparent_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -411,7 +412,7 @@ Module Type NAMEIPARENT.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                                 ga gf cov logstart bmapstart inodestart nib
                                 size dev plen pfun nfun n Sb
                                 pidv dq dqb dqs dqpv m K eb b lks Vpr.

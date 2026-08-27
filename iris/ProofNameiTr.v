@@ -96,7 +96,7 @@ Local Ltac namidx := first [ vm_compute; reflexivity | vm_compute; discriminate 
 
 Section ProofNameiTrMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- THE FRAME CARVE: the two low slots ARE [name[14]] ---- *)
@@ -176,7 +176,7 @@ Section ProofNameiTrMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -186,7 +186,7 @@ Section ProofNameiTrMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namei_tr_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_namei_tr_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                        ga gf cov logstart bmapstart inodestart nib
                        size dev plen pfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -380,7 +380,7 @@ Section ProofNameiTrMain.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_tr gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    iApply (NX.wp_namex_tr gs j gl gu gd gk pd pav pu bn g gfs gi gtl
               ga gf cov logstart bmapstart inodestart nib size dev
               plen pfun nfun n Sb P Pmiss pidv dq dqb dqs dqpv R5 (K - 4)%nat eb b
               _ Vpr Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov

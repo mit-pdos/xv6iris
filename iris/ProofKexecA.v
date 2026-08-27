@@ -238,6 +238,7 @@ Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -321,7 +322,7 @@ Section KexecABody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -368,7 +369,7 @@ Section KexecABody.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gfs gi gtl
               cov logstart inodestart nib dev -∗
     kalloc_env ga None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -598,7 +599,7 @@ Section KexecABody.
        leaving it is [LogInv.log_opS_op]; nothing else in the phase moves.
        (sys_chdir did this first -- SpecSysChdir.v's ledger section.) ---- *)
     iDestruct (log_op_openS with "Hlog") as (Sb0) "[Hlog Htx]".
-    iApply (Namei.wp_namei_gen gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    iApply (Namei.wp_namei_gen gs jp gl gu gd gk pd pav pu bn g gfs gi gtl
               ga gf cov logstart bmapstart inodestart nib size dev
               plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs dqpv
               N5 (K - 68)%nat eb eb lks
@@ -864,7 +865,7 @@ Section KexecABody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -915,7 +916,7 @@ Section KexecABody.
     m !!! Regidx Rs1 = s10 ->
     m !!! Regidx Rs2 = s20 ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gfs gi gtl
               cov logstart inodestart nib dev -∗
     (* ---- THE HEADER ORACLE (N-5.2B) ------------------------------------
        ONE ghost step, fired at the instant ilock's payload is open and
@@ -992,9 +993,9 @@ Section KexecABody.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jp) -∗
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
-                     (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
+                     (ic_tok fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_tx_dep cn kf sf dev inumf gyf -∗
+        ic_tx_dep fsc_ic kf sf dev inumf gyf -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -1060,8 +1061,8 @@ Section KexecABody.
     assert (Hib' : bv_unsigned inum < 16 * Z.of_nat nib)
       by (rewrite Hnib; exact Hib).
     destruct (Hiregb inum Hib') as [Hibc Hibl].
-    iDestruct (T.kxa_esc_acc cn gfs gi cov logstart k Hk with "Hesc") as "#Hesck".
-    iDestruct (ic_sleeplocks_lookup cn k Hk with "Hslks") as (gilk gislk) "#Hslkk".
+    iDestruct (T.kxa_esc_acc gfs gi cov logstart k Hk with "Hesc") as "#Hesck".
+    iDestruct (ic_sleeplocks_lookup fsc_ic k Hk with "Hslks") as (gilk gislk) "#Hslkk".
     iDestruct (T.kxa_bs3_split with "Hbs") as "[Hbs1 Hbs2]".
     (* ---- open the process for the pid quarter ---- *)
     (* the BLOCK and the cwd reference: [p->cwd] is one of the block's own
@@ -1155,7 +1156,7 @@ Section KexecABody.
        seam is the BUDGET half. *)
     iDestruct (log_op_split with "Hlog") as "[Hlog Htx]".
     iEval (rewrite Htlog) in "Htx".
-    iApply (Ilock.wp_ilock_tx_sconf gs jp gl gu gd gk pd pav pu bn gfs gi cn
+    iApply (Ilock.wp_ilock_tx_sconf gs jp gl gu gd gk pd pav pu bn gfs gi
               gilk gislk cov logstart inodestart nib k (q/2)%Qp gy PlainK
               dev inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat eb eb lks
@@ -1687,7 +1688,7 @@ Section KexecABody.
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _ Hcr15
                      with "Hcont") as "Hcont".
         iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
-      iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi gtl
                   gilk gislk ga gf cov logstart bmapstart inodestart nib size
                   dev k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                   plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
@@ -1769,7 +1770,7 @@ Section KexecABody.
       iDestruct (wp_next_retarget CID0 CID11 true (proc_addr jp) _ Hcr11
                    with "Hcont") as "Hcont".
       iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
-      iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi gtl
                 gilk gislk ga gf cov logstart bmapstart inodestart nib size
                 dev k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
@@ -1848,7 +1849,7 @@ Section KexecAMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -1903,7 +1904,7 @@ Section KexecAMain.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gfs gi gtl
               cov logstart inodestart nib dev -∗
     (* THE HEADER ORACLE, relayed to [kxc_a2] -- see its statement.  Phase A
        is the block that FINDS the inum, so the oracle is quantified over it
@@ -1979,9 +1980,9 @@ Section KexecAMain.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jp) -∗
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
-                     (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
+                     (ic_tok fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_tx_dep cn kf sf dev inumf gyf -∗
+        ic_tx_dep fsc_ic kf sf dev inumf gyf -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -2025,7 +2026,7 @@ Section KexecAMain.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab Horacle #Hka Hbm Hins #Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont #Hkw Hcont90".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
-    iApply (kxc_a1 (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
+    iApply (kxc_a1 (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn g gfs gi gtl ga gf
               cov logstart bmapstart inodestart nib size dev
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m K eb b lks sp0 ra0 s00 s10 s20 pv av KEX
@@ -2038,7 +2039,7 @@ Section KexecAMain.
     iIntros (CIDs Hss M32 ipv zi n1) "Hseam Hexit".
     iDestruct (wp_next_retarget CID0 CIDs true (proc_addr jp) _ Hss
                  with "Hcont90") as "Hcont90".
-    iApply (kxc_a2 (CID0 := CIDs) Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
+    iApply (kxc_a2 (CID0 := CIDs) Q gs jp gl gu gd gk pd pav pu bn g gfs gi gtl ga gf
               cov logstart bmapstart inodestart nib size dev
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 HD XCH KEX

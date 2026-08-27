@@ -111,6 +111,7 @@ Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import SpecPrintk.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -598,7 +599,7 @@ Qed.
 
 Section DlBuf.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the two frame slots the [de] occupies (10 and 9), carved into sixteen
@@ -662,10 +663,10 @@ Section DlBuf.
     (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
-    Lemma dl_esc_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
+    Lemma dl_esc_acc (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart k
+    (ic_escrows fsc_ic γfs γi cov logstart -∗ ic_escrow fsc_ic γfs γi cov logstart k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -979,7 +980,7 @@ Qed.
 
 Section ProofDirlinkMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
@@ -1282,7 +1283,7 @@ Section ProofDirlinkMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (ga : gname) (gf : gname) (gpr : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -1295,7 +1296,7 @@ Section ProofDirlinkMain.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_dirlink_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_dirlink_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                           ga gf gpr cov logstart inodestart nib bmapstart
                           size dev ip dinum bm data dn dn0 fn inum
                           ncount Sb tid qtx pidv dq dqd dqn dqs dqb dqbs dqf
@@ -1771,7 +1772,7 @@ Section ProofDirlinkMain.
     iDestruct (dl_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
    iDestruct (cpu_own_transport CID CID12 0%nat eb (proc_addr j) b 
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
+    iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk pd pav pu bn gfs gi gtl
               ga gf cov logstart inodestart nib dev ip dinum bm data dn dn0 fn
               false (mword_of_int 0 : mword 32)
               pidv dq dqd dqn R7 (K - 10)%nat eb b _ Vpr
@@ -1855,9 +1856,9 @@ Section ProofDirlinkMain.
         exact (Hinums kk Hklt Hklive). }
       destruct (Hiregb (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32)
                   Hinb) as [Hcblk Hcblog].
-      iDestruct (dl_esc_acc cn gfs gi cov logstart kslot Hkslot with "Hesc")
+      iDestruct (dl_esc_acc gfs gi cov logstart kslot Hkslot with "Hesc")
         as "#Hesck".
-      iDestruct (ic_sleeplocks_lookup cn kslot Hkslot with "Hslks") as (gil gisl) "#Hslk".
+      iDestruct (ic_sleeplocks_lookup fsc_ic kslot Hkslot with "Hslks") as (gil gisl) "#Hslk".
       iDestruct (dl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
         [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
       iDestruct (cpu_own_transport CIDdl CID14 0%nat eb (proc_addr j) b
@@ -1868,7 +1869,7 @@ Section ProofDirlinkMain.
          The birth epoch is opened for the reservation and never named
          again: at [crz = false] iput makes no epoch-ordered claim. *)
       iDestruct (log_opS_named with "Hop") as (edl) "Hop".
-      iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                 gil gisl cov logstart bmapstart inodestart nib size dev
                 kslot qq (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32)
                 ncount Sb false false false edl tid qtx pidv dq dqb dqs E1 (K - 10)%nat eb b lks Vpr true
@@ -3502,7 +3503,7 @@ Section ProofDirlinkMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (ga : gname) (gf : gname) (gpr : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -3515,7 +3516,7 @@ Section ProofDirlinkMain.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_dirlink_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_dirlink_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                             ga gf gpr cov logstart inodestart nib bmapstart
                             size dev ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
@@ -3543,7 +3544,7 @@ Section ProofDirlinkMain.
        seven dominates it at every pair of booleans. *)
     assert (Hncg : forall crb ind : bool, (dl_need crb ind <= ncount)%nat)
       by (intros crb ind; exact (Nat.le_trans _ _ _ (dl_need_le crb ind) Hnc)).
-    iApply (wp_dirlink_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    iApply (wp_dirlink_gen gs j gl gu gd gk pd pav pu bn g gfs gi gtl
               ga gf gpr cov logstart inodestart nib bmapstart size dev
               ip dinum bm data dn dn0 fn inum ncount Sb0 t0 (1/2)%Qp
               pidv dq dqd dqn dqs dqb dqbs dqf m K eb b lks Vpr
