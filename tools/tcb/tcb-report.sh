@@ -9,11 +9,19 @@
 # mentions needs trusting -- but the STATEMENT is the thing a human agrees
 # to, so every definition it unfolds to is trusted.
 #
-# THE WHOLE TRICK IS THE SEED, and it is the only idea here.  Pointing
-# [Print All Dependencies] at the THEOREM walks its proof cone -- the
-# untrusted half, thousands of files.  Pointing it at a DEFINITION WHOSE
+# THE WHOLE TRICK IS THE SEED, and it is the only idea here.
+# [assumptions.ml]'s traversal walks a constant's BODY and never its type --
+# and a theorem's body is its PROOF.  So [Print All Dependencies] aimed at
+# the theorem returns the untrusted half: every lemma and every definition
+# any proof in the cone happens to mention.  Aiming it at a DEFINITION WHOSE
 # BODY IS THE STATEMENT walks the statement instead.  That is the
 # [Definition tcb_seed := ltac:(... type of ...)] line below.
+#
+# It is also the difference between a CI step and no CI step.  MEASURED on
+# xv6_fs_adequacy_xv6Σ: seeded, 3.3 s; unseeded, still running when killed
+# at 120 s -- it is forcing every opaque proof body in the development, the
+# same walk that makes `make audit-only` cost ~379 s (optimization.md,
+# "Print Assumptions is a whole-tree walk").
 #
 # WHAT IT OVER-APPROXIMATES.  assumptions.ml's traversal forces opaque proof
 # bodies and walks into them, so definitions reached only through a [Qed]
