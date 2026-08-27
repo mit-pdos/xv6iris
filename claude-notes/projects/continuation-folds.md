@@ -18,6 +18,7 @@ stays TRANSPARENT and the `iApply ("H" $! …)` sites unify through it.
 | what | measured |
 |---|---|
 | `ProofNamex` + `ProofNamexTr`: the six `nx_*_exit` inner continuations | 111.4 → 110.1 s and 92.2 → 90.7 s (−1.2 / −1.6 %) |
+| `ProofDirlink`: `dl_scan_exit` + `dl_after_exit` (6.3 kB into a 36.2 s lemma) | 41.7 → 38.5 s (**−7.7 %**), `.vo` −9.9 % |
 | `ProofSysUnlink`: `sys_unlink_closer` + `su_w1/w2/w3_seam` | 153.7 s → 133.1 s (−13.4 %), `.vo` −14.8 % |
 | kexec: `KexecOkQ.kexec_closer`, 36 inline copies across 12 files | B3/C/A 166.6 s → 153.6 s (−7.8 %), `.vo` −7 to −10 % |
 
@@ -65,7 +66,27 @@ they sit there. Every result so far fits it and nothing else does:
 worth nothing, because per-step cost is `|Δ|` ABSOLUTE. Attribute cost with
 `coqc -time` per enclosing `Lemma` (the `Chars` offsets are BYTES).
 
-## Remaining, ranked — by LEMMA cost × share
+## Remaining, ranked — bytes removable × the cost of the lemma that CARRIES them
+
+A tree-wide sweep (continuations ≥1000 B, ≥6 top-level rows so an
+already-named body does not count, in files ≥20 s) leaves 28 candidates; with
+the carrying lemma's own `coqc -time` cost against them, only four are worth
+anything:
+
+| candidate | bytes × lemma | note |
+|---|---|---|
+| `ProofIput.ip_free_entry` | 7.7 kB × 15.6 s | the largest inline continuation left in the tree |
+| `ProofKforkB6.kfk_prologue` | 4.6 + 2.8 kB × 15.0 s | two in one lemma; clean, no history |
+| `ProofIput.ip_free_locked` | 3.9 kB × 23.7 s | **this is the one that regressed +13 s**; see below |
+| `ProofKexecA.kxc_a2` | 3.0 kB × 23.5 s | |
+
+Everything else on the ≥1 kB list fails on the carrying lemma being cheap, and
+`WpSconfCsr.wp_csrr_sstatus_s_sconf` is the cautionary one: **89.5 % share, the
+highest in the tree, and the lemma costs 1.0 s.** Same for
+`ProofKexecA.kxc_phaseA` (3.3 kB, 0.9 s), `ProofMain.mn_grp_kvm` (2.0 s),
+`ProofSysExec.sx_setup` (3.8 s), `ProofKvmmake` (4.4 s).
+
+## Superseded ranking (kept for the method)
 
 Per-lemma cost from isolated `coqc -time`; share is the largest inline
 continuation as a fraction of that lemma's statement.

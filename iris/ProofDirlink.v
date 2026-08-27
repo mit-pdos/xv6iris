@@ -1043,58 +1043,12 @@ Section ProofDirlinkMain.
            pc_is ret_tgt -∗
            WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang))%I.
-
-  Definition dl_after_body
-      (j : nat) (m : regfile) (sp0 ip nb : mword 64)
-      (dqd : dfrac) (dev : mword 32) (dqf : dfrac) (dinum : mword 32)
-      (dn dn0 : dinode) (bm : blkmap)
-      (data : nat -> list (bv 8)) (dqn : dfrac) (fn : nat -> bv 8)
-      (dqs : dfrac) (inodestart : Z) (dqbs : dfrac) (size : Z)
-      (dqb : dfrac) (bmapstart : Z)
-      (dq : dfrac) (pidv : mword 32)
-      (bn : bio_names) (g : log_names) (ncount : nat) (Sb : gset Z)
-      (tid : nat) (qtx : Qp) (K : nat)
-      (b eb : bool) (k0 : nat) (inum : mword 16) (nrec : nat)
-      (s : list (bv 8)) (ret_tgt : mword 64)
-      (CIDa : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
-    (∀ (Mp : regfile) (dolz : nat -> bv 8) (w5 w6 : mword 64),
-       ⌜dl_pregs m sp0 ip nb
-          (zero_extend' 64 (inum : mword 16) : mword 64)
-          (mword_of_int (Z.of_nat (16 * k0)%nat) : mword 64) Mp⌝ -∗
-       sie_cap_gpr KT1 Mp (K - 10)%nat b (proc_addr j) -∗
-       cpu_own 0 eb (proc_addr j) b lks -∗
-       pc_is (mword_of_int (DK + 0x70)) -∗
-       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈[KT1] w5 -∗
-       (pa_stk sp0 6) ↦₈[KT1] w6 -∗
-       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] dolz jj) -∗
-       i_dev ip ↦₄{dqd} dev -∗
-       i_inum ip ↦₄{dqf} dinum -∗
-       inode_meta ip dn -∗
-       inode_map fsc_fs ip bm -∗
-       inode_blocks fsc_fs bm data -∗
-       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
-       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-       dinode_at fsc_ireg dinum dn0 -∗
-       proc_priv_bare (proc_addr j) pidv Vpr -∗
-       bslots 3 -∗
-       iref_slot -∗
-       log_opS g ncount Sb -∗
-       (* the share iput's windows park, riding through (durable-disk
-          B''-tx5): the found arm spends it at its [iput] and gets it back,
-          the append arm never touches it. *)
-       tid ↪[ln_tx g]{#qtx} () -∗
-       (* the borrowed ticket list, riding to the continuation (§7.1) *)
-       IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
-       wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId =>
-         ∀ (mf : regfile) (found : bool)
+  (* the exit continuation of [dl_after_body], named: inline it was
+     3139 B, a third to a half of that block Delta at every
+     step of the walk (optimization.md, fold block continuations). *)
+  Definition dl_after_exit
+      (j : nat) (m : regfile) (ip : mword 64) (nb : mword 64) (dqd : dfrac) (dev : mword 32) (dqf : dfrac) (dinum : mword 32) (dn : dinode) (dn0 : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (dqn : dfrac) (fn : nat -> bv 8) (dqs : dfrac) (inodestart : Z) (dqbs : dfrac) (size : Z) (dqb : dfrac) (bmapstart : Z) (pidv : mword 32) (g : log_names) (ncount : nat) (Sb : gset Z) (tid : nat) (qtx : Qp) (K : nat) (b : bool) (eb : bool) (k0 : nat) (inum : mword 16) (nrec : nat) (s : list (bv 8)) (ret_tgt : mword 64) (lks : gset string) (Vpr : pprivate) (CIDc : CpuId) : iProp Σ :=
+    (∀ (mf : regfile) (found : bool)
            (bm' : blkmap) (data' : nat -> list (bv 8))
            (dn' dn0' : dinode) (n' : nat) (Sb' : gset Z)
            (tot : nat),
@@ -1154,55 +1108,50 @@ Section ProofDirlinkMain.
                         \/ (mf !!! Regidx Ra0
                               = (mword_of_int (-1) : mword 64)
                            /\ (tot < 16)%nat))⌝ -∗
-             WP (Loop : expr riscv_lang)) -∗
-       WP (Loop : expr riscv_lang))%I.
+             WP (Loop : expr riscv_lang))%I.
 
-  Definition dl_scan_body
-      (j : nat) (nrec : nat) (dn : dinode) (data : nat -> list (bv 8))
-      (m : regfile) (sp0 ip nb : mword 64) (inum : mword 16) (K : nat)
-      (b eb : bool) (dev : mword 32) (dqf : dfrac)
-      (dinum : mword 32) (bm : blkmap) (dqn : dfrac)
-      (fn : nat -> bv 8) (dqs : dfrac) (inodestart : Z) (dqbs : dfrac)
-      (size : Z) (dqb : dfrac) (bmapstart : Z)
-      (dn0 : dinode) (dq : dfrac)
-      (pidv : mword 32) (bn : bio_names) (g : log_names) (ncount : nat)
-      (Sb : gset Z) (tid : nat) (qtx : Qp)
-      (k0 : nat) (s : list (bv 8)) (ret_tgt : mword 64) (dqd : dfrac)
-      (fuel : nat) (CIDl : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
-    (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8),
-       ⌜(S nrec - i <= fuel)%nat⌝ -∗
-       (* §15(b): THE LOOP TEST, not [i < nrec] -- without
-          granularity the code takes one turn past [nrec], whose
-          readi is short and whose next branch panics. *)
-       ⌜Z.of_nat i * 16 < bv_unsigned (di_size dn)⌝ -∗
-       ⌜dir_free_first data i = None⌝ -∗
-       ⌜dl_regs m sp0 ip nb
-          (zero_extend' 64 (inum : mword 16) : mword 64) (16 * i)%nat Ml⌝ -∗
-       sie_cap_gpr KT1 Ml (K - 10)%nat b (proc_addr j) -∗
+
+  Definition dl_after_body
+      (j : nat) (m : regfile) (sp0 ip nb : mword 64)
+      (dqd : dfrac) (dev : mword 32) (dqf : dfrac) (dinum : mword 32)
+      (dn dn0 : dinode) (bm : blkmap)
+      (data : nat -> list (bv 8)) (dqn : dfrac) (fn : nat -> bv 8)
+      (dqs : dfrac) (inodestart : Z) (dqbs : dfrac) (size : Z)
+      (dqb : dfrac) (bmapstart : Z)
+      (dq : dfrac) (pidv : mword 32)
+      (bn : bio_names) (g : log_names) (ncount : nat) (Sb : gset Z)
+      (tid : nat) (qtx : Qp) (K : nat)
+      (b eb : bool) (k0 : nat) (inum : mword 16) (nrec : nat)
+      (s : list (bv 8)) (ret_tgt : mword 64)
+      (CIDa : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+    (∀ (Mp : regfile) (dolz : nat -> bv 8) (w5 w6 : mword 64),
+       ⌜dl_pregs m sp0 ip nb
+          (zero_extend' 64 (inum : mword 16) : mword 64)
+          (mword_of_int (Z.of_nat (16 * k0)%nat) : mword 64) Mp⌝ -∗
+       sie_cap_gpr KT1 Mp (K - 10)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
-       pc_is (mword_of_int (DK + 0x30)) -∗
+       pc_is (mword_of_int (DK + 0x70)) -∗
        (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
        (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
        (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
        (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] w5 -∗
+       (pa_stk sp0 6) ↦₈[KT1] w6 -∗
        (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
        (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] dol jj) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] dolz jj) -∗
        i_dev ip ↦₄{dqd} dev -∗
        i_inum ip ↦₄{dqf} dinum -∗
        inode_meta ip dn -∗
        inode_map fsc_fs ip bm -∗
        inode_blocks fsc_fs bm data -∗
-       ([∗ list] i0 ∈ seq 0 14, pa_add nb i0 ↦ₘ[KT1]{dqn} fn i0) -∗
+       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        dinode_at fsc_ireg dinum dn0 -∗
        proc_priv_bare (proc_addr j) pidv Vpr -∗
-       bslot -∗
-       bslots 2 -∗
+       bslots 3 -∗
        iref_slot -∗
        log_opS g ncount Sb -∗
        (* the share iput's windows park, riding through (durable-disk
@@ -1211,8 +1160,14 @@ Section ProofDirlinkMain.
        tid ↪[ln_tx g]{#qtx} () -∗
        (* the borrowed ticket list, riding to the continuation (§7.1) *)
        IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
-       wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId =>
-         ∀ (mf : regfile) (found : bool)
+       wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId => dl_after_exit j m ip nb dqd dev dqf dinum dn dn0 bm data dqn fn dqs inodestart dqbs size dqb bmapstart pidv g ncount Sb tid qtx K b eb k0 inum nrec s ret_tgt lks Vpr CIDc) -∗
+       WP (Loop : expr riscv_lang))%I.
+  (* the exit continuation of [dl_scan_body], named: inline it was
+     3142 B, a third to a half of that block Delta at every
+     step of the walk (optimization.md, fold block continuations). *)
+  Definition dl_scan_exit
+      (j : nat) (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (m : regfile) (ip : mword 64) (nb : mword 64) (inum : mword 16) (K : nat) (b : bool) (eb : bool) (dev : mword 32) (dqf : dfrac) (dinum : mword 32) (bm : blkmap) (dqn : dfrac) (fn : nat -> bv 8) (dqs : dfrac) (inodestart : Z) (dqbs : dfrac) (size : Z) (dqb : dfrac) (bmapstart : Z) (dn0 : dinode) (pidv : mword 32) (g : log_names) (ncount : nat) (Sb : gset Z) (tid : nat) (qtx : Qp) (k0 : nat) (s : list (bv 8)) (ret_tgt : mword 64) (dqd : dfrac) (lks : gset string) (Vpr : pprivate) (CIDc : CpuId) : iProp Σ :=
+    (∀ (mf : regfile) (found : bool)
            (bm' : blkmap) (data' : nat -> list (bv 8))
            (dn' dn0' : dinode) (n' : nat) (Sb' : gset Z)
            (tot : nat),
@@ -1272,7 +1227,64 @@ Section ProofDirlinkMain.
                         \/ (mf !!! Regidx Ra0
                               = (mword_of_int (-1) : mword 64)
                            /\ (tot < 16)%nat))⌝ -∗
-             WP (Loop : expr riscv_lang)) -∗
+             WP (Loop : expr riscv_lang))%I.
+
+
+  Definition dl_scan_body
+      (j : nat) (nrec : nat) (dn : dinode) (data : nat -> list (bv 8))
+      (m : regfile) (sp0 ip nb : mword 64) (inum : mword 16) (K : nat)
+      (b eb : bool) (dev : mword 32) (dqf : dfrac)
+      (dinum : mword 32) (bm : blkmap) (dqn : dfrac)
+      (fn : nat -> bv 8) (dqs : dfrac) (inodestart : Z) (dqbs : dfrac)
+      (size : Z) (dqb : dfrac) (bmapstart : Z)
+      (dn0 : dinode) (dq : dfrac)
+      (pidv : mword 32) (bn : bio_names) (g : log_names) (ncount : nat)
+      (Sb : gset Z) (tid : nat) (qtx : Qp)
+      (k0 : nat) (s : list (bv 8)) (ret_tgt : mword 64) (dqd : dfrac)
+      (fuel : nat) (CIDl : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+    (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8),
+       ⌜(S nrec - i <= fuel)%nat⌝ -∗
+       (* §15(b): THE LOOP TEST, not [i < nrec] -- without
+          granularity the code takes one turn past [nrec], whose
+          readi is short and whose next branch panics. *)
+       ⌜Z.of_nat i * 16 < bv_unsigned (di_size dn)⌝ -∗
+       ⌜dir_free_first data i = None⌝ -∗
+       ⌜dl_regs m sp0 ip nb
+          (zero_extend' 64 (inum : mword 16) : mword 64) (16 * i)%nat Ml⌝ -∗
+       sie_cap_gpr KT1 Ml (K - 10)%nat b (proc_addr j) -∗
+       cpu_own 0 eb (proc_addr j) b lks -∗
+       pc_is (mword_of_int (DK + 0x30)) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] dol jj) -∗
+       i_dev ip ↦₄{dqd} dev -∗
+       i_inum ip ↦₄{dqf} dinum -∗
+       inode_meta ip dn -∗
+       inode_map fsc_fs ip bm -∗
+       inode_blocks fsc_fs bm data -∗
+       ([∗ list] i0 ∈ seq 0 14, pa_add nb i0 ↦ₘ[KT1]{dqn} fn i0) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       dinode_at fsc_ireg dinum dn0 -∗
+       proc_priv_bare (proc_addr j) pidv Vpr -∗
+       bslot -∗
+       bslots 2 -∗
+       iref_slot -∗
+       log_opS g ncount Sb -∗
+       (* the share iput's windows park, riding through (durable-disk
+          B''-tx5): the found arm spends it at its [iput] and gets it back,
+          the append arm never touches it. *)
+       tid ↪[ln_tx g]{#qtx} () -∗
+       (* the borrowed ticket list, riding to the continuation (§7.1) *)
+       IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
+       wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId => dl_scan_exit j nrec dn data m ip nb inum K b eb dev dqf dinum bm dqn fn dqs inodestart dqbs size dqb bmapstart dn0 pidv g ncount Sb tid qtx k0 s ret_tgt dqd lks Vpr CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* THE CORE, in SET FORM (fs-icache.md section 18 clause 1).
