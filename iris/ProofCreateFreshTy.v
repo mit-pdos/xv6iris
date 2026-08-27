@@ -104,6 +104,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -124,14 +125,14 @@ Definition cr_cs_but_s3 (m mf : regfile) : Prop :=
 
 Definition create_fresh_ty_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γi : gname)
-    (cn : ic_names) (gtl : gname) (γpr : gname)
+    (gtl : gname) (γpr : gname)
     (cov : gset Z) (logstart inodestart : Z) (ninodes : Z) (nib : nat)
     (dev : mword 32) (ty : mword 16)
     (kd : nat) (dqp : dfrac)                     (* the LOCKED PARENT's slot *)
@@ -196,21 +197,21 @@ Definition create_fresh_ty_body
      (γu' : uart_names) (γd' : disk_names) (γk' : gname)
      (pd' pav' pu' : mword 64) (bn' : bio_names)
      (γ' : log_names) (γfs' : fs_names) (γi' : gname)
-     (cn' : ic_names) (gtl' : gname) (γpr' : gname)
+     (gtl' : gname) (γpr' : gname)
      (cov' : gset Z) (logstart' inodestart' ninodes' : Z) (nib' : nat)
      (dev' : mword 32) (ty' : mword 16) (u' : nat) (Sb' : gset Z)
      (pidv' : mword 32) (dq' dqs' dqn' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string) (Vpr' : pprivate) (t' : nat) (qt' : Qp),
      wp_ialloc_gen_body (CID := CIDa) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
-                        γ' γfs' γi' cn' gtl' γpr' cov' logstart' inodestart'
+                        γ' γfs' γi' gtl' γpr' cov' logstart' inodestart'
                         ninodes' nib' dev' ty' u' Sb' pidv' dq' dqs' dqn'
                         m' K' eb' b' lks' Vpr' t' qt') ->
   (forall `{CIDl : CpuId}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (γu' : uart_names) (γd' : disk_names) (γk' : gname)
      (pd' pav' pu' : mword 64) (bn' : bio_names)
-     (γfs' : fs_names) (γi' : gname) (cn' : ic_names) (gil' gisl' : gname)
+     (γfs' : fs_names) (γi' : gname) (gil' gisl' : gname)
      (cov' : gset Z) (logstart' inodestart' : Z) (nib' : nat)
      (k' : nat) (s' : Qp) (g' : gname) (d' : ic_dep) (o' : ilkc)
      (dev' inum' : mword 32)
@@ -218,7 +219,7 @@ Definition create_fresh_ty_body
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string) (Vpr' : pprivate),
      wp_ilock_dep_sconf_body (CID := CIDl) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
-                             γfs' γi' cn' gil' gisl' cov' logstart' inodestart'
+                             γfs' γi' gil' gisl' cov' logstart' inodestart'
                              nib' k' s' g' d' o' dev' inum' pidv' dq' dqs'
                              m' K' eb' b' lks' Vpr') ->
   (* ================= THE SPAN ================= *)
@@ -229,10 +230,10 @@ Definition create_fresh_ty_body
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
-  is_itable2 gtl cn γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows cn γfs γi cov logstart -∗
-  ic_sleeplocks cn -∗
+  ic_escrows fsc_ic γfs γi cov logstart -∗
+  ic_sleeplocks fsc_ic -∗
   ireg_inv γi γfs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  The span
      covers [jal ialloc] at +0xa8, and [wp_ialloc_gen_body] -- the
@@ -285,9 +286,9 @@ Definition create_fresh_ty_body
           /\ fresh_shape dn⌝ ∗
          pc_is (mword_of_int (KernelSyms.create + 0xb4) : mword 64) ∗
          is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
-                          (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) ∗
+                          (ic_tok fsc_ic kslot) (slh_tok (icfg_isl kslot)) ∗
          sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv ∗
-         ic_deposit cn kslot (DepTx (q/2)%Qp dev inum g t qt) ∗
+         ic_deposit fsc_ic kslot (DepTx (q/2)%Qp dev inum g t qt) ∗
          i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev ∗
          i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} inum ∗
          i_valid (ientry kslot) ↦₄ valid_word true ∗
@@ -363,15 +364,15 @@ Qed.
 
 Section CftHelpers.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
   (* the escrow-family accessor and the slot split.  The sleeplock family's
      accessor is [IcacheEscrow.ic_sleeplocks_lookup], beside the definition. *)
-  Lemma cft_esc_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
+  Lemma cft_esc_acc (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart k
+    (ic_escrows fsc_ic γfs γi cov logstart -∗ ic_escrow fsc_ic γfs γi cov logstart k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -399,13 +400,13 @@ Local Ltac nz := vm_compute; discriminate.
 
 Lemma create_fresh_ty :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname) (γpr : gname)
+      (gtl : gname) (γpr : gname)
       (cov : gset Z) (logstart inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
       (kd : nat) (dqp : dfrac)
@@ -413,7 +414,7 @@ Lemma create_fresh_ty :
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
+      create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi gtl γpr
                            cov logstart inodestart ninodes nib dev ty kd dqp
                            u Sb t qt qc pidv dq dqs dqn Ma K eb b lks Vpr.
 Proof.
@@ -504,7 +505,7 @@ Proof.
   iDestruct (cft_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
   iDestruct (cpu_own_transport CID CID3 0%nat eb (proc_addr j) b
                ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-  iApply (Hia CID3 γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr cov logstart
+  iApply (Hia CID3 γs j γl γu γd γk pd pav pu bn γ γfs γi gtl γpr cov logstart
             inodestart ninodes nib dev ty u Sb pidv dq dqs dqn A3 K eb b lks Vpr
             t qc
             HKia Hlg Hist Hiregb Hn1 Hn2 Hn3 Htynz Htyk Hpkc Hj Hgs HA3a0 HA3a1 Heb
@@ -582,9 +583,9 @@ Proof.
         [ exact (HF1cs c Hc Hne) | exact (cft_cs_ne c Rra Hc Hcsra) ]. }
     assert (Hpcb4 : ret_pc (B1 !!! Regidx Rra : mword 64)
                     = mword_of_int (CK + 0xb4)) by (rewrite HB1ra; pcw).
-    iDestruct (cft_esc_acc cn γfs γi cov logstart kslot Hkslt with "Hesc")
+    iDestruct (cft_esc_acc γfs γi cov logstart kslot Hkslt with "Hesc")
       as "#Hescc".
-    iDestruct (ic_sleeplocks_lookup cn kslot Hkslt with "Hslks") as (gilc gislc) "#Hslkc".
+    iDestruct (ic_sleeplocks_lookup fsc_ic kslot Hkslt with "Hslks") as (gilc gislc) "#Hslkc".
     (* THE RECEIPT UNPACKS IN ONE STEP (SIMP-2), and what comes out beside
        the reference IS the licence ilock's claim arm asks for:
        [InodeRegion.inode_claimed_to_ClaimK] is exactly
@@ -604,7 +605,7 @@ Proof.
     iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %->.
     iDestruct (cpu_own_transport CID4 CID7 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Hil CID7 γs j γl γu γd γk pd pav pu bn γfs γi cn gilc gislc cov logstart
+    iApply (Hil CID7 γs j γl γu γd γk pd pav pu bn γfs γi gilc gislc cov logstart
               inodestart nib kslot (q/2)%Qp gsh
               (DepTx (q/2)%Qp dev inum gsh t qt) (ClaimK ty t qc) dev inum pidv dq dqs
               B1 K eb b lks Vpr

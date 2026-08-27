@@ -151,6 +151,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -215,7 +216,6 @@ Record fstat_names := MkFStatNames {
   fsn_bio        : bio_names;
   fsn_fs         : fs_names;
   fsn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
-  fsn_ic         : ic_names;      (* the icache's names (IcacheEscrow.v)    *)
   fsn_cov        : gset Z;
   fsn_logstart   : Z;
   fsn_inodestart : Z;
@@ -233,8 +233,7 @@ Global Instance fstat_names_inhabited : Inhabited fstat_names :=
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     (MkFsNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive)
-    1%positive (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
-                          (fun _ => 1%positive))
+    1%positive
     ∅ 0 0 (DfracOwn 1)).
 
 Section SpecFilestat.
@@ -264,11 +263,11 @@ Section SpecFilestat.
      (* the three persistent invariants SpecIlock v3 / SpecIunlock v3 take,
         at the FAMILY where they were per-slot *)
      itable_inv ∗
-     ic_escrows (fsn_ic fn) (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn)
+     ic_escrows fsc_ic (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn)
                 (fsn_logstart fn) ∗
      ireg_inv (fsn_ireg fn) (fsn_fs fn) (fsn_inodestart fn) icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
-     ic_sleeplocks (fsn_ic fn) ∗
+     ic_sleeplocks fsc_ic ∗
      sb_inodestart ↦₄{fsn_dqs fn}
        (mword_of_int (fsn_inodestart fn) : mword 32) ∗
      (* the disk fabric *)
@@ -374,10 +373,10 @@ Section SpecFilestat.
   (* the per-entry escrow, out of the family -- [SpecFileclose]'s
      [ic_escrows_acc], restated here so this contract does not depend on a
      sibling contract (same OWED note as above: the home is IcacheEscrow). *)
-  Lemma ic_escrows_acc2 (cn : ic_names) (γfs : fs_names) (γi : gname)
+  Lemma ic_escrows_acc2 (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (ik : nat) :
     (ik < NINODE)%nat ->
-    (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart ik
+    (ic_escrows fsc_ic γfs γi cov logstart -∗ ic_escrow fsc_ic γfs γi cov logstart ik
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.

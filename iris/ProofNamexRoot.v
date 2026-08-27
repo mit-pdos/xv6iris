@@ -82,6 +82,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -100,7 +101,7 @@ Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
 
 Section ProofNamexRoot.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -123,12 +124,12 @@ Section ProofNamexRoot.
   Notation Rs10 := (mword_of_int 26 : mword 5).
 
   Lemma wp_namex_root
-      (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
+      (gtl : gname) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_root_body gtl cn gfs gi cov logstart inodestart nib dev dqp
+    : wp_namex_root_body gtl gfs gi cov logstart inodestart nib dev dqp
                          m n K eb p b lks Vpr.
   Proof.
     cbv beta delta [wp_namex_root_body].
@@ -520,7 +521,7 @@ Section ProofNamexRoot.
        -- which is exactly why it costs this walk nothing. *)
     iAssert (iname gi gfs inodestart ROOTINO RootL) as "Hlic";
       [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
-    iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev ROOTINO
+    iApply (IG.wp_iget_sconf gtl gfs gi cov logstart inodestart nib dev ROOTINO
               RootL
               A3 n eb p (K - 12)%nat b lks
               Kig Hn Hrino HA3a0 HA3a1 Hbelow

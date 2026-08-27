@@ -81,6 +81,7 @@ Require Import ProofKfork.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -233,7 +234,7 @@ Section KforkPrologue.
      quantified, never [fsc_kpages]. *)
   Lemma kfk_prologue
       (γa : gname) (γk : gname * gname) (γp γw γl γf γil γic : gname) (γs : list gname)
-      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
+      (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
       (R : iProp Σ) (lks : gset string) :
@@ -257,7 +258,7 @@ Section KforkPrologue.
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γl γf -∗
-    is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
+    is_itable2 γil fsc_ic γfs γic cov logstart nib icfg_dev -∗
     itable_inv -∗
     kalloc_env_at γa γk on -∗
     (* the proc table's sealed regime -- what allocproc mints the new slot's
@@ -443,7 +444,7 @@ Section KforkPrologue.
         kalloc_env_at γa γk None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         is_ftable γl γf -∗
-        is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
+        is_itable2 γil fsc_ic γfs γic cov logstart nib icfg_dev -∗
         itable_inv -∗
         R -∗
         WP (Loop : expr riscv_lang))) -∗

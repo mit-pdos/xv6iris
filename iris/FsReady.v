@@ -464,13 +464,10 @@ Section FsReady.
      constituent-shaped contract asks for -- so a continuation carrying ONE
      persistent row can feed a callee that spells seven.
 
-     They are grouped the way real contracts group them: the machine's two
-     text/data certificates, the printk pair (and the [panic_env] every
+     They are grouped the way real contracts group them: the machine's data
+     certificate, the printk pair (and the [panic_env] every
      panic arm actually asks for), the block/log fabric, the disk fabric,
      the icache's four, the inode region's two, and the allocator. *)
-
-  Lemma fs_ready_text : fs_ready -∗ kernel_text.
-  Proof. rewrite /fs_ready. by iIntros "($ & _)". Qed.
 
   Lemma fs_ready_data : fs_ready -∗ kernel_data.
   Proof. rewrite /fs_ready. by iIntros "(_ & $ & _)". Qed.

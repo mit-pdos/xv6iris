@@ -525,3 +525,9 @@ Section batch.
   Qed.
 
 End batch.
+
+(* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md):
+   a [∗ set] over registers; named in 74 files, machine chain.
+   AT THE END OF THE FILE, so this file's own lemmas -- the accessors every
+   consumer should be using -- can still take it apart. *)
+Global Typeclasses Opaque hreg_frame.

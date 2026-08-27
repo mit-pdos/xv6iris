@@ -174,7 +174,6 @@ Record fclose_names := MkFCloseNames {
      are: one equation at the caller ([SpecKexit]'s [fn = MkFCloseNames
      ...]) instead of a dozen coherence conjuncts. *)
   fcn_ireg     : gname;           (* the inode region's ghost (iput's [gi]) *)
-  fcn_ic       : ic_names;        (* the icache's names                     *)
   fcn_tlock    : gname;           (* itable.lock                            *)
   fcn_bmapstart : Z;
   fcn_inodestart : Z;
@@ -201,8 +200,6 @@ Global Instance fclose_names_inhabited : Inhabited fclose_names :=
     (MkFsNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive)
     ∅ 0 (mword_of_int 0) (mword_of_int 0) (DfracOwn 1)
     1%positive
-    (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
-               (fun _ => 1%positive))
     1%positive 0 0 0%nat 0).
 
 Section SpecFileclose.
@@ -246,10 +243,10 @@ Section SpecFileclose.
      a *function spec* owning a definition the invariant layer needs is what
      put [ProcInv] into [FsReady]'s dependency cone. *)
 
-  Lemma ic_escrows_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
+  Lemma ic_escrows_acc (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart k
+    (ic_escrows fsc_ic γfs γi cov logstart -∗ ic_escrow fsc_ic γfs γi cov logstart k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -282,7 +279,6 @@ Section SpecFileclose.
     fct_logst  : fcn_logstart fn = fsc_logst;
     fct_dev    : fcn_dev fn = icfg_dev;
     fct_ireg   : fcn_ireg fn = fsc_ireg;
-    fct_ic     : fcn_ic fn = fsc_ic;
     fct_tlock  : fcn_tlock fn = fsc_itlock;
     fct_bms    : fcn_bmapstart fn = fsc_bmapstart;
     fct_ist    : fcn_inodestart fn = icfg_ist;

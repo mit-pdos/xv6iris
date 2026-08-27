@@ -123,6 +123,7 @@ Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -1196,9 +1197,9 @@ Section KexecAExit.
   (*  that are not already shared -- the sleeplock family's is             *)
   (*  [IcacheEscrow.ic_sleeplocks_lookup].                                 *)
   (* =================================================================== *)
-  Lemma kxa_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Lemma kxa_esc_acc (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) : (k < NINODE)%nat ->
-    (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
+    (ic_escrows fsc_ic gfs gi cov logstart -∗ ic_escrow fsc_ic gfs gi cov logstart k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -1244,7 +1245,7 @@ Section KexecAExit.
   (*  where the context is exactly the thirteen pieces and nothing else,  *)
   (*  the same search is a no-op; a caller then writes one [iApply].      *)
   (* =================================================================== *)
-  Lemma fs_fabric_mk gs gu gd gk pd pav pu bn g gfs gi cn gtl
+  Lemma fs_fabric_mk gs gu gd gk pd pav pu bn g gfs gi gtl
       cov logstart inodestart nib dev :
     (* the fabric's last conjunct (durable-disk B''-tx), FIRST in the wand
        chain so a caller writes it as one [[%]] slot *)
@@ -1255,17 +1256,17 @@ Section KexecAExit.
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrows cn gfs gi cov logstart -∗
-    ic_sleeplocks cn -∗
+    ic_escrows fsc_ic gfs gi cov logstart -∗
+    ic_sleeplocks fsc_ic -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gfs gi gtl
               cov logstart inodestart nib dev.
   Proof.
     iIntros "%Hclogf Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hropen
@@ -1432,7 +1433,7 @@ Section KexecABad.
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname) (ga gf : gname)
+      (gtl : gname) (gil gisl : gname) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (* [gy]: the GENERATION the caller's share names (SpecIlock v5 /
@@ -1477,12 +1478,12 @@ Section KexecABad.
     cpu_claim_ext eb (proc_addr jp) -∗
     kernel_text -∗
     pc_is (mword_of_int (KXA + 0x064) : mword 64) -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gfs gi gtl
               cov logstart inodestart nib dev -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
     (* ---- the open inode: exactly SpecIunlockput's input ---- *)
     sleeplocked_q gisl sq (i_lock (ientry k)) pidv -∗
-    ic_tx_dep cn k sq dev inum gy -∗
+    ic_tx_dep fsc_ic k sq dev inum gy -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
@@ -1547,7 +1548,7 @@ Section KexecABad.
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock & %Hclogf)".
-    iDestruct (kxa_esc_acc cn gfs gi cov logstart k Hk with "Hesc") as "#Hesck".
+    iDestruct (kxa_esc_acc gfs gi cov logstart k Hk with "Hesc") as "#Hesck".
     iDestruct (proc_priv_bare_cref gf (proc_addr jp) pidv V with "Hpriv")
       as "(Hppid & Hcref & Hpvbk)".
     (* ---- +0x064: c.mv a0,s4 ---- *)
@@ -1594,7 +1595,7 @@ Section KexecABad.
     iDestruct (cpu_claim_ext_transport CID0 CIDj1 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iApply (Iunlockput.wp_iunlockput_tx_sconf gs jp gl gu gd gk pd pav pu bn g gfs
-              gi cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
+              gi gtl gil gisl cov logstart bmapstart inodestart nib size dev
               k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
               B2 (K - 68)%nat eb eb lks V
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc

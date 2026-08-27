@@ -144,6 +144,7 @@ Require Import SpecIlock.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -334,7 +335,7 @@ Definition il_sp (m M : regfile) : Prop :=
       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))).
 
 Section IlockDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   (* ilock's 32-byte frame: ra@24 s0@16 s1@8, and slot 4 (s2's) held
      ANONYMOUSLY -- the cached arm never writes it. *)
@@ -376,12 +377,12 @@ Section IlockDefs.
       iSplitR; [iPureIntro; reflexivity | iExact "H"].
   Qed.
 
-  (* [cn] and [s] are here for ONE resource: the other half of the entry
+  (* [fsc_ic] and [s] are here for ONE resource: the other half of the entry
      sleeplock's checkout descriptor (§14.8).  SpecIlock v3 hands it to the
      caller, so both arms of the function have to carry it to the join. *)
   Definition il_cont `{GEN : GenId} `{CID0 : CpuId} 
       (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
-      (cn : ic_names) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
+      (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac) (j : nat)
@@ -402,7 +403,7 @@ Section IlockDefs.
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         bslot -∗
         sleeplocked_q gisl s (i_lock ip) pidv -∗
-        ic_deposit cn k d -∗
+        ic_deposit fsc_ic k d -∗
         i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
         i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
         i_valid ip ↦₄ valid_word true -∗
@@ -431,11 +432,11 @@ End IlockDefs.
 (*  +0x1e .. +0x26 : THE JOIN -- pop ra/s0/s1, ret, and the contract.     *)
 (* ===================================================================== *)
 Section IlockEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
-      (cn : ic_names) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
+      (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (dn : dinode) (bm : blkmap) (filled : bool)
@@ -457,7 +458,7 @@ Section IlockEpilogue.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslot -∗
     sleeplocked_q gisl s (i_lock ip) pidv -∗
-    ic_deposit cn k d -∗
+    ic_deposit fsc_ic k d -∗
     i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
     i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
     i_valid ip ↦₄ valid_word true -∗
@@ -465,7 +466,7 @@ Section IlockEpilogue.
     ity_shot g (di_type dn) -∗
     ifreeze_off (bv_unsigned inum) -∗
     ireg_wd_back o g (bv_unsigned inum) -∗
-    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g d o cov logstart inodestart k ip
+    il_cont (CID0 := CID0)  gfs gi gisl bn s g d o cov logstart inodestart k ip
             dev inum pidv dq dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -683,7 +684,7 @@ End IlockEpilogue.
 (*  +0x36 .. +0xa0 : THE UNCACHED ARM.                                    *)
 (* ===================================================================== *)
 Section IlockLoad.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   (* ------------------------------------------------------------------ *)
   (*  A CLAIMED INODE'S BUNDLE, OUT OF NOTHING (§16.4's fill sub-arm)     *)
@@ -722,7 +723,7 @@ Section IlockLoad.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (gfs : fs_names) (gi : gname) (gisl : gname)
-      (cn : ic_names) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
+      (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (k : nat) (ip : mword 64) (inum : mword 32)
@@ -771,7 +772,7 @@ Section IlockLoad.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslot -∗
     sleeplocked_q gisl s (i_lock ip) pidv -∗
-    ic_deposit cn k d -∗
+    ic_deposit fsc_ic k d -∗
     i_valid ip ↦₄ (mword_of_int 0 : mword 32) -∗
     inode_raw ip -∗
     (* THE [_np] FORM, not the full pool row (iclaim-ledger.md §3.5
@@ -796,7 +797,7 @@ Section IlockLoad.
        CONVERTS, or [PlainK]'s borrowed unit, which refutes the box arm and
        comes back.  See [SpecIlock]'s header. *)
     ireg_wd_lic o g (bv_unsigned inum) -∗
-    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g d o cov logstart inodestart k ip
+    il_cont (CID0 := CID0)  gfs gi gisl bn s g d o cov logstart inodestart k ip
             dev inum pidv dq dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2193,7 +2194,7 @@ Section IlockLoad.
     iDestruct (cpu_claim_ext_transport CID9 CID39 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     iEval (rewrite -valid_word_true) in "Hvalid".
-    iApply (il_epilogue (CID0 := CID39)  j gfs gi gisl bn cn s g d o cov logstart inodestart
+    iApply (il_epilogue (CID0 := CID39)  j gfs gi gisl bn s g d o cov logstart inodestart
               k ip dev inum dn bm fl pidv dq dqs m Z0 K eb b lks Vpr
               HK HZ0sp HZ0thr Hfr Hpost
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok
@@ -2221,7 +2222,7 @@ Section IlockLoad.
 End IlockLoad.
 
 Section ProofIlockMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_ilock_dep_sconf
@@ -2230,14 +2231,13 @@ Section ProofIlockMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (gfs : fs_names) (gi : gname)
-      (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
+    : wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi gil gisl
                               cov logstart inodestart nib k s g d o dev inum
                               pidv dq dqs m K eb b lks Vpr.
   Proof.
@@ -2265,7 +2265,7 @@ Section ProofIlockMain.
       - iSplitL; [iExact "Hcl" | done]. }
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]/[il_load]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
-    iAssert (il_cont (CID0 := CID)  gfs gi gisl bn cn s g d o cov logstart inodestart k ip
+    iAssert (il_cont (CID0 := CID)  gfs gi gisl bn s g d o cov logstart inodestart k ip
                dev inum pidv dq dqs j m K eb b lks Vpr)%I
       with "[Hcont]" as "Hcont"; [rewrite /il_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi sp,sp,-32 ===== *)
@@ -2516,7 +2516,7 @@ Section ProofIlockMain.
        as a genuine pass-through: ilock's own (untouched since entry) is
        exactly what its wait loop's interior [sleep] needs. *)
     iApply (ASL.wp_acquiresleep_gen_sconf gs j gil gisl "inode"%string
-              (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 pidv Vpr (K - 4)%nat eb b lks
+              (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) s R6 pidv Vpr (K - 4)%nat eb b lks
               Hj ltac:(lia)
               (* acquiresleep's bound is "sleep lock"(6); ilock's own is
                  "bcache"(4), and [locks_below_mono] weakens it. *)
@@ -2557,18 +2557,18 @@ Section ProofIlockMain.
        [DepRd] the read checkout sheds three quarters into it before the
        escrow closes.  Both outcomes are [il_payload d], so the whole rest of
        this proof is written once. *)
-    iAssert (|==> ((ic_escrow_body cn gfs gi cov logstart k ∗
-                    ic_deposit cn k d ∗
+    iAssert (|==> ((ic_escrow_body fsc_ic gfs gi cov logstart k ∗
+                    ic_deposit fsc_ic k d ∗
                     (∃ v : bool,
                        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
                        i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
                        i_valid (ientry k) ↦₄ valid_word v ∗
                        il_payload d gfs gi cov logstart k inum g v))
-                   ∨ (ic_tok cn k ∗ ic_dep_own k d dev inum ∗
+                   ∨ (ic_tok fsc_ic k ∗ ic_dep_own k d dev inum ∗
                       frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
                       (frzown (bv_unsigned inum) -∗
                        frzsel k ((1/2)/2)%Qp true -∗
-                         ic_escrow_body cn gfs gi cov logstart k))))%I
+                         ic_escrow_body fsc_ic gfs gi cov logstart k))))%I
       with "[Hbody Htok Href Hside]" as ">[Hok | Hfrz]".
     { destruct (ic_dep_rd d) eqn:Hrd.
       - (* THE READ ARM.  [ShotK]'s one-shot is what kills [valid = 0]
@@ -2576,7 +2576,7 @@ Section ProofIlockMain.
         iDestruct "Hrdsh" as (ty) "Hshot".
         pose proof (ic_dep_rd_shr d s dev inum g Hdshr Hrd) as Hdrd.
         rewrite Hdrd.
-        iMod (ic_swap_checkout_rd cn gfs gi cov logstart k s dev inum g ty
+        iMod (ic_swap_checkout_rd fsc_ic gfs gi cov logstart k s dev inum g ty
                 with "Hbody Htok Href Hshot") as "[Hok | Hfrz]";
           [| iModIntro; iRight; iExact "Hfrz"].
         iDestruct "Hok" as "(Hbody & Hdep & Hpay)".
@@ -2593,7 +2593,7 @@ Section ProofIlockMain.
         iExists dn0, bm0. iSplitL "Hheld"; [iExact "Hheld" | iExact "Hsh"].
       - (* EVERY BUNDLELESS DESCRIPTOR, the write arm included: the arm
            keeps nothing and the difference is what [ic_dep_side] parked. *)
-        iMod (ic_swap_checkout cn gfs gi cov logstart k d g dev inum Hdg Hrd
+        iMod (ic_swap_checkout fsc_ic gfs gi cov logstart k d g dev inum Hdg Hrd
                 with "Hbody Htok [Href Hside]") as "[Hok | Hfrz]";
           [iApply (ic_dep_own_of_shr k d s dev inum g Hdshr with "Href Hside")
           | | iModIntro; iRight; iExact "Hfrz"].
@@ -2721,7 +2721,7 @@ Section ProofIlockMain.
       (* THE CACHED ARM REPORTS [filled = false]: the entry was loaded by
          some earlier fill and its record is whatever that fill read, so
          [fresh_shape] is not available and not claimed. *)
-      iApply (il_epilogue (CID0 := CID13)  j gfs gi gisl bn cn s g d o cov logstart
+      iApply (il_epilogue (CID0 := CID13)  j gfs gi gisl bn s g d o cov logstart
                 inodestart k ip dev inum dnp bmp false pidv dq dqs m Q1 K eb b lks Vpr
                 HK HQ1sp HQ1thr ltac:(discriminate) Hpost
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok
@@ -2787,7 +2787,7 @@ Section ProofIlockMain.
       iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       iApply (il_load (CID0 := CID13)  gs j gl gu gd gk pd pav pu bn gfs gi gisl
-                cn s g d o cov logstart inodestart nib dev k ip inum
+                s g d o cov logstart inodestart nib dev k ip inum
                 pidv dq dqs m Q1 K eb b lks Vpr
                 HK Hfills Hrdf HQ1sp HQ1thr HQ1s1 Hipe Hk Hgeom Hst Hcov Hinlt Hj Hgl
                 Hbelow
@@ -2806,14 +2806,13 @@ Section ProofIlockMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (gfs : fs_names) (gi : gname)
-      (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
+    : wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi gil gisl
                              cov logstart inodestart nib k s g o dev inum
                              pidv dq dqs m K eb b lks Vpr.
   Proof.

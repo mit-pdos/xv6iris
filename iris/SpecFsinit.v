@@ -184,6 +184,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -248,14 +249,14 @@ Qed.
 
 Definition wp_fsinit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γfs : fs_names) (γi : gname)
-    (cn : ic_names) (gtl : gname)                     (* the icache + itable *)
+    (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z)
     (ninodes : Z) (nib : nat) (size : Z)
@@ -437,10 +438,10 @@ Definition wp_fsinit_sconf_body
      returns and before [kexec("/init")] -- that seal is OWED to forkret's
      first branch. *)
   ireg_boot -∗
-  is_itable2 gtl cn γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows cn γfs γi cov logstart -∗
-  ic_sleeplocks cn -∗
+  ic_escrows fsc_ic γfs γi cov logstart -∗
+  ic_sleeplocks fsc_ic -∗
   (* itrunc's bitmap, through ireclaim's iput *)
   bitmap_reg γfs bmapstart cov logstart size -∗
   (* ---- initlog's RAW struct log cells, threaded straight through ---- *)
@@ -530,13 +531,13 @@ Definition wp_fsinit_sconf_body
 Module Type FSINIT.
   Parameter wp_fsinit_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
@@ -555,7 +556,7 @@ Module Type FSINIT.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb),
-      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
+      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog

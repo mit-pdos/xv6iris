@@ -106,6 +106,7 @@ Require Import FsCollectAll.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -189,7 +190,7 @@ Definition fsi_thr4 (m M : regfile) : Prop :=
 
 Section FsinitDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   (* ra@24 s0@16 s1@8 s2@0 off the pushed sp, i.e. slots 1..4 off the entry *)
   Definition fsi_frame (m : regfile) : iProp Σ :=
@@ -282,7 +283,7 @@ End FsinitDefs.
 (* ===================================================================== *)
 Section FsinitEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γfs : fs_names)
@@ -529,7 +530,7 @@ End FsinitEpilogue.
 (* ===================================================================== *)
 Section FsinitMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
@@ -537,7 +538,7 @@ Section FsinitMain.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
@@ -556,7 +557,7 @@ Section FsinitMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb) :
-      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
+      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
@@ -618,7 +619,7 @@ Section FsinitMain.
     iAssert (□ (sb_park γfs sbrec -∗ snap_law icfg_log γfs cov logstart))%I
       as "#Hlawf".
     { iModIntro. iIntros "#Hpark".
-      iApply (fs_snap_law_build icfg_log cn γfs γi cov logstart nib sbrec
+      iApply (fs_snap_law_build icfg_log fsc_ic γfs γi cov logstart nib sbrec
                 eq_refl Hcgeom'
                 with "Hireg' Hbm' Hesc Hpoolinv Hpark"). }
     iAssert (fsi_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
@@ -1556,7 +1557,7 @@ Section FsinitMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
-              icfg_log γfs γi cn gtl γpr cov logstart bmapstart inodestart
+              icfg_log γfs γi gtl γpr cov logstart bmapstart inodestart
               ninodes nib size dev pidv dq (DfracOwn 1) (DfracOwn 1)
               (DfracOwn 1) R1 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0

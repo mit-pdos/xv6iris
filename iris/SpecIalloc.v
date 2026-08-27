@@ -144,6 +144,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -178,14 +179,14 @@ Proof. rewrite /dinode_wf /ialloc_fresh /=. reflexivity. Qed.
 
 Definition wp_ialloc_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γi : gname)
-    (cn : ic_names) (gtl : gname)                     (* the icache + itable *)
+    (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
     (dev : mword 32) (ty : mword 16)
@@ -277,9 +278,9 @@ Definition wp_ialloc_sconf_body
      one of its own; brelse gives it back *)
   bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl cn γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows cn γfs γi cov logstart -∗
+  ic_escrows fsc_ic γfs γi cov logstart -∗
   (* ONE ledger unit for the tail iget; RETURNED on the no-inodes arm *)
   iref_slot -∗
   (* THIS OPERATION'S RESERVATION: the one log_write the claim runs *)
@@ -378,14 +379,14 @@ Definition wp_ialloc_sconf_body
    inside every [dirlink] on [ip].                                        *)
 Definition wp_ialloc_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γi : gname)
-    (cn : ic_names) (gtl : gname)                     (* the icache + itable *)
+    (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
     (dev : mword 32) (ty : mword 16)
@@ -477,9 +478,9 @@ Definition wp_ialloc_gen_body
      one of its own; brelse gives it back *)
   bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl cn γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows cn γfs γi cov logstart -∗
+  ic_escrows fsc_ic γfs γi cov logstart -∗
   (* ONE ledger unit for the tail iget; RETURNED on the no-inodes arm *)
   iref_slot -∗
   (* THIS OPERATION'S RESERVATION, IN SET FORM: the one log_write the claim
@@ -550,13 +551,13 @@ Module Type IALLOC.
      the sconf form moves. *)
   Parameter wp_ialloc_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (γpr : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
@@ -565,19 +566,19 @@ Module Type IALLOC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
-      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
+      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi gtl γpr
                          cov logstart inodestart ninodes nib dev ty u Sb
                          pidv dq dqs dqn m K eb b lks Vpr t qt.
 
   Parameter wp_ialloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (γpr : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
@@ -586,7 +587,7 @@ Module Type IALLOC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
-      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
+      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi gtl γpr
                            cov logstart inodestart ninodes nib dev ty u
                            pidv dq dqs dqn m K eb b lks Vpr t qt.
 End IALLOC.

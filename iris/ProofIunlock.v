@@ -68,6 +68,7 @@ Require Import SpecIunlock.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -108,7 +109,7 @@ Definition iul_sp (m M : regfile) : Prop :=
       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))).
 
 Section ProofIunlockMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* iunlock's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
@@ -119,7 +120,7 @@ Section ProofIunlockMain.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
   Definition iul_cont `{CID0 : CpuId}
-      (cn : ic_names) (k : nat) (s : Qp) (g : gname) (d : ic_dep)
+      (k : nat) (s : Qp) (g : gname) (d : ic_dep)
       (dev inum : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
@@ -138,7 +139,6 @@ Section ProofIunlockMain.
   Lemma wp_iunlock_dep_sconf
       (gs : list gname)
       (gfs : fs_names) (gi : gname)
-      (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
       (k : nat) (s : Qp) (g : gname) (d : ic_dep) (dev inum : mword 32)
@@ -146,7 +146,7 @@ Section ProofIunlockMain.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlock_dep_sconf_body gs gfs gi cn gil gisl cov logstart k s g d
+    : wp_iunlock_dep_sconf_body gs gfs gi gil gisl cov logstart k s g d
                                 dev inum dn' bm' pidv dq m K eb p b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlock_dep_sconf_body].
@@ -161,7 +161,7 @@ Section ProofIunlockMain.
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
     iEval (rewrite Hipe) in "Hvalid".
-    iAssert (iul_cont (CID0 := CID)  cn k s g d dev inum pidv dq m K eb p b lks Vpr)%I
+    iAssert (iul_cont (CID0 := CID) k s g d dev inum pidv dq m K eb p b lks Vpr)%I
       with "[Hcont]" as "Hcont"; [rewrite /iul_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi sp,sp,-32 ===== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1 : mword 64)
@@ -374,7 +374,7 @@ Section ProofIunlockMain.
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (HS.wp_holdingsleep_gen_sconf gil gisl "inode"%string
-              (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 p pidv (K - 4)%nat eb b lks
+              (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) s R6 p pidv (K - 4)%nat eb b lks
  Vpr ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
@@ -436,7 +436,7 @@ Section ProofIunlockMain.
        is persistent, so it survives the close. *)
     iApply fupd_wp.
     iInv "Hesc" as ">Hbodyp" "Hclosep".
-    iDestruct (ic_open_out cn gfs gi cov logstart k d g true
+    iDestruct (ic_open_out fsc_ic gfs gi cov logstart k d g true
                  Hdg with "Hbodyp Hvalid Hdep")
       as "(Hvalid & Hdep & Hborp)".
     iDestruct "Hborp" as (sbp) "[Hlvp Hbbackp]".
@@ -452,7 +452,7 @@ Section ProofIunlockMain.
               (mword_of_int 8 : mword 12) mH (K - 4)%nat
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
                          i_valid (ientry k) ↦₄ valid_word true ∗
-                         ic_deposit cn k d)%I)
+                         ic_deposit fsc_ic k d)%I)
               (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k) ∖ ↑icacheN) b
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc [] [] [Hvalid Hdep]").
@@ -464,7 +464,7 @@ Section ProofIunlockMain.
          what rules out [ic_out]'s frozen alternative -- the free path's
          window, which parks its live mass in [islot2] and deposits
          a [DepFrz], so there would be no slice to borrow. *)
-      iDestruct (ic_open_out cn gfs gi cov logstart k d g true
+      iDestruct (ic_open_out fsc_ic gfs gi cov logstart k d g true
                    Hdg with "Hbody Hvalid Hdep")
         as "(Hvalid & Hdep & Hbor)".
       iDestruct "Hbor" as (sb) "[Hlv Hbback]".
@@ -555,13 +555,13 @@ Section ProofIunlockMain.
        [DepRd], undoes the arm at the same stroke, so no bundleless out-arm is
        ever visible.  What comes back beside the share is [ic_dep_side d]. *)
     iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_swap_park_dep cn gfs gi cov logstart k d s dev inum g dn' bm'
+    iMod (ic_swap_park_dep fsc_ic gfs gi cov logstart k d s dev inum g dn' bm'
             Hdshr with "Hbody Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz")
       as "(Hbody & Htok & Href & Hside)".
     iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
     iModIntro.
     iApply (RS.wp_releasesleep_gen_sconf gs gil gisl "inode"%string
-              (ic_tok cn k) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks
+              (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks
               ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [] [Hstok] Htok Hprocs").
@@ -798,7 +798,6 @@ Section ProofIunlockMain.
   Lemma wp_iunlock_tx_sconf
       (gs : list gname)
       (gfs : fs_names) (gi : gname)
-      (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
       (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
@@ -806,7 +805,7 @@ Section ProofIunlockMain.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlock_tx_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev
+    : wp_iunlock_tx_sconf_body gs gfs gi gil gisl cov logstart k s g dev
                                inum dn' bm' pidv dq m K eb p b lks Vpr.
   Proof.
     apply wp_iunlock_tx_of_dep. intros d.

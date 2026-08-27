@@ -156,6 +156,7 @@ Require Import ProcAvail.
 Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
    printing one takes tens of minutes, so a one-line mistake reads as a hang.
@@ -224,7 +225,7 @@ Section KforkArms.
   (*  a complete, hypothesis-free match for [Hcont7c]'s own type.           *)
   (* =================================================================== *)
   Lemma kfork_arm2
-      (γa : gname) (γk : gname * gname) (γf γl2 : gname) (γs : list gname) (cn : ic_names)
+      (γa : gname) (γk : gname * gname) (γf γl2 : gname) (γs : list gname) 
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64) (npa : mword 64) (j : nat)
@@ -278,7 +279,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γa γk γf cn lvl eb pme b pid_p Vp K mr
+        kfork_post γa γk γf lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -337,7 +338,7 @@ Section KforkArms.
   (*  crosses a lock, so "b" never moves from the caller's own). *)
   (* =================================================================== *)
   Lemma kfork_arm1
-      (γa : gname) (γk : gname * gname) (γf : gname) (cn : ic_names)
+      (γa : gname) (γk : gname * gname) (γf : gname) 
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64) (Mt : regfile) (lks : gset string) :
@@ -362,7 +363,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γa γk γf cn lvl eb pme b pid_p Vp K mr
+        kfork_post γa γk γf lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -425,7 +426,7 @@ Section KforkArms.
   (* =================================================================== *)
   Lemma kfork_arm3
       (γa : gname) (γk : gname * gname) (γf γil γic γw γl : gname) (γs : list gname)
-      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
+      (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Vp : pprivate)
@@ -489,7 +490,7 @@ Section KforkArms.
     kalloc_env_at γa γk None -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γl γf -∗
-    is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
+    is_itable2 γil fsc_ic γfs γic cov logstart nib icfg_dev -∗
     itable_inv -∗
     (* the region handle, straight through to [B4.kfk_b4]'s [idup]
        (iclaim-ledger.md §3.19); persistent, and this arm reads no dinode *)
@@ -505,7 +506,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γa γk γf cn lvl eb pme b pid_p Vp K mr
+        kfork_post γa γk γf lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -606,7 +607,7 @@ Section KforkArms.
     - iApply wp_next_off_intro. iIntros (Mx2) "%Hregs2 Hsc Hown Hpcx Hpvx Hpvcx".
       destruct Hregs2 as (Hd1 & Hd2 & Hd3 & Hd4 & Hd5).
       (* ---- ProofKforkB4: idup / safestrcpy / pid read ---- *)
-      iApply (B4.kfk_b4 γf γil γic cn γfs cov logstart inodestart nib
+      iApply (B4.kfk_b4 γf γil γic γfs cov logstart inodestart nib
                 pid_p pid_c Vp
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
                 Mx2 (trap_res b) K (S lvl) eb ({["proc"]} ∪ lks)
@@ -715,12 +716,12 @@ Section KforkMain.
      allocator gname, so nothing here may pin the pair at [fsc_kpages]. *)
   Lemma wp_kfork_sconf
       (γa : gname) (γk : gname * gname) (γp γw γl γf γil γic : gname) (γs : list gname)
-      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
+      (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string)
  :
-    wp_kfork_sconf_body γa γk γp γw γl γf γil γic γs cn γfs cov logstart
+    wp_kfork_sconf_body γa γk γp γw γl γf γil γic γs γfs cov logstart
       inodestart nib m lvl K eb pme b pid_p Vp lks.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
@@ -732,14 +733,14 @@ Section KforkMain.
     (* [B6.kfk_prologue] is still generic in the allocator's count; kfork
        pins it at [None] here, which is what collapses its Hcont10a
        disjunction and, with it, two of [kfork_post]'s three arms. *)
-    iApply (B6.kfk_prologue γa γk γp γw γl γf γil γic γs cn γfs cov logstart nib
+    iApply (B6.kfk_prologue γa γk γp γw γl γf γil γic γs γfs cov logstart nib
               m lvl K eb pme None b
               pid_p Vp
               (wp_next b pme (fun (CID : CpuId) =>
                  (∀ mr : regfile,
                     ⌜ callee_saved m mr ⌝ -∗
                     pc_is (ret_pc (m !!! Regidx Rra)) -∗
-                    kfork_post γa γk γf cn lvl eb pme b pid_p Vp
+                    kfork_post γa γk γf lvl eb pme b pid_p Vp
                       K mr (mr !!! Regidx Ra0) lks -∗
                     WP (Loop : expr riscv_lang))%I)) lks
               HK Hlvl
@@ -755,7 +756,7 @@ Section KforkMain.
          [kfork_post] state [kalloc_env_at] once instead of per-arm. *)
       iAssert (kalloc_env_at γa γk None) with "[Hke]" as "Hke".
       { iDestruct "Hke" as "[$ | (% & _ & $)]". }
-      iApply (kfork_arm1 (CID0 := CID1) γa γk γf cn m K lvl eb b pme pid_p Vp
+      iApply (kfork_arm1 (CID0 := CID1) γa γk γf m K lvl eb b pme pid_p Vp
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5) Mt lks
                 (wpk_K_ge8 K HK) eq_refl eq_refl eq_refl eq_refl eq_refl
@@ -767,7 +768,7 @@ Section KforkMain.
       iIntros "%HMtsp %HMts4 %HMts5 %HMta0 %HMtthr %Hpures".
       iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hir Hbslp Hctx Hkstk Hpay Hcpu Hke HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
-      iApply (kfork_arm2 (CID0 := CID2) γa γk γf γl2 γs cn m K lvl eb b pme
+      iApply (kfork_arm2 (CID0 := CID2) γa γk γf γl2 γs m K lvl eb b pme
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
                 npa j pid_c ch Vc Mt lks
@@ -791,7 +792,7 @@ Section KforkMain.
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       destruct Htfs as (Htfsrc & Htfdst).
       iApply (kfork_arm3 (CID0 := CID3) γa γk γf γil γic γw γl γs
-                cn γfs cov logstart inodestart nib m K lvl eb b pme
+                γfs cov logstart inodestart nib m K lvl eb b pme
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
                 Mt npa j γl2 pid_c ch Vc' tfsrc tfdst lks

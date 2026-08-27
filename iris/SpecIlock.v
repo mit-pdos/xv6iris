@@ -66,7 +66,7 @@
    premise was UNSATISFIABLE, design §4), [ic_escrow] (the entry's content),
    [ireg_inv] (the inode region -- v1's [fs_chalf] of the whole inode block,
    plus its [diblk_wf] and its conditional-slot premise, all three of which
-   §11.3 retires).  The sleeplock protects only [ic_tok cn k], the checkout
+   §11.3 retires).  The sleeplock protects only [ic_tok fsc_ic k], the checkout
    token; the CONTENT travels through the escrow, because iget rewrites a
    recycled entry's cells holding [itable.lock] and no sleeplock at all.
 
@@ -188,6 +188,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -198,14 +199,13 @@ Local Open Scope Z_scope.
    memmove 2. *)
 Notation K_ilock := (62%nat) (only parsing).
 Definition wp_ilock_dep_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (gfs : fs_names) (gi : gname)                      (* fs blocks + region  *)
-    (cn : ic_names)                                    (* the icache's names  *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (dev inum : mword 32)
@@ -291,7 +291,7 @@ Definition wp_ilock_dep_sconf_body
   (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,
      the inode region *)
   itable_inv -∗
-  ic_escrow cn gfs gi cov logstart k -∗
+  ic_escrow fsc_ic gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
   (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
   (* THE ENTRY'S SLEEPLOCK -- TRACKED, and at the cache's canonical gname
@@ -301,7 +301,7 @@ Definition wp_ilock_dep_sconf_body
      (claude-notes/projects/iput-acquiresleep.md).  The deposit ilock leaves
      is the [slh_tok] slice of the very share it consumes below, so no
      caller pays anything new. *)
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k)
                    (slh_tok (icfg_isl k)) -∗
   (* THE CALLER'S SHARE (v3) -- consumed; deposited whole at the checkout.
      GENERATION-NAMED (design 17.3, ratified 17.4): the share's liveness
@@ -386,7 +386,7 @@ Definition wp_ilock_dep_sconf_body
          identity halves, the valid cell, and the loaded content at a
          record the region agrees with.  Exactly [ic_swap_park]'s input,
          i.e. exactly SpecIunlock v3's precondition. *)
-      ic_deposit cn k d -∗
+      ic_deposit fsc_ic k d -∗
       i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
@@ -458,14 +458,13 @@ Definition wp_ilock_dep_sconf_body
    ([wp_ilock_tx_of_dep] below); not a line of ilock's own proof is
    re-run. *)
 Definition wp_ilock_tx_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (gfs : fs_names) (gi : gname)                      (* fs blocks + region  *)
-    (cn : ic_names)                                    (* the icache's names  *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
@@ -516,7 +515,7 @@ Definition wp_ilock_tx_sconf_body
   (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,
      the inode region *)
   itable_inv -∗
-  ic_escrow cn gfs gi cov logstart k -∗
+  ic_escrow fsc_ic gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
   (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
   (* THE ENTRY'S SLEEPLOCK -- TRACKED, and at the cache's canonical gname
@@ -526,7 +525,7 @@ Definition wp_ilock_tx_sconf_body
      (claude-notes/projects/iput-acquiresleep.md).  The deposit ilock leaves
      is the [slh_tok] slice of the very share it consumes below, so no
      caller pays anything new. *)
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k)
                    (slh_tok (icfg_isl k)) -∗
   (* THE CALLER'S SHARE (v3) -- consumed; deposited whole at the checkout.
      GENERATION-NAMED (design 17.3, ratified 17.4): the share's liveness
@@ -628,7 +627,7 @@ Definition wp_ilock_tx_sconf_body
          identity halves, the valid cell, and the loaded content at a
          record the region agrees with.  Exactly [ic_swap_park]'s input,
          i.e. exactly SpecIunlock v3's precondition. *)
-      ic_tx_dep cn k s dev inum g -∗
+      ic_tx_dep fsc_ic k s dev inum g -∗
       i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
@@ -697,13 +696,12 @@ Definition wp_ilock_tx_sconf_body
    halves rejoined into [IcacheEscrow.ic_tx_dep] at the post.  The escrow
    holds its half from the checkout on. *)
 Lemma wp_ilock_tx_of_dep
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (j : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (gfs : fs_names) (gi : gname)
-    (cn : ic_names)
     (gil gisl : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
@@ -711,10 +709,10 @@ Lemma wp_ilock_tx_of_dep
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :
   (forall d : ic_dep,
-     wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
+     wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi gil gisl
                              cov logstart inodestart nib k s g d o dev inum
                              pidv dq dqs m K eb b lks Vpr) ->
-  wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
+  wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi gil gisl
                          cov logstart inodestart nib k s g o dev inum
                          pidv dq dqs m K eb b lks Vpr.
 Proof.
@@ -748,42 +746,40 @@ Module Type ILOCK.
      ([fileread], [filestat]) uses it at [DepRd] directly, which is what
      retires [ic_shed_rd] at those two sites. *)
   Parameter wp_ilock_dep_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (gfs : fs_names) (gi : gname)
-      (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
+      wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi gil gisl
                               cov logstart inodestart nib k s g d o dev inum
                               pidv dq dqs m K eb b lks Vpr.
   (* THE TRANSACTIONAL FORM (durable-disk B''-tx).  Same C function, same
      proof; what selects it is whether the caller brings [LogInv.log_tx].
      [ProofIlock] defines it by [wp_ilock_tx_of_dep]. *)
   Parameter wp_ilock_tx_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (gfs : fs_names) (gi : gname)
-      (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
+      wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi gil gisl
                              cov logstart inodestart nib k s g o dev inum
                              pidv dq dqs m K eb b lks Vpr.
 End ILOCK.

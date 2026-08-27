@@ -121,6 +121,7 @@ Require Import SpecSysMkdir.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
@@ -735,10 +736,10 @@ Section ProofSysMkdirBody.
   (* the per-slot projection out of the boot family, at the copy THIS
      contract names ([ic_escrows] is IcacheEscrow's -- see fs-sysfile's
      trap 3 on the four [ic_sleeplocks] copies, which bites the same way). *)
-  Lemma md_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Lemma md_esc_acc (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
+    (ic_escrows fsc_ic gfs gi cov logstart -∗ ic_escrow fsc_ic gfs gi cov logstart k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -753,7 +754,7 @@ Section ProofSysMkdirBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
       (ns : nat)
@@ -763,7 +764,7 @@ Section ProofSysMkdirBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
     wp_sys_mkdir_sconf_body gf ga gpr gs j gl gu gd gk pd pav pu bn g gfs gi
-                            cn gtl cov logstart bmapstart inodestart nib
+                            gtl cov logstart bmapstart inodestart nib
                             ninodes size dev ns dqb dqs dqbs dqn v
                             pid V m K eb b lks.
   Proof.
@@ -1188,7 +1189,7 @@ Section ProofSysMkdirBody.
       iDestruct (cpu_own_transport CID11 CID17 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Create.wp_create_sconf (CID := CID17) gs j gl gu gd gk pd pav pu
-                bn g gfs gi cn gtl ga gf gpr cov logstart bmapstart inodestart
+                bn g gfs gi gtl ga gf gpr cov logstart bmapstart inodestart
                 nib ninodes size dev pk bf
                 SpecDirlookup.T_DIR (mword_of_int 0) (mword_of_int 0)
                 (upd_upt V P') MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
@@ -1266,7 +1267,7 @@ Section ProofSysMkdirBody.
            erased reference, so weaken it back here.  One line, and the
            name is what sys_open's O_CREATE arm needs kept. *)
         iDestruct (inode_ref_short_gen_forget with "Href") as "Href".
-        iDestruct (md_esc_acc cn gfs gi cov logstart kk ltac:(lia)
+        iDestruct (md_esc_acc gfs gi cov logstart kk ltac:(lia)
                      with "Hescrows") as "#Hesc".
         (* CREATE'S PAYOUT IS THE ARMED DESCRIPTOR (durable-disk B''-tx2):
            the escrow parked half of the transaction's element at create's
@@ -1280,7 +1281,7 @@ Section ProofSysMkdirBody.
         iDestruct (cpu_own_transport CID18 CID20 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID20) gs j gl gu gd gk
-                  pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
+                  pd pav pu bn g gfs gi gtl gil gisl cov logstart bmapstart
                   inodestart nib size dev kk qi ss gy inum dn bm un1
                   pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks
                   (upd_upt V P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0

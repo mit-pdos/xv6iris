@@ -147,22 +147,22 @@ and the cleanups below — no wall, and nothing the theorem waits on.
 
 ## STILL PRESENT BUT SUPERSEDED (delete when their consumers move)
 
-`RiscvPtsto.fs_dur_names`' `fdn_bmap/ist/nin` (their only consumer, the
-old ledger's fold, is deleted) and `riscv_dview_name` (the `gamma_v`
-parameter `FsCrash.P_fs`/`fs_crash_seam` still thread and nothing reads;
-deleting it is a sweep of `Pc`'s arity through `RiscvAdequacy`/
-`SystemAdequacy`, both slow serial files, so it was left for a cleanup lane).
+GONE with lane S2: `RiscvPtsto.fs_dur_names` in whole (`fdn_link`,
+`fdn_top`, `fdn_bmap`, `fdn_ist`, `fdn_nin`) and both fixed-layer fields
+`riscv_dview_name` / `riscv_fsdur`, with the `Pc`-arity sweep through
+`RiscvAdequacy`/`SystemAdequacy` they needed; `FsDurBytes.fs_gamma_D`;
+`FsState.fs_boot_alloc_empty`.
 GONE with lane CE: `LogDefs.fs_dview`/`fs_dview_rebase`,
 `FsDurBytes.fs_dview_dbelems`/`fs_dview_dbytes`, and `FsDurImg`'s
 resource-MOVING image conversion `fs_dur_of_image`/`fs_dur_view_of_image`
 (section 10) — the boot mint distributes the era's pieces off facts and
 never wanted that shape.
 
-STALE COMMENT REFERENCES, measured after S1: fifteen citations in live
-sources still name files an earlier sweep deleted — `DirLinks` (six, in
-`IcacheBoot`/`FsStateEra`/`IcacheEscrow`/`InodeRegion`), `FsDurWire` (three)
-and `FsDurObj`/`FsDurLedger` (three) in `RiscvPtsto`/`FsStateDefs`/
-`FsDurImg`.  `ipool_shape` is also still the notes' vocabulary for a pool
+STALE COMMENT REFERENCES: NONE LEFT in `iris/*.v` after S2 (`DirLinks`,
+`FsDurWire`, `FsDurObj`, `FsDurLedger`, `IregDirBit` are unmatched there).
+Re-measure before believing this; the standing rule is that a comment names
+a live MECHANISM, not a deleted file.  `ipool_shape` is still the notes'
+vocabulary for a pool
 entry in `design/fs-icache.md` (21), `design/fs-fragments.md` (7) and
 `projects/durable-disk.md` (5); the definition is gone and the rows are
 `IcacheEscrow.ipool_ord`/`ipool_ext`, which `design/fs-icache.md`'s new
@@ -3926,17 +3926,207 @@ two read-only reviews that priced it are the era-vocabulary plan and the
 holistic ghost-state review (session scratch; their conclusions are in
 the rows below and in `design/fs-ghost-state.md`).
 
-- [ ] **S2 — the easy cleanups** (review ranks 2, 3, 8): `wp_iunlockput_dep_sconf`
+- [x] **S2 — the easy cleanups** (review ranks 2, 3, 8): `wp_iunlockput_dep_sconf`
   out of the module type; the dead-code sweep (`EscrowDefs.regN` family,
   `IcacheInv.is_itable`/`itable_res`/`islot_free`, `ic_frz_park`,
   `log_opSw`, the `IcacheRef` fraction-1 readings, `FsDurImg`'s resource
   half, …) and the `P_fs` arity sweep (`γv`/`Γd` unread; `fdn_*`);
   `fs_snap`'s `B` existential; the duplicate `icM_wf`.
+
+  **AS LANDED — S2: THE CLEANUP.  Whole tree green, `make audit-only` at
+  the thirteen-entry baseline, and the audited theorem's STATEMENT
+  (`xv6_fs_adequacy_xv6Σ`) is byte-identical — it never named either
+  deleted parameter.**
+
+  - **`IUNLOCKPUT` is three Parameters.**  `wp_iunlockput_dep_sconf`'s only
+    application is inside the file that proves it, so it is a `Local Lemma`
+    in `ProofIunlockput` and the body stays in `SpecIunlockput` as
+    `wp_iunlockput_dep_sconf_body`.  No client named it (`wp_iunlockput_dep_gen`
+    is the generic form callers do use).
+  - **Deleted, each re-measured by comment-stripped grep over `iris/*.v`
+    and each cascade re-measured after its head went:**
+    `EscrowDefs.regN`/`ireg_reg_body`/`ireg_reg_inv`/`reg_pending_absurd`
+    (an invariant family with no carrier);
+    `IcacheInv.is_itable`/`itable_res`/`islot`/`islot_free`/`islots_acc_upd`
+    (the v1 table, superseded by `IcacheEscrow`'s `_2` family — the
+    `islot_rest*`/`islot_free_at`/`islot_rest_join` half is LIVE and stays);
+    `IcacheEscrow.ic_frz_park` (+ Timeless) and `ic_dep_bundleless`;
+    `LogInv.log_opSw_intro`; `IcacheRef.inode_ref_gen_bare` (+ Timeless);
+    `FsStateInode.dir_owned` with `dir_owned_of`/`_unlink`/`_link`/`_orphan`
+    and its Timeless instance; `FsDurSnap`'s whole spike vocabulary
+    (`snap_inum_ok`, `snap_inode_at`, `snap_ok_inode`, `snap_ok_rec_of_bytes`,
+    `snap_ok_data`, `dir_entries_of_first`, `snap_slot_holds`, `snap_node_is`,
+    `snap_dir_entry`, `snap_ok_node_of_slot`, `snap_dir_entry_of_first`,
+    `P_dur_inode`, `P_dur_node_of_slot` — written ahead of the spike and
+    never consumed); `FsDurImg`'s RESOURCE HALF (sections 3/5/6/7 —
+    `fs_dur_bundle`, `fs_gamma_dur`, `dur_blk_owned`, `img_inode_phi_res`,
+    `img_recs_of_block`, `img_recs_of_region`, `img_free_ty`,
+    `img_inodes_phi`, `img_free_bitmap` — and `img_owned`);
+    `FsReady.fs_ready_text`; `LogDefs.big_sepM_fs_restrict`/`fs_restrict_keys`
+    (S1 relocated them here; their only reader was `FsDurImg`'s resource half).
+    `IcacheRef.iref_lic` is deleted BY RENAME: `runit_plain` is now the
+    primitive (`link_frag_e z (lelem None 1)`) and its three moves are
+    stated at that name.
+  - **THE ARITY SWEEP.**  `RiscvPtsto.fs_dur_names` and both fixed-layer
+    fields `riscv_dview_name` / `riscv_fsdur` are GONE, with
+    `FsDurBytes.fs_gamma_D` (+ `_phi`/`_link`/`_top`/`_excl`/`_timeless`,
+    and the `fs_dbelems` family that only served them) and
+    `FsState.fs_boot_alloc_empty`.  Before → after:
+    `P_fs γs γv Γd cov ls dk` → `P_fs γs cov ls dk`;
+    `P_fs_rec_named γsw γreg γst γv Γd cov ls dk` → `… γsw γreg γst cov ls dk`;
+    `P_fs_named γd N γsw γreg γst γv Γd cov ls` → `… γd N γsw γreg γst cov ls`;
+    `P_fs_alloc`/`_clean` also drop the `ghost_map_auth γv 1 ∅` premise;
+    `Pc : gname→gname→gname→gname→gname→fs_dur_names→iProp` →
+    `gname→gname→gname→gname→iProp`; `boot_fixedGS … γdisk ndisk γdview Γd
+    γswap Pcp` → `… γdisk ndisk γswap Pcp`; `HPc` loses the empty-byte-map
+    premise and the `∃ Γd` it handed back, so `RiscvAdequacy` allocates no
+    byte map at all.  `fs_crash_seam` is arity-free and did NOT move, so the
+    90 threading files are untouched; the sweep is six files.  The only
+    STATEMENT one rung below the audited theorem that moved is
+    `xv6_power_adequacy_xv6Σ`'s `Hphi`, which loses `(γdv : gname)` and
+    `(Γd : fs_dur_names)` — a pure deletion of two parameters its body never
+    read.  `xv6_fs_adequacy_xv6Σ` is unchanged.
+  - **Item 8, first half:** `FsDurRead.snap_auth` binds its byte map
+    existentially inside itself (`snap_auth g D = ∃ B, ghost_map_auth g 1 B ∗
+    ⌜B ⊆ fs_dbytes D⌝`), so `FsDurSnap.fs_snap` is 4 arguments and its
+    sixteen readings lose one binder each.  `P_dur`'s statement is unchanged.
+  - **RE-MEASURED AND KEPT (the review's list was optimistic).**
+    `LogInv.log_opSw` is LIVE — `log_opSwe_opSw`, `log_opSw_opS` and
+    `log_opSw_witness` are called from `ProofBalloc`, `ProofIalloc`,
+    `ProofIput` and `ProofIupdate`; only `log_opSw_intro` was caller-less.
+    `IcacheRef.frzm_at`/`frzm_full`/`icnt_full`/`hpn_at` are LIVE (each is
+    the base of a live `_h`/`_split`/`_full` family in the same file);
+    deleting `icnt_full`/`frzm_full` would mean restating `icnt_split`/
+    `frzm_split`, i.e. a contract change for one `rewrite`.
+    `FsDurImg.link_auths`/`link_toks_of`/`ent_ops`/`toks_of_list` are NOT
+    the resource half: they are pure `fsLinkUR` plumbing under
+    `img_link_incl` → `img_link_valid` → the LIVE `img_snap_ok`, so they
+    stay.  `BioInitAt.v` has NO caller-less body: all four names have
+    external consumers and both `Local Lemma`s are used in-file (what IS
+    duplicated there is the one-line `seq j (S n) = j :: seq (S j) n`, which
+    four files prove by `reflexivity` — a hoist, not dead code).
+  - **SKIPPED, measured.**  (i) The duplicate `⌜icM_wf M⌝` in
+    `IcacheInv.itable_body` and `IcacheEscrow.itable_res2`.  BOTH copies have
+    consumers, and dropping either is a cross-cutting premise sweep of the
+    icache's 348-file cone, not a deduplication: the invariant's copy is
+    destructured at ~18 sites in `IcacheInv` (nine of which USE it — through
+    `iref_word_live` and the `destruct Hwf as [Hdom Hcnt']`
+    re-establishments), so dropping it adds `icM_wf M ->` to ten accessor
+    contracts and every `Proof*` call site; dropping the LOCK's copy instead
+    turns a free pure fact into an `itable_half_agree` off an invariant
+    opening at exactly the points (`ProofIput`'s three `icM_wf Mt ->`
+    lemmas) that have no fupd to open it in.  (ii) The `_reg`/`_inv` pair
+    merge is out of scope as the brief says: it needs the seal
+    unconditional.
+  - **PROSE.**  Every citation of a deleted FILE is gone from `iris/*.v`
+    (`DirLinks`, `FsDurWire`, `FsDurObj`, `FsDurLedger`), and the notes drift
+    the review found in `design/fs-ghost-state.md` is fixed (the landed
+    exception seal, `escA_inv`'s argument list, the pool arms' vanished
+    `top_frag`, `ic_payload_arm`'s whole-tail disjunction, `fs_snap`'s
+    existential map).  ONE claimed drift was NOT drift: the file already
+    says the commit opens SIX invariant families and never names `icacheN`.
+    `design/crash.md`, `fs-state.md`, `durable-fs-plan.md` and `fs-icache.md`
+    got banners where they described the deleted fixed-layer fields,
+    `dir_owned` or the v1 `is_itable`/`itable_res` as live.
 - [ ] **Rank 1 — de-thread the ambient names** (AFTER S2): the fs contracts
   stop binding copies of `icfg`/`fscfg`'s per-boot constants
   (`γfs cov logstart cn γi γl nib inodestart dev`); the 339 tie equations
   vanish; `fs_world` collapses into `fs_ready`.  First slice `cn : ic_names`.
-  Design pass pending; owner rules on its plan before it runs.
+
+  **AS LANDED — R1a: THE PROBE AND THE WHOLE `cn : ic_names` SLICE.  Whole
+  tree green, `make audit-only` identical BY NAME to a pre-change run of the
+  same tree (the thirteen entries), and `SystemAdequacy.v` /
+  `SystemAssumptions.v` are byte-identical — the audited theorem's statement
+  never named `cn`.**
+
+  - **THE PROBE (`iris/ProbeR1a.v`, deliberately not in `_CoqProject`;
+    compile it by hand against a built tree).**  It settles the hazard at
+    the exact binder group of a group-B file, and both predicted answers
+    hold.  In a group that carries `!fileG Σ` AND a standalone `ICFG :
+    icfg`, ONE proposition splits across two records: `Set Printing All`
+    shows the ambient reading at `@file_icfg Σ fileG0` and the textually
+    identical local one at `ICFG`, while the `fsc_ic` conjunct is
+    `@file_fscfg Σ fileG0` in BOTH because `fscfg` has only one path.  They
+    are not convertible, `iFrame` says *"cannot frame (inode_held v)"*,
+    `iApply`/`iSpecialize` refuse, and the sealed shape — the two configs
+    quantified independently, which is what a `Module Type` does — is
+    perfectly statable and unprovable.  Deleting the standalone `ICFG` is
+    the whole cure: same term, framing and specialization go through, and a
+    toy `Module Type` / `Module … : T` pair plus a client functor
+    type-check.  Every `Fail` in the file has its CONTROL beside it in the
+    cured section, so a `Fail` that passed for an unrelated reason would
+    show up as its control failing.
+  - **`Link*.v` (finding iii).**  All 206 scanned outside comments for the
+    198 names that lose a parameter.  Exactly ONE code-level hit, and it is
+    positional: `LinkNameiRootBoot.v`'s `iApply (NameiRoot.wp_namei_root
+    fsc_itlock fsc_ic fsc_fs …)`.  Everything else is a functor application
+    over MODULE arguments, which no parameter change can reach; four more
+    files name a contract only in prose.
+  - **THE RULE THE RANK RUNS ON**: a sealed file has exactly ONE instance
+    path to each config — `fileG` alone (no standalone `ICFG`), or an
+    explicit `ICFG` + `FSC` pair with no `fileG`.  Group A (48 files) was
+    already right, group B (16) was cured by deleting 38 standalone `ICFG`
+    binders, group C (21) gained `FSC : fscfg` beside `ICFG` in 76 binder
+    groups.
+  - **THE CUT DOES NOT SPLIT.**  A partially de-threaded callee forces
+    `cn = fsc_ic` on its callers — a Spec GAINING a row — so the `cn` slice
+    is 79 contract files plus 9 boundary files in one step, not the ~25
+    leaves the plan sized.  198 declarations lost the parameter; over the 91
+    `.v` files touched, 1143 `cn` tokens became 3 (all prose), of which 245
+    were `(cn : ic_names)` binders and 898 argument/use sites.
+  - **Contracts whose statement changed** (each loses exactly one
+    parameter; none gains a premise): `wp_iget_sconf`, `wp_ilock_dep_sconf`
+    / `wp_ilock_tx_sconf`, `wp_iunlock_dep_sconf` / `wp_iunlock_tx_sconf`,
+    `wp_iunlockput_dep_gen` / `wp_iunlockput_tx_sconf` /
+    `wp_iunlockput_tx_gen`, `wp_iput_sconf` / `wp_iput_gen`,
+    `wp_idup_sconf`, `wp_ialloc_sconf` / `wp_ialloc_gen`,
+    `wp_fsinit_sconf`, `wp_ireclaim_sconf`, `wp_namei_*` / `wp_namex_*`
+    (incl. both root corners), `wp_nameiparent_*`, `wp_dirlink_*`,
+    `wp_dirlookup_sconf` / `wp_dirlookup_tree`, `wp_create_sconf`,
+    `wp_kexec_sconf`, `wp_kexit_sconf`, `wp_kfork_sconf`, and all nine
+    `wp_sys_*_sconf`.  The module types whose Parameters moved: `IGET ILOCK
+    IUNLOCK IUNLOCKPUT IPUT IDUP IALLOC FSINIT IRECLAIM NAMEI NAMEI_ROOT
+    NAMEI_TR NAMEIPARENT NAMEX NAMEX_ROOT NAMEX_TR DIRLINK DIRLOOKUP CREATE
+    KEXEC KEXECB2 KEXECB3 KEXIT KFORK FILECLOSE FILEREAD FILESTAT SYSCHDIR
+    SYSEXEC SYSEXIT SYSFORK SYSLINK SYSMKDIR SYSMKNOD SYSOPEN SYSUNLINK` —
+    thirty-six, and every `Module … : T` that discharges one still seals.
+  - **Ties deleted** (there is no threaded copy left for them to tie):
+    `FsSyscalls.fs_world`'s `⌜cn = fsc_ic⌝` — eighteen equations to
+    seventeen, and its `fs_world_all` proof is one `->` shorter;
+    `ProofSyscall.sysc_ties.sct_ic`; `SpecFileclose.fclose_ties.fct_ic`.
+  - **Five names records lose their icache field** — `fclose_names.fcn_ic`,
+    `fread_names.frn_ic`, `fwrite_names.fwn_ic`, `fstat_names.fsn_ic`,
+    `UsertrapRes.ut_names.un_cn`.  They existed only to hand a threaded
+    `cn` down, and their environments (`fileread_fs_env` & co.) state
+    `ic_escrows fsc_ic …` directly now.  KEEPING them was the alternative
+    and it is the forbidden one: `fread`/`fwrite`/`fstat` never had a tie,
+    so their contracts would have had to GAIN one.
+  - **THE CONE COST, MEASURED** (marginal transitive requires added by
+    `Require Import FsCfg`): +9 for `SpecIdup` and `SpecIunlock` (`FsCfg`
+    with `BufOwn DiskAddrs PermInv PlicPlan VirtioProto WireInv WpUart
+    WpVirtio`), +1 for `SpecFsinit SpecIalloc SpecIget SpecIlock SpecIput
+    SpecIreclaim`, and **+0 for the other 59** — they already reached
+    `FsCfg` transitively and needed only the `Import` for name scope.
+  - **THE TRAP THIS SLICE COST HALF AN HOUR**, worth copying: a file that
+    binds `` `{FSC : fscfg} `` without `Require Import FsCfg` still PARSES —
+    backtick generalization invents a fresh `fscfg : Type` — and the
+    failure surfaces far away as *"Could not find an instance for
+    `FsCfg.fscfg`"* at the first lemma that uses the class, with
+    `fscfg : Type` sitting in the printed environment as the tell.
+    `LinkNameiRootBoot.v`'s import comment already warned about this shape;
+    it is now measured.  The checker is one grep: no file may name `fscfg`
+    or `fsc_*` without requiring `FsCfg`.
+  - `IcacheEscrow` / `IcacheInv` / `IcacheBoot` / `FsCollectAll` KEEP their
+    `cn`, permanently: de-threading is a CONTRACT-SURFACE move and those
+    live below `FsCfg`.  `ic_sleeplocks_lookup` stays the sole accessor.
+  - **WHAT STAGE 1b OWES** (nothing of `cn` is left): the OTHER threaded
+    constants, on the same 88-file surface and by the same closed-cut rule —
+    `γfs cov logstart γi gtl nib inodestart dev g`.  The three tie
+    records are the meter: seventeen equations left in `fs_world`,
+    twenty-three fields in `sysc_ties`, seventeen in `fclose_ties`.
+    Each constant is its own closed cut and must be swept whole; expect the
+    same group-B cure to be a no-op now (those 16 files have no standalone
+    `ICFG` left).
 - [ ] **EV — the era-vocabulary unification** (approved): five staged
   lanes; three of the four holders are already predicate-vocabulary; the
   payoff is the commit handing a real `fs_state` to the transport.  Runs

@@ -117,7 +117,7 @@
    [kfork_post].
 
    What is left of the icache is only what the LOCK needs:
-   [IcacheEscrow.is_itable2 γil cn γfs γic cov logstart nib icfg_dev] (which drags
+   [IcacheEscrow.is_itable2 γil fsc_ic γfs γic cov logstart nib icfg_dev] (which drags
    the disk and log fabric -- [γfs], [cov], [logstart], [nib] -- along) and
    [itable_inv].  No coherence side condition ties the caller's lock to
    [ProcInv.cwd_ref]'s reference: both are stated over the same canonical
@@ -177,6 +177,7 @@ Require Import SyscParkEnv ParkCap.   (* [park_world] / [park_token] *)
 Require Import Xv6Cameras.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 
 
 (* kfork's own frame is 8 slots (addi sp,sp,-64); the deepest callee is
@@ -186,7 +187,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Notation K_kfork := (56%nat) (only parsing).
 Definition kfork_post
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γk : gname * gname) (γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
+    (γa : gname) (γk : gname * gname) (γf : gname) (lvl : nat) (eb : bool)
     (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate)
     (K : nat) (mr : regfile) (rv : mword 64) (lks : gset string) : iProp Σ :=
@@ -213,7 +214,7 @@ Definition kfork_post
 Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γk : gname * gname) (γp γw γl γf γil γic : gname)  (γs : list gname)
-    (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
+    (γfs : fs_names) (cov : gset Z) (logstart : Z)
     (inodestart : Z) (nib : nat)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string) :=
@@ -241,7 +242,7 @@ Definition wp_kfork_sconf_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
-  is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
+  is_itable2 γil fsc_ic γfs γic cov logstart nib icfg_dev -∗
   itable_inv -∗
   (* THE INODE REGION, and it is here for ONE reason: kfork's
      [np->cwd = idup(p->cwd)].  idup's [ref++] became a ledger move in
@@ -279,7 +280,7 @@ Definition wp_kfork_sconf_body
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post γa γk γf cn lvl eb pme b pid_p Vp K mr
+      kfork_post γa γk γf lvl eb pme b pid_p Vp K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -288,10 +289,10 @@ Module Type KFORK.
   Parameter wp_kfork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γk : gname * gname) (γp γw γl γf γil γic : gname) (γs : list gname)
-      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
+      (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string),
-      wp_kfork_sconf_body γa γk γp γw γl γf γil γic γs cn γfs cov logstart
+      wp_kfork_sconf_body γa γk γp γw γl γf γil γic γs γfs cov logstart
         inodestart nib m lvl K eb pme b pid_p Vp lks.
 End KFORK.

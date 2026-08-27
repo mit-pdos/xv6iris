@@ -201,6 +201,7 @@ Require Import IgetLic.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 
 (* iget's own frame is 6 slots ([c.addi16sp sp,-48] at +0x00, with ra / s0 /
    s1 / s2 / s3 / s4 pushed at 40 / 32 / 24 / 16 / 8 / 0 and [c.addi4spn
@@ -208,8 +209,8 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    none.  [K_idup]'s budget for a frame half again as deep. *)
 Notation K_iget := (58%nat) (only parsing).
 Definition wp_iget_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
+    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γl : gname) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (dev inum : mword 32)
     (l : ilic)                                   (* THE LICENCE, §7.1 *)
@@ -236,11 +237,11 @@ Definition wp_iget_sconf_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
-  is_itable2 γl cn γfs γi cov logstart nib dev -∗
+  is_itable2 γl fsc_ic γfs γi cov logstart nib dev -∗
   (* the [ref] words *)
   itable_inv -∗
   (* EVERY entry's content -- the scan cannot name its slot in advance *)
-  ic_escrows cn γfs γi cov logstart -∗
+  ic_escrows fsc_ic γfs γi cov logstart -∗
   (* THE INODE REGION, and GHOST-ONLY (header, §3.3): the recycle arm's peel
      refutes a standing freeze from [l] inside it, and its 0 -> 1 count move
      carries the ledger's [icnt] half.  Persistent, so it costs a caller a
@@ -284,13 +285,13 @@ Definition wp_iget_sconf_body
 
 Module Type IGET.
   Parameter wp_iget_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
+    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γl : gname) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (dev inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_iget_sconf_body γl cn γfs γi cov logstart inodestart nib dev inum l
+      wp_iget_sconf_body γl γfs γi cov logstart inodestart nib dev inum l
                          m n eb p K b lks.
 End IGET.

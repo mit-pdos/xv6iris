@@ -1221,7 +1221,8 @@ Qed.
 (* THE MACHINE'S [++], CROSSED WITH NO GUARD AT ALL.  A sixteen-bit
    increment raises the value by at most one -- true even at the wrap, which
    lands at zero.  (Lane G6 moved this pair and the one below here from
-   [DirLinks.dlc_bv_add1_le] / [_nz_eq]: they are arithmetic about
+   the old link ledger's [dlc_bv_add1_le] / [_nz_eq]: they are arithmetic
+   about
    [di_nlink]'s width and have nothing to do with the ledger that file
    carried.) *)
 Lemma nlink_add1_le (h : mword 16) :
@@ -2964,14 +2965,7 @@ Section InodeRegion.
        [∗ list] i ∈ seq 0 16,
          ireg_slot γfs γi (16 * Z.of_nat bi + Z.of_nat i)%Z (ds !!! i))%I.
 
-  (* OPTION A (option 1, in-body): the per-inum registry, held INSIDE the
-     region invariant so [ireg_claim_au] refutes the pending arm from the open
-     it already does -- no [ireg_reg_inv] premise, no syscall-cone re-spec.
-     Every inum's whole [reg_full] rides here; boot registers all of them.
-     Timeless body, so the accessors' [>] strip is unaffected; carried through
-     UNCHANGED by every accessor except [ireg_claim_au] (reads a copy to
-     refute) and, at walk time, the deposit (splits [reg_full]->[reg_half]). *)
-  (* OPTION A (walk reg-fold): the registry conjunct in [ireg_body] is now the
+  (* OPTION A (walk reg-fold): the registry conjunct in [ireg_body] is the
      bare [icfg_reg] auth (plus coverage).  Every inum's [reg_full]/[reg_half]
      fragment rides INSIDE its slot arm (see [ireg_slot]), coupled to
      pending-ness, so "non-pending ⟹ reg_full" is structural.  The auth is used
@@ -3579,7 +3573,7 @@ Section InodeRegion.
   Qed.
 
   (* the big-op's slot [bi], with the rest re-buildable at a map that
-     changed only at [bi]'s keys -- IcacheInv.islots_acc_upd's shape *)
+     changed only at [bi]'s keys -- IcacheInv.live_pool_acc_upd's shape *)
   Lemma ireg_blks_acc_upd (γi : gname) (γfs : fs_names) (inodestart : Z)
       (m : gmap Z dinode) (nib bi : nat) :
     (bi < nib)%nat ->

@@ -1392,7 +1392,7 @@ Section ProofFileclose.
           (* the entry's own escrow and sleeplock, out of the two families:
              a closer cannot name the slot in its contract, so it takes
              every slot's and picks the one the reference names *)
-          iDestruct (ic_escrows_acc _ _ _ _ _ kk Hkk with "Hescrows") as "#Hescrow".
+          iDestruct (ic_escrows_acc _ _ _ _ kk Hkk with "Hescrows") as "#Hescrow".
           iDestruct (ic_sleeplocks_lookup _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".
           destruct (Hinumgeo inum Hinumb) as [Hiblk Hiblog].
           (* NO [subst b] HERE.  [Houtb] does read [b = eb] at [noff = 0], but
@@ -1504,7 +1504,7 @@ Section ProofFileclose.
           iApply (Iput.wp_iput_sconf (CID := CIDf5) (fcn_procs fn) (fcn_j fn)
                     (fcn_plock fn) fsc_uart fsc_disk fsc_dlock
                     pdd pavd pud fsc_bio
-                    icfg_log fsc_fs fsc_ireg fsc_ic
+                    icfg_log fsc_fs fsc_ireg
                     fsc_itlock gil gisl
                     fsc_cov fsc_logst fsc_bmapstart
                     icfg_ist icfg_nib fsc_size

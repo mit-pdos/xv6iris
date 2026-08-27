@@ -21,6 +21,11 @@ Require Import MstatusFacts.
 Require Import KptPt KMap.
 Local Open Scope Z_scope.
 
+(* This file's business IS taking the word apart, so it opts back out of
+   [RiscvPtsto]'s seal (see the note at the end of that file).  Local, so no
+   consumer of this file inherits the transparency. *)
+Local Typeclasses Transparent word_pointsto word4_pointsto.
+
 Section InstrBytes.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.

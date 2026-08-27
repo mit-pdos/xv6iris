@@ -329,6 +329,10 @@ Proof.
       [exact (Hm _ _ H)|congruence].
 Qed.
 
+(* Opts back out of the [gpr_file] seal: this file destructs it directly.
+   Local, so nothing above inherits the transparency. *)
+Local Typeclasses Transparent gpr_file.
+
 Section VcGenSIris.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.

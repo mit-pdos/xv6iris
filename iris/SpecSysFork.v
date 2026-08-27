@@ -84,6 +84,7 @@ Require Import SyscParkEnv ParkCap.   (* [park_world] / [park_token] *)
 Require Import Xv6Cameras.  (* [logG]: [ireg_inv]'s own instance argument *)
 Import Defs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* kfork's budget plus this function's own two slots. *)
@@ -92,7 +93,7 @@ Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γp γw γl γf γil γic : gname) (γs : list gname)
-    (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
+    (γfs : fs_names) (cov : gset Z) (logstart : Z)
     (inodestart : Z) (nib : nat)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
     (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string) :=
@@ -110,7 +111,7 @@ Definition wp_sys_fork_sconf_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
-  is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
+  is_itable2 γil fsc_ic γfs γic cov logstart nib icfg_dev -∗
   itable_inv -∗
   (* the inode region, and it travels with the fs fabric for the SAME reason
      the itable does -- kfork's [np->cwd = idup(p->cwd)], whose [ref++] is a
@@ -159,10 +160,10 @@ Module Type SYSFORK.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
-      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
+      (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart
+      wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs γfs cov logstart
                              inodestart nib m lvl av eb p b pid V lks.
 End SYSFORK.

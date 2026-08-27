@@ -48,17 +48,15 @@ are parameters, not a config-class dependency).  The file system is
 instantiated TWICE with the same definitions:
 
 - **`Γ_D`, the committed (durable) view.**  `Φ_D a v := a ↪[γD] v`, the
-  FULL element of a fixed-layer byte-keyed `ghost_map Z (bv 8)` whose auth
-  is the committed byte view `D` inside `P_disk` (`crash.md`).  `γlink_D`,
-  `γtop_D` are fixed-layer gnames — since durable-disk 2c-names they are
-  ONE `riscvFixedGS` field, `riscv_fsdur : RiscvPtsto.fs_dur_names`
-  (`fdn_link`/`fdn_top`), so `Γ_D` is
-  `MkFsView (λ a v, a ↪[riscv_dview_name] v) (fdn_link riscv_fsdur)
-  (fdn_top riscv_fsdur)` and any file with a `riscvFixedGS` can spell it.
-  **The CLIENT allocates that bundle**, inside adequacy's `HPc` update,
-  which hands the record back existentially: the link family's camera has
-  no authority over its keys, so a family adequacy minted at `ε` could
-  never be filled (`crash.md`, "The durable disk").
+  FULL element of a byte-keyed `ghost_map Z (bv 8)` whose auth is the
+  committed byte view `D`.  **ITS THREE GNAMES ARE EXISTENTIAL, INSIDE THE
+  SNAPSHOT** (durable-disk lane CE; S2 deleted the fixed-layer fields
+  `riscv_dview_name` and `riscv_fsdur : fs_dur_names` that used to carry
+  them, and the record itself).  `FsDurSnap.fs_snap Γ g D S` binds
+  `Γ = snap_gamma g gl gt` at the epoch's own three fresh names, and
+  `P_dur D` closes all of them — which is exactly what makes the durable
+  half of `FsCrash.P_fs` a function of `D` alone and lets a commit DROP one
+  epoch and allocate the next.  Nothing outside `crashN` names any of them.
   The whole instance lives inside
   `crashN` (`P_wf`, §4); no mortal ever holds a piece of it (ruling 1).
 - **`Γ_L`, the logged (in-era) view.**  `Φ_L a v := a ↪[fs_L] v`, the FULL
@@ -100,7 +98,6 @@ inode_owned Γ i n     := rec_owned Γ i n.rec
                          ∗ (ind_owned Γ n when the indirect block exists)
                          ∗ link_auth Γ i (nlink n.rec)
                          ∗ ⌜local clauses⌝
-dir_owned  Γ d n      := inode_owned Γ d n ∗ (the entry reading, with tokens, below)
 rec_owned  Γ i dn     := byte_range Γ (IBLOCK i) (64·slot i) (dinode_bytes dn)
 blk_owned  Γ b bs     := byte_range Γ b 0 bs                   (length bs = BSIZE)
 byte_range Γ b off bs := [∗ list] k ↦ v ∈ bs, Γ.Φ (b·BSIZE + off + k) v
@@ -121,7 +118,9 @@ free_bitmap Γ F       := blk_owned Γ bmapstart (bm_bytes F)
   the `∗`.
 - **Local clauses of `inode_owned`**: `type ∈ {DIR, FILE, DEV}`;
   `size ≤ MAXFILE`; `bm_covers`; `type = 0 → nlink = 0`; `nlink ≤ 32767`.
-  Of `dir_owned`: `16 ∣ size`; "." ↦ self and ".." present; names unique.
+  Of a DIRECTORY (the `fn_is_dir` clauses of the same `inode_local`, so
+  there is no separate `dir_owned` predicate): `16 ∣ size`; "." ↦ self and
+  ".." present; names unique.
   Of `free_bitmap`: nothing beyond the encoding (the block's bytes are
   `bm_bytes F`).  There is NO clause at `fs_inodes` or `fs_state` level.
 - **`free_bitmap`, CSL-style.**  It owns the bitmap block and, for every
@@ -134,7 +133,7 @@ free_bitmap Γ F       := blk_owned Γ bmapstart (bm_bytes F)
   lost resource, which is what a leaked block is).
 - **Links are a counting RA, not an equation.**  `inode_owned Γ i n` holds
   `link_auth Γ i (nlink n.rec)`; every directory entry OTHER THAN "."
-  inside `dir_owned` holds one `link_tok Γ target`.  The RA's law gives
+  inside its `ent_toks_x` holds one `link_tok Γ target`.  The RA's law gives
   `#tokens ≤ nlink`, and that is the direction safety uses: at `nlink = 0`
   no entry points at the inode, so it may be freed.  The tokens move
   where the code moves the counts, with both inodes locked as the code
@@ -881,12 +880,11 @@ and not of `LogInv.log_ctx` (78 files).  The geometry is fixed at boot and
 never moves (nothing in xv6 writes the superblock), so it belongs as PURE
 FIELDS of `RiscvPtsto.fs_dur_names`, which `P_fs` already takes and which
 any file with a `riscvFixedGS` spells ambiently as `riscv_fsdur` — exactly
-as `riscv_dview_name` is spelled.  The client allocates that bundle inside
-adequacy's `HPc`, so it can fill the fields from the image's own superblock
-(`SystemAdequacy`'s two `MkFsDurNames` sites have `sb` and `nib` in scope);
-the era side owes the pure equation "my superblock's geometry is
-`riscv_fsdur`'s", which belongs in the FS config bundle every supplier
-already carries.
+as `riscv_dview_name` is spelled.  **THAT PLAN IS DEAD AND SO IS THE
+RECORD** (S2): the snapshot ruling carries the geometry inside
+`FsDurSnap.snap_shape S D` at the epoch's own abstract state, so nothing
+read `fdn_bmap`/`fdn_ist`/`fdn_nin` and `fs_dur_names` is deleted along
+with `riscv_dview_name` and `riscv_fsdur`.
 
 ### 4⅞d. AS LANDED (3b'): the index is on the bundle, `dwire_geom` was
 ### UNSATISFIABLE at xv6's own layout, and the flip's two ENDS are terms

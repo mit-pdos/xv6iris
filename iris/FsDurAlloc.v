@@ -958,7 +958,7 @@ Section AllocSnap.
   Theorem fs_snap_alloc S D :
     snap_ok S D ->
     ⊢ |==> ∃ g gl gt : gname,
-        fs_snap (snap_gamma g gl gt) g (fs_dbytes D) D S.
+        fs_snap (snap_gamma g gl gt) g D S.
   Proof.
     intros Hok.
     iMod (snap_bytes_alloc (fs_dbytes D)) as (g) "[Hba Hbe]".
@@ -969,8 +969,9 @@ Section AllocSnap.
     iDestruct (snap_ledger_of_elems g gl gt D (sk_bsz (sk_bytes Hok)) with "Hbe")
       as "Hled".
     rewrite /fs_snap /snap_auth /top_frag /snap_gamma /=.
-    iFrame "Hba Hta Htf".
-    iSplitR; [iPureIntro; reflexivity |].
+    iFrame "Hta Htf".
+    iSplitL "Hba";
+      [iExists (fs_dbytes D); iFrame "Hba"; iPureIntro; reflexivity |].
     iSplitL "Hled Hlinks".
     { iApply (fs_state_of_ledger (snap_gamma g gl gt) S D Hok with "Hled").
       iExact "Hlinks". }
@@ -982,6 +983,6 @@ Section AllocSnap.
   Proof.
     intros Hok.
     iMod (fs_snap_alloc S D Hok) as (g gl gt) "Hsnap".
-    iModIntro. iExists g, gl, gt, (fs_dbytes D), S. iExact "Hsnap".
+    iModIntro. iExists g, gl, gt, S. iExact "Hsnap".
   Qed.
 End AllocSnap.

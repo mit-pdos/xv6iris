@@ -36,7 +36,7 @@
    process holds NOFILE of the first but at most one cwd of the second.
 
    Routing mirrors the fd units exactly: the AUTHORITY lives in the itable
-   lock's resource ([IcacheInv.itable_res]) beside the per-slot counts, so
+   lock's resource ([IcacheEscrow.itable_res2]) beside the per-slot counts, so
    that a thread holding the lock can weigh the count it is about to bump
    against the supply in one place.                                      *)
 From Stdlib Require Import ZArith Lia List.

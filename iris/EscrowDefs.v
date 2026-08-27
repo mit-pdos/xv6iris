@@ -132,37 +132,4 @@ Section EscrowDefs.
   Global Instance region_pending_timeless z : Timeless (region_pending z).
   Proof. rewrite /region_pending. apply _. Qed.
 
-  (* ------------------------------------------------------------------ *)
-  (*  THE REGISTRY INVARIANT (option 1's [reg_full] home)                 *)
-  (* ------------------------------------------------------------------ *)
-  (* Holds the whole [icfg_reg] auth and every region inum's [reg_full].
-     Timeless body ([ghost_map_auth] + [reg_full] are Timeless), so it opens
-     with [>].  Boot registers every inum; the pure clause is what lets
-     [ireg_claim_au]'s pending branch find [reg_full inum].  At the flip-gate
-     the body is flat; the reordered walk evolves it to a per-inum
-     [reg_full ∨ pending-split] (walk-plan item). *)
-  Definition regN : namespace := nroot .@ "iregreg".
-  Definition ireg_reg_body (nib : nat) : iProp Σ :=
-    (∃ m : gmap Z (gname * gname),
-       ⌜∀ z : Z, (0 <= z < 16 * Z.of_nat nib)%Z -> is_Some (m !! z)⌝ ∗
-       ghost_map_auth icfg_reg 1 m ∗
-       ([∗ map] z ↦ p ∈ m, reg_full z (fst p) (snd p)))%I.
-  Definition ireg_reg_inv (nib : nat) : iProp Σ := inv regN (ireg_reg_body nib).
-  Global Instance ireg_reg_inv_persistent nib : Persistent (ireg_reg_inv nib).
-  Proof. rewrite /ireg_reg_inv. apply _. Qed.
-
-  (* the pending branch's one-liner: [reg_full inum] (from the registry) and the
-     pending arm's [reg_half inum] exceed fraction 1 -- impossible.  Proves any
-     goal.  The registry is left open in this (dead) branch, which is sound. *)
-  Lemma reg_pending_absurd E (z : Z) (nib : nat) (ge gr : gname) (P : iProp Σ) :
-    ↑regN ⊆ E → (0 <= z < 16 * Z.of_nat nib)%Z →
-    ireg_reg_inv nib -∗ reg_half z ge gr ={E}=∗ P.
-  Proof.
-    iIntros (HE Hz) "#Hinv Hrh".
-    iInv "Hinv" as ">(%m & %Hcov & Hauth & Hfulls)" "Hcl".
-    destruct (Hcov z Hz) as [[ge0 gr0] Hp].
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hp with "Hfulls") as "[Hrf _]".
-    iDestruct (reg_full_half_False with "Hrf Hrh") as "[]".
-  Qed.
-
 End EscrowDefs.

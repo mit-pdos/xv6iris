@@ -128,6 +128,7 @@ Require Import SpecDirlookup.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -400,7 +401,7 @@ Qed.
 
 Section FsLookup.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, FSC : fscfg}.
 
   (* [FsRep.fnode] AT A NAMED RECORD AND NAMED BYTES.  [fnode] hides
      [dn]/[bm]/[data] existentially, which is right for a tree statement
@@ -529,14 +530,14 @@ End FsLookup.
    [fdir] and the byte-level bundle. *)
 Definition wp_dirlookup_tree_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γfs : fs_names) (γi : gname)
-    (cn : ic_names) (gtl : gname)                     (* the icache + itable *)
+    (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64)
@@ -604,9 +605,9 @@ Definition wp_dirlookup_tree_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl cn γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows cn γfs γi cov logstart -∗
+  ic_escrows fsc_ic γfs γi cov logstart -∗
   (* the inode region: iget's premise since iclaim-ledger.md §3.3, relayed
      verbatim.  The tree layer neither reads nor names a dinode through it
      -- the hit arm's iget opens it ghost-only, on the ledger columns. *)
@@ -671,13 +672,13 @@ Module FsLookupTree (DL : DIRLOOKUP).
 
   Lemma wp_dirlookup_tree
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-        ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (γa : gname) (γf : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64)
@@ -689,7 +690,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
-      wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
+      wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn γfs γi gtl
                              γa γf cov logstart inodestart nib dev ip bm data dn
                              dpi ents fn hasp pofv pidv dq dqd dqn
                              m K eb b lks Vpr.
@@ -711,7 +712,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
     iAssert (dlinks γfs (bv_unsigned (inum_of dpi)) dn bm data)
       with "[Hedges]" as "Hedges".
     { rewrite Hkeq. iExact "Hedges". }
-    iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
+    iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γfs γi gtl
               γa γf cov logstart inodestart nib dev ip (inum_of dpi) bm data dn dn
               fn hasp pofv
               pidv dq dqd dqn m K eb b lks Vpr
@@ -759,7 +760,7 @@ End FsLookupTree.
 
 Section FsLookupAu.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, FSC : fscfg}.
 
   (* the tree the caller's locked node completes.  FRAGMENTS-WITH-HOLES is
      the only consistent top-level shape (§1.4), so the ambient tree is the
@@ -918,7 +919,7 @@ Qed.
 
 Section FsLookupDots.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, FSC : fscfg}.
 
   (* ===================================================================== *)
   (*  THE PAYLOAD -> TREE CONSTRUCTOR (fs-fragments §7.5.8, item S2-0).     *)

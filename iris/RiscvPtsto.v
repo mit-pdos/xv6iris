@@ -350,49 +350,6 @@ Record riscvEraGS := RiscvEraGS {
   era_resv_name : gname;
 }.
 
-(* THE DURABLE FILE SYSTEM'S REMAINING GHOST NAMES (durable-disk 2c;
-   claude-notes/design/fs-state.md section 1).  The committed view
-   [Gamma_D] is a record of THREE things: the byte points-to
-   [Phi_D a v := a -> v at riscv_dview_name], which the field below
-   already supplies, and two plain gnames -- the link-counting family and
-   the top-level abstract map.  They ride the fixed layer as ONE BUNDLE
-   FIELD rather than as two more positional names (the bundle rule, ruled
-   for 2c): a gname a CLIENT must be able to name has to be fixed-layer,
-   and a record keeps [Pc]/[HPc]/[Hproj]/[Hswap]/[boot_fixedGS] at one
-   extra argument however many of them there turn out to be.
-
-   THE RECORD IS DECLARED HERE, in the machine layer, and it names NO file
-   system: two gnames and nothing else.  What they are gnames OF is stated
-   entirely above, where [FsState]'s cameras live -- exactly as
-   [riscv_crash_pred] is an arbitrary client [iProp] here and [P_fs]
-   there.
-
-   THE RECORD ALSO CARRIES THE IMAGE'S BLOCK GEOMETRY, as three PLAIN
-   INTEGERS (durable-disk 3b'; fs-state.md section 4.875c).  The durable
-   tie [FsDurWire.kinds_of_state] is INDEXED by the geometry rather than
-   reading it off the abstract state -- [FsDurWire.kinds_geom_underdetermined]
-   and [kind_write_geom_free_degenerate] are why -- and the index has to
-   reach [FsCrash.P_fs] and the log's two payload laws without an arity
-   change anywhere ([fs_crash_seam] is threaded by name through 90 files
-   and [LogInv.log_ctx] through 78).  The geometry is fixed at boot and
-   never moves -- nothing in xv6 writes the superblock -- so it belongs
-   beside the durable instance's other fixed data, and every file with a
-   [riscvFixedGS] spells it ambiently as [riscv_fsdur], exactly as it
-   spells [riscv_dview_name].
-
-   THEY ARE [Z]s AND NOT AN [FsDurObj.dgeom], deliberately: that record
-   lives above [FsState], i.e. far above this file, and importing it here
-   would put the whole file-system cone underneath the machine layer.
-   [FsDurWire.fdn_geom] is the one-line reading. *)
-Record fs_dur_names := MkFsDurNames {
-  fdn_link : gname;   (* FsStateLink's link-counting family, at Gamma_D *)
-  fdn_top  : gname;   (* FsState's top-level abstract map, at Gamma_D   *)
-  fdn_bmap : Z;       (* the bitmap block                               *)
-  fdn_ist  : Z;       (* the inode region's first block                 *)
-  fdn_nin  : Z;       (* 16 * (the region's block count): the inums it  *)
-                      (* can hold, which is what indexes the slot tie   *)
-}.
-
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscvF_invGS :: invGS Σ;
   riscvF_regGS :: ghost_mapG Σ register (sigT type_of_register);
@@ -482,47 +439,6 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      under any write at all.  A machine constant of this boot (adequacy's
      [ndisk]), fixed-layer like the name. *)
   riscv_disk_size : nat;
-  (* THE COMMITTED BYTE VIEW'S NAME (claude-notes/design/fs-state.md section
-     1; durable-disk 2c-pre).  A second FIXED-layer [ghost_map Z (bv 8)]
-     name, typed by the SAME [riscvF_diskGS] above -- the tree's unique
-     source of that instance -- and therefore costing no new functor.  It
-     names the COMMITTED (durable) byte view [D]: its authority and ALL of
-     its elements live inside the crash predicate ([FsCrash.P_fs]'s two
-     [gamma_D] conjuncts), so, exactly like [riscv_disk_name]'s fragments,
-     no thread that can die ever holds one.
-
-     WHY IT IS FIXED-LAYER RATHER THAN A FIELD OF [FsCrash.fs_crash_names]:
-     the file system's durable instance [Gamma_D] is a family of predicates
-     stated over [Phi_D a v := a -> v at gamma_D], and a CLIENT -- the log's
-     parked payload, the commit debt -- has to NAME it.  A gname bound
-     existentially inside the crash predicate cannot be named from outside.
-     Here it is a PARAMETER of [LogDefs.fs_dstep], so that step is the
-     client's real debt at the real durable name.
-
-     The machine layer never touches it: unlike [riscv_disk_name], whose
-     auth is [state_interp]'s fixed conjunct, this name's auth is inside
-     [crashN] from the first instant.  Adequacy allocates the map EMPTY and
-     hands the authority to the crash predicate, which fills it at the
-     image's committed view ([FsCrash.P_fs_alloc]) -- the machine layer
-     cannot compute that view and must not name it. *)
-  riscv_dview_name : gname;
-  (* [Gamma_D]'s REMAINING TWO GNAMES, as ONE BUNDLE (durable-disk 2c).
-     See [fs_dur_names] above for the record and for why it is one field.
-     Like [riscv_dview_name] these are FIXED-layer because the durable
-     file system is what survives a crash and because a client -- the
-     log's parked payload, the commit debt -- has to NAME the instance
-     it owes a step at.
-
-     THE CLIENT ALLOCATES THEM, not adequacy, and that is a deviation
-     from 2c's task text with a reason: the link family's camera
-     ([FsStateLink.linkUR = gmapUR Z (authR natUR)]) has NO authority
-     over which keys exist, so a family allocated at the unit CANNOT be
-     grown -- [eps ~~> link_elem I] is refuted by the frame
-     [{[0 := auth 5]}].  So [RiscvAdequacy]'s [HPc] hands the record back
-     EXISTENTIALLY: the client mints both gnames at the values it needs
-     inside its own update and the machine layer, which must not name a
-     file-system camera at all, learns only that they exist. *)
-  riscv_fsdur : fs_dur_names;
   (* THE CRASH PREDICATE (claude-notes/design/crash.md): the client's
      durability invariant over the durable disk, sealed into [crash_inv]
      below.  A bare [iProp Σ] again (it was [dk]-indexed while the tie was a
@@ -2768,3 +2684,44 @@ Proof. rewrite /phys_pointsto. apply _. Qed.
 Global Instance phys_word_pointsto_timeless `{!riscvGS Σ} a dq w :
   Timeless (phys_word_pointsto a dq w).
 Proof. rewrite /phys_word_pointsto. apply _. Qed.
+
+(* The instances a consumer would otherwise re-derive BY UNFOLDING, declared
+   here so the seal below does not cost them.  Without these, three files fail
+   with "Cannot infer this placeholder of type Timeless (...)" -- the seal
+   stops [apply _] from reaching the [mem_pointsto]s underneath. *)
+Global Instance word_pointsto_timeless `{!riscvGS Σ} (ktr : CurKtier)
+    (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+  Timeless (word_pointsto (KTR := ktr) a dq w).
+Proof. rewrite /word_pointsto. apply _. Qed.
+
+(* the [ktier]-spelled twin, for the same reason [word_pointsto_discarded_
+   persistent'] has one: a goal that names the tier directly does not go
+   through [CurKtier]. *)
+Global Instance word_pointsto_timeless' `{!riscvGS Σ} (ktr : ktier)
+    (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+  Timeless (word_pointsto (KTR := ktr) a dq w).
+Proof. exact (word_pointsto_timeless ktr a dq w). Qed.
+
+(* ======================================================================= *)
+(* THE WORD POINTS-TO IS SEALED FOR EVERY FILE ABOVE THIS ONE.             *)
+(*                                                                         *)
+(* [word_pointsto] is [[∗ list] j ∈ seq 0 8, mem_pointsto ...] under a      *)
+(* transparent name, and it is the most widely named such constant in the   *)
+(* tree (110 files) -- so [iFrame]'s [Frame] search unfolds it and tries    *)
+(* every candidate hypothesis against all eight bytes.  Sealing it alone    *)
+(* took [SpecKexecB2] from 11.6 s to 7.8 s.                                 *)
+(*                                                                         *)
+(* AT THE END OF THE FILE, not beside the definition: this file's own       *)
+(* lemmas take the word APART ([iAndDestructChoice: cannot destruct] if the *)
+(* seal is in scope for them), and they are exactly the lemmas every        *)
+(* consumer should be using instead of unfolding it by hand.  [rewrite      *)
+(* /word_pointsto] and [unfold] are unaffected by the seal, so a site that  *)
+(* genuinely needs the bytes still has them.                                *)
+(* ======================================================================= *)
+Global Typeclasses Opaque word_pointsto.
+
+(* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md):
+   the ↦₄ sibling of [word_pointsto], same shape ([∗ list] over 4).
+   AT THE END OF THE FILE, so this file's own lemmas -- the accessors every
+   consumer should be using -- can still take it apart. *)
+Global Typeclasses Opaque word4_pointsto.

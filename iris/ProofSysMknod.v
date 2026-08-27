@@ -131,6 +131,7 @@ Require Import SpecSysMknod.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
@@ -303,6 +304,10 @@ Proof. vm_compute. discriminate. Qed.
 (* ===================================================================== *)
 (*  THE FRAME: sixteen of the eighteen slots ARE [char path[128]].        *)
 (* ===================================================================== *)
+
+(* Opts back out of the [word4_pointsto] seal: this file destructs it directly.
+   Local, so nothing above inherits the transparency. *)
+Local Typeclasses Transparent word4_pointsto.
 
 Section ProofSysMknodFrame.
   Context `{!riscvGS Σ}.
@@ -973,10 +978,10 @@ Section ProofSysMknodBody.
   (* the per-slot projection out of the boot family, at the copy THIS
      contract names ([ic_escrows] is IcacheEscrow's -- see fs-sysfile's
      trap 3 on the four [ic_sleeplocks] copies, which bites the same way). *)
-  Lemma mn_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Lemma mn_esc_acc (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
+    (ic_escrows fsc_ic gfs gi cov logstart -∗ ic_escrow fsc_ic gfs gi cov logstart k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -991,7 +996,7 @@ Section ProofSysMknodBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
       (ns : nat)
@@ -1001,7 +1006,7 @@ Section ProofSysMknodBody.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
     wp_sys_mknod_sconf_body gf ga gpr gs j gl gu gd gk pd pav pu bn g gfs gi
-                            cn gtl cov logstart bmapstart inodestart nib
+                            gtl cov logstart bmapstart inodestart nib
                             ninodes size dev ns dqb dqs dqbs dqn v0 v1 v2
                             pid V m K eb b lks.
   Proof.
@@ -1653,7 +1658,7 @@ Section ProofSysMknodBody.
       iDestruct (cpu_own_transport CID19 CID25 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Create.wp_create_sconf (CID := CID25) gs j gl gu gd gk pd pav pu
-                bn g gfs gi cn gtl ga gf gpr cov logstart bmapstart inodestart
+                bn g gfs gi gtl ga gf gpr cov logstart bmapstart inodestart
                 nib ninodes size dev pk bf
                 SpecCreate.T_DEVICE (hw_lo (arg_int32 v1)) (hw_lo (arg_int32 v2))
                 (upd_upt V P') MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
@@ -1731,7 +1736,7 @@ Section ProofSysMknodBody.
            erased reference, so weaken it back here.  One line, and the
            name is what sys_open's O_CREATE arm needs kept. *)
         iDestruct (inode_ref_short_gen_forget with "Href") as "Href".
-        iDestruct (mn_esc_acc cn gfs gi cov logstart kk ltac:(lia)
+        iDestruct (mn_esc_acc gfs gi cov logstart kk ltac:(lia)
                      with "Hescrows") as "#Hesc".
         (* CREATE'S PAYOUT IS THE ARMED DESCRIPTOR (durable-disk B''-tx2):
            the escrow parked half of the transaction's element at create's
@@ -1745,7 +1750,7 @@ Section ProofSysMknodBody.
         iDestruct (cpu_own_transport CID26 CID28 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID28) gs j gl gu gd gk
-                  pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
+                  pd pav pu bn g gfs gi gtl gil gisl cov logstart bmapstart
                   inodestart nib size dev kk qi ss gy inum dn bm un1
                   pid (DfracOwn (1/4)) dqb dqs P0 (K - 20)%nat eb b lks
                   (upd_upt V P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0

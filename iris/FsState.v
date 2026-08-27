@@ -6,7 +6,7 @@
 
      FsStateDefs.v    the view record [Γ], [byte_range], [blk_owned]
      FsStateLink.v    the link-counting RA
-     FsStateInode.v   [rec_owned], [ind_owned], [inode_owned], [dir_owned]
+     FsStateInode.v   [rec_owned], [ind_owned], [inode_owned]
      FsStateBitmap.v  [free_bitmap]
      FsState.v        [sb_owned], [fs_inodes], [fs_state], [fs_view], the mint
 
@@ -695,24 +695,6 @@ Section FsState.
     iApply (big_sepM_mono with "Hl"). intros i n Hi; simpl.
     iIntros "H". iExists (lc_D f i), (lc_v f i), (lc_tyf f i). iFrame.
     iPureIntro. exact (Hok i n Hi).
-  Qed.
-
-  (* THE DEGENERATE INSTANCE, and it is what durable-disk 2c's fixed-layer
-     plumbing mints: two fresh gnames with an EMPTY top map and an empty
-     link family.  It exists because [RiscvPtsto.fs_dur_names] -- the
-     bundle [Gamma_D]'s two gnames ride the fixed layer in -- has to be
-     produced inside adequacy's own update, and the machine layer must not
-     name a file-system camera.  The IMAGE's instance is
-     [fs_boot_alloc_at]; this is the same lemma at [I = empty]. *)
-  Lemma fs_boot_alloc_empty :
-    ⊢ |==> ∃ gl gt : gname,
-        ghost_map_auth gt 1 (∅ : gmap Z fs_node) ∗ fs_links gl ∅.
-  Proof.
-    iMod (fs_boot_alloc_at ∅ ∅ (fun _ => (∅, (TFile, fun _ => TFile)))) as (gl gt) "(Ha & _ & Hl)".
-    { intros i n Hi. rewrite lookup_empty in Hi. discriminate. }
-    { apply link_elem_valid_no_ents.
-      intros i n Hi. rewrite lookup_empty in Hi. discriminate. }
-    iModIntro. iExists gl, gt. iFrame.
   Qed.
 
   Lemma fs_boot_alloc (I : gmap Z fs_node) (f : link_choice) :

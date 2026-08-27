@@ -4,7 +4,7 @@
 (*  sections 2 and 4)                                                     *)
 (*                                                                        *)
 (*  A DURABLE SNAPSHOT'S BYTE AUTHORITY STANDS AT THE COMMITTED VIEW'S     *)
-(*  BYTES.  [snap_auth g B D] is the authority at the snapshot's own map   *)
+(*  BYTES.  [snap_auth g D] is the authority at the snapshot's own map   *)
 (*  [B] together with ONE equation between two VALUES -- [B] is inside     *)
 (*  [LogDefs.fs_dbytes D], the flattening of the WAL's committed block map *)
 (*  -- and that equation is the whole of the snapshot's IDENTITY.  It is   *)
@@ -242,12 +242,18 @@ Section Read.
 
   (* THE IDENTITY.  The snapshot's byte authority, and the equation that
      makes it the COMMITTED VIEW's: every byte the snapshot owns is a byte
-     [D] holds, at the address [D] holds it. *)
-  Definition snap_auth (g : gname) (B : gmap Z (bv 8))
-      (D : gmap Z (list (bv 8))) : iProp Σ :=
-    (ghost_map_auth g 1 B ∗ ⌜B ⊆ fs_dbytes D⌝)%I.
+     [D] holds, at the address [D] holds it.
 
-  Global Instance snap_auth_timeless g B D : Timeless (snap_auth g B D).
+     THE MAP ITSELF IS EXISTENTIAL.  Nothing above this definition ever
+     reads [B]'s value -- every consumer goes through the equation, and
+     [P_dur] bound it existentially anyway -- so binding it here rather
+     than at every reader takes one argument off this predicate,
+     [FsDurSnap.fs_snap] and their thirty-odd readings. *)
+  Definition snap_auth (g : gname)
+      (D : gmap Z (list (bv 8))) : iProp Σ :=
+    (∃ B : gmap Z (bv 8), ghost_map_auth g 1 B ∗ ⌜B ⊆ fs_dbytes D⌝)%I.
+
+  Global Instance snap_auth_timeless g D : Timeless (snap_auth g D).
   Proof. rewrite /snap_auth. apply _. Qed.
 
   (* SEALED: the identity is ONE hypothesis at every reader, and an
@@ -259,15 +265,15 @@ Section Read.
      [fsΦ] is the ghost-map element on the nose -- so ONE [ghost_map_lookup]
      per byte pins the run inside the authority, and the identity carries it
      the rest of the way into [fs_dbytes D]. *)
-  Lemma snap_run_sub (g gl gt : gname) (B : gmap Z (bv 8))
+  Lemma snap_run_sub (g gl gt : gname)
       (D : gmap Z (list (bv 8))) (dq : dfrac) (b off : Z)
       (bs : list (bv 8)) :
-    snap_auth g B D -∗
+    snap_auth g D -∗
     byte_range_q (snap_gamma g gl gt) dq b off bs -∗
     ⌜(map_seqZ (b * BSZ + off) bs : gmap Z (bv 8)) ⊆ fs_dbytes D⌝.
   Proof.
     iIntros "Hau Hr". rewrite /snap_auth.
-    iDestruct "Hau" as "[Ha %Hsub]".
+    iDestruct "Hau" as (B) "[Ha %Hsub]".
     iAssert (⌜forall (k : nat) (v : bv 8), bs !! k = Some v ->
                B !! (b * BSIZE_z + off + Z.of_nat k)%Z = Some v⌝)%I
       with "[Ha Hr]" as %Hpt.
@@ -290,12 +296,12 @@ Section Read.
 
   (* A RECORD'S SIXTY-FOUR BYTES, at their slot: the block they sit in and
      the split that names them.  This IS [FsDurSnap.rec_in_blk]. *)
-  Lemma snap_run_read (g gl gt : gname) (B : gmap Z (bv 8))
+  Lemma snap_run_read (g gl gt : gname)
       (D : gmap Z (list (bv 8))) (dq : dfrac) (b off : Z)
       (bs : list (bv 8)) :
     dblk_full D -> 0 <= off -> off + Z.of_nat (length bs) <= BSZ ->
     (0 < length bs)%nat ->
-    snap_auth g B D -∗
+    snap_auth g D -∗
     byte_range_q (snap_gamma g gl gt) dq b off bs -∗
     ⌜exists cs, D !! b = Some cs /\ length cs = BSIZE
                 /\ exists pre post,
@@ -307,11 +313,11 @@ Section Read.
     iPureIntro. exact (dbytes_run_read D b off bs Hf Hoff Hfit Hne Hsub).
   Qed.
 
-  Lemma snap_run_read_full (g gl gt : gname) (B : gmap Z (bv 8))
+  Lemma snap_run_read_full (g gl gt : gname)
       (D : gmap Z (list (bv 8))) (b off : Z) (bs : list (bv 8)) :
     dblk_full D -> 0 <= off -> off + Z.of_nat (length bs) <= BSZ ->
     (0 < length bs)%nat ->
-    snap_auth g B D -∗
+    snap_auth g D -∗
     byte_range (snap_gamma g gl gt) b off bs -∗
     ⌜exists cs, D !! b = Some cs /\ length cs = BSIZE
                 /\ exists pre post,
@@ -319,14 +325,14 @@ Section Read.
                      /\ Z.of_nat (length pre) = off⌝.
   Proof.
     intros Hf Hoff Hfit Hne. rewrite byte_range_1.
-    iApply (snap_run_read g gl gt B D (DfracOwn 1) b off bs Hf Hoff Hfit Hne).
+    iApply (snap_run_read g gl gt D (DfracOwn 1) b off bs Hf Hoff Hfit Hne).
   Qed.
 
   (* A WHOLE BLOCK: the committed map holds exactly these bytes there. *)
-  Lemma snap_blk_read (g gl gt : gname) (B : gmap Z (bv 8))
+  Lemma snap_blk_read (g gl gt : gname)
       (D : gmap Z (list (bv 8))) (dq : dfrac) (b : Z) (bs : list (bv 8)) :
     dblk_full D ->
-    snap_auth g B D -∗
+    snap_auth g D -∗
     blk_owned_q (snap_gamma g gl gt) dq b bs -∗
     ⌜D !! b = Some bs⌝.
   Proof.
@@ -334,7 +340,7 @@ Section Read.
        an [iFrame] hang), so the pair is opened by an explicit unfold *)
     intros Hf. iIntros "Ha Hb". rewrite /blk_owned_q.
     iDestruct "Hb" as "[%Hlb Hr]".
-    iDestruct (snap_run_read g gl gt B D dq b 0 bs Hf ltac:(lia)
+    iDestruct (snap_run_read g gl gt D dq b 0 bs Hf ltac:(lia)
                  ltac:(rewrite Hlb -BSZ_BSIZE; lia)
                  ltac:(rewrite Hlb; unfold BSIZE; lia) with "Ha Hr")
       as %(cs & Hb & Hlen & pre & post & Heq & Hpre).
@@ -348,24 +354,24 @@ Section Read.
     rewrite Hb Heq Hpe Hqe app_nil_l app_nil_r //.
   Qed.
 
-  Lemma snap_blk_read_full (g gl gt : gname) (B : gmap Z (bv 8))
+  Lemma snap_blk_read_full (g gl gt : gname)
       (D : gmap Z (list (bv 8))) (b : Z) (bs : list (bv 8)) :
     dblk_full D ->
-    snap_auth g B D -∗
+    snap_auth g D -∗
     blk_owned (snap_gamma g gl gt) b bs -∗
     ⌜D !! b = Some bs⌝.
   Proof.
     intros Hf. rewrite blk_owned_1.
-    iApply (snap_blk_read g gl gt B D (DfracOwn 1) b bs Hf).
+    iApply (snap_blk_read g gl gt D (DfracOwn 1) b bs Hf).
   Qed.
 
   (* ...and the DOMAIN reading a block whose bytes the snapshot owns at an
      unknown value needs: the committed map holds SOMETHING there.  This is
      the free pool's arm. *)
-  Lemma snap_blk_dom (g gl gt : gname) (B : gmap Z (bv 8))
+  Lemma snap_blk_dom (g gl gt : gname)
       (D : gmap Z (list (bv 8))) (dq : dfrac) (b : Z) (bs : list (bv 8)) :
     dblk_full D ->
-    snap_auth g B D -∗
+    snap_auth g D -∗
     blk_owned_q (snap_gamma g gl gt) dq b bs -∗
     ⌜is_Some (D !! b)⌝.
   Proof.

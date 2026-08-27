@@ -179,6 +179,10 @@ Proof.
   apply Z.mod_mul. lia.
 Qed.
 
+(* Opts back out of [RiscvPtsto]'s [word_pointsto] seal: the disk resource is stated byte-wise and this file destructs the word.
+   Local, so nothing above this file inherits the transparency. *)
+Local Typeclasses Transparent word_pointsto word4_pointsto.
+
 Section DiskInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
 

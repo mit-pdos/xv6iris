@@ -99,6 +99,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -121,7 +122,7 @@ Definition ic_dep_side_tx (d : ic_dep) : option (nat * Qp) :=
   end.
 
 Section IunlockputSide.
-  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg}.
 
   Lemma ic_dep_side_of_tx (d : ic_dep) (t : nat) (q : Qp) :
     ic_dep_side_tx d = Some (t, q) ->
@@ -159,14 +160,13 @@ Notation K_iunlockput := (78%nat) (only parsing).
    ([IcacheEscrow.ic_swap_park_dep]).  What the arm parked comes back in the
    post as [IcacheEscrow.ic_dep_side d]. *)
 Definition wp_iunlockput_dep_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names) (gfs : fs_names) (gi : gname)
-    (cn : ic_names)                                    (* the icache's names  *)
     (gtl : gname)                                      (* itable.lock         *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -238,9 +238,9 @@ Definition wp_iunlockput_dep_sconf_body
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrow cn gfs gi cov logstart k -∗
+  ic_escrow fsc_ic gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
   (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
      runtime premise verbatim, because iunlockput's whole obligation here is
@@ -249,10 +249,10 @@ Definition wp_iunlockput_dep_sconf_body
      [rg := false] consumer on either of this file's two contracts.  The
      premise is persistent, so nothing comes back. *)
   ireg_open -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
-  ic_deposit cn k d -∗
+  ic_deposit fsc_ic k d -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -317,14 +317,13 @@ Definition wp_iunlockput_dep_sconf_body
   WP (Loop : expr riscv_lang).
 
 Definition wp_iunlockput_dep_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names) (gfs : fs_names) (gi : gname)
-    (cn : ic_names)                                    (* the icache's names  *)
     (gtl : gname)                                      (* itable.lock         *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -400,9 +399,9 @@ Definition wp_iunlockput_dep_gen_body
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrow cn gfs gi cov logstart k -∗
+  ic_escrow fsc_ic gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
   (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
      runtime premise verbatim, because iunlockput's whole obligation here is
@@ -411,10 +410,10 @@ Definition wp_iunlockput_dep_gen_body
      [rg := false] consumer on either of this file's two contracts.  The
      premise is persistent, so nothing comes back. *)
   ireg_open -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
-  ic_deposit cn k d -∗
+  ic_deposit fsc_ic k d -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -497,14 +496,13 @@ Definition wp_iunlockput_dep_gen_body
    parked comes back in the post and rejoins the caller's residue, so not a
    line of iunlockput's own proof is re-run. *)
 Definition wp_iunlockput_tx_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names) (gfs : fs_names) (gi : gname)
-    (cn : ic_names)                                    (* the icache's names  *)
     (gtl : gname)                                      (* itable.lock         *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -561,9 +559,9 @@ Definition wp_iunlockput_tx_sconf_body
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrow cn gfs gi cov logstart k -∗
+  ic_escrow fsc_ic gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
   (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
      runtime premise verbatim, because iunlockput's whole obligation here is
@@ -572,14 +570,14 @@ Definition wp_iunlockput_tx_sconf_body
      [rg := false] consumer on either of this file's two contracts.  The
      premise is persistent, so nothing comes back. *)
   ireg_open -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
   (* THE WRITE ARM COMES HOME (durable-disk B''-tx): the descriptor arrives
      at [DepTx] with the holder's residue beside it, and the disarm --
      iunlockput's own first ghost step -- returns exactly the share it
      recorded. *)
-  ic_tx_dep cn k s dev inum gy -∗
+  ic_tx_dep fsc_ic k s dev inum gy -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -639,14 +637,13 @@ Definition wp_iunlockput_tx_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 Definition wp_iunlockput_tx_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names) (gfs : fs_names) (gi : gname)
-    (cn : ic_names)                                    (* the icache's names  *)
     (gtl : gname)                                      (* itable.lock         *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -706,9 +703,9 @@ Definition wp_iunlockput_tx_gen_body
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrow cn gfs gi cov logstart k -∗
+  ic_escrow fsc_ic gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
   (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
      runtime premise verbatim, because iunlockput's whole obligation here is
@@ -717,14 +714,14 @@ Definition wp_iunlockput_tx_gen_body
      [rg := false] consumer on either of this file's two contracts.  The
      premise is persistent, so nothing comes back. *)
   ireg_open -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
   (* THE WRITE ARM COMES HOME (durable-disk B''-tx): the descriptor arrives
      at [DepTx] with the holder's residue beside it, and the disarm --
      iunlockput's own first ghost step -- returns exactly the share it
      recorded. *)
-  ic_tx_dep cn k s dev inum gy -∗
+  ic_tx_dep fsc_ic k s dev inum gy -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -804,7 +801,7 @@ Definition wp_iunlockput_tx_gen_body
    the arm parked comes back in the post and rejoins the caller's residue.
    No disarm fupd stands before the call any more. *)
 Section IunlockputOfDep.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_iunlockput_tx_of_dep_sconf
@@ -813,7 +810,7 @@ Section IunlockputOfDep.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -823,12 +820,12 @@ Section IunlockputOfDep.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
-       wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn
+       wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi
                                     gtl gil gisl cov logstart bmapstart
                                     inodestart nib size dev k qi s gy d inum
                                     dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks
                                     Vpr) ->
-    wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                                 gil gisl cov logstart bmapstart inodestart nib
                                 size dev k qi s gy inum dn' bm' n
                                 pidv dq dqb dqs m K eb b lks Vpr.
@@ -866,7 +863,7 @@ Section IunlockputOfDep.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -876,12 +873,12 @@ Section IunlockputOfDep.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
-       wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn
+       wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi
                                   gtl gil gisl cov logstart bmapstart
                                   inodestart nib size dev k qi s gy d inum
                                   dn' bm' n Sb crb cru crz e0 tid qtx
                                   pidv dq dqb dqs m K eb b lks Vpr) ->
-    wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                               gil gisl cov logstart bmapstart inodestart nib
                               size dev k qi s gy inum dn' bm' n Sb crb cru
                               crz e0 pidv dq dqb dqs m K eb b lks Vpr.
@@ -917,37 +914,19 @@ End IunlockputOfDep.
 
 
 Module Type IUNLOCKPUT.
-  (* THE GENERIC FORMS (durable-disk B''-tx4): one proof of iunlockput's code,
+  (* THE GENERIC FORM (durable-disk B''-tx4): one proof of iunlockput's code,
      the park's descriptor chosen by the caller.  The two published readings
-     below are their [DepTx] instances. *)
-  Parameter wp_iunlockput_dep_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
-      (pd pav pu : mword 64)
-      (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
-      (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
-      (dn' : dinode) (bm' : blkmap)
-      (n : nat) (tid : nat) (qtx : Qp)
-      (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn
-                                   gtl gil gisl cov logstart bmapstart
-                                   inodestart nib size dev k qi s gy d inum
-                                   dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks Vpr.
+     below are its [DepTx] instances.  The sconf reading of the generic form
+     is NOT published: its only application is inside [ProofIunlockput], where
+     it is a [Local Lemma] discharging [wp_iunlockput_tx_sconf]. *)
   Parameter wp_iunlockput_dep_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
@@ -957,7 +936,7 @@ Module Type IUNLOCKPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                                  gil gisl cov logstart bmapstart inodestart
                                  nib size dev k qi s gy d inum dn' bm' n Sb
                                  crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks
@@ -965,13 +944,13 @@ Module Type IUNLOCKPUT.
   (* the two TRANSACTIONAL forms (durable-disk B''-tx); [ProofIunlockput]
      defines them by [wp_iunlockput_tx_of_sconf] / [_of_gen]. *)
   Parameter wp_iunlockput_tx_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -980,18 +959,18 @@ Module Type IUNLOCKPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                                   gil gisl cov logstart bmapstart inodestart
                                   nib size dev k qi s gy inum dn' bm' n
                                   pidv dq dqb dqs m K eb b lks Vpr.
   Parameter wp_iunlockput_tx_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -1000,7 +979,7 @@ Module Type IUNLOCKPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi gtl
                                 gil gisl cov logstart bmapstart inodestart nib
                                 size dev k qi s gy inum dn' bm' n Sb crb cru
                                 crz e0 pidv dq dqb dqs m K eb b lks Vpr.

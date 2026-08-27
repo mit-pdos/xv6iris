@@ -2186,8 +2186,8 @@ Section EraRes.
      post does not say the linked inum is nonzero, and no walk in this
      tree carries that fact -- so the move has to be true anyway.  It is:
      a record whose two inum bytes are zero is DEAD, so the entry map does
-     not gain the name and the token is simply dropped, exactly as
-     [DirLinks.dir_link_at_dirlink] drops its ticket at the same corner. *)
+     not gain the name and the token is simply dropped -- the same corner
+     the old link ledger's per-entry ticket was dropped at. *)
   Lemma dir_view_dead_write (data data' : nat -> list (bv 8))
       (nrec nrec' k0 : nat) :
     (nrec <= nrec')%nat ->
@@ -2624,7 +2624,7 @@ Section EraRes.
      the liveness bit alone.  This is what [ProofSysUnlink]'s rmdir arm
      reads at the emptied child before the decrement (durable-disk G5's
      FINDING 3); until G6 the same fact came off the old ledger's count
-     clause ([DirLinks.dir_links_empty_nlink]). *)
+     clause. *)
   Lemma ent_dset_ok_dots_only (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) (D : gset fname) :
     blk_holes_zero bm data ->
@@ -2737,8 +2737,8 @@ Section EraRes.
       so the entry map loses ONE name and the token that entry carried comes
       OUT -- to the [ip->nlink--] flush that pays for it
       ([InodeRegion.ireg_write_unlink_fl]).  The premise list is the one the
-      walk already holds for [DirLinks.dir_links_unlink] and
-      [DirView.dir_uniq_zero]: the zeroing delta, uniqueness, the record's
+      walk already holds for [DirView.dir_uniq_zero]: the zeroing delta,
+      uniqueness, the record's
       index and liveness, and the record delta.
 
       [t <> i] is the SELF-record exclusion, and it is the walk's own: at a

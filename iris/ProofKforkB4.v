@@ -81,6 +81,7 @@ Require Import CodeKfork.
 Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal can carry a large [proc_priv]/[proc_pt_at]
@@ -214,7 +215,7 @@ Section KforkB4Proof.
      instantiates [rsv := trap_res b].  Same shape as [ProofAllocproc.ap_tail]
      and [ProofKforkB3.kfkb3_fd_loop]. *)
   Lemma kfk_b4
-      (γf γil γic : gname) (cn : ic_names) (γfs : fs_names)
+      (γf γil γic : gname) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (pid_p pid_c : mword 32) (Vp Vc : pprivate)
       (pme npa : mword 64)
@@ -241,7 +242,7 @@ Section KforkB4Proof.
     cpu_own lvl eb pme false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
-    is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
+    is_itable2 γil fsc_ic γfs γic cov logstart nib icfg_dev -∗
     itable_inv -∗
     (* THE INODE REGION -- pure pass-through to the [idup] below, whose
        [ref++] became a ledger move in increment IVe (iclaim-ledger.md
@@ -366,7 +367,7 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
-    iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart inodestart nib
+    iApply (ID.wp_idup_sconf γil γfs γic cov logstart inodestart nib
               ck cdev M1 lvl eb pme (rsv + (K - 8))%nat false lks
               (* the callee's bound is stated with a NAMED constant, so go through
                  [etransitivity] rather than [lia]: [exact] converts the name to

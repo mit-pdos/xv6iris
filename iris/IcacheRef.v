@@ -275,7 +275,7 @@ Qed.
           claim of the same inum through);
      [r]  §20.7's (M1) carrier: the count of outstanding icache REFERENCES
           to the inum, minted at [iget] from the caller's licence and
-          returned at [iput]'s [ip->ref--] ([iref_lic z]).
+          returned at [iput]'s [ip->ref--] ([runit_plain z]).
 
    [f] (the freeze phase, below) and [rc] (the claim-flavoured reference
    count, RULING R) sit above them in the same element.
@@ -471,8 +471,9 @@ Definition lelem (c : ctyUR) (r : nat) : linkElemUR := lelemf c r None.
    the walk does not park the token at all: it keeps [ifreeze_pre] IN HAND
    from the mint to +0x8a (a pure ghost, untouched by the escrow
    choreography) and parks the RECEIPT in the token's slot instead.  The
-   parked arm's conjunct is therefore [ifreeze_off z ∨ frzown z]
-   ([IcacheEscrow.ic_frz_park]), and its left arm dies at +0x8a on
+   parked arm's conjunct is therefore [ifreeze_off z ∨ frzown z] -- as
+   built, the whole tail of [IcacheEscrow.ic_payload_arm] is that
+   disjunction (A⁗) -- and its left arm dies at +0x8a on
    [ifreeze_excl] against the token the walk is still holding -- one line,
    no region open, no licence.
 
@@ -1273,9 +1274,6 @@ Section IcacheLink.
      [Xv6Cameras.ctyval]. *)
   Definition iclaim (z : Z) (ty : bv 16) (t : nat) (q : Qp) : iProp Σ :=
     link_frag_e z (lelem (Some (Excl ((ty, (t, q)) : ctyval))) 0).
-  Definition iref_lic (z : Z) : iProp Σ :=
-    link_frag_e z (lelem None 1).
-
   (* ---- THE TWO FLAVOURS OF REFERENCE PROVENANCE (§5', RULING R) --------
 
      ONE unit rides with every icache reference for the reference's whole
@@ -1283,10 +1281,11 @@ Section IcacheLink.
      the iput that closes it.  The FLAVOUR records which licence paid for the
      mint -- [runit_claim] for the [ClaimL] iget that is ialloc's own (the
      claimant's reference into its own claim box), [runit_plain] for every
-     other.  [runit_plain] IS the landed [iref_lic]: the r column keeps its
-     name, its fragment and its two landed moves, and only the SECOND
-     flavour is new. *)
-  Definition runit_plain (z : Z) : iProp Σ := iref_lic z.
+     other.  [runit_plain] is the r column's own fragment -- the column
+     keeps its two landed moves ([link_mint_ref]/[link_spend_ref]) and only
+     the SECOND flavour is new. *)
+  Definition runit_plain (z : Z) : iProp Σ :=
+    link_frag_e z (lelem None 1).
   Definition runit_claim (z : Z) : iProp Σ :=
     link_frag_e z (lelemc None 0 None 1).
 
@@ -1355,8 +1354,6 @@ Section IcacheLink.
   Proof. apply _. Qed.
   Global Instance iclaim_timeless z ty t q : Timeless (iclaim z ty t q).
   Proof. apply _. Qed.
-  Global Instance iref_lic_timeless z : Timeless (iref_lic z).
-  Proof. apply _. Qed.
   Global Instance runit_plain_timeless z : Timeless (runit_plain z).
   Proof. apply _. Qed.
   Global Instance runit_claim_timeless z : Timeless (runit_claim z).
@@ -1410,9 +1407,9 @@ Section IcacheLink.
   Qed.
 
   Lemma link_r_ge (z : Z) (c : ctyUR) (r : nat) (f : frzUR) (rc : nat) :
-    link_auth z c r f rc -∗ iref_lic z -∗ ⌜(1 <= r)%nat⌝.
+    link_auth z c r f rc -∗ runit_plain z -∗ ⌜(1 <= r)%nat⌝.
   Proof.
-    iIntros "Ha Hb". rewrite /iref_lic.
+    iIntros "Ha Hb". rewrite /runit_plain.
     iDestruct (link_agree with "Ha Hb") as %H. done.
   Qed.
 
@@ -1441,7 +1438,7 @@ Section IcacheLink.
   Proof.
     iIntros "Ha Hb". rewrite /runit. destruct b.
     - iApply (link_rc_ge with "Ha Hb").
-    - rewrite /runit_plain. iApply (link_r_ge with "Ha Hb").
+    - iApply (link_r_ge with "Ha Hb").
   Qed.
 
   (* THE CLAIM AGREES rather than bounds: [Excl ()] has no proper
@@ -1610,19 +1607,19 @@ Section IcacheLink.
   (* THE REFERENCE LICENCE (§20.7's (M1)). *)
   Lemma link_mint_ref (z : Z) (c : ctyUR) (r : nat) (f : frzUR) (rc : nat) :
     link_auth z c r f rc ==∗
-    link_auth z c (S r) f rc ∗ iref_lic z.
+    link_auth z c (S r) f rc ∗ runit_plain z.
   Proof.
-    rewrite /link_auth /iref_lic. iIntros "Ha".
+    rewrite /link_auth /runit_plain. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
     apply lelemc_local_update; try apply link_lu_id.
     apply nat_local_update. lia.
   Qed.
 
   Lemma link_spend_ref (z : Z) (c : ctyUR) (r : nat) (f : frzUR) (rc : nat) :
-    link_auth z c (S r) f rc -∗ iref_lic z ==∗
+    link_auth z c (S r) f rc -∗ runit_plain z ==∗
     link_auth z c r f rc.
   Proof.
-    rewrite /link_auth /iref_lic. iIntros "Ha Hb".
+    rewrite /link_auth /runit_plain. iIntros "Ha Hb".
     iMod (link_update _ _ _ (lelemc c r f rc)
             (lelem None 0)
             with "Ha Hb") as "[$ _]"; [| done].
@@ -1665,7 +1662,7 @@ Section IcacheLink.
   Proof.
     rewrite /runit /rup /rcup. destruct b.
     - iApply link_mint_refc.
-    - rewrite /runit_plain. iApply link_mint_ref.
+    - iApply link_mint_ref.
   Qed.
 
   Lemma link_spend_runit (b : bool) (z : Z) (c : ctyUR) (r : nat)
@@ -1675,7 +1672,7 @@ Section IcacheLink.
   Proof.
     rewrite /runit /rup /rcup. destruct b.
     - iApply link_spend_refc.
-    - rewrite /runit_plain. iApply link_spend_ref.
+    - iApply link_spend_ref.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1768,8 +1765,8 @@ Section IcacheLink.
 
   (* One EXCLUSIVE unit per inum.  Its home is [InodeRegion.ireg_slot]'s
      receipt clause at every phase except [FrzPre], and the freezer's hand
-     (via [IcacheEscrow.ic_frz_park], the parked payload's token slot) for
-     the duration of the free window.  See [frzoUR]'s header for why this
+     (via [IcacheEscrow.ic_payload_arm]'s FROZEN alternative, the parked
+     payload's tail) for the duration of the free window.  See [frzoUR]'s header for why this
      rather than A‴'s half-half bool. *)
   Definition frzown (z : Z) : iProp Σ :=
     own icfg_frzo ({[ z := Excl () ]} : frzoUR).
@@ -2388,10 +2385,6 @@ Section IcacheRef.
       (g : gname) : iProp Σ :=
     (inode_ident k (DfracOwn s) dev inum ∗ live_gen k s g)%I.
 
-  Definition inode_ref_gen_bare (k : nat) (q : Qp) (dev inum : mword 32)
-      (g : gname) : iProp Σ :=
-    (iref_frag k q ∗ live_gen k q g ∗ inode_ident k (DfracOwn q) dev inum)%I.
-
   Lemma inode_shr_gen_bare_split k s dev inum g :
     inode_shr_gen k s dev inum g ⊣⊢
     inode_shr_gen_bare k s dev inum g ∗ slh_tok (icfg_isl k) s.
@@ -2402,9 +2395,6 @@ Section IcacheRef.
 
   Global Instance inode_shr_gen_bare_timeless k s dev inum g :
     Timeless (inode_shr_gen_bare k s dev inum g).
-  Proof. apply _. Qed.
-  Global Instance inode_ref_gen_bare_timeless k q dev inum g :
-    Timeless (inode_ref_gen_bare k q dev inum g).
   Proof. apply _. Qed.
 
   Lemma inode_shr_gen_intro k s dev inum :

@@ -126,7 +126,8 @@ Record inode_local (i : Z) (n : fs_node) : Prop := MkInodeLocal {
   inl_nlink      : bv_unsigned (di_nlink (fn_rec n)) <= 32767;
   (* directory-local; vacuous for anything else.  [inode_owned] is the one
      iterated predicate, so a directory's clauses live here rather than in a
-     sibling of it -- see [dir_owned] below, which is the reading. *)
+     sibling of it; a client that knows [fn_is_dir n = true] reads them off
+     the same [inode_local] every inode carries. *)
   inl_dir_size   : fn_is_dir n = true -> (16 | fn_size n);
   inl_dir_uniq   : fn_is_dir n = true -> dir_names_unique (fn_data n) (fn_nrec n);
   (* THE DOTS ARE GUARDED BY [nlink <> 0] (B2 of the 2026-08-23 survey).
@@ -833,10 +834,6 @@ Section InodeOwned.
   Definition inode_owned Γ (sb : fs_sb) (i : Z) (n : fs_node) : iProp Σ :=
     (inode_phi Γ sb i n ∗ inode_ghost Γ i n)%I.
 
-  (* the reading a directory's clients use *)
-  Definition dir_owned Γ (sb : fs_sb) (d : Z) (n : fs_node) : iProp Σ :=
-    (inode_owned Γ sb d n ∗ ⌜fn_is_dir n = true⌝)%I.
-
   Lemma inode_owned_split Γ sb i n :
     inode_owned Γ sb i n ⊣⊢ inode_phi Γ sb i n ∗ inode_ghost Γ i n.
   Proof. done. Qed.
@@ -844,10 +841,6 @@ Section InodeOwned.
   Lemma inode_owned_local Γ sb i n :
     inode_owned Γ sb i n -∗ ⌜inode_local i n⌝.
   Proof. iIntros "[_ (%v & _ & _ & _ & $)]". Qed.
-
-  Lemma dir_owned_of Γ sb d n :
-    fn_is_dir n = true -> inode_owned Γ sb d n ⊢ dir_owned Γ sb d n.
-  Proof. iIntros (H) "H". by iFrame. Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  5.  Timelessness                                                 *)
@@ -1019,10 +1012,6 @@ Section InodeOwned.
   Global Instance inode_owned_timeless `{!GTimeless Γ} sb i n :
     Timeless (inode_owned Γ sb i n).
   Proof. rewrite /inode_owned. apply _. Qed.
-
-  Global Instance dir_owned_timeless `{!GTimeless Γ} sb d n :
-    Timeless (dir_owned Γ sb d n).
-  Proof. rewrite /dir_owned. apply _. Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  6.  Gathering and scattering the link ghosts                     *)
@@ -1791,7 +1780,7 @@ Section InodeOwned.
   Proof. done. Qed.
 
   (* ---------------------------------------------------------------- *)
-  (*  10. The DIRENT moves at [dir_owned], and the link reading        *)
+  (*  10. The link reading of an owned inode                           *)
   (* ---------------------------------------------------------------- *)
 
   (* the direction safety uses: at [nlink = 0] no entry points here *)
@@ -1802,133 +1791,6 @@ Section InodeOwned.
     destruct (decide (fn_nlink n = 0%nat)) as [Hz | Hnz]; [| done].
     rewrite (fn_mult_zero n Hz).
     iDestruct (link_auth_zero_no_tok with "Ha Ht") as "[]".
-  Qed.
-
-  Lemma dir_owned_unlink Γ sb d n n' s t :
-    fn_orphan n' = fn_orphan n ->
-    fn_nlink n' = fn_nlink n ->
-    fn_dd n' = fn_dd n ->
-    fn_is_dir n' = fn_is_dir n ->
-    s <> DOTDOT ->
-    dir_entries n !! s = Some t ->
-    dir_entries n' = delete s (dir_entries n) ->
-    inode_local d n' -> fn_is_dir n' = true ->
-    dir_owned Γ sb d n ⊢
-      inode_phi Γ sb d n
-      ∗ ∃ D, ⌜ent_dset_ok n D /\ node_exact n D⌝
-             ∗ ent_tok Γ d (fn_dd n) (fn_orphan n) (bool_decide (s ∈ D)) s t
-             ∗ (⌜node_exact n' (D ∖ {[s]})⌝ -∗ inode_phi Γ sb d n'
-                -∗ dir_owned Γ sb d n').
-  Proof.
-    intros Horph Hnl Hdd Hdir0 Hne Hs Hdel Hloc Hdir.
-    iIntros "[[$ (%v & %Hv & Ha & (%D & %Hd & %Hx & Ht) & _)] %Hdir1]".
-    iExists D. iSplitR; [by iPureIntro |].
-    iDestruct (ent_toks_delete Γ d n n' D s t Horph Hdd Hs Hdel with "Ht")
-      as "[$ Ht]".
-    iIntros (Hx') "Hphi".
-    rewrite /dir_owned /inode_owned /inode_ghost /fn_mult Hnl Horph Hdir0.
-    iFrame "Hphi". iSplitL; [| by iPureIntro].
-    iExists v. iSplitR.
-    { iPureIntro. rewrite /fn_ity_ok in Hv |- *.
-      destruct v; rewrite Hdir0; exact Hv. }
-    iFrame "Ha". iSplitL "Ht"; [| by iPureIntro].
-    iExists (D ∖ {[s]}).
-    iSplitR.
-    { iPureIntro. intros s' Hs'.
-      assert (Hin : s' ∈ D) by set_solver.
-      assert (Hns : s' <> s) by set_solver.
-      destruct (Hd s' Hin) as (Hex & H1 & H2).
-      split_and!; [| exact H1 | exact H2].
-      rewrite Hdel lookup_delete_ne //. }
-    iSplitR; [by iPureIntro |]. iExact "Ht".
-  Qed.
-
-  Lemma dir_owned_link Γ sb d n n' k0 s z (isd : bool) :
-    fn_orphan n' = fn_orphan n ->
-    fn_nlink n' = fn_nlink n ->
-    fn_dd n' = fn_dd n ->
-    fn_is_dir n = true ->
-    dir_first (fn_data n) (fn_nrec n) s = None ->
-    dir_insert_at (fn_data n) (fn_data n') (fn_nrec n) (fn_nrec n') k0 s z ->
-    (isd = true -> s <> DOT /\ s <> DOTDOT) ->
-    inode_local d n' -> fn_is_dir n' = true ->
-    dir_owned Γ sb d n ⊢
-      inode_phi Γ sb d n
-      ∗ ∃ D, ⌜ent_dset_ok n D /\ node_exact n D /\ s ∉ D⌝
-             ∗ (⌜node_exact n' (if isd then {[s]} ∪ D else D)⌝
-                -∗ inode_phi Γ sb d n'
-                -∗ ent_tok Γ d (fn_dd n) (fn_orphan n) isd s (bv_unsigned z)
-                -∗ dir_owned Γ sb d n').
-  Proof.
-    intros Horph Hnl Hdd Hd Hnone Hins Hnd Hloc Hdir.
-    iIntros "[[$ (%v & %Hv & Ha & (%D & %Hdok & %Hx & Ht) & _)] _]".
-    assert (HsD : s ∉ D).
-    { intros Hs. destruct (Hdok s Hs) as ([t Ht] & _ & _).
-      rewrite (dir_entries_fresh n s Hnone) in Ht. discriminate. }
-    iExists D. iSplitR; [by iPureIntro |].
-    iIntros (Hx') "Hphi Htok".
-    iDestruct (ent_toks_insert Γ d n n' D k0 s z isd Horph Hdd Hd Hdir Hnone
-                 Hins HsD with "Ht Htok") as "Ht".
-    rewrite /dir_owned /inode_owned /inode_ghost /fn_mult Hnl Horph Hd Hdir.
-    iFrame "Hphi". iSplitL; [| by iPureIntro].
-    iExists v. iSplitR.
-    { iPureIntro. rewrite /fn_ity_ok in Hv |- *.
-      destruct v; rewrite Hdir; rewrite Hd in Hv; exact Hv. }
-    iFrame "Ha". iSplitL "Ht"; [| by iPureIntro].
-    iExists (if isd then {[s]} ∪ D else D).
-    iSplitR; [| iSplitR; [by iPureIntro | iExact "Ht"]].
-    iPureIntro. intros s' Hs'.
-    assert (Hlk : dir_entries n' = <[s := bv_unsigned z]> (dir_entries n))
-      by exact (dir_entries_write n n' k0 s z Hd Hdir Hnone Hins).
-    destruct isd.
-    - destruct (Hnd eq_refl) as [Hns1 Hns2].
-      destruct (decide (s' = s)) as [-> | Hne].
-      + rewrite Hlk lookup_insert.
-        split_and!; [by eexists | exact Hns1 | exact Hns2].
-      + assert (Hin : s' ∈ D) by set_solver.
-        destruct (Hdok s' Hin) as ([t Ht] & H1 & H2).
-        split_and!; [| exact H1 | exact H2].
-        rewrite Hlk lookup_insert_ne; [by eexists | exact (not_eq_sym Hne)].
-    - destruct (Hdok s' Hs') as ([t Ht] & H1 & H2).
-      split_and!; [| exact H1 | exact H2].
-      rewrite Hlk lookup_insert_ne; [by eexists | intros Hc; rewrite -Hc in Hs'; exact (HsD Hs')].
-  Qed.
-
-  (* the child's side of "unlink a directory". *)
-  Lemma dir_owned_orphan Γ sb d n n' t :
-    dir_entries n' = dir_entries n ->
-    fn_orphan n = false -> fn_orphan n' = true ->
-    fn_is_dir n' = fn_is_dir n ->
-    dir_entries n !! DOTDOT = Some t ->
-    dir_entries n !! DOT = Some d ->
-    t <> d ->
-    inode_local d n' -> fn_is_dir n' = true ->
-    dir_owned Γ sb d n ⊢
-      inode_phi Γ sb d n
-      ∗ ∃ v D, ⌜fn_ity_ok n v /\ ent_dset_ok n D /\ node_exact n D
-               /\ ent_ty_ok d (fn_dd n) (bool_decide (DOT ∈ D)) DOT v⌝
-             ∗ link_auth Γ d (fn_mult n) v
-             ∗ (∃ ty, link_tok Γ t ty) ∗ link_tok Γ d v
-             ∗ (⌜node_exact n' D⌝ -∗ inode_phi Γ sb d n'
-                -∗ link_auth Γ d (fn_mult n') v -∗ dir_owned Γ sb d n').
-  Proof.
-    intros Hents Ho Ho' Hdir0 Hdd Hdt Hne Hloc Hdir.
-    iIntros "[[$ (%v & %Hv & Ha & (%D & %Hdok & %Hx & Ht) & _)] _]".
-    iDestruct (ent_toks_orphan Γ d n n' D t Hents Ho Ho' Hdd Hdt Hne
-                 with "Ht") as "[Hup [(%ty & Hdotv & %Hok) Ht]]".
-    iDestruct (link_auth_tok_agree with "Ha Hdotv") as %[-> _].
-    iExists v, D. iFrame "Ha Hup Hdotv".
-    iSplitR; [iPureIntro; split_and!; [exact Hv | exact Hdok | exact Hx | exact Hok] |].
-    iIntros (Hx') "Hphi Ha".
-    rewrite /dir_owned /inode_owned /inode_ghost.
-    iFrame "Hphi". iSplitL; [| by iPureIntro].
-    iExists v. iSplitR.
-    { iPureIntro. rewrite /fn_ity_ok in Hv |- *.
-      destruct v; rewrite Hdir0; exact Hv. }
-    iFrame "Ha". iSplitL "Ht"; [| by iPureIntro].
-    iExists D.
-    iSplitR; [| iSplitR; [by iPureIntro | iExact "Ht"]].
-    iPureIntro. exact (ent_dset_ok_cong n n' D Hents Hdok).
   Qed.
 
 End InodeOwned.
