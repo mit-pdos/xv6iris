@@ -1070,10 +1070,10 @@ Section IcacheEscrow.
       Both would put the token on the same custody path -- pool bundle ->
       parked arm -> holder -> parked arm -> pool -- because [ic_parked]'s
       payload conjunct is exactly this predicate.  The cheaper one wins, and
-      the expensive one would also have poisoned [ic_close_to_empty_await],
+      the expensive one would also have poisoned the FREE path's eviction,
       whose payload is the FREEZER's (its token is standing at [FrzPost],
-      not [FrzOff]); with the split, that lemma keeps its exact signature by
-      speaking at [_np].
+      not [FrzOff]); with the split, those lemmas keep their exact
+      signatures by speaking at [_np].
 
       WHY [FrzOff] AND NOT [(ifreeze_off ∨ ifreeze_pre)].  A-custody's
       PARKED row offers the disjunction so that the freezer's +0x70 mid-free
@@ -1187,7 +1187,7 @@ Section IcacheEscrow.
          [IcacheRef.frzown_excl] closes it) -- DEVIATION 1's obligation,
          unchanged in kind, recorded at ProofIlock.
      Every LEFT-only consumer ([ic_payload], [ic_mk_parked], [ic_swap_park],
-     [ic_close_to_empty]) keeps its exact signature. *)
+     the eviction family) keeps its exact signature. *)
   (* ---- THE LOCK-WINDOW PIN, PER ARM (durable-disk B''-tx5) ----
 
      [ic_slot_cover]'s alternative (d) was inhabited by iput's three windows,
@@ -2967,14 +2967,15 @@ Section IcacheEscrow.
          [iref_close_last_store_au] threaded [FrzOff] through unchanged and
          drove the count 1 -> 0, so the closer surrenders
          [icnt_half z 0 ∗ ifreeze_off z] and the pool takes a NORMAL arm.
-         That is [ic_close_to_empty] below, unchanged but for the two new
-         premises.
+         That is [ic_close_to_empty_late] below, which runs the eviction on
+         what the caller holds and takes the three ledger outputs as a wand.
 
        FREE path (iput's +0x8a, strictly inside the freeze window): the same
          AU stepped [FrzPre -> FrzPost], so what the closer holds is
          [icnt_half z 0 ∗ ifreeze_post z] and the pool must take the AWAIT
-         arm instead.  That is [ic_close_to_empty_await]; it also hands the
-         displaced [ipool_shape_np] BACK to the freer, which is §1.2's whole
+         arm instead.  That is [ic_close_to_empty_frz] plus
+         [ipool_shape_await]; the eviction also hands the displaced
+         [ipool_shape_np] BACK to the freer, which is §1.2's whole
          point -- the freer keeps [dinode_at] (with its identity intact) and
          the block resources across releasesleep, and parks only the escrow.
 
@@ -3045,9 +3046,9 @@ Section IcacheEscrow.
     iExists dev, inum, (valid_word v). iFrame.
   Qed.
 
-  (* FLAVOUR 1', THE SAME EVICTION WITH ITS LEDGER TRIPLE ARRIVING LATE.
+  (* FLAVOUR 1: THE ORDINARY EVICTION, WITH ITS LEDGER TRIPLE ARRIVING LATE.
 
-     [ic_close_to_empty] above asks for the count at zero -- and the ORDINARY
+     An eager form would ask for the count at zero -- and the ORDINARY
      last close cannot have it when it must run.  The eviction has to happen
      BEFORE the [sw] that zeroes [ip->ref] ([ic_open_auth_ref] wants the
      table authority still showing the slot at REF-1, and the store deletes
@@ -3058,7 +3059,7 @@ Section IcacheEscrow.
      what the caller does hold and hand the pool bundle back as a WAND, to
      be fed the three ledger outputs the store produces.
 
-     Not a second proof: [ic_close_to_empty] is this one applied
+     A caller that did hold the triple would just apply this one
      immediately. *)
   Lemma ic_close_to_empty_late cn γfs γi cov logstart k (v : bool) (g : gname)
       (dev inum : mword 32) :
@@ -5098,8 +5099,8 @@ Section IcacheEscrow.
      be in the caller's hand at the same ghost step as the escrow arm's
      half, because the flip needs the whole cell and the partition moves
      with it.  They hand out a HALF -- the pool's quarter joined to the
-     table's -- so [ic_open_empty_free] and the [ic_close_to_empty] family
-     are called UNCHANGED, and the wand takes the flipped half back and
+     table's -- so [ic_open_empty_free] and the eviction family are called
+     UNCHANGED, and the wand takes the flipped half back and
      returns the table its quarter.
 
      [ipool_put] needs no identity at all: it moves an inum out of the

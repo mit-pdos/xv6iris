@@ -482,7 +482,7 @@ Section IcacheBootRegion.
   Qed.
 
   (* THE REGION'S BOOT ALLOCATION.  In: the [nib] inode blocks' client halves,
-     straight out of [FsBoot.fs_boot_bundle]'s [cov ∖ log_region_set] big-op.
+     straight out of the boot mint's [cov ∖ log_region_set] big-op.
      Out: the region invariant and one exclusive [dinode_at] per inum of the
      region, at the image's own record -- which is exactly the pool's input.
 

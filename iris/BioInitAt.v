@@ -19,8 +19,8 @@
                                 the record the caller already published
 
    [bio_init] itself is left alone: it lives in [BioInv], which this file
-   imports, and its one caller ([FsBoot.fs_boot_bundle]) has no consumer yet.
-   The two bodies are duplicated until that caller moves over. *)
+   imports, and it has no caller in the tree.  The two bodies are duplicated
+   until one appears. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.

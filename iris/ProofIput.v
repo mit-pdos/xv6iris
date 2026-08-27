@@ -39,7 +39,7 @@
    The tail also splits INTERNALLY on the count, which is what lets all four
    entries share it: at [Pos.succ n] it is [IcacheInv.iref_close_store_au]
    and nothing else moves; at [1] it is REF-1, the last close, and the
-   EVICTION (§13.9) -- [ic_close_to_empty], [ipool_put], [ci] and [M]
+   EVICTION (§13.9) -- [ic_close_to_empty_late], [ipool_put], [ci] and [M]
    deleting together, the table's slot re-forming as [islot_empty].
 
    ---- THE WINDOW (design §13.13) ---------------------------------------
