@@ -2861,6 +2861,18 @@ so it never wanted that shape.
   produced), `FsDurSnap.P_dur_tie`/`P_dur_node_of_slot`/
   `snap_dir_entry_of_first` (the readings), and `SystemAdequacy.fs_boot_pure`
   (`∃ S, snap_ok S D` at every reachable state).  Not worked here.
+- [ ] **Lane H — RULING (owner): `snap_ok` lives ONLY ON TOP OF THE PROOF
+  STACK.**  It is a way to extract a pure fact for the example adequacy
+  theorem (`SystemAdequacy.fs_boot_pure`'s `∃ S, snap_ok S D`, READ off the
+  snapshot by `FsDurSnap.fs_snap_read_ok`/`P_dur_tie`) and nothing more:
+  no lemma of the steady-state proof takes `snap_ok` as a premise — not the
+  commit, not the boot mint.  The snapshot is an `fs_state` over its own
+  ghosts with its byte authority tied to the committed view by EQUALITY
+  (`B = fs_dbytes D`: the predicate owns every home block); commits and
+  boots move it by the resource transport (`FsDurXfer.fs_state_xfer`,
+  fragment for fragment, shares allowed, disjointness from `phi_excl`);
+  the value-first allocator and its carve survive only inside era 0's image
+  producer.  H4 does the commit side, H5 the boot side.
 - [ ] **Lane H — THE VALUE-FIRST ALLOCATOR IS A MISTAKE TO CLEAN UP
   (owner ruling; first cleanup after the theorem).**  As built, the commit
   MATERIALISES a pure disjointness fact: `FsCollectAll.fs_collect_snap_ok`
