@@ -2950,7 +2950,7 @@ so it never wanted that shape.
   notes another session landed); the `P_log`/`P_fs` split as two
   ordinary invariants if wanted (the crash predicate slims to the WAL's
   half; `P_fs` an `inv` over immortal gnames); any further local clauses.
-- [ ] **Lane G — cleanups (independent, run in the gaps).**  THE
+- [x] **Lane G — cleanups (independent, run in the gaps).**  THE
   DEMOLITION (slices 6b–6f) IS DONE at G6; what is left of this item is
   the three NON-ledger cleanups listed below and nothing else.  The
   demolition slices 6b–6f of the old link ledger (`DirLinks.v` 2009
@@ -3489,13 +3489,45 @@ so it never wanted that shape.
     `IcacheInv` (5 patterns), `FsCollect` (4), `IgetLic` (3),
     `IregLinkNz` (4), `EscrowDeposit` (1), `FsCollectAll` (1).  Nothing in
     `FsCollect*` changed but arity.
-  - **LEFT BEHIND, deliberately:** the tree still has ~35 files whose PROSE
-    names `dir_links` / `ilinkd` / `dlc_bound` / (T1) in explanatory
-    comments.  The headers that state a LIVE mechanism were rewritten
-    (`IcacheRef`, `InodeRegion`, `IcacheEscrow`, `SpecIupdate`, `IcacheBoot`,
-    `FsCfgBoot`, `DirLinks`, `IregDirBit`, `FsBootWall`); the rest are
-    historical asides in walk files and are cheap to sweep when someone is
-    next in them.
+
+  **AS LANDED — G7: THE SWEEP.  Whole tree green, `make audit-only` at the
+  three-entry baseline.  NOTHING OF LANE G REMAINS OUTSIDE THE FILES LANE H
+  HOLDS.**
+
+  - **`IcacheRef`'s twelve caller-less lemmas are deleted** (re-measured by
+    grep, definition sites only): `ientry_lock_0`, `ireg_regime_false`,
+    `ireg_regime_disj`, `runit_any_plain`, `iclaim_excl`, `icnt_join`,
+    `frzm_join`, `hpn_update`, `live_gen_halve`, `inode_ref_agree`,
+    `inode_ref_gen_bare_split`, `inode_ref_shr_agree`.  No contract moved.
+  - **The prose sweep is DONE** across every file outside H's list: no
+    explanatory comment in the built tree names `dir_links` / `ilink*` /
+    `iparent` / `igrey` / `dlc_*` / `dir_link_at` / (L1) / (T1) / the
+    `wl`-`wdu`-`wdt`-`g` columns any more.  They state the live mechanism
+    instead (`FsStateLink.link_tok`, `InodeRegion.ireg_lnk`,
+    `IcacheEscrow.dlinks` = `FsStateInode.ent_toks_x`, `node_exact`) or are
+    gone where they were narrative.  `DirLinks.v` and `IregDirBit.v` are
+    left as they are: they are the deleted apparatus itself, off
+    `_CoqProject`.
+  - **Stale names corrected on the way past:** `ireg_write_link_fl`/
+    `_unlink_fl` → `_reg` (`SpecIlock`, `SpecIupdate`, `ProofIupdate`);
+    `ireg_tok_root_min2` → `ireg_tok_root_le` (`IregLinkNz`);
+    `IcacheBoot.ireg_alloc`'s premise stands at `N`, not `W`
+    (`FsImgCheck`); `IgetLic`'s `LinkedL` carries the fragment's VALUE, and
+    its tombstone for two deleted licences is replaced by the rule that
+    closes the enumeration (every constructor must be refutable at an
+    in-transition box).  `ProofCreate.cr_flav` and its five lemmas are
+    deleted with the flavour index they served.
+  - **`FsLookup.fdir_dots_index` is now caller-less** — its consumer was
+    `dir_links_dotdot_out`.  Kept; it is the payload/tree seam's own
+    reading.
+  - **BLOCKED ON LANE H, and that is all that is left of this item:**
+    `FsBoot.fs_boot_bundle` (still caller-less); the `eo_minst`/
+    `lm_install` unification (`ProofEndOp`/`LogInv`/`ProofInitlog`); and
+    all three 2c-img relocations, whose sources are `FsDurImg.v`/
+    `FsDurBytes.v` and whose destinations are `FsStateDefs.v`/
+    `FsStateInode.v`/`LogDefs.v`.  One more nit for whoever is next in
+    `SystemAdequacy.v`: its audit paragraph still says "the eight-entry
+    baseline"; the baseline is three.
 
 ## Sizing notes for whoever runs the lanes
 
