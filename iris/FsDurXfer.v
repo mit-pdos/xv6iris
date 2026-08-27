@@ -1,0 +1,688 @@
+(* ====================================================================== *)
+(*  FsDurXfer.v -- THE RESOURCE TRANSPORT (durable-disk lane H;            *)
+(*  claude-notes/design/durable-fs-plan.md sections 4 and 5)               *)
+(*                                                                        *)
+(*  BOTH ENDS OF EVERY TRANSPORT ARE [FsState.fs_state]s, and NOTHING is   *)
+(*  ever computed from the abstract state [S] but the state itself.  The   *)
+(*  value-first allocator this file replaces took a BYTE MAP plus a pure   *)
+(*  disjointness/cut record and CARVED a freshly allocated map by it; the  *)
+(*  carve was an artifact of the input TYPE, because a byte map is one     *)
+(*  linear resource and the file system is a [∗] of many.                  *)
+(*                                                                        *)
+(*  WITH AN INSTANCE AS INPUT there is nothing to carve: each object's     *)
+(*  fresh elements are minted from THAT OBJECT'S OWN source fragments, so  *)
+(*  the [∗] shape is inherited object by object.  The one fact the mint    *)
+(*  needs -- that two objects never name one byte -- is not stated, not    *)
+(*  maintained and not passed in: it is READ OFF THE SOURCE'S OWN          *)
+(*  EXCLUSIVITY inside this file ([phi_runs_disj]; two full fragments at   *)
+(*  one address are inconsistent, [FsStateDefs.phi_excl]).                 *)
+(*                                                                        *)
+(*  THE SHAPE, bottom up:                                                  *)
+(*                                                                        *)
+(*    1.  A RUN is a (block, offset, bytes) triple; [xr_map] is its flat   *)
+(*        byte map and [phi_runs] the [∗] of the runs at a view.           *)
+(*    2.  [phi_runs_disj]: the runs' maps are pairwise disjoint, off       *)
+(*        [phi_excl] alone.  It is a PURE conclusion, so reading it costs  *)
+(*        nothing (the affine [pure_keep] device, one level down).         *)
+(*    3.  [phi_runs_union]: with that disjointness the [∗] of the runs IS  *)
+(*        the [∗] of ONE map -- in both directions, and Gamma-generically. *)
+(* ====================================================================== *)
+
+From Stdlib Require Import ZArith Lia List.
+From stdpp Require Import gmap list list_numbers bitvector.definitions.
+From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import auth gmap numbers dfrac.
+From iris.base_logic.lib Require Import iprop own ghost_map.
+Require Import BioDefs.
+Require Import DiskImg.       (* [diskImgG] -- the fresh byte map's class *)
+Require Import BitmapEnc.
+Require Import BlockWords.
+Require Import DinodeEnc.
+Require Import DirView.
+Require Import FsTree.
+Require Import InodeDefs.
+Require Import FsImg.
+Require Import Xv6Cameras.
+Require Import FsDurBytes.    (* [big_sepM_map_seqZ_gen] *)
+Require Export FsState.
+
+Local Open Scope Z_scope.
+
+(* ====================================================================== *)
+(*  1.  RUNS                                                               *)
+(* ====================================================================== *)
+
+Definition xrun : Type := (Z * Z * list (bv 8))%type.
+
+Definition xr_blk (r : xrun) : Z := r.1.1.
+Definition xr_off (r : xrun) : Z := r.1.2.
+Definition xr_bs  (r : xrun) : list (bv 8) := r.2.
+
+Definition xr_map (r : xrun) : gmap Z (bv 8) :=
+  map_seqZ (xr_blk r * BSIZE_z + xr_off r) (xr_bs r).
+
+Definition xr_union (l : list xrun) : gmap Z (bv 8) :=
+  union_list (xr_map <$> l).
+
+(* pairwise disjointness, BY POSITION (a list may repeat an empty run) *)
+Definition xr_disj (l : list xrun) : Prop :=
+  forall (k j : nat) r1 r2, k <> j ->
+    l !! k = Some r1 -> l !! j = Some r2 -> xr_map r1 ##ₘ xr_map r2.
+
+Lemma xr_union_nil : xr_union [] = ∅.
+Proof. reflexivity. Qed.
+
+Lemma xr_union_cons (r : xrun) (l : list xrun) :
+  xr_union (r :: l) = xr_map r ∪ xr_union l.
+Proof. reflexivity. Qed.
+
+Lemma xr_disj_cons (r : xrun) (l : list xrun) :
+  xr_disj (r :: l) ->
+  xr_disj l /\ (forall j r2, l !! j = Some r2 -> xr_map r ##ₘ xr_map r2).
+Proof.
+  intros Hd. split.
+  - intros k j r1 r2 Hne Hk Hj.
+    apply (Hd (S k) (S j) r1 r2 ltac:(lia) Hk Hj).
+  - intros j r2 Hj.
+    apply (Hd 0%nat (S j) r r2 ltac:(lia) eq_refl Hj).
+Qed.
+
+Lemma xr_disj_head (r : xrun) (l : list xrun) :
+  xr_disj (r :: l) -> xr_map r ##ₘ xr_union l.
+Proof.
+  intros Hd. destruct (xr_disj_cons r l Hd) as [_ Hhd].
+  clear Hd. revert Hhd. induction l as [| r' l IH]; intros Hhd.
+  - rewrite xr_union_nil. apply map_disjoint_empty_r.
+  - rewrite xr_union_cons. apply map_disjoint_union_r. split.
+    + apply (Hhd 0%nat r' eq_refl).
+    + apply IH. intros j r2 Hj. apply (Hhd (S j) r2 Hj).
+Qed.
+
+Lemma xr_disj_app (l1 l2 : list xrun) :
+  xr_disj (l1 ++ l2) -> xr_disj l1 /\ xr_disj l2.
+Proof.
+  intros Hd. split.
+  - intros k j r1 r2 Hne Hk Hj.
+    apply (Hd k j r1 r2 Hne);
+      rewrite lookup_app_l //;
+      [ apply (lookup_lt_Some _ _ _ Hk) | apply (lookup_lt_Some _ _ _ Hj) ].
+  - intros k j r1 r2 Hne Hk Hj.
+    apply (Hd (length l1 + k)%nat (length l1 + j)%nat r1 r2 ltac:(lia));
+      rewrite lookup_app_r; try lia;
+      rewrite Nat.add_comm Nat.add_sub //.
+Qed.
+
+Lemma xr_union_app (l1 l2 : list xrun) :
+  xr_union (l1 ++ l2) = xr_union l1 ∪ xr_union l2.
+Proof.
+  induction l1 as [| r l1 IH]; simpl.
+  - rewrite xr_union_nil left_id_L //.
+  - rewrite !xr_union_cons IH assoc_L //.
+Qed.
+
+(* ====================================================================== *)
+(*  2.  THE RUNS AT A VIEW, AND THE FLAT MAP                               *)
+(* ====================================================================== *)
+
+Section Runs.
+  Context {Σ : gFunctors}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  Definition phi_map Γ (M : gmap Z (bv 8)) : iProp Σ :=
+    ([∗ map] a ↦ v ∈ M, fsΦ Γ (DfracOwn 1) a v)%I.
+
+  Definition phi_runs Γ (l : list xrun) : iProp Σ :=
+    ([∗ list] r ∈ l, byte_range Γ (xr_blk r) (xr_off r) (xr_bs r))%I.
+
+  Lemma phi_map_of_range Γ (r : xrun) :
+    byte_range Γ (xr_blk r) (xr_off r) (xr_bs r) ⊣⊢ phi_map Γ (xr_map r).
+  Proof.
+    rewrite /phi_map /xr_map big_sepM_map_seqZ_gen /byte_range /byte_range_q //.
+  Qed.
+
+  Lemma phi_runs_nil Γ : phi_runs Γ [] ⊣⊢ emp.
+  Proof. rewrite /phi_runs big_sepL_nil //. Qed.
+
+  Lemma phi_runs_cons Γ r l :
+    phi_runs Γ (r :: l) ⊣⊢ phi_map Γ (xr_map r) ∗ phi_runs Γ l.
+  Proof. rewrite /phi_runs big_sepL_cons phi_map_of_range //. Qed.
+
+  Lemma phi_runs_app Γ l1 l2 :
+    phi_runs Γ (l1 ++ l2) ⊣⊢ phi_runs Γ l1 ∗ phi_runs Γ l2.
+  Proof. rewrite /phi_runs big_sepL_app //. Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  2a.  DISJOINTNESS IS READ OFF EXCLUSIVITY                        *)
+  (* ---------------------------------------------------------------- *)
+
+  Lemma phi_map_disj Γ (Hex : phi_excl Γ) M1 M2 :
+    phi_map Γ M1 -∗ phi_map Γ M2 -∗ ⌜M1 ##ₘ M2⌝.
+  Proof.
+    revert M2. induction M1 as [| a v M1 Ha IH] using map_ind; intros M2.
+    - iIntros "_ _". iPureIntro. apply map_disjoint_empty_l.
+    - rewrite /phi_map big_sepM_insert; [| exact Ha].
+      iIntros "[Hav HM1] HM2".
+      destruct (M2 !! a) as [w |] eqn:Hw.
+      { iDestruct (big_sepM_lookup _ _ a w Hw with "HM2") as "Haw".
+        iDestruct (Hex a v w (DfracOwn 1) (DfracOwn 1) with "[$Hav $Haw]")
+          as %Hv.
+        exfalso. exact (dfrac_full_nvalid (DfracOwn 1) Hv). }
+      iDestruct (IH M2 with "HM1 HM2") as %Hd.
+      iPureIntro. apply map_disjoint_insert_l. split; [exact Hw | exact Hd].
+  Qed.
+
+  Lemma phi_runs_disj Γ (Hex : phi_excl Γ) l :
+    phi_runs Γ l -∗ ⌜xr_disj l⌝.
+  Proof.
+    induction l as [| r l IH].
+    - iIntros "_". iPureIntro.
+      intros k j r1 r2 _ Hk. rewrite lookup_nil in Hk. discriminate.
+    - rewrite phi_runs_cons. iIntros "[Hr Hl]".
+      iAssert (⌜xr_disj l⌝ ∧ phi_runs Γ l)%I with "[Hl]" as "[%Hdl Hl]".
+      { iSplit; [iApply (IH with "Hl") | iExact "Hl"]. }
+      iAssert (⌜forall j r2, l !! j = Some r2 -> xr_map r ##ₘ xr_map r2⌝)%I
+        with "[Hr Hl]" as %Hhd.
+      { iIntros (j r2 Hj).
+        rewrite /phi_runs (big_sepL_lookup _ _ j r2 Hj) phi_map_of_range.
+        iApply (phi_map_disj Γ Hex with "Hr Hl"). }
+      iPureIntro. intros k j r1 r2 Hne Hk Hj.
+      destruct k as [| k]; destruct j as [| j]; [lia | | |].
+      + simpl in Hk. injection Hk as <-. exact (Hhd j r2 Hj).
+      + simpl in Hj. injection Hj as <-.
+        apply map_disjoint_sym. exact (Hhd k r1 Hk).
+      + exact (Hdl k j r1 r2 ltac:(lia) Hk Hj).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  2b.  THE FLATTENING, BOTH WAYS                                   *)
+  (* ---------------------------------------------------------------- *)
+
+  Lemma phi_runs_union Γ l :
+    xr_disj l -> phi_runs Γ l ⊣⊢ phi_map Γ (xr_union l).
+  Proof.
+    induction l as [| r l IH]; intros Hd.
+    - rewrite phi_runs_nil xr_union_nil /phi_map big_sepM_empty //.
+    - destruct (xr_disj_cons r l Hd) as [Hdl _].
+      rewrite phi_runs_cons (IH Hdl) xr_union_cons /phi_map.
+      rewrite big_sepM_union; [done | exact (xr_disj_head r l Hd)].
+  Qed.
+
+End Runs.
+
+(* ====================================================================== *)
+(*  3.  THE FILE SYSTEM'S OWN RUNS                                         *)
+(*                                                                        *)
+(*  [FsState.fs_footprint] IS a [∗] of byte runs -- one per object -- and  *)
+(*  [xr_fs] names them.  The correspondence is Gamma-GENERIC and needs no  *)
+(*  disjointness in either direction: it is the SHAPE of the predicate,    *)
+(*  not a fact about it.  Its only side conditions are block LENGTHS and   *)
+(*  the free pool's domain, and both are read off the source's own         *)
+(*  resources ([fs_footprint_runs] produces them).                         *)
+(* ====================================================================== *)
+
+Definition xr_rec (sb : fs_sb) (i : Z) (n : fs_node) : xrun :=
+  ((IBLOCK (fs_inum_bv i) (sb_inodestart sb),
+    Z.of_nat (64 * islot (fs_inum_bv i))), dinode_bytes (fn_rec n)).
+
+Definition xr_dat (n : fs_node) (p : nat * list (bv 8)) : xrun :=
+  ((fn_naddr n p.1, 0), p.2).
+
+Definition xr_ind (n : fs_node) : list xrun :=
+  if decide (fn_indb n = 0) then []
+  else [((fn_indb n, 0), ind_bytes (fn_ent n))].
+
+Definition xr_inode (sb : fs_sb) (i : Z) (n : fs_node) : list xrun :=
+  xr_rec sb i n :: ((xr_dat n <$> map_to_list (fn_blk n)) ++ xr_ind n).
+
+Definition xr_inodes (sb : fs_sb) (I : gmap Z fs_node) : list xrun :=
+  concat ((fun p : Z * fs_node => xr_inode sb p.1 p.2) <$> map_to_list I).
+
+Definition xr_pool (PM : gmap Z (list (bv 8))) : list xrun :=
+  (fun p : Z * list (bv 8) => ((p.1, 0), p.2)) <$> map_to_list PM.
+
+Definition xr_fs (S : fs_state_rec) (PM : gmap Z (list (bv 8))) : list xrun :=
+  ((SB_BNO, 0), fss_sbb S)
+  :: ((sb_bmapstart (fss_sb S), 0), bm_bytes BSIZE (fss_used S))
+  :: (xr_inodes (fss_sb S) (fss_inodes S) ++ xr_pool PM).
+
+(* the LENGTHS one node's runs carry, and the free pool's domain: what the
+   [blk_owned] shape states and a [byte_range] does not *)
+Definition node_lens (n : fs_node) : Prop :=
+  (forall k bs, fn_blk n !! k = Some bs -> length bs = BSIZE)
+  /\ (fn_indb n <> 0 -> length (ind_bytes (fn_ent n)) = BSIZE).
+
+Definition pool_pm (l : list Z) (u : gset Z) (PM : gmap Z (list (bv 8)))
+  : Prop :=
+  (forall b, is_Some (PM !! b) <-> (b ∈ l /\ b ∉ u))
+  /\ (forall b bs, PM !! b = Some bs -> length bs = BSIZE).
+
+Definition xf_shape (S : fs_state_rec) (PM : gmap Z (list (bv 8))) : Prop :=
+  length (fss_sbb S) = BSIZE
+  /\ (forall i n, fss_inodes S !! i = Some n -> node_lens n)
+  /\ pool_pm (seqZ 0 (sb_size (fss_sb S))) (fss_used S) PM.
+
+Section FsRuns.
+  Context {Σ : gFunctors}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  (* ---------------------------------------------------------------- *)
+  (*  3a.  ONE INODE                                                   *)
+  (* ---------------------------------------------------------------- *)
+
+  Lemma inode_phi_runs Γ (sb : fs_sb) (i : Z) (n : fs_node) :
+    inode_phi Γ sb i n ⊢ ⌜node_lens n⌝ ∗ phi_runs Γ (xr_inode sb i n).
+  Proof.
+    rewrite /inode_phi /xr_inode phi_runs_cons phi_runs_app.
+    iIntros "(Hr & Hd & Hi)".
+    iAssert (⌜forall k bs, fn_blk n !! k = Some bs -> length bs = BSIZE⌝)%I
+      with "[Hd]" as %Hlen.
+    { iIntros (k bs Hk).
+      rewrite (big_sepM_lookup _ _ k bs Hk) /blk_owned.
+      iDestruct "Hd" as "[$ _]". }
+    iAssert (⌜fn_indb n <> 0 -> length (ind_bytes (fn_ent n)) = BSIZE⌝)%I
+      with "[Hi]" as %Hind.
+    { iIntros (Hnz). rewrite /ind_owned (decide_False _ _ Hnz) /blk_owned.
+      iDestruct "Hi" as "[$ _]". }
+    iSplitR; [iPureIntro; split; [exact Hlen | exact Hind] |].
+    iSplitL "Hr"; [| iSplitL "Hd"].
+    - rewrite -phi_map_of_range /rec_owned /xr_rec //=.
+    - iEval (rewrite big_sepM_map_to_list) in "Hd".
+      rewrite /phi_runs big_sepL_fmap.
+      iApply (big_sepL_mono with "Hd"). intros k p _.
+      rewrite /blk_owned /xr_dat /xr_blk /xr_off /xr_bs /=. iIntros "[_ $]".
+    - rewrite /xr_ind /ind_owned. case_decide as Hz.
+      + rewrite phi_runs_nil //.
+      + rewrite /phi_runs big_sepL_singleton /blk_owned /=.
+        iDestruct "Hi" as "[_ $]".
+  Qed.
+
+  Lemma inode_phi_of_runs Γ (sb : fs_sb) (i : Z) (n : fs_node) :
+    node_lens n -> phi_runs Γ (xr_inode sb i n) ⊢ inode_phi Γ sb i n.
+  Proof.
+    intros [Hlen Hind].
+    rewrite /inode_phi /xr_inode phi_runs_cons phi_runs_app.
+    iIntros "(Hr & Hd & Hi)". iSplitL "Hr"; [| iSplitL "Hd"].
+    - rewrite -phi_map_of_range /rec_owned /xr_rec //=.
+    - rewrite big_sepM_map_to_list.
+      rewrite /phi_runs big_sepL_fmap.
+      iApply (big_sepL_mono with "Hd"). intros k p Hp.
+      rewrite /blk_owned /xr_dat /xr_blk /xr_off /xr_bs /=. iIntros "$".
+      iPureIntro. apply (Hlen p.1 p.2).
+      apply elem_of_map_to_list. rewrite -surjective_pairing.
+      exact (elem_of_list_lookup_2 _ _ _ Hp).
+    - rewrite /xr_ind /ind_owned. case_decide as Hz; [done |].
+      rewrite /phi_runs big_sepL_singleton /blk_owned /=.
+      iFrame "Hi". iPureIntro. exact (Hind Hz).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  3b.  EVERY INODE                                                 *)
+  (* ---------------------------------------------------------------- *)
+
+  Lemma phi_runs_concat Γ (ls : list (list xrun)) :
+    phi_runs Γ (concat ls) ⊣⊢ [∗ list] l ∈ ls, phi_runs Γ l.
+  Proof.
+    induction ls as [| l ls IH].
+    - rewrite /phi_runs //=.
+    - assert (Hc : concat (l :: ls) = l ++ concat ls) by reflexivity.
+      rewrite Hc phi_runs_app big_sepL_cons IH //.
+  Qed.
+
+  Lemma fs_inodes_phi_runs Γ (sb : fs_sb) (I : gmap Z fs_node) :
+    ([∗ map] i ↦ n ∈ I, inode_phi Γ sb i n)
+    ⊢ ⌜forall i n, I !! i = Some n -> node_lens n⌝
+      ∗ phi_runs Γ (xr_inodes sb I).
+  Proof.
+    iIntros "H".
+    iAssert (⌜forall i n, I !! i = Some n -> node_lens n⌝)%I
+      with "[H]" as %Hlens.
+    { iIntros (i n Hi). rewrite (big_sepM_lookup _ _ i n Hi).
+      iDestruct (inode_phi_runs with "H") as "[$ _]". }
+    iSplitR; [by iPureIntro |].
+    rewrite big_sepM_map_to_list.
+    rewrite /xr_inodes phi_runs_concat big_sepL_fmap.
+    iApply (big_sepL_mono with "H"). intros k p _. simpl.
+    iIntros "H". iDestruct (inode_phi_runs with "H") as "[_ $]".
+  Qed.
+
+  Lemma fs_inodes_phi_of_runs Γ (sb : fs_sb) (I : gmap Z fs_node) :
+    (forall i n, I !! i = Some n -> node_lens n) ->
+    phi_runs Γ (xr_inodes sb I) ⊢ [∗ map] i ↦ n ∈ I, inode_phi Γ sb i n.
+  Proof.
+    intros Hlens.
+    rewrite big_sepM_map_to_list.
+    rewrite /xr_inodes phi_runs_concat big_sepL_fmap.
+    iIntros "H". iApply (big_sepL_mono with "H"). intros k p Hp. simpl.
+    iApply (inode_phi_of_runs Γ sb p.1 p.2).
+    apply (Hlens p.1 p.2). apply elem_of_map_to_list.
+    rewrite -surjective_pairing. exact (elem_of_list_lookup_2 _ _ _ Hp).
+  Qed.
+
+End FsRuns.
+
+(* ====================================================================== *)
+(*  3c.  THE FREE POOL                                                     *)
+(*                                                                        *)
+(*  [FsStateBitmap.free_pool] is a big-op over a RANGE whose free entries  *)
+(*  hold EXISTENTIAL bytes.  The runs need those bytes named, so the walk  *)
+(*  collects them into a map [PM] -- and the map is the SOURCE'S, read off *)
+(*  its own resources, not a value anybody computes.                       *)
+(* ====================================================================== *)
+
+Section FsPool.
+  Context {Σ : gFunctors}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  Lemma free_pool_list_pm Γ (u : gset Z) (l : list Z) :
+    base.NoDup l ->
+    ([∗ list] b ∈ l, pool_elt Γ u b)
+    ⊢ ∃ PM, ⌜pool_pm l u PM⌝ ∗ ([∗ map] b ↦ bs ∈ PM, blk_owned Γ b bs).
+  Proof.
+    induction l as [| b l IH]; intros Hnd.
+    - iIntros "_". iExists ∅. rewrite big_sepM_empty. iSplitL; [| done].
+      iPureIntro. split.
+      + intros x. rewrite lookup_empty. split.
+        * intros [? Hc]. discriminate.
+        * intros [Hx _]. exfalso. eapply not_elem_of_nil. exact Hx.
+      + intros x bs. rewrite lookup_empty. discriminate.
+    - apply NoDup_cons in Hnd as [Hb Hnd].
+      rewrite big_sepL_cons. iIntros "[Hb Hl]".
+      iDestruct (IH Hnd with "Hl") as (PM) "[%Hpm HPM]".
+      destruct Hpm as [Hdom Hlens].
+      rewrite /pool_elt. destruct (bool_decide (b ∈ u)) eqn:Hbu.
+      + apply bool_decide_eq_true in Hbu.
+        iExists PM. iFrame "HPM". iPureIntro. split; [| exact Hlens].
+        intros x. rewrite (Hdom x). split.
+        * intros [Hx Hxu]. split; [apply elem_of_cons; by right | exact Hxu].
+        * intros [Hx Hxu]. apply elem_of_cons in Hx as [-> | Hx];
+            [contradiction | by split].
+      + apply bool_decide_eq_false in Hbu.
+        iDestruct "Hb" as (bs) "Hb".
+        assert (HPMb : PM !! b = None).
+        { destruct (PM !! b) as [c |] eqn:E; [| done].
+          exfalso. destruct (proj1 (Hdom b) (mk_is_Some _ _ E)) as [Hin _].
+          exact (Hb Hin). }
+        iAssert (⌜length bs = BSIZE⌝)%I with "[Hb]" as %Hlen.
+        { rewrite /blk_owned. iDestruct "Hb" as "[$ _]". }
+        iExists (<[b := bs]> PM). iSplitR.
+        * iPureIntro. split.
+          -- intros x. destruct (decide (x = b)) as [-> | Hne].
+             ++ rewrite lookup_insert. split.
+                ** intros _. split; [apply elem_of_cons; by left | exact Hbu].
+                ** intros _. by eexists.
+             ++ rewrite lookup_insert_ne; [| done]. rewrite (Hdom x). split.
+                ** intros [Hx Hxu]. split;
+                     [apply elem_of_cons; by right | exact Hxu].
+                ** intros [Hx Hxu]. apply elem_of_cons in Hx as [-> | Hx];
+                     [contradiction | by split].
+          -- intros x cs. destruct (decide (x = b)) as [-> | Hne].
+             ++ rewrite lookup_insert. intros Hc. injection Hc as <-.
+                exact Hlen.
+             ++ rewrite lookup_insert_ne; [| done]. exact (Hlens x cs).
+        * rewrite big_sepM_insert; [| exact HPMb]. iFrame.
+  Qed.
+
+  Lemma free_pool_list_of_pm Γ (u : gset Z) (l : list Z) PM :
+    base.NoDup l -> pool_pm l u PM ->
+    ([∗ map] b ↦ bs ∈ PM, blk_owned Γ b bs) ⊢ [∗ list] b ∈ l, pool_elt Γ u b.
+  Proof.
+    revert PM. induction l as [| b l IH]; intros PM Hnd [Hdom Hlens].
+    - iIntros "_". rewrite big_sepL_nil //.
+    - apply NoDup_cons in Hnd as [Hb Hnd].
+      rewrite big_sepL_cons /pool_elt.
+      destruct (bool_decide (b ∈ u)) eqn:Hbu.
+      + apply bool_decide_eq_true in Hbu.
+        iIntros "HPM". iSplitR; [done |].
+        iApply (IH PM Hnd with "HPM"). split; [| exact Hlens].
+        intros x. rewrite (Hdom x). split.
+        * intros [Hx Hxu]. apply elem_of_cons in Hx as [-> | Hx];
+            [contradiction | by split].
+        * intros [Hx Hxu]. split; [apply elem_of_cons; by right | exact Hxu].
+      + apply bool_decide_eq_false in Hbu.
+        assert (Hsb : is_Some (PM !! b)).
+        { apply (Hdom b). split; [apply elem_of_cons; by left | exact Hbu]. }
+        destruct Hsb as [bs Hbs].
+        rewrite (big_sepM_delete _ PM b bs Hbs).
+        iIntros "[Hb HPM]". iSplitL "Hb"; [by iExists bs |].
+        iApply (IH (delete b PM) Hnd with "HPM"). split.
+        * intros x. destruct (decide (x = b)) as [-> | Hne].
+          -- rewrite lookup_delete. split.
+             ++ intros [? Hc]. discriminate.
+             ++ intros [Hx _]. contradiction.
+          -- rewrite lookup_delete_ne; [| done]. rewrite (Hdom x). split.
+             ++ intros [Hx Hxu]. apply elem_of_cons in Hx as [-> | Hx];
+                  [contradiction | by split].
+             ++ intros [Hx Hxu]. split;
+                  [apply elem_of_cons; by right | exact Hxu].
+        * intros x cs Hx. apply lookup_delete_Some in Hx as [_ Hx].
+          exact (Hlens x cs Hx).
+  Qed.
+
+  Lemma pool_pm_runs Γ PM :
+    (forall b bs, PM !! b = Some bs -> length bs = BSIZE) ->
+    ([∗ map] b ↦ bs ∈ PM, blk_owned Γ b bs) ⊣⊢ phi_runs Γ (xr_pool PM).
+  Proof.
+    intros Hlens.
+    rewrite big_sepM_map_to_list /xr_pool /phi_runs big_sepL_fmap.
+    apply big_sepL_proper. intros k p Hp.
+    assert (Hin : PM !! p.1 = Some p.2).
+    { apply elem_of_map_to_list. rewrite -surjective_pairing.
+      exact (elem_of_list_lookup_2 _ _ _ Hp). }
+    rewrite /blk_owned /xr_blk /xr_off /xr_bs /=.
+    iSplit; [iIntros "[_ $]" | iIntros "$"; iPureIntro; exact (Hlens _ _ Hin)].
+  Qed.
+
+  Lemma free_pool_runs Γ (nb : Z) (u : gset Z) :
+    free_pool Γ nb u
+    ⊢ ∃ PM, ⌜pool_pm (seqZ 0 nb) u PM⌝ ∗ phi_runs Γ (xr_pool PM).
+  Proof.
+    rewrite /free_pool. iIntros "H".
+    iDestruct (free_pool_list_pm Γ u (seqZ 0 nb) (NoDup_seqZ 0 nb) with "H")
+      as (PM) "[%Hpm HPM]".
+    iExists PM. iSplitR; [by iPureIntro |].
+    rewrite -(pool_pm_runs Γ PM (proj2 Hpm)). iExact "HPM".
+  Qed.
+
+  Lemma free_pool_of_runs Γ (nb : Z) (u : gset Z) PM :
+    pool_pm (seqZ 0 nb) u PM ->
+    phi_runs Γ (xr_pool PM) ⊢ free_pool Γ nb u.
+  Proof.
+    intros Hpm. rewrite -(pool_pm_runs Γ PM (proj2 Hpm)) /free_pool.
+    iApply (free_pool_list_of_pm Γ u (seqZ 0 nb) PM (NoDup_seqZ 0 nb) Hpm).
+  Qed.
+
+End FsPool.
+
+(* ====================================================================== *)
+(*  3d.  THE WHOLE BYTE HALF                                               *)
+(* ====================================================================== *)
+
+Section FsFoot.
+  Context {Σ : gFunctors}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  Lemma phi_runs_cons_range Γ r l :
+    phi_runs Γ (r :: l)
+    ⊣⊢ byte_range Γ (xr_blk r) (xr_off r) (xr_bs r) ∗ phi_runs Γ l.
+  Proof. rewrite /phi_runs big_sepL_cons //. Qed.
+
+  Lemma fs_footprint_runs Γ S :
+    fs_footprint Γ S ⊢ ∃ PM, ⌜xf_shape S PM⌝ ∗ phi_runs Γ (xr_fs S PM).
+  Proof.
+    rewrite /fs_footprint. iIntros "(Hsb & Hin & Hbm & Hpool)".
+    iDestruct (fs_inodes_phi_runs with "Hin") as "[%Hlens Hin]".
+    iDestruct (free_pool_runs with "Hpool") as (PM) "[%Hpm Hpool]".
+    iAssert (⌜length (fss_sbb S) = BSIZE⌝)%I with "[Hsb]" as %Hsbl.
+    { rewrite /blk_owned. iDestruct "Hsb" as "[$ _]". }
+    iExists PM. iSplitR.
+    { iPureIntro. split; [exact Hsbl | split; [exact Hlens | exact Hpm]]. }
+    rewrite /xr_fs !phi_runs_cons_range phi_runs_app.
+    rewrite /blk_owned /xr_blk /xr_off /xr_bs /=.
+    iDestruct "Hsb" as "[_ Hsb]". iDestruct "Hbm" as "[_ Hbm]".
+    iFrame.
+  Qed.
+
+  Lemma fs_footprint_of_runs Γ S PM :
+    xf_shape S PM -> phi_runs Γ (xr_fs S PM) ⊢ fs_footprint Γ S.
+  Proof.
+    intros (Hsbl & Hlens & Hpm).
+    rewrite /xr_fs !phi_runs_cons_range phi_runs_app.
+    rewrite /xr_blk /xr_off /xr_bs /=.
+    iIntros "(Hsb & Hbm & Hin & Hpool)".
+    rewrite /fs_footprint /blk_owned.
+    iSplitL "Hsb"; [by iFrame |].
+    iSplitL "Hin"; [by iApply (fs_inodes_phi_of_runs Γ _ _ Hlens with "Hin") |].
+    iSplitL "Hbm".
+    { iFrame. iPureIntro. exact (bm_bytes_length BSIZE (fss_used S)). }
+    iApply (free_pool_of_runs Γ _ _ PM Hpm with "Hpool").
+  Qed.
+
+End FsFoot.
+
+(* ====================================================================== *)
+(*  4.  THE TRANSPORT                                                      *)
+(*                                                                        *)
+(*  [fs_state Γ S] in, [fs_state Γ S ∗ fs_state Γ' S] out, over a FRESH    *)
+(*  family [Γ'].  Three allocations and not one decode:                    *)
+(*                                                                        *)
+(*    - the BYTE map: [ghost_map_alloc] at the flattening of the source's  *)
+(*      OWN runs.  The values are the source's; the fresh elements come    *)
+(*      out already in the [∗] shape the source had, because the map they  *)
+(*      are allocated at IS that [∗] flattened, and the flattening is a    *)
+(*      bijection exactly where the source's own exclusivity says the      *)
+(*      objects do not overlap ([phi_runs_disj]).  Nothing is carved and   *)
+(*      no disjointness clause is stated, maintained or supplied.          *)
+(*    - the LINK family: ONE [own_alloc] at the SOURCE'S own element,      *)
+(*      read off its resources by [FsState.fs_links_valid].  The choice    *)
+(*      function is the gather's, never a function of [S].                 *)
+(*    - the TOP map: [ghost_map_alloc] at [fss_inodes S] -- the state      *)
+(*      itself, which is the index of BOTH ends, so no value is decoded.   *)
+(* ====================================================================== *)
+
+Section Xfer.
+  (* [diskImgG] is the tree's UNIQUE [ghost_mapG Σ Z (bv 8)]; a fresh
+     family's byte map is a fresh gname at that same class. *)
+  Context `{!diskImgG Σ, !fsLinkG Σ, !fsTopG Σ}.
+  Implicit Types Γ : fs_view_names Σ.
+  Implicit Types S : fs_state_rec.
+
+  (* the FULL element, exactly as the era's [FsBytesGamma.fs_gamma_L] is *)
+  Definition snap_gamma (g gl gt : gname) : fs_view_names Σ :=
+    MkFsView (fun (dq : dfrac) (a : Z) (v : bv 8) => (a ↪[g]{dq} v)%I) gl gt.
+
+  Global Instance snap_gamma_gtimeless g gl gt :
+    GTimeless (snap_gamma g gl gt).
+  Proof. intros dq a v. rewrite /snap_gamma /=. apply _. Qed.
+
+  (* two owners of one byte is [False].  [FsStateDefs.phi_excl]'s consumers
+     -- [FsStateBitmap.free_pool_used], hence xv6's "freeing free block"
+     panic arm, and [FsStateDefs.blk_owned_ne] -- therefore read on the
+     durable side exactly as they do at the era's view. *)
+  Lemma snap_gamma_excl g gl gt : phi_excl (snap_gamma g gl gt).
+  Proof.
+    intros a v w dq1 dq2. rewrite /snap_gamma /=.
+    iIntros "[H1 H2]".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
+    done.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  4a.  THE BYTE HALF                                               *)
+  (* ---------------------------------------------------------------- *)
+
+  Lemma fs_footprint_xfer Γ (Hex : phi_excl Γ) S (gl gt : gname) :
+    fs_footprint Γ S ==∗
+      ∃ (g : gname) (B : gmap Z (bv 8)),
+        fs_footprint Γ S ∗ ghost_map_auth g 1 B
+        ∗ fs_footprint (snap_gamma g gl gt) S.
+  Proof.
+    iIntros "Hf".
+    iDestruct (fs_footprint_runs with "Hf") as (PM) "[%Hshape Hr]".
+    iAssert (⌜xr_disj (xr_fs S PM)⌝ ∧ phi_runs Γ (xr_fs S PM))%I
+      with "[Hr]" as "[%Hdisj Hr]".
+    { iSplit; [iApply (phi_runs_disj Γ Hex with "Hr") | iExact "Hr"]. }
+    rewrite (phi_runs_union Γ _ Hdisj).
+    iMod (ghost_map_alloc (xr_union (xr_fs S PM))) as (g) "[Hba Hbe]".
+    iModIntro. iExists g, (xr_union (xr_fs S PM)).
+    iSplitL "Hr".
+    { iApply (fs_footprint_of_runs Γ S PM Hshape).
+      rewrite (phi_runs_union Γ _ Hdisj). iExact "Hr". }
+    iFrame "Hba".
+    iApply (fs_footprint_of_runs (snap_gamma g gl gt) S PM Hshape).
+    rewrite (phi_runs_union (snap_gamma g gl gt) _ Hdisj).
+    rewrite /phi_map /snap_gamma /=. iExact "Hbe".
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  4b.  THE WHOLE INSTANCE                                          *)
+  (* ---------------------------------------------------------------- *)
+
+  Theorem fs_state_xfer Γ (Hex : phi_excl Γ) S :
+    fs_state Γ S ==∗
+      ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
+        fs_state Γ S
+        ∗ ghost_map_auth g 1 B
+        ∗ ghost_map_auth gt 1 (fss_inodes S)
+        ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
+        ∗ fs_state (snap_gamma g gl gt) S.
+  Proof.
+    iIntros "HS". iEval (rewrite fs_state_split fs_ghost_split) in "HS".
+    iDestruct "HS" as "(Hf & Hl & #Hp)".
+    iAssert (⌜∃ f, link_elem_ok (fss_inodes S) f
+                   /\ ✓ link_elem (fss_inodes S) f⌝
+             ∧ fs_links (γlink Γ) (fss_inodes S))%I with "[Hl]" as "[%Hlv Hl]".
+    { iSplit; [iApply (fs_links_valid with "Hl") | iExact "Hl"]. }
+    destruct Hlv as (f & Hfok & Hfv).
+    iMod (fs_boot_alloc_at (fss_inodes S) (fss_inodes S) f Hfok Hfv)
+      as (gl gt) "(Hta & Htf & Hl')".
+    iMod (fs_footprint_xfer Γ Hex S gl gt with "Hf") as (g B) "(Hf & Hba & Hf')".
+    iModIntro. iExists g, gl, gt, B.
+    iSplitL "Hf Hl".
+    { rewrite fs_state_split fs_ghost_split. iFrame "Hf Hl Hp". }
+    iFrame "Hba Hta".
+    iSplitL "Htf".
+    { rewrite /top_frag /snap_gamma /=. iExact "Htf". }
+    rewrite fs_state_split fs_ghost_split. iFrame "Hf' Hp".
+    rewrite /snap_gamma /=. iExact "Hl'".
+  Qed.
+
+  (* ...AND THE SAME WITH A SPARE LINK FRAGMENT RIDING ALONG (the inode
+     region's keep-alive token at the root, [InodeRegion.ireg_keep]: no
+     directory entry accounts for it, so it is not part of [fs_links] and
+     has to be transported beside it).  ONE [own_alloc] at the source's own
+     element PLUS that fragment -- [FsState.fs_boot_alloc_root_slack] --
+     which is why the slack is never a pure clause of anything. *)
+  Theorem fs_state_xfer_tok Γ (Hex : phi_excl Γ) S (r : Z) (v : ity) :
+    fs_state Γ S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
+      ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
+        fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)
+        ∗ ghost_map_auth g 1 B
+        ∗ ghost_map_auth gt 1 (fss_inodes S)
+        ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
+        ∗ fs_state (snap_gamma g gl gt) S
+        ∗ own gl (link_tok_elem r v).
+  Proof.
+    iIntros "HS Ht". iEval (rewrite fs_state_split fs_ghost_split) in "HS".
+    iDestruct "HS" as "(Hf & Hl & #Hp)".
+    iAssert (⌜∃ f, link_elem_ok (fss_inodes S) f
+                   /\ ✓ (link_elem (fss_inodes S) f ⋅ link_tok_elem r v)⌝
+             ∧ (fs_links (γlink Γ) (fss_inodes S)
+                ∗ own (γlink Γ) (link_tok_elem r v)))%I
+      with "[Hl Ht]" as "[%Hlv [Hl Ht]]".
+    { iSplit; [iApply (fs_links_valid_tok with "Hl Ht") | iFrame]. }
+    destruct Hlv as (f & Hfok & Hfv).
+    iMod (fs_boot_alloc_root_slack (fss_inodes S) f r v Hfok Hfv)
+      as (gl gt) "(Hta & Htf & Hl' & Ht')".
+    iMod (fs_footprint_xfer Γ Hex S gl gt with "Hf") as (g B) "(Hf & Hba & Hf')".
+    iModIntro. iExists g, gl, gt, B.
+    iSplitL "Hf Hl".
+    { rewrite fs_state_split fs_ghost_split. iFrame "Hf Hl Hp". }
+    iFrame "Ht Hba Hta".
+    iSplitL "Htf".
+    { rewrite /top_frag /snap_gamma /=. iExact "Htf". }
+    iSplitR "Ht'"; [| rewrite /snap_gamma /=; iExact "Ht'"].
+    rewrite fs_state_split fs_ghost_split. iFrame "Hf' Hp".
+    rewrite /snap_gamma /=. iExact "Hl'".
+  Qed.
+
+End Xfer.
