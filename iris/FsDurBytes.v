@@ -1,5 +1,4 @@
-(* FsDurBytes.v -- THE THEORY OF [LogDefs.fs_dbytes], AND THE DURABLE VIEW
-   RECORD [Gamma_D].
+(* FsDurBytes.v -- THE THEORY OF [LogDefs.fs_dbytes].
 
    Design of record: claude-notes/design/fs-state.md sections 1 and 4; this
    is durable-disk 2c-img, leaf 1.
@@ -9,8 +8,7 @@
    byte lives at [b * BSIZE + i].  What a durable instance needs is to look
    INSIDE it: that the byte elements at [fs_dbytes D] ARE the file system's
    per-block ownership, one [FsStateDefs.blk_owned] per entry of [D].  That
-   is [fs_dbelems_dbytes] below, and everything above it in this file exists
-   to get there.
+   is [fs_dbytes_blocks] below, stated Gamma-generically.
 
    THE ONE PREMISE IS A LENGTH BOUND, and it is what makes the flattening
    injective: two blocks' byte ranges are disjoint exactly because a block
@@ -20,15 +18,12 @@
    [map_fold]'s own insert equation ([map_fold_insert_L]) needs the same
    fact, since its commutation premise is [map_union_comm]'s.
 
-   [Gamma_D] IS [FsBytesGamma.fs_gamma_L]'s DURABLE TWIN.  Same record, same
-   two properties consumers cannot prove of an abstract [fsΦ]
-   ([FsStateDefs.phi_excl], [FsStateDefs.GTimeless]); what differs is which
-   byte map's full element [fsΦ] is, and where the link/top gnames come
-   from -- [RiscvPtsto.fs_dur_names], the fixed layer's bundle, rather than
-   the era's [FsBlocks.fs_names].  Both gnames arrive as PARAMETERS (the
-   standing rule), so this file binds no [riscvFixedGS] and a caller may
-   spell the ambient instance [fs_gamma_D riscv_dview_name riscv_fsdur]
-   itself. *)
+   THERE IS NO [Gamma_D] RECORD ANY MORE (durable-disk lane CE, S2's arity
+   sweep).  The pre-snapshot design instantiated [FsStateDefs]' view record
+   at a fixed-layer byte-map gname and a two-gname bundle; the snapshot
+   ruling made the durable half of [FsCrash.P_fs] a function of the
+   committed map over its OWN existential names, and nothing read the
+   instance.  What is left here is the Gamma-GENERIC flattening theory. *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -36,7 +31,6 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import dfrac.
 From iris.base_logic.lib Require Import iprop ghost_map.
 Require Import BioDefs.        (* [BSIZE] -- the flattening's stride       *)
-Require Import RiscvPtsto.     (* [fs_dur_names] -- Gamma_D's two gnames   *)
 Require Import FsImg.          (* [BSIZE_z] -- [byte_range]'s own stride   *)
 Require Import LogDefs.        (* [fs_dbytes] -- the byte flattening       *)
 (* LAST, so its [byte_range]/[blk_owned] win over the block layer's twins
@@ -327,99 +321,3 @@ Section DbytesGen.
   Qed.
 
 End DbytesGen.
-
-(* ===================================================================== *)
-(*  2.  THE DURABLE VIEW RECORD, AND THE BYTE ELEMENTS                    *)
-(* ===================================================================== *)
-
-Section DurBytes.
-  (* [diskImgG] is the tree's UNIQUE [ghost_mapG Σ Z (bv 8)] -- the class
-     the durable byte maps are stated over. *)
-  Context `{!diskImgG Σ}.
-
-  (* the byte elements of a whole byte map, named.  It is the shape the
-     snapshot's own ledger is handed in ([FsDurSnap.snap_ledger_of_elems]),
-     and the theory below is about it. *)
-  Definition fs_dbelems (g : gname) (B : gmap Z (bv 8)) : iProp Σ :=
-    ([∗ map] a ↦ v ∈ B, a ↪[g] v)%I.
-
-  Global Instance fs_dbelems_timeless g B : Timeless (fs_dbelems g B).
-  Proof. rewrite /fs_dbelems. apply _. Qed.
-
-  Lemma fs_dbelems_empty (g : gname) : fs_dbelems g ∅ ⊣⊢ emp.
-  Proof. rewrite /fs_dbelems big_sepM_empty //. Qed.
-
-  Lemma fs_dbelems_union (g : gname) (B1 B2 : gmap Z (bv 8)) :
-    B1 ##ₘ B2 ->
-    fs_dbelems g (B1 ∪ B2) ⊣⊢ fs_dbelems g B1 ∗ fs_dbelems g B2.
-  Proof. intros Hd. rewrite /fs_dbelems big_sepM_union //. Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (*  2a.  [Gamma_D]                                                     *)
-  (* ------------------------------------------------------------------ *)
-
-  (* [FsBytesGamma.fs_gamma_L]'s durable twin: the same record, at the
-     durable byte map's full element and the fixed layer's two gnames. *)
-  Definition fs_gamma_D (g : gname) (Γd : fs_dur_names) : fs_view_names Σ :=
-    MkFsView (fun (dq : dfrac) (a : Z) (v : bv 8) => (a ↪[g]{dq} v)%I)
-             (fdn_link Γd) (fdn_top Γd).
-
-  Lemma fs_gamma_D_phi (g : gname) (Γd : fs_dur_names) (a : Z) (v : bv 8) :
-    fsΦ (fs_gamma_D g Γd) (DfracOwn 1) a v = (a ↪[g] v)%I.
-  Proof. reflexivity. Qed.
-
-  Lemma fs_gamma_D_link (g : gname) (Γd : fs_dur_names) :
-    γlink (fs_gamma_D g Γd) = fdn_link Γd.
-  Proof. reflexivity. Qed.
-
-  Lemma fs_gamma_D_top (g : gname) (Γd : fs_dur_names) :
-    γtop (fs_gamma_D g Γd) = fdn_top Γd.
-  Proof. reflexivity. Qed.
-
-  (* two owners of one byte is [False] -- the concrete instance of
-     [FsStateDefs.phi_excl] at the durable view *)
-  Lemma fs_gamma_D_excl (g : gname) (Γd : fs_dur_names) :
-    phi_excl (fs_gamma_D g Γd).
-  Proof.
-    intros a v w dq1 dq2. rewrite /fs_gamma_D /=.
-    iIntros "[H1 H2]".
-    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
-    done.
-  Qed.
-
-  Global Instance fs_gamma_D_timeless (g : gname) (Γd : fs_dur_names) :
-    GTimeless (fs_gamma_D g Γd).
-  Proof. intros dq a v. rewrite /fs_gamma_D /=. apply _. Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (*  2b.  ONE BLOCK                                                     *)
-  (* ------------------------------------------------------------------ *)
-
-  (* ONE BLOCK'S ELEMENTS ARE ITS [blk_owned] *)
-  Lemma blk_owned_dbelems (g : gname) (Γd : fs_dur_names) (b : Z)
-      (bs : list (bv 8)) :
-    length bs = BSIZE ->
-    blk_owned (fs_gamma_D g Γd) b bs
-    ⊣⊢ fs_dbelems g (map_seqZ (b * Z.of_nat BSIZE) bs).
-  Proof. exact (blk_owned_seqZ (fs_gamma_D g Γd) b bs). Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (*  2c.  THE ONE LEMMA EVERYTHING NEEDS                                *)
-  (* ------------------------------------------------------------------ *)
-
-  (* THE TIE: the durable view's byte elements at [fs_dbytes D] ARE one
-     [blk_owned] per block of [D].  This is what lets stage 2c's [P_wf]
-     read [FsState.fs_state] off the flat blob [P_fs] fills [γD] with, and
-     it is the only thing that ever looks inside [fs_dbytes]. *)
-  Theorem fs_dbelems_dbytes (g : gname) (Γd : fs_dur_names)
-      (D : gmap Z (list (bv 8))) :
-    (forall b bs, D !! b = Some bs -> length bs = BSIZE) ->
-    fs_dbelems g (fs_dbytes D)
-    ⊣⊢ ([∗ map] b ↦ bs ∈ D, blk_owned (fs_gamma_D g Γd) b bs).
-  Proof. exact (fs_dbytes_blocks (fs_gamma_D g Γd) D). Qed.
-
-End DurBytes.
-
-(* a big-op over a whole-disk byte map: [iFrame] must treat it as one atom
-   (durable-notes.md, "a big-op behind a [Definition] is a hang") *)
-Global Typeclasses Opaque fs_dbelems.

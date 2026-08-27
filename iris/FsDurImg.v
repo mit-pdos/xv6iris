@@ -17,12 +17,11 @@
 (* is left is PURE: the image's decoded state (section 8), the link        *)
 (* family's validity (section 9) and the snapshot theorem (section 11).    *)
 (*                                                                        *)
-(* [FsCrash.P_fs_alloc] fills the durable byte map [riscv_dview_name] with *)
-(* [LogDefs.fs_dbytes D0] -- the flat byte elements of the boot era's      *)
-(* committed BLOCK view, which at a clean image is                        *)
-(* [fs_restrict (fs_blocks dk) (fs_home_set cov logstart)].  Stage 2c's    *)
-(* [P_wf] is not that blob but [FsState.fs_view Gamma_D].  THIS FILE IS    *)
-(* THE ONE CONVERSION, and it is where the image is decoded.               *)
+(* THE BOOT ERA'S COMMITTED BLOCK VIEW is                                  *)
+(* [fs_restrict (fs_blocks dk) (fs_home_set cov logstart)], and the        *)
+(* snapshot [FsCrash.P_fs] carries is [FsDurSnap.P_dur] of exactly that    *)
+(* map.  THIS FILE IS WHERE THE IMAGE IS DECODED into the abstract state   *)
+(* that snapshot is [snap_ok] against.                                     *)
 (*                                                                        *)
 (* IT COMPUTES NOTHING AND NAMES NO LITERAL IMAGE (ruling R3, as           *)
 (* [FsCfgBoot] follows it): every image fact arrives as a HYPOTHESIS, in   *)
@@ -1727,14 +1726,13 @@ Section DurImgSnap.
       as a resource -- off [img_P_dur_alloc], which is the image half of the
       whole story.  Era 0 is the only place the image decoder is ever read;
       every later era's boot mints from the previous era's snapshot.  *)
-  Lemma img_boot_P_fs_dur (gsw greg gst gv : gname) (Gd : fs_dur_names)
+  Lemma img_boot_P_fs_dur (gsw greg gst : gname)
       (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (nib : nat)
       (cov : gset Z) :
     fs_boot_image_wf dk ndisk sb nib cov ->
-    mono_nat_auth_own gsw 1 0%nat ∗
-    ghost_map_auth gv 1 (∅ : gmap Z (bv 8)) ⊢ |==> ∃ gs : fs_crash_names,
+    mono_nat_auth_own gsw 1 0%nat ⊢ |==> ∃ gs : fs_crash_names,
       ⌜fcn_swap gs = gsw /\ fcn_reg gs = greg /\ fcn_start gs = gst⌝ ∗
-      P_fs gs gv Gd cov (FsImg.sb_logstart sb) dk ∗
+      P_fs gs cov (FsImg.sb_logstart sb) dk ∗
       fs_receipt gs (fs_restrict (fs_blocks dk)
                        (fs_home_set cov (FsImg.sb_logstart sb))).
   Proof.
@@ -1744,7 +1742,7 @@ Section DurImgSnap.
     { rewrite /hdr_n /log_hdr_bno.
       exact (fsimg_wf_log (fs_blocks dk) sb (proj1 Himg)). }
     iIntros "H".
-    iMod (P_fs_alloc_clean gsw greg gst gv Gd dk cov (FsImg.sb_logstart sb)
+    iMod (P_fs_alloc_clean gsw greg gst dk cov (FsImg.sb_logstart sb)
             Hclean (img_P_dur_alloc dk ndisk sb nib cov Himg)
             with "H") as (gs) "(%Heq & HP & Hrc)".
     iModIntro. iExists gs. iFrame "HP Hrc".
