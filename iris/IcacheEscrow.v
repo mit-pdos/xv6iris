@@ -201,7 +201,8 @@ Local Open Scope Z_scope.
 (* the escrow layer's names, as one record (BioInv.bio_names' shape): the
    reference authority IcacheInv's lemmas take, and per slot the checkout
    token's gname and the recycle token's gname.  The itable spinlock's own
-   gname stays a separate argument, exactly as [is_itable] takes it. *)
+   gname stays a separate argument, which is why [is_itable2] takes it
+   beside this record rather than inside it. *)
 Record ic_names := MkIcNames {
   icn_esc : nat -> gname;   (* entry k's CHECKOUT token                  *)
   icn_mid : nat -> gname;   (* entry k's RECYCLE token                   *)
@@ -613,8 +614,11 @@ Section IcacheEscrow.
   (* OPTION A: the NON-PENDING (Timeless) pool shape -- the ORIGINAL two-arm
      shape, unchanged.  It is what the escrow's parked bundle [ic_unloaded]
      carries, so the escrow (and the whole loaded/unloaded/evict/fill/recycle
-     lifecycle) is untouched.  [reg_full] does NOT ride here: it lives in the
-     [regN] invariant, borrowed by [ireg_claim_au]'s callers. *)
+     lifecycle) is untouched.  [reg_full] does NOT ride here: the region's own
+     [InodeRegion.ireg_slot] arm carries each inum's [reg_full]/[reg_half]
+     fragment, coupled to pending-ness, so "non-pending => reg_full" is
+     structural and [ireg_claim_au] refutes the pending arm from the open it
+     already does. *)
   (* THE ERA'S ABSTRACT VALUE IS NOT ON THE MARKER ARM ANY MORE (durable-disk
      C-3c).  It used to ride here UNTIED, which is exactly what left the
      commit's collection unable to prove [FsDurSnap.sk_rec] or [sk_links] at a
@@ -1118,41 +1122,6 @@ Section IcacheEscrow.
     rewrite /ic_payload. iIntros "H Ht".
     iSplitL "H"; [iExact "H" | iExact "Ht"].
   Qed.
-
-  (* ---- THE PARKED ARM's TOKEN SLOT (iclaim-ledger.md §3.14 as built) ----
-
-     DEVIATION 1 (§3.10) left the parked arm carrying [ifreeze_off], and
-     A‴ asks for it to carry [(ifreeze_off ∨ ifreeze_pre)] so that iput's
-     mid-free park at +0x70 -- which happens INSIDE the freeze window -- has
-     somewhere to put the phase the mint left standing.  What lands here is
-     that widening with the RIGHT arm's content changed, and the change is
-     what makes the +0x8a re-open decidable:
-
-       [ifreeze_off z ∨ frzown z]
-
-     The free path does NOT park its [ifreeze_pre]; it keeps that in hand
-     from the mint at +0x50 all the way to the last close at +0x8a (a pure
-     ghost, untouched by the escrow choreography) and parks the RECEIPT
-     [InodeRegion]'s slot lent it instead.  So when [ic_open_auth_ref] hands
-     the arm back at +0x8a, the left disjunct dies on [IcacheRef.ifreeze_excl]
-     against the token still in the freezer's hand -- one line, no region
-     open, no licence.  Had the arm carried [ifreeze_pre] the freezer would
-     have had nothing left to decide the disjunction WITH.
-
-     WHAT IT COSTS A CHECKOUT.  [ic_swap_checkout] now hands the holder
-     [ic_payload_arm] rather than [ic_payload], so ilock owes the refutation
-     of the [frzown] arm -- which its licence pays for
-     ([IgetLic.iname_not_frozen] puts the column at [FrzOff], at which the
-     region's own clause holds the receipt, and [frzown_excl] closes it).
-     That is ProofIlock's item and is recorded there.  Every other consumer
-     of [ic_payload] is unmoved: [ic_swap_park], [ic_parked_intro],
-     [ic_close_mid_to_parked] and [ic_payload_at_pack] keep their exact
-     signatures and take the LEFT arm internally. *)
-  Definition ic_frz_park (z : Z) : iProp Σ :=
-    (ifreeze_off z ∨ frzown z)%I.
-
-  Global Instance ic_frz_park_timeless z : Timeless (ic_frz_park z).
-  Proof. rewrite /ic_frz_park. tl_struct. Qed.
 
   (* ---- THE PARKED ARM's TAIL, WIDENED BY A⁗ (iclaim-ledger.md §3.16) ----
 
@@ -3851,12 +3820,8 @@ Section IcacheEscrow.
      the bundle in the escrow and [DepTx] parks a transaction share the
      commit can refute; iput's freeze window [DepFrz] leaves NOTHING and says
      nothing, which is what [ic_slot_cover]'s alternative (d) below is stated
-     at.  No lock checkout is bundleless any more (durable-disk B''-tx4). *)
-  Definition ic_dep_bundleless (d : ic_dep) : bool :=
-    match d with
-    | DepFrz _ _ _ _ _ => true
-    | _ => false
-    end.
+     at.  No lock checkout is bundleless any more (durable-disk B''-tx4), so
+     the case split is spelled at (d) itself and needs no predicate. *)
 
   (* A BORROW THAT PUTS THE ARM BACK.  The frame [R] is existential because
      the commit takes only the piece it collects and the rest of the arm has
@@ -4453,9 +4418,9 @@ Section IcacheEscrow.
   (* ------------------------------------------------------------------ *)
 
   (* THE CACHED SET, speakable.  [M] is slot-keyed and value-blind and the
-     inums live in identity CELLS, so [itable_res] carries a pure
-     slot -> (dev, inum) map alongside; the pool then covers the region's
-     inums MINUS the cached ones. *)
+     inums live in identity CELLS, so [itable_res2] carries a pure
+     slot -> (dev, inum) map [ci] alongside; the pool then covers the
+     region's inums MINUS the cached ones. *)
   Definition ci_inums (ci : gmap nat (mword 32 * mword 32)) : gset Z :=
     list_to_set ((fun p => bv_unsigned (snd (snd p))) <$> map_to_list ci).
 
@@ -5965,8 +5930,9 @@ Section IcacheEscrow.
   Proof. iIntros "[_ $]". Qed.
 
   (* the slot accessor a WRITER needs: BOTH pure maps may come back changed,
-     provided they changed only at [k].  [IcacheInv.islots_acc_upd]'s shape
-     and proof, with one more map to carry. *)
+     provided they changed only at [k].  [big_sepL_delete] over
+     [seq 0 NINODE], with one more map to carry than
+     [IcacheInv.live_pool_acc_upd]. *)
   Lemma islots2_acc_upd (cn : ic_names) (M : gmap nat (Qp * positive))
       (ci : gmap nat (mword 32 * mword 32)) (k : nat) :
     (k < NINODE)%nat ->

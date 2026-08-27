@@ -598,33 +598,6 @@ Global Arguments sir_blk {_ _ _ _} _.
 Global Arguments sir_ind {_ _ _ _} _.
 Global Arguments sir_slot {_ _ _ _} _.
 
-(* THE PURE READING THE SPIKE USES: the state names every region inum, and
-   for the named node the record's bytes are where they are.  Everything a
-   consumer of a snapshot learns about one inode goes through this.
-
-   BOTH SIDES ARE NAMED DEFINITIONS and not inline arithmetic, because the
-   guarded form below appears inside a [⌜ ⌝], where the ambient scope is
-   [type_scope] and [a + b] would parse as [sum] (durable-notes.md, the
-   scope-stack trap). *)
-Definition snap_inum_ok (S : fs_state_rec) (i : Z) : Prop :=
-  0 <= i < sb_ninodes (fss_sb S).
-
-Definition snap_inode_at (S : fs_state_rec) (D : gmap Z (list (bv 8)))
-    (i : Z) : Prop :=
-  exists n, fss_inodes S !! i = Some n
-         /\ inode_local i n
-         /\ exists bs, D !! (sb_inodestart (fss_sb S) + i `div` 16) = Some bs
-                    /\ rec_in_blk bs (64 * (i `mod` 16)) (fn_rec n).
-
-Lemma snap_ok_inode (S : fs_state_rec) (D : gmap Z (list (bv 8))) (i : Z) :
-  snap_ok S D -> snap_inum_ok S i -> snap_inode_at S D i.
-Proof.
-  intros [Hok Hloc] Hi.
-  destruct (sk_dom Hok i Hi) as [n Hn].
-  exists n. split; [exact Hn |]. split; [exact (Hloc i n Hn) |].
-  exact (sk_rec Hok i n Hn).
-Qed.
-
 (* ===================================================================== *)
 (*  1b. THE ENCODING IS INJECTIVE, AND WHAT THAT BUYS                     *)
 (*                                                                        *)
@@ -751,104 +724,6 @@ Proof.
     by (rewrite (dinode_bytes_length dn Hwf) (dinode_bytes_length dn' Hwf') //).
   destruct (app_inj_1 _ _ _ _ Hl Hrest) as [Hd _].
   exact (dinode_bytes_inj dn dn' Hwf Hwf' Hd).
-Qed.
-
-(* ===================================================================== *)
-(*  1c. WHAT A DURABLE BYTE FACT SAYS ABOUT THE SNAPSHOT'S STATE          *)
-(* ===================================================================== *)
-
-(* THE RECORD.  What the committed map holds at inum [i]'s slot IS the
-   snapshot node's record -- which is the step from a fact about the
-   durable disk's BYTES to a fact about the durable FILE SYSTEM,
-   i.e. the whole of what the snapshot registry adds over the flat blob. *)
-Lemma snap_ok_rec_of_bytes (S : fs_state_rec) (D : gmap Z (list (bv 8)))
-    (i : Z) (bs : list (bv 8)) (dn : dinode) :
-  snap_ok S D -> snap_inum_ok S i ->
-  D !! (sb_inodestart (fss_sb S) + i `div` 16) = Some bs ->
-  rec_in_blk bs (64 * (i `mod` 16)) dn -> dinode_wf dn ->
-  exists n, fss_inodes S !! i = Some n /\ fn_rec n = dn /\ inode_local i n.
-Proof.
-  intros Hok Hi Hbs Hin Hwf.
-  destruct (snap_ok_inode S D i Hok Hi) as (n & Hn & Hloc & bs' & Hbs' & Hin').
-  rewrite Hbs in Hbs'. injection Hbs' as <-.
-  exists n. split; [exact Hn |]. split; [| exact Hloc].
-  exact (rec_in_blk_inj bs _ (fn_rec n) dn (inl_rec_wf Hloc) Hwf Hin' Hin).
-Qed.
-
-(* THE DATA.  A slot below the node's size is a block of [D], at the node's
-   own reading -- so every dirent fact about a node's [fn_data] is a fact
-   about the committed map's blocks. *)
-Lemma snap_ok_data (S : fs_state_rec) (D : gmap Z (list (bv 8)))
-    (i : Z) (n : fs_node) (k : nat) :
-  snap_ok S D -> fss_inodes S !! i = Some n ->
-  (k < FS_MAXFILE)%nat -> Z.of_nat k * BSIZE_z < fn_size n ->
-  D !! fn_naddr n k = Some (fn_data n k).
-Proof.
-  intros [Hok Hloc] Hn Hk Hlt.
-  destruct (inode_local_data_owned i n k (Hloc i n Hn) Hk Hlt)
-    as (bs & Hbs & Hdat & _).
-  rewrite Hdat. exact (sk_blk Hok i n k bs Hn Hbs).
-Qed.
-
-(* THE DIRECTORY ENTRY.  A pure reading of [dir_entries], stated here
-   because the spike's parent half is its one consumer; FOR RELOCATION it
-   belongs in [FsStateInode.v] beside [dir_entries]. *)
-Lemma dir_entries_of_first (np : fs_node) (s : fname) (z : Z) (k : nat) :
-  fn_is_dir np = true ->
-  dir_first (fn_data np) (fn_nrec np) s = Some k ->
-  bv_unsigned (dir_inum (fn_data np) k) = z ->
-  dir_entries np !! s = Some z.
-Proof.
-  intros Hdir Hfirst Hinum.
-  rewrite /dir_entries Hdir.
-  apply dir_view_lookup_Some. exists k. split; [exact Hfirst | exact Hinum].
-Qed.
-
-(* ===================================================================== *)
-(*  1d. THE TWO SHAPES THE SPIKE THEOREM READS OFF A SNAPSHOT             *)
-(*                                                                        *)
-(*  Each side is a NAMED [Prop] rather than inline arithmetic, because     *)
-(*  both appear inside a [⌜ ⌝] where the ambient scope is [type_scope]     *)
-(*  and [a + b] would parse as [sum].                                     *)
-(* ===================================================================== *)
-
-(* "the committed map's inode block holds [dn] at inum [i]'s slot" *)
-Definition snap_slot_holds (S : fs_state_rec) (D : gmap Z (list (bv 8)))
-    (i : Z) (dn : dinode) : Prop :=
-  exists bs, D !! (sb_inodestart (fss_sb S) + i `div` 16) = Some bs
-          /\ rec_in_blk bs (64 * (i `mod` 16)) dn.
-
-(* "the durable file system's inode [i] IS the record [dn]" *)
-Definition snap_node_is (S : fs_state_rec) (i : Z) (dn : dinode) : Prop :=
-  exists n, fss_inodes S !! i = Some n /\ fn_rec n = dn /\ inode_local i n.
-
-(* "the durable file system's directory [p] maps [s] to [z]" *)
-Definition snap_dir_entry (S : fs_state_rec) (p : Z) (s : fname) (z : Z)
-    : Prop :=
-  exists np, fss_inodes S !! p = Some np /\ fn_is_dir np = true
-          /\ dir_entries np !! s = Some z.
-
-Lemma snap_ok_node_of_slot (S : fs_state_rec) (D : gmap Z (list (bv 8)))
-    (i : Z) (dn : dinode) :
-  snap_ok S D -> snap_inum_ok S i -> dinode_wf dn ->
-  snap_slot_holds S D i dn -> snap_node_is S i dn.
-Proof.
-  intros Hok Hi Hwf (bs & Hbs & Hin).
-  destruct (snap_ok_rec_of_bytes S D i bs dn Hok Hi Hbs Hin Hwf)
-    as (n & Hn & Hrec & Hloc).
-  exists n. split_and!; [exact Hn | exact Hrec | exact Hloc].
-Qed.
-
-Lemma snap_dir_entry_of_first (S : fs_state_rec) (p : Z) (np : fs_node)
-    (s : fname) (z : Z) (k : nat) :
-  fss_inodes S !! p = Some np -> fn_is_dir np = true ->
-  dir_first (fn_data np) (fn_nrec np) s = Some k ->
-  bv_unsigned (dir_inum (fn_data np) k) = z ->
-  snap_dir_entry S p s z.
-Proof.
-  intros Hp Hdir Hfirst Hinum.
-  exists np. split_and!;
-    [exact Hp | exact Hdir | exact (dir_entries_of_first np s z k Hdir Hfirst Hinum)].
 Qed.
 
 (* the [snap_meta] arms, read out one at a time: this is how a caller that
@@ -1469,8 +1344,8 @@ Section Snap.
   Qed.
 
   (* ...and the same with the snapshot HANDED BACK, which is the form an
-     invariant's opener needs.  Everything the spike theorem reads off the
-     current snapshot goes through this plus the pure [snap_ok_inode]. *)
+     invariant's opener needs.  Everything a consumer reads off the current
+     snapshot goes through this plus the pure clauses of [snap_ok]. *)
   Lemma P_dur_tie_keep D :
     dblk_full D -> P_dur D -∗ ∃ S, ⌜snap_ok S D⌝ ∗ P_dur D.
   Proof.
@@ -1478,41 +1353,6 @@ Section Snap.
     iDestruct (fs_snap_read_ok _ _ _ _ _ _ Hf with "Hs") as %Hok.
     iExists S. iSplitR; [iPureIntro; exact Hok |].
     iExists g, gl, gt, B, S. iExact "Hs".
-  Qed.
-
-  (* THE SPIKE'S READING: at the current snapshot, every region inum is
-     named, its node satisfies the local clauses, and its record's bytes
-     are the ones the committed map holds at its slot. *)
-  Lemma P_dur_inode D (i : Z) :
-    dblk_full D ->
-    P_dur D -∗
-      ∃ S, ⌜snap_ok S D⌝
-           ∗ ⌜snap_inum_ok S i -> snap_inode_at S D i⌝
-           ∗ P_dur D.
-  Proof.
-    intros Hf. iIntros "H".
-    iDestruct (P_dur_tie_keep D Hf with "H") as (S Hok) "HP".
-    iExists S. iFrame "HP". iSplitR; [iPureIntro; exact Hok |].
-    iPureIntro. intros Hi. exact (snap_ok_inode S D i Hok Hi).
-  Qed.
-
-  (* THE SPIKE'S DURABLE HALF, at the current snapshot: a byte fact about
-     the committed map's inode block becomes a fact about the durable FILE
-     SYSTEM's inode.  This is what the snapshot registry adds over the flat
-     byte blob, and it is the reading [mknod_durable] is stated at. *)
-  Lemma P_dur_node_of_slot D (i : Z) (dn : dinode) :
-    dblk_full D -> dinode_wf dn ->
-    P_dur D -∗
-      ∃ S, ⌜snap_ok S D⌝
-           ∗ ⌜snap_inum_ok S i -> snap_slot_holds S D i dn ->
-              snap_node_is S i dn⌝
-           ∗ P_dur D.
-  Proof.
-    iIntros (Hf Hwf) "H".
-    iDestruct (P_dur_tie_keep D Hf with "H") as (S Hok) "HP".
-    iExists S. iFrame "HP". iSplitR; [iPureIntro; exact Hok |].
-    iPureIntro. intros Hi Hslot.
-    exact (snap_ok_node_of_slot S D i dn Hok Hi Hwf Hslot).
   Qed.
 
 End Snap.

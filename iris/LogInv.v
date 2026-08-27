@@ -684,15 +684,6 @@ Section LogInv.
     log_opSwe γ u Sb b v e0 -∗ log_opSe γ u Sb e0.
   Proof. iIntros "(H & _ & _)". iFrame. Qed.
 
-  Lemma log_opSw_intro (γ : log_names) (u : nat) (Sb : gset Z)
-      (e0 : nat) (b : Z) (v : nat) :
-    (v <= e0)%nat ->
-    log_opSe γ u Sb e0 -∗ logged_at γ e0 b -∗ log_opSw γ u Sb b v.
-  Proof.
-    intros Hv. iIntros "H Hw". iExists e0.
-    iApply (log_opSwe_intro γ u Sb e0 b v Hv with "H Hw").
-  Qed.
-
   Lemma log_opSw_opS (γ : log_names) (u : nat) (Sb : gset Z) (b : Z) (v : nat) :
     log_opSw γ u Sb b v -∗ log_opS γ u Sb.
   Proof.

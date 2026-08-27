@@ -611,9 +611,10 @@ Section IcacheGhost.
     iApply (live_slot_live with "Hs Hsl").
   Qed.
 
-  (* the pool's slot accessor -- [islots_acc_upd]'s shape and proof, and it
-     covers deletion as well as insertion because the wand takes ANY [M']
-     that agrees away from [k]. *)
+  (* the pool's slot accessor -- [big_sepL_delete] over [seq 0 NINODE], and
+     it covers deletion as well as insertion because the wand takes ANY [M']
+     that agrees away from [k].  [IcacheEscrow.islots2_acc_upd] is the same
+     shape over the table's two pure maps. *)
   Lemma live_pool_acc_upd (M : gmap nat (Qp * positive)) (k : nat) :
     (k < NINODE)%nat ->
     live_pool M -∗
@@ -3572,8 +3573,8 @@ Section IcacheTable.
      is now an [inode_ident] like every other share.
 
      [islot_rest_at] pins the two values (the pool's slot->inum map wants
-     them pinned, §13.2); [islot_rest] is the ∃-bound form the plain
-     [itable_res] uses.
+     them pinned, §13.2); [islot_rest] is the ∃-bound form
+     [IcacheEscrow.islot2]'s live arm uses.
 
      THE [None] ARM IS [False], NOT [emp] (design §13.8, C5's blocker B).
      [None] is the [q ≥ ½] case -- the whole shared half handed out, the
@@ -3604,62 +3605,6 @@ Section IcacheTable.
      §13.1e). *)
   Definition islot_free_at (k : nat) (dev inum : mword 32) : iProp Σ :=
     inode_ident k (DfracOwn (1/2)) dev inum.
-
-  Definition islot_free (k : nat) : iProp Σ :=
-    (∃ dev inum : mword 32, islot_free_at k dev inum)%I.
-
-  (* A LIVE slot also parks one iref-slot unit per outstanding reference.
-     That is what lets a thread about to run [ref++] weigh the count against
-     the supply without leaving the lock: [IrefSlots.iref_slots_no_overflow]
-     against the [iref_slots_auth] below.  Exactly [FileInv]'s arrangement
-     for [fd_slots] -- see [IrefSlots.v]'s header for why an unconditional
-     increment needs it and why no axiom may replace it. *)
-  Definition islot (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
-    match M !! k with
-    | None => islot_free k
-    | Some (q, n) => (islot_rest k q ∗ iref_slots (Pos.to_nat n))%I
-    end.
-
-  Definition itable_res : iProp Σ :=
-    (∃ M : gmap nat (Qp * positive),
-       itable_half M ∗ ⌜icM_wf M⌝ ∗ iref_slots_auth ∗
-       [∗ list] k ∈ seq 0 NINODE, islot M k)%I.
-
-  Definition is_itable (γl : gname) : iProp Σ :=
-    is_lock γl itable_lock "itable"%string itable_res.
-
-  Global Instance is_itable_persistent γl : Persistent (is_itable γl).
-  Proof. apply _. Qed.
-
-  (* The lock resource's slot accessor, in the form a WRITER needs: the map
-     may come back CHANGED, provided it changed only at [k].  Same shape and
-     same proof as [iref_cells_acc_upd] one section up -- [big_sepL_delete]
-     splits index [k] off, and the element of [seq 0 NINODE] at index [j]
-     being [j] is what turns "index ≠ k" into "this slot did not move". *)
-  Lemma islots_acc_upd (M : gmap nat (Qp * positive)) (k : nat) :
-    (k < NINODE)%nat ->
-    ([∗ list] j ∈ seq 0 NINODE, islot M j) -∗
-      islot M k ∗
-      (∀ M' : gmap nat (Qp * positive),
-         ⌜forall j, j <> k -> M' !! j = M !! j⌝ -∗
-         islot M' k -∗ [∗ list] j ∈ seq 0 NINODE, islot M' j).
-  Proof.
-    intros Hk. iIntros "Hs".
-    iDestruct (big_sepL_delete _ (seq 0 NINODE) k k
-                 ltac:(apply lookup_seq; split; [lia|exact Hk]) with "Hs")
-      as "[Hslot Hrest]".
-    iFrame "Hslot". iIntros (M') "%Hagree Hslot".
-    iApply (big_sepL_delete _ (seq 0 NINODE) k k
-              ltac:(apply lookup_seq; split; [lia|exact Hk])).
-    iFrame "Hslot".
-    iApply (big_sepL_impl with "Hrest").
-    iIntros "!>" (j x Hjx) "H".
-    destruct (decide (j = k)) as [->|Hne]; [iExact "H"|].
-    apply lookup_seq in Hjx as [Hx _].
-    assert (Hxk : x <> k) by lia.
-    iEval (rewrite /islot) in "H".
-    rewrite /islot (Hagree x Hxk). iExact "H".
-  Qed.
 
   (* THE LAST CLOSER'S JOIN, and the second half of REF-1 EXCLUSIVITY at
      the points-to level: [iref_lookup] forced [q = qt] on a slot whose

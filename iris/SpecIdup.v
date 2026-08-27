@@ -67,8 +67,7 @@
    [is_itable2] is the itable spinlock over the v2 resource (design §13.2/
    §13.3: the pure slot->inum map [ci] and the uncached POOL ride inside it
    alongside the authority half).  idup moves only the [ref] word and [M],
-   so both of those ride through its critical section untouched -- the flip
-   from [is_itable] is a re-framing, not a re-proof (§13.4).
+   so both of those ride through its critical section untouched (§13.4).
 
    It is instantiated AT THE CALLER'S [dev], because the table is
    single-device (§13.11): the region and the pool are inum-keyed, so

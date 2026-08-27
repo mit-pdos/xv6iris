@@ -917,29 +917,11 @@ End IunlockputOfDep.
 
 
 Module Type IUNLOCKPUT.
-  (* THE GENERIC FORMS (durable-disk B''-tx4): one proof of iunlockput's code,
+  (* THE GENERIC FORM (durable-disk B''-tx4): one proof of iunlockput's code,
      the park's descriptor chosen by the caller.  The two published readings
-     below are their [DepTx] instances. *)
-  Parameter wp_iunlockput_dep_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
-      (pd pav pu : mword 64)
-      (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
-      (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
-      (dn' : dinode) (bm' : blkmap)
-      (n : nat) (tid : nat) (qtx : Qp)
-      (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn
-                                   gtl gil gisl cov logstart bmapstart
-                                   inodestart nib size dev k qi s gy d inum
-                                   dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks Vpr.
+     below are its [DepTx] instances.  The sconf reading of the generic form
+     is NOT published: its only application is inside [ProofIunlockput], where
+     it is a [Local Lemma] discharging [wp_iunlockput_tx_sconf]. *)
   Parameter wp_iunlockput_dep_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)

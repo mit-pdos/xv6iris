@@ -6,7 +6,7 @@
 
      FsStateDefs.v    the view record [Γ], [byte_range], [blk_owned]
      FsStateLink.v    the link-counting RA
-     FsStateInode.v   [rec_owned], [ind_owned], [inode_owned], [dir_owned]
+     FsStateInode.v   [rec_owned], [ind_owned], [inode_owned]
      FsStateBitmap.v  [free_bitmap]
      FsState.v        [sb_owned], [fs_inodes], [fs_state], [fs_view], the mint
 

@@ -588,7 +588,7 @@ Section ProofIunlockputMain.
   (*  [ip_spend_w w false false <= 2 <= iput_units], so the gen bound is    *)
   (*  weaker and the seal's arithmetic goes the easy way.                   *)
   (* ===================================================================== *)
-  Lemma wp_iunlockput_dep_sconf
+  Local Lemma wp_iunlockput_dep_sconf
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
