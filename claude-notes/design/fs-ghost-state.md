@@ -411,6 +411,24 @@ somebody will otherwise re-derive:
   durable resources, and per-transaction deferred WRITE SETS in the WAL's
   ledger; plan §8.
 
+**THE BOOT MINT CONSUMES THIS SIDE (lane E-mint).**  The era's file-system
+instance is no longer decoded out of `fs.img`: `FsCfgSnap.fs_cfg_alloc_snap`
+mints it from `FsDurSnap.snap_ok S (fs_restrict (fs_blocks dk)
+(fs_home_set cov ls))` — the same pure tie the commit re-establishes — and
+distributes it into the region, the pool, the bitmap and `ftop_inv` exactly
+as before.  `FsCfgSnap.snap_rec_decode` is the ONE bridge (`sk_rec` against
+`FsDurImg.img_rec_in_blk`, closed by `rec_in_blk_inj`); above it nothing
+reads the block function except through `snap_bytes`' clauses, and every
+peel of the boot ledger is `snap_names_cov` closed by the used-set coupling
+(`sk_meta_used`/`sk_own_used`).  So `sk_regdom`, `sk_dirloc`, `sk_links`'
+root slack and `FsStateInode.inl_bare_free` all have a CONSUMER, which is
+plan §7's definition of done for them.  What still spends the image is one
+lemma, `FsCfgSnap.fs_cfg_alloc_img` = the mint at `FsDurImg.img_snap_ok`;
+it is era 0's snapshot producer and nothing else.  The mint still runs at
+PowerOn inside `BootShared.boot_shared_alloc` — `iris/FsBootWall.v` records
+why it cannot yet move into `fsinit` (userinit's `namei("/")` takes the
+root's pool row first) and the two exits.
+
 ## 3. The inode region (`InodeRegion.v`, invariant `iregN`, gname `γi`)
 
 The bottom of the inode world: one `ireg_slot γi z d` per inum `z` inside
@@ -1018,6 +1036,12 @@ contract in the tree.
 | contract facts | `SpecIdup` carries `!logG` + `ireg_inv` (the region handle its count move needs — `ireg_inv`'s type really does mention `logG`, via the epoch coupling).  It is stated over `inode_held`: **`inode_held (ientry k)` in, `inode_held ∗ inode_held` out**, because both of its callers (`ProofKforkB4`'s parent cwd, `ProofNamex`'s cwd) HOLD `inode_held` already — the shed/gather lives INSIDE the contract.  There are no `s`/`inum` binders; a pure `dev = icfg_dev` tie rides in their place (the `sysc_fs_env` pattern), because `inode_held` is pointer-keyed at the cache's own device.  `K_iput = 74`, `K_iunlockput = 78`. |
 
 ## 7. Boot phase, the seal, and `fs_ready`
+
+WHERE THE ERA'S INSTANCE COMES FROM (lane E-mint): `FsCfgSnap`'s mint, run
+inside `BootShared.boot_shared_alloc` at PowerOn, off the durable snapshot
+(§2b) — NOT off `fs.img`, whose decoders are confined to era 0's snapshot
+producer `FsDurImg.img_snap_ok`.  The seal below is unchanged by that and
+still runs after `fsinit` returns.
 
 `ireg_boot := ity_pending icfg_boot` (exclusive) vs `ireg_open := ∃ ty,
 ity_shot icfg_boot ty` (persistent) — a one-shot (`ity_shoot`).

@@ -290,6 +290,29 @@ placement: the log's write set never names block 1 (`fsinit` reads the
 superblock off the raw disk before recovery; `sb_park`'s full-fraction
 run refutes any `log_write` at block 1 — a row of `log_state`).
 
+**THE PLACEMENT HALF OF THAT RULING IS REFUTED (lane E-mint, machine-checked
+in `iris/FsBootWall.v`).**  "The icache's slot escrows and pool are sealed
+EMPTY at PowerOn and stocked by the same mint" cannot hold: `userinit` runs
+at main+0x9e, BEFORE `fsinit` (which is forkret's arm), and its
+`p->cwd = namei("/")` is one `iget(ROOTDEV, ROOTINO)` that MOVES the inum's
+pool row into the slot escrow (`IcacheEscrow.ipool_take_lend`), so
+`ipool_body`'s partition row — at the three empty keys `icache_boot_at` is
+handed — forces the ordinary index to BE the whole region
+(`boot_pool_index_forced`, `boot_pool_holds_root`,
+`boot_empty_pool_refuted`).  A pool row is not a marker: its allocated arm
+is the inode's whole era-side bundle.  What IS built and is
+placement-independent is the mint reading the SNAPSHOT rather than the
+image — `FsCfgSnap.fs_cfg_alloc_snap`, with `fs_cfg_alloc_img` (the era-0
+corollary, off `FsDurImg.img_snap_ok`) as its one image-spending caller.
+It currently runs where `fs_cfg_alloc` ran, at PowerOn, which keeps
+`SpecFsinit`'s `hdr_n = 0`.  The two exits — (1) mint `L` at `D` with a
+WAL-owned exception set inside `FsBlocks.fs_bytes_body` that
+`install_trans` shrinks, plus a "recovery is done" seal on ~28 readers of
+`bytes_tie`; (2) a third, content-free arm on `ipool_shape_np` with the
+fsinit mint filling the pool AND the fifty escrows — are written out in
+`FsBootWall.v`'s header and are the owner's to choose.  Both consume
+`fs_cfg_alloc_snap` unchanged.
+
 **The theorem** (the spike, `mknod_durable`): for the batch containing a
 `mknod`'s transaction, after its commit the CURRENT snapshot's inode
 table at `inum` is `create_made ty major minor` and the parent's

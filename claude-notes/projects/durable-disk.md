@@ -2536,6 +2536,112 @@ so it never wanted that shape.
     (`Himg g' Hbf`), from which `FirstTok.first_fsinit_pures_of_image`
     produces both `hdr_n = 0` and the superblock image facts.  That is
     E-boot's lane.
+
+    **AS LANDED (E-mint): THE MINT READS THE SNAPSHOT.  THE PLACEMENT IS A
+    WALL, AND IT IS MACHINE-CHECKED.**
+
+    THE VALUE SIDE IS CLOSED.  `iris/FsCfgSnap.v` (new) is
+    `FsCfgBoot.fs_cfg_alloc` with every image premise replaced by
+    `FsDurSnap.snap_ok S (fs_restrict (fs_blocks dk) (fs_home_set cov ls))`
+    and every object spelled at `S`'s own node.  `fs_cfg_alloc` is DELETED
+    from `FsCfgBoot.v`; what `BootShared.boot_shared_alloc` calls is
+    `FsCfgSnap.fs_cfg_alloc_img`, which is `fs_cfg_alloc_snap` applied to
+    `FsDurImg.img_snap_ok` -- the ONE place `fs_boot_image_wf` is spent and
+    the only reader of the `img_*` decoders below `FsDurImg`.  It takes the
+    image bundle WHOLE rather than ten projections, so the call site is one
+    line.
+
+    THE ONE BRIDGE IS `snap_rec_decode`: at a named inum the image
+    DECODER's record IS the snapshot node's record (`sk_rec` against
+    `FsDurImg.img_rec_in_blk`, closed by `rec_in_blk_inj`).  Above it
+    nothing reads the block function except through `snap_bytes`' own
+    clauses.  What each image sweep became:
+      * `IcacheBoot.ireg_alloc`'s six ∀-over-decodings conjuncts <-
+        `inode_local`'s `inl_free`/`inl_nlink`/`inl_type`/`inl_bare_free`
+        at the node `sk_regdom` names (`snap_ireg_premises`).
+      * `InodeRegion.ftop_alloc`'s locality premise <- `snap_local`,
+        VERBATIM.
+      * the TYPE REGISTER <- `sk_links`'s SLACKED element through
+        `FsState.fs_boot_alloc_root_slack`, split by
+        `FsStateInode.inode_link_iff` into the region's `ireg_lnk_at` and
+        each directory's `ent_toks_x` (`snap_link_route`).  The root's
+        keep-alive is read off its own authority by
+        `FsStateLink.link_auth_tok_agree`, so nothing is assumed about the
+        slack fragment's value, and `FsCfgBoot`'s ticket routing
+        (`ireg_lnks_of_image`, `ent_toks_of_region`) has no reader.
+      * `IcacheBoot.ipool_alloc`'s per-inum bundle <- `snap_inode_ok`
+        (`FsStateEra.inode_ok_of_local` + `snap_names_cov` + `sk_slot`),
+        `inode_rec_local_of`, `dir_uniq_of_local` and
+        `FsDurSnap.snap_node_dir_local` (= `sk_dirloc`), with
+        `FsStateEra.bm_of`/`fn_data` as the node's own decomposition and
+        `era_node_bm_of` rebuilding it (`ipool_alloc_of_snap`).
+      * the BITMAP <- `sk_bmap`/`sk_pool`, its disjointness from the free
+        pool off `sk_meta_used` rather than an arithmetic argument about
+        the data region (`bitmap_res_of_snap`).
+      * EVERY PEEL of the home ledger is `snap_names_cov` closed by the
+        USED-SET COUPLING.  `snap_meta_ireg` -- a region block is inum
+        `16j`'s record block, by `sk_regdom` -- is the only new pure lemma,
+        and the only geometry spent is `sk_sbok`'s.
+    So `sk_regdom`, `sk_dirloc`, `sk_links`' root slack and
+    `inl_bare_free` -- lanes E-boot and E-clauses' four new clauses -- are
+    CONSUMED BY A MINT, which is plan §7's definition of done for them.
+
+    **THE WALL IS THE PLACEMENT, and it refutes the ruling's second
+    sentence.**  Plan §5 puts the mint inside `fsinit` after `initlog`,
+    with "the icache's slot escrows and pool sealed EMPTY at PowerOn".  The
+    escrows are; THE POOL CANNOT BE.  `userinit` runs at main+0x9e, BEFORE
+    `fsinit` (which is forkret's arm), and its `p->cwd = namei("/")` is one
+    `iget(ROOTDEV, ROOTINO)` that MOVES the inum's pool row into the slot
+    escrow's MID arm (`ProofIget.v` ~:1378, `IcacheEscrow.ipool_take_lend`).
+    `IcacheEscrow.ipool_body`'s partition row, at the three EMPTY keys
+    `IcacheBoot.icache_boot_at` is handed, forces the ordinary index to BE
+    the whole region: `iris/FsBootWall.v`'s `boot_pool_index_forced` /
+    `boot_pool_holds_root` / `boot_empty_pool_refuted`.  A pool row is not a
+    marker -- `ipool_ord` carries `ipool_shape_np`, whose allocated arm is
+    the inode's whole era-side bundle.
+    So the mint stays at PowerOn inside `boot_shared_alloc`, and
+    `SpecFsinit`'s premise (g) `hdr_n = 0` DID NOT MOVE: at a clean header
+    the committed map IS the raw home blocks, which is exactly what
+    `fs_cfg_alloc_snap`'s premise wants.  E-recover's wall is unchanged.
+    `xv6_power_adequacy` / `Himg` / `fs_boot_image_eras` were not touched.
+
+    **THE TWO EXITS**, written out in `FsBootWall.v`'s new header, are the
+    owner's to choose; both consume `fs_cfg_alloc_snap` exactly as it
+    stands and differ only in the fupd it runs in.
+      (1) MINT `L` AT `D` AND KEEP THE MINT AT PowerOn.  Nothing about the
+          file system then waits for `install_trans`; what waits is the tie
+          between the byte view and the buffer cache
+          (`FsBlocks.bytes_tie`, `BioInv.pool_blk`), false for the ≤
+          LOGSIZE pending home blocks in the recovery window.  The cost is
+          an exception set inside `FsBlocks.fs_bytes_body` that
+          `install_trans` shrinks plus a "recovery is done" seal on the ~28
+          readers of the tie.  It lands on the WAL.
+      (2) GIVE `ipool_shape_np` A THIRD, CONTENT-FREE ARM.  `iget` may move
+          an unminted row (nothing `ilock`s before `fsinit`), and the
+          fsinit mint fills every row.  Its price is that the root's row is
+          NOT in the pool by then -- userinit took it -- so the mint has to
+          reach into the fifty slot escrows as well, which is the commit's
+          own fifty-invariant opening (`FsCollectAll`) run backwards, and
+          every consumer of the pool's arms grows a case.
+
+    **WHAT `Himg` STILL FEEDS, measured on this branch.**  (i)
+    `BootShared.boot_shared_alloc` spends it in exactly ONE place,
+    `FsCfgSnap.fs_cfg_alloc_img`; its fifteen projections are otherwise
+    unread there (the `destruct` is kept because it is what frees the name
+    `Himg` for `disk_ghosts_alloc`'s own gname equation).  (ii)
+    `SystemAdequacy` also hands it to `boot_hart_primary`, where
+    `FirstTok.first_fsinit_pures_of_image` produces `hdr_n = 0`, block 1's
+    byte shape, the parse/`sb_ok` pair and `col_geom`.  That half is
+    untouched: it is `SpecFsinit`'s premise (g) and its companions, and it
+    goes only with the recovery window.
+
+    **LEFT BEHIND, deliberately:** `FsCfgBoot`'s image routing --
+    `ipool_alloc_of_image`, `ireg_lnks_of_image`, `ent_toks_of_region`,
+    `bitmap_res_of_image`, `image_ireg_premises`, `img_nodes_local` and the
+    `img_*` readings above them -- is caller-less now.  It is kept, as
+    `InodeRegion.dv_lend_mint` was kept at E-unpin, for the lane that
+    deletes `Himg` to sweep; a note at `FsCfgBoot.v`'s deletion site names
+    each one's snapshot twin.
 - [ ] **Lane D — HANDED OFF (owner).**  Durability statements about
   individual syscalls (`mknod_durable` and its siblings) belong to the
   file-system BEHAVIOUR specification project
