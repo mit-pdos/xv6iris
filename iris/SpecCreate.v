@@ -353,6 +353,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -462,21 +463,21 @@ Section CreateSpec.
      caller re-form and spend the reference.  Factored out because
      sys_open, sys_mkdir and sys_mknod all consume it and none of them
      should have to re-spell it. *)
-  Definition create_locked (cn : ic_names) (γfs : fs_names) (γi : gname)
+  Definition create_locked (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (pidv : mword 32)
       (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ γil γisl : gname,
-       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) ∗
+       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) ∗
        sleeplocked_q γisl s (i_lock (ientry k)) pidv ∗
        (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): create returns with
           the child still write-locked, so what it hands over is the
           TRANSACTIONAL descriptor -- the escrow's arm at a half beside the
           holder's own half of the same element.  It stands exactly where a
-          bare [ic_deposit cn k d] stands, at the same arguments, and it is
+          bare [ic_deposit fsc_ic k d] stands, at the same arguments, and it is
           why this contract's post no longer hands the
           caller a separate [LogInv.log_tx] on the success arm. *)
-       ic_tx_dep cn k s dev inum g ∗
+       ic_tx_dep fsc_ic k s dev inum g ∗
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
        i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
        i_valid (ientry k) ↦₄ valid_word true ∗
@@ -504,11 +505,11 @@ Section CreateSpec.
      site in ProofCreate.v -- [iSplitL]/[iExact] is free, the same fix as
      [IcacheEscrow.ic_mk_loaded] for the same reason (optimization.md,
      "Framing"). *)
-  Lemma create_locked_mk cn γfs γi cov logstart dev pidv k qi s g inum dn bm
+  Lemma create_locked_mk γfs γi cov logstart dev pidv k qi s g inum dn bm
       γil γisl :
-    is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+    is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
     sleeplocked_q γisl s (i_lock (ientry k)) pidv -∗
-    ic_tx_dep cn k s dev inum g -∗
+    ic_tx_dep fsc_ic k s dev inum g -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
@@ -517,7 +518,7 @@ Section CreateSpec.
     ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short_gen k (qi + s)%Qp qi dev inum g -∗
     runit_any (bv_unsigned inum) -∗
-    create_locked cn γfs γi cov logstart dev pidv k qi s g inum dn bm.
+    create_locked γfs γi cov logstart dev pidv k qi s g inum dn bm.
   Proof.
     iIntros "Hlk Hlkd Hdep Hdev Hinum Hvalid Hload Hshot Hfrz Href Hru".
     rewrite /create_locked. iExists γil, γisl.
@@ -540,7 +541,7 @@ Definition wp_create_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γi : gname)
-    (cn : ic_names) (gtl : gname)                     (* the icache + itable *)
+    (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname) (γpr : gname)           (* kalloc, ftable, printk *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (ninodes : Z) (size : Z) (dev : mword 32)
@@ -626,10 +627,10 @@ Definition wp_create_sconf_body
   log_ctx γ bn γfs cov logstart dev -∗
   kalloc_env γa None -∗
   (* ---- THE ICACHE, THE ITABLE AND THE INODE REGION ---- *)
-  is_itable2 gtl cn γfs γi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic γfs γi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows cn γfs γi cov logstart -∗
-  ic_sleeplocks cn -∗
+  ic_escrows fsc_ic γfs γi cov logstart -∗
+  ic_sleeplocks fsc_ic -∗
   ireg_inv γi γfs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
      borrowed, never spent.  create is the only function in the tree that
@@ -748,7 +749,7 @@ Definition wp_create_sconf_body
                       tests at +0x4c / +0x5c passed. *)
                 ty = T_FILE
                 /\ (di_type dn = T_FILE \/ di_type dn = T_DEVICE))⌝ ∗
-         create_locked cn γfs γi cov logstart dev pidv k qi s g inum dn bm
+         create_locked γfs γi cov logstart dev pidv k qi s g inum dn bm
        else (* ARMS N / F-BAD / A-FAIL / FAIL: a0 = 0 and create holds
                nothing -- every inode it touched has been iunlockput. *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
@@ -765,7 +766,7 @@ Module Type CREATE.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (γa : gname) (γf : gname) (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
@@ -777,7 +778,7 @@ Module Type CREATE.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
+      wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi gtl
                            γa γf γpr cov logstart bmapstart inodestart nib
                            ninodes size dev plen pfun ty major minor
                            V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.

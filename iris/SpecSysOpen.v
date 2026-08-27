@@ -210,6 +210,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -265,7 +266,7 @@ Definition wp_sys_open_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names) (gfs : fs_names) (gi : gname)
-    (cn : ic_names) (gtl : gname)                       (* the icache + itable *)
+    (gtl : gname)                       (* the itable's lock   *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (ninodes : Z) (size : Z) (dev : mword 32)
     (ns : nat)                                          (* the iref ledger     *)
@@ -340,10 +341,10 @@ Definition wp_sys_open_sconf_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region ialloc / itrunc claim out of ---- *)
-  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
   itable_inv -∗
-  ic_escrows cn gfs gi cov logstart -∗
-  ic_sleeplocks cn -∗
+  ic_escrows fsc_ic gfs gi cov logstart -∗
+  ic_sleeplocks fsc_ic -∗
   ireg_inv gi gfs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
      borrowed and never spent; it rides the SAME channel [ireg_inv] does,
@@ -415,7 +416,7 @@ Module Type SYSOPEN.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
       (ns : nat)
@@ -425,7 +426,7 @@ Module Type SYSOPEN.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_open_sconf_body γfl γf γa γpr gs j gl gu gd gk pd pav pu bn g gfs
-                             gi cn gtl cov logstart bmapstart inodestart nib
+                             gi gtl cov logstart bmapstart inodestart nib
                              ninodes size dev ns dqb dqs dqbs dqn v vom
                              pid V m K eb b lks.
 End SYSOPEN.

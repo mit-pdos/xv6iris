@@ -105,6 +105,7 @@ Require Import ProofSysOpenParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -580,7 +581,7 @@ Section ProofSysOpenTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -622,14 +623,14 @@ Section ProofSysOpenTails.
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow cn gfs gi cov logstart kk -∗
+    ic_escrow fsc_ic gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep cn kk s dev inum gy -∗
+    ic_tx_dep fsc_ic kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -748,7 +749,7 @@ Section ProofSysOpenTails.
        the ARMED contract (B''-tx4), which retires the descriptor in the
        ghost step that parks the payload and hands the whole token back. *)
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
+              pd pav pu bn g gfs gi gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 24)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -931,7 +932,7 @@ Section ProofSysOpenTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -973,14 +974,14 @@ Section ProofSysOpenTails.
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow cn gfs gi cov logstart kk -∗
+    ic_escrow fsc_ic gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep cn kk s dev inum gy -∗
+    ic_tx_dep fsc_ic kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1099,7 +1100,7 @@ Section ProofSysOpenTails.
        the ARMED contract (B''-tx4), which retires the descriptor in the
        ghost step that parks the payload and hands the whole token back. *)
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
+              pd pav pu bn g gfs gi gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 24)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -1282,7 +1283,7 @@ Section ProofSysOpenTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -1323,14 +1324,14 @@ Section ProofSysOpenTails.
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow cn gfs gi cov logstart kk -∗
+    ic_escrow fsc_ic gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep cn kk s dev inum gy -∗
+    ic_tx_dep fsc_ic kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1445,7 +1446,7 @@ Section ProofSysOpenTails.
        the ARMED contract (B''-tx4), which retires the descriptor in the
        ghost step that parks the payload and hands the whole token back. *)
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
+              pd pav pu bn g gfs gi gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 24)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -1681,7 +1682,7 @@ Section ProofSysOpenTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -1728,14 +1729,14 @@ Section ProofSysOpenTails.
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow cn gfs gi cov logstart kk -∗
+    ic_escrow fsc_ic gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep cn kk s dev inum gy -∗
+    ic_tx_dep fsc_ic kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1908,7 +1909,7 @@ Section ProofSysOpenTails.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (so_tail_e (CID0 := CID4) gs jx gl gu gd gk pd pav pu bn g gfs gi
-              cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
+              gtl gil gisl cov logstart bmapstart inodestart nib size dev
               kk qi s gy inum dn bm u pidv dq dqb dqs m P1 sp0 K eb b lks
               (m !!! Regidx Rs3 : mword 64) w6 w23 w24 bp
               Vpr HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -1965,7 +1966,7 @@ Section ProofSysOpenTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gil gisl : gname)
+      (gil gisl : gname)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (kk : nat) (s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
@@ -1997,10 +1998,10 @@ Section ProofSysOpenTails.
     fs_crash_seam cov logstart -∗
     gen_cert -∗
     itable_inv -∗
-    ic_escrow cn gfs gi cov logstart kk -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    ic_escrow fsc_ic gfs gi cov logstart kk -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep cn kk s dev inum gy -∗
+    ic_tx_dep fsc_ic kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -2098,7 +2099,7 @@ Section ProofSysOpenTails.
        the other half inside the descriptor ever since.  The release takes
        the ARMED contract (B''-tx4), which retires the descriptor in the
        ghost step that parks the payload and hands the whole token back. *)
-    iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID2) gs gfs gi cn gil gisl
+    iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID2) gs gfs gi gil gisl
               cov logstart kk s gy dev inum dn bm pidv dq M2 (K - 24)%nat eb
               (proc_addr jx) b lks
               Vpr HKiu Hkk HM2a0

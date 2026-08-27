@@ -91,6 +91,7 @@ Require Import ProofSysUnlinkParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -763,7 +764,7 @@ Section ProofSysUnlinkTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -805,14 +806,14 @@ Section ProofSysUnlinkTails.
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow cn gfs gi cov logstart kk -∗
+    ic_escrow fsc_ic gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep cn kk s dev inum gy -∗
+    ic_tx_dep fsc_ic kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -932,7 +933,7 @@ Section ProofSysUnlinkTails.
        release of the walk, so the ARMED contract (B''-tx4) brings the whole
        element home in the ghost step that parks the payload. *)
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
+              pd pav pu bn g gfs gi gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 30)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -1101,7 +1102,7 @@ Section ProofSysUnlinkTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -1142,14 +1143,14 @@ Section ProofSysUnlinkTails.
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow cn gfs gi cov logstart kk -∗
+    ic_escrow fsc_ic gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep cn kk s dev inum gy -∗
+    ic_tx_dep fsc_ic kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1246,7 +1247,7 @@ Section ProofSysUnlinkTails.
     iDestruct (cpu_claim_ext_transport CID0 CID1 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (su_tail_bad (CID0 := CID1) gs jx gl gu gd gk pd pav pu bn g gfs gi
-              cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
+              gtl gil gisl cov logstart bmapstart inodestart nib size dev
               kk qi s gy inum dn bm u pidv dq dqb dqs m M1 sp0 K eb b lks
               (m !!! Regidx Rs2 : mword 64) w5 w6 w27 w30 bd bnm bp be
               Vpr HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -1285,7 +1286,7 @@ Section ProofSysUnlinkTails.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (gil gisl : gname) (gili gisli : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -1332,16 +1333,16 @@ Section ProofSysUnlinkTails.
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow cn gfs gi cov logstart kk -∗
-    ic_escrow cn gfs gi cov logstart ki -∗
+    ic_escrow fsc_ic gfs gi cov logstart kk -∗
+    ic_escrow fsc_ic gfs gi cov logstart ki -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     (* ---- dp, still locked: released in [bad:] ---- *)
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep_at cn kk s dev inum gy t (1/4) -∗
+    ic_tx_dep_at fsc_ic kk s dev inum gy t (1/4) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1355,9 +1356,9 @@ Section ProofSysUnlinkTails.
     (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
     runit_any (bv_unsigned inum) -∗
     (* ---- ip, released HERE ---- *)
-    is_sleeplock_gen gili gisli (i_lock (ientry ki)) "inode"%string (ic_tok cn ki) (slh_tok (icfg_isl ki)) -∗
+    is_sleeplock_gen gili gisli (i_lock (ientry ki)) "inode"%string (ic_tok fsc_ic ki) (slh_tok (icfg_isl ki)) -∗
     sleeplocked_q gisli si (i_lock (ientry ki)) pidv -∗
-    ic_tx_dep_at cn ki si dev inumi gyi t (1/4) -∗
+    ic_tx_dep_at fsc_ic ki si dev inumi gyi t (1/4) -∗
     i_dev (ientry ki) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry ki) ↦₄{DfracOwn (1/2)} inumi -∗
     i_valid (ientry ki) ↦₄ valid_word true -∗
@@ -1484,7 +1485,7 @@ Section ProofSysUnlinkTails.
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
+              pd pav pu bn g gfs gi gtl gili gisli cov logstart bmapstart
               inodestart nib size dev ki qip si gyi
               (DepTx si dev inumi gyi t (1/4)%Qp) inumi dni bmi u SbE
               false false false eE _ _ pidv
@@ -1504,7 +1505,7 @@ Section ProofSysUnlinkTails.
     (* ...and [dp]'s arm GROWS back to a half, which is where a one-lock
        walk stands: [su_tail_bad] takes [ic_tx_dep]. *)
     iApply fupd_wp.
-    iMod (ic_grow_tx ⊤ cn gfs gi cov logstart kk s dev inum gy true
+    iMod (ic_grow_tx ⊤ fsc_ic gfs gi cov logstart kk s dev inum gy true
             t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter)
             ltac:(solve_ndisj) with "Hesck Hivalid Hdep Htd")
       as "(Hivalid & Hdep)".
@@ -1602,7 +1603,7 @@ Section ProofSysUnlinkTails.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID6)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (su_tail_bad (CID0 := CID6) gs jx gl gu gd gk pd pav pu bn g gfs gi
-              cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
+              gtl gil gisl cov logstart bmapstart inodestart nib size dev
               kk qi s gy inum dn bm n2 pidv dq dqb dqs m P2 sp0 K eb b
               lks (m !!! Regidx Rs2 : mword 64) (m !!! Regidx Rs3 : mword 64)
               w6 w27 w30 bd bnm bp be

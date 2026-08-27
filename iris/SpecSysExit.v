@@ -83,6 +83,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -101,7 +102,7 @@ Definition wp_sys_exit_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (ip : mword 64) (dqi : dfrac)                     (* the initproc cell   *)
     (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
-    (γi : gname) (cn : ic_names) (γtl : gname)        (* the inode cache     *)
+    (γi : gname) (γtl : gname)        (* the itable's lock   *)
     (bmapstart inodestart : Z) (nib : nat) (size : Z)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
@@ -110,7 +111,7 @@ Definition wp_sys_exit_sconf_body
   let pj := proc_addr j in
   fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
          cov logstart dev pid (DfracOwn (1/4))
-         γi cn γtl bmapstart inodestart nib size ->
+         γi γtl bmapstart inodestart nib size ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* the syscall argument, out of the trapframe page [proc_priv] carries *)
@@ -192,13 +193,13 @@ Module Type SYSEXIT.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (dqi : dfrac)
       (γkl : gname) (γka : gname * gname)
-      (γi : gname) (cn : ic_names) (γtl : gname)
+      (γi : gname) (γtl : gname)
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string),
       wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                              cov logstart dev ip dqi γkl γka
-                             γi cn γtl bmapstart inodestart nib size
+                             γi γtl bmapstart inodestart nib size
                              on fn m av eb b pid V v0 lks.
 End SYSEXIT.

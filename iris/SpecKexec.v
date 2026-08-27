@@ -197,6 +197,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -340,7 +341,7 @@ Definition fs_fabric
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64) (bn : bio_names)
-    (g : log_names) (gfs : fs_names) (gi : gname) (cn : ic_names) (gtl : gname)
+    (g : log_names) (gfs : fs_names) (gi : gname) (gtl : gname)
     (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
     : iProp Σ :=
   (* THE AMBIENT KERNEL ENVIRONMENT, which every fs contract below this one
@@ -355,10 +356,10 @@ Definition fs_fabric
    log_ctx g bn gfs cov logstart dev ∗
    fs_crash_seam cov logstart ∗
    gen_cert ∗
-   is_itable2 gtl cn gfs gi cov logstart nib dev ∗
+   is_itable2 gtl fsc_ic gfs gi cov logstart nib dev ∗
    itable_inv ∗
-   ic_escrows cn gfs gi cov logstart ∗
-   ic_sleeplocks cn ∗
+   ic_escrows fsc_ic gfs gi cov logstart ∗
+   ic_sleeplocks fsc_ic ∗
    ireg_inv gi gfs inodestart nib ∗
    (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2 RULING B, §6'' RULING
       G').  The kexec cone reaches iput (fileclose on the exec'ing process's
@@ -385,8 +386,8 @@ Definition fs_fabric
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    gs gu gd gk pd pav pu bn g gfs gi cn gtl cov logstart inodestart nib dev :
-  Persistent (fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    gs gu gd gk pd pav pu bn g gfs gi gtl cov logstart inodestart nib dev :
+  Persistent (fs_fabric gs gu gd gk pd pav pu bn g gfs gi gtl
                         cov logstart inodestart nib dev).
 Proof. apply _. Qed.
 
@@ -402,7 +403,7 @@ Definition wp_kexec_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (g : log_names) (gfs : fs_names) (gi : gname)
-    (cn : ic_names) (gtl : gname)                       (* the icache + itable *)
+    (gtl : gname)                       (* the itable's lock   *)
     (ga : gname) (gf : gname)                           (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -511,7 +512,7 @@ Definition wp_kexec_sconf_body
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+  fs_fabric gs gu gd gk pd pav pu bn g gfs gi gtl
             cov logstart inodestart nib dev -∗
   kalloc_env ga None -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -588,7 +589,7 @@ Module Type KEXEC.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -599,7 +600,7 @@ Module Type KEXEC.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gfs gi gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev plen pfun na avf alen aslen afun
                           pidv V dqb dqs dqa dqpv dqas m K eb b lks.

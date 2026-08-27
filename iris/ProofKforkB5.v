@@ -229,7 +229,7 @@ Section ProofKforkB5.
     { iDestruct "Hfdone" as "[_ #Hrdy]". iApply (FsReady.fs_ready_geom with "Hrdy"). }
     pose (N := MkUtNames γft γf γw γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
                  γtl fsc_printk fsc_bio icfg_log fsc_fs fsc_cov fsc_logst icfg_dev
-                 iv1 DfracDiscarded fsc_kalloc fsc_kpages fsc_ireg fsc_ic fsc_itlock
+                 iv1 DfracDiscarded fsc_kalloc fsc_kpages fsc_ireg fsc_itlock
                  fsc_bmapstart icfg_ist icfg_nib fsc_size ks pid_c).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (FsReady.fgo_loggeom Hgeomok)]. }

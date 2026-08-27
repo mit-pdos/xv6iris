@@ -74,6 +74,7 @@ Require Import ProofKexecTail.
 Require Import SpecKexec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -540,14 +541,14 @@ Section KexecBSeam.
      (convention 6): nine resources phases A and B both carry and neither
      looks inside.  Bundled here so the two output states below do not each
      spell them out. *)
-  Definition kxc_open (gfs : fs_names) (gi : gname) (cn : ic_names)
+  Definition kxc_open (gfs : fs_names) (gi : gname) 
       (cov : gset Z) (logstart : Z) (dev : mword 32) (pidv : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) : iProp Σ :=
-    (is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) (slh_tok (icfg_isl kf)) ∗
+    (is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok fsc_ic kf) (slh_tok (icfg_isl kf)) ∗
      sleeplocked_q gislf sf (i_lock (ientry kf)) pidv ∗
-     ic_tx_dep cn kf sf dev inumf gyf ∗
+     ic_tx_dep fsc_ic kf sf dev inumf gyf ∗
      i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev ∗
      i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf ∗
      i_valid (ientry kf) ↦₄ valid_word true ∗
@@ -575,7 +576,7 @@ Section KexecBSeam.
   Definition kxc_at_1a2
       (jp : nat)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (ga gf : gname)
+      (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -611,7 +612,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+     kxc_open gfs gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_opb g n2 ∗
      iref_slots 1 ∗
@@ -657,7 +658,7 @@ Section KexecBSeam.
   Definition kxc_at_12c
       (jp : nat)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (ga gf : gname)
+      (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -696,7 +697,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+     kxc_open gfs gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_opb g n2 ∗
      iref_slots 1 ∗
@@ -730,7 +731,7 @@ Section KexecBSeam.
   Definition kxc_at_1a4
       (jp : nat)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (ga gf : gname)
+      (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -767,7 +768,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+     kxc_open gfs gi cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_opb g n2 ∗
      iref_slots 1 ∗

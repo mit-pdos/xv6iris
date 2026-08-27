@@ -839,6 +839,7 @@ Require Import IcacheEscrow.
 Require Import SpecFileread.
 Require Import CodeFilewrite ProofFilereadParts ProofFilewriteParts.
 Require Import ProcAvail.
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 
 Set Printing Depth 40.
 
@@ -1531,10 +1532,10 @@ Section ProofFilewrite.
     IcacheInv.itable_inv -∗
     (* the FAMILIES, since the slot is the carve's output and not the
        caller's to name *)
-    ic_escrows (fwn_ic fn) (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
+    ic_escrows fsc_ic (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
       (fwn_logstart fn) -∗
     ireg_inv (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) icfg_nib -∗
-    ic_sleeplocks (fwn_ic fn) -∗
+    ic_sleeplocks fsc_ic -∗
     dev_inv (fwn_uart fn) (fwn_disk fn) -∗
     DiskInv.disk_geom (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
     is_lock (fwn_dlock fn) DiskAddrs.d_lock "virtio_disk"%string
@@ -1737,9 +1738,9 @@ Section ProofFilewrite.
     assert (P4 : IBLOCK inum (fwn_inodestart fn)
                    ∉ log_region_set (fwn_logstart fn))
       by (apply P4q; exact P5).
-    iDestruct (ic_escrows_acc2 (fwn_ic fn) (fwn_fs fn) (fwn_ireg fn)
+    iDestruct (ic_escrows_acc2 (fwn_fs fn) (fwn_ireg fn)
                  (fwn_cov fn) (fwn_logstart fn) ik P9 with "Hescs") as "#Hesc".
-    iDestruct (ic_sleeplocks_lookup (fwn_ic fn) ik P9 with "Hslks")
+    iDestruct (ic_sleeplocks_lookup fsc_ic ik P9 with "Hslks")
       as (gil gisl) "#Hslk2".
     (* =================================================================
        +0x84 jal ra,begin_op -- THE TRANSACTION OPENS.  The pid quarter is
@@ -1852,7 +1853,7 @@ Section ProofFilewrite.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Ilock.wp_ilock_tx_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
-              (fwn_bio fn) (fwn_fs fn) (fwn_ireg fn) (fwn_ic fn)
+              (fwn_bio fn) (fwn_fs fn) (fwn_ireg fn)
               gil gisl
               (fwn_cov fn) (fwn_logstart fn) (fwn_inodestart fn)
               icfg_nib ik (sh / 2)%Qp g (ShotK ty)
@@ -2339,7 +2340,7 @@ Section ProofFilewrite.
     iDestruct (cpu_own_transport CIDwi CIDb4 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Iunlock.wp_iunlock_tx_sconf gs (fwn_fs fn) (fwn_ireg fn)
-              (fwn_ic fn) gil gisl
+              gil gisl
               (fwn_cov fn) (fwn_logstart fn)
               ik (sh / 2)%Qp g icfg_dev
               inum dn' bm'

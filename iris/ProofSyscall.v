@@ -527,7 +527,6 @@ Record sysc_ties `{ICFG : icfg} `{FSC : fscfg}
      every arm below, is unchanged. *)
   (* ---- the inode cache, the region and the log ---- *)
   sct_ireg       : fcn_ireg fn = fsc_ireg;
-  sct_ic         : fcn_ic fn = fsc_ic;
   sct_tlock      : fcn_tlock fn = fsc_itlock;
   sct_log        : fcn_log fn = icfg_log;
   sct_inodestart : fcn_inodestart fn = icfg_ist;
@@ -681,7 +680,6 @@ Section SyscallVocab.
     - exact (sct_logstart _ _ _ T).
     - exact (sct_dev _ _ _ T).
     - exact (sct_ireg _ _ _ T).
-    - exact (sct_ic _ _ _ T).
     - exact (sct_tlock _ _ _ T).
     - exact (sct_bmapstart _ _ _ T).
     - exact (sct_inodestart _ _ _ T).
@@ -717,14 +715,14 @@ Section SyscallVocab.
         ~ (DinodeEnc.IBLOCK inum (fcn_inodestart fn)
              ∈ log_region_set (fcn_logstart fn))⌝ ∗
      ⌜IcacheInv.cov_below (fcn_cov fn) (fcn_size fn)⌝ ∗
-     IcacheEscrow.is_itable2 (fcn_tlock fn) (fcn_ic fn) (fcn_fs fn) (fcn_ireg fn)
+     IcacheEscrow.is_itable2 (fcn_tlock fn) fsc_ic (fcn_fs fn) (fcn_ireg fn)
                 (fcn_cov fn) (fcn_logstart fn) (fcn_nib fn) (fcn_dev fn) ∗
      IcacheInv.itable_inv ∗
-     IcacheEscrow.ic_escrows (fcn_ic fn) (fcn_fs fn) (fcn_ireg fn) (fcn_cov fn)
+     IcacheEscrow.ic_escrows fsc_ic (fcn_fs fn) (fcn_ireg fn) (fcn_cov fn)
                 (fcn_logstart fn) ∗
      InodeRegion.ireg_inv (fcn_ireg fn) (fcn_fs fn) (fcn_inodestart fn) (fcn_nib fn) ∗
      ireg_open ∗
-     IcacheEscrow.ic_sleeplocks (fcn_ic fn))%I.
+     IcacheEscrow.ic_sleeplocks fsc_ic)%I.
   Proof.
     (* the three rows between the ties and [fs_ready] -- [procs_inv] and the
        two disk rows -- are nothing this bundle is about. *)
@@ -742,7 +740,7 @@ Section SyscallVocab.
        this goal through no hypothesis (the pure rows below carry them out of
        [G] instead), and a rewrite with no subterm to hit is an error. *)
     rewrite -(sct_fs _ _ _ T) -(sct_cov _ _ _ T) -(sct_logstart _ _ _ T)
-            -(sct_ireg _ _ _ T) -(sct_ic _ _ _ T) -(sct_tlock _ _ _ T)
+            -(sct_ireg _ _ _ T) -(sct_tlock _ _ _ T)
             -(sct_inodestart _ _ _ T) -(sct_nib _ _ _ T) -(sct_dev _ _ _ T).
     iSplit; [ iPureIntro; reflexivity |].
     iSplit; [ iPureIntro; reflexivity |].
@@ -871,7 +869,7 @@ Section SyscallVocab.
                conclusion, and the rewrite would fail with "does not match
                any subterm".  The tie itself stays on the record -- a
                consumer still reads [fcn_dlock fn = fsc_dlock]. *)
-            -(sct_ireg _ _ _ T) -(sct_ic _ _ _ T) -(sct_tlock _ _ _ T)
+            -(sct_ireg _ _ _ T) -(sct_tlock _ _ _ T)
             -(sct_log _ _ _ T) -(sct_inodestart _ _ _ T) -(sct_nib _ _ _ T)
             -(sct_dev _ _ _ T) -(sct_kmem _ _ _ T) -(sct_kalloc _ _ _ T).
     (* assembled conjunct by conjunct rather than with a named [iFrame]: the
@@ -1023,7 +1021,7 @@ Section SyscallVocab.
     sysc_ties (proc_addr (fcn_j fn)) (fcn_bio fn) fn.
   Proof.
     intros [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hlog Hfs Hcov Hlogst Hdev
-            Hireg Hic Htlock Hbms Hist Hnib Hsize] Hj Hplock Hdq.
+            Hireg Htlock Hbms Hist Hnib Hsize] Hj Hplock Hdq.
     (* [sct_bio] and [sct_pj] are [reflexivity] because the indices were
        READ OFF [fn]; everything else is one of the twenty-two hypotheses. *)
     constructor; try assumption; try reflexivity.
@@ -1153,7 +1151,7 @@ Section SyscallVocab.
     kernel_data -∗ procs_inv γs -∗ syscall_env γf pj bn fn -∗
     SpecKexec.fs_fabric γs (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
       (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-      (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+      (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
       (fcn_cov fn) (fcn_logstart fn) (fcn_inodestart fn) (fcn_nib fn) (fcn_dev fn).
   Proof.
     iIntros "#Hdata #Hprocs #Henv".
@@ -1232,7 +1230,7 @@ Section SyscallVocab.
            (fcn_kalloc fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
            (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_log fn) (fcn_fs fn)
            (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn) pid (DfracOwn (1/4))
-           (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn) (fcn_bmapstart fn)
+           (fcn_ireg fn) (fcn_tlock fn) (fcn_bmapstart fn)
            (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn).
   Proof. intros <- <- <-. destruct fn; reflexivity. Qed.
 
@@ -2180,7 +2178,7 @@ Section SyscallVocab.
   Definition sysc_fstat_names (bn : bio_names) (fn : fclose_names) : fstat_names :=
     MkFStatNames (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
       (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_fs fn)
-      (fcn_ireg fn) (fcn_ic fn) (fcn_cov fn) (fcn_logstart fn)
+      (fcn_ireg fn) (fcn_cov fn) (fcn_logstart fn)
       (fcn_inodestart fn) DfracDiscarded.
 
   (* =================================================================== *)
@@ -2205,7 +2203,7 @@ Section SyscallVocab.
     MkFReadNames (fcn_procs fn) (fcn_j fn) (fcn_plock fn)
       (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn) γc
       (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_fs fn)
-      (fcn_ireg fn) (fcn_ic fn) (fcn_cov fn) (fcn_logstart fn)
+      (fcn_ireg fn) (fcn_cov fn) (fcn_logstart fn)
       (fcn_inodestart fn) DfracDiscarded
       ConsoleInv.devsw_read_val (fun _ => DfracDiscarded).
 
@@ -2378,7 +2376,7 @@ Section SyscallVocab.
     MkFWriteNames γs j γlp
       (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn) γl
       (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_log fn) (fcn_fs fn)
-      (fcn_ireg fn) (fcn_ic fn) γpr (fcn_cov fn) (fcn_logstart fn)
+      (fcn_ireg fn) γpr (fcn_cov fn) (fcn_logstart fn)
       (fcn_inodestart fn) (fcn_bmapstart fn) (fcn_size fn)
       DfracDiscarded DfracDiscarded DfracDiscarded
       ConsoleInv.devsw_write_val (fun _ => DfracDiscarded).
@@ -3100,7 +3098,7 @@ Section SyscallArms.
     iDestruct "Hfsenv" as "(_ & #Hprocs' & _)".
     (* ---- the call ---- *)
     iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf (fcn_tlock fn) (fcn_ireg fn)
-              (fcn_procs fn) (fcn_ic fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
+              (fcn_procs fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
               (fcn_inodestart fn) (fcn_nib fn)
               M 0%nat (av - 4)%nat true pj true pid V ∅
               ltac:(lia) sysc_noff0b
@@ -3229,7 +3227,7 @@ Section SyscallArms.
     iApply (SysExec.wp_sys_exec_sconf γf γa γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded v0 v1 pid V M (av - 4)%nat true true lks
@@ -3364,7 +3362,7 @@ Section SyscallArms.
               (fcn_log fn) (fcn_fs fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn) ip dqi
               (fcn_kmem fn) (fcn_kalloc fn)
-              (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+              (fcn_ireg fn) (fcn_tlock fn)
               (fcn_bmapstart fn) (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn)
               None fn
               M (av - 4)%nat true true pid V v0 ∅
@@ -3739,7 +3737,7 @@ Section SyscallArms.
     iApply (SysChdir.wp_sys_chdir_sconf γf γa γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded v0 pid V M (av - 4)%nat true true ∅
@@ -3841,7 +3839,7 @@ Section SyscallArms.
     iApply (SysUnlink.wp_sys_unlink_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded DfracDiscarded v0 pid V M
@@ -3921,7 +3919,7 @@ Section SyscallArms.
     iApply (SysLink.wp_sys_link_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn) (fcn_dev fn)
               DfracDiscarded DfracDiscarded DfracDiscarded v0 v1 pid V M
@@ -4234,7 +4232,7 @@ Section SyscallArms.
     iApply (SysMkdir.wp_sys_mkdir_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) fsc_ninodes (fcn_size fn)
               (fcn_dev fn) IREFSPARE
@@ -4328,7 +4326,7 @@ Section SyscallArms.
     iApply (SysMknod.wp_sys_mknod_sconf γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) fsc_ninodes (fcn_size fn)
               (fcn_dev fn) IREFSPARE
@@ -4435,7 +4433,7 @@ Section SyscallArms.
     iApply (SysOpen.wp_sys_open_sconf γft γf γa fsc_printk γs j γl
               (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_tlock fn)
               (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
               (fcn_inodestart fn) (fcn_nib fn) fsc_ninodes (fcn_size fn)
               (fcn_dev fn) IREFSPARE

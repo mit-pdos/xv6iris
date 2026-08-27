@@ -123,6 +123,7 @@ Require Import ProofSysUnlinkTails.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -499,10 +500,10 @@ Section ProofSysUnlinkBody.
   (* the two per-slot projections out of the boot families, at the copies
      THIS contract names ([ic_escrows] is IcacheEscrow's, [ic_sleeplocks]
      SpecDirlink's). *)
-  Lemma su_esc_acc `{GEN : GenId} (cn : ic_names) (gfs : fs_names) (gi : gname)
+  Lemma su_esc_acc `{GEN : GenId} (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
+    (ic_escrows fsc_ic gfs gi cov logstart -∗ ic_escrow fsc_ic gfs gi cov logstart k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -510,12 +511,12 @@ Section ProofSysUnlinkBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma su_slk_acc `{GEN : GenId} (cn : ic_names) (k : nat) :
+  Lemma su_slk_acc `{GEN : GenId} (k : nat) :
     (k < NINODE)%nat ->
-    (ic_sleeplocks cn -∗
+    (ic_sleeplocks fsc_ic -∗
      ∃ gil gisl : gname,
        is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string
-                        (ic_tok cn k) (slh_tok (icfg_isl k))
+                        (ic_tok fsc_ic k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_sleeplocks.
@@ -671,7 +672,7 @@ Section ProofSysUnlinkBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (dqb dqs dqbs : dfrac)
@@ -709,10 +710,10 @@ Section ProofSysUnlinkBody.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots 3 -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrows cn gfs gi cov logstart -∗
-    ic_sleeplocks cn -∗
+    ic_escrows fsc_ic gfs gi cov logstart -∗
+    ic_sleeplocks fsc_ic -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1179,7 +1180,7 @@ Section ProofSysUnlinkBody.
       iDestruct (cpu_own_transport CID13 CID16 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Nameiparent.wp_nameiparent_gen (CID := CID16) gs jx gl gu gd gk
-                pd pav pu bn g gfs gi cn gtl ga gf cov logstart bmapstart
+                pd pav pu bn g gfs gi gtl ga gf cov logstart bmapstart
                 inodestart nib size dev pk1 bp1 bnm0
                 MAXOPBLOCKS Sb0 pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                 N3 (K - 30)%nat eb b lks
@@ -1424,7 +1425,7 @@ Section ProofSysUnlinkBody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
@@ -1467,15 +1468,15 @@ Section ProofSysUnlinkBody.
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
     gen_cert -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrow cn gfs gi cov logstart kk -∗
+    ic_escrow fsc_ic gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string
-                     (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+                     (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep cn kk s dev inum gy -∗
+    ic_tx_dep fsc_ic kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1546,7 +1547,7 @@ Section ProofSysUnlinkBody.
     iDestruct (su_nm_join (pa_stk sp0 10) bnm0 nfx with "Hnm14 Hnm2") as "HbNj".
     iDestruct (su_bytes_name (pa_stk sp0 10) 16 with "HbNj") as (bnf) "HbNj".
     iApply (Tails.su_tail_bad (CID0 := CID0) gs jx gl gu gd gk pd pav pu bn g
-              gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib size
+              gfs gi gtl gil gisl cov logstart bmapstart inodestart nib size
               dev kk qi s gy inum dn bm u pidv (DfracOwn (1/4)) dqb dqs
               m M sp0 K eb b lks w4 w5 w6 w27 w30 bd bnf bp be
               (upd_upt V P1) HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -1608,7 +1609,7 @@ Section ProofSysUnlinkBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (dqb dqs dqbs : dfrac)
@@ -1656,10 +1657,10 @@ Section ProofSysUnlinkBody.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots 3 -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrows cn gfs gi cov logstart -∗
-    ic_sleeplocks cn -∗
+    ic_escrows fsc_ic gfs gi cov logstart -∗
+    ic_sleeplocks fsc_ic -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1728,9 +1729,9 @@ Section ProofSysUnlinkBody.
        proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
        (* ---- [dp], LOCKED and OPEN ---- *)
        is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                        (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+                        (ic_tok fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
-       ic_deposit cn kd (DepTx sd dev dinum gyd t (1/2)) -∗
+       ic_deposit fsc_ic kd (DepTx sd dev dinum gyd t (1/2)) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -1849,9 +1850,9 @@ Section ProofSysUnlinkBody.
     iEval (rewrite su_shed_gen) in "Hrefdp".
     iDestruct "Hrefdp" as "[Hkeepd Hshrd]".
     iDestruct (inode_ref_short_gen_forget with "Hkeepd") as "Hkeepd".
-    iDestruct (su_esc_acc cn gfs gi cov logstart kd Hkd with "Hescrows")
+    iDestruct (su_esc_acc gfs gi cov logstart kd Hkd with "Hescrows")
       as "#Hescd".
-    iDestruct (su_slk_acc cn kd Hkd with "Hslks") as (gild gisld) "#Hslkd0".
+    iDestruct (su_slk_acc kd Hkd with "Hslks") as (gild gisld) "#Hslkd0".
     iDestruct (su_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     (* the process block, opened for the callees' pid fraction *)
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (upd_upt V P1)
@@ -1906,7 +1907,7 @@ Section ProofSysUnlinkBody.
     iDestruct (log_tx_split icfg_log t 1 (1/2) (1/2)
                  (eq_sym Qp.half_half) with "Htw") as "[Htp Htx]".
     iApply (Ilock.wp_ilock_dep_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
-              gfs gi cn gild gisld cov logstart inodestart nib kd (qd/2)%Qp
+              gfs gi gild gisld cov logstart inodestart nib kd (qd/2)%Qp
               gyd (DepTx (qd/2)%Qp dev dinum gyd t (1/2)) PlainK dev dinum
               pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b
               lks
@@ -2058,7 +2059,7 @@ Section ProofSysUnlinkBody.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iDestruct (ic_tx_dep_intro with "Hdep Htx") as "Hdep".
       iApply (su_w2_bad (CID0 := CID8) gf gs jx gl gu gd gk pd pav pu bn g gfs
-                gi cn gtl gild gisld cov logstart bmapstart inodestart nib size
+                gi gtl gild gisld cov logstart bmapstart inodestart nib size
                 dev kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd n1 pid
                 dqb dqs dqbs V P1 m mn1 sp0 K eb b lks w4 w5 w6 w27 w30
                 bd nf bnm0 bp be
@@ -2214,7 +2215,7 @@ Section ProofSysUnlinkBody.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iDestruct (ic_tx_dep_intro with "Hdep Htx") as "Hdep".
         iApply (su_w2_bad (CID0 := CID14) gf gs jx gl gu gd gk pd pav pu bn g
-                  gfs gi cn gtl gild gisld cov logstart bmapstart inodestart
+                  gfs gi gtl gild gisld cov logstart bmapstart inodestart
                   nib size dev kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
                   n1 pid dqb dqs dqbs V P1 m mn2 sp0 K eb b lks
                   w4 w5 w6 w27 w30 bd nf bnm0 bp be
@@ -2391,7 +2392,7 @@ Section ProofSysUnlinkBody.
         assert (Hholesd : blk_holes_zero bmd datd)
           by (destruct Hiok0 as (_ & _ & _ & _ & _ & Hq & _); exact Hq).
         iApply (Dirlookup.wp_dirlookup_sconf (CID := CID19) gs jx gl gu gd gk
-                  pd pav pu bn gfs gi cn gtl ga gf cov logstart inodestart nib dev
+                  pd pav pu bn gfs gi gtl ga gf cov logstart inodestart nib dev
                   (ientry kd) dinum bmd datd dnd dnd nf true (word_hi w27) pid
                   (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1)
                   R12 (K - 30)%nat eb b lks
@@ -2561,7 +2562,7 @@ Section ProofSysUnlinkBody.
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iDestruct (ic_tx_dep_intro with "Hdep Htx") as "Hdep".
           iApply (Tails.su_tail_d (CID0 := CID22) gs jx gl gu gd gk pd pav pu
-                    bn g gfs gi cn gtl gild gisld cov logstart bmapstart
+                    bn g gfs gi gtl gild gisld cov logstart bmapstart
                     inodestart nib size dev kd (qd/2)%Qp (qd/2)%Qp gyd
                     dinum dnd bmd n1 pid (DfracOwn (1/4)) dqb dqs
                     m R13 sp0 K eb b lks w5 w6 (word_of_words (word_lo w27)
@@ -3474,7 +3475,7 @@ Section ProofSysUnlinkBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (dqb dqs dqbs : dfrac)
@@ -3542,10 +3543,10 @@ Section ProofSysUnlinkBody.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots 3 -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrows cn gfs gi cov logstart -∗
-    ic_sleeplocks cn -∗
+    ic_escrows fsc_ic gfs gi cov logstart -∗
+    ic_sleeplocks fsc_ic -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -3557,9 +3558,9 @@ Section ProofSysUnlinkBody.
     proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
     (* ---- [dp], LOCKED and OPEN (the +0x72 seam's bundle) ---- *)
     is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+                     (ic_tok fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
     sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
-    ic_deposit cn kd (DepTx sd dev dinum gyd t (1/2)) -∗
+    ic_deposit fsc_ic kd (DepTx sd dev dinum gyd t (1/2)) -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
     i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -3646,9 +3647,9 @@ Section ProofSysUnlinkBody.
        proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
        (* ---- [dp], unchanged ---- *)
        is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                        (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+                        (ic_tok fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
-       ic_deposit cn kd (DepTx sd dev dinum gyd t (1/4)) -∗
+       ic_deposit fsc_ic kd (DepTx sd dev dinum gyd t (1/4)) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -3672,9 +3673,9 @@ Section ProofSysUnlinkBody.
        runit_any (bv_unsigned dinum) -∗
        (* ---- [ip], LOCKED and OPEN ---- *)
        is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
-                        (ic_tok cn ks) (slh_tok (icfg_isl ks)) -∗
+                        (ic_tok fsc_ic ks) (slh_tok (icfg_isl ks)) -∗
        sleeplocked_q gisli si (i_lock (ientry ks)) pid -∗
-       ic_deposit cn ks (DepTx si dev
+       ic_deposit fsc_ic ks (DepTx si dev
          (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi
          t (1/4)) -∗
        i_dev (ientry ks) ↦₄{DfracOwn (1/2)} dev -∗
@@ -3828,11 +3829,11 @@ Section ProofSysUnlinkBody.
     iEval (rewrite su_shed_gen) in "Hchild".
     iDestruct "Hchild" as "[Hkeepi Hshri]".
     iDestruct (inode_ref_short_gen_forget with "Hkeepi") as "Hkeepi".
-    iDestruct (su_esc_acc cn gfs gi cov logstart kd Hkd with "Hescrows")
+    iDestruct (su_esc_acc gfs gi cov logstart kd Hkd with "Hescrows")
       as "#Hescd".
-    iDestruct (su_esc_acc cn gfs gi cov logstart ks Hks with "Hescrows")
+    iDestruct (su_esc_acc gfs gi cov logstart ks Hks with "Hescrows")
       as "#Hesci".
-    iDestruct (su_slk_acc cn ks Hks with "Hslks") as (gili gisli) "#Hslki".
+    iDestruct (su_slk_acc ks Hks with "Hslks") as (gili gisli) "#Hslki".
     iDestruct (su_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     (* ===== +0x72 c.sdsp s3,200(sp) -- slot 5, saved LATER STILL ===== *)
     assert (Hd5 : add_vec (M2 !!! Regidx csp_rs1 : mword 64)
@@ -3879,13 +3880,13 @@ Section ProofSysUnlinkBody.
        so the residue the walk keeps is a half and no bundleless arm ever
        stands. *)
     iApply fupd_wp.
-    iMod (ic_shrink_tx ⊤ cn gfs gi cov logstart kd sd dev dinum gyd true
+    iMod (ic_shrink_tx ⊤ fsc_ic gfs gi cov logstart kd sd dev dinum gyd true
             t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter)
             ltac:(solve_ndisj) with "Hescd Hivalidd Hdepd")
       as "(Hivalidd & Hdepd & Htp)".
     iModIntro.
     iApply (Ilock.wp_ilock_dep_sconf (CID := CID2) gs jx gl gu gd gk pd pav pu bn
-              gfs gi cn gili gisli cov logstart inodestart nib ks (qs/2)%Qp
+              gfs gi gili gisli cov logstart inodestart nib ks (qs/2)%Qp
               gyi (DepTx (qs/2)%Qp dev
                      (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
                      gyi t (1/4)) PlainK dev
@@ -4115,16 +4116,16 @@ Section ProofSysUnlinkBody.
                      with "Hcont") as "Hcont".
         iDestruct (log_tx_split icfg_log t (1/2) (1/4) (1/4)
                      (eq_sym Qp.quarter_quarter) with "Htx") as "[Htxd Htxi]".
-        iAssert (ic_tx_dep_at cn kd sd dev dinum gyd t (1/4))
+        iAssert (ic_tx_dep_at fsc_ic kd sd dev dinum gyd t (1/4))
           with "[Hdepd Htxd]" as "Hdepd";
           [rewrite /ic_tx_dep_at; iFrame "Hdepd Htxd" |].
-        iAssert (ic_tx_dep_at cn ks (qs/2)%Qp dev
+        iAssert (ic_tx_dep_at fsc_ic ks (qs/2)%Qp dev
                    (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
                    gyi t (1/4))
           with "[Hdepi Htxi]" as "Hdepi";
           [rewrite /ic_tx_dep_at; iFrame "Hdepi Htxi" |].
         iApply (Tails.su_tail_e (CID0 := CIDx) gs jx gl gu gd gk pd pav pu bn
-                  g gfs gi cn gtl gild gisld gili gisli cov logstart bmapstart
+                  g gfs gi gtl gild gisld gili gisli cov logstart bmapstart
                   inodestart nib size dev kd qdi sd gyd dinum dnd bmd
                   ks (qs/2)%Qp (qs/2)%Qp gyi
                   (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
@@ -4269,7 +4270,7 @@ Section ProofSysUnlinkBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gpr : gname)
+      (gtl : gname) (gpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (dqb dqs dqbs : dfrac)
@@ -4348,9 +4349,9 @@ Section ProofSysUnlinkBody.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots 3 -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrows cn gfs gi cov logstart -∗
+    ic_escrows fsc_ic gfs gi cov logstart -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -4362,9 +4363,9 @@ Section ProofSysUnlinkBody.
     proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
     (* ---- [dp], LOCKED and OPEN ---- *)
     is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+                     (ic_tok fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
     sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
-    ic_deposit cn kd (DepTx sd dev dinum gyd t (1/4)) -∗
+    ic_deposit fsc_ic kd (DepTx sd dev dinum gyd t (1/4)) -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
     i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -4387,9 +4388,9 @@ Section ProofSysUnlinkBody.
     runit_any (bv_unsigned dinum) -∗
     (* ---- [ip], LOCKED and OPEN ---- *)
     is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
-                     (ic_tok cn ks) (slh_tok (icfg_isl ks)) -∗
+                     (ic_tok fsc_ic ks) (slh_tok (icfg_isl ks)) -∗
     sleeplocked_q gisli si (i_lock (ientry ks)) pid -∗
-    ic_deposit cn ks (DepTx si dev
+    ic_deposit fsc_ic ks (DepTx si dev
       (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi
       t (1/4)) -∗
     i_dev (ientry ks) ↦₄{DfracOwn (1/2)} dev -∗
@@ -5254,7 +5255,7 @@ Section ProofSysUnlinkBody.
       by (rewrite /C5; apply su_regs_caller; [exact Hcsra | exact HC4regs]).
     iDestruct (cpu_own_transport D13 D20 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iDestruct (su_esc_acc cn gfs gi cov logstart kd Hkd with "Hescrows")
+    iDestruct (su_esc_acc gfs gi cov logstart kd Hkd with "Hescrows")
       as "#Hescd".
     iDestruct (log_opS_named with "HopS") as (e0) "HopS".
     (* [dp]'s arm comes off at its own release (durable-disk B''-tx2) *)
@@ -5262,7 +5263,7 @@ Section ProofSysUnlinkBody.
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D20) gs jx gl gu gd gk pd pav
-              pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
+              pu bn g gfs gi gtl gild gisld cov logstart bmapstart
               inodestart nib size dev kd qdi sd gyd
               (DepTx sd dev dinum gyd t (1/4)%Qp) dinum dnW bm'
               nw Sbw false true false e0 _ _ pid (DfracOwn (1/4)) dqb dqs
@@ -5592,7 +5593,7 @@ Section ProofSysUnlinkBody.
     { rewrite su_setnl_type. iExact "Hshoti". }
     iDestruct (cpu_own_transport D27 D29 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iDestruct (su_esc_acc cn gfs gi cov logstart ks Hks with "Hescrows")
+    iDestruct (su_esc_acc gfs gi cov logstart ks Hks with "Hescrows")
       as "#Hesci".
     iDestruct (log_opS_named with "HopS") as (e1) "HopS".
     pose (dni2 := su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
@@ -5616,7 +5617,7 @@ Section ProofSysUnlinkBody.
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D29) gs jx gl gu gd gk pd pav
-              pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
+              pu bn g gfs gi gtl gili gisli cov logstart bmapstart
               inodestart nib size dev ks qsi si gyi
               (DepTx si dev
                  (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
@@ -5903,7 +5904,7 @@ Section ProofSysUnlinkBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gpr : gname)
+      (gtl : gname) (gpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (dqb dqs dqbs : dfrac)
@@ -6005,9 +6006,9 @@ Section ProofSysUnlinkBody.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots 3 -∗
-    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    is_itable2 gtl fsc_ic gfs gi cov logstart nib dev -∗
     itable_inv -∗
-    ic_escrows cn gfs gi cov logstart -∗
+    ic_escrows fsc_ic gfs gi cov logstart -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -6019,9 +6020,9 @@ Section ProofSysUnlinkBody.
     proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
     (* ---- [dp], LOCKED and OPEN ---- *)
     is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+                     (ic_tok fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
     sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
-    ic_deposit cn kd (DepTx sd dev dinum gyd t (1/4)) -∗
+    ic_deposit fsc_ic kd (DepTx sd dev dinum gyd t (1/4)) -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
     i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -6044,9 +6045,9 @@ Section ProofSysUnlinkBody.
     runit_any (bv_unsigned dinum) -∗
     (* ---- [ip], LOCKED and OPEN ---- *)
     is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
-                     (ic_tok cn ks) (slh_tok (icfg_isl ks)) -∗
+                     (ic_tok fsc_ic ks) (slh_tok (icfg_isl ks)) -∗
     sleeplocked_q gisli si (i_lock (ientry ks)) pid -∗
-    ic_deposit cn ks (DepTx si dev
+    ic_deposit fsc_ic ks (DepTx si dev
       (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi
       t (1/4)) -∗
     i_dev (ientry ks) ↦₄{DfracOwn (1/2)} dev -∗
@@ -7445,7 +7446,7 @@ Section ProofSysUnlinkBody.
       by (rewrite /C5; apply su_regs_caller; [exact Hcsra | exact HC4regs]).
     iDestruct (cpu_own_transport T7 D20 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iDestruct (su_esc_acc cn gfs gi cov logstart kd Hkd with "Hescrows")
+    iDestruct (su_esc_acc gfs gi cov logstart kd Hkd with "Hescrows")
       as "#Hescd".
     iDestruct (log_opS_named with "HopS") as (e0) "HopS".
     pose (dnW2 := su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
@@ -7466,7 +7467,7 @@ Section ProofSysUnlinkBody.
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D20) gs jx gl gu gd gk pd pav
-              pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
+              pu bn g gfs gi gtl gild gisld cov logstart bmapstart
               inodestart nib size dev kd qdi sd gyd
               (DepTx sd dev dinum gyd t (1/4)%Qp) dinum dnW2 bm'
               (S c1) (Sbw ∪ {[IBLOCK dinum inodestart]}) false true false e0 _ _ pid (DfracOwn (1/4)) dqb dqs
@@ -7845,7 +7846,7 @@ Section ProofSysUnlinkBody.
     { rewrite su_setnl_type. iExact "Hshoti". }
     iDestruct (cpu_own_transport D27 D29 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iDestruct (su_esc_acc cn gfs gi cov logstart ks Hks with "Hescrows")
+    iDestruct (su_esc_acc gfs gi cov logstart ks Hks with "Hescrows")
       as "#Hesci".
     iDestruct (log_opS_named with "HopS") as (e1) "HopS".
     pose (dni2 := su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
@@ -7869,7 +7870,7 @@ Section ProofSysUnlinkBody.
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D29) gs jx gl gu gd gk pd pav
-              pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
+              pu bn g gfs gi gtl gili gisli cov logstart bmapstart
               inodestart nib size dev ks qsi si gyi
               (DepTx si dev
                  (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
@@ -8162,14 +8163,14 @@ Section ProofSysUnlinkBody.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname)
+      (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (dqb dqs dqbs : dfrac) (v0 : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
     SpecSysUnlink.wp_sys_unlink_sconf_body gf ga gpr gs jx gl gu gd gk pd pav
-      pu bn g gfs gi cn gtl cov logstart bmapstart inodestart nib size dev
+      pu bn g gfs gi gtl cov logstart bmapstart inodestart nib size dev
       dqb dqs dqbs v0 pid V m K eb b lks.
   Proof.
     cbv beta zeta delta [SpecSysUnlink.wp_sys_unlink_sconf_body].
@@ -8181,7 +8182,7 @@ Section ProofSysUnlinkBody.
              Hcont".
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpenv".
     (* ---- W1, +0x00..+0x2e: the prologue, argstr, begin_op, nameiparent ---- *)
-    iApply (su_w1 gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl cov
+    iApply (su_w1 gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi gtl cov
               logstart bmapstart inodestart nib size dev dqb dqs dqbs
               v0 pid V m K eb b lks HK Hcdev Hcnib Hclog Hcist HdevR Hnib0
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb
@@ -8196,7 +8197,7 @@ Section ProofSysUnlinkBody.
              H30 Hcont".
     (* ---- W2, +0x30..+0x6e: ilock(dp), the two namecmp refusals,
        dirlookup ---- *)
-    iApply (su_w2 gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl cov
+    iApply (su_w2 gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi gtl cov
               logstart bmapstart inodestart nib size dev dqb dqs dqbs
               pid V P1 n1 Sb1 w1 dpv nf bnm0 bp bd be w4 w5 w6 w27 w30
               m Ms (m !!! Regidx csp_rs1 : mword 64) K eb b lks
@@ -8220,7 +8221,7 @@ Section ProofSysUnlinkBody.
     (* ---- W3, +0x72..+0x88: ilock(ip), the nlink panic, the T_DIR test
        (and, on the taken arm, the whole isdirempty loop through W4) ---- *)
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpetop".
-    iApply (su_w3 gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl cov
+    iApply (su_w3 gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi gtl cov
               logstart bmapstart inodestart nib size dev dqb dqs dqbs
               pid V P1 n1 Sb1 w1 kd ks kk gild gisld gyd qdi sd qs
               dinum dnd bmd datd lo nf bnm0 bp bd be w5 w6 w30
@@ -8253,7 +8254,7 @@ Section ProofSysUnlinkBody.
        internally and takes neither as a premise. ---- *)
     destruct isdir.
     - destruct Hisd as (Htyzi & Hdots & Hdead).
-      iApply (su_w5_dir gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      iApply (su_w5_dir gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi gtl
                 gpr cov logstart bmapstart inodestart nib size dev
                 dqb dqs dqbs pid V P1 n1 Sb1 w1 kd ks kk gild gisld gyd
                 qdi sd qs dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
@@ -8275,7 +8276,7 @@ Section ProofSysUnlinkBody.
                       Hdviewi Hfviewi Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                       HbE H30 Hcont").
-    - iApply (su_w5_file gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    - iApply (su_w5_file gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi gtl
                 gpr cov logstart bmapstart inodestart nib size dev
                 dqb dqs dqbs pid V P1 n1 Sb1 w1 kd ks kk gild gisld gyd
                 qdi sd qs dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30

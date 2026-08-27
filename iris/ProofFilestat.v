@@ -111,6 +111,7 @@ Require Import CodeFilestat ProofFilestatParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -529,10 +530,10 @@ Section ProofFilestat.
            "(%Hipk & %Hik & %Hinlt & #Hshot0 & Hshr0 & Hpayback)".
       assert (Hibcov : IBLOCK inm (fsn_inodestart fn) ∈ fsn_cov fn)
         by (apply Hgeo; exact Hinlt).
-      iDestruct (ic_escrows_acc2 (fsn_ic fn) (fsn_fs fn) (fsn_ireg fn)
+      iDestruct (ic_escrows_acc2 (fsn_fs fn) (fsn_ireg fn)
                    (fsn_cov fn) (fsn_logstart fn) ikk Hik with "Hescs")
         as "#Hesc".
-      iDestruct (ic_sleeplocks_lookup (fsn_ic fn) ikk Hik with "Hslks")
+      iDestruct (ic_sleeplocks_lookup fsc_ic ikk Hik with "Hslks")
         as (gil gisl) "#Hslk".
       (* LEND HALF, KEEP HALF.  iunlock returns the arity-preserving
          [inode_shr], so the generation the payload names has to be pinned on
@@ -669,7 +670,7 @@ Section ProofFilestat.
          payload's slice already does, so nothing has to be introduced here. *)
       iApply (Ilock.wp_ilock_dep_sconf γs j γlp (fsn_uart fn) (fsn_disk fn)
                 (fsn_dlock fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
-                (fsn_bio fn) (fsn_fs fn) (fsn_ireg fn) (fsn_ic fn)
+                (fsn_bio fn) (fsn_fs fn) (fsn_ireg fn)
                 gil gisl
                 (fsn_cov fn) (fsn_logstart fn) (fsn_inodestart fn)
                 icfg_nib ikk (ssh/2)%Qp gsh
@@ -975,7 +976,7 @@ Section ProofFilestat.
       iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Iunlock.wp_iunlock_dep_sconf γs (fsn_fs fn) (fsn_ireg fn)
-                (fsn_ic fn) gil gisl
+                gil gisl
                 (fsn_cov fn) (fsn_logstart fn)
                 ikk (ssh/2)%Qp gsh (DepRd (ssh/2)%Qp icfg_dev inm gsh)
                 icfg_dev inm

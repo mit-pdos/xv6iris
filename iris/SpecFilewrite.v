@@ -170,6 +170,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -265,7 +266,6 @@ Record fwrite_names := MkFWriteNames {
   fwn_log        : log_names;     (* begin_op / end_op                      *)
   fwn_fs         : fs_names;
   fwn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
-  fwn_ic         : ic_names;      (* the icache's names (IcacheEscrow.v)    *)
   fwn_pr         : gname;         (* balloc's printk credential             *)
   fwn_cov        : gset Z;
   fwn_logstart   : Z;
@@ -300,8 +300,7 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
        (fun _ => 1%positive))
     (MkLogNames 1%positive 1%positive 1%positive 1%positive 1%positive)
     (MkFsNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive)
-    1%positive (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
-                          (fun _ => 1%positive))
+    1%positive
     1%positive
     ∅ 0 0 0 0
     (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
@@ -476,11 +475,11 @@ Section SpecFilewrite.
      (* THE THREE PERSISTENT ICACHE INVARIANTS SpecIlock / SpecIunlock take,
         the escrow at the FAMILY where it was per-slot *)
      itable_inv ∗
-     ic_escrows (fwn_ic fn) (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
+     ic_escrows fsc_ic (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
                 (fwn_logstart fn) ∗
      ireg_inv (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
-     ic_sleeplocks (fwn_ic fn) ∗
+     ic_sleeplocks fsc_ic ∗
      (* THE LENT SHARE AND ITS GENERATION'S TYPE WITNESS ARE NOT HERE.
         Both used to be: the generation-named share (design fs-icache.md
         §17.3, ratified §17.4) and [ity_shot] at that generation (§17.6 (5),

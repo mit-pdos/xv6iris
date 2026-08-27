@@ -104,6 +104,7 @@ Require Import CodeFileread ProofFilereadParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -1887,10 +1888,10 @@ Section ProofFileread.
                     Hpayback)".
              assert (Hibcov : IBLOCK inm (frn_inodestart fn) ∈ frn_cov fn)
                by (apply Hgeo; exact Hinlt).
-             iDestruct (ic_escrows_acc2 (frn_ic fn) (frn_fs fn) (frn_ireg fn)
+             iDestruct (ic_escrows_acc2 (frn_fs fn) (frn_ireg fn)
                           (frn_cov fn) (frn_logstart fn) ikk Hik with "Hescs")
                as "#Hesc".
-             iDestruct (ic_sleeplocks_lookup (frn_ic fn) ikk Hik with "Hslks")
+             iDestruct (ic_sleeplocks_lookup fsc_ic ikk Hik with "Hslks")
                as (gil gisl) "#Hslk".
              (* LEND HALF, KEEP HALF.  iunlock returns the arity-preserving
                 [inode_shr], so the generation the payload names has to be
@@ -2010,7 +2011,7 @@ Section ProofFileread.
                 to open with is gone with the caller-supplied [inode_shr]. *)
              iApply (Ilock.wp_ilock_dep_sconf γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
-                       (frn_bio fn) (frn_fs fn) (frn_ireg fn) (frn_ic fn)
+                       (frn_bio fn) (frn_fs fn) (frn_ireg fn)
                        gil gisl
                        (frn_cov fn) (frn_logstart fn) (frn_inodestart fn)
                        icfg_nib ikk (ssh/2)%Qp gsh
@@ -2469,7 +2470,7 @@ Section ProofFileread.
                 iDestruct (cpu_own_transport CIDrd CID82 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
                 iApply (Iunlock.wp_iunlock_dep_sconf γs (frn_fs fn) (frn_ireg fn)
-                          (frn_ic fn) gil gisl
+                          gil gisl
                           (frn_cov fn) (frn_logstart fn)
                           ikk (ssh/2)%Qp gsh
                           (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm
@@ -2758,7 +2759,7 @@ Section ProofFileread.
                 iDestruct (cpu_own_transport CIDrd CID92 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
                 iApply (Iunlock.wp_iunlock_dep_sconf γs (frn_fs fn) (frn_ireg fn)
-                          (frn_ic fn) gil gisl
+                          gil gisl
                           (frn_cov fn) (frn_logstart fn)
                           ikk (ssh/2)%Qp gsh
                           (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm
