@@ -213,6 +213,24 @@ Section IcacheEscrow.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
 
+  (* THE STRUCTURAL Timeless PEELER, and it lives HERE -- at the top of the
+     section -- on purpose.  It used to sit ~700 lines down, so every instance
+     above it could not see it and closed with a bare [apply _] instead: one
+     search backtracking across a whole [∃/∗/∨] tower, 8.1 s over the 18 sites
+     that preceded the old definition ([inode_meta_timeless] 3.2 s and
+     [ic_loaded_timeless] 2.9 s between them).  Peeling one connective per step
+     and calling [apply _] only at the LEAVES is optimization.md's rule; keeping
+     the tactic in scope for the whole section is what lets every instance obey
+     it.  Dispatch is SYNTACTIC ([lazymatch] on the connective), so it never
+     descends into a leaf that typeclass search should have. *)
+  Local Ltac tl_struct :=
+    lazymatch goal with
+    | |- Timeless (bi_exist _) => apply bi.exist_timeless; intro; tl_struct
+    | |- Timeless (bi_sep _ _) => apply bi.sep_timeless; [tl_struct | tl_struct]
+    | |- Timeless (bi_or _ _) => apply bi.or_timeless; [tl_struct | tl_struct]
+    | |- _ => apply _
+    end.
+
   (* ------------------------------------------------------------------ *)
   (*  Timeless instances the arms are built out of                       *)
   (* ------------------------------------------------------------------ *)
@@ -226,7 +244,7 @@ Section IcacheEscrow.
 
   Global Instance word2_pointsto_timeless (ktr : CurKtier) (a : Arch.pa) (dq : dfrac) (w : bv 16) :
     Timeless (word2_pointsto (KTR := ktr) a dq w).
-  Proof. rewrite /word2_pointsto. apply _. Qed.
+  Proof. rewrite /word2_pointsto. tl_struct. Qed.
 
   Global Instance word2_pointsto_timeless' (ktr : ktier) (a : Arch.pa) (dq : dfrac) (w : bv 16) :
     Timeless (word2_pointsto (KTR := ktr) a dq w).
@@ -234,28 +252,28 @@ Section IcacheEscrow.
 
   Global Instance inode_meta_timeless (ip : mword 64) (d : dinode) :
     Timeless (inode_meta ip d).
-  Proof. rewrite /inode_meta. apply _. Qed.
+  Proof. rewrite /inode_meta. tl_struct. Qed.
 
   Global Instance inode_addrs_timeless (ip : mword 64) (l : list (bv 32)) :
     Timeless (inode_addrs ip l).
-  Proof. rewrite /inode_addrs. apply _. Qed.
+  Proof. rewrite /inode_addrs. tl_struct. Qed.
 
   Global Instance inode_raw_timeless (ip : mword 64) : Timeless (inode_raw ip).
-  Proof. rewrite /inode_raw. apply _. Qed.
+  Proof. rewrite /inode_raw. tl_struct. Qed.
 
   Global Instance ind_blk_timeless γfs bm : Timeless (ind_blk γfs bm).
   Proof. rewrite /ind_blk. case_decide; apply _. Qed.
 
 
   Global Instance ind_res_timeless γfs bm : Timeless (ind_res γfs bm).
-  Proof. rewrite /ind_res. apply _. Qed.
+  Proof. rewrite /ind_res. tl_struct. Qed.
 
   Global Instance blk_res_timeless γfs w bs : Timeless (blk_res γfs w bs).
   Proof. rewrite /blk_res. case_decide; apply _. Qed.
 
   Global Instance inode_blocks_timeless γfs bm data :
     Timeless (inode_blocks γfs bm data).
-  Proof. rewrite /inode_blocks. apply _. Qed.
+  Proof. rewrite /inode_blocks. tl_struct. Qed.
 
   (* full ownership of a 4-byte cell is exclusive AGAINST ANY FRACTION --
      which is what makes the FULL-versus-½ inum cell a discriminator.
@@ -359,11 +377,11 @@ Section IcacheEscrow.
   Proof. apply lock_tok_excl_exclusive. Qed.
 
   Global Instance ic_tok_timeless cn k : Timeless (ic_tok cn k).
-  Proof. rewrite /ic_tok. apply _. Qed.
+  Proof. rewrite /ic_tok. tl_struct. Qed.
   Global Instance ic_deposit_timeless cn k d : Timeless (ic_deposit cn k d).
-  Proof. rewrite /ic_deposit. apply _. Qed.
+  Proof. rewrite /ic_deposit. tl_struct. Qed.
   Global Instance ic_mid_timeless cn k : Timeless (ic_mid cn k).
-  Proof. rewrite /ic_mid. apply _. Qed.
+  Proof. rewrite /ic_mid. tl_struct. Qed.
 
   (* ---- ...AND THE IDENTIFICATION AGREEMENT (§13.8) ------------------- *)
 
@@ -398,7 +416,7 @@ Section IcacheEscrow.
 
   Global Instance ic_id_timeless cn k q v dev inum :
     Timeless (ic_id cn k q v dev inum).
-  Proof. rewrite /ic_id. apply _. Qed.
+  Proof. rewrite /ic_id. tl_struct. Qed.
 
   Lemma ic_id_agree cn k q1 q2 v1 d1 n1 v2 d2 n2 :
     ic_id cn k q1 v1 d1 n1 -∗ ic_id cn k q2 v2 d2 n2 -∗
@@ -526,7 +544,7 @@ Section IcacheEscrow.
 
   Global Instance dlinks_timeless γfs self dn bm data :
     Timeless (dlinks γfs self dn bm data).
-  Proof. rewrite /dlinks. apply _. Qed.
+  Proof. rewrite /dlinks. tl_struct. Qed.
 
   Lemma dlinks_open γfs self dn bm data :
     dlinks γfs self dn bm data -∗
@@ -746,7 +764,7 @@ Section IcacheEscrow.
 
   Global Instance ipool_ord_timeless γfs γi cov logstart inum :
     Timeless (ipool_ord γfs γi cov logstart inum).
-  Proof. rewrite /ipool_ord. apply _. Qed.
+  Proof. rewrite /ipool_ord. tl_struct. Qed.
 
   (* the three readings that tie the split to [ipool_shape], so that every
      existing producer and consumer keeps speaking the full shape *)
@@ -783,11 +801,11 @@ Section IcacheEscrow.
 
   Global Instance ipool_alloc_timeless γfs γi cov logstart inum :
     Timeless (ipool_alloc γfs γi cov logstart inum).
-  Proof. rewrite /ipool_alloc. apply _. Qed.
+  Proof. rewrite /ipool_alloc. tl_struct. Qed.
 
   Global Instance ipool_shape_np_timeless γfs γi cov logstart inum :
     Timeless (ipool_shape_np γfs γi cov logstart inum).
-  Proof. rewrite /ipool_shape_np. apply _. Qed.
+  Proof. rewrite /ipool_shape_np. tl_struct. Qed.
 
   (* A LOADED entry's parked content: the in-memory record [dn] in the five
      metadata cells and the block map in the thirteen addrs cells, with the
@@ -871,11 +889,11 @@ Section IcacheEscrow.
 
   Global Instance ic_loaded_timeless γfs γi cov logstart k inum dn bm :
     Timeless (ic_loaded γfs γi cov logstart k inum dn bm).
-  Proof. rewrite /ic_loaded. apply _. Qed.
+  Proof. rewrite /ic_loaded. tl_struct. Qed.
 
   Global Instance ic_unloaded_timeless γfs γi cov logstart k inum :
     Timeless (ic_unloaded γfs γi cov logstart k inum).
-  Proof. rewrite /ic_unloaded. apply _. Qed.
+  Proof. rewrite /ic_unloaded. tl_struct. Qed.
 
   (* ==================================================================== *)
   (*  THE READ ARM (durable-fs-plan.md section 3, [ilock] without a        *)
@@ -937,13 +955,6 @@ Section IcacheEscrow.
   (* THE STRUCTURAL [Timeless] TACTIC.  Defined HERE, above the read arm's
      two bundles, because a bare [apply _] on a nine-conjunct payload
      backtracks through every definition in it; the arms below use it too. *)
-  Local Ltac tl_struct :=
-    lazymatch goal with
-    | |- Timeless (bi_exist _) => apply bi.exist_timeless; intro; tl_struct
-    | |- Timeless (bi_sep _ _) => apply bi.sep_timeless; [tl_struct | tl_struct]
-    | |- Timeless (bi_or _ _) => apply bi.or_timeless; [tl_struct | tl_struct]
-    | |- _ => apply _
-    end.
 
   Global Instance ic_rd_arm_timeless γfs γi cov logstart inum :
     Timeless (ic_rd_arm γfs γi cov logstart inum).
@@ -1078,7 +1089,7 @@ Section IcacheEscrow.
 
   Global Instance ic_payload_np_timeless γfs γi cov logstart k inum g v :
     Timeless (ic_payload_np γfs γi cov logstart k inum g v).
-  Proof. rewrite /ic_payload_np. destruct v; apply _. Qed.
+  Proof. rewrite /ic_payload_np. destruct v; tl_struct. Qed.
 
   (* ==================================================================== *)
   (*  THE FREEZE TOKEN RIDES THE PAYLOAD (iclaim-ledger.md §3.1 A-custody, *)
@@ -1129,7 +1140,7 @@ Section IcacheEscrow.
 
   Global Instance ic_payload_timeless γfs γi cov logstart k inum g v :
     Timeless (ic_payload γfs γi cov logstart k inum g v).
-  Proof. rewrite /ic_payload. apply _. Qed.
+  Proof. rewrite /ic_payload. tl_struct. Qed.
 
   Lemma ic_payload_split γfs γi cov logstart k inum g v :
     ic_payload γfs γi cov logstart k inum g v -∗
@@ -1179,7 +1190,7 @@ Section IcacheEscrow.
     (ifreeze_off z ∨ frzown z)%I.
 
   Global Instance ic_frz_park_timeless z : Timeless (ic_frz_park z).
-  Proof. rewrite /ic_frz_park. apply _. Qed.
+  Proof. rewrite /ic_frz_park. tl_struct. Qed.
 
   (* ---- THE PARKED ARM's TAIL, WIDENED BY A⁗ (iclaim-ledger.md §3.16) ----
 
@@ -1245,9 +1256,9 @@ Section IcacheEscrow.
        hpn_h k (Some (t, q)) ∗ t ↪[ln_tx icfg_log]{#q} tt)%I.
 
   Global Instance ic_pin_rest_timeless k : Timeless (ic_pin_rest k).
-  Proof. rewrite /ic_pin_rest. apply _. Qed.
+  Proof. rewrite /ic_pin_rest. tl_struct. Qed.
   Global Instance ic_pin_tx_timeless k : Timeless (ic_pin_tx k).
-  Proof. rewrite /ic_pin_tx. apply _. Qed.
+  Proof. rewrite /ic_pin_tx. tl_struct. Qed.
 
   (* THE REFUTATION THE COMMIT READS, and the whole reason the pin exists:
      an arm inside one of iput's two windows holds a POSITIVE share of some
@@ -1317,7 +1328,7 @@ Section IcacheEscrow.
 
   Global Instance ic_payload_arm_timeless γfs γi cov logstart k inum g v :
     Timeless (ic_payload_arm γfs γi cov logstart k inum g v).
-  Proof. rewrite /ic_payload_arm. apply _. Qed.
+  Proof. rewrite /ic_payload_arm. tl_struct. Qed.
 
   (* the ordinary holder's bundle + the arm's liveness half IS an arm's tail,
      on its LEFT alternative *)
@@ -1387,7 +1398,7 @@ Section IcacheEscrow.
 
   Global Instance ic_payload_at_timeless γfs γi cov logstart k inum g dn bm :
     Timeless (ic_payload_at γfs γi cov logstart k inum g dn bm).
-  Proof. rewrite /ic_payload_at. apply _. Qed.
+  Proof. rewrite /ic_payload_at. tl_struct. Qed.
 
   Lemma ic_payload_at_pack_np γfs γi cov logstart k inum g dn bm :
     ic_payload_at γfs γi cov logstart k inum g dn bm -∗
@@ -1502,15 +1513,15 @@ Section IcacheEscrow.
 
   Global Instance ic_dep_own_timeless k d dev inum :
     Timeless (ic_dep_own k d dev inum).
-  Proof. rewrite /ic_dep_own. destruct d; apply _. Qed.
+  Proof. rewrite /ic_dep_own. destruct d; tl_struct. Qed.
 
   Global Instance ic_dep_half_timeless k d :
     Timeless (ic_dep_half k d).
-  Proof. rewrite /ic_dep_half. destruct d; apply _. Qed.
+  Proof. rewrite /ic_dep_half. destruct d; tl_struct. Qed.
 
   Global Instance ic_dep_res_timeless k d dev inum :
     Timeless (ic_dep_res k d dev inum).
-  Proof. rewrite /ic_dep_res. apply _. Qed.
+  Proof. rewrite /ic_dep_res. tl_struct. Qed.
 
   (* the descriptor's generation is the one its slice names -- the bridge
      between the pure [IcacheRef.ic_dep_gname] side condition every swap
@@ -1638,7 +1649,7 @@ Section IcacheEscrow.
     end.
 
   Global Instance ic_dep_side_timeless d : Timeless (ic_dep_side d).
-  Proof. rewrite /ic_dep_side. destruct d; apply _. Qed.
+  Proof. rewrite /ic_dep_side. destruct d; tl_struct. Qed.
 
   Lemma ic_dep_gname_of_shr d (s : Qp) (dev inum : mword 32) (g : gname) :
     ic_dep_shr d = Some (s, dev, inum, g) -> ic_dep_gname d = Some g.
@@ -1743,7 +1754,7 @@ Section IcacheEscrow.
 
   Global Instance ic_out_frz_timeless k d dev inum :
     Timeless (ic_out_frz k d dev inum).
-  Proof. rewrite /ic_out_frz /inode_ident. destruct d; apply _. Qed.
+  Proof. rewrite /ic_out_frz /inode_ident. destruct d; tl_struct. Qed.
 
   (* ...and the refutation the commit reads off it ([ic_dep_own_tx_no_ops]'s
      line at the freeze window): a [DepFrz] arm holds a positive share of an
@@ -3622,7 +3633,7 @@ Section IcacheEscrow.
 
   Global Instance ic_tx_dep_timeless cn k s dev inum g :
     Timeless (ic_tx_dep cn k s dev inum g).
-  Proof. rewrite /ic_tx_dep. apply _. Qed.
+  Proof. rewrite /ic_tx_dep. tl_struct. Qed.
 
   Lemma ic_tx_dep_intro cn k s dev inum g (t : nat) :
     ic_deposit cn k (DepTx s dev inum g t (1/2)) -∗
@@ -3660,7 +3671,7 @@ Section IcacheEscrow.
 
   Global Instance ic_tx_dep_at_timeless cn k s dev inum g t q :
     Timeless (ic_tx_dep_at cn k s dev inum g t q).
-  Proof. rewrite /ic_tx_dep_at. apply _. Qed.
+  Proof. rewrite /ic_tx_dep_at. tl_struct. Qed.
 
   Lemma ic_tx_dep_at_half cn k s dev inum g t :
     ic_tx_dep_at cn k s dev inum g t (1/2) -∗ ic_tx_dep cn k s dev inum g.
@@ -3967,6 +3978,17 @@ Section IcacheEscrow.
       (cov : gset Z) (logstart : Z) (k : nat) (Q : iProp Σ) : iProp Σ :=
     (Q ∗ ∃ R : iProp Σ,
        R ∗ (Q -∗ R -∗ ic_escrow_body cn γfs γi cov logstart k))%I.
+
+  (* SEALED, per optimization.md's "a big-op under a transparent name is an
+     iFrame bomb".  [ic_lend]'s closing wand mentions [ic_escrow_body] -- a
+     five-way disjunction of resource towers -- and an [ic_lend] sits in EVERY
+     alternative of [ic_slot_cover] below, so a bare [iFrame] rebuilding a cover
+     unfolded its way down into the whole tower.  Sealing HERE rather than at
+     [ic_escrow_body] is what makes it free: this abstraction is only ever built
+     through [ic_lend_intro] (which unfolds it itself) and never taken apart, so
+     no call site changes.  Sealing the body instead costs a [rewrite] at every
+     one of its fifteen destructs AND fifteen constructs. *)
+  Local Typeclasses Opaque ic_lend.
 
   Lemma ic_lend_intro cn γfs γi cov logstart k (Q R : iProp Σ) :
     Q -∗ R -∗ (Q -∗ R -∗ ic_escrow_body cn γfs γi cov logstart k) -∗
@@ -4678,7 +4700,7 @@ Section IcacheEscrow.
 
   Global Instance ipool_rows_timeless γfs γi cov logstart P :
     Timeless (ipool_rows γfs γi cov logstart P).
-  Proof. rewrite /ipool_rows. apply _. Qed.
+  Proof. rewrite /ipool_rows. tl_struct. Qed.
 
   (* THE RESIDENCY KEY.  Two halves at [icfg_pool] (ambient, see
      [IcacheRef]): one inside the invariant, one under the itable lock, so
@@ -4798,7 +4820,7 @@ Section IcacheEscrow.
     ([∗ map] z ↦ p ∈ T, p.1 ↪[ln_tx icfg_log]{#(p.2)} tt)%I.
 
   Global Instance ipool_transit_timeless T : Timeless (ipool_transit T).
-  Proof. rewrite /ipool_transit. apply _. Qed.
+  Proof. rewrite /ipool_transit. tl_struct. Qed.
 
   (* THE REFUTATION THE COMMIT READS, and the whole reason the ledger exists:
      every inum in transit has a POSITIVE share of some transaction's [ln_tx]
@@ -4876,10 +4898,10 @@ Section IcacheEscrow.
   Proof. destruct v; rewrite /crp_row; apply _. Qed.
 
   Global Instance ipool_corpse_timeless γi K : Timeless (ipool_corpse γi K).
-  Proof. rewrite /ipool_corpse. apply _. Qed.
+  Proof. rewrite /ipool_corpse. tl_struct. Qed.
 
   Global Instance ipool_ckey_timeless K : Timeless (ipool_ckey K).
-  Proof. rewrite /ipool_ckey. apply _. Qed.
+  Proof. rewrite /ipool_ckey. tl_struct. Qed.
 
   (* ONE ROW, REFUTED: a corpse whose deposit has not run parks a POSITIVE
      share of the freeing transaction's element, and at a commit the WAL's
@@ -4959,7 +4981,7 @@ Section IcacheEscrow.
     ([∗ list] k ↦ p ∈ ids, ic_id cn k (1/4) p.1.1 p.1.2 p.2)%I.
 
   Global Instance ic_ids_timeless cn ids : Timeless (ic_ids cn ids).
-  Proof. rewrite /ic_ids. apply _. Qed.
+  Proof. rewrite /ic_ids. tl_struct. Qed.
 
   (* one slot's contribution to the cached set: its inum when it is live,
      nothing when it is not *)
@@ -5104,7 +5126,7 @@ Section IcacheEscrow.
   Global Instance ipool_body_timeless cn γfs γi cov logstart nib :
     Timeless (ipool_body cn γfs γi cov logstart nib).
   Proof.
-    rewrite /ipool_body /ipool_key /ipool_xkey /ipool_tkey. apply _.
+    rewrite /ipool_body /ipool_key /ipool_xkey /ipool_tkey. tl_struct.
   Qed.
 
   (* distinct from every namespace an opener may already hold: the escrow
