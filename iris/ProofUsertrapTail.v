@@ -140,7 +140,7 @@ Section ProofUsertrapTail.
     iDestruct "Hcaps" as "(#Hpi & #Hkd & #Hks & #Hdi & #Hpk & #Hw & #Hft
                            & #Hkm & #Hdk & #Hbio & #Hlog & #Hseam & #Hgc & #Hdev
                            & #Hgeom & #Hav & #Hties & #Hfsr & #Hpw)".
-    iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & _)".
+    iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & Hufr & _)".
     iPoseProof (SpecPrintk.printk_env_panic with "Hpk") as "#Hpe".
     iApply (KE.wp_kexit_sconf (un_ft N) (un_f N) (un_w N) (un_s N) (un_j N) (un_l N)
               (un_u N) (un_v N) (un_k N) (un_pd N) (un_pav N) (un_pu N)
@@ -151,7 +151,7 @@ Section ProofUsertrapTail.
               None (un_fn N) m nx b b _ (un_pid N) V
               eq_refl Hj Hjl Hnx Hlg Hbelow
               with "Hcg Hcl Hcpu Hcsrs Hclm Htext Hkd Hpc Hpi Hpe Hw Hft Hkm Hav
-                    Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hties Hfsr Hip Hfd Hir Hpv").
+                    Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hties Hfsr Hip Hfd Hir Hpv Hufr").
     all: try lkbelow.
   Qed.
 
@@ -267,7 +267,7 @@ Section UtRet2.
       iSplitL "Hstk"; [iExact "Hstk"|]. iSplitL "Hstr"; [iExact "Hstr"|].
       iSplitL "Harm"; [iExact "Harm"|].
       iSplitR; [iExact "Htc"|]. iExact "Hwit". }
-    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
+    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hufr & Hsy & Hownback)".
     (* [ut_caps] is NOT destructured here: +0xb2..+0xc6 calls nothing, so no
        member of it is needed, and destructuring an intuitionistic hypothesis
        CONSUMES the name -- which the exit needs to hand [ut_env] back. *)
@@ -582,7 +582,7 @@ Section UtRet2.
     iDestruct "Hscause" as (scv) "Hscause".
     iDestruct "Hstval" as (stv) "Hstval".
     iSpecialize ("Hcont" $! CID with "[%]"); [intros _; reflexivity|].
-    iDestruct ("Hownback" $! V with "Hpv Hsy") as "Hown".
+    iDestruct ("Hownback" $! V with "Hpv Hufr Hsy") as "Hown".
     iApply ("Hcont" $! (pv_upt V) (tp_pin S9) msg
               (kvi_satp_word (ud_root (pv_upt V))) (mepc_val uepc) scv stv mdv0
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
@@ -671,7 +671,7 @@ Section UtRet.
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
-    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
+    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hufr & Hsy & Hownback)".
     iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
     iDestruct (ut_tf_length with "Hpv") as %Htflen.
     destruct Hepcx as [uepc Hepc].
@@ -736,7 +736,7 @@ Section UtRet.
                     (add_vec (un_ks N) (mword_of_int 4096)) kroot Htflen Hmode Hasid Hppn)
                  with "Hkinv") as "#Htfk".
     iEval (rewrite Hksp) in "Htfk".
-    iDestruct ("Hownback" $! Vr with "Hpv Hsy") as "Hown".
+    iDestruct ("Hownback" $! Vr with "Hpv Hufr Hsy") as "Hown".
     iApply (ut_ret2 (CID := CIDp) Rsys N Vr pt ksp m0 mf av nx b uepc vb
               mie_v menvcfg0 lks
               Hwf' Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp

@@ -153,7 +153,11 @@ Section SpecSysPipe.
        ⌜r = (zero_reg : mword 64) /\ fd_frees (pv_ofile W) = fd0 :: fd1 :: l⌝ ∗
        proc_priv γf p pid
          (upd_ofile (upd_ofile W fd0 (fnode k0)) fd1 (fnode k1)))
-    ∗ fd_slot ∗ fd_slot.
+    (* THE fd-STATE FRAGMENT BUNDLE, in and out.  The success arm spends TWO
+       accesses -- both descriptors go from [FdClosed] to [FdOpen FdPipe] --
+       and every failure arm hands it straight back: each of them nulls
+       whatever it had installed, so no descriptor's state has moved. *)
+    ∗ fd_frags_any (pv_fdg W) ∗ fd_slot ∗ fd_slot.
 
 End SpecSysPipe.
 
@@ -228,6 +232,8 @@ Definition wp_sys_pipe_sconf_body
      acquire on the way has its own panic arm *)
   kalloc_env γa None -∗
   proc_priv γf p pid V -∗
+  (* the descriptor-state fragments -- spent on the two new descriptors *)
+  fd_frags_any (pv_fdg V) -∗
   (* the syscall's own allowance -- two references may be live in locals
      before they reach descriptors.  Both come back. *)
   fd_slot -∗ fd_slot -∗

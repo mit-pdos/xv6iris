@@ -513,7 +513,7 @@ Section UtEntry.
     (*  +0x28 .. +0x2e: p->trapframe->epc = r_sepc().                    *)
     (* =============================================================== *)
     iDestruct "Henv" as "[#Hcaps Hown]".
-    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
+    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hufr & Hsy & Hownback)".
     iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
     destruct Hepcx as [uepc Hepc].
     iDestruct (ut_entry_tfp_valid with "Hpv") as %Hpv_valid.
@@ -599,7 +599,7 @@ Section UtEntry.
     change (upd_tf V (<[tf_epc_idx := rget S3 Ra4]> (pv_tf V))) with V'.
     assert (HuptV' : pv_upt V' = pv_upt V)
       by (rewrite /V'; destruct V; reflexivity).
-    iDestruct ("Hownback" $! V' with "Hpv Hsy") as "Hown".
+    iDestruct ("Hownback" $! V' with "Hpv Hufr Hsy") as "Hown".
     (* the callee-saved relation, threaded through eleven writes *)
     assert (Hcs1 : ut_cs m M1)
       by (rewrite /M1; apply ut_cs_insert4;

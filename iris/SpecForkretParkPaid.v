@@ -139,6 +139,14 @@ Definition forkret_park_pkg
        park token, abstract here; see [SpecForkret] and ParkCap.v *)
     (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64)
+    (* THE PARKED PROCESS'S fd-STATE GHOST NAME.  The package's closer holds
+       that process's fragment bundle, which is keyed on this name; the
+       resume hands back a record [V'] for the same process, and the
+       [pv_fdg V' = g] premise below is what re-keys the bundle onto it.
+       A NAME rather than the whole [pprivate]: the package deliberately
+       does not carry [V] (see this file's header), and the name is the only
+       part of it the bundle needs. *)
+    (g : gname)
     (pid : mword 32) (av : nat) : iProp Σ :=
   (* [ksp] is spelled out rather than [let]-bound: this bundle is DESTRUCTED
      by its consumer, and a [let] survives [rewrite /forkret_park_pkg]. *)
@@ -179,6 +187,13 @@ Definition forkret_park_pkg
       ⌜pv_upt V' = pt'⌝ -∗
       ⌜ud_data pt' = ud_pas pt'⌝ -∗
       ⌜proc_pt_wf pt'⌝ -∗
+      (* THE fd-STATE GHOST NAME IS THE PARKED ONE.  The bundle the parker
+         closed over is keyed on [pv_fdg V]; the resume hands back a record
+         [V'] for the SAME process, and nothing between park and resume
+         reassigns a live process's descriptor ghost (only allocproc chooses
+         one).  Saying so here is what lets the closed-over bundle be handed
+         to the residue at [V']. *)
+      ⌜pv_fdg V' = g⌝ -∗
       UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
       FirstTok.first_done -∗
       W -∗
@@ -223,7 +238,7 @@ Definition forkret_park_paid_body
      lets [ParkCap.park_token] -- whose cap this is -- be a guarded
      fixpoint: the package's closer names the token, and a parker holds the
      token only under a later. *)
-  ⊢ ▷ forkret_park_pkg URes W γs γf pa ks pid av -∗
+  ⊢ ▷ forkret_park_pkg URes W γs γf pa ks (pv_fdg V) pid av -∗
     ▷ W -∗
     is_kstack pa ks -∗
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗

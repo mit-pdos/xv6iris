@@ -239,12 +239,20 @@ End SpecForkret.
 Definition forkret_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
-    (W : iProp Σ) (γf : gname) (p ksp : mword 64) (pid : mword 32)
-    (av : nat) : iProp Σ :=
+    (W : iProp Σ) (γf : gname) (p ksp : mword 64)
+    (* the parked process's fd-state ghost name *)
+    (g : gname)
+    (pid : mword 32) (av : nat) : iProp Σ :=
   (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
      ⌜pv_upt V' = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
+     (* ...and the fd-state ghost name the resumed record carries.  The
+        closer's builder captured the process's fragment bundle at the
+        PARKED record's name, so it needs to know the resumed one agrees --
+        no step between park and resume reassigns a live process's
+        descriptor ghost.  See [SpecForkretParkPaid.forkret_park_pkg]. *)
+     ⌜pv_fdg V' = g⌝ -∗
      (* THE TRAPFRAME'S KERNEL WORDS, at the resuming hart: prepare_return
         wrote them there and [V'] is the descriptor it handed back, so this
         is forkret's to pay -- see [UsertrapRes.ut_tfk]. *)
@@ -327,7 +335,7 @@ Definition wp_forkret_gen_body
   W -∗
   (* ---- the residue closer -- see the header, and [forkret_closer] above
      for why it is a name rather than the wand spelled out ---- *)
-  forkret_closer URes W γf p ksp pid av -∗
+  forkret_closer URes W γf p ksp (pv_fdg V) pid av -∗
   WP (Loop : expr riscv_lang).
 
 (* The residue is the module-type parameter it is everywhere else: forkret's

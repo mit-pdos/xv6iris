@@ -71,6 +71,8 @@ Definition kexec_ok_q (Q : mword 64 -> Prop) (V V' : pprivate) (r : mword 64)
    ud_tfp (pv_upt V') = ud_tfp (pv_upt V) /\
    kxc_tf (pv_tf V) (pv_tf V') entry spv /\
    pv_ofile V' = pv_ofile V /\
+   (* ...and its fd-state ghost name -- see [SpecKexec.kexec_ok]'s note *)
+   pv_fdg V' = pv_fdg V /\
    pv_cwd V' = pv_cwd V /\
    length (pv_name V') = PNAMELEN /\
    (uint szv' - 4096 <= uint spv)%Z /\

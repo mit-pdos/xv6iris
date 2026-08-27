@@ -269,7 +269,7 @@ Section Ut56.
     iDestruct "Hscause" as (sc) "Hscause".
     iDestruct "Hstval" as (st) "Hstval".
     (* the pid quarter, out of the process block *)
-    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
+    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hufr & Hsy & Hownback)".
     iDestruct (proc_priv_pid with "Hpv") as "(Hpid & Hpidback)".
     (* ---- +0x56: csrr a1,scause ---- *)
     iApply (wp_csrr_scause_s_sconf (mword_of_int (UT + 0x56)) Ra1 m nx
@@ -594,7 +594,7 @@ Section Ut56.
                    = mword_of_int (UT + 0xa6)) by pcw.
     iEval (rewrite Hpa6) in "Hpc".
     (* ---- the bundle back together, and on to +0xa6 ---- *)
-    iDestruct ("Hownback" $! V with "Hpv Hsy") as "Hown".
+    iDestruct ("Hownback" $! V with "Hpv Hufr Hsy") as "Hown".
     iApply (T.ut_a6 Rsys N V pt ksp m0 S1 av nx false
               mie_v menvcfg0 lks
               Hwf' Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
@@ -682,7 +682,7 @@ Section UtD0.
     iDestruct "Hcsrs" as "(Hsepc & Hscause & Hstval & Hsret & Hres & Hkpt)".
     iDestruct "Hscause" as (sc) "Hscause".
     iDestruct "Hstval" as (st) "Hstval".
-    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
+    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hufr & Hsy & Hownback)".
     iDestruct (proc_priv_sz_bound with "Hpv") as %Hszb.
     iDestruct (proc_priv_copy with "Hpv") as "(Hsz & Hpgt & Hppt & Hpvback)".
     (* ---- +0xd0: csrr a2,stval ---- *)
@@ -929,7 +929,7 @@ Section UtD0.
       iDestruct ("Hpvback" $! (pv_upt V) ltac:(apply uptd_ext_sz_refl)
                    with "Hsz Hpgt Hppt") as "Hpv".
       rewrite upd_upt_id.
-      iDestruct ("Hownback" $! V with "Hpv Hsy") as "Hown".
+      iDestruct ("Hownback" $! V with "Hpv Hufr Hsy") as "Hown".
       iApply (ut_56 Rsys N V pt ksp m0 mr av nx
                 mie_v menvcfg0 lks
                 Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
@@ -975,7 +975,7 @@ Section UtD0.
       change (upd_upt V Pd) with V'.
       assert (HV'tfp : ud_tfp (pv_upt V') = ud_tfp pt).
       { rewrite /V' /Pd. exact Htfpe. }
-      iDestruct ("Hownback" $! V' with "Hpv Hsy") as "Hown".
+      iDestruct ("Hownback" $! V' with "Hpv Hufr Hsy") as "Hown".
       iApply (T.ut_a6 Rsys N V' pt ksp m0 mr av nx false
                 mie_v menvcfg0 lks
                 Hwf' Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr

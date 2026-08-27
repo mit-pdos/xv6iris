@@ -1047,18 +1047,23 @@ typed file or is closed, and `FileInvDefs.fdstate_of` maps an untyped
 `fcontent` to `FdClosed` precisely so that "the cell is non-null" and "the
 ghost says open" are ONE clause rather than two.
 
+`ProcInv.ofile_slot_agree` is what the whole thing is for, and it is a real
+lemma rather than a vacuous one: a holder of ONE descriptor's fragment learns
+from its value alone whether that descriptor's cell is null — with no access
+to the array and without disturbing it.  Stated before the auth/frag split it
+would have had unsatisfiable premises (the slot held both halves, so a third
+share was invalid).
+
 ### The shape: two halves, one gmap, per incarnation
 
-- **Two halves.**  `fd_st_auth γ fd st` rides with the array;
-  `fd_st γ fd st` is the fragment a client holds.  Both are the same
+- **Two halves, and they are SPLIT.**  `fd_st_auth γ fd st` rides with the
+  array inside `ofile_slot`; `fd_st γ fd st` lives in `FdSlots.fd_frags`, a
+  whole-array bundle that travels BESIDE the process block.  Both are the same
   `1/2`-fraction resource, so either alone PINS the state (`fd_st_agree`) and
-  neither alone can move it — an update needs both (`fd_st_both_update`).
-  That is exactly the power wanted: the kernel cannot silently retype a
-  descriptor a client is reasoning about, and a client cannot invent a state
-  change without the kernel taking a step.  `fd_st_both` is both halves, and
-  it is where both currently sit — inside the process invariant.  **The next
-  increment splits the fragment out** and hands it to clients; nothing in the
-  shape has to change for that.
+  neither alone can move it — an update needs both (`fd_st_move`, the form
+  every site actually has them in).  That is exactly the power wanted: the
+  kernel cannot silently retype a descriptor a client is reasoning about, and
+  a client cannot invent a state change without the kernel taking a step.
 - **One gmap under one name**, not NOFILE `ghost_var`s.  A list of sixteen
   ghost names would have to be allocated, threaded through `proc_priv`, and
   kept in step with the array, and every one-descriptor lemma would carry the
@@ -1125,19 +1130,48 @@ existential costs nothing.
 
 ### The five sites that move a descriptor's state
 
-| site | move | how |
+| site | move | needs the bundle? |
 |---|---|---|
-| `allocproc` | mint, 16 × `FdClosed` | `fd_st_alloc` in `proc_dormant_unused` |
-| `fdalloc` (install) | none — the ghost passes through at `FdClosed` | `proc_ofiles_install` |
-| the settle after fdalloc (`sys_open`, `sys_pipe`, `sys_dup`) | `FdClosed → FdOpen t` | `proc_ofiles_repay` |
-| `sys_close`, `kexit`, `sys_pipe`'s failure tails | `FdOpen t → FdClosed` | `fd_st_both_update` |
-| `kfork` | child `FdClosed → FdOpen t`, parent unchanged | `fd_st_both_update` + `ofile_slot_file` |
-| death (`kexit`; also kfork's freeproc path and allocproc's failure tails) | dropped | `proc_ofiles_null_split` |
+| `allocproc` | mint, 16 × `FdClosed`, split auth/frag | — (it produces both) |
+| `fdalloc` (install) | none — hands the authority out at `FdClosed` | no |
+| the settle (`sys_open`, `sys_pipe` ×2, `sys_dup`) | `FdClosed → FdOpen t` | **yes** |
+| `sys_close`, `kexit`, `sys_pipe`'s undo tails | `FdOpen t → FdClosed` | **yes** |
+| `kfork` | child `FdClosed → FdOpen t` | **yes** (the child's) |
+| `sys_read` / `sys_write` / `sys_fstat` | none — same file back | **no** |
+| death (`kexit`; kfork's freeproc path; allocproc's failure tails) | dropped | — |
 
-`fdalloc` is the one worth noticing: it stores the pointer but leaves the
-descriptor in the DEFICIT, so it never opens the ghost — the caller's repay
-does, at the type of the file it actually installs.  That is what keeps
-`fdalloc` generic in the file it is handed and still keeps the ghost honest.
+**THE LAST TWO ROWS ARE THE POINT, and they are what shaped the deficit.**
+`proc_ofiles_lend` hands the descriptor's AUTHORITY out with the reference,
+and `proc_ofiles_repay` takes it back, so a borrower that returns the file it
+took returns the state it took and touches no fragment.  Had the lent arm
+parked the authority instead, every repay would have been an update and the
+bundle would appear in read's contract — saying something false about it.
+`fdalloc` is the mirror case: it makes the cell non-null but hands its
+authority out still at `FdClosed`, because it does not know what the file is;
+the caller's settle is what moves it, and that is where the bundle is spent.
+
+### Where the bundle lives, and how far it travels
+
+`UsertrapRes.ut_own` / `ut_own_nopt`, beside `proc_priv` — the same
+in-and-out channel `bslots` / `fd_slots FDSPARE` / `iref_slots` already use,
+for the reason `FdSlots.v`'s `FDSPARE` note gives: `proc_priv`'s accessors are
+borrow-and-return and their wands swallow the block, so a syscall holding the
+bundle *out* of `proc_priv` could not then pass `proc_priv` to a callee.  From
+there it reaches, for free, everything the residue reaches — `ut_res_bare`,
+hence `ProofUserretClosed.Rut_at`, hence `user_inv`'s `Rut` conjunct.  **It
+already rides across arbitrary user execution.**  What the next increment
+does is lift it OUT of `usertrap_res_bare` so `userret` can hand it to a
+verified user program instead of parking it opaquely.
+
+`SpecSyscall`'s twenty-two entries thread it, and the four that spend it say
+so.  Two equations pay for the plumbing, both of them true and neither
+avoidable: the dispatcher's return carries `⌜pv_fdg V' = pv_fdg V⌝` (no
+syscall reassigns a live process's descriptor ghost — only `allocproc` chooses
+one, and `fork` chooses the CHILD's), and the park's resume carries the same
+against the parked name, because the parked closure captures the child's
+bundle before the resume record exists.  `SpecKexec.kexec_ok` gained
+`pv_fdg V' = pv_fdg V` for the first of those: exec keeps the descriptor
+block, so it keeps the ghost the block's authorities are keyed on.
 
 ## `sys_close`: the descriptor that gives up its reference
 

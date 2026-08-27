@@ -87,11 +87,17 @@ Section SpecSysDup.
   (* sys_dup's result, keyed by the returned a0.  THREE arms, because there are
      two ways to fail and they are distinguishable: no such descriptor, or no
      room for another one.  Both leave the process exactly as it was. *)
+  (* THE fd-STATE FRAGMENT BUNDLE rides in and out on all three arms.  Only
+     the third spends it: duplicating opens a NEW descriptor, so that
+     descriptor's authority has to move from [FdClosed] to the source file's
+     type ([ProcInv.proc_priv_settle]).  The SOURCE descriptor's state does
+     not change and its authority round-trips through the loan, which is why
+     one bundle access is enough for a two-descriptor syscall. *)
   Definition sys_dup_post (γf : gname) (p : mword 64) (pid : mword 32)
       (V : pprivate) (v : mword 64) (r : mword 64) : iProp Σ :=
     ((* argfd said no: the argument is not an open descriptor *)
      ⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile V) = None⌝ ∗
-       proc_priv γf p pid V
+       proc_priv γf p pid V ∗ fd_frags_any (pv_fdg V)
      ∨
      (* the descriptor exists but the table is full.  xv6 does NOT close
         anything here -- it never took a reference -- so the block is
@@ -101,7 +107,7 @@ Section SpecSysDup.
         ⌜r = (mword_of_int (-1) : mword 64) /\
          arg_fd v (pv_ofile V) = Some (fd0, fv) /\
          fd_frees (pv_ofile V) = []⌝ ∗
-        proc_priv γf p pid V)
+        proc_priv γf p pid V ∗ fd_frags_any (pv_fdg V))
      ∨
      (* duplicated: the least free descriptor now names the same file the
         source did, and the count behind it has gone up by one. *)
@@ -109,7 +115,7 @@ Section SpecSysDup.
         ⌜r = (mword_of_int (Z.of_nat fd1) : mword 64) /\
          arg_fd v (pv_ofile V) = Some (fd0, fv) /\
          fd_frees (pv_ofile V) = fd1 :: l⌝ ∗
-        proc_priv γf p pid (upd_ofile V fd1 fv)))%I.
+        proc_priv γf p pid (upd_ofile V fd1 fv) ∗ fd_frags_any (pv_fdg V)))%I.
 
 End SpecSysDup.
 
@@ -141,6 +147,8 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG
   (* the ftable lock, for filedup's ghost step *)
   is_ftable γl γf -∗
   proc_priv γf p pid V -∗
+  (* the descriptor-state fragments -- spent on the destination descriptor *)
+  fd_frags_any (pv_fdg V) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗

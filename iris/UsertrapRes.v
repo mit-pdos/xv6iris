@@ -756,6 +756,19 @@ Section UsertrapRes.
         trapframe page (at the VA tier) -- which is why SpecUsertrap.v's
         boundary hands over neither. *)
      proc_priv (un_f N) (un_pj N) (un_pid N) V ∗
+     (* THE DESCRIPTOR-STATE FRAGMENTS ([FdSlots.fd_frags]), BESIDE the
+        block and not inside it.  This is their home: they are what an fd
+        operation must spend to retype a descriptor (the array holds only
+        the authority), and they ride from here across user execution --
+        [ut_res_bare] is what [ProofUserretClosed.Rut_at] parks inside
+        [user_inv].  Beside rather than inside for the reason [FDSPARE]'s
+        allowance is: [proc_priv]'s accessors are borrow-and-return and
+        their wands swallow the block, so a syscall holding the bundle out
+        of [proc_priv] could not then pass [proc_priv] to a callee.
+        Quantified over the states, exactly as [FdSlots.fd_frags_any]'s
+        header explains -- the trap round does not read them, and a client
+        that wants to state a delta takes [fd_frags] at an explicit list. *)
+     fd_frags_any (pv_fdg V) ∗
      (* everything the twenty-two syscall table entries consume, abstractly *)
      Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N))%I.
 
@@ -766,18 +779,23 @@ Section UsertrapRes.
   (* the process block and the syscall environment, borrowed together and
      handed back at a moved record: syscall wants both, prepare_return and
      vmfault only the first. *)
+  (* THE BUNDLE COMES OUT WITH THE BLOCK, and goes back with it: a syscall
+     that retypes a descriptor needs both, and one that does not simply
+     hands the bundle straight back. *)
   Lemma ut_own_priv (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ) (N : ut_names)
       (V : pprivate) :
     ut_own Rsys N V -∗
     proc_priv (un_f N) (un_pj N) (un_pid N) V ∗
+    fd_frags_any (pv_fdg V) ∗
     Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) ∗
     (∀ V' : pprivate,
        proc_priv (un_f N) (un_pj N) (un_pid N) V' -∗
+       fd_frags_any (pv_fdg V') -∗
        Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗ ut_own Rsys N V').
   Proof.
-    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hsy)".
-    iFrame "Hpv Hsy". iIntros (V') "Hpv Hsy".
-    rewrite /ut_own. iFrame "Hb Hip Hfd Hir Hpv Hsy".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy)".
+    iFrame "Hpv Hfr Hsy". iIntros (V') "Hpv Hfr Hsy".
+    rewrite /ut_own. iFrame "Hb Hip Hfd Hir Hpv Hfr Hsy".
   Qed.
 
   (* [ut_own]'s SIX raw conjuncts, straight back into [ut_own N] -- the
@@ -795,12 +813,13 @@ Section UsertrapRes.
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
     proc_priv (un_f N) (un_pj N) (un_pid N) V -∗
+    fd_frags_any (pv_fdg V) -∗
     Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗
     ut_own Rsys N V.
   Proof.
     rewrite /ut_own.
-    iIntros "Hb Hip Hfd Hir Hpv Hsy".
-    iFrame "Hb Hip Hfd Hir Hpv Hsy".
+    iIntros "Hb Hip Hfd Hir Hpv Hfr Hsy".
+    iFrame "Hb Hip Hfd Hir Hpv Hfr Hsy".
   Qed.
 
   (* THE TRAPFRAME BORROW, at the [proc_priv] level.  [proc_fields] /
@@ -1009,14 +1028,14 @@ Section UsertrapRes.
     iIntros "H".
     iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
     iDestruct "Henv" as "[Hcaps Hown]".
-    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
+    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hfr & Hsy & Hownback)".
     iDestruct (proc_priv_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
     iExists kroot, (pv_tf V). iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf".
     iIntros (ws') "%Htfk' Htf'".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
-    iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
+    iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hfr Hsy") as "Hown'".
     iExists N, (upd_tf V ws'), av.
     iDestruct (ut_tfk_intro ksp (upd_tf V ws') kroot Htfk' with "Hkpt") as "#Htfk'".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
@@ -1080,6 +1099,8 @@ Section UsertrapRes.
      fd_slots FDSPARE ∗
      iref_slots IREFSPARE ∗
      proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V ∗
+     (* the descriptor-state fragments -- see [ut_own]'s note *)
+     fd_frags_any (pv_fdg V) ∗
      Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N))%I.
 
   Definition ut_env_nopt (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
@@ -1092,8 +1113,8 @@ Section UsertrapRes.
     ut_own_nopt Rsys N V -∗ proc_pt (pv_upt V) -∗ ut_own Rsys N V.
   Proof.
     rewrite /ut_own /ut_own_nopt proc_priv_split_pt.
-    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hsy) Hpt".
-    iFrame "Hb Hip Hfd Hir Hpv Hpt Hsy".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy) Hpt".
+    iFrame "Hb Hip Hfd Hir Hpv Hfr Hpt Hsy".
   Qed.
 
   Lemma ut_own_pt_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
@@ -1101,8 +1122,8 @@ Section UsertrapRes.
     ut_own Rsys N V -∗ ut_own_nopt Rsys N V ∗ proc_pt (pv_upt V).
   Proof.
     rewrite /ut_own /ut_own_nopt proc_priv_split_pt.
-    iIntros "(Hb & Hip & Hfd & Hir & (Hpv & Hpt) & Hsy)".
-    iFrame "Hb Hip Hfd Hir Hpv Hpt Hsy".
+    iIntros "(Hb & Hip & Hfd & Hir & (Hpv & Hpt) & Hfr & Hsy)".
+    iFrame "Hb Hip Hfd Hir Hpv Hfr Hpt Hsy".
   Qed.
 
   (* the borrow accessor, at the reduced environment -- [ut_own_priv]'s twin *)
@@ -1110,14 +1131,16 @@ Section UsertrapRes.
       (V : pprivate) :
     ut_own_nopt Rsys N V -∗
     proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V ∗
+    fd_frags_any (pv_fdg V) ∗
     Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) ∗
     (∀ V' : pprivate,
        proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
+       fd_frags_any (pv_fdg V') -∗
        Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗ ut_own_nopt Rsys N V').
   Proof.
-    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hsy)".
-    iFrame "Hpv Hsy". iIntros (V') "Hpv Hsy".
-    rewrite /ut_own_nopt. iFrame "Hb Hip Hfd Hir Hpv Hsy".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy)".
+    iFrame "Hpv Hfr Hsy". iIntros (V') "Hpv Hfr Hsy".
+    rewrite /ut_own_nopt. iFrame "Hb Hip Hfd Hir Hpv Hfr Hsy".
   Qed.
 
   (* the descriptor's derived footprint field is invisible to the reduced
@@ -1279,14 +1302,14 @@ Section UsertrapRes.
   Proof.
     iIntros "H".
     iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
-    iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hsy & Hownback)".
+    iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hfr & Hsy & Hownback)".
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
     iExists kroot, (pv_tf V). iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf".
     iIntros (ws') "%Htfk' Htf'".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
-    iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
+    iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hfr Hsy") as "Hown'".
     iExists N, (upd_tf V ws'), av.
     iDestruct (ut_tfk_intro ksp (upd_tf V ws') kroot Htfk' with "Hkpt") as "#Htfk'".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
@@ -1359,7 +1382,7 @@ Section UsertrapRes.
     iDestruct "Htrap" as "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
     iDestruct (cpu_own_csrs_open with "Hcpu") as "[Hcsrs Hcback]".
     (* ... and the trapframe page, out of the process block *)
-    iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hsy & Hownback)".
+    iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hfr & Hsy & Hownback)".
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
@@ -1367,7 +1390,7 @@ Section UsertrapRes.
     iFrame "Htf Hcsrs".
     iIntros (ws') "%Htfk' Htf' Hcsrs'".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
-    iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
+    iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hfr Hsy") as "Hown'".
     iDestruct ("Hcback" with "Hcsrs'") as "Hcpu".
     iExists N, (upd_tf V ws'), av.
     iDestruct (ut_tfk_intro ksp (upd_tf V ws') kroot Htfk' with "Hkpt") as "#Htfk'".
@@ -1664,6 +1687,11 @@ Definition ut_park_intro_body
        proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
        fd_slots FDSPARE -∗
        iref_slots IREFSPARE -∗
+       (* ...and the descriptor-state fragments, on the same channel the
+          three allowances above travel: allocproc minted them with the
+          block ([ProcInv.proc_dormant_unused]) and whoever resumes the
+          process hands them back in. *)
+       fd_frags_any (pv_fdg V') -∗
        URB h pt' (add_vec (un_ks N) (mword_of_int 4096))).
 
 Lemma ut_res_bare_park
@@ -1693,11 +1721,12 @@ Lemma ut_res_bare_park
      proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
      fd_slots FDSPARE -∗
      iref_slots IREFSPARE -∗
+     fd_frags_any (pv_fdg V') -∗
      ut_res_bare (CID := h) Rsys pt'
        (add_vec (un_ks N) (mword_of_int 4096))).
 Proof.
   iIntros (Hwf Hav) "#Hpark Hderive Hown".
-  iIntros (h pt' V') "%Hupt #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+  iIntros (h pt' V') "%Hupt #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref Hfrag".
   iDestruct ("Hderive" with "Hdone HW") as "Hsys".
   iDestruct "Hdone" as "[_ #Hrdy]".
   iDestruct (ut_caps_of_park with "Hpark Hrdy") as "#Hcaps".
@@ -1718,7 +1747,8 @@ Proof.
   iSplitL "Hip"; [iExact "Hip" |].
   iSplitL "Hfd"; [iExact "Hfd" |].
   iSplitL "Hiref"; [iExact "Hiref" |].
-  iSplitL "Hpriv"; [iExact "Hpriv" | iExact "Hsys"].
+  iSplitL "Hpriv"; [iExact "Hpriv" |].
+  iSplitL "Hfrag"; [iExact "Hfrag" | iExact "Hsys"].
 Qed.
 
 

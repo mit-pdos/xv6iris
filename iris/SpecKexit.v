@@ -263,6 +263,11 @@ Definition wp_kexit_sconf_body
      block parks. *)
   iref_slots IREFSPARE -∗
   proc_priv γf pj pid V -∗
+  (* THE fd-STATE FRAGMENT BUNDLE.  kexit closes every descriptor, and after
+     [ProcInv]'s auth/frag split a close is a retype that needs both halves.
+     It is NOT given back: the process is ending, and the bundle dies with
+     the incarnation whose name it is keyed on (FdSlots.v). *)
+  fd_frags_any (pv_fdg V) -∗
   (* NO continuation: kexit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).
 

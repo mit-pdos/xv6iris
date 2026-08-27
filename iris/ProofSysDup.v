@@ -350,7 +350,7 @@ Section ProofSysDup.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hftab Hpriv Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hftab Hpriv Hfrag Hcont".
     iDestruct (proc_priv_ofile_len with "Hpriv") as %Hoflen.
     (* ===================== PROLOGUE (48-byte frame) ===================== *)
     (* ---- +0x00: c.addi16sp sp,-48 ---- *)
@@ -611,8 +611,8 @@ Section ProofSysDup.
       iDestruct (cpu_own_transport CID9 CIDz1 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     iSpecialize ("Hcont" $! CIDz1 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! Fz1 with "[%] Hcg Hcpu Hpc [Hpriv]"); [exact HcsF|].
-      rewrite /sys_dup_post. iLeft. iSplitR; [| iExact "Hpriv"].
+    iApply ("Hcont" $! Fz1 with "[%] Hcg Hcpu Hpc [Hpriv Hfrag]"); [exact HcsF|].
+      rewrite /sys_dup_post. iLeft. iSplitR; [| iFrame "Hpriv Hfrag"].
       iPureIntro. split; [exact HFa0 | exact Hnone]. }
     (* ===================== argfd found the descriptor ===================== *)
     iDestruct "Hsucc" as (fd0 fv) "([%Hrv0 %Hsome] & _ & Hs5)".
@@ -732,7 +732,7 @@ Section ProofSysDup.
        reference, so the reference comes out first and the array goes in
        holed. *)
     iDestruct (proc_priv_lend γf p pid V fd0 fv Hlk0 Hfvnz with "Hpriv")
-      as (k q Cf) "((%Hfvk & %Hklt & %Hty) & Href & Hcore & Hof)".
+      as (k q Cf) "((%Hfvk & %Hklt & %Hty) & Href & Hauth0 & Hcore & Hof)".
     iDestruct (cpu_own_transport CID9 CID16 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     iApply (Fdalloc.wp_fdalloc_sconf γf k {[fd0]} B4 (av - 6)%nat n eb p pid V b lks
@@ -825,10 +825,10 @@ Section ProofSysDup.
       (* NOT [set_solver]: it runs naive_solver over the WHOLE context, which
          here is ~200 hypotheses of large mword terms -- 106 s for [fd0 not in
          {}].  See claude-notes/optimization.md. *)
-      iMod (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile V) ∅ fd0 k q Cf
+      iDestruct (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile V) ∅ fd0 k q Cf
                    ltac:(apply not_elem_of_empty)
                    ltac:(rewrite Hlk0 Hfvk; reflexivity) Hklt Hty
-                   with "[Hof] Href") as "Hof".
+                   with "[Hof] Href Hauth0") as "Hof".
       { rewrite (union_empty_r_L {[fd0]}). iExact "Hof". }
       iDestruct (proc_priv_join with "Hcore Hof") as "Hpriv".
       iApply (wp_blt_x0_taken_s_sconf (mword_of_int (KernelSyms.sys_dup + 0x2c))
@@ -916,12 +916,12 @@ Section ProofSysDup.
       iDestruct (cpu_own_transport CID17 CIDz2 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     iSpecialize ("Hcont" $! CIDz2 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! Fz2 with "[%] Hcg Hcpu Hpc [Hpriv]"); [exact HcsF|].
+    iApply ("Hcont" $! Fz2 with "[%] Hcg Hcpu Hpc [Hpriv Hfrag]"); [exact HcsF|].
       rewrite /sys_dup_post. iRight. iLeft.
-      iExists fd0, fv. iSplitR; [| iExact "Hpriv"].
+      iExists fd0, fv. iSplitR; [| iFrame "Hpriv Hfrag"].
       iPureIntro. split; [exact HFa0|]. split; [exact Hsome | exact Hnone2]. }
     (* ============ the descriptor was allocated: duplicate ============ *)
-    iDestruct "Hs2ok" as (fd1 l) "([%Hr2 %Hfr1] & Hof & Hunit)".
+    iDestruct "Hs2ok" as (fd1 l) "([%Hr2 %Hfr1] & Hof & Hunit & Hauth1)".
     pose proof (fd_frees_head_lt (pv_ofile V) fd1 l Hfr1) as Hfd1len.
     assert (Hfd1N : (fd1 < NOFILE)%nat) by (rewrite -Hoflen; exact Hfd1len).
     assert (Hfree1 : pv_ofile V !! fd1 = Some (zero_reg : mword 64))
@@ -1016,13 +1016,23 @@ Section ProofSysDup.
     assert (Hlk0' : pv_ofile (upd_ofile V fd1 (fnode k)) !! fd0 = Some (fnode k)).
     { cbn [upd_ofile pv_ofile pv_fdg]. rewrite list_lookup_insert_ne; [| exact Hne01].
       rewrite Hlk0 Hfvk. reflexivity. }
-    iMod (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile (upd_ofile V fd1 (fnode k)))
+    (* THE DESTINATION IS THE ONE THAT CHANGES STATE.  fdalloc handed out its
+       authority at [FdClosed]; it has to arrive at the source file's type,
+       and that move is what this syscall spends the fragment bundle on. *)
+    iDestruct (fd_frags_any_acc (pv_fdg V) fd1 Hfd1N with "Hfrag")
+      as (stq) "[Hfr Hfrback]".
+    iMod (fd_st_move _ fd1 FdClosed stq (fdstate_of Cf) with "Hauth1 Hfr")
+      as "[Hauth1 Hfr]".
+    iDestruct ("Hfrback" with "Hfr") as "Hfrag".
+    iDestruct (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile (upd_ofile V fd1 (fnode k)))
                  {[fd0]} fd1 k (q/2)%Qp Cf
                  ltac:(apply not_elem_of_singleton_2; exact Hne01)
-                 Hlk1 Hklt Hty with "Hof Href0") as "Hof".
-    iMod (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile (upd_ofile V fd1 (fnode k)))
+                 Hlk1 Hklt Hty with "Hof Href0 Hauth1") as "Hof".
+    (* the SOURCE keeps its state: the authority the loan took out goes back
+       exactly as it came, so no second bundle access is needed. *)
+    iDestruct (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile (upd_ofile V fd1 (fnode k)))
                  ∅ fd0 k (q/2)%Qp Cf ltac:(apply not_elem_of_empty) Hlk0' Hklt Hty
-                 with "[Hof] Href1") as "Hof".
+                 with "[Hof] Href1 Hauth0") as "Hof".
     { rewrite (union_empty_r_L {[fd0]}). iExact "Hof". }
     iDestruct (proc_priv_join with "[Hcore] Hof") as "Hpriv".
     { rewrite proc_priv_core_upd_ofile. iExact "Hcore". }
@@ -1106,11 +1116,11 @@ Section ProofSysDup.
     iDestruct (cpu_own_transport CID23 CIDz3 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     iSpecialize ("Hcont" $! CIDz3 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! Fz3 with "[%] Hcg Hcpu Hpc [Hpriv]"); [exact HcsF|].
+    iApply ("Hcont" $! Fz3 with "[%] Hcg Hcpu Hpc [Hpriv Hfrag]"); [exact HcsF|].
     rewrite /sys_dup_post. iRight. iRight.
     iExists fd0, fd1, fv, l. iSplitR.
     { iPureIntro. split; [exact HFa0|]. split; [exact Hsome | exact Hfr1]. }
-    rewrite Hfvk. iExact "Hpriv".
+    rewrite Hfvk. iFrame "Hpriv Hfrag".
   Qed.
 
 End ProofSysDup.

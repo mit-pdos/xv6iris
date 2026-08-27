@@ -260,14 +260,20 @@ Section ProcInv.
      FD_NONE to [FdClosed]).  That is true of xv6 -- filealloc's fresh,
      untyped file reaches a descriptor only after sys_open or pipealloc has
      set [f->type] -- and it has to be said HERE, because it is what makes
-     "the cell is non-null" and "the ghost says open" the same fact. *)
+     "the cell is non-null" and "the ghost says open" the same fact.
+       ONLY THE AUTHORITY IS HERE.  The matching fragments live in
+     [FdSlots.fd_frags], a bundle that travels BESIDE the block
+     ([UsertrapRes.ut_own]); read that predicate's header for why.  The
+     consequence is the point of the split: this predicate alone can no
+     longer MOVE a descriptor's state, so every operation that retypes one
+     has to hold the bundle, and says so in its contract. *)
   Definition ofile_slot (γf γd : gname) (pa : mword 64) (fd : nat) (v : mword 64)
       : iProp Σ :=
     (p_ofile pa fd ↦₈ v ∗
-     (⌜v = (zero_reg : mword 64)⌝ ∗ fd_slot ∗ fd_st_both γd fd FdClosed ∨
+     (⌜v = (zero_reg : mword 64)⌝ ∗ fd_slot ∗ fd_st_auth γd fd FdClosed ∨
       ∃ (k : nat) (q : Qp) (C : fcontent),
         ⌜v = fnode k /\ (k < NFILE)%nat /\ fdstate_of C <> FdClosed⌝ ∗
-        file_ref γf k q C ∗ fd_st_both γd fd (fdstate_of C)))%I.
+        file_ref γf k q C ∗ fd_st_auth γd fd (fdstate_of C)))%I.
 
   (* ---- the two ends of "filling a descriptor", as accessors ----
      An EMPTY descriptor owns the fd-slot unit itself, so opening one YIELDS
@@ -279,7 +285,7 @@ Section ProcInv.
   Lemma ofile_slot_null (γf γd : gname) (pa : mword 64) (fd : nat) :
     ofile_slot γf γd pa fd (zero_reg : mword 64) -∗
     p_ofile pa fd ↦₈ (zero_reg : mword 64) ∗ fd_slot ∗
-    fd_st_both γd fd FdClosed.
+    fd_st_auth γd fd FdClosed.
   Proof.
     iIntros "[$ [(_ & $ & $) | (%k & %q & %C & (%Hfn & %Hk & _) & _)]]".
     exfalso. apply (fnode_ne_zero k Hk). symmetry. exact Hfn.
@@ -289,36 +295,31 @@ Section ProcInv.
       (C : fcontent) :
     (k < NFILE)%nat -> fdstate_of C <> FdClosed ->
     p_ofile pa fd ↦₈ fnode k -∗ file_ref γf k q C -∗
-    fd_st_both γd fd (fdstate_of C) -∗ ofile_slot γf γd pa fd (fnode k).
+    fd_st_auth γd fd (fdstate_of C) -∗ ofile_slot γf γd pa fd (fnode k).
   Proof.
     iIntros (Hk Hty) "Hc Href Hst". iFrame "Hc". iRight.
     iExists k, q, C. iFrame "Href Hst". iPureIntro.
     split; [reflexivity | split; [exact Hk | exact Hty]].
   Qed.
 
-  (* THE READING, in BORROW form: the array knows every descriptor's state,
-     and what it knows agrees with the cell.  This is the shape the fragment
-     split will use -- what leaves is exactly the [fd_st] half this lends --
-     and it is the strongest thing that CAN be said while both halves are
-     still inside.  A client-facing agreement lemma ("a holder of [fd_st γd
-     fd st] learns whether the cell is null") would be VACUOUS today: the
-     slot already holds both halves, so a third share is invalid and the
-     premise set is unsatisfiable.  That is the one thing the next increment
-     buys, and the reason it is worth doing. *)
-  Lemma ofile_slot_state (γf γd : gname) (pa : mword 64) (fd : nat) (v : mword 64) :
-    ofile_slot γf γd pa fd v -∗
-    ∃ st : fdstate,
-      ⌜st = FdClosed <-> v = (zero_reg : mword 64)⌝ ∗ fd_st γd fd st ∗
-      (fd_st γd fd st -∗ ofile_slot γf γd pa fd v).
+  (* THE READING, AND IT IS A CLIENT LEMMA NOW.  A holder of one descriptor's
+     FRAGMENT learns from its value alone whether the cell is null -- with no
+     access to the array, and without disturbing it.  This is what the split
+     bought: stated before it, the premises were unsatisfiable (the slot held
+     both halves, so a third share was invalid) and the lemma was vacuous.
+     It is also how an fd operation learns which state it is updating FROM --
+     the bundle hands out a fragment at an existential [st]
+     ([FdSlots.fd_frags_any_acc]) and this pins it against the slot. *)
+  Lemma ofile_slot_agree (γf γd : gname) (pa : mword 64) (fd : nat)
+      (v : mword 64) (st : fdstate) :
+    fd_st γd fd st -∗ ofile_slot γf γd pa fd v -∗
+    ⌜(v = (zero_reg : mword 64) /\ st = FdClosed)
+     \/ (v <> (zero_reg : mword 64) /\ st <> FdClosed)⌝.
   Proof.
-    iIntros "[Hc [(-> & Hu & Ha & Hf) | (%k & %q & %C & (%Hfn & %Hk & %Hty) & Href & Ha & Hf)]]".
-    - iExists FdClosed. iFrame "Hf". iSplitR; [iPureIntro; split; done|].
-      iIntros "Hf". iFrame "Hc". iLeft. by iFrame "Hu Ha Hf".
-    - iExists (fdstate_of C). iFrame "Hf". iSplitR.
-      { iPureIntro. split; [done|]. intro Hz. exfalso.
-        apply (fnode_ne_zero k Hk). by rewrite -Hfn. }
-      iIntros "Hf". iFrame "Hc". iRight. iExists k, q, C. iFrame "Href Ha Hf".
-      iPureIntro. split; [exact Hfn | split; [exact Hk | exact Hty]].
+    iIntros "Hst [_ [(-> & _ & Ha) | (%k & %q & %C & (%Hfn & %Hk & %Hty) & _ & Ha)]]".
+    - iDestruct (fd_st_agree with "Ha Hst") as %<-. iPureIntro. by left.
+    - iDestruct (fd_st_agree with "Ha Hst") as %<-. iPureIntro. right.
+      split; [rewrite Hfn; exact (fnode_ne_zero k Hk) | exact Hty].
   Qed.
 
   Definition proc_ofiles (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
@@ -347,15 +348,17 @@ Section ProcInv.
      not tell a free descriptor from a lent one, and could install a second
      reference over a loan.
 
-     WHY THE GHOST IS EXISTENTIAL ON A LENT DESCRIPTOR.  A loan is a window
-     INSIDE one syscall -- [proc_priv] is [D = ∅], so no loan survives a
-     return -- and during it the array does not know the type of the file that
-     will come back.  Both halves of the descriptor's ghost stay here, so
-     whoever settles the loan can retype it in one step
-     ([proc_ofiles_repay]); it is the repay that re-pins the ghost to the
-     file's actual [fcontent], and no client can observe the window.  Once the
-     FRAGMENT is handed out (the next increment), the fragment's own value
-     pins [st] here through [fd_st_agree] and the existential costs nothing.
+     THE AUTHORITY LEAVES WITH THE REFERENCE, so a lent descriptor carries
+     no ghost at all.  That is what makes the fragment bundle needed by
+     exactly the operations that RETYPE a descriptor and by no others:
+     read / write / fstat lend a descriptor and give the SAME file back, so
+     the authority they took out at [fdstate_of C] is the one they return
+     and nothing has to move; open / pipe / dup / close / fork install a
+     DIFFERENT state, and only they have to reach into the bundle
+     ([FdSlots.fd_st_move]).  An arm that parked the authority here instead
+     would have to update on the way out even when nothing changed, which
+     would put the bundle in every descriptor-touching contract and say
+     something false about read.
 
      WHY NOT A THIRD [ofile_slot] DISJUNCT.  Because only the holder of the
      block sees [D].  A "maybe on loan" case inside [ofile_slot] would have to
@@ -365,8 +368,7 @@ Section ProcInv.
   Definition ofile_lent_or_slot (γf γd : gname) (pa : mword 64) (D : gset nat)
       (fd : nat) (v : mword 64) : iProp Σ :=
     (if bool_decide (fd ∈ D)
-     then ⌜v <> (zero_reg : mword 64)⌝ ∗ p_ofile pa fd ↦₈ v ∗
-          (∃ st : fdstate, fd_st_both γd fd st)
+     then ⌜v <> (zero_reg : mword 64)⌝ ∗ p_ofile pa fd ↦₈ v
      else ofile_slot γf γd pa fd v)%I.
 
   Definition proc_ofiles_owe (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
@@ -378,8 +380,7 @@ Section ProcInv.
       (fd : nat) (v : mword 64) :
     fd ∈ D ->
     ofile_lent_or_slot γf γd pa D fd v ⊣⊢
-    ⌜v <> (zero_reg : mword 64)⌝ ∗ p_ofile pa fd ↦₈ v ∗
-    (∃ st : fdstate, fd_st_both γd fd st).
+    ⌜v <> (zero_reg : mword 64)⌝ ∗ p_ofile pa fd ↦₈ v.
   Proof. intro Hin. rewrite /ofile_lent_or_slot bool_decide_true //. Qed.
 
   Lemma ofile_lent_or_slot_out (γf γd : gname) (pa : mword 64) (D : gset nat)
@@ -449,7 +450,10 @@ Section ProcInv.
        It hands back the file's TYPEDNESS along with the reference, because
      that is the one thing the repay cannot re-derive: [ofile_slot] is where
      "a descriptor names a typed file" is stated, and once the payload is out
-     of the array nothing else says it. *)
+     of the array nothing else says it.  It hands back the descriptor's
+     ghost AUTHORITY for the same reason -- see [ofile_lent_or_slot]'s note:
+     a borrower that returns the same file returns the same authority and
+     needs no fragment. *)
   Lemma proc_ofiles_lend (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
       (D : gset nat) (fd : nat) (v : mword 64) :
     fd ∉ D ->
@@ -458,7 +462,7 @@ Section ProcInv.
     proc_ofiles_owe γf γd pa fs D -∗
     ∃ (k : nat) (q : Qp) (C : fcontent),
       ⌜v = fnode k /\ (k < NFILE)%nat /\ fdstate_of C <> FdClosed⌝ ∗
-      file_ref γf k q C ∗
+      file_ref γf k q C ∗ fd_st_auth γd fd (fdstate_of C) ∗
       proc_ofiles_owe γf γd pa fs ({[fd]} ∪ D).
   Proof.
     iIntros (Hnin Hfd Hnz) "Ho".
@@ -467,54 +471,61 @@ Section ProcInv.
     rewrite (ofile_lent_or_slot_out _ _ _ _ _ _ Hnin) /ofile_slot.
     iDestruct "Hs" as "[Hc [(%Hz & _) | (%k & %q & %C & (%Hfn & %Hk & %Hty) & Href & Hst)]]";
       [contradiction|].
-    iDestruct ("Hback" $! v with "[Hc Hst]") as "Ho".
+    iDestruct ("Hback" $! v with "[Hc]") as "Ho".
     { rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ (elem_of_union_l _ _ _
                  (elem_of_singleton_2 _ _ (eq_refl fd)))).
-      iFrame "Hc". iSplitR; [iPureIntro; exact Hnz|].
-      iExists (fdstate_of C). iExact "Hst". }
+      iFrame "Hc". iPureIntro. exact Hnz. }
     rewrite list_insert_id; [|exact Hfd].
-    iExists k, q, C. iFrame "Href Ho". iPureIntro.
+    iExists k, q, C. iFrame "Href Hst Ho". iPureIntro.
     split; [exact Hfn | split; [exact Hk | exact Hty]].
   Qed.
 
-  (* REPAY: hand a reference back, and the descriptor leaves the deficit.
-     THE GHOST STEP LIVES HERE: the descriptor's state is re-pinned to the
-     type of the file actually being installed, which is why this is an
-     UPDATE and why it demands the typedness clause the lend handed out. *)
+  (* REPAY: hand a reference back -- AND the authority that came out with
+     it -- and the descriptor leaves the deficit.
+       THERE IS NO GHOST STEP HERE, and that is the design.  A borrower that
+     returns the file it took returns the authority it took, so the state
+     does not move and no fragment is involved: read / write / fstat are
+     exactly this shape and their contracts stay bundle-free.  An arm that
+     wants to install a DIFFERENT state (open, pipe, dup's destination)
+     moves the authority itself with [FdSlots.fd_st_move] -- which needs the
+     bundle -- and hands the moved one in here. *)
   Lemma proc_ofiles_repay (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
       (D : gset nat) (fd k : nat) (q : Qp) (C : fcontent) :
     fd ∉ D ->
     fs !! fd = Some (fnode k) ->
     (k < NFILE)%nat ->
     fdstate_of C <> FdClosed ->
-    proc_ofiles_owe γf γd pa fs ({[fd]} ∪ D) -∗ file_ref γf k q C ==∗
+    proc_ofiles_owe γf γd pa fs ({[fd]} ∪ D) -∗ file_ref γf k q C -∗
+    fd_st_auth γd fd (fdstate_of C) -∗
     proc_ofiles_owe γf γd pa fs D.
   Proof.
-    iIntros (Hnin Hfd Hk Hty) "Ho Href".
+    iIntros (Hnin Hfd Hk Hty) "Ho Href Ha".
     iDestruct (proc_ofiles_owe_acc _ _ _ _ ({[fd]} ∪ D) D fd (fnode k) Hfd
                  ltac:(set_solver) with "Ho") as "[Hs Hback]".
     rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ (elem_of_union_l _ _ _
                (elem_of_singleton_2 _ _ (eq_refl fd)))).
-    iDestruct "Hs" as "(_ & Hc & %st & Hst)".
-    iMod (fd_st_both_update γd fd st (fdstate_of C) with "Hst") as "Hst".
-    iDestruct ("Hback" $! (fnode k) with "[Hc Href Hst]") as "Ho".
+    iDestruct "Hs" as "(_ & Hc)".
+    iDestruct ("Hback" $! (fnode k) with "[Hc Href Ha]") as "Ho".
     { rewrite (ofile_lent_or_slot_out _ _ _ _ _ _ Hnin).
-      iApply (ofile_slot_file _ _ _ _ _ q C Hk Hty with "Hc Href Hst"). }
-    rewrite list_insert_id; [|exact Hfd]. by iModIntro.
+      iApply (ofile_slot_file _ _ _ _ _ q C Hk Hty with "Hc Href Ha"). }
+    rewrite list_insert_id; [|exact Hfd]. iExact "Ho".
   Qed.
 
   (* INSTALL: fdalloc's whole move.  A free descriptor's unit comes out with
      its cell; writing a non-null pointer puts the descriptor in the deficit,
      for the caller to settle.  fdalloc needs no [file_ref] at all -- its code
      only stores a pointer, and [fd ∉ D] is DERIVED from the cell being null
-     (the non-null clause on the lent case).  The ghost half goes STRAIGHT
-     THROUGH, at [FdClosed]: the descriptor is not open until the caller has
-     put a typed file behind it, which is [proc_ofiles_repay]'s step. *)
+     (the non-null clause on the lent case).  THE AUTHORITY COMES OUT, at
+     [FdClosed]: fdalloc has made the cell non-null but the descriptor is
+     not OPEN until a typed file is behind it, and moving the authority to
+     that file's type is the caller's step -- the one that needs the
+     fragment bundle. *)
   Lemma proc_ofiles_install (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
       (D : gset nat) (fd : nat) :
     fs !! fd = Some (zero_reg : mword 64) ->
     proc_ofiles_owe γf γd pa fs D -∗
     p_ofile pa fd ↦₈ (zero_reg : mword 64) ∗ fd_slot ∗
+    fd_st_auth γd fd FdClosed ∗
     (∀ v', ⌜v' <> (zero_reg : mword 64)⌝ -∗ p_ofile pa fd ↦₈ v' -∗
            proc_ofiles_owe γf γd pa (<[fd := v']> fs) ({[fd]} ∪ D)).
   Proof.
@@ -529,13 +540,12 @@ Section ProcInv.
     iDestruct (proc_ofiles_owe_acc _ _ _ _ D ({[fd]} ∪ D) fd _ Hfd
                  ltac:(set_solver) with "Ho") as "[Hs Hback]".
     rewrite (ofile_lent_or_slot_out _ _ _ _ _ _ Hnin).
-    iDestruct (ofile_slot_null with "Hs") as "($ & $ & Hst)".
+    iDestruct (ofile_slot_null with "Hs") as "($ & $ & $)".
     iIntros (v' Hnz) "Hc".
-    iApply ("Hback" $! v' with "[Hc Hst]").
+    iApply ("Hback" $! v' with "[Hc]").
     rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ (elem_of_union_l _ _ _
                (elem_of_singleton_2 _ _ (eq_refl fd)))).
-    iFrame "Hc". iSplitR; [iPureIntro; exact Hnz|].
-    iExists FdClosed. iExact "Hst".
+    iFrame "Hc". iPureIntro. exact Hnz.
   Qed.
 
   (* READ one cell, loan or no loan: fdalloc's scan.  Touching the payload
@@ -552,9 +562,9 @@ Section ProcInv.
                  (fun j _ => iff_refl (j ∈ D)) with "Ho") as "[Hs Hback]".
     destruct (decide (fd ∈ D)) as [Hin|Hin].
     - rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ Hin).
-      iDestruct "Hs" as "(%Hnz & Hc & Hst)". iFrame "Hc". iIntros "Hc".
-      iDestruct ("Hback" $! v with "[Hc Hst]") as "Ho".
-      { rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ Hin). iFrame "Hc Hst".
+      iDestruct "Hs" as "(%Hnz & Hc)". iFrame "Hc". iIntros "Hc".
+      iDestruct ("Hback" $! v with "[Hc]") as "Ho".
+      { rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ Hin). iFrame "Hc".
         iPureIntro. exact Hnz. }
       rewrite list_insert_id; [|exact Hfd]. iExact "Ho".
     - rewrite (ofile_lent_or_slot_out _ _ _ _ _ _ Hin) /ofile_slot.
@@ -2036,15 +2046,15 @@ Section ProcInv.
     proc_priv γf pa pid V -∗
     ∃ (k : nat) (q : Qp) (C : fcontent),
       ⌜v = fnode k /\ (k < NFILE)%nat /\ fdstate_of C <> FdClosed⌝ ∗
-      file_ref γf k q C ∗
+      file_ref γf k q C ∗ fd_st_auth (pv_fdg V) fd (fdstate_of C) ∗
       proc_priv_core pa pid V ∗
       proc_ofiles_owe γf (pv_fdg V) pa (pv_ofile V) {[fd]}.
   Proof.
     iIntros (Hfd Hnz) "[Hcore Ho]".
     rewrite -(proc_ofiles_owe_empty γf (pv_fdg V) pa (pv_ofile V)).
     iDestruct (proc_ofiles_lend _ _ _ _ ∅ fd v ltac:(set_solver) Hfd Hnz with "Ho")
-      as (k q C) "[%Hk [Href Ho]]".
-    iExists k, q, C. iFrame "Href Hcore".
+      as (k q C) "[%Hk [Href [Hst Ho]]]".
+    iExists k, q, C. iFrame "Href Hst Hcore".
     rewrite (union_empty_r_L {[fd]}). iFrame "Ho". iPureIntro. exact Hk.
   Qed.
 
@@ -2064,21 +2074,28 @@ Section ProcInv.
      the source descriptor at that point, and only [filedup] can make a second
      one. *)
   Lemma proc_priv_settle (γf : gname) (pa : mword 64) (pid : mword 32)
-      (V : pprivate) (fd k : nat) (q : Qp) (C : fcontent) :
+      (V : pprivate) (fd k : nat) (q : Qp) (C : fcontent) (st st' : fdstate) :
     (fd < NOFILE)%nat ->
     length (pv_ofile V) = NOFILE ->
     (k < NFILE)%nat ->
     fdstate_of C <> FdClosed ->
     proc_priv_core pa pid V -∗
     proc_ofiles_owe γf (pv_fdg V) pa (pv_ofile (upd_ofile V fd (fnode k))) ({[fd]} ∪ ∅) -∗
-    file_ref γf k q C ==∗
-    proc_priv γf pa pid (upd_ofile V fd (fnode k)).
+    file_ref γf k q C -∗
+    fd_st_auth (pv_fdg V) fd st -∗ fd_st (pv_fdg V) fd st' ==∗
+    proc_priv γf pa pid (upd_ofile V fd (fnode k)) ∗
+    fd_st (pv_fdg V) fd (fdstate_of C).
   Proof.
-    iIntros (Hfd Hlen Hk Hty) "Hcore Ho Href".
+    iIntros (Hfd Hlen Hk Hty) "Hcore Ho Href Ha Hfr".
     assert (Hlk : pv_ofile (upd_ofile V fd (fnode k)) !! fd = Some (fnode k)).
     { cbn [upd_ofile pv_ofile pv_fdg]. apply list_lookup_insert. rewrite Hlen. exact Hfd. }
-    iMod (proc_ofiles_repay _ _ _ _ ∅ fd k q C ltac:(set_solver) Hlk Hk Hty
-                 with "Ho Href") as "Ho".
+    (* THE ONE GHOST STEP OF AN OPEN: the descriptor fdalloc made non-null is
+       now OPEN, at the type of the file being installed.  Both halves are
+       required, which is why this accessor -- and so sys_open / sys_pipe /
+       sys_dup -- takes the fragment. *)
+    iMod (fd_st_move _ fd st st' (fdstate_of C) with "Ha Hfr") as "[Ha $]".
+    iDestruct (proc_ofiles_repay _ _ _ _ ∅ fd k q C ltac:(set_solver) Hlk Hk Hty
+                 with "Ho Href Ha") as "Ho".
     iModIntro. iApply (proc_priv_join with "[Hcore] Ho").
     rewrite proc_priv_core_upd_ofile. iExact "Hcore".
   Qed.
@@ -2274,21 +2291,29 @@ Section ProcInv.
        pv_cwd V = (zero_reg : mword 64) /\
        uint (pv_sz V) <= uvm_maxsz⌝ ∗
       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
-      proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf (pv_fdg V) pa (pv_ofile V).
+      proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf (pv_fdg V) pa (pv_ofile V) ∗
+      (* THE FRAGMENT BUNDLE, out with the block and BESIDE it -- inside the
+         existential because it is keyed on the [pv_fdg] this step just
+         chose.  It travels with [fd_slots FDSPARE] from here to
+         [UsertrapRes.ut_own] and is what every later fd operation spends. *)
+      fd_frags_any (pv_fdg V).
   Proof.
     iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
     iDestruct "Haddr" as "[Hpg Htf]".
     iMod (fd_st_alloc NOFILE) as (γd) "Hst".
+    iDestruct (fd_st_both_split γd NOFILE with "Hst") as "[Hauth Hfrag]".
+    iDestruct (fd_frags_of_closed γd with "Hfrag") as "Hfrag".
     iModIntro. iFrame "Hctx Hpg Htf Hsp Hir Hbs Hkst".
     iExists (upd_fdg V γd), pid.
     cbn [upd_fdg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name].
     iSplit; [done|]. iFrame "Hpid Hf".
+    iSplitR "Hfrag"; [| iExists (replicate NOFILE FdClosed); iExact "Hfrag"].
     iDestruct (fd_st_closed_to_any γd (replicate NOFILE (zero_reg : mword 64))
-                 with "[Hst]") as "Hst"; [by rewrite length_replicate|].
+                 with "[Hauth]") as "Hst"; [by rewrite length_replicate|].
     rewrite /proc_ofiles /ofile_cells Hof length_replicate. iSplit; [done|].
     iAssert ([∗ list] fd ↦ v ∈ replicate NOFILE (zero_reg : mword 64),
-               (p_ofile pa fd ↦₈ v ∗ fd_slot ∗ fd_st_both γd fd FdClosed))%I
+               (p_ofile pa fd ↦₈ v ∗ fd_slot ∗ fd_st_auth γd fd FdClosed))%I
       with "[Ho Hs Hst]" as "Ho".
     { rewrite !big_sepL_sep. iFrame "Ho Hs Hst". }
     iApply (big_sepL_impl with "Ho"). iIntros "!>" (fd v Hv) "(Hcell & Hslot & Hst)".
@@ -2301,11 +2326,14 @@ Section ProcInv.
      that took the block apart with [proc_dormant_unused] and now wants to
      hand freeproc the rest needs this direction.  allocproc's two failure
      tails are the first consumers. *)
-  (* AND THIS IS WHERE THE fd-STATE GHOST DIES.  Every descriptor is closed,
-     so every slot's ghost is at [FdClosed] and both of its halves are here;
-     they are simply DROPPED.  Nothing gives them back and nothing may: the
-     name belonged to the incarnation that is ending, and the next process to
-     take this slot mints its own ([proc_dormant_unused]). *)
+  (* AND THIS IS WHERE THE fd-STATE AUTHORITY DIES.  Every descriptor is
+     closed, so every slot's authority is at [FdClosed]; they are simply
+     DROPPED.  Nothing gives them back and nothing may: the name belonged to
+     the incarnation that is ending, and the next process to take this slot
+     mints its own ([proc_dormant_unused]).  The FRAGMENT bundle dies the
+     same way, wherever its holder happens to be -- kexit drops it with the
+     rest of the trap round's residue, which is why this lemma does not
+     mention it. *)
   Lemma proc_ofiles_null_split (γf γd : gname) (pa : mword 64) (fs : list (mword 64)) :
     fs = replicate NOFILE (zero_reg : mword 64) ->
     proc_ofiles γf γd pa fs -∗

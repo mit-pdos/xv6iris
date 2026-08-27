@@ -197,6 +197,9 @@ Proof.
              ⌜pv_upt V' = pt'⌝ -∗
              ⌜ud_data pt' = ud_pas pt'⌝ -∗
              ⌜proc_pt_wf pt'⌝ -∗
+             (* the resumed record names the same fd-state ghost the parked
+                one did -- see [SpecForkretParkPaid.forkret_park_pkg] *)
+             ⌜pv_fdg V' = pv_fdg V⌝ -∗
              UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
              first_done -∗
              W -∗
@@ -206,9 +209,9 @@ Proof.
              FR.usertrap_res_bare (CID := h) pt'
                (add_vec ks (mword_of_int 4096)))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h pt' V') "%HV %Hnorm %Hptwf #Htfk Hdone HW #Htc Hy".
-    iApply ("Hclose" with "[%] [%] [%] Htfk Hdone HW Htc Hy Hfd Hirsp");
-      [exact HV | exact Hnorm | exact Hptwf]. }
+  { iIntros (h pt' V') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc Hy".
+    iApply ("Hclose" with "[%] [%] [%] [%] Htfk Hdone HW Htc Hy Hfd Hirsp");
+      [exact HV | exact Hnorm | exact Hptwf | exact Hfg]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
   iDestruct "Hpay" as (A' cret backr) "[Hrec Hpay]".
   (* the payload can only be the DISPATCH one -- the parking disjunct would
@@ -289,9 +292,10 @@ Proof.
   iNext. iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".
   iFrame "Htext Hwire Hkmap Hpinv Hmk Hstk".
-  iIntros (h pt' V') "%HV %Hnorm %Hptwf #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
-  iApply ("Hclose" $! h pt' V' with "[%] [%] [%] Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
-    [exact HV | exact Hnorm | exact Hptwf].
+  iIntros (h pt' V') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
+  iApply ("Hclose" $! h pt' V'
+            with "[%] [%] [%] [%] Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
+    [exact HV | exact Hnorm | exact Hptwf | exact Hfg].
 Qed.
 
 End ForkretParkProof.

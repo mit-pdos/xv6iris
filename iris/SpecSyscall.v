@@ -206,6 +206,13 @@ Definition wp_syscall_sconf_body
      UNREACHABLE one. *)
   R γf pj bn fn -∗
   proc_priv γf pj pid V -∗
+  (* THE DESCRIPTOR-STATE FRAGMENTS, in and out on the same channel as the
+     four families above and for the same reason: [UsertrapRes.ut_own] holds
+     them, and four of the twenty-two entries (open, close, pipe, dup) spend
+     them -- retyping a descriptor takes both halves after [ProcInv]'s
+     auth/frag split, and the array holds only the authority.  exit and fork
+     spend them too, through the process they end or start. *)
+  fd_frags_any (pv_fdg V) -∗
   (* THE EXIT SLOT IS AN ADDITIVE CONJUNCTION, AND THAT IS WHAT LETS ONE
      TABLE ENTRY NOT RETURN WITHOUT THE CONTRACT SAYING WHICH ONE.
 
@@ -243,6 +250,11 @@ Definition wp_syscall_sconf_body
          else in the record may: [pv_tf] always does (the a0 slot is the
          return value), and sbrk / exec / chdir / open move the rest. *)
       ⌜ ud_tfp (pv_upt V') = ud_tfp (pv_upt V) ⌝ -∗
+      (* ...and the fd-state ghost name, which no syscall reassigns: only
+         allocproc chooses one ([ProcInv.proc_dormant_unused]), and fork
+         chooses the CHILD's.  So the bundle below is stated at the ENTRY
+         record and this equation is what lets the caller re-key it. *)
+      ⌜ pv_fdg V' = pv_fdg V ⌝ -∗
       sie_cap_gpr KT1 mf av true pj -∗
       cpu_own 0%nat true pj true lks -∗
       bslots 3 -∗
@@ -251,6 +263,7 @@ Definition wp_syscall_sconf_body
       iref_slots IREFSPARE -∗
       R γf pj bn fn -∗
       proc_priv γf pj pid V' -∗
+      fd_frags_any (pv_fdg V) -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang))
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗

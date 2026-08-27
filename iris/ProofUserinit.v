@@ -408,7 +408,7 @@ Section ProofUserinit.
         rewrite avail_sub_Some in Hz0. unfold avail_zero in Hz0.
         exfalso. lia. }
     iDestruct "Hgot" as (j γl ch pid V root tfp ks rest nc)
-      "(%Hfacts & Hheld & Hhart & Hpriv & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
+      "(%Hfacts & Hheld & Hhart & Hpriv & Hfrag & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
         & Hctx & Hcg & Hcpu & Hpay & Hkenv & Hpav)".
     destruct Hfacts as (Hrv & Hj & Hgl & _ & _ & Hcwd0 & Hrest & Hnc).
     (* [Hkfree] is KEPT: the paid park is anchored on the child's free
@@ -737,7 +737,8 @@ Section ProofUserinit.
        and from here on a resource every process hands its children. *)
     iPoseProof (FP.park_token_intro γs) as "#Htoken".
     iMod (park_token_park N rest (upd_cwd V ipv) Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown [Hks Hctx Hpriv Hfd Hirs]")
+            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag
+                  [Hks Hctx Hpriv Hfd Hirs]")
       as "Hpctx".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirs". iExact "Hctx". }
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")

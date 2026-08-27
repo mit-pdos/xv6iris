@@ -252,7 +252,11 @@ Section SpecSysOpen.
        ⌜r = (mword_of_int (Z.of_nat fd) : mword 64) /\
         fd_frees (pv_ofile W) = fd :: l⌝ ∗
        proc_priv γf p pid (upd_ofile W fd (fnode k)))
-    ∗ fd_slot.
+    (* THE fd-STATE FRAGMENT BUNDLE, in and out.  Only the success arm spends
+       it: the descriptor fdalloc opened has to be retyped from [FdClosed] to
+       the new file's type ([ProcInv.proc_priv_settle]).  Every failure arm
+       hands it straight back -- none of them installed a descriptor. *)
+    ∗ fd_frags_any (pv_fdg W) ∗ fd_slot.
 
 End SpecSysOpen.
 
@@ -368,6 +372,8 @@ Definition wp_sys_open_sconf_body
   iref_slots ns -∗
   fd_slot -∗
   proc_priv γf pj pid V -∗
+  (* the descriptor-state fragments -- spent on the descriptor open returns *)
+  fd_frags_any (pv_fdg V) -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_open sleeps in create,
      in namei, in ilock, in itrunc and in the two op brackets, so it can
      return on another hart whatever SIE was doing.  Vacuous at [true], so

@@ -306,6 +306,12 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
    ud_tfp (pv_upt V') = ud_tfp (pv_upt V) /\
    kxc_tf (pv_tf V) (pv_tf V') entry spv /\
    pv_ofile V' = pv_ofile V /\
+   (* ...AND ITS fd-STATE GHOST NAME, which follows: exec never opens the
+      descriptor block, so the [proc_ofiles] it hands back is the one it was
+      given, authorities and all, and that is keyed on [pv_fdg].  Stated
+      because the syscall dispatcher's return needs it -- the fd-state
+      fragment bundle rides beside the block and has to be re-keyed. *)
+   pv_fdg V' = pv_fdg V /\
    pv_cwd V' = pv_cwd V /\
    length (pv_name V') = PNAMELEN /\
    (* the stack geometry: [sp] sits in the top page of the image, above the

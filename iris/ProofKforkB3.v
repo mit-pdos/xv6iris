@@ -288,12 +288,14 @@ Section KforkB3Proof.
           pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
           proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
+          fd_frags_any (pv_fdg V0) -∗
           WP (Loop : expr riscv_lang)) -∗
       sie_cap_gpr KT1 M (rsv + (K - 8))%nat b pme -∗
       cpu_own n eb pme b lks -∗
       pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
       proc_priv γf pme pid_p Vp -∗
       proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
+      fd_frags_any (pv_fdg V0) -∗
       WP (Loop : expr riscv_lang)).
   Proof.
     intros HK Hn HV0 Hbelow.
@@ -324,18 +326,20 @@ Section KforkB3Proof.
               pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
               proc_priv γf pme pid_p Vp -∗
               proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
+              fd_frags_any (pv_fdg V0) -∗
               WP (Loop : expr riscv_lang)) -∗
           sie_cap_gpr KT1 M (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme b lks -∗
           pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
           proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
+          fd_frags_any (pv_fdg V0) -∗
           WP (Loop : expr riscv_lang)))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2".
+      { iIntros (CIDk Hsk i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hcfrag".
         exfalso. lia. }
-      iIntros (CIDk Hsk i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2".
+      iIntros (CIDk Hsk i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hcfrag".
       destruct Hregs as (Hcsp & Hs0 & Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hthr).
       (* --------------------------------------------------------------- *)
       (*  Htail: the increment+test at +0x8e..+0x92, shared by both arms *)
@@ -352,9 +356,10 @@ Section KforkB3Proof.
           pc_is (mword_of_int (KF + 0x8e) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
           proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) (S i)) -∗
+          fd_frags_any (pv_fdg V0) -∗
           WP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
-      { iIntros (CIDta Hsta Mt) "%Hregst Hcg Hown Hpc Hpv Hpv2".
+      { iIntros (CIDta Hsta Mt) "%Hregst Hcg Hown Hpc Hpv Hpv2 Hcfrag".
         destruct Hregst as (Ht0 & Ht0' & Ht1 & Ht2 & Ht3 & Ht4 & Ht5 & Htthr).
         (* ---- +0x8e: c.addi s1,s1,8 ---- *)
         iApply (wp_caddi_s_sconf (mword_of_int (KF + 0x8e)) Rs1 (mword_of_int 8 : mword 6)
@@ -443,7 +448,7 @@ Section KforkB3Proof.
           iDestruct (cpu_own_transport CIDta CID3 n eb pme b ltac:(wp_next_chain) with "Hown")
             as "Hown".
           iSpecialize ("Hqx" $! CID3 with "[%]"); [wp_next_chain|].
-          iApply ("Hqx" $! T2 with "[%] Hcg Hown Hpc Hpv Hpv2").
+          iApply ("Hqx" $! T2 with "[%] Hcg Hown Hpc Hpv Hpv2 Hcfrag").
           split; [exact HT2csp|]. split; [exact HT2s0|].
           split; [exact HT2s4|]. split; [exact HT2s5|]. exact HT2thr.
         - (* FALL: one more slot to look at *)
@@ -465,7 +470,7 @@ Section KforkB3Proof.
           iDestruct (cpu_own_transport CIDta CID3 n eb pme b ltac:(wp_next_chain) with "Hown")
             as "Hown".
           iSpecialize ("IHf" $! CID3 with "[%]"); [wp_next_chain|].
-          iApply ("IHf" $! (S i) T2 with "[%] [%] [%] Hqx Hcg Hown Hpc Hpv Hpv2").
+          iApply ("IHf" $! (S i) T2 with "[%] [%] [%] Hqx Hcg Hown Hpc Hpv Hpv2 Hcfrag").
           + unfold NOFILE in Hfuel |- *. lia.
           + unfold NOFILE in Hne, Hi |- *. lia.
           + split; [exact HT2csp|]. split; [exact HT2s0|]. split; [exact HT2s1|].
@@ -540,7 +545,7 @@ Section KforkB3Proof.
         iDestruct (cpu_own_transport CIDk CIDm n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
         iSpecialize ("Htail" $! CIDm with "[%]"); [wp_next_chain|].
-        iApply ("Htail" $! L1 with "[%] Hcg Hown Hpc Hpv Hpv2").
+        iApply ("Htail" $! L1 with "[%] Hcg Hown Hpc Hpv Hpv2 Hcfrag").
         split; [exact HL1csp|]. split; [exact HL1s0|]. split; [exact HL1s1|].
         split; [exact HL1s2|]. split; [exact HL1s3|]. split; [exact HL1s4|].
         split; [exact HL1s5|]. exact HL1thr.
@@ -648,7 +653,15 @@ Section KforkB3Proof.
         (* close the child's slot: it now names the SAME file the parent's does,
            so its ghost moves from CLOSED to that file's type -- the one place
            kfork changes a descriptor's user-visible state. *)
-        iMod (fd_st_both_update _ i FdClosed (fdstate_of Cf) with "Hst2") as "Hst2".
+        (* THE CHILD'S RETYPE, and it is what kfork spends the child's own
+           fragment bundle on: the array holds only the authority, so opening
+           the child's descriptor takes both halves ([FdSlots.fd_st_move]). *)
+        iDestruct (fd_frags_any_acc (pv_fdg (kfk_childV V0 (pv_ofile Vp) i)) i
+                     ltac:(unfold NOFILE in *; lia) with "Hcfrag")
+          as (stq) "[Hcfr Hcfrback]".
+        iMod (fd_st_move _ i FdClosed stq (fdstate_of Cf) with "Hst2 Hcfr")
+          as "[Hst2 Hcfr]".
+        iDestruct ("Hcfrback" with "Hcfr") as "Hcfrag".
         iDestruct (ofile_slot_file γf _ npa i k (q/2)%Qp Cf Hk Hty
                      with "Hcell2 Hslotb Hst2") as "Hslot2".
         iDestruct ("Hback2" $! (fnode k) with "Hslot2") as "Hpv2".
@@ -677,14 +690,14 @@ Section KforkB3Proof.
         iDestruct (cpu_own_transport CIDo CIDq n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
         iSpecialize ("Htail" $! CIDq with "[%]"); [wp_next_chain|].
-        iApply ("Htail" $! mr with "[%] Hcg Hown Hpc Hpv Hpv2").
+        iApply ("Htail" $! mr with "[%] Hcg Hown Hpc Hpv Hpv2 Hcfrag").
         split; [exact Hmrcsp|]. split; [exact Hmrs0|]. split; [exact Hmrs1|].
         split; [exact Hmrs2|]. split; [exact Hmrs3|]. split; [exact Hmrs4|].
         split; [exact Hmrs5|]. exact Hmrthr. }
-    iIntros (i M) "%Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2".
+    iIntros (i M) "%Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hcfrag".
     iSpecialize ("Hloop" $! (NOFILE - i)%nat).
     iSpecialize ("Hloop" $! CID0 with "[%]"); [by intros|].
-    iApply ("Hloop" $! i M with "[%] [%] [%] Hqx Hcg Hown Hpc Hpv Hpv2");
+    iApply ("Hloop" $! i M with "[%] [%] [%] Hqx Hcg Hown Hpc Hpv Hpv2 Hcfrag");
       [lia | exact Hi | exact Hregs].
   Qed.
 

@@ -140,7 +140,7 @@ Section ProofSysExit.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcl Hcpu #Htext #Hdata Hpc #Hprocs #Hpenv
              #Hlk #Hft #Hkl Hkav #Hbio #Hlog #Hcrash #Hcert #Hdev #Hgeom
-             #Hdlk Hbs %Hties Hrdy Hip Hfds Hirs Hpriv".
+             #Hdlk Hbs %Hties Hrdy Hip Hfds Hirs Hpriv Hufrag".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
@@ -343,7 +343,7 @@ Section ProofSysExit.
               Hfn Hj Hgl (sex_Kke av Hav) Hgeo Hbelow
               with "Hcg Hcl4 Hcpu [] [] Htext Hdata Hpc Hprocs Hpenv Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs
-                    [%] Hrdy Hip Hfds Hirs Hpriv").
+                    [%] Hrdy Hip Hfds Hirs Hpriv Hufrag").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }

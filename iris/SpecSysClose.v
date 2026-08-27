@@ -85,13 +85,19 @@ Section SpecSysClose.
   (* sys_close's result, keyed by the returned a0.  In the success case the
      descriptor named by the argument is null and one file reference is
      gone; in the failure case nothing at all has happened. *)
+  (* THE fd-STATE FRAGMENT BUNDLE comes back on BOTH arms, and is a premise
+     of the call: sys_close RETYPES a descriptor (open -> closed), and after
+     [ProcInv]'s auth/frag split that is a step the array cannot take on its
+     own ([FdSlots.fd_st_move] needs both halves).  The failure arm hands it
+     straight back untouched -- it closed nothing. *)
   Definition sys_close_post (γf : gname) (p : mword 64) (pid : mword 32)
       (V : pprivate) (v : mword 64) (r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile V) = None⌝ ∗
-       proc_priv γf p pid V
+       proc_priv γf p pid V ∗ fd_frags_any (pv_fdg V)
      ∨ ∃ (fd : nat) (fv : mword 64),
          ⌜r = (zero_reg : mword 64) /\ arg_fd v (pv_ofile V) = Some (fd, fv)⌝ ∗
-         proc_priv γf p pid (upd_ofile V fd (zero_reg : mword 64)))%I.
+         proc_priv γf p pid (upd_ofile V fd (zero_reg : mword 64)) ∗
+         fd_frags_any (pv_fdg V))%I.
 
 End SpecSysClose.
 
@@ -154,6 +160,8 @@ Definition wp_sys_close_sconf_body
   is_ftable γl γf -∗
   panic_env -∗
   proc_priv γf p pid V -∗
+  (* the descriptor-state fragments: what the retype below is paid out of *)
+  fd_frags_any (pv_fdg V) -∗
   (* THE CLOSING ENVIRONMENT.  sys_close closes a descriptor of unknown type,
      so it owns both of fileclose's bundles and hands over whichever the
      type selects ([SpecFileclose.fileclose_env_split]); the other is

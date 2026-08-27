@@ -470,6 +470,10 @@ Section KforkArms.
       (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
     proc_priv γf pme pid_p Vp -∗
     proc_priv_nocwd γf npa pid_c Vc' -∗
+    (* the child's descriptor-state fragments, minted with its block by
+       allocproc: kfork spends one access per descriptor it duplicates and
+       the rest goes into the child's residue at the park. *)
+    FdSlots.fd_frags_any (ProcDefs.pv_fdg Vc') -∗
     (* the slot's ALLOCATION MARKER, minted by allocproc and carried to
        whichever release finally parks the slot ([ProcAvail.v]).
        Persistent. *)
@@ -514,7 +518,7 @@ Section KforkArms.
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
       Hofnull Hcwdnull Hbelow.
     subst tfsrc tfdst.
-    iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv #Hmk
+    iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv Hcfrag #Hmk
              Hheld Hhart Hfd Hbsl Hkst Hctxex Hpay Hkalloc #Hwlock #Hft
              Hitb Hitinv #Hireg Hirs #Hfdone #Hworld #Htoken Hcont".
     iDestruct "Hctxex" as (ks rest) "(%Hrestlen & Hks & Hkctx)".
@@ -592,7 +596,7 @@ Section KforkArms.
     iSpecialize ("Hb3app" $! 0%nat Mx
       with "[%] [%] [Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                      Hheld Hhart Hfd Hbsl Hkst Hpay Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Hcont]
-            Hcg Hcpu Hpc Hpv [HCpriv]").
+            Hcg Hcpu Hpc Hpv [HCpriv] Hcfrag").
     - unfold NOFILE. lia.
     - split_and!.
       + exact HMxsp.
@@ -603,7 +607,7 @@ Section KforkArms.
       + exact HMxs4.
       + exact HMxs5.
       + exact HMxfull.
-    - iApply wp_next_off_intro. iIntros (Mx2) "%Hregs2 Hsc Hown Hpcx Hpvx Hpvcx".
+    - iApply wp_next_off_intro. iIntros (Mx2) "%Hregs2 Hsc Hown Hpcx Hpvx Hpvcx Hcfrag".
       destruct Hregs2 as (Hd1 & Hd2 & Hd3 & Hd4 & Hd5).
       (* ---- ProofKforkB4: idup / safestrcpy / pid read ---- *)
       iApply (B4.kfk_b4 γf inodestart nib
@@ -618,6 +622,11 @@ Section KforkArms.
       iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4 Hirsp".
       destruct Hp4 as (Hthr4 & Hpid4).
       iDestruct "Hpvcx4" as (Vc4) "(%HVc4 & Hpvcx4)".
+      (* B4 moved only [cwd] and [name]; the child's fd-state ghost name is
+         the one allocproc chose, which is what the park is keyed on. *)
+      assert (Hcfg4 : pv_fdg Vc4 = pv_fdg (kfk_childV V2 (pv_ofile Vp) NOFILE))
+        by (destruct HVc4 as (_ & _ & _ & _ & _ & Hg & _); exact Hg).
+      iEval (rewrite -Hcfg4) in "Hcfrag".
       assert (Hmf4s4 : mf4 !!! Regidx Rs4 = npa).
       { rewrite (Hthr4 Rs4 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)).
         exact Hd3. }
@@ -641,7 +650,7 @@ Section KforkArms.
                 pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hprocs Hwlock Hft Hworld Htoken Hfdone
-                      Hheld Hhart Hpvcx4 Hmk Hfd Hirsp Hbsl Hkst Hks Hkctx").
+                      Hheld Hhart Hpvcx4 Hcfrag Hmk Hfd Hirsp Hbsl Hkst Hks Hkctx").
       all: try lkbelow.
       (* [b] is symbolic here (B5's own exit index): an ordinary crossing,
          not [wp_next_off_intro] -- the brief's correction (a). *)
@@ -785,7 +794,7 @@ Section KforkMain.
     - (* ---- arm 3: uvmcopy succeeded, the copy loop's head at +0x4a ---- *)
       iIntros (CIDh Hxh). iIntros (CID3 Hx3 Mt npa j γl2 pid_c ch Vc' tfsrc tfdst).
       iIntros "%HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures".
-      iIntros "Hcg #Ht Hpc Hframe Hpv HCp #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu
+      iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hcfrag #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu
                Hke #Hwl #Hft #Hit #Hiti HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       destruct Htfs as (Htfsrc & Htfdst).
@@ -798,7 +807,7 @@ Section KforkMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
                 Hnpa HjN Hgamma Hofn Hcwdn ltac:(lkbelow)
-                with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hmk Hheld Hhart
+                with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hcfrag Hmk Hheld Hhart
                       Hfd Hbsl Hkst Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs Hfdone Hworld Htoken
                       [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument

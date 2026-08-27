@@ -71,6 +71,9 @@ Section ParkCap.
   Definition park_pkg
       (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
       (γs : list gname) (γf : gname) (pa ks : mword 64)
+      (* the parked process's fd-state ghost name -- see
+         [SpecForkretParkPaid.forkret_park_pkg], which is this verbatim *)
+      (g : gname)
       (pid : mword 32) (av : nat) : iProp Σ :=
     (kernel_text ∗
      wire_inv ∗
@@ -82,6 +85,8 @@ Section ParkCap.
         ⌜pv_upt V' = pt'⌝ -∗
         ⌜ud_data pt' = ud_pas pt'⌝ -∗
         ⌜proc_pt_wf pt'⌝ -∗
+        (* the resumed record names the parked process's fd-state ghost *)
+        ⌜pv_fdg V' = g⌝ -∗
         ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
         first_done -∗
         W -∗
@@ -111,7 +116,7 @@ Section ParkCap.
        ⌜length rest = 12%nat⌝ -∗
        ⌜exists j : nat, pa = proc_addr j /\ (j < NPROC)%nat⌝ -∗
        ⌜(K_usertrap <= av)%nat⌝ -∗
-       ▷ park_pkg URB W γs γf pa ks pid av -∗
+       ▷ park_pkg URB W γs γf pa ks (pv_fdg V) pid av -∗
        (* ...and [W] itself, for forkret to hand the closer: under the same
           later, for the same reason *)
        ▷ W -∗
@@ -138,6 +143,7 @@ Section ParkCap.
              proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
              fd_slots FDSPARE -∗
              iref_slots IREFSPARE -∗
+             fd_frags_any (pv_fdg V') -∗
              URB h pt' (add_vec (un_ks N) (mword_of_int 4096)))))%I.
 
   (* THE TOKEN: some residue, its cap and its channel, both at [W := the
@@ -179,10 +185,17 @@ Section ParkCap.
     stack_own (KTR := KT1) (add_vec (un_ks N) (mword_of_int 4096)) KSTACK_AV -∗
     park_env N -∗
     park_own N -∗
+    (* THE CHILD'S DESCRIPTOR-STATE FRAGMENTS.  They are NOT part of
+       [park_child]: that bundle is handed straight to the cap, whereas
+       these have to be captured by the package's RESUME closer, which is
+       built here.  allocproc minted them with the block; the resume hands
+       them to [UsertrapRes.ut_own], re-keyed by the closer's own
+       [pv_fdg V' = pv_fdg V] premise. *)
+    fd_frags_any (pv_fdg V) -∗
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) V -∗
     |==> ▷ proc_ctx (un_s N) (un_pj N).
   Proof.
-    iIntros (Hwf Hrest) "#Htok #Htext #Hwire #Hkmap #Hslot Hstack #Henv Hown Hchild".
+    iIntros (Hwf Hrest) "#Htok #Htext #Hwire #Hkmap #Hslot Hstack #Henv Hown Hfrag Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iPoseProof "Htok" as "Htok'".
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
@@ -192,7 +205,7 @@ Section ParkCap.
     iDestruct ("Hchan" $! N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
     iApply ("Hcap" $! (un_f N) (un_pj N) (un_ks N) rest (un_pid N) V KSTACK_AV
-              with "[%] [%] [%] [Hstack Hown Hclose] [] Hchild").
+              with "[%] [%] [%] [Hstack Hown Hclose Hfrag] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
     - exact Hkav.
@@ -200,8 +213,11 @@ Section ParkCap.
       iNext.
       iFrame "Htext Hwire Hkmap Hprocs Hslot Hstack".
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
-      iIntros (h pt' V') "%Hupt %Hnorm %Hptwf #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
-      iApply ("Hclose'" $! h pt' V' with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref").
+      iIntros (h pt' V') "%Hupt %Hnorm %Hptwf %Hfg #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+      (* the parked bundle, re-keyed onto the resumed record *)
+      iEval (rewrite -Hfg) in "Hfrag".
+      iApply ("Hclose'" $! h pt' V'
+                with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").
       exact Hupt.
     - iNext. iExact "Htok".
   Qed.

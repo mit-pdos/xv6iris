@@ -177,6 +177,11 @@ Definition wp_sys_exit_sconf_body
      hands back to build the ZOMBIE block *)
   iref_slots IREFSPARE -∗
   proc_priv γf pj pid V -∗
+  (* THE fd-STATE FRAGMENT BUNDLE, and it does not come back: sys_exit runs
+     kexit, which closes every descriptor (a retype, so it needs both halves)
+     and then parks the process as a ZOMBIE.  The bundle dies with the
+     incarnation whose name it is keyed on (FdSlots.v). *)
+  fd_frags_any (pv_fdg V) -∗
   (* NO continuation: sys_exit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).
 

@@ -183,6 +183,15 @@ Definition allocproc_post
           when it installs a working directory ([proc_priv_split_cwd]);
           kfork does it at its [sd a0,336(s4)]. *)
        proc_priv_nocwd γf (proc_addr j) pid V ∗
+       (* THE DESCRIPTOR-STATE FRAGMENTS, minted here with the block: this
+          is the one function that chooses a process's [pv_fdg]
+          ([ProcInv.proc_dormant_unused]), so it is the one place the
+          bundle can come from.  It travels beside the block exactly as the
+          three allowances below do, to the caller's park and from there
+          into [UsertrapRes.ut_own], where every fd operation spends it.
+          A FAILURE TAIL simply drops it -- the name dies with the
+          incarnation that never started. *)
+       fd_frags_any (pv_fdg V) ∗
        (* THE SLOT IS NOW ALLOCATED.  Persistent, minted here out of
           [procs_avail]'s authority, and what the caller hands to
           [SchedCtx.proc_slots_park] when it releases the slot at USED or

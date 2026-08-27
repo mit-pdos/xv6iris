@@ -337,6 +337,13 @@ Section ProofSysOpenBody.
     bslots 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
+    (* the descriptor-state fragments, threaded exactly as the fd unit above
+       is: sys_open spends one access, at the settle. *)
+    fd_frags_any (pv_fdg V) -∗
+    (* ...and the descriptor's own AUTHORITY, at [FdClosed]: fdalloc handed
+       it out when it made the cell non-null, and the settle below moves it
+       to the new file's type. *)
+    fd_st_auth (pv_fdg V) fd FdClosed -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -359,7 +366,7 @@ Section ProofSysOpenBody.
               #Hitinv #Hesck #Hslkk Hslkd Hdep Hidev Hiinum Hivalid
               Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip Hfoff
               Hiru Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl
-              Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24 Hcont".
+              Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24 Hcont".
     iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
     iApply (Tails.so_tail_s (CID0 := CID0) gs jx gl gu gd gk pd pav pu bn g
               gil gisl icfg_dev kk s gy inum dn bm
@@ -373,7 +380,7 @@ Section ProofSysOpenBody.
                     Hf4
                     Hf5 Hf6 HbP H23 H24
                     [Hkeep Hru Hfref Hflive Hflds Hfpn Hfip Hfoff Hiru Hcback Howe
-                     Hsbb Hsbi Hbsl Hisl Hfds Hcont]").
+                     Hsbb Hsbi Hbsl Hisl Hfds Hfrag Hauth Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
                                          Hpbare Hshr".
@@ -387,13 +394,20 @@ Section ProofSysOpenBody.
       as "Href".
     (* the descriptor's ghost state: the file is FD_INODE or FD_DEVICE, so
        the descriptor sys_open returns is OPEN at that type. *)
-    iMod (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 C Hfdlt Hlen
-                 Hkf (fdstate_of_open C (or_intror Htyor))
-                 with "Hcore Howe Href") as "Hpriv".
+    (* THE ONE GHOST STEP: the descriptor fdalloc opened is now OPEN, at the
+       new file's type.  fdalloc handed out its authority at [FdClosed] and
+       the matching fragment comes out of the bundle -- which is why
+       sys_open's contract takes [fd_frags_any] at all. *)
+    iDestruct (fd_frags_any_acc (pv_fdg V) fd Hfdlt with "Hfrag")
+      as (stq) "[Hfr Hfrback]".
+    iMod (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 C FdClosed stq
+                 Hfdlt Hlen Hkf (fdstate_of_open C (or_intror Htyor))
+                 with "Hcore Howe Href Hauth Hfr") as "[Hpriv Hfr]".
+    iDestruct ("Hfrback" with "Hfr") as "Hfrag".
     iModIntro.
     iAssert (sys_open_post gf (proc_addr jx) pidv V (mf !!! Regidx Ra0 : mword 64))
-      with "[Hpriv Hfds]" as "Hpost".
-    { rewrite /sys_open_post. iSplitR "Hfds"; [| iExact "Hfds"].
+      with "[Hpriv Hfds Hfrag]" as "Hpost".
+    { rewrite /sys_open_post. iSplitR "Hfds Hfrag"; [| iFrame "Hfrag Hfds"].
       iRight. iExists fd, l, kf.
       iSplitR.
       { iPureIntro. split; [| exact Hfrees]. rewrite Ha0f. reflexivity. }
@@ -569,6 +583,13 @@ Section ProofSysOpenBody.
     bslots 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
+    (* the descriptor-state fragments, threaded exactly as the fd unit above
+       is: sys_open spends one access, at the settle. *)
+    fd_frags_any (pv_fdg V) -∗
+    (* ...and the descriptor's own AUTHORITY, at [FdClosed]: fdalloc handed
+       it out when it made the cell non-null, and the settle below moves it
+       to the new file's type. *)
+    fd_st_auth (pv_fdg V) fd FdClosed -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -597,7 +618,7 @@ Section ProofSysOpenBody.
               #Hitinv #Hesck #Hireg #Hslkk Hslkd Hdep Hidev Hiinum
               Hivalid Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd Hfwr
               Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop
-              Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP
+              Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP
               H23lo H23hi H24 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     (* ===== +0x88 sd s1,24(s2) -- f->ip = ip ===== *)
@@ -818,7 +839,7 @@ Section ProofSysOpenBody.
                       Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                       Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
                       Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
-                      Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
+                      Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                       Hcont"). }
     (* ---- O_TRUNC set: the type test at +0xb4 ---- *)
     iApply (wp_cbeqz_fall_s_sconf (CID := CID9) (mword_of_int (SO + 0xac))
@@ -916,7 +937,7 @@ Section ProofSysOpenBody.
                       Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                       Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
                       Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
-                      Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
+                      Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                       Hcont"). }
     (* ---- T_FILE: the +0x14e itrunc block ---- *)
     iApply (wp_beq_taken_s_sconf (CID := CID12) (mword_of_int (SO + 0xb4))
@@ -1119,7 +1140,7 @@ Section ProofSysOpenBody.
                     Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
                     Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
-                    Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
+                    Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                     Hcont").
   Qed.
 
@@ -1238,6 +1259,9 @@ Section ProofSysOpenBody.
        equality. *)
     iref_slots nsj -∗
     fd_slot -∗
+    (* the descriptor-state fragments, threaded exactly as the fd unit above
+       is: sys_open spends one access, at the settle. *)
+    fd_frags_any (pv_fdg V) -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -1264,7 +1288,7 @@ Section ProofSysOpenBody.
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpe #Hftab #Hbio #Hlog
               Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep
               Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hpriv #Hprocs #Hdev #Hgeo
-              #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
+              #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbP H23lo H23hi H24 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     (* [fileclose]'s loan, off the top of the allowance *)
@@ -1409,7 +1433,7 @@ Section ProofSysOpenBody.
                       Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
                       Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
-                      HbP H23 H24 [Hpback Hfds Hisl Hires Hcont]").
+                      HbP H23 H24 [Hpback Hfds Hfrag Hisl Hires Hcont]").
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf)
         "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
@@ -1422,10 +1446,10 @@ Section ProofSysOpenBody.
       replace (nsj - 1 + 1 + 1)%nat with (S nsj) by lia.
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf (S nsj) with "[%] [%] Hcg Hown Htce Hcce
-                Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds]").
+                Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag]").
       { exact Hcsf. }
       { reflexivity. }
-      { rewrite /sys_open_post. iSplitR "Hfds"; [| iExact "Hfds"].
+      { rewrite /sys_open_post. iSplitR "Hfds Hfrag"; [| iFrame "Hfrag Hfds"].
         iLeft. iSplitR; [iPureIntro; exact Ha0f | iExact "Hpriv"]. } }
     (* ---- filealloc succeeded ---- *)
     iApply (wp_cbeqz_fall_s_sconf (CID := CID4) (mword_of_int (SO + 0x66))
@@ -1549,7 +1573,7 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp6e) in "Hpc".
     (* ===== +0x70 bltz a0, +0x126  [ARM F-FAIL] ===== *)
     rewrite /fdalloc_post.
-    iDestruct "Hfdpost" as "[[[%Hm1 %Hnofd] Howe] | (%fd & %ll & [%Hfdv %Hfrees] & Howe & Hfds)]".
+    iDestruct "Hfdpost" as "[[[%Hm1 %Hnofd] Howe] | (%fd & %ll & [%Hfdv %Hfrees] & Howe & Hfds & Hauth)]".
     { (* ---- fdalloc refused ---- *)
       iApply (wp_blt_x0_taken_s_sconf (CID := CID9) (mword_of_int (SO + 0x70))
                 (mword_of_int 182 : mword 13) Ra0 M4 (K - 24)%nat b ltac:(nz)
@@ -1585,7 +1609,7 @@ Section ProofSysOpenBody.
                       Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
                       Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hires Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
-                      HbP H23 H24 [Hcback Howe Hisl Hcont]").
+                      HbP H23 H24 [Hcback Howe Hisl Hfrag Hcont]").
       { iApply (fileclose_env_none _ _ _ _ _ Cf Hty0). }
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf)
@@ -1599,10 +1623,10 @@ Section ProofSysOpenBody.
       replace (nsj - 1 + 2)%nat with (S nsj) by lia.
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf (S nsj) with "[%] [%] Hcg Hown Htce Hcce
-                Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds]").
+                Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag]").
       { exact Hcsf. }
       { reflexivity. }
-      { rewrite /sys_open_post. iSplitR "Hfds"; [| iExact "Hfds"].
+      { rewrite /sys_open_post. iSplitR "Hfds Hfrag"; [| iFrame "Hfrag Hfds"].
         iLeft. iSplitR; [iPureIntro; exact Ha0f | iExact "Hpriv"]. } }
     (* ---- fdalloc installed the descriptor ---- *)
     assert (Hfdlt : (fd < NOFILE)%nat).
@@ -1809,7 +1833,7 @@ Section ProofSysOpenBody.
                       Hitinv Hesck Hireg Hslkk Hslkd Hdep Hidev Hiinum
                       Hivalid Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd
                       Hfwr Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe Hprocs Hdev Hgeo
-                      Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4
+                      Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4
                       Hf5 Hf6 HbP H23lo H23hi H24 Hcont"). }
     (* ---- not a device: the FD_INODE pair ---- *)
     iApply (wp_beq_fall_s_sconf (CID := CID12) (mword_of_int (SO + 0x7a))
@@ -1906,7 +1930,7 @@ Section ProofSysOpenBody.
                     Hitinv Hesck Hireg Hslkk Hslkd Hdep Hidev Hiinum
                     Hivalid Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd
                     Hfwr Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe Hprocs Hdev Hgeo
-                    Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4
+                    Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4
                     Hf5 Hf6 HbP H23lo H23hi H24 Hcont").
   Qed.
 
@@ -2019,6 +2043,9 @@ Section ProofSysOpenBody.
        top, which is where the [1 <= nsj] premise goes. *)
     iref_slots nsj -∗
     fd_slot -∗
+    (* the descriptor-state fragments, threaded exactly as the fd unit above
+       is: sys_open spends one access, at the settle. *)
+    fd_frags_any (pv_fdg V) -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -2045,7 +2072,7 @@ Section ProofSysOpenBody.
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpe #Hftab #Hbio #Hlog
               Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep
               Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hpriv #Hprocs #Hdev #Hgeo
-              #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
+              #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbP H23lo H23hi H24 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     (* ===== +0x4a lh a4,68(s1) ===== *)
@@ -2137,7 +2164,7 @@ Section ProofSysOpenBody.
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
                       Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
-                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
+                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcont"). }
     (* ---- T_DEVICE: the [major] bounds test ---- *)
     iApply (wp_bne_fall_s_sconf (CID := CID2) (mword_of_int (SO + 0x50))
@@ -2243,7 +2270,7 @@ Section ProofSysOpenBody.
                       Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
                       Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
-                      HbP H23 H24 [Hpback Hfds Hisl Hcont]").
+                      HbP H23 H24 [Hpback Hfds Hfrag Hisl Hcont]").
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf)
         "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
@@ -2255,10 +2282,10 @@ Section ProofSysOpenBody.
       replace (nsj + 1)%nat with (S nsj) by lia.
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf (S nsj) with "[%] [%] Hcg Hown Htce Hcce
-                Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds]").
+                Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag]").
       { exact Hcsf. }
       { reflexivity. }
-      { rewrite /sys_open_post. iSplitR "Hfds"; [| iExact "Hfds"].
+      { rewrite /sys_open_post. iSplitR "Hfds Hfrag"; [| iFrame "Hfrag Hfds"].
         iLeft. iSplitR; [iPureIntro; exact Ha0f | iExact "Hpriv"]. } }
     (* ---- the major is a legal device index ---- *)
     iApply (wp_bltu_fall_s_sconf (CID := CID5) (mword_of_int (SO + 0x5a))
@@ -2290,7 +2317,7 @@ Section ProofSysOpenBody.
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
                     Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
                     Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
-                    Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
+                    Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1
                     Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcont").
   Qed.
 
@@ -2469,6 +2496,9 @@ Section ProofSysOpenBody.
     bslots 3 -∗
     iref_slots ns -∗
     fd_slot -∗
+    (* the descriptor-state fragments, threaded exactly as the fd unit above
+       is: sys_open spends one access, at the settle. *)
+    fd_frags_any (pv_fdg V) -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -2496,7 +2526,7 @@ Section ProofSysOpenBody.
               #Hlog Hseam Hgen #Hkenv #Hitab #Hitinv #Hescrows #Hslks #Hireg
               #Hropen
               Hsbn Hsbi Hsbs Hsbb #Hbmres Hpriv #Hprocs #Hdev #Hgeo #Hdlk HopS Htx
-              Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
+              Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
               Hcont".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -2732,7 +2762,7 @@ Section ProofSysOpenBody.
                 HP1s3 Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
-                      HbP H23 H24 [Hpback Hfds Hisl Hsbn Hsbi Hsbs Hsbb
+                      HbP H23 H24 [Hpback Hfds Hfrag Hisl Hsbn Hsbi Hsbs Hsbb
                       Hbsl Hcont]").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
@@ -2742,10 +2772,10 @@ Section ProofSysOpenBody.
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf ns1 with "[%] [%] Hcg Hown Htce Hcce Hpc
-                Hsbn Hsbi Hsbs Hsbb Hbsl Hisl [Hpriv Hfds]").
+                Hsbn Hsbi Hsbs Hsbb Hbsl Hisl [Hpriv Hfds Hfrag]").
       { exact Hcsf. }
       { unfold sys_open_slots, create_slots in *. lia. }
-      { rewrite /sys_open_post. iSplitR "Hfds"; [| iExact "Hfds"].
+      { rewrite /sys_open_post. iSplitR "Hfds Hfrag"; [| iFrame "Hfrag Hfds"].
         iLeft. iSplitR; [iPureIntro; exact Ha0f | iExact "Hpriv"]. } }
     (* ---- create SUCCEEDED: the locked inode, straight to the join ---- *)
     iDestruct "Hok" as "[%Hokf Hlocked]".
@@ -2814,7 +2844,7 @@ Section ProofSysOpenBody.
                     Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hslk Hslkd Hdep
                     Hidev Hiinum Hivalid Hload Hshot Hfrz Href Hru Hpriv Hprocs
                     Hdev
-                    Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3
+                    Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3
                     Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcontj").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -2930,6 +2960,9 @@ Section ProofSysOpenBody.
     bslots 3 -∗
     iref_slots ns -∗
     fd_slot -∗
+    (* the descriptor-state fragments, threaded exactly as the fd unit above
+       is: sys_open spends one access, at the settle. *)
+    fd_frags_any (pv_fdg V) -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -2958,7 +2991,7 @@ Section ProofSysOpenBody.
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpre #Hftab #Hbio
               #Hlog Hseam Hgen #Hkenv #Hitab #Hitinv #Hescrows #Hslks #Hireg #Hropen
               Hsbn Hsbi Hsbs Hsbb #Hbmres Hpriv #Hprocs #Hdev #Hgeo #Hdlk HopS Htx
-              Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
+              Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
               Hcont".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -3140,7 +3173,7 @@ Section ProofSysOpenBody.
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hpback2 Hfds Hisl Hsbn Hsbi Hsbs Hsbb
-                      Hbsl Hcont]").
+                      Hbsl Hfrag Hcont]").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
@@ -3149,10 +3182,10 @@ Section ProofSysOpenBody.
       iDestruct ("Hpback2" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf ns with "[%] [%] Hcg Hown Htce Hcce Hpc
-                Hsbn Hsbi Hsbs Hsbb Hbsl Hisl [Hpriv Hfds]").
+                Hsbn Hsbi Hsbs Hsbb Hbsl Hisl [Hpriv Hfds Hfrag]").
       { exact Hcsf. }
       { unfold sys_open_slots, create_slots in *. lia. }
-      { rewrite /sys_open_post. iSplitR "Hfds"; [| iExact "Hfds"].
+      { rewrite /sys_open_post. iSplitR "Hfds Hfrag"; [| iFrame "Hfrag Hfds"].
         iLeft. iSplitR; [iPureIntro; exact Ha0f | iExact "Hpriv"]. } }
     (* ---- namei RESOLVED: the reference, shed and generation-named ---- *)
     iDestruct "Hres" as "(%Hnaip & Hheldip & Hir1)".
@@ -3385,7 +3418,7 @@ Section ProofSysOpenBody.
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
                       Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
-                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
+                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcontj").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. } }
@@ -3473,7 +3506,7 @@ Section ProofSysOpenBody.
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
                       Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
-                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
+                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcontj").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. } }
@@ -3509,7 +3542,7 @@ Section ProofSysOpenBody.
                     Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum
                     Hivalid Hload Hshot Hfrz Hkeepe Hru Hsbb Hsbi Hbmres Hpbare Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23
-                    H24 [Hpback2 Hfds Hisl Hsbn Hsbs Hcont]").
+                    H24 [Hpback2 Hfds Hisl Hsbn Hsbs Hfrag Hcont]").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
@@ -3523,10 +3556,10 @@ Section ProofSysOpenBody.
     iEval (rewrite Hnsc) in "Hisl".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! mf ns with "[%] [%] Hcg Hown Htce Hcce Hpc
-              Hsbn Hsbi Hsbs Hsbb Hbsl Hisl [Hpriv Hfds]").
+              Hsbn Hsbi Hsbs Hsbb Hbsl Hisl [Hpriv Hfds Hfrag]").
     { exact Hcsf. }
     { unfold sys_open_slots, create_slots in *. lia. }
-    { rewrite /sys_open_post. iSplitR "Hfds"; [| iExact "Hfds"].
+    { rewrite /sys_open_post. iSplitR "Hfds Hfrag"; [| iFrame "Hfrag Hfds"].
       iLeft. iSplitR; [iPureIntro; exact Ha0f | iExact "Hpriv"]. }
   Qed.
 
@@ -3598,7 +3631,7 @@ Section ProofSysOpenBody.
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpre #Hftab #Hbio #Hlog
              Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
              #Hireg #Hropen Hsbn Hsbi Hsbs Hsbb #Hbmres #Hkenv #Hprocs Hisl
-             Hfds Hpriv Hcont".
+             Hfds Hpriv Hfrag Hcont".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
@@ -4048,20 +4081,20 @@ Section ProofSysOpenBody.
                 HK24 Kpop ltac:(reflexivity) HR2sp HR2thr HR2s1 HR2s2 HR2s3 Hal
                 with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23 H24
                       [Hown Hpriv Hisl Hfds Hbsl Hsbn Hsbi Hsbs Hsbb
-                       Hcont]").
+                       Hfrag Hcont]").
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CID16 CIDy 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf ns P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
-                Hsbn Hsbi Hsbs Hsbb [%] Hisl [Hpriv Hfds]").
+                Hsbn Hsbi Hsbs Hsbb [%] Hisl [Hpriv Hfds Hfrag]").
       { exact Hcsf. }
       { exact Hupt. }
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { split; lia. }
-      { rewrite /sys_open_post. iSplitR "Hfds"; [| iExact "Hfds"].
+      { rewrite /sys_open_post. iSplitR "Hfds Hfrag"; [| iFrame "Hfrag Hfds"].
         iLeft. iSplitR; [| iExact "Hpriv"]. iPureIntro.
         rewrite Ha0f. exact HR2a0. } }
     (* ---- the string fetched: the [bltz] falls through ---- *)
@@ -4249,7 +4282,7 @@ Section ProofSysOpenBody.
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpre Hftab Hbio
                       Hlog Hseam Hgen Hkenv Hitab Hitinv Hescrows Hslks Hireg Hropen
                       Hsbn Hsbi Hsbs Hsbb Hbmres Hpriv Hprocs Hdev Hgeo Hdlk
-                      HopS Htx Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23lo
+                      HopS Htx Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23lo
                       H23hi H24 Hcont0").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. } }
@@ -4281,7 +4314,7 @@ Section ProofSysOpenBody.
                     Hlog Hseam Hgen Hkenv Hitab Hitinv Hescrows Hslks Hireg
                     Hropen
                     Hsbn Hsbi Hsbs Hsbb Hbmres Hpriv Hprocs Hdev Hgeo Hdlk
-                    HopS Htx Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23lo
+                    HopS Htx Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23lo
                     H23hi H24 Hcont0").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }

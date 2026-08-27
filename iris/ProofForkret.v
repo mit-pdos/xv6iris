@@ -222,7 +222,7 @@ Lemma fkr_tail
      of this walk, and a proofmode step's term carries the whole context
      twice -- see that definition's header. *)
   forkret_closer (fun h : CpuId => usertrap_res_bare (CID := h))
-                 W γf p ksp pid av -∗
+                 W γf p ksp (pv_fdg V) pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1.
@@ -289,10 +289,15 @@ Proof.
      at this hart ([UsertrapRes.ut_tfk]).  Built here, where the facts are,
      and carried beside the hidden record. *)
   iAssert (∃ V' : pprivate, ⌜pv_upt V' = pv_upt V⌝ ∗
+             (* ...and its fd-state ghost name, which prepare_return's
+                [upd_tf] does not touch: the closer this proof feeds was
+                stated at the parked process's name. *)
+             ⌜pv_fdg V' = pv_fdg V⌝ ∗
              UsertrapRes.ut_tfk (CID := CIDf) ksp V' ∗ proc_priv γf p pid V')%I
-    with "[Hpv]" as (V') "(%HuptV' & #Htfk & Hpv)".
+    with "[Hpv]" as (V') "(%HuptV' & %Hfg & #Htfk & Hpv)".
   { iExists (upd_tf V (prepare_return_tf (pv_tf V) ksat ksp (cid_word (CID := CIDf)))).
     iFrame "Hpv". iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
     iApply (ut_tfk_intro (CID := CIDf) ksp
               (upd_tf V (prepare_return_tf (pv_tf V) ksat ksp (cid_word (CID := CIDf))))
               kroot0
@@ -658,8 +663,11 @@ Proof.
     iSplitL "Hparked"; [iExact "Hparked" | iExact "Hpnopt"]. }
   iDestruct (ut_tfk_upd_upt (CID := CIDf) ksp V' pt with "Htfk") as "#Htfk'".
   iDestruct ("Hyield" $! CIDf pt (upd_upt V' pt)
-               with "[%] [%] [%] Htfk' Hdone HW Htc Hyld")
-    as "Hures"; [reflexivity | exact Hnorm | exact Hptwf |].
+               with "[%] [%] [%] [%] Htfk' Hdone HW Htc Hyld")
+    as "Hures"; [reflexivity | exact Hnorm | exact Hptwf | | ].
+  (* the resumed record names the parked process's fd-state ghost: forkret
+     moved only [pv_upt], and [upd_upt] does not touch [pv_fdg]. *)
+  { cbn [pv_fdg upd_upt]. exact Hfg. }
   (* ---- the config record for this round ---- *)
   assert (HSEa0 : tp_pin SE !!! Regidx (mword_of_int 10)
                   = kvi_satp_word (ud_root pt)).
@@ -783,7 +791,7 @@ Lemma fkr_boot
      of this walk, and a proofmode step's term carries the whole context
      twice -- see that definition's header. *)
   forkret_closer (fun h : CpuId => usertrap_res_bare (CID := h))
-                 W γf p ksp pid av -∗
+                 W γf p ksp (pv_fdg V) pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1.
@@ -1376,6 +1384,12 @@ Proof.
   iIntros (CIDk Hkk mf V' entry spv szv')
     "%Hcsk %Hkok Hcg Hcpu Hextc Hclmc Hpc Hbms2 Hist2 Hka2 Hpriv
      Hpath2 Hargv Hargs2 Hsl3 Hirs2".
+  (* kexec keeps the descriptor block, hence the fd-state ghost name it is
+     keyed on -- [SpecKexec.kexec_ok] states it. *)
+  assert (Hfgk : pv_fdg V' = pv_fdg V).
+  { destruct Hkok as [ (_ & HV') | Hs ].
+    - rewrite HV'. reflexivity.
+    - destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & Hfg & _). exact Hfg. }
   assert (Hpck : ret_pc (D5 !!! Regidx Rra : mword 64) = mword_of_int (FR + 0x56))
     by (rewrite HD5ra; pcw).
   iEval (rewrite Hpck) in "Hpc".
@@ -1582,7 +1596,10 @@ Proof.
               (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V')))
               ks E4 av av2 eb Hjlt ltac:(kxarith) Havsum HE4sp HE4s1
               with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
-                    Hpriv Hdone HW Hyield").
+                    Hpriv Hdone HW [Hyield]").
+    (* [upd_tf] does not touch [pv_fdg], so the closer the caller handed in
+       at the ENTRY record's name is the one this tail wants. *)
+    iEval (cbn [pv_fdg upd_tf]; rewrite Hfgk). iExact "Hyield".
 Qed.
 
 Theorem wp_forkret

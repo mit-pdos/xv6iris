@@ -336,7 +336,7 @@ Section ProofSysClose.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
-    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hftab #Hpe Hpriv Hiru Hpenv
+    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hftab #Hpe Hpriv Hfrag Hiru Hpenv
               Hfenv Hcont".
     (* [b] AND [eb] ARE DERIVABLY EQUAL HERE, and the derivation is available
        because fileclose's FS bundle carries [⌜n = 0⌝]: sys_close has no
@@ -625,9 +625,9 @@ Section ProofSysClose.
       iDestruct (cpu_claim_ext_transport CID CID12 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv] [Hpenv] Hfenv Hiru");
+      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv Hfrag] [Hpenv] Hfenv Hiru");
         [exact Hcsf| |].
-      { rewrite /sys_close_post. iLeft. iFrame "Hpriv". iPureIntro.
+      { rewrite /sys_close_post. iLeft. iFrame "Hpriv Hfrag". iPureIntro.
         split; [exact Hmfa0 | exact Hnone]. }
       (* no fileclose ran on this path, so both bundles are as they came in *)
       { by iExists on. }
@@ -880,10 +880,17 @@ Section ProofSysClose.
                       = mword_of_int (KernelSyms.sys_close + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3a) in "Hpc".
       (* the descriptor is empty now, and it owns the unit fileclose returned *)
-      (* THE GHOST STEP: the descriptor is closed now, so its state goes to
-         [FdClosed] -- both halves are in hand, which is what the update
-         costs (FdSlots.v). *)
-      iMod (fd_st_both_update _ fd (fdstate_of Cf) FdClosed with "Hst") as "Hst".
+      (* THE GHOST STEP, AND IT IS WHAT THE BUNDLE IS FOR: the descriptor is
+         closed now, so its state goes to [FdClosed].  The array handed out
+         only the AUTHORITY ([Hst], out of [ofile_slot]'s file arm); the
+         matching fragment comes out of the bundle, and [fd_st_move] joins
+         them.  This is the one step in sys_close that could not be taken
+         after [ProcInv]'s auth/frag split without holding [fd_frags_any]. *)
+      iDestruct (fd_frags_any_acc (pv_fdg V) fd Hfdlt with "Hfrag")
+        as (stq) "[Hfr Hfrback]".
+      iMod (fd_st_move _ fd (fdstate_of Cf) stq FdClosed with "Hst Hfr")
+        as "[Hst Hfr]".
+      iDestruct ("Hfrback" with "Hfr") as "Hfrag".
       iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot Hst]")
         as "Hpriv".
       { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hfdslot Hst". }
@@ -935,9 +942,9 @@ Section ProofSysClose.
       iDestruct (cpu_claim_ext_transport CID21 CID23 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv] Hpenv Hfenv Hiru");
+      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv Hfrag] Hpenv Hfenv Hiru");
         [exact Hcsf|].
-      rewrite /sys_close_post. iRight. iExists fd, fv. iFrame "Hpriv". iPureIntro.
+      rewrite /sys_close_post. iRight. iExists fd, fv. iFrame "Hpriv Hfrag". iPureIntro.
       split; [exact Hmfa0 | exact Hsome].
   Qed.
 

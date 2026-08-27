@@ -406,6 +406,10 @@ Section KforkPrologue.
           (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
         proc_priv γf pme pid_p Vp -∗
         proc_priv_nocwd γf npa pid_c Vc' -∗
+        (* the child's descriptor-state fragments, out of allocproc with its
+           block -- kfork spends them duplicating descriptors and parks the
+           rest in the child's residue. *)
+        FdSlots.fd_frags_any (ProcDefs.pv_fdg Vc') -∗
         (* the new slot's ALLOCATION MARKER, minted by allocproc and needed
            by whoever finally parks the slot at USED / RUNNABLE
            ([SchedCtx.proc_slots_park]).  Persistent. *)
@@ -716,7 +720,7 @@ Section KforkPrologue.
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
          =================================================================== *)
       iDestruct "Hp2" as (j γl2 ch pid_c Vc root tfp ks rest nc)
-        "(%Hpures & Hheld & Hhart & Hcpriv & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
+        "(%Hpures & Hheld & Hhart & Hcpriv & Hcfrag & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
       destruct Hpures as (Hrv & HjN & Hgamma & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
       set (npa := proc_addr j).
@@ -1295,6 +1299,7 @@ Section KforkPrologue.
                   (upd_pt (upd_sz Vc (pv_sz Vp)) P' (pv_tf Vc))
                   (ud_tfp (pv_upt Vp)) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv HCpriv
+                        Hcfrag
                         Hmk Hheld Hhart Hfdsp Hirsp Hbslp Hkstk [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
         * exact HN10sp.
         * exact HN10s4.

@@ -205,15 +205,21 @@ Section SpecFdalloc.
      ⌜r = (mword_of_int (-1) : mword 64) /\ fd_frees (pv_ofile V) = []⌝ ∗
        proc_ofiles_owe γf (pv_fdg V) p (pv_ofile V) D
      ∨
-     (* the least free descriptor now names the file.  Two things changed: the
-        unit that descriptor used to own comes back to the caller, and the
+     (* the least free descriptor now names the file.  Three things changed:
+        the unit that descriptor used to own comes back to the caller, the
         descriptor now OWES a payload -- it names a file whose reference the
-        caller still holds. *)
+        caller still holds -- and its ghost AUTHORITY comes out too, still at
+        [FdClosed].  fdalloc made the cell non-null; it did not make the
+        descriptor OPEN, because it does not know what the file is.  The
+        caller moves the authority to that file's type at
+        [ProcInv.proc_priv_settle], which is where the fd-state fragment
+        bundle is spent -- so "sys_open changed the state of a descriptor" is
+        a fact about the CALLER's contract, not fdalloc's. *)
      ∃ (fd : nat) (l : list nat),
        ⌜r = (mword_of_int (Z.of_nat fd) : mword 64) /\
         fd_frees (pv_ofile V) = fd :: l⌝ ∗
        proc_ofiles_owe γf (pv_fdg V) p (pv_ofile (upd_ofile V fd (fnode k)))
-         ({[fd]} ∪ D) ∗ fd_slot)%I.
+         ({[fd]} ∪ D) ∗ fd_slot ∗ fd_st_auth (pv_fdg V) fd FdClosed)%I.
 
 End SpecFdalloc.
 

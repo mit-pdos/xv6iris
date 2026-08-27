@@ -832,7 +832,7 @@ Section ProofFdalloc.
            descriptor's unit comes out with its cell, and writing the pointer
            puts the descriptor in the caller's payload deficit. *)
         iDestruct (proc_ofiles_install _ _ _ _ _ fd Hw with "Hpv")
-          as "(Hcell & Hfdslot & Hpvback)".
+          as "(Hcell & Hfdslot & Hauth & Hpvback)".
         assert (Haddr3c : add_vec (G3 !!! Regidx Ra2) (sign_extend' 64 (mword_of_int 0 : mword 12))
                           = p_ofile p fd) by (rewrite HG3a2; apply addv_sext0).
         iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.fdalloc + 0x3c)) Rs1 Ra2 (mword_of_int 0 : mword 12)
@@ -883,11 +883,11 @@ Section ProofFdalloc.
         iDestruct (cpu_own_transport CID0 CIDfx n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CIDfx with "[%]"); [wp_next_chain|].
         destruct (fda_frees_found _ fd Hw Hpre) as [l Hfrees].
-        iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hcore [Hpv Hfdslot]"); [exact Hcsf|].
+        iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hcore [Hpv Hfdslot Hauth]"); [exact Hcsf|].
         rewrite /fdalloc_post. iRight. iExists fd, l.
         cbn [upd_ofile pv_ofile pv_fdg].
         iSplitR; [iPureIntro; split; [exact Hfa0 | exact Hfrees]|].
-        iFrame "Hpv Hfdslot".
+        iFrame "Hpv Hfdslot Hauth".
       - (* ============ BUSY: advance, and either loop or give up ======== *)
         iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x1c))
                   (mword_of_int 11 : mword 8) (Cregidx (mword_of_int 6)) Ra4

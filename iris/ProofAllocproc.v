@@ -940,7 +940,7 @@ Section ProofAllocproc.
         iMod (proc_dormant_unused γf (proc_addr k) with "Hdorm")
           as "(Hctx & Hpgcell & Htfcell & Hspare & Hirsp & Hbsp & Hkst & Hrest)".
         iModIntro.
-        iDestruct "Hrest" as (V pid0) "([%Hof [%Hcwd %Hszb]] & Hpidhalf & Hfields & Hofiles)".
+        iDestruct "Hrest" as (V pid0) "([%Hof [%Hcwd %Hszb]] & Hpidhalf & Hfields & Hofiles & Hfrag)".
         iDestruct "Hpub" as (kl xs pid1) "(Hkilled & Hxstate & Hpidinv)".
         iDestruct (p_pid_join (proc_addr k) pid1 pid0 with "Hpidinv Hpidhalf") as "[%Hpideq Hpidfull]".
         (* +0x38 jal ra,allocpid *)
@@ -2060,7 +2060,7 @@ Section ProofAllocproc.
         { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
           iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
         iFrame "Hkst".
-        iFrame "Hpark Hpriv Hmk Hspare Hirsp Hbsp Hks".
+        iFrame "Hpark Hpriv Hfrag Hmk Hspare Hirsp Hbsp Hks".
         iSplitL "Hc0 Hc1 Hcrest".
         { rewrite ctx_cells_run !big_sepL_cons Nat.mul_0_r RiscvExtras.pa_add_0.
           iFrame "Hc0 Hc1 Hcrest". }

@@ -186,6 +186,9 @@ Section ProofKforkB5.
     SchedCtx.proc_held cpu_id j γl USED ch -∗
     ProcGeom.hart_at_any (ProcGeom.proc_addr j) -∗
     ProcInv.proc_priv γf (ProcGeom.proc_addr j) pid_c Vc -∗
+    (* the child's descriptor-state fragments, minted with its block by
+       allocproc; the park captures them into the resume closer. *)
+    FdSlots.fd_frags_any (ProcDefs.pv_fdg Vc) -∗
     (* the slot's ALLOCATION MARKER, minted by allocproc and carried here
        through kfork's body: every non-UNUSED arm of the lock invariant
        holds it, so both releases below need it ([ProcAvail.v]).
@@ -210,7 +213,7 @@ Section ProofKforkB5.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9 Hfresh.
-    iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl #Hft #Hworld #Htoken #Hfdone Hheld Hhart Hpriv #Hmk
+    iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl #Hft #Hworld #Htoken #Hfdone Hheld Hhart Hpriv Hfrag #Hmk
              Hfd Hirsp Hbsl Hkfree #Hks Hctx Hcont".
     (* -------------------------------------------------------------- *)
     (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via the *)
@@ -251,7 +254,8 @@ Section ProofKforkB5.
     { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
     iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
     iMod (park_token_park N rest Vc Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park [Hks Hctx Hpriv Hfd Hirsp]")
+            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag
+                  [Hks Hctx Hpriv Hfd Hirsp]")
       as "Hpctx".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirsp".
       (* the two files each define forkret's entry; the constants are equal *)

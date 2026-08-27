@@ -273,7 +273,8 @@ Section KforkB4Proof.
         (∃ Vc' : pprivate,
            ⌜pv_sz Vc' = pv_sz Vc /\ pv_upt Vc' = pv_upt Vc /\
             pv_tf Vc' = pv_tf Vc /\ pv_ofile Vc' = pv_ofile Vc /\
-            pv_cwd Vc' = pv_cwd Vp /\ length (pv_name Vc') = PNAMELEN⌝ ∗
+            pv_cwd Vc' = pv_cwd Vp /\ pv_fdg Vc' = pv_fdg Vc /\
+            length (pv_name Vc') = PNAMELEN⌝ ∗
            proc_priv γf npa pid_c Vc') -∗
         iref_slots IREFSPARE -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -627,7 +628,8 @@ Section KforkB4Proof.
     iAssert (∃ Vc' : pprivate,
                ⌜pv_sz Vc' = pv_sz Vc /\ pv_upt Vc' = pv_upt Vc /\
                 pv_tf Vc' = pv_tf Vc /\ pv_ofile Vc' = pv_ofile Vc /\
-                pv_cwd Vc' = pv_cwd Vp /\ length (pv_name Vc') = PNAMELEN⌝ ∗
+                pv_cwd Vc' = pv_cwd Vp /\ pv_fdg Vc' = pv_fdg Vc /\
+                length (pv_name Vc') = PNAMELEN⌝ ∗
                proc_priv γf npa pid_c Vc')%I
       with "[Hchild4]" as "HchildFinal".
     { iExists Vc3.

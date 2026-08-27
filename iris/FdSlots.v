@@ -307,8 +307,11 @@ Section FdSlots.
   (* THE AUTHORITY: the half [ProcInv.ofile_slot] keeps beside the cell. *)
   Definition fd_st_auth (γ : gname) (fd : nat) (st : fdstate) : iProp Σ :=
     fd_st_at γ fd (1/2) st.
-  (* BOTH, which is where both currently live -- the process invariant.  The
-     fragment is split out of here when it is handed to a client. *)
+  (* BOTH.  Only two places hold this now: the mint ([fd_st_alloc], before
+     the halves are split) and whoever is mid-update -- an update needs both
+     ([fd_st_both_update]).  The AUTHORITY lives in [ProcInv.ofile_slot],
+     pinned to the cell; the FRAGMENTS live in [fd_frags] below, a bundle
+     that travels BESIDE the process block. *)
   Definition fd_st_both (γ : gname) (fd : nat) (st : fdstate) : iProp Σ :=
     (fd_st_auth γ fd st ∗ fd_st γ fd st)%I.
 
@@ -366,6 +369,21 @@ Section FdSlots.
     fd_st_both γ fd st ==∗ fd_st_both γ fd st'.
   Proof. rewrite !fd_st_both_full. apply fd_st_at_update. Qed.
 
+  (* THE UPDATE IN THE FORM EVERY CALLER ACTUALLY HAS IT: an authority and a
+     fragment, held separately and at states the caller may not know are
+     equal.  Agreement is folded in, so no site has to do it by hand -- which
+     matters because after the split EVERY descriptor retype is this move:
+     the array supplies the authority, the bundle the fragment. *)
+  Lemma fd_st_move (γ : gname) (fd : nat) (st st' new : fdstate) :
+    fd_st_auth γ fd st -∗ fd_st γ fd st' ==∗
+    fd_st_auth γ fd new ∗ fd_st γ fd new.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (fd_st_agree with "Ha Hf") as %Heq. subst st'.
+    iAssert (fd_st_both γ fd st) with "[Ha Hf]" as "H"; [by iFrame "Ha Hf"|].
+    iMod (fd_st_both_update γ fd st new with "H") as "[$ $]". done.
+  Qed.
+
   Lemma fdst_map0_split (γ : gname) (n : nat) :
     own γ (fdst_map0 n) ⊢ [∗ list] fd ∈ seq 0 n, fd_st_both γ fd FdClosed.
   Proof.
@@ -387,11 +405,117 @@ Section FdSlots.
     iModIntro. iExists γ. iApply (fdst_map0_split with "H").
   Qed.
 
+  (* =================================================================== *)
+  (*  THE FRAGMENT BUNDLE                                                 *)
+  (* =================================================================== *)
+  (* One process's NOFILE fragments, as a single resource.  This is the
+     other end of the split: [ProcInv.ofile_slot] keeps the AUTHORITY beside
+     the cell it describes, and everything a holder of the block might want
+     to SAY about its descriptors is here.
+
+     WHY A WHOLE-ARRAY BUNDLE rather than per-descriptor fragments handed
+     around one at a time.  A syscall does not know which descriptor it will
+     touch until it has read its argument (sys_close), or until fdalloc has
+     scanned (sys_open, sys_pipe, sys_dup), so a contract stated at ONE [fd]
+     could not be written down at the call.  The bundle is also what a
+     client will eventually hold: "my file descriptors" is one assertion,
+     not sixteen.
+
+     WHY IT TRAVELS BESIDE THE BLOCK, not inside it.  Same reason
+     [FDSPARE]'s allowance does, one paragraph up: [proc_priv]'s accessors
+     are all borrow-and-return and their wands swallow the block, so a
+     syscall that held the bundle *out* of [proc_priv] could not then pass
+     [proc_priv] to a callee.  Its home is [UsertrapRes.ut_own], on the same
+     in-and-out channel [ut_own] already gives [fd_slots] and [bslots], and
+     from there it rides across user execution inside
+     [ProofUserretClosed.Rut_at] for free.  The next increment lifts it OUT
+     of that residue so userret can hand it to a verified user program
+     instead of parking it. *)
+  Definition fd_frags (γ : gname) (sts : list fdstate) : iProp Σ :=
+    (⌜length sts = NOFILE⌝ ∗ [∗ list] fd ↦ st ∈ sts, fd_st γ fd st)%I.
+
+  (* THE VALUES ARE EXISTENTIAL FOR NOW, and that is a staging decision, not
+     a limitation of the shape.  Nothing outside the kernel reads them yet,
+     and quantifying keeps the bundle a plain in-and-out family on the
+     syscall channel -- the same shape [fd_slots FDSPARE] has, so
+     [SpecSyscall]'s twenty-two entries thread it without a new index.  A
+     client that wants to state a DELTA ("fd 3 is closed now") takes
+     [fd_frags] at an explicit [sts] instead; that is a change of parameter
+     at the holder, not a re-plumb. *)
+  Definition fd_frags_any (γ : gname) : iProp Σ := (∃ sts, fd_frags γ sts)%I.
+
+  Global Instance fd_frags_timeless γ sts : Timeless (fd_frags γ sts).
+  Proof. apply _. Qed.
+
+  Lemma fd_frags_len γ sts : fd_frags γ sts -∗ ⌜length sts = NOFILE⌝.
+  Proof. iIntros "[$ _]". Qed.
+
+  (* open one descriptor's fragment and close it back at a new state -- the
+     only thing an fd operation ever does to the bundle. *)
+  Lemma fd_frags_acc (γ : gname) (sts : list fdstate) (fd : nat) (st : fdstate) :
+    sts !! fd = Some st ->
+    fd_frags γ sts -∗
+    fd_st γ fd st ∗ (∀ st', fd_st γ fd st' -∗ fd_frags γ (<[fd := st']> sts)).
+  Proof.
+    iIntros (Hfd) "[%Hlen Hs]".
+    iDestruct (big_sepL_insert_acc _ _ _ _ Hfd with "Hs") as "[$ Hback]".
+    iIntros (st') "Hst". iSplitR.
+    { iPureIntro. rewrite length_insert. exact Hlen. }
+    iApply ("Hback" with "Hst").
+  Qed.
+
+  (* ...and at the quantified bundle, which is what a syscall actually
+     holds.  The state it finds is whatever the authority says
+     ([ProcInv.ofile_slot_agree] is how a caller learns it). *)
+  Lemma fd_frags_any_acc (γ : gname) (fd : nat) :
+    (fd < NOFILE)%nat ->
+    fd_frags_any γ -∗
+    ∃ st : fdstate, fd_st γ fd st ∗ (∀ st', fd_st γ fd st' -∗ fd_frags_any γ).
+  Proof.
+    iIntros (Hfd) "(%sts & Hb)".
+    iDestruct (fd_frags_len with "Hb") as %Hlen.
+    assert (Hlk : is_Some (sts !! fd)) by (apply lookup_lt_is_Some_2; lia).
+    destruct Hlk as [st Hst].
+    iDestruct (fd_frags_acc γ sts fd st Hst with "Hb") as "[Hst Hback]".
+    iExists st. iFrame "Hst". iIntros (st') "Hst".
+    iExists (<[fd := st']> sts). iApply ("Hback" with "Hst").
+  Qed.
+
+  (* THE MINT'S SPLIT.  [fd_st_alloc] produces both halves paired, one per
+     descriptor; the authority side goes to [ProcInv.proc_ofiles] and the
+     fragment side becomes the bundle. *)
+  Lemma fd_st_both_split (γ : gname) (n : nat) :
+    ([∗ list] fd ∈ seq 0 n, fd_st_both γ fd FdClosed) -∗
+    ([∗ list] fd ∈ seq 0 n, fd_st_auth γ fd FdClosed) ∗
+    ([∗ list] fd ∈ seq 0 n, fd_st γ fd FdClosed).
+  Proof. rewrite -big_sepL_sep. iIntros "$". Qed.
+
+  (* the fragment side, in the bundle's own shape *)
+  Lemma fd_frags_of_closed_at (γ : gname) (n o : nat) :
+    ([∗ list] fd ∈ seq o n, fd_st γ fd FdClosed) -∗
+    [∗ list] i ↦ st ∈ replicate n FdClosed, fd_st γ (o + i) st.
+  Proof.
+    revert o. induction n as [|n IH]; iIntros (o) "H"; [done|].
+    cbn [seq replicate big_opL]. rewrite Nat.add_0_r.
+    iDestruct "H" as "[$ H]".
+    iDestruct (IH (S o) with "H") as "H".
+    iApply (big_sepL_mono with "H"). iIntros (i y _) "H".
+    replace (S o + i)%nat with (o + S i)%nat by lia. iExact "H".
+  Qed.
+
+  Lemma fd_frags_of_closed (γ : gname) :
+    ([∗ list] fd ∈ seq 0 NOFILE, fd_st γ fd FdClosed) -∗
+    fd_frags γ (replicate NOFILE FdClosed).
+  Proof.
+    iIntros "H". iSplitR; [iPureIntro; apply length_replicate|].
+    iApply (fd_frags_of_closed_at γ NOFILE 0 with "H").
+  Qed.
+
   (* the parcelled-out form the fd table wants: one unit per ARRAY SLOT,
      mirroring [fd_slots_to_any]. *)
   Lemma fd_st_closed_to_any_at {A} (γ : gname) (l : list A) (o : nat) :
-    ([∗ list] fd ∈ seq o (length l), fd_st_both γ fd FdClosed) -∗
-    [∗ list] i ↦ _ ∈ l, fd_st_both γ (o + i) FdClosed.
+    ([∗ list] fd ∈ seq o (length l), fd_st_auth γ fd FdClosed) -∗
+    [∗ list] i ↦ _ ∈ l, fd_st_auth γ (o + i) FdClosed.
   Proof.
     revert o. induction l as [|x l IH]; iIntros (o) "H"; [done|].
     cbn [length seq big_opL]. rewrite Nat.add_0_r.
@@ -402,8 +526,8 @@ Section FdSlots.
   Qed.
 
   Lemma fd_st_closed_to_any {A} (γ : gname) (l : list A) :
-    ([∗ list] fd ∈ seq 0 (length l), fd_st_both γ fd FdClosed) -∗
-    [∗ list] fd ↦ _ ∈ l, fd_st_both γ fd FdClosed.
+    ([∗ list] fd ∈ seq 0 (length l), fd_st_auth γ fd FdClosed) -∗
+    [∗ list] fd ↦ _ ∈ l, fd_st_auth γ fd FdClosed.
   Proof. iApply (fd_st_closed_to_any_at γ l 0). Qed.
 
 End FdSlots.
