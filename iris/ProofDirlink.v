@@ -3541,8 +3541,9 @@ Section ProofDirlinkMain.
     iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     (* THE SHARE IPUT'S WINDOWS PARK (durable-disk B''-tx5): this form has
        the WHOLE element, so half is what the gen form takes and the two
-       rejoin below -- which is why the counted contract gained only the
-       [g = icfg_log] equation and no resource. *)
+       rejoin below -- which is why the counted contract gained no resource
+       (before rank 1c it gained the [g = icfg_log] equation, and that is
+       gone with the threaded copy). *)
     iDestruct (log_tx_halve with "Htx") as (t0) "[Htx1 Htx2]".
     (* THE COUNTED SEAL'S ONE NEW STEP (D0 pre-stage 1): the gen form asks
        for the honest [dl_need], the counted form was given the constant,

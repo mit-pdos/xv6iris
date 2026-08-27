@@ -72,11 +72,11 @@
 
     [FsSyscalls.fs_world] is therefore no longer a one-line alias: it is
     this predicate AT A CALLER'S OWN NAMES -- the tie equations
-    ([bn = fsc_bio], [glog = icfg_log], …) beside the ambient [fs_ready] --
+    ([bn = fsc_bio], [γd = fsc_disk], …) beside the ambient [fs_ready] --
     with [fs_world_all] doing the substitution once, so a body that threads
     its own names still destructs ONE row and gets the constituents spelled
-    the way its callee spells them.  That is [SpecKexec]'s existing
-    [g = icfg_log] idiom at full width.
+    the way its callee spells them.  Rank 1c took the four [icfg] rows out
+    of that list; the device and allocator names are what is left of it.
 
     ---- WHY IT MATTERS: THE FORKRET DELTA ----
 

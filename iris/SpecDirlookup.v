@@ -64,7 +64,7 @@
        [IcacheEscrow.ic_loaded] and in [ipool_shape_np]'s allocated arm, so
        namex destructs it out of ilock's postcondition at a directory it
        could not have named in advance -- [DirView.dir_ok_dir] is the one
-       step, and it wants [nib = icfg_nib].
+       step, and it is at [icfg_nib] outright since rank 1c.
 
    ---- THE GRANULARITY PREMISE IS GONE (fs-icache.md §15(b)) -----------
 

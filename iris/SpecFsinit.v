@@ -64,14 +64,15 @@
    up they are premises about a named 32-byte record instead of five
    free-floating unexplained hypotheses on five different contracts.
 
-   ---- THE FOUR-LINE DEVICE TIE, IN SpecNamex's EXACT SHAPE -----------
+   ---- THE TWO-LINE DEVICE PREMISE, IN SpecNamex's EXACT SHAPE ---------
 
    N5a's ledger settled where these go and it is here, not in IcacheBoot:
    [icache_boot] is device-generic BY CONSTRUCTION (it takes [dv] and [nib]
    as parameters), and the [dv = icfg_dev] tie is [IcacheRef.icfg_alloc]'s to
-   make.  So this contract carries SpecNamex's four lines verbatim --
-   [dev = icfg_dev], [nib = icfg_nib], [dev = ROOTDEV], [(0 < nib)%nat] --
-   and hands ireclaim the raw device-generic form it wants.
+   make.  The two TIES that used to ride here ([dev = icfg_dev],
+   [nib = icfg_nib]) are gone with the threaded copies (rank 1c); what is
+   left is what they were there to enable -- [icfg_dev = ROOTDEV] and
+   [(0 < icfg_nib)%nat] -- and ireclaim gets the same form as before.
 
    [ROOTDEV] itself was hoisted out of [SpecNamex.v] into [InodeInv.v] (N5d,
    beside [sb_ninodes]) precisely so that this file could name it: a Spec
@@ -508,8 +509,8 @@ Definition wp_fsinit_sconf_body
          ireclaim at +0x54.  It does not cross the boundary as an input.
          AT [icfg_log], not existentially: this is [FsReady.fs_ready]'s log
          conjunct, modulo the seal site's instantiation of [bn]/[fsc_fs]/[fsc_cov]/
-         [fsc_logst] at [fsc_bio]/[fsc_fs]/[fsc_cov]/[fsc_logst] and
-         [dev = icfg_dev], which premise (e) above already gives. *)
+         [fsc_logst] at [fsc_bio]/[fsc_fs]/[fsc_cov]/[fsc_logst] -- the
+         device it is stated at IS [icfg_dev] since rank 1c. *)
       log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
       (* three, not two: see the header *)
       bslots 3 -∗

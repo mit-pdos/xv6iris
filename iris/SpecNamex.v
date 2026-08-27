@@ -124,8 +124,9 @@
 
    ---- THE PREMISES -------------------------------------------------------
 
-   (1) [dev = icfg_dev], [nib = icfg_nib] -- ProofKexit's pattern.  The second
-       is what N4a's [DirView.dir_ok_dir] wants: the [dir_ok icfg_nib dn data]
+   (1) THE TWO icfg TIES ARE GONE (rank 1c): namex reads the device and the
+       inode count off the class.  What N4a's [DirView.dir_ok_dir] wanted
+       the second of them for is still here -- the [dir_ok icfg_nib dn data]
        conjunct now rides inside [IcacheEscrow.ic_loaded], so namex destructs
        dirlookup's [dir_inums_ok] premise straight out of ilock's
        postcondition at a directory it could not have named in advance.

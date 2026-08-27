@@ -235,11 +235,11 @@ Section FsBundles.
      PARAMETER-FREE -- every ghost name it used to take is ambient, in
      [FsCfg.fscfg] and [IcacheRef.icfg] (see FsCfg.v's header for why a
      carried predicate must not be an existential).  The contracts below
-     still THREAD their names, as every fs contract in the tree does, so
-     what they want is the ambient predicate plus the equations saying the
-     two agree -- [SpecKexec]'s [g = icfg_log] idiom, at the full width.
-     True at boot by construction; the boot chain builds the [fscfg]
-     instance out of exactly these names.
+     still THREAD the DEVICE and ALLOCATOR names, so what they want is the
+     ambient predicate plus the equations saying the two agree.  The four
+     [icfg] rows left with rank 1c; the six device/allocator ones and the
+     bitmap's two numbers are stage 4's.  True at boot by construction; the
+     boot chain builds the [fscfg] instance out of exactly these names.
 
      [procs_inv] IS NO LONGER IN IT.  It is persistent, it is a PROCESS
      resource rather than a file-system one, and it was the only conjunct

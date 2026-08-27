@@ -5429,7 +5429,8 @@ Section ProofIput.
     (* THE SHARE, OUT OF THE WHOLE TOKEN (durable-disk B''-tx5).  This form's
        [log_op] carries the WHOLE [ln_tx] element, so the gen contract's
        named share costs it nothing but a halving -- which is why the
-       statement gains only the [g = icfg_log] equation and no resource. *)
+       statement gains no resource (before rank 1c it gained the
+       [g = icfg_log] equation, and that is gone with the copy). *)
     iDestruct (log_tx_halve with "Htx") as (t0) "[Htx1 Htx2]".
     (* SIMP-1: the runtime contract states the regime at the persistent
        [ireg_open] itself; the indexed form the gen contract keeps is that

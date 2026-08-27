@@ -65,13 +65,13 @@
 
    ialloc's last act is [return iget(dev, inum)] at +0xaa, so the success
    arm's payout is [SpecIget]'s: a slot [kslot < NINODE], a fraction [q],
-   [a0 = ientry kslot], and ONE [IcacheRef.inode_ref kslot q dev inum].  The
-   inum is existential -- the scan finds it -- and its region bound
-   [bv_unsigned inum < 16 * nib] travels with it, which is what lets a
-   caller rebuild [IcacheRef.inode_held] once it also knows
-   [dev = icfg_dev] and [nib = icfg_nib].  Deliberately NOT a premise here:
-   ialloc is device-generic exactly as iget is, and the two ties are the
-   caller's to make.
+   [a0 = ientry kslot], and ONE [IcacheRef.inode_ref kslot q icfg_dev inum].
+   The inum is existential -- the scan finds it -- and its region bound
+   [bv_unsigned inum < 16 * icfg_nib] travels with it, which is what lets a
+   caller rebuild [IcacheRef.inode_held] outright.  Until rank 1c the device
+   and the inode count were THREADED and the caller had to bring
+   [dev = icfg_dev] / [nib = icfg_nib]; there is one file system and one
+   device, so both are read off the class now and the two ties are gone.
 
    The claimed record is named too, as [ialloc_fresh ty] -- nonzero type,
    zero size, thirteen zero address words, and NOTHING ELSE, because the
