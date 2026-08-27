@@ -3527,3 +3527,19 @@ pname_wf).  This lane runs PARALLEL to the fliptree critical path,
 on the green main tree; the fliptree keeps ↦ₛ raw with its three
 named bridges until this lands and ports at cutover with the rest
 of M1.
+
+0.21′ AMENDMENT (owner, same day): pname_cells is NOT unified into ↦ₛ
+— it is a different kind of string (a fixed-size array with an
+embedded null-terminated string; pname_wf carries the terminator).
+The ruled relationship is a DERIVATION AT CALL BOUNDARIES: an
+accessor/split-join pair from the array-with-a-string resource to the
+callee-facing ↦ₛ fact — borrow the prefix-up-to-the-null as the
+string view (the tail bytes stay behind), hand it to the function
+that expects a string, reassemble on return.  Both resources keep
+their own definitions; the bridge is positional (a prefix/suffix
+split of the byte list), so it is split + reassemble, not a
+conversion.  The lane builds: the ctx string tower (the 0.21′ ruling),
+the derived context-free form for the handles, and this
+array→string accessor family with safestrcpy's spec as the acceptance
+test (its source argument consumes the borrowed string view; kfork's
+and kexec's call sites are the worked instances).
