@@ -831,7 +831,7 @@ Definition dir_inums_ok (data : nat -> list (bv 8)) (nrec nib : nat) : Prop :=
 Definition T_DIR_z : Z := 1.
 
 (* THE CONJUNCT THE TWO ESCROW PAYLOADS GAIN ([IcacheEscrow.ic_loaded] and
-   [ipool_shape]'s allocated arm).  TYPE-CONDITIONAL, because it is only
+   [ipool_shape_np]'s allocated arm).  TYPE-CONDITIONAL, because it is only
    directories whose bytes are records: a file's data is arbitrary and a
    free inode has no data at all.  [nib] is the ambient [icfg_nib] at both
    payloads -- capacity, no resource.
@@ -863,7 +863,7 @@ Lemma dir_ok_not_dir (nib : nat) (dn : dinode) (data : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) <> T_DIR_z -> dir_ok nib dn data.
 Proof. intros H Hc. exfalso. exact (H Hc). Qed.
 
-(* (ii) it is FREE -- [ipool_shape]'s free arm, and iput's post-itrunc park *)
+(* (ii) it is FREE -- [ipool_shape_np]'s free arm, and iput's post-itrunc park *)
 Lemma dir_ok_free (nib : nat) (dn : dinode) (data : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) = 0 -> dir_ok nib dn data.
 Proof.

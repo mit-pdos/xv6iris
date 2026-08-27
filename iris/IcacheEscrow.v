@@ -714,34 +714,28 @@ Section IcacheEscrow.
      [InodeRegion.ireg_freeze_au] swaps for [ifreeze_pre]; the AWAIT arm
      carries the freer's [ifreeze_post] inside [pool_await], where increment
      II already filed it.  One token per inum on every arm, never two. *)
-  Definition ipool_shape (γfs : fs_names) (γi : gname) (cov : gset Z)
-      (logstart : Z) (inum : mword 32) : iProp Σ :=
-    (icnt_half (bv_unsigned inum) 0%nat ∗
-     (* THE FREEZE MIRROR's UNCACHED HALF (iclaim-ledger.md §3.16), beside
-        the count half and for its reason verbatim: the pool's domain is the
-        complement of the live arms' inums, so one half per pool entry is one
-        half per uncached inum.  The value is the literal [false] on all
-        three arms: [FrzOff] on the two ordinary ones and [FrzPost] on the
-        await arm, and [ireg_frzm_ok] is down at both. *)
-     frzm_h (bv_unsigned inum) false ∗
-     (ipool_shape_np γfs γi cov logstart inum ∗ ifreeze_off (bv_unsigned inum)
-      (* THE PENDING ARM's TOKEN MOVED INTO ITS ESCROW (A⁗, §3.16): the
-         off-lock deposit hands the retired [ifreeze_off] to
-         [EscrowInode.escA_deposit_acc], which parks it in the escrow's FILLED
-         state, and [escA_redeem] gives it to whoever converts this entry to
-         an [imark].  Two copies of one exclusive ledger cell is not a
-         choice -- and the placement is what lets the AWAIT arm below carry
-         the STANDING freeze in the same escrow, which is the refuter §1.3
-         always wanted. *)
-      (* THE ERA'S ABSTRACT VALUE IS NOT HERE EITHER (durable-disk C-3c).
-         A freed inum's fragment travels from iput's payload to the region
-         through the ESCROW's own EMPTY arm ([EscrowInode.escA_body]), which
-         is the one place both the +0x94 park and the +0xba deposit reach --
-         so neither in-transition arm carries it and the deposit parks it
-         region-side ([InodeRegion.ireg_top_park]) at the corpse's bare
-         record. *)
-      ∨ pool_pending γfs (bv_unsigned inum)
-      ∨ pool_await γfs (bv_unsigned inum)))%I.
+  (* THE FREEZE MIRROR's UNCACHED HALF (iclaim-ledger.md §3.16) rides both
+     rows beside the count half, and for its reason verbatim: the pool's
+     domain is the complement of the live arms' inums, so one half per pool
+     entry is one half per uncached inum.  The value is the literal [false]
+     on all three arms: [FrzOff] on the two ordinary ones and [FrzPost] on
+     the await arm, and [ireg_frzm_ok] is down at both.
+
+     THE PENDING ARM's TOKEN IS IN ITS ESCROW (A⁗, §3.16): the off-lock
+     deposit hands the retired [ifreeze_off] to
+     [EscrowInode.escA_deposit_acc], which parks it in the escrow's FILLED
+     state, and [escA_redeem] gives it to whoever converts this entry to an
+     [imark].  Two copies of one exclusive ledger cell is not a choice --
+     and the placement is what lets the AWAIT arm carry the STANDING freeze
+     in the same escrow, which is the refuter §1.3 always wanted.
+
+     THE ERA'S ABSTRACT VALUE IS NOT ON EITHER ROW (durable-disk C-3c).
+     A freed inum's fragment travels from iput's payload to the region
+     through the ESCROW's own EMPTY arm ([EscrowInode.escA_body]), which is
+     the one place both the +0x94 park and the +0xba deposit reach -- so
+     neither in-transition arm carries it and the deposit parks it
+     region-side ([InodeRegion.ireg_top_park]) at the corpse's bare
+     record. *)
 
   (* the ORDINARY row: the count half, the mirror half, the two-arm
      (allocated / marker) Timeless shape and the unfrozen token. *)
@@ -765,38 +759,6 @@ Section IcacheEscrow.
   Global Instance ipool_ord_timeless γfs γi cov logstart inum :
     Timeless (ipool_ord γfs γi cov logstart inum).
   Proof. rewrite /ipool_ord. tl_struct. Qed.
-
-  (* the three readings that tie the split to [ipool_shape], so that every
-     existing producer and consumer keeps speaking the full shape *)
-  Lemma ipool_ord_shape γfs γi cov logstart inum :
-    ipool_ord γfs γi cov logstart inum -∗
-    ipool_shape γfs γi cov logstart inum.
-  Proof.
-    rewrite /ipool_ord /ipool_shape. iIntros "(Hc & Hm & Hnp & Hoff)".
-    iSplitL "Hc"; [iExact "Hc" |]. iSplitL "Hm"; [iExact "Hm" |].
-    iLeft. iSplitL "Hnp"; [iExact "Hnp" | iExact "Hoff"].
-  Qed.
-
-  Lemma ipool_ext_shape γfs γi cov logstart inum :
-    ipool_ext γfs γi cov logstart inum -∗
-    ipool_shape γfs γi cov logstart inum.
-  Proof.
-    rewrite /ipool_ext /ipool_shape. iIntros "(Hc & Hm & Hx)".
-    iSplitL "Hc"; [iExact "Hc" |]. iSplitL "Hm"; [iExact "Hm" |].
-    iRight. iExact "Hx".
-  Qed.
-
-  Lemma ipool_shape_arms γfs γi cov logstart inum :
-    ipool_shape γfs γi cov logstart inum -∗
-    (ipool_ord γfs γi cov logstart inum ∨ ipool_ext γfs γi cov logstart inum).
-  Proof.
-    rewrite /ipool_shape /ipool_ord /ipool_ext.
-    iIntros "(Hc & Hm & [[Hnp Hoff] | Hx])".
-    - iLeft. iSplitL "Hc"; [iExact "Hc" |]. iSplitL "Hm"; [iExact "Hm" |].
-      iSplitL "Hnp"; [iExact "Hnp" | iExact "Hoff"].
-    - iRight. iSplitL "Hc"; [iExact "Hc" |]. iSplitL "Hm"; [iExact "Hm" |].
-      iExact "Hx".
-  Qed.
 
 
   Global Instance ipool_alloc_timeless γfs γi cov logstart inum :
@@ -823,7 +785,7 @@ Section IcacheEscrow.
      checked-out bundle's dinode_at may lag until the holder's iupdate
      retags it.  Design: fs-icache.md §13 (parked-clean).
 
-     THE DIRECTORY-WF CONJUNCT (§15(a)), the twin of [ipool_shape]'s: a
+     THE DIRECTORY-WF CONJUNCT (§15(a)), the twin of the pool row's: a
      parked DIRECTORY's live records all name inums the inode region
      covers.  This is what namex destructs out of ilock's postcondition,
      and it is the reason dirlookup's [dir_inums_ok] premise is
@@ -1054,7 +1016,7 @@ Section IcacheEscrow.
      LOADED polarity, [ity_pending g] on the UNLOADED one.
 
      WHY THE PENDING RIDES HERE AND NOT ONE LEVEL DOWN.  §17.3 (B) put it
-     with [ipool_shape]'s ALLOCATED disjunct, on the argument that "ilock's
+     with [ipool_shape_np]'s ALLOCATED disjunct, on the argument that "ilock's
      fill MUST take the allocated branch -- it is where [dinode_at] lives".
      §16.4's CLAIM BOX refutes that: [ProofIlock]'s fill also completes on
      the MARKER branch, through [InodeRegion.ireg_withdraw], whenever ialloc
@@ -1075,7 +1037,7 @@ Section IcacheEscrow.
      ([IcacheInv.live_slot_alloc]); the fill spends it; and iput's free path
      -- the second filler, via §17.6.1's reachable claim-and-hit sequence --
      RETIRES the generation at +0x54 ([IcacheInv.live_slot_regen]) before it
-     re-parks UNLOADED with a fresh pending.  [ipool_shape], [imark],
+     re-parks UNLOADED with a fresh pending.  The pool row, [imark],
      [InodeRegion] and [ProofIalloc] are untouched, which is §16's standing
      constraint respected by construction. *)
   Definition ic_payload_np (γfs : fs_names) (γi : gname) (cov : gset Z)
@@ -1972,7 +1934,7 @@ Section IcacheEscrow.
      a [first [apply bi.sep_timeless | …]].  [apply] unifies up to delta, so
      the [first] form peels straight THROUGH a named abstraction that
      already has its own instance -- through [ic_unloaded] into
-     [ipool_shape]'s disjunction and [inode_blocks]' 268-element big-op --
+     the pool row's disjunction and [inode_blocks]' 268-element big-op --
      and then backtracks over all of it: measured 33 s and 42 s on
      [ic_mid_arm] and [ic_escrow_body], i.e. an order of magnitude WORSE
      than the monolithic [apply _] it replaced.  Matching [bi_sep]/[bi_or]/
@@ -3083,40 +3045,6 @@ Section IcacheEscrow.
     iExists dev, inum, (valid_word v). iFrame.
   Qed.
 
-  (* FLAVOUR 1: the ORDINARY last close.  The closer surrenders the uncached
-     ledger pair its [iref_close_last_store_au] just produced -- the count at
-     zero and the still-unfrozen token -- and the pool takes a normal arm. *)
-  Lemma ic_close_to_empty cn γfs γi cov logstart k (v : bool) (g : gname)
-      (dev inum : mword 32) :
-    ic_id cn k (1/2) true dev inum -∗
-    ic_id cn k (1/2) true dev inum -∗
-    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
-    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
-    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-    i_valid (ientry k) ↦₄ valid_word v -∗
-    ic_payload_np γfs γi cov logstart k inum g v -∗
-    ic_mid cn k -∗
-    ic_pin_rest k -∗
-    icnt_half (bv_unsigned inum) 0%nat -∗
-    (* the MIRROR's half rides into the pool beside the count half (§3.16) *)
-    frzm_h (bv_unsigned inum) false -∗
-    ifreeze_off (bv_unsigned inum) -∗
-    |==> ic_escrow_body cn γfs γi cov logstart k ∗
-         ic_id cn k (1/2) false dev inum ∗
-         ipool_ord γfs γi cov logstart inum.
-  Proof.
-    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt Hpin Hcnt Hmir Hoff".
-    iMod (ic_close_to_empty_core cn γfs γi cov logstart k v g dev inum
-            with "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt Hpin")
-      as "(Hbody & Hgf2 & Hnp)".
-    iModIntro.
-    iSplitL "Hbody"; [iExact "Hbody" |].
-    iSplitL "Hgf2"; [iExact "Hgf2" |].
-    rewrite /ipool_ord. iSplitL "Hcnt"; [iExact "Hcnt" |].
-    iSplitL "Hmir"; [iExact "Hmir" |].
-    iSplitL "Hnp"; [iExact "Hnp" | iExact "Hoff"].
-  Qed.
-
   (* FLAVOUR 1', THE SAME EVICTION WITH ITS LEDGER TRIPLE ARRIVING LATE.
 
      [ic_close_to_empty] above asks for the count at zero -- and the ORDINARY
@@ -3151,7 +3079,7 @@ Section IcacheEscrow.
           (* AN ORDINARY ROW, NOT THE FULL SHAPE (durable-disk C-7): the
              ordinary eviction's row goes into the pool INVARIANT, and
              [ipool_put_ord] is what puts it there -- so the arm is named
-             rather than existentially re-hidden behind [ipool_shape]. *)
+             rather than existentially re-hidden behind the pool row. *)
           ipool_ord γfs γi cov logstart inum).
   Proof.
     iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt Hpin".
@@ -3175,7 +3103,7 @@ Section IcacheEscrow.
      deposit.  The escrow and its ticket are the freer's own
      ([EscrowInode.escA_alloc], mask-only, minted before the park). *)
   (* ...AND B2 IS GONE WITH IT (iclaim-ledger.md §3.16).  IVa's complaint --
-     "the eviction hands back exactly one [ipool_shape], and the reorder needs
+     "the eviction hands back exactly one pool row, and the reorder needs
      BOTH the free-pool entry and the record out of it, and [ipool_shape_np]
      existentially erases which arm and which record it is" -- was a
      consequence of the FREER having given its payload back to the escrow at
@@ -3242,47 +3170,6 @@ Section IcacheEscrow.
   Proof.
     iIntros "Hcnt Hmir #Hesc Htk Hdv Hfv". rewrite /ipool_ext.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
-    iSplitL "Hmir"; [iExact "Hmir" |].
-    iRight.
-    rewrite /pool_await. iExists ge, gr, gd, rg.
-    iSplitR; [iExact "Hesc" |].
-    iSplitL "Htk"; [iExact "Htk" |].
-    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
-  Qed.
-
-  Lemma ic_close_to_empty_await cn γfs γi cov logstart k (v : bool)
-      (ge gr gd : gname) (rg : frzidx) (dev inum : mword 32) :
-    ic_id cn k (1/2) true dev inum -∗
-    ic_id cn k (1/2) true dev inum -∗
-    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
-    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
-    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-    i_valid (ientry k) ↦₄ valid_word v -∗
-    (* the five metadata cells and the thirteen addrs cells, which the EMPTY
-       arm keeps -- the freer hands them over and keeps everything else *)
-    inode_raw (ientry k) -∗
-    ic_mid cn k -∗
-    ic_pin_rest k -∗
-    icnt_half (bv_unsigned inum) 0%nat -∗
-    frzm_h (bv_unsigned inum) false -∗
-    escA_inv γfs ge gr gd (bv_unsigned inum) rg -∗
-    redeem_ticketA gr -∗
-    (∃ e, dv_ride (bv_unsigned inum) e) -∗
-    (∃ b, fv_ride (bv_unsigned inum) b) -∗
-    |==> ic_escrow_body cn γfs γi cov logstart k ∗
-         ic_id cn k (1/2) false dev inum ∗
-         ipool_ext γfs γi cov logstart inum.
-  Proof.
-    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hpin Hcnt Hmir #Hesc Htk Hdv Hfv".
-    iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
-      as "[Hgf1 Hgf2]".
-    iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
-    iModIntro.
-    iSplitR "Hgf2 Hcnt Hmir Htk Hdv Hfv";
-      [| iSplitL "Hgf2"; [iExact "Hgf2" |]].
-    { iApply ic_close_empty. rewrite /ic_empty_arm.
-      iExists dev, inum, (valid_word v). iFrame. }
-    rewrite /ipool_ext. iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
     iRight.
     rewrite /pool_await. iExists ge, gr, gd, rg.
@@ -3657,8 +3544,8 @@ Section IcacheEscrow.
      THE ID IS NAMED HERE and closed existentially only at a boundary.  Two
      arms of one transaction must be at the SAME [t] -- shares at different
      ghost-map keys never rejoin into a whole element -- and nothing about
-     the escrow determines an id ([IcacheTxRefute.tx_two_halves_no_whole]),
-     so a walk that holds two locks binds [t] in its stage statement and
+     the escrow determines an id, so a walk that holds two locks binds [t]
+     in its stage statement and
      spells each conjunct at [ic_tx_dep_at]'s own arity.  That is what keeps
      the sweep POSITION-STABLE: a stage's bare [ic_deposit cn k d]
      becomes [ic_tx_dep_at cn k .. t (1/4)] in place, its [log_tx g] (or its
@@ -4672,7 +4559,7 @@ Section IcacheEscrow.
      (this file's own note at the head of section 0), and this tree has no
      later credits ([RiscvPtsto.num_laters_per_step _ := 0]).  So an
      invariant-resident pool would have to be TIMELESS, and the full
-     [ipool_shape] is not: its pending and await alternatives hold
+     the pool row is not: its pending and await alternatives hold
      [EscrowInode.escA_inv], an [inv].  [ipool_no_timeless_check] below is
      that obstruction, checked.
 
@@ -4690,7 +4577,7 @@ Section IcacheEscrow.
      A consumer that lands on a pending/await inum refutes or redeems it
      exactly where it does today -- [ipool_shape_to_np], the caller's
      licence and [IcacheRef.ifreeze_excl] -- because both movers hand out
-     and take back the FULL [ipool_shape]. *)
+     and take back the FULL pool row. *)
 
   (* THE ORDINARY ROWS, as one big-op -- what boot stocks and what the
      invariant is allocated from. *)
@@ -4806,7 +4693,7 @@ Section IcacheEscrow.
   (*                                                                      *)
   (*  [(t, q)] ARE FIELDS OF THE LEDGER and not existentials inside the    *)
   (*  parked share, for [Xv6Cameras.ic_dep]'s reason verbatim              *)
-  (*  ([IcacheTxRefute.tx_two_halves_no_whole]): [ipool_put] has to hand   *)
+  (*  -- two halves are not the whole: [ipool_put] has to hand             *)
   (*  the walk back EXACTLY the element it parked, and an existentially    *)
   (*  keyed share cannot be re-identified.  The ledger is a [ghost_var]    *)
   (*  whose other half the walk carries inside [ipool], so the two agree.  *)
@@ -5551,7 +5438,7 @@ Section IcacheEscrow.
      invariant and the inum stops being in transit; the fifty identities do
      not move, and the share the eviction parked comes home at the ledger's
      own [(t, q)].  Since durable-disk C-7 the ARM IS NAMED rather than
-     re-hidden behind [ipool_shape]: which side the row lands on decides what
+     re-hidden behind the pool row: which side the row lands on decides what
      the walk gets back, so the two sides are two lemmas. *)
   Lemma ipool_put_ord (E : coPset) (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (P : gset Z) (z : Z)
@@ -5934,16 +5821,17 @@ Section IcacheEscrow.
     iApply "Hback". iApply ("Hbody" with "Hgid").
   Qed.
 
-  (* the obstruction the split is FOR, checked: the full pool shape is not
-     Timeless, so it could never have moved into an invariant whole. *)
+  (* the obstruction the split is FOR, checked: the in-transition row is not
+     Timeless, so a pool shape carrying it could never have moved into an
+     invariant whole. *)
   Lemma ipool_no_timeless_check (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : True.
   Proof.
-    (* the ordinary alternative is timeless ... *)
+    (* the ordinary row is timeless ... *)
     assert (Timeless (ipool_ord γfs γi cov logstart inum)) by apply _.
-    (* ... the whole shape is NOT, and neither is the [inv] that makes it
-       so -- which is what forbids [iInv .. as ">"] on a pool invariant. *)
-    Fail (assert (Timeless (ipool_shape γfs γi cov logstart inum)) by apply _).
+    (* ... the in-transition one is NOT, and neither is the [inv] that makes
+       it so -- which is what forbids [iInv .. as ">"] on a pool invariant. *)
+    Fail (assert (Timeless (ipool_ext γfs γi cov logstart inum)) by apply _).
     Fail (assert (forall (N : namespace) (P : iProp Σ), Timeless (inv N P))
            by (intros; apply _)).
     done.

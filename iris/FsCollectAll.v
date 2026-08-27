@@ -75,7 +75,6 @@ Require Import IcacheEscrow.
 Require Import FsDurXfer.       (* the run vocabulary: [xr_fs], [xf_shape] *)
 Require Import FsDurSnap.
 Require Import FsCollect.
-Require Import FsDurQuiesce.    (* [esc_ns_still_open] *)
 Require Import LogSnapLaw.      (* [snap_law] -- what [log_ctx] parks *)
 
 Local Open Scope Z_scope.
@@ -210,6 +209,45 @@ Section BigOpsRegion.
   Qed.
 
 End BigOpsRegion.
+
+(* ====================================================================== *)
+(*  0b.  THE NAMESPACE ARITHMETIC THE FIFTY-FOLD OPENING RUNS ON          *)
+(* ====================================================================== *)
+
+(* THE SIDE CONDITION A SECOND OPENING WOULD OWE, REFUTED.  [inv_acc] at
+   [E] concludes at [E ∖ ↑N]; a second [inv N _] there needs
+   [↑N ⊆ E ∖ ↑N].  A namespace's closure is infinite ([nclose_infinite]),
+   hence inhabited, and no inhabited set is contained in a set it has been
+   removed from.  Stated at an arbitrary [E] so that it covers the nested
+   openings the collection would need, not just the outermost one. *)
+Lemma ns_not_reopenable (N : namespace) (E : coPset) :
+  ↑N ⊆ E -> ~ (↑N ⊆ E ∖ ↑N).
+Proof.
+  intros HE Hsub.
+  pose proof (coPpick_elem_of (↑N) (nclose_infinite N)) as Hx.
+  apply (Hsub _) in Hx as Hx'.
+  apply elem_of_difference in Hx' as [_ Hnot].
+  exact (Hnot Hx).
+Qed.
+
+(* ...and the same fact in the form the fix is stated at: two DISTINCT
+   namespaces of one family are disjoint, so the two openings compose.
+   This is what [icEscN .@ j] / [icEscN .@ k] buys, and it is why the fix
+   is a change of allocation rather than of the proof. *)
+Lemma esc_ns_disjoint (N : namespace) (j k : nat) :
+  j <> k -> (↑N.@j : coPset) ## ↑N.@k.
+Proof. intros Hne. apply ndot_ne_disjoint. exact Hne. Qed.
+
+(* the mask a k-th opening leaves still contains every LATER slot's
+   namespace, which is the induction step the fifty-fold collection runs *)
+Lemma esc_ns_still_open (N : namespace) (E : coPset) (j k : nat) :
+  j <> k -> ↑N.@k ⊆ E -> ↑N.@k ⊆ E ∖ ↑N.@j.
+Proof.
+  intros Hne HE x Hx.
+  apply elem_of_difference. split; [exact (HE x Hx)|].
+  intros Hxj. exact (esc_ns_disjoint N k j (fun H => Hne (eq_sym H)) x Hx Hxj).
+Qed.
+
 
 (* ====================================================================== *)
 (*  1.  THE THREE SUPPLIERS, EACH AS A [FsCollect.col_side]                *)
@@ -900,10 +938,10 @@ Section CollectAll.
   (* ==================================================================== *)
   (*  3.  OPENING THE FIFTY ESCROWS AT ONE GHOST STEP                      *)
   (*                                                                      *)
-  (*  [inv N P] opens ONCE per namespace ([FsDurQuiesce.ns_not_reopenable]) *)
+  (*  [inv N P] opens ONCE per namespace ([ns_not_reopenable] above),      *)
   (*  which is why the family sits at [icEscN .@ k]; the induction that     *)
-  (*  works is [FsDurQuiesce.esc_ns_still_open], and the mask it leaves is  *)
-  (*  the union of the slots' own namespaces, not [↑icEscN].               *)
+  (*  works is [esc_ns_still_open], and the mask it leaves is the union of  *)
+  (*  the slots' own namespaces, not [↑icEscN].                            *)
   (* ==================================================================== *)
 
   Definition esc_ns (ks : list nat) : coPset :=

@@ -1218,7 +1218,7 @@ Section IputTail.
         iExists dev, inum. iFrame. }
       (* THE DEPOSIT (durable-disk B''-esc): an ORDINARY row goes back into
          the pool's own invariant, so the put is a fupd.  It takes the FULL
-         [ipool_shape] and decides the side itself, so nothing above this
+         the pool row and decides the side itself, so nothing above this
          line changes. *)
       iApply fupd_wp.
       iMod (ipool_put_ord ⊤ cn gfs gi cov logstart nib
@@ -2432,7 +2432,7 @@ Section IputFreePath.
         proc_priv_bare pj pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        (* NO [ipool_shape] HERE (IVd).  Under the REORDER the itable lock goes
+        (* NO POOL ROW HERE (IVd).  Under the REORDER the itable lock goes
            at +0x94, BEFORE the +0xba deposit, and [IcacheEscrow.ic_ci_wf]'s
            [dom ci = dom M] then forces the evicted inum's pool entry into the
            itable's own free pool AT THAT RELEASE -- the entry is parked on the
@@ -3259,7 +3259,7 @@ Section IputFreePath.
     (* ===================================================================
        THE ONE OPEN DESIGN DEBT OF THE REORDER (see the blocker note at the
        head of the file).  The eviction hands back exactly ONE
-       [ipool_shape], and the reordered free path needs TWO things out of
+       the pool row, and the reordered free path needs TWO things out of
        it at once:
 
          (i)  the itable's free pool must show [region_inums nib ∖
@@ -3272,7 +3272,7 @@ Section IputFreePath.
               ([ireg_free_deposit_au], which consumes the fragment).
 
        The bundle carries the record on its [ipool_alloc] arm, so (i) and
-       (ii) compete for it; and [ipool_shape]'s other two arms are both out
+       (ii) compete for it; and the pool row's other two arms are both out
        of reach here ([imark] is inside [ireg_inv] until the deposit,
        [pool_pending] needs the [committedA] the deposit mints).  On top of
        that [ipool_shape_np] existentially quantifies BOTH the arm and the
@@ -3972,8 +3972,8 @@ Section IputFreePath.
        (* THE INDEX NAMES THE PARKED SHARE (durable-disk C-6): the mint at
           +0x50 lends the freeze clause HALF of the caller's own share, and
           the pair [(tid, qtx/2)] is what lets the off-lock deposit hand back
-          exactly that element ([IcacheTxRefute.tx_two_halves_no_whole]).  The
-          other half is the window's, below. *)
+          exactly that element: two halves of one element are not the
+          whole.  The other half is the window's, below. *)
        ifreeze_pre ((rg, (tid, (qtx/2)%Qp)) : frzidx) (bv_unsigned inum) -∗
        frzown (bv_unsigned inum) -∗
        frzm_h (bv_unsigned inum) true -∗
@@ -4846,7 +4846,7 @@ Section ProofIput.
 
   (* the record iput leaves on disk: itrunc's, with the type zeroed by the
      [sh] at +0x66.  [bv_unsigned (di_type ...) = 0] is exactly
-     [ipool_shape]'s FREE disjunct, which is what the park deposits. *)
+     [ipool_shape_np]'s FREE disjunct, which is what the park deposits. *)
   Definition di_free (d : dinode) : dinode :=
     MkDinode (mword_of_int 0 : mword 16) (di_major d) (di_minor d) (di_nlink d)
              (bv_0 32) (bm_cells bm_empty).

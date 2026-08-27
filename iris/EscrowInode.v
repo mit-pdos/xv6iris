@@ -55,7 +55,7 @@ Section EscrowInode.
          needs no token premise from the walk at all.
      (c) it re-arms the pool: [escA_redeem] hands the [ifreeze_off] to
          whoever converts the await arm to [imark], which is exactly the
-         token [IcacheEscrow.ipool_shape]'s ordinary arms owe.
+         token [IcacheEscrow.ipool_shape_np]'s ordinary arms owe.
      REDEEMED holds neither: by then the token is in the peeler's hand and
      the pool entry is an ordinary one. *)
   (* ...AND THE DEPOSIT TICKET [gd], the third gname (§3.16).  It is the
@@ -253,7 +253,7 @@ Section EscrowInode.
     (∃ ge gr gd (rg : frzidx),
        escA_inv γfs ge gr gd z rg ∗ committedA ge ∗ redeem_ticketA gr ∗
        (∃ e, dv_ride z e) ∗ (∃ b, fv_ride z b))%I.
-  (* NOT Timeless: [escA_inv] is an [inv].  Wherever [ipool_shape] must stay
+  (* NOT Timeless: [escA_inv] is an [inv].  Wherever the pool row must stay
      Timeless, its pending arm is opened without the [>] later-strip. *)
 
 End EscrowInode.

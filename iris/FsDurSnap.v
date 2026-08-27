@@ -374,7 +374,7 @@ Record snap_bytes (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
      [dir_ok] needs the REGION'S WIDTH: [inode_local i n] takes an inum and
      a node and nothing else, while a [snap_bytes] clause may read [S]'s own
      superblock -- which is exactly how [sk_regdom] is stated, and
-     [snap_nib] below is that same [ninodes/16 + 1].
+     [FsState.fs_nib] is that same [ninodes/16 + 1].
      LAST, so no destructuring pattern above moves. *)
   sk_dirloc : forall i n, fss_inodes S !! i = Some n ->
                 node_dir_local i (Z.to_nat (sb_ninodes (fss_sb S) / 16 + 1)) n;
@@ -419,14 +419,6 @@ Global Arguments sk_regdom {_ _} _.
 Global Arguments sk_dirloc {_ _} _.
 Global Arguments sk_dombelow {_ _} _.
 
-(* THE REGION'S WIDTH, off [S]'s own superblock: mkfs rounds [ninodes] up to
-   a whole inode block, so the region is [ninodes/16 + 1] blocks and the
-   inum space is [16 *] that.  It is the width [sk_regdom] is stated at and
-   the one [sk_dirloc]'s [DirView.dir_ok] is bounded by; at the boot
-   configuration it IS [IcacheRef.icfg_nib]
-   ([FirstTok.col_geom_of_config]'s own hypothesis). *)
-Definition snap_nib (S : fs_state_rec) : nat := fs_nib S.
-
 (* THE MINT-SIDE READING (durable-disk lane E-clauses).  The three
    [DirView] premises [IcacheEscrow.ipool_alloc] takes, off the snapshot's
    node -- so the boot mint's snapshot route has a twin of
@@ -440,8 +432,8 @@ Lemma snap_node_dir_local (S : fs_state_rec) (D : gmap Z (list (bv 8)))
   node_dir_local i nib n.
 Proof.
   intros Hb Hi Hw.
-  assert (Hnib : nib = snap_nib S).
-  { rewrite /snap_nib /fs_nib -Hw Nat2Z.id //. }
+  assert (Hnib : nib = fs_nib S).
+  { rewrite /fs_nib -Hw Nat2Z.id //. }
   rewrite Hnib. exact (sk_dirloc Hb i n Hi).
 Qed.
 
@@ -550,8 +542,7 @@ Proof. intros Hb Hl. exact (conj Hb Hl). Qed.
 (*  is one fact about a [ghost_map]: an AUTHORITY may hold entries no      *)
 (*  fragment names, so nothing the snapshot owns bounds [D]'s domain or a  *)
 (*  block's length, and nothing it owns says which INUMS the state names.  *)
-(*  [FsDurXferWall.snap_shape_not_readable] is the refutation at the       *)
-(*  tied form.                                                            *)
+(*  No amount of resource reasoning recovers them at the tied form.        *)
 (*                                                                        *)
 (*  ALL SEVEN ARE CONFIGURATION FACTS and both producers have them for     *)
 (*  free: at a commit they are [FsCollect.col_geom] plus [col_hand]'s own  *)
@@ -956,8 +947,8 @@ Section Snap.
   (*  committed view's own flattening -- off                             *)
   (*  [FsDurXfer.phi_runs_ex_disj] / [phi_runs_ex_in], which are         *)
   (*  [FsStateDefs.phi_excl] and one [ghost_map_lookup] and nothing      *)
-  (*  else.  The fifth is the GEOMETRY, which no resource pins           *)
-  (*  ([FsDurXferWall], sections 1 and 1b).                              *)
+  (*  else.  The fifth is the GEOMETRY, which no resource pins -- an     *)
+  (*  authority may hold entries no fragment names.                      *)
   (*                                                                    *)
   (*  WHAT IS NOT HERE is the whole expensive half of [snap_bytes]: no   *)
   (*  byte tie, no used-set coupling, no [sk_disj], no cut clause.  The  *)

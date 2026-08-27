@@ -482,12 +482,31 @@ Section RecOwned.
 
   (* ---- the 16-fold split/gather ------------------------------------ *)
 
-  (* two generic big-op readings, both about the INDEX only *)
+  (* three generic big-op readings, all about the INDEX only *)
   Lemma big_sepL_seq0 (Ψ : nat -> iProp Σ) (n : nat) :
     ([∗ list] j ∈ seq 0 n, Ψ j) ⊣⊢ ([∗ list] k ↦ _ ∈ seq 0 n, Ψ k).
   Proof.
     apply big_sepL_proper. intros k j Hk.
     apply lookup_seq in Hk as [-> _]. done.
+  Qed.
+
+  (* a range of [m * n], as [n] runs of [m] *)
+  Lemma big_sepL_seq_chunks (Phi : nat -> iProp Σ) (m n : nat) :
+    ([∗ list] i ∈ seq 0 n, [∗ list] k ∈ seq 0 m, Phi (m * i + k)%nat)
+    ⊣⊢ ([∗ list] j ∈ seq 0 (m * n), Phi j).
+  Proof.
+    induction n as [| n IH].
+    - rewrite Nat.mul_0_r //.
+    - rewrite seq_S big_sepL_app big_sepL_cons big_sepL_nil right_id.
+      rewrite Nat.add_0_l IH.
+      replace (m * S n)%nat with (m * n + m)%nat by lia.
+      rewrite seq_app big_sepL_app.
+      apply bi.sep_proper; [done |].
+      replace (seq (0 + m * n)%nat m) with (seq (m * n + 0)%nat m)
+        by (f_equal; lia).
+      rewrite -(fmap_add_seq (m * n)%nat 0%nat m) big_sepL_fmap.
+      apply big_sepL_proper. intros k j Hk.
+      apply lookup_seq in Hk as [-> _]. rewrite Nat.add_0_l //.
   Qed.
 
   Lemma big_sepL_len_irrel {A B : Type} (l : list A) (l' : list B)

@@ -2026,7 +2026,7 @@ Proof.
 Qed.
 
 (* WHY: [DirView.dir_ok] / [dir_inums_ok] ride in BOTH icache escrow
-   payloads ([IcacheEscrow.ic_loaded] and [ipool_shape]'s allocated arm,
+   payloads ([IcacheEscrow.ic_loaded] and [ipool_shape_np]'s allocated arm,
    fs-icache.md §15(a)) and no decoding produces them -- IcacheBoot threads
    them.  [FsTree.dir_names_unique] is R2's invariant, which is what makes
    an unlink's tree delta a [delete] rather than an unmasking.  The dot
@@ -2151,7 +2151,7 @@ Qed.
 (* ====================================================================== *)
 
 (* WHY THIS IS A SEPARATE CONJUNCT AND NOT A CLAUSE OF W6.  Every escrow
-   payload and [IcacheBoot.ipool_shape]'s allocated arm carries
+   payload and [IcacheBoot.ipool_shape_np]'s allocated arm carries
    [DirView.dir_dots_ix], which pins ["."] at record 0 and [".."] at
    record 1 -- BY INDEX.  W6's [fs_dir_wf] and W7's [fs_root_wf] check the
    dots through [DirView.dir_first], the scan [dirlookup] performs: they say

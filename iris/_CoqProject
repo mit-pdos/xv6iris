@@ -1325,16 +1325,8 @@ FsDurSnap.v
 FsDurAlloc.v
 FsDurImg.v
 FsCfgSnap.v
-FsDurXferWall.v
-FsDurRefute.v
-FsDurDefer.v
-FsDurTrunc.v
-FsDurQuiesce.v
-IcacheTxRefute.v
-IcacheTxArm.v
 IregClean.v
 FsCollect.v
 FsCollectImg.v
-FsBootWall.v
 FsCollectAll.v
 LogSnapLaw.v

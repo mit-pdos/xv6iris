@@ -61,7 +61,7 @@
 
        WHERE A CALLER GETS IT (fs-icache.md §15(a)): it is now a SYSTEM
        INVARIANT, the conjunct [DirView.dir_ok icfg_nib dn data] riding in
-       [IcacheEscrow.ic_loaded] and in [ipool_shape]'s allocated arm, so
+       [IcacheEscrow.ic_loaded] and in [ipool_shape_np]'s allocated arm, so
        namex destructs it out of ilock's postcondition at a directory it
        could not have named in advance -- [DirView.dir_ok_dir] is the one
        step, and it wants [nib = icfg_nib].

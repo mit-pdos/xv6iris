@@ -826,8 +826,8 @@ Section LogInv.
      the escrow's write arm ([IcacheEscrow.ic_arm_tx]), so that [end_op] --
      which consumes the WHOLE element -- cannot commit while the inode is
      write-locked.  The id has to come OUT of [log_tx]'s existential for the
-     arm to name it, which is exactly [IcacheTxRefute]'s finding: an
-     existentially-keyed share can never be rejoined.  It goes back in at
+     arm to name it, because an existentially-keyed share can never be
+     rejoined.  It goes back in at
      the join, so nothing above these two lines ever sees an id. *)
   Lemma log_tx_halve (γ : log_names) :
     log_tx γ -∗ ∃ t : nat,
@@ -941,7 +941,7 @@ Section LogInv.
      transaction's element, which is what lets the commit refute them at an
      empty [ln_tx] authority; and a share must be handed back at exactly the
      [(t, q)] it went in at, so the id is a FIELD here where [log_tx] closes
-     it existentially ([IcacheTxRefute.tx_two_halves_no_whole] is why).
+     it existentially -- two halves of one element are not the whole.
 
      Bundled as ONE conjunct in [log_opSe]'s own position for [log_opSt]'s
      reason verbatim: written as two, every threading site of iput's

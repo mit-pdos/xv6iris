@@ -253,26 +253,6 @@ Section DurImgRec.
   Context {Σ : gFunctors}.
   Implicit Types Gam : fs_view_names Σ.
 
-  (* a range of [m * n], as [n] runs of [m].  Generic; it belongs beside
-     [FsStateInode.big_sepL_seq0] and should move there. *)
-  Lemma big_sepL_seq_chunks (Phi : nat -> iProp Σ) (m n : nat) :
-    ([∗ list] i ∈ seq 0 n, [∗ list] k ∈ seq 0 m, Phi (m * i + k)%nat)
-    ⊣⊢ ([∗ list] j ∈ seq 0 (m * n), Phi j).
-  Proof.
-    induction n as [| n IH].
-    - rewrite Nat.mul_0_r //.
-    - rewrite seq_S big_sepL_app big_sepL_cons big_sepL_nil right_id.
-      rewrite Nat.add_0_l IH.
-      replace (m * S n)%nat with (m * n + m)%nat by lia.
-      rewrite seq_app big_sepL_app.
-      apply bi.sep_proper; [done |].
-      replace (seq (0 + m * n)%nat m) with (seq (m * n + 0)%nat m)
-        by (f_equal; lia).
-      rewrite -(fmap_add_seq (m * n)%nat 0%nat m) big_sepL_fmap.
-      apply big_sepL_proper. intros k j Hk.
-      apply lookup_seq in Hk as [-> _]. rewrite Nat.add_0_l //.
-  Qed.
-
   (* ONE INODE BLOCK'S SIXTEEN RECORDS.  The block's bytes decode to SOME
      record list ([IcacheBoot.diblk_bytes_surj], which needs only the
      block's length), and [FsImg.fs_dinode_of_diblk] says that list's slot
@@ -484,30 +464,6 @@ Section DurImgBitmap.
     iApply free_pool_intro.
     iApply (big_sepS_mono with "Hpool"). intros b Hb.
     iIntros "Hf". by iExists (P b).
-  Qed.
-
-  (* THE RESTRICTED VIEW, AS A BIG-OP OVER ITS SET.  [LogDefs.fs_restrict]
-     is [set_to_map], i.e. [list_to_map] over the set's elements, so this
-     is [FsCfgBoot.big_sepM_img_nodes]' proof at a different map.  It
-     belongs beside [fs_restrict]'s own theory in [LogDefs.v]. *)
-  Lemma fs_restrict_keys (P : Z -> list (bv 8)) (S : gset Z) :
-    ((fun b : Z => (b, P b)) <$> elements S).*1 = elements S.
-  Proof.
-    rewrite -list_fmap_compose.
-    rewrite (list_fmap_ext _ id); [apply list_fmap_id | intros; reflexivity].
-  Qed.
-
-  Lemma big_sepM_fs_restrict (Phi : Z -> list (bv 8) -> iProp Σ)
-      (P : Z -> list (bv 8)) (S : gset Z) :
-    ([∗ map] b ↦ bs ∈ fs_restrict P S, Phi b bs)
-    ⊣⊢ ([∗ set] b ∈ S, Phi b (P b)).
-  Proof.
-    rewrite /fs_restrict /set_to_map.
-    assert (Hnd : base.NoDup (((fun b : Z => (b, P b)) <$> elements S).*1))
-      by (rewrite fs_restrict_keys; apply NoDup_elements).
-    rewrite (big_sepM_list_to_map Phi _ Hnd).
-    rewrite big_sepL_fmap /=.
-    rewrite big_sepS_elements //.
   Qed.
 
 End DurImgBitmap.

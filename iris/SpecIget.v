@@ -72,7 +72,7 @@
        half of that column.
 
    The inum's pool bundle still moves through the recycle arm as an opaque
-   [ipool_shape] ([IcacheEscrow], §13.3) -- extracted from the pool and
+   the pool row ([IcacheEscrow], §13.3) -- extracted from the pool and
    parked in the entry's escrow for whoever ilocks it next -- and iget never
    looks inside it.  The bundle's payload is untouched here; only its two
    ghost columns move.

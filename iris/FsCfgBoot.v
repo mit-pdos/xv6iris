@@ -465,72 +465,6 @@ Section FsCfgBootPool.
   Qed.
 
 
-  (* ---- [dir_view]'s association list has distinct KEYS --------------- *)
-
-  (* two records that both WIN cannot share a name: the later one's own
-     win condition says no earlier live record carries it *)
-  Lemma dir_wins_bname_ne (data : nat -> list (bv 8)) (j k : nat) :
-    (j < k)%nat -> dir_wins data j = true -> dir_wins data k = true ->
-    dir_bname data j <> dir_bname data k.
-  Proof.
-    intros Hjk Hj Hk Heq.
-    apply dir_wins_true in Hk as [_ Hnone].
-    apply dir_wins_true in Hj as [Hlj _].
-    assert (Hm : dir_match data j (dir_bname data k))
-      by (split; [exact Hlj | exact Heq]).
-    exact (proj1 (dir_first_None data k (dir_bname data k)) Hnone j Hjk Hm).
-  Qed.
-
-  Lemma dir_entry_fst (data : nat -> list (bv 8)) (l : list nat) :
-    (omap (dir_entry data) l).*1
-    = omap (fun k => if dir_wins data k then Some (dir_bname data k) else None)
-           l.
-  Proof.
-    induction l as [| k l IH]; [reflexivity |].
-    cbn [omap list_omap]. rewrite {1}/dir_entry.
-    destruct (dir_wins data k); [| exact IH].
-    cbn [fmap list_fmap fst]. rewrite IH //.
-  Qed.
-
-  Lemma dir_wins_names_nodup (data : nat -> list (bv 8)) (j n : nat) :
-    base.NoDup
-      (omap (fun k => if dir_wins data k then Some (dir_bname data k) else None)
-            (seq j n)).
-  Proof.
-    revert j. induction n as [| n IH]; intros j; [apply NoDup_nil_2 |].
-    replace (seq j (S n)) with (j :: seq (S j) n) by reflexivity.
-    cbn [omap list_omap].
-    destruct (dir_wins data j) eqn:Hw; [| exact (IH (S j))].
-    apply NoDup_cons_2; [| exact (IH (S j))].
-    intros Hin. apply elem_of_list_omap in Hin as (k & Hk & Hkeq).
-    apply elem_of_seq in Hk.
-    destruct (dir_wins data k) eqn:Hwk; [| discriminate Hkeq].
-    injection Hkeq as Hkeq.
-    exact (dir_wins_bname_ne data j k ltac:(lia) Hw Hwk (eq_sym Hkeq)).
-  Qed.
-
-  Lemma dir_entry_names_nodup (data : nat -> list (bv 8)) (nrec : nat) :
-    base.NoDup ((omap (dir_entry data) (seq 0 nrec)).*1).
-  Proof. rewrite dir_entry_fst. apply dir_wins_names_nodup. Qed.
-
-  (* ---- THE IMAGE'S REGISTER VALUE AT EACH INUM ----------------------
-     A well-formed image has exactly ONE directory, the root (W9's (T)),
-     and the root's [".."] names the root itself (W7).  So the register's
-     value is [TDir ROOTINO] at the root and [TFile] everywhere else, and
-     [FsStateInode.fn_ity_ok] holds at every inum by construction. *)
-  Definition img_ity (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) : ity :=
-    if bool_decide (bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z)
-    then TDir ROOTINO else TFile.
-
-  Lemma img_ity_ok (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
-    FsStateInode.fn_ity_ok (img_node P sb z) (img_ity P sb z).
-  Proof.
-    rewrite /FsStateInode.fn_ity_ok /img_ity /img_node /fn_is_dir /fn_type
-      era_node_rec.
-    destruct (bool_decide (bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z));
-      reflexivity.
-  Qed.
-
 End FsCfgBootPool.
 
 (* ====================================================================== *)
@@ -569,18 +503,6 @@ End FsCfgBootBitmap.
 (* ====================================================================== *)
 (*  THE TWO BOOT KITS (ruling R6), GHOST ROWS ONLY                         *)
 (* ====================================================================== *)
-
-(* [fs_cfg_alloc]'s former mask premise, NAMED.  It was there for the era-0
-   /init pins' mint ([dv_lend_mint] opens the inode region), which lane
-   E-unpin removed, so [fs_cfg_alloc] no longer takes a mask premise and this
-   lemma has NO CALLER today.  Kept because it is the recorded answer to a
-   trap that will recur: [BootShared] does not import [InodeRegion], so it
-   cannot spell [iregN]; and an inline [ltac:(solve_ndisj)] inside the
-   application term is elaborated before the conclusion is unified, which
-   stopped working when the era fupd's post grew its B3 rows.  A named lemma
-   is neither. *)
-Lemma fs_cfg_iregN_top : (↑iregN : coPset) ⊆ ⊤.
-Proof. solve_ndisj. Qed.
 
 Section FsCfgBootEra.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.

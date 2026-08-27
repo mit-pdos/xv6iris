@@ -1527,7 +1527,7 @@ Section BootAlloc.
        and /init's fview pin (N-5.1 W5a / N-5.2A), which this proof received
        and immediately dropped; those era-0 image-CONTENT facts are off the
        boot chain now, so there is no pin to drop and no mask premise to
-       thread (the mask was [dv_lend_mint]'s).  See
+       thread (the mask was the dview lend mint's).  See
        claude-notes/projects/namei-pinned-lookup.md's banner. *)
     iMod (fs_cfg_alloc_snap γd γv (v_disk (g.(gdev).(dvirtio))) ndisk S cov
             nib ⊤ Pb

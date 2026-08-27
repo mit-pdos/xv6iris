@@ -28,7 +28,7 @@
     can then read the key only by opening, and nothing lets the CALLER
     supply a fact about it); §20.9(d) killed parking an authority with the
     record; §20.9(e) killed a new gname (it would enter [ireg_inv] AND
-    [ipool_shape], i.e. [ic_escrow]'s arity, i.e. every fs contract).  So
+    the pool row, i.e. [ic_escrow]'s arity, i.e. every fs contract).  So
     [fs_rep] is a DERIVED PREDICATE over client-held fragments.  If a proof
     on top of this file finds itself wanting an authority, it is wrong:
     stop and re-read §20.9.

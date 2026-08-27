@@ -66,6 +66,26 @@ Local Open Scope Z_scope.
 Section GammaDefs.
   Context {Σ : gFunctors}.
 
+  (* A RANGE-INDEXED BIG-OP OVER A [map_seqZ] IS THE MAP'S.  Stated over a
+     bare [Σ], so every view -- the logged one and the durable one alike --
+     uses this one copy.  [FsBlocks] keeps a twin only because that file
+     defines its own [byte_range]/[byte_range_q]: importing this one there
+     would shadow the block layer's names. *)
+  Lemma big_sepM_map_seqZ_gen (Phi : Z -> bv 8 -> iProp Σ) (start : Z)
+      (xs : list (bv 8)) :
+    ([∗ map] a ↦ v ∈ (map_seqZ start xs : gmap Z (bv 8)), Phi a v)
+    ⊣⊢ ([∗ list] k ↦ v ∈ xs, Phi (start + Z.of_nat k) v).
+  Proof.
+    revert start. induction xs as [| x xs IH]; intros start.
+    - simpl. rewrite big_sepM_empty //.
+    - rewrite map_seqZ_cons big_sepM_insert; [| apply map_seqZ_cons_disjoint].
+      rewrite IH big_sepL_cons.
+      assert (Hz : start + Z.of_nat 0 = start) by lia. rewrite Hz.
+      f_equiv. apply big_sepL_proper. intros k y _.
+      assert (Hs : Z.succ start + Z.of_nat k = start + Z.of_nat (S k)) by lia.
+      rewrite Hs //.
+  Qed.
+
   (* [fsΦ] is spelled [Φ] in the design; the field is renamed here because a
      top-level projection named [Φ] would shadow the proofmode's ubiquitous
      [Φ] binder at every use site. *)

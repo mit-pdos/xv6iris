@@ -46,7 +46,7 @@
 
    ---- WHO HOLDS A FREE INUM'S FRAGMENT (§16.3/§16.4) --------------------
 
-   Until §16 a free inum's [dinode_at] lived in [IcacheEscrow.ipool_shape]'s
+   Until §16 a free inum's [dinode_at] lived in the pool row's
    free arm, i.e. behind the itable spinlock -- and ialloc, whose claim is
    serialised by the BUFFER and by nothing else, can never hold that lock.
    So the free arm's fragment moved IN HERE: [ireg_slot] below is the
@@ -614,8 +614,8 @@ Proof. intros [_ [_ Hx]]. exact (eq_sym Hx). Qed.
 (* [ClaimK] NAMES THE CLAIMING TRANSACTION (durable-disk C-5): the share
    [t |->[ln_tx icfg_log]{#q} tt] that [ireg_claim_au] parked in the region
    for the length of the claim box comes back at the fill, and it has to
-   come back at exactly the pair that went in
-   ([IcacheTxRefute.tx_two_halves_no_whole]).  The pair rides in the c
+   come back at exactly the pair that went in -- two halves of one element
+   are not the whole.  The pair rides in the c
    column's own value, so the claimant's [IcacheRef.iclaim] fragment names
    it and [ireg_wd_back]'s claim arm is what hands it back. *)
 Inductive ilkc : Type :=
@@ -1278,7 +1278,7 @@ Qed.
 (* THE MARKER'S KEY.  The claim box needs a per-inum EXCLUSIVE token whose
    two homes are the region invariant and a pool/entry marker; a second
    ghost name for it would have to appear in [ireg_inv] AND in
-   [IcacheEscrow.ipool_shape], i.e. in [ic_escrow]'s arity, i.e. in every
+   the pool row, i.e. in [ic_escrow]'s arity, i.e. in every
    fs contract in the tree.  So it is filed in the region's OWN ghost map,
    at a key no inum can occupy: inums are [bv_unsigned]s and hence
    nonnegative, and [imark_key] lands strictly below zero.  The map's
@@ -1862,8 +1862,8 @@ Section InodeRegion.
      so [ireg_fsh_no_ops] reads [f = FrzOff] off the clause at EVERY slot.
 
      It is [ireg_cpin]'s device at the f column, and the pair sits in the
-     phase's own INDEX for [IcacheTxRefute.tx_two_halves_no_whole]'s reason
-     verbatim -- iput's spec names [(tid, q)] and must get THAT element back,
+     phase's own INDEX because two halves of one element are not the whole
+     -- iput's spec names [(tid, q)] and must get THAT element back,
      and an existentially-keyed share cannot be re-identified.  The index is
      where the freezer's own [IcacheRef.ifreeze_pre] / [ifreeze_post] fragment
      already re-identifies it, so no new ghost and no new column. *)
@@ -2653,7 +2653,7 @@ Section InodeRegion.
   (*  holds the exclusive fragment at that key, and                        *)
   (*  [IcacheRef.link_claim_agree] re-identifies [(t, q)] at the fill --   *)
   (*  which is why [Xv6Cameras.ctyval] carries the pair as FIELDS and not  *)
-  (*  existentially ([IcacheTxRefute.tx_two_halves_no_whole]).            *)
+  (*  existentially: two halves of one element are not the whole.          *)
   Definition ireg_cpin (c : ctyUR) : iProp Σ :=
     match c with
     | Some (Excl v) => (v.2.1 ↪[ln_tx icfg_log]{#(v.2.2)} tt)%I
@@ -3149,8 +3149,8 @@ Section InodeRegion.
      is the inode LOCK's property, and the lock is invisible here.  Keyed by
      TRANSACTION it costs the arming walk its WHOLE token, and a walk that
      has parked a SHARE of the same token elsewhere -- which is exactly what
-     a transactional [ilock] does -- can then never arm at all
-     ([IcacheTxArm.arm_needs_whole] is that refutation).  Keyed by an ARM ID
+     a transactional [ilock] does -- can then never arm at all.  So a walk
+     arms BY SHARE and never by the whole token.  Keyed by an ARM ID
      it is free: the ghost step SEES the registry's own map, so
      [fresh (dom A)] is a key nobody holds, and the arm may then park ANY
      share.
@@ -4443,7 +4443,7 @@ Section InodeRegion.
        its off-lock deposit, at which the inum has no bundle anywhere --
        unreachable at a commit ([ireg_fsh_no_ops]).  The pair rides in [rg],
        not existentially, so the deposit returns EXACTLY the element the
-       freezer parked ([IcacheTxRefute.tx_two_halves_no_whole]). *)
+       freezer parked -- two halves of one element are not the whole. *)
     ireg_fpin rg -∗
     dinode_at γi inum dn -∗
     ifreeze FrzOff (bv_unsigned inum) -∗
@@ -5660,7 +5660,7 @@ Section InodeRegion.
      for it -- is deleted. *)
 
   (* ==================================================================== *)
-  (*  §L.  THE LEND'S THREE OPERATIONS (N-4 PHASE B, E1-region)            *)
+  (*  §L.  THE LEND'S OPERATIONS (N-4 PHASE B, E1-region)                  *)
   (* ==================================================================== *)
 
   (*  Each one is [DirViewLend]'s column move with an [↑iregN] open around
@@ -5729,28 +5729,6 @@ Section InodeRegion.
     iModIntro. rewrite /ireg_lcols. iFrame.
   Qed.
 
-  (* THE MINT.  Whoever holds a directory's whole contents element and this
-     inum's licence cuts a lend out of it: ¾ stays on the custody chain
-     (with the ride's marker), ¼ goes into the column, and the caller walks
-     away with a pin.  The licence is spent into the column, so no inum is
-     ever lent twice.  (No call site at this stage -- N-5.1's boot stocking
-     is the mint's consumer; [IcacheBoot.ireg_alloc] hands the licences to
-     [FsCfgBoot], which currently drops them.) *)
-  Lemma dv_lend_mint (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (z : Z) (e : gmap fname Z) :
-    ↑iregN ⊆ E ->
-    dvl_dom z ->
-    ireg_inv γi γfs inodestart nib -∗ dv_lic z -∗ dv_hold z e ={E}=∗
-      (dv_half z (DfracOwn (3/4)) e ∗ dv_lentm z e) ∗ dv_pin z e.
-  Proof.
-    iIntros (HE Hdom) "#Hinv Hlic Hw".
-    iApply (ireg_lcol_use E γi γfs inodestart nib z with "Hinv");
-      [exact HE | exact Hdom |].
-    iIntros "Hcol".
-    iMod (dv_col_mint z e Hdom with "Hlic Hw Hcol") as "[$ $]".
-    by iModIntro.
-  Qed.
-
   (* THE WRITER'S TOTAL MOVE: [DirViewG.dv_set] at the ride.  On the whole
      arm it IS [dv_set] and the region is never opened; on the ¾ arm it
      gathers the escrowed ¼, sets, and cancels on the way out.  Total, with
@@ -5801,29 +5779,14 @@ Section InodeRegion.
   Qed.
 
   (* ==================================================================== *)
-  (*  §LF.  THE fview LEND'S THREE OPERATIONS (N-5.2A, §13 D-52c)          *)
+  (*  §LF.  THE fview LEND'S OPERATIONS (N-5.2A, §13 D-52c)                *)
   (* ==================================================================== *)
 
-  (*  §L's three, at the file-contents column.  Same signatures, same
-      [ireg_inv] argument, same absence of an inum-range premise (the bound
-      is [DirViewLend.dvl_dom], carried by the fview tokens too), same
-      totality of the writer's move.  The fview lend's consumer is the kexec
-      walk (N-5.2B); the mint's is [FsCfgBoot]'s stocking, at inum 7.       *)
-
-  Lemma fv_lend_mint (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (z : Z) (b : list (bv 8)) :
-    ↑iregN ⊆ E ->
-    dvl_dom z ->
-    ireg_inv γi γfs inodestart nib -∗ fv_lic z -∗ fv_hold z b ={E}=∗
-      (fv_half z (DfracOwn (3/4)) b ∗ fv_lentm z b) ∗ fv_pin z b.
-  Proof.
-    iIntros (HE Hdom) "#Hinv Hlic Hw".
-    iApply (ireg_fcol_use E γi γfs inodestart nib z with "Hinv");
-      [exact HE | exact Hdom |].
-    iIntros "Hcol".
-    iMod (fv_col_mint z b Hdom with "Hlic Hw Hcol") as "[$ $]".
-    by iModIntro.
-  Qed.
+  (*  §L's, at the file-contents column.  Same signatures, same [ireg_inv]
+      argument, same absence of an inum-range premise (the bound is
+      [DirViewLend.dvl_dom], carried by the fview tokens too), same totality
+      of the writer's move.  The fview lend's consumer is the kexec walk
+      (N-5.2B).                                                             *)
 
   Lemma fv_set_rt (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (z : Z) (b b' : list (bv 8)) :

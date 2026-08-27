@@ -34,8 +34,8 @@
         It is parked in [InodeRegion.ireg_registry] -- the region's per-inum
         SIDE ledger, the conjunct of [ireg_body] that every accessor already
         threads opaquely -- so not one [ireg_slot] lemma moves.
-      * the three operations ([dv_lend_mint], [dv_set_rt], [dv_pin_redeem])
-        live in [InodeRegion.v] §L, take an [ireg_inv] argument (a
+      * the operations ([dv_set_rt], [dv_pin_redeem]) live in
+        [InodeRegion.v] §L, take an [ireg_inv] argument (a
         PERSISTENT handle every calling context already holds) and open
         [↑iregN].  No spec text changes anywhere.
       * everything a client or a writer carries -- the ride's marker, the

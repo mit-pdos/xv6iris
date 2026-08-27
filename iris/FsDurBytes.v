@@ -271,27 +271,6 @@ Section DbytesGen.
   Context {Σ : gFunctors}.
   Implicit Types Γ : fs_view_names Σ.
 
-  (* A RANGE-INDEXED BIG-OP OVER A [map_seqZ] IS THE MAP'S.  This is
-     [FsBlocks.big_sepM_map_seqZ] restated over a bare [Σ]: the block
-     layer's copy is inside a section binding [riscvGS]/[diskGhostG]/
-     [fsLogG], which a leaf about the DURABLE view has no business
-     binding.  IT BELONGS IN [FsStateDefs.v] and should be relocated
-     there, with [FsBlocks]' copy deleted in the same move. *)
-  Lemma big_sepM_map_seqZ_gen (Phi : Z -> bv 8 -> iProp Σ) (start : Z)
-      (xs : list (bv 8)) :
-    ([∗ map] a ↦ v ∈ (map_seqZ start xs : gmap Z (bv 8)), Phi a v)
-    ⊣⊢ ([∗ list] k ↦ v ∈ xs, Phi (start + Z.of_nat k) v).
-  Proof.
-    revert start. induction xs as [| x xs IH]; intros start.
-    - simpl. rewrite big_sepM_empty //.
-    - rewrite map_seqZ_cons big_sepM_insert; [| apply map_seqZ_cons_disjoint].
-      rewrite IH big_sepL_cons.
-      assert (Hz : start + Z.of_nat 0 = start) by lia. rewrite Hz.
-      f_equiv. apply big_sepL_proper. intros k y _.
-      assert (Hs : Z.succ start + Z.of_nat k = start + Z.of_nat (S k)) by lia.
-      rewrite Hs //.
-  Qed.
-
   (* ONE BLOCK'S ELEMENTS ARE ITS [blk_owned], at any view *)
   Lemma blk_owned_seqZ Γ (b : Z) (bs : list (bv 8)) :
     length bs = BSIZE ->

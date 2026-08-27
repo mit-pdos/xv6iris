@@ -725,7 +725,7 @@ Class icfg := MkIcfg {
      the same reason [icfg_iref] and [icfg_live] do: the ledger's authority
      is parked in [InodeRegion.ireg_slot] and its fragments ride in the two
      escrow payloads, so a threaded name would enter [ireg_inv] AND
-     [IcacheEscrow.ipool_shape] -- i.e. [ic_escrow]'s arity, i.e. every fs
+     the pool row -- i.e. [ic_escrow]'s arity, i.e. every fs
      contract in the tree (§20.9(e), and §16.5's packaging argument that it
      restates).  Here it costs ZERO signature moves anywhere. *)
   icfg_link : gname;
@@ -776,7 +776,7 @@ Class icfg := MkIcfg {
   icfg_boot : gname;
   (* OPTION A (reordered iput): the per-inum escrow-name REGISTRY's gname.
      Ambient for [icfg_iref]'s reason -- [region_pending] parks a half in
-     [ireg_slot] and the other in [ipool_shape]'s pending arm, so a threaded
+     [ireg_slot] and the other in [ipool_ext]'s pending arm, so a threaded
      name would enter every fs contract.  Registers every inum: the full
      element refutes the pending arm at [ireg_claim_au] by fraction overflow. *)
   icfg_reg : gname;
@@ -1341,8 +1341,8 @@ Section IcacheLink.
   (* ...AND, SINCE durable-disk C-6, the FREEZING TRANSACTION and its share
      ([Xv6Cameras.frzidx]): the fragment is the one thing that re-identifies
      the share [InodeRegion.ireg_fsh] parks for the window's length, so the
-     pair has to be an index and not an existential
-     ([IcacheTxRefute.tx_two_halves_no_whole]). *)
+     pair has to be an index and not an existential: two halves of one
+     element are not the whole. *)
   Definition ifreeze_pre (rg : frzidx) (z : Z) : iProp Σ := ifreeze (FrzPre rg) z.
   Definition ifreeze_post (rg : frzidx) (z : Z) : iProp Σ := ifreeze (FrzPost rg) z.
 
@@ -1868,8 +1868,8 @@ Section IcacheLink.
      THE VALUE IS THE PAIR, NOT A BOOLEAN, and that is the whole point: at
      the window's exit [ic_open_held] hands its share back at the [(t, q)]
      the arm NAMES, so the freeing walk can rejoin it with the residue its
-     caller must get back.  An existentially-keyed share cannot
-     ([IcacheTxRefute.tx_two_halves_no_whole]). *)
+     caller must get back.  An existentially-keyed share cannot: two halves
+     of one element are not the whole. *)
   Definition hpn_at (k : nat) (q : Qp) (o : option (nat * Qp)) : iProp Σ :=
     own icfg_hpn
       ({[ k := to_frac_agree q (o : leibnizO (option (nat * Qp))) ]} : hpnUR).
@@ -1940,7 +1940,7 @@ Section IcacheLink.
   (* [icfg_alloc]'s [CM] argument, taken apart: one whole element per inum at
      zero becomes the REGION's half ([InodeRegion.ireg_slot], via
      [IcacheBoot.ireg_alloc]'s big-op premise) and the free POOL's half
-     ([IcacheEscrow.ipool_shape]).  This is the fraction discipline named in
+     (the pool row).  This is the fraction discipline named in
      §2.2 -- [icnt_half] is 1/2, the two halves are the only two shares that
      exist, and their sum is the whole element boot minted. *)
   Lemma icnt_boot_split (P : gset Z) :

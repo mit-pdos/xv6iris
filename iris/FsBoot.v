@@ -95,10 +95,8 @@ Lemma fs_cov_in_0 (cov : gset Z) (ndisk : nat) :
 Proof. intros Hc Hin. destruct (Hc 0 Hin) as [Hlt _]. lia. Qed.
 
 (* the two halves of [log_geom_ok], for a caller that has the bundle and
-   wants one of them.  [fs_boot_bundle] itself consumes only the second
-   ([log_region_set logstart ⊆ cov]); it takes the whole [log_geom_ok]
-   anyway because that is the premise [SpecInitlog] states, so a boot
-   client proves it once and feeds it to both. *)
+   wants one of them.  A boot client proves the whole [log_geom_ok] once --
+   that is the premise [SpecInitlog] states -- and feeds it to both. *)
 Lemma log_geom_cov_ok (cov : gset Z) (logstart : Z) :
   log_geom_ok cov logstart -> cov_ok cov.
 Proof. by intros [? _]. Qed.
@@ -531,93 +529,6 @@ Section FsBoot.
     iIntros "[Hslots Hhdr]". iFrame "Hhdr".
     iApply (big_sepL_mono with "Hslots"). intros k i _.
     iIntros "H". iExists (fs_blocks dk (log_slot_bno logstart i)). iExact "H".
-  Qed.
-
-  (* THE BUNDLE a boot client applies.  [bio_init]'s premises are copied
-     verbatim, in order; the pool bundle it also wants is what this lemma
-     manufactures out of the mint. *)
-  Lemma fs_boot_bundle (γv : disk_names) (dk : Z -> bv 8) (ndisk : nat)
-      (cov : gset Z) (logstart : Z) (dev : mword 32) (γlk γtp : gname)
-      (E : coPset) :
-    fs_cov_in cov ndisk ->
-    log_geom_ok cov logstart ->
-    bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_name bcache_addr "bcache"%string -∗
-    add_vec bcache_addr (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈
-      (zero_reg : mword 64) -∗
-    ([∗ list] k ∈ seq 0 NBUF, sl_fresh (buf_lock (bnode k)) "buffer"%string) -∗
-    ([∗ list] k ∈ seq 0 NBUF,
-       b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
-       b_disk (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
-       b_dev (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
-       b_blockno (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
-       brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
-       (∃ bs : list (bv 8), ⌜length bs = 1024%nat⌝ ∗
-          [∗ list] j ↦ byte ∈ bs, pa_add (b_data (bpa k)) j ↦ₘ byte)) -∗
-    bcache_lru bhead (blist 0 NBUF) -∗
-    disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
-    (* THE SLOT SUPPLY, THREADED RATHER THAN MINTED HERE.  Its ghost name is
-       canonical ([Xv6Cameras.bioslot_name]), so it is fixed before this
-       bundle runs: [BioDefs.bslots_alloc] mints authority and fragments
-       together at the era, and the fragments come straight back out below. *)
-    bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
-    ∃ (bn : bio_names) (γfs : fs_names),
-      ⌜fs_link γfs = γlk⌝ ∗ ⌜fs_top γfs = γtp⌝ ∗
-      bio_ctx bn (fs_view γfs γv dev cov) ∗ bslots BSLOTS_FS ∗
-      ghost_map_auth (fs_cache γfs) 1 (fs_C0 dk cov) ∗
-      ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
-      ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗
-      (* THE BYTE VIEW'S ROW, persistent, re-exported to every consumer
-         above (durable-disk 1c-flip step 1) *)
-      fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
-                   (fs_home_set cov logstart) (fs_blocks dk) ∗
-      exc_sealed (fs_exc γfs) ∗
-      fs_chalf γfs (log_hdr_bno logstart)
-              (fs_blocks dk (log_hdr_bno logstart)) ∗
-      ([∗ list] i ∈ seq 0 LOGBLOCKS,
-         ∃ bs : list (bv 8), fs_chalf γfs (log_slot_bno logstart i) bs) ∗
-      (* THE HOME BLOCKS, at the EXCLUSIVE byte run.  The log region's own
-         two rows above stay [fs_chalf]: the log's storage is not in the
-         file system's byte view, which is exactly why [home] is
-         [fs_home_set] and not [cov]. *)
-      ([∗ set] b ∈ fs_home_set cov logstart,
-         fsblock (fs_bytes γfs) b (fs_blocks dk b)).
-  Proof.
-    iIntros (Hcov Hgeom) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hm Hsa Hsf".
-    assert (Hnc0 : (0 : Z) ∉ cov) by (exact (fs_cov_in_0 cov ndisk Hcov)).
-    destruct Hgeom as [Hcovok Hsub].
-    iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov logstart) dev
-            γlk γtp E (fs_blocks dk) ∅
-            Hcov ltac:(rewrite /fs_home_set; apply elem_of_subseteq;
-                       intros x Hx; apply elem_of_difference in Hx as [Hc _];
-                       exact Hc)
-            ltac:(intros b _; apply fs_blocks_length)
-            ltac:(apply empty_subseteq)
-            ltac:(intros b _ _; reflexivity)
-            with "Hm")
-      as (γfs) "(%Hlk & %Htp & Hpool & HaL & HaD & #Hinv & Hxo & Hdty & Hrest & Hlog)".
-    iMod (exc_seal (fs_exc γfs) with "Hxo") as "#Hseal".
-    iMod (bio_init (fs_view γfs γv dev cov) E Hnc0
-            with "Hlkw Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf") as (bn) "[Hctx Hsl]".
-    iModIntro. iExists bn, γfs.
-    iSplitR; [done |]. iSplitR; [done |].
-    (* the mint's [fs_chalf] half is [cov] minus the home set, i.e. the log
-       region itself -- the [∖∖] cancels because the region is covered *)
-    (* [set_solver] is not used HERE (nor anywhere in this file): the goal
-       is small but the context is the whole boot bundle, and stdpp's
-       closing step walks it -- durable-notes' measured trap. *)
-    assert (Hcancel : cov ∖ fs_home_set cov logstart = log_region_set logstart).
-    { rewrite /fs_home_set. apply set_eq. intros x. split.
-      - intros Hx. apply elem_of_difference in Hx as [Hc Hn].
-        destruct (decide (x ∈ log_region_set logstart)) as [Hr | Hr];
-          [exact Hr |].
-        exfalso. apply Hn. apply elem_of_difference.
-        split; [exact Hc | exact Hr].
-      - intros Hx. apply elem_of_difference. split; [exact (Hsub x Hx) |].
-        intros Hd. apply elem_of_difference in Hd as [_ Hn]. exact (Hn Hx). }
-    rewrite Hcancel.
-    iDestruct (fs_log_region_split with "Hlog") as "[Hhdr Hslots]".
-    iFrame "Hctx Hsl HaL HaD Hdty Hinv Hseal Hhdr Hslots Hrest".
   Qed.
 
 End FsBoot.

@@ -40,7 +40,7 @@ Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import FsImg.
 Require Import Xv6Cameras.
-Require Import FsDurBytes.    (* [big_sepM_map_seqZ_gen] *)
+Require Import FsDurBytes.    (* the byte-map flattening *)
 Require Export FsState.
 
 Local Open Scope Z_scope.

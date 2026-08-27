@@ -887,8 +887,8 @@ End FsLookupAu.
         self-supplying where the earlier form made every caller carry the
         record count;
       - the record-0 facts come free, so the ["."] edge is readable at the
-        tree too ([node_dots_index]'s [ents !! DOT = Some self]) -- the
-        self-loop, now visible as an ordinary entry;
+        tree too ([ents !! DOT = Some self]) -- the self-loop, now visible
+        as an ordinary entry;
       - [self <> 0] falls out ([DirView.dir_dots_ix_self]), which is the
         fact create's [".."] establishment could not get anywhere else.
 
@@ -916,110 +916,9 @@ Proof.
   rewrite Hd. reflexivity.
 Qed.
 
-(* **BOTH DOT RECORDS, AT THE INDEX [dirlookup] STOPS ON.**  Record 0 is
-   trivially first; record 1 needs the invariant to refute record 0, which
-   is the join described above. *)
-Lemma node_dots_first (self : Z) (ents : gmap fname Z) (dn : dinode)
-    (data : nat -> list (bv 8)) :
-  node_rep (NDir ents) dn data ->
-  dir_dots_ix self dn data ->
-  bv_unsigned (di_nlink dn) <> 0 ->
-  dir_first data (dnrec dn) DOT = Some 0%nat
-  /\ dir_first data (dnrec dn) DOTDOT = Some 1%nat.
-Proof.
-  unfold dnrec. intros Hrep Hix Hnl.
-  pose proof (node_rep_dir ents dn data Hrep) as Hty.
-  destruct (Hix Hty Hnl) as (Hnrec & Hl0 & _ & Hn0 & Hl1 & Hn1).
-  assert (Hu : dir_names_unique data (dir_nrec (bv_unsigned (di_size dn))))
-    by (destruct Hrep as (_ & Hu & _); exact Hu).
-  assert (Hb0 : dir_bname data 0 = DOT).
-  { unfold dir_bname. rewrite Hn0. symmetry. exact DOT_dot_name. }
-  assert (Hb1 : dir_bname data 1 = DOTDOT).
-  { unfold dir_bname. rewrite Hn1. symmetry. exact DOTDOT_dotdot_name. }
-  split.
-  - apply dir_first_Some. split; [lia | split].
-    + split; [exact Hl0 | exact Hb0].
-    + intros q Hq. lia.
-  - apply dir_first_Some. split; [lia | split].
-    + split; [exact Hl1 | exact Hb1].
-    + intros q Hq [Hlq Hnq].
-      (* the only record below is 0, and it is the ["."]: uniqueness, not
-         a name disequality, is what refutes it *)
-      assert (Hq0 : q = 0%nat) by lia. subst q.
-      assert (H01 : (0%nat) = 1%nat).
-      { apply (Hu 0%nat 1%nat ltac:(lia) ltac:(lia) Hl0 Hl1).
-        rewrite Hb1. exact Hnq. }
-      discriminate.
-Qed.
-
-(* **THE COMPOSITION.**  The tree's parent edge IS the payload's index-1
-   inum, and the tree's ["."] edge IS the node's own inum. *)
-Lemma node_dots_index (self dp : Z) (ents : gmap fname Z) (dn : dinode)
-    (data : nat -> list (bv 8)) :
-  node_rep (NDir ents) dn data ->
-  dir_dots_ix self dn data ->
-  bv_unsigned (di_nlink dn) <> 0 ->
-  ents !! DOTDOT = Some dp ->
-  dir_first data (dnrec dn) DOTDOT = Some 1%nat
-  /\ dp = bv_unsigned (dir_inum data 1)
-  /\ ents !! DOT = Some self
-  /\ self <> 0
-  /\ (2 <= dnrec dn)%nat.
-Proof.
-  intros Hrep Hix Hnl Hdd.
-  pose proof (node_rep_dir ents dn data Hrep) as Hty.
-  destruct (node_dots_first self ents dn data Hrep Hix Hnl) as [Hf0 Hf1].
-  pose proof (Hix Hty Hnl) as Hproj.
-  destruct Hproj as (Hnrec & _ & Hin0 & _ & _ & _).
-  split; [exact Hf1 |].
-  split.
-  { pose proof (node_lookup_found ents dn data DOTDOT 1 Hrep Hf1) as H.
-    rewrite Hdd in H. injection H as H. exact H. }
-  split.
-  { pose proof (node_lookup_found ents dn data DOT 0 Hrep Hf0) as H.
-    rewrite Hin0 in H. exact H. }
-  split; [exact (dir_dots_ix_self self dn data Hty Hnl Hix) | exact Hnrec].
-Qed.
-
-(* ...and its resource form, straight off the node fragment: this is the
-   line S7 writes.  Nothing is consumed -- the fragment is only read.
-
-   THE FRAGMENT IS INDEXED AT [self], AND THAT IS THE COUPLING: the tree's
-   node key and the payload's [self] are the same number precisely because
-   record 0's ["."] names the node's own inum.  Both payloads have the inum
-   in hand, so it costs no arity at any call site.
-
-   THE LAST CONJUNCT SAYS THE PARENT IS NOT THE CHILD, discharged AT THE
-   TREE: the extraction refuses a node whose [".."] names itself (the
-   root), and that is a statement the tree can make and the bytes cannot. *)
 Section FsLookupDots.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{ICFG : icfg}.
-
-  Lemma fdir_dots_index (γi : gname) (γfs : fs_names) (self dp : Z)
-      (ents : gmap fname Z) (dn : dinode) (bm : blkmap)
-      (data : nat -> list (bv 8)) :
-    dir_dots_ix self dn data ->
-    bv_unsigned (di_nlink dn) <> 0 ->
-    ents !! DOTDOT = Some dp ->
-    dp <> self ->
-    fdir γi γfs self ents dn bm data -∗
-      ⌜dir_first data (dnrec dn) DOTDOT = Some 1%nat
-       /\ dp = bv_unsigned (dir_inum data 1)
-       /\ ents !! DOT = Some self
-       /\ self <> 0
-       /\ (2 <= dnrec dn)%nat
-       /\ bv_unsigned (di_type dn) = T_DIR_z
-       /\ bv_unsigned (dir_inum data 1) <> self⌝.
-  Proof.
-    intros Hix Hnl Hdd Hne. iIntros "(_ & _ & %Hrep)". iPureIntro.
-    destruct (node_dots_index self dp ents dn data Hrep Hix Hnl Hdd)
-      as (Hf1 & Hz & Hdot & Hs0 & Hnrec).
-    split; [exact Hf1 |]. split; [exact Hz |]. split; [exact Hdot |].
-    split; [exact Hs0 |]. split; [exact Hnrec |].
-    split; [exact (node_rep_dir ents dn data Hrep) |].
-    rewrite <- Hz. exact Hne.
-  Qed.
 
   (* ===================================================================== *)
   (*  THE PAYLOAD -> TREE CONSTRUCTOR (fs-fragments §7.5.8, item S2-0).     *)
@@ -1040,10 +939,9 @@ Section FsLookupDots.
   (*  OWN bytes, which is what makes the lemma unconditional in [ents].     *)
   (*  **AND THAT IS ALSO ITS LIMIT** (S7-unlink's D1): a walk that builds   *)
   (*  its [ents] this way learns [ents !! DOTDOT = Some (dir_inum data 1)]  *)
-  (*  and nothing more, so feeding it to [fdir_dots_index] instantiates     *)
-  (*  [dp] AS [dir_inum data 1] and returns the premise it was given.  The  *)
-  (*  parent-edge IDENTITY is a two-inode relation; no reading of ONE       *)
-  (*  payload can supply it.  See fs-sysfile.md, S7-unlink W5-DIR.          *)
+  (*  and nothing more -- the parent-edge IDENTITY is a two-inode           *)
+  (*  relation, and no reading of ONE payload can supply it.  See           *)
+  (*  fs-sysfile.md, S7-unlink W5-DIR.                                      *)
   (* ===================================================================== *)
 
   Lemma inum_of_self (inum : mword 32) : inum_of (bv_unsigned inum) = inum.

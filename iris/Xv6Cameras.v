@@ -355,7 +355,6 @@ Class fsLogG (Σ : gFunctors) := FsLogG {
      second field here would be a second, non-interacting Sigma slot and
      would break the disk image's own auth/fragment pairing. *)
   fsdirty_inG :: ghost_mapG Σ Z bool;
-  fsown_inG :: ghost_mapG Σ Z unit;
   (* THE BYTE VIEW'S EXCEPTION SET (durable-disk lane E-except).  A
      ONE-KEY ghost map, so that its single element carries both jobs the
      recovery window needs: the WAL's exclusive HANDLE on the pending set
@@ -367,7 +366,7 @@ Class fsLogG (Σ : gFunctors) := FsLogG {
   fsexc_inG :: ghost_mapG Σ unit (gset Z);
 }.
 Definition fsLogΣ : gFunctors :=
-  #[ghost_mapΣ Z (list (bv 8)); ghost_mapΣ Z bool; ghost_mapΣ Z unit;
+  #[ghost_mapΣ Z (list (bv 8)); ghost_mapΣ Z bool;
     ghost_mapΣ unit (gset Z)].
 Global Instance subG_fsLogΣ {Σ} : subG fsLogΣ Σ -> fsLogG Σ.
 Proof. solve_inG. Qed.
@@ -587,8 +586,9 @@ Definition ityR : cmra := csumR (exclR unitO) (agreeR (leibnizO (bv 16))).
    inside iput's caller's transaction, and what PROVES that is a share of
    that transaction's [LogDefs.ln_tx] element parked in the slot's own freeze
    clause ([InodeRegion.ireg_fsh]).  A parked share has to come back to the
-   freezer AT ITS OWN [(t, q)] ([IcacheTxRefute.tx_two_halves_no_whole]), so
-   the pair rides in the phase's own INDEX beside the regime bit -- which is
+   freezer AT ITS OWN [(t, q)] -- two halves of one element are not the
+   whole -- so the pair rides in the phase's own INDEX beside the regime
+   bit, which is
    exactly where the freezer's [IcacheRef.ifreeze_pre] / [ifreeze_post]
    fragment already re-identifies it.  [rg.1] is RULING G''s regime arm as
    before; [rg.2] is the transaction and its share. *)
@@ -620,8 +620,9 @@ Definition frzUR : ucmra := optionUR frzR.
    runs inside a transaction, and what PROVES that is a share of the
    claiming transaction's [LogDefs.ln_tx] element parked in the region's
    slot ([InodeRegion.ireg_cpin]).  A parked share has to come back to the
-   claimant AT ITS OWN [(t, q)] ([IcacheTxRefute.tx_two_halves_no_whole]),
-   so the pair rides in the c column's own VALUE: the column is keyed by
+   claimant AT ITS OWN [(t, q)] -- two halves of one element are not the
+   whole -- so the pair rides in the c column's own VALUE: the column is
+   keyed by
    the INUM, the claimant holds the exclusive fragment at that key, and
    [IcacheRef.link_claim_agree] is the re-identification. *)
 Definition ctyval : Type := (bv 16 * (nat * Qp))%type.
@@ -739,8 +740,8 @@ Inductive ic_dep : Type :=
      [IcacheEscrow.ic_deposit] is a [ghost_var] whose other half the holder
      carries, so the descriptor PINS the arm's transaction and share to the
      holder's, and the park hands back exactly what the checkout parked.  An
-     existentially-keyed share cannot re-identify --
-     [IcacheTxRefute.tx_two_halves_no_whole] is the refutation. *)
+     existentially-keyed share cannot re-identify: two halves of one
+     element are not the whole. *)
   | DepTx (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
           (t : nat) (q : Qp)
   (* THE READ ARM (durable-fs-plan.md section 3, [ilock] without a
@@ -770,8 +771,8 @@ Inductive ic_dep : Type :=
    transaction: [InodeRegion.ireg_arm] then needs no freshness argument at
    all (a fresh [nat] key is free in a map the ghost step can see), which is
    what lets a walk arm from a RESIDUE after an [ilock] has parked a share
-   of the same token ([IcacheTxArm.v] is the refutation of the whole-token
-   form). *)
+   of the same token.  A walk arms BY SHARE: an arm that demanded the WHOLE
+   token could never fire beside a parked one. *)
 Definition ireg_arm_ent : Type := (nat * Qp * gset Z)%type.
 
 (* THE CORPSE LEDGER's value (durable-disk C-7, plan section 4).  One row per
@@ -786,9 +787,9 @@ Definition ireg_arm_ent : Type := (nat * Qp * gset Z)%type.
      share [q] of the freeing transaction [t]'s [LogDefs.ln_tx] element --
      so the state is refuted outright at a commit, exactly as
      [IcacheEscrow.ipool_transit] is ([ipool_corpse_no_ops]).  [(t, q)] are
-     FIELDS and not existentials for [ic_dep]'s reason verbatim
-     ([IcacheTxRefute.tx_two_halves_no_whole]): the deposit hands the freer
-     back EXACTLY the share [ipool_put_corpse] parked.
+     FIELDS and not existentials for [ic_dep]'s reason verbatim (two halves
+     of one element are not the whole): the deposit hands the freer back
+     EXACTLY the share [ipool_put_corpse] parked.
    - [CrpDep]: the deposit HAS run, and the row parks [InodeRegion.imark] --
      which is what refutes the region slot's own MARKED arm and leaves the
      commit's collection the free bundle on the PENDING one
@@ -834,8 +835,8 @@ Class icacheG (Σ : gFunctors) := IcacheG {
      The inums a walk is CARRYING between an eviction's identity flip and its
      deposit, each with the transaction id and share the walk parked for it.
      [(t, q)] are FIELDS and not existentials for [ic_dep]'s reason verbatim
-     ([IcacheTxRefute.tx_two_halves_no_whole]): the walk has to take back
-     EXACTLY what it parked, and an existentially-keyed share cannot be
+     (two halves of one element are not the whole): the walk has to take
+     back EXACTLY what it parked, and an existentially-keyed share cannot be
      re-identified.  One half of the ledger sits in the pool's invariant
      beside the parked shares, the other in [IcacheEscrow.ipool] under the
      itable lock. *)

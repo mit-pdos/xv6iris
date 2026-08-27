@@ -1323,7 +1323,7 @@ Section ProofIget.
                two have to be ONE ghost step.  Under [fupd_wp] they were two,
                and the intermediate closing could not re-establish the row.
                Nothing about the WITHDRAW itself changed: what comes out is
-               still the FULL [ipool_shape] and the peel below is unchanged;
+               still the FULL pool row and the peel below is unchanged;
                the lock's [ipool] simply travels through the update, which is
                why it joins the store's post. *)
             assert (Hpa72 : add_vec (rget N1 Rs3) (sign_extend' 64 (mword_of_int 4 : mword 12))

@@ -91,8 +91,10 @@ Record fs_state_rec := MkFsS {
 
 (* the region's width off [S]'s own superblock: mkfs rounds [ninodes] up to
    a whole inode block, so the region is [ninodes/16 + 1] blocks and the
-   inum space is [16 *] that.  At the boot configuration it IS
-   [IcacheRef.icfg_nib]. *)
+   inum space is [16 *] that.  It is the width [FsDurSnap.sk_regdom] is
+   stated at and the one [sk_dirloc]'s [DirView.dir_ok] is bounded by; at
+   the boot configuration it IS [IcacheRef.icfg_nib]
+   ([FirstTok.col_geom_of_config]'s own hypothesis). *)
 Definition fs_nib (S : fs_state_rec) : nat :=
   Z.to_nat (sb_ninodes (fss_sb S) / 16 + 1).
 

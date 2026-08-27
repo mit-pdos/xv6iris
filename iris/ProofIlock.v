@@ -66,7 +66,7 @@
    The [ip == 0 || ip->ref < 1] panic is REFUTED, as always.  The SECOND
    one, [ip->type == 0] at +0x9c, IS NOT, and this is the first proof here
    that takes a panic branch on purpose.  The pool legitimately holds free
-   inodes ([IcacheEscrow.ipool_shape]'s type-0 shape, §13.3), no caller
+   inodes ([IcacheEscrow.ipool_shape_np]'s type-0 shape, §13.3), no caller
    premise could rule one out today (allocatedness is namei/ialloc's
    knowledge, future work), and §13.1 retired the shadow that used to carry
    v1's conditional agreement.  So [il_load] splits on the pool entry's
@@ -774,7 +774,7 @@ Section IlockLoad.
     ic_deposit cn k d -∗
     i_valid ip ↦₄ (mword_of_int 0 : mword 32) -∗
     inode_raw ip -∗
-    (* THE [_np] FORM, not the full [ipool_shape] (iclaim-ledger.md §3.5
+    (* THE [_np] FORM, not the full pool row (iclaim-ledger.md §3.5
        item 7).  What a checked-out UNLOADED payload actually contains is
        [IcacheEscrow.ic_unloaded], i.e. [inode_raw ∗ ipool_shape_np]: the
        ledger's [icnt] half and the freeze token left the bundle at the

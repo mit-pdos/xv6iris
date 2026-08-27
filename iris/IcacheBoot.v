@@ -31,7 +31,7 @@
    that (the surjectivity companions of §12.3's [diblk_bytes_inj]) and §2
    spends it.
 
-   THE POOL IS DIFFERENT.  [IcacheEscrow.ipool_shape]'s ALLOCATED arm carries
+   THE POOL IS DIFFERENT.  [IcacheEscrow.ipool_shape_np]'s ALLOCATED arm carries
    [InodeLock.inode_ok] -- a well-formed block map inside [cov], the size cap
    (§13.5), [blk_holes_zero] and [inode_sized] -- together with the file's
    own byte runs, its indirect block's included.  Nothing anywhere in
@@ -1136,7 +1136,7 @@ Section IcacheBootPool.
   Context `{GEN : GenId}.
 
   (* THE POOL'S KEYS ARE THE [mword] ROUND TRIP, and the ledger's are plain
-     [Z]: [ipool] indexes [ipool_shape] at [mword_of_int z], so its [icnt] and
+     [Z]: [ipool] indexes the pool row at [mword_of_int z], so its [icnt] and
      [ifreeze] conjuncts sit at [bv_unsigned (mword_of_int z)], while
      [IcacheRef.icnt_boot_split] / [IcacheRef.link_boot_split] hand a boot
      client its big-ops at [z].  Over [region_inums] the two agree

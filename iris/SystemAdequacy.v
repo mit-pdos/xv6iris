@@ -347,9 +347,9 @@ Section SystemBoot.
     pose (Pb := fs_rec_view
                   (fs_blocks (v_disk (g.(gdev).(dvirtio)))) D).
     assert (Hbundle : fs_boot_snap_wf (v_disk (g.(gdev).(dvirtio)))
-                        XV6_DISK_BYTES S Pb (fss_sb S) (snap_nib S) cov).
+                        XV6_DISK_BYTES S Pb (fss_sb S) (fs_nib S) cov).
     { split; [reflexivity |].
-      split; [rewrite /snap_nib Z2Nat.id; [reflexivity | lia] |].
+      split; [rewrite /fs_nib Z2Nat.id; [reflexivity | lia] |].
       split.
       { rewrite Hlseq (fs_recovery_restrict _ D cov _ Hrec Hhwf).
         exact Hsnok. }
@@ -375,7 +375,7 @@ Section SystemBoot.
     iAssert (fs_crash_seam cov (FsImg.sb_logstart (fss_sb S))) as "#Hseam".
     { rewrite Hlseq /fs_crash_seam. iModIntro.
       rewrite Hcp. iSplitL; iIntros "H"; iExact "H". }
-    iMod (boot_shared_alloc g XV6_DISK_BYTES (fss_sb S) (snap_nib S) cov
+    iMod (boot_shared_alloc g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb Hbf Hbundle with "Hres")
       as (Hfd Hir Hpav Hbs HF γd γv Rspent)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
@@ -436,7 +436,7 @@ Section SystemBoot.
         iDestruct "Hh0" as (iv) "Hh0".
         iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
-                  (v_disk (g.(gdev).(dvirtio))) (fss_sb S) (snap_nib S) cov
+                  (v_disk (g.(gdev).(dvirtio))) (fss_sb S) (fs_nib S) cov
                   XV6_DISK_BYTES S Pb Rspent
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
                   Hbundle

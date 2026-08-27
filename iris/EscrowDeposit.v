@@ -101,7 +101,7 @@ Section EscrowDeposit.
        it takes the [FrzPost] token the walk carries from iput+0x8a and steps
        the column back to [FrzOff], so the pin's post arm DISSOLVES exactly as
        the type goes to zero.  What comes back is [ifreeze_off], which is what
-       the parked pool entry wants ([IcacheEscrow.ipool_shape]'s pending arm).
+       the parked pool entry wants ([IcacheEscrow.ipool_ext]'s pending arm).
        WHY A TOKEN AND NOT A PREMISE: nothing in the depositor's hand refutes a
        standing freeze at a LIVE record -- [dn] has a nonzero type and a zero
        nlink, which is precisely what both frozen phases admit -- so the pin at

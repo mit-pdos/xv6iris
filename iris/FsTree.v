@@ -1152,7 +1152,7 @@ Lemma dir_uniq_not_dir (dn : dinode) (data : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) <> T_DIR_z -> dir_uniq dn data.
 Proof. intros H Hc. exfalso. exact (H Hc). Qed.
 
-(* (ii) it is FREE -- [ipool_shape]'s free arm, and iput's post-itrunc park *)
+(* (ii) it is FREE -- [ipool_shape_np]'s free arm, and iput's post-itrunc park *)
 Lemma dir_uniq_free (dn : dinode) (data : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) = 0 -> dir_uniq dn data.
 Proof.

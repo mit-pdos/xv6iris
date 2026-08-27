@@ -108,7 +108,7 @@
    used to carry v1's conditional agreement premise is gone, a caller
    premise "this inum is allocated" would be undischargeable today
    (allocatedness is directory-structure knowledge -- namei/ialloc, future
-   work), and the pool legitimately holds free inodes ([ipool_shape]'s
+   work), and the pool legitimately holds free inodes (the pool row's
    type-0 shape, §13.3).  So on the free-inode arm ilock DIVERGES through
    [SpecPanic]'s own contract and this postcondition speaks only for
    successful loads.  That is sound in a partial-correctness WP and it is
@@ -686,7 +686,8 @@ Definition wp_ilock_tx_sconf_body
   WP (Loop : expr riscv_lang).
 
 (* THE [log_tx] READING OF THE ARM, which is where the id leaves and re-enters
-   [LogInv.log_tx]'s existential ([IcacheTxRefute] is why it has to). *)
+   [LogInv.log_tx]'s existential -- a parked share must sit at a NAMED
+   [(t, q)], since two halves of one element are not the whole. *)
 (* THE PUBLISHED READING, A DERIVATION OF THE ONE GENERIC BODY, which
    re-proves no line of ilock's code (durable-disk B''-tx3/-tx4).  The
    read-lockers ([fileread], [filestat]) call the generic form at [DepRd]
