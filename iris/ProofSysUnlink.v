@@ -1007,8 +1007,8 @@ Section ProofSysUnlinkBody.
                         (m !!! Regidx Rs3 : mword 64) M6)
       by (rewrite /M6; apply su_regs_caller; [exact Hcsra | exact HM5regs]).
     iDestruct (su_bytes_name (pa_stk sp0 26) 128 with "HbP") as (bp0) "HbP".
-    iDestruct (cpu_own_transport CID0 CID8 0 eb (proc_addr jx) b ltac:(wp_next_chain)
-                 with "Hown") as "Hown".
+    iDestruct (cpu_own_transport CID0 CID8 0 eb (proc_addr jx) b
+                 ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Argstr.wp_argstr_sconf (CID := CID8) ga gf M6 (K - 30)%nat 0%nat eb
               (proc_addr jx) 0%nat v0 pid V 128%nat bp0 b lks
               su_arg0_lt HM6a0 Harg0 su_noff0 ltac:(exact Kar) HM6a2
@@ -5665,12 +5665,23 @@ Section ProofSysUnlinkBody.
       by (rewrite /E3; apply upd_eq).
     assert (HE3regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) E3)
       by (rewrite /E3; apply su_regs_caller; [exact Hcsra | exact Hipregs]).
+    (* ONE hoisted premise for the whole triple, not three inline [ltac:]s.
+       [wp_next_chain] is a [repeat match goal], i.e. a whole-context scan, and
+       optimization.md's rule is that such a tactic spliced into ARGUMENT
+       position is priced by the depth of its call site rather than by its goal
+       -- the splice's goal is an evar carrying every variable in scope.  The
+       three transports here share one CID pair, so one [assert] serves all
+       three and the [eb] form is one rewrite off the [b] form. *)
+    assert (Htr1 : b = false \/ proc_addr jx = zero_reg
+                     -> (D31 : CPU) = (D30 : CPU)) by wp_next_chain.
+    assert (Htre1 : eb = false \/ proc_addr jx = zero_reg
+                      -> (D31 : CPU) = (D30 : CPU)) by (rewrite Hbeq; exact Htr1).
     iDestruct (cpu_own_transport D30 D31 0 eb (proc_addr jx) b
-                 ltac:(wp_next_chain) with "Hown") as "Hown".
+                 Htr1 with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport D30 D31 eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Htce") as "Htce".
+                 Htre1 with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport D30 D31 eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Hcce") as "Hcce".
+                 Htre1 with "Hcce") as "Hcce".
     (* both arms are home, so the element is whole again for the [end_op] *)
     iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
                  (eq_sym Qp.quarter_quarter) with "Htq1 Htq2") as "Htp".
@@ -5816,12 +5827,23 @@ Section ProofSysUnlinkBody.
       by exact (su_regs_s2 _ _ _ _ _ _ HF4regs).
     assert (HF4s3 : (F4 !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64))
       by exact (su_regs_s3 _ _ _ _ _ _ HF4regs).
+    (* ONE hoisted premise for the whole triple, not three inline [ltac:]s.
+       [wp_next_chain] is a [repeat match goal], i.e. a whole-context scan, and
+       optimization.md's rule is that such a tactic spliced into ARGUMENT
+       position is priced by the depth of its call site rather than by its goal
+       -- the splice's goal is an evar carrying every variable in scope.  The
+       three transports here share one CID pair, so one [assert] serves all
+       three and the [eb] form is one rewrite off the [b] form. *)
+    assert (Htr3 : b = false \/ proc_addr jx = zero_reg
+                     -> (D37 : CPU) = (D32 : CPU)) by wp_next_chain.
+    assert (Htre3 : eb = false \/ proc_addr jx = zero_reg
+                      -> (D37 : CPU) = (D32 : CPU)) by (rewrite Hbeq; exact Htr3).
     iDestruct (cpu_own_transport D32 D37 0 eb (proc_addr jx) b
-                 ltac:(wp_next_chain) with "Hown") as "Hown".
+                 Htr3 with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport D32 D37 eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Htce") as "Htce".
+                 Htre3 with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport D32 D37 eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Hcce") as "Hcce".
+                 Htre3 with "Hcce") as "Hcce".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := D37)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (su_epilogue (CID0 := D37) m F4 sp0 K b (proc_addr jx)
@@ -5836,12 +5858,23 @@ Section ProofSysUnlinkBody.
                      Hisl2 Hpre Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    (* ONE hoisted premise for the whole triple, not three inline [ltac:]s.
+       [wp_next_chain] is a [repeat match goal], i.e. a whole-context scan, and
+       optimization.md's rule is that such a tactic spliced into ARGUMENT
+       position is priced by the depth of its call site rather than by its goal
+       -- the splice's goal is an evar carrying every variable in scope.  The
+       three transports here share one CID pair, so one [assert] serves all
+       three and the [eb] form is one rewrite off the [b] form. *)
+    assert (Htr5 : b = false \/ proc_addr jx = zero_reg
+                     -> (CIDy : CPU) = (D37 : CPU)) by wp_next_chain.
+    assert (Htre5 : eb = false \/ proc_addr jx = zero_reg
+                      -> (CIDy : CPU) = (D37 : CPU)) by (rewrite Hbeq; exact Htr5).
     iDestruct (cpu_own_transport D37 CIDy 0 eb (proc_addr jx) b
-                 ltac:(wp_next_chain) with "Hown") as "Hown".
+                 Htr5 with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport D37 CIDy eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Htce") as "Htce".
+                 Htre5 with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport D37 CIDy eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Hcce") as "Hcce".
+                 Htre5 with "Hcce") as "Hcce".
     iDestruct ("Hpre" with "Hpidq") as "Hpriv".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! mf P1 with "[%] [%] Hcg Hown Htce Hcce Hpc
@@ -7885,12 +7918,23 @@ Section ProofSysUnlinkBody.
       by (rewrite /E3; apply upd_eq).
     assert (HE3regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) E3)
       by (rewrite /E3; apply su_regs_caller; [exact Hcsra | exact Hipregs]).
+    (* ONE hoisted premise for the whole triple, not three inline [ltac:]s.
+       [wp_next_chain] is a [repeat match goal], i.e. a whole-context scan, and
+       optimization.md's rule is that such a tactic spliced into ARGUMENT
+       position is priced by the depth of its call site rather than by its goal
+       -- the splice's goal is an evar carrying every variable in scope.  The
+       three transports here share one CID pair, so one [assert] serves all
+       three and the [eb] form is one rewrite off the [b] form. *)
+    assert (Htr2 : b = false \/ proc_addr jx = zero_reg
+                     -> (D31 : CPU) = (D30 : CPU)) by wp_next_chain.
+    assert (Htre2 : eb = false \/ proc_addr jx = zero_reg
+                      -> (D31 : CPU) = (D30 : CPU)) by (rewrite Hbeq; exact Htr2).
     iDestruct (cpu_own_transport D30 D31 0 eb (proc_addr jx) b
-                 ltac:(wp_next_chain) with "Hown") as "Hown".
+                 Htr2 with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport D30 D31 eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Htce") as "Htce".
+                 Htre2 with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport D30 D31 eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Hcce") as "Hcce".
+                 Htre2 with "Hcce") as "Hcce".
     (* both arms are home, so the element is whole again for the [end_op] *)
     iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
                  (eq_sym Qp.quarter_quarter) with "Htq1 Htq2") as "Htp".
@@ -8036,12 +8080,23 @@ Section ProofSysUnlinkBody.
       by exact (su_regs_s2 _ _ _ _ _ _ HF4regs).
     assert (HF4s3 : (F4 !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64))
       by exact (su_regs_s3 _ _ _ _ _ _ HF4regs).
+    (* ONE hoisted premise for the whole triple, not three inline [ltac:]s.
+       [wp_next_chain] is a [repeat match goal], i.e. a whole-context scan, and
+       optimization.md's rule is that such a tactic spliced into ARGUMENT
+       position is priced by the depth of its call site rather than by its goal
+       -- the splice's goal is an evar carrying every variable in scope.  The
+       three transports here share one CID pair, so one [assert] serves all
+       three and the [eb] form is one rewrite off the [b] form. *)
+    assert (Htr4 : b = false \/ proc_addr jx = zero_reg
+                     -> (D37 : CPU) = (D32 : CPU)) by wp_next_chain.
+    assert (Htre4 : eb = false \/ proc_addr jx = zero_reg
+                      -> (D37 : CPU) = (D32 : CPU)) by (rewrite Hbeq; exact Htr4).
     iDestruct (cpu_own_transport D32 D37 0 eb (proc_addr jx) b
-                 ltac:(wp_next_chain) with "Hown") as "Hown".
+                 Htr4 with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport D32 D37 eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Htce") as "Htce".
+                 Htre4 with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport D32 D37 eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Hcce") as "Hcce".
+                 Htre4 with "Hcce") as "Hcce".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := D37)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (su_epilogue (CID0 := D37) m F4 sp0 K b (proc_addr jx)
@@ -8056,12 +8111,23 @@ Section ProofSysUnlinkBody.
                      Hisl2 Hpre Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    (* ONE hoisted premise for the whole triple, not three inline [ltac:]s.
+       [wp_next_chain] is a [repeat match goal], i.e. a whole-context scan, and
+       optimization.md's rule is that such a tactic spliced into ARGUMENT
+       position is priced by the depth of its call site rather than by its goal
+       -- the splice's goal is an evar carrying every variable in scope.  The
+       three transports here share one CID pair, so one [assert] serves all
+       three and the [eb] form is one rewrite off the [b] form. *)
+    assert (Htr6 : b = false \/ proc_addr jx = zero_reg
+                     -> (CIDy : CPU) = (D37 : CPU)) by wp_next_chain.
+    assert (Htre6 : eb = false \/ proc_addr jx = zero_reg
+                      -> (CIDy : CPU) = (D37 : CPU)) by (rewrite Hbeq; exact Htr6).
     iDestruct (cpu_own_transport D37 CIDy 0 eb (proc_addr jx) b
-                 ltac:(wp_next_chain) with "Hown") as "Hown".
+                 Htr6 with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport D37 CIDy eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Htce") as "Htce".
+                 Htre6 with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport D37 CIDy eb (proc_addr jx)
-                 ltac:(rewrite Hbeq; wp_next_chain) with "Hcce") as "Hcce".
+                 Htre6 with "Hcce") as "Hcce".
     iDestruct ("Hpre" with "Hpidq") as "Hpriv".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! mf P1 with "[%] [%] Hcg Hown Htce Hcce Hpc
