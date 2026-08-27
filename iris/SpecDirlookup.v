@@ -115,7 +115,7 @@
    [iFrame] -- every one of them holds it already, out of
    [IcacheEscrow.ic_loaded].
 
-   [dinode_at γi dinum dr] -- the HOME's own record, which is licence (c) at
+   [dinode_at fsc_ireg dinum dr] -- the HOME's own record, which is licence (c) at
    the SELF record.  A lookup of ["."] returns the inum of the very
    directory the caller has locked, and the self record carries no fragment
    of ANOTHER inum's register (the source comment is "No ip->nlink++ for
@@ -257,7 +257,6 @@ Definition wp_dirlookup_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (inodestart : Z) (nib : nat) (dev : mword 32)
@@ -378,22 +377,22 @@ Definition wp_dirlookup_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* ---- THE INODE REGION, and it is iget's premise, not dirlookup's own
      (iclaim-ledger.md §3.3's contract-set widening, increment IIIe).  The
      hit arm's [iget] opens it GHOST-ONLY, on the ledger's [icnt] and freeze
      columns; dirlookup itself still reads dinodes only through [readi] and
      the borrowed [dinode_at] below.  Persistent, so it is a frame at every
      one of the five call sites. ---- *)
-  ireg_inv γi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   (* ONE ledger unit for the iget on the found arm; RETURNED on the other *)
   iref_slot -∗
   (* ---- THE BORROWED TICKET LIST, THE HOME'S ENTRY UNITS AND ITS OWN
      RECORD ---- *)
   IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
-  dinode_at γi dinum dr -∗
+  dinode_at fsc_ireg dinum dr -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (through namex / dirlookup, down to ilock and sleep), so a park moves
      the hart with interrupts off and the crossing has nothing to do with
@@ -417,7 +416,7 @@ Definition wp_dirlookup_sconf_body
       bslot -∗
       (* ...AND THE BORROW, BACK VERBATIM ON BOTH ARMS *)
       IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
-      dinode_at γi dinum dr -∗
+      dinode_at fsc_ireg dinum dr -∗
       (* THE TWO ARMS *)
       (if found
        then ⌜dir_first data nrec s = Some k
@@ -453,7 +452,6 @@ Module Type DIRLOOKUP.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γi : gname)
       (gtl : gname)
       (γa : gname) (γf : gname)
       (inodestart : Z) (nib : nat) (dev : mword 32)
@@ -465,7 +463,7 @@ Module Type DIRLOOKUP.
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlookup_sconf_body γs j γl γu γd γk pd pav pu bn γi gtl
+      wp_dirlookup_sconf_body γs j γl γu γd γk pd pav pu bn gtl
                               γa γf inodestart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
 End DIRLOOKUP.

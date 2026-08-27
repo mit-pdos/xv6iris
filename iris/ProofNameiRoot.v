@@ -115,12 +115,12 @@ Section ProofNameiRoot.
   Notation Ra2 := (mword_of_int 12 : mword 5).
 
   Lemma wp_namei_root
-      (gtl : gname) (gi : gname)
+      (gtl : gname)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namei_root_body gtl gi inodestart nib dev dqp
+    : wp_namei_root_body gtl inodestart nib dev dqp
                          m n K eb p b lks Vpr.
   Proof.
     cbv beta delta [wp_namei_root_body].
@@ -281,7 +281,7 @@ Section ProofNameiRoot.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := b) (CIDa := CID) (CIDb := CID7)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_root gtl gi inodestart nib dev dqp
+    iApply (NX.wp_namex_root gtl inodestart nib dev dqp
               R5 n (K - 4)%nat eb p b lks
               Vpr Knx Hn Hdev Hnib Hroot Hnib0 HR5a1 Hbelow
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hitb2 Hitbl Hesc Hireg Hisl Hp0 Hp1").

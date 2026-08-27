@@ -463,7 +463,7 @@ Section CreateSpec.
      caller re-form and spend the reference.  Factored out because
      sys_open, sys_mkdir and sys_mknod all consume it and none of them
      should have to re-spell it. *)
-  Definition create_locked (γi : gname)
+  Definition create_locked
       (dev : mword 32) (pidv : mword 32)
       (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
@@ -481,7 +481,7 @@ Section CreateSpec.
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
        i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
        i_valid (ientry k) ↦₄ valid_word true ∗
-       ic_loaded fsc_fs γi fsc_cov fsc_logst k inum dn bm ∗
+       ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm ∗
        ity_shot g (di_type dn) ∗
        (* ...AND THE INUM'S FREEZE TOKEN (iclaim-ledger.md §3.9): this bundle
           is a CHECKED-OUT entry, i.e. exactly [SpecIunlockput]'s
@@ -505,7 +505,7 @@ Section CreateSpec.
      site in ProofCreate.v -- [iSplitL]/[iExact] is free, the same fix as
      [IcacheEscrow.ic_mk_loaded] for the same reason (optimization.md,
      "Framing"). *)
-  Lemma create_locked_mk γi dev pidv k qi s g inum dn bm
+  Lemma create_locked_mk dev pidv k qi s g inum dn bm
       γil γisl :
     is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
     sleeplocked_q γisl s (i_lock (ientry k)) pidv -∗
@@ -513,12 +513,12 @@ Section CreateSpec.
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
-    ic_loaded fsc_fs γi fsc_cov fsc_logst k inum dn bm -∗
+    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗
     ity_shot g (di_type dn) -∗
     ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short_gen k (qi + s)%Qp qi dev inum g -∗
     runit_any (bv_unsigned inum) -∗
-    create_locked γi dev pidv k qi s g inum dn bm.
+    create_locked dev pidv k qi s g inum dn bm.
   Proof.
     iIntros "Hlk Hlkd Hdep Hdev Hinum Hvalid Hload Hshot Hfrz Href Hru".
     rewrite /create_locked. iExists γil, γisl.
@@ -540,7 +540,7 @@ Definition wp_create_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname) (γpr : gname)           (* kalloc, ftable, printk *)
     (bmapstart inodestart : Z) (nib : nat)
@@ -627,11 +627,11 @@ Definition wp_create_sconf_body
   log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
   kalloc_env γa None -∗
   (* ---- THE ICACHE, THE ITABLE AND THE INODE REGION ---- *)
-  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv γi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
      borrowed, never spent.  create is the only function in the tree that
      runs [ialloc], and [SpecIalloc] now takes this because
@@ -749,7 +749,7 @@ Definition wp_create_sconf_body
                       tests at +0x4c / +0x5c passed. *)
                 ty = T_FILE
                 /\ (di_type dn = T_FILE \/ di_type dn = T_DEVICE))⌝ ∗
-         create_locked γi dev pidv k qi s g inum dn bm
+         create_locked dev pidv k qi s g inum dn bm
        else (* ARMS N / F-BAD / A-FAIL / FAIL: a0 = 0 and create holds
                nothing -- every inode it touched has been iunlockput. *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
@@ -765,7 +765,7 @@ Module Type CREATE.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa : gname) (γf : gname) (γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -778,7 +778,7 @@ Module Type CREATE.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ γi gtl
+      wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ gtl
                            γa γf γpr bmapstart inodestart nib
                            ninodes size dev plen pfun ty major minor
                            V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.

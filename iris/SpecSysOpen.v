@@ -265,7 +265,7 @@ Definition wp_sys_open_sconf_body
     (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gi : gname)
+    (g : log_names)
     (gtl : gname)                       (* the itable's lock   *)
     (bmapstart inodestart : Z) (nib : nat)
     (ninodes : Z) (size : Z) (dev : mword 32)
@@ -341,11 +341,11 @@ Definition wp_sys_open_sconf_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region ialloc / itrunc claim out of ---- *)
-  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv gi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
      borrowed and never spent; it rides the SAME channel [ireg_inv] does,
      down to [SpecCreate] -> [SpecIalloc] -> [InodeRegion.ireg_claim_au],
@@ -415,7 +415,7 @@ Module Type SYSOPEN.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
@@ -426,7 +426,7 @@ Module Type SYSOPEN.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_open_sconf_body γfl γf γa γpr gs j gl gu gd gk pd pav pu bn g
-                             gi gtl bmapstart inodestart nib
+                             gtl bmapstart inodestart nib
                              ninodes size dev ns dqb dqs dqbs dqn v vom
                              pid V m K eb b lks.
 End SYSOPEN.

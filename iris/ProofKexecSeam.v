@@ -541,7 +541,7 @@ Section KexecBSeam.
      (convention 6): nine resources phases A and B both carry and neither
      looks inside.  Bundled here so the two output states below do not each
      spell them out. *)
-  Definition kxc_open (gi : gname)
+  Definition kxc_open
       (dev : mword 32) (pidv : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
@@ -552,7 +552,7 @@ Section KexecBSeam.
      i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev ∗
      i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf ∗
      i_valid (ientry kf) ↦₄ valid_word true ∗
-     ic_loaded fsc_fs gi fsc_cov fsc_logst kf inumf dnf bmf ∗
+     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf ∗
      ity_shot gyf (di_type dnf) ∗
      (* ...and the payload's freeze token (§3.9, RULING A-prime) *)
      ifreeze_off (bv_unsigned inumf) ∗
@@ -575,7 +575,7 @@ Section KexecBSeam.
   (* --------------------------------------------------------------- *)
   Definition kxc_at_1a2
       (jp : nat)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -612,7 +612,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open gi dev pidv kf qf sf gyf inumf dnf bmf
+     kxc_open dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_opb g n2 ∗
      iref_slots 1 ∗
@@ -657,7 +657,7 @@ Section KexecBSeam.
   (* --------------------------------------------------------------- *)
   Definition kxc_at_12c
       (jp : nat)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -697,7 +697,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open gi dev pidv kf qf sf gyf inumf dnf bmf
+     kxc_open dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_opb g n2 ∗
      iref_slots 1 ∗
@@ -730,7 +730,7 @@ Section KexecBSeam.
   (* --------------------------------------------------------------- *)
   Definition kxc_at_1a4
       (jp : nat)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -768,7 +768,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open gi dev pidv kf qf sf gyf inumf dnf bmf
+     kxc_open dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_opb g n2 ∗
      iref_slots 1 ∗

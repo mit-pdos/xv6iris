@@ -1102,7 +1102,7 @@ End IallocOut.
 (*  the decoded [ds] whose slot [islot inum] has type 0.                  *)
 (*                                                                        *)
 (*  The log_write at +0x9a is the ONLY ghost step, and its fupd premise   *)
-(*  is [InodeRegion.ireg_claim_au ⊤ γi fsc_fs inodestart nib inum            *)
+(*  is [InodeRegion.ireg_claim_au ⊤ fsc_ireg fsc_fs inodestart nib inum            *)
 (*  (ialloc_fresh ty) ds] -- no resource in, [True] out.                  *)
 (* ===================================================================== *)
 Section IallocClaim.
@@ -1113,7 +1113,7 @@ Section IallocClaim.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (γ : log_names) (γi : gname)
+      (bn : bio_names) (γ : log_names)
       (gtl : gname)
       (inodestart ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
@@ -1156,7 +1156,7 @@ Section IallocClaim.
     panic_env -∗
     bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
     log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
-    ireg_inv γi fsc_fs inodestart nib -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     (* RULING B (iclaim-ledger.md §3.2): the sealed regime, which
        [InodeRegion.ireg_claim_au] now takes.  Persistent -- borrowed, never
        spent -- and it rides the same channel [ireg_inv] does. *)
@@ -1165,9 +1165,9 @@ Section IallocClaim.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
-    ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+    ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     iref_slot -∗
     ia_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
@@ -1533,7 +1533,7 @@ Section IallocClaim.
          bound) are still dropped -- one adapter line, fs-log.md §G.17 --
          but the ANCHOR is now [iclaim]; see the instantiation above. *)
       iApply lw_au_rec.
-      iApply (ireg_claim_au ⊤ γi fsc_fs inodestart nib inum (ialloc_fresh ty) ds
+      iApply (ireg_claim_au ⊤ fsc_ireg fsc_fs inodestart nib inum (ialloc_fresh ty) ds
                 t qt ltac:(solve_ndisj) Hnib Hdswf Ht0
                 (ialloc_fresh_shape ty Hty) Htyk with "Hireg Hiopen Htx"). }
     (* THE RECEIPT LANDS HERE (iclaim-ledger.md §2.4 / IIIb step 4).  The
@@ -1750,7 +1750,7 @@ Section IallocClaim.
         It is create's [ilock(ip)] that finally spends it, at
         [InodeRegion.ireg_withdraw]. *)
     iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-    iApply (IG.wp_iget_sconf gtl γi inodestart nib dev inum
+    iApply (IG.wp_iget_sconf gtl inodestart nib dev inum
               (ClaimL ty t qt)
               WA 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity)
@@ -1993,7 +1993,7 @@ Section IallocScan.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (γ : log_names) (γi : gname)
+      (bn : bio_names) (γ : log_names)
       (gtl : gname) (γpr : gname)
       (inodestart ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16) (u : nat) (Sb : gset Z)
@@ -2020,7 +2020,7 @@ Section IallocScan.
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
     log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
-    ireg_inv γi fsc_fs inodestart nib -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     (* RULING B (iclaim-ledger.md §3.2): the sealed regime, which
        [InodeRegion.ireg_claim_au] now takes.  Persistent -- borrowed, never
        spent -- and it rides the same channel [ireg_inv] does. *)
@@ -2029,9 +2029,9 @@ Section IallocScan.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
-    ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+    ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     (* ONE turn of the loop, at any surviving [inum], under any fuel that
        bounds what is left to scan.  Everything else is re-supplied by the
        caller of this wand at every re-entry. *)
@@ -2310,7 +2310,7 @@ Section IallocScan.
       iDestruct (ia_held_L with "Hheld") as "[HpL Hheldback0]".
       iApply fupd_wp.
       iEval (rewrite Hbno (ireg_bi_iblock inum inodestart)) in "HpL".
-      iMod (ireg_read_blk ⊤ γi fsc_fs inodestart nib (ireg_bi inum) bs0
+      iMod (ireg_read_blk ⊤ fsc_ireg fsc_fs inodestart nib (ireg_bi inum) bs0
               ltac:(solve_ndisj) logN_top (ireg_bi_lt inum nib Hnib)
               with "Hireg HpL") as "(%Hex & HpL)".
       iModIntro.
@@ -2576,7 +2576,7 @@ Section IallocScan.
         iEval (rewrite Hjt) in "Hpc".
         iDestruct (cpu_own_transport CID6 CID13 0 true (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (ia_claim (CID0 := CID13) γs j γl γu γd γk pd pav pu bn γ γi
+        iApply (ia_claim (CID0 := CID13) γs j γl γu γd γk pd pav pu bn γ
                   gtl inodestart ninodes nib dev ty inum ds u Sb
                   t qt kk bno bsd0 d0 pidv dq dqs dqn m GA K b lks
                   Vpr HK Hgeom HGAsp HGAthr HGAs1 HGAs3 HGAs5 HGAs6 HGAs2 Hkk
@@ -2861,7 +2861,7 @@ Section IallocMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γpr : gname)
       (inodestart : Z) (ninodes : Z) (nib : nat)
@@ -2871,7 +2871,7 @@ Section IallocMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp) :
-      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γi gtl γpr
+      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ gtl γpr
                          inodestart ninodes nib dev ty u Sb
                          pidv dq dqs dqn m K eb b lks Vpr t qt.
   Proof.
@@ -3314,7 +3314,7 @@ Section IallocMain.
     assert (Hunit1 : bv_unsigned (mword_of_int 1 : mword 32) = 1).
     { rewrite moi32_unsigned. apply bvw32_small.
       change (2^32)%Z with 4294967296%Z. lia. }
-    iPoseProof (ia_scan (CIDe := CID19) γs j γl γu γd γk pd pav pu bn γ γi
+    iPoseProof (ia_scan (CIDe := CID19) γs j γl γu γd γk pd pav pu bn γ
                   gtl γpr inodestart ninodes nib dev ty u Sb
                   t qt pidv dq dqs dqn m K b lks
                   Vpr HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Hbelow
@@ -3347,7 +3347,7 @@ Section IallocMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γpr : gname)
       (inodestart : Z) (ninodes : Z) (nib : nat)
@@ -3357,7 +3357,7 @@ Section IallocMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp) :
-      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γi gtl γpr
+      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ gtl γpr
                            inodestart ninodes nib dev ty u
                            pidv dq dqs dqn m K eb b lks Vpr t qt.
   Proof.
@@ -3368,7 +3368,7 @@ Section IallocMain.
               Hsbn Hsbi #Hireg #Hiopen Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
               #Hitb2 #Hitbl #Hesc Hiref Hop Htxc Hcont".
     iDestruct (log_op_openS with "Hop") as (Sb) "[HopS Htx]".
-    iApply (wp_ialloc_gen (CID := CID) γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (wp_ialloc_gen (CID := CID) γs j γl γu γd γk pd pav pu bn γ
               gtl γpr inodestart ninodes nib dev ty u Sb
               pidv dq dqs dqn m K eb b lks
               Vpr t qt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Ha0 Ha1 Heb Hbelow

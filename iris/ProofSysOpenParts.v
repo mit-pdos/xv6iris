@@ -802,14 +802,14 @@ Section ProofSysOpenPublish.
 
   (* the open direction, one unfolding: [ic_loaded]'s [inode_addrs ∗
      ind_res] is itrunc's [inode_map]. *)
-  Lemma so_loaded_open (gi : gname)
+  Lemma so_loaded_open
       (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
-    ic_loaded fsc_fs gi fsc_cov fsc_logst k inum dn bm -∗
+    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗
     ∃ data : nat -> list (bv 8),
       ⌜inode_ok fsc_cov fsc_logst dn bm data⌝ ∗ ⌜inode_rec_local dn⌝ ∗
       ⌜dir_ok icfg_nib dn data⌝ ∗
       dlinks fsc_fs (bv_unsigned inum) dn bm data ∗
-      dinode_at gi inum dn ∗
+      dinode_at fsc_ireg inum dn ∗
       inode_meta (ientry k) dn ∗
       inode_map fsc_fs (ientry k) bm ∗
       inode_blocks fsc_fs bm data ∗
@@ -848,12 +848,12 @@ Section ProofSysOpenPublish.
   Qed.
 
   (* ...and the close direction at itrunc's outputs. *)
-  Lemma so_trunc_loaded (gi : gname)
+  Lemma so_trunc_loaded
       (k : nat) (inum : mword 32) (dn : dinode) :
     bv_unsigned (di_type dn) <> 0 ->
     bv_unsigned (di_type dn) <> T_DIR_z ->
     inode_rec_local dn ->
-    dinode_at gi inum (di_trunc dn) -∗
+    dinode_at fsc_ireg inum (di_trunc dn) -∗
     inode_meta (ientry k) (di_trunc dn) -∗
     inode_map fsc_fs (ientry k) bm_empty -∗
     inode_blocks fsc_fs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
@@ -869,11 +869,11 @@ Section ProofSysOpenPublish.
     top_frag (fs_gamma_L fsc_fs) (bv_unsigned inum)
              (era_node (di_trunc dn) bm_empty
                        (fun _ => replicate BSIZE (bv_0 8))) -∗
-    ic_loaded fsc_fs gi fsc_cov fsc_logst k inum (di_trunc dn) bm_empty.
+    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum (di_trunc dn) bm_empty.
   Proof.
     intros Hnz Hnd Hrl. iIntros "Hat Hmeta [Haddr Hind] Hblk Hdv Hfv Htop".
     assert (Hty : di_type (di_trunc dn) = di_type dn) by reflexivity.
-    iApply (ic_mk_loaded fsc_fs gi fsc_cov fsc_logst k inum (di_trunc dn) bm_empty
+    iApply (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum (di_trunc dn) bm_empty
               (fun _ => replicate BSIZE (bv_0 8))
               (so_trunc_ok dn Hnz)
               (* itrunc keeps the TYPE and zeroes the count and the size, so

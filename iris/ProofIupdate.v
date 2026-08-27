@@ -133,9 +133,9 @@ Section IupdateDefs.
      Every contract below is the SAME 44-instruction walk; what differs is
      which region lemma fills log_write's ghost step and therefore what the
      step pays out.  Four landed contracts take
-     [InodeRegion.ireg_out γi inum dn] -- the retagged fragment, or the
+     [InodeRegion.ireg_out fsc_ireg inum dn] -- the retagged fragment, or the
      marker at a type-0 flush -- and the fifth takes
-     [dinode_at γi inum dn] beside the [FsStateLink.link_tok] the flushed
+     [dinode_at fsc_ireg inum dn] beside the [FsStateLink.link_tok] the flushed
      [ip->nlink++] buys.  So [Pout] is a parameter
      of the continuation and the ghost step is a PREMISE, rather than the
      walk being cloned once per payout. *)
@@ -171,11 +171,11 @@ Section IupdateDefs.
      proof-internal (the walk learns it at [InodeRegion.ireg_read], out of
      the region's own coupling), so the premise quantifies over it and takes
      the caller's [dinode_at] on the way in. *)
-  Definition iu_region_step (γ : log_names) (γi : gname)
+  Definition iu_region_step (γ : log_names)
       (inodestart : Z) (inum : mword 32) (dn dn0 : dinode) (e0 : nat)
       (Pout : iProp Σ) : iProp Σ :=
     (∀ (ds : list dinode),
-       ⌜diblk_wf ds⌝ -∗ dinode_at γi inum dn0 -∗
+       ⌜diblk_wf ds⌝ -∗ dinode_at fsc_ireg inum dn0 -∗
        iu_region_au γ inodestart inum dn ds e0 Pout)%I.
 
   (* the record being flushed is a legal dinode -- one line, needed by both
@@ -198,7 +198,7 @@ Section IupdateDefs.
      off-lock DEPOSIT.  So the contract narrows to [di_type dn <> 0], the
      [case_decide]'s zero arm is refuted by that premise, and what is left
      is the single [ireg_write_au] this step always really was. *)
-  Lemma iu_step_out (γ : log_names) (γi : gname)
+  Lemma iu_step_out (γ : log_names)
       (inodestart : Z) (nib : nat)
       (inum : mword 32) (dn dn0 : dinode) (e0 : nat) :
     bv_unsigned inum < 16 * Z.of_nat nib ->
@@ -206,8 +206,8 @@ Section IupdateDefs.
     di_type_stable dn dn0 ->
     di_nlink_stable dn dn0 ->
     bv_unsigned (di_type dn) <> 0 ->
-    ireg_inv γi fsc_fs inodestart nib -∗
-    iu_region_step γ γi inodestart inum dn dn0 e0 (ireg_out γi inum dn).
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+    iu_region_step γ inodestart inum dn dn0 e0 (ireg_out fsc_ireg inum dn).
   Proof.
     intros Hnib Hdnwf Hstab Hnlk Hnzty.
     iIntros "#Hireg" (ds) "%Hdswf Hdn".
@@ -217,7 +217,7 @@ Section IupdateDefs.
     rewrite /iu_region_au. iApply lw_au_rec.
     rewrite /ireg_out. case_decide as Hty.
     - exfalso. exact (Hnzty Hty).
-    - iApply (ireg_write_au ⊤ γi fsc_fs inodestart nib inum dn0 dn
+    - iApply (ireg_write_au ⊤ fsc_ireg fsc_fs inodestart nib inum dn0 dn
                 (diblk_bytes ds)
                 ltac:(solve_ndisj) Hnib Hdnwf Hty Hstab Hnlk
                 with "Hireg Hdn").
@@ -230,7 +230,7 @@ Section IupdateDefs.
      the payout it hands back.  The type premise is forced: (L3) makes a
      type-0 record's [nlink] zero, and the increment below makes the
      flushed one's at least one. *)
-  Lemma iu_step_link (γ : log_names) (γi : gname)
+  Lemma iu_step_link (γ : log_names)
       (inodestart : Z) (nib : nat)
       (inum : mword 32) (dn dn0 : dinode) (e0 : nat)
       (pin : bool) (oty : option ity) :
@@ -250,15 +250,15 @@ Section IupdateDefs.
     (forall v : ity, oty = Some v ->
        ireg_mult dn0 = 0%nat
        /\ ireg_reg_ok (bv_unsigned (di_type dn)) v) ->
-    ireg_inv γi fsc_fs inodestart nib -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     (* THE FREEZE-PIN PREMISE, RULING A-prime's two-armed form
        (iclaim-ledger.md §3.9), relayed straight to the mover: either the
        raised record is ALREADY named, or the caller presents the inum's
        freeze token.  Borrowed and returned -- it comes back inside the
        anchor below, which is why the anchor grew a third conjunct. *)
     ireg_link_pin pin (bv_unsigned inum) dn0 -∗
-    iu_region_step γ γi inodestart inum dn dn0 e0
-      (dinode_at γi inum dn ∗
+    iu_region_step γ inodestart inum dn dn0 e0
+      (dinode_at fsc_ireg inum dn ∗
        (∃ v : ity,
           ⌜ireg_reg_ok (bv_unsigned (di_type dn)) v
            /\ (forall w, oty = Some w -> v = w)⌝
@@ -275,7 +275,7 @@ Section IupdateDefs.
        and the anchor is the unit -- the same one adapter line the ordinary
        step takes. *)
     rewrite /iu_region_au. iApply lw_au_rec.
-    iApply (ireg_write_link_reg ⊤ γi fsc_fs inodestart nib inum dn0 dn
+    iApply (ireg_write_link_reg ⊤ fsc_ireg fsc_fs inodestart nib inum dn0 dn
               (diblk_bytes ds) pin oty
               ltac:(solve_ndisj) Hnib Hdnwf Hnz Hstab Hbump Hgrd Hup
               with "Hireg Hdn Hpin").
@@ -300,7 +300,7 @@ Section IupdateDefs.
        [izrcpt]'s antecedent is false at the written record, so the receipt
        is free -- and then the anchor is the unit, at the caller's OWN [γ],
        which is why this arm needs neither tie. *)
-  Lemma iu_step_unlink (γ : log_names) (γi : gname)
+  Lemma iu_step_unlink (γ : log_names)
       (inodestart : Z) (nib : nat)
       (inum : mword 32) (dn dn0 : dinode) (e0 : nat)
       (uty : ity) :
@@ -309,7 +309,7 @@ Section IupdateDefs.
     bv_unsigned (di_type dn) <> 0 ->
     di_type_stable dn dn0 ->
     bv_unsigned (di_nlink dn0) = bv_unsigned (di_nlink dn) + 1 ->
-    ireg_inv γi fsc_fs inodestart nib -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     (* THE COUNTING RA's UNIT, COMING BACK (durable-disk 2b-inode-5): the
        token the directory entry whose removal this decrement pays for
        gave up out of its own [FsStateInode.ent_toks]. *)
@@ -319,13 +319,13 @@ Section IupdateDefs.
             (bv_unsigned (di_nlink dn))) uty) -∗
     (⌜γ = icfg_log⌝ ∗ ⌜inodestart = icfg_ist⌝
      ∨ ⌜bv_unsigned (di_nlink dn) <> 0⌝) -∗
-    iu_region_step γ γi inodestart inum dn dn0 e0
-      (dinode_at γi inum dn).
+    iu_region_step γ inodestart inum dn dn0 e0
+      (dinode_at fsc_ireg inum dn).
   Proof.
     intros Hnib Hdnwf Hnz Hstab Hnl.
     iIntros "#Hireg Htok Hrc" (ds) "%Hdswf Hdn".
     rewrite /iu_region_au.
-    iMod (ireg_write_unlink_reg ⊤ γi fsc_fs inodestart nib inum dn0 dn
+    iMod (ireg_write_unlink_reg ⊤ fsc_ireg fsc_fs inodestart nib inum dn0 dn
             (diblk_bytes ds) uty
             ltac:(solve_ndisj) Hnib Hdnwf Hnz Hstab Hnl
             with "Hireg Hdn Htok")
@@ -934,7 +934,7 @@ Section ProofIupdateMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -974,15 +974,15 @@ Section ProofIupdateMain.
       inode_meta ip dn -∗
       inode_map fsc_fs ip bm -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      ireg_inv γi fsc_fs inodestart nib -∗
-      dinode_at γi inum dn0 -∗
+      ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+      dinode_at fsc_ireg inum dn0 -∗
       (* THE REGION'S GHOST STEP, AS A PREMISE (design §20.18, stage C2):
          the caller says which region lemma fires and therefore what the
          flush pays out.  It takes the [dinode_at] above back, because the
          walk needs it first for its own [InodeRegion.ireg_read] -- that is
          where the sixteen-dinode list this step is stated over comes from,
          and why the premise quantifies over it. *)
-      iu_region_step γ γi inodestart inum dn dn0 e0 Pout -∗
+      iu_region_step γ inodestart inum dn dn0 e0 Pout -∗
       proc_priv_bare pj pidv Vpr -∗
       procs_inv γs -∗
       dev_inv γu γd -∗
@@ -1419,7 +1419,7 @@ Section ProofIupdateMain.
     iDestruct (iu_held_k with "Hheld") as %Hkk.
     iDestruct (bio_held_fs_L with "Hheld") as "[HpL Hheldback0]".
     iApply fupd_wp.
-    iMod (ireg_read ⊤ γi fsc_fs inodestart nib inum dn0 (uint bno) bs0
+    iMod (ireg_read ⊤ fsc_ireg fsc_fs inodestart nib inum dn0 (uint bno) bs0
             ltac:(solve_ndisj) logN_top Hnib Hbno
             with "Hireg Hdn HpL") as "(%Hex & Hdn & HpL)".
     iModIntro.
@@ -2012,7 +2012,7 @@ Qed.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -2021,7 +2021,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γi
+    : wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ
                           inodestart nib dev ip inum dn dn0 bm u Sb
                           pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2046,12 +2046,12 @@ Qed.
     (* THE ORDINARY GHOST STEP (§20.18 C2): the two-arm region move this
        contract always made, now supplied to the core rather than wired
        into it. *)
-    iPoseProof (iu_step_out γ γi inodestart nib inum dn dn0 e0 Hnib
+    iPoseProof (iu_step_out γ inodestart nib inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ
               inodestart nib dev ip inum dn dn0 bm u Sb false e0 0%nat
-              (ireg_out γi inum dn)
+              (ireg_out fsc_ireg inum dn)
               pidv dq dqd dqn dqs m K eb b lks
               Vpr HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
@@ -2077,7 +2077,7 @@ Qed.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -2086,7 +2086,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γi
+    : wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ
                               inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
                               pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2095,12 +2095,12 @@ Qed.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl #Hvlb #Hcrd Hop Hcont".
-    iPoseProof (iu_step_out γ γi inodestart nib inum dn dn0 e0 Hnib
+    iPoseProof (iu_step_out γ inodestart nib inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ
               inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
-              (ireg_out γi inum dn)
+              (ireg_out fsc_ireg inum dn)
               pidv dq dqd dqn dqs m K eb b lks
               Vpr HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
@@ -2125,7 +2125,7 @@ Qed.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -2134,7 +2134,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γi
+    : wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ
                            inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2151,12 +2151,12 @@ Qed.
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iPoseProof (log_credit_own γ cru Sb e0 (IBLOCK inum inodestart) Hcru)
       as "#Hcrd".
-    iPoseProof (iu_step_out γ γi inodestart nib inum dn dn0 e0 Hnib
+    iPoseProof (iu_step_out γ inodestart nib inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ
               inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
-              (ireg_out γi inum dn)
+              (ireg_out fsc_ireg inum dn)
               pidv dq dqd dqn dqs m K true b lks
               Vpr HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
@@ -2187,7 +2187,7 @@ Qed.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -2196,7 +2196,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γi
+    : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ
                             inodestart nib dev ip inum dn dn0 bm u
                             pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2210,12 +2210,12 @@ Qed.
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iPoseProof (log_credit_own γ false Sb0 e0 (IBLOCK inum inodestart)
                   ltac:(discriminate)) as "#Hcrd".
-    iPoseProof (iu_step_out γ γi inodestart nib inum dn dn0 e0 Hnib
+    iPoseProof (iu_step_out γ inodestart nib inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ
               inodestart nib dev ip inum dn dn0 bm u Sb0 false e0 0%nat
-              (ireg_out γi inum dn)
+              (ireg_out fsc_ireg inum dn)
               pidv dq dqd dqn dqs m K eb b lks
               Vpr HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
@@ -2244,7 +2244,7 @@ Qed.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -2254,7 +2254,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γi
+    : wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ
                            inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pin oty pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2273,13 +2273,13 @@ Qed.
     iPoseProof (log_credit_own γ cru Sb e0 (IBLOCK inum inodestart) Hcru)
       as "#Hcrd".
     (* THE ONE SUBSTITUTION *)
-    iPoseProof (iu_step_link γ γi inodestart nib inum dn dn0 e0 pin oty Hnib
+    iPoseProof (iu_step_link γ inodestart nib inum dn dn0 e0 pin oty Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hbump Hgrd
                   Hup
                   with "Hireg Hpin") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ
               inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
-              (dinode_at γi inum dn ∗
+              (dinode_at fsc_ireg inum dn ∗
                (∃ v : ity,
           ⌜ireg_reg_ok (bv_unsigned (di_type dn)) v
            /\ (forall w, oty = Some w -> v = w)⌝
@@ -2320,7 +2320,7 @@ Qed.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -2330,7 +2330,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γi
+    : wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ
                              inodestart nib dev ip inum dn dn0 bm u Sb cru
                              uty pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2351,12 +2351,12 @@ Qed.
     iPoseProof (log_credit_own γ cru Sb e0 (IBLOCK inum inodestart) Hcru)
       as "#Hcrd".
     (* THE ONE SUBSTITUTION *)
-    iPoseProof (iu_step_unlink γ γi inodestart nib inum dn dn0 e0 uty Hnib
+    iPoseProof (iu_step_unlink γ inodestart nib inum dn dn0 e0 uty Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hnl
                   with "Hireg Htok Hrc") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ
               inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
-              (dinode_at γi inum dn)%I
+              (dinode_at fsc_ireg inum dn)%I
               pidv dq dqd dqn dqs m K true b lks Vpr
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap

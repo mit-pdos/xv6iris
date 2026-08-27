@@ -255,7 +255,6 @@ Definition wp_fsinit_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (bmapstart inodestart : Z)
@@ -430,7 +429,7 @@ Definition wp_fsinit_sconf_body
   ([∗ list] i ∈ seq 0 32, pa_add sb_base i ↦ₘ sb_old i) -∗
   (* ---- the icache's four persistent things, straight from
          [IcacheBoot.icache_boot] ---- *)
-  ireg_reg γi fsc_fs inodestart nib -∗
+  ireg_reg fsc_ireg fsc_fs inodestart nib -∗
   (* THE BOOT-SHELTER TOKEN (fs-fragments.md §7.12), from [icfg_alloc] through
      the boot chain: fsinit frames it across bread/memmove/initlog and hands it
      to ireclaim, which is the only reason it is safe there (§7.1.7).  Returned
@@ -438,9 +437,9 @@ Definition wp_fsinit_sconf_body
      returns and before [kexec("/init")] -- that seal is OWED to forkret's
      first branch. *)
   ireg_boot -∗
-  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
   (* itrunc's bitmap, through ireclaim's iput *)
   bitmap_reg fsc_fs bmapstart fsc_cov fsc_logst size -∗
@@ -536,7 +535,6 @@ Module Type FSINIT.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γi : gname)
       (gtl : gname)
       (γpr : gname)
       (bmapstart inodestart : Z)
@@ -556,7 +554,7 @@ Module Type FSINIT.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb),
-      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γi gtl γpr
+      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn gtl γpr
                            bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog

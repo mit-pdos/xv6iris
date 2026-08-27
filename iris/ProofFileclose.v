@@ -1351,7 +1351,7 @@ Section ProofFileclose.
              with the substitution going the other way: there the ties are
              [->]d into the ambient predicate, here the callees are
              instantiated at the ambient names directly. *)
-          destruct Hties as [Ht_uart Ht_disk Ht_dlock Ht_kmem Ht_kalloc Ht_bio Ht_log Ht_dev Ht_ireg Ht_tlock Ht_bms Ht_ist Ht_nib Ht_size].
+          destruct Hties as [Ht_uart Ht_disk Ht_dlock Ht_kmem Ht_kalloc Ht_bio Ht_log Ht_dev Ht_tlock Ht_bms Ht_ist Ht_nib Ht_size].
           (* the [fcn_bio] tie has nothing to rewrite in a [bslots] any
              more: the slot supply is at the CANONICAL ghost name, so the
              count no longer mentions the bio record at all. *)
@@ -1389,7 +1389,7 @@ Section ProofFileclose.
           (* the entry's own escrow and sleeplock, out of the two families:
              a closer cannot name the slot in its contract, so it takes
              every slot's and picks the one the reference names *)
-          iDestruct (ic_escrows_acc _ kk Hkk with "Hescrows") as "#Hescrow".
+          iDestruct (ic_escrows_acc kk Hkk with "Hescrows") as "#Hescrow".
           iDestruct (ic_sleeplocks_lookup _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".
           destruct (Hinumgeo inum Hinumb) as [Hiblk Hiblog].
           (* NO [subst b] HERE.  [Houtb] does read [b = eb] at [noff = 0], but
@@ -1501,7 +1501,7 @@ Section ProofFileclose.
           iApply (Iput.wp_iput_sconf (CID := CIDf5) (fcn_procs fn) (fcn_j fn)
                     (fcn_plock fn) fsc_uart fsc_disk fsc_dlock
                     pdd pavd pud fsc_bio
-                    icfg_log fsc_ireg
+                    icfg_log
                     fsc_itlock gil gisl
                     fsc_bmapstart
                     icfg_ist icfg_nib fsc_size

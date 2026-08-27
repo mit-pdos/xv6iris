@@ -280,7 +280,7 @@ Section KexecB3Seam.
 
   Definition kxc_at_11a
       (jp : nat)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -319,7 +319,7 @@ Section KexecB3Seam.
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
      kalloc_env ga None ∗
-     kxc_res jp bn g gi gf bmapstart inodestart size dev
+     kxc_res jp bn g gf bmapstart inodestart size dev
              kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
              aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
              w5 w6 w7 w8 w9 w10 w11 w12 w13 (kxc_off ef i) w65 w67 ef P)%I.
@@ -390,7 +390,7 @@ Section KexecB3Incr.
   Local Ltac is0slot := apply stk_push; apply bv_eq; vm_compute; reflexivity.
 
   Lemma kxc_incr `{CID0 : CpuId}
-      (jp : nat) (bn : bio_names) (g : log_names) (gi : gname)
+      (jp : nat) (bn : bio_names) (g : log_names)
       (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -405,19 +405,19 @@ Section KexecB3Incr.
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) :
     kernel_text -∗
-    kxc_at_11a jp bn g gi ga gf bmapstart inodestart nib
+    kxc_at_11a jp bn g ga gf bmapstart inodestart nib
                size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
                plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas M K
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67 ef P i szv -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile),
-        ( kxc_at_12c jp bn g gi ga gf bmapstart inodestart
+        ( kxc_at_12c jp bn g ga gf bmapstart inodestart
                      nib size dev kf qf sf gyf inumf dnf bmf
                      gilf gislf n2 plen pfun na avf aslen afun pidv V eb
                      dqb dqs dqa dqpv dqas m M' K sp0 ra0 s00 s10 s20 pv av
                      w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (S i) szv
-          ∨ kxc_at_1a4 jp bn g gi ga gf bmapstart inodestart
+          ∨ kxc_at_1a4 jp bn g ga gf bmapstart inodestart
                        nib size dev kf qf sf gyf inumf dnf bmf
                        gilf gislf n2 plen pfun na avf aslen afun pidv V eb
                        dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
@@ -808,7 +808,7 @@ Section KexecB3Body.
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -840,9 +840,9 @@ Section KexecB3Body.
     m !!! Regidx Rs1 = s10 ->
     m !!! Regidx Rs2 = s20 ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gi gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gtl
               inodestart nib dev -∗
-    kxc_at_12c jp bn g gi ga gf bmapstart inodestart nib
+    kxc_at_12c jp bn g ga gf bmapstart inodestart nib
                size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
                plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas m M K
                sp0 ra0 s00 s10 s20 pv av
@@ -875,7 +875,7 @@ Section KexecB3Body.
     (* ---- THE ONE OUTPUT: the back edge's verdict, and the exit back ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile) (P' : uptd) (szv' : mword 64),
-        ( kxc_at_12c jp bn g gi ga gf bmapstart inodestart
+        ( kxc_at_12c jp bn g ga gf bmapstart inodestart
                      nib size dev kf qf sf gyf inumf dnf bmf
                      gilf gislf n2 plen pfun na avf aslen afun pidv V eb
                      dqb dqs dqa dqpv dqas m M' K sp0 ra0 s00 s10 s20 pv av
@@ -883,7 +883,7 @@ Section KexecB3Body.
                      (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                      (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                      w67 ef P' (S i) szv'
-          ∨ kxc_at_1a4 jp bn g gi ga gf bmapstart inodestart
+          ∨ kxc_at_1a4 jp bn g ga gf bmapstart inodestart
                        nib size dev kf qf sf gyf inumf dnf bmf
                        gilf gislf n2 plen pfun na avf aslen afun pidv V eb
                        dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
@@ -1150,11 +1150,11 @@ Section KexecB3Body.
     iEval (rewrite Hpc13e) in "Hpc".
     iEval (rewrite HU5a2) in "Hphb".
     iDestruct ("Hpvbk" with "Hppid") as "Hpriv".
-    iDestruct (kxc_load_seal gi kf inumf dnf bmf datl
+    iDestruct (kxc_load_seal kf inumf dnf bmf datl
                  Hiok Hrl Hdok Hddix Hdoc Hduq
                  with "Hdlk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop") as "Hload".
     iDestruct (A.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
-    iDestruct (kxc_open_intro gi dev pidv kf qf sf gyf
+    iDestruct (kxc_open_intro dev pidv kf qf sf gyf
                  inumf dnf bmf gilf gislf
                  with "Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload
                        Hity Hfrz Hkeep Hru") as "Hopen".
@@ -1300,7 +1300,7 @@ Section KexecB3Body.
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDrd CIDg4 eb (proc_addr jp)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-        iApply (kxc_incr (CID0 := CIDg4) jp bn g gi ga gf
+        iApply (kxc_incr (CID0 := CIDg4) jp bn g ga gf
                   bmapstart inodestart nib size dev kf qf sf gyf
                   inumf dnf bmf gilf gislf n2 plen pfun na avf aslen afun
                   pidv V eb dqb dqs dqa dqpv dqas m U7 K sp0 ra0 s00 s10 s20 pv av
@@ -1480,7 +1480,7 @@ Section KexecB3Body.
           iDestruct (wp_next_retarget CID0 CIDy2 true (proc_addr jp) _ Hbcr
                        with "Hcont") as "Hcont".
           iApply (B2.kxc_bad324 (CID0 := CIDy2) Q gs jp gl gu gd gk pd pav pu bn g
-                    gi gtl gilf gislf ga gf bmapstart
+                    gtl gilf gislf ga gf bmapstart
                     inodestart nib size dev kf qf sf gyf inumf dnf bmf
                     n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m U9
                     K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P szv eb ∅
@@ -1623,7 +1623,7 @@ Section KexecB3Body.
              iDestruct (wp_next_retarget CID0 CIDy2 true (proc_addr jp) _ Hbcr
                           with "Hcont") as "Hcont".
              iApply (B2.kxc_bad324 (CID0 := CIDy2) Q gs jp gl gu gd gk pd pav pu bn g
-                       gi gtl gilf gislf ga gf bmapstart
+                       gtl gilf gislf ga gf bmapstart
                        inodestart nib size dev kf qf sf gyf inumf dnf bmf
                        n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m U11
                        K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P szv eb ∅
@@ -1766,7 +1766,7 @@ Section KexecB3Body.
                 iDestruct (wp_next_retarget CID0 CIDy2 true (proc_addr jp) _ Hbcr
                              with "Hcont") as "Hcont".
                 iApply (B2.kxc_bad324 (CID0 := CIDy2) Q gs jp gl gu gd gk pd pav pu bn g
-                          gi gtl gilf gislf ga gf bmapstart
+                          gtl gilf gislf ga gf bmapstart
                           inodestart nib size dev kf qf sf gyf inumf dnf bmf
                           n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m U13
                           K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P szv eb ∅
@@ -2256,7 +2256,7 @@ Section KexecB3Body.
                    assert (HM4s6' : M4 !!! Regidx Rs6 = page_base P4.(ud_root))
                      by (rewrite HM4s6 HP4rt; reflexivity).
                    iApply (B2.kxc_bad324 (CID0 := CIDw3) Q gs jp gl gu gd gk pd
-                             pav pu bn g gi gtl gilf gislf ga gf
+                             pav pu bn g gtl gilf gislf ga gf
                              bmapstart inodestart nib size dev
                              kf qf sf gyf inumf dnf bmf n2 plen pfun na
                              avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M4 K
@@ -2459,7 +2459,7 @@ Section KexecB3Body.
                        assert (HU21s11 : U21 !!! Regidx Rs11
                                          = (mword_of_int 56 : mword 64))
                          by (rewrite /U21 upd_ne; [exact HU20s11 | bnz]).
-                       iApply (kxc_incr (CID0 := CIDv3) jp bn g gi ga gf
+                       iApply (kxc_incr (CID0 := CIDv3) jp bn g ga gf
                                  bmapstart inodestart nib size dev
                                  kf qf sf gyf inumf dnf bmf gilf
                                  gislf n2 plen pfun na avf aslen afun pidv V eb
@@ -2710,7 +2710,7 @@ Section KexecB3Body.
                        iDestruct (wp_next_retarget CID0 CIDv5 true (proc_addr jp)
                                     _ Hcrl with "Hcont") as "Hcont".
                        iApply (B2.kxc_ls (CID0 := CIDv5) Q gs jp gl gu gd gk pd pav
-                                 pu bn g gi gtl gilf gislf ga gf
+                                 pu bn g gtl gilf gislf ga gf
                                  bmapstart inodestart nib size dev
                                  kf qf sf gyf inumf dnf bmf n2 plen pfun na
                                  avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m K
@@ -2830,7 +2830,7 @@ Section KexecB3Body.
                                     ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
                        iDestruct (cpu_claim_ext_transport CIDq1 CIDq2 eb (proc_addr jp)
                                     ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-                       iApply (kxc_incr (CID0 := CIDq2) jp bn g gi ga gf
+                       iApply (kxc_incr (CID0 := CIDq2) jp bn g ga gf
                                  bmapstart inodestart nib size dev
                                  kf qf sf gyf inumf dnf bmf gilf
                                  gislf n2 plen pfun na avf aslen afun pidv V eb
@@ -2936,7 +2936,7 @@ Section KexecB3Body.
       iDestruct (wp_next_retarget CID0 CIDb2 true (proc_addr jp) _ Hcrb
                    with "Hcont") as "Hcont".
       iApply (B2.kxc_bad324 (CID0 := CIDb2) Q gs jp gl gu gd gk pd pav pu bn g
-                gi gtl gilf gislf ga gf bmapstart
+                gtl gilf gislf ga gf bmapstart
                 inodestart nib size dev kf qf sf gyf inumf dnf bmf
                 n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M2
                 K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P szv eb ∅
@@ -2982,7 +2982,7 @@ Section KexecB3Loop.
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -3016,9 +3016,9 @@ Section KexecB3Loop.
     forall (W : nat) (M : regfile) (P : uptd) (i : nat) (szv : mword 64),
     (eh_phnum ef - Z.of_nat i <= Z.of_nat W)%Z ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gi gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gtl
               inodestart nib dev -∗
-    kxc_at_12c jp bn g gi ga gf bmapstart inodestart nib
+    kxc_at_12c jp bn g ga gf bmapstart inodestart nib
                size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
                plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas m M K
                sp0 ra0 s00 s10 s20 pv av
@@ -3049,7 +3049,7 @@ Section KexecB3Loop.
           WP (Loop : expr riscv_lang)) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile) (P' : uptd) (szv' : mword 64),
-        kxc_at_1a4 jp bn g gi ga gf bmapstart inodestart
+        kxc_at_1a4 jp bn g ga gf bmapstart inodestart
                    nib size dev kf qf sf gyf inumf dnf bmf
                    gilf gislf n2 plen pfun na avf aslen afun pidv V eb
                    dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
@@ -3087,7 +3087,7 @@ Section KexecB3Loop.
     induction W as [| W IH]; intros CID0 M P i szv Hfuel;
       iIntros "#Htext #Hfab Hst Hcont Hc1a4";
       iApply (kxc_ph_step (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn g
-                gi gtl gilf gislf ga gf bmapstart inodestart
+                gtl gilf gislf ga gf bmapstart inodestart
                 nib size dev kf qf sf gyf inumf dnf bmf n2 plen
                 pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas m M K
                 sp0 ra0 s00 s10 s20 pv av w67 ef P i szv
@@ -3154,7 +3154,7 @@ Section KexecB3Close.
 
   (* ---- +0x1a2: c.li s2,0 -- the no-segments path joins at +0x1a4 ---- *)
   Lemma kxc_seam1a2 `{CID0 : CpuId}
-      (jp : nat) (bn : bio_names) (g : log_names) (gi : gname)
+      (jp : nat) (bn : bio_names) (g : log_names)
       (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -3169,14 +3169,14 @@ Section KexecB3Close.
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) :
     kernel_text -∗
-    kxc_at_1a2 jp bn g gi ga gf bmapstart inodestart nib
+    kxc_at_1a2 jp bn g ga gf bmapstart inodestart nib
                size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
                plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas m M K
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile),
-        kxc_at_1a4 jp bn g gi ga gf bmapstart inodestart
+        kxc_at_1a4 jp bn g ga gf bmapstart inodestart
                    nib size dev kf qf sf gyf inumf dnf bmf
                    gilf gislf n2 plen pfun na avf aslen afun pidv V eb
                    dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
@@ -3273,7 +3273,7 @@ Section KexecB3Close.
   Lemma kxc_close `{CID0 : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -3299,9 +3299,9 @@ Section KexecB3Close.
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gi gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gtl
               inodestart nib dev -∗
-    kxc_at_1a4 jp bn g gi ga gf bmapstart inodestart nib
+    kxc_at_1a4 jp bn g ga gf bmapstart inodestart nib
                size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
                plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas M K
                sp0 ra0 s00 s10 s20 pv av
@@ -3333,7 +3333,7 @@ Section KexecB3Close.
                            Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
     iDestruct (proc_priv_bare_acc gf (proc_addr jp) pidv V with "Hpriv")
       as "[Hppid Hpvbk]".
-    iDestruct (A.kxa_esc_acc gi kf Hk with "Hesc")
+    iDestruct (A.kxa_esc_acc kf Hk with "Hesc")
       as "#Hesck".
     (* ---- +0x1a4: c.mv a0,s4 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KXB + 0x1a4)) Ra0 Rs4
@@ -3395,7 +3395,7 @@ Section KexecB3Close.
     iDestruct (cpu_claim_ext_transport CID0 CIDj1 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iApply (Iunlockput.wp_iunlockput_tx_sconf gs jp gl gu gd gk pd pav pu bn g
-              gi gtl gilf gislf bmapstart inodestart nib size
+              gtl gilf gislf bmapstart inodestart nib size
               dev kf qf sf gyf inumf dnf bmf n2 pidv (DfracOwn (1/4))
               dqb dqs B2 (K - 68)%nat eb eb ∅
               V ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
@@ -3548,7 +3548,7 @@ Section KexecB3Main.
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -3561,7 +3561,7 @@ Section KexecB3Main.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) :
-    kxc_b2_body Q gs jp gl gu gd gk pd pav pu bn g gi gtl gilf gislf
+    kxc_b2_body Q gs jp gl gu gd gk pd pav pu bn g gtl gilf gislf
       ga gf bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
@@ -3571,7 +3571,7 @@ Section KexecB3Main.
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdevc
            Hsp Hra Hs0 Hs1 Hs2.
     iIntros "#Htext #Hfab Hst Hcont Hc1ae".
-    iApply (kxc_phdr (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn g gi
+    iApply (kxc_phdr (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn g
               gtl gilf gislf ga gf bmapstart inodestart nib size
               dev kf qf sf gyf inumf dnf bmf n2 plen pfun na avf
               alen aslen afun pidv V eb dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20
@@ -3588,7 +3588,7 @@ Section KexecB3Main.
               (CIDn : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CID0 CIDn true (proc_addr jp) _ Hcr
                  with "Hc1ae") as "Hc1ae".
-    iApply (kxc_close (CID0 := CIDn) gs jp gl gu gd gk pd pav pu bn g gi
+    iApply (kxc_close (CID0 := CIDn) gs jp gl gu gd gk pd pav pu bn g
               gtl gilf gislf ga gf bmapstart inodestart nib size
               dev kf qf sf gyf inumf dnf bmf n2 plen pfun na avf
               aslen afun pidv V eb dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
@@ -3610,7 +3610,7 @@ Section KexecB3Main.
   Lemma kxc_b2z
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -3623,7 +3623,7 @@ Section KexecB3Main.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) :
-    kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gi gtl gilf gislf
+    kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gtl gilf gislf
       ga gf bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w13 w67 ef P.
@@ -3631,7 +3631,7 @@ Section KexecB3Main.
     cbv beta delta [kxc_b2z_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs.
     iIntros "#Htext #Hfab Hst Hc1ae".
-    iApply (kxc_seam1a2 (CID0 := CID0) jp bn g gi ga gf
+    iApply (kxc_seam1a2 (CID0 := CID0) jp bn g ga gf
               bmapstart inodestart nib size dev kf qf sf gyf inumf
               dnf bmf gilf gislf n2 plen pfun na avf aslen afun pidv V eb
               dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
@@ -3644,7 +3644,7 @@ Section KexecB3Main.
               (CIDn : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CID0 CIDn true (proc_addr jp) _ Hcr
                  with "Hc1ae") as "Hc1ae".
-    iApply (kxc_close (CID0 := CIDn) gs jp gl gu gd gk pd pav pu bn g gi
+    iApply (kxc_close (CID0 := CIDn) gs jp gl gu gd gk pd pav pu bn g
               gtl gilf gislf ga gf bmapstart inodestart nib size
               dev kf qf sf gyf inumf dnf bmf n2 plen pfun na avf
               aslen afun pidv V eb dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av

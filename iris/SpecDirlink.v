@@ -448,7 +448,7 @@ Definition wp_dirlink_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname) (γpr : gname)
     (inodestart : Z) (nib : nat)
@@ -483,7 +483,7 @@ Definition wp_dirlink_sconf_body
      header for why it is a disjunction and not "the home is live"), and the
      ticket list, over the PRE-state and handed back VERBATIM on both arms.
      The record dirlookup's licence (c) wants is the one this contract
-     already takes, [dinode_at γi dinum dn0]; its nonzero type follows from
+     already takes, [dinode_at fsc_ireg dinum dn0]; its nonzero type follows from
      [Htype] and [di_type_stable] and costs no premise.  §20.18 ruling 1 is
      untouched: this is a BORROW, not an obligation -- no [dlinks]
      obligation at dirlink, and the re-park at the post-state stays exactly
@@ -573,7 +573,7 @@ Definition wp_dirlink_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
-  ireg_inv γi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -583,7 +583,7 @@ Definition wp_dirlink_sconf_body
      comes back; only ireclaim, which freezes before the seal is fired,
      lends [ireg_boot] instead. *)
   ireg_open -∗
-  dinode_at γi dinum dn0 -∗
+  dinode_at fsc_ireg dinum dn0 -∗
   (* ---- the caller's own pid cell ---- *)
   proc_priv_bare pj pidv Vpr -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
@@ -593,9 +593,9 @@ Definition wp_dirlink_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots 3 -∗
   (* ---- THE ICACHE ---- *)
-  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
   iref_slot -∗
   (* the borrowed ticket list, over the PRE-state *)
@@ -627,7 +627,7 @@ Definition wp_dirlink_sconf_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      dinode_at γi dinum dn0' -∗
+      dinode_at fsc_ireg dinum dn0' -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots 3 -∗
       (* NET ZERO on the ledger: dirlookup's iget spends one and iput
@@ -723,7 +723,7 @@ Definition wp_dirlink_gen_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname) (γpr : gname)
     (inodestart : Z) (nib : nat)
@@ -758,7 +758,7 @@ Definition wp_dirlink_gen_body
      header for why it is a disjunction and not "the home is live"), and the
      ticket list, over the PRE-state and handed back VERBATIM on both arms.
      The record dirlookup's licence (c) wants is the one this contract
-     already takes, [dinode_at γi dinum dn0]; its nonzero type follows from
+     already takes, [dinode_at fsc_ireg dinum dn0]; its nonzero type follows from
      [Htype] and [di_type_stable] and costs no premise.  §20.18 ruling 1 is
      untouched: this is a BORROW, not an obligation -- no [dlinks]
      obligation at dirlink, and the re-park at the post-state stays exactly
@@ -855,7 +855,7 @@ Definition wp_dirlink_gen_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
-  ireg_inv γi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -865,7 +865,7 @@ Definition wp_dirlink_gen_body
      comes back; only ireclaim, which freezes before the seal is fired,
      lends [ireg_boot] instead. *)
   ireg_open -∗
-  dinode_at γi dinum dn0 -∗
+  dinode_at fsc_ireg dinum dn0 -∗
   (* ---- the caller's own pid cell ---- *)
   proc_priv_bare pj pidv Vpr -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
@@ -875,9 +875,9 @@ Definition wp_dirlink_gen_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots 3 -∗
   (* ---- THE ICACHE ---- *)
-  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
   iref_slot -∗
   (* the borrowed ticket list, over the PRE-state *)
@@ -915,7 +915,7 @@ Definition wp_dirlink_gen_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      dinode_at γi dinum dn0' -∗
+      dinode_at fsc_ireg dinum dn0' -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots 3 -∗
       (* NET ZERO on the ledger: dirlookup's iget spends one and iput
@@ -1028,7 +1028,7 @@ Module Type DIRLINK.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa : gname) (γf : gname) (γpr : gname)
       (inodestart : Z) (nib : nat)
@@ -1042,7 +1042,7 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ γi gtl
+      wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ gtl
                             γa γf γpr inodestart nib bmapstart
                             size dev ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
@@ -1058,7 +1058,7 @@ Module Type DIRLINK.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa : gname) (γf : gname) (γpr : gname)
       (inodestart : Z) (nib : nat)
@@ -1072,7 +1072,7 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ γi gtl
+      wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ gtl
                           γa γf γpr inodestart nib bmapstart
                           size dev ip dinum bm data dn dn0 fn inum
                           ncount Sb tid qtx pidv dq dqd dqn dqs dqb dqbs dqf

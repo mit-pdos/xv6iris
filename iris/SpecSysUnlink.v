@@ -323,7 +323,7 @@ Definition wp_sys_unlink_sconf_body
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gi : gname)
+    (g : log_names)
     (gtl : gname)                      (* the itable's lock   *)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -395,11 +395,11 @@ Definition wp_sys_unlink_sconf_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region the two flushes write ---- *)
-  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv gi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -440,7 +440,7 @@ Module Type SYSUNLINK.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -450,7 +450,7 @@ Module Type SYSUNLINK.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_unlink_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g
-                               gi gtl bmapstart inodestart
+                               gtl bmapstart inodestart
                                nib size dev dqb dqs dqbs v0 pid V
                                m K eb b lks.
 End SYSUNLINK.

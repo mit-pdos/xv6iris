@@ -185,7 +185,7 @@ Definition wp_sys_exec_sconf_body
     (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gi : gname)
+    (g : log_names)
     (gtl : gname)                       (* the itable's lock   *)
     (bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
@@ -238,7 +238,7 @@ Definition wp_sys_exec_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* ---- the file system, as kexec's own bundle: thirteen persistent
          resources this function only relays ---- *)
-  fs_fabric gs gu gd gk pd pav pu bn g gi gtl
+  fs_fabric gs gu gd gk pd pav pu bn g gtl
             inodestart nib dev -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -284,7 +284,7 @@ Module Type SYSEXEC.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -293,7 +293,7 @@ Module Type SYSEXEC.
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gi
+      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g
                              gtl bmapstart inodestart nib
                              size dev dqb dqs v0 v1 pid V m K eb b lks.
 End SYSEXEC.

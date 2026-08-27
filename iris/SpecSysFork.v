@@ -92,7 +92,7 @@ Notation K_sys_fork := ((K_kfork + 2)%nat) (only parsing).
 Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa γp γw γl γf γil γic : gname) (γs : list gname)
+    (γa γp γw γl γf γil : gname) (γs : list gname)
     (inodestart : Z) (nib : nat)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
     (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string) :=
@@ -110,7 +110,7 @@ Definition wp_sys_fork_sconf_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
-  is_itable2 γil fsc_ic fsc_fs γic fsc_cov fsc_logst nib icfg_dev -∗
+  is_itable2 γil fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
   itable_inv -∗
   (* the inode region, and it travels with the fs fabric for the SAME reason
      the itable does -- kfork's [np->cwd = idup(p->cwd)], whose [ref++] is a
@@ -118,7 +118,7 @@ Definition wp_sys_fork_sconf_body
      and every FS syscall's dispatch already holds it (a projection of the
      [fs_ready] its bundle carries), so a dispatcher pays nothing
      extra.  sys_fork does no I/O and touches no log. *)
-  ireg_inv γic fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   kalloc_env γa None -∗
   (* the proc table's sealed regime, threaded to kfork's allocproc
      ([ProcAvail.v]); persistent, so it costs nothing to carry *)
@@ -158,10 +158,10 @@ Module Type SYSFORK.
   Parameter wp_sys_fork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa γp γw γl γf γil γic : gname) (γs : list gname)
+      (γa γp γw γl γf γil : gname) (γs : list gname)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs
+      wp_sys_fork_sconf_body γa γp γw γl γf γil γs
                              inodestart nib m lvl av eb p b pid V lks.
 End SYSFORK.

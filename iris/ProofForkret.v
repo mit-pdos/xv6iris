@@ -987,7 +987,7 @@ Proof.
   iDestruct (cpu_claim_ext_transport CID CIDb8 eb p
                ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
   iApply (FS.wp_fsinit_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-            fsc_bio fsc_ireg fsc_itlock fsc_printk
+            fsc_bio fsc_itlock fsc_printk
             fsc_bmapstart icfg_ist fsc_ninodes icfg_nib
             fsc_size icfg_dev
             v_magic (mword_of_int fsc_size) v_nblocks
@@ -1288,7 +1288,7 @@ Proof.
   iDestruct (fs_ready_region with "Hfsr") as "[_ #Hropen]".
   iDestruct (fs_ready_kalloc with "Hfsr") as "#Hkaenv".
   iAssert (fs_fabric γs fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio icfg_log
-             fsc_ireg fsc_itlock icfg_ist
+             fsc_itlock icfg_ist
              icfg_nib icfg_dev) as "#Hfab".
   (* ...and the same row-by-row build, for the same measured reason: this
      named [iFrame] over the fabric's sixteen definition-valued rows was
@@ -1353,7 +1353,7 @@ Proof.
   iDestruct (cpu_claim_ext_transport CIDf1 CIDb19 eb p
                ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
   iApply (KX.wp_kexec_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-            fsc_bio icfg_log fsc_ireg fsc_itlock
+            fsc_bio icfg_log fsc_itlock
             fsc_kalloc γf fsc_bmapstart icfg_ist icfg_nib
             fsc_size icfg_dev
             5%nat fkr_init_bytes 1%nat fkr_argv

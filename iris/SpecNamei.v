@@ -90,7 +90,7 @@ Definition wp_namei_sconf_body
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gi : gname)
+    (g : log_names)
     (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (bmapstart inodestart : Z) (nib : nat)
@@ -145,11 +145,11 @@ Definition wp_namei_sconf_body
   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
   log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
   kalloc_env ga None -∗
-  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv gi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -229,7 +229,7 @@ Definition wp_namei_gen_body
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gi : gname)
+    (g : log_names)
     (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (bmapstart inodestart : Z) (nib : nat)
@@ -286,11 +286,11 @@ Definition wp_namei_gen_body
   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
   log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
   kalloc_env ga None -∗
-  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv gi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -364,7 +364,7 @@ Module Type NAMEI.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -374,7 +374,7 @@ Module Type NAMEI.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namei_sconf_body gs j gl gu gd gk pd pav pu bn g gi gtl
+      wp_namei_sconf_body gs j gl gu gd gk pd pav pu bn g gtl
                           ga gf bmapstart inodestart nib
                           size dev plen pfun n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -387,7 +387,7 @@ Module Type NAMEI.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -397,7 +397,7 @@ Module Type NAMEI.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namei_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl
+      wp_namei_gen_body gs j gl gu gd gk pd pav pu bn g gtl
                           ga gf bmapstart inodestart nib
                           size dev plen pfun n Sb
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -423,7 +423,7 @@ Notation K_namei_root := (74%nat) (only parsing).
 Definition wp_namei_root_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (gtl : gname) (gi : gname)
+    (gtl : gname)
     (inodestart : Z) (nib : nat) (dev : mword 32)
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
@@ -444,13 +444,13 @@ Definition wp_namei_root_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* the inode region -- iget's premise since iclaim-ledger.md §3.3, and
      GHOST-ONLY there (the recycle arm's peel and its 0 -> 1 count move).
      Persistent, relayed unchanged. *)
-  ireg_reg gi fsc_fs inodestart nib -∗
+  ireg_reg fsc_ireg fsc_fs inodestart nib -∗
   (* ...AND NOT [ireg_open]: the corner's regime premise is gone, forwarded
      from [SpecNamex.wp_namex_root_body], whose header says why.  The short
      version: [ireg_open] does not exist until fsinit's [ireg_boot] is shot,
@@ -476,11 +476,11 @@ Module Type NAMEI_ROOT.
   Parameter wp_namei_root :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (gtl : gname) (gi : gname)
+      (gtl : gname)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namei_root_body gtl gi inodestart nib dev dqp
+      wp_namei_root_body gtl inodestart nib dev dqp
                          m n K eb p b lks Vpr.
 End NAMEI_ROOT.

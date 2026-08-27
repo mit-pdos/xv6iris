@@ -1888,7 +1888,7 @@ Section ProofFileread.
                     Hpayback)".
              assert (Hibcov : IBLOCK inm (frn_inodestart fn) ∈ fsc_cov)
                by (apply Hgeo; exact Hinlt).
-             iDestruct (ic_escrows_acc2 (frn_ireg fn)
+             iDestruct (ic_escrows_acc2
                           ikk Hik with "Hescs")
                as "#Hesc".
              iDestruct (ic_sleeplocks_lookup fsc_ic ikk Hik with "Hslks")
@@ -2011,7 +2011,7 @@ Section ProofFileread.
                 to open with is gone with the caller-supplied [inode_shr]. *)
              iApply (Ilock.wp_ilock_dep_sconf γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
-                       (frn_bio fn) (frn_ireg fn)
+                       (frn_bio fn)
                        gil gisl
                        (frn_inodestart fn)
                        icfg_nib ikk (ssh/2)%Qp gsh
@@ -2405,7 +2405,7 @@ Section ProofFileread.
                 (* the quarter goes home inside [ic_swap_park_dep]'s own
                    ghost step (durable-disk B''-tx3); nothing is unshed
                    first. *)
-                iAssert (ic_dep_held fsc_fs (frn_ireg fn) fsc_cov
+                iAssert (ic_dep_held fsc_fs fsc_ireg fsc_cov
                            fsc_logst (DepRd (ssh/2)%Qp icfg_dev inm gsh)
                            ikk inm dnl bml)%I
                   with "[Hmeta Haddrs Hquarter]" as "Hlk".
@@ -2469,7 +2469,7 @@ Section ProofFileread.
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID82 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-                iApply (Iunlock.wp_iunlock_dep_sconf γs (frn_ireg fn)
+                iApply (Iunlock.wp_iunlock_dep_sconf γs
                           gil gisl
                           ikk (ssh/2)%Qp gsh
                           (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm
@@ -2693,7 +2693,7 @@ Section ProofFileread.
                 (* the quarter goes home inside [ic_swap_park_dep]'s own
                    ghost step (durable-disk B''-tx3); nothing is unshed
                    first. *)
-                iAssert (ic_dep_held fsc_fs (frn_ireg fn) fsc_cov
+                iAssert (ic_dep_held fsc_fs fsc_ireg fsc_cov
                            fsc_logst (DepRd (ssh/2)%Qp icfg_dev inm gsh)
                            ikk inm dnl bml)%I
                   with "[Hmeta Haddrs Hquarter]" as "Hlk".
@@ -2757,7 +2757,7 @@ Section ProofFileread.
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID92 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-                iApply (Iunlock.wp_iunlock_dep_sconf γs (frn_ireg fn)
+                iApply (Iunlock.wp_iunlock_dep_sconf γs
                           gil gisl
                           ikk (ssh/2)%Qp gsh
                           (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm

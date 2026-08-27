@@ -95,7 +95,7 @@ Section ProofIunlockputMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname) (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -106,7 +106,7 @@ Section ProofIunlockputMain.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl
+    : wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gtl
                                  gil gisl bmapstart inodestart nib
                                  size dev k qi s gy d inum dn' bm' n Sb crb cru
                                  crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr.
@@ -269,7 +269,7 @@ Section ProofIunlockputMain.
     (* "sleep lock" outranks "itable": weaken [Hfresh]'s bound. *)
     assert (Hfresh_sl : locks_below lks "sleep lock")
       by lkbelow.
-    iApply (IU.wp_iunlock_dep_sconf gs gi gil gisl k s gy d dev inum
+    iApply (IU.wp_iunlock_dep_sconf gs gil gisl k s gy d dev inum
               dn' bm' pidv dq R4 (K - 4)%nat eb pj b lks Vpr
               ltac:(lia) Hdsh Hk ltac:(rewrite HR4a0; exact Hipe)
               Hfresh_sl
@@ -360,7 +360,7 @@ Section ProofIunlockputMain.
        state the regime at the persistent [ireg_open]; iput's gen form keeps
        the index, and this is it at [rg := true]. *)
     iEval (rewrite -ireg_regime_true) in "Hropen".
-    iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gi gtl gil gisl
+    iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gtl gil gisl
               bmapstart inodestart nib size dev
               k (qi + s)%Qp inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs R6 (K - 4)%nat eb b lks Vpr true
               ltac:(lia) Hclog Hk Hcrb Hcru
@@ -594,7 +594,7 @@ Section ProofIunlockputMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname) (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -604,7 +604,7 @@ Section ProofIunlockputMain.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g gi
+    : wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g
                                    gtl gil gisl bmapstart
                                    inodestart nib size dev k qi s gy d inum
                                    dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks Vpr.
@@ -618,7 +618,7 @@ Section ProofIunlockputMain.
               Hcont".
     rewrite {1}/log_opb. iDestruct "Hlogop" as (Sb0) "Hlogop".
     iDestruct (log_opS_named with "Hlogop") as (e00) "Hlogop".
-    iApply (wp_iunlockput_dep_gen gs j gl gu gd gk pd pav pu bn g gi gtl gil gisl
+    iApply (wp_iunlockput_dep_gen gs j gl gu gd gk pd pav pu bn g gtl gil gisl
               bmapstart inodestart nib size dev
               k qi s gy d inum dn' bm' n Sb0 false false false e00 tid qtx
               pidv dq dqb dqs m K eb b lks Vpr
@@ -654,7 +654,7 @@ Section ProofIunlockputMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname) (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -664,7 +664,7 @@ Section ProofIunlockputMain.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g gi gtl
+    : wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g gtl
                                   gil gisl bmapstart inodestart
                                   nib size dev k qi s gy inum dn' bm' n
                                   pidv dq dqb dqs m K eb b lks Vpr.
@@ -678,7 +678,7 @@ Section ProofIunlockputMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname) (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -688,7 +688,7 @@ Section ProofIunlockputMain.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl
+    : wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g gtl
                                 gil gisl bmapstart inodestart nib
                                 size dev k qi s gy inum dn' bm' n Sb crb cru
                                 crz e0 pidv dq dqb dqs m K eb b lks Vpr.

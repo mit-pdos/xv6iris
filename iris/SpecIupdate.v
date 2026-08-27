@@ -32,7 +32,7 @@
    is unsatisfiable by two lock holders in the same block.  The inode
    REGION ([InodeRegion.v]) owns the halves instead and never lets them
    out; the caller holds the EXCLUSIVE per-inum fragment
-   [dinode_at γi inum dn0] plus the persistent [ireg_inv], and iupdate
+   [dinode_at fsc_ireg inum dn0] plus the persistent [ireg_inv], and iupdate
    hands it back retagged at [dn].  The sixteen-dinode list [ds] is now
    proof-internal: iupdate learns it at its own bread, via
    [InodeRegion.ireg_read].
@@ -126,7 +126,7 @@ Definition wp_iupdate_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -236,8 +236,8 @@ Definition wp_iupdate_sconf_body
   (* THE INODE REGION, and THIS INUM'S on-disk record: the exclusive
      per-inum fragment that replaced the block half (design §11.3/§12).
      [dn0] is the STALE record -- it need not equal [dn]. *)
-  ireg_inv γi fsc_fs inodestart nib -∗
-  dinode_at γi inum dn0 -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  dinode_at fsc_ireg inum dn0 -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
@@ -281,7 +281,7 @@ Definition wp_iupdate_sconf_body
          region invariant and what comes back is [InodeRegion.imark], the
          marker the free pool arm now carries.  One contract, because the
          two cases differ only in the payout. *)
-      ireg_out γi inum dn -∗
+      ireg_out fsc_ireg inum dn -∗
       bslots 2 -∗
       log_op γ u -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -308,7 +308,7 @@ Definition wp_iupdate_gen_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -413,8 +413,8 @@ Definition wp_iupdate_gen_body
   (* THE INODE REGION, and THIS INUM'S on-disk record: the exclusive
      per-inum fragment that replaced the block half (design §11.3/§12).
      [dn0] is the STALE record -- it need not equal [dn]. *)
-  ireg_inv γi fsc_fs inodestart nib -∗
-  dinode_at γi inum dn0 -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  dinode_at fsc_ireg inum dn0 -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
@@ -457,7 +457,7 @@ Definition wp_iupdate_gen_body
          region invariant and what comes back is [InodeRegion.imark], the
          marker the free pool arm now carries.  One contract, because the
          two cases differ only in the payout. *)
-      ireg_out γi inum dn -∗
+      ireg_out fsc_ireg inum dn -∗
       bslots 2 -∗
       log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]}) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -484,7 +484,7 @@ Definition wp_iupdate_cred_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -592,8 +592,8 @@ Definition wp_iupdate_cred_body
   (* THE INODE REGION, and THIS INUM'S on-disk record: the exclusive
      per-inum fragment that replaced the block half (design §11.3/§12).
      [dn0] is the STALE record -- it need not equal [dn]. *)
-  ireg_inv γi fsc_fs inodestart nib -∗
-  dinode_at γi inum dn0 -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  dinode_at fsc_ireg inum dn0 -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
@@ -636,7 +636,7 @@ Definition wp_iupdate_cred_body
          region invariant and what comes back is [InodeRegion.imark], the
          marker the free pool arm now carries.  One contract, because the
          two cases differ only in the payout. *)
-      ireg_out γi inum dn -∗
+      ireg_out fsc_ireg inum dn -∗
       bslots 2 -∗
       (* THE CREDITED SPEND ([CreateBudget.iu_spend cru]): the unit comes
          BACK when the block was already in the op's set, and is spent
@@ -679,7 +679,7 @@ Definition wp_iupdate_credgen_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -753,8 +753,8 @@ Definition wp_iupdate_credgen_body
   inode_meta ip dn -∗
   inode_map fsc_fs ip bm -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  ireg_inv γi fsc_fs inodestart nib -∗
-  dinode_at γi inum dn0 -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  dinode_at fsc_ireg inum dn0 -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv γs -∗
   dev_inv γu γd -∗
@@ -784,7 +784,7 @@ Definition wp_iupdate_credgen_body
       inode_meta ip dn -∗
       inode_map fsc_fs ip bm -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      ireg_out γi inum dn -∗
+      ireg_out fsc_ireg inum dn -∗
       bslots 2 -∗
       (* EPOCH-CLOSED ON THE WAY OUT.  The credit above is an ENTRY-side
          premise -- it is spent by the flush -- and [log_write]'s own post
@@ -825,8 +825,8 @@ Definition wp_iupdate_credgen_body
 (*        kernel's NLINK_MAX guard, not as the Z equation -- see the       *)
 (*        premise itself for why the Z form is unsuppliable and what       *)
 (*        derives it (InodeRegion's (L4), the twelfth stop).               *)
-(*   (ii) the post's [InodeRegion.ireg_out γi inum dn] becomes             *)
-(*        [dinode_at γi inum dn] beside the [FsStateLink.link_tok] pile.   *)
+(*   (ii) the post's [InodeRegion.ireg_out fsc_ireg inum dn] becomes             *)
+(*        [dinode_at fsc_ireg inum dn] beside the [FsStateLink.link_tok] pile.   *)
 (*        With a nonzero type [ireg_out] IS [dinode_at], so this is the    *)
 (*        same payout plus the minted fragments -- what a written          *)
 (*        directory record needs (§20.10's finding 1) and the one thing    *)
@@ -856,7 +856,7 @@ Definition wp_iupdate_link_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -931,8 +931,8 @@ Definition wp_iupdate_link_body
   inode_meta ip dn -∗
   inode_map fsc_fs ip bm -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  ireg_inv γi fsc_fs inodestart nib -∗
-  dinode_at γi inum dn0 -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  dinode_at fsc_ireg inum dn0 -∗
   (* THE FREEZE-PIN PREMISE, IN ITS RULING A-prime FORM (iclaim-ledger.md
      §3.9; [InodeRegion.ireg_write_link_reg]'s row).  The record whose count
      this flush RAISES must not be mid-free -- a freeze is precisely the
@@ -983,7 +983,7 @@ Definition wp_iupdate_link_body
          [ireg_out] is [dinode_at] here), plus the fragments the raised
          count pays for.  They travel to the [dirlink] that files them in a
          directory's [FsStateInode.ent_toks]. *)
-      dinode_at γi inum dn -∗
+      dinode_at fsc_ireg inum dn -∗
       (* ...AND THE COUNTING RA's OWN UNIT (durable-disk 2b-inode-5), which
          is what the [dirlink] that follows files in the directory's
          [FsStateInode.ent_toks] inside its checked-out payload.  The
@@ -1027,7 +1027,7 @@ Definition wp_iupdate_link_body
 (*        is PAID FOR by consuming one, so authority and fragments fall    *)
 (*        on both sides in the same ghost step and no fragment ever        *)
 (*        outlives the count that backs it.                               *)
-(*  (iii) the payout is [dinode_at γi inum dn] alone -- the retagged       *)
+(*  (iii) the payout is [dinode_at fsc_ireg inum dn] alone -- the retagged       *)
 (*        fragment, which with a nonzero type is what [ireg_out] is.       *)
 (*   (iv) THE RECEIPT PREMISE, and it is the whole of stage C4.            *)
 (*                                                                        *)
@@ -1070,7 +1070,7 @@ Definition wp_iupdate_unlink_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
@@ -1129,8 +1129,8 @@ Definition wp_iupdate_unlink_body
   inode_meta ip dn -∗
   inode_map fsc_fs ip bm -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  ireg_inv γi fsc_fs inodestart nib -∗
-  dinode_at γi inum dn0 -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  dinode_at fsc_ireg inum dn0 -∗
   (* ...AND THE COUNTING RA's UNIT BESIDE IT (durable-disk 2b-inode-5),
      also consumed: this is the one flush in the kernel that LOWERS a
      count, so it is the one that returns a token to the region's
@@ -1170,7 +1170,7 @@ Definition wp_iupdate_unlink_body
       (* THE FLUSH, AND NOTHING MINTED (edit (iii)): the retagged fragment
          alone -- the type is nonzero, so this is [ireg_out] here -- and
          the fragment that went in is GONE, spent by the count it paid. *)
-      dinode_at γi inum dn -∗
+      dinode_at fsc_ireg inum dn -∗
       bslots 2 -∗
       log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1184,7 +1184,7 @@ Module Type IUPDATE.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1192,7 +1192,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γi
+      wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ
                             inodestart nib dev ip inum dn dn0 bm u
                             pidv dq dqd dqn dqs m K eb b lks Vpr.
 
@@ -1206,7 +1206,7 @@ Module Type IUPDATE.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1214,7 +1214,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γi
+      wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ
                           inodestart nib dev ip inum dn dn0 bm u Sb
                           pidv dq dqd dqn dqs m K eb b lks Vpr.
   (* the CREDITED set-form contract (S5a finding 3): the same walk with the
@@ -1227,7 +1227,7 @@ Module Type IUPDATE.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1235,7 +1235,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γi
+      wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ
                            inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb b lks Vpr.
   (* the credited set-form contract at itrunc's altitude: eb-generic, so a
@@ -1252,7 +1252,7 @@ Module Type IUPDATE.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1260,7 +1260,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γi
+      wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ
                               inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
                               pidv dq dqd dqn dqs m K eb b lks Vpr.
 
@@ -1276,7 +1276,7 @@ Module Type IUPDATE.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1285,7 +1285,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γi
+      wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ
                            inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pin oty pidv dq dqd dqn dqs m K eb b lks Vpr.
 
@@ -1300,7 +1300,7 @@ Module Type IUPDATE.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -1309,7 +1309,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γi
+      wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ
                              inodestart nib dev ip inum dn dn0 bm u Sb cru
                              uty pidv dq dqd dqn dqs m K eb b lks Vpr.
 End IUPDATE.

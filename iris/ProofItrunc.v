@@ -87,7 +87,7 @@ Section ItruncCont.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
 
   Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
-      (γ : log_names) (γi : gname) (bn : bio_names)
+      (γ : log_names) (bn : bio_names)
       (bmapstart inodestart size : Z)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
@@ -110,7 +110,7 @@ Section ItruncCont.
         inode_meta ip (di_trunc dn) -∗
         inode_map fsc_fs ip bm_empty -∗
         inode_blocks fsc_fs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
-        dinode_at γi inum (di_trunc dn) -∗
+        dinode_at fsc_ireg inum (di_trunc dn) -∗
         bslots 3 -∗
         (* EXACTLY u, AT EXACTLY [Sbf]: iupdate always runs, so the tail
            always spends [it_iu cru] and always logs this inode's block.
@@ -194,7 +194,7 @@ Section ItruncTail.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (γ : log_names) (γi : gname)
+      (bn : bio_names) (γ : log_names)
       (bmapstart inodestart size : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -239,8 +239,8 @@ Section ItruncTail.
     inode_meta ip dn -∗
     inode_map fsc_fs ip bm_empty -∗
     inode_blocks fsc_fs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
-    ireg_inv γi fsc_fs inodestart nib -∗
-    dinode_at γi inum dn0 -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+    dinode_at fsc_ireg inum dn0 -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -249,7 +249,7 @@ Section ItruncTail.
        a RESOURCE at the walk's own birth epoch (fs-log.md §G.20) *)
     log_credit γ cru Sb0 e0 (IBLOCK inum inodestart) -∗
     log_opSe γ (S u) Sb0 e0 -∗
-    it_cont (CID0 := CID0) γ γi bn bmapstart inodestart size
+    it_cont (CID0 := CID0) γ bn bmapstart inodestart size
             dev ip inum dn bm (if cru then S u else u)
             (Sb0 ∪ {[IBLOCK inum inodestart]})
             pidv dq dqd dqn dqb dqs j m K b eb lks Vpr -∗
@@ -363,7 +363,7 @@ Section ItruncTail.
        iput can present a GROUP witness through the whole walk, and the
        birth epoch NAMED, because a credit is only sound against the epoch
        of the op presenting it.  iupdate's own post re-closes the epoch. *)
-    iApply (IU.wp_iupdate_credgen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (IU.wp_iupdate_credgen γs j γl γu γd γk pd pav pu bn γ
               inodestart nib dev ip inum (di_trunc dn) dn0
               bm_empty u Sb0 cru e0 0%nat
               pidv dq dqd dqn dqs T1 (K - 6)%nat eb b
@@ -385,7 +385,7 @@ Section ItruncTail.
                            Hmeta Hmap Hsbi Hdn Hsl Hop Hwit".
     (* §16.4: iupdate's payout is conditional on the flushed record's type,
        and [di_trunc] keeps the type -- so this is the allocated branch *)
-    iDestruct (ireg_out_alloc_inv γi inum (di_trunc dn) Hdtnz with "Hdn")
+    iDestruct (ireg_out_alloc_inv fsc_ireg inum (di_trunc dn) Hdtnz with "Hdn")
       as "Hdn".
     assert (Hpc42 : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (IT + 0x42)) by (rewrite HT1ra; pcw).
@@ -2516,7 +2516,7 @@ Section ItruncMain.
   Lemma wp_itrunc_gen `{GEN : GenId} `{CID : CpuId}       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (γ : log_names) (γi : gname)
+      (bn : bio_names) (γ : log_names)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z)
       (dev : mword 32)
@@ -2526,7 +2526,7 @@ Section ItruncMain.
       (e0 : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γi
+    : wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ
                          bmapstart inodestart nib size dev
                          ip inum dn dn0 bm data u Sb crb cru e0
                          pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
@@ -2897,7 +2897,7 @@ Section ItruncMain.
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID14x)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (it_tail (CID0 := CID14x) γs j γl γu γd γk pd pav pu bn γ γi
+      iApply (it_tail (CID0 := CID14x) γs j γl γu γd γk pd pav pu bn γ
                 bmapstart inodestart size nib dev ip inum
                 dn dn0 bm
                 n1 Sq cru e0 pidv dq dqd dqn dqb dqs m R0 K b eb lks
@@ -2984,7 +2984,7 @@ Section ItruncMain.
                     with "Hcru") as "#Hcru2".
       iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID15y)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (it_tail (CID0 := CID15y) γs j γl γu γd γk pd pav pu bn γ γi
+      iApply (it_tail (CID0 := CID15y) γs j γl γu γd γk pd pav pu bn γ
                 bmapstart inodestart size nib dev ip inum
                 dn dn0 bm
                 n3 Sr cru e0 pidv dq dqd dqn dqb dqs m Mz K b eb lks
@@ -3032,7 +3032,7 @@ Section ItruncMain.
   Lemma wp_itrunc_sconf `{GEN : GenId} `{CID : CpuId}       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (γ : log_names) (γi : gname)
+      (bn : bio_names) (γ : log_names)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z)
       (dev : mword 32)
@@ -3041,7 +3041,7 @@ Section ItruncMain.
       (data : nat -> list (bv 8)) (u : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γi
+    : wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ
                            bmapstart inodestart nib size dev
                            ip inum dn dn0 bm data u
                            pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
@@ -3060,7 +3060,7 @@ Section ItruncMain.
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iPoseProof (log_credit_own γ false Sb0 e0 (IBLOCK inum inodestart)
                   ltac:(discriminate)) as "#Hcru".
-    iApply (wp_itrunc_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (wp_itrunc_gen γs j γl γu γd γk pd pav pu bn γ
               bmapstart inodestart nib size dev
               ip inum dn dn0 bm data u Sb0 false false e0
               pidv dq dqd dqn dqb dqs m K eb b lks

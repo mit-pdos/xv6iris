@@ -171,7 +171,7 @@ Definition wp_namei_tr_body
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gi : gname)
+    (g : log_names)
     (gtl : gname)                      (* the itable's lock   *)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (bmapstart inodestart : Z) (nib : nat)
@@ -222,11 +222,11 @@ Definition wp_namei_tr_body
   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
   log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
   kalloc_env ga None -∗
-  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs gi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv gi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   ireg_open -∗
   procs_inv gs -∗
   dev_inv gu gd -∗
@@ -302,7 +302,7 @@ Module Type NAMEI_TR.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -313,7 +313,7 @@ Module Type NAMEI_TR.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namei_tr_body gs j gl gu gd gk pd pav pu bn g gi gtl
+      wp_namei_tr_body gs j gl gu gd gk pd pav pu bn g gtl
                        ga gf bmapstart inodestart nib
                        size dev plen pfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.

@@ -1532,9 +1532,9 @@ Section ProofFilewrite.
     IcacheInv.itable_inv -∗
     (* the FAMILIES, since the slot is the carve's output and not the
        caller's to name *)
-    ic_escrows fsc_ic fsc_fs (fwn_ireg fn) fsc_cov
+    ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov
       fsc_logst -∗
-    ireg_inv (fwn_ireg fn) fsc_fs (fwn_inodestart fn) icfg_nib -∗
+    ireg_inv fsc_ireg fsc_fs (fwn_inodestart fn) icfg_nib -∗
     ic_sleeplocks fsc_ic -∗
     dev_inv (fwn_uart fn) (fwn_disk fn) -∗
     DiskInv.disk_geom (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
@@ -1738,7 +1738,7 @@ Section ProofFilewrite.
     assert (P4 : IBLOCK inum (fwn_inodestart fn)
                    ∉ log_region_set fsc_logst)
       by (apply P4q; exact P5).
-    iDestruct (ic_escrows_acc2 (fwn_ireg fn)
+    iDestruct (ic_escrows_acc2
                  ik P9 with "Hescs") as "#Hesc".
     iDestruct (ic_sleeplocks_lookup fsc_ic ik P9 with "Hslks")
       as (gil gisl) "#Hslk2".
@@ -1853,7 +1853,7 @@ Section ProofFilewrite.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Ilock.wp_ilock_tx_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
-              (fwn_bio fn) (fwn_ireg fn)
+              (fwn_bio fn)
               gil gisl
               (fwn_inodestart fn)
               icfg_nib ik (sh / 2)%Qp g (ShotK ty)
@@ -2065,7 +2065,7 @@ Section ProofFilewrite.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Writei.wp_writei_gen KT0 gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
-              (fwn_bio fn) (fwn_log fn) (fwn_ireg fn) ga gf
+              (fwn_bio fn) (fwn_log fn) ga gf
               (fwn_inodestart fn) icfg_nib
               (fwn_bmapstart fn) (fwn_size fn) icfg_dev
               (fwn_pr fn)
@@ -2252,7 +2252,7 @@ Section ProofFilewrite.
        the record and the blocks, so the ride is set and the era's abstract
        value is RETAGGED at the new node (durable-disk 2b-inode-3). *)
     iDestruct "Hfview" as "[Hfview Htop]".
-    iMod (dvw_set_rt ⊤ (fwn_ireg fn) fsc_fs (fwn_inodestart fn) icfg_nib
+    iMod (dvw_set_rt ⊤ fsc_ireg fsc_fs (fwn_inodestart fn) icfg_nib
             (bv_unsigned inum) (dv_of dnl datal) (dv_of dn' data')
             (fv_of dnl datal) (fv_of dn' data')
             ltac:(solve_ndisj) with "Hireg Hdview Hfview")
@@ -2275,7 +2275,7 @@ Section ProofFilewrite.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
       with "[Hmark]" as "Hvalid".
     { rewrite -P8. iExact "Hmark". }
-    iAssert (ic_loaded fsc_fs (fwn_ireg fn) fsc_cov
+    iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov
                fsc_logst ik inum dn' bm')
       with "[Hdnat Hmeta Hmap Hblocks Hdview Hfview Htop]" as "Hlk".
     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map. iExists data'.
@@ -2339,7 +2339,7 @@ Section ProofFilewrite.
                  (upd_upt (upd_upt V PI) P') with "Hpriv") as "[Hppid Hpbk3]".
     iDestruct (cpu_own_transport CIDwi CIDb4 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Iunlock.wp_iunlock_tx_sconf gs (fwn_ireg fn)
+    iApply (Iunlock.wp_iunlock_tx_sconf gs
               gil gisl
               ik (sh / 2)%Qp g icfg_dev
               inum dn' bm'

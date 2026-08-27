@@ -411,18 +411,18 @@ Section FsLookup.
      takes the fragment SPREAD -- "the caller holds [fnode dp (NDir ents)]
      or its components" -- and [fdir_fnode] repacks it the moment the
      caller wants the tree statement back. *)
-  Definition fdir (γi : gname) (i : Z)
+  Definition fdir (i : Z)
       (ents : gmap fname Z) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) : iProp Σ :=
-    (dinode_at γi (inum_of i) dn ∗ inode_blocks fsc_fs bm data ∗
+    (dinode_at fsc_ireg (inum_of i) dn ∗ inode_blocks fsc_fs bm data ∗
      ⌜node_rep (NDir ents) dn data⌝)%I.
 
-  Lemma fdir_intro (γi : gname) (i : Z)
+  Lemma fdir_intro (i : Z)
       (ents : gmap fname Z) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) :
     node_rep (NDir ents) dn data ->
-    dinode_at γi (inum_of i) dn -∗ inode_blocks fsc_fs bm data -∗
-    fdir γi i ents dn bm data.
+    dinode_at fsc_ireg (inum_of i) dn -∗ inode_blocks fsc_fs bm data -∗
+    fdir i ents dn bm data.
   Proof.
     intros Hrep. iIntros "Hd Hb". rewrite /fdir.
     iSplitL "Hd"; [iExact "Hd" |].
@@ -430,32 +430,32 @@ Section FsLookup.
     iPureIntro. exact Hrep.
   Qed.
 
-  Lemma fdir_fnode (γi : gname) (i : Z)
+  Lemma fdir_fnode (i : Z)
       (ents : gmap fname Z) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) :
-    fdir γi i ents dn bm data -∗ fnode γi fsc_fs i (NDir ents).
+    fdir i ents dn bm data -∗ fnode fsc_ireg fsc_fs i (NDir ents).
   Proof.
     iIntros "(Hd & Hb & %Hrep)".
-    iApply (fnode_intro γi fsc_fs i (NDir ents) dn bm data Hrep with "Hd Hb").
+    iApply (fnode_intro fsc_ireg fsc_fs i (NDir ents) dn bm data Hrep with "Hd Hb").
   Qed.
 
-  Lemma fnode_fdir (γi : gname) (i : Z)
+  Lemma fnode_fdir (i : Z)
       (ents : gmap fname Z) :
-    fnode γi fsc_fs i (NDir ents) -∗
+    fnode fsc_ireg fsc_fs i (NDir ents) -∗
       ∃ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
-        fdir γi i ents dn bm data.
+        fdir i ents dn bm data.
   Proof.
     iIntros "H". iDestruct "H" as (dn bm data) "(Hd & Hb & %Hrep)".
     iExists dn, bm, data.
-    iApply (fdir_intro γi i ents dn bm data Hrep with "Hd Hb").
+    iApply (fdir_intro i ents dn bm data Hrep with "Hd Hb").
   Qed.
 
   (* the record's type, read straight off the fragment -- what a caller
      hands dirlookup's dead panic *)
-  Lemma fdir_T_DIR (γi : gname) (i : Z)
+  Lemma fdir_T_DIR (i : Z)
       (ents : gmap fname Z) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) :
-    fdir γi i ents dn bm data -∗ ⌜di_type dn = T_DIR⌝.
+    fdir i ents dn bm data -∗ ⌜di_type dn = T_DIR⌝.
   Proof.
     iIntros "(_ & _ & %Hrep)". iPureIntro.
     exact (node_rep_T_DIR ents dn data Hrep).
@@ -473,7 +473,7 @@ End FsLookup.
      - the [di_type dn = T_DIR] premise is GONE -- [node_rep]'s NDir case
        supplies it ([node_rep_T_DIR]);
      - [inode_blocks fsc_fs bm data] in the pre and the post is replaced by
-       the directory's node fragment [fdir γi fsc_fs dpi ents dn bm data],
+       the directory's node fragment [fdir fsc_ireg fsc_fs dpi ents dn bm data],
        which CONTAINS it.  The [dinode_at] half rides through untouched:
        dirlookup never names the region;
      - each arm carries the tree-level answer beside the byte-level one;
@@ -536,7 +536,6 @@ Definition wp_dirlookup_tree_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γi : gname)
     (gtl : gname)                     (* the itable's lock   *)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (inodestart : Z) (nib : nat) (dev : mword 32)
@@ -591,7 +590,7 @@ Definition wp_dirlookup_tree_body
   i_dev ip ↦₄{dqd} dev -∗
   inode_meta ip dn -∗
   inode_map fsc_fs ip bm -∗
-  fdir γi dpi ents dn bm data -∗
+  fdir dpi ents dn bm data -∗
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's [f]) ---- *)
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- poff: a 4-byte cell, or nothing ---- *)
@@ -605,13 +604,13 @@ Definition wp_dirlookup_tree_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* the inode region: iget's premise since iclaim-ledger.md §3.3, relayed
      verbatim.  The tree layer neither reads nor names a dinode through it
      -- the hit arm's iget opens it ghost-only, on the ledger columns. *)
-  ireg_inv γi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   iref_slot -∗
   (* the directory's OUT-EDGES, borrowed for the licence and returned
      verbatim on both arms (§1.3 makes them a client-held fragment) --
@@ -634,7 +633,7 @@ Definition wp_dirlookup_tree_body
       i_dev ip ↦₄{dqd} dev -∗
       inode_meta ip dn -∗
       inode_map fsc_fs ip bm -∗
-      fdir γi dpi ents dn bm data -∗
+      fdir dpi ents dn bm data -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       proc_priv_bare pj pidv Vpr -∗
       bslot -∗
@@ -677,7 +676,6 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γi : gname)
       (gtl : gname)
       (γa : gname) (γf : gname)
       (inodestart : Z) (nib : nat) (dev : mword 32)
@@ -690,7 +688,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
-      wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn γi gtl
+      wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn gtl
                              γa γf inodestart nib dev ip bm data dn
                              dpi ents fn hasp pofv pidv dq dqd dqn
                              m K eb b lks Vpr.
@@ -712,7 +710,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
     iAssert (dlinks fsc_fs (bv_unsigned (inum_of dpi)) dn bm data)
       with "[Hedges]" as "Hedges".
     { rewrite Hkeq. iExact "Hedges". }
-    iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γi gtl
+    iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn gtl
               γa γf inodestart nib dev ip (inum_of dpi) bm data dn dn
               fn hasp pofv
               pidv dq dqd dqn m K eb b lks Vpr
@@ -736,7 +734,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
               with "[] Hcg Hcnt Hpc Hidev Hmeta Hmap
                     [Hdiat Hblocks] Hname Hppid Hbslot Hedges [Harm]").
     - iPureIntro. exact Hcs.
-    - iApply (fdir_intro γi dpi ents dn bm data Hrep with "Hdiat Hblocks").
+    - iApply (fdir_intro dpi ents dn bm data Hrep with "Hdiat Hblocks").
     - destruct found.
       + iDestruct "Harm" as "(%Hpure & Href & Hru & Hpf)".
         iSplitR.
@@ -793,22 +791,22 @@ Section FsLookupAu.
      a path -> inode function across two instants: the next iteration of a
      walk opens the invariant again, at a tree that may have moved
      (SpecNamex.v:113-124).  Nothing here weakens that ruling. *)
-  Definition dl_au (γi : gname) (Ed : coPset)
+  Definition dl_au (Ed : coPset)
       (dpi : Z) (ents : gmap fname Z) (s : fname)
       (Φt : option Z -> iProp Σ) : iProp Σ :=
     (|={⊤, Ed}=> ∃ t : fstree,
-       ⌜fs_nodes t !! dpi = None⌝ ∗ fs_rep γi fsc_fs t ∗
-       (fs_rep γi fsc_fs t
+       ⌜fs_nodes t !! dpi = None⌝ ∗ fs_rep fsc_ireg fsc_fs t ∗
+       (fs_rep fsc_ireg fsc_fs t
         ={Ed, ⊤}=∗ Φt (tree_ent (tree_ins t dpi (NDir ents)) dpi s)))%I.
 
   (* FIRING IT.  The ambient fragment is handed back untouched, which is
      what makes the update ATOMIC rather than an accessor held open; the
      receipt lands at the node's own answer, which §1 has already shown to
      be dirlookup's. *)
-  Lemma dl_au_fire (γi : gname) (Ed : coPset)
+  Lemma dl_au_fire (Ed : coPset)
       (dpi : Z) (ents : gmap fname Z) (s : fname)
       (Φt : option Z -> iProp Σ) :
-    dl_au γi Ed dpi ents s Φt ={⊤}=∗ Φt (ents !! s).
+    dl_au Ed dpi ents s Φt ={⊤}=∗ Φt (ents !! s).
   Proof.
     iIntros "Hau". iMod "Hau" as (t) "(%Hhole & Ht & Hclose)".
     iEval (rewrite tree_ins_ent) in "Hclose".
@@ -817,13 +815,13 @@ Section FsLookupAu.
 
   (* the two arms, composed: this is what a client writes in dirlookup's
      continuation, one line per arm *)
-  Lemma dl_au_found (γi : gname) (Ed : coPset)
+  Lemma dl_au_found (Ed : coPset)
       (dpi : Z) (ents : gmap fname Z) (dn : dinode)
       (data : nat -> list (bv 8)) (s : fname) (k : nat)
       (Φt : option Z -> iProp Σ) :
     node_rep (NDir ents) dn data ->
     dir_first data (dnrec dn) s = Some k ->
-    dl_au γi Ed dpi ents s Φt
+    dl_au Ed dpi ents s Φt
     ={⊤}=∗ Φt (Some (bv_unsigned (dir_inum data k))).
   Proof.
     intros Hrep Hf.
@@ -831,13 +829,13 @@ Section FsLookupAu.
     iApply dl_au_fire.
   Qed.
 
-  Lemma dl_au_miss (γi : gname) (Ed : coPset)
+  Lemma dl_au_miss (Ed : coPset)
       (dpi : Z) (ents : gmap fname Z) (dn : dinode)
       (data : nat -> list (bv 8)) (s : fname)
       (Φt : option Z -> iProp Σ) :
     node_rep (NDir ents) dn data ->
     dir_first data (dnrec dn) s = None ->
-    dl_au γi Ed dpi ents s Φt ={⊤}=∗ Φt None.
+    dl_au Ed dpi ents s Φt ={⊤}=∗ Φt None.
   Proof.
     intros Hrep Hf.
     rewrite <- (node_lookup_none ents dn data s Hrep Hf).
@@ -952,16 +950,16 @@ Section FsLookupDots.
     unfold bv_modulus in H. cbn in H. lia.
   Qed.
 
-  Lemma ic_loaded_fdir (gi : gname)
+  Lemma ic_loaded_fdir
       (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     bv_unsigned (di_type dn) = T_DIR_z ->
-    ic_loaded fsc_fs gi fsc_cov fsc_logst k inum dn bm -∗
+    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗
       ∃ data : nat -> list (bv 8),
-        fdir gi (bv_unsigned inum)
+        fdir (bv_unsigned inum)
              (dir_view data (dnrec dn)) dn bm data ∗
-        (fdir gi (bv_unsigned inum)
+        (fdir (bv_unsigned inum)
               (dir_view data (dnrec dn)) dn bm data -∗
-         ic_loaded fsc_fs gi fsc_cov fsc_logst k inum dn bm).
+         ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm).
   Proof.
     intros Hty.
     iIntros "H". iDestruct (ic_loaded_open with "H") as (data)
@@ -978,25 +976,25 @@ Section FsLookupDots.
       iPureIntro. exact Hrep. }
     iIntros "Hfd". rewrite /fdir inum_of_self.
     iDestruct "Hfd" as "(Hdiat & Hblocks & _)".
-    iApply (ic_mk_loaded fsc_fs gi fsc_cov fsc_logst k inum dn bm data
+    iApply (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm data
               Hiok Hrl Hdok Hddix Hdoc Hduq
               with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdv Hfv Htop").
   Qed.
 
   (* ...and the [fnode] form, which is what a client of F1b asks for. *)
-  Lemma ic_loaded_fnode (gi : gname)
+  Lemma ic_loaded_fnode
       (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     bv_unsigned (di_type dn) = T_DIR_z ->
-    ic_loaded fsc_fs gi fsc_cov fsc_logst k inum dn bm -∗
+    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗
       ∃ data : nat -> list (bv 8),
-        fnode gi fsc_fs (bv_unsigned inum)
+        fnode fsc_ireg fsc_fs (bv_unsigned inum)
               (NDir (dir_view data (dnrec dn))) ∗
-        (fdir gi (bv_unsigned inum)
+        (fdir (bv_unsigned inum)
               (dir_view data (dnrec dn)) dn bm data -∗
-         ic_loaded fsc_fs gi fsc_cov fsc_logst k inum dn bm).
+         ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm).
   Proof.
     intros Hty. iIntros "H".
-    iDestruct (ic_loaded_fdir gi k inum dn bm Hty with "H")
+    iDestruct (ic_loaded_fdir k inum dn bm Hty with "H")
       as (data) "[Hfd Hback]".
     iExists data. iSplitR "Hback"; [| iExact "Hback"].
     iApply (fdir_fnode with "Hfd").

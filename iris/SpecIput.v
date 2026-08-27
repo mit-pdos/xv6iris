@@ -134,7 +134,7 @@ Definition wp_iput_sconf_body
     (gu : uart_names) (gd : disk_names) (gk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gi : gname)
+    (g : log_names)
     (gtl : gname)                                     (* itable.lock         *)
     (gil gisl : gname)                                (* ip->lock            *)
     (bmapstart inodestart : Z) (nib : nat)
@@ -206,14 +206,14 @@ Definition wp_iput_sconf_body
   log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
   (* the itable spinlock over the v2 resource; §13.11's trailing device *)
-  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   (* the [ref] words *)
   itable_inv -∗
   (* THIS slot's escrow -- iput knows its slot, so unlike iget it needs no
      ic_escrows family *)
-  ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst k -∗
+  ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
   (* the inode region *)
-  ireg_inv gi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   (* THE SEALED REGIME, AT THE RUNTIME ARM (iclaim-ledger.md §6′, RULING G;
      SPECIALIZED BY SIMP-1).  iput's free path FREEZES the inode
      ([InodeRegion.ireg_freeze_au] at +0x50), and §2.3's boot-shelter clause
@@ -359,7 +359,7 @@ Definition wp_iput_gen_body
     (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names) (gi : gname)
+    (g : log_names)
     (gtl : gname)
     (gil gisl : gname)
     (bmapstart inodestart : Z) (nib : nat)
@@ -405,10 +405,10 @@ Definition wp_iput_gen_body
   panic_env -∗
   bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
   log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
-  is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst k -∗
-  ireg_inv gi fsc_fs inodestart nib -∗
+  ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING G).
      iput's free path FREEZES the inode ([InodeRegion.ireg_freeze_au] at
      +0x50), and §2.3's boot-shelter clause makes a freezer exhibit the regime
@@ -506,7 +506,7 @@ Module Type IPUT.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname) (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -515,7 +515,7 @@ Module Type IPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gi gtl gil gisl
+      wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gtl gil gisl
                           bmapstart inodestart nib size dev
                           k q inum n pidv dq dqb dqs m K eb b lks Vpr.
   (* the credited set-form contract; [wp_iput_sconf] is this at
@@ -529,7 +529,7 @@ Module Type IPUT.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname) (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -539,7 +539,7 @@ Module Type IPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool),
-      wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl gil gisl
+      wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gtl gil gisl
                        bmapstart inodestart nib size dev
                        k q inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr rg.
 End IPUT.

@@ -881,10 +881,10 @@ Section ProofSysChdirBody.
   (* the two per-slot projections out of the boot families, at the copies
      THIS contract names ([ic_escrows] is IcacheEscrow's, [ic_sleeplocks]
      SpecDirlink's -- see the worklist's trap 3). *)
-  Lemma sc_esc_acc (gi : gname)
+  Lemma sc_esc_acc
       (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows fsc_ic fsc_fs gi fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst k
+    (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -915,7 +915,7 @@ Section ProofSysChdirBody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -924,7 +924,7 @@ Section ProofSysChdirBody.
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-    wp_sys_chdir_sconf_body gf ga gs j gl gu gd gk pd pav pu bn g gi
+    wp_sys_chdir_sconf_body gf ga gs j gl gu gd gk pd pav pu bn g
                             gtl bmapstart inodestart nib
                             size dev dqb dqs v pid V m K eb b lks.
   Proof.
@@ -1417,7 +1417,7 @@ Section ProofSysChdirBody.
       iDestruct (cpu_own_transport CID15 CID19 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Namei.wp_namei_gen (CID := CID19) gs j gl gu gd gk pd pav pu bn
-                g gi gtl ga gf bmapstart inodestart nib
+                g gtl ga gf bmapstart inodestart nib
                 size dev pk bf MAXOPBLOCKS Sb0
                 pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                 N1 (K - 20)%nat eb b lks
@@ -1507,7 +1507,7 @@ Section ProofSysChdirBody.
         iDestruct "Hrefip" as "[Hkeep Hshr]".
         iEval (rewrite inode_shr_gen_intro) in "Hshr".
         iDestruct "Hshr" as (gsh) "Hshr".
-        iDestruct (sc_esc_acc gi kk Hkk with "Hescrows")
+        iDestruct (sc_esc_acc kk Hkk with "Hescrows")
           as "#Hesck".
         iDestruct (sc_slk_acc kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
         iDestruct (sc_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
@@ -1554,7 +1554,7 @@ Section ProofSysChdirBody.
            the descriptor conjunct crosses the window. *)
         iEval (rewrite Hclog) in "Htx".
         iApply (Ilock.wp_ilock_tx_sconf (CID := CID23) gs j gl gu gd gk pd pav pu
-                  bn gi gil gisl inodestart nib
+                  bn gil gisl inodestart nib
                   kk (qq/2)%Qp gsh PlainK dev inum pid (DfracOwn (1/4)) dqs
                   P0 (K - 20)%nat eb b lks
                   (upd_upt V P') ltac:(lia) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP0a0
@@ -1713,7 +1713,7 @@ Section ProofSysChdirBody.
           assert (HP4thr : sc_thr m P4).
           { intros c Hc N2' N8 N9 N18. rewrite /P4 upd_ne; [| regne].
             exact (HP3thr c Hc N2' N8 N9 N18). }
-          iAssert (ic_loaded fsc_fs gi fsc_cov fsc_logst kk inum dn bm)
+          iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn bm)
             with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Hdview
                    Hfview]"
             as "Hload".
@@ -1734,7 +1734,7 @@ Section ProofSysChdirBody.
              half the [ilock] parked. *)
           iDestruct (cpu_own_transport CID24 CID29 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
-          iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID29) gs gi gil gisl
+          iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID29) gs gil gisl
                     kk (qq/2)%Qp gsh dev inum dn bm
                     pid (DfracOwn (1/4)) P4 (K - 20)%nat eb pj b lks
                     (upd_upt V P') ltac:(lia) Hkk HP4a0 (Hlb "sleep lock"%string)
@@ -1831,7 +1831,7 @@ Section ProofSysChdirBody.
           assert (Hinbc : bv_unsigned inumc < 16 * Z.of_nat nib)
             by (rewrite Hcnib; exact Hinumcc).
           destruct (Hiregb inumc Hinbc) as [Hiblkc Hiblogc].
-          iDestruct (sc_esc_acc gi kc Hkc with "Hescrows")
+          iDestruct (sc_esc_acc kc Hkc with "Hescrows")
             as "#Hescc".
           iDestruct (sc_slk_acc kc Hkc with "Hslks") as (gilc gislc) "#Hslkc".
           iDestruct (sc_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
@@ -1839,7 +1839,7 @@ Section ProofSysChdirBody.
           iDestruct (cpu_own_transport CID30 CID32 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (Iput.wp_iput_sconf (CID := CID32) gs j gl gu gd gk pd pav pu bn
-                    g gi gtl gilc gislc bmapstart inodestart
+                    g gtl gilc gislc bmapstart inodestart
                     nib size dev kc qc inumc n1 pid (DfracOwn (1/4)) dqb dqs
                     P6 (K - 20)%nat eb b lks
                     (upd_upt V P') ltac:(lia) Hclog Hkc Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -2087,7 +2087,7 @@ Section ProofSysChdirBody.
           assert (HQ1thr : sc_thr m Q1).
           { intros c Hc N2' N8 N9 N18. rewrite /Q1 upd_ne; [| regne].
             exact (HQ0thr c Hc N2' N8 N9 N18). }
-          iAssert (ic_loaded fsc_fs gi fsc_cov fsc_logst kk inum dn bm)
+          iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn bm)
             with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Hdview
                    Hfview]"
             as "Hload".
@@ -2111,7 +2111,7 @@ Section ProofSysChdirBody.
           iDestruct (cpu_own_transport CID24 CID29 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID29) gs j gl gu gd gk
-                    pd pav pu bn g gi gtl gil gisl bmapstart
+                    pd pav pu bn g gtl gil gisl bmapstart
                     inodestart nib size dev kk (qq/2)%Qp (qq/2)%Qp gsh inum
                     dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                     Q1 (K - 20)%nat eb b lks

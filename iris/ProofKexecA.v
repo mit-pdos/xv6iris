@@ -321,7 +321,7 @@ Section KexecABody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -369,7 +369,7 @@ Section KexecABody.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gi gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gtl
               inodestart nib dev -∗
     kalloc_env ga None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -599,7 +599,7 @@ Section KexecABody.
        leaving it is [LogInv.log_opS_op]; nothing else in the phase moves.
        (sys_chdir did this first -- SpecSysChdir.v's ledger section.) ---- *)
     iDestruct (log_op_openS with "Hlog") as (Sb0) "[Hlog Htx]".
-    iApply (Namei.wp_namei_gen gs jp gl gu gd gk pd pav pu bn g gi gtl
+    iApply (Namei.wp_namei_gen gs jp gl gu gd gk pd pav pu bn g gtl
               ga gf bmapstart inodestart nib size dev
               plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs dqpv
               N5 (K - 68)%nat eb eb lks
@@ -864,7 +864,7 @@ Section KexecABody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -916,7 +916,7 @@ Section KexecABody.
     m !!! Regidx Rs1 = s10 ->
     m !!! Regidx Rs2 = s20 ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gi gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gtl
               inodestart nib dev -∗
     (* ---- THE HEADER ORACLE (N-5.2B) ------------------------------------
        ONE ghost step, fired at the instant ilock's payload is open and
@@ -999,7 +999,7 @@ Section KexecABody.
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
-        ic_loaded fsc_fs gi fsc_cov fsc_logst kf inumf dnf bmf -∗
+        ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf -∗
         (* SpecIlock v5's additive type witness, at the generation the
            share names -- what SpecIunlockput now needs at +0x064. *)
         ity_shot gyf (di_type dnf) -∗
@@ -1061,7 +1061,7 @@ Section KexecABody.
     assert (Hib' : bv_unsigned inum < 16 * Z.of_nat nib)
       by (rewrite Hnib; exact Hib).
     destruct (Hiregb inum Hib') as [Hibc Hibl].
-    iDestruct (T.kxa_esc_acc gi k Hk with "Hesc") as "#Hesck".
+    iDestruct (T.kxa_esc_acc k Hk with "Hesc") as "#Hesck".
     iDestruct (ic_sleeplocks_lookup fsc_ic k Hk with "Hslks") as (gilk gislk) "#Hslkk".
     iDestruct (T.kxa_bs3_split with "Hbs") as "[Hbs1 Hbs2]".
     (* ---- open the process for the pid quarter ---- *)
@@ -1156,7 +1156,7 @@ Section KexecABody.
        seam is the BUDGET half. *)
     iDestruct (log_op_split with "Hlog") as "[Hlog Htx]".
     iEval (rewrite Htlog) in "Htx".
-    iApply (Ilock.wp_ilock_tx_sconf gs jp gl gu gd gk pd pav pu bn gi
+    iApply (Ilock.wp_ilock_tx_sconf gs jp gl gu gd gk pd pav pu bn
               gilk gislk inodestart nib k (q/2)%Qp gy PlainK
               dev inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat eb eb lks
@@ -1551,7 +1551,7 @@ Section KexecABody.
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDrd CID15 eb (proc_addr jp)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-        iAssert (ic_loaded fsc_fs gi fsc_cov fsc_logst k inum dnl bml)
+        iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dnl bml)
           with "[Hdiat Hmeta Hmap Hblocks Hdlk Hdview Hfview Htopl]" as "Hload".
         { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map. iExists datl.
           iSplitR; [iPureIntro; split_and!;
@@ -1657,7 +1657,7 @@ Section KexecABody.
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDrd CID15 eb (proc_addr jp)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-        iAssert (ic_loaded fsc_fs gi fsc_cov fsc_logst k inum dnl bml)
+        iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dnl bml)
           with "[Hdiat Hmeta Hmap Hblocks Hdlk Hdview Hfview Htopl]" as "Hload".
         { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map. iExists datl.
           iSplitR; [iPureIntro; split_and!;
@@ -1688,7 +1688,7 @@ Section KexecABody.
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _ Hcr15
                      with "Hcont") as "Hcont".
         iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
-      iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gi gtl
+      iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gtl
                   gilk gislk ga gf bmapstart inodestart nib size
                   dev k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                   plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
@@ -1740,7 +1740,7 @@ Section KexecABody.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDrd CID11 eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-      iAssert (ic_loaded fsc_fs gi fsc_cov fsc_logst k inum dnl bml)
+      iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dnl bml)
         with "[Hdiat Hmeta Hmap Hblocks Hdlk Hdview Hfview Htopl]" as "Hload".
       { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map. iExists datl.
         iSplitR; [iPureIntro; split_and!;
@@ -1770,7 +1770,7 @@ Section KexecABody.
       iDestruct (wp_next_retarget CID0 CID11 true (proc_addr jp) _ Hcr11
                    with "Hcont") as "Hcont".
       iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
-      iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gi gtl
+      iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gtl
                 gilk gislk ga gf bmapstart inodestart nib size
                 dev k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
@@ -1848,7 +1848,7 @@ Section KexecAMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -1904,7 +1904,7 @@ Section KexecAMain.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
-    fs_fabric gs gu gd gk pd pav pu bn g gi gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gtl
               inodestart nib dev -∗
     (* THE HEADER ORACLE, relayed to [kxc_a2] -- see its statement.  Phase A
        is the block that FINDS the inum, so the oracle is quantified over it
@@ -1986,7 +1986,7 @@ Section KexecAMain.
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
-        ic_loaded fsc_fs gi fsc_cov fsc_logst kf inumf dnf bmf -∗
+        ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf -∗
         (* SpecIlock v5's additive type witness, at the generation the
            share names -- what SpecIunlockput now needs at +0x064. *)
         ity_shot gyf (di_type dnf) -∗
@@ -2026,7 +2026,7 @@ Section KexecAMain.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab Horacle #Hka Hbm Hins #Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont #Hkw Hcont90".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
-    iApply (kxc_a1 (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn g gi gtl ga gf
+    iApply (kxc_a1 (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn g gtl ga gf
               bmapstart inodestart nib size dev
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m K eb b lks sp0 ra0 s00 s10 s20 pv av KEX
@@ -2039,7 +2039,7 @@ Section KexecAMain.
     iIntros (CIDs Hss M32 ipv zi n1) "Hseam Hexit".
     iDestruct (wp_next_retarget CID0 CIDs true (proc_addr jp) _ Hss
                  with "Hcont90") as "Hcont90".
-    iApply (kxc_a2 (CID0 := CIDs) Q gs jp gl gu gd gk pd pav pu bn g gi gtl ga gf
+    iApply (kxc_a2 (CID0 := CIDs) Q gs jp gl gu gd gk pd pav pu bn g gtl ga gf
               bmapstart inodestart nib size dev
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 HD XCH KEX

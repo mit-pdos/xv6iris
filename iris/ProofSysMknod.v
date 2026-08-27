@@ -978,10 +978,10 @@ Section ProofSysMknodBody.
   (* the per-slot projection out of the boot family, at the copy THIS
      contract names ([ic_escrows] is IcacheEscrow's -- see fs-sysfile's
      trap 3 on the four [ic_sleeplocks] copies, which bites the same way). *)
-  Lemma mn_esc_acc (gi : gname)
+  Lemma mn_esc_acc
       (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows fsc_ic fsc_fs gi fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst k
+    (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -995,7 +995,7 @@ Section ProofSysMknodBody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
@@ -1005,7 +1005,7 @@ Section ProofSysMknodBody.
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-    wp_sys_mknod_sconf_body gf ga gpr gs j gl gu gd gk pd pav pu bn g gi
+    wp_sys_mknod_sconf_body gf ga gpr gs j gl gu gd gk pd pav pu bn g
                             gtl bmapstart inodestart nib
                             ninodes size dev ns dqb dqs dqbs dqn v0 v1 v2
                             pid V m K eb b lks.
@@ -1658,7 +1658,7 @@ Section ProofSysMknodBody.
       iDestruct (cpu_own_transport CID19 CID25 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Create.wp_create_sconf (CID := CID25) gs j gl gu gd gk pd pav pu
-                bn g gi gtl ga gf gpr bmapstart inodestart
+                bn g gtl ga gf gpr bmapstart inodestart
                 nib ninodes size dev pk bf
                 SpecCreate.T_DEVICE (hw_lo (arg_int32 v1)) (hw_lo (arg_int32 v2))
                 (upd_upt V P') MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
@@ -1736,7 +1736,7 @@ Section ProofSysMknodBody.
            erased reference, so weaken it back here.  One line, and the
            name is what sys_open's O_CREATE arm needs kept. *)
         iDestruct (inode_ref_short_gen_forget with "Href") as "Href".
-        iDestruct (mn_esc_acc gi kk ltac:(lia)
+        iDestruct (mn_esc_acc kk ltac:(lia)
                      with "Hescrows") as "#Hesc".
         (* CREATE'S PAYOUT IS THE ARMED DESCRIPTOR (durable-disk B''-tx2):
            the escrow parked half of the transaction's element at create's
@@ -1750,7 +1750,7 @@ Section ProofSysMknodBody.
         iDestruct (cpu_own_transport CID26 CID28 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID28) gs j gl gu gd gk
-                  pd pav pu bn g gi gtl gil gisl bmapstart
+                  pd pav pu bn g gtl gil gisl bmapstart
                   inodestart nib size dev kk qi ss gy inum dn bm un1
                   pid (DfracOwn (1/4)) dqb dqs P0 (K - 20)%nat eb b lks
                   (upd_upt V P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0

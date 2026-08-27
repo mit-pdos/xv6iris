@@ -189,7 +189,7 @@ Definition wp_ireclaim_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (gtl : gname)                     (* the itable's lock   *)
     (γpr : gname)
     (bmapstart inodestart : Z)
@@ -272,7 +272,7 @@ Definition wp_ireclaim_sconf_body
   (* THE INODE REGION -- persistent.  ireclaim never claims and never writes
      a dinode, so [DinodeSlot.diblk_slot_acc] is all its scan needs and
      [InodeRegion.ireg_claim_au] never appears. *)
-  ireg_inv γi fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
   (* THE BOOT-SHELTER TOKEN (fs-fragments.md §7.12 / §7.1.7).  ireclaim's [iget]
      fires at a claim-SHAPED record (type ≠ 0, nlink 0); the licence alone does
      not exclude a mid-window claim box, and the exclusion is the boot-order
@@ -282,9 +282,9 @@ Definition wp_ireclaim_sconf_body
      only caller, hands it in and takes it back. *)
   ireg_boot -∗
   (* ---- THE ICACHE, as iget / ilock / iput take it ---- *)
-  is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+  is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
   itable_inv -∗
-  ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* THE FIFTY ENTRY SLEEPLOCKS, as a family: the scan does not know which
      slot iget will pick.  [IcacheEscrow.ic_sleeplocks_lookup] projects it. *)
   ic_sleeplocks fsc_ic -∗
@@ -344,7 +344,7 @@ Module Type IRECLAIM.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γpr : gname)
       (bmapstart inodestart : Z)
@@ -353,7 +353,7 @@ Module Type IRECLAIM.
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γi gtl γpr
+      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ gtl γpr
                              bmapstart inodestart ninodes nib size
                              dev pidv dq dqb dqs dqn m K eb b lks Vpr.
 End IRECLAIM.

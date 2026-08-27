@@ -460,7 +460,6 @@ Section UsertrapRes.
     un_dqi : dfrac;
     un_kl  : gname;                   (* kmem.lock                          *)
     un_ka  : gname * gname;
-    un_i   : gname;                   (* the inode region's ghost            *)
     un_tl  : gname;                   (* itable.lock                        *)
     un_bmapstart : Z;
     un_inodestart : Z;
@@ -479,7 +478,7 @@ Section UsertrapRes.
       (un_u N) (un_v N) (un_k N) (un_pd N) (un_pav N) (un_pu N)
       (un_bn N) (un_lg N) (un_dev N)
       (un_pid N) (DfracOwn (1/4))
-      (un_i N) (un_tl N) (un_bmapstart N) (un_inodestart N)
+      (un_tl N) (un_bmapstart N) (un_inodestart N)
       (un_nib N) (un_size N).
 
   (* NO FIELD OF [ut_names] MOVES ACROSS A SYSCALL.  The block bitmap used
@@ -692,11 +691,11 @@ Section UsertrapRes.
        than at [un_fn]'s projections of them, so every [rewrite] below is
        syntactic.  [Hties] itself is kept whole: it is conjunct 17. *)
     pose proof Hties as Ht.
-    destruct Ht as [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hlog Hdevn Hireg Htlock Hbms Hist Hnib Hsize].
+    destruct Ht as [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hlog Hdevn Htlock Hbms Hist Hnib Hsize].
     cbn [un_fn fcn_uart fcn_disk fcn_dlock fcn_kmem fcn_kalloc fcn_bio
-         fcn_log fcn_dev fcn_ireg
+         fcn_log fcn_dev
          fcn_tlock fcn_bmapstart fcn_inodestart fcn_nib fcn_size]
-      in Huart, Hdisk, Hdlock, Hkmem, Hkalloc, Hbio, Hlog, Hdevn, Hireg, Htlock, Hbms, Hist, Hnib, Hsize.
+      in Huart, Hdisk, Hdlock, Hkmem, Hkalloc, Hbio, Hlog, Hdevn, Htlock, Hbms, Hist, Hnib, Hsize.
     (* THE DISK FABRIC, and it is the only row that is not a copy: the
        record's three pages are identified with [fs_ready]'s witness by the
        persistent cells both [disk_geom]s read. *)

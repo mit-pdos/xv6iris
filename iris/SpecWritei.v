@@ -513,7 +513,7 @@ Definition wp_writei_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -658,8 +658,8 @@ Definition wp_writei_sconf_body
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
-  ireg_inv γi fsc_fs inodestart nib -∗
-  dinode_at γi inum dn0 -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  dinode_at fsc_ireg inum dn0 -∗
   (* THE SOURCE, AND THE PID CELL THAT RIDES WITH IT.  On the user arm a
      virtual address into the running process's own space; on the kernel arm
      the caller's own byte buffer, returned unchanged.
@@ -767,7 +767,7 @@ Definition wp_writei_sconf_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      dinode_at γi inum dn0' -∗
+      dinode_at fsc_ireg inum dn0' -∗
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
       (if user
@@ -797,7 +797,7 @@ Definition wp_writei_gen_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -932,8 +932,8 @@ Definition wp_writei_gen_body
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
-  ireg_inv γi fsc_fs inodestart nib -∗
-  dinode_at γi inum dn0 -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  dinode_at fsc_ireg inum dn0 -∗
   (* THE SOURCE, AND THE PID CELL THAT RIDES WITH IT.  On the user arm a
      virtual address into the running process's own space; on the kernel arm
      the caller's own byte buffer, returned unchanged.
@@ -1051,7 +1051,7 @@ Definition wp_writei_gen_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      dinode_at γi inum dn0' -∗
+      dinode_at fsc_ireg inum dn0' -∗
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
       (if user
@@ -1071,7 +1071,7 @@ Module Type WRITEI.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (γa : gname) (γf : gname)
       (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -1084,7 +1084,7 @@ Module Type WRITEI.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_writei_sconf_body ktb γs j γl γu γd γk pd pav pu bn γ γi γa γf
+      wp_writei_sconf_body ktb γs j γl γu γd γk pd pav pu bn γ γa γf
                            inodestart nib bmapstart size dev γpr
                            ip inum bm data dn dn0
                            user off n src_bytes V ncount
@@ -1100,7 +1100,7 @@ Module Type WRITEI.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (γa : gname) (γf : gname)
       (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
@@ -1113,7 +1113,7 @@ Module Type WRITEI.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_writei_gen_body ktb γs j γl γu γd γk pd pav pu bn γ γi γa γf
+      wp_writei_gen_body ktb γs j γl γu γd γk pd pav pu bn γ γa γf
                          inodestart nib bmapstart size dev γpr
                          ip inum bm data dn dn0
                          user off n src_bytes V ncount Sb

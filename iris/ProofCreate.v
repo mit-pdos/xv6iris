@@ -1508,10 +1508,10 @@ Section ProofCreateMain.
 
   (* the escrow-family accessor, at create's own persistent bundles.  The
      sleeplock family's is [IcacheEscrow.ic_sleeplocks_lookup]. *)
-    Lemma cr_esc_acc (γi : gname)
+    Lemma cr_esc_acc
       (k : nat) :
     (k < NINODE)%nat ->
-    (ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs γi fsc_cov fsc_logst k
+    (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -1666,7 +1666,7 @@ Section ProofCreateMain.
   Qed.
 
   Definition cr_cont_body
-      (γi : gname) (γ : log_names)
+      (γ : log_names)
       (γf : gname) (bn : bio_names)
       (bmapstart inodestart : Z) (nib : nat)
       (ninodes size : Z) (dev : mword 32)
@@ -1716,7 +1716,7 @@ Section ProofCreateMain.
                            dn = create_made ty major minor)
                   else ty = T_FILE
                        /\ (di_type dn = T_FILE \/ di_type dn = T_DEVICE))⌝ ∗
-          create_locked γi dev pidv k qi s g inum dn bm
+          create_locked dev pidv k qi s g inum dn bm
         else ⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗ log_tx γ) -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -2038,7 +2038,7 @@ Section ProofCreateMain.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa γf γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -2111,7 +2111,7 @@ Section ProofCreateMain.
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
        dlinks fsc_fs (bv_unsigned dind) dn bm data -∗
-       dinode_at γi dind dn -∗
+       dinode_at fsc_ireg dind dn -∗
        inode_meta (ientry kd) dn -∗
        inode_map fsc_fs (ientry kd) bm -∗
        inode_blocks fsc_fs bm data -∗
@@ -2152,7 +2152,7 @@ Section ProofCreateMain.
           retargeting, so this file hands over [Hcont] untouched. *)
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
-            cr_cont_body γi γ γf bn bmapstart inodestart
+            cr_cont_body γ γf bn bmapstart inodestart
                          nib ninodes size dev plen pfun pv ty major minor
                          V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                          ret_tgt CIDc) -∗
@@ -2188,7 +2188,7 @@ Section ProofCreateMain.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa γf γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -2286,7 +2286,7 @@ Section ProofCreateMain.
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
        dlinks fsc_fs (bv_unsigned dind) dn bm data -∗
-       dinode_at γi dind dn -∗
+       dinode_at fsc_ireg dind dn -∗
        inode_meta (ientry kd) dn -∗
        inode_map fsc_fs (ientry kd) bm -∗
        inode_blocks fsc_fs bm data -∗
@@ -2316,7 +2316,7 @@ Section ProofCreateMain.
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
        i_valid (ientry kslot) ↦₄ valid_word true -∗
        dlinks fsc_fs (bv_unsigned cinum) dnc bmc datc -∗
-       dinode_at γi cinum (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
+       dinode_at fsc_ireg cinum (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
        inode_meta (ientry kslot)
                   (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
        inode_map fsc_fs (ientry kslot) bmc -∗
@@ -2363,7 +2363,7 @@ Section ProofCreateMain.
        cr_dirty t (bv_unsigned cinum) -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
-            cr_cont_body γi γ γf bn bmapstart inodestart
+            cr_cont_body γ γf bn bmapstart inodestart
                          nib ninodes size dev plen pfun pv ty major minor
                          V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                          ret_tgt CIDc) -∗
@@ -2373,7 +2373,7 @@ Section ProofCreateMain.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa γf γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -2498,7 +2498,7 @@ Section ProofCreateMain.
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
        dlinks fsc_fs (bv_unsigned dind) dn bm data -∗
-       dinode_at γi dind dn0' -∗
+       dinode_at fsc_ireg dind dn0' -∗
        inode_meta (ientry kd) dn' -∗
        inode_map fsc_fs (ientry kd) bm' -∗
        inode_blocks fsc_fs bm' data' -∗
@@ -2530,7 +2530,7 @@ Section ProofCreateMain.
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
        i_valid (ientry kslot) ↦₄ valid_word true -∗
        dlinks fsc_fs (bv_unsigned cinum) dnc bmc datc -∗
-       dinode_at γi cinum (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
+       dinode_at fsc_ireg cinum (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
        inode_meta (ientry kslot)
                   (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
        inode_map fsc_fs (ientry kslot) bmc -∗
@@ -2575,7 +2575,7 @@ Section ProofCreateMain.
        t ↪[ln_tx γ]{#(1/2)} tt -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
-            cr_cont_body γi γ γf bn bmapstart inodestart
+            cr_cont_body γ γf bn bmapstart inodestart
                          nib ninodes size dev plen pfun pv ty major minor
                          V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                          ret_tgt CIDc) -∗
@@ -2591,7 +2591,7 @@ Section ProofCreateMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa γf γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -2645,11 +2645,11 @@ Section ProofCreateMain.
     bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
     log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
     kalloc_env γa None -∗
-    is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
-    ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+    ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
-    ireg_inv γi fsc_fs inodestart nib -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     ireg_open -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -2671,7 +2671,7 @@ Section ProofCreateMain.
     log_tx γ -∗
     (* ---- THE PARKED ALLOCATE HALF, as a HYPOTHESIS ---- *)
     wp_next true (proc_addr j) (fun CIDa : CpuId =>
-      cr_alloc_body γs j γl γu γd γk pd pav pu bn γ γi gtl γa γf γpr
+      cr_alloc_body γs j γl γu γd γk pd pav pu bn γ gtl γa γf γpr
                     bmapstart inodestart nib ninodes size dev
                     plen pfun (m !!! Regidx Ra0 : mword 64)
                     ty major minor V u Sb ns pidv dqb dqs dqbs dqn m
@@ -2679,7 +2679,7 @@ Section ProofCreateMain.
                     (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks CIDa) -∗
     (* ---- the contract's own continuation ---- *)
     wp_next true (proc_addr j) (fun CIDc : CpuId =>
-      cr_cont_body γi γ γf bn bmapstart inodestart nib
+      cr_cont_body γ γf bn bmapstart inodestart nib
                    ninodes size dev plen pfun (m !!! Regidx Ra0 : mword 64)
                    ty major minor V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                    (ret_pc (m !!! Regidx Rra : mword 64)) CIDc) -∗
@@ -2992,7 +2992,7 @@ Section ProofCreateMain.
     iEval (rewrite -HR7a1) in "Hnb14".
     iDestruct (cpu_own_transport CID CID14 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (NP.wp_nameiparent_gen γs j γl γu γd γk pd pav pu bn γ γi gtl
+    iApply (NP.wp_nameiparent_gen γs j γl γu γd γk pd pav pu bn γ gtl
               γa γf bmapstart inodestart nib size dev
               plen pfun nf0 u Sb pidv (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
               R7 (K - 10)%nat eb b lks V
@@ -3089,7 +3089,7 @@ Section ProofCreateMain.
       iEval (rewrite -Hdev) in "Href".
       iEval (rewrite cr_shed_gen) in "Href".
       iDestruct "Href" as "[Hkeep Hshr]".
-      iDestruct (cr_esc_acc γi kd Hkd with "Hesc") as "#Hescd".
+      iDestruct (cr_esc_acc kd Hkd with "Hesc") as "#Hescd".
       iDestruct (ic_sleeplocks_lookup fsc_ic kd Hkd with "Hslks") as (gild gisld) "#Hslkd".
       iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
       iDestruct (proc_priv_bare_acc γf (proc_addr j) pidv V with "Hpriv")
@@ -3129,7 +3129,7 @@ Section ProofCreateMain.
       iDestruct (log_tx_open with "Htx") as (t) "Htw".
       iDestruct (log_tx_split icfg_log t 1 (1/2) (1/2)
                    (eq_sym Qp.half_half) with "Htw") as "[Htp Htx]".
-      iApply (IL.wp_ilock_dep_sconf γs j γl γu γd γk pd pav pu bn γi
+      iApply (IL.wp_ilock_dep_sconf γs j γl γu γd γk pd pav pu bn
                 gild gisld inodestart nib kd (qd/2)%Qp gd
                 (DepTx (qd/2)%Qp dev dind gd t (1/2)) PlainK
                 dev dind
@@ -3211,7 +3211,7 @@ Section ProofCreateMain.
         iAssert (inode_meta (ientry kd) dnl)
           with "[Hity Himaj Himin Hinl Hisz]" as "Hmetal".
         { rewrite /inode_meta /i_type /i_nlink. iFrame. }
-        iDestruct (ic_mk_loaded fsc_fs γi fsc_cov fsc_logst kd dind dnl bml datl
+        iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dnl bml datl
                      Hiok Hrl_datl Hdok Hddix Hdoc Hduq
                      with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks Hdview Hfview
                            Htop")
@@ -3269,7 +3269,7 @@ Section ProofCreateMain.
            bundleless out-state stands across the call. *)
         iDestruct (log_opS_named with "Hop") as (e0) "Hop".
         iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-        iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γi
+        iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ
                   gtl gild gisld bmapstart inodestart nib size dev
                   kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
                   false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
@@ -3556,7 +3556,7 @@ Section ProofCreateMain.
            and go back into the payload with the same node. *)
         assert (Hholesl : blk_holes_zero bml datl)
           by (destruct Hiok as (_ & _ & _ & _ & _ & Hq & _); exact Hq).
-        iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γi
+        iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn
                   gtl γa γf inodestart nib dev (ientry kd) dind bml datl
                   dnl dnl nfp
                   false (mword_of_int 0 : mword 32)
@@ -3700,7 +3700,7 @@ Section ProofCreateMain.
           assert (HF3regs : cr_regs m sp0 ipv (ientry kslot) ty major minor F3)
             by (rewrite /F3; apply cr_regs_caller; [exact Hcsra | exact HF2regs]).
           iDestruct "Hmap" as "[Haddrs Hind]".
-          iDestruct (ic_mk_loaded fsc_fs γi fsc_cov fsc_logst kd dind dnl bml datl
+          iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dnl bml datl
                        Hiok Hrl_datl Hdok Hddix Hdoc Hduq
                        with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview
                              Htop")
@@ -3714,7 +3714,7 @@ Section ProofCreateMain.
              bundleless out-state stands across the call. *)
           iDestruct (log_opS_named with "Hop") as (e0) "Hop".
           iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-          iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γi
+          iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ
                     gtl gild gisld bmapstart inodestart nib size
                     dev kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
                     false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
@@ -3792,7 +3792,7 @@ Section ProofCreateMain.
           iEval (rewrite inode_ref_short_gen_intro) in "Hckeep".
           iDestruct "Hckeep" as (gck) "Hckeep".
           iDestruct (inode_ref_short_shr_gen_agree with "Hckeep Hcshr") as %->.
-          iDestruct (cr_esc_acc γi kslot Hkslot with "Hesc")
+          iDestruct (cr_esc_acc kslot Hkslot with "Hesc")
             as "#Hescc".
           iDestruct (ic_sleeplocks_lookup fsc_ic kslot Hkslot with "Hslks")
             as (gilc gislc) "#Hslkc".
@@ -3803,7 +3803,7 @@ Section ProofCreateMain.
              CHECKOUT ITSELF (B''-tx3).  The parent went home at +0x50, so
              this arm parks exactly the half that came back from its disarm,
              at the same transaction. *)
-          iApply (IL.wp_ilock_dep_sconf γs j γl γu γd γk pd pav pu bn γi
+          iApply (IL.wp_ilock_dep_sconf γs j γl γu γd γk pd pav pu bn
                     gilc gislc inodestart nib kslot (qq/2)%Qp gc
                     (DepTx (qq/2)%Qp dev cinum gc t (1/2)) PlainK
                     dev cinum pidv (DfracOwn (1/4)) dqs F5 (K - 10)%nat eb b lks
@@ -3861,7 +3861,7 @@ Section ProofCreateMain.
                        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
                        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
                        i_valid (ientry kslot) ↦₄ valid_word true -∗
-                       ic_loaded fsc_fs γi fsc_cov fsc_logst kslot cinum dnc bmc -∗
+                       ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum dnc bmc -∗
                        ity_shot gc (di_type dnc) -∗
                        (* the child payload's freeze token (§3.9) *)
                        ifreeze_off (bv_unsigned cinum) -∗
@@ -3884,7 +3884,7 @@ Section ProofCreateMain.
                        t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
                        wp_next (CID0 := CID) true (proc_addr j)
                          (fun CIDc : CpuId =>
-                            cr_cont_body γi γ γf bn bmapstart
+                            cr_cont_body γ γf bn bmapstart
                               inodestart nib ninodes size dev plen pfun
                               (m !!! Regidx Ra0 : mword 64) ty major minor V u Sb
                               ns pidv dqb dqs dqbs dqn m K eb b lks j ret_tgt
@@ -3946,7 +3946,7 @@ Section ProofCreateMain.
                bundleless out-state stands across the call. *)
             iDestruct (log_opS_named with "Hop") as (ec) "Hop".
             iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckeep2".
-            iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γi
+            iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ
                       gtl gilc gislc bmapstart inodestart nib
                       size dev kslot (qq/2)%Qp (qq/2)%Qp gc (DepTx (qq/2)%Qp dev cinum gc t (1/2)%Qp) cinum dnc bmc
                       n2 Sb2 false false false ec _ _ pidv (DfracOwn (1/4)) dqb dqs
@@ -4236,7 +4236,7 @@ Section ProofCreateMain.
              iAssert (inode_meta (ientry kslot) dnc)
                with "[Hcity Hcimaj Hcimin Hcinl Hcisz]" as "Hcmetal".
              { rewrite /inode_meta /i_type. iFrame. }
-             iDestruct (ic_mk_loaded fsc_fs γi fsc_cov fsc_logst kslot cinum dnc bmc
+             iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum dnc bmc
                           datc Hciok Hrl_datc Hcdok Hcddix Hcdoc Hcduq
                           with "Hcdlnk Hcdiat Hcmetal Hcaddrs Hcind Hcblocks
                                 Hcdview Hcfview Hctop")
@@ -4309,7 +4309,7 @@ Section ProofCreateMain.
                   split; [split; [exact Hcpos | exact Hcinb] |].
                   split; [exact Htyf |].
                   exact (cr_trange_in (di_type dnc) Hrng). }
-                iApply (create_locked_mk γi
+                iApply (create_locked_mk
                           _ _ _ _ _ _ _ _ _ gilc gislc
                           with "Hslkc Hcslkd Hcdep Hcidev Hciinum
                                 Hcivalid Hcload Hcshot Hcfrz Hckeep Hruc").
@@ -4430,7 +4430,7 @@ Section ProofCreateMain.
         iAssert (inode_meta (ientry kd) dnl)
           with "[Hity Himaj Himin Hinl Hisz]" as "Hmetal".
         { rewrite /inode_meta /i_type /i_nlink. iFrame. }
-        iDestruct (ic_mk_loaded fsc_fs γi fsc_cov fsc_logst kd dind dnl bml datl
+        iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dnl bml datl
                      Hiok Hrl_datl Hdok Hddix Hdoc Hduq
                      with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks Hdview Hfview
                            Htop")
@@ -4488,7 +4488,7 @@ Section ProofCreateMain.
            bundleless out-state stands across the call. *)
         iDestruct (log_opS_named with "Hop") as (e0) "Hop".
         iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-        iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γi
+        iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ
                   gtl gild gisld bmapstart inodestart nib size dev
                   kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
                   false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
@@ -4850,7 +4850,7 @@ Section ProofCreateMain.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa γf γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -4902,11 +4902,11 @@ Section ProofCreateMain.
     bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
     log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
     kalloc_env γa None -∗
-    is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
-    ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+    ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
-    ireg_inv γi fsc_fs inodestart nib -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     (* RULING B (iclaim-ledger.md §3.2): the sealed regime, for the
        [create_fresh_ty] span's [jal ialloc].  Persistent, borrowed. *)
     ireg_open -∗
@@ -4919,7 +4919,7 @@ Section ProofCreateMain.
        (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
        (nf nsl : nat -> bv 8) (t : nat),
        wp_next (CID0 := CID) true (proc_addr j) (fun CIDm : CpuId =>
-         cr_mkdir_body γs j γl γu γd γk pd pav pu bn γ γi gtl γa γf γpr
+         cr_mkdir_body γs j γl γu γd γk pd pav pu bn γ gtl γa γf γpr
                        bmapstart inodestart nib ninodes size dev
                        plen pfun pv ty major minor V u Sb ns pidv
                        dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -4929,7 +4929,7 @@ Section ProofCreateMain.
        (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
        (nf nsl : nat -> bv 8) (t : nat),
        wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
-         cr_fail_body γs j γl γu γd γk pd pav pu bn γ γi gtl γa γf γpr
+         cr_fail_body γs j γl γu γd γk pd pav pu bn γ gtl γa γf γpr
                       bmapstart inodestart nib ninodes size dev
                       plen pfun pv ty major minor V u Sb ns pidv
                       dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -4943,7 +4943,7 @@ Section ProofCreateMain.
        relates [CIDa] to [CID]), and this is also the shape [cr_found_half]
        takes its premise in, so the seal is one [iApply]. *)
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDa : CpuId =>
-      cr_alloc_body γs j γl γu γd γk pd pav pu bn γ γi gtl γa γf γpr
+      cr_alloc_body γs j γl γu γd γk pd pav pu bn γ gtl γa γf γpr
                     bmapstart inodestart nib ninodes size dev
                     plen pfun pv ty major minor V u Sb ns pidv dqb dqs dqbs dqn
                     m sp0 ret_tgt K eb b lks CIDa).
@@ -4988,7 +4988,7 @@ Section ProofCreateMain.
     assert (Hq1 : (8 <= q1)%nat) by lia.
     assert (Hn1ip : (iput_units <= S q1)%nat) by exact (cr_ip_of9 _ Hn1lo).
     destruct (Hiregb dind Hdib) as [Hdblk Hdblog].
-    iDestruct (cr_esc_acc γi kd Hkdlt with "Hesc") as "#Hescd".
+    iDestruct (cr_esc_acc kd Hkdlt with "Hesc") as "#Hescd".
     (* ===== +0xa2 c.sdsp s3,40(sp) : THE EIGHTH SAVE ================== *)
     assert (HAs3 : (Ma !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64))
       by exact (Athr Rs3 ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(nz)
@@ -5019,7 +5019,7 @@ Section ProofCreateMain.
        ALLOC arm it comes back inside the child's deposit; on the FAIL arm,
        bare, and the parent's arm grows back to a half. *)
     iApply fupd_wp.
-    iMod (ic_shrink_tx ⊤ fsc_ic fsc_fs γi fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
+    iMod (ic_shrink_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
             t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter)
             ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
       as "(Hivalid & Hdep & Htp)".
@@ -5035,7 +5035,7 @@ Section ProofCreateMain.
     iDestruct (log_tx_split icfg_log t (1/2) (1/4) (1/4)
                  (eq_sym Qp.quarter_quarter) with "Htx") as "[Htcl Htx]".
     (* ===== +0xa4 .. +0xb0 : THE FRESH-TYPE GATE SPAN ================= *)
-    iApply (create_fresh_ty γs j γl γu γd γk pd pav pu bn γ γi gtl
+    iApply (create_fresh_ty γs j γl γu γd γk pd pav pu bn γ gtl
               γpr inodestart ninodes nib dev ty kd (DfracOwn (1/2))
               q1 Sb1 t (1/4)%Qp (1/4)%Qp
               pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks V
@@ -5109,7 +5109,7 @@ Section ProofCreateMain.
          CHECKOUT parked what came back (B''-tx3), so the half that is left
          is what the registry's arm below parks.  Quarter + quarter + half =
          the whole element. *)
-      iDestruct (cr_esc_acc γi kslot Hkslt with "Hesc")
+      iDestruct (cr_esc_acc kslot Hkslt with "Hesc")
         as "#Hescc".
       iEval (rewrite Hglog) in "Htx".
       iApply fupd_wp.
@@ -5254,7 +5254,7 @@ Section ProofCreateMain.
       iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
       iDestruct (cpu_own_transport CIDo CIDB6 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (IU.wp_iupdate_link γs j γl γu γd γk pd pav pu bn γ γi
+      iApply (IU.wp_iupdate_link γs j γl γu γd γk pd pav pu bn γ
                 inodestart nib dev (ientry kslot) cinum
                 (cr_setf dnc major minor (mword_of_int 1 : mword 16)) dnc bmc
                 q2 (Sb1 ∪ {[IBLOCK cinum inodestart]}) true
@@ -5639,7 +5639,7 @@ Section ProofCreateMain.
         (* dirlink's own [iput] may need a share (durable-disk B''-tx5); the
            FILE arm has the residue free, so it simply lends it. *)
         iEval (rewrite -Hglog) in "Htx".
-        iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γi
+        iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ
                   gtl γa γf γpr inodestart nib bmapstart size dev
                   (ientry kd) dind bm data dn dn nf (cr_low16 cinum)
                   (S q2) (Sb1 ∪ {[IBLOCK cinum inodestart]}
@@ -5871,7 +5871,7 @@ Section ProofCreateMain.
                 instead of [iFrame]. *)
              (* THE MOVER (namei-pinned-lookup.md §9 W3, dirlink's row) *)
              iApply fupd_wp.
-             iMod (dvw_set_rt ⊤ γi fsc_fs inodestart nib
+             iMod (dvw_set_rt ⊤ fsc_ireg fsc_fs inodestart nib
                      (bv_unsigned dind) (dv_of dn data) (dv_of dn' data')
                      (fv_of dn data) (fv_of dn' data')
                      ltac:(solve_ndisj) with "Hiregi Hdview Hfview")
@@ -5906,7 +5906,7 @@ Section ProofCreateMain.
                      with "[] Htop") as "Htop";
                [iApply (ireg_inv_ftop with "Hiregi") |].
              iModIntro.
-             iAssert (ic_loaded fsc_fs γi fsc_cov fsc_logst kd dind dn' bm')
+             iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn' bm')
                with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop]"
                as "Hload".
              { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists data'.
@@ -5987,7 +5987,7 @@ Section ProofCreateMain.
              iAssert (ity_shot gd (di_type dn')) as "#Hshotl'".
              { rewrite Hty'. iExact "Hshotl". }
              iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ
-                       γi gtl γil γisl bmapstart inodestart nib
+                       gtl γil γisl bmapstart inodestart nib
                        size dev kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/4)%Qp) dind dn' bm'
                        n' Sb' false true false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                        Y2 (K - 10)%nat eb b lks
@@ -6097,7 +6097,7 @@ Section ProofCreateMain.
              iDestruct (iref_slots_combine with "Hislk Hisl2") as "Hisl".
              iDestruct (iref_slots_combine with "Hisl Hislrr") as "Hisl".
              iApply fupd_wp.
-             iMod (ic_grow_tx ⊤ fsc_ic fsc_fs γi fsc_cov fsc_logst kslot (q/2)%Qp dev cinum
+             iMod (ic_grow_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kslot (q/2)%Qp dev cinum
                      g true t (1/2) (1/4) (1/4)
                      (eq_sym Qp.quarter_quarter) ltac:(solve_ndisj)
                      with "Hescc Hcivalid Hcdep Htp")
@@ -6158,7 +6158,7 @@ Section ProofCreateMain.
                            (mword_of_int 1 : mword 16)).
                exact Hchdir. }
              iDestruct "Hcmap" as "[Hca Hci]".
-             iDestruct (ic_mk_loaded fsc_fs γi fsc_cov fsc_logst kslot cinum
+             iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum
                           (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                           bmc datc
                           (cr_setf_inode_ok fsc_cov fsc_logst dnc bmc datc major minor
@@ -6183,7 +6183,7 @@ Section ProofCreateMain.
                                              (mword_of_int 1 : mword 16))))
                as "Hcshot1".
              { rewrite cr_setf_type. iExact "Hcshot". }
-             iApply (create_locked_mk γi
+             iApply (create_locked_mk
                        _ _ _ _ _ _ _ _ _ gil gisl
                        with "Hslkc Hcslkd Hcdep Hcidev Hciinum
                              Hcivalid Hcload Hcshot1 Hcfrz Hckeep Hruc").
@@ -6217,7 +6217,7 @@ Section ProofCreateMain.
                 append moved the parent's bytes even on the failing return,
                 and [cr_fail_body] is stated at the POST record. *)
              iApply fupd_wp.
-             iMod (dvw_set_rt ⊤ γi fsc_fs inodestart nib
+             iMod (dvw_set_rt ⊤ fsc_ireg fsc_fs inodestart nib
                      (bv_unsigned dind) (dv_of dn data) (dv_of dn' data')
                      (fv_of dn data) (fv_of dn' data')
                      ltac:(solve_ndisj) with "Hiregi Hdview Hfview")
@@ -6307,7 +6307,7 @@ Section ProofCreateMain.
       (* nothing was claimed, so no second lock was taken: the quarter goes
          straight back into the parent's arm (durable-disk B''-tx3). *)
       iApply fupd_wp.
-      iMod (ic_grow_tx ⊤ fsc_ic fsc_fs γi fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
+      iMod (ic_grow_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
               t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter)
               ltac:(solve_ndisj) with "Hescd Hivalid Hdep Htp")
         as "(Hivalid & Hdep)".
@@ -6363,7 +6363,7 @@ Section ProofCreateMain.
       iDestruct "Hmap" as "[Haddrs Hind]".
       assert (Hdok2 : dir_ok icfg_nib dn data) by (rewrite -Hnib; exact Hdok).
       pose proof Hddix as Hddix2.
-      iDestruct (ic_mk_loaded fsc_fs γi fsc_cov fsc_logst kd dind dn bm data
+      iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn bm data
                    Hiok Hrl Hdok2 Hddix2 (cr_doc_of_live dn dn data eq_refl Hnl0)
                    Hduq
                    with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview
@@ -6377,7 +6377,7 @@ Section ProofCreateMain.
          bundleless out-state stands across the call. *)
       iDestruct (log_opS_named with "Hop") as (e0) "Hop".
       iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-      iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γi
+      iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ
                 gtl γil γisl bmapstart inodestart nib size dev
                 kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dn bm (S q1) Sb1
                 false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
@@ -6546,7 +6546,7 @@ Section ProofCreateMain.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa γf γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -6584,17 +6584,17 @@ Section ProofCreateMain.
     kernel_text -∗ kernel_data -∗ panic_env -∗
     bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
     log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
-    is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
-    ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
-    ireg_inv γi fsc_fs inodestart nib -∗
+    ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     ireg_open -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
-      cr_fail_body γs j γl γu γd γk pd pav pu bn γ γi gtl γa γf γpr
+      cr_fail_body γs j γl γu γd γk pd pav pu bn γ gtl γa γf γpr
                    bmapstart inodestart nib ninodes size dev
                    plen pfun pv ty major minor V u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -6726,7 +6726,7 @@ Section ProofCreateMain.
     iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     iDestruct (cpu_own_transport CIDf CIDG3 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ
               inodestart nib dev (ientry kslot) cinum
               (cr_setf dnc major minor (mword_of_int 0 : mword 16))
               (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc
@@ -6854,7 +6854,7 @@ Section ProofCreateMain.
             ltac:(solve_ndisj) Hlocz with "[] Hctop") as "Hctop";
       [iApply (ireg_inv_ftop with "Hiregi") |].
     iModIntro.
-    iDestruct (ic_mk_loaded fsc_fs γi fsc_cov fsc_logst kslot cinum
+    iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum
                  (cr_setf dnc major minor (mword_of_int 0 : mword 16))
                  bmc datc
                  (cr_setf_inode_ok fsc_cov fsc_logst dnc bmc datc major minor
@@ -6877,7 +6877,7 @@ Section ProofCreateMain.
     iAssert (ity_shot g (di_type (cr_setf dnc major minor
                                     (mword_of_int 0 : mword 16))))
       as "#Hcshot'". { rewrite cr_setf_type. iExact "Hcshot". }
-    iPoseProof (cr_esc_acc γi kslot Hkslt with "Hesc")
+    iPoseProof (cr_esc_acc kslot Hkslt with "Hesc")
       as "#Hescc".
     iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckp".
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
@@ -6886,7 +6886,7 @@ Section ProofCreateMain.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the share it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
-    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ
               gtl gil gisl bmapstart inodestart nib size dev
               kslot (q/2)%Qp (q/2)%Qp g (DepTx (q/2)%Qp dev cinum g t (1/4)%Qp) cinum
               (cr_setf dnc major minor (mword_of_int 0 : mword 16)) bmc
@@ -7100,7 +7100,7 @@ Section ProofCreateMain.
             with "[] Htop") as "Htop";
       [iApply (ireg_inv_ftop with "Hiregi") |].
     iModIntro.
-    iDestruct (ic_mk_loaded fsc_fs γi fsc_cov fsc_logst kd dind dn' bm' data'
+    iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn' bm' data'
                  Hiok' Hrl' Hdok' Hddix' (cr_doc_of_live dn dn' data' Hnl' Hnl0)
                  Hduq'
                  with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview
@@ -7108,7 +7108,7 @@ Section ProofCreateMain.
       as "Hload".
     iAssert (ity_shot gd (di_type dn')) as "#Hshotl'".
     { rewrite Hty'. iExact "Hshotl". }
-    iPoseProof (cr_esc_acc γi kd Hkdlt with "Hesc")
+    iPoseProof (cr_esc_acc kd Hkdlt with "Hesc")
       as "#Hescd".
     iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
     iDestruct (log_opS_named with "Hop") as (e1) "Hop".
@@ -7117,7 +7117,7 @@ Section ProofCreateMain.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the share it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
-    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ
               gtl γil γisl bmapstart inodestart nib size dev
               kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/4)%Qp) dind dn' bm'
               n5 Sb5 false false false e1 _ _ pidv (DfracOwn (1/4)) dqb dqs
@@ -7246,7 +7246,7 @@ Section ProofCreateMain.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa γf γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -7338,7 +7338,7 @@ Section ProofCreateMain.
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
        dlinks fsc_fs (bv_unsigned dind) dp bmp datap -∗
-       dinode_at γi dind dp -∗
+       dinode_at fsc_ireg dind dp -∗
        inode_meta (ientry kd) dp -∗
        inode_map fsc_fs (ientry kd) bmp -∗
        inode_blocks fsc_fs bmp datap -∗
@@ -7365,7 +7365,7 @@ Section ProofCreateMain.
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
        i_valid (ientry kslot) ↦₄ valid_word true -∗
-       dinode_at γi cinum dc -∗
+       dinode_at fsc_ireg cinum dc -∗
        inode_meta (ientry kslot) dc -∗
        inode_map fsc_fs (ientry kslot) bmc -∗
        inode_blocks fsc_fs bmc datc -∗
@@ -7407,7 +7407,7 @@ Section ProofCreateMain.
        cr_dirty t (bv_unsigned cinum) -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
-            cr_cont_body γi γ γf bn bmapstart inodestart
+            cr_cont_body γ γf bn bmapstart inodestart
                          nib ninodes size dev plen pfun pv ty major minor
                          V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                          ret_tgt CIDc) -∗
@@ -7418,7 +7418,7 @@ Section ProofCreateMain.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa γf γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -7455,17 +7455,17 @@ Section ProofCreateMain.
     kernel_text -∗ kernel_data -∗ panic_env -∗
     bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
     log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
-    is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
-    ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
-    ireg_inv γi fsc_fs inodestart nib -∗
+    ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     ireg_open -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
-      cr_fail_mkdir_body γs j γl γu γd γk pd pav pu bn γ γi gtl γa γf γpr
+      cr_fail_mkdir_body γs j γl γu γd γk pd pav pu bn γ gtl γa γf γpr
                    bmapstart inodestart nib ninodes size dev
                    plen pfun pv ty major minor V u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -7631,7 +7631,7 @@ Section ProofCreateMain.
     iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     iDestruct (cpu_own_transport CIDf CIDG3 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ
               inodestart nib dev (ientry kslot) cinum
               (cr_setf dc major minor (mword_of_int 0 : mword 16)) dc bmc
               u0 Sb4 true
@@ -7741,7 +7741,7 @@ Section ProofCreateMain.
       as "[Htx Hctop]";
       [iApply (ireg_inv_ftop with "Hiregi") |].
     iModIntro.
-    iAssert (ic_loaded fsc_fs γi fsc_cov fsc_logst kslot cinum
+    iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum
                (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc)
       with "[Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop]"
       as "Hcload".
@@ -7785,7 +7785,7 @@ Section ProofCreateMain.
     iAssert (ity_shot g (di_type (cr_setf dc major minor
                                     (mword_of_int 0 : mword 16))))
       as "#Hcshot'". { rewrite cr_setf_type. iExact "Hcshot". }
-    iPoseProof (cr_esc_acc γi kslot Hkslt with "Hesc")
+    iPoseProof (cr_esc_acc kslot Hkslt with "Hesc")
       as "#Hescc".
     iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckp".
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
@@ -7794,7 +7794,7 @@ Section ProofCreateMain.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the share it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
-    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ
               gtl gil gisl bmapstart inodestart nib size dev
               kslot (q/2)%Qp (q/2)%Qp g (DepTx (q/2)%Qp dev cinum g t (1/4)%Qp) cinum
               (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc
@@ -7882,7 +7882,7 @@ Section ProofCreateMain.
     (* THE PARENT NEEDS NO RE-PARK: all three entries sit before +0x134, so
        its record, its bytes and its ledger are the ones the walk handed
        over -- and the walk has already undone its own failing append. *)
-    iAssert (ic_loaded fsc_fs γi fsc_cov fsc_logst kd dind dp bmp)
+    iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dp bmp)
       with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop]" as "Hload".
     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datap.
       iSplitR; [iPureIntro; exact Hiok |].
@@ -7895,7 +7895,7 @@ Section ProofCreateMain.
       iFrame "Hdiat Hmeta".
       iEval (rewrite /inode_map) in "Hmap".
       iDestruct "Hmap" as "[Haddrs Hind]". iFrame. }
-    iPoseProof (cr_esc_acc γi kd Hkdlt with "Hesc")
+    iPoseProof (cr_esc_acc kd Hkdlt with "Hesc")
       as "#Hescd".
     iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
     iDestruct (log_opS_named with "Hop") as (e1) "Hop".
@@ -7904,7 +7904,7 @@ Section ProofCreateMain.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the share it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
-    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ
               gtl γil γisl bmapstart inodestart nib size dev
               kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/4)%Qp) dind dp bmp
               n5 Sb5 false false false e1 _ _ pidv (DfracOwn (1/4)) dqb dqs
@@ -8037,7 +8037,7 @@ Section ProofCreateMain.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa γf γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -8085,18 +8085,18 @@ Section ProofCreateMain.
     bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
     log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
     kalloc_env γa None -∗
-    is_itable2 gtl fsc_ic fsc_fs γi fsc_cov fsc_logst nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
-    ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗
+    ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
-    ireg_inv γi fsc_fs inodestart nib -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     ireg_open -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDm : CpuId =>
-      cr_mkdir_body γs j γl γu γd γk pd pav pu bn γ γi gtl γa γf γpr
+      cr_mkdir_body γs j γl γu γd γk pd pav pu bn γ gtl γa γf γpr
                     bmapstart inodestart nib ninodes size dev
                     plen pfun pv ty major minor V u Sb ns pidv
                     dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -8141,9 +8141,9 @@ Section ProofCreateMain.
     destruct HXr as (X2 & X8 & X9 & X18 & X19 & X20 & X21 & X22 & Xthr).
     destruct (Hiregb cinum Hcinb) as [Hcblk Hcblog].
     destruct (Hiregb dind Hdib) as [Hdblk Hdblog].
-    iDestruct (cr_esc_acc γi kslot Hkslt with "Hesc")
+    iDestruct (cr_esc_acc kslot Hkslt with "Hesc")
       as "#Hescc".
-    iDestruct (cr_esc_acc γi kd Hkdlt with "Hesc")
+    iDestruct (cr_esc_acc kd Hkdlt with "Hesc")
       as "#Hescd".
     (* ---- the two rodata name windows, both PERSISTENT ---- *)
     assert (Hn3lo : (8 <= n3)%nat) by exact (proj1 Hn3).
@@ -8401,12 +8401,12 @@ Section ProofCreateMain.
        back at the return.  The eighth is enough: what iput's windows need is
        a POSITIVE share of an OPEN transaction, and any is. *)
     iApply fupd_wp.
-    iMod (ic_shrink_tx ⊤ fsc_ic fsc_fs γi fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
+    iMod (ic_shrink_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
             t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
             ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
       as "(Hivalid & Hdep & Htxs)".
     iModIntro. iEval (rewrite -Hglog) in "Htxs".
-    iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γi
+    iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ
               gtl γa γf γpr inodestart nib bmapstart size dev
               (ientry kslot) cinum bmc datc
               (cr_setf dnc major minor (mword_of_int 1 : mword 16))
@@ -8439,7 +8439,7 @@ Section ProofCreateMain.
        Hop Htxs %Hcap1 %Hsizedp1 %Harm1".
     iEval (rewrite Hglog) in "Htxs".
     iApply fupd_wp.
-    iMod (ic_grow_tx ⊤ fsc_ic fsc_fs γi fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
+    iMod (ic_grow_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
             t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
             ltac:(solve_ndisj) with "Hescd Hivalid Hdep Htxs")
       as "(Hivalid & Hdep)".
@@ -8841,12 +8841,12 @@ Section ProofCreateMain.
        back at the return.  The eighth is enough: what iput's windows need is
        a POSITIVE share of an OPEN transaction, and any is. *)
     iApply fupd_wp.
-    iMod (ic_shrink_tx ⊤ fsc_ic fsc_fs γi fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
+    iMod (ic_shrink_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
             t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
             ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
       as "(Hivalid & Hdep & Htxs)".
     iModIntro. iEval (rewrite -Hglog) in "Htxs".
-      iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γi
+      iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ
                 gtl γa γf γpr inodestart nib bmapstart size dev
                 (ientry kslot) cinum bm1 dat1 dc1 dc1
                 cr_dotdot_f (cr_low16 dind) n4 Sb4
@@ -8880,7 +8880,7 @@ Section ProofCreateMain.
          Hop Htxs %Hcap2 %Hsizedp2 %Harm2".
       iEval (rewrite Hglog) in "Htxs".
     iApply fupd_wp.
-    iMod (ic_grow_tx ⊤ fsc_ic fsc_fs γi fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
+    iMod (ic_grow_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kd (qd/2)%Qp dev dind gd true
             t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
             ltac:(solve_ndisj) with "Hescd Hivalid Hdep Htxs")
       as "(Hivalid & Hdep)".
@@ -9219,12 +9219,12 @@ Section ProofCreateMain.
            links above; here it comes off the CHILD's arm, because the call
            itself is over the parent. *)
         iApply fupd_wp.
-        iMod (ic_shrink_tx ⊤ fsc_ic fsc_fs γi fsc_cov fsc_logst kslot (q/2)%Qp dev cinum g
+        iMod (ic_shrink_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kslot (q/2)%Qp dev cinum g
                 true t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
                 ltac:(solve_ndisj) with "Hescc Hcivalid Hcdep")
           as "(Hcivalid & Hcdep & Htxs)".
         iModIntro. iEval (rewrite -Hglog) in "Htxs".
-        iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γi
+        iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ
                   gtl γa γf γpr inodestart nib bmapstart size dev
                   (ientry kd) dind bm data dn dn nf (cr_low16 cinum)
                   n5 Sb5
@@ -9258,7 +9258,7 @@ Section ProofCreateMain.
            Hop Htxs %Hcap3 %Hsizedp3 %Harm3".
         iEval (rewrite Hglog) in "Htxs".
         iApply fupd_wp.
-        iMod (ic_grow_tx ⊤ fsc_ic fsc_fs γi fsc_cov fsc_logst kslot (q/2)%Qp dev cinum g
+        iMod (ic_grow_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kslot (q/2)%Qp dev cinum g
                 true t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
                 ltac:(solve_ndisj) with "Hescc Hcivalid Hcdep Htxs")
           as "(Hcivalid & Hcdep)".
@@ -9388,7 +9388,7 @@ Section ProofCreateMain.
           iEval (rewrite Hq134) in "Hpc".
           (* the child is not the parent: two records held at once are two
              records ([InodeRegion.dinode_at_ne], pure, consumes neither) *)
-          iDestruct (InodeRegion.dinode_at_ne γi cinum dind _ _
+          iDestruct (InodeRegion.dinode_at_ne fsc_ireg cinum dind _ _
                        with "Hcdiat Hdiat") as %Hcned.
           (* ===== +0x134 lhu a5,74(s1) : dp->nlink =================== *)
           iEval (rewrite /inode_meta) in "Hmeta".
@@ -9586,7 +9586,7 @@ Section ProofCreateMain.
           iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
           iDestruct (cpu_own_transport CIDd3 CIDh6 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (IU.wp_iupdate_link γs j γl γu γd γk pd pav pu bn γ γi
+          iApply (IU.wp_iupdate_link γs j γl γu γd γk pd pav pu bn γ
                     inodestart nib dev (ientry kd) dind
                     (cr_setf dp3 (di_major dp3) (di_minor dp3)
                        (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16)))
@@ -9635,7 +9635,7 @@ Section ProofCreateMain.
              [IregLinkNz.ireg_tok_nz] is mask-preserving and hands
              everything back. *)
           iApply fupd_wp.
-          iMod (ireg_tok_nz ⊤ γi fsc_fs inodestart nib dind
+          iMod (ireg_tok_nz ⊤ fsc_ireg fsc_fs inodestart nib dind
                   (cr_setf dp3 (di_major dp3) (di_minor dp3)
                      (add_vec (di_nlink dp3 : mword 16)
                         (mword_of_int 1 : mword 16)))
@@ -9705,7 +9705,7 @@ Section ProofCreateMain.
                        Hdot1 Horph1 with "Hcetk2")
             as "[(%vdot0 & Hdot0) Hcnodot]".
           iApply fupd_wp.
-          iMod (IregLinkNz.ireg_toks_agree ⊤ γi fsc_fs inodestart nib cinum _
+          iMod (IregLinkNz.ireg_toks_agree ⊤ fsc_ireg fsc_fs inodestart nib cinum _
                   vdot0 (cr_ity ty (bv_unsigned dind))
                   ltac:(solve_ndisj) Hcinb
                   with "Hiregi Hcdiat Hdot0 Htoken")
@@ -9897,12 +9897,12 @@ Section ProofCreateMain.
              parent's bytes moved, so its hold moves with them.  One free
              own-update; no delta is proved. *)
           iApply fupd_wp.
-          iMod (dv_set_rt ⊤ γi fsc_fs inodestart nib _ _
+          iMod (dv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _
                   (dv_of (cr_setf dp3 (di_major dp3) (di_minor dp3)
                                      (add_vec (di_nlink dp3 : mword 16)
                                         (mword_of_int 1 : mword 16))) dat3)
                   ltac:(solve_ndisj) with "Hiregi Hdview") as "Hdview".
-          iMod (fv_set_rt ⊤ γi fsc_fs inodestart nib _ _
+          iMod (fv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _
                   (fv_of (cr_setf dp3 (di_major dp3) (di_minor dp3)
                                      (add_vec (di_nlink dp3 : mword 16)
                                         (mword_of_int 1 : mword 16))) dat3)
@@ -9972,7 +9972,7 @@ Section ProofCreateMain.
                   with "[] Htop") as "Htop";
             [iApply (ireg_inv_ftop with "Hiregi") |].
           iModIntro.
-          iDestruct (ic_mk_loaded fsc_fs γi fsc_cov fsc_logst kd dind
+          iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind
                        (cr_setf dp3 (di_major dp3) (di_minor dp3)
                           (add_vec (di_nlink dp3 : mword 16)
                              (mword_of_int 1 : mword 16))) bm3 dat3
@@ -10068,7 +10068,7 @@ Section ProofCreateMain.
           iDestruct (log_opS_named with "Hop") as (e0) "Hop".
           iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
           iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ
-                    γi gtl γil γisl bmapstart inodestart nib
+                    gtl γil γisl bmapstart inodestart nib
                     size dev kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/4)%Qp) dind
                     (cr_setf dp3 (di_major dp3) (di_minor dp3)
                        (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16)))
@@ -10183,9 +10183,9 @@ Section ProofCreateMain.
           (* THE MOVER (§9 W3): the child's own ["."] and [".."] links moved
              its bytes. *)
           iApply fupd_wp.
-          iMod (dv_set_rt ⊤ γi fsc_fs inodestart nib _ _ (dv_of dc2 dat2)
+          iMod (dv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _ (dv_of dc2 dat2)
                   ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
-          iMod (fv_set_rt ⊤ γi fsc_fs inodestart nib _ _ (fv_of dc2 dat2)
+          iMod (fv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _ (fv_of dc2 dat2)
                   ltac:(solve_ndisj) with "Hiregi Hcfview") as "Hcfview".
           (* ...and the ERA's abstract value at that same record
              (durable-disk 2b-inode-3). *)
@@ -10200,7 +10200,7 @@ Section ProofCreateMain.
             [iApply (ireg_inv_ftop with "Hiregi") |].
           iModIntro.
           iApply fupd_wp.
-          iMod (ic_grow_tx ⊤ fsc_ic fsc_fs γi fsc_cov fsc_logst kslot (q/2)%Qp dev cinum g
+          iMod (ic_grow_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kslot (q/2)%Qp dev cinum g
                   true t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter)
                   ltac:(solve_ndisj) with "Hescc Hcivalid Hcdep Htq2")
             as "(Hcivalid & Hcdep)".
@@ -10228,7 +10228,7 @@ Section ProofCreateMain.
               exact (cr_fail_ip_right (S u6) n7 Hipn6 (proj1 Hn7)). }
           iEval (rewrite /inode_map) in "Hcmap".
           iDestruct "Hcmap" as "[Hcaddrs2 Hcind2]".
-          iDestruct (ic_mk_loaded fsc_fs γi fsc_cov fsc_logst kslot cinum dc2 bm2 dat2
+          iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum dc2 bm2 dat2
                        Hc2iok Hc2rl Hc2dokn (Hc2ddix Ht162)
                        (dir_orphan_clean_of_only dc2 dat2 Hc2dots) Hc2duq
                        with "Hcdlnk2 Hcdiat Hcmeta Hcaddrs2 Hcind2 Hcblocks
@@ -10245,7 +10245,7 @@ Section ProofCreateMain.
             split; [exact Hc2mn |].
             split; [exact Hc2nlz |].
             intro Hnd. exfalso. exact (Hnd Htdir). }
-          iApply (create_locked_mk γi
+          iApply (create_locked_mk
                     _ _ _ _ _ _ _ _ _ gil gisl
                     with "Hslkc Hcslkd Hcdep Hcidev Hciinum
                           Hcivalid Hcloadf Hcshot2 Hcfrz Hckeep Hruc").
@@ -10332,9 +10332,9 @@ Section ProofCreateMain.
                           (dir_nrec (bv_unsigned (di_size dn)))))%Z.
                 rewrite Nat.add_0_r Nat2Z.inj_mul. lia. }
           iApply fupd_wp.
-          iMod (dv_set_rt ⊤ γi fsc_fs inodestart nib _ _ (dv_of dp3 dat3)
+          iMod (dv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _ (dv_of dp3 dat3)
                   ltac:(solve_ndisj) with "Hiregi Hdview") as "Hdview".
-          iMod (fv_set_rt ⊤ γi fsc_fs inodestart nib _ _ (fv_of dp3 dat3)
+          iMod (fv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _ (fv_of dp3 dat3)
                   ltac:(solve_ndisj) with "Hiregi Hfview") as "Hfview".
           iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned dind)
                   (era_node dn bm data) (era_node dp3 bm3 dat3)
@@ -10343,9 +10343,9 @@ Section ProofCreateMain.
                      bm3 dat3 Hp3iok Hp3rl Hp3duq Hp3ddix)
                   with "[] Htop") as "Htop";
             [iApply (ireg_inv_ftop with "Hiregi") |].
-          iMod (dv_set_rt ⊤ γi fsc_fs inodestart nib _ _ (dv_of dc2 dat2)
+          iMod (dv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _ (dv_of dc2 dat2)
                   ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
-          iMod (fv_set_rt ⊤ γi fsc_fs inodestart nib _ _ (fv_of dc2 dat2)
+          iMod (fv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _ (fv_of dc2 dat2)
                   ltac:(solve_ndisj) with "Hiregi Hcfview") as "Hcfview".
           (* ...and the ERA's abstract value at that same record
              (durable-disk 2b-inode-3). *)
@@ -10369,7 +10369,7 @@ Section ProofCreateMain.
                        (bv_unsigned cinum) (era_node dc1 bm1 dat1) Dc1
                        Hdot1c Horph1c with "Hcetk2") as "[(%vf1 & Hdotf1) _]".
           iApply fupd_wp.
-          iMod (IregLinkNz.ireg_toks_agree ⊤ γi fsc_fs inodestart nib cinum _
+          iMod (IregLinkNz.ireg_toks_agree ⊤ fsc_ireg fsc_fs inodestart nib cinum _
                   vf1 (cr_ity ty (bv_unsigned dind))
                   ltac:(solve_ndisj) Hcinb
                   with "Hiregi Hcdiat Hdotf1 Htoken")
@@ -10382,7 +10382,7 @@ Section ProofCreateMain.
           { rewrite (cr_delta_dir ty Htdirc) FsStateLink.link_toks_reps_S
               FsStateLink.link_reps_1.
             iSplitL "Htoken"; [iExact "Htoken" | rewrite -Hvf1; iExact "Hdotf1"]. }
-          iPoseProof (cr_fail_mkdir_half γs j γl γu γd γk pd pav pu bn γ γi
+          iPoseProof (cr_fail_mkdir_half γs j γl γu γd γk pd pav pu bn γ
                         gtl γa γf γpr bmapstart inodestart nib
                         ninodes size dev plen pfun pv ty major minor V u
                         Sb ns pidv dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -10470,9 +10470,9 @@ Section ProofCreateMain.
         (* THE MOVER (§9 W3): the child's two interior links moved its bytes;
            the parent's own append has not run on this entry. *)
         iApply fupd_wp.
-        iMod (dv_set_rt ⊤ γi fsc_fs inodestart nib _ _ (dv_of dc2 dat2)
+        iMod (dv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _ (dv_of dc2 dat2)
                   ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
-        iMod (fv_set_rt ⊤ γi fsc_fs inodestart nib _ _ (fv_of dc2 dat2)
+        iMod (fv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _ (fv_of dc2 dat2)
                 ltac:(solve_ndisj) with "Hiregi Hcfview") as "Hcfview".
         (* ...and the ERA's abstract value at the same record. *)
         iMod (cr_dirty_retag ⊤ t (bv_unsigned cinum)
@@ -10495,7 +10495,7 @@ Section ProofCreateMain.
                      (bv_unsigned cinum) (era_node dc1 bm1 dat1) Dc1
                      Hdot1c Horph1c with "Hcetk2") as "[(%vf1 & Hdotf1) _]".
         iApply fupd_wp.
-        iMod (IregLinkNz.ireg_toks_agree ⊤ γi fsc_fs inodestart nib cinum _
+        iMod (IregLinkNz.ireg_toks_agree ⊤ fsc_ireg fsc_fs inodestart nib cinum _
                 vf1 (cr_ity ty (bv_unsigned dind))
                 ltac:(solve_ndisj) Hcinb
                 with "Hiregi Hcdiat Hdotf1 Htoken")
@@ -10508,7 +10508,7 @@ Section ProofCreateMain.
         { rewrite (cr_delta_dir ty Htdirc) FsStateLink.link_toks_reps_S
             FsStateLink.link_reps_1.
           iSplitL "Htoken"; [iExact "Htoken" | rewrite -Hvf1; iExact "Hdotf1"]. }
-        iPoseProof (cr_fail_mkdir_half γs j γl γu γd γk pd pav pu bn γ γi
+        iPoseProof (cr_fail_mkdir_half γs j γl γu γd γk pd pav pu bn γ
                       gtl γa γf γpr bmapstart inodestart nib ninodes
                       size dev plen pfun pv ty major minor V u Sb ns pidv
                       dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -10594,9 +10594,9 @@ Section ProofCreateMain.
           exists 0%Z. vm_compute. reflexivity. }
       (* THE MOVER (§9 W3): the child's first interior link moved its bytes. *)
       iApply fupd_wp.
-      iMod (fv_set_rt ⊤ γi fsc_fs inodestart nib _ _ (fv_of dc1 dat1)
+      iMod (fv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _ (fv_of dc1 dat1)
               ltac:(solve_ndisj) with "Hiregi Hcfview") as "Hcfview".
-      iMod (dv_set_rt ⊤ γi fsc_fs inodestart nib _ _ (dv_of dc1 dat1)
+      iMod (dv_set_rt ⊤ fsc_ireg fsc_fs inodestart nib _ _ (dv_of dc1 dat1)
                   ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
       (* ...and the ERA's abstract value at the same record. *)
       iMod (cr_dirty_retag ⊤ t (bv_unsigned cinum)
@@ -10606,7 +10606,7 @@ Section ProofCreateMain.
               ltac:(solve_ndisj) with "[] Hdirty Hctop") as "[Hdirty Hctop]";
         [iApply (ireg_inv_ftop with "Hiregi") |].
       iModIntro.
-      iPoseProof (cr_fail_mkdir_half γs j γl γu γd γk pd pav pu bn γ γi
+      iPoseProof (cr_fail_mkdir_half γs j γl γu γd γk pd pav pu bn γ
                     gtl γa γf γpr bmapstart inodestart nib ninodes
                     size dev plen pfun pv ty major minor V u Sb ns pidv
                     dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -10702,7 +10702,7 @@ Section ProofCreateMain.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (gtl : gname)
       (γa γf γpr : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -10713,7 +10713,7 @@ Section ProofCreateMain.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-    wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ γi gtl
+    wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ gtl
                          γa γf γpr bmapstart inodestart nib
                          ninodes size dev plen pfun ty major minor
                          V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.
@@ -10732,7 +10732,7 @@ Section ProofCreateMain.
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     iDestruct (cr_cap_align m K b (proc_addr j) HK10 with "Hcg")
       as %[Hal10 Hal9].
-    iApply (cr_found_half γs j γl γu γd γk pd pav pu bn γ γi gtl
+    iApply (cr_found_half γs j γl γu γd γk pd pav pu bn γ gtl
               γa γf γpr bmapstart inodestart nib ninodes size
               dev plen pfun ty major minor V u Sb ns pidv
               dqb dqs dqbs dqn m K eb b lks
@@ -10743,7 +10743,7 @@ Section ProofCreateMain.
                     Hitb2 Hitbl Hesc Hslks Hiregi Hiopen Hsbn Hsbi Hsbs Hsbb Hbmr
                     Hpriv Hpath Hprocs Hdevi Hgeom Hdlk Hbsl Hisl Hop Htx
                     [] Hcont").
-    iApply (cr_alloc_half γs j γl γu γd γk pd pav pu bn γ γi gtl
+    iApply (cr_alloc_half γs j γl γu γd γk pd pav pu bn γ gtl
               γa γf γpr bmapstart inodestart nib ninodes size
               dev plen pfun (m !!! Regidx Ra0 : mword 64)
               ty major minor V u Sb ns pidv dqb dqs dqbs dqn m
@@ -10755,7 +10755,7 @@ Section ProofCreateMain.
               with "Htext Hkd Hpk Hbio Hlogc Hkenv Hitb2 Hitbl Hesc
                     Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk [] []").
     - iIntros (kd qd gd γil γisl dind dn bm data nf nsl t).
-      iApply (cr_mkdir_half γs j γl γu γd γk pd pav pu bn γ γi gtl
+      iApply (cr_mkdir_half γs j γl γu γd γk pd pav pu bn γ gtl
                 γa γf γpr bmapstart inodestart nib ninodes size
                 dev plen pfun (m !!! Regidx Ra0 : mword 64)
                 ty major minor V u Sb ns pidv dqb dqs dqbs dqn m
@@ -10768,7 +10768,7 @@ Section ProofCreateMain.
                 with "Htext Hkd Hpk Hbio Hlogc Hkenv Hitb2 Hitbl
                       Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk").
     - iIntros (kd qd gd γil γisl dind dn bm data nf nsl t).
-      iApply (cr_fail_half γs j γl γu γd γk pd pav pu bn γ γi gtl
+      iApply (cr_fail_half γs j γl γu γd γk pd pav pu bn γ gtl
                 γa γf γpr bmapstart inodestart nib ninodes size
                 dev plen pfun (m !!! Regidx Ra0 : mword 64)
                 ty major minor V u Sb ns pidv dqb dqs dqbs dqn m

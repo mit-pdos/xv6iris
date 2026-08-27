@@ -274,7 +274,6 @@ Record fread_names := MkFReadNames {
   frn_pav        : mword 64;
   frn_pu         : mword 64;
   frn_bio        : bio_names;
-  frn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
   frn_inodestart : Z;
   frn_dqs        : dfrac;         (* sb.inodestart                          *)
   (* THE DEVICE TABLE'S READ COLUMN, AS FUNCTIONS OF THE MAJOR.  Scalars
@@ -305,7 +304,6 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
     (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
-    1%positive
     0 (DfracOwn 1)
     (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
 
@@ -467,9 +465,9 @@ Section SpecFileread.
         [ref] words, the entries' content escrows, the inode region -- the
         escrow at the FAMILY where it was per-slot. *)
      itable_inv ∗
-     ic_escrows fsc_ic fsc_fs (frn_ireg fn) fsc_cov
+     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov
                 fsc_logst ∗
-     ireg_inv (frn_ireg fn) fsc_fs (frn_inodestart fn) icfg_nib ∗
+     ireg_inv fsc_ireg fsc_fs (frn_inodestart fn) icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
      sb_inodestart ↦₄{frn_dqs fn}
@@ -601,10 +599,10 @@ Section SpecFileread.
   Qed.
 
   (* the per-entry escrow, out of the family *)
-  Lemma ic_escrows_acc2 (γi : gname)
+  Lemma ic_escrows_acc2
       (ik : nat) :
     (ik < NINODE)%nat ->
-    (ic_escrows fsc_ic fsc_fs γi fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs γi fsc_cov fsc_logst ik
+    (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ik
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.

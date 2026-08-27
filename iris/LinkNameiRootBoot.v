@@ -56,7 +56,7 @@ Module NameiRootBoot : NAMEI_ROOT_BOOT.
        the root corner never touches the private block), so any inhabitant
        serves.  BootCarveMain's zero record is the one other dummy in the
        tree; duplicated rather than exported -- it is one literal. *)
-    iApply (NameiRoot.wp_namei_root fsc_itlock fsc_ireg
+    iApply (NameiRoot.wp_namei_root fsc_itlock
               icfg_ist icfg_nib icfg_dev dqp m n K eb p b lks
               (MkPPriv (zero_reg : mword 64)
                  (UPTD (mword_of_int 0 : mword 44) (mword_of_int 0 : mword 44) ∅ ∅)

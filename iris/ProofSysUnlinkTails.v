@@ -763,7 +763,7 @@ Section ProofSysUnlinkTails.
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (gtl : gname) (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -806,10 +806,10 @@ Section ProofSysUnlinkTails.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
-    ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst kk -∗
-    ireg_inv gi fsc_fs inodestart nib -∗
+    ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
@@ -817,7 +817,7 @@ Section ProofSysUnlinkTails.
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
-    ic_loaded fsc_fs gi fsc_cov fsc_logst kk inum dn bm -∗
+    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
     (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
        iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
@@ -933,7 +933,7 @@ Section ProofSysUnlinkTails.
        release of the walk, so the ARMED contract (B''-tx4) brings the whole
        element home in the ghost step that parks the payload. *)
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gi gtl gil gisl bmapstart
+              pd pav pu bn g gtl gil gisl bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 30)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
@@ -1101,7 +1101,7 @@ Section ProofSysUnlinkTails.
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (gtl : gname) (gil gisl : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -1143,10 +1143,10 @@ Section ProofSysUnlinkTails.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
-    ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst kk -∗
-    ireg_inv gi fsc_fs inodestart nib -∗
+    ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
@@ -1154,7 +1154,7 @@ Section ProofSysUnlinkTails.
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
-    ic_loaded fsc_fs gi fsc_cov fsc_logst kk inum dn bm -∗
+    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
     (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
        iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
@@ -1246,7 +1246,7 @@ Section ProofSysUnlinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID1 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (su_tail_bad (CID0 := CID1) gs jx gl gu gd gk pd pav pu bn g gi
+    iApply (su_tail_bad (CID0 := CID1) gs jx gl gu gd gk pd pav pu bn g
               gtl gil gisl bmapstart inodestart nib size dev
               kk qi s gy inum dn bm u pidv dq dqb dqs m M1 sp0 K eb b lks
               (m !!! Regidx Rs2 : mword 64) w5 w6 w27 w30 bd bnm bp be
@@ -1285,7 +1285,7 @@ Section ProofSysUnlinkTails.
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (gtl : gname)
       (gil gisl : gname) (gili gisli : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -1333,11 +1333,11 @@ Section ProofSysUnlinkTails.
     log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    is_itable2 gtl fsc_ic fsc_fs gi fsc_cov fsc_logst nib dev -∗
+    is_itable2 gtl fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
     itable_inv -∗
-    ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst kk -∗
-    ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst ki -∗
-    ireg_inv gi fsc_fs inodestart nib -∗
+    ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
+    ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ki -∗
+    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
     ireg_open -∗
     (* ---- dp, still locked: released in [bad:] ---- *)
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
@@ -1346,7 +1346,7 @@ Section ProofSysUnlinkTails.
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
-    ic_loaded fsc_fs gi fsc_cov fsc_logst kk inum dn bm -∗
+    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
     (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
        iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
@@ -1362,7 +1362,7 @@ Section ProofSysUnlinkTails.
     i_dev (ientry ki) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry ki) ↦₄{DfracOwn (1/2)} inumi -∗
     i_valid (ientry ki) ↦₄ valid_word true -∗
-    ic_loaded fsc_fs gi fsc_cov fsc_logst ki inumi dni bmi -∗
+    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ki inumi dni bmi -∗
     ity_shot gyi (di_type dni) -∗
     (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
        iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
@@ -1485,7 +1485,7 @@ Section ProofSysUnlinkTails.
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn g gi gtl gili gisli bmapstart
+              pd pav pu bn g gtl gili gisli bmapstart
               inodestart nib size dev ki qip si gyi
               (DepTx si dev inumi gyi t (1/4)%Qp) inumi dni bmi u SbE
               false false false eE _ _ pidv
@@ -1505,7 +1505,7 @@ Section ProofSysUnlinkTails.
     (* ...and [dp]'s arm GROWS back to a half, which is where a one-lock
        walk stands: [su_tail_bad] takes [ic_tx_dep]. *)
     iApply fupd_wp.
-    iMod (ic_grow_tx ⊤ fsc_ic fsc_fs gi fsc_cov fsc_logst kk s dev inum gy true
+    iMod (ic_grow_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk s dev inum gy true
             t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter)
             ltac:(solve_ndisj) with "Hesck Hivalid Hdep Htd")
       as "(Hivalid & Hdep)".
@@ -1602,7 +1602,7 @@ Section ProofSysUnlinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID6)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (su_tail_bad (CID0 := CID6) gs jx gl gu gd gk pd pav pu bn g gi
+    iApply (su_tail_bad (CID0 := CID6) gs jx gl gu gd gk pd pav pu bn g
               gtl gil gisl bmapstart inodestart nib size dev
               kk qi s gy inum dn bm n2 pidv dq dqb dqs m P2 sp0 K eb b
               lks (m !!! Regidx Rs2 : mword 64) (m !!! Regidx Rs3 : mword 64)

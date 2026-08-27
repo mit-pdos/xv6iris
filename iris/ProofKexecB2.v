@@ -290,7 +290,7 @@ Section KexecB2Body.
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -303,7 +303,7 @@ Section KexecB2Body.
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string) :
-    kxc_bad324_body Q gs jp gl gu gd gk pd pav pu bn g gi gtl gilf gislf
+    kxc_bad324_body Q gs jp gl gu gd gk pd pav pu bn g gtl gilf gislf
       ga gf bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
@@ -652,7 +652,7 @@ Section KexecB2Body.
                   (CID13 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CID0 CID13 true (proc_addr jp) _ Hcr
                  with "Hcont") as "Hcont".
-    iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gi gtl
+    iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gtl
               gilf gislf ga gf bmapstart inodestart nib size
               dev kf qf sf gyf inumf dnf bmf n2
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
@@ -776,7 +776,7 @@ Section KexecB2Loops.
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names) (gi : gname)
+      (bn : bio_names) (g : log_names)
       (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
@@ -790,7 +790,7 @@ Section KexecB2Loops.
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :
-    kxc_ls_body Q gs jp gl gu gd gk pd pav pu bn g gi gtl gilf gislf
+    kxc_ls_body Q gs jp gl gu gd gk pd pav pu bn g gtl gilf gislf
       ga gf bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
@@ -1387,11 +1387,11 @@ Section KexecB2Loops.
                    (rd_delivered datl fpg offn tot) ltac:(lia)
                    with "Hdst Hrest") as "Hpage".
       iDestruct ("Hgive" with "Hpage") as "Hpt".
-      iDestruct (kxc_load_seal gi kf inumf dnf bmf datl
+      iDestruct (kxc_load_seal kf inumf dnf bmf datl
                    Hiok Hrl Hdok Hddix Hdoc Hduq
                    with "Hdlk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop") as "Hload".
       iDestruct (A.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
-      iDestruct (kxc_open_intro gi dev pidv kf qf sf gyf
+      iDestruct (kxc_open_intro dev pidv kf qf sf gyf
                    inumf dnf bmf gilf gislf
                    with "Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload
                          Hity Hfrz Hkeep Hru") as "Hopen".
@@ -1645,7 +1645,7 @@ Section KexecB2Loops.
         iDestruct (wp_next_retarget CID0 CIDb1 true (proc_addr jp) _ Hcr3
                      with "Hcont") as "Hcont".
         iApply (kxc_bad324 (CID0 := CIDb1) Q gs jp gl gu gd gk pd pav pu bn g
-                  gi gtl gilf gislf ga gf bmapstart inodestart
+                  gtl gilf gislf ga gf bmapstart inodestart
                   nib size dev kf qf sf gyf inumf dnf bmf n2 plen
                   pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M2 K
                   sp0 ra0 s00 s10 s20 pv av w63 w67 ef P w65 eb lks

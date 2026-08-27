@@ -264,7 +264,6 @@ Record fwrite_names := MkFWriteNames {
   fwn_pu         : mword 64;
   fwn_bio        : bio_names;
   fwn_log        : log_names;     (* begin_op / end_op                      *)
-  fwn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
   fwn_pr         : gname;         (* balloc's printk credential             *)
   fwn_inodestart : Z;
   fwn_bmapstart  : Z;             (* the bitmap, for bmap -> balloc          *)
@@ -296,7 +295,6 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     (MkLogNames 1%positive 1%positive 1%positive 1%positive 1%positive)
-    1%positive
     1%positive
     0 0 0
     (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
@@ -471,9 +469,9 @@ Section SpecFilewrite.
      (* THE THREE PERSISTENT ICACHE INVARIANTS SpecIlock / SpecIunlock take,
         the escrow at the FAMILY where it was per-slot *)
      itable_inv ∗
-     ic_escrows fsc_ic fsc_fs (fwn_ireg fn) fsc_cov
+     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov
                 fsc_logst ∗
-     ireg_inv (fwn_ireg fn) fsc_fs (fwn_inodestart fn) icfg_nib ∗
+     ireg_inv fsc_ireg fsc_fs (fwn_inodestart fn) icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
      (* THE LENT SHARE AND ITS GENERATION'S TYPE WITNESS ARE NOT HERE.

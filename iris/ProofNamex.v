@@ -592,9 +592,9 @@ Section ProofNamexMain.
   (* the escrow-family accessor, restated locally since the walk's slots are
      dirlookup's outputs.  The sleeplock family's accessor is
      [IcacheEscrow.ic_sleeplocks_lookup]. *)
-  Lemma nx_esc_acc (gi : gname)
+  Lemma nx_esc_acc
       (k : nat) : (k < NINODE)%nat ->
-    (ic_escrows fsc_ic fsc_fs gi fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs gi fsc_cov fsc_logst k
+    (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
@@ -1124,7 +1124,7 @@ Section ProofNamexMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -1136,7 +1136,7 @@ Section ProofNamexMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gi gtl
+    : wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gtl
                         ga gf bmapstart inodestart nib
                         size dev plen pfun nfun npar n Sb
                         pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -2669,7 +2669,7 @@ Section ProofNamexMain.
                assert (Hpb' : bv_unsigned pinum < 16 * Z.of_nat nib)
                  by (rewrite Hnib; exact Hpb).
                destruct (Hiregb pinum Hpb') as [Hibc Hibl].
-               iDestruct (nx_esc_acc gi pk Hpk with "Hesc")
+               iDestruct (nx_esc_acc pk Hpk with "Hesc")
                  as "#Hescp".
                iDestruct (ic_sleeplocks_lookup fsc_ic pk Hpk with "Hslks")
                  as (gilp gislp) "#Hslkp".
@@ -2689,7 +2689,7 @@ Section ProofNamexMain.
                iEval (rewrite Htlog) in "Htx".
                iDestruct (log_tx_halve with "Htx") as (tnx) "[Htxa Htxb]".
                iEval (rewrite -Htlog) in "Htxa".
-               iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gi
+               iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g
                          gtl gilp gislp bmapstart inodestart
                          nib size dev pk pq pinum ncur Scur wc false
                          false enxA tnx (1/2)%Qp pidv dq dqb dqs
@@ -3068,7 +3068,7 @@ Section ProofNamexMain.
                    assert (Hib' : bv_unsigned iinum < 16 * Z.of_nat nib)
                      by (rewrite Hnib; exact Hib).
                    destruct (Hiregb iinum Hib') as [Hibc Hibl].
-                   iDestruct (nx_esc_acc gi ik Hik
+                   iDestruct (nx_esc_acc ik Hik
                                 with "Hesc") as "#Hesck".
                    iDestruct (ic_sleeplocks_lookup fsc_ic ik Hik with "Hslks")
                      as (gilk gislk) "#Hslkk".
@@ -3148,7 +3148,7 @@ Section ProofNamexMain.
                       the residue rides the descriptor conjunct home. *)
                    iEval (rewrite Htlog) in "Htx".
                    iApply (IL.wp_ilock_tx_sconf gs j gl gu gd gk pd pav pu bn
-                             gi gilk gislk inodestart nib
+                             gilk gislk inodestart nib
                              ik (iq/2)%Qp gsh PlainK dev iinum pidv dq dqs
                              V2 (K - 12)%nat eb b lks Vpr
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
@@ -3296,7 +3296,7 @@ Section ProofNamexMain.
                        { iApply (nxi_0d2 with "Htext"). }
                        iIntros (CIDN0 HqN0). iApply bi.later_intro. iIntros "Hcg Hpc".
                        iEval (rewrite Htg07an) in "Hpc".
-                     iAssert (ic_loaded fsc_fs gi fsc_cov fsc_logst ik iinum dnl bml)
+                     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ik iinum dnl bml)
                        with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
                               Hblocks Hdlnk Hdview Hfview]" as "Hload".
                      { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datl.
@@ -3370,7 +3370,7 @@ Section ProofNamexMain.
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn g gi gtl gilk gislk
+                               bn g gtl gilk gislk
                                bmapstart inodestart nib size dev
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
@@ -3510,7 +3510,7 @@ Section ProofNamexMain.
                      iDestruct (log_opS_named with "Hlog") as (enx) "Hlog".
                      iDestruct (log_opSe_lb with "Hlog") as "#Hlbnx".
                      iApply fupd_wp.
-                     iMod (InodeRegion.ireg_obs_mint ⊤ gi fsc_fs inodestart nib
+                     iMod (InodeRegion.ireg_obs_mint ⊤ fsc_ireg fsc_fs inodestart nib
                              iinum dnl g enx ltac:(solve_ndisj) Hib' Htlog
                              (nx_nlink_nz _ Hnl0)
                              with "Hireg Hdiat Hlbnx") as "[Hdiat #Hobs]".
@@ -3641,7 +3641,7 @@ Section ProofNamexMain.
                                   (m !!! Regidx Ra1 : mword 64) NP3)
                          by exact (nx_regs_caller m sp0 _ _ _ _ NP2 Rra _
                                      ltac:(vm_compute; reflexivity) HP2regs).
-                       iAssert (ic_loaded fsc_fs gi fsc_cov fsc_logst ik iinum dnl bml)
+                       iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ik iinum dnl bml)
                          with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
                                 Hblocks Hdlnk Hdview Hfview]" as "Hload".
                        { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datl.
@@ -3663,7 +3663,7 @@ Section ProofNamexMain.
                                     ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
                        iDestruct (cpu_claim_ext_transport CIDil CIDP5 eb (proc_addr j)
                                     ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-                       iApply (IU.wp_iunlock_tx_sconf gs gi gilk gislk
+                       iApply (IU.wp_iunlock_tx_sconf gs gilk gislk
                                  ik (iq/2)%Qp gsh dev iinum dnl bml
                                  pidv dq NP3 (K - 12)%nat eb (proc_addr j) b lks Vpr
                                  Kiu Hik HP3a0
@@ -3967,7 +3967,7 @@ Section ProofNamexMain.
                            by (destruct Hiok as (_ & _ & _ & _ & _ & Hq & _);
                                exact Hq).
                          iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk
-                                   pd pav pu bn gi gtl ga gf
+                                   pd pav pu bn gtl ga gf
                                    inodestart nib dev (ientry ik) iinum
                                    bml datl dnl dnl
                                    nf' false (mword_of_int 0 : mword 32)
@@ -4031,7 +4031,7 @@ Section ProofNamexMain.
                                             & Z22 & Z23 & Z24 & Z25 & Zthr).
                          iEval (rewrite /inode_map) in "Hmap".
                          iDestruct "Hmap" as "[Haddrs Hind]".
-                         iAssert (ic_loaded fsc_fs gi fsc_cov fsc_logst ik iinum dnl
+                         iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ik iinum dnl
                                     bml)
                            with "[Hdiat Hmeta Haddrs Hind Hblocks Hdlnk Hdview Hfview]"
                            as "Hload".
@@ -4189,7 +4189,7 @@ Section ProofNamexMain.
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn g gi gtl gilk gislk
+                                     pd pav pu bn g gtl gilk gislk
                                      bmapstart inodestart nib
                                      size dev ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
@@ -4420,7 +4420,7 @@ Section ProofNamexMain.
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn g gi gtl gilk gislk
+                                     pd pav pu bn g gtl gilk gislk
                                      bmapstart inodestart nib
                                      size dev ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
@@ -4657,7 +4657,7 @@ Section ProofNamexMain.
                      { iApply (nxi_0ca with "Htext"). }
                      iIntros (CIDN0 HqN0). iApply bi.later_intro. iIntros "Hcg Hpc".
                      iEval (rewrite Htg054) in "Hpc".
-                     iAssert (ic_loaded fsc_fs gi fsc_cov fsc_logst ik iinum dnl bml)
+                     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ik iinum dnl bml)
                        with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
                               Hblocks Hdlnk Hdview Hfview]" as "Hload".
                      { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datl.
@@ -4731,7 +4731,7 @@ Section ProofNamexMain.
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn g gi gtl gilk gislk
+                               bn g gtl gilk gislk
                                bmapstart inodestart nib size dev
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
@@ -5519,10 +5519,10 @@ Section ProofNamexMain.
          ([IgetLic.iname_root_alloc]).  The licence is PURE: the evidence
          lives in the region's invariant, not in this walk's hands, which
          is why it costs the walk nothing. *)
-      iAssert (iname gi fsc_fs inodestart ROOTINO RootL) as "Hlicr";
+      iAssert (iname fsc_ireg fsc_fs inodestart ROOTINO RootL) as "Hlicr";
         [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
       iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-      iApply (IG.wp_iget_sconf gtl gi inodestart nib dev ROOTINO
+      iApply (IG.wp_iget_sconf gtl inodestart nib dev ROOTINO
                 RootL
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
@@ -5821,7 +5821,7 @@ Section ProofNamexMain.
          its [ref++] is a ledger move, so it takes the region handle this
          walk already carries -- persistent, and the same [Hireg] the iget
          above was given. *)
-      iApply (ID.wp_idup_sconf gtl gi inodestart nib
+      iApply (ID.wp_idup_sconf gtl inodestart nib
                 ck dev B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kid ltac:(vm_compute; reflexivity) Hckl HB3a0 Hdev
                 ltac:(lkbelow)
@@ -6015,7 +6015,7 @@ Section ProofNamexMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names) (gi : gname)
+      (g : log_names)
       (gtl : gname)
       (ga : gname) (gf : gname)
       (bmapstart inodestart : Z) (nib : nat)
@@ -6027,7 +6027,7 @@ Section ProofNamexMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gi gtl
+    : wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gtl
                           ga gf bmapstart inodestart nib
                           size dev plen pfun nfun npar n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
@@ -6043,7 +6043,7 @@ Section ProofNamexMain.
        now takes the TOKEN with it (durable-disk B''-tx), so the seal hands
        the pair over rather than framing the token past the walk. *)
     iDestruct (log_op_openSt with "Hlog") as (Sb0) "Hlog".
-    iApply (wp_namex_gen gs j gl gu gd gk pd pav pu bn g gi gtl
+    iApply (wp_namex_gen gs j gl gu gd gk pd pav pu bn g gtl
               ga gf bmapstart inodestart nib size dev
               plen pfun nfun npar n Sb0 pidv dq dqb dqs dqpv m K eb b lks Vpr
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov

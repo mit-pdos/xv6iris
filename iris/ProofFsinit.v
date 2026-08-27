@@ -537,7 +537,6 @@ Section FsinitMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γi : gname)
       (gtl : gname)
       (γpr : gname)
       (bmapstart inodestart : Z)
@@ -557,7 +556,7 @@ Section FsinitMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb) :
-      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γi gtl γpr
+      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn gtl γpr
                            bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
@@ -610,7 +609,7 @@ Section FsinitMain.
     assert (Hcgeom' : col_geom sbrec (FsImg.sb_inodestart sbrec) nib
                         (fs_home_set fsc_cov fsc_logst))
       by (rewrite (cg_ist Hcgeom); exact Hcgeom).
-    iAssert (ireg_reg γi fsc_fs (FsImg.sb_inodestart sbrec) nib) as "#Hireg'".
+    iAssert (ireg_reg fsc_ireg fsc_fs (FsImg.sb_inodestart sbrec) nib) as "#Hireg'".
     { rewrite (cg_ist Hcgeom). iExact "Hireg". }
     iAssert (bitmap_reg fsc_fs (FsImg.sb_bmapstart sbrec) fsc_cov fsc_logst
                (FsImg.sb_size sbrec)) as "#Hbm'".
@@ -619,7 +618,7 @@ Section FsinitMain.
     iAssert (□ (sb_park fsc_fs sbrec -∗ snap_law icfg_log fsc_fs fsc_cov fsc_logst))%I
       as "#Hlawf".
     { iModIntro. iIntros "#Hpark".
-      iApply (fs_snap_law_build icfg_log fsc_ic fsc_fs γi fsc_cov fsc_logst nib sbrec
+      iApply (fs_snap_law_build icfg_log fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib sbrec
                 eq_refl Hcgeom'
                 with "Hireg' Hbm' Hesc Hpoolinv Hpark"). }
     iAssert (fsi_cont (CID0 := CID) bn bmapstart inodestart
@@ -1557,7 +1556,7 @@ Section FsinitMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
-              icfg_log γi gtl γpr bmapstart inodestart
+              icfg_log gtl γpr bmapstart inodestart
               ninodes nib size dev pidv dq (DfracOwn 1) (DfracOwn 1)
               (DfracOwn 1) R1 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0

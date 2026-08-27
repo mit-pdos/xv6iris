@@ -309,7 +309,7 @@ Definition wp_itrunc_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (bmapstart : Z) (inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
@@ -428,8 +428,8 @@ Definition wp_itrunc_sconf_body
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
-  ireg_inv γi fsc_fs inodestart nib -∗
-  dinode_at γi inum dn0 -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  dinode_at fsc_ireg inum dn0 -∗
   (* the caller's own pid cell *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
@@ -476,7 +476,7 @@ Definition wp_itrunc_sconf_body
       (* ...and every block it named is back in the pool *)
       (* the flush landed: this inum's on-disk record is the truncated
          inode *)
-      dinode_at γi inum (di_trunc dn) -∗
+      dinode_at fsc_ireg inum (di_trunc dn) -∗
       bslots 3 -∗
       (* SPEND AT MOST TWO, AT LEAST ONE: iupdate always runs; the bitmap
          unit is spent only if the inode named a block at all *)
@@ -518,7 +518,7 @@ Definition wp_itrunc_gen_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γi : gname)
+    (γ : log_names)
     (bmapstart : Z) (inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
@@ -578,8 +578,8 @@ Definition wp_itrunc_gen_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
-  ireg_inv γi fsc_fs inodestart nib -∗
-  dinode_at γi inum dn0 -∗
+  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  dinode_at fsc_ireg inum dn0 -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv γs -∗
   dev_inv γu γd -∗
@@ -619,7 +619,7 @@ Definition wp_itrunc_gen_body
       inode_meta ip (di_trunc dn) -∗
       inode_map fsc_fs ip bm_empty -∗
       inode_blocks fsc_fs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
-      dinode_at γi inum (di_trunc dn) -∗
+      dinode_at fsc_ireg inum (di_trunc dn) -∗
       bslots 3 -∗
       (* THE LEDGER, SET FORM.  The set only GROWS, it provably contains
          this inode's block, and the counter is bracketed by the two
@@ -654,7 +654,7 @@ Module Type ITRUNC.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (bmapstart : Z) (inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -664,7 +664,7 @@ Module Type ITRUNC.
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γi
+      wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ
                            bmapstart inodestart nib size dev
                            ip inum dn dn0 bm data u
                            pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
@@ -678,7 +678,7 @@ Module Type ITRUNC.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γi : gname)
+      (γ : log_names)
       (bmapstart : Z) (inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
@@ -688,7 +688,7 @@ Module Type ITRUNC.
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γi
+      wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ
                          bmapstart inodestart nib size dev
                          ip inum dn dn0 bm data u Sb crb cru e0
                          pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
