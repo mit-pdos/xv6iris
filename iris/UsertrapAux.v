@@ -7,7 +7,8 @@
 
    Both are ordinary .rodata literals reached by an auipc/addi pair, so all
    this file does is name them, name their addresses, and mint the persistent
-   [↦ₛ□] out of [KernelDataInv.kernel_data].  It is [ProcdumpAux.v] §3
+   [↦ₛ□] out of [KernelDataInv.kernel_data] (at the reading thread's context;
+   [↦ₛ] is context-indexed since M1 stage 3).  It is [ProcdumpAux.v] §3
    verbatim in shape, and for the same recorded reason: the byte premises are
    pure lemmas passed to [kernel_data_string] BY NAME, because an inline
    [ltac:(...)] byte premise is re-elaborated by the proofmode without the

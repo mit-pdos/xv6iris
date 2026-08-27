@@ -374,7 +374,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the unflipped towers (↦₄ / ↦ₛ) cross the seam here *)
+(* NO SHIM: this file's one crossing was [sysc_pname_app]'s, and [↦ₛ]
+   flipping (M1 stage 3) deleted it. *)
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -2039,34 +2040,13 @@ Section SyscallVocab.
               ltac:(vm_compute; discriminate) sysc_fmt_bytes with "Hd").
   Qed.
 
-  (* [p->name]'s sixteen bytes as a byte CURSOR from its own base -- the
-     bridge [pname_cells] (element-indexed) needs before it can meet
-     [string_pointsto] (cursor-indexed).  Mirrors ProofKforkParts'
-     [kfk_name_addr], re-derived here rather than importing a proof file. *)
-  Lemma sysc_name_addr (pa : mword 64) (i : nat) :
-    pa_add (p_name pa 0) i = p_name pa i.
-  Proof.
-    unfold pa_add, p_name.
-    change (add_vec pa (mword_of_int (344 + Z.of_nat 0))) with (add_vec_int pa 344).
-    rewrite avi_assoc. reflexivity.
-  Qed.
-
-  (* the sixteen raw bytes, SPLIT at the NUL: a real C string in front,
-     whatever gcc left behind it.  Over [pname_bytes], the bare big-op --
-     [pname_cells] now carries [ProcGeom.pname_wf] as well, and this lemma is
-     the byte-level half. *)
-  Lemma sysc_pname_app (pa : mword 64) (dq : dfrac) (nm : string) (pad : list (bv 8)) :
-    pname_bytes pa dq (List.app (cstring_bytes nm) pad) ⊣⊢
-    (p_name pa 0 ↦ₛ{dq} nm ∗
-     [∗ list] i ↦ b ∈ pad, p_name pa (length (cstring_bytes nm) + i) ↦ₘ{dq} b).
-  Proof.
-    rewrite /pname_bytes big_sepL_app /string_pointsto.
-    apply bi.sep_proper; [| reflexivity].
-    (* ↦ₛ has not flipped (M1 stage 2): [string_pointsto] is still the raw
-       byte tower, so each of [pname_bytes]'s ctx bytes crosses the seam. *)
-    apply big_sepL_proper. intros k x Hk. rewrite sysc_name_addr.
-    apply TsoCtxShim.ctx_pointsto_shim.
-  Qed.
+  (* The byte cursor and the NUL split that this file used to re-derive by
+     hand ([sysc_name_addr] / [sysc_pname_app], the latter through a
+     shim crossing, because [↦ₛ] had not flipped) are now
+     [ProcDefs.pname_addr] and the array->string accessor family
+     ([pname_cells_borrow] / [pname_cells_return], tso-port.md §0.21′
+     amendment) -- and with [↦ₛ] context-indexed there is no crossing left
+     to make. *)
 
   (* [&p->name] is never null: the proc array sits far above 0, exactly as
      [ProcGeom.proc_addr_nonzero] says of its base. *)
@@ -4569,9 +4549,10 @@ Section SyscallArms.
      does cost something: printk WALKS it, so it must be a real C string, and
      [ProcDefs.pname_cells] carries exactly that ([ProcGeom.pname_wf], "there
      is a NUL in the sixteen bytes", established at every write site).
-     [CstringInv.bytes_string_split] turns it into the C string plus padding,
-     and [sysc_pname_app] turns those bytes into the [string_pointsto]
-     printk's [PkAStr] wants.  None of it is assumed.
+     [ProcDefs.pname_cells_borrow] -- the array->string accessor -- hands out
+     the prefix up to the NUL as the [↦ₛ] fact printk's [PkAStr] wants,
+     keeping the tail bytes behind; [pname_cells_return] reassembles.  None
+     of it is assumed.
 
      The WEAK general corollary [wp_printk_gen_sconf] is what is called (the
      one procdump's own loop uses): syscall makes no claim about what reached
@@ -4729,16 +4710,13 @@ Section SyscallArms.
     (* ---- p->name as a C STRING, derived not assumed: the invariant gives
        the NUL, [CstringInv] gives the split ---- *)
     iDestruct (sysc_priv_name with "Hpriv") as "(%Hnlen & Hnm & Hnmback)".
-    (* [Hnwf] is the invariant [pname_cells] carries -- "there is a NUL in
-       p->name" -- and [CstringInv.bytes_string_split] turns it into the C
-       string plus padding that [printk("%s", ...)] wants. *)
-    iDestruct (pname_cells_open with "Hnm") as "(%Hnwf & Hnm)".
-    destruct (CstringInv.bytes_string_split (pv_name V) Hnwf) as (pad & Hsplit).
-    set (nm := CstringInv.bytes_string (pv_name V)).
-    assert (Hnonul : PrintkFmt.nonul nm = true)
-      by apply CstringInv.bytes_string_nonul.
-    iEval (rewrite Hsplit) in "Hnm".
-    iDestruct (sysc_pname_app (proc_addr j) (DfracOwn 1) nm pad with "Hnm") as "[Hstr Hpad]".
+    (* THE ARRAY->STRING BORROW (ProcDefs, tso-port.md §0.21′ amendment):
+       [pname_cells] carries [ProcGeom.pname_wf] -- "there is a NUL in
+       p->name" -- and that DETERMINES the string, so out comes the prefix
+       up to the NUL as an ordinary [↦ₛ] fact with the tail bytes retained.
+       [printk("%s", ...)] takes the string view; [pname_cells_return]
+       reassembles the array afterwards. *)
+    iDestruct (pname_cells_borrow with "Hnm") as (nm pad) "(%Hsplit & %Hnonul & Hstr & Hpad)".
     iPoseProof (sysc_fmt_str with "Hdata") as "Hfmt".
     iDestruct (cpu_own_transport CID CIDe 0%nat true (proc_addr j) true
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
@@ -4756,10 +4734,9 @@ Section SyscallArms.
     destruct Hcsp as [Hcs Hra0].
     iDestruct (sysc_descs_take F4 (p_name (proc_addr j) 0) nm (DfracOwn 1) HF4va1
                  with "Hdescs") as "Hstr".
-    iDestruct (sysc_pname_app (proc_addr j) (DfracOwn 1) nm pad with "[Hstr Hpad]")
-      as "Hnm"; [iFrame "Hstr Hpad"|].
-    iEval (rewrite -Hsplit) in "Hnm".
-    iDestruct (pname_cells_intro _ _ _ Hnwf with "Hnm") as "Hnm".
+    iDestruct (pname_cells_return (proc_addr j) (DfracOwn 1) nm pad
+                 with "Hstr Hpad") as "Hnm".
+    rewrite -Hsplit.
     iDestruct ("Hnmback" with "Hnm") as "Hpriv".
     iEval (rewrite Hpc52) in "Hpc".
     (* what the printk call preserved of the registers the tail still reads *)

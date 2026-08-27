@@ -7,11 +7,16 @@ From iris.base_logic.lib Require Import gen_heap invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto.
+Require Import InstrBytes.   (* [avi_assoc]: the name field's byte cursor *)
 Require Import PageGeom ProcGeom TrampPt.
 Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
 Require Import StackOwn.
 Require Import FdSlots IrefSlots.
+(* [bytes_string]/[bytes_string_split]: the pure half of the array->string
+   borrow below -- a fixed-size buffer with a NUL in it DETERMINES the C
+   string it holds. *)
+Require Import CstringInv.
 (* EXPORTED, not merely imported: [proc_dormant] mentions [bslots], so every
    file that unfolds the dormant block needs the vocabulary in scope. *)
 Require Export BioDefs.
@@ -63,6 +68,96 @@ Section ProcDefs.
   Lemma pname_cells_intro (pa : mword 64) (dq : dfrac) (bs : list (bv 8)) :
     pname_wf bs -> pname_bytes pa dq bs -∗ pname_cells pa dq bs.
   Proof. intro H. iIntros "H". by iFrame. Qed.
+
+  (* ===================================================================== *)
+  (* THE ARRAY -> STRING ACCESSOR (tso-port.md §0.21′ amendment).           *)
+  (*                                                                       *)
+  (* [pname_cells] and [↦ₛ] are DIFFERENT RESOURCES and each keeps its own  *)
+  (* definition.  [p->name] is a FIXED-SIZE ARRAY -- sixteen bytes, always  *)
+  (* all sixteen owned, the length is part of [proc_fields] -- with a C     *)
+  (* string EMBEDDED in it; [pname_wf] is the terminator's existence.  [↦ₛ] *)
+  (* is a string and nothing else: it owns |s|+1 bytes and stops.           *)
+  (*                                                                       *)
+  (* So the bridge is not a conversion, it is a POSITIONAL SPLIT: borrow    *)
+  (* the prefix up to (and including) the NUL as a [↦ₛ] fact, KEEP the tail *)
+  (* bytes behind as [pname_pad], hand the string view to a callee that     *)
+  (* speaks strings, and reassemble on return.  The reassembly takes an     *)
+  (* ARBITRARY string, not the borrowed one, because the callee may have    *)
+  (* written it (safestrcpy does) -- and [pname_wf] comes back for free,    *)
+  (* since a [cstring_bytes] prefix carries its own NUL.                    *)
+  (* ===================================================================== *)
+
+  (* the bytes the borrow leaves behind: everything past the string's NUL,
+     addressed from the FIELD's base so the two halves rejoin positionally *)
+  Definition pname_pad (pa : mword 64) (dq : dfrac) (nm : string)
+      (pad : list (bv 8)) : iProp Σ :=
+    ([∗ list] i ↦ b ∈ pad,
+       p_name pa (length (cstring_bytes nm) + i) ↦ₘ{dq} b)%I.
+
+  (* [p->name]'s bytes as a CURSOR from the field's base -- what
+     [pname_cells]' element-indexed big-op needs before it can meet
+     [ctx_string_pointsto]'s. *)
+  Lemma pname_addr (pa : mword 64) (i : nat) :
+    pa_add (p_name pa 0) i = p_name pa i.
+  Proof.
+    unfold pa_add, p_name.
+    change (add_vec pa (mword_of_int (344 + Z.of_nat 0))) with (add_vec_int pa 344).
+    rewrite avi_assoc. reflexivity.
+  Qed.
+
+  (* THE SPLIT, as an equivalence: both directions of the borrow at once. *)
+  Lemma pname_bytes_split (pa : mword 64) (dq : dfrac) (nm : string)
+      (pad : list (bv 8)) :
+    pname_bytes pa dq (cstring_bytes nm ++ pad) ⊣⊢
+    p_name pa 0 ↦ₛ{dq} nm ∗ pname_pad pa dq nm pad.
+  Proof.
+    rewrite /pname_bytes /pname_pad big_sepL_app
+            ctx_string_pointsto_unfold.
+    apply bi.sep_proper; [| reflexivity].
+    apply big_sepL_proper. intros k x Hk. by rewrite pname_addr.
+  Qed.
+
+  (* a buffer that BEGINS with a C string is well-formed: the string's own
+     terminator is the NUL [pname_wf] asks for. *)
+  Lemma pname_wf_cstring (nm : string) (pad : list (bv 8)) :
+    pname_wf (cstring_bytes nm ++ pad).
+  Proof.
+    rewrite /pname_wf /cstring_bytes -app_assoc.
+    exists (length (string_bytes nm)). split.
+    - rewrite length_app. cbn [length app]. lia.
+    - rewrite lookup_app_r; [| apply Nat.le_refl].
+      rewrite Nat.sub_diag. reflexivity.
+  Qed.
+
+  (* THE BORROW.  Out comes the string the array holds -- determined, not
+     assumed: [pname_wf] gives the NUL and [CstringInv] gives the split --
+     as a [↦ₛ] fact at the field's base, plus the retained tail.  [nonul]
+     rides along because a [%s] consumer needs it and it is free here. *)
+  Lemma pname_cells_borrow (pa : mword 64) (dq : dfrac) (bs : list (bv 8)) :
+    pname_cells pa dq bs -∗
+    ∃ (nm : string) (pad : list (bv 8)),
+      ⌜bs = (cstring_bytes nm ++ pad)%list⌝ ∗ ⌜PrintkFmt.nonul nm = true⌝ ∗
+      p_name pa 0 ↦ₛ{dq} nm ∗ pname_pad pa dq nm pad.
+  Proof.
+    iIntros "H". iDestruct (pname_cells_open with "H") as "[%Hwf H]".
+    destruct (bytes_string_split bs Hwf) as (pad & Hsplit).
+    iExists (bytes_string bs), pad.
+    iSplitR; [by iPureIntro|].
+    iSplitR; [iPureIntro; apply bytes_string_nonul|].
+    rewrite -pname_bytes_split -Hsplit. iExact "H".
+  Qed.
+
+  (* THE REASSEMBLY, at an ARBITRARY string: what a callee that WROTE the
+     field hands back.  [pname_wf] is re-derived, never carried across. *)
+  Lemma pname_cells_return (pa : mword 64) (dq : dfrac) (nm : string)
+      (pad : list (bv 8)) :
+    p_name pa 0 ↦ₛ{dq} nm -∗ pname_pad pa dq nm pad -∗
+    pname_cells pa dq (cstring_bytes nm ++ pad).
+  Proof.
+    iIntros "Hs Hp".
+    iApply (pname_cells_intro _ _ _ (pname_wf_cstring nm pad)).
+    iApply pname_bytes_split. iFrame "Hs Hp".
+  Qed.
 
   Definition proc_fields (pa : mword 64) (dq : dfrac) (V : pprivate) : iProp Σ :=
     (p_sz pa        ↦₈{dq} pv_sz V ∗

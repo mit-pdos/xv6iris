@@ -2,8 +2,11 @@
 
 ## 0. CHECKPOINT — READ THIS FIRST
 
-**THE TREE IS FULLY GREEN (2026-08-27).  RED SET EMPTY.  READ §0.20′,
-§0.19′, §0.17′ AND §0.18′ FIRST** — §0.20′ is the CUTOVER BACK-PORTS (three
+**THE TREE IS FULLY GREEN (2026-08-27).  RED SET EMPTY.  READ §0.22′,
+§0.20′, §0.19′, §0.17′ AND §0.18′ FIRST** — §0.22′ is M1 STAGE 3 (`↦ₛ`
+flipped context-relative at arbitrary timestamps, its `ctx_string_all`
+derived form in the lock handles, and the array→string accessor; §0.21′
+is the ruling it implements); — §0.20′ is the CUTOVER BACK-PORTS (three
 flip-workspace shapes landed on main below the Σ seam: the virtio
 inside-out, the `HartMStore`/`HartMLoad` obligation pass-throughs, and
 `WpSconfMem`'s store-side engine-bracket re-parking — with two measured
@@ -243,9 +246,8 @@ a file that imports `TsoCtx` (last) parses the flipped meaning, a file
 that does not stays raw, and definitions are opaque names to their
 consumers, so the honest fallout is exactly the fact-passing SEAMS —
 found by ~30 error-driven build rounds, not by prediction.  `↦ₓ`/`↦ᵣ`
-never flip; `↦₂`/`↦₄`/`↦ₛ`/`↦ₚ` are stage 2 (each remaining
-`TsoCtxShim` use at a `↦₄`-split/join or string extraction is a stage-2
-worklist entry).
+never flip; `↦₂`/`↦₄` are stage 2 (§0.19′), `↦ₛ` is stage 3 (§0.22′),
+`↦ₚ` stays raw.
 
 **KMEM REDONE MINIMAL-DIFF (the acceptance test).** `KallocInv.v` is
 the SC file plus: one section binder (`Context `{XIk : CurCtx}` — every
@@ -265,16 +267,16 @@ conjuncts (caught with `coqc -time`; the fix is one word).
 1. **`kernel_data` is ∀-CONTEXT** (`∀ ξ, [∗ map] … ctx_pointsto ξ …`):
    image bytes predate every thread (the twin's timestamp-0 story), the
    one boot mint serves every consumer at its own ambient, and all ~169
-   mention sites are textually unchanged.  `kernel_data_string` keeps
-   its raw `↦ₛ` conclusion via one shim use (the "flip ↦ₛ" marker); its
-   proof instantiates the ∀ at a CONCRETE `MkCtxId inhabitant
-   inhabitant` so the lemma does not capture the ambient (capture
-   shifted call-site elaboration — ProofPanic/ProofFilewriteParts broke
-   until de-captured).
-2. **Lock metadata stays RAW; lock-internal cells go ∃-context.**
-   `lock_name`/`sl_name` (the name field) are spelled raw
-   `word_pointsto` — a context in the persistent HANDLE would make a
-   boot-minted `is_lock` unstatable elsewhere.  `lk_cpu_res`'s owner
+   mention sites are textually unchanged.  (`kernel_data_string` used to
+   spend that ∀ on a junk `MkCtxId inhabitant inhabitant` and cross to the
+   raw string tower through the shim — the tree's one "flip ↦ₛ" marker.
+   §0.22′ retires it: `kernel_data_string_all` keeps the ∀, and it is the
+   producer of the derived context-free string fact.)
+2. **Lock metadata stays CONTEXT-FREE; lock-internal cells go ∃-context.**
+   `lock_name`/`sl_name`'s name FIELD is spelled raw `word_pointsto` and
+   its STRING is `ctx_string_all` (§0.22′'s ∀-context derived form) — a
+   context in the persistent HANDLE would make a boot-minted `is_lock`
+   unstatable elsewhere.  `lk_cpu_res`'s owner
    cell is `∃ ξ, ctx_word_pointsto ξ …` (the cell belongs to whichever
    hart last stored it); the `lk_cpu_res_free/win/held` unfold lemmas
    keep their ambient statements via `WpLock.lk_cpu_cell_acc` (shim).
@@ -2255,10 +2257,11 @@ gen_heap bridges) and **`ctx_word{2,4}_reindex`** — the SC-only ξ→ξ' re-in
 new in this stage; the SHIM LEDGER below says where its twenty uses are and why
 each is an M4 entry.
 
-**`↦ₛ` DOES NOT FLIP.**  A6.15's two reasons transfer unchanged and are
-recorded beside the stage-2 notations in `TsoCtx.v`.  After this stage the
-deliberately-raw tiers are exactly **`↦ₓ` (text), `↦ᵣ` (registers), `↦ₚ`
-(the physical/image tier) and `↦ₛ` (strings)**.
+**`↦ₛ` did not flip AT THIS STAGE, and the reasons recorded here are
+REFUTED by §0.21′/§0.22′** (both read the tier off its rodata instances
+only, and the kernel writes `p->name` at runtime).  It flips in stage 3;
+after THAT stage the deliberately-raw tiers are exactly **`↦ₓ` (text),
+`↦ᵣ` (registers) and `↦ₚ` (the physical/image tier)**.
 
 #### THE WAVE: 31 ROUNDS, NOT A6.15's 14
 
@@ -2452,11 +2455,12 @@ absorb can run inside one, §0.17′'s rule), `FileInvDefs` (2,
 
 #### WHAT M1 LEAVES BEHIND
 
-M1 is COMPLETE.  Deliberately raw, with the reasons recorded at their
+M1 stage 2 is complete; **stage 3 (`↦ₛ`, §0.22′) is what actually closes
+M1**.  Deliberately raw after it, with the reasons recorded at their
 definitions: **`↦ₓ`** (kernel text — timestamp-0, context-free by the port's
-ruling), **`↦ᵣ`** (registers — per-hart machine state), **`↦ₚ`** (the physical
-tier — image bytes, the pristine gate's tier, the DMA window's flat half) and
-**`↦ₛ`** (strings — A6.15's two reasons, transferred verbatim).
+ruling), **`↦ᵣ`** (registers — per-hart machine state) and **`↦ₚ`** (the
+physical tier — image bytes, the pristine gate's tier, the DMA window's flat
+half).
 
 **RED SET: EMPTY.**  A CLEAN 1331-file VM round at exit 0 with zero errors,
 and a green incremental round on either side of it.  No `Admitted`, no
@@ -3507,6 +3511,8 @@ OPEN:
 arbitrary timestamps; pristine/t=0 is a DERIVED special case, never the
 definition
 
+> **LANDED — the implementation and its measurements are §0.22′.**
+
 The pristine-tier spelling floated for ↦ₛ (flip-note A6.69's item 2)
 is OVERRULED as the definition: it hardcodes timestamp 0, and the
 kernel has dynamically-generated strings — safestrcpy at proc.c:290
@@ -3543,3 +3549,209 @@ the derived context-free form for the handles, and this
 array→string accessor family with safestrcpy's spec as the acceptance
 test (its source argument consumes the borrowed string view; kfork's
 and kexec's call sites are the worked instances).
+
+### 0.22′ M1 STAGE 3 IS LANDED — `↦ₛ` IS CONTEXT-RELATIVE AT ARBITRARY
+TIMESTAMPS, AND THE ARRAY→STRING ACCESSOR IS ITS BRIDGE (2026-08-27)
+
+Implements §0.21′ and its amendment on the green main tree, PARALLEL to the
+fliptree critical path.  §0.19′'s "`↦ₛ` DOES NOT FLIP" and its "WHAT M1
+LEAVES BEHIND" list are SUPERSEDED for the string tier by this section; the
+deliberately-raw tiers are now exactly **`↦ₓ` (text), `↦ᵣ` (registers) and
+`↦ₚ` (the physical/image tier)**.
+
+#### THE STRUCTURE QUESTION, ANSWERED BY THE M1 MECHANISM
+
+The fliptree lane's aborted evaluation (A6.70) flagged that
+`string_pointsto` lives in `RiscvPtsto.v`, BELOW `TsoCtx`, and that the flip
+therefore had to either MOVE the definition and its four-notation family
+(34 files) or split declaration from definition.  Neither: the answer is the
+one stage 1 and stage 2 already used, and it needed no new decision.
+`TsoCtx.v` declares a SECOND tower (`ctx_string_pointsto`) over its own
+sealed byte and RE-DECLARES the four `↦ₛ` spellings at it; `RiscvPtsto`'s
+raw tower stays put as the kit-tier fact, exactly as `word4_pointsto` does.
+Import order decides, the spellings are character-identical, and NOTHING
+moved.  **The general rule, since this is the third time it has come up:** a
+tier flip never relocates the raw definition — the raw one is the below-Σ
+fact and the flipped one is a new tower with the same spelling.
+
+#### THE TOWER
+
+`ctx_string_pointsto ξ a dq s` = `[∗ list] j ↦ b ∈ cstring_bytes s,
+ctx_pointsto ξ (pa_add a j) dq b` — the raw tower's shape over the ctx byte,
+no alignment side condition.  Laws, mirroring the stage-2 word towers
+adapted to strings: `_unfold` / `_bytes` / `_intro` / `Timeless` (+ the
+`ktier`-typed `_timeless'`) / discarded-`Persistent` (+
+`_discarded_persistent'`) / `_frac_split` / `_half` / `_persist` /
+`ctx_string_ktier_mono`, plus `ctx_morph_string` beside `ctx_morph_word4`.
+Not sealed, for the word towers' reason.
+
+**One law is DELIBERATELY WEAKER than the word towers', and the difference
+is a real fact about strings.**  `ctx_word4_pointsto_agree` concludes
+`⌜w1 = w2⌝`; the string tower's `ctx_string_pointsto_bytes_agree` concludes
+only that the two byte lists agree where both reach.  Two string facts at
+one address need NOT name the same string: `s1` may be a proper prefix of
+`s2` when `s2` has an EMBEDDED NUL character, which Coq's `string` permits
+and only `PrintkFmt.nonul` rules out — and `nonul` lives far above `TsoCtx`.
+State the byte-level law here and let a `nonul`-holding consumer sharpen it.
+
+#### THE DERIVED CONTEXT-FREE FORM, AND WHERE ITS SUPPLY COMES FROM
+
+`ctx_string_all a dq s := ∀ ξ : CtxId, ctx_string_pointsto ξ a dq s`, with
+`_unfold` / `_elim` / `_intro` / `Persistent` (+ the `ktier` twin) /
+`_ktier_mono`.  The `kernel_data` precedent, and the pristine/t=0 story
+enters HERE — as the justification of a derived fact, never as the meaning
+of `↦ₛ`.
+
+`WpLock.lock_name` and `SleepLock.sl_name` carry it.  Each is still
+`∃ p, word_pointsto (name_field lk) □ p ∗ <the string>`; only the string
+half moved, the field stays RAW per §0.8′ ruling 2.  **`is_lock` and
+`is_sleeplock` are character-identical and still CLOSED TERMS** — the park
+rows (`ut_park_caps`'s three handles) did not move, `UsertrapRes.v` /
+`UtResFits.v` / `ParkCap.v` are untouched and green, and `SystemAdequacy.v`
+is at seconds.
+
+**The supply was already minted and was being thrown away, exactly as
+A6.70 measured.**  `kernel_data` is ∀-context (§0.8′ ruling 1), and
+`kernel_data_string` used to instantiate that ∀ at a JUNK
+`MkCtxId inhabitant inhabitant` and cross to the raw tower through the
+shim — because its conclusion had to be context-free and the raw tower was
+the only context-free string there was.  Now `kernel_data_string_all` keeps
+the ∀ and hands it straight through (zero shim), and `kernel_data_string`
+is that lemma instantiated at `cur_ctx`, its statement unchanged.  **The
+lesson worth keeping: a lemma that instantiates a ∀ at a junk witness is a
+lemma whose conclusion is in the wrong tier — the junk witness is the
+diagnostic.**  `KernelDataInv.v` was the tree's one "flip `↦ₛ`" seam marker
+and it is gone.
+
+`SpecInitlock` / `SpecInitlockWrapper` / `SpecInitsleeplock` take the ∀ form
+as their name-string premise (the one sanctioned client-visible shape
+change), and their twelve callers mint it with `kernel_data_string_all`
+instead of `kernel_data_string` — one call, used twice, since it is
+persistent.  The chain rodata → `kernel_data_string_all` → `lock_name_intro`
+→ `is_lock` has NO seam anywhere in it.
+
+#### WHY THE SINGLE TOWER SUPERSEDES THE DISCARDED/OWNED SPLIT
+
+The fliptree lane independently converged on SPLITTING `↦ₛ` into a
+discarded (rodata, context-free) and an owned (runtime, context-indexed)
+form before the countermand.  It is refuted by the ruling and by this
+landing: the split hardcodes the rodata/runtime distinction INTO THE
+NOTATION, so every consumer must know statically which kind of string it
+holds, and the two forms cannot meet — `printk("%s", …)` takes a format
+literal and a `p->name` in the SAME `descs` list at the SAME
+`pk_desc_res`, and under a split that list cannot be typed without a
+disjunction in the resource.  The single arbitrary-timestamp tower gives
+one `pk_desc_res`, and the rodata case comes back as `ctx_string_all` — a
+DERIVED fact that lives only where a persistent handle needs it (two
+definitions, three spec premises, twelve mint sites), not as a second tier
+with its own law set.  The general shape: **when two cases differ in what
+you can PROVE about them, that is a derived lemma; only when they differ in
+what they MEAN is it a second definition.**
+
+#### THE ARRAY→STRING ACCESSOR (`ProcDefs.v`)
+
+`pname_cells` stays its own resource (§0.21′ amendment): `p->name` is a
+FIXED-SIZE sixteen-byte array — all sixteen always owned, the length is part
+of `proc_fields` — with a C string embedded in it, and `ProcGeom.pname_wf`
+is the terminator's existence.  `↦ₛ` owns `|s|+1` bytes and stops.  The
+bridge is a POSITIONAL split, not a conversion:
+
+| | |
+|---|---|
+| `pname_pad pa dq nm pad` | the bytes past the string's NUL, addressed from the FIELD's base so the halves rejoin positionally |
+| `pname_addr pa i` | `pa_add (p_name pa 0) i = p_name pa i` — the cursor/element re-index |
+| `pname_bytes_split` | `pname_bytes pa dq (cstring_bytes nm ++ pad) ⊣⊢ p_name pa 0 ↦ₛ{dq} nm ∗ pname_pad pa dq nm pad` — both directions at once |
+| `pname_wf_cstring` | a buffer that BEGINS with a C string is well-formed |
+| `pname_cells_borrow` | `pname_cells pa dq bs -∗ ∃ nm pad, ⌜bs = cstring_bytes nm ++ pad⌝ ∗ ⌜nonul nm⌝ ∗ p_name pa 0 ↦ₛ{dq} nm ∗ pname_pad pa dq nm pad` |
+| `pname_cells_return` | `p_name pa 0 ↦ₛ{dq} nm -∗ pname_pad pa dq nm pad -∗ pname_cells pa dq (cstring_bytes nm ++ pad)` |
+
+The string is DETERMINED, not assumed (`pname_wf` gives the NUL,
+`CstringInv.bytes_string_split` gives the split), and the RETURN takes an
+ARBITRARY string because the callee may have written it — `pname_wf` is
+re-derived, never carried across.  `ProofSyscall`'s hand-rolled
+`sysc_name_addr` / `sysc_pname_app` (the latter a shim crossing) are
+retired into it.
+
+**WORKED INSTANCES.**
+
+1. `ProofSyscall`'s `printk("%d %s: unknown sys call %d\n", p->pid,
+   p->name, num)` — seven lines of hand-rolled split/rejoin became
+   `pname_cells_borrow` … `pname_cells_return`, with `nonul` riding out of
+   the accessor.
+2. **kfork's `safestrcpy(np->name, p->name, 16)`** — the SOURCE argument now
+   comes out of the borrow.  `ProofKforkParts.kfk_src_of_string` re-indexes
+   the borrowed `↦ₛ` view plus the retained tail into the byte window
+   safestrcpy's contract states its source over, and
+   `kfk_src_ok_of_string` discharges `ssc_src_ok` from **the string's own
+   NUL — the second disjunct** — rather than from kfork happening to own all
+   sixteen bytes (`ssc_src_ok_full` is gone from that call).  That is the
+   honest reason the copy is safe, and it is the same reason exec's is.
+
+**safestrcpy'S SPEC IS NOT RE-SPECED, and why.**  Its source is stated as a
+byte window over a naming function `f` because its POSTCONDITION has to
+speak about the destination byte by byte (`ssc_post`'s `s j = f j` for
+`j < k`), which a `↦ₛ` fact cannot say; and `SpecStrncpy` / `ProofUserinit`
+share the `f`-shaped source.  The re-spec, recorded at
+`ProofKforkParts.kfk_src_of_string` for whoever wants it: replace the source
+premise and `ssc_src_ok f n ns` by `t ↦ₛ{dq} src` alone, dropping `ns` and
+`f` from the source side; `ssc_stop` then reads
+`k = min (String.length src) (n-1)` and `ssc_post`'s copied bytes read off
+`cstring_bytes src`.  Strictly smaller, but it is a RE-PROOF of the copy
+loop, not a re-statement.
+
+**WHERE THE ACCESSOR DOES *NOT* APPLY, measured at kexec.**  exec's
+`safestrcpy(p->name, last, PNAMELEN)` has its array at the DESTINATION and
+its source at `last`, a pointer INTO `char path[MAXPATH]` — a `ByteBuf`
+window with `bb_cstr`, not an array-with-an-embedded-string, so the accessor
+has no purchase on the source.  At the destination the callee reports BYTES
+(`h`), so `pname_wf` + `pname_cells_intro` is the closer and the accessor's
+return half would be a no-op round trip; the return half is for a callee
+that reports a STRING, which is exactly what the re-spec above would make
+safestrcpy.  The general shape the amendment gestures at (a fixed-size
+buffer + terminator evidence) would generalize to `ByteBuf`'s `bb_cstr` if a
+second instance ever wants it; there is one today, and one instance is not a
+generalization.
+
+#### FALLOUT LEDGER
+
+**FOUR full VM rounds, 44 files changed** — an order of magnitude smaller
+than stage 2's 31 rounds, and the reason is worth recording: the string tier
+has almost no INTERIOR.  It is produced in one place (`kernel_data`) and
+consumed in one (`printk`), so the flip's honest seams were three files, not
+thirty.  Error classes, in the order the build produced them:
+
+| class | files | fix |
+|---|---|---|
+| `Could not find an instance for "CurCtx"` on a `<msg>_str : kernel_data -∗ a ↦ₛ□ msg` lemma in a binder-less `*Msg`/`*Data` section | 11 | one `Context \`{XI : CurCtx}.` per section; every statement text unchanged |
+| initlock/initsleeplock callers feeding the spec's string premise | 12 | `kernel_data_string` → `kernel_data_string_all` |
+| genuine ctx↔mem seams that CEASED TO EXIST | 3 (`KernelDataInv`, `ProofSyscall`, `ProofPrintk`) | delete the crossing |
+| the `↦ₛ`-vs-`pname_cells` split done by hand | 1 (`ProofSyscall`) | the accessor |
+
+Two intermediate loop-invariant lemmas (`ProofIinit`, `ProofProcinit`) took
+the ∀ form on their name premises, since they carry the string across the
+per-lock loop.  `PrintkArgs.pk_desc_res` gained the ambient binder — it is
+the one definition BELOW `TsoCtx` that spoke `↦ₛ`, and leaving it raw would
+have made every printk caller a seam.
+
+SHIM LEDGER: files naming `TsoCtxShim` **73 → 71**, uses **401 → 396**.
+`KernelDataInv` and `ProofSyscall` lost it entirely; `ProofPrintk` lost
+three uses (`pk_str_byte`'s two and `pk_digits_data`'s one) and keeps its
+stack-frame crossings.  **No shim use was ADDED** — the derived ∀ form is
+minted from `kernel_data`'s own ∀, so stage 3 is the first tier flip that
+pays nothing for what it buys.
+
+VERDICT: two consecutive full 1331-file VM rounds at exit 0, zero errors, no
+`Admitted`, no `admit`, no new `Axiom`.  Exported client-visible statements
+are unchanged except the three spec premises and the two handle definitions
+the ruling moves.
+
+#### PORT OBLIGATION FOR THE FLIP WORKSPACE
+
+The fliptree keeps `↦ₛ` raw with three named rodata bridges.  At cutover it
+ports THIS shape, not a re-derivation: the tower and `ctx_string_all` in
+`TsoCtx.v`, `kernel_data_string_all` as the ∀'s producer (its three bridges
+collapse into that one lemma), the two handle definitions, and
+`ProcDefs`'s accessor family.  The twin's job is one arm: `ctx_string_all`
+at `⌜t = 0⌝` for the rodata literals — which is where the pristine receipts
+`BootCarve.kernel_data_intro` already holds finally get spent instead of
+discarded.

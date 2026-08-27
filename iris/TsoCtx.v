@@ -703,6 +703,176 @@ Section ctx.
     iIntros (k j _) "H". iApply (ctx_ktier_mono kt kt' with "H").
   Qed.
 
+  (* ---- the STRING tower ([↦ₛ]) ---------------------------------------
+     [RiscvPtsto.string_pointsto]'s shape over the context fact: a
+     NUL-terminated C string resident byte-by-byte from [a], no alignment
+     side condition (a C string is byte-addressed).
+
+     WHY IT IS CONTEXT-RELATIVE AT ALL (tso-port.md §0.21′, and this is the
+     ruling that retired the "↦ₛ stays raw" assessment that used to sit
+     beside the notations below).  The earlier assessment read every string
+     in the tree as a DISCARDED read-only image literal, whose load
+     obligation the pristine (timestamp-0) gate discharges with no context.
+     That is false of the kernel's DYNAMIC strings: [p->name] is written by
+     [safestrcpy] at proc.c:290 and exec.c:132, so its bytes carry ordinary
+     ledger residue and its readers owe an ordinary load obligation at the
+     reading thread's context.  A tier that covers only the pristine case is
+     not the string tier, it is a special case of it -- so [↦ₛ] denotes the
+     context-relative fact at ARBITRARY timestamps, and the pristine story
+     comes back as the DERIVED [ctx_string_all] below (the [kernel_data]
+     precedent: one ∀-quantified fact minted once, usable at every
+     context), which is what the persistent lock handles carry. *)
+  Definition ctx_string_pointsto `{KTR : !CurKtier} (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (s : string) : iProp Σ :=
+    ([∗ list] j ↦ b ∈ cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b)%I.
+
+  Section ctx_string.
+    Context `{KTR : !CurKtier}.
+
+    Lemma ctx_string_pointsto_unfold ξ a dq s :
+      ctx_string_pointsto ξ a dq s ⊣⊢
+      [∗ list] j ↦ b ∈ cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b.
+    Proof. reflexivity. Qed.
+
+    Lemma ctx_string_pointsto_bytes ξ a dq s :
+      ctx_string_pointsto ξ a dq s ⊢
+      [∗ list] j ↦ b ∈ cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b.
+    Proof. iIntros "$". Qed.
+
+    Lemma ctx_string_pointsto_intro ξ a dq s :
+      ([∗ list] j ↦ b ∈ cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b)
+      ⊢ ctx_string_pointsto ξ a dq s.
+    Proof. iIntros "$". Qed.
+
+    Global Instance ctx_string_pointsto_timeless ξ a dq s :
+      Timeless (ctx_string_pointsto ξ a dq s).
+    Proof. rewrite /ctx_string_pointsto. apply _. Qed.
+
+    Global Instance ctx_string_pointsto_discarded_persistent ξ a s :
+      Persistent (ctx_string_pointsto ξ a DfracDiscarded s).
+    Proof. rewrite /ctx_string_pointsto. apply _. Qed.
+
+    Lemma ctx_string_pointsto_frac_split ξ a q1 q2 s :
+      ctx_string_pointsto ξ a (DfracOwn (q1 + q2)) s ⊣⊢
+      ctx_string_pointsto ξ a (DfracOwn q1) s ∗
+      ctx_string_pointsto ξ a (DfracOwn q2) s.
+    Proof.
+      rewrite /ctx_string_pointsto -big_sepL_sep.
+      apply big_opL_proper. intros ? b ?. apply ctx_pointsto_frac_split.
+    Qed.
+
+    Lemma ctx_string_pointsto_half ξ a s :
+      ctx_string_pointsto ξ a (DfracOwn 1) s ⊣⊢
+      ctx_string_pointsto ξ a (DfracOwn (1/2)) s ∗
+      ctx_string_pointsto ξ a (DfracOwn (1/2)) s.
+    Proof. rewrite -ctx_string_pointsto_frac_split Qp.div_2. reflexivity. Qed.
+
+    Lemma ctx_string_pointsto_persist ξ a dq s :
+      ctx_string_pointsto ξ a dq s ==∗ ctx_string_pointsto ξ a DfracDiscarded s.
+    Proof.
+      iIntros "H". rewrite /ctx_string_pointsto.
+      iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+      iIntros "!>" (j b Hj) "Hb". by iApply ctx_pointsto_persist.
+    Qed.
+  End ctx_string.
+
+  (* Agreement, cross-context like the word towers' -- but stated at the
+     BYTE level, which is the strongest form that is TRUE here.  Two string
+     facts at one address need NOT name the same string: [s1] may be a
+     proper prefix of [s2] when [s2] has an embedded NUL character (Coq's
+     [string] permits one; the tree's [PrintkFmt.nonul] is exactly the
+     predicate that rules it out, and it lives far above this file).  So the
+     law says what the memory says: wherever both byte lists reach, they
+     agree. *)
+  Lemma ctx_string_pointsto_bytes_agree {kt1 kt2 : ktier} (ξ1 ξ2 : CtxId)
+      a dq1 s1 dq2 s2 :
+    ctx_string_pointsto (KTR := kt1) ξ1 a dq1 s1 -∗
+    ctx_string_pointsto (KTR := kt2) ξ2 a dq2 s2 -∗
+    ⌜forall j b1 b2, cstring_bytes s1 !! j = Some b1 ->
+                     cstring_bytes s2 !! j = Some b2 -> b1 = b2⌝.
+  Proof.
+    iIntros "H1 H2". iIntros (j b1 b2 Hb1 Hb2).
+    iDestruct (big_sepL_lookup with "H1") as "Hc1"; [exact Hb1|].
+    iDestruct (big_sepL_lookup with "H2") as "Hc2"; [exact Hb2|].
+    by iApply (ctx_pointsto_agree with "Hc1 Hc2").
+  Qed.
+
+  (* the [ktier]-typed twins, for the same reason as the word towers' *)
+  Global Instance ctx_string_pointsto_timeless' (ktr : ktier) (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (s : string) :
+    Timeless (ctx_string_pointsto (KTR := ktr) ξ a dq s).
+  Proof. exact (ctx_string_pointsto_timeless (KTR := ktr) ξ a dq s). Qed.
+
+  Global Instance ctx_string_pointsto_discarded_persistent' (ktr : ktier)
+      (ξ : CtxId) (a : Arch.pa) (s : string) :
+    Persistent (ctx_string_pointsto (KTR := ktr) ξ a DfracDiscarded s).
+  Proof. exact (ctx_string_pointsto_discarded_persistent (KTR := ktr) ξ a s). Qed.
+
+  Lemma ctx_string_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} ξ a dq s :
+    ctx_string_pointsto (KTR := kt) ξ a dq s ⊢
+    ctx_string_pointsto (KTR := kt') ξ a dq s.
+  Proof.
+    rewrite /ctx_string_pointsto. iIntros "H".
+    iApply (big_sepL_mono with "H").
+    iIntros (k b _) "H". iApply (ctx_ktier_mono kt kt' with "H").
+  Qed.
+
+  (* ---- the DERIVED context-free form -----------------------------------
+     [ctx_string_all a dq s]: the string holds at EVERY context.  This is
+     the pristine/timestamp-0 story, and it is a DERIVED special case of the
+     tower above -- never its definition (tso-port.md §0.21′).
+
+     It exists because the persistent lock handles carry a string.
+     [WpLock.lock_name] / [SleepLock.sl_name] are half of [is_lock] /
+     [is_sleeplock], which are CLOSED TERMS that ride in park records and
+     are minted at boot for consumers that run at their own contexts; a
+     handle whose statement mentions an ambient ξ is unstatable elsewhere
+     (§0.8′ ruling 2, the root both design problems were routed around).
+     The ∀ keeps the handle context-free IN SHAPE while its content is an
+     ordinary string fact.
+
+     WHERE IT COMES FROM, honestly: [KernelDataInv.kernel_data] is itself
+     ∀-context, so [kernel_data_string_all] mints this form with no seam --
+     the lock names are rodata literals, and their timestamp-0 provenance is
+     the JUSTIFICATION of the derived fact rather than the meaning of [↦ₛ].
+     At cutover the twin discharges the ∀ through its ⌜t = 0⌝ arm. *)
+  Definition ctx_string_all `{KTR : !CurKtier}
+      (a : Arch.pa) (dq : dfrac) (s : string) : iProp Σ :=
+    (∀ ξ : CtxId, ctx_string_pointsto ξ a dq s)%I.
+
+  Section ctx_string_all.
+    Context `{KTR : !CurKtier}.
+
+    Lemma ctx_string_all_unfold a dq s :
+      ctx_string_all a dq s ⊣⊢ ∀ ξ : CtxId, ctx_string_pointsto ξ a dq s.
+    Proof. reflexivity. Qed.
+
+    (* USE IT AT YOUR OWN CONTEXT: the only elimination, and the one every
+       consumer of a handle's string runs. *)
+    Lemma ctx_string_all_elim (ξ : CtxId) a dq s :
+      ctx_string_all a dq s ⊢ ctx_string_pointsto ξ a dq s.
+    Proof. iIntros "H". iApply "H". Qed.
+
+    Lemma ctx_string_all_intro a dq s :
+      (∀ ξ : CtxId, ctx_string_pointsto ξ a dq s) ⊢ ctx_string_all a dq s.
+    Proof. iIntros "$". Qed.
+
+    Global Instance ctx_string_all_persistent a s :
+      Persistent (ctx_string_all a DfracDiscarded s).
+    Proof. rewrite /ctx_string_all. apply _. Qed.
+  End ctx_string_all.
+
+  Global Instance ctx_string_all_persistent' (ktr : ktier) a s :
+    Persistent (ctx_string_all (KTR := ktr) a DfracDiscarded s).
+  Proof. exact (ctx_string_all_persistent (KTR := ktr) a s). Qed.
+
+  Lemma ctx_string_all_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} a dq s :
+    ctx_string_all (KTR := kt) a dq s ⊢ ctx_string_all (KTR := kt') a dq s.
+  Proof.
+    rewrite /ctx_string_all. iIntros "H" (ξ).
+    iApply (ctx_string_ktier_mono kt kt'). iApply "H".
+  Qed.
+
   (* ---------------------------------------------------------------- *)
   (* Transport: the ONLY ways a fact changes context                   *)
   (* ---------------------------------------------------------------- *)
@@ -890,6 +1060,18 @@ Section ctx.
     iFrame "Hd". iSplit; [done|]. iExact "H".
   Qed.
 
+  (* the C string's transport obligation *)
+  Global Instance ctx_morph_string (kt : ktier) a dq s :
+    CtxMorph (λ ξ, ctx_string_pointsto (KTR := kt) ξ a dq s).
+  Proof.
+    iIntros (ξ ξ') "Hd H".
+    iDestruct (ctx_morph_big_sepL (cstring_bytes s)
+            (λ j b ξ0, ctx_pointsto (KTR := kt) ξ0 (pa_add a j) dq b)
+            (λ i x, ctx_morph_pointsto _ _ _ _)
+            ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame "Hd". iExact "H".
+  Qed.
+
   (* The composition acid test: a lock-payload-shaped assertion is
      morphable by typeclass search alone.  If this ever needs a manual
      proof, an instance regressed. *)
@@ -1034,11 +1216,11 @@ Global Typeclasses Transparent CurCtx.
    IS the seam.  The spellings are character-identical, which is the
    whole point: statement text above the seam does not change, its
    MEANING does.  [↦c] becomes a synonym and is retired by attrition.
-   Stage 2 (below, after the payload wrapper) flips [↦₄]/[↦₂]; [↦ₛ] was
-   ASSESSED THERE AND DELIBERATELY LEFT RAW, and [↦ₚ] stays raw with it
-   (image bytes and the DMA window's flat half).  [↦ₓ] (text) and [↦ᵣ]
-   (registers) NEVER flip -- text is timestamp-0 context-free by the
-   port's ruling, and registers are per-hart machine state. *)
+   Stage 2 (below, after the payload wrapper) flips [↦₄]/[↦₂], and stage 3
+   flips [↦ₛ]; [↦ₚ] stays raw (image bytes and the DMA window's flat half).
+   [↦ₓ] (text) and [↦ᵣ] (registers) NEVER flip -- text is timestamp-0
+   context-free by the port's ruling, and registers are per-hart machine
+   state. *)
 Notation "a ↦ₘ{ dq } v" := (ctx_pointsto cur_ctx a dq v)
   (at level 20, format "a  ↦ₘ{ dq }  v") : bi_scope.
 Notation "a ↦ₘ□ v" := (ctx_pointsto cur_ctx a DfracDiscarded v)
@@ -1076,7 +1258,7 @@ Notation "a ↦₈[ kt ] dq w" := (ctx_word_pointsto (KTR := kt) cur_ctx a dq w)
    IcacheEscrow, which imports IcacheInv after TsoCtx).  Any per-file tier
    override must be [Local Notation].
 
-   [↦ₛ] IS DELIBERATELY NOT FLIPPED; see the block after the seal. *)
+   [↦ₛ] flips too; its block is below. *)
 Notation "a ↦₂{ dq } w" := (ctx_word2_pointsto cur_ctx a dq w)
   (at level 20, format "a  ↦₂{ dq }  w") : bi_scope.
 Notation "a ↦₂ w" := (ctx_word2_pointsto cur_ctx a (DfracOwn 1) w)
@@ -1097,29 +1279,45 @@ Notation "a ↦₄[ kt ] dq w" := (ctx_word4_pointsto (KTR := kt) cur_ctx a dq w
   (at level 20, kt at level 50, dq custom dfrac at level 1,
    format "a  ↦₄[ kt ] dq  w") : bi_scope.
 
-(* WHY [↦ₛ] STAYS RAW (the stage-2 assessment; tso-machine-flip.md §6
-   amendment A6.15, and it transfers to this tree unchanged).  It was
-   listed with [↦₂]/[↦₄] and it is the one that must NOT move, for two
-   independent reasons:
+(* ================================================================== *)
+(* M1 STAGE 3: the [↦ₛ] family (tso-port.md §0.21′).  Same mechanism, all
+   four dfrac spellings, bracket form included.
 
-   1. IT WOULD PUT A CONTEXT INSIDE [is_lock].  [WpLock.lock_name] is
-      [∃ p, word_pointsto (lock_name_field lk) □ p ∗ p ↦ₛ□ s], and
-      [lock_name] is half of the PERSISTENT lock handle.  Flipping [↦ₛ]
-      makes the handle ξ-dependent IN THE STATEMENT -- not as the artifact
-      of the constant embedding that tso-port.md §0.11′ measured -- and a
-      boot-minted [is_lock] then cannot be stated at another thread.  That
-      is tso-port.md §0.8′ ruling 2, the root both design problems were
-      routed around.
-   2. IT WOULD BUY NOTHING.  Every string fact in this tree is a DISCARDED
-      image literal (lock names, panic messages).  A discarded byte can
-      never owe [Wobl_ram], and its load obligation is discharged by the
-      PRISTINE (timestamp-0) gate, which needs no context at all.  The
-      ledger index would be dead weight on 37 files.
+   THE ASSESSMENT THIS REPLACES said [↦ₛ] must not move, for two reasons,
+   and BOTH were wrong in the same way -- they read the tier off its
+   rodata instances only:
 
-   Net: flipping it removes ONE forget (in [kernel_data_string]), ADDS one
-   (in [lock_name_intro]), puts a binder on 37 files and a real ξ in the
-   lock handle.  [↦ₛ] therefore LEAVES the stage-2 list and joins
-   [↦ₓ]/[↦ᵣ]/[↦ₚ] as deliberately raw. *)
+   1. "It would put a context inside [is_lock]."  It would, if the handle
+      carried the tier's ordinary fact.  It does not: [WpLock.lock_name] /
+      [SleepLock.sl_name] carry [ctx_string_all] (above), the ∀-context
+      DERIVED form, so [is_lock] / [is_sleeplock] stay closed terms and
+      §0.8′ ruling 2 is intact.  The park rows do not move.
+   2. "Every string fact in this tree is a discarded image literal, whose
+      load obligation the pristine gate discharges."  FALSE: [p->name] is
+      written by [safestrcpy] (proc.c:290, exec.c:132) and read by
+      [printk("%s", p->name)].  Those bytes are as ordinary as any other
+      RAM, and a tier that cannot speak about them is not the string tier.
+      They only escaped notice because the proofs walked them through the
+      ad-hoc [ProcDefs.pname_cells] byte big-op, never through [↦ₛ] -- and
+      that big-op is itself context-indexed already.
+
+   So the tier is context-relative at arbitrary timestamps and the
+   pristine case is DERIVED, which is the general rule this port keeps
+   re-learning: the definition covers the dynamic case, the static case is
+   a lemma.  [ProcDefs.pname_cells] stays its OWN resource (a fixed-size
+   array with an embedded string, carrying [ProcGeom.pname_wf]); the
+   bridge to [↦ₛ] is the positional borrow/return pair in that file
+   ([pname_string_borrow] / its family), not a conversion -- §0.21′'s
+   amendment. *)
+Notation "a ↦ₛ{ dq } s" := (ctx_string_pointsto cur_ctx a dq s)
+  (at level 20, format "a  ↦ₛ{ dq }  s") : bi_scope.
+Notation "a ↦ₛ□ s" := (ctx_string_pointsto cur_ctx a DfracDiscarded s)
+  (at level 20, format "a  ↦ₛ□  s") : bi_scope.
+Notation "a ↦ₛ s" := (ctx_string_pointsto cur_ctx a (DfracOwn 1) s)
+  (at level 20, format "a  ↦ₛ  s") : bi_scope.
+Notation "a ↦ₛ[ kt ] dq s" := (ctx_string_pointsto (KTR := kt) cur_ctx a dq s)
+  (at level 20, kt at level 50, dq custom dfrac at level 1,
+   format "a  ↦ₛ[ kt ] dq  s") : bi_scope.
 
 (* The seal.  [ctx_dom] and [hart_view_lb] stay opaque too: nothing above
    this file may learn they are [True] at SC, and nothing may learn
@@ -1127,8 +1325,9 @@ Notation "a ↦₄[ kt ] dq w" := (ctx_word4_pointsto (KTR := kt) cur_ctx a dq w
 Global Typeclasses Opaque own_context ctx_parked hart_view_lb
   ctx_pointsto ctx_dom.
 Global Opaque own_context ctx_parked hart_view_lb ctx_pointsto ctx_dom.
-(* [ctx_word_pointsto] -- and its stage-2 siblings [ctx_word2_pointsto] /
-   [ctx_word4_pointsto] -- are NOT sealed at all: each is a tower OVER the sealed
+(* [ctx_word_pointsto] -- and its siblings [ctx_word2_pointsto] /
+   [ctx_word4_pointsto] / [ctx_string_pointsto] / [ctx_string_all] -- are NOT
+   sealed at all: each is a tower OVER the sealed
    byte fact, so exposing its ⌜aligned⌝ ∗ big-op shape leaks nothing about
    SC-degeneracy -- and the tree's pre-flip proofs destruct/frame the word
    shape structurally (that worked when [word_pointsto] was transparent, and

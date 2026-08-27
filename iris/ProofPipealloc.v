@@ -160,7 +160,7 @@ Section ProofPipealloc.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string pipe_name_str "pipe"%string
+    iPoseProof (kernel_data_string_all pipe_name_str "pipe"%string
                   (mword_of_int pipe_name_str) eq_refl
                   ltac:(unfold text_end, pipe_name_str; lia)
                   ltac:(vm_compute; discriminate) Hpipestr

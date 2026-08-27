@@ -1810,11 +1810,19 @@ End word4_pointsto.
    at [a+|s|] -- with no alignment side condition, a C string being
    byte-addressed (this is what distinguishes it from [↦₈]/[↦₄]).
 
-   The intended fraction is [DfracDiscarded]: the kernel's string literals are
-   read-only image bytes that nothing ever writes, so [a ↦ₛ□ s] is PERSISTENT
-   and hence freely DUPLICABLE -- it can be passed to a callee and kept, and it
-   can sit inside a persistent predicate.  That is what lets a lock carry its
-   own name ([lock_name], WpLock.v) at no ownership cost.                     *)
+   THIS IS THE KIT-TIER (below-Sigma) FACT.  Above the seam the [↦ₛ]
+   spellings mean [TsoCtx.ctx_string_pointsto] -- the context-indexed tower
+   over the same byte shape, flipped by M1 stage 3 (tso-port.md §0.21′)
+   because the kernel has RUNTIME-WRITTEN strings ([p->name], written by
+   safestrcpy) and a tier that covers only rodata literals is not the string
+   tier.  Nothing above the seam uses the definition below; it stays for the
+   same reason [word4_pointsto] does, as the raw shape the twin is measured
+   against.
+
+   [DfracDiscarded] is the fraction a rodata literal is held at, so [a ↦ₛ□ s]
+   is PERSISTENT and hence freely DUPLICABLE.  What a persistent LOCK HANDLE
+   carries is not this fact, though, but its ∀-context derived form
+   ([TsoCtx.ctx_string_all]) -- see [WpLock.lock_name].                      *)
 (* ---------------------------------------------------------------------- *)
 
 (* the characters of [s] as bytes (no terminator) *)

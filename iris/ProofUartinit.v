@@ -156,7 +156,7 @@ Section ProofUartinit.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string uart_name_str "uart"%string name_uart eq_refl
+    iPoseProof (kernel_data_string_all uart_name_str "uart"%string name_uart eq_refl
                   ltac:(unfold text_end, uart_name_str; lia)
                   ltac:(vm_compute; discriminate) Huartstr
                   with "Hkdata") as "#Hstr_uart".

@@ -454,16 +454,25 @@ Section Lock.
   Definition lock_name_field (lk : mword 64) : mword 64 :=
     add_vec lk (sign_extend' 64 (mword_of_int 8 : mword 12)).
 
-  (* RAW (context-free) since the M1 flip, deliberately: the name field is
-     lock METADATA -- written once by initlock, discarded, read by nobody's
-     data path -- and it rides inside [is_lock].  Were it the flipped [↦₈□]
-     it would drag the ambient context into the HANDLE, and a handle minted
-     at boot's context could not even be stated at another thread's.  The
-     intro below converts the minter's (context-indexed) store result
-     through the shim. *)
+  (* CONTEXT-FREE, deliberately, and in the two different ways the port has
+     for it.  The name field is lock METADATA -- written once by initlock,
+     discarded, read by nobody's data path -- and it rides inside [is_lock];
+     were either half of it stated at an ambient ξ, that ξ would be in the
+     HANDLE, and a handle minted at boot's context could not even be stated
+     at another thread's (§0.8′ ruling 2, which the park rows depend on).
+
+     - the FIELD is the RAW [word_pointsto] (the M1 flip's ruling; the intro
+       below converts the minter's context-indexed store result through the
+       shim);
+     - the STRING is [TsoCtx.ctx_string_all], the ∀-context DERIVED form of
+       [↦ₛ] (§0.21′).  [↦ₛ] itself is context-relative now -- it has to be,
+       [p->name] is written at runtime -- so the handle takes the derived
+       fact, which [KernelDataInv.kernel_data_string_all] mints for a rodata
+       literal with no seam at all. *)
   Definition lock_name (lk : mword 64) (s : string) : iProp Σ :=
     (∃ p : mword 64,
-       word_pointsto (lock_name_field lk) DfracDiscarded p ∗ p ↦ₛ□ s)%I.
+       word_pointsto (lock_name_field lk) DfracDiscarded p ∗
+       ctx_string_all p DfracDiscarded s)%I.
 
   Global Instance lock_name_persistent lk s : Persistent (lock_name lk s).
   Proof. apply _. Qed.
@@ -474,7 +483,8 @@ Section Lock.
      static seals it here and forgets it.  A basic update, so this works in
      place inside a WP goal -- no [fupd_wp] needed. *)
   Lemma lock_name_intro (lk p : mword 64) (s : string) :
-    p ↦ₛ□ s -∗ lock_name_field lk ↦₈ p ==∗ lock_name lk s.
+    ctx_string_all p DfracDiscarded s -∗
+    lock_name_field lk ↦₈ p ==∗ lock_name lk s.
   Proof.
     iIntros "#Hs Hf".
     iDestruct (TsoCtxShim.ctx_word_to_mem with "Hf") as "Hf".

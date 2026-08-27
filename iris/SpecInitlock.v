@@ -33,9 +33,13 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   (2 <= K)%nat ->
   sie_cap_gpr kt m K b p -∗
   kernel_text -∗ pc_is pcE -∗
-  (* the string argument [a1] points at: DUPLICABLE (persistent) ownership,
-     so the caller keeps its copy and initlock can seal it into the lock. *)
-  name ↦ₛ□ s -∗
+  (* the string argument [a1] points at, in the ∀-CONTEXT form
+     ([TsoCtx.ctx_string_all], the derived context-free reading of [↦ₛ] --
+     tso-port.md §0.21′): DUPLICABLE (persistent) ownership, so the caller
+     keeps its copy, and context-free so that the [lock_name] the caller
+     seals with it keeps [is_lock] a closed term.  A rodata literal's
+     producer is [KernelDataInv.kernel_data_string_all]. *)
+  ctx_string_all name DfracDiscarded s -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗

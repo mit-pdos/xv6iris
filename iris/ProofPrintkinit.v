@@ -84,7 +84,7 @@ Section ProofPrintkinit.
       do 3 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string pr_name_str "pr"%string name eq_refl ltac:(unfold text_end, pr_name_str; lia)
+    iPoseProof (kernel_data_string_all pr_name_str "pr"%string name eq_refl ltac:(unfold text_end, pr_name_str; lia)
                                                                         ltac:(vm_compute; discriminate) Hpr
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf KT0 m K KernelSyms.printkinit

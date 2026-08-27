@@ -353,7 +353,7 @@ Section ProofBinit.
       do 7 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string bcache_name_str "bcache"%string name_bcache eq_refl ltac:(unfold text_end, bcache_name_str; lia)
+    iPoseProof (kernel_data_string_all bcache_name_str "bcache"%string name_bcache eq_refl ltac:(unfold text_end, bcache_name_str; lia)
                                                                                        ltac:(vm_compute; discriminate) Hbcache
                   with "Hkdata") as "#Hstr_bcache".
     assert (Hbuffer : forall j bt, cstring_bytes "buffer"%string !! j = Some bt ->
@@ -362,7 +362,7 @@ Section ProofBinit.
       do 7 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string buffer_name_str "buffer"%string name_buffer eq_refl ltac:(unfold text_end, buffer_name_str; lia)
+    iPoseProof (kernel_data_string_all buffer_name_str "buffer"%string name_buffer eq_refl ltac:(unfold text_end, buffer_name_str; lia)
                                                                                        ltac:(vm_compute; discriminate) Hbuffer
                   with "Hkdata") as "#Hstr_buffer".
     assert (Hslstr : forall j bt, cstring_bytes "sleep lock"%string !! j = Some bt ->
@@ -371,7 +371,7 @@ Section ProofBinit.
       do 11 (destruct j as [|j];
              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string 0x80007568 "sleep lock"%string sl_str_addr eq_refl ltac:(unfold text_end; lia)
+    iPoseProof (kernel_data_string_all 0x80007568 "sleep lock"%string sl_str_addr eq_refl ltac:(unfold text_end; lia)
                                                                                       ltac:(vm_compute; discriminate) Hslstr
                   with "Hkdata") as "#Hstr_sl".
     (* ---- the frame geometry ---- *)

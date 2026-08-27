@@ -72,7 +72,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the unflipped towers (↦₄ / ↦ₛ) cross the seam here *)
+Require TsoCtxShim.   (* the raw [WpSconfMem] word towers cross the seam here *)
 Import Defs.
 Local Open Scope Z_scope.
 

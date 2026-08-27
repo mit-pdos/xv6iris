@@ -31,8 +31,9 @@ Import Defs.
 
 
 (* the "sleep lock" string literal in rodata (the auipc/addi pair at
-   KernelSyms.initsleeplock+0x10 resolves here); the caller extracts the persistent [↦ₛ□] from
-   [kernel_data] via [kernel_data_string]. *)
+   KernelSyms.initsleeplock+0x10 resolves here); the caller extracts the persistent
+   ∀-context string fact ([TsoCtx.ctx_string_all], the derived context-free
+   form of [↦ₛ]) from [kernel_data] via [kernel_data_string_all]. *)
 Definition sl_str_addr : mword 64 := mword_of_int 0x80007568.
 
 Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -49,8 +50,8 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
   kernel_text -∗ pc_is pcE -∗
   (* the two strings: the fixed "sleep lock" literal for the inner spinlock,
      and the caller's own name for the sleeplock (both duplicable). *)
-  sl_str_addr ↦ₛ□ "sleep lock"%string -∗
-  name ↦ₛ□ s -∗
+  ctx_string_all sl_str_addr DfracDiscarded "sleep lock"%string -∗
+  ctx_string_all name DfracDiscarded s -∗
   (* the six struct fields, raw *)
   slk ↦₄ vlocked -∗
   sl_lk slk ↦₄ vlk -∗
