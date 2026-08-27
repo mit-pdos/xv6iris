@@ -1,5 +1,26 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
+M4, THE PREREQUISITE ROUND (2026-08-27, latest session).  **CLEAN ROUND:
+1088 of 1296, RED 9 — UNCHANGED**, over a round that rebuilt the whole
+tree from `RiscvLang` up and then `WpSconfMem`'s 281-file cone on top.
+**THE ATOMIC UNIT A6.77 HANDED OVER COULD NOT BE STARTED: three named
+pieces of "everything below is landed" do not exist**, and one of them —
+a degenerate window payload on the lock WORD — cannot be built at all
+(`win_ok1`'s conjunct (1) fixes what may be written, and the lock word's
+writer is an AMO storing the caller's register).  Two of the three are
+now LANDED, additively and with zero client movement:
+`WpSconfMem.wp_load_s_sconf_au_exv` (the value-UNKNOWN load, the only
+shape the two racy lock reads can use — `_dat` names the value and serves
+the holder route only), and `RiscvLang.mm_ok`'s third conjunct, **the era
+image covers all of RAM**, which is what A6.74 §(3) always specified and
+what closes A6.75 §(3)'s named residual without any per-cell payload.
+The third is a TRANCHE, not a step: **the racy kit has no MINT**, and
+cannot have a local one — `win_ok1` conjunct (1) quantifies over the whole
+log, and the READER's conjunct (3) needs an own-last record a hart that
+never touched the lock does not have.  Both close at the EMPTY LOG, so
+what is owed is a boot mint plus its carve-to-`newlock` threading.
+**A6.78 is the record and the handoff.**
+
 STEP 5, THE RULINGS TRANCHE (2026-08-27, latest session).  **CLEAN ROUND:
 1083 of 1333, RED 14.**  Four owner rulings executed and one gate found missing.
 **`BitmapInv` FLIPPED and the measured cost was ZERO consumer edits** —
@@ -8672,6 +8693,245 @@ gates, the store gate, and now the datum-parametric AU.
 **ACCEPTANCE, unchanged:** the exported lock surface does not move, and
 `WpSconfLock`'s 160-file cone opens — sweep it and report the honest number
 when it does.
+
+
+### A6.78 THE ATOMIC UNIT DOES NOT EXIST YET — THREE OF ITS PREREQUISITES
+### WERE ASSUMED LANDED AND ARE NOT, AND TWO OF THEM ARE NOW LANDED
+
+A6.77's handoff says of items (2)–(4) that "everything below is landed and
+waiting".  Measured against the source before touching anything: **three
+named pieces of that "everything" do not exist, and one of them cannot be
+built in the shape the handoff names.**  This round measured all three,
+LANDED THE TWO CHEAP ONES ADDITIVELY, and leaves the third — which is a
+tranche, not a step — as the handoff.
+
+**CLEAN ROUND: 1088 of 1296, RED 9 — UNCHANGED**, across a round that
+rebuilt the WHOLE tree from `RiscvLang` up (the memory-model invariant
+grew a conjunct) and then `WpSconfMem`'s 281-file cone on top of it.  No
+`Admitted`, no `admit`, no new `Axiom`; the one `Abort` is still
+`UsertrapRes.ut_res_bare_park`.  Shim ledger unchanged: **26 live
+qualified uses -- `BootCarveMain` 25 and `WpSconfLock`'s `lock_claims`
+1** -- which is the whole remaining `TsoCtxShim` surface, and the two
+items it names are the boot-25 lane and this tranche's step 3.
+
+#### (1) THE `_dat` AU SERVES *ONE* OF THE THREE ROUTES, NOT THREE
+
+A6.77 §HANDOFF item 2 routes all three lock reads through
+`wp_load_s_sconf_au_dat` with `Hload := ` the route's gate.  Read the
+leaf's premise:
+
+```coq
+    (forall CIDw img sigma log V ppn v, … -∗ Dat v -∗
+       ⌜forall tvr, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+          tso_read_bytes img log … (Z.to_N width) v⌝) ->
+```
+
+**it NAMES the value.**  The atomic update hands over `∃ v, Dat v ∗ …`
+and the caller builds that update with no machine state in sight, so `v`
+is fixed before the read it is about.  That is exactly right for the
+HOLDER route (`ledger_read_bytes_vis_ok` concludes an equality) and
+impossible for the other two: `ledger_read_racy_word_ok` concludes an
+EXCLUSION (`w ≠ cpw`) and `ledger_read_any_ok` concludes only
+`∃ c, tso_read … = Some c`.  Neither can be turned into "the read returns
+THIS v".
+
+This is the same distinction A6.74 §(1) built `Mobl_ram_exv` for and then
+recorded in that definition's own header — *"[Mobl_ram_ex] must NOT be
+used for such a cell: its shape asserts one word good at every reachable
+view, which is false the moment another hart writes."*  The `_exv` node
+lane has been sitting in `HartSMem` with **zero consumers** since A6.74;
+A6.77 built the `_dat` generalisation instead and recorded it as covering
+all three routes.  It does not.
+
+**LANDED: `WpSconfMem.wp_load_s_sconf_au_exv`.**  The existential moves
+INSIDE the view quantifier and the resource loses its value index:
+
+```coq
+  Lemma wp_load_s_sconf_au_exv … (P : mword (8*width) -> Prop) (Res T : iProp Σ) :
+    … ->
+    (forall CIDw img sigma log V ppn, … -∗ Res -∗
+       ⌜forall tvr, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+          exists v, tso_read_bytes img log … (Z.to_N width) v /\ P v⌝) ->
+    … -∗
+    (|={⊤ ∖ ↑minstretN, Em}=> Res ∗ (Res ={Em, ⊤ ∖ ↑minstretN}=∗ T)) -∗
+    ( ∀ v, wp_next b p (fun CID => … -∗ ⌜P v⌝ -∗ T -∗ WP …)) -∗ …
+```
+
+**AND IT NEEDED NO NEW ENGINE, which is the measurement worth keeping.**
+`swp_execute_LOAD_ram_Sw_ex` takes its `Rr` and its obligation as
+ARGUMENTS, and `swp_read_ram_node_w_exv`'s post
+(`∃ bytes, ⌜r = …⌝ ∗ ⌜P bytes⌝ ∗ R`) IS the `_ex` engine's
+(`∃ bytes, ⌜r = …⌝ ∗ Rr bytes`) at `Rr := fun bs => ⌜P bs⌝ ∗ R` —
+literally the same term, since `∗` associates right.  So the leaf is
+`_dat`'s proof with **three arguments and four tactics changed**, and it
+compiled first try; the file is 18 s.
+
+> **A6.64's THREE-SPELLINGS RULE, restated for this shape.**  What must be
+> `clearbody`-rigid here is `Rex` (the value-independent payload), **not**
+> the engine's `Rr`: `Rr` is the literal lambda `fun bs => ⌜P bs⌝ ∗ Rex`,
+> and making IT rigid stops the node's post from unifying with the
+> engine's slot.  The rule survives — the leaf's `Rr`, the obligation
+> argument (`Mobl_ram_exv width pa P Rex`) and the NODE argument
+> (`swp_read_ram_node_w_exv width pa P Rex`) are spelled in agreement —
+> but the thing you hoist is one level down from `_dat`'s.
+
+#### (2) THE DEGENERATE `tw_n = 4` WINDOW PAYLOAD ON THE LOCK WORD IS NOT
+#### BUILDABLE — AND THE OTHER HALF OF A6.75 §(3)'s DISJUNCTION IS
+
+A6.75 §(3) left a named residual: the free-path read of the lock WORD has
+no image-coverage supplier, and offered two ways to pay it — *"either give
+the lock word a (degenerate, `tw_n = 4`) window payload, or add an
+image-coverage conjunct to the lock's own claim"* — and A6.76/A6.77 both
+took the first.  **The two are not equivalent and the first is false.**
+
+`win_ok1`'s conjunct (1) says every message touching the byte writes the
+WHOLE window with **either the CLEAR word `tw_z` or its author's own word
+`tw_cp (pm_tid m)`** — two fixed byte functions, fixed for the life of the
+payload (`win_ok1_app_store` re-establishes the claim only at the SAME
+`z` and `cp`; only `own` may move).  The lock word's writers are release's
+`sw zero` — fine, that is `z` — and **the AMO, whose stored value is
+`amoswap_stored (rget m rs2)`, a caller's register**.  No fixed `cp` can
+cover it.  Nothing "degenerate" repairs this: `cp h := z` makes the AMO
+arm false, and shrinking to `tw_n = 1` per byte keeps conjunct (1)
+value-constrained.  The payload is a claim about WHAT IS WRITTEN; the lock
+word is the one cell in the kit whose written value is not the kit's to
+choose.
+
+**LANDED: the other half.  `RiscvLang.mm_ok` gains a THIRD conjunct,**
+last per the new-conjunct rule:
+
+```coq
+  /\ (forall a : Arch.pa, (ram_lo <= uint a < ram_hi)%Z -> is_Some (g.(gimg) !! a))
+```
+
+— *the era image covers all of RAM* — and `TsoCtx` gains
+`ledger_img_cover` / `ledger_read_any_ram_ok` / `ledger_read_any_word_ok`
+off it.  **This is what A6.74 §(3) actually specified** (*"payable from
+`addr_is_ram` plus the interp's image coverage"*); A6.75 found no such
+interp conjunct and downgraded it to a PREMISE on `ledger_read_any_ok`,
+which is what sent the design looking for a per-cell payload to pay it.
+
+**AND IT IS THE RIGHT HOME, for the reason A6.74 §(2) gave about frames.**
+`gimg` is written exactly ONCE per era (the PowerOn arm) and framed by
+every other step, so the conjunct is free at every arm but one, and at
+that one it is `boot_facts`' own RAM-totality clause, already there.  A
+per-cell ghost claim would instead have needed a MINT — and no cell's
+creator can prove a fact about the era image.  *A coverage claim's home is
+decided by its frame condition* (A6.74's rule); this one's frame condition
+is "the image does not move", so its home is the machine invariant.
+
+**MEASURED CHURN: 5 files, no client movement.**  `RiscvLang` (the
+conjunct + the two preservation lemmas + a local `mword_of_int (uint w) = w`),
+`RiscvExec` (`tso_interp_of`'s fourth pure tie + `tso_interp_of_img_cover`;
+every leaf reaches the bundle through NAMED accessors, so the 21 files that
+mention `tso_interp_of` did not move), `TsoCtx` (11 `destruct Hmm` and 4
+`mm_ok` reconstructions, one token each), `CtxPinMint` (1),
+`RiscvAdequacy` (2 sites).
+
+> **ONE EXPORTED STATEMENT DID MOVE, and it is named here because the
+> owner's standing rule says to name it.**  `riscv_system_adequacy` (and
+> its device corollary) gains
+> `(Hramtot : forall a, addr_is_ram a -> is_Some (g.(gmem) !! a))` —
+> the CONVERSE of the `Hram` premise it already takes.  The
+> single-generation form takes `g` as given, so RAM totality has to be
+> assumed there; the POWER form (`riscv_power_adequacy`, and hence
+> `SystemAdequacy`'s two theorems) takes it from `boot_facts` and its
+> statement is UNCHANGED.  No caller of the single-generation form exists
+> outside the device corollary, so the cost was one argument.
+
+> **A `lia` PAPER CUT WORTH THE LINE.**  In `RiscvLang`, closing
+> `0 ≤ bv_unsigned w` (the side goal of `rewrite Z2N.id`) with `lia`
+> fails as **"Cannot find witness"** even with `bv_unsigned_in_range` in
+> the context — the same misleading message durable-notes files under the
+> evar trap, here with no evar in sight.  `pose proof … as [Hr0 _]` and
+> `exact Hr0`.  The identical proof body in `RiscvExtras` works, so it is
+> the ambient hint/instance set, not the goal.
+
+#### (3) THE RACY KIT HAS NO MINT, AND THAT IS THE REMAINING TRANCHE
+
+`ledger_store_wpay_ok` PRESERVES the window payload — its input is
+`wpay_map_own Pold (DfracOwn 1) Wold`, i.e. the payload must already be
+there.  **There is no `ledger_wpay_mint`, and there cannot be one from
+local facts**, because `win_ok1`'s conjunct (1) quantifies over the WHOLE
+log: creating the claim requires knowing that no earlier message wrote the
+cell with a disallowed word.  `ledger_pin_mint` has no such problem — the
+pin's `pin_ok_mint` needs only the address's LATEST write — which is
+exactly why the pin lane was mintable and this one is not.
+
+**AND THE READER SIDE HAS THE SAME SHAPE OF GAP.**
+`ledger_read_racy_word_ok` requires `own (hart_agent cpu_id) = Some t` —
+an own-last record for the READING hart.  `holding()`'s `notheld` caller
+is a hart that does not hold the lock, which does NOT imply it ever wrote
+`lk->cpu`.  A hart that has never touched this lock has no record, and
+`win_ok1` conjunct (3) says nothing at `own h = None`.
+
+**BOTH GAPS CLOSE AT THE SAME PLACE, AND IT IS THE EMPTY LOG.**  At
+`glog = []`:
+
+- conjunct (1) is VACUOUS (no messages);
+- conjunct (2) is now free — §(2)'s image coverage;
+- conjunct (3) holds for EVERY agent at `own := fun _ => Some 0%nat`:
+  timestamp 0 is `img !! a`, `visibleb h tv log 0 = true` at every view
+  (`visibleb_below`), the image byte at `lk->cpu` is the clear word
+  (`.bss`), and `own_last [] h a 0` is vacuous.
+
+and once minted it is maintained for free: `own_last_app_frame`'s side
+condition is `pm_tid m = h -> msg_byte m a = None`, which every OTHER
+store in the tree discharges from `ledger_store_ok`'s own `auth`.
+
+So the missing piece is **a boot mint plus its threading**: `TsoCtx`
+gains a `ledger_wpay_mint` whose premise set is the empty log (or,
+equivalently, the four conjuncts above), `BootCarve` mints the lock cells'
+payload while the log is still empty, and the payload rides to
+`lock_inv_alloc` through the `newlock` family — the creator cascade
+§0.18′ priced (19 call sites) plus `BootCarveMain`.  **That is a tranche
+of its own and it is what item (2) of A6.77's handoff is really waiting
+on.**
+
+> Two alternatives were considered and are recorded as rejected.  (i)
+> Relativising conjunct (1) to timestamps above a mint index `tw_lo`
+> makes the mint local, but the READER's conjunct (3) still needs
+> "visible at every view", which only timestamp 0 or the reader's own
+> message gives — so it moves the gap rather than closing it, at the cost
+> of reworking `read_down_win` / `find_top` / `racy_read_window`.  (ii)
+> Deriving the reader's own-last record from a hart-local "I have never
+> written `a`" resource: no such ghost exists, and adding one is a bigger
+> change than the boot mint.
+
+#### HANDOFF: M4'S LEAF TIER, WITH THE ORDER CORRECTED
+
+Below the leaves, what now exists: the `_exv` node lane AND its S-mode
+consumer (§(1)); all four read gates plus §(2)'s three image gates; the
+two-armed store gate; both datum-parametric AUs.  What does NOT exist is
+the racy payload's MINT.
+
+1. **The racy payload's boot mint and its threading** (§(3)) —
+   `TsoCtx.ledger_wpay_mint` at the empty log, `BootCarve`'s mint of the
+   lock cells, and the payload through the `newlock` family to
+   `WpLock.lock_inv_alloc`.  **This gates `wp_cld_lkcpu_lockopen_notheld_s_sconf`
+   and therefore `ProofHolding:281` and therefore the whole cone.**
+2. **`WpLock.lk_cpu_res` at `phys_ledger_word`** with the eight
+   `phys_ledger_wpay` fragments and the held arm's `ledger_vis` residue.
+   The lock WORD gets **no** payload (§(2)): its free-path read is
+   `ledger_read_any_word_ok` off `addr_is_ram`, and its HOLDER read
+   (`wp_clw_lockopen_locked_s_sconf`, which must conclude the word is
+   NONZERO) needs the held arm to carry the AMO's `ledger_msg_at`
+   author fragment, so that `ledger_vis_own` gives the exact value.
+   **That last point is new and is not in A6.77's list.**
+3. **`WpSconfLock`**: delete `wp_cld_lkcpu_lockopen_s_sconf`; the two
+   holder reads on `wp_load_s_sconf_au_dat`; `notheld` and the free-path
+   word read on `wp_load_s_sconf_au_exv`; the stores/AMO on the parked
+   record and `ledger_store_wpay_ok`.  **The AMO leaf is the biggest
+   single item and A6.77's list does not price it**: it does its own
+   inline read and write of the lock word through
+   `word4_pointsto_write_c` (the ctx tower), and at the reshaped cell
+   both have to be re-done at the ledger tier.
+   `lock_claims`' surviving `TsoCtxShim.ctx_word_of_mem` dies here.
+4. **`ProofHolding`**'s 2 call sites, statements unchanged.
+
+**ACCEPTANCE, unchanged:** `SpecAcquire` / `SpecRelease` / `SpecHolding` /
+`is_lock` / `locked` / `lock_openable` do not move, and `WpSconfLock`'s
+160-file cone opens.
 
 
 ## 7. Order of work
