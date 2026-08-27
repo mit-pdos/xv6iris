@@ -119,7 +119,7 @@ Section ConsoleinitBody.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string cons_name_str "cons"%string name eq_refl
+    iPoseProof (kernel_data_string_all cons_name_str "cons"%string name eq_refl
                   ltac:(unfold text_end, cons_name_str; lia)
                   ltac:(vm_compute; discriminate) Hcons
                   with "Hkdata") as "#Hstr".

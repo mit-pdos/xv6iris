@@ -326,12 +326,62 @@ Global Instance gtv_insert : Insert CPU nat (CPU -> nat) :=
 Definition hart_agent (c : CPU) : agent := fin_to_nat c.
 Definition disk_agent : agent := NCPU.
 
+(* RAM as the platform wires it.  [RiscvPtsto.addr_is_ram] is exactly
+   [ram_lo <= uint a < ram_hi] (its [ram_base]/[ram_size] live ABOVE this
+   file, so the constants are spelled here; keep the two in sync).
+   STATED HERE, above [mm_ok], because the memory-model invariant's third
+   conjunct is about RAM (it used to sit beside [boot_facts] below). *)
+Definition ram_lo : Z := 0x80000000.
+Definition ram_hi : Z := 0x88000000.
+
 (* THE MEMORY-MODEL STEP INVARIANT (tso-machine-flip.md §1), a pure
    conjunct of the state interpretation exactly like [resv_ok]: the flat
-   cache IS the log applied to the image, and no view runs past the top. *)
+   cache IS the log applied to the image, no view runs past the top, and
+   THE ERA IMAGE COVERS ALL OF RAM.
+
+   THE THIRD CONJUNCT IS NEW (A6.78) AND IT IS THE HONEST HOME OF THE
+   "NO EVIDENCE" READ'S OBLIGATION.  [TsoMemPa.read_down] bottoms out at
+   timestamp 0 -- the era image -- so a reader with no receipt and no
+   ownership still gets a VALUE exactly when the image has one at that
+   address ([TsoCtx.ledger_read_any_ok]).  A6.74 §(3) priced that gate as
+   payable "from [addr_is_ram] plus the interp's image coverage" and A6.75
+   then had to leave the coverage as a PREMISE, because no such interp
+   conjunct existed.  This is it, and it is where it belongs: [gimg] is
+   written exactly once per era (PowerOn) and framed by every other arm,
+   so the conjunct is FREE at every step but the boot one, and at the boot
+   one it is [boot_facts]' own RAM totality clause.  Carrying it in a ghost
+   payload instead was measured and rejected: a per-cell claim needs a MINT,
+   and no cell's creator can prove a fact about the era image.
+
+   LAST, per durable-notes' new-conjunct rule, so the pair destructurings
+   that only want the flat tie move by one token and nothing reorders. *)
 Definition mm_ok (g : gstate) : Prop :=
   g.(gmem) = flat g.(gimg) g.(glog)
-  /\ forall c : CPU, (g.(gtv) c <= length g.(glog))%nat.
+  /\ (forall c : CPU, (g.(gtv) c <= length g.(glog))%nat)
+  /\ (forall a : Arch.pa,
+        (ram_lo <= SailStdpp.Operators_mwords.uint a < ram_hi)%Z ->
+        is_Some (g.(gimg) !! a)).
+
+(* [mword_of_int (uint w) = w] at the address width -- the round trip the
+   image-coverage conjunct needs to meet [boot_facts]' RAM totality, which
+   is stated over [Z].  (A local mirror of [PowerBoot.pa_of_z_uint], which
+   lives ABOVE this file.) *)
+Lemma mm_moi_uint (w : Arch.pa) :
+  (SailStdpp.Values.mword_of_int (SailStdpp.Operators_mwords.uint w)
+   : Arch.pa) = w.
+Proof.
+  (* [RiscvExtras.uint_unsigned]'s body, inlined: that file lives above
+     this one. *)
+  assert (Hu : SailStdpp.Operators_mwords.uint w = bv_unsigned w).
+  { pose proof (bv_unsigned_in_range 64 w) as [Hr0 _].
+    unfold SailStdpp.Operators_mwords.uint, SailStdpp.Values.get_word,
+      MachineWord.MachineWord.word_to_N.
+    rewrite Z2N.id; [ reflexivity | exact Hr0 ]. }
+  unfold SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite Hu.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  apply Z_to_bv_bv_unsigned.
+Qed.
 
 (* the bytes reserved by every hart OTHER than [cpu] -- what blocks [cpu]'s
    stores and exclusive reads -- and by every hart at all -- what blocks the
@@ -874,12 +924,6 @@ Definition hart_node_step (gen : nat) (g : gstate) (cpu : CPU) (m : M unit)
 (* mideleg/mie/mcounteren/stimecmp/pmpaddr_n) is deliberately left          *)
 (* arbitrary, so this predicate stays as weak as the hardware.              *)
 (* ---------------------------------------------------------------------- *)
-
-(* RAM as the platform wires it.  [RiscvPtsto.addr_is_ram] is exactly
-   [ram_lo <= uint a < ram_hi] (its [ram_base]/[ram_size] live ABOVE this
-   file, so the constants are spelled here; keep the two in sync). *)
-Definition ram_lo : Z := 0x80000000.
-Definition ram_hi : Z := 0x88000000.
 
 (* THE LOADED IMAGE.  The ELF's loadable bytes -- text ([kernel_bytes]) and
    data ([kernel_data]) -- RESTRICTED to the file image [ram_lo, img_end).
@@ -1816,10 +1860,10 @@ Qed.
 Lemma hart_node_step_mm_ok gen g cpu m e' g' :
   hart_node_step gen g cpu m e' g' -> mm_ok g -> mm_ok g'.
 Proof.
-  intros (m' & s' & log' & tv' & r' & Hn & _ & ->) (Hf & Htv).
+  intros (m' & s' & log' & tv' & r' & Hn & _ & ->) (Hf & Htv & Hcov).
   destruct (mnode_step_mm _ _ _ _ _ _ _ _ _ _ _ _ _ Hn Hf (Htv cpu))
     as (Hf' & Hgrow & Htv').
-  split; [exact Hf'|].
+  split_and!; [exact Hf'| |exact Hcov].
   intros c. cbn. rewrite /insert /gtv_insert. case_decide as Hc.
   - exact Htv'.
   - pose proof (Htv c). lia.
@@ -1836,21 +1880,31 @@ Proof.
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
     | (-> & _ & _ & [ (_ & _ & ->) | (_ & _ & Hboot) ]) ] ] ] ];
     try exact Hok;
-    try (by destruct Hok as (Hf & Htv); split; [exact Hf|exact Htv]).
+    try (by destruct Hok as (Hf & Htv & Hcov); split_and!;
+            [exact Hf|exact Htv|exact Hcov]).
   - exact (hart_node_step_mm_ok _ _ _ _ _ _ Hn Hok).
-  - (* the disk: append and cache move in lock-step *)
-    destruct Hok as (Hf & Htv).
-    destruct Hlog as [(-> & ->) | (_ & ->)]; split; cbn [gmem gimg glog gtv].
+  - (* the disk: append and cache move in lock-step; the IMAGE does not move *)
+    destruct Hok as (Hf & Htv & Hcov).
+    destruct Hlog as [(-> & ->) | (_ & ->)]; split_and!;
+      cbn [gmem gimg glog gtv].
     + rewrite Hf. apply (left_id_L _ _).
     + exact Htv.
+    + exact Hcov.
     + rewrite flat_snoc Hf //.
     + intros c. rewrite length_app /=. pose proof (Htv c). lia.
-  - (* PowerOn: empty log over the loaded image *)
+    + exact Hcov.
+  - (* PowerOn: empty log over the loaded image, whose RAM totality is
+       [boot_facts]' own third clause -- so the image-coverage conjunct is
+       established exactly where the image is created and nowhere else. *)
     destruct Hboot as (_ & _ & Hbf).
-    destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & _ & Hlog & Himg & Hgtv).
-    split.
+    destruct Hbf as (_ & _ & Hram & _ & _ & _ & _ & _ & Hlog & Himg & Hgtv).
+    split_and!.
     + rewrite Hlog Himg /flat //.
     + intros c. rewrite Hgtv Hlog /=. lia.
+    + intros a Ha. rewrite Himg.
+      pose proof (Hram (SailStdpp.Operators_mwords.uint a) Ha) as Hb.
+      rewrite mm_moi_uint in Hb.
+      by exists (boot_byte (SailStdpp.Operators_mwords.uint a)).
 Qed.
 
 Definition riscv_lang : language := Language riscv_lang_mixin.

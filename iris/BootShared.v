@@ -120,14 +120,14 @@ Qed.
    ONE range and walks it in ADDRESS order, taking each bundle's window and
    keeping the tail.  The skipped prefix is DROPPED -- every gap in the layout
    table (tx_chan, ticks, sb, log, a record's padding) is claimed by
-   nobody, and [boot_raw_ran] is affine.  With this, one bundle is one line. *)
-Lemma bss_cut `{!riscvGS Σ} (g : gstate) (lo a b hi : Z) :
+   nobody, and [boot_cran] is affine.  With this, one bundle is one line. *)
+Lemma bss_cut `{!riscvGS Σ} `{XI : TsoCtx.CurCtx} (g : gstate) (lo a b hi : Z) :
   lo <= a -> a <= b -> b <= hi ->
-  boot_raw_ran g lo hi ⊢ boot_raw_ran g a b ∗ boot_raw_ran g b hi.
+  boot_cran g lo hi ⊢ boot_cran g a b ∗ boot_cran g b hi.
 Proof.
   intros H1 H2 H3. iIntros "H".
-  iDestruct (boot_ran_split g lo a hi H1 ltac:(lia) with "H") as "[_ H]".
-  iDestruct (boot_ran_split g a b hi H2 H3 with "H") as "[H1 H2]".
+  iDestruct (boot_cran_split g lo a hi H1 ltac:(lia) with "H") as "[_ H]".
+  iDestruct (boot_cran_split g a b hi H2 H3 with "H") as "[H1 H2]".
   iFrame "H1 H2".
 Qed.
 
@@ -276,18 +276,18 @@ Section BootBss.
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     ram_lo <= A -> A + 4096 < ram_hi -> A mod 8 = 0 ->
-    boot_raw_ran g A (A + 4096) ⊢ hart_stack_raw (pa_of_z A).
+    boot_cran g A (A + 4096) ⊢ hart_stack_raw (pa_of_z A).
   Proof.
     intros Hmem Hlo Hhi Hal.
     rewrite /hart_stack_raw off_of_z.
     assert (Hu : uint (pa_of_z (A + 4096)) = A + 4096)
       by (apply boot_uint_pa; lia).
     iIntros "H".
-    iApply (boot_stack_own_phys g (pa_of_z (A + 4096)) boot_stack_depth Hmem
+    iApply (boot_cran_stack_own_phys g (pa_of_z (A + 4096)) boot_stack_depth Hmem
               ltac:(rewrite Hu; exact (z_stk_lo A Hlo))
               ltac:(rewrite Hu; exact (z_stk_top A ltac:(lia)))
               ltac:(rewrite Hu; exact (z_mod_addo 8 A 4096 Hal eq_refl))).
-    iApply (boot_ran_eq g A (A + 4096)
+    iApply (boot_cran_eq g A (A + 4096)
               (uint (pa_of_z (A + 4096)) - 8 * Z.of_nat boot_stack_depth)
               (uint (pa_of_z (A + 4096)))
               ltac:(rewrite Hu; exact (z_stk_base A))
@@ -311,7 +311,7 @@ Section BootBss.
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= A -> img_end <= A -> A + 128 <= ram_hi -> A mod 8 = 0 ->
-    kmap_static_claims -∗ boot_raw_ran g A (A + 128) -∗ cpu_slot_raw (pa_of_z A).
+    kmap_static_claims -∗ boot_cran g A (A + 128) -∗ cpu_slot_raw (pa_of_z A).
   Proof.
     intros Hmem Hlo Hbss Hhi Hal. iIntros "#Hcl H".
     iDestruct (bss_cut g A A (A + 8) (A + 128)
@@ -322,17 +322,17 @@ Section BootBss.
                  ltac:(lia) ltac:(lia) ltac:(lia) with "H") as "[H2 H]".
     iDestruct (bss_cut g (A + 120 + 4) (A + 124) (A + 124 + 4) (A + 128)
                  ltac:(lia) ltac:(lia) ltac:(lia) with "H") as "[H3 _]".
-    iDestruct (boot_ran_cell8_bss g A (zero_reg : mword 64) Hmem Hlo Hbss
+    iDestruct (boot_cran_cell8_bss g A (zero_reg : mword 64) Hmem Hlo Hbss
                  ltac:(lia) Hal nth_byte_zero8 with "Hcl H0") as "H0".
     iDestruct (boot_own_ctx g (A + 8) Hmem ltac:(lia) ltac:(lia)
                  ltac:(exact (z_mod_addo 8 A 8 Hal eq_refl)) with "Hcl H1")
       as "H1".
-    iDestruct (boot_ran_cell4_bss g (A + 120) (noff_val 0) Hmem
+    iDestruct (boot_cran_cell4_bss g (A + 120) (noff_val 0) Hmem
                  ltac:(lia) ltac:(lia) ltac:(lia)
                  ltac:(exact (z_mod_addo 4 A 120 (z_mod8_mod4 A Hal) eq_refl))
                  ltac:(intros j _; apply nth_byte_zero;
                        vm_compute; reflexivity) with "Hcl H2") as "H2".
-    iDestruct (boot_ran_cell4 g (A + 124) Hmem ltac:(lia) ltac:(lia)
+    iDestruct (boot_cran_cell4 g (A + 124) Hmem ltac:(lia) ltac:(lia)
                  ltac:(exact (z_mod_addo 4 A 124 (z_mod8_mod4 A Hal) eq_refl))
                  with "Hcl H3") as (iv) "H3".
     rewrite /cpu_slot_raw !off_of_z.
@@ -454,7 +454,7 @@ Section BootBssChain.
        procinit routes it so a DORMANT slot owns three -- see
        [ProcDefs.proc_dormant]'s note for the ledger it opens. *)
     bslots (NPROC * 3) -∗
-    boot_raw_ran g img_end ram_hi -∗
+    boot_cran g img_end ram_hi -∗
       started_addr ↦₄ started_clear ∗
       main_locks_raw ∗
       main_globals_raw ∗
@@ -478,7 +478,7 @@ Section BootBssChain.
     iDestruct (bss_cut g img_end KernelSyms.started
                  (KernelSyms.started + 4) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hst H]".
-    iDestruct (boot_ran_cell4_bss g KernelSyms.started started_clear Hmem
+    iDestruct (boot_cran_cell4_bss g KernelSyms.started started_clear Hmem
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) ltac:(zeq)
                  ltac:(intros j _; apply nth_byte_zero; zeq)
                  with "Hcl Hst") as "Hst".
@@ -486,12 +486,12 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.started + 4) KernelSyms.kernel_pagetable
                  (KernelSyms.kernel_pagetable + 8) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hkpt H]".
-    iDestruct (boot_ran_cell8 g KernelSyms.kernel_pagetable Hmem ltac:(zlit)
+    iDestruct (boot_cran_cell8 g KernelSyms.kernel_pagetable Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hkpt") as (vkpt) "Hkpt".
     iDestruct (bss_cut g (KernelSyms.kernel_pagetable + 8) KernelSyms.initproc
                  (KernelSyms.initproc + 8) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hip H]".
-    iDestruct (boot_ran_cell8 g KernelSyms.initproc Hmem ltac:(zlit)
+    iDestruct (boot_cran_cell8 g KernelSyms.initproc Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hip") as (vip) "Hip".
     (* ---- 0x8000a248 ticks: the tick counter tickslock protects.  main needs
            it to ALLOCATE that lock (is_tickslock = is_lock … ticks_res), which
@@ -500,13 +500,13 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.initproc + 8) KernelSyms.ticks
                  (KernelSyms.ticks + 4) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Htk H]".
-    iDestruct (boot_ran_cell4 g KernelSyms.ticks Hmem ltac:(zlit)
+    iDestruct (boot_cran_cell4 g KernelSyms.ticks Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Htk") as (vtk) "Htk".
     (* ---- 0x8000a270 stack0[8][4096]: the per-hart stack family ---- *)
     iDestruct (bss_cut g (KernelSyms.ticks + 4) KernelSyms.stack0
                  (KernelSyms.stack0 + 4096 * Z.of_nat NCPU) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hstk H]".
-    iDestruct (boot_stride_family_seq g hart_stack_raw KernelSyms.stack0 4096 NCPU
+    iDestruct (boot_cran_stride_family_seq g hart_stack_raw KernelSyms.stack0 4096 NCPU
                  ltac:(lia)
                  ltac:(intros i A Hi HA _ _;
                        destruct (z_stride_side KernelSyms.stack0 4096 NCPU 4096
@@ -545,7 +545,7 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.kmem + 24) (KernelSyms.kmem + 24)
                  (KernelSyms.kmem + 24 + 8) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hkm H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.kmem + 24)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.kmem + 24)
                  (mword_of_int 0 : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq)
                  ltac:(intros j _; apply nth_byte_zero; zeq) with "Hcl Hkm")
@@ -560,7 +560,7 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.wait_lock + 24) KernelSyms.cpus
                  (KernelSyms.cpus + 128 * Z.of_nat NCPU) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hcpus H]".
-    iDestruct (boot_stride_family_seq g cpu_slot_raw KernelSyms.cpus 128 NCPU
+    iDestruct (boot_cran_stride_family_seq g cpu_slot_raw KernelSyms.cpus 128 NCPU
                  ltac:(lia)
                  ltac:(intros i A Hi HA _ _;
                        destruct (z_stride_side KernelSyms.cpus 128 NCPU 128
@@ -611,7 +611,7 @@ Section BootBssChain.
     iDestruct (bss_cut g (buf_base + buf_stride * Z.of_nat NBUF + 88)
                  KernelSyms.sb (KernelSyms.sb + Z.of_nat 32%nat) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hsbb H]".
-    iDestruct (boot_ran_mem_run g KernelSyms.sb 32%nat Hmem ltac:(zlit)
+    iDestruct (boot_cran_mem_run g KernelSyms.sb 32%nat Hmem ltac:(zlit)
                  ltac:(zlit) with "Hcl Hsbb") as "Hsbb".
     iDestruct (bss_cut g (KernelSyms.sb + Z.of_nat 32%nat)
                  KernelSyms.itable (KernelSyms.itable + 24) ram_hi
@@ -632,7 +632,7 @@ Section BootBssChain.
     (* ---- devsw[0 .. NDEV): THE WHOLE TABLE, not just CONSOLE's entry.
        consoleinit is about to overwrite entry CONSOLE's two cells, so those
        come out at arbitrary values; the other eighteen are handed over ZERO,
-       via [boot_ran_cell8_bss].  That is what [ConsoleInv.devsw_rest] states,
+       via [boot_cran_cell8_bss].  That is what [ConsoleInv.devsw_rest] states,
        and it is what lets [ConsoleInv.devsw_table] say what each slot HOLDS
        rather than "null or consoleread" -- the BSS being zero is a fact the
        carve has, so there is no reason to weaken the table to a disjunction
@@ -640,136 +640,136 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.log + 168)
                  (KernelSyms.devsw + 0) (KernelSyms.devsw + 8) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd0r H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 0)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 0)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd0r")
       as "Hd0r".
     iDestruct (bss_cut g (KernelSyms.devsw + 8)
                  (KernelSyms.devsw + 8) (KernelSyms.devsw + 16) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd0w H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 8)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 8)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd0w")
       as "Hd0w".
     iDestruct (bss_cut g (KernelSyms.devsw + 16)
                  (KernelSyms.devsw + 16) (KernelSyms.devsw + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd1r H]".
-    iDestruct (boot_ran_cell8 g (KernelSyms.devsw + 16) Hmem ltac:(zlit)
+    iDestruct (boot_cran_cell8 g (KernelSyms.devsw + 16) Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hd1r") as (vdr) "Hdr".
     iDestruct (bss_cut g (KernelSyms.devsw + 24)
                  (KernelSyms.devsw + 24) (KernelSyms.devsw + 32) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd1w H]".
-    iDestruct (boot_ran_cell8 g (KernelSyms.devsw + 24) Hmem ltac:(zlit)
+    iDestruct (boot_cran_cell8 g (KernelSyms.devsw + 24) Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hd1w") as (vdw) "Hdw".
     iDestruct (bss_cut g (KernelSyms.devsw + 32)
                  (KernelSyms.devsw + 32) (KernelSyms.devsw + 40) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd2r H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 32)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 32)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd2r")
       as "Hd2r".
     iDestruct (bss_cut g (KernelSyms.devsw + 40)
                  (KernelSyms.devsw + 40) (KernelSyms.devsw + 48) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd2w H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 40)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 40)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd2w")
       as "Hd2w".
     iDestruct (bss_cut g (KernelSyms.devsw + 48)
                  (KernelSyms.devsw + 48) (KernelSyms.devsw + 56) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd3r H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 48)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 48)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd3r")
       as "Hd3r".
     iDestruct (bss_cut g (KernelSyms.devsw + 56)
                  (KernelSyms.devsw + 56) (KernelSyms.devsw + 64) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd3w H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 56)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 56)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd3w")
       as "Hd3w".
     iDestruct (bss_cut g (KernelSyms.devsw + 64)
                  (KernelSyms.devsw + 64) (KernelSyms.devsw + 72) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd4r H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 64)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 64)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd4r")
       as "Hd4r".
     iDestruct (bss_cut g (KernelSyms.devsw + 72)
                  (KernelSyms.devsw + 72) (KernelSyms.devsw + 80) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd4w H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 72)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 72)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd4w")
       as "Hd4w".
     iDestruct (bss_cut g (KernelSyms.devsw + 80)
                  (KernelSyms.devsw + 80) (KernelSyms.devsw + 88) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd5r H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 80)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 80)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd5r")
       as "Hd5r".
     iDestruct (bss_cut g (KernelSyms.devsw + 88)
                  (KernelSyms.devsw + 88) (KernelSyms.devsw + 96) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd5w H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 88)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 88)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd5w")
       as "Hd5w".
     iDestruct (bss_cut g (KernelSyms.devsw + 96)
                  (KernelSyms.devsw + 96) (KernelSyms.devsw + 104) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd6r H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 96)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 96)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd6r")
       as "Hd6r".
     iDestruct (bss_cut g (KernelSyms.devsw + 104)
                  (KernelSyms.devsw + 104) (KernelSyms.devsw + 112) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd6w H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 104)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 104)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd6w")
       as "Hd6w".
     iDestruct (bss_cut g (KernelSyms.devsw + 112)
                  (KernelSyms.devsw + 112) (KernelSyms.devsw + 120) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd7r H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 112)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 112)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd7r")
       as "Hd7r".
     iDestruct (bss_cut g (KernelSyms.devsw + 120)
                  (KernelSyms.devsw + 120) (KernelSyms.devsw + 128) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd7w H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 120)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 120)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd7w")
       as "Hd7w".
     iDestruct (bss_cut g (KernelSyms.devsw + 128)
                  (KernelSyms.devsw + 128) (KernelSyms.devsw + 136) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd8r H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 128)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 128)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd8r")
       as "Hd8r".
     iDestruct (bss_cut g (KernelSyms.devsw + 136)
                  (KernelSyms.devsw + 136) (KernelSyms.devsw + 144) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd8w H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 136)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 136)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd8w")
       as "Hd8w".
     iDestruct (bss_cut g (KernelSyms.devsw + 144)
                  (KernelSyms.devsw + 144) (KernelSyms.devsw + 152) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd9r H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 144)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 144)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd9r")
       as "Hd9r".
     iDestruct (bss_cut g (KernelSyms.devsw + 152)
                  (KernelSyms.devsw + 152) (KernelSyms.devsw + 160) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hd9w H]".
-    iDestruct (boot_ran_cell8_bss g (KernelSyms.devsw + 152)
+    iDestruct (boot_cran_cell8_bss g (KernelSyms.devsw + 152)
                  (zero_reg : mword 64) Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) nth_byte_zero8 with "Hcl Hd9w")
       as "Hd9w".
@@ -794,27 +794,27 @@ Section BootBssChain.
     iDestruct (bss_cut g (file_base + file_stride * Z.of_nat NFILE)
                  KernelSyms.disk (KernelSyms.disk + 8) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hdd H]".
-    iDestruct (boot_ran_cell8 g KernelSyms.disk Hmem ltac:(zlit) ltac:(zlit)
+    iDestruct (boot_cran_cell8 g KernelSyms.disk Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zeq) with "Hcl Hdd") as (vdd) "Hdd".
     iDestruct (bss_cut g (KernelSyms.disk + 8) (KernelSyms.disk + 8)
                  (KernelSyms.disk + 16) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hda H]".
-    iDestruct (boot_ran_cell8 g (KernelSyms.disk + 8) Hmem ltac:(zlit)
+    iDestruct (boot_cran_cell8 g (KernelSyms.disk + 8) Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hda") as (vda) "Hda".
     iDestruct (bss_cut g (KernelSyms.disk + 16) (KernelSyms.disk + 16)
                  (KernelSyms.disk + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hdu H]".
-    iDestruct (boot_ran_cell8 g (KernelSyms.disk + 16) Hmem ltac:(zlit)
+    iDestruct (boot_cran_cell8 g (KernelSyms.disk + 16) Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hdu") as (vdu) "Hdu".
     iDestruct (bss_cut g (KernelSyms.disk + 24) (KernelSyms.disk + 24)
                  (KernelSyms.disk + 24 + Z.of_nat 8%nat) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hdf H]".
-    iDestruct (boot_ran_mem_run g (KernelSyms.disk + 24) 8%nat Hmem ltac:(zlit)
+    iDestruct (boot_cran_mem_run g (KernelSyms.disk + 24) 8%nat Hmem ltac:(zlit)
                  ltac:(zlit) with "Hcl Hdf") as "Hdf".
     iDestruct (bss_cut g (KernelSyms.disk + 24 + Z.of_nat 8%nat)
                  (KernelSyms.disk + 32) (KernelSyms.disk + 34) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hdi H]".
-    iDestruct (boot_ran_cell2_bss g (KernelSyms.disk + 32) (wrap16 0%nat) Hmem
+    iDestruct (boot_cran_cell2_bss g (KernelSyms.disk + 32) (wrap16 0%nat) Hmem
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) ltac:(zeq)
                  ltac:(intros j _; apply nth_byte_zero; zeq) with "Hcl Hdi")
       as "Hdi".
@@ -835,11 +835,11 @@ Section BootBssChain.
        moves when [KernelSyms.end_] crosses one.  It is kept a literal because
        [bss_cut]'s ordering side conditions are closed by [zlit] on literals,
        and it is self-checking -- [s1entry_uint] (which now computes from the
-       dumped symbol) and the [boot_ran_eq] equation just below both fail to
+       dumped symbol) and the [boot_cran_eq] equation just below both fail to
        compile if [end] ever lands in a different page. *)
     iDestruct (bss_cut g (KernelSyms.disk + 296 + 24) 0x80024000 ram_hi ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hrun _]".
-    iDestruct (boot_ran_eq g 0x80024000 ram_hi
+    iDestruct (boot_cran_eq g 0x80024000 ram_hi
                  (uint s1entry_val - 4096) (uint phystop_val)
                  ltac:(rewrite s1entry_uint; zeq)
                  ltac:(rewrite phystop_uint; zeq) with "Hrun") as "Hrun".
@@ -996,7 +996,7 @@ Qed.
    [∃ v, alp_nextpid ↦₄ v].  [first] is different: forkret's [if (first)]
    branch is decided by that cell, so a holder of [∃ w, first ↦₄ w] cannot
    tell which arm it is in and the boot arm becomes unprovable.  The image
-   says 1 ([KernelData], via [boot_ran_cell4_at]), and pinning it here is
+   says 1 ([KernelData], via [boot_cran_cell4_at]), and pinning it here is
    what lets the FIRST process carry the right to run that arm. *)
 (* [first]'s FOUR IMAGE BYTES, as a named lemma.  It is named for the reason
    [BootChain.entry_got_bytes] is: the discharge is a [vm_compute] over an
@@ -1158,6 +1158,13 @@ Section BootAlloc.
       log_mirror_half (FsCrash.mirror_of
          (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))) ∗
       swap_lb (S gen_id) ∗
+      (* THE ELEMENT HALF OF THE IMAGE (tso-machine-flip.md A6.81).  The
+         [boot_raw_bytes] row above is the FLAT byte only; a registered
+         (context-tier) byte is that byte PLUS the address's ledger
+         element, and the era's [ghost_map_alloc] is the system's one
+         supplier.  It arrives as the WHOLE map, exactly as the raw row
+         does, and is cut in step with it by [boot_led_all_split]. *)
+      BootCarve.boot_led_all g ∗
       crash_inv ∗ gen_cert.
   Proof. iIntros "H". iExact "H". Qed.
 
@@ -1352,14 +1359,21 @@ Section BootAlloc.
     iDestruct (power_boot_res_unpack g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hstrans & Hsie & Hspp & Hspie &
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
-        #Hcinv & #Hcert)".
+        Hled & #Hcinv & #Hcert)".
     (* ---- the claims bundle FIRST: both image halves need it ---- *)
     iMod (kmap_static_claims_intro with "Hkfrags") as "#Hcl".
     (* ---- the image: text persisted, data persisted up to [rodata_end] ---- *)
     iDestruct (boot_bytes_split g with "Hbytes") as "[Htext Hdata]".
-    iMod (boot_text_persist g Hram with "Hcl Htext") as "Htext".
+    (* THE ELEMENT HALF, cut at [text_end] in step with the raw bytes (A6.81).
+       The text half is PERSISTED into [pristine_elem] and folded into [↦ₓ□];
+       the data half is paired back onto the raw range so that every cell the
+       .bss walk carves below comes out at the CONTEXT tier. *)
+    iDestruct (boot_led_all_split g Hram with "Hled") as "[Hledtext Hleddata]".
+    iMod (boot_led_text_persist g with "Hledtext") as "#Hpristext".
+    iMod (boot_text_persist g Hram with "Hcl Hpristext Htext") as "Htext".
     iDestruct (kernel_text_intro g Hmemf with "Htext") as "#Hktext".
     iDestruct (boot_data_ran g Hram with "Hdata") as "Hdata".
+    iDestruct (boot_cran_intro g text_end ram_hi with "Hdata Hleddata") as "Hdata".
     (* THE SECOND CUT IS AT [rodata_end], NOT AT [img_end].  [rodata_end,
        img_end) is the image's WRITABLE initialized data (`.data`, `.got`,
        `.got.plt`), and the kernel stores into `.data`; persisting it would
@@ -1369,6 +1383,7 @@ Section BootAlloc.
     iDestruct (bss_cut g text_end text_end rodata_end ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "Hdata")
       as "[Hro Hrw]".
+    iDestruct (boot_cran_raw g text_end rodata_end with "Hro") as "Hro".
     iDestruct (boot_ran_own g text_end rodata_end Hram ltac:(zlit)
                  with "Hcl Hro") as "Hro".
     iMod (boot_ran_persist g text_end rodata_end with "Hro") as "#Hro".
@@ -1396,18 +1411,19 @@ Section BootAlloc.
        makes [vm_compute] normalise [boot_byte], i.e. the filtered union of
        both 17932-entry image maps, inside this proof's context -- which is
        not slow but non-terminating in practice. *)
-    iDestruct (boot_ran_cell4_at g KernelSyms.first_1 (mword_of_int 1)
+    iDestruct (boot_cran_cell4_at g KernelSyms.first_1 (mword_of_int 1)
                  Hmem ltac:(zlit) ltac:(zlit) ltac:(zeq)
                  (boot_byte_data_run KernelSyms.first_1
                     (mword_of_int 1 : mword 32) 4%nat ltac:(zlit) first_bytes)
                  with "Hcl Hfirst") as "Hfirst".
-    iDestruct (boot_ran_cell4 g KernelSyms.nextpid Hmem ltac:(zlit)
+    iDestruct (boot_cran_cell4 g KernelSyms.nextpid Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hnext") as "Hnext".
     (* ---- [_entry]'s GOT slot: the &stack0 word, at [DfracDiscarded] so all
            eight harts share it.  It is in `.got`, i.e. ABOVE [rodata_end],
            so it is persisted here as ONE cell rather than claimed wholesale
            by [kernel_data] -- nothing ever writes the GOT (xv6 is statically
            linked and non-PIE), but the section flags cannot say so. ---- *)
+    iDestruct (boot_cran_raw g entry_got (entry_got + 8) with "Hgot") as "Hgot".
     iMod (boot_ran_phys_word g entry_got v_stack0 mb_ld_ea entry_ld_ea_addr
             Hmem ltac:(zlit) ltac:(zlit) ltac:(zeq)
             (boot_byte_data_run entry_got v_stack0 8%nat ltac:(zlit)

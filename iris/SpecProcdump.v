@@ -142,6 +142,12 @@ Section ProcdumpView.
        p_state pa  ↦₄{ dqs } st ∗
        p_pid   pa  ↦₄{ dqp } pid ∗
        p_name  pa 0 ↦ₛ{ dqn } nm)%I.
+  (* The name conjunct is the BORROWED STRING VIEW of [p->name]: a producer
+     holding the process block gets it from [ProcDefs.pname_cells_borrow]
+     (the array->string accessor, tso-port.md §0.21′ amendment), which also
+     supplies [nonul nm], and closes with [pname_cells_return].  Nothing in
+     the tree calls procdump, so the view arrives as a caller premise here;
+     the accessor is what a caller would build it with. *)
 
   (* The whole table.  [seq 0 NPROC] binds the INDEX as the element, so the
      big-op splits at a cursor with [seq_app] -- which is exactly the shape

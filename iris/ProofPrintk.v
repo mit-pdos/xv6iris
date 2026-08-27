@@ -50,8 +50,13 @@ From Kernel Require KernelInstrs KernelData.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the epilogue's stack_own hand-back crosses to the
-                         raw stack carve *)
+(* NO SHIM.  This file's two crossings were the RODATA ones -- [pk_str_byte]'s
+   format byte and [pk_digits_data]'s digit table -- and M1 stage 3
+   (tso-port.md §0.22′) deleted both: [↦ₛ] is context-indexed now, so a
+   string's byte IS the load leaf's ctx slot, in BOTH directions, which is
+   what a one-way shim projection never was.  The epilogue's [stack_own]
+   hand-back that the [Require] used to be justified by goes through
+   [ByteBuf]'s own crossings, not this file's. *)
 Local Open Scope Z_scope.
 Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving
                             ([ctx_word_pointsto_split4]/[_join4]) and the
@@ -1156,15 +1161,14 @@ Section ProofPrintk.
     (pa_add a j) ↦ₘ{dq} (pk_fbyte f j) ∗
     ((pa_add a j) ↦ₘ{dq} (pk_fbyte f j) -∗ a ↦ₛ{dq} f).
   Proof.
-    intro Hj. rewrite /string_pointsto.
+    intro Hj. rewrite /ctx_string_pointsto.
     iIntros "H".
     iDestruct (big_sepL_lookup_acc _ _ j (pk_fbyte f j) with "H") as "[Hb Hcl]".
     { rewrite /pk_fbyte. apply list_lookup_lookup_total_lt. exact Hj. }
-    (* the format string is rodata (raw ↦ₛ tower); its byte crosses to the
-       load leaf's ctx slot and back through the shim *)
-    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb") as "Hb".
-    iFrame "Hb". iIntros "Hb". iApply "Hcl".
-    iApply (TsoCtx.ctx_pointsto_forget with "Hb").
+    (* NO SEAM: [↦ₛ] is context-indexed (M1 stage 3), so the string's byte
+       IS the load leaf's ctx slot -- in BOTH directions, which is what the
+       shim crossing here could never be. *)
+    iFrame "Hb". iIntros "Hb". iApply "Hcl". iExact "Hb".
   Qed.
 
   Lemma wp_printk_setup `{CID0 : CpuId}
@@ -4424,9 +4428,8 @@ Section ProofPrintk.
     rewrite /pk_digits. iApply big_sepL_intro. iIntros "!>" (u j Hu).
     apply lookup_seq in Hu. destruct Hu as [-> Hlt].
     iExists (pk_fbyte "0123456789abcdef"%string u).
-    (* [kernel_data_string] is KernelDataInv's RAW image byte; [pk_digits] is
-       the flipped [↦ₘ]. *)
-    iApply TsoCtxShim.ctx_pointsto_of_mem.
+    (* no seam: [↦ₛ] is context-indexed (M1 stage 3), so its bytes ARE
+       [pk_digits]' [↦ₘ] bytes. *)
     iApply (big_sepL_lookup _ _ u (pk_fbyte "0123456789abcdef"%string u) with "Hs").
     rewrite /pk_fbyte. apply list_lookup_lookup_total_lt.
     rewrite cstring_bytes_length. cbn [String.length]. lia.

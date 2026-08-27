@@ -31,6 +31,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Export PrintkFmt.
+(* [↦ₛ] is context-indexed (M1 stage 3, tso-port.md §0.21′): a [%s]
+   argument is ordinary memory at the DESCRIBING thread's context -- most
+   often [p->name], which is written at runtime. *)
+Require Import TsoCtx.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
@@ -53,7 +57,7 @@ Definition pk_desc_kind (d : pk_arg_desc) : pk_kind :=
 (* WHAT THE DESCRIPTION COSTS.  Hart-free -- the string points-to is memory,
    which is shared -- so this takes no [CpuId] and a description crosses a
    migration untouched. *)
-Definition pk_desc_res `{!riscvGS Σ} `{GEN : GenId} (v : mword 64) (d : pk_arg_desc) : iProp Σ :=
+Definition pk_desc_res `{!riscvGS Σ} `{GEN : GenId} `{XI : CurCtx} (v : mword 64) (d : pk_arg_desc) : iProp Σ :=
   match d with
   | PkANum => True
   (* a [char *] to a real string is NOT null -- the caller has to say so.

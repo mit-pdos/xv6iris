@@ -522,16 +522,33 @@ Section KforkB4Proof.
     (* open both name buffers *)
     iDestruct (kfk_name_open γf pme pid_p Vp with "Hparent2") as "(HnmP & %HnlP & HnmPback)".
     iDestruct (kfk_name_open γf npa pid_c Vc2 with "Hchild2") as "(HnmC & %HnlC & HnmCback)".
-    (* past [pname_wf]: the parent's is carried through untouched (safestrcpy
-       only READS it), the child's is re-derived below from the call's own
+    (* THE SOURCE COMES OUT OF THE ARRAY->STRING BORROW (ProcDefs,
+       tso-port.md §0.21′ amendment).  [p->name] is a fixed-size array with
+       a C string embedded in it; [pname_cells_borrow] hands out the prefix
+       up to the NUL as an ordinary [↦ₛ] fact -- a RUNTIME-WRITTEN string,
+       which is exactly the case the flipped tier exists to cover -- and
+       keeps the tail bytes behind.  [kfk_src_of_string] re-indexes the two
+       halves into the byte window safestrcpy's contract states its source
+       over, and [kfk_src_ok_of_string] discharges [ssc_src_ok] from the
+       string's OWN NUL (the second disjunct) instead of from kfork
+       happening to own all sixteen bytes.
+       The parent's [pname_wf] is carried through untouched (safestrcpy only
+       READS it); the child's is re-derived below from the call's own
        postcondition. *)
-    iDestruct (pname_cells_open with "HnmP") as "(%HwfP & HnmP)".
+    iDestruct (pname_cells_borrow with "HnmP")
+      as (nmP padP) "(%HsplitP & _ & HstrP & HpadP)".
+    assert (HwfP : pname_wf (pv_name Vp))
+      by (rewrite HsplitP; apply pname_wf_cstring).
+    assert (HfP : forall i, (i < length (cstring_bytes nmP ++ padP)%list)%nat ->
+                    (cstring_bytes nmP ++ padP)%list !! i
+                    = Some (kfk_name_fn (pv_name Vp) i))
+      by (rewrite -HsplitP; exact (kfk_name_fn_spec (pv_name Vp))).
+    iDestruct (kfk_src_of_string pme (DfracOwn 1) nmP padP
+                 (kfk_name_fn (pv_name Vp)) HfP with "HstrP HpadP") as "HnmPseq".
     iDestruct (pname_cells_open with "HnmC") as "(_ & HnmC)".
-    iDestruct (kfk_pname_bytes pme (DfracOwn 1) (pv_name Vp) (kfk_name_fn (pv_name Vp))
-                 (kfk_name_fn_spec (pv_name Vp)) with "HnmP") as "HnmPseq".
     iDestruct (kfk_pname_bytes npa (DfracOwn 1) (pv_name Vc2) (kfk_name_fn (pv_name Vc2))
                  (kfk_name_fn_spec (pv_name Vc2)) with "HnmC") as "HnmCseq".
-    iEval (rewrite HnlP) in "HnmPseq".
+    iEval (rewrite -HsplitP HnlP) in "HnmPseq".
     iEval (rewrite HnlC) in "HnmCseq".
     iEval (rewrite -HM6a1) in "HnmPseq".
     iEval (rewrite -HM6a0) in "HnmCseq".
@@ -541,13 +558,17 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* THE safestrcpy CALL.                                           *)
     (* ------------------------------------------------------------- *)
-    (* [ns := n = 16]: kfork owns all sixteen bytes of [p->name], so the
-       source-ownership premise is [ssc_src_ok]'s first (budget) disjunct. *)
+    (* [ns := n = 16].  The source-ownership premise is NOT the budget
+       disjunct any more: it is the borrowed string's own terminator. *)
+    assert (HsrcP : SpecSafestrcpy.ssc_src_ok (kfk_name_fn (pv_name Vp)) 16%nat 16%nat).
+    { replace 16%nat with (length (cstring_bytes nmP ++ padP)%list)
+        by (rewrite -HsplitP; exact HnlP).
+      exact (kfk_src_ok_of_string nmP padP (kfk_name_fn (pv_name Vp)) _ HfP). }
     iApply (SS.wp_safestrcpy_sconf KT0 KT0 M6 16%nat 16%nat
               (kfk_name_fn (pv_name Vp)) (kfk_name_fn (pv_name Vc2))
               (rsv + (K - 8))%nat (DfracOwn 1) false pme
               ltac:(etransitivity; [exact (kfk_b4_stack_ss K HK) | lia]) HM6a2' Hn31
-              (SpecSafestrcpy.ssc_src_ok_full _ _)
+              HsrcP
               with "Hcg Htext Hpc HnmPseq HnmCseq").
     iApply wp_next_off_intro.
     iIntros (mr2 h) "Hcg Hpc HnmPseq' HnmCseq' %Hcs_ss %Ha0_ss %Hpostdisj".

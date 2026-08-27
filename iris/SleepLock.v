@@ -116,11 +116,14 @@ Section SleepLock.
 
   (* the sleeplock's own name field (+32), mirroring [lock_name]: written
      once by initsleeplock and then discarded, so persistent. *)
-  (* RAW (context-free), for the same reason as [WpLock.lock_name]: name
-     metadata inside the persistent handle must not drag a context in. *)
+  (* CONTEXT-FREE, exactly as [WpLock.lock_name] and for its reason: name
+     metadata inside the persistent handle must not drag a context in.  The
+     field is the RAW word; the string is [TsoCtx.ctx_string_all], [↦ₛ]'s
+     ∀-context DERIVED form (tso-port.md §0.21′). *)
   Definition sl_name (slk : mword 64) (s : string) : iProp Σ :=
     (∃ p : mword 64,
-       word_pointsto (sl_name_field slk) DfracDiscarded p ∗ p ↦ₛ□ s)%I.
+       word_pointsto (sl_name_field slk) DfracDiscarded p ∗
+       ctx_string_all p DfracDiscarded s)%I.
 
   Global Instance sl_name_persistent slk s : Persistent (sl_name slk s).
   Proof. apply _. Qed.

@@ -2052,6 +2052,131 @@ Section snodes.
     iIntros (tvn ? ?) "_";
     rewrite (Hres bs); iApply swp_ret; iExists bs; by iFrame.
 
+  (* THE SAME FOUR NODES WITH THE VALUE *CONFINED* RATHER THAN NAMED
+     (tso-m4-memo.md §6, as amended by tso-machine-flip.md A6.73's
+     measurement B).
+
+     THE DIFFERENCE FROM [_ex], AND IT IS THE WHOLE POINT: [_ex] puts its
+     [∃ bytes] OUTSIDE the [∀ tv'], i.e. it names ONE word good at every
+     reachable view.  That is [tso-pin-memo.md] §0's refuted shape and it
+     is FALSE of any cell another hart may be writing -- which is exactly
+     the racy lock-owner cell.  Here the existential moves INSIDE the [∀]
+     and what the caller pins is a PREDICATE [P]; the VALUE comes back from
+     the step, together with [⌜P w⌝].
+
+     The resource [R] is deliberately NOT value-indexed: a racy leaf's
+     continuation wants [⌜P c⌝ ∗ T], and a value-indexed [Rr] would have to
+     be chosen before the step it is about.
+
+     COST: only the statement.  [HartEvents.swp_hart_ram_read_plain_ex]
+     (A6.51 ruling 1) is already this shape one tier down, and
+     [PtTreeAdue.v:985-1006] is a worked call site of it. *)
+  Local Ltac node_read_exv req Hproj Hres pr :=
+    let bs := fresh "bs" in
+    let tn := fresh "tn" in
+    iIntros "#Hcert Hmem";
+    iApply (swp_hart_ram_read_plain_ex _ req _ _ pr Hproj ltac:(assumption)
+              ltac:(reflexivity) with "Hcert [Hmem]");
+    iIntros (s ? ? ? ?) "%Htv Hs Htso";
+    iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "[% Hcl]";
+    iModIntro; iSplitR; [ iPureIntro; assumption | ];
+    iNext; iMod "Hcl" as "(Hs & Htso & HR)"; iModIntro; iFrame "Hs Htso";
+    iIntros (tn bs) "_ _ _ % _";
+    rewrite (Hres bs); iApply swp_ret; iExists bs;
+    iSplitR; [ done | iSplitR; [ iPureIntro; assumption | iExact "HR" ] ].
+
+  Lemma swp_read_ram_node1_exv (pa : SailStdpp.Values.mword 64)
+      (P : SailStdpp.Values.mword (8 * 1) -> Prop) (R : iProp Σ) :
+    dev_addr pa = false ->
+    gen_cert -∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+           exists bytes : SailStdpp.Values.mword (8 * 1),
+             tso_read_bytes img log (hart_agent cpu_id) tv' pa 1 bytes
+             /\ P bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 1 false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 1),
+                  ⌜r = (bytes, default_meta)⌝ ∗ ⌜P bytes⌝ ∗ R).
+  Proof.
+    intro Hdev.
+    node_read_exv (mread_req1 pa) (hread_req_at_read_ram1 pa)
+      (hread_resume_read_ram1 pa) P.
+  Qed.
+
+  Lemma swp_read_ram_node2_exv (pa : SailStdpp.Values.mword 64)
+      (P : SailStdpp.Values.mword (8 * 2) -> Prop) (R : iProp Σ) :
+    dev_addr pa = false ->
+    gen_cert -∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+           exists bytes : SailStdpp.Values.mword (8 * 2),
+             tso_read_bytes img log (hart_agent cpu_id) tv' pa 2 bytes
+             /\ P bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 2 false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 2),
+                  ⌜r = (bytes, default_meta)⌝ ∗ ⌜P bytes⌝ ∗ R).
+  Proof.
+    intro Hdev.
+    node_read_exv (mread_req2 pa) (hread_req_at_read_ram2 pa)
+      (hread_resume_read_ram2 pa) P.
+  Qed.
+
+  Lemma swp_read_ram_node4_exv (pa : SailStdpp.Values.mword 64)
+      (P : SailStdpp.Values.mword (8 * 4) -> Prop) (R : iProp Σ) :
+    dev_addr pa = false ->
+    gen_cert -∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+           exists bytes : SailStdpp.Values.mword (8 * 4),
+             tso_read_bytes img log (hart_agent cpu_id) tv' pa 4 bytes
+             /\ P bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 4 false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 4),
+                  ⌜r = (bytes, default_meta)⌝ ∗ ⌜P bytes⌝ ∗ R).
+  Proof.
+    intro Hdev.
+    node_read_exv (mread_req pa) (hread_req_at_read_ram pa)
+      (hread_resume_read_ram pa) P.
+  Qed.
+
+  Lemma swp_read_ram_node8_exv (pa : SailStdpp.Values.mword 64)
+      (P : SailStdpp.Values.mword (8 * 8) -> Prop) (R : iProp Σ) :
+    dev_addr pa = false ->
+    gen_cert -∗
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+           exists bytes : SailStdpp.Values.mword (8 * 8),
+             tso_read_bytes img log (hart_agent cpu_id) tv' pa 8 bytes
+             /\ P bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 8 false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 8),
+                  ⌜r = (bytes, default_meta)⌝ ∗ ⌜P bytes⌝ ∗ R).
+  Proof.
+    intro Hdev.
+    node_read_exv (mread_req8 pa) (hread_req_at_read_ram8 pa)
+      (hread_resume_read_ram8 pa) P.
+  Qed.
+
   Lemma swp_read_ram_node1_ex (pa : SailStdpp.Values.mword 64)
       (Rr : SailStdpp.Values.mword (8 * 1) -> iProp Σ) :
     dev_addr pa = false ->
@@ -3724,6 +3849,48 @@ Section instances.
         ⌜dev_read σ.(mdev) pa 4 = Some (bytes, d')⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗
                      Rr bytes))%I.
+
+  (* ---- THE VALUE-CONFINED OBLIGATION (tso-m4-memo.md §6; A6.73's
+     measurement B).  [Mobl_ram_ex]'s body with the [∃ bytes] moved INSIDE
+     the [∀ tv'] and the resource made value-independent.  The reader of a
+     RACY cell cannot name the word at all -- what it can name is a
+     predicate the word satisfies at every view the machine's drain may
+     choose -- and [Mobl_ram_ex] must NOT be used for such a cell: its
+     shape asserts one word good at every reachable view, which is false
+     the moment another hart writes.
+
+     [Mobl_ram] (the fixed-value form) is the special case [P := eq v]
+     with the [∃] discharged by [v]; it is left as its own definition
+     because every engine below is abstract over the NAME. *)
+  Definition Mobl_ram_exv (width : Z) (pa : SailStdpp.Values.mword 64)
+      (P : SailStdpp.Values.mword (8 * width) -> Prop) (R : iProp Σ) : iProp Σ :=
+    (∀ σ img log tv V,
+       ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       mstate_interp σ -∗
+       tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+           exists bytes : SailStdpp.Values.mword (8 * width),
+             tso_read_bytes img log (hart_agent cpu_id) tv' pa
+               (Z.to_N width) bytes /\ P bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R))%I.
+
+  Lemma swp_read_ram_node_w_exv (width : Z) (pa : SailStdpp.Values.mword 64)
+      (P : SailStdpp.Values.mword (8 * width) -> Prop) (R : iProp Σ) :
+    vmem_width width ->
+    dev_addr pa = false ->
+    ⊢ gen_cert -∗
+      Mobl_ram_exv width pa P R -∗
+      swp (read_ram Read_plain (Physaddr pa) width false)
+        (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                    ⌜r = (bytes, default_meta)⌝ ∗ ⌜P bytes⌝ ∗ R).
+  Proof.
+    intros [-> | [-> | [-> | ->]]] Hdev;
+      [ exact (swp_read_ram_node1_exv pa P R Hdev)
+      | exact (swp_read_ram_node2_exv pa P R Hdev)
+      | exact (swp_read_ram_node4_exv pa P R Hdev)
+      | exact (swp_read_ram_node8_exv pa P R Hdev) ].
+  Qed.
 
   Lemma swp_read_ram_node_w_ex (width : Z) (pa : SailStdpp.Values.mword 64)
       (Rr : SailStdpp.Values.mword (8 * width) -> iProp Σ) :

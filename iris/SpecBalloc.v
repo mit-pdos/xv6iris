@@ -53,7 +53,7 @@
 
      - [γpr] and the two PERSISTENT credentials [kernel_data] and
        [printk_env γpr γu γd] (the format string itself needs no premise:
-       [KernelDataInv.kernel_data_string] mints its persistent [↦ₛ□] out of
+       [KernelDataInv.kernel_data_string_all] mints its persistent string out of
        [kernel_data]);
      - printk's contract as a [Prop] HYPOTHESIS
        ([SpecPrintk.printk_gen_contract]), never as a functor argument.

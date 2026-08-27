@@ -154,6 +154,9 @@ Qed.
 Section DirlookupMsg.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* M1 stage 3: [↦ₛ] is context-indexed, and a rodata message extracted
+     from [kernel_data] lands at the READING thread's context. *)
+  Context `{XI : CurCtx}.
 
   Lemma dlk_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int dlk_msg_a : mword 64) ↦ₛ□ dlk_msg.

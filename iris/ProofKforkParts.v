@@ -640,6 +640,64 @@ Section KforkRes.
     length (h <$> seq 0 n) = n.
   Proof. by rewrite length_fmap length_seq. Qed.
 
+  (* =================================================================== *)
+  (* THE ARRAY -> STRING BORROW AT safestrcpy'S *SOURCE* ARGUMENT         *)
+  (* (tso-port.md §0.21′ amendment; the acceptance test of the accessor). *)
+  (*                                                                     *)
+  (* [safestrcpy]'s contract states BOTH buffers as raw byte windows over *)
+  (* a naming function [f], because its postcondition has to speak about  *)
+  (* the DESTINATION byte by byte -- [ssc_post]'s [s j = f j] for [j < k]  *)
+  (* -- and a [↦ₛ] fact cannot say that.  That shape is load-bearing and   *)
+  (* stays.  What these two lemmas show is that the SOURCE half of the     *)
+  (* contract is nevertheless exactly what the accessor hands out:         *)
+  (*                                                                     *)
+  (*   - the OWNERSHIP premise is the borrowed [↦ₛ] view plus the retained *)
+  (*     tail, re-indexed (a string is a byte window, so no ownership is   *)
+  (*     invented or lost);                                               *)
+  (*   - [ssc_src_ok] is discharged by the STRING'S OWN NUL -- the second  *)
+  (*     disjunct -- rather than by the caller happening to own the whole  *)
+  (*     sixteen bytes.  That is the honest reason kfork's copy is safe,   *)
+  (*     and it is the reason exec's is (its source runs off the end of    *)
+  (*     [char path[MAXPATH]]; see SpecSafestrcpy's header).               *)
+  (*                                                                     *)
+  (* A FUTURE safestrcpy RE-SPEC, recorded rather than done: replace the   *)
+  (* source premise [([∗ list] j ∈ seq 0 ns, (pa_add t j) ↦ₘ{dq} f j)] and *)
+  (* [ssc_src_ok f n ns] by [t ↦ₛ{dq} src] alone, dropping [ns] and [f]    *)
+  (* from the source side entirely; [ssc_stop] then reads [k = min          *)
+  (* (String.length src) (n-1)] and [ssc_post]'s copied bytes read off      *)
+  (* [cstring_bytes src].  It is a strictly smaller contract, but it is a   *)
+  (* re-proof of the copy loop (which today walks [f]), not a re-statement, *)
+  (* and [ProofUserinit]/[SpecStrncpy] share the [f]-shaped source, so it   *)
+  (* is its own piece of work.                                             *)
+  (* =================================================================== *)
+
+  (* the borrowed string view IS safestrcpy's source window *)
+  Lemma kfk_src_of_string `{XI : CurCtx} (pa : mword 64) (dq : dfrac)
+      (nm : string) (pad : list (bv 8)) (f : nat -> bv 8) :
+    (forall i, (i < length (cstring_bytes nm ++ pad))%nat ->
+       (cstring_bytes nm ++ pad) !! i = Some (f i)) ->
+    p_name pa 0 ↦ₛ{dq} nm -∗ pname_pad pa dq nm pad -∗
+    ([∗ list] j ∈ seq 0 (length (cstring_bytes nm ++ pad)),
+       pa_add (kfk_name_base pa) j ↦ₘ{dq} f j).
+  Proof.
+    intro Hf. iIntros "Hs Hp".
+    iApply (kfk_pname_bytes pa dq _ f Hf).
+    iApply pname_bytes_split. iFrame "Hs Hp".
+  Qed.
+
+  (* ...and the string's own NUL is [ssc_src_ok]'s second disjunct *)
+  Lemma kfk_src_ok_of_string (nm : string) (pad : list (bv 8))
+      (f : nat -> bv 8) (n : nat) :
+    (forall i, (i < length (cstring_bytes nm ++ pad))%nat ->
+       (cstring_bytes nm ++ pad) !! i = Some (f i)) ->
+    SpecSafestrcpy.ssc_src_ok f n (length (cstring_bytes nm ++ pad)).
+  Proof.
+    intro Hf. right.
+    destruct (pname_wf_cstring nm pad) as (k & Hk & Hb).
+    exists k. split; [exact Hk |].
+    specialize (Hf k Hk). rewrite Hb in Hf. by injection Hf.
+  Qed.
+
 End KforkRes.
 
 (* =================================================================== *)

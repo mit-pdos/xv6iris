@@ -410,6 +410,11 @@ Section KernelvecCore.
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[KT1] vold15 -∗
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[KT1] vold16 -∗
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[KT1] vold17 -∗
+    (* THE WRITER'S TOKEN (tso-machine-flip.md A6.63): the VC block's
+       memory ops are LEDGER APPENDS, so the generated WP takes the
+       author's context and hands it back.  It is in hand at the handler's
+       entry ([sie_cap]'s fourth conjunct), so this threading stops here. *)
+    TsoCtx.own_context XI -∗
     ( smode_config γ dq -∗
       tlb_res_pt root_ppn -∗
       pc_is (mword_of_int (KernelSyms.kernelvec + 0x24)) -∗
@@ -431,12 +436,13 @@ Section KernelvecCore.
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[KT1] (m !!! Regidx (mword_of_int 29 : mword 5)) -∗
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[KT1] (m !!! Regidx (mword_of_int 30 : mword 5)) -∗
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[KT1] (m !!! Regidx (mword_of_int 31 : mword 5)) -∗
+      TsoCtx.own_context XI -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros.
     iIntros "Hsm Htlbinv
-             Hpc Hfile #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
+             Hpc Hfile #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx Hcont".
     iDestruct "Hfile" as "(%Hdomm & Hfilemap)".
     iAssert (gpr_file m) with "[Hfilemap]" as "Hfile".
     { rewrite /gpr_file. iSplit; [iPureIntro; exact Hdomm | iExact "Hfilemap"]. }
@@ -524,7 +530,7 @@ Section KernelvecCore.
               (dq:=dq)
  kv_store_run HmS
               with "Hsm Htlbinv
-                    Hpc Hfile [] [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] []").
+                    Hpc Hfile [] [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] [] Hctx").
     { iApply (kv_store_instrs with "Htext"). }
     { rewrite /vheap_own. cbn [vheap]. rewrite /kv_store_heap0.
       cbn [big_opL fst snd].
@@ -532,7 +538,7 @@ Section KernelvecCore.
       rewrite !HR2 HVo1 HVo2 HVo3 HVo4 HVo5 HVo6 HVo7 HVo8 HVo9 HVo10 HVo11 HVo12 HVo13 HVo14 HVo15 HVo16 HVo17.
       iFrame "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
-    iIntros (mf) "%Hmf Hsm Htlbinv Hpc Hfile Hheap _".
+    iIntros (mf) "%Hmf Hsm Htlbinv Hpc Hfile Hheap _ Hctx".
     destruct Hmf as [Hmf Hpres].
     iEval (rewrite /vheap_own; cbn [vheap]; rewrite /kv_store_heap1;
            cbn [big_opL fst snd];
@@ -544,7 +550,7 @@ Section KernelvecCore.
       - rewrite (Hmf r sv Er). rewrite (HmS r sv Er). reflexivity.
       - exact (Hpres r Er). }
     iDestruct (gpr_file_ext mf m Hall with "Hfile") as "Hfile".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
+    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx").
   Qed.
 
   (* the 17-instruction register-restore run, as ONE block; STRENGTHENED to
@@ -575,6 +581,11 @@ Section KernelvecCore.
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[KT1] w15 -∗
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[KT1] w16 -∗
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[KT1] w17 -∗
+    (* THE WRITER'S TOKEN (tso-machine-flip.md A6.63): the VC block's
+       memory ops are LEDGER APPENDS, so the generated WP takes the
+       author's context and hands it back.  It is in hand at the handler's
+       entry ([sie_cap]'s fourth conjunct), so this threading stops here. *)
+    TsoCtx.own_context XI -∗
     ( smode_config γ dq -∗
       tlb_res_pt root_ppn -∗
       pc_is (mword_of_int (KernelSyms.kernelvec + 0x4a)) -∗
@@ -596,12 +607,13 @@ Section KernelvecCore.
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[KT1] w15 -∗
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[KT1] w16 -∗
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[KT1] w17 -∗
+      TsoCtx.own_context XI -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros.
     iIntros "Hsm Htlbinv
-             Hpc Hfile #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
+             Hpc Hfile #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx Hcont".
     iDestruct "Hfile" as "(%Hdomm & Hfilemap)".
     iAssert (gpr_file m) with "[Hfilemap]" as "Hfile".
     { rewrite /gpr_file. iSplit; [iPureIntro; exact Hdomm | iExact "Hfilemap"]. }
@@ -655,7 +667,7 @@ Section KernelvecCore.
               (dq:=dq)
  kv_load_run HmL
               with "Hsm Htlbinv
-                    Hpc Hfile [] [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] []").
+                    Hpc Hfile [] [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] [] Hctx").
     { iApply (kv_load_instrs with "Htext"). }
     { rewrite /vheap_own. cbn [vheap]. rewrite /kv_store_heap0.
       cbn [big_opL fst snd].
@@ -663,7 +675,7 @@ Section KernelvecCore.
       rewrite !HR2 HVw1 HVw2 HVw3 HVw4 HVw5 HVw6 HVw7 HVw8 HVw9 HVw10 HVw11 HVw12 HVw13 HVw14 HVw15 HVw16 HVw17.
       iFrame "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
-    iIntros (mf) "%Hmf Hsm Htlbinv Hpc Hfile Hheap _".
+    iIntros (mf) "%Hmf Hsm Htlbinv Hpc Hfile Hheap _ Hctx".
     destruct Hmf as [Hmf Hpres].
     iEval (rewrite /vheap_own; cbn [vheap]; rewrite /kv_store_heap0;
            cbn [big_opL fst snd];
@@ -787,7 +799,7 @@ Section KernelvecCore.
       rewrite (Hpres r Hnone).
       kv_skipt. reflexivity. }
     iDestruct (gpr_file_ext mf (kv_load_result m w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17) Hall with "Hfile") as "Hfile".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
+    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx").
   Qed.
 
   (* =================================================================== *)
@@ -821,6 +833,11 @@ Section KernelvecCore.
     (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[KT1] vold15 -∗
     (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[KT1] vold16 -∗
     (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[KT1] vold17 -∗
+    (* THE WRITER'S TOKEN (tso-machine-flip.md A6.63): the VC block's
+       memory ops are LEDGER APPENDS, so the generated WP takes the
+       author's context and hands it back.  It is in hand at the handler's
+       entry ([sie_cap]'s fourth conjunct), so this threading stops here. *)
+    TsoCtx.own_context XI -∗
     ( smode_config γ (DfracOwn (1/2)) -∗
       tlb_res_pt root_ppn -∗
       pc_is (mword_of_int (KernelSyms.kerneltrap) : mword 64) -∗
@@ -842,12 +859,13 @@ Section KernelvecCore.
       (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 29 : mword 5)) -∗
       (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 30 : mword 5)) -∗
       (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 31 : mword 5)) -∗
+      TsoCtx.own_context XI -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros.
     iIntros "Hsm Htlbinv Hpc Hfile
-             #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
+             #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx Hcont".
     (* ---- #1: c.addi16sp sp,-256 @ 0x800053e0 (fetch page-walk, fills slot 5) ---- *)
     assert (Hpc1 : add_vec_int (mword_of_int (KernelSyms.kernelvec) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64))
       by (vm_compute; reflexivity).
@@ -951,8 +969,8 @@ Section KernelvecCore.
               vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17
               (dq := DfracOwn (1/2))
 
-              with "Hsm Htlbinv Hpc Hfile Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
-    iIntros "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
+              with "Hsm Htlbinv Hpc Hfile Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx").
+    iIntros "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx".
     (* convert the block's result cells back to the prologue's address/value shape *)
     iEval (rewrite Hm1sp Hmr1) in "Hw1".
     iEval (rewrite <- Heqw2; rewrite Hmr2) in "Hw2".
@@ -983,7 +1001,7 @@ Section KernelvecCore.
     { iApply (kv_i19 with "Htext"). }
     iEval (rewrite kv_jal_tgt kv_ra_val).
     iIntros "Hsm Htlbinv Hpc Hfile".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
+    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx").
   Qed.
 
 
@@ -1040,6 +1058,10 @@ Section KernelvecCore.
     (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[KT1] v15 -∗
     (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[KT1] v16 -∗
     (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[KT1] v17 -∗
+    (* THE WRITER'S TOKEN (tso-machine-flip.md A6.63): the VC block's
+       memory ops are LEDGER APPENDS, so the generated WP takes the
+       author's context and hands it back. *)
+    TsoCtx.own_context XI -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗
       mstatus ↦ᵣ mstatus0 -∗
@@ -1067,12 +1089,13 @@ Section KernelvecCore.
       (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[KT1] v15 -∗
       (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[KT1] v16 -∗
       (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[KT1] v17 -∗
+      TsoCtx.own_context XI -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hsp0.
     iIntros "#Hhw #Hinv Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile
-             #Htext Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17 Hcont".
+             #Htext Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17 Hctx Hcont".
     (* ---- #20..#36: the 17 c.ldsp register restores, as ONE VCgen block ---- *)
     (* bridge each stack cell from the epilogue's zero_extend'/concat address
        shape to the block's [add_vec (mt !!! csp) (mword_of_int N)] shape. *)
@@ -1129,8 +1152,8 @@ Section KernelvecCore.
               v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17
               (dq := DfracOwn (1/2))
 
-              with "Hsm Htlbinv Hpc Hfile Htext Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17").
-    iIntros "Hsm Htlbinv Hpc Hfile Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17".
+              with "Hsm Htlbinv Hpc Hfile Htext Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17 Hctx").
+    iIntros "Hsm Htlbinv Hpc Hfile Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17 Hctx".
     (* convert the block's result cells back to the epilogue's address shape *)
     iEval (rewrite Hsp0) in "Hv1".
     iEval (rewrite <- Heqv2) in "Hv2".
@@ -1167,7 +1190,7 @@ Section KernelvecCore.
       as "(Hhs & Hpriv & Hms & Hsie & Hmie & Hmdl & Hmenv)".
     iEval (rewrite Hsp17) in "Hfile".
     (* the block stops HERE, at the sret's pc: the capstone runs #38 itself. *)
-    iApply ("Hcont" with "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17").
+    iApply ("Hcont" with "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17 Hctx").
   Qed.
 
 
@@ -1560,8 +1583,8 @@ Section KernelvecHandler.
     iApply (wp_kv_prologue root_ppn sie_gname Me
               w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17
               with "Hsm Htlbinv Hpc Hfile
-                    Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
-    iIntros "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
+                    Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx").
+    iIntros "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx".
     (* THE SAVED VALUES ARE MADE HART-FREE HERE, and that is not cosmetic: the
        cells come out of the prologue holding [Me !!! k] at the ENTRY
        hart, while the file this proof must hand back is [tp_pin m] at the
@@ -1735,9 +1758,9 @@ Section KernelvecHandler.
               (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 3 : mword 5)) (m !!! Regidx (mword_of_int 5 : mword 5)) (m !!! Regidx (mword_of_int 6 : mword 5)) (m !!! Regidx (mword_of_int 7 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) (m !!! Regidx (mword_of_int 11 : mword 5)) (m !!! Regidx (mword_of_int 12 : mword 5)) (m !!! Regidx (mword_of_int 13 : mword 5)) (m !!! Regidx (mword_of_int 14 : mword 5)) (m !!! Regidx (mword_of_int 15 : mword 5)) (m !!! Regidx (mword_of_int 16 : mword 5)) (m !!! Regidx (mword_of_int 17 : mword 5)) (m !!! Regidx (mword_of_int 28 : mword 5)) (m !!! Regidx (mword_of_int 29 : mword 5)) (m !!! Regidx (mword_of_int 30 : mword 5)) (m !!! Regidx (mword_of_int 31 : mword 5))
               HSIEf HMPRVf HSXLf Hmmf HPBMTEf eq_refl Hspf
               with "Hhwf Hinvf Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinvf Hpcf Hfilef
-                    Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
+                    Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx").
     iIntros "Hhsf Hprivf Hmsf Hhalff Hmief Hmdlf Hmenvf Htlbinvf Hpcf Hfilef
-             Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
+             Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx".
 
     (* ---- the file is back at [tp_pin m], register for register ---- *)
     assert (Hcsm : forall k : mword 5, is_cs_idx k = true ->

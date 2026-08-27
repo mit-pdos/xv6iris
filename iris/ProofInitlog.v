@@ -1254,7 +1254,7 @@ Section ProofInitlog.
       do 4 (destruct jj as [|jj];
             [vm_compute in Hjj; injection Hjj as <-; vm_compute; reflexivity |]);
       vm_compute in Hjj; discriminate. }
-    iPoseProof (kernel_data_string log_name_str "log"%string
+    iPoseProof (kernel_data_string_all log_name_str "log"%string
                   (mword_of_int log_name_str : mword 64) eq_refl
                   ltac:(unfold text_end, log_name_str; lia)
                   ltac:(vm_compute; discriminate) Hlogs

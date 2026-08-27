@@ -110,7 +110,7 @@ Section CtxPinMint.
       (a : Arch.pa) (dq : dfrac) (v : bv 8) (t : nat) :
     (own_pub (hart_agent cpu_id) g.(glog) <= g.(gtv) cpu_id)%nat ->
     tso_interp_at riscv_eraGS g -∗ own_context xi -∗
-    phys_pointsto a dq v -∗ a ↪[ts_name]{dq} ((t, None) : TsoMemPa.ts_elem) -∗
+    phys_pointsto a dq v -∗ a ↪[ts_name]{dq} ((t, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem) -∗
     (llb (ctx_bound_name xi) t ∨ (t, a) ↪[ctx_dirty_name xi]{dq} ()) -∗
     ⌜(t <= g.(gtv) cpu_id)%nat⌝.
   Proof.
@@ -237,7 +237,7 @@ Section CtxPinMint.
     iIntros "Hint".
     iDestruct "Hint"
       as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as [Hflat Htv].
+    destruct Hmm as (Hflat & Htv & Hcov).
     iDestruct (view_lb_get _ _ (avf g) (length g.(glog)) (hart_agent cpu_id)
                 with "Hv Hlen") as "(Hv & Hlen & #Hrcpt)".
     { rewrite avf_hart. apply Htv. }

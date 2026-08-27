@@ -299,8 +299,8 @@ Section ProofIinit.
        M !!! Regidx c = m !!! Regidx c) ->
     sie_cap_gpr KT1 M (K - 6) b p -∗
     kernel_text -∗
-    sl_str_addr ↦ₛ□ "sleep lock"%string -∗
-    name_inode ↦ₛ□ "inode"%string -∗
+    ctx_string_all sl_str_addr DfracDiscarded "sleep lock"%string -∗
+    ctx_string_all name_inode DfracDiscarded "inode"%string -∗
     pc_is (mword_of_int (KernelSyms.iinit + 0x3a)) -∗
     ([∗ list] i ∈ seq 0 j, sl_fresh (inode_lock i) "inode"%string) -∗
     ([∗ list] i ∈ seq j (NINODE - j), sl_raw (inode_lock i)) -∗
@@ -541,7 +541,7 @@ Section ProofIinit.
       do 7 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string itable_name_str "itable"%string name_itable eq_refl ltac:(unfold text_end, itable_name_str; lia)
+    iPoseProof (kernel_data_string_all itable_name_str "itable"%string name_itable eq_refl ltac:(unfold text_end, itable_name_str; lia)
                                                                                        ltac:(vm_compute; discriminate) Hitable
                   with "Hkdata") as "#Hstr_itable".
     assert (Hinode : forall j bt, cstring_bytes "inode"%string !! j = Some bt ->
@@ -550,7 +550,7 @@ Section ProofIinit.
       do 6 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string inode_name_str "inode"%string name_inode eq_refl ltac:(unfold text_end, inode_name_str; lia)
+    iPoseProof (kernel_data_string_all inode_name_str "inode"%string name_inode eq_refl ltac:(unfold text_end, inode_name_str; lia)
                                                                                     ltac:(vm_compute; discriminate) Hinode
                   with "Hkdata") as "#Hstr_inode".
     assert (Hslstr : forall j bt, cstring_bytes "sleep lock"%string !! j = Some bt ->
@@ -559,7 +559,7 @@ Section ProofIinit.
       do 11 (destruct j as [|j];
              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string 0x80007568 "sleep lock"%string sl_str_addr eq_refl ltac:(unfold text_end; lia)
+    iPoseProof (kernel_data_string_all 0x80007568 "sleep lock"%string sl_str_addr eq_refl ltac:(unfold text_end; lia)
                                                                                       ltac:(vm_compute; discriminate) Hslstr
                   with "Hkdata") as "#Hstr_sl".
     (* ---- the frame geometry ---- *)

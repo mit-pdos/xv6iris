@@ -455,6 +455,15 @@ Theorem riscv_system_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId}
        into the client's crash predicate *)
     (ndisk : nat)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
+    (* ...AND ITS CONVERSE, the RAM TOTALITY (A6.78).  [Hram] says nothing
+       outside RAM exists; this says all of RAM does, which is what
+       [RiscvLang.mm_ok]'s image-coverage conjunct needs at the era's first
+       state -- and hence what the "no evidence" read at the real machine
+       ([TsoCtx.ledger_read_any_ram_ok]) is ultimately paid from.  The
+       POWER form does not take it: there it is [boot_facts]' own third
+       clause.  It is a TRUE premise about a booted machine, and
+       [BootCarve]'s RAM enumeration is where a client already has it. *)
+    (Hramtot : forall a : Arch.pa, addr_is_ram a -> is_Some (g.(gmem) !! a))
     (* the SINGLE-GENERATION form (crash.md): the machine is already booted
        and running generation 0 -- the power thread is not in this pool, so
        power stays on and the generation never moves.  The full power
@@ -676,7 +685,7 @@ Proof.
   (* half ([BootCarve.boot_led_ran]) and A6.10's pristine receipts both    *)
   (* bottom out HERE.                                                      *)
   iMod (ghost_map_alloc
-          ((fun _ : bv 8 => ((0%nat, None) : TsoMemPa.ts_elem)) <$> g.(gmem)))
+          ((fun _ : bv 8 => ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem)) <$> g.(gmem)))
     as (γts) "[Htsauth Htsfrags]".
   (* (2) THE PERSISTED LOG, EMPTY: no store has been issued. *)
   iMod (ghost_map_alloc_empty (K := nat) (V := TsoMemPa.pwmsg))
@@ -822,7 +831,7 @@ Proof.
     (* ================================================================ *)
     iSplitL "Htsauth Hlogmauth Hloglenauth Hviewauth".
     { rewrite /tso_interp_at.
-      iExists ((fun _ : bv 8 => ((0%nat, None) : TsoMemPa.ts_elem))
+      iExists ((fun _ : bv 8 => ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem))
                  <$> g.(gmem)), ∅.
       iFrame "Htsauth".
       iSplitR; [iPureIntro; apply dom_fmap_L |].
@@ -834,18 +843,23 @@ Proof.
         rewrite lookup_fmap in Ha.
         destruct (g.(gmem) !! a) as [v|] eqn:Hv; [|discriminate].
         cbn in Ha. injection Ha as <-.
-        split.
+        split_and!.
         - exists v. split; [exact Hv |].
           rewrite /TsoMemPa.latest /TsoMemPa.log_byte Hlog0 Himg0 /=.
           split; [exact Hv |].
           intros t' Ht'. destruct t' as [|i]; [lia | reflexivity].
-        - intros Sv B Hc. discriminate Hc. }
+        - intros Sv B Hc. discriminate Hc.
+        (* the WINDOW half is vacuous at [None] too: no lock cell has been
+           carved yet at the era's first state. *)
+        - intros W Hc. discriminate Hc. }
       iFrame "Hlogmauth".
       iSplitR.
       { iPureIntro. intros i. rewrite lookup_empty Hlog0 //. }
       rewrite Hlog0 /=. iFrame "Hloglenauth Hviewauth".
       iPureIntro. rewrite /mm_ok Hlog0 Himg0 /TsoMemPa.flat /=.
-      split; [reflexivity |]. intros c. rewrite Htv0. lia. }
+      split_and!; [reflexivity | intros c; rewrite Htv0; lia |].
+      intros a Ha. apply Hramtot.
+      move: Ha. rewrite /addr_is_ram /ram_base /ram_size /ram_lo /ram_hi. lia. }
     (* the reservation mirror and its (vacuous) snapshot invariant *)
     iFrame "Hresvauth". iPureIntro.
     intros c r Hc. rewrite Hresv0 in Hc. discriminate. }
@@ -880,6 +894,7 @@ Qed.
 
 Corollary riscv_device_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId} (g : gstate)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
+    (Hramtot : forall a : Arch.pa, addr_is_ram a -> is_Some (g.(gmem) !! a))
     (* NOTE: there is deliberately NO hypothesis about the power-on DLAB.
        [uart_ghosts_alloc] hands the caller its half of the DLAB agreement
        rather than freezing it, and the freeze happens in the boot chain (at
@@ -938,7 +953,7 @@ Proof.
      anything but the completion arm, which finds the index move free. *)
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) 0
-           (fun (_ _ _ _ _ : gname) (_ : fs_dur_names) => True%I) 0%nat Hram
+           (fun (_ _ _ _ _ : gname) (_ : fs_dur_names) => True%I) 0%nat Hram Hramtot
            Hpow Hgen0 Hgid Hresv0 Hlog0 Himg0 Htv0).
   { iIntros (γdisk γsw γreg γst γdv) "_". iModIntro.
     iExists (MkFsDurNames γdisk γdisk). done. }
@@ -1117,6 +1132,23 @@ Section power.
         SAME one -- which is the whole point (the durability property is what
         survives the power cycle).  The boot client threads it to
         [wp_disk_loop]. *)
+     (* THE ERA'S ELEMENT SUPPLY (tso-machine-flip.md A6.81): one LEDGER
+        ELEMENT per byte of [gmem], at timestamp 0 with no canon pin -- the
+        image is what was last written and nothing is pinned yet.  It is
+        the row the memory row above is only HALF of: a registered
+        (context-tier) byte is a raw byte PLUS its element, so a boot client
+        that carves ctx cells needs both, byte for byte, and this
+        [ghost_map_alloc] is the system's one and only supplier (A6.9).
+        The single-generation theorem hands the same supply in the CLIENT's
+        range vocabulary ([BootCarve.boot_led_ran], already split at
+        [text_end]); the power arm hands the whole map, exactly as it hands
+        the whole raw one, and the client cuts both with the same lemma
+        pair.  It sits HERE rather than last so that the fixed-layer tail
+        ([crash_inv] and the generation certificate) stays one bundle at
+        every unpack. *)
+     ([∗ map] a ↦ _ ∈ g'.(gmem),
+        ghost_map_elem (era_ts_name HE) a (DfracOwn 1)
+          ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem)) ∗
      crash_inv ∗
      gen_born gen ∗ gen_started gen ∗ era_registered gen HE)%I.
 
@@ -1337,7 +1369,7 @@ Section power.
          does, and [boot_shape] gives [g2]'s memory as its own image. *)
       iMod kptb_ghost_alloc as (γkptb) "Hkptb2".
       iMod (ghost_map_alloc
-              ((fun _ : bv 8 => ((0%nat, None) : TsoMemPa.ts_elem)) <$> g2.(gmem)))
+              ((fun _ : bv 8 => ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem)) <$> g2.(gmem)))
         as (γts) "[Htsauth2 Htsfrags2]".
       iMod (ghost_map_alloc_empty (K := nat) (V := TsoMemPa.pwmsg))
         as (γlogm) "Hlogmauth2".
@@ -1373,9 +1405,10 @@ Section power.
               with "HRelem Hgst Hsauth Htie Hmir HPsw")
         as ">(Hsauth & Htie & HPsw & Hmir & #Hswlb)".
       iMod ("Hclosesw" with "HPsw") as "_".
+      iEval (rewrite big_sepM_fmap) in "Htsfrags2".
       iMod (Hboot HE g.(ggen) g2 Hbf Hpure with
               "[Helems Hbytes Hkauth Hkfrags Hkpt Hkptb2 Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
-                Hdfrags Hmir Hresvfrags]")
+                Hdfrags Hmir Hresvfrags Htsfrags2]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
         iFrame "Hbytes Hkauth Hkfrags Hkpt Hkptb2 Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF Hdfrags Hmir Hswlb".
@@ -1387,6 +1420,7 @@ Section power.
              reservation clause alone -- take its first arm. *)
           rewrite (resv_map_none _ (proj1 Hnone)) big_sepM_gset_to_gmap.
           iExact "Hresvfrags". }
+        iSplitL "Htsfrags2"; [iExact "Htsfrags2" |].
         iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].
         iSplitR; [|iExact "HRelem"].
@@ -1430,11 +1464,11 @@ Section power.
         (* four conjuncts are the same fact read four ways, and           *)
         (* [boot_shape]'s own reset clause supplies every one of them.    *)
         (* ============================================================ *)
-        destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & Hreset).
+        destruct Hbf as (_ & _ & Hramtot2 & _ & _ & _ & _ & Hreset).
         destruct Hreset as (Hresv0 & Hlog0 & Himg0 & Htv0).
         iSplitL "Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2".
         { rewrite /tso_interp_at.
-          iExists ((fun _ : bv 8 => ((0%nat, None) : TsoMemPa.ts_elem))
+          iExists ((fun _ : bv 8 => ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem))
                      <$> g2.(gmem)), ∅.
           iFrame "Htsauth2".
           iSplitR; [iPureIntro; apply dom_fmap_L |].
@@ -1443,18 +1477,27 @@ Section power.
             rewrite lookup_fmap in Ha.
             destruct (g2.(gmem) !! a) as [v|] eqn:Hv; [|discriminate].
             cbn in Ha. injection Ha as <-.
-            split.
+            split_and!.
             - exists v. split; [exact Hv |].
               rewrite /TsoMemPa.latest /TsoMemPa.log_byte Hlog0 Himg0 /=.
               split; [exact Hv |].
               intros t' Ht'. destruct t' as [|i]; [lia | reflexivity].
-            - intros Sv B Hc. discriminate Hc. }
+            - intros Sv B Hc. discriminate Hc.
+            - intros W Hc. discriminate Hc. }
           iFrame "Hlogmauth2".
           iSplitR.
           { iPureIntro. intros i. rewrite lookup_empty Hlog0 //. }
           rewrite Hlog0 /=. iFrame "Hloglenauth2 Hviewauth2".
           iPureIntro. rewrite /mm_ok Hlog0 Himg0 /TsoMemPa.flat /=.
-          split; [reflexivity |]. intros c. rewrite Htv0. lia. }
+          split_and!; [reflexivity | intros c; rewrite Htv0; lia |].
+          (* [boot_facts]' RAM totality: the era image is created HERE and
+             this is the one arm that has to establish the conjunct. *)
+          intros a Ha.
+          rewrite -(RiscvLang.mm_moi_uint a).
+          exists (boot_byte (SailStdpp.Operators_mwords.uint a)).
+          apply Hramtot2.
+          move: Ha. rewrite /addr_is_ram /ram_base /ram_size /ram_lo /ram_hi.
+          lia. }
         (* the reservation mirror: minted at the reset machine's all-[None]
            map, and the snapshot invariant is vacuous there *)
         iFrame "Hresvauth". iPureIntro.

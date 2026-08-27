@@ -291,6 +291,12 @@ Section ProcdumpLoopRes.
   Qed.
 
   Context `{GEN : GenId}.
+  (* M1 stage 3 (tso-port.md §0.22′): [↦ₛ] is context-indexed, and so is
+     [PrintkArgs.pk_desc_res] -- a [%s] argument is ordinary memory at the
+     DESCRIBING thread's context ([p->name] is written at runtime).  The
+     binder is the whole cost here; every statement text below is
+     unchanged. *)
+  Context `{XI : CurCtx}.
 
   Lemma pdl_pkastr (CIDx : CpuId) (v : mword 64) (dq : dfrac) (s : string) :
     nonul s = true -> eq_vec v (zero_reg : mword 64) = false ->

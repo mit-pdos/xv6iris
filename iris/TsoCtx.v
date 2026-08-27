@@ -490,7 +490,7 @@ Section ctx.
        ⌜addr_is_ram (pa_of ppn va)⌝ ∗
        ⌜ktier_pin cur_ktier ppn va⌝ ∗
        pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn va) dq v ∗
-       (pa_of ppn va) ↪[ts_name]{dq} (t, None) ∗
+       (pa_of ppn va) ↪[ts_name]{dq} (t, ts_pay_none) ∗
        (llb (ctx_bound_name ξ) t                             (* CLEAN *)
         ∨ (t, pa_of ppn va) ↪[ctx_dirty_name ξ]{dq} ()))%I.  (* DIRTY *)
   Lemma ctx_pointsto_aux : { f | f = @ctx_pointsto_def }.
@@ -539,9 +539,10 @@ Section ctx.
   (*                                                                   *)
   (* So [grep ctx_pointsto_forget] is the honest inventory of the       *)
   (* places where the tree still parks a byte OUTSIDE the ledger: the   *)
-  (* unflipped towers ([↦ₛ], [↦₂]/[↦₄]), the deliberately-raw lock      *)
+  (* raw towers the kit still speaks, the deliberately-raw lock         *)
   (* metadata (tso-port.md §0.8' ruling 2) and the phys tier (ruling    *)
-  (* 6).  Each is a stage-2 / M4 worklist entry, not a leak.            *)
+  (* 6).  Each is an M4 worklist entry, not a leak.  [↦ₛ] left this     *)
+  (* list at M1 stage 3.                                                *)
   (* ---------------------------------------------------------------- *)
   Lemma ctx_pointsto_forget {KTR : CurKtier} ξ a dq v :
     ctx_pointsto (KTR := KTR) ξ a dq v ⊢ mem_pointsto (KTR := KTR) a dq v.
@@ -1026,6 +1027,197 @@ Section ctx.
     iIntros (k j _) "H". iApply (ctx_ktier_mono kt kt' with "H").
   Qed.
 
+  (* ---- the STRING tower ([↦ₛ]) ---------------------------------------
+     [RiscvPtsto.string_pointsto]'s shape over the context fact: a
+     NUL-terminated C string resident byte-by-byte from [a], no alignment
+     side condition (a C string is byte-addressed).
+
+     WHY IT IS CONTEXT-RELATIVE AT ALL (tso-port.md §0.21′/§0.22′, the
+     ruling that retired the "↦ₛ stays raw" assessment that used to sit
+     beside the notations below, and which this workspace's A6.15 had
+     recorded).  The earlier assessment read every string in the tree as a
+     DISCARDED read-only image literal, whose load obligation the pristine
+     (timestamp-0) gate discharges with no context.  That is false of the
+     kernel's DYNAMIC strings: [p->name] is written by [safestrcpy] at
+     proc.c:290 and exec.c:132, so its bytes carry ordinary ledger residue
+     and its readers owe an ordinary load obligation at the reading
+     thread's context.  A tier that covers only the pristine case is not
+     the string tier, it is a special case of it -- so [↦ₛ] denotes the
+     context-relative fact at ARBITRARY timestamps, and the pristine story
+     comes back as the DERIVED [ctx_string_all] below (the [kernel_data]
+     precedent: one ∀-quantified fact minted once, usable at every
+     context), which is what the persistent lock handles carry.
+
+     THE STRUCTURE RULE, since this is the third tier to flip: a tier flip
+     never RELOCATES the raw definition.  [RiscvPtsto]'s tower stays put as
+     the below-Σ fact and this is a SECOND tower with the same spelling;
+     import order decides.  Nothing moved. *)
+  Definition ctx_string_pointsto `{KTR : !CurKtier} (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (s : string) : iProp Σ :=
+    ([∗ list] j ↦ b ∈ cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b)%I.
+
+  Section ctx_string.
+    Context `{KTR : !CurKtier}.
+
+    Lemma ctx_string_pointsto_unfold ξ a dq s :
+      ctx_string_pointsto ξ a dq s ⊣⊢
+      [∗ list] j ↦ b ∈ cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b.
+    Proof. reflexivity. Qed.
+
+    Lemma ctx_string_pointsto_bytes ξ a dq s :
+      ctx_string_pointsto ξ a dq s ⊢
+      [∗ list] j ↦ b ∈ cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b.
+    Proof. iIntros "$". Qed.
+
+    Lemma ctx_string_pointsto_intro ξ a dq s :
+      ([∗ list] j ↦ b ∈ cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b)
+      ⊢ ctx_string_pointsto ξ a dq s.
+    Proof. iIntros "$". Qed.
+
+    Global Instance ctx_string_pointsto_timeless ξ a dq s :
+      Timeless (ctx_string_pointsto ξ a dq s).
+    Proof. rewrite /ctx_string_pointsto. apply _. Qed.
+
+    Global Instance ctx_string_pointsto_discarded_persistent ξ a s :
+      Persistent (ctx_string_pointsto ξ a DfracDiscarded s).
+    Proof. rewrite /ctx_string_pointsto. apply _. Qed.
+
+    Lemma ctx_string_pointsto_frac_split ξ a q1 q2 s :
+      ctx_string_pointsto ξ a (DfracOwn (q1 + q2)) s ⊣⊢
+      ctx_string_pointsto ξ a (DfracOwn q1) s ∗
+      ctx_string_pointsto ξ a (DfracOwn q2) s.
+    Proof.
+      rewrite /ctx_string_pointsto -big_sepL_sep.
+      apply big_opL_proper. intros ? b ?. apply ctx_pointsto_frac_split.
+    Qed.
+
+    Lemma ctx_string_pointsto_half ξ a s :
+      ctx_string_pointsto ξ a (DfracOwn 1) s ⊣⊢
+      ctx_string_pointsto ξ a (DfracOwn (1/2)) s ∗
+      ctx_string_pointsto ξ a (DfracOwn (1/2)) s.
+    Proof. rewrite -ctx_string_pointsto_frac_split Qp.div_2. reflexivity. Qed.
+
+    Lemma ctx_string_pointsto_persist ξ a dq s :
+      ctx_string_pointsto ξ a dq s ==∗ ctx_string_pointsto ξ a DfracDiscarded s.
+    Proof.
+      iIntros "H". rewrite /ctx_string_pointsto.
+      iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+      iIntros "!>" (j b Hj) "Hb". by iApply ctx_pointsto_persist.
+    Qed.
+
+    (* the forgetful projection at the tower ([ctx_pointsto_forget]'s
+       warning applies verbatim -- one-way, and the result licenses no
+       plain load) *)
+    Lemma ctx_string_pointsto_forget ξ a dq s :
+      ctx_string_pointsto ξ a dq s ⊢ string_pointsto a dq s.
+    Proof.
+      rewrite /ctx_string_pointsto /string_pointsto.
+      iIntros "H". iApply (big_sepL_mono with "H").
+      iIntros (k b _) "H". iApply (ctx_pointsto_forget with "H").
+    Qed.
+  End ctx_string.
+
+  (* Agreement, cross-context like the word towers' -- but stated at the
+     BYTE level, which is the strongest form that is TRUE here.  Two string
+     facts at one address need NOT name the same string: [s1] may be a
+     proper prefix of [s2] when [s2] has an embedded NUL character (Coq's
+     [string] permits one; the tree's [PrintkFmt.nonul] is exactly the
+     predicate that rules it out, and it lives far above this file).  So the
+     law says what the memory says: wherever both byte lists reach, they
+     agree. *)
+  Lemma ctx_string_pointsto_bytes_agree {kt1 kt2 : ktier} (ξ1 ξ2 : CtxId)
+      a dq1 s1 dq2 s2 :
+    ctx_string_pointsto (KTR := kt1) ξ1 a dq1 s1 -∗
+    ctx_string_pointsto (KTR := kt2) ξ2 a dq2 s2 -∗
+    ⌜forall j b1 b2, cstring_bytes s1 !! j = Some b1 ->
+                     cstring_bytes s2 !! j = Some b2 -> b1 = b2⌝.
+  Proof.
+    iIntros "H1 H2". iIntros (j b1 b2 Hb1 Hb2).
+    iDestruct (big_sepL_lookup with "H1") as "Hc1"; [exact Hb1|].
+    iDestruct (big_sepL_lookup with "H2") as "Hc2"; [exact Hb2|].
+    by iApply (ctx_pointsto_agree with "Hc1 Hc2").
+  Qed.
+
+  (* the [ktier]-typed twins, for the same reason as the word towers' *)
+  Global Instance ctx_string_pointsto_timeless' (ktr : ktier) (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (s : string) :
+    Timeless (ctx_string_pointsto (KTR := ktr) ξ a dq s).
+  Proof. exact (ctx_string_pointsto_timeless (KTR := ktr) ξ a dq s). Qed.
+
+  Global Instance ctx_string_pointsto_discarded_persistent' (ktr : ktier)
+      (ξ : CtxId) (a : Arch.pa) (s : string) :
+    Persistent (ctx_string_pointsto (KTR := ktr) ξ a DfracDiscarded s).
+  Proof. exact (ctx_string_pointsto_discarded_persistent (KTR := ktr) ξ a s). Qed.
+
+  Lemma ctx_string_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} ξ a dq s :
+    ctx_string_pointsto (KTR := kt) ξ a dq s ⊢
+    ctx_string_pointsto (KTR := kt') ξ a dq s.
+  Proof.
+    rewrite /ctx_string_pointsto. iIntros "H".
+    iApply (big_sepL_mono with "H").
+    iIntros (k b _) "H". iApply (ctx_ktier_mono kt kt' with "H").
+  Qed.
+
+  (* ---- the DERIVED context-free form -----------------------------------
+     [ctx_string_all a dq s]: the string holds at EVERY context.  This is
+     the pristine/timestamp-0 story, and it is a DERIVED special case of the
+     tower above -- never its definition (tso-port.md §0.21′).
+
+     It exists because the persistent lock handles carry a string.
+     [WpLock.lock_name] / [SleepLock.sl_name] are half of [is_lock] /
+     [is_sleeplock], which are CLOSED TERMS that ride in park records and
+     are minted at boot for consumers that run at their own contexts; a
+     handle whose statement mentions an ambient ξ is unstatable elsewhere
+     (§0.8′ ruling 2, the root both design problems were routed around).
+     The ∀ keeps the handle context-free IN SHAPE while its content is an
+     ordinary string fact.
+
+     WHERE IT COMES FROM, honestly, AND WHERE THE ⌜t = 0⌝ ARM IS PAID.
+     [KernelDataInv.kernel_data] is itself ∀-context, so
+     [kernel_data_string_all] mints this form with no seam; and
+     [kernel_data]'s own ∀ is minted by the boot carve out of
+     [ctx_pointsto_of_pristine_va_all] above -- a discarded image byte plus
+     its pristine receipt, justified by [llb]'s [t = 0] arm, which mentions
+     no context.  So the chain rodata -> [kernel_data_string_all] ->
+     [lock_name_intro] -> [is_lock] bottoms out in the clean-arm disjunct
+     and has no crossing anywhere in it. *)
+  Definition ctx_string_all `{KTR : !CurKtier}
+      (a : Arch.pa) (dq : dfrac) (s : string) : iProp Σ :=
+    (∀ ξ : CtxId, ctx_string_pointsto ξ a dq s)%I.
+
+  Section ctx_string_all.
+    Context `{KTR : !CurKtier}.
+
+    Lemma ctx_string_all_unfold a dq s :
+      ctx_string_all a dq s ⊣⊢ ∀ ξ : CtxId, ctx_string_pointsto ξ a dq s.
+    Proof. reflexivity. Qed.
+
+    (* USE IT AT YOUR OWN CONTEXT: the only elimination, and the one every
+       consumer of a handle's string runs. *)
+    Lemma ctx_string_all_elim (ξ : CtxId) a dq s :
+      ctx_string_all a dq s ⊢ ctx_string_pointsto ξ a dq s.
+    Proof. iIntros "H". iApply "H". Qed.
+
+    Lemma ctx_string_all_intro a dq s :
+      (∀ ξ : CtxId, ctx_string_pointsto ξ a dq s) ⊢ ctx_string_all a dq s.
+    Proof. iIntros "$". Qed.
+
+    Global Instance ctx_string_all_persistent a s :
+      Persistent (ctx_string_all a DfracDiscarded s).
+    Proof. rewrite /ctx_string_all. apply _. Qed.
+  End ctx_string_all.
+
+  Global Instance ctx_string_all_persistent' (ktr : ktier) a s :
+    Persistent (ctx_string_all (KTR := ktr) a DfracDiscarded s).
+  Proof. exact (ctx_string_all_persistent (KTR := ktr) a s). Qed.
+
+  Lemma ctx_string_all_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} a dq s :
+    ctx_string_all (KTR := kt) a dq s ⊢ ctx_string_all (KTR := kt') a dq s.
+  Proof.
+    rewrite /ctx_string_all. iIntros "H" (ξ).
+    iApply (ctx_string_ktier_mono kt kt'). iApply "H".
+  Qed.
+
 
   (* ---------------------------------------------------------------- *)
   (* Transport: the ONLY ways a fact changes context                   *)
@@ -1286,7 +1478,7 @@ Section ctx.
     iIntros (Htop) "Hint #HT".
     iDestruct "Hint"
       as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as [Hflat Htv].
+    destruct Hmm as (Hflat & Htv & Hcov).
     iDestruct (llb_valid with "Hlen HT") as %HTlen.
     iDestruct (view_lb_get _ _ (avf g) (length g.(glog)) (hart_agent cpu_id)
                 with "Hv Hlen") as "(Hv & Hlen & #Hrcpt)".
@@ -1313,7 +1505,7 @@ Section ctx.
     iIntros (Htop) "Hint Hrun Hpk".
     iDestruct "Hint"
       as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as [Hflat Htv].
+    destruct Hmm as (Hflat & Htv & Hcov).
     iDestruct "Hrun"
       as "(%B' & %K & %W & %D' & [Hb' Hd'] & #HK & %HBK & #HW & %HDW & #Hoks)".
     iDestruct "Hpk" as "(%D & Hat & #HT & %HDT)".
@@ -1411,7 +1603,7 @@ Section ctx.
     iIntros "Hgh Hint Hrun Hfact".
     iDestruct "Hint"
       as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as [Hflat Htv].
+    destruct Hmm as (Hflat & Htv & Hcov).
     iDestruct "Hrun"
       as "(%B & %K & %W & %D & [Hb Hd] & #HK & %HBK & #HW & %HDW & #Hoks)".
     iDestruct "Hfact"
@@ -1634,6 +1826,34 @@ Section ctx.
     iApply (ctx_pointsto_of_pristine_va ξ a v with "Hm Hpr").
   Qed.
 
+  (* THE ⌜t = 0⌝ ARM, SPELLED AT THE STRING TIER (tso-machine-flip.md
+     A6.71's "the ONE arm this tree owes"): a rodata literal's bytes,
+     discarded and pristine, ARE the ∀-context string fact
+     [ctx_string_all].  Main could only sketch this -- its twin is
+     degenerate -- and here it is one line over the byte mint above,
+     because the mint is per-BYTE and the ∀ costs nothing when every
+     premise is persistent.  The justification is [llb]'s [t = 0] arm,
+     which mentions no context: THAT is why the clean arm is [llb]-shaped.
+
+     [KernelDataInv.kernel_data_string_all] does not need to go through
+     this lemma -- it holds [kernel_data]'s ∀ already, and the boot carve
+     built THAT ∀ exactly this way, one byte at a time -- so this is the
+     form for a producer holding raw image bytes plus their receipts
+     directly. *)
+  Lemma ctx_string_all_of_pristine `{KTR : !CurKtier}
+      (a : Arch.pa) (s : string) :
+    string_pointsto a DfracDiscarded s -∗
+    ([∗ list] j ↦ _ ∈ cstring_bytes s, pristine_va (pa_add a j)) -∗
+    ctx_string_all a DfracDiscarded s.
+  Proof.
+    rewrite /string_pointsto /ctx_string_all /ctx_string_pointsto.
+    iIntros "#Hm #Hpr" (ξ).
+    iApply big_sepL_intro. iIntros "!>" (j b Hj).
+    iDestruct (big_sepL_lookup _ _ j b with "Hm") as "Hmj"; [exact Hj|].
+    iDestruct (big_sepL_lookup _ _ j b with "Hpr") as "Hprj"; [exact Hj|].
+    iApply (ctx_pointsto_of_pristine_va ξ (pa_add a j) b with "Hmj Hprj").
+  Qed.
+
   (* ================================================================== *)
   (* THE PHYSICAL LEDGER BYTE, AND THE STORE GATE                       *)
   (* (tso-machine-flip.md §6 amendment A6.16)                           *)
@@ -1657,7 +1877,7 @@ Section ctx.
       (v : bv 8) : iProp Σ :=
     (∃ t : nat,
        phys_pointsto a dq v ∗
-       a ↪[ts_name]{dq} (t, None) ∗
+       a ↪[ts_name]{dq} (t, ts_pay_none) ∗
        (llb (ctx_bound_name ξ) t                          (* CLEAN *)
         ∨ (t, a) ↪[ctx_dirty_name ξ]{dq} ()))%I.          (* DIRTY *)
   Lemma ctx_phys_pointsto_aux : { f | f = ctx_phys_pointsto_def }.
@@ -1775,10 +1995,10 @@ Section ctx.
       ⌜dom Pnew ⊆ dom mem⌝ ∗
       ⌜forall k, k ∈ dom D' <-> (k ∈ dom D \/ (k.1 = S i /\ k.2 ∈ dom Pnew))⌝ ∗
       gen_heap_interp (hG := riscv_memGS) (Pnew ∪ mem) ∗
-      ghost_map_auth ts_name 1 (((fun _ => (S i, None)) <$> Pnew) ∪ TM) ∗
+      ghost_map_auth ts_name 1 (((fun _ => (S i, ts_pay_none)) <$> Pnew) ∪ TM) ∗
       ghost_map_auth (ctx_dirty_name ξ) 1 D' ∗
       ([∗ map] a ↦ v ∈ Pnew,
-         phys_pointsto a (DfracOwn 1) v ∗ a ↪[ts_name] (S i, None) ∗
+         phys_pointsto a (DfracOwn 1) v ∗ a ↪[ts_name] (S i, ts_pay_none) ∗
          (S i, a) ↪[ctx_dirty_name ξ] ()).
   Proof.
     revert Pold. induction Pnew as [|a vn P2 Hfresh IH] using map_ind;
@@ -1806,7 +2026,7 @@ Section ctx.
       iDestruct "Hb" as "(%t & Hpt & Hte & Hbit)".
       iDestruct (phys_valid with "Hgh Hpt") as %Hmem.
       iMod (phys_update _ a vo vn with "Hgh Hpt") as "[Hgh Hpt]".
-      iMod (ghost_map_update (S i, None) with "Hts Hte") as "[Hts Hte]".
+      iMod (ghost_map_update (S i, ts_pay_none) with "Hts Hte") as "[Hts Hte]".
       (* the dirty key is FRESH: every old key is at or below [i] and every
          key this loop has added names an address of [P2], which [a] is not *)
       assert (Hfr : D2 !! (S i, a) = None).
@@ -1890,7 +2110,7 @@ Section ctx.
     rewrite own_context_unseal /own_context_def.
     iDestruct "Hint"
       as "(%TM & %LM & Hts & %Hdomtm & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as [Hflat Htvok].
+    destruct Hmm as (Hflat & Htvok & Hcov).
     iDestruct "Hrun"
       as "(%B & %K & %W & %D & [Hb Hd] & #HK & %HBK & #HW & %HDW & #Hoks)".
     (* (2) the message is persisted, at slot [length glog] *)
@@ -1922,7 +2142,7 @@ Section ctx.
     iModIntro.
     iSplitL "Hgh"; first by rewrite Hmem.
     iSplitL "Hts Hm Hlen Hv".
-    { iExists (((fun _ : bv 8 => ((S (length g.(glog)), None) : ts_elem)) <$> Pnew) ∪ TM),
+    { iExists (((fun _ : bv 8 => ((S (length g.(glog)), ts_pay_none) : ts_elem)) <$> Pnew) ∪ TM),
               (<[length g.(glog) := msg]> LM).
       iFrame "Hts Hm Hlen Hv".
       iSplitR.
@@ -1939,27 +2159,34 @@ Section ctx.
            needs no new premise (tso-pin-memo.md §5.3). *)
         iPureIntro. intros a e Hlk.
         destruct (Pnew !! a) as [vn|] eqn:Hpa.
-        - assert (Hl : ((fun _ : bv 8 => ((S (length g.(glog)), None) : ts_elem)) <$> Pnew) !! a
-                       = Some ((S (length g.(glog)), None) : ts_elem))
+        - assert (Hl : ((fun _ : bv 8 => ((S (length g.(glog)), ts_pay_none) : ts_elem)) <$> Pnew) !! a
+                       = Some ((S (length g.(glog)), ts_pay_none) : ts_elem))
             by (rewrite lookup_fmap Hpa //).
           rewrite (lookup_union_Some_l _ _ _ _ Hl) in Hlk.
           injection Hlk as <-.
           apply (ts_ok_unpinned _ _ _ _ _ vn).
           { rewrite Hmem. by apply lookup_union_Some_l. }
           rewrite Hlog Himg. apply latest_app_new. by rewrite /msg_byte /=.
-        - assert (Hl : ((fun _ : bv 8 => ((S (length g.(glog)), None) : ts_elem)) <$> Pnew) !! a = None)
+        - assert (Hl : ((fun _ : bv 8 => ((S (length g.(glog)), ts_pay_none) : ts_elem)) <$> Pnew) !! a = None)
             by (rewrite lookup_fmap Hpa //).
           rewrite (lookup_union_r _ _ _ Hl) in Hlk.
           pose proof (Htie _ _ Hlk) as Hok.
           assert (Hmb : msg_byte msg a = None) by (rewrite /msg_byte /=; exact Hpa).
-          split.
+          split_and!.
           + destruct (ts_ok_latest _ _ _ _ _ Hok) as (v0 & Hgm & Hlat).
             exists v0. split.
             { rewrite Hmem. by rewrite lookup_union_r. }
             rewrite Hlog Himg. by apply latest_app_frame.
           + intros Sv Bp He2. rewrite Hlog Himg.
             apply (pin_ok_app_frame _ _ _ _ _ _
-                     (ts_ok_pin _ _ _ _ _ _ _ Hok He2) Hmb). }
+                     (ts_ok_pin _ _ _ _ _ _ _ Hok He2) Hmb).
+          (* the WINDOW arm frames on the SAME per-address side condition as
+             the pin's -- which is the whole content of TsoMemPa §12c's
+             correction (the byte-0 shape would need a per-WINDOW one here,
+             and there is nothing in scope to prove it from). *)
+          + intros W0 HW0. rewrite Hlog Himg.
+            apply (win_ok1_app_frame _ _ _ _ _
+                     (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb). }
       iSplitR.
       { iPureIntro. intros j. rewrite Hlog.
         destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -1968,9 +2195,10 @@ Section ctx.
           destruct (decide (j < length g.(glog))%nat) as [Hlt|Hge].
           + by rewrite lookup_app_l.
           + rewrite !lookup_ge_None_2 //; rewrite ?length_app /=; lia. }
-      iPureIntro. split.
+      iPureIntro. split_and!.
       - rewrite Hmem Hlog Himg flat_snoc /=. by rewrite -Hflat.
-      - intros c. have := Htvok' c. lia. }
+      - intros c. have := Htvok' c. lia.
+      - rewrite Himg. exact Hcov. }
     iSplitL "Hb Hd".
     { iExists B, K, (length g'.(glog)), D'. iFrame "Hb Hd HK".
       iSplitR; first done.
@@ -2020,7 +2248,7 @@ Section ctx.
   (* [own_context] CANNOT be used, because the owner is an invariant.)   *)
   (* ================================================================== *)
   Definition phys_ledger_def (a : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
-    (∃ t : nat, phys_pointsto a dq v ∗ a ↪[ts_name]{dq} (t, None))%I.
+    (∃ t : nat, phys_pointsto a dq v ∗ a ↪[ts_name]{dq} (t, ts_pay_none))%I.
   Lemma phys_ledger_aux : { f | f = phys_ledger_def }.
   Proof. by eexists. Qed.
   Definition phys_ledger (a : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
@@ -2061,7 +2289,7 @@ Section ctx.
   (* against a receipt.                                                 *)
   Definition phys_ledger_at (a : Arch.pa) (dq : dfrac) (v : bv 8)
       (t : nat) : iProp Σ :=
-    (phys_pointsto a dq v ∗ a ↪[ts_name]{dq} (t, None))%I.
+    (phys_pointsto a dq v ∗ a ↪[ts_name]{dq} (t, ts_pay_none))%I.
 
   Global Instance phys_ledger_at_timeless a dq v t :
     Timeless (phys_ledger_at a dq v t).
@@ -2083,7 +2311,7 @@ Section ctx.
   (* ---------------------------------------------------------------- *)
   Definition phys_ledger_pin (a : Arch.pa) (dq : dfrac) (v : bv 8)
       (t B : nat) (Sv : gset (bv 8)) : iProp Σ :=
-    (phys_pointsto a dq v ∗ a ↪[ts_name]{dq} (t, Some (Sv, B)))%I.
+    (phys_pointsto a dq v ∗ a ↪[ts_name]{dq} (t, ts_pay_pin Sv B))%I.
 
   Global Instance phys_ledger_pin_timeless a dq v t B Sv :
     Timeless (phys_ledger_pin a dq v t B Sv).
@@ -2116,6 +2344,29 @@ Section ctx.
   Definition pin_map_own (Pv : gmap Arch.pa (bv 8)) (dq : dfrac) (B : nat)
       (Sf : Arch.pa -> gset (bv 8)) : iProp Σ :=
     ([∗ map] a ↦ v ∈ Pv, ∃ t : nat, phys_ledger_pin a dq v t B (Sf a))%I.
+
+  (* the reader's per-byte fragment: the ledger byte with the WINDOW arm
+     of its element set.  A window is held as [n] of these, all naming the
+     same [(base, n, z, cp, own)] and differing only in the offset. *)
+  Definition phys_ledger_wpay (a : Arch.pa) (dq : dfrac) (v : bv 8) (t : nat)
+      (W : ts_win) : iProp Σ :=
+    (phys_pointsto a dq v ∗ a ↪[ts_name]{dq} (t, ts_pay_win W))%I.
+
+  Global Instance phys_ledger_wpay_timeless a dq v t W :
+    Timeless (phys_ledger_wpay a dq v t W).
+  Proof. rewrite /phys_ledger_wpay. apply _. Qed.
+
+  Lemma phys_ledger_wpay_forget a dq v t W :
+    phys_ledger_wpay a dq v t W ⊢ phys_pointsto a dq v.
+  Proof. by iIntros "[$ _]". Qed.
+
+  (* the window analogue of [pin_map_own]: the footprint a window store
+     hands in.  Same shape, and the [Wf] is a FUNCTION of the address
+     because each byte's element names its own offset. *)
+  Definition wpay_map_own (Pv : gmap Arch.pa (bv 8)) (dq : dfrac)
+      (Wf : Arch.pa -> ts_win) : iProp Σ :=
+    ([∗ map] a ↦ v ∈ Pv, ∃ t : nat, phys_ledger_wpay a dq v t (Wf a))%I.
+
 
   Lemma phys_ledger_at_ledger a dq v t :
     phys_ledger_at a dq v t ⊢ phys_ledger a dq v.
@@ -2202,7 +2453,7 @@ Section ctx.
   (* free ([TsoGhost.llb]'s [⌜K = 0⌝] disjunct -- no bupd, no context).    *)
   (* ---------------------------------------------------------------- *)
   Definition ledger_elem0 (a : Arch.pa) (dq : dfrac) : iProp Σ :=
-    (a ↪[ts_name]{dq} (0%nat, None))%I.
+    (a ↪[ts_name]{dq} (0%nat, ts_pay_none))%I.
 
   Lemma phys_ledger_of_elem (a : Arch.pa) (dq : dfrac) (v : bv 8) :
     phys_pointsto a dq v -∗ ledger_elem0 a dq -∗ phys_ledger a dq v.
@@ -2210,6 +2461,22 @@ Section ctx.
     iIntros "Hp He". rewrite phys_ledger_unseal /phys_ledger_def.
     iExists 0%nat. iFrame "Hp He".
   Qed.
+
+  (* ...AND THE TIMESTAMP-EXPOSED TWIN, WHICH IS THE SAME TERM (A6.80).
+     [ledger_wpay_mint] asks for [phys_ledger_at … 0] -- "this byte is
+     unwritten in this era" -- and [ledger_elem0] IS that element, so the
+     carve's cells reach the mint with no conversion at all.  What has to
+     be arranged on the path is only that the timestamp is not SEALED
+     away: [phys_ledger_of_elem] above is the sealing one, and every cell
+     that will carry the racy payload must take THIS one instead.
+     Both directions, because the carve builds and the mint consumes. *)
+  Lemma phys_ledger_at0_of_elem (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    phys_pointsto a dq v -∗ ledger_elem0 a dq -∗ phys_ledger_at a dq v 0%nat.
+  Proof. iIntros "Hp He". rewrite /phys_ledger_at /ledger_elem0. iFrame. Qed.
+
+  Lemma phys_ledger_at0_elem (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    phys_ledger_at a dq v 0%nat ⊢ phys_pointsto a dq v ∗ ledger_elem0 a dq.
+  Proof. rewrite /phys_ledger_at /ledger_elem0. iIntros "$". Qed.
 
   Lemma ctx_phys_pointsto_of_elem (ξ : CtxId) (a : Arch.pa) (dq : dfrac)
       (v : bv 8) :
@@ -2222,7 +2489,7 @@ Section ctx.
 
   (* ---------------------------------------------------------------- *)
   (* A6.63 THE READ-ONLY MINT, and it is what unblocks the last of the   *)
-  (* shim tail.  A rodata byte lives at the RAW tower ([↦ₛ]/[↦ₘ□],       *)
+  (* shim tail.  A rodata byte lives at the RAW tower ([↦ₘ□],            *)
   (* KernelDataInv's image bytes) but the load leaves now demand a CTX   *)
   (* byte, and that direction is the one the flip makes false -- A6.62's *)
   (* four residual sites ([ProofPrintk] x2, [ProofSyscall],              *)
@@ -2410,7 +2677,7 @@ Section ctx.
     ([∗ map] a ↦ v ∈ Pold, phys_ledger a (DfracOwn 1) v) ==∗
     ⌜dom Pnew ⊆ dom mem⌝ ∗
     gen_heap_interp (hG := riscv_memGS) (Pnew ∪ mem) ∗
-    ghost_map_auth ts_name 1 (((fun _ => (S i, None)) <$> Pnew) ∪ TM) ∗
+    ghost_map_auth ts_name 1 (((fun _ => (S i, ts_pay_none)) <$> Pnew) ∪ TM) ∗
     ([∗ map] a ↦ v ∈ Pnew, phys_ledger_at a (DfracOwn 1) v (S i)).
   Proof.
     revert Pold. induction Pnew as [|a vn P2 Hfresh IH] using map_ind;
@@ -2432,7 +2699,7 @@ Section ctx.
       iDestruct "Hb" as "(%t & Hpt & Hte)".
       iDestruct (phys_valid with "Hgh Hpt") as %Hmem.
       iMod (phys_update _ a vo vn with "Hgh Hpt") as "[Hgh Hpt]".
-      iMod (ghost_map_update (S i, None) with "Hts Hte") as "[Hts Hte]".
+      iMod (ghost_map_update (S i, ts_pay_none) with "Hts Hte") as "[Hts Hte]".
       iModIntro.
       rewrite fmap_insert -!insert_union_l !big_sepM_insert //.
       iFrame "Hgh Hts Hbig".
@@ -2459,11 +2726,11 @@ Section ctx.
   (* ---------------------------------------------------------------- *)
   Definition pin_tm (i B : nat) (Sf : Arch.pa -> gset (bv 8))
       (Pv : gmap Arch.pa (bv 8)) : gmap Arch.pa ts_elem :=
-    map_imap (fun a _ => Some ((S i, Some (Sf a, B)) : ts_elem)) Pv.
+    map_imap (fun a _ => Some ((S i, ts_pay_pin (Sf a) B) : ts_elem)) Pv.
 
   Local Lemma pin_tm_lookup i B Sf Pv a :
     pin_tm i B Sf Pv !! a
-    = (fun _ : bv 8 => ((S i, Some (Sf a, B)) : ts_elem)) <$> (Pv !! a).
+    = (fun _ : bv 8 => ((S i, ts_pay_pin (Sf a) B) : ts_elem)) <$> (Pv !! a).
   Proof.
     rewrite /pin_tm map_lookup_imap. by destruct (Pv !! a).
   Qed.
@@ -2473,7 +2740,7 @@ Section ctx.
 
   Local Lemma pin_tm_insert i B Sf (P : gmap Arch.pa (bv 8)) a v :
     pin_tm i B Sf (<[a := v]> P)
-    = <[a := ((S i, Some (Sf a, B)) : ts_elem)]> (pin_tm i B Sf P).
+    = <[a := ((S i, ts_pay_pin (Sf a) B) : ts_elem)]> (pin_tm i B Sf P).
   Proof.
     apply map_eq. intros k. rewrite pin_tm_lookup.
     destruct (decide (k = a)) as [->|Hne].
@@ -2491,7 +2758,7 @@ Section ctx.
     (* the OLD elements, so the caller can re-establish the pin tie on the
        footprint out of [TsoMemPa.pin_ok_app] rather than out of nothing *)
     ⌜forall a, a ∈ dom Pnew ->
-       exists t, TM !! a = Some ((t, Some (Sf a, B)) : ts_elem)⌝ ∗
+       exists t, TM !! a = Some ((t, ts_pay_pin (Sf a) B) : ts_elem)⌝ ∗
     gen_heap_interp (hG := riscv_memGS) (Pnew ∪ mem) ∗
     ghost_map_auth ts_name 1 (pin_tm i B Sf Pnew ∪ TM) ∗
     ([∗ map] a ↦ v ∈ Pnew, phys_ledger_pin a (DfracOwn 1) v (S i) B (Sf a)).
@@ -2515,11 +2782,11 @@ Section ctx.
       iDestruct "Hb" as "(%t & Hpt & Hte)".
       iDestruct (phys_valid with "Hgh Hpt") as %Hmem.
       iDestruct (ghost_map_lookup with "Hts Hte") as %Hlk.
-      assert (HTMa : TM !! a = Some ((t, Some (Sf a, B)) : ts_elem)).
+      assert (HTMa : TM !! a = Some ((t, ts_pay_pin (Sf a) B) : ts_elem)).
       { rewrite lookup_union_r in Hlk; first exact Hlk.
         rewrite pin_tm_lookup. by rewrite Hfresh. }
       iMod (phys_update _ a vo vn with "Hgh Hpt") as "[Hgh Hpt]".
-      iMod (ghost_map_update ((S i, Some (Sf a, B)) : ts_elem) with "Hts Hte")
+      iMod (ghost_map_update ((S i, ts_pay_pin (Sf a) B) : ts_elem) with "Hts Hte")
         as "[Hts Hte]".
       iModIntro.
       rewrite pin_tm_insert -!insert_union_l !big_sepM_insert //.
@@ -2562,7 +2829,7 @@ Section ctx.
     iIntros (Hdom Hin Himg Hlog Hmem Htv Htvok') "Hgh Hint Hold".
     iDestruct "Hint"
       as "(%TM & %LM & Hts & %Hdomtm & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as [Hflat Htvok].
+    destruct Hmm as (Hflat & Htvok & Hcov).
     set (msg := PWMsg Pnew auth).
     assert (HLMfresh : LM !! length g.(glog) = None).
     { rewrite HLM. apply lookup_ge_None_2. lia. }
@@ -2596,12 +2863,12 @@ Section ctx.
     { iPureIntro. intros a e Hlk.
       destruct (Pnew !! a) as [vn|] eqn:Hpa.
       - assert (Hl : pin_tm (length g.(glog)) B Sf Pnew !! a
-                     = Some ((S (length g.(glog)), Some (Sf a, B)) : ts_elem))
+                     = Some ((S (length g.(glog)), ts_pay_pin (Sf a) B) : ts_elem))
           by (rewrite pin_tm_lookup Hpa //).
         rewrite (lookup_union_Some_l _ _ _ _ Hl) in Hlk. injection Hlk as <-.
         assert (Hmb : msg_byte msg a = Some vn)
           by (rewrite /msg_byte /=; exact Hpa).
-        split.
+        split_and!; last (by move => W0 HW0).
         + exists vn. split.
           { rewrite Hmem. by apply lookup_union_Some_l. }
           rewrite Hlog Himg. apply latest_app_new. exact Hmb.
@@ -2616,14 +2883,19 @@ Section ctx.
         rewrite (lookup_union_r _ _ _ Hl) in Hlk.
         pose proof (Htie _ _ Hlk) as Hok.
         assert (Hmb : msg_byte msg a = None) by (rewrite /msg_byte /=; exact Hpa).
-        split.
+        split_and!.
         + destruct (ts_ok_latest _ _ _ _ _ Hok) as (v0 & Hgm & Hlat).
           exists v0. split.
           { rewrite Hmem. by rewrite lookup_union_r. }
           rewrite Hlog Himg. by apply latest_app_frame.
         + intros Sv' B' He2. rewrite Hlog Himg.
           apply (pin_ok_app_frame _ _ _ _ _ _
-                   (ts_ok_pin _ _ _ _ _ _ _ Hok He2) Hmb). }
+                   (ts_ok_pin _ _ _ _ _ _ _ Hok He2) Hmb).
+        (* the WINDOW arm frames on the SAME per-address side condition
+           as the pin's (TsoMemPa §12c) *)
+        + intros W0 HW0. rewrite Hlog Himg.
+          apply (win_ok1_app_frame _ _ _ _ _
+                   (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb). }
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -2632,9 +2904,231 @@ Section ctx.
         destruct (decide (j < length g.(glog))%nat) as [Hlt|Hge].
         + by rewrite lookup_app_l.
         + rewrite !lookup_ge_None_2 //; rewrite ?length_app /=; lia. }
-    iPureIntro. split.
+    iPureIntro. split_and!.
     - rewrite Hmem Hlog Himg flat_snoc /=. by rewrite -Hflat.
     - intros c. have := Htvok' c. lia.
+    - rewrite Himg. exact Hcov.
+  Qed.
+
+  Definition wpay_tm (i : nat) (Wf : Arch.pa -> ts_win)
+      (Pv : gmap Arch.pa (bv 8)) : gmap Arch.pa ts_elem :=
+    map_imap (fun a _ => Some ((S i, ts_pay_win (Wf a)) : ts_elem)) Pv.
+
+  Local Lemma wpay_tm_lookup i Wf Pv a :
+    wpay_tm i Wf Pv !! a
+    = (fun _ : bv 8 => ((S i, ts_pay_win (Wf a)) : ts_elem)) <$> (Pv !! a).
+  Proof.
+    rewrite /wpay_tm map_lookup_imap. by destruct (Pv !! a).
+  Qed.
+
+  Local Lemma wpay_tm_empty i Wf : wpay_tm i Wf ∅ = ∅.
+  Proof. apply map_eq. intros k. by rewrite wpay_tm_lookup lookup_empty. Qed.
+
+  Local Lemma wpay_tm_insert i Wf (P : gmap Arch.pa (bv 8)) a v :
+    wpay_tm i Wf (<[a := v]> P)
+    = <[a := ((S i, ts_pay_win (Wf a)) : ts_elem)]> (wpay_tm i Wf P).
+  Proof.
+    apply map_eq. intros k. rewrite wpay_tm_lookup.
+    destruct (decide (k = a)) as [->|Hne].
+    - by rewrite !lookup_insert.
+    - rewrite !lookup_insert_ne // wpay_tm_lookup //.
+  Qed.
+
+  Local Lemma ledger_store_wpay_bytes (i : nat) (Wold Wf : Arch.pa -> ts_win)
+      (Pold Pnew mem : gmap Arch.pa (bv 8)) (TM : gmap Arch.pa ts_elem) :
+    dom Pold = dom Pnew ->
+    gen_heap_interp (hG := riscv_memGS) mem -∗
+    ghost_map_auth ts_name 1 TM -∗
+    wpay_map_own Pold (DfracOwn 1) Wold ==∗
+    ⌜dom Pnew ⊆ dom mem⌝ ∗
+    (* the OLD elements, so the caller can re-establish the pin tie on the
+       footprint out of [TsoMemPa.win_ok1_app_store] rather than out of
+       nothing *)
+    ⌜forall a, a ∈ dom Pnew ->
+       exists t, TM !! a = Some ((t, ts_pay_win (Wold a)) : ts_elem)⌝ ∗
+    gen_heap_interp (hG := riscv_memGS) (Pnew ∪ mem) ∗
+    ghost_map_auth ts_name 1 (wpay_tm i Wf Pnew ∪ TM) ∗
+    ([∗ map] a ↦ v ∈ Pnew, phys_ledger_wpay a (DfracOwn 1) v (S i) (Wf a)).
+  Proof.
+    revert Pold. rewrite /wpay_map_own.
+    induction Pnew as [|a vn P2 Hfresh IH] using map_ind; intros Pold Hdom.
+    - rewrite dom_empty_L in Hdom. apply dom_empty_inv_L in Hdom as ->.
+      iIntros "Hgh Hts _". iModIntro.
+      rewrite wpay_tm_empty !left_id_L !big_sepM_empty.
+      iFrame "Hgh Hts". iPureIntro. split; first set_solver.
+      intros a Ha. rewrite dom_empty_L in Ha. set_solver.
+    - iIntros "Hgh Hts Hold".
+      assert (Ha : a ∈ dom Pold) by (rewrite Hdom dom_insert_L; set_solver).
+      apply elem_of_dom in Ha as [vo Hvo].
+      iDestruct (big_sepM_delete _ _ a vo Hvo with "Hold") as "[Hb Hrest]".
+      assert (Hdom2 : dom (delete a Pold) = dom P2).
+      { rewrite dom_delete_L Hdom dom_insert_L.
+        assert (a ∉ dom P2) by (by apply not_elem_of_dom). set_solver. }
+      iMod (IH (delete a Pold) Hdom2 with "Hgh Hts Hrest")
+        as "(%Hsub2 & %Hold2 & Hgh & Hts & Hbig)".
+      iDestruct "Hb" as "(%t & Hpt & Hte)".
+      iDestruct (phys_valid with "Hgh Hpt") as %Hmem.
+      iDestruct (ghost_map_lookup with "Hts Hte") as %Hlk.
+      assert (HTMa : TM !! a = Some ((t, ts_pay_win (Wold a)) : ts_elem)).
+      { rewrite lookup_union_r in Hlk; first exact Hlk.
+        rewrite wpay_tm_lookup. by rewrite Hfresh. }
+      iMod (phys_update _ a vo vn with "Hgh Hpt") as "[Hgh Hpt]".
+      iMod (ghost_map_update ((S i, ts_pay_win (Wf a)) : ts_elem) with "Hts Hte")
+        as "[Hts Hte]".
+      iModIntro.
+      rewrite wpay_tm_insert -!insert_union_l !big_sepM_insert //.
+      iFrame "Hgh Hts Hbig".
+      iSplitR.
+      { iPureIntro. rewrite dom_insert_L. apply union_least; [|exact Hsub2].
+        assert (Hin : a ∈ dom mem).
+        { apply elem_of_dom_2 in Hmem. rewrite dom_union_L elem_of_union in Hmem.
+          destruct Hmem as [Hx|Hx]; last done.
+          apply not_elem_of_dom in Hfresh. set_solver. }
+        set_solver. }
+      iSplitR.
+      { iPureIntro. intros a' Ha'. rewrite dom_insert_L elem_of_union in Ha'.
+        destruct Ha' as [Ha'|Ha'].
+        - apply elem_of_singleton in Ha' as ->. by exists t.
+        - exact (Hold2 a' Ha'). }
+      rewrite /phys_ledger_wpay. iFrame "Hpt Hte".
+  Qed.
+
+  (* THE WINDOW STORE GATE: [ledger_store_pin_ok]'s twin for a cell that
+     carries the racy payload rather than the pin.  It exists because the
+     ordinary [ledger_store_ok] REPLACES the elements it writes with
+     [ts_pay_none] -- correct, but it would drop the window claim the lock's
+     readers assemble from.
+
+     THE TWO ARMS OF [Hstore] ARE THE LOCK'S TWO STORES, and stating them
+     as a disjunction is what keeps the gate honest: a release writes the
+     CLEAR word and the author's own-last entry moves to the top (so the
+     author may read "not mine" again); an acquire writes the author's OWN
+     word and the entry is REVOKED (the author is excluded until it
+     releases).  Every other agent's entry is untouched, and its four
+     conjuncts frame on the author premise alone -- which is the same
+     [auth] argument [ledger_store_ok] already takes. *)
+  Lemma ledger_store_wpay_ok (g g' : gstate) (auth : agent)
+      (Pold Pnew : gmap Arch.pa (bv 8))
+      (base : Arch.pa) (n : nat) (z : nat -> bv 8)
+      (cp : agent -> nat -> bv 8) (own own' : agent -> option nat)
+      (Wold Wf : Arch.pa -> ts_win) :
+    dom Pold = dom Pnew ->
+    (* the footprint IS the window, byte for byte *)
+    (forall j, (j < n)%nat -> Wold (pa_add base j) = TsWin base n j z cp own) ->
+    (forall j, (j < n)%nat -> Wf (pa_add base j) = TsWin base n j z cp own') ->
+    (forall a, a ∈ dom Pnew -> exists j, (j < n)%nat /\ a = pa_add base j) ->
+    (* WHAT WAS WRITTEN -- the two arms above *)
+    ((forall j, (j < n)%nat -> Pnew !! pa_add base j = Some (z j))
+       /\ own' auth = Some (S (length g.(glog)))
+     \/ (forall j, (j < n)%nat -> Pnew !! pa_add base j = Some (cp auth j))
+       /\ own' auth = None) ->
+    (forall h, h <> auth -> own' h = own h) ->
+    g'.(gimg) = g.(gimg) ->
+    g'.(glog) = (g.(glog) ++ [PWMsg Pnew auth])%list ->
+    g'.(gmem) = Pnew ∪ g.(gmem) ->
+    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    wpay_map_own Pold (DfracOwn 1) Wold ==∗
+    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
+    tso_interp_at riscv_eraGS g' ∗
+    ledger_msg_at (length g.(glog)) (PWMsg Pnew auth) ∗
+    ([∗ map] a ↦ v ∈ Pnew,
+       phys_ledger_wpay a (DfracOwn 1) v (S (length g.(glog))) (Wf a)).
+  Proof.
+    iIntros (Hdom HWold HWf Hfoot Hstore Hoth Himg Hlog Hmem Htv Htvok') "Hgh Hint Hold".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hts & %Hdomtm & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
+    destruct Hmm as (Hflat & Htvok & Hcov).
+    set (msg := PWMsg Pnew auth).
+    assert (HLMfresh : LM !! length g.(glog) = None).
+    { rewrite HLM. apply lookup_ge_None_2. lia. }
+    iMod (ghost_map_insert_persist (length g.(glog)) msg HLMfresh with "Hm")
+      as "[Hm #Hmsg]".
+    iMod (mono_nat_own_update (length g'.(glog)) with "Hlen") as "[Hlen _]".
+    { rewrite Hlog length_app /=. lia. }
+    iMod (ledger_store_wpay_bytes (length g.(glog)) Wold Wf Pold Pnew g.(gmem) TM
+            Hdom with "Hgh Hts Hold")
+      as "(%Hsub & %Hold2 & Hgh & Hts & Hbig)".
+    assert (Hlen' : length g'.(glog) = S (length g.(glog))).
+    { rewrite Hlog length_app /=. lia. }
+    assert (Havf : forall x, (avf g x <= avf g' x)%nat).
+    { intros x. rewrite /avf Hlog length_app /=.
+      destruct (lt_dec x NCPU) as [Hx|Hx]; [apply Htv | lia]. }
+    iMod (view_auth_update _ (avf g) (avf g') Havf with "Hv") as "Hv".
+    iModIntro.
+    iSplitL "Hgh"; first by rewrite Hmem.
+    iFrame "Hbig". iFrame "Hmsg".
+    iExists (wpay_tm (length g.(glog)) Wf Pnew ∪ TM),
+            (<[length g.(glog) := msg]> LM).
+    iFrame "Hts Hm Hlen Hv".
+    iSplitR.
+    { iPureIntro.
+      assert (Hdpin : dom (wpay_tm (length g.(glog)) Wf Pnew) = dom Pnew).
+      { apply set_eq. intros k.
+        by rewrite !elem_of_dom wpay_tm_lookup fmap_is_Some. }
+      rewrite dom_union_L Hdpin Hmem dom_union_L Hdomtm.
+      by rewrite (subseteq_union_1_L _ _ Hsub). }
+    iSplitR.
+    { iPureIntro. intros a e Hlk.
+      destruct (Pnew !! a) as [vn|] eqn:Hpa.
+      - assert (Hl : wpay_tm (length g.(glog)) Wf Pnew !! a
+                     = Some ((S (length g.(glog)), ts_pay_win (Wf a)) : ts_elem))
+          by (rewrite wpay_tm_lookup Hpa //).
+        rewrite (lookup_union_Some_l _ _ _ _ Hl) in Hlk. injection Hlk as <-.
+        assert (Hmb : msg_byte msg a = Some vn)
+          by (rewrite /msg_byte /=; exact Hpa).
+        destruct (Hfoot a ltac:(by apply elem_of_dom)) as (j & Hj & ->).
+        destruct (Hold2 (pa_add base j) ltac:(by apply elem_of_dom))
+          as (told & HTMa).
+        split_and!.
+        + exists vn. split.
+          { rewrite Hmem. by apply lookup_union_Some_l. }
+          rewrite Hlog Himg. apply latest_app_new. exact Hmb.
+        + intros Sv' B' Heq. rewrite (HWf j Hj) in Heq. discriminate Heq.
+        + intros W0 HW0. rewrite (HWf j Hj) in HW0.
+          cbn in HW0. injection HW0 as <-.
+          rewrite Hlog Himg.
+          apply (win_ok1_app_store _ _ _ base n j z cp own own').
+          * rewrite -(HWold j Hj).
+            exact (ts_ok_win _ _ _ _ _ _ (Htie _ _ HTMa) eq_refl).
+          * cbn [pm_tid]. case: Hstore => [[Hcl Ho] | [Hme Ho]].
+            -- left. split; [| exact Ho].
+               move => k Hk. rewrite /msg_byte /=. exact (Hcl k Hk).
+            -- right. split; [| exact Ho].
+               move => k Hk. rewrite /msg_byte /=. exact (Hme k Hk).
+          * cbn [pm_tid]. exact Hoth.
+      - assert (Hl : wpay_tm (length g.(glog)) Wf Pnew !! a = None)
+          by (rewrite wpay_tm_lookup Hpa //).
+        rewrite (lookup_union_r _ _ _ Hl) in Hlk.
+        pose proof (Htie _ _ Hlk) as Hok.
+        assert (Hmb : msg_byte msg a = None) by (rewrite /msg_byte /=; exact Hpa).
+        split_and!.
+        + destruct (ts_ok_latest _ _ _ _ _ Hok) as (v0 & Hgm & Hlat).
+          exists v0. split.
+          { rewrite Hmem. by rewrite lookup_union_r. }
+          rewrite Hlog Himg. by apply latest_app_frame.
+        + intros Sv' B' He2. rewrite Hlog Himg.
+          apply (pin_ok_app_frame _ _ _ _ _ _
+                   (ts_ok_pin _ _ _ _ _ _ _ Hok He2) Hmb).
+        (* the WINDOW arm frames on the SAME per-address side condition
+           as the pin's (TsoMemPa §12c) *)
+        + intros W0 HW0. rewrite Hlog Himg.
+          apply (win_ok1_app_frame _ _ _ _ _
+                   (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb). }
+    iSplitR.
+    { iPureIntro. intros j. rewrite Hlog.
+      destruct (decide (j = length g.(glog))) as [->|Hne].
+      - rewrite lookup_insert. symmetry. by apply list_lookup_middle.
+      - rewrite lookup_insert_ne; last congruence. rewrite HLM.
+        destruct (decide (j < length g.(glog))%nat) as [Hlt|Hge].
+        + by rewrite lookup_app_l.
+        + rewrite !lookup_ge_None_2 //; rewrite ?length_app /=; lia. }
+    iPureIntro. split_and!.
+    - rewrite Hmem Hlog Himg flat_snoc /=. by rewrite -Hflat.
+    - intros c. have := Htvok' c. lia.
+    - rewrite Himg. exact Hcov.
   Qed.
 
   (* THE CONTEXT-FREE STORE GATE.  Same three of the four ghost steps as
@@ -2676,7 +3170,7 @@ Section ctx.
     iIntros (Hdom Himg Hlog Hmem Htv Htvok') "Hgh Hint Hold".
     iDestruct "Hint"
       as "(%TM & %LM & Hts & %Hdomtm & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as [Hflat Htvok].
+    destruct Hmm as (Hflat & Htvok & Hcov).
     set (msg := PWMsg Pnew auth).
     assert (HLMfresh : LM !! length g.(glog) = None).
     { rewrite HLM. apply lookup_ge_None_2. lia. }
@@ -2695,7 +3189,7 @@ Section ctx.
     iModIntro.
     iSplitL "Hgh"; first by rewrite Hmem.
     iFrame "Hbig". iFrame "Hmsg".
-    iExists (((fun _ : bv 8 => ((S (length g.(glog)), None) : ts_elem)) <$> Pnew) ∪ TM),
+    iExists (((fun _ : bv 8 => ((S (length g.(glog)), ts_pay_none) : ts_elem)) <$> Pnew) ∪ TM),
             (<[length g.(glog) := msg]> LM).
     iFrame "Hts Hm Hlen Hv".
     iSplitR.
@@ -2705,26 +3199,31 @@ Section ctx.
     { (* both halves; see [ctx_store_ok]'s note *)
       iPureIntro. intros a e Hlk.
       destruct (Pnew !! a) as [vn|] eqn:Hpa.
-      - assert (Hl : ((fun _ : bv 8 => ((S (length g.(glog)), None) : ts_elem)) <$> Pnew) !! a
-                     = Some ((S (length g.(glog)), None) : ts_elem))
+      - assert (Hl : ((fun _ : bv 8 => ((S (length g.(glog)), ts_pay_none) : ts_elem)) <$> Pnew) !! a
+                     = Some ((S (length g.(glog)), ts_pay_none) : ts_elem))
           by (rewrite lookup_fmap Hpa //).
         rewrite (lookup_union_Some_l _ _ _ _ Hl) in Hlk. injection Hlk as <-.
         apply (ts_ok_unpinned _ _ _ _ _ vn).
         { rewrite Hmem. by apply lookup_union_Some_l. }
         rewrite Hlog Himg. apply latest_app_new. by rewrite /msg_byte /=.
-      - assert (Hl : ((fun _ : bv 8 => ((S (length g.(glog)), None) : ts_elem)) <$> Pnew) !! a = None)
+      - assert (Hl : ((fun _ : bv 8 => ((S (length g.(glog)), ts_pay_none) : ts_elem)) <$> Pnew) !! a = None)
           by (rewrite lookup_fmap Hpa //).
         rewrite (lookup_union_r _ _ _ Hl) in Hlk.
         pose proof (Htie _ _ Hlk) as Hok.
         assert (Hmb : msg_byte msg a = None) by (rewrite /msg_byte /=; exact Hpa).
-        split.
+        split_and!.
         + destruct (ts_ok_latest _ _ _ _ _ Hok) as (v0 & Hgm & Hlat).
           exists v0. split.
           { rewrite Hmem. by rewrite lookup_union_r. }
           rewrite Hlog Himg. by apply latest_app_frame.
         + intros Sv Bp He2. rewrite Hlog Himg.
           apply (pin_ok_app_frame _ _ _ _ _ _
-                   (ts_ok_pin _ _ _ _ _ _ _ Hok He2) Hmb). }
+                   (ts_ok_pin _ _ _ _ _ _ _ Hok He2) Hmb).
+        (* the WINDOW arm frames on the SAME per-address side condition
+           as the pin's (TsoMemPa §12c) *)
+        + intros W0 HW0. rewrite Hlog Himg.
+          apply (win_ok1_app_frame _ _ _ _ _
+                   (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb). }
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -2733,9 +3232,10 @@ Section ctx.
         destruct (decide (j < length g.(glog))%nat) as [Hlt|Hge].
         + by rewrite lookup_app_l.
         + rewrite !lookup_ge_None_2 //; rewrite ?length_app /=; lia. }
-    iPureIntro. split.
+    iPureIntro. split_and!.
     - rewrite Hmem Hlog Himg flat_snoc /=. by rewrite -Hflat.
     - intros c. have := Htvok' c. lia.
+    - rewrite Himg. exact Hcov.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -3054,7 +3554,7 @@ Section ctx.
     iIntros "Hgh Hint Hrun Hfact".
     iDestruct "Hint"
       as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as [Hflat Htv].
+    destruct Hmm as (Hflat & Htv & Hcov).
     iDestruct "Hrun"
       as "(%B & %K & %W & %D & [Hb Hd] & #HK & %HBK & #HW & %HDW & #Hoks)".
     iDestruct "Hfact" as "(%t & Hpt & Htse & Hbit)".
@@ -3214,10 +3714,10 @@ Section ctx.
     iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
     destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
     rewrite Hgm in Hgm0. injection Hgm0 as <-.
-    iMod (ghost_map_update ((t, Some (Sv, B)) : ts_elem) with "Hauth Hts")
+    iMod (ghost_map_update ((t, ts_pay_pin Sv B) : ts_elem) with "Hauth Hts")
       as "[Hauth Hts]".
     iModIntro. iFrame "Hgh Hpt Hts".
-    iExists (<[a := ((t, Some (Sv, B)) : ts_elem)]> TM), LM.
+    iExists (<[a := ((t, ts_pay_pin Sv B) : ts_elem)]> TM), LM.
     iFrame "Hauth Hm Hlen Hvw".
     iSplitR.
     { iPureIntro. rewrite dom_insert_L Hdom.
@@ -3226,11 +3726,198 @@ Section ctx.
     iSplitR; last (iPureIntro; split; [exact HLM | exact Hmm]).
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
-    - rewrite lookup_insert in Hlk. injection Hlk as <-. split.
+    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+      split_and!; last (by move => W0 HW0).
       + exists v. split; [exact Hgm | exact Hlat].
       + intros Sv' B' Heq. cbn in Heq. injection Heq as <- <-.
         exact (pin_ok_mint _ _ _ _ _ t v Hlat HtB Hv).
     - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (* ...AND ITS PREMISE IS A FACT OF THE MACHINE, NOT A DEBT ON THE     *)
+  (* CLIENT (A6.78).  [RiscvLang.mm_ok]'s third conjunct says the era   *)
+  (* image covers ALL of RAM, so the "no evidence" read is discharged   *)
+  (* from [addr_is_ram] alone -- which is what A6.74 §(3) priced it at  *)
+  (* and what A6.75 §(3) had to leave as a named residual because no    *)
+  (* interp conjunct supplied it.                                       *)
+  (*                                                                   *)
+  (* A DEGENERATE WINDOW PAYLOAD ON THE LOCK WORD IS THEREFORE NOT      *)
+  (* NEEDED, AND MUST NOT BE BUILT: [win_ok1]'s conjunct (1) says every *)
+  (* message touching the cell writes the CLEAR word or the author's    *)
+  (* own, and the lock word's writer is an AMO whose stored value is    *)
+  (* the caller's register.  A6.75 §(3)'s two options were not          *)
+  (* equivalent; this is the one that exists.                           *)
+  (* ---------------------------------------------------------------- *)
+  Lemma ledger_img_cover (g : gstate) (a : Arch.pa) :
+    addr_is_ram a ->
+    tso_interp_at riscv_eraGS g -∗ ⌜is_Some (g.(gimg) !! a)⌝.
+  Proof.
+    iIntros (Hram) "Hint".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    destruct Hmm as (_ & _ & Hcov).
+    iPureIntro. apply Hcov.
+    move: Hram. rewrite /addr_is_ram /ram_base /ram_size /ram_lo /ram_hi. lia.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (* THE RACY PAYLOAD'S MINT (A6.79), AND ITS PREMISE IS THE ELEMENT'S  *)
+  (* OWN TIMESTAMP.                                                     *)
+  (*                                                                   *)
+  (* The pin's mint above needs only the address's LATEST write, which  *)
+  (* is why it can run at any time.  [win_ok1] looks as though it       *)
+  (* cannot: its conjunct (1) quantifies over the WHOLE log ("every     *)
+  (* message touching this byte wrote the clear word or its author's    *)
+  (* own"), and conjunct (3) wants EVERY agent's own-last write to the  *)
+  (* byte -- a hart that has never touched the cell has no record to    *)
+  (* offer.  A6.78 filed both as closing only at [glog = []].           *)
+  (*                                                                   *)
+  (* MEASURED, THE PREMISE IS WEAKER AND LOCAL: [e.1 = 0].  The interp's *)
+  (* tie at a timestamp-0 element says [latest img log a 0 v], whose    *)
+  (* SECOND half is "no timestamp above 0 writes [a]" -- i.e. NO        *)
+  (* MESSAGE IN THE LOG WRITES THIS BYTE AT ALL.  That discharges       *)
+  (* conjunct (1) vacuously (its premise [is_Some (msg_byte m a)] is    *)
+  (* false for every logged message) and [own_last log h a 0] for every *)
+  (* agent at once, for the same reason.  Conjunct (2) is [mm_ok]'s     *)
+  (* image coverage (A6.78) over a RAM address, and [phys_ledger_ram]   *)
+  (* says the cell is RAM.  So the mint runs whenever the cell is still *)
+  (* UNWRITTEN IN THIS ERA -- which is what a [.bss] spinlock is when   *)
+  (* [initlock] first reaches it, and it is a fact the boot carve       *)
+  (* already carries rather than one anybody has to re-establish.       *)
+  (*                                                                   *)
+  (* [tw_z] IS THE CELL'S CURRENT VALUE, not a parameter: the tie       *)
+  (* determines the image byte, so the clear word is whatever the       *)
+  (* loader left there (zero, for a [.bss] spinlock).  [tw_cp] IS free  *)
+  (* -- conjunct (1) is vacuous, so the author words are the caller's   *)
+  (* choice, and they are fixed for the life of the payload             *)
+  (* ([win_ok1_app_store] re-establishes the claim only at the same     *)
+  (* [z] and [cp]; only [own] ever moves).                              *)
+  (* ---------------------------------------------------------------- *)
+  Lemma ledger_wpay_mint1 (g : gstate) (a : Arch.pa) (v : bv 8) (W : ts_win) :
+    a = pa_add (tw_base W) (tw_j W) ->
+    (tw_j W < tw_n W)%nat ->
+    (forall k, (k < tw_n W)%nat -> is_Some (g.(gimg) !! pa_add (tw_base W) k)) ->
+    (forall h t, tw_own W h = Some t -> t = 0%nat) ->
+    tw_z W (tw_j W) = v ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    phys_ledger_at a (DfracOwn 1) v 0%nat ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗
+    phys_ledger_wpay a (DfracOwn 1) v 0%nat W.
+  Proof.
+    iIntros (Ha Hj Hcov Hown Hz) "Hgh Hint [Hpt Hts]".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
+    iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
+    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
+    rewrite Hgm in Hgm0. injection Hgm0 as <-.
+    cbn in Hlat.
+    (* THE ONE FACT THE WHOLE MINT RESTS ON: nothing in the log writes [a] *)
+    assert (Hnone : forall i m, g.(glog) !! i = Some m -> msg_byte m a = None).
+    { move => i m Hlk.
+      have Hb := proj2 Hlat (S i) ltac:(lia).
+      move: Hb. rewrite /log_byte Hlk //. }
+    assert (Himg : g.(gimg) !! a = Some v) by exact (proj1 Hlat).
+    assert (Hw : win_ok1 g.(gimg) g.(glog) a W).
+    { split_and!.
+      - exact Ha.
+      - exact Hj.
+      - move => i m Hlk Hs. exfalso.
+        rewrite /is_Some (Hnone i m Hlk) in Hs. by destruct Hs as [? ?].
+      - exact Hcov.
+      - move => h t' Hown'. rewrite (Hown h t' Hown').
+        split_and!.
+        + lia.
+        + move => tv. apply visibleb_below. lia.
+        + rewrite /log_byte Hz. exact Himg.
+        + move => i m Hlk _ Hs. exfalso.
+          rewrite /is_Some (Hnone i m Hlk) in Hs. by destruct Hs as [? ?]. }
+    iMod (ghost_map_update ((0%nat, ts_pay_win W) : ts_elem) with "Hauth Hts")
+      as "[Hauth Hts]".
+    iModIntro. iFrame "Hgh".
+    iSplitR "Hpt Hts"; last (rewrite /phys_ledger_wpay; iFrame "Hpt Hts").
+    iExists (<[a := ((0%nat, ts_pay_win W) : ts_elem)]> TM), LM.
+    iFrame "Hauth Hm Hlen Hvw".
+    iSplitR.
+    { iPureIntro. rewrite dom_insert_L Hdom.
+      assert (Ha' : a ∈ dom g.(gmem)) by (by eapply elem_of_dom_2).
+      set_solver. }
+    iSplitR; last (iPureIntro; split; [exact HLM | exact Hmm]).
+    iPureIntro. intros a' e Hlk.
+    destruct (decide (a' = a)) as [->|Hne].
+    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+      split_and!.
+      + exists v. split; [exact Hgm | exact Hlat].
+      + move => Sv' B' Heq. discriminate Heq.
+      + move => W0 HW0. cbn in HW0. injection HW0 as <-. exact Hw.
+    - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
+  Qed.
+
+  (* THE WINDOW FORM the creator applies: [n] adjacent UNWRITTEN cells
+     become the [n] agreeing copies the reader assembles from.  The
+     image-coverage conjunct is extracted ONCE, before the run, because it
+     is about the WHOLE window and no single byte's cell knows it. *)
+  Local Lemma ledger_wpay_mint_run (g : gstate) (base : Arch.pa) (n : nat)
+      (f : nat -> bv 8) (cp : agent -> nat -> bv 8) (l : list nat) :
+    (forall k, (k < n)%nat -> is_Some (g.(gimg) !! pa_add base k)) ->
+    (forall j, j ∈ l -> (j < n)%nat) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ l, phys_ledger_at (pa_add base j) (DfracOwn 1) (f j) 0%nat) ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗
+    ([∗ list] j ∈ l,
+       phys_ledger_wpay (pa_add base j) (DfracOwn 1) (f j) 0%nat
+         (TsWin base n j f cp (fun _ => Some 0%nat))).
+  Proof.
+    intros Hcov.
+    assert (Hown0 : forall (h : agent) (t : nat),
+              (fun _ : agent => Some 0%nat) h = Some t -> t = 0%nat).
+    { intros h t Ht. by injection Ht as <-. }
+    revert l. induction l as [|j l IH]; intros Hlt.
+    - iIntros "Hgh Hint _". iModIntro. iFrame "Hgh Hint". done.
+    - iIntros "Hgh Hint Hb".
+      rewrite !big_sepL_cons. iDestruct "Hb" as "[Hbj Hbl]".
+      assert (Hjn : (j < n)%nat) by (apply Hlt; set_solver).
+      iMod (ledger_wpay_mint1 g (pa_add base j) (f j)
+              (TsWin base n j f cp (fun _ => Some 0%nat))
+              eq_refl Hjn Hcov Hown0 eq_refl with "Hgh Hint Hbj")
+        as "(Hgh & Hint & Hbj)".
+      assert (Hlt' : forall k, k ∈ l -> (k < n)%nat)
+        by (intros k Hk; apply Hlt; set_solver).
+      iMod (IH Hlt' with "Hgh Hint Hbl") as "(Hgh & Hint & Hbl)".
+      iModIntro. iFrame "Hgh Hint Hbj Hbl".
+  Qed.
+
+  Lemma ledger_wpay_mint (g : gstate) (base : Arch.pa) (n : nat)
+      (f : nat -> bv 8) (cp : agent -> nat -> bv 8) :
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ seq 0 n,
+       phys_ledger_at (pa_add base j) (DfracOwn 1) (f j) 0%nat) ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗
+    ([∗ list] j ∈ seq 0 n,
+       phys_ledger_wpay (pa_add base j) (DfracOwn 1) (f j) 0%nat
+         (TsWin base n j f cp (fun _ => Some 0%nat))).
+  Proof.
+    iIntros "Hgh Hint Hb".
+    (* the window's image coverage, off the cells' own RAM-ness plus
+       [mm_ok]'s third conjunct -- extracted before anything moves *)
+    iAssert (⌜forall k, (k < n)%nat -> is_Some (g.(gimg) !! pa_add base k)⌝)%I
+      as %Hcov.
+    { rewrite bi.pure_forall. iIntros (k). rewrite bi.pure_impl. iIntros (Hk).
+      iDestruct (big_sepL_lookup _ (seq 0 n) k k with "Hb") as "Hbk".
+      { rewrite lookup_seq_lt; [reflexivity|lia]. }
+      iDestruct (phys_ledger_at_ledger with "Hbk") as "Hbk".
+      iDestruct (phys_ledger_ram with "Hbk") as %Hram.
+      iApply (ledger_img_cover g (pa_add base k) Hram with "Hint"). }
+    iApply (ledger_wpay_mint_run g base n f cp (seq 0 n) Hcov
+              with "Hgh Hint Hb").
+    intros j Hj. apply elem_of_seq in Hj. lia.
   Qed.
 
   (* (2) THE READ, and it is a PROJECTION: the pin's tie IS the           *)
@@ -3283,6 +3970,187 @@ Section ctx.
   Qed.
 
   (* the window form of the general gate *)
+  (* ---------------------------------------------------------------- *)
+  (* (4) THE RACY GATE (tso-m4-memo.md §3; the kit is TsoMemPa §12/§12c). *)
+  (*                                                                    *)
+  (* The one read in the tree with NO receipt and NO synchronisation:    *)
+  (* [holding()]'s [ld a5,16(a0)] of [lk->cpu] by a hart that does not    *)
+  (* hold the lock.  It cannot conclude a VALUE -- the pin's shape --     *)
+  (* only an EXCLUSION, and the exclusion is a property of the READER'S   *)
+  (* OWN WRITE HISTORY, not of the value.                                *)
+  (*                                                                    *)
+  (* NOTE WHAT IS *NOT* IN THE PREMISES: no [view_lb], no bound, no       *)
+  (* [g.(gtv)] at all.  The conclusion holds at EVERY view, because       *)
+  (* [read_down] scans DOWN from the top and [visibleb_own] makes the     *)
+  (* reader's own message visible at every view -- so no receipt can      *)
+  (* make it better and none is needed.  That is the sharpest statement   *)
+  (* of why the racy kit is not a weakened pin.                          *)
+  (* ---------------------------------------------------------------- *)
+
+  Lemma ledger_read_racy_ok `{CID : CpuId} (g : gstate)
+      (base : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8)
+      (ts : nat -> nat) (z : nat -> bv 8) (cp : agent -> nat -> bv 8)
+      (own : agent -> option nat) (t : nat) :
+    (0 < n)%nat ->
+    (* MY own-last record: where my last write to this window is *)
+    own (hart_agent cpu_id) = Some t ->
+    (* the clear word is not mine ... *)
+    (exists k, (k < n)%nat /\ z k <> cp (hart_agent cpu_id) k) ->
+    (* ... and no other agent's word is mine.  BOTH premises are
+       WORD-level and ask only for a distinguishing offset PER OTHER
+       AGENT -- which is exactly what the [cpus_ptr] layout provides and a
+       byte-keyed kit would not (tso-m4-memo.md §3's computation). *)
+    (forall h', h' <> hart_agent cpu_id ->
+       exists k, (k < n)%nat /\ cp h' k <> cp (hart_agent cpu_id) k) ->
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ seq 0 n,
+       phys_ledger_wpay (pa_add base j) dq (f j) (ts j)
+         (TsWin base n j z cp own)) -∗
+    ⌜forall tv : nat, exists k, (k < n)%nat /\
+       tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add base k)
+       <> Some (cp (hart_agent cpu_id) k)⌝.
+  Proof.
+    iIntros (Hn Hown Hzk Hinj) "Hint Hb".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    (* every byte's element carries its own copy of the window claim *)
+    iAssert (⌜forall j : nat, (j < n)%nat ->
+               win_ok1 g.(gimg) g.(glog) (pa_add base j)
+                 (win_at base n z cp own j)⌝)%I as %Hcov.
+    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
+      iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hb") as "[_ Hej]".
+      { rewrite lookup_seq_lt; [reflexivity|lia]. }
+      iDestruct (ghost_map_lookup with "Hauth Hej") as %HTMj.
+      iPureIntro.
+      exact (ts_ok_win _ _ _ _ _ _ (Htie _ _ HTMj) eq_refl). }
+    iPureIntro. intros tv.
+    exact (win_assemble_not_mine g.(gimg) g.(glog) base n z cp own Hn Hcov
+             (hart_agent cpu_id) t tv Hown Hzk Hinj).
+  Qed.
+
+  (* (5) THE "NO EVIDENCE" GATE (tso-machine-flip.md A6.74 §(3)'s third kit
+     item, owner-approved).  The memo's site table marks the free-path lock
+     word read "receipt in hand? no" and prices it at nothing.  At the real
+     machine "no receipt" still owes a READ RESULT: the leaf must exhibit a
+     value at every reachable view even when it concludes nothing about it.
+     It is payable from image coverage alone -- [read_down] bottoms out at
+     timestamp 0, which is visible at every view -- and it needs neither a
+     receipt nor ownership of the byte's VALUE. *)
+  (* PURE: it consumes no resource at all, which is the honest statement of
+     "no evidence" -- the leaf's obligation is discharged by the machine's
+     own totality over the image, not by anything the client owns. *)
+  Lemma ledger_read_any_ok `{CID : CpuId} (g : gstate) (a : Arch.pa) (b : bv 8) :
+    g.(gimg) !! a = Some b ->
+    forall tv : nat, exists c,
+      tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv a = Some c.
+  Proof. intros Hi tv. exact (tso_read_total _ _ _ _ _ b Hi). Qed.
+
+  Lemma ledger_read_any_ram_ok `{CID : CpuId} (g : gstate) (a : Arch.pa) :
+    addr_is_ram a ->
+    tso_interp_at riscv_eraGS g -∗
+    ⌜forall tv : nat, exists c,
+       tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv a = Some c⌝.
+  Proof.
+    iIntros (Hram) "Hint".
+    iDestruct (ledger_img_cover g a Hram with "Hint") as %[b Hb].
+    iPureIntro. exact (ledger_read_any_ok g a b Hb).
+  Qed.
+
+  (* ...and the WORD form the free-path leaf actually consumes: [n] RAM
+     bytes each return SOMETHING, and [assemble_bytes] is what turns the
+     [n] values into the one word the read node must exhibit.  The word is
+     per-view, which is why this cannot be [Mobl_ram_ex]'s shape: a racy
+     word has no single value good at every reachable view. *)
+  Lemma ledger_read_any_word_ok `{CID : CpuId} (g : gstate)
+      (a : Arch.pa) (n : nat) (m : N) :
+    (8 * Z.of_nat n <= Z.of_N m)%Z ->
+    (forall j, (j < n)%nat -> addr_is_ram (pa_add a j)) ->
+    tso_interp_at riscv_eraGS g -∗
+    ⌜forall tv : nat, exists w : bv m,
+       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv a
+         (N.of_nat n) w⌝.
+  Proof.
+    iIntros (Hm Hram) "Hint".
+    iAssert (⌜forall j : nat, (j < n)%nat ->
+               forall tv : nat, exists c,
+                 tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add a j)
+                 = Some c⌝)%I as %HH.
+    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
+      iApply (ledger_read_any_ram_ok g (pa_add a j) (Hram j Hj) with "Hint"). }
+    iPureIntro. intros tv.
+    (* NO CHOICE AXIOM: [tso_read] is a FUNCTION, so the per-offset byte is
+       its own [default] and the existential above only has to say that the
+       option is not [None]. *)
+    pose (f := fun j : nat =>
+            default (bv_0 8)
+              (tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add a j))).
+    exists (Z_to_bv m (assemble_bytes (f <$> seq 0 n))).
+    intros j Hj.
+    assert (Hjn : (j < n)%nat) by lia.
+    assert (Hlen : length (f <$> seq 0 n) = n)
+      by (rewrite length_fmap length_seq //).
+    (* durable-notes' [ltac:] trap: both side conditions are about
+       [length (f <$> seq 0 n)], which is an ATOM until [Hlen] is used --
+       so they are named, not passed as [ltac:(lia)]. *)
+    assert (Hw : (8 * Z.of_nat (length (f <$> seq 0 n)) <= Z.of_N m)%Z)
+      by (rewrite Hlen; lia).
+    assert (Hjl : (j < length (f <$> seq 0 n))%nat) by (rewrite Hlen; lia).
+    rewrite (nth_byte_assemble_len m (f <$> seq 0 n) j Hw Hjl).
+    assert (Hlk : (f <$> seq 0 n) !!! j = f j).
+    { rewrite list_lookup_total_alt list_lookup_fmap lookup_seq_lt //. }
+    rewrite Hlk /f.
+    destruct (HH j Hjn tv) as (c & Hc). by rewrite Hc.
+  Qed.
+
+  (* ...and a WINDOWED cell supplies its own image coverage: [win_ok1]'s
+     conjunct (2).  So the free-path read of a cell that already carries the
+     racy payload costs nothing extra. *)
+  Lemma ledger_win_img_cover `{CID : CpuId} (g : gstate)
+      (base : Arch.pa) (n : nat) (dq : dfrac) (v : bv 8) (t j : nat)
+      (W : ts_win) :
+    tw_base W = base -> tw_n W = n ->
+    tso_interp_at riscv_eraGS g -∗
+    phys_ledger_wpay (pa_add base j) dq v t W -∗
+    ⌜forall k, (k < n)%nat -> is_Some (g.(gimg) !! pa_add base k)⌝.
+  Proof.
+    iIntros (Hb Hn) "Hint [_ He]".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    iDestruct (ghost_map_lookup with "Hauth He") as %HTM.
+    pose proof (ts_ok_win _ _ _ _ _ _ (Htie _ _ HTM) eq_refl) as Hw.
+    destruct Hw as (_ & _ & _ & Hcov & _).
+    iPureIntro. intros k Hk. rewrite -Hb. apply Hcov. lia.
+  Qed.
+
+  (* ...and the WORD form the leaf actually consumes: a byte that differs
+     makes the assembled word differ.  [n = 8] at the lock, but stated at
+     the general width so the [bv] step is done once. *)
+  Lemma ledger_read_racy_word_ok `{CID : CpuId} (g : gstate)
+      (base : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8)
+      (ts : nat -> nat) (z : nat -> bv 8) (cp : agent -> nat -> bv 8)
+      (own : agent -> option nat) (t : nat) {m : N} (cpw : bv m) :
+    (0 < n)%nat ->
+    own (hart_agent cpu_id) = Some t ->
+    (forall k, (k < n)%nat -> nth_byte cpw k = cp (hart_agent cpu_id) k) ->
+    (exists k, (k < n)%nat /\ z k <> cp (hart_agent cpu_id) k) ->
+    (forall h', h' <> hart_agent cpu_id ->
+       exists k, (k < n)%nat /\ cp h' k <> cp (hart_agent cpu_id) k) ->
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ seq 0 n,
+       phys_ledger_wpay (pa_add base j) dq (f j) (ts j)
+         (TsWin base n j z cp own)) -∗
+    ⌜forall (tv : nat) (w : bv m),
+       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv base
+         (N.of_nat n) w -> w <> cpw⌝.
+  Proof.
+    iIntros (Hn Hown Hcpw Hzk Hinj) "Hint Hb".
+    iDestruct (ledger_read_racy_ok g base n dq f ts z cp own t Hn Hown Hzk Hinj
+                 with "Hint Hb") as %Hex.
+    iPureIntro. intros tv w Hrd ->.
+    destruct (Hex tv) as (k & Hk & Hne). apply Hne.
+    rewrite (Hrd k ltac:(lia)). by rewrite (Hcpw k Hk).
+  Qed.
+
   Lemma ledger_read_bytes_vis_ok `{CID : CpuId} (g : gstate)
       (a : Arch.pa) (n : N) {m : N} (w : bv m) (dq : dfrac) (B : nat) :
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
@@ -3558,7 +4426,7 @@ Notation "a ↦₈[ kt ] dq w" := (ctx_word_pointsto (KTR := kt) cur_ctx a dq w)
    copied EXACTLY -- an omitted [dq custom dfrac at level 1] leaves the
    ε-dq spellings parsing raw, silently.
 
-   [↦ₛ] IS DELIBERATELY NOT FLIPPED; see the block after the seal. *)
+   [↦ₛ] flips too; its block is below. *)
 Notation "a ↦₂{ dq } w" := (ctx_word2_pointsto cur_ctx a dq w)
   (at level 20, format "a  ↦₂{ dq }  w") : bi_scope.
 Notation "a ↦₂ w" := (ctx_word2_pointsto cur_ctx a (DfracOwn 1) w)
@@ -3579,30 +4447,47 @@ Notation "a ↦₄[ kt ] dq w" := (ctx_word4_pointsto (KTR := kt) cur_ctx a dq w
   (at level 20, kt at level 50, dq custom dfrac at level 1,
    format "a  ↦₄[ kt ] dq  w") : bi_scope.
 
-(* WHY [↦ₛ] STAYS RAW (the stage-2 assessment, tso-machine-flip.md §6
-   amendment A6.15).  It was listed with [↦₂]/[↦₄] and it is the one that
-   should NOT move, for two independent reasons:
+(* ================================================================== *)
+(* M1 STAGE 3: the [↦ₛ] family (tso-port.md §0.21′/§0.22′).  Same
+   mechanism, all four dfrac spellings, bracket form included.
 
-   1. IT WOULD PUT A CONTEXT INSIDE [is_lock].  [WpLock.lock_name] is
-      [∃ p, word_pointsto (lock_name_field lk) □ p ∗ p ↦ₛ□ s], and
-      [lock_name] is half of the PERSISTENT lock handle.  Flipping [↦ₛ]
-      makes the handle ξ-dependent for real -- not as the artifact of the
-      constant embedding that tso-port.md §0.11′ measured, but in the
-      statement -- and a boot-minted [is_lock] then cannot be stated at
-      another thread.  That is tso-port.md §0.8′ RULING 2, and it is the
-      root the park and trap protocols were just routed around.
-   2. IT WOULD BUY NOTHING.  Every string fact in this tree is a
-      DISCARDED image literal (lock names, panic messages).  A discarded
-      byte is read-only forever, so it can never owe [Wobl_ram]; and its
-      load obligation is discharged by the PRISTINE gate (A6.10), which
-      needs no context at all.  The ledger index would be dead weight on
-      37 files.
+   THE ASSESSMENT THIS REPLACES (this workspace's A6.15, recorded here so
+   nobody re-derives it) said [↦ₛ] must not move, for two reasons, and
+   BOTH were wrong in the same way -- they read the tier off its rodata
+   instances only:
 
-   Net effect of flipping it would be: one [forget] use removed in
-   [KernelDataInv.kernel_data_string], one ADDED in [WpLock.lock_name_intro],
-   a [CurCtx] binder on 37 files, and a real ξ in the lock handle.  So
-   [↦ₛ] leaves the stage-2 list and joins [↦ₓ]/[↦ᵣ]/[↦ₚ] as deliberately
-   raw. *)
+   1. "It would put a context inside [is_lock]."  It would, if the handle
+      carried the tier's ordinary fact.  It does not: [WpLock.lock_name] /
+      [SleepLock.sl_name] carry [ctx_string_all] (above), the ∀-context
+      DERIVED form, so [is_lock] / [is_sleeplock] stay closed terms and
+      §0.8′ ruling 2 is intact.  The park rows do not move.
+   2. "Every string fact in this tree is a discarded image literal, whose
+      load obligation the pristine gate discharges."  FALSE: [p->name] is
+      written by [safestrcpy] (proc.c:290, exec.c:132) and read by
+      [printk("%s", p->name)].  Those bytes are as ordinary as any other
+      RAM, and a tier that cannot speak about them is not the string tier.
+      They only escaped notice because the proofs walked them through the
+      ad-hoc [ProcDefs.pname_cells] byte big-op, never through [↦ₛ] -- and
+      that big-op is itself context-indexed already.
+
+   So the tier is context-relative at arbitrary timestamps and the
+   pristine case is DERIVED, which is the general rule this port keeps
+   re-learning: the definition covers the dynamic case, the static case is
+   a lemma ([ctx_string_all_of_pristine] is that lemma, and it is where
+   the boot carve's pristine receipts get spent at this tier).
+   [ProcDefs.pname_cells] stays its OWN resource (a fixed-size array with
+   an embedded string, carrying [ProcGeom.pname_wf]); the bridge to [↦ₛ]
+   is the positional borrow/return pair in that file
+   ([pname_cells_borrow] / [pname_cells_return]), not a conversion. *)
+Notation "a ↦ₛ{ dq } s" := (ctx_string_pointsto cur_ctx a dq s)
+  (at level 20, format "a  ↦ₛ{ dq }  s") : bi_scope.
+Notation "a ↦ₛ□ s" := (ctx_string_pointsto cur_ctx a DfracDiscarded s)
+  (at level 20, format "a  ↦ₛ□  s") : bi_scope.
+Notation "a ↦ₛ s" := (ctx_string_pointsto cur_ctx a (DfracOwn 1) s)
+  (at level 20, format "a  ↦ₛ  s") : bi_scope.
+Notation "a ↦ₛ[ kt ] dq s" := (ctx_string_pointsto (KTR := kt) cur_ctx a dq s)
+  (at level 20, kt at level 50, dq custom dfrac at level 1,
+   format "a  ↦ₛ[ kt ] dq  s") : bi_scope.
 
 (* The seal.  [ctx_dom] and [hart_view_lb] stay opaque too: nothing above
    this file may learn their bodies, and nothing may learn what
@@ -3616,6 +4501,8 @@ Global Opaque own_context ctx_parked hart_view_lb ctx_pointsto ctx_dom
    cross silently by δ, and the physical family faces [phys_pointsto] the
    way the VA one faces [mem_pointsto].  [ctx_phys_word_pointsto] is NOT
    sealed -- a tower over the sealed byte, like [ctx_word_pointsto]. *)
-(* [ctx_word_pointsto] is NOT sealed at all: it is a tower OVER the sealed
-   byte fact, so exposing its ⌜aligned⌝ ∗ big-op shape leaks nothing --
-   and the tree's proofs destruct/frame the word shape structurally. *)
+(* [ctx_word_pointsto] -- and its siblings [ctx_word2_pointsto] /
+   [ctx_word4_pointsto] / [ctx_string_pointsto] / [ctx_string_all] -- are
+   NOT sealed at all: each is a tower OVER the sealed byte fact, so
+   exposing its ⌜aligned⌝ ∗ big-op shape leaks nothing -- and the tree's
+   proofs destruct/frame the word shape structurally. *)

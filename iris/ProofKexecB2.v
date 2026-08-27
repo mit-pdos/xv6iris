@@ -195,6 +195,9 @@ Qed.
 Section KexecMsg.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* M1 stage 3: [↦ₛ] is context-indexed, and a rodata message extracted
+     from [kernel_data] lands at the READING thread's context. *)
+  Context `{XI : CurCtx}.
 
   Lemma kxc_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int kxc_msg_a : mword 64) ↦ₛ□ kxc_msg.

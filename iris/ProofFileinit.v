@@ -83,7 +83,7 @@ Section ProofFileinit.
       do 7 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string ftable_name_str "ftable"%string name eq_refl ltac:(unfold text_end, ftable_name_str; lia)
+    iPoseProof (kernel_data_string_all ftable_name_str "ftable"%string name eq_refl ltac:(unfold text_end, ftable_name_str; lia)
                                                                                 ltac:(vm_compute; discriminate) Hftable
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf KT1 m K KernelSyms.fileinit

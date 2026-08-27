@@ -401,6 +401,11 @@ Section VcGenSIris.
     block_instrs_s st.(vpc) prog -∗
     vheap_own ρ st.(vheap) -∗
     vheap4_own ρ st.(vheap4) -∗
+    (* THE WRITER'S TOKEN, threaded (tso-machine-flip.md A6.63): every
+       memory leaf below takes [own_context] and hands it back -- a store is
+       a LEDGER APPEND and the append's author is the token's hart -- so the
+       generated block WP carries it exactly as it carries the heap. *)
+    TsoCtx.own_context XI -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
@@ -409,6 +414,7 @@ Section VcGenSIris.
       gpr_file (vregs_den ρ st'.(vregs)) -∗
       vheap_own ρ st'.(vheap) -∗
       vheap4_own ρ st'.(vheap4) -∗
+      TsoCtx.own_context XI -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -417,14 +423,14 @@ Section VcGenSIris.
     - (* empty block *)
       simpl in Hblk. injection Hblk as <-.
       iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-               Hpc Hgpr _ Hheap Hheap4 Hcont".
+               Hpc Hgpr _ Hheap Hheap4 Hctx Hcont".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                            Hpc Hgpr Hheap Hheap4").
+                            Hpc Hgpr Hheap Hheap4 Hctx").
     - cbn [vc_block_s] in Hblk.
       destruct (vc_step_s st op) as [st1|] eqn:Hstep;
         rewrite ?Hstep in Hblk; [|discriminate].
       iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-               Hpc Hgpr [Hi Hbi] Hheap Hheap4 Hcont".
+               Hpc Hgpr [Hi Hbi] Hheap Hheap4 Hctx Hcont".
       destruct op as [imm rd|rdc nzimm rd|uimm rs2|uimm rd
                      |imm rs1 rd|imm rs2 rs1|imm rd
                      |rvc imm rs2 rs1|rvc imm rs1 rd|imm6]; simpl in Hstep.
@@ -455,7 +461,7 @@ Section VcGenSIris.
           apply vregs_den_insert. }
         iEval (rewrite Egpr) in "Hgpr".
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScaddi4spn *)
         destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (regidx_eqb (creg2reg_idx rdc) (Regidx rd)) eqn:Hrdc0;
@@ -486,7 +492,7 @@ Section VcGenSIris.
           apply vregs_den_insert. }
         iEval (rewrite Egpr) in "Hgpr".
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScsdsp *)
         destruct (is_tp rs2) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -512,14 +518,14 @@ Section VcGenSIris.
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                        Hpc Hgpr Hi Hcell").
-        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                        Hpc Hgpr Hi Hctx Hcell").
+        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
         iEval (rewrite avi_mword) in "Hpc".
         iEval (rewrite (vregs_den_lookup ρ _ _ _ Hrs2) -Hea) in "Hcell".
         iDestruct ("Hheapk" $! (sval_addZ v1 (zoff6 uimm), v2) with "[Hcell]")
           as "Hheap"; [iExact "Hcell"|].
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScldsp *)
         destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
@@ -547,8 +553,8 @@ Section VcGenSIris.
                   (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                        Hpc Hgpr Hi Hcell").
-        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                        Hpc Hgpr Hi Hctx Hcell").
+        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
         iEval (rewrite avi_mword) in "Hpc".
         iEval (rewrite -Hea) in "Hcell".
         iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
@@ -558,7 +564,7 @@ Section VcGenSIris.
         { unfold regval_into_reg. apply vregs_den_insert. }
         iEval (rewrite Egpr) in "Hgpr".
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VSclw *)
         destruct (orb (is_tp rd) (is_tp rs1)) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
@@ -586,8 +592,8 @@ Section VcGenSIris.
                   (dq:=dq)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                        Hpc Hgpr Hi Hcell").
-        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                        Hpc Hgpr Hi Hctx Hcell").
+        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
         iEval (rewrite avi_mword) in "Hpc".
         iEval (rewrite -Hea) in "Hcell".
         iDestruct ("Hheapk" with "[Hcell]") as "Hheap4"; [iExact "Hcell"|].
@@ -599,7 +605,7 @@ Section VcGenSIris.
           cbn [sval_den]. reflexivity. }
         iEval (rewrite Egpr) in "Hgpr".
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScsw *)
         destruct (orb (is_tp rs1) (is_tp rs2)) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -626,8 +632,8 @@ Section VcGenSIris.
                   (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                        Hpc Hgpr Hi Hcell").
-        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                        Hpc Hgpr Hi Hctx Hcell").
+        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
         iEval (rewrite avi_mword) in "Hpc".
         assert (Hsv : trunc32 (vregs_den ρ (vregs st) !!! Regidx rs2)
                       = sval32_den ρ (sval_trunc32 v2)).
@@ -636,7 +642,7 @@ Section VcGenSIris.
         iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), sval_trunc32 v2)
                      with "[Hcell]") as "Hheap4"; [iExact "Hcell"|].
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScaddiw *)
         destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
@@ -668,7 +674,7 @@ Section VcGenSIris.
           rewrite trunc32_subrange. reflexivity. }
         iEval (rewrite Egpr) in "Hgpr".
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VSsd : general-base 8-byte store (c.sd / base sd) *)
         destruct (orb (is_tp rs1) (is_tp rs2)) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -697,28 +703,28 @@ Section VcGenSIris.
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          Hpc Hgpr Hi Hcell").
-          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                          Hpc Hgpr Hi Hctx Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite Hsv -Hea) in "Hcell".
           iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
             as "Hheap"; [iExact "Hcell"|].
           iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
         * iPoseProof Hwit as "#Hwit".
           iApply (wp_sd_s_r_t R KTR KTR (mword_of_int (vpc st)) rs2 rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          Hpc Hgpr Hi Hcell").
-          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                          Hpc Hgpr Hi Hctx Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite Hsv -Hea) in "Hcell".
           iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
             as "Hheap"; [iExact "Hcell"|].
           iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VSld : general-base 8-byte load (c.ld / base ld) *)
         destruct (orb (is_tp rd) (is_tp rs1)) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
@@ -750,28 +756,28 @@ Section VcGenSIris.
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          Hpc Hgpr Hi Hcell").
-          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                          Hpc Hgpr Hi Hctx Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite -Hea) in "Hcell".
           iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
           iEval (rewrite Egpr) in "Hgpr".
           iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
         * iPoseProof Hwit as "#Hwit".
           iApply (wp_ld_s_r_t R KTR KTR (mword_of_int (vpc st)) rd rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          Hpc Hgpr Hi Hcell").
-          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                          Hpc Hgpr Hi Hctx Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite -Hea) in "Hcell".
           iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
           iEval (rewrite Egpr) in "Hgpr".
           iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScaddi16sp *)
         destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; [|discriminate].
@@ -796,7 +802,7 @@ Section VcGenSIris.
           apply vregs_den_insert. }
         iEval (rewrite Egpr) in "Hgpr".
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
     (* the [KtierLe KTR KTR] side conditions of the tier-generic leaves are
        shelved by [iApply]'s elaboration, not solved in place. *)
     Unshelve. all: apply _.
@@ -825,6 +831,11 @@ Section VcGenSIris.
     block_instrs_s st.(vpc) prog -∗
     vheap_own ρ st.(vheap) -∗
     vheap4_own ρ st.(vheap4) -∗
+    (* THE WRITER'S TOKEN, threaded (tso-machine-flip.md A6.63): every
+       memory leaf below takes [own_context] and hands it back -- a store is
+       a LEDGER APPEND and the append's author is the token's hart -- so the
+       generated block WP carries it exactly as it carries the heap. *)
+    TsoCtx.own_context XI -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
@@ -833,6 +844,7 @@ Section VcGenSIris.
       gpr_file (vregs_den ρ st'.(vregs)) -∗
       vheap_own ρ st'.(vheap) -∗
       vheap4_own ρ st'.(vheap4) -∗
+      TsoCtx.own_context XI -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
@@ -901,6 +913,11 @@ Section VcGenSIris.
     block_instrs_s st.(vpc) prog -∗
     vheap_own ρ st.(vheap) -∗
     vheap4_own ρ st.(vheap4) -∗
+    (* THE WRITER'S TOKEN, threaded (tso-machine-flip.md A6.63): every
+       memory leaf below takes [own_context] and hands it back -- a store is
+       a LEDGER APPEND and the append's author is the token's hart -- so the
+       generated block WP carries it exactly as it carries the heap. *)
+    TsoCtx.own_context XI -∗
     ( ∀ mf : regfile,
       ⌜ gpr_matches ρ st'.(vregs) mf ∧ agree_off st'.(vregs) mf m0 ⌝ -∗
       hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -911,6 +928,7 @@ Section VcGenSIris.
       gpr_file mf -∗
       vheap_own ρ st'.(vheap) -∗
       vheap4_own ρ st'.(vheap4) -∗
+      TsoCtx.own_context XI -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -919,14 +937,14 @@ Section VcGenSIris.
     - (* empty block *)
       simpl in Hblk. injection Hblk as <-.
       iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-               Hpc Hgpr _ Hheap Hheap4 Hcont".
+               Hpc Hgpr _ Hheap Hheap4 Hctx Hcont".
       iApply ("Hcont" $! m with "[//] Hhs Hpriv Hms Hmie Hmdl Hmenv
-                                 Htlbinv Hpc Hgpr Hheap Hheap4").
+                                 Htlbinv Hpc Hgpr Hheap Hheap4 Hctx").
     - cbn [vc_block_s] in Hblk.
       destruct (vc_step_s st op) as [st1|] eqn:Hstep;
         rewrite ?Hstep in Hblk; [|discriminate].
       iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-               Hpc Hgpr [Hi Hbi] Hheap Hheap4 Hcont".
+               Hpc Hgpr [Hi Hbi] Hheap Hheap4 Hctx Hcont".
       destruct op as [imm rd|rdc nzimm rd|uimm rs2|uimm rd
                      |imm rs1 rd|imm rs2 rs1|imm rd
                      |rvc imm rs2 rs1|rvc imm rs1 rd|imm6]; simpl in Hstep.
@@ -953,7 +971,7 @@ Section VcGenSIris.
           reflexivity. }
         iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScaddi4spn *)
         destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (regidx_eqb (creg2reg_idx rdc) (Regidx rd)) eqn:Hrdc0;
@@ -981,7 +999,7 @@ Section VcGenSIris.
           reflexivity. }
         iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScsdsp *)
         destruct (is_tp rs2) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -1008,15 +1026,15 @@ Section VcGenSIris.
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                        Hpc Hgpr Hi Hcell").
-        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                        Hpc Hgpr Hi Hctx Hcell").
+        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
         iEval (rewrite avi_mword) in "Hpc".
         iEval (rewrite Hm2 -Hea) in "Hcell".
         iDestruct ("Hheapk" $! (sval_addZ v1 (zoff6 uimm), v2) with "[Hcell]")
           as "Hheap"; [iExact "Hcell"|].
         iApply (IH _ _ Hblk Hmatch Hao
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScldsp *)
         destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
@@ -1044,8 +1062,8 @@ Section VcGenSIris.
                   (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                        Hpc Hgpr Hi Hcell").
-        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                        Hpc Hgpr Hi Hctx Hcell").
+        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
         iEval (rewrite avi_mword) in "Hpc".
         iEval (rewrite -Hea) in "Hcell".
         iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
@@ -1053,7 +1071,7 @@ Section VcGenSIris.
           by reflexivity.
         iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VSclw *)
         destruct (orb (is_tp rd) (is_tp rs1)) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
@@ -1080,8 +1098,8 @@ Section VcGenSIris.
                   (dq:=dq)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                        Hpc Hgpr Hi Hcell").
-        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                        Hpc Hgpr Hi Hctx Hcell").
+        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
         iEval (rewrite avi_mword) in "Hpc".
         iEval (rewrite -Hea) in "Hcell".
         iDestruct ("Hheapk" with "[Hcell]") as "Hheap4"; [iExact "Hcell"|].
@@ -1089,7 +1107,7 @@ Section VcGenSIris.
                        = sval_den ρ (S32 w32)) by reflexivity.
         iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScsw *)
         destruct (orb (is_tp rs1) (is_tp rs2)) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -1116,8 +1134,8 @@ Section VcGenSIris.
                   (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                        Hpc Hgpr Hi Hcell").
-        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                        Hpc Hgpr Hi Hctx Hcell").
+        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
         iEval (rewrite avi_mword) in "Hpc".
         assert (Hsv : trunc32 (m !!! Regidx rs2) = sval32_den ρ (sval_trunc32 v2)).
         { rewrite sval_trunc32_den Hm2. reflexivity. }
@@ -1126,7 +1144,7 @@ Section VcGenSIris.
                      with "[Hcell]") as "Hheap4"; [iExact "Hcell"|].
         iApply (IH _ _ Hblk Hmatch Hao
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScaddiw *)
         destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
@@ -1155,7 +1173,7 @@ Section VcGenSIris.
           rewrite trunc32_subrange. reflexivity. }
         iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VSsd : general-base 8-byte store (agreement interface) *)
         destruct (orb (is_tp rs1) (is_tp rs2)) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -1182,30 +1200,30 @@ Section VcGenSIris.
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          Hpc Hgpr Hi Hcell").
-          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                          Hpc Hgpr Hi Hctx Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite Hm2 -Hea) in "Hcell".
           iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
             as "Hheap"; [iExact "Hcell"|].
           iApply (IH _ _ Hblk Hmatch Hao
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
         * iPoseProof Hwit as "#Hwit".
           iApply (wp_sd_s_r_t R KTR KTR (mword_of_int (vpc st)) rs2 rs1 imm
                     m (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          Hpc Hgpr Hi Hcell").
-          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                          Hpc Hgpr Hi Hctx Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite Hm2 -Hea) in "Hcell".
           iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
             as "Hheap"; [iExact "Hcell"|].
           iApply (IH _ _ Hblk Hmatch Hao
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VSld : general-base 8-byte load (agreement interface) *)
         destruct (orb (is_tp rd) (is_tp rs1)) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
@@ -1233,28 +1251,28 @@ Section VcGenSIris.
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          Hpc Hgpr Hi Hcell").
-          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                          Hpc Hgpr Hi Hctx Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite -Hea) in "Hcell".
           iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
           iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
         * iPoseProof Hwit as "#Hwit".
           iApply (wp_ld_s_r_t R KTR KTR (mword_of_int (vpc st)) rd rs1 imm
                     m (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          Hpc Hgpr Hi Hcell").
-          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+                          Hpc Hgpr Hi Hctx Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hctx Hcell".
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite -Hea) in "Hcell".
           iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
           iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
       + (* VScaddi16sp *)
         destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; [|discriminate].
@@ -1275,7 +1293,7 @@ Section VcGenSIris.
           reflexivity. }
         iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
-                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont").
   Qed.
 
   Lemma wp_vc_block_s_aux (root_ppn : mword 44) (prog : list vop_s)
@@ -1304,6 +1322,11 @@ Section VcGenSIris.
     block_instrs_s st.(vpc) prog -∗
     vheap_own ρ st.(vheap) -∗
     vheap4_own ρ st.(vheap4) -∗
+    (* THE WRITER'S TOKEN, threaded (tso-machine-flip.md A6.63): every
+       memory leaf below takes [own_context] and hands it back -- a store is
+       a LEDGER APPEND and the append's author is the token's hart -- so the
+       generated block WP carries it exactly as it carries the heap. *)
+    TsoCtx.own_context XI -∗
     ( ∀ mf : regfile,
       ⌜ gpr_matches ρ st'.(vregs) mf ∧ agree_off st'.(vregs) mf m0 ⌝ -∗
       hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -1314,6 +1337,7 @@ Section VcGenSIris.
       gpr_file mf -∗
       vheap_own ρ st'.(vheap) -∗
       vheap4_own ρ st'.(vheap4) -∗
+      TsoCtx.own_context XI -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
@@ -1341,6 +1365,11 @@ Section VcGenSIris.
     block_instrs_s st.(vpc) prog -∗
     vheap_own ρ st.(vheap) -∗
     vheap4_own ρ st.(vheap4) -∗
+    (* THE WRITER'S TOKEN, threaded (tso-machine-flip.md A6.63): every
+       memory leaf below takes [own_context] and hands it back -- a store is
+       a LEDGER APPEND and the append's author is the token's hart -- so the
+       generated block WP carries it exactly as it carries the heap. *)
+    TsoCtx.own_context XI -∗
     ( ∀ mf : regfile,
       ⌜ gpr_matches ρ st'.(vregs) mf ∧ agree_off st'.(vregs) mf m ⌝ -∗
       smode_config γ dq -∗
@@ -1349,11 +1378,12 @@ Section VcGenSIris.
       gpr_file mf -∗
       vheap_own ρ st'.(vheap) -∗
       vheap4_own ρ st'.(vheap4) -∗
+      TsoCtx.own_context XI -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwit Hblk Hmatch.
-    iIntros "Hsm Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont".
+    iIntros "Hsm Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx Hcont".
     iDestruct (smode_config_unbundle with "Hsm") as
       "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
     iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
@@ -1362,12 +1392,12 @@ Section VcGenSIris.
     iApply (wp_vc_block_s_aux_r R prog st st' ρ m m mstatus0 mie_v mdv0 menvcfg0
               (dq:=dq) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hwit Hblk Hmatch
               (fun r _ => eq_refl)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hbi Hheap Hheap4 [Hcont Hsie]").
-    iIntros (mf) "%Hmf Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hheap Hheap4".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hctx [Hcont Hsie]").
+    iIntros (mf) "%Hmf Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hheap Hheap4 Hctx".
     iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" $! mf with "[//] Hsm Htlbinv Hpc Hgpr Hheap Hheap4").
+    iApply ("Hcont" $! mf with "[//] Hsm Htlbinv Hpc Hgpr Hheap Hheap4 Hctx").
   Qed.
 
   Lemma wp_vc_block_s (root_ppn : mword 44) (prog : list vop_s)
@@ -1383,6 +1413,11 @@ Section VcGenSIris.
     block_instrs_s st.(vpc) prog -∗
     vheap_own ρ st.(vheap) -∗
     vheap4_own ρ st.(vheap4) -∗
+    (* THE WRITER'S TOKEN, threaded (tso-machine-flip.md A6.63): every
+       memory leaf below takes [own_context] and hands it back -- a store is
+       a LEDGER APPEND and the append's author is the token's hart -- so the
+       generated block WP carries it exactly as it carries the heap. *)
+    TsoCtx.own_context XI -∗
     ( ∀ mf : regfile,
       ⌜ gpr_matches ρ st'.(vregs) mf ∧ agree_off st'.(vregs) mf m ⌝ -∗
       smode_config γ dq -∗
@@ -1391,6 +1426,7 @@ Section VcGenSIris.
       gpr_file mf -∗
       vheap_own ρ st'.(vheap) -∗
       vheap4_own ρ st'.(vheap4) -∗
+      TsoCtx.own_context XI -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.

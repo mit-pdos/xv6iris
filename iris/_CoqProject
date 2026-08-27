@@ -242,55 +242,76 @@ UserTranslate.v
 UserMem.v
 UserFetch.v
 UserStepFull.v
-# --- BEGIN verified Umode WP tier (sync/echo/sh/init) ---
-# Descoped from the hart-node-port build on 2026-08-19 and REVIVED on
-# 2026-08-20, ported onto per-node semantics; all 41 rows are in the build.
-# Distinct from the ProofUser/UserExec "run arbitrary user-mode code" tier,
-# and from LinkUserinit/SpecUserinit, which are the KERNEL's userinit path.
-# What the port cost, and why it cost so little, is in
+# --- BEGIN verified Umode WP tier (sync/echo/sh/init) -- DESCOPED ---
+# DESCOPED FROM THE TSO PORT, 2026-08-27, by the owner ruling recorded at
+# tso-port.md §0.24' (commit dc36835c): the port carries the GENERIC
+# user-mode safety tier -- arbitrary-user-code safety ([ProofUser] /
+# [UserExec] and the user translation/fetch machinery it and the kernel's
+# own copyin/copyout/exec lanes consume -- and DEFERS the SPECIFIC-BINARY
+# tier: the init/sync/sh/echo certificates and the machinery consumed ONLY
+# by them.  This is the Aug-19 precedent replayed (the block was descoped
+# then and revived on Aug-20); the rows stay here, commented, so the revival
+# is one edit again.
+#
+# THE SPLIT IS MEASURED, NOT ASSERTED.  Taking the reverse-dependency
+# closure over iris/.CoqMakefile.d from the seed {UProof*, USpec*, UCode*}
+# and iterating "every consumer of a descoped file is itself descoped" to a
+# FIXPOINT yields exactly the 41 rows below -- the block was already
+# dependency-closed, which is why the edit is a comment sweep and nothing
+# else.  Verified: no file outside the block consumes any file inside it,
+# and [SystemAdequacy] depends on NONE of them.
+#
+# THE ONE RESULT THAT MOVES THE PORT'S QUEUE: [UmodeFetch] (37 files behind
+# it, one of the three U-mode red frontier files) is INSIDE this tier -- its
+# own header says so ("the CONCRETE-byte instruction fetch of the VERIFIED
+# user-mode tier"), and the generic tier's fetch composer is the separate
+# [UserFetchPt.v].  So the U-mode payer threading's frontier is TWO files,
+# [UptWalkPt] and [UserMemPt], not three.
+#
+# What the tier is and what its port cost when it WAS in scope:
 # claude-notes/projects/user-verified.md.
-UmodeMem.v
-UmodeCap.v
-UmodeFetch.v
-UmodeAbi.v
-UmodeArith.v
-UmodeSyscall.v
-UmodeIo.v
-WpUmodeStep.v
-WpUmodeLeaf.v
-WpUmodeBranch.v
-WpUmodeStore.v
-WpUmodeLoad.v
-USpecSync.v
-UCodeSync.v
-UProofSync.v
-UCodeEcho.v
-USpecEcho.v
-UCodeSh.v
-USpecSh.v
-USpecShParse.v
-UmodeFrame.v
-UmodeStub.v
-UProofShLib.v
-UProofShMem.v
-UProofShHeap.v
-UProofShLex.v
-UProofShIo.v
-UProofShInput.v
-UProofShParse.v
-UProofShCmd.v
-UProofShTop.v
-UProofShMain.v
-UProofShEcho.v
-UCodeInit.v
-UmodeInitIo.v
-USpecInit.v
-UProofInitLib.v
-UProofInitPrintf.v
-UProofInit.v
-UProofEchoA.v
-UProofEcho.v
-# --- END verified Umode WP tier ---
+# UmodeMem.v
+# UmodeCap.v
+# UmodeFetch.v
+# UmodeAbi.v
+# UmodeArith.v
+# UmodeSyscall.v
+# UmodeIo.v
+# WpUmodeStep.v
+# WpUmodeLeaf.v
+# WpUmodeBranch.v
+# WpUmodeStore.v
+# WpUmodeLoad.v
+# USpecSync.v
+# UCodeSync.v
+# UProofSync.v
+# UCodeEcho.v
+# USpecEcho.v
+# UCodeSh.v
+# USpecSh.v
+# USpecShParse.v
+# UmodeFrame.v
+# UmodeStub.v
+# UProofShLib.v
+# UProofShMem.v
+# UProofShHeap.v
+# UProofShLex.v
+# UProofShIo.v
+# UProofShInput.v
+# UProofShParse.v
+# UProofShCmd.v
+# UProofShTop.v
+# UProofShMain.v
+# UProofShEcho.v
+# UCodeInit.v
+# UmodeInitIo.v
+# USpecInit.v
+# UProofInitLib.v
+# UProofInitPrintf.v
+# UProofInit.v
+# UProofEchoA.v
+# UProofEcho.v
+# --- END verified Umode WP tier -- DESCOPED ---
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
