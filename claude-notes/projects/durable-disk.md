@@ -2873,6 +2873,13 @@ so it never wanted that shape.
   fragment for fragment, shares allowed, disjointness from `phi_excl`);
   the value-first allocator and its carve survive only inside era 0's image
   producer.  H4 does the commit side, H5 the boot side.
+  ADDENDUM (owner): the snapshot carries NO pure geometry.  `snap_shape`
+  is dropped from `fs_snap`; superblock geometry is read off the
+  snapshot's own `sb_owned`, per-directory facts off the bundles, and
+  facts about the committed view `D` itself (block size, `dom D` below
+  `sb_size`) are the WAL's, supplied where consumed.  The predicate needs
+  nothing about `D`'s domain, and the `=` identity is neither provable
+  (resources are affine) nor needed (`FsDurXferWall`).
 - [ ] **Lane H — THE VALUE-FIRST ALLOCATOR IS A MISTAKE TO CLEAN UP
   (owner ruling; first cleanup after the theorem).**  As built, the commit
   MATERIALISES a pure disjointness fact: `FsCollectAll.fs_collect_snap_ok`
