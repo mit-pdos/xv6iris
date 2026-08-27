@@ -97,6 +97,8 @@ Require Import FsState.        (* [fs_state], [top_frag] *)
 Require Import FsDurXfer.      (* [snap_gamma] *)
 Require Import FsDurRead.      (* [snap_auth] -- the epoch's IDENTITY *)
 Require Import FsDurSnap.      (* [snap_ok], [snap_shape], [fs_snap] *)
+Require Import FsDurAlloc.     (* [fs_snap_alloc] -- the value-first entry
+                                  the two inhabitedness witnesses use *)
 
 Local Open Scope Z_scope.
 

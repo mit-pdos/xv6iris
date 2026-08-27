@@ -1321,6 +1321,7 @@ FsDurBytes.v
 FsDurXfer.v
 FsDurRead.v
 FsDurSnap.v
+FsDurAlloc.v
 FsDurImg.v
 FsCfgSnap.v
 FsDurXferWall.v

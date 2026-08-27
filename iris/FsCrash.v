@@ -2360,30 +2360,34 @@ Section fs_crash.
      provable from nothing.  The client instantiates
      [Pc := fun dk => ∃ γs, P_fs γs cov logstart dk] and discharges the
      obligation with this lemma. *)
-  (* ...AND IT MINTS THE DURABLE SNAPSHOT (lane CE, plan section 3).  The one
-     thing the snapshot needs is the PURE tie [snap_ok S D0] -- it owns no
-     resource anybody else has ([FsDurSnap.P_dur_alloc] is a
-     build-from-nothing update) -- so this lemma gains exactly one pure
-     premise, discharged at era 0 by the image's own theorem
-     ([FsDurImg.img_snap_ok], through [FsDurImg.img_boot_P_fs_dur]).  The
-     [gamma_v] map adequacy still mints EMPTY is no longer read here; it is
-     dropped affinely, and lane CE item 3 deletes the field. *)
+  (* ...AND IT TAKES THE DURABLE SNAPSHOT ALREADY BUILT (durable-disk lane
+     H5).  Era 0's epoch is the ONE snapshot in the tree with no source
+     instance to be minted off, so its byte map has to be CARVED by pure
+     disjointness facts -- and that carve is IMAGE-SPECIFIC
+     ([FsDurAlloc.P_dur_alloc], whose one caller is
+     [FsDurImg.img_P_dur_alloc]).  This lemma therefore takes the epoch as a
+     RESOURCE under an update rather than [exists S, snap_ok S D0] as a pure
+     premise: the crash predicate does not know how a file system is built
+     out of bytes, and nothing at or below it mentions [snap_ok] any more.
+     The [gamma_v] map adequacy still mints EMPTY is no longer read here; it
+     is dropped affinely, and lane CE item 3 deletes the field. *)
   Lemma P_fs_alloc (γsw γreg γst γv : gname) (Γd : fs_dur_names) (dk0 : Z -> bv 8)
       (D0 : gmap Z (list (bv 8))) (cov : gset Z) (logstart : Z) :
     fs_recovery (fs_blocks dk0) D0 cov logstart ->
     hdr_wf (fs_blocks dk0) cov logstart ->
-    (* the snapshot's own premise: the committed map IS a file system *)
-    (exists S : fs_state_rec, snap_ok S D0) ->
+    (* the snapshot's own premise, as a RESOURCE: era 0's epoch, built by
+       the one producer that can build one from bytes (the image) *)
+    (⊢ |==> P_dur D0) ->
     mono_nat_auth_own γsw 1 0%nat ∗
     ghost_map_auth γv 1 (∅ : gmap Z (bv 8)) ⊢ |==> ∃ γs : fs_crash_names,
       ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
       P_fs γs γv Γd cov logstart dk0 ∗ fs_receipt γs D0.
   Proof.
-    intros Hrec Hhwf [S Hsnap]. iIntros "[Hsw Hva]".
+    intros Hrec Hhwf Hsnap. iIntros "[Hsw Hva]".
     iMod (fs_hist_alloc [D0]) as (γh) "[Hauth #Hlb]".
-    (* THE DURABLE FILE SYSTEM IS BORN HERE (lane CE): one copy of the
+    (* THE DURABLE FILE SYSTEM ARRIVES HERE (lane CE / H5): one copy of the
        predicate over fresh names, at the committed map. *)
-    iMod (P_dur_alloc S D0 Hsnap) as "Hdur".
+    iMod Hsnap as "Hdur".
     iModIntro. iExists (MkFsCrashNames γh γsw γreg γst).
     iSplitR; [iPureIntro; done|].
     iSplitL "Hauth Hsw Hdur".
@@ -2403,8 +2407,7 @@ Section fs_crash.
   Lemma P_fs_alloc_clean (γsw γreg γst γv : gname) (Γd : fs_dur_names) (dk0 : Z -> bv 8)
       (cov : gset Z) (logstart : Z) :
     hdr_n (fs_blocks dk0 (log_hdr_bno logstart)) = 0 ->
-    (exists S : fs_state_rec,
-       snap_ok S (fs_restrict (fs_blocks dk0) (fs_home_set cov logstart))) ->
+    (⊢ |==> P_dur (fs_restrict (fs_blocks dk0) (fs_home_set cov logstart))) ->
     mono_nat_auth_own γsw 1 0%nat ∗
     ghost_map_auth γv 1 (∅ : gmap Z (bv 8)) ⊢ |==> ∃ γs : fs_crash_names,
       ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗

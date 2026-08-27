@@ -51,8 +51,10 @@ Require Import BootChain BootShared.
 Require Import FsCfgBoot.   (* [fs_boot_image_wf], moved down at stage (f) *)
 Require Import RiscvAdequacy.
 Require Import FsCrash.
-Require Import FsDurSnap.   (* [snap_ok] -- [P_fs_alloc]'s durable premise *)
-Require Import FsDurImg.    (* [img_state] / [img_snap_ok]: era 0's discharge *)
+Require Import FsDurSnap.   (* [snap_ok] -- the theorem's durability claim *)
+Require Import FsDurAlloc.  (* era 0's value-first carve, through FsDurImg *)
+Require Import FsDurImg.    (* [img_snap_ok] / [img_P_dur_alloc]: era 0's own
+                               epoch, the ONE value-first allocation left *)
 Require Import FirstTok.    (* [fs_extent_of_image] *)
 (* THE LITERAL mkfs IMAGE.  Both halves, since the corollary at the bottom
    of this file discharges every image hypothesis: [FsImgDisk] is the
@@ -547,13 +549,15 @@ Proof.
     destruct Hw as (Hwf & _).
     apply hdr_wf_zero. rewrite /log_hdr_bno /hdr_n.
     exact (FsImg.fsimg_wf_log _ _ Hwf). }
-  (* ...AND THE DURABLE SNAPSHOT'S PREMISE (lane CE): [FsCrash.P_fs] carries
-     one copy of the file-system predicate at the committed map, so the era-0
-     mint needs "[D0] IS a file system".  The image's log is clean, so [D0]
-     is exactly its home blocks, and [FsDurImg.img_snap_ok] is the theorem.
+  (* ...AND THE DURABLE SNAPSHOT ITSELF (lane CE, re-pointed by lane H5):
+     [FsCrash.P_fs] carries one copy of the file-system predicate at the
+     committed map, so the era-0 mint needs THE EPOCH, not a pure tie.  The
+     image's log is clean, so [D0] is exactly its home blocks, and
+     [FsDurImg.img_P_dur_alloc] -- the tree's ONE value-first allocation,
+     over [FsDurAlloc]'s carve -- builds it.
      THIS IS THE ONLY PLACE THE IMAGE DECODER IS READ: every later era's boot
      re-founds the file system from the snapshot the previous era committed. *)
-  assert (Hsnap0 : exists S : fs_state_rec, snap_ok S D0).
+  assert (Hsnap0 : ⊢ |==> P_dur D0).
   { pose proof Himg as Hw.
     assert (Hclean : hdr_n (fs_blocks (v_disk (g.(gdev).(dvirtio)))
                               (log_hdr_bno (FsImg.sb_logstart sb))) = 0).
@@ -561,8 +565,7 @@ Proof.
       exact (FsImg.fsimg_wf_log _ _ (proj1 Hw)). }
     rewrite (proj1 (fs_recovery_clean _ D0 cov (FsImg.sb_logstart sb) Hclean)
                Hrec).
-    exists (img_state (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib).
-    exact (img_snap_ok _ XV6_DISK_BYTES sb nib cov Hw). }
+    exact (img_P_dur_alloc _ XV6_DISK_BYTES sb nib cov Hw). }
   (* THE CRASH PREDICATE AT ERA 0: the record from mkfs's recovery fact,
      and the DURABLE DISK's fragments -- the whole [0, XV6_DISK_BYTES) of the
      initial image, handed over once by the power theorem and owned by the
