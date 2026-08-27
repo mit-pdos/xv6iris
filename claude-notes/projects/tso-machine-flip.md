@@ -5929,6 +5929,119 @@ deletions, the ten mechanical collapses, `DinodeSlot`,
 of them, and it is running now.
 
 
+### A6.65 THE NODE-ARGUMENT AUDIT IS CLEAN (ONE INSTANCE, PAID), THE
+### PT-CELL TIER IS ONE MISSING PURE LAW, AND THE M2 MINT IS GONE
+
+**ITEM (1), THE AUDIT A6.64's OWN RULE DEMANDED — and the answer is the
+good one.**  Grepped the whole tree for the two argument positions that can
+carry a stale payload into a leaf application:
+
+| position | sites outside the model files |
+|---|---|
+| a NODE term passed as an argument (`swp_{read,write}_ram_node*`) | **1** — `WpSconfMem.v:629`, the one A6.64 fixed |
+| an OBLIGATION term passed as an argument (`Mobl_ram_ex` / `Wobl_ram_ex`) | **1** — `WpSconfMem.v:599`, same application |
+
+**There is no second instance.**  And the reason is structural, not luck:
+every other token-threaded S-mode leaf (`WpSmodePtLeaves`,
+`WpSmodePtMem`, `WpSmodePtMemWrap`, `SmodeCorePt`) discharges its memory
+obligation through a proof ARM — the `iIntros (sigma img log tv V)` bullet
+— rather than by passing a node TERM.  An arm cannot carry a stale payload,
+because the payload is whatever the goal says it is.  All four are green,
+which is the confirmation.
+
+> **SO THE RULE'S SCOPE IS NARROWER THAN IT LOOKED, AND THAT IS WORTH
+> KNOWING:** the hazard belongs to the `_ex`-style leaves that take their
+> node and obligation as TERMS.  `WpSconfMem` is the only file in the tree
+> shaped that way today.  **But the rule still binds forward**: the leaves
+> not yet threaded (`VcGenS`'s six block lemmas, the `tramp_tr_obl` six)
+> will acquire the same hazard the moment they are threaded, and this
+> audit is the thing to re-run after each of those tranches — it is one
+> grep.
+
+### ITEM (3), THE PT-CELL TIER: SIX FILES, ONE MISSING PURE LAW
+
+A6.49's ledger-page move made `PtTree.pt_slot_own` the page-table tower
+(`↦ₚₜ` = `pt_slot_own (UTier cur_ctx)`), and the walk-lane proofs were
+still applying `RiscvPtsto.phys_word_pointsto_ram` — a RAW law — to a
+tiered cell.  That is the whole of the class:
+
+    iSpecialize: cannot instantiate (?a ↦ₚ₈{?dq} ?w -∗ ⌜addr_is_ram ?a⌝)
+    with (pt_addr0 p1 (vpn_at vpn0 k) ↦ₚₜ w0)
+
+**And `PtTree` already had the hard half.**  `pt_slot_own_forget` (`:1160`)
+takes BOTH tiers down to the raw physical word — its own header says "all
+the PURE memory facts below ever wanted of a slot".  What was missing was
+the two-line composition, now landed beside it:
+
+```coq
+  Lemma pt_slot_own_ram  a dq w : pt_slot_own a dq w ⊢ ⌜addr_is_ram a⌝.
+  Lemma pt_slot_own_ram7 a dq w : pt_slot_own a dq w ⊢ ⌜addr_is_ram (pa_add a 7)⌝.
+```
+
+**The conclusion is PURE, which is what makes this free at the call sites**:
+a pure conclusion is persistent, so the slot is not consumed and the walk
+lane keeps using it inline exactly as before.  Five call sites moved,
+character for character (`ProofIsmapped:408`, `ProofMappages:763`,
+`ProofUvmcopy:1102`, `ProofWalkaddr:637`, `ProofUvmunmap:836`).
+
+`ProcInv` and `TfPage36` are the same owner one tier up — their `tf_words`
+family still spells the raw `↦ₚ₈` in its STATEMENTS, and settling that is
+what A6.62's frontier table meant by "settle `ProcInv`/`TfPage36` first".
+
+### ITEM (4): `ProofScheduler` CANNOT BE PAID — THE M2 MINT NO LONGER EXISTS
+
+A6.58 predicted this file exactly ("its single caller `ProofScheduler` is
+the M2 worklist entry that price creates"), and the price is real:
+`SwtchCtx.ctx_cells_reindex` (`:337`) now demands `ctx_dom ξ ξ'` and is a
+`==∗`, while `ProofScheduler:510` still calls it with the cells alone,
+inside a plain `iAssert`.
+
+The obvious repair is the one `ProofAcquire:665` uses —
+`iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom"` — **and it is not available:
+`ctx_dom_sc` does not exist any more.**  `TsoCtxShim.v` is down to a single
+declaration (`own_context_alloc`, itself callerless); the SC-only transport
+stopgaps were removed with the rest of the shim's body.
+
+> So the M2 transport class — `ProofAcquire` ×2, `ProofRelease`,
+> `ProofSwtch` and now `ProofScheduler` — **is blocked on the lock kit's
+> REAL mint, not on a local edit.**  Per §0.18′ that mint is
+> `ZZAbsorbProbe.twin_absorb` against `twin_passed_get`'s view receipt, and
+> per A6.39 it is its own tranche against a green tree.  **Do not
+> re-declare `ctx_dom_sc`**: it is false at the real machine, an axiom
+> would be worse than the red, and the red is now honestly localised to
+> five sites in one class.  Characterised, not paid.
+
+### CLOSING NUMBER: 875 OF 1330, RED 34
+
+The PT-tier law landed clean: **all five walk-lane files went green in one
+rebuild** (`ProofIsmapped`, `ProofMappages`, `ProofUvmcopy`,
+`ProofUvmunmap`, `ProofWalkaddr`), nothing regressed, red 39 → 34, and the
+count moved 868 → **875**.  Model `.vo` checked to postdate its source
+first (A6.39); one make throughout.
+
+Two lemmas of two lines each bought five files, which is what a MISSING
+PURE LAW looks like from the outside — the walk lane was never wrong about
+its slots, it just had no way to say `addr_is_ram` at the tier the slots
+now live in.
+
+### THE QUEUE AS IT NOW STANDS
+
+1. **`ProcInv` / `TfPage36`** — the PT-cell tier's statement half; the
+   five walk-lane sites are already paid and will follow.
+2. **The boot 26** — hand-written explicit-ξ, and A6.63 established the
+   dependency runs the right way now: the carve supplies their elements at
+   `DfracOwn 1` through `boot_led_ran`.  Still needs the word/buffer twins
+   of `ctx_pointsto_of_ro` (both are `big_sepL` folds of the byte lemma,
+   `boot_led_word`'s shape).
+3. **`RiscvAdequacy`'s power tail** — A6.61's cascade items 4–6, now the
+   only thing between the carve and a green adequacy file.
+4. **`UmodeFetch`** (7 sites, 2 files, each owing a □ obligation — A6.62),
+   the **`tramp_tr_obl` six**, **`UserMemPt`**'s window accessor.
+5. **The M2 transport class** (5 sites) — the lock tranche.
+6. **`VcGenS`** — six block statements and an induction, reaching the
+   scheduler/trap tier (A6.61).  Re-run the node-argument grep after it.
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
