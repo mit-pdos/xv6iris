@@ -770,3 +770,11 @@ Section SchedCtx.
   Qed.
 
 End SchedCtx.
+
+(* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md):
+   [procs_inv] is two [∗ list]s over NPROC, and it is named in 166 files.
+   AT THE END OF THE FILE, so the accessors above -- [procs_inv_len],
+   [procs_inv_lookup] and the kstack one -- can still take it apart.  Those
+   accessors are what a consumer should use; four files had been hand-rolling
+   [iDestruct "Hpinv" as "[%Hl _]"] instead, and now call [procs_inv_len]. *)
+Global Typeclasses Opaque procs_inv.

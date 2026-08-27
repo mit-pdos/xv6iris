@@ -36,6 +36,7 @@ From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Import ghost_var gen_heap invariants.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import FdSlots.
+Require Import SchedCtx.  (* [procs_inv_len]: the accessor, not a destruct *)
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -93,8 +94,7 @@ Section ProofReleasesleep.
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
     assert (Hbeb : eb = b) by (symmetry; exact Hbmatch). subst eb.
     iDestruct (is_sleeplock_gen_lock with "Hslp") as "#Hlockinv".
-    iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
-    { iDestruct "Hpinv" as "[%Hl _]". iPureIntro. exact Hl. }
+    iDestruct (procs_inv_len with "Hpinv") as %Hlen.
     (* ===== PROLOGUE: 4-slot frame push + saves ra/s0/s1/s2 ===== *)
     set (R1 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.

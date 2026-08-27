@@ -56,6 +56,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
+Require Import SchedCtx.  (* [procs_inv_len]: the accessor, not a destruct *)
 Require Import HartTp WpNext.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RiscvExtras.
@@ -124,8 +125,7 @@ Section ProofPipeclose.
       by (intro i; apply mycpu_ret_nonzero, tp_ok_cid_of).
     iIntros "Hcg Hown #Htext Hpc #Hpipe Href #Hkmem Havail #Hpinv Hcont".
     iDestruct (sie_b_agree m n av eb b pme lks with "Hcg Hown") as %Houtb.
-    iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
-    { iDestruct "Hpinv" as "[%Hl _]". iPureIntro. exact Hl. }
+    iDestruct (procs_inv_len with "Hpinv") as %Hlen.
     iDestruct (is_pipe_valid with "Hpipe") as %Hpv.
     iPoseProof (is_pipe_openable with "Hpipe") as "#Hopen".
     (* ---- 0x00: c.addi sp,-32 -- the frame trade (k := 4) ---- *)
