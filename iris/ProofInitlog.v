@@ -2169,7 +2169,10 @@ Section ProofInitlog.
     assert (Hxempty : (list_to_set (hdr_dec bs_hdr).2 : gset Z)
                         ∖ list_to_set (map uint (il_W bs_hdr ((hdr_dec bs_hdr).1)))
                       = ∅).
-    { rewrite (il_W_uint bs_hdr). set_solver. }
+    (* [il_W_uint] makes the two sides the SAME set, so this is stdpp's
+       [difference_diag_L], not a set-solving problem: naming it is 5.9 s
+       cheaper than letting [set_solver] rediscover it. *)
+    { rewrite (il_W_uint bs_hdr). apply difference_diag_L. }
     iEval (rewrite Hxempty) in "Hxo".
     iMod (exc_seal (fs_exc γfs) with "Hxo") as "#Hseal".
     assert (Hpc68 : ret_pc (C2 !!! Regidx Rra : mword 64)

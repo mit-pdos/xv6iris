@@ -230,7 +230,11 @@ Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import SpecIput.
 Require Import SpecDirlookup.
-Require Import SpecDirlink.
+(* NOT [SpecDirlink]: the only thing this file took from it was
+   [ireg_blocks_ok], which is a transparent alias for
+   [InodeInv.ireg_blocks_ok] (required above) -- and a Spec file must not
+   require another function's Spec (SpecDirlink.v's own header says so).
+   Dropping it takes SpecDirlink and SpecWritei off this file's cone. *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
