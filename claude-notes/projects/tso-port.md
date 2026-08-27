@@ -3755,3 +3755,21 @@ collapse into that one lemma), the two handle definitions, and
 at `⌜t = 0⌝` for the rodata literals — which is where the pristine receipts
 `BootCarve.kernel_data_intro` already holds finally get spent instead of
 discarded.
+
+### 0.23′ OWNER RULING (2026-08-27): main moves ONCE, after leg C
+validates on the tso branch
+
+The M-leg's merge/replay onto `main` WAITS until leg C has landed and
+validated on the `tso` branch — the below-Σ kit swapped in from the
+flip workspace, the full build green, `make audit` at baseline, the
+adequacy statement carrying its carve conjunct.  Rationale (owner):
+the Σ-surface statements added on the M-leg are exactly the things a
+cutover surprise would force back open, and main must not churn
+twice.  Consequences: (i) the C-leg cutover is performed ON THE TSO
+BRANCH first — `tso` remains the certificate tree; (ii) the
+merge-vs-replay choice for main is also deferred to that moment
+(post-cutover, a plain merge/rebase of `tso` is likely to dominate
+the runbook replay, but decide with the validated tree in hand;
+`tso-flip-replay.md` stays as the fallback recipe); (iii) nothing in
+the current lane plan touches `main` — this ruling changes no
+in-flight work, only pins the ordering.
