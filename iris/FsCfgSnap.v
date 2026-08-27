@@ -47,7 +47,7 @@ Require Import RiscvPtsto RiscvModelBytes.
 Require Import FsState.
 Require Import FsStateDefs FsStateInode FsStateBitmap FsStateEra.
 Require Import FsBlocks FsBytesGamma.
-Require Import DinodeEnc DirView.
+Require Import DinodeEnc DirView FsTree.
 Require Import FsCrash LogDefs.
 Require Import InodeInv InodeLock InodeRegion.
 Require Import IcacheEscrow IcacheBoot.
@@ -577,3 +577,179 @@ Section SnapLinks.
   Qed.
 
 End SnapLinks.
+
+(* ====================================================================== *)
+(*  7.  THE FREE POOL, STOCKED FROM THE SNAPSHOT                           *)
+(*                                                                        *)
+(*  [FsCfgBoot.ipool_alloc_of_image]'s twin.  Every per-inum obligation    *)
+(*  [IcacheBoot.ipool_alloc] carries is a reading of [snap_ok] at the      *)
+(*  inum's own node: [InodeLock.inode_ok] is section 5,                     *)
+(*  [FsStateEra.inode_rec_local] and [FsTree.dir_uniq] are                  *)
+(*  [FsStateInode.inode_local] clauses, the three [DirView] premises are   *)
+(*  [FsDurSnap.snap_node_dir_local] (which is [sk_dirloc]), and the block  *)
+(*  resources are section 4's [snap_inode_blocks_res].  The node's own     *)
+(*  [(dn, bm, data)] decomposition is [FsStateEra.bm_of] / [fn_data], and  *)
+(*  [FsStateEra.era_node_bm_of] is what says it rebuilds the very node.    *)
+(* ====================================================================== *)
+
+Lemma dir_uniq_of_local (i : Z) (n : fs_node) :
+  inode_local i n -> dir_uniq (fn_rec n) (fn_data n).
+Proof.
+  intros Hl Hty. apply (inl_dir_uniq Hl).
+  rewrite /fn_is_dir. exact (bool_decide_eq_true_2 _ Hty).
+Qed.
+
+Section SnapPool.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, !irefslotG Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma ipool_alloc_of_snap (γfs : fs_names) (γi : gname)
+      (S : fs_state_rec) (P : Z -> list (bv 8)) (cov C A : gset Z) :
+    snap_ok S (fs_restrict P (fs_home_set cov (sb_logstart (fss_sb S)))) ->
+    Z.of_nat icfg_nib = sb_ninodes (fss_sb S) / 16 + 1 ->
+    16 * Z.of_nat icfg_nib <= 2 ^ 32 ->
+    (* the live set as a PARAMETER, exactly as the image route takes it *)
+    (forall z : Z, z ∈ A <-> z ∈ region_inums icfg_nib
+                             /\ fn_type (snap_node S z) <> 0) ->
+    (* the carve's corner: each live node's own blocks are inside [C] *)
+    (forall z : Z, z ∈ A -> snap_blk_set (snap_node S z) ⊆ C) ->
+    ([∗ set] z ∈ region_inums icfg_nib, icnt_half z 0%nat) -∗
+    ([∗ set] z ∈ region_inums icfg_nib, frzm_h z false) -∗
+    ([∗ set] z ∈ region_inums icfg_nib, ifreeze_off z) -∗
+    ([∗ set] z ∈ region_inums icfg_nib,
+       dv_ride z (dv_of (fn_rec (snap_node S z)) (fn_data (snap_node S z)))) -∗
+    ([∗ set] z ∈ region_inums icfg_nib,
+       fv_ride z (fv_of (fn_rec (snap_node S z)) (fn_data (snap_node S z)))) -∗
+    ([∗ set] z ∈ A, top_frag (fs_gamma_L γfs) z (snap_node S z)) -∗
+    ([∗ set] z ∈ region_inums icfg_nib,
+       ireg_out γi (mword_of_int z : mword 32) (fn_rec (snap_node S z))) -∗
+    ([∗ set] z ∈ A, ent_toks_x (fs_gamma_L γfs) z (snap_node S z)) -∗
+    ([∗ set] b ∈ C, fsblock (fs_bytes γfs) b (P b)) -∗
+    ipool_rows γfs γi cov (sb_logstart (fss_sb S)) (region_inums icfg_nib)
+      ∗ ([∗ set] b ∈ C ∖ snap_live_blocks S A,
+           fsblock (fs_bytes γfs) b (P b)).
+  Proof.
+    intros Hok Hw Hnib HA HC.
+    iIntros "Hcnt Hmir Hoff Hdv Hfv Htop Hout Hdlk Hblk".
+    pose proof (sk_bytes Hok) as Hb.
+    pose proof (sk_local Hok) as Hloc.
+    assert (HARs : A ⊆ region_inums icfg_nib).
+    { apply elem_of_subseteq. intros z Hz.
+      exact (proj1 (proj1 (HA z) Hz)). }
+    assert (Hty : forall z : Z, z ∈ A -> fn_type (snap_node S z) <> 0)
+      by (intros z Hz; exact (proj2 (proj1 (HA z) Hz))).
+    assert (Hnode : forall z : Z, z ∈ region_inums icfg_nib ->
+              fss_inodes S !! z = Some (snap_node S z))
+      by (intros z Hz;
+          exact (snap_node_at S _ icfg_nib z Hb Hw Hz)).
+    assert (Hln : forall z : Z, z ∈ region_inums icfg_nib ->
+              inode_local z (snap_node S z))
+      by (intros z Hz; exact (Hloc z (snap_node S z) (Hnode z Hz))).
+    assert (Hfree : forall z : Z, z ∈ region_inums icfg_nib -> z ∉ A ->
+              fn_type (snap_node S z) = 0).
+    { intros z Hz Hna.
+      destruct (decide (fn_type (snap_node S z) = 0)) as [H0 | H0];
+        [exact H0 |].
+      exfalso. apply Hna, (proj2 (HA z)). split; [exact Hz | exact H0]. }
+    (* ---- the ledger columns, shifted onto the pool's keys ------------ *)
+    iDestruct (region_key_shift icfg_nib (fun z => icnt_half z 0%nat) Hnib
+                 with "Hcnt") as "Hcnt".
+    iDestruct (region_key_shift icfg_nib (fun z => frzm_h z false) Hnib
+                 with "Hmir") as "Hmir".
+    iDestruct (region_key_shift icfg_nib (fun z => ifreeze_off z) Hnib
+                 with "Hoff") as "Hoff".
+    (* ---- the blocks, carved ------------------------------------------ *)
+    assert (Hsub : forall i : Z, i ∈ elements A ->
+              snap_blk_set (snap_node S i) ⊆ C)
+      by (intros i Hi; apply HC, elem_of_elements, Hi).
+    assert (Hdisj : forall i j : Z, i ∈ elements A -> j ∈ elements A ->
+              i <> j ->
+              snap_blk_set (snap_node S i) ## snap_blk_set (snap_node S j)).
+    { intros i j Hi Hj Hne.
+      apply elem_of_elements in Hi. apply elem_of_elements in Hj.
+      exact (snap_blk_set_disj S _ i j (snap_node S i) (snap_node S j) Hb
+               (Hnode i (proj1 (proj1 (HA i) Hi)))
+               (Hnode j (proj1 (proj1 (HA j) Hj))) Hne). }
+    rewrite /snap_live_blocks.
+    iDestruct (big_sepS_carve
+                 (fun b => fsblock (fs_bytes γfs) b (P b))%I
+                 C (elements A) (fun i => snap_blk_set (snap_node S i))
+                 (NoDup_elements A) Hsub Hdisj with "Hblk") as "[Hpc Hrem]".
+    iSplitR "Hrem"; [| iExact "Hrem"].
+    iDestruct (big_sepS_of_elements
+                 (fun i => [∗ set] b ∈ snap_blk_set (snap_node S i),
+                             fsblock (fs_bytes γfs) b (P b))%I A
+                 with "Hpc") as "Hpc".
+    (* ---- the region's payout, split along the same subset ------------ *)
+    iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
+                 with "Hout") as "[HoutA HoutF]".
+    iAssert ([∗ set] z ∈ region_inums icfg_nib ∖ A,
+               imark γi (bv_unsigned (mword_of_int z : mword 32)))%I
+      with "[HoutF]" as "Hmk".
+    { iApply (big_sepS_mono with "HoutF"). intros z Hz.
+      apply elem_of_difference in Hz as [Hz1 Hz2]. iIntros "H".
+      iApply (ireg_out_free_inv γi (mword_of_int z : mword 32)
+                (fn_rec (snap_node S z)) (Hfree z Hz1 Hz2) with "H"). }
+    (* ---- the contents holds, split along the same subset -------------- *)
+    iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
+                 with "Hdv") as "[HdvA HdvF]".
+    iAssert ([∗ set] z ∈ region_inums icfg_nib ∖ A,
+               ∃ e, dv_ride (bv_unsigned (mword_of_int z : mword 32)) e)%I
+      with "[HdvF]" as "HdvF".
+    { iApply (big_sepS_mono with "HdvF"). intros z Hz.
+      apply elem_of_difference in Hz as [Hz1 _].
+      rewrite (region_inum_faithful icfg_nib z Hnib Hz1).
+      iIntros "H". iExists _. iExact "H". }
+    iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
+                 with "Hfv") as "[HfvA HfvF]".
+    iAssert ([∗ set] z ∈ region_inums icfg_nib ∖ A,
+               ∃ b, fv_ride (bv_unsigned (mword_of_int z : mword 32)) b)%I
+      with "[HfvF]" as "HfvF".
+    { iApply (big_sepS_mono with "HfvF"). intros z Hz.
+      apply elem_of_difference in Hz as [Hz1 _].
+      rewrite (region_inum_faithful icfg_nib z Hnib Hz1).
+      iIntros "H". iExists _. iExact "H". }
+    (* ---- the allocated arm, one named application per inum ----------- *)
+    iDestruct (big_sepS_sep_2 with "HoutA Hdlk") as "Ha".
+    iDestruct (big_sepS_sep_2 with "Ha Hpc") as "Ha".
+    iDestruct (big_sepS_sep_2 with "Ha HdvA") as "Ha".
+    iDestruct (big_sepS_sep_2 with "Ha HfvA") as "Ha".
+    iDestruct (big_sepS_sep_2 with "Ha Htop") as "Ha".
+    iApply (ipool_alloc γfs γi cov (sb_logstart (fss_sb S))
+              (region_inums icfg_nib) A HARs
+              with "Hcnt Hmir Hoff [Ha] Hmk HdvF HfvF").
+    iApply (big_sepS_mono with "Ha"). intros z Hz.
+    pose proof (Hln z (HARs z Hz)) as Hlz.
+    pose proof (Hnode z (HARs z Hz)) as Hnz.
+    rewrite (region_inum_faithful icfg_nib z Hnib (HARs z Hz)).
+    iIntros "[[[[[Hreg Hdl] Hblks] Hdv] Hfv] Htopz]".
+    iExists (fn_rec (snap_node S z)), (bm_of (snap_node S z)),
+            (fn_data (snap_node S z)).
+    iSplitR.
+    { iPureIntro.
+      exact (snap_inode_ok S P cov (sb_logstart (fss_sb S)) z
+               (snap_node S z) Hb Hlz Hnz (Hty z Hz)). }
+    iSplitR; [iPureIntro; exact (inode_rec_local_of z (snap_node S z) Hlz) |].
+    (* the three [DirView] premises, off [sk_dirloc] *)
+    pose proof (snap_node_dir_local S _ z (snap_node S z) icfg_nib
+                  Hb Hnz Hw) as Hdl3.
+    iSplitR; [iPureIntro; exact (node_dir_local_ok Hdl3) |].
+    iSplitR; [iPureIntro; exact (node_dir_local_ix Hdl3) |].
+    iSplitR; [iPureIntro; exact (node_dir_local_orph Hdl3) |].
+    iSplitR; [iPureIntro; exact (dir_uniq_of_local z (snap_node S z) Hlz) |].
+    iSplitL "Hdl".
+    { rewrite /dlinks (era_node_bm_of z (snap_node S z) Hlz). iExact "Hdl". }
+    iDestruct (snap_inode_blocks_res γfs S P
+                 (fs_home_set cov (sb_logstart (fss_sb S))) z (snap_node S z)
+                 Hb Hlz Hnz with "Hblks") as "[Hblks Hind]".
+    iSplitL "Hreg".
+    { iApply (ireg_out_alloc_inv γi (mword_of_int z : mword 32)
+                (fn_rec (snap_node S z)) (Hty z Hz) with "Hreg"). }
+    iSplitL "Hind"; [iExact "Hind" |].
+    iSplitL "Hblks"; [iExact "Hblks" |].
+    iSplitL "Htopz".
+    { rewrite (era_node_bm_of z (snap_node S z) Hlz). iExact "Htopz". }
+    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
+  Qed.
+
+End SnapPool.
