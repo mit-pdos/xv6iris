@@ -910,7 +910,8 @@ Proof.
                                                 vname vcpu sb_old)
     "(%Hpures & Hmirf & Hlfree & Hb1 & Hsbraw & _ & Hboot & _ &
       Hlock0 & Hlname & Hlcpu & Hlstart & Hldev & Hlout & Hlcmt & Hlnc & Hlhn &
-      Hlhblk & Hauths & Hdirty & Hhdr & Hlslots & Hsl35 & Hirs2 & Hrem & Hxo)".
+      Hlhblk & Hauths & Hdirty & Hhdr & Hlslots & Hsl35 & Hirs2 & Hrem &
+      #Hbinvf & Hxo)".
   destruct Hpures as [[v_magic [v_nblocks [v_nlog [Himg Hmagic]]]]
                       [Hhdr0 [H1cov [H1log [Hsbparse [Hsbok
                        [Hcgeom [Hbmq Hszq]]]]]]]].
@@ -923,7 +924,6 @@ Proof.
      exception set.  At a clean on-disk header that set is EMPTY and the
      record is unconstrained; the three header rows below are
      [FsCrash.hdr_wf] read off [hdr_dec_zero]. *)
-  iDestruct (BitmapInv.bitmap_inv_bytes_at with "Hbits") as (Xv) "#Hbinvf".
   assert (Hhdrbnd : ((hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).1
                      <= LOGBLOCKS)%nat)
     by (rewrite (hdr_dec_zero _ Hhdr0); cbn; unfold LOGBLOCKS; lia).
@@ -939,8 +939,9 @@ Proof.
   assert (Hxvslot : forall (i : nat) (b0 : Z),
             (hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).2 !! i
               = Some b0 ->
-            Xv b0 = lm_view (FsCrash.mirror_of (FsCrash.fs_blocks dk))
-                      (log_slot_bno fsc_logst i)).
+            FsCrash.fs_blocks dk b0
+              = lm_view (FsCrash.mirror_of (FsCrash.fs_blocks dk))
+                  (log_slot_bno fsc_logst i)).
   { rewrite (hdr_dec_zero _ Hhdr0). cbn. intros i b0 Hi. discriminate. }
   assert (Hxempty : (list_to_set
                        (hdr_dec (FsCrash.fs_blocks dk
@@ -1012,7 +1013,7 @@ Proof.
             (mword_of_int fsc_ninodes) v_nlog (mword_of_int fsc_logst)
             (mword_of_int icfg_ist) (mword_of_int fsc_bmapstart)
             (FsCrash.fs_blocks dk 1) sb_old
-            (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst)) Xv
+            (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst)) (FsCrash.fs_blocks dk)
             (FsCrash.mirror_of (FsCrash.fs_blocks dk)) L D
             vlock vname vcpu v_start v_dev v_nc v_n
             pid (DfracOwn 1) B6 av2 eb eb ∅ V

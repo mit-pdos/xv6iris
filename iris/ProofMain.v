@@ -1362,7 +1362,8 @@ Section ProofMain.
     fs_kit_icache_rest _ _ -∗
     fs_kit_fsinit_ghost _ _ (FsCrash.fs_blocks dk)
       (fs_kit_spent (FsCrash.fs_blocks dk) sb nib
-         (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb)) -∗
+         (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb))
+      (FsCrash.fs_blocks dk) ∅ -∗
     (* ---- ROWS (A)/(B)/(C) OF [FirstTok.first_fsinit] (fs-cfg-boot.md
        (f-2)): the 32 raw [&sb] bytes and the whole [struct log], both
        carved in [BootShared.boot_bss_carve] for the first time at this

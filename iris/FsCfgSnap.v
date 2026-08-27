@@ -831,13 +831,25 @@ Section SnapMint.
 
   Lemma fs_cfg_alloc_snap (γd : uart_names) (γv : disk_names)
       (dk : Z -> bv 8) (ndisk : nat) (S : fs_state_rec) (cov : gset Z)
-      (nib : nat) (E : coPset) :
+      (nib : nat) (E : coPset)
+      (* ---- THE VALUE THE ERA'S BYTE VIEW IS MINTED AT (durable-disk lane
+         E-except): the COMMITTED view [FsCrash.fr_D], which differs from
+         the raw disk exactly on [Xexc], the pending home blocks of a dirty
+         on-disk log header.  The CACHE map stays raw -- that is what keeps
+         [BioInv.pool_blk] honest -- and the difference comes out as the
+         WAL's exception handle.  At a clean header [Xexc = ∅] and [Pb] IS
+         the raw home content. ---- *)
+      (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
     (* ---- THE DURABLE SNAPSHOT, and it is the whole of the file system's
-       side: the committed map IS the home blocks of this era's disk (which
-       [FsCrash.fs_recovery_clean] gives at a clean header) and it is the
-       encoding of the abstract state [S]. ---- *)
-    snap_ok S (fs_restrict (fs_blocks dk)
+       side: the committed map IS what the machine would recover to, and it
+       is the encoding of the abstract state [S]. ---- *)
+    snap_ok S (fs_restrict Pb
                  (fs_home_set cov (sb_logstart (fss_sb S)))) ->
+    (forall b : Z, length (Pb b) = BSIZE) ->
+    Xexc ⊆ fs_home_set cov (sb_logstart (fss_sb S)) ->
+    (1 : Z) ∉ Xexc ->
+    (forall b : Z, b ∈ fs_home_set cov (sb_logstart (fss_sb S)) ->
+       b ∉ Xexc -> Pb b = fs_blocks dk b) ->
     (* ---- the region's width, tied to [S]'s OWN superblock ---- *)
     Z.of_nat nib = sb_ninodes (fss_sb S) / 16 + 1 ->
     16 * Z.of_nat nib <= 2 ^ 32 ->
@@ -857,9 +869,9 @@ Section SnapMint.
       ⌜fsc_size = sb_size (fss_sb S)⌝ ∗
       ⌜fsc_ninodes = sb_ninodes (fss_sb S)⌝ ∗
       fs_kit_icache ICFG FSC ∗
-      fs_kit_fsinit_ghost ICFG FSC (fs_blocks dk) (snap_spent S nib).
+      fs_kit_fsinit_ghost ICFG FSC (fs_blocks dk) (snap_spent S nib) Pb Xexc.
   Proof.
-    intros Hok Hnibeq Hnib32 Hcovin Hcovmeta Hcovdata.
+    intros Hok HlPb HXsub HX1 Hagr Hnibeq Hnib32 Hcovin Hcovmeta Hcovdata.
     pose proof (sk_bytes Hok) as Hb.
     pose proof (sk_local Hok) as Hloc.
     iIntros "Hdisk Hsa Hsf".
@@ -897,8 +909,7 @@ Section SnapMint.
       pose proof (Z.mod_pos_bound (sb_ninodes (fss_sb S)) 16 ltac:(lia))
         as Hmb. lia. }
     assert (Hnib0 : (0 < icfg_nib)%nat) by lia.
-    assert (Hfull : fs_blocks_full (fs_blocks dk))
-      by (intros b; apply fs_blocks_length).
+    assert (Hfull : fs_blocks_full Pb) by (intros b; apply HlPb).
     assert (Hds : fs_data_start (fss_sb S)
                   = sb_inodestart (fss_sb S) + Z.of_nat icfg_nib + 1)
       by (rewrite /fs_data_start; lia).
@@ -996,17 +1007,15 @@ Section SnapMint.
       as (γlk γtp) "(Htopa & Htopf & Hlnk & Hkeep)".
     iMod (fs_boot_ghosts γv dk ndisk cov
             (fs_home_set cov (sb_logstart (fss_sb S)))
-            ROOTDEV γlk γtp E (fs_blocks dk) ∅ Hcovin Hhomesub
-            ltac:(intros b _; apply fs_blocks_length)
-            ltac:(apply empty_subseteq)
-            ltac:(intros b _ _; reflexivity)
+            ROOTDEV γlk γtp E Pb Xexc Hcovin Hhomesub
+            ltac:(intros b _; apply HlPb) HXsub Hagr
             with "Hdisk")
       as (γfs) "(%Hlkq & %Htp & Hpool & HaL & HaD & #Hbinv & Hxo & Hdty & Hfsb & Hchl)".
     (* THE EXCEPTION HANDLE (durable-disk lane E-except) goes into
        fsinit's kit: the mint runs at [X = ∅] -- the byte view is born
        equal to the RAW home blocks -- and [initlog] is what seals it. *)
     iAssert (fs_bytes_at γfs (fs_home_set cov (sb_logstart (fss_sb S))))
-      as "#Hbrow"; [iExists (fs_blocks dk); iExact "Hbinv" |].
+      as "#Hbrow"; [iExists Pb; iExact "Hbinv" |].
     (* ---- THE TOP MAP IS ROUTED HERE --------------------------------- *)
     iEval (rewrite -Htp) in "Htopa".
     iEval (rewrite -Htp) in "Htopf".
@@ -1065,7 +1074,7 @@ Section SnapMint.
                  Hiregcov with "Hblk") as "[Hbireg HfsbC]".
     iEval (rewrite big_sepS_singleton) in "Hb1".
     iDestruct (ireg_blk_of_set
-                 (fun b => fsblock (fs_bytes γfs) b (fs_blocks dk b))
+                 (fun b => fsblock (fs_bytes γfs) b (Pb b))
                  (sb_inodestart (fss_sb S)) icfg_nib with "Hbireg")
       as "Hbireg".
     (* ---- 6. THE INODE REGION ---------------------------------------- *)
@@ -1074,13 +1083,13 @@ Section SnapMint.
     iMod (ireg_alloc E γfs (sb_inodestart (fss_sb S)) icfg_nib
             (fs_home_set cov (sb_logstart (fss_sb S)))
             (fun bi : nat =>
-               fs_blocks dk (sb_inodestart (fss_sb S) + Z.of_nat bi))
+               Pb (sb_inodestart (fss_sb S) + Z.of_nat bi))
             (fun z => fn_nlink (snap_node S z))
             (fun z => fn_rec (snap_node S z))
             Hnib32 eq_refl
-            ltac:(intros bi _; rewrite fs_blocks_length; reflexivity)
+            ltac:(intros bi _; rewrite HlPb; reflexivity)
             ltac:(intros dss Hdl Hdwf Hde;
-                  exact (snap_ireg_premises S (fs_blocks dk)
+                  exact (snap_ireg_premises S Pb
                            (fs_home_set cov (sb_logstart (fss_sb S)))
                            dss icfg_nib Hfull Hb Hloc Hnibeq Hnib32
                            Hdl Hdwf Hde))
@@ -1102,7 +1111,7 @@ Section SnapMint.
     { iApply (big_sepS_mono with "Hfv"). intros z _. iIntros "H".
       iApply (fv_ride_of_hold with "H"). }
     (* the payout is at the DECODED record; restate it at [S]'s own *)
-    destruct (snap_ireg_premises S (fs_blocks dk)
+    destruct (snap_ireg_premises S Pb
                 (fs_home_set cov (sb_logstart (fss_sb S)))
                 dss icfg_nib Hfull Hb Hloc Hnibeq Hnib32 Hdl Hdwf Hde)
       as (_ & _ & _ & _ & _ & Hrecat).
@@ -1125,7 +1134,7 @@ Section SnapMint.
       apply elem_of_snap_blk_set in Hbb.
       pose proof (snap_node_at S _ icfg_nib z Hb Hnibeq (HAsub z Hz)) as Hnz.
       destruct (sk_own_used Hb z (snap_node S z) b Hnz Hbb) as [_ Hnm].
-      destruct (snap_names_cov S (fs_blocks dk) cov
+      destruct (snap_names_cov S Pb cov
                   (sb_logstart (fss_sb S)) b Hb
                   ltac:(right; left; by exists z, (snap_node S z)))
         as [Hcv Hnlg].
@@ -1135,7 +1144,7 @@ Section SnapMint.
           rewrite elem_of_singleton. exact (snap_meta_sb S b Hnm).
         + exact Hnlg.
       - intros Hc. exact (Hnm (snap_meta_ireg S _ icfg_nib b Hb Hnibeq Hc)). }
-    iDestruct (ipool_alloc_of_snap γfs γi S (fs_blocks dk) cov
+    iDestruct (ipool_alloc_of_snap γfs γi S Pb cov
                  (((cov ∖ ({[ (1:Z) ]} : gset Z))
                      ∖ log_region_set (sb_logstart (fss_sb S)))
                     ∖ ireg_blk_set (sb_inodestart (fss_sb S)) icfg_nib)
@@ -1160,7 +1169,7 @@ Section SnapMint.
         - left. right. by left.
         - apply elem_of_free_set in Hf as [Hran Hnu].
           right; right. split; [exact Hran | exact Hnu]. }
-      destruct (snap_names_cov S (fs_blocks dk) cov
+      destruct (snap_names_cov S Pb cov
                   (sb_logstart (fss_sb S)) b Hb Hnames) as [Hcv Hnlg].
       (* the bitmap block is a METADATA role, hence marked in use, hence in
          no node's footprint; a free block's bit reads CLEAR, and every
@@ -1202,10 +1211,10 @@ Section SnapMint.
       apply elem_of_difference. split; [exact Hcv |].
       rewrite elem_of_singleton. exact Hne1. }
     iDestruct (big_sepS_split_sub
-                 (fun b => fsblock (fs_bytes γfs) b (fs_blocks dk b))%I
+                 (fun b => fsblock (fs_bytes γfs) b (Pb b))%I
                  _ (snap_bitmap_spent S) Hbmsub with "Hrem")
       as "[Hbmspent Hrem]".
-    iDestruct (bitmap_res_of_snap γfs S (fs_blocks dk)
+    iDestruct (bitmap_res_of_snap γfs S Pb
                  (fs_home_set cov (sb_logstart (fss_sb S))) Hb
                  with "Hbmspent") as "Hbmres".
     iMod (bitmap_inv_alloc E with "Hbrow Hbmres") as "#Hbmres".
@@ -1278,6 +1287,8 @@ Section SnapMint.
     iSplitL "Hlogtok"; [iExact "Hlogtok" |].
     iSplitL "Hboot"; [iExact "Hboot" |].
     iSplitR; [iExact "Hireginv" |].
+    iEval (rewrite (Hagr 1 (H1home 1 (elem_of_singleton_2 1 1 eq_refl)) HX1))
+      in "Hb1".
     iSplitL "Hb1"; [iExact "Hb1" |].
     iSplitL "HaL HaD".
     { iExists (fs_C0 dk cov), (fs_D0 dk cov).
@@ -1287,7 +1298,8 @@ Section SnapMint.
     iSplitL "Hhdr"; [iExact "Hhdr" |].
     iSplitL "Hslots"; [iExact "Hslots" |].
     iSplitL "Hbmres"; [iExact "Hbmres" |].
-    iSplitL "Hrem"; [iExact "Hrem" | iExact "Hxo"].
+    iSplitL "Hrem"; [iExact "Hrem" |].
+    iSplitR; [iExact "Hbinv" | iExact "Hxo"].
   Qed.
 
 End SnapMint.
@@ -1382,21 +1394,24 @@ Section SnapEra0.
   (*  the coverage remainder is stated at a spent set; a BIGGER spent set is
       a SMALLER remainder, so the kit weakens along [⊆]. *)
   Lemma fs_kit_fsinit_ghost_weaken (ICFG : icfg) (FSC : fscfg)
-      (P : Z -> list (bv 8)) (R R' : gset Z) :
+      (P : Z -> list (bv 8)) (R R' : gset Z)
+      (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
     R ⊆ R' ->
-    fs_kit_fsinit_ghost ICFG FSC P R -∗ fs_kit_fsinit_ghost ICFG FSC P R'.
+    fs_kit_fsinit_ghost ICFG FSC P R Pb Xexc -∗
+    fs_kit_fsinit_ghost ICFG FSC P R' Pb Xexc.
   Proof.
     intros Hsub.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
-      as "(H1 & H2 & #H3 & H4 & H5 & H6 & H7 & H8 & #H9 & Hrem & Hxo)".
+      as "(H1 & H2 & #H3 & H4 & H5 & H6 & H7 & H8 & #H9 & Hrem & #H10 & Hxo)".
     assert (Hsub' : fsc_cov ∖ R' ⊆ fsc_cov ∖ R).
     { apply elem_of_subseteq. intros b Hb.
       apply elem_of_difference in Hb as [Hc Hn].
       apply elem_of_difference. split; [exact Hc |].
       intros Hr. exact (Hn (Hsub b Hr)). }
     iDestruct (big_sepS_subseteq _ _ _ Hsub' with "Hrem") as "Hrem".
-    rewrite /fs_kit_fsinit_ghost. iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 Hrem Hxo".
+    rewrite /fs_kit_fsinit_ghost.
+    iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 Hrem H10 Hxo".
   Qed.
 
   (*  THE ERA-0 MINT, at [FsCfgBoot.fs_cfg_alloc]'s own signature.  It is
@@ -1417,14 +1432,19 @@ Section SnapEra0.
       fs_kit_icache ICFG FSC ∗
       fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk)
         (fs_kit_spent (FsCrash.fs_blocks dk) sb nib
-           (fs_live_set (FsCrash.fs_blocks dk) sb)).
+           (fs_live_set (FsCrash.fs_blocks dk) sb))
+        (FsCrash.fs_blocks dk) ∅.
   Proof.
     intros Hbf.
     pose proof Hbf as (Hwf & Hrw & Hnin & Hnib32 & Hnib0 & Hnibeq & Hcovin
                        & Hcovmeta & Hcovdata & _).
     iIntros "Hdisk Hsa Hsf".
     iMod (fs_cfg_alloc_snap γd γv dk ndisk (img_state (fs_blocks dk) sb nib)
-            cov nib E (img_snap_ok dk ndisk sb nib cov Hbf)
+            cov nib E (fs_blocks dk) ∅
+            (img_snap_ok dk ndisk sb nib cov Hbf)
+            (fun b => fs_blocks_length dk b)
+            (empty_subseteq _) (not_elem_of_empty 1)
+            (fun b _ _ => eq_refl)
             Hnibeq Hnib32 Hcovin Hcovmeta Hcovdata with "Hdisk Hsa Hsf")
       as (ICFG FSC) "Hfs".
     iModIntro. iExists ICFG, FSC.
@@ -1440,6 +1460,7 @@ Section SnapEra0.
               (snap_spent (img_state (fs_blocks dk) sb nib) nib)
               (fs_kit_spent (fs_blocks dk) sb nib
                  (fs_live_set (fs_blocks dk) sb))
+              (fs_blocks dk) ∅
               (img_snap_spent (fs_blocks dk) sb nib Hwf Hrw) with "Hkit2").
   Qed.
 

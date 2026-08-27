@@ -1828,8 +1828,14 @@ Section FsCfgBootEra.
 
       [ireg_inv] is persistent and also travels via [main_deposit]; it is
       here because THIS is where it is produced and it is cheap to carry. *)
+  (* [P] is the era's RAW disk (the cache map and the log region read it);
+     [Pb] is what the era's BYTE view was minted at -- the committed view
+     [FsCrash.fr_D] -- and [Xexc] is where the two differ (durable-disk
+     lane E-except).  At a clean on-disk header the two functions agree on
+     the home set and [Xexc] is empty. *)
   Definition fs_kit_fsinit_ghost (ICFG : icfg) (FSC : fscfg)
-      (P : Z -> list (bv 8)) (Rspent : gset Z) : iProp Σ :=
+      (P : Z -> list (bv 8)) (Rspent : gset Z)
+      (Pb : Z -> list (bv 8)) (Xexc : gset Z) : iProp Σ :=
     ((* the log's four gnames at genesis, AT [icfg_log] -- which is what
         makes fsinit's post assemble into [FsReady.fs_ready] *)
      log_free_tok icfg_log ∗
@@ -1866,17 +1872,22 @@ Section FsCfgBootEra.
         did not spend.  At an image whose [cov] is exactly its own block
         range this is empty; it is kept because [cov] is a parameter. *)
      ([∗ set] b ∈ fsc_cov ∖ Rspent,
-        fsblock (fs_bytes fsc_fs) b (P b)) ∗
-     (* THE BYTE VIEW'S EXCEPTION HANDLE (durable-disk lane E-except).  The
-        era's mint hands the WAL the home blocks on which the byte view and
-        the buffer cache disagree; fsinit threads it into [initlog], which
-        empties it and seals it into [LogInv.log_ctx].  It is [∅] while the
-        mint reads the RAW home blocks.  LAST. *)
-     exc_own (fs_exc fsc_fs) ∅)%I.
+        fsblock (fs_bytes fsc_fs) b (Pb b)) ∗
+     (* THE BYTE VIEW'S ROW, NAMED AT [Pb] (durable-disk lane E-except):
+        fsinit needs it named so that [initlog] can say what the logged
+        view holds on the exception set. *)
+     fs_bytes_inv (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
+                  (fs_home_set fsc_cov fsc_logst) Pb ∗
+     (* ...AND THE WAL'S EXCEPTION HANDLE.  The era's mint hands the WAL the
+        home blocks on which the byte view and the buffer cache disagree;
+        fsinit threads it into [initlog], which empties it and seals it into
+        [LogInv.log_ctx].  LAST. *)
+     exc_own (fs_exc fsc_fs) Xexc)%I.
 
   Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg)
-      (P : Z -> list (bv 8)) (Rspent : gset Z) :
-    fs_kit_fsinit_ghost ICFG FSC P Rspent -∗
+      (P : Z -> list (bv 8)) (Rspent : gset Z)
+      (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
+    fs_kit_fsinit_ghost ICFG FSC P Rspent Pb Xexc -∗
       log_free_tok icfg_log ∗
       ireg_boot ∗
       ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib ∗
@@ -1891,8 +1902,10 @@ Section FsCfgBootEra.
          ∃ bs : list (bv 8), fs_chalf fsc_fs (log_slot_bno fsc_logst i) bs) ∗
       bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
       ([∗ set] b ∈ fsc_cov ∖ Rspent,
-         fsblock (fs_bytes fsc_fs) b (P b)) ∗
-      exc_own (fs_exc fsc_fs) ∅.
+         fsblock (fs_bytes fsc_fs) b (Pb b)) ∗
+      fs_bytes_inv (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
+                   (fs_home_set fsc_cov fsc_logst) Pb ∗
+      exc_own (fs_exc fsc_fs) Xexc.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -1998,36 +2011,38 @@ Section FsCfgBootEra.
       forkret's [fsinit] (stage (f)).  Stated as its own lemma so neither
       site has to know the kit's ordering.                                *)
   Lemma fs_kit_fsinit_ghost_ireg (ICFG : icfg) (FSC : fscfg)
-      (P : Z -> list (bv 8)) (Rspent : gset Z) :
-    fs_kit_fsinit_ghost ICFG FSC P Rspent -∗
+      (P : Z -> list (bv 8)) (Rspent : gset Z)
+      (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
+    fs_kit_fsinit_ghost ICFG FSC P Rspent Pb Xexc -∗
       ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib ∗
-      fs_kit_fsinit_ghost ICFG FSC P Rspent.
+      fs_kit_fsinit_ghost ICFG FSC P Rspent Pb Xexc.
   Proof.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem)".
+           Hbmres & Hrem & #Hbinv & Hxo)".
     iSplitR; [iExact "Hireg" |].
     rewrite /fs_kit_fsinit_ghost.
-    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem".
+    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo".
   Qed.
 
   (* ...and the same peel for the equally-persistent BITMAP row, so a
      boot client (ProofMain's [first_boot_persist] assembly) reads it off
      the kit without knowing the kit's layout. *)
   Lemma fs_kit_fsinit_ghost_bitmap (ICFG : icfg) (FSC : fscfg)
-      (P : Z -> list (bv 8)) (Rspent : gset Z) :
-    fs_kit_fsinit_ghost ICFG FSC P Rspent -∗
+      (P : Z -> list (bv 8)) (Rspent : gset Z)
+      (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
+    fs_kit_fsinit_ghost ICFG FSC P Rspent Pb Xexc -∗
       bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
-      fs_kit_fsinit_ghost ICFG FSC P Rspent.
+      fs_kit_fsinit_ghost ICFG FSC P Rspent Pb Xexc.
   Proof.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           #Hbmres & Hrem)".
+           #Hbmres & Hrem & #Hbinv & Hxo)".
     iSplitR; [iExact "Hbmres" |].
     rewrite /fs_kit_fsinit_ghost.
-    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem".
+    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo".
   Qed.
 
   (* ==================================================================== *)
@@ -2367,4 +2382,5 @@ Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
    fs_kit_icache ICFG FSC ∗
    fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk)
      (fs_kit_spent (FsCrash.fs_blocks dk) sb nib
-        (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb)))%I.
+        (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb))
+     (FsCrash.fs_blocks dk) ∅)%I.

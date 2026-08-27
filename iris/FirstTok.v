@@ -334,7 +334,8 @@ Section FirstTok.
        ⌜first_fsinit_pures dk sb⌝ ∗
        fs_kit_fsinit_ghost _ _ (FsCrash.fs_blocks dk)
          (fs_kit_spent (FsCrash.fs_blocks dk) sb icfg_nib
-            (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb)) ∗
+            (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb))
+         (FsCrash.fs_blocks dk) ∅ ∗
        (* rows (A): the raw cells fsinit / initlog write *)
        ([∗ list] i ∈ seq 0 32, pa_add first_sb_base i ↦ₘ sb_old i) ∗
        log_addr ↦₄ vlock ∗
@@ -392,8 +393,11 @@ Section FirstTok.
         ([∗ set] b ∈ fsc_cov ∖ fs_kit_spent (FsCrash.fs_blocks dk) sb icfg_nib
                                  (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb),
            fsblock (fs_bytes fsc_fs) b (FsCrash.fs_blocks dk b)) ∗
-        (* the byte view's exception handle, straight through to initlog
-           (durable-disk lane E-except) *)
+        (* the byte view's row NAMED at what it was minted at, and the WAL's
+           exception handle, both straight through to initlog (durable-disk
+           lane E-except) *)
+        fs_bytes_inv (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
+                     (fs_home_set fsc_cov fsc_logst) (FsCrash.fs_blocks dk) ∗
         exc_own (fs_exc fsc_fs) ∅.
   Proof.
     iIntros "H". rewrite /first_fsinit.
@@ -402,10 +406,10 @@ Section FirstTok.
         Hnc & Hn & Hblk & Hmir & Hiref & Hbsl)".
     iDestruct (fs_kit_fsinit_ghost_open with "Hkit")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem & Hxo)".
+           Hbmres & Hrem & #Hbinv & Hxo)".
     iExists dk, sb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu, sb_old.
     iFrame "Hmir Hlog Hb1 Hsb Hireg Hboot Hbmres Hlk Hnm Hcpu Hst Hdv Hout
-            Hcmt Hnc Hn Hblk Hauths Hdty Hhdr Hslots Hbsl Hiref Hrem Hxo".
+            Hcmt Hnc Hn Hblk Hauths Hdty Hhdr Hslots Hbsl Hiref Hrem Hbinv Hxo".
     iPureIntro. exact Hp.
   Qed.
 
