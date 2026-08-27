@@ -1683,8 +1683,6 @@ Section DurImgAlloc.
     fs_boot_image_wf dk ndisk sb nib cov ->
     ⊢ |==> ∃ g gl gt : gname,
         fs_snap (snap_gamma g gl gt) g
-          (fs_dbytes (fs_restrict (fs_blocks dk)
-                        (fs_home_set cov (FsImg.sb_logstart sb))))
           (fs_restrict (fs_blocks dk)
              (fs_home_set cov (FsImg.sb_logstart sb)))
           (img_state (fs_blocks dk) sb nib).

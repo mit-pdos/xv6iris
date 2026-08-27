@@ -784,16 +784,16 @@ Section Snap.
      THE ONE PURE CONJUNCT LEFT IS [snap_shape], and section
      1c' says why no resource can pin it.  Nothing outside [crashN] ever
      holds a piece of any of this. *)
-  Definition fs_snap Γ (g : gname) (B : gmap Z (bv 8)) D S : iProp Σ :=
-    (snap_auth g B D
+  Definition fs_snap Γ (g : gname) D S : iProp Σ :=
+    (snap_auth g D
      ∗ ghost_map_auth (γtop Γ) 1 (fss_inodes S)
      ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag Γ i n)
      ∗ fs_state Γ S
      ∗ (∃ kv : ity, own (γlink Γ) (link_tok_elem ROOTINO kv))
      ∗ ⌜snap_shape S D⌝)%I.
 
-  Global Instance fs_snap_timeless `{!GTimeless Γ} g B D S :
-    Timeless (fs_snap Γ g B D S).
+  Global Instance fs_snap_timeless `{!GTimeless Γ} g D S :
+    Timeless (fs_snap Γ g D S).
   Proof. rewrite /fs_snap. apply _. Qed.
 
   (* THE REGISTRY: the CURRENT snapshot, at the committed block map [D].
@@ -802,8 +802,8 @@ Section Snap.
      [P_dur] a function of [D] alone and therefore droppable into
      [FsCrash.P_fs] with no arity change. *)
   Definition P_dur D : iProp Σ :=
-    (∃ (g gl gt : gname) (B : gmap Z (bv 8)) (S : fs_state_rec),
-       fs_snap (snap_gamma g gl gt) g B D S)%I.
+    (∃ (g gl gt : gname) (S : fs_state_rec),
+       fs_snap (snap_gamma g gl gt) g D S)%I.
 
   Global Instance P_dur_timeless D : Timeless (P_dur D).
   Proof. rewrite /P_dur. apply _. Qed.
@@ -853,17 +853,18 @@ Section Snap.
 
   Theorem fs_snap_alloc_mint S D :
     snap_mint S D ->
-    ⊢ |==> ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
-        fs_snap (snap_gamma g gl gt) g B D S.
+    ⊢ |==> ∃ g gl gt : gname,
+        fs_snap (snap_gamma g gl gt) g D S.
   Proof.
     intros Hm.
     destruct (sm_links Hm) as (f & v & Hfok & Hfv).
     destruct (sm_runs Hm) as (PM & Hshape & Hdisj & Hin).
     iMod (fs_state_mint_runs S PM f v Hshape Hdisj (sm_parse Hm) (sm_local Hm)
             (sm_geom Hm) Hfok Hfv) as (g gl gt) "(Hba & Hta & Htf & HS & Ht)".
-    iModIntro. iExists g, gl, gt, (xr_union (xr_fs S PM)).
+    iModIntro. iExists g, gl, gt.
     rewrite /fs_snap /snap_auth.
-    iFrame "Hba". iSplitR; [by iPureIntro |].
+    iSplitL "Hba"; [iExists (xr_union (xr_fs S PM)); iFrame "Hba";
+                    by iPureIntro |].
     iFrame "Hta Htf HS".
     iSplitL "Ht"; [by iExists v |].
     iPureIntro. exact (sm_shape Hm).
@@ -872,8 +873,8 @@ Section Snap.
   Lemma P_dur_alloc_mint S D : snap_mint S D -> ⊢ |==> P_dur D.
   Proof.
     intros Hm.
-    iMod (fs_snap_alloc_mint S D Hm) as (g gl gt B) "Hsnap".
-    iModIntro. iExists g, gl, gt, B, S. iExact "Hsnap".
+    iMod (fs_snap_alloc_mint S D Hm) as (g gl gt) "Hsnap".
+    iModIntro. iExists g, gl, gt, S. iExact "Hsnap".
   Qed.
 
   (* ================================================================== *)
@@ -890,9 +891,9 @@ Section Snap.
 
   (* ---- the block legs of one inode ---- *)
 
-  Lemma snap_read_blks (g gl gt : gname) B D (n : fs_node) :
+  Lemma snap_read_blks (g gl gt : gname) D (n : fs_node) :
     dblk_full D ->
-    snap_auth g B D -∗
+    snap_auth g D -∗
     ([∗ map] k ↦ bs ∈ fn_blk n,
        blk_owned (snap_gamma g gl gt) (fn_naddr n k) bs) -∗
     ⌜forall k bs, fn_blk n !! k = Some bs -> D !! fn_naddr n k = Some bs⌝.
@@ -902,24 +903,24 @@ Section Snap.
     rewrite bi.pure_forall. iIntros (bs).
     rewrite bi.pure_impl. iIntros (Hk).
     iDestruct (big_sepM_lookup _ _ k bs Hk with "Hdat") as "Hb".
-    iApply (snap_blk_read_full g gl gt B D (fn_naddr n k) bs Hf with "Hau Hb").
+    iApply (snap_blk_read_full g gl gt D (fn_naddr n k) bs Hf with "Hau Hb").
   Qed.
 
-  Lemma snap_read_ind (g gl gt : gname) B D (n : fs_node) :
+  Lemma snap_read_ind (g gl gt : gname) D (n : fs_node) :
     dblk_full D ->
-    snap_auth g B D -∗ ind_owned (snap_gamma g gl gt) n -∗
+    snap_auth g D -∗ ind_owned (snap_gamma g gl gt) n -∗
     ⌜fn_indb n <> 0 -> D !! fn_indb n = Some (ind_bytes (fn_ent n))⌝.
   Proof.
     intros Hf. iIntros "Hau Hind".
     rewrite bi.pure_impl. iIntros (Hnz).
     rewrite /ind_owned (decide_False _ _ Hnz).
-    iApply (snap_blk_read_full g gl gt B D (fn_indb n)
+    iApply (snap_blk_read_full g gl gt D (fn_indb n)
               (ind_bytes (fn_ent n)) Hf with "Hau Hind").
   Qed.
 
-  Lemma snap_read_pool (g gl gt : gname) B D (nb : Z) (u : gset Z) :
+  Lemma snap_read_pool (g gl gt : gname) D (nb : Z) (u : gset Z) :
     dblk_full D ->
-    snap_auth g B D -∗ free_pool (snap_gamma g gl gt) nb u -∗
+    snap_auth g D -∗ free_pool (snap_gamma g gl gt) nb u -∗
     ⌜forall b, 0 <= b < nb -> b ∉ u -> is_Some (D !! b)⌝.
   Proof.
     intros Hf. iIntros "Hau Hpool".
@@ -931,7 +932,7 @@ Section Snap.
     rewrite Hb' {1}/pool_elt (bool_decide_eq_false_2 _ Hnu).
     iDestruct "Hpool" as "[Helt _]". iDestruct "Helt" as (bsx) "Helt".
     rewrite blk_owned_1.
-    iApply (snap_blk_dom g gl gt B D (DfracOwn 1) b bsx Hf with "Hau Helt").
+    iApply (snap_blk_dom g gl gt D (DfracOwn 1) b bsx Hf with "Hau Helt").
   Qed.
 
   (* ---- ONE inode's own slots are distinct: exclusivity, not a clause -- *)
@@ -1009,10 +1010,10 @@ Section Snap.
 
   (* ---- the whole per-inode reading ---- *)
 
-  Lemma snap_read_inode (g gl gt : gname) B D (sb : fs_sb)
+  Lemma snap_read_inode (g gl gt : gname) D (sb : fs_sb)
       (i : Z) (n : fs_node) :
     dblk_full D -> 0 <= i < 2 ^ 32 -> inode_local i n ->
-    snap_auth g B D -∗
+    snap_auth g D -∗
     inode_phi (snap_gamma g gl gt) sb i n -∗
     ⌜snap_inode_read sb D i n⌝.
   Proof.
@@ -1021,14 +1022,14 @@ Section Snap.
     iDestruct (inode_dat_slot_inj (snap_gamma g gl gt)
                  (snap_gamma_excl g gl gt) i n Hloc with "Hdat") as %Hslot.
     rewrite /inode_dat. iDestruct "Hdat" as "[Hd Hi]".
-    iDestruct (snap_read_blks g gl gt B D n Hf with "Hau Hd") as %Hblk.
-    iDestruct (snap_read_ind g gl gt B D n Hf with "Hau Hi") as %Hind.
+    iDestruct (snap_read_blks g gl gt D n Hf with "Hau Hd") as %Hblk.
+    iDestruct (snap_read_ind g gl gt D n Hf with "Hau Hi") as %Hind.
     rewrite (rec_owned_sb (snap_gamma g gl gt) sb i (fn_rec n) Hi)
             /rec_owned_at.
     pose proof (Z.mod_pos_bound i 16 ltac:(lia)) as [Hm0 Hm1].
     assert (Hlen64 : length (dinode_bytes (fn_rec n)) = 64%nat)
       by exact (dinode_bytes_length (fn_rec n) (inl_rec_wf Hloc)).
-    iDestruct (snap_run_read_full g gl gt B D
+    iDestruct (snap_run_read_full g gl gt D
                  (sb_inodestart sb + i `div` 16) (64 * (i `mod` 16))
                  (dinode_bytes (fn_rec n)) Hf ltac:(lia)
                  ltac:(rewrite Hlen64; unfold BSZ; lia)
@@ -1042,12 +1043,12 @@ Section Snap.
     - exact Hslot.
   Qed.
 
-  Lemma snap_read_inodes (g gl gt : gname) B D (sb : fs_sb)
+  Lemma snap_read_inodes (g gl gt : gname) D (sb : fs_sb)
       (I : gmap Z fs_node) :
     dblk_full D ->
     (forall i n, I !! i = Some n -> 0 <= i < 2 ^ 32) ->
     (forall i n, I !! i = Some n -> inode_local i n) ->
-    snap_auth g B D -∗
+    snap_auth g D -∗
     ([∗ map] i ↦ n ∈ I, inode_phi (snap_gamma g gl gt) sb i n) -∗
     ⌜forall i n, I !! i = Some n -> snap_inode_read sb D i n⌝.
   Proof.
@@ -1056,7 +1057,7 @@ Section Snap.
     rewrite bi.pure_forall. iIntros (n).
     rewrite bi.pure_impl. iIntros (Hi).
     iDestruct (big_sepM_lookup _ _ i n Hi with "Hin") as "Hphi".
-    iApply (snap_read_inode g gl gt B D sb i n Hf (Hrng i n Hi) (Hloc i n Hi)
+    iApply (snap_read_inode g gl gt D sb i n Hf (Hrng i n Hi) (Hloc i n Hi)
               with "Hau Hphi").
   Qed.
 
@@ -1217,9 +1218,9 @@ Section Snap.
      the committed view's own construction ([FsCrash.fs_recovery_dblk_full]
      at the crash predicate, the cache map's length row at a commit).  So it
      is a PREMISE here rather than a carried conjunct. *)
-  Theorem fs_snap_read_ok (g gl gt : gname) B D S :
+  Theorem fs_snap_read_ok (g gl gt : gname) D S :
     dblk_full D ->
-    fs_snap (snap_gamma g gl gt) g B D S -∗ ⌜snap_ok S D⌝.
+    fs_snap (snap_gamma g gl gt) g D S -∗ ⌜snap_ok S D⌝.
   Proof.
     (* [snap_auth] is itself a pair, so the epoch's identity comes off as
        ONE hypothesis (a [&]-pattern would descend into it) *)
@@ -1238,13 +1239,13 @@ Section Snap.
       by iPureIntro. }
     rewrite /fs_footprint. iDestruct "Hfp" as "(Hsbb & Hin & Hbmb & Hpool)".
     (* ---- the byte ties, by agreement with the epoch's own authority ---- *)
-    iDestruct (snap_blk_read_full g gl gt B D SB_BNO (fss_sbb S) Hf
+    iDestruct (snap_blk_read_full g gl gt D SB_BNO (fss_sbb S) Hf
                  with "Hau Hsbb") as %Hsbv.
-    iDestruct (snap_blk_read_full g gl gt B D (sb_bmapstart (fss_sb S))
+    iDestruct (snap_blk_read_full g gl gt D (sb_bmapstart (fss_sb S))
                  (bm_bytes BSIZE (fss_used S)) Hf with "Hau Hbmb") as %Hbmv.
-    iDestruct (snap_read_inodes g gl gt B D (fss_sb S) (fss_inodes S)
+    iDestruct (snap_read_inodes g gl gt D (fss_sb S) (fss_inodes S)
                  Hf Hrng Hloc with "Hau Hin") as %Hnodes.
-    iDestruct (snap_read_pool g gl gt B D (sb_size (fss_sb S)) (fss_used S)
+    iDestruct (snap_read_pool g gl gt D (sb_size (fss_sb S)) (fss_used S)
                  Hf with "Hau Hpool") as %Hpoolv.
     (* ---- the used-set coupling, off the [∗] ---- *)
     iDestruct (fs_inodes_phi_disj (snap_gamma g gl gt)
@@ -1302,13 +1303,13 @@ Section Snap.
 
   (* ...and the same with the snapshot HANDED BACK, which is the form an
      invariant's opener needs.  Nothing is spent: the conclusion is pure. *)
-  Lemma fs_snap_read_ok_keep (g gl gt : gname) B D S :
+  Lemma fs_snap_read_ok_keep (g gl gt : gname) D S :
     dblk_full D ->
-    fs_snap (snap_gamma g gl gt) g B D S -∗
-    ⌜snap_ok S D⌝ ∗ fs_snap (snap_gamma g gl gt) g B D S.
+    fs_snap (snap_gamma g gl gt) g D S -∗
+    ⌜snap_ok S D⌝ ∗ fs_snap (snap_gamma g gl gt) g D S.
   Proof.
     intros Hf. iIntros "H".
-    iDestruct (fs_snap_read_ok _ _ _ _ _ _ Hf with "H") as %Hok.
+    iDestruct (fs_snap_read_ok _ _ _ _ _ Hf with "H") as %Hok.
     iSplitR; [by iPureIntro | iExact "H"].
   Qed.
 
@@ -1339,8 +1340,8 @@ Section Snap.
      conclusion is pure and the snapshot stays whole. *)
   Lemma P_dur_tie D : dblk_full D -> P_dur D -∗ ∃ S, ⌜snap_ok S D⌝.
   Proof.
-    intros Hf. iIntros "H". iDestruct "H" as (g gl gt B S) "Hs".
-    iDestruct (fs_snap_read_ok _ _ _ _ _ _ Hf with "Hs") as %Hok. eauto.
+    intros Hf. iIntros "H". iDestruct "H" as (g gl gt S) "Hs".
+    iDestruct (fs_snap_read_ok _ _ _ _ _ Hf with "Hs") as %Hok. eauto.
   Qed.
 
   (* ...and the same with the snapshot HANDED BACK, which is the form an
@@ -1349,10 +1350,10 @@ Section Snap.
   Lemma P_dur_tie_keep D :
     dblk_full D -> P_dur D -∗ ∃ S, ⌜snap_ok S D⌝ ∗ P_dur D.
   Proof.
-    intros Hf. iIntros "H". iDestruct "H" as (g gl gt B S) "Hs".
-    iDestruct (fs_snap_read_ok _ _ _ _ _ _ Hf with "Hs") as %Hok.
+    intros Hf. iIntros "H". iDestruct "H" as (g gl gt S) "Hs".
+    iDestruct (fs_snap_read_ok _ _ _ _ _ Hf with "Hs") as %Hok.
     iExists S. iSplitR; [iPureIntro; exact Hok |].
-    iExists g, gl, gt, B, S. iExact "Hs".
+    iExists g, gl, gt, S. iExact "Hs".
   Qed.
 
 End Snap.
