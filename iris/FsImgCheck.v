@@ -257,10 +257,12 @@ Proof. exact (fsimg_wf_root_link fsimg_P fsimg_sb fsimg_wf_ok). Qed.
 (* ---- the durable predicate's sharpening: file nlink EQUALS its count -- *)
 
 (*  [FsImg.fs_links_eq] is stage F1's addition: the durable committed-view
-    invariant ([FsWf.fs_durable_wf_body]) states link EQUALITIES, while W9
-    keeps only [count <= nlink] for a file -- so the image discharge
-    ([FsWfImg.fsimg_durable_wf]) takes this sweep as its one new literal
-    fact.  One more W9-shaped pass: the ticket supply is rebuilt once and
+    invariant that once consumed it stated link EQUALITIES, while W9
+    keeps only [count <= nlink] for a file -- so the image discharge took
+    this sweep as its one new literal fact.  That invariant and its
+    discharge are DELETED (the pure wf layer, ruling 3 /
+    claude-notes/design/fs-state.md section 6); the sweep stays because
+    the equality is what row (a)'s boot establishment reads.  One more W9-shaped pass: the ticket supply is rebuilt once and
     each inum pays one [fs_tick_count].  Measured cost is recorded in the
     worklist (same ballpark as W9's own ~20 s including [Qed]).           *)
 Lemma fsimg_links_eq : fs_links_eq fsimg_P fsimg_sb = true.

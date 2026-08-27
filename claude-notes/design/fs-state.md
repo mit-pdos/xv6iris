@@ -1554,11 +1554,19 @@ extensionality suite and the mkfs discharge went with them (1019 → 47
 lines).  Note the trap that hid this: a single dead-code pass reports
 none of it, because the island and the suite reference each other — it
 takes the FIXPOINT (unreachable from any live root), not one pass.
-`FsWf.v` keeps `dv_of_D`, the junk-tolerant totalisation `FsCollect`,
-`FsCrash`, `LogSnapLaw` and `ProofEndOp` read, and nothing else — not even
-an import: the dead-import sweep dropped all seven project `Require`s and
-the whole-tree build confirmed it, so no downstream file was reaching
-`FsImg`/`FsTree` through this one (`FsCrash` gets `FsImg` via `FsDurSnap`).
+`FsWf.v` IS GONE TOO.  What it had left after the deletion was one
+two-line definition, `dv_of_D` — the junk-tolerant totalisation of a finite
+block map — under a name that described what the file used to be, with a
+comment six times the length of its code.  `dv_of_D` moved DOWN into
+`LogDefs.v`, beside `fs_home_set`, `fs_restrict`/`fs_install` and
+`fs_dbytes`, which are there for exactly the reason it now is: the log
+names the value it parks the client's payload at, and the log layer may not
+import the crash layer.  Two things fell out of the move — `lm_logged` had
+been spelling `dv_of_D` out by hand (its comment said so, because `dv_of_D`
+"lives ABOVE this file"), and is now written through it, so a crash-layer
+proof holding `fs_restrict (dv_of_D L) …` closes syntactically instead of
+by delta.  Its readers (`FsCollect`, `FsCrash`, `LogSnapLaw`, `ProofEndOp`)
+reach it through `LogDefs`, which they all already had.
 
 
 ## 6½. Link counts and types are ONE RA: the type register (RULING, lane G5)

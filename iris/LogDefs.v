@@ -131,6 +131,16 @@ Qed.
 (* this file.                                                             *)
 (* ---------------------------------------------------------------------- *)
 
+(* A FINITE BLOCK MAP, READ TOTALLY.  Every decoder over the committed
+   view wants a total [Z -> list (bv 8)] and is junk-tolerant, so a block
+   the map does not carry reads as [[]] (the superblock parse then fails on
+   its length guard, every [fs_le_at] reads zeros, and no decoder gets
+   stuck).  It belongs here for the reason the rest of this section does:
+   the log names the value it parks the client's payload at, and [lm_logged]
+   below IS this reading restricted to the home set. *)
+Definition dv_of_D (D : gmap Z (list (bv 8))) : Z -> list (bv 8) :=
+  fun b => default [] (D !! b).
+
 (* a total block view, restricted to a finite set of block numbers *)
 Definition fs_restrict (P : Z -> list (bv 8)) (s : gset Z)
     : gmap Z (list (bv 8)) :=
@@ -208,14 +218,15 @@ Definition lm_committed (M : log_mirror) (cov : gset Z) (ls : Z)
     (fs_restrict (lm_view M) (fs_home_set cov ls)).
 
 (* ...and the committed view a LOGGED view yields on the home set: what a
-   commit installs, and the index the parked payload comes back at.  The
-   reading is spelled out rather than written through [FsWf.dv_of_D],
-   which lives ABOVE this file -- the two are the same term up to delta,
-   so a crash-layer proof that holds [fs_restrict (dv_of_D L) …] closes
-   against this one by [reflexivity]. *)
+   commit installs, and the index the parked payload comes back at.  This
+   is literally [dv_of_D] restricted to the home set, and is now written
+   that way: the reading used to be spelled out by hand here because
+   [dv_of_D] lived ABOVE this file, so a crash-layer proof holding
+   [fs_restrict (dv_of_D L) …] closed against it by delta rather than
+   syntactically. *)
 Definition lm_logged (L : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z)
     : gmap Z (list (bv 8)) :=
-  fs_restrict (fun b => default [] (L !! b)) (fs_home_set cov ls).
+  fs_restrict (dv_of_D L) (fs_home_set cov ls).
 
 (* THE CLEAN PICTURE'S COMMITTED VIEW IS THE LOGGED VIEW (durable-disk 1d).
    Between commits the on-disk header is clean, so nothing is installed and
@@ -229,7 +240,7 @@ Lemma lm_committed_clean (M : log_mirror) (L : gmap Z (list (bv 8)))
   (forall b : Z, b ∈ fs_home_set cov ls -> L !! b = Some (lm_view M b)) ->
   lm_committed M cov ls = lm_logged L cov ls.
 Proof.
-  intros Hhdr Hrow. rewrite /lm_committed /lm_logged Hhdr /= fs_install_nil.
+  intros Hhdr Hrow. rewrite /lm_committed /lm_logged /dv_of_D Hhdr /= fs_install_nil.
   symmetry. apply fs_restrict_ext. intros b Hb. by rewrite (Hrow b Hb).
 Qed.
 
@@ -273,7 +284,7 @@ Lemma lm_logged_insert_ne (L : gmap Z (list (bv 8))) (cov : gset Z)
   b ∉ fs_home_set cov ls ->
   lm_logged (<[b := bs]> L) cov ls = lm_logged L cov ls.
 Proof.
-  intros Hb. apply fs_restrict_ext. intros c Hc.
+  intros Hb. apply fs_restrict_ext. intros c Hc. rewrite /dv_of_D.
   rewrite lookup_insert_ne; [reflexivity|].
   intro Hbad. apply Hb. rewrite Hbad. exact Hc.
 Qed.
@@ -307,7 +318,7 @@ Lemma lm_logged_insert_home (L : gmap Z (list (bv 8))) (cov : gset Z)
   b ∈ fs_home_set cov ls ->
   lm_logged (<[b := bs]> L) cov ls = <[b := bs]> (lm_logged L cov ls).
 Proof.
-  intros Hb. apply map_eq. intros c. rewrite /lm_logged.
+  intros Hb. apply map_eq. intros c. rewrite /lm_logged /dv_of_D.
   destruct (decide (c = b)) as [-> | Hne].
   - rewrite lookup_insert fs_restrict_lookup (decide_True _ _ Hb)
             lookup_insert //.

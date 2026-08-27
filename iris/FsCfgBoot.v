@@ -2331,10 +2331,12 @@ Definition fs_boot_image_wf (dk : Z -> bv 8) (ndisk : nat)
      [FsImg.fs_links_eq]: every live FILE inode's [nlink] EQUALS the number
      of directory entries naming it.  [fsimg_wf]'s W3 only bounds it from
      below, and the boot establishment of stage G1's abstract-view row (a)
-     needs the equality: [FsWfImg.fsimg_durable_wf] concludes
-     [FsWf.fs_durable_wf_body] of the image's committed view from
+     needs the equality: the image discharge concluded the durable
+     invariant of the image's committed view from
      [fsimg_wf + fs_links_eq + fs_region_wf + parse], and that view is the
-     row's [A] at era 0.  Cited at the literal image by
+     row's [A] at era 0.  (Both the invariant and that discharge are gone
+     with the pure wf layer, ruling 3; the equality is still what row (a)
+     needs.)  Cited at the literal image by
      [FsImgCheck.fsimg_links_eq], exactly as (10) cites [fsimg_parse_sb], so
      this costs the adequacy cone no new computation. *)
   /\ FsImg.fs_links_eq (FsCrash.fs_blocks dk) sb = true

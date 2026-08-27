@@ -50,7 +50,6 @@ Require Import RiscvPtsto.
 Require Import WpLock.
 Require Export BioDefs.  (* preserve [BSIZE] for existing importers *)
 Require Export LogDefs.  (* [hdr_dec]/[le_word], the mirror readings *)
-Require Export FsWf.  (* [dv_of_D]: the committed view as a total reading *)
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Require Import FsDurSnap.   (* [P_dur] -- the DURABLE SNAPSHOT, which is
                                [P_fs]'s durable conjunct since lane CE

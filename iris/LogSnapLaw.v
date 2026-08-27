@@ -55,7 +55,6 @@ Require Import Xv6Cameras.     (* [logG] *)
 Require Import BioDefs.        (* [BSIZE] *)
 Require Import LogDefs.        (* [log_names], [ln_tx], [fs_restrict],
                                   [fs_home_set]                        *)
-Require Import FsWf.           (* [dv_of_D] *)
 Require Import FsBlocks.       (* [fs_names], [fs_bytes], [logN]/[fsbN],
                                   [bytes_tie], [bytes_dom]             *)
 Require Import FsDurSnap.      (* [P_dur]: the durable epoch registry *)
@@ -73,8 +72,8 @@ Section SnapLaw.
   (* THE CONCLUSION, AS ONE NAME.  [LogInv] must be able to STATE the law
      and to hand its output on, and it deliberately imports no pure
      well-formedness layer (see its header); wrapping the epoch here is
-     what keeps [FsWf]'s and [FsDurSnap]'s vocabulary out of [log_ctx]'s
-     text.  [FsCollect.col_view C home] IS [fs_restrict (dv_of_D C) home],
+     what keeps [FsDurSnap]'s vocabulary out of [log_ctx]'s text
+     ([dv_of_D] itself is [LogDefs] vocabulary, which [LogInv] has).  [FsCollect.col_view C home] IS [fs_restrict (dv_of_D C) home],
      so this is the registry at exactly the map the commit jumps to. *)
   Definition snap_law_out (C : gmap Z (list (bv 8))) (home : gset Z)
     : iProp Σ :=

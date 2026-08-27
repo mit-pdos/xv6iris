@@ -2451,8 +2451,8 @@ Qed.
    one: a COMMITTED ORPHAN -- an inode unlinked while open, whose zeroed
    [nlink] the transaction wrote home; xv6's boot sweep ([ireclaim],
    fs.c) exists for exactly these -- keeps a live type, a sane size and
-   sane addrs with [nlink = 0].  The durable invariant
-   [FsWf.fs_durable_wf_body] therefore sweeps THIS form; [fs_inode_wf]
+   sane addrs with [nlink = 0].  The pure durable invariant that swept
+   THIS form is deleted (ruling 3); [fs_inode_wf]
    stays as-is for the boot readings (at a clean mkfs image the two
    coincide, [fs_inodes_wf_dwf]).
 
@@ -3330,7 +3330,7 @@ Qed.
 (* ---- THE DURABLE-STATE SHARPENING OF W9's BOUND ----------------------
    [fs_links_wf] records only [count <= nlink] for a non-directory (its
    directory arm is mkfs's own [z = ROOTINO] pin), but the durable
-   invariant [FsWf.fs_durable_wf_body] needs the EQUALITY: a live
+   committed-view reading needs the EQUALITY: a live
    non-directory inode's [nlink] IS its ticket count, which no projection
    of W9 can supply.  A separate additive sweep rather than a
    strengthening of [fs_links_wf], because [fsimg_wf]'s conjunct list is
