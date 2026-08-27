@@ -4324,6 +4324,17 @@ the rows below and in `design/fs-ghost-state.md`).
     else.  That is the whole of the rebase: nine files, thirty-two hunks, all
     the same shape (upstream's folded call vs this slice's inlined
     continuation), resolved by taking the FOLD and dropping its argument.
+    THE FOLD LANE IS STILL LANDING, AND ITS COMMITS ALL CONFLICT THE SAME
+    WAY: a fold lifts a block's tail into a named `*_exit` definition whose
+    binder list spells `dev` / `nib` / `inodestart` / `g` out in full, so the
+    conflict is "the fold vs. the inlined continuation" and the resolution is
+    always TAKE THE FOLD AND DE-THREAD IT.  Three rebases went that way here
+    (`KexecOkQ.kexec_closer`; `ProofDirlink`'s `dl_after_exit`/`dl_scan_exit`;
+    `ProofKexecA` and `ProofKforkB6`'s `kxc_*`/`kfk_pro_exit*`), and the cheap
+    way to do it is not to merge by hand: check the FOLDED file out whole and
+    re-run the slice's own rewriter on a scratch copy of the pre-change tree
+    with that one file swapped in.  It is deterministic, so the answer is the
+    same one the sweep would have produced had the fold landed first.
   - **WHAT STAGE 4 STILL OWES**: the bundle collapse proper.  `fs_world` →
     `fs_ready` + `fs_ready_disk` (its eight remaining equations are the six
     device/allocator names `γpr γa γu γd γk bn` and `bmapstart`/`size`);
