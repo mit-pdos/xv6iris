@@ -5555,6 +5555,380 @@ it converts a twelve-core sweep into a one-core one.
 6. `VcGenS` and the scheduler/trap tier (A6.61) — the successor tranche.
 
 
+### A6.63 THE ELEMENT CARVE IS IMPLEMENTED — AND IT UNBLOCKS THE BOOT 26
+### AS WELL, WHICH MEANS A6.58's OWNER TABLE HAD THE DEPENDENCY BACKWARDS
+
+Built to the ruled Q1–Q5.  **The theorem's conclusion gains exactly one
+conjunct**, at `RiscvAdequacy.v:520`, between the `↦ₘ` data row and
+`kmap_auth`:
+
+```coq
+       BootCarve.boot_led_ran g text_end ram_hi ∗
+```
+
+Q1 (client vocabulary) is why it is `boot_led_ran` and not the `filter`
+term, and paying for it was one word: **`supra_text_ran` promoted from
+`Local`** (`BootCarve.v:334`), which is the bridge between §2's
+`text_end`-and-above half and the range vocabulary.  Q2 (the client
+persists) is why it is one row at `DfracOwn 1` rather than a three-way
+split.
+
+**THE SUPPLY WAS ALREADY ON THE FLOOR, EXACTLY AS A6.61 FOUND.**
+`RiscvAdequacy.v:645`'s `ghost_map_alloc` produced `Htsfrags` and the proof
+never mentioned it again, while `boot_text_persist` — which has taken a
+three-resource form since it was written — was being called with two.  The
+carve is what closes both holes at once, and it is four lines:
+
+```coq
+  iEval (rewrite big_sepM_fmap) in "Htsfrags".
+  iDestruct (@boot_led_all_split Σ HR g Hram with "Htsfrags")
+    as "[Hledtext Hleddata]".
+  iMod (@boot_led_text_persist Σ HR g with "Hledtext") as "#Hpristext".
+  iMod (@boot_text_persist Σ HR g Hram with "Hkbundle Hpristext Htext") as "Htext".
+```
+
+**TWO NEW LEMMAS IN `BootCarve` §9**, both as ruled:
+
+- `boot_led_all_split` — the element twin of `boot_bytes_split`, cut at
+  `text_end` **in step with the raw bytes** so the halves pair byte for
+  byte, landing the upper half as `boot_led_ran g text_end ram_hi`.  Proof
+  is `boot_bytes_split`'s verbatim plus the `supra_text_ran` rewrite.
+- `boot_led_text_persist` — Q5's new lemma rather than churning
+  `boot_text_persist`'s green statement.  One `big_sepM_bupd` over
+  `ghost_map_elem_persist`, because **`pristine_elem` IS `ledger_elem0` at
+  `DfracDiscarded`** — same key, same value.
+
+**Q3, THE ALIAS, AND THE DIRECTION IS RECORDED:** `TsoCtx.pristine_byte`
+was a character-for-character duplicate of `RiscvPtsto.pristine_elem`.
+**TsoCtx imports RiscvPtsto, so `pristine_elem` is the definition and
+`pristine_byte` is now the alias** — never the other way round.  Kept a
+`Definition` (not a `Notation`) so both instances and every existing
+`rewrite /pristine_byte` keep working; the bodies are convertible, so no
+proof in the tree changes.
+
+**AND THE KIT ITEM THE `↦ₛ` RESIDUE NEEDED, `TsoCtx.ctx_pointsto_of_ro`:**
+
+```coq
+  Lemma ctx_pointsto_of_ro `{KTR : !CurKtier} (ξ : CtxId) (a : Arch.pa)
+      (ppn : mword 44) (dq : dfrac) (v : bv 8) :
+    kmap_at (svpn_of a) ppn KP_rw -∗
+    mem_pointsto a dq v -∗
+    ledger_elem0 (pa_of ppn a) dq -∗
+    ctx_pointsto ξ a dq v.
+```
+
+The caller supplies `ppn` with its `kmap_at` witness — every leaf site
+already holds one — so the element is indexed at the PHYSICAL address,
+exactly as `ctx_pointsto_def` holds it, and `kmap_at_agree` ties the two
+`ppn`s inside.  It is payable for one reason and it is worth restating:
+**at timestamp 0 the clean arm is free** (`TsoGhost.llb_0`), so a byte
+needs no new authority to enter the tier — it needs its ledger element,
+and A6.9 says the era's allocation is the only supplier.
+
+> **A LANDING NOTE THAT COST A COMPILE:** the first placement put
+> `ctx_pointsto_of_ro` at `TsoCtx.v:1748`, four hundred lines ABOVE
+> `ledger_elem0`'s definition (`:2171`).  `TsoCtx.v` is one 2000-line
+> section and the kit is NOT in dependency order by eye — put a new lemma
+> beside the one it is the twin of (`ctx_phys_pointsto_of_elem`), not
+> beside the one it reads like.
+
+### AND THE CARVE FLUSHED OUT WHY `RiscvAdequacy` HAS BEEN RED: THE
+### FUNCTOR NEVER GREW WITH THE RECORD
+
+Landing the conjunct moved the file's error from line 694 to line 712 —
+i.e. **past the statement**, which is the first evidence the carve itself
+elaborates.  What is at 712 is older and was misdiagnosed:
+
+    Could not find an instance for the following existential variables:
+    ?riscvF_kptbGS : inG Σ kptbR
+    ?riscvF_tsomemGS : tsoMemG Σ
+
+A6.58 read this as a POSITIONAL problem and left a comment saying so ("the
+positional underscore runs are 11 before `Hmpre` and 3 after `γreg`").
+**The counts are right.**  Counted against `riscvFixedGS`'s field list
+(`RiscvPtsto.v:396`) the eleven underscores land exactly on
+`regGS … mirrorGS`, and the three after `γreg` on
+`resvGS`/`tsomemGS`/`diskGS`.  The problem is not where the `_`s are — it
+is that **there is nothing for two of them to resolve to**:
+
+- `riscvGpreS` (`RiscvAdequacy.v:87`) had `riscv_pre_kptGS :: inG Σ kptR`
+  and **no `kptbR` field and no `tsoMemG` field**;
+- `riscvΣ` (`:141`) had `GFunctor kptR` and **no `GFunctor kptbR` and no
+  TSO functors**;
+- and **`tsoMemΣ` did not exist at all** — `TsoGhost.v` defined the class
+  `tsoMemG` (four fields) and never gave it a functor or a `subG` instance.
+
+So the record grew for the flip (A6.53's pin bound, the TSO ghosts) and the
+PRE-class and functor that are supposed to supply it never did.  **A record
+field is capacity you must also allocate**; a positional `_` cannot invent
+an instance.  Landed:
+
+```coq
+(* TsoGhost.v, beside the class *)
+Definition tsoMemΣ : gFunctors :=
+  #[ ghost_mapΣ Arch.pa TsoMemPa.ts_elem;
+     ghost_mapΣ nat TsoMemPa.pwmsg;
+     GFunctor (authR viewUR);
+     ghost_mapΣ (nat * Arch.pa) unit ].
+Global Instance subG_tsoMemG {Σ} : subG tsoMemΣ Σ -> tsoMemG Σ.
+Proof. solve_inG. Qed.
+
+(* RiscvAdequacy.v *)
+  riscv_pre_kptbGS :: inG Σ kptbR;
+  riscv_pre_tsomemGS :: tsoMemG Σ;
+     GFunctor kptbR;
+     tsoMemΣ;
+```
+
+`tsoMemΣ` deliberately carries **no `mono_natΣ`**, matching the class's own
+standing note: a second `mono_natG` beside `riscvF_genGS` would make
+resolution ambiguous, and `riscvΣ` already carries the one the tree shares.
+
+### THE BOOT 26 ARE THE SAME PROBLEM AS THE `↦ₛ` FOUR, NOT A SEPARATE ONE
+
+Read while sizing item (2), and it changes that item's shape.  All 26
+surviving boot crossings (`BootCarveMain` ×25, `BootBridge` ×1) are the
+raw→ctx direction on **loader image bytes**: `ctx_word_of_mem`,
+`ctx_pointsto_of_mem`, `ctx_eslot_of_mem`, `ctx_buf_of_mem`, sitting on
+top of `phys_ident_mem` / `phys_ident_text`.  That is *precisely* the shape
+`ctx_pointsto_of_ro` now covers — the only difference is the dfrac: the
+boot carve OWNS its bytes, so it needs `ledger_elem0 a (DfracOwn 1)`, not
+the discarded one.
+
+**And that supply is what the carve just created.**  `boot_led_ran g
+text_end ram_hi` hands the client exactly those elements, at exactly that
+dfrac, over exactly the data half the boot carve works on.
+
+> So A6.58's table had the dependency backwards.  The boot carve is not a
+> separate owner "the tool must not touch" *and nothing else* — it is
+> **the largest consumer of the element carve**, and it could not have been
+> done before it at any price.  The blacklist ruling still stands and is
+> now better motivated: the boot files must name every ξ explicitly
+> because they are where the elements are still being distributed, and an
+> ambient ξ there would silently pick a context for bytes that have not
+> been assigned one yet.
+
+**WHAT ITEM (2) NOW IS, precisely.**  Not a sweep: ~14 lemmas across
+`BootCarveMain` (one section, `:477`, `Context {!riscvGS Σ, !xv6G Σ}` and
+**no** `CurCtx` — as the blacklist requires) and `BootBridge`.  Each gains
+an explicit `(ξ : TsoCtx.CtxId)` parameter and an element premise for the
+bytes it mints, and each crossing becomes a `ctx_pointsto_of_ro` at
+`DfracOwn 1`.  The one kit item still missing is the *word*-level and
+*buffer*-level twins (`ctx_word_pointsto_of_ro`, `ctx_buf_of_ro`), since 14
+of the 26 sites are `ctx_word_of_mem` and 2 are `ctx_buf_of_mem`; both are
+`big_sepL` folds of the byte lemma over 8 (resp. `len`) elements, i.e.
+`boot_led_word`'s shape, which already exists at `BootCarve.v:1226`.
+
+### ITEM (3) IS NOT A ONE-LINE ARGUMENT FIX — `UmodeFetch` IS SEVEN CALL
+### SITES ACROSS TWO FILES, EACH OWING A □ OBLIGATION
+
+A6.60 read this one as "the file still passes a leaf-map hypothesis where a
+`bytemap → iProp` is expected", and the error text does say exactly that
+(`UmodeFetch.v:561`: `Hl` has type `ud_um pt !! svpn_of pc = Some w_leaf`
+while a `TsoMemPa.bytemap → iProp` is expected).  But the cause is not a
+misplaced hypothesis — it is a **new explicit parameter** on
+`UserPtTree.utlb_inv_pt_translateAddr_u` (`:1376`):
+
+```coq
+      (w va pa : mword 64) (σ : mstate)
+      (S : TsoMemPa.bytemap -> iProp Σ) :
+```
+
+`S` is A6.24's payer, threaded through the U-mode wrapper: a predicate over
+MACHINE memory that must survive the walk's A/D write-back.  It is taken as
+`S σ.(mem)`, returned as `S σ'.(mem)`, and the caller owes a **□
+obligation** that an 8-byte page-table write preserves it:
+
+```coq
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (write_bytes m a 8 wnew) ∗
+         S (write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+```
+
+**So every caller must CHOOSE an `S` and PROVE that obligation**, and there
+are seven: `UserFetchPt` `:194` `:334` `:397` `:565` and `UmodeFetch`
+`:559` `:682` `:792`.  **`UserFetchPt` has no `.vo` either** — it is red
+for the same reason and was simply never named, because `UmodeFetch` fails
+first.  Item (3) is therefore two files, not one, and its real content is
+choosing the store predicate at each site (for `UmodeFetch` the resource
+that has to cross the walk is the user memory `umem pt M`) and discharging
+the preservation obligation — the same A6.24/A6.27 payer question the
+kernel-side wrappers already answered, one tier over.
+
+Comparable in size to the `tramp_tr_obl` six.  Not landed.
+
+### ITEM (6), CHARACTERISED: THE `VcGenS` CASCADE IS SIX STATEMENTS AND AN
+### INDUCTION, AND IT REACHES THE SCHEDULER
+
+The successor tranche's handoff, measured rather than estimated.
+
+**THE FILE:** `VcGenS.v`, 1539 lines, **zero `own_context`**, and it
+exports **six** block lemmas, not one — three regime-generic and three
+`root_ppn` wrappers:
+
+| lemma | line |
+|---|---|
+| `wp_vc_block_s_den_r` | 378 |
+| `wp_vc_block_s_den` | 805 |
+| `wp_vc_block_s_aux_r` | 875 |
+| `wp_vc_block_s_aux` | 1281 |
+| `wp_vc_block_s_r` | 1330 |
+| `wp_vc_block_s` | 1373 |
+
+**WHY IT IS NOT A STATEMENT SWEEP.**  Each `_r` form is proved by
+`revert st. induction prog as [|op rest IH]`, and the token has to be
+threaded *through the induction*: taken in the statement, handed to `IH` at
+every step, and returned in the continuation beside `vheap_own` /
+`vheap4_own`.  The four sp-relative call sites that force it are
+`wp_csdsp_gpr_s_r_t` / `wp_cldsp_gpr_s_r_t` at `:510`, `:544`, `:1006`,
+`:1041` — `WpSmodePtMemWrap`'s wrappers, which are already threaded and
+green.
+
+**THE REACH:** `IntrDefs`, `ProofKernelvec` (`:520`, `:651`, via
+`wp_vc_block_s`), `ProofSwtch` (`:194`, via `wp_vc_block_s_den_r`),
+`SRegime`, `WpSwtchVc`.  **`ProofSwtch` is already an M2 quarantine site**
+(A6.60's lock/park four), so this cascade and the lock tranche land in the
+same file and should be sequenced deliberately rather than raced.
+
+**THE SHAPE TO COPY** is `WpSmodePtMem`'s (A6.61): token in and out of each
+statement, into the folded post, into the leaf's spec list, back out
+through the continuation — with the one addition that here it must also
+survive `IH`.
+
+
+### A6.64 `WpSconfMem` IS GREEN — AND THE CAUSE WAS NEITHER OF THE TWO
+### THINGS A6.61 AND A6.62′ SAID IT WAS
+
+**202 sentences, 4.74 seconds, `.vo` on disk.**  Against 35 minutes, 60
+minutes and 57 minutes of non-termination in the three prior attempts.
+The one sentence that would not elaborate now bills **0.042 s**.
+
+**THE ROOT CAUSE, and it is a THIRD story.**  A6.61 said the leaf's payload
+was a duplicated lambda and naming it would fix it (refuted by A6.62′).
+A6.62′ said the name had to be RIGID and `clearbody` would fix it (refuted
+by the 57-minute run).  Neither was the bug.  The bug is that **the payload
+was spelled DIFFERENTLY at three positions of the same forty-argument
+application**:
+
+| position | what it said |
+|---|---|
+| the leaf's `R` | `Psic` (`= own_context ∗ Ψ bs`) |
+| the obligation argument | `Mobl_ram_ex width (pa_of ppn ea) Psic` |
+| **the node argument** | `swp_read_ram_node_w_ex width (pa_of ppn ea) **Ψ** …` |
+
+The node was still handing the payload at `Ψ` — the PRE-flip payload —
+while the leaf and the obligation wanted `own_context ∗ Ψ`.  So
+higher-order unification was asked to discover the relationship between
+`Ψ` and `own_context ∗ Ψ` while working through forty arguments, and it
+diverged.  **Make the three agree and the application elaborates in 42
+milliseconds.**
+
+> **THE DURABLE RULE, corrected for the third and last time.**  At these
+> leaf applications the payload must be spelled IDENTICALLY at the leaf's
+> `R`, at the obligation argument and at the node argument.  Naming it
+> (`set`) is what makes that consistency easy to write and easy to check by
+> eye — but naming is not the fix and `clearbody` is not the fix.  **The
+> flip's threading edits must move the NODE argument too, and A6.58's
+> recipe never said so**, which is why every S-mode leaf that took the
+> token has this hazard latent until its node is checked.
+
+**AND THE SPLIT EXPERIMENT IS WHAT FOUND IT.**  Splitting `iApply` into
+`iPoseProof … as "Hleaf"` + `iApply ("Hleaf" with …)` showed the cost was
+entirely in the `iPoseProof` — i.e. in ELABORATING the application, with
+the goal not yet consulted.  That is what ruled out goal unification and
+sent the search into the argument list, where the mismatch was.  **The
+split is worth keeping in the file**: it costs nothing and it is the only
+thing that localises this class of failure.
+
+### THE CROSS-LANE CpuId BACK-PORT WAS REAL, AND IT BIT EXACTLY AS PREDICTED
+
+`tso-port.md` §0.20′ (M-leg) arrived while this was in flight and it was
+right on every point.  `own_context` is CpuId-indexed; both engines re-park
+with `rename CID into CID0; iIntros (CID Hs)`; the capability's token is at
+the FRESH `CpuId` while typeclass resolution silently finds the section
+instance.  Landed here:
+
+- `{CIDw : CpuId}` binders on BOTH local helpers (`wordw_pointsto_write_c`
+  AND `wordw_pointsto_load_c` — §0.20′ only had the write one, because
+  main's SC read needs no token);
+- **the parameter is used TWICE in each**, exactly as §0.20′ warned: once
+  for `own_context (CID := CIDw)` and once for the message author /
+  read agent `hart_agent (@cpu_id CIDw)` — 3 token sites and 6 author
+  sites across the two helpers;
+- `(CID := CIDw)` pushed down to `SmodeCorePt.wordw_win_store_c` /
+  `wordw_win_load_c` (legal there — they are outside this section);
+- `(CIDw := CID)` at both node calls, and `own_context (CID := CID)` in
+  both leaf payloads;
+- and the read node's `iAssert` obligation re-spelled at
+  `hart_agent (@cpu_id CID)` — which failed first as
+  `iApply: cannot apply` on two terms that print identically, the §0.20′
+  signature exactly.
+
+**Two more genuine bugs behind it**, both invisible until the file
+compiled this far:
+
+- both nodes needed the token passed IN through the spec pattern
+  (`[HAU]` → `[HAU Hctx]`); it was being used inside the bracket without
+  being given to it;
+- **`wordw1_byte` was stated across the tier**: `wordw_pointsto` is built
+  from `ctx_pointsto cur_ctx` (line 118), so the one-byte window IS the
+  context byte, but the lemma claimed `⊣⊢ mem_pointsto a dq w` — the RAW
+  one.  False in the return direction at TSO; at the ctx tower both
+  directions are identities.  Same class as `DinodeSlot`'s two (A6.62).
+
+### THE CONE OPENED: 868 OF 1330, AND THE FRONTIER IS A REAL FRONTIER NOW
+
+**868, up from 731.**  `WpSconfMem` going green added **137 files** in two
+sweeps, and for the first time since the flip the `Proof*` tier has been
+compiled at all.  Model `.vo` checked to postdate its source first (A6.39);
+one make; closing rebuild stable at the same number.
+
+**A6.61 AND A6.62's UNVALIDATED WORK IS NOW VALIDATED, AND IT HELD.**  The
+21 owner-client deletions, the ten mechanical collapses, `DinodeSlot`,
+`ProofDirlookupParts`, `ProofDirlink`, `ProofKexecTail`, the four
+`ProofSys*` join4s — all green.  The owner re-tiering of `BcacheInv` and
+`WaitInv` is confirmed end to end, clients included.
+
+> **ONE SELF-INFLICTED BUG, worth recording because the tool did it.**  The
+> dead-`Require TsoCtxShim` sweep matched `^Require TsoCtxShim\.[^\n]*\n`
+> and several of those lines were the FIRST line of a multi-line comment —
+> so it deleted the opener and left the tail, giving `Syntax error: illegal
+> begin of vernac` in seven files.  A second guard (`if "ByteBuf" not in
+> t`) was defeated by a comment *I had just written* mentioning ByteBuf.
+> **When a script edits `Require` lines, check comment balance afterwards**
+> — `s.count("(*") != s.count("*)")` found all seven in one pass and is now
+> the cheapest possible post-condition for any header-editing sweep.
+
+**THE 39 RED, CLASSIFIED** — and the newly-reached ones are dominated by a
+single owner, not scattered:
+
+| class | files | what it is |
+|---|---|---|
+| **the PT-cell tier (`↦ₚₜ` vs `↦ₚ₈`)** | `ProofMappages` `ProofUvmcopy` `ProofUvmunmap` `ProofWalkaddr` `ProofIsmapped` `TfPage36` (+`ProcInv`) | the SAME forced ledger-page move A6.49 measured, now reaching the page-table proofs.  **One owner, one tranche** — settle `ProcInv`/`TfPage36` first and the rest follow |
+| unresolved implicits | `ProofBmap` `ProofEndOp` `ProofFreewalk` `ProofInstallTrans` | missing section binders, the `FsLookup` class (A6.58) |
+| `ctx_phys` window | `ProofWalk` `UserMemPt` | the window accessor `UserMemPt` needs (A6.62) |
+| `ctx_dom` / swtch re-index | `ProofScheduler` | **exactly A6.58's prediction**: `SwtchCtx.ctx_cells_reindex` became a PRICED re-index and "its single caller (`ProofScheduler`) is the M2 worklist entry that price creates" |
+| the characterized five | `UmodeFetch` `UptWalkPt` `UserMemPt` `VcGenS` `RiscvAdequacy` | A6.62/A6.63's queue, unchanged |
+| the `↦ₛ`/rodata residue | `ProofPrintk` `WpSconfLock` `ProofFilewriteParts` | blocked on the element carve (A6.62) |
+
+**`RiscvAdequacy` moved 694 → 1372** under the carve — past the statement,
+past the era record, past the device corollary, into the power path — and
+its remaining tail is A6.61's cascade items 4–6.  The carve itself
+elaborates; what is left below it is the power arm's own cascade.
+
+### WHAT THIS OPENS
+
+`WpSconfMem` gates roughly six hundred files, including **every `Proof*`
+edit A6.61 and A6.62 landed and could not check** — the 21 owner-client
+deletions, the ten mechanical collapses, `DinodeSlot`,
+`ProofDirlookupParts`, `VirtioDiskRwDefs`, `ProofKexecTail`,
+`WpSconfLock`.  The sweep behind this file is the first real news about all
+of them, and it is running now.
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
