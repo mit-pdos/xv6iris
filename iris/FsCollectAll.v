@@ -127,21 +127,11 @@ Section BigOps.
       + rewrite big_sepS_insert; [| exact Hnin]. iFrame "Hx Hs".
   Qed.
 
-  (* ...and two sets' big-ops cover their union, the overlap being dropped *)
-  Lemma big_sepS_union_weak `{Countable A} (X Y : gset A) (Φ : A -> iProp Σ) :
-    ([∗ set] z ∈ X, Φ z) -∗ ([∗ set] z ∈ Y, Φ z) -∗ [∗ set] z ∈ X ∪ Y, Φ z.
-  Proof.
-    iIntros "HX HY".
-    assert (Heq : X ∪ Y = X ∪ (Y ∖ X)).
-    { apply set_eq. intros y. rewrite !elem_of_union elem_of_difference.
-      destruct (decide (y ∈ X)); naive_solver. }
-    assert (Hdj : X ## (Y ∖ X)).
-    { intros y Hy1 Hy2. apply elem_of_difference in Hy2 as [_ Hn].
-      exact (Hn Hy1). }
-    rewrite Heq.
-    rewrite (big_sepS_union Φ X (Y ∖ X) Hdj).
-    iFrame "HX". iApply (big_sepS_subseteq with "HY"). set_solver.
-  Qed.
+  (* [big_sepS_union_weak] IS DELETED (durable-disk EV-Y).  It covered a
+     UNION by dropping the overlap, which is what the pool/marker/live
+     partition used to need; the three index sets are now shown DISJOINT
+     from the region's own slots ([col_sidez_disj] below), so the exact
+     [big_sepS_union] applies and nothing is dropped at that boundary. *)
 
 End BigOps.
 
@@ -272,6 +262,56 @@ Section CollectAll.
     0 <= z < 2 ^ 32 -> bv_unsigned (mword_of_int z : mword 32) = z.
   Proof.
     intros Hr. rewrite moi32_unsigned. apply bv_wrap_small. exact Hr.
+  Qed.
+
+  (* ==================================================================== *)
+  (*  ...AND THE PARTITION IS DISJOINT (durable-disk EV-Y)                  *)
+  (*                                                                      *)
+  (*  [IcacheEscrow.ipool_quiesce_acc] states its three index sets as a    *)
+  (*  UNION and no pure row says they do not overlap.  They do not, and    *)
+  (*  the proof is SEPARATION LOGIC: a shared inum would give two          *)
+  (*  [FsCollect.col_side]s beside the region's own slot, which            *)
+  (*  [FsCollect.col_side_slot_excl] refutes off one exclusive [ghost_map] *)
+  (*  element.  Nothing pure about the state is materialised and the       *)
+  (*  conclusion is pure, so the caller keeps every row.                   *)
+  (* ==================================================================== *)
+  (* the refutation at an inum named as a NUMBER, exactly as
+     [col_region_quiesce_take_z] is for the door *)
+  Lemma col_side_slot_excl_z (γfs : fs_names) (γi : gname) (z : Z)
+      (w : mword 32) (d : dinode) :
+    bv_unsigned w = z ->
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ireg_slot γfs γi z d -∗
+    col_side γfs γi w -∗ col_side γfs γi w -∗ False.
+  Proof.
+    intros <-. iIntros "Ht Hslot Hs1 Hs2".
+    iApply (col_side_slot_excl γfs γi w d with "Ht Hslot Hs1 Hs2").
+  Qed.
+
+  Lemma col_sidez_disj (γfs : fs_names) (γi : gname) (m : gmap Z dinode)
+      (Rs A B : gset Z) :
+    A ⊆ Rs -> B ⊆ Rs ->
+    (forall z : Z, z ∈ Rs -> 0 <= z < 2 ^ 32) ->
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ([∗ set] z ∈ Rs, ∃ d : dinode, ⌜m !! z = Some d⌝
+                                   ∗ ireg_slot γfs γi z d) -∗
+    ([∗ set] z ∈ A, col_sidez γfs γi z) -∗
+    ([∗ set] z ∈ B, col_sidez γfs γi z) -∗ ⌜A ## B⌝.
+  Proof.
+    intros HA HB Hw. iIntros "Ht Hslots HA HB".
+    iAssert (⌜forall z : Z, z ∈ A -> z ∈ B -> False⌝)%I
+      with "[Ht Hslots HA HB]" as %Hd.
+    { rewrite bi.pure_forall. iIntros (z).
+      rewrite bi.pure_impl. iIntros (HzA).
+      rewrite bi.pure_impl. iIntros (HzB).
+      assert (HzR : z ∈ Rs) by exact (HA z HzA).
+      iDestruct (big_sepS_elem_of _ Rs z HzR with "Hslots") as (d Hd) "Hslot".
+      iDestruct (big_sepS_elem_of _ A z HzA with "HA") as "Hs1".
+      iDestruct (big_sepS_elem_of _ B z HzB with "HB") as "Hs2".
+      rewrite /col_sidez.
+      iApply (col_side_slot_excl_z γfs γi z (mword_of_int z) d
+                (moi_unsigned_z z (Hw z HzR)) with "Ht Hslot Hs1 Hs2"). }
+    iPureIntro. apply elem_of_disjoint. exact Hd.
   Qed.
 
   (* ---- the region's own half: records apart from slots --------------- *)
@@ -833,11 +873,11 @@ Section CollectAll.
   (*  share: it is that a transport at [q > 1/2] necessarily takes MORE    *)
   (*  THAN HALF of every byte, so the collection that feeds it can no      *)
   (*  longer be DESTRUCTIVE -- it has to be an accessor and take its       *)
-  (*  source back out of the transport, and three of its steps drop        *)
-  (*  resource irreversibly ([big_sepS_union_weak] at the pool/marker/live *)
-  (*  partition, which [IcacheEscrow.ipool_quiesce_acc] does not make      *)
-  (*  disjoint; [col_keeps_root]; and the era's residue in                 *)
-  (*  [col_hand_footprint]).  That is a lane of its own.                   *)
+  (*  source back out of the transport.  The partition's step is no longer *)
+  (*  one of the obstacles (durable-disk EV-Y: [col_sidez_disj] makes the  *)
+  (*  three index sets disjoint from the region's own slots, so the exact  *)
+  (*  [big_sepS_union] applies); what still drops resource irreversibly is *)
+  (*  [col_keeps_root] and the era's residue in [col_hand_footprint].      *)
   (* ==================================================================== *)
   Lemma col_hand_state (γfs : fs_names) (γi : gname) (nib : nat)
       (sb : fs_sb) (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
@@ -997,9 +1037,48 @@ Section CollectAll.
       iApply (big_sepL_impl with "Hids"). iIntros "!>" (k p Hk) "H".
       rewrite Nat.add_0_l. iExact "H". }
     iDestruct (esc_covers_live cn γfs γi cov ls 0%nat ids with "Hzip") as "HL".
-    (* ---- their union IS the region ---- *)
-    iDestruct (big_sepS_union_weak with "HO HX") as "HOX".
-    iDestruct (big_sepS_union_weak with "HOX HL") as "HR".
+    (* ---- THE PARTITION IS DISJOINT (durable-disk EV-Y), so their union
+       IS the region and nothing is dropped at this boundary.  The three
+       readings ride an [∧] so that the rows they are read off survive
+       them ---- *)
+    assert (HOR : O ⊆ region_inums nib).
+    { rewrite Hrow. intros y Hy.
+      apply elem_of_union. left. apply elem_of_union. by left. }
+    assert (HXR : X ⊆ region_inums nib).
+    { rewrite Hrow. intros y Hy.
+      apply elem_of_union. left. apply elem_of_union. by right. }
+    assert (HLR : ic_live_inums ids ⊆ region_inums nib).
+    { rewrite Hrow. intros y Hy. apply elem_of_union. by right. }
+    iAssert (⌜O ## X⌝ ∧ ⌜O ## ic_live_inums ids⌝
+             ∧ ⌜X ## ic_live_inums ids⌝
+             ∧ (ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+                ∗ ([∗ set] z ∈ region_inums nib,
+                     ∃ d : dinode, ⌜m !! z = Some d⌝
+                                   ∗ ireg_slot γfs γi z d)
+                ∗ ([∗ set] z ∈ O, col_sidez γfs γi z)
+                ∗ ([∗ set] z ∈ X, col_sidez γfs γi z)
+                ∗ ([∗ set] z ∈ ic_live_inums ids, col_sidez γfs γi z)))%I
+      with "[Htx Hslots HO HX HL]"
+      as "(%HdOX & %HdOL & %HdXL & (Htx & Hslots & HO & HX & HL))".
+    { iSplit.
+      { iApply (col_sidez_disj γfs γi m (region_inums nib) O X
+                  HOR HXR Hwide with "Htx Hslots HO HX"). }
+      iSplit.
+      { iApply (col_sidez_disj γfs γi m (region_inums nib) O
+                  (ic_live_inums ids) HOR HLR Hwide with "Htx Hslots HO HL"). }
+      iSplit.
+      { iApply (col_sidez_disj γfs γi m (region_inums nib) X
+                  (ic_live_inums ids) HXR HLR Hwide with "Htx Hslots HX HL"). }
+      iFrame "Htx Hslots HO HX HL". }
+    assert (HdOXL : (O ∪ X) ## ic_live_inums ids)
+      by (apply disjoint_union_l; split; assumption).
+    iAssert ([∗ set] z ∈ O ∪ X, col_sidez γfs γi z)%I
+      with "[HO HX]" as "HOX".
+    { rewrite (big_sepS_union (col_sidez γfs γi) O X HdOX). iFrame "HO HX". }
+    iAssert ([∗ set] z ∈ O ∪ X ∪ ic_live_inums ids, col_sidez γfs γi z)%I
+      with "[HOX HL]" as "HR".
+    { rewrite (big_sepS_union (col_sidez γfs γi) (O ∪ X)
+                 (ic_live_inums ids) HdOXL). iFrame "HOX HL". }
     rewrite -Hrow.
     (* ---- zip with the region's slots, and turn each pair into a bundle -- *)
     iAssert ([∗ set] z ∈ region_inums nib,

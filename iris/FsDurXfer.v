@@ -416,25 +416,12 @@ Lemma xq_strip_cons (r : xqrun) (l : list xqrun) :
   xq_strip (r :: l) = r.2 :: xq_strip l.
 Proof. reflexivity. Qed.
 
-Lemma xq_strip_app (l1 l2 : list xqrun) :
-  xq_strip (l1 ++ l2) = xq_strip l1 ++ xq_strip l2.
-Proof. rewrite /xq_strip fmap_app //. Qed.
-
 Lemma xq_ok_cons (r : xqrun) (l : list xqrun) :
   ~ ✓ (r.1 ⋅ r.1) -> xq_ok l -> xq_ok (r :: l).
 Proof.
   intros Hr Hl k x Hk. destruct k as [| k].
   - simpl in Hk. injection Hk as <-. exact Hr.
   - exact (Hl k x Hk).
-Qed.
-
-Lemma xq_ok_app (l1 l2 : list xqrun) :
-  xq_ok l1 -> xq_ok l2 -> xq_ok (l1 ++ l2).
-Proof.
-  intros H1 H2 k x Hk.
-  destruct (decide (k < length l1)%nat) as [Hlt | Hge].
-  - rewrite lookup_app_l in Hk; [| exact Hlt]. exact (H1 k x Hk).
-  - rewrite lookup_app_r in Hk; [| lia]. exact (H2 _ x Hk).
 Qed.
 
 Lemma xq_ok_at (dq : dfrac) (l : list xrun) :
@@ -469,18 +456,11 @@ Section RunsQ.
     rewrite /phi_map_q /xr_map big_sepM_map_seqZ_gen /byte_range_q //.
   Qed.
 
-  Lemma phi_runs_q_nil Γ : phi_runs_q Γ [] ⊣⊢ emp.
-  Proof. rewrite /phi_runs_q big_sepL_nil //. Qed.
-
   Lemma phi_runs_q_cons Γ r l :
     phi_runs_q Γ (r :: l)
     ⊣⊢ byte_range_q Γ r.1 (xr_blk r.2) (xr_off r.2) (xr_bs r.2)
         ∗ phi_runs_q Γ l.
   Proof. rewrite /phi_runs_q big_sepL_cons //. Qed.
-
-  Lemma phi_runs_q_app Γ l1 l2 :
-    phi_runs_q Γ (l1 ++ l2) ⊣⊢ phi_runs_q Γ l1 ∗ phi_runs_q Γ l2.
-  Proof. rewrite /phi_runs_q big_sepL_app //. Qed.
 
   (* THE ONE-SHARE LIST IS THE CONSTANT-SHARE VIEW'S OWN RUN LIST. *)
   Lemma phi_runs_q_at Γ dq l :

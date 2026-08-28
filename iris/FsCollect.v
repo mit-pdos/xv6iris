@@ -567,28 +567,6 @@ Section Collect.
   (*  3.  READING ONE BUNDLE                                               *)
   (* ==================================================================== *)
 
-  (* a node's OWN block, out of its bundle: a data block it holds or its
-     indirect block ([FsDurSnap.fn_owns] is exactly those two) *)
-  Lemma col_bundle_owns γfs γi (i b : Z) (n : fs_node) :
-    fn_owns n b ->
-    col_bundle γfs γi i n -∗
-    ∃ (dq : dfrac) (bs : list (bv 8)),
-      ⌜~ ✓ (dq ⋅ dq)⌝ ∗ blk_owned_q (fs_gamma_L γfs) dq b bs.
-  Proof.
-    intros Howns. iIntros "H".
-    iDestruct "H" as (inum Hbv) "H".
-    pose (dq := DfracOwn (3/4)).
-    assert (Hnv : ~ ✓ (dq ⋅ dq)) by exact FsStateDefs.dfrac_34_nvalid.
-    rewrite /inode_owned_era_q /inode_dat_q.
-    iDestruct "H" as "(_ & [Hblk Hind] & _ & _)".
-    destruct Howns as [(k & [bs Hbs] & Hk) | [Hnz Hind]].
-    - iExists dq, bs. iSplitR; [iPureIntro; exact Hnv |].
-      rewrite (big_sepM_lookup _ _ k bs Hbs). rewrite Hk. iExact "Hblk".
-    - iExists dq, (ind_bytes (fn_ent n)).
-      iSplitR; [iPureIntro; exact Hnv |].
-      rewrite /ind_owned_q (decide_False _ _ Hnz) Hind. iExact "Hind".
-  Qed.
-
   (* the bundle's own local clause, and its record proxy *)
   Lemma col_bundle_local γfs γi (i : Z) (n : fs_node) :
     col_bundle γfs γi i n -∗ ⌜inode_local i n⌝.
@@ -629,197 +607,21 @@ Section Collect.
     iApply (ghost_map_lookup with "Ha Htf").
   Qed.
 
-  (* ONE NODE NEVER NAMES ONE BLOCK TWICE, off its own [∗]: two of its slots
-     at one nonzero address would be two owners of that block at a share
-     whose double is invalid. *)
-  Lemma col_bundle_slot γfs γi (i : Z) (n : fs_node) :
-    col_bundle γfs γi i n -∗ ⌜fn_slot_inj n⌝.
-  Proof.
-    iIntros "H".
-    iDestruct (col_bundle_local with "H") as %Hloc.
-    rewrite /fn_slot_inj.
-    rewrite bi.pure_forall. iIntros (k).
-    rewrite bi.pure_forall. iIntros (j).
-    rewrite bi.pure_forall. iIntros (Hk).
-    rewrite bi.pure_forall. iIntros (Hj).
-    rewrite bi.pure_forall. iIntros (Hnz).
-    rewrite bi.pure_forall. iIntros (Heq).
-    destruct (decide (k = j)) as [-> | Hne]; [by iPureIntro |].
-    (* the two slots are two blocks of THIS node's footprint *)
-    iExFalso.
-    iAssert (∃ (dq : dfrac) (bs1 bs2 : list (bv 8)),
-               ⌜~ ✓ (dq ⋅ dq)⌝ ∗
-               blk_owned_q (fs_gamma_L γfs) dq (fn_slot n k) bs1 ∗
-               blk_owned_q (fs_gamma_L γfs) dq (fn_slot n j) bs2)%I
-      with "[H]" as (dq bs1 bs2 Hnv) "[H1 H2]".
-    { iDestruct "H" as (inum Hbv) "H".
-      pose (dq := DfracOwn (3/4)).
-      assert (Hnv : ~ ✓ (dq ⋅ dq)) by exact FsStateDefs.dfrac_34_nvalid.
-      rewrite /inode_owned_era_q /inode_dat_q.
-      iDestruct "H" as "(_ & [Hblk Hind] & _ & _)".
-      iExists dq.
-      (* slot [FS_MAXFILE] is the indirect block; the others are data *)
-      destruct (decide (k = FS_MAXFILE)) as [-> | HkD].
-      - (* k is the indirect slot, so j is a data slot (k <> j) *)
-        assert (HjD : (j < FS_MAXFILE)%nat) by lia.
-        rewrite fn_slot_ind in Hnz. rewrite fn_slot_ind.
-        rewrite (fn_slot_data n j HjD).
-        rewrite (fn_slot_ind n) (fn_slot_data n j HjD) in Heq.
-        assert (Hjnz : fn_naddr n j <> 0) by (rewrite -Heq; exact Hnz).
-        destruct (proj2 (inl_blk_dom Hloc j HjD) Hjnz) as [bsj Hbsj].
-        iExists (ind_bytes (fn_ent n)), bsj.
-        iSplitR; [iPureIntro; exact Hnv |].
-        iSplitL "Hind".
-        + rewrite /ind_owned_q (decide_False _ _ Hnz). iExact "Hind".
-        + rewrite (big_sepM_lookup _ _ j bsj Hbsj). iExact "Hblk".
-      - assert (HkD' : (k < FS_MAXFILE)%nat) by lia.
-        rewrite (fn_slot_data n k HkD') in Hnz.
-        rewrite (fn_slot_data n k HkD') in Heq.
-        rewrite (fn_slot_data n k HkD').
-        destruct (proj2 (inl_blk_dom Hloc k HkD') Hnz) as [bsk Hbsk].
-        destruct (decide (j = FS_MAXFILE)) as [-> | HjD].
-        + rewrite fn_slot_ind. rewrite fn_slot_ind in Heq.
-          assert (Hinz : fn_indb n <> 0) by (rewrite -Heq; exact Hnz).
-          iExists bsk, (ind_bytes (fn_ent n)).
-          iSplitR; [iPureIntro; exact Hnv |].
-          iSplitL "Hblk".
-          * rewrite (big_sepM_lookup _ _ k bsk Hbsk). iExact "Hblk".
-          * rewrite /ind_owned_q (decide_False _ _ Hinz). iExact "Hind".
-        + assert (HjD' : (j < FS_MAXFILE)%nat) by lia.
-          rewrite (fn_slot_data n j HjD').
-          rewrite (fn_slot_data n j HjD') in Heq.
-          assert (Hjnz : fn_naddr n j <> 0) by (rewrite -Heq; exact Hnz).
-          destruct (proj2 (inl_blk_dom Hloc j HjD') Hjnz) as [bsj Hbsj].
-          iExists bsk, bsj.
-          iSplitR; [iPureIntro; exact Hnv |].
-          rewrite (big_sepM_delete _ (fn_blk n) k bsk Hbsk).
-          iDestruct "Hblk" as "[Hk Hrest]".
-          assert (Hbsj' : delete k (fn_blk n) !! j = Some bsj)
-            by (rewrite lookup_delete_ne; [exact Hbsj | exact Hne]).
-          rewrite (big_sepM_lookup _ _ j bsj Hbsj').
-          iSplitL "Hk"; [iExact "Hk" | iExact "Hrest"]. }
-    rewrite Heq.
-    iApply (blk_owned_q_excl (fs_gamma_L γfs) (fs_gamma_L_excl γfs) dq dq
-              (fn_slot n j) bs1 bs2 (dfrac_nvalid_pair dq dq Hnv Hnv)
-              with "H1 H2").
-  Qed.
-
   (* ==================================================================== *)
-  (*  4.  THE FULL-FRACTION OWNERS: the three metadata roles               *)
+  (*  4.  WHAT THE BUNDLES SAY ABOUT THE MAP                               *)
+  (*                                                                      *)
+  (*  The PURE-CARVE support that used to stand here is DELETED            *)
+  (*  (durable-disk EV-Y): [col_bundles_disj] -- which MATERIALISED        *)
+  (*  cross-inode block disjointness as a pure fact, exactly what the      *)
+  (*  transport reads off [FsStateDefs.phi_excl] instead -- together with  *)
+  (*  [col_bundles_used], [col_bundles_blk], [col_bundles_ind],            *)
+  (*  [col_bundles_slot], [col_bundles_not_meta], [col_meta_used],         *)
+  (*  [col_rec_tie], [col_auth_pure], [col_view_len], [col_pool_dom] and   *)
+  (*  the per-bundle readings only they used ([col_bundle_owns],           *)
+  (*  [col_bundle_slot], [col_bundle_data], [col_bundle_ind],              *)
+  (*  [col_recs_blk], [col_used_of_blk]).  Lane H4's deletion of           *)
+  (*  [col_snap_bytes] orphaned every one of them.                        *)
   (* ==================================================================== *)
-
-  (* the region's [bi]-th block, whole, off the records *)
-  Lemma col_recs_blk γfs γi (ist : Z) (nib bi : nat) (m : gmap Z dinode) :
-    (bi < nib)%nat ->
-    col_recs γfs γi ist nib m -∗
-    ∃ ds : list dinode,
-      ⌜diblk_wf ds⌝ ∗ ⌜ireg_couple m bi ds⌝ ∗
-      blk_owned (fs_gamma_L γfs) (ist + Z.of_nat bi) (diblk_bytes ds).
-  Proof.
-    intros Hbi. iIntros "[_ Hl]".
-    assert (Hlk : seq 0 nib !! bi = Some bi) by (apply lookup_seq; lia).
-    rewrite (big_sepL_lookup _ _ bi bi Hlk).
-    iDestruct "Hl" as (ds Hwf Hcp) "Hr".
-    iExists ds. iSplitR; [iPureIntro; exact Hwf |].
-    iSplitR; [iPureIntro; exact Hcp |].
-    iDestruct (ireg_recs_to_blk γfs ist bi ds Hwf with "Hr") as "Hb".
-    rewrite -gamma_blk_owned. iExact "Hb".
-  Qed.
-
-  (* ==================================================================== *)
-  (*  5.  THE PURE CLAUSES, ONE AT A TIME                                  *)
-  (* ==================================================================== *)
-
-  (* ---- 5a. a block whose bytes anybody holds is IN USE ---------------- *)
-
-  Lemma col_used_of_blk γfs Lb C home (sb : fs_sb) (used : gset Z)
-      (ist : Z) (nib : nat) (dq : dfrac) (b : Z) (bs : list (bv 8)) :
-    col_geom sb ist nib home ->
-    col_auth γfs Lb C home -∗
-    free_pool (fs_gamma_L γfs) (sb_size sb) used -∗
-    blk_owned_q (fs_gamma_L γfs) dq b bs -∗ ⌜b ∈ used⌝.
-  Proof.
-    intros Hg. iIntros "Hau Hpool Hb".
-    iDestruct (col_blk with "Hau Hb") as %[Hhome _].
-    iApply (free_pool_used_q (fs_gamma_L γfs) (fs_gamma_L_excl γfs) dq
-              (sb_size sb) used b bs (cg_size Hg b Hhome) with "Hpool Hb").
-  Qed.
-
-  (* the two SPECIFIC readings [sk_blk] and [sk_ind] want, at the very byte
-     lists the node's map and entry array name *)
-  Lemma col_bundle_data γfs γi (i : Z) (n : fs_node) (k : nat)
-      (bs : list (bv 8)) :
-    fn_blk n !! k = Some bs ->
-    col_bundle γfs γi i n -∗
-    ∃ dq : dfrac, blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs.
-  Proof.
-    intros Hbs. iIntros "H". iDestruct "H" as (inum Hbv) "H".
-    pose (dq := DfracOwn (3/4)).
-    assert (Hnv : ~ ✓ (dq ⋅ dq)) by exact FsStateDefs.dfrac_34_nvalid.
-    rewrite /inode_owned_era_q /inode_dat_q.
-    iDestruct "H" as "(_ & [Hblk _] & _ & _)".
-    iExists dq. rewrite (big_sepM_lookup _ _ k bs Hbs). iExact "Hblk".
-  Qed.
-
-  Lemma col_bundle_ind γfs γi (i : Z) (n : fs_node) :
-    fn_indb n <> 0 ->
-    col_bundle γfs γi i n -∗
-    ∃ dq : dfrac,
-      blk_owned_q (fs_gamma_L γfs) dq (fn_indb n) (ind_bytes (fn_ent n)).
-  Proof.
-    intros Hnz. iIntros "H". iDestruct "H" as (inum Hbv) "H".
-    pose (dq := DfracOwn (3/4)).
-    assert (Hnv : ~ ✓ (dq ⋅ dq)) by exact FsStateDefs.dfrac_34_nvalid.
-    rewrite /inode_owned_era_q /inode_dat_q.
-    iDestruct "H" as "(_ & [_ Hind] & _ & _)".
-    iExists dq. rewrite /ind_owned_q (decide_False _ _ Hnz). iExact "Hind".
-  Qed.
-
-  (* ---- 5b. the pure rows of the byte invariant, and [sk_bsz] ---------- *)
-
-  Lemma col_auth_pure γfs Lb C home :
-    col_auth γfs Lb C home -∗
-    ⌜dom C = home
-     /\ (forall b bs, C !! b = Some bs -> length bs = BSIZE)⌝.
-  Proof.
-    iIntros "(_ & %Hdom & %Hlens & _ & _)". iPureIntro. split; assumption.
-  Qed.
-
-  (* every block of the committed view is a whole block: it IS one of [C]'s,
-     and the log's own row (b) says those are block-sized *)
-  Lemma col_view_len (C : gmap Z (list (bv 8))) (home : gset Z) :
-    dom C = home ->
-    (forall b bs, C !! b = Some bs -> length bs = BSIZE) ->
-    forall b bs, col_view C home !! b = Some bs -> length bs = BSIZE.
-  Proof.
-    intros Hdom Hlens b bs Hb.
-    apply fs_restrict_lookup_Some in Hb as [Hin ->].
-    assert (Hc : is_Some (C !! b)) by (apply elem_of_dom; rewrite Hdom; exact Hin).
-    destruct Hc as [bs' Hbs']. rewrite /dv_of_D Hbs' /=.
-    exact (Hlens b bs' Hbs').
-  Qed.
-
-  (* ---- 5c. the free pool covers every clear bit ----------------------- *)
-
-  Lemma col_pool_dom γfs Lb C home (nb : Z) (u : gset Z) :
-    col_auth γfs Lb C home -∗
-    free_pool (fs_gamma_L γfs) nb u -∗
-    ⌜forall b : Z, 0 <= b < nb -> b ∉ u ->
-       is_Some (col_view C home !! b)⌝.
-  Proof.
-    iIntros "Hau Hpool".
-    rewrite bi.pure_forall. iIntros (b).
-    rewrite bi.pure_impl. iIntros (Hb).
-    rewrite bi.pure_impl. iIntros (Hnu).
-    assert (Hb' : Z.of_nat (Z.to_nat b) = b) by lia.
-    rewrite (free_pool_split (fs_gamma_L γfs) nb u (Z.to_nat b)); [| lia].
-    rewrite Hb' {1}/pool_elt (bool_decide_eq_false_2 _ Hnu).
-    iDestruct "Hpool" as "[Helt _]". iDestruct "Helt" as (bsx) "Helt".
-    iDestruct (col_blk_full with "Hau Helt") as %[_ Hv].
-    iPureIntro. exists bsx. exact Hv.
-  Qed.
-
-  (* ---- 5d. what a bundle says about ONE inode ------------------------- *)
 
   Lemma col_bundles_local γfs γi (I : gmap Z fs_node) :
     ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n) -∗
@@ -833,262 +635,8 @@ Section Collect.
     iApply (col_bundle_local with "Hb").
   Qed.
 
-  Lemma col_bundles_slot γfs γi (I : gmap Z fs_node) :
-    ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n) -∗
-    ⌜forall i n, I !! i = Some n -> fn_slot_inj n⌝.
-  Proof.
-    iIntros "Hb".
-    rewrite bi.pure_forall. iIntros (i).
-    rewrite bi.pure_forall. iIntros (n).
-    rewrite bi.pure_impl. iIntros (Hin).
-    rewrite (big_sepM_lookup _ _ i n Hin).
-    iApply (col_bundle_slot with "Hb").
-  Qed.
-
-  Lemma col_bundles_blk γfs Lb C home γi (I : gmap Z fs_node) :
-    col_auth γfs Lb C home -∗
-    ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n) -∗
-    ⌜forall i n k bs, I !! i = Some n -> fn_blk n !! k = Some bs ->
-       col_view C home !! fn_naddr n k = Some bs⌝.
-  Proof.
-    iIntros "Hau Hb".
-    rewrite bi.pure_forall. iIntros (i).
-    rewrite bi.pure_forall. iIntros (n).
-    rewrite bi.pure_forall. iIntros (k).
-    rewrite bi.pure_forall. iIntros (bs).
-    rewrite bi.pure_impl. iIntros (Hin).
-    rewrite bi.pure_impl. iIntros (Hbs).
-    rewrite (big_sepM_lookup _ _ i n Hin).
-    iDestruct (col_bundle_data γfs γi i n k bs Hbs with "Hb") as (dq) "Hblk".
-    iDestruct (col_blk with "Hau Hblk") as %[_ Hv].
-    iPureIntro. exact Hv.
-  Qed.
-
-  Lemma col_bundles_ind γfs Lb C home γi (I : gmap Z fs_node) :
-    col_auth γfs Lb C home -∗
-    ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n) -∗
-    ⌜forall i n, I !! i = Some n -> fn_indb n <> 0 ->
-       col_view C home !! fn_indb n = Some (ind_bytes (fn_ent n))⌝.
-  Proof.
-    iIntros "Hau Hb".
-    rewrite bi.pure_forall. iIntros (i).
-    rewrite bi.pure_forall. iIntros (n).
-    rewrite bi.pure_impl. iIntros (Hin).
-    rewrite bi.pure_impl. iIntros (Hnz).
-    rewrite (big_sepM_lookup _ _ i n Hin).
-    iDestruct (col_bundle_ind γfs γi i n Hnz with "Hb") as (dq) "Hblk".
-    iDestruct (col_blk with "Hau Hblk") as %[_ Hv].
-    iPureIntro. exact Hv.
-  Qed.
-
-  (* ---- 5e. NO TWO NODES SHARE A BLOCK, off the [∗] -------------------- *)
-
-  Lemma col_bundles_disj γfs γi (I : gmap Z fs_node) :
-    ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n) -∗
-    ⌜forall i n j n2 b, I !! i = Some n -> I !! j = Some n2 ->
-       fn_owns n b -> fn_owns n2 b -> i = j⌝.
-  Proof.
-    iIntros "Hb".
-    rewrite bi.pure_forall. iIntros (i).
-    rewrite bi.pure_forall. iIntros (n).
-    rewrite bi.pure_forall. iIntros (j).
-    rewrite bi.pure_forall. iIntros (n2).
-    rewrite bi.pure_forall. iIntros (b).
-    rewrite bi.pure_impl. iIntros (Hi).
-    rewrite bi.pure_impl. iIntros (Hj).
-    rewrite bi.pure_impl. iIntros (Hon).
-    rewrite bi.pure_impl. iIntros (Hon2).
-    destruct (decide (i = j)) as [-> | Hne]; [by iPureIntro |].
-    iExFalso.
-    rewrite (big_sepM_delete _ I i n Hi).
-    iDestruct "Hb" as "[Hi Hrest]".
-    assert (Hj' : delete i I !! j = Some n2)
-      by (rewrite lookup_delete_ne; [exact Hj | exact Hne]).
-    rewrite (big_sepM_lookup _ _ j n2 Hj').
-    iDestruct (col_bundle_owns γfs γi i b n Hon with "Hi")
-      as (dq1 bs1 Hnv1) "H1".
-    iDestruct (col_bundle_owns γfs γi j b n2 Hon2 with "Hrest")
-      as (dq2 bs2 Hnv2) "H2".
-    iApply (blk_owned_q_excl (fs_gamma_L γfs) (fs_gamma_L_excl γfs) dq1 dq2
-              b bs1 bs2 (dfrac_nvalid_pair dq1 dq2 Hnv1 Hnv2) with "H1 H2").
-  Qed.
-
-  (* ---- 5f. a node's own blocks are IN USE and are NOT metadata -------- *)
-
-  Lemma col_bundles_used γfs Lb C home γi (I : gmap Z fs_node)
-      (sb : fs_sb) (ist : Z) (nib : nat) (used : gset Z) :
-    col_geom sb ist nib home ->
-    col_auth γfs Lb C home -∗
-    free_pool (fs_gamma_L γfs) (sb_size sb) used -∗
-    ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n) -∗
-    ⌜forall i n b, I !! i = Some n -> fn_owns n b -> b ∈ used⌝.
-  Proof.
-    intros Hg. iIntros "Hau Hpool Hb".
-    rewrite bi.pure_forall. iIntros (i).
-    rewrite bi.pure_forall. iIntros (n).
-    rewrite bi.pure_forall. iIntros (b).
-    rewrite bi.pure_impl. iIntros (Hi).
-    rewrite bi.pure_impl. iIntros (Hon).
-    rewrite (big_sepM_lookup _ _ i n Hi).
-    iDestruct (col_bundle_owns γfs γi i b n Hon with "Hb")
-      as (dq bs Hnv) "Hblk".
-    iApply (col_used_of_blk γfs Lb C home sb used ist nib dq b bs Hg
-              with "Hau Hpool Hblk").
-  Qed.
-
-  (* THE THREE METADATA ROLES ARE FULL-FRACTION OWNERS, so a node's block --
-     held at a share whose double is invalid, hence at more than nothing --
-     is none of them.  This is [snap_meta] refuted by the [∗], exactly as
-     [sk_disj] is. *)
-  Lemma col_bundles_not_meta γfs γi (I : gmap Z fs_node) (m : gmap Z dinode)
-      (sb : fs_sb) (sbb : list (bv 8)) (ist : Z) (nib : nat)
-      (used : gset Z) (home : gset Z) :
-    col_geom sb ist nib home ->
-    (forall i : Z, i ∈ dom I <-> 0 <= i < 16 * Z.of_nat nib) ->
-    blk_owned (fs_gamma_L γfs) SB_BNO sbb -∗
-    blk_owned (fs_gamma_L γfs) (sb_bmapstart sb) (bm_bytes BSIZE used) -∗
-    col_recs γfs γi ist nib m -∗
-    ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n) -∗
-    ⌜forall i n b, I !! i = Some n -> fn_owns n b ->
-       ~ snap_meta (col_state sb sbb I used) b⌝.
-  Proof.
-    intros Hg Hdi. iIntros "Hsbb Hbmb Hrec Hb".
-    rewrite bi.pure_forall. iIntros (i).
-    rewrite bi.pure_forall. iIntros (n).
-    rewrite bi.pure_forall. iIntros (b).
-    rewrite bi.pure_impl. iIntros (Hi).
-    rewrite bi.pure_impl. iIntros (Hon).
-    rewrite bi.pure_impl. iIntros (Hmeta).
-    rewrite (big_sepM_lookup _ _ i n Hi).
-    iDestruct (col_bundle_owns γfs γi i b n Hon with "Hb")
-      as (dq bs Hnv) "Hblk".
-    rewrite /col_state /snap_meta /= in Hmeta.
-    destruct Hmeta as [-> | [-> | (z & Hz & ->)]].
-    - rewrite blk_owned_1.
-      iApply (blk_owned_q_excl (fs_gamma_L γfs) (fs_gamma_L_excl γfs)
-                (DfracOwn 1) dq SB_BNO sbb bs (dfrac_full_nvalid dq)
-                with "Hsbb Hblk").
-    - rewrite blk_owned_1.
-      iApply (blk_owned_q_excl (fs_gamma_L γfs) (fs_gamma_L_excl γfs)
-                (DfracOwn 1) dq (sb_bmapstart sb) (bm_bytes BSIZE used) bs
-                (dfrac_full_nvalid dq) with "Hbmb Hblk").
-    - (* a REGION block: the records own it whole *)
-      assert (Hzr : 0 <= z < 16 * Z.of_nat nib)
-        by (apply Hdi; apply elem_of_dom; exact Hz).
-      assert (Hd0 : 0 <= z `div` 16) by (apply Z.div_pos; lia).
-      assert (Hdlt : z `div` 16 < Z.of_nat nib)
-        by (apply Z.div_lt_upper_bound; lia).
-      set (bi := Z.to_nat (z `div` 16)).
-      assert (Hbi : (bi < nib)%nat) by (unfold bi; lia).
-      assert (Hbiz : Z.of_nat bi = z `div` 16) by (unfold bi; lia).
-      iDestruct (col_recs_blk γfs γi ist nib bi m Hbi with "Hrec")
-        as (ds Hwf Hcp) "Hrblk".
-      rewrite Hbiz (cg_ist Hg) blk_owned_1.
-      iApply (blk_owned_q_excl (fs_gamma_L γfs) (fs_gamma_L_excl γfs)
-                (DfracOwn 1) dq (ist + z `div` 16) (diblk_bytes ds) bs
-                (dfrac_full_nvalid dq) with "Hrblk Hblk").
-  Qed.
-
-  (* ...and the same three, IN USE: a clear bit would put a SECOND owner of
-     the block into the free pool. *)
-  Lemma col_meta_used γfs Lb C home γi (I : gmap Z fs_node)
-      (m : gmap Z dinode) (sb : fs_sb) (sbb : list (bv 8))
-      (ist : Z) (nib : nat) (used : gset Z) :
-    col_geom sb ist nib home ->
-    (forall i : Z, i ∈ dom I <-> 0 <= i < 16 * Z.of_nat nib) ->
-    col_auth γfs Lb C home -∗
-    blk_owned (fs_gamma_L γfs) SB_BNO sbb -∗
-    blk_owned (fs_gamma_L γfs) (sb_bmapstart sb) (bm_bytes BSIZE used) -∗
-    free_pool (fs_gamma_L γfs) (sb_size sb) used -∗
-    col_recs γfs γi ist nib m -∗
-    ⌜forall b : Z, snap_meta (col_state sb sbb I used) b -> b ∈ used⌝.
-  Proof.
-    intros Hg Hdi. iIntros "Hau Hsbb Hbmb Hpool Hrec".
-    rewrite bi.pure_forall. iIntros (b).
-    rewrite bi.pure_impl. iIntros (Hmeta).
-    rewrite /col_state /snap_meta /= in Hmeta.
-    destruct Hmeta as [-> | [-> | (z & Hz & ->)]].
-    - rewrite blk_owned_1.
-      iApply (col_used_of_blk γfs Lb C home sb used ist nib (DfracOwn 1)
-                SB_BNO sbb Hg with "Hau Hpool Hsbb").
-    - rewrite blk_owned_1.
-      iApply (col_used_of_blk γfs Lb C home sb used ist nib (DfracOwn 1)
-                (sb_bmapstart sb) (bm_bytes BSIZE used) Hg
-                with "Hau Hpool Hbmb").
-    - assert (Hzr : 0 <= z < 16 * Z.of_nat nib)
-        by (apply Hdi; apply elem_of_dom; exact Hz).
-      assert (Hd0 : 0 <= z `div` 16) by (apply Z.div_pos; lia).
-      assert (Hdlt : z `div` 16 < Z.of_nat nib)
-        by (apply Z.div_lt_upper_bound; lia).
-      set (bi := Z.to_nat (z `div` 16)).
-      assert (Hbi : (bi < nib)%nat) by (unfold bi; lia).
-      assert (Hbiz : Z.of_nat bi = z `div` 16) by (unfold bi; lia).
-      iDestruct (col_recs_blk γfs γi ist nib bi m Hbi with "Hrec")
-        as (ds Hwf Hcp) "Hrblk".
-      rewrite Hbiz (cg_ist Hg) blk_owned_1.
-      iApply (col_used_of_blk γfs Lb C home sb used ist nib (DfracOwn 1)
-                (ist + z `div` 16) (diblk_bytes ds) Hg
-                with "Hau Hpool Hrblk").
-  Qed.
-
-  (* ---- 5g. a record sits where the region put it ---------------------- *)
-
-  Lemma col_rec_tie γfs Lb C home γi (I : gmap Z fs_node) (m : gmap Z dinode)
-      (sb : fs_sb) (ist : Z) (nib : nat) :
-    col_geom sb ist nib home ->
-    (forall i : Z, i ∈ dom I <-> 0 <= i < 16 * Z.of_nat nib) ->
-    col_auth γfs Lb C home -∗
-    col_recs γfs γi ist nib m -∗
-    ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n) -∗
-    (* the offsets are spelled at [%Z]: inside a [⌜ ⌝] the ambient scope is
-       [type_scope], where [a + b] parses as [sum] (durable-notes.md, the
-       scope-stack trap) *)
-    ⌜forall i n, I !! i = Some n ->
-       exists bs,
-         col_view C home !! (sb_inodestart sb + i `div` 16)%Z = Some bs
-         /\ rec_in_blk bs (64 * (i `mod` 16))%Z (fn_rec n)⌝.
-  Proof.
-    intros Hg Hdi. iIntros "Hau Hrec Hb".
-    rewrite bi.pure_forall. iIntros (i).
-    rewrite bi.pure_forall. iIntros (n).
-    rewrite bi.pure_impl. iIntros (Hi).
-    (* the record proxy pins the region's value at this inum *)
-    iDestruct "Hrec" as "[Hma Hrows]".
-    rewrite (big_sepM_lookup _ _ i n Hi).
-    iDestruct (col_bundle_rec γfs γi i n m with "Hma Hb") as %Hmi.
-    assert (Hir : 0 <= i < 16 * Z.of_nat nib)
-      by (apply Hdi; apply elem_of_dom; exists n; exact Hi).
-    assert (Hd0 : 0 <= i `div` 16) by (apply Z.div_pos; lia).
-    assert (Hdlt : i `div` 16 < Z.of_nat nib)
-      by (apply Z.div_lt_upper_bound; lia).
-    pose proof (Z.mod_pos_bound i 16 ltac:(lia)) as [Hm0 Hm1].
-    set (bi := Z.to_nat (i `div` 16)).
-    assert (Hbi : (bi < nib)%nat) by (unfold bi; lia).
-    assert (Hbiz : Z.of_nat bi = i `div` 16) by (unfold bi; lia).
-    set (sl := Z.to_nat (i `mod` 16)).
-    assert (Hsl : (sl < 16)%nat) by (unfold sl; lia).
-    assert (Hslz : Z.of_nat sl = i `mod` 16) by (unfold sl; lia).
-    iDestruct (col_recs_blk γfs γi ist nib bi m Hbi with "[Hma Hrows]")
-      as (ds Hwf Hcp) "Hrblk".
-    { rewrite /col_recs. iSplitL "Hma"; [iExact "Hma" | iExact "Hrows"]. }
-    iDestruct (col_blk_full with "Hau Hrblk") as %[_ Hv].
-    iPureIntro.
-    (* the sixteen records of that block, and this inum's is the [sl]-th *)
-    destruct Hwf as [Hlen16 Hall].
-    assert (Hkey : (16 * Z.of_nat bi + Z.of_nat sl)%Z = i)
-      by (rewrite Hbiz Hslz; pose proof (Z.div_mod i 16 ltac:(lia)); lia).
-    pose proof (Hcp sl Hsl) as Hds. rewrite Hkey Hmi in Hds.
-    assert (Hrec : ds !!! sl = fn_rec n) by (injection Hds; auto).
-    destruct (col_diblk_split ds sl Hall ltac:(lia)) as (pre & post & Heq & Hlp).
-    exists (diblk_bytes ds). split.
-    - rewrite (cg_ist Hg) -Hbiz. exact Hv.
-    - rewrite /rec_in_blk. exists pre, post. split.
-      + rewrite Heq Hrec. reflexivity.
-      + rewrite Hlp. rewrite -Hslz. lia.
-  Qed.
-
   (* ==================================================================== *)
-  (*  6.  THE COLLECTION, AND WHAT THE ALLOCATOR TAKES                     *)
+  (*  5.  THE COLLECTION, AND WHAT THE ALLOCATOR TAKES                     *)
   (* ==================================================================== *)
 
   (* [col_snap_bytes] / [col_snap_ok] / [col_snap_ok_ex] ARE DELETED
@@ -1279,7 +827,7 @@ Section Collect.
   Qed.
 
   (* ==================================================================== *)
-  (*  5.  A FREE INUM'S BUNDLE -- SUPPLIER (D) (durable-disk lane C-3c)    *)
+  (*  7.  A FREE INUM'S BUNDLE -- SUPPLIER (D) (durable-disk lane C-3c)    *)
   (* ==================================================================== *)
 
   (* THE READING THAT CLOSES (D).  A FREE inum owns no block and no indirect
@@ -1555,6 +1103,66 @@ Section Collect.
             nothing. *)
          ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
          ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi inum n)%I.
+
+  (* ==================================================================== *)
+  (*  ...AND NO INUM IS SUPPLIED TWICE (durable-disk EV-Y)                 *)
+  (*                                                                      *)
+  (*  THE PARTITION'S DISJOINTNESS, FROM SEPARATION LOGIC AND NOTHING      *)
+  (*  ELSE.  [IcacheEscrow.ipool_quiesce_acc] states its three index sets  *)
+  (*  as a UNION -- the ordinary pool rows, the corpse ledger's markers    *)
+  (*  and the live slots' inums -- and nothing pure says they do not       *)
+  (*  overlap.  They do not, and the witness is the REGION's own slot at   *)
+  (*  that inum: whichever way the slot's arm falls, two [col_side]s at    *)
+  (*  one inum are two owners of one exclusive cell.                      *)
+  (*                                                                      *)
+  (*  Three exclusive cells and no arithmetic.  A [col_side]'s bundle arm  *)
+  (*  carries [InodeRegion.dinode_at] -- the region's record PROXY, one    *)
+  (*  [ghost_map] element at FULL fraction, which is why the share the     *)
+  (*  legs ride at is irrelevant here -- and its marker arm carries        *)
+  (*  [InodeRegion.imark], an element at the mirrored key.  The two arms   *)
+  (*  therefore do not refute each OTHER, and that is what the region's    *)
+  (*  slot is for: [col_region_slot_acc] hands out either a marker (which  *)
+  (*  kills a marker side) or the free bundle (which kills a bundle side), *)
+  (*  and the mixed pair is exactly the case where one of the two lands.   *)
+  (*                                                                      *)
+  (*  The conclusion is [False], so nothing has to be given back and the   *)
+  (*  accessor's own closing wands are dropped.                            *)
+  (* ==================================================================== *)
+  Lemma col_side_slot_excl γfs (γi : gname) (inum : bv 32) (d : dinode) :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ireg_slot γfs γi (bv_unsigned inum) d -∗
+    col_side γfs γi inum -∗ col_side γfs γi inum -∗ False.
+  Proof.
+    iIntros "Hauth Hslot Hs1 Hs2".
+    rewrite /col_side.
+    iDestruct "Hs1" as "[Hmk1 | (%n1 & _ & Hleg1)]";
+      iDestruct "Hs2" as "[Hmk2 | (%n2 & _ & Hleg2)]".
+    - (* two markers *)
+      iApply (imark_excl with "Hmk1 Hmk2").
+    - (* a marker and a bundle: the region's arm decides *)
+      iDestruct (col_region_slot_acc γfs γi inum d with "Hauth Hslot")
+        as "[_ Harm]".
+      iDestruct "Harm" as "[[Hmk _] | (_ & Hown & _)]".
+      + iApply (imark_excl with "Hmk1 Hmk").
+      + iDestruct (ic_inode_leg_open with "Hleg2") as "[_ Hown2]".
+        rewrite /inode_owned_era /inode_owned_era_q.
+        iDestruct "Hown" as "(Hd & _)". iDestruct "Hown2" as "(Hd2 & _)".
+        iApply (dinode_at_excl with "Hd Hd2").
+    - iDestruct (col_region_slot_acc γfs γi inum d with "Hauth Hslot")
+        as "[_ Harm]".
+      iDestruct "Harm" as "[[Hmk _] | (_ & Hown & _)]".
+      + iApply (imark_excl with "Hmk2 Hmk").
+      + iDestruct (ic_inode_leg_open with "Hleg1") as "[_ Hown1]".
+        rewrite /inode_owned_era /inode_owned_era_q.
+        iDestruct "Hown" as "(Hd & _)". iDestruct "Hown1" as "(Hd1 & _)".
+        iApply (dinode_at_excl with "Hd Hd1").
+    - (* two bundles: the record proxy is exclusive at any share *)
+      iDestruct (ic_inode_leg_open with "Hleg1") as "[_ Hown1]".
+      iDestruct (ic_inode_leg_open with "Hleg2") as "[_ Hown2]".
+      rewrite /inode_owned_era_q.
+      iDestruct "Hown1" as "(Hd1 & _)". iDestruct "Hown2" as "(Hd2 & _)".
+      iApply (dinode_at_excl with "Hd1 Hd2").
+  Qed.
 
   (* A FREE INUM OWNS NO ENTRY TOKENS: its record's type is zero, so the
      node is not a directory and [dir_entries] is empty. *)
