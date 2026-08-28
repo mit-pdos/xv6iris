@@ -81,7 +81,7 @@ Require Import UexecWp.   (* [uexec_wp] -- named by the slot accessor's type *)
 Require Import KptTree.
 Require Import TrampPt.
 Require Import DiskPtsto WpUart LogInv.
-Require Import BioDefs.
+Require Import Xv6Cameras.
 Require Import SpecFileclose.
 Require Import IrefSlots.
 Require Import FdSlots ProcInv.

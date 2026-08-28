@@ -85,16 +85,16 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskInv.
+Require Import Xv6Cameras.
 Require Import BioDefs.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
 Require Import BitmapInv.
 Require Import ByteBuf.
 Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import KvmSpec.
 Require Import PageGeom.

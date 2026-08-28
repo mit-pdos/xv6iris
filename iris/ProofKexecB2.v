@@ -104,18 +104,17 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import IcacheEscrow.
 Require Import W32Arith.
 Require Import PageGeom.
 Require Import ProcGeom.
-Require Import DiskPtsto.
+Require Import Xv6Cameras.
 Require Import BioDefs.
 (* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
    [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
    [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
    [byte_range], both of which have live twins below, and the LAST import
    wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
-Require Import FsBlocks LogInv.
+Require Import LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.

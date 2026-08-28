@@ -103,7 +103,7 @@ Require Import SpecAllocproc.
    [main_globals_raw] and iinit's own postcondition are stated at
    ([IcacheRef.NINODE] is convertible with it, and every crossing is a
    conversion the [icache_boot_at] application does itself). *)
-Require Import FsCfgBoot.
+Require Import FsCfgKits.
 (* [FirstTok.first_fsinit] and the two pure producers: stage (f)'s transport
    site is main+0x9e (fs-cfg-boot.md (f-3)). *)
 Require Import LogDefs LogInv.

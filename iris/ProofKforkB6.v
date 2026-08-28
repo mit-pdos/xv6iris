@@ -62,7 +62,7 @@ Require Import ProcInv.
 Require Import KallocInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
-Require Import FsBlocks.
+Require Import Xv6Cameras.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheInv.

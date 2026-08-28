@@ -125,7 +125,7 @@ Require Import FirstTok.  (* [first_done] / [first_tok_of_done] *)
 Require Import KvmSpec.
 Require Import SchedCtx.
 Require Import IrefSlots.
-Require Import FsBlocks.
+Require Import Xv6Cameras.
 Require Import InodeRegion.
 Require Import IcacheInv.
 Require Import IcacheEscrow.

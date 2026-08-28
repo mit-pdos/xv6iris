@@ -55,7 +55,6 @@ Require Import UserPtTree ProcPtOwn.
 (* [uexec_wp] -- REQUIRED DIRECTLY because this proof holds a slot in the
    proof-mode context across the [jal syscall]: [Typeclasses Opaque] does not
    travel through a re-export (durable-notes). *)
-Require Import UexecWp.
 Require Import KptTree TrampPt.
 Require Import WpUart LogInv.
 Require Import IrefSlots.

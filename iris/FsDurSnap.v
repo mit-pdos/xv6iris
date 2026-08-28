@@ -65,8 +65,6 @@ Require Import DiskImg.       (* [diskImgG] -- the byte map's capacity class;
 Require Import BitmapEnc.
 Require Import BlockWords.
 Require Import DinodeEnc.
-Require Import DirView.
-Require Import FsTree.
 Require Import RiscvModelBytes.  (* [nth_byte] / [bv_eq_of_bytes] *)
 Require Import FsImg.
 Require Import LogDefs.       (* [fs_dbytes] -- the byte flattening       *)

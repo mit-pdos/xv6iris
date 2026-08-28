@@ -52,7 +52,6 @@ Require Import FsCfgBoot.   (* [fs_boot_image_wf], moved down at stage (f) *)
 Require Import RiscvAdequacy.
 Require Import FsCrash.
 Require Import FsDurSnap.   (* [snap_ok] -- the theorem's durability claim *)
-Require Import FsDurAlloc.  (* era 0's value-first carve, through FsDurImg *)
 Require Import FsDurImg.    (* [img_snap_ok] / [img_P_dur_alloc]: era 0's own
                                epoch, the ONE value-first allocation left *)
 Require Import FirstTok.    (* [fs_extent_of_image] *)

@@ -55,7 +55,6 @@ Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import StackBytes.
-Require Import CalleeSaved.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import IntrDefs.
@@ -72,7 +71,7 @@ Require Import W32Arith.
 Require Import ElfEnc.
 Require Import PageGeom.
 Require Import ProcGeom.
-Require Import DiskPtsto.
+Require Import Xv6Cameras.
 Require Import BioDefs.
 (* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
    [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
@@ -82,7 +81,7 @@ Require Import BioDefs.
 Require Import FsState.
 Require Import FsBytesGamma.
 Require Import FsStateEra.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.

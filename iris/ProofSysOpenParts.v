@@ -69,7 +69,6 @@ Require Import DirView.
 Require Import FsState.
 Require Import FsBytesGamma.
 Require Import FsStateEra.
-Require Import FsBlocks.              (* [fs_names] *)
 Require Import BioDefs.               (* [BSIZE] *)
 Require Import InodeInv.
 Require Import InodeLock.

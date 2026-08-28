@@ -69,7 +69,7 @@ Require Import FileInvDefs.
 Require Import WpLock.
 Require Import ProcInv.
 Require Import FirstTok.  (* [first_done] / [first_tok_of_done] *)
-Require Import FsBlocks.
+Require Import Xv6Cameras.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.

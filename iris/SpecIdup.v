@@ -171,7 +171,6 @@ Require Import CalleeSaved.
 Require Import LockRank.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.

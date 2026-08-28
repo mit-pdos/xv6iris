@@ -324,7 +324,8 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import KptTree TrampPt.
 Require Import KallocInv KvmSpec.
-Require Import DiskPtsto DiskInv.
+Require Import DiskInv.
+Require Import Xv6Cameras.
 Require Import WpUart.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.

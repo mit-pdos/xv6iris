@@ -119,9 +119,10 @@ Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import SchedCtx.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskInv.
+Require Import Xv6Cameras.
 Require Import BioDefs.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
 Require Import BitmapInv.
 Require Import IrefSlots.
 Require Import IcacheRef.

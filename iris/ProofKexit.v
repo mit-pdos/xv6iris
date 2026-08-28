@@ -73,7 +73,8 @@ Require Import ProcInv.
 Require Import SchedCtx.
 Require Import WaitInv.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskInv.
+Require Import Xv6Cameras.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.

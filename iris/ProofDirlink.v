@@ -86,9 +86,9 @@ Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import WpUart.
-Require Import DiskPtsto.
+Require Import Xv6Cameras.
 Require Import BioDefs.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
 Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import DirentEnc.

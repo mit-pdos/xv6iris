@@ -45,7 +45,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras.
 Require Import Pt4kWalk.
-Require Import KptExecMap.   (* tramp_ppn, for the trampoline-window text lemma *)
 Local Open Scope Z_scope.
 Import Defs.
 

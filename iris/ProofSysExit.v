@@ -41,12 +41,11 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import ProofKforkParts.
 Require Import UserPtTree.
-Require Import IrefSlots IcacheEscrow.
+Require Import IrefSlots.
 Require Import SpecFileclose.
 Require Import WpUart.
-Require Import DiskPtsto.
-Require Import BioDefs.
-Require Import FsBlocks LogInv.
+Require Import Xv6Cameras.
+Require Import LogInv.
 (* IMPORTED, not merely required: [FsReady]'s [Typeclasses Opaque fs_ready]
    seal is what keeps [Persistent ?P] from delta-unfolding the predicate's
    twenty conjuncts (that file's own header measures the cost). *)

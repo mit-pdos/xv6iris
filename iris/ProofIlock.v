@@ -98,7 +98,8 @@ Require Import VcGen.
 Require Import IntrDefs.
 Require Import MinstretInv.
 Require Import CpuOwn.
-Require Import DiskPtsto DiskInv.
+Require Import DiskInv.
+Require Import Xv6Cameras.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpAu4.

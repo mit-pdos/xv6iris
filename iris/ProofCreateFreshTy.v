@@ -74,7 +74,8 @@ Require Import SchedCtx.
 Require Import ProcGeom.
 Require Import SleepLock.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskInv.
+Require Import Xv6Cameras.
 Require Import BioInv.
 (* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
    [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
