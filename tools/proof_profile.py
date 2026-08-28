@@ -235,6 +235,64 @@ def chain_edge_annotation(chain, index, annotations):
     return annotations.get(edge, "unknown — edge not measured")
 
 
+def load_dead_code_report(iris_dir):
+    """Run the canonical dead-code analyzer (`iris/find_dead.py`) and return
+    {file: [(line, kind, name, secpath), ...]} for every file, so the
+    critical-path table can show, next to each file's import weakness,
+    what dead code that same file is carrying.
+
+    Loaded the same way `load_weak_import_annotations` loads
+    `find_weak_imports.py`: the analyzer stays a standalone script under
+    `iris/` (useful on its own), and this keeps the two aligned automatically.
+    Scheme-kind entries (the induction principles `Inductive` emits for every
+    type, dead or not) are excluded by `dead_by_file`'s default -- they are
+    not removable independently of the type. Failure is informational: the
+    ordinary build profile remains available with an explanatory note.
+    """
+    script = os.path.abspath(os.path.join(iris_dir, "find_dead.py"))
+    if not os.path.isfile(script):
+        return {}, "`find_dead.py` was not found"
+
+    module_name = "_proof_profile_find_dead"
+    iris_abs = os.path.abspath(iris_dir)
+    added_path = iris_abs not in sys.path
+    if added_path:
+        sys.path.insert(0, iris_abs)
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, script)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot load {script}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module.dead_by_file(iris_abs), None
+    except Exception as error:  # informational report: degrade, do not fail CI
+        return {}, f"dead-code analysis unavailable: {type(error).__name__}: {error}"
+    finally:
+        if added_path:
+            sys.path.remove(iris_abs)
+
+
+def dead_cell(entries, budget=60):
+    """Compact cell for the critical-path table: a count plus as many names
+    as fit in `budget` chars, so one file with dozens of dead defs (seen:
+    75) does not blow out the table width."""
+    if not entries:
+        return "clean"
+    names = [name for _, _, name, _ in entries]
+    joined = ", ".join(names)
+    if len(joined) <= budget:
+        return f"{len(entries)}: {joined}"
+    out, total = [], 0
+    for nm in names:
+        add = len(nm) + (2 if out else 0)
+        if total + add > budget:
+            break
+        out.append(nm)
+        total += add
+    return f"{len(entries)}: " + ", ".join(out) + f", +{len(entries) - len(out)} more"
+
+
 def offset_to_line(iris_dir, cache, fbase, off):
     if fbase not in cache:
         try:
@@ -457,6 +515,7 @@ def main():
     deps, targets = parse_deps(deps_path)
     stmts, n_timing = parse_timings(iris)
     weak_annotations, weak_note = load_weak_import_annotations(iris)
+    dead_report, dead_note = load_dead_code_report(iris)
 
     # ---- analyses ----
     finish, pred = critical_path(deps, targets, real)
@@ -526,10 +585,16 @@ def main():
             f"divided by all declarations in that previous file; **weak** means "
             f"≤{WEAK_IMPORT_FRACTION:.0%}. `already transitive` means the direct "
             "edge adds no serialization because another import already reaches "
-            "the same file.\n"
+            "the same file. `dead code` is that row's own unreferenced "
+            "definitions (`iris/find_dead.py`; auto-generated induction "
+            "schemes and module-signature obligations excluded, since neither "
+            "is independently removable) — heuristic, not verdict: a hint-DB-"
+            "only lemma or a not-yet-wired top-level spec can still appear.\n"
         )
         if weak_note:
-            md.append(f"_Note: {weak_note}._\n")
+            md.append(f"_Note (weak imports): {weak_note}._\n")
+        if dead_note:
+            md.append(f"_Note (dead code): {dead_note}._\n")
         rows, cum = [], 0.0
         for index, n in enumerate(chain):
             cum += real.get(n, 0.0)
@@ -538,9 +603,10 @@ def main():
                 f"{cum:.1f}",
                 f"`{n}`",
                 chain_edge_annotation(chain, index, weak_annotations),
+                dead_cell(dead_report.get(n, [])),
             ])
         md.append(md_table(
-            ["wall", "cum", "file", "dependency weakness"], rows
+            ["wall", "cum", "file", "dependency weakness", "dead code"], rows
         ))
         # other long chains: top files by their own critical depth, off this path
         others = [(finish[n], n) for n in finish if n not in onpath]
@@ -587,12 +653,17 @@ def main():
         cum = 0.0
         if weak_note:
             f.write(f"weakness note: {weak_note}\n")
+        if dead_note:
+            f.write(f"dead-code note: {dead_note}\n")
         for index, n in enumerate(chain):
             cum += real.get(n, 0.0)
             annotation = chain_edge_annotation(chain, index, weak_annotations)
+            dead_list = dead_report.get(n, [])
+            dead_str = ("dead: " + ", ".join(name for _, _, name, _ in dead_list)
+                        if dead_list else "dead: none")
             f.write(
                 f"{real.get(n,0.0):8.2f}  cum {cum:8.2f}  {n}  "
-                f"[{annotation}]\n"
+                f"[{annotation}]  [{dead_str}]\n"
             )
 
     print(report_md)
