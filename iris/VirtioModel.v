@@ -1562,6 +1562,10 @@ Qed.
 
 (* the device has work to do: it can pop, or it can answer something it has
    already popped *)
+Definition virtio_pending (v : virtio_state) (mv : vmem) : bool :=
+  virtio_live (v_cfg v)
+  && (negb (bool_decide (v_seen v = avail_idx_at (v_cfg v) mv))
+      || negb (bool_decide (v_inflight v = ∅))).
 
 (* A position may be answered exactly when the device has POPPED it and not
    yet completed it.  Which of those it picks is free -- that is finding 5 --
@@ -1621,6 +1625,16 @@ Definition virtio_complete_ok (v : virtio_state) (r : vio_req) (i : bv 16)
     || bool_decide (vreq_touch r ∩ dom (v_cache v) = ∅).
 
 (* a READ and an unrecognised type are completable at once *)
+Lemma virtio_complete_ok_in (v : virtio_state) (r : vio_req) (i : bv 16) :
+  bv_unsigned (vr_type r) <> virtio_blk_t_out ->
+  bv_unsigned (vr_type r) <> virtio_blk_t_flush ->
+  vreq_touch r ∩ dom (v_cache v) = ∅ ->
+  virtio_complete_ok v r i = true.
+Proof.
+  intros H1 H2 H3. unfold virtio_complete_ok.
+  rewrite (proj2 (Z.eqb_neq _ _) H1), (proj2 (Z.eqb_neq _ _) H2).
+  rewrite (bool_decide_eq_true_2 _ H3). apply orb_true_r.
+Qed.
 
 (* ...and the gate read back: a read that completed had its own sectors off
    the cache, so the bytes it reported are the DURABLE ones *)
@@ -1871,11 +1885,43 @@ Definition virtio_stalled (v : virtio_state) (mv : vmem) : bool :=
 (* A MALFORMED CHAIN IS A DEAD POSITION: neither half of the request
    protocol has a transition for it.  Stated at the position rather than at
    the watermark, since the device chooses which position it looks at. *)
+Lemma virtio_chain_bad_no_step (v : virtio_state) (mv : vmem) (i : bv 16) :
+  virtio_chain_ok (v_cfg v) mv i = false ->
+  virtio_req_step v mv i = None /\ virtio_capture_step v mv i = None.
+Proof.
+  unfold virtio_chain_ok, virtio_req_step, virtio_capture_step, req_from.
+  intro Hc.
+  destruct (chain_from (v_cfg v) mv i) as [[[[h d0] d1] d2]|]; [discriminate|].
+  split; by destruct (negb (virtio_serve_ok v mv i)).
+Qed.
 
 (* the stalled device has work to do -- it is the device that CANNOT answer,
    not the device with nothing to answer *)
+Lemma virtio_stalled_pending (v : virtio_state) (mv : vmem) :
+  virtio_stalled v mv = true -> virtio_pending v mv = true.
+Proof.
+  unfold virtio_stalled, virtio_pending. intro H.
+  apply andb_prop in H as [Hl Hex]. rewrite Hl. cbn [andb].
+  apply existsb_exists in Hex as (p & Hin & _).
+  apply elem_of_list_In, elem_of_elements in Hin.
+  rewrite (bool_decide_eq_false_2 (v_inflight v = ∅));
+    [by rewrite orb_true_r|].
+  intro Hc. rewrite Hc in Hin. by apply elem_of_empty in Hin.
+Qed.
 
 (* ...and the position it stalled AT: some servable one whose chain is bad *)
+Lemma virtio_stalled_pos (v : virtio_state) (mv : vmem) :
+  virtio_stalled v mv = true ->
+  exists i, virtio_serve_ok v mv i = true
+            /\ virtio_chain_ok (v_cfg v) mv i = false.
+Proof.
+  unfold virtio_stalled, virtio_serve_ok. intro H.
+  apply andb_prop in H as [Hl Hex].
+  apply existsb_exists in Hex as (p & Hin & Hbad).
+  apply elem_of_list_In, elem_of_elements in Hin.
+  exists p. rewrite Hl, (bool_decide_eq_true_2 (p ∈ v_inflight v) Hin).
+  split; [reflexivity|]. by apply negb_true_iff in Hbad.
+Qed.
 
 (* ...and neither does it have a CAPTURE step: a malformed chain names no
    request at all.  (A DRAIN is a different matter: it reads nothing off the
@@ -2256,8 +2302,8 @@ Definition virtio_capacity0 : Z := 128.
 Definition virtio0_state : virtio_state :=
   VirtioState virtio_cfg0 zero32 zero16 ∅ zero16 (fun _ => byte_zero) ∅ None (Z_to_bv 64 virtio_capacity0).
 
-
-
+Definition set_vcap (v : virtio_state) (cap : bv 64) : virtio_state :=
+  VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) cap.
 
 
 (* the power-on device caches nothing, so the writethrough invariant holds *)
