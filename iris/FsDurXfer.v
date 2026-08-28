@@ -796,6 +796,66 @@ Section FsRuns.
     iFrame "Hd Hi". rewrite -phi_map_of_range /rec_owned /xr_rec //=.
   Qed.
 
+
+
+  (* ---------------------------------------------------------------- *)
+  (*  3a'. ONE INODE AT THE HOLDER'S OWN SHARE (durable-disk EV        *)
+  (*       stage 5)                                                    *)
+  (*                                                                   *)
+  (*  [FsState.fs_footprint_q]'s inode column, as runs.  The RECORD    *)
+  (*  rides at fraction 1 and the data legs at the bundle's own share,  *)
+  (*  which is exactly what [phi_runs_ex] is for: a share per RUN,      *)
+  (*  existentially bound, so no choice function over the inode map is  *)
+  (*  needed.  The share-generic reading of the data half is free --    *)
+  (*  [gamma_q Γ dq]'s [fsΦ] ignores the dfrac it is handed, so         *)
+  (*  [inode_dat] AT that view IS [inode_dat_q Γ dq].                   *)
+  (* ---------------------------------------------------------------- *)
+
+  Lemma gamma_q_inode_dat Γ dq n :
+    inode_dat (gamma_q Γ dq) n ⊣⊢ inode_dat_q Γ dq n.
+  Proof.
+    rewrite /inode_dat /inode_dat_q gamma_q_ind_owned.
+    apply bi.sep_proper; [| done].
+    apply big_sepM_proper. intros k bs _. apply gamma_q_blk_owned.
+  Qed.
+
+  Lemma inode_phi_q_runs Γ dq (sb : fs_sb) (i : Z) (n : fs_node) :
+    ~ ✓ (dq ⋅ dq) ->
+    inode_phi_q Γ dq sb i n
+    ⊢ ⌜node_lens n⌝ ∗ phi_runs_ex Γ (xr_inode sb i n).
+  Proof.
+    intros Hdq. rewrite /inode_phi_q -gamma_q_inode_dat /inode_dat.
+    iIntros "[Hr Hd]".
+    iDestruct (inode_dats_runs (gamma_q Γ dq) n with "Hd") as "[%Hlens Hdats]".
+    iSplitR; [by iPureIntro |].
+    iApply (phi_runs_ex_app Γ [xr_rec sb i n] (xr_dats n)).
+    iSplitL "Hr".
+    - iApply phi_runs_ex_full. rewrite -(rec_owned_run Γ sb i n). iExact "Hr".
+    - iApply (phi_runs_ex_at Γ dq (xr_dats n) Hdq with "Hdats").
+  Qed.
+
+  Lemma fs_inodes_phi_q_runs Γ (sb : fs_sb) (I : gmap Z fs_node) :
+    ([∗ map] i ↦ n ∈ I,
+       ∃ dq : dfrac, ⌜~ ✓ (dq ⋅ dq)⌝ ∗ inode_phi_q Γ dq sb i n)
+    ⊢ ⌜forall i n, I !! i = Some n -> node_lens n⌝
+      ∗ phi_runs_ex Γ (xr_inodes sb I).
+  Proof.
+    iIntros "H".
+    iAssert (⌜forall i n, I !! i = Some n -> node_lens n⌝)%I
+      with "[H]" as %Hlens.
+    { iIntros (i n Hi). rewrite (big_sepM_lookup _ _ i n Hi).
+      iDestruct "H" as (dq Hdq) "H".
+      iDestruct (inode_phi_q_runs Γ dq sb i n Hdq with "H") as "[$ _]". }
+    iSplitR; [by iPureIntro |].
+    rewrite big_sepM_map_to_list /xr_inodes.
+    iApply (phi_runs_ex_concat Γ (map_to_list I)
+              (fun p : Z * fs_node => xr_inode sb p.1 p.2) _ _ with "H").
+    Unshelve.
+    intros p. iIntros "H". iDestruct "H" as (dq Hdq) "H".
+    iDestruct (inode_phi_q_runs Γ dq sb p.1 p.2 Hdq with "H") as "[_ $]".
+  Qed.
+
+
   (* ---------------------------------------------------------------- *)
   (*  3b.  EVERY INODE                                                 *)
   (* ---------------------------------------------------------------- *)
@@ -1016,6 +1076,39 @@ Section FsFoot.
     iSplitL "Hbm".
     { iFrame. iPureIntro. exact (bm_bytes_length BSIZE (fss_used S)). }
     iApply (free_pool_of_runs Γ _ _ PM Hpm with "Hpool").
+  Qed.
+
+
+
+  (* ...AND THE WHOLE FOOTPRINT AT QUIESCENCE'S SHARES (durable-disk EV
+     stage 5).  [fs_footprint_runs]' twin, and the ONE step the commit's
+     mint takes between the collection and [FsDurSnap.snap_mint]: the
+     metadata objects at fraction 1, the inode column at a share per inode.
+     The full-share instance factors through it by
+     [FsState.fs_footprint_q_1], so nothing is duplicated. *)
+  Lemma fs_footprint_q_runs Γ S :
+    fs_footprint_q Γ S ⊢ ∃ PM, ⌜xf_shape S PM⌝ ∗ phi_runs_ex Γ (xr_fs S PM).
+  Proof.
+    rewrite /fs_footprint_q. iIntros "(Hsb & Hin & Hbm & Hpool)".
+    iDestruct (fs_inodes_phi_q_runs with "Hin") as "[%Hlens Hin]".
+    iDestruct (free_pool_runs with "Hpool") as (PM) "[%Hpm Hpool]".
+    iAssert (⌜length (fss_sbb S) = BSIZE⌝)%I with "[Hsb]" as %Hsbl.
+    { rewrite /blk_owned. iDestruct "Hsb" as "[$ _]". }
+    iExists PM. iSplitR.
+    { iPureIntro. split; [exact Hsbl | split; [exact Hlens | exact Hpm]]. }
+    rewrite /xr_fs.
+    iApply (phi_runs_ex_cons Γ (DfracOwn 1) ((SB_BNO, 0), fss_sbb S) _
+              (dfrac_full_nvalid (DfracOwn 1))).
+    rewrite /blk_owned /xr_blk /xr_off /xr_bs /=.
+    iDestruct "Hsb" as "[_ Hsb]". iDestruct "Hbm" as "[_ Hbm]".
+    iSplitL "Hsb"; [rewrite -byte_range_1; iExact "Hsb" |].
+    iApply (phi_runs_ex_cons Γ (DfracOwn 1)
+              ((sb_bmapstart (fss_sb S), 0), bm_bytes BSIZE (fss_used S)) _
+              (dfrac_full_nvalid (DfracOwn 1))).
+    rewrite /xr_blk /xr_off /xr_bs /=.
+    iSplitL "Hbm"; [rewrite -byte_range_1; iExact "Hbm" |].
+    iApply phi_runs_ex_app. iSplitL "Hin"; [iExact "Hin" |].
+    iApply (phi_runs_ex_full with "Hpool").
   Qed.
 
 End FsFoot.

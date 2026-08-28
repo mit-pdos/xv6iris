@@ -760,6 +760,56 @@ Section InodeOwned.
     rewrite /inode_phi_at inode_phi_dat (rec_owned_sb Γ sb i (fn_rec n) Hi) //.
   Qed.
 
+  (* ...AND THE SAME TWO AT THE HOLDER'S OWN SHARE (durable-disk EV stage
+     5).  What a commit's collection gathers per inode is NOT [inode_phi]:
+     the RECORD parks region-side at fraction 1 always, while the DATA leg
+     arrives out of THAT inode's own escrow at a share of its own -- 1 for
+     an unlocked inode, 3/4 for a read-locked one, and 3/4 cannot be
+     promoted ([FsDurXfer.dfrac_nvalid_pair] is the arithmetic).  So the
+     footprint quiescence yields is this shape and not the full-share one;
+     [FsState.fs_footprint_q] is the whole-state form and
+     [FsDurXfer.fs_footprint_q_runs] its runs reading.
+
+     [inode_phi_q Γ (DfracOwn 1)] IS [inode_phi Γ] -- [inode_dat_1] is
+     [reflexivity] -- so the full-share reading is free and no consumer of
+     [inode_phi] moves. *)
+  Definition inode_phi_q Γ (dq : dfrac) (sb : fs_sb) (i : Z) (n : fs_node)
+    : iProp Σ :=
+    (rec_owned Γ sb i (fn_rec n) ∗ inode_dat_q Γ dq n)%I.
+
+  Definition inode_phi_at_q Γ (dq : dfrac) (istart z : Z) (n : fs_node)
+    : iProp Σ :=
+    (rec_owned_at Γ istart z (fn_rec n) ∗ inode_dat_q Γ dq n)%I.
+
+  Lemma inode_phi_q_1 Γ sb i n :
+    inode_phi Γ sb i n = inode_phi_q Γ (DfracOwn 1) sb i n.
+  Proof. reflexivity. Qed.
+
+  Lemma inode_phi_at_q_1 Γ istart z n :
+    inode_phi_at Γ istart z n = inode_phi_at_q Γ (DfracOwn 1) istart z n.
+  Proof. reflexivity. Qed.
+
+  Global Instance inode_phi_q_timeless `{!GTimeless Γ} dq sb i n :
+    Timeless (inode_phi_q Γ dq sb i n).
+  Proof. rewrite /inode_phi_q. tl_struct. Qed.
+
+  Global Instance inode_phi_at_q_timeless `{!GTimeless Γ} dq istart z n :
+    Timeless (inode_phi_at_q Γ dq istart z n).
+  Proof. rewrite /inode_phi_at_q. tl_struct. Qed.
+
+  (* the superblock step at a share -- [inode_phi_sb]'s own statement, and
+     the one the collection runs: [FsCollectAll.col_recs_by_inum] hands the
+     record out at the REGION's numbering ([rec_owned_at]) and the bundle
+     hands out the data leg. *)
+  Lemma inode_phi_sb_q Γ dq sb i n :
+    0 <= i < 2 ^ 32 ->
+    inode_phi_at_q Γ dq (sb_inodestart sb) i n ⊣⊢ inode_phi_q Γ dq sb i n.
+  Proof.
+    intros Hi.
+    rewrite /inode_phi_at_q /inode_phi_q
+            (rec_owned_sb Γ sb i (fn_rec n) Hi) //.
+  Qed.
+
   (* ---------------------------------------------------------------- *)
   (*  4.  The TYPE REGISTER's fragments an inode's entries carry       *)
   (*      (fs-state.md section 6.5 -- lane G5's ruling)                *)
@@ -1943,4 +1993,5 @@ End InodeOwned.
 
    A SEAL DOES NOT TRAVEL: a file that puts one of these in its
    intuitionistic context must [Require Import FsStateInode] directly. *)
-Global Typeclasses Opaque inode_dat_q inode_dat inode_phi_at.
+Global Typeclasses Opaque inode_dat_q inode_dat inode_phi_at
+                         inode_phi_q inode_phi_at_q.

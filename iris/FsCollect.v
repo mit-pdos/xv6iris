@@ -1208,47 +1208,21 @@ Section Collect.
       rewrite /col_state /= in Hw. rewrite Hw. exact Hdirloc.
   Qed.
 
-  (* ---- the RUNS, one object at a time ------------------------------- *)
+  (* ---- ONE INODE'S FOOTPRINT, AT ITS OWN SHARE ---------------------- *)
 
-  (* ONE INODE'S BLOCK LEGS, as runs at the bundle's own share.  The
-     bundle's data and indirect legs ARE [FsDurXfer.xr_dats]'s runs read at
-     the CONSTANT-SHARE view, which is the whole of what makes the
-     collection a legal transport source. *)
-  Lemma col_bundle_dats γfs γi (i : Z) (n : fs_node) :
-    col_bundle γfs γi i n
-    ⊢ ⌜node_lens n⌝ ∗ phi_runs_ex (fs_gamma_L γfs) (xr_dats n).
-  Proof.
-    iIntros "H". iDestruct "H" as (dq inum Hbv Hnv) "H".
-    rewrite /inode_owned_era_q /inode_dat_q.
-    iDestruct "H" as "(_ & [Hblk Hind] & _ & _)".
-    iAssert (([∗ map] k ↦ bs ∈ fn_blk n,
-                blk_owned (gamma_q (fs_gamma_L γfs) dq) (fn_naddr n k) bs)
-             ∗ ind_owned (gamma_q (fs_gamma_L γfs) dq) n)%I
-      with "[Hblk Hind]" as "Hd".
-    { iSplitL "Hblk".
-      - iApply (big_sepM_mono with "Hblk"). intros k bs _.
-        rewrite gamma_q_blk_owned //.
-      - rewrite gamma_q_ind_owned. iExact "Hind". }
-    iDestruct (inode_dats_runs (gamma_q (fs_gamma_L γfs) dq) n with "Hd")
-      as "[%Hlens Hr]".
-    iSplitR; [by iPureIntro |].
-    iApply (phi_runs_ex_at (fs_gamma_L γfs) dq (xr_dats n) Hnv with "Hr").
-  Qed.
+  (* WHAT THE COLLECTION HAS OF ONE INODE'S BYTES (durable-disk EV stage
+     5), and it is [FsState.fs_footprint_q]'s column on the nose: the
+     RECORD out of the region at fraction 1, the DATA leg out of the
+     inode's own bundle at the bundle's share.  [FsStateInode.inode_phi_sb_q]
+     is the one step that puts the superblock back, exactly as
+     [inode_phi_sb] is at fraction 1.
 
-  Lemma col_bundles_lens γfs γi (I : gmap Z fs_node) :
-    ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n) -∗
-    ⌜forall i n, I !! i = Some n -> node_lens n⌝.
-  Proof.
-    iIntros "H".
-    rewrite bi.pure_forall. iIntros (i).
-    rewrite bi.pure_forall. iIntros (n).
-    rewrite bi.pure_impl. iIntros (Hi).
-    iDestruct (big_sepM_lookup _ _ i n Hi with "H") as "Hb".
-    iDestruct (col_bundle_dats with "Hb") as "[$ _]".
-  Qed.
-
-  (* ONE INODE'S RUNS: its record's, out of the REGION at fraction 1, and
-     its block legs', out of its own bundle at the bundle's share. *)
+     THE RUNS WALK IS NO LONGER HERE.  [col_bundle_dats] / [col_inode_runs]
+     / [col_bundles_lens] turned this pair into [FsDurXfer.phi_runs_ex] by
+     hand, per inode; that arithmetic is Gamma-generic and now lives where
+     the run vocabulary does ([FsDurXfer.inode_phi_q_runs],
+     [fs_inodes_phi_q_runs], [fs_footprint_q_runs]), so the commit's mint
+     factors through ONE call of it. *)
   Lemma col_bundle_inum γfs γi (i : Z) (n : fs_node) :
     col_bundle γfs γi i n -∗ ⌜0 <= i < 2 ^ 32⌝.
   Proof.
@@ -1259,24 +1233,21 @@ Section Collect.
     rewrite H32 in Hhi. lia.
   Qed.
 
-  Lemma col_inode_runs γfs γi (sb : fs_sb) (i : Z) (n : fs_node) :
+  Lemma col_bundle_phi γfs γi (sb : fs_sb) (i : Z) (n : fs_node) :
     rec_owned_at (fs_gamma_L γfs) (sb_inodestart sb) i (fn_rec n) -∗
     col_bundle γfs γi i n -∗
-    phi_runs_ex (fs_gamma_L γfs) (xr_inode sb i n).
+    ∃ dq : dfrac,
+      ⌜~ ✓ (dq ⋅ dq)⌝ ∗ inode_phi_q (fs_gamma_L γfs) dq sb i n.
   Proof.
     iIntros "Hrec Hb".
     iAssert (⌜0 <= i < 2 ^ 32⌝ ∧ col_bundle γfs γi i n)%I
       with "[Hb]" as "[%Hi Hb]".
     { iSplit; [iApply (col_bundle_inum with "Hb") | iExact "Hb"]. }
-    iDestruct (col_bundle_dats with "Hb") as "[_ Hdats]".
-    rewrite /xr_inode.
-    iApply (phi_runs_ex_cons (fs_gamma_L γfs) (DfracOwn 1) (xr_rec sb i n)
-              (xr_dats n) (dfrac_full_nvalid (DfracOwn 1))).
-    iSplitR "Hdats"; [| iExact "Hdats"].
-    rewrite -(rec_owned_sb (fs_gamma_L γfs) sb i (fn_rec n) Hi)
-            (rec_owned_run (fs_gamma_L γfs) sb i n)
-            /phi_runs big_sepL_singleton -byte_range_1.
-    iExact "Hrec".
+    iDestruct "Hb" as (dq inum Hbv Hnv) "H".
+    rewrite /inode_owned_era_q. iDestruct "H" as "(_ & Hd & _ & _)".
+    iExists dq. iSplitR; [by iPureIntro |].
+    rewrite -(inode_phi_sb_q (fs_gamma_L γfs) dq sb i n Hi)
+            /inode_phi_at_q. iFrame "Hrec Hd".
   Qed.
 
   (* ==================================================================== *)
