@@ -51,6 +51,8 @@ WpNext.v
 PtreeType.v
 Ktier.v
 RiscvPtsto.v
+TsoCtx.v
+TsoCtxShim.v
 PermInv.v
 PageGeom.v
 KptExecMap.v

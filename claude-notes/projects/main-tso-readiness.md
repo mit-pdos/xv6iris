@@ -579,3 +579,81 @@ recipe (never a dump rule):
 This is the number every later slice is measured against.  The audit
 reports whatever was last BUILT, not what is at HEAD, so re-run it only
 after a green build of the tree in question.
+
+---
+
+# AMENDMENT 2 (2026-08-28) — SLICE 1 LANDED
+
+Two new files, `iris/TsoCtx.v` (1446 lines) and `iris/TsoCtxShim.v` (222),
+inserted in `iris/_CoqProject` after `RiscvPtsto.v`.  **No existing file
+changed** — §4's "purely additive, green by construction" held literally.
+
+## 2.1 What landed
+
+The M-leg's `TsoCtx.v` as the skeleton — `CtxId`/`CurCtx`, the
+`own_context`/`ctx_parked`/`hart_view_lb` tokens with their lifecycle
+(`ctx_park`/`ctx_resume`/`ctx_exchange`/`own_context_boot`), the
+`ctx_pointsto` tower and its word/word2/word4/string levels with the four
+notation spellings each, `ctx_dom`, `CtxMorph` with its instance set, and
+`ctx_deposit`/`ctx_absorb` — plus §4's MANDATORY additions taken from the
+T-leg (Amendment 1 §1.2: they are on `tso-flip`, not on `tso`):
+
+| law | statement |
+|---|---|
+| `ctx_floor ξ lo` | persistent, timeless; `ctx_floor_0`, `ctx_floor_le` |
+| `ctx_bound_raise` | `own_context ξ -∗ hart_view_lb K' ==∗ own_context ξ ∗ ctx_floor ξ K'` |
+| `own_context_floor_view` | `own_context ξ -∗ ctx_floor ξ lo -∗ own_context ξ ∗ ∃K, hart_view_lb K ∗ ⌜lo ≤ K⌝` |
+| `ctx_floor_dom` | `ctx_dom ξ ξ' -∗ ctx_floor ξ lo -∗ ctx_dom ξ ξ' ∗ ctx_floor ξ' lo` |
+
+All four have trivial SC bodies and real statements.  `ctx_floor_dom` is
+A6.116/A6.117's ten-line law — a floor the sender can discharge is one the
+receiver can discharge — which is why payload transport needs no
+`CtxMorph` strengthening.  The token is THREADED, not consumed, by
+`own_context_floor_view`: a read gate discharges its floor mid-proof and
+keeps running as ξ.
+
+## 2.2 Two drift findings against the M-leg
+
+- **`ghost_varG Σ CPU` is already in main's Σ** (`riscvF_parkGS`,
+  `RiscvPtsto.v:375`), which is exactly what `own_context_def` needs.  No
+  Σ change, no new `inG`, no functor row.
+- **`word2_pointsto_unfold` does not exist on main.**  The M-leg's shim
+  names it; main's `word2_pointsto` (`RiscvPtsto.v:1527`) is a plain
+  transparent definition and only the word4 tier ever needed a named
+  unfolding.  Resolved by delta in the shim (`rewrite /word2_pointsto`)
+  rather than by adding the lemma upstream — adding it would have edited an
+  existing file and cost Slice 1 its additive property for nothing.
+
+## 2.3 THE SEAL DELIVERS LESS THAN §8 CLAIMS — say what it does deliver
+
+Recorded per §6(f) and §10.  §8 says that after the seal "no client CAN
+exploit SC-only equivalences".  That is stronger than any of the seals
+available here.  The M-leg's idiom — `Definition f := proj1_sig f_aux`
+with `Lemma f_aux : {g | g = f_def}` closed by `Qed` — does block
+CONVERSION (the match on the opaque witness is stuck, so `reflexivity`
+alone fails).  But `f_aux` and `f_def` are both public global constants,
+so any file may write `rewrite (proj2_sig f_aux)` and recover the body in
+one line, with no import of `TsoCtxShim` and nothing reliable to grep for.
+Sealing or deleting the `_unseal` lemmas does not change this.  The same
+holds a fortiori for `Global Opaque`, which `unfold` walks straight
+through — that weaker seal is what let the port grow the silent crossings
+`8f675587b` was written to find.
+
+Only module-signature ascription makes the body equation NOT EXIST as a
+term rather than merely inconvenient to reach.  **The owner considered and
+declined it (2026-08-28)**, so the sig-projection idiom stands.  The
+consequence to carry, and the reason this is written down: at Slice 4,
+"main is TSO-ready" is a property maintained BY DISCIPLINE, not enforced by
+the typechecker.  State it that way in the completion criteria, and treat
+`grep -l TsoCtxShim` plus a scan for `proj2_sig .*_aux` outside `TsoCtx.v`
+as the audit that stands in for the guarantee.  Measured for calibration:
+across the M-leg's 1332 files the hatch is touched in exactly TWO —
+`TsoCtx.v` (30 uses, its own law proofs) and `TsoCtxShim.v` (5).  The
+discipline has held; it is just not enforced.
+
+## 2.4 Gate
+
+`MAKEEXIT=0`, 0 `Error`, dumps unchanged, `audit-only` = the same 13
+assumptions as the baseline (`Print Assumptions` emits them in an unstable
+ORDER, so compare the sorted set, not the bytes).  Confirmation round over
+the committed tree recompiled 0 files.
