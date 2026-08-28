@@ -185,7 +185,7 @@ Qed.
 
 (* EVERY RA NAMED IN THIS SECTION -- [icacheUR], [iliveUR], [ityR],
    [frz]/[frzR]/[frzUR], [ctyR]/[ctyUR], [linkElemUR0/1]/[linkElemUR],
-   [linkUR], [icntUR], [frzoUR], [frzmUR], [ic_dep] -- AND THE CLASS
+   [linkUR], [icntUR], [frzmUR], [ic_dep] -- AND THE CLASS
    [icacheG] ITSELF ARE DEFINED IN Xv6Cameras.v, which this file
    re-exports.  Only the TYPES moved: the constructors ([lelem*]),
    the boot literals and every lemma stated over them are
@@ -447,41 +447,6 @@ Definition lelem (c : ctyUR) (r : nat) : linkElemUR := lelemf c r None.
    requirement honest -- exactly "both halves in hand", which is what
    forces every count move to reach the region's half (§2.2). *)
 
-(* ---- THE FREEZE RECEIPT's RA (iclaim-ledger.md §3.14, as built) --------
-
-   ONE EXCLUSIVE TOKEN PER INUM, and it is the STAND-IN the free path's
-   payload park needs.
-
-   RULING A‴ asked for a half-half bool "mirror" of the f column, keyed by
-   inum and parked beside [icnt] on both sides, so that (a) a mover holding
-   the itable side could read the phase and (b) the freezer could re-derive
-   it at +0x8a.  Job (a) is refuted on the lane (see the ledger's IVb
-   as-built record: at the free path's LOCK-FREE span the dying reference's
-   whole mass is in the escrow and in the freezer's own hand, so the itable
-   side has nothing to park and a mirror bit alone yields knowledge, not a
-   contradiction).  Job (b) is real, and this is it, in the cheapest algebra
-   that does it: an EXCLUSIVE unit per inum, parked in
-   [InodeRegion.ireg_slot] at every phase EXCEPT [FrzPre] and handed to the
-   freezer for the duration of the window.
-
-   WHAT IT BUYS, exactly.  A‴'s custody line has the freeze token travel
-   WITH THE PAYLOAD (checked out at ilock, parked at iput+0x70, out again at
-   +0x8a), and DEVIATION 1's widening then makes the parked arm's token
-   conjunct a disjunction the +0x8a opener must resolve.  With the receipt
-   the walk does not park the token at all: it keeps [ifreeze_pre] IN HAND
-   from the mint to +0x8a (a pure ghost, untouched by the escrow
-   choreography) and parks the RECEIPT in the token's slot instead.  The
-   parked arm's conjunct is therefore [ifreeze_off z ∨ frzown z] -- as
-   built, the whole tail of [IcacheEscrow.ic_payload_arm] is that
-   disjunction (A⁗) -- and its left arm dies at +0x8a on
-   [ifreeze_excl] against the token the walk is still holding -- one line,
-   no region open, no licence.
-
-   Keyed by [Z] and filed under one ambient gname for [icfg_icnt]'s reason
-   verbatim: one home is [InodeRegion.ireg_slot] (inside [ireg_inv], whose
-   arity is fixed by thirty-odd fs contracts) and the other is a payload
-   bundle. *)
-
 (* ---- THE FREEZE MIRROR's RA (iclaim-ledger.md §3.16 = RULING A⁗) -------
 
    A per-inum 1/2-1/2 AGREEMENT on a [bool] -- "inum [z]'s f column stands at
@@ -500,9 +465,8 @@ Definition lelem (c : ctyUR) (r : nat) : linkElemUR := lelemf c r None.
 
      (S1a) the mint site DECIDES [islot2]'s live arm LEFT with no invariant
            open at all -- parked 1/2 + my 1/2 + my q overflows the slot's live
-           unit ([IcacheInv.live_frac_bound]) -- and the [false] half then
-           kills the payload slot's [frzown] arm through the region's receipt
-           clause, so the mint's [ifreeze_off] is extractable;
+           unit ([IcacheInv.live_frac_bound]) -- so the mint's [ifreeze_off]
+           is extractable;
      (S1b) at iput+0x8a the freezer's [ifreeze_pre] fixes the f column at the
            region open ([IcacheInv.link_freeze_agree]) and the mirror clause
            ([InodeRegion.ireg_frzm_ok]) forces the arm RIGHT, so the parked
@@ -511,10 +475,11 @@ Definition lelem (c : ctyUR) (r : nat) : linkElemUR := lelemf c r None.
            the parked [q + 1/2] plus the caller's own share feed
            [IcacheInv.live_whole_share_absurd].
 
-   The RECEIPT ([frzoUR]) STAYS: the two are complementary, the receipt being
-   hand-vs-region exclusivity and the mirror the region-vs-lock BRANCH
-   SELECTOR the payload disjunction needed.  Keyed by [Z] and ambient for
-   [icfg_icnt]'s reason verbatim. *)
+   AND IT IS THE ONLY HANDLE the f column has outside the region: the frozen
+   arms of [IcacheEscrow.ic_payload_arm] and [ic_out_frz] are decided by the
+   slot's freeze SELECTOR ([frzsel], RULING R-e) and by [ifreeze_pre], and
+   nothing beside the mirror crosses the region/lock wall.  Keyed by [Z] and
+   ambient for [icfg_icnt]'s reason verbatim. *)
 
 (* ---- THE TWO BOOT LITERALS (iclaim-ledger.md §2.2/§2.3, increment IIIa) ---
 
@@ -543,11 +508,6 @@ Definition lelem (c : ctyUR) (r : nat) : linkElemUR := lelemf c r None.
    and no w/c/r/p fragment escapes at boot. *)
 Definition icnt_boot_map (P : gset Z) : icntUR :=
   gset_to_gmap (to_frac_agree 1 (0%nat : leibnizO nat)) P.
-
-(* THE RECEIPT MAP is one exclusive unit per inum -- "no inode is frozen at
-   boot", so every slot's clause is on its receipt-held arm. *)
-Definition frzo_boot_map (P : gset Z) : frzoUR :=
-  gset_to_gmap (Excl ()) P.
 
 (* THE MIRROR MAP is one WHOLE element per inum at [false] -- "no inode's f
    column stands at FrzPre at boot" -- which [frzm_boot_split] cuts into the
@@ -595,14 +555,6 @@ Qed.
 Lemma icnt_boot_map_valid (P : gset Z) : ✓ (icnt_boot_map P).
 Proof.
   intros i. rewrite /icnt_boot_map lookup_gset_to_gmap.
-  destruct (decide (i ∈ P)) as [Hi | Hi].
-  - rewrite option_guard_True //.
-  - rewrite option_guard_False //.
-Qed.
-
-Lemma frzo_boot_map_valid (P : gset Z) : ✓ (frzo_boot_map P).
-Proof.
-  intros i. rewrite /frzo_boot_map lookup_gset_to_gmap.
   destruct (decide (i ∈ P)) as [Hi | Hi].
   - rewrite option_guard_True //.
   - rewrite option_guard_False //.
@@ -809,11 +761,6 @@ Class icfg := MkIcfg {
      by thirty-odd fs contracts) and the other rides under the itable lock,
      so a threaded name would enter both. *)
   icfg_icnt : gname;
-  (* THE FREEZE RECEIPT's gname (iclaim-ledger.md §3.14 as built), ambient
-     for [icfg_icnt]'s reason verbatim: it is parked in
-     [InodeRegion.ireg_slot] and rides in [IcacheEscrow]'s parked payload,
-     so a threaded name would enter [ireg_inv] AND [ic_escrow]. *)
-  icfg_frzo : gname;
   (* THE FREEZE MIRROR's gname (iclaim-ledger.md §3.16 / RULING A⁗), ambient
      for [icfg_icnt]'s reason verbatim: one half is parked in
      [InodeRegion.ireg_slot] and the other in [IcacheEscrow.islot2]'s live
@@ -1012,10 +959,10 @@ Proof.
 Qed.
 
 Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (nib : nat)
-    (LM : linkUR) (CM : icntUR) (FM : frzoUR) (BM : frzmUR) (DM : dviewUR)
+    (LM : linkUR) (CM : icntUR) (BM : frzmUR) (DM : dviewUR)
     (VM : fviewUR)
     (γlog : log_names) (ist : Z) :
-  ✓ LM -> ✓ CM -> ✓ FM -> ✓ BM -> ✓ DM -> ✓ VM ->
+  ✓ LM -> ✓ CM -> ✓ BM -> ✓ DM -> ✓ VM ->
   ⊢ |==> ∃ (ICFG : icfg) (g0 : gname),
       ⌜icfg_dev = dv⌝ ∗ ⌜icfg_nib = nib⌝ ∗
       ⌜icfg_log = γlog⌝ ∗ ⌜icfg_ist = ist⌝ ∗
@@ -1029,11 +976,7 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
          [IcacheBoot] if the very [own_alloc] that mints it also mints the
          map. *)
       own icfg_icnt CM ∗
-      (* THE FREEZE RECEIPT's boot map, an ARGUMENT for [CM]'s reason: one
-         exclusive unit per region inum, which [InodeRegion.ireg_slot]'s
-         receipt clause parks at boot ("no inode is frozen at boot"). *)
-      own icfg_frzo FM ∗
-      (* THE FREEZE MIRROR's boot map (§3.16), an ARGUMENT for [FM]'s reason:
+      (* THE FREEZE MIRROR's boot map (§3.16), an ARGUMENT for [CM]'s reason:
          one whole 1/2-1/2 element per region inum at [false], which
          [frzm_boot_split] cuts into [ireg_slot]'s clause half and the free
          pool's half. *)
@@ -1091,7 +1034,7 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
          to [IcacheEscrow.ipool_alloc_inv], whose [X] is [∅]. *)
       ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse).
 Proof.
-  intros HLM HCM HFM HBM HDM HVM.
+  intros HLM HCM HBM HDM HVM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
   iMod (isl_fun_alloc NINODE 0) as (fisl) "Hisl".
   iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : icacheUR)) as (γ) "Ha".
@@ -1105,7 +1048,6 @@ Proof.
   { apply live_boot_map_valid. }
   iMod (own_alloc LM) as (γlk) "Hlk"; [exact HLM |].
   iMod (own_alloc CM) as (γcnt) "Hcnt"; [exact HCM |].
-  iMod (own_alloc FM) as (γfrzo) "Hfrzo"; [exact HFM |].
   iMod (own_alloc BM) as (γfrzm) "Hfrzm"; [exact HBM |].
   iMod (own_alloc DM) as (γdv) "Hdv"; [exact HDM |].
   iMod (own_alloc VM) as (γfv) "Hfv"; [exact HVM |].
@@ -1127,10 +1069,10 @@ Proof.
   (* the corpse ledger, whole and empty (durable-disk C-7) *)
   iMod (ghost_map_alloc (∅ : gmap Z icorpse)) as (γpcrp) "[Hpcrp _]".
   iModIntro.
-  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzo γfrzm γdv γfv γhpn γptrn γpcrp), g0.
-  cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_pext icfg_icnt icfg_frzo
+  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzm γdv γfv γhpn γptrn γpcrp), g0.
+  cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_pext icfg_icnt
        icfg_frzm icfg_dview icfg_fview icfg_hpn icfg_ptrn icfg_pcrp].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn Hpcrp".
+  by iFrame "Ha Hl Hlk Hcnt Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn Hpcrp".
 Qed.
 
 (* ===================================================================== *)
@@ -1760,21 +1702,6 @@ Section IcacheLink.
   Qed.
 
   (* ===================================================================== *)
-  (*  THE FREEZE RECEIPT [frzown] (iclaim-ledger.md §3.14 as built)         *)
-  (* ===================================================================== *)
-
-  (* One EXCLUSIVE unit per inum.  Its home is [InodeRegion.ireg_slot]'s
-     receipt clause at every phase except [FrzPre], and the freezer's hand
-     (via [IcacheEscrow.ic_payload_arm]'s FROZEN alternative, the parked
-     payload's tail) for the duration of the free window.  See [frzoUR]'s header for why this
-     rather than A‴'s half-half bool. *)
-  Definition frzown (z : Z) : iProp Σ :=
-    own icfg_frzo ({[ z := Excl () ]} : frzoUR).
-
-  Global Instance frzown_timeless z : Timeless (frzown z).
-  Proof. apply _. Qed.
-
-  (* ===================================================================== *)
   (*  THE FREEZE MIRROR [frzm] (iclaim-ledger.md §3.16 / RULING A⁗)         *)
   (* ===================================================================== *)
 
@@ -1936,17 +1863,6 @@ Section IcacheLink.
     rewrite big_opS_own_1. iIntros "H".
     iApply (big_sepS_mono with "H"). intros z _.
     iIntros "H". rewrite -icnt_split /icnt_full /icnt_at. iExact "H".
-  Qed.
-
-  (* ...and the RECEIPT map, likewise: one exclusive unit per region inum,
-     handed to [IcacheBoot.ireg_alloc] to park in every slot's clause. *)
-  Lemma frzo_boot_split (P : gset Z) :
-    own icfg_frzo (frzo_boot_map P) ⊢ [∗ set] z ∈ P, frzown z.
-  Proof.
-    rewrite /frzo_boot_map (gset_to_gmap_singletons (A := exclR unitO)).
-    rewrite big_opS_own_1. iIntros "H".
-    iApply (big_sepS_mono with "H"). intros z _.
-    iIntros "H". rewrite /frzown. iExact "H".
   Qed.
 
   (* ...and the MIRROR map, likewise ([icnt_boot_split]'s clone): one whole

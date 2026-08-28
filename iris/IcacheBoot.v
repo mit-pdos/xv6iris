@@ -865,17 +865,12 @@ Section IcacheBootRegion.
        [own_alloc] that minted it can hand the halves over
        ([IcacheRef.icfg_alloc] + [IcacheRef.icnt_split]). *)
     ([∗ set] z ∈ region_inums nib, icnt_half z 0) -∗
-    (* THE FREEZE RECEIPTS (iclaim-ledger.md §3.14 as built), one exclusive
-       unit per inum: boot freezes nothing, so every slot's receipt clause
-       is on its [frzown] arm and the region parks the whole family.  A
-       PREMISE for the count halves' reason -- the gname is the ambient
-       class's ([IcacheRef.icfg_alloc] + [IcacheRef.frzo_boot_split]). *)
-    ([∗ set] z ∈ region_inums nib, frzown z) -∗
     (* THE FREEZE MIRROR's REGION HALVES (iclaim-ledger.md §3.16 / A⁗), one
        per inum and all DOWN -- boot's f column is [FrzOff] everywhere, so
        [ireg_frzm_ok] holds at [false] at every slot.  A PREMISE for the
-       receipts' reason ([IcacheRef.icfg_alloc] + [IcacheRef.frzm_boot_split];
-       the OTHER half of each goes to the free pool's bundle). *)
+       count halves' reason ([IcacheRef.icfg_alloc] +
+       [IcacheRef.frzm_boot_split]; the OTHER half of each goes to the free
+       pool's bundle). *)
     ([∗ set] z ∈ region_inums nib, frzm_h z false) -∗
     (* THE OBSERVATION COUNTERS (fs-log.md §G.17), one per inum and all at
        zero: nobody has ever observed a nonzero nlink, which is exactly the
@@ -923,7 +918,7 @@ Section IcacheBootRegion.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     destruct (Himg dss Hl Hwf He)
       as (Hl3 & Hl4 & Hl5 & Hlnkat & Hbare & Hrecat).
-    iIntros "Hlk Hlnks Hcnts Hrcpts Hmirs Hepa Htops Hblks #Hbinv #Hftopi Hboot Hrauth".
+    iIntros "Hlk Hlnks Hcnts Hmirs Hepa Htops Hblks #Hbinv #Hftopi Hboot Hrauth".
     (* OPTION A: bulk-register every inum with a dummy escrow gname pair, then
        wrap as [ireg_registry] for the region body. *)
     iMod (ghost_map_insert_big (dummy_reg nib) with "Hrauth") as "[Hrauth Hfulls]".
@@ -1001,8 +996,7 @@ Section IcacheBootRegion.
     iDestruct (big_sepS_sep_2 with "Hall Hfulls") as "Hall".
     (* the count coupling's region halves ride in beside the rest (§2.2) *)
     iDestruct (big_sepS_sep_2 with "Hall Hcnts") as "Hall".
-    (* ...and the freeze receipts (§3.14 as built) *)
-    iDestruct (big_sepS_sep_2 with "Hall Hrcpts") as "Hall".
+    (* ...and the freeze mirror's region halves (§3.16) *)
     iDestruct (big_sepS_sep_2 with "Hall Hmirs") as "Hall".
     (* ...and the link RA's per-inum pile (durable-disk 2b-inode-4) *)
     iDestruct (big_sepS_sep_2 with "Hall Hlnks") as "Hall".
@@ -1016,7 +1010,7 @@ Section IcacheBootRegion.
                 ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)))%I
       with "[Hall]" as "Hall".
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
-      iIntros "[[[[[[[[[Hfrag Hmk] Hla] Hep] Hrf] Hcnt] Hrcpt] Hmir] Hlnk] Htop]".
+      iIntros "[[[[[[[[Hfrag Hmk] Hla] Hep] Hrf] Hcnt] Hmir] Hlnk] Htop]".
       iEval (rewrite /ireg_top_boot (Hrecat z Hz)) in "Htop".
       iDestruct (ireg_lnk_of_at γfs z (N z) (bv_unsigned (di_type (D z)))
                    (image_dinode dss z)
@@ -1035,7 +1029,7 @@ Section IcacheBootRegion.
         iApply (ireg_slot_intro γfs γi z (image_dinode dss z) None 0
                   (Some (Excl FrzOff)) 0%nat
                   Hok (ireg_claim_ok_none _ _) I
-                  with "Hla Hep Hlnk [] Hcnt [] [Hrcpt Hmir]").
+                  with "Hla Hep Hlnk [] Hcnt [] [Hmir]").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
@@ -1066,7 +1060,7 @@ Section IcacheBootRegion.
         iApply (ireg_slot_intro γfs γi z (image_dinode dss z) None 0
                   (Some (Excl FrzOff)) 0%nat
                   Hok (ireg_claim_ok_none _ _) I
-                  with "Hla Hep Hlnk [] Hcnt [] [Hrcpt Hmir]").
+                  with "Hla Hep Hlnk [] Hcnt [] [Hmir]").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }

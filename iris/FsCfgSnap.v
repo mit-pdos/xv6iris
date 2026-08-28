@@ -885,16 +885,15 @@ Section SnapMint.
     iMod (icfg_alloc ROOTDEV nib
             (link_boot_map (region_inums nib))
             (icnt_boot_map (region_inums nib))
-            (frzo_boot_map (region_inums nib))
             (frzm_boot_map (region_inums nib))
             (dview_boot_map (region_inums nib))
             (fview_boot_map (region_inums nib))
             γlog (sb_inodestart (fss_sb S))
             (link_boot_map_valid _) (icnt_boot_map_valid _)
-            (frzo_boot_map_valid _) (frzm_boot_map_valid _)
+            (frzm_boot_map_valid _)
             (dview_boot_map_valid _) (fview_boot_map_valid _))
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
-                     Hlk & Hcnt & Hfrzo & Hfrzm & Hdv & Hfv & Hboot & Hep &
+                     Hlk & Hcnt & Hfrzm & Hdv & Hfv & Hboot & Hep &
                      Hisl & Hrauth & Hlkauth & Hpkey & Hxkey & Hhpn & Htkey &
                      Hckey)".
     iDestruct (hpn_boot_split with "Hhpn") as "Hhpn".
@@ -969,8 +968,6 @@ Section SnapMint.
     iDestruct (icnt_boot_split (region_inums icfg_nib) with "Hcnt") as "Hcnt".
     iEval (rewrite big_sepS_sep) in "Hcnt".
     iDestruct "Hcnt" as "[HcntR HcntP]".
-    iDestruct (frzo_boot_split (region_inums icfg_nib) with "Hfrzo")
-      as "Hrcpt".
     iDestruct (frzm_boot_split (region_inums icfg_nib) with "Hfrzm")
       as "Hmir".
     iEval (rewrite big_sepS_sep) in "Hmir".
@@ -1097,7 +1094,7 @@ Section SnapMint.
                            (fs_home_set cov (sb_logstart (fss_sb S)))
                            dss icfg_nib Hfull Hb Hloc Hnibeq Hnib32
                            Hdl Hdwf Hde))
-            with "Hla Hlnks HcntR Hrcpt HmirR Hep Htopreg Hbireg Hbrow Hftopi Hboot Hrauth")
+            with "Hla Hlnks HcntR HmirR Hep Htopreg Hbireg Hbrow Hftopi Hboot Hrauth")
       as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hlics & Hflics &
                     Hout)".
     iDestruct "Hireginv" as "#Hireginv".
