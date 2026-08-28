@@ -442,12 +442,84 @@ things, and the answer differs:
   quadratic in the file size.  Prove `Some (NFile b) = Some (NFile b')
   -> b = b'` AT VARIABLES and close the instance by transitivity through
   `node_at`.  That one change took the file from >15 min to 5.5 s.
-- [ ] **Y — sys_sync (gated on durable lane F).**  The `flushed`
-  receipt (persistent snapshot certificate copy, plan 4⁹.3) + the
-  `wp_sys_sync` parallel form (R10), per doc §5 principle 2's derivation
-  chain — items (ii) and (iii); item (i) is DONE (the commit concludes
-  something real).
+- [ ] **Y — sys_sync.**  The `flushed` receipt (persistent snapshot
+  certificate copy, plan 4⁹.3) + the `wp_sys_sync` parallel form (R10),
+  per doc §5 principle 2's derivation chain — items (ii) and (iii);
+  item (i) is DONE (the commit concludes something real).
+
+  **AS LANDED 2026-08-28 — the machinery, the composition and the
+  contract; what is left is ONE OWNER DECISION and the wait loop.**  Two
+  new leaf files, both green on the mirror, every artifact `Closed under
+  the global context`, nothing else in the tree touched:
+
+  - **`iris/FsFlushed.v` — the receipt.**  `flushed_at γs b D :=
+    ∃ l, ⌜length l = b⌝ ∗ fs_hist_lb (fcn_hist γs) (l ++ [D])`, and the
+    client-facing `flushed b D` with `γs` closed under
+    `fs_receipt_any`'s three seam equations.  **NO NEW GHOST, NO NEW
+    INVARIANT, NO ARITY MOVED.**  The finding that decided the shape:
+    *there is no numeric durable-epoch pointer in the tree and there
+    cannot cheaply be one* — the epoch is `FsDurSnap.P_dur`, whose gname
+    family is existential and which is indexed BY THE COMMITTED MAP
+    ALONE; a commit drops it and allocates a fresh one
+    (`dsnap_step_xfer`), so nothing of an epoch survives to be compared.
+    What does survive is the crash record's mono-list `fcn_hist`, and it
+    is already a commit counter with its values attached: the index IS
+    `length l`, which `fs_receipt` merely existentially closes.  So the
+    "commit counter for the receipt `ProofEndOp.v:1783` drops" is not a
+    new counter at all — it is a projection of the receipt the committer
+    already holds.  Proven: persistence, `flushed_at_agree` (one bound,
+    one disk — from `mono_list_lb_op_valid_L`, no authority needed),
+    `flushed_at_earlier` (monotone, and the earlier map is the history's
+    own entry), `P_fs_flushed_lookup` (a receipt's index is its POSITION
+    in the record's history — `P_fs_receipt_committed` sharpened), and
+    the producer `P_fs_flushed_now`: whenever the crash predicate is
+    open it hands out its current commit's receipt plus `snap_holds`,
+    non-destructively.
+  - **the composition (same file, §3), the acceptance test.**  `dur_at b
+    D i n := flushed b D ∗ ⌜snap_holds D⌝ ∗ ⌜FsDurSyscall.dur_node D i
+    n⌝` — the worklist's promised shape, with NOTHING in FsDurSyscall
+    moving.  Mint (`dur_at_of_rec`, off the bytes a transaction left in
+    the inum's slot; `dur_at_of_snap`), read (`dur_at_node`), agreement
+    (`dur_at_agree`), the cross-node conjunction at one bound
+    (`dur_at_pair` — doc §5's "two carriers, same b"), the end-to-end
+    `dur_at_of_crash` from `P_fs` alone, and a non-vacuity witness.
+  - **`iris/SpecSysSyncFlush.v` — the R10 parallel contract.**
+    `SpecSysSync.v` is byte-identical.  The new body is the landed one
+    plus `log_epoch_lb γ e` in (the caller's invocation-time batch
+    witness — free, `sync_witness_0`) and `flushed_sync γ e` out.
+    `SysSyncFlushWeaken : SYS_SYNC_FLUSH -> SYS_SYNC` is PROVED, so
+    "the postcondition only grows" is now a theorem and arm 22 of the
+    dispatcher keeps its contract.  `flushed_sync_of_bank` discharges
+    BOTH arms of the fast/slow case split at once.
+  - **THE OWNER DECISION, and it is the only thing between this and a
+    proof.**  The receipt has no producer a client can reach:
+    `P_fs_flushed_now` needs the crash predicate OPEN, which is the
+    commit's fupd and nothing else — sys_sync writes no disk block.  The
+    committer must BANK the receipt it currently drops, as one conjunct
+    of `LogInv.log_res` (`SpecSysSyncFlush.log_flushed_bank`, spelled
+    there as a type-checked definition), deposited at the same
+    re-deposit that runs `log_epoch_bump`.  Measured cost: it changes NO
+    arity (`log_ctx`, `wp_end_op`, `log_names` all stand) but it
+    re-elaborates `LogInv.v` and hence the whole tree, and it breaks
+    ~14 positional sites in `ProofBeginOp` (4, one of which restates
+    `log_res`'s body verbatim), `ProofEndOp` (5), `ProofLogWrite` (3),
+    `ProofInitlog` (1); `ProofSysSync`'s own three openers survive
+    (they close with `iExact "Hrest"`).
+  - **THE SECOND DEBT, smaller, and only the SLOW path needs it.**
+    `log_res` binds the `log.ncommit` cell existentially and says
+    nothing about its value, so `ProofSysSync`'s wait loop carries no
+    `nc` binder and its back edge is a raw case split.  Proving that the
+    WAIT ends at a later batch needs the cell tied to `ln_ep`
+    (`⌜uint nc = Z.of_nat E⌝` or its off-by-one) and the loop invariant
+    restated over the tie.  The fast path needs neither.
+  - **Why the post is not `S e`.**  On the fast path no commit occurs,
+    and a caller whose witness was taken in the current batch finds the
+    log empty exactly when that batch is empty; demanding `S e` would
+    make the contract unprovable there without making any consumer
+    stronger.  The receipt is what consumers use.
 
 Sizing: D is spike-sized — the readings exist, the work is assembly and
 statement.  S0 is one design session.  A and W are the campaign's bulk.
-P is contained (two pins).  Y is small once F lands.
+P is contained (two pins).  Y's machinery and contract are LANDED
+(2026-08-28); what is left of it is the owner's `log_res` conjunct and,
+for the slow path only, the ncommit tie.

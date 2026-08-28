@@ -1376,3 +1376,11 @@ SpecSysOpenAU.v
 FsAbsStart.v
 SpecSysDupAU.v
 SpecSysWriteConsAU.v
+
+# fs-syscall-specs lane Y: sys_sync's durability receipt.  Both are LEAVES.
+# FsFlushed builds [flushed b D] out of the crash record's mono-list history
+# (no new ghost, no arity moved) and composes it with FsDurSyscall's per-node
+# certificates; SpecSysSyncFlush is the R10 parallel contract stated beside
+# the landed empty one, which does not move.  Nothing requires either.
+FsFlushed.v
+SpecSysSyncFlush.v

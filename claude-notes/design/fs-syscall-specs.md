@@ -522,12 +522,21 @@ about what OTHER processes' ops do to durability beyond the monotone
 snapshot design was proven through; the earlier fold-era version of this
 block is in git history):**
 
-- `flushed` = a mono-nat lower bound on the EPOCH POINTER the crash
-  predicate carries (plan 4⁹.1) — and its persistent-receipt producer is
-  named by the durable campaign itself: "sync-style receipts are copies"
-  of the frozen snapshot certificate (4⁹.3), which is exactly durable
-  lane F's deliverable.  Nothing here is speculative any more; lane Y of
-  the campaign worklist consumes F.
+- `flushed` = **[CORRECTED 2026-08-28 BY LANE Y, WHICH BUILT IT.  It is
+  NOT a mono-nat lower bound on an epoch pointer: there is no epoch
+  POINTER.  `FsDurSnap.P_dur`'s gname family is existential and the
+  epoch is indexed by the committed MAP alone; a commit drops the epoch
+  and allocates a fresh one, so no resource of one survives to be
+  compared.  The bound rides the crash record's mono-list history
+  instead — `flushed b D := ∃ l, ⌜length l = b⌝ ∗ fs_hist_lb (fcn_hist
+  γs) (l ++ [D])`, i.e. the index is the receipt's OWN position, which
+  `FsCrash.fs_receipt` was already existentially closing.  See
+  `iris/FsFlushed.v`; nothing was added to the ghost state.]**  Its
+  persistent-receipt producer is the one the durable campaign named:
+  "sync-style receipts are copies" of the frozen snapshot certificate
+  (4⁹.3).  What lane Y still owes is not the receipt but its BANK — the
+  committer depositing into `LogInv.log_res` the receipt it drops today
+  (worklist row Y).
 - The carrier = `top_frag_q`'s `abs_of` reading, RULED (v3, §2) — no
   batch bound rides it; the bound is derived via the persistent `dur_at`
   certificates (principle 3 above).  Lane S0's question is answered; what
