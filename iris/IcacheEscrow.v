@@ -4694,9 +4694,10 @@ Section IcacheEscrow.
   Definition ipool_tkey (T : gmap Z (nat * Qp)) : iProp Σ :=
     ghost_var icfg_ptrn (1/2) T.
 
-  (* one parked share per inum in transit, at the ledger's own [(t, q)] *)
+  (* one parked share per inum in transit, at the ledger's own [(t, q)] --
+     [TxPin.tx_pins] at the pool's key, which is exactly the shape *)
   Definition ipool_transit (T : gmap Z (nat * Qp)) : iProp Σ :=
-    ([∗ map] z ↦ p ∈ T, p.1 ↪[ln_tx icfg_log]{#(p.2)} tt)%I.
+    tx_pins icfg_log T.
 
   Global Instance ipool_transit_timeless T : Timeless (ipool_transit T).
   Proof. rewrite /ipool_transit. tl_struct. Qed.
@@ -4711,11 +4712,7 @@ Section IcacheEscrow.
     ipool_transit T -∗ ⌜T = ∅⌝.
   Proof.
     iIntros "Ha HT". rewrite /ipool_transit.
-    destruct (decide (T = ∅)) as [-> | Hne]; [done |].
-    destruct (map_choose T Hne) as (z & p & Hz).
-    iDestruct (big_sepM_lookup _ _ z p Hz with "HT") as "Htx".
-    iDestruct (ghost_map_lookup with "Ha Htx") as %Hbad.
-    rewrite lookup_empty in Hbad. discriminate.
+    iApply (tx_pins_no_ops with "Ha HT").
   Qed.
 
   (* ==================================================================== *)
@@ -4766,7 +4763,7 @@ Section IcacheEscrow.
   (* what one row parks, by its value *)
   Definition crp_row (γi : gname) (z : Z) (v : icorpse) : iProp Σ :=
     match v with
-    | CrpPre t q => (t ↪[ln_tx icfg_log]{#q} tt)%I
+    | CrpPre t q => tx_pin icfg_log t q
     | CrpDep => imark γi z
     end.
 
@@ -4790,9 +4787,7 @@ Section IcacheEscrow.
     crp_row γi z v -∗ ⌜v = CrpDep⌝.
   Proof.
     iIntros "Ha Hrow". destruct v as [t q |]; [| done].
-    rewrite /crp_row.
-    iDestruct (ghost_map_lookup with "Ha Hrow") as %Hbad.
-    rewrite lookup_empty in Hbad. discriminate.
+    rewrite /crp_row. iDestruct (tx_pin_no_ops with "Ha Hrow") as %[].
   Qed.
 
   (* ...AND THE WHOLE LEDGER: at a commit every corpse has been deposited,
@@ -5068,7 +5063,7 @@ Section IcacheEscrow.
       iSplitR; [iPureIntro; exact Hlen |].
       iSplitR; [iPureIntro; rewrite Hlive dom_empty_L; set_solver |].
       iSplitR; [iPureIntro; exact dom_empty_L |].
-      rewrite /ipool_ckey /ipool_transit /ipool_corpse !big_sepM_empty.
+      rewrite /ipool_ckey /ipool_transit /tx_pins /ipool_corpse !big_sepM_empty.
       iFrame "Hk1 Hx1 Ht1 Hids Hrows Hckey". }
     iModIntro. iFrame "Hinv". rewrite /ipool.
     iExists (region_inums nib). iSplitR; [iPureIntro; set_solver |].
@@ -5365,7 +5360,7 @@ Section IcacheEscrow.
       iSplitR; [iPureIntro; exact Hdk |].
       iDestruct "Htr" as "_".
       iFrame "Hk1 Hx1 Ht1 Hids Hrows Hck Hcrp".
-      rewrite /ipool_transit big_sepM_singleton /=. iExact "Htx". }
+      rewrite /ipool_transit /tx_pins big_sepM_singleton /=. iExact "Htx". }
     iModIntro. iExact "Hq1".
   Qed.
 
@@ -5447,7 +5442,7 @@ Section IcacheEscrow.
     iDestruct (ghost_var_agree with "Hx1 Hxkey") as %->.
     iDestruct (ghost_var_agree with "Ht1 Htkey") as %->.
     rewrite dom_singleton_L in Hrow.
-    rewrite /ipool_transit big_sepM_singleton /=.
+    rewrite /ipool_transit /tx_pins big_sepM_singleton /=.
     iMod (ghost_var_update_halves (∅ : gmap Z (nat * Qp)) with "Ht1 Htkey")
       as "[Ht1 Htkey]".
     iMod (ghost_var_update_halves ({[z]} ∪ O) with "Hk1 Hkey")
@@ -5459,7 +5454,7 @@ Section IcacheEscrow.
         [iPureIntro; rewrite dom_empty_L Hrow; clear Hrow; set_solver |].
       iSplitR; [iPureIntro; exact Hdk |].
       iFrame "Hk1 Hx1 Ht1 Hids Hck Hcrp".
-      iSplitR; [rewrite /ipool_transit big_sepM_empty; done |].
+      iSplitR; [rewrite /ipool_transit /tx_pins big_sepM_empty; done |].
       rewrite /ipool_rows big_sepS_union; [| set_solver].
       iSplitL "Hrow"; [| iExact "Hrows"].
       rewrite big_sepS_singleton. iExact "Hrow". }
@@ -5503,7 +5498,7 @@ Section IcacheEscrow.
     iDestruct (ghost_var_agree with "Hx1 Hxkey") as %->.
     iDestruct (ghost_var_agree with "Ht1 Htkey") as %->.
     rewrite dom_singleton_L in Hrow.
-    rewrite /ipool_transit big_sepM_singleton /=.
+    rewrite /ipool_transit /tx_pins big_sepM_singleton /=.
     iMod (ghost_var_update_halves (∅ : gmap Z (nat * Qp)) with "Ht1 Htkey")
       as "[Ht1 Htkey]".
     iMod (ghost_var_update_halves ({[z]} ∪ (P ∖ O)) with "Hx1 Hxkey")
@@ -5521,7 +5516,7 @@ Section IcacheEscrow.
         [iPureIntro; rewrite dom_empty_L Hrow; clear Hrow; set_solver |].
       iSplitR; [iPureIntro; rewrite dom_insert_L Hdk; reflexivity |].
       iFrame "Hk1 Hx1 Ht1 Hids Hrows Hck".
-      iSplitR; [rewrite /ipool_transit big_sepM_empty; done |].
+      iSplitR; [rewrite /ipool_transit /tx_pins big_sepM_empty; done |].
       rewrite /ipool_corpse big_sepM_insert; [| exact HKz].
       iSplitL "Htr"; [iExact "Htr" | iExact "Hcrp"]. }
     iModIntro. iFrame "Hel". rewrite /ipool. iExists O.
@@ -5562,7 +5557,7 @@ Section IcacheEscrow.
     iDestruct (ghost_map_lookup with "Hck Hel") as %HKz.
     rewrite {1}/ipool_corpse (big_sepM_delete _ K z (CrpPre t q) HKz).
     iDestruct "Hcrp" as "[Hshare Hcrp]".
-    iEval (rewrite /crp_row) in "Hshare".
+    iEval (rewrite /crp_row /tx_pin) in "Hshare".
     iMod (ghost_map_update CrpDep with "Hck Hel") as "[Hck Hel]".
     iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows Hck Hcrp Hmk]") as "_".
     { iApply bi.later_intro. rewrite /ipool_body.
@@ -5726,7 +5721,7 @@ Section IcacheEscrow.
     { iPureIntro. rewrite dom_empty_L in Hrow. rewrite Hrow. set_solver. }
     iFrame "Htxa Hrows Hids Hcrp".
     iIntros "(Hrows & Hids & Hcrp)". iApply "Hback". iFrame "Hrows Hids".
-    iSplitR; [rewrite /ipool_transit big_sepM_empty; done |].
+    iSplitR; [rewrite /ipool_transit /tx_pins big_sepM_empty; done |].
     iEval (rewrite (ipool_corpse_marks γi K HF) Hdk). iExact "Hcrp".
   Qed.
 
