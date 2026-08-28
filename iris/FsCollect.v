@@ -302,6 +302,16 @@ Require Import FsState.       (* [fs_state_rec], [fs_links], [sb_owned]     *)
 Require Import FsStateEra.    (* [inode_owned_era_q]                        *)
 Require Import EscrowDefs.    (* [reg_full] / [reg_half] / [region_pending] *)
 Require Import InodeRegion.   (* [dinode_at], [ireg_recs], [ireg_couple]    *)
+Require Import IcacheEscrow.  (* [ic_inode_leg] -- WHAT A SLOT HOLDS OF ONE
+   INODE, which is what [col_side] takes (durable-disk EV stage 5).  The
+   predicate is the pair [FsStateInode.ent_toks_x] beside
+   [FsStateEra.inode_owned_era_q]: both halves are in this file's cone
+   already, and naming the pair once is what lets the collection take a
+   slot's whole per-inode leg in ONE step.  The cone cost is FIVE files
+   (90 -> 95 transitive dependencies), because everything else
+   [IcacheEscrow] rests on was already below this file; the LEAF property
+   this header claims is about the BOOT chain ([FsCfgBoot], [FsDurImg]),
+   which stays out -- see [FsCollectImg].                                *)
 Require Import FsDurBytes.    (* [fs_dbytes] and its lookup laws            *)
 Require Import FsDurXfer.     (* [dfrac_nvalid_pair], the run vocabulary    *)
 Require Import FsDurSnap.     (* [snap_bytes], [snap_local], [snap_ok]      *)
@@ -1525,6 +1535,13 @@ Section Collect.
   (*  [FsStateEra.inode_owned_era_q] carries no link piece at all.  At a   *)
   (*  MARKER the tokens are free ([col_free_ent_toks]: a type-0 record is  *)
   (*  no directory), which is why the marker arm does not name them.        *)
+  (*                                                                      *)
+  (*  THE PAIR IS ONE CONJUNCT (durable-disk EV stages 4 and 5).           *)
+  (*  [IcacheEscrow.ic_inode_leg γfs dq γi inum n] IS the era bundle       *)
+  (*  beside those tokens, and it is what all three suppliers lend --      *)
+  (*  [ic_slot_cover]'s bundle alternative, [ipool_alloc], and the         *)
+  (*  region's own free bundle here.  Naming it on THIS side too is what   *)
+  (*  removes the last two re-associations at the [col_side] boundary.     *)
   Definition col_side γfs (γi : gname) (inum : bv 32) : iProp Σ :=
     (imark γi (bv_unsigned inum)
      ∨ ∃ (n : fs_node) (dq : dfrac),
@@ -1537,8 +1554,7 @@ Section Collect.
             [ipool_alloc]), and being pure they cost the closing wand
             nothing. *)
          ∗ ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
-         ∗ inode_owned_era_q γfs dq γi inum n
-         ∗ ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n)%I.
+         ∗ ic_inode_leg γfs dq γi inum n)%I.
 
   (* A FREE INUM OWNS NO ENTRY TOKENS: its record's type is zero, so the
      node is not a directory and [dir_entries] is empty. *)
@@ -1602,48 +1618,14 @@ Section Collect.
     iSplitR; [done |]. iSplitR; [iPureIntro; exact Hdq |]. iExact "H".
   Qed.
 
-  Lemma col_region_quiesce_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    col_side γfs γi inum -∗
-    ireg_slot γfs γi (bv_unsigned inum) d -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
-      ∗ ∃ (n : fs_node) (dq : dfrac),
-          ⌜~ ✓ (dq ⋅ dq)⌝
-          ∗ ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
-          ∗ inode_owned_era_q γfs dq γi inum n
-          ∗ ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n
-          ∗ ((inode_owned_era_q γfs dq γi inum n
-              ∗ ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
-               col_side γfs γi inum
-               ∗ ireg_slot γfs γi (bv_unsigned inum) d).
-  Proof.
-    iIntros "Hauth Hside Hslot".
-    iDestruct "Hside" as "[Hmk | (%n & %dq & %Hdq & %Hdl & Hown & Hte)]".
-    - (* THE MARKER: the region holds this inum's record, and the bundle is
-         the free one it parks beside it. *)
-      iDestruct (col_free_slot_acc γfs γi inum d with "Hauth Hmk Hslot")
-        as "(Hauth & %Ht0 & Hmk & Hown & Hback)".
-      assert (Hdl0 : node_dir_local (bv_unsigned inum) icfg_nib (free_node d)).
-      { apply node_dir_local_free. rewrite free_node_rec. exact Ht0. }
-      iFrame "Hauth". iExists (free_node d), (DfracOwn 1).
-      iSplitR; [iPureIntro; exact dfrac_full_nvalid |].
-      rewrite -inode_owned_era_1.
-      iSplitR; [iPureIntro; exact Hdl0 |].
-      iSplitL "Hown"; [iExact "Hown" |].
-      iSplitR; [iApply (col_free_ent_toks γfs (bv_unsigned inum) d Ht0) |].
-      iIntros "[Hown _]". iSplitL "Hmk"; [iLeft; iExact "Hmk" |].
-      iApply ("Hback" with "Hown").
-    - (* A CACHED OR ALLOCATED INUM: the bundle is already in hand and the
-         region slot is not touched. *)
-      iFrame "Hauth". iExists n, dq.
-      iSplitR; [iPureIntro; exact Hdq |].
-      iSplitR; [iPureIntro; exact Hdl |].
-      iSplitL "Hown"; [iExact "Hown" |].
-      iSplitL "Hte"; [iExact "Hte" |].
-      iIntros "[Hown Hte]". iSplitR "Hslot"; [| iExact "Hslot"].
-      iRight. iExists n, dq. iSplitR; [iPureIntro; exact Hdq |].
-      iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hown Hte".
-  Qed.
+  (* [col_region_quiesce_acc], the ACCESSOR twin of
+     [col_region_quiesce_take] below, is DELETED (durable-disk EV stage 5).
+     It had no caller and could not acquire one: the collection's
+     conclusion is pure, so [FsCollectAll.pure_keep] gives every invariant
+     back and there is nothing for a closing wand to do -- and the
+     authority the [fs_links] leg needs is a conjunct of the very slot the
+     marker arm's reading consumes, which no accessor can yield beside the
+     bundle. *)
 
   (* ==================================================================== *)
   (*  THE DESTRUCTIVE TWINS (durable-disk C-8)                             *)
@@ -1705,17 +1687,18 @@ Section Collect.
       ∗ ∃ (n : fs_node) (dq : dfrac),
           ⌜~ ✓ (dq ⋅ dq)⌝
           ∗ ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
-          ∗ inode_owned_era_q γfs dq γi inum n
-          ∗ ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n.
+          ∗ ic_inode_leg γfs dq γi inum n.
   Proof.
     iIntros "Hauth Hside Hslot".
     iDestruct (col_region_slot_take γfs γi inum d with "Hauth Hslot")
       as "(Hauth & Hlnk & Harm)".
     iFrame "Hauth Hlnk".
-    iDestruct "Hside" as "[Hmk | (%n & %dq & %Hdq & %Hdl & Hown & Hte)]".
+    iDestruct "Hside" as "[Hmk | (%n & %dq & %Hdq & %Hdl & Hleg)]".
     - (* THE MARKER: the pool's marker refutes the region's own marked arm,
          so the slot's free bundle is what is left.  A type-0 record is no
-         directory, so its three directory clauses are vacuous. *)
+         directory, so its three directory clauses are vacuous, and its
+         entry tokens are free ([col_free_ent_toks]) -- which is what turns
+         the region's bare bundle into a whole leg. *)
       iDestruct "Harm" as "[Hmk' | (%Ht0 & Hown)]".
       { iExFalso. iApply (imark_excl with "Hmk Hmk'"). }
       iExists (free_node d), (DfracOwn 1).
@@ -1723,11 +1706,60 @@ Section Collect.
       iSplitR.
       { iPureIntro. apply node_dir_local_free.
         rewrite free_node_rec. exact Ht0. }
-      rewrite -inode_owned_era_1. iFrame "Hown".
+      (* [inode_owned_era] IS the bundle at [DfracOwn 1]
+         ([inode_owned_era_1] is [reflexivity]), so the leg takes it with
+         no rewrite -- and no rewrite is POSSIBLE, the leg being sealed. *)
+      iApply (ic_inode_leg_intro γfs (DfracOwn 1) γi inum (free_node d)
+                with "[] Hown").
       iApply (col_free_ent_toks γfs (bv_unsigned inum) d Ht0).
-    - (* A CACHED OR ALLOCATED INUM: the bundle is already in hand. *)
+    - (* A CACHED OR ALLOCATED INUM: the leg is already in hand. *)
       iExists n, dq. iSplitR; [iPureIntro; exact Hdq |].
-      iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hown Hte".
+      iSplitR; [iPureIntro; exact Hdl |]. iExact "Hleg".
+  Qed.
+
+  (* ==================================================================== *)
+  (*  ...AND WHAT ONE SLOT HANDS THE COLLECTION, IN ONE STEP               *)
+  (*  (durable-disk EV stage 5)                                            *)
+  (*                                                                      *)
+  (*  The leg is everything a slot holds of this inode; what the REGION    *)
+  (*  kept is the record (as bytes, region-side at fraction 1) and the     *)
+  (*  record's link AUTHORITY.  Together they are the collection's own two *)
+  (*  per-inum legs -- [col_hand]'s [col_bundle] and its                    *)
+  (*  [FsState.fs_links] element -- plus [InodeRegion.ireg_keep], which is *)
+  (*  [emp] at every inum but the ROOT and is RESIDUE there                *)
+  (*  (durable-fs-plan.md section 4: it is the slack in                    *)
+  (*  [FsDurSnap.sk_links], never spent).                                  *)
+  (*                                                                      *)
+  (*  THE TWO AUTHORITIES ARE PREMISES, not because the step needs to      *)
+  (*  update either -- it reads both -- but because the record the bundle  *)
+  (*  names must be shown to BE the region's ([col_bundle_rec], which is   *)
+  (*  what discharges [col_link_of]'s multiplicity bridge) and the node    *)
+  (*  the leg carries to be the abstract map's ([col_bundle_top]).         *)
+  (* ==================================================================== *)
+  Lemma col_leg_bundle γfs (γi : gname) (inum : bv 32) (n : fs_node)
+      (d : dinode) (dq : dfrac) (m : gmap Z dinode) (I : gmap Z fs_node) :
+    ~ ✓ (dq ⋅ dq) ->
+    m !! bv_unsigned inum = Some d ->
+    ghost_map_auth γi 1 m -∗
+    ghost_map_auth (fs_top γfs) 1 I -∗
+    ireg_lnk γfs (bv_unsigned inum) d -∗
+    ic_inode_leg γfs dq γi inum n -∗
+      ghost_map_auth γi 1 m
+      ∗ ghost_map_auth (fs_top γfs) 1 I
+      ∗ ⌜I !! bv_unsigned inum = Some n⌝
+      ∗ col_bundle γfs γi (bv_unsigned inum) n
+      ∗ fs_link_node (fs_link γfs) (bv_unsigned inum) n
+      ∗ ∃ kv : ity, ireg_keep γfs (bv_unsigned inum) kv.
+  Proof.
+    intros Hdq Hmd. iIntros "Hma Hia Hlnk Hleg".
+    iDestruct (ic_inode_leg_open with "Hleg") as "[Hte Hown]".
+    iDestruct (col_bundle_of_side γfs γi inum n dq Hdq with "Hown") as "Hb".
+    iDestruct (col_bundle_top with "Hia Hb") as %HIz.
+    iDestruct (col_bundle_rec with "Hma Hb") as %Hmz.
+    rewrite Hmd in Hmz. injection Hmz as Hrec.
+    iDestruct (col_link_of γfs (bv_unsigned inum) n d (eq_sym Hrec)
+                 with "Hlnk Hte") as "[Hle Hkp]".
+    iFrame "Hma Hia Hb Hle Hkp". iPureIntro. exact HIz.
   Qed.
 
   End FreeSlot.

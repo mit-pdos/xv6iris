@@ -644,8 +644,14 @@ Section IcacheEscrow.
      searches this file runs constantly, and unsealed it would cost each of
      them the era bundle's four conjuncts on top of what they already walk.
      [rewrite /ic_inode_leg] and the declared [Timeless] instance still
-     work, and the four openers below are what the proofs use. *)
-  Local Typeclasses Opaque ic_inode_leg.
+     work, and the four openers below are what the proofs use.
+
+     GLOBAL SINCE STAGE 5, because the seal has a second consumer now:
+     [FsCollect.col_side] IS this predicate, and a seal does not travel
+     (durable-notes, "a [Typeclasses Opaque] seal does not travel").  An
+     unsealed leg there would let a framing search walk into the era
+     bundle's four conjuncts at every one of the collection's inums. *)
+  Global Typeclasses Opaque ic_inode_leg.
 
   Lemma ic_inode_leg_open γfs dq γi (inum : mword 32) n :
     ic_inode_leg γfs dq γi inum n -∗

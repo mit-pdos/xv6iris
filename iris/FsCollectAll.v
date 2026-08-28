@@ -320,10 +320,9 @@ Section CollectAll.
     - rewrite /ipool_alloc.
       iDestruct "Halloc" as (dn0 bm0 data0)
         "(%Hok & %Hdok & %Hddix & %Hdoc & _ & Hleg & _ & _)".
-      (* the pool row's leg is [col_side]'s pair in ONE conjunct
-         (durable-disk EV stage 4); [col_side] still spells the pair out,
-         so this open is the boundary *)
-      iDestruct (IcacheEscrow.ic_inode_leg_open with "Hleg") as "[Hte Hn]".
+      (* the pool row's leg IS [col_side]'s conjunct, on the nose
+         (durable-disk EV stage 5): nothing is opened at this boundary any
+         more *)
       iRight. iExists (era_node dn0 bm0 data0), (DfracOwn 1).
       iSplitR;
         [iPureIntro; exact (FsStateDefs.dfrac_full_nvalid (DfracOwn 1)) |].
@@ -334,7 +333,7 @@ Section CollectAll.
       { iPureIntro.
         exact (FsStateEra.node_dir_local_of_ok (bv_unsigned w) cov ls
                  icfg_nib dn0 bm0 data0 Hok Hdok Hddix Hdoc). }
-      iFrame "Hn Hte".
+      iExact "Hleg".
     - iLeft. iExact "Hmk".
   Qed.
 
@@ -391,13 +390,14 @@ Section CollectAll.
       iApply (ipool_shape_np_side with "Hnp").
     - iDestruct "Hc" as (dq n) "[%Hdq [%Hdl Hl]]".
       rewrite /ic_lend. iDestruct "Hl" as "[(Hid & Hleg) _]".
-      (* the cover lends the LEG as one conjunct (durable-disk EV stage 4);
-         [col_side] still spells the pair out, so this open is the boundary *)
-      iDestruct (IcacheEscrow.ic_inode_leg_open with "Hleg") as "[Hte Hn]".
+      (* the cover lends the LEG as one conjunct (durable-disk EV stage 4)
+         and [col_side] now IS that conjunct (stage 5): the boundary is a
+         pass-through, and the two [ic_inode_leg_open]s that used to sit
+         here and at [ipool_shape_np_side] are gone. *)
       iDestruct (ic_id_agree with "Hq Hid") as %(_ & _ & <-).
       rewrite /col_side. iRight. iExists n, dq.
       iSplitR; [iPureIntro; exact Hdq |].
-      iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hn Hte".
+      iSplitR; [iPureIntro; exact Hdl |]. iExact "Hleg".
   Qed.
 
   Lemma ic_live_inums_cons_true (dev inum : mword 32)
@@ -498,11 +498,36 @@ Section CollectAll.
       ∗ ∃ (n : fs_node) (dq : dfrac),
           ⌜~ ✓ (dq ⋅ dq)⌝
           ∗ ⌜node_dir_local z icfg_nib n⌝
-          ∗ inode_owned_era_q γfs dq γi w n
-          ∗ ent_toks_x (fs_gamma_L γfs) z n.
+          ∗ ic_inode_leg γfs dq γi w n.
   Proof.
     intros <-. iIntros "Ht Hs Hr".
     iApply (col_region_quiesce_take with "Ht Hs Hr").
+  Qed.
+
+  (* ...and the SLOT'S OWN HAND, at an inum named as a number
+     (durable-disk EV stage 5).  [FsCollect.col_leg_bundle] takes the leg
+     the door hands out beside what the REGION kept and yields the
+     collection's own two per-inum legs; this is it at the cache's
+     currency, exactly as [col_region_quiesce_take_z] is for the door. *)
+  Lemma col_leg_bundle_z (γfs : fs_names) (γi : gname) (z : Z)
+      (w : mword 32) (n : fs_node) (d : dinode) (dq : dfrac)
+      (m : gmap Z dinode) (I : gmap Z fs_node) :
+    bv_unsigned w = z ->
+    ~ ✓ (dq ⋅ dq) ->
+    m !! z = Some d ->
+    ghost_map_auth γi 1 m -∗
+    ghost_map_auth (fs_top γfs) 1 I -∗
+    ireg_lnk γfs z d -∗
+    ic_inode_leg γfs dq γi w n -∗
+      ghost_map_auth γi 1 m
+      ∗ ghost_map_auth (fs_top γfs) 1 I
+      ∗ ⌜I !! z = Some n⌝
+      ∗ col_bundle γfs γi z n
+      ∗ fs_link_node (fs_link γfs) z n
+      ∗ ∃ kv : ity, ireg_keep γfs z kv.
+  Proof.
+    intros <- Hdq Hmd.
+    exact (col_leg_bundle γfs γi w n d dq m I Hdq Hmd).
   Qed.
 
   Lemma col_sides_bundles (γfs : fs_names) (γi : gname)
@@ -545,18 +570,18 @@ Section CollectAll.
       rewrite /col_sidez.
       iDestruct (col_region_quiesce_take_z γfs γi z (mword_of_int z) d Hmoi
                    with "Ht Hside Hslot") as
-        "(Ht & Hlnk & %n & %dq & %Hdq & %Hdl & Hown & Hte)".
-      iDestruct (col_bundle_of_side γfs γi (mword_of_int z : mword 32) n dq
-                   Hdq with "Hown") as "Hb".
-      rewrite Hmoi.
-      (* the abstract map's value at this inum IS the bundle's node, and the
-         record the bundle names IS the region's *)
-      iDestruct (col_bundle_top with "Hi Hb") as %HIz.
-      iDestruct (col_bundle_rec with "Hm Hb") as %Hmz.
-      rewrite Hmd in Hmz. injection Hmz as Hrec.
-      iFrame "Ht Hm Hi".
-      iDestruct (col_link_of γfs z n d (eq_sym Hrec) with "Hlnk Hte")
-        as "[Hle Hkp]".
+        "(Ht & Hlnk & %n & %dq & %Hdq & %Hdl & Hleg)".
+      iFrame "Ht".
+      (* ONE STEP (durable-disk EV stage 5): the slot's whole per-inode leg
+         beside what the region kept IS the bundle, the [FsState.fs_links]
+         element and the keep-alive fragment.  The two agreements the step
+         rests on -- the abstract map's value at this inum IS the leg's
+         node, and the record the leg names IS the region's -- are inside
+         [FsCollect.col_leg_bundle]. *)
+      iDestruct (col_leg_bundle_z γfs γi z (mword_of_int z) n d dq m I Hmoi
+                   Hdq Hmd with "Hm Hi Hlnk Hleg")
+        as "(Hm & Hi & %HIz & Hb & Hle & Hkp)".
+      iFrame "Hm Hi".
       iSplitR "Hkp"; [| iExact "Hkp"].
       iExists n. iSplitR; [iPureIntro; exact HIz |].
       iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hb Hle".
