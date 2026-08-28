@@ -10160,3 +10160,217 @@ worked precedent.
 > longer on the critical path at all — the only thing the AMO must mint is
 > the view receipt (`twin_passed_get`), and the acquire leaf's payload
 > transport is `ZZAbsorbProbe.twin_absorb` against it.
+
+### A6.90 THE PARK PROTOCOL IS PORTED ONTO THE REAL Ztso MACHINE, AND THE
+### PARK'S OWN ABORT IS DEAD — BUT THE SPLIT LANDS ONE ROW WIDER THAN MAIN'S,
+### AND THE REASON IS A MEASUREMENT, NOT A CHOICE
+
+Workspace: `PARKTREE = /shared/xv6iris-3-parktree` (a full tree copy taken
+from the flip workspace at 20:43; its `.v` set for the park lane is
+byte-identical to the fliptree's at fork, verified by md5).  All numbers
+below are from the GCP VM (`gcp-rocq/run-on-gcp` from `PARKTREE`, its own
+remote mirror, always under `flock /tmp/claude-gcp.lock`).
+
+**BASELINE, cold full build (round 0): RED 9** —
+`ProofKernelvec`, `ProofMain`, `ProofSwtch`, `ProofVirtioDiskIntr`,
+`ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`, `UtResFits`, `WpSconfLock`.
+`UsertrapRes.ut_res_bare_park` was the tree's one `Abort`; `UtResFits` was
+red on it; `ProofSwtch` was red on the DELETED `TsoCtxShim.hart_view_lb_any`.
+
+**`UtResFits` IS GREEN.  THE ABORT IS DEAD.**  `UsertrapRes`, `ParkCap`,
+`UtResFits`, `ProofKforkB5`, `ProofUsertrap`, `ProofUservec`, `SpecForkret`,
+`SpecForkretParkPaid` all compile.  No `Admitted`, no `Abort`, no new
+`Axiom`, no kit file touched.
+
+#### THE THREE-WAY SPLIT LANDS — WITH FOUR MORE ROWS ON THE RESUMER'S SIDE
+
+`tso-port.md` §0.12′'s rule ports verbatim: *pure facts and CONTEXT-FREE
+resources ride the record; ξ-DEPENDENT resources are supplied by the
+RESUMER at its own context; ξ-INDEXED DISCARDED CELLS ride the record only
+to be consumed into PURE EQUATIONS against the resumer's own copies through
+`TsoCtx.ctx_word_pointsto_agree`.*  What differs is the VERDICT the rule
+returns on four rows, and every one of the four is measured on this tree
+rather than read off main:
+
+| row | main | HERE | why |
+|---|---|---|---|
+| `is_tickslock` | record (closed term) | **`park_globals`** | `ticks_res` is `∃t, a_ticks ↦₄ t` and `↦₄` IS the ctx byte tower (A6.55); `<{ ticks_res }>` is a constant embedding of a ξ-INDEXED payload |
+| the nextpid lock | record | **`park_globals`** | same, `nextpid_res` |
+| `is_ftable` | record (closed since §0.16′) | **`park_globals`** | the off-borrow ruling + `ftable_res`'s λ-conversion have not landed here |
+| the WAIT LOCK | record (closed) | **`park_globals`** | **`WaitInv.wait_res` looks ξ-free at its section head and is not**: `parents_own` holds `p_parent (proc_addr j) ↦₈ v` for every slot.  MEASURED by an `iExact` failure, not by reading |
+
+So `park_globals` here is `(ξ γs γw γft γf γtl)` and SEVEN rows deep
+(`procs_inv`, the wait lock, `is_ftable`, `console_caps`, `console_ready`,
+`is_tickslock`, the nextpid lock, the `initproc` cell).  `ut_park_caps` keeps
+three pure ties (`fclose_ties`, `un_pr`, and `⌜un_dqi N = DfracDiscarded⌝`),
+three genuinely closed resources (`procs_avail None`, `wire_inv`, `kmap_at`)
+and the three pins (`is_kstack`, `disk_geom`, `initproc ↦₈□`).
+`park_own N = bslots 3` — context-FREE, as ruled.
+
+> **THE RULE THAT DECIDES A ROW IS ONE GREP, AND THE HEADER LIES.**  A
+> payload is ξ-dependent iff its LEAVES hold a cell outside the deliberately
+> raw tiers — and a `Context {XI : CurCtx}` at a section head says nothing
+> either way (`wait_res`'s binder looked phantom and was not; `procs_avail`
+> has no binder and is genuinely closed).  Read the leaves.  The cheap
+> instrument is an `iExact` at the two contexts: it fails FAST when the two
+> sides differ under `is_lock`'s payload argument.
+
+#### THE HONEST RECEIPTS: WHAT MAIN CONJURES AND WHAT THIS PORT SUBSTITUTES
+
+Main's park landing needs no `hart_view_lb` at all inside the park itself,
+so there is exactly ONE receipt substitution in this tranche and it is a
+NEGATIVE result, recorded below (`ProofSwtch`).  What the port DID have to
+mint honestly is a persistence law, not a receipt:
+
+- **`ProofUserinit`'s `initproc` seal.**  Main crosses to the raw fact with
+  `TsoCtxShim.ctx_word_to_mem`, seals it with `word_pointsto_persist`, and
+  crosses back.  **Both shim lemmas are GONE at the machine flip**, so the
+  port uses `TsoCtx.ctx_word_pointsto_persist` — the ctx tower's own law —
+  directly.  **KIT GAP, FLAGGED:** the DISCARDED ctx word has no
+  `Persistent` instance, `iMod … as "#H"` refuses it, and — MEASURED — an
+  equivalent `Local Instance` **is provable by `apply _` in a probe file and
+  still does not fire at the use site**.  The port ships an explicit
+  duplication wand (`uin_ctx_word_discarded_dup`, unfold + `iDestruct … as
+  "#H"` at the byte big-op) inside `ProofUserinit`.  **The right home is
+  `TsoCtx.v`'s own `Section ctx_word`, beside `ctx_word_pointsto_persist`,
+  as a `Global Instance`; it is NOT added here because `TsoCtx.v` is under
+  the whole tree and is the parallel lane's live file.**
+
+#### THE ∀-PARKER `ParkCap` LANDS, AND ITS CONCLUSION NAMES `ξp`
+
+`park_cap`/`park_chan`/`park_token`/`park_token_F` name **no context at
+all**; `park_cap` quantifies `∀ (hp : CpuId) (ξp : CtxId)` and borrows the
+parker's `own_context (CID := hp) ξp`, handed straight back
+(§0.16′ step (ii)'s recorded shape, and the hart is bound BECAUSE
+`own_context` is hart-ambient).  `park_token_F_contractive` closes with
+`solve_contractive` unchanged, with the `▷` moved onto the CLOSER ROW alone.
+
+**ONE DIVERGENCE FROM MAIN'S SHAPE, and it is forced:** `park_cap`'s
+conclusion is `▷ proc_ctx (XI := ξp) γs pa`.  On main `proc_ctx` is a CLOSED
+TERM because §0.15′'s `XIp` reshape put `valid_context`'s rows at the
+record's own existential identity; that reshape has **not** landed here, so
+`proc_ctx` is ξ-indexed and the record a parker builds is at the PARKER's ξ.
+Naming it keeps `park_token` ξ-FREE all the same — which is the only
+property `UtResFits` needs.  **Drop the annotation when the reshape lands.**
+
+#### THE PARK'S SECOND CROSSING IS REFUTED HERE, AND IT IS THE M3 SWEEP
+
+`ProofForkretPark.forkret_park_paid` is brought to the new SHAPE (token
+borrowed and returned, package no longer under a `▷`, the closer taking
+`park_globals Xc`) and **still does not close**, at
+`FR.wp_forkret`'s `sie_cap_gpr` premise.  The measurement is unambiguous and
+it is §0.13′'s wall, not a detail:
+
+> `SwtchCtx.valid_context_pre` in this tree ALREADY hands the resume wand's
+> `sie_cap_gpr` at the record's own `XIp` — and `forkret_park_paid`
+> instantiates `XIp := XIc`, the freshly minted parked context.  **A
+> thread's ambient context is fixed by the `sie_cap_gpr` it holds**, so
+> forkret runs at `XIc` and needs `procs_inv` / `park_globals` /
+> `proc_priv` / `is_kstack` THERE.  The only law that moves them is
+> `TsoCtx.ctx_deposit`, whose obligation is `CtxMorph` per row — and here
+> four of the rows are constant embeddings `<{ P }>` of ξ-INDEXED payloads
+> (`proc_lock_res`, `ftable_res`, `ticks_res`, `nextpid_res`) plus
+> `proc_priv → first_tok → bio_ctx → buf_escrow`, an `inv` over a
+> ξ-indexed body — **the ONE shape `CtxMorph` cannot cross**.
+
+**So the park's second crossing in THIS tree is gated on exactly what main
+paid for it: the M3 λ-payload sweep (§0.14′ step 3 / §0.16′ step (i)) and
+the bcache escrow's parked-record form (§0.17′ member 1).**  None of that is
+in this workspace.  `park_globals_morph` is therefore deliberately ABSENT
+from `UsertrapRes.v` (main has it), with the reason in the file.
+
+#### `ProofSwtch`: THE RECEIPT HAS NO PRODUCER YET, AND THE DESIGN GAP IS REAL
+
+`ProofSwtch.v:157` calls the deleted `hart_view_lb_any` to feed
+`ctx_resume XIt Tt Tt`.  **It cannot be minted honestly at that site, and
+the reason is structural**, checked against all four candidate sources the
+brief named:
+
+1. **`hart_view_lb_get` (the interp mint) — NO SITE.**  The call is under
+   `iApply fupd_wp`, a pure ghost step BEFORE the leaf, so `tso_interp_at`
+   is not in hand.  A6.68's rule (`own_context` outside a leaf,
+   `tso_interp_at` inside one) cuts exactly here.
+2. **`SpecAcquire`'s export — TOO WEAK.**  It gives `∃ K, hart_view_lb K`
+   with `K` unconstrained; `ctx_resume` needs `Tt ≤ K` and nothing relates
+   an ∃-bound `K` to the record's stamp.
+3. **`view_lb_0` — WRONG RECORD.**  It pays `cpu_ctx_free` (stamp 0 at
+   boot) and `SchedCtx.cpu_ctx_free`'s pattern of carrying `hart_view_lb T`
+   beside the token; a `valid_context` record is MIGRATABLE and names no
+   hart, so it cannot carry a hart-indexed receipt.
+4. **`absorb_lb`'s stable pair — RIGHT LAW, MISSING PRODUCER.**  Its premise
+   `hart_view_lb K ∗ ⌜T ≤ K⌝` is exactly what is wanted; the producer is the
+   p->lock acquire, i.e. `ProofAcquire`, which sits BEHIND `WpSconfLock` in
+   the DAG and is red.
+
+> **THE DESIGN ITEM, STATED ONCE.  A migratable parked record cannot carry
+> its own view receipt, so the resumer must supply one — and to supply it
+> the resumer must be able to NAME the record's stamp.  Today `Tp` is
+> ∃-bound inside `valid_context_pre`.  The fix is therefore not a lemma but
+> a statement change: publish the stamp (make `Tp` reachable at the resume
+> site, e.g. as an argument of `proc_ctx` / a row of the p->lock payload),
+> and give `wp_swtch_sconf` the receipt as a premise threaded from the
+> scheduler's acquire.  Both halves belong to the M2 receipt-threading unit
+> together with `ProofAcquire`/`ProofRelease`'s `ctx_dom_sc` sites; neither
+> is payable while that cone is closed.**  `ProofSwtch` is left RED at that
+> one line, unchanged, rather than half-edited.
+
+Consequently the §0.15′/§0.17′ `SwtchCtx` reshape was NOT written: it moves
+`valid_context`'s `P` to `CtxId -d> …` and cascades into `SpecSwtch`,
+`ProofSched` and `ProofScheduler` — three files OUTSIDE this lane's set, two
+of them in the closed cone — and it buys nothing until the receipt above
+exists.  **Characterize-and-stop, per the brief.**
+
+#### AND THE ABORT WAS HIDING THREE FILES, WHICH IS §0.12′'s LESSON AGAIN
+
+With `UtResFits` green, `make` reached five files for the FIRST TIME in this
+workspace.  Two are this port's (`ProofForkretPark`, above; `ProofKforkB5`,
+now green).  **Three are PRE-EXISTING flip debt that no build had ever
+seen:**
+
+- `ProofUserinit.v:470` — `word_pointsto_persist` applied to a flipped
+  `↦₈` (fixed here, see the kit-gap flag above);
+- `ProofForkret.v:161` — `fkr_kpt_of_res`: `iFrame "Hk"` no longer discharges
+  `kpt_inv r` out of `tlb_res_pt`;
+- `ProofUserretClosed.v:275` — a 17-cell `↦ₚ₈` trapframe specialization.
+
+Neither of the last two is a park problem and neither is touched.  **NOTE
+FOR THE NEXT LANE: `ProofForkret` still owes the mechanical threading of
+`SpecForkret`'s new premises (`γw γft γtl`, the `park_globals cur_ctx` row,
+and the closer's extra argument at its two application sites in `fkr_tail`
+and `fkr_boot`).**  It was left untouched on purpose: half-threading a
+1900-line proof that is red for an unrelated reason makes the merge worse,
+not better.
+
+#### CLOSING NUMBER, AND IT IS AN INCREMENTAL ONE
+
+**1099 of 1296 `.vo`, RED 11**, two consecutive incremental `-k` rounds at
+the same number (the second recompiles exactly the eleven red files and
+nothing else): `ProofForkret`, `ProofForkretPark`, `ProofKernelvec`,
+`ProofMain`, `ProofSwtch`, `ProofUserretClosed`, `ProofVirtioDiskIntr`,
+`ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`, `WpSconfLock`.  Baseline was
+RED 9 on the same tree.
+
+**THE COUNT WENT UP BY TWO AND THE TREE WENT FORWARD, which is A6.24's rule
+met again.**  `UtResFits` left the red list; that unblocked its five-file
+cone, which had never been compiled in this workspace at all.  Of the five,
+`ProofKforkB5` and `ProofUserinit` are GREEN, `ProofForkretPark` is this
+port's named frontier, and `ProofForkret` / `ProofUserretClosed` are
+inherited flip debt the `Abort` had been hiding.  Net: −1 fixed, +3
+revealed, of which 2 were never this lane's.
+
+**HONEST QUALIFIER: this is not a clean number** — the base is the round-0
+cold full build of this workspace plus eight incrementals; no `rm -f *.vo`
+round was run after the port, and A6.38's rule says only a clean rebuild
+counts after a machine change (none happened here).
+
+**VALIDATED (green, compiled from source this tranche):** `UsertrapRes.v`,
+`ParkCap.v`, `UtResFits.v`, `SpecForkret.v`, `SpecForkretParkPaid.v`,
+`ProofUserinit.v`, `ProofKforkB5.v`, `ProofUsertrap.v`, `ProofUservec.v`.
+**UNVALIDATED (edited, red, named):** `ProofForkretPark.v` (the second
+crossing, refuted above) and `ProofUserretClosed.v` (echo edit only; the file
+is red on pre-existing debt at line 275).  **NOT EDITED, characterized:**
+`ProofSwtch.v`, `SwtchCtx.v`, `SchedCtx.v`, `ProofForkret.v`.
+
+**DIFF MANIFEST:** `/shared/xv6iris-3-parktree/PARK-PORT.diff`, a unified
+diff of the port's files against the fliptree snapshot they were forked
+from (md5-verified identical at fork for every file in the set).
