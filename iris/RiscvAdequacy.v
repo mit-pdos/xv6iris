@@ -978,6 +978,56 @@ Section power.
      crash_inv ∗
      gen_born gen ∗ gen_started gen ∗ era_registered gen HE)%I.
 
+  (* THE LENT RESOURCE COMES BACK OUT (durable-disk BT-3).  [Rb]'s conjunct
+     is the client's, so the client must be able to SPEND it before it hands
+     the rest of the mint on -- the boot's own transport reads the epoch off
+     it and then calls the shared allocator, which never sees it again.
+     Everything else crosses unchanged, which is why the residue is stated
+     at [Rb := emp] rather than through a wand: nothing puts anything back.
+
+     PURE REASSOCIATION, hypothesis by hypothesis.  A bare [iFrame] here
+     would resolve its instances up to delta against
+     [disk_img_bytes]'s [big_sepL] (durable-notes, "[iFrame] resolves its
+     instances up to delta"), so every conjunct is placed BY NAME. *)
+  Lemma power_boot_res_lend (HE : riscvEraGS) (gen : nat)
+      (D : CPU -> gset register) (nproc ndisk : nat)
+      (Mof : (Z -> bv 8) -> log_mirror)
+      (Rb : (Z -> bv 8) -> iProp Σ) (g' : gstate) :
+    power_boot_res HE gen D nproc ndisk Mof Rb g' ⊢
+      Rb (v_disk (g'.(gdev).(dvirtio))) ∗
+      power_boot_res HE gen D nproc ndisk Mof (fun _ => emp)%I g'.
+  Proof.
+    rewrite /power_boot_res.
+    iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12 &
+              H13 & H14 & H15 & H16 & H17 & H18 & H19 & HRb & H21 & H22 &
+              H23 & H24)".
+    iSplitL "HRb"; [ iExact "HRb" | ].
+    iSplitL "H1"; [ iExact "H1" | ].
+    iSplitL "H2"; [ iExact "H2" | ].
+    iSplitL "H3"; [ iExact "H3" | ].
+    iSplitL "H4"; [ iExact "H4" | ].
+    iSplitL "H5"; [ iExact "H5" | ].
+    iSplitL "H6"; [ iExact "H6" | ].
+    iSplitL "H7"; [ iExact "H7" | ].
+    iSplitL "H8"; [ iExact "H8" | ].
+    iSplitL "H9"; [ iExact "H9" | ].
+    iSplitL "H10"; [ iExact "H10" | ].
+    iSplitL "H11"; [ iExact "H11" | ].
+    iSplitL "H12"; [ iExact "H12" | ].
+    iSplitL "H13"; [ iExact "H13" | ].
+    iSplitL "H14"; [ iExact "H14" | ].
+    iSplitL "H15"; [ iExact "H15" | ].
+    iSplitL "H16"; [ iExact "H16" | ].
+    iSplitL "H17"; [ iExact "H17" | ].
+    iSplitL "H18"; [ iExact "H18" | ].
+    iSplitL "H19"; [ iExact "H19" | ].
+    iSplitR; [ done | ].
+    iSplitL "H21"; [ iExact "H21" | ].
+    iSplitL "H22"; [ iExact "H22" | ].
+    iSplitL "H23"; [ iExact "H23" | ].
+    iExact "H24".
+  Qed.
+
   Lemma wp_power_loop (D : CPU -> gset register) (nproc ndisk : nat)
       (* THE CLIENT'S PURE PROJECTION OF THE CRASH PREDICATE (stage H0,
          claude-notes/projects/durable-disk.md).  A crash predicate that is a

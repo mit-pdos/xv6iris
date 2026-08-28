@@ -839,12 +839,17 @@ Section SnapMint.
          [BioInv.pool_blk] honest -- and the difference comes out as the
          WAL's exception handle.  At a clean header [Xexc = ∅] and [Pb] IS
          the raw home content. ---- *)
+      (* ---- THE EPOCH'S OWN GHOST NAMES (durable-disk BT-3).  The mint
+         takes the DURABLE SNAPSHOT ITSELF, unpacked at the state it stands
+         at, and READS [snap_ok] off it ([FsDurSnap.fs_snap_read_ok]).
+         Unpacked rather than [P_dur], because [P_dur] closes the state
+         existentially and this lemma's whole postcondition -- every
+         configuration tie -- is spelled at [S]: the caller binds [S] out of
+         the resource and hands both down together, which is what makes the
+         boot's state the epoch's own rather than a second one that would
+         need a determinacy theorem to identify. ---- *)
+      (gsn gln gtn : gname)
       (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
-    (* ---- THE DURABLE SNAPSHOT, and it is the whole of the file system's
-       side: the committed map IS what the machine would recover to, and it
-       is the encoding of the abstract state [S]. ---- *)
-    snap_ok S (fs_restrict Pb
-                 (fs_home_set cov (sb_logstart (fss_sb S)))) ->
     (forall b : Z, length (Pb b) = BSIZE) ->
     Xexc ⊆ fs_home_set cov (sb_logstart (fss_sb S)) ->
     (1 : Z) ∉ Xexc ->
@@ -863,7 +868,16 @@ Section SnapMint.
        [FsDurSnap.snap_cov_window]. *)
     (forall b : Z, 1 <= b < fs_data_start (fss_sb S) -> b ∈ cov) ->
     disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
-    bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
+    bslots_auth -∗ bslots BSLOTS_FS -∗
+    (* ---- THE DURABLE SNAPSHOT, AS A RESOURCE, and it is the whole of the
+       file system's side: the committed map IS what the machine would
+       recover to, and it is the encoding of the abstract state [S].  What
+       was a pure [snap_ok] premise until durable-disk BT-3 is now READ off
+       this ([fs_snap_read_ok]), so the tie is derived at every era and
+       carried by nothing. ---- *)
+    fs_snap (FsDurBytes.snap_gamma gsn gln gtn) gsn
+      (fs_restrict Pb (fs_home_set cov (sb_logstart (fss_sb S)))) S
+    ={E}=∗
     ∃ (ICFG : icfg) (FSC : fscfg),
       ⌜icfg_dev = ROOTDEV⌝ ∗ ⌜icfg_nib = nib⌝ ∗
       ⌜icfg_ist = sb_inodestart (fss_sb S)⌝ ∗
@@ -875,10 +889,23 @@ Section SnapMint.
       fs_kit_icache ICFG FSC ∗
       fs_kit_fsinit_ghost ICFG FSC (fs_blocks dk) (snap_spent S nib) Pb Xexc.
   Proof.
-    intros Hok HlPb HXsub HX1 Hagr Hnibeq Hnib32 Hcovin Hcovmeta.
+    intros HlPb HXsub HX1 Hagr Hnibeq Hnib32 Hcovin Hcovmeta.
+    (* the WAL's own row (b) at the boot's ledger: every block of the
+       committed view is a whole block, which here is [HlPb] read through
+       [fs_restrict] ([FsCrash.fs_recovery_blocks_full] is the same fact at
+       the caller). *)
+    assert (Hdf : FsDurRead.dblk_full (fs_restrict Pb
+                    (fs_home_set cov (sb_logstart (fss_sb S))))).
+    { intros b bs Hbs. apply fs_restrict_lookup_Some in Hbs as [_ ->].
+      exact (HlPb b). }
+    iIntros "Hdisk Hsa Hsf Hsnap".
+    (* THE TIE IS A READING (durable-disk BT-3, plan section 2's "the
+       epoch's IDENTITY is a resource"): [snap_ok] is no longer handed in
+       anywhere on the boot side -- it comes off the epoch's own resources,
+       exactly as the commit's readers take it. *)
+    iDestruct (fs_snap_read_ok _ _ _ _ _ Hdf with "Hsnap") as %Hok.
     pose proof (sk_bytes Hok) as Hb.
     pose proof (sk_local Hok) as Hloc.
-    iIntros "Hdisk Hsa Hsf".
     (* ---- 1. the log's four gnames, at their genesis values ---------- *)
     iMod log_ghost_alloc as (γlog) "Hlogtok".
     (* ---- 2. THE INODE CACHE'S RECORD -------------------------------- *)
