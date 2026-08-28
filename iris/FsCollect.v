@@ -445,6 +445,68 @@ Section Collect.
   Qed.
 
   (* ==================================================================== *)
+  (*  ...AND WHAT LETS THE FREE POOL BE PUT BACK (durable-disk EV-Y)       *)
+  (*                                                                      *)
+  (*  [FsStateBitmap.free_pool_shed] is ONE DIRECTION, and the reason is   *)
+  (*  real: a free row hides its bytes under an existential, so two halves *)
+  (*  of one row do not rejoin on their own.  They rejoin against the      *)
+  (*  BYTE AUTHORITY, which the collection holds throughout: [col_blk]     *)
+  (*  reads the committed view's value at ANY share, so both halves name   *)
+  (*  the same list and [FsStateDefs.blk_owned_split_34] closes.  This is  *)
+  (*  what lets the accessor hand the transport a pool at three quarters   *)
+  (*  and still give [BitmapInv.bitmap_inv] its whole one back.            *)
+  (* ==================================================================== *)
+  Lemma col_pool_join_list γfs Lb C home (u : gset Z) (l : list Z) :
+    col_auth γfs Lb C home -∗
+    ([∗ list] b ∈ l, pool_elt (gamma_q (fs_gamma_L γfs) (DfracOwn (3/4))) u b) -∗
+    ([∗ list] b ∈ l, pool_elt (gamma_q (fs_gamma_L γfs) (DfracOwn (1/4))) u b) -∗
+      col_auth γfs Lb C home
+      ∗ [∗ list] b ∈ l, pool_elt (fs_gamma_L γfs) u b.
+  Proof.
+    induction l as [| b l IH]; iIntros "Hau H1 H2".
+    - iFrame "Hau". done.
+    - rewrite !big_sepL_cons.
+      iDestruct "H1" as "[Hb1 H1]". iDestruct "H2" as "[Hb2 H2]".
+      iDestruct (IH with "Hau H1 H2") as "[Hau Hl]".
+      iFrame "Hl".
+      rewrite /pool_elt. case_bool_decide as Hu; [iFrame "Hau" |].
+      iDestruct "Hb1" as (bs1) "Hb1". iDestruct "Hb2" as (bs2) "Hb2".
+      rewrite !gamma_q_blk_owned.
+      iDestruct (col_blk γfs Lb C home (DfracOwn (3/4)) b bs1
+                   with "Hau Hb1") as %[_ Hv1].
+      iDestruct (col_blk γfs Lb C home (DfracOwn (1/4)) b bs2
+                   with "Hau Hb2") as %[_ Hv2].
+      assert (Heq : bs1 = bs2) by (apply (inj Some); rewrite -Hv1; exact Hv2).
+      subst bs2.
+      iFrame "Hau". iExists bs1.
+      rewrite (blk_owned_split_34 (fs_gamma_L γfs) (fs_gamma_L_frac γfs) b bs1).
+      iFrame "Hb1 Hb2".
+  Qed.
+
+  (* the block rejoin the metadata objects go back through: the byte list
+     is NAMED here, so no agreement is needed and
+     [FsStateDefs.blk_owned_split_34] is an [⊣⊢]. *)
+  Lemma blk_owned_join_34 (Γ : fs_view_names Σ) (Hfr : phi_frac Γ)
+      (b : Z) (bs : list (bv 8)) :
+    blk_owned (gamma_q Γ (DfracOwn (3/4))) b bs -∗
+    blk_owned (gamma_q Γ (DfracOwn (1/4))) b bs -∗
+    blk_owned Γ b bs.
+  Proof.
+    rewrite !gamma_q_blk_owned (blk_owned_split_34 Γ Hfr b bs).
+    iIntros "H1 H2". iFrame "H1 H2".
+  Qed.
+
+  Lemma col_free_pool_join γfs Lb C home (nb : Z) (u : gset Z) :
+    col_auth γfs Lb C home -∗
+    free_pool (gamma_q (fs_gamma_L γfs) (DfracOwn (3/4))) nb u -∗
+    free_pool (gamma_q (fs_gamma_L γfs) (DfracOwn (1/4))) nb u -∗
+      col_auth γfs Lb C home ∗ free_pool (fs_gamma_L γfs) nb u.
+  Proof.
+    rewrite /free_pool.
+    iApply (col_pool_join_list γfs Lb C home u (seqZ 0 nb)).
+  Qed.
+
+  (* ==================================================================== *)
   (*  2.  THE COLLECTED HAND                                               *)
   (* ==================================================================== *)
 
@@ -826,6 +888,43 @@ Section Collect.
     iFrame "Hrec Hd".
   Qed.
 
+  (* ...AND THE SAME STEP AS AN ACCESSOR (durable-disk EV-Y).  The record
+     comes down to the collection's uniform share and the quarter is KEPT
+     rather than dropped ([FsStateInode.rec_owned_at_split_34] is an
+     [⊣⊢], so it goes straight back); the era's two residue pieces -- the
+     record PROXY [InodeRegion.dinode_at] and the abstract fragment
+     [FsState.top_frag_q] -- ride the closing wand's frame, which is what
+     lets the region and [InodeRegion.ftop_inv] be closed with the bodies
+     they were opened with. *)
+  Lemma col_bundle_phi_acc γfs γi (sb : fs_sb) (i : Z) (n : fs_node) :
+    rec_owned_at (fs_gamma_L γfs) (sb_inodestart sb) i (fn_rec n) -∗
+    col_bundle γfs γi i n -∗
+      inode_phi (gamma_q (fs_gamma_L γfs) (DfracOwn (3/4))) sb i n
+      ∗ (inode_phi (gamma_q (fs_gamma_L γfs) (DfracOwn (3/4))) sb i n -∗
+           rec_owned_at (fs_gamma_L γfs) (sb_inodestart sb) i (fn_rec n)
+           ∗ col_bundle γfs γi i n).
+  Proof.
+    iIntros "Hrec Hb".
+    iAssert (⌜0 <= i < 2 ^ 32⌝ ∧ col_bundle γfs γi i n)%I
+      with "[Hb]" as "[%Hi Hb]".
+    { iSplit; [iApply (col_bundle_inum with "Hb") | iExact "Hb"]. }
+    iDestruct "Hb" as (inum Hbv) "H".
+    rewrite /inode_owned_era_q.
+    iDestruct "H" as "(Hd & Hdat & Htf & %Hloc)".
+    iDestruct (rec_owned_at_shed_to _ (fs_gamma_L_frac γfs) with "Hrec")
+      as "[Hr34 Hr14]".
+    rewrite !gamma_q_inode_phi
+            (rec_owned_sb_q (fs_gamma_L γfs) (DfracOwn (3/4)) sb i (fn_rec n) Hi).
+    iSplitL "Hr34 Hdat"; [iFrame "Hr34 Hdat" |].
+    iIntros "[Hr34 Hdat]".
+    iSplitL "Hr34 Hr14".
+    { rewrite (rec_owned_at_split_34 (fs_gamma_L γfs) (fs_gamma_L_frac γfs)).
+      iFrame "Hr34 Hr14". }
+    iExists inum. iSplitR; [by iPureIntro |].
+    rewrite /inode_owned_era_q. iFrame "Hd Hdat Htf". by iPureIntro.
+  Qed.
+
+
   (* ==================================================================== *)
   (*  7.  A FREE INUM'S BUNDLE -- SUPPLIER (D) (durable-disk lane C-3c)    *)
   (* ==================================================================== *)
@@ -1045,6 +1144,110 @@ Section Collect.
   Qed.
 
   (* ==================================================================== *)
+  (*  ...AND THE SAME DOOR WITH THE LINK AUTHORITY OUT (durable-disk EV-Y) *)
+  (*                                                                      *)
+  (*  THE ACCESSOR THE COLLECTION NEEDS.  [InodeRegion.ireg_lnk] is        *)
+  (*  [ireg_slot]'s LAST conjunct and the collection needs it OUT beside   *)
+  (*  the bundle -- it is what [FsState.fs_links] is built from, hence     *)
+  (*  half of the [FsState.fs_state] the transport takes.  Splitting it    *)
+  (*  off first ([col_slot_lnk_acc]) closes the arm inside the wand, so    *)
+  (*  the two cannot be composed: the pair has to come out of ONE          *)
+  (*  destructuring, which is this.  Everything else is                    *)
+  (*  [col_region_slot_acc] verbatim.                                      *)
+  (* ==================================================================== *)
+  Lemma col_region_slot_lnk_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ireg_slot γfs γi (bv_unsigned inum) d -∗
+      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ ireg_lnk γfs (bv_unsigned inum) d
+      ∗ ((imark γi (bv_unsigned inum)
+          ∗ (imark γi (bv_unsigned inum)
+             -∗ ireg_lnk γfs (bv_unsigned inum) d
+             -∗ ireg_slot γfs γi (bv_unsigned inum) d))
+         ∨ (⌜bv_unsigned (di_type d) = 0⌝
+            ∗ inode_owned_era γfs γi inum (free_node d)
+            ∗ (inode_owned_era γfs γi inum (free_node d)
+               -∗ ireg_lnk γfs (bv_unsigned inum) d
+               -∗ ireg_slot γfs γi (bv_unsigned inum) d))).
+  Proof.
+    iIntros "Hauth Hslot".
+    iDestruct "Hslot" as "[(%rl & %cl & %fz & %cn & Hla & %Hlok &
+                            #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp &
+                            Harm) [Hep Hlnk]]".
+    iDestruct (ireg_shp_split with "Hfdisj") as "[Hfsh Hcpin]".
+    iDestruct (ireg_cpin_no_ops cl fz d Hclm with "Hauth Hcpin") as %Hc0.
+    iDestruct (ireg_shp_intro cl fz with "Hfsh Hcpin") as "Hfdisj".
+    iFrame "Hauth Hlnk".
+    iDestruct "Harm" as "[[Harm Hrf] | Hpend]".
+    - iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk]]".
+      + assert (Ht0 : bv_unsigned (di_type d) = 0)
+          by exact (ireg_in_quiesce cl d Hc0 Hin1).
+        assert (Hnl : bv_unsigned (di_nlink d) = 0)
+          by exact (proj1 Hlok Ht0).
+        iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Ht0 with "Hpk")
+          as "[%Hb Htop]".
+        iRight. iSplitR; [iPureIntro; exact Ht0 |].
+        iSplitL "Hfr Htop".
+        { iApply (inode_owned_era_free γfs γi inum d Hb Hnl Ht0
+                    with "Hfr Htop"). }
+        iIntros "Hown Hlnk".
+        iDestruct "Hown" as "(Hfr & _ & Htop & _)".
+        iDestruct (ireg_top_park_free γfs (bv_unsigned inum) d Hb with "Htop")
+          as "Hpk".
+        iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d cl rl fz cn
+                  Hlok Hclm Hfrz
+                  with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp [Hfr Hpk Hrf]").
+        iLeft. iSplitR "Hrf"; [| iExact "Hrf"].
+        iLeft. iSplitR; [iPureIntro; exact Hin1 |]. iFrame "Hfr Hpk".
+      + iLeft. iFrame "Hmk". iIntros "Hmk Hlnk".
+        iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d cl rl fz cn
+                  Hlok Hclm Hfrz
+                  with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp [Hmk Hrf]").
+        iLeft. iSplitR "Hrf"; [| iExact "Hrf"].
+        iRight. iSplitR; [iPureIntro; exact Ht2 |]. iExact "Hmk".
+    - iDestruct "Hpend" as "(%Htp & Hfr & Hrh & Hrp & Hpk)".
+      assert (Hnl : bv_unsigned (di_nlink d) = 0)
+        by exact (proj1 Hlok Htp).
+      iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Htp with "Hpk")
+        as "[%Hb Htop]".
+      iRight. iSplitR; [iPureIntro; exact Htp |].
+      iSplitL "Hfr Htop".
+      { iApply (inode_owned_era_free γfs γi inum d Hb Hnl Htp
+                  with "Hfr Htop"). }
+      iIntros "Hown Hlnk".
+      iDestruct "Hown" as "(Hfr & _ & Htop & _)".
+      iDestruct (ireg_top_park_free γfs (bv_unsigned inum) d Hb with "Htop")
+        as "Hpk".
+      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d cl rl fz cn
+                Hlok Hclm Hfrz
+                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp [Hfr Hrh Hrp Hpk]").
+      iRight. iSplitR; [iPureIntro; exact Htp |]. iFrame "Hfr Hrh Hrp Hpk".
+  Qed.
+
+  (* ...and the marker-arm reading of it, [col_free_slot_acc]'s twin. *)
+  Lemma col_free_slot_lnk_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    imark γi (bv_unsigned inum) -∗
+    ireg_slot γfs γi (bv_unsigned inum) d -∗
+      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ ireg_lnk γfs (bv_unsigned inum) d
+      ∗ ⌜bv_unsigned (di_type d) = 0⌝
+      ∗ imark γi (bv_unsigned inum)
+      ∗ inode_owned_era γfs γi inum (free_node d)
+      ∗ (inode_owned_era γfs γi inum (free_node d)
+         -∗ ireg_lnk γfs (bv_unsigned inum) d
+         -∗ ireg_slot γfs γi (bv_unsigned inum) d).
+  Proof.
+    iIntros "Hauth Hmk Hslot".
+    iDestruct (col_region_slot_lnk_acc γfs γi inum d with "Hauth Hslot")
+      as "(Hauth & Hlnk & Harm)".
+    iFrame "Hauth Hlnk".
+    iDestruct "Harm" as "[[Hmk' _] | (%Ht0 & Hown & Hback)]".
+    { iExFalso. iApply (imark_excl with "Hmk Hmk'"). }
+    iSplitR; [iPureIntro; exact Ht0 |]. iFrame "Hmk Hown Hback".
+  Qed.
+
+  (* ==================================================================== *)
   (*  THE DOOR THE ASSEMBLY CALLS AT EVERY REGION INUM                     *)
   (*  (durable-disk C-7, and it is what (G) makes statable)                *)
   (*                                                                      *)
@@ -1216,6 +1419,63 @@ Section Collect.
     iExact "Hla".
   Qed.
 
+  (* ...AND THE PACK IS REVERSIBLE (durable-disk EV-Y).  The collection
+     hands [FsState.fs_links] to the transport inside [FsState.fs_state]
+     and takes it back unchanged, so what it owes the region afterwards is
+     [InodeRegion.ireg_lnk] again -- the authority and the root's
+     keep-alive at the SAME type value.  [FsStateInode.inode_link_iff] is
+     an [⊣⊢], so the authority comes straight back; the value is pinned by
+     [FsStateLink.link_auth_tok_agree] at the root, where the keep-alive is
+     a real token, and is unconstrained everywhere else, where it is [emp].
+     The [kv] rides OUTSIDE the closing wand so the wand knows it. *)
+  Lemma col_link_of_acc γfs (i : Z) (n : fs_node) (d : dinode) :
+    fn_rec n = d ->
+    ireg_lnk γfs i d -∗
+    ent_toks_x (fs_gamma_L γfs) i n -∗
+      fs_link_node (fs_link γfs) i n
+      ∗ (∃ kv : ity, ireg_keep γfs i kv)
+      ∗ (fs_link_node (fs_link γfs) i n -∗ (∃ kv : ity, ireg_keep γfs i kv) -∗
+           ireg_lnk γfs i d ∗ ent_toks_x (fs_gamma_L γfs) i n).
+  Proof.
+    intros Hrec.
+    iIntros "Hlnk Hte".
+    iDestruct "Hlnk" as (v) "(%Hok & Hla & Hkp)".
+    assert (Hdty : ireg_dir_ty = DirView.T_DIR_z)
+      by (vm_compute; reflexivity).
+    assert (Hity : forall w : ity, ireg_reg_ok (bv_unsigned (di_type d)) w
+                                   <-> fn_ity_ok n w).
+    { intros [| k]; rewrite /fn_ity_ok /ireg_reg_ok /fn_is_dir /fn_type -Hrec
+        Hdty; split.
+      - intros Hx. by apply bool_decide_eq_false_2.
+      - intros Hx. apply bool_decide_eq_false in Hx. exact Hx.
+      - intros Hx. by apply bool_decide_eq_true_2.
+      - intros Hx. apply bool_decide_eq_true in Hx. exact Hx. }
+    assert (Hmul : ireg_mult_at (ireg_nl d) (bv_unsigned (di_type d))
+                   = fn_mult n).
+    { rewrite /ireg_mult_at /ireg_nl /fn_mult /fn_nlink /fn_orphan
+        /fn_is_dir /fn_type -Hrec Hdty //. }
+    iSplitL "Hla Hte".
+    { iApply (inode_link_iff (fs_gamma_L γfs) i n).
+      iSplitL "Hla"; [| iExact "Hte"].
+      iExists v. iSplitR; [iPureIntro; by apply Hity |].
+      rewrite -Hmul. iExact "Hla". }
+    iSplitL "Hkp"; [by iExists v |].
+    iIntros "Hle Hkp". iDestruct "Hkp" as (kv) "Hkp".
+    iAssert ((∃ w, ⌜fn_ity_ok n w⌝
+                   ∗ link_auth (fs_gamma_L γfs) i (fn_mult n) w)
+             ∗ ent_toks_x (fs_gamma_L γfs) i n)%I with "[Hle]" as "[Hla Hte]".
+    { rewrite (inode_link_iff (fs_gamma_L γfs) i n). iExact "Hle". }
+    iFrame "Hte".
+    iDestruct "Hla" as (w) "[%Hw Hla]".
+    rewrite /ireg_lnk /ireg_lnk_at.
+    iExists w. iSplitR; [iPureIntro; by apply Hity |].
+    rewrite Hmul.
+    rewrite /ireg_keep. case_bool_decide as Hr.
+    - iDestruct (link_auth_tok_agree (fs_gamma_L γfs) i (fn_mult n) w kv
+                   with "Hla Hkp") as %[-> _]. iFrame "Hla Hkp".
+    - iFrame "Hla".
+  Qed.
+
   Lemma col_bundle_of_side γfs (γi : gname) (inum : bv 32) (n : fs_node) :
     inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n -∗
     col_bundle γfs γi (bv_unsigned inum) n.
@@ -1323,6 +1583,172 @@ Section Collect.
   Qed.
 
   (* ==================================================================== *)
+  (*  A SUPPLIER'S ROW, WITH ITS OWN WAY BACK (durable-disk EV-Y)           *)
+  (*                                                                      *)
+  (*  [col_side] says WHAT a supplier lends this inum; [col_row] says that *)
+  (*  AND how to give the supplier's own row back.  It is [ic_lend]'s      *)
+  (*  shape -- the frame [F] is existential because the door takes only    *)
+  (*  the piece it collects and the rest of the row travels with the       *)
+  (*  closing wand -- and all three suppliers have it:                     *)
+  (*                                                                      *)
+  (*    - the corpse ledger's marker IS the row ([col_row_mark]);          *)
+  (*    - the pool's ordinary row keeps its ledger halves and, on the      *)
+  (*      alloc arm, the quarter it sheds ([FsCollectAll.ipool_ord_row]);  *)
+  (*    - a live slot's cover keeps the escrow's identity half and         *)
+  (*      [IcacheEscrow.ic_lend]'s own frame                               *)
+  (*      ([FsCollectAll.ic_cover_row]).                                   *)
+  (*                                                                      *)
+  (*  WHY THE PARAMETER AND NOT [col_side] ITSELF: the marker supplier     *)
+  (*  cannot be closed from a [col_side], because the disjunction has      *)
+  (*  forgotten which arm it is.  Parameterising by the row keeps that     *)
+  (*  information where it is still known -- inside the wand the supplier  *)
+  (*  itself built.                                                        *)
+  (* ==================================================================== *)
+  Definition col_row γfs (γi : gname) (inum : bv 32) (Q : iProp Σ) : iProp Σ :=
+    ((∃ F : iProp Σ,
+        imark γi (bv_unsigned inum) ∗ F
+        ∗ (imark γi (bv_unsigned inum) -∗ F -∗ Q))
+     ∨ (∃ (n : fs_node) (F : iProp Σ),
+          ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
+          ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi inum n ∗ F
+          ∗ (ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗ F -∗ Q)))%I.
+
+  (* SEALED for [ic_lend]'s reason verbatim: the closing wand mentions a
+     supplier's whole row, and a bare [iFrame] rebuilding one would unfold
+     its way into it at every one of the collection's inums. *)
+  Global Typeclasses Opaque col_row.
+
+  Lemma col_row_intro_mark γfs (γi : gname) (inum : bv 32) (F Q : iProp Σ) :
+    imark γi (bv_unsigned inum) -∗ F -∗
+    (imark γi (bv_unsigned inum) -∗ F -∗ Q) -∗
+    col_row γfs γi inum Q.
+  Proof.
+    iIntros "Hmk HF Hw". rewrite /col_row. iLeft. iExists F. iFrame.
+  Qed.
+
+  Lemma col_row_intro_leg γfs (γi : gname) (inum : bv 32) (n : fs_node)
+      (F Q : iProp Σ) :
+    node_dir_local (bv_unsigned inum) icfg_nib n ->
+    ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗ F -∗
+    (ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗ F -∗ Q) -∗
+    col_row γfs γi inum Q.
+  Proof.
+    intros Hdl. iIntros "Hleg HF Hw". rewrite /col_row. iRight.
+    iExists n, F. iSplitR; [iPureIntro; exact Hdl |]. iFrame.
+  Qed.
+
+  (* the two structural moves on a row: park more of the supplier beside
+     what it already keeps, and re-read the whole row afterwards.  Together
+     they are how a supplier whose row is a tower ([IcacheEscrow.ipool_ord],
+     a slot's cover) is built out of the arm that carries the bundle. *)
+  Lemma col_row_frame γfs (γi : gname) (inum : bv 32) (Q R : iProp Σ) :
+    col_row γfs γi inum Q -∗ R -∗ col_row γfs γi inum (Q ∗ R).
+  Proof.
+    rewrite /col_row.
+    iIntros "[(%F & Hmk & HF & Hw) | (%n & %F & %Hdl & Hleg & HF & Hw)] HR".
+    - iLeft. iExists (F ∗ R)%I. iFrame "Hmk HF HR".
+      iIntros "Hmk [HF HR]". iFrame "HR". iApply ("Hw" with "Hmk HF").
+    - iRight. iExists n, (F ∗ R)%I.
+      iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hleg HF HR".
+      iIntros "Hleg [HF HR]". iFrame "HR". iApply ("Hw" with "Hleg HF").
+  Qed.
+
+  Lemma col_row_mono γfs (γi : gname) (inum : bv 32) (Q Q' : iProp Σ) :
+    (Q -∗ Q') -∗ col_row γfs γi inum Q -∗ col_row γfs γi inum Q'.
+  Proof.
+    rewrite /col_row.
+    iIntros "Himp [(%F & Hmk & HF & Hw) | (%n & %F & %Hdl & Hleg & HF & Hw)]".
+    - iLeft. iExists (F ∗ (Q -∗ Q'))%I. iFrame "Hmk HF Himp".
+      iIntros "Hmk [HF Himp]". iApply "Himp". iApply ("Hw" with "Hmk HF").
+    - iRight. iExists n, (F ∗ (Q -∗ Q'))%I.
+      iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hleg HF Himp".
+      iIntros "Hleg [HF Himp]". iApply "Himp". iApply ("Hw" with "Hleg HF").
+  Qed.
+
+  (* the row FORGETS its way back, which is what the disjointness reading
+     takes ([col_side_slot_excl]) *)
+  Lemma col_row_side γfs (γi : gname) (inum : bv 32) (Q : iProp Σ) :
+    col_row γfs γi inum Q -∗ col_side γfs γi inum.
+  Proof.
+    rewrite /col_row /col_side.
+    iIntros "[(%F & Hmk & _) | (%n & %F & %Hdl & Hleg & _)]".
+    - iLeft. iExact "Hmk".
+    - iRight. iExists n. iSplitR; [iPureIntro; exact Hdl |]. iExact "Hleg".
+  Qed.
+
+  (* the corpse ledger's marker, as a row: nothing is kept and the way back
+     is the identity *)
+  Lemma col_row_mark γfs (γi : gname) (inum : bv 32) :
+    imark γi (bv_unsigned inum) -∗
+    col_row γfs γi inum (imark γi (bv_unsigned inum)).
+  Proof.
+    iIntros "Hmk". rewrite /col_row. iLeft. iExists emp%I.
+    iFrame "Hmk". iSplitR; [done |]. iIntros "H _". iExact "H".
+  Qed.
+
+  (* ==================================================================== *)
+  (*  ...AND THE DOOR AS AN ACCESSOR (durable-disk EV-Y)                   *)
+  (*                                                                      *)
+  (*  [col_region_quiesce_acc] under a new name, and it CAN acquire a      *)
+  (*  caller now: the obstruction EV stage 5 recorded -- the authority the *)
+  (*  [fs_links] leg needs is a conjunct of the very slot the marker arm's *)
+  (*  reading consumes -- is [col_region_slot_lnk_acc], which hands the    *)
+  (*  pair out of ONE destructuring.  The two arms differ only in where    *)
+  (*  the leg comes from:                                                 *)
+  (*                                                                      *)
+  (*   - THE MARKER: the region's own free bundle, built into a whole leg  *)
+  (*     ([col_free_ent_toks] supplies the tokens a type-0 record owes)    *)
+  (*     and SHED to the collection's uniform share.  The quarter is kept  *)
+  (*     in this wand's frame instead of being dropped, and the wand puts  *)
+  (*     it back ([IcacheEscrow.ic_inode_leg_shed_of]).                    *)
+  (*   - A CACHED OR ALLOCATED INUM: the leg is already in hand and the    *)
+  (*     slot is not touched at all, so the wand is [col_slot_lnk_acc]'s.  *)
+  (* ==================================================================== *)
+  Lemma col_row_slot_acc γfs (γi : gname) (inum : bv 32) (d : dinode)
+      (Q : iProp Σ) :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    col_row γfs γi inum Q -∗
+    ireg_slot γfs γi (bv_unsigned inum) d -∗
+      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ ireg_lnk γfs (bv_unsigned inum) d
+      ∗ ∃ n : fs_node,
+          ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
+          ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi inum n
+          ∗ (ic_inode_leg γfs (DfracOwn (3/4)) γi inum n
+             -∗ ireg_lnk γfs (bv_unsigned inum) d
+             -∗ Q ∗ ireg_slot γfs γi (bv_unsigned inum) d).
+  Proof.
+    iIntros "Hauth Hrow Hslot".
+    rewrite /col_row.
+    iDestruct "Hrow"
+      as "[(%F & Hmk & HF & Hw) | (%n & %F & %Hdl & Hleg & HF & Hw)]".
+    - iDestruct (col_free_slot_lnk_acc γfs γi inum d with "Hauth Hmk Hslot")
+        as "(Hauth & Hlnk & %Ht0 & Hmk & Hown & Hback)".
+      iFrame "Hauth Hlnk".
+      iExists (free_node d).
+      iSplitR.
+      { iPureIntro. apply node_dir_local_free.
+        rewrite free_node_rec. exact Ht0. }
+      iDestruct (ic_inode_leg_intro γfs (DfracOwn 1) γi inum (free_node d)
+                   with "[] Hown") as "Hleg".
+      { iApply (col_free_ent_toks γfs (bv_unsigned inum) d Ht0). }
+      iDestruct (ic_inode_leg_shed_to with "Hleg") as "[Hleg Hrd]".
+      iFrame "Hleg".
+      iIntros "Hleg Hlnk".
+      iDestruct (ic_inode_leg_shed_of with "Hleg Hrd") as "Hleg".
+      iDestruct (ic_inode_leg_open with "Hleg") as "[_ Hown]".
+      iSplitL "Hmk HF Hw"; [iApply ("Hw" with "Hmk HF") |].
+      iApply ("Hback" with "Hown Hlnk").
+    - iDestruct (col_slot_lnk_acc γfs γi (bv_unsigned inum) d with "Hslot")
+        as "[Hlnk Hback]".
+      iFrame "Hauth Hlnk".
+      iExists n. iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hleg".
+      iIntros "Hleg Hlnk".
+      iSplitL "Hleg HF Hw"; [iApply ("Hw" with "Hleg HF") |].
+      iApply ("Hback" with "Hlnk").
+  Qed.
+
+  (* ==================================================================== *)
   (*  ...AND WHAT ONE SLOT HANDS THE COLLECTION, IN ONE STEP               *)
   (*  (durable-disk EV stage 5)                                            *)
   (*                                                                      *)
@@ -1364,6 +1790,49 @@ Section Collect.
     iDestruct (col_link_of γfs (bv_unsigned inum) n d (eq_sym Hrec)
                  with "Hlnk Hte") as "[Hle Hkp]".
     iFrame "Hma Hia Hb Hle Hkp". iPureIntro. exact HIz.
+  Qed.
+
+  (* ...AND THE SAME STEP AS AN ACCESSOR (durable-disk EV-Y).  Both
+     authorities are still read-only; what is new is that the two legs the
+     step produces come back.  [col_bundle] existentialises the inum, and
+     [bv_unsigned] is injective, so the returned bundle is at THIS inum;
+     the abstract map's value is pinned by the [⌜I !! _ = Some n⌝] the step
+     already exports, so no second agreement is needed on the way back. *)
+  Lemma col_leg_bundle_acc γfs (γi : gname) (inum : bv 32) (n : fs_node)
+      (d : dinode) (m : gmap Z dinode) (I : gmap Z fs_node) :
+    m !! bv_unsigned inum = Some d ->
+    ghost_map_auth γi 1 m -∗
+    ghost_map_auth (fs_top γfs) 1 I -∗
+    ireg_lnk γfs (bv_unsigned inum) d -∗
+    ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗
+      ghost_map_auth γi 1 m
+      ∗ ghost_map_auth (fs_top γfs) 1 I
+      ∗ ⌜I !! bv_unsigned inum = Some n⌝
+      ∗ col_bundle γfs γi (bv_unsigned inum) n
+      ∗ fs_link_node (fs_link γfs) (bv_unsigned inum) n
+      ∗ (∃ kv : ity, ireg_keep γfs (bv_unsigned inum) kv)
+      ∗ (col_bundle γfs γi (bv_unsigned inum) n
+         -∗ fs_link_node (fs_link γfs) (bv_unsigned inum) n
+         -∗ (∃ kv : ity, ireg_keep γfs (bv_unsigned inum) kv)
+         -∗ ireg_lnk γfs (bv_unsigned inum) d
+            ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi inum n).
+  Proof.
+    intros Hmd. iIntros "Hma Hia Hlnk Hleg".
+    iDestruct (ic_inode_leg_open with "Hleg") as "[Hte Hown]".
+    iDestruct (col_bundle_of_side γfs γi inum n with "Hown") as "Hb".
+    iDestruct (col_bundle_top with "Hia Hb") as %HIz.
+    iDestruct (col_bundle_rec with "Hma Hb") as %Hmz.
+    rewrite Hmd in Hmz. injection Hmz as Hrec.
+    iDestruct (col_link_of_acc γfs (bv_unsigned inum) n d (eq_sym Hrec)
+                 with "Hlnk Hte") as "(Hle & Hkp & Hback)".
+    iFrame "Hma Hia Hb Hle Hkp".
+    iSplitR; [iPureIntro; exact HIz |].
+    iIntros "Hb Hle Hkp".
+    iDestruct "Hb" as (inum') "[%Hbv Hown]".
+    assert (inum' = inum) as -> by (apply bv_eq; exact Hbv).
+    iDestruct ("Hback" with "Hle Hkp") as "[Hlnk Hte]".
+    iFrame "Hlnk".
+    iApply (ic_inode_leg_intro with "Hte Hown").
   Qed.
 
   End FreeSlot.

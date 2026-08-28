@@ -880,6 +880,51 @@ Section Snap.
   Qed.
 
   (* ================================================================== *)
+  (*  6b.  THE EPOCH OFF AN INSTANCE (durable-disk EV-Y)                 *)
+  (*                                                                    *)
+  (*  THE TRANSPORT IS THE MINT'S CALLER.  Where [P_dur_alloc_mint]      *)
+  (*  takes a package of READINGS -- among them [sm_runs], which         *)
+  (*  MATERIALISES the runs' pairwise disjointness as a pure fact --     *)
+  (*  this takes the file-system predicate itself and hands it to        *)
+  (*  [FsDurXfer.fs_state_xfer_tok], which reads the same disjointness   *)
+  (*  off the SOURCE'S OWN EXCLUSIVITY inside the lemma                  *)
+  (*  ([FsStateDefs.phi_excl] at a share above a half) and materialises  *)
+  (*  nothing.  The source comes back UNCHANGED, which is the whole      *)
+  (*  reason a commit can call it: the collection is an accessor and     *)
+  (*  gives every invariant body back afterwards                         *)
+  (*  ([FsCollectAll.col_bodies_acc]).                                   *)
+  (*                                                                    *)
+  (*  TWO PURE PREMISES REMAIN, and neither is about disjointness: the   *)
+  (*  snapshot's own [snap_shape] -- the ONE clause no resource pins,    *)
+  (*  durable-fs-plan.md section 2 -- and "the source's byte map is      *)
+  (*  inside the committed view's flattening", which is where the        *)
+  (*  epoch's IDENTITY comes from ([FsDurRead.snap_auth]).               *)
+  (* ================================================================== *)
+  Theorem P_dur_alloc_xfer Γ (Hex : phi_excl Γ) (A : iProp Σ)
+      (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) (q : Qp)
+      (S : fs_state_rec) D (v : ity) :
+    (1/2 < q)%Qp ->
+    snap_shape S D ->
+    M ⊆ fs_dbytes D ->
+    A -∗ fs_state Γ (DfracOwn q) S -∗
+    own (γlink Γ) (link_tok_elem ROOTINO v) ==∗
+      A ∗ fs_state Γ (DfracOwn q) S
+      ∗ own (γlink Γ) (link_tok_elem ROOTINO v)
+      ∗ P_dur D.
+  Proof.
+    intros Hq Hsh Hle. iIntros "HA HS Ht".
+    iMod (fs_state_xfer_tok Γ Hex A M Hag q S ROOTINO v Hq with "HA HS Ht")
+      as (g gl gt B) "(%Hin & HA & HS & Ht & Hba & Hta & Htf & HS' & Ht')".
+    iModIntro. iFrame "HA HS Ht".
+    iExists g, gl, gt, S. rewrite /fs_snap /snap_auth.
+    iSplitL "Hba".
+    { iExists B. iFrame "Hba". iPureIntro. exact (transitivity Hin Hle). }
+    iFrame "Hta Htf HS'".
+    iSplitL "Ht'"; [by iExists v |].
+    iPureIntro. exact Hsh.
+  Qed.
+
+  (* ================================================================== *)
   (*  7b.  THE READING (durable-disk lane H3)                            *)
   (*                                                                    *)
   (*  [snap_ok S D] OFF THE SNAPSHOT'S OWN RESOURCES.  Nothing is        *)
