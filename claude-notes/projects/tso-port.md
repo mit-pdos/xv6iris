@@ -3945,3 +3945,24 @@ and green (the named-context parked record + per-hart absorb).  The
 general rule for the paper: every persistent fact in the system must
 name the barrier that distributes it; "it's in an invariant" is not
 an answer under weak memory.
+
+### 0.30′ OWNER RULING (2026-08-27): the main-merge plan — apply the
+CHANNEL REFACTORINGS to main first, on SC, in the barrier style
+
+How the eventual merge onto `main` will proceed: the structural
+refactorings this port discovered — the exemplar being devsw taken
+OUT of an invariant and passed through the [started] flag's
+predicate instead — will be applied to main LOCALLY, as SC-provable
+restructurings, ahead of any semantic change.  All of this reasoning
+is expressible on SC: the visibility inequalities are vacuous there,
+but the STRUCTURE — which barrier distributes which persistent fact,
+which lock payload carries which cells, stamps-beside-data in the
+fence predicates, kfree's visibility-free ownership, the p->lock
+resume tie — is fully statable and provable.  Once main's SC proof
+is WRITTEN IN THIS STYLE, porting the whole thing to TSO becomes the
+below-seam swap the plan always intended, with the above-seam
+statements already converged.  This is the working content of
+0.25′'s partial-replay gate: what replays onto main after the
+three-case confidence gate is exactly these channel refactorings,
+SC-proven, in the barrier style — main churns once (0.23′), and it
+churns into the shape the TSO proof already validated.
