@@ -3814,3 +3814,30 @@ site is mechanical wiring behind M4); (1) is one in-flight tranche
 from done (the atomic unit; all kit proven); (2)'s consumer half is
 green and its producer half + the park port are the remaining real
 work.
+
+### 0.26′ OWNER RULING (2026-08-27): free-page ownership is
+VISIBILITY-FREE — ∃x,↦x is subtly too strong for kfree under TSO
+
+The owner's observation, verbatim in spirit: kfree's classical
+precondition ∃x, a ↦ x asserts the freer holds a value DETERMINATE
+AT ITS OWN CPU'S VIEW, and under TSO that is surplus — a page whose
+lock another CPU just released has no value well-known to the freer,
+and freeing must not require one.  What kfree needs is only the
+FUTURE half of ownership: exclusivity plus the per-byte timestamp
+element any future write must pay.  Determinacy re-mints itself at
+the next write with no evidence (stores do not read; one's own write
+is visible by forwarding), and xv6's kfree/kalloc memset immediately,
+so the allocator path never reads before writing.  Consequences:
+(i) the allocator's free-page bodies restate at the visibility-free
+tier (physical fraction + element, no justification bit — the tier
+already exists in the kit); (ii) the lock-cell reclamation at
+pipeclose→kfree becomes EVIDENCE-FREE — a ghost reset of the history
+payload at full element ownership (removing a history claim only
+weakens the interpretation's obligations) plus the tier weakening;
+the acquire remains protocol-relevant (no-other-references), not
+per-byte-relevant; (iii) drain-evidence reclamation survives only
+where a taker READS before writing — the context-switch stamp, which
+is designed separately; (iv) a kalloc client that reads a fresh page
+before writing it now owes a visibility justification, which is the
+model being honest about allocator junk.  This supersedes the
+drain-evidence reclaim-gate design for the free path.
