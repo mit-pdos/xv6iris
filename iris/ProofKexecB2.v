@@ -812,7 +812,7 @@ Section KexecB2Loops.
     (* depth 0 forces the held set empty, so readi's order premise needs no
        hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct (SpecKexec.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     rewrite /kxc_res.
@@ -1603,9 +1603,7 @@ Section KexecB2Loops.
                     with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hka
                           [Hopen Hlog Hirs Hbm Hins Hbits Hbs Hpt Hpriv Hpath
                            Hargv Hargs Helf Hframe] Hcont Hc116").
-          { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
-                                         Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
-                                         Hdlock"). }
+          { iExact "Hfab". }
           { rewrite /kxc_res.
             iSplitL "Hopen"; [iExact "Hopen" |].
             iSplitL "Hlog"; [iExact "Hlog" |]. iSplitL "Hirs"; [iExact "Hirs" |].
@@ -1658,9 +1656,7 @@ Section KexecB2Loops.
                   with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hopen Hbm Hins Hbits Hka
                         Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                         Hcont").
-        { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
-                                       Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
-                                       Hdlock"). } }
+        { iExact "Hfab". } }
 
     (* ---- +0x10e: bgeu s9,a5,+0x0da ---- *)
     assert (Hcmp : zopz0zKzJ_u (rget N9 Rs9) (rget N9 Ra5)

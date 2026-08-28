@@ -418,7 +418,7 @@ Section KexecABody.
     (* depth 0 forces the held set empty, so begin_op's order premise ("log",
        3) needs no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct (SpecKexec.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     (* ---- open the process's private block ONCE (convention 2) ---- *)
@@ -994,7 +994,7 @@ Section KexecABody.
     (* depth 0 forces the held set empty, so the ilock/end_op order premises
        need no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct (SpecKexec.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     (* ---- the inode: slot, share, and the region facts ---- *)
@@ -1646,8 +1646,7 @@ Section KexecABody.
                   with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd Hdep
                         Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
-        { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
-                                       Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock"). }
+        { iExact "Hfab". }
         rewrite /kxc_frameA6.
         iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
         iSplitL "Hf1"; [iExact "Hf1" |].
@@ -1728,8 +1727,7 @@ Section KexecABody.
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd Hdep
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
-      { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
-                                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock"). }
+      { iExact "Hfab". }
       rewrite /kxc_frameA6.
       iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
       iSplitL "Hf1"; [iExact "Hf1" |].

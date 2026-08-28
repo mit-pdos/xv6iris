@@ -377,6 +377,19 @@ Proof. rewrite /Mcount fmap_delete. reflexivity. Qed.
    them through the class every one of those files ALREADY binds costs one
    field.
 
+   AND SINCE RANK 1 THE CLASS IS THE ONLY PATH.  When [file_fscfg] landed,
+   an fs contract still THREADED its own copy of every name in it and tied
+   the two by a pure premise; the field was there so that the predicate
+   could be NAMED at the interfaces that carry it.  Ranks 1a-1d removed the
+   threading itself -- [cn], [γfs], [cov], [logstart], [γi], the itable
+   lock, [dev], [nib], [inodestart], the log's names, the six device and
+   allocator gnames and the image's three numbers, in that order -- so the
+   fs contract surface now reads all of them off this class and off
+   [file_icfg], and the tie records that used to relate the two spellings
+   ([FsSyscalls.fs_world], [SpecFileclose.fclose_ties]) do not exist.  That
+   is why the two-instance-path trap below is not a style rule: with no
+   threaded copy left there is no second spelling to fall back on.
+
    NEITHER RECORD IS CAPACITY, which is why they are not in [Xv6G.xv6G] --
    see that file's "what is deliberately not here".  Both are per-boot
    VALUES (gnames, gsets, block numbers), so there is no camera and no

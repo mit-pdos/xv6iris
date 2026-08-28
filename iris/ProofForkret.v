@@ -1297,24 +1297,13 @@ Proof.
   iDestruct (fs_ready_kalloc with "Hfsr") as "#Hkaenv".
   iAssert (fs_fabric γs pd pav pu)
     as "#Hfab".
-  (* ...and the same row-by-row build, for the same measured reason: this
-     named [iFrame] over the fabric's sixteen definition-valued rows was
-     61.0 s. *)
+  (* FOUR ROWS, not sixteen (rank 1d): the fabric IS [fs_ready] plus the
+     process array and the disk fabric at this caller's own three pages.
+     The sixteen-step chain this replaces was written because a named
+     [iFrame] over that many definition-valued rows measured 61.0 s. *)
   { rewrite /fs_fabric.
-    iSplitR; [iExact "Hkdata" |].
-    iSplitR; [iExact "Hpenv2" |].
-    iSplitR; [iExact "Hbio" |].
-    iSplitR; [iExact "Hlctx" |].
-    iSplitR; [iExact "Hseam" |].
-    iSplitR; [iExact "Hgen" |].
-    iSplitR; [iExact "Hitb2" |].
-    iSplitR; [iExact "Hitbl" |].
-    iSplitR; [iExact "Hesc" |].
-    iSplitR; [iExact "Hslks" |].
-    iSplitR; [iExact "HiregS" |].
-    iSplitR; [iExact "Hropen" |].
+    iSplitR; [iExact "Hfsr" |].
     iSplitR; [iExact "Hpinv" |].
-    iSplitR; [iExact "Hdevi" |].
     iSplitR; [iExact "Hdgeom" |].
     iExact "Hdlock". }
   (* ---- the process block, put back together: the token is the steady

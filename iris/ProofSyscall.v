@@ -1064,33 +1064,17 @@ Section SyscallVocab.
 .
   Proof.
     iIntros "#Hdata #Hprocs #Henv".
-    iDestruct (syscall_env_all with "Henv") as (γp γw γft γtk)
-      "(_ & _ & _ & _ & _ & _ & _ & #Hfs)".
-    iDestruct (sysc_fs_env_all with "Hfs") as
-      "( _ & _ & _ & _ & _ & _ & _ &
-        _ & #Hpanic & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & _ )".
-    iDestruct (sysc_ic_env_of_ready with "Hfs") as
-      "( _ & _ & _ & _ & _ & _ & _ & #Hit & #Hitinv & #Hesc & #Hireg &
-        #Hropen & #Hsl )".
-    (* assembled conjunct by conjunct rather than with [iFrame "#"]: the
-       fifteen are in the fabric's own order, and a mismatch then names the
-       one that moved instead of leaving an unsolved goal. *)
+    iDestruct "Henv" as "(_ & _ & #Hfs & _)".
+    iDestruct "Hfs" as "(_ & _ & #Hgeom & #Hdlock & #Hrdy)".
+    (* FOUR ROWS (rank 1d): the fabric IS [FsReady.fs_ready] plus the
+       dispatch's own [procs_inv] and the disk fabric at [fn]'s three ring
+       pages, which is exactly what [sysc_fs_env] already carries.  The
+       fifteen-step chain this replaces existed because a named [iFrame]
+       over that many definition-valued rows is a goal-side search per
+       hypothesis. *)
     rewrite /SpecKexec.fs_fabric.
-    iSplitR; [iExact "Hdata"   |].
-    iSplitR; [iExact "Hpanic"  |].
-    iSplitR; [iExact "Hbio"    |].
-    iSplitR; [iExact "Hlog"    |].
-    iSplitR; [iExact "Hseam"   |].
-    iSplitR; [iExact "Hgen"    |].
-    iSplitR; [iExact "Hit"     |].
-    iSplitR; [iExact "Hitinv"  |].
-    iSplitR; [iExact "Hesc"    |].
-    iSplitR; [iExact "Hsl"     |].
-    iSplitR; [iExact "Hireg"   |].
-    iSplitR; [iExact "Hropen"  |].
+    iSplitR; [iExact "Hrdy"    |].
     iSplitR; [iExact "Hprocs"  |].
-    iSplitR; [iExact "Hdevi"   |].
     iSplitR; [iExact "Hgeom"   |].
     iExact "Hdlock".
   Qed.

@@ -70,13 +70,15 @@
     the file system LOOK as though it depended on process abstractions.  A
     spec that wants it takes [procs_inv γs] as its own premise.
 
-    [FsSyscalls.fs_world] is therefore no longer a one-line alias: it is
-    this predicate AT A CALLER'S OWN NAMES -- the tie equations
-    ([bn = fsc_bio], [γd = fsc_disk], …) beside the ambient [fs_ready] --
-    with [fs_world_all] doing the substitution once, so a body that threads
-    its own names still destructs ONE row and gets the constituents spelled
-    the way its callee spells them.  Rank 1c took the four [icfg] rows out
-    of that list; the device and allocator names are what is left of it.
+    [FsSyscalls.fs_world] IS GONE (rank 1d).  It was this predicate AT A
+    CALLER'S OWN NAMES -- the tie equations ([bn = fsc_bio],
+    [γd = fsc_disk], …) beside the ambient [fs_ready] -- and rank 1 took
+    every one of those names off the fs contract surface, so both sides of
+    every equation print the same and the wrapper had nothing left to say.
+    A caller that threads its own [pd]/[pav]/[pu] -- the ONE part of the
+    fabric [fscfg] cannot hold (its ruling R1) -- uses [fs_ready_disk] to
+    unpack this predicate's witness and [disk_geom_agree] to identify the
+    two; everything else it wants is a projection below.
 
     ---- WHY IT MATTERS: THE FORKRET DELTA ----
 
@@ -505,8 +507,8 @@ Section FsReady.
      ADDRESSES held in [disk_geom]'s own persistent cells, so any two
      [disk_geom]s at one [disk_names] agree on all three.  A consumer that
      threads its own [pd]/[pav]/[pu] and carries [disk_geom] at them (which
-     is how [FsSyscalls.fs_world] and [ProofSyscall.sysc_fs_env] now spell
-     the disk fabric) can therefore always identify them with [fs_ready]'s
+     is how [ProofSyscall.sysc_fs_env] and [SpecKexec.fs_fabric] spell the
+     disk fabric) can therefore always identify them with [fs_ready]'s
      witness.  Nothing analogous exists for a gname, which is why R1 stops
      at these three fields. *)
   (* [γ]'s type is left to inference: [DiskPtsto.disk_names] is not among

@@ -4028,10 +4028,17 @@ the rows below and in `design/fs-ghost-state.md`).
     `design/crash.md`, `fs-state.md`, `durable-fs-plan.md` and `fs-icache.md`
     got banners where they described the deleted fixed-layer fields,
     `dir_owned` or the v1 `is_itable`/`itable_res` as live.
-- [ ] **Rank 1 — de-thread the ambient names** (AFTER S2): the fs contracts
-  stop binding copies of `icfg`/`fscfg`'s per-boot constants
-  (`γfs cov logstart cn γi γl nib inodestart dev`); the 339 tie equations
-  vanish; `fs_world` collapses into `fs_ready`.  First slice `cn : ic_names`.
+- [x] **Rank 1 — de-thread the ambient names** (DONE, R1a–R1d): the fs
+  contracts stop binding copies of `icfg`/`fscfg`'s per-boot constants —
+  `cn` (1a), `γfs cov logstart γi` and the itable lock (1b), `dev nib
+  inodestart` and the log's names (1c), and the six device/allocator gnames
+  with the image's three numbers (1d).  All 339 tie equations are gone, and
+  so are the three records that carried them: `FsSyscalls.fs_world` and
+  `SpecFileclose.fclose_ties` are DELETED and `ProofSyscall.sysc_ties` is
+  four PROCESS fields under the name `sysc_proc_ties`.  What is left is the
+  boot side (where the era's numbers are tied to the fields at the point the
+  instance is BUILT), everything structurally below `FsCfg`, and nine honest
+  per-call identity facts.
 
   **AS LANDED — R1a: THE PROBE AND THE WHOLE `cn : ic_names` SLICE.  Whole
   tree green, `make audit-only` identical BY NAME to a pre-change run of the
@@ -4335,13 +4342,140 @@ the rows below and in `design/fs-ghost-state.md`).
     re-run the slice's own rewriter on a scratch copy of the pre-change tree
     with that one file swapped in.  It is deterministic, so the answer is the
     same one the sweep would have produced had the fold landed first.
-  - **WHAT STAGE 4 STILL OWES**: the bundle collapse proper.  `fs_world` →
-    `fs_ready` + `fs_ready_disk` (its eight remaining equations are the six
-    device/allocator names `γpr γa γu γd γk bn` and `bmapstart`/`size`);
-    `fs_world_all`'s 25-second `iSplit` chain; `FsSyscalls.fs_geom` (now
-    fifteen fields) dies in favour of `FsReady.fs_geom_ok`;
-    `sysc_ties` → four process fields; `fclose_names` 20 → 8 fields and
-    `fclose_ties` dies; `fs_fabric` still takes eight names.
+
+  **AS LANDED — R1d: THE BUNDLE COLLAPSE, AND THE LAST TEN NAMES.  Whole
+  tree green (zero `Error`), `SystemAdequacy.v` / `SystemAssumptions.v`
+  byte-identical to `origin/main` — the audited theorem never named any of
+  the ten, and its `sb`/`nib`/`cov` are the image's numbers, tied inside
+  `boot_shared_alloc`.**
+
+  - **THE TEN NAMES, MEASURED OVER THE 103-FILE CUT** (rank 1c's 91 plus
+    `ProofItruncParts`, `ProofKexecC`, `ProofKexecD` and the
+    fileread/filestat/sysread/sysfstat/syswrite family, which had to follow
+    because they CALL `ilock`/`readi`): `bn : bio_names` → `fsc_bio`,
+    `γu`/`gu` → `fsc_uart`, `γd`/`gd` → `fsc_disk`, `γk`/`gk` at bare
+    `gname` → `fsc_dlock`, `γa`/`ga`/`γkl` → `fsc_kalloc`, `γk`/`γka` at
+    `gname * gname` → `fsc_kpages`, `γpr`/`gpr` → `fsc_printk`, and the
+    image's three numbers `bmapstart`/`size`/`ninodes` → `fsc_bmapstart` /
+    `fsc_size` / `fsc_ninodes`.  **1842 binder positions went, 774
+    applications lost a positional argument, 2626 uses became a class
+    field.**  Eight files gained `Require Import FsCfg` (`ProofKexec`,
+    `ProofKexecB2`, `SpecSysWrite`, `ProofUsertrap`, `ProofUsertrapArms`,
+    `SpecSysFstat`, `SpecSysRead`, `SpecSyscall`).
+  - **WHICH GNAME IS WHICH IS A USE QUESTION, and every spelling was
+    checked against one.**  `KvmSpec.kalloc_env_at γa γk` takes the kmem
+    LOCK first and the free-list count/seal PAIR second, so `γa`/`ga`/`γkl`
+    are `fsc_kalloc` and `γk` at `gname * gname` / `γka` are `fsc_kpages`;
+    `γk`/`gk` at bare `gname` is always the `"virtio_disk"` lock
+    (`is_lock γk d_lock "virtio_disk"`).  The three spellings that mean
+    something else — `γf`/`gf` the file table, `γl`/`gl` the running
+    process's slot lock, `γtk` the ticks lock — are untouched.
+  - **THE CUT IS UPWARD-CLOSED, WHICH IS WHY IT IS SMALLER THAN THE NAMES
+    ARE.**  `γa`, `γu` and `γpr` are threaded through 262 files — the whole
+    kalloc/vm/console/pipe cone — and almost none of that is the FS
+    contract surface.  The forbidden direction is a de-threaded CALLEE
+    forcing a tie premise on a threaded caller; a de-threaded CALLER
+    instantiating a threaded callee is free and costs nothing.  So the cut
+    is the fs surface and everything above it, and `SpecCopyin`,
+    `SpecWalk`, `SpecKalloc`, `SpecUvmalloc`, the WAL, the bio layer and
+    the bitmap/bmap contracts keep their parameters and are INSTANTIATED at
+    the fields.
+  - **THE THREE TIE BUNDLES ARE GONE, and the meter reads zero.**
+    `FsSyscalls.fs_world` (8 equations) is DELETED, with `fs_world_all`
+    (whose twenty-one-step `iSplit` chain is `FsReady.fs_ready_all`, where
+    it always belonged), `fs_world_persistent`, `fs_world_ready` and
+    `fs_ready_world`.  `SpecFileclose.fclose_ties` (8) is DELETED, and
+    `ProofSyscall.sysc_fclose_ties` with it.  `ProofSyscall.sysc_ties`
+    13 → **4** fields and is renamed `sysc_proc_ties`: what survives is
+    `sct_dq`, `sct_pj`, `sct_j`, `sct_plock` — the pid quarter and the
+    three PROCESS facts, which are there precisely because `fs_ready`
+    carries no process content at all.
+  - **AND `FsSyscalls.fs_geom` WITH THEM.**  The fifteen-field pure record
+    parameterised by `bmapstart`/`ninodes`/`size` is `FsReady.fs_geom_ok`,
+    which says the same about the ambient configuration and takes no
+    parameters; its four `bitmap_geom_ok` conjuncts come through the
+    `fgo_size`/`fgo_bm_nn`/`fgo_bm_cov`/`fgo_bm_out` accessors rather than
+    being restated.  The two friendly bodies lose thirteen parameters
+    between them — including `pd`/`pav`/`pu`, which they never needed: the
+    proof unpacks `fs_ready`'s own existential and instantiates the seal at
+    the witness.  `fs_res` loses four.
+  - **`SpecKexec.fs_fabric`: SEVENTEEN ROWS AND EIGHT PARAMETERS BECOME
+    FOUR AND FOUR.**  It is `FsReady.fs_ready ∗ procs_inv gs ∗ disk_geom
+    fsc_disk pd pav pu ∗ is_lock fsc_dlock …` — a bundle spelled entirely
+    at ambient names IS that predicate, and a copy of a parameter-free
+    predicate is still a copy.  `fs_fabric_all` hands the sixteen rows back
+    in the cone's own order, so the six positional `iDestruct`s did not
+    move; `ProofKexecTail.fs_fabric_mk` is DELETED, because its ten call
+    sites were rebuilding a PERSISTENT bundle they still held — each is one
+    `iExact "Hfab"` now, and the 107.7 s / 90.6 s that lemma was written to
+    avoid goes with it.  The two builders (`ProofForkret`,
+    `ProofSyscall.sysc_fs_fabric`) went from sixteen and fifteen `iSplitR`s
+    to four.
+  - **FIVE NAMES RECORDS LOSE THE FIELDS THAT ONLY CARRIED A COPY DOWN**,
+    and had to, for rank 1a's reason — a record field whose value IS a
+    `FsCfg.fscfg` field can only carry a copy of it, and the equation
+    saying so is one Rocq will not let a proof `rewrite` by:
+    `fclose_names` 16 → **8**, `UsertrapRes.ut_names` 23 → **14**,
+    `fwrite_names` 19 → **12**, `fread_names` 14 → **10**, `fstat_names`
+    8 → **4**.  What survives in each is the PROCESS, the device arm's own
+    lock (`frn_cons`, `fwn_txlock`), and the three virtio ring pages.
+  - **THE RING PAGES ARE THE ONE THING THAT STAYS, everywhere.**
+    `fsc_desc`/`fsc_avail`/`fsc_used` left `fscfg` in fs-cfg-boot.md's R1
+    (`virtio_disk_init` `kalloc`s them at WP time), so `fs_ready`
+    QUANTIFIES them and every bundle above carries `disk_geom` at its own
+    three as a RESOURCE.  `FsReady.disk_geom_agree` is the bridge, and it
+    is why `fcn_pd`/`un_pd`/`frn_pd`/`fsn_pd`/`fwn_pd` are still fields.
+  - **ONE SPEC ROW CHANGED SHAPE RATHER THAN DYING**, and it is the
+    allocator's.  `SpecSysFork` took `kalloc_env fsc_kalloc None`, whose
+    `∃ γk` hides the free-list pair; kfork NAMES the pair
+    (`kalloc_env_at`, because allocproc speaks about the count) and the
+    pair is `fsc_kpages` now, so a hidden witness could no longer be handed
+    on.  The row is `kalloc_env_at fsc_kalloc fsc_kpages None` — the same
+    row at the ambient pair, and every caller has it spelled out inside
+    `fs_ready` (`fs_ready_kmem`).  For the same reason
+    `ProofSyscall.syscall_env_all` loses four of its eight existentials:
+    the allocator's lock and printk's three names are fields, and hiding a
+    field behind an `∃` hands an arm a name nothing says anything about —
+    this file's own unreachable-witness argument.
+  - **TWO NEW TRAPS, BOTH MEASURED, AND THEY ARE THE SAME TRAP.**  A class
+    field written in an EXPLICIT-ARGUMENT position elaborates to
+    `@fsc_ninodes ?fscfg`, and typeclass resolution is deferred to the END
+    of the application — so (i) an `ltac:` side condition supplied inside
+    that application and (ii) a goal opened by a proofmode `$!`
+    specialization both run with the instance still an EVAR.  `lia` then
+    treats the goal's field and the context's as two different atoms and
+    fails with *"Cannot find witness"* on a REFLEXIVE inequality
+    (`Z.to_nat (fsc_ninodes - 1) <= Z.to_nat (fsc_ninodes - 1)`), which
+    reads like a broken hypothesis and is not.  The tell is
+    `constr_eq`/`Set Printing All`: the goal says `?fscfg` where the
+    hypothesis says `FSC`.  Two fixes, both local and both in the source:
+    pass a hypothesis whose statement was elaborated ON ITS OWN (`Hn64` in
+    `ProofIalloc`/`ProofIreclaim`), or route the term through `constr:`,
+    which elaborates with resolution ON.
+  - **NOTHING GOT SLOWER, MEASURED** (standalone `rocq compile`, same VM,
+    against the branch's base tree built beside it): `ProofSyscall`
+    43.8 → 39.9 s, `ProofFileclose` 19.1 → 18.4, `ProofCreate`
+    139.6 → 139.2, `ProofSysOpen` 63.7 → 62.5, `ProofSysOpenTails`
+    21.9 → 21.2, `ProofSysUnlink` 131.2 → 130.0; peak RSS flat to −3 %.
+    Every delta is at or below the noise floor, which is the expected
+    answer: dropping a parameter shortens a statement without changing a
+    proof step.  `ProofSyscall` is the one that actually got faster, and
+    that is the bundles: eighteen of its twenty positional destructs lost a
+    row and nine tie `rewrite`s went away.
+  - **WHAT IS LEFT, AND WHERE.**  The tie meter over the whole tree (with
+    comments stripped, and reading `<=` as the comparison it is) is 41
+    equations and every one is in a sanctioned class: the boot side, where
+    the era's image numbers are tied to the fields WHERE THE INSTANCE IS
+    BUILT (`FirstTok`, `SpecFsinit`, `FsCfgBoot`); structurally below
+    `FsCfg` (`FsCollect`, `FsCollectAll`, `FsCollectImg`, `IcacheBoot`,
+    `InodeRegion`'s five `⌜γ = icfg_log⌝`, discharged by `eq_refl`); the
+    nine honest per-call identity facts read off an entry's own cells
+    (`ProofIget`, `ProofIput`); and the five STALE files `_CoqProject` does
+    not list (`DirViewPin`, `NameiInitPinned`, `ProofKexecPinned*`,
+    `SpecKexecPinned`), which rank 1b left alone and which whoever revives
+    the pinned corner ports across 1a–1d together.  **Not one tie is left
+    on the fs contract surface.**  `tools/dethread_check.py` reports
+    `0 declarations out of scope`.
 - [ ] **EV — the era-vocabulary unification** (approved): five staged
   lanes; three of the four holders are already predicate-vocabulary; the
   payoff is the commit handing a real `fs_state` to the transport.  Runs

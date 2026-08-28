@@ -1202,69 +1202,13 @@ Section KexecAExit.
     rewrite bslots_op. iFrame.
   Qed.
 
-  (* =================================================================== *)
-  (*  [fs_fabric]'s CONSTRUCTOR.                                          *)
-  (*                                                                      *)
-  (*  BELONGS NEXT TO [fs_fabric]'s definition in SpecKexec.v, right      *)
-  (*  after its [Persistent] instance -- it lives here only because this  *)
-  (*  is a file phase A and phase B's call sites can require without      *)
-  (*  touching a Spec file, and [fs_fabric]'s own header already says its *)
-  (*  home is a shared file once a second contract wants it (promote on   *)
-  (*  the second consumer).  MOVE IT to SpecKexec.v when that happens.    *)
-  (*                                                                      *)
-  (*  Both of [T.kxc_bad64]'s call sites in ProofKexecA.v hand its        *)
-  (*  [fs_fabric] premise over as a [[]]-bullet closed with [rewrite      *)
-  (*  /fs_fabric; iFrame "<the same thirteen names>"].  [fs_fabric]        *)
-  (*  unfolds to a flat 13-conjunct [∗] (IcacheEscrow's arms, BioInv's    *)
-  (*  ctx's, the crash seam, the era cert, the itable pair, the two       *)
-  (*  icache families, [ireg_inv], [procs_inv] -- a big-op of [is_lock]   *)
-  (*  over every proc -- and the disk fabric), and a NAMED [iFrame] still *)
-  (*  pays a GOAL-side search over that whole bundle (optimization.md's   *)
-  (*  icache-files entry, "#3"): 107.7 s and 90.6 s, two single sentences *)
-  (*  inside kexec's whole-function proof, where [Qed]'s term-size law    *)
-  (*  charges the search once per surviving proof step.  Assembled HERE,  *)
-  (*  where the context is exactly the thirteen pieces and nothing else,  *)
-  (*  the same search is a no-op; a caller then writes one [iApply].      *)
-  (* =================================================================== *)
-  Lemma fs_fabric_mk gs pd pav pu :
-    kernel_data -∗
-    panic_env -∗
-    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
-    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
-    fs_crash_seam fsc_cov fsc_logst -∗
-    gen_cert -∗
-    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
-    itable_inv -∗
-    ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
-    ic_sleeplocks fsc_ic -∗
-    ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
-    ireg_open -∗
-    procs_inv gs -∗
-    dev_inv fsc_uart fsc_disk -∗
-    disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
-    fs_fabric gs pd pav pu.
-  Proof.
-    iIntros "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hropen
-             Hprocs Hdevi Hdgeom Hdlock".
-    rewrite /fs_fabric.
-    iSplitL "Hkd"; [iExact "Hkd" |].
-    iSplitL "Hpenv"; [iExact "Hpenv" |].
-    iSplitL "Hbio"; [iExact "Hbio" |].
-    iSplitL "Hlogc"; [iExact "Hlogc" |].
-    iSplitL "Hcrash"; [iExact "Hcrash" |].
-    iSplitL "Hcert"; [iExact "Hcert" |].
-    iSplitL "Hitab"; [iExact "Hitab" |].
-    iSplitL "Hitinv"; [iExact "Hitinv" |].
-    iSplitL "Hesc"; [iExact "Hesc" |].
-    iSplitL "Hslks"; [iExact "Hslks" |].
-    iSplitL "Hireg"; [iExact "Hireg" |].
-    iSplitL "Hropen"; [iExact "Hropen" |].
-    iSplitL "Hprocs"; [iExact "Hprocs" |].
-    iSplitL "Hdevi"; [iExact "Hdevi" |].
-    iSplitL "Hdgeom"; [iExact "Hdgeom" |].
-    iExact "Hdlock".
-  Qed.
+  (* [fs_fabric]'s CONSTRUCTOR IS GONE (rank 1d), and so is the 107.7 s it
+     was written to avoid.  The bundle is [FsReady.fs_ready] plus three rows
+     now (SpecKexec.v), so a block that unpacked it with
+     [SpecKexec.fs_fabric_all] and has to hand it on again does not rebuild
+     anything: the bundle is PERSISTENT and still in the intuitionistic
+     context, so every one of the ten call sites is one [iExact "Hfab"]. *)
+
 
   (* =================================================================== *)
   (*  THE SHARED [-1] EXIT, at +0x072.                                    *)
@@ -1482,7 +1426,7 @@ Section KexecABad.
     (* depth 0 with interrupts on forces the held set empty, so iunlockput's
        order premise needs no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct (SpecKexec.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct (kxa_esc_acc k Hk with "Hesc") as "#Hesck".

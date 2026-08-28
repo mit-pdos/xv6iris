@@ -888,7 +888,7 @@ Section KexecB3Body.
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
-    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct (SpecKexec.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
@@ -1447,9 +1447,7 @@ Section KexecB3Body.
                     with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hopen Hbm Hins Hbits Hka
                           Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                           Hcont").
-          { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
-                                         Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
-                                         Hdlock"). }
+          { iExact "Hfab". }
         * (* well-formed so far *)
           iApply (wp_bltu_fall_s_sconf (mword_of_int (KXB + 0x154))
                     (mword_of_int 486 : mword 13) Ra5 Rs1 U9 (K - 68)%nat eb
@@ -1590,9 +1588,7 @@ Section KexecB3Body.
                        with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hopen Hbm Hins Hbits Hka
                              Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                              Hcont").
-             { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
-                                            Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
-                                            Hdlock"). }
+             { iExact "Hfab". }
           -- iApply (wp_bltu_fall_s_sconf (mword_of_int (KXB + 0x15e))
                        (mword_of_int 482 : mword 13) Ra5 Rs1 U11 (K - 68)%nat
                        eb ltac:(bnz) ltac:(bnz) ltac:(exact Ewr)
@@ -1733,9 +1729,7 @@ Section KexecB3Body.
                           with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hopen Hbm Hins Hbits Hka
                                 Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                                 Hcont").
-                { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
-                                               Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
-                                               Hdlock"). }
+                { iExact "Hfab". }
              ++ iApply (wp_bnez_x0_fall_s_sconf (mword_of_int (KXB + 0x168))
                           (mword_of_int 478 : mword 13) Ra5 U13 (K - 68)%nat
                           eb ltac:(bnz) ltac:(exact Eal)
@@ -2225,9 +2219,7 @@ Section KexecB3Body.
                              with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hopen Hbm Hins
                                    Hbits Hka Hpt Hpriv Hpath Hargv Hargs Helf
                                    Hbs Hirs Hlog Hframe Hcont").
-                   { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab
-                                                  Hitinv Hesc Hslks Hireg Hropen Hprocs
-                                                  Hdevi Hdgeom Hdlock"). }
+                   { iExact "Hfab". }
                 ** (* ---- the table grew ---- *)
                    iApply (wp_beqz_x0_fall_s_sconf (mword_of_int (KXB + 0x184))
                              (mword_of_int 456 : mword 13) Ra0 M4 (K - 68)%nat
@@ -2692,10 +2684,7 @@ Section KexecB3Body.
                                  HU24s11
                                  with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hka
                                        [-Hcont Hout] Hcont [Hout]").
-                       { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert
-                                                      Hitab Hitinv Hesc Hslks
-                                                      Hireg Hropen Hprocs Hdevi Hdgeom
-                                                      Hdlock"). }
+                       { iExact "Hfab". }
                        { rewrite /kxc_res.
                          iSplitL "Hopen"; [iExact "Hopen" |].
                          iSplitL "Hlog"; [iExact "Hlog" |].
@@ -2903,9 +2892,7 @@ Section KexecB3Body.
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hopen Hbm Hins Hbits Hka
                       Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                       Hcont").
-      { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
-                                     Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
-                                     Hdlock"). }
+      { iExact "Hfab". }
   Qed.
 
 End KexecB3Body.
@@ -3240,7 +3227,7 @@ Section KexecB3Close.
                          #Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
-    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct (SpecKexec.fs_fabric_all with "Hfab") as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct "Hopen" as "(#Hslkk & Hslkd & Hdep & Hidev & Hiinum &
