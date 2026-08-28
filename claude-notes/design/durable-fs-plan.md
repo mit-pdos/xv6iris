@@ -6,10 +6,9 @@ of machine-checked refutations (archived with their lane reports in
 the Coq files that held them are deleted and §8 below carries their
 lessons).  The live worklist is
 [`../projects/durable-disk.md`](../projects/durable-disk.md).  This file
-supersedes the accreted rulings §4½–§4⁹ of
-[`fs-state.md`](fs-state.md); `fs-state.md` §0–§2 (the guiding rule and
-the nested predicate) and §7 (as-built notes) remain the reference for
-the predicate itself.
+is where the durable side's design lives; [`fs-state.md`](fs-state.md)
+§0–§2 (the guiding rule and the nested predicate) and §7 (as-built notes)
+remain the reference for the predicate itself.
 
 Vocabulary used below is xv6's and CSL's only.  "The crash predicate" is
 the one Iris predicate the machine layer preserves across a power cycle

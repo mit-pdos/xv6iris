@@ -72,10 +72,10 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   including the per-write payload.
 - **[`fs-state.md`](design/fs-state.md)** — the PREDICATE itself: the view
   record `Γ`, byte-level ownership on both the durable and logged sides,
-  `inode_owned`/`dir_owned`/`free_bitmap`/`fs_state` as nested predicates
+  `inode_owned`/`free_bitmap`/`fs_state` as nested predicates
   with link TOKENS and no whole-state pure clauses, "in flight, not
-  inconsistent", the log's FS-agnostic interface (§0–§2, §7).  Its §4½–§4⁹
-  rulings are SUPERSEDED by `durable-fs-plan.md`.
+  inconsistent", the log's FS-agnostic interface (§0–§2, §7).  The durable
+  side's design is `durable-fs-plan.md`'s.
 - **[`fs-ghost-state.md`](design/fs-ghost-state.md)** — the reference
   INVENTORY of every file-system ghost: per piece its RA, its HOME, what a
   fragment means, who mints/spends it — the log's transaction token and

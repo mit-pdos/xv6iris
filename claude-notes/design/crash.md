@@ -272,25 +272,20 @@ stays open — honestly open, not vacuously closed.
 Refines the ruling above; worklist stages E–I in
 `projects/durable-disk.md`. Five decisions:
 
-1. **`P_fs = P_disk ∗ P_wf`, sharing the committed map `D` through one
-   binder in the `crashN` body** (`∃ dk D, frags dk ∗ P_disk dk D ∗
-   P_wf D` — the machine layer still opens exactly one invariant at a
-   DMA completion; a `ghost_var` handle for `D` is introduced only when
-   an OUTSIDE holder needs to name it, e.g. the contents layer's
-   sync receipts). `P_disk` is the log/WAL layer's:
+1. **`P_fs` is the WAL's half and the FS's half, sharing the committed
+   map `D` through one binder in the `crashN` body** (`∃ dk D, frags dk ∗
+   P_disk dk D ∗ P_dur D` — the machine layer still opens exactly one
+   invariant at a DMA completion; a `ghost_var` handle for `D` is
+   introduced only when an OUTSIDE holder needs to name it, e.g. the
+   contents layer's sync receipts). `P_disk` is the log/WAL layer's:
    the physical fragments pinning `dk`, `fs_recovery (fs_blocks dk) D`,
-   `hdr_wf`, the mirror/custody arm, the history. `P_wf` is the FS
-   layer's: `⌜fs_durable_wf D⌝` — and EVENTUALLY the higher-level durable
-   ghosts: directory and file CONTENTS as their own ghost state, tied to
-   `D` by the decode relation, so durability statements speak about
-   files and directories, never about a disk-like view (that is also
-   where sys_sync's pending postcondition wants to land). Both conjuncts
-   stay timeless.
+   `hdr_wf`, the mirror/custody arm, the history. The FS half is the
+   snapshot of `D` (next section). Both conjuncts stay timeless.
 2. **The logical disk is `D`; everything era-visible is stated over `D`.**
    The era mint (`fs_cfg_alloc`, the `fs_L` logged view, the icache /
    bitmap / link-ledger stocks) runs at `D`, read out of `P_fs` in the
    era fupd — never at the raw boot disk. Its well-formedness premises
-   come from `⌜fs_durable_wf D⌝`.
+   come from the FS half's own statement about `D`.
 3. **Recovery is logically invisible** — LANDED (durable-disk 1a). A
    dirty-log boot is the post-commit pre-install steady state: logged
    view = slot content, home block physically stale, dirty-at-boot true.
@@ -306,14 +301,9 @@ Refines the ruling above; worklist stages E–I in
    per-block caught-up receipts the install permits return
    (`fs_recovery_clear_keeps`), recovery-side writes are no-ops by (3).
    So every `P_disk`-side permit is derived once, in the WAL layer, from
-   its own state, and `end_op`'s one crash-facing premise is a
-   logically-atomic update of the durable view:
-   `∀ D, P_wf D ==∗ P_wf D'` at `D' =` the batch's logged values over
-   the old view. A FUPD, not a pure premise: the eventual
-   contents-level ghosts must move in the same instant. Built at
-   `end_op` time (invariants openable at ⊤), consumed at the
-   completion's `∅`-mask opening, hence a basic ghost update; the old
-   view's `⌜fs_durable_wf D⌝` arrives from the invariant body at fire time.
+   its own state, and `end_op` carries no FS-facing premise at all: the
+   commit's own step re-founds the FS half at the new committed map out of
+   what the collection hands it.
    **What lets the commit fupd NAME `D'` at mask `∅` is the widened
    mirror**: `log_mirror`'s payload grows from header+slots to the era's
    full picture of the durable extent (home blocks included), pinned to
@@ -328,312 +318,36 @@ Refines the ruling above; worklist stages E–I in
    era knows the committed view BY VALUE
    (`FsCrash.fs_recovery_of_mirror`) — and no bio-layer fact is ever
    needed inside a permit.
-5. **`fs_durable_wf`** is THE well-formedness invariant of the durable
-   committed view — the property every reachable committed state has and
-   every commit preserves. It states the content sweeps generally
-   (`fsimg_wf`'s W9 as written is an mkfs-image artifact — "the only
-   directory is root", false after one successful mkdir — and log
-   cleanliness is no part of it: a committed-uninstalled log is a fine
-   durable state). There is nothing special about `fs.img` beyond being
-   the base case of the poweroff/poweron loop invariant: adequacy
-   constructs the entire `P_fs` for it at init time, via
-   `fsimg_wf -> fs_durable_wf`. Each commit proves preservation — that obligation
-   is per-OP, at `end_op`, under group-commit quiescence (`out = 0`):
-   mid-batch logged views are DELIBERATELY inconsistent (bitmap bit set
-   before the inode points at the block), so the wf row on `log_res` is
-   conditioned on the op ledger being empty and re-established by each
-   op as it ends. The commit fupd is then assembled generically from
-   `⌜wf(L)⌝ + ⌜install of the batch over D = L⌝` — no `end_op` exit arm
-   states install-arithmetic.
+5. **The durable committed view is WELL FORMED, and that is the FS half's
+   own statement** — the property every reachable committed state has and
+   every commit preserves, re-established per OP at `end_op` under
+   group-commit quiescence (`out = 0`), because mid-batch logged views are
+   DELIBERATELY inconsistent (a bitmap bit is set before the inode points
+   at the block). There is nothing special about `fs.img` beyond being the
+   base case of the poweroff/poweron loop invariant: adequacy constructs
+   the entire `P_fs` for it at init time, off `fsimg_wf`. What the
+   property IS, and how the commit re-establishes it, is
+   [`durable-fs-plan.md`](durable-fs-plan.md).
 
-### `P_disk` / `P_wf` as they actually stand (durable-disk 1d, landed 2026-08-23)
+### The FS half of the crash predicate: a SNAPSHOT of the committed map
 
-Decision 1's split is now real in the tree, and the FS half is a RESOURCE
-rather than a pure sweep:
+`FsCrash.fs_rec_wf` is the WAL layer's own three conjuncts — `fs_recovery`,
+`last (fr_hist r) = Some (fr_D r)`, `hdr_wf` — and the file system's half
+of `P_fs` is the durable SNAPSHOT of the committed map,
+`FsDurSnap.P_dur (fr_D r)`: one copy of the file-system predicate over its
+own existential ghost names, allocated at the commit out of what the
+collection hands over and never updated in place.  It is a function of
+`fr_D r` alone, so `P_fs` names no durable ghost — there is no fixed-layer
+byte view, no lent authority and no client write permission on the durable
+side, and a writer's durable obligation is discharged at the commit rather
+than per write.  Every permit that does not move the committed view frames
+the conjunct untouched; the commit is the one write that advances it
+(`FsDurSnap.dsnap_step_xfer`).
 
-* `FsCrash.fs_rec_wf` is exactly the WAL layer's own three conjuncts —
-  `fs_recovery`, `last (fr_hist r) = Some (fr_D r)`, `hdr_wf`. The fourth
-  (`FsWf.fs_durable_wf (fr_D r)`, body `True`) is DELETED, together with
-  `fs_durable_wf` and `fs_durable_wf_placeholder`.
-* `P_fs` gains two conjuncts, both indexed by `fr_D r`:
-  `ghost_map_auth (fcn_view γs) 1 (fs_dbytes (fr_D r))` — the durable BYTE
-  view's authority, `P_disk`'s — and `fs_dview (fcn_view γs) (fs_dbytes
-  (fr_D r))` — its exclusive elements, which are `fs-state.md` §1's `Φ_D`
-  and are `P_wf`'s. `fs_dbytes` is the byte flattening of a block map
-  (block `b`'s byte `i` at `b·BSIZE + i`).
-* `γD` is `RiscvPtsto.riscv_dview_name`, a `riscvFixedGS` FIELD (never
-  re-minted, no mortal ever holds an element). It is not in
-  `fs_crash_names`: a gname the crash predicate binds existentially cannot
-  be named by a client, and the log's parked payload and the commit debt
-  have to name it. `P_fs` / `P_fs_rec_named` / `P_fs_named` take it as
-  their fourth explicit fixed name `γv`, beside `γsw`/`γreg`/`γst`;
-  `P_fs_rec` and `P_fs_any` — hence `fs_crash_seam`, whose arity does not
-  move — read it ambiently off the record, exactly as they read
-  `riscv_disk_name`.
-* **It moves only at the commit.** Every preserving permit frames the pair;
-  `fs_commit_L_sector0_rec` moves it at the `D'` it already computes (`L` on
-  the home set) by RUNNING THE CLIENT'S PREPARED STEP — since durable-disk
-  1d' the permit takes `LogDefs.fs_dstep (fs_restrict V home)
-  (fs_restrict (dv_of_D L) home)` as a spatial argument and LENDS both the
-  auth and `P_wf` to it for the instant, which is `fs-state.md` §5's commit
-  law made real. `fs_dview_rebase` is the TRIVIAL witness a Ψ-free client
-  supplies (`LogDefs.fs_dstep_rebase`), not something the permit performs.
-  `fs_dview` is `Typeclasses Opaque` and lives in `LogDefs.v` (the LOG has
-  to state the step and may not import this layer).
-* `P_wf` is a SEALED DEFINITION, not a parameter, and that is a measured
-  deviation: `P_fs_any` sits inside `fs_crash_seam`, which appears by name
-  in the statements of 90 files, so an `iProp`-valued parameter — explicit
-  argument or ambient class, it makes no difference — reaches all of them.
-  Stage 2 replaces the body by `fs_view Γ_D`, which CONTAINS it, at which
-  point `fs_dstep_rebase` stops holding and the client's debt is the only
-  way to build the commit's step. **`fs_dstep`'s gname is a PARAMETER**
-  (`fs_dstep γD D D'`). `LogDefs.v` sits below `RiscvPtsto` and may not
-  import it, so the name is an argument there; `LogInv.log_psi_commit` and
-  `FsCrash`'s seam section, which both carry `riscvGS`, instantiate it
-  AMBIENTLY at `riscv_dview_name` — the one kind of gname this tree does
-  not thread explicitly, and the reason `log_ctx_at`'s arity did not move.
-
-**WHAT "`P_wf` AS REAL" COSTS, AND WHY IT IS STILL A BLOB (3a,
-2026-08-24).** The intended body is `fs_view Γ_D` plus an explicit residual
-(`FsDurImg.fs_dur_view_of_image` already builds exactly that from the mkfs
-image, generically in `fs_boot_image_wf`). The log's side of the interface
-is DONE — the payload's second index, the two laws, the retirement of the
-Ψ-free `log_write` forms — and the wall is now entirely on `P_wf`'s side.
-The full account is `fs-state.md` §4 and §7:
-
-- **`P_wf`'s body MUST carry its own byte map and say that it owns it.**
-  `fs_dstep` moves `ghost_map_auth γD 1 (fs_dbytes D)`, and a `ghost_map`
-  authority moves only where its ELEMENTS are in hand. An index-free body
-  (`∃ S Br, top auth ∗ the top fragments ∗ fs_state Γ_D S ∗ a clause-free
-  byte bin`) puts no lower bound on which elements it owns relative to the
-  auth's map, so no `fs_dstep γ D D'` with `D ≠ D'` is derivable from it —
-  not by a supplier and not by the commit. Today's flat body IS the
-  completeness statement, which is exactly why `fs_dstep_rebase` holds.
-  Survey (iii)'s block-indexed shape is not the answer either (its domain
-  clause needs a `fs_state_blocks` theorem that does not state); the
-  equation has to be at the BYTE level, which in turn wants the free pool's
-  CONTENTS inside the bound data.
-- **And a supplier still has to FIND its object**: `FsState.fs_state_acc`
-  wants `fss_inodes S !! i = Some n` at an existentially bound `S`. The
-  node's VALUE is free (auth agreement pins it), only its EXISTENCE is not.
-  The durable inode map's domain never changes, so a persistent per-inum
-  token minted at boot would serve; a byte bin's membership does move, so
-  it belongs in the DEBT's own existential rather than in `P_wf`.
-- The durable top map has NO elements: `FsState.inode_owned` carries no
-  `top_frag`, so the durable abstract state cannot be retagged.
-  `FsDurImg.fs_dur_of_image` now returns the per-inode fragments (it used
-  to drop them); the definition of `P_wf` has to hold them.
-- The identity step survives the flip and nothing else of `fs_dstep_rebase`
-  does: `LogDefs.fs_dstep_id` and `fs_dstep_trans` are the debt's whole
-  algebra and are already landed, body-free. `fs_dstep_rebase` itself is
-  still the SUPPLIERS' discharge, through `LogInv.log_psi_write_rebase`.
-
-
-**AND THE HOME-VIEW ACCESSOR RULING (fs-state.md §4½) DOES NOT LIFT IT
-EITHER — TWO WALLS, BOTH MACHINE-CHECKED (3a').**
-Making durable write permission the client's per-block accessor moves the
-ownership obligation, it does not remove it. The full account with the
-lemma names is fs-state.md §4½a; the two headlines:
-
-- **The chain has no intermediate object at a `bfree`.** One accessor per
-  `log_write`, each handing back a whole `P_wf`, means every intermediate
-  durable byte map has to be some `fs_state Γ_D S`. It is not:
-  `free_pool` owns every block whose bitmap bit reads FREE while
-  `inl_blk_dom` makes an inode own every block its RECORD names, and xv6
-  clears the bit one `log_write` before it writes the record — so between
-  `itrunc`'s `bfree` and its `iupdate` the block has two owners. The
-  in-transit bin cannot help (the conflict is between two conjuncts that
-  both CLAIM the block). COMMITTED states are unaffected: xv6 never commits
-  one, so `fs_state` remains a correct invariant of the committed view and
-  fails only as the per-write intermediate. The decoupling that removes
-  this wall — the free pool's owned set stated EXPLICITLY rather than read
-  off the bitmap's bytes — costs `FsStateBitmap.free_pool_used`, i.e. the
-  argument that kills xv6's freeing-a-free-block panic.
-- **The AU quantifies over the index.** `SpecLogWrite`'s premise is
-  `∀ D₀ Dc, Ψ D₀ Dc ==∗ Ψ D₀ (<[b := bs]> Dc)`, so a supplier owes "`P_wf`
-  owns block `b`" uniformly in the durable byte map — the completeness
-  demand the ruling set out to avoid, arriving through the quantifier
-  rather than through the body. A client-chosen `Ψ` that carries a tie
-  pinning `Dc` is the only handle, and it makes each supplier's obligation
-  a fact about the whole durable map.
-
-**AND DEFERRED JUSTIFICATION (fs-state.md §4¾) LIFTS WALL (B) AND MEETS A
-THIRD — TWO OPEN TRANSACTIONS SHARING ONE BLOCK (3a-def).**
-Deferring to `end_op` does pin `Dj`: the row's
-off-the-deferred-domain clause hands the writer `⌜Dj !! b = lm_logged L !! b⌝`
-at its own block, so the `∀ Dc` obligation is gone. What it does not survive
-is concurrency, which the ruling does not mention and `LogInv.log_res`
-permits (`out ≤ 3`). The full account with the lemma names is fs-state.md
-§4¾a; the three headlines:
-
-- **The ledger records no ORDER and `lm_logged L` depends on it**, so no
-  order-free overlay of per-op deferred maps can be `log_state`'s row
-  (`defer_overlay_order_blind`, at an arbitrary resolver). The row that
-  works is POINTWISE — each open op's deferred value IS the logged value,
-  and off the deferred domain `Dj` agrees with the logged view — and it is
-  maintained by all five ledger transitions.
-- **It FORCES a `log_write` to evict its block from every other open op's
-  entry**, and eviction hands the last writer of a shared block the earlier
-  op's obligation: the bitmap bit another op's `balloc` set, the claim
-  marker another op's `ialloc` wrote. The bitmap instance is machine-checked
-  (`free_pool_used_no_block` + `fs_state_orphan_step_False`): the orphaned
-  block is owned by no conjunct of `fs_state Γ_D` between the evicting
-  write and the owning op's own record write.
-- **So §4¾'s consequence 4 is wrong**: the in-transit bin and §4½a (C)'s
-  explicit pool are needed after all. (C) is cheaper than §4½a priced it —
-  `FsStateBitmap.free_pool_used`, the freeing-a-free-block panic argument,
-  is consumed on the ERA side, so only the per-BATCH endpoint condition is
-  owed. And the wall's shape says where deferral belongs: in the CLIENT's
-  payload, where an intermediate object need never be a `P_wf`, with the log
-  adding only a quiescence token so `log_psi_commit` is demanded at
-  `out = 0` only.
-
-**AND THE OBJECT-GRANULAR POOL IS INERT AT THE DURABLE READING — SO WHAT
-THE COMMIT NEEDS FROM THE CLIENT IS A PURE FACT, NOT A BUNDLE OF FUPDS
-(3a-obj, `iris/FsDurWire.v`).** `FsDurObj`'s algebra is stated over an
-arbitrary reading `R` and its concrete lemmas over an arbitrary `Γ`, and
-nothing there instantiates `Γ` at the DURABLE view. Once you do, the pending
-entry `dpend R o (x,x') := R o x ==∗ R o x'` cannot be RUN: an object's
-durable resources are `ghost_map` elements (of the byte view, and of the top
-map for an inode slot), moving one needs the AUTHORITY, and completeness
-puts the authority and every element inside `P_wf` — which is exactly the
-configuration the commit is in, since the permit lends both to the step.
-`dpend_dur_blk_False` / `dpool_run_dur_False` / `dpend_dur_slot_False`. The
-entries a client CAN hold are the ones that promise nothing (`dpend_flat_bit`
-read the other way). The full account with the lemma names is fs-state.md
-§4⅞b; the two consequences for THIS layer:
-
-- **The complement makes the finding constructive.** A body holding an
-  authority AND all of its elements rebases unconditionally
-  (`LogDefs.fs_dview_rebase` for the bytes, `FsDurWire.top_rebase` for the
-  durable top map), so nothing is lost: `FsDurWire.dstep_dec_of_bridge`
-  derives the whole durable step from the TARGET'S PURE BRIDGE and no client
-  resource at all. `P_wf`'s landed shape is therefore the flat completeness
-  (which `FsDurBytes.fs_dview_dbytes` says IS "every home block owned as a
-  `DBlk`") plus the top map's authority and ALL its fragments plus a pure
-  bridge — `FsDurWire.P_wf_dec`. **Its crash guarantee is exactly as strong
-  as its pure tie is made**; `FsDurWire.kinds_of_state` carries the four
-  clauses the encode bridge and the suppliers need, and strengthening it
-  towards `fs_state`'s local clauses is PURE work that costs the resource
-  story nothing.
-- **`fs_state` with `free_pool_at_full` is contradictory** — `fs_state`
-  already owns the bitmap block through `free_bitmap_at`'s first conjunct
-  (`FsDurWire.fs_state_full_pool_False`), so "every home block `DBlk`-owned"
-  is the flat ownership INSTEAD OF the coupled decomposition, never beside
-  it.
-
-**AND THE DURABLE TIE'S GEOMETRY IS AN INDEX, NOT A PROJECTION OF THE
-PAYLOAD'S STATE (3b, `iris/FsDurWire.v` §4a/§6a).** The pure tie's `S` is
-existential in the payload, so a supplier's write obligation is quantified
-over every admissible `(S, K)`; a tie whose bitmap block is
-`sb_bmapstart (fss_sb S)` therefore leaves a writer's own block — fixed by
-the CODE — unrelated to the state's. `kinds_geom_underdetermined` is one
-kind assignment satisfying the tie at two different geometries. **And the
-obligation is not thereby unprovable, which is the dangerous half:**
-`kind_write_geom_free_degenerate` discharges it with a state that has no
-inodes and no inode region, so the flip would have compiled with a durable
-tie that says nothing about any inode from the first `balloc` onwards. The
-geometry is an explicit `dgeom` + `nin` index of `kinds_of_state`,
-`P_wf_dec`, `dstep_dec` and `Psi_dec`, and the three supplier obligations
-(`bm_write_obligation`, `data_write_obligation`, `di_write_obligation`) are
-stated at it and PRESERVE the payload's own state. For the flip, the index
-belongs in **`RiscvPtsto.fs_dur_names` as pure fields** — it is fixed at boot
-and never moves, nothing in xv6 writes the superblock — so that neither
-`P_fs` (whose `cov`/`ls` are threaded by name through 90 files inside
-`fs_crash_seam`) nor `LogInv.log_ctx` (78) grows an argument.
-
-**AND THE INDEX IS ON THE BUNDLE, WHILE THE LAYOUT PREMISE THAT CAME WITH
-IT WAS UNSATISFIABLE (3b', `RiscvPtsto.v` / `FsDurWire.v` / `FsDurImg.v`).**
-`fs_dur_names` carries the geometry as three plain `Z`s — `fdn_bmap`,
-`fdn_ist`, `fdn_nin` (`16 · nib`, the inums the REGION holds) — spelled as
-integers rather than as an `FsDurObj.dgeom`, which lives above `FsState`
-and would put the file-system cone underneath the machine layer;
-`FsDurWire.fdn_geom` is the reading, and `P_wf_dec`/`dstep_dec` take the
-geometry off the bundle they already hold, so no arity moves.  **The 3b
-layout premise `dwire_geom` was FALSE at xv6's own layout**: stated
-unbounded (`∀ j ≥ 0, dg_ist G + j ≠ dg_bmap G`) it is refuted at
-`j := dg_bmap G − dg_ist G` whenever the bitmap block is above the inode
-region, which `FsImg.sbo_bmapstart` makes it, so every mover taking it was
-vacuously applicable and unusable — and 3b's own non-vacuity witness hid
-that by exhibiting an INVERTED layout.  The repaired form bounds `j` by
-the region (`16·j < nin`, which every use site already carries) and states
-the STRICT `dg_ist G + j < dg_bmap G`; strictness is what lets a DATA
-block's writer rule out the bitmap block and every region block with one
-comparison (`data_write_above`), which is the only geometry fact such a
-writer holds.  The flipped `P_fs_alloc` takes the durable tie as ONE
-resource, `FsDurWire.dur_seed` (`P_wf_dec` minus the flat blob), built at
-the image by `FsDurImg.img_dur_seed`.  What the ERA still owes — and what
-`fs-state.md` §4⅞d records placements for, the "FS config bundle every
-supplier already carries" NOT existing — is the equation tying its own
-`bmapstart`/`inodestart`/`nib` to the bundle's: it rides `log_ctx_at`
-(the layout half, which names only the ambient record), `bitmap_inv` and
-`ireg_inv`, one conjunct each, all three minted at `fs_cfg_alloc`.
-
-**THE KINDS DESIGN IS REJECTED, AND THE STRUCTURED BODY NEEDS THE SAME
-THREE NUMBERS ANYWAY (3c, `iris/FsDurLedger.v`).**  Under the owner's
-STRUCTURED-BODY ruling (`fs-state.md` §5') `kinds_of_state`, `dwire_geom`
-and the whole role-proving family go, and `P_wf` is `fs_state Gamma_D S`
-with the durable top map's authority and every one of its fragments.  The
-byte authority is then moved only where the body demonstrably owns the
-bytes -- `FsDurLedger.dbytes_range_update`, one `ghost_map_update_big` at
-ONE byte range of ONE home block -- so `P_wf` needs no completeness clause
-and no byte bin, and a home byte nobody owns (xv6's boot block: marked
-used, named by no inode) is simply outside every entry.  What survives of
-the geometry is `fdn_bmap` / `fdn_ist` / `fdn_nin` as THREE EQUATIONS ON
-THE BODY (`FsDurLedger.dgeo_ok`): the first two turn a writer's block
-number into the existentially-bound state's own geometry, and the third is
-per-inum EXISTENCE, which is underivable in both directions -- the durable
-inode map's DOMAIN is not a function of the byte map (a smaller state owns
-fewer bytes and no agreement refutes it) and not a function of the
-superblock either (the domain is `region_inums nib`, while
-`sb_ninodes <= 16*nib`).  So `fs_dur_names`' three fields stay, the three
-era-side carriers above stay, and only the third equation reaches a record
-writer.
-
-**SNAPSHOT COMMITS: THE TRANSPORT IS AN ALLOCATION, AND EVERY RESOURCE
-WALL GOES WITH IT (4, `iris/FsDurSnap.v`).**  Under the owner's SNAPSHOT
-ruling (`fs-state.md` §4⁹) no durable ghost is ever moved: the committer
-ALLOCATES a fresh gname family at the quiescent state's values, proves the
-whole predicate at birth, and discards the previous instance.  So the
-durable step is `P_dur D ==∗ P_dur D'` with the input simply DROPPED, and
-it is derivable from a PURE fact about `D'` alone — no lent authority, no
-`fs_dstep`-shaped byte move, no completeness, no in-transit bin.
-`FsDurSnap.fs_snap_alloc` is the transport: byte map, top map and link
-family in ONE update, gnames existential, inputs the abstract state VALUE
-plus `snap_ok S D`.
-
-The one thing that makes the construction go through is that the
-snapshot's byte points-to is **persistent** (`a ↪□ v`).  With `blk_owned`
-persistent the footprint's pieces are COPIES of the block ledger, so
-`fs_state` is BUILDABLE from a flat byte map; at an exclusive points-to the
-same construction demands "distinct inodes name distinct blocks", a
-cross-inode pure fact that `fs-state.md` §0 forbids and that no per-object
-accumulation supplies.  What the durable instance gives up — `phi_excl` and
-hence `free_pool_used` (xv6's freeing-a-free-block panic) and
-`blk_owned_ne` — is consumed ERA-side only, which 3a-def and 3a-val had
-already priced at zero.  The link family's `● nlink` has no core, so the
-BUNDLE is not persistent; nothing borrows it, because every consumer reads
-the pure `snap_ok`, which is.
-
-**THE BATCH'S FRAME IS THE USED-SET COUPLING, AND THE BYTE HALF PINS THE
-OBJECTS (4b).**  The tie SPLITS: `snap_ok S D = snap_bytes S D ∧
-snap_local S`.  `snap_bytes` — the byte tie plus the representation
-clauses plus the coupling (metadata blocks are marked in use; a node's own
-blocks are marked in use and are no metadata block; no two nodes share
-one) — is true even MID-OP and is what a batch accumulates; `snap_local`
-is the per-inode `inode_local` and does not mention `D`, so no write can
-disturb it.  The frame's hypothesis then comes off ONE object at ONE
-writer: a block whose bit reads CLEAR is untouched
-(`snap_untouched_of_free`, the ADOPT case, off the writer's own bitmap
-AU), and a block that is my node's is untouched by every clause but mine
-(`snap_untouched_of_own`).  The coupling is exactly the image's W3+W4+W5,
-so boot owes nothing new.  And with the representation clauses on the byte
-side the three byte ties DETERMINE each node (`snap_bytes_node_inj`),
-which is what lets a writer read the payload's existentially-bound state
-as its own — the reason the accumulation can be state-free at all.  What
-is still open is the LOCAL half's accumulation across concurrent ops in
-one batch; `fs-state.md` §4⁹b has the finding and the proposed row over
-the log's `pend`.
+The whole design — the snapshot tie a batch accumulates, what the commit
+collects at quiescence, the boot point — is
+[`durable-fs-plan.md`](durable-fs-plan.md), the design of record, with the
+ghost inventory in [`fs-ghost-state.md`](fs-ghost-state.md).
 
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
