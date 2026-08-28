@@ -857,6 +857,56 @@ Section Snap.
   Qed.
 
   (* ================================================================== *)
+  (*  6b'. THE EPOCH IS LENDABLE (durable-disk BT-2)                     *)
+  (*                                                                    *)
+  (*  [P_dur D ==∗ P_dur D ∗ P_dur D], and it is NOT a duplication of a  *)
+  (*  linear resource: the second epoch is a FRESH gname family minted   *)
+  (*  by the transport off the first ([P_dur_alloc_xfer] at [q = 1]),    *)
+  (*  and the first comes back untouched because everything the          *)
+  (*  transport does to a source is READ PURE FACTS off it.              *)
+  (*                                                                    *)
+  (*  NO NEW PREMISE, and that is the point.  Both of the transport's    *)
+  (*  pure inputs are literal conjuncts of [fs_snap]: [snap_shape S D]   *)
+  (*  is its last row, and [B ⊆ fs_dbytes D] is [FsDurRead.snap_auth]'s  *)
+  (*  own.  Its two resource inputs are the epoch's byte authority (as   *)
+  (*  the [phi_agree] source, [snap_gamma_agree]) and its exclusivity    *)
+  (*  ([snap_gamma_excl]).                                              *)
+  (*                                                                    *)
+  (*  THIS IS THE BOOT-SIDE TRANSPORT'S HINGE: the crash predicate keeps *)
+  (*  its own epoch across the power cycle and the era gets a CLONE, so  *)
+  (*  "lent, returned" is realized at the one site that can do it        *)
+  (*  ([FsCrash.P_fs_swap], at the PowerOn arm).                          *)
+  (*                                                                    *)
+  (*  NO BARE [iFrame] AT THE CLOSE (durable-disk H2's landing note):    *)
+  (*  two byte authorities are in context at once here -- the source's   *)
+  (*  [g] and the fresh family's -- and [P_dur]'s head conjunct is a     *)
+  (*  byte authority, so a bare [iFrame] would unify the wrong gname.    *)
+  (*  Every conjunct is placed by name.                                  *)
+  (* ================================================================== *)
+  Lemma P_dur_clone D : P_dur D ==∗ P_dur D ∗ P_dur D.
+  Proof.
+    iIntros "HD". rewrite {1}/P_dur.
+    iDestruct "HD" as (g gl gt S) "Hs".
+    rewrite /fs_snap. iDestruct "Hs" as "(Hba & Hta & Htf & HS & Hlk & %Hsh)".
+    rewrite /snap_auth. iDestruct "Hba" as (B) "[Hba %Hin]".
+    iDestruct "Hlk" as (kv) "Hlk".
+    iMod (P_dur_alloc_xfer (snap_gamma g gl gt) (snap_gamma_excl g gl gt)
+            (ghost_map_auth g 1 B) B (snap_gamma_agree g gl gt B) 1%Qp S D kv
+            qp_half_lt_1 Hsh Hin with "Hba HS Hlk")
+      as "(Hba & HS & Hlk & Hnew)".
+    iModIntro. iSplitR "Hnew"; [| iExact "Hnew"].
+    rewrite /P_dur. iExists g, gl, gt, S. rewrite /fs_snap.
+    iSplitL "Hba".
+    { rewrite /snap_auth. iExists B. iSplitL "Hba"; [iExact "Hba" |].
+      iPureIntro. exact Hin. }
+    iSplitL "Hta"; [iExact "Hta" |].
+    iSplitL "Htf"; [iExact "Htf" |].
+    iSplitL "HS"; [iExact "HS" |].
+    iSplitL "Hlk"; [iExists kv; iExact "Hlk" |].
+    iPureIntro. exact Hsh.
+  Qed.
+
+  (* ================================================================== *)
   (*  7b.  THE READING (durable-disk lane H3)                            *)
   (*                                                                    *)
   (*  [snap_ok S D] OFF THE SNAPSHOT'S OWN RESOURCES.  Nothing is        *)

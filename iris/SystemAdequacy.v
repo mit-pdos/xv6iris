@@ -603,35 +603,22 @@ Proof.
               variable in the same fupd, so the era boots already holding a
               true picture and the swap receipt. *)
            (fun dk => mirror_of (fs_blocks dk))
-           (* THE LENT RESOURCE (durable-disk BT-1): NOTHING YET.  The
-              channel is open -- [Hswap] is the one hook that runs with
-              [crashN] open and the fixed disk auth in hand, so it is the
-              only place a resource can leave the crash predicate for a
-              boot -- but this stage instantiates it at [emp] and the era
-              drops it, so the transport's shape lands on its own.  BT-2
-              fills it with [∃ D, ⌜fs_recovery …⌝ ∗ P_dur D], cloned off
-              the crash predicate's own epoch. *)
-           (fun _ => emp)%I
-           (* NO [iFrame] IN HERE, AND THAT IS NOT STYLE (durable-notes.md,
-              "[iFrame] resolves its instances up to delta").  One conjunct
-              of this post is [▷ P_fs_named …], whose body owns
-              [DiskImg.disk_img_bytes γd 0 (disk_read dk0 0 XV6_DISK_BYTES)]
-              -- a 2,048,000-element [big_sepL] behind a [Definition].  A
-              bare [iFrame] unfolds it looking for a frame and the file goes
-              from 7 s to unbounded at 32 GB (MEASURED).  Every conjunct is
-              placed by name instead. *)
+           (* THE LENT RESOURCE (durable-disk BT-2): THE CRASH PREDICATE'S
+              OWN EPOCH, at the map the machine's disk recovers to.  This
+              is the whole boot-side transport: [P_fs_swap] runs at the
+              PowerOn arm with [crashN] open and the fixed disk auth in
+              hand -- the one place [dk] is the MACHINE's -- takes the
+              epoch out through [FsCrash.P_fs_dur_acc], clones it with
+              [FsDurSnap.P_dur_clone] (the transport at [q = 1], which
+              costs no new pure premise) and closes the accessor, so the
+              record keeps its own and the era gets a copy.  Its [D] is
+              pinned to the boot's own by [fs_recovery_det], which is why
+              no state-determinacy theorem is needed.  [boot_shared_alloc]
+              still drops it; BT-3 hands it to the mint. *)
+           (P_fs_lend cov (FsImg.sb_logstart sb))
            ltac:(intros γd γsw γreg γst Er gen dk;
-                 iIntros "Hreg Hlb Hsa Ha HM HP";
-                 iMod (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
-                         (FsImg.sb_logstart sb) dk Er gen
-                         with "Hreg Hlb Hsa Ha HM HP")
-                   as ">(Hsa & Ha & HP & HM & Hswlb)";
-                 iModIntro; iModIntro;
-                 iSplitL "Hsa"; [iExact "Hsa" |];
-                 iSplitL "Ha"; [iExact "Ha" |];
-                 iSplitL "HP"; [iExact "HP" |];
-                 iSplitL "HM"; [iExact "HM" |];
-                 iSplitL "Hswlb"; [iExact "Hswlb" | done])
+                 exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
+                          (FsImg.sb_logstart sb) dk Er gen))
            (* THE TRACE HOOK, threaded straight through: this layer fixes the
               crash predicate but says nothing about what the client reads off
               it, so [phi]/[Hphi] pass down unexamined. *)
