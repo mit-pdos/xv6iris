@@ -1948,36 +1948,6 @@ Section ProofCopyin.
     - rewrite Hfa0. exact Hres.
   Qed.
 
-  (* THE [proc_pt]-ALTITUDE COROLLARY.  Most callers -- either_copyin,
-     fetchaddr, fetchstr, argstr, kexec -- say nothing about the bytes they
-     read, so they keep the contract that does not name a memory.  Opening
-     and re-sealing is the whole of the derivation: [ProcPtOwn.proc_pt_ptm]
-     IS the equivalence, and it holds at every size. *)
-  Lemma wp_copyin_sconf
-      (γa : gname) (mm : regfile)
-      (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_copyin_sconf_body ktb γa mm P szv len dst_olds K lvl eb p b lks.
-  Proof.
-    cbv beta delta [wp_copyin_sconf_body].
-    intros pcE dst ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
-    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hdst Hcont".
-    iEval (rewrite (proc_pt_ptm P (uint szv))) in "Hpt".
-    iDestruct "Hpt" as (M) "Hpt".
-    iApply (wp_copyin_sconf_mem γa mm P M szv len dst_olds K lvl eb p b lks
-              HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow
-              with "Hcg Hcnt Htext Hpc Hpt Henv Hdst").
-    rewrite /wp_next. iIntros (CIDr) "%Hch".
-    iSpecialize ("Hcont" $! CIDr with "[%]"); [exact Hch |].
-    iIntros (mr P' dst_new) "Hcg2 Hcnt2 Hpc2 Hpt2 Hdst2 %Hcs %Hext %Hres".
-    iApply ("Hcont" $! mr P' dst_new with
-              "Hcg2 Hcnt2 Hpc2 [Hpt2] Hdst2 [%] [%] [%]").
-    - iApply (proc_ptm_pt with "Hpt2").
-    - exact Hcs.
-    - exact Hext.
-    - destruct Hres as [(Hz & _) | Hm]; [ by left | by right ].
-  Qed.
-
 End ProofCopyin.
 
 End CopyinProof.

@@ -111,6 +111,8 @@ Definition wp_consoleread_sconf_body
     (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleread in
   let pj := proc_addr j in
+  (* a1 = dst, the user destination the bytes are copied to *)
+  let dst := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* the process running here is proc j (sleep/killed's linkage) *)
   (j < NPROC)%nat ->
@@ -146,19 +148,32 @@ Definition wp_consoleread_sconf_body
   kalloc_env γa None -∗
   procs_inv γs -∗
   wp_next b pj (fun (CID : CpuId) =>
-    (* the image moves: the copy leaf may fault a page in, and copyout
-       writes user memory -- milestone J item 1's ∃-weakened staging *)
-  ∀ (mf : regfile) (r : Z) (P' : uptd) (M' : gmap Z (bv 8)),
+    (* THE IMAGE MOVES, AND THE MOVE IS A WINDOW.  consoleread's only write
+       to user memory is the loop's one-byte-per-round either_copyout,
+       walking [dst] upwards, so the block comes back at the image it went
+       in at WITH THE RUN [dst .. dst+d) WRITTEN and nothing else touched.
+       A caller reads its own untouched bytes back with
+       [UserPtTree.umem_wr_lookup_out].
+
+       WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE.  [d]
+       is how far the loop got -- NOT pinned to [r], because a copyout that
+       faults part-way may still have moved its byte before the loop broke.
+       [bs] is what came out of the console ring, which no contract at this
+       tier can name: the ring is the existential half of [ConsoleInv]'s
+       invariant and the loop sleeps inside the read. *)
+  ∀ (mf : regfile) (r : Z) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       (* the whole of what a device read promises: it delivered somewhere
          between "failed" and "all of it". *)
       ⌜(-1 <= r <= Z.max 0 n)%Z⌝ -∗
+      ⌜(Z.of_nat d <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv_core pj pid (upd_usM (us_upt U P') M') -∗
+      proc_priv_core pj pid
+        (upd_usM (us_upt U P') (umem_wr (us_M U) dst d bs)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

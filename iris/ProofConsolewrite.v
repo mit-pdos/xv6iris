@@ -272,8 +272,8 @@ Section CwBodies.
   Definition cw_ret `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
       (eb : bool) (pid : mword 32) (U : ustate) (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CID : CpuId) =>
-       (* the image moves: the copy-in may fault a page in *)
-       ∀ (mf : regfile) (r : Z) (P' : uptd) (M' : gmap Z (bv 8)),
+       (* the image does not move: either_copyin is same-[U] *)
+       ∀ (mf : regfile) (r : Z) (P' : uptd),
          ⌜callee_saved m0 mf⌝ -∗
          ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
          ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
@@ -281,7 +281,7 @@ Section CwBodies.
          sie_cap_gpr KT1 mf av true (proc_addr jp) -∗
          cpu_own 0%nat eb (proc_addr jp) true lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
-         proc_priv_core (proc_addr jp) pid (upd_usM (us_upt U P') M') -∗
+         proc_priv_core (proc_addr jp) pid (us_upt U P') -∗
          WP (Loop : expr riscv_lang)))%I.
 
   (* the loop re-enters its own continuation at a MOVED descriptor; both the
@@ -295,8 +295,8 @@ Section CwBodies.
     intro Hext. rewrite /cw_ret /wp_next.
     iIntros "H" (CID) "%Hg".
     iSpecialize ("H" $! CID with "[%]"); [exact Hg|].
-    iIntros (mf r P' M') "%Hcs %Hx %Hr %Ha0".
-    iApply ("H" $! mf r P' M' with "[%] [%] [%] [%]").
+    iIntros (mf r P') "%Hcs %Hx %Hr %Ha0".
+    iApply ("H" $! mf r P' with "[%] [%] [%] [%]").
     - exact Hcs.
     - exact (uptd_ext_trans _ _ _ Hext Hx).
     - exact Hr.
@@ -465,14 +465,14 @@ Section CwBodies.
                  with "Hcnt") as "Hcnt".
     rewrite /cw_ret.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E5 r (pv_upt (us_V U)) (us_M U) with "[%] [%] [%] [%] Hcg Hcnt Hpc [Hpriv]").
+    iApply ("Hcont" $! E5 r (pv_upt (us_V U)) with "[%] [%] [%] [%] Hcg Hcnt Hpc [Hpriv]").
     - exact Hcs.
     - apply uptd_ext_refl.
     - exact Hr.
     - exact HE5a0.
-    - (* the round trip that moved nothing: [us_upt_id] folds the descriptor
-         write and [upd_usM_id] the image write. *)
-      rewrite us_upt_id upd_usM_id. iExact "Hpriv".
+    - (* the round trip that moved nothing: [us_upt_id] folds the
+         descriptor write, and there is no image write left to fold. *)
+      rewrite us_upt_id. iExact "Hpriv".
   Qed.
 
   (* the whole of what the pop needs: the nine spill slots plus the four the

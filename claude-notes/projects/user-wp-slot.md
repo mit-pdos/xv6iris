@@ -123,6 +123,27 @@ instantiation, before any sync linking:
    `uv_cap` premise on the true branch → the sync trap-exit reshape
    onto the return channel (umode side).
 
+## THE uvis RULING (owner): the slot is keyed on the ACTUALLY-user-visible state
+
+The page-table descriptor is kernel-side REALIZATION, not observation:
+a process sees its va-keyed memory and its registers, never PPNs — two
+states with the same view on different tables are user-indistinguishable.
+So a second record, `uvis := { uvis_tf : list (mword 64); uvis_M :
+gmap Z (bv 8) }` with `uvis_of : ustate -> uvis`, captures the
+user-visible state (ustate minus the table; later fd view and pid as
+fields), and `uexec_slot (W : uvis)` UNIVERSALLY QUANTIFIES the
+realizing descriptor inside — `∀ P, ⌜loop_ok C P⌝ -∗ …
+user_pt_inv P (uvis_M W) … Rut P …` — exactly parallel to the ∀-dead
+register-file base, and exactly the ∀-descriptor form the fork clause
+needs for the child (same `M`, fresh table).  `ustate`/`proc_priv`
+keep the descriptor exposed: the trap seams, the phase splits and the
+table-moving specs are keyed on it.  Small change by construction:
+nothing in the kernel consumes `uexec_slot` yet, so the re-key touches
+UexecSlot/UexecCond/USyncKernel only.  `uvis_tf` keeps the full
+36-word list (words 0/1/2/4 are kernel words, dead weight in the key;
+a later refinement may restrict to the 32 user-relevant words — epc,
+word 3, IS user-visible and stays).
+
 ## THE proc_pt_any ELIMINATION CAMPAIGN (owner-ruled)
 
 `proc_pt_any` is a spec smell: a file whose contract holds it cannot
@@ -144,8 +165,9 @@ FIVE RULES THE CAMPAIGN RUNS ON:
 
 - **A leaf's `_mem` form is the PRIMITIVE; its `proc_pt_any` form is a
   five-line corollary** (`ProcPtOwn.proc_pt_ptm` in, `proc_ptm_pt` out —
-  `ProofCopyin.wp_copyin_sconf` is the recipe).  When a leaf's last
-  ∃-caller converts, DELETE the corollary rather than keep it.
+  `ProofCopyin.wp_copyin_sconf` WAS the worked recipe, until tier 3
+  deleted it too).  When a leaf's last ∃-caller converts, DELETE the
+  corollary rather than keep it.
 - **Re-alting a copy loop to the lazy view is mechanical** once the loop
   names its source bytes: swap `proc_pt_acc_rep0` / `proc_pt_rebuild` /
   `proc_pt_page_acc(_vmfault)` for their `proc_ptm`
@@ -159,6 +181,25 @@ FIVE RULES THE CAMPAIGN RUNS ON:
   (`umem_wr M dst d src`).  `∃ M', ⌜P M'⌝ ∗ … M'` type-checks and says
   the same thing, but it is not an equation and a caller cannot rewrite
   with it.
+- **A LOOP'S WINDOW NEEDS ITS CURSOR PINNED.**  A byte-at-a-time copy
+  loop carries a cursor with no stated relation to the entry address,
+  which makes the round's `umem_wr` uncomposable with the run already
+  written.  The invariant that fixes it is one line -- `cur = pa_add dst
+  k`, `k` the count delivered so far -- and adding it is most of the diff
+  in consoleread and piperead.  `UserPtTree.umem_wr_app` then appends the
+  round with NO no-wrap side condition, because the run is keyed by
+  `add_vec_int`.
+- **RE-KEYING AN EXIT ONTO A MOVED BLOCK CANNOT CARRY A WINDOW READ OFF
+  THAT BLOCK.**  Two runs at the SAME base do not compose (`umem_wr`
+  promises nothing about a run that wraps), so an exit that a shift
+  lemma re-bases must key its window on a bare entry image carried as its
+  own parameter -- `ProofConsoleread.cr_ret`'s `Ment`.
+- **WHEN A WRITER'S POST ALREADY CARRIES A COUNT, SPEND THE FAILURE ARM'S
+  EXISTENTIAL BY RE-INSTANTIATING THAT COUNT.**  readi's `-1` exit used
+  to report the loop counter, leaving the partly-copied chunk invisible
+  and forcing an `∃ d` on the image.  Reporting *counter + what the
+  failing chunk managed* makes one number do both jobs and leaves readi's
+  post with NO existential at all.
 - **DROPPING A `∀ M'` FROM A POST BREAKS CALLERS THAT WERE PASSING A
   DIFFERENT IMAGE, SILENTLY-UNTIL-IT-DOESN'T.**  While the post bound
   `∀ M'`, a caller could hand the callee `upd_usM U Mx` in place of `U`
@@ -176,10 +217,10 @@ FIVE RULES THE CAMPAIGN RUNS ON:
   `M' := us_M U` and needs no edit.  That is what lets one tier convert
   without dragging the tier above it in.
 
-STATE: tiers 0 (vm.c leaves), 1 (fetch/arg) and 2 (`either_copy`) are
-DONE, and so are the three items that were ready out of order.
-`either_copyin_post` is same-`U`; `either_copyout_post` is the campaign's
-FIRST PRECISE WRITER --
+STATE: tiers 0 (vm.c leaves), 1 (fetch/arg), 2 (`either_copy`) and 3
+(the file / pipe / console read-write layer) are DONE, and so are the
+three items that were ready out of order.  `either_copyin_post` is
+same-`U`; `either_copyout_post` is the campaign's FIRST PRECISE WRITER --
 
 ```coq
 ∃ (P' : uptd) (d : nat),
@@ -189,17 +230,30 @@ FIRST PRECISE WRITER --
 ```
 
 -- the entry image with the copied prefix written at `dst`, an EQUATION
-rather than a fresh binder.  `SpecEitherCopyout.either_copyout_post_any`
-is the one-line forgetting the not-yet-converted tier above uses, and
-every call of it is an entry on the remaining worklist.
-`wp_vmfault_sconf` and `wp_uvmunmap_sconf` are deleted (no callers left);
-the six fs-syscall specs no longer bind `∀ M'`.  `SpecUvmclear` and
-`SpecProcFreepagetable` now have `_mem` forms: uvmclear's is the
-PRIMITIVE and is same-`M` (clearing PTE_U moves neither `ud_um`'s domain
-nor a leaf's ppn, so neither `uva_mapped` nor `uva_pa` moves --
-`ProcPtOwn.umem_lazy_set_same`), proc_freepagetable's is a corollary
-because its post hands nothing back either way.  The frontier is TIER 3,
-the file / pipe / console read-write layer.
+rather than a fresh binder.  TIER 3 lifted that through nine contracts:
+`wp_readi_sconf`, `wp_consoleread_sconf`, `wp_piperead_sconf`,
+`wp_filestat_sconf` and `wp_fileread_sconf` are PRECISE (the block comes
+back at `umem_wr (us_M U) dst d bs`, with `d` a length and `bs` a byte
+function -- never a `gmap`); `wp_writei_sconf`/`_gen`,
+`wp_consolewrite_sconf`, `wp_pipewrite_sconf` and `wp_filewrite_sconf`
+are SAME-`M`.  readi's post carries NO existential at all: its `tot` is
+both the reported count and the window's length.
+
+The window vocabulary is `UserPtTree`'s: `umem_wr_app` (adjacent runs
+append, no no-wrap side condition), `umem_wr_ext`, and `umem_wrote M M'
+dst d` (`∃ src, M' = umem_wr M dst d src`) with `_0`/`_app`/`_out`/`_dom`
+for a reader whose source is a DEVICE and whose bytes therefore cannot be
+named -- the console ring, the far end of a pipe.
+
+`wp_vmfault_sconf` and `wp_uvmunmap_sconf` are deleted (no callers left),
+and so now are `either_copyout_post_any` and `wp_copyin_sconf`
+(piperead, its last caller, moved to `wp_copyin_sconf_mem`);
+`wp_copyout_sconf` survives on ProofSysPipe ×2, ProofKwait ×1 and
+ProofKexecC ×2.  The
+six fs-syscall specs no longer bind `∀ M'`.  `SpecUvmclear` and
+`SpecProcFreepagetable` have `_mem` forms.  The frontier is TIER 4, the
+syscall dispatch: sys_read/write/fstat/wait/pipe/sbrk, growproc, kwait,
+and then `wp_syscall_sconf`, none of which needs new algebra.
 
 ## The ledger
 

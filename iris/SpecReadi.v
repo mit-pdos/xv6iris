@@ -78,8 +78,23 @@
    argument -- exactly what [either_copyout]'s ghost [user] flag is for
    (claude-notes/completed/either-copy.md names readi/writei as the reason
    it is a ghost boolean).  readi THREADS the flag: [proc_priv] is required
-   only on the user arm, and on that arm nothing is said about the bytes the
-   process will read back.
+   only on the user arm.
+
+   ON THE USER ARM THE SAME CLAUSE IS AN EQUATION ON THE PROCESS'S MEMORY.
+   The block comes back at
+
+     upd_usM (us_upt U P') (umem_wr (us_M U) dst tot (rd_bytes data off))
+
+   -- the image it went in at, with the file's bytes [off .. off+tot)
+   written at user va [dst .. dst+tot).  It pins the untouched bytes as
+   firmly as the written ones, and it is the SAME [tot] the return value
+   names, on BOTH arms: a copy that faulted part-way reports -1 but still
+   moved [tot] bytes, and [tot] is what readi's [tot] IS.  (That is why the
+   -1 arm's [tot] is not the loop counter but the loop counter plus
+   whatever the failing chunk managed -- see [ProofReadi]'s +0xb0 exit.)
+   [UserPtTree.umem_wr] is keyed by the 64-bit va, so the statement need not
+   promise that [dst + tot] does not wrap; a caller that knows it does not
+   reads bytes back with [umem_wr_lookup_in] / [umem_wr_lookup_out].
 
    ==== THE RETURN VALUE IS EXACT =======================================
 
@@ -216,6 +231,26 @@ Definition rd_delivered (data : nat -> list (bv 8)) (dst_olds : nat -> bv 8)
   if decide (i < tot)%nat
   then file_byte data (off + i)%nat
   else dst_olds i.
+
+(* the clamp only ever shrinks *)
+Lemma rd_clamp_le (szw : bv 32) (off n : nat) : (rd_clamp szw off n <= n)%nat.
+Proof. rewrite /rd_clamp. case_decide as H1; lia. Qed.
+
+(* THE SAME BYTES, WITHOUT THE TAIL -- what the USER arm's window equation
+   is written over.  A [umem_wr] run of length [tot] reads its source only
+   below [tot], where [rd_delivered] IS this ([rd_delivered_bytes]); saying
+   it this way keeps the caller's own [dst_olds], which the user arm never
+   owns, out of the equation. *)
+Definition rd_bytes (data : nat -> list (bv 8)) (off i : nat) : bv 8 :=
+  file_byte data (off + i)%nat.
+
+Lemma rd_delivered_bytes (data : nat -> list (bv 8)) (dst_olds : nat -> bv 8)
+    (off tot i : nat) :
+  (i < tot)%nat -> rd_delivered data dst_olds off tot i = rd_bytes data off i.
+Proof.
+  intro Hi. rewrite /rd_delivered /rd_bytes.
+  case_decide as H1; [reflexivity | exfalso; lia].
+Qed.
 
 (* ===================================================================== *)
 (*  THE ABI's 32-BIT ARGUMENT, FOR A CALLER WHOSE ARGUMENT IS SMALL      *)
@@ -394,10 +429,11 @@ Definition wp_readi_sconf_body
      [eb = false] is reachable the [b] form would promise the caller it
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CID : CpuId) =>
-  (* THE USER ARM'S IMAGE MOVES: either_copyout writes user memory, so the
-     block comes back at a NEW [M'] (milestone J item 1's ∃-weakened staging;
-     the precise window is win-2 work).  The kernel arm's does not. *)
-  ∀ (mf : regfile) (tot : nat) (P' : uptd) (M' : gmap Z (bv 8)),
+  (* THE USER ARM'S IMAGE MOVES, AND THE MOVE IS NAMED: either_copyout
+     writes user memory, so the block comes back with the run
+     [dst .. dst+tot) overwritten by the file's bytes and NOTHING else
+     touched.  The kernel arm's image does not move at all. *)
+  ∀ (mf : regfile) (tot : nat) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       (* never more than the clamped count *)
@@ -425,7 +461,9 @@ Definition wp_readi_sconf_body
          fraction goes back the way it came -- with the kernel arm's buffer,
          or inside the user arm's block. *)
       (if user
-       then proc_priv_core pj pidv (upd_usM (us_upt U P') M')
+       then proc_priv_core pj pidv
+              (upd_usM (us_upt U P')
+                 (umem_wr (us_M U) dst tot (rd_bytes data off)))
        else ([∗ list] i ∈ seq 0 n,
               pa_add dst i ↦ₘ[ktb] rd_delivered data dst_olds off tot i) ∗
             proc_priv_bare pj pidv U) -∗

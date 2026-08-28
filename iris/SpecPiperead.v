@@ -76,6 +76,8 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   let pcE : mword 64 := mword_of_int KernelSyms.piperead in
   let pj := proc_addr j in
   let pi := m !!! Regidx (mword_of_int 10 : mword 5) in
+  (* a1 = addr, the user destination the bytes are copied to *)
+  let addr := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* the process running here is proc j (sleep/killed's linkage) *)
   (j < NPROC)%nat ->
@@ -106,18 +108,31 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   (* the running-thread bundle (SpecSleep.v) *)
   procs_inv γs -∗
   wp_next b pj (fun (CID : CpuId) =>
-  (* THE IMAGE MOVES: the copy leaf may fault a page in (and copyout writes
-     user memory), so the block comes back at a fresh [M'] -- milestone J
-     item 1's ∃-weakened staging, exactly as [SpecPipewrite]'s post. *)
-  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
+  (* THE IMAGE MOVES, AND THE MOVE IS A WINDOW.  piperead's only write to
+     user memory is its copy loop's one-byte-per-round copyout, walking
+     [addr] upwards, so the block comes back at the image it went in at WITH
+     THE RUN [addr .. addr+d) WRITTEN and nothing else touched.  A caller
+     reads its own untouched bytes back with
+     [UserPtTree.umem_wr_lookup_out].
+
+     WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE.  [d] is
+     how far the loop got (bounded by the requested count; it is NOT pinned
+     to the return value, because a copyout that faults part-way may still
+     have moved its byte before the loop broke).  [bs] is what came out of
+     the pipe, which no contract at this tier can name: the ring's contents
+     are the existential half of [PipeInvDefs]'s invariant and the loop sleeps
+     inside the read. *)
+  ∀ (mf : regfile) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜(Z.of_nat d <= Z.max 0 n)%Z⌝ -∗
       ⌜pipe_rw_ret n (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       pipe_ref γp w q -∗
-      proc_priv_core pj pid (upd_usM (us_upt U P') M') -∗
+      proc_priv_core pj pid
+        (upd_usM (us_upt U P') (umem_wr (us_M U) addr d bs)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

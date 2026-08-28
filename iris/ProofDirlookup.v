@@ -1641,7 +1641,7 @@ Section ProofDirlookupMain.
                   with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hrow Hkenv Hidev Hmeta Hmap
                         Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbslot").
         all: try lkbelow.
-        iIntros (CIDrd Hsrd mrd tot P' Mrd)
+        iIntros (CIDrd Hsrd mrd tot P')
           "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt Hextc Hclmc Hpc Hidev Hmeta Hmap Hblocks
            Hdst2 Hbslot".
         iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".

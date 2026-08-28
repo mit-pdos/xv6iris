@@ -617,9 +617,13 @@ Definition wp_filewrite_sconf_body
      [b = true] at the only constructible instance, so this is not a change of
      strength today; it is the spelling the eb-generic sweep needs. *)
   wp_next true pj (fun (CID : CpuId) =>
-    (* the image moves: the copy leaf may fault a page in, and copyout
-       writes user memory -- milestone J item 1's ∃-weakened staging *)
-  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
+    (* THE IMAGE DOES NOT MOVE.  filewrite only READS user memory -- its
+       three arms are writei (either_copyin), consolewrite (either_copyin)
+       and pipewrite (copyin) -- and at the lazy view a fault inside a copy
+       backs a page already in the view reading 0.  So the block comes back
+       at the caller's own [us_M U]; only the DESCRIPTOR grows.
+       (image campaign, tier 3.) *)
+  ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜filewrite_ret n r⌝ -∗
@@ -628,7 +632,7 @@ Definition wp_filewrite_sconf_body
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q st -∗
-      proc_priv_core pj pidv (upd_usM (us_upt U P') M') -∗
+      proc_priv_core pj pidv (us_upt U P') -∗
       filewrite_env_out fn st -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

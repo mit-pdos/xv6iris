@@ -616,6 +616,122 @@ Proof.
   apply elem_of_dom. apply Hsome. lia.
 Qed.
 
+(* THE VA-KEYED RUN'S OWN ALGEBRA.  Two bumps off one base collapse into
+   one, MODULO 2^64 and therefore with NO no-wrap side condition -- which is
+   the whole reason [umem_wr] is keyed by [add_vec_int] rather than by an
+   integer base.  [ByteCursor.pa_add_bump] is the same fact about the
+   pointer; this file cannot see it (it is below ByteCursor), so the two
+   lines are repeated rather than shared. *)
+Lemma add_vec_int_nat_assoc (p : mword 64) (a b : nat) :
+  add_vec_int (add_vec_int p (Z.of_nat a)) (Z.of_nat b)
+  = add_vec_int p (Z.of_nat (a + b)).
+Proof.
+  unfold add_vec_int. apply bv_eq.
+  rewrite !add_vec64_unsigned !moi64_unsigned.
+  rewrite !bv_wrap_add_idemp_r !bv_wrap_add_idemp_l. f_equal.
+  rewrite Nat2Z.inj_add. ring.
+Qed.
+
+(* ADJACENT RUNS APPEND.  A CHUNKED writer into user memory -- readi's
+   block-at-a-time loop, consoleread's and piperead's byte-at-a-time ones
+   -- issues one [copyout] per chunk, each starting where the last stopped,
+   and its loop invariant has to say "the accumulated window is ONE run of
+   length [n+k]".
+   That is this equation, and unlike [umem_write_app] it needs no bound on
+   [n + k] at all: both sides key the same address by the same modular sum.
+
+   The source function is the OUTER one throughout ([src (n + i)] for the
+   second chunk), which is what a loop carrying "the file's bytes from
+   [off]" already has; a caller whose chunk names its bytes differently
+   closes the gap with [umem_wr_ext] below. *)
+Lemma umem_wr_app (M : gmap Z (bv 8)) (dstva : mword 64) (n k : nat)
+    (src : nat -> bv 8) :
+  umem_wr (umem_wr M dstva n src) (add_vec_int dstva (Z.of_nat n)) k
+          (fun i => src (n + i)%nat)
+  = umem_wr M dstva (n + k)%nat src.
+Proof.
+  induction k as [| k IH].
+  - rewrite Nat.add_0_r. reflexivity.
+  - cbn [umem_wr]. rewrite IH.
+    replace (n + S k)%nat with (S (n + k))%nat by lia.
+    cbn [umem_wr]. rewrite add_vec_int_nat_assoc. reflexivity.
+Qed.
+
+(* two source functions that agree on the run write the same thing *)
+Lemma umem_wr_ext (M : gmap Z (bv 8)) (dstva : mword 64) (n : nat)
+    (src src' : nat -> bv 8) :
+  (forall i, (i < n)%nat -> src i = src' i) ->
+  umem_wr M dstva n src = umem_wr M dstva n src'.
+Proof.
+  induction n as [| k IH]; intros He; [reflexivity |].
+  cbn [umem_wr]. rewrite (IH ltac:(intros i Hi; apply He; lia)).
+  rewrite (He k ltac:(lia)). reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(*  THE WINDOW WITHOUT ITS CONTENTS                                       *)
+(* ===================================================================== *)
+(* A reader that fills user memory from a DEVICE -- the console ring, the
+   far end of a pipe -- cannot NAME the bytes it delivered: they are the
+   existential contents of an invariant, and the read is interleaved with
+   sleeps.  What it CAN say, and what its callers actually need, is that
+   nothing outside the window it wrote has moved.  That is this predicate:
+   the run is pinned, its contents are not.
+
+   It is strictly weaker than the [umem_wr] EQUATION a reader whose source
+   is nameable states (readi's, whose bytes are the file's), and strictly
+   stronger than "some image": [umem_wrote_out] hands a caller every
+   untouched byte back and [umem_wrote_dom] pins the domain. *)
+Definition umem_wrote (M M' : gmap Z (bv 8)) (dstva : mword 64) (d : nat)
+  : Prop := exists src : nat -> bv 8, M' = umem_wr M dstva d src.
+
+(* nothing written yet *)
+Lemma umem_wrote_0 (M : gmap Z (bv 8)) (dstva : mword 64) :
+  umem_wrote M M dstva 0.
+Proof. exists (fun _ => bv_0 8). reflexivity. Qed.
+
+(* ...and the run extends, one chunk at a time, at the address the run
+   stops at.  This is the loop step: the invariant carries the accumulated
+   [d], the round supplies its own chunk, and the two compose with no
+   no-wrap side condition. *)
+Lemma umem_wrote_app (M M1 M2 : gmap Z (bv 8)) (dstva : mword 64)
+    (d k : nat) (g : nat -> bv 8) :
+  umem_wrote M M1 dstva d ->
+  M2 = umem_wr M1 (add_vec_int dstva (Z.of_nat d)) k g ->
+  umem_wrote M M2 dstva (d + k)%nat.
+Proof.
+  intros [f ->] ->.
+  pose (h := fun i => if decide (i < d)%nat then f i else g (i - d)%nat).
+  exists h.
+  rewrite <- (umem_wr_app M dstva d k h).
+  rewrite (umem_wr_ext M dstva d f h
+             ltac:(intros i Hi; rewrite /h;
+                   case_decide as Hd; [reflexivity | exfalso; lia])).
+  apply umem_wr_ext. intros i _. rewrite /h.
+  case_decide as Hd; [exfalso; lia |]. f_equal. lia.
+Qed.
+
+(* a one-chunk window, which is what a single [copyout] leaves *)
+Lemma umem_wrote_of (M : gmap Z (bv 8)) (dstva : mword 64) (d : nat)
+    (src : nat -> bv 8) : umem_wrote M (umem_wr M dstva d src) dstva d.
+Proof. by exists src. Qed.
+
+(* WHAT THE CALLER GETS BACK: every byte outside the run, unchanged... *)
+Lemma umem_wrote_out (M M' : gmap Z (bv 8)) (dstva : mword 64) (d : nat)
+    (va : Z) :
+  umem_wrote M M' dstva d ->
+  (forall i, (i < d)%nat -> va <> uint (add_vec_int dstva (Z.of_nat i))) ->
+  M' !! va = M !! va.
+Proof. intros [src ->] Hne. exact (umem_wr_lookup_out M dstva d src va Hne). Qed.
+
+(* ...and the domain, which is what the block's own well-formedness needs *)
+Lemma umem_wrote_dom (M M' : gmap Z (bv 8)) (dstva : mword 64) (d : nat) :
+  umem_wrote M M' dstva d ->
+  (forall i, (i < d)%nat ->
+     is_Some (M !! uint (add_vec_int dstva (Z.of_nat i)))) ->
+  dom M' = dom M.
+Proof. intros [src ->] Hs. exact (umem_wr_dom M dstva d src Hs). Qed.
+
 (* overwriting the same run wins outright *)
 Lemma umem_write_overwrite (M : gmap Z (bv 8)) (a : Z) (n : nat) (f g : nat -> bv 8) :
   umem_write (umem_write M a n f) a n g = umem_write M a n g.

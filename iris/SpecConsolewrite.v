@@ -154,9 +154,12 @@ Definition wp_consolewrite_sconf_body
      [true] unconditionally.  With [eb = true] above and [cpu_own_eb_agree]
      at level 0 the two spellings coincide at every constructible instance. *)
   wp_next true pj (fun (CID : CpuId) =>
-    (* the image moves: the copy leaf may fault a page in, and copyout
-       writes user memory -- milestone J item 1's ∃-weakened staging *)
-  ∀ (mf : regfile) (r : Z) (P' : uptd) (M' : gmap Z (bv 8)),
+    (* THE IMAGE DOES NOT MOVE.  consolewrite only READS user memory
+       (either_copyin, one 64-byte chunk at a time), and at the lazy view a
+       fault inside the copy backs a page already in the view reading 0.  So
+       the block comes back at the caller's own [us_M U]; only the
+       DESCRIPTOR grows.  (image campaign, tier 3.) *)
+  ∀ (mf : regfile) (r : Z) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       (* the whole of what a device write promises: it delivered somewhere
@@ -166,7 +169,7 @@ Definition wp_consolewrite_sconf_body
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv_core pj pid (upd_usM (us_upt U P') M') -∗
+      proc_priv_core pj pid (us_upt U P') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

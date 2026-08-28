@@ -683,6 +683,8 @@ Definition wp_fileread_sconf_body
     (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileread in
   let pj := proc_addr j in
+  (* a1 = addr, the user destination all three arms copy to *)
+  let addr := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (fileread_stack <= K)%nat ->
   (k < NFILE)%nat ->
@@ -734,18 +736,32 @@ Definition wp_fileread_sconf_body
      [eb = false] is reachable the [b] form would promise the caller it
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CID : CpuId) =>
-    (* the image moves: the copy leaf may fault a page in, and copyout
-       writes user memory -- milestone J item 1's ∃-weakened staging *)
-  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
+    (* THE IMAGE MOVES, AND THE MOVE IS A WINDOW AT [addr].  All three arms
+       write user memory the same way -- readi's either_copyout, and
+       consoleread's / piperead's one-byte-per-round copyout -- and all
+       three start at [addr], so the dispatcher's post is the arms' shared
+       shape: the entry image with the run [addr .. addr+d) overwritten and
+       nothing else touched.
+
+       WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE.  On
+       the INODE arm [bs] is in fact the file's bytes and [d] the returned
+       count ([SpecReadi]'s post is an equation); this contract does not
+       relay that, because the console and pipe arms cannot, and a caller
+       that wants it calls readi.  A caller of THIS reads its own untouched
+       bytes back with [UserPtTree.umem_wr_lookup_out], which is what the
+       shared shape is for. *)
+  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜fileread_ret n r⌝ -∗
+      ⌜(Z.of_nat d <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q st -∗
-      proc_priv_core pj pidv (upd_usM (us_upt U P') M') -∗
+      proc_priv_core pj pidv
+        (upd_usM (us_upt U P') (umem_wr (us_M U) addr d bs)) -∗
       fileread_env_out fn st -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

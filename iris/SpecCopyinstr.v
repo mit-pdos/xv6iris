@@ -122,8 +122,8 @@ Definition copyinstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
 (* a memory.  copyinstr has NO such caller -- fetchstr, its only one,    *)
 (* holds [ProcInv.proc_priv] and wants its block back at the image it    *)
 (* lent -- so the ∃-weakened twin is not written.  Should one ever be    *)
-(* wanted, [ProcPtOwn.proc_pt_ptm] derives it in five lines (see         *)
-(* [ProofCopyin.wp_copyin_sconf]).                                       *)
+(* wanted, [ProcPtOwn.proc_pt_ptm] derives it in five lines (copyin's    *)
+(* twin, which used to be the worked example, is deleted too).           *)
 (* ===================================================================== *)
 Definition wp_copyinstr_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (ktb : ktier) (γa : gname) (mm : regfile)

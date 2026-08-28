@@ -950,7 +950,7 @@ Section ProofSysWrite.
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
-      iIntros (CID25 Hs25 mf rv P' M')
+      iIntros (CID25 Hs25 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
       iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
@@ -963,7 +963,7 @@ Section ProofSysWrite.
                    ltac:(apply not_elem_of_empty) Hlkk Hkk Hty
                    with "[Howe] Href Hauth") as "Howe".
       { rewrite (union_empty_r_L {[fd]}). iExact "Howe". }
-      iDestruct (proc_priv_join γf pj pidv (upd_usM (us_upt U P') M') with "[Hcore] [Howe]")
+      iDestruct (proc_priv_join γf pj pidv (us_upt U P') with "[Hcore] [Howe]")
         as "Hpriv".
       { iExact "Hcore". }
       { cbn [upd_upt pv_ofile pv_fdg]. iExact "Howe". }
