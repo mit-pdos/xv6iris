@@ -14722,3 +14722,33 @@ attach the absorb at the leaf's real write step, and either retire
 Deciding between those two is the first thing the unit settles; routing through
 it is preferred, since that is what it was built for and it keeps the absorb
 next to the view fact that licenses it.
+
+### §6 (addendum) — THE NODE DOES EXPOSE THE INTERP: the export can attach without touching another lane's file
+
+The obstacle I expected — that the AMO's write node hands over only
+`gen_heap_interp` and so could not host a ledger mint — **does not exist**.
+`HartSMem.swp_execute_AMOSWAP_S_ex_mode` (`:5044`) states its write obligation
+over
+
+```coq
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+          … tso_interp_of riscv_eraGS img (write_bytes σ.(mem) pa 4 sv) …
+```
+
+so the TSO interp is in scope at exactly the step where `lock_word_amo_mint`
+wants it, and the absorb (`hart_view_lb_get` + `ctx_bound_raise`) has both its
+inputs there: the log-top view the AMO establishes, and the token `Hctx` from
+`iDestruct "Hcap"` (`WpSconfLock:1458`).  **No contract outside this lane's
+files has to move** — `HartSMem` is read, not edited.
+
+What is stale is the leaf's own write-node text
+(`WpSconfLock:1575` ff.), which still destructures `Hsi` as
+`[Hreg [Hmem Hdev]]` and writes through `word4_pointsto_write_c` on a
+`word4_pointsto` — pre-flip shape, never re-cut because the file has been red
+upstream of it since the baseline and Coq stops at the first error.  Re-cutting
+that node to the ledger tier IS the routing the owner approved, and it is what
+makes `lock_word_amo_mint` its own client at last.
+
+So the unit stands as itemised in §3, with step (1) now precisely: re-cut the
+AMO leaf's write node onto `lock_word_amo_mint`, and hang the `ctx_floor`
+export off the view fact that node already establishes.
