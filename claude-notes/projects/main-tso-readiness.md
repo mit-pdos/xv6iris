@@ -657,3 +657,79 @@ discipline has held; it is just not enforced.
 assumptions as the baseline (`Print Assumptions` emits them in an unstable
 ORDER, so compare the sorted set, not the bytes).  Confirmation round over
 the committed tree recompiled 0 files.
+
+---
+
+# AMENDMENT 3 (2026-08-28) — SLICE 2, CHUNK 1: THE MEMORY-LEAF TWIN TIER
+
+35 ctx twins, each spliced BESIDE its original in the same kit file
+(§2c's rule), across five files.  **1304 insertions, ZERO deletions** —
+every original is byte-identical and every consumer of them is untouched.
+
+| file | twins | tier |
+|---|---|---|
+| `WpSconfMem.v` | 16 | the S-mode `sconf` load/store leaves + `ctx_pointsto_claim` |
+| `WpSmodePtMem.v` | 8 | the PT-translating loads/stores |
+| `WpSmodePtLeaves.v` | 4 | `cld`/`csd` |
+| `WpSmodePtMemWrap.v` | 4 | `cldsp`/`csdsp` |
+| `WpSmodeHalf.v` | 3 | the halfword tier (`↦₂`) |
+
+## 3.1 The import-order gate, PROBED not assumed
+
+`TsoCtx.v` re-declares all four spellings of `↦ₘ` and `↦₈`, so a file that
+imports it LAST flips (tso-flip-replay.md pass 1).  A file that needs the
+ctx vocabulary but must NOT flip yet re-imports `RiscvPtsto` after it.
+Verified rather than reasoned about, with the runbook's own probe
+(`Set Printing All`): under `Require Import TsoCtx TsoCtxShim.` followed by
+`Require Import RiscvPtsto.`, `a ↦ₘ v` elaborates to `mem_pointsto` and
+`a ↦₈ w` to `word_pointsto` — RAW.  That one probe is what makes the whole
+tier additive: twins get the context vocabulary, originals keep their
+meaning, and the flip stays a separate, later, deliberate act.
+
+## 3.2 TWO TWIN IDIOMS, and which to use when
+
+- **Continuation intercept** — for `wp_next`-shaped leaves (`WpSconfMem`,
+  `WpSmodeHalf`; 19 of the 35).  `ctx_*_to_mem` in, apply the original,
+  `rewrite /wp_next`, re-introduce, `ctx_*_of_mem` back.  `wp_next b p K`
+  is a plain `∀ CID, ⌜…⌝ -∗ K CID`, so it introduces like any wand.
+- **Goal rewrite** — for the PT tier (16 of the 35), whose continuation is
+  a flat wand chain of ten-odd hypotheses.  `rewrite !(ctx_word_shim _
+  cur_ctx)` turns BOTH occurrences of the window raw, at which point the
+  goal is LITERALLY the original statement and `exact` discharges it.  No
+  hypothesis names, indifferent to the continuation's shape.  Strictly the
+  nicer idiom; it is not used for the `wp_next` tier only because the
+  window there sits under the continuation's `fun CID => …` binder, which
+  a plain `rewrite` will not enter.
+
+Both die at cutover — the shim's `⊣⊢` is exactly what stops being true —
+so each twin then gets its direct TSO proof with its STATEMENT unchanged.
+That is the whole point of the tier.
+
+## 3.3 What the statement buys, and it is visible in the type
+
+The twin's window comes back at the SAME `cur_ctx` it went in at, ACROSS
+the `wp_next`, where `CID` rebinds and the context does not.  That is
+migration survival, stated.  It is why the fact is indexed by the thread
+of control and not by the hart — the axis A6.89/A6.92's two refuted
+spellings (the strengthened `locked` token, the lock word's author
+receipt) were both on the wrong side of.
+
+## 3.4 Deferred, with the reason
+
+- **`WpAu4`'s two AMO leaves** (`wp_lw_au_s_sconf`, `wp_sw_au_s_sconf`).
+  Their window sits inside an atomic update (`∃ v, … ↦₄ v ∗ (… ={Em,⊤}=∗ Ψ v)`),
+  so neither idiom applies mechanically — and they should not be twinned
+  mechanically: the AMO is exactly where §0.35′(iii)'s log-top receipt and
+  bound-absorb enter, so their ctx statement is lock-tranche content, not
+  leaf-tier content.
+- **`WpLock`'s nine** (`lk_cpu_res_*`, `newlock*`, `lock_inv_alloc`, …).
+  Not per-instruction leaves at all — lock-kit lemmas, which §5.2 wants
+  converted together with (a) λ-payloads, (b) `lk_floor`, (d) the receipt
+  pair and (e) the no-migration premises.
+- **`WpSwtchVc.seg_cells_ctx`, `WpLockAt.newlock_at`,
+  `WpSconfLock.wp_sd_lkcpu_lockopen_gen`** — same reason, lock/swtch tier.
+
+## 3.5 Gate
+
+`MAKEEXIT=0`, 0 `Error`, 470 files recompiled, dumps unchanged,
+`audit-only` = the sanctioned 13.

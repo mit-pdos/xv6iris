@@ -58,6 +58,14 @@ Require Import IntrDefs.
 Require Import KptGhost.   (* kptN: the accessor-mask premise below *)
 Require Import SRegime.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+(* SLICE 2, the leaf tier: the ctx TWINS below need the context
+   vocabulary, but this file's OWN statements must stay raw until the
+   M1 flip.  Import order is the gate (tso-flip-replay.md pass 1):
+   TsoCtx re-declares the four spellings of [mem] and [word], so
+   RiscvPtsto is re-imported AFTER it and its notations win.  Probed
+   with [Set Printing All] -- [a e8 v] here is [mem_pointsto]. *)
+Require Import TsoCtx TsoCtxShim.
+Require Import RiscvPtsto.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -134,6 +142,15 @@ Section WpSconfMem.
     iDestruct (mem_pointsto_acc with "Hb")
       as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & _ & _)".
     iExists ppn. iFrame "Hk". done.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma ctx_pointsto_claim `{KTR : !CurKtier} `{XI : !CurCtx}
+      (a : Arch.pa) (dq : dfrac) (b : bv 8) :
+    ctx_pointsto cur_ctx a dq b -∗ mem_claim a.
+  Proof.
+    iIntros "Hctx".
+    iApply mem_pointsto_claim. by iApply ctx_pointsto_to_mem.
   Qed.
 
   Definition wordw_claim `{KTR : !CurKtier} (width : Z) (a : Arch.pa) : iProp Σ :=
@@ -857,6 +874,46 @@ Section WpSconfMem.
               exec_read_ram_plain_8 (data2_ext_8 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE CTX TWIN (tso-port.md 2c).  Same statement, the byte window at
+     the context index instead of raw, derived from the original in one
+     shim step at each end.  Minted here because a converted consumer
+     needs this leaf; at cutover the twin gets its direct TSO proof, the
+     statement unchanged, and the original dies with the shim.
+
+     THE POINT OF THE STATEMENT is what survives the [wp_next]: [CID]
+     rebinds in the continuation and [cur_ctx] does NOT, so the window
+     comes back at the SAME context the caller put in.  That is migration
+     survival, visible in the type -- and it is why the fact is indexed by
+     the thread of control rather than by the hart. *)
+  Lemma wp_cld_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 -> rd_ok rd ->
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    ctx_word_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg v]> m) n b p -∗
+      pc_is (add_vec_int pc 2) -∗
+      ctx_word_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa Hrd Hrdok.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word_to_mem with "Hctx") as "Hraw".
+    iApply (wp_cld_s_sconf (ktd := ktd) pc rd rs1 imm m n v b (dqm := dqm)
+              Hrd Hrdok with "Hcg Hpc Hinstr Hraw").
+    (* [CID] is the SECTION's hart (line 86); the continuation's binder is a
+       DIFFERENT one -- that is the whole content of a wp_next crossing. *)
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word_of_mem.
+  Qed.
+
 
   (* [SrcOk rs1]: the base register's read, see the family note above
      [wp_load_s_sconf_au]. *)
@@ -1788,5 +1845,350 @@ Section WpSconfMem.
   Definition mem_srcok_pos_a5 : SrcOk (mword_of_int 15 : mword 5) := _.
   Definition mem_srcok_pos_sp : SrcOk csp_rs1 := _.
   Fail Definition mem_srcok_neg : SrcOk Rtp := _.
+
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_lbu_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (v : mword 8) (b : bool) {dqm : dfrac} `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 ->
+    rd_ok rd ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
+    ctx_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      ctx_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa Hp0 Hp1.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_pointsto_to_mem with "Hctx") as "Hraw".
+    iApply (wp_lbu_s_sconf (ktd := ktd) (dqm := dqm) pc rd rs1 imm m n v b Hp0 Hp1 with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_pointsto_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_lwu_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 -> rd_ok rd ->
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 4)) -∗ ctx_word4_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗ ctx_word4_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa Hp0 Hp1.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word4_to_mem with "Hctx") as "Hraw".
+    iApply (wp_lwu_s_sconf (ktd := ktd) (dqm := dqm) pc rd rs1 imm m n v b Hp0 Hp1 with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word4_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_ld_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 -> rd_ok rd ->
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗ ctx_word_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg v]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗ ctx_word_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa Hp0 Hp1.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word_to_mem with "Hctx") as "Hraw".
+    iApply (wp_ld_s_sconf (ktd := ktd) (dqm := dqm) pc rd rs1 imm m n v b Hp0 Hp1 with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_clw_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 -> rd_ok rd ->
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗ ctx_word4_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
+      pc_is (add_vec_int pc 2) -∗ ctx_word4_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa Hp0 Hp1.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word4_to_mem with "Hctx") as "Hraw".
+    iApply (wp_clw_s_sconf (ktd := ktd) (dqm := dqm) pc rd rs1 imm m n v b Hp0 Hp1 with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word4_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_lw_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 -> rd_ok rd ->
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗ ctx_word4_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗ ctx_word4_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa Hp0 Hp1.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word4_to_mem with "Hctx") as "Hraw".
+    iApply (wp_lw_s_sconf (ktd := ktd) (dqm := dqm) pc rd rs1 imm m n v b Hp0 Hp1 with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word4_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_csd_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+      (m : regfile) (n : nat) (vold : mword 64) (b : bool) `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let storeval := rget m rs2 in
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗ ctx_word_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) vold -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 2) -∗ ctx_word_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa storeval.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word_to_mem with "Hctx") as "Hraw".
+    iApply (wp_csd_s_sconf (ktd := ktd) pc rs2 rs1 imm m n vold b  with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_sd_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+      (m : regfile) (n : nat) (vold : mword 64) (b : bool) `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let storeval := rget m rs2 in
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗ ctx_word_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) vold -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗ ctx_word_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa storeval.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word_to_mem with "Hctx") as "Hraw".
+    iApply (wp_sd_s_sconf (ktd := ktd) pc rs2 rs1 imm m n vold b  with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_csw_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+      (m : regfile) (n : nat) (vold : mword 32) (b : bool) `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let storeval := trunc32 (rget m rs2) in
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗ ctx_word4_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) vold -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 2) -∗ ctx_word4_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa storeval.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word4_to_mem with "Hctx") as "Hraw".
+    iApply (wp_csw_s_sconf (ktd := ktd) pc rs2 rs1 imm m n vold b  with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word4_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_sw_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+      (m : regfile) (n : nat) (vold : mword 32) (b : bool) `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let storeval := trunc32 (rget m rs2) in
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗ ctx_word4_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) vold -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗ ctx_word4_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa storeval.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word4_to_mem with "Hctx") as "Hraw".
+    iApply (wp_sw_s_sconf (ktd := ktd) pc rs2 rs1 imm m n vold b  with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word4_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_sb_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+      (m : regfile) (n : nat) (vold : bv 8) (b : bool) `{!KtierLe ktd kt} :
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let storeval := trunc8 (rget m rs2) in
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
+    ctx_pointsto (KTR := ktd) cur_ctx ea (DfracOwn 1) vold -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      ctx_pointsto (KTR := ktd) cur_ctx ea (DfracOwn 1) storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros ea storeval.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_pointsto_to_mem with "Hctx") as "Hraw".
+    iApply (wp_sb_s_sconf (ktd := ktd) pc rs2 rs1 imm m n vold b  with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_pointsto_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_cldsp_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (uimm : mword 6) (rd : mword 5)
+      (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} `{!KtierLe ktd kt} :
+    let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
+    let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
+    uint rd <> 0 ->
+    rd_ok rd ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc true (LOAD (imm, sp, Regidx rd, false, 8)) -∗
+    ctx_word_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg v]> m) n b p -∗
+      pc_is (add_vec_int pc 2) -∗
+      ctx_word_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros imm pa Hp0 Hp1.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word_to_mem with "Hctx") as "Hraw".
+    iApply (wp_cldsp_s_sconf (ktd := ktd) (dqm := dqm) pc uimm rd m n v b Hp0 Hp1 with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_csdsp_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (uimm : mword 6) (rs2 : mword 5) `{!SrcOk rs2}
+      (m : regfile) (n : nat) (vold : mword 64) (b : bool) `{!KtierLe ktd kt} :
+    let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
+    let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
+    let storeval := rget m rs2 in
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc true (STORE (imm, Regidx rs2, sp, 8)) -∗
+    ctx_word_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) vold -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 2) -∗
+      ctx_word_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros imm pa storeval.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word_to_mem with "Hctx") as "Hraw".
+    iApply (wp_csdsp_s_sconf (ktd := ktd) pc uimm rs2 m n vold b  with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_sd_zero_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (vold : mword 64) (b : bool) `{!KtierLe ktd kt} :
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let storeval := (zero_reg : mword 64) in
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8)) -∗
+    ctx_word_pointsto (KTR := ktd) cur_ctx ea (DfracOwn 1) vold -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      ctx_word_pointsto (KTR := ktd) cur_ctx ea (DfracOwn 1) storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros ea storeval.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word_to_mem with "Hctx") as "Hraw".
+    iApply (wp_sd_zero_s_sconf (ktd := ktd) pc rs1 imm m n vold b  with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word_of_mem.
+  Qed.
+
+  (* ctx twin -- see [wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_sw_zero_s_sconf_c {ktd : ktier} `{XI : !CurCtx}
+      (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (vold : bv 32) (b : bool) `{!KtierLe ktd kt} :
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let storeval := (mword_of_int 0 : mword 32) in
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
+    ctx_word4_pointsto (KTR := ktd) cur_ctx ea (DfracOwn 1) vold -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      ctx_word4_pointsto (KTR := ktd) cur_ctx ea (DfracOwn 1) storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros ea storeval.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word4_to_mem with "Hctx") as "Hraw".
+    iApply (wp_sw_zero_s_sconf (ktd := ktd) pc rs1 imm m n vold b  with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word4_of_mem.
+  Qed.
 
 End WpSconfMem.

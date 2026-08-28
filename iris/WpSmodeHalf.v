@@ -47,6 +47,10 @@ Require Import IntrDefs.
 Require Import WpSconfMem.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+(* SLICE 2 leaf tier: ctx twins below; RiscvPtsto re-imported after
+   TsoCtx so this file's own notations stay raw until the M1 flip. *)
+Require Import TsoCtx TsoCtxShim.
+Require Import RiscvPtsto.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -185,6 +189,32 @@ Section WpSmodeHalf.
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
+  (* ctx twin -- [wp_next]-shaped, so the continuation is intercepted; see
+     [WpSconfMem.wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_lhu_s_sconf_c `{XI : !CurCtx}
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (v : mword 16) (b : bool) {dqm : dfrac}
+      {ktd : ktier} `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 -> rd_ok rd ->
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 2)) -∗ ctx_word2_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗ ctx_word2_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa Hq0 Hq1.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word2_to_mem with "Hctx") as "Hraw".
+    iApply (wp_lhu_s_sconf (dqm := dqm) (ktd := ktd) pc rd rs1 imm m n v b Hq0 Hq1 with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word2_of_mem.
+  Qed.
+
+
   (* lh rd, imm(rs1) -- SIGN-extended halfword load (falls out of the same
      generic; xv6's virtio driver only uses lhu). *)
   Lemma wp_lh_s_sconf
@@ -214,6 +244,32 @@ Section WpSmodeHalf.
               exec_read_ram_plain_2 (data2_ext_2 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
+
+  (* ctx twin -- [wp_next]-shaped, so the continuation is intercepted; see
+     [WpSconfMem.wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_lh_s_sconf_c `{XI : !CurCtx}
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (v : mword 16) (b : bool) {dqm : dfrac}
+      {ktd : ktier} `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 -> rd_ok rd ->
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 2)) -∗ ctx_word2_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗ ctx_word2_pointsto (KTR := ktd) cur_ctx pa dqm v -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa Hq0 Hq1.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word2_to_mem with "Hctx") as "Hraw".
+    iApply (wp_lh_s_sconf (dqm := dqm) (ktd := ktd) pc rd rs1 imm m n v b Hq0 Hq1 with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word2_of_mem.
+  Qed.
+
 
   (* sh rs2, imm(rs1) -- halfword store.  Writes no register, so (like
      [wp_sw_s_sconf]) there are no rd premises and no [sie_cap] retarget;
@@ -248,6 +304,32 @@ Section WpSmodeHalf.
               exec_write_ram_plain_2 (store_ext_2 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
+
+  (* ctx twin -- [wp_next]-shaped, so the continuation is intercepted; see
+     [WpSconfMem.wp_cld_s_sconf_c] for the family note. *)
+  Lemma wp_sh_s_sconf_c `{XI : !CurCtx}
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+      (m : regfile) (n : nat) (vold : mword 16) (b : bool)
+      {ktd : ktier} `{!KtierLe ktd kt} :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let storeval := trunc16 (rget m rs2) in
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
+    instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗ ctx_word2_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) vold -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗ ctx_word2_pointsto (KTR := ktd) cur_ctx pa (DfracOwn 1) storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa storeval.
+    iIntros "Hcg Hpc Hinstr Hctx Hcont".
+    iDestruct (ctx_word2_to_mem with "Hctx") as "Hraw".
+    iApply (wp_sh_s_sconf (ktd := ktd) pc rs2 rs1 imm m n vold b  with "Hcg Hpc Hinstr Hraw").
+    rewrite /wp_next. iIntros (CID' Hs) "Hcg Hpc Hraw".
+    iApply ("Hcont" $! CID' Hs with "Hcg Hpc").
+    by iApply ctx_word2_of_mem.
+  Qed.
+
 
   (* ------------------------------------------------------------------- *)
   (* [SrcOk] SMOKE TEST -- see IntrDefs.v's checker block.  x15 (a5) is the *)
