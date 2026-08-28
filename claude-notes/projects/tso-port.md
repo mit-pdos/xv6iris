@@ -4124,3 +4124,38 @@ floors against U with the range-shaped post absorbing post-release
 device appends (case 3), the parked stamp T ≤ U at swtch (case 4 =
 0.27′ proper).  Unlocks WpSconfLock's cone, ProofSwtch, and both
 virtio files.
+
+### 0.36′ OWNER RULING (2026-08-28): the kernel-page-table fact is
+CONTEXT-RELATIVE too — Q3 resolves on is_lock's pattern, no machine change
+
+"we need to make this kernel-page-table fact also context-relative like
+is_lock.  it needs to say that the current CPU's timestamp is high
+enough for the page table to be consistent at it.  and the secondary
+CPUs already get this kernel-page-table iProp through the [started]
+invariant, so they should get along with it a context
+transitive-monotonicity fact that, now that they've observed
+[started == 1], their timestamp also dominates the kernel-page-table
+validity timestamp.  same pattern as is_lock: the fact, even if it's
+persistent or whatever, still needs to be context-relative."
+
+Consequences: (a) the PIN was the wrong shape — a context-FREE promise
+("any hart at view ≥ B") is what forced the drain requirement the image
+cannot pay (A6.90's finding); stated at ξ, hart 0's boot-context
+instance rides the ctx tower's EXISTING own-write (dirty) arm — the
+author consumes its own table with no publication, no sfence.vma model
+change, no author-arm invention; (b) the secondaries' half is the
+transitive-monotonicity purchase: the started deposit carries the
+ξ-indexed KPT fact + the bound relation "PT-validity stamp ≤ flag-write
+stamp" (program order on hart 0; the flag's visibility certifies the
+PTEs' publication by the prefix property), and the flag-read receipt +
+ctx_bound_raise + monotonicity buys the secondary context's floor —
+0.35′'s buy/carry/cash, one tier up, the same chain as newlock's floor;
+(c) the walker's read gates (TransPt) become two-armed through the ctx
+tower's own disjunction (clean arm for started-descended contexts,
+own-write arm for the boot context), not through a new pin arm;
+(d) kpt_creds restates ξ-relatively; A6.90's directions 1–3 are all
+superseded — direction 2 (sfence.vma drains) is NOT taken, sfence.vma
+stays TLB-only until the de-conflation pass.  Paper form: EVERY
+persistent fact about memory is context-relative under TSO —
+"persistent" says it will not be invalidated, not that it is free to
+whoever finds it.
