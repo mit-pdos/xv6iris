@@ -2011,8 +2011,8 @@ Section KexecB3Body.
                    exactly the size uvmalloc's own [oldsz] argument reads
                    (= [szv], the loop invariant's index), so the [_mem]
                    contract's premise closes without a rewrite. *)
-                iDestruct (proc_pt_any_ptm P (uint (Y !!! Regidx Ra1))
-                             with "Hpt") as (Mb) "Hpt".
+                iEval (rewrite (proc_pt_ptm P (uint (Y !!! Regidx Ra1)))) in "Hpt".
+                iDestruct "Hpt" as (Mb) "Hpt".
                 iApply (Uvmalloc.wp_uvmalloc_mem_sconf fsc_kalloc Y P Mb xp
                           (K - 68)%nat eb
                           (proc_addr jp) eb ∅ ltac:(lia) HYtp HYa0 HYa3

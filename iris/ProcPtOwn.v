@@ -3401,17 +3401,6 @@ Section ProcPt.
       iApply (umem_lazy_any with "Hm").
   Qed.
 
-  (* THE ∃-WEAKENED TIER'S RETURN, RE-VIEWED.  Everything below
-     [proc_priv] (uvmalloc, copyin, copyout, vmfault, ...) hands the
-     address space back anonymously; the block wants it at the LAZY
-     sz-region view.  [proc_pt_ptm] holds at EVERY [sz], so the crossing
-     costs nothing and the size is whatever the block is about to be
-     rebuilt at -- usually an evar at the point of use, resolved by the
-     closer that consumes the result. *)
-  Lemma proc_pt_any_ptm (P : uptd) (sz : Z) :
-    proc_pt_any P -∗ ∃ M : gmap Z (bv 8), proc_ptm P sz M.
-  Proof. rewrite (proc_pt_ptm P sz). iIntros "$". Qed.
-
   (* THE READ-ONLY CROSSING, AS A BORROW.  A caller that must hand the
      MAPPED view to a callee which gives it back VERBATIM (uvmcopy's parent
      side is the one such caller) opens the lazy view into its own backed
@@ -4901,12 +4890,6 @@ Section ProcPt.
      p_trapframe pa ↦₈ page_base P.(ud_tfp) ∗
      proc_pt P M)%I.
 
-  (* the ∃-weakened spelling, for the one consumer that cannot name the
-     bytes: [ProcDefs.proc_dormant]'s ZOMBIE arm, whose descriptor is
-     itself existential. *)
-  Definition proc_pt_at_any (pa : mword 64) (P : uptd) : iProp Σ :=
-    (∃ M : gmap Z (bv 8), proc_pt_at pa P M)%I.
-
   (* JUST THE TWO CELLS.  They name the table but are not part of it: they
      are ordinary [struct proc] words, owned by the kernel across user
      execution, whereas [proc_pt] is the address space itself and must be
@@ -4924,20 +4907,6 @@ Section ProcPt.
     - iIntros "(H1 & H2 & H3)". iFrame "H1 H2 H3".
     - iIntros "((H1 & H2) & H3)". iFrame "H1 H2 H3".
   Qed.
-
-  Lemma proc_pt_at_any_split (pa : mword 64) (P : uptd) :
-    proc_pt_at_any pa P ⊣⊢ proc_pt_cells pa P ∗ proc_pt_any P.
-  Proof.
-    rewrite /proc_pt_at_any /proc_pt_any. iSplit.
-    - iIntros "H". iDestruct "H" as (M) "H".
-      rewrite proc_pt_at_split. iDestruct "H" as "[$ H]". iExists M. iExact "H".
-    - iIntros "[Hc H]". iDestruct "H" as (M) "H". iExists M.
-      rewrite proc_pt_at_split. iFrame "Hc H".
-  Qed.
-
-  Lemma proc_pt_at_forget (pa : mword 64) (P : uptd) (M : gmap Z (bv 8)) :
-    proc_pt_at pa P M -∗ proc_pt_at_any pa P.
-  Proof. iIntros "H". iExists M. iExact "H". Qed.
 
   (* ---- THE CELLS PLUS THE **LAZY** VIEW ------------------------------
      What [ProcInv.proc_priv] holds.  Identical to [proc_pt_at] except for
@@ -4962,20 +4931,12 @@ Section ProcPt.
      always SOME anonymous mapped address space, and an anonymous one can
      be re-viewed at any size. *)
   Lemma proc_ptm_at_forget (pa : mword 64) (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
-    proc_ptm_at pa P sz M -∗ proc_pt_at_any pa P.
+    proc_ptm_at pa P sz M -∗ ∃ M' : gmap Z (bv 8), proc_pt_at pa P M'.
   Proof.
-    rewrite proc_ptm_at_split proc_pt_at_any_split.
-    iIntros "[$ H]". iApply (proc_ptm_pt with "H").
-  Qed.
-
-  Lemma proc_pt_at_ptm (pa : mword 64) (P : uptd) (sz : Z) :
-    proc_pt_at_any pa P ⊣⊢ ∃ M : gmap Z (bv 8), proc_ptm_at pa P sz M.
-  Proof.
-    rewrite proc_pt_at_any_split (proc_pt_ptm P sz). iSplit.
-    - iIntros "[Hc H]". iDestruct "H" as (M) "H". iExists M.
-      rewrite proc_ptm_at_split. iFrame "Hc H".
-    - iIntros "H". iDestruct "H" as (M) "H". rewrite proc_ptm_at_split.
-      iDestruct "H" as "[$ H]". iExists M. iExact "H".
+    rewrite proc_ptm_at_split. iIntros "[Hc H]".
+    iDestruct (proc_ptm_pt with "H") as "H". rewrite /proc_pt_any.
+    iDestruct "H" as (M') "H". iExists M'.
+    rewrite proc_pt_at_split. iFrame "Hc H".
   Qed.
 
   (* the two named crossings, lifted to the cells-bearing tier *)
@@ -5004,7 +4965,7 @@ Section ProcPt.
      it turns a one-line projection into minutes and gigabytes (measured: a
      [proc_priv] projection went 2 s -> 300 s / 15.7 GB without this).  Same
      reason [phys_page_own]/[upt_pages_own] are already opaque above. *)
-  Typeclasses Opaque proc_pt proc_pt_at proc_pt_any proc_pt_at_any.
+  Typeclasses Opaque proc_pt proc_pt_at proc_pt_any.
   (* [proc_ptm] is now a [proc_priv] conjunct, so it is on the same
      iFrame-search hot path the note above describes -- seal it too. *)
   Typeclasses Opaque proc_ptm proc_ptm_at.
@@ -5040,13 +5001,6 @@ Section ProcPt.
     iIntros "(_ & Ht & _)". iDestruct "Ht" as (t) "[%Hspec Ht]".
     iDestruct (ptree_own_page_valid 2 (DfracOwn 1) t with "Ht") as %Hv.
     iPureIntro. destruct Hspec as [Hbase _]. by rewrite -Hbase.
-  Qed.
-
-  Lemma proc_pt_any_root_valid (P : uptd) :
-    proc_pt_any P ⊢ ⌜page_valid (page_base P.(ud_root))⌝.
-  Proof.
-    rewrite /proc_pt_any. iIntros "H". iDestruct "H" as (M) "H".
-    by iApply proc_pt_root_valid.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -5426,9 +5380,6 @@ Section ProcPt.
   Lemma proc_pt_norm (P : uptd) (M : gmap Z (bv 8)) :
     proc_pt P M ⊣⊢ proc_pt (ud_norm P) M.
   Proof. apply proc_pt_data_irrel; reflexivity. Qed.
-
-  Lemma proc_pt_any_norm (P : uptd) : proc_pt_any P ⊣⊢ proc_pt_any (ud_norm P).
-  Proof. apply proc_pt_any_data_irrel; reflexivity. Qed.
 
   (* the same renormalisation at the LAZY view -- what a residue that holds
      [proc_priv]'s own memory conjunct needs before it hands the descriptor

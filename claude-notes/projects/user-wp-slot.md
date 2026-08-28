@@ -29,12 +29,16 @@ at the sanctioned 13 assumptions, tracked dumps unchanged):
   `destruct (decide …)`) and `USyncKernel.sync_uexec_slot` (sync's
   entry deposit; `uv_cap` is its one assumption) are IN THE TREE with
   no kernel consumer yet.
-- The `proc_pt_any` ELIMINATION CAMPAIGN is through tiers 0–6 (§2).
-  EVERY CONTRACT in the tree is now precise or honestly ∃: readers
-  into user memory state the `umem_wr` window as an equation, writers
-  from user memory are same-`M`, sbrk/growproc are equations on the
-  image at every arm, and all five ∃-twins are GONE.  What is left is
-  tier 7, the kill, in §2's own checkpoint sequence.
+- The `proc_pt_any` ELIMINATION CAMPAIGN is FINISHED as far as it is
+  worth taking (§2).  NO CONTRACT in the tree reads at a named ∃:
+  readers into user memory state the `umem_wr` window as an equation,
+  writers from user memory are same-`M`, sbrk/growproc are equations
+  on the image at every arm, the syscall dispatcher says which user
+  bytes each table index can have moved, all five ∃-twins are gone,
+  and the nine honestly-existential contracts write their ∃ out.
+  `proc_pt_any` itself SURVIVES as a proof-internal spelling, with a
+  banner at its definition; §2 has the price of deleting it and why
+  the owner shelved that.
 
 ## §0 Operating rules (hard-won; violating these cost real time)
 
@@ -81,7 +85,7 @@ phase splits and table-moving specs are keyed on it.  `uvis_tf` keeps
 the full 36-word list (kernel words 0/1/2/4 are dead weight in the
 key; epc, word 3, is user-visible); a later refinement may restrict.
 
-## §2 The `proc_pt_any` elimination campaign (owner-ruled), tier 7
+## §2 The `proc_pt_any` elimination campaign (owner-ruled) — landed
 
 `proc_pt_any` is a spec smell — a contract holding it cannot say what
 happens to the process state.  Bottom-up conversion (callees first),
@@ -133,22 +137,44 @@ Three discharge lemmas serve all 22 arms: `sysc_mem_ok_quiet`,
 `sysc_mem_ok_window` (over the table, so one lemma covers all four
 windows) and `sysc_mem_ok_sbrk`.
 
-**TIER 7 — the kill, in three GREEN CHECKPOINTS** (owner-ruled: go to
-the full kill, but gate each stage).  ① is landed.
+**TIER 7 — SHELVED, and priced first.**  Checkpoints ① (the precise
+contracts and the ∃-twins) and ② (no contract reads at a named ∃) are
+LANDED.  ③, deleting `proc_pt_any` itself, was priced against the
+post-② tree and the owner shelved it.  The price:
 
-- ① **the ∃-twins and the precise contracts** — above.
-- ② **contracts stop reading at a named ∃.**  Nine occurrences in five
-  files, every one honestly existential: `SpecFreeproc.fp_pt`,
-  `SpecKexecB2` ×2, `SpecProcFreepagetable`, `SpecUsertrap`'s
-  `ut_res_pt_open`/`_close` pair, and `ProcDefs`' two dormant-ZOMBIE
-  arms.  Each becomes an inline `∃ M, proc_pt P M` at its own site.
-- ③ **the kill.**  The ~65 remaining proof-internal occurrences
-  (`proc_pt_any_ptm` / `_wf_get` steps in the kexec and uvm cones, the
-  trap residue, `BarePt`, `ProofKforkParts`), then delete
-  `proc_pt_any` / `proc_pt_at_any` and re-base the ~15-lemma family in
-  `ProcPtOwn` on `proc_ptm`.  **Owner's guardrail: if a survivor turns
-  out to be the same lemma under a new spelling, and most of the family
-  does, STOP AND REPORT the tally rather than churn through it.**
+- ten of the sixteen lemmas around it come back as the SAME STATEMENT
+  with `∃ M, proc_pt P M` typed where `proc_pt_any P` stood —
+  `proc_pt_any_unfold`, `proc_pt_ptm`, `proc_ptm_pt` (19 call sites,
+  the most-used thing in the family), `proc_pt_acc_rep0`,
+  `proc_pt_rebuild`, `proc_pt_split`, the `proc_pt_page_acc` accessor
+  pair, and the `proc_pt_at_*` restatements;
+- ~65 proof-internal call sites in the kexec and uvm cones, the trap
+  residue, `BarePt` and `ProofKforkParts` change mechanically and
+  prove exactly what they proved before;
+- and `Typeclasses Opaque proc_pt_any` is LOAD-BEARING — it is what
+  stops `iIntros`/`iDestruct` from silently opening the existential
+  under proofs that never mentioned it.  Lane I measured that seam
+  precisely: plain wand application goes through conversion and does
+  not care whether the predicate is folded, but `iFrame`'s
+  witness-then-match and `rewrite`'s syntactic pattern do.
+
+**What was taken instead** — the part of the family that carries no
+weight: `proc_pt_any_norm` and `proc_pt_any_root_valid` (no users
+left), the whole `proc_pt_at_any` sub-family (nothing outside
+`ProcPtOwn` holds it after ②; its one live consumer moved to the
+STRONGER `proc_ptm_at_of_pt_at`), `proc_pt_any_ptm` (one direction of
+`proc_pt_ptm`, which is an iff), and `proc_pt_any_data_irrel` re-based
+on a general `proc_pt_data_irrel`.
+
+`proc_pt_forget` and `proc_pt_any_wf_get` STAY: they are the fold and
+the query interface of the predicate that stays, and replacing them
+makes call sites longer, not shorter.
+
+**IF ③ IS EVER RE-OPENED**, the thing that would make it worth doing is
+not the name — it is milestone J's residue re-key, which turns
+`SpecUsertrap`'s parked-table pair from an honest ∃ into a `(V, M)`-keyed
+resource.  At that point the survivors shrink for a REASON rather than
+by re-spelling, and the tally above should be re-taken.
 
 **Conversion idioms (the campaign's learned rules):**
 1. A leaf's `_mem` form is the PRIMITIVE; its `proc_pt_any` form is a

@@ -829,7 +829,8 @@ Section KexecCSetup.
     (* the callee's own [let] on the nose.  Fold back once the call        *)
     (* returns -- kexec's own image stays honestly existential, so nothing *)
     (* past the adapter below reads [M0] itself. ---- *)
-    iDestruct (proc_pt_any_ptm P (uint (Y !!! Regidx Ra1)) with "Hpt") as (M0) "Hpt".
+    iEval (rewrite (proc_pt_ptm P (uint (Y !!! Regidx Ra1)))) in "Hpt".
+    iDestruct "Hpt" as (M0) "Hpt".
     iApply (Uvmalloc.wp_uvmalloc_mem_sconf fsc_kalloc Y P M0 4 (K - 68)%nat eb
               (proc_addr jp) eb ∅ ltac:(lia) HYtp HYa0 HYa3
               ltac:(lia) uvm_perm_ok_22
@@ -1198,7 +1199,8 @@ Section KexecCSetup.
          PTE_U moves neither the domain nor a page's ppn, so the choice of
          [sz] below is free; [uint sz1] is what is already in scope. Open
          the ∃-weakened table to it and fold back once the call returns. *)
-      iDestruct (proc_pt_any_ptm P' (uint sz1) with "Hptnew") as (Muc) "Hptnew".
+      iEval (rewrite (proc_pt_ptm P' (uint sz1))) in "Hptnew".
+      iDestruct "Hptnew" as (Muc) "Hptnew".
       iApply (Uvmclear.wp_uvmclear_mem_sconf Z1 P' (uint sz1) Muc
                 (uvm_pte (Z.lor 4 18) rleaf)
                 (K - 68)%nat eb (proc_addr jp)
@@ -3127,7 +3129,8 @@ Section KexecCLoop.
          [M'] half of [copyout_wrote] is discarded, kexec is building a NEW
          address space and its own contract stays honestly existential in
          the image. *)
-      iDestruct (proc_pt_any_ptm P (uint sz1) with "Hpt") as (M0) "Hpt".
+      iEval (rewrite (proc_pt_ptm P (uint sz1))) in "Hpt".
+      iDestruct "Hpt" as (M0) "Hpt".
       iApply (Copyout.wp_copyout_sconf_mem KT0 fsc_kalloc Z2 P M0 sz1 (S (alen c)) (afun c) dqas
                 (K - 68)%nat 0%nat eb (proc_addr jp) eb ∅
                 ltac:(lia) HZ2a0 HZ2a1
@@ -4780,7 +4783,8 @@ Section KexecCClose.
          [M'] half of [copyout_wrote] is discarded, kexec is building a NEW
          address space and its own contract stays honestly existential in
          the image. *)
-      iDestruct (proc_pt_any_ptm P (uint sz1) with "Hpt") as (M0) "Hpt".
+      iEval (rewrite (proc_pt_ptm P (uint sz1))) in "Hpt".
+      iDestruct "Hpt" as (M0) "Hpt".
       iApply (Copyout.wp_copyout_sconf_mem KT1 fsc_kalloc X12 P M0 sz1 (8 * S c)%nat ufun (DfracOwn 1)
                 (K - 68)%nat 0%nat eb (proc_addr jp) eb ∅
                 ltac:(lia) HX12a0 HX12a1

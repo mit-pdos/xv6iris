@@ -174,7 +174,12 @@ outstanding; see the `completed/` section below).
   `sync`'s entry deposit — design of record:
   `design/user-wp-slot.md`); the file is the six-item ledger, including
   the two rulings to get before the residue re-key and the deliberately
-  undesigned deposit-covering formulation.
+  undesigned deposit-covering formulation.  Its §2 is FINISHED and is
+  worth reading for its own sake: the `proc_pt_any` campaign, which took
+  every contract in the tree to a PRECISE image or an existential written
+  out, and which carries the priced-and-shelved cost of deleting the
+  predicate itself — a worked example of stopping a refactor at the point
+  where the remaining work is re-spelling.
 
 - **[`fs-syscall-specs.md`](projects/fs-syscall-specs.md)** — the
   file-system BEHAVIOUR specification: what each syscall does to the

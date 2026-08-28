@@ -994,8 +994,8 @@ Section KforkPrologue.
          nothing, and the child's bytes outside the run don't exist yet
          either way. *)
       iDestruct (proc_ptm_pt with "HCpt") as "HCpt".
-      iDestruct (proc_pt_any_ptm (pv_upt Vc) (uint (pv_sz (us_V Up)))
-                   with "HCpt") as (MC0) "HCpt".
+      iEval (rewrite (proc_pt_ptm (pv_upt Vc) (uint (pv_sz (us_V Up))))) in "HCpt".
+      iDestruct "HCpt" as (MC0) "HCpt".
       iApply (Uvmcopy.wp_uvmcopy_mem_sconf fsc_kalloc N5p (pv_upt (us_V Up)) (pv_upt Vc)
                 (uint (pv_sz (us_V Up))) (uint (pv_sz (us_V Up))) (us_M Up) MC0
                 (trap_res b + K1)%nat eb pme (S lvl) false
@@ -1059,7 +1059,8 @@ Section KforkPrologue.
            wants it back at the child's OWN (still zero) size -- [np->sz]
            was never stored to on this path -- so re-view it there. *)
         iDestruct (proc_ptm_pt with "HCpt") as "HCpt".
-        iDestruct (proc_pt_any_ptm with "HCpt") as (MCo) "HCpt".
+        iEval (rewrite (proc_pt_ptm (pv_upt Vc) (uint (pv_sz Vc)))) in "HCpt".
+        iDestruct "HCpt" as (MCo) "HCpt".
         iDestruct ("HCwand" $! (pv_upt Vc) (pv_sz Vc) (pv_tf Vc) MCo
                      with "[%] [%] [%] [%] HCsz HCpg HCpt HCtf HCtfpg") as "HCpriv".
         { reflexivity. } { reflexivity. } { exact HszbC. } { exact HbelC. }
