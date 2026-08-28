@@ -1372,3 +1372,4 @@ LinkSysMknodAU.v
 # state (the port the banner of claude-notes/projects/namei-pinned-lookup.md
 # asks for).  A LEAF, like every consumer of FsImgCheck -- nothing requires it.
 FsInitPin.v
+SpecSysOpenAU.v
