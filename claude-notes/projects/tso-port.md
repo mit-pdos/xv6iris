@@ -4172,3 +4172,19 @@ trampoline-confined, provably unparkable, SIE=false windows) is NOT
 taken now, and the decision waits for main's user-mode WP rework to
 land.  The A6.107 measurement is preserved as the input to that future
 decision.
+
+### 0.38′ OWNER RULING (2026-08-28): the lk_floor widening is RATIFIED
+
+The owner ratified A6.105's widening of 0.35′(i): the handle carries
+`lk_floor ξ lo := ctx_floor ξ lo ∨ llb loglen_name lo` — the context
+floor, OR the install store's log-position receipt, converting to the
+floor at any AMO (hart_view_lb_get + ctx_bound_raise), i.e. at the
+acquire 0.35′(iii) already named.  Reading: "you received this handle,
+or you wrote this lock" — ctx_pointsto's clean-vs-own-write
+disjunction surfacing in the handle.  The right arm's only resting
+holder is the creator's thread before its first AMO, whose reads are
+covered by store forwarding; every channel crossing delivers the left
+arm.  This resolves the generalized creator bootstrap (A6.101/A6.105:
+a hart's own store never advances its own view, and no AMO stands
+between initlock's store and newlock — for ANY lock, boot or dynamic).
+0.35′ stands otherwise unchanged.
