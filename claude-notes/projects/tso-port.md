@@ -4063,3 +4063,29 @@ and first barriers — is load-bearing and is exactly the fliptree's
 remaining producer wiring in ProofMain (the third strans_res_at/kpt_res_at
 arm) plus the §0.27′ park resume tie; once those land, the membership is
 already correct everywhere and nothing re-homes.
+
+### 0.34′ OWNER RULING (2026-08-28): `locked` strengthens to carry the
+no-migration-while-holding evidence, sealed
+
+Resolving A6.87 §(7)'s hart-relative exactness class (the holder's
+exact read of its own acquire write needs hart_agent (@cpu_id CIDw) =
+hart_agent h0, and no leaf had it): the owner confirmed the semantic
+chain already in the tree — acquire's proof calls push_off, which
+returns sie_cap_gpr with interrupts definitely blocked (b = false),
+and under that condition wp_next promises the thread stays on the
+same CPU — and ruled the missing premise travels IN `locked`:
+"i'm ok with sticking more things into [locked]; that seems
+perfectly fine, especially if it's going to be opaque to the
+callers."  So `locked` binds the author hart h0 and rides with the
+capability, SEALED: call sites keep passing an abstract token, the
+kit's leaves peel CIDw = h0 inside.  Side effect worth keeping: the
+strengthened type is a lint — any proof that tried to send `locked`
+where the capability cannot follow would be describing a
+migration-while-holding the system forbids.  lk_cpu_pay_vis (A6.84)
+settles against the same fact.  Paper tidbit: TSO forced the proof
+to distinguish "same context" from "same hart"; the ctx tower's
+exactness was context-relative and migration-safe, an author receipt
+is hart-relative, and the spinlock's holding() is the one place the
+difference is load-bearing — the sound reason is the scheduler's
+(push_off), so the lock token is what imports a scheduler fact into
+a memory-tier leaf.
