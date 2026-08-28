@@ -364,10 +364,16 @@ DELETED; `col_snap_bytes`/`col_snap_ok`/`col_snap_ok_ex` were already, and
 value-first allocator keeps ONE caller, era 0's image, so **`snap_ok` is
 handed IN nowhere else in the tree**.
 
-The BOOT mint reads it one level up instead: `FsCfgSnap.fs_cfg_alloc_snap`
-never builds `fs_state (fs_gamma_L γfs) S` at all — it distributes the
-pieces straight into region/bitmap/escrow/pool off facts, and §5 says why
-that is right rather than merely unfinished.
+The BOOT mint reads it off ITS OWN SOURCE (durable-disk BT-3):
+`FsCfgSnap.fs_cfg_alloc_snap` takes the previous era's epoch, unpacked at
+the state it stands at (`fs_snap (snap_gamma gsn gln gtn) gsn D S` with
+`D = fs_restrict Pb (fs_home_set cov ls)`), and runs `fs_snap_read_ok` on
+it.  So the boot side, like the commit side, hands `snap_ok` IN nowhere:
+every clause the mint spends — `sk_disj` included — is read off the
+source's own exclusivity inside that lemma.  It still never builds
+`fs_state (fs_gamma_L γfs) S`: it distributes the pieces straight into
+region/bitmap/escrow/pool off the reading, and §5 says what would be
+involved in making that distribution `∗`-shaped.
 
 **AND `snap_ok` DOES NOT NEED SHRINKING.**  It is left whole because
 `SystemAdequacy.fs_boot_pure` exports `∃ S, snap_ok S D` as the theorem's
@@ -447,19 +453,29 @@ flattening", which is where the epoch's IDENTITY comes from.
 
 ## 5. Boot, adequacy, and the theorem
 
-**Boot** (stage 4, lane E-boot), AS BUILT: `FsCfgSnap.fs_cfg_alloc_snap`
-re-founds the era at PowerOn, inside `BootShared.boot_shared_alloc`, off
-the PURE tie and a fresh byte map — it never builds
-`fs_state (fs_gamma_L γfs) S` at all.  It REPLACES the boot-time decoding
-of `fs.img`, which
+**Boot** (stage 4, lane E-boot; the input is the EPOCH since durable-disk
+BT-3): `FsCfgSnap.fs_cfg_alloc_snap` re-founds the era at PowerOn, inside
+`BootShared.boot_shared_alloc`, off the PREVIOUS ERA'S OWN SNAPSHOT and a
+fresh byte map — it never builds `fs_state (fs_gamma_L γfs) S` at all.  It
+REPLACES the boot-time decoding of `fs.img`, which
 survives only at era 0 inside `P_fs_alloc`/`FsDurImg` (it produces era 0's
-snapshot).  The value the mint takes is `D = fr_D` of the boot recovery
-record, read off the crash predicate's `P_dur` (`P_fs_dur_acc`,
-`P_dur_tie` — pure content, so it rides `riscv_power_adequacy`'s
-`Hproj`/`Ppure`).  **Since durable-disk BT the EPOCH ITSELF also reaches
-the boot**, as a resource on `power_boot_res`'s new client conjunct
-`Rb` (below, and `design/crash.md`); `boot_shared_alloc` receives it and
-drops it until BT-3 hands it to the mint.
+snapshot).  **THE EPOCH REACHES THE BOOT AS A RESOURCE**, on
+`power_boot_res`'s client conjunct `Rb` (below, and `design/crash.md`).
+`SystemAdequacy.xv6_boot_era` splits that conjunct off
+(`RiscvAdequacy.power_boot_res_lend`), pins the lent committed map to the
+one its own `fs_boot_pure` names (`FsCrash.fs_recovery_det` — recovery is a
+FUNCTION of the physical disk), unpacks it, and hands
+`fs_snap (snap_gamma gsn gln gtn) gsn D S` down through
+`boot_shared_alloc` to the mint, which reads `snap_ok S D` off it
+(`FsDurSnap.fs_snap_read_ok`; the WAL's `dblk_full` row is the mint's own
+block-width premise read through `fs_restrict`).  **THE ERA'S ABSTRACT
+STATE IS THE EPOCH'S OWN**: `S` comes out of the resource, not out of
+`fs_boot_pure`'s existential, which is why no state-determinacy theorem is
+needed and why the epoch travels UNPACKED rather than as `P_dur` (whose
+state is existential while every configuration tie the mint returns is
+spelled at `S`).  `fs_boot_pure`'s `∃ S, snap_ok S D` stays as the
+theorem's durability claim and as what `FirstTok` reads; it is a DERIVED
+export at every era and a premise of nothing.
 
 **IT CAN, AND THE CHANNEL IS OPEN (durable-disk BT; H5's three reasons,
 below, are superseded).**  Reasons (i) and (ii) fell to lemmas that were
@@ -478,9 +494,44 @@ CARRIES A RESOURCE OUT"), and `FsCrash.P_fs_swap` fills it with
 P_dur D` — the crash predicate's own epoch, CLONED (`P_dur_clone`) and
 returned, at the one point in the system holding both the fixed disk auth
 and `crashN`.  The bridge from the era's `[∗ set] b ∈ home, fsblock` to a
-flat byte map is `FsDurBytes.fs_dbytes_set_blocks`.  What remains is
-plumbing: `boot_shared_alloc` still DROPS the lent epoch, and
-`fs_cfg_alloc_snap` still takes the pure `snap_ok` (stages BT-3..BT-5).
+flat byte map is `FsDurBytes.fs_dbytes_set_blocks`.  The channel is
+CONSUMED (BT-3): the mint takes the epoch and reads the tie off it.
+
+**WHAT AN `∗`-SHAPED DISTRIBUTION WOULD STILL COST, AND WHY THE READING IS
+WHERE IT STOPS.**  Running `fs_state_install_era` at the boot — so that the
+pool's, the payloads' and the bitmap's objects arrive `∗`-shaped instead of
+being cut out of the home ledger — buys exactly ONE thing beyond BT-3:
+`FsBoot.big_sepS_carve` inside `FsCfgSnap.ipool_alloc_of_snap`, the tree's
+last consumer of `snap_blk_set_disj` (hence of `sk_disj`) on the boot side.
+Everything else the peels spend (`snap_names_cov` closed by
+`sk_meta_used`/`sk_own_used`, the byte ties `sk_blk`/`sk_ind`/`sk_bmap`)
+they would spend again, because the install is priced by two obligations
+that carve is not:
+
+- **`fs_footprint` is ALL-OR-NOTHING.**  It owns each record as a 64-byte
+  RUN, so an install at the era's home set swallows the inode region's
+  blocks along with the payloads.  There is no partial install that leaves
+  the region alone, so "the pool, the payloads and the bitmap" cannot be
+  moved without the region's re-gluing (`InodeRegion.ireg_recs_blk` plus
+  the inum-map-to-block-set regrouping) in the same change.
+- **THE RESIDUE IS BYTE-SHAPED AND THE KIT'S IS BLOCK-SHAPED.**
+  `fs_footprint_install`'s remainder is `phi_map Γ (Mh ∖ xr_union (xr_fs S
+  PM))`, while `FsCfgKits.fs_kit_fsinit_ghost` hands `fsinit` a
+  `[∗ set] b ∈ fsc_cov ∖ Rspent` of blocks.  Reconciling them needs either
+  a MAP EQUALITY (`xr_union (xr_fs S PM) = fs_dbytes (fs_restrict Pb
+  spent)`, both directions) or — the cheaper one-directional form — a
+  block-level pre-split of the home ledger plus
+  `xr_union (xr_fs S PM) ⊆ fs_dbytes (fs_restrict Pb spent)`, i.e. "every
+  byte the footprint owns lies in a spent block", which needs each run's
+  offset+width bound and the same `sk_own_used`/`snap_names_cov`
+  accounting the peels already do.
+
+So `sk_disj` is what an install would remove from the boot mint — and since
+BT-3 it is no longer a fact anybody states or carries: `fs_snap_read_ok`
+derives it from `FsStateDefs.phi_excl` at `snap_gamma` INSIDE the reading,
+which is what the ruling asks of it.  What is left is a change of CARRIER
+(a `Prop` for one lemma call versus a `∗` shape) inside one file, and
+nothing above `FsCfgSnap` moves either way.
 
 **H5's three reasons, kept for the record (they were right when written).**  (i) The era's byte
 AUTHORITY is minted at the WHOLE home map (`FsBoot.fs_boot_ghosts`, which
@@ -499,20 +550,17 @@ instead is the PROVENANCE: `snap_ok` is no longer carried by anything, so
 the facts the mint spends are read off the epoch's own resources one level
 up.
 
-**RE-CHECKED AT EV STAGE 5, and the answer did not move.**  The plan's
-stage 7 asked for `fs_cfg_alloc_snap` to become "identity on `fs_state`".
-It cannot be a shape it does not have: the mint's inputs are a BYTE
-FUNCTION `Pb`, `disk_bytes γv` and the PURE `snap_ok S D` — there is no
-source instance anywhere on the boot side — and its output is not an
-`fs_state` either but the era's whole configuration (`ICFG`/`FSC` plus the
-two kits), distributed into region, pool, bitmap and `ftop_inv`.  Nor can
-the `snap_ok` premise be dropped: the proof spends `sk_bytes` (the decode
-bridge `snap_rec_decode`), `sk_local`, `sk_own_used`/`sk_meta_used` (every
-peel of the boot ledger, `snap_names_cov`), `sk_sbok`, `sk_regdom` and
-`sk_links` — and its supplier is a value-first allocation at era 0
-(`FsDurAlloc`/`FsDurImg`), which is the one caller of the carve.  Turning
-that around is a boot-side lane about where the era's byte AUTHORITY is
-minted (reason (i) above), not a stage of the era-vocabulary campaign.
+**THE MINT IS NOT "IDENTITY ON `fs_state`", AND CANNOT BE.**  The plan's
+stage 7 asked for that shape.  Its output is not an `fs_state` but the
+era's whole configuration (`ICFG`/`FSC` plus the two kits), distributed
+into region, pool, bitmap and `ftop_inv`; its byte input is the era's own
+freshly minted home ledger, which is where reason (i) above bites.  What
+DID move is the tie's provenance: there IS a source instance on the boot
+side now (BT-3), so the mint spends `sk_bytes` (the decode bridge
+`snap_rec_decode`), `sk_local`, `sk_own_used`/`sk_meta_used` (every peel of
+the boot ledger, `snap_names_cov`), `sk_sbok`, `sk_regdom`, `sk_disj` and
+`sk_links` as READINGS off the epoch it is handed rather than as a premise
+anybody supplies.
 
 **Ghost-wise recovery is a NO-OP, and the mint runs AT POWERON (RULING,
 corrected by lane E-mint).**  `D` is a pure function of the raw disk —

@@ -84,8 +84,11 @@ fs_state_mint : fs_state Γ_D S -∗ (footprint S at Φ_L) ==∗ fs_state Γ_D S
 
 that walks the durable instance and allocates `Γ_L`'s ghosts to match
 (for each directory, as many fresh link tokens as it holds entries with
-tokens, drawn from freshly allocated `link_auth`s).  That lemma IS the
-boot mint (stage H1 of the worklist); there is no image decoding at boot.
+tokens, drawn from freshly allocated `link_auth`s).  There is no image
+decoding at boot: `FsCfgSnap.fs_cfg_alloc_snap` is handed the previous era's
+own epoch (`FsDurSnap.fs_snap` at the committed map, lent at the PowerOn
+arm) and reads everything it spends off it — see
+[`durable-fs-plan.md`](durable-fs-plan.md) §5.
 
 ## 2. The nested predicates
 
