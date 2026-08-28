@@ -21,12 +21,13 @@
 
    (1) THE WALK IS THE ERA WALK.  [SpecNparWrapEra.wp_npar_wrap_era] in
        place of [SpecNameiparent.wp_nameiparent_gen]: the two trace rows
-       ([P 0 ROOTINO] and [FsAbsNpar.ep_hops_from] over the PARENT PREFIX)
-       come in, the cursor at the parent index and the parent's own inum
-       come back on success, and [FsAbsNpar.np_dead] comes back on
-       failure.  That walk is ABSOLUTE-PATHS-ONLY, so this contract takes
-       [pfun 0 = SLASH]; the relative start is the era walk's own
-       out-of-scope item and not this file's.
+       ([FsAbsStart.ep_start], the cursor and the PARENT-PREFIX family
+       deferred in the START INUM) comes in, the cursor at the parent
+       index and the parent's own inum come back on success, and
+       [FsAbsNpar.np_dead] comes back on failure.  That walk takes BOTH
+       STARTS as of lane A-iii, so this contract has NO absolute-path
+       premise: a relative create walks from [p->cwd] and the trace fires
+       there.
 
    (2) THE TYPE IS FIXED AT [T_DEVICE].  mknod is the only caller of this
        form, and pinning [ty] buys two whole halves of the walk: the
@@ -128,6 +129,7 @@ Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ                 *)
 Require Import SpecSysMknodAU.  (* [cre_pre], [mknod_parent_elems]          *)
 Require Import FsAbsEra.
 Require Import FsAbsNpar.       (* [np_elems], [ep_hops_from], [np_dead]    *)
+Require Import FsAbsStart.      (* [ep_start]: the DEFERRED start           *)
 Require Import FsAbsEraMknod.   (* [mknod_walk_dead_era]                    *)
 Require Import FsAbsMknodFire.  (* the authority-shaped commits             *)
 From Kernel Require KernelSyms.
@@ -232,8 +234,6 @@ Definition wp_create_au_body
   (* ---- namex's path buffer ---- *)
   bb_cstr pfun plen ->
   (Z.of_nat plen < 2 ^ 31)%Z ->
-  (* ---- THE ERA WALK's SCOPE: absolute paths (SpecNparEra's header) ---- *)
-  pfun 0%nat = SLASH ->
   (* ---- ialloc's three geometry premises ---- *)
   1 < fsc_ninodes ->
   fsc_ninodes <= 16 * Z.of_nat icfg_nib ->
@@ -282,15 +282,13 @@ Definition wp_create_au_body
   iref_slots ns -∗
   log_opS icfg_log u Sb -∗
   log_tx icfg_log -∗
-  (* ---- THE AU SIDE: the two trace rows and the two commits ----
-     The trace rows are the ALREADY-FIRED form of
-     [FsAbsEraMknod.mknod_walk_pre_era]: create knows its own path buffer,
-     so the syscall fires that one-shot at the string it fetched
-     ([FsAbsNparMknod.np_pre_of_mknod]) and hands the two rows in.  The
-     hop family is over the PARENT PREFIX, which is
-     [SpecSysMknodAU.mknod_parent_elems] definitionally. *)
-  P 0%nat (bv_unsigned ROOTINO) -∗
-  ep_hops_from fsc_fs P Pmiss pl 0%nat -∗
+  (* ---- THE AU SIDE: the trace and the two commits ----
+     [FsAbsStart.ep_start] at create's own path buffer IS
+     [FsAbsEraMknod.mknod_walk_pre_era] ([FsAbsNparMknod.np_start_of_mknod]),
+     so the syscall hands its one-shot straight down and the START INUM is
+     decided inside the walk.  The hop family is over the PARENT PREFIX,
+     which is [SpecSysMknodAU.mknod_parent_elems] definitionally. *)
+  ep_start fsc_fs P Pmiss pl -∗
   acre_commit_at Γfs ∅ (ADev ma mi) Φok -∗
   dlookup_commit_at Γfs ∅ Φex -∗
   wp_next true pj (fun (CID : CpuId) =>

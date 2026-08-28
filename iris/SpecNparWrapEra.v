@@ -13,12 +13,12 @@
    THE DIFF AGAINST [SpecNameiparent.wp_nameiparent_gen_body], and there is
    nothing else in this file:
 
-     - the ABSOLUTE-PATH premise [pfun 0 = SLASH] (the era contracts' scope);
-     - the two trace premises, [P 0 ROOTINO] and
-       [FsAbsNpar.ep_hops_from fsc_fs P Pmiss pl 0] -- the PARENT-PREFIX
-       family, which is exactly what
-       [FsAbsEraMknod.mknod_walk_pre_era] produces
-       ([FsAbsNparMknod.np_pre_of_mknod]);
+     - ONE trace premise, [FsAbsStart.ep_start] -- the cursor and the
+       PARENT-PREFIX family at whatever inum the walk begins at, which is
+       [FsAbsEraMknod.mknod_walk_pre_era] on the nose
+       ([FsAbsNparMknod.np_start_of_mknod]).  There is NO absolute-path
+       premise: the relative start landed with lane A-iii and both arms
+       of namex's entry test are proven;
      - the success arm gains the cursor at the parent index and exposes the
        returned inum ([SpecNparEra.inode_held_ty_at] in place of
        [IcacheRef.inode_held_ty]);
@@ -76,6 +76,7 @@ Require Import SpecNamex.
 Require Import SpecNameiTr.   (* [inode_held_at] *)
 Require Import FsAbsEra.      (* [elend] *)
 Require Import FsAbsNpar.     (* [np_elems]/[ep_hops_from]/[np_dead] *)
+Require Import FsAbsStart.    (* [ep_start]: the DEFERRED start (lane A-iii) *)
 Require Import SpecNparEra.   (* [inode_held_ty_at]: the typed, pinned parent *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -134,9 +135,6 @@ Definition wp_npar_wrap_era_body
      the short branch fails memmove's own 2^32 bound).  SpecFetchstr's
      header records the identical premise for strlen's [subw]. *)
   (Z.of_nat plen < 2 ^ 31)%Z ->
-  (* ABSOLUTE PATHS ONLY, the era contracts' scope ([SpecNparEra]'s
-     header records why the relative start is a contract-shape change). *)
-  pfun 0%nat = SLASH ->
   (* the walk's need, no longer linear in the path length
      (fs-log.md §G.24; [SpecNamex.walk_need]) *)
   (walk_need L <= n)%nat ->
@@ -185,10 +183,10 @@ Definition wp_npar_wrap_era_body
      the write arm (durable-disk B''-tx), and the pair rides in the set
      form's own position so no stage lemma moved *)
   log_opSt icfg_log n Sb -∗
-  (* ---- THE TRACE, OVER THE PARENT PREFIX.  Threaded straight into
-     [SpecNparEra.wp_npar_era]; this wrapper touches neither row. ---- *)
-  P 0%nat (bv_unsigned ROOTINO) -∗
-  ep_hops_from fsc_fs P Pmiss pl 0%nat -∗
+  (* ---- THE TRACE, OVER THE PARENT PREFIX, DEFERRED IN THE START.
+     Threaded straight into [SpecNparEra.wp_npar_era]; this wrapper
+     touches it not at all. ---- *)
+  ep_start fsc_fs P Pmiss pl -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (through namex / dirlookup, down to ilock and sleep), so a park moves
      the hart with interrupts off and the crossing has nothing to do with

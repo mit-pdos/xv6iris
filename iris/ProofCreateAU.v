@@ -210,6 +210,7 @@ Require Import SpecNparWrapEra.  (* the ERA nameiparent walk            *)
 Require Import FsBytesGamma.
 Require Import FsAbsEra.
 Require Import FsAbsNpar.        (* [np_elems]/[ep_hops_from]/[np_dead] *)
+Require Import FsAbsStart.       (* [ep_start]: the DEFERRED start      *)
 Require Import SpecSysMknodAU.   (* [cre_pre], [mknod_parent_elems]     *)
 Require Import FsAbsEraMknod.
 Require Import FsAbsNparMknod.   (* [np_dead_to_mknod]                  *)
@@ -2522,9 +2523,6 @@ Section ProofCreateMain.
     InodeInv.ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
     bb_cstr pfun plen ->
     (Z.of_nat plen < 2 ^ 31)%Z ->
-    (* the era walk's scope, and the premise that sends namex's entry test
-       down the [iget(ROOTDEV, ROOTINO)] arm the caller's [P 0] is stated at *)
-    pfun 0%nat = SLASH ->
     (* the type is FIXED (SpecCreateAU, difference (2)) *)
     ty = T_DEVICE ->
     1 < fsc_ninodes ->
@@ -2574,11 +2572,10 @@ Section ProofCreateMain.
     (* the transaction token, for the child's suspended row inside
        (durable-disk lane A) *)
     log_tx icfg_log -∗
-    (* ---- THE AU SIDE: the two ALREADY-FIRED trace rows of
-       [FsAbsEraMknod.mknod_walk_pre_era] (the syscall fires the one-shot at
-       the string it fetched) and the two commits ---- *)
-    P 0%nat (bv_unsigned ROOTINO) -∗
-    ep_hops_from fsc_fs P Pmiss (bview plen pfun) 0%nat -∗
+    (* ---- THE AU SIDE: the walk's DEFERRED start ([ep_start] at this
+       path buffer IS [FsAbsEraMknod.mknod_walk_pre_era]) and the two
+       commits ---- *)
+    ep_start fsc_fs P Pmiss (bview plen pfun) -∗
     acre_commit_at (fs_gamma_L fsc_fs) ∅
       (ADev (bv_unsigned major) (bv_unsigned minor)) Φok -∗
     dlookup_commit_at (fs_gamma_L fsc_fs) ∅ Φex -∗
@@ -2601,7 +2598,7 @@ Section ProofCreateMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc Hbmsl
-           Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hslash Hty
+           Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hty
            Hni1 Hni2 Hni3 Htynz Htyk Hpkc
            Hu Hns Hj Hgs Ha1 Ha2 Ha3 Heb.
     destruct (cr_kb K HK)
@@ -2609,7 +2606,7 @@ Section ProofCreateMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlogc #Hkenv
              #Hitb2 #Hitbl #Hesc #Hslks #Hiregi #Hiopen
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hpriv Hpath #Hprocs #Hdevi #Hgeom #Hdlk
-             Hbsl Hislots Hop Htx HP0 Hhops Hacre Hdlkc Halloc Hcont".
+             Hbsl Hislots Hop Htx Htr Hacre Hdlkc Halloc Hcont".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     (* PIN THE INDEX: at level 0 [cpu_own_eb_agree] gives [eb = b], and the
        crossings below are the literal [true] (create parks everywhere). *)
@@ -2917,11 +2914,11 @@ Section ProofCreateMain.
               pidv (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
               R7 (K - 10)%nat eb b lks U
               ltac:(exact HKnp) Hroot Hnib0 Hlg Hsize
-              Hbms0 Hbmsc Hbmsl Hist0 Hcovb Hiregb Hcstr Hplen31 Hslash
+              Hbms0 Hbmsc Hbmsl Hist0 Hcovb Hiregb Hcstr Hplen31
               ltac:(exact (cr_walk_need _ u Hu)) Hj Hgs
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbb Hsbi Hbmr
-                    Hppid Hcref Hpath Hnb14 Hbsl Hisl2 [$Hop $Htx] HP0 Hhops").
+                    Hppid Hcref Hpath Hnb14 Hbsl Hisl2 [$Hop $Htx] Htr").
     (* nameiparent is eb-generic now; create is still at [eb = true]. *)
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -7062,7 +7059,7 @@ Section ProofCreateMain.
   Proof.
     rewrite /wp_create_au_body.
     intros HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc Hbmsl
-           Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hslash Hni1 Hni2 Hni3 Hnib16
+           Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hni1 Hni2 Hni3 Hnib16
            Hty Hpkc Hu Hns Hj Hgs Ha1 Ha2 Ha3 Heb.
     (* the two type facts create's own halves want, off the fixed type *)
     assert (Htynz : bv_unsigned ty <> 0)
@@ -7076,7 +7073,7 @@ Section ProofCreateMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlogc #Hkenv
              #Hitb2 #Hitbl #Hesc #Hslks #Hiregi #Hiopen Hsbn Hsbi Hsbs Hsbb #Hbmr
              Hpriv Hpath #Hprocs #Hdevi #Hgeom #Hdlk Hbsl Hisl Hop Htx
-             HP0 Hhops Hacre Hdlkc Hcont".
+             Htr Hacre Hdlkc Hcont".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     iDestruct (cr_cap_align m K b (proc_addr j) HK10 with "Hcg")
       as %[Hal10 Hal9].
@@ -7085,13 +7082,13 @@ Section ProofCreateMain.
  plen pfun ty major minor U u Sb ns pidv
               dqb dqs dqbs dqn m K eb b lks P Pmiss Φok Φex
               HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc
-              Hbmsl Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hslash Hty
+              Hbmsl Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hty
               Hni1 Hni2 Hni3
               Htynz Htyk Hpkc Hu Hns Hj Hgs Ha1 Ha2 Ha3 Heb
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                     Hitb2 Hitbl Hesc Hslks Hiregi Hiopen Hsbn Hsbi Hsbs Hsbb Hbmr
                     Hpriv Hpath Hprocs Hdevi Hgeom Hdlk Hbsl Hisl Hop Htx
-                    HP0 Hhops Hacre Hdlkc [] Hcont").
+                    Htr Hacre Hdlkc [] Hcont").
     iApply (cr_alloc_half γs j γl pd pav pu
  γf
  plen pfun (m !!! Regidx Ra0 : mword 64)

@@ -1373,3 +1373,4 @@ LinkSysMknodAU.v
 # asks for).  A LEAF, like every consumer of FsImgCheck -- nothing requires it.
 FsInitPin.v
 SpecSysOpenAU.v
+FsAbsStart.v

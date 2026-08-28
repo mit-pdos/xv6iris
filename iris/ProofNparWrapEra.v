@@ -132,14 +132,14 @@ Section ProofNparWrapEraMain.
     cbv beta delta [wp_npar_wrap_era_body].
     intros pcE pjv pv nb ret_tgt pl L
            HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
-           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hpfun0 Hbud Hj Hgs.
+           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs.
     destruct (npi_kb K HK) as (Knx & K2 & Kpop).
     (* N3d trap 1's whole-function fix: fold [proc_addr j] into every
        resource ONCE, and never write [pjv] again. *)
     assert (Hpjd : proc_addr j = pjv) by reflexivity.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hropen #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
-              #Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog HP0 Hhops0 Hcont".
+              #Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog Htr Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     (* depth 0 forces the held set empty, so every [locks_below] the callees
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
@@ -314,11 +314,11 @@ Section ProofNparWrapEraMain.
  gf
               plen pfun nfun n Sb P Pmiss pidv dq dqb dqs dqpv R5 (K - 2)%nat eb b
               _ Upr Knx Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
-              Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hpfun0 Hbud Hj Hgs
+              Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
               ltac:(rewrite HR5a1; exact npar_a1_false)
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos
-                    Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog HP0 Hhops0").
+                    Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog Htr").
     all: try lkbelow.
     iIntros (CID8 Hq8 mf n' Sb' ok nf ipv w)
             "%Hcs Hcg Hcnt Hextc Hclmc Hpc Hbmap Hinos Hppid Hcwdr

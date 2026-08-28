@@ -55,16 +55,18 @@
        [FsAbs.lend_agrees] where [dv_half] could only reach
        [FsAbs.lend_reads] ([FsAbsSeam], finding 2).
 
-   THREE ARMS ARE STILL DEAD, AND ARE STILL REFUTED RATHER THAN PROVED:
-   the ruling fixes this contract, like the frozen one, at ABSOLUTE PATHS,
-   namei side -- [pfun 0 = SLASH] kills the relative start (myproc / idup)
-   and [a1 = 0] kills [L_par] and the nameiparent tail of [L_done].  The
-   NAMEIPARENT side is the lane's remaining item and it is not a question
-   about the lend: the fire above is shared by both sides of the [a1]
-   test, and what is missing is namex's two npar exits, which
-   [ProofNamex.v] proves for the landed contract and which the trace
-   contracts' success arm ([P L iL]) would have to be re-indexed for
-   (nameiparent fires L-1 hops and returns the PARENT).
+   THE RELATIVE START IS NOW PROVED (lane A-iii, 2026-08-28), so the arm
+   count is TWO dead, not three: [a1 = 0] still kills [L_par] and the
+   nameiparent tail of [L_done], but the [pfun 0 = SLASH] premise is gone
+   and the myproc / idup arm is back, restored from [ProofNamex]'s own
+   text.  What it needed was not a reading of the cwd but a trace that is
+   PARAMETRIC in the start ([FsAbsStart.ex_start]): the walk opens idup's
+   returned package, reads the slot's inum off the witness, and fires the
+   caller's one shot there.  The absolute arm fires the same premise at
+   ROOTINO and is otherwise unchanged, line for line.  The NAMEIPARENT
+   side landed separately ([ProofNparEra], the same walk at [a1 <> 0] with
+   the family re-indexed to the parent prefix) and takes the relative
+   start the same way.
 
    The block decomposition, the [Htail] / [Hloop] / [Hrest] / [Hdlblk]
    assertions and the performance rules behind them are [ProofNamex.v]'s --
@@ -129,6 +131,8 @@ Require Import SpecNameiTr.   (* [inode_held_at] ONLY: the pinned package.
                                  NOT what this walk fires. *)
 Require Import FsAbsEra.      (* [ex_hop]/[ex_hops_from], [elend], and the
                                  three ghost lemmas the fire uses *)
+Require Import FsAbsStart.    (* [ex_start] and [bview_head_slash]: the
+                                 deferred start the two arms fire *)
 Require Import SpecNamexEra.
 Require Import ProofDirlookupParts ProofNamexParts.
 Require Import ProofNamex.    (* READ-ONLY REUSE: its top-level pure lemmas *)
@@ -780,7 +784,7 @@ Section ProofNamexTrMain.
     cbv beta delta [wp_namex_era_body].
     intros pcE pjv pv nb ret_tgt pl L
            HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
-           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hpfun0 Hbud Hj Hgs Ha1
+           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Ha1
            Hbelow.
     destruct (nx_kb K HK) as (Kmp & Kid & Kig & Kmm & Kil & Kiu & Kiup
                               & Kdl & Kip & Kpop & K12).
@@ -789,7 +793,7 @@ Section ProofNamexTrMain.
     assert (Hpjd : proc_addr j = pjv) by reflexivity.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hropen #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
-              #Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot [Hlog Htx] HP0 Hhops0 Hcont".
+              #Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot [Hlog Htx] Htr Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
        level 0 [cpu_own_eb_agree] gives [eb = b], so [b] IS the literal
        [true] here.  The crossings below are the literal [true] (this
@@ -4951,6 +4955,16 @@ Section ProofNamexTrMain.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iDestruct (wp_next_shift (b := true) (CIDa := CID23) (CIDb := CIDK5)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      (* THE ONE SHOT, FIRED AT THE ROOT.  [FsAbsStart.ex_start] is
+         universally quantified over the start inum; this arm's is
+         ROOTINO, and the tie ([the path begins with SLASH] -> [r =
+         ROOTINO]) is discharged by [reflexivity] because [r] IS ROOTINO
+         here.  The relative arm below fires the same premise at idup's
+         own inum, where the implication is refuted instead. *)
+      iApply fupd_wp.
+      iMod ("Htr" $! (bv_unsigned ROOTINO) with "[%]") as "[HP0 Hhops0]";
+        [intros _; reflexivity |].
+      iModIntro.
       iSpecialize ("Hloop" $! (S plen) CIDK5 with "[%]"); [wp_next_chain |].
       iApply ("Hloop" $! 0%nat (ientry kig) A8 n Sb [] nfun false
                 (bv_unsigned ROOTINO)
@@ -4970,12 +4984,321 @@ Section ProofNamexTrMain.
       (* entering the loop, the running set IS the caller's *)
       - reflexivity.
       - rewrite pa_add_0. exact HAregs.
-    + (* --------- THE RELATIVE ARM IS DEAD: ABSOLUTE PATHS ONLY --------- *)
-      (* The ruling scopes this contract to [pfun 0 = SLASH] (Q-c), so the
-         [beq a4,a5] at +0x2a is decided by a PREMISE and myproc / idup are
-         never reached.  When the relative form lands it needs an
-         inum-exposed cwd, which is a different contract's business. *)
-      exfalso. exact (Hsl0 Hpfun0).
+    + (* ------- THE RELATIVE ARM: idup(myproc()->cwd) (lane A-iii) ------
+         RESTORED from [ProofNamex.wp_namex_gen]'s own arm, instruction for
+         instruction; the era proof used to REFUTE it from [pfun 0 = SLASH]
+         and that premise is gone.  Only two things are new, and both are
+         at the join: the starting reference is read AT ITS INUM out of
+         idup's package, and the caller's deferred trace is fired there. *)
+      iApply (wp_beq_fall_s_sconf (mword_of_int (NX + 0x2a))
+                (mword_of_int 30 : mword 13) Ra5 Ra4 R7 (K - 12)%nat b
+                ltac:(nz) ltac:(nz)
+                ltac:(rgne; rgne; rewrite HR7a4 HR7a5; exact (nx_slash_ne _ Hsl0))
+                with "Hcg Hpc []").
+      { iApply (nxi_02a with "Htext"). }
+      iIntros (CID20 Hq20) "Hcg Hpc".
+      assert (Hpp02e : add_vec_int (mword_of_int (NX + 0x2a) : mword 64) 4
+                       = mword_of_int (NX + 0x2e)) by pcw.
+      iEval (rewrite Hpp02e) in "Hpc".
+      (* +0x2e jal ra,myproc *)
+      assert (Htgtmp : add_vec (mword_of_int (NX + 0x2e) : mword 64)
+                         (sign_extend' 64 (mword_of_int 2088978 : mword 21))
+                       = mword_of_int KernelSyms.myproc) by pcw.
+      iApply (wp_jal_s_sconf (mword_of_int (NX + 0x2e)) Rra
+                (mword_of_int 2088978 : mword 21) R7 (K - 12)%nat b
+                ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc []").
+      { iApply (nxi_02e with "Htext"). }
+      iIntros (CID21 Hq21) "Hcg Hpc".
+      iEval (rewrite Htgtmp) in "Hpc".
+      pose (B1 := <[Regidx Rra := regval_into_reg
+                    (add_vec_int (mword_of_int (NX + 0x2e) : mword 64) 4)]> R7).
+      assert (HB1ra : B1 !!! Regidx Rra
+                      = add_vec_int (mword_of_int (NX + 0x2e) : mword 64) 4)
+        by (rewrite /B1; apply upd_eq).
+      iDestruct (cpu_own_transport CID CID21 0%nat eb (proc_addr j) b
+                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID CID21 eb (proc_addr j)
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID CID21 eb (proc_addr j)
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+      iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID21)
+                   ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      iApply (MP.wp_myproc_sconf B1 (K - 12)%nat 0%nat eb (proc_addr j) b _
+                ltac:(vm_compute; reflexivity) Kmp
+                with "Hcg Hcnt Htext Hpc").
+      iIntros (CIDmp Hqmp msv mf1) "%Hmsf Hcg Hcnt Hpc %Hmpp".
+      destruct Hmpp as [Hcsmp Hmpa0].
+      assert (Hpc032 : ret_pc (B1 !!! Regidx Rra) = mword_of_int (NX + 0x32)).
+      { rewrite HB1ra. pcw. }
+      iEval (rewrite Hpc032) in "Hpc".
+      (* +0x32 ld a0,336(a0) : a0 := p->cwd
+         [p->cwd] IS ONE OF THE BLOCK'S OWN CELLS, so it is BORROWED for this
+         one load and handed straight back on the next line -- the contract
+         passes [proc_priv_bare] around and never a loose share of the cell.
+         The value the load produces is the block's own [pv_cwd Vpr]. *)
+      iDestruct (proc_priv_bare_cwd (proc_addr j) pidv Upr with "Hppid")
+        as "[Hcwdc Hcwdbk]".
+      iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (NX + 0x32)) Ra0 Ra0
+                (mword_of_int 336 : mword 12) mf1 (K - 12)%nat (pv_cwd (us_V Upr)) b
+                (dqm := DfracOwn 1)
+                ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hcwdc]").
+      { iApply (nxi_032 with "Htext"). }
+      { iEval (rgne; rewrite Hmpa0 p_cwd_sext). iExact "Hcwdc". }
+      iIntros (CID22 Hq22) "Hcg Hpc Hcwdc".
+      iEval (rgne; rewrite Hmpa0 p_cwd_sext) in "Hcwdc".
+      iDestruct ("Hcwdbk" $! (pv_cwd (us_V Upr)) with "Hcwdc") as "Hppid".
+      rewrite us_cwd_id.
+      pose (B2 := <[Regidx Ra0 := regval_into_reg (pv_cwd (us_V Upr))]> mf1).
+      assert (HB2a0 : B2 !!! Regidx Ra0 = pv_cwd (us_V Upr))
+        by (rewrite /B2; apply upd_eq).
+      assert (Hpp036 : add_vec_int (mword_of_int (NX + 0x32) : mword 64) 4
+                       = mword_of_int (NX + 0x36)) by pcw.
+      iEval (rewrite Hpp036) in "Hpc".
+      (* ---- THE SHED: the cwd reference lends a share to idup ---- *)
+      (* SIMP-2: the package travels WHOLE.  What is still read off it is
+         the SLOT (the pointer [a0] is set to) and the two pure facts; the
+         carve and the gather that used to bracket the call are inside
+         [SpecIdup] now, and the cwd's fraction is untouched either way. *)
+      iDestruct "Hcwdr" as (ck cq cinum) "(%Hcwde & %Hckl & %Hcinb & Hcrefp)".
+      iAssert (inode_held (ientry ck)) with "[Hcrefp]" as "Hcheld".
+      { iExists ck, cq, cinum.
+        iSplitR; [done |]. iSplitR; [iPureIntro; exact Hckl |].
+        iSplitR; [iPureIntro; exact Hcinb |]. iExact "Hcrefp". }
+      (* +0x36 jal ra,idup *)
+      assert (Htgtid : add_vec (mword_of_int (NX + 0x36) : mword 64)
+                         (sign_extend' 64 (mword_of_int 2095360 : mword 21))
+                       = mword_of_int KernelSyms.idup) by pcw.
+      iApply (wp_jal_s_sconf (mword_of_int (NX + 0x36)) Rra
+                (mword_of_int 2095360 : mword 21) B2 (K - 12)%nat b
+                ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc []").
+      { iApply (nxi_036 with "Htext"). }
+      iIntros (CID23 Hq23) "Hcg Hpc".
+      iEval (rewrite Htgtid) in "Hpc".
+      pose (B3 := <[Regidx Rra := regval_into_reg
+                    (add_vec_int (mword_of_int (NX + 0x36) : mword 64) 4)]> B2).
+      assert (HB3ra : B3 !!! Regidx Rra
+                      = add_vec_int (mword_of_int (NX + 0x36) : mword 64) 4)
+        by (rewrite /B3; apply upd_eq).
+      assert (HB3a0 : B3 !!! Regidx Ra0 = ientry ck).
+      { rewrite /B3 upd_ne; [| nz]. rewrite HB2a0. exact Hcwde. }
+      (* the relative arm: myproc returned [cpu_own] at CIDmp, and it does not
+         thread the complement, so the pair is still at CID21. *)
+      iDestruct (cpu_own_transport CIDmp CID23 0%nat eb (proc_addr j) b
+                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID21 CID23 eb (proc_addr j)
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID21 CID23 eb (proc_addr j)
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+      iDestruct (wp_next_shift (b := true) (CIDa := CID21) (CIDb := CID23)
+                   ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      (* idup's contract widened in increment IVe (iclaim-ledger.md §3.19):
+         its [ref++] is a ledger move, so it takes the region handle this
+         walk already carries -- persistent, and the same [Hireg] the iget
+         above was given. *)
+      iApply (ID.wp_idup_sconf
+                ck B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
+                Kid ltac:(vm_compute; reflexivity) Hckl HB3a0
+                ltac:(lkbelow)
+                with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hireg Hisl1 Hcheld").
+      all: try lkbelow.
+      iIntros (CIDid Hqid mid) "Hcg Hcnt Hpc %Hidp Hcwdr Hip0".
+      destruct Hidp as [Hcsid Hida0].
+      (* the cwd's own package, back whole -- the carve and the gather
+         happened inside the call (SIMP-2). *)
+      iEval (rewrite -Hcwde) in "Hcwdr".
+      assert (Hpc03a : ret_pc (B3 !!! Regidx Rra) = mword_of_int (NX + 0x3a)).
+      { rewrite HB3ra. pcw. }
+      iEval (rewrite Hpc03a) in "Hpc".
+      (* +0x3a c.mv s4,a0 *)
+      iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x3a)) Rs4 Ra0 mid (K - 12)%nat b
+                ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+      { iApply (nxi_03a with "Htext"). }
+      iIntros (CIDBm1 HqBm1) "Hcg Hpc". iEval (rgne) in "Hcg".
+      pose (B4 := <[Regidx Rs4 := regval_into_reg
+                    (add_vec (zero_reg : mword 64) (mid !!! Regidx Ra0))]> mid).
+      assert (HB4s4 : B4 !!! Regidx Rs4 = ientry ck).
+      { rewrite /B4 upd_eq. rewrite Hida0. apply add_vec_zero_l. }
+      (* THE WALK'S STARTING REFERENCE, AND WHERE THE Q-c GAP CLOSES.
+         idup's second package hides its inum -- but the walk is the one
+         holding it, so it OPENS the existential right here and reads the
+         slot's inum off the witness.  [inode_held_at] is that package
+         with the witness named, which is exactly the currency the era
+         loop's invariant carries ([inode_held_at ipv dcur]).  No new
+         reading of [ProcInv.cwd_ref] is needed, and none exists. *)
+      iDestruct "Hip0" as (ik iq iinum) "(%Hipe & %Hikl & %Hiinb & Hirefp)".
+      iAssert (inode_held_at (ientry ck) (bv_unsigned iinum))
+        with "[Hirefp]" as "Hip".
+      { rewrite /inode_held_at. iExists ik, iq, iinum.
+        iSplitR; [iPureIntro; exact Hipe |].
+        iSplitR; [iPureIntro; exact Hikl |].
+        iSplitR; [iPureIntro; exact Hiinb |].
+        iSplitR; [iPureIntro; reflexivity |]. iExact "Hirefp". }
+      (* THE ONE SHOT, FIRED AT THE CWD.  The tie is REFUTED on this arm
+         rather than used: [pfun 0 <> SLASH] and the buffer's head IS
+         [pfun 0] ([FsAbsStart.bview_head_slash]), so the caller's ROOTINO
+         clause never applies and the start is idup's own inum. *)
+      iApply fupd_wp.
+      iMod ("Htr" $! (bv_unsigned iinum) with "[%]") as "[HP0 Hhops0]";
+        [ intros Hpl0; exfalso; exact (Hsl0 (bview_head_slash plen pfun Hpl0)) |].
+      iModIntro.
+      (* ---- the register facts the two [callee_saved]s carry over ---- *)
+      assert (Hcsa1 : is_cs_idx Ra1 = false) by (vm_compute; reflexivity).
+      assert (HB4sp : B4 !!! Regidx csp_rs1 = pa_stk sp0 12).
+      { rewrite /B4 upd_ne; [| nz].
+        rewrite (callee_saved_lookup Hcsid csp_rs1 ltac:(vm_compute; reflexivity)).
+        rewrite /B3 upd_ne; [| nz]. rewrite /B2 upd_ne; [| nz].
+        rewrite (callee_saved_lookup Hcsmp csp_rs1 ltac:(vm_compute; reflexivity)).
+        rewrite /B1 upd_ne; [exact HR7sp | nz]. }
+      assert (HB4s0 : B4 !!! Regidx Rs0 = sp0).
+      { rewrite /B4 upd_ne; [| nz].
+        rewrite (callee_saved_lookup Hcsid Rs0 ltac:(vm_compute; reflexivity)).
+        rewrite /B3 upd_ne; [| nz]. rewrite /B2 upd_ne; [| nz].
+        rewrite (callee_saved_lookup Hcsmp Rs0 ltac:(vm_compute; reflexivity)).
+        rewrite /B1 upd_ne; [exact HR7s0 | nz]. }
+      assert (HB4s1 : B4 !!! Regidx Rs1 = pv).
+      { rewrite /B4 upd_ne; [| nz].
+        rewrite (callee_saved_lookup Hcsid Rs1 ltac:(vm_compute; reflexivity)).
+        rewrite /B3 upd_ne; [| nz]. rewrite /B2 upd_ne; [| nz].
+        rewrite (callee_saved_lookup Hcsmp Rs1 ltac:(vm_compute; reflexivity)).
+        rewrite /B1 upd_ne; [exact HR7s1 | nz]. }
+      assert (HB4s5 : B4 !!! Regidx Rs5 = nb).
+      { rewrite /B4 upd_ne; [| nz].
+        rewrite (callee_saved_lookup Hcsid Rs5 ltac:(vm_compute; reflexivity)).
+        rewrite /B3 upd_ne; [| nz]. rewrite /B2 upd_ne; [| nz].
+        rewrite (callee_saved_lookup Hcsmp Rs5 ltac:(vm_compute; reflexivity)).
+        rewrite /B1 upd_ne; [exact HR7s5 | nz]. }
+      assert (HB4s6 : B4 !!! Regidx Rs6 = (m !!! Regidx Ra1 : mword 64)).
+      { rewrite /B4 upd_ne; [| nz].
+        rewrite (callee_saved_lookup Hcsid Rs6 ltac:(vm_compute; reflexivity)).
+        rewrite /B3 upd_ne; [| nz]. rewrite /B2 upd_ne; [| nz].
+        rewrite (callee_saved_lookup Hcsmp Rs6 ltac:(vm_compute; reflexivity)).
+        rewrite /B1 upd_ne; [exact HR7s6 | nz]. }
+      assert (HB4o : forall c : mword 5, is_cs_idx c = true ->
+                c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs2 -> c <> Rs3 ->
+                c <> Rs4 -> c <> Rs5 -> c <> Rs6 -> c <> Rs7 -> c <> Rs8 ->
+                c <> Rs9 -> c <> Rs10 ->
+                B4 !!! Regidx c = (m !!! Regidx c : mword 64)).
+      { intros c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23 N24 N25 N26.
+        rewrite /B4 upd_ne; [| dlk_xne N20].
+        rewrite (callee_saved_lookup Hcsid c Hc).
+        rewrite /B3 upd_ne; [| dlk_rne2 Hcsra Hc].
+        rewrite /B2 upd_ne; [| dlk_rne2 Hcsa0 Hc].
+        rewrite (callee_saved_lookup Hcsmp c Hc).
+        rewrite /B1 upd_ne;
+          [ exact (HR7o c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23 N24 N25 N26)
+          | dlk_rne2 Hcsra Hc ]. }
+      assert (Hpp03c : add_vec_int (mword_of_int (NX + 0x3a) : mword 64) 2
+                       = mword_of_int (NX + 0x3c)) by pcw.
+      iEval (rewrite Hpp03c) in "Hpc".
+      (* ===== +0x3c .. +0x46 : the four constants, then [c.j +0xf4] ===== *)
+      iApply (wp_li4_s_sconf (mword_of_int (NX + 0x3c)) Rs3
+                (mword_of_int 47 : mword 12) (mword_of_int 47 : mword 64)
+                B4 (K - 12)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
+                with "Hcg Hpc []").
+      { iApply (nxi_03c with "Htext"). }
+      iIntros (CIDB1 HqB1) "Hcg Hpc".
+      pose (B5 := <[Regidx Rs3 := regval_into_reg (mword_of_int 47 : mword 64)]> B4).
+      assert (HpB040 : add_vec_int (mword_of_int (NX + 0x3c) : mword 64) 4
+                       = mword_of_int (NX + 0x40)) by pcw.
+      iEval (rewrite HpB040) in "Hpc".
+      iApply (wp_cli_s_sconf (mword_of_int (NX + 0x40)) Rs8 (mword_of_int 13 : mword 6)
+                (mword_of_int 13 : mword 64) B5 (K - 12)%nat b
+                ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
+      { iApply (nxi_040 with "Htext"). }
+      iIntros (CIDB2 HqB2) "Hcg Hpc".
+      pose (B6 := <[Regidx Rs8 := regval_into_reg (mword_of_int 13 : mword 64)]> B5).
+      assert (HpB042 : add_vec_int (mword_of_int (NX + 0x40) : mword 64) 2
+                       = mword_of_int (NX + 0x42)) by pcw.
+      iEval (rewrite HpB042) in "Hpc".
+      iApply (wp_cli_s_sconf (mword_of_int (NX + 0x42)) Rs9 (mword_of_int 14 : mword 6)
+                (mword_of_int 14 : mword 64) B6 (K - 12)%nat b
+                ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
+      { iApply (nxi_042 with "Htext"). }
+      iIntros (CIDB3 HqB3) "Hcg Hpc".
+      pose (B7 := <[Regidx Rs9 := regval_into_reg (mword_of_int 14 : mword 64)]> B6).
+      assert (HpB044 : add_vec_int (mword_of_int (NX + 0x42) : mword 64) 2
+                       = mword_of_int (NX + 0x44)) by pcw.
+      iEval (rewrite HpB044) in "Hpc".
+      iApply (wp_cli_s_sconf (mword_of_int (NX + 0x44)) Rs7 (mword_of_int 1 : mword 6)
+                (mword_of_int 1 : mword 64) B7 (K - 12)%nat b
+                ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
+      { iApply (nxi_044 with "Htext"). }
+      iIntros (CIDB4 HqB4) "Hcg Hpc".
+      pose (B8 := <[Regidx Rs7 := regval_into_reg (mword_of_int 1 : mword 64)]> B7).
+      assert (HpB046 : add_vec_int (mword_of_int (NX + 0x44) : mword 64) 2
+                       = mword_of_int (NX + 0x46)) by pcw.
+      iEval (rewrite HpB046) in "Hpc".
+      assert (HBregs : nx_regs m sp0 pv (ientry ck) nb
+                           (m !!! Regidx Ra1 : mword 64) B8).
+      { unfold nx_regs. split_and!.
+        - rewrite /B8 upd_ne; [| nz]. rewrite /B7 upd_ne; [| nz].
+          rewrite /B6 upd_ne; [| nz]. rewrite /B5 upd_ne; [exact HB4sp | nz].
+        - rewrite /B8 upd_ne; [| nz]. rewrite /B7 upd_ne; [| nz].
+          rewrite /B6 upd_ne; [| nz]. rewrite /B5 upd_ne; [exact HB4s0 | nz].
+        - rewrite /B8 upd_ne; [| nz]. rewrite /B7 upd_ne; [| nz].
+          rewrite /B6 upd_ne; [| nz]. rewrite /B5 upd_ne; [exact HB4s1 | nz].
+        - rewrite /B8 upd_ne; [| nz]. rewrite /B7 upd_ne; [| nz].
+          rewrite /B6 upd_ne; [| nz]. rewrite /B5 upd_eq. reflexivity.
+        - rewrite /B8 upd_ne; [| nz]. rewrite /B7 upd_ne; [| nz].
+          rewrite /B6 upd_ne; [| nz]. rewrite /B5 upd_ne; [exact HB4s4 | nz].
+        - rewrite /B8 upd_ne; [| nz]. rewrite /B7 upd_ne; [| nz].
+          rewrite /B6 upd_ne; [| nz]. rewrite /B5 upd_ne; [exact HB4s5 | nz].
+        - rewrite /B8 upd_ne; [| nz]. rewrite /B7 upd_ne; [| nz].
+          rewrite /B6 upd_ne; [| nz]. rewrite /B5 upd_ne; [exact HB4s6 | nz].
+        - rewrite /B8 upd_eq. reflexivity.
+        - rewrite /B8 upd_ne; [| nz]. rewrite /B7 upd_ne; [| nz].
+          rewrite /B6 upd_eq. reflexivity.
+        - rewrite /B8 upd_ne; [| nz]. rewrite /B7 upd_eq. reflexivity.
+        - intros c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23 N24 N25 N26.
+          rewrite /B8 upd_ne; [| dlk_xne N23].
+          rewrite /B7 upd_ne; [| dlk_xne N25].
+          rewrite /B6 upd_ne; [| dlk_xne N24].
+          rewrite /B5 upd_ne; [| dlk_xne N19].
+          exact (HB4o c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23 N24 N25 N26). }
+      (* +0x46 c.j +0xf4 : into the walk *)
+      assert (HtgtB0e4 : add_vec (mword_of_int (NX + 0x46) : mword 64)
+                (sign_extend' 64 (sign_extend' 21
+                   (concat_vec (mword_of_int 87 : mword 11) ('b"0"))))
+                = mword_of_int (NX + 0xf4)) by pcw.
+      iApply (wp_cj_s_sconf (mword_of_int (NX + 0x46))
+                (sign_extend' 21 (concat_vec (mword_of_int 87 : mword 11) ('b"0")))
+                B8 (K - 12)%nat b
+                ltac:(rewrite HtgtB0e4; vm_compute; reflexivity)
+                with "Hcg Hpc []").
+      { iApply (nxi_046 with "Htext"). }
+      iIntros (CIDB5 HqB5). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iEval (rewrite HtgtB0e4) in "Hpc".
+      (* ---- ENTER THE WALK at off = 0, es0 = [], ncur = n ---- *)
+      iDestruct (cpu_own_transport CIDid CIDB5 0%nat eb (proc_addr j) b
+                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      (* idup does not thread the complement either. *)
+      iDestruct (trap_csrs_ext_transport CID23 CIDB5 eb (proc_addr j)
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID23 CIDB5 eb (proc_addr j)
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+      iDestruct (wp_next_shift (b := true) (CIDa := CID23) (CIDb := CIDB5)
+                   ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      iSpecialize ("Hloop" $! (S plen) CIDB5 with "[%]"); [wp_next_chain |].
+      iApply ("Hloop" $! 0%nat (ientry ck) B8 n Sb [] nfun false
+                (bv_unsigned iinum)
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hclmc Hpc
+                      Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
+                      Hip Hisl2 Hbmap Hinos Hppid Hcwdr Hpath
+                      Hname Hbslot [$Hlog $Htx] HP0 Hhops0 Hcont").
+      - lia.
+      - lia.
+      - rewrite drop_0. reflexivity.
+      (* the budget invariant at entry: nothing paid yet *)
+      - exact (nx_wi_init n).
+      - lia.
+      - exact (nx_wi_need0 _ _ Hbud).
+      - rewrite drop_0. exact (nx_wi_need _ _ Hbud).
+      - discriminate.
+      (* entering the loop, the running set IS the caller's *)
+      - reflexivity.
+      - rewrite pa_add_0. exact HBregs.
   Qed.
 
 End ProofNamexTrMain.

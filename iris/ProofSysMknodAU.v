@@ -137,7 +137,7 @@ Require Import SpecSysMknodAU.   (* [dev_arg]                           *)
 Require Import FsAbsEra.
 Require Import FsAbsNpar.
 Require Import FsAbsEraMknod.
-Require Import FsAbsNparMknod.   (* [np_pre_of_mknod]                   *)
+Require Import FsAbsNparMknod.   (* [np_start_of_mknod]                 *)
 Require Import FsAbsMknodFire.   (* the commits and [mkf_dev_arg]       *)
 Require Import SpecCreateAU.     (* [CREATE_AU], [cau_ok] / [cau_fail]  *)
 Require Import SpecSysMknodAUEra. (* the contract this file seals       *)
@@ -1649,16 +1649,16 @@ Section ProofSysMknodBody.
                       = mword_of_int (MN + 0x40)) by pcw.
       iEval (rewrite Hpp40) in "Hpc".
       (* ================================================================ *)
-      (*  THE ERA WALK IS ABSOLUTE-PATHS-ONLY, so the FETCHED string      *)
-      (*  decides which create contract this call can use.  On an          *)
-      (*  absolute path the AU-carrying one applies and the caller's       *)
-      (*  receipts are real; on a relative one the LANDED contract is all  *)
-      (*  there is and the whole bundle comes back unspent -- that is the  *)
-      (*  escape disjunct on [SpecSysMknodAUEra]'s ret-0 arm, and the ONLY *)
-      (*  thing between this proof and the frozen arms.                    *)
+      (*  ONE CREATE CONTRACT, FOR EVERY FETCHED STRING.  The era walk    *)
+      (*  took the relative start in lane A-iii, so create-AU no longer    *)
+      (*  asks whether the path begins with SLASH: the walk decides that   *)
+      (*  at its own entry test and starts at [p->cwd] when it does not.   *)
+      (*  The [destruct] on the fetched byte, the whole landed-create      *)
+      (*  branch under it, and the ret-0 ESCAPE it existed to discharge    *)
+      (*  are gone -- what init's "console" / "sh" get is the same receipt *)
+      (*  an absolute path gets.                                          *)
       (* ================================================================ *)
-      destruct (decide (bf 0%nat = SLASH)) as [Habs | Hrel].
-      { (* ============ THE ABSOLUTE PATH ============ *)
+      { (* ============ create, AU-carrying, either start ============ *)
         (* ============ +0x40 jal ra,create ============ *)
         iApply (wp_jal_s_sconf (CID := CID24) (mword_of_int (MN + 0x40)) Rra
                   (mword_of_int 2095296 : mword 21) N3 (K - 20)%nat b
@@ -1698,14 +1698,13 @@ Section ProofSysMknodBody.
         iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
         iDestruct (cpu_own_transport CID19 CID25 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-           (* THE ONE-SHOT, FIRED AT THE STRING THIS CALL FETCHED
-              ([FsAbsNparMknod.np_pre_of_mknod]): it hands out the cursor at
-              [ROOTINO] and the PARENT-PREFIX hop family, which is exactly
-              what create-AU threads into the era nameiparent. *)
-           iApply fupd_wp.
-           iMod (np_pre_of_mknod fsc_fs P Pmiss (bview pk bf) with "Hwp")
-             as "[HP0 Hhops]".
-           iModIntro.
+           (* THE ONE-SHOT, HANDED DOWN UNFIRED
+              ([FsAbsNparMknod.np_start_of_mknod]): [ep_start] at the
+              string this call fetched IS [mknod_walk_pre_era] at that
+              string, so nothing is fired here -- the WALK picks the start
+              inum (ROOTINO, or the cwd's) and fires it there. *)
+           iDestruct (np_start_of_mknod fsc_fs P Pmiss (bview pk bf)
+                        with "Hwp") as "Htr".
            iApply (CreateAU.wp_create_au (CID := CID25) gs j gl pd pav pu
       gf
       pk bf
@@ -1714,14 +1713,14 @@ Section ProofSysMknodBody.
                      N4 (K - 20)%nat eb b lks P Pmiss Φok Φex
                      ltac:(lia) HdevR Hnib0 Hgeom Hsize
                      Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
-                     (mn_plen_lt pk Hpk) Habs Hni1 Hni2 Hni3 Hush eq_refl Hpkc
+                     (mn_plen_lt pk Hpk) Hni1 Hni2 Hni3 Hush eq_refl Hpkc
                      ltac:(unfold create_units; lia) Hnsb Hj Hgl
                      HN4a1 HN4a2 HN4a3 Heb
                      with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv
                            Hitab Hitinv Hescrows Hslks Hireg Hiopen Hsbn Hsbi Hsbs
                            Hsbb
                            Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS Htx
-                           HP0 Hhops Hacre Hdlkc").
+                           Htr Hacre Hdlkc").
            { iEval (rewrite HN4a0). iExact "Hbufk". }
         iIntros (CID26 Hq26 mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1)
           "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
@@ -1916,7 +1915,7 @@ Section ProofSysMknodBody.
                 create returned and the string this call fetched *)
              rewrite /mknod_arms_era. iLeft.
              iSplitR; [iPureIntro; rewrite Ha0f; exact HP2a0 |].
-             iLeft. rewrite /mknod_post_ok_era.
+             rewrite /mknod_post_ok_era.
              iExists (bview pk bf), (bv_unsigned inum).
              iSplitR; [iPureIntro; exact Hinum |]. iExact "Hcauok". }
         + (* ---------- ARM B: create returned 0 ---------- *)
@@ -1968,306 +1967,6 @@ Section ProofSysMknodBody.
              rewrite /mknod_post_fail_era. iRight.
              iExists (bview pk bf). iExact "Hcf". }
       }
-      (* ====== THE RELATIVE PATH: the LANDED create contract ====== *)
-      (* ============ +0x40 jal ra,create ============ *)
-      iApply (wp_jal_s_sconf (CID := CID24) (mword_of_int (MN + 0x40)) Rra
-                (mword_of_int 2095296 : mword 21) N3 (K - 20)%nat b
-                ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc []").
-      { iApply (smni_40 with "Htext"). }
-      iIntros (CID25 Hq25) "Hcg Hpc".
-      set (N4 := <[Regidx Rra := regval_into_reg
-                    (add_vec_int (mword_of_int (MN + 0x40) : mword 64) 4)]> N3).
-      assert (Hjcr : add_vec (mword_of_int (MN + 0x40) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095296 : mword 21))
-                     = mword_of_int KernelSyms.create) by pcw.
-      iEval (rewrite Hjcr) in "Hpc".
-      assert (HN4ra : (N4 !!! Regidx Rra : mword 64)
-                      = add_vec_int (mword_of_int (MN + 0x40) : mword 64) 4)
-        by (rewrite /N4; apply upd_eq).
-      assert (HN4a0 : (N4 !!! Regidx Ra0 : mword 64) = pa_stk sp0 18)
-        by (rewrite /N4 upd_ne; [exact HN3a0 | nz]).
-      assert (HN4a1 : (N4 !!! Regidx Ra1 : mword 64)
-                      = (sign_extend' 64 SpecCreate.T_DEVICE))
-        by (rewrite /N4 upd_ne; [exact HN3a1 | nz]).
-      assert (HN4a2 : (N4 !!! Regidx Ra2 : mword 64)
-                      = (sign_extend' 64 (hw_lo (arg_int32 v1))))
-        by (rewrite /N4 upd_ne; [exact HN3a2 | nz]).
-      assert (HN4a3 : (N4 !!! Regidx Ra3 : mword 64)
-                      = (sign_extend' 64 (hw_lo (arg_int32 v2))))
-        by (rewrite /N4 upd_ne; [exact HN3a3 | nz]).
-      assert (HN4sp : mn_sp sp0 N4)
-        by (rewrite /mn_sp /N4 upd_ne; [exact HN3sp | nz]).
-      assert (HN4s0 : (N4 !!! Regidx Rs0 : mword 64) = sp0)
-        by (rewrite /N4 upd_ne; [exact HN3s0 | nz]).
-      assert (HN4thr : mn_thr m N4).
-      { intros c Hc N2' N8. rewrite /N4 upd_ne; [| regne].
-        exact (HN3thr c Hc N2' N8). }
-      iDestruct (mn_buf_split (pa_stk sp0 18) bf pk Hpk with "Hbuf")
-        as "[Hbufk Hbufrest]".
-      iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
-      iDestruct (cpu_own_transport CID19 CID25 0 eb pj b
-                   ltac:(wp_next_chain) with "Hown") as "Hown".
-      iApply (Create.wp_create_sconf (CID := CID25) gs j gl pd pav pu
- gf
- pk bf
-                SpecCreate.T_DEVICE (hw_lo (arg_int32 v1)) (hw_lo (arg_int32 v2))
-                (upd_usM (us_upt U P') _) MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
-                N4 (K - 20)%nat eb b lks
-                ltac:(lia) HdevR Hnib0 Hgeom Hsize
-                Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
-                (mn_plen_lt pk Hpk) Hni1 Hni2 Hni3 Hush mn_tdev_nz SpecCreate.T_DEVICE_ty_ok Hpkc
-                ltac:(unfold create_units; lia) Hnsb Hj Hgl
-                HN4a1 HN4a2 HN4a3 Heb
-                with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv
-                      Hitab Hitinv Hescrows Hslks Hireg Hiopen Hsbn Hsbi Hsbs
-                      Hsbb
-                      Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS Htx").
-      { iEval (rewrite HN4a0). iExact "Hbufk". }
-      iIntros (CID26 Hq26 mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1)
-        "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
-         %Hns1 Hir %Hun1 HopS Hok".
-      iEval (rewrite HN4a0) in "Hbufk".
-      assert (Hpc44 : ret_pc (N4 !!! Regidx Rra : mword 64)
-                      = mword_of_int (MN + 0x44)) by (rewrite HN4ra; pcw).
-      iEval (rewrite Hpc44) in "Hpc".
-      assert (Hcrsp : mn_sp sp0 mcr).
-      { rewrite /mn_sp (callee_saved_lookup Hcscr csp_rs1 ltac:(vm_compute; reflexivity)).
-        exact HN4sp. }
-      assert (Hcrthr : mn_thr m mcr).
-      { intros c Hc N2' N8. rewrite (callee_saved_lookup Hcscr c Hc).
-        exact (HN4thr c Hc N2' N8). }
-      (* ============ +0x2c c.beqz a0 -> ARM B ============ *)
-      destruct ok.
-      + (* ---------- create SUCCEEDED: the LOCKED inode ---------- *)
-        iDestruct "Hok" as "[%Hokf Hlocked]".
-        destruct Hokf as (Hcra0 & Hkk & Hinum & _).
-        assert (Hipnz : ientry kk <> (zero_reg : mword 64))
-          by (apply ientry_ne_zero; lia).
-        iApply (wp_cbeqz_fall_s_sconf (CID := CID26) (mword_of_int (MN + 0x44))
-                  (mword_of_int 10 : mword 8) (Cregidx (mword_of_int 2)) Ra0
-                  mcr (K - 20)%nat b
-                  ltac:(vm_compute; reflexivity) ltac:(nz)
-                  ltac:(rgne; rewrite Hcra0;
-                        apply (proj2 (eq_vec_false_iff _ _)); exact Hipnz)
-                  with "Hcg Hpc []").
-        { iApply (smni_44 with "Htext"). }
-        iIntros (CID27 Hq27) "Hcg Hpc".
-        assert (Hpp46 : add_vec_int (mword_of_int (MN + 0x44) : mword 64) 2
-                        = mword_of_int (MN + 0x46)) by pcw.
-        iEval (rewrite Hpp46) in "Hpc".
-        (* ============ +0x2e jal ra,iunlockput ============ *)
-        iApply (wp_jal_s_sconf (CID := CID27) (mword_of_int (MN + 0x46)) Rra
-                  (mword_of_int 2089308 : mword 21) mcr (K - 20)%nat b
-                  ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc []").
-        { iApply (smni_46 with "Htext"). }
-        iIntros (CID28 Hq28) "Hcg Hpc".
-        set (P0 := <[Regidx Rra := regval_into_reg
-                      (add_vec_int (mword_of_int (MN + 0x46) : mword 64) 4)]> mcr).
-        assert (Hjiu : add_vec (mword_of_int (MN + 0x46) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2089308 : mword 21))
-                       = mword_of_int KernelSyms.iunlockput) by pcw.
-        iEval (rewrite Hjiu) in "Hpc".
-        assert (HP0ra : (P0 !!! Regidx Rra : mword 64)
-                        = add_vec_int (mword_of_int (MN + 0x46) : mword 64) 4)
-          by (rewrite /P0; apply upd_eq).
-        assert (HP0a0 : (P0 !!! Regidx Ra0 : mword 64) = ientry kk)
-          by (rewrite /P0 upd_ne; [exact Hcra0 | nz]).
-        assert (HP0sp : mn_sp sp0 P0)
-          by (rewrite /mn_sp /P0 upd_ne; [exact Hcrsp | nz]).
-        assert (HP0thr : mn_thr m P0).
-        { intros c Hc N2' N8. rewrite /P0 upd_ne; [| regne].
-          exact (Hcrthr c Hc N2' N8). }
-        (* the ten conjuncts create hands back ARE iunlockput's precondition *)
-        iDestruct "Hlocked" as (gil gisl)
-          "(Hslk & Hslkd & Hdep & Hidev & Hiinum & Hivalid & Hload &
-            Hshot & Hfrz & Href & Hru)".
-        (* create's payout is GENERATION-NAMED now; iunlockput takes the
-           erased reference, so weaken it back here.  One line, and the
-           name is what sys_open's O_CREATE arm needs kept. *)
-        iDestruct (inode_ref_short_gen_forget with "Href") as "Href".
-        iDestruct (mn_esc_acc kk ltac:(lia)
-                     with "Hescrows") as "#Hesc".
-        (* CREATE'S PAYOUT IS THE ARMED DESCRIPTOR (durable-disk B''-tx2):
-           the escrow parked half of the transaction's element at create's
-           own [ilock(ip)] and create handed the other half over inside the
-           bundle.  The release takes the ARMED contract (B''-tx4), which
-           retires the descriptor in the ghost step that parks the payload
-           and hands the whole token back. *)
-        destruct (Hiregb inum ltac:(lia)) as [Hibcov Hiblog].
-        iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
-          as "[Hpbare Hpback]".
-        iDestruct (cpu_own_transport CID26 CID28 0 eb pj b
-                     ltac:(wp_next_chain) with "Hown") as "Hown".
-        iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID28) gs j gl
-                  pd pav pu gil gisl
- kk qi ss gy inum dn bm un1
-                  pid (DfracOwn (1/4)) dqb dqs P0 (K - 20)%nat eb b lks
-                  (us_upt U P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
-                  Hibcov Hiblog ltac:(lia) Hcovb
-                  ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
-                  (Hlb "log"%string)
-                  with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                        Hesc Hireg [] Hslk Hslkd Hdep Hidev Hiinum Hivalid
-                        Hload Hshot Hfrz [$Href $Hru] Hsbb Hsbi Hbmres Hpbare Hprocs Hdev
-                        Hgeo Hdlk Hbsl [HopS]").
-        { rewrite Heb /trap_csrs_ext. done. }
-        { rewrite Heb /cpu_claim_ext. done. }
-        (* RULING G: a runtime caller lends the SEALED arm. *)
-        { iExact "Hiopen". }
-        { iApply (log_opS_opb with "HopS"). }
-        iIntros (CID29 Hq29 miu n2)
-          "%Hcsiu Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi Hbsl %Hn2
-           Hop Hislot".
-        assert (Hpc4a : ret_pc (P0 !!! Regidx Rra : mword 64)
-                        = mword_of_int (MN + 0x4a)) by (rewrite HP0ra; pcw).
-        iEval (rewrite Hpc4a) in "Hpc".
-        assert (Hiusp : mn_sp sp0 miu).
-        { rewrite /mn_sp (callee_saved_lookup Hcsiu csp_rs1 ltac:(vm_compute; reflexivity)).
-          exact HP0sp. }
-        assert (Hiuthr : mn_thr m miu).
-        { intros c Hc N2' N8. rewrite (callee_saved_lookup Hcsiu c Hc).
-          exact (HP0thr c Hc N2' N8). }
-        (* ============ +0x32 jal ra,end_op ============ *)
-        iApply (wp_jal_s_sconf (CID := CID29) (mword_of_int (MN + 0x4a)) Rra
-                  (mword_of_int 2091514 : mword 21) miu (K - 20)%nat b
-                  ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc []").
-        { iApply (smni_4a with "Htext"). }
-        iIntros (CID30 Hq30) "Hcg Hpc".
-        set (P1 := <[Regidx Rra := regval_into_reg
-                      (add_vec_int (mword_of_int (MN + 0x4a) : mword 64) 4)]> miu).
-        assert (Hjeo : add_vec (mword_of_int (MN + 0x4a) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2091514 : mword 21))
-                       = mword_of_int KernelSyms.end_op) by pcw.
-        iEval (rewrite Hjeo) in "Hpc".
-        assert (HP1ra : (P1 !!! Regidx Rra : mword 64)
-                        = add_vec_int (mword_of_int (MN + 0x4a) : mword 64) 4)
-          by (rewrite /P1; apply upd_eq).
-        assert (HP1sp : mn_sp sp0 P1)
-          by (rewrite /mn_sp /P1 upd_ne; [exact Hiusp | nz]).
-        assert (HP1thr : mn_thr m P1).
-        { intros c Hc N2' N8. rewrite /P1 upd_ne; [| regne].
-          exact (Hiuthr c Hc N2' N8). }
-        iDestruct (cpu_own_transport CID29 CID30 0 eb pj b
-                     ltac:(wp_next_chain) with "Hown") as "Hown".
-        iApply (EndOp.wp_end_op_sconf (CID := CID30) gs j gl fsc_uart fsc_disk fsc_dlock pd pav pu
-                  fsc_bio icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n2 pid (DfracOwn (1/4))
-                  P1 (K - 20)%nat eb b lks
-                  (us_upt U P') ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
-                  with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                        Hpbare Hprocs Hdev Hgeo Hdlk Hop").
-        { rewrite Heb /trap_csrs_ext. done. }
-        { rewrite Heb /cpu_claim_ext. done. }
-        iIntros (CID31 Hq31 meo) "%Hcseo Hcg Hown _ _ Hpc Hpbare".
-        assert (Hpc4e : ret_pc (P1 !!! Regidx Rra : mword 64)
-                        = mword_of_int (MN + 0x4e)) by (rewrite HP1ra; pcw).
-        iEval (rewrite Hpc4e) in "Hpc".
-        assert (Heosp : mn_sp sp0 meo).
-        { rewrite /mn_sp (callee_saved_lookup Hcseo csp_rs1 ltac:(vm_compute; reflexivity)).
-          exact HP1sp. }
-        assert (Heothr : mn_thr m meo).
-        { intros c Hc N2' N8. rewrite (callee_saved_lookup Hcseo c Hc).
-          exact (HP1thr c Hc N2' N8). }
-        (* ============ +0x36 c.li a0,0 ============ *)
-        iApply (wp_cli_s_sconf (CID := CID31) (mword_of_int (MN + 0x4e)) Ra0
-                  (mword_of_int 0 : mword 6) (zero_reg : mword 64)
-                  meo (K - 20)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
-                  with "Hcg Hpc []").
-        { iApply (smni_4e with "Htext"). }
-        iIntros (CID32 Hq32) "Hcg Hpc".
-        set (P2 := <[Regidx Ra0 := regval_into_reg (zero_reg : mword 64)]> meo).
-        assert (HP2a0 : (P2 !!! Regidx Ra0 : mword 64) = (zero_reg : mword 64))
-          by (rewrite /P2; apply upd_eq).
-        assert (HP2sp : mn_sp sp0 P2)
-          by (rewrite /mn_sp /P2 upd_ne; [exact Heosp | nz]).
-        assert (HP2thr : mn_thr m P2).
-        { intros c Hc N2' N8. rewrite /P2 upd_ne; [| regne].
-          exact (Heothr c Hc N2' N8). }
-        assert (Hpp50 : add_vec_int (mword_of_int (MN + 0x4e) : mword 64) 2
-                        = mword_of_int (MN + 0x50)) by pcw.
-        iEval (rewrite Hpp50) in "Hpc".
-        (* the block goes back whole, the buffer whole, the slot back *)
-        iDestruct ("Hpback" with "Hpbare") as "Hpriv".
-        iDestruct (iref_slots_combine ns1 1 with "Hir Hislot") as "Hir".
-        iDestruct (mn_buf_join (pa_stk sp0 18) bf pk Hpk with "Hbufk Hbufrest")
-          as "Hbytes2".
-        iDestruct (mn_bytes_name (pa_stk sp0 18) 128 with "Hbytes2") as (bf1) "Hbuf".
-        iDestruct (cpu_own_transport CID31 CID32 0 eb pj b
-                     ltac:(wp_next_chain) with "Hown") as "Hown".
-        iApply (mn_epilogue (CID0 := CID32) m P2 sp0 K b pj _ _ bf1
-                  ltac:(lia) Kpop ltac:(reflexivity) HP2sp HP2thr Hal
-                  with "Hcg Htext Hpc Hf1 Hf2 Hf19 Hf20 Hbuf
-                        [Hown Hbsl Hsbn Hsbi Hsbs Hsbb Hir Hpriv Hcont Hwp Hacre Hdlkc]").
-        iEval (rewrite /wp_next).
-        iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
-        iDestruct (cpu_own_transport CID32 CIDz 0 eb pj b
-                     ltac:(wp_next_chain) with "Hown") as "Hown".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-        iApply ("Hcont" $! mf (ns1 + 1)%nat P' with "[%] [%] Hcg Hown
-                  [] [] Hpc Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hir Hpriv
-                  [Hwp Hacre Hdlkc]").
-        { exact Hcsf. }
-        { exact Hupt. }
-        { rewrite Heb /trap_csrs_ext. done. }
-        { rewrite Heb /cpu_claim_ext. done. }
-        { cbn in Hns1. lia. }
-        { (* THE ret-0 ARM'S ESCAPE: the fetched path was RELATIVE, so the
-             era walk never ran and the bundle is unspent
-             (SpecSysMknodAUEra's header, finding (3)) *)
-          rewrite /mknod_arms_era. iLeft.
-          iSplitR; [iPureIntro; rewrite Ha0f; exact HP2a0 |].
-          iRight. rewrite /mknod_au_pre_era. iFrame "Hwp Hacre Hdlkc". }
-      + (* ---------- ARM B: create returned 0 ---------- *)
-        iDestruct "Hok" as "[%Hcrz Htx]".
-        iApply (wp_cbeqz_taken_s_sconf (CID := CID26) (mword_of_int (MN + 0x44))
-                  (mword_of_int 10 : mword 8) (Cregidx (mword_of_int 2)) Ra0
-                  mcr (K - 20)%nat b
-                  ltac:(vm_compute; reflexivity) ltac:(nz)
-                  ltac:(rgne; rewrite Hcrz; vm_compute; reflexivity)
-                  ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
-        { iApply (smni_44 with "Htext"). }
-        iApply bi.later_intro. iIntros (CID27 Hq27) "Hcg Hpc".
-        assert (Htg58 : add_vec (mword_of_int (MN + 0x44) : mword 64)
-                          (sign_extend' 64
-                             (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0"))))
-                        = mword_of_int (MN + 0x58)) by pcw.
-        iEval (rewrite Htg58) in "Hpc".
-        iDestruct (mn_buf_join (pa_stk sp0 18) bf pk Hpk with "Hbufk Hbufrest")
-          as "Hbytes2".
-        iDestruct (mn_bytes_name (pa_stk sp0 18) 128 with "Hbytes2") as (bf1) "Hbuf".
-        iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
-          as "[Hpbare Hpback]".
-        iDestruct (cpu_own_transport CID26 CID27 0 eb pj b
-                     ltac:(wp_next_chain) with "Hown") as "Hown".
-        iApply (mn_m1_tail (CID0 := CID27) gs j gl pd pav pu fsc_fs
- un1 pid (DfracOwn (1/4))
-                  m mcr sp0 K eb b lks _ _ bf1
-                  (us_upt U P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
-                  ltac:(reflexivity) Hcrsp Hcrthr Hal
-                  with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                        Hpbare Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hf19 Hf20
-                        Hbuf
-                        [Hpback Hbsl Hsbn Hsbi Hsbs Hsbb Hir Hcont Hwp Hacre Hdlkc]").
-        { rewrite Heb /trap_csrs_ext. done. }
-        { rewrite Heb /cpu_claim_ext. done. }
-        { iApply (log_opS_op with "HopS Htx"). }
-        iEval (rewrite /wp_next).
-        iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
-        iDestruct ("Hpback" with "Hpbare") as "Hpriv".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-        iApply ("Hcont" $! mf ns1 P' with "[%] [%] Hcg Hown
-                  [] [] Hpc Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hir Hpriv
-                  [Hwp Hacre Hdlkc]").
-        { exact Hcsf. }
-        { exact Hupt. }
-        { rewrite Heb /trap_csrs_ext. done. }
-        { rewrite Heb /cpu_claim_ext. done. }
-        { cbn in Hns1. exact Hns1. }
-        { rewrite /mknod_arms_era. iRight. iSplitR; [by iPureIntro |].
-          rewrite /mknod_post_fail_era. iLeft.
-          rewrite /mknod_au_pre_era. iFrame "Hwp Hacre Hdlkc". }
     - (* ================= ARM A: argstr returned -1 =================
          The [bltz] is TAKEN, straight to the shared "-1" tail at +0x40. *)
       iApply (wp_blt_x0_taken_s_sconf (CID := CID19) (mword_of_int (MN + 0x2e))
