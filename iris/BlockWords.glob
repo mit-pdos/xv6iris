@@ -1,0 +1,461 @@
+DIGEST 52857f69288ec6f24b1c02651cafdf0b
+Fxv6iris.BlockWords
+R1733:1738 Stdlib.ZArith.ZArith <> <> lib
+R1740:1742 Stdlib.micromega.Lia <> <> lib
+R1744:1747 Stdlib.Lists.List <> <> lib
+R1776:1779 stdpp.list <> <> lib
+R1781:1801 stdpp.bitvector.definitions <> <> lib
+R1819:1833 xv6iris.RiscvModelBytes <> <> lib
+def 2179:2188 <> word_bytes
+R2195:2196 stdpp.bitvector.definitions <> bv rec
+binder 2191:2191 <> w:1
+R2204:2207 Corelib.Init.Datatypes <> list ind
+R2210:2211 stdpp.bitvector.definitions <> bv rec
+R2221:2221 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R2238:2239 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R2256:2257 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R2274:2275 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R2292:2292 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R2222:2229 xv6iris.RiscvModelBytes <> nth_byte def
+R2231:2231 xv6iris.BlockWords <> w:1 var
+R2240:2247 xv6iris.RiscvModelBytes <> nth_byte def
+R2249:2249 xv6iris.BlockWords <> w:1 var
+R2258:2265 xv6iris.RiscvModelBytes <> nth_byte def
+R2267:2267 xv6iris.BlockWords <> w:1 var
+R2276:2283 xv6iris.RiscvModelBytes <> nth_byte def
+R2285:2285 xv6iris.BlockWords <> w:1 var
+def 2305:2313 <> ind_bytes
+R2320:2323 Corelib.Init.Datatypes <> list ind
+R2326:2327 stdpp.bitvector.definitions <> bv rec
+binder 2316:2316 <> e:2
+R2336:2339 Corelib.Init.Datatypes <> list ind
+R2342:2343 stdpp.bitvector.definitions <> bv rec
+R2359:2359 xv6iris.BlockWords <> e:2 var
+R2370:2371 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R2376:2377 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R2384:2387 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R2406:2409 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R2394:2403 xv6iris.BlockWords <> word_bytes def
+R2410:2418 xv6iris.BlockWords <> ind_bytes:3 def
+prf 2588:2600 <> ind_bytes_nil
+R2616:2618 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2604:2612 xv6iris.BlockWords <> ind_bytes def
+R2614:2615 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R2619:2620 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+prf 2655:2668 <> ind_bytes_cons
+R2675:2676 stdpp.bitvector.definitions <> bv rec
+binder 2671:2671 <> w:5
+R2687:2690 Corelib.Init.Datatypes <> list ind
+R2693:2694 stdpp.bitvector.definitions <> bv rec
+binder 2683:2683 <> e:6
+R2723:2725 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2705:2713 xv6iris.BlockWords <> ind_bytes def
+R2717:2720 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R2716:2716 xv6iris.BlockWords <> w:5 var
+R2721:2721 xv6iris.BlockWords <> e:6 var
+R2739:2742 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R2727:2736 xv6iris.BlockWords <> word_bytes def
+R2738:2738 xv6iris.BlockWords <> w:5 var
+R2743:2751 xv6iris.BlockWords <> ind_bytes def
+R2753:2753 xv6iris.BlockWords <> e:6 var
+prf 3027:3043 <> word_bytes_length
+R3050:3051 stdpp.bitvector.definitions <> bv rec
+binder 3046:3046 <> w:7
+R3080:3082 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3059:3064 Corelib.Init.Datatypes <> length def
+R3067:3076 xv6iris.BlockWords <> word_bytes def
+R3078:3078 xv6iris.BlockWords <> w:7 var
+prf 3122:3138 <> word_bytes_lookup
+R3145:3146 stdpp.bitvector.definitions <> bv rec
+binder 3141:3141 <> w:8
+R3157:3159 Corelib.Init.Datatypes <> nat ind
+binder 3153:3153 <> j:9
+R3177:3180 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3168:3170 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R3167:3167 xv6iris.BlockWords <> j:9 var
+R3198:3200 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3193:3196 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R3197:3197 xv6iris.BlockWords <> j:9 var
+R3181:3190 xv6iris.BlockWords <> word_bytes def
+R3192:3192 xv6iris.BlockWords <> w:8 var
+R3201:3204 Corelib.Init.Datatypes <> Some constr
+R3207:3214 xv6iris.RiscvModelBytes <> nth_byte def
+R3218:3218 xv6iris.BlockWords <> j:9 var
+R3216:3216 xv6iris.BlockWords <> w:8 var
+prf 3547:3562 <> ind_bytes_length
+R3569:3572 Corelib.Init.Datatypes <> list ind
+R3575:3576 stdpp.bitvector.definitions <> bv rec
+binder 3565:3565 <> e:10
+R3607:3609 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3587:3592 Corelib.Init.Datatypes <> length def
+R3595:3603 xv6iris.BlockWords <> ind_bytes def
+R3605:3605 xv6iris.BlockWords <> e:10 var
+R3612:3614 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R3615:3620 Corelib.Init.Datatypes <> length def
+R3622:3622 xv6iris.BlockWords <> e:10 var
+R3691:3704 xv6iris.BlockWords <> ind_bytes_cons thm
+R3707:3716 Stdlib.Lists.List <> length_app thm
+R3719:3735 xv6iris.BlockWords <> word_bytes_length thm
+R3691:3704 xv6iris.BlockWords <> ind_bytes_cons thm
+R3691:3704 xv6iris.BlockWords <> ind_bytes_cons thm
+R3707:3716 Stdlib.Lists.List <> length_app thm
+R3707:3716 Stdlib.Lists.List <> length_app thm
+R3719:3735 xv6iris.BlockWords <> word_bytes_length thm
+R3719:3735 xv6iris.BlockWords <> word_bytes_length thm
+R3750:3755 Corelib.Init.Datatypes <> length def
+prf 3850:3869 <> ind_bytes_length_256
+R3876:3879 Corelib.Init.Datatypes <> list ind
+R3882:3883 stdpp.bitvector.definitions <> bv rec
+binder 3872:3872 <> e:11
+R3912:3915 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3902:3904 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3894:3899 Corelib.Init.Datatypes <> length def
+R3901:3901 xv6iris.BlockWords <> e:11 var
+R3936:3938 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3916:3921 Corelib.Init.Datatypes <> length def
+R3924:3932 xv6iris.BlockWords <> ind_bytes def
+R3934:3934 xv6iris.BlockWords <> e:11 var
+R3975:3990 xv6iris.BlockWords <> ind_bytes_length thm
+R3975:3990 xv6iris.BlockWords <> ind_bytes_length thm
+R3975:3990 xv6iris.BlockWords <> ind_bytes_length thm
+prf 4255:4270 <> ind_bytes_lookup
+R4277:4280 Corelib.Init.Datatypes <> list ind
+R4283:4284 stdpp.bitvector.definitions <> bv rec
+binder 4273:4273 <> e:12
+R4298:4300 Corelib.Init.Datatypes <> nat ind
+binder 4292:4292 <> i:13
+binder 4294:4294 <> j:14
+R4325:4328 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4309:4311 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R4308:4308 xv6iris.BlockWords <> i:13 var
+R4312:4317 Corelib.Init.Datatypes <> length def
+R4319:4319 xv6iris.BlockWords <> e:12 var
+R4340:4345 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4331:4333 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R4330:4330 xv6iris.BlockWords <> j:14 var
+R4376:4378 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4357:4360 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R4367:4369 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4363:4365 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R4366:4366 xv6iris.BlockWords <> i:13 var
+R4370:4370 xv6iris.BlockWords <> j:14 var
+R4346:4354 xv6iris.BlockWords <> ind_bytes def
+R4356:4356 xv6iris.BlockWords <> e:12 var
+R4379:4382 Corelib.Init.Datatypes <> Some constr
+R4385:4392 xv6iris.RiscvModelBytes <> nth_byte def
+R4404:4404 xv6iris.BlockWords <> j:14 var
+R4396:4400 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R4401:4401 xv6iris.BlockWords <> i:13 var
+R4395:4395 xv6iris.BlockWords <> e:12 var
+R4479:4484 Corelib.Init.Datatypes <> length def
+R4517:4522 Corelib.Init.Datatypes <> length def
+R4539:4552 xv6iris.BlockWords <> ind_bytes_cons thm
+R4539:4552 xv6iris.BlockWords <> ind_bytes_cons thm
+R4539:4552 xv6iris.BlockWords <> ind_bytes_cons thm
+R4596:4598 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4592:4594 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R4596:4598 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4592:4594 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R4658:4674 xv6iris.BlockWords <> word_bytes_length thm
+R4633:4644 stdpp.list_basics <> lookup_app_l thm
+R4633:4644 stdpp.list_basics <> lookup_app_l thm
+R4658:4674 xv6iris.BlockWords <> word_bytes_length thm
+R4658:4674 xv6iris.BlockWords <> word_bytes_length thm
+R4633:4644 stdpp.list_basics <> lookup_app_l thm
+R4695:4711 xv6iris.BlockWords <> word_bytes_lookup thm
+R4695:4711 xv6iris.BlockWords <> word_bytes_lookup thm
+R4695:4711 xv6iris.BlockWords <> word_bytes_lookup thm
+R4755:4757 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4748:4750 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R4751:4751 Corelib.Init.Datatypes <> S constr
+R4772:4775 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4786:4786 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4782:4784 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4777:4779 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R4755:4757 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4748:4750 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R4751:4751 Corelib.Init.Datatypes <> S constr
+R4772:4775 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4786:4786 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4782:4784 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4777:4779 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R4838:4854 xv6iris.BlockWords <> word_bytes_length thm
+R4813:4824 stdpp.list_basics <> lookup_app_r thm
+R4813:4824 stdpp.list_basics <> lookup_app_r thm
+R4838:4854 xv6iris.BlockWords <> word_bytes_length thm
+R4838:4854 xv6iris.BlockWords <> word_bytes_length thm
+R4813:4824 stdpp.list_basics <> lookup_app_r thm
+R4875:4891 xv6iris.BlockWords <> word_bytes_length thm
+R4875:4891 xv6iris.BlockWords <> word_bytes_length thm
+R4875:4891 xv6iris.BlockWords <> word_bytes_length thm
+R4923:4925 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R4908:4911 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4922:4922 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4918:4920 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4913:4915 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R4945:4947 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4940:4942 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R4923:4925 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R4908:4911 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4922:4922 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4918:4920 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4913:4915 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R4945:4947 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4940:4942 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+prf 5011:5031 <> ind_bytes_lookup_None
+R5038:5041 Corelib.Init.Datatypes <> list ind
+R5044:5045 stdpp.bitvector.definitions <> bv rec
+binder 5034:5034 <> e:15
+R5057:5059 Corelib.Init.Datatypes <> nat ind
+binder 5053:5053 <> k:16
+R5089:5092 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5079:5082 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R5068:5070 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R5071:5076 Corelib.Init.Datatypes <> length def
+R5078:5078 xv6iris.BlockWords <> e:15 var
+R5083:5083 xv6iris.BlockWords <> k:16 var
+R5109:5111 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5104:5107 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5108:5108 xv6iris.BlockWords <> k:16 var
+R5093:5101 xv6iris.BlockWords <> ind_bytes def
+R5103:5103 xv6iris.BlockWords <> e:15 var
+R5112:5115 Corelib.Init.Datatypes <> None constr
+R5144:5159 stdpp.list_basics <> lookup_ge_None_2 thm
+R5144:5159 stdpp.list_basics <> lookup_ge_None_2 thm
+R5170:5185 xv6iris.BlockWords <> ind_bytes_length thm
+R5170:5185 xv6iris.BlockWords <> ind_bytes_length thm
+R5170:5185 xv6iris.BlockWords <> ind_bytes_length thm
+prf 5438:5458 <> ind_bytes_insert_same
+R5465:5468 Corelib.Init.Datatypes <> list ind
+R5471:5472 stdpp.bitvector.definitions <> bv rec
+binder 5461:5461 <> e:17
+R5484:5486 Corelib.Init.Datatypes <> nat ind
+binder 5480:5480 <> i:18
+R5494:5495 stdpp.bitvector.definitions <> bv rec
+binder 5490:5490 <> v:19
+R5506:5508 Corelib.Init.Datatypes <> nat ind
+binder 5502:5502 <> j:20
+R5533:5536 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5517:5519 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R5516:5516 xv6iris.BlockWords <> i:18 var
+R5520:5525 Corelib.Init.Datatypes <> length def
+R5527:5527 xv6iris.BlockWords <> e:17 var
+R5548:5553 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5539:5541 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R5538:5538 xv6iris.BlockWords <> j:20 var
+R5595:5597 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5576:5579 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5586:5588 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5582:5584 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R5585:5585 xv6iris.BlockWords <> i:18 var
+R5589:5589 xv6iris.BlockWords <> j:20 var
+R5554:5562 xv6iris.BlockWords <> ind_bytes def
+R5565:5566 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5568:5569 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5571:5574 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5567:5567 xv6iris.BlockWords <> i:18 var
+R5570:5570 xv6iris.BlockWords <> v:19 var
+R5574:5574 xv6iris.BlockWords <> e:17 var
+R5598:5601 Corelib.Init.Datatypes <> Some constr
+R5604:5611 xv6iris.RiscvModelBytes <> nth_byte def
+R5615:5615 xv6iris.BlockWords <> j:20 var
+R5613:5613 xv6iris.BlockWords <> v:19 var
+R5652:5667 xv6iris.BlockWords <> ind_bytes_lookup thm
+R5681:5693 stdpp.list_basics <> length_insert thm
+R5652:5667 xv6iris.BlockWords <> ind_bytes_lookup thm
+R5652:5667 xv6iris.BlockWords <> ind_bytes_lookup thm
+R5652:5667 xv6iris.BlockWords <> ind_bytes_lookup thm
+R5652:5667 xv6iris.BlockWords <> ind_bytes_lookup thm
+R5681:5693 stdpp.list_basics <> length_insert thm
+R5681:5693 stdpp.list_basics <> length_insert thm
+R5728:5751 stdpp.list_basics <> list_lookup_total_insert thm
+R5728:5751 stdpp.list_basics <> list_lookup_total_insert thm
+R5728:5751 stdpp.list_basics <> list_lookup_total_insert thm
+prf 5791:5812 <> ind_bytes_insert_other
+R5819:5822 Corelib.Init.Datatypes <> list ind
+R5825:5826 stdpp.bitvector.definitions <> bv rec
+binder 5815:5815 <> e:21
+R5838:5840 Corelib.Init.Datatypes <> nat ind
+binder 5834:5834 <> i:22
+R5848:5849 stdpp.bitvector.definitions <> bv rec
+binder 5844:5844 <> v:23
+R5860:5862 Corelib.Init.Datatypes <> nat ind
+binder 5856:5856 <> k:24
+R5887:5890 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5871:5873 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R5870:5870 xv6iris.BlockWords <> i:22 var
+R5874:5879 Corelib.Init.Datatypes <> length def
+R5881:5881 xv6iris.BlockWords <> e:21 var
+R5924:5929 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5901:5904 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R5893:5895 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R5892:5892 xv6iris.BlockWords <> k:24 var
+R5897:5899 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R5900:5900 xv6iris.BlockWords <> i:22 var
+R5914:5917 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R5910:5912 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5906:5908 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R5909:5909 xv6iris.BlockWords <> i:22 var
+R5918:5918 xv6iris.BlockWords <> k:24 var
+R5957:5959 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5952:5955 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5956:5956 xv6iris.BlockWords <> k:24 var
+R5930:5938 xv6iris.BlockWords <> ind_bytes def
+R5941:5942 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5944:5945 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5947:5950 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5943:5943 xv6iris.BlockWords <> i:22 var
+R5946:5946 xv6iris.BlockWords <> v:23 var
+R5950:5950 xv6iris.BlockWords <> e:21 var
+R5971:5974 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5975:5975 xv6iris.BlockWords <> k:24 var
+R5960:5968 xv6iris.BlockWords <> ind_bytes def
+R5970:5970 xv6iris.BlockWords <> e:21 var
+R6013:6027 Stdlib.Arith.PeanoNat Nat lt_ge_cases thm
+R6033:6035 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R6036:6041 Corelib.Init.Datatypes <> length def
+R6013:6027 Stdlib.Arith.PeanoNat Nat lt_ge_cases thm
+R6033:6035 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R6036:6041 Corelib.Init.Datatypes <> length def
+R6149:6162 Stdlib.Arith.PeanoNat Nat div_mod_eq thm
+R6149:6162 Stdlib.Arith.PeanoNat Nat div_mod_eq thm
+R6202:6204 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R6196:6200 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'mod'_x not
+R6223:6241 Stdlib.Arith.PeanoNat Nat mod_upper_bound def
+R6202:6204 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R6196:6200 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'mod'_x not
+R6223:6241 Stdlib.Arith.PeanoNat Nat mod_upper_bound def
+R6273:6275 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R6269:6271 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'/'_x not
+R6276:6281 Corelib.Init.Datatypes <> length def
+R6273:6275 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R6269:6271 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'/'_x not
+R6276:6281 Corelib.Init.Datatypes <> length def
+R6323:6326 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R6319:6321 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'/'_x not
+R6323:6326 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R6319:6321 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'/'_x not
+R6358:6360 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'/'_x not
+R6358:6360 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'/'_x not
+R6397:6401 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'mod'_x not
+R6397:6401 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'mod'_x not
+R6463:6478 xv6iris.BlockWords <> ind_bytes_lookup thm
+R6492:6504 stdpp.list_basics <> length_insert thm
+R6463:6478 xv6iris.BlockWords <> ind_bytes_lookup thm
+R6463:6478 xv6iris.BlockWords <> ind_bytes_lookup thm
+R6463:6478 xv6iris.BlockWords <> ind_bytes_lookup thm
+R6463:6478 xv6iris.BlockWords <> ind_bytes_lookup thm
+R6492:6504 stdpp.list_basics <> length_insert thm
+R6492:6504 stdpp.list_basics <> length_insert thm
+R6541:6556 xv6iris.BlockWords <> ind_bytes_lookup thm
+R6541:6556 xv6iris.BlockWords <> ind_bytes_lookup thm
+R6541:6556 xv6iris.BlockWords <> ind_bytes_lookup thm
+R6585:6611 stdpp.list_basics <> list_lookup_total_insert_ne thm
+R6585:6611 stdpp.list_basics <> list_lookup_total_insert_ne thm
+R6585:6611 stdpp.list_basics <> list_lookup_total_insert_ne thm
+R6726:6738 stdpp.list_basics <> length_insert thm
+R6692:6712 xv6iris.BlockWords <> ind_bytes_lookup_None thm
+R6692:6712 xv6iris.BlockWords <> ind_bytes_lookup_None thm
+R6726:6738 stdpp.list_basics <> length_insert thm
+R6726:6738 stdpp.list_basics <> length_insert thm
+R6692:6712 xv6iris.BlockWords <> ind_bytes_lookup_None thm
+R6759:6779 xv6iris.BlockWords <> ind_bytes_lookup_None thm
+R6759:6779 xv6iris.BlockWords <> ind_bytes_lookup_None thm
+R6759:6779 xv6iris.BlockWords <> ind_bytes_lookup_None thm
+prf 6814:6836 <> ind_bytes_insert_length
+R6843:6846 Corelib.Init.Datatypes <> list ind
+R6849:6850 stdpp.bitvector.definitions <> bv rec
+binder 6839:6839 <> e:25
+R6862:6864 Corelib.Init.Datatypes <> nat ind
+binder 6858:6858 <> i:26
+R6872:6873 stdpp.bitvector.definitions <> bv rec
+binder 6868:6868 <> v:27
+R6914:6916 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6883:6888 Corelib.Init.Datatypes <> length def
+R6891:6899 xv6iris.BlockWords <> ind_bytes def
+R6902:6903 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R6905:6906 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R6908:6911 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R6904:6904 xv6iris.BlockWords <> i:26 var
+R6907:6907 xv6iris.BlockWords <> v:27 var
+R6911:6911 xv6iris.BlockWords <> e:25 var
+R6917:6922 Corelib.Init.Datatypes <> length def
+R6925:6933 xv6iris.BlockWords <> ind_bytes def
+R6935:6935 xv6iris.BlockWords <> e:25 var
+R6955:6970 xv6iris.BlockWords <> ind_bytes_length thm
+R6973:6985 stdpp.list_basics <> length_insert thm
+R6955:6970 xv6iris.BlockWords <> ind_bytes_length thm
+R6955:6970 xv6iris.BlockWords <> ind_bytes_length thm
+R6955:6970 xv6iris.BlockWords <> ind_bytes_length thm
+R6955:6970 xv6iris.BlockWords <> ind_bytes_length thm
+R6973:6985 stdpp.list_basics <> length_insert thm
+R6973:6985 stdpp.list_basics <> length_insert thm
+prf 7798:7810 <> nth_byte_zero
+R7817:7817 Corelib.Numbers.BinNums <> N ind
+binder 7813:7813 <> m:28
+R7825:7827 Corelib.Init.Datatypes <> nat ind
+binder 7821:7821 <> j:29
+R7851:7853 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7832:7839 xv6iris.RiscvModelBytes <> nth_byte def
+R7850:7850 xv6iris.BlockWords <> j:29 var
+R7842:7845 stdpp.bitvector.definitions <> bv_0 def
+R7847:7847 xv6iris.BlockWords <> m:28 var
+R7854:7857 stdpp.bitvector.definitions <> bv_0 def
+R7877:7881 stdpp.bitvector.definitions <> bv_eq thm
+R7877:7881 stdpp.bitvector.definitions <> bv_eq thm
+R7891:7898 xv6iris.RiscvModelBytes <> nth_byte def
+R7911:7929 stdpp.bitvector.definitions <> bv_extract_unsigned thm
+R7933:7945 stdpp.bitvector.definitions <> bv_0_unsigned thm
+R7948:7959 Stdlib.ZArith.BinInt Z shiftr_0_l thm
+R7911:7929 stdpp.bitvector.definitions <> bv_extract_unsigned thm
+R7911:7929 stdpp.bitvector.definitions <> bv_extract_unsigned thm
+R7933:7945 stdpp.bitvector.definitions <> bv_0_unsigned thm
+R7933:7945 stdpp.bitvector.definitions <> bv_0_unsigned thm
+R7933:7945 stdpp.bitvector.definitions <> bv_0_unsigned thm
+R7948:7959 Stdlib.ZArith.BinInt Z shiftr_0_l thm
+R7948:7959 Stdlib.ZArith.BinInt Z shiftr_0_l thm
+R7971:7977 stdpp.bitvector.definitions <> bv_wrap def
+prf 8005:8019 <> word_bytes_zero
+R8043:8045 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8023:8032 xv6iris.BlockWords <> word_bytes def
+R8035:8038 stdpp.bitvector.definitions <> bv_0 def
+R8046:8054 stdpp.list_basics <> replicate def
+R8059:8062 stdpp.bitvector.definitions <> bv_0 def
+R8082:8091 xv6iris.BlockWords <> word_bytes def
+R8103:8115 xv6iris.BlockWords <> nth_byte_zero thm
+R8103:8115 xv6iris.BlockWords <> nth_byte_zero thm
+R8103:8115 xv6iris.BlockWords <> nth_byte_zero thm
+R8103:8115 xv6iris.BlockWords <> nth_byte_zero thm
+R8103:8115 xv6iris.BlockWords <> nth_byte_zero thm
+R8103:8115 xv6iris.BlockWords <> nth_byte_zero thm
+R8103:8115 xv6iris.BlockWords <> nth_byte_zero thm
+prf 8143:8161 <> ind_bytes_replicate
+R8168:8170 Corelib.Init.Datatypes <> nat ind
+binder 8164:8164 <> n:30
+R8210:8212 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8177:8185 xv6iris.BlockWords <> ind_bytes def
+R8188:8196 stdpp.list_basics <> replicate def
+R8201:8204 stdpp.bitvector.definitions <> bv_0 def
+R8198:8198 xv6iris.BlockWords <> n:30 var
+R8213:8221 stdpp.list_basics <> replicate def
+R8232:8235 stdpp.bitvector.definitions <> bv_0 def
+R8225:8227 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8228:8228 xv6iris.BlockWords <> n:30 var
+R8297:8305 stdpp.list_basics <> replicate def
+R8317:8330 xv6iris.BlockWords <> ind_bytes_cons thm
+R8333:8347 xv6iris.BlockWords <> word_bytes_zero thm
+R8317:8330 xv6iris.BlockWords <> ind_bytes_cons thm
+R8317:8330 xv6iris.BlockWords <> ind_bytes_cons thm
+R8333:8347 xv6iris.BlockWords <> word_bytes_zero thm
+R8333:8347 xv6iris.BlockWords <> word_bytes_zero thm
+R8366:8368 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8369:8369 Corelib.Init.Datatypes <> S constr
+R8385:8387 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R8389:8391 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8366:8368 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8369:8369 Corelib.Init.Datatypes <> S constr
+R8385:8387 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R8389:8391 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8417:8429 stdpp.list_basics <> replicate_add thm
+R8417:8429 stdpp.list_basics <> replicate_add thm
+R8417:8429 stdpp.list_basics <> replicate_add thm

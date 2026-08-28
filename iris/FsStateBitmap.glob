@@ -1,0 +1,977 @@
+DIGEST a697244b8e21c71a0d04d190c6fa02e5
+Fxv6iris.FsStateBitmap
+R1223:1228 Stdlib.ZArith.ZArith <> <> lib
+R1230:1232 Stdlib.micromega.Lia <> <> lib
+R1234:1237 Stdlib.Lists.List <> <> lib
+R1266:1269 stdpp.gmap <> <> lib
+R1271:1274 stdpp.list <> <> lib
+R1276:1287 stdpp.list_numbers <> <> lib
+R1289:1309 stdpp.bitvector.definitions <> <> lib
+R1347:1355 iris.proofmode.proofmode <> <> lib
+R1398:1402 iris.base_logic.lib.iprop <> <> lib
+R1420:1426 xv6iris.BioDefs <> <> lib
+R1444:1452 xv6iris.BitmapEnc <> <> lib
+R1470:1474 xv6iris.FsImg <> <> lib
+R1492:1502 xv6iris.FsStateDefs <> <> lib
+sec 1541:1546 <> Bitmap
+var  1560:1561 Bitmap Σ
+R1565:1573 iris.base_logic.lib.iprop <> gFunctors rec
+R1599:1611 xv6iris.FsStateDefs <> fs_view_names rec
+R1613:1614 xv6iris.FsStateBitmap <> Bitmap.Σ var
+def 1698:1705 <> pool_elt
+binder 1707:1708 <> Γ:2
+R1715:1718 stdpp.gmap <> gset def
+R1720:1720 Corelib.Numbers.BinNums <> Z ind
+binder 1711:1711 <> u:3
+R1728:1728 Corelib.Numbers.BinNums <> Z ind
+binder 1724:1724 <> b:4
+R1733:1737 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R1739:1740 xv6iris.FsStateBitmap <> Bitmap.Σ var
+R1750:1752 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R1774:1779 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R1783:1788 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R1789:1792 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R1795:1796 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 1793:1794 <> bs:5
+R1797:1805 xv6iris.FsStateDefs <> blk_owned def
+R1807:1808 xv6iris.FsStateBitmap <> Γ:2 var
+R1810:1810 xv6iris.FsStateBitmap <> b:4 var
+R1812:1813 xv6iris.FsStateBitmap <> bs:5 var
+R1780:1782 iris.bi.interface <> ::bi_scope:'emp' not
+R1753:1763 stdpp.decidable <> bool_decide def
+R1767:1771 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R1766:1766 xv6iris.FsStateBitmap <> b:4 var
+R1772:1772 xv6iris.FsStateBitmap <> u:3 var
+def 1833:1841 <> free_pool
+binder 1843:1844 <> Γ:6
+R1852:1852 Corelib.Numbers.BinNums <> Z ind
+binder 1847:1848 <> nb:7
+R1860:1863 stdpp.gmap <> gset def
+R1865:1865 Corelib.Numbers.BinNums <> Z ind
+binder 1856:1856 <> u:8
+R1870:1874 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R1876:1877 xv6iris.FsStateBitmap <> Bitmap.Σ var
+R1887:1897 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R1899:1903 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R1913:1914 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 1898:1898 <> b:9
+binder 1898:1898 <> b:10
+R1915:1922 xv6iris.FsStateBitmap <> pool_elt def
+R1924:1925 xv6iris.FsStateBitmap <> Γ:6 var
+R1927:1927 xv6iris.FsStateBitmap <> u:8 var
+R1929:1929 xv6iris.FsStateBitmap <> b:9 var
+R1904:1907 stdpp.list_numbers <> seqZ def
+R1911:1912 xv6iris.FsStateBitmap <> nb:7 var
+def 2118:2130 <> free_pool_but
+binder 2132:2133 <> Γ:11
+R2141:2141 Corelib.Numbers.BinNums <> Z ind
+binder 2136:2137 <> nb:12
+R2149:2152 stdpp.gmap <> gset def
+R2154:2154 Corelib.Numbers.BinNums <> Z ind
+binder 2145:2145 <> u:13
+R2163:2165 Corelib.Init.Datatypes <> nat ind
+binder 2158:2159 <> i0:14
+R2170:2174 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R2176:2177 xv6iris.FsStateBitmap <> Bitmap.Σ var
+R2187:2197 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R2199:2203 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R2205:2209 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R2219:2227 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+binder 2198:2198 <> k:15
+binder 2198:2198 <> k:16
+binder 2204:2204 <> b:17
+binder 2204:2204 <> b:18
+R2228:2230 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2246:2251 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2255:2260 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2261:2268 xv6iris.FsStateBitmap <> pool_elt def
+R2270:2271 xv6iris.FsStateBitmap <> Γ:11 var
+R2273:2273 xv6iris.FsStateBitmap <> u:13 var
+R2275:2275 xv6iris.FsStateBitmap <> b:17 var
+R2252:2254 iris.bi.interface <> ::bi_scope:'emp' not
+R2231:2236 stdpp.base <> decide def
+R2240:2242 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2239:2239 xv6iris.FsStateBitmap <> k:15 var
+R2243:2244 xv6iris.FsStateBitmap <> i0:14 var
+R2210:2213 stdpp.list_numbers <> seqZ def
+R2217:2218 xv6iris.FsStateBitmap <> nb:12 var
+def 2754:2767 <> free_bitmap_at
+binder 2769:2770 <> Γ:19
+R2782:2782 Corelib.Numbers.BinNums <> Z ind
+binder 2773:2775 <> bms:20
+binder 2777:2778 <> nb:21
+R2790:2793 stdpp.gmap <> gset def
+R2795:2795 Corelib.Numbers.BinNums <> Z ind
+binder 2786:2786 <> u:22
+R2800:2804 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R2806:2807 xv6iris.FsStateBitmap <> Bitmap.Σ var
+R2852:2856 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2817:2825 xv6iris.FsStateDefs <> blk_owned def
+R2827:2828 xv6iris.FsStateBitmap <> Γ:19 var
+R2830:2832 xv6iris.FsStateBitmap <> bms:20 var
+R2835:2842 xv6iris.BitmapEnc <> bm_bytes def
+R2844:2848 xv6iris.BioDefs <> BSIZE def
+R2850:2850 xv6iris.FsStateBitmap <> u:22 var
+R2857:2865 xv6iris.FsStateBitmap <> free_pool def
+R2867:2868 xv6iris.FsStateBitmap <> Γ:19 var
+R2870:2871 xv6iris.FsStateBitmap <> nb:21 var
+R2873:2873 xv6iris.FsStateBitmap <> u:22 var
+def 2893:2903 <> free_bitmap
+binder 2905:2906 <> Γ:23
+R2914:2918 xv6iris.FsImg <> fs_sb rec
+binder 2909:2910 <> sb:24
+R2926:2929 stdpp.gmap <> gset def
+R2931:2931 Corelib.Numbers.BinNums <> Z ind
+binder 2922:2922 <> u:25
+R2936:2940 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R2942:2943 xv6iris.FsStateBitmap <> Bitmap.Σ var
+R2952:2965 xv6iris.FsStateBitmap <> free_bitmap_at def
+R2967:2968 xv6iris.FsStateBitmap <> Γ:23 var
+R2971:2982 xv6iris.FsImg <> sb_bmapstart proj
+R2984:2985 xv6iris.FsStateBitmap <> sb:24 var
+R2989:2995 xv6iris.FsImg <> sb_size proj
+R2997:2998 xv6iris.FsStateBitmap <> sb:24 var
+R3001:3001 xv6iris.FsStateBitmap <> u:25 var
+prf 3013:3030 <> free_bitmap_unfold
+binder 3032:3033 <> Γ:26
+binder 3035:3036 <> sb:27
+binder 3038:3038 <> u:28
+R3065:3076 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R3046:3056 xv6iris.FsStateBitmap <> free_bitmap def
+R3058:3059 xv6iris.FsStateBitmap <> Γ:26 var
+R3061:3062 xv6iris.FsStateBitmap <> sb:27 var
+R3064:3064 xv6iris.FsStateBitmap <> u:28 var
+R3077:3090 xv6iris.FsStateBitmap <> free_bitmap_at def
+R3092:3093 xv6iris.FsStateBitmap <> Γ:26 var
+R3096:3107 xv6iris.FsImg <> sb_bmapstart proj
+R3109:3110 xv6iris.FsStateBitmap <> sb:27 var
+R3114:3120 xv6iris.FsImg <> sb_size proj
+R3122:3123 xv6iris.FsStateBitmap <> sb:27 var
+R3126:3126 xv6iris.FsStateBitmap <> u:28 var
+prf 3484:3503 <> free_bitmap_at_gname
+binder 3505:3506 <> Γ:29
+binder 3508:3508 <> g:30
+binder 3510:3510 <> t:31
+binder 3512:3514 <> bms:32
+binder 3516:3517 <> nb:33
+binder 3519:3519 <> u:34
+R3553:3564 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R3527:3540 xv6iris.FsStateBitmap <> free_bitmap_at def
+R3542:3543 xv6iris.FsStateBitmap <> Γ:29 var
+R3545:3547 xv6iris.FsStateBitmap <> bms:32 var
+R3549:3550 xv6iris.FsStateBitmap <> nb:33 var
+R3552:3552 xv6iris.FsStateBitmap <> u:34 var
+R3565:3578 xv6iris.FsStateBitmap <> free_bitmap_at def
+R3581:3588 xv6iris.FsStateDefs <> MkFsView constr
+R3591:3594 xv6iris.FsStateDefs <> fsΦ proj
+R3596:3597 xv6iris.FsStateBitmap <> Γ:29 var
+R3600:3600 xv6iris.FsStateBitmap <> g:30 var
+R3602:3602 xv6iris.FsStateBitmap <> t:31 var
+R3605:3607 xv6iris.FsStateBitmap <> bms:32 var
+R3609:3610 xv6iris.FsStateBitmap <> nb:33 var
+R3612:3612 xv6iris.FsStateBitmap <> u:34 var
+inst 3654:3670 <> pool_elt_timeless
+R3675:3683 xv6iris.FsStateDefs <> GTimeless class
+binder 3685:3686 <> Γ:35
+binder 3674:3686 <> GTimeless0:36
+binder 3689:3689 <> u:37
+binder 3691:3691 <> b:38
+R3699:3706 iris.bi.derived_connectives <> Timeless class
+R3709:3716 xv6iris.FsStateBitmap <> pool_elt def
+R3718:3719 xv6iris.FsStateBitmap <> Γ:35 var
+R3721:3721 xv6iris.FsStateBitmap <> u:37 var
+R3723:3723 xv6iris.FsStateBitmap <> b:38 var
+R3745:3752 xv6iris.FsStateBitmap <> pool_elt def
+R3745:3752 xv6iris.FsStateBitmap <> pool_elt def
+R3745:3752 xv6iris.FsStateBitmap <> pool_elt def
+R3765:3775 stdpp.decidable <> bool_decide def
+R3779:3783 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R3765:3775 stdpp.decidable <> bool_decide def
+R3779:3783 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+inst 3822:3839 <> free_pool_timeless
+R3844:3852 xv6iris.FsStateDefs <> GTimeless class
+binder 3854:3855 <> Γ:39
+binder 3843:3855 <> GTimeless0:40
+binder 3858:3859 <> nb:41
+binder 3861:3861 <> u:42
+R3869:3876 iris.bi.derived_connectives <> Timeless class
+R3879:3887 xv6iris.FsStateBitmap <> free_pool def
+R3889:3890 xv6iris.FsStateBitmap <> Γ:39 var
+R3892:3893 xv6iris.FsStateBitmap <> nb:41 var
+R3895:3895 xv6iris.FsStateBitmap <> u:42 var
+R3917:3925 xv6iris.FsStateBitmap <> free_pool def
+R3917:3925 xv6iris.FsStateBitmap <> free_pool def
+R3917:3925 xv6iris.FsStateBitmap <> free_pool def
+inst 3961:3983 <> free_bitmap_at_timeless
+R3988:3996 xv6iris.FsStateDefs <> GTimeless class
+binder 3998:3999 <> Γ:43
+binder 3987:3999 <> GTimeless0:44
+binder 4002:4004 <> bms:45
+binder 4006:4007 <> nb:46
+binder 4009:4009 <> u:47
+R4017:4024 iris.bi.derived_connectives <> Timeless class
+R4027:4040 xv6iris.FsStateBitmap <> free_bitmap_at def
+R4042:4043 xv6iris.FsStateBitmap <> Γ:43 var
+R4045:4047 xv6iris.FsStateBitmap <> bms:45 var
+R4049:4050 xv6iris.FsStateBitmap <> nb:46 var
+R4052:4052 xv6iris.FsStateBitmap <> u:47 var
+R4074:4087 xv6iris.FsStateBitmap <> free_bitmap_at def
+R4074:4087 xv6iris.FsStateBitmap <> free_bitmap_at def
+R4074:4087 xv6iris.FsStateBitmap <> free_bitmap_at def
+inst 4123:4142 <> free_bitmap_timeless
+R4147:4155 xv6iris.FsStateDefs <> GTimeless class
+binder 4157:4158 <> Γ:48
+binder 4146:4158 <> GTimeless0:49
+binder 4161:4162 <> sb:50
+binder 4164:4164 <> u:51
+R4172:4179 iris.bi.derived_connectives <> Timeless class
+R4182:4192 xv6iris.FsStateBitmap <> free_bitmap def
+R4194:4195 xv6iris.FsStateBitmap <> Γ:48 var
+R4197:4198 xv6iris.FsStateBitmap <> sb:50 var
+R4200:4200 xv6iris.FsStateBitmap <> u:51 var
+R4222:4232 xv6iris.FsStateBitmap <> free_bitmap def
+R4222:4232 xv6iris.FsStateBitmap <> free_bitmap def
+R4222:4232 xv6iris.FsStateBitmap <> free_bitmap def
+prf 4479:4493 <> seqZ_lookup_nat
+R4501:4501 Corelib.Numbers.BinNums <> Z ind
+binder 4496:4497 <> nb:52
+R4509:4511 Corelib.Init.Datatypes <> nat ind
+binder 4505:4505 <> i:53
+R4539:4542 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4531:4533 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R4521:4528 Stdlib.ZArith.BinInt Z of_nat def
+R4530:4530 xv6iris.FsStateBitmap <> i:53 var
+R4534:4535 xv6iris.FsStateBitmap <> nb:52 var
+R4557:4559 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4552:4555 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R4556:4556 xv6iris.FsStateBitmap <> i:53 var
+R4543:4546 stdpp.list_numbers <> seqZ def
+R4550:4551 xv6iris.FsStateBitmap <> nb:52 var
+R4560:4563 Corelib.Init.Datatypes <> Some constr
+R4566:4573 Stdlib.ZArith.BinInt Z of_nat def
+R4575:4575 xv6iris.FsStateBitmap <> i:53 var
+R4615:4628 stdpp.list_numbers <> lookup_seqZ_lt thm
+R4615:4628 stdpp.list_numbers <> lookup_seqZ_lt thm
+R4615:4628 stdpp.list_numbers <> lookup_seqZ_lt thm
+prf 4650:4664 <> free_pool_split
+binder 4666:4667 <> Γ:54
+binder 4669:4670 <> nb:55
+binder 4672:4672 <> u:56
+R4680:4682 Corelib.Init.Datatypes <> nat ind
+binder 4675:4676 <> i0:57
+R4711:4718 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4703:4705 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R4692:4699 Stdlib.ZArith.BinInt Z of_nat def
+R4701:4702 xv6iris.FsStateBitmap <> i0:57 var
+R4706:4707 xv6iris.FsStateBitmap <> nb:55 var
+R4736:4749 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R4719:4727 xv6iris.FsStateBitmap <> free_pool def
+R4729:4730 xv6iris.FsStateBitmap <> Γ:54 var
+R4732:4733 xv6iris.FsStateBitmap <> nb:55 var
+R4735:4735 xv6iris.FsStateBitmap <> u:56 var
+R4777:4781 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4750:4757 xv6iris.FsStateBitmap <> pool_elt def
+R4759:4760 xv6iris.FsStateBitmap <> Γ:54 var
+R4762:4762 xv6iris.FsStateBitmap <> u:56 var
+R4765:4772 Stdlib.ZArith.BinInt Z of_nat def
+R4774:4775 xv6iris.FsStateBitmap <> i0:57 var
+R4782:4794 xv6iris.FsStateBitmap <> free_pool_but def
+R4796:4797 xv6iris.FsStateBitmap <> Γ:54 var
+R4799:4800 xv6iris.FsStateBitmap <> nb:55 var
+R4802:4802 xv6iris.FsStateBitmap <> u:56 var
+R4804:4805 xv6iris.FsStateBitmap <> i0:57 var
+R4845:4853 xv6iris.FsStateBitmap <> free_pool def
+R4856:4868 xv6iris.FsStateBitmap <> free_pool_but def
+R4845:4853 xv6iris.FsStateBitmap <> free_pool def
+R4845:4853 xv6iris.FsStateBitmap <> free_pool def
+R4856:4868 xv6iris.FsStateBitmap <> free_pool_but def
+R4856:4868 xv6iris.FsStateBitmap <> free_pool_but def
+R4887:4901 iris.bi.big_op <> big_sepL_delete thm
+R4906:4909 stdpp.list_numbers <> seqZ def
+R4921:4928 Stdlib.ZArith.BinInt Z of_nat def
+R4955:4969 xv6iris.FsStateBitmap <> seqZ_lookup_nat thm
+R4887:4901 iris.bi.big_op <> big_sepL_delete thm
+R4906:4909 stdpp.list_numbers <> seqZ def
+R4921:4928 Stdlib.ZArith.BinInt Z of_nat def
+R4887:4901 iris.bi.big_op <> big_sepL_delete thm
+R4906:4909 stdpp.list_numbers <> seqZ def
+R4921:4928 Stdlib.ZArith.BinInt Z of_nat def
+R4955:4969 xv6iris.FsStateBitmap <> seqZ_lookup_nat thm
+prf 5061:5076 <> free_pool_but_eq
+binder 5078:5079 <> Γ:58
+binder 5081:5082 <> nb:59
+binder 5084:5084 <> u:60
+binder 5086:5087 <> u':61
+R5095:5097 Corelib.Init.Datatypes <> nat ind
+binder 5090:5091 <> i0:62
+R5106:5106 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5163:5171 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5107:5113 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5119:5120 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5118:5118 Corelib.Numbers.BinNums <> Z ind
+binder 5114:5114 <> x:63
+R5137:5141 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5162:5162 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5122:5125 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R5121:5121 xv6iris.FsStateBitmap <> x:63 var
+R5126:5133 Stdlib.ZArith.BinInt Z of_nat def
+R5135:5136 xv6iris.FsStateBitmap <> i0:62 var
+R5149:5153 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R5143:5147 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5142:5142 xv6iris.FsStateBitmap <> x:63 var
+R5148:5148 xv6iris.FsStateBitmap <> u:60 var
+R5155:5159 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5154:5154 xv6iris.FsStateBitmap <> x:63 var
+R5160:5161 xv6iris.FsStateBitmap <> u':61 var
+R5196:5203 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R5172:5184 xv6iris.FsStateBitmap <> free_pool_but def
+R5186:5187 xv6iris.FsStateBitmap <> Γ:58 var
+R5189:5190 xv6iris.FsStateBitmap <> nb:59 var
+R5192:5192 xv6iris.FsStateBitmap <> u:60 var
+R5194:5195 xv6iris.FsStateBitmap <> i0:62 var
+R5204:5216 xv6iris.FsStateBitmap <> free_pool_but def
+R5218:5219 xv6iris.FsStateBitmap <> Γ:58 var
+R5221:5222 xv6iris.FsStateBitmap <> nb:59 var
+R5224:5225 xv6iris.FsStateBitmap <> u':61 var
+R5227:5228 xv6iris.FsStateBitmap <> i0:62 var
+R5270:5282 xv6iris.FsStateBitmap <> free_pool_but def
+R5270:5282 xv6iris.FsStateBitmap <> free_pool_but def
+R5270:5282 xv6iris.FsStateBitmap <> free_pool_but def
+R5295:5309 iris.bi.big_op <> big_sepL_proper thm
+R5295:5309 iris.bi.big_op <> big_sepL_proper thm
+R5341:5346 stdpp.base <> decide def
+R5350:5352 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5341:5346 stdpp.base <> decide def
+R5350:5352 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5389:5399 stdpp.list_numbers <> lookup_seqZ thm
+R5389:5399 stdpp.list_numbers <> lookup_seqZ thm
+R5433:5440 xv6iris.FsStateBitmap <> pool_elt def
+R5443:5460 xv6iris.BitmapEnc <> bool_decide_iff_eq thm
+R5542:5546 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5529:5531 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5532:5539 Stdlib.ZArith.BinInt Z of_nat def
+R5477:5481 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5464:5466 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5467:5474 Stdlib.ZArith.BinInt Z of_nat def
+R5433:5440 xv6iris.FsStateBitmap <> pool_elt def
+R5433:5440 xv6iris.FsStateBitmap <> pool_elt def
+R5443:5460 xv6iris.BitmapEnc <> bool_decide_iff_eq thm
+R5542:5546 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5529:5531 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5532:5539 Stdlib.ZArith.BinInt Z of_nat def
+R5477:5481 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5464:5466 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5467:5474 Stdlib.ZArith.BinInt Z of_nat def
+R5443:5460 xv6iris.BitmapEnc <> bool_decide_iff_eq thm
+R5542:5546 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5529:5531 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5532:5539 Stdlib.ZArith.BinInt Z of_nat def
+R5477:5481 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5464:5466 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5467:5474 Stdlib.ZArith.BinInt Z of_nat def
+prf 5911:5924 <> free_pool_take
+binder 5926:5927 <> Γ:64
+binder 5929:5930 <> nb:65
+binder 5932:5932 <> u:66
+R5939:5939 Corelib.Numbers.BinNums <> Z ind
+binder 5935:5935 <> b:67
+R5959:5962 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5949:5952 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R5954:5956 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R5953:5953 xv6iris.FsStateBitmap <> b:67 var
+R5953:5953 xv6iris.FsStateBitmap <> b:67 var
+R5957:5958 xv6iris.FsStateBitmap <> nb:65 var
+R5970:5977 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5964:5968 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R5963:5963 xv6iris.FsStateBitmap <> b:67 var
+R5969:5969 xv6iris.FsStateBitmap <> u:66 var
+R5995:5999 iris.bi.interface <> ::stdpp_scope:x_'⊢'_x not
+R5978:5986 xv6iris.FsStateBitmap <> free_pool def
+R5988:5989 xv6iris.FsStateBitmap <> Γ:64 var
+R5991:5992 xv6iris.FsStateBitmap <> nb:65 var
+R5994:5994 xv6iris.FsStateBitmap <> u:66 var
+R6000:6000 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6026:6031 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6001:6004 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6007:6008 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 6005:6006 <> bs:68
+R6009:6017 xv6iris.FsStateDefs <> blk_owned def
+R6019:6020 xv6iris.FsStateBitmap <> Γ:64 var
+R6022:6022 xv6iris.FsStateBitmap <> b:67 var
+R6024:6025 xv6iris.FsStateBitmap <> bs:68 var
+R6032:6040 xv6iris.FsStateBitmap <> free_pool def
+R6042:6043 xv6iris.FsStateBitmap <> Γ:64 var
+R6045:6046 xv6iris.FsStateBitmap <> nb:65 var
+R6050:6054 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R6049:6049 xv6iris.FsStateBitmap <> u:66 var
+R6055:6056 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6058:6059 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6057:6057 xv6iris.FsStateBitmap <> b:67 var
+R6136:6138 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6115:6122 Stdlib.ZArith.BinInt Z of_nat def
+R6125:6132 Stdlib.ZArith.BinInt Z to_nat def
+R6136:6138 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6115:6122 Stdlib.ZArith.BinInt Z of_nat def
+R6125:6132 Stdlib.ZArith.BinInt Z to_nat def
+R6169:6173 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R6175:6179 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R6180:6181 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6183:6184 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6169:6173 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R6175:6179 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R6180:6181 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6183:6184 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6215:6229 xv6iris.FsStateBitmap <> free_pool_split thm
+R6240:6247 Stdlib.ZArith.BinInt Z to_nat def
+R6215:6229 xv6iris.FsStateBitmap <> free_pool_split thm
+R6240:6247 Stdlib.ZArith.BinInt Z to_nat def
+R6215:6229 xv6iris.FsStateBitmap <> free_pool_split thm
+R6240:6247 Stdlib.ZArith.BinInt Z to_nat def
+R6282:6289 xv6iris.FsStateBitmap <> pool_elt def
+R6292:6313 stdpp.decidable <> bool_decide_eq_false_2 thm
+R6282:6289 xv6iris.FsStateBitmap <> pool_elt def
+R6282:6289 xv6iris.FsStateBitmap <> pool_elt def
+R6292:6313 stdpp.decidable <> bool_decide_eq_false_2 thm
+R6292:6313 stdpp.decidable <> bool_decide_eq_false_2 thm
+R6361:6375 xv6iris.FsStateBitmap <> free_pool_split thm
+R6385:6389 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R6390:6391 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6393:6394 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6398:6405 Stdlib.ZArith.BinInt Z to_nat def
+R6361:6375 xv6iris.FsStateBitmap <> free_pool_split thm
+R6385:6389 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R6390:6391 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6393:6394 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6398:6405 Stdlib.ZArith.BinInt Z to_nat def
+R6361:6375 xv6iris.FsStateBitmap <> free_pool_split thm
+R6385:6389 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R6390:6391 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6393:6394 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6398:6405 Stdlib.ZArith.BinInt Z to_nat def
+R6437:6444 xv6iris.FsStateBitmap <> pool_elt def
+R6447:6467 stdpp.decidable <> bool_decide_eq_true_2 thm
+R6437:6444 xv6iris.FsStateBitmap <> pool_elt def
+R6437:6444 xv6iris.FsStateBitmap <> pool_elt def
+R6447:6467 stdpp.decidable <> bool_decide_eq_true_2 thm
+R6447:6467 stdpp.decidable <> bool_decide_eq_true_2 thm
+R6514:6529 xv6iris.FsStateBitmap <> free_pool_but_eq thm
+R6541:6545 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R6546:6547 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6549:6550 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6554:6561 Stdlib.ZArith.BinInt Z to_nat def
+R6514:6529 xv6iris.FsStateBitmap <> free_pool_but_eq thm
+R6541:6545 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R6546:6547 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6549:6550 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6554:6561 Stdlib.ZArith.BinInt Z to_nat def
+R6514:6529 xv6iris.FsStateBitmap <> free_pool_but_eq thm
+R6541:6545 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R6546:6547 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6549:6550 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R6554:6561 Stdlib.ZArith.BinInt Z to_nat def
+prf 6846:6859 <> free_pool_used
+binder 6861:6862 <> Γ:69
+R6871:6878 xv6iris.FsStateDefs <> phi_excl def
+R6880:6881 xv6iris.FsStateBitmap <> Γ:69 var
+binder 6865:6867 <> Hex:70
+binder 6884:6885 <> nb:71
+binder 6887:6887 <> u:72
+R6894:6894 Corelib.Numbers.BinNums <> Z ind
+binder 6890:6890 <> b:73
+binder 6897:6898 <> bs:74
+R6917:6924 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6907:6910 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R6912:6914 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R6911:6911 xv6iris.FsStateBitmap <> b:73 var
+R6911:6911 xv6iris.FsStateBitmap <> b:73 var
+R6915:6916 xv6iris.FsStateBitmap <> nb:71 var
+R6942:6947 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6925:6933 xv6iris.FsStateBitmap <> free_pool def
+R6935:6936 xv6iris.FsStateBitmap <> Γ:69 var
+R6938:6939 xv6iris.FsStateBitmap <> nb:71 var
+R6941:6941 xv6iris.FsStateBitmap <> u:72 var
+R6965:6970 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6948:6956 xv6iris.FsStateDefs <> blk_owned def
+R6958:6959 xv6iris.FsStateBitmap <> Γ:69 var
+R6961:6961 xv6iris.FsStateBitmap <> b:73 var
+R6963:6964 xv6iris.FsStateBitmap <> bs:74 var
+R6971:6973 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6981:6983 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6975:6979 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R6974:6974 xv6iris.FsStateBitmap <> b:73 var
+R6980:6980 xv6iris.FsStateBitmap <> u:72 var
+R7055:7057 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7034:7041 Stdlib.ZArith.BinInt Z of_nat def
+R7044:7051 Stdlib.ZArith.BinInt Z to_nat def
+R7055:7057 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7034:7041 Stdlib.ZArith.BinInt Z of_nat def
+R7044:7051 Stdlib.ZArith.BinInt Z to_nat def
+R7083:7088 stdpp.base <> decide def
+R7092:7096 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R7083:7088 stdpp.base <> decide def
+R7092:7096 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R7177:7191 xv6iris.FsStateBitmap <> free_pool_split thm
+R7202:7209 Stdlib.ZArith.BinInt Z to_nat def
+R7177:7191 xv6iris.FsStateBitmap <> free_pool_split thm
+R7202:7209 Stdlib.ZArith.BinInt Z to_nat def
+R7177:7191 xv6iris.FsStateBitmap <> free_pool_split thm
+R7202:7209 Stdlib.ZArith.BinInt Z to_nat def
+R7244:7251 xv6iris.FsStateBitmap <> pool_elt def
+R7254:7275 stdpp.decidable <> bool_decide_eq_false_2 thm
+R7244:7251 xv6iris.FsStateBitmap <> pool_elt def
+R7244:7251 xv6iris.FsStateBitmap <> pool_elt def
+R7254:7275 stdpp.decidable <> bool_decide_eq_false_2 thm
+R7254:7275 stdpp.decidable <> bool_decide_eq_false_2 thm
+R7366:7366 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7388:7393 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7404:7404 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7367:7380 xv6iris.FsStateDefs <> blk_owned_excl thm
+R7366:7366 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7388:7393 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7404:7404 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7367:7380 xv6iris.FsStateDefs <> blk_owned_excl thm
+prf 7503:7516 <> free_pool_give
+binder 7518:7519 <> Γ:75
+R7528:7535 xv6iris.FsStateDefs <> phi_excl def
+R7537:7538 xv6iris.FsStateBitmap <> Γ:75 var
+binder 7522:7524 <> Hex:76
+binder 7541:7542 <> nb:77
+binder 7544:7544 <> u:78
+R7551:7551 Corelib.Numbers.BinNums <> Z ind
+binder 7547:7547 <> b:79
+binder 7554:7555 <> bs:80
+R7574:7581 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7564:7567 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R7569:7571 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R7568:7568 xv6iris.FsStateBitmap <> b:79 var
+R7568:7568 xv6iris.FsStateBitmap <> b:79 var
+R7572:7573 xv6iris.FsStateBitmap <> nb:77 var
+R7599:7604 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7582:7590 xv6iris.FsStateDefs <> blk_owned def
+R7592:7593 xv6iris.FsStateBitmap <> Γ:75 var
+R7595:7595 xv6iris.FsStateBitmap <> b:79 var
+R7597:7598 xv6iris.FsStateBitmap <> bs:80 var
+R7622:7627 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7605:7613 xv6iris.FsStateBitmap <> free_pool def
+R7615:7616 xv6iris.FsStateBitmap <> Γ:75 var
+R7618:7619 xv6iris.FsStateBitmap <> nb:77 var
+R7621:7621 xv6iris.FsStateBitmap <> u:78 var
+R7628:7636 xv6iris.FsStateBitmap <> free_pool def
+R7638:7639 xv6iris.FsStateBitmap <> Γ:75 var
+R7641:7642 xv6iris.FsStateBitmap <> nb:77 var
+R7646:7650 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R7645:7645 xv6iris.FsStateBitmap <> u:78 var
+R7651:7652 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7654:7655 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7653:7653 xv6iris.FsStateBitmap <> b:79 var
+R7728:7730 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7707:7714 Stdlib.ZArith.BinInt Z of_nat def
+R7717:7724 Stdlib.ZArith.BinInt Z to_nat def
+R7728:7730 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7707:7714 Stdlib.ZArith.BinInt Z of_nat def
+R7717:7724 Stdlib.ZArith.BinInt Z to_nat def
+R7761:7765 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R7767:7771 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R7772:7773 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7775:7776 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7761:7765 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R7767:7771 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R7772:7773 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7775:7776 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7833:7833 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7876:7898 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7910:7910 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7834:7847 xv6iris.FsStateBitmap <> free_pool_used thm
+R7833:7833 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7876:7898 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7910:7910 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7834:7847 xv6iris.FsStateBitmap <> free_pool_used thm
+R7934:7948 xv6iris.FsStateBitmap <> free_pool_split thm
+R7959:7966 Stdlib.ZArith.BinInt Z to_nat def
+R7934:7948 xv6iris.FsStateBitmap <> free_pool_split thm
+R7959:7966 Stdlib.ZArith.BinInt Z to_nat def
+R7934:7948 xv6iris.FsStateBitmap <> free_pool_split thm
+R7959:7966 Stdlib.ZArith.BinInt Z to_nat def
+R8049:8063 xv6iris.FsStateBitmap <> free_pool_split thm
+R8073:8077 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8078:8079 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8081:8082 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8086:8093 Stdlib.ZArith.BinInt Z to_nat def
+R8049:8063 xv6iris.FsStateBitmap <> free_pool_split thm
+R8073:8077 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8078:8079 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8081:8082 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8086:8093 Stdlib.ZArith.BinInt Z to_nat def
+R8049:8063 xv6iris.FsStateBitmap <> free_pool_split thm
+R8073:8077 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8078:8079 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8081:8082 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8086:8093 Stdlib.ZArith.BinInt Z to_nat def
+R8125:8132 xv6iris.FsStateBitmap <> pool_elt def
+R8135:8156 stdpp.decidable <> bool_decide_eq_false_2 thm
+R8125:8132 xv6iris.FsStateBitmap <> pool_elt def
+R8125:8132 xv6iris.FsStateBitmap <> pool_elt def
+R8135:8156 stdpp.decidable <> bool_decide_eq_false_2 thm
+R8135:8156 stdpp.decidable <> bool_decide_eq_false_2 thm
+R8218:8233 xv6iris.FsStateBitmap <> free_pool_but_eq thm
+R8245:8249 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8250:8251 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8253:8254 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8258:8265 Stdlib.ZArith.BinInt Z to_nat def
+R8218:8233 xv6iris.FsStateBitmap <> free_pool_but_eq thm
+R8245:8249 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8250:8251 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8253:8254 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8258:8265 Stdlib.ZArith.BinInt Z to_nat def
+R8218:8233 xv6iris.FsStateBitmap <> free_pool_but_eq thm
+R8245:8249 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8250:8251 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8253:8254 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8258:8265 Stdlib.ZArith.BinInt Z to_nat def
+def 8772:8779 <> free_set
+R8787:8787 Corelib.Numbers.BinNums <> Z ind
+binder 8782:8783 <> nb:81
+R8795:8798 stdpp.gmap <> gset def
+R8800:8800 Corelib.Numbers.BinNums <> Z ind
+binder 8791:8791 <> u:82
+R8805:8808 stdpp.gmap <> gset def
+R8810:8810 Corelib.Numbers.BinNums <> Z ind
+R8819:8819 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8852:8857 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8846:8849 stdpp.gmap <> gset def
+R8851:8851 Corelib.Numbers.BinNums <> Z ind
+R8820:8830 stdpp.base <> list_to_set def
+R8833:8836 stdpp.list_numbers <> seqZ def
+R8840:8841 xv6iris.FsStateBitmap <> nb:81 var
+R8858:8858 xv6iris.FsStateBitmap <> u:82 var
+prf 8870:8885 <> elem_of_free_set
+R8893:8893 Corelib.Numbers.BinNums <> Z ind
+binder 8888:8889 <> nb:83
+R8901:8904 stdpp.gmap <> gset def
+R8906:8906 Corelib.Numbers.BinNums <> Z ind
+binder 8897:8897 <> u:84
+R8914:8914 Corelib.Numbers.BinNums <> Z ind
+binder 8910:8910 <> x:85
+R8942:8947 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R8970:8970 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R8924:8928 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R8923:8923 xv6iris.FsStateBitmap <> x:85 var
+R8929:8936 xv6iris.FsStateBitmap <> free_set def
+R8938:8939 xv6iris.FsStateBitmap <> nb:83 var
+R8941:8941 xv6iris.FsStateBitmap <> u:84 var
+R8959:8962 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R8949:8952 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R8954:8956 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R8953:8953 xv6iris.FsStateBitmap <> x:85 var
+R8953:8953 xv6iris.FsStateBitmap <> x:85 var
+R8957:8958 xv6iris.FsStateBitmap <> nb:83 var
+R8964:8968 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R8963:8963 xv6iris.FsStateBitmap <> x:85 var
+R8969:8969 xv6iris.FsStateBitmap <> u:84 var
+R8993:9000 xv6iris.FsStateBitmap <> free_set def
+R9015:9032 stdpp.base <> elem_of_difference meth
+R9034:9052 stdpp.sets <> elem_of_list_to_set thm
+R9054:9065 stdpp.list_numbers <> elem_of_seqZ thm
+R9015:9032 stdpp.base <> elem_of_difference meth
+R9015:9032 stdpp.base <> elem_of_difference meth
+R9034:9052 stdpp.sets <> elem_of_list_to_set thm
+R9034:9052 stdpp.sets <> elem_of_list_to_set thm
+R9054:9065 stdpp.list_numbers <> elem_of_seqZ thm
+R9054:9065 stdpp.list_numbers <> elem_of_seqZ thm
+prf 9189:9202 <> diff_int_split
+R9211:9214 stdpp.gmap <> gset def
+R9216:9216 Corelib.Numbers.BinNums <> Z ind
+binder 9205:9205 <> X:86
+binder 9207:9207 <> Y:87
+R9222:9224 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9221:9221 xv6iris.FsStateBitmap <> X:86 var
+R9225:9225 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9233:9239 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9247:9247 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9227:9231 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R9226:9226 xv6iris.FsStateBitmap <> X:86 var
+R9232:9232 xv6iris.FsStateBitmap <> Y:87 var
+R9241:9245 stdpp.base <> ::stdpp_scope:x_'∩'_x not
+R9240:9240 xv6iris.FsStateBitmap <> X:86 var
+R9246:9246 xv6iris.FsStateBitmap <> Y:87 var
+R9269:9274 stdpp.sets <> set_eq thm
+R9269:9274 stdpp.sets <> set_eq thm
+R9299:9311 stdpp.base <> elem_of_union meth
+R9313:9330 stdpp.base <> elem_of_difference meth
+R9332:9351 stdpp.base <> elem_of_intersection meth
+R9299:9311 stdpp.base <> elem_of_union meth
+R9299:9311 stdpp.base <> elem_of_union meth
+R9313:9330 stdpp.base <> elem_of_difference meth
+R9313:9330 stdpp.base <> elem_of_difference meth
+R9332:9351 stdpp.base <> elem_of_intersection meth
+R9332:9351 stdpp.base <> elem_of_intersection meth
+R9368:9373 stdpp.base <> decide def
+R9377:9381 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R9368:9373 stdpp.base <> decide def
+R9377:9381 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+prf 9410:9422 <> diff_int_disj
+R9431:9434 stdpp.gmap <> gset def
+R9436:9436 Corelib.Numbers.BinNums <> Z ind
+binder 9425:9425 <> X:88
+binder 9427:9427 <> Y:89
+R9441:9441 stdpp.base <> ::stdpp_scope:x_'##'_x not
+R9449:9454 stdpp.base <> ::stdpp_scope:x_'##'_x not
+R9462:9462 stdpp.base <> ::stdpp_scope:x_'##'_x not
+R9443:9447 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R9442:9442 xv6iris.FsStateBitmap <> X:88 var
+R9448:9448 xv6iris.FsStateBitmap <> Y:89 var
+R9456:9460 stdpp.base <> ::stdpp_scope:x_'∩'_x not
+R9455:9455 xv6iris.FsStateBitmap <> X:88 var
+R9461:9461 xv6iris.FsStateBitmap <> Y:89 var
+R9506:9523 stdpp.base <> elem_of_difference meth
+R9506:9523 stdpp.base <> elem_of_difference meth
+R9553:9572 stdpp.base <> elem_of_intersection meth
+R9553:9572 stdpp.base <> elem_of_intersection meth
+prf 9623:9637 <> free_pool_intro
+binder 9639:9640 <> Γ:90
+R9648:9648 Corelib.Numbers.BinNums <> Z ind
+binder 9643:9644 <> nb:91
+R9656:9659 stdpp.gmap <> gset def
+R9661:9661 Corelib.Numbers.BinNums <> Z ind
+binder 9652:9652 <> u:92
+R9670:9670 iris.bi.interface <> ::stdpp_scope:x_'⊢'_x not
+R9727:9732 iris.bi.interface <> ::stdpp_scope:x_'⊢'_x not
+R9671:9680 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R9682:9686 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R9700:9701 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+binder 9681:9681 <> b:93
+binder 9681:9681 <> b:94
+R9702:9705 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R9708:9709 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 9706:9707 <> bs:95
+R9710:9718 xv6iris.FsStateDefs <> blk_owned def
+R9720:9721 xv6iris.FsStateBitmap <> Γ:90 var
+R9723:9723 xv6iris.FsStateBitmap <> b:93 var
+R9725:9726 xv6iris.FsStateBitmap <> bs:95 var
+R9687:9694 xv6iris.FsStateBitmap <> free_set def
+R9696:9697 xv6iris.FsStateBitmap <> nb:91 var
+R9699:9699 xv6iris.FsStateBitmap <> u:92 var
+R9733:9741 xv6iris.FsStateBitmap <> free_pool def
+R9743:9744 xv6iris.FsStateBitmap <> Γ:90 var
+R9746:9747 xv6iris.FsStateBitmap <> nb:91 var
+R9749:9749 xv6iris.FsStateBitmap <> u:92 var
+R9774:9782 xv6iris.FsStateBitmap <> free_pool def
+R9774:9782 xv6iris.FsStateBitmap <> free_pool def
+R9774:9782 xv6iris.FsStateBitmap <> free_pool def
+R9799:9818 iris.bi.big_op <> big_sepS_list_to_set thm
+binder 9825:9825 <> b:96
+R9830:9837 xv6iris.FsStateBitmap <> pool_elt def
+R9844:9844 xv6iris.FsStateBitmap <> b:96 var
+R9848:9851 stdpp.list_numbers <> seqZ def
+R9876:9885 stdpp.list_numbers <> NoDup_seqZ thm
+R9799:9818 iris.bi.big_op <> big_sepS_list_to_set thm
+binder 9825:9825 <> b:97
+R9830:9837 xv6iris.FsStateBitmap <> pool_elt def
+R9844:9844 xv6iris.FsStateBitmap <> b:97 var
+R9848:9851 stdpp.list_numbers <> seqZ def
+R9876:9885 stdpp.list_numbers <> NoDup_seqZ thm
+R9799:9818 iris.bi.big_op <> big_sepS_list_to_set thm
+binder 9825:9825 <> b:98
+R9830:9837 xv6iris.FsStateBitmap <> pool_elt def
+R9844:9844 xv6iris.FsStateBitmap <> b:98 var
+R9848:9851 stdpp.list_numbers <> seqZ def
+R9876:9885 stdpp.list_numbers <> NoDup_seqZ thm
+R9908:9921 xv6iris.FsStateBitmap <> diff_int_split thm
+R9950:9953 stdpp.gmap <> gset def
+R9955:9955 Corelib.Numbers.BinNums <> Z ind
+R9924:9934 stdpp.base <> list_to_set def
+R9937:9940 stdpp.list_numbers <> seqZ def
+R9908:9921 xv6iris.FsStateBitmap <> diff_int_split thm
+R9950:9953 stdpp.gmap <> gset def
+R9955:9955 Corelib.Numbers.BinNums <> Z ind
+R9924:9934 stdpp.base <> list_to_set def
+R9937:9940 stdpp.list_numbers <> seqZ def
+R9908:9921 xv6iris.FsStateBitmap <> diff_int_split thm
+R9950:9953 stdpp.gmap <> gset def
+R9955:9955 Corelib.Numbers.BinNums <> Z ind
+R9924:9934 stdpp.base <> list_to_set def
+R9937:9940 stdpp.list_numbers <> seqZ def
+R9974:9987 iris.bi.big_op <> big_sepS_union thm
+R9999:10011 xv6iris.FsStateBitmap <> diff_int_disj thm
+R9974:9987 iris.bi.big_op <> big_sepS_union thm
+R9974:9987 iris.bi.big_op <> big_sepS_union thm
+R9999:10011 xv6iris.FsStateBitmap <> diff_int_disj thm
+R10028:10035 xv6iris.FsStateBitmap <> free_set def
+R10028:10035 xv6iris.FsStateBitmap <> free_set def
+R10028:10035 xv6iris.FsStateBitmap <> free_set def
+R10081:10081 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10095:10100 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10104:10104 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10082:10094 iris.bi.big_op <> big_sepS_mono thm
+R10081:10081 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10095:10100 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10104:10104 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10082:10094 iris.bi.big_op <> big_sepS_mono thm
+R10132:10149 stdpp.base <> elem_of_difference meth
+R10132:10149 stdpp.base <> elem_of_difference meth
+R10184:10191 xv6iris.FsStateBitmap <> pool_elt def
+R10194:10215 stdpp.decidable <> bool_decide_eq_false_2 thm
+R10184:10191 xv6iris.FsStateBitmap <> pool_elt def
+R10184:10191 xv6iris.FsStateBitmap <> pool_elt def
+R10194:10215 stdpp.decidable <> bool_decide_eq_false_2 thm
+R10194:10215 stdpp.decidable <> bool_decide_eq_false_2 thm
+R10244:10257 iris.bi.big_op <> big_sepS_intro thm
+R10244:10257 iris.bi.big_op <> big_sepS_intro thm
+R10299:10318 stdpp.base <> elem_of_intersection meth
+R10299:10318 stdpp.base <> elem_of_intersection meth
+R10353:10360 xv6iris.FsStateBitmap <> pool_elt def
+R10363:10383 stdpp.decidable <> bool_decide_eq_true_2 thm
+R10353:10360 xv6iris.FsStateBitmap <> pool_elt def
+R10353:10360 xv6iris.FsStateBitmap <> pool_elt def
+R10363:10383 stdpp.decidable <> bool_decide_eq_true_2 thm
+R10363:10383 stdpp.decidable <> bool_decide_eq_true_2 thm
+prf 10636:10647 <> bitmap_alloc
+binder 10649:10650 <> Γ:99
+R10662:10662 Corelib.Numbers.BinNums <> Z ind
+binder 10653:10655 <> bms:100
+binder 10657:10658 <> nb:101
+binder 10665:10665 <> u:102
+R10672:10672 Corelib.Numbers.BinNums <> Z ind
+binder 10668:10668 <> b:103
+R10692:10695 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10682:10685 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R10687:10689 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R10686:10686 xv6iris.FsStateBitmap <> b:103 var
+R10686:10686 xv6iris.FsStateBitmap <> b:103 var
+R10690:10691 xv6iris.FsStateBitmap <> nb:101 var
+R10703:10710 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10697:10701 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R10696:10696 xv6iris.FsStateBitmap <> b:103 var
+R10702:10702 xv6iris.FsStateBitmap <> u:102 var
+R10737:10747 iris.bi.interface <> ::stdpp_scope:x_'⊢'_x not
+R10711:10724 xv6iris.FsStateBitmap <> free_bitmap_at def
+R10726:10727 xv6iris.FsStateBitmap <> Γ:99 var
+R10729:10731 xv6iris.FsStateBitmap <> bms:100 var
+R10733:10734 xv6iris.FsStateBitmap <> nb:101 var
+R10736:10736 xv6iris.FsStateBitmap <> u:102 var
+R10748:10748 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10774:10785 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10749:10752 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R10755:10756 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 10753:10754 <> bs:104
+R10757:10765 xv6iris.FsStateDefs <> blk_owned def
+R10767:10768 xv6iris.FsStateBitmap <> Γ:99 var
+R10770:10770 xv6iris.FsStateBitmap <> b:103 var
+R10772:10773 xv6iris.FsStateBitmap <> bs:104 var
+R10821:10832 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10933:10933 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10786:10794 xv6iris.FsStateDefs <> blk_owned def
+R10796:10797 xv6iris.FsStateBitmap <> Γ:99 var
+R10799:10801 xv6iris.FsStateBitmap <> bms:100 var
+R10804:10811 xv6iris.BitmapEnc <> bm_bytes def
+R10813:10817 xv6iris.BioDefs <> BSIZE def
+R10819:10819 xv6iris.FsStateBitmap <> u:102 var
+R10880:10894 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10833:10841 xv6iris.FsStateDefs <> blk_owned def
+R10843:10844 xv6iris.FsStateBitmap <> Γ:99 var
+R10846:10848 xv6iris.FsStateBitmap <> bms:100 var
+R10851:10858 xv6iris.BitmapEnc <> bm_bytes def
+R10860:10864 xv6iris.BioDefs <> BSIZE def
+R10868:10872 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R10867:10867 xv6iris.FsStateBitmap <> u:102 var
+R10873:10874 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R10876:10877 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R10875:10875 xv6iris.FsStateBitmap <> b:103 var
+R10895:10908 xv6iris.FsStateBitmap <> free_bitmap_at def
+R10910:10911 xv6iris.FsStateBitmap <> Γ:99 var
+R10913:10915 xv6iris.FsStateBitmap <> bms:100 var
+R10917:10918 xv6iris.FsStateBitmap <> nb:101 var
+R10922:10926 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R10921:10921 xv6iris.FsStateBitmap <> u:102 var
+R10927:10928 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R10930:10931 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R10929:10929 xv6iris.FsStateBitmap <> b:103 var
+R10975:10988 xv6iris.FsStateBitmap <> free_bitmap_at def
+R10991:11004 xv6iris.FsStateBitmap <> free_pool_take thm
+R10975:10988 xv6iris.FsStateBitmap <> free_bitmap_at def
+R10975:10988 xv6iris.FsStateBitmap <> free_bitmap_at def
+R10991:11004 xv6iris.FsStateBitmap <> free_pool_take thm
+R10991:11004 xv6iris.FsStateBitmap <> free_pool_take thm
+prf 11131:11141 <> bitmap_free
+binder 11143:11144 <> Γ:105
+R11153:11160 xv6iris.FsStateDefs <> phi_excl def
+R11162:11163 xv6iris.FsStateBitmap <> Γ:105 var
+binder 11147:11149 <> Hex:106
+R11176:11176 Corelib.Numbers.BinNums <> Z ind
+binder 11167:11169 <> bms:107
+binder 11171:11172 <> nb:108
+binder 11179:11179 <> u:109
+R11186:11186 Corelib.Numbers.BinNums <> Z ind
+binder 11182:11182 <> b:110
+binder 11189:11190 <> bs:111
+R11209:11216 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11199:11202 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11204:11206 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11203:11203 xv6iris.FsStateBitmap <> b:110 var
+R11203:11203 xv6iris.FsStateBitmap <> b:110 var
+R11207:11208 xv6iris.FsStateBitmap <> nb:108 var
+R11243:11248 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11217:11230 xv6iris.FsStateBitmap <> free_bitmap_at def
+R11232:11233 xv6iris.FsStateBitmap <> Γ:105 var
+R11235:11237 xv6iris.FsStateBitmap <> bms:107 var
+R11239:11240 xv6iris.FsStateBitmap <> nb:108 var
+R11242:11242 xv6iris.FsStateBitmap <> u:109 var
+R11266:11277 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11249:11257 xv6iris.FsStateDefs <> blk_owned def
+R11259:11260 xv6iris.FsStateBitmap <> Γ:105 var
+R11262:11262 xv6iris.FsStateBitmap <> b:110 var
+R11264:11265 xv6iris.FsStateBitmap <> bs:111 var
+R11291:11301 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11278:11280 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11288:11290 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11282:11286 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R11281:11281 xv6iris.FsStateBitmap <> b:110 var
+R11287:11287 xv6iris.FsStateBitmap <> u:109 var
+R11337:11348 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11449:11449 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11302:11310 xv6iris.FsStateDefs <> blk_owned def
+R11312:11313 xv6iris.FsStateBitmap <> Γ:105 var
+R11315:11317 xv6iris.FsStateBitmap <> bms:107 var
+R11320:11327 xv6iris.BitmapEnc <> bm_bytes def
+R11329:11333 xv6iris.BioDefs <> BSIZE def
+R11335:11335 xv6iris.FsStateBitmap <> u:109 var
+R11396:11410 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11349:11357 xv6iris.FsStateDefs <> blk_owned def
+R11359:11360 xv6iris.FsStateBitmap <> Γ:105 var
+R11362:11364 xv6iris.FsStateBitmap <> bms:107 var
+R11367:11374 xv6iris.BitmapEnc <> bm_bytes def
+R11376:11380 xv6iris.BioDefs <> BSIZE def
+R11384:11388 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R11383:11383 xv6iris.FsStateBitmap <> u:109 var
+R11389:11390 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11392:11393 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11391:11391 xv6iris.FsStateBitmap <> b:110 var
+R11411:11424 xv6iris.FsStateBitmap <> free_bitmap_at def
+R11426:11427 xv6iris.FsStateBitmap <> Γ:105 var
+R11429:11431 xv6iris.FsStateBitmap <> bms:107 var
+R11433:11434 xv6iris.FsStateBitmap <> nb:108 var
+R11438:11442 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R11437:11437 xv6iris.FsStateBitmap <> u:109 var
+R11443:11444 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11446:11447 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11445:11445 xv6iris.FsStateBitmap <> b:110 var
+R11487:11500 xv6iris.FsStateBitmap <> free_bitmap_at def
+R11487:11500 xv6iris.FsStateBitmap <> free_bitmap_at def
+R11487:11500 xv6iris.FsStateBitmap <> free_bitmap_at def
+R11550:11550 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11587:11592 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11604:11604 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11551:11564 xv6iris.FsStateBitmap <> free_pool_used thm
+R11550:11550 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11587:11592 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11604:11604 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11551:11564 xv6iris.FsStateBitmap <> free_pool_used thm
+R11676:11676 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11713:11718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11730:11730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11677:11690 xv6iris.FsStateBitmap <> free_pool_give thm
+R11676:11676 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11713:11718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11730:11730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11677:11690 xv6iris.FsStateBitmap <> free_pool_give thm
+R11745:11750 xv6iris.FsStateBitmap Bitmap <> sec

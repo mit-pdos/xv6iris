@@ -37,23 +37,16 @@ Section ProofMemsetPage.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
-  (* §0.26′ / A6.85: THE PRIMITIVE.  The page comes in VISIBILITY-FREE and
-     goes out REGISTERED and NAMED -- memset never reads what it fills, so
-     this is the contract the code has.  [bytes_choose] still names the
-     old bytes, but what it names now is a value nobody claims to have
-     observed: the ∃ inside [byte_free] is the freer's honest position. *)
-  Lemma wp_memset_page_free_val_sconf
+  Lemma wp_memset_page_val_sconf
       (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64)
-    : wp_memset_page_free_val_sconf_body kt m0 n cval b pcur.
+    : wp_memset_page_val_sconf_body kt m0 n cval b pcur.
   Proof.
-    cbv beta delta [wp_memset_page_free_val_sconf_body].
+    cbv beta delta [wp_memset_page_val_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hpv Hcval Ha2.
     iIntros "Hcg #Htext Hpc Hpage Hcont".
-    (* --- bridge [page_free p] to memset's per-byte buffer.  NO
-       [bytes_choose]: with the value hidden inside [mem_free] there is
-       nothing left to name, which is the normalized spelling saying what
-       the ruling says. --- *)
-    iEval (rewrite /page_free /byte_free) in "Hpage".
+    (* A6.87: [page_own] IS the visibility-free page, so the buffer goes
+       straight to the free engine and comes back REGISTERED. *)
+    iEval (rewrite /page_own /byte_any) in "Hpage".
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
     iApply (MemsetArray.wp_memset_free_sconf kt KT0 m0 n 4096 cval b pcur
@@ -65,38 +58,6 @@ Section ProofMemsetPage.
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
     - iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H".
     - exact Hcs.
-  Qed.
-
-  (* the contents-existential free form: kfree's own memset *)
-  Lemma wp_memset_page_free_sconf
-      (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64)
-    : wp_memset_page_free_sconf_body kt m0 n cval b pcur.
-  Proof.
-    cbv beta delta [wp_memset_page_free_sconf_body].
-    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hpv Hcval Ha2.
-    iIntros "Hcg #Htext Hpc Hpage Hcont".
-    iApply (wp_memset_page_free_val_sconf m0 n cval b pcur Hn Hpv Hcval Ha2
-              with "Hcg Htext Hpc Hpage").
-    rewrite /wp_next. iIntros (CID1) "%Hs1".
-    iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
-    iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
-    iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]"); [| exact Hcs].
-    iEval (rewrite /page_own /byte_any).
-    iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
-    iExists _. iExact "H".
-  Qed.
-
-  Lemma wp_memset_page_val_sconf
-      (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64)
-    : wp_memset_page_val_sconf_body kt m0 n cval b pcur.
-  Proof.
-    cbv beta delta [wp_memset_page_val_sconf_body].
-    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hpv Hcval Ha2.
-    iIntros "Hcg #Htext Hpc Hpage Hcont".
-    (* the registered form is the free one under [page_own_free] *)
-    iApply (wp_memset_page_free_val_sconf m0 n cval b pcur Hn Hpv Hcval Ha2
-              with "Hcg Htext Hpc [Hpage] Hcont").
-    by iApply page_own_free.
   Qed.
 
   (* ...and the contents-existential form, by forgetting them *)
@@ -113,9 +74,7 @@ Section ProofMemsetPage.
     iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
     iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]"); [| exact Hcs].
-    iEval (rewrite /page_own /byte_any).
-    iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
-    iExists _. iExact "H".
+    iApply page_own_of_named. iExact "Hbuf".
   Qed.
 
 End ProofMemsetPage.

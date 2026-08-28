@@ -130,27 +130,28 @@ Section PageFields.
     ([∗ list] j ∈ seq (o + a) b, byte_any (pa_add p j)).
   Proof. by rewrite seq_app big_sepL_app. Qed.
 
-  (* §0.26′ / A6.86: the same two equations at the VISIBILITY-FREE tier.
-     [page_free] is [page_own]'s big-op at a WEAKER per-byte predicate, so
-     every structural window law has an exact twin whose proof is the same
-     word; only the two the free page's reassembly needs are stated. *)
-  Lemma bwin_free_split (p : mword 64) (o a b : nat) :
-    ([∗ list] j ∈ seq o (a + b), byte_free (pa_add p j)) ⊣⊢
-    ([∗ list] j ∈ seq o a, byte_free (pa_add p j)) ∗
-    ([∗ list] j ∈ seq (o + a) b, byte_free (pa_add p j)).
+  (* A6.87: the named twins of the two structural equations, plus the
+     one-way weakening a named window has into an anonymous one. *)
+  Lemma bwin_named_split (p : mword 64) (o a b : nat) (f : nat -> bv 8) :
+    ([∗ list] j ∈ seq o (a + b), (pa_add p j) ↦ₘ (f j)) ⊣⊢
+    ([∗ list] j ∈ seq o a, (pa_add p j) ↦ₘ (f j)) ∗
+    ([∗ list] j ∈ seq (o + a) b, (pa_add p j) ↦ₘ (f j)).
   Proof. by rewrite seq_app big_sepL_app. Qed.
 
-  Lemma bwin_any_free (p : mword 64) (o n : nat) :
-    ([∗ list] j ∈ seq o n, byte_any (pa_add p j)) ⊢
-    ([∗ list] j ∈ seq o n, byte_free (pa_add p j)).
-  Proof. apply big_sepL_mono. intros ? ? _. apply byte_any_free. Qed.
-
-  Lemma bwin_free_rebase (p : mword 64) (o n : nat) :
-    ([∗ list] j ∈ seq o n, byte_free (pa_add p j)) ⊣⊢
-    ([∗ list] j ∈ seq 0 n, byte_free (pa_add (pa_add p o) j)).
+  Lemma bwin_named_rebase (p : mword 64) (o n : nat) (f : nat -> bv 8) :
+    ([∗ list] j ∈ seq o n, (pa_add p j) ↦ₘ (f j)) ⊣⊢
+    ([∗ list] j ∈ seq 0 n, (pa_add (pa_add p o) j) ↦ₘ (f (o + j)%nat)).
   Proof.
     rewrite -{1}(Nat.add_0_r o) -fmap_add_seq big_sepL_fmap.
     apply big_sepL_proper. intros k j _. by rewrite pa_add_add.
+  Qed.
+
+  Lemma bwin_named_any (p : mword 64) (o n : nat) (f : nat -> bv 8) :
+    ([∗ list] j ∈ seq o n, (pa_add p j) ↦ₘ (f j)) ⊢
+    ([∗ list] j ∈ seq o n, byte_any (pa_add p j)).
+  Proof.
+    apply big_sepL_mono. intros k j _. rewrite /byte_any.
+    iIntros "H". by iApply TsoCtx.ctx_pointsto_free.
   Qed.
 
   Lemma bwin_rebase (p : mword 64) (o n : nat) :
@@ -163,8 +164,19 @@ Section PageFields.
 
   (* a window of anonymous bytes IS some concrete byte list: the shape a
      content-tracking buffer (a pipe's [data], a page-table page) wants. *)
-  Lemma bwin_bytes_list (a : mword 64) (n : nat) :
-    ([∗ list] j ∈ seq 0 n, byte_any (pa_add a j)) ⊢
+  (* ================================================================== *)
+  (* A6.87: THE FORWARD DIRECTION IS OFF A *NAMED* WINDOW.                *)
+  (* [byte_any] is the visibility-free byte now, so "these four bytes are  *)
+  (* SOME word" is exactly the claim the ruling removes -- bytes nobody    *)
+  (* has written have no value to assemble.  Every forward lemma below     *)
+  (* therefore takes the window NAMED (which is what a caller has after    *)
+  (* its own write: [KallocInv.page_filled] at [f := fun _ => c]), and the *)
+  (* proofs are the old ones with the [∃]-destructs deleted.               *)
+  (* The [_back] directions are unchanged: a registered word always was    *)
+  (* more than a window of anonymous bytes.                                *)
+  (* ================================================================== *)
+  Lemma bwin_named_bytes_list (a : mword 64) (n : nat) (f : nat -> bv 8) :
+    ([∗ list] j ∈ seq 0 n, (pa_add a j) ↦ₘ (f j)) ⊢
     ∃ bs : list (bv 8), ⌜length bs = n⌝ ∗ ([∗ list] j ↦ b ∈ bs, pa_add a j ↦ₘ b).
   Proof.
     induction n as [|n IH].
@@ -173,91 +185,89 @@ Section PageFields.
       iIntros "[Hpre Hlast]".
       iDestruct (IH with "Hpre") as (bs) "[%Hlen Hbs]".
       rewrite big_sepL_singleton.
-      (* [byte_any] is Global TC-opaque since the flip; open it for the
-         ∃-destruct *)
-      iEval (rewrite /byte_any) in "Hlast".
-      iDestruct "Hlast" as (b) "Hb".
-      iExists (bs ++ [b])%list.
+      iExists (bs ++ [f (0 + n)%nat])%list.
       iSplit; [iPureIntro; rewrite length_app Hlen; simpl; lia|].
       rewrite big_sepL_app big_sepL_singleton Hlen.
       iFrame "Hbs".
       replace (n + 0)%nat with (0 + n)%nat by lia.
-      iExact "Hb".
+      iExact "Hlast".
   Qed.
 
   (* ---- anonymous bytes ARE a word cell ---- *)
 
-  Lemma bytes_word4 (a : mword 64) :
+  Lemma bytes_named_word4 (a : mword 64) (f : nat -> bv 8) :
     is_aligned_paddr (Physaddr a) 4 = true ->
-    ([∗ list] j ∈ seq 0 4, byte_any (pa_add a j)) ⊢ ∃ w : mword 32, a ↦₄ w.
+    ([∗ list] j ∈ seq 0 4, (pa_add a j) ↦ₘ (f j)) ⊢ ∃ w : mword 32, a ↦₄ w.
   Proof.
-    intro Hal. rewrite /byte_any.
+    intro Hal.
     change (seq 0 4) with [0;1;2;3]%nat.
     iIntros "(H0 & H1 & H2 & H3 & _)".
-    iDestruct "H0" as (b0) "H0". iDestruct "H1" as (b1) "H1".
-    iDestruct "H2" as (b2) "H2". iDestruct "H3" as (b3) "H3".
-    (* M1 STAGE 2 LANDED: [↦₄] is the ctx tower, so the four shim
-       conversions that used to sit here are GONE -- the bytes and the
-       word are on the same side of the seal now. *)
-    set (bs := [b0;b1;b2;b3]).
+    set (bs := [f 0%nat; f 1%nat; f 2%nat; f 3%nat]).
     set (w := Z_to_bv 32 (assemble_bytes bs) : mword 32).
     iExists w.
     rewrite /ctx_word4_pointsto.
     iSplitR; [iPureIntro; exact Hal|].
-    assert (E0 : nth_byte w 0%nat = b0) by (subst w bs; apply nth_byte_assemble4; [reflexivity | lia]).
-    assert (E1 : nth_byte w 1%nat = b1) by (subst w bs; apply nth_byte_assemble4; [reflexivity | lia]).
-    assert (E2 : nth_byte w 2%nat = b2) by (subst w bs; apply nth_byte_assemble4; [reflexivity | lia]).
-    assert (E3 : nth_byte w 3%nat = b3) by (subst w bs; apply nth_byte_assemble4; [reflexivity | lia]).
+    assert (E0 : nth_byte w 0%nat = f 0%nat) by (subst w bs; apply nth_byte_assemble4; [reflexivity | lia]).
+    assert (E1 : nth_byte w 1%nat = f 1%nat) by (subst w bs; apply nth_byte_assemble4; [reflexivity | lia]).
+    assert (E2 : nth_byte w 2%nat = f 2%nat) by (subst w bs; apply nth_byte_assemble4; [reflexivity | lia]).
+    assert (E3 : nth_byte w 3%nat = f 3%nat) by (subst w bs; apply nth_byte_assemble4; [reflexivity | lia]).
     change (seq 0 4) with [0;1;2;3]%nat. simpl.
     rewrite E0 E1 E2 E3. iFrame.
   Qed.
 
-  Lemma bytes_word8 (a : mword 64) :
+  Lemma bytes_named_word8 (a : mword 64) (f : nat -> bv 8) :
     is_aligned_paddr (Physaddr a) 8 = true ->
-    ([∗ list] j ∈ seq 0 8, byte_any (pa_add a j)) ⊢ ∃ w : mword 64, a ↦₈ w.
+    ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₘ (f j)) ⊢ ∃ w : mword 64, a ↦₈ w.
   Proof.
-    intro Hal. rewrite /byte_any.
+    intro Hal.
     change (seq 0 8) with [0;1;2;3;4;5;6;7]%nat.
     iIntros "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & _)".
-    iDestruct "H0" as (b0) "H0". iDestruct "H1" as (b1) "H1".
-    iDestruct "H2" as (b2) "H2". iDestruct "H3" as (b3) "H3".
-    iDestruct "H4" as (b4) "H4". iDestruct "H5" as (b5) "H5".
-    iDestruct "H6" as (b6) "H6". iDestruct "H7" as (b7) "H7".
-    set (bs := [b0;b1;b2;b3;b4;b5;b6;b7]).
+    set (bs := [f 0%nat; f 1%nat; f 2%nat; f 3%nat;
+                f 4%nat; f 5%nat; f 6%nat; f 7%nat]).
     set (w := Z_to_bv 64 (assemble_bytes bs) : mword 64).
     iExists w.
     rewrite /ctx_word_pointsto.
     iSplitR; [iPureIntro; exact Hal|].
-    assert (E0 : nth_byte w 0%nat = b0) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E1 : nth_byte w 1%nat = b1) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E2 : nth_byte w 2%nat = b2) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E3 : nth_byte w 3%nat = b3) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E4 : nth_byte w 4%nat = b4) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E5 : nth_byte w 5%nat = b5) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E6 : nth_byte w 6%nat = b6) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E7 : nth_byte w 7%nat = b7) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E0 : nth_byte w 0%nat = f 0%nat) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E1 : nth_byte w 1%nat = f 1%nat) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E2 : nth_byte w 2%nat = f 2%nat) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E3 : nth_byte w 3%nat = f 3%nat) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E4 : nth_byte w 4%nat = f 4%nat) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E5 : nth_byte w 5%nat = f 5%nat) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E6 : nth_byte w 6%nat = f 6%nat) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E7 : nth_byte w 7%nat = f 7%nat) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
     change (seq 0 8) with [0;1;2;3;4;5;6;7]%nat. simpl.
     rewrite E0 E1 E2 E3 E4 E5 E6 E7. iFrame.
   Qed.
 
   (* the two field forms in one step, at a page offset: the caller supplies the
      offset's divisibility and gets the cell. *)
-  Lemma page_field4 (p : mword 64) (o : nat) :
+  Lemma page_field4_named (p : mword 64) (o : nat) (f : nat -> bv 8) :
     page_valid p -> (o + 4 <= 4096)%nat -> (4 | Z.of_nat o) ->
-    ([∗ list] j ∈ seq o 4, byte_any (pa_add p j)) ⊢ ∃ w : mword 32, pa_add p o ↦₄ w.
+    ([∗ list] j ∈ seq o 4, (pa_add p j) ↦ₘ (f j)) ⊢ ∃ w : mword 32, pa_add p o ↦₄ w.
   Proof.
-    intros Hpv Ho Hdvd. rewrite bwin_rebase.
-    apply bytes_word4. apply (page_off_aligned p o 4 Hpv ltac:(lia) ltac:(lia));
-      [ exists 1024; reflexivity | exact Hdvd ].
+    intros Hpv Ho Hdvd.
+    rewrite -{1}(Nat.add_0_r o) -fmap_add_seq big_sepL_fmap.
+    iIntros "H".
+    iApply (bytes_named_word4 (pa_add p o) (fun j => f (o + j)%nat)).
+    { apply (page_off_aligned p o 4 Hpv ltac:(lia) ltac:(lia));
+        [ exists 1024; reflexivity | exact Hdvd ]. }
+    iApply (big_sepL_mono with "H"). iIntros (k j _) "Hb".
+    by rewrite pa_add_add.
   Qed.
 
-  Lemma page_field8 (p : mword 64) (o : nat) :
+  Lemma page_field8_named (p : mword 64) (o : nat) (f : nat -> bv 8) :
     page_valid p -> (o + 8 <= 4096)%nat -> (8 | Z.of_nat o) ->
-    ([∗ list] j ∈ seq o 8, byte_any (pa_add p j)) ⊢ ∃ w : mword 64, pa_add p o ↦₈ w.
+    ([∗ list] j ∈ seq o 8, (pa_add p j) ↦ₘ (f j)) ⊢ ∃ w : mword 64, pa_add p o ↦₈ w.
   Proof.
-    intros Hpv Ho Hdvd. rewrite bwin_rebase.
-    apply bytes_word8. apply (page_off_aligned p o 8 Hpv ltac:(lia) ltac:(lia));
-      [ exists 512; reflexivity | exact Hdvd ].
+    intros Hpv Ho Hdvd.
+    rewrite -{1}(Nat.add_0_r o) -fmap_add_seq big_sepL_fmap.
+    iIntros "H".
+    iApply (bytes_named_word8 (pa_add p o) (fun j => f (o + j)%nat)).
+    { apply (page_off_aligned p o 8 Hpv ltac:(lia) ltac:(lia));
+        [ exists 512; reflexivity | exact Hdvd ]. }
+    iApply (big_sepL_mono with "H"). iIntros (k j _) "Hb".
+    by rewrite pa_add_add.
   Qed.
 
   (* ---- a RUN of word cells out of a page's prefix ----
@@ -268,20 +278,20 @@ Section PageFields.
      length is the caller's [n].  Stated over [pa_add p (8 * i)] -- the same
      form [ProcInv.a_tf_word] is defined at -- so a consumer needs no address
      rewriting. *)
-  Lemma page_words8 (p : mword 64) (n : nat) :
+  Lemma page_words8_named (p : mword 64) (n : nat) (f : nat -> bv 8) :
     page_valid p -> (8 * n <= 4096)%nat ->
-    ([∗ list] j ∈ seq 0 (8 * n), byte_any (pa_add p j)) ⊢
+    ([∗ list] j ∈ seq 0 (8 * n), (pa_add p j) ↦ₘ (f j)) ⊢
     ∃ ws : list (mword 64), ⌜length ws = n⌝ ∗
       ([∗ list] i ↦ w ∈ ws, pa_add p (8 * i)%nat ↦₈ w).
   Proof.
     intro Hpv. induction n as [|n IH]; intro Hn.
     - iIntros "_". iExists []. by iSplit.
     - replace (8 * S n)%nat with (8 * n + 8)%nat by lia.
-      rewrite (bwin_split p 0 (8 * n) 8).
+      rewrite seq_app big_sepL_app.
       iIntros "[Hpre Hlast]".
       iDestruct (IH ltac:(lia) with "Hpre") as (ws) "[%Hlen Hws]".
       rewrite Nat.add_0_l.
-      iDestruct (page_field8 p (8 * n)%nat Hpv ltac:(lia)
+      iDestruct (page_field8_named p (8 * n)%nat f Hpv ltac:(lia)
                    ltac:(exists (Z.of_nat n); lia) with "Hlast") as (w) "Hw".
       iExists (ws ++ [w])%list.
       iSplit; [iPureIntro; rewrite length_app Hlen /=; lia|].
@@ -300,14 +310,16 @@ Section PageFields.
   Proof.
     (* M1 STAGE 2: no crossing -- a ctx word IS ctx bytes *)
     rewrite ctx_word4_pointsto_bytes. apply big_sepL_mono.
-    intros k j _. iIntros "H". rewrite /byte_any. by iExists (nth_byte w j).
+    intros k j _. iIntros "H". rewrite /byte_any.
+    by iApply TsoCtx.ctx_pointsto_free.
   Qed.
 
   Lemma word8_bwin (a : mword 64) (w : mword 64) :
     a ↦₈ w ⊢ [∗ list] j ∈ seq 0 8, byte_any (pa_add a j).
   Proof.
     rewrite ctx_word_pointsto_bytes. apply big_sepL_mono.
-    intros k j _. iIntros "H". by iExists (nth_byte w j).
+    intros k j _. iIntros "H". rewrite /byte_any.
+    by iApply TsoCtx.ctx_pointsto_free.
   Qed.
 
   Lemma page_field4_back (p : mword 64) (o : nat) (w : mword 32) :
@@ -349,7 +361,8 @@ Section PageFields.
     rewrite big_sepL_app big_sepL_singleton.
     iIntros "[Hpre Hlast]".
     iSplitL "Hpre"; [ by iApply IH | ].
-    rewrite Nat.add_0_r. by iExists b.
+    rewrite Nat.add_0_r. rewrite /byte_any.
+    by iApply TsoCtx.ctx_pointsto_free.
   Qed.
 
 End PageFields.

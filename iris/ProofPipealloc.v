@@ -1376,7 +1376,9 @@ Section ProofPipealloc.
     { intros c Hcs N2 N8 N9 N20 N18 N19.
       rewrite /G2 upd_ne; [| regne]. apply HG1thr; assumption. }
     (* the page becomes a raw [struct pipe] *)
-    iDestruct (page_own_pipe_raw _ Hpv with "Hpage") as "Hraw".
+    (* A6.87: the pipe is carved out of the page KALLOC MEMSET, not out of
+       a visibility-free one -- the struct's fields are word cells. *)
+    iDestruct (page_filled_pipe_raw _ _ Hpv with "Hpage") as "Hraw".
     rewrite /pipe_raw.
     iDestruct "Hraw" as "(Hlkw & Hlkn & Hlkc & Hdat & Hnr & Hnw & Hro & Hwo & Hslack)".
     iDestruct "Hlkw" as (vlock) "Hlkw". iDestruct "Hlkn" as (vname) "Hlkn".

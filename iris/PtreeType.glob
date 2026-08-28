@@ -1,0 +1,44 @@
+DIGEST a8639c18b9d7502514a8d5a81f4813af
+Fxv6iris.PtreeType
+R997:1002 Stdlib.ZArith.ZArith <> <> lib
+R1020:1035 SailStdpp.Values <> <> lib
+ind 1075:1079 <> ptree
+constr 1095:1100 <> PtNode
+R1110:1114 SailStdpp.Values <> mword def
+binder 1103:1106 <> base:3
+R1146:1149 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1139:1143 SailStdpp.Values <> mword def
+R1150:1154 SailStdpp.Values <> mword def
+binder 1132:1135 <> ents:4
+R1186:1189 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1179:1183 SailStdpp.Values <> mword def
+R1190:1195 Corelib.Init.Datatypes <> option ind
+R1197:1201 xv6iris.PtreeType <> ptree:1 ind
+binder 1172:1175 <> kids:5
+scheme 1075:1079 <> ptree_rect
+scheme 1075:1079 <> ptree_ind
+scheme 1075:1079 <> ptree_rec
+scheme 1075:1079 <> ptree_sind
+def 1217:1223 <> pt_base
+R1230:1234 xv6iris.PtreeType <> ptree ind
+binder 1226:1226 <> t:6
+R1239:1243 SailStdpp.Values <> mword def
+R1259:1259 xv6iris.PtreeType <> t:6 var
+R1266:1271 xv6iris.PtreeType <> PtNode constr
+def 1300:1306 <> pt_ents
+R1313:1317 xv6iris.PtreeType <> ptree ind
+binder 1309:1309 <> t:8
+R1329:1332 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1322:1326 SailStdpp.Values <> mword def
+R1333:1337 SailStdpp.Values <> mword def
+R1353:1353 xv6iris.PtreeType <> t:8 var
+R1360:1365 xv6iris.PtreeType <> PtNode constr
+def 1394:1400 <> pt_kids
+R1407:1411 xv6iris.PtreeType <> ptree ind
+binder 1403:1403 <> t:10
+R1423:1426 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1416:1420 SailStdpp.Values <> mword def
+R1427:1432 Corelib.Init.Datatypes <> option ind
+R1434:1438 xv6iris.PtreeType <> ptree ind
+R1451:1451 xv6iris.PtreeType <> t:10 var
+R1458:1463 xv6iris.PtreeType <> PtNode constr

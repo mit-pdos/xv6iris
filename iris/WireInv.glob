@@ -1,0 +1,109 @@
+DIGEST 53c9270de070ef4a920aa95e43e524d2
+Fxv6iris.WireInv
+R856:859 stdpp.gmap <> <> lib
+R861:866 stdpp.finite <> <> lib
+R904:912 iris.proofmode.proofmode <> <> lib
+R955:964 iris.base_logic.lib.invariants <> <> lib
+R982:1007 SailStdpp.Operators_mwords <> <> lib
+R1025:1038 SailStdpp.Base <> <> lib
+R1056:1072 Riscv.rv64d_types <> <> lib
+R1074:1084 Riscv.rv64d <> <> lib
+R1102:1110 xv6iris.RiscvLang <> <> lib
+R1112:1121 xv6iris.RiscvPtsto <> <> lib
+sec 1159:1165 <> WireInv
+R1181:1187 xv6iris.RiscvPtsto <> riscvGS class
+def 1208:1212 <> wireN
+R1216:1224 stdpp.namespaces <> namespace def
+R1234:1237 stdpp.namespaces <> ::stdpp_scope:x_'.@'_x not
+R1229:1233 stdpp.namespaces <> nroot def
+def 1574:1586 <> wire_inv_body
+R1590:1594 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R1596:1597 xv6iris.WireInv <> WireInv.Σ var
+R1607:1611 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R1638:1647 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R1627:1630 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1624:1626 xv6iris.RiscvLang <> CPU def
+R1631:1635 SailStdpp.Values <> mword def
+binder 1612:1615 <> seip:3
+R1627:1630 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1624:1626 xv6iris.RiscvLang <> CPU def
+R1631:1635 SailStdpp.Values <> mword def
+binder 1617:1620 <> meip:4
+R1648:1657 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R1659:1664 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R1690:1701 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+binder 1658:1658 <> c:5
+binder 1658:1658 <> c:6
+R1750:1763 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R1702:1716 xv6iris.RiscvPtsto <> reg_pointsto_at def
+R1718:1718 xv6iris.WireInv <> c:5 var
+R1720:1727 Riscv.rv64d_types <> sig_seip constr
+R1730:1737 iris.algebra.dfrac <> DfracOwn constr
+R1743:1746 xv6iris.WireInv <> seip:3 var
+R1748:1748 xv6iris.WireInv <> c:5 var
+R1764:1778 xv6iris.RiscvPtsto <> reg_pointsto_at def
+R1780:1780 xv6iris.WireInv <> c:5 var
+R1782:1789 Riscv.rv64d_types <> sig_meip constr
+R1792:1799 iris.algebra.dfrac <> DfracOwn constr
+R1805:1808 xv6iris.WireInv <> meip:4 var
+R1810:1810 xv6iris.WireInv <> c:5 var
+R1682:1685 stdpp.gmap <> gset def
+R1687:1689 xv6iris.RiscvLang <> CPU def
+R1665:1674 stdpp.sets <> fin_to_set def
+R1676:1678 xv6iris.RiscvLang <> CPU def
+def 1831:1838 <> wire_inv
+R1842:1846 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R1848:1849 xv6iris.WireInv <> WireInv.Σ var
+R1854:1856 iris.base_logic.lib.invariants <> inv def
+R1864:1876 xv6iris.WireInv <> wire_inv_body def
+R1858:1862 xv6iris.WireInv <> wireN def
+inst 1898:1916 <> wire_inv_persistent
+R1920:1929 iris.bi.derived_connectives <> Persistent class
+R1931:1938 xv6iris.WireInv <> wire_inv def
+inst 1983:2004 <> wire_inv_body_timeless
+R2008:2015 iris.bi.derived_connectives <> Timeless class
+R2017:2029 xv6iris.WireInv <> wire_inv_body def
+R2050:2062 xv6iris.WireInv <> wire_inv_body def
+R2050:2062 xv6iris.WireInv <> wire_inv_body def
+R2050:2062 xv6iris.WireInv <> wire_inv_body def
+prf 2165:2178 <> wire_inv_alloc
+binder 2180:2180 <> E:7
+R2198:2201 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2195:2197 xv6iris.RiscvLang <> CPU def
+R2202:2206 SailStdpp.Values <> mword def
+binder 2183:2186 <> seip:8
+binder 2188:2191 <> meip:9
+R2217:2217 iris.bi.updates <> ::stdpp_scope:x_'={'_x_'}=∗'_x not
+R2378:2385 iris.bi.updates <> ::stdpp_scope:x_'={'_x_'}=∗'_x not
+R2387:2392 iris.bi.updates <> ::stdpp_scope:x_'={'_x_'}=∗'_x not
+R2218:2227 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R2229:2234 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R2260:2269 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+binder 2228:2228 <> c:10
+binder 2228:2228 <> c:11
+R2318:2329 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2270:2284 xv6iris.RiscvPtsto <> reg_pointsto_at def
+R2286:2286 xv6iris.WireInv <> c:10 var
+R2288:2295 Riscv.rv64d_types <> sig_seip constr
+R2298:2305 iris.algebra.dfrac <> DfracOwn constr
+R2311:2314 xv6iris.WireInv <> seip:8 var
+R2316:2316 xv6iris.WireInv <> c:10 var
+R2330:2344 xv6iris.RiscvPtsto <> reg_pointsto_at def
+R2346:2346 xv6iris.WireInv <> c:10 var
+R2348:2355 Riscv.rv64d_types <> sig_meip constr
+R2358:2365 iris.algebra.dfrac <> DfracOwn constr
+R2371:2374 xv6iris.WireInv <> meip:9 var
+R2376:2376 xv6iris.WireInv <> c:10 var
+R2252:2255 stdpp.gmap <> gset def
+R2257:2259 xv6iris.RiscvLang <> CPU def
+R2235:2244 stdpp.sets <> fin_to_set def
+R2246:2248 xv6iris.RiscvLang <> CPU def
+R2386:2386 xv6iris.WireInv <> E:7 var
+R2386:2386 xv6iris.WireInv <> E:7 var
+R2393:2400 xv6iris.WireInv <> wire_inv def
+R2445:2453 iris.base_logic.lib.invariants <> inv_alloc thm
+R2445:2453 iris.base_logic.lib.invariants <> inv_alloc thm
+R2472:2484 xv6iris.WireInv <> wire_inv_body def
+R2472:2484 xv6iris.WireInv <> wire_inv_body def
+R2472:2484 xv6iris.WireInv <> wire_inv_body def
+R2530:2536 xv6iris.WireInv WireInv <> sec

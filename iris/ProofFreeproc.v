@@ -870,7 +870,7 @@ Section ProofFreeproc.
                 with "Hcg Hcpu Htext Hpc Hkmem [Hpage] Havail").
       all: try lkbelow.
       { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HT1a0; exact Htfval |].
-        (* §0.26′ *) iEval (rewrite HT1a0). iApply (page_own_free with "Hpage"). }
+        iEval (rewrite HT1a0). iExact "Hpage". }
       iIntros (CIDk Hsk mrk) "Hcg Hcpu Hpc %Hcsk _".
       assert (Hret14 : ret_pc (T1 !!! Regidx Rra) = mword_of_int (FR + 0x14)).
       { rewrite HT1ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }

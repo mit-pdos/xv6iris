@@ -1,0 +1,94 @@
+DIGEST f2aac511183303a201da3fe44062c144
+Fxv6iris.SpecSpin
+R655:660 Stdlib.ZArith.ZArith <> <> lib
+R689:692 stdpp.gmap <> <> lib
+R694:714 stdpp.bitvector.definitions <> <> lib
+R752:760 iris.proofmode.proofmode <> <> lib
+R802:809 iris.program_logic.language <> <> lib
+R852:861 iris.base_logic.lib.invariants <> <> lib
+R879:904 SailStdpp.Operators_mwords <> <> lib
+R922:938 Riscv.rv64d_types <> <> lib
+R940:950 Riscv.rv64d <> <> lib
+R968:981 SailStdpp.Base <> <> lib
+R999:1007 xv6iris.RiscvLang <> <> lib
+R1009:1015 xv6iris.RegFile <> <> lib
+R1017:1026 xv6iris.RiscvPtsto <> <> lib
+R1028:1041 xv6iris.RiscvFetchExec <> <> lib
+R1043:1047 xv6iris.WpGpr <> <> lib
+R1065:1074 xv6iris.InstrBytes <> <> lib
+R1076:1085 xv6iris.KernelText <> <> lib
+R1108:1117 Kernel.KernelSyms <> <> lib
+R1135:1140 xv6iris.TsoCtx <> <> lib
+def 1292:1298 <> pc_spin
+R1302:1306 SailStdpp.Values <> mword def
+R1314:1325 SailStdpp.Values <> mword_of_int def
+R1327:1341 Kernel.KernelSyms <> spin def
+def 1356:1367 <> wp_spin_body
+R1372:1378 xv6iris.RiscvPtsto <> riscvGS class
+binder 1380:1381 <> Σ:1
+binder 1371:1381 <> riscvGS0:2
+R1392:1396 xv6iris.RiscvLang <> GenId class
+binder 1386:1388 <> GEN:3
+R1407:1411 xv6iris.RiscvLang <> CpuId class
+binder 1401:1403 <> CID:4
+R1421:1426 xv6iris.TsoCtx <> CurCtx class
+binder 1416:1417 <> XI:5
+R1434:1440 xv6iris.RegFile <> regfile def
+binder 1430:1430 <> m:6
+R1458:1473 Riscv.rv64d_types <> type_of_register def
+R1475:1482 Riscv.rv64d_types <> pmpcfg_n constr
+binder 1448:1454 <> pmpcfg0:7
+R1490:1491 stdpp.numbers <> Qp rec
+binder 1486:1486 <> q:8
+R1521:1526 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1499:1512 xv6iris.RiscvFetchExec <> pmp_allows_all def
+R1514:1520 xv6iris.SpecSpin <> pmpcfg0:7 var
+R1552:1559 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R1527:1538 xv6iris.InstrBytes <> mmode_config def
+R1541:1548 iris.algebra.dfrac <> DfracOwn constr
+R1550:1550 xv6iris.SpecSpin <> q:8 var
+R1595:1602 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R1568:1575 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ{'_x_'}'_x not
+R1586:1587 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ{'_x_'}'_x not
+R1560:1567 Riscv.rv64d_types <> pmpcfg_n constr
+R1576:1583 iris.algebra.dfrac <> DfracOwn constr
+R1585:1585 xv6iris.SpecSpin <> q:8 var
+R1588:1594 xv6iris.SpecSpin <> pmpcfg0:7 var
+R1616:1623 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R1603:1607 xv6iris.InstrBytes <> pc_is def
+R1609:1615 xv6iris.SpecSpin <> pc_spin def
+R1634:1641 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R1624:1631 xv6iris.WpGpr <> gpr_file def
+R1633:1633 xv6iris.SpecSpin <> m:6 var
+R1653:1660 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R1642:1652 xv6iris.KernelText <> kernel_text def
+R1661:1664 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R1687:1687 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R1672:1675 iris.program_logic.language <> expr proj
+R1677:1686 xv6iris.RiscvLang <> riscv_lang def
+R1665:1668 xv6iris.RiscvLang <> Loop abbrev
+modtype 1703:1706 <> SPIN
+ax 1721:1727 SPIN wp_spin
+R1735:1743 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R1867:1875 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R1745:1751 xv6iris.RiscvPtsto <> riscvGS class
+binder 1753:1754 <> Σ:9
+binder 1744:1754 <> riscvGS0:10
+R1765:1769 xv6iris.RiscvLang <> GenId class
+binder 1759:1761 <> GEN:11
+R1780:1784 xv6iris.RiscvLang <> CpuId class
+binder 1774:1776 <> CID:12
+R1794:1799 xv6iris.TsoCtx <> CurCtx class
+binder 1789:1790 <> XI:13
+R1807:1813 xv6iris.RegFile <> regfile def
+binder 1803:1803 <> m:14
+R1833:1848 Riscv.rv64d_types <> type_of_register def
+R1850:1857 Riscv.rv64d_types <> pmpcfg_n constr
+binder 1823:1829 <> pmpcfg0:15
+R1865:1866 stdpp.numbers <> Qp rec
+binder 1861:1861 <> q:16
+R1876:1887 xv6iris.SpecSpin <> wp_spin_body def
+R1899:1899 xv6iris.SpecSpin <> q:16 var
+R1891:1897 xv6iris.SpecSpin <> pmpcfg0:15 var
+R1889:1889 xv6iris.SpecSpin <> m:14 var
+R1906:1909 xv6iris.SpecSpin SPIN <> modtype

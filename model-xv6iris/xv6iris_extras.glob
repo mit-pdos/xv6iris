@@ -1,0 +1,50 @@
+DIGEST 8afc9f538d9b0c1e811761cc33cf705b
+FRiscv.xv6iris_extras
+R5948:5953 Stdlib.ZArith.ZArith <> <> lib
+R5971:5984 SailStdpp.Base <> <> lib
+R6002:6012 Riscv.rv64d_types <> <> lib
+def 6186:6201 <> load_reservation
+binder 6204:6204 <> n:1
+R6215:6219 SailStdpp.Values <> mword def
+R6221:6221 Riscv.xv6iris_extras <> n:1 var
+binder 6208:6211 <> addr:2
+R6233:6233 Corelib.Numbers.BinNums <> Z ind
+binder 6225:6229 <> width:3
+R6238:6238 Riscv.rv64d_types <> M def
+R6240:6243 Corelib.Init.Datatypes <> unit ind
+R6250:6256 Riscv.rv64d_types <> returnM def
+R6258:6259 Corelib.Init.Datatypes <> tt constr
+def 6274:6291 <> cancel_reservation
+R6298:6301 Corelib.Init.Datatypes <> unit ind
+R6306:6306 Riscv.rv64d_types <> M def
+R6308:6311 Corelib.Init.Datatypes <> unit ind
+R6318:6324 Riscv.rv64d_types <> returnM def
+R6326:6327 Corelib.Init.Datatypes <> tt constr
+ax 6579:6590 <> resv_matches
+R6606:6606 Corelib.Numbers.BinNums <> Z ind
+binder 6602:6602 <> n:4
+R6617:6620 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6610:6614 SailStdpp.Values <> mword def
+R6616:6616 Riscv.xv6iris_extras <> n:4 var
+R6621:6624 Corelib.Init.Datatypes <> bool ind
+ax 6637:6649 <> resv_is_valid
+R6653:6656 Corelib.Init.Datatypes <> bool ind
+def 6671:6687 <> match_reservation
+binder 6690:6690 <> n:9
+R6701:6705 SailStdpp.Values <> mword def
+R6707:6707 Riscv.xv6iris_extras <> n:9 var
+binder 6694:6697 <> addr:10
+R6712:6715 Corelib.Init.Datatypes <> bool ind
+R6720:6731 Riscv.xv6iris_extras <> resv_matches defax
+R6733:6733 Riscv.xv6iris_extras <> n:9 var
+R6735:6738 Riscv.xv6iris_extras <> addr:10 var
+def 6753:6769 <> valid_reservation
+R6776:6779 Corelib.Init.Datatypes <> unit ind
+R6784:6787 Corelib.Init.Datatypes <> bool ind
+R6792:6804 Riscv.xv6iris_extras <> resv_is_valid defax
+def 7057:7071 <> plat_term_write
+R7078:7082 SailStdpp.Values <> mword def
+R7089:7089 Riscv.rv64d_types <> M def
+R7091:7094 Corelib.Init.Datatypes <> unit ind
+R7101:7107 Riscv.rv64d_types <> returnM def
+R7109:7110 Corelib.Init.Datatypes <> tt constr

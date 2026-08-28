@@ -1,0 +1,286 @@
+DIGEST 73f2e93df72019652dfe48c5a39bd07d
+Fxv6iris.RegFile
+R1645:1650 Stdlib.ZArith.ZArith <> <> lib
+R1652:1675 Stdlib.Logic.FunctionalExtensionality <> <> lib
+R1704:1707 stdpp.gmap <> <> lib
+R1709:1714 stdpp.finite <> <> lib
+R1716:1736 stdpp.bitvector.definitions <> <> lib
+R1738:1754 stdpp.bitvector.tactics <> <> lib
+R1792:1800 iris.proofmode.proofmode <> <> lib
+R1818:1831 SailStdpp.Base <> <> lib
+R1833:1848 SailStdpp.Values <> <> lib
+R1850:1870 SailStdpp.MachineWord <> <> lib
+R1872:1897 SailStdpp.Operators_mwords <> <> lib
+R1915:1931 Riscv.rv64d_types <> <> lib
+def 2192:2198 <> regfile
+R2209:2212 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2203:2208 Riscv.rv64d_types <> regidx ind
+R2213:2217 SailStdpp.Values <> mword def
+def 3000:3005 <> rf_upd
+R3012:3018 xv6iris.RegFile <> regfile def
+binder 3008:3008 <> f:1
+R3026:3031 Riscv.rv64d_types <> regidx ind
+binder 3022:3022 <> k:2
+R3039:3043 SailStdpp.Values <> mword def
+binder 3035:3035 <> v:3
+R3051:3057 xv6iris.RegFile <> regfile def
+binder 3068:3068 <> j:4
+R3073:3075 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3095:3100 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3102:3107 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3108:3108 xv6iris.RegFile <> f:1 var
+R3110:3110 xv6iris.RegFile <> j:4 var
+R3101:3101 xv6iris.RegFile <> v:3 var
+R3076:3086 stdpp.decidable <> bool_decide def
+R3090:3092 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3089:3089 xv6iris.RegFile <> j:4 var
+R3093:3093 xv6iris.RegFile <> k:2 var
+inst 3130:3143 <> regfile_insert
+R3147:3152 stdpp.base <> Insert class
+R3172:3178 xv6iris.RegFile <> regfile def
+R3162:3166 SailStdpp.Values <> mword def
+R3154:3159 Riscv.rv64d_types <> regidx ind
+binder 3189:3189 <> k:5
+binder 3191:3191 <> v:6
+binder 3193:3193 <> f:7
+R3198:3203 xv6iris.RegFile <> rf_upd def
+R3205:3205 xv6iris.RegFile <> f:7 var
+R3207:3207 xv6iris.RegFile <> k:5 var
+R3209:3209 xv6iris.RegFile <> v:6 var
+inst 3228:3247 <> regfile_lookup_total
+R3251:3261 stdpp.base <> LookupTotal class
+R3281:3287 xv6iris.RegFile <> regfile def
+R3271:3275 SailStdpp.Values <> mword def
+R3263:3268 Riscv.rv64d_types <> regidx ind
+binder 3298:3298 <> k:8
+binder 3300:3300 <> f:9
+R3305:3305 xv6iris.RegFile <> f:9 var
+R3307:3307 xv6iris.RegFile <> k:8 var
+prf 3317:3325 <> rf_lookup
+R3332:3338 xv6iris.RegFile <> regfile def
+binder 3328:3328 <> f:10
+R3346:3351 Riscv.rv64d_types <> regidx ind
+binder 3342:3342 <> k:11
+R3363:3365 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3357:3361 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R3362:3362 xv6iris.RegFile <> k:11 var
+R3356:3356 xv6iris.RegFile <> f:10 var
+R3366:3366 xv6iris.RegFile <> f:10 var
+R3368:3368 xv6iris.RegFile <> k:11 var
+prf 3403:3408 <> upd_eq
+R3415:3421 xv6iris.RegFile <> regfile def
+binder 3411:3411 <> f:12
+R3429:3434 Riscv.rv64d_types <> regidx ind
+binder 3425:3425 <> k:13
+R3442:3446 SailStdpp.Values <> mword def
+binder 3438:3438 <> v:14
+R3474:3476 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3454:3454 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R3467:3472 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R3473:3473 xv6iris.RegFile <> k:13 var
+R3455:3456 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3458:3461 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3463:3466 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3457:3457 xv6iris.RegFile <> k:13 var
+R3462:3462 xv6iris.RegFile <> v:14 var
+R3466:3466 xv6iris.RegFile <> f:12 var
+R3477:3477 xv6iris.RegFile <> v:14 var
+R3496:3507 stdpp.base <> lookup_total def
+R3510:3529 xv6iris.RegFile <> regfile_lookup_total inst
+R3532:3537 stdpp.base <> insert def
+R3540:3553 xv6iris.RegFile <> regfile_insert inst
+R3556:3561 xv6iris.RegFile <> rf_upd def
+R3574:3594 stdpp.decidable <> bool_decide_eq_true_2 thm
+R3574:3594 stdpp.decidable <> bool_decide_eq_true_2 thm
+R3574:3594 stdpp.decidable <> bool_decide_eq_true_2 thm
+prf 3612:3617 <> upd_ne
+R3624:3630 xv6iris.RegFile <> regfile def
+binder 3620:3620 <> f:15
+R3640:3645 Riscv.rv64d_types <> regidx ind
+binder 3634:3634 <> k:16
+binder 3636:3636 <> j:17
+R3653:3657 SailStdpp.Values <> mword def
+binder 3649:3649 <> v:18
+R3673:3676 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3668:3671 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R3667:3667 xv6iris.RegFile <> j:17 var
+R3672:3672 xv6iris.RegFile <> k:16 var
+R3697:3699 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3677:3677 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R3690:3695 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R3696:3696 xv6iris.RegFile <> j:17 var
+R3678:3679 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3681:3684 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3686:3689 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3680:3680 xv6iris.RegFile <> k:16 var
+R3685:3685 xv6iris.RegFile <> v:18 var
+R3689:3689 xv6iris.RegFile <> f:15 var
+R3701:3705 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R3706:3706 xv6iris.RegFile <> j:17 var
+R3700:3700 xv6iris.RegFile <> f:15 var
+R3733:3744 stdpp.base <> lookup_total def
+R3747:3766 xv6iris.RegFile <> regfile_lookup_total inst
+R3769:3774 stdpp.base <> insert def
+R3777:3790 xv6iris.RegFile <> regfile_insert inst
+R3793:3798 xv6iris.RegFile <> rf_upd def
+R3811:3832 stdpp.decidable <> bool_decide_eq_false_2 thm
+R3811:3832 stdpp.decidable <> bool_decide_eq_false_2 thm
+R3811:3832 stdpp.decidable <> bool_decide_eq_false_2 thm
+prf 3890:3896 <> upd_upd
+R3903:3909 xv6iris.RegFile <> regfile def
+binder 3899:3899 <> f:19
+R3917:3922 Riscv.rv64d_types <> regidx ind
+binder 3913:3913 <> k:20
+R3932:3936 SailStdpp.Values <> mword def
+binder 3926:3926 <> a:21
+binder 3928:3928 <> b:22
+R3971:3973 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3946:3947 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3949:3952 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3954:3970 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3948:3948 xv6iris.RegFile <> k:20 var
+R3953:3953 xv6iris.RegFile <> a:21 var
+R3958:3959 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3961:3964 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3966:3969 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3960:3960 xv6iris.RegFile <> k:20 var
+R3965:3965 xv6iris.RegFile <> b:22 var
+R3969:3969 xv6iris.RegFile <> f:19 var
+R3974:3975 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3977:3980 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3982:3985 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3976:3976 xv6iris.RegFile <> k:20 var
+R3981:3981 xv6iris.RegFile <> a:21 var
+R3985:3985 xv6iris.RegFile <> f:19 var
+R4003:4027 Stdlib.Logic.FunctionalExtensionality <> functional_extensionality thm
+R4003:4027 Stdlib.Logic.FunctionalExtensionality <> functional_extensionality thm
+R4048:4053 stdpp.base <> insert def
+R4056:4069 xv6iris.RegFile <> regfile_insert inst
+R4072:4077 xv6iris.RegFile <> rf_upd def
+R4093:4103 stdpp.decidable <> bool_decide def
+R4107:4109 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4093:4103 stdpp.decidable <> bool_decide def
+R4107:4109 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+inst 4365:4377 <> regidx_finite
+R4381:4386 stdpp.finite <> Finite class
+R4388:4393 Riscv.rv64d_types <> regidx ind
+R4403:4406 stdpp.finite <> enum meth
+R4403:4406 stdpp.finite <> enum meth
+R4403:4406 stdpp.finite <> enum meth
+R4417:4421 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R4411:4416 Riscv.rv64d_types <> Regidx constr
+R4422:4425 stdpp.finite <> enum meth
+R4428:4429 stdpp.bitvector.definitions <> bv rec
+R4463:4474 stdpp.list_monad <> NoDup_fmap_2 thm
+R4512:4521 stdpp.finite <> NoDup_enum meth
+R4463:4474 stdpp.list_monad <> NoDup_fmap_2 thm
+R4512:4521 stdpp.finite <> NoDup_enum meth
+R4567:4583 stdpp.list_monad <> elem_of_list_fmap thm
+R4567:4583 stdpp.list_monad <> elem_of_list_fmap thm
+R4617:4628 stdpp.finite <> elem_of_enum meth
+R4617:4628 stdpp.finite <> elem_of_enum meth
+def 4869:4878 <> rf_to_gmap
+R4885:4891 xv6iris.RegFile <> regfile def
+binder 4881:4881 <> f:23
+R4896:4899 stdpp.gmap <> gmap rec
+R4909:4913 SailStdpp.Values <> mword def
+R4901:4906 Riscv.rv64d_types <> regidx ind
+R4924:4934 stdpp.fin_maps <> list_to_map def
+R4937:4937 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R4955:4960 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+binder 4942:4942 <> r:24
+R4947:4947 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4949:4950 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4954:4954 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4948:4948 xv6iris.RegFile <> r:24 var
+R4951:4951 xv6iris.RegFile <> f:23 var
+R4953:4953 xv6iris.RegFile <> r:24 var
+R4961:4964 stdpp.finite <> enum meth
+R4966:4971 Riscv.rv64d_types <> regidx ind
+prf 4982:4998 <> rf_to_gmap_lookup
+R5005:5011 xv6iris.RegFile <> regfile def
+binder 5001:5001 <> f:25
+R5019:5024 Riscv.rv64d_types <> regidx ind
+binder 5015:5015 <> r:26
+R5046:5048 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5041:5044 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5045:5045 xv6iris.RegFile <> r:26 var
+R5029:5038 xv6iris.RegFile <> rf_to_gmap def
+R5040:5040 xv6iris.RegFile <> f:25 var
+R5049:5052 Corelib.Init.Datatypes <> Some constr
+R5055:5055 xv6iris.RegFile <> f:25 var
+R5057:5057 xv6iris.RegFile <> r:26 var
+R5077:5086 xv6iris.RegFile <> rf_to_gmap def
+R5095:5115 stdpp.fin_maps <> elem_of_list_to_map_1 thm
+R5095:5115 stdpp.fin_maps <> elem_of_list_to_map_1 thm
+R5131:5147 stdpp.list_monad <> list_fmap_compose thm
+R5131:5147 stdpp.list_monad <> list_fmap_compose thm
+R5131:5147 stdpp.list_monad <> list_fmap_compose thm
+R5156:5174 stdpp.list_monad <> NoDup_fmap_2_strong thm
+R5186:5195 stdpp.finite <> NoDup_enum meth
+R5156:5174 stdpp.list_monad <> NoDup_fmap_2_strong thm
+R5186:5195 stdpp.finite <> NoDup_enum meth
+R5238:5254 stdpp.list_monad <> elem_of_list_fmap thm
+R5238:5254 stdpp.list_monad <> elem_of_list_fmap thm
+R5288:5299 stdpp.finite <> elem_of_enum meth
+R5288:5299 stdpp.finite <> elem_of_enum meth
+prf 5315:5328 <> rf_to_gmap_dom
+R5335:5341 xv6iris.RegFile <> regfile def
+binder 5331:5331 <> f:27
+R5349:5354 Riscv.rv64d_types <> regidx ind
+binder 5345:5345 <> r:28
+R5360:5364 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5359:5359 xv6iris.RegFile <> r:28 var
+R5365:5367 stdpp.base <> dom def
+R5370:5379 xv6iris.RegFile <> rf_to_gmap def
+R5381:5381 xv6iris.RegFile <> f:27 var
+R5398:5408 stdpp.fin_map_dom <> elem_of_dom meth
+R5398:5408 stdpp.fin_map_dom <> elem_of_dom meth
+R5419:5435 xv6iris.RegFile <> rf_to_gmap_lookup thm
+R5419:5435 xv6iris.RegFile <> rf_to_gmap_lookup thm
+R5419:5435 xv6iris.RegFile <> rf_to_gmap_lookup thm
+prf 5457:5470 <> rf_to_gmap_upd
+R5477:5483 xv6iris.RegFile <> regfile def
+binder 5473:5473 <> f:29
+R5491:5496 Riscv.rv64d_types <> regidx ind
+binder 5487:5487 <> k:30
+R5504:5508 SailStdpp.Values <> mword def
+binder 5500:5500 <> v:31
+R5543:5545 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5518:5527 xv6iris.RegFile <> rf_to_gmap def
+R5530:5531 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5533:5536 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5538:5541 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5532:5532 xv6iris.RegFile <> k:30 var
+R5537:5537 xv6iris.RegFile <> v:31 var
+R5541:5541 xv6iris.RegFile <> f:29 var
+R5546:5547 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5549:5552 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5554:5570 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5548:5548 xv6iris.RegFile <> k:30 var
+R5553:5553 xv6iris.RegFile <> v:31 var
+R5558:5567 xv6iris.RegFile <> rf_to_gmap def
+R5569:5569 xv6iris.RegFile <> f:29 var
+R5588:5593 stdpp.fin_maps <> map_eq meth
+R5588:5593 stdpp.fin_maps <> map_eq meth
+R5613:5629 xv6iris.RegFile <> rf_to_gmap_lookup thm
+R5613:5629 xv6iris.RegFile <> rf_to_gmap_lookup thm
+R5613:5629 xv6iris.RegFile <> rf_to_gmap_lookup thm
+R5644:5649 stdpp.base <> decide def
+R5653:5655 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5644:5649 stdpp.base <> decide def
+R5653:5655 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5685:5697 stdpp.fin_maps <> lookup_insert thm
+R5685:5697 stdpp.fin_maps <> lookup_insert thm
+R5685:5697 stdpp.fin_maps <> lookup_insert thm
+R5715:5720 xv6iris.RegFile <> upd_eq thm
+R5715:5720 xv6iris.RegFile <> upd_eq thm
+R5735:5750 stdpp.fin_maps <> lookup_insert_ne thm
+R5755:5771 xv6iris.RegFile <> rf_to_gmap_lookup thm
+R5735:5750 stdpp.fin_maps <> lookup_insert_ne thm
+R5735:5750 stdpp.fin_maps <> lookup_insert_ne thm
+R5755:5771 xv6iris.RegFile <> rf_to_gmap_lookup thm
+R5755:5771 xv6iris.RegFile <> rf_to_gmap_lookup thm
+R5792:5797 xv6iris.RegFile <> upd_ne thm
+R5792:5797 xv6iris.RegFile <> upd_ne thm
+R6576:6584 xv6iris.RegFile <> rf_lookup thm

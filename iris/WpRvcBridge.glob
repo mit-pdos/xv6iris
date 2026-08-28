@@ -1,0 +1,1467 @@
+DIGEST ece6afd4e42b16a66c2009ac1414d4ed
+Fxv6iris.WpRvcBridge
+R1244:1249 Stdlib.ZArith.ZArith <> <> lib
+R1278:1298 stdpp.bitvector.definitions <> <> lib
+R1336:1344 iris.proofmode.proofmode <> <> lib
+R1362:1387 SailStdpp.Operators_mwords <> <> lib
+R1405:1421 Riscv.rv64d_types <> <> lib
+R1423:1433 Riscv.rv64d <> <> lib
+R1451:1464 SailStdpp.Base <> <> lib
+R1482:1490 xv6iris.RiscvLang <> <> lib
+R1492:1500 xv6iris.RiscvExec <> <> lib
+R1502:1515 xv6iris.RiscvFetchExec <> <> lib
+R1551:1554 Riscv.rv64d_types Defs <> mod
+def 1625:1626 <> ro
+binder 1629:1629 <> T:1
+R1637:1637 Riscv.rv64d_types <> M def
+R1639:1639 xv6iris.WpRvcBridge <> T:1 var
+binder 1633:1633 <> m:2
+R1652:1658 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R1665:1666 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 1659:1659 <> s:3
+binder 1661:1661 <> v:4
+binder 1663:1664 <> s':5
+R1690:1693 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1675:1677 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1667:1670 xv6iris.RiscvExec <> exec def
+R1674:1674 xv6iris.WpRvcBridge <> s:3 var
+R1672:1672 xv6iris.WpRvcBridge <> m:2 var
+R1678:1681 Corelib.Init.Datatypes <> Some constr
+R1683:1683 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1685:1686 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1689:1689 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1684:1684 xv6iris.WpRvcBridge <> v:4 var
+R1687:1688 xv6iris.WpRvcBridge <> s':5 var
+R1696:1698 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1694:1695 xv6iris.WpRvcBridge <> s':5 var
+R1699:1699 xv6iris.WpRvcBridge <> s:3 var
+prf 1709:1718 <> ro_returnM
+binder 1721:1721 <> T:6
+R1729:1729 xv6iris.WpRvcBridge <> T:6 var
+binder 1725:1725 <> x:7
+R1734:1735 xv6iris.WpRvcBridge <> ro def
+R1738:1744 Riscv.rv64d_types <> returnM def
+R1746:1746 xv6iris.WpRvcBridge <> x:7 var
+R1782:1793 xv6iris.RiscvExec <> exec_returnm thm
+R1782:1793 xv6iris.RiscvExec <> exec_returnm thm
+R1782:1793 xv6iris.RiscvExec <> exec_returnm thm
+prf 1838:1848 <> ro_read_reg
+R1855:1862 Riscv.rv64d_types <> register variant
+binder 1851:1851 <> r:8
+R1867:1868 xv6iris.WpRvcBridge <> ro def
+R1889:1889 Riscv.rv64d_types <> M def
+R1871:1883 Riscv.rv64d_types Defs read_reg def
+R1885:1885 xv6iris.WpRvcBridge <> r:8 var
+R1927:1939 xv6iris.RiscvExec <> exec_read_reg thm
+R1927:1939 xv6iris.RiscvExec <> exec_read_reg thm
+R1927:1939 xv6iris.RiscvExec <> exec_read_reg thm
+prf 1984:1990 <> ro_bind
+binder 1993:1993 <> T:9
+binder 1995:1995 <> U:10
+R2003:2003 Riscv.rv64d_types <> M def
+R2005:2005 xv6iris.WpRvcBridge <> T:9 var
+binder 1999:1999 <> m:11
+R2014:2017 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2013:2013 xv6iris.WpRvcBridge <> T:9 var
+R2018:2018 Riscv.rv64d_types <> M def
+R2020:2020 xv6iris.WpRvcBridge <> U:10 var
+binder 2009:2009 <> k:12
+R2031:2034 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2027:2028 xv6iris.WpRvcBridge <> ro def
+R2030:2030 xv6iris.WpRvcBridge <> m:11 var
+R2035:2035 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2054:2058 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2036:2042 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2044:2045 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 2043:2043 <> a:13
+R2046:2047 xv6iris.WpRvcBridge <> ro def
+R2050:2050 xv6iris.WpRvcBridge <> k:12 var
+R2052:2052 xv6iris.WpRvcBridge <> a:13 var
+R2059:2060 xv6iris.WpRvcBridge <> ro def
+R2063:2071 Riscv.rv64d_types Defs bind def
+R2075:2075 xv6iris.WpRvcBridge <> k:12 var
+R2073:2073 xv6iris.WpRvcBridge <> m:11 var
+R2117:2125 xv6iris.RiscvExec <> exec_bind thm
+R2117:2125 xv6iris.RiscvExec <> exec_bind thm
+R2117:2125 xv6iris.RiscvExec <> exec_bind thm
+R2145:2148 xv6iris.RiscvExec <> exec def
+R2145:2148 xv6iris.RiscvExec <> exec def
+prf 2277:2288 <> ro_and_boolM
+R2297:2297 Riscv.rv64d_types <> M def
+R2299:2302 Corelib.Init.Datatypes <> bool ind
+binder 2291:2291 <> l:14
+binder 2293:2293 <> r:15
+R2311:2314 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2307:2308 xv6iris.WpRvcBridge <> ro def
+R2310:2310 xv6iris.WpRvcBridge <> l:14 var
+R2319:2322 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2315:2316 xv6iris.WpRvcBridge <> ro def
+R2318:2318 xv6iris.WpRvcBridge <> r:15 var
+R2323:2324 xv6iris.WpRvcBridge <> ro def
+R2327:2335 Riscv.rv64d_types Defs and_boolM def
+R2339:2339 xv6iris.WpRvcBridge <> r:15 var
+R2337:2337 xv6iris.WpRvcBridge <> l:14 var
+R2371:2379 Riscv.rv64d_types Defs and_boolM def
+R2388:2394 xv6iris.WpRvcBridge <> ro_bind thm
+R2445:2454 xv6iris.WpRvcBridge <> ro_returnM thm
+R2388:2394 xv6iris.WpRvcBridge <> ro_bind thm
+R2445:2454 xv6iris.WpRvcBridge <> ro_returnM thm
+prf 2470:2480 <> ro_or_boolM
+R2489:2489 Riscv.rv64d_types <> M def
+R2491:2494 Corelib.Init.Datatypes <> bool ind
+binder 2483:2483 <> l:16
+binder 2485:2485 <> r:17
+R2503:2506 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2499:2500 xv6iris.WpRvcBridge <> ro def
+R2502:2502 xv6iris.WpRvcBridge <> l:16 var
+R2511:2514 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2507:2508 xv6iris.WpRvcBridge <> ro def
+R2510:2510 xv6iris.WpRvcBridge <> r:17 var
+R2515:2516 xv6iris.WpRvcBridge <> ro def
+R2519:2526 Riscv.rv64d_types Defs or_boolM def
+R2530:2530 xv6iris.WpRvcBridge <> r:17 var
+R2528:2528 xv6iris.WpRvcBridge <> l:16 var
+R2562:2569 Riscv.rv64d_types Defs or_boolM def
+R2578:2584 xv6iris.WpRvcBridge <> ro_bind thm
+R2626:2635 xv6iris.WpRvcBridge <> ro_returnM thm
+R2578:2584 xv6iris.WpRvcBridge <> ro_bind thm
+R2626:2635 xv6iris.WpRvcBridge <> ro_returnM thm
+prf 2660:2673 <> ro_assert_exp'
+R2680:2683 Corelib.Init.Datatypes <> bool ind
+binder 2676:2676 <> b:18
+R2693:2698 Stdlib.Strings.String <> string ind
+binder 2687:2689 <> msg:19
+R2703:2704 xv6iris.WpRvcBridge <> ro def
+R2707:2717 Riscv.rv64d_types Defs assert_exp' def
+R2721:2723 xv6iris.WpRvcBridge <> msg:19 var
+R2719:2719 xv6iris.WpRvcBridge <> b:18 var
+prf 2827:2831 <> ro_if
+binder 2834:2834 <> T:20
+R2840:2843 Corelib.Init.Datatypes <> bool ind
+binder 2838:2838 <> b:21
+R2853:2853 Riscv.rv64d_types <> M def
+R2855:2855 xv6iris.WpRvcBridge <> T:20 var
+binder 2847:2847 <> x:22
+binder 2849:2849 <> y:23
+R2864:2867 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2860:2861 xv6iris.WpRvcBridge <> ro def
+R2863:2863 xv6iris.WpRvcBridge <> x:22 var
+R2872:2875 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2868:2869 xv6iris.WpRvcBridge <> ro def
+R2871:2871 xv6iris.WpRvcBridge <> y:23 var
+R2876:2877 xv6iris.WpRvcBridge <> ro def
+R2880:2882 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2884:2889 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2891:2896 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2897:2897 xv6iris.WpRvcBridge <> y:23 var
+R2890:2890 xv6iris.WpRvcBridge <> x:22 var
+R2883:2883 xv6iris.WpRvcBridge <> b:21 var
+prf 2957:2963 <> ro_exit
+binder 2966:2966 <> T:24
+R2974:2977 Corelib.Init.Datatypes <> unit ind
+binder 2970:2970 <> x:25
+R2982:2983 xv6iris.WpRvcBridge <> ro def
+R2995:2995 Riscv.rv64d_types <> M def
+R2997:2997 xv6iris.WpRvcBridge <> T:24 var
+R2986:2989 Riscv.rv64d_types Defs exit def
+R2991:2991 xv6iris.WpRvcBridge <> x:25 var
+prf 3060:3074 <> ro_read_senvcfg
+R3078:3079 xv6iris.WpRvcBridge <> ro def
+R3082:3093 Riscv.rv64d <> read_senvcfg def
+R3095:3096 Corelib.Init.Datatypes <> tt constr
+R3114:3125 Riscv.rv64d <> read_senvcfg def
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3173:3183 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3191:3200 xv6iris.WpRvcBridge <> ro_returnM thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3173:3183 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3191:3200 xv6iris.WpRvcBridge <> ro_returnM thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3173:3183 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3191:3200 xv6iris.WpRvcBridge <> ro_returnM thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3173:3183 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3191:3200 xv6iris.WpRvcBridge <> ro_returnM thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3173:3183 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3191:3200 xv6iris.WpRvcBridge <> ro_returnM thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3173:3183 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3191:3200 xv6iris.WpRvcBridge <> ro_returnM thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3173:3183 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3191:3200 xv6iris.WpRvcBridge <> ro_returnM thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3173:3183 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3191:3200 xv6iris.WpRvcBridge <> ro_returnM thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3173:3183 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3191:3200 xv6iris.WpRvcBridge <> ro_returnM thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3173:3183 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3191:3200 xv6iris.WpRvcBridge <> ro_returnM thm
+R3159:3165 xv6iris.WpRvcBridge <> ro_bind thm
+R3173:3183 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3191:3200 xv6iris.WpRvcBridge <> ro_returnM thm
+prf 3221:3237 <> ro_internal_error
+binder 3240:3240 <> T:26
+binder 3243:3243 <> f:27
+binder 3245:3245 <> l:28
+binder 3247:3247 <> m:29
+R3251:3252 xv6iris.WpRvcBridge <> ro def
+R3255:3268 Riscv.rv64d <> internal_error def
+R3281:3281 xv6iris.WpRvcBridge <> m:29 var
+R3279:3279 xv6iris.WpRvcBridge <> l:28 var
+R3277:3277 xv6iris.WpRvcBridge <> f:27 var
+R3274:3274 xv6iris.WpRvcBridge <> T:26 var
+prf 3415:3433 <> ro_rec_hartSupports
+R3437:3443 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3469:3470 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 3444:3444 <> k:30
+R3453:3455 Corelib.Init.Wf <> Acc ind
+R3465:3465 xv6iris.WpRvcBridge <> k:30 var
+R3458:3460 Stdlib.ZArith.Zwf <> Zwf def
+binder 3447:3449 <> acc:31
+binder 3468:3468 <> e:32
+R3471:3472 xv6iris.WpRvcBridge <> ro def
+R3475:3491 Riscv.rv64d <> _rec_hartSupports def
+R3493:3493 xv6iris.WpRvcBridge <> e:32 var
+R3495:3495 xv6iris.WpRvcBridge <> k:30 var
+R3497:3499 xv6iris.WpRvcBridge <> acc:31 var
+R3540:3555 Corelib.Init.Wf <> well_founded_ind thm
+binder 3594:3594 <> k:33
+R3599:3606 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3629:3630 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3613:3615 Corelib.Init.Wf <> Acc ind
+R3625:3625 xv6iris.WpRvcBridge <> k:33 var
+R3618:3620 Stdlib.ZArith.Zwf <> Zwf def
+binder 3607:3609 <> acc:34
+binder 3628:3628 <> e:35
+R3631:3632 xv6iris.WpRvcBridge <> ro def
+R3635:3651 Riscv.rv64d <> _rec_hartSupports def
+R3653:3653 xv6iris.WpRvcBridge <> e:35 var
+R3655:3655 xv6iris.WpRvcBridge <> k:33 var
+R3657:3659 xv6iris.WpRvcBridge <> acc:34 var
+R3558:3573 Stdlib.ZArith.Zwf <> Zwf_well_founded thm
+R3540:3555 Corelib.Init.Wf <> well_founded_ind thm
+binder 3594:3594 <> k:36
+R3599:3606 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3629:3630 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3613:3615 Corelib.Init.Wf <> Acc ind
+R3625:3625 xv6iris.WpRvcBridge <> k:36 var
+R3618:3620 Stdlib.ZArith.Zwf <> Zwf def
+binder 3607:3609 <> acc:37
+binder 3628:3628 <> e:38
+R3631:3632 xv6iris.WpRvcBridge <> ro def
+R3635:3651 Riscv.rv64d <> _rec_hartSupports def
+R3653:3653 xv6iris.WpRvcBridge <> e:38 var
+R3655:3655 xv6iris.WpRvcBridge <> k:36 var
+R3657:3659 xv6iris.WpRvcBridge <> acc:37 var
+R3558:3573 Stdlib.ZArith.Zwf <> Zwf_well_founded thm
+R3705:3721 Riscv.rv64d <> _rec_hartSupports def
+R3733:3739 xv6iris.WpRvcBridge <> ro_bind thm
+R3749:3762 xv6iris.WpRvcBridge <> ro_assert_exp' thm
+R3789:3793 Corelib.Init.Logic <> proj1 thm
+R3796:3803 Stdlib.ZArith.BinInt Z geb_le thm
+R3733:3739 xv6iris.WpRvcBridge <> ro_bind thm
+R3749:3762 xv6iris.WpRvcBridge <> ro_assert_exp' thm
+R3789:3793 Corelib.Init.Logic <> proj1 thm
+R3796:3803 Stdlib.ZArith.BinInt Z geb_le thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R4002:4004 Stdlib.ZArith.Zwf <> Zwf def
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+R3868:3877 xv6iris.WpRvcBridge <> ro_returnM thm
+R3887:3898 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R3908:3918 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R3934:3940 xv6iris.WpRvcBridge <> ro_bind thm
+R3950:3960 xv6iris.WpRvcBridge <> ro_read_reg thm
+R3970:3974 xv6iris.WpRvcBridge <> ro_if thm
+prf 4034:4048 <> ro_hartSupports
+binder 4050:4050 <> e:39
+R4054:4055 xv6iris.WpRvcBridge <> ro def
+R4058:4069 Riscv.rv64d <> hartSupports def
+R4071:4071 xv6iris.WpRvcBridge <> e:39 var
+R4089:4100 Riscv.rv64d <> hartSupports def
+R4109:4127 xv6iris.WpRvcBridge <> ro_rec_hartSupports thm
+R4109:4127 xv6iris.WpRvcBridge <> ro_rec_hartSupports thm
+R4183:4192 xv6iris.WpRvcBridge <> ro_returnM thm
+R4202:4212 xv6iris.WpRvcBridge <> ro_read_reg thm
+R4222:4235 xv6iris.WpRvcBridge <> ro_assert_exp' thm
+R4249:4263 xv6iris.WpRvcBridge <> ro_hartSupports thm
+R4273:4287 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R4297:4313 xv6iris.WpRvcBridge <> ro_internal_error thm
+R4327:4333 xv6iris.WpRvcBridge <> ro_exit thm
+R4347:4358 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R4368:4378 xv6iris.WpRvcBridge <> ro_or_boolM thm
+R4388:4392 xv6iris.WpRvcBridge <> ro_if thm
+R4402:4408 xv6iris.WpRvcBridge <> ro_bind thm
+R4524:4526 Corelib.Init.Wf <> Acc ind
+R4524:4526 Corelib.Init.Wf <> Acc ind
+R4561:4581 Riscv.rv64d <> _rec_currentlyEnabled def
+prf 4929:4943 <> ro_rec_cE_Zicsr
+binder 4945:4945 <> k:40
+binder 4947:4949 <> acc:41
+R4953:4954 xv6iris.WpRvcBridge <> ro def
+R4957:4977 Riscv.rv64d <> _rec_currentlyEnabled def
+R4979:4987 Riscv.rv64d_types <> Ext_Zicsr constr
+R4989:4989 xv6iris.WpRvcBridge <> k:40 var
+R4991:4993 xv6iris.WpRvcBridge <> acc:41 var
+prf 5041:5051 <> ro_rec_cE_C
+binder 5053:5053 <> k:42
+binder 5055:5057 <> acc:43
+R5061:5062 xv6iris.WpRvcBridge <> ro def
+R5065:5085 Riscv.rv64d <> _rec_currentlyEnabled def
+R5087:5091 Riscv.rv64d_types <> Ext_C constr
+R5093:5093 xv6iris.WpRvcBridge <> k:42 var
+R5095:5097 xv6iris.WpRvcBridge <> acc:43 var
+prf 5145:5155 <> ro_rec_cE_M
+binder 5157:5157 <> k:44
+binder 5159:5161 <> acc:45
+R5165:5166 xv6iris.WpRvcBridge <> ro def
+R5169:5189 Riscv.rv64d <> _rec_currentlyEnabled def
+R5191:5195 Riscv.rv64d_types <> Ext_M constr
+R5197:5197 xv6iris.WpRvcBridge <> k:44 var
+R5199:5201 xv6iris.WpRvcBridge <> acc:45 var
+prf 5249:5259 <> ro_rec_cE_B
+binder 5261:5261 <> k:46
+binder 5263:5265 <> acc:47
+R5269:5270 xv6iris.WpRvcBridge <> ro def
+R5273:5293 Riscv.rv64d <> _rec_currentlyEnabled def
+R5295:5299 Riscv.rv64d_types <> Ext_B constr
+R5301:5301 xv6iris.WpRvcBridge <> k:46 var
+R5303:5305 xv6iris.WpRvcBridge <> acc:47 var
+prf 5353:5363 <> ro_rec_cE_A
+binder 5365:5365 <> k:48
+binder 5367:5369 <> acc:49
+R5373:5374 xv6iris.WpRvcBridge <> ro def
+R5377:5397 Riscv.rv64d <> _rec_currentlyEnabled def
+R5399:5403 Riscv.rv64d_types <> Ext_A constr
+R5405:5405 xv6iris.WpRvcBridge <> k:48 var
+R5407:5409 xv6iris.WpRvcBridge <> acc:49 var
+prf 5457:5471 <> ro_rec_cE_Zimop
+binder 5473:5473 <> k:50
+binder 5475:5477 <> acc:51
+R5481:5482 xv6iris.WpRvcBridge <> ro def
+R5485:5505 Riscv.rv64d <> _rec_currentlyEnabled def
+R5507:5515 Riscv.rv64d_types <> Ext_Zimop constr
+R5517:5517 xv6iris.WpRvcBridge <> k:50 var
+R5519:5521 xv6iris.WpRvcBridge <> acc:51 var
+prf 5569:5579 <> ro_rec_cE_U
+binder 5581:5581 <> k:52
+binder 5583:5585 <> acc:53
+R5589:5590 xv6iris.WpRvcBridge <> ro def
+R5593:5613 Riscv.rv64d <> _rec_currentlyEnabled def
+R5615:5619 Riscv.rv64d_types <> Ext_U constr
+R5621:5621 xv6iris.WpRvcBridge <> k:52 var
+R5623:5625 xv6iris.WpRvcBridge <> acc:53 var
+R5661:5675 xv6iris.WpRvcBridge <> ro_rec_cE_Zicsr thm
+R5661:5675 xv6iris.WpRvcBridge <> ro_rec_cE_Zicsr thm
+R5661:5675 xv6iris.WpRvcBridge <> ro_rec_cE_Zicsr thm
+R5661:5675 xv6iris.WpRvcBridge <> ro_rec_cE_Zicsr thm
+R5661:5675 xv6iris.WpRvcBridge <> ro_rec_cE_Zicsr thm
+prf 5690:5700 <> ro_rec_cE_S
+binder 5702:5702 <> k:54
+binder 5704:5706 <> acc:55
+R5710:5711 xv6iris.WpRvcBridge <> ro def
+R5714:5734 Riscv.rv64d <> _rec_currentlyEnabled def
+R5736:5740 Riscv.rv64d_types <> Ext_S constr
+R5742:5742 xv6iris.WpRvcBridge <> k:54 var
+R5744:5746 xv6iris.WpRvcBridge <> acc:55 var
+R5782:5796 xv6iris.WpRvcBridge <> ro_rec_cE_Zicsr thm
+R5782:5796 xv6iris.WpRvcBridge <> ro_rec_cE_Zicsr thm
+R5782:5796 xv6iris.WpRvcBridge <> ro_rec_cE_Zicsr thm
+R5782:5796 xv6iris.WpRvcBridge <> ro_rec_cE_Zicsr thm
+R5782:5796 xv6iris.WpRvcBridge <> ro_rec_cE_Zicsr thm
+prf 5811:5823 <> ro_rec_cE_Zca
+binder 5825:5825 <> k:56
+binder 5827:5829 <> acc:57
+R5833:5834 xv6iris.WpRvcBridge <> ro def
+R5837:5857 Riscv.rv64d <> _rec_currentlyEnabled def
+R5859:5865 Riscv.rv64d_types <> Ext_Zca constr
+R5867:5867 xv6iris.WpRvcBridge <> k:56 var
+R5869:5871 xv6iris.WpRvcBridge <> acc:57 var
+R5907:5917 xv6iris.WpRvcBridge <> ro_rec_cE_C thm
+R5907:5917 xv6iris.WpRvcBridge <> ro_rec_cE_C thm
+R5907:5917 xv6iris.WpRvcBridge <> ro_rec_cE_C thm
+prf 5932:5946 <> ro_rec_cE_Zaamo
+binder 5948:5948 <> k:58
+binder 5950:5952 <> acc:59
+R5956:5957 xv6iris.WpRvcBridge <> ro def
+R5960:5980 Riscv.rv64d <> _rec_currentlyEnabled def
+R5982:5990 Riscv.rv64d_types <> Ext_Zaamo constr
+R5992:5992 xv6iris.WpRvcBridge <> k:58 var
+R5994:5996 xv6iris.WpRvcBridge <> acc:59 var
+R6032:6042 xv6iris.WpRvcBridge <> ro_rec_cE_A thm
+R6032:6042 xv6iris.WpRvcBridge <> ro_rec_cE_A thm
+R6032:6042 xv6iris.WpRvcBridge <> ro_rec_cE_A thm
+R6086:6100 xv6iris.WpRvcBridge <> ro_rec_cE_Zicsr thm
+R6110:6120 xv6iris.WpRvcBridge <> ro_rec_cE_C thm
+R6130:6140 xv6iris.WpRvcBridge <> ro_rec_cE_M thm
+R6152:6162 xv6iris.WpRvcBridge <> ro_rec_cE_B thm
+R6172:6182 xv6iris.WpRvcBridge <> ro_rec_cE_U thm
+R6192:6202 xv6iris.WpRvcBridge <> ro_rec_cE_S thm
+R6212:6224 xv6iris.WpRvcBridge <> ro_rec_cE_Zca thm
+R6236:6246 xv6iris.WpRvcBridge <> ro_rec_cE_A thm
+R6256:6270 xv6iris.WpRvcBridge <> ro_rec_cE_Zimop thm
+R6280:6294 xv6iris.WpRvcBridge <> ro_rec_cE_Zaamo thm
+R6320:6335 Riscv.rv64d <> currentlyEnabled def
+R6348:6363 Riscv.rv64d_types Defs Zwf_guarded def
+R6374:6394 Riscv.rv64d <> _rec_currentlyEnabled def
+prf 6424:6432 <> ro_cE_Zcb
+R6436:6437 xv6iris.WpRvcBridge <> ro def
+R6440:6455 Riscv.rv64d <> currentlyEnabled def
+R6457:6463 Riscv.rv64d_types <> Ext_Zcb constr
+prf 6504:6514 <> ro_cE_Zcmop
+R6518:6519 xv6iris.WpRvcBridge <> ro def
+R6522:6537 Riscv.rv64d <> currentlyEnabled def
+R6539:6547 Riscv.rv64d_types <> Ext_Zcmop constr
+prf 6584:6592 <> ro_cE_Zbb
+R6596:6597 xv6iris.WpRvcBridge <> ro def
+R6600:6615 Riscv.rv64d <> currentlyEnabled def
+R6617:6623 Riscv.rv64d_types <> Ext_Zbb constr
+prf 6664:6676 <> ro_cE_Zicfiss
+R6680:6681 xv6iris.WpRvcBridge <> ro def
+R6684:6699 Riscv.rv64d <> currentlyEnabled def
+R6701:6711 Riscv.rv64d_types <> Ext_Zicfiss constr
+prf 6744:6754 <> ro_cE_Zmmul
+R6758:6759 xv6iris.WpRvcBridge <> ro def
+R6762:6777 Riscv.rv64d <> currentlyEnabled def
+R6779:6787 Riscv.rv64d_types <> Ext_Zmmul constr
+prf 6824:6838 <> ro_cE_Zihintntl
+R6842:6843 xv6iris.WpRvcBridge <> ro def
+R6846:6861 Riscv.rv64d <> currentlyEnabled def
+R6863:6875 Riscv.rv64d_types <> Ext_Zihintntl constr
+prf 6904:6912 <> ro_cE_Zba
+R6916:6917 xv6iris.WpRvcBridge <> ro def
+R6920:6935 Riscv.rv64d <> currentlyEnabled def
+R6937:6943 Riscv.rv64d_types <> Ext_Zba constr
+prf 6984:6990 <> ro_cE_M
+R6994:6995 xv6iris.WpRvcBridge <> ro def
+R6998:7013 Riscv.rv64d <> currentlyEnabled def
+R7015:7019 Riscv.rv64d_types <> Ext_M constr
+prf 7064:7070 <> ro_cE_S
+R7074:7075 xv6iris.WpRvcBridge <> ro def
+R7078:7093 Riscv.rv64d <> currentlyEnabled def
+R7095:7099 Riscv.rv64d_types <> Ext_S constr
+R7117:7132 Riscv.rv64d <> currentlyEnabled def
+R7141:7151 xv6iris.WpRvcBridge <> ro_rec_cE_S thm
+R7141:7151 xv6iris.WpRvcBridge <> ro_rec_cE_S thm
+prf 7166:7180 <> ro_zicfiss_xSSE
+binder 7182:7182 <> p:60
+R7186:7187 xv6iris.WpRvcBridge <> ro def
+R7190:7201 Riscv.rv64d <> zicfiss_xSSE def
+R7203:7203 xv6iris.WpRvcBridge <> p:60 var
+R7223:7234 Riscv.rv64d <> zicfiss_xSSE def
+R7243:7254 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R7264:7270 xv6iris.WpRvcBridge <> ro_cE_S thm
+R7243:7254 xv6iris.WpRvcBridge <> ro_and_boolM thm
+R7264:7270 xv6iris.WpRvcBridge <> ro_cE_S thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+R7326:7332 xv6iris.WpRvcBridge <> ro_bind thm
+R7340:7350 xv6iris.WpRvcBridge <> ro_read_reg thm
+R7358:7372 xv6iris.WpRvcBridge <> ro_read_senvcfg thm
+R7380:7396 xv6iris.WpRvcBridge <> ro_internal_error thm
+R7309:7318 xv6iris.WpRvcBridge <> ro_returnM thm
+prf 7417:7429 <> ro_encdec_reg
+binder 7431:7431 <> w:61
+R7435:7436 xv6iris.WpRvcBridge <> ro def
+R7439:7458 Riscv.rv64d <> encdec_reg_backwards def
+R7460:7460 xv6iris.WpRvcBridge <> w:61 var
+R7478:7497 Riscv.rv64d <> encdec_reg_backwards def
+R7516:7520 xv6iris.WpRvcBridge <> ro_if thm
+R7530:7539 xv6iris.WpRvcBridge <> ro_returnM thm
+R7549:7555 xv6iris.WpRvcBridge <> ro_bind thm
+R7565:7578 xv6iris.WpRvcBridge <> ro_assert_exp' thm
+R7593:7599 xv6iris.WpRvcBridge <> ro_exit thm
+R7516:7520 xv6iris.WpRvcBridge <> ro_if thm
+R7530:7539 xv6iris.WpRvcBridge <> ro_returnM thm
+R7549:7555 xv6iris.WpRvcBridge <> ro_bind thm
+R7565:7578 xv6iris.WpRvcBridge <> ro_assert_exp' thm
+R7593:7599 xv6iris.WpRvcBridge <> ro_exit thm
+prf 7615:7627 <> ro_encdec_ntl
+binder 7629:7629 <> w:62
+R7633:7634 xv6iris.WpRvcBridge <> ro def
+R7637:7656 Riscv.rv64d <> encdec_ntl_backwards def
+R7658:7658 xv6iris.WpRvcBridge <> w:62 var
+R7676:7695 Riscv.rv64d <> encdec_ntl_backwards def
+R7722:7726 xv6iris.WpRvcBridge <> ro_if thm
+R7736:7745 xv6iris.WpRvcBridge <> ro_returnM thm
+R7722:7726 xv6iris.WpRvcBridge <> ro_if thm
+R7736:7745 xv6iris.WpRvcBridge <> ro_returnM thm
+R7722:7726 xv6iris.WpRvcBridge <> ro_if thm
+R7736:7745 xv6iris.WpRvcBridge <> ro_returnM thm
+R7722:7726 xv6iris.WpRvcBridge <> ro_if thm
+R7736:7745 xv6iris.WpRvcBridge <> ro_returnM thm
+R7722:7726 xv6iris.WpRvcBridge <> ro_if thm
+R7736:7745 xv6iris.WpRvcBridge <> ro_returnM thm
+R7722:7726 xv6iris.WpRvcBridge <> ro_if thm
+R7757:7763 xv6iris.WpRvcBridge <> ro_bind thm
+R7773:7786 xv6iris.WpRvcBridge <> ro_assert_exp' thm
+R7801:7807 xv6iris.WpRvcBridge <> ro_exit thm
+R7757:7763 xv6iris.WpRvcBridge <> ro_bind thm
+R7773:7786 xv6iris.WpRvcBridge <> ro_assert_exp' thm
+R7801:7807 xv6iris.WpRvcBridge <> ro_exit thm
+R8095:8096 xv6iris.WpRvcBridge <> ro def
+R8099:8105 Riscv.rv64d_types <> returnM def
+R8095:8096 xv6iris.WpRvcBridge <> ro def
+R8099:8105 Riscv.rv64d_types <> returnM def
+R8137:8138 xv6iris.WpRvcBridge <> ro def
+R8141:8153 Riscv.rv64d_types Defs read_reg def
+R8137:8138 xv6iris.WpRvcBridge <> ro def
+R8141:8153 Riscv.rv64d_types Defs read_reg def
+R8186:8187 xv6iris.WpRvcBridge <> ro def
+R8190:8197 Riscv.rv64d_types Defs read_reg def
+R8186:8187 xv6iris.WpRvcBridge <> ro def
+R8190:8197 Riscv.rv64d_types Defs read_reg def
+R8230:8231 xv6iris.WpRvcBridge <> ro def
+R8234:8244 Riscv.rv64d_types Defs assert_exp' def
+R8230:8231 xv6iris.WpRvcBridge <> ro def
+R8234:8244 Riscv.rv64d_types Defs assert_exp' def
+R8282:8283 xv6iris.WpRvcBridge <> ro def
+R8286:8289 Riscv.rv64d_types Defs exit def
+R8282:8283 xv6iris.WpRvcBridge <> ro def
+R8286:8289 Riscv.rv64d_types Defs exit def
+R8318:8319 xv6iris.WpRvcBridge <> ro def
+R8322:8333 Riscv.rv64d <> zicfiss_xSSE def
+R8318:8319 xv6iris.WpRvcBridge <> ro def
+R8322:8333 Riscv.rv64d <> zicfiss_xSSE def
+R8370:8371 xv6iris.WpRvcBridge <> ro def
+R8374:8393 Riscv.rv64d <> encdec_reg_backwards def
+R8370:8371 xv6iris.WpRvcBridge <> ro def
+R8374:8393 Riscv.rv64d <> encdec_reg_backwards def
+R8428:8429 xv6iris.WpRvcBridge <> ro def
+R8432:8451 Riscv.rv64d <> encdec_ntl_backwards def
+R8428:8429 xv6iris.WpRvcBridge <> ro def
+R8432:8451 Riscv.rv64d <> encdec_ntl_backwards def
+R8486:8487 xv6iris.WpRvcBridge <> ro def
+R8490:8505 Riscv.rv64d <> currentlyEnabled def
+R8507:8513 Riscv.rv64d_types <> Ext_Zcb constr
+R8486:8487 xv6iris.WpRvcBridge <> ro def
+R8490:8505 Riscv.rv64d <> currentlyEnabled def
+R8507:8513 Riscv.rv64d_types <> Ext_Zcb constr
+R8542:8543 xv6iris.WpRvcBridge <> ro def
+R8546:8561 Riscv.rv64d <> currentlyEnabled def
+R8563:8571 Riscv.rv64d_types <> Ext_Zcmop constr
+R8542:8543 xv6iris.WpRvcBridge <> ro def
+R8546:8561 Riscv.rv64d <> currentlyEnabled def
+R8563:8571 Riscv.rv64d_types <> Ext_Zcmop constr
+R8602:8603 xv6iris.WpRvcBridge <> ro def
+R8606:8621 Riscv.rv64d <> currentlyEnabled def
+R8623:8629 Riscv.rv64d_types <> Ext_Zbb constr
+R8602:8603 xv6iris.WpRvcBridge <> ro def
+R8606:8621 Riscv.rv64d <> currentlyEnabled def
+R8623:8629 Riscv.rv64d_types <> Ext_Zbb constr
+R8658:8659 xv6iris.WpRvcBridge <> ro def
+R8662:8677 Riscv.rv64d <> currentlyEnabled def
+R8679:8689 Riscv.rv64d_types <> Ext_Zicfiss constr
+R8658:8659 xv6iris.WpRvcBridge <> ro def
+R8662:8677 Riscv.rv64d <> currentlyEnabled def
+R8679:8689 Riscv.rv64d_types <> Ext_Zicfiss constr
+R8722:8723 xv6iris.WpRvcBridge <> ro def
+R8726:8741 Riscv.rv64d <> currentlyEnabled def
+R8743:8751 Riscv.rv64d_types <> Ext_Zmmul constr
+R8722:8723 xv6iris.WpRvcBridge <> ro def
+R8726:8741 Riscv.rv64d <> currentlyEnabled def
+R8743:8751 Riscv.rv64d_types <> Ext_Zmmul constr
+R8782:8783 xv6iris.WpRvcBridge <> ro def
+R8786:8801 Riscv.rv64d <> currentlyEnabled def
+R8803:8815 Riscv.rv64d_types <> Ext_Zihintntl constr
+R8782:8783 xv6iris.WpRvcBridge <> ro def
+R8786:8801 Riscv.rv64d <> currentlyEnabled def
+R8803:8815 Riscv.rv64d_types <> Ext_Zihintntl constr
+R8850:8851 xv6iris.WpRvcBridge <> ro def
+R8854:8869 Riscv.rv64d <> currentlyEnabled def
+R8871:8877 Riscv.rv64d_types <> Ext_Zba constr
+R8850:8851 xv6iris.WpRvcBridge <> ro def
+R8854:8869 Riscv.rv64d <> currentlyEnabled def
+R8871:8877 Riscv.rv64d_types <> Ext_Zba constr
+R8906:8907 xv6iris.WpRvcBridge <> ro def
+R8910:8925 Riscv.rv64d <> currentlyEnabled def
+R8927:8931 Riscv.rv64d_types <> Ext_M constr
+R8906:8907 xv6iris.WpRvcBridge <> ro def
+R8910:8925 Riscv.rv64d <> currentlyEnabled def
+R8927:8931 Riscv.rv64d_types <> Ext_M constr
+R8943:8949 xv6iris.WpRvcBridge <> ro_cE_M thm
+R8889:8897 xv6iris.WpRvcBridge <> ro_cE_Zba thm
+R8827:8841 xv6iris.WpRvcBridge <> ro_cE_Zihintntl thm
+R8763:8773 xv6iris.WpRvcBridge <> ro_cE_Zmmul thm
+R8701:8713 xv6iris.WpRvcBridge <> ro_cE_Zicfiss thm
+R8641:8649 xv6iris.WpRvcBridge <> ro_cE_Zbb thm
+R8583:8593 xv6iris.WpRvcBridge <> ro_cE_Zcmop thm
+R8525:8533 xv6iris.WpRvcBridge <> ro_cE_Zcb thm
+R8465:8477 xv6iris.WpRvcBridge <> ro_encdec_ntl thm
+R8407:8419 xv6iris.WpRvcBridge <> ro_encdec_reg thm
+R8347:8361 xv6iris.WpRvcBridge <> ro_zicfiss_xSSE thm
+R8303:8309 xv6iris.WpRvcBridge <> ro_exit thm
+R8260:8273 xv6iris.WpRvcBridge <> ro_assert_exp' thm
+R8211:8221 xv6iris.WpRvcBridge <> ro_read_reg thm
+R8167:8177 xv6iris.WpRvcBridge <> ro_read_reg thm
+R8119:8128 xv6iris.WpRvcBridge <> ro_returnM thm
+def 9097:9098 <> Rb
+binder 9101:9101 <> T:63
+R9112:9112 Riscv.rv64d_types <> M def
+R9114:9114 xv6iris.WpRvcBridge <> T:63 var
+binder 9105:9105 <> m:64
+binder 9107:9108 <> m':65
+R9129:9135 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R9137:9138 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 9136:9136 <> s:66
+R9207:9214 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9200:9202 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9139:9144 SailStdpp.Operators_mwords <> eq_vec def
+R9194:9195 SailStdpp.Values <> :::'''b'_x not
+R9147:9157 Riscv.rv64d <> _get_Misa_C def
+R9160:9174 Riscv.rv64d_types <> register_lookup def
+R9176:9179 Riscv.rv64d_types <> misa constr
+R9184:9188 xv6iris.RiscvLang <> sregs proj
+R9181:9181 xv6iris.WpRvcBridge <> s:66 var
+R9203:9206 Corelib.Init.Datatypes <> true constr
+R9235:9243 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R9361:9361 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R9223:9225 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9215:9218 xv6iris.RiscvExec <> exec def
+R9222:9222 xv6iris.WpRvcBridge <> s:66 var
+R9220:9220 xv6iris.WpRvcBridge <> m:64 var
+R9226:9229 xv6iris.RiscvExec <> exec def
+R9234:9234 xv6iris.WpRvcBridge <> s:66 var
+R9231:9232 xv6iris.WpRvcBridge <> m':65 var
+R9244:9250 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R9255:9256 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 9251:9251 <> v:67
+binder 9253:9254 <> s':68
+R9280:9291 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9265:9267 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9257:9260 xv6iris.RiscvExec <> exec def
+R9264:9264 xv6iris.WpRvcBridge <> s:66 var
+R9262:9262 xv6iris.WpRvcBridge <> m:64 var
+R9268:9271 Corelib.Init.Datatypes <> Some constr
+R9273:9273 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9275:9276 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9279:9279 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9274:9274 xv6iris.WpRvcBridge <> v:67 var
+R9277:9278 xv6iris.WpRvcBridge <> s':68 var
+R9354:9356 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9292:9297 SailStdpp.Operators_mwords <> eq_vec def
+R9348:9349 SailStdpp.Values <> :::'''b'_x not
+R9300:9310 Riscv.rv64d <> _get_Misa_C def
+R9313:9327 Riscv.rv64d_types <> register_lookup def
+R9329:9332 Riscv.rv64d_types <> misa constr
+R9338:9342 xv6iris.RiscvLang <> sregs proj
+R9334:9335 xv6iris.WpRvcBridge <> s':68 var
+R9357:9360 Corelib.Init.Datatypes <> true constr
+prf 9370:9376 <> Rb_exec
+binder 9379:9379 <> T:69
+R9390:9390 Riscv.rv64d_types <> M def
+R9392:9392 xv6iris.WpRvcBridge <> T:69 var
+binder 9383:9383 <> m:70
+binder 9385:9386 <> m':71
+binder 9395:9395 <> s:72
+R9408:9411 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9401:9402 xv6iris.WpRvcBridge <> Rb def
+R9406:9407 xv6iris.WpRvcBridge <> m':71 var
+R9404:9404 xv6iris.WpRvcBridge <> m:70 var
+R9480:9483 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9473:9475 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9412:9417 SailStdpp.Operators_mwords <> eq_vec def
+R9467:9468 SailStdpp.Values <> :::'''b'_x not
+R9420:9430 Riscv.rv64d <> _get_Misa_C def
+R9433:9447 Riscv.rv64d_types <> register_lookup def
+R9449:9452 Riscv.rv64d_types <> misa constr
+R9457:9461 xv6iris.RiscvLang <> sregs proj
+R9454:9454 xv6iris.WpRvcBridge <> s:72 var
+R9476:9479 Corelib.Init.Datatypes <> true constr
+R9492:9494 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9484:9487 xv6iris.RiscvExec <> exec def
+R9491:9491 xv6iris.WpRvcBridge <> s:72 var
+R9489:9489 xv6iris.WpRvcBridge <> m:70 var
+R9495:9498 xv6iris.RiscvExec <> exec def
+R9503:9503 xv6iris.WpRvcBridge <> s:72 var
+R9500:9501 xv6iris.WpRvcBridge <> m':71 var
+R9533:9537 Corelib.Init.Logic <> proj1 thm
+R9533:9537 Corelib.Init.Logic <> proj1 thm
+prf 9561:9567 <> Rb_refl
+binder 9570:9570 <> T:73
+R9578:9578 Riscv.rv64d_types <> M def
+R9580:9580 xv6iris.WpRvcBridge <> T:73 var
+binder 9574:9574 <> m:74
+R9589:9592 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9585:9586 xv6iris.WpRvcBridge <> ro def
+R9588:9588 xv6iris.WpRvcBridge <> m:74 var
+R9593:9594 xv6iris.WpRvcBridge <> Rb def
+R9598:9598 xv6iris.WpRvcBridge <> m:74 var
+R9596:9596 xv6iris.WpRvcBridge <> m:74 var
+prf 9712:9721 <> Rb_returnM
+binder 9724:9724 <> T:75
+R9732:9732 xv6iris.WpRvcBridge <> T:75 var
+binder 9728:9728 <> x:76
+R9737:9738 xv6iris.WpRvcBridge <> Rb def
+R9753:9759 Riscv.rv64d_types <> returnM def
+R9761:9761 xv6iris.WpRvcBridge <> x:76 var
+R9741:9747 Riscv.rv64d_types <> returnM def
+R9749:9749 xv6iris.WpRvcBridge <> x:76 var
+R9778:9784 xv6iris.WpRvcBridge <> Rb_refl thm
+R9787:9796 xv6iris.WpRvcBridge <> ro_returnM thm
+R9778:9784 xv6iris.WpRvcBridge <> Rb_refl thm
+R9787:9796 xv6iris.WpRvcBridge <> ro_returnM thm
+prf 9810:9816 <> Rb_leaf
+R9820:9821 xv6iris.WpRvcBridge <> Rb def
+R9851:9857 Riscv.rv64d_types <> returnM def
+R9859:9862 Corelib.Init.Datatypes <> true constr
+R9824:9839 Riscv.rv64d <> currentlyEnabled def
+R9841:9847 Riscv.rv64d_types <> Ext_Zca constr
+R9897:9921 xv6iris.RiscvFetchExec <> exec_currentlyEnabled_Zca thm
+R9897:9921 xv6iris.RiscvFetchExec <> exec_currentlyEnabled_Zca thm
+R9897:9921 xv6iris.RiscvFetchExec <> exec_currentlyEnabled_Zca thm
+prf 10015:10021 <> Rb_bind
+binder 10024:10024 <> T:77
+binder 10026:10026 <> U:78
+R10037:10037 Riscv.rv64d_types <> M def
+R10039:10039 xv6iris.WpRvcBridge <> T:77 var
+binder 10030:10030 <> m:79
+binder 10032:10033 <> m':80
+R10051:10054 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10050:10050 xv6iris.WpRvcBridge <> T:77 var
+R10055:10055 Riscv.rv64d_types <> M def
+R10057:10057 xv6iris.WpRvcBridge <> U:78 var
+binder 10043:10043 <> k:81
+binder 10045:10046 <> k':82
+R10071:10074 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10064:10065 xv6iris.WpRvcBridge <> Rb def
+R10069:10070 xv6iris.WpRvcBridge <> m':80 var
+R10067:10067 xv6iris.WpRvcBridge <> m:79 var
+R10075:10075 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10101:10105 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10076:10082 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R10084:10085 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 10083:10083 <> a:83
+R10086:10087 xv6iris.WpRvcBridge <> Rb def
+R10096:10097 xv6iris.WpRvcBridge <> k':82 var
+R10099:10099 xv6iris.WpRvcBridge <> a:83 var
+R10090:10090 xv6iris.WpRvcBridge <> k:81 var
+R10092:10092 xv6iris.WpRvcBridge <> a:83 var
+R10106:10107 xv6iris.WpRvcBridge <> Rb def
+R10126:10134 Riscv.rv64d_types Defs bind def
+R10139:10140 xv6iris.WpRvcBridge <> k':82 var
+R10136:10137 xv6iris.WpRvcBridge <> m':80 var
+R10110:10118 Riscv.rv64d_types Defs bind def
+R10122:10122 xv6iris.WpRvcBridge <> k:81 var
+R10120:10120 xv6iris.WpRvcBridge <> m:79 var
+R10181:10189 xv6iris.RiscvExec <> exec_bind thm
+R10181:10189 xv6iris.RiscvExec <> exec_bind thm
+R10181:10189 xv6iris.RiscvExec <> exec_bind thm
+R10181:10189 xv6iris.RiscvExec <> exec_bind thm
+R10181:10189 xv6iris.RiscvExec <> exec_bind thm
+R10254:10257 xv6iris.RiscvExec <> exec def
+R10254:10257 xv6iris.RiscvExec <> exec def
+prf 10503:10507 <> Rb_if
+binder 10510:10510 <> T:84
+R10518:10521 Corelib.Init.Datatypes <> bool ind
+binder 10514:10514 <> b:85
+R10537:10537 Riscv.rv64d_types <> M def
+R10539:10539 xv6iris.WpRvcBridge <> T:84 var
+binder 10525:10525 <> x:86
+binder 10527:10528 <> x':87
+binder 10530:10530 <> y:88
+binder 10532:10533 <> y':89
+R10551:10554 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10544:10545 xv6iris.WpRvcBridge <> Rb def
+R10549:10550 xv6iris.WpRvcBridge <> x':87 var
+R10547:10547 xv6iris.WpRvcBridge <> x:86 var
+R10562:10565 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10555:10556 xv6iris.WpRvcBridge <> Rb def
+R10560:10561 xv6iris.WpRvcBridge <> y':89 var
+R10558:10558 xv6iris.WpRvcBridge <> y:88 var
+R10566:10567 xv6iris.WpRvcBridge <> Rb def
+R10591:10593 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R10595:10600 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R10603:10608 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R10609:10610 xv6iris.WpRvcBridge <> y':89 var
+R10601:10602 xv6iris.WpRvcBridge <> x':87 var
+R10594:10594 xv6iris.WpRvcBridge <> b:85 var
+R10570:10572 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R10574:10579 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R10581:10586 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R10587:10587 xv6iris.WpRvcBridge <> y:88 var
+R10580:10580 xv6iris.WpRvcBridge <> x:86 var
+R10573:10573 xv6iris.WpRvcBridge <> b:85 var
+prf 10670:10681 <> Rb_and_boolM
+R10696:10696 Riscv.rv64d_types <> M def
+R10698:10701 Corelib.Init.Datatypes <> bool ind
+binder 10684:10684 <> l:90
+binder 10686:10687 <> l':91
+binder 10689:10689 <> r:92
+binder 10691:10692 <> r':93
+R10713:10716 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10706:10707 xv6iris.WpRvcBridge <> Rb def
+R10711:10712 xv6iris.WpRvcBridge <> l':91 var
+R10709:10709 xv6iris.WpRvcBridge <> l:90 var
+R10724:10727 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10717:10718 xv6iris.WpRvcBridge <> Rb def
+R10722:10723 xv6iris.WpRvcBridge <> r':93 var
+R10720:10720 xv6iris.WpRvcBridge <> r:92 var
+R10728:10729 xv6iris.WpRvcBridge <> Rb def
+R10748:10756 Riscv.rv64d_types Defs and_boolM def
+R10761:10762 xv6iris.WpRvcBridge <> r':93 var
+R10758:10759 xv6iris.WpRvcBridge <> l':91 var
+R10732:10740 Riscv.rv64d_types Defs and_boolM def
+R10744:10744 xv6iris.WpRvcBridge <> r:92 var
+R10742:10742 xv6iris.WpRvcBridge <> l:90 var
+R10794:10802 Riscv.rv64d_types Defs and_boolM def
+R10811:10817 xv6iris.WpRvcBridge <> Rb_bind thm
+R10811:10817 xv6iris.WpRvcBridge <> Rb_bind thm
+R10872:10881 xv6iris.WpRvcBridge <> Rb_returnM thm
+R10872:10881 xv6iris.WpRvcBridge <> Rb_returnM thm
+prf 10896:10906 <> Rb_or_boolM
+R10921:10921 Riscv.rv64d_types <> M def
+R10923:10926 Corelib.Init.Datatypes <> bool ind
+binder 10909:10909 <> l:94
+binder 10911:10912 <> l':95
+binder 10914:10914 <> r:96
+binder 10916:10917 <> r':97
+R10938:10941 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10931:10932 xv6iris.WpRvcBridge <> Rb def
+R10936:10937 xv6iris.WpRvcBridge <> l':95 var
+R10934:10934 xv6iris.WpRvcBridge <> l:94 var
+R10949:10952 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10942:10943 xv6iris.WpRvcBridge <> Rb def
+R10947:10948 xv6iris.WpRvcBridge <> r':97 var
+R10945:10945 xv6iris.WpRvcBridge <> r:96 var
+R10953:10954 xv6iris.WpRvcBridge <> Rb def
+R10972:10979 Riscv.rv64d_types Defs or_boolM def
+R10984:10985 xv6iris.WpRvcBridge <> r':97 var
+R10981:10982 xv6iris.WpRvcBridge <> l':95 var
+R10957:10964 Riscv.rv64d_types Defs or_boolM def
+R10968:10968 xv6iris.WpRvcBridge <> r:96 var
+R10966:10966 xv6iris.WpRvcBridge <> l:94 var
+R11017:11024 Riscv.rv64d_types Defs or_boolM def
+R11033:11039 xv6iris.WpRvcBridge <> Rb_bind thm
+R11033:11039 xv6iris.WpRvcBridge <> Rb_bind thm
+R11083:11092 xv6iris.WpRvcBridge <> Rb_returnM thm
+R11083:11092 xv6iris.WpRvcBridge <> Rb_returnM thm
+prf 11118:11129 <> Rb_match_opt
+binder 11132:11132 <> T:98
+binder 11134:11134 <> U:99
+R11142:11147 Corelib.Init.Datatypes <> option ind
+R11149:11149 xv6iris.WpRvcBridge <> T:98 var
+binder 11138:11138 <> w:100
+R11161:11164 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11160:11160 xv6iris.WpRvcBridge <> T:98 var
+R11165:11165 Riscv.rv64d_types <> M def
+R11167:11167 xv6iris.WpRvcBridge <> U:99 var
+binder 11153:11153 <> f:101
+binder 11155:11156 <> f':102
+R11178:11178 Riscv.rv64d_types <> M def
+R11180:11180 xv6iris.WpRvcBridge <> U:99 var
+binder 11171:11171 <> n:103
+binder 11173:11174 <> n':104
+R11187:11187 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11213:11217 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11188:11194 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R11196:11197 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 11195:11195 <> a:105
+R11198:11199 xv6iris.WpRvcBridge <> Rb def
+R11208:11209 xv6iris.WpRvcBridge <> f':102 var
+R11211:11211 xv6iris.WpRvcBridge <> a:105 var
+R11202:11202 xv6iris.WpRvcBridge <> f:101 var
+R11204:11204 xv6iris.WpRvcBridge <> a:105 var
+R11225:11230 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11218:11219 xv6iris.WpRvcBridge <> Rb def
+R11223:11224 xv6iris.WpRvcBridge <> n':104 var
+R11221:11221 xv6iris.WpRvcBridge <> n:103 var
+R11231:11232 xv6iris.WpRvcBridge <> Rb def
+R11286:11286 xv6iris.WpRvcBridge <> w:100 var
+R11293:11296 Corelib.Init.Datatypes <> Some constr
+R11303:11304 xv6iris.WpRvcBridge <> f':102 var
+R11310:11313 Corelib.Init.Datatypes <> None constr
+R11318:11319 xv6iris.WpRvcBridge <> n':104 var
+R11241:11241 xv6iris.WpRvcBridge <> w:100 var
+R11248:11251 Corelib.Init.Datatypes <> Some constr
+R11258:11258 xv6iris.WpRvcBridge <> f:101 var
+R11264:11267 Corelib.Init.Datatypes <> None constr
+R11272:11272 xv6iris.WpRvcBridge <> n:103 var
+R11523:11524 xv6iris.WpRvcBridge <> Rb def
+R11565:11566 xv6iris.WpRvcBridge <> Rb def
+R11569:11584 Riscv.rv64d <> currentlyEnabled def
+R11586:11592 Riscv.rv64d_types <> Ext_Zca constr
+R11565:11566 xv6iris.WpRvcBridge <> Rb def
+R11569:11584 Riscv.rv64d <> currentlyEnabled def
+R11586:11592 Riscv.rv64d_types <> Ext_Zca constr
+R11621:11622 xv6iris.WpRvcBridge <> Rb def
+R11625:11631 Riscv.rv64d_types <> returnM def
+R11621:11622 xv6iris.WpRvcBridge <> Rb def
+R11625:11631 Riscv.rv64d_types <> returnM def
+R11665:11666 xv6iris.WpRvcBridge <> Rb def
+R11669:11677 Riscv.rv64d_types Defs and_boolM def
+R11665:11666 xv6iris.WpRvcBridge <> Rb def
+R11669:11677 Riscv.rv64d_types Defs and_boolM def
+R11728:11729 xv6iris.WpRvcBridge <> Rb def
+R11732:11739 Riscv.rv64d_types Defs or_boolM def
+R11728:11729 xv6iris.WpRvcBridge <> Rb def
+R11732:11739 Riscv.rv64d_types Defs or_boolM def
+R11789:11790 xv6iris.WpRvcBridge <> Rb def
+R11793:11801 Riscv.rv64d_types Defs bind def
+R11789:11790 xv6iris.WpRvcBridge <> Rb def
+R11793:11801 Riscv.rv64d_types Defs bind def
+R11855:11856 xv6iris.WpRvcBridge <> Rb def
+R11873:11876 Corelib.Init.Datatypes <> Some constr
+R11887:11890 Corelib.Init.Datatypes <> None constr
+R11855:11856 xv6iris.WpRvcBridge <> Rb def
+R11873:11876 Corelib.Init.Datatypes <> Some constr
+R11887:11890 Corelib.Init.Datatypes <> None constr
+R11953:11954 xv6iris.WpRvcBridge <> Rb def
+R11957:11959 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R11961:11966 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R11968:11973 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R11953:11954 xv6iris.WpRvcBridge <> Rb def
+R11957:11959 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R11961:11966 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R11968:11973 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R12014:12015 xv6iris.WpRvcBridge <> Rb def
+R12014:12015 xv6iris.WpRvcBridge <> Rb def
+R12030:12036 xv6iris.WpRvcBridge <> Rb_refl thm
+R11988:11992 xv6iris.WpRvcBridge <> Rb_if thm
+R11913:11924 xv6iris.WpRvcBridge <> Rb_match_opt thm
+R11819:11825 xv6iris.WpRvcBridge <> Rb_bind thm
+R11757:11767 xv6iris.WpRvcBridge <> Rb_or_boolM thm
+R11695:11706 xv6iris.WpRvcBridge <> Rb_and_boolM thm
+R11647:11656 xv6iris.WpRvcBridge <> Rb_returnM thm
+R11606:11612 xv6iris.WpRvcBridge <> Rb_leaf thm
+def 12270:12282 <> decode_c_pure
+R12289:12293 SailStdpp.Values <> mword def
+binder 12285:12285 <> w:108
+R12301:12301 Riscv.rv64d_types <> M def
+R12303:12313 Riscv.rv64d_types <> instruction ind
+R12348:12368 Riscv.rv64d <> ext_decode_compressed def
+R12401:12421 Riscv.rv64d <> ext_decode_compressed def
+R12424:12450 Riscv.rv64d <> encdec_compressed_backwards def
+R12557:12572 Riscv.rv64d <> currentlyEnabled def
+R12574:12580 Riscv.rv64d_types <> Ext_Zca constr
+R12626:12632 Riscv.rv64d_types <> returnM def
+R12634:12637 Corelib.Init.Datatypes <> true constr
+R12348:12368 Riscv.rv64d <> ext_decode_compressed def
+R12557:12572 Riscv.rv64d <> currentlyEnabled def
+R12574:12580 Riscv.rv64d_types <> Ext_Zca constr
+R12626:12632 Riscv.rv64d_types <> returnM def
+R12634:12637 Corelib.Init.Datatypes <> true constr
+prf 12770:12779 <> rvc_bridge
+R12786:12790 SailStdpp.Values <> mword def
+binder 12782:12782 <> w:109
+binder 12796:12796 <> s:110
+R12870:12875 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12863:12865 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12802:12807 SailStdpp.Operators_mwords <> eq_vec def
+R12857:12858 SailStdpp.Values <> :::'''b'_x not
+R12810:12820 Riscv.rv64d <> _get_Misa_C def
+R12823:12837 Riscv.rv64d_types <> register_lookup def
+R12839:12842 Riscv.rv64d_types <> misa constr
+R12847:12851 xv6iris.RiscvLang <> sregs proj
+R12844:12844 xv6iris.WpRvcBridge <> s:110 var
+R12866:12869 Corelib.Init.Datatypes <> true constr
+R12908:12910 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12876:12879 xv6iris.RiscvExec <> exec def
+R12907:12907 xv6iris.WpRvcBridge <> s:110 var
+R12882:12902 Riscv.rv64d <> ext_decode_compressed def
+R12904:12904 xv6iris.WpRvcBridge <> w:109 var
+R12911:12914 xv6iris.RiscvExec <> exec def
+R12934:12934 xv6iris.WpRvcBridge <> s:110 var
+R12917:12929 xv6iris.WpRvcBridge <> decode_c_pure def
+R12931:12931 xv6iris.WpRvcBridge <> w:109 var
+R12963:12969 xv6iris.WpRvcBridge <> Rb_exec thm
+R12963:12969 xv6iris.WpRvcBridge <> Rb_exec thm
+R13002:13014 xv6iris.WpRvcBridge <> decode_c_pure def
+R13017:13037 Riscv.rv64d <> ext_decode_compressed def
+R13040:13066 Riscv.rv64d <> encdec_compressed_backwards def
+R13560:13569 xv6iris.WpRvcBridge <> rvc_bridge thm
+R13635:13639 stdpp.bitvector.definitions <> bv_eq thm

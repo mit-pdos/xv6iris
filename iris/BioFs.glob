@@ -1,0 +1,130 @@
+DIGEST 0f01512f634272000bed110d1159e107
+Fxv6iris.BioFs
+R1009:1014 Stdlib.ZArith.ZArith <> <> lib
+R1016:1018 Stdlib.micromega.Lia <> <> lib
+R1020:1023 Stdlib.Lists.List <> <> lib
+R1052:1055 stdpp.gmap <> <> lib
+R1057:1060 stdpp.list <> <> lib
+R1062:1082 stdpp.bitvector.definitions <> <> lib
+R1120:1128 iris.proofmode.proofmode <> <> lib
+R1171:1179 iris.base_logic.lib.ghost_map <> <> lib
+R1197:1226 SailStdpp.ConcurrencyInterface <> <> lib
+R1228:1265 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R1267:1301 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R1303:1328 SailStdpp.Operators_mwords <> <> lib
+R1346:1359 SailStdpp.Base <> <> lib
+R1361:1379 SailStdpp.TypeCasts <> <> lib
+R1381:1396 SailStdpp.Values <> <> lib
+R1398:1418 SailStdpp.MachineWord <> <> lib
+R1436:1445 xv6iris.RiscvPtsto <> <> lib
+R1463:1471 xv6iris.DiskPtsto <> <> lib
+R1489:1494 xv6iris.BioInv <> <> lib
+R1512:1519 xv6iris.FsBlocks <> <> lib
+R1537:1553 Riscv.rv64d_types <> <> lib
+R1571:1574 xv6iris.Xv6G <> <> lib
+R1639:1644 xv6iris.TsoCtx <> <> lib
+sec 1656:1660 <> BioFs
+R1676:1682 xv6iris.RiscvPtsto <> riscvGS class
+R1689:1692 xv6iris.Xv6G <> xv6G class
+R1694:1695 xv6iris.BioFs <> Σ:1 var
+var  1711:1712 BioFs XI
+R1716:1721 xv6iris.TsoCtx <> CurCtx class
+prf 1734:1746 <> bio_held_fs_L
+R1754:1762 xv6iris.BioDefs <> bio_names rec
+binder 1749:1750 <> bn:5
+R1773:1780 xv6iris.FsBlocks <> fs_names rec
+binder 1766:1769 <> γfs:6
+R1790:1799 xv6iris.DiskPtsto <> disk_names rec
+binder 1784:1786 <> γd:7
+R1815:1819 SailStdpp.Values <> mword def
+binder 1809:1811 <> dev:8
+R1832:1835 stdpp.gmap <> gset def
+R1837:1837 Corelib.Numbers.BinNums <> Z ind
+binder 1826:1828 <> cov:9
+R1846:1848 Corelib.Init.Datatypes <> nat ind
+binder 1841:1842 <> kb:10
+R1866:1870 SailStdpp.Values <> mword def
+binder 1852:1855 <> pidv:11
+binder 1857:1858 <> dv:12
+binder 1860:1862 <> bno:13
+R1896:1899 Corelib.Init.Datatypes <> list ind
+R1902:1903 stdpp.bitvector.definitions <> bv rec
+binder 1883:1884 <> bs:14
+binder 1886:1888 <> bsl:15
+binder 1890:1892 <> bsd:16
+R1914:1917 Corelib.Init.Datatypes <> bool ind
+binder 1910:1910 <> d:17
+R1992:2003 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R1926:1933 xv6iris.BioInv <> bio_held def
+R1935:1936 xv6iris.BioFs <> bn:5 var
+R1939:1945 xv6iris.FsBlocks <> fs_view def
+R1947:1950 xv6iris.BioFs <> γfs:6 var
+R1952:1954 xv6iris.BioFs <> γd:7 var
+R1956:1958 xv6iris.BioFs <> dev:8 var
+R1960:1962 xv6iris.BioFs <> cov:9 var
+R1965:1966 xv6iris.BioFs <> kb:10 var
+R1968:1971 xv6iris.BioFs <> pidv:11 var
+R1973:1974 xv6iris.BioFs <> dv:12 var
+R1976:1978 xv6iris.BioFs <> bno:13 var
+R1980:1981 xv6iris.BioFs <> bs:14 var
+R1983:1985 xv6iris.BioFs <> bsl:15 var
+R1987:1989 xv6iris.BioFs <> bsd:16 var
+R1991:1991 xv6iris.BioFs <> d:17 var
+R2004:2004 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2044:2056 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2177:2177 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2013:2017 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R2031:2031 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R2040:2040 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R2018:2025 xv6iris.FsBlocks <> fs_cache proj
+R2027:2030 xv6iris.BioFs <> γfs:6 var
+R2005:2008 SailStdpp.Operators_mwords <> uint def
+R2010:2012 xv6iris.BioFs <> bno:13 var
+R2032:2034 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R2038:2039 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R2036:2036 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R2041:2043 xv6iris.BioFs <> bsl:15 var
+R2057:2057 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R2097:2110 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R2066:2070 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R2084:2084 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R2093:2093 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R2071:2078 xv6iris.FsBlocks <> fs_cache proj
+R2080:2083 xv6iris.BioFs <> γfs:6 var
+R2058:2061 SailStdpp.Operators_mwords <> uint def
+R2063:2065 xv6iris.BioFs <> bno:13 var
+R2085:2087 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R2091:2092 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R2089:2089 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R2094:2096 xv6iris.BioFs <> bsl:15 var
+R2111:2118 xv6iris.BioInv <> bio_held def
+R2120:2121 xv6iris.BioFs <> bn:5 var
+R2124:2130 xv6iris.FsBlocks <> fs_view def
+R2132:2135 xv6iris.BioFs <> γfs:6 var
+R2137:2139 xv6iris.BioFs <> γd:7 var
+R2141:2143 xv6iris.BioFs <> dev:8 var
+R2145:2147 xv6iris.BioFs <> cov:9 var
+R2150:2151 xv6iris.BioFs <> kb:10 var
+R2153:2156 xv6iris.BioFs <> pidv:11 var
+R2158:2159 xv6iris.BioFs <> dv:12 var
+R2161:2163 xv6iris.BioFs <> bno:13 var
+R2165:2166 xv6iris.BioFs <> bs:14 var
+R2168:2170 xv6iris.BioFs <> bsl:15 var
+R2172:2174 xv6iris.BioFs <> bsd:16 var
+R2176:2176 xv6iris.BioFs <> d:17 var
+R2202:2209 xv6iris.BioInv <> bio_held def
+R2212:2218 xv6iris.BioInv <> bio_pay def
+R2221:2227 xv6iris.FsBlocks <> fs_view def
+R2202:2209 xv6iris.BioInv <> bio_held def
+R2202:2209 xv6iris.BioInv <> bio_held def
+R2212:2218 xv6iris.BioInv <> bio_pay def
+R2212:2218 xv6iris.BioInv <> bio_pay def
+R2221:2227 xv6iris.FsBlocks <> fs_view def
+R2221:2227 xv6iris.FsBlocks <> fs_view def
+R2326:2334 xv6iris.FsBlocks <> fs_mdirty def
+R2326:2334 xv6iris.FsBlocks <> fs_mdirty def
+R2326:2334 xv6iris.FsBlocks <> fs_mdirty def
+R2534:2542 xv6iris.FsBlocks <> fs_mclean def
+R2534:2542 xv6iris.FsBlocks <> fs_mclean def
+R2534:2542 xv6iris.FsBlocks <> fs_mclean def
+R2743:2747 xv6iris.BioFs BioFs <> sec

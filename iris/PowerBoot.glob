@@ -1,0 +1,387 @@
+DIGEST 4c221bf86c79b9853fc99eba301b8d6a
+Fxv6iris.PowerBoot
+R1204:1209 Stdlib.ZArith.ZArith <> <> lib
+R1238:1241 stdpp.gmap <> <> lib
+R1243:1248 stdpp.finite <> <> lib
+R1250:1270 stdpp.bitvector.definitions <> <> lib
+R1288:1313 SailStdpp.Operators_mwords <> <> lib
+R1331:1347 Riscv.rv64d_types <> <> lib
+R1349:1359 Riscv.rv64d <> <> lib
+R1377:1385 xv6iris.RiscvLang <> <> lib
+R1403:1410 xv6iris.ColdBoot <> <> lib
+R1478:1488 xv6iris.RiscvExtras <> <> lib
+def 2650:2657 <> boot_hid
+R2664:2666 xv6iris.RiscvLang <> CPU def
+binder 2660:2660 <> c:1
+R2671:2692 SailStdpp.Values <> mword def
+R2700:2707 xv6iris.RiscvLang <> boot_w64 def
+R2710:2717 Stdlib.ZArith.BinInt Z of_nat def
+R2720:2729 stdpp.fin <> fin_to_nat def
+R2731:2731 xv6iris.PowerBoot <> c:1 var
+def 2748:2756 <> boot_regs
+R2763:2765 xv6iris.RiscvLang <> CPU def
+binder 2759:2759 <> c:2
+R2770:2777 Riscv.rv64d_types <> regstate rec
+R2782:2790 xv6iris.ColdBoot <> cold_regs def
+R2793:2800 xv6iris.PowerBoot <> boot_hid def
+R2802:2802 xv6iris.PowerBoot <> c:2 var
+prf 2945:2957 <> boot_regs_run
+R2964:2966 xv6iris.RiscvLang <> CPU def
+binder 2960:2960 <> c:3
+R2973:2975 xv6iris.RiscvLang <> run def
+R3075:3080 xv6iris.RiscvLang <> MState constr
+R3083:3091 xv6iris.ColdBoot <> cold_regs def
+R3094:3101 xv6iris.PowerBoot <> boot_hid def
+R3103:3103 xv6iris.PowerBoot <> c:3 var
+R3107:3109 stdpp.base <> ::stdpp_scope:'∅' not
+R3111:3120 xv6iris.DevModel <> dev0_state def
+R3065:3066 Corelib.Init.Datatypes <> tt constr
+R3028:3033 xv6iris.RiscvLang <> MState constr
+R3035:3047 Riscv.rv64d_types <> init_regstate def
+R3049:3051 stdpp.base <> ::stdpp_scope:'∅' not
+R3053:3062 xv6iris.DevModel <> dev0_state def
+R2978:2996 xv6iris.ArchReset <> boot_prog def
+R2999:3006 xv6iris.PowerBoot <> boot_hid def
+R3008:3008 xv6iris.PowerBoot <> c:3 var
+R3011:3018 xv6iris.RiscvLang <> pma_boot def
+R3138:3156 xv6iris.ColdBoot <> cold_boot_run_shape thm
+R3159:3166 xv6iris.PowerBoot <> boot_hid def
+R3138:3156 xv6iris.ColdBoot <> cold_boot_run_shape thm
+R3159:3166 xv6iris.PowerBoot <> boot_hid def
+prf 3403:3417 <> boot_regs_reset
+R3424:3426 xv6iris.RiscvLang <> CPU def
+binder 3420:3420 <> c:4
+R3431:3440 xv6iris.RiscvLang <> reset_regs def
+R3442:3442 xv6iris.PowerBoot <> c:4 var
+R3445:3453 xv6iris.PowerBoot <> boot_regs def
+R3455:3455 xv6iris.PowerBoot <> c:4 var
+R3473:3492 xv6iris.ColdBoot <> reset_regs_cold_boot thm
+R3473:3492 xv6iris.ColdBoot <> reset_regs_cold_boot thm
+def 3907:3913 <> pa_of_z
+R3920:3920 Corelib.Numbers.BinNums <> Z ind
+binder 3916:3916 <> a:5
+R3925:3931 Riscv.rv64d_types Arch pa def
+R3936:3964 SailStdpp.Values <> mword_of_int def
+R3966:3966 xv6iris.PowerBoot <> a:5 var
+def 4316:4327 <> boot_mem_raw
+R4331:4334 stdpp.gmap <> gmap rec
+R4345:4346 stdpp.bitvector.definitions <> bv rec
+R4336:4342 Riscv.rv64d_types Arch pa def
+R4356:4366 stdpp.fin_maps <> list_to_map def
+R4369:4369 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R4407:4429 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R4378:4378 Corelib.Numbers.BinNums <> Z ind
+binder 4374:4374 <> a:6
+R4383:4383 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4393:4394 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4406:4406 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4384:4390 xv6iris.PowerBoot <> pa_of_z def
+R4392:4392 xv6iris.PowerBoot <> a:6 var
+R4395:4403 xv6iris.RiscvLang <> boot_byte def
+R4405:4405 xv6iris.PowerBoot <> a:6 var
+R4430:4433 stdpp.list_numbers <> seqZ def
+R4435:4440 xv6iris.RiscvLang <> ram_lo def
+R4449:4451 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R4443:4448 xv6iris.RiscvLang <> ram_hi def
+R4452:4457 xv6iris.RiscvLang <> ram_lo def
+def 4474:4481 <> boot_mem
+R4485:4488 stdpp.gmap <> gmap rec
+R4499:4500 stdpp.bitvector.definitions <> bv rec
+R4490:4496 Riscv.rv64d_types Arch pa def
+R4510:4520 stdpp.base <> filter def
+R4598:4609 xv6iris.PowerBoot <> boot_mem_raw def
+R4539:4541 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R4532:4538 Riscv.rv64d_types Arch pa def
+R4542:4543 stdpp.bitvector.definitions <> bv rec
+binder 4527:4528 <> ab:7
+R4557:4560 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R4570:4572 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R4551:4556 xv6iris.RiscvLang <> ram_lo def
+R4561:4564 SailStdpp.Operators_mwords <> uint def
+R4568:4569 stdpp.base <> :::x_'.1' not
+R4566:4567 xv6iris.PowerBoot <> ab:7 var
+R4561:4564 SailStdpp.Operators_mwords <> uint def
+R4568:4569 stdpp.base <> :::x_'.1' not
+R4566:4567 xv6iris.PowerBoot <> ab:7 var
+R4573:4578 xv6iris.RiscvLang <> ram_hi def
+prf 4730:4741 <> boot_uint_pa
+R4748:4748 Corelib.Numbers.BinNums <> Z ind
+binder 4744:4744 <> a:8
+R4773:4776 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4759:4762 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R4764:4766 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R4753:4758 xv6iris.RiscvLang <> ram_lo def
+R4763:4763 xv6iris.PowerBoot <> a:8 var
+R4763:4763 xv6iris.PowerBoot <> a:8 var
+R4767:4772 xv6iris.RiscvLang <> ram_hi def
+R4793:4795 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4777:4780 SailStdpp.Operators_mwords <> uint def
+R4783:4789 xv6iris.PowerBoot <> pa_of_z def
+R4791:4791 xv6iris.PowerBoot <> a:8 var
+R4796:4796 xv6iris.PowerBoot <> a:8 var
+R4825:4831 xv6iris.PowerBoot <> pa_of_z def
+R4834:4839 xv6iris.RiscvLang <> ram_lo def
+R4842:4847 xv6iris.RiscvLang <> ram_hi def
+R4865:4877 xv6iris.RiscvExtras <> uint_unsigned thm
+R4880:4888 xv6iris.RiscvExtras <> moi64_mod thm
+R4865:4877 xv6iris.RiscvExtras <> uint_unsigned thm
+R4865:4877 xv6iris.RiscvExtras <> uint_unsigned thm
+R4880:4888 xv6iris.RiscvExtras <> moi64_mod thm
+R4880:4888 xv6iris.RiscvExtras <> moi64_mod thm
+R4897:4907 Stdlib.ZArith.BinInt Z mod_small thm
+R4897:4907 Stdlib.ZArith.BinInt Z mod_small thm
+prf 5353:5364 <> pa_of_z_uint
+R5371:5377 Riscv.rv64d_types Arch pa def
+binder 5367:5367 <> p:9
+R5398:5400 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5382:5388 xv6iris.PowerBoot <> pa_of_z def
+R5391:5394 SailStdpp.Operators_mwords <> uint def
+R5396:5396 xv6iris.PowerBoot <> p:9 var
+R5401:5401 xv6iris.PowerBoot <> p:9 var
+R5420:5426 xv6iris.PowerBoot <> pa_of_z def
+R5429:5457 SailStdpp.Values <> mword_of_int def
+R5460:5492 SailStdpp.MachineWord MachineWord Z_to_word def
+R5505:5517 xv6iris.RiscvExtras <> uint_unsigned thm
+R5505:5517 xv6iris.RiscvExtras <> uint_unsigned thm
+R5505:5517 xv6iris.RiscvExtras <> uint_unsigned thm
+R5526:5544 stdpp.bitvector.definitions <> Z_to_bv_bv_unsigned thm
+R5526:5544 stdpp.bitvector.definitions <> Z_to_bv_bv_unsigned thm
+prf 5559:5569 <> pa_of_z_inj
+R5579:5579 Corelib.Numbers.BinNums <> Z ind
+binder 5572:5572 <> a:10
+binder 5574:5575 <> a':11
+R5606:5609 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5592:5595 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R5597:5599 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R5586:5591 xv6iris.RiscvLang <> ram_lo def
+R5596:5596 xv6iris.PowerBoot <> a:10 var
+R5596:5596 xv6iris.PowerBoot <> a:10 var
+R5600:5605 xv6iris.RiscvLang <> ram_hi def
+R5631:5634 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5616:5619 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R5622:5624 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R5610:5615 xv6iris.RiscvLang <> ram_lo def
+R5620:5621 xv6iris.PowerBoot <> a':11 var
+R5620:5621 xv6iris.PowerBoot <> a':11 var
+R5625:5630 xv6iris.RiscvLang <> ram_hi def
+R5657:5660 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5644:5646 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5635:5641 xv6iris.PowerBoot <> pa_of_z def
+R5643:5643 xv6iris.PowerBoot <> a:10 var
+R5647:5653 xv6iris.PowerBoot <> pa_of_z def
+R5655:5656 xv6iris.PowerBoot <> a':11 var
+R5662:5664 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5661:5661 xv6iris.PowerBoot <> a:10 var
+R5665:5666 xv6iris.PowerBoot <> a':11 var
+R5711:5722 xv6iris.PowerBoot <> boot_uint_pa thm
+R5735:5746 xv6iris.PowerBoot <> boot_uint_pa thm
+R5711:5722 xv6iris.PowerBoot <> boot_uint_pa thm
+R5711:5722 xv6iris.PowerBoot <> boot_uint_pa thm
+R5735:5746 xv6iris.PowerBoot <> boot_uint_pa thm
+R5735:5746 xv6iris.PowerBoot <> boot_uint_pa thm
+prf 5793:5806 <> seqZ_ram_range
+R5813:5813 Corelib.Numbers.BinNums <> Z ind
+binder 5809:5809 <> a:12
+R5855:5859 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R5821:5825 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5820:5820 xv6iris.PowerBoot <> a:12 var
+R5826:5829 stdpp.list_numbers <> seqZ def
+R5831:5836 xv6iris.RiscvLang <> ram_lo def
+R5845:5847 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R5839:5844 xv6iris.RiscvLang <> ram_hi def
+R5848:5853 xv6iris.RiscvLang <> ram_lo def
+R5866:5869 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R5871:5873 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R5860:5865 xv6iris.RiscvLang <> ram_lo def
+R5870:5870 xv6iris.PowerBoot <> a:12 var
+R5870:5870 xv6iris.PowerBoot <> a:12 var
+R5874:5879 xv6iris.RiscvLang <> ram_hi def
+R5899:5910 stdpp.list_numbers <> elem_of_seqZ thm
+R5899:5910 stdpp.list_numbers <> elem_of_seqZ thm
+R5899:5910 stdpp.list_numbers <> elem_of_seqZ thm
+R5920:5925 xv6iris.RiscvLang <> ram_lo def
+R5928:5933 xv6iris.RiscvLang <> ram_hi def
+prf 5973:5991 <> boot_mem_keys_nodup
+R5997:6001 stdpp.base <> NoDup ind
+R6004:6004 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R6036:6053 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R6145:6145 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R6021:6023 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R6014:6020 Riscv.rv64d_types Arch pa def
+R6024:6025 stdpp.bitvector.definitions <> bv rec
+binder 6009:6010 <> ab:13
+R6034:6035 stdpp.base <> :::x_'.1' not
+R6032:6033 xv6iris.PowerBoot <> ab:13 var
+R6054:6054 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R6092:6115 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R6063:6063 Corelib.Numbers.BinNums <> Z ind
+binder 6059:6059 <> a:14
+R6068:6068 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6078:6079 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6091:6091 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6069:6075 xv6iris.PowerBoot <> pa_of_z def
+R6077:6077 xv6iris.PowerBoot <> a:14 var
+R6080:6088 xv6iris.RiscvLang <> boot_byte def
+R6090:6090 xv6iris.PowerBoot <> a:14 var
+R6116:6119 stdpp.list_numbers <> seqZ def
+R6121:6126 xv6iris.RiscvLang <> ram_lo def
+R6135:6137 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R6129:6134 xv6iris.RiscvLang <> ram_hi def
+R6138:6143 xv6iris.RiscvLang <> ram_lo def
+R6169:6185 stdpp.list_monad <> list_fmap_compose thm
+R6169:6185 stdpp.list_monad <> list_fmap_compose thm
+R6169:6185 stdpp.list_monad <> list_fmap_compose thm
+R6196:6214 stdpp.list_monad <> NoDup_fmap_2_strong thm
+R6226:6235 stdpp.list_numbers <> NoDup_seqZ thm
+R6196:6214 stdpp.list_monad <> NoDup_fmap_2_strong thm
+R6226:6235 stdpp.list_numbers <> NoDup_seqZ thm
+R6284:6294 xv6iris.PowerBoot <> pa_of_z_inj thm
+R6310:6314 Corelib.Init.Logic <> proj1 thm
+R6317:6330 xv6iris.PowerBoot <> seqZ_ram_range thm
+R6352:6356 Corelib.Init.Logic <> proj1 thm
+R6359:6372 xv6iris.PowerBoot <> seqZ_ram_range thm
+R6284:6294 xv6iris.PowerBoot <> pa_of_z_inj thm
+R6310:6314 Corelib.Init.Logic <> proj1 thm
+R6317:6330 xv6iris.PowerBoot <> seqZ_ram_range thm
+R6352:6356 Corelib.Init.Logic <> proj1 thm
+R6359:6372 xv6iris.PowerBoot <> seqZ_ram_range thm
+prf 6418:6436 <> boot_mem_raw_lookup
+R6443:6443 Corelib.Numbers.BinNums <> Z ind
+binder 6439:6439 <> a:15
+R6470:6473 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6456:6459 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R6461:6463 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R6450:6455 xv6iris.RiscvLang <> ram_lo def
+R6460:6460 xv6iris.PowerBoot <> a:15 var
+R6460:6460 xv6iris.PowerBoot <> a:15 var
+R6464:6469 xv6iris.RiscvLang <> ram_hi def
+R6499:6501 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6486:6489 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R6490:6496 xv6iris.PowerBoot <> pa_of_z def
+R6498:6498 xv6iris.PowerBoot <> a:15 var
+R6474:6485 xv6iris.PowerBoot <> boot_mem_raw def
+R6502:6505 Corelib.Init.Datatypes <> Some constr
+R6508:6516 xv6iris.RiscvLang <> boot_byte def
+R6518:6518 xv6iris.PowerBoot <> a:15 var
+R6548:6559 xv6iris.PowerBoot <> boot_mem_raw def
+R6570:6588 stdpp.fin_maps <> elem_of_list_to_map thm
+R6599:6617 xv6iris.PowerBoot <> boot_mem_keys_nodup thm
+R6570:6588 stdpp.fin_maps <> elem_of_list_to_map thm
+R6599:6617 xv6iris.PowerBoot <> boot_mem_keys_nodup thm
+R6631:6647 stdpp.list_monad <> elem_of_list_fmap thm
+R6631:6647 stdpp.list_monad <> elem_of_list_fmap thm
+R6692:6696 Corelib.Init.Logic <> proj2 thm
+R6699:6712 xv6iris.PowerBoot <> seqZ_ram_range thm
+R6692:6696 Corelib.Init.Logic <> proj2 thm
+R6699:6712 xv6iris.PowerBoot <> seqZ_ram_range thm
+prf 6736:6750 <> boot_mem_lookup
+R6757:6757 Corelib.Numbers.BinNums <> Z ind
+binder 6753:6753 <> a:16
+R6784:6787 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6770:6773 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R6775:6777 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R6764:6769 xv6iris.RiscvLang <> ram_lo def
+R6774:6774 xv6iris.PowerBoot <> a:16 var
+R6774:6774 xv6iris.PowerBoot <> a:16 var
+R6778:6783 xv6iris.RiscvLang <> ram_hi def
+R6809:6811 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6796:6799 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R6800:6806 xv6iris.PowerBoot <> pa_of_z def
+R6808:6808 xv6iris.PowerBoot <> a:16 var
+R6788:6795 xv6iris.PowerBoot <> boot_mem def
+R6812:6815 Corelib.Init.Datatypes <> Some constr
+R6818:6826 xv6iris.RiscvLang <> boot_byte def
+R6828:6828 xv6iris.PowerBoot <> a:16 var
+R6858:6865 xv6iris.PowerBoot <> boot_mem def
+R6876:6899 stdpp.fin_maps <> map_lookup_filter_Some_2 thm
+R6915:6933 xv6iris.PowerBoot <> boot_mem_raw_lookup thm
+R6961:6972 xv6iris.PowerBoot <> boot_uint_pa thm
+R6876:6899 stdpp.fin_maps <> map_lookup_filter_Some_2 thm
+R6915:6933 xv6iris.PowerBoot <> boot_mem_raw_lookup thm
+R6961:6972 xv6iris.PowerBoot <> boot_uint_pa thm
+R6961:6972 xv6iris.PowerBoot <> boot_uint_pa thm
+prf 7005:7019 <> boot_mem_in_ram
+R7026:7032 Riscv.rv64d_types Arch pa def
+binder 7022:7022 <> a:17
+R7040:7041 stdpp.bitvector.definitions <> bv rec
+binder 7036:7036 <> b:18
+R7072:7075 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7063:7065 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7058:7061 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R7062:7062 xv6iris.PowerBoot <> a:17 var
+R7050:7057 xv6iris.PowerBoot <> boot_mem def
+R7066:7069 Corelib.Init.Datatypes <> Some constr
+R7071:7071 xv6iris.PowerBoot <> b:18 var
+R7082:7085 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R7092:7094 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R7076:7081 xv6iris.RiscvLang <> ram_lo def
+R7086:7089 SailStdpp.Operators_mwords <> uint def
+R7091:7091 xv6iris.PowerBoot <> a:17 var
+R7086:7089 SailStdpp.Operators_mwords <> uint def
+R7091:7091 xv6iris.PowerBoot <> a:17 var
+R7095:7100 xv6iris.RiscvLang <> ram_hi def
+R7129:7136 xv6iris.PowerBoot <> boot_mem def
+R7153:7174 stdpp.fin_maps <> map_lookup_filter_Some thm
+R7153:7174 stdpp.fin_maps <> map_lookup_filter_Some thm
+R7190:7194 Corelib.Init.Logic <> proj2 thm
+R7190:7194 Corelib.Init.Logic <> proj2 thm
+def 7864:7874 <> boot_gstate
+R7881:7886 xv6iris.RiscvLang <> gstate rec
+binder 7877:7877 <> g:19
+R7891:7896 xv6iris.RiscvLang <> gstate rec
+R7903:7908 xv6iris.RiscvLang <> GState constr
+binder 7915:7915 <> c:20
+R7920:7928 xv6iris.PowerBoot <> boot_regs def
+R7930:7930 xv6iris.PowerBoot <> c:20 var
+R7933:7940 xv6iris.PowerBoot <> boot_mem def
+R7952:7959 xv6iris.DevModel <> DevState constr
+R7961:7971 xv6iris.DevModel <> uart0_state def
+R7973:7983 xv6iris.DevModel <> plic0_state def
+R7986:7997 xv6iris.VirtioModel <> virtio_reset def
+R8009:8015 xv6iris.DevModel <> dvirtio proj
+R8002:8005 xv6iris.RiscvLang <> gdev proj
+R7999:7999 xv6iris.PowerBoot <> g:19 var
+R8032:8035 xv6iris.RiscvLang <> ggen proj
+R8029:8029 xv6iris.PowerBoot <> g:19 var
+R8038:8041 Corelib.Init.Datatypes <> true constr
+R8053:8056 Corelib.Init.Datatypes <> None constr
+R8068:8075 xv6iris.PowerBoot <> boot_mem def
+R8077:8078 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+prf 8105:8126 <> boot_shape_boot_gstate
+R8133:8138 xv6iris.RiscvLang <> gstate rec
+binder 8129:8129 <> g:21
+R8143:8152 xv6iris.RiscvLang <> boot_shape def
+R8154:8154 xv6iris.PowerBoot <> g:21 var
+R8157:8167 xv6iris.PowerBoot <> boot_gstate def
+R8169:8169 xv6iris.PowerBoot <> g:21 var
+R8189:8198 xv6iris.RiscvLang <> boot_shape def
+R8201:8210 xv6iris.RiscvLang <> boot_facts def
+R8213:8223 xv6iris.PowerBoot <> boot_gstate def
+R8233:8236 xv6iris.RiscvLang <> ggen proj
+R8238:8241 xv6iris.RiscvLang <> gpow proj
+R8243:8247 xv6iris.RiscvLang <> gregs proj
+R8249:8252 xv6iris.RiscvLang <> gmem proj
+R8254:8257 xv6iris.RiscvLang <> gdev proj
+R8259:8263 xv6iris.RiscvLang <> gresv proj
+R8265:8268 xv6iris.RiscvLang <> gimg proj
+R8270:8273 xv6iris.RiscvLang <> glog proj
+R8275:8277 xv6iris.RiscvLang <> gtv proj
+R8279:8283 xv6iris.DevModel <> duart proj
+R8285:8289 xv6iris.DevModel <> dplic proj
+R8291:8297 xv6iris.DevModel <> dvirtio proj
+R8577:8591 xv6iris.PowerBoot <> boot_mem_in_ram thm
+R8577:8591 xv6iris.PowerBoot <> boot_mem_in_ram thm
+R8604:8618 xv6iris.PowerBoot <> boot_mem_lookup thm
+R8604:8618 xv6iris.PowerBoot <> boot_mem_lookup thm
+R8712:8724 Riscv.rv64d_types <> init_regstate def
+R8728:8736 xv6iris.ColdBoot <> cold_regs def
+R8739:8746 xv6iris.PowerBoot <> boot_hid def
+R8712:8724 Riscv.rv64d_types <> init_regstate def
+R8728:8736 xv6iris.ColdBoot <> cold_regs def
+R8739:8746 xv6iris.PowerBoot <> boot_hid def
+R8773:8785 xv6iris.PowerBoot <> boot_regs_run thm
+R8773:8785 xv6iris.PowerBoot <> boot_regs_run thm
+R8862:8868 xv6iris.DevModel <> dvirtio proj
+R8855:8858 xv6iris.RiscvLang <> gdev proj
+R8862:8868 xv6iris.DevModel <> dvirtio proj
+R8855:8858 xv6iris.RiscvLang <> gdev proj

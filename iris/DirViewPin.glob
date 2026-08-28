@@ -1,0 +1,1460 @@
+DIGEST 1d5b785ad654bbe87c6d30af9c591fd3
+Fxv6iris.DirViewPin
+R1767:1772 Stdlib.ZArith.ZArith <> <> lib
+R1774:1776 Stdlib.micromega.Lia <> <> lib
+R1778:1781 Stdlib.Lists.List <> <> lib
+R1810:1813 stdpp.gmap <> <> lib
+R1815:1818 stdpp.list <> <> lib
+R1820:1828 stdpp.functions <> <> lib
+R1830:1850 stdpp.bitvector.definitions <> <> lib
+R1888:1896 iris.proofmode.proofmode <> <> lib
+R1932:1935 iris.algebra.auth <> <> lib
+R1937:1940 iris.algebra.gmap <> <> lib
+R1942:1945 iris.algebra.frac <> <> lib
+R1947:1950 iris.algebra.excl <> <> lib
+R1952:1956 iris.algebra.dfrac <> <> lib
+R1958:1964 iris.algebra.updates <> <> lib
+R2004:2014 iris.algebra.lib.dfrac_agree <> <> lib
+R2057:2059 iris.base_logic.lib.own <> <> lib
+R2061:2070 iris.base_logic.lib.invariants <> <> lib
+R2072:2080 iris.base_logic.lib.ghost_var <> <> lib
+R2082:2089 iris.base_logic.lib.gen_heap <> <> lib
+R2091:2099 iris.base_logic.lib.ghost_map <> <> lib
+R2141:2148 iris.program_logic.language <> <> lib
+R2150:2159 iris.program_logic.weakestpre <> <> lib
+R2161:2167 iris.program_logic.lifting <> <> lib
+R2185:2214 SailStdpp.ConcurrencyInterface <> <> lib
+R2216:2253 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R2255:2289 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R2291:2316 SailStdpp.Operators_mwords <> <> lib
+R2334:2347 SailStdpp.Base <> <> lib
+R2349:2367 SailStdpp.TypeCasts <> <> lib
+R2369:2384 SailStdpp.Values <> <> lib
+R2386:2406 SailStdpp.MachineWord <> <> lib
+R2424:2438 xv6iris.RiscvModelBytes <> <> lib
+R2456:2464 xv6iris.RiscvLang <> <> lib
+R2466:2475 xv6iris.RiscvPtsto <> <> lib
+R2493:2502 xv6iris.InstrBytes <> <> lib
+R2520:2526 xv6iris.RegFile <> <> lib
+R2544:2554 xv6iris.RiscvExtras <> <> lib
+R2572:2582 xv6iris.CalleeSaved <> <> lib
+R2584:2593 xv6iris.KernelText <> <> lib
+R2611:2618 xv6iris.IntrDefs <> <> lib
+R2636:2641 xv6iris.WpNext <> <> lib
+R2659:2664 xv6iris.WpLock <> <> lib
+R2682:2694 xv6iris.KernelDataInv <> <> lib
+R2712:2720 xv6iris.SpecPanic <> <> lib
+R2738:2744 xv6iris.FdSlots <> <> lib
+R2762:2769 xv6iris.ProcGeom <> <> lib
+R2787:2794 xv6iris.SwtchCtx <> <> lib
+R2812:2817 xv6iris.CpuOwn <> <> lib
+R2835:2842 xv6iris.SchedCtx <> <> lib
+R2860:2867 xv6iris.ProcDefs <> <> lib
+R2885:2890 xv6iris.WpUart <> <> lib
+R2908:2916 xv6iris.DiskPtsto <> <> lib
+R2918:2924 xv6iris.DiskInv <> <> lib
+R2942:2947 xv6iris.BioInv <> <> lib
+R2965:2972 xv6iris.FsBlocks <> <> lib
+R2974:2979 xv6iris.LogInv <> <> lib
+R2997:3005 xv6iris.BitmapInv <> <> lib
+R3023:3029 xv6iris.ByteBuf <> <> lib
+R3047:3055 xv6iris.DirentEnc <> <> lib
+R3073:3081 xv6iris.PathElems <> <> lib
+R3099:3106 xv6iris.InodeInv <> <> lib
+R3124:3134 xv6iris.InodeRegion <> <> lib
+R3152:3160 xv6iris.IrefSlots <> <> lib
+R3178:3186 xv6iris.IcacheRef <> <> lib
+R3204:3212 xv6iris.IcacheInv <> <> lib
+R3230:3241 xv6iris.IcacheEscrow <> <> lib
+R3293:3303 xv6iris.DirViewLend <> <> lib
+R3371:3376 xv6iris.FsTree <> <> lib
+R3394:3400 xv6iris.KvmSpec <> <> lib
+R3418:3428 xv6iris.FileInvDefs <> <> lib
+R3446:3456 xv6iris.SpecDirlink <> <> lib
+R3474:3482 xv6iris.SpecNamex <> <> lib
+R3500:3508 xv6iris.SpecNamei <> <> lib
+R3526:3536 xv6iris.SpecNameiTr <> <> lib
+R3609:3618 Kernel.KernelSyms <> <> lib
+R3636:3652 Riscv.rv64d_types <> <> lib
+R3654:3664 Riscv.rv64d <> <> lib
+R3666:3683 Riscv.riscv_extras <> <> lib
+R3701:3709 xv6iris.ProcAvail <> <> lib
+R3727:3730 xv6iris.Xv6G <> <> lib
+R3748:3753 xv6iris.TsoCtx <> <> lib
+R3763:3766 Riscv.rv64d_types Defs <> mod
+sec 4035:4042 <> PinChain
+var  4130:4133 PinChain ICFG
+R4058:4064 xv6iris.RiscvPtsto <> riscvGS class
+R4071:4074 xv6iris.Xv6G <> xv6G class
+R4076:4077 xv6iris.DirViewPin <> Σ:1 var
+R4081:4088 xv6iris.Xv6Cameras <> bioslotG class
+R4090:4091 xv6iris.DirViewPin <> Σ:1 var
+R4095:4101 xv6iris.FdSlots <> fdslotG class
+R4103:4104 xv6iris.DirViewPin <> Σ:1 var
+R4108:4112 xv6iris.FileInvDefs <> fileG class
+R4114:4115 xv6iris.DirViewPin <> Σ:1 var
+R4137:4140 xv6iris.IcacheRef <> icfg class
+R4144:4152 xv6iris.IrefSlots <> irefslotG class
+R4154:4155 xv6iris.DirViewPin <> Σ:1 var
+R4159:4162 xv6iris.ProcAvail <> pavG class
+R4164:4165 xv6iris.DirViewPin <> Σ:1 var
+def 4608:4613 <> dvp_ds
+R4623:4623 Corelib.Numbers.BinNums <> Z ind
+binder 4616:4619 <> root:10
+R4634:4637 Corelib.Init.Datatypes <> list ind
+R4645:4647 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R4640:4644 xv6iris.FsTree <> fname def
+R4648:4648 Corelib.Numbers.BinNums <> Z ind
+binder 4627:4630 <> hops:11
+R4654:4657 Corelib.Init.Datatypes <> list ind
+R4659:4659 Corelib.Numbers.BinNums <> Z ind
+R4672:4675 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R4668:4671 xv6iris.DirViewPin <> root:10 var
+R4680:4682 stdpp.base <> :::x_'.*2' not
+R4676:4679 xv6iris.DirViewPin <> hops:11 var
+def 4698:4703 <> dvp_at
+R4713:4713 Corelib.Numbers.BinNums <> Z ind
+binder 4706:4709 <> root:12
+R4724:4727 Corelib.Init.Datatypes <> list ind
+R4735:4737 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R4730:4734 xv6iris.FsTree <> fname def
+R4738:4738 Corelib.Numbers.BinNums <> Z ind
+binder 4717:4720 <> hops:13
+R4747:4749 Corelib.Init.Datatypes <> nat ind
+binder 4743:4743 <> k:14
+R4754:4754 Corelib.Numbers.BinNums <> Z ind
+R4779:4783 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R4784:4784 xv6iris.DirViewPin <> k:14 var
+R4763:4768 xv6iris.DirViewPin <> dvp_ds def
+R4770:4773 xv6iris.DirViewPin <> root:12 var
+R4775:4778 xv6iris.DirViewPin <> hops:13 var
+def 4801:4810 <> dv_pin_ent
+R4817:4817 Corelib.Numbers.BinNums <> Z ind
+binder 4813:4813 <> d:15
+R4825:4829 xv6iris.FsTree <> fname def
+binder 4821:4821 <> s:16
+R4837:4837 Corelib.Numbers.BinNums <> Z ind
+binder 4833:4833 <> c:17
+R4842:4846 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4848:4849 xv6iris.DirViewPin <> PinChain.Σ var
+R4859:4862 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R4864:4865 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 4863:4863 <> e:18
+R4876:4880 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4866:4871 xv6iris.DirViewLend <> dv_pin def
+R4873:4873 xv6iris.DirViewPin <> d:15 var
+R4875:4875 xv6iris.DirViewPin <> e:18 var
+R4881:4883 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4899:4901 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4890:4892 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4885:4888 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R4889:4889 xv6iris.DirViewPin <> s:16 var
+R4884:4884 xv6iris.DirViewPin <> e:18 var
+R4893:4896 Corelib.Init.Datatypes <> Some constr
+R4898:4898 xv6iris.DirViewPin <> c:17 var
+def 4982:4989 <> dvp_pins
+R4999:4999 Corelib.Numbers.BinNums <> Z ind
+binder 4992:4995 <> root:19
+R5010:5013 Corelib.Init.Datatypes <> list ind
+R5021:5023 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R5016:5020 xv6iris.FsTree <> fname def
+R5024:5024 Corelib.Numbers.BinNums <> Z ind
+binder 5003:5006 <> hops:20
+R5033:5035 Corelib.Init.Datatypes <> nat ind
+binder 5029:5029 <> k:21
+R5044:5048 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R5050:5051 xv6iris.DirViewPin <> PinChain.Σ var
+R5061:5071 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R5073:5077 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R5079:5083 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R5095:5103 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+binder 5072:5072 <> j:22
+binder 5072:5072 <> j:23
+binder 5078:5078 <> h:24
+binder 5078:5078 <> h:25
+R5104:5113 xv6iris.DirViewPin <> dv_pin_ent def
+R5116:5121 xv6iris.DirViewPin <> dvp_at def
+R5123:5126 xv6iris.DirViewPin <> root:19 var
+R5128:5131 xv6iris.DirViewPin <> hops:20 var
+R5135:5137 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5134:5134 xv6iris.DirViewPin <> k:21 var
+R5138:5138 xv6iris.DirViewPin <> j:22 var
+R5147:5148 stdpp.base <> :::x_'.1' not
+R5146:5146 xv6iris.DirViewPin <> h:24 var
+R5151:5152 stdpp.base <> :::x_'.2' not
+R5150:5150 xv6iris.DirViewPin <> h:24 var
+R5084:5087 stdpp.list_basics <> drop abbrev
+R5091:5094 xv6iris.DirViewPin <> hops:20 var
+R5089:5089 xv6iris.DirViewPin <> k:21 var
+def 5501:5508 <> dvp_lost
+R5518:5518 Corelib.Numbers.BinNums <> Z ind
+binder 5511:5514 <> root:26
+R5529:5532 Corelib.Init.Datatypes <> list ind
+R5540:5542 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R5535:5539 xv6iris.FsTree <> fname def
+R5543:5543 Corelib.Numbers.BinNums <> Z ind
+binder 5522:5525 <> hops:27
+R5549:5553 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R5555:5556 xv6iris.DirViewPin <> PinChain.Σ var
+R5566:5570 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5597:5599 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5575:5577 Corelib.Init.Datatypes <> nat ind
+binder 5571:5571 <> i:28
+R5585:5588 stdpp.gmap <> gmap rec
+R5596:5596 Corelib.Numbers.BinNums <> Z ind
+R5590:5594 xv6iris.FsTree <> fname def
+binder 5581:5581 <> e:29
+R5627:5638 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5600:5602 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5624:5626 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5605:5607 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R5604:5604 xv6iris.DirViewPin <> i:28 var
+R5608:5613 Stdlib.Lists.List <> length abbrev
+R5615:5618 xv6iris.DirViewPin <> hops:27 var
+R5639:5650 xv6iris.DirViewLend <> dv_cancelled def
+R5653:5658 xv6iris.DirViewPin <> dvp_at def
+R5660:5663 xv6iris.DirViewPin <> root:26 var
+R5665:5668 xv6iris.DirViewPin <> hops:27 var
+R5670:5670 xv6iris.DirViewPin <> i:28 var
+R5673:5673 xv6iris.DirViewPin <> e:29 var
+def 6042:6046 <> dvp_P
+R6056:6056 Corelib.Numbers.BinNums <> Z ind
+binder 6049:6052 <> root:30
+R6067:6070 Corelib.Init.Datatypes <> list ind
+R6078:6080 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R6073:6077 xv6iris.FsTree <> fname def
+R6081:6081 Corelib.Numbers.BinNums <> Z ind
+binder 6060:6063 <> hops:31
+R6090:6092 Corelib.Init.Datatypes <> nat ind
+binder 6086:6086 <> k:32
+R6100:6100 Corelib.Numbers.BinNums <> Z ind
+binder 6096:6096 <> d:33
+R6109:6113 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6115:6116 xv6iris.DirViewPin <> PinChain.Σ var
+R6126:6126 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R6180:6185 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R6155:6159 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6127:6129 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6152:6154 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6131:6133 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6130:6130 xv6iris.DirViewPin <> d:33 var
+R6134:6139 xv6iris.DirViewPin <> dvp_at def
+R6141:6144 xv6iris.DirViewPin <> root:30 var
+R6146:6149 xv6iris.DirViewPin <> hops:31 var
+R6151:6151 xv6iris.DirViewPin <> k:32 var
+R6160:6167 xv6iris.DirViewPin <> dvp_pins def
+R6169:6172 xv6iris.DirViewPin <> root:30 var
+R6174:6177 xv6iris.DirViewPin <> hops:31 var
+R6179:6179 xv6iris.DirViewPin <> k:32 var
+R6186:6193 xv6iris.DirViewPin <> dvp_lost def
+R6195:6198 xv6iris.DirViewPin <> root:30 var
+R6200:6203 xv6iris.DirViewPin <> hops:31 var
+def 6362:6370 <> dvp_Pmiss
+R6380:6380 Corelib.Numbers.BinNums <> Z ind
+binder 6373:6376 <> root:34
+R6391:6394 Corelib.Init.Datatypes <> list ind
+R6402:6404 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R6397:6401 xv6iris.FsTree <> fname def
+R6405:6405 Corelib.Numbers.BinNums <> Z ind
+binder 6384:6387 <> hops:35
+R6414:6416 Corelib.Init.Datatypes <> nat ind
+binder 6410:6410 <> k:36
+R6424:6424 Corelib.Numbers.BinNums <> Z ind
+binder 6420:6420 <> d:37
+R6433:6437 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6439:6440 xv6iris.DirViewPin <> PinChain.Σ var
+R6449:6456 xv6iris.DirViewPin <> dvp_lost def
+R6458:6461 xv6iris.DirViewPin <> root:34 var
+R6463:6466 xv6iris.DirViewPin <> hops:35 var
+inst 6488:6506 <> dvp_lost_persistent
+binder 6508:6511 <> root:38
+binder 6513:6516 <> hops:39
+R6524:6533 iris.bi.derived_connectives <> Persistent class
+R6536:6543 xv6iris.DirViewPin <> dvp_lost def
+R6545:6548 xv6iris.DirViewPin <> root:38 var
+R6550:6553 xv6iris.DirViewPin <> hops:39 var
+R6575:6582 xv6iris.DirViewPin <> dvp_lost def
+R6575:6582 xv6iris.DirViewPin <> dvp_lost def
+R6575:6582 xv6iris.DirViewPin <> dvp_lost def
+prf 6608:6615 <> dvp_at_0
+R6625:6625 Corelib.Numbers.BinNums <> Z ind
+binder 6618:6621 <> root:40
+R6636:6639 Corelib.Init.Datatypes <> list ind
+R6647:6649 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R6642:6646 xv6iris.FsTree <> fname def
+R6650:6650 Corelib.Numbers.BinNums <> Z ind
+binder 6629:6632 <> hops:41
+R6682:6684 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6660:6665 xv6iris.DirViewPin <> dvp_at def
+R6667:6670 xv6iris.DirViewPin <> root:40 var
+R6672:6675 xv6iris.DirViewPin <> hops:41 var
+R6685:6688 xv6iris.DirViewPin <> root:40 var
+R6712:6717 xv6iris.DirViewPin <> dvp_at def
+R6720:6725 xv6iris.DirViewPin <> dvp_ds def
+R6712:6717 xv6iris.DirViewPin <> dvp_at def
+R6712:6717 xv6iris.DirViewPin <> dvp_at def
+R6720:6725 xv6iris.DirViewPin <> dvp_ds def
+R6720:6725 xv6iris.DirViewPin <> dvp_ds def
+prf 6742:6749 <> dvp_at_S
+R6759:6759 Corelib.Numbers.BinNums <> Z ind
+binder 6752:6755 <> root:42
+R6770:6773 Corelib.Init.Datatypes <> list ind
+R6781:6783 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R6776:6780 xv6iris.FsTree <> fname def
+R6784:6784 Corelib.Numbers.BinNums <> Z ind
+binder 6763:6766 <> hops:43
+R6793:6795 Corelib.Init.Datatypes <> nat ind
+binder 6789:6789 <> k:44
+R6809:6813 xv6iris.FsTree <> fname def
+binder 6805:6805 <> s:45
+R6821:6821 Corelib.Numbers.BinNums <> Z ind
+binder 6817:6817 <> c:46
+R6853:6856 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6839:6841 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6834:6837 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R6838:6838 xv6iris.DirViewPin <> k:44 var
+R6830:6833 xv6iris.DirViewPin <> hops:43 var
+R6842:6845 Corelib.Init.Datatypes <> Some constr
+R6847:6847 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6849:6850 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6852:6852 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6848:6848 xv6iris.DirViewPin <> s:45 var
+R6851:6851 xv6iris.DirViewPin <> c:46 var
+R6879:6881 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6857:6862 xv6iris.DirViewPin <> dvp_at def
+R6864:6867 xv6iris.DirViewPin <> root:42 var
+R6869:6872 xv6iris.DirViewPin <> hops:43 var
+R6875:6875 Corelib.Init.Datatypes <> S constr
+R6877:6877 xv6iris.DirViewPin <> k:44 var
+R6882:6882 xv6iris.DirViewPin <> c:46 var
+R6918:6923 xv6iris.DirViewPin <> dvp_at def
+R6926:6931 xv6iris.DirViewPin <> dvp_ds def
+R6933:6953 stdpp.list_basics <> list_lookup_total_alt thm
+R6918:6923 xv6iris.DirViewPin <> dvp_at def
+R6918:6923 xv6iris.DirViewPin <> dvp_at def
+R6926:6931 xv6iris.DirViewPin <> dvp_ds def
+R6926:6931 xv6iris.DirViewPin <> dvp_ds def
+R6933:6953 stdpp.list_basics <> list_lookup_total_alt thm
+R6933:6953 stdpp.list_basics <> list_lookup_total_alt thm
+R6974:6989 stdpp.list_monad <> list_lookup_fmap thm
+R6974:6989 stdpp.list_monad <> list_lookup_fmap thm
+R6974:6989 stdpp.list_monad <> list_lookup_fmap thm
+prf 8038:8047 <> dvp_nx_hop
+R8055:8059 iris.base_logic.lib.iprop <> gname def
+binder 8050:8051 <> gi:47
+R8069:8076 xv6iris.FsBlocks <> fs_names rec
+binder 8063:8065 <> gfs:48
+R8093:8093 Corelib.Numbers.BinNums <> Z ind
+binder 8080:8089 <> inodestart:49
+R8103:8105 Corelib.Init.Datatypes <> nat ind
+binder 8097:8099 <> nib:50
+R8122:8122 Corelib.Numbers.BinNums <> Z ind
+binder 8115:8118 <> root:51
+R8133:8136 Corelib.Init.Datatypes <> list ind
+R8144:8146 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R8139:8143 xv6iris.FsTree <> fname def
+R8147:8147 Corelib.Numbers.BinNums <> Z ind
+binder 8126:8129 <> hops:52
+R8162:8164 Corelib.Init.Datatypes <> nat ind
+binder 8158:8158 <> k:53
+R8172:8176 xv6iris.FsTree <> fname def
+binder 8168:8168 <> s:54
+R8184:8184 Corelib.Numbers.BinNums <> Z ind
+binder 8180:8180 <> c:55
+R8216:8223 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8202:8204 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8197:8200 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R8201:8201 xv6iris.DirViewPin <> k:53 var
+R8193:8196 xv6iris.DirViewPin <> hops:52 var
+R8205:8208 Corelib.Init.Datatypes <> Some constr
+R8210:8210 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8212:8213 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8215:8215 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8211:8211 xv6iris.DirViewPin <> s:54 var
+R8214:8214 xv6iris.DirViewPin <> c:55 var
+R8254:8263 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8224:8231 xv6iris.InodeRegion <> ireg_inv def
+R8233:8234 xv6iris.DirViewPin <> gi:47 var
+R8236:8238 xv6iris.DirViewPin <> gfs:48 var
+R8240:8249 xv6iris.DirViewPin <> inodestart:49 var
+R8251:8253 xv6iris.DirViewPin <> nib:50 var
+R8264:8269 xv6iris.SpecNameiTr <> nx_hop def
+R8272:8276 xv6iris.DirViewPin <> dvp_P def
+R8278:8281 xv6iris.DirViewPin <> root:51 var
+R8283:8286 xv6iris.DirViewPin <> hops:52 var
+R8290:8298 xv6iris.DirViewPin <> dvp_Pmiss def
+R8300:8303 xv6iris.DirViewPin <> root:51 var
+R8305:8308 xv6iris.DirViewPin <> hops:52 var
+R8311:8311 xv6iris.DirViewPin <> k:53 var
+R8313:8313 xv6iris.DirViewPin <> s:54 var
+R8349:8354 xv6iris.SpecNameiTr <> nx_hop def
+R8357:8361 xv6iris.DirViewPin <> dvp_P def
+R8364:8372 xv6iris.DirViewPin <> dvp_Pmiss def
+R8375:8382 xv6iris.DirViewPin <> dvp_pins def
+R8385:8394 xv6iris.DirViewPin <> dv_pin_ent def
+R8349:8354 xv6iris.SpecNameiTr <> nx_hop def
+R8349:8354 xv6iris.SpecNameiTr <> nx_hop def
+R8357:8361 xv6iris.DirViewPin <> dvp_P def
+R8357:8361 xv6iris.DirViewPin <> dvp_P def
+R8364:8372 xv6iris.DirViewPin <> dvp_Pmiss def
+R8364:8372 xv6iris.DirViewPin <> dvp_Pmiss def
+R8375:8382 xv6iris.DirViewPin <> dvp_pins def
+R8375:8382 xv6iris.DirViewPin <> dvp_pins def
+R8385:8394 xv6iris.DirViewPin <> dv_pin_ent def
+R8385:8394 xv6iris.DirViewPin <> dv_pin_ent def
+R8501:8506 stdpp.list_basics <> drop_S thm
+R8518:8530 iris.bi.big_op <> big_sepL_cons thm
+R8532:8542 Stdlib.Arith.PeanoNat Nat add_0_r thm
+R8501:8506 stdpp.list_basics <> drop_S thm
+R8501:8506 stdpp.list_basics <> drop_S thm
+R8518:8530 iris.bi.big_op <> big_sepL_cons thm
+R8518:8530 iris.bi.big_op <> big_sepL_cons thm
+R8532:8542 Stdlib.Arith.PeanoNat Nat add_0_r thm
+R8532:8542 Stdlib.Arith.PeanoNat Nat add_0_r thm
+R8556:8558 Corelib.Init.Datatypes <> fst def
+R8560:8562 Corelib.Init.Datatypes <> snd def
+R8658:8658 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8744:8749 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8766:8766 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8659:8671 xv6iris.InodeRegion <> dv_pin_redeem thm
+R8673:8675 stdpp.base <> ::stdpp_scope:'⊤' not
+R8658:8658 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8744:8749 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8766:8766 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8659:8671 xv6iris.InodeRegion <> dv_pin_redeem thm
+R8673:8675 stdpp.base <> ::stdpp_scope:'⊤' not
+R8943:8950 xv6iris.DirViewPin <> dvp_at_S thm
+R8943:8950 xv6iris.DirViewPin <> dvp_at_S thm
+R8970:8970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8984:8989 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8995:8995 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8971:8983 iris.bi.big_op <> big_sepL_mono thm
+R8970:8970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8984:8989 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8995:8995 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8971:8983 iris.bi.big_op <> big_sepL_mono thm
+R9033:9046 Stdlib.Arith.PeanoNat Nat add_succ_r thm
+R9048:9061 Stdlib.Arith.PeanoNat Nat add_succ_l thm
+R9033:9046 Stdlib.Arith.PeanoNat Nat add_succ_r thm
+R9033:9046 Stdlib.Arith.PeanoNat Nat add_succ_r thm
+R9048:9061 Stdlib.Arith.PeanoNat Nat add_succ_l thm
+R9048:9061 Stdlib.Arith.PeanoNat Nat add_succ_l thm
+R9114:9121 xv6iris.DirViewPin <> dvp_lost def
+R9114:9121 xv6iris.DirViewPin <> dvp_lost def
+R9163:9170 xv6iris.DirViewPin <> dvp_lost def
+R9163:9170 xv6iris.DirViewPin <> dvp_lost def
+R9163:9170 xv6iris.DirViewPin <> dvp_lost def
+R9229:9242 stdpp.list_basics <> lookup_lt_Some thm
+R9229:9242 stdpp.list_basics <> lookup_lt_Some thm
+R9289:9296 xv6iris.DirViewPin <> dvp_lost def
+R9289:9296 xv6iris.DirViewPin <> dvp_lost def
+R9289:9296 xv6iris.DirViewPin <> dvp_lost def
+R9321:9324 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R9321:9324 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R9413:9416 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R9413:9416 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+prf 9584:9594 <> dvp_nx_hops
+R9602:9606 iris.base_logic.lib.iprop <> gname def
+binder 9597:9598 <> gi:56
+R9616:9623 xv6iris.FsBlocks <> fs_names rec
+binder 9610:9612 <> gfs:57
+R9640:9640 Corelib.Numbers.BinNums <> Z ind
+binder 9627:9636 <> inodestart:58
+R9650:9652 Corelib.Init.Datatypes <> nat ind
+binder 9644:9646 <> nib:59
+R9669:9669 Corelib.Numbers.BinNums <> Z ind
+binder 9662:9665 <> root:60
+R9680:9683 Corelib.Init.Datatypes <> list ind
+R9691:9693 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R9686:9690 xv6iris.FsTree <> fname def
+R9694:9694 Corelib.Numbers.BinNums <> Z ind
+binder 9673:9676 <> hops:61
+R9704:9707 Corelib.Init.Datatypes <> list ind
+R9710:9711 stdpp.bitvector.definitions <> bv rec
+binder 9699:9700 <> pl:62
+R9746:9753 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9736:9738 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9723:9732 xv6iris.PathElems <> path_elems def
+R9734:9735 xv6iris.DirViewPin <> pl:62 var
+R9743:9745 stdpp.base <> :::x_'.*1' not
+R9739:9742 xv6iris.DirViewPin <> hops:61 var
+R9784:9793 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9754:9761 xv6iris.InodeRegion <> ireg_inv def
+R9763:9764 xv6iris.DirViewPin <> gi:56 var
+R9766:9768 xv6iris.DirViewPin <> gfs:57 var
+R9770:9779 xv6iris.DirViewPin <> inodestart:58 var
+R9781:9783 xv6iris.DirViewPin <> nib:59 var
+R9794:9805 xv6iris.SpecNameiTr <> nx_hops_from def
+R9808:9812 xv6iris.DirViewPin <> dvp_P def
+R9814:9817 xv6iris.DirViewPin <> root:60 var
+R9819:9822 xv6iris.DirViewPin <> hops:61 var
+R9826:9834 xv6iris.DirViewPin <> dvp_Pmiss def
+R9836:9839 xv6iris.DirViewPin <> root:60 var
+R9841:9844 xv6iris.DirViewPin <> hops:61 var
+R9847:9848 xv6iris.DirViewPin <> pl:62 var
+R9891:9902 xv6iris.SpecNameiTr <> nx_hops_from def
+R9904:9909 stdpp.list_basics <> drop_0 thm
+R9891:9902 xv6iris.SpecNameiTr <> nx_hops_from def
+R9891:9902 xv6iris.SpecNameiTr <> nx_hops_from def
+R9904:9909 stdpp.list_basics <> drop_0 thm
+R9904:9909 stdpp.list_basics <> drop_0 thm
+R9949:9962 iris.bi.big_op <> big_sepL_intro thm
+R9949:9962 iris.bi.big_op <> big_sepL_intro thm
+R10001:10016 stdpp.list_monad <> list_lookup_fmap thm
+R10001:10016 stdpp.list_monad <> list_lookup_fmap thm
+R10001:10016 stdpp.list_monad <> list_lookup_fmap thm
+R10043:10046 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R10043:10046 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R10101:10101 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10154:10176 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10184:10184 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10102:10111 xv6iris.DirViewPin <> dvp_nx_hop thm
+R10101:10101 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10154:10176 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10184:10184 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10102:10111 xv6iris.DirViewPin <> dvp_nx_hop thm
+prf 10246:10253 <> dvp_P_at
+R10263:10263 Corelib.Numbers.BinNums <> Z ind
+binder 10256:10259 <> root:63
+R10274:10277 Corelib.Init.Datatypes <> list ind
+R10285:10287 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R10280:10284 xv6iris.FsTree <> fname def
+R10288:10288 Corelib.Numbers.BinNums <> Z ind
+binder 10267:10270 <> hops:64
+R10297:10299 Corelib.Init.Datatypes <> nat ind
+binder 10293:10293 <> k:65
+R10308:10308 Corelib.Numbers.BinNums <> Z ind
+binder 10303:10304 <> iL:66
+R10337:10348 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10317:10321 xv6iris.DirViewPin <> dvp_P def
+R10323:10326 xv6iris.DirViewPin <> root:63 var
+R10328:10331 xv6iris.DirViewPin <> hops:64 var
+R10333:10333 xv6iris.DirViewPin <> k:65 var
+R10335:10336 xv6iris.DirViewPin <> iL:66 var
+R10378:10382 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R10349:10351 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10375:10377 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10354:10356 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10352:10353 xv6iris.DirViewPin <> iL:66 var
+R10357:10362 xv6iris.DirViewPin <> dvp_at def
+R10364:10367 xv6iris.DirViewPin <> root:63 var
+R10369:10372 xv6iris.DirViewPin <> hops:64 var
+R10374:10374 xv6iris.DirViewPin <> k:65 var
+R10383:10390 xv6iris.DirViewPin <> dvp_lost def
+R10392:10395 xv6iris.DirViewPin <> root:63 var
+R10397:10400 xv6iris.DirViewPin <> hops:64 var
+R10425:10429 xv6iris.DirViewPin <> dvp_P def
+R10425:10429 xv6iris.DirViewPin <> dvp_P def
+R10425:10429 xv6iris.DirViewPin <> dvp_P def
+R10524:10531 xv6iris.DirViewPin PinChain <> sec
+def 11928:11947 <> wp_namei_pinned_body
+R11956:11962 xv6iris.RiscvPtsto <> riscvGS class
+binder 11964:11965 <> Σ:67
+binder 11955:11965 <> riscvGS0:68
+R11969:11972 xv6iris.Xv6G <> xv6G class
+R11974:11975 xv6iris.DirViewPin <> Σ:67 var
+binder 11968:11975 <> xv6G0:69
+R11979:11986 xv6iris.Xv6Cameras <> bioslotG class
+R11988:11989 xv6iris.DirViewPin <> Σ:67 var
+binder 11978:11989 <> bioslotG0:70
+R11993:11999 xv6iris.FdSlots <> fdslotG class
+R12001:12002 xv6iris.DirViewPin <> Σ:67 var
+binder 11992:12002 <> fdslotG0:71
+R12006:12010 xv6iris.FileInvDefs <> fileG class
+R12012:12013 xv6iris.DirViewPin <> Σ:67 var
+binder 12005:12013 <> fileG0:72
+R12029:12032 xv6iris.IcacheRef <> icfg class
+binder 12022:12025 <> ICFG:73
+R12036:12044 xv6iris.IrefSlots <> irefslotG class
+R12046:12047 xv6iris.DirViewPin <> Σ:67 var
+binder 12035:12047 <> irefslotG0:74
+R12051:12054 xv6iris.ProcAvail <> pavG class
+R12056:12057 xv6iris.DirViewPin <> Σ:67 var
+binder 12050:12057 <> pavG0:75
+R12068:12072 xv6iris.RiscvLang <> GenId class
+binder 12062:12064 <> GEN:76
+R12083:12087 xv6iris.RiscvLang <> CpuId class
+binder 12077:12079 <> CID:77
+R12097:12102 xv6iris.TsoCtx <> CurCtx class
+binder 12092:12093 <> XI:78
+R12116:12119 Corelib.Init.Datatypes <> list ind
+R12121:12125 iris.base_logic.lib.iprop <> gname def
+binder 12111:12112 <> gs:79
+R12133:12135 Corelib.Init.Datatypes <> nat ind
+binder 12129:12129 <> j:80
+R12144:12148 iris.base_logic.lib.iprop <> gname def
+binder 12139:12140 <> gl:81
+R12161:12170 xv6iris.WpUart <> uart_names rec
+binder 12156:12157 <> gu:82
+R12179:12188 xv6iris.DiskPtsto <> disk_names rec
+binder 12174:12175 <> gd:83
+R12197:12201 iris.base_logic.lib.iprop <> gname def
+binder 12192:12193 <> gk:84
+R12221:12225 SailStdpp.Values <> mword def
+binder 12209:12210 <> pd:85
+binder 12212:12214 <> pav:86
+binder 12216:12217 <> pu:87
+R12241:12249 xv6iris.BioDefs <> bio_names rec
+binder 12236:12237 <> bn:88
+R12261:12269 xv6iris.LogDefs <> log_names rec
+binder 12257:12257 <> g:89
+R12279:12286 xv6iris.FsBlocks <> fs_names rec
+binder 12273:12275 <> gfs:90
+R12295:12299 iris.base_logic.lib.iprop <> gname def
+binder 12290:12291 <> gi:91
+R12312:12319 xv6iris.IcacheEscrow <> ic_names rec
+binder 12307:12308 <> cn:92
+R12329:12333 iris.base_logic.lib.iprop <> gname def
+binder 12323:12325 <> gtl:93
+R12346:12350 iris.base_logic.lib.iprop <> gname def
+binder 12341:12342 <> ga:94
+R12359:12363 iris.base_logic.lib.iprop <> gname def
+binder 12354:12355 <> gf:95
+R12377:12380 stdpp.gmap <> gset def
+R12382:12382 Corelib.Numbers.BinNums <> Z ind
+binder 12371:12373 <> cov:96
+R12418:12418 Corelib.Numbers.BinNums <> Z ind
+binder 12386:12393 <> logstart:97
+binder 12395:12403 <> bmapstart:98
+binder 12405:12414 <> inodestart:99
+R12428:12430 Corelib.Init.Datatypes <> nat ind
+binder 12422:12424 <> nib:100
+R12445:12445 Corelib.Numbers.BinNums <> Z ind
+binder 12438:12441 <> size:101
+R12455:12459 SailStdpp.Values <> mword def
+binder 12449:12451 <> dev:102
+R12477:12479 Corelib.Init.Datatypes <> nat ind
+binder 12470:12473 <> plen:103
+R12493:12496 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12490:12492 Corelib.Init.Datatypes <> nat ind
+R12497:12498 stdpp.bitvector.definitions <> bv rec
+binder 12483:12486 <> pfun:104
+R12512:12514 Corelib.Init.Datatypes <> nat ind
+binder 12508:12508 <> n:105
+R12523:12526 stdpp.gmap <> gset def
+R12528:12528 Corelib.Numbers.BinNums <> Z ind
+binder 12518:12519 <> Sb:106
+R12543:12546 Corelib.Init.Datatypes <> list ind
+R12554:12556 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R12549:12553 xv6iris.FsTree <> fname def
+R12557:12557 Corelib.Numbers.BinNums <> Z ind
+binder 12536:12539 <> hops:107
+R12623:12627 SailStdpp.Values <> mword def
+binder 12616:12619 <> pidv:108
+R12652:12656 iris.algebra.dfrac <> dfrac ind
+binder 12634:12635 <> dq:109
+binder 12637:12639 <> dqb:110
+binder 12641:12643 <> dqs:111
+binder 12645:12648 <> dqpv:112
+R12668:12674 xv6iris.RegFile <> regfile def
+binder 12664:12664 <> m:113
+R12682:12684 Corelib.Init.Datatypes <> nat ind
+binder 12678:12678 <> K:114
+R12693:12696 Corelib.Init.Datatypes <> bool ind
+binder 12688:12689 <> eb:115
+R12708:12711 Corelib.Init.Datatypes <> bool ind
+binder 12704:12704 <> b:116
+R12721:12724 stdpp.gmap <> gset def
+R12726:12731 Stdlib.Strings.String <> string ind
+binder 12715:12717 <> lks:117
+R12741:12748 xv6iris.ProcDefs <> pprivate rec
+binder 12735:12737 <> Vpr:118
+R12778:12789 SailStdpp.Values <> mword_of_int def
+R12791:12806 Kernel.KernelSyms <> namei def
+R12766:12770 SailStdpp.Values <> mword def
+binder 12760:12762 <> pcE:119
+R12823:12831 xv6iris.ProcGeom <> proc_addr def
+R12833:12833 xv6iris.DirViewPin <> j:80 var
+binder 12817:12818 <> pj:120
+R12851:12855 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R12856:12861 Riscv.rv64d_types <> Regidx constr
+R12882:12886 SailStdpp.Values <> mword def
+R12864:12875 SailStdpp.Values <> mword_of_int def
+R12850:12850 xv6iris.DirViewPin <> m:113 var
+binder 12844:12845 <> pv:121
+R12911:12916 xv6iris.RiscvExtras <> ret_pc def
+R12920:12924 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R12925:12930 Riscv.rv64d_types <> Regidx constr
+R12950:12954 SailStdpp.Values <> mword def
+R12933:12944 SailStdpp.Values <> mword_of_int def
+R12919:12919 xv6iris.DirViewPin <> m:113 var
+binder 12900:12906 <> ret_tgt:122
+R12975:12979 xv6iris.DirentEnc <> bview def
+R12981:12984 xv6iris.DirViewPin <> plen:103 var
+R12986:12989 xv6iris.DirViewPin <> pfun:104 var
+binder 12969:12970 <> pl:123
+R13005:13010 Stdlib.Lists.List <> length abbrev
+R13013:13022 xv6iris.PathElems <> path_elems def
+R13024:13025 xv6iris.DirViewPin <> pl:123 var
+binder 13000:13000 <> L:124
+R13049:13059 stdpp.bitvector.definitions <> bv_unsigned proj
+R13061:13067 xv6iris.InodeInv <> ROOTINO def
+R13044:13044 Corelib.Numbers.BinNums <> Z ind
+binder 13037:13040 <> root:125
+R13092:13097 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13082:13085 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R13075:13081 xv6iris.SpecNamei <> K_namei abbrev
+R13086:13086 xv6iris.DirViewPin <> K:114 var
+R13112:13117 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13101:13103 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13098:13100 xv6iris.DirViewPin <> dev:102 var
+R13104:13111 xv6iris.IcacheRef <> icfg_dev meth
+R13132:13137 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13121:13123 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13118:13120 xv6iris.DirViewPin <> nib:100 var
+R13124:13131 xv6iris.IcacheRef <> icfg_nib meth
+R13150:13155 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13139:13141 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13138:13138 xv6iris.DirViewPin <> g:89 var
+R13142:13149 xv6iris.IcacheRef <> icfg_log meth
+R13177:13182 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13166:13168 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13156:13165 xv6iris.DirViewPin <> inodestart:99 var
+R13169:13176 xv6iris.IcacheRef <> icfg_ist meth
+R13196:13201 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13186:13188 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13183:13185 xv6iris.DirViewPin <> dev:102 var
+R13189:13195 xv6iris.InodeInv <> ROOTDEV def
+R13215:13220 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13204:13206 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R13207:13209 xv6iris.DirViewPin <> nib:100 var
+R13245:13250 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13221:13231 xv6iris.LogInv <> log_geom_ok def
+R13233:13235 xv6iris.DirViewPin <> cov:96 var
+R13237:13244 xv6iris.DirViewPin <> logstart:97 var
+R13266:13271 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13252:13254 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<='_x not
+R13259:13262 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<='_x not
+R13255:13258 xv6iris.DirViewPin <> size:101 var
+R13255:13258 xv6iris.DirViewPin <> size:101 var
+R13263:13265 xv6iris.BitmapInv <> BPB def
+R13286:13291 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13273:13276 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R13277:13285 xv6iris.DirViewPin <> bmapstart:98 var
+R13309:13314 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13301:13305 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R13292:13300 xv6iris.DirViewPin <> bmapstart:98 var
+R13306:13308 xv6iris.DirViewPin <> cov:96 var
+R13356:13361 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13315:13317 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R13355:13355 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R13327:13331 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R13318:13326 xv6iris.DirViewPin <> bmapstart:98 var
+R13332:13345 xv6iris.LogDefs <> log_region_set def
+R13347:13354 xv6iris.DirViewPin <> logstart:97 var
+R13377:13382 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13363:13366 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R13367:13376 xv6iris.DirViewPin <> inodestart:99 var
+R13401:13406 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13383:13391 xv6iris.IcacheInv <> cov_below def
+R13393:13395 xv6iris.DirViewPin <> cov:96 var
+R13397:13400 xv6iris.DirViewPin <> size:101 var
+R13449:13454 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13407:13420 xv6iris.SpecDirlink <> ireg_blocks_ok def
+R13422:13431 xv6iris.DirViewPin <> inodestart:99 var
+R13433:13435 xv6iris.DirViewPin <> nib:100 var
+R13437:13439 xv6iris.DirViewPin <> cov:96 var
+R13441:13448 xv6iris.DirViewPin <> logstart:97 var
+R13472:13477 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13455:13461 xv6iris.ByteBuf <> bb_cstr def
+R13463:13466 xv6iris.DirViewPin <> pfun:104 var
+R13468:13471 xv6iris.DirViewPin <> plen:103 var
+R13504:13509 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13492:13494 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R13479:13486 Stdlib.ZArith.BinInt Z of_nat def
+R13488:13491 xv6iris.DirViewPin <> plen:103 var
+R13496:13498 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R13528:13533 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13520:13522 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13510:13513 xv6iris.DirViewPin <> pfun:104 var
+R13523:13527 xv6iris.PathElems <> SLASH def
+R13556:13561 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13546:13549 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R13535:13543 xv6iris.SpecNamex <> walk_need def
+R13545:13545 xv6iris.DirViewPin <> L:124 var
+R13550:13550 xv6iris.DirViewPin <> n:105 var
+R13577:13582 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13564:13566 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R13563:13563 xv6iris.DirViewPin <> j:80 var
+R13567:13571 xv6iris.ProcGeom <> NPROC def
+R13600:13725 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13590:13592 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13585:13588 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R13589:13589 xv6iris.DirViewPin <> j:80 var
+R13583:13584 xv6iris.DirViewPin <> gs:79 var
+R13593:13596 Corelib.Init.Datatypes <> Some constr
+R13598:13599 xv6iris.DirViewPin <> gl:81 var
+R13749:13754 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13739:13741 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13726:13735 xv6iris.PathElems <> path_elems def
+R13737:13738 xv6iris.DirViewPin <> pl:123 var
+R13746:13748 stdpp.base <> :::x_'.*1' not
+R13742:13745 xv6iris.DirViewPin <> hops:107 var
+R13779:13786 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R13755:13765 xv6iris.IntrDefs <> sie_cap_gpr def
+R13767:13769 xv6iris.Ktier <> KT1 constr
+R13771:13771 xv6iris.DirViewPin <> m:113 var
+R13773:13773 xv6iris.DirViewPin <> K:114 var
+R13775:13775 xv6iris.DirViewPin <> b:116 var
+R13777:13778 xv6iris.DirViewPin <> pj:120 var
+R13808:13815 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13787:13793 xv6iris.CpuOwn <> cpu_own def
+R13797:13798 xv6iris.DirViewPin <> eb:115 var
+R13800:13801 xv6iris.DirViewPin <> pj:120 var
+R13803:13803 xv6iris.DirViewPin <> b:116 var
+R13805:13807 xv6iris.DirViewPin <> lks:117 var
+R13836:13843 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13816:13828 xv6iris.IntrDefs <> trap_csrs_ext def
+R13830:13832 xv6iris.Ktier <> KT1 constr
+R13834:13835 xv6iris.DirViewPin <> eb:115 var
+R13863:13870 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13844:13856 xv6iris.IntrDefs <> cpu_claim_ext def
+R13858:13859 xv6iris.DirViewPin <> eb:115 var
+R13861:13862 xv6iris.DirViewPin <> pj:120 var
+R13882:13887 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13871:13881 xv6iris.KernelText <> kernel_text def
+R13899:13904 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13888:13898 xv6iris.KernelDataInv <> kernel_data def
+R13914:13921 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13905:13909 xv6iris.InstrBytes <> pc_is def
+R13911:13913 xv6iris.DirViewPin <> pcE:119 var
+R13931:13938 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13922:13930 xv6iris.SpecPanic <> panic_env def
+R13974:13981 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13939:13945 xv6iris.BioInv <> bio_ctx def
+R13947:13948 xv6iris.DirViewPin <> bn:88 var
+R13951:13957 xv6iris.FsBlocks <> fs_view def
+R13959:13961 xv6iris.DirViewPin <> gfs:90 var
+R13963:13964 xv6iris.DirViewPin <> gd:83 var
+R13966:13968 xv6iris.DirViewPin <> dev:102 var
+R13970:13972 xv6iris.DirViewPin <> cov:96 var
+R14015:14022 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13982:13988 xv6iris.LogInv <> log_ctx def
+R13990:13990 xv6iris.DirViewPin <> g:89 var
+R13992:13993 xv6iris.DirViewPin <> bn:88 var
+R13995:13997 xv6iris.DirViewPin <> gfs:90 var
+R13999:14001 xv6iris.DirViewPin <> cov:96 var
+R14003:14010 xv6iris.DirViewPin <> logstart:97 var
+R14012:14014 xv6iris.DirViewPin <> dev:102 var
+R14041:14048 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14023:14032 xv6iris.KvmSpec <> kalloc_env def
+R14034:14035 xv6iris.DirViewPin <> ga:94 var
+R14037:14040 Corelib.Init.Datatypes <> None constr
+R14094:14101 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14049:14058 xv6iris.IcacheEscrow <> is_itable2 def
+R14060:14062 xv6iris.DirViewPin <> gtl:93 var
+R14064:14065 xv6iris.DirViewPin <> cn:92 var
+R14067:14069 xv6iris.DirViewPin <> gfs:90 var
+R14071:14072 xv6iris.DirViewPin <> gi:91 var
+R14074:14076 xv6iris.DirViewPin <> cov:96 var
+R14078:14085 xv6iris.DirViewPin <> logstart:97 var
+R14087:14089 xv6iris.DirViewPin <> nib:100 var
+R14091:14093 xv6iris.DirViewPin <> dev:102 var
+R14112:14119 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14102:14111 xv6iris.IcacheInv <> itable_inv def
+R14153:14160 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14120:14129 xv6iris.IcacheEscrow <> ic_escrows def
+R14131:14132 xv6iris.DirViewPin <> cn:92 var
+R14134:14136 xv6iris.DirViewPin <> gfs:90 var
+R14138:14139 xv6iris.DirViewPin <> gi:91 var
+R14141:14143 xv6iris.DirViewPin <> cov:96 var
+R14145:14152 xv6iris.DirViewPin <> logstart:97 var
+R14177:14184 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14161:14173 xv6iris.IcacheEscrow <> ic_sleeplocks def
+R14175:14176 xv6iris.DirViewPin <> cn:92 var
+R14215:14222 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14185:14192 xv6iris.InodeRegion <> ireg_inv def
+R14194:14195 xv6iris.DirViewPin <> gi:91 var
+R14197:14199 xv6iris.DirViewPin <> gfs:90 var
+R14201:14210 xv6iris.DirViewPin <> inodestart:99 var
+R14212:14214 xv6iris.DirViewPin <> nib:100 var
+R14232:14239 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14223:14231 xv6iris.IcacheRef <> ireg_open def
+R14252:14259 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14240:14248 xv6iris.SchedCtx <> procs_inv def
+R14250:14251 xv6iris.DirViewPin <> gs:79 var
+R14273:14280 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14260:14266 xv6iris.WpUart <> dev_inv def
+R14268:14269 xv6iris.DirViewPin <> gu:82 var
+R14271:14272 xv6iris.DirViewPin <> gd:83 var
+R14303:14310 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14281:14289 xv6iris.DiskInv <> disk_geom def
+R14291:14292 xv6iris.DirViewPin <> gd:83 var
+R14294:14295 xv6iris.DirViewPin <> pd:85 var
+R14297:14299 xv6iris.DirViewPin <> pav:86 var
+R14301:14302 xv6iris.DirViewPin <> pu:87 var
+R14377:14384 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14311:14317 xv6iris.WpLock <> is_lock def
+R14319:14320 xv6iris.DirViewPin <> gk:84 var
+R14322:14327 xv6iris.DiskInv <> d_lock def
+R14350:14352 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R14374:14376 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R14353:14360 xv6iris.DiskInv <> disk_res def
+R14362:14363 xv6iris.DirViewPin <> gd:83 var
+R14365:14366 xv6iris.DirViewPin <> pd:85 var
+R14368:14370 xv6iris.DirViewPin <> pav:86 var
+R14372:14373 xv6iris.DirViewPin <> pu:87 var
+R14445:14452 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14397:14404 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R14408:14410 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R14444:14444 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R14385:14396 xv6iris.BitmapInv <> sb_bmapstart def
+R14405:14407 xv6iris.DirViewPin <> dqb:110 var
+R14436:14440 SailStdpp.Values <> mword def
+R14411:14422 SailStdpp.Values <> mword_of_int def
+R14424:14432 xv6iris.DirViewPin <> bmapstart:98 var
+R14515:14522 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14466:14473 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R14477:14479 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R14514:14514 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R14453:14465 xv6iris.InodeInv <> sb_inodestart def
+R14474:14476 xv6iris.DirViewPin <> dqs:111 var
+R14506:14510 SailStdpp.Values <> mword def
+R14480:14491 SailStdpp.Values <> mword_of_int def
+R14493:14502 xv6iris.DirViewPin <> inodestart:99 var
+R14565:14572 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14523:14532 xv6iris.BitmapInv <> bitmap_inv def
+R14534:14536 xv6iris.DirViewPin <> gfs:90 var
+R14538:14546 xv6iris.DirViewPin <> bmapstart:98 var
+R14548:14550 xv6iris.DirViewPin <> cov:96 var
+R14552:14559 xv6iris.DirViewPin <> logstart:97 var
+R14561:14564 xv6iris.DirViewPin <> size:101 var
+R14599:14606 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14573:14586 xv6iris.ProcDefs <> proc_priv_bare def
+R14588:14589 xv6iris.DirViewPin <> pj:120 var
+R14591:14594 xv6iris.DirViewPin <> pidv:108 var
+R14596:14598 xv6iris.DirViewPin <> Vpr:118 var
+R14630:14637 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14607:14616 xv6iris.IcacheRef <> inode_held def
+R14619:14624 xv6iris.ProcDefs <> pv_cwd proj
+R14626:14628 xv6iris.DirViewPin <> Vpr:118 var
+R14638:14638 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14708:14716 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14639:14649 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R14651:14655 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R14670:14671 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 14650:14650 <> i:126
+binder 14650:14650 <> i:127
+R14683:14690 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R14694:14694 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R14701:14701 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R14691:14693 xv6iris.Ktier <> KT1 constr
+R14672:14677 xv6iris.RiscvModelBytes <> pa_add def
+R14679:14680 xv6iris.DirViewPin <> pv:121 var
+R14682:14682 xv6iris.DirViewPin <> i:126 var
+R14695:14695 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R14700:14700 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R14696:14699 xv6iris.DirViewPin <> dqpv:112 var
+R14702:14705 xv6iris.DirViewPin <> pfun:104 var
+R14707:14707 xv6iris.DirViewPin <> i:126 var
+R14656:14658 Corelib.Lists.ListDef <> seq def
+R14663:14663 Corelib.Init.Datatypes <> S constr
+R14665:14668 xv6iris.DirViewPin <> plen:103 var
+R14725:14732 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14717:14722 xv6iris.BioDefs <> bslots def
+R14745:14752 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14733:14742 xv6iris.IrefSlots <> iref_slots def
+R14767:14847 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14753:14759 xv6iris.LogInv <> log_opS def
+R14761:14761 xv6iris.DirViewPin <> g:89 var
+R14763:14763 xv6iris.DirViewPin <> n:105 var
+R14765:14766 xv6iris.DirViewPin <> Sb:106 var
+R14872:14879 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14848:14855 xv6iris.DirViewPin <> dvp_pins def
+R14857:14860 xv6iris.DirViewPin <> root:125 var
+R14862:14865 xv6iris.DirViewPin <> hops:107 var
+R16357:16364 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14880:14886 xv6iris.WpNext <> wp_next def
+R14908:14912 xv6iris.RiscvLang <> CpuId class
+binder 14902:14904 <> CID:128
+R14920:14924 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R15007:15015 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R14930:14936 xv6iris.RegFile <> regfile def
+binder 14925:14926 <> mf:129
+R14945:14947 Corelib.Init.Datatypes <> nat ind
+binder 14940:14941 <> n':130
+R14957:14960 stdpp.gmap <> gset def
+R14962:14962 Corelib.Numbers.BinNums <> Z ind
+binder 14951:14953 <> Sb':131
+R14975:14978 Corelib.Init.Datatypes <> bool ind
+binder 14970:14971 <> ok:132
+R14988:14992 SailStdpp.Values <> mword def
+binder 14982:14984 <> ipv:133
+R15003:15006 Corelib.Init.Datatypes <> bool ind
+binder 14999:14999 <> w:134
+R15039:15050 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15016:15018 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15036:15038 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15019:15030 xv6iris.CalleeSaved <> callee_saved def
+R15032:15032 xv6iris.DirViewPin <> m:113 var
+R15034:15035 xv6iris.DirViewPin <> mf:129 var
+R15076:15087 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15051:15061 xv6iris.IntrDefs <> sie_cap_gpr def
+R15063:15065 xv6iris.Ktier <> KT1 constr
+R15067:15068 xv6iris.DirViewPin <> mf:129 var
+R15070:15070 xv6iris.DirViewPin <> K:114 var
+R15072:15072 xv6iris.DirViewPin <> b:116 var
+R15074:15075 xv6iris.DirViewPin <> pj:120 var
+R15109:15120 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15088:15094 xv6iris.CpuOwn <> cpu_own def
+R15098:15099 xv6iris.DirViewPin <> eb:115 var
+R15101:15102 xv6iris.DirViewPin <> pj:120 var
+R15104:15104 xv6iris.DirViewPin <> b:116 var
+R15106:15108 xv6iris.DirViewPin <> lks:117 var
+R15141:15152 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15121:15133 xv6iris.IntrDefs <> trap_csrs_ext def
+R15135:15137 xv6iris.Ktier <> KT1 constr
+R15139:15140 xv6iris.DirViewPin <> eb:115 var
+R15172:15183 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15153:15165 xv6iris.IntrDefs <> cpu_claim_ext def
+R15167:15168 xv6iris.DirViewPin <> eb:115 var
+R15170:15171 xv6iris.DirViewPin <> pj:120 var
+R15197:15208 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15184:15188 xv6iris.InstrBytes <> pc_is def
+R15190:15196 xv6iris.DirViewPin <> ret_tgt:122 var
+R15269:15280 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15221:15228 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R15232:15234 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R15268:15268 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R15209:15220 xv6iris.BitmapInv <> sb_bmapstart def
+R15229:15231 xv6iris.DirViewPin <> dqb:110 var
+R15260:15264 SailStdpp.Values <> mword def
+R15235:15246 SailStdpp.Values <> mword_of_int def
+R15248:15256 xv6iris.DirViewPin <> bmapstart:98 var
+R15343:15354 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15294:15301 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R15305:15307 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R15342:15342 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R15281:15293 xv6iris.InodeInv <> sb_inodestart def
+R15302:15304 xv6iris.DirViewPin <> dqs:111 var
+R15334:15338 SailStdpp.Values <> mword def
+R15308:15319 SailStdpp.Values <> mword_of_int def
+R15321:15330 xv6iris.DirViewPin <> inodestart:99 var
+R15381:15392 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15355:15368 xv6iris.ProcDefs <> proc_priv_bare def
+R15370:15371 xv6iris.DirViewPin <> pj:120 var
+R15373:15376 xv6iris.DirViewPin <> pidv:108 var
+R15378:15380 xv6iris.DirViewPin <> Vpr:118 var
+R15416:15427 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15393:15402 xv6iris.IcacheRef <> inode_held def
+R15405:15410 xv6iris.ProcDefs <> pv_cwd proj
+R15412:15414 xv6iris.DirViewPin <> Vpr:118 var
+R15428:15428 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15498:15510 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15429:15439 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R15441:15445 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R15460:15461 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 15440:15440 <> i:135
+binder 15440:15440 <> i:136
+R15473:15480 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R15484:15484 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R15491:15491 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R15481:15483 xv6iris.Ktier <> KT1 constr
+R15462:15467 xv6iris.RiscvModelBytes <> pa_add def
+R15469:15470 xv6iris.DirViewPin <> pv:121 var
+R15472:15472 xv6iris.DirViewPin <> i:135 var
+R15485:15485 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R15490:15490 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R15486:15489 xv6iris.DirViewPin <> dqpv:112 var
+R15492:15495 xv6iris.DirViewPin <> pfun:104 var
+R15497:15497 xv6iris.DirViewPin <> i:135 var
+R15446:15448 Corelib.Lists.ListDef <> seq def
+R15453:15453 Corelib.Init.Datatypes <> S constr
+R15455:15458 xv6iris.DirViewPin <> plen:103 var
+R15519:15530 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15511:15516 xv6iris.BioDefs <> bslots def
+R15547:15558 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15531:15533 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15544:15546 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15536:15540 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R15534:15535 xv6iris.DirViewPin <> Sb:106 var
+R15541:15543 xv6iris.DirViewPin <> Sb':131 var
+R15594:15605 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15559:15561 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15591:15593 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15570:15573 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15563:15565 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15562:15562 xv6iris.DirViewPin <> w:134 var
+R15566:15569 Corelib.Init.Datatypes <> true constr
+R15583:15587 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R15574:15582 xv6iris.DirViewPin <> bmapstart:98 var
+R15588:15590 xv6iris.DirViewPin <> Sb':131 var
+R15704:15715 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15606:15608 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15701:15703 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15677:15687 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R15666:15669 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R15612:15615 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R15660:15660 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R15611:15611 xv6iris.DirViewPin <> n:105 var
+R15628:15631 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R15659:15659 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R15616:15625 xv6iris.SpecNamex <> walk_spend def
+R15627:15627 xv6iris.DirViewPin <> w:134 var
+R15632:15634 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R15637:15642 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R15648:15653 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R15635:15636 xv6iris.DirViewPin <> ok:132 var
+R15670:15671 xv6iris.DirViewPin <> n':130 var
+R15691:15694 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R15689:15690 xv6iris.DirViewPin <> n':130 var
+R15695:15695 xv6iris.DirViewPin <> n:105 var
+R15732:15743 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15716:15722 xv6iris.LogInv <> log_opS def
+R15724:15724 xv6iris.DirViewPin <> g:89 var
+R15726:15727 xv6iris.DirViewPin <> n':130 var
+R15729:15731 xv6iris.DirViewPin <> Sb':131 var
+R15744:15744 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16316:16328 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15745:15747 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R15750:15762 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R15999:16011 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R16102:16118 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16012:16014 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R16099:16101 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R16056:16072 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16098:16098 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16017:16021 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R16022:16027 Riscv.rv64d_types <> Regidx constr
+R16048:16052 SailStdpp.Values <> mword def
+R16030:16041 SailStdpp.Values <> mword_of_int def
+R16015:16016 xv6iris.DirViewPin <> mf:129 var
+R16090:16094 SailStdpp.Values <> mword def
+R16073:16084 SailStdpp.Values <> mword_of_int def
+R16131:16148 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16315:16315 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16119:16128 xv6iris.IrefSlots <> iref_slots def
+R16149:16153 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R16169:16171 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R16158:16160 Corelib.Init.Datatypes <> nat ind
+binder 16154:16154 <> k:137
+R16168:16168 Corelib.Numbers.BinNums <> Z ind
+binder 16164:16164 <> d:138
+R16199:16219 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16314:16314 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16172:16174 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R16196:16198 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R16177:16179 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R16176:16176 xv6iris.DirViewPin <> k:137 var
+R16180:16185 Stdlib.Lists.List <> length abbrev
+R16187:16190 xv6iris.DirViewPin <> hops:107 var
+R16220:16220 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R16274:16295 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R16249:16253 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16221:16223 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R16246:16248 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R16225:16227 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16224:16224 xv6iris.DirViewPin <> d:138 var
+R16228:16233 xv6iris.DirViewPin <> dvp_at def
+R16235:16238 xv6iris.DirViewPin <> root:125 var
+R16240:16243 xv6iris.DirViewPin <> hops:107 var
+R16245:16245 xv6iris.DirViewPin <> k:137 var
+R16254:16261 xv6iris.DirViewPin <> dvp_pins def
+R16263:16266 xv6iris.DirViewPin <> root:125 var
+R16268:16271 xv6iris.DirViewPin <> hops:107 var
+R16273:16273 xv6iris.DirViewPin <> k:137 var
+R16296:16303 xv6iris.DirViewPin <> dvp_lost def
+R16305:16308 xv6iris.DirViewPin <> root:125 var
+R16310:16313 xv6iris.DirViewPin <> hops:107 var
+R15763:15767 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R15774:15790 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R15773:15773 Corelib.Numbers.BinNums <> Z ind
+binder 15768:15769 <> iL:139
+R15844:15862 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15791:15793 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15841:15843 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15835:15837 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15796:15800 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R15801:15806 Riscv.rv64d_types <> Regidx constr
+R15827:15831 SailStdpp.Values <> mword def
+R15809:15820 SailStdpp.Values <> mword_of_int def
+R15794:15795 xv6iris.DirViewPin <> mf:129 var
+R15838:15840 xv6iris.DirViewPin <> ipv:133 var
+R15883:15901 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15863:15875 xv6iris.SpecNameiTr <> inode_held_at def
+R15881:15882 xv6iris.DirViewPin <> iL:139 var
+R15877:15879 xv6iris.DirViewPin <> ipv:133 var
+R15914:15933 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15998:15998 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15902:15911 xv6iris.IrefSlots <> iref_slots def
+R15975:15979 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R15934:15936 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15972:15974 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15939:15941 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15937:15938 xv6iris.DirViewPin <> iL:139 var
+R15942:15947 xv6iris.DirViewPin <> dvp_at def
+R15949:15952 xv6iris.DirViewPin <> root:125 var
+R15954:15957 xv6iris.DirViewPin <> hops:107 var
+R15960:15965 Stdlib.Lists.List <> length abbrev
+R15967:15970 xv6iris.DirViewPin <> hops:107 var
+R15980:15987 xv6iris.DirViewPin <> dvp_lost def
+R15989:15992 xv6iris.DirViewPin <> root:125 var
+R15994:15997 xv6iris.DirViewPin <> hops:107 var
+R15748:15749 xv6iris.DirViewPin <> ok:132 var
+R16329:16332 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16355:16355 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16340:16343 iris.program_logic.language <> expr proj
+R16345:16354 xv6iris.RiscvLang <> riscv_lang def
+R16333:16336 xv6iris.RiscvLang <> Loop abbrev
+R14893:14894 xv6iris.DirViewPin <> pj:120 var
+R14888:14891 Corelib.Init.Datatypes <> true constr
+R16365:16368 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16391:16391 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16376:16379 iris.program_logic.language <> expr proj
+R16381:16390 xv6iris.RiscvLang <> riscv_lang def
+R16369:16372 xv6iris.RiscvLang <> Loop abbrev
+R16425:16432 xv6iris.SpecNameiTr NAMEI_TR <> mod
+mod 16402:16417 <> NameiPinnedProof
+prf 16445:16459 NameiPinnedProof wp_namei_pinned
+R16468:16474 xv6iris.RiscvPtsto <> riscvGS class
+binder 16476:16477 <> Σ:140
+binder 16467:16477 <> riscvGS0:141
+R16481:16484 xv6iris.Xv6G <> xv6G class
+R16486:16487 xv6iris.DirViewPin <> Σ:140 var
+binder 16480:16487 <> xv6G0:142
+R16491:16498 xv6iris.Xv6Cameras <> bioslotG class
+R16500:16501 xv6iris.DirViewPin <> Σ:140 var
+binder 16490:16501 <> bioslotG0:143
+R16505:16511 xv6iris.FdSlots <> fdslotG class
+R16513:16514 xv6iris.DirViewPin <> Σ:140 var
+binder 16504:16514 <> fdslotG0:144
+R16518:16522 xv6iris.FileInvDefs <> fileG class
+R16524:16525 xv6iris.DirViewPin <> Σ:140 var
+binder 16517:16525 <> fileG0:145
+R16541:16544 xv6iris.IcacheRef <> icfg class
+binder 16534:16537 <> ICFG:146
+R16548:16556 xv6iris.IrefSlots <> irefslotG class
+R16558:16559 xv6iris.DirViewPin <> Σ:140 var
+binder 16547:16559 <> irefslotG0:147
+R16563:16566 xv6iris.ProcAvail <> pavG class
+R16568:16569 xv6iris.DirViewPin <> Σ:140 var
+binder 16562:16569 <> pavG0:148
+R16580:16584 xv6iris.RiscvLang <> GenId class
+binder 16574:16576 <> GEN:149
+R16595:16599 xv6iris.RiscvLang <> CpuId class
+binder 16589:16591 <> CID:150
+R16609:16614 xv6iris.TsoCtx <> CurCtx class
+binder 16604:16605 <> XI:151
+R16627:16630 Corelib.Init.Datatypes <> list ind
+R16632:16636 iris.base_logic.lib.iprop <> gname def
+binder 16622:16623 <> gs:152
+R16644:16646 Corelib.Init.Datatypes <> nat ind
+binder 16640:16640 <> j:153
+R16655:16659 iris.base_logic.lib.iprop <> gname def
+binder 16650:16651 <> gl:154
+R16672:16681 xv6iris.WpUart <> uart_names rec
+binder 16667:16668 <> gu:155
+R16690:16699 xv6iris.DiskPtsto <> disk_names rec
+binder 16685:16686 <> gd:156
+R16708:16712 iris.base_logic.lib.iprop <> gname def
+binder 16703:16704 <> gk:157
+R16732:16736 SailStdpp.Values <> mword def
+binder 16720:16721 <> pd:158
+binder 16723:16725 <> pav:159
+binder 16727:16728 <> pu:160
+R16752:16760 xv6iris.BioDefs <> bio_names rec
+binder 16747:16748 <> bn:161
+R16772:16780 xv6iris.LogDefs <> log_names rec
+binder 16768:16768 <> g:162
+R16790:16797 xv6iris.FsBlocks <> fs_names rec
+binder 16784:16786 <> gfs:163
+R16806:16810 iris.base_logic.lib.iprop <> gname def
+binder 16801:16802 <> gi:164
+R16823:16830 xv6iris.IcacheEscrow <> ic_names rec
+binder 16818:16819 <> cn:165
+R16840:16844 iris.base_logic.lib.iprop <> gname def
+binder 16834:16836 <> gtl:166
+R16857:16861 iris.base_logic.lib.iprop <> gname def
+binder 16852:16853 <> ga:167
+R16870:16874 iris.base_logic.lib.iprop <> gname def
+binder 16865:16866 <> gf:168
+R16888:16891 stdpp.gmap <> gset def
+R16893:16893 Corelib.Numbers.BinNums <> Z ind
+binder 16882:16884 <> cov:169
+R16929:16929 Corelib.Numbers.BinNums <> Z ind
+binder 16897:16904 <> logstart:170
+binder 16906:16914 <> bmapstart:171
+binder 16916:16925 <> inodestart:172
+R16939:16941 Corelib.Init.Datatypes <> nat ind
+binder 16933:16935 <> nib:173
+R16956:16956 Corelib.Numbers.BinNums <> Z ind
+binder 16949:16952 <> size:174
+R16966:16970 SailStdpp.Values <> mword def
+binder 16960:16962 <> dev:175
+R16988:16990 Corelib.Init.Datatypes <> nat ind
+binder 16981:16984 <> plen:176
+R17004:17007 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17001:17003 Corelib.Init.Datatypes <> nat ind
+R17008:17009 stdpp.bitvector.definitions <> bv rec
+binder 16994:16997 <> pfun:177
+R17023:17025 Corelib.Init.Datatypes <> nat ind
+binder 17019:17019 <> n:178
+R17034:17037 stdpp.gmap <> gset def
+R17039:17039 Corelib.Numbers.BinNums <> Z ind
+binder 17029:17030 <> Sb:179
+R17054:17057 Corelib.Init.Datatypes <> list ind
+R17065:17067 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R17060:17064 xv6iris.FsTree <> fname def
+R17068:17068 Corelib.Numbers.BinNums <> Z ind
+binder 17047:17050 <> hops:180
+R17084:17088 SailStdpp.Values <> mword def
+binder 17077:17080 <> pidv:181
+R17113:17117 iris.algebra.dfrac <> dfrac ind
+binder 17095:17096 <> dq:182
+binder 17098:17100 <> dqb:183
+binder 17102:17104 <> dqs:184
+binder 17106:17109 <> dqpv:185
+R17129:17135 xv6iris.RegFile <> regfile def
+binder 17125:17125 <> m:186
+R17143:17145 Corelib.Init.Datatypes <> nat ind
+binder 17139:17139 <> K:187
+R17154:17157 Corelib.Init.Datatypes <> bool ind
+binder 17149:17150 <> eb:188
+R17169:17172 Corelib.Init.Datatypes <> bool ind
+binder 17165:17165 <> b:189
+R17182:17185 stdpp.gmap <> gset def
+R17187:17192 Stdlib.Strings.String <> string ind
+binder 17176:17178 <> lks:190
+R17202:17209 xv6iris.ProcDefs <> pprivate rec
+binder 17196:17198 <> Vpr:191
+R17218:17237 xv6iris.DirViewPin <> wp_namei_pinned_body def
+R17467:17469 xv6iris.DirViewPin <> Vpr:191 var
+R17463:17465 xv6iris.DirViewPin <> lks:190 var
+R17461:17461 xv6iris.DirViewPin <> b:189 var
+R17458:17459 xv6iris.DirViewPin <> eb:188 var
+R17456:17456 xv6iris.DirViewPin <> K:187 var
+R17454:17454 xv6iris.DirViewPin <> m:186 var
+R17449:17452 xv6iris.DirViewPin <> dqpv:185 var
+R17445:17447 xv6iris.DirViewPin <> dqs:184 var
+R17441:17443 xv6iris.DirViewPin <> dqb:183 var
+R17438:17439 xv6iris.DirViewPin <> dq:182 var
+R17433:17436 xv6iris.DirViewPin <> pidv:181 var
+R17403:17406 xv6iris.DirViewPin <> hops:180 var
+R17400:17401 xv6iris.DirViewPin <> Sb:179 var
+R17398:17398 xv6iris.DirViewPin <> n:178 var
+R17393:17396 xv6iris.DirViewPin <> pfun:177 var
+R17388:17391 xv6iris.DirViewPin <> plen:176 var
+R17384:17386 xv6iris.DirViewPin <> dev:175 var
+R17379:17382 xv6iris.DirViewPin <> size:174 var
+R17350:17352 xv6iris.DirViewPin <> nib:173 var
+R17339:17348 xv6iris.DirViewPin <> inodestart:172 var
+R17329:17337 xv6iris.DirViewPin <> bmapstart:171 var
+R17320:17327 xv6iris.DirViewPin <> logstart:170 var
+R17316:17318 xv6iris.DirViewPin <> cov:169 var
+R17313:17314 xv6iris.DirViewPin <> gf:168 var
+R17310:17311 xv6iris.DirViewPin <> ga:167 var
+R17281:17283 xv6iris.DirViewPin <> gtl:166 var
+R17278:17279 xv6iris.DirViewPin <> cn:165 var
+R17275:17276 xv6iris.DirViewPin <> gi:164 var
+R17271:17273 xv6iris.DirViewPin <> gfs:163 var
+R17269:17269 xv6iris.DirViewPin <> g:162 var
+R17266:17267 xv6iris.DirViewPin <> bn:161 var
+R17263:17264 xv6iris.DirViewPin <> pu:160 var
+R17259:17261 xv6iris.DirViewPin <> pav:159 var
+R17256:17257 xv6iris.DirViewPin <> pd:158 var
+R17253:17254 xv6iris.DirViewPin <> gk:157 var
+R17250:17251 xv6iris.DirViewPin <> gd:156 var
+R17247:17248 xv6iris.DirViewPin <> gu:155 var
+R17244:17245 xv6iris.DirViewPin <> gl:154 var
+R17242:17242 xv6iris.DirViewPin <> j:153 var
+R17239:17240 xv6iris.DirViewPin <> gs:152 var
+R17494:17513 xv6iris.DirViewPin <> wp_namei_pinned_body def
+R17494:17513 xv6iris.DirViewPin <> wp_namei_pinned_body def
+R17494:17513 xv6iris.DirViewPin <> wp_namei_pinned_body def
+R17873:17873 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18313:18330 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18569:18569 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17874:17887 xv6iris.DirViewPin NT wp_namei_tr defax
+R18095:18103 xv6iris.DirViewPin <> dvp_Pmiss def
+R18106:18116 stdpp.bitvector.definitions <> bv_unsigned proj
+R18118:18124 xv6iris.InodeInv <> ROOTINO def
+R18046:18050 xv6iris.DirViewPin <> dvp_P def
+R18053:18063 stdpp.bitvector.definitions <> bv_unsigned proj
+R18065:18071 xv6iris.InodeInv <> ROOTINO def
+R17873:17873 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18313:18330 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18569:18569 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17874:17887 xv6iris.DirViewPin NT wp_namei_tr defax
+R18095:18103 xv6iris.DirViewPin <> dvp_Pmiss def
+R18106:18116 stdpp.bitvector.definitions <> bv_unsigned proj
+R18118:18124 xv6iris.InodeInv <> ROOTINO def
+R18046:18050 xv6iris.DirViewPin <> dvp_P def
+R18053:18063 stdpp.bitvector.definitions <> bv_unsigned proj
+R18065:18071 xv6iris.InodeInv <> ROOTINO def
+R18689:18693 xv6iris.DirViewPin <> dvp_P def
+R18689:18693 xv6iris.DirViewPin <> dvp_P def
+R18689:18693 xv6iris.DirViewPin <> dvp_P def
+R18742:18749 xv6iris.DirViewPin <> dvp_at_0 thm
+R18742:18749 xv6iris.DirViewPin <> dvp_at_0 thm
+R18742:18749 xv6iris.DirViewPin <> dvp_at_0 thm
+R18912:18912 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18946:18951 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18958:18958 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18913:18923 xv6iris.DirViewPin <> dvp_nx_hops thm
+R18912:18912 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18946:18951 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18958:18958 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18913:18923 xv6iris.DirViewPin <> dvp_nx_hops thm
+R19081:19083 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19044:19049 Stdlib.Lists.List <> length abbrev
+R19052:19061 xv6iris.PathElems <> path_elems def
+R19064:19068 xv6iris.DirentEnc <> bview def
+R19084:19089 Stdlib.Lists.List <> length abbrev
+R19081:19083 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19044:19049 Stdlib.Lists.List <> length abbrev
+R19052:19061 xv6iris.PathElems <> path_elems def
+R19064:19068 xv6iris.DirentEnc <> bview def
+R19084:19089 Stdlib.Lists.List <> length abbrev
+R19127:19137 stdpp.list_monad <> length_fmap thm
+R19127:19137 stdpp.list_monad <> length_fmap thm
+R19127:19137 stdpp.list_monad <> length_fmap thm
+R19157:19163 xv6iris.WpNext <> wp_next def
+R19157:19163 xv6iris.WpNext <> wp_next def
+R19157:19163 xv6iris.WpNext <> wp_next def
+R19204:19204 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19212:19215 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19220:19225 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19231:19231 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19204:19204 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19212:19215 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19220:19225 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19231:19231 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19399:19399 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19407:19410 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19413:19413 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19416:19416 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19420:19420 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19423:19423 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19427:19427 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19429:19449 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19552:19552 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19399:19399 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19407:19410 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19413:19413 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19416:19416 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19420:19420 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19423:19423 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19427:19427 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19429:19449 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19552:19552 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R19716:19716 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19725:19730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19735:19735 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19717:19724 xv6iris.DirViewPin <> dvp_P_at thm
+R19716:19716 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19725:19730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19735:19735 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19717:19724 xv6iris.DirViewPin <> dvp_P_at thm
+R20040:20044 xv6iris.DirViewPin <> dvp_P def
+R20040:20044 xv6iris.DirViewPin <> dvp_P def
+R20040:20044 xv6iris.DirViewPin <> dvp_P def
+R20110:20115 xv6iris.DirViewPin <> dvp_at def
+R20118:20128 stdpp.bitvector.definitions <> bv_unsigned proj
+R20130:20136 xv6iris.InodeInv <> ROOTINO def
+R20110:20115 xv6iris.DirViewPin <> dvp_at def
+R20118:20128 stdpp.bitvector.definitions <> bv_unsigned proj
+R20130:20136 xv6iris.InodeInv <> ROOTINO def
+R20365:20373 xv6iris.DirViewPin <> dvp_Pmiss def
+R20365:20373 xv6iris.DirViewPin <> dvp_Pmiss def
+R20365:20373 xv6iris.DirViewPin <> dvp_Pmiss def
+R20404:20419 xv6iris.DirViewPin NameiPinnedProof <> mod

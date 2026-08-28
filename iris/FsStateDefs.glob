@@ -1,0 +1,394 @@
+DIGEST f1ccf11a09c4f94ce8da3a607c7dfebe
+Fxv6iris.FsStateDefs
+R1696:1701 Stdlib.ZArith.ZArith <> <> lib
+R1703:1705 Stdlib.micromega.Lia <> <> lib
+R1707:1710 Stdlib.Lists.List <> <> lib
+R1739:1742 stdpp.gmap <> <> lib
+R1744:1747 stdpp.list <> <> lib
+R1749:1769 stdpp.bitvector.definitions <> <> lib
+R1807:1815 iris.proofmode.proofmode <> <> lib
+R1858:1862 iris.base_logic.lib.iprop <> <> lib
+R1880:1886 xv6iris.BioDefs <> <> lib
+R1904:1908 xv6iris.FsImg <> <> lib
+sec 2315:2323 <> GammaDefs
+var  2337:2338 GammaDefs Σ
+R2342:2350 iris.base_logic.lib.iprop <> gFunctors rec
+rec 2559:2571 <> fs_view_names
+proj 2591:2594 <> fsΦ
+proj 2667:2672 <> γlink
+proj 2749:2753 <> γtop
+R2601:2604 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2600:2600 Corelib.Numbers.BinNums <> Z ind
+R2609:2612 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2605:2606 stdpp.bitvector.definitions <> bv rec
+R2613:2617 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R2619:2620 xv6iris.FsStateDefs <> GammaDefs.Σ var
+R2676:2680 iris.base_logic.lib.iprop <> gname def
+R2758:2762 iris.base_logic.lib.iprop <> gname def
+def 2917:2924 <> phi_excl
+R2932:2944 xv6iris.FsStateDefs <> fs_view_names rec
+binder 2927:2928 <> Γ:6
+R2961:2968 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2987:2989 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2973:2973 Corelib.Numbers.BinNums <> Z ind
+binder 2969:2969 <> a:7
+R2983:2984 stdpp.bitvector.definitions <> bv rec
+binder 2977:2977 <> v:8
+R2983:2984 stdpp.bitvector.definitions <> bv rec
+binder 2979:2979 <> w:9
+R2990:2990 iris.bi.interface <> ::stdpp_scope:x_'⊢'_x not
+R3018:3023 iris.bi.interface <> ::stdpp_scope:x_'⊢'_x not
+R3002:3006 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2991:2994 xv6iris.FsStateDefs <> fsΦ proj
+R2996:2997 xv6iris.FsStateDefs <> Γ:6 var
+R2999:2999 xv6iris.FsStateDefs <> a:7 var
+R3001:3001 xv6iris.FsStateDefs <> v:8 var
+R3007:3010 xv6iris.FsStateDefs <> fsΦ proj
+R3012:3013 xv6iris.FsStateDefs <> Γ:6 var
+R3015:3015 xv6iris.FsStateDefs <> a:7 var
+R3017:3017 xv6iris.FsStateDefs <> w:9 var
+R3024:3028 iris.bi.interface <> ::bi_scope:'False' not
+ind 3040:3048 <> GTimeless
+constr 3078:3086 <> gtimeless
+rec 3040:3048 <> GTimeless
+proj 3078:3086 <> gtimeless
+R3056:3068 xv6iris.FsStateDefs <> fs_view_names rec
+binder 3051:3052 <> Γ:10
+R3090:3097 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3114:3116 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3102:3102 Corelib.Numbers.BinNums <> Z ind
+binder 3098:3098 <> a:12
+R3110:3111 stdpp.bitvector.definitions <> bv rec
+binder 3106:3106 <> v:13
+R3117:3124 iris.bi.derived_connectives <> Timeless class
+R3127:3130 xv6iris.FsStateDefs <> fsΦ proj
+R3132:3133 xv6iris.FsStateDefs <> Γ:10 var
+R3135:3135 xv6iris.FsStateDefs <> a:12 var
+R3137:3137 xv6iris.FsStateDefs <> v:13 var
+def 3432:3441 <> byte_range
+R3449:3461 xv6iris.FsStateDefs <> fs_view_names rec
+binder 3444:3445 <> Γ:15
+R3473:3473 Corelib.Numbers.BinNums <> Z ind
+binder 3465:3465 <> b:16
+binder 3467:3469 <> off:17
+R3482:3485 Corelib.Init.Datatypes <> list ind
+R3488:3489 stdpp.bitvector.definitions <> bv rec
+binder 3477:3478 <> bs:18
+R3501:3505 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3507:3508 xv6iris.FsStateDefs <> GammaDefs.Σ var
+R3518:3528 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R3530:3534 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R3536:3540 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R3543:3544 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+binder 3529:3529 <> k:19
+binder 3529:3529 <> k:20
+binder 3535:3535 <> v:21
+binder 3535:3535 <> v:22
+R3545:3548 xv6iris.FsStateDefs <> fsΦ proj
+R3550:3551 xv6iris.FsStateDefs <> Γ:15 var
+R3571:3573 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R3565:3567 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R3555:3557 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R3554:3554 xv6iris.FsStateDefs <> b:16 var
+R3558:3564 xv6iris.FsImg <> BSIZE_z def
+R3568:3570 xv6iris.FsStateDefs <> off:17 var
+R3574:3581 Stdlib.ZArith.BinInt Z of_nat def
+R3583:3583 xv6iris.FsStateDefs <> k:19 var
+R3586:3586 xv6iris.FsStateDefs <> v:21 var
+R3541:3542 xv6iris.FsStateDefs <> bs:18 var
+def 3647:3655 <> blk_owned
+R3663:3675 xv6iris.FsStateDefs <> fs_view_names rec
+binder 3658:3659 <> Γ:23
+R3683:3683 Corelib.Numbers.BinNums <> Z ind
+binder 3679:3679 <> b:24
+R3692:3695 Corelib.Init.Datatypes <> list ind
+R3698:3699 stdpp.bitvector.definitions <> bv rec
+binder 3687:3688 <> bs:25
+R3711:3715 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3717:3718 xv6iris.FsStateDefs <> GammaDefs.Σ var
+R3751:3755 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3728:3730 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3748:3750 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3740:3742 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3731:3736 Corelib.Init.Datatypes <> length def
+R3738:3739 xv6iris.FsStateDefs <> bs:25 var
+R3743:3747 xv6iris.BioDefs <> BSIZE def
+R3756:3765 xv6iris.FsStateDefs <> byte_range def
+R3767:3768 xv6iris.FsStateDefs <> Γ:23 var
+R3770:3770 xv6iris.FsStateDefs <> b:24 var
+R3774:3775 xv6iris.FsStateDefs <> bs:25 var
+inst 3800:3818 <> byte_range_timeless
+R3823:3831 xv6iris.FsStateDefs <> GTimeless class
+binder 3833:3834 <> Γ:26
+binder 3822:3834 <> GTimeless0:27
+binder 3837:3837 <> b:28
+binder 3839:3841 <> off:29
+binder 3843:3844 <> bs:30
+R3852:3859 iris.bi.derived_connectives <> Timeless class
+R3862:3871 xv6iris.FsStateDefs <> byte_range def
+R3873:3874 xv6iris.FsStateDefs <> Γ:26 var
+R3876:3876 xv6iris.FsStateDefs <> b:28 var
+R3878:3880 xv6iris.FsStateDefs <> off:29 var
+R3882:3883 xv6iris.FsStateDefs <> bs:30 var
+R3909:3918 xv6iris.FsStateDefs <> byte_range def
+R3909:3918 xv6iris.FsStateDefs <> byte_range def
+R3909:3918 xv6iris.FsStateDefs <> byte_range def
+R3927:3943 iris.bi.big_op <> big_sepL_timeless thm
+R3927:3943 iris.bi.big_op <> big_sepL_timeless thm
+R3964:3972 xv6iris.FsStateDefs <> gtimeless def
+R3964:3972 xv6iris.FsStateDefs <> gtimeless def
+inst 4001:4018 <> blk_owned_timeless
+R4023:4031 xv6iris.FsStateDefs <> GTimeless class
+binder 4033:4034 <> Γ:31
+binder 4022:4034 <> GTimeless0:32
+binder 4037:4037 <> b:33
+binder 4039:4040 <> bs:34
+R4048:4055 iris.bi.derived_connectives <> Timeless class
+R4058:4066 xv6iris.FsStateDefs <> blk_owned def
+R4068:4069 xv6iris.FsStateDefs <> Γ:31 var
+R4071:4071 xv6iris.FsStateDefs <> b:33 var
+R4073:4074 xv6iris.FsStateDefs <> bs:34 var
+R4096:4104 xv6iris.FsStateDefs <> blk_owned def
+R4096:4104 xv6iris.FsStateDefs <> blk_owned def
+R4096:4104 xv6iris.FsStateDefs <> blk_owned def
+prf 4130:4145 <> blk_owned_length
+binder 4147:4148 <> Γ:35
+binder 4150:4150 <> b:36
+binder 4152:4153 <> bs:37
+R4174:4179 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4157:4165 xv6iris.FsStateDefs <> blk_owned def
+R4167:4168 xv6iris.FsStateDefs <> Γ:35 var
+R4170:4170 xv6iris.FsStateDefs <> b:36 var
+R4172:4173 xv6iris.FsStateDefs <> bs:37 var
+R4180:4182 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4200:4202 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4192:4194 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4183:4188 Corelib.Init.Datatypes <> length def
+R4190:4191 xv6iris.FsStateDefs <> bs:37 var
+R4195:4199 xv6iris.BioDefs <> BSIZE def
+prf 4251:4264 <> byte_range_nil
+binder 4266:4267 <> Γ:38
+binder 4269:4269 <> b:39
+binder 4271:4273 <> off:40
+R4299:4306 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R4277:4286 xv6iris.FsStateDefs <> byte_range def
+R4288:4289 xv6iris.FsStateDefs <> Γ:38 var
+R4291:4291 xv6iris.FsStateDefs <> b:39 var
+R4293:4295 xv6iris.FsStateDefs <> off:40 var
+R4297:4298 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R4307:4309 iris.bi.interface <> ::bi_scope:'emp' not
+R4330:4339 xv6iris.FsStateDefs <> byte_range def
+R4330:4339 xv6iris.FsStateDefs <> byte_range def
+R4330:4339 xv6iris.FsStateDefs <> byte_range def
+prf 4359:4372 <> byte_range_app
+binder 4374:4375 <> Γ:41
+binder 4377:4377 <> b:42
+binder 4379:4381 <> off:43
+binder 4383:4385 <> bs1:44
+binder 4387:4389 <> bs2:45
+R4429:4440 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R4397:4406 xv6iris.FsStateDefs <> byte_range def
+R4408:4409 xv6iris.FsStateDefs <> Γ:41 var
+R4411:4411 xv6iris.FsStateDefs <> b:42 var
+R4413:4415 xv6iris.FsStateDefs <> off:43 var
+R4421:4424 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R4418:4420 xv6iris.FsStateDefs <> bs1:44 var
+R4425:4427 xv6iris.FsStateDefs <> bs2:45 var
+R4464:4476 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4441:4450 xv6iris.FsStateDefs <> byte_range def
+R4452:4453 xv6iris.FsStateDefs <> Γ:41 var
+R4455:4455 xv6iris.FsStateDefs <> b:42 var
+R4457:4459 xv6iris.FsStateDefs <> off:43 var
+R4461:4463 xv6iris.FsStateDefs <> bs1:44 var
+R4477:4486 xv6iris.FsStateDefs <> byte_range def
+R4488:4489 xv6iris.FsStateDefs <> Γ:41 var
+R4491:4491 xv6iris.FsStateDefs <> b:42 var
+R4497:4499 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4494:4496 xv6iris.FsStateDefs <> off:43 var
+R4500:4507 Stdlib.ZArith.BinInt Z of_nat def
+R4510:4515 Corelib.Init.Datatypes <> length def
+R4517:4519 xv6iris.FsStateDefs <> bs1:44 var
+R4523:4525 xv6iris.FsStateDefs <> bs2:45 var
+R4550:4559 xv6iris.FsStateDefs <> byte_range def
+R4561:4572 iris.bi.big_op <> big_sepL_app thm
+R4550:4559 xv6iris.FsStateDefs <> byte_range def
+R4550:4559 xv6iris.FsStateDefs <> byte_range def
+R4561:4572 iris.bi.big_op <> big_sepL_app thm
+R4561:4572 iris.bi.big_op <> big_sepL_app thm
+R4585:4597 iris.bi.derived_laws bi sep_proper inst
+R4585:4597 iris.bi.derived_laws bi sep_proper inst
+R4620:4634 iris.bi.big_op <> big_sepL_proper thm
+R4620:4634 iris.bi.big_op <> big_sepL_proper thm
+R4713:4732 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4685:4687 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4679:4681 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4669:4671 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R4672:4678 xv6iris.FsImg <> BSIZE_z def
+R4688:4695 Stdlib.ZArith.BinInt Z of_nat def
+R4708:4710 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4698:4703 Corelib.Init.Datatypes <> length def
+R4776:4778 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4744:4747 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4775:4775 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4734:4736 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R4737:4743 xv6iris.FsImg <> BSIZE_z def
+R4751:4753 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4754:4761 Stdlib.ZArith.BinInt Z of_nat def
+R4764:4769 Corelib.Init.Datatypes <> length def
+R4779:4786 Stdlib.ZArith.BinInt Z of_nat def
+R4713:4732 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4685:4687 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4679:4681 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4669:4671 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R4672:4678 xv6iris.FsImg <> BSIZE_z def
+R4688:4695 Stdlib.ZArith.BinInt Z of_nat def
+R4708:4710 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4698:4703 Corelib.Init.Datatypes <> length def
+R4776:4778 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4744:4747 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4775:4775 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4734:4736 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R4737:4743 xv6iris.FsImg <> BSIZE_z def
+R4751:4753 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4754:4761 Stdlib.ZArith.BinInt Z of_nat def
+R4764:4769 Corelib.Init.Datatypes <> length def
+R4779:4786 Stdlib.ZArith.BinInt Z of_nat def
+prf 5365:5379 <> byte_range_excl
+binder 5381:5382 <> Γ:46
+R5391:5398 xv6iris.FsStateDefs <> phi_excl def
+R5400:5401 xv6iris.FsStateDefs <> Γ:46 var
+binder 5385:5387 <> Hex:47
+binder 5404:5404 <> b:48
+binder 5406:5408 <> off:49
+binder 5410:5411 <> bs:50
+binder 5413:5415 <> bs':51
+R5442:5445 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5425:5427 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R5428:5433 Corelib.Init.Datatypes <> length def
+R5435:5436 xv6iris.FsStateDefs <> bs:50 var
+R5466:5473 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5448:5450 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R5451:5456 Corelib.Init.Datatypes <> length def
+R5458:5460 xv6iris.FsStateDefs <> bs':51 var
+R5496:5501 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5474:5483 xv6iris.FsStateDefs <> byte_range def
+R5485:5486 xv6iris.FsStateDefs <> Γ:46 var
+R5488:5488 xv6iris.FsStateDefs <> b:48 var
+R5490:5492 xv6iris.FsStateDefs <> off:49 var
+R5494:5495 xv6iris.FsStateDefs <> bs:50 var
+R5525:5530 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5502:5511 xv6iris.FsStateDefs <> byte_range def
+R5513:5514 xv6iris.FsStateDefs <> Γ:46 var
+R5516:5516 xv6iris.FsStateDefs <> b:48 var
+R5518:5520 xv6iris.FsStateDefs <> off:49 var
+R5522:5524 xv6iris.FsStateDefs <> bs':51 var
+R5531:5535 iris.bi.interface <> ::bi_scope:'False' not
+R5600:5618 stdpp.list_basics <> lookup_lt_is_Some_2 thm
+R5600:5618 stdpp.list_basics <> lookup_lt_is_Some_2 thm
+R5658:5676 stdpp.list_basics <> lookup_lt_is_Some_2 thm
+R5658:5676 stdpp.list_basics <> lookup_lt_is_Some_2 thm
+R5719:5728 xv6iris.FsStateDefs <> byte_range def
+R5719:5728 xv6iris.FsStateDefs <> byte_range def
+R5719:5728 xv6iris.FsStateDefs <> byte_range def
+R5745:5745 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5776:5781 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5785:5785 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5746:5760 iris.bi.big_op <> big_sepL_lookup thm
+R5745:5745 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5776:5781 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5785:5785 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5746:5760 iris.bi.big_op <> big_sepL_lookup thm
+R5810:5810 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5843:5848 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5853:5853 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5811:5825 iris.bi.big_op <> big_sepL_lookup thm
+R5810:5810 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5843:5848 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5853:5853 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5811:5825 iris.bi.big_op <> big_sepL_lookup thm
+R5898:5900 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5892:5894 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5882:5884 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R5885:5891 xv6iris.FsImg <> BSIZE_z def
+R5901:5908 Stdlib.ZArith.BinInt Z of_nat def
+R5898:5900 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5892:5894 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5882:5884 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R5885:5891 xv6iris.FsImg <> BSIZE_z def
+R5901:5908 Stdlib.ZArith.BinInt Z of_nat def
+prf 5952:5964 <> BSIZE_pos_nat
+R5970:5972 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R5973:5977 xv6iris.BioDefs <> BSIZE def
+R6003:6007 xv6iris.BioDefs <> BSIZE def
+R6003:6007 xv6iris.BioDefs <> BSIZE def
+R6003:6007 xv6iris.BioDefs <> BSIZE def
+prf 6029:6042 <> blk_owned_excl
+binder 6044:6045 <> Γ:52
+R6054:6061 xv6iris.FsStateDefs <> phi_excl def
+R6063:6064 xv6iris.FsStateDefs <> Γ:52 var
+binder 6048:6050 <> Hex:53
+binder 6067:6067 <> b:54
+binder 6069:6070 <> bs:55
+binder 6072:6074 <> bs':56
+R6099:6104 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6082:6090 xv6iris.FsStateDefs <> blk_owned def
+R6092:6093 xv6iris.FsStateDefs <> Γ:52 var
+R6095:6095 xv6iris.FsStateDefs <> b:54 var
+R6097:6098 xv6iris.FsStateDefs <> bs:55 var
+R6123:6128 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6105:6113 xv6iris.FsStateDefs <> blk_owned def
+R6115:6116 xv6iris.FsStateDefs <> Γ:52 var
+R6118:6118 xv6iris.FsStateDefs <> b:54 var
+R6120:6122 xv6iris.FsStateDefs <> bs':56 var
+R6129:6133 iris.bi.interface <> ::bi_scope:'False' not
+R6189:6189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6223:6228 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6235:6235 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6190:6204 xv6iris.FsStateDefs <> byte_range_excl thm
+R6278:6290 xv6iris.FsStateDefs <> BSIZE_pos_nat thm
+R6189:6189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6223:6228 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6235:6235 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6190:6204 xv6iris.FsStateDefs <> byte_range_excl thm
+R6278:6290 xv6iris.FsStateDefs <> BSIZE_pos_nat thm
+R6278:6290 xv6iris.FsStateDefs <> BSIZE_pos_nat thm
+prf 6515:6526 <> blk_owned_ne
+binder 6528:6529 <> Γ:57
+R6538:6545 xv6iris.FsStateDefs <> phi_excl def
+R6547:6548 xv6iris.FsStateDefs <> Γ:57 var
+binder 6532:6534 <> Hex:58
+binder 6551:6551 <> b:59
+binder 6553:6554 <> b':60
+binder 6556:6557 <> bs:61
+binder 6559:6561 <> bs':62
+R6586:6591 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6569:6577 xv6iris.FsStateDefs <> blk_owned def
+R6579:6580 xv6iris.FsStateDefs <> Γ:57 var
+R6582:6582 xv6iris.FsStateDefs <> b:59 var
+R6584:6585 xv6iris.FsStateDefs <> bs:61 var
+R6611:6616 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6592:6600 xv6iris.FsStateDefs <> blk_owned def
+R6602:6603 xv6iris.FsStateDefs <> Γ:57 var
+R6605:6606 xv6iris.FsStateDefs <> b':60 var
+R6608:6610 xv6iris.FsStateDefs <> bs':62 var
+R6617:6619 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6627:6629 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6621:6624 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R6620:6620 xv6iris.FsStateDefs <> b:59 var
+R6625:6626 xv6iris.FsStateDefs <> b':60 var
+R6671:6676 stdpp.base <> decide def
+R6680:6682 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6671:6676 stdpp.base <> decide def
+R6680:6682 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6727:6727 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6749:6754 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6761:6761 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6728:6741 xv6iris.FsStateDefs <> blk_owned_excl thm
+R6727:6727 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6749:6754 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6761:6761 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6728:6741 xv6iris.FsStateDefs <> blk_owned_excl thm
+R6784:6792 xv6iris.FsStateDefs GammaDefs <> sec
+R6813:6825 xv6iris.FsStateDefs <> fs_view_names rec
+R6813:6825 xv6iris.FsStateDefs <> fs_view_names rec
+R6871:6879 xv6iris.FsStateDefs <> gtimeless def

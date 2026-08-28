@@ -1,0 +1,173 @@
+DIGEST b42fbb7ffcf3eb010394dd7f9ed096ac
+Fxv6iris.ElfKernel
+R2637:2642 Stdlib.ZArith.ZArith <> <> lib
+R2644:2647 Stdlib.Lists.List <> <> lib
+R2685:2691 Stdlib.Strings.PString <> <> lib
+R2720:2723 stdpp.gmap <> <> lib
+R2762:2772 stdpp.bitvector.definitions <> <> lib
+R2803:2809 xv6iris.ElfFile <> <> lib
+R2811:2822 xv6iris.PStringBytes <> <> lib
+R2852:2863 Kernel.KernelElfRaw <> <> lib
+R2865:2876 Kernel.KernelInstrs <> <> lib
+R2878:2887 Kernel.KernelData <> <> lib
+def 3291:3300 <> kernel_elf
+R3304:3312 xv6iris.ElfFile <> elf_bytes def
+R3317:3333 xv6iris.PStringBytes <> pstring_hex_bytes def
+R3335:3348 Kernel.KernelElfRaw <> kernel_elf_hex def
+R4554:4556 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4554:4556 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4582:4588 Corelib.Init.Logic <> eq_refl constr
+prf 4871:4887 <> kernel_elf_length
+R4919:4921 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4891:4898 Stdlib.ZArith.BinInt Z of_nat def
+R4901:4906 stdpp.base <> length abbrev
+R4908:4917 xv6iris.ElfKernel <> kernel_elf def
+R4922:4936 Kernel.KernelElfRaw <> kernel_elf_size def
+R4955:4964 xv6iris.ElfKernel <> kernel_elf def
+R4975:4998 xv6iris.PStringBytes <> pstring_hex_bytes_length thm
+R4975:4998 xv6iris.PStringBytes <> pstring_hex_bytes_length thm
+R4975:4998 xv6iris.PStringBytes <> pstring_hex_bytes_length thm
+prf 5270:5282 <> kernel_elf_wf
+R5303:5305 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5286:5291 xv6iris.ElfFile <> elf_wf def
+R5293:5302 xv6iris.ElfKernel <> kernel_elf def
+R5306:5309 Corelib.Init.Datatypes <> true constr
+prf 5338:5359 <> kernel_elf_sections_wf
+R5389:5391 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5363:5377 xv6iris.ElfFile <> elf_sections_wf def
+R5379:5388 xv6iris.ElfKernel <> kernel_elf def
+R5392:5395 Corelib.Init.Datatypes <> true constr
+prf 5656:5671 <> kernel_elf_entry
+R5695:5697 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5675:5683 xv6iris.ElfFile <> elf_entry def
+R5685:5694 xv6iris.ElfKernel <> kernel_elf def
+R5698:5701 Corelib.Init.Datatypes <> Some constr
+R5703:5724 Kernel.KernelData <> kernelEntry def
+prf 5753:5771 <> kernel_elf_segments
+R5800:5802 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5777:5788 xv6iris.ElfFile <> elf_segments def
+R5790:5799 xv6iris.ElfKernel <> kernel_elf def
+R5803:5806 Corelib.Init.Datatypes <> Some constr
+R5808:5833 Kernel.KernelData <> kernel_segments def
+prf 5862:5876 <> kernel_elf_base
+R5903:5905 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5880:5891 xv6iris.ElfFile <> elf_mem_base def
+R5893:5902 xv6iris.ElfKernel <> kernel_elf def
+R5906:5909 Corelib.Init.Datatypes <> Some constr
+R5911:5934 Kernel.KernelData <> kernelMemBase def
+prf 5963:5976 <> kernel_elf_end
+R6002:6004 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5980:5990 xv6iris.ElfFile <> elf_mem_end def
+R5992:6001 xv6iris.ElfKernel <> kernel_elf def
+R6005:6008 Corelib.Init.Datatypes <> Some constr
+R6010:6032 Kernel.KernelData <> kernelMemEnd def
+prf 6271:6291 <> kernel_elf_rodata_end
+R6322:6324 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6297:6310 xv6iris.ElfFile <> elf_rodata_end def
+R6312:6321 xv6iris.ElfKernel <> kernel_elf def
+R6325:6328 Corelib.Init.Datatypes <> Some constr
+R6330:6355 Kernel.KernelData <> kernelRodataEnd def
+prf 6782:6807 <> kernel_elf_file_image_bool
+R6922:6924 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6813:6823 stdpp.decidable <> bool_decide def
+R6851:6868 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6826:6839 xv6iris.ElfFile <> elf_file_image def
+R6841:6850 xv6iris.ElfKernel <> kernel_elf def
+R6894:6898 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R6869:6893 Kernel.KernelInstrs <> kernel_bytes def
+R6899:6920 Kernel.KernelData <> kernel_data def
+R6925:6928 Corelib.Init.Datatypes <> true constr
+prf 6957:6977 <> kernel_elf_file_image
+R7008:7010 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6983:6996 xv6iris.ElfFile <> elf_file_image def
+R6998:7007 xv6iris.ElfKernel <> kernel_elf def
+R7036:7040 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R7011:7035 Kernel.KernelInstrs <> kernel_bytes def
+R7041:7062 Kernel.KernelData <> kernel_data def
+R7085:7110 xv6iris.ElfKernel <> kernel_elf_file_image_bool thm
+R7085:7110 xv6iris.ElfKernel <> kernel_elf_file_image_bool thm
+R7126:7146 stdpp.decidable <> bool_decide_eq_true_1 thm
+R7126:7146 stdpp.decidable <> bool_decide_eq_true_1 thm
+def 7773:7785 <> kernel_bss_lo
+R7789:7789 Corelib.Numbers.BinNums <> Z ind
+def 7817:7831 <> kernel_bss_size
+R7835:7835 Corelib.Numbers.BinNums <> Z ind
+prf 7855:7880 <> kernel_elf_zero_image_bool
+R8037:8039 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7886:7896 stdpp.decidable <> bool_decide def
+R7924:7941 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7899:7912 xv6iris.ElfFile <> elf_zero_image def
+R7914:7923 xv6iris.ElfKernel <> kernel_elf def
+R7942:7949 stdpp.fin_maps <> map_seqZ def
+R7985:7993 stdpp.list_basics <> replicate def
+R8022:8034 xv6iris.ElfFile <> elf_zero_byte def
+R7996:8003 Stdlib.ZArith.BinInt Z to_nat def
+R8005:8019 xv6iris.ElfKernel <> kernel_bss_size def
+R7951:7963 xv6iris.ElfKernel <> kernel_bss_lo def
+R8040:8043 Corelib.Init.Datatypes <> true constr
+prf 8072:8092 <> kernel_elf_zero_image
+R8123:8127 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8098:8111 xv6iris.ElfFile <> elf_zero_image def
+R8113:8122 xv6iris.ElfKernel <> kernel_elf def
+R8128:8135 stdpp.fin_maps <> map_seqZ def
+R8152:8160 stdpp.list_basics <> replicate def
+R8189:8201 xv6iris.ElfFile <> elf_zero_byte def
+R8163:8170 Stdlib.ZArith.BinInt Z to_nat def
+R8172:8186 xv6iris.ElfKernel <> kernel_bss_size def
+R8137:8149 xv6iris.ElfKernel <> kernel_bss_lo def
+R8225:8250 xv6iris.ElfKernel <> kernel_elf_zero_image_bool thm
+R8225:8250 xv6iris.ElfKernel <> kernel_elf_zero_image_bool thm
+R8266:8286 stdpp.decidable <> bool_decide_eq_true_1 thm
+R8266:8286 stdpp.decidable <> bool_decide_eq_true_1 thm
+prf 8493:8506 <> kernel_bss_top
+R8541:8543 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8523:8525 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R8510:8522 xv6iris.ElfKernel <> kernel_bss_lo def
+R8526:8540 xv6iris.ElfKernel <> kernel_bss_size def
+R8544:8566 Kernel.KernelData <> kernelMemEnd def
+prf 8613:8626 <> kernel_bss_bot
+R8663:8665 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8654:8656 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R8630:8653 Kernel.KernelData <> kernelMemBase def
+R8666:8678 xv6iris.ElfKernel <> kernel_bss_lo def
+prf 8989:9004 <> kernel_elf_image
+R9030:9034 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9010:9018 xv6iris.ElfFile <> elf_image def
+R9020:9029 xv6iris.ElfKernel <> kernel_elf def
+R9035:9035 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9088:9093 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9061:9065 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9036:9060 Kernel.KernelInstrs <> kernel_bytes def
+R9066:9087 Kernel.KernelData <> kernel_data def
+R9094:9107 xv6iris.ElfFile <> elf_zero_image def
+R9109:9118 xv6iris.ElfKernel <> kernel_elf def
+R9140:9154 xv6iris.ElfFile <> elf_image_split thm
+R9156:9165 xv6iris.ElfKernel <> kernel_elf def
+R9167:9179 xv6iris.ElfKernel <> kernel_elf_wf thm
+R9140:9154 xv6iris.ElfFile <> elf_image_split thm
+R9156:9165 xv6iris.ElfKernel <> kernel_elf def
+R9167:9179 xv6iris.ElfKernel <> kernel_elf_wf thm
+R9215:9235 xv6iris.ElfKernel <> kernel_elf_file_image thm
+R9215:9235 xv6iris.ElfKernel <> kernel_elf_file_image thm
+R9215:9235 xv6iris.ElfKernel <> kernel_elf_file_image thm
+prf 9337:9361 <> kernel_elf_image_concrete
+R9387:9391 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9367:9375 xv6iris.ElfFile <> elf_image def
+R9377:9386 xv6iris.ElfKernel <> kernel_elf def
+R9392:9392 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9445:9454 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9418:9422 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9393:9417 Kernel.KernelInstrs <> kernel_bytes def
+R9423:9444 Kernel.KernelData <> kernel_data def
+R9455:9462 stdpp.fin_maps <> map_seqZ def
+R9479:9487 stdpp.list_basics <> replicate def
+R9516:9528 xv6iris.ElfFile <> elf_zero_byte def
+R9490:9497 Stdlib.ZArith.BinInt Z to_nat def
+R9499:9513 xv6iris.ElfKernel <> kernel_bss_size def
+R9464:9476 xv6iris.ElfKernel <> kernel_bss_lo def
+R9547:9562 xv6iris.ElfKernel <> kernel_elf_image thm
+R9565:9585 xv6iris.ElfKernel <> kernel_elf_zero_image thm
+R9547:9562 xv6iris.ElfKernel <> kernel_elf_image thm
+R9547:9562 xv6iris.ElfKernel <> kernel_elf_image thm
+R9565:9585 xv6iris.ElfKernel <> kernel_elf_zero_image thm
+R9565:9585 xv6iris.ElfKernel <> kernel_elf_zero_image thm

@@ -1,0 +1,159 @@
+DIGEST 70c23cc4636f1172fcde789f3224e772
+Fxv6iris.SpecScheduler
+R1632:1637 Stdlib.ZArith.ZArith <> <> lib
+R1639:1641 Stdlib.micromega.Lia <> <> lib
+R1643:1646 Stdlib.Lists.List <> <> lib
+R1675:1678 stdpp.gmap <> <> lib
+R1680:1700 stdpp.bitvector.definitions <> <> lib
+R1738:1746 iris.proofmode.proofmode <> <> lib
+R1788:1795 iris.program_logic.language <> <> lib
+R1797:1803 iris.program_logic.lifting <> <> lib
+R1846:1854 iris.base_logic.lib.ghost_var <> <> lib
+R1856:1865 iris.base_logic.lib.invariants <> <> lib
+R1867:1874 iris.base_logic.lib.gen_heap <> <> lib
+R1892:1921 SailStdpp.ConcurrencyInterface <> <> lib
+R1923:1960 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R1962:1996 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R1998:2023 SailStdpp.Operators_mwords <> <> lib
+R2041:2054 SailStdpp.Base <> <> lib
+R2056:2074 SailStdpp.TypeCasts <> <> lib
+R2076:2091 SailStdpp.Values <> <> lib
+R2093:2113 SailStdpp.MachineWord <> <> lib
+R2131:2139 xv6iris.RiscvLang <> <> lib
+R2141:2150 xv6iris.RiscvPtsto <> <> lib
+R2168:2177 xv6iris.InstrBytes <> <> lib
+R2195:2201 xv6iris.RegFile <> <> lib
+R2219:2228 xv6iris.KernelText <> <> lib
+R2246:2253 xv6iris.IntrDefs <> <> lib
+R2271:2277 xv6iris.FdSlots <> <> lib
+R2295:2302 xv6iris.SwtchCtx <> <> lib
+R2320:2325 xv6iris.CpuOwn <> <> lib
+R2343:2350 xv6iris.SchedCtx <> <> lib
+R2368:2384 Riscv.rv64d_types <> <> lib
+R2386:2396 Riscv.rv64d <> <> lib
+R2398:2415 Riscv.riscv_extras <> <> lib
+R2433:2441 xv6iris.ProcAvail <> <> lib
+R2459:2462 xv6iris.Xv6G <> <> lib
+R2527:2532 xv6iris.TsoCtx <> <> lib
+R2542:2545 Riscv.rv64d_types Defs <> mod
+def 2561:2583 <> wp_scheduler_sconf_body
+R2588:2594 xv6iris.RiscvPtsto <> riscvGS class
+binder 2596:2597 <> Σ:1
+binder 2587:2597 <> riscvGS0:2
+R2601:2604 xv6iris.Xv6G <> xv6G class
+R2606:2607 xv6iris.SpecScheduler <> Σ:1 var
+binder 2600:2607 <> xv6G0:3
+R2611:2618 xv6iris.Xv6Cameras <> bioslotG class
+R2620:2621 xv6iris.SpecScheduler <> Σ:1 var
+binder 2610:2621 <> bioslotG0:4
+R2625:2631 xv6iris.FdSlots <> fdslotG class
+R2633:2634 xv6iris.SpecScheduler <> Σ:1 var
+binder 2624:2634 <> fdslotG0:5
+R2638:2646 xv6iris.IrefSlots <> irefslotG class
+R2648:2649 xv6iris.SpecScheduler <> Σ:1 var
+binder 2637:2649 <> irefslotG0:6
+R2653:2656 xv6iris.ProcAvail <> pavG class
+R2658:2659 xv6iris.SpecScheduler <> Σ:1 var
+binder 2652:2659 <> pavG0:7
+R2670:2674 xv6iris.RiscvLang <> GenId class
+binder 2664:2666 <> GEN:8
+R2685:2689 xv6iris.RiscvLang <> CpuId class
+binder 2679:2681 <> CID:9
+R2699:2704 xv6iris.TsoCtx <> CurCtx class
+binder 2694:2695 <> XI:10
+R2723:2726 Corelib.Init.Datatypes <> list ind
+R2728:2732 iris.base_logic.lib.iprop <> gname def
+binder 2717:2719 <> γs:11
+R2740:2746 xv6iris.RegFile <> regfile def
+binder 2736:2736 <> m:12
+R2755:2757 Corelib.Init.Datatypes <> nat ind
+binder 2750:2751 <> av:13
+R2766:2770 SailStdpp.Values <> mword def
+binder 2761:2762 <> p0:14
+R2803:2814 SailStdpp.Values <> mword_of_int def
+R2816:2835 Kernel.KernelSyms <> scheduler def
+R2791:2795 SailStdpp.Values <> mword def
+binder 2785:2787 <> pcE:15
+R3045:4191 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3034:3036 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3032:3033 xv6iris.SpecScheduler <> p0:14 var
+R3037:3044 Riscv.rv64d <> zero_reg def
+R4223:4228 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4212:4215 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R4207:4209 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4193:4206 xv6iris.IntrDefs <> kv_frame_slots abbrev
+R4216:4217 xv6iris.SpecScheduler <> av:13 var
+R4258:4265 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4229:4239 xv6iris.IntrDefs <> sie_cap_gpr def
+R4241:4243 xv6iris.Ktier <> KT1 constr
+R4245:4245 xv6iris.SpecScheduler <> m:12 var
+R4247:4248 xv6iris.SpecScheduler <> av:13 var
+R4250:4254 Corelib.Init.Datatypes <> false constr
+R4256:4257 xv6iris.SpecScheduler <> p0:14 var
+R4278:4285 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4266:4277 xv6iris.SchedCtx <> cpu_ctx_free def
+R4314:4321 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4286:4292 xv6iris.CpuOwn <> cpu_own def
+R4296:4300 Corelib.Init.Datatypes <> false constr
+R4302:4303 xv6iris.SpecScheduler <> p0:14 var
+R4305:4309 Corelib.Init.Datatypes <> false constr
+R4311:4313 stdpp.base <> ::stdpp_scope:'∅' not
+R4333:4338 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4322:4332 xv6iris.KernelText <> kernel_text def
+R4348:4355 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4339:4343 xv6iris.InstrBytes <> pc_is def
+R4345:4347 xv6iris.SpecScheduler <> pcE:15 var
+R4369:5035 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4356:4364 xv6iris.SchedCtx <> procs_inv def
+R4366:4368 xv6iris.SpecScheduler <> γs:11 var
+R5049:5056 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5036:5044 xv6iris.IntrDefs <> trap_csrs def
+R5046:5048 xv6iris.Ktier <> KT1 constr
+R5057:5060 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R5083:5083 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R5068:5071 iris.program_logic.language <> expr proj
+R5073:5082 xv6iris.RiscvLang <> riscv_lang def
+R5061:5064 xv6iris.RiscvLang <> Loop abbrev
+modtype 5099:5107 <> SCHEDULER
+ax 5122:5139 SCHEDULER wp_scheduler_sconf
+R5147:5155 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5347:5355 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5157:5163 xv6iris.RiscvPtsto <> riscvGS class
+binder 5165:5166 <> Σ:16
+binder 5156:5166 <> riscvGS0:17
+R5170:5173 xv6iris.Xv6G <> xv6G class
+R5175:5176 xv6iris.SpecScheduler <> Σ:16 var
+binder 5169:5176 <> xv6G0:18
+R5180:5187 xv6iris.Xv6Cameras <> bioslotG class
+R5189:5190 xv6iris.SpecScheduler <> Σ:16 var
+binder 5179:5190 <> bioslotG0:19
+R5194:5200 xv6iris.FdSlots <> fdslotG class
+R5202:5203 xv6iris.SpecScheduler <> Σ:16 var
+binder 5193:5203 <> fdslotG0:20
+R5207:5215 xv6iris.IrefSlots <> irefslotG class
+R5217:5218 xv6iris.SpecScheduler <> Σ:16 var
+binder 5206:5218 <> irefslotG0:21
+R5222:5225 xv6iris.ProcAvail <> pavG class
+R5227:5228 xv6iris.SpecScheduler <> Σ:16 var
+binder 5221:5228 <> pavG0:22
+R5239:5243 xv6iris.RiscvLang <> GenId class
+binder 5233:5235 <> GEN:23
+R5254:5258 xv6iris.RiscvLang <> CpuId class
+binder 5248:5250 <> CID:24
+R5268:5273 xv6iris.TsoCtx <> CurCtx class
+binder 5263:5264 <> XI:25
+R5296:5299 Corelib.Init.Datatypes <> list ind
+R5301:5305 iris.base_logic.lib.iprop <> gname def
+binder 5290:5292 <> γs:26
+R5313:5319 xv6iris.RegFile <> regfile def
+binder 5309:5309 <> m:27
+R5328:5330 Corelib.Init.Datatypes <> nat ind
+binder 5323:5324 <> av:28
+R5339:5343 SailStdpp.Values <> mword def
+binder 5334:5335 <> p0:29
+R5356:5378 xv6iris.SpecScheduler <> wp_scheduler_sconf_body def
+R5389:5390 xv6iris.SpecScheduler <> p0:29 var
+R5386:5387 xv6iris.SpecScheduler <> av:28 var
+R5384:5384 xv6iris.SpecScheduler <> m:27 var
+R5380:5382 xv6iris.SpecScheduler <> γs:26 var
+R5397:5405 xv6iris.SpecScheduler SCHEDULER <> modtype

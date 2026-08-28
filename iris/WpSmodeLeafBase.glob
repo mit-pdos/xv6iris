@@ -1,0 +1,39 @@
+DIGEST 41a1084c6802251bd33c361b163138b2
+Fxv6iris.WpSmodeLeafBase
+R309:334 SailStdpp.Operators_mwords <> <> lib
+R336:352 Riscv.rv64d_types <> <> lib
+R354:367 SailStdpp.Base <> <> lib
+R385:393 xv6iris.RiscvLang <> <> lib
+R395:404 xv6iris.RiscvPtsto <> <> lib
+R442:450 iris.proofmode.proofmode <> <> lib
+R492:499 iris.program_logic.language <> <> lib
+R528:548 stdpp.bitvector.definitions <> <> lib
+R550:553 stdpp.gmap <> <> lib
+R584:595 Kernel.KernelInstrs <> <> lib
+R597:606 Kernel.KernelSyms <> <> lib
+R636:638 Stdlib.micromega.Lia <> <> lib
+R640:643 Stdlib.Lists.List <> <> lib
+R685:691 iris.program_logic.lifting <> <> lib
+R734:742 iris.base_logic.lib.ghost_var <> <> lib
+R744:753 iris.base_logic.lib.invariants <> <> lib
+R755:762 iris.base_logic.lib.gen_heap <> <> lib
+R797:806 iris.bi.lib.fractional <> <> lib
+R824:841 Riscv.riscv_extras <> <> lib
+R843:861 SailStdpp.TypeCasts <> <> lib
+R863:878 SailStdpp.Values <> <> lib
+R880:900 SailStdpp.MachineWord <> <> lib
+R918:928 Riscv.rv64d <> <> lib
+R946:949 xv6iris.Xv6G <> <> lib
+R1014:1019 xv6iris.TsoCtx <> <> lib
+R1029:1032 Riscv.rv64d_types Defs <> mod
+sec 1321:1336 <> WpSmodeGprEngine
+R1352:1358 xv6iris.RiscvPtsto <> riscvGS class
+R1365:1368 xv6iris.Xv6G <> xv6G class
+R1370:1371 xv6iris.WpSmodeLeafBase <> Σ:1 var
+var  1387:1389 WpSmodeGprEngine GEN
+var  1402:1404 WpSmodeGprEngine CID
+var  1417:1418 WpSmodeGprEngine XI
+R1393:1397 xv6iris.RiscvLang <> GenId class
+R1408:1412 xv6iris.RiscvLang <> CpuId class
+R1422:1427 xv6iris.TsoCtx <> CurCtx class
+R1442:1457 xv6iris.WpSmodeLeafBase WpSmodeGprEngine <> sec

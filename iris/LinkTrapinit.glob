@@ -1,0 +1,7 @@
+DIGEST bb2789976950941ff5338ee2512a762c
+Fxv6iris.LinkTrapinit
+R156:167 xv6iris.LinkInitlock <> <> lib
+R169:181 xv6iris.ProofTrapinit <> <> lib
+R204:216 xv6iris.ProofTrapinit TrapinitProof <> modtype
+R218:225 xv6iris.LinkInitlock Initlock <> modtype
+mod 192:199 <> Trapinit

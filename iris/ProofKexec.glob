@@ -1,0 +1,2121 @@
+DIGEST bb7c85c8ab524b6a4fb29db537dff1cf
+Fxv6iris.ProofKexec
+R2906:2914 Stdlib.Logic.Eqdep_dec <> <> lib
+R2916:2921 Stdlib.ZArith.ZArith <> <> lib
+R2923:2925 Stdlib.micromega.Lia <> <> lib
+R2927:2930 Stdlib.Lists.List <> <> lib
+R2959:2962 stdpp.gmap <> <> lib
+R2964:2967 stdpp.list <> <> lib
+R2969:2977 stdpp.functions <> <> lib
+R2979:2999 stdpp.bitvector.definitions <> <> lib
+R3001:3017 stdpp.bitvector.tactics <> <> lib
+R3055:3063 iris.proofmode.proofmode <> <> lib
+R3099:3102 iris.algebra.auth <> <> lib
+R3104:3107 iris.algebra.gmap <> <> lib
+R3109:3112 iris.algebra.frac <> <> lib
+R3155:3163 iris.base_logic.lib.ghost_var <> <> lib
+R3165:3174 iris.base_logic.lib.invariants <> <> lib
+R3176:3183 iris.base_logic.lib.gen_heap <> <> lib
+R3185:3193 iris.base_logic.lib.ghost_map <> <> lib
+R3235:3242 iris.program_logic.language <> <> lib
+R3244:3253 iris.program_logic.weakestpre <> <> lib
+R3255:3261 iris.program_logic.lifting <> <> lib
+R3279:3308 SailStdpp.ConcurrencyInterface <> <> lib
+R3310:3347 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R3349:3383 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R3385:3410 SailStdpp.Operators_mwords <> <> lib
+R3428:3444 Riscv.rv64d_types <> <> lib
+R3446:3456 Riscv.rv64d <> <> lib
+R3458:3475 Riscv.riscv_extras <> <> lib
+R3493:3506 SailStdpp.Base <> <> lib
+R3508:3526 SailStdpp.TypeCasts <> <> lib
+R3528:3543 SailStdpp.Values <> <> lib
+R3545:3565 SailStdpp.MachineWord <> <> lib
+R3583:3597 xv6iris.RiscvModelBytes <> <> lib
+R3615:3623 xv6iris.RiscvLang <> <> lib
+R3625:3634 xv6iris.RiscvPtsto <> <> lib
+R3652:3658 xv6iris.RegFile <> <> lib
+R3676:3681 xv6iris.WpNext <> <> lib
+R3699:3713 xv6iris.WpMmodeLeafBase <> <> lib
+R3731:3741 xv6iris.RiscvExtras <> <> lib
+R3759:3766 xv6iris.StackOwn <> <> lib
+R3784:3794 xv6iris.CalleeSaved <> <> lib
+R3812:3821 xv6iris.InstrBytes <> <> lib
+R3839:3848 xv6iris.KernelText <> <> lib
+R3866:3873 xv6iris.IntrDefs <> <> lib
+R3891:3896 xv6iris.CpuOwn <> <> lib
+R3914:3920 xv6iris.FdSlots <> <> lib
+R3938:3945 xv6iris.SwtchCtx <> <> lib
+R3963:3968 xv6iris.WpUart <> <> lib
+R3986:3997 xv6iris.IcacheEscrow <> <> lib
+R4015:4021 xv6iris.ByteBuf <> <> lib
+R4039:4046 xv6iris.ProcGeom <> <> lib
+R4064:4070 xv6iris.ProcInv <> <> lib
+R4088:4096 xv6iris.DiskPtsto <> <> lib
+R4114:4120 xv6iris.BioDefs <> <> lib
+R4138:4145 xv6iris.FsBlocks <> <> lib
+R4163:4169 xv6iris.LogDefs <> <> lib
+R4187:4195 xv6iris.BitmapInv <> <> lib
+R4213:4220 xv6iris.InodeInv <> <> lib
+R4238:4244 xv6iris.KvmSpec <> <> lib
+R4262:4270 xv6iris.IrefSlots <> <> lib
+R4288:4297 xv6iris.UserPtTree <> <> lib
+R4315:4325 xv6iris.FileInvDefs <> <> lib
+R4343:4351 xv6iris.SpecKexec <> <> lib
+R4369:4376 xv6iris.KexecOkQ <> <> lib
+R4394:4403 xv6iris.SpecMyproc <> <> lib
+R4421:4431 xv6iris.SpecBeginOp <> <> lib
+R4449:4457 xv6iris.SpecEndOp <> <> lib
+R4475:4483 xv6iris.SpecIlock <> <> lib
+R4501:4509 xv6iris.SpecReadi <> <> lib
+R4527:4540 xv6iris.SpecIunlockput <> <> lib
+R4558:4566 xv6iris.SpecNamei <> <> lib
+R4584:4604 xv6iris.SpecProcFreepagetable <> <> lib
+R4622:4638 xv6iris.SpecProcPagetable <> <> lib
+R4656:4667 xv6iris.SpecWalkaddr <> <> lib
+R4685:4698 xv6iris.SpecFlags2perm <> <> lib
+R4716:4727 xv6iris.SpecUvmalloc <> <> lib
+R4745:4756 xv6iris.SpecUvmclear <> <> lib
+R4774:4783 xv6iris.SpecStrlen <> <> lib
+R4801:4811 xv6iris.SpecCopyout <> <> lib
+R4829:4842 xv6iris.SpecSafestrcpy <> <> lib
+R4860:4873 xv6iris.ProofKexecTail <> <> lib
+R4891:4904 xv6iris.ProofKexecSeam <> <> lib
+R4922:4932 xv6iris.ProofKexecA <> <> lib
+R4950:4960 xv6iris.ProofKexecB <> <> lib
+R4978:4986 xv6iris.SpecPanic <> <> lib
+R5004:5015 xv6iris.ProofKexecB2 <> <> lib
+R5033:5044 xv6iris.ProofKexecB3 <> <> lib
+R5062:5072 xv6iris.ProofKexecC <> <> lib
+R5090:5100 xv6iris.ProofKexecD <> <> lib
+R5123:5132 Kernel.KernelSyms <> <> lib
+R5150:5158 xv6iris.ProcAvail <> <> lib
+R5176:5179 xv6iris.Xv6G <> <> lib
+R5244:5249 xv6iris.TsoCtx <> <> lib
+abbrev 5498:5499 <> KX
+R5504:5519 Kernel.KernelSyms <> kexec def
+R5566:5571 xv6iris.SpecMyproc MYPROC <> mod
+R5585:5592 xv6iris.SpecBeginOp BEGIN_OP <> mod
+R5604:5608 xv6iris.SpecNamei NAMEI <> mod
+R5638:5642 xv6iris.SpecIlock ILOCK <> mod
+R5654:5658 xv6iris.SpecReadi READI <> mod
+R5675:5684 xv6iris.SpecIunlockput IUNLOCKPUT <> mod
+R5714:5719 xv6iris.SpecEndOp END_OP <> mod
+R5729:5746 xv6iris.SpecProcPagetable PROC_PAGETABLE_GEN <> mod
+R5774:5791 xv6iris.SpecProcFreepagetable PROC_FREEPAGETABLE <> mod
+R5806:5813 xv6iris.SpecWalkaddr WALKADDR <> mod
+R5848:5857 xv6iris.SpecFlags2perm FLAGS2PERM <> mod
+R5872:5879 xv6iris.SpecUvmalloc UVMALLOC <> mod
+R5912:5919 xv6iris.SpecUvmclear UVMCLEAR <> mod
+R5932:5937 xv6iris.SpecStrlen STRLEN <> mod
+R5951:5957 xv6iris.SpecCopyout COPYOUT <> mod
+R5984:5993 xv6iris.SpecSafestrcpy SAFESTRCPY <> mod
+R6002:6006 xv6iris.SpecPanic PANIC <> mod
+R6011:6015 xv6iris.SpecKexec KEXEC <> mod
+mod 5545:5554 <> KexecProof
+R6032:6054 xv6iris.ProofKexecA KexecAProof <> modtype
+R6056:6061 xv6iris.ProofKexec Myproc <> modtype
+R6063:6069 xv6iris.ProofKexec BeginOp <> modtype
+R6071:6075 xv6iris.ProofKexec Namei <> modtype
+R6077:6081 xv6iris.ProofKexec Ilock <> modtype
+R6083:6087 xv6iris.ProofKexec Readi <> modtype
+R6126:6135 xv6iris.ProofKexec Iunlockput <> modtype
+R6137:6141 xv6iris.ProofKexec EndOp <> modtype
+mod 6026:6027 <> KexecProof.PA
+R6157:6179 xv6iris.ProofKexecB KexecBProof <> modtype
+R6181:6186 xv6iris.ProofKexec Myproc <> modtype
+R6188:6194 xv6iris.ProofKexec BeginOp <> modtype
+R6196:6200 xv6iris.ProofKexec Namei <> modtype
+R6202:6206 xv6iris.ProofKexec Ilock <> modtype
+R6208:6212 xv6iris.ProofKexec Readi <> modtype
+R6251:6260 xv6iris.ProofKexec Iunlockput <> modtype
+R6262:6266 xv6iris.ProofKexec EndOp <> modtype
+R6268:6270 xv6iris.ProofKexec PPT <> modtype
+mod 6151:6152 <> KexecProof.PB
+R6287:6311 xv6iris.ProofKexecB2 KexecB2Proof <> modtype
+R6313:6318 xv6iris.ProofKexec Myproc <> modtype
+R6320:6326 xv6iris.ProofKexec BeginOp <> modtype
+R6328:6332 xv6iris.ProofKexec Namei <> modtype
+R6334:6338 xv6iris.ProofKexec Ilock <> modtype
+R6340:6344 xv6iris.ProofKexec Readi <> modtype
+R6386:6395 xv6iris.ProofKexec Iunlockput <> modtype
+R6397:6401 xv6iris.ProofKexec EndOp <> modtype
+R6403:6405 xv6iris.ProofKexec PFP <> modtype
+R6407:6414 xv6iris.ProofKexec Walkaddr <> modtype
+R6416:6417 xv6iris.ProofKexec PN <> modtype
+mod 6280:6282 <> KexecProof.PB2
+R6434:6458 xv6iris.ProofKexecB3 KexecB3Proof <> modtype
+R6460:6465 xv6iris.ProofKexec Myproc <> modtype
+R6467:6473 xv6iris.ProofKexec BeginOp <> modtype
+R6475:6479 xv6iris.ProofKexec Namei <> modtype
+R6481:6485 xv6iris.ProofKexec Ilock <> modtype
+R6487:6491 xv6iris.ProofKexec Readi <> modtype
+R6533:6542 xv6iris.ProofKexec Iunlockput <> modtype
+R6544:6548 xv6iris.ProofKexec EndOp <> modtype
+R6550:6552 xv6iris.ProofKexec PFP <> modtype
+R6554:6561 xv6iris.ProofKexec Walkaddr <> modtype
+R6603:6612 xv6iris.ProofKexec Flags2perm <> modtype
+R6614:6621 xv6iris.ProofKexec Uvmalloc <> modtype
+R6623:6625 xv6iris.ProofKexec KexecProof.PB2 <> modtype
+mod 6427:6429 <> KexecProof.PB3
+R6641:6663 xv6iris.ProofKexecC KexecCProof <> modtype
+R6665:6670 xv6iris.ProofKexec Myproc <> modtype
+R6672:6678 xv6iris.ProofKexec BeginOp <> modtype
+R6680:6684 xv6iris.ProofKexec Namei <> modtype
+R6686:6690 xv6iris.ProofKexec Ilock <> modtype
+R6692:6696 xv6iris.ProofKexec Readi <> modtype
+R6735:6744 xv6iris.ProofKexec Iunlockput <> modtype
+R6746:6750 xv6iris.ProofKexec EndOp <> modtype
+R6752:6754 xv6iris.ProofKexec PFP <> modtype
+R6756:6763 xv6iris.ProofKexec Walkaddr <> modtype
+R6765:6774 xv6iris.ProofKexec Flags2perm <> modtype
+R6813:6820 xv6iris.ProofKexec Uvmalloc <> modtype
+R6822:6829 xv6iris.ProofKexec Uvmclear <> modtype
+R6831:6836 xv6iris.ProofKexec Strlen <> modtype
+R6838:6844 xv6iris.ProofKexec Copyout <> modtype
+mod 6635:6636 <> KexecProof.PC
+R6860:6882 xv6iris.ProofKexecD KexecDProof <> modtype
+R6884:6886 xv6iris.ProofKexec PFP <> modtype
+R6888:6889 xv6iris.ProofKexec SS <> modtype
+mod 6854:6855 <> KexecProof.PD
+sec 7597:7605 KexecProof KexecTail
+R7621:7627 xv6iris.RiscvPtsto <> riscvGS class
+R7634:7637 xv6iris.Xv6G <> xv6G class
+R7639:7640 xv6iris.ProofKexec <> Σ:1 var
+R7644:7651 xv6iris.Xv6Cameras <> bioslotG class
+R7653:7654 xv6iris.ProofKexec <> Σ:1 var
+R7658:7664 xv6iris.FdSlots <> fdslotG class
+R7666:7667 xv6iris.ProofKexec <> Σ:1 var
+R7671:7675 xv6iris.FileInvDefs <> fileG class
+R7677:7678 xv6iris.ProofKexec <> Σ:1 var
+R7682:7690 xv6iris.IrefSlots <> irefslotG class
+R7692:7693 xv6iris.ProofKexec <> Σ:1 var
+R7697:7700 xv6iris.ProcAvail <> pavG class
+R7702:7703 xv6iris.ProofKexec <> Σ:1 var
+var  7719:7721 KexecProof.KexecTail GEN
+R7725:7729 xv6iris.RiscvLang <> GenId class
+abbrev 7745:7747 KexecProof Rra
+R7770:7774 SailStdpp.Values <> mword def
+R7753:7764 SailStdpp.Values <> mword_of_int def
+abbrev 7791:7793 KexecProof Rs0
+R7816:7820 SailStdpp.Values <> mword def
+R7799:7810 SailStdpp.Values <> mword_of_int def
+abbrev 7837:7839 KexecProof Rs1
+R7862:7866 SailStdpp.Values <> mword def
+R7845:7856 SailStdpp.Values <> mword_of_int def
+abbrev 7883:7885 KexecProof Rs2
+R7909:7913 SailStdpp.Values <> mword def
+R7891:7902 SailStdpp.Values <> mword_of_int def
+abbrev 7930:7932 KexecProof Rs3
+R7956:7960 SailStdpp.Values <> mword def
+R7938:7949 SailStdpp.Values <> mword_of_int def
+abbrev 7977:7979 KexecProof Rs4
+R8003:8007 SailStdpp.Values <> mword def
+R7985:7996 SailStdpp.Values <> mword_of_int def
+abbrev 8024:8026 KexecProof Rs5
+R8050:8054 SailStdpp.Values <> mword def
+R8032:8043 SailStdpp.Values <> mword_of_int def
+abbrev 8071:8073 KexecProof Rs6
+R8097:8101 SailStdpp.Values <> mword def
+R8079:8090 SailStdpp.Values <> mword_of_int def
+abbrev 8118:8120 KexecProof Rs7
+R8144:8148 SailStdpp.Values <> mword def
+R8126:8137 SailStdpp.Values <> mword_of_int def
+abbrev 8165:8167 KexecProof Rs8
+R8191:8195 SailStdpp.Values <> mword def
+R8173:8184 SailStdpp.Values <> mword_of_int def
+abbrev 8212:8214 KexecProof Rs9
+R8238:8242 SailStdpp.Values <> mword def
+R8220:8231 SailStdpp.Values <> mword_of_int def
+abbrev 8259:8262 KexecProof Rs10
+R8286:8290 SailStdpp.Values <> mword def
+R8268:8279 SailStdpp.Values <> mword_of_int def
+abbrev 8307:8310 KexecProof Rs11
+R8334:8338 SailStdpp.Values <> mword def
+R8316:8327 SailStdpp.Values <> mword_of_int def
+abbrev 8355:8357 KexecProof Ra0
+R8381:8385 SailStdpp.Values <> mword def
+R8363:8374 SailStdpp.Values <> mword_of_int def
+abbrev 8402:8404 KexecProof Ra1
+R8428:8432 SailStdpp.Values <> mword def
+R8410:8421 SailStdpp.Values <> mword_of_int def
+prf 8911:8920 KexecProof kxc_d_tail
+R8931:8935 xv6iris.RiscvLang <> CpuId class
+binder 8924:8927 <> CID0:10
+R8945:8950 xv6iris.TsoCtx <> CurCtx class
+binder 8940:8941 <> XI:11
+R8972:8975 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8964:8968 SailStdpp.Values <> mword def
+binder 8960:8960 <> Q:12
+R8994:8996 Corelib.Init.Datatypes <> nat ind
+binder 8989:8990 <> jp:13
+R9005:9013 xv6iris.BioDefs <> bio_names rec
+binder 9000:9001 <> bn:14
+R9023:9030 xv6iris.FsBlocks <> fs_names rec
+binder 9017:9019 <> gfs:15
+R9042:9046 iris.base_logic.lib.iprop <> gname def
+binder 9034:9035 <> ga:16
+binder 9037:9038 <> gf:17
+R9062:9065 stdpp.gmap <> gset def
+R9067:9067 Corelib.Numbers.BinNums <> Z ind
+binder 9056:9058 <> cov:18
+R9103:9103 Corelib.Numbers.BinNums <> Z ind
+binder 9071:9078 <> logstart:19
+binder 9080:9088 <> bmapstart:20
+binder 9090:9099 <> inodestart:21
+R9120:9120 Corelib.Numbers.BinNums <> Z ind
+binder 9113:9116 <> size:22
+R9137:9139 Corelib.Init.Datatypes <> nat ind
+binder 9130:9133 <> plen:23
+R9153:9156 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9150:9152 Corelib.Init.Datatypes <> nat ind
+R9157:9158 stdpp.bitvector.definitions <> bv rec
+binder 9143:9146 <> pfun:24
+R9175:9177 Corelib.Init.Datatypes <> nat ind
+binder 9170:9171 <> na:25
+R9190:9193 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9187:9189 Corelib.Init.Datatypes <> nat ind
+R9194:9198 SailStdpp.Values <> mword def
+binder 9181:9183 <> avf:26
+R9221:9224 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9218:9220 Corelib.Init.Datatypes <> nat ind
+R9225:9227 Corelib.Init.Datatypes <> nat ind
+binder 9205:9208 <> alen:27
+binder 9210:9214 <> aslen:28
+R9247:9250 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9244:9246 Corelib.Init.Datatypes <> nat ind
+R9254:9257 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9251:9253 Corelib.Init.Datatypes <> nat ind
+R9258:9259 stdpp.bitvector.definitions <> bv rec
+binder 9237:9240 <> afun:29
+R9278:9282 SailStdpp.Values <> mword def
+binder 9271:9274 <> pidv:30
+R9293:9300 xv6iris.ProcDefs <> pprivate rec
+binder 9289:9289 <> V:31
+R9309:9312 Corelib.Init.Datatypes <> bool ind
+binder 9304:9305 <> eb:32
+R9340:9344 iris.algebra.dfrac <> dfrac ind
+binder 9316:9318 <> dqb:33
+binder 9320:9322 <> dqs:34
+binder 9324:9326 <> dqa:35
+binder 9328:9331 <> dqpv:36
+binder 9333:9336 <> dqas:37
+R9360:9366 xv6iris.RegFile <> regfile def
+binder 9354:9354 <> m:38
+binder 9356:9356 <> M:39
+R9374:9376 Corelib.Init.Datatypes <> nat ind
+binder 9370:9370 <> K:40
+R9414:9418 SailStdpp.Values <> mword def
+binder 9386:9388 <> sp0:41
+binder 9390:9392 <> ra0:42
+binder 9394:9396 <> s00:43
+binder 9398:9400 <> s10:44
+binder 9402:9404 <> s20:45
+binder 9406:9407 <> pv:46
+binder 9409:9410 <> av:47
+R9468:9472 SailStdpp.Values <> mword def
+binder 9431:9432 <> w5:48
+binder 9434:9435 <> w6:49
+binder 9437:9438 <> w7:50
+binder 9440:9441 <> w8:51
+binder 9443:9444 <> w9:52
+binder 9446:9448 <> w10:53
+binder 9450:9452 <> w11:54
+binder 9454:9456 <> w12:55
+binder 9458:9460 <> w13:56
+binder 9462:9464 <> w67:57
+R9493:9496 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9490:9492 Corelib.Init.Datatypes <> nat ind
+R9497:9498 stdpp.bitvector.definitions <> bv rec
+binder 9485:9486 <> ef:58
+R9508:9511 xv6iris.UserPtTree <> uptd rec
+binder 9504:9504 <> P:59
+R9521:9525 SailStdpp.Values <> mword def
+binder 9515:9517 <> sz1:60
+R9536:9538 Corelib.Init.Datatypes <> nat ind
+binder 9532:9532 <> c:61
+R9898:9905 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9882:9882 xv6iris.ProofKexec <> Q:12 var
+R9885:9893 xv6iris.KexecOkQ <> kxq_entry def
+R9895:9896 xv6iris.ProofKexec <> ef:58 var
+R9924:9931 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9914:9917 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R9907:9913 xv6iris.SpecKexec <> K_kexec abbrev
+R9918:9918 xv6iris.ProofKexec <> K:40 var
+R9949:9956 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9932:9938 xv6iris.ByteBuf <> bb_cstr def
+R9940:9943 xv6iris.ProofKexec <> pfun:24 var
+R9945:9948 xv6iris.ProofKexec <> plen:23 var
+R9974:9981 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9960:9962 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R9958:9959 xv6iris.ProofKexec <> na:25 var
+R9963:9968 xv6iris.SpecKexec <> MAXARG def
+R10002:10009 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9987:9990 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R9991:9994 SailStdpp.Operators_mwords <> uint def
+R9996:9998 xv6iris.ProofKexec <> sz1:60 var
+R10010:10010 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10073:10081 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10011:10017 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R10019:10020 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 10018:10018 <> i:62
+R10033:10036 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10023:10025 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R10022:10022 xv6iris.ProofKexec <> i:62 var
+R10026:10027 xv6iris.ProofKexec <> na:25 var
+R10042:10046 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R10072:10072 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R10037:10039 xv6iris.ProofKexec <> avf:26 var
+R10041:10041 xv6iris.ProofKexec <> i:62 var
+R10064:10068 SailStdpp.Values <> mword def
+R10047:10058 SailStdpp.Values <> mword_of_int def
+R10082:10082 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10173:10181 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10083:10089 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R10091:10092 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 10090:10090 <> i:63
+R10104:10114 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10095:10097 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R10094:10094 xv6iris.ProofKexec <> i:63 var
+R10166:10168 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10115:10130 Riscv.rv64d <> is_aligned_paddr def
+R10133:10140 Riscv.rv64d_types <> Physaddr constr
+R10143:10148 xv6iris.StackOwn <> pa_stk def
+R10150:10152 xv6iris.ProofKexec <> sp0:41 var
+R10157:10159 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R10160:10160 xv6iris.ProofKexec <> i:63 var
+R10169:10172 Corelib.Init.Datatypes <> true constr
+R10208:10211 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10202:10204 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10183:10187 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10188:10193 Riscv.rv64d_types <> Regidx constr
+R10195:10201 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R10182:10182 xv6iris.ProofKexec <> m:38 var
+R10205:10207 xv6iris.ProofKexec <> sp0:41 var
+R10234:10241 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10228:10230 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10213:10217 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10218:10223 Riscv.rv64d_types <> Regidx constr
+R10225:10227 xv6iris.ProofKexec KexecProof Rra abbrev
+R10212:10212 xv6iris.ProofKexec <> m:38 var
+R10231:10233 xv6iris.ProofKexec <> ra0:42 var
+R10264:10267 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10258:10260 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10243:10247 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10248:10253 Riscv.rv64d_types <> Regidx constr
+R10255:10257 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R10242:10242 xv6iris.ProofKexec <> m:38 var
+R10261:10263 xv6iris.ProofKexec <> s00:43 var
+R10290:10293 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10284:10286 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10269:10273 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10274:10279 Riscv.rv64d_types <> Regidx constr
+R10281:10283 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R10268:10268 xv6iris.ProofKexec <> m:38 var
+R10287:10289 xv6iris.ProofKexec <> s10:44 var
+R10316:10323 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10310:10312 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10295:10299 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10300:10305 Riscv.rv64d_types <> Regidx constr
+R10307:10309 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R10294:10294 xv6iris.ProofKexec <> m:38 var
+R10313:10315 xv6iris.ProofKexec <> s20:45 var
+R10345:10348 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10340:10342 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10325:10329 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10330:10335 Riscv.rv64d_types <> Regidx constr
+R10337:10339 xv6iris.ProofKexec KexecProof Rs3 abbrev
+R10324:10324 xv6iris.ProofKexec <> m:38 var
+R10343:10344 xv6iris.ProofKexec <> w5:48 var
+R10370:10373 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10365:10367 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10350:10354 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10355:10360 Riscv.rv64d_types <> Regidx constr
+R10362:10364 xv6iris.ProofKexec KexecProof Rs4 abbrev
+R10349:10349 xv6iris.ProofKexec <> m:38 var
+R10368:10369 xv6iris.ProofKexec <> w6:49 var
+R10395:10402 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10390:10392 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10375:10379 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10380:10385 Riscv.rv64d_types <> Regidx constr
+R10387:10389 xv6iris.ProofKexec KexecProof Rs5 abbrev
+R10374:10374 xv6iris.ProofKexec <> m:38 var
+R10393:10394 xv6iris.ProofKexec <> w7:50 var
+R10424:10427 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10419:10421 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10404:10408 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10409:10414 Riscv.rv64d_types <> Regidx constr
+R10416:10418 xv6iris.ProofKexec KexecProof Rs6 abbrev
+R10403:10403 xv6iris.ProofKexec <> m:38 var
+R10422:10423 xv6iris.ProofKexec <> w8:51 var
+R10449:10452 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10444:10446 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10429:10433 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10434:10439 Riscv.rv64d_types <> Regidx constr
+R10441:10443 xv6iris.ProofKexec KexecProof Rs7 abbrev
+R10428:10428 xv6iris.ProofKexec <> m:38 var
+R10447:10448 xv6iris.ProofKexec <> w9:52 var
+R10475:10482 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10469:10471 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10454:10458 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10459:10464 Riscv.rv64d_types <> Regidx constr
+R10466:10468 xv6iris.ProofKexec KexecProof Rs8 abbrev
+R10453:10453 xv6iris.ProofKexec <> m:38 var
+R10472:10474 xv6iris.ProofKexec <> w10:53 var
+R10505:10508 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10499:10501 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10484:10488 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10489:10494 Riscv.rv64d_types <> Regidx constr
+R10496:10498 xv6iris.ProofKexec KexecProof Rs9 abbrev
+R10483:10483 xv6iris.ProofKexec <> m:38 var
+R10502:10504 xv6iris.ProofKexec <> w11:54 var
+R10532:10539 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10526:10528 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10510:10514 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10515:10520 Riscv.rv64d_types <> Regidx constr
+R10522:10525 xv6iris.ProofKexec KexecProof Rs10 abbrev
+R10509:10509 xv6iris.ProofKexec <> m:38 var
+R10529:10531 xv6iris.ProofKexec <> w12:55 var
+R10551:10560 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10540:10550 xv6iris.KernelText <> kernel_text def
+R10842:10851 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10561:10570 xv6iris.ProofKexecSeam <> kxc_at_272 def
+R10572:10573 xv6iris.ProofKexec <> jp:13 var
+R10575:10576 xv6iris.ProofKexec <> bn:14 var
+R10578:10580 xv6iris.ProofKexec <> gfs:15 var
+R10582:10583 xv6iris.ProofKexec <> ga:16 var
+R10585:10586 xv6iris.ProofKexec <> gf:17 var
+R10588:10590 xv6iris.ProofKexec <> cov:18 var
+R10592:10599 xv6iris.ProofKexec <> logstart:19 var
+R10601:10609 xv6iris.ProofKexec <> bmapstart:20 var
+R10611:10620 xv6iris.ProofKexec <> inodestart:21 var
+R10622:10625 xv6iris.ProofKexec <> size:22 var
+R10642:10645 xv6iris.ProofKexec <> plen:23 var
+R10647:10650 xv6iris.ProofKexec <> pfun:24 var
+R10652:10653 xv6iris.ProofKexec <> na:25 var
+R10655:10657 xv6iris.ProofKexec <> avf:26 var
+R10659:10662 xv6iris.ProofKexec <> alen:27 var
+R10664:10668 xv6iris.ProofKexec <> aslen:28 var
+R10670:10673 xv6iris.ProofKexec <> afun:29 var
+R10675:10678 xv6iris.ProofKexec <> pidv:30 var
+R10680:10680 xv6iris.ProofKexec <> V:31 var
+R10682:10683 xv6iris.ProofKexec <> eb:32 var
+R10685:10687 xv6iris.ProofKexec <> dqb:33 var
+R10689:10691 xv6iris.ProofKexec <> dqs:34 var
+R10693:10695 xv6iris.ProofKexec <> dqa:35 var
+R10697:10700 xv6iris.ProofKexec <> dqpv:36 var
+R10702:10705 xv6iris.ProofKexec <> dqas:37 var
+R10722:10722 xv6iris.ProofKexec <> M:39 var
+R10724:10724 xv6iris.ProofKexec <> K:40 var
+R10726:10728 xv6iris.ProofKexec <> sp0:41 var
+R10730:10732 xv6iris.ProofKexec <> ra0:42 var
+R10734:10736 xv6iris.ProofKexec <> s00:43 var
+R10738:10740 xv6iris.ProofKexec <> s10:44 var
+R10742:10744 xv6iris.ProofKexec <> s20:45 var
+R10746:10747 xv6iris.ProofKexec <> pv:46 var
+R10749:10750 xv6iris.ProofKexec <> av:47 var
+R10767:10768 xv6iris.ProofKexec <> w5:48 var
+R10770:10771 xv6iris.ProofKexec <> w6:49 var
+R10773:10774 xv6iris.ProofKexec <> w7:50 var
+R10776:10777 xv6iris.ProofKexec <> w8:51 var
+R10779:10780 xv6iris.ProofKexec <> w9:52 var
+R10782:10784 xv6iris.ProofKexec <> w10:53 var
+R10786:10788 xv6iris.ProofKexec <> w11:54 var
+R10790:10792 xv6iris.ProofKexec <> w12:55 var
+R10794:10796 xv6iris.ProofKexec <> w13:56 var
+R10798:10800 xv6iris.ProofKexec <> w67:57 var
+R10802:10803 xv6iris.ProofKexec <> ef:58 var
+R10805:10805 xv6iris.ProofKexec <> P:59 var
+R10808:10812 xv6iris.ProcDefs <> pv_sz proj
+R10814:10814 xv6iris.ProofKexec <> V:31 var
+R10817:10819 xv6iris.ProofKexec <> sz1:60 var
+R10823:10827 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R10828:10833 Riscv.rv64d_types <> Regidx constr
+R10835:10838 xv6iris.ProofKexec KexecProof Rs11 abbrev
+R10822:10822 xv6iris.ProofKexec <> m:38 var
+R10841:10841 xv6iris.ProofKexec <> c:61 var
+R11957:11966 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10852:10858 xv6iris.WpNext <> wp_next def
+R10892:10896 xv6iris.RiscvLang <> CpuId class
+binder 10886:10888 <> CID:64
+R10908:10912 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R10977:10989 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R10918:10924 xv6iris.RegFile <> regfile def
+binder 10913:10914 <> mf:65
+R10933:10940 xv6iris.ProcDefs <> pprivate rec
+binder 10928:10929 <> V':66
+R10969:10973 SailStdpp.Values <> mword def
+binder 10952:10956 <> entry:67
+R10969:10973 SailStdpp.Values <> mword def
+binder 10958:10960 <> spv:68
+R10969:10973 SailStdpp.Values <> mword def
+binder 10962:10965 <> szv':69
+R11013:11028 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10990:10992 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11010:11012 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10993:11004 xv6iris.CalleeSaved <> callee_saved def
+R11006:11006 xv6iris.ProofKexec <> m:38 var
+R11008:11009 xv6iris.ProofKexec <> mf:65 var
+R11095:11110 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11029:11031 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11092:11094 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11032:11041 xv6iris.KexecOkQ <> kexec_ok_q def
+R11043:11043 xv6iris.ProofKexec <> Q:12 var
+R11045:11045 xv6iris.ProofKexec <> V:31 var
+R11047:11048 xv6iris.ProofKexec <> V':66 var
+R11053:11057 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R11058:11063 Riscv.rv64d_types <> Regidx constr
+R11065:11067 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R11051:11052 xv6iris.ProofKexec <> mf:65 var
+R11070:11074 xv6iris.ProofKexec <> entry:67 var
+R11076:11078 xv6iris.ProofKexec <> spv:68 var
+R11080:11083 xv6iris.ProofKexec <> szv':69 var
+R11085:11086 xv6iris.ProofKexec <> na:25 var
+R11088:11091 xv6iris.ProofKexec <> alen:27 var
+R11149:11164 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11111:11121 xv6iris.IntrDefs <> sie_cap_gpr def
+R11123:11125 xv6iris.Ktier <> KT1 constr
+R11127:11128 xv6iris.ProofKexec <> mf:65 var
+R11130:11130 xv6iris.ProofKexec <> K:40 var
+R11132:11133 xv6iris.ProofKexec <> eb:32 var
+R11136:11144 xv6iris.ProcGeom <> proc_addr def
+R11146:11147 xv6iris.ProofKexec <> jp:13 var
+R11199:11214 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11165:11171 xv6iris.CpuOwn <> cpu_own def
+R11175:11176 xv6iris.ProofKexec <> eb:32 var
+R11179:11187 xv6iris.ProcGeom <> proc_addr def
+R11189:11190 xv6iris.ProofKexec <> jp:13 var
+R11193:11194 xv6iris.ProofKexec <> eb:32 var
+R11196:11198 stdpp.base <> ::stdpp_scope:'∅' not
+R11235:11250 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11215:11227 xv6iris.IntrDefs <> trap_csrs_ext def
+R11229:11231 xv6iris.Ktier <> KT1 constr
+R11233:11234 xv6iris.ProofKexec <> eb:32 var
+R11282:11297 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11251:11263 xv6iris.IntrDefs <> cpu_claim_ext def
+R11265:11266 xv6iris.ProofKexec <> eb:32 var
+R11269:11277 xv6iris.ProcGeom <> proc_addr def
+R11279:11280 xv6iris.ProofKexec <> jp:13 var
+R11316:11331 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11298:11302 xv6iris.InstrBytes <> pc_is def
+R11305:11310 xv6iris.RiscvExtras <> ret_pc def
+R11312:11314 xv6iris.ProofKexec <> ra0:42 var
+R11392:11407 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11344:11351 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R11355:11357 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R11391:11391 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R11332:11343 xv6iris.BitmapInv <> sb_bmapstart def
+R11352:11354 xv6iris.ProofKexec <> dqb:33 var
+R11383:11387 SailStdpp.Values <> mword def
+R11358:11369 SailStdpp.Values <> mword_of_int def
+R11371:11379 xv6iris.ProofKexec <> bmapstart:20 var
+R11470:11485 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11421:11428 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R11432:11434 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R11469:11469 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R11408:11420 xv6iris.InodeInv <> sb_inodestart def
+R11429:11431 xv6iris.ProofKexec <> dqs:34 var
+R11461:11465 SailStdpp.Values <> mword def
+R11435:11446 SailStdpp.Values <> mword_of_int def
+R11448:11457 xv6iris.ProofKexec <> inodestart:21 var
+R11504:11519 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11486:11495 xv6iris.KvmSpec <> kalloc_env def
+R11497:11498 xv6iris.ProofKexec <> ga:16 var
+R11500:11503 Corelib.Init.Datatypes <> None constr
+R11555:11570 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11520:11528 xv6iris.ProcInv <> proc_priv def
+R11530:11531 xv6iris.ProofKexec <> gf:17 var
+R11534:11542 xv6iris.ProcGeom <> proc_addr def
+R11544:11545 xv6iris.ProofKexec <> jp:13 var
+R11548:11551 xv6iris.ProofKexec <> pidv:30 var
+R11553:11554 xv6iris.ProofKexec <> V':66 var
+R11571:11571 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11641:11657 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11572:11582 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11584:11588 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11603:11604 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 11583:11583 <> i:70
+binder 11583:11583 <> i:71
+R11616:11623 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R11627:11627 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R11634:11634 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R11624:11626 xv6iris.Ktier <> KT1 constr
+R11605:11610 xv6iris.RiscvModelBytes <> pa_add def
+R11612:11613 xv6iris.ProofKexec <> pv:46 var
+R11615:11615 xv6iris.ProofKexec <> i:70 var
+R11628:11628 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R11633:11633 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R11629:11632 xv6iris.ProofKexec <> dqpv:36 var
+R11635:11638 xv6iris.ProofKexec <> pfun:24 var
+R11640:11640 xv6iris.ProofKexec <> i:70 var
+R11589:11591 Corelib.Lists.ListDef <> seq def
+R11596:11596 Corelib.Init.Datatypes <> S constr
+R11598:11601 xv6iris.ProofKexec <> plen:23 var
+R11658:11658 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11730:11746 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11659:11669 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11671:11675 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11688:11689 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 11670:11670 <> i:72
+binder 11670:11670 <> i:73
+R11707:11714 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈['_x_']'_x_x not
+R11718:11718 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈['_x_']'_x_x not
+R11724:11724 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈['_x_']'_x_x not
+R11715:11717 xv6iris.Ktier <> KT1 constr
+R11690:11695 xv6iris.RiscvModelBytes <> pa_add def
+R11697:11698 xv6iris.ProofKexec <> av:47 var
+R11702:11704 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R11705:11705 xv6iris.ProofKexec <> i:72 var
+R11719:11719 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R11723:11723 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R11720:11722 xv6iris.ProofKexec <> dqa:35 var
+R11725:11727 xv6iris.ProofKexec <> avf:26 var
+R11729:11729 xv6iris.ProofKexec <> i:72 var
+R11676:11678 Corelib.Lists.ListDef <> seq def
+R11683:11683 Corelib.Init.Datatypes <> S constr
+R11685:11686 xv6iris.ProofKexec <> na:25 var
+R11747:11747 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11860:11876 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11748:11758 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11760:11764 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11773:11787 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 11759:11759 <> i:74
+binder 11759:11759 <> i:75
+R11788:11798 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11800:11804 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11820:11821 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 11799:11799 <> j:76
+binder 11799:11799 <> j:77
+R11838:11845 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ{'_x_'}'_x not
+R11850:11851 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ{'_x_'}'_x not
+R11822:11827 xv6iris.RiscvModelBytes <> pa_add def
+R11830:11832 xv6iris.ProofKexec <> avf:26 var
+R11834:11834 xv6iris.ProofKexec <> i:74 var
+R11837:11837 xv6iris.ProofKexec <> j:76 var
+R11846:11849 xv6iris.ProofKexec <> dqas:37 var
+R11852:11855 xv6iris.ProofKexec <> afun:29 var
+R11859:11859 xv6iris.ProofKexec <> j:76 var
+R11857:11857 xv6iris.ProofKexec <> i:74 var
+R11805:11807 Corelib.Lists.ListDef <> seq def
+R11812:11816 xv6iris.ProofKexec <> aslen:28 var
+R11818:11818 xv6iris.ProofKexec <> i:74 var
+R11765:11767 Corelib.Lists.ListDef <> seq def
+R11771:11772 xv6iris.ProofKexec <> na:25 var
+R11885:11900 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11877:11882 xv6iris.BioDefs <> bslots def
+R11913:11928 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11901:11910 xv6iris.IrefSlots <> iref_slots def
+R11929:11932 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11955:11955 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11940:11943 iris.program_logic.language <> expr proj
+R11945:11954 xv6iris.RiscvLang <> riscv_lang def
+R11933:11936 xv6iris.RiscvLang <> Loop abbrev
+R10866:10874 xv6iris.ProcGeom <> proc_addr def
+R10876:10877 xv6iris.ProofKexec <> jp:13 var
+R10860:10863 Corelib.Init.Datatypes <> true constr
+R11967:11970 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11993:11993 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11978:11981 iris.program_logic.language <> expr proj
+R11983:11992 xv6iris.RiscvLang <> riscv_lang def
+R11971:11974 xv6iris.RiscvLang <> Loop abbrev
+R12178:12178 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12570:12589 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12610:12610 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12179:12192 xv6iris.ProofKexec KexecProof kxc_c_close thm
+R12446:12450 xv6iris.ProcDefs <> pv_sz proj
+R12178:12178 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12570:12589 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12610:12610 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12179:12192 xv6iris.ProofKexec KexecProof kxc_c_close thm
+R12446:12450 xv6iris.ProcDefs <> pv_sz proj
+R12683:12683 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13091:13110 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13131:13131 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12684:12696 xv6iris.ProofKexec KexecProof kxd_phaseD thm
+R12683:12683 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13091:13110 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13131:13131 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12684:12696 xv6iris.ProofKexec KexecProof kxd_phaseD thm
+prf 13383:13388 KexecProof kxc_cd
+R13399:13403 xv6iris.RiscvLang <> CpuId class
+binder 13392:13395 <> CID0:78
+R13413:13418 xv6iris.TsoCtx <> CurCtx class
+binder 13408:13409 <> XI:79
+R13440:13443 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13432:13436 SailStdpp.Values <> mword def
+binder 13428:13428 <> Q:80
+R13462:13464 Corelib.Init.Datatypes <> nat ind
+binder 13457:13458 <> jp:81
+R13473:13481 xv6iris.BioDefs <> bio_names rec
+binder 13468:13469 <> bn:82
+R13491:13498 xv6iris.FsBlocks <> fs_names rec
+binder 13485:13487 <> gfs:83
+R13510:13514 iris.base_logic.lib.iprop <> gname def
+binder 13502:13503 <> ga:84
+binder 13505:13506 <> gf:85
+R13530:13533 stdpp.gmap <> gset def
+R13535:13535 Corelib.Numbers.BinNums <> Z ind
+binder 13524:13526 <> cov:86
+R13571:13571 Corelib.Numbers.BinNums <> Z ind
+binder 13539:13546 <> logstart:87
+binder 13548:13556 <> bmapstart:88
+binder 13558:13567 <> inodestart:89
+R13588:13588 Corelib.Numbers.BinNums <> Z ind
+binder 13581:13584 <> size:90
+R13605:13607 Corelib.Init.Datatypes <> nat ind
+binder 13598:13601 <> plen:91
+R13621:13624 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13618:13620 Corelib.Init.Datatypes <> nat ind
+R13625:13626 stdpp.bitvector.definitions <> bv rec
+binder 13611:13614 <> pfun:92
+R13643:13645 Corelib.Init.Datatypes <> nat ind
+binder 13638:13639 <> na:93
+R13658:13661 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13655:13657 Corelib.Init.Datatypes <> nat ind
+R13662:13666 SailStdpp.Values <> mword def
+binder 13649:13651 <> avf:94
+R13689:13692 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13686:13688 Corelib.Init.Datatypes <> nat ind
+R13693:13695 Corelib.Init.Datatypes <> nat ind
+binder 13673:13676 <> alen:95
+binder 13678:13682 <> aslen:96
+R13715:13718 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13712:13714 Corelib.Init.Datatypes <> nat ind
+R13722:13725 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13719:13721 Corelib.Init.Datatypes <> nat ind
+R13726:13727 stdpp.bitvector.definitions <> bv rec
+binder 13705:13708 <> afun:97
+R13746:13750 SailStdpp.Values <> mword def
+binder 13739:13742 <> pidv:98
+R13761:13768 xv6iris.ProcDefs <> pprivate rec
+binder 13757:13757 <> V:99
+R13777:13780 Corelib.Init.Datatypes <> bool ind
+binder 13772:13773 <> eb:100
+R13808:13812 iris.algebra.dfrac <> dfrac ind
+binder 13784:13786 <> dqb:101
+binder 13788:13790 <> dqs:102
+binder 13792:13794 <> dqa:103
+binder 13796:13799 <> dqpv:104
+binder 13801:13804 <> dqas:105
+R13828:13834 xv6iris.RegFile <> regfile def
+binder 13822:13822 <> m:106
+binder 13824:13824 <> M:107
+R13842:13844 Corelib.Init.Datatypes <> nat ind
+binder 13838:13838 <> K:108
+R13882:13886 SailStdpp.Values <> mword def
+binder 13854:13856 <> sp0:109
+binder 13858:13860 <> ra0:110
+binder 13862:13864 <> s00:111
+binder 13866:13868 <> s10:112
+binder 13870:13872 <> s20:113
+binder 13874:13875 <> pv:114
+binder 13877:13878 <> av:115
+R13936:13940 SailStdpp.Values <> mword def
+binder 13899:13900 <> w5:116
+binder 13902:13903 <> w6:117
+binder 13905:13906 <> w7:118
+binder 13908:13909 <> w8:119
+binder 13911:13912 <> w9:120
+binder 13914:13916 <> w10:121
+binder 13918:13920 <> w11:122
+binder 13922:13924 <> w12:123
+binder 13926:13928 <> w13:124
+binder 13930:13932 <> w67:125
+R13961:13964 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13958:13960 Corelib.Init.Datatypes <> nat ind
+R13965:13966 stdpp.bitvector.definitions <> bv rec
+binder 13953:13954 <> ef:126
+R13976:13979 xv6iris.UserPtTree <> uptd rec
+binder 13972:13972 <> P:127
+R13989:13993 SailStdpp.Values <> mword def
+binder 13983:13985 <> szv:128
+R14356:14363 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14340:14340 xv6iris.ProofKexec <> Q:80 var
+R14343:14351 xv6iris.KexecOkQ <> kxq_entry def
+R14353:14354 xv6iris.ProofKexec <> ef:126 var
+R14382:14389 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14372:14375 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R14365:14371 xv6iris.SpecKexec <> K_kexec abbrev
+R14376:14376 xv6iris.ProofKexec <> K:108 var
+R14407:14414 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14390:14396 xv6iris.ByteBuf <> bb_cstr def
+R14398:14401 xv6iris.ProofKexec <> pfun:92 var
+R14403:14406 xv6iris.ProofKexec <> plen:91 var
+R14432:14439 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14418:14420 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14416:14417 xv6iris.ProofKexec <> na:93 var
+R14421:14426 xv6iris.SpecKexec <> MAXARG def
+R14440:14440 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14503:14511 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14441:14447 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R14449:14450 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 14448:14448 <> i:129
+R14463:14466 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14453:14455 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14452:14452 xv6iris.ProofKexec <> i:129 var
+R14456:14457 xv6iris.ProofKexec <> na:93 var
+R14472:14476 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R14502:14502 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R14467:14469 xv6iris.ProofKexec <> avf:94 var
+R14471:14471 xv6iris.ProofKexec <> i:129 var
+R14494:14498 SailStdpp.Values <> mword def
+R14477:14488 SailStdpp.Values <> mword_of_int def
+R14548:14555 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14518:14521 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14547:14547 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14512:14514 xv6iris.ProofKexec <> avf:94 var
+R14516:14517 xv6iris.ProofKexec <> na:93 var
+R14539:14543 SailStdpp.Values <> mword def
+R14522:14533 SailStdpp.Values <> mword_of_int def
+R14556:14556 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14605:14613 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14557:14563 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R14565:14566 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 14564:14564 <> i:130
+R14579:14582 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14569:14571 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14568:14568 xv6iris.ProofKexec <> i:130 var
+R14572:14573 xv6iris.ProofKexec <> na:93 var
+R14590:14592 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14584:14587 xv6iris.ProofKexec <> alen:95 var
+R14589:14589 xv6iris.ProofKexec <> i:130 var
+R14593:14597 xv6iris.ProofKexec <> aslen:96 var
+R14599:14599 xv6iris.ProofKexec <> i:130 var
+R14614:14614 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14666:14674 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14615:14621 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R14623:14624 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 14622:14622 <> i:131
+R14637:14640 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14627:14629 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14626:14626 xv6iris.ProofKexec <> i:131 var
+R14630:14631 xv6iris.ProofKexec <> na:93 var
+R14641:14647 xv6iris.ByteBuf <> bb_cstr def
+R14650:14653 xv6iris.ProofKexec <> afun:97 var
+R14655:14655 xv6iris.ProofKexec <> i:131 var
+R14659:14662 xv6iris.ProofKexec <> alen:95 var
+R14664:14664 xv6iris.ProofKexec <> i:131 var
+R14675:14675 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14730:14738 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14676:14682 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R14684:14685 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 14683:14683 <> i:132
+R14698:14701 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14688:14690 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14687:14687 xv6iris.ProofKexec <> i:132 var
+R14691:14692 xv6iris.ProofKexec <> na:93 var
+R14720:14722 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R14703:14710 Stdlib.ZArith.BinInt Z of_nat def
+R14713:14716 xv6iris.ProofKexec <> alen:95 var
+R14718:14718 xv6iris.ProofKexec <> i:132 var
+R14765:14768 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14759:14761 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14740:14744 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R14745:14750 Riscv.rv64d_types <> Regidx constr
+R14752:14758 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R14739:14739 xv6iris.ProofKexec <> m:106 var
+R14762:14764 xv6iris.ProofKexec <> sp0:109 var
+R14791:14798 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14785:14787 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14770:14774 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R14775:14780 Riscv.rv64d_types <> Regidx constr
+R14782:14784 xv6iris.ProofKexec KexecProof Rra abbrev
+R14769:14769 xv6iris.ProofKexec <> m:106 var
+R14788:14790 xv6iris.ProofKexec <> ra0:110 var
+R14821:14824 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14815:14817 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14800:14804 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R14805:14810 Riscv.rv64d_types <> Regidx constr
+R14812:14814 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R14799:14799 xv6iris.ProofKexec <> m:106 var
+R14818:14820 xv6iris.ProofKexec <> s00:111 var
+R14847:14850 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14841:14843 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14826:14830 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R14831:14836 Riscv.rv64d_types <> Regidx constr
+R14838:14840 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R14825:14825 xv6iris.ProofKexec <> m:106 var
+R14844:14846 xv6iris.ProofKexec <> s10:112 var
+R14873:14880 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14867:14869 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14852:14856 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R14857:14862 Riscv.rv64d_types <> Regidx constr
+R14864:14866 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R14851:14851 xv6iris.ProofKexec <> m:106 var
+R14870:14872 xv6iris.ProofKexec <> s20:113 var
+R14902:14905 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14897:14899 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14882:14886 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R14887:14892 Riscv.rv64d_types <> Regidx constr
+R14894:14896 xv6iris.ProofKexec KexecProof Rs3 abbrev
+R14881:14881 xv6iris.ProofKexec <> m:106 var
+R14900:14901 xv6iris.ProofKexec <> w5:116 var
+R14927:14930 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14922:14924 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14907:14911 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R14912:14917 Riscv.rv64d_types <> Regidx constr
+R14919:14921 xv6iris.ProofKexec KexecProof Rs4 abbrev
+R14906:14906 xv6iris.ProofKexec <> m:106 var
+R14925:14926 xv6iris.ProofKexec <> w6:117 var
+R14952:14959 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14947:14949 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14932:14936 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R14937:14942 Riscv.rv64d_types <> Regidx constr
+R14944:14946 xv6iris.ProofKexec KexecProof Rs5 abbrev
+R14931:14931 xv6iris.ProofKexec <> m:106 var
+R14950:14951 xv6iris.ProofKexec <> w7:118 var
+R14981:14984 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14976:14978 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14961:14965 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R14966:14971 Riscv.rv64d_types <> Regidx constr
+R14973:14975 xv6iris.ProofKexec KexecProof Rs6 abbrev
+R14960:14960 xv6iris.ProofKexec <> m:106 var
+R14979:14980 xv6iris.ProofKexec <> w8:119 var
+R15006:15009 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15001:15003 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14986:14990 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R14991:14996 Riscv.rv64d_types <> Regidx constr
+R14998:15000 xv6iris.ProofKexec KexecProof Rs7 abbrev
+R14985:14985 xv6iris.ProofKexec <> m:106 var
+R15004:15005 xv6iris.ProofKexec <> w9:120 var
+R15032:15039 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15026:15028 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15011:15015 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R15016:15021 Riscv.rv64d_types <> Regidx constr
+R15023:15025 xv6iris.ProofKexec KexecProof Rs8 abbrev
+R15010:15010 xv6iris.ProofKexec <> m:106 var
+R15029:15031 xv6iris.ProofKexec <> w10:121 var
+R15062:15065 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15056:15058 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15041:15045 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R15046:15051 Riscv.rv64d_types <> Regidx constr
+R15053:15055 xv6iris.ProofKexec KexecProof Rs9 abbrev
+R15040:15040 xv6iris.ProofKexec <> m:106 var
+R15059:15061 xv6iris.ProofKexec <> w11:122 var
+R15089:15096 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15083:15085 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15067:15071 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R15072:15077 Riscv.rv64d_types <> Regidx constr
+R15079:15082 xv6iris.ProofKexec KexecProof Rs10 abbrev
+R15066:15066 xv6iris.ProofKexec <> m:106 var
+R15086:15088 xv6iris.ProofKexec <> w12:123 var
+R15108:15117 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R15097:15107 xv6iris.KernelText <> kernel_text def
+R15382:15391 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15118:15127 xv6iris.ProofKexecSeam <> kxc_at_1ae def
+R15129:15130 xv6iris.ProofKexec <> jp:81 var
+R15132:15133 xv6iris.ProofKexec <> bn:82 var
+R15135:15137 xv6iris.ProofKexec <> gfs:83 var
+R15139:15140 xv6iris.ProofKexec <> ga:84 var
+R15142:15143 xv6iris.ProofKexec <> gf:85 var
+R15145:15147 xv6iris.ProofKexec <> cov:86 var
+R15149:15156 xv6iris.ProofKexec <> logstart:87 var
+R15158:15166 xv6iris.ProofKexec <> bmapstart:88 var
+R15168:15177 xv6iris.ProofKexec <> inodestart:89 var
+R15179:15182 xv6iris.ProofKexec <> size:90 var
+R15199:15202 xv6iris.ProofKexec <> plen:91 var
+R15204:15207 xv6iris.ProofKexec <> pfun:92 var
+R15209:15210 xv6iris.ProofKexec <> na:93 var
+R15212:15214 xv6iris.ProofKexec <> avf:94 var
+R15216:15220 xv6iris.ProofKexec <> aslen:96 var
+R15222:15225 xv6iris.ProofKexec <> afun:97 var
+R15227:15230 xv6iris.ProofKexec <> pidv:98 var
+R15232:15232 xv6iris.ProofKexec <> V:99 var
+R15234:15235 xv6iris.ProofKexec <> eb:100 var
+R15237:15239 xv6iris.ProofKexec <> dqb:101 var
+R15241:15243 xv6iris.ProofKexec <> dqs:102 var
+R15245:15247 xv6iris.ProofKexec <> dqa:103 var
+R15249:15252 xv6iris.ProofKexec <> dqpv:104 var
+R15254:15257 xv6iris.ProofKexec <> dqas:105 var
+R15274:15274 xv6iris.ProofKexec <> M:107 var
+R15276:15276 xv6iris.ProofKexec <> K:108 var
+R15278:15280 xv6iris.ProofKexec <> sp0:109 var
+R15282:15284 xv6iris.ProofKexec <> ra0:110 var
+R15286:15288 xv6iris.ProofKexec <> s00:111 var
+R15290:15292 xv6iris.ProofKexec <> s10:112 var
+R15294:15296 xv6iris.ProofKexec <> s20:113 var
+R15298:15299 xv6iris.ProofKexec <> pv:114 var
+R15301:15302 xv6iris.ProofKexec <> av:115 var
+R15319:15320 xv6iris.ProofKexec <> w5:116 var
+R15322:15323 xv6iris.ProofKexec <> w6:117 var
+R15325:15326 xv6iris.ProofKexec <> w7:118 var
+R15328:15329 xv6iris.ProofKexec <> w8:119 var
+R15331:15332 xv6iris.ProofKexec <> w9:120 var
+R15334:15336 xv6iris.ProofKexec <> w10:121 var
+R15338:15340 xv6iris.ProofKexec <> w11:122 var
+R15342:15344 xv6iris.ProofKexec <> w12:123 var
+R15346:15348 xv6iris.ProofKexec <> w13:124 var
+R15350:15352 xv6iris.ProofKexec <> w67:125 var
+R15354:15355 xv6iris.ProofKexec <> ef:126 var
+R15357:15357 xv6iris.ProofKexec <> P:127 var
+R15359:15361 xv6iris.ProofKexec <> szv:128 var
+R15365:15369 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R15370:15375 Riscv.rv64d_types <> Regidx constr
+R15377:15380 xv6iris.ProofKexec KexecProof Rs11 abbrev
+R15364:15364 xv6iris.ProofKexec <> m:106 var
+R16497:16506 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15392:15398 xv6iris.WpNext <> wp_next def
+R15432:15436 xv6iris.RiscvLang <> CpuId class
+binder 15426:15428 <> CID:133
+R15448:15452 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R15517:15529 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R15458:15464 xv6iris.RegFile <> regfile def
+binder 15453:15454 <> mf:134
+R15473:15480 xv6iris.ProcDefs <> pprivate rec
+binder 15468:15469 <> V':135
+R15509:15513 SailStdpp.Values <> mword def
+binder 15492:15496 <> entry:136
+R15509:15513 SailStdpp.Values <> mword def
+binder 15498:15500 <> spv:137
+R15509:15513 SailStdpp.Values <> mword def
+binder 15502:15505 <> szv':138
+R15553:15568 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15530:15532 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15550:15552 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15533:15544 xv6iris.CalleeSaved <> callee_saved def
+R15546:15546 xv6iris.ProofKexec <> m:106 var
+R15548:15549 xv6iris.ProofKexec <> mf:134 var
+R15635:15650 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15569:15571 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15632:15634 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15572:15581 xv6iris.KexecOkQ <> kexec_ok_q def
+R15583:15583 xv6iris.ProofKexec <> Q:80 var
+R15585:15585 xv6iris.ProofKexec <> V:99 var
+R15587:15588 xv6iris.ProofKexec <> V':135 var
+R15593:15597 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R15598:15603 Riscv.rv64d_types <> Regidx constr
+R15605:15607 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R15591:15592 xv6iris.ProofKexec <> mf:134 var
+R15610:15614 xv6iris.ProofKexec <> entry:136 var
+R15616:15618 xv6iris.ProofKexec <> spv:137 var
+R15620:15623 xv6iris.ProofKexec <> szv':138 var
+R15625:15626 xv6iris.ProofKexec <> na:93 var
+R15628:15631 xv6iris.ProofKexec <> alen:95 var
+R15689:15704 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15651:15661 xv6iris.IntrDefs <> sie_cap_gpr def
+R15663:15665 xv6iris.Ktier <> KT1 constr
+R15667:15668 xv6iris.ProofKexec <> mf:134 var
+R15670:15670 xv6iris.ProofKexec <> K:108 var
+R15672:15673 xv6iris.ProofKexec <> eb:100 var
+R15676:15684 xv6iris.ProcGeom <> proc_addr def
+R15686:15687 xv6iris.ProofKexec <> jp:81 var
+R15739:15754 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15705:15711 xv6iris.CpuOwn <> cpu_own def
+R15715:15716 xv6iris.ProofKexec <> eb:100 var
+R15719:15727 xv6iris.ProcGeom <> proc_addr def
+R15729:15730 xv6iris.ProofKexec <> jp:81 var
+R15733:15734 xv6iris.ProofKexec <> eb:100 var
+R15736:15738 stdpp.base <> ::stdpp_scope:'∅' not
+R15775:15790 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15755:15767 xv6iris.IntrDefs <> trap_csrs_ext def
+R15769:15771 xv6iris.Ktier <> KT1 constr
+R15773:15774 xv6iris.ProofKexec <> eb:100 var
+R15822:15837 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15791:15803 xv6iris.IntrDefs <> cpu_claim_ext def
+R15805:15806 xv6iris.ProofKexec <> eb:100 var
+R15809:15817 xv6iris.ProcGeom <> proc_addr def
+R15819:15820 xv6iris.ProofKexec <> jp:81 var
+R15856:15871 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15838:15842 xv6iris.InstrBytes <> pc_is def
+R15845:15850 xv6iris.RiscvExtras <> ret_pc def
+R15852:15854 xv6iris.ProofKexec <> ra0:110 var
+R15932:15947 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15884:15891 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R15895:15897 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R15931:15931 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R15872:15883 xv6iris.BitmapInv <> sb_bmapstart def
+R15892:15894 xv6iris.ProofKexec <> dqb:101 var
+R15923:15927 SailStdpp.Values <> mword def
+R15898:15909 SailStdpp.Values <> mword_of_int def
+R15911:15919 xv6iris.ProofKexec <> bmapstart:88 var
+R16010:16025 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15961:15968 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R15972:15974 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R16009:16009 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R15948:15960 xv6iris.InodeInv <> sb_inodestart def
+R15969:15971 xv6iris.ProofKexec <> dqs:102 var
+R16001:16005 SailStdpp.Values <> mword def
+R15975:15986 SailStdpp.Values <> mword_of_int def
+R15988:15997 xv6iris.ProofKexec <> inodestart:89 var
+R16044:16059 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16026:16035 xv6iris.KvmSpec <> kalloc_env def
+R16037:16038 xv6iris.ProofKexec <> ga:84 var
+R16040:16043 Corelib.Init.Datatypes <> None constr
+R16095:16110 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16060:16068 xv6iris.ProcInv <> proc_priv def
+R16070:16071 xv6iris.ProofKexec <> gf:85 var
+R16074:16082 xv6iris.ProcGeom <> proc_addr def
+R16084:16085 xv6iris.ProofKexec <> jp:81 var
+R16088:16091 xv6iris.ProofKexec <> pidv:98 var
+R16093:16094 xv6iris.ProofKexec <> V':135 var
+R16111:16111 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16181:16197 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16112:16122 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R16124:16128 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R16143:16144 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 16123:16123 <> i:139
+binder 16123:16123 <> i:140
+R16156:16163 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R16167:16167 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R16174:16174 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ['_x_']'_x_x not
+R16164:16166 xv6iris.Ktier <> KT1 constr
+R16145:16150 xv6iris.RiscvModelBytes <> pa_add def
+R16152:16153 xv6iris.ProofKexec <> pv:114 var
+R16155:16155 xv6iris.ProofKexec <> i:139 var
+R16168:16168 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R16173:16173 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R16169:16172 xv6iris.ProofKexec <> dqpv:104 var
+R16175:16178 xv6iris.ProofKexec <> pfun:92 var
+R16180:16180 xv6iris.ProofKexec <> i:139 var
+R16129:16131 Corelib.Lists.ListDef <> seq def
+R16136:16136 Corelib.Init.Datatypes <> S constr
+R16138:16141 xv6iris.ProofKexec <> plen:91 var
+R16198:16198 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16270:16286 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16199:16209 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R16211:16215 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R16228:16229 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 16210:16210 <> i:141
+binder 16210:16210 <> i:142
+R16247:16254 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈['_x_']'_x_x not
+R16258:16258 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈['_x_']'_x_x not
+R16264:16264 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈['_x_']'_x_x not
+R16255:16257 xv6iris.Ktier <> KT1 constr
+R16230:16235 xv6iris.RiscvModelBytes <> pa_add def
+R16237:16238 xv6iris.ProofKexec <> av:115 var
+R16242:16244 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R16245:16245 xv6iris.ProofKexec <> i:141 var
+R16259:16259 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R16263:16263 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R16260:16262 xv6iris.ProofKexec <> dqa:103 var
+R16265:16267 xv6iris.ProofKexec <> avf:94 var
+R16269:16269 xv6iris.ProofKexec <> i:141 var
+R16216:16218 Corelib.Lists.ListDef <> seq def
+R16223:16223 Corelib.Init.Datatypes <> S constr
+R16225:16226 xv6iris.ProofKexec <> na:93 var
+R16287:16287 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16400:16416 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16288:16298 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R16300:16304 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R16313:16327 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 16299:16299 <> i:143
+binder 16299:16299 <> i:144
+R16328:16338 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R16340:16344 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R16360:16361 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 16339:16339 <> j:145
+binder 16339:16339 <> j:146
+R16378:16385 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ{'_x_'}'_x not
+R16390:16391 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ{'_x_'}'_x not
+R16362:16367 xv6iris.RiscvModelBytes <> pa_add def
+R16370:16372 xv6iris.ProofKexec <> avf:94 var
+R16374:16374 xv6iris.ProofKexec <> i:143 var
+R16377:16377 xv6iris.ProofKexec <> j:145 var
+R16386:16389 xv6iris.ProofKexec <> dqas:105 var
+R16392:16395 xv6iris.ProofKexec <> afun:97 var
+R16399:16399 xv6iris.ProofKexec <> j:145 var
+R16397:16397 xv6iris.ProofKexec <> i:143 var
+R16345:16347 Corelib.Lists.ListDef <> seq def
+R16352:16356 xv6iris.ProofKexec <> aslen:96 var
+R16358:16358 xv6iris.ProofKexec <> i:143 var
+R16305:16307 Corelib.Lists.ListDef <> seq def
+R16311:16312 xv6iris.ProofKexec <> na:93 var
+R16425:16440 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16417:16422 xv6iris.BioDefs <> bslots def
+R16453:16468 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16441:16450 xv6iris.IrefSlots <> iref_slots def
+R16469:16472 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16495:16495 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16480:16483 iris.program_logic.language <> expr proj
+R16485:16494 xv6iris.RiscvLang <> riscv_lang def
+R16473:16476 xv6iris.RiscvLang <> Loop abbrev
+R15406:15414 xv6iris.ProcGeom <> proc_addr def
+R15416:15417 xv6iris.ProofKexec <> jp:81 var
+R15400:15403 Corelib.Init.Datatypes <> true constr
+R16507:16510 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16533:16533 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16518:16521 iris.program_logic.language <> expr proj
+R16523:16532 xv6iris.RiscvLang <> riscv_lang def
+R16511:16514 xv6iris.RiscvLang <> Loop abbrev
+R17078:17087 xv6iris.ProofKexecSeam <> kxc_at_1ae def
+R17078:17087 xv6iris.ProofKexecSeam <> kxc_at_1ae def
+R17078:17087 xv6iris.ProofKexecSeam <> kxc_at_1ae def
+R17163:17172 xv6iris.ProofKexecSeam <> kxc_at_1ae def
+R17410:17414 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R17415:17420 Riscv.rv64d_types <> Regidx constr
+R17422:17425 xv6iris.ProofKexec KexecProof Rs11 abbrev
+R17163:17172 xv6iris.ProofKexecSeam <> kxc_at_1ae def
+R17410:17414 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R17415:17420 Riscv.rv64d_types <> Regidx constr
+R17422:17425 xv6iris.ProofKexec KexecProof Rs11 abbrev
+R17475:17484 xv6iris.ProofKexecSeam <> kxc_at_1ae def
+R17475:17484 xv6iris.ProofKexecSeam <> kxc_at_1ae def
+R17475:17484 xv6iris.ProofKexecSeam <> kxc_at_1ae def
+R17653:17653 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18068:18087 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18108:18108 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17654:17667 xv6iris.ProofKexec KexecProof kxc_c_setup thm
+R17653:17653 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18068:18087 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18108:18108 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17654:17667 xv6iris.ProofKexec KexecProof kxc_c_setup thm
+R18449:18458 xv6iris.ProofKexecSeam <> kxc_at_21a def
+R18449:18458 xv6iris.ProofKexecSeam <> kxc_at_21a def
+R18449:18458 xv6iris.ProofKexecSeam <> kxc_at_21a def
+R18544:18546 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R18544:18546 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R18618:18627 Stdlib.Arith.PeanoNat Nat eq_dec thm
+R18618:18627 Stdlib.Arith.PeanoNat Nat eq_dec thm
+R18736:18745 xv6iris.ProofKexecSeam <> kxc_at_21a def
+R18991:18995 xv6iris.ProcDefs <> pv_sz proj
+R19006:19010 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R19011:19016 Riscv.rv64d_types <> Regidx constr
+R19018:19021 xv6iris.ProofKexec KexecProof Rs11 abbrev
+R18736:18745 xv6iris.ProofKexecSeam <> kxc_at_21a def
+R18991:18995 xv6iris.ProcDefs <> pv_sz proj
+R19006:19010 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R19011:19016 Riscv.rv64d_types <> Regidx constr
+R19018:19021 xv6iris.ProofKexec KexecProof Rs11 abbrev
+R19080:19089 xv6iris.ProofKexecSeam <> kxc_at_21a def
+R19080:19089 xv6iris.ProofKexecSeam <> kxc_at_21a def
+R19080:19089 xv6iris.ProofKexecSeam <> kxc_at_21a def
+R19264:19264 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19764:19785 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19808:19808 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19265:19280 xv6iris.ProofKexec KexecProof kxc_argv_loop thm
+R19536:19540 xv6iris.ProcDefs <> pv_sz proj
+R19264:19264 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19764:19785 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19808:19808 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19265:19280 xv6iris.ProofKexec KexecProof kxc_argv_loop thm
+R19536:19540 xv6iris.ProcDefs <> pv_sz proj
+R19888:19888 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20304:20325 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20346:20346 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19889:19898 xv6iris.ProofKexec KexecProof kxc_d_tail thm
+R19888:19888 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20304:20325 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20346:20346 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19889:19898 xv6iris.ProofKexec KexecProof kxc_d_tail thm
+R20421:20421 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20836:20857 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20877:20877 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20422:20431 xv6iris.ProofKexec KexecProof kxc_d_tail thm
+R20421:20421 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20836:20857 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20877:20877 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20422:20431 xv6iris.ProofKexec KexecProof kxc_d_tail thm
+R20892:20900 xv6iris.ProofKexec KexecProof.KexecTail <> sec
+sec 21142:21150 KexecProof KexecMain
+R21166:21172 xv6iris.RiscvPtsto <> riscvGS class
+R21179:21182 xv6iris.Xv6G <> xv6G class
+R21184:21185 xv6iris.ProofKexec <> Σ:147 var
+R21189:21196 xv6iris.Xv6Cameras <> bioslotG class
+R21198:21199 xv6iris.ProofKexec <> Σ:147 var
+R21203:21209 xv6iris.FdSlots <> fdslotG class
+R21211:21212 xv6iris.ProofKexec <> Σ:147 var
+R21216:21220 xv6iris.FileInvDefs <> fileG class
+R21222:21223 xv6iris.ProofKexec <> Σ:147 var
+R21227:21235 xv6iris.IrefSlots <> irefslotG class
+R21237:21238 xv6iris.ProofKexec <> Σ:147 var
+R21242:21245 xv6iris.ProcAvail <> pavG class
+R21247:21248 xv6iris.ProofKexec <> Σ:147 var
+var  21264:21266 KexecProof.KexecMain GEN
+var  21279:21282 KexecProof.KexecMain CID0
+var  21295:21296 KexecProof.KexecMain XI
+R21270:21274 xv6iris.RiscvLang <> GenId class
+R21286:21290 xv6iris.RiscvLang <> CpuId class
+R21300:21305 xv6iris.TsoCtx <> CurCtx class
+abbrev 21321:21323 KexecProof Rra
+R21346:21350 SailStdpp.Values <> mword def
+R21329:21340 SailStdpp.Values <> mword_of_int def
+abbrev 21367:21369 KexecProof Rs0
+R21392:21396 SailStdpp.Values <> mword def
+R21375:21386 SailStdpp.Values <> mword_of_int def
+abbrev 21413:21415 KexecProof Rs1
+R21438:21442 SailStdpp.Values <> mword def
+R21421:21432 SailStdpp.Values <> mword_of_int def
+abbrev 21459:21461 KexecProof Rs2
+R21485:21489 SailStdpp.Values <> mword def
+R21467:21478 SailStdpp.Values <> mword_of_int def
+abbrev 21506:21508 KexecProof Rs3
+R21532:21536 SailStdpp.Values <> mword def
+R21514:21525 SailStdpp.Values <> mword_of_int def
+abbrev 21553:21555 KexecProof Rs4
+R21579:21583 SailStdpp.Values <> mword def
+R21561:21572 SailStdpp.Values <> mword_of_int def
+abbrev 21600:21602 KexecProof Rs5
+R21626:21630 SailStdpp.Values <> mword def
+R21608:21619 SailStdpp.Values <> mword_of_int def
+abbrev 21647:21649 KexecProof Rs6
+R21673:21677 SailStdpp.Values <> mword def
+R21655:21666 SailStdpp.Values <> mword_of_int def
+abbrev 21694:21696 KexecProof Rs7
+R21720:21724 SailStdpp.Values <> mword def
+R21702:21713 SailStdpp.Values <> mword_of_int def
+abbrev 21741:21743 KexecProof Rs8
+R21767:21771 SailStdpp.Values <> mword def
+R21749:21760 SailStdpp.Values <> mword_of_int def
+abbrev 21788:21790 KexecProof Rs9
+R21814:21818 SailStdpp.Values <> mword def
+R21796:21807 SailStdpp.Values <> mword_of_int def
+abbrev 21835:21838 KexecProof Rs10
+R21862:21866 SailStdpp.Values <> mword def
+R21844:21855 SailStdpp.Values <> mword_of_int def
+abbrev 21883:21886 KexecProof Rs11
+R21910:21914 SailStdpp.Values <> mword def
+R21892:21903 SailStdpp.Values <> mword_of_int def
+abbrev 21931:21933 KexecProof Ra0
+R21957:21961 SailStdpp.Values <> mword def
+R21939:21950 SailStdpp.Values <> mword_of_int def
+abbrev 21978:21980 KexecProof Ra1
+R22004:22008 SailStdpp.Values <> mword def
+R21986:21997 SailStdpp.Values <> mword_of_int def
+abbrev 22097:22098 KexecProof QT
+R22112:22116 SailStdpp.Values <> mword def
+R22124:22127 stdpp.base <> ::type_scope:'True' not
+prf 22155:22168 KexecProof wp_kexec_sconf
+R22182:22185 Corelib.Init.Datatypes <> list ind
+R22187:22191 iris.base_logic.lib.iprop <> gname def
+binder 22177:22178 <> gs:158
+R22200:22202 Corelib.Init.Datatypes <> nat ind
+binder 22195:22196 <> jp:159
+R22211:22215 iris.base_logic.lib.iprop <> gname def
+binder 22206:22207 <> gl:160
+R22230:22239 xv6iris.WpUart <> uart_names rec
+binder 22225:22226 <> gu:161
+R22248:22257 xv6iris.DiskPtsto <> disk_names rec
+binder 22243:22244 <> gd:162
+R22266:22270 iris.base_logic.lib.iprop <> gname def
+binder 22261:22262 <> gk:163
+R22292:22296 SailStdpp.Values <> mword def
+binder 22280:22281 <> pd:164
+binder 22283:22285 <> pav:165
+binder 22287:22288 <> pu:166
+R22314:22322 xv6iris.BioDefs <> bio_names rec
+binder 22309:22310 <> bn:167
+R22336:22344 xv6iris.LogDefs <> log_names rec
+binder 22332:22332 <> g:168
+R22354:22361 xv6iris.FsBlocks <> fs_names rec
+binder 22348:22350 <> gfs:169
+R22370:22374 iris.base_logic.lib.iprop <> gname def
+binder 22365:22366 <> gi:170
+R22389:22396 xv6iris.IcacheEscrow <> ic_names rec
+binder 22384:22385 <> cn:171
+R22406:22410 iris.base_logic.lib.iprop <> gname def
+binder 22400:22402 <> gtl:172
+R22425:22429 iris.base_logic.lib.iprop <> gname def
+binder 22420:22421 <> ga:173
+R22438:22442 iris.base_logic.lib.iprop <> gname def
+binder 22433:22434 <> gf:174
+R22458:22461 stdpp.gmap <> gset def
+R22463:22463 Corelib.Numbers.BinNums <> Z ind
+binder 22452:22454 <> cov:175
+R22499:22499 Corelib.Numbers.BinNums <> Z ind
+binder 22467:22474 <> logstart:176
+binder 22476:22484 <> bmapstart:177
+binder 22486:22495 <> inodestart:178
+R22509:22511 Corelib.Init.Datatypes <> nat ind
+binder 22503:22505 <> nib:179
+R22528:22528 Corelib.Numbers.BinNums <> Z ind
+binder 22521:22524 <> size:180
+R22538:22542 SailStdpp.Values <> mword def
+binder 22532:22534 <> dev:181
+R22562:22564 Corelib.Init.Datatypes <> nat ind
+binder 22555:22558 <> plen:182
+R22578:22581 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22575:22577 Corelib.Init.Datatypes <> nat ind
+R22582:22583 stdpp.bitvector.definitions <> bv rec
+binder 22568:22571 <> pfun:183
+R22600:22602 Corelib.Init.Datatypes <> nat ind
+binder 22595:22596 <> na:184
+R22615:22618 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22612:22614 Corelib.Init.Datatypes <> nat ind
+R22619:22623 SailStdpp.Values <> mword def
+binder 22606:22608 <> avf:185
+R22652:22655 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22649:22651 Corelib.Init.Datatypes <> nat ind
+R22656:22658 Corelib.Init.Datatypes <> nat ind
+binder 22636:22639 <> alen:186
+binder 22641:22645 <> aslen:187
+R22672:22675 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22669:22671 Corelib.Init.Datatypes <> nat ind
+R22679:22682 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22676:22678 Corelib.Init.Datatypes <> nat ind
+R22683:22684 stdpp.bitvector.definitions <> bv rec
+binder 22662:22665 <> afun:188
+R22703:22707 SailStdpp.Values <> mword def
+binder 22696:22699 <> pidv:189
+R22718:22725 xv6iris.ProcDefs <> pprivate rec
+binder 22714:22714 <> V:190
+R22759:22763 iris.algebra.dfrac <> dfrac ind
+binder 22735:22737 <> dqb:191
+binder 22739:22741 <> dqs:192
+binder 22743:22745 <> dqa:193
+binder 22747:22750 <> dqpv:194
+binder 22752:22755 <> dqas:195
+R22777:22783 xv6iris.RegFile <> regfile def
+binder 22773:22773 <> m:196
+R22791:22793 Corelib.Init.Datatypes <> nat ind
+binder 22787:22787 <> K:197
+R22802:22805 Corelib.Init.Datatypes <> bool ind
+binder 22797:22798 <> eb:198
+R22819:22822 Corelib.Init.Datatypes <> bool ind
+binder 22815:22815 <> b:199
+R22832:22835 stdpp.gmap <> gset def
+R22837:22842 Stdlib.Strings.String <> string ind
+binder 22826:22828 <> lks:200
+R22851:22869 xv6iris.SpecKexec <> wp_kexec_sconf_body def
+R23114:23116 xv6iris.ProofKexec <> lks:200 var
+R23112:23112 xv6iris.ProofKexec <> b:199 var
+R23109:23110 xv6iris.ProofKexec <> eb:198 var
+R23107:23107 xv6iris.ProofKexec <> K:197 var
+R23105:23105 xv6iris.ProofKexec <> m:196 var
+R23100:23103 xv6iris.ProofKexec <> dqas:195 var
+R23095:23098 xv6iris.ProofKexec <> dqpv:194 var
+R23091:23093 xv6iris.ProofKexec <> dqa:193 var
+R23087:23089 xv6iris.ProofKexec <> dqs:192 var
+R23083:23085 xv6iris.ProofKexec <> dqb:191 var
+R23081:23081 xv6iris.ProofKexec <> V:190 var
+R23076:23079 xv6iris.ProofKexec <> pidv:189 var
+R23047:23050 xv6iris.ProofKexec <> afun:188 var
+R23041:23045 xv6iris.ProofKexec <> aslen:187 var
+R23036:23039 xv6iris.ProofKexec <> alen:186 var
+R23032:23034 xv6iris.ProofKexec <> avf:185 var
+R23029:23030 xv6iris.ProofKexec <> na:184 var
+R23024:23027 xv6iris.ProofKexec <> pfun:183 var
+R23019:23022 xv6iris.ProofKexec <> plen:182 var
+R23015:23017 xv6iris.ProofKexec <> dev:181 var
+R23010:23013 xv6iris.ProofKexec <> size:180 var
+R22982:22984 xv6iris.ProofKexec <> nib:179 var
+R22971:22980 xv6iris.ProofKexec <> inodestart:178 var
+R22961:22969 xv6iris.ProofKexec <> bmapstart:177 var
+R22952:22959 xv6iris.ProofKexec <> logstart:176 var
+R22948:22950 xv6iris.ProofKexec <> cov:175 var
+R22945:22946 xv6iris.ProofKexec <> gf:174 var
+R22942:22943 xv6iris.ProofKexec <> ga:173 var
+R22914:22916 xv6iris.ProofKexec <> gtl:172 var
+R22911:22912 xv6iris.ProofKexec <> cn:171 var
+R22908:22909 xv6iris.ProofKexec <> gi:170 var
+R22904:22906 xv6iris.ProofKexec <> gfs:169 var
+R22902:22902 xv6iris.ProofKexec <> g:168 var
+R22899:22900 xv6iris.ProofKexec <> bn:167 var
+R22896:22897 xv6iris.ProofKexec <> pu:166 var
+R22892:22894 xv6iris.ProofKexec <> pav:165 var
+R22889:22890 xv6iris.ProofKexec <> pd:164 var
+R22886:22887 xv6iris.ProofKexec <> gk:163 var
+R22883:22884 xv6iris.ProofKexec <> gd:162 var
+R22880:22881 xv6iris.ProofKexec <> gu:161 var
+R22877:22878 xv6iris.ProofKexec <> gl:160 var
+R22874:22875 xv6iris.ProofKexec <> jp:159 var
+R22871:22872 xv6iris.ProofKexec <> gs:158 var
+R23141:23159 xv6iris.SpecKexec <> wp_kexec_sconf_body def
+R23141:23159 xv6iris.SpecKexec <> wp_kexec_sconf_body def
+R23141:23159 xv6iris.SpecKexec <> wp_kexec_sconf_body def
+R23761:23761 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23811:23833 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23844:23844 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23762:23776 xv6iris.ProofKexecTail <> kxc_sie_b_agree thm
+R23794:23802 xv6iris.ProcGeom <> proc_addr def
+R23761:23761 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23811:23833 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23844:23844 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23762:23776 xv6iris.ProofKexecTail <> kxc_sie_b_agree thm
+R23794:23802 xv6iris.ProcGeom <> proc_addr def
+R23898:23898 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23915:23920 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23931:23931 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23899:23914 xv6iris.CpuOwn <> cpu_own_eb_agree thm
+R23898:23898 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23915:23920 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23931:23931 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23899:23914 xv6iris.CpuOwn <> cpu_own_eb_agree thm
+R24079:24079 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24098:24103 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24110:24110 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24080:24097 xv6iris.CpuOwn <> cpu_own_zero_empty thm
+R24079:24079 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24098:24103 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24110:24110 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24080:24097 xv6iris.CpuOwn <> cpu_own_zero_empty thm
+R24435:24435 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24693:24715 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24723:24723 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24436:24448 xv6iris.ProofKexecTail <> kxc_exit_qgen thm
+R24677:24681 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R24682:24687 Riscv.rv64d_types <> Regidx constr
+R24689:24691 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R24658:24662 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R24663:24668 Riscv.rv64d_types <> Regidx constr
+R24670:24672 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R24639:24643 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R24644:24649 Riscv.rv64d_types <> Regidx constr
+R24651:24653 xv6iris.ProofKexec KexecProof Rra abbrev
+R24616:24618 stdpp.base <> ::stdpp_scope:'∅' not
+R24469:24477 xv6iris.ProcGeom <> proc_addr def
+R24465:24466 xv6iris.ProofKexec KexecProof QT abbrev
+R24459:24462 xv6iris.ProofKexec <> KexecProof.KexecMain.CID0 var
+R24435:24435 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24693:24715 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24723:24723 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24436:24448 xv6iris.ProofKexecTail <> kxc_exit_qgen thm
+R24677:24681 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R24682:24687 Riscv.rv64d_types <> Regidx constr
+R24689:24691 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R24658:24662 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R24663:24668 Riscv.rv64d_types <> Regidx constr
+R24670:24672 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R24639:24643 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R24644:24649 Riscv.rv64d_types <> Regidx constr
+R24651:24653 xv6iris.ProofKexec KexecProof Rra abbrev
+R24616:24618 stdpp.base <> ::stdpp_scope:'∅' not
+R24469:24477 xv6iris.ProcGeom <> proc_addr def
+R24465:24466 xv6iris.ProofKexec KexecProof QT abbrev
+R24459:24462 xv6iris.ProofKexec <> KexecProof.KexecMain.CID0 var
+R24829:24829 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25468:25487 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25612:25612 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24830:24842 xv6iris.ProofKexec KexecProof kxc_phaseA thm
+R24859:24860 xv6iris.ProofKexec KexecProof QT abbrev
+R25076:25078 stdpp.base <> ::stdpp_scope:'∅' not
+R25096:25100 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25101:25106 Riscv.rv64d_types <> Regidx constr
+R25108:25114 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R25119:25123 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25124:25129 Riscv.rv64d_types <> Regidx constr
+R25131:25133 xv6iris.ProofKexec KexecProof Rra abbrev
+R25138:25142 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25143:25148 Riscv.rv64d_types <> Regidx constr
+R25150:25152 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R25171:25175 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25176:25181 Riscv.rv64d_types <> Regidx constr
+R25183:25185 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R25190:25194 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25195:25200 Riscv.rv64d_types <> Regidx constr
+R25202:25204 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R25223:25227 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25228:25233 Riscv.rv64d_types <> Regidx constr
+R25235:25237 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R25242:25246 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25247:25252 Riscv.rv64d_types <> Regidx constr
+R25254:25256 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R25259:25262 Corelib.Init.Datatypes <> None constr
+R25264:25266 iris.bi.interface <> ::bi_scope:'emp' not
+R25413:25419 Corelib.Init.Logic <> eq_refl constr
+R25421:25427 Corelib.Init.Logic <> eq_refl constr
+R25429:25435 Corelib.Init.Logic <> eq_refl constr
+R25437:25443 Corelib.Init.Logic <> eq_refl constr
+R25445:25451 Corelib.Init.Logic <> eq_refl constr
+R25453:25459 Corelib.Init.Logic <> eq_refl constr
+R25461:25467 Corelib.Init.Logic <> eq_refl constr
+R24853:24856 xv6iris.ProofKexec <> KexecProof.KexecMain.CID0 var
+R24829:24829 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25468:25487 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25612:25612 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24830:24842 xv6iris.ProofKexec KexecProof kxc_phaseA thm
+R24859:24860 xv6iris.ProofKexec KexecProof QT abbrev
+R25076:25078 stdpp.base <> ::stdpp_scope:'∅' not
+R25096:25100 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25101:25106 Riscv.rv64d_types <> Regidx constr
+R25108:25114 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R25119:25123 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25124:25129 Riscv.rv64d_types <> Regidx constr
+R25131:25133 xv6iris.ProofKexec KexecProof Rra abbrev
+R25138:25142 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25143:25148 Riscv.rv64d_types <> Regidx constr
+R25150:25152 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R25171:25175 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25176:25181 Riscv.rv64d_types <> Regidx constr
+R25183:25185 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R25190:25194 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25195:25200 Riscv.rv64d_types <> Regidx constr
+R25202:25204 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R25223:25227 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25228:25233 Riscv.rv64d_types <> Regidx constr
+R25235:25237 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R25242:25246 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R25247:25252 Riscv.rv64d_types <> Regidx constr
+R25254:25256 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R25259:25262 Corelib.Init.Datatypes <> None constr
+R25264:25266 iris.bi.interface <> ::bi_scope:'emp' not
+R25413:25419 Corelib.Init.Logic <> eq_refl constr
+R25421:25427 Corelib.Init.Logic <> eq_refl constr
+R25429:25435 Corelib.Init.Logic <> eq_refl constr
+R25437:25443 Corelib.Init.Logic <> eq_refl constr
+R25445:25451 Corelib.Init.Logic <> eq_refl constr
+R25453:25459 Corelib.Init.Logic <> eq_refl constr
+R25461:25467 Corelib.Init.Logic <> eq_refl constr
+R24853:24856 xv6iris.ProofKexec <> KexecProof.KexecMain.CID0 var
+R26599:26606 xv6iris.ProofKexecSeam <> kxc_open def
+R26599:26606 xv6iris.ProofKexecSeam <> kxc_open def
+R26826:26833 xv6iris.ProofKexecSeam <> kxc_open def
+R26826:26833 xv6iris.ProofKexecSeam <> kxc_open def
+R26826:26833 xv6iris.ProofKexecSeam <> kxc_open def
+R27362:27362 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28042:28061 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28202:28202 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27363:27371 xv6iris.ProofKexec KexecProof kxc_b1 thm
+R27388:27389 xv6iris.ProofKexec KexecProof QT abbrev
+R27664:27666 stdpp.base <> ::stdpp_scope:'∅' not
+R27684:27688 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27689:27694 Riscv.rv64d_types <> Regidx constr
+R27696:27702 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R27707:27711 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27712:27717 Riscv.rv64d_types <> Regidx constr
+R27719:27721 xv6iris.ProofKexec KexecProof Rra abbrev
+R27726:27730 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27731:27736 Riscv.rv64d_types <> Regidx constr
+R27738:27740 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R27759:27763 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27764:27769 Riscv.rv64d_types <> Regidx constr
+R27771:27773 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R27778:27782 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27783:27788 Riscv.rv64d_types <> Regidx constr
+R27790:27792 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R27811:27815 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27816:27821 Riscv.rv64d_types <> Regidx constr
+R27823:27825 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R27830:27834 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27835:27840 Riscv.rv64d_types <> Regidx constr
+R27842:27844 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R27946:27952 Corelib.Init.Logic <> eq_refl constr
+R27954:27960 Corelib.Init.Logic <> eq_refl constr
+R27962:27968 Corelib.Init.Logic <> eq_refl constr
+R27970:27976 Corelib.Init.Logic <> eq_refl constr
+R27978:27984 Corelib.Init.Logic <> eq_refl constr
+R27362:27362 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28042:28061 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28202:28202 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27363:27371 xv6iris.ProofKexec KexecProof kxc_b1 thm
+R27388:27389 xv6iris.ProofKexec KexecProof QT abbrev
+R27664:27666 stdpp.base <> ::stdpp_scope:'∅' not
+R27684:27688 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27689:27694 Riscv.rv64d_types <> Regidx constr
+R27696:27702 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R27707:27711 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27712:27717 Riscv.rv64d_types <> Regidx constr
+R27719:27721 xv6iris.ProofKexec KexecProof Rra abbrev
+R27726:27730 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27731:27736 Riscv.rv64d_types <> Regidx constr
+R27738:27740 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R27759:27763 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27764:27769 Riscv.rv64d_types <> Regidx constr
+R27771:27773 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R27778:27782 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27783:27788 Riscv.rv64d_types <> Regidx constr
+R27790:27792 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R27811:27815 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27816:27821 Riscv.rv64d_types <> Regidx constr
+R27823:27825 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R27830:27834 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R27835:27840 Riscv.rv64d_types <> Regidx constr
+R27842:27844 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R27946:27952 Corelib.Init.Logic <> eq_refl constr
+R27954:27960 Corelib.Init.Logic <> eq_refl constr
+R27962:27968 Corelib.Init.Logic <> eq_refl constr
+R27970:27976 Corelib.Init.Logic <> eq_refl constr
+R27978:27984 Corelib.Init.Logic <> eq_refl constr
+R28362:28362 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28924:28945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28973:28973 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28363:28373 xv6iris.ProofKexec KexecProof kxc_b2z defax
+R28819:28823 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28824:28829 Riscv.rv64d_types <> Regidx constr
+R28831:28833 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R28800:28804 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28805:28810 Riscv.rv64d_types <> Regidx constr
+R28812:28814 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R28765:28769 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28770:28775 Riscv.rv64d_types <> Regidx constr
+R28777:28779 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R28746:28750 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28751:28756 Riscv.rv64d_types <> Regidx constr
+R28758:28760 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R28727:28731 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28732:28737 Riscv.rv64d_types <> Regidx constr
+R28739:28741 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R28692:28696 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28697:28702 Riscv.rv64d_types <> Regidx constr
+R28704:28706 xv6iris.ProofKexec KexecProof Rra abbrev
+R28669:28673 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28674:28679 Riscv.rv64d_types <> Regidx constr
+R28681:28687 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R28362:28362 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28924:28945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28973:28973 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28363:28373 xv6iris.ProofKexec KexecProof kxc_b2z defax
+R28819:28823 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28824:28829 Riscv.rv64d_types <> Regidx constr
+R28831:28833 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R28800:28804 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28805:28810 Riscv.rv64d_types <> Regidx constr
+R28812:28814 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R28765:28769 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28770:28775 Riscv.rv64d_types <> Regidx constr
+R28777:28779 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R28746:28750 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28751:28756 Riscv.rv64d_types <> Regidx constr
+R28758:28760 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R28727:28731 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28732:28737 Riscv.rv64d_types <> Regidx constr
+R28739:28741 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R28692:28696 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28697:28702 Riscv.rv64d_types <> Regidx constr
+R28704:28706 xv6iris.ProofKexec KexecProof Rra abbrev
+R28669:28673 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R28674:28679 Riscv.rv64d_types <> Regidx constr
+R28681:28687 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R29044:29044 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29133:29138 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29146:29146 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29045:29060 xv6iris.WpNext <> wp_next_retarget thm
+R29078:29086 xv6iris.ProcGeom <> proc_addr def
+R29072:29075 Corelib.Init.Datatypes <> true constr
+R29044:29044 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29133:29138 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29146:29146 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29045:29060 xv6iris.WpNext <> wp_next_retarget thm
+R29078:29086 xv6iris.ProcGeom <> proc_addr def
+R29072:29075 Corelib.Init.Datatypes <> true constr
+R29173:29173 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30013:30034 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30055:30055 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29174:29179 xv6iris.ProofKexec KexecProof kxc_cd thm
+R30006:30012 Corelib.Init.Logic <> eq_refl constr
+R29998:30004 Corelib.Init.Logic <> eq_refl constr
+R29990:29996 Corelib.Init.Logic <> eq_refl constr
+R29982:29988 Corelib.Init.Logic <> eq_refl constr
+R29974:29980 Corelib.Init.Logic <> eq_refl constr
+R29966:29972 Corelib.Init.Logic <> eq_refl constr
+R29942:29948 Corelib.Init.Logic <> eq_refl constr
+R29934:29940 Corelib.Init.Logic <> eq_refl constr
+R29926:29932 Corelib.Init.Logic <> eq_refl constr
+R29918:29924 Corelib.Init.Logic <> eq_refl constr
+R29910:29916 Corelib.Init.Logic <> eq_refl constr
+R29902:29908 Corelib.Init.Logic <> eq_refl constr
+R29894:29900 Corelib.Init.Logic <> eq_refl constr
+R29820:29820 Corelib.Init.Logic <> I constr
+R29794:29798 SailStdpp.Values <> mword def
+R29777:29788 SailStdpp.Values <> mword_of_int def
+R29726:29730 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29731:29736 Riscv.rv64d_types <> Regidx constr
+R29738:29741 xv6iris.ProofKexec KexecProof Rs10 abbrev
+R29707:29711 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29712:29717 Riscv.rv64d_types <> Regidx constr
+R29719:29721 xv6iris.ProofKexec KexecProof Rs9 abbrev
+R29672:29676 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29677:29682 Riscv.rv64d_types <> Regidx constr
+R29684:29686 xv6iris.ProofKexec KexecProof Rs8 abbrev
+R29653:29657 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29658:29663 Riscv.rv64d_types <> Regidx constr
+R29665:29667 xv6iris.ProofKexec KexecProof Rs7 abbrev
+R29634:29638 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29639:29644 Riscv.rv64d_types <> Regidx constr
+R29646:29648 xv6iris.ProofKexec KexecProof Rs6 abbrev
+R29599:29603 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29604:29609 Riscv.rv64d_types <> Regidx constr
+R29611:29613 xv6iris.ProofKexec KexecProof Rs5 abbrev
+R29580:29584 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29585:29590 Riscv.rv64d_types <> Regidx constr
+R29592:29594 xv6iris.ProofKexec KexecProof Rs4 abbrev
+R29561:29565 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29566:29571 Riscv.rv64d_types <> Regidx constr
+R29573:29575 xv6iris.ProofKexec KexecProof Rs3 abbrev
+R29526:29530 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29531:29536 Riscv.rv64d_types <> Regidx constr
+R29538:29540 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R29507:29511 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29512:29517 Riscv.rv64d_types <> Regidx constr
+R29519:29521 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R29472:29476 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29477:29482 Riscv.rv64d_types <> Regidx constr
+R29484:29486 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R29453:29457 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29458:29463 Riscv.rv64d_types <> Regidx constr
+R29465:29467 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R29418:29422 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29423:29428 Riscv.rv64d_types <> Regidx constr
+R29430:29432 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R29399:29403 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29404:29409 Riscv.rv64d_types <> Regidx constr
+R29411:29413 xv6iris.ProofKexec KexecProof Rra abbrev
+R29376:29380 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29381:29386 Riscv.rv64d_types <> Regidx constr
+R29388:29394 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R29196:29197 xv6iris.ProofKexec KexecProof QT abbrev
+R29173:29173 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30013:30034 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30055:30055 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29174:29179 xv6iris.ProofKexec KexecProof kxc_cd thm
+R30006:30012 Corelib.Init.Logic <> eq_refl constr
+R29998:30004 Corelib.Init.Logic <> eq_refl constr
+R29990:29996 Corelib.Init.Logic <> eq_refl constr
+R29982:29988 Corelib.Init.Logic <> eq_refl constr
+R29974:29980 Corelib.Init.Logic <> eq_refl constr
+R29966:29972 Corelib.Init.Logic <> eq_refl constr
+R29942:29948 Corelib.Init.Logic <> eq_refl constr
+R29934:29940 Corelib.Init.Logic <> eq_refl constr
+R29926:29932 Corelib.Init.Logic <> eq_refl constr
+R29918:29924 Corelib.Init.Logic <> eq_refl constr
+R29910:29916 Corelib.Init.Logic <> eq_refl constr
+R29902:29908 Corelib.Init.Logic <> eq_refl constr
+R29894:29900 Corelib.Init.Logic <> eq_refl constr
+R29820:29820 Corelib.Init.Logic <> I constr
+R29794:29798 SailStdpp.Values <> mword def
+R29777:29788 SailStdpp.Values <> mword_of_int def
+R29726:29730 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29731:29736 Riscv.rv64d_types <> Regidx constr
+R29738:29741 xv6iris.ProofKexec KexecProof Rs10 abbrev
+R29707:29711 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29712:29717 Riscv.rv64d_types <> Regidx constr
+R29719:29721 xv6iris.ProofKexec KexecProof Rs9 abbrev
+R29672:29676 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29677:29682 Riscv.rv64d_types <> Regidx constr
+R29684:29686 xv6iris.ProofKexec KexecProof Rs8 abbrev
+R29653:29657 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29658:29663 Riscv.rv64d_types <> Regidx constr
+R29665:29667 xv6iris.ProofKexec KexecProof Rs7 abbrev
+R29634:29638 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29639:29644 Riscv.rv64d_types <> Regidx constr
+R29646:29648 xv6iris.ProofKexec KexecProof Rs6 abbrev
+R29599:29603 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29604:29609 Riscv.rv64d_types <> Regidx constr
+R29611:29613 xv6iris.ProofKexec KexecProof Rs5 abbrev
+R29580:29584 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29585:29590 Riscv.rv64d_types <> Regidx constr
+R29592:29594 xv6iris.ProofKexec KexecProof Rs4 abbrev
+R29561:29565 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29566:29571 Riscv.rv64d_types <> Regidx constr
+R29573:29575 xv6iris.ProofKexec KexecProof Rs3 abbrev
+R29526:29530 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29531:29536 Riscv.rv64d_types <> Regidx constr
+R29538:29540 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R29507:29511 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29512:29517 Riscv.rv64d_types <> Regidx constr
+R29519:29521 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R29472:29476 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29477:29482 Riscv.rv64d_types <> Regidx constr
+R29484:29486 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R29453:29457 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29458:29463 Riscv.rv64d_types <> Regidx constr
+R29465:29467 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R29418:29422 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29423:29428 Riscv.rv64d_types <> Regidx constr
+R29430:29432 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R29399:29403 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29404:29409 Riscv.rv64d_types <> Regidx constr
+R29411:29413 xv6iris.ProofKexec KexecProof Rra abbrev
+R29376:29380 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R29381:29386 Riscv.rv64d_types <> Regidx constr
+R29388:29394 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R29196:29197 xv6iris.ProofKexec KexecProof QT abbrev
+R30211:30211 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30923:30944 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30973:30973 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30212:30221 xv6iris.ProofKexec KexecProof kxc_b2 defax
+R30916:30922 Corelib.Init.Logic <> eq_refl constr
+R30908:30914 Corelib.Init.Logic <> eq_refl constr
+R30900:30906 Corelib.Init.Logic <> eq_refl constr
+R30892:30898 Corelib.Init.Logic <> eq_refl constr
+R30884:30890 Corelib.Init.Logic <> eq_refl constr
+R30780:30784 SailStdpp.Values <> mword def
+R30763:30774 SailStdpp.Values <> mword_of_int def
+R30724:30728 SailStdpp.Values <> mword def
+R30704:30715 SailStdpp.Values <> mword_of_int def
+R30670:30674 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30675:30680 Riscv.rv64d_types <> Regidx constr
+R30682:30684 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R30651:30655 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30656:30661 Riscv.rv64d_types <> Regidx constr
+R30663:30665 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R30616:30620 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30621:30626 Riscv.rv64d_types <> Regidx constr
+R30628:30630 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R30597:30601 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30602:30607 Riscv.rv64d_types <> Regidx constr
+R30609:30611 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R30578:30582 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30583:30588 Riscv.rv64d_types <> Regidx constr
+R30590:30592 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R30543:30547 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30548:30553 Riscv.rv64d_types <> Regidx constr
+R30555:30557 xv6iris.ProofKexec KexecProof Rra abbrev
+R30520:30524 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30525:30530 Riscv.rv64d_types <> Regidx constr
+R30532:30538 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R30238:30239 xv6iris.ProofKexec KexecProof QT abbrev
+R30211:30211 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30923:30944 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30973:30973 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30212:30221 xv6iris.ProofKexec KexecProof kxc_b2 defax
+R30916:30922 Corelib.Init.Logic <> eq_refl constr
+R30908:30914 Corelib.Init.Logic <> eq_refl constr
+R30900:30906 Corelib.Init.Logic <> eq_refl constr
+R30892:30898 Corelib.Init.Logic <> eq_refl constr
+R30884:30890 Corelib.Init.Logic <> eq_refl constr
+R30780:30784 SailStdpp.Values <> mword def
+R30763:30774 SailStdpp.Values <> mword_of_int def
+R30724:30728 SailStdpp.Values <> mword def
+R30704:30715 SailStdpp.Values <> mword_of_int def
+R30670:30674 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30675:30680 Riscv.rv64d_types <> Regidx constr
+R30682:30684 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R30651:30655 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30656:30661 Riscv.rv64d_types <> Regidx constr
+R30663:30665 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R30616:30620 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30621:30626 Riscv.rv64d_types <> Regidx constr
+R30628:30630 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R30597:30601 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30602:30607 Riscv.rv64d_types <> Regidx constr
+R30609:30611 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R30578:30582 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30583:30588 Riscv.rv64d_types <> Regidx constr
+R30590:30592 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R30543:30547 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30548:30553 Riscv.rv64d_types <> Regidx constr
+R30555:30557 xv6iris.ProofKexec KexecProof Rra abbrev
+R30520:30524 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R30525:30530 Riscv.rv64d_types <> Regidx constr
+R30532:30538 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R30238:30239 xv6iris.ProofKexec KexecProof QT abbrev
+R31055:31055 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31913:31934 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31955:31955 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31056:31061 xv6iris.ProofKexec KexecProof kxc_cd thm
+R31906:31912 Corelib.Init.Logic <> eq_refl constr
+R31898:31904 Corelib.Init.Logic <> eq_refl constr
+R31890:31896 Corelib.Init.Logic <> eq_refl constr
+R31882:31888 Corelib.Init.Logic <> eq_refl constr
+R31874:31880 Corelib.Init.Logic <> eq_refl constr
+R31866:31872 Corelib.Init.Logic <> eq_refl constr
+R31842:31848 Corelib.Init.Logic <> eq_refl constr
+R31834:31840 Corelib.Init.Logic <> eq_refl constr
+R31826:31832 Corelib.Init.Logic <> eq_refl constr
+R31818:31824 Corelib.Init.Logic <> eq_refl constr
+R31810:31816 Corelib.Init.Logic <> eq_refl constr
+R31802:31808 Corelib.Init.Logic <> eq_refl constr
+R31794:31800 Corelib.Init.Logic <> eq_refl constr
+R31720:31720 Corelib.Init.Logic <> I constr
+R31683:31687 SailStdpp.Values <> mword def
+R31663:31674 SailStdpp.Values <> mword_of_int def
+R31628:31632 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31633:31638 Riscv.rv64d_types <> Regidx constr
+R31640:31643 xv6iris.ProofKexec KexecProof Rs11 abbrev
+R31608:31612 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31613:31618 Riscv.rv64d_types <> Regidx constr
+R31620:31623 xv6iris.ProofKexec KexecProof Rs10 abbrev
+R31589:31593 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31594:31599 Riscv.rv64d_types <> Regidx constr
+R31601:31603 xv6iris.ProofKexec KexecProof Rs9 abbrev
+R31554:31558 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31559:31564 Riscv.rv64d_types <> Regidx constr
+R31566:31568 xv6iris.ProofKexec KexecProof Rs8 abbrev
+R31535:31539 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31540:31545 Riscv.rv64d_types <> Regidx constr
+R31547:31549 xv6iris.ProofKexec KexecProof Rs7 abbrev
+R31516:31520 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31521:31526 Riscv.rv64d_types <> Regidx constr
+R31528:31530 xv6iris.ProofKexec KexecProof Rs6 abbrev
+R31481:31485 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31486:31491 Riscv.rv64d_types <> Regidx constr
+R31493:31495 xv6iris.ProofKexec KexecProof Rs5 abbrev
+R31462:31466 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31467:31472 Riscv.rv64d_types <> Regidx constr
+R31474:31476 xv6iris.ProofKexec KexecProof Rs4 abbrev
+R31443:31447 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31448:31453 Riscv.rv64d_types <> Regidx constr
+R31455:31457 xv6iris.ProofKexec KexecProof Rs3 abbrev
+R31408:31412 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31413:31418 Riscv.rv64d_types <> Regidx constr
+R31420:31422 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R31389:31393 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31394:31399 Riscv.rv64d_types <> Regidx constr
+R31401:31403 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R31354:31358 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31359:31364 Riscv.rv64d_types <> Regidx constr
+R31366:31368 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R31335:31339 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31340:31345 Riscv.rv64d_types <> Regidx constr
+R31347:31349 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R31300:31304 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31305:31310 Riscv.rv64d_types <> Regidx constr
+R31312:31314 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R31281:31285 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31286:31291 Riscv.rv64d_types <> Regidx constr
+R31293:31295 xv6iris.ProofKexec KexecProof Rra abbrev
+R31258:31262 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31263:31268 Riscv.rv64d_types <> Regidx constr
+R31270:31276 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R31078:31079 xv6iris.ProofKexec KexecProof QT abbrev
+R31055:31055 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31913:31934 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31955:31955 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31056:31061 xv6iris.ProofKexec KexecProof kxc_cd thm
+R31906:31912 Corelib.Init.Logic <> eq_refl constr
+R31898:31904 Corelib.Init.Logic <> eq_refl constr
+R31890:31896 Corelib.Init.Logic <> eq_refl constr
+R31882:31888 Corelib.Init.Logic <> eq_refl constr
+R31874:31880 Corelib.Init.Logic <> eq_refl constr
+R31866:31872 Corelib.Init.Logic <> eq_refl constr
+R31842:31848 Corelib.Init.Logic <> eq_refl constr
+R31834:31840 Corelib.Init.Logic <> eq_refl constr
+R31826:31832 Corelib.Init.Logic <> eq_refl constr
+R31818:31824 Corelib.Init.Logic <> eq_refl constr
+R31810:31816 Corelib.Init.Logic <> eq_refl constr
+R31802:31808 Corelib.Init.Logic <> eq_refl constr
+R31794:31800 Corelib.Init.Logic <> eq_refl constr
+R31720:31720 Corelib.Init.Logic <> I constr
+R31683:31687 SailStdpp.Values <> mword def
+R31663:31674 SailStdpp.Values <> mword_of_int def
+R31628:31632 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31633:31638 Riscv.rv64d_types <> Regidx constr
+R31640:31643 xv6iris.ProofKexec KexecProof Rs11 abbrev
+R31608:31612 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31613:31618 Riscv.rv64d_types <> Regidx constr
+R31620:31623 xv6iris.ProofKexec KexecProof Rs10 abbrev
+R31589:31593 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31594:31599 Riscv.rv64d_types <> Regidx constr
+R31601:31603 xv6iris.ProofKexec KexecProof Rs9 abbrev
+R31554:31558 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31559:31564 Riscv.rv64d_types <> Regidx constr
+R31566:31568 xv6iris.ProofKexec KexecProof Rs8 abbrev
+R31535:31539 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31540:31545 Riscv.rv64d_types <> Regidx constr
+R31547:31549 xv6iris.ProofKexec KexecProof Rs7 abbrev
+R31516:31520 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31521:31526 Riscv.rv64d_types <> Regidx constr
+R31528:31530 xv6iris.ProofKexec KexecProof Rs6 abbrev
+R31481:31485 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31486:31491 Riscv.rv64d_types <> Regidx constr
+R31493:31495 xv6iris.ProofKexec KexecProof Rs5 abbrev
+R31462:31466 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31467:31472 Riscv.rv64d_types <> Regidx constr
+R31474:31476 xv6iris.ProofKexec KexecProof Rs4 abbrev
+R31443:31447 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31448:31453 Riscv.rv64d_types <> Regidx constr
+R31455:31457 xv6iris.ProofKexec KexecProof Rs3 abbrev
+R31408:31412 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31413:31418 Riscv.rv64d_types <> Regidx constr
+R31420:31422 xv6iris.ProofKexec KexecProof Ra1 abbrev
+R31389:31393 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31394:31399 Riscv.rv64d_types <> Regidx constr
+R31401:31403 xv6iris.ProofKexec KexecProof Ra0 abbrev
+R31354:31358 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31359:31364 Riscv.rv64d_types <> Regidx constr
+R31366:31368 xv6iris.ProofKexec KexecProof Rs2 abbrev
+R31335:31339 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31340:31345 Riscv.rv64d_types <> Regidx constr
+R31347:31349 xv6iris.ProofKexec KexecProof Rs1 abbrev
+R31300:31304 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31305:31310 Riscv.rv64d_types <> Regidx constr
+R31312:31314 xv6iris.ProofKexec KexecProof Rs0 abbrev
+R31281:31285 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31286:31291 Riscv.rv64d_types <> Regidx constr
+R31293:31295 xv6iris.ProofKexec KexecProof Rra abbrev
+R31258:31262 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R31263:31268 Riscv.rv64d_types <> Regidx constr
+R31270:31276 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R31078:31079 xv6iris.ProofKexec KexecProof QT abbrev
+R31970:31978 xv6iris.ProofKexec KexecProof.KexecMain <> sec
+R31986:31995 xv6iris.ProofKexec KexecProof <> mod

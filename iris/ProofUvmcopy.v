@@ -1468,7 +1468,12 @@ Section ProofUvmcopy.
                  with "Hkmapb Hpo") as "[Hsrc Hsrcback]".
     pose (fsrc := fun j0 : nat =>
                     Mold !!! (4096 * Z.of_nat j + Z.of_nat j0)%Z).
-    iDestruct (bb_page_named r with "Hpage") as (fdst) "Hdst".
+    (* A6.87: the destination is the page kalloc MEMSET; its bytes are named
+       at [kalloc_junk], which is what memmove's buffer contract wants. *)
+    iEval (rewrite /page_filled) in "Hpage".
+    iDestruct (bb_any_named r 4096 with "[Hpage]") as (fdst) "Hdst".
+    { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j0 _) "H".
+      by iExists KallocInv.kalloc_junk. }
     iApply (Memmove.wp_memmove_sconf KT1 KT0 KT0 C5 (K - 10)%nat 4096%nat fsrc fdst (DfracOwn 1) b p
               HKmm ltac:(vm_compute; reflexivity) Hmmlen
               with "Hcg Htext Hpc [Hsrc] [Hdst]").
@@ -1833,8 +1838,9 @@ Section ProofUvmcopy.
     all: try lkbelow.
     { rewrite /kfree_pre HF2a0.
       iSplitR; [iPureIntro; exact Hpv |].
-      (* §0.26′: contents-blind AND view-blind *)
-      iApply page_own_free. rewrite /page_own /byte_any.
+      (* §0.26′: contents-blind AND view-blind, in the MEANING of
+         [page_own] rather than in this text *)
+      iApply page_own_of_named_ex.
       iApply (big_sepL_impl with "Hpage"). iIntros "!>" (kk x Hx) "Hj".
       iExists _. iExact "Hj". }
     iIntros (CIDl30 Hsl30 mf) "Hcg Hcnt Hpc %Hfcs _".

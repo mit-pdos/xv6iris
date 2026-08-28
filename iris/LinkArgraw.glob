@@ -1,0 +1,7 @@
+DIGEST 2d24813d8ad468f4f13ea33b1e1fb99d
+Fxv6iris.LinkArgraw
+R161:170 xv6iris.LinkMyproc <> <> lib
+R172:182 xv6iris.ProofArgraw <> <> lib
+R203:213 xv6iris.ProofArgraw ArgrawProof <> modtype
+R215:220 xv6iris.LinkMyproc Myproc <> modtype
+mod 193:198 <> Argraw

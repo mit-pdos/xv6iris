@@ -1,0 +1,7 @@
+DIGEST 5375dccc6c0bb333b36b09b7c9bd4383
+Fxv6iris.LinkPlicinithart
+R172:180 xv6iris.LinkCpuid <> <> lib
+R182:198 xv6iris.ProofPlicinithart <> <> lib
+R225:241 xv6iris.ProofPlicinithart PlicinithartProof <> modtype
+R243:247 xv6iris.LinkCpuid Cpuid <> modtype
+mod 209:220 <> Plicinithart

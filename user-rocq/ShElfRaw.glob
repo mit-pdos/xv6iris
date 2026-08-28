@@ -1,0 +1,73 @@
+DIGEST 98d317fce8b9e8fe43e9384a3e7c1258
+FUser.ShElfRaw
+R1088:1093 Stdlib.ZArith.ZArith <> <> lib
+R1095:1098 Stdlib.Lists.List <> <> lib
+R1136:1142 Stdlib.Strings.PString <> <> lib
+R1152:1164 Stdlib.Lists.List ListNotations <> mod
+def 1428:1444 <> sh_elf_hex_chunk0
+R1448:1464 Corelib.Strings.PrimString <> string prim
+def 9684:9700 <> sh_elf_hex_chunk1
+R9704:9720 Corelib.Strings.PrimString <> string prim
+def 17940:17956 <> sh_elf_hex_chunk2
+R17960:17976 Corelib.Strings.PrimString <> string prim
+def 26196:26212 <> sh_elf_hex_chunk3
+R26216:26232 Corelib.Strings.PrimString <> string prim
+def 34452:34468 <> sh_elf_hex_chunk4
+R34472:34488 Corelib.Strings.PrimString <> string prim
+def 42708:42724 <> sh_elf_hex_chunk5
+R42728:42744 Corelib.Strings.PrimString <> string prim
+def 50964:50980 <> sh_elf_hex_chunk6
+R50984:51000 Corelib.Strings.PrimString <> string prim
+def 59220:59236 <> sh_elf_hex_chunk7
+R59240:59256 Corelib.Strings.PrimString <> string prim
+def 67476:67492 <> sh_elf_hex_chunk8
+R67496:67512 Corelib.Strings.PrimString <> string prim
+def 75732:75748 <> sh_elf_hex_chunk9
+R75752:75768 Corelib.Strings.PrimString <> string prim
+def 83988:84005 <> sh_elf_hex_chunk10
+R84009:84025 Corelib.Strings.PrimString <> string prim
+def 92245:92262 <> sh_elf_hex_chunk11
+R92266:92282 Corelib.Strings.PrimString <> string prim
+def 100502:100519 <> sh_elf_hex_chunk12
+R100523:100539 Corelib.Strings.PrimString <> string prim
+def 108759:108776 <> sh_elf_hex_chunk13
+R108780:108796 Corelib.Strings.PrimString <> string prim
+def 117016:117033 <> sh_elf_hex_chunk14
+R117037:117053 Corelib.Strings.PrimString <> string prim
+def 119018:119027 <> sh_elf_hex
+R119031:119047 Corelib.Strings.PrimString <> string prim
+R119054:119067 Stdlib.Lists.List <> fold_left def
+R119084:119084 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119102:119103 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119121:119122 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119140:119141 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119159:119160 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119178:119179 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119197:119198 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119216:119217 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119235:119236 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119254:119255 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119273:119274 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119293:119294 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119313:119314 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119333:119334 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119353:119354 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119373:119373 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R119085:119101 User.ShElfRaw <> sh_elf_hex_chunk0 def
+R119104:119120 User.ShElfRaw <> sh_elf_hex_chunk1 def
+R119123:119139 User.ShElfRaw <> sh_elf_hex_chunk2 def
+R119142:119158 User.ShElfRaw <> sh_elf_hex_chunk3 def
+R119161:119177 User.ShElfRaw <> sh_elf_hex_chunk4 def
+R119180:119196 User.ShElfRaw <> sh_elf_hex_chunk5 def
+R119199:119215 User.ShElfRaw <> sh_elf_hex_chunk6 def
+R119218:119234 User.ShElfRaw <> sh_elf_hex_chunk7 def
+R119237:119253 User.ShElfRaw <> sh_elf_hex_chunk8 def
+R119256:119272 User.ShElfRaw <> sh_elf_hex_chunk9 def
+R119275:119292 User.ShElfRaw <> sh_elf_hex_chunk10 def
+R119295:119312 User.ShElfRaw <> sh_elf_hex_chunk11 def
+R119315:119332 User.ShElfRaw <> sh_elf_hex_chunk12 def
+R119335:119352 User.ShElfRaw <> sh_elf_hex_chunk13 def
+R119355:119372 User.ShElfRaw <> sh_elf_hex_chunk14 def
+R119069:119082 Corelib.Strings.PrimString <> cat prim
+def 119476:119486 <> sh_elf_size
+R119490:119490 Corelib.Numbers.BinNums <> Z ind

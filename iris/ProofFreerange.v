@@ -682,10 +682,7 @@ Section ProofFreerange.
                   Hfresh
                   with "Hcg Hcnt Htext Hpc Hkmem [Hpage] Havail").
         all: try lkbelow.
-        (* §0.26′: the freer owes only the future of the page *)
-        { rewrite /kfree_pre. iSplitR;
-            [iPureIntro; rewrite HM2a0; exact Hpvq
-            | rewrite HM2a0; iApply (page_own_free with "Hpage")]. }
+        { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HM2a0; exact Hpvq | rewrite HM2a0; iExact "Hpage"]. }
         iIntros (CIDkf Hskf mkf) "Hcg Hcnt Hpc %Hkfcs Havail".
         assert (Hkfret : ret_pc (M2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.freerange + 0x32)).
         { rewrite HM2ra. apply bv_eq; vm_compute; reflexivity. }

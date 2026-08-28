@@ -1,0 +1,673 @@
+DIGEST 77d80fc4595ab7058351a9701e798382
+Fxv6iris.LockSet
+R3113:3118 Stdlib.ZArith.ZArith <> <> lib
+R3120:3122 Stdlib.micromega.Lia <> <> lib
+R3124:3127 Stdlib.Lists.List <> <> lib
+R3156:3159 stdpp.gmap <> <> lib
+R3161:3164 stdpp.sets <> <> lib
+R3166:3186 stdpp.bitvector.definitions <> <> lib
+R3224:3232 iris.proofmode.proofmode <> <> lib
+R3268:3271 iris.algebra.auth <> <> lib
+R3273:3276 iris.algebra.gset <> <> lib
+R3319:3321 iris.base_logic.lib.own <> <> lib
+R3339:3352 SailStdpp.Base <> <> lib
+R3354:3379 SailStdpp.Operators_mwords <> <> lib
+R3381:3396 SailStdpp.Values <> <> lib
+R3414:3430 Riscv.rv64d_types <> <> lib
+R3432:3442 Riscv.rv64d <> <> lib
+R3460:3469 xv6iris.RiscvPtsto <> <> lib
+R3471:3479 xv6iris.RiscvLang <> <> lib
+R3497:3504 xv6iris.LockRank <> <> lib
+R3522:3527 xv6iris.TsoCtx <> <> lib
+sec 3565:3571 <> LockSet
+R3587:3593 xv6iris.RiscvPtsto <> riscvGS class
+def 3885:3892 <> lock_cpu
+R3900:3904 SailStdpp.Values <> mword def
+binder 3895:3896 <> lk:3
+R3912:3916 SailStdpp.Values <> mword def
+R3928:3934 SailStdpp.Operators_mwords <> add_vec def
+R3940:3951 Riscv.rv64d <> sign_extend' def
+R3975:3979 SailStdpp.Values <> mword def
+R3957:3968 SailStdpp.Values <> mword_of_int def
+R3936:3937 xv6iris.LockSet <> lk:3 var
+def 4218:4224 <> lk_auth
+R4231:4233 xv6iris.RiscvLang <> CPU def
+binder 4227:4227 <> i:4
+R4241:4244 stdpp.gmap <> gset def
+R4246:4251 Stdlib.Strings.String <> string ind
+binder 4237:4237 <> S:5
+R4256:4260 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4262:4263 xv6iris.LockSet <> LockSet.Σ var
+R4272:4274 iris.base_logic.lib.own <> own def
+R4309:4316 xv6iris.RiscvPtsto <> lockSetR def
+R4294:4296 iris.algebra.auth <> :::'●'_x_x not
+R4297:4298 iris.algebra.auth <> :::'●'_x_x not
+R4305:4305 iris.algebra.auth <> :::'●'_x_x not
+R4299:4302 iris.algebra.gset <> GSet constr
+R4304:4304 xv6iris.LockSet <> S:5 var
+R4277:4288 xv6iris.RiscvPtsto <> lockset_name def
+R4290:4290 xv6iris.LockSet <> i:4 var
+def 4412:4416 <> lk_in
+R4423:4425 xv6iris.RiscvLang <> CPU def
+binder 4419:4419 <> i:6
+R4433:4438 Stdlib.Strings.String <> string ind
+binder 4429:4429 <> r:7
+R4443:4447 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4449:4450 xv6iris.LockSet <> LockSet.Σ var
+R4459:4461 iris.base_logic.lib.own <> own def
+R4500:4507 xv6iris.RiscvPtsto <> lockSetR def
+R4481:4485 iris.algebra.auth <> :::'◯'_x not
+R4496:4496 iris.algebra.auth <> :::'◯'_x not
+R4486:4489 iris.algebra.gset <> GSet constr
+R4491:4492 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R4494:4495 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R4493:4493 xv6iris.LockSet <> r:7 var
+R4464:4475 xv6iris.RiscvPtsto <> lockset_name def
+R4477:4477 xv6iris.LockSet <> i:6 var
+def 4677:4688 <> cpu_locks_at
+R4695:4697 xv6iris.RiscvLang <> CPU def
+binder 4691:4691 <> i:8
+R4705:4708 stdpp.gmap <> gset def
+R4710:4715 Stdlib.Strings.String <> string ind
+binder 4701:4701 <> S:9
+R4720:4724 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4726:4727 xv6iris.LockSet <> LockSet.Σ var
+R4736:4742 xv6iris.LockSet <> lk_auth def
+R4744:4744 xv6iris.LockSet <> i:8 var
+R4746:4746 xv6iris.LockSet <> S:9 var
+inst 4768:4783 <> lk_auth_timeless
+binder 4785:4785 <> i:10
+binder 4787:4787 <> S:11
+R4791:4798 iris.bi.derived_connectives <> Timeless class
+R4801:4807 xv6iris.LockSet <> lk_auth def
+R4809:4809 xv6iris.LockSet <> i:10 var
+R4811:4811 xv6iris.LockSet <> S:11 var
+inst 4856:4869 <> lk_in_timeless
+binder 4871:4871 <> i:12
+binder 4873:4873 <> r:13
+R4877:4884 iris.bi.derived_connectives <> Timeless class
+R4887:4891 xv6iris.LockSet <> lk_in def
+R4893:4893 xv6iris.LockSet <> i:12 var
+R4895:4895 xv6iris.LockSet <> r:13 var
+inst 4940:4960 <> cpu_locks_at_timeless
+binder 4962:4962 <> i:14
+binder 4964:4964 <> S:15
+R4968:4975 iris.bi.derived_connectives <> Timeless class
+R4978:4989 xv6iris.LockSet <> cpu_locks_at def
+R4991:4991 xv6iris.LockSet <> i:14 var
+R4993:4993 xv6iris.LockSet <> S:15 var
+prf 5183:5193 <> lk_in_agree
+R5200:5202 xv6iris.RiscvLang <> CPU def
+binder 5196:5196 <> i:16
+R5210:5213 stdpp.gmap <> gset def
+R5215:5220 Stdlib.Strings.String <> string ind
+binder 5206:5206 <> S:17
+R5228:5233 Stdlib.Strings.String <> string ind
+binder 5224:5224 <> r:18
+R5253:5258 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5242:5248 xv6iris.LockSet <> lk_auth def
+R5250:5250 xv6iris.LockSet <> i:16 var
+R5252:5252 xv6iris.LockSet <> S:17 var
+R5268:5273 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5259:5263 xv6iris.LockSet <> lk_in def
+R5265:5265 xv6iris.LockSet <> i:16 var
+R5267:5267 xv6iris.LockSet <> r:18 var
+R5274:5276 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5284:5286 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5278:5282 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5277:5277 xv6iris.LockSet <> r:18 var
+R5283:5283 xv6iris.LockSet <> S:17 var
+R5333:5333 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5345:5350 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5358:5358 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5334:5344 iris.base_logic.lib.own <> own_valid_2 thm
+R5333:5333 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5345:5350 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5358:5358 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5334:5344 iris.base_logic.lib.own <> own_valid_2 thm
+R5394:5417 iris.algebra.auth <> auth_both_valid_discrete thm
+R5394:5417 iris.algebra.auth <> auth_both_valid_discrete thm
+R5449:5466 iris.algebra.gset <> gset_disj_included thm
+R5449:5466 iris.algebra.gset <> gset_disj_included thm
+R5488:5507 stdpp.sets <> singleton_subseteq_l thm
+R5488:5507 stdpp.sets <> singleton_subseteq_l thm
+prf 5548:5559 <> cpu_locks_in
+R5566:5568 xv6iris.RiscvLang <> CPU def
+binder 5562:5562 <> i:19
+R5576:5579 stdpp.gmap <> gset def
+R5581:5586 Stdlib.Strings.String <> string ind
+binder 5572:5572 <> S:20
+R5594:5599 Stdlib.Strings.String <> string ind
+binder 5590:5590 <> r:21
+R5624:5629 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5608:5619 xv6iris.LockSet <> cpu_locks_at def
+R5621:5621 xv6iris.LockSet <> i:19 var
+R5623:5623 xv6iris.LockSet <> S:20 var
+R5639:5644 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5630:5634 xv6iris.LockSet <> lk_in def
+R5636:5636 xv6iris.LockSet <> i:19 var
+R5638:5638 xv6iris.LockSet <> r:21 var
+R5645:5647 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5655:5657 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5649:5653 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5648:5648 xv6iris.LockSet <> r:21 var
+R5654:5654 xv6iris.LockSet <> S:20 var
+R5693:5693 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5705:5710 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5718:5718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5694:5704 xv6iris.LockSet <> lk_in_agree thm
+R5693:5693 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5705:5710 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5718:5718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5694:5704 xv6iris.LockSet <> lk_in_agree thm
+prf 6191:6206 <> cpu_locks_not_in
+R6213:6215 xv6iris.RiscvLang <> CPU def
+binder 6209:6209 <> i:22
+R6223:6226 stdpp.gmap <> gset def
+R6228:6233 Stdlib.Strings.String <> string ind
+binder 6219:6219 <> S:23
+R6241:6246 Stdlib.Strings.String <> string ind
+binder 6237:6237 <> r:24
+R6262:6269 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6256:6260 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R6255:6255 xv6iris.LockSet <> r:24 var
+R6261:6261 xv6iris.LockSet <> S:23 var
+R6286:6291 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6270:6281 xv6iris.LockSet <> cpu_locks_at def
+R6283:6283 xv6iris.LockSet <> i:22 var
+R6285:6285 xv6iris.LockSet <> S:23 var
+R6301:6306 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6292:6296 xv6iris.LockSet <> lk_in def
+R6298:6298 xv6iris.LockSet <> i:22 var
+R6300:6300 xv6iris.LockSet <> r:24 var
+R6307:6311 iris.bi.interface <> ::bi_scope:'False' not
+R6365:6365 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6378:6383 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6391:6391 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6366:6377 xv6iris.LockSet <> cpu_locks_in thm
+R6365:6365 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6378:6383 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6391:6391 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6366:6377 xv6iris.LockSet <> cpu_locks_in thm
+prf 6452:6473 <> cpu_locks_not_in_below
+R6480:6482 xv6iris.RiscvLang <> CPU def
+binder 6476:6476 <> i:25
+R6490:6493 stdpp.gmap <> gset def
+R6495:6500 Stdlib.Strings.String <> string ind
+binder 6486:6486 <> S:26
+R6508:6513 Stdlib.Strings.String <> string ind
+binder 6504:6504 <> r:27
+R6537:6544 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6522:6532 xv6iris.LockRank <> locks_below def
+R6534:6534 xv6iris.LockSet <> S:26 var
+R6536:6536 xv6iris.LockSet <> r:27 var
+R6561:6566 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6545:6556 xv6iris.LockSet <> cpu_locks_at def
+R6558:6558 xv6iris.LockSet <> i:25 var
+R6560:6560 xv6iris.LockSet <> S:26 var
+R6576:6581 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6567:6571 xv6iris.LockSet <> lk_in def
+R6573:6573 xv6iris.LockSet <> i:25 var
+R6575:6575 xv6iris.LockSet <> r:27 var
+R6582:6586 iris.bi.interface <> ::bi_scope:'False' not
+R6615:6630 xv6iris.LockSet <> cpu_locks_not_in thm
+R6633:6652 xv6iris.LockRank <> locks_below_not_elem thm
+R6615:6630 xv6iris.LockSet <> cpu_locks_not_in thm
+R6633:6652 xv6iris.LockRank <> locks_below_not_elem thm
+prf 6882:6891 <> lk_in_excl
+R6898:6900 xv6iris.RiscvLang <> CPU def
+binder 6894:6894 <> i:28
+R6908:6913 Stdlib.Strings.String <> string ind
+binder 6904:6904 <> r:29
+R6931:6936 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6922:6926 xv6iris.LockSet <> lk_in def
+R6928:6928 xv6iris.LockSet <> i:28 var
+R6930:6930 xv6iris.LockSet <> r:29 var
+R6946:6951 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6937:6941 xv6iris.LockSet <> lk_in def
+R6943:6943 xv6iris.LockSet <> i:28 var
+R6945:6945 xv6iris.LockSet <> r:29 var
+R6952:6956 iris.bi.interface <> ::bi_scope:'False' not
+R7003:7003 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7015:7020 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7028:7028 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7004:7014 iris.base_logic.lib.own <> own_valid_2 thm
+R7003:7003 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7015:7020 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7028:7028 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7004:7014 iris.base_logic.lib.own <> own_valid_2 thm
+R7051:7062 iris.algebra.auth <> auth_frag_op thm
+R7064:7078 iris.algebra.auth <> auth_frag_valid thm
+R7080:7097 iris.algebra.gset <> gset_disj_valid_op thm
+R7051:7062 iris.algebra.auth <> auth_frag_op thm
+R7051:7062 iris.algebra.auth <> auth_frag_op thm
+R7064:7078 iris.algebra.auth <> auth_frag_valid thm
+R7064:7078 iris.algebra.auth <> auth_frag_valid thm
+R7080:7097 iris.algebra.gset <> gset_disj_valid_op thm
+R7080:7097 iris.algebra.gset <> gset_disj_valid_op thm
+prf 7297:7312 <> cpu_locks_insert
+R7319:7321 xv6iris.RiscvLang <> CPU def
+binder 7315:7315 <> i:30
+R7329:7332 stdpp.gmap <> gset def
+R7334:7339 Stdlib.Strings.String <> string ind
+binder 7325:7325 <> S:31
+R7347:7352 Stdlib.Strings.String <> string ind
+binder 7343:7343 <> r:32
+R7368:7375 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7362:7366 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R7361:7361 xv6iris.LockSet <> r:32 var
+R7367:7367 xv6iris.LockSet <> S:31 var
+R7392:7398 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R7376:7387 xv6iris.LockSet <> cpu_locks_at def
+R7389:7389 xv6iris.LockSet <> i:30 var
+R7391:7391 xv6iris.LockSet <> S:31 var
+R7427:7431 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7399:7410 xv6iris.LockSet <> cpu_locks_at def
+R7412:7412 xv6iris.LockSet <> i:30 var
+R7420:7424 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R7415:7416 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7418:7419 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7417:7417 xv6iris.LockSet <> r:32 var
+R7425:7425 xv6iris.LockSet <> S:31 var
+R7432:7436 xv6iris.LockSet <> lk_in def
+R7438:7438 xv6iris.LockSet <> i:30 var
+R7440:7440 xv6iris.LockSet <> r:32 var
+R7502:7505 stdpp.base <> ::stdpp_scope:x_'##'_x not
+R7497:7498 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7500:7501 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7502:7505 stdpp.base <> ::stdpp_scope:x_'##'_x not
+R7497:7498 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7500:7501 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7533:7533 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7609:7626 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7631:7631 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7534:7543 iris.base_logic.lib.own <> own_update thm
+R7600:7607 xv6iris.RiscvPtsto <> lockSetR def
+R7575:7579 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R7551:7553 iris.algebra.auth <> :::'●'_x_x not
+R7554:7555 iris.algebra.auth <> :::'●'_x_x not
+R7574:7574 iris.algebra.auth <> :::'●'_x_x not
+R7556:7559 iris.algebra.gset <> GSet constr
+R7567:7571 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R7562:7563 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7565:7566 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7580:7584 iris.algebra.auth <> :::'◯'_x not
+R7595:7595 iris.algebra.auth <> :::'◯'_x not
+R7585:7588 iris.algebra.gset <> GSet constr
+R7590:7591 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7593:7594 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7533:7533 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7609:7626 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7631:7631 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7534:7543 iris.base_logic.lib.own <> own_update thm
+R7600:7607 xv6iris.RiscvPtsto <> lockSetR def
+R7575:7579 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R7551:7553 iris.algebra.auth <> :::'●'_x_x not
+R7554:7555 iris.algebra.auth <> :::'●'_x_x not
+R7574:7574 iris.algebra.auth <> :::'●'_x_x not
+R7556:7559 iris.algebra.gset <> GSet constr
+R7567:7571 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R7562:7563 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7565:7566 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7580:7584 iris.algebra.auth <> :::'◯'_x not
+R7595:7595 iris.algebra.auth <> :::'◯'_x not
+R7585:7588 iris.algebra.gset <> GSet constr
+R7590:7591 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7593:7594 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7659:7675 iris.algebra.auth <> auth_update_alloc thm
+R7659:7675 iris.algebra.auth <> auth_update_alloc thm
+R7690:7723 iris.algebra.gset <> gset_disj_alloc_empty_local_update thm
+R7690:7723 iris.algebra.gset <> gset_disj_alloc_empty_local_update thm
+prf 7865:7886 <> cpu_locks_insert_below
+R7893:7895 xv6iris.RiscvLang <> CPU def
+binder 7889:7889 <> i:33
+R7903:7906 stdpp.gmap <> gset def
+R7908:7913 Stdlib.Strings.String <> string ind
+binder 7899:7899 <> S:34
+R7921:7926 Stdlib.Strings.String <> string ind
+binder 7917:7917 <> r:35
+R7950:7957 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7935:7945 xv6iris.LockRank <> locks_below def
+R7947:7947 xv6iris.LockSet <> S:34 var
+R7949:7949 xv6iris.LockSet <> r:35 var
+R7974:7980 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R7958:7969 xv6iris.LockSet <> cpu_locks_at def
+R7971:7971 xv6iris.LockSet <> i:33 var
+R7973:7973 xv6iris.LockSet <> S:34 var
+R8009:8013 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7981:7992 xv6iris.LockSet <> cpu_locks_at def
+R7994:7994 xv6iris.LockSet <> i:33 var
+R8002:8006 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R7997:7998 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8000:8001 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7999:7999 xv6iris.LockSet <> r:35 var
+R8007:8007 xv6iris.LockSet <> S:34 var
+R8014:8018 xv6iris.LockSet <> lk_in def
+R8020:8020 xv6iris.LockSet <> i:33 var
+R8022:8022 xv6iris.LockSet <> r:35 var
+R8055:8070 xv6iris.LockSet <> cpu_locks_insert thm
+R8073:8092 xv6iris.LockRank <> locks_below_not_elem thm
+R8055:8070 xv6iris.LockSet <> cpu_locks_insert thm
+R8073:8092 xv6iris.LockRank <> locks_below_not_elem thm
+prf 8193:8208 <> cpu_locks_delete
+R8215:8217 xv6iris.RiscvLang <> CPU def
+binder 8211:8211 <> i:36
+R8225:8228 stdpp.gmap <> gset def
+R8230:8235 Stdlib.Strings.String <> string ind
+binder 8221:8221 <> S:37
+R8243:8248 Stdlib.Strings.String <> string ind
+binder 8239:8239 <> r:38
+R8273:8278 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8257:8268 xv6iris.LockSet <> cpu_locks_at def
+R8270:8270 xv6iris.LockSet <> i:36 var
+R8272:8272 xv6iris.LockSet <> S:37 var
+R8288:8298 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R8279:8283 xv6iris.LockSet <> lk_in def
+R8285:8285 xv6iris.LockSet <> i:36 var
+R8287:8287 xv6iris.LockSet <> r:38 var
+R8312:8316 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R8299:8301 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R8309:8311 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R8303:8307 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R8302:8302 xv6iris.LockSet <> r:38 var
+R8308:8308 xv6iris.LockSet <> S:37 var
+R8317:8328 xv6iris.LockSet <> cpu_locks_at def
+R8330:8330 xv6iris.LockSet <> i:36 var
+R8334:8338 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8333:8333 xv6iris.LockSet <> S:37 var
+R8339:8340 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8342:8343 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8341:8341 xv6iris.LockSet <> r:38 var
+R8391:8391 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8404:8409 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8417:8417 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8392:8403 xv6iris.LockSet <> cpu_locks_in thm
+R8391:8391 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8404:8409 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8417:8417 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8392:8403 xv6iris.LockSet <> cpu_locks_in thm
+R8437:8437 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8496:8501 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8509:8509 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8438:8449 iris.base_logic.lib.own <> own_update_2 thm
+R8487:8494 xv6iris.RiscvPtsto <> lockSetR def
+R8459:8461 iris.algebra.auth <> :::'●'_x_x not
+R8462:8463 iris.algebra.auth <> :::'●'_x_x not
+R8482:8482 iris.algebra.auth <> :::'●'_x_x not
+R8464:8467 iris.algebra.gset <> GSet constr
+R8471:8475 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8476:8477 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8479:8480 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8437:8437 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8496:8501 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8509:8509 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8438:8449 iris.base_logic.lib.own <> own_update_2 thm
+R8487:8494 xv6iris.RiscvPtsto <> lockSetR def
+R8459:8461 iris.algebra.auth <> :::'●'_x_x not
+R8462:8463 iris.algebra.auth <> :::'●'_x_x not
+R8482:8482 iris.algebra.auth <> :::'●'_x_x not
+R8464:8467 iris.algebra.gset <> GSet constr
+R8471:8475 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8476:8477 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8479:8480 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R8538:8556 iris.algebra.auth <> auth_update_dealloc thm
+R8538:8556 iris.algebra.auth <> auth_update_dealloc thm
+R8565:8594 iris.algebra.gset <> gset_disj_dealloc_local_update thm
+R8565:8594 iris.algebra.gset <> gset_disj_dealloc_local_update thm
+prf 8734:8754 <> cpu_locks_intro_empty
+R8761:8763 xv6iris.RiscvLang <> CPU def
+binder 8757:8757 <> i:39
+R8785:8790 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8772:8778 xv6iris.LockSet <> lk_auth def
+R8780:8780 xv6iris.LockSet <> i:39 var
+R8782:8784 stdpp.base <> ::stdpp_scope:'∅' not
+R8791:8802 xv6iris.LockSet <> cpu_locks_at def
+R8804:8804 xv6iris.LockSet <> i:39 var
+R8806:8808 stdpp.base <> ::stdpp_scope:'∅' not
+def 10472:10487 <> cpu_locks_lvl_at
+R10494:10496 xv6iris.RiscvLang <> CPU def
+binder 10490:10490 <> i:40
+R10504:10506 Corelib.Init.Datatypes <> nat ind
+binder 10500:10500 <> n:41
+R10516:10519 stdpp.gmap <> gset def
+R10521:10526 Stdlib.Strings.String <> string ind
+binder 10510:10512 <> lks:42
+R10531:10535 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R10537:10538 xv6iris.LockSet <> LockSet.Σ var
+R10566:10570 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10548:10559 xv6iris.LockSet <> cpu_locks_at def
+R10561:10561 xv6iris.LockSet <> i:40 var
+R10563:10565 xv6iris.LockSet <> lks:42 var
+R10571:10573 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10593:10595 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10583:10586 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10575:10578 stdpp.base <> size def
+R10580:10582 xv6iris.LockSet <> lks:42 var
+R10587:10587 xv6iris.LockSet <> n:41 var
+prf 10610:10630 <> cpu_locks_lvl_at_elim
+R10637:10639 xv6iris.RiscvLang <> CPU def
+binder 10633:10633 <> i:43
+R10647:10649 Corelib.Init.Datatypes <> nat ind
+binder 10643:10643 <> n:44
+R10659:10662 stdpp.gmap <> gset def
+R10664:10669 Stdlib.Strings.String <> string ind
+binder 10653:10655 <> lks:45
+R10702:10707 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10678:10693 xv6iris.LockSet <> cpu_locks_lvl_at def
+R10695:10695 xv6iris.LockSet <> i:43 var
+R10697:10697 xv6iris.LockSet <> n:44 var
+R10699:10701 xv6iris.LockSet <> lks:45 var
+R10726:10730 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10708:10719 xv6iris.LockSet <> cpu_locks_at def
+R10721:10721 xv6iris.LockSet <> i:43 var
+R10723:10725 xv6iris.LockSet <> lks:45 var
+R10731:10733 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10753:10755 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10743:10746 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10735:10738 stdpp.base <> size def
+R10740:10742 xv6iris.LockSet <> lks:45 var
+R10747:10747 xv6iris.LockSet <> n:44 var
+prf 10798:10819 <> cpu_locks_lvl_at_intro
+R10826:10828 xv6iris.RiscvLang <> CPU def
+binder 10822:10822 <> i:46
+R10836:10838 Corelib.Init.Datatypes <> nat ind
+binder 10832:10832 <> n:47
+R10848:10851 stdpp.gmap <> gset def
+R10853:10858 Stdlib.Strings.String <> string ind
+binder 10842:10844 <> lks:48
+R10886:10889 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10876:10879 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10868:10871 stdpp.base <> size def
+R10873:10875 xv6iris.LockSet <> lks:48 var
+R10880:10880 xv6iris.LockSet <> n:47 var
+R10908:10913 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10890:10901 xv6iris.LockSet <> cpu_locks_at def
+R10903:10903 xv6iris.LockSet <> i:46 var
+R10905:10907 xv6iris.LockSet <> lks:48 var
+R10914:10929 xv6iris.LockSet <> cpu_locks_lvl_at def
+R10931:10931 xv6iris.LockSet <> i:46 var
+R10933:10933 xv6iris.LockSet <> n:47 var
+R10935:10937 xv6iris.LockSet <> lks:48 var
+prf 11081:11103 <> cpu_locks_lvl_at_weaken
+R11110:11112 xv6iris.RiscvLang <> CPU def
+binder 11106:11106 <> i:49
+R11123:11125 Corelib.Init.Datatypes <> nat ind
+binder 11116:11116 <> n:50
+binder 11118:11119 <> n':51
+R11135:11138 stdpp.gmap <> gset def
+R11140:11145 Stdlib.Strings.String <> string ind
+binder 11129:11131 <> lks:52
+R11167:11170 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11156:11159 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11155:11155 xv6iris.LockSet <> n:50 var
+R11160:11161 xv6iris.LockSet <> n':51 var
+R11195:11200 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11171:11186 xv6iris.LockSet <> cpu_locks_lvl_at def
+R11188:11188 xv6iris.LockSet <> i:49 var
+R11190:11190 xv6iris.LockSet <> n:50 var
+R11192:11194 xv6iris.LockSet <> lks:52 var
+R11201:11216 xv6iris.LockSet <> cpu_locks_lvl_at def
+R11218:11218 xv6iris.LockSet <> i:49 var
+R11220:11221 xv6iris.LockSet <> n':51 var
+R11223:11225 xv6iris.LockSet <> lks:52 var
+R11302:11308 xv6iris.LockSet LockSet <> sec
+sec 11320:11333 <> LockSetAmbient
+R11349:11355 xv6iris.RiscvPtsto <> riscvGS class
+var  11374:11376 LockSetAmbient CID
+var  11389:11390 LockSetAmbient XI
+R11380:11384 xv6iris.RiscvLang <> CpuId class
+R11394:11399 xv6iris.TsoCtx <> CurCtx class
+def 11534:11542 <> cpu_locks
+R11549:11552 stdpp.gmap <> gset def
+R11554:11559 Stdlib.Strings.String <> string ind
+binder 11545:11545 <> S:57
+R11564:11568 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R11570:11571 xv6iris.LockSet <> LockSetAmbient.Σ var
+R11576:11587 xv6iris.LockSet <> cpu_locks_at def
+R11589:11594 xv6iris.RiscvLang <> cpu_id def
+R11596:11596 xv6iris.LockSet <> S:57 var
+prf 11608:11623 <> cpu_locks_unfold
+R11630:11633 stdpp.gmap <> gset def
+R11635:11640 Stdlib.Strings.String <> string ind
+binder 11626:11626 <> S:58
+R11660:11667 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R11649:11657 xv6iris.LockSet <> cpu_locks def
+R11659:11659 xv6iris.LockSet <> S:58 var
+R11668:11679 xv6iris.LockSet <> cpu_locks_at def
+R11681:11686 xv6iris.RiscvLang <> cpu_id def
+R11688:11688 xv6iris.LockSet <> S:58 var
+def 11792:11804 <> cpu_locks_lvl
+R11811:11813 Corelib.Init.Datatypes <> nat ind
+binder 11807:11807 <> n:59
+R11821:11824 stdpp.gmap <> gset def
+R11826:11831 Stdlib.Strings.String <> string ind
+binder 11817:11817 <> S:60
+R11836:11840 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R11842:11843 xv6iris.LockSet <> LockSetAmbient.Σ var
+R11852:11867 xv6iris.LockSet <> cpu_locks_lvl_at def
+R11869:11874 xv6iris.RiscvLang <> cpu_id def
+R11876:11876 xv6iris.LockSet <> n:59 var
+R11878:11878 xv6iris.LockSet <> S:60 var
+prf 11890:11907 <> cpu_locks_lvl_elim
+R11914:11916 Corelib.Init.Datatypes <> nat ind
+binder 11910:11910 <> n:61
+R11924:11927 stdpp.gmap <> gset def
+R11929:11934 Stdlib.Strings.String <> string ind
+binder 11920:11920 <> S:62
+R11960:11965 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11943:11955 xv6iris.LockSet <> cpu_locks_lvl def
+R11957:11957 xv6iris.LockSet <> n:61 var
+R11959:11959 xv6iris.LockSet <> S:62 var
+R11977:11981 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11966:11974 xv6iris.LockSet <> cpu_locks def
+R11976:11976 xv6iris.LockSet <> S:62 var
+R11982:11984 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R12002:12004 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11992:11995 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11986:11989 stdpp.base <> size def
+R11991:11991 xv6iris.LockSet <> S:62 var
+R11996:11996 xv6iris.LockSet <> n:61 var
+R12023:12043 xv6iris.LockSet <> cpu_locks_lvl_at_elim thm
+R12023:12043 xv6iris.LockSet <> cpu_locks_lvl_at_elim thm
+prf 12060:12078 <> cpu_locks_lvl_intro
+R12085:12087 Corelib.Init.Datatypes <> nat ind
+binder 12081:12081 <> n:63
+R12095:12098 stdpp.gmap <> gset def
+R12100:12105 Stdlib.Strings.String <> string ind
+binder 12091:12091 <> S:64
+R12131:12134 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12121:12124 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R12115:12118 stdpp.base <> size def
+R12120:12120 xv6iris.LockSet <> S:64 var
+R12125:12125 xv6iris.LockSet <> n:63 var
+R12146:12151 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12135:12143 xv6iris.LockSet <> cpu_locks def
+R12145:12145 xv6iris.LockSet <> S:64 var
+R12152:12164 xv6iris.LockSet <> cpu_locks_lvl def
+R12166:12166 xv6iris.LockSet <> n:63 var
+R12168:12168 xv6iris.LockSet <> S:64 var
+R12200:12221 xv6iris.LockSet <> cpu_locks_lvl_at_intro thm
+R12200:12221 xv6iris.LockSet <> cpu_locks_lvl_at_intro thm
+prf 12321:12340 <> cpu_locks_lvl_weaken
+R12350:12352 Corelib.Init.Datatypes <> nat ind
+binder 12343:12343 <> n:65
+binder 12345:12346 <> n':66
+R12360:12363 stdpp.gmap <> gset def
+R12365:12370 Stdlib.Strings.String <> string ind
+binder 12356:12356 <> S:67
+R12392:12395 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12381:12384 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R12380:12380 xv6iris.LockSet <> n:65 var
+R12385:12386 xv6iris.LockSet <> n':66 var
+R12413:12418 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12396:12408 xv6iris.LockSet <> cpu_locks_lvl def
+R12410:12410 xv6iris.LockSet <> n:65 var
+R12412:12412 xv6iris.LockSet <> S:67 var
+R12419:12431 xv6iris.LockSet <> cpu_locks_lvl def
+R12433:12434 xv6iris.LockSet <> n':66 var
+R12436:12436 xv6iris.LockSet <> S:67 var
+R12470:12492 xv6iris.LockSet <> cpu_locks_lvl_at_weaken thm
+R12470:12492 xv6iris.LockSet <> cpu_locks_lvl_at_weaken thm
+prf 12753:12773 <> cpu_locks_lvl_relevel
+R12783:12785 Corelib.Init.Datatypes <> nat ind
+binder 12776:12776 <> n:68
+binder 12778:12779 <> n':69
+R12793:12796 stdpp.gmap <> gset def
+R12798:12803 Stdlib.Strings.String <> string ind
+binder 12789:12789 <> S:70
+R12830:12833 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12819:12822 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R12813:12816 stdpp.base <> size def
+R12818:12818 xv6iris.LockSet <> S:70 var
+R12823:12824 xv6iris.LockSet <> n':69 var
+R12851:12856 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12834:12846 xv6iris.LockSet <> cpu_locks_lvl def
+R12848:12848 xv6iris.LockSet <> n:68 var
+R12850:12850 xv6iris.LockSet <> S:70 var
+R12857:12869 xv6iris.LockSet <> cpu_locks_lvl def
+R12871:12872 xv6iris.LockSet <> n':69 var
+R12874:12874 xv6iris.LockSet <> S:70 var
+R12917:12917 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12936:12941 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12945:12945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12918:12935 xv6iris.LockSet <> cpu_locks_lvl_elim thm
+R12917:12917 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12936:12941 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12945:12945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12918:12935 xv6iris.LockSet <> cpu_locks_lvl_elim thm
+R12970:12970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12997:13002 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13006:13006 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12971:12989 xv6iris.LockSet <> cpu_locks_lvl_intro thm
+R12970:12970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12997:13002 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13006:13006 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12971:12989 xv6iris.LockSet <> cpu_locks_lvl_intro thm
+prf 13148:13165 <> cpu_locks_lvl_zero
+R13172:13175 stdpp.gmap <> gset def
+R13177:13182 Stdlib.Strings.String <> string ind
+binder 13168:13168 <> S:71
+R13208:13213 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R13191:13203 xv6iris.LockSet <> cpu_locks_lvl def
+R13207:13207 xv6iris.LockSet <> S:71 var
+R13225:13229 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13214:13222 xv6iris.LockSet <> cpu_locks def
+R13224:13224 xv6iris.LockSet <> S:71 var
+R13230:13232 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13240:13242 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13234:13236 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13233:13233 xv6iris.LockSet <> S:71 var
+R13237:13239 stdpp.base <> ::stdpp_scope:'∅' not
+R13281:13281 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13300:13305 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13309:13309 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13282:13299 xv6iris.LockSet <> cpu_locks_lvl_elim thm
+R13281:13281 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13300:13305 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13309:13309 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13282:13299 xv6iris.LockSet <> cpu_locks_lvl_elim thm
+R13348:13360 stdpp.base <> leibniz_equiv def
+R13363:13376 stdpp.fin_sets <> size_empty_inv thm
+R13348:13360 stdpp.base <> leibniz_equiv def
+R13363:13376 stdpp.fin_sets <> size_empty_inv thm
+R13396:13409 xv6iris.LockSet LockSetAmbient <> sec

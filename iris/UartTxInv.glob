@@ -1,0 +1,501 @@
+DIGEST 4d822a5ce077c9d83697ad930d5b1155
+Fxv6iris.UartTxInv
+R3192:3197 Stdlib.ZArith.ZArith <> <> lib
+R3199:3202 Stdlib.Lists.List <> <> lib
+R3231:3234 stdpp.gmap <> <> lib
+R3236:3239 stdpp.list <> <> lib
+R3241:3261 stdpp.bitvector.definitions <> <> lib
+R3299:3307 iris.proofmode.proofmode <> <> lib
+R3347:3355 iris.algebra.lib.mono_list <> <> lib
+R3398:3407 iris.base_logic.lib.invariants <> <> lib
+R3409:3411 iris.base_logic.lib.own <> <> lib
+R3429:3458 SailStdpp.ConcurrencyInterface <> <> lib
+R3460:3497 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R3499:3533 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R3535:3560 SailStdpp.Operators_mwords <> <> lib
+R3578:3591 SailStdpp.Base <> <> lib
+R3593:3611 SailStdpp.TypeCasts <> <> lib
+R3613:3628 SailStdpp.Values <> <> lib
+R3630:3650 SailStdpp.MachineWord <> <> lib
+R3668:3684 Riscv.rv64d_types <> <> lib
+R3686:3696 Riscv.rv64d <> <> lib
+R3714:3723 xv6iris.RiscvPtsto <> <> lib
+R3741:3748 xv6iris.DevModel <> <> lib
+R3750:3758 xv6iris.DiskPtsto <> <> lib
+R3760:3765 xv6iris.WpUart <> <> lib
+R3783:3788 xv6iris.WpLock <> <> lib
+R3806:3811 xv6iris.TsoCtx <> <> lib
+R3883:3892 Kernel.KernelSyms <> <> lib
+R3910:3913 xv6iris.Xv6G <> <> lib
+prf 4248:4271 <> mono_list_lb_nil_is_unit
+R4278:4280 iris.algebra.ofe <> ofe rec
+binder 4274:4274 <> A:1
+R4287:4287 stdpp.base <> ::stdpp_scope:x_'≡'_x not
+R4307:4313 stdpp.base <> ::stdpp_scope:x_'≡'_x not
+R4332:4332 stdpp.base <> ::stdpp_scope:x_'≡'_x not
+R4288:4294 iris.algebra.lib.mono_list <> :::'◯ML'_x not
+R4306:4306 iris.algebra.lib.mono_list <> :::'◯ML'_x not
+R4300:4303 Corelib.Init.Datatypes <> list ind
+R4305:4305 xv6iris.UartTxInv <> A:1 var
+R4295:4296 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R4319:4329 iris.algebra.lib.mono_list <> mono_listUR def
+R4331:4331 xv6iris.UartTxInv <> A:1 var
+R4314:4315 iris.algebra.cmra <> ε def
+sec 4362:4370 <> UartTxInv
+R4386:4392 xv6iris.RiscvPtsto <> riscvGS class
+R4399:4402 xv6iris.Xv6G <> xv6G class
+R4404:4405 xv6iris.UartTxInv <> Σ:2 var
+var  4421:4422 UartTxInv XI
+R4426:4431 xv6iris.TsoCtx <> CurCtx class
+var  4710:4712 UartTxInv GEN
+R4716:4730 xv6iris.RiscvLang <> GenId class
+def 4892:4900 <> a_tx_lock
+R4904:4908 SailStdpp.Values <> mword def
+R4916:4927 SailStdpp.Values <> mword_of_int def
+R4929:4946 Kernel.KernelSyms <> tx_lock def
+def 4962:4970 <> a_tx_chan
+R4974:4978 SailStdpp.Values <> mword def
+R4986:4997 SailStdpp.Values <> mword_of_int def
+R4999:5016 Kernel.KernelSyms <> tx_chan def
+def 5394:5399 <> tx_res
+R5408:5417 xv6iris.WpUart <> uart_names rec
+binder 5402:5404 <> γu:7
+R5422:5426 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R5428:5429 xv6iris.UartTxInv <> UartTxInv.Σ var
+R5439:5442 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5458:5459 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5447:5450 Corelib.Init.Datatypes <> list ind
+R5453:5454 stdpp.bitvector.definitions <> bv rec
+binder 5443:5443 <> l:8
+R5460:5470 xv6iris.WpUart <> uart_tx_own def
+R5472:5474 xv6iris.UartTxInv <> γu:7 var
+R5476:5476 xv6iris.UartTxInv <> l:8 var
+prf 5491:5502 <> tx_res_intro
+R5511:5520 xv6iris.WpUart <> uart_names rec
+binder 5505:5507 <> γu:9
+R5528:5531 Corelib.Init.Datatypes <> list ind
+R5534:5535 stdpp.bitvector.definitions <> bv rec
+binder 5524:5524 <> l:10
+R5564:5569 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5547:5557 xv6iris.WpUart <> uart_tx_own def
+R5559:5561 xv6iris.UartTxInv <> γu:9 var
+R5563:5563 xv6iris.UartTxInv <> l:10 var
+R5570:5575 xv6iris.UartTxInv <> tx_res def
+R5577:5579 xv6iris.UartTxInv <> γu:9 var
+def 7010:7018 <> is_txlock
+R7027:7031 iris.base_logic.lib.iprop <> gname def
+binder 7021:7023 <> γl:11
+R7041:7050 xv6iris.WpUart <> uart_names rec
+binder 7035:7037 <> γu:12
+R7055:7059 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R7061:7062 xv6iris.UartTxInv <> UartTxInv.Σ var
+R7124:7133 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7072:7078 xv6iris.WpLock <> is_lock def
+R7080:7082 xv6iris.UartTxInv <> γl:11 var
+R7084:7092 xv6iris.UartTxInv <> a_tx_lock def
+R7108:7110 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R7121:7123 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R7111:7116 xv6iris.UartTxInv <> tx_res def
+R7118:7120 xv6iris.UartTxInv <> γu:12 var
+R7134:7146 xv6iris.WpUart <> uart_dlab_off def
+R7148:7150 xv6iris.UartTxInv <> γu:12 var
+inst 7175:7194 <> is_txlock_persistent
+binder 7196:7198 <> γl:13
+binder 7200:7202 <> γu:14
+R7206:7215 iris.bi.derived_connectives <> Persistent class
+R7218:7226 xv6iris.UartTxInv <> is_txlock def
+R7228:7230 xv6iris.UartTxInv <> γl:13 var
+R7232:7234 xv6iris.UartTxInv <> γu:14 var
+prf 7270:7283 <> is_txlock_lock
+binder 7285:7287 <> γl:15
+binder 7289:7291 <> γu:16
+R7316:7321 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7299:7307 xv6iris.UartTxInv <> is_txlock def
+R7309:7311 xv6iris.UartTxInv <> γl:15 var
+R7313:7315 xv6iris.UartTxInv <> γu:16 var
+R7322:7328 xv6iris.WpLock <> is_lock def
+R7330:7332 xv6iris.UartTxInv <> γl:15 var
+R7334:7342 xv6iris.UartTxInv <> a_tx_lock def
+R7358:7360 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R7371:7373 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R7361:7366 xv6iris.UartTxInv <> tx_res def
+R7368:7370 xv6iris.UartTxInv <> γu:16 var
+prf 7416:7429 <> is_txlock_dlab
+binder 7431:7433 <> γl:17
+binder 7435:7437 <> γu:18
+R7458:7463 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7441:7449 xv6iris.UartTxInv <> is_txlock def
+R7451:7453 xv6iris.UartTxInv <> γl:17 var
+R7455:7457 xv6iris.UartTxInv <> γu:18 var
+R7464:7476 xv6iris.WpUart <> uart_dlab_off def
+R7478:7480 xv6iris.UartTxInv <> γu:18 var
+prf 7523:7537 <> is_txlock_intro
+binder 7539:7541 <> γl:19
+binder 7543:7545 <> γu:20
+R7605:7614 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7553:7559 xv6iris.WpLock <> is_lock def
+R7561:7563 xv6iris.UartTxInv <> γl:19 var
+R7565:7573 xv6iris.UartTxInv <> a_tx_lock def
+R7589:7591 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R7602:7604 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R7592:7597 xv6iris.UartTxInv <> tx_res def
+R7599:7601 xv6iris.UartTxInv <> γu:20 var
+R7632:7637 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7615:7627 xv6iris.WpUart <> uart_dlab_off def
+R7629:7631 xv6iris.UartTxInv <> γu:20 var
+R7638:7646 xv6iris.UartTxInv <> is_txlock def
+R7648:7650 xv6iris.UartTxInv <> γl:19 var
+R7652:7654 xv6iris.UartTxInv <> γu:20 var
+def 8470:8482 <> uart_sent_sub
+R8491:8500 xv6iris.WpUart <> uart_names rec
+binder 8485:8487 <> γu:21
+R8509:8512 Corelib.Init.Datatypes <> list ind
+R8515:8516 stdpp.bitvector.definitions <> bv rec
+binder 8504:8505 <> bs:22
+R8524:8528 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R8530:8531 xv6iris.UartTxInv <> UartTxInv.Σ var
+R8541:8544 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R8561:8562 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R8550:8553 Corelib.Init.Datatypes <> list ind
+R8556:8557 stdpp.bitvector.definitions <> bv rec
+binder 8545:8546 <> tr:23
+R8579:8583 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R8563:8571 xv6iris.WpUart <> uart_sent def
+R8573:8575 xv6iris.UartTxInv <> γu:21 var
+R8577:8578 xv6iris.UartTxInv <> tr:23 var
+R8584:8587 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R8606:8609 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R8590:8603 stdpp.list_relations <> ::stdpp_scope:x_'`sublist_of`'_x not
+R8588:8589 xv6iris.UartTxInv <> bs:22 var
+R8604:8605 xv6iris.UartTxInv <> tr:23 var
+inst 8634:8657 <> uart_sent_sub_persistent
+binder 8659:8661 <> γu:24
+binder 8663:8664 <> bs:25
+R8668:8677 iris.bi.derived_connectives <> Persistent class
+R8680:8692 xv6iris.UartTxInv <> uart_sent_sub def
+R8694:8696 xv6iris.UartTxInv <> γu:24 var
+R8698:8699 xv6iris.UartTxInv <> bs:25 var
+prf 8735:8751 <> uart_sent_sub_nil
+binder 8753:8755 <> γu:26
+R8763:8766 Corelib.Init.Datatypes <> list ind
+R8769:8770 stdpp.bitvector.definitions <> bv rec
+binder 8758:8759 <> tr:27
+R8798:8803 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8782:8790 xv6iris.WpUart <> uart_sent def
+R8792:8794 xv6iris.UartTxInv <> γu:26 var
+R8796:8797 xv6iris.UartTxInv <> tr:27 var
+R8804:8816 xv6iris.UartTxInv <> uart_sent_sub def
+R8818:8820 xv6iris.UartTxInv <> γu:26 var
+R8822:8823 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R8894:8927 stdpp.list_relations <> sublist_nil_l thm
+R8894:8927 stdpp.list_relations <> sublist_nil_l thm
+prf 9618:9639 <> uart_sent_sub_nil_free
+R9648:9657 xv6iris.WpUart <> uart_names rec
+binder 9642:9644 <> γu:28
+R9666:9669 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R9670:9674 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R9675:9687 xv6iris.UartTxInv <> uart_sent_sub def
+R9689:9691 xv6iris.UartTxInv <> γu:28 var
+R9693:9694 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R9716:9723 iris.base_logic.lib.own <> own_unit thm
+R9762:9767 xv6iris.WpUart <> un_acc proj
+R9726:9736 iris.algebra.lib.mono_list <> mono_listUR def
+R9739:9746 iris.algebra.ofe <> leibnizO abbrev
+R9749:9750 stdpp.bitvector.definitions <> bv rec
+R9716:9723 iris.base_logic.lib.own <> own_unit thm
+R9762:9767 xv6iris.WpUart <> un_acc proj
+R9726:9736 iris.algebra.lib.mono_list <> mono_listUR def
+R9739:9746 iris.algebra.ofe <> leibnizO abbrev
+R9749:9750 stdpp.bitvector.definitions <> bv rec
+R9803:9815 xv6iris.UartTxInv <> uart_sent_sub def
+R9803:9815 xv6iris.UartTxInv <> uart_sent_sub def
+R9803:9815 xv6iris.UartTxInv <> uart_sent_sub def
+R9826:9827 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R9826:9827 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R9879:9912 stdpp.list_relations <> sublist_nil_l thm
+R9879:9912 stdpp.list_relations <> sublist_nil_l thm
+R9930:9938 xv6iris.WpUart <> uart_sent def
+R9942:9965 xv6iris.UartTxInv <> mono_list_lb_nil_is_unit thm
+R9968:9975 iris.algebra.ofe <> leibnizO abbrev
+R9978:9979 stdpp.bitvector.definitions <> bv rec
+R9930:9938 xv6iris.WpUart <> uart_sent def
+R9930:9938 xv6iris.WpUart <> uart_sent def
+R9942:9965 xv6iris.UartTxInv <> mono_list_lb_nil_is_unit thm
+R9968:9975 iris.algebra.ofe <> leibnizO abbrev
+R9978:9979 stdpp.bitvector.definitions <> bv rec
+R9942:9965 xv6iris.UartTxInv <> mono_list_lb_nil_is_unit thm
+R9968:9975 iris.algebra.ofe <> leibnizO abbrev
+R9978:9979 stdpp.bitvector.definitions <> bv rec
+prf 10118:10135 <> uart_sent_sub_snoc
+binder 10137:10139 <> γu:29
+R10149:10152 Corelib.Init.Datatypes <> list ind
+R10155:10156 stdpp.bitvector.definitions <> bv rec
+binder 10142:10143 <> bs:30
+binder 10145:10145 <> l:31
+R10167:10168 stdpp.bitvector.definitions <> bv rec
+binder 10163:10163 <> c:32
+R10196:10203 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10181:10194 stdpp.list_relations <> ::stdpp_scope:x_'`sublist_of`'_x not
+R10179:10180 xv6iris.UartTxInv <> bs:30 var
+R10195:10195 xv6iris.UartTxInv <> l:31 var
+R10228:10233 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10204:10212 xv6iris.WpUart <> uart_sent def
+R10214:10216 xv6iris.UartTxInv <> γu:29 var
+R10220:10223 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R10219:10219 xv6iris.UartTxInv <> l:31 var
+R10224:10224 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R10226:10226 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R10225:10225 xv6iris.UartTxInv <> c:32 var
+R10234:10246 xv6iris.UartTxInv <> uart_sent_sub def
+R10248:10250 xv6iris.UartTxInv <> γu:29 var
+R10255:10258 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R10253:10254 xv6iris.UartTxInv <> bs:30 var
+R10259:10259 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R10261:10261 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R10260:10260 xv6iris.UartTxInv <> c:32 var
+R10309:10312 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R10313:10313 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R10315:10315 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R10309:10312 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R10313:10313 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R10315:10315 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R10359:10390 stdpp.list_relations <> sublist_app thm
+R10359:10390 stdpp.list_relations <> sublist_app thm
+prf 10559:10574 <> uart_sent_prefix
+R10583:10592 xv6iris.WpUart <> uart_names rec
+binder 10577:10579 <> γu:33
+R10600:10609 xv6iris.DevModel <> uart_state rec
+binder 10596:10596 <> u:34
+R10617:10620 Corelib.Init.Datatypes <> list ind
+R10623:10624 stdpp.bitvector.definitions <> bv rec
+binder 10613:10613 <> l:35
+R10656:10661 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10636:10649 xv6iris.WpUart <> uart_sent_auth def
+R10651:10653 xv6iris.UartTxInv <> γu:33 var
+R10655:10655 xv6iris.UartTxInv <> u:34 var
+R10677:10682 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10662:10670 xv6iris.WpUart <> uart_sent def
+R10672:10674 xv6iris.UartTxInv <> γu:33 var
+R10676:10676 xv6iris.UartTxInv <> l:35 var
+R10683:10686 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10711:10714 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10688:10700 stdpp.list_relations <> ::stdpp_scope:x_'`prefix_of`'_x not
+R10687:10687 xv6iris.UartTxInv <> l:35 var
+R10701:10708 xv6iris.DevModel <> uart_acc def
+R10710:10710 xv6iris.UartTxInv <> u:34 var
+R10756:10769 xv6iris.WpUart <> uart_sent_auth def
+R10772:10780 xv6iris.WpUart <> uart_sent def
+R10756:10769 xv6iris.WpUart <> uart_sent_auth def
+R10756:10769 xv6iris.WpUart <> uart_sent_auth def
+R10772:10780 xv6iris.WpUart <> uart_sent def
+R10772:10780 xv6iris.WpUart <> uart_sent def
+R10800:10800 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10812:10817 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10825:10825 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10801:10811 iris.base_logic.lib.own <> own_valid_2 thm
+R10833:10854 iris.algebra.lib.mono_list <> mono_list_both_valid_L thm
+R10800:10800 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10812:10817 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10825:10825 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10801:10811 iris.base_logic.lib.own <> own_valid_2 thm
+R10833:10854 iris.algebra.lib.mono_list <> mono_list_both_valid_L thm
+prf 11140:11159 <> uart_tx_own_snapshot
+R11168:11177 xv6iris.WpUart <> uart_names rec
+binder 11162:11164 <> γu:36
+R11187:11196 xv6iris.DiskPtsto <> disk_names rec
+binder 11181:11183 <> γd:37
+R11210:11213 Corelib.Init.Datatypes <> list ind
+R11216:11217 stdpp.bitvector.definitions <> bv rec
+binder 11206:11206 <> l:38
+R11228:11233 stdpp.coPset <> coPset def
+binder 11224:11224 <> E:39
+R11255:11262 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11249:11253 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R11242:11244 stdpp.base <> :::'↑'_x not
+R11245:11248 xv6iris.WpUart <> devN def
+R11254:11254 xv6iris.UartTxInv <> E:39 var
+R11278:11283 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11263:11269 xv6iris.WpUart <> dev_inv def
+R11271:11273 xv6iris.UartTxInv <> γu:36 var
+R11275:11277 xv6iris.UartTxInv <> γd:37 var
+R11301:11303 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R11305:11316 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R11284:11294 xv6iris.WpUart <> uart_tx_own def
+R11296:11298 xv6iris.UartTxInv <> γu:36 var
+R11300:11300 xv6iris.UartTxInv <> l:38 var
+R11304:11304 xv6iris.UartTxInv <> E:39 var
+R11304:11304 xv6iris.UartTxInv <> E:39 var
+R11334:11338 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11317:11327 xv6iris.WpUart <> uart_tx_own def
+R11329:11331 xv6iris.UartTxInv <> γu:36 var
+R11333:11333 xv6iris.UartTxInv <> l:38 var
+R11339:11347 xv6iris.WpUart <> uart_sent def
+R11349:11351 xv6iris.UartTxInv <> γu:36 var
+R11353:11353 xv6iris.UartTxInv <> l:38 var
+R11483:11483 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11496:11501 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11508:11508 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11484:11495 xv6iris.WpUart <> dev_inv_uart thm
+R11483:11483 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11496:11501 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11508:11508 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11484:11495 xv6iris.WpUart <> dev_inv_uart thm
+R11624:11634 xv6iris.WpUart <> uart_ghosts def
+R11624:11634 xv6iris.WpUart <> uart_ghosts def
+R11624:11634 xv6iris.WpUart <> uart_ghosts def
+R11709:11709 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11727:11732 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11743:11743 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11710:11726 xv6iris.WpUart <> uart_tx_own_agree thm
+R11709:11709 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11727:11732 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11743:11743 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11710:11726 xv6iris.WpUart <> uart_tx_own_agree thm
+R11769:11769 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11783:11788 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11793:11793 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11770:11782 xv6iris.WpUart <> uart_sent_get thm
+R11769:11769 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11783:11788 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11793:11793 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11770:11782 xv6iris.WpUart <> uart_sent_get thm
+R11820:11820 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11829:11834 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11857:11857 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11820:11820 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11829:11834 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11857:11857 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11900:11910 xv6iris.WpUart <> uart_ghosts def
+R11900:11910 xv6iris.WpUart <> uart_ghosts def
+R11900:11910 xv6iris.WpUart <> uart_ghosts def
+prf 11998:12020 <> uart_tx_own_sent_prefix
+R12029:12038 xv6iris.WpUart <> uart_names rec
+binder 12023:12025 <> γu:40
+R12048:12057 xv6iris.DiskPtsto <> disk_names rec
+binder 12042:12044 <> γd:41
+R12073:12076 Corelib.Init.Datatypes <> list ind
+R12079:12080 stdpp.bitvector.definitions <> bv rec
+binder 12067:12067 <> l:42
+binder 12069:12069 <> L:43
+R12091:12096 stdpp.coPset <> coPset def
+binder 12087:12087 <> E:44
+R12118:12125 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12112:12116 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R12105:12107 stdpp.base <> :::'↑'_x not
+R12108:12111 xv6iris.WpUart <> devN def
+R12117:12117 xv6iris.UartTxInv <> E:44 var
+R12141:12146 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12126:12132 xv6iris.WpUart <> dev_inv def
+R12134:12136 xv6iris.UartTxInv <> γu:40 var
+R12138:12140 xv6iris.UartTxInv <> γd:41 var
+R12164:12169 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12147:12157 xv6iris.WpUart <> uart_tx_own def
+R12159:12161 xv6iris.UartTxInv <> γu:40 var
+R12163:12163 xv6iris.UartTxInv <> l:42 var
+R12185:12187 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R12189:12200 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R12170:12178 xv6iris.WpUart <> uart_sent def
+R12180:12182 xv6iris.UartTxInv <> γu:40 var
+R12184:12184 xv6iris.UartTxInv <> L:43 var
+R12188:12188 xv6iris.UartTxInv <> E:44 var
+R12188:12188 xv6iris.UartTxInv <> E:44 var
+R12218:12222 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R12201:12211 xv6iris.WpUart <> uart_tx_own def
+R12213:12215 xv6iris.UartTxInv <> γu:40 var
+R12217:12217 xv6iris.UartTxInv <> l:42 var
+R12223:12226 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R12242:12245 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R12228:12240 stdpp.list_relations <> ::stdpp_scope:x_'`prefix_of`'_x not
+R12227:12227 xv6iris.UartTxInv <> L:43 var
+R12241:12241 xv6iris.UartTxInv <> l:42 var
+R12306:12306 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12319:12324 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12331:12331 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12307:12318 xv6iris.WpUart <> dev_inv_uart thm
+R12306:12306 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12319:12324 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12331:12331 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12307:12318 xv6iris.WpUart <> dev_inv_uart thm
+R12447:12457 xv6iris.WpUart <> uart_ghosts def
+R12447:12457 xv6iris.WpUart <> uart_ghosts def
+R12447:12457 xv6iris.WpUart <> uart_ghosts def
+R12532:12532 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12550:12555 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12566:12566 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12533:12549 xv6iris.WpUart <> uart_tx_own_agree thm
+R12532:12532 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12550:12555 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12566:12566 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12533:12549 xv6iris.WpUart <> uart_tx_own_agree thm
+R12592:12592 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12609:12614 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12622:12622 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12593:12608 xv6iris.UartTxInv <> uart_sent_prefix thm
+R12592:12592 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12609:12614 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12622:12622 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12593:12608 xv6iris.UartTxInv <> uart_sent_prefix thm
+R12643:12643 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12652:12657 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12680:12680 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12643:12643 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12652:12657 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12680:12680 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12723:12733 xv6iris.WpUart <> uart_ghosts def
+R12723:12733 xv6iris.WpUart <> uart_ghosts def
+R12723:12733 xv6iris.WpUart <> uart_ghosts def
+prf 13152:13171 <> uart_tx_own_sent_sub
+R13180:13189 xv6iris.WpUart <> uart_names rec
+binder 13174:13176 <> γu:45
+R13199:13208 xv6iris.DiskPtsto <> disk_names rec
+binder 13193:13195 <> γd:46
+R13222:13225 Corelib.Init.Datatypes <> list ind
+R13228:13229 stdpp.bitvector.definitions <> bv rec
+binder 13218:13218 <> l:47
+R13241:13244 Corelib.Init.Datatypes <> list ind
+R13247:13248 stdpp.bitvector.definitions <> bv rec
+binder 13236:13237 <> bs:48
+R13259:13264 stdpp.coPset <> coPset def
+binder 13255:13255 <> E:49
+R13286:13293 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13280:13284 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R13273:13275 stdpp.base <> :::'↑'_x not
+R13276:13279 xv6iris.WpUart <> devN def
+R13285:13285 xv6iris.UartTxInv <> E:49 var
+R13309:13314 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R13294:13300 xv6iris.WpUart <> dev_inv def
+R13302:13304 xv6iris.UartTxInv <> γu:45 var
+R13306:13308 xv6iris.UartTxInv <> γd:46 var
+R13332:13337 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13315:13325 xv6iris.WpUart <> uart_tx_own def
+R13327:13329 xv6iris.UartTxInv <> γu:45 var
+R13331:13331 xv6iris.UartTxInv <> l:47 var
+R13358:13360 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R13362:13373 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R13338:13350 xv6iris.UartTxInv <> uart_sent_sub def
+R13352:13354 xv6iris.UartTxInv <> γu:45 var
+R13356:13357 xv6iris.UartTxInv <> bs:48 var
+R13361:13361 xv6iris.UartTxInv <> E:49 var
+R13361:13361 xv6iris.UartTxInv <> E:49 var
+R13391:13395 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13374:13384 xv6iris.WpUart <> uart_tx_own def
+R13386:13388 xv6iris.UartTxInv <> γu:45 var
+R13390:13390 xv6iris.UartTxInv <> l:47 var
+R13396:13399 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13417:13420 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13402:13415 stdpp.list_relations <> ::stdpp_scope:x_'`sublist_of`'_x not
+R13400:13401 xv6iris.UartTxInv <> bs:48 var
+R13416:13416 xv6iris.UartTxInv <> l:47 var
+R13520:13520 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13561:13566 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13581:13581 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13521:13543 xv6iris.UartTxInv <> uart_tx_own_sent_prefix thm
+R13520:13520 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13561:13566 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13581:13581 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13521:13543 xv6iris.UartTxInv <> uart_tx_own_sent_prefix thm
+R13690:13701 Corelib.Classes.RelationClasses <> transitivity def
+R13690:13701 Corelib.Classes.RelationClasses <> transitivity def
+R13715:13752 stdpp.list_relations <> sublist_inserts_r thm
+R13715:13752 stdpp.list_relations <> sublist_inserts_r thm
+R13781:13789 xv6iris.UartTxInv UartTxInv <> sec

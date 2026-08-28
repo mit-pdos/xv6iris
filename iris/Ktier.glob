@@ -1,0 +1,109 @@
+DIGEST 568fe3d1ca69f5b1503a91adb19ba05c
+Fxv6iris.Ktier
+ind 3190:3194 <> ktier
+constr 3205:3207 <> KT0
+constr 3211:3213 <> KT1
+scheme 3190:3194 <> ktier_rect
+scheme 3190:3194 <> ktier_ind
+scheme 3190:3194 <> ktier_rec
+scheme 3190:3194 <> ktier_sind
+def 3228:3239 <> ktier_eq_dec
+R3250:3254 xv6iris.Ktier <> ktier ind
+binder 3242:3243 <> t1:3
+binder 3245:3246 <> t2:4
+R3259:3259 Corelib.Init.Specif <> ::type_scope:'{'_x_'}'_'+'_'{'_x_'}' not
+R3267:3271 Corelib.Init.Specif <> ::type_scope:'{'_x_'}'_'+'_'{'_x_'}' not
+R3280:3280 Corelib.Init.Specif <> ::type_scope:'{'_x_'}'_'+'_'{'_x_'}' not
+R3262:3264 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3260:3261 xv6iris.Ktier <> t1:3 var
+R3265:3266 xv6iris.Ktier <> t2:4 var
+R3274:3277 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R3272:3273 xv6iris.Ktier <> t1:3 var
+R3278:3279 xv6iris.Ktier <> t2:4 var
+def 3433:3441 <> ktier_leb
+R3452:3456 xv6iris.Ktier <> ktier ind
+binder 3444:3445 <> t1:5
+binder 3447:3448 <> t2:6
+R3461:3464 Corelib.Init.Datatypes <> bool ind
+R3481:3482 xv6iris.Ktier <> t2:6 var
+R3477:3478 xv6iris.Ktier <> t1:5 var
+R3493:3495 xv6iris.Ktier <> KT1 constr
+R3498:3500 xv6iris.Ktier <> KT0 constr
+R3505:3509 Corelib.Init.Datatypes <> false constr
+R3523:3526 Corelib.Init.Datatypes <> true constr
+ind 3542:3548 <> KtierLe
+constr 3576:3589 <> ktier_le_holds
+rec 3542:3548 <> KtierLe
+proj 3576:3589 <> ktier_le_holds
+R3559:3563 xv6iris.Ktier <> ktier ind
+binder 3551:3552 <> t1:9
+binder 3554:3555 <> t2:10
+R3608:3610 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3593:3601 xv6iris.Ktier <> ktier_leb def
+R3603:3604 xv6iris.Ktier <> t1:9 var
+R3606:3607 xv6iris.Ktier <> t2:10 var
+R3611:3614 Corelib.Init.Datatypes <> true constr
+inst 3848:3859 <> ktier_le_bot
+binder 3861:3861 <> t:13
+R3865:3871 xv6iris.Ktier <> KtierLe class
+R3877:3877 xv6iris.Ktier <> t:13 var
+R3873:3875 xv6iris.Ktier <> KT0 constr
+inst 3933:3944 <> ktier_le_top
+binder 3946:3946 <> t:14
+R3950:3956 xv6iris.Ktier <> KtierLe class
+R3960:3962 xv6iris.Ktier <> KT1 constr
+R3958:3958 xv6iris.Ktier <> t:14 var
+inst 4018:4030 <> ktier_le_refl
+binder 4032:4032 <> t:15
+R4036:4042 xv6iris.Ktier <> KtierLe class
+R4046:4046 xv6iris.Ktier <> t:15 var
+R4044:4044 xv6iris.Ktier <> t:15 var
+prf 6250:6263 <> ktier_le_cases
+R6274:6278 xv6iris.Ktier <> ktier ind
+binder 6266:6267 <> t1:16
+binder 6269:6270 <> t2:17
+R6298:6301 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6285:6291 xv6iris.Ktier <> KtierLe class
+R6296:6297 xv6iris.Ktier <> t2:17 var
+R6293:6294 xv6iris.Ktier <> t1:16 var
+R6309:6313 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R6334:6334 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R6304:6306 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6302:6303 xv6iris.Ktier <> t1:16 var
+R6307:6308 xv6iris.Ktier <> t2:17 var
+R6322:6325 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R6316:6318 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6314:6315 xv6iris.Ktier <> t1:16 var
+R6319:6321 xv6iris.Ktier <> KT0 constr
+R6328:6330 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6326:6327 xv6iris.Ktier <> t2:17 var
+R6331:6333 xv6iris.Ktier <> KT1 constr
+ind 6694:6701 <> CurKtier
+constr 6706:6714 <> cur_ktier
+rec 6694:6701 <> CurKtier
+proj 6706:6714 <> cur_ktier
+R6718:6722 xv6iris.Ktier <> ktier ind
+inst 7001:7016 <> curktier_default
+R7020:7027 xv6iris.Ktier <> CurKtier class
+R7038:7040 xv6iris.Ktier <> KT0 constr
+inst 7891:7904 <> ktier_le_bot_c
+R7911:7918 xv6iris.Ktier <> CurKtier class
+binder 7907:7907 <> t:20
+R7923:7929 xv6iris.Ktier <> KtierLe class
+R7935:7935 xv6iris.Ktier <> t:20 var
+R7931:7933 xv6iris.Ktier <> KT0 constr
+R7940:7951 xv6iris.Ktier <> ktier_le_bot inst
+inst 7972:7985 <> ktier_le_top_c
+R7992:7999 xv6iris.Ktier <> CurKtier class
+binder 7988:7988 <> t:21
+R8004:8010 xv6iris.Ktier <> KtierLe class
+R8014:8016 xv6iris.Ktier <> KT1 constr
+R8012:8012 xv6iris.Ktier <> t:21 var
+R8021:8032 xv6iris.Ktier <> ktier_le_top inst
+inst 8053:8067 <> ktier_le_refl_c
+R8074:8081 xv6iris.Ktier <> CurKtier class
+binder 8070:8070 <> t:22
+R8086:8092 xv6iris.Ktier <> KtierLe class
+R8096:8096 xv6iris.Ktier <> t:22 var
+R8094:8094 xv6iris.Ktier <> t:22 var
+R8101:8113 xv6iris.Ktier <> ktier_le_refl inst

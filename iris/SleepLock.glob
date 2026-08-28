@@ -1,0 +1,2459 @@
+DIGEST a5d38b828683b03f017a0e5aafc9dda9
+Fxv6iris.SleepLock
+R5107:5115 iris.proofmode.proofmode <> <> lib
+R5151:5154 iris.algebra.excl <> <> lib
+R5156:5159 iris.algebra.auth <> <> lib
+R5161:5165 iris.algebra.ufrac <> <> lib
+R5167:5173 iris.algebra.updates <> <> lib
+R5175:5187 iris.algebra.local_updates <> <> lib
+R5227:5235 iris.algebra.lib.excl_auth <> <> lib
+R5278:5287 iris.base_logic.lib.invariants <> <> lib
+R5289:5291 iris.base_logic.lib.own <> <> lib
+R5309:5322 SailStdpp.Base <> <> lib
+R5324:5349 SailStdpp.Operators_mwords <> <> lib
+R5367:5377 Riscv.rv64d <> <> lib
+R5395:5404 xv6iris.RiscvPtsto <> <> lib
+R5422:5427 xv6iris.WpLock <> <> lib
+R5445:5450 xv6iris.TsoCtx <> <> lib
+sec 5537:5545 <> SleepLock
+R5561:5567 xv6iris.RiscvPtsto <> riscvGS class
+R5574:5578 xv6iris.Xv6Cameras <> lockG class
+R5580:5581 xv6iris.SleepLock <> Σ:1 var
+var  5597:5598 SleepLock XI
+R5602:5607 xv6iris.TsoCtx <> CurCtx class
+def 6021:6025 <> sl_lk
+R6034:6038 SailStdpp.Values <> mword def
+binder 6028:6030 <> slk:5
+R6046:6050 SailStdpp.Values <> mword def
+R6062:6068 SailStdpp.Operators_mwords <> add_vec def
+R6075:6086 Riscv.rv64d <> sign_extend' def
+R6109:6113 SailStdpp.Values <> mword def
+R6092:6103 SailStdpp.Values <> mword_of_int def
+R6070:6072 xv6iris.SleepLock <> slk:5 var
+def 6134:6141 <> sl_lkcpu
+R6150:6154 SailStdpp.Values <> mword def
+binder 6144:6146 <> slk:6
+R6162:6166 SailStdpp.Values <> mword def
+R6178:6184 SailStdpp.Operators_mwords <> add_vec def
+R6199:6210 Riscv.rv64d <> sign_extend' def
+R6234:6238 SailStdpp.Values <> mword def
+R6216:6227 SailStdpp.Values <> mword_of_int def
+R6187:6191 xv6iris.SleepLock <> sl_lk def
+R6193:6195 xv6iris.SleepLock <> slk:6 var
+def 6259:6271 <> sl_name_field
+R6280:6284 SailStdpp.Values <> mword def
+binder 6274:6276 <> slk:7
+R6292:6296 SailStdpp.Values <> mword def
+R6308:6314 SailStdpp.Operators_mwords <> add_vec def
+R6321:6332 Riscv.rv64d <> sign_extend' def
+R6356:6360 SailStdpp.Values <> mword def
+R6338:6349 SailStdpp.Values <> mword_of_int def
+R6316:6318 xv6iris.SleepLock <> slk:7 var
+def 6381:6386 <> sl_pid
+R6395:6399 SailStdpp.Values <> mword def
+binder 6389:6391 <> slk:8
+R6407:6411 SailStdpp.Values <> mword def
+R6423:6429 SailStdpp.Operators_mwords <> add_vec def
+R6436:6447 Riscv.rv64d <> sign_extend' def
+R6471:6475 SailStdpp.Values <> mword def
+R6453:6464 SailStdpp.Values <> mword_of_int def
+R6431:6433 xv6iris.SleepLock <> slk:8 var
+def 6922:6928 <> sl_name
+R6937:6941 SailStdpp.Values <> mword def
+binder 6931:6933 <> slk:9
+R6952:6957 Stdlib.Strings.String <> string ind
+binder 6948:6948 <> s:10
+R6962:6966 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6968:6969 xv6iris.SleepLock <> SleepLock.Σ var
+R6979:6982 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6995:7003 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6987:6991 SailStdpp.Values <> mword def
+binder 6983:6983 <> p:11
+R7054:7065 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7004:7016 xv6iris.RiscvPtsto <> word_pointsto def
+R7053:7053 xv6iris.SleepLock <> p:11 var
+R7038:7051 iris.algebra.dfrac <> DfracDiscarded constr
+R7019:7031 xv6iris.SleepLock <> sl_name_field def
+R7033:7035 xv6iris.SleepLock <> slk:9 var
+R7066:7079 xv6iris.TsoCtx <> ctx_string_all def
+R7098:7098 xv6iris.SleepLock <> s:10 var
+R7083:7096 iris.algebra.dfrac <> DfracDiscarded constr
+R7081:7081 xv6iris.SleepLock <> p:11 var
+inst 7123:7140 <> sl_name_persistent
+binder 7142:7144 <> slk:12
+binder 7146:7146 <> s:13
+R7150:7159 iris.bi.derived_connectives <> Persistent class
+R7162:7168 xv6iris.SleepLock <> sl_name def
+R7170:7172 xv6iris.SleepLock <> slk:12 var
+R7174:7174 xv6iris.SleepLock <> s:13 var
+def 8015:8021 <> sl_htok
+R8029:8033 iris.base_logic.lib.iprop <> gname def
+binder 8024:8025 <> γ:14
+R8041:8042 stdpp.numbers <> Qp rec
+binder 8037:8037 <> q:15
+R8047:8051 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R8053:8054 xv6iris.SleepLock <> SleepLock.Σ var
+R8063:8065 iris.base_logic.lib.own <> own def
+R8102:8106 xv6iris.Xv6Cameras <> slhUR def
+R8071:8071 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8094:8095 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8098:8098 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8072:8077 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R8093:8093 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R8082:8089 iris.algebra.ofe <> leibnizO abbrev
+R8091:8092 stdpp.numbers <> Qp rec
+R8078:8078 xv6iris.SleepLock <> q:15 var
+R8096:8097 iris.algebra.cmra <> ε def
+R8067:8068 xv6iris.SleepLock <> γ:14 var
+def 8314:8321 <> sl_hauth
+R8329:8333 iris.base_logic.lib.iprop <> gname def
+binder 8324:8325 <> γ:16
+R8341:8342 stdpp.numbers <> Qp rec
+binder 8337:8337 <> q:17
+R8347:8351 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R8353:8354 xv6iris.SleepLock <> SleepLock.Σ var
+R8363:8365 iris.base_logic.lib.own <> own def
+R8402:8406 xv6iris.Xv6Cameras <> slhUR def
+R8371:8371 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8394:8395 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8398:8398 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8372:8377 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R8393:8393 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R8382:8389 iris.algebra.ofe <> leibnizO abbrev
+R8391:8392 stdpp.numbers <> Qp rec
+R8378:8378 xv6iris.SleepLock <> q:17 var
+R8396:8397 iris.algebra.cmra <> ε def
+R8367:8368 xv6iris.SleepLock <> γ:16 var
+def 8484:8490 <> slh_tok
+R8498:8502 iris.base_logic.lib.iprop <> gname def
+binder 8493:8494 <> γ:18
+R8510:8511 stdpp.numbers <> Qp rec
+binder 8506:8506 <> q:19
+R8516:8520 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R8522:8523 xv6iris.SleepLock <> SleepLock.Σ var
+R8532:8534 iris.base_logic.lib.own <> own def
+R8579:8583 xv6iris.Xv6Cameras <> slhUR def
+R8540:8540 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8543:8544 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8575:8575 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8541:8542 iris.algebra.cmra <> ε def
+R8545:8549 iris.algebra.auth <> :::'◯'_x not
+R8574:8574 iris.algebra.auth <> :::'◯'_x not
+R8559:8566 iris.algebra.cmra <> optionUR canonstruc
+R8568:8573 iris.algebra.ufrac <> ufracR canonstruc
+R8550:8553 Corelib.Init.Datatypes <> Some constr
+R8555:8555 xv6iris.SleepLock <> q:19 var
+R8536:8537 xv6iris.SleepLock <> γ:18 var
+def 8665:8672 <> slh_auth
+R8680:8684 iris.base_logic.lib.iprop <> gname def
+binder 8675:8676 <> γ:20
+R8692:8697 Corelib.Init.Datatypes <> option ind
+R8699:8700 stdpp.numbers <> Qp rec
+binder 8688:8688 <> t:21
+R8705:8709 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R8711:8712 xv6iris.SleepLock <> SleepLock.Σ var
+R8721:8723 iris.base_logic.lib.own <> own def
+R8763:8767 xv6iris.Xv6Cameras <> slhUR def
+R8729:8729 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8732:8733 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8759:8759 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8730:8731 iris.algebra.cmra <> ε def
+R8734:8736 iris.algebra.auth <> :::'●'_x_x not
+R8737:8738 iris.algebra.auth <> :::'●'_x_x not
+R8758:8758 iris.algebra.auth <> :::'●'_x_x not
+R8743:8750 iris.algebra.cmra <> optionUR canonstruc
+R8752:8757 iris.algebra.ufrac <> ufracR canonstruc
+R8739:8739 xv6iris.SleepLock <> t:21 var
+R8725:8726 xv6iris.SleepLock <> γ:20 var
+def 10109:10121 <> sleeplocked_q
+R10129:10133 iris.base_logic.lib.iprop <> gname def
+binder 10124:10125 <> γ:22
+R10141:10142 stdpp.numbers <> Qp rec
+binder 10137:10137 <> q:23
+R10152:10156 SailStdpp.Values <> mword def
+binder 10146:10148 <> slk:24
+R10175:10179 SailStdpp.Values <> mword def
+binder 10169:10171 <> pid:25
+R10187:10191 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R10193:10194 xv6iris.SleepLock <> SleepLock.Σ var
+R10216:10220 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10204:10210 xv6iris.SleepLock <> sl_htok def
+R10212:10213 xv6iris.SleepLock <> γ:22 var
+R10215:10215 xv6iris.SleepLock <> q:23 var
+R10231:10238 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R10221:10226 xv6iris.SleepLock <> sl_pid def
+R10228:10230 xv6iris.SleepLock <> slk:24 var
+R10239:10241 xv6iris.SleepLock <> pid:25 var
+def 10405:10415 <> sleeplocked
+R10423:10427 iris.base_logic.lib.iprop <> gname def
+binder 10418:10419 <> γ:26
+R10437:10441 SailStdpp.Values <> mword def
+binder 10431:10433 <> slk:27
+R10454:10458 SailStdpp.Values <> mword def
+binder 10448:10450 <> pid:28
+R10466:10470 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R10472:10473 xv6iris.SleepLock <> SleepLock.Σ var
+R10483:10486 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R10493:10494 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R10491:10492 stdpp.numbers <> Qp rec
+binder 10487:10487 <> q:29
+R10495:10507 xv6iris.SleepLock <> sleeplocked_q def
+R10509:10510 xv6iris.SleepLock <> γ:26 var
+R10512:10512 xv6iris.SleepLock <> q:29 var
+R10514:10516 xv6iris.SleepLock <> slk:27 var
+R10518:10520 xv6iris.SleepLock <> pid:28 var
+prf 10764:10780 <> sleeplocked_q_pid
+binder 10782:10783 <> γ:30
+binder 10785:10785 <> q:31
+binder 10787:10789 <> slk:32
+binder 10791:10793 <> pid:33
+R10827:10836 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10801:10813 xv6iris.SleepLock <> sleeplocked_q def
+R10815:10816 xv6iris.SleepLock <> γ:30 var
+R10818:10818 xv6iris.SleepLock <> q:31 var
+R10820:10822 xv6iris.SleepLock <> slk:32 var
+R10824:10826 xv6iris.SleepLock <> pid:33 var
+R10858:10867 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10944:10944 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10847:10854 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R10837:10842 xv6iris.SleepLock <> sl_pid def
+R10844:10846 xv6iris.SleepLock <> slk:32 var
+R10855:10857 xv6iris.SleepLock <> pid:33 var
+R10868:10871 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R10887:10888 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R10879:10883 SailStdpp.Values <> mword def
+binder 10872:10875 <> pid':34
+R10911:10916 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10899:10906 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R10889:10894 xv6iris.SleepLock <> sl_pid def
+R10896:10898 xv6iris.SleepLock <> slk:32 var
+R10907:10910 xv6iris.SleepLock <> pid':34 var
+R10917:10929 xv6iris.SleepLock <> sleeplocked_q def
+R10931:10932 xv6iris.SleepLock <> γ:30 var
+R10934:10934 xv6iris.SleepLock <> q:31 var
+R10936:10938 xv6iris.SleepLock <> slk:32 var
+R10940:10943 xv6iris.SleepLock <> pid':34 var
+prf 11039:11053 <> sleeplocked_pid
+binder 11055:11056 <> γ:35
+binder 11058:11060 <> slk:36
+binder 11062:11064 <> pid:37
+R11094:11103 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11072:11082 xv6iris.SleepLock <> sleeplocked def
+R11084:11085 xv6iris.SleepLock <> γ:35 var
+R11087:11089 xv6iris.SleepLock <> slk:36 var
+R11091:11093 xv6iris.SleepLock <> pid:37 var
+R11125:11134 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11207:11207 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11114:11121 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R11104:11109 xv6iris.SleepLock <> sl_pid def
+R11111:11113 xv6iris.SleepLock <> slk:36 var
+R11122:11124 xv6iris.SleepLock <> pid:37 var
+R11135:11138 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R11154:11155 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R11146:11150 SailStdpp.Values <> mword def
+binder 11139:11142 <> pid':38
+R11178:11183 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11166:11173 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R11156:11161 xv6iris.SleepLock <> sl_pid def
+R11163:11165 xv6iris.SleepLock <> slk:36 var
+R11174:11177 xv6iris.SleepLock <> pid':38 var
+R11184:11194 xv6iris.SleepLock <> sleeplocked def
+R11196:11197 xv6iris.SleepLock <> γ:35 var
+R11199:11201 xv6iris.SleepLock <> slk:36 var
+R11203:11206 xv6iris.SleepLock <> pid':38 var
+R11252:11252 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11270:11275 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11280:11280 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11253:11269 xv6iris.SleepLock <> sleeplocked_q_pid thm
+R11252:11252 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11270:11275 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11280:11280 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11253:11269 xv6iris.SleepLock <> sleeplocked_q_pid thm
+R11343:11343 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11351:11356 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11363:11363 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11343:11343 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11351:11356 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11363:11363 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+inst 11392:11407 <> sl_htok_timeless
+binder 11409:11410 <> γ:39
+binder 11412:11412 <> q:40
+R11416:11423 iris.bi.derived_connectives <> Timeless class
+R11426:11432 xv6iris.SleepLock <> sl_htok def
+R11434:11435 xv6iris.SleepLock <> γ:39 var
+R11437:11437 xv6iris.SleepLock <> q:40 var
+inst 11482:11503 <> sleeplocked_q_timeless
+binder 11505:11506 <> γ:41
+binder 11508:11508 <> q:42
+binder 11510:11512 <> slk:43
+binder 11514:11516 <> pid:44
+R11524:11531 iris.bi.derived_connectives <> Timeless class
+R11534:11546 xv6iris.SleepLock <> sleeplocked_q def
+R11548:11549 xv6iris.SleepLock <> γ:41 var
+R11551:11551 xv6iris.SleepLock <> q:42 var
+R11553:11555 xv6iris.SleepLock <> slk:43 var
+R11557:11559 xv6iris.SleepLock <> pid:44 var
+inst 11604:11620 <> sl_hauth_timeless
+binder 11622:11623 <> γ:45
+binder 11625:11625 <> q:46
+R11629:11636 iris.bi.derived_connectives <> Timeless class
+R11639:11646 xv6iris.SleepLock <> sl_hauth def
+R11648:11649 xv6iris.SleepLock <> γ:45 var
+R11651:11651 xv6iris.SleepLock <> q:46 var
+inst 11696:11711 <> slh_tok_timeless
+binder 11713:11714 <> γ:47
+binder 11716:11716 <> q:48
+R11720:11727 iris.bi.derived_connectives <> Timeless class
+R11730:11736 xv6iris.SleepLock <> slh_tok def
+R11738:11739 xv6iris.SleepLock <> γ:47 var
+R11741:11741 xv6iris.SleepLock <> q:48 var
+inst 11786:11802 <> slh_auth_timeless
+binder 11804:11805 <> γ:49
+binder 11807:11807 <> t:50
+R11811:11818 iris.bi.derived_connectives <> Timeless class
+R11821:11828 xv6iris.SleepLock <> slh_auth def
+R11830:11831 xv6iris.SleepLock <> γ:49 var
+R11833:11833 xv6iris.SleepLock <> t:50 var
+inst 11878:11897 <> sleeplocked_timeless
+binder 11899:11900 <> γ:51
+binder 11902:11904 <> slk:52
+binder 11906:11908 <> pid:53
+R11912:11919 iris.bi.derived_connectives <> Timeless class
+R11922:11932 xv6iris.SleepLock <> sleeplocked def
+R11934:11935 xv6iris.SleepLock <> γ:51 var
+R11937:11939 xv6iris.SleepLock <> slk:52 var
+R11941:11943 xv6iris.SleepLock <> pid:53 var
+prf 12058:12074 <> sl_htok_exclusive
+binder 12076:12077 <> γ:54
+binder 12079:12079 <> q:55
+binder 12081:12082 <> q':56
+R12102:12107 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12090:12096 xv6iris.SleepLock <> sl_htok def
+R12098:12099 xv6iris.SleepLock <> γ:54 var
+R12101:12101 xv6iris.SleepLock <> q:55 var
+R12121:12126 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12108:12114 xv6iris.SleepLock <> sl_htok def
+R12116:12117 xv6iris.SleepLock <> γ:54 var
+R12119:12120 xv6iris.SleepLock <> q':56 var
+R12127:12131 iris.bi.interface <> ::bi_scope:'False' not
+R12178:12178 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12190:12195 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12203:12203 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12179:12189 iris.base_logic.lib.own <> own_valid_2 thm
+R12178:12178 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12190:12195 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12203:12203 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12179:12189 iris.base_logic.lib.own <> own_valid_2 thm
+R12255:12259 Corelib.Init.Logic <> proj1 thm
+R12262:12284 iris.algebra.lib.excl_auth <> excl_auth_frag_op_valid thm
+R12255:12259 Corelib.Init.Logic <> proj1 thm
+R12262:12284 iris.algebra.lib.excl_auth <> excl_auth_frag_op_valid thm
+prf 12313:12335 <> sleeplocked_q_exclusive
+binder 12337:12338 <> γ:57
+binder 12340:12340 <> q:58
+binder 12342:12343 <> q':59
+binder 12345:12347 <> slk:60
+binder 12349:12352 <> slk':61
+binder 12354:12356 <> pid:62
+binder 12358:12361 <> pid':63
+R12395:12400 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12369:12381 xv6iris.SleepLock <> sleeplocked_q def
+R12383:12384 xv6iris.SleepLock <> γ:57 var
+R12386:12386 xv6iris.SleepLock <> q:58 var
+R12388:12390 xv6iris.SleepLock <> slk:60 var
+R12392:12394 xv6iris.SleepLock <> pid:62 var
+R12430:12435 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12401:12413 xv6iris.SleepLock <> sleeplocked_q def
+R12415:12416 xv6iris.SleepLock <> γ:57 var
+R12418:12419 xv6iris.SleepLock <> q':59 var
+R12421:12424 xv6iris.SleepLock <> slk':61 var
+R12426:12429 xv6iris.SleepLock <> pid':63 var
+R12436:12440 iris.bi.interface <> ::bi_scope:'False' not
+R12488:12488 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12506:12511 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12519:12519 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12489:12505 xv6iris.SleepLock <> sl_htok_exclusive thm
+R12488:12488 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12506:12511 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12519:12519 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12489:12505 xv6iris.SleepLock <> sl_htok_exclusive thm
+prf 12538:12558 <> sleeplocked_exclusive
+binder 12560:12561 <> γ:64
+binder 12563:12565 <> slk:65
+binder 12567:12570 <> slk':66
+binder 12572:12574 <> pid:67
+binder 12576:12579 <> pid':68
+R12609:12614 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12587:12597 xv6iris.SleepLock <> sleeplocked def
+R12599:12600 xv6iris.SleepLock <> γ:64 var
+R12602:12604 xv6iris.SleepLock <> slk:65 var
+R12606:12608 xv6iris.SleepLock <> pid:67 var
+R12639:12644 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12615:12625 xv6iris.SleepLock <> sleeplocked def
+R12627:12628 xv6iris.SleepLock <> γ:64 var
+R12630:12633 xv6iris.SleepLock <> slk':66 var
+R12635:12638 xv6iris.SleepLock <> pid':68 var
+R12645:12649 iris.bi.interface <> ::bi_scope:'False' not
+R12750:12750 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12774:12779 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12787:12787 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12751:12773 xv6iris.SleepLock <> sleeplocked_q_exclusive thm
+R12750:12750 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12774:12779 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12787:12787 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12751:12773 xv6iris.SleepLock <> sleeplocked_q_exclusive thm
+prf 12950:12963 <> sl_hauth_agree
+binder 12965:12966 <> γ:69
+binder 12968:12968 <> q:70
+binder 12970:12971 <> q':71
+R12992:12997 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12979:12986 xv6iris.SleepLock <> sl_hauth def
+R12988:12989 xv6iris.SleepLock <> γ:69 var
+R12991:12991 xv6iris.SleepLock <> q:70 var
+R13011:13016 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12998:13004 xv6iris.SleepLock <> sl_htok def
+R13006:13007 xv6iris.SleepLock <> γ:69 var
+R13009:13010 xv6iris.SleepLock <> q':71 var
+R13017:13019 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13026:13028 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13021:13023 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13020:13020 xv6iris.SleepLock <> q:70 var
+R13024:13025 xv6iris.SleepLock <> q':71 var
+R13075:13075 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13087:13092 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13100:13100 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13076:13086 iris.base_logic.lib.own <> own_valid_2 thm
+R13075:13075 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13087:13092 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13100:13100 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13076:13086 iris.base_logic.lib.own <> own_valid_2 thm
+R13161:13177 iris.algebra.lib.excl_auth <> excl_auth_agree_L thm
+R13161:13177 iris.algebra.lib.excl_auth <> excl_auth_agree_L thm
+prf 13360:13374 <> sl_hauth_update
+binder 13376:13377 <> γ:72
+binder 13379:13379 <> q:73
+binder 13381:13382 <> q':74
+R13403:13408 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R13390:13397 xv6iris.SleepLock <> sl_hauth def
+R13399:13400 xv6iris.SleepLock <> γ:72 var
+R13402:13402 xv6iris.SleepLock <> q:73 var
+R13421:13427 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R13409:13415 xv6iris.SleepLock <> sl_htok def
+R13417:13418 xv6iris.SleepLock <> γ:72 var
+R13420:13420 xv6iris.SleepLock <> q:73 var
+R13442:13446 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13428:13435 xv6iris.SleepLock <> sl_hauth def
+R13437:13438 xv6iris.SleepLock <> γ:72 var
+R13440:13441 xv6iris.SleepLock <> q':74 var
+R13447:13453 xv6iris.SleepLock <> sl_htok def
+R13455:13456 xv6iris.SleepLock <> γ:72 var
+R13458:13459 xv6iris.SleepLock <> q':74 var
+R13501:13501 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13588:13605 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13613:13613 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13502:13513 iris.base_logic.lib.own <> own_update_2 thm
+R13582:13586 xv6iris.Xv6Cameras <> slhUR def
+R13522:13522 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13574:13575 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13578:13578 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13546:13550 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R13523:13528 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R13545:13545 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R13534:13541 iris.algebra.ofe <> leibnizO abbrev
+R13543:13544 stdpp.numbers <> Qp rec
+R13551:13556 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R13573:13573 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R13562:13569 iris.algebra.ofe <> leibnizO abbrev
+R13571:13572 stdpp.numbers <> Qp rec
+R13576:13577 iris.algebra.cmra <> ε def
+R13501:13501 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13588:13605 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13613:13613 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13502:13513 iris.base_logic.lib.own <> own_update_2 thm
+R13582:13586 xv6iris.Xv6Cameras <> slhUR def
+R13522:13522 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13574:13575 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13578:13578 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13546:13550 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R13523:13528 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R13545:13545 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R13534:13541 iris.algebra.ofe <> leibnizO abbrev
+R13543:13544 stdpp.numbers <> Qp rec
+R13551:13556 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R13573:13573 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R13562:13569 iris.algebra.ofe <> leibnizO abbrev
+R13571:13572 stdpp.numbers <> Qp rec
+R13576:13577 iris.algebra.cmra <> ε def
+R13638:13644 iris.algebra.cmra <> pair_op thm
+R13646:13652 stdpp.base <> left_id def
+R13638:13644 iris.algebra.cmra <> pair_op thm
+R13638:13644 iris.algebra.cmra <> pair_op thm
+R13646:13652 stdpp.base <> left_id def
+R13646:13652 stdpp.base <> left_id def
+R13667:13677 iris.algebra.updates <> prod_update thm
+R13695:13710 iris.algebra.lib.excl_auth <> excl_auth_update thm
+R13667:13677 iris.algebra.updates <> prod_update thm
+R13695:13710 iris.algebra.lib.excl_auth <> excl_auth_update thm
+R13747:13755 iris.algebra.cmra <> pair_op_1 thm
+R13757:13762 iris.base_logic.lib.own <> own_op thm
+R13747:13755 iris.algebra.cmra <> pair_op_1 thm
+R13747:13755 iris.algebra.cmra <> pair_op_1 thm
+R13757:13762 iris.base_logic.lib.own <> own_op thm
+R13757:13762 iris.base_logic.lib.own <> own_op thm
+prf 13872:13887 <> sl_hauth_agree_q
+binder 13889:13890 <> γ:75
+binder 13892:13892 <> q:76
+binder 13894:13895 <> q':77
+binder 13897:13899 <> slk:78
+binder 13901:13903 <> pid:79
+R13924:13929 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R13911:13918 xv6iris.SleepLock <> sl_hauth def
+R13920:13921 xv6iris.SleepLock <> γ:75 var
+R13923:13923 xv6iris.SleepLock <> q:76 var
+R13957:13962 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13930:13942 xv6iris.SleepLock <> sleeplocked_q def
+R13944:13945 xv6iris.SleepLock <> γ:75 var
+R13947:13948 xv6iris.SleepLock <> q':77 var
+R13950:13952 xv6iris.SleepLock <> slk:78 var
+R13954:13956 xv6iris.SleepLock <> pid:79 var
+R13963:13965 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13972:13974 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13967:13969 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13966:13966 xv6iris.SleepLock <> q:76 var
+R13970:13971 xv6iris.SleepLock <> q':77 var
+R14014:14014 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14029:14034 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14042:14042 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14015:14028 xv6iris.SleepLock <> sl_hauth_agree thm
+R14014:14014 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14029:14034 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14042:14042 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14015:14028 xv6iris.SleepLock <> sl_hauth_agree thm
+prf 14139:14151 <> slh_tok_split
+binder 14153:14154 <> γ:80
+binder 14156:14156 <> p:81
+binder 14158:14158 <> q:82
+R14187:14194 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R14166:14172 xv6iris.SleepLock <> slh_tok def
+R14174:14175 xv6iris.SleepLock <> γ:80 var
+R14179:14181 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R14178:14178 xv6iris.SleepLock <> p:81 var
+R14182:14182 xv6iris.SleepLock <> q:82 var
+R14207:14211 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14195:14201 xv6iris.SleepLock <> slh_tok def
+R14203:14204 xv6iris.SleepLock <> γ:80 var
+R14206:14206 xv6iris.SleepLock <> p:81 var
+R14212:14218 xv6iris.SleepLock <> slh_tok def
+R14220:14221 xv6iris.SleepLock <> γ:80 var
+R14223:14223 xv6iris.SleepLock <> q:82 var
+R14248:14254 xv6iris.SleepLock <> slh_tok def
+R14257:14262 iris.base_logic.lib.own <> own_op thm
+R14248:14254 xv6iris.SleepLock <> slh_tok def
+R14248:14254 xv6iris.SleepLock <> slh_tok def
+R14257:14262 iris.base_logic.lib.own <> own_op thm
+R14257:14262 iris.base_logic.lib.own <> own_op thm
+R14287:14293 iris.algebra.cmra <> pair_op thm
+R14295:14301 stdpp.base <> left_id def
+R14304:14315 iris.algebra.auth <> auth_frag_op thm
+R14318:14324 iris.algebra.cmra <> Some_op def
+R14287:14293 iris.algebra.cmra <> pair_op thm
+R14287:14293 iris.algebra.cmra <> pair_op thm
+R14295:14301 stdpp.base <> left_id def
+R14295:14301 stdpp.base <> left_id def
+R14304:14315 iris.algebra.auth <> auth_frag_op thm
+R14304:14315 iris.algebra.auth <> auth_frag_op thm
+R14318:14324 iris.algebra.cmra <> Some_op def
+R14318:14324 iris.algebra.cmra <> Some_op def
+prf 14349:14360 <> slh_tok_join
+binder 14362:14363 <> γ:83
+binder 14365:14365 <> p:84
+binder 14367:14367 <> q:85
+R14387:14392 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R14375:14381 xv6iris.SleepLock <> slh_tok def
+R14383:14384 xv6iris.SleepLock <> γ:83 var
+R14386:14386 xv6iris.SleepLock <> p:84 var
+R14405:14410 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14393:14399 xv6iris.SleepLock <> slh_tok def
+R14401:14402 xv6iris.SleepLock <> γ:83 var
+R14404:14404 xv6iris.SleepLock <> q:85 var
+R14411:14417 xv6iris.SleepLock <> slh_tok def
+R14419:14420 xv6iris.SleepLock <> γ:83 var
+R14424:14426 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R14423:14423 xv6iris.SleepLock <> p:84 var
+R14427:14427 xv6iris.SleepLock <> q:85 var
+R14467:14479 xv6iris.SleepLock <> slh_tok_split thm
+R14467:14479 xv6iris.SleepLock <> slh_tok_split thm
+prf 14720:14739 <> slh_auth_none_no_tok
+binder 14741:14742 <> γ:86
+binder 14744:14744 <> q:87
+R14768:14773 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R14752:14759 xv6iris.SleepLock <> slh_auth def
+R14761:14762 xv6iris.SleepLock <> γ:86 var
+R14764:14767 Corelib.Init.Datatypes <> None constr
+R14786:14791 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14774:14780 xv6iris.SleepLock <> slh_tok def
+R14782:14783 xv6iris.SleepLock <> γ:86 var
+R14785:14785 xv6iris.SleepLock <> q:87 var
+R14792:14796 iris.bi.interface <> ::bi_scope:'False' not
+R14843:14843 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14855:14860 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14868:14868 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14844:14854 iris.base_logic.lib.own <> own_valid_2 thm
+R14843:14843 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14855:14860 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14868:14868 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14844:14854 iris.base_logic.lib.own <> own_valid_2 thm
+R14930:14953 iris.algebra.auth <> auth_both_valid_discrete thm
+R14930:14953 iris.algebra.auth <> auth_both_valid_discrete thm
+R14986:15000 iris.algebra.cmra <> option_included thm
+R14986:15000 iris.algebra.cmra <> option_included thm
+prf 15153:15167 <> slh_auth_tok_le
+binder 15169:15170 <> γ:88
+binder 15172:15172 <> t:89
+binder 15174:15174 <> q:90
+R15195:15200 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R15182:15189 xv6iris.SleepLock <> slh_auth def
+R15191:15192 xv6iris.SleepLock <> γ:88 var
+R15194:15194 xv6iris.SleepLock <> t:89 var
+R15213:15218 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15201:15207 xv6iris.SleepLock <> slh_tok def
+R15209:15210 xv6iris.SleepLock <> γ:88 var
+R15212:15212 xv6iris.SleepLock <> q:90 var
+R15219:15221 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15258:15260 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15222:15225 Stdlib.Unicode.Utf8_core <> ::type_scope:'∃'_x_'..'_x_','_x not
+R15228:15229 Stdlib.Unicode.Utf8_core <> ::type_scope:'∃'_x_'..'_x_','_x not
+binder 15226:15227 <> t':91
+R15241:15244 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R15231:15233 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15230:15230 xv6iris.SleepLock <> t:89 var
+R15234:15237 Corelib.Init.Datatypes <> Some constr
+R15239:15240 xv6iris.SleepLock <> t':91 var
+R15247:15251 stdpp.numbers Qp.notations ::Qp_scope:x_'≤'_x not
+R15246:15246 xv6iris.SleepLock <> q:90 var
+R15252:15253 xv6iris.SleepLock <> t':91 var
+R15307:15307 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15319:15324 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15332:15332 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15308:15318 iris.base_logic.lib.own <> own_valid_2 thm
+R15307:15307 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15319:15324 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15332:15332 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15308:15318 iris.base_logic.lib.own <> own_valid_2 thm
+R15394:15417 iris.algebra.auth <> auth_both_valid_discrete thm
+R15394:15417 iris.algebra.auth <> auth_both_valid_discrete thm
+R15450:15464 iris.algebra.cmra <> option_included thm
+R15450:15464 iris.algebra.cmra <> option_included thm
+R15553:15555 stdpp.base <> inj def
+R15557:15560 Corelib.Init.Datatypes <> Some constr
+R15553:15555 stdpp.base <> inj def
+R15557:15560 Corelib.Init.Datatypes <> Some constr
+R15731:15741 stdpp.numbers Qp le_add_l thm
+R15731:15741 stdpp.numbers Qp le_add_l thm
+prf 15760:15772 <> slh_mint_none
+binder 15774:15775 <> γ:92
+binder 15777:15777 <> q:93
+R15801:15807 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R15785:15792 xv6iris.SleepLock <> slh_auth def
+R15794:15795 xv6iris.SleepLock <> γ:92 var
+R15797:15800 Corelib.Init.Datatypes <> None constr
+R15828:15832 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15808:15815 xv6iris.SleepLock <> slh_auth def
+R15817:15818 xv6iris.SleepLock <> γ:92 var
+R15821:15824 Corelib.Init.Datatypes <> Some constr
+R15826:15826 xv6iris.SleepLock <> q:93 var
+R15833:15839 xv6iris.SleepLock <> slh_tok def
+R15841:15842 xv6iris.SleepLock <> γ:92 var
+R15844:15844 xv6iris.SleepLock <> q:93 var
+R15883:15883 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15980:15997 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16002:16002 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15884:15893 iris.base_logic.lib.own <> own_update thm
+R15974:15978 xv6iris.Xv6Cameras <> slhUR def
+R15900:15900 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15903:15904 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15970:15970 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15901:15902 iris.algebra.cmra <> ε def
+R15935:15939 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R15905:15907 iris.algebra.auth <> :::'●'_x_x not
+R15908:15909 iris.algebra.auth <> :::'●'_x_x not
+R15934:15934 iris.algebra.auth <> :::'●'_x_x not
+R15919:15926 iris.algebra.cmra <> optionUR canonstruc
+R15928:15933 iris.algebra.ufrac <> ufracR canonstruc
+R15910:15913 Corelib.Init.Datatypes <> Some constr
+R15940:15944 iris.algebra.auth <> :::'◯'_x not
+R15969:15969 iris.algebra.auth <> :::'◯'_x not
+R15954:15961 iris.algebra.cmra <> optionUR canonstruc
+R15963:15968 iris.algebra.ufrac <> ufracR canonstruc
+R15945:15948 Corelib.Init.Datatypes <> Some constr
+R15883:15883 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15980:15997 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16002:16002 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15884:15893 iris.base_logic.lib.own <> own_update thm
+R15974:15978 xv6iris.Xv6Cameras <> slhUR def
+R15900:15900 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15903:15904 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15970:15970 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15901:15902 iris.algebra.cmra <> ε def
+R15935:15939 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R15905:15907 iris.algebra.auth <> :::'●'_x_x not
+R15908:15909 iris.algebra.auth <> :::'●'_x_x not
+R15934:15934 iris.algebra.auth <> :::'●'_x_x not
+R15919:15926 iris.algebra.cmra <> optionUR canonstruc
+R15928:15933 iris.algebra.ufrac <> ufracR canonstruc
+R15910:15913 Corelib.Init.Datatypes <> Some constr
+R15940:15944 iris.algebra.auth <> :::'◯'_x not
+R15969:15969 iris.algebra.auth <> :::'◯'_x not
+R15954:15961 iris.algebra.cmra <> optionUR canonstruc
+R15963:15968 iris.algebra.ufrac <> ufracR canonstruc
+R15945:15948 Corelib.Init.Datatypes <> Some constr
+R16024:16034 iris.algebra.updates <> prod_update thm
+R16024:16034 iris.algebra.updates <> prod_update thm
+R16068:16084 iris.algebra.auth <> auth_update_alloc thm
+R16098:16105 iris.algebra.cmra <> optionUR canonstruc
+R16107:16112 iris.algebra.ufrac <> ufracR canonstruc
+R16089:16092 Corelib.Init.Datatypes <> Some constr
+R16125:16132 iris.algebra.cmra <> optionUR canonstruc
+R16134:16139 iris.algebra.ufrac <> ufracR canonstruc
+R16116:16119 Corelib.Init.Datatypes <> Some constr
+R16068:16084 iris.algebra.auth <> auth_update_alloc thm
+R16098:16105 iris.algebra.cmra <> optionUR canonstruc
+R16107:16112 iris.algebra.ufrac <> ufracR canonstruc
+R16089:16092 Corelib.Init.Datatypes <> Some constr
+R16125:16132 iris.algebra.cmra <> optionUR canonstruc
+R16134:16139 iris.algebra.ufrac <> ufracR canonstruc
+R16116:16119 Corelib.Init.Datatypes <> Some constr
+R16157:16181 iris.algebra.local_updates <> alloc_option_local_update thm
+R16196:16199 Corelib.Init.Datatypes <> None constr
+R16188:16193 iris.algebra.ufrac <> ufracR canonstruc
+R16157:16181 iris.algebra.local_updates <> alloc_option_local_update thm
+R16196:16199 Corelib.Init.Datatypes <> None constr
+R16188:16193 iris.algebra.ufrac <> ufracR canonstruc
+R16234:16242 iris.algebra.cmra <> pair_op_2 thm
+R16244:16249 iris.base_logic.lib.own <> own_op thm
+R16234:16242 iris.algebra.cmra <> pair_op_2 thm
+R16234:16242 iris.algebra.cmra <> pair_op_2 thm
+R16244:16249 iris.base_logic.lib.own <> own_op thm
+R16244:16249 iris.base_logic.lib.own <> own_op thm
+prf 16294:16301 <> slh_mint
+binder 16303:16304 <> γ:94
+binder 16306:16306 <> t:95
+binder 16308:16308 <> q:96
+R16336:16342 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R16316:16323 xv6iris.SleepLock <> slh_auth def
+R16325:16326 xv6iris.SleepLock <> γ:94 var
+R16329:16332 Corelib.Init.Datatypes <> Some constr
+R16334:16334 xv6iris.SleepLock <> t:95 var
+R16372:16376 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16343:16350 xv6iris.SleepLock <> slh_auth def
+R16352:16353 xv6iris.SleepLock <> γ:94 var
+R16356:16359 Corelib.Init.Datatypes <> Some constr
+R16363:16365 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R16362:16362 xv6iris.SleepLock <> t:95 var
+R16366:16366 xv6iris.SleepLock <> q:96 var
+R16377:16383 xv6iris.SleepLock <> slh_tok def
+R16385:16386 xv6iris.SleepLock <> γ:94 var
+R16388:16388 xv6iris.SleepLock <> q:96 var
+R16427:16427 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16545:16562 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16567:16567 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16428:16437 iris.base_logic.lib.own <> own_update thm
+R16539:16543 xv6iris.Xv6Cameras <> slhUR def
+R16456:16456 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16459:16460 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16535:16535 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16457:16458 iris.algebra.cmra <> ε def
+R16500:16504 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R16461:16463 iris.algebra.auth <> :::'●'_x_x not
+R16464:16465 iris.algebra.auth <> :::'●'_x_x not
+R16499:16499 iris.algebra.auth <> :::'●'_x_x not
+R16484:16491 iris.algebra.cmra <> optionUR canonstruc
+R16493:16498 iris.algebra.ufrac <> ufracR canonstruc
+R16466:16469 Corelib.Init.Datatypes <> Some constr
+R16473:16475 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R16505:16509 iris.algebra.auth <> :::'◯'_x not
+R16534:16534 iris.algebra.auth <> :::'◯'_x not
+R16519:16526 iris.algebra.cmra <> optionUR canonstruc
+R16528:16533 iris.algebra.ufrac <> ufracR canonstruc
+R16510:16513 Corelib.Init.Datatypes <> Some constr
+R16427:16427 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16545:16562 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16567:16567 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16428:16437 iris.base_logic.lib.own <> own_update thm
+R16539:16543 xv6iris.Xv6Cameras <> slhUR def
+R16456:16456 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16459:16460 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16535:16535 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16457:16458 iris.algebra.cmra <> ε def
+R16500:16504 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R16461:16463 iris.algebra.auth <> :::'●'_x_x not
+R16464:16465 iris.algebra.auth <> :::'●'_x_x not
+R16499:16499 iris.algebra.auth <> :::'●'_x_x not
+R16484:16491 iris.algebra.cmra <> optionUR canonstruc
+R16493:16498 iris.algebra.ufrac <> ufracR canonstruc
+R16466:16469 Corelib.Init.Datatypes <> Some constr
+R16473:16475 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R16505:16509 iris.algebra.auth <> :::'◯'_x not
+R16534:16534 iris.algebra.auth <> :::'◯'_x not
+R16519:16526 iris.algebra.cmra <> optionUR canonstruc
+R16528:16533 iris.algebra.ufrac <> ufracR canonstruc
+R16510:16513 Corelib.Init.Datatypes <> Some constr
+R16589:16599 iris.algebra.updates <> prod_update thm
+R16589:16599 iris.algebra.updates <> prod_update thm
+R16633:16649 iris.algebra.auth <> auth_update_alloc thm
+R16672:16679 iris.algebra.cmra <> optionUR canonstruc
+R16681:16686 iris.algebra.ufrac <> ufracR canonstruc
+R16654:16657 Corelib.Init.Datatypes <> Some constr
+R16661:16663 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R16699:16706 iris.algebra.cmra <> optionUR canonstruc
+R16708:16713 iris.algebra.ufrac <> ufracR canonstruc
+R16690:16693 Corelib.Init.Datatypes <> Some constr
+R16633:16649 iris.algebra.auth <> auth_update_alloc thm
+R16672:16679 iris.algebra.cmra <> optionUR canonstruc
+R16681:16686 iris.algebra.ufrac <> ufracR canonstruc
+R16654:16657 Corelib.Init.Datatypes <> Some constr
+R16661:16663 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R16699:16706 iris.algebra.cmra <> optionUR canonstruc
+R16708:16713 iris.algebra.ufrac <> ufracR canonstruc
+R16690:16693 Corelib.Init.Datatypes <> Some constr
+R16730:16757 iris.algebra.local_updates <> local_update_unital_discrete thm
+R16730:16757 iris.algebra.local_updates <> local_update_unital_discrete thm
+R16790:16796 stdpp.base <> left_id def
+R16790:16796 stdpp.base <> left_id def
+R16790:16796 stdpp.base <> left_id def
+R16844:16850 iris.algebra.cmra <> Some_op def
+R16844:16850 iris.algebra.cmra <> Some_op def
+R16844:16850 iris.algebra.cmra <> Some_op def
+R16865:16868 stdpp.base <> comm def
+R16870:16875 stdpp.numbers Qp add def
+R16865:16868 stdpp.base <> comm def
+R16870:16875 stdpp.numbers Qp add def
+R16865:16868 stdpp.base <> comm def
+R16870:16875 stdpp.numbers Qp add def
+R16908:16916 iris.algebra.cmra <> pair_op_2 thm
+R16918:16923 iris.base_logic.lib.own <> own_op thm
+R16908:16916 iris.algebra.cmra <> pair_op_2 thm
+R16908:16916 iris.algebra.cmra <> pair_op_2 thm
+R16918:16923 iris.base_logic.lib.own <> own_op thm
+R16918:16923 iris.base_logic.lib.own <> own_op thm
+prf 17152:17161 <> slh_return
+binder 17163:17164 <> γ:97
+binder 17166:17166 <> t:98
+binder 17168:17168 <> q:99
+R17205:17210 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R17176:17183 xv6iris.SleepLock <> slh_auth def
+R17185:17186 xv6iris.SleepLock <> γ:97 var
+R17189:17192 Corelib.Init.Datatypes <> Some constr
+R17196:17198 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R17195:17195 xv6iris.SleepLock <> t:98 var
+R17199:17199 xv6iris.SleepLock <> q:99 var
+R17223:17229 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R17211:17217 xv6iris.SleepLock <> slh_tok def
+R17219:17220 xv6iris.SleepLock <> γ:97 var
+R17222:17222 xv6iris.SleepLock <> q:99 var
+R17230:17237 xv6iris.SleepLock <> slh_auth def
+R17239:17240 xv6iris.SleepLock <> γ:97 var
+R17243:17246 Corelib.Init.Datatypes <> Some constr
+R17248:17248 xv6iris.SleepLock <> t:98 var
+R17291:17291 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17357:17374 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17382:17382 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17292:17303 iris.base_logic.lib.own <> own_update_2 thm
+R17351:17355 xv6iris.Xv6Cameras <> slhUR def
+R17312:17312 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R17315:17316 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R17347:17347 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R17313:17314 iris.algebra.cmra <> ε def
+R17317:17319 iris.algebra.auth <> :::'●'_x_x not
+R17320:17321 iris.algebra.auth <> :::'●'_x_x not
+R17346:17346 iris.algebra.auth <> :::'●'_x_x not
+R17331:17338 iris.algebra.cmra <> optionUR canonstruc
+R17340:17345 iris.algebra.ufrac <> ufracR canonstruc
+R17322:17325 Corelib.Init.Datatypes <> Some constr
+R17291:17291 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17357:17374 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17382:17382 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17292:17303 iris.base_logic.lib.own <> own_update_2 thm
+R17351:17355 xv6iris.Xv6Cameras <> slhUR def
+R17312:17312 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R17315:17316 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R17347:17347 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R17313:17314 iris.algebra.cmra <> ε def
+R17317:17319 iris.algebra.auth <> :::'●'_x_x not
+R17320:17321 iris.algebra.auth <> :::'●'_x_x not
+R17346:17346 iris.algebra.auth <> :::'●'_x_x not
+R17331:17338 iris.algebra.cmra <> optionUR canonstruc
+R17340:17345 iris.algebra.ufrac <> ufracR canonstruc
+R17322:17325 Corelib.Init.Datatypes <> Some constr
+R17407:17413 iris.algebra.cmra <> pair_op thm
+R17415:17421 stdpp.base <> left_id def
+R17407:17413 iris.algebra.cmra <> pair_op thm
+R17407:17413 iris.algebra.cmra <> pair_op thm
+R17415:17421 stdpp.base <> left_id def
+R17415:17421 stdpp.base <> left_id def
+R17436:17446 iris.algebra.updates <> prod_update thm
+R17436:17446 iris.algebra.updates <> prod_update thm
+R17480:17498 iris.algebra.auth <> auth_update_dealloc thm
+R17514:17521 iris.algebra.cmra <> optionUR canonstruc
+R17523:17528 iris.algebra.ufrac <> ufracR canonstruc
+R17505:17508 Corelib.Init.Datatypes <> Some constr
+R17480:17498 iris.algebra.auth <> auth_update_dealloc thm
+R17514:17521 iris.algebra.cmra <> optionUR canonstruc
+R17523:17528 iris.algebra.ufrac <> ufracR canonstruc
+R17505:17508 Corelib.Init.Datatypes <> Some constr
+R17545:17572 iris.algebra.local_updates <> local_update_unital_discrete thm
+R17545:17572 iris.algebra.local_updates <> local_update_unital_discrete thm
+R17623:17629 stdpp.base <> left_id def
+R17623:17629 stdpp.base <> left_id def
+R17623:17629 stdpp.base <> left_id def
+R17675:17681 iris.algebra.cmra <> Some_op def
+R17675:17681 iris.algebra.cmra <> Some_op def
+R17675:17681 iris.algebra.cmra <> Some_op def
+R17698:17700 stdpp.base <> inj def
+R17702:17705 Corelib.Init.Datatypes <> Some constr
+R17698:17700 stdpp.base <> inj def
+R17702:17705 Corelib.Init.Datatypes <> Some constr
+R17738:17740 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17738:17740 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17762:17764 stdpp.base <> inj def
+binder 17771:17771 <> x:100
+R17778:17780 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R17777:17777 xv6iris.SleepLock <> x:100 var
+R17762:17764 stdpp.base <> inj def
+binder 17771:17771 <> x:101
+R17778:17780 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R17777:17777 xv6iris.SleepLock <> x:101 var
+R17810:17813 stdpp.base <> comm def
+R17815:17820 stdpp.numbers Qp add def
+R17810:17813 stdpp.base <> comm def
+R17815:17820 stdpp.numbers Qp add def
+R17865:17872 stdpp.base <> right_id def
+R17865:17872 stdpp.base <> right_id def
+R17865:17872 stdpp.base <> right_id def
+R17889:17891 stdpp.base <> inj def
+R17893:17896 Corelib.Init.Datatypes <> Some constr
+R17889:17891 stdpp.base <> inj def
+R17893:17896 Corelib.Init.Datatypes <> Some constr
+R17933:17936 stdpp.base <> comm def
+R17938:17943 stdpp.numbers Qp add def
+R17933:17936 stdpp.base <> comm def
+R17938:17943 stdpp.numbers Qp add def
+R17933:17936 stdpp.base <> comm def
+R17938:17943 stdpp.numbers Qp add def
+R17965:17978 stdpp.numbers Qp add_id_free thm
+R17965:17978 stdpp.numbers Qp add_id_free thm
+prf 18029:18043 <> slh_return_last
+binder 18045:18046 <> γ:102
+binder 18048:18048 <> q:103
+R18076:18081 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R18056:18063 xv6iris.SleepLock <> slh_auth def
+R18065:18066 xv6iris.SleepLock <> γ:102 var
+R18069:18072 Corelib.Init.Datatypes <> Some constr
+R18074:18074 xv6iris.SleepLock <> q:103 var
+R18094:18100 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R18082:18088 xv6iris.SleepLock <> slh_tok def
+R18090:18091 xv6iris.SleepLock <> γ:102 var
+R18093:18093 xv6iris.SleepLock <> q:103 var
+R18101:18108 xv6iris.SleepLock <> slh_auth def
+R18110:18111 xv6iris.SleepLock <> γ:102 var
+R18113:18116 Corelib.Init.Datatypes <> None constr
+R18158:18158 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18222:18239 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18247:18247 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18159:18170 iris.base_logic.lib.own <> own_update_2 thm
+R18216:18220 xv6iris.Xv6Cameras <> slhUR def
+R18179:18179 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18182:18183 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18212:18212 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18180:18181 iris.algebra.cmra <> ε def
+R18184:18186 iris.algebra.auth <> :::'●'_x_x not
+R18187:18188 iris.algebra.auth <> :::'●'_x_x not
+R18211:18211 iris.algebra.auth <> :::'●'_x_x not
+R18196:18203 iris.algebra.cmra <> optionUR canonstruc
+R18205:18210 iris.algebra.ufrac <> ufracR canonstruc
+R18189:18192 Corelib.Init.Datatypes <> None constr
+R18158:18158 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18222:18239 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18247:18247 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18159:18170 iris.base_logic.lib.own <> own_update_2 thm
+R18216:18220 xv6iris.Xv6Cameras <> slhUR def
+R18179:18179 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18182:18183 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18212:18212 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18180:18181 iris.algebra.cmra <> ε def
+R18184:18186 iris.algebra.auth <> :::'●'_x_x not
+R18187:18188 iris.algebra.auth <> :::'●'_x_x not
+R18211:18211 iris.algebra.auth <> :::'●'_x_x not
+R18196:18203 iris.algebra.cmra <> optionUR canonstruc
+R18205:18210 iris.algebra.ufrac <> ufracR canonstruc
+R18189:18192 Corelib.Init.Datatypes <> None constr
+R18272:18278 iris.algebra.cmra <> pair_op thm
+R18280:18286 stdpp.base <> left_id def
+R18272:18278 iris.algebra.cmra <> pair_op thm
+R18272:18278 iris.algebra.cmra <> pair_op thm
+R18280:18286 stdpp.base <> left_id def
+R18280:18286 stdpp.base <> left_id def
+R18301:18311 iris.algebra.updates <> prod_update thm
+R18301:18311 iris.algebra.updates <> prod_update thm
+R18345:18363 iris.algebra.auth <> auth_update_dealloc thm
+R18377:18384 iris.algebra.cmra <> optionUR canonstruc
+R18386:18391 iris.algebra.ufrac <> ufracR canonstruc
+R18370:18373 Corelib.Init.Datatypes <> None constr
+R18345:18363 iris.algebra.auth <> auth_update_dealloc thm
+R18377:18384 iris.algebra.cmra <> optionUR canonstruc
+R18386:18391 iris.algebra.ufrac <> ufracR canonstruc
+R18370:18373 Corelib.Init.Datatypes <> None constr
+R18408:18435 iris.algebra.local_updates <> local_update_unital_discrete thm
+R18408:18435 iris.algebra.local_updates <> local_update_unital_discrete thm
+R18486:18492 stdpp.base <> left_id def
+R18486:18492 stdpp.base <> left_id def
+R18486:18492 stdpp.base <> left_id def
+R18556:18562 iris.algebra.cmra <> Some_op def
+R18556:18562 iris.algebra.cmra <> Some_op def
+R18556:18562 iris.algebra.cmra <> Some_op def
+R18579:18581 stdpp.base <> inj def
+R18583:18586 Corelib.Init.Datatypes <> Some constr
+R18579:18581 stdpp.base <> inj def
+R18583:18586 Corelib.Init.Datatypes <> Some constr
+R18627:18640 stdpp.numbers Qp add_id_free thm
+R18627:18640 stdpp.numbers Qp add_id_free thm
+def 19117:19127 <> sl_free_tok
+R19135:19139 iris.base_logic.lib.iprop <> gname def
+binder 19130:19131 <> γ:104
+R19144:19148 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R19150:19151 xv6iris.SleepLock <> SleepLock.Σ var
+R19161:19164 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R19171:19172 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R19169:19170 stdpp.numbers <> Qp rec
+binder 19165:19165 <> q:105
+R19185:19189 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R19173:19179 xv6iris.SleepLock <> sl_htok def
+R19181:19182 xv6iris.SleepLock <> γ:104 var
+R19184:19184 xv6iris.SleepLock <> q:105 var
+R19190:19197 xv6iris.SleepLock <> sl_hauth def
+R19199:19200 xv6iris.SleepLock <> γ:104 var
+R19202:19202 xv6iris.SleepLock <> q:105 var
+def 19603:19614 <> sl_free_hold
+R19622:19626 iris.base_logic.lib.iprop <> gname def
+binder 19617:19618 <> γ:106
+R19636:19640 SailStdpp.Values <> mword def
+binder 19630:19632 <> slk:107
+R19648:19652 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R19654:19655 xv6iris.SleepLock <> SleepLock.Σ var
+R19665:19668 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R19675:19676 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R19673:19674 stdpp.numbers <> Qp rec
+binder 19669:19669 <> q:108
+R19727:19746 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R19677:19689 xv6iris.SleepLock <> sleeplocked_q def
+R19691:19692 xv6iris.SleepLock <> γ:106 var
+R19694:19694 xv6iris.SleepLock <> q:108 var
+R19696:19698 xv6iris.SleepLock <> slk:107 var
+R19718:19722 SailStdpp.Values <> mword def
+R19701:19712 SailStdpp.Values <> mword_of_int def
+R19747:19754 xv6iris.SleepLock <> sl_hauth def
+R19756:19757 xv6iris.SleepLock <> γ:106 var
+R19759:19759 xv6iris.SleepLock <> q:108 var
+prf 19774:19791 <> sl_free_hold_intro
+binder 19793:19794 <> γ:109
+binder 19796:19798 <> slk:110
+R19820:19825 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R19806:19816 xv6iris.SleepLock <> sl_free_tok def
+R19818:19819 xv6iris.SleepLock <> γ:109 var
+R19871:19880 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19836:19844 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R19870:19870 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R19826:19831 xv6iris.SleepLock <> sl_pid def
+R19833:19835 xv6iris.SleepLock <> slk:110 var
+R19862:19866 SailStdpp.Values <> mword def
+R19845:19856 SailStdpp.Values <> mword_of_int def
+R19881:19892 xv6iris.SleepLock <> sl_free_hold def
+R19894:19895 xv6iris.SleepLock <> γ:109 var
+R19897:19899 xv6iris.SleepLock <> slk:110 var
+def 20115:20120 <> sl_dep
+R20128:20132 iris.base_logic.lib.iprop <> gname def
+binder 20123:20124 <> γ:111
+R20142:20145 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20140:20141 stdpp.numbers <> Qp rec
+R20146:20150 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R20152:20153 xv6iris.SleepLock <> SleepLock.Σ var
+binder 20136:20136 <> H:112
+R20158:20162 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R20164:20165 xv6iris.SleepLock <> SleepLock.Σ var
+R20175:20178 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R20185:20186 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R20183:20184 stdpp.numbers <> Qp rec
+binder 20179:20179 <> q:113
+R20200:20204 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20187:20194 xv6iris.SleepLock <> sl_hauth def
+R20196:20197 xv6iris.SleepLock <> γ:111 var
+R20199:20199 xv6iris.SleepLock <> q:113 var
+R20205:20205 xv6iris.SleepLock <> H:112 var
+R20207:20207 xv6iris.SleepLock <> q:113 var
+def 20282:20293 <> sl_untracked
+R20299:20302 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20297:20298 stdpp.numbers <> Qp rec
+R20303:20307 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R20309:20310 xv6iris.SleepLock <> SleepLock.Σ var
+R20324:20326 iris.bi.interface <> ::bi_scope:'emp' not
+def 20345:20354 <> sl_res_gen
+R20362:20366 iris.base_logic.lib.iprop <> gname def
+binder 20357:20358 <> γ:114
+R20376:20380 SailStdpp.Values <> mword def
+binder 20370:20372 <> slk:115
+R20391:20395 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R20397:20398 xv6iris.SleepLock <> SleepLock.Σ var
+binder 20387:20387 <> R:116
+R20414:20417 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20412:20413 stdpp.numbers <> Qp rec
+R20418:20422 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R20424:20425 xv6iris.SleepLock <> SleepLock.Σ var
+binder 20408:20408 <> H:117
+R20430:20434 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R20436:20437 xv6iris.SleepLock <> SleepLock.Σ var
+R20447:20450 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R20463:20471 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R20455:20459 SailStdpp.Values <> mword def
+binder 20451:20451 <> v:118
+R20484:20496 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20642:20642 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20475:20482 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R20472:20474 xv6iris.SleepLock <> slk:115 var
+R20483:20483 xv6iris.SleepLock <> v:118 var
+R20564:20576 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R20534:20538 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20497:20499 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20531:20533 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20501:20504 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20530:20530 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20500:20500 xv6iris.SleepLock <> v:118 var
+R20522:20526 SailStdpp.Values <> mword def
+R20505:20516 SailStdpp.Values <> mword_of_int def
+R20558:20562 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20539:20550 xv6iris.SleepLock <> sl_free_hold def
+R20552:20553 xv6iris.SleepLock <> γ:114 var
+R20555:20557 xv6iris.SleepLock <> slk:115 var
+R20563:20563 xv6iris.SleepLock <> R:116 var
+R20626:20630 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20577:20579 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20623:20625 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20616:20618 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20580:20586 SailStdpp.Operators_mwords <> neq_vec def
+R20608:20615 Riscv.rv64d <> zero_reg def
+R20589:20600 Riscv.rv64d <> sign_extend' def
+R20605:20605 xv6iris.SleepLock <> v:118 var
+R20619:20622 Corelib.Init.Datatypes <> true constr
+R20631:20636 xv6iris.SleepLock <> sl_dep def
+R20638:20639 xv6iris.SleepLock <> γ:114 var
+R20641:20641 xv6iris.SleepLock <> H:117 var
+def 20662:20667 <> sl_res
+R20675:20679 iris.base_logic.lib.iprop <> gname def
+binder 20670:20671 <> γ:119
+R20689:20693 SailStdpp.Values <> mword def
+binder 20683:20685 <> slk:120
+R20704:20708 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R20710:20711 xv6iris.SleepLock <> SleepLock.Σ var
+binder 20700:20700 <> R:121
+R20716:20720 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R20722:20723 xv6iris.SleepLock <> SleepLock.Σ var
+R20732:20741 xv6iris.SleepLock <> sl_res_gen def
+R20743:20744 xv6iris.SleepLock <> γ:119 var
+R20746:20748 xv6iris.SleepLock <> slk:120 var
+R20750:20750 xv6iris.SleepLock <> R:121 var
+R20752:20763 xv6iris.SleepLock <> sl_untracked def
+def 20977:20992 <> is_sleeplock_gen
+R21004:21008 iris.base_logic.lib.iprop <> gname def
+binder 20995:20997 <> γl:122
+binder 20999:21000 <> γ:123
+R21018:21022 SailStdpp.Values <> mword def
+binder 21012:21014 <> slk:124
+R21033:21038 Stdlib.Strings.String <> string ind
+binder 21029:21029 <> s:125
+R21052:21056 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R21058:21059 xv6iris.SleepLock <> SleepLock.Σ var
+binder 21048:21048 <> R:126
+R21069:21072 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21067:21068 stdpp.numbers <> Qp rec
+R21073:21077 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R21079:21080 xv6iris.SleepLock <> SleepLock.Σ var
+binder 21063:21063 <> H:127
+R21085:21089 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R21091:21092 xv6iris.SleepLock <> SleepLock.Σ var
+R21115:21124 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R21102:21108 xv6iris.SleepLock <> sl_name def
+R21110:21112 xv6iris.SleepLock <> slk:124 var
+R21114:21114 xv6iris.SleepLock <> s:125 var
+R21125:21131 xv6iris.WpLock <> is_lock def
+R21133:21135 xv6iris.SleepLock <> γl:122 var
+R21138:21142 xv6iris.SleepLock <> sl_lk def
+R21144:21146 xv6iris.SleepLock <> slk:124 var
+R21169:21171 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R21193:21195 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R21172:21181 xv6iris.SleepLock <> sl_res_gen def
+R21183:21184 xv6iris.SleepLock <> γ:123 var
+R21186:21188 xv6iris.SleepLock <> slk:124 var
+R21190:21190 xv6iris.SleepLock <> R:126 var
+R21192:21192 xv6iris.SleepLock <> H:127 var
+def 21215:21226 <> is_sleeplock
+R21238:21242 iris.base_logic.lib.iprop <> gname def
+binder 21229:21231 <> γl:128
+binder 21233:21234 <> γ:129
+R21252:21256 SailStdpp.Values <> mword def
+binder 21246:21248 <> slk:130
+R21267:21272 Stdlib.Strings.String <> string ind
+binder 21263:21263 <> s:131
+R21286:21290 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R21292:21293 xv6iris.SleepLock <> SleepLock.Σ var
+binder 21282:21282 <> R:132
+R21298:21302 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R21304:21305 xv6iris.SleepLock <> SleepLock.Σ var
+R21314:21329 xv6iris.SleepLock <> is_sleeplock_gen def
+R21331:21333 xv6iris.SleepLock <> γl:128 var
+R21335:21336 xv6iris.SleepLock <> γ:129 var
+R21338:21340 xv6iris.SleepLock <> slk:130 var
+R21342:21342 xv6iris.SleepLock <> s:131 var
+R21344:21344 xv6iris.SleepLock <> R:132 var
+R21346:21357 xv6iris.SleepLock <> sl_untracked def
+def 21572:21587 <> is_sleeplock_tok
+R21599:21603 iris.base_logic.lib.iprop <> gname def
+binder 21590:21592 <> γl:133
+binder 21594:21595 <> γ:134
+R21613:21617 SailStdpp.Values <> mword def
+binder 21607:21609 <> slk:135
+R21628:21633 Stdlib.Strings.String <> string ind
+binder 21624:21624 <> s:136
+R21647:21651 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R21653:21654 xv6iris.SleepLock <> SleepLock.Σ var
+binder 21643:21643 <> R:137
+R21659:21663 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R21665:21666 xv6iris.SleepLock <> SleepLock.Σ var
+R21675:21690 xv6iris.SleepLock <> is_sleeplock_gen def
+R21692:21694 xv6iris.SleepLock <> γl:133 var
+R21696:21697 xv6iris.SleepLock <> γ:134 var
+R21699:21701 xv6iris.SleepLock <> slk:135 var
+R21703:21703 xv6iris.SleepLock <> s:136 var
+R21705:21705 xv6iris.SleepLock <> R:137 var
+R21708:21714 xv6iris.SleepLock <> slh_tok def
+R21716:21717 xv6iris.SleepLock <> γ:134 var
+inst 21740:21766 <> is_sleeplock_gen_persistent
+binder 21768:21770 <> γl:138
+binder 21772:21773 <> γ:139
+binder 21775:21777 <> slk:140
+binder 21779:21779 <> s:141
+binder 21781:21781 <> R:142
+binder 21783:21783 <> H:143
+R21791:21800 iris.bi.derived_connectives <> Persistent class
+R21803:21818 xv6iris.SleepLock <> is_sleeplock_gen def
+R21820:21822 xv6iris.SleepLock <> γl:138 var
+R21824:21825 xv6iris.SleepLock <> γ:139 var
+R21827:21829 xv6iris.SleepLock <> slk:140 var
+R21831:21831 xv6iris.SleepLock <> s:141 var
+R21833:21833 xv6iris.SleepLock <> R:142 var
+R21835:21835 xv6iris.SleepLock <> H:143 var
+inst 21880:21902 <> is_sleeplock_persistent
+binder 21904:21906 <> γl:144
+binder 21908:21909 <> γ:145
+binder 21911:21913 <> slk:146
+binder 21915:21915 <> s:147
+binder 21917:21917 <> R:148
+R21925:21934 iris.bi.derived_connectives <> Persistent class
+R21937:21948 xv6iris.SleepLock <> is_sleeplock def
+R21950:21952 xv6iris.SleepLock <> γl:144 var
+R21954:21955 xv6iris.SleepLock <> γ:145 var
+R21957:21959 xv6iris.SleepLock <> slk:146 var
+R21961:21961 xv6iris.SleepLock <> s:147 var
+R21963:21963 xv6iris.SleepLock <> R:148 var
+inst 22008:22034 <> is_sleeplock_tok_persistent
+binder 22036:22038 <> γl:149
+binder 22040:22041 <> γ:150
+binder 22043:22045 <> slk:151
+binder 22047:22047 <> s:152
+binder 22049:22049 <> R:153
+R22057:22066 iris.bi.derived_connectives <> Persistent class
+R22069:22084 xv6iris.SleepLock <> is_sleeplock_tok def
+R22086:22088 xv6iris.SleepLock <> γl:149 var
+R22090:22091 xv6iris.SleepLock <> γ:150 var
+R22093:22095 xv6iris.SleepLock <> slk:151 var
+R22097:22097 xv6iris.SleepLock <> s:152 var
+R22099:22099 xv6iris.SleepLock <> R:153 var
+prf 22135:22155 <> is_sleeplock_gen_name
+binder 22157:22159 <> γl:154
+binder 22161:22162 <> γ:155
+binder 22164:22166 <> slk:156
+binder 22168:22168 <> s:157
+binder 22170:22170 <> R:158
+binder 22172:22172 <> H:159
+R22213:22218 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22180:22195 xv6iris.SleepLock <> is_sleeplock_gen def
+R22197:22199 xv6iris.SleepLock <> γl:154 var
+R22201:22202 xv6iris.SleepLock <> γ:155 var
+R22204:22206 xv6iris.SleepLock <> slk:156 var
+R22208:22208 xv6iris.SleepLock <> s:157 var
+R22210:22210 xv6iris.SleepLock <> R:158 var
+R22212:22212 xv6iris.SleepLock <> H:159 var
+R22219:22225 xv6iris.SleepLock <> sl_name def
+R22227:22229 xv6iris.SleepLock <> slk:156 var
+R22231:22231 xv6iris.SleepLock <> s:157 var
+prf 22273:22293 <> is_sleeplock_gen_lock
+binder 22295:22297 <> γl:160
+binder 22299:22300 <> γ:161
+binder 22302:22304 <> slk:162
+binder 22306:22306 <> s:163
+binder 22308:22308 <> R:164
+binder 22310:22310 <> H:165
+R22351:22360 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22318:22333 xv6iris.SleepLock <> is_sleeplock_gen def
+R22335:22337 xv6iris.SleepLock <> γl:160 var
+R22339:22340 xv6iris.SleepLock <> γ:161 var
+R22342:22344 xv6iris.SleepLock <> slk:162 var
+R22346:22346 xv6iris.SleepLock <> s:163 var
+R22348:22348 xv6iris.SleepLock <> R:164 var
+R22350:22350 xv6iris.SleepLock <> H:165 var
+R22361:22367 xv6iris.WpLock <> is_lock def
+R22369:22371 xv6iris.SleepLock <> γl:160 var
+R22374:22378 xv6iris.SleepLock <> sl_lk def
+R22380:22382 xv6iris.SleepLock <> slk:162 var
+R22405:22407 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R22429:22431 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R22408:22417 xv6iris.SleepLock <> sl_res_gen def
+R22419:22420 xv6iris.SleepLock <> γ:161 var
+R22422:22424 xv6iris.SleepLock <> slk:162 var
+R22426:22426 xv6iris.SleepLock <> R:164 var
+R22428:22428 xv6iris.SleepLock <> H:165 var
+prf 22473:22494 <> is_sleeplock_gen_intro
+binder 22496:22498 <> γl:166
+binder 22500:22501 <> γ:167
+binder 22503:22505 <> slk:168
+binder 22507:22507 <> s:169
+binder 22509:22509 <> R:170
+binder 22511:22511 <> H:171
+R22532:22541 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22519:22525 xv6iris.SleepLock <> sl_name def
+R22527:22529 xv6iris.SleepLock <> slk:168 var
+R22531:22531 xv6iris.SleepLock <> s:169 var
+R22613:22622 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R22542:22548 xv6iris.WpLock <> is_lock def
+R22550:22552 xv6iris.SleepLock <> γl:166 var
+R22555:22559 xv6iris.SleepLock <> sl_lk def
+R22561:22563 xv6iris.SleepLock <> slk:168 var
+R22586:22588 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R22610:22612 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R22589:22598 xv6iris.SleepLock <> sl_res_gen def
+R22600:22601 xv6iris.SleepLock <> γ:167 var
+R22603:22605 xv6iris.SleepLock <> slk:168 var
+R22607:22607 xv6iris.SleepLock <> R:170 var
+R22609:22609 xv6iris.SleepLock <> H:171 var
+R22623:22638 xv6iris.SleepLock <> is_sleeplock_gen def
+R22640:22642 xv6iris.SleepLock <> γl:166 var
+R22644:22645 xv6iris.SleepLock <> γ:167 var
+R22647:22649 xv6iris.SleepLock <> slk:168 var
+R22651:22651 xv6iris.SleepLock <> s:169 var
+R22653:22653 xv6iris.SleepLock <> R:170 var
+R22655:22655 xv6iris.SleepLock <> H:171 var
+prf 22719:22735 <> is_sleeplock_name
+binder 22737:22739 <> γl:172
+binder 22741:22742 <> γ:173
+binder 22744:22746 <> slk:174
+binder 22748:22748 <> s:175
+binder 22750:22750 <> R:176
+R22785:22790 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22758:22769 xv6iris.SleepLock <> is_sleeplock def
+R22771:22773 xv6iris.SleepLock <> γl:172 var
+R22775:22776 xv6iris.SleepLock <> γ:173 var
+R22778:22780 xv6iris.SleepLock <> slk:174 var
+R22782:22782 xv6iris.SleepLock <> s:175 var
+R22784:22784 xv6iris.SleepLock <> R:176 var
+R22791:22797 xv6iris.SleepLock <> sl_name def
+R22799:22801 xv6iris.SleepLock <> slk:174 var
+R22803:22803 xv6iris.SleepLock <> s:175 var
+R22821:22841 xv6iris.SleepLock <> is_sleeplock_gen_name thm
+R22821:22841 xv6iris.SleepLock <> is_sleeplock_gen_name thm
+prf 22857:22873 <> is_sleeplock_lock
+binder 22875:22877 <> γl:177
+binder 22879:22880 <> γ:178
+binder 22882:22884 <> slk:179
+binder 22886:22886 <> s:180
+binder 22888:22888 <> R:181
+R22923:22932 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22896:22907 xv6iris.SleepLock <> is_sleeplock def
+R22909:22911 xv6iris.SleepLock <> γl:177 var
+R22913:22914 xv6iris.SleepLock <> γ:178 var
+R22916:22918 xv6iris.SleepLock <> slk:179 var
+R22920:22920 xv6iris.SleepLock <> s:180 var
+R22922:22922 xv6iris.SleepLock <> R:181 var
+R22933:22939 xv6iris.WpLock <> is_lock def
+R22941:22943 xv6iris.SleepLock <> γl:177 var
+R22946:22950 xv6iris.SleepLock <> sl_lk def
+R22952:22954 xv6iris.SleepLock <> slk:179 var
+R22977:22979 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R22995:22997 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R22980:22985 xv6iris.SleepLock <> sl_res def
+R22987:22988 xv6iris.SleepLock <> γ:178 var
+R22990:22992 xv6iris.SleepLock <> slk:179 var
+R22994:22994 xv6iris.SleepLock <> R:181 var
+R23015:23035 xv6iris.SleepLock <> is_sleeplock_gen_lock thm
+R23015:23035 xv6iris.SleepLock <> is_sleeplock_gen_lock thm
+prf 23051:23068 <> is_sleeplock_intro
+binder 23070:23072 <> γl:182
+binder 23074:23075 <> γ:183
+binder 23077:23079 <> slk:184
+binder 23081:23081 <> s:185
+binder 23083:23083 <> R:186
+R23104:23113 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R23091:23097 xv6iris.SleepLock <> sl_name def
+R23099:23101 xv6iris.SleepLock <> slk:184 var
+R23103:23103 xv6iris.SleepLock <> s:185 var
+R23179:23188 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R23114:23120 xv6iris.WpLock <> is_lock def
+R23122:23124 xv6iris.SleepLock <> γl:182 var
+R23127:23131 xv6iris.SleepLock <> sl_lk def
+R23133:23135 xv6iris.SleepLock <> slk:184 var
+R23158:23160 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R23176:23178 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R23161:23166 xv6iris.SleepLock <> sl_res def
+R23168:23169 xv6iris.SleepLock <> γ:183 var
+R23171:23173 xv6iris.SleepLock <> slk:184 var
+R23175:23175 xv6iris.SleepLock <> R:186 var
+R23189:23200 xv6iris.SleepLock <> is_sleeplock def
+R23202:23204 xv6iris.SleepLock <> γl:182 var
+R23206:23207 xv6iris.SleepLock <> γ:183 var
+R23209:23211 xv6iris.SleepLock <> slk:184 var
+R23213:23213 xv6iris.SleepLock <> s:185 var
+R23215:23215 xv6iris.SleepLock <> R:186 var
+R23233:23254 xv6iris.SleepLock <> is_sleeplock_gen_intro thm
+R23233:23254 xv6iris.SleepLock <> is_sleeplock_gen_intro thm
+prf 23568:23583 <> sl_res_open_held
+binder 23585:23586 <> γ:187
+binder 23588:23590 <> slk:188
+binder 23592:23592 <> R:189
+binder 23594:23594 <> H:190
+binder 23596:23598 <> pid:191
+R23627:23632 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R23606:23615 xv6iris.SleepLock <> sl_res_gen def
+R23617:23618 xv6iris.SleepLock <> γ:187 var
+R23620:23622 xv6iris.SleepLock <> slk:188 var
+R23624:23624 xv6iris.SleepLock <> R:189 var
+R23626:23626 xv6iris.SleepLock <> H:190 var
+R23655:23664 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R23633:23643 xv6iris.SleepLock <> sleeplocked def
+R23645:23646 xv6iris.SleepLock <> γ:187 var
+R23648:23650 xv6iris.SleepLock <> slk:188 var
+R23652:23654 xv6iris.SleepLock <> pid:191 var
+R23687:23691 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R23665:23675 xv6iris.SleepLock <> sleeplocked def
+R23677:23678 xv6iris.SleepLock <> γ:187 var
+R23680:23682 xv6iris.SleepLock <> slk:188 var
+R23684:23686 xv6iris.SleepLock <> pid:191 var
+R23703:23712 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R23804:23804 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R23692:23697 xv6iris.SleepLock <> sl_dep def
+R23699:23700 xv6iris.SleepLock <> γ:187 var
+R23702:23702 xv6iris.SleepLock <> H:190 var
+R23713:23716 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R23729:23737 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R23721:23725 SailStdpp.Values <> mword def
+binder 23717:23717 <> v:192
+R23750:23754 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R23741:23748 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R23738:23740 xv6iris.SleepLock <> slk:188 var
+R23749:23749 xv6iris.SleepLock <> v:192 var
+R23755:23757 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R23801:23803 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R23794:23796 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23758:23764 SailStdpp.Operators_mwords <> neq_vec def
+R23786:23793 Riscv.rv64d <> zero_reg def
+R23767:23778 Riscv.rv64d <> sign_extend' def
+R23783:23783 xv6iris.SleepLock <> v:192 var
+R23797:23800 Corelib.Init.Datatypes <> true constr
+R24015:24015 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24039:24044 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24057:24057 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24016:24038 xv6iris.SleepLock <> sleeplocked_q_exclusive thm
+R24015:24015 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24039:24044 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24057:24057 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24016:24038 xv6iris.SleepLock <> sleeplocked_q_exclusive thm
+prf 24377:24394 <> sl_res_open_held_q
+binder 24396:24397 <> γ:193
+binder 24399:24401 <> slk:194
+binder 24403:24403 <> R:195
+binder 24405:24405 <> H:196
+binder 24407:24407 <> q:197
+binder 24409:24411 <> pid:198
+R24440:24445 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R24419:24428 xv6iris.SleepLock <> sl_res_gen def
+R24430:24431 xv6iris.SleepLock <> γ:193 var
+R24433:24435 xv6iris.SleepLock <> slk:194 var
+R24437:24437 xv6iris.SleepLock <> R:195 var
+R24439:24439 xv6iris.SleepLock <> H:196 var
+R24472:24481 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R24446:24458 xv6iris.SleepLock <> sleeplocked_q def
+R24460:24461 xv6iris.SleepLock <> γ:193 var
+R24463:24463 xv6iris.SleepLock <> q:197 var
+R24465:24467 xv6iris.SleepLock <> slk:194 var
+R24469:24471 xv6iris.SleepLock <> pid:198 var
+R24508:24512 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R24482:24494 xv6iris.SleepLock <> sleeplocked_q def
+R24496:24497 xv6iris.SleepLock <> γ:193 var
+R24499:24499 xv6iris.SleepLock <> q:197 var
+R24501:24503 xv6iris.SleepLock <> slk:194 var
+R24505:24507 xv6iris.SleepLock <> pid:198 var
+R24526:24530 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R24513:24520 xv6iris.SleepLock <> sl_hauth def
+R24522:24523 xv6iris.SleepLock <> γ:193 var
+R24525:24525 xv6iris.SleepLock <> q:197 var
+R24534:24543 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R24635:24635 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R24531:24531 xv6iris.SleepLock <> H:196 var
+R24533:24533 xv6iris.SleepLock <> q:197 var
+R24544:24547 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R24560:24568 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R24552:24556 SailStdpp.Values <> mword def
+binder 24548:24548 <> v:199
+R24581:24585 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R24572:24579 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R24569:24571 xv6iris.SleepLock <> slk:194 var
+R24580:24580 xv6iris.SleepLock <> v:199 var
+R24586:24588 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R24632:24634 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R24625:24627 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24589:24595 SailStdpp.Operators_mwords <> neq_vec def
+R24617:24624 Riscv.rv64d <> zero_reg def
+R24598:24609 Riscv.rv64d <> sign_extend' def
+R24614:24614 xv6iris.SleepLock <> v:199 var
+R24628:24631 Corelib.Init.Datatypes <> true constr
+R24808:24808 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24832:24837 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24850:24850 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24809:24831 xv6iris.SleepLock <> sleeplocked_q_exclusive thm
+R24808:24808 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24832:24837 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24850:24850 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24809:24831 xv6iris.SleepLock <> sleeplocked_q_exclusive thm
+R24910:24910 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24927:24932 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24943:24943 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24911:24926 xv6iris.SleepLock <> sl_hauth_agree_q thm
+R24910:24910 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24927:24932 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24943:24943 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24911:24926 xv6iris.SleepLock <> sl_hauth_agree_q thm
+prf 25160:25176 <> sl_res_close_held
+binder 25178:25179 <> γ:200
+binder 25181:25183 <> slk:201
+binder 25185:25185 <> R:202
+binder 25187:25187 <> H:203
+R25194:25198 SailStdpp.Values <> mword def
+binder 25190:25190 <> v:204
+R25253:25260 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25246:25248 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25210:25216 SailStdpp.Operators_mwords <> neq_vec def
+R25238:25245 Riscv.rv64d <> zero_reg def
+R25219:25230 Riscv.rv64d <> sign_extend' def
+R25235:25235 xv6iris.SleepLock <> v:204 var
+R25249:25252 Corelib.Init.Datatypes <> true constr
+R25273:25278 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R25264:25271 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R25261:25263 xv6iris.SleepLock <> slk:201 var
+R25272:25272 xv6iris.SleepLock <> v:204 var
+R25290:25295 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R25279:25284 xv6iris.SleepLock <> sl_dep def
+R25286:25287 xv6iris.SleepLock <> γ:200 var
+R25289:25289 xv6iris.SleepLock <> H:203 var
+R25296:25305 xv6iris.SleepLock <> sl_res_gen def
+R25307:25308 xv6iris.SleepLock <> γ:200 var
+R25310:25312 xv6iris.SleepLock <> slk:201 var
+R25314:25314 xv6iris.SleepLock <> R:202 var
+R25316:25316 xv6iris.SleepLock <> H:203 var
+prf 25410:25428 <> sl_res_close_held_q
+binder 25430:25431 <> γ:205
+binder 25433:25435 <> slk:206
+binder 25437:25437 <> R:207
+binder 25439:25439 <> H:208
+R25446:25450 SailStdpp.Values <> mword def
+binder 25442:25442 <> v:209
+R25461:25462 stdpp.numbers <> Qp rec
+binder 25457:25457 <> q:210
+R25514:25521 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25507:25509 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25471:25477 SailStdpp.Operators_mwords <> neq_vec def
+R25499:25506 Riscv.rv64d <> zero_reg def
+R25480:25491 Riscv.rv64d <> sign_extend' def
+R25496:25496 xv6iris.SleepLock <> v:209 var
+R25510:25513 Corelib.Init.Datatypes <> true constr
+R25534:25539 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R25525:25532 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R25522:25524 xv6iris.SleepLock <> slk:206 var
+R25533:25533 xv6iris.SleepLock <> v:209 var
+R25553:25558 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R25540:25547 xv6iris.SleepLock <> sl_hauth def
+R25549:25550 xv6iris.SleepLock <> γ:205 var
+R25552:25552 xv6iris.SleepLock <> q:210 var
+R25562:25567 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R25559:25559 xv6iris.SleepLock <> H:208 var
+R25561:25561 xv6iris.SleepLock <> q:210 var
+R25568:25577 xv6iris.SleepLock <> sl_res_gen def
+R25579:25580 xv6iris.SleepLock <> γ:205 var
+R25582:25584 xv6iris.SleepLock <> slk:206 var
+R25586:25586 xv6iris.SleepLock <> R:207 var
+R25588:25588 xv6iris.SleepLock <> H:208 var
+R25642:25642 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25660:25665 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25670:25670 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25643:25659 xv6iris.SleepLock <> sl_res_close_held thm
+R25642:25642 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25660:25665 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25670:25670 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25643:25659 xv6iris.SleepLock <> sl_res_close_held thm
+prf 26092:26108 <> sl_res_close_free
+binder 26110:26111 <> γ:211
+binder 26113:26115 <> slk:212
+binder 26117:26117 <> R:213
+binder 26119:26119 <> H:214
+R26126:26127 stdpp.numbers <> Qp rec
+binder 26122:26122 <> q:215
+R26174:26183 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R26139:26147 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R26173:26173 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R26136:26138 xv6iris.SleepLock <> slk:212 var
+R26165:26169 SailStdpp.Values <> mword def
+R26148:26159 SailStdpp.Values <> mword_of_int def
+R26234:26243 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R26184:26196 xv6iris.SleepLock <> sleeplocked_q def
+R26198:26199 xv6iris.SleepLock <> γ:211 var
+R26201:26201 xv6iris.SleepLock <> q:215 var
+R26203:26205 xv6iris.SleepLock <> slk:212 var
+R26225:26229 SailStdpp.Values <> mword def
+R26208:26219 SailStdpp.Values <> mword_of_int def
+R26257:26266 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R26244:26251 xv6iris.SleepLock <> sl_hauth def
+R26253:26254 xv6iris.SleepLock <> γ:211 var
+R26256:26256 xv6iris.SleepLock <> q:215 var
+R26268:26277 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R26267:26267 xv6iris.SleepLock <> R:213 var
+R26278:26287 xv6iris.SleepLock <> sl_res_gen def
+R26289:26290 xv6iris.SleepLock <> γ:211 var
+R26292:26294 xv6iris.SleepLock <> slk:212 var
+R26296:26296 xv6iris.SleepLock <> R:213 var
+R26298:26298 xv6iris.SleepLock <> H:214 var
+R26366:26370 SailStdpp.Values <> mword def
+R26349:26360 SailStdpp.Values <> mword_of_int def
+R26366:26370 SailStdpp.Values <> mword def
+R26349:26360 SailStdpp.Values <> mword_of_int def
+prf 26654:26669 <> sl_free_retarget
+binder 26671:26672 <> γ:216
+binder 26674:26676 <> slk:217
+R26683:26684 stdpp.numbers <> Qp rec
+binder 26679:26679 <> q:218
+R26712:26722 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R26693:26704 xv6iris.SleepLock <> sl_free_hold def
+R26706:26707 xv6iris.SleepLock <> γ:216 var
+R26709:26711 xv6iris.SleepLock <> slk:217 var
+R26773:26777 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R26723:26735 xv6iris.SleepLock <> sleeplocked_q def
+R26737:26738 xv6iris.SleepLock <> γ:216 var
+R26740:26740 xv6iris.SleepLock <> q:218 var
+R26742:26744 xv6iris.SleepLock <> slk:217 var
+R26764:26768 SailStdpp.Values <> mword def
+R26747:26758 SailStdpp.Values <> mword_of_int def
+R26778:26785 xv6iris.SleepLock <> sl_hauth def
+R26787:26788 xv6iris.SleepLock <> γ:216 var
+R26790:26790 xv6iris.SleepLock <> q:218 var
+R26879:26879 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26903:26908 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26919:26919 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26880:26894 xv6iris.SleepLock <> sl_hauth_update thm
+R26879:26879 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26903:26908 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26919:26919 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26880:26894 xv6iris.SleepLock <> sl_hauth_update thm
+prf 28078:28092 <> slh_ghost_alloc
+R28096:28099 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R28100:28104 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R28105:28108 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R28119:28120 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R28114:28118 iris.base_logic.lib.iprop <> gname def
+binder 28109:28110 <> γ:219
+R28135:28139 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R28121:28131 xv6iris.SleepLock <> sl_free_tok def
+R28133:28134 xv6iris.SleepLock <> γ:219 var
+R28140:28147 xv6iris.SleepLock <> slh_auth def
+R28149:28150 xv6iris.SleepLock <> γ:219 var
+R28152:28155 Corelib.Init.Datatypes <> None constr
+R28177:28185 iris.base_logic.lib.own <> own_alloc thm
+R28296:28322 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R28365:28365 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R28188:28188 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R28228:28255 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R28295:28295 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R28223:28227 xv6iris.Xv6Cameras <> slhUR def
+R28189:28189 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28215:28216 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28219:28219 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28190:28195 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R28214:28214 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R28203:28210 iris.algebra.ofe <> leibnizO abbrev
+R28212:28213 stdpp.numbers <> Qp rec
+R28217:28218 iris.algebra.cmra <> ε def
+R28290:28294 xv6iris.Xv6Cameras <> slhUR def
+R28256:28256 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28282:28283 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28286:28286 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28257:28262 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R28281:28281 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R28270:28277 iris.algebra.ofe <> leibnizO abbrev
+R28279:28280 stdpp.numbers <> Qp rec
+R28284:28285 iris.algebra.cmra <> ε def
+R28360:28364 xv6iris.Xv6Cameras <> slhUR def
+R28323:28323 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28326:28327 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28356:28356 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28324:28325 iris.algebra.cmra <> ε def
+R28328:28330 iris.algebra.auth <> :::'●'_x_x not
+R28331:28332 iris.algebra.auth <> :::'●'_x_x not
+R28355:28355 iris.algebra.auth <> :::'●'_x_x not
+R28340:28347 iris.algebra.cmra <> optionUR canonstruc
+R28349:28354 iris.algebra.ufrac <> ufracR canonstruc
+R28333:28336 Corelib.Init.Datatypes <> None constr
+R28177:28185 iris.base_logic.lib.own <> own_alloc thm
+R28296:28322 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R28365:28365 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R28188:28188 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R28228:28255 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R28295:28295 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R28223:28227 xv6iris.Xv6Cameras <> slhUR def
+R28189:28189 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28215:28216 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28219:28219 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28190:28195 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R28214:28214 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R28203:28210 iris.algebra.ofe <> leibnizO abbrev
+R28212:28213 stdpp.numbers <> Qp rec
+R28217:28218 iris.algebra.cmra <> ε def
+R28290:28294 xv6iris.Xv6Cameras <> slhUR def
+R28256:28256 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28282:28283 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28286:28286 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28257:28262 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R28281:28281 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R28270:28277 iris.algebra.ofe <> leibnizO abbrev
+R28279:28280 stdpp.numbers <> Qp rec
+R28284:28285 iris.algebra.cmra <> ε def
+R28360:28364 xv6iris.Xv6Cameras <> slhUR def
+R28323:28323 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28326:28327 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28356:28356 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28324:28325 iris.algebra.cmra <> ε def
+R28328:28330 iris.algebra.auth <> :::'●'_x_x not
+R28331:28332 iris.algebra.auth <> :::'●'_x_x not
+R28355:28355 iris.algebra.auth <> :::'●'_x_x not
+R28340:28347 iris.algebra.cmra <> optionUR canonstruc
+R28349:28354 iris.algebra.ufrac <> ufracR canonstruc
+R28333:28336 Corelib.Init.Datatypes <> None constr
+R28399:28405 iris.algebra.cmra <> pair_op thm
+R28408:28414 stdpp.base <> left_id def
+R28417:28424 stdpp.base <> right_id def
+R28399:28405 iris.algebra.cmra <> pair_op thm
+R28399:28405 iris.algebra.cmra <> pair_op thm
+R28399:28405 iris.algebra.cmra <> pair_op thm
+R28408:28414 stdpp.base <> left_id def
+R28408:28414 stdpp.base <> left_id def
+R28408:28414 stdpp.base <> left_id def
+R28417:28424 stdpp.base <> right_id def
+R28417:28424 stdpp.base <> right_id def
+R28417:28424 stdpp.base <> right_id def
+R28433:28442 iris.algebra.cmra <> pair_valid thm
+R28433:28442 iris.algebra.cmra <> pair_valid thm
+R28469:28483 iris.algebra.lib.excl_auth <> excl_auth_valid thm
+R28496:28510 iris.algebra.auth <> auth_auth_valid thm
+R28469:28483 iris.algebra.lib.excl_auth <> excl_auth_valid thm
+R28496:28510 iris.algebra.auth <> auth_auth_valid thm
+prf 28749:28768 <> new_sleeplock_gen_at
+R28778:28792 xv6iris.RiscvLang <> CpuId class
+binder 28772:28774 <> CID:220
+binder 28795:28795 <> E:221
+R28803:28807 iris.base_logic.lib.iprop <> gname def
+binder 28798:28799 <> γ:222
+R28817:28821 SailStdpp.Values <> mword def
+binder 28811:28813 <> slk:223
+R28832:28837 Stdlib.Strings.String <> string ind
+binder 28828:28828 <> s:224
+R28851:28855 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R28857:28858 xv6iris.SleepLock <> SleepLock.Σ var
+binder 28847:28847 <> R:225
+R28868:28871 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28866:28867 stdpp.numbers <> Qp rec
+R28872:28876 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R28878:28879 xv6iris.SleepLock <> SleepLock.Σ var
+binder 28862:28862 <> H:226
+R28902:28911 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R28888:28898 xv6iris.SleepLock <> sl_free_tok def
+R28900:28901 xv6iris.SleepLock <> γ:222 var
+R28953:28962 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28912:28920 xv6iris.WpLock <> lock_name def
+R28923:28927 xv6iris.SleepLock <> sl_lk def
+R28929:28931 xv6iris.SleepLock <> slk:223 var
+R28976:28985 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28963:28969 xv6iris.SleepLock <> sl_name def
+R28971:28973 xv6iris.SleepLock <> slk:223 var
+R28975:28975 xv6iris.SleepLock <> s:224 var
+R29030:29039 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28995:29003 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R29029:29029 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R28986:28990 xv6iris.SleepLock <> sl_lk def
+R28992:28994 xv6iris.SleepLock <> slk:223 var
+R29021:29025 SailStdpp.Values <> mword def
+R29004:29015 SailStdpp.Values <> mword_of_int def
+R29071:29080 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R29040:29058 xv6iris.WpLock <> lk_cpu_fresh def
+R29061:29065 xv6iris.SleepLock <> sl_lk def
+R29067:29069 xv6iris.SleepLock <> slk:223 var
+R29119:29128 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R29084:29092 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R29118:29118 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R29081:29083 xv6iris.SleepLock <> slk:223 var
+R29110:29114 SailStdpp.Values <> mword def
+R29093:29104 SailStdpp.Values <> mword_of_int def
+R29174:29183 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R29139:29147 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R29173:29173 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R29129:29134 xv6iris.SleepLock <> sl_pid def
+R29136:29138 xv6iris.SleepLock <> slk:223 var
+R29165:29169 SailStdpp.Values <> mword def
+R29148:29159 SailStdpp.Values <> mword_of_int def
+R29203:29212 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R29184:29194 xv6iris.TsoCtx <> own_context def
+R29196:29202 xv6iris.TsoCtx <> cur_ctx def
+R29214:29216 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R29218:29223 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R29213:29213 xv6iris.SleepLock <> R:225 var
+R29217:29217 xv6iris.SleepLock <> E:221 var
+R29217:29217 xv6iris.SleepLock <> E:221 var
+R29243:29247 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R29224:29234 xv6iris.TsoCtx <> own_context def
+R29236:29242 xv6iris.TsoCtx <> cur_ctx def
+R29248:29251 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R29263:29264 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R29258:29262 iris.base_logic.lib.iprop <> gname def
+binder 29252:29254 <> γl:227
+R29265:29280 xv6iris.SleepLock <> is_sleeplock_gen def
+R29282:29284 xv6iris.SleepLock <> γl:227 var
+R29286:29287 xv6iris.SleepLock <> γ:222 var
+R29289:29291 xv6iris.SleepLock <> slk:223 var
+R29293:29293 xv6iris.SleepLock <> s:224 var
+R29295:29295 xv6iris.SleepLock <> R:225 var
+R29297:29297 xv6iris.SleepLock <> H:226 var
+R29382:29382 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29401:29406 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29419:29419 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29383:29400 xv6iris.SleepLock <> sl_free_hold_intro thm
+R29382:29382 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29401:29406 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29419:29419 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29383:29400 xv6iris.SleepLock <> sl_free_hold_intro thm
+R29452:29452 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29522:29539 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29578:29578 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29453:29459 xv6iris.WpLock <> newlock thm
+R29495:29497 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R29519:29521 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R29498:29507 xv6iris.SleepLock <> sl_res_gen def
+R29464:29468 xv6iris.SleepLock <> sl_lk def
+R29452:29452 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29522:29539 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29578:29578 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29453:29459 xv6iris.WpLock <> newlock thm
+R29495:29497 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R29519:29521 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R29498:29507 xv6iris.SleepLock <> sl_res_gen def
+R29464:29468 xv6iris.SleepLock <> sl_lk def
+R29610:29610 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29628:29633 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29650:29650 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29611:29627 xv6iris.SleepLock <> sl_res_close_free thm
+R29610:29610 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29628:29633 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29650:29650 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29611:29627 xv6iris.SleepLock <> sl_res_close_free thm
+R29746:29746 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29769:29774 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29785:29785 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29747:29768 xv6iris.SleepLock <> is_sleeplock_gen_intro thm
+R29746:29746 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29769:29774 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29785:29785 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29747:29768 xv6iris.SleepLock <> is_sleeplock_gen_intro thm
+prf 29911:29927 <> new_sleeplock_gen
+R29937:29951 xv6iris.RiscvLang <> CpuId class
+binder 29931:29933 <> CID:228
+binder 29954:29954 <> E:229
+R29963:29967 SailStdpp.Values <> mword def
+binder 29957:29959 <> slk:230
+R29978:29983 Stdlib.Strings.String <> string ind
+binder 29974:29974 <> s:231
+R29991:29995 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R29997:29998 xv6iris.SleepLock <> SleepLock.Σ var
+binder 29987:29987 <> R:232
+R30017:30020 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30012:30016 iris.base_logic.lib.iprop <> gname def
+R30023:30026 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30021:30022 stdpp.numbers <> Qp rec
+R30027:30031 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R30033:30034 xv6iris.SleepLock <> SleepLock.Σ var
+binder 30008:30008 <> H:233
+R30084:30093 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R30043:30051 xv6iris.WpLock <> lock_name def
+R30054:30058 xv6iris.SleepLock <> sl_lk def
+R30060:30062 xv6iris.SleepLock <> slk:230 var
+R30107:30116 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R30094:30100 xv6iris.SleepLock <> sl_name def
+R30102:30104 xv6iris.SleepLock <> slk:230 var
+R30106:30106 xv6iris.SleepLock <> s:231 var
+R30161:30170 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R30126:30134 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R30160:30160 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R30117:30121 xv6iris.SleepLock <> sl_lk def
+R30123:30125 xv6iris.SleepLock <> slk:230 var
+R30152:30156 SailStdpp.Values <> mword def
+R30135:30146 SailStdpp.Values <> mword_of_int def
+R30202:30211 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R30171:30189 xv6iris.WpLock <> lk_cpu_fresh def
+R30192:30196 xv6iris.SleepLock <> sl_lk def
+R30198:30200 xv6iris.SleepLock <> slk:230 var
+R30250:30259 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R30215:30223 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R30249:30249 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R30212:30214 xv6iris.SleepLock <> slk:230 var
+R30241:30245 SailStdpp.Values <> mword def
+R30224:30235 SailStdpp.Values <> mword_of_int def
+R30305:30314 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R30270:30278 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R30304:30304 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R30260:30265 xv6iris.SleepLock <> sl_pid def
+R30267:30269 xv6iris.SleepLock <> slk:230 var
+R30296:30300 SailStdpp.Values <> mword def
+R30279:30290 SailStdpp.Values <> mword_of_int def
+R30334:30343 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R30315:30325 xv6iris.TsoCtx <> own_context def
+R30327:30333 xv6iris.TsoCtx <> cur_ctx def
+R30345:30347 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R30349:30354 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R30344:30344 xv6iris.SleepLock <> R:232 var
+R30348:30348 xv6iris.SleepLock <> E:229 var
+R30348:30348 xv6iris.SleepLock <> E:229 var
+R30374:30378 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R30355:30365 xv6iris.TsoCtx <> own_context def
+R30367:30373 xv6iris.TsoCtx <> cur_ctx def
+R30379:30382 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R30397:30398 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R30392:30396 iris.base_logic.lib.iprop <> gname def
+binder 30383:30385 <> γl:234
+R30392:30396 iris.base_logic.lib.iprop <> gname def
+binder 30387:30388 <> γ:235
+R30437:30441 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R30399:30414 xv6iris.SleepLock <> is_sleeplock_gen def
+R30416:30418 xv6iris.SleepLock <> γl:234 var
+R30420:30421 xv6iris.SleepLock <> γ:235 var
+R30423:30425 xv6iris.SleepLock <> slk:230 var
+R30427:30427 xv6iris.SleepLock <> s:231 var
+R30429:30429 xv6iris.SleepLock <> R:232 var
+R30432:30432 xv6iris.SleepLock <> H:233 var
+R30434:30435 xv6iris.SleepLock <> γ:235 var
+R30442:30449 xv6iris.SleepLock <> slh_auth def
+R30451:30452 xv6iris.SleepLock <> γ:235 var
+R30454:30457 Corelib.Init.Datatypes <> None constr
+R30532:30540 iris.base_logic.lib.own <> own_alloc thm
+R30651:30677 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R30720:30720 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R30543:30543 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R30583:30610 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R30650:30650 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R30578:30582 xv6iris.Xv6Cameras <> slhUR def
+R30544:30544 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30570:30571 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30574:30574 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30545:30550 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R30569:30569 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R30558:30565 iris.algebra.ofe <> leibnizO abbrev
+R30567:30568 stdpp.numbers <> Qp rec
+R30572:30573 iris.algebra.cmra <> ε def
+R30645:30649 xv6iris.Xv6Cameras <> slhUR def
+R30611:30611 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30637:30638 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30641:30641 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30612:30617 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R30636:30636 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R30625:30632 iris.algebra.ofe <> leibnizO abbrev
+R30634:30635 stdpp.numbers <> Qp rec
+R30639:30640 iris.algebra.cmra <> ε def
+R30715:30719 xv6iris.Xv6Cameras <> slhUR def
+R30678:30678 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30681:30682 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30711:30711 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30679:30680 iris.algebra.cmra <> ε def
+R30683:30685 iris.algebra.auth <> :::'●'_x_x not
+R30686:30687 iris.algebra.auth <> :::'●'_x_x not
+R30710:30710 iris.algebra.auth <> :::'●'_x_x not
+R30695:30702 iris.algebra.cmra <> optionUR canonstruc
+R30704:30709 iris.algebra.ufrac <> ufracR canonstruc
+R30688:30691 Corelib.Init.Datatypes <> None constr
+R30532:30540 iris.base_logic.lib.own <> own_alloc thm
+R30651:30677 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R30720:30720 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R30543:30543 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R30583:30610 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R30650:30650 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R30578:30582 xv6iris.Xv6Cameras <> slhUR def
+R30544:30544 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30570:30571 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30574:30574 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30545:30550 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R30569:30569 iris.algebra.lib.excl_auth <> :::'●E'_x not
+R30558:30565 iris.algebra.ofe <> leibnizO abbrev
+R30567:30568 stdpp.numbers <> Qp rec
+R30572:30573 iris.algebra.cmra <> ε def
+R30645:30649 xv6iris.Xv6Cameras <> slhUR def
+R30611:30611 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30637:30638 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30641:30641 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30612:30617 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R30636:30636 iris.algebra.lib.excl_auth <> :::'◯E'_x not
+R30625:30632 iris.algebra.ofe <> leibnizO abbrev
+R30634:30635 stdpp.numbers <> Qp rec
+R30639:30640 iris.algebra.cmra <> ε def
+R30715:30719 xv6iris.Xv6Cameras <> slhUR def
+R30678:30678 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30681:30682 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30711:30711 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R30679:30680 iris.algebra.cmra <> ε def
+R30683:30685 iris.algebra.auth <> :::'●'_x_x not
+R30686:30687 iris.algebra.auth <> :::'●'_x_x not
+R30710:30710 iris.algebra.auth <> :::'●'_x_x not
+R30695:30702 iris.algebra.cmra <> optionUR canonstruc
+R30704:30709 iris.algebra.ufrac <> ufracR canonstruc
+R30688:30691 Corelib.Init.Datatypes <> None constr
+R30754:30760 iris.algebra.cmra <> pair_op thm
+R30763:30769 stdpp.base <> left_id def
+R30772:30779 stdpp.base <> right_id def
+R30754:30760 iris.algebra.cmra <> pair_op thm
+R30754:30760 iris.algebra.cmra <> pair_op thm
+R30754:30760 iris.algebra.cmra <> pair_op thm
+R30763:30769 stdpp.base <> left_id def
+R30763:30769 stdpp.base <> left_id def
+R30763:30769 stdpp.base <> left_id def
+R30772:30779 stdpp.base <> right_id def
+R30772:30779 stdpp.base <> right_id def
+R30772:30779 stdpp.base <> right_id def
+R30788:30797 iris.algebra.cmra <> pair_valid thm
+R30788:30797 iris.algebra.cmra <> pair_valid thm
+R30824:30838 iris.algebra.lib.excl_auth <> excl_auth_valid thm
+R30851:30865 iris.algebra.auth <> auth_auth_valid thm
+R30824:30838 iris.algebra.lib.excl_auth <> excl_auth_valid thm
+R30851:30865 iris.algebra.auth <> auth_auth_valid thm
+R30925:30925 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31000:31017 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31061:31061 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30926:30932 xv6iris.WpLock <> newlock thm
+R30968:30970 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R30997:30999 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R30971:30980 xv6iris.SleepLock <> sl_res_gen def
+R30937:30941 xv6iris.SleepLock <> sl_lk def
+R30925:30925 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31000:31017 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31061:31061 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30926:30932 xv6iris.WpLock <> newlock thm
+R30968:30970 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R30997:30999 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R30971:30980 xv6iris.SleepLock <> sl_res_gen def
+R30937:30941 xv6iris.SleepLock <> sl_lk def
+R31093:31093 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31111:31116 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31140:31140 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31094:31110 xv6iris.SleepLock <> sl_res_close_free thm
+R31093:31093 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31111:31116 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31140:31140 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31094:31110 xv6iris.SleepLock <> sl_res_close_free thm
+R31282:31282 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31305:31310 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31321:31321 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31283:31304 xv6iris.SleepLock <> is_sleeplock_gen_intro thm
+R31282:31282 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31305:31310 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31321:31321 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31283:31304 xv6iris.SleepLock <> is_sleeplock_gen_intro thm
+prf 31447:31459 <> new_sleeplock
+R31469:31483 xv6iris.RiscvLang <> CpuId class
+binder 31463:31465 <> CID:236
+binder 31486:31486 <> E:237
+R31495:31499 SailStdpp.Values <> mword def
+binder 31489:31491 <> slk:238
+R31510:31515 Stdlib.Strings.String <> string ind
+binder 31506:31506 <> s:239
+R31523:31527 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R31529:31530 xv6iris.SleepLock <> SleepLock.Σ var
+binder 31519:31519 <> R:240
+R31580:31589 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R31539:31547 xv6iris.WpLock <> lock_name def
+R31550:31554 xv6iris.SleepLock <> sl_lk def
+R31556:31558 xv6iris.SleepLock <> slk:238 var
+R31603:31612 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31590:31596 xv6iris.SleepLock <> sl_name def
+R31598:31600 xv6iris.SleepLock <> slk:238 var
+R31602:31602 xv6iris.SleepLock <> s:239 var
+R31657:31666 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31622:31630 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R31656:31656 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R31613:31617 xv6iris.SleepLock <> sl_lk def
+R31619:31621 xv6iris.SleepLock <> slk:238 var
+R31648:31652 SailStdpp.Values <> mword def
+R31631:31642 SailStdpp.Values <> mword_of_int def
+R31698:31707 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31667:31685 xv6iris.WpLock <> lk_cpu_fresh def
+R31688:31692 xv6iris.SleepLock <> sl_lk def
+R31694:31696 xv6iris.SleepLock <> slk:238 var
+R31746:31755 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31711:31719 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R31745:31745 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R31708:31710 xv6iris.SleepLock <> slk:238 var
+R31737:31741 SailStdpp.Values <> mword def
+R31720:31731 SailStdpp.Values <> mword_of_int def
+R31801:31810 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31766:31774 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R31800:31800 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R31756:31761 xv6iris.SleepLock <> sl_pid def
+R31763:31765 xv6iris.SleepLock <> slk:238 var
+R31792:31796 SailStdpp.Values <> mword def
+R31775:31786 SailStdpp.Values <> mword_of_int def
+R31830:31839 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31811:31821 xv6iris.TsoCtx <> own_context def
+R31823:31829 xv6iris.TsoCtx <> cur_ctx def
+R31841:31843 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R31845:31850 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R31840:31840 xv6iris.SleepLock <> R:240 var
+R31844:31844 xv6iris.SleepLock <> E:237 var
+R31844:31844 xv6iris.SleepLock <> E:237 var
+R31870:31874 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R31851:31861 xv6iris.TsoCtx <> own_context def
+R31863:31869 xv6iris.TsoCtx <> cur_ctx def
+R31875:31878 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R31893:31894 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R31888:31892 iris.base_logic.lib.iprop <> gname def
+binder 31879:31881 <> γl:241
+R31888:31892 iris.base_logic.lib.iprop <> gname def
+binder 31883:31884 <> γ:242
+R31895:31906 xv6iris.SleepLock <> is_sleeplock def
+R31908:31910 xv6iris.SleepLock <> γl:241 var
+R31912:31913 xv6iris.SleepLock <> γ:242 var
+R31915:31917 xv6iris.SleepLock <> slk:238 var
+R31919:31919 xv6iris.SleepLock <> s:239 var
+R31921:31921 xv6iris.SleepLock <> R:240 var
+R31995:31995 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32047:32064 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32102:32102 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31996:32012 xv6iris.SleepLock <> new_sleeplock_gen thm
+R32034:32045 xv6iris.SleepLock <> sl_untracked def
+R31995:31995 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32047:32064 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32102:32102 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31996:32012 xv6iris.SleepLock <> new_sleeplock_gen thm
+R32034:32045 xv6iris.SleepLock <> sl_untracked def
+def 33085:33090 <> sl_raw
+R33099:33103 SailStdpp.Values <> mword def
+binder 33093:33095 <> slk:243
+R33111:33115 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R33117:33118 xv6iris.SleepLock <> SleepLock.Σ var
+R33128:33132 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R33192:33201 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R33152:33156 SailStdpp.Values <> mword def
+binder 33133:33139 <> vlocked:244
+R33152:33156 SailStdpp.Values <> mword def
+binder 33141:33143 <> vlk:245
+R33152:33156 SailStdpp.Values <> mword def
+binder 33145:33148 <> vpid:246
+R33184:33188 SailStdpp.Values <> mword def
+binder 33163:33169 <> vlkname:247
+R33184:33188 SailStdpp.Values <> mword def
+binder 33171:33174 <> vcpu:248
+R33184:33188 SailStdpp.Values <> mword def
+binder 33176:33180 <> vname:249
+R33220:33231 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R33205:33212 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R33202:33204 xv6iris.SleepLock <> slk:243 var
+R33213:33219 xv6iris.SleepLock <> vlocked:244 var
+R33252:33263 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R33241:33248 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R33232:33236 xv6iris.SleepLock <> sl_lk def
+R33238:33240 xv6iris.SleepLock <> slk:243 var
+R33249:33251 xv6iris.SleepLock <> vlk:245 var
+R33306:33317 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R33291:33298 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R33264:33278 xv6iris.WpLock <> lock_name_field def
+R33281:33285 xv6iris.SleepLock <> sl_lk def
+R33287:33289 xv6iris.SleepLock <> slk:243 var
+R33299:33305 xv6iris.SleepLock <> vlkname:247 var
+R33342:33353 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R33330:33337 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R33318:33325 xv6iris.SleepLock <> sl_lkcpu def
+R33327:33329 xv6iris.SleepLock <> slk:243 var
+R33338:33341 xv6iris.SleepLock <> vcpu:248 var
+R33384:33395 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R33371:33378 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R33354:33366 xv6iris.SleepLock <> sl_name_field def
+R33368:33370 xv6iris.SleepLock <> slk:243 var
+R33379:33383 xv6iris.SleepLock <> vname:249 var
+R33406:33413 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R33396:33401 xv6iris.SleepLock <> sl_pid def
+R33403:33405 xv6iris.SleepLock <> slk:243 var
+R33414:33417 xv6iris.SleepLock <> vpid:246 var
+def 33437:33444 <> sl_fresh
+R33453:33457 SailStdpp.Values <> mword def
+binder 33447:33449 <> slk:250
+R33468:33473 Stdlib.Strings.String <> string ind
+binder 33464:33464 <> s:251
+R33478:33482 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R33484:33485 xv6iris.SleepLock <> SleepLock.Σ var
+R33533:33542 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R33498:33506 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R33532:33532 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R33495:33497 xv6iris.SleepLock <> slk:250 var
+R33524:33528 SailStdpp.Values <> mword def
+R33507:33518 SailStdpp.Values <> mword_of_int def
+R33587:33596 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R33552:33560 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R33586:33586 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R33543:33547 xv6iris.SleepLock <> sl_lk def
+R33549:33551 xv6iris.SleepLock <> slk:250 var
+R33578:33582 SailStdpp.Values <> mword def
+R33561:33572 SailStdpp.Values <> mword_of_int def
+R33638:33647 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R33597:33605 xv6iris.WpLock <> lock_name def
+R33608:33612 xv6iris.SleepLock <> sl_lk def
+R33614:33616 xv6iris.SleepLock <> slk:250 var
+R33679:33688 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R33648:33666 xv6iris.WpLock <> lk_cpu_fresh def
+R33669:33673 xv6iris.SleepLock <> sl_lk def
+R33675:33677 xv6iris.SleepLock <> slk:250 var
+R33702:33711 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R33689:33695 xv6iris.SleepLock <> sl_name def
+R33697:33699 xv6iris.SleepLock <> slk:250 var
+R33701:33701 xv6iris.SleepLock <> s:251 var
+R33722:33730 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R33756:33756 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R33712:33717 xv6iris.SleepLock <> sl_pid def
+R33719:33721 xv6iris.SleepLock <> slk:250 var
+R33748:33752 SailStdpp.Values <> mword def
+R33731:33742 SailStdpp.Values <> mword_of_int def
+prf 33944:33959 <> sl_fresh_new_gen
+R33969:33983 xv6iris.RiscvLang <> CpuId class
+binder 33963:33965 <> CID:252
+binder 33986:33986 <> E:253
+R33995:33999 SailStdpp.Values <> mword def
+binder 33989:33991 <> slk:254
+R34010:34015 Stdlib.Strings.String <> string ind
+binder 34006:34006 <> s:255
+R34029:34033 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R34035:34036 xv6iris.SleepLock <> SleepLock.Σ var
+binder 34025:34025 <> R:256
+R34049:34052 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R34044:34048 iris.base_logic.lib.iprop <> gname def
+R34055:34058 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R34053:34054 stdpp.numbers <> Qp rec
+R34059:34063 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R34065:34066 xv6iris.SleepLock <> SleepLock.Σ var
+binder 34040:34040 <> H:257
+R34089:34094 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R34075:34082 xv6iris.SleepLock <> sl_fresh def
+R34084:34086 xv6iris.SleepLock <> slk:254 var
+R34088:34088 xv6iris.SleepLock <> s:255 var
+R34114:34119 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R34095:34105 xv6iris.TsoCtx <> own_context def
+R34107:34113 xv6iris.TsoCtx <> cur_ctx def
+R34121:34123 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R34125:34130 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R34120:34120 xv6iris.SleepLock <> R:256 var
+R34124:34124 xv6iris.SleepLock <> E:253 var
+R34124:34124 xv6iris.SleepLock <> E:253 var
+R34150:34158 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R34131:34141 xv6iris.TsoCtx <> own_context def
+R34143:34149 xv6iris.TsoCtx <> cur_ctx def
+R34159:34162 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R34177:34178 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R34172:34176 iris.base_logic.lib.iprop <> gname def
+binder 34163:34165 <> γl:258
+R34172:34176 iris.base_logic.lib.iprop <> gname def
+binder 34167:34168 <> γ:259
+R34217:34221 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R34179:34194 xv6iris.SleepLock <> is_sleeplock_gen def
+R34196:34198 xv6iris.SleepLock <> γl:258 var
+R34200:34201 xv6iris.SleepLock <> γ:259 var
+R34203:34205 xv6iris.SleepLock <> slk:254 var
+R34207:34207 xv6iris.SleepLock <> s:255 var
+R34209:34209 xv6iris.SleepLock <> R:256 var
+R34212:34212 xv6iris.SleepLock <> H:257 var
+R34214:34215 xv6iris.SleepLock <> γ:259 var
+R34222:34229 xv6iris.SleepLock <> slh_auth def
+R34231:34232 xv6iris.SleepLock <> γ:259 var
+R34234:34237 Corelib.Init.Datatypes <> None constr
+R34325:34325 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34355:34360 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34398:34398 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34326:34342 xv6iris.SleepLock <> new_sleeplock_gen thm
+R34325:34325 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34355:34360 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34398:34398 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34326:34342 xv6iris.SleepLock <> new_sleeplock_gen thm
+prf 34417:34428 <> sl_fresh_new
+R34438:34452 xv6iris.RiscvLang <> CpuId class
+binder 34432:34434 <> CID:260
+binder 34455:34455 <> E:261
+R34464:34468 SailStdpp.Values <> mword def
+binder 34458:34460 <> slk:262
+R34479:34484 Stdlib.Strings.String <> string ind
+binder 34475:34475 <> s:263
+R34498:34502 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R34504:34505 xv6iris.SleepLock <> SleepLock.Σ var
+binder 34494:34494 <> R:264
+R34528:34533 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R34514:34521 xv6iris.SleepLock <> sl_fresh def
+R34523:34525 xv6iris.SleepLock <> slk:262 var
+R34527:34527 xv6iris.SleepLock <> s:263 var
+R34553:34558 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R34534:34544 xv6iris.TsoCtx <> own_context def
+R34546:34552 xv6iris.TsoCtx <> cur_ctx def
+R34560:34562 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R34564:34569 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R34559:34559 xv6iris.SleepLock <> R:264 var
+R34563:34563 xv6iris.SleepLock <> E:261 var
+R34563:34563 xv6iris.SleepLock <> E:261 var
+R34589:34597 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R34570:34580 xv6iris.TsoCtx <> own_context def
+R34582:34588 xv6iris.TsoCtx <> cur_ctx def
+R34598:34601 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R34616:34617 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R34611:34615 iris.base_logic.lib.iprop <> gname def
+binder 34602:34604 <> γl:265
+R34611:34615 iris.base_logic.lib.iprop <> gname def
+binder 34606:34607 <> γ:266
+R34618:34629 xv6iris.SleepLock <> is_sleeplock def
+R34631:34633 xv6iris.SleepLock <> γl:265 var
+R34635:34636 xv6iris.SleepLock <> γ:266 var
+R34638:34640 xv6iris.SleepLock <> slk:262 var
+R34642:34642 xv6iris.SleepLock <> s:263 var
+R34644:34644 xv6iris.SleepLock <> R:264 var
+R34732:34732 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34756:34761 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34799:34799 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34733:34745 xv6iris.SleepLock <> new_sleeplock thm
+R34732:34732 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34756:34761 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34799:34799 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R34733:34745 xv6iris.SleepLock <> new_sleeplock thm
+prf 35032:35050 <> sl_fresh_new_gen_at
+R35060:35074 xv6iris.RiscvLang <> CpuId class
+binder 35054:35056 <> CID:267
+binder 35077:35077 <> E:268
+R35085:35089 iris.base_logic.lib.iprop <> gname def
+binder 35080:35081 <> γ:269
+R35105:35109 SailStdpp.Values <> mword def
+binder 35099:35101 <> slk:270
+R35120:35125 Stdlib.Strings.String <> string ind
+binder 35116:35116 <> s:271
+R35133:35137 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R35139:35140 xv6iris.SleepLock <> SleepLock.Σ var
+binder 35129:35129 <> R:272
+R35150:35153 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35148:35149 stdpp.numbers <> Qp rec
+R35154:35158 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R35160:35161 xv6iris.SleepLock <> SleepLock.Σ var
+binder 35144:35144 <> H:273
+R35184:35189 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R35170:35180 xv6iris.SleepLock <> sl_free_tok def
+R35182:35183 xv6iris.SleepLock <> γ:269 var
+R35204:35209 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R35190:35197 xv6iris.SleepLock <> sl_fresh def
+R35199:35201 xv6iris.SleepLock <> slk:270 var
+R35203:35203 xv6iris.SleepLock <> s:271 var
+R35229:35234 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R35210:35220 xv6iris.TsoCtx <> own_context def
+R35222:35228 xv6iris.TsoCtx <> cur_ctx def
+R35236:35238 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R35240:35249 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R35235:35235 xv6iris.SleepLock <> R:272 var
+R35239:35239 xv6iris.SleepLock <> E:268 var
+R35239:35239 xv6iris.SleepLock <> E:268 var
+R35269:35273 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35250:35260 xv6iris.TsoCtx <> own_context def
+R35262:35268 xv6iris.TsoCtx <> cur_ctx def
+R35274:35277 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R35289:35290 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R35284:35288 iris.base_logic.lib.iprop <> gname def
+binder 35278:35280 <> γl:274
+R35291:35306 xv6iris.SleepLock <> is_sleeplock_gen def
+R35308:35310 xv6iris.SleepLock <> γl:274 var
+R35312:35313 xv6iris.SleepLock <> γ:269 var
+R35315:35317 xv6iris.SleepLock <> slk:270 var
+R35319:35319 xv6iris.SleepLock <> s:271 var
+R35321:35321 xv6iris.SleepLock <> R:272 var
+R35323:35323 xv6iris.SleepLock <> H:273 var
+R35417:35417 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R35453:35472 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R35516:35516 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R35418:35437 xv6iris.SleepLock <> new_sleeplock_gen_at thm
+R35417:35417 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R35453:35472 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R35516:35516 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R35418:35437 xv6iris.SleepLock <> new_sleeplock_gen_at thm
+prf 35732:35747 <> sl_fresh_new_tok
+R35757:35771 xv6iris.RiscvLang <> CpuId class
+binder 35751:35753 <> CID:275
+binder 35774:35774 <> E:276
+R35783:35787 SailStdpp.Values <> mword def
+binder 35777:35779 <> slk:277
+R35804:35809 Stdlib.Strings.String <> string ind
+binder 35800:35800 <> s:278
+R35817:35821 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R35823:35824 xv6iris.SleepLock <> SleepLock.Σ var
+binder 35813:35813 <> R:279
+R35847:35852 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R35833:35840 xv6iris.SleepLock <> sl_fresh def
+R35842:35844 xv6iris.SleepLock <> slk:277 var
+R35846:35846 xv6iris.SleepLock <> s:278 var
+R35872:35877 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R35853:35863 xv6iris.TsoCtx <> own_context def
+R35865:35871 xv6iris.TsoCtx <> cur_ctx def
+R35879:35881 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R35883:35888 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R35878:35878 xv6iris.SleepLock <> R:279 var
+R35882:35882 xv6iris.SleepLock <> E:276 var
+R35882:35882 xv6iris.SleepLock <> E:276 var
+R35908:35916 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35889:35899 xv6iris.TsoCtx <> own_context def
+R35901:35907 xv6iris.TsoCtx <> cur_ctx def
+R35917:35920 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R35935:35936 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R35930:35934 iris.base_logic.lib.iprop <> gname def
+binder 35921:35923 <> γl:280
+R35930:35934 iris.base_logic.lib.iprop <> gname def
+binder 35925:35926 <> γ:281
+R35968:35972 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35937:35952 xv6iris.SleepLock <> is_sleeplock_tok def
+R35954:35956 xv6iris.SleepLock <> γl:280 var
+R35958:35959 xv6iris.SleepLock <> γ:281 var
+R35961:35963 xv6iris.SleepLock <> slk:277 var
+R35965:35965 xv6iris.SleepLock <> s:278 var
+R35967:35967 xv6iris.SleepLock <> R:279 var
+R35973:35980 xv6iris.SleepLock <> slh_auth def
+R35982:35983 xv6iris.SleepLock <> γ:281 var
+R35985:35988 Corelib.Init.Datatypes <> None constr
+R36037:36037 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36072:36077 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36090:36090 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36038:36053 xv6iris.SleepLock <> sl_fresh_new_gen thm
+R36065:36071 xv6iris.SleepLock <> slh_tok def
+R36037:36037 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36072:36077 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36090:36090 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36038:36053 xv6iris.SleepLock <> sl_fresh_new_gen thm
+R36065:36071 xv6iris.SleepLock <> slh_tok def
+R36105:36113 xv6iris.SleepLock SleepLock <> sec

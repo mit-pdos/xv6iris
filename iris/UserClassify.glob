@@ -1,0 +1,142 @@
+DIGEST b83bdd06166faaa70bb19d44fe001815
+Fxv6iris.UserClassify
+R27:32 Stdlib.ZArith.ZArith <> <> lib
+R34:37 Stdlib.Bool.Bool <> <> lib
+R39:41 Stdlib.micromega.Lia <> <> lib
+R70:73 stdpp.gmap <> <> lib
+R75:95 stdpp.bitvector.definitions <> <> lib
+R133:141 iris.proofmode.proofmode <> <> lib
+R184:193 iris.base_logic.lib.invariants <> <> lib
+R235:242 iris.program_logic.language <> <> lib
+R244:250 iris.program_logic.lifting <> <> lib
+R268:297 SailStdpp.ConcurrencyInterface <> <> lib
+R299:336 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R338:372 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R374:399 SailStdpp.Operators_mwords <> <> lib
+R417:433 Riscv.rv64d_types <> <> lib
+R435:445 Riscv.rv64d <> <> lib
+R463:476 SailStdpp.Base <> <> lib
+R478:496 SailStdpp.TypeCasts <> <> lib
+R498:513 SailStdpp.Values <> <> lib
+R515:535 SailStdpp.MachineWord <> <> lib
+R553:561 xv6iris.RiscvLang <> <> lib
+R563:572 xv6iris.RiscvPtsto <> <> lib
+R590:599 xv6iris.UserPtTree <> <> lib
+R601:608 xv6iris.UserExec <> <> lib
+R626:631 xv6iris.TsoCtx <> <> lib
+R667:670 Riscv.rv64d_types Defs <> mod
+sec 682:693 <> UserClassify
+R709:715 xv6iris.RiscvPtsto <> riscvGS class
+var  734:736 UserClassify GEN
+var  749:751 UserClassify CID
+var  764:765 UserClassify XI
+R740:744 xv6iris.RiscvLang <> GenId class
+R755:759 xv6iris.RiscvLang <> CpuId class
+R769:774 xv6iris.TsoCtx <> CurCtx class
+var  789:789 UserClassify C
+var  800:801 UserClassify pt
+R793:796 xv6iris.UserExec <> ucfg rec
+R805:808 xv6iris.UserPtTree <> uptd rec
+var  823:825 UserClassify Rut
+R833:836 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R829:832 xv6iris.UserPtTree <> uptd rec
+R837:841 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R843:844 xv6iris.UserClassify <> UserClassify.Σ var
+def 1157:1167 <> u_result_ok
+R1174:1188 Riscv.rv64d_types <> ExecutionResult ind
+binder 1170:1170 <> r:9
+R1226:1233 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R1206:1208 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1205:1205 xv6iris.UserClassify <> r:9 var
+R1209:1222 Riscv.rv64d_types <> Retire_Success constr
+R1224:1225 Corelib.Init.Datatypes <> tt constr
+R1234:1234 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R1356:1364 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R1235:1241 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R1250:1251 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 1242:1242 <> e:10
+binder 1244:1245 <> xv:11
+binder 1247:1249 <> pcx:12
+R1310:1338 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R1253:1255 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1252:1252 xv6iris.UserClassify <> r:9 var
+R1256:1271 Riscv.rv64d_types <> Trap constr
+R1273:1273 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1278:1279 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1304:1305 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1309:1309 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1274:1277 Riscv.rv64d_types <> User constr
+R1280:1298 Riscv.rv64d <> make_sync_exception def
+R1300:1300 xv6iris.UserClassify <> e:10 var
+R1302:1303 xv6iris.UserClassify <> xv:11 var
+R1306:1308 xv6iris.UserClassify <> pcx:12 var
+R1349:1351 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1339:1346 xv6iris.UserExec <> user_exc def
+R1348:1348 xv6iris.UserClassify <> e:10 var
+R1352:1355 Corelib.Init.Datatypes <> true constr
+R1391:1399 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R1472:1472 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R1366:1368 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1365:1365 xv6iris.UserClassify <> r:9 var
+R1369:1387 Riscv.rv64d_types <> Illegal_Instruction constr
+R1389:1390 Corelib.Init.Datatypes <> tt constr
+R1400:1406 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R1409:1410 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 1407:1408 <> wr:13
+R1428:1432 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R1471:1471 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R1412:1414 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1411:1411 xv6iris.UserClassify <> r:9 var
+R1415:1424 Riscv.rv64d_types <> Enter_Wait constr
+R1426:1427 xv6iris.UserClassify <> wr:13 var
+R1450:1453 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R1435:1437 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1433:1434 xv6iris.UserClassify <> wr:13 var
+R1438:1449 Riscv.rv64d_types <> WAIT_WRS_STO constr
+R1456:1458 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1454:1455 xv6iris.UserClassify <> wr:13 var
+R1459:1470 Riscv.rv64d_types <> WAIT_WRS_NTO constr
+def 1618:1631 <> u_step_outcome
+R1639:1642 Riscv.rv64d_types <> Step ind
+binder 1634:1635 <> st:14
+R1659:1659 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R1748:1757 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R1873:1873 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R1660:1667 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R1703:1705 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R1672:1686 Riscv.rv64d_types <> ExecutionResult ind
+binder 1668:1668 <> r:15
+R1695:1699 SailStdpp.Values <> mword def
+binder 1690:1691 <> ib:16
+R1731:1734 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R1708:1710 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1706:1707 xv6iris.UserClassify <> st:14 var
+R1711:1722 Riscv.rv64d_types <> Step_Execute constr
+R1724:1724 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1726:1727 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1730:1730 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1725:1725 xv6iris.UserClassify <> r:15 var
+R1728:1729 xv6iris.UserClassify <> ib:16 var
+R1735:1745 xv6iris.UserClassify <> u_result_ok def
+R1747:1747 xv6iris.UserClassify <> r:15 var
+R1758:1765 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R1799:1811 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R1770:1782 Riscv.rv64d_types <> ExceptionType ind
+binder 1766:1766 <> e:17
+R1791:1795 SailStdpp.Values <> mword def
+binder 1786:1787 <> xv:18
+R1852:1855 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R1814:1816 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1812:1813 xv6iris.UserClassify <> st:14 var
+R1817:1834 Riscv.rv64d_types <> Step_Fetch_Failure constr
+R1836:1836 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1848:1849 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1851:1851 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1837:1844 Riscv.rv64d_types <> Virtaddr constr
+R1846:1847 xv6iris.UserClassify <> xv:18 var
+R1850:1850 xv6iris.UserClassify <> e:17 var
+R1866:1868 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1856:1863 xv6iris.UserExec <> user_exc def
+R1865:1865 xv6iris.UserClassify <> e:17 var
+R1869:1872 Corelib.Init.Datatypes <> true constr
+R4005:4016 xv6iris.UserClassify UserClassify <> sec

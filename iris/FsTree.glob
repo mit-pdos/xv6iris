@@ -1,0 +1,3667 @@
+DIGEST a7fd0465d56a1dda92d5e40fb2a82177
+Fxv6iris.FsTree
+R4503:4508 Stdlib.ZArith.ZArith <> <> lib
+R4510:4512 Stdlib.micromega.Lia <> <> lib
+R4514:4517 Stdlib.Lists.List <> <> lib
+R4546:4549 stdpp.gmap <> <> lib
+R4551:4554 stdpp.list <> <> lib
+R4556:4576 stdpp.bitvector.definitions <> <> lib
+R4594:4609 SailStdpp.Values <> <> lib
+R4627:4641 xv6iris.RiscvModelBytes <> <> lib
+R4659:4667 xv6iris.DinodeEnc <> <> lib
+R4685:4693 xv6iris.DirentEnc <> <> lib
+R4711:4719 xv6iris.InodeDefs <> <> lib
+R4737:4743 xv6iris.DirView <> <> lib
+def 5319:5323 <> fname
+R5328:5331 Corelib.Init.Datatypes <> list ind
+R5334:5335 stdpp.bitvector.definitions <> bv rec
+inst 5358:5369 <> fname_eq_dec
+R5373:5382 stdpp.base <> EqDecision abbrev
+R5384:5388 xv6iris.FsTree <> fname def
+inst 5412:5426 <> fname_countable
+R5430:5438 stdpp.countable <> Countable class
+R5440:5444 xv6iris.FsTree <> fname def
+def 6052:6054 <> DOT
+R6058:6062 xv6iris.FsTree <> fname def
+R6067:6068 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R6094:6095 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R6087:6091 SailStdpp.Values <> mword def
+R6069:6080 SailStdpp.Values <> mword_of_int def
+def 6109:6114 <> DOTDOT
+R6118:6122 xv6iris.FsTree <> fname def
+R6129:6130 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R6156:6159 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R6185:6186 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R6149:6153 SailStdpp.Values <> mword def
+R6131:6142 SailStdpp.Values <> mword_of_int def
+R6178:6182 SailStdpp.Values <> mword def
+R6160:6171 SailStdpp.Values <> mword_of_int def
+ind 6684:6689 <> fsnode
+constr 6696:6700 <> NFile
+constr 6723:6726 <> NDir
+R6708:6711 Corelib.Init.Datatypes <> list ind
+R6714:6715 stdpp.bitvector.definitions <> bv rec
+binder 6703:6704 <> bs:3
+R6737:6740 stdpp.gmap <> gmap rec
+R6748:6748 Corelib.Numbers.BinNums <> Z ind
+R6742:6746 xv6iris.FsTree <> fname def
+binder 6730:6733 <> ents:4
+scheme 6684:6689 <> fsnode_rect
+scheme 6684:6689 <> fsnode_ind
+scheme 6684:6689 <> fsnode_rec
+scheme 6684:6689 <> fsnode_sind
+rec 6760:6765 <> fstree
+proj 6779:6786 <> fs_nodes
+proj 6805:6811 <> fs_root
+R6790:6793 stdpp.gmap <> gmap rec
+R6797:6802 xv6iris.FsTree <> fsnode ind
+R6795:6795 Corelib.Numbers.BinNums <> Z ind
+R6815:6815 Corelib.Numbers.BinNums <> Z ind
+def 7104:7112 <> dir_bname
+R7125:7128 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7122:7124 Corelib.Init.Datatypes <> nat ind
+R7129:7132 Corelib.Init.Datatypes <> list ind
+R7135:7136 stdpp.bitvector.definitions <> bv rec
+binder 7115:7118 <> data:8
+R7147:7149 Corelib.Init.Datatypes <> nat ind
+binder 7143:7143 <> k:9
+R7154:7158 xv6iris.FsTree <> fname def
+R7165:7169 xv6iris.DirentEnc <> bname def
+R7175:7182 xv6iris.DirView <> dir_name def
+R7184:7187 xv6iris.FsTree <> data:8 var
+R7189:7189 xv6iris.FsTree <> k:9 var
+def 7634:7641 <> dir_wins
+R7654:7657 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7651:7653 Corelib.Init.Datatypes <> nat ind
+R7658:7661 Corelib.Init.Datatypes <> list ind
+R7664:7665 stdpp.bitvector.definitions <> bv rec
+binder 7644:7647 <> data:10
+R7676:7678 Corelib.Init.Datatypes <> nat ind
+binder 7672:7672 <> k:11
+R7683:7686 Corelib.Init.Datatypes <> bool ind
+R7709:7712 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R7693:7701 xv6iris.DirView <> dir_liveb def
+R7703:7706 xv6iris.FsTree <> data:10 var
+R7708:7708 xv6iris.FsTree <> k:11 var
+R7713:7723 stdpp.decidable <> bool_decide def
+R7761:7763 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7726:7734 xv6iris.DirView <> dir_first def
+R7736:7739 xv6iris.FsTree <> data:10 var
+R7741:7741 xv6iris.FsTree <> k:11 var
+R7744:7752 xv6iris.FsTree <> dir_bname def
+R7754:7757 xv6iris.FsTree <> data:10 var
+R7759:7759 xv6iris.FsTree <> k:11 var
+R7764:7767 Corelib.Init.Datatypes <> None constr
+def 7783:7791 <> dir_entry
+R7804:7807 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7801:7803 Corelib.Init.Datatypes <> nat ind
+R7808:7811 Corelib.Init.Datatypes <> list ind
+R7814:7815 stdpp.bitvector.definitions <> bv rec
+binder 7794:7797 <> data:12
+R7826:7828 Corelib.Init.Datatypes <> nat ind
+binder 7822:7822 <> k:13
+R7835:7840 Corelib.Init.Datatypes <> option ind
+R7848:7850 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R7843:7847 xv6iris.FsTree <> fname def
+R7851:7851 Corelib.Numbers.BinNums <> Z ind
+R7862:7869 xv6iris.FsTree <> dir_wins def
+R7871:7874 xv6iris.FsTree <> data:12 var
+R7876:7876 xv6iris.FsTree <> k:13 var
+R7947:7950 Corelib.Init.Datatypes <> None constr
+R7885:7888 Corelib.Init.Datatypes <> Some constr
+R7890:7890 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7907:7908 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7938:7938 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7891:7899 xv6iris.FsTree <> dir_bname def
+R7901:7904 xv6iris.FsTree <> data:12 var
+R7906:7906 xv6iris.FsTree <> k:13 var
+R7909:7919 stdpp.bitvector.definitions <> bv_unsigned proj
+R7922:7929 xv6iris.DirView <> dir_inum def
+R7931:7934 xv6iris.FsTree <> data:12 var
+R7936:7936 xv6iris.FsTree <> k:13 var
+def 8276:8283 <> dir_view
+R8296:8299 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8293:8295 Corelib.Init.Datatypes <> nat ind
+R8300:8303 Corelib.Init.Datatypes <> list ind
+R8306:8307 stdpp.bitvector.definitions <> bv rec
+binder 8286:8289 <> data:14
+R8321:8323 Corelib.Init.Datatypes <> nat ind
+binder 8314:8317 <> nrec:15
+R8328:8331 stdpp.gmap <> gmap rec
+R8339:8339 Corelib.Numbers.BinNums <> Z ind
+R8333:8337 xv6iris.FsTree <> fname def
+R8346:8356 stdpp.fin_maps <> list_to_map def
+R8359:8362 stdpp.base <> omap def
+R8382:8384 Corelib.Lists.ListDef <> seq def
+R8388:8391 xv6iris.FsTree <> nrec:15 var
+R8365:8373 xv6iris.FsTree <> dir_entry def
+R8375:8378 xv6iris.FsTree <> data:14 var
+prf 8481:8493 <> dir_wins_true
+R8506:8509 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8503:8505 Corelib.Init.Datatypes <> nat ind
+R8510:8513 Corelib.Init.Datatypes <> list ind
+R8516:8517 stdpp.bitvector.definitions <> bv rec
+binder 8496:8499 <> data:16
+R8528:8530 Corelib.Init.Datatypes <> nat ind
+binder 8524:8524 <> k:17
+R8559:8566 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R8628:8628 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R8552:8554 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8537:8544 xv6iris.FsTree <> dir_wins def
+R8546:8549 xv6iris.FsTree <> data:16 var
+R8551:8551 xv6iris.FsTree <> k:17 var
+R8555:8558 Corelib.Init.Datatypes <> true constr
+R8582:8585 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R8567:8574 xv6iris.DirView <> dir_live def
+R8576:8579 xv6iris.FsTree <> data:16 var
+R8581:8581 xv6iris.FsTree <> k:17 var
+R8621:8623 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8586:8594 xv6iris.DirView <> dir_first def
+R8596:8599 xv6iris.FsTree <> data:16 var
+R8601:8601 xv6iris.FsTree <> k:17 var
+R8604:8612 xv6iris.FsTree <> dir_bname def
+R8614:8617 xv6iris.FsTree <> data:16 var
+R8619:8619 xv6iris.FsTree <> k:17 var
+R8624:8627 Corelib.Init.Datatypes <> None constr
+R8647:8654 xv6iris.FsTree <> dir_wins def
+R8665:8677 Stdlib.Bool.Bool <> andb_true_iff thm
+R8665:8677 Stdlib.Bool.Bool <> andb_true_iff thm
+R8665:8677 Stdlib.Bool.Bool <> andb_true_iff thm
+R8688:8701 xv6iris.DirView <> dir_liveb_true thm
+R8688:8701 xv6iris.DirView <> dir_liveb_true thm
+R8688:8701 xv6iris.DirView <> dir_liveb_true thm
+R8714:8732 stdpp.decidable <> bool_decide_eq_true thm
+R8714:8732 stdpp.decidable <> bool_decide_eq_true thm
+R8714:8732 stdpp.decidable <> bool_decide_eq_true thm
+prf 8760:8772 <> dir_wins_live
+R8785:8788 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8782:8784 Corelib.Init.Datatypes <> nat ind
+R8789:8792 Corelib.Init.Datatypes <> list ind
+R8795:8796 stdpp.bitvector.definitions <> bv rec
+binder 8775:8778 <> data:18
+R8807:8809 Corelib.Init.Datatypes <> nat ind
+binder 8803:8803 <> k:19
+R8838:8841 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8831:8833 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8816:8823 xv6iris.FsTree <> dir_wins def
+R8825:8828 xv6iris.FsTree <> data:18 var
+R8830:8830 xv6iris.FsTree <> k:19 var
+R8834:8837 Corelib.Init.Datatypes <> true constr
+R8842:8849 xv6iris.DirView <> dir_live def
+R8851:8854 xv6iris.FsTree <> data:18 var
+R8856:8856 xv6iris.FsTree <> k:19 var
+R8883:8887 Corelib.Init.Logic <> proj1 thm
+R8890:8894 Corelib.Init.Logic <> proj1 thm
+R8897:8909 xv6iris.FsTree <> dir_wins_true thm
+R8883:8887 Corelib.Init.Logic <> proj1 thm
+R8890:8894 Corelib.Init.Logic <> proj1 thm
+R8897:8909 xv6iris.FsTree <> dir_wins_true thm
+prf 8936:8949 <> dir_first_wins
+R8962:8965 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8959:8961 Corelib.Init.Datatypes <> nat ind
+R8966:8969 Corelib.Init.Datatypes <> list ind
+R8972:8973 stdpp.bitvector.definitions <> bv rec
+binder 8952:8955 <> data:20
+R8989:8991 Corelib.Init.Datatypes <> nat ind
+binder 8980:8983 <> nrec:21
+binder 8985:8985 <> k:22
+R9012:9018 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9093:9093 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9000:9002 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R8999:8999 xv6iris.FsTree <> k:22 var
+R9003:9006 xv6iris.FsTree <> nrec:21 var
+R9066:9070 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R9057:9059 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9019:9027 xv6iris.DirView <> dir_first def
+R9029:9032 xv6iris.FsTree <> data:20 var
+R9034:9037 xv6iris.FsTree <> nrec:21 var
+R9040:9048 xv6iris.FsTree <> dir_bname def
+R9050:9053 xv6iris.FsTree <> data:20 var
+R9055:9055 xv6iris.FsTree <> k:22 var
+R9060:9063 Corelib.Init.Datatypes <> Some constr
+R9065:9065 xv6iris.FsTree <> k:22 var
+R9086:9088 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9071:9078 xv6iris.FsTree <> dir_wins def
+R9080:9083 xv6iris.FsTree <> data:20 var
+R9085:9085 xv6iris.FsTree <> k:22 var
+R9089:9092 Corelib.Init.Datatypes <> true constr
+R9124:9136 xv6iris.FsTree <> dir_wins_true thm
+R9124:9136 xv6iris.FsTree <> dir_wins_true thm
+R9124:9136 xv6iris.FsTree <> dir_wins_true thm
+R9166:9179 xv6iris.DirView <> dir_first_Some thm
+R9166:9179 xv6iris.DirView <> dir_first_Some thm
+R9255:9268 xv6iris.DirView <> dir_first_None thm
+R9255:9268 xv6iris.DirView <> dir_first_None thm
+R9314:9327 xv6iris.DirView <> dir_first_Some thm
+R9314:9327 xv6iris.DirView <> dir_first_Some thm
+R9408:9421 xv6iris.DirView <> dir_first_None thm
+R9408:9421 xv6iris.DirView <> dir_first_None thm
+prf 9528:9538 <> dir_first_S
+R9551:9554 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9548:9550 Corelib.Init.Datatypes <> nat ind
+R9555:9558 Corelib.Init.Datatypes <> list ind
+R9561:9562 stdpp.bitvector.definitions <> bv rec
+binder 9541:9544 <> data:23
+R9573:9575 Corelib.Init.Datatypes <> nat ind
+binder 9569:9569 <> n:24
+R9583:9587 xv6iris.FsTree <> fname def
+binder 9579:9579 <> s:25
+R9616:9620 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9594:9602 xv6iris.DirView <> dir_first def
+R9604:9607 xv6iris.FsTree <> data:23 var
+R9610:9610 Corelib.Init.Datatypes <> S constr
+R9612:9612 xv6iris.FsTree <> n:24 var
+R9615:9615 xv6iris.FsTree <> s:25 var
+R9627:9635 xv6iris.DirView <> dir_first def
+R9637:9640 xv6iris.FsTree <> data:23 var
+R9642:9642 xv6iris.FsTree <> n:24 var
+R9644:9644 xv6iris.FsTree <> s:25 var
+R9657:9660 Corelib.Init.Datatypes <> Some constr
+R9667:9670 Corelib.Init.Datatypes <> Some constr
+R9680:9683 Corelib.Init.Datatypes <> None constr
+R9691:9700 xv6iris.DirView <> dir_matchb def
+R9702:9705 xv6iris.FsTree <> data:23 var
+R9707:9707 xv6iris.FsTree <> n:24 var
+R9709:9709 xv6iris.FsTree <> s:25 var
+R9728:9731 Corelib.Init.Datatypes <> None constr
+R9716:9719 Corelib.Init.Datatypes <> Some constr
+R9721:9721 xv6iris.FsTree <> n:24 var
+R9756:9764 xv6iris.DirView <> dir_first def
+R9773:9780 xv6iris.DirView <> dfirst_S thm
+R9773:9780 xv6iris.DirView <> dfirst_S thm
+prf 9795:9806 <> dir_view_nil
+R9819:9822 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9816:9818 Corelib.Init.Datatypes <> nat ind
+R9823:9826 Corelib.Init.Datatypes <> list ind
+R9829:9830 stdpp.bitvector.definitions <> bv rec
+binder 9809:9812 <> data:26
+R9853:9855 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9838:9845 xv6iris.FsTree <> dir_view def
+R9847:9850 xv6iris.FsTree <> data:26 var
+R9856:9858 stdpp.base <> ::stdpp_scope:'∅' not
+prf 9893:9902 <> dir_view_S
+R9915:9918 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9912:9914 Corelib.Init.Datatypes <> nat ind
+R9919:9922 Corelib.Init.Datatypes <> list ind
+R9925:9926 stdpp.bitvector.definitions <> bv rec
+binder 9905:9908 <> data:27
+R9937:9939 Corelib.Init.Datatypes <> nat ind
+binder 9933:9933 <> n:28
+R9965:9969 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9946:9953 xv6iris.FsTree <> dir_view def
+R9955:9958 xv6iris.FsTree <> data:27 var
+R9961:9961 Corelib.Init.Datatypes <> S constr
+R9963:9963 xv6iris.FsTree <> n:28 var
+R9985:9994 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R10099:10099 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9970:9977 xv6iris.FsTree <> dir_view def
+R9979:9982 xv6iris.FsTree <> data:27 var
+R9984:9984 xv6iris.FsTree <> n:28 var
+R9998:10005 xv6iris.FsTree <> dir_wins def
+R10007:10010 xv6iris.FsTree <> data:27 var
+R10012:10012 xv6iris.FsTree <> n:28 var
+R10096:10098 stdpp.base <> ::stdpp_scope:'∅' not
+R10026:10027 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R10044:10047 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R10077:10082 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R10028:10036 xv6iris.FsTree <> dir_bname def
+R10038:10041 xv6iris.FsTree <> data:27 var
+R10043:10043 xv6iris.FsTree <> n:28 var
+R10048:10058 stdpp.bitvector.definitions <> bv_unsigned proj
+R10061:10068 xv6iris.DirView <> dir_inum def
+R10070:10073 xv6iris.FsTree <> data:27 var
+R10075:10075 xv6iris.FsTree <> n:28 var
+R10080:10082 stdpp.base <> ::stdpp_scope:'∅' not
+R10118:10125 xv6iris.FsTree <> dir_view def
+R10136:10140 Stdlib.Lists.List <> seq_S thm
+R10136:10140 Stdlib.Lists.List <> seq_S thm
+R10136:10140 Stdlib.Lists.List <> seq_S thm
+R10155:10157 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R10155:10157 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R10190:10197 stdpp.list_monad <> omap_app thm
+R10190:10197 stdpp.list_monad <> omap_app thm
+R10190:10197 stdpp.list_monad <> omap_app thm
+R10208:10222 stdpp.fin_maps <> list_to_map_app thm
+R10208:10222 stdpp.fin_maps <> list_to_map_app thm
+R10208:10222 stdpp.fin_maps <> list_to_map_app thm
+R10241:10244 stdpp.base <> omap def
+R10246:10254 stdpp.list_monad <> list_omap inst
+R10256:10266 stdpp.fin_maps <> list_to_map def
+R10277:10285 xv6iris.FsTree <> dir_entry def
+R10300:10307 xv6iris.FsTree <> dir_wins def
+R10323:10331 stdpp.list_monad <> list_omap inst
+R10333:10343 stdpp.fin_maps <> list_to_map def
+R10300:10307 xv6iris.FsTree <> dir_wins def
+prf 10561:10577 <> dir_view_S_lookup
+R10590:10593 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10587:10589 Corelib.Init.Datatypes <> nat ind
+R10594:10597 Corelib.Init.Datatypes <> list ind
+R10600:10601 stdpp.bitvector.definitions <> bv rec
+binder 10580:10583 <> data:29
+R10612:10614 Corelib.Init.Datatypes <> nat ind
+binder 10608:10608 <> n:30
+R10622:10626 xv6iris.FsTree <> fname def
+binder 10618:10618 <> s:31
+R10657:10661 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10652:10655 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R10656:10656 xv6iris.FsTree <> s:31 var
+R10633:10640 xv6iris.FsTree <> dir_view def
+R10642:10645 xv6iris.FsTree <> data:29 var
+R10648:10648 Corelib.Init.Datatypes <> S constr
+R10650:10650 xv6iris.FsTree <> n:30 var
+R10683:10686 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R10687:10687 xv6iris.FsTree <> s:31 var
+R10668:10675 xv6iris.FsTree <> dir_view def
+R10677:10680 xv6iris.FsTree <> data:29 var
+R10682:10682 xv6iris.FsTree <> n:30 var
+R10700:10703 Corelib.Init.Datatypes <> Some constr
+R10710:10713 Corelib.Init.Datatypes <> Some constr
+R10723:10726 Corelib.Init.Datatypes <> None constr
+R10749:10752 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R10734:10741 xv6iris.FsTree <> dir_wins def
+R10743:10746 xv6iris.FsTree <> data:29 var
+R10748:10748 xv6iris.FsTree <> n:30 var
+R10753:10763 stdpp.decidable <> bool_decide def
+R10782:10784 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10766:10774 xv6iris.FsTree <> dir_bname def
+R10776:10779 xv6iris.FsTree <> data:29 var
+R10781:10781 xv6iris.FsTree <> n:30 var
+R10785:10785 xv6iris.FsTree <> s:31 var
+R10863:10866 Corelib.Init.Datatypes <> None constr
+R10807:10810 Corelib.Init.Datatypes <> Some constr
+R10813:10823 stdpp.bitvector.definitions <> bv_unsigned proj
+R10826:10833 xv6iris.DirView <> dir_inum def
+R10835:10838 xv6iris.FsTree <> data:29 var
+R10840:10840 xv6iris.FsTree <> n:30 var
+R10894:10903 xv6iris.FsTree <> dir_view_S thm
+R10894:10903 xv6iris.FsTree <> dir_view_S thm
+R10894:10903 xv6iris.FsTree <> dir_view_S thm
+R10914:10925 stdpp.fin_maps <> lookup_union thm
+R10914:10925 stdpp.fin_maps <> lookup_union thm
+R10914:10925 stdpp.fin_maps <> lookup_union thm
+R10940:10947 xv6iris.FsTree <> dir_wins def
+R10970:10973 Corelib.Init.Datatypes <> andb def
+R10940:10947 xv6iris.FsTree <> dir_wins def
+R10991:10996 stdpp.base <> decide def
+R11015:11017 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10999:11007 xv6iris.FsTree <> dir_bname def
+R10991:10996 stdpp.base <> decide def
+R11015:11017 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10999:11007 xv6iris.FsTree <> dir_bname def
+R11053:11073 stdpp.decidable <> bool_decide_eq_true_2 thm
+R11092:11094 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11076:11084 xv6iris.FsTree <> dir_bname def
+R11053:11073 stdpp.decidable <> bool_decide_eq_true_2 thm
+R11092:11094 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11076:11084 xv6iris.FsTree <> dir_bname def
+R11053:11073 stdpp.decidable <> bool_decide_eq_true_2 thm
+R11092:11094 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11076:11084 xv6iris.FsTree <> dir_bname def
+R11131:11143 stdpp.fin_maps <> lookup_insert thm
+R11131:11143 stdpp.fin_maps <> lookup_insert thm
+R11131:11143 stdpp.fin_maps <> lookup_insert thm
+R11177:11180 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R11162:11169 xv6iris.FsTree <> dir_view def
+R11177:11180 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R11162:11169 xv6iris.FsTree <> dir_view def
+R11221:11236 stdpp.fin_maps <> lookup_insert_ne thm
+R11221:11236 stdpp.fin_maps <> lookup_insert_ne thm
+R11221:11236 stdpp.fin_maps <> lookup_insert_ne thm
+R11260:11271 stdpp.fin_maps <> lookup_empty meth
+R11260:11271 stdpp.fin_maps <> lookup_empty meth
+R11260:11271 stdpp.fin_maps <> lookup_empty meth
+R11289:11310 stdpp.decidable <> bool_decide_eq_false_2 thm
+R11329:11331 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11313:11321 xv6iris.FsTree <> dir_bname def
+R11289:11310 stdpp.decidable <> bool_decide_eq_false_2 thm
+R11329:11331 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11313:11321 xv6iris.FsTree <> dir_bname def
+R11289:11310 stdpp.decidable <> bool_decide_eq_false_2 thm
+R11329:11331 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11313:11321 xv6iris.FsTree <> dir_bname def
+R11372:11375 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R11357:11364 xv6iris.FsTree <> dir_view def
+R11372:11375 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R11357:11364 xv6iris.FsTree <> dir_view def
+R11414:11425 stdpp.fin_maps <> lookup_empty meth
+R11414:11425 stdpp.fin_maps <> lookup_empty meth
+R11414:11425 stdpp.fin_maps <> lookup_empty meth
+R11457:11460 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R11442:11449 xv6iris.FsTree <> dir_view def
+R11457:11460 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R11442:11449 xv6iris.FsTree <> dir_view def
+prf 11747:11761 <> dir_view_lookup
+R11774:11777 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11771:11773 Corelib.Init.Datatypes <> nat ind
+R11778:11781 Corelib.Init.Datatypes <> list ind
+R11784:11785 stdpp.bitvector.definitions <> bv rec
+binder 11764:11767 <> data:32
+R11799:11801 Corelib.Init.Datatypes <> nat ind
+binder 11792:11795 <> nrec:33
+R11809:11813 xv6iris.FsTree <> fname def
+binder 11805:11805 <> s:34
+R11843:11847 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11838:11841 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R11842:11842 xv6iris.FsTree <> s:34 var
+R11820:11827 xv6iris.FsTree <> dir_view def
+R11829:11832 xv6iris.FsTree <> data:32 var
+R11834:11837 xv6iris.FsTree <> nrec:33 var
+R11848:11848 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R11887:11892 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+binder 11853:11853 <> k:35
+R11858:11868 stdpp.bitvector.definitions <> bv_unsigned proj
+R11871:11878 xv6iris.DirView <> dir_inum def
+R11880:11883 xv6iris.FsTree <> data:32 var
+R11885:11885 xv6iris.FsTree <> k:35 var
+R11893:11901 xv6iris.DirView <> dir_first def
+R11903:11906 xv6iris.FsTree <> data:32 var
+R11908:11911 xv6iris.FsTree <> nrec:33 var
+R11913:11913 xv6iris.FsTree <> s:34 var
+R11982:11998 xv6iris.FsTree <> dir_view_S_lookup thm
+R11982:11998 xv6iris.FsTree <> dir_view_S_lookup thm
+R11982:11998 xv6iris.FsTree <> dir_view_S_lookup thm
+R12021:12031 xv6iris.FsTree <> dir_first_S thm
+R12021:12031 xv6iris.FsTree <> dir_first_S thm
+R12021:12031 xv6iris.FsTree <> dir_first_S thm
+R12048:12056 xv6iris.DirView <> dir_first def
+R12096:12099 stdpp.base <> fmap def
+R12101:12111 stdpp.option <> option_fmap inst
+R12113:12122 Corelib.Init.Datatypes <> option_map def
+R12048:12056 xv6iris.DirView <> dir_first def
+R12157:12166 xv6iris.DirView <> dir_matchb def
+R12157:12166 xv6iris.DirView <> dir_matchb def
+R12206:12214 xv6iris.DirView <> dir_match def
+R12236:12250 xv6iris.DirView <> dir_matchb_true thm
+R12206:12214 xv6iris.DirView <> dir_match def
+R12236:12250 xv6iris.DirView <> dir_matchb_true thm
+R12335:12337 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12320:12327 xv6iris.FsTree <> dir_wins def
+R12338:12341 Corelib.Init.Datatypes <> true constr
+R12335:12337 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12320:12327 xv6iris.FsTree <> dir_wins def
+R12338:12341 Corelib.Init.Datatypes <> true constr
+R12359:12371 xv6iris.FsTree <> dir_wins_true thm
+R12359:12371 xv6iris.FsTree <> dir_wins_true thm
+R12413:12421 xv6iris.FsTree <> dir_bname def
+R12474:12477 Corelib.Init.Datatypes <> andb def
+R12496:12516 stdpp.decidable <> bool_decide_eq_true_2 thm
+R12535:12537 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12519:12527 xv6iris.FsTree <> dir_bname def
+R12496:12516 stdpp.decidable <> bool_decide_eq_true_2 thm
+R12535:12537 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12519:12527 xv6iris.FsTree <> dir_bname def
+R12496:12516 stdpp.decidable <> bool_decide_eq_true_2 thm
+R12535:12537 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12519:12527 xv6iris.FsTree <> dir_bname def
+R12496:12516 stdpp.decidable <> bool_decide_eq_true_2 thm
+R12535:12537 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12519:12527 xv6iris.FsTree <> dir_bname def
+R12560:12568 xv6iris.FsTree <> dir_bname def
+R12621:12628 xv6iris.FsTree <> dir_wins def
+R12651:12654 Corelib.Init.Datatypes <> andb def
+R12621:12628 xv6iris.FsTree <> dir_wins def
+R12711:12714 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R12695:12703 xv6iris.FsTree <> dir_bname def
+R12711:12714 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R12695:12703 xv6iris.FsTree <> dir_bname def
+R12745:12757 xv6iris.FsTree <> dir_wins_true thm
+R12745:12757 xv6iris.FsTree <> dir_wins_true thm
+R12811:12819 xv6iris.DirView <> dir_match def
+R12811:12819 xv6iris.DirView <> dir_match def
+R12908:12922 xv6iris.DirView <> dir_matchb_true thm
+R12908:12922 xv6iris.DirView <> dir_matchb_true thm
+R12982:13003 stdpp.decidable <> bool_decide_eq_false_2 thm
+R13022:13024 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13006:13014 xv6iris.FsTree <> dir_bname def
+R12982:13003 stdpp.decidable <> bool_decide_eq_false_2 thm
+R13022:13024 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13006:13014 xv6iris.FsTree <> dir_bname def
+R12982:13003 stdpp.decidable <> bool_decide_eq_false_2 thm
+R13022:13024 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13006:13014 xv6iris.FsTree <> dir_bname def
+prf 13065:13084 <> dir_view_lookup_Some
+R13097:13100 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13094:13096 Corelib.Init.Datatypes <> nat ind
+R13101:13104 Corelib.Init.Datatypes <> list ind
+R13107:13108 stdpp.bitvector.definitions <> bv rec
+binder 13087:13090 <> data:36
+R13122:13124 Corelib.Init.Datatypes <> nat ind
+binder 13115:13118 <> nrec:37
+R13136:13140 xv6iris.FsTree <> fname def
+binder 13132:13132 <> s:38
+R13148:13148 Corelib.Numbers.BinNums <> Z ind
+binder 13144:13144 <> z:39
+R13187:13194 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R13301:13301 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R13178:13180 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13173:13176 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R13177:13177 xv6iris.FsTree <> s:38 var
+R13155:13162 xv6iris.FsTree <> dir_view def
+R13164:13167 xv6iris.FsTree <> data:36 var
+R13169:13172 xv6iris.FsTree <> nrec:37 var
+R13181:13184 Corelib.Init.Datatypes <> Some constr
+R13186:13186 xv6iris.FsTree <> z:39 var
+R13195:13201 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R13209:13210 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R13206:13208 Corelib.Init.Datatypes <> nat ind
+binder 13202:13202 <> k:40
+R13241:13267 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R13232:13234 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13211:13219 xv6iris.DirView <> dir_first def
+R13221:13224 xv6iris.FsTree <> data:36 var
+R13226:13229 xv6iris.FsTree <> nrec:37 var
+R13231:13231 xv6iris.FsTree <> s:38 var
+R13235:13238 Corelib.Init.Datatypes <> Some constr
+R13240:13240 xv6iris.FsTree <> k:40 var
+R13297:13299 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13268:13278 stdpp.bitvector.definitions <> bv_unsigned proj
+R13281:13288 xv6iris.DirView <> dir_inum def
+R13290:13293 xv6iris.FsTree <> data:36 var
+R13295:13295 xv6iris.FsTree <> k:40 var
+R13300:13300 xv6iris.FsTree <> z:39 var
+R13321:13335 xv6iris.FsTree <> dir_view_lookup thm
+R13321:13335 xv6iris.FsTree <> dir_view_lookup thm
+R13321:13335 xv6iris.FsTree <> dir_view_lookup thm
+R13369:13377 xv6iris.DirView <> dir_first def
+R13369:13377 xv6iris.DirView <> dir_first def
+prf 13547:13566 <> dir_view_lookup_None
+R13579:13582 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13576:13578 Corelib.Init.Datatypes <> nat ind
+R13583:13586 Corelib.Init.Datatypes <> list ind
+R13589:13590 stdpp.bitvector.definitions <> bv rec
+binder 13569:13572 <> data:41
+R13604:13606 Corelib.Init.Datatypes <> nat ind
+binder 13597:13600 <> nrec:42
+R13618:13622 xv6iris.FsTree <> fname def
+binder 13614:13614 <> s:43
+R13659:13663 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R13652:13654 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13647:13650 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R13651:13651 xv6iris.FsTree <> s:43 var
+R13629:13636 xv6iris.FsTree <> dir_view def
+R13638:13641 xv6iris.FsTree <> data:41 var
+R13643:13646 xv6iris.FsTree <> nrec:42 var
+R13655:13658 Corelib.Init.Datatypes <> None constr
+R13685:13687 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13664:13672 xv6iris.DirView <> dir_first def
+R13674:13677 xv6iris.FsTree <> data:41 var
+R13679:13682 xv6iris.FsTree <> nrec:42 var
+R13684:13684 xv6iris.FsTree <> s:43 var
+R13688:13691 Corelib.Init.Datatypes <> None constr
+R13711:13725 xv6iris.FsTree <> dir_view_lookup thm
+R13711:13725 xv6iris.FsTree <> dir_view_lookup thm
+R13711:13725 xv6iris.FsTree <> dir_view_lookup thm
+R13740:13748 xv6iris.DirView <> dir_first def
+R13782:13785 stdpp.base <> fmap def
+R13787:13797 stdpp.option <> option_fmap inst
+R13799:13808 Corelib.Init.Datatypes <> option_map def
+R13740:13748 xv6iris.DirView <> dir_first def
+prf 13883:13908 <> dir_view_lookup_None_match
+R13921:13924 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13918:13920 Corelib.Init.Datatypes <> nat ind
+R13925:13928 Corelib.Init.Datatypes <> list ind
+R13931:13932 stdpp.bitvector.definitions <> bv rec
+binder 13911:13914 <> data:44
+R13946:13948 Corelib.Init.Datatypes <> nat ind
+binder 13939:13942 <> nrec:45
+R13960:13964 xv6iris.FsTree <> fname def
+binder 13956:13956 <> s:46
+R14001:14008 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R14063:14063 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R13994:13996 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13989:13992 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R13993:13993 xv6iris.FsTree <> s:46 var
+R13971:13978 xv6iris.FsTree <> dir_view def
+R13980:13983 xv6iris.FsTree <> data:44 var
+R13985:13988 xv6iris.FsTree <> nrec:45 var
+R13997:14000 Corelib.Init.Datatypes <> None constr
+R14009:14015 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R14023:14024 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R14020:14022 Corelib.Init.Datatypes <> nat ind
+binder 14016:14016 <> k:47
+R14039:14042 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14027:14029 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14026:14026 xv6iris.FsTree <> k:47 var
+R14030:14033 xv6iris.FsTree <> nrec:45 var
+R14043:14044 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R14045:14053 xv6iris.DirView <> dir_match def
+R14055:14058 xv6iris.FsTree <> data:44 var
+R14060:14060 xv6iris.FsTree <> k:47 var
+R14062:14062 xv6iris.FsTree <> s:46 var
+R14081:14100 xv6iris.FsTree <> dir_view_lookup_None thm
+R14081:14100 xv6iris.FsTree <> dir_view_lookup_None thm
+R14081:14100 xv6iris.FsTree <> dir_view_lookup_None thm
+R14109:14122 xv6iris.DirView <> dir_first_None thm
+R14109:14122 xv6iris.DirView <> dir_first_None thm
+prf 14209:14227 <> dir_view_lookup_rec
+R14240:14243 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14237:14239 Corelib.Init.Datatypes <> nat ind
+R14244:14247 Corelib.Init.Datatypes <> list ind
+R14250:14251 stdpp.bitvector.definitions <> bv rec
+binder 14230:14233 <> data:48
+R14265:14267 Corelib.Init.Datatypes <> nat ind
+binder 14258:14261 <> nrec:49
+R14279:14283 xv6iris.FsTree <> fname def
+binder 14275:14275 <> s:50
+R14291:14291 Corelib.Numbers.BinNums <> Z ind
+binder 14287:14287 <> z:51
+R14330:14335 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14321:14323 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14316:14319 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R14320:14320 xv6iris.FsTree <> s:50 var
+R14298:14305 xv6iris.FsTree <> dir_view def
+R14307:14310 xv6iris.FsTree <> data:48 var
+R14312:14315 xv6iris.FsTree <> nrec:49 var
+R14324:14327 Corelib.Init.Datatypes <> Some constr
+R14329:14329 xv6iris.FsTree <> z:51 var
+R14336:14342 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R14350:14351 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R14347:14349 Corelib.Init.Datatypes <> nat ind
+binder 14343:14343 <> k:52
+R14366:14369 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R14354:14356 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14353:14353 xv6iris.FsTree <> k:52 var
+R14357:14360 xv6iris.FsTree <> nrec:49 var
+R14385:14388 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R14370:14377 xv6iris.DirView <> dir_live def
+R14379:14382 xv6iris.FsTree <> data:48 var
+R14384:14384 xv6iris.FsTree <> k:52 var
+R14409:14430 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R14405:14407 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14389:14397 xv6iris.FsTree <> dir_bname def
+R14399:14402 xv6iris.FsTree <> data:48 var
+R14404:14404 xv6iris.FsTree <> k:52 var
+R14408:14408 xv6iris.FsTree <> s:50 var
+R14460:14462 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14431:14441 stdpp.bitvector.definitions <> bv_unsigned proj
+R14444:14451 xv6iris.DirView <> dir_inum def
+R14453:14456 xv6iris.FsTree <> data:48 var
+R14458:14458 xv6iris.FsTree <> k:52 var
+R14463:14463 xv6iris.FsTree <> z:51 var
+R14491:14510 xv6iris.FsTree <> dir_view_lookup_Some thm
+R14491:14510 xv6iris.FsTree <> dir_view_lookup_Some thm
+R14574:14585 xv6iris.DirView <> dir_first_lt thm
+R14574:14585 xv6iris.DirView <> dir_first_lt thm
+R14620:14633 xv6iris.DirView <> dir_first_live thm
+R14620:14633 xv6iris.DirView <> dir_first_live thm
+R14668:14681 xv6iris.DirView <> dir_first_name thm
+R14668:14681 xv6iris.DirView <> dir_first_name thm
+prf 16306:16320 <> dv_lookup_first
+R16330:16333 stdpp.gmap <> gmap rec
+R16341:16341 Corelib.Numbers.BinNums <> Z ind
+R16335:16339 xv6iris.FsTree <> fname def
+binder 16323:16326 <> ents:53
+R16359:16362 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16356:16358 Corelib.Init.Datatypes <> nat ind
+R16363:16366 Corelib.Init.Datatypes <> list ind
+R16369:16370 stdpp.bitvector.definitions <> bv rec
+binder 16349:16352 <> data:54
+R16384:16386 Corelib.Init.Datatypes <> nat ind
+binder 16377:16380 <> nrec:55
+R16394:16398 xv6iris.FsTree <> fname def
+binder 16390:16390 <> s:56
+R16430:16435 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16409:16411 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16405:16408 xv6iris.FsTree <> ents:53 var
+R16412:16419 xv6iris.FsTree <> dir_view def
+R16421:16424 xv6iris.FsTree <> data:54 var
+R16426:16429 xv6iris.FsTree <> nrec:55 var
+R16445:16449 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16440:16443 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R16444:16444 xv6iris.FsTree <> s:56 var
+R16436:16439 xv6iris.FsTree <> ents:53 var
+R16450:16450 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R16489:16494 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+binder 16455:16455 <> k:57
+R16460:16470 stdpp.bitvector.definitions <> bv_unsigned proj
+R16473:16480 xv6iris.DirView <> dir_inum def
+R16482:16485 xv6iris.FsTree <> data:54 var
+R16487:16487 xv6iris.FsTree <> k:57 var
+R16495:16503 xv6iris.DirView <> dir_first def
+R16505:16508 xv6iris.FsTree <> data:54 var
+R16510:16513 xv6iris.FsTree <> nrec:55 var
+R16515:16515 xv6iris.FsTree <> s:56 var
+R16542:16556 xv6iris.FsTree <> dir_view_lookup thm
+R16542:16556 xv6iris.FsTree <> dir_view_lookup thm
+prf 16669:16683 <> dv_lookup_found
+R16693:16696 stdpp.gmap <> gmap rec
+R16704:16704 Corelib.Numbers.BinNums <> Z ind
+R16698:16702 xv6iris.FsTree <> fname def
+binder 16686:16689 <> ents:58
+R16722:16725 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16719:16721 Corelib.Init.Datatypes <> nat ind
+R16726:16729 Corelib.Init.Datatypes <> list ind
+R16732:16733 stdpp.bitvector.definitions <> bv rec
+binder 16712:16715 <> data:59
+R16747:16749 Corelib.Init.Datatypes <> nat ind
+binder 16740:16743 <> nrec:60
+R16757:16761 xv6iris.FsTree <> fname def
+binder 16753:16753 <> s:61
+R16769:16771 Corelib.Init.Datatypes <> nat ind
+binder 16765:16765 <> k:62
+R16803:16808 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16782:16784 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16778:16781 xv6iris.FsTree <> ents:58 var
+R16785:16792 xv6iris.FsTree <> dir_view def
+R16794:16797 xv6iris.FsTree <> data:59 var
+R16799:16802 xv6iris.FsTree <> nrec:60 var
+R16839:16844 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16830:16832 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16809:16817 xv6iris.DirView <> dir_first def
+R16819:16822 xv6iris.FsTree <> data:59 var
+R16824:16827 xv6iris.FsTree <> nrec:60 var
+R16829:16829 xv6iris.FsTree <> s:61 var
+R16833:16836 Corelib.Init.Datatypes <> Some constr
+R16838:16838 xv6iris.FsTree <> k:62 var
+R16854:16856 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16849:16852 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R16853:16853 xv6iris.FsTree <> s:61 var
+R16845:16848 xv6iris.FsTree <> ents:58 var
+R16857:16860 Corelib.Init.Datatypes <> Some constr
+R16863:16873 stdpp.bitvector.definitions <> bv_unsigned proj
+R16876:16883 xv6iris.DirView <> dir_inum def
+R16885:16888 xv6iris.FsTree <> data:59 var
+R16890:16890 xv6iris.FsTree <> k:62 var
+R16927:16941 xv6iris.FsTree <> dv_lookup_first thm
+R16927:16941 xv6iris.FsTree <> dv_lookup_first thm
+R16927:16941 xv6iris.FsTree <> dv_lookup_first thm
+prf 17079:17092 <> dv_lookup_none
+R17102:17105 stdpp.gmap <> gmap rec
+R17113:17113 Corelib.Numbers.BinNums <> Z ind
+R17107:17111 xv6iris.FsTree <> fname def
+binder 17095:17098 <> ents:63
+R17131:17134 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17128:17130 Corelib.Init.Datatypes <> nat ind
+R17135:17138 Corelib.Init.Datatypes <> list ind
+R17141:17142 stdpp.bitvector.definitions <> bv rec
+binder 17121:17124 <> data:64
+R17156:17158 Corelib.Init.Datatypes <> nat ind
+binder 17149:17152 <> nrec:65
+R17166:17170 xv6iris.FsTree <> fname def
+binder 17162:17162 <> s:66
+R17202:17207 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17181:17183 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17177:17180 xv6iris.FsTree <> ents:63 var
+R17184:17191 xv6iris.FsTree <> dir_view def
+R17193:17196 xv6iris.FsTree <> data:64 var
+R17198:17201 xv6iris.FsTree <> nrec:65 var
+R17236:17241 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17229:17231 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17208:17216 xv6iris.DirView <> dir_first def
+R17218:17221 xv6iris.FsTree <> data:64 var
+R17223:17226 xv6iris.FsTree <> nrec:65 var
+R17228:17228 xv6iris.FsTree <> s:66 var
+R17232:17235 Corelib.Init.Datatypes <> None constr
+R17251:17253 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17246:17249 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R17250:17250 xv6iris.FsTree <> s:66 var
+R17242:17245 xv6iris.FsTree <> ents:63 var
+R17254:17257 Corelib.Init.Datatypes <> None constr
+R17292:17306 xv6iris.FsTree <> dv_lookup_first thm
+R17292:17306 xv6iris.FsTree <> dv_lookup_first thm
+R17292:17306 xv6iris.FsTree <> dv_lookup_first thm
+prf 17656:17673 <> dv_lookup_none_inv
+R17683:17686 stdpp.gmap <> gmap rec
+R17694:17694 Corelib.Numbers.BinNums <> Z ind
+R17688:17692 xv6iris.FsTree <> fname def
+binder 17676:17679 <> ents:67
+R17712:17715 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17709:17711 Corelib.Init.Datatypes <> nat ind
+R17716:17719 Corelib.Init.Datatypes <> list ind
+R17722:17723 stdpp.bitvector.definitions <> bv rec
+binder 17702:17705 <> data:68
+R17737:17739 Corelib.Init.Datatypes <> nat ind
+binder 17730:17733 <> nrec:69
+R17747:17751 xv6iris.FsTree <> fname def
+binder 17743:17743 <> s:70
+R17783:17788 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17762:17764 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17758:17761 xv6iris.FsTree <> ents:67 var
+R17765:17772 xv6iris.FsTree <> dir_view def
+R17774:17777 xv6iris.FsTree <> data:68 var
+R17779:17782 xv6iris.FsTree <> nrec:69 var
+R17805:17810 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17798:17800 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17793:17796 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R17797:17797 xv6iris.FsTree <> s:70 var
+R17789:17792 xv6iris.FsTree <> ents:67 var
+R17801:17804 Corelib.Init.Datatypes <> None constr
+R17832:17834 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17811:17819 xv6iris.DirView <> dir_first def
+R17821:17824 xv6iris.FsTree <> data:68 var
+R17826:17829 xv6iris.FsTree <> nrec:69 var
+R17831:17831 xv6iris.FsTree <> s:70 var
+R17835:17838 Corelib.Init.Datatypes <> None constr
+R17872:17886 xv6iris.FsTree <> dv_lookup_first thm
+R17872:17886 xv6iris.FsTree <> dv_lookup_first thm
+R17872:17886 xv6iris.FsTree <> dv_lookup_first thm
+R17927:17935 xv6iris.DirView <> dir_first def
+R17969:17972 stdpp.base <> fmap def
+R17974:17984 stdpp.option <> option_fmap inst
+R17986:17995 Corelib.Init.Datatypes <> option_map def
+R17927:17935 xv6iris.DirView <> dir_first def
+prf 18046:18063 <> dv_lookup_some_inv
+R18073:18076 stdpp.gmap <> gmap rec
+R18084:18084 Corelib.Numbers.BinNums <> Z ind
+R18078:18082 xv6iris.FsTree <> fname def
+binder 18066:18069 <> ents:71
+R18102:18105 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18099:18101 Corelib.Init.Datatypes <> nat ind
+R18106:18109 Corelib.Init.Datatypes <> list ind
+R18112:18113 stdpp.bitvector.definitions <> bv rec
+binder 18092:18095 <> data:72
+R18127:18129 Corelib.Init.Datatypes <> nat ind
+binder 18120:18123 <> nrec:73
+R18137:18141 xv6iris.FsTree <> fname def
+binder 18133:18133 <> s:74
+R18149:18149 Corelib.Numbers.BinNums <> Z ind
+binder 18145:18145 <> z:75
+R18181:18186 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18160:18162 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18156:18159 xv6iris.FsTree <> ents:71 var
+R18163:18170 xv6iris.FsTree <> dir_view def
+R18172:18175 xv6iris.FsTree <> data:72 var
+R18177:18180 xv6iris.FsTree <> nrec:73 var
+R18205:18210 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18196:18198 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18191:18194 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R18195:18195 xv6iris.FsTree <> s:74 var
+R18187:18190 xv6iris.FsTree <> ents:71 var
+R18199:18202 Corelib.Init.Datatypes <> Some constr
+R18204:18204 xv6iris.FsTree <> z:75 var
+R18211:18217 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R18225:18230 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R18222:18224 Corelib.Init.Datatypes <> nat ind
+binder 18218:18218 <> k:76
+R18261:18268 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R18252:18254 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18231:18239 xv6iris.DirView <> dir_first def
+R18241:18244 xv6iris.FsTree <> data:72 var
+R18246:18249 xv6iris.FsTree <> nrec:73 var
+R18251:18251 xv6iris.FsTree <> s:74 var
+R18255:18258 Corelib.Init.Datatypes <> Some constr
+R18260:18260 xv6iris.FsTree <> k:76 var
+R18283:18286 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R18271:18273 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R18270:18270 xv6iris.FsTree <> k:76 var
+R18274:18277 xv6iris.FsTree <> nrec:73 var
+R18302:18305 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R18287:18294 xv6iris.DirView <> dir_live def
+R18296:18299 xv6iris.FsTree <> data:72 var
+R18301:18301 xv6iris.FsTree <> k:76 var
+R18326:18333 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R18322:18324 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18306:18314 xv6iris.FsTree <> dir_bname def
+R18316:18319 xv6iris.FsTree <> data:72 var
+R18321:18321 xv6iris.FsTree <> k:76 var
+R18325:18325 xv6iris.FsTree <> s:74 var
+R18363:18365 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18334:18344 stdpp.bitvector.definitions <> bv_unsigned proj
+R18347:18354 xv6iris.DirView <> dir_inum def
+R18356:18359 xv6iris.FsTree <> data:72 var
+R18361:18361 xv6iris.FsTree <> k:76 var
+R18366:18366 xv6iris.FsTree <> z:75 var
+R18400:18414 xv6iris.FsTree <> dv_lookup_first thm
+R18400:18414 xv6iris.FsTree <> dv_lookup_first thm
+R18400:18414 xv6iris.FsTree <> dv_lookup_first thm
+R18455:18463 xv6iris.DirView <> dir_first def
+R18504:18507 stdpp.base <> fmap def
+R18509:18519 stdpp.option <> option_fmap inst
+R18521:18530 Corelib.Init.Datatypes <> option_map def
+R18455:18463 xv6iris.DirView <> dir_first def
+R18612:18623 xv6iris.DirView <> dir_first_lt thm
+R18612:18623 xv6iris.DirView <> dir_first_lt thm
+R18658:18671 xv6iris.DirView <> dir_first_live thm
+R18658:18671 xv6iris.DirView <> dir_first_live thm
+R18706:18719 xv6iris.DirView <> dir_first_name thm
+R18706:18719 xv6iris.DirView <> dir_first_name thm
+prf 19007:19028 <> dv_lookup_live_is_Some
+R19038:19041 stdpp.gmap <> gmap rec
+R19049:19049 Corelib.Numbers.BinNums <> Z ind
+R19043:19047 xv6iris.FsTree <> fname def
+binder 19031:19034 <> ents:77
+R19067:19070 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19064:19066 Corelib.Init.Datatypes <> nat ind
+R19071:19074 Corelib.Init.Datatypes <> list ind
+R19077:19078 stdpp.bitvector.definitions <> bv rec
+binder 19057:19060 <> data:78
+R19094:19096 Corelib.Init.Datatypes <> nat ind
+binder 19085:19088 <> nrec:79
+binder 19090:19090 <> k:80
+R19104:19108 xv6iris.FsTree <> fname def
+binder 19100:19100 <> s:81
+R19140:19145 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19119:19121 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19115:19118 xv6iris.FsTree <> ents:77 var
+R19122:19129 xv6iris.FsTree <> dir_view def
+R19131:19134 xv6iris.FsTree <> data:78 var
+R19136:19139 xv6iris.FsTree <> nrec:79 var
+R19160:19163 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19148:19150 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R19147:19147 xv6iris.FsTree <> k:80 var
+R19151:19154 xv6iris.FsTree <> nrec:79 var
+R19179:19182 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19164:19171 xv6iris.DirView <> dir_live def
+R19173:19176 xv6iris.FsTree <> data:78 var
+R19178:19178 xv6iris.FsTree <> k:80 var
+R19203:19208 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19199:19201 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19183:19191 xv6iris.FsTree <> dir_bname def
+R19193:19196 xv6iris.FsTree <> data:78 var
+R19198:19198 xv6iris.FsTree <> k:80 var
+R19202:19202 xv6iris.FsTree <> s:81 var
+R19209:19215 stdpp.option <> is_Some def
+R19222:19225 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R19226:19226 xv6iris.FsTree <> s:81 var
+R19218:19221 xv6iris.FsTree <> ents:77 var
+R19289:19292 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R19271:19278 xv6iris.FsTree <> dir_view def
+R19289:19292 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R19271:19278 xv6iris.FsTree <> dir_view def
+R19355:19359 Corelib.Init.Logic <> proj1 thm
+R19362:19387 xv6iris.FsTree <> dir_view_lookup_None_match thm
+R19355:19359 Corelib.Init.Logic <> proj1 thm
+R19362:19387 xv6iris.FsTree <> dir_view_lookup_None_match thm
+prf 19832:19853 <> dv_live_value_shadowed
+R19863:19866 stdpp.gmap <> gmap rec
+R19874:19874 Corelib.Numbers.BinNums <> Z ind
+R19868:19872 xv6iris.FsTree <> fname def
+binder 19856:19859 <> ents:82
+R19892:19895 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19889:19891 Corelib.Init.Datatypes <> nat ind
+R19896:19899 Corelib.Init.Datatypes <> list ind
+R19902:19903 stdpp.bitvector.definitions <> bv rec
+binder 19882:19885 <> data:83
+R19923:19925 Corelib.Init.Datatypes <> nat ind
+binder 19910:19913 <> nrec:84
+binder 19915:19916 <> k0:85
+binder 19918:19919 <> k1:86
+R19933:19937 xv6iris.FsTree <> fname def
+binder 19929:19929 <> s:87
+R19969:19974 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19948:19950 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19944:19947 xv6iris.FsTree <> ents:82 var
+R19951:19958 xv6iris.FsTree <> dir_view def
+R19960:19963 xv6iris.FsTree <> data:83 var
+R19965:19968 xv6iris.FsTree <> nrec:84 var
+R20006:20011 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19996:19998 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19975:19983 xv6iris.DirView <> dir_first def
+R19985:19988 xv6iris.FsTree <> data:83 var
+R19990:19993 xv6iris.FsTree <> nrec:84 var
+R19995:19995 xv6iris.FsTree <> s:87 var
+R19999:20002 Corelib.Init.Datatypes <> Some constr
+R20004:20005 xv6iris.FsTree <> k0:85 var
+R20027:20030 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20015:20017 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R20013:20014 xv6iris.FsTree <> k1:86 var
+R20018:20021 xv6iris.FsTree <> nrec:84 var
+R20047:20050 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20031:20038 xv6iris.DirView <> dir_live def
+R20040:20043 xv6iris.FsTree <> data:83 var
+R20045:20046 xv6iris.FsTree <> k1:86 var
+R20072:20077 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20068:20070 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20051:20059 xv6iris.FsTree <> dir_bname def
+R20061:20064 xv6iris.FsTree <> data:83 var
+R20066:20067 xv6iris.FsTree <> k1:86 var
+R20071:20071 xv6iris.FsTree <> s:87 var
+R20142:20147 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20108:20111 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R20078:20088 stdpp.bitvector.definitions <> bv_unsigned proj
+R20091:20098 xv6iris.DirView <> dir_inum def
+R20100:20103 xv6iris.FsTree <> data:83 var
+R20105:20106 xv6iris.FsTree <> k1:86 var
+R20112:20122 stdpp.bitvector.definitions <> bv_unsigned proj
+R20125:20132 xv6iris.DirView <> dir_inum def
+R20134:20137 xv6iris.FsTree <> data:83 var
+R20139:20140 xv6iris.FsTree <> k0:85 var
+R20157:20160 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R20152:20155 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R20156:20156 xv6iris.FsTree <> s:87 var
+R20148:20151 xv6iris.FsTree <> ents:82 var
+R20161:20164 Corelib.Init.Datatypes <> Some constr
+R20167:20177 stdpp.bitvector.definitions <> bv_unsigned proj
+R20180:20187 xv6iris.DirView <> dir_inum def
+R20189:20192 xv6iris.FsTree <> data:83 var
+R20194:20195 xv6iris.FsTree <> k1:86 var
+R20249:20263 xv6iris.FsTree <> dv_lookup_found thm
+R20249:20263 xv6iris.FsTree <> dv_lookup_found thm
+R20249:20263 xv6iris.FsTree <> dv_lookup_found thm
+R20347:20352 Corelib.Init.Logic <> eq_sym thm
+R20347:20352 Corelib.Init.Logic <> eq_sym thm
+def 20894:20909 <> dir_names_unique
+R20922:20925 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20919:20921 Corelib.Init.Datatypes <> nat ind
+R20926:20929 Corelib.Init.Datatypes <> list ind
+R20932:20933 stdpp.bitvector.definitions <> bv rec
+binder 20912:20915 <> data:88
+R20947:20949 Corelib.Init.Datatypes <> nat ind
+binder 20940:20943 <> nrec:89
+R20964:20970 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R20980:20981 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R20977:20979 Corelib.Init.Datatypes <> nat ind
+binder 20971:20971 <> j:90
+R20977:20979 Corelib.Init.Datatypes <> nat ind
+binder 20973:20973 <> k:91
+R20996:20999 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20984:20986 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R20983:20983 xv6iris.FsTree <> j:90 var
+R20987:20990 xv6iris.FsTree <> nrec:89 var
+R21014:21021 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21002:21004 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R21001:21001 xv6iris.FsTree <> k:91 var
+R21005:21008 xv6iris.FsTree <> nrec:89 var
+R21037:21040 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21022:21029 xv6iris.DirView <> dir_live def
+R21031:21034 xv6iris.FsTree <> data:88 var
+R21036:21036 xv6iris.FsTree <> j:90 var
+R21056:21063 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21041:21048 xv6iris.DirView <> dir_live def
+R21050:21053 xv6iris.FsTree <> data:88 var
+R21055:21055 xv6iris.FsTree <> k:91 var
+R21099:21102 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21080:21082 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21064:21072 xv6iris.FsTree <> dir_bname def
+R21074:21077 xv6iris.FsTree <> data:88 var
+R21079:21079 xv6iris.FsTree <> j:90 var
+R21083:21091 xv6iris.FsTree <> dir_bname def
+R21093:21096 xv6iris.FsTree <> data:88 var
+R21098:21098 xv6iris.FsTree <> k:91 var
+R21104:21106 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21103:21103 xv6iris.FsTree <> j:90 var
+R21107:21107 xv6iris.FsTree <> k:91 var
+prf 21117:21135 <> dir_names_unique_le
+R21148:21151 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21145:21147 Corelib.Init.Datatypes <> nat ind
+R21152:21155 Corelib.Init.Datatypes <> list ind
+R21158:21159 stdpp.bitvector.definitions <> bv rec
+binder 21138:21141 <> data:92
+R21172:21174 Corelib.Init.Datatypes <> nat ind
+binder 21166:21166 <> n:93
+binder 21168:21168 <> m:94
+R21193:21196 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21183:21186 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R21182:21182 xv6iris.FsTree <> n:93 var
+R21187:21187 xv6iris.FsTree <> m:94 var
+R21220:21223 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21197:21212 xv6iris.FsTree <> dir_names_unique def
+R21214:21217 xv6iris.FsTree <> data:92 var
+R21219:21219 xv6iris.FsTree <> m:94 var
+R21224:21239 xv6iris.FsTree <> dir_names_unique def
+R21241:21244 xv6iris.FsTree <> data:92 var
+R21246:21246 xv6iris.FsTree <> n:93 var
+prf 21560:21572 <> dir_view_live
+R21585:21588 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21582:21584 Corelib.Init.Datatypes <> nat ind
+R21589:21592 Corelib.Init.Datatypes <> list ind
+R21595:21596 stdpp.bitvector.definitions <> bv rec
+binder 21575:21578 <> data:95
+R21612:21614 Corelib.Init.Datatypes <> nat ind
+binder 21603:21606 <> nrec:96
+binder 21608:21608 <> k:97
+R21647:21650 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21621:21636 xv6iris.FsTree <> dir_names_unique def
+R21638:21641 xv6iris.FsTree <> data:95 var
+R21643:21646 xv6iris.FsTree <> nrec:96 var
+R21665:21668 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21653:21655 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R21652:21652 xv6iris.FsTree <> k:97 var
+R21656:21659 xv6iris.FsTree <> nrec:96 var
+R21684:21689 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21669:21676 xv6iris.DirView <> dir_live def
+R21678:21681 xv6iris.FsTree <> data:95 var
+R21683:21683 xv6iris.FsTree <> k:97 var
+R21728:21730 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21708:21711 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R21712:21720 xv6iris.FsTree <> dir_bname def
+R21722:21725 xv6iris.FsTree <> data:95 var
+R21727:21727 xv6iris.FsTree <> k:97 var
+R21690:21697 xv6iris.FsTree <> dir_view def
+R21699:21702 xv6iris.FsTree <> data:95 var
+R21704:21707 xv6iris.FsTree <> nrec:96 var
+R21731:21734 Corelib.Init.Datatypes <> Some constr
+R21737:21747 stdpp.bitvector.definitions <> bv_unsigned proj
+R21750:21757 xv6iris.DirView <> dir_inum def
+R21759:21762 xv6iris.FsTree <> data:95 var
+R21764:21764 xv6iris.FsTree <> k:97 var
+R21803:21817 xv6iris.FsTree <> dir_view_lookup thm
+R21803:21817 xv6iris.FsTree <> dir_view_lookup thm
+R21803:21817 xv6iris.FsTree <> dir_view_lookup thm
+R21832:21840 xv6iris.DirView <> dir_first def
+R21853:21861 xv6iris.FsTree <> dir_bname def
+R21832:21840 xv6iris.DirView <> dir_first def
+R21853:21861 xv6iris.FsTree <> dir_bname def
+R21910:21912 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21910:21912 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21929:21942 xv6iris.DirView <> dir_first_Some thm
+R21929:21942 xv6iris.DirView <> dir_first_Some thm
+R22093:22097 Corelib.Init.Logic <> proj1 thm
+R22100:22113 xv6iris.DirView <> dir_first_None thm
+R22126:22134 xv6iris.FsTree <> dir_bname def
+R22093:22097 Corelib.Init.Logic <> proj1 thm
+R22100:22113 xv6iris.DirView <> dir_first_None thm
+R22126:22134 xv6iris.FsTree <> dir_bname def
+def 22785:22797 <> dir_zeroed_at
+R22816:22819 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22813:22815 Corelib.Init.Datatypes <> nat ind
+R22820:22823 Corelib.Init.Datatypes <> list ind
+R22826:22827 stdpp.bitvector.definitions <> bv rec
+binder 22800:22803 <> data:98
+binder 22805:22809 <> data':99
+R22839:22841 Corelib.Init.Datatypes <> nat ind
+binder 22834:22835 <> k0:100
+R22883:22888 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R22873:22875 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22856:22863 xv6iris.DirView <> dir_inum def
+R22865:22869 xv6iris.FsTree <> data':99 var
+R22871:22872 xv6iris.FsTree <> k0:100 var
+R22876:22879 stdpp.bitvector.definitions <> bv_0 def
+R22889:22889 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R22951:22958 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R23022:23022 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R22890:22896 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R22904:22905 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R22901:22903 Corelib.Init.Datatypes <> nat ind
+binder 22897:22897 <> q:101
+R22913:22916 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22907:22910 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R22906:22906 xv6iris.FsTree <> q:101 var
+R22911:22912 xv6iris.FsTree <> k0:100 var
+R22933:22935 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22917:22924 xv6iris.DirView <> dir_inum def
+R22926:22930 xv6iris.FsTree <> data':99 var
+R22932:22932 xv6iris.FsTree <> q:101 var
+R22936:22943 xv6iris.DirView <> dir_inum def
+R22945:22948 xv6iris.FsTree <> data:98 var
+R22950:22950 xv6iris.FsTree <> q:101 var
+R22959:22965 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R22973:22974 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R22970:22972 Corelib.Init.Datatypes <> nat ind
+binder 22966:22966 <> q:102
+R22982:22985 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22976:22979 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R22975:22975 xv6iris.FsTree <> q:102 var
+R22980:22981 xv6iris.FsTree <> k0:100 var
+R23003:23005 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22986:22994 xv6iris.FsTree <> dir_bname def
+R22996:23000 xv6iris.FsTree <> data':99 var
+R23002:23002 xv6iris.FsTree <> q:102 var
+R23006:23014 xv6iris.FsTree <> dir_bname def
+R23016:23019 xv6iris.FsTree <> data:98 var
+R23021:23021 xv6iris.FsTree <> q:102 var
+prf 23032:23050 <> dir_zeroed_of_bytes
+R23069:23072 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23066:23068 Corelib.Init.Datatypes <> nat ind
+R23073:23076 Corelib.Init.Datatypes <> list ind
+R23079:23080 stdpp.bitvector.definitions <> bv rec
+binder 23053:23056 <> data:103
+binder 23058:23062 <> data':104
+R23100:23102 Corelib.Init.Datatypes <> nat ind
+binder 23091:23092 <> k0:105
+binder 23094:23096 <> tot:106
+R23110:23115 xv6iris.DirentEnc <> dirent rec
+binder 23106:23106 <> d:107
+R23136:23139 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23124:23127 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23128:23130 xv6iris.FsTree <> tot:106 var
+R23155:23160 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23144:23147 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23141:23143 xv6iris.FsTree <> tot:106 var
+R23180:23185 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23170:23172 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23161:23167 xv6iris.DirentEnc <> de_inum proj
+R23169:23169 xv6iris.FsTree <> d:107 var
+R23173:23176 stdpp.bitvector.definitions <> bv_0 def
+R23186:23186 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23368:23374 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23187:23193 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R23201:23207 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R23198:23200 Corelib.Init.Datatypes <> nat ind
+binder 23194:23194 <> x:108
+R23225:23232 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23208:23216 xv6iris.InodeDefs <> file_byte def
+R23218:23222 xv6iris.FsTree <> data':104 var
+R23224:23224 xv6iris.FsTree <> x:108 var
+R23236:23241 stdpp.base <> decide def
+R23262:23265 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R23252:23255 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23247:23249 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23250:23251 xv6iris.FsTree <> k0:105 var
+R23256:23256 xv6iris.FsTree <> x:108 var
+R23268:23270 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R23267:23267 xv6iris.FsTree <> x:108 var
+R23278:23280 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R23273:23275 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23276:23277 xv6iris.FsTree <> k0:105 var
+R23281:23283 xv6iris.FsTree <> tot:106 var
+R23352:23360 xv6iris.InodeDefs <> file_byte def
+R23362:23365 xv6iris.FsTree <> data:103 var
+R23367:23367 xv6iris.FsTree <> x:108 var
+R23317:23321 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R23324:23326 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R23323:23323 xv6iris.FsTree <> x:108 var
+R23329:23331 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23332:23333 xv6iris.FsTree <> k0:105 var
+R23303:23314 xv6iris.DirentEnc <> dirent_bytes def
+R23316:23316 xv6iris.FsTree <> d:107 var
+R23375:23387 xv6iris.FsTree <> dir_zeroed_at def
+R23389:23392 xv6iris.FsTree <> data:103 var
+R23394:23398 xv6iris.FsTree <> data':104 var
+R23400:23401 xv6iris.FsTree <> k0:105 var
+R23455:23461 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R23471:23472 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R23468:23470 Corelib.Init.Datatypes <> nat ind
+binder 23462:23462 <> q:109
+R23468:23470 Corelib.Init.Datatypes <> nat ind
+binder 23464:23464 <> x:110
+R23480:23483 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23474:23477 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R23473:23473 xv6iris.FsTree <> q:109 var
+R23501:23523 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23491:23494 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23487:23489 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23490:23490 xv6iris.FsTree <> q:109 var
+R23495:23495 xv6iris.FsTree <> x:110 var
+R23545:23548 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23526:23528 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R23525:23525 xv6iris.FsTree <> x:110 var
+R23535:23537 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R23531:23533 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23534:23534 xv6iris.FsTree <> q:109 var
+R23566:23568 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23549:23557 xv6iris.InodeDefs <> file_byte def
+R23565:23565 xv6iris.FsTree <> x:110 var
+R23569:23577 xv6iris.InodeDefs <> file_byte def
+R23584:23584 xv6iris.FsTree <> x:110 var
+R23455:23461 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R23471:23472 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R23468:23470 Corelib.Init.Datatypes <> nat ind
+binder 23462:23462 <> q:111
+R23468:23470 Corelib.Init.Datatypes <> nat ind
+binder 23464:23464 <> x:112
+R23480:23483 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23474:23477 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R23473:23473 xv6iris.FsTree <> q:111 var
+R23501:23523 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23491:23494 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23487:23489 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23490:23490 xv6iris.FsTree <> q:111 var
+R23495:23495 xv6iris.FsTree <> x:112 var
+R23545:23548 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23526:23528 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R23525:23525 xv6iris.FsTree <> x:112 var
+R23535:23537 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R23531:23533 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23534:23534 xv6iris.FsTree <> q:111 var
+R23566:23568 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23549:23557 xv6iris.InodeDefs <> file_byte def
+R23565:23565 xv6iris.FsTree <> x:112 var
+R23569:23577 xv6iris.InodeDefs <> file_byte def
+R23584:23584 xv6iris.FsTree <> x:112 var
+R23645:23656 stdpp.decidable <> decide_False thm
+R23645:23656 stdpp.decidable <> decide_False thm
+R23645:23656 stdpp.decidable <> decide_False thm
+R23645:23656 stdpp.decidable <> decide_False thm
+R23731:23745 xv6iris.DirView <> dir_inum_of_two thm
+R23731:23745 xv6iris.DirView <> dir_inum_of_two thm
+R23731:23745 xv6iris.DirView <> dir_inum_of_two thm
+R23731:23745 xv6iris.DirView <> dir_inum_of_two thm
+R23813:23815 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R23808:23810 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23813:23815 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R23808:23810 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23813:23815 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R23808:23810 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23837:23847 stdpp.decidable <> decide_True thm
+R23837:23847 stdpp.decidable <> decide_True thm
+R23837:23847 stdpp.decidable <> decide_True thm
+R23837:23847 stdpp.decidable <> decide_True thm
+R23883:23885 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R23879:23881 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R23874:23876 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23888:23890 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23883:23885 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R23879:23881 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R23874:23876 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23888:23890 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23951:23958 xv6iris.DirView <> dir_inum def
+R23984:23986 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23984:23986 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R23984:23986 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R24048:24050 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R24044:24046 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R24048:24050 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R24044:24046 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R24048:24050 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R24044:24046 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R24126:24134 xv6iris.FsTree <> dir_bname def
+R24143:24151 xv6iris.DirView <> bname_ext thm
+R24143:24151 xv6iris.DirView <> bname_ext thm
+R24178:24185 xv6iris.DirView <> dir_name def
+R24213:24215 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R24209:24211 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R24205:24207 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R24213:24215 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R24209:24211 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R24205:24207 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+prf 24245:24259 <> dir_zeroed_dead
+R24278:24281 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24275:24277 Corelib.Init.Datatypes <> nat ind
+R24282:24285 Corelib.Init.Datatypes <> list ind
+R24288:24289 stdpp.bitvector.definitions <> bv rec
+binder 24262:24265 <> data:113
+binder 24267:24271 <> data':114
+R24301:24303 Corelib.Init.Datatypes <> nat ind
+binder 24296:24297 <> k0:115
+R24337:24340 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24310:24322 xv6iris.FsTree <> dir_zeroed_at def
+R24324:24327 xv6iris.FsTree <> data:113 var
+R24329:24333 xv6iris.FsTree <> data':114 var
+R24335:24336 xv6iris.FsTree <> k0:115 var
+R24341:24342 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R24343:24350 xv6iris.DirView <> dir_live def
+R24352:24356 xv6iris.FsTree <> data':114 var
+R24358:24359 xv6iris.FsTree <> k0:115 var
+prf 24492:24512 <> dir_names_unique_zero
+R24531:24534 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24528:24530 Corelib.Init.Datatypes <> nat ind
+R24535:24538 Corelib.Init.Datatypes <> list ind
+R24541:24542 stdpp.bitvector.definitions <> bv rec
+binder 24515:24518 <> data:116
+binder 24520:24524 <> data':117
+R24563:24565 Corelib.Init.Datatypes <> nat ind
+binder 24553:24556 <> nrec:118
+binder 24558:24559 <> k0:119
+R24599:24604 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24572:24584 xv6iris.FsTree <> dir_zeroed_at def
+R24586:24589 xv6iris.FsTree <> data:116 var
+R24591:24595 xv6iris.FsTree <> data':117 var
+R24597:24598 xv6iris.FsTree <> k0:119 var
+R24631:24634 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24605:24620 xv6iris.FsTree <> dir_names_unique def
+R24622:24625 xv6iris.FsTree <> data:116 var
+R24627:24630 xv6iris.FsTree <> nrec:118 var
+R24635:24650 xv6iris.FsTree <> dir_names_unique def
+R24652:24656 xv6iris.FsTree <> data':117 var
+R24658:24661 xv6iris.FsTree <> nrec:118 var
+R24745:24748 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R24745:24748 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R24803:24806 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R24803:24806 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R24882:24889 xv6iris.DirView <> dir_live def
+R24941:24948 xv6iris.DirView <> dir_live def
+prf 25145:25161 <> dir_zeroed_matchb
+R25180:25183 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25177:25179 Corelib.Init.Datatypes <> nat ind
+R25184:25187 Corelib.Init.Datatypes <> list ind
+R25190:25191 stdpp.bitvector.definitions <> bv rec
+binder 25164:25167 <> data:120
+binder 25169:25173 <> data':121
+R25207:25209 Corelib.Init.Datatypes <> nat ind
+binder 25202:25203 <> k0:122
+R25217:25221 xv6iris.FsTree <> fname def
+binder 25213:25213 <> s:123
+R25229:25231 Corelib.Init.Datatypes <> nat ind
+binder 25225:25225 <> q:124
+R25265:25268 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25238:25250 xv6iris.FsTree <> dir_zeroed_at def
+R25252:25255 xv6iris.FsTree <> data:120 var
+R25257:25261 xv6iris.FsTree <> data':121 var
+R25263:25264 xv6iris.FsTree <> k0:122 var
+R25276:25281 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25270:25273 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R25269:25269 xv6iris.FsTree <> q:124 var
+R25274:25275 xv6iris.FsTree <> k0:122 var
+R25302:25304 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25282:25291 xv6iris.DirView <> dir_matchb def
+R25293:25297 xv6iris.FsTree <> data':121 var
+R25299:25299 xv6iris.FsTree <> q:124 var
+R25301:25301 xv6iris.FsTree <> s:123 var
+R25305:25314 xv6iris.DirView <> dir_matchb def
+R25316:25319 xv6iris.FsTree <> data:120 var
+R25321:25321 xv6iris.FsTree <> q:124 var
+R25323:25323 xv6iris.FsTree <> s:123 var
+R25375:25384 xv6iris.DirView <> dir_matchb def
+R25387:25395 xv6iris.DirView <> dir_liveb def
+R25398:25406 xv6iris.DirView <> dir_freeb def
+R25444:25448 xv6iris.DirentEnc <> bname def
+R25454:25461 xv6iris.DirView <> dir_name def
+R25479:25487 xv6iris.FsTree <> dir_bname def
+R25444:25448 xv6iris.DirentEnc <> bname def
+R25454:25461 xv6iris.DirView <> dir_name def
+R25479:25487 xv6iris.FsTree <> dir_bname def
+R25525:25529 xv6iris.DirentEnc <> bname def
+R25535:25542 xv6iris.DirView <> dir_name def
+R25559:25567 xv6iris.FsTree <> dir_bname def
+R25525:25529 xv6iris.DirentEnc <> bname def
+R25535:25542 xv6iris.DirView <> dir_name def
+R25559:25567 xv6iris.FsTree <> dir_bname def
+prf 26031:26043 <> dir_view_zero
+R26062:26065 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26059:26061 Corelib.Init.Datatypes <> nat ind
+R26066:26069 Corelib.Init.Datatypes <> list ind
+R26072:26073 stdpp.bitvector.definitions <> bv rec
+binder 26046:26049 <> data:125
+binder 26051:26055 <> data':126
+R26090:26092 Corelib.Init.Datatypes <> nat ind
+binder 26080:26083 <> nrec:127
+binder 26085:26086 <> k0:128
+R26125:26130 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26099:26114 xv6iris.FsTree <> dir_names_unique def
+R26116:26119 xv6iris.FsTree <> data:125 var
+R26121:26124 xv6iris.FsTree <> nrec:127 var
+R26146:26149 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26134:26136 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R26132:26133 xv6iris.FsTree <> k0:128 var
+R26137:26140 xv6iris.FsTree <> nrec:127 var
+R26166:26171 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26150:26157 xv6iris.DirView <> dir_live def
+R26159:26162 xv6iris.FsTree <> data:125 var
+R26164:26165 xv6iris.FsTree <> k0:128 var
+R26199:26204 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26172:26184 xv6iris.FsTree <> dir_zeroed_at def
+R26186:26189 xv6iris.FsTree <> data:125 var
+R26191:26195 xv6iris.FsTree <> data':126 var
+R26197:26198 xv6iris.FsTree <> k0:128 var
+R26224:26226 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26205:26212 xv6iris.FsTree <> dir_view def
+R26214:26218 xv6iris.FsTree <> data':126 var
+R26220:26223 xv6iris.FsTree <> nrec:127 var
+R26227:26232 stdpp.base <> delete def
+R26255:26262 xv6iris.FsTree <> dir_view def
+R26264:26267 xv6iris.FsTree <> data:125 var
+R26269:26272 xv6iris.FsTree <> nrec:127 var
+R26235:26243 xv6iris.FsTree <> dir_bname def
+R26245:26248 xv6iris.FsTree <> data:125 var
+R26250:26251 xv6iris.FsTree <> k0:128 var
+R26360:26365 stdpp.fin_maps <> map_eq meth
+R26360:26365 stdpp.fin_maps <> map_eq meth
+R26390:26395 stdpp.base <> decide def
+R26399:26401 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26402:26410 xv6iris.FsTree <> dir_bname def
+R26390:26395 stdpp.base <> decide def
+R26399:26401 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26402:26410 xv6iris.FsTree <> dir_bname def
+R26505:26517 stdpp.fin_maps <> lookup_delete thm
+R26505:26517 stdpp.fin_maps <> lookup_delete thm
+R26505:26517 stdpp.fin_maps <> lookup_delete thm
+R26530:26555 xv6iris.FsTree <> dir_view_lookup_None_match thm
+R26530:26555 xv6iris.FsTree <> dir_view_lookup_None_match thm
+R26601:26604 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R26601:26604 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R26660:26667 xv6iris.DirView <> dir_live def
+R26694:26701 xv6iris.DirView <> dir_live def
+R26660:26667 xv6iris.DirView <> dir_live def
+R26908:26923 stdpp.fin_maps <> lookup_delete_ne thm
+R26908:26923 stdpp.fin_maps <> lookup_delete_ne thm
+R26908:26923 stdpp.fin_maps <> lookup_delete_ne thm
+R26953:26967 xv6iris.FsTree <> dir_view_lookup thm
+R26953:26967 xv6iris.FsTree <> dir_view_lookup thm
+R26953:26967 xv6iris.FsTree <> dir_view_lookup thm
+R26953:26967 xv6iris.FsTree <> dir_view_lookup thm
+R26953:26967 xv6iris.FsTree <> dir_view_lookup thm
+R27013:27015 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26991:26999 xv6iris.DirView <> dir_first def
+R27016:27024 xv6iris.DirView <> dir_first def
+R27013:27015 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26991:26999 xv6iris.DirView <> dir_first def
+R27016:27024 xv6iris.DirView <> dir_first def
+R27053:27061 xv6iris.DirView <> dir_first def
+R27070:27079 xv6iris.DirView <> dfirst_ext thm
+R27070:27079 xv6iris.DirView <> dfirst_ext thm
+R27111:27116 stdpp.base <> decide def
+R27120:27122 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27111:27116 stdpp.base <> decide def
+R27120:27122 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27185:27187 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27164:27173 xv6iris.DirView <> dir_matchb def
+R27188:27192 Corelib.Init.Datatypes <> false constr
+R27185:27187 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27164:27173 xv6iris.DirView <> dir_matchb def
+R27188:27192 Corelib.Init.Datatypes <> false constr
+R27212:27227 xv6iris.DirView <> dir_matchb_false thm
+R27212:27227 xv6iris.DirView <> dir_matchb_false thm
+R27263:27277 xv6iris.FsTree <> dir_zeroed_dead thm
+R27263:27277 xv6iris.FsTree <> dir_zeroed_dead thm
+R27347:27349 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27327:27336 xv6iris.DirView <> dir_matchb def
+R27350:27354 Corelib.Init.Datatypes <> false constr
+R27347:27349 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27327:27336 xv6iris.DirView <> dir_matchb def
+R27350:27354 Corelib.Init.Datatypes <> false constr
+R27374:27389 xv6iris.DirView <> dir_matchb_false thm
+R27374:27389 xv6iris.DirView <> dir_matchb_false thm
+R27512:27528 xv6iris.FsTree <> dir_zeroed_matchb thm
+R27512:27528 xv6iris.FsTree <> dir_zeroed_matchb thm
+R27595:27603 xv6iris.DirView <> dir_first def
+R27595:27603 xv6iris.DirView <> dir_first def
+R27672:27675 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R27672:27675 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R27721:27734 xv6iris.DirView <> dir_first_name thm
+R27721:27734 xv6iris.DirView <> dir_first_name thm
+R27721:27734 xv6iris.DirView <> dir_first_name thm
+def 28119:28128 <> file_bytes
+R28141:28144 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28138:28140 Corelib.Init.Datatypes <> nat ind
+R28145:28148 Corelib.Init.Datatypes <> list ind
+R28151:28152 stdpp.bitvector.definitions <> bv rec
+binder 28131:28134 <> data:129
+R28163:28165 Corelib.Init.Datatypes <> nat ind
+binder 28159:28159 <> n:130
+R28170:28173 Corelib.Init.Datatypes <> list ind
+R28176:28177 stdpp.bitvector.definitions <> bv rec
+R28201:28205 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R28187:28195 xv6iris.InodeDefs <> file_byte def
+R28197:28200 xv6iris.FsTree <> data:129 var
+R28206:28208 Corelib.Lists.ListDef <> seq def
+R28212:28212 xv6iris.FsTree <> n:130 var
+def 28447:28453 <> node_of
+R28461:28466 xv6iris.DinodeEnc <> dinode rec
+binder 28456:28457 <> dn:131
+R28480:28483 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28477:28479 Corelib.Init.Datatypes <> nat ind
+R28484:28487 Corelib.Init.Datatypes <> list ind
+R28490:28491 stdpp.bitvector.definitions <> bv rec
+binder 28470:28473 <> data:132
+R28499:28504 xv6iris.FsTree <> fsnode ind
+R28514:28519 stdpp.base <> decide def
+R28546:28548 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R28522:28532 stdpp.bitvector.definitions <> bv_unsigned proj
+R28535:28541 xv6iris.DinodeEnc <> di_type proj
+R28543:28544 xv6iris.FsTree <> dn:131 var
+R28549:28555 xv6iris.DirView <> T_DIR_z def
+R28631:28635 xv6iris.FsTree <> NFile constr
+R28638:28647 xv6iris.FsTree <> file_bytes def
+R28649:28652 xv6iris.FsTree <> data:132 var
+R28655:28662 Stdlib.ZArith.BinInt Z to_nat def
+R28665:28675 stdpp.bitvector.definitions <> bv_unsigned proj
+R28678:28684 xv6iris.DinodeEnc <> di_size proj
+R28686:28687 xv6iris.FsTree <> dn:131 var
+R28565:28568 xv6iris.FsTree <> NDir constr
+R28571:28578 xv6iris.FsTree <> dir_view def
+R28580:28583 xv6iris.FsTree <> data:132 var
+R28586:28593 xv6iris.DirView <> dir_nrec def
+R28596:28606 stdpp.bitvector.definitions <> bv_unsigned proj
+R28609:28615 xv6iris.DinodeEnc <> di_size proj
+R28617:28618 xv6iris.FsTree <> dn:131 var
+def 29231:29238 <> node_rep
+R29245:29250 xv6iris.FsTree <> fsnode ind
+binder 29241:29241 <> n:133
+R29259:29264 xv6iris.DinodeEnc <> dinode rec
+binder 29254:29255 <> dn:134
+R29278:29281 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29275:29277 Corelib.Init.Datatypes <> nat ind
+R29282:29285 Corelib.Init.Datatypes <> list ind
+R29288:29289 stdpp.bitvector.definitions <> bv rec
+binder 29268:29271 <> data:135
+R29315:29315 xv6iris.FsTree <> n:133 var
+R29326:29330 xv6iris.FsTree <> NFile constr
+R29373:29382 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R29368:29371 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R29344:29354 stdpp.bitvector.definitions <> bv_unsigned proj
+R29357:29363 xv6iris.DinodeEnc <> di_type proj
+R29365:29366 xv6iris.FsTree <> dn:134 var
+R29418:29427 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R29407:29410 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R29383:29393 stdpp.bitvector.definitions <> bv_unsigned proj
+R29396:29402 xv6iris.DinodeEnc <> di_type proj
+R29404:29405 xv6iris.FsTree <> dn:134 var
+R29411:29417 xv6iris.DirView <> T_DIR_z def
+R29430:29432 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29433:29442 xv6iris.FsTree <> file_bytes def
+R29444:29447 xv6iris.FsTree <> data:135 var
+R29450:29457 Stdlib.ZArith.BinInt Z to_nat def
+R29460:29470 stdpp.bitvector.definitions <> bv_unsigned proj
+R29473:29479 xv6iris.DinodeEnc <> di_size proj
+R29481:29482 xv6iris.FsTree <> dn:134 var
+R29491:29494 xv6iris.FsTree <> NDir constr
+R29544:29553 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R29534:29536 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29510:29520 stdpp.bitvector.definitions <> bv_unsigned proj
+R29523:29529 xv6iris.DinodeEnc <> di_type proj
+R29531:29532 xv6iris.FsTree <> dn:134 var
+R29537:29543 xv6iris.DirView <> T_DIR_z def
+R29613:29622 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R29554:29569 xv6iris.FsTree <> dir_names_unique def
+R29571:29574 xv6iris.FsTree <> data:135 var
+R29577:29584 xv6iris.DirView <> dir_nrec def
+R29587:29597 stdpp.bitvector.definitions <> bv_unsigned proj
+R29600:29606 xv6iris.DinodeEnc <> di_size proj
+R29608:29609 xv6iris.FsTree <> dn:134 var
+R29627:29629 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29630:29637 xv6iris.FsTree <> dir_view def
+R29639:29642 xv6iris.FsTree <> data:135 var
+R29645:29652 xv6iris.DirView <> dir_nrec def
+R29655:29665 stdpp.bitvector.definitions <> bv_unsigned proj
+R29668:29674 xv6iris.DinodeEnc <> di_size proj
+R29676:29677 xv6iris.FsTree <> dn:134 var
+prf 29696:29706 <> node_rep_of
+R29714:29719 xv6iris.DinodeEnc <> dinode rec
+binder 29709:29710 <> dn:137
+R29733:29736 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29730:29732 Corelib.Init.Datatypes <> nat ind
+R29737:29740 Corelib.Init.Datatypes <> list ind
+R29743:29744 stdpp.bitvector.definitions <> bv rec
+binder 29723:29726 <> data:138
+R29783:29788 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29778:29781 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R29754:29764 stdpp.bitvector.definitions <> bv_unsigned proj
+R29767:29773 xv6iris.DinodeEnc <> di_type proj
+R29775:29776 xv6iris.FsTree <> dn:137 var
+R29848:29853 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29789:29804 xv6iris.FsTree <> dir_names_unique def
+R29806:29809 xv6iris.FsTree <> data:138 var
+R29812:29819 xv6iris.DirView <> dir_nrec def
+R29822:29832 stdpp.bitvector.definitions <> bv_unsigned proj
+R29835:29841 xv6iris.DinodeEnc <> di_size proj
+R29843:29844 xv6iris.FsTree <> dn:137 var
+R29854:29861 xv6iris.FsTree <> node_rep def
+R29864:29870 xv6iris.FsTree <> node_of def
+R29872:29873 xv6iris.FsTree <> dn:137 var
+R29875:29878 xv6iris.FsTree <> data:138 var
+R29881:29882 xv6iris.FsTree <> dn:137 var
+R29884:29887 xv6iris.FsTree <> data:138 var
+R29921:29927 xv6iris.FsTree <> node_of def
+R29942:29947 stdpp.base <> decide def
+R29974:29976 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29950:29960 stdpp.bitvector.definitions <> bv_unsigned proj
+R29963:29969 xv6iris.DinodeEnc <> di_type proj
+R29977:29983 xv6iris.DirView <> T_DIR_z def
+R29942:29947 stdpp.base <> decide def
+R29974:29976 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29950:29960 stdpp.bitvector.definitions <> bv_unsigned proj
+R29963:29969 xv6iris.DinodeEnc <> di_type proj
+R29977:29983 xv6iris.DirView <> T_DIR_z def
+prf 30279:30294 <> node_rep_node_of
+R30301:30306 xv6iris.FsTree <> fsnode ind
+binder 30297:30297 <> n:139
+R30315:30320 xv6iris.DinodeEnc <> dinode rec
+binder 30310:30311 <> dn:140
+R30334:30337 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30331:30333 Corelib.Init.Datatypes <> nat ind
+R30338:30341 Corelib.Init.Datatypes <> list ind
+R30344:30345 stdpp.bitvector.definitions <> bv rec
+binder 30324:30327 <> data:141
+R30373:30376 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30355:30362 xv6iris.FsTree <> node_rep def
+R30364:30364 xv6iris.FsTree <> n:139 var
+R30366:30367 xv6iris.FsTree <> dn:140 var
+R30369:30372 xv6iris.FsTree <> data:141 var
+R30378:30380 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30377:30377 xv6iris.FsTree <> n:139 var
+R30381:30387 xv6iris.FsTree <> node_of def
+R30389:30390 xv6iris.FsTree <> dn:140 var
+R30392:30395 xv6iris.FsTree <> data:141 var
+R30446:30452 xv6iris.FsTree <> node_of def
+R30490:30501 stdpp.decidable <> decide_False thm
+R30490:30501 stdpp.decidable <> decide_False thm
+R30490:30501 stdpp.decidable <> decide_False thm
+R30564:30574 stdpp.decidable <> decide_True thm
+R30564:30574 stdpp.decidable <> decide_True thm
+R30564:30574 stdpp.decidable <> decide_True thm
+prf 30828:30839 <> node_rep_inj
+R30850:30855 xv6iris.FsTree <> fsnode ind
+binder 30842:30843 <> n1:142
+binder 30845:30846 <> n2:143
+R30864:30869 xv6iris.DinodeEnc <> dinode rec
+binder 30859:30860 <> dn:144
+R30887:30890 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30884:30886 Corelib.Init.Datatypes <> nat ind
+R30891:30894 Corelib.Init.Datatypes <> list ind
+R30897:30898 stdpp.bitvector.definitions <> bv rec
+binder 30877:30880 <> data:145
+R30927:30930 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30908:30915 xv6iris.FsTree <> node_rep def
+R30917:30918 xv6iris.FsTree <> n1:142 var
+R30920:30921 xv6iris.FsTree <> dn:144 var
+R30923:30926 xv6iris.FsTree <> data:145 var
+R30950:30953 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30931:30938 xv6iris.FsTree <> node_rep def
+R30940:30941 xv6iris.FsTree <> n2:143 var
+R30943:30944 xv6iris.FsTree <> dn:144 var
+R30946:30949 xv6iris.FsTree <> data:145 var
+R30956:30958 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30954:30955 xv6iris.FsTree <> n1:142 var
+R30959:30960 xv6iris.FsTree <> n2:143 var
+R30997:31012 xv6iris.FsTree <> node_rep_node_of thm
+R30997:31012 xv6iris.FsTree <> node_rep_node_of thm
+R30997:31012 xv6iris.FsTree <> node_rep_node_of thm
+R31041:31056 xv6iris.FsTree <> node_rep_node_of thm
+R31041:31056 xv6iris.FsTree <> node_rep_node_of thm
+R31041:31056 xv6iris.FsTree <> node_rep_node_of thm
+prf 31155:31166 <> node_rep_dir
+R31176:31179 stdpp.gmap <> gmap rec
+R31187:31187 Corelib.Numbers.BinNums <> Z ind
+R31181:31185 xv6iris.FsTree <> fname def
+binder 31169:31172 <> ents:146
+R31196:31201 xv6iris.DinodeEnc <> dinode rec
+binder 31191:31192 <> dn:147
+R31219:31222 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31216:31218 Corelib.Init.Datatypes <> nat ind
+R31223:31226 Corelib.Init.Datatypes <> list ind
+R31229:31230 stdpp.bitvector.definitions <> bv rec
+binder 31209:31212 <> data:148
+R31268:31271 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31240:31247 xv6iris.FsTree <> node_rep def
+R31250:31253 xv6iris.FsTree <> NDir constr
+R31255:31258 xv6iris.FsTree <> ents:146 var
+R31261:31262 xv6iris.FsTree <> dn:147 var
+R31264:31267 xv6iris.FsTree <> data:148 var
+R31296:31298 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31272:31282 stdpp.bitvector.definitions <> bv_unsigned proj
+R31285:31291 xv6iris.DinodeEnc <> di_type proj
+R31293:31294 xv6iris.FsTree <> dn:147 var
+R31299:31305 xv6iris.DirView <> T_DIR_z def
+prf 31356:31368 <> node_rep_file
+R31376:31379 Corelib.Init.Datatypes <> list ind
+R31382:31383 stdpp.bitvector.definitions <> bv rec
+binder 31371:31372 <> bs:149
+R31395:31400 xv6iris.DinodeEnc <> dinode rec
+binder 31390:31391 <> dn:150
+R31418:31421 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31415:31417 Corelib.Init.Datatypes <> nat ind
+R31422:31425 Corelib.Init.Datatypes <> list ind
+R31428:31429 stdpp.bitvector.definitions <> bv rec
+binder 31408:31411 <> data:151
+R31466:31469 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31439:31446 xv6iris.FsTree <> node_rep def
+R31449:31453 xv6iris.FsTree <> NFile constr
+R31455:31456 xv6iris.FsTree <> bs:149 var
+R31459:31460 xv6iris.FsTree <> dn:150 var
+R31462:31465 xv6iris.FsTree <> data:151 var
+R31494:31497 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R31470:31480 stdpp.bitvector.definitions <> bv_unsigned proj
+R31483:31489 xv6iris.DinodeEnc <> di_type proj
+R31491:31492 xv6iris.FsTree <> dn:150 var
+R31498:31504 xv6iris.DirView <> T_DIR_z def
+prf 31555:31568 <> node_rep_alloc
+R31575:31580 xv6iris.FsTree <> fsnode ind
+binder 31571:31571 <> n:152
+R31589:31594 xv6iris.DinodeEnc <> dinode rec
+binder 31584:31585 <> dn:153
+R31608:31611 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31605:31607 Corelib.Init.Datatypes <> nat ind
+R31612:31615 Corelib.Init.Datatypes <> list ind
+R31618:31619 stdpp.bitvector.definitions <> bv rec
+binder 31598:31601 <> data:154
+R31647:31650 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31629:31636 xv6iris.FsTree <> node_rep def
+R31638:31638 xv6iris.FsTree <> n:152 var
+R31640:31641 xv6iris.FsTree <> dn:153 var
+R31643:31646 xv6iris.FsTree <> data:154 var
+R31675:31678 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R31651:31661 stdpp.bitvector.definitions <> bv_unsigned proj
+R31664:31670 xv6iris.DinodeEnc <> di_type proj
+R31672:31673 xv6iris.FsTree <> dn:153 var
+R31798:31804 xv6iris.DirView <> T_DIR_z def
+prf 32099:32110 <> node_rep_ent
+R32120:32123 stdpp.gmap <> gmap rec
+R32131:32131 Corelib.Numbers.BinNums <> Z ind
+R32125:32129 xv6iris.FsTree <> fname def
+binder 32113:32116 <> ents:155
+R32140:32145 xv6iris.DinodeEnc <> dinode rec
+binder 32135:32136 <> dn:156
+R32163:32166 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32160:32162 Corelib.Init.Datatypes <> nat ind
+R32167:32170 Corelib.Init.Datatypes <> list ind
+R32173:32174 stdpp.bitvector.definitions <> bv rec
+binder 32153:32156 <> data:157
+R32185:32189 xv6iris.FsTree <> fname def
+binder 32181:32181 <> s:158
+R32197:32197 Corelib.Numbers.BinNums <> Z ind
+binder 32193:32193 <> z:159
+R32232:32237 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32204:32211 xv6iris.FsTree <> node_rep def
+R32214:32217 xv6iris.FsTree <> NDir constr
+R32219:32222 xv6iris.FsTree <> ents:155 var
+R32225:32226 xv6iris.FsTree <> dn:156 var
+R32228:32231 xv6iris.FsTree <> data:157 var
+R32256:32261 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32247:32249 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32242:32245 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R32246:32246 xv6iris.FsTree <> s:158 var
+R32238:32241 xv6iris.FsTree <> ents:155 var
+R32250:32253 Corelib.Init.Datatypes <> Some constr
+R32255:32255 xv6iris.FsTree <> z:159 var
+R32262:32268 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R32276:32281 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R32273:32275 Corelib.Init.Datatypes <> nat ind
+binder 32269:32269 <> k:160
+R32345:32352 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R32336:32338 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32282:32290 xv6iris.DirView <> dir_first def
+R32292:32295 xv6iris.FsTree <> data:157 var
+R32298:32305 xv6iris.DirView <> dir_nrec def
+R32308:32318 stdpp.bitvector.definitions <> bv_unsigned proj
+R32321:32327 xv6iris.DinodeEnc <> di_size proj
+R32329:32330 xv6iris.FsTree <> dn:156 var
+R32335:32335 xv6iris.FsTree <> s:158 var
+R32339:32342 Corelib.Init.Datatypes <> Some constr
+R32344:32344 xv6iris.FsTree <> k:160 var
+R32368:32375 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R32353:32360 xv6iris.DirView <> dir_live def
+R32362:32365 xv6iris.FsTree <> data:157 var
+R32367:32367 xv6iris.FsTree <> k:160 var
+R32396:32403 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R32392:32394 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32376:32384 xv6iris.FsTree <> dir_bname def
+R32386:32389 xv6iris.FsTree <> data:157 var
+R32391:32391 xv6iris.FsTree <> k:160 var
+R32395:32395 xv6iris.FsTree <> s:158 var
+R32433:32435 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32404:32414 stdpp.bitvector.definitions <> bv_unsigned proj
+R32417:32424 xv6iris.DirView <> dir_inum def
+R32426:32429 xv6iris.FsTree <> data:157 var
+R32431:32431 xv6iris.FsTree <> k:160 var
+R32436:32436 xv6iris.FsTree <> z:159 var
+R32477:32496 xv6iris.FsTree <> dir_view_lookup_Some thm
+R32477:32496 xv6iris.FsTree <> dir_view_lookup_Some thm
+R32585:32598 xv6iris.DirView <> dir_first_live thm
+R32585:32598 xv6iris.DirView <> dir_first_live thm
+R32633:32646 xv6iris.DirView <> dir_first_name thm
+R32633:32646 xv6iris.DirView <> dir_first_name thm
+prf 32754:32768 <> node_rep_ent_of
+R32778:32781 stdpp.gmap <> gmap rec
+R32789:32789 Corelib.Numbers.BinNums <> Z ind
+R32783:32787 xv6iris.FsTree <> fname def
+binder 32771:32774 <> ents:161
+R32798:32803 xv6iris.DinodeEnc <> dinode rec
+binder 32793:32794 <> dn:162
+R32821:32824 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32818:32820 Corelib.Init.Datatypes <> nat ind
+R32825:32828 Corelib.Init.Datatypes <> list ind
+R32831:32832 stdpp.bitvector.definitions <> bv rec
+binder 32811:32814 <> data:163
+R32843:32845 Corelib.Init.Datatypes <> nat ind
+binder 32839:32839 <> k:164
+R32880:32885 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32852:32859 xv6iris.FsTree <> node_rep def
+R32862:32865 xv6iris.FsTree <> NDir constr
+R32867:32870 xv6iris.FsTree <> ents:161 var
+R32873:32874 xv6iris.FsTree <> dn:162 var
+R32876:32879 xv6iris.FsTree <> data:163 var
+R32931:32934 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32888:32890 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R32887:32887 xv6iris.FsTree <> k:164 var
+R32891:32898 xv6iris.DirView <> dir_nrec def
+R32901:32911 stdpp.bitvector.definitions <> bv_unsigned proj
+R32914:32920 xv6iris.DinodeEnc <> di_size proj
+R32922:32923 xv6iris.FsTree <> dn:162 var
+R32950:32955 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32935:32942 xv6iris.DirView <> dir_live def
+R32944:32947 xv6iris.FsTree <> data:163 var
+R32949:32949 xv6iris.FsTree <> k:164 var
+R32980:32982 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32960:32963 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R32964:32972 xv6iris.FsTree <> dir_bname def
+R32974:32977 xv6iris.FsTree <> data:163 var
+R32979:32979 xv6iris.FsTree <> k:164 var
+R32956:32959 xv6iris.FsTree <> ents:161 var
+R32983:32986 Corelib.Init.Datatypes <> Some constr
+R32989:32999 stdpp.bitvector.definitions <> bv_unsigned proj
+R33002:33009 xv6iris.DirView <> dir_inum def
+R33011:33014 xv6iris.FsTree <> data:163 var
+R33016:33016 xv6iris.FsTree <> k:164 var
+R33065:33077 xv6iris.FsTree <> dir_view_live thm
+R33065:33077 xv6iris.FsTree <> dir_view_live thm
+def 33627:33634 <> tree_ent
+R33641:33646 xv6iris.FsTree <> fstree rec
+binder 33637:33637 <> t:165
+R33654:33654 Corelib.Numbers.BinNums <> Z ind
+binder 33650:33650 <> i:166
+R33662:33666 xv6iris.FsTree <> fname def
+binder 33658:33658 <> f:167
+R33671:33676 Corelib.Init.Datatypes <> option ind
+R33678:33678 Corelib.Numbers.BinNums <> Z ind
+R33701:33704 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R33705:33705 xv6iris.FsTree <> i:166 var
+R33691:33698 xv6iris.FsTree <> fs_nodes proj
+R33700:33700 xv6iris.FsTree <> t:165 var
+R33716:33719 Corelib.Init.Datatypes <> Some constr
+R33722:33725 xv6iris.FsTree <> NDir constr
+R33740:33743 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R33744:33744 xv6iris.FsTree <> f:167 var
+R33755:33758 Corelib.Init.Datatypes <> None constr
+def 33779:33787 <> path_step
+R33794:33799 xv6iris.FsTree <> fstree rec
+binder 33790:33790 <> t:168
+R33808:33813 Corelib.Init.Datatypes <> option ind
+R33815:33815 Corelib.Numbers.BinNums <> Z ind
+binder 33803:33804 <> oi:169
+R33823:33827 xv6iris.FsTree <> fname def
+binder 33819:33819 <> f:170
+R33832:33837 Corelib.Init.Datatypes <> option ind
+R33839:33839 Corelib.Numbers.BinNums <> Z ind
+R33852:33853 xv6iris.FsTree <> oi:169 var
+R33864:33867 Corelib.Init.Datatypes <> Some constr
+R33874:33881 xv6iris.FsTree <> tree_ent def
+R33883:33883 xv6iris.FsTree <> t:168 var
+R33887:33887 xv6iris.FsTree <> f:170 var
+R33893:33896 Corelib.Init.Datatypes <> None constr
+R33901:33904 Corelib.Init.Datatypes <> None constr
+def 34069:34075 <> path_at
+R34082:34087 xv6iris.FsTree <> fstree rec
+binder 34078:34078 <> t:172
+R34095:34095 Corelib.Numbers.BinNums <> Z ind
+binder 34091:34091 <> i:173
+R34103:34106 Corelib.Init.Datatypes <> list ind
+R34108:34112 xv6iris.FsTree <> fname def
+binder 34099:34099 <> p:174
+R34117:34122 Corelib.Init.Datatypes <> option ind
+R34124:34124 Corelib.Numbers.BinNums <> Z ind
+R34131:34135 stdpp.list_basics <> foldl def
+R34160:34160 xv6iris.FsTree <> p:174 var
+R34152:34155 Corelib.Init.Datatypes <> Some constr
+R34157:34157 xv6iris.FsTree <> i:173 var
+R34138:34146 xv6iris.FsTree <> path_step def
+R34148:34148 xv6iris.FsTree <> t:172 var
+prf 34170:34180 <> path_at_nil
+R34187:34192 xv6iris.FsTree <> fstree rec
+binder 34183:34183 <> t:175
+R34200:34200 Corelib.Numbers.BinNums <> Z ind
+binder 34196:34196 <> i:176
+R34219:34221 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R34205:34211 xv6iris.FsTree <> path_at def
+R34213:34213 xv6iris.FsTree <> t:175 var
+R34215:34215 xv6iris.FsTree <> i:176 var
+R34217:34218 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R34222:34225 Corelib.Init.Datatypes <> Some constr
+R34227:34227 xv6iris.FsTree <> i:176 var
+prf 34262:34275 <> path_step_none
+R34282:34287 xv6iris.FsTree <> fstree rec
+binder 34278:34278 <> t:177
+R34295:34298 Corelib.Init.Datatypes <> list ind
+R34300:34304 xv6iris.FsTree <> fname def
+binder 34291:34291 <> p:178
+R34337:34339 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R34311:34315 stdpp.list_basics <> foldl def
+R34336:34336 xv6iris.FsTree <> p:178 var
+R34331:34334 Corelib.Init.Datatypes <> None constr
+R34318:34326 xv6iris.FsTree <> path_step def
+R34328:34328 xv6iris.FsTree <> t:177 var
+R34340:34343 Corelib.Init.Datatypes <> None constr
+prf 34418:34429 <> path_at_cons
+R34436:34441 xv6iris.FsTree <> fstree rec
+binder 34432:34432 <> t:179
+R34449:34449 Corelib.Numbers.BinNums <> Z ind
+binder 34445:34445 <> i:180
+R34457:34461 xv6iris.FsTree <> fname def
+binder 34453:34453 <> f:181
+R34469:34472 Corelib.Init.Datatypes <> list ind
+R34474:34478 xv6iris.FsTree <> fname def
+binder 34465:34465 <> p:182
+R34505:34509 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R34485:34491 xv6iris.FsTree <> path_at def
+R34493:34493 xv6iris.FsTree <> t:179 var
+R34495:34495 xv6iris.FsTree <> i:180 var
+R34499:34502 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R34498:34498 xv6iris.FsTree <> f:181 var
+R34503:34503 xv6iris.FsTree <> p:182 var
+R34516:34523 xv6iris.FsTree <> tree_ent def
+R34525:34525 xv6iris.FsTree <> t:179 var
+R34527:34527 xv6iris.FsTree <> i:180 var
+R34529:34529 xv6iris.FsTree <> f:181 var
+R34542:34545 Corelib.Init.Datatypes <> Some constr
+R34552:34558 xv6iris.FsTree <> path_at def
+R34560:34560 xv6iris.FsTree <> t:179 var
+R34564:34564 xv6iris.FsTree <> p:182 var
+R34572:34575 Corelib.Init.Datatypes <> None constr
+R34580:34583 Corelib.Init.Datatypes <> None constr
+R34610:34616 xv6iris.FsTree <> path_at def
+R34624:34628 stdpp.list_basics <> foldl def
+R34630:34638 xv6iris.FsTree <> path_step def
+R34654:34661 xv6iris.FsTree <> tree_ent def
+R34701:34714 xv6iris.FsTree <> path_step_none thm
+R34654:34661 xv6iris.FsTree <> tree_ent def
+R34701:34714 xv6iris.FsTree <> path_step_none thm
+prf 34730:34740 <> path_at_app
+R34747:34752 xv6iris.FsTree <> fstree rec
+binder 34743:34743 <> t:183
+R34760:34760 Corelib.Numbers.BinNums <> Z ind
+binder 34756:34756 <> i:184
+R34770:34773 Corelib.Init.Datatypes <> list ind
+R34775:34779 xv6iris.FsTree <> fname def
+binder 34764:34764 <> p:185
+binder 34766:34766 <> q:186
+R34806:34810 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R34786:34792 xv6iris.FsTree <> path_at def
+R34794:34794 xv6iris.FsTree <> t:183 var
+R34796:34796 xv6iris.FsTree <> i:184 var
+R34800:34803 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R34799:34799 xv6iris.FsTree <> p:185 var
+R34804:34804 xv6iris.FsTree <> q:186 var
+R34817:34823 xv6iris.FsTree <> path_at def
+R34825:34825 xv6iris.FsTree <> t:183 var
+R34827:34827 xv6iris.FsTree <> i:184 var
+R34829:34829 xv6iris.FsTree <> p:185 var
+R34842:34845 Corelib.Init.Datatypes <> Some constr
+R34852:34858 xv6iris.FsTree <> path_at def
+R34860:34860 xv6iris.FsTree <> t:183 var
+R34864:34864 xv6iris.FsTree <> q:186 var
+R34872:34875 Corelib.Init.Datatypes <> None constr
+R34880:34883 Corelib.Init.Datatypes <> None constr
+R34974:34976 Corelib.Init.Datatypes <> app def
+R34989:35000 xv6iris.FsTree <> path_at_cons thm
+R34989:35000 xv6iris.FsTree <> path_at_cons thm
+R34989:35000 xv6iris.FsTree <> path_at_cons thm
+R34989:35000 xv6iris.FsTree <> path_at_cons thm
+R34989:35000 xv6iris.FsTree <> path_at_cons thm
+R35013:35020 xv6iris.FsTree <> tree_ent def
+R35013:35020 xv6iris.FsTree <> tree_ent def
+prf 35082:35098 <> path_at_singleton
+R35105:35110 xv6iris.FsTree <> fstree rec
+binder 35101:35101 <> t:187
+R35118:35118 Corelib.Numbers.BinNums <> Z ind
+binder 35114:35114 <> i:188
+R35126:35130 xv6iris.FsTree <> fname def
+binder 35122:35122 <> f:189
+R35152:35154 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R35137:35143 xv6iris.FsTree <> path_at def
+R35145:35145 xv6iris.FsTree <> t:187 var
+R35147:35147 xv6iris.FsTree <> i:188 var
+R35149:35149 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R35151:35151 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R35150:35150 xv6iris.FsTree <> f:189 var
+R35155:35162 xv6iris.FsTree <> tree_ent def
+R35164:35164 xv6iris.FsTree <> t:187 var
+R35166:35166 xv6iris.FsTree <> i:188 var
+R35168:35168 xv6iris.FsTree <> f:189 var
+R35186:35197 xv6iris.FsTree <> path_at_cons thm
+R35186:35197 xv6iris.FsTree <> path_at_cons thm
+R35186:35197 xv6iris.FsTree <> path_at_cons thm
+R35210:35217 xv6iris.FsTree <> tree_ent def
+R35210:35217 xv6iris.FsTree <> tree_ent def
+def 35455:35464 <> path_chain
+R35471:35476 xv6iris.FsTree <> fstree rec
+binder 35467:35467 <> t:190
+R35484:35484 Corelib.Numbers.BinNums <> Z ind
+binder 35480:35480 <> i:191
+R35492:35495 Corelib.Init.Datatypes <> list ind
+R35497:35501 xv6iris.FsTree <> fname def
+binder 35488:35488 <> p:192
+R35506:35509 Corelib.Init.Datatypes <> list ind
+R35511:35511 Corelib.Numbers.BinNums <> Z ind
+R35524:35524 xv6iris.FsTree <> p:192 var
+R35535:35536 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R35541:35541 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R35543:35543 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R35542:35542 xv6iris.FsTree <> i:191 var
+R35550:35553 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R35567:35571 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R35680:35680 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R35566:35566 xv6iris.FsTree <> i:191 var
+R35578:35585 xv6iris.FsTree <> tree_ent def
+R35587:35587 xv6iris.FsTree <> t:190 var
+R35589:35589 xv6iris.FsTree <> i:191 var
+R35612:35615 Corelib.Init.Datatypes <> Some constr
+R35622:35631 xv6iris.FsTree <> path_chain:193 def
+R35633:35633 xv6iris.FsTree <> t:190 var
+R35654:35657 Corelib.Init.Datatypes <> None constr
+R35662:35663 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+prf 35696:35710 <> path_chain_head
+R35717:35722 xv6iris.FsTree <> fstree rec
+binder 35713:35713 <> t:195
+R35730:35730 Corelib.Numbers.BinNums <> Z ind
+binder 35726:35726 <> i:196
+R35738:35741 Corelib.Init.Datatypes <> list ind
+R35743:35747 xv6iris.FsTree <> fname def
+binder 35734:35734 <> p:197
+R35754:35760 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R35762:35763 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 35761:35761 <> l:198
+R35780:35782 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R35764:35773 xv6iris.FsTree <> path_chain def
+R35775:35775 xv6iris.FsTree <> t:195 var
+R35777:35777 xv6iris.FsTree <> i:196 var
+R35779:35779 xv6iris.FsTree <> p:197 var
+R35784:35787 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R35783:35783 xv6iris.FsTree <> i:196 var
+R35788:35788 xv6iris.FsTree <> l:198 var
+prf 35845:35859 <> path_chain_last
+R35866:35871 xv6iris.FsTree <> fstree rec
+binder 35862:35862 <> t:199
+R35881:35881 Corelib.Numbers.BinNums <> Z ind
+binder 35875:35875 <> i:200
+binder 35877:35877 <> j:201
+R35889:35892 Corelib.Init.Datatypes <> list ind
+R35894:35898 xv6iris.FsTree <> fname def
+binder 35885:35885 <> p:202
+R35927:35930 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35918:35920 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R35905:35911 xv6iris.FsTree <> path_at def
+R35913:35913 xv6iris.FsTree <> t:199 var
+R35915:35915 xv6iris.FsTree <> i:200 var
+R35917:35917 xv6iris.FsTree <> p:202 var
+R35921:35924 Corelib.Init.Datatypes <> Some constr
+R35926:35926 xv6iris.FsTree <> j:201 var
+R35932:35936 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R35931:35931 xv6iris.FsTree <> j:201 var
+R35937:35946 xv6iris.FsTree <> path_chain def
+R35948:35948 xv6iris.FsTree <> t:199 var
+R35950:35950 xv6iris.FsTree <> i:200 var
+R35952:35952 xv6iris.FsTree <> p:202 var
+R36057:36073 stdpp.base <> elem_of_list_here constr
+R36057:36073 stdpp.base <> elem_of_list_here constr
+R36088:36099 xv6iris.FsTree <> path_at_cons thm
+R36088:36099 xv6iris.FsTree <> path_at_cons thm
+R36088:36099 xv6iris.FsTree <> path_at_cons thm
+R36112:36121 xv6iris.FsTree <> path_chain def
+R36139:36146 xv6iris.FsTree <> tree_ent def
+R36139:36146 xv6iris.FsTree <> tree_ent def
+R36193:36212 stdpp.base <> elem_of_list_further constr
+R36193:36212 stdpp.base <> elem_of_list_further constr
+def 36754:36764 <> fs_inums_ok
+R36771:36776 xv6iris.FsTree <> fstree rec
+binder 36767:36767 <> t:203
+R36791:36798 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R36817:36819 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R36803:36803 Corelib.Numbers.BinNums <> Z ind
+binder 36799:36799 <> i:204
+R36811:36816 xv6iris.FsTree <> fsnode ind
+binder 36807:36807 <> n:205
+R36844:36847 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R36835:36837 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R36830:36833 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R36834:36834 xv6iris.FsTree <> i:204 var
+R36820:36827 xv6iris.FsTree <> fs_nodes proj
+R36829:36829 xv6iris.FsTree <> t:203 var
+R36838:36841 Corelib.Init.Datatypes <> Some constr
+R36843:36843 xv6iris.FsTree <> n:205 var
+R36849:36852 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R36854:36856 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R36853:36853 xv6iris.FsTree <> i:204 var
+R36853:36853 xv6iris.FsTree <> i:204 var
+R36858:36860 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+def 36877:36887 <> fs_root_dir
+R36894:36899 xv6iris.FsTree <> fstree rec
+binder 36890:36890 <> t:206
+R36914:36920 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R36940:36941 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R36928:36931 stdpp.gmap <> gmap rec
+R36939:36939 Corelib.Numbers.BinNums <> Z ind
+R36933:36937 xv6iris.FsTree <> fname def
+binder 36921:36924 <> ents:207
+R36965:36967 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R36952:36955 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R36956:36962 xv6iris.FsTree <> fs_root proj
+R36964:36964 xv6iris.FsTree <> t:206 var
+R36942:36949 xv6iris.FsTree <> fs_nodes proj
+R36951:36951 xv6iris.FsTree <> t:206 var
+R36968:36971 Corelib.Init.Datatypes <> Some constr
+R36974:36977 xv6iris.FsTree <> NDir constr
+R36979:36982 xv6iris.FsTree <> ents:207 var
+def 36998:37002 <> fs_wf
+R37009:37014 xv6iris.FsTree <> fstree rec
+binder 37005:37005 <> t:208
+R37040:37043 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R37027:37037 xv6iris.FsTree <> fs_inums_ok def
+R37039:37039 xv6iris.FsTree <> t:208 var
+R37044:37054 xv6iris.FsTree <> fs_root_dir def
+R37056:37056 xv6iris.FsTree <> t:208 var
+def 37212:37220 <> fs_proper
+R37227:37230 Corelib.Init.Datatypes <> list ind
+R37232:37236 xv6iris.FsTree <> fname def
+binder 37223:37223 <> p:209
+R37251:37256 Corelib.Lists.ListDef <> Forall ind
+R37293:37293 xv6iris.FsTree <> p:209 var
+binder 37263:37263 <> f:210
+R37276:37279 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R37269:37272 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R37268:37268 xv6iris.FsTree <> f:210 var
+R37273:37275 xv6iris.FsTree <> DOT def
+R37281:37284 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R37280:37280 xv6iris.FsTree <> f:210 var
+R37285:37290 xv6iris.FsTree <> DOTDOT def
+def 37570:37584 <> fs_dirs_acyclic
+R37591:37596 xv6iris.FsTree <> fstree rec
+binder 37587:37587 <> t:211
+R37611:37618 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R37641:37647 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R37623:37623 Corelib.Numbers.BinNums <> Z ind
+binder 37619:37619 <> i:212
+R37631:37634 Corelib.Init.Datatypes <> list ind
+R37636:37640 xv6iris.FsTree <> fname def
+binder 37627:37627 <> p:213
+R37655:37658 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R37649:37652 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R37648:37648 xv6iris.FsTree <> p:213 var
+R37653:37654 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R37670:37673 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R37659:37667 xv6iris.FsTree <> fs_proper def
+R37669:37669 xv6iris.FsTree <> p:213 var
+R37687:37690 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R37674:37680 xv6iris.FsTree <> path_at def
+R37682:37682 xv6iris.FsTree <> t:211 var
+R37684:37684 xv6iris.FsTree <> i:212 var
+R37686:37686 xv6iris.FsTree <> p:213 var
+R37691:37694 Corelib.Init.Datatypes <> Some constr
+R37696:37696 xv6iris.FsTree <> i:212 var
+prf 37706:37723 <> fs_dirs_acyclic_ne
+R37730:37735 xv6iris.FsTree <> fstree rec
+binder 37726:37726 <> t:214
+R37745:37745 Corelib.Numbers.BinNums <> Z ind
+binder 37739:37739 <> i:215
+binder 37741:37741 <> j:216
+R37753:37757 xv6iris.FsTree <> fname def
+binder 37749:37749 <> f:217
+R37781:37784 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R37764:37778 xv6iris.FsTree <> fs_dirs_acyclic def
+R37780:37780 xv6iris.FsTree <> t:214 var
+R37793:37796 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R37786:37789 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R37785:37785 xv6iris.FsTree <> f:217 var
+R37790:37792 xv6iris.FsTree <> DOT def
+R37808:37811 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R37798:37801 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R37797:37797 xv6iris.FsTree <> f:217 var
+R37802:37807 xv6iris.FsTree <> DOTDOT def
+R37835:37840 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R37826:37828 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R37812:37819 xv6iris.FsTree <> tree_ent def
+R37821:37821 xv6iris.FsTree <> t:214 var
+R37823:37823 xv6iris.FsTree <> i:215 var
+R37825:37825 xv6iris.FsTree <> f:217 var
+R37829:37832 Corelib.Init.Datatypes <> Some constr
+R37834:37834 xv6iris.FsTree <> j:216 var
+R37842:37845 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R37841:37841 xv6iris.FsTree <> i:215 var
+R37846:37846 xv6iris.FsTree <> j:216 var
+R37897:37897 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R37899:37899 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R37897:37897 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R37899:37899 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R37942:37957 stdpp.list_relations <> Forall_singleton thm
+R37942:37957 stdpp.list_relations <> Forall_singleton thm
+R37991:38007 xv6iris.FsTree <> path_at_singleton thm
+R37991:38007 xv6iris.FsTree <> path_at_singleton thm
+R37991:38007 xv6iris.FsTree <> path_at_singleton thm
+def 39008:39021 <> dir_written_at
+R39040:39043 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39037:39039 Corelib.Init.Datatypes <> nat ind
+R39044:39047 Corelib.Init.Datatypes <> list ind
+R39050:39051 stdpp.bitvector.definitions <> bv rec
+binder 39024:39027 <> data:218
+binder 39029:39033 <> data':219
+R39063:39065 Corelib.Init.Datatypes <> nat ind
+binder 39058:39059 <> k0:220
+R39077:39081 xv6iris.FsTree <> fname def
+binder 39073:39073 <> s:221
+R39089:39090 stdpp.bitvector.definitions <> bv rec
+binder 39085:39085 <> z:222
+R39129:39134 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R39125:39127 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39108:39115 xv6iris.DirView <> dir_inum def
+R39117:39121 xv6iris.FsTree <> data':219 var
+R39123:39124 xv6iris.FsTree <> k0:220 var
+R39128:39128 xv6iris.FsTree <> z:222 var
+R39157:39163 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R39217:39217 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R39153:39155 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39135:39143 xv6iris.FsTree <> dir_bname def
+R39145:39149 xv6iris.FsTree <> data':219 var
+R39151:39152 xv6iris.FsTree <> k0:220 var
+R39156:39156 xv6iris.FsTree <> s:221 var
+R39164:39170 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R39178:39179 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R39175:39177 Corelib.Init.Datatypes <> nat ind
+binder 39171:39171 <> q:223
+R39187:39190 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39181:39184 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R39180:39180 xv6iris.FsTree <> q:223 var
+R39185:39186 xv6iris.FsTree <> k0:220 var
+R39191:39203 xv6iris.DirView <> dir_win_agree def
+R39205:39208 xv6iris.FsTree <> data:218 var
+R39210:39214 xv6iris.FsTree <> data':219 var
+R39216:39216 xv6iris.FsTree <> q:223 var
+prf 39227:39242 <> dir_written_inum
+R39261:39264 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39258:39260 Corelib.Init.Datatypes <> nat ind
+R39265:39268 Corelib.Init.Datatypes <> list ind
+R39271:39272 stdpp.bitvector.definitions <> bv rec
+binder 39245:39248 <> data:224
+binder 39250:39254 <> data':225
+R39284:39286 Corelib.Init.Datatypes <> nat ind
+binder 39279:39280 <> k0:226
+R39298:39302 xv6iris.FsTree <> fname def
+binder 39294:39294 <> s:227
+R39310:39311 stdpp.bitvector.definitions <> bv rec
+binder 39306:39306 <> z:228
+R39322:39324 Corelib.Init.Datatypes <> nat ind
+binder 39318:39318 <> q:229
+R39363:39366 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39331:39344 xv6iris.FsTree <> dir_written_at def
+R39346:39349 xv6iris.FsTree <> data:224 var
+R39351:39355 xv6iris.FsTree <> data':225 var
+R39357:39358 xv6iris.FsTree <> k0:226 var
+R39360:39360 xv6iris.FsTree <> s:227 var
+R39362:39362 xv6iris.FsTree <> z:228 var
+R39374:39379 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39368:39371 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R39367:39367 xv6iris.FsTree <> q:229 var
+R39372:39373 xv6iris.FsTree <> k0:226 var
+R39396:39398 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39380:39387 xv6iris.DirView <> dir_inum def
+R39389:39393 xv6iris.FsTree <> data':225 var
+R39395:39395 xv6iris.FsTree <> q:229 var
+R39399:39406 xv6iris.DirView <> dir_inum def
+R39408:39411 xv6iris.FsTree <> data:224 var
+R39413:39413 xv6iris.FsTree <> q:229 var
+R39453:39466 xv6iris.DirView <> dir_inum_agree thm
+R39453:39466 xv6iris.DirView <> dir_inum_agree thm
+prf 39504:39520 <> dir_written_bname
+R39539:39542 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39536:39538 Corelib.Init.Datatypes <> nat ind
+R39543:39546 Corelib.Init.Datatypes <> list ind
+R39549:39550 stdpp.bitvector.definitions <> bv rec
+binder 39523:39526 <> data:230
+binder 39528:39532 <> data':231
+R39562:39564 Corelib.Init.Datatypes <> nat ind
+binder 39557:39558 <> k0:232
+R39576:39580 xv6iris.FsTree <> fname def
+binder 39572:39572 <> s:233
+R39588:39589 stdpp.bitvector.definitions <> bv rec
+binder 39584:39584 <> z:234
+R39600:39602 Corelib.Init.Datatypes <> nat ind
+binder 39596:39596 <> q:235
+R39641:39644 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39609:39622 xv6iris.FsTree <> dir_written_at def
+R39624:39627 xv6iris.FsTree <> data:230 var
+R39629:39633 xv6iris.FsTree <> data':231 var
+R39635:39636 xv6iris.FsTree <> k0:232 var
+R39638:39638 xv6iris.FsTree <> s:233 var
+R39640:39640 xv6iris.FsTree <> z:234 var
+R39652:39657 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39646:39649 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R39645:39645 xv6iris.FsTree <> q:235 var
+R39650:39651 xv6iris.FsTree <> k0:232 var
+R39675:39677 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39658:39666 xv6iris.FsTree <> dir_bname def
+R39668:39672 xv6iris.FsTree <> data':231 var
+R39674:39674 xv6iris.FsTree <> q:235 var
+R39678:39686 xv6iris.FsTree <> dir_bname def
+R39688:39691 xv6iris.FsTree <> data:230 var
+R39693:39693 xv6iris.FsTree <> q:235 var
+R39735:39749 xv6iris.DirView <> dir_bname_agree thm
+R39735:39749 xv6iris.DirView <> dir_bname_agree thm
+prf 39787:39802 <> dir_written_live
+R39821:39824 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39818:39820 Corelib.Init.Datatypes <> nat ind
+R39825:39828 Corelib.Init.Datatypes <> list ind
+R39831:39832 stdpp.bitvector.definitions <> bv rec
+binder 39805:39808 <> data:236
+binder 39810:39814 <> data':237
+R39844:39846 Corelib.Init.Datatypes <> nat ind
+binder 39839:39840 <> k0:238
+R39858:39862 xv6iris.FsTree <> fname def
+binder 39854:39854 <> s:239
+R39870:39871 stdpp.bitvector.definitions <> bv rec
+binder 39866:39866 <> z:240
+R39882:39884 Corelib.Init.Datatypes <> nat ind
+binder 39878:39878 <> q:241
+R39923:39926 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39891:39904 xv6iris.FsTree <> dir_written_at def
+R39906:39909 xv6iris.FsTree <> data:236 var
+R39911:39915 xv6iris.FsTree <> data':237 var
+R39917:39918 xv6iris.FsTree <> k0:238 var
+R39920:39920 xv6iris.FsTree <> s:239 var
+R39922:39922 xv6iris.FsTree <> z:240 var
+R39934:39940 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39977:39977 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39928:39931 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R39927:39927 xv6iris.FsTree <> q:241 var
+R39932:39933 xv6iris.FsTree <> k0:238 var
+R39957:39961 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R39941:39948 xv6iris.DirView <> dir_live def
+R39950:39954 xv6iris.FsTree <> data':237 var
+R39956:39956 xv6iris.FsTree <> q:241 var
+R39962:39969 xv6iris.DirView <> dir_live def
+R39971:39974 xv6iris.FsTree <> data:236 var
+R39976:39976 xv6iris.FsTree <> q:241 var
+R40010:40017 xv6iris.DirView <> dir_live def
+R40031:40046 xv6iris.FsTree <> dir_written_inum thm
+R40031:40046 xv6iris.FsTree <> dir_written_inum thm
+R40031:40046 xv6iris.FsTree <> dir_written_inum thm
+prf 40172:40188 <> dir_written_live0
+R40207:40210 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40204:40206 Corelib.Init.Datatypes <> nat ind
+R40211:40214 Corelib.Init.Datatypes <> list ind
+R40217:40218 stdpp.bitvector.definitions <> bv rec
+binder 40191:40194 <> data:242
+binder 40196:40200 <> data':243
+R40230:40232 Corelib.Init.Datatypes <> nat ind
+binder 40225:40226 <> k0:244
+R40244:40248 xv6iris.FsTree <> fname def
+binder 40240:40240 <> s:245
+R40256:40257 stdpp.bitvector.definitions <> bv rec
+binder 40252:40252 <> z:246
+R40299:40302 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40267:40280 xv6iris.FsTree <> dir_written_at def
+R40282:40285 xv6iris.FsTree <> data:242 var
+R40287:40291 xv6iris.FsTree <> data':243 var
+R40293:40294 xv6iris.FsTree <> k0:244 var
+R40296:40296 xv6iris.FsTree <> s:245 var
+R40298:40298 xv6iris.FsTree <> z:246 var
+R40315:40318 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40304:40307 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R40303:40303 xv6iris.FsTree <> z:246 var
+R40308:40311 stdpp.bitvector.definitions <> bv_0 def
+R40319:40326 xv6iris.DirView <> dir_live def
+R40328:40332 xv6iris.FsTree <> data':243 var
+R40334:40335 xv6iris.FsTree <> k0:244 var
+R40377:40384 xv6iris.DirView <> dir_live def
+prf 40753:40769 <> dir_written_class
+R40788:40791 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40785:40787 Corelib.Init.Datatypes <> nat ind
+R40792:40795 Corelib.Init.Datatypes <> list ind
+R40798:40799 stdpp.bitvector.definitions <> bv rec
+binder 40772:40775 <> data:247
+binder 40777:40781 <> data':248
+R40826:40828 Corelib.Init.Datatypes <> nat ind
+binder 40810:40813 <> nrec:249
+binder 40815:40819 <> nrec':250
+binder 40821:40822 <> k0:251
+R40836:40840 xv6iris.FsTree <> fname def
+binder 40832:40832 <> s:252
+R40848:40849 stdpp.bitvector.definitions <> bv rec
+binder 40844:40844 <> z:253
+R40860:40862 Corelib.Init.Datatypes <> nat ind
+binder 40856:40856 <> q:254
+R40901:40906 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40869:40882 xv6iris.FsTree <> dir_written_at def
+R40884:40887 xv6iris.FsTree <> data:247 var
+R40889:40893 xv6iris.FsTree <> data':248 var
+R40895:40896 xv6iris.FsTree <> k0:251 var
+R40898:40898 xv6iris.FsTree <> s:252 var
+R40900:40900 xv6iris.FsTree <> z:253 var
+R40907:40907 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40980:40986 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40908:40914 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R40922:40923 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R40919:40921 Corelib.Init.Datatypes <> nat ind
+binder 40915:40915 <> r:255
+R40947:40950 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40929:40932 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R40934:40936 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R40925:40928 xv6iris.FsTree <> nrec:249 var
+R40933:40933 xv6iris.FsTree <> r:255 var
+R40933:40933 xv6iris.FsTree <> r:255 var
+R40937:40941 xv6iris.FsTree <> nrec':250 var
+R40958:40961 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40952:40955 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R40951:40951 xv6iris.FsTree <> r:255 var
+R40956:40957 xv6iris.FsTree <> k0:251 var
+R40962:40963 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R40964:40971 xv6iris.DirView <> dir_live def
+R40973:40977 xv6iris.FsTree <> data':248 var
+R40979:40979 xv6iris.FsTree <> r:255 var
+R41002:41005 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40989:40991 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R40988:40988 xv6iris.FsTree <> q:254 var
+R40992:40996 xv6iris.FsTree <> nrec':250 var
+R41022:41025 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41006:41013 xv6iris.DirView <> dir_live def
+R41015:41019 xv6iris.FsTree <> data':248 var
+R41021:41021 xv6iris.FsTree <> q:254 var
+R41033:41038 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41027:41030 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R41026:41026 xv6iris.FsTree <> q:254 var
+R41031:41032 xv6iris.FsTree <> k0:251 var
+R41053:41056 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R41041:41043 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R41040:41040 xv6iris.FsTree <> q:254 var
+R41044:41047 xv6iris.FsTree <> nrec:249 var
+R41057:41064 xv6iris.DirView <> dir_live def
+R41066:41069 xv6iris.FsTree <> data:247 var
+R41071:41071 xv6iris.FsTree <> q:254 var
+R41122:41127 stdpp.base <> decide def
+R41131:41133 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R41122:41127 stdpp.base <> decide def
+R41131:41133 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R41198:41202 Corelib.Init.Logic <> proj1 thm
+R41205:41220 xv6iris.FsTree <> dir_written_live thm
+R41198:41202 Corelib.Init.Logic <> proj1 thm
+R41205:41220 xv6iris.FsTree <> dir_written_live thm
+R41288:41291 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R41293:41295 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R41288:41291 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R41293:41295 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+prf 41686:41707 <> dir_names_unique_write
+R41726:41729 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41723:41725 Corelib.Init.Datatypes <> nat ind
+R41730:41733 Corelib.Init.Datatypes <> list ind
+R41736:41737 stdpp.bitvector.definitions <> bv rec
+binder 41710:41713 <> data:256
+binder 41715:41719 <> data':257
+R41764:41766 Corelib.Init.Datatypes <> nat ind
+binder 41748:41751 <> nrec:258
+binder 41753:41757 <> nrec':259
+binder 41759:41760 <> k0:260
+R41774:41778 xv6iris.FsTree <> fname def
+binder 41770:41770 <> s:261
+R41786:41787 stdpp.bitvector.definitions <> bv rec
+binder 41782:41782 <> z:262
+R41823:41828 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41797:41812 xv6iris.FsTree <> dir_names_unique def
+R41814:41817 xv6iris.FsTree <> data:256 var
+R41819:41822 xv6iris.FsTree <> nrec:258 var
+R41848:41851 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41834:41837 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R41830:41833 xv6iris.FsTree <> nrec:258 var
+R41838:41842 xv6iris.FsTree <> nrec':259 var
+R41868:41873 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41855:41857 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R41853:41854 xv6iris.FsTree <> k0:260 var
+R41858:41862 xv6iris.FsTree <> nrec':259 var
+R41874:41874 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41947:41953 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41875:41881 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R41889:41890 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R41886:41888 Corelib.Init.Datatypes <> nat ind
+binder 41882:41882 <> r:263
+R41914:41917 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41896:41899 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R41901:41903 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R41892:41895 xv6iris.FsTree <> nrec:258 var
+R41900:41900 xv6iris.FsTree <> r:263 var
+R41900:41900 xv6iris.FsTree <> r:263 var
+R41904:41908 xv6iris.FsTree <> nrec':259 var
+R41925:41928 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41919:41922 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R41918:41918 xv6iris.FsTree <> r:263 var
+R41923:41924 xv6iris.FsTree <> k0:260 var
+R41929:41930 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R41931:41938 xv6iris.DirView <> dir_live def
+R41940:41944 xv6iris.FsTree <> data':257 var
+R41946:41946 xv6iris.FsTree <> r:263 var
+R41982:41987 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41975:41977 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R41954:41962 xv6iris.DirView <> dir_first def
+R41964:41967 xv6iris.FsTree <> data:256 var
+R41969:41972 xv6iris.FsTree <> nrec:258 var
+R41974:41974 xv6iris.FsTree <> s:261 var
+R41978:41981 Corelib.Init.Datatypes <> None constr
+R42020:42025 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41988:42001 xv6iris.FsTree <> dir_written_at def
+R42003:42006 xv6iris.FsTree <> data:256 var
+R42008:42012 xv6iris.FsTree <> data':257 var
+R42014:42015 xv6iris.FsTree <> k0:260 var
+R42017:42017 xv6iris.FsTree <> s:261 var
+R42019:42019 xv6iris.FsTree <> z:262 var
+R42026:42041 xv6iris.FsTree <> dir_names_unique def
+R42043:42047 xv6iris.FsTree <> data':257 var
+R42049:42053 xv6iris.FsTree <> nrec':259 var
+R42193:42199 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R42207:42208 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R42204:42206 Corelib.Init.Datatypes <> nat ind
+binder 42200:42200 <> q:264
+R42224:42227 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42211:42213 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R42210:42210 xv6iris.FsTree <> q:264 var
+R42244:42265 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42228:42235 xv6iris.DirView <> dir_live def
+R42243:42243 xv6iris.FsTree <> q:264 var
+R42273:42276 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42267:42270 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R42266:42266 xv6iris.FsTree <> q:264 var
+R42294:42297 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R42277:42285 xv6iris.FsTree <> dir_bname def
+R42293:42293 xv6iris.FsTree <> q:264 var
+R42193:42199 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R42207:42208 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R42204:42206 Corelib.Init.Datatypes <> nat ind
+binder 42200:42200 <> q:265
+R42224:42227 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42211:42213 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R42210:42210 xv6iris.FsTree <> q:265 var
+R42244:42265 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42228:42235 xv6iris.DirView <> dir_live def
+R42243:42243 xv6iris.FsTree <> q:265 var
+R42273:42276 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42267:42270 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R42266:42266 xv6iris.FsTree <> q:265 var
+R42294:42297 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R42277:42285 xv6iris.FsTree <> dir_bname def
+R42293:42293 xv6iris.FsTree <> q:265 var
+R42344:42360 xv6iris.FsTree <> dir_written_class thm
+R42344:42360 xv6iris.FsTree <> dir_written_class thm
+R42445:42449 Corelib.Init.Logic <> proj1 thm
+R42452:42465 xv6iris.DirView <> dir_first_None thm
+R42445:42449 Corelib.Init.Logic <> proj1 thm
+R42452:42465 xv6iris.DirView <> dir_first_None thm
+R42562:42578 xv6iris.FsTree <> dir_written_bname thm
+R42562:42578 xv6iris.FsTree <> dir_written_bname thm
+R42623:42628 stdpp.base <> decide def
+R42632:42634 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R42672:42677 stdpp.base <> decide def
+R42681:42683 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R42623:42628 stdpp.base <> decide def
+R42632:42634 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R42672:42677 stdpp.base <> decide def
+R42681:42683 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R42672:42677 stdpp.base <> decide def
+R42681:42683 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R42804:42808 Corelib.Init.Logic <> proj1 thm
+R42811:42815 Corelib.Init.Logic <> proj2 thm
+R42804:42808 Corelib.Init.Logic <> proj1 thm
+R42811:42815 Corelib.Init.Logic <> proj2 thm
+R42901:42905 Corelib.Init.Logic <> proj1 thm
+R42908:42912 Corelib.Init.Logic <> proj2 thm
+R42901:42905 Corelib.Init.Logic <> proj1 thm
+R42908:42912 Corelib.Init.Logic <> proj2 thm
+R42934:42950 xv6iris.FsTree <> dir_written_class thm
+R42934:42950 xv6iris.FsTree <> dir_written_class thm
+R43041:43057 xv6iris.FsTree <> dir_written_class thm
+R43041:43057 xv6iris.FsTree <> dir_written_class thm
+R43190:43206 xv6iris.FsTree <> dir_written_bname thm
+R43190:43206 xv6iris.FsTree <> dir_written_bname thm
+R43190:43206 xv6iris.FsTree <> dir_written_bname thm
+R43254:43270 xv6iris.FsTree <> dir_written_bname thm
+R43254:43270 xv6iris.FsTree <> dir_written_bname thm
+R43254:43270 xv6iris.FsTree <> dir_written_bname thm
+prf 43631:43642 <> dfirst_trunc
+R43652:43655 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43649:43651 Corelib.Init.Datatypes <> nat ind
+R43656:43659 Corelib.Init.Datatypes <> bool ind
+binder 43645:43645 <> p:266
+R43669:43671 Corelib.Init.Datatypes <> nat ind
+binder 43663:43663 <> n:267
+binder 43665:43665 <> m:268
+R43690:43693 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43680:43683 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R43679:43679 xv6iris.FsTree <> n:267 var
+R43684:43684 xv6iris.FsTree <> m:268 var
+R43694:43694 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43742:43748 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43695:43701 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R43709:43710 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R43706:43708 Corelib.Init.Datatypes <> nat ind
+binder 43702:43702 <> j:269
+R43727:43730 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43713:43716 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R43718:43720 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R43712:43712 xv6iris.FsTree <> n:267 var
+R43717:43717 xv6iris.FsTree <> j:269 var
+R43717:43717 xv6iris.FsTree <> j:269 var
+R43721:43721 xv6iris.FsTree <> m:268 var
+R43734:43736 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R43731:43731 xv6iris.FsTree <> p:266 var
+R43733:43733 xv6iris.FsTree <> j:269 var
+R43737:43741 Corelib.Init.Datatypes <> false constr
+R43759:43761 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R43749:43754 xv6iris.DirView <> dfirst def
+R43756:43756 xv6iris.FsTree <> p:266 var
+R43758:43758 xv6iris.FsTree <> m:268 var
+R43762:43767 xv6iris.DirView <> dfirst def
+R43769:43769 xv6iris.FsTree <> p:266 var
+R43771:43771 xv6iris.FsTree <> n:267 var
+R43809:43814 xv6iris.DirView <> dfirst def
+R43809:43814 xv6iris.DirView <> dfirst def
+R43849:43859 xv6iris.DirView <> dfirst_mono thm
+R43849:43859 xv6iris.DirView <> dfirst_mono thm
+R43888:43900 xv6iris.DirView <> dfirst_None_2 thm
+R43888:43900 xv6iris.DirView <> dfirst_None_2 thm
+R43930:43935 stdpp.base <> decide def
+R43939:43941 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R43930:43935 stdpp.base <> decide def
+R43939:43941 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R43979:43991 xv6iris.DirView <> dfirst_None_1 thm
+R43979:43991 xv6iris.DirView <> dfirst_None_1 thm
+prf 44128:44145 <> dir_written_matchb
+R44164:44167 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R44161:44163 Corelib.Init.Datatypes <> nat ind
+R44168:44171 Corelib.Init.Datatypes <> list ind
+R44174:44175 stdpp.bitvector.definitions <> bv rec
+binder 44148:44151 <> data:270
+binder 44153:44157 <> data':271
+R44191:44193 Corelib.Init.Datatypes <> nat ind
+binder 44186:44187 <> k0:272
+R44201:44205 xv6iris.FsTree <> fname def
+binder 44197:44197 <> s:273
+R44213:44214 stdpp.bitvector.definitions <> bv rec
+binder 44209:44209 <> z:274
+R44225:44229 xv6iris.FsTree <> fname def
+binder 44221:44221 <> x:275
+R44237:44239 Corelib.Init.Datatypes <> nat ind
+binder 44233:44233 <> q:276
+R44278:44281 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R44246:44259 xv6iris.FsTree <> dir_written_at def
+R44261:44264 xv6iris.FsTree <> data:270 var
+R44266:44270 xv6iris.FsTree <> data':271 var
+R44272:44273 xv6iris.FsTree <> k0:272 var
+R44275:44275 xv6iris.FsTree <> s:273 var
+R44277:44277 xv6iris.FsTree <> z:274 var
+R44289:44294 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R44283:44286 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R44282:44282 xv6iris.FsTree <> q:276 var
+R44287:44288 xv6iris.FsTree <> k0:272 var
+R44315:44317 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R44295:44304 xv6iris.DirView <> dir_matchb def
+R44306:44310 xv6iris.FsTree <> data':271 var
+R44312:44312 xv6iris.FsTree <> q:276 var
+R44314:44314 xv6iris.FsTree <> x:275 var
+R44318:44327 xv6iris.DirView <> dir_matchb def
+R44329:44332 xv6iris.FsTree <> data:270 var
+R44334:44334 xv6iris.FsTree <> q:276 var
+R44336:44336 xv6iris.FsTree <> x:275 var
+R44369:44378 xv6iris.DirView <> dir_matchb def
+R44381:44389 xv6iris.DirView <> dir_liveb def
+R44392:44400 xv6iris.DirView <> dir_freeb def
+R44414:44429 xv6iris.FsTree <> dir_written_inum thm
+R44414:44429 xv6iris.FsTree <> dir_written_inum thm
+R44414:44429 xv6iris.FsTree <> dir_written_inum thm
+R44470:44474 xv6iris.DirentEnc <> bname def
+R44480:44487 xv6iris.DirView <> dir_name def
+R44505:44513 xv6iris.FsTree <> dir_bname def
+R44470:44474 xv6iris.DirentEnc <> bname def
+R44480:44487 xv6iris.DirView <> dir_name def
+R44505:44513 xv6iris.FsTree <> dir_bname def
+R44551:44555 xv6iris.DirentEnc <> bname def
+R44561:44568 xv6iris.DirView <> dir_name def
+R44585:44593 xv6iris.FsTree <> dir_bname def
+R44551:44555 xv6iris.DirentEnc <> bname def
+R44561:44568 xv6iris.DirView <> dir_name def
+R44585:44593 xv6iris.FsTree <> dir_bname def
+R44630:44646 xv6iris.FsTree <> dir_written_bname thm
+R44630:44646 xv6iris.FsTree <> dir_written_bname thm
+R44630:44646 xv6iris.FsTree <> dir_written_bname thm
+def 45654:45666 <> dir_insert_at
+R45685:45688 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R45682:45684 Corelib.Init.Datatypes <> nat ind
+R45689:45692 Corelib.Init.Datatypes <> list ind
+R45695:45696 stdpp.bitvector.definitions <> bv rec
+binder 45669:45672 <> data:277
+binder 45674:45678 <> data':278
+R45723:45725 Corelib.Init.Datatypes <> nat ind
+binder 45707:45710 <> nrec:279
+binder 45712:45716 <> nrec':280
+binder 45718:45719 <> k0:281
+R45733:45737 xv6iris.FsTree <> fname def
+binder 45729:45729 <> s:282
+R45745:45746 stdpp.bitvector.definitions <> bv rec
+binder 45741:45741 <> z:283
+R45783:45788 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R45769:45772 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R45765:45768 xv6iris.FsTree <> nrec:279 var
+R45773:45777 xv6iris.FsTree <> nrec':280 var
+R45805:45810 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R45792:45794 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R45790:45791 xv6iris.FsTree <> k0:281 var
+R45795:45799 xv6iris.FsTree <> nrec':280 var
+R45811:45811 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R45849:45855 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R45827:45830 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R45815:45817 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R45813:45814 xv6iris.FsTree <> k0:281 var
+R45818:45821 xv6iris.FsTree <> nrec:279 var
+R45831:45832 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R45833:45840 xv6iris.DirView <> dir_live def
+R45842:45845 xv6iris.FsTree <> data:277 var
+R45847:45848 xv6iris.FsTree <> k0:281 var
+R45856:45856 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R45929:45935 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R45857:45863 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R45871:45872 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R45868:45870 Corelib.Init.Datatypes <> nat ind
+binder 45864:45864 <> r:284
+R45896:45899 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R45878:45881 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R45883:45885 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R45874:45877 xv6iris.FsTree <> nrec:279 var
+R45882:45882 xv6iris.FsTree <> r:284 var
+R45882:45882 xv6iris.FsTree <> r:284 var
+R45886:45890 xv6iris.FsTree <> nrec':280 var
+R45907:45910 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R45901:45904 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R45900:45900 xv6iris.FsTree <> r:284 var
+R45905:45906 xv6iris.FsTree <> k0:281 var
+R45911:45912 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R45913:45920 xv6iris.DirView <> dir_live def
+R45922:45926 xv6iris.FsTree <> data':278 var
+R45928:45928 xv6iris.FsTree <> r:284 var
+R45948:45953 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R45937:45940 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R45936:45936 xv6iris.FsTree <> z:283 var
+R45941:45944 stdpp.bitvector.definitions <> bv_0 def
+R45954:45967 xv6iris.FsTree <> dir_written_at def
+R45969:45972 xv6iris.FsTree <> data:277 var
+R45974:45978 xv6iris.FsTree <> data':278 var
+R45980:45981 xv6iris.FsTree <> k0:281 var
+R45983:45983 xv6iris.FsTree <> s:282 var
+R45985:45985 xv6iris.FsTree <> z:283 var
+prf 46073:46088 <> dir_insert_reuse
+R46107:46110 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46104:46106 Corelib.Init.Datatypes <> nat ind
+R46111:46114 Corelib.Init.Datatypes <> list ind
+R46117:46118 stdpp.bitvector.definitions <> bv rec
+binder 46091:46094 <> data:285
+binder 46096:46100 <> data':286
+R46139:46141 Corelib.Init.Datatypes <> nat ind
+binder 46129:46132 <> nrec:287
+binder 46134:46135 <> k0:288
+R46149:46153 xv6iris.FsTree <> fname def
+binder 46145:46145 <> s:289
+R46161:46162 stdpp.bitvector.definitions <> bv rec
+binder 46157:46157 <> z:290
+R46187:46190 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46175:46177 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R46173:46174 xv6iris.FsTree <> k0:288 var
+R46178:46181 xv6iris.FsTree <> nrec:287 var
+R46209:46212 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46191:46192 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R46193:46200 xv6iris.DirView <> dir_live def
+R46202:46205 xv6iris.FsTree <> data:285 var
+R46207:46208 xv6iris.FsTree <> k0:288 var
+R46225:46230 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46214:46217 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R46213:46213 xv6iris.FsTree <> z:290 var
+R46218:46221 stdpp.bitvector.definitions <> bv_0 def
+R46263:46268 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46231:46244 xv6iris.FsTree <> dir_written_at def
+R46246:46249 xv6iris.FsTree <> data:285 var
+R46251:46255 xv6iris.FsTree <> data':286 var
+R46257:46258 xv6iris.FsTree <> k0:288 var
+R46260:46260 xv6iris.FsTree <> s:289 var
+R46262:46262 xv6iris.FsTree <> z:290 var
+R46269:46281 xv6iris.FsTree <> dir_insert_at def
+R46283:46286 xv6iris.FsTree <> data:285 var
+R46288:46292 xv6iris.FsTree <> data':286 var
+R46294:46297 xv6iris.FsTree <> nrec:287 var
+R46299:46302 xv6iris.FsTree <> nrec:287 var
+R46304:46305 xv6iris.FsTree <> k0:288 var
+R46307:46307 xv6iris.FsTree <> s:289 var
+R46309:46309 xv6iris.FsTree <> z:290 var
+prf 46571:46587 <> dir_insert_append
+R46606:46609 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46603:46605 Corelib.Init.Datatypes <> nat ind
+R46610:46613 Corelib.Init.Datatypes <> list ind
+R46616:46617 stdpp.bitvector.definitions <> bv rec
+binder 46590:46593 <> data:291
+binder 46595:46599 <> data':292
+R46635:46637 Corelib.Init.Datatypes <> nat ind
+binder 46628:46631 <> nrec:293
+R46645:46649 xv6iris.FsTree <> fname def
+binder 46641:46641 <> s:294
+R46657:46658 stdpp.bitvector.definitions <> bv rec
+binder 46653:46653 <> z:295
+R46680:46683 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46669:46672 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R46668:46668 xv6iris.FsTree <> z:295 var
+R46673:46676 stdpp.bitvector.definitions <> bv_0 def
+R46718:46723 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46684:46697 xv6iris.FsTree <> dir_written_at def
+R46699:46702 xv6iris.FsTree <> data:291 var
+R46704:46708 xv6iris.FsTree <> data':292 var
+R46710:46713 xv6iris.FsTree <> nrec:293 var
+R46715:46715 xv6iris.FsTree <> s:294 var
+R46717:46717 xv6iris.FsTree <> z:295 var
+R46724:46736 xv6iris.FsTree <> dir_insert_at def
+R46738:46741 xv6iris.FsTree <> data:291 var
+R46743:46747 xv6iris.FsTree <> data':292 var
+R46749:46752 xv6iris.FsTree <> nrec:293 var
+R46755:46755 Corelib.Init.Datatypes <> S constr
+R46757:46760 xv6iris.FsTree <> nrec:293 var
+R46763:46766 xv6iris.FsTree <> nrec:293 var
+R46768:46768 xv6iris.FsTree <> s:294 var
+R46770:46770 xv6iris.FsTree <> z:295 var
+prf 47584:47598 <> dir_view_insert
+R47617:47620 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R47614:47616 Corelib.Init.Datatypes <> nat ind
+R47621:47624 Corelib.Init.Datatypes <> list ind
+R47627:47628 stdpp.bitvector.definitions <> bv rec
+binder 47601:47604 <> data:296
+binder 47606:47610 <> data':297
+R47655:47657 Corelib.Init.Datatypes <> nat ind
+binder 47639:47642 <> nrec:298
+binder 47644:47648 <> nrec':299
+binder 47650:47651 <> k0:300
+R47665:47669 xv6iris.FsTree <> fname def
+binder 47661:47661 <> s:301
+R47677:47678 stdpp.bitvector.definitions <> bv rec
+binder 47673:47673 <> z:302
+R47716:47721 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R47709:47711 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R47688:47696 xv6iris.DirView <> dir_first def
+R47698:47701 xv6iris.FsTree <> data:296 var
+R47703:47706 xv6iris.FsTree <> nrec:298 var
+R47708:47708 xv6iris.FsTree <> s:301 var
+R47712:47715 Corelib.Init.Datatypes <> None constr
+R47764:47769 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R47722:47734 xv6iris.FsTree <> dir_insert_at def
+R47736:47739 xv6iris.FsTree <> data:296 var
+R47741:47745 xv6iris.FsTree <> data':297 var
+R47747:47750 xv6iris.FsTree <> nrec:298 var
+R47752:47756 xv6iris.FsTree <> nrec':299 var
+R47758:47759 xv6iris.FsTree <> k0:300 var
+R47761:47761 xv6iris.FsTree <> s:301 var
+R47763:47763 xv6iris.FsTree <> z:302 var
+R47790:47792 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R47770:47777 xv6iris.FsTree <> dir_view def
+R47779:47783 xv6iris.FsTree <> data':297 var
+R47785:47789 xv6iris.FsTree <> nrec':299 var
+R47793:47794 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R47796:47799 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R47813:47835 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R47795:47795 xv6iris.FsTree <> s:301 var
+R47800:47810 stdpp.bitvector.definitions <> bv_unsigned proj
+R47812:47812 xv6iris.FsTree <> z:302 var
+R47817:47824 xv6iris.FsTree <> dir_view def
+R47826:47829 xv6iris.FsTree <> data:296 var
+R47831:47834 xv6iris.FsTree <> nrec:298 var
+R47959:47966 xv6iris.DirView <> dir_live def
+R47992:48008 xv6iris.FsTree <> dir_written_live0 thm
+R47959:47966 xv6iris.DirView <> dir_live def
+R47992:48008 xv6iris.FsTree <> dir_written_live0 thm
+R48045:48050 stdpp.fin_maps <> map_eq meth
+R48045:48050 stdpp.fin_maps <> map_eq meth
+R48075:48080 stdpp.base <> decide def
+R48084:48086 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R48075:48080 stdpp.base <> decide def
+R48084:48086 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R48169:48181 stdpp.fin_maps <> lookup_insert thm
+R48169:48181 stdpp.fin_maps <> lookup_insert thm
+R48169:48181 stdpp.fin_maps <> lookup_insert thm
+R48192:48206 xv6iris.FsTree <> dir_view_lookup thm
+R48192:48206 xv6iris.FsTree <> dir_view_lookup thm
+R48192:48206 xv6iris.FsTree <> dir_view_lookup thm
+R48249:48251 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R48226:48234 xv6iris.DirView <> dir_first def
+R48252:48255 Corelib.Init.Datatypes <> Some constr
+R48249:48251 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R48226:48234 xv6iris.DirView <> dir_first def
+R48252:48255 Corelib.Init.Datatypes <> Some constr
+R48275:48283 xv6iris.DirView <> dir_first def
+R48292:48304 xv6iris.DirView <> dfirst_Some_2 thm
+R48292:48304 xv6iris.DirView <> dfirst_Some_2 thm
+R48338:48352 xv6iris.DirView <> dir_matchb_true thm
+R48338:48352 xv6iris.DirView <> dir_matchb_true thm
+R48435:48438 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R48435:48438 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R48469:48474 stdpp.base <> decide def
+R48478:48480 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R48469:48474 stdpp.base <> decide def
+R48478:48480 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R48527:48544 xv6iris.FsTree <> dir_written_matchb thm
+R48527:48544 xv6iris.FsTree <> dir_written_matchb thm
+R48527:48544 xv6iris.FsTree <> dir_written_matchb thm
+R48593:48608 xv6iris.DirView <> dir_matchb_false thm
+R48593:48608 xv6iris.DirView <> dir_matchb_false thm
+R48628:48632 Corelib.Init.Logic <> proj1 thm
+R48635:48648 xv6iris.DirView <> dir_first_None thm
+R48628:48632 Corelib.Init.Logic <> proj1 thm
+R48635:48648 xv6iris.DirView <> dir_first_None thm
+R48693:48708 xv6iris.DirView <> dir_matchb_false thm
+R48693:48708 xv6iris.DirView <> dir_matchb_false thm
+R48899:48914 stdpp.fin_maps <> lookup_insert_ne thm
+R48899:48914 stdpp.fin_maps <> lookup_insert_ne thm
+R48899:48914 stdpp.fin_maps <> lookup_insert_ne thm
+R48944:48958 xv6iris.FsTree <> dir_view_lookup thm
+R48944:48958 xv6iris.FsTree <> dir_view_lookup thm
+R48944:48958 xv6iris.FsTree <> dir_view_lookup thm
+R48944:48958 xv6iris.FsTree <> dir_view_lookup thm
+R48944:48958 xv6iris.FsTree <> dir_view_lookup thm
+R48979:48985 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R48993:48994 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R48990:48992 Corelib.Init.Datatypes <> nat ind
+binder 48986:48986 <> r:303
+R49018:49041 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R49000:49003 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R49005:49007 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R49004:49004 xv6iris.FsTree <> r:303 var
+R49004:49004 xv6iris.FsTree <> r:303 var
+R49062:49064 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49042:49051 xv6iris.DirView <> dir_matchb def
+R49059:49059 xv6iris.FsTree <> r:303 var
+R49065:49069 Corelib.Init.Datatypes <> false constr
+R48979:48985 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R48993:48994 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R48990:48992 Corelib.Init.Datatypes <> nat ind
+binder 48986:48986 <> r:304
+R49018:49041 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R49000:49003 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R49005:49007 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R49004:49004 xv6iris.FsTree <> r:304 var
+R49004:49004 xv6iris.FsTree <> r:304 var
+R49062:49064 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49042:49051 xv6iris.DirView <> dir_matchb def
+R49059:49059 xv6iris.FsTree <> r:304 var
+R49065:49069 Corelib.Init.Datatypes <> false constr
+R49098:49113 xv6iris.DirView <> dir_matchb_false thm
+R49098:49113 xv6iris.DirView <> dir_matchb_false thm
+R49150:49155 stdpp.base <> decide def
+R49159:49161 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49150:49155 stdpp.base <> decide def
+R49159:49161 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49310:49312 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49287:49295 xv6iris.DirView <> dir_first def
+R49313:49321 xv6iris.DirView <> dir_first def
+R49310:49312 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49287:49295 xv6iris.DirView <> dir_first def
+R49313:49321 xv6iris.DirView <> dir_first def
+R49350:49358 xv6iris.DirView <> dir_first def
+R49376:49387 xv6iris.FsTree <> dfirst_trunc thm
+binder 49394:49394 <> k:305
+R49399:49408 xv6iris.DirView <> dir_matchb def
+R49416:49416 xv6iris.FsTree <> k:305 var
+R49376:49387 xv6iris.FsTree <> dfirst_trunc thm
+binder 49394:49394 <> k:306
+R49399:49408 xv6iris.DirView <> dir_matchb def
+R49416:49416 xv6iris.FsTree <> k:306 var
+R49376:49387 xv6iris.FsTree <> dfirst_trunc thm
+binder 49394:49394 <> k:307
+R49399:49408 xv6iris.DirView <> dir_matchb def
+R49416:49416 xv6iris.FsTree <> k:307 var
+R49454:49463 xv6iris.DirView <> dfirst_ext thm
+R49454:49463 xv6iris.DirView <> dfirst_ext thm
+R49495:49500 stdpp.base <> decide def
+R49504:49506 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49495:49500 stdpp.base <> decide def
+R49504:49506 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49569:49571 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49548:49557 xv6iris.DirView <> dir_matchb def
+R49572:49576 Corelib.Init.Datatypes <> false constr
+R49569:49571 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49548:49557 xv6iris.DirView <> dir_matchb def
+R49572:49576 Corelib.Init.Datatypes <> false constr
+R49596:49611 xv6iris.DirView <> dir_matchb_false thm
+R49596:49611 xv6iris.DirView <> dir_matchb_false thm
+R49725:49727 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49705:49714 xv6iris.DirView <> dir_matchb def
+R49728:49732 Corelib.Init.Datatypes <> false constr
+R49725:49727 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49705:49714 xv6iris.DirView <> dir_matchb def
+R49728:49732 Corelib.Init.Datatypes <> false constr
+R49752:49767 xv6iris.DirView <> dir_matchb_false thm
+R49752:49767 xv6iris.DirView <> dir_matchb_false thm
+R49862:49879 xv6iris.FsTree <> dir_written_matchb thm
+R49862:49879 xv6iris.FsTree <> dir_written_matchb thm
+R49944:49952 xv6iris.DirView <> dir_first def
+R49944:49952 xv6iris.DirView <> dir_first def
+R50012:50025 xv6iris.DirView <> dir_first_Some thm
+R50012:50025 xv6iris.DirView <> dir_first_Some thm
+R50094:50097 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R50094:50097 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R50159:50174 xv6iris.FsTree <> dir_written_inum thm
+R50159:50174 xv6iris.FsTree <> dir_written_inum thm
+R50159:50174 xv6iris.FsTree <> dir_written_inum thm
+prf 50298:50320 <> dir_names_unique_insert
+R50339:50342 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R50336:50338 Corelib.Init.Datatypes <> nat ind
+R50343:50346 Corelib.Init.Datatypes <> list ind
+R50349:50350 stdpp.bitvector.definitions <> bv rec
+binder 50323:50326 <> data:308
+binder 50328:50332 <> data':309
+R50377:50379 Corelib.Init.Datatypes <> nat ind
+binder 50361:50364 <> nrec:310
+binder 50366:50370 <> nrec':311
+binder 50372:50373 <> k0:312
+R50387:50391 xv6iris.FsTree <> fname def
+binder 50383:50383 <> s:313
+R50399:50400 stdpp.bitvector.definitions <> bv rec
+binder 50395:50395 <> z:314
+R50436:50441 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R50410:50425 xv6iris.FsTree <> dir_names_unique def
+R50427:50430 xv6iris.FsTree <> data:308 var
+R50432:50435 xv6iris.FsTree <> nrec:310 var
+R50470:50475 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R50463:50465 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R50442:50450 xv6iris.DirView <> dir_first def
+R50452:50455 xv6iris.FsTree <> data:308 var
+R50457:50460 xv6iris.FsTree <> nrec:310 var
+R50462:50462 xv6iris.FsTree <> s:313 var
+R50466:50469 Corelib.Init.Datatypes <> None constr
+R50518:50523 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R50476:50488 xv6iris.FsTree <> dir_insert_at def
+R50490:50493 xv6iris.FsTree <> data:308 var
+R50495:50499 xv6iris.FsTree <> data':309 var
+R50501:50504 xv6iris.FsTree <> nrec:310 var
+R50506:50510 xv6iris.FsTree <> nrec':311 var
+R50512:50513 xv6iris.FsTree <> k0:312 var
+R50515:50515 xv6iris.FsTree <> s:313 var
+R50517:50517 xv6iris.FsTree <> z:314 var
+R50524:50539 xv6iris.FsTree <> dir_names_unique def
+R50541:50545 xv6iris.FsTree <> data':309 var
+R50547:50551 xv6iris.FsTree <> nrec':311 var
+R50622:50643 xv6iris.FsTree <> dir_names_unique_write thm
+R50622:50643 xv6iris.FsTree <> dir_names_unique_write thm
+def 52804:52811 <> dir_uniq
+R52819:52824 xv6iris.DinodeEnc <> dinode rec
+binder 52814:52815 <> dn:315
+R52838:52841 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R52835:52837 Corelib.Init.Datatypes <> nat ind
+R52842:52845 Corelib.Init.Datatypes <> list ind
+R52848:52849 stdpp.bitvector.definitions <> bv rec
+binder 52828:52831 <> data:316
+R52901:52906 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R52891:52893 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R52867:52877 stdpp.bitvector.definitions <> bv_unsigned proj
+R52880:52886 xv6iris.DinodeEnc <> di_type proj
+R52888:52889 xv6iris.FsTree <> dn:315 var
+R52894:52900 xv6iris.DirView <> T_DIR_z def
+R52907:52922 xv6iris.FsTree <> dir_names_unique def
+R52924:52927 xv6iris.FsTree <> data:316 var
+R52930:52937 xv6iris.DirView <> dir_nrec def
+R52940:52950 stdpp.bitvector.definitions <> bv_unsigned proj
+R52953:52959 xv6iris.DinodeEnc <> di_size proj
+R52961:52962 xv6iris.FsTree <> dn:315 var
+prf 53086:53101 <> dir_uniq_not_dir
+R53109:53114 xv6iris.DinodeEnc <> dinode rec
+binder 53104:53105 <> dn:317
+R53128:53131 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53125:53127 Corelib.Init.Datatypes <> nat ind
+R53132:53135 Corelib.Init.Datatypes <> list ind
+R53138:53139 stdpp.bitvector.definitions <> bv rec
+binder 53118:53121 <> data:318
+R53184:53187 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53173:53176 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R53149:53159 stdpp.bitvector.definitions <> bv_unsigned proj
+R53162:53168 xv6iris.DinodeEnc <> di_type proj
+R53170:53171 xv6iris.FsTree <> dn:317 var
+R53177:53183 xv6iris.DirView <> T_DIR_z def
+R53188:53195 xv6iris.FsTree <> dir_uniq def
+R53197:53198 xv6iris.FsTree <> dn:317 var
+R53200:53203 xv6iris.FsTree <> data:318 var
+prf 53340:53352 <> dir_uniq_free
+R53360:53365 xv6iris.DinodeEnc <> dinode rec
+binder 53355:53356 <> dn:319
+R53379:53382 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53376:53378 Corelib.Init.Datatypes <> nat ind
+R53383:53386 Corelib.Init.Datatypes <> list ind
+R53389:53390 stdpp.bitvector.definitions <> bv rec
+binder 53369:53372 <> data:320
+R53428:53431 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53424:53426 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R53400:53410 stdpp.bitvector.definitions <> bv_unsigned proj
+R53413:53419 xv6iris.DinodeEnc <> di_type proj
+R53421:53422 xv6iris.FsTree <> dn:319 var
+R53432:53439 xv6iris.FsTree <> dir_uniq def
+R53441:53442 xv6iris.FsTree <> dn:319 var
+R53444:53447 xv6iris.FsTree <> data:320 var
+R53475:53490 xv6iris.FsTree <> dir_uniq_not_dir thm
+R53475:53490 xv6iris.FsTree <> dir_uniq_not_dir thm
+R53511:53517 xv6iris.DirView <> T_DIR_z def
+prf 53612:53629 <> dir_uniq_size_zero
+R53637:53642 xv6iris.DinodeEnc <> dinode rec
+binder 53632:53633 <> dn:321
+R53656:53659 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53653:53655 Corelib.Init.Datatypes <> nat ind
+R53660:53663 Corelib.Init.Datatypes <> list ind
+R53666:53667 stdpp.bitvector.definitions <> bv rec
+binder 53646:53649 <> data:322
+R53705:53708 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53701:53703 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R53677:53687 stdpp.bitvector.definitions <> bv_unsigned proj
+R53690:53696 xv6iris.DinodeEnc <> di_size proj
+R53698:53699 xv6iris.FsTree <> dn:321 var
+R53709:53716 xv6iris.FsTree <> dir_uniq def
+R53718:53719 xv6iris.FsTree <> dn:321 var
+R53721:53724 xv6iris.FsTree <> data:322 var
+R53791:53798 xv6iris.DirView <> dir_nrec def
+R53791:53798 xv6iris.DirView <> dir_nrec def
+prf 53940:53950 <> dir_uniq_eq
+R53962:53967 xv6iris.DinodeEnc <> dinode rec
+binder 53953:53954 <> dn:323
+binder 53956:53958 <> dn':324
+R53987:53990 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53984:53986 Corelib.Init.Datatypes <> nat ind
+R53991:53994 Corelib.Init.Datatypes <> list ind
+R53997:53998 stdpp.bitvector.definitions <> bv rec
+binder 53971:53974 <> data:325
+binder 53976:53980 <> data':326
+R54016:54019 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R54010:54012 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R54008:54009 xv6iris.FsTree <> dn:323 var
+R54013:54015 xv6iris.FsTree <> dn':324 var
+R54032:54035 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R54024:54026 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R54020:54023 xv6iris.FsTree <> data:325 var
+R54027:54031 xv6iris.FsTree <> data':326 var
+R54052:54055 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R54036:54043 xv6iris.FsTree <> dir_uniq def
+R54045:54046 xv6iris.FsTree <> dn:323 var
+R54048:54051 xv6iris.FsTree <> data:325 var
+R54056:54063 xv6iris.FsTree <> dir_uniq def
+R54065:54067 xv6iris.FsTree <> dn':324 var
+R54069:54073 xv6iris.FsTree <> data':326 var
+R54103:54104 Corelib.Init.Datatypes <> id def
+R54103:54104 Corelib.Init.Datatypes <> id def
+prf 54384:54396 <> dir_uniq_cong
+R54408:54413 xv6iris.DinodeEnc <> dinode rec
+binder 54399:54400 <> dn:327
+binder 54402:54404 <> dn':328
+R54427:54430 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R54424:54426 Corelib.Init.Datatypes <> nat ind
+R54431:54434 Corelib.Init.Datatypes <> list ind
+R54437:54438 stdpp.bitvector.definitions <> bv rec
+binder 54417:54420 <> data:329
+R54472:54475 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R54459:54461 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R54448:54454 xv6iris.DinodeEnc <> di_type proj
+R54456:54458 xv6iris.FsTree <> dn':328 var
+R54462:54468 xv6iris.DinodeEnc <> di_type proj
+R54470:54471 xv6iris.FsTree <> dn:327 var
+R54500:54505 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R54487:54489 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R54476:54482 xv6iris.DinodeEnc <> di_size proj
+R54484:54486 xv6iris.FsTree <> dn':328 var
+R54490:54496 xv6iris.DinodeEnc <> di_size proj
+R54498:54499 xv6iris.FsTree <> dn:327 var
+R54522:54525 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R54506:54513 xv6iris.FsTree <> dir_uniq def
+R54515:54516 xv6iris.FsTree <> dn:327 var
+R54518:54521 xv6iris.FsTree <> data:329 var
+R54526:54533 xv6iris.FsTree <> dir_uniq def
+R54535:54537 xv6iris.FsTree <> dn':328 var
+R54539:54542 xv6iris.FsTree <> data:329 var
+prf 54707:54717 <> dir_uniq_of
+R54725:54730 xv6iris.DinodeEnc <> dinode rec
+binder 54720:54721 <> dn:330
+R54744:54747 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R54741:54743 Corelib.Init.Datatypes <> nat ind
+R54748:54751 Corelib.Init.Datatypes <> list ind
+R54754:54755 stdpp.bitvector.definitions <> bv rec
+binder 54734:54737 <> data:331
+R54824:54829 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R54765:54780 xv6iris.FsTree <> dir_names_unique def
+R54782:54785 xv6iris.FsTree <> data:331 var
+R54788:54795 xv6iris.DirView <> dir_nrec def
+R54798:54808 stdpp.bitvector.definitions <> bv_unsigned proj
+R54811:54817 xv6iris.DinodeEnc <> di_size proj
+R54819:54820 xv6iris.FsTree <> dn:330 var
+R54830:54837 xv6iris.FsTree <> dir_uniq def
+R54839:54840 xv6iris.FsTree <> dn:330 var
+R54842:54845 xv6iris.FsTree <> data:331 var
+prf 54963:54976 <> dir_uniq_names
+R54984:54989 xv6iris.DinodeEnc <> dinode rec
+binder 54979:54980 <> dn:332
+R55003:55006 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R55000:55002 Corelib.Init.Datatypes <> nat ind
+R55007:55010 Corelib.Init.Datatypes <> list ind
+R55013:55014 stdpp.bitvector.definitions <> bv rec
+binder 54993:54996 <> data:333
+R55058:55061 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R55048:55050 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R55024:55034 stdpp.bitvector.definitions <> bv_unsigned proj
+R55037:55043 xv6iris.DinodeEnc <> di_type proj
+R55045:55046 xv6iris.FsTree <> dn:332 var
+R55051:55057 xv6iris.DirView <> T_DIR_z def
+R55078:55083 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R55062:55069 xv6iris.FsTree <> dir_uniq def
+R55071:55072 xv6iris.FsTree <> dn:332 var
+R55074:55077 xv6iris.FsTree <> data:333 var
+R55084:55099 xv6iris.FsTree <> dir_names_unique def
+R55101:55104 xv6iris.FsTree <> data:333 var
+R55107:55114 xv6iris.DirView <> dir_nrec def
+R55117:55127 stdpp.bitvector.definitions <> bv_unsigned proj
+R55130:55136 xv6iris.DinodeEnc <> di_size proj
+R55138:55139 xv6iris.FsTree <> dn:332 var
+prf 55463:55475 <> dir_uniq_zero
+R55487:55492 xv6iris.DinodeEnc <> dinode rec
+binder 55478:55479 <> dn:334
+binder 55481:55483 <> dn':335
+R55512:55515 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R55509:55511 Corelib.Init.Datatypes <> nat ind
+R55516:55519 Corelib.Init.Datatypes <> list ind
+R55522:55523 stdpp.bitvector.definitions <> bv rec
+binder 55496:55499 <> data:336
+binder 55501:55505 <> data':337
+R55539:55541 Corelib.Init.Datatypes <> nat ind
+binder 55534:55535 <> k0:338
+R55572:55577 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R55559:55561 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R55548:55554 xv6iris.DinodeEnc <> di_type proj
+R55556:55558 xv6iris.FsTree <> dn':335 var
+R55562:55568 xv6iris.DinodeEnc <> di_type proj
+R55570:55571 xv6iris.FsTree <> dn:334 var
+R55631:55636 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R55603:55606 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R55578:55588 stdpp.bitvector.definitions <> bv_unsigned proj
+R55591:55597 xv6iris.DinodeEnc <> di_size proj
+R55599:55601 xv6iris.FsTree <> dn':335 var
+R55607:55617 stdpp.bitvector.definitions <> bv_unsigned proj
+R55620:55626 xv6iris.DinodeEnc <> di_size proj
+R55628:55629 xv6iris.FsTree <> dn:334 var
+R55664:55669 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R55637:55649 xv6iris.FsTree <> dir_zeroed_at def
+R55651:55654 xv6iris.FsTree <> data:336 var
+R55656:55660 xv6iris.FsTree <> data':337 var
+R55662:55663 xv6iris.FsTree <> k0:338 var
+R55686:55689 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R55670:55677 xv6iris.FsTree <> dir_uniq def
+R55679:55680 xv6iris.FsTree <> dn:334 var
+R55682:55685 xv6iris.FsTree <> data:336 var
+R55690:55697 xv6iris.FsTree <> dir_uniq def
+R55699:55701 xv6iris.FsTree <> dn':335 var
+R55703:55707 xv6iris.FsTree <> data':337 var
+R55785:55787 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R55761:55771 stdpp.bitvector.definitions <> bv_unsigned proj
+R55774:55780 xv6iris.DinodeEnc <> di_type proj
+R55788:55794 xv6iris.DirView <> T_DIR_z def
+R55785:55787 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R55761:55771 stdpp.bitvector.definitions <> bv_unsigned proj
+R55774:55780 xv6iris.DinodeEnc <> di_type proj
+R55788:55794 xv6iris.DirView <> T_DIR_z def
+R55842:55860 xv6iris.FsTree <> dir_names_unique_le thm
+R55880:55887 xv6iris.DirView <> dir_nrec def
+R55890:55900 stdpp.bitvector.definitions <> bv_unsigned proj
+R55903:55909 xv6iris.DinodeEnc <> di_size proj
+R55930:55937 xv6iris.DirView <> dir_nrec def
+R55940:55950 stdpp.bitvector.definitions <> bv_unsigned proj
+R55953:55959 xv6iris.DinodeEnc <> di_size proj
+R55842:55860 xv6iris.FsTree <> dir_names_unique_le thm
+R55880:55887 xv6iris.DirView <> dir_nrec def
+R55890:55900 stdpp.bitvector.definitions <> bv_unsigned proj
+R55903:55909 xv6iris.DinodeEnc <> di_size proj
+R55930:55937 xv6iris.DirView <> dir_nrec def
+R55940:55950 stdpp.bitvector.definitions <> bv_unsigned proj
+R55953:55959 xv6iris.DinodeEnc <> di_size proj
+R55979:55991 xv6iris.DirView <> dir_nrec_mono thm
+R55979:55991 xv6iris.DirView <> dir_nrec_mono thm
+R56016:56036 xv6iris.FsTree <> dir_names_unique_zero thm
+R56016:56036 xv6iris.FsTree <> dir_names_unique_zero thm
+prf 56826:56841 <> dir_uniq_dirlink
+R56853:56858 xv6iris.DinodeEnc <> dinode rec
+binder 56844:56845 <> dn:339
+binder 56847:56849 <> dn':340
+R56882:56885 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R56879:56881 Corelib.Init.Datatypes <> nat ind
+R56886:56889 Corelib.Init.Datatypes <> list ind
+R56892:56893 stdpp.bitvector.definitions <> bv rec
+binder 56866:56869 <> data:341
+binder 56871:56875 <> data':342
+R56911:56912 stdpp.bitvector.definitions <> bv rec
+binder 56904:56907 <> inum:343
+R56923:56926 Corelib.Init.Datatypes <> list ind
+R56929:56930 stdpp.bitvector.definitions <> bv rec
+binder 56919:56919 <> s:344
+R56951:56953 Corelib.Init.Datatypes <> nat ind
+binder 56937:56940 <> nrec:345
+binder 56942:56943 <> k0:346
+binder 56945:56947 <> tot:347
+R57002:57007 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R56964:56966 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R56960:56963 xv6iris.FsTree <> nrec:345 var
+R56967:56974 xv6iris.DirView <> dir_nrec def
+R56977:56987 stdpp.bitvector.definitions <> bv_unsigned proj
+R56990:56996 xv6iris.DinodeEnc <> di_size proj
+R56998:56999 xv6iris.FsTree <> dn:339 var
+R57031:57036 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57010:57012 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R57008:57009 xv6iris.FsTree <> k0:346 var
+R57013:57020 xv6iris.DirView <> dir_slot def
+R57022:57025 xv6iris.FsTree <> data:341 var
+R57027:57030 xv6iris.FsTree <> nrec:345 var
+R57037:57037 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57065:57071 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57049:57052 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R57041:57043 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R57038:57040 xv6iris.FsTree <> tot:347 var
+R57056:57058 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R57053:57055 xv6iris.FsTree <> tot:347 var
+R57092:57095 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57081:57084 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R57073:57078 Stdlib.Lists.List <> length abbrev
+R57080:57080 xv6iris.FsTree <> s:344 var
+R57103:57108 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57096:57100 xv6iris.DirentEnc <> nonul def
+R57102:57102 xv6iris.FsTree <> s:344 var
+R57133:57138 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57120:57122 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R57109:57115 xv6iris.DinodeEnc <> di_type proj
+R57117:57119 xv6iris.FsTree <> dn':340 var
+R57123:57129 xv6iris.DinodeEnc <> di_type proj
+R57131:57132 xv6iris.FsTree <> dn:339 var
+R57230:57235 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57164:57170 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R57139:57149 stdpp.bitvector.definitions <> bv_unsigned proj
+R57152:57158 xv6iris.DinodeEnc <> di_size proj
+R57160:57162 xv6iris.FsTree <> dn':340 var
+R57171:57175 Stdlib.ZArith.BinInt Z max def
+R57178:57188 stdpp.bitvector.definitions <> bv_unsigned proj
+R57191:57197 xv6iris.DinodeEnc <> di_size proj
+R57199:57200 xv6iris.FsTree <> dn:339 var
+R57205:57212 Stdlib.ZArith.BinInt Z of_nat def
+R57222:57224 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R57217:57219 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R57220:57221 xv6iris.FsTree <> k0:346 var
+R57225:57227 xv6iris.FsTree <> tot:347 var
+R57236:57236 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57436:57442 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57237:57243 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R57251:57257 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R57248:57250 Corelib.Init.Datatypes <> nat ind
+binder 57244:57244 <> x:348
+R57275:57282 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R57258:57266 xv6iris.InodeDefs <> file_byte def
+R57268:57272 xv6iris.FsTree <> data':342 var
+R57274:57274 xv6iris.FsTree <> x:348 var
+R57286:57291 stdpp.base <> decide def
+R57312:57315 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R57302:57305 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R57297:57299 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R57300:57301 xv6iris.FsTree <> k0:346 var
+R57306:57306 xv6iris.FsTree <> x:348 var
+R57318:57320 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R57317:57317 xv6iris.FsTree <> x:348 var
+R57328:57330 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R57323:57325 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R57326:57327 xv6iris.FsTree <> k0:346 var
+R57331:57333 xv6iris.FsTree <> tot:347 var
+R57420:57428 xv6iris.InodeDefs <> file_byte def
+R57430:57433 xv6iris.FsTree <> data:341 var
+R57435:57435 xv6iris.FsTree <> x:348 var
+R57385:57389 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R57392:57394 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R57391:57391 xv6iris.FsTree <> x:348 var
+R57397:57399 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R57400:57401 xv6iris.FsTree <> k0:346 var
+R57353:57364 xv6iris.DirentEnc <> dirent_bytes def
+R57367:57376 xv6iris.DirentEnc <> de_of_name def
+R57378:57381 xv6iris.FsTree <> inum:343 var
+R57383:57383 xv6iris.FsTree <> s:344 var
+R57471:57476 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57464:57466 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R57443:57451 xv6iris.DirView <> dir_first def
+R57453:57456 xv6iris.FsTree <> data:341 var
+R57458:57461 xv6iris.FsTree <> nrec:345 var
+R57463:57463 xv6iris.FsTree <> s:344 var
+R57467:57470 Corelib.Init.Datatypes <> None constr
+R57493:57496 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57477:57484 xv6iris.FsTree <> dir_uniq def
+R57486:57487 xv6iris.FsTree <> dn:339 var
+R57489:57492 xv6iris.FsTree <> data:341 var
+R57497:57504 xv6iris.FsTree <> dir_uniq def
+R57506:57508 xv6iris.FsTree <> dn':340 var
+R57510:57514 xv6iris.FsTree <> data':342 var
+R57621:57623 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R57597:57607 stdpp.bitvector.definitions <> bv_unsigned proj
+R57610:57616 xv6iris.DinodeEnc <> di_type proj
+R57624:57630 xv6iris.DirView <> T_DIR_z def
+R57621:57623 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R57597:57607 stdpp.bitvector.definitions <> bv_unsigned proj
+R57610:57616 xv6iris.DinodeEnc <> di_type proj
+R57624:57630 xv6iris.DirView <> T_DIR_z def
+R57790:57793 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R57794:57804 stdpp.bitvector.definitions <> bv_unsigned proj
+R57807:57813 xv6iris.DinodeEnc <> di_size proj
+R57834:57838 Corelib.Init.Logic <> proj1 thm
+R57841:57860 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R57865:57871 xv6iris.DinodeEnc <> di_size proj
+R57790:57793 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R57794:57804 stdpp.bitvector.definitions <> bv_unsigned proj
+R57807:57813 xv6iris.DinodeEnc <> di_size proj
+R57834:57838 Corelib.Init.Logic <> proj1 thm
+R57841:57860 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R57865:57871 xv6iris.DinodeEnc <> di_size proj
+R57900:57903 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R57904:57914 stdpp.bitvector.definitions <> bv_unsigned proj
+R57917:57923 xv6iris.DinodeEnc <> di_size proj
+R57945:57949 Corelib.Init.Logic <> proj1 thm
+R57952:57971 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R57976:57982 xv6iris.DinodeEnc <> di_size proj
+R57900:57903 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R57904:57914 stdpp.bitvector.definitions <> bv_unsigned proj
+R57917:57923 xv6iris.DinodeEnc <> di_size proj
+R57945:57949 Corelib.Init.Logic <> proj1 thm
+R57952:57971 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R57976:57982 xv6iris.DinodeEnc <> di_size proj
+R58004:58017 xv6iris.DirView <> dir_nrec_range thm
+R58020:58030 stdpp.bitvector.definitions <> bv_unsigned proj
+R58033:58039 xv6iris.DinodeEnc <> di_size proj
+R58004:58017 xv6iris.DirView <> dir_nrec_range thm
+R58020:58030 stdpp.bitvector.definitions <> bv_unsigned proj
+R58033:58039 xv6iris.DinodeEnc <> di_size proj
+R58081:58094 xv6iris.DirView <> dir_nrec_range thm
+R58097:58107 stdpp.bitvector.definitions <> bv_unsigned proj
+R58110:58116 xv6iris.DinodeEnc <> di_size proj
+R58081:58094 xv6iris.DirView <> dir_nrec_range thm
+R58097:58107 stdpp.bitvector.definitions <> bv_unsigned proj
+R58110:58116 xv6iris.DinodeEnc <> di_size proj
+R58205:58208 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R58243:58253 xv6iris.DirView <> dir_slot_le thm
+R58205:58208 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R58243:58253 xv6iris.DirView <> dir_slot_le thm
+R58273:58280 xv6iris.DirView <> dir_nrec def
+R58283:58293 stdpp.bitvector.definitions <> bv_unsigned proj
+R58296:58302 xv6iris.DinodeEnc <> di_size proj
+R58273:58280 xv6iris.DirView <> dir_nrec def
+R58283:58293 stdpp.bitvector.definitions <> bv_unsigned proj
+R58296:58302 xv6iris.DinodeEnc <> di_size proj
+R58334:58337 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R58334:58337 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R58521:58527 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R58535:58536 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R58532:58534 Corelib.Init.Datatypes <> nat ind
+binder 58528:58528 <> q:349
+R58537:58549 xv6iris.DirView <> dir_win_agree def
+R58562:58562 xv6iris.FsTree <> q:349 var
+R58521:58527 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R58535:58536 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R58532:58534 Corelib.Init.Datatypes <> nat ind
+binder 58528:58528 <> q:350
+R58537:58549 xv6iris.DirView <> dir_win_agree def
+R58562:58562 xv6iris.FsTree <> q:350 var
+R58608:58610 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R58604:58606 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R58608:58610 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R58604:58606 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R58608:58610 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R58604:58606 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R58634:58645 stdpp.decidable <> decide_False thm
+R58634:58645 stdpp.decidable <> decide_False thm
+R58634:58645 stdpp.decidable <> decide_False thm
+R58634:58645 stdpp.decidable <> decide_False thm
+R58697:58700 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R58697:58700 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R58805:58812 xv6iris.DirView <> dir_live def
+R58827:58840 xv6iris.DirView <> dir_inum_agree thm
+R58827:58840 xv6iris.DirView <> dir_inum_agree thm
+R58827:58840 xv6iris.DirView <> dir_inum_agree thm
+R58896:58903 xv6iris.DirView <> dir_live def
+R58918:58931 xv6iris.DirView <> dir_inum_agree thm
+R58918:58931 xv6iris.DirView <> dir_inum_agree thm
+R58918:58931 xv6iris.DirView <> dir_inum_agree thm
+R58987:58995 xv6iris.FsTree <> dir_bname def
+R59016:59030 xv6iris.DirView <> dir_bname_agree thm
+R59016:59030 xv6iris.DirView <> dir_bname_agree thm
+R59016:59030 xv6iris.DirView <> dir_bname_agree thm
+R59074:59088 xv6iris.DirView <> dir_bname_agree thm
+R59074:59088 xv6iris.DirView <> dir_bname_agree thm
+R59074:59088 xv6iris.DirView <> dir_bname_agree thm
+R59243:59249 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R59251:59252 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 59250:59250 <> j:351
+R59265:59282 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R59255:59257 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R59254:59254 xv6iris.FsTree <> j:351 var
+R59316:59332 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R59283:59291 xv6iris.InodeDefs <> file_byte def
+R59307:59309 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R59302:59304 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59310:59310 xv6iris.FsTree <> j:351 var
+R59365:59369 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R59370:59370 xv6iris.FsTree <> j:351 var
+R59333:59344 xv6iris.DirentEnc <> dirent_bytes def
+R59347:59356 xv6iris.DirentEnc <> de_of_name def
+R59243:59249 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R59251:59252 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 59250:59250 <> j:352
+R59265:59282 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R59255:59257 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R59254:59254 xv6iris.FsTree <> j:352 var
+R59316:59332 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R59283:59291 xv6iris.InodeDefs <> file_byte def
+R59307:59309 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R59302:59304 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59310:59310 xv6iris.FsTree <> j:352 var
+R59365:59369 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R59370:59370 xv6iris.FsTree <> j:352 var
+R59333:59344 xv6iris.DirentEnc <> dirent_bytes def
+R59347:59356 xv6iris.DirentEnc <> de_of_name def
+R59415:59417 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R59410:59412 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59415:59417 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R59410:59412 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59415:59417 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R59410:59412 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59441:59451 stdpp.decidable <> decide_True thm
+R59441:59451 stdpp.decidable <> decide_True thm
+R59441:59451 stdpp.decidable <> decide_True thm
+R59441:59451 stdpp.decidable <> decide_True thm
+R59489:59491 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R59485:59487 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R59480:59482 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59494:59496 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59489:59491 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R59485:59487 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R59480:59482 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59494:59496 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59549:59566 xv6iris.DirView <> dir_record_of_name thm
+R59549:59566 xv6iris.DirView <> dir_record_of_name thm
+R59634:59647 xv6iris.FsTree <> dir_written_at def
+R59634:59647 xv6iris.FsTree <> dir_written_at def
+R59722:59730 xv6iris.FsTree <> dir_bname def
+R59792:59794 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R59788:59790 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59792:59794 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R59788:59790 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59792:59794 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R59788:59790 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R59820:59831 stdpp.decidable <> decide_False thm
+R59820:59831 stdpp.decidable <> decide_False thm
+R59820:59831 stdpp.decidable <> decide_False thm
+R59820:59831 stdpp.decidable <> decide_False thm
+R59917:59919 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R59917:59919 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R59976:59982 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R59990:59991 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R59987:59989 Corelib.Init.Datatypes <> nat ind
+binder 59983:59983 <> r:353
+R60015:60018 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R59997:60000 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R60002:60004 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R60001:60001 xv6iris.FsTree <> r:353 var
+R60001:60001 xv6iris.FsTree <> r:353 var
+R60026:60051 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R60020:60023 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R60019:60019 xv6iris.FsTree <> r:353 var
+R60052:60053 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R60054:60061 xv6iris.DirView <> dir_live def
+R60069:60069 xv6iris.FsTree <> r:353 var
+R59976:59982 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R59990:59991 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R59987:59989 Corelib.Init.Datatypes <> nat ind
+binder 59983:59983 <> r:354
+R60015:60018 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R59997:60000 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R60002:60004 Corelib.Init.Peano <> ::nat_scope:x_'<='_x_'<'_x not
+R60001:60001 xv6iris.FsTree <> r:354 var
+R60001:60001 xv6iris.FsTree <> r:354 var
+R60026:60051 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R60020:60023 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R60019:60019 xv6iris.FsTree <> r:354 var
+R60052:60053 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R60054:60061 xv6iris.DirView <> dir_live def
+R60069:60069 xv6iris.FsTree <> r:354 var
+R60143:60164 xv6iris.FsTree <> dir_names_unique_write thm
+R60143:60164 xv6iris.FsTree <> dir_names_unique_write thm

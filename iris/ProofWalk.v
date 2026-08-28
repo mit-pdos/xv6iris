@@ -689,17 +689,15 @@ Section ProofWalk.
     (* bridge [page_own p] to memset's per-byte buffer, then hand it to the
        general array-memset spec at len = 4096 (KEEPING the written bytes). *)
     iEval (rewrite /page_own /byte_any) in "Hpage".
-    iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add p j) ↦ₘ b)%I) with "Hpage")
-      as (olds) "Hbuf".
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
     (* memset's contract is context-indexed AND so is [page_own] since the M1
        flip: both sides are the SAME ctx fact now, so the crossing is gone --
        only the tier annotation is re-fixed, per byte. *)
-    iApply (MemsetArray.wp_memset_sconf kt KT0 m0 n 4096 cval olds b pcur
+    iApply (MemsetArray.wp_memset_free_sconf kt KT0 m0 n 4096 cval b pcur
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
-              with "Hcg Htext Hpc [Hbuf]").
-    { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
+              with "Hcg Htext Hpc [Hpage]").
+    { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". iExact "H". }
     iIntros (CIDm Hsm mfin) "Hcg Hpc Hbuf %Hcs".
     iSpecialize ("Hcont" $! CIDm with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! mfin with "Hcg Hpc Hbuf [%]").
@@ -978,7 +976,9 @@ Section ProofWalk.
               ltac:(rewrite /N4 upd_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hpage]").
-    { iEval (rewrite HN4a0). iExact "Hpage". }
+    (* A6.87: kalloc hands back its own memset run; this memset only wants
+       the ownership, so it downgrades. *)
+    { iEval (rewrite HN4a0). iApply (page_own_of_filled with "Hpage"). }
     iIntros (CIDa9 Hsa9 mfin) "Hcg Hpc Hbytes %Hmcs".
     assert (Hret86 : ret_pc (N4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.walk + 0x86)).
     { rewrite /N4 upd_eq. apply bv_eq; vm_compute; reflexivity. }

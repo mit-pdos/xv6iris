@@ -1,0 +1,46 @@
+*** APPLIED AND LANDED, 2026-08-28 (tso-machine-flip.md A6.86). ***
+This archive is now HISTORY: WpLock.v in the tree IS the flipped file, the
+27-site creator sweep is in, ProofInitlock mints at its own store, and the
+blocker below (ProofPipeclose:749) was dissolved by the §0.26' restatement
+(A6.85) -- kfree_pre is KallocInv.page_free now, so the wpay cell never has
+to re-enter the ctx tower.  DO NOT RE-APPLY wplock_new.py; it will fail its
+own asserts.  Three manual steps it does NOT do are recorded in A6.86 §(1),
+and one of its notes below is off by a name (there is no `lock_body`).
+
+THE M4 CONTRACT FLIP, ARCHIVED (tso-machine-flip.md A6.84).
+
+wplock_new.py  -- the WpLock half, applied to the file as A6.83 left it.
+                  IT COMPILED GREEN: lock_word at phys_ledger_word4, the
+                  owner cell at the wpay payload with the own-invariant,
+                  the two address claims in lock_inv, all four creators,
+                  both finishers.  Also needed: the imports
+                    From stdpp Require Import bitvector.definitions.
+                    Require Import Riscv.rv64d_types.
+                    Require Import Ktier KMap RiscvExtras.
+                  the M4 kit block MOVED above the physical fields (it
+                  defines lkcpu_z/lkcpu_cp, which lk_cpu_pay uses), and
+                  `rewrite /lock_inv /lock_body.` before each
+                  `iFrame "Hc4 Hc8"`.
+phaseA.v       -- the TsoCtx gates, LANDED (they are in TsoCtx.v now).
+
+WHAT STOPPED IT is NOT in either file: the DESTROY path's reclaim.
+ProofPipeclose:749 (GREEN) calls pipe_bytes_page_own to rebuild
+KallocInv.page_own for kfree, and page_own is 4096 `byte_any` = CTX
+bytes.  A wpay ledger cell cannot re-enter the ctx tower: the missing
+half is the clean/dirty bit, and minting a DIRTY entry needs the
+context's own authority at an index >= the cell's timestamp
+(TsoCtx.ctx_store_bytes' `forall k in dom D, k.1 <= i`), i.e. a DRAIN.
+That is the reclaim/publication lane, not M4.
+
+ALSO NEEDED AND ALSO REVERTED (it is one line each):
+ - WpSconfMem.wp_sd_zero_wpay_s_sconf's post must additionally hand back
+   `wordw_claim (KTR := KT0) 8 ea` (the leaf already holds it as
+   "#Hclaim"); WpLock.lk_addr_claim is convertible to it at KT0, and
+   ProofInitlock assembles lk_cpu_fresh from that plus the payload's own
+   per-byte RAM-ness (TsoCtx.phys_ledger_wpay_ram) via
+   WpLock.lk_addr_claim_of_parts.
+ - WpSconfMem's two LOAD AUs (_dat and _exv, both with ZERO consumers)
+   want the `ktier_pin ktd ppn ea` premise the STORE _dat already has:
+   without it the obligation cannot identify `pa_of ppn ea` with `ea`,
+   which is the only bridge from the leaf's VA-keyed claim to a
+   phys_ledger_* cell.  The leaf has it in scope as `%Hid`.

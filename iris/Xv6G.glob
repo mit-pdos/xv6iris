@@ -1,0 +1,100 @@
+DIGEST df90434b85d30df425c2fa8019756875
+Fxv6iris.Xv6G
+R3479:3487 iris.proofmode.proofmode <> <> lib
+R3530:3532 iris.base_logic.lib.own <> <> lib
+R3534:3554 iris.base_logic.lib.cancelable_invariants <> <> lib
+R3572:3581 xv6iris.Xv6Cameras <> <> lib
+rec 3591:3594 <> xv6G
+proj 3625:3631 <> xv6_sie
+proj 3654:3661 <> xv6_lock
+proj 3684:3693 <> xv6_kalloc
+proj 3716:3722 <> xv6_bio
+proj 3745:3752 <> xv6_disk
+proj 3780:3787 <> xv6_uart
+proj 3815:3823 <> xv6_fslog
+proj 3846:3852 <> xv6_log
+proj 3875:3885 <> xv6_fscrash
+proj 3908:3915 <> xv6_ireg
+proj 4375:4383 <> xv6_fstop
+proj 4904:4913 <> xv6_fslink
+proj 5508:5517 <> xv6_icache
+proj 5540:5547 <> xv6_pipe
+proj 5570:5577 <> xv6_cinv
+proj 5600:5606 <> xv6_uio
+R3602:3610 iris.base_logic.lib.iprop <> gFunctors rec
+binder 3597:3598 <> Σ:1
+R3643:3646 xv6iris.Xv6Cameras <> sieG class
+R3648:3649 xv6iris.Xv6G <> Σ:1 var
+R3672:3676 xv6iris.Xv6Cameras <> lockG class
+R3678:3679 xv6iris.Xv6G <> Σ:1 var
+R3702:3708 xv6iris.Xv6Cameras <> kallocG class
+R3710:3711 xv6iris.Xv6G <> Σ:1 var
+R3734:3737 xv6iris.Xv6Cameras <> bioG class
+R3739:3740 xv6iris.Xv6G <> Σ:1 var
+R3763:3772 xv6iris.Xv6Cameras <> diskGhostG class
+R3774:3775 xv6iris.Xv6G <> Σ:1 var
+R3798:3807 xv6iris.Xv6Cameras <> uartGhostG class
+R3809:3810 xv6iris.Xv6G <> Σ:1 var
+R3833:3838 xv6iris.Xv6Cameras <> fsLogG class
+R3840:3841 xv6iris.Xv6G <> Σ:1 var
+R3864:3867 xv6iris.Xv6Cameras <> logG class
+R3869:3870 xv6iris.Xv6G <> Σ:1 var
+R3893:3900 xv6iris.Xv6Cameras <> fsCrashG class
+R3902:3903 xv6iris.Xv6G <> Σ:1 var
+R3926:3930 xv6iris.Xv6Cameras <> iregG class
+R3932:3933 xv6iris.Xv6G <> Σ:1 var
+R4393:4398 xv6iris.Xv6Cameras <> fsTopG class
+R4400:4401 xv6iris.Xv6G <> Σ:1 var
+R4922:4928 xv6iris.Xv6Cameras <> fsLinkG class
+R4930:4931 xv6iris.Xv6G <> Σ:1 var
+R5526:5532 xv6iris.Xv6Cameras <> icacheG class
+R5534:5535 xv6iris.Xv6G <> Σ:1 var
+R5558:5562 xv6iris.Xv6Cameras <> pipeG class
+R5564:5565 xv6iris.Xv6G <> Σ:1 var
+R5588:5592 iris.base_logic.lib.cancelable_invariants <> cinvG class
+R5594:5595 xv6iris.Xv6G <> Σ:1 var
+R5618:5621 xv6iris.Xv6Cameras <> uioG class
+R5623:5624 xv6iris.Xv6G <> Σ:1 var
+def 6058:6063 <> xv6GΣ
+R6067:6075 iris.base_logic.lib.iprop <> gFunctors rec
+R6082:6084 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6090:6091 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6098:6099 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6108:6109 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6115:6116 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6128:6129 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6141:6142 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6150:6151 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6157:6163 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6173:6174 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6181:6182 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6190:6191 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6200:6201 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6210:6211 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6218:6219 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6226:6227 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6233:6234 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6085:6089 xv6iris.Xv6Cameras <> sieΣ def
+R6092:6097 xv6iris.Xv6Cameras <> lockΣ def
+R6100:6107 xv6iris.Xv6Cameras <> kallocΣ def
+R6110:6114 xv6iris.Xv6Cameras <> bioΣ def
+R6117:6127 xv6iris.Xv6Cameras <> diskGhostΣ def
+R6130:6140 xv6iris.Xv6Cameras <> uartGhostΣ def
+R6143:6149 xv6iris.Xv6Cameras <> fsLogΣ def
+R6152:6156 xv6iris.Xv6Cameras <> logΣ def
+R6164:6172 xv6iris.Xv6Cameras <> fsCrashΣ def
+R6175:6180 xv6iris.Xv6Cameras <> iregΣ def
+R6183:6189 xv6iris.Xv6Cameras <> fsTopΣ def
+R6192:6199 xv6iris.Xv6Cameras <> fsLinkΣ def
+R6202:6209 xv6iris.Xv6Cameras <> icacheΣ def
+R6212:6217 xv6iris.Xv6Cameras <> pipeΣ def
+R6220:6225 iris.base_logic.lib.cancelable_invariants <> cinvΣ def
+R6228:6232 xv6iris.Xv6Cameras <> uioΣ def
+inst 6254:6264 <> subG_xv6GΣ
+binder 6267:6268 <> Σ:19
+R6287:6290 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6273:6276 iris.base_logic.lib.iprop <> subG class
+R6285:6286 xv6iris.Xv6G <> Σ:19 var
+R6278:6283 xv6iris.Xv6G <> xv6GΣ def
+R6291:6294 xv6iris.Xv6G <> xv6G class
+R6296:6297 xv6iris.Xv6G <> Σ:19 var

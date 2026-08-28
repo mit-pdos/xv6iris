@@ -1161,8 +1161,7 @@ Section ProofUvmunmap.
               with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail").
     all: try lkbelow.
     { rewrite /kfree_pre HB6a0.
-      (* §0.26′ *)
-      iSplitR; [iPureIntro; exact Hpv | iApply (page_own_free with "Hpage")]. }
+      iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }
     iIntros (CIDk1 Hsk1 mk) "Hcg Hcnt Hpc %Hkcs _".
     iEval (rewrite Hret74) in "Hpc".
     assert (Hmksp : mk !!! Regidx csp_rs1 = spr).

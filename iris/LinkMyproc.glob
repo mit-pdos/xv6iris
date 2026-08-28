@@ -1,0 +1,7 @@
+DIGEST 66a413e93dda6123df7d7ded3daa75c1
+Fxv6iris.LinkMyproc
+R173:183 xv6iris.LinkPushOff <> <> lib
+R185:195 xv6iris.ProofMyproc <> <> lib
+R216:226 xv6iris.ProofMyproc MyprocProof <> modtype
+R228:234 xv6iris.LinkPushOff PushOff <> modtype
+mod 206:211 <> Myproc

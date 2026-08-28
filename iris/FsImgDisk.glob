@@ -1,0 +1,78 @@
+DIGEST 0c015c9679570a5248c5ceab58b126d6
+Fxv6iris.FsImgDisk
+R2065:2070 Stdlib.ZArith.ZArith <> <> lib
+R2072:2075 Stdlib.Lists.List <> <> lib
+R2113:2119 Stdlib.Strings.PString <> <> lib
+R2148:2151 stdpp.gmap <> <> lib
+R2190:2200 stdpp.bitvector.definitions <> <> lib
+R2231:2242 xv6iris.PStringBytes <> <> lib
+R2244:2250 xv6iris.LogDefs <> <> lib
+R2252:2258 xv6iris.FsCrash <> <> lib
+R2288:2295 Kernel.FsImgRaw <> <> lib
+def 3438:3445 <> fsimg_dk
+R3450:3453 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3449:3449 Corelib.Numbers.BinNums <> Z ind
+R3454:3455 stdpp.bitvector.definitions <> bv rec
+binder 3468:3468 <> a:1
+R3476:3476 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R3484:3489 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R3514:3514 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R3478:3482 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R3483:3483 xv6iris.FsImgDisk <> a:1 var
+R3491:3494 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<?'_x not
+R3490:3490 xv6iris.FsImgDisk <> a:1 var
+R3495:3513 Kernel.FsImgRaw <> fsimg_size def
+R3586:3592 stdpp.bitvector.definitions <> Z_to_bv def
+R3532:3547 xv6iris.PStringBytes <> pstring_hex_byte def
+R3549:3566 Kernel.FsImgRaw <> fsimg_hex def
+R3568:3568 xv6iris.FsImgDisk <> a:1 var
+def 3928:3934 <> fsimg_P
+R3939:3942 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3938:3938 Corelib.Numbers.BinNums <> Z ind
+R3943:3946 Corelib.Init.Datatypes <> list ind
+R3949:3950 stdpp.bitvector.definitions <> bv rec
+R3958:3966 xv6iris.FsCrash <> fs_blocks def
+R3968:3975 xv6iris.FsImgDisk <> fsimg_dk def
+prf 4537:4551 <> fsimg_log_clean
+R4572:4574 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4555:4559 xv6iris.LogDefs <> hdr_n def
+R4562:4568 xv6iris.FsImgDisk <> fsimg_P def
+def 5095:5102 <> fsimg_D0
+R5111:5114 stdpp.gmap <> gset def
+R5116:5116 Corelib.Numbers.BinNums <> Z ind
+binder 5105:5107 <> cov:2
+R5121:5124 stdpp.gmap <> gmap rec
+R5129:5132 Corelib.Init.Datatypes <> list ind
+R5135:5136 stdpp.bitvector.definitions <> bv rec
+R5126:5126 Corelib.Numbers.BinNums <> Z ind
+R5147:5157 xv6iris.LogDefs <> fs_restrict def
+R5159:5165 xv6iris.FsImgDisk <> fsimg_P def
+R5168:5178 xv6iris.LogDefs <> fs_home_set def
+R5180:5182 xv6iris.FsImgDisk <> cov:2 var
+prf 5557:5570 <> fsimg_recovery
+R5579:5582 stdpp.gmap <> gset def
+R5584:5584 Corelib.Numbers.BinNums <> Z ind
+binder 5573:5575 <> cov:3
+R5591:5601 xv6iris.FsCrash <> fs_recovery def
+R5603:5609 xv6iris.FsImgDisk <> fsimg_P def
+R5612:5619 xv6iris.FsImgDisk <> fsimg_D0 def
+R5621:5623 xv6iris.FsImgDisk <> cov:3 var
+R5626:5628 xv6iris.FsImgDisk <> cov:3 var
+R5686:5688 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5655:5659 xv6iris.LogDefs <> hdr_n def
+R5662:5668 xv6iris.FsImgDisk <> fsimg_P def
+R5671:5681 xv6iris.LogDefs <> log_hdr_bno def
+R5701:5715 xv6iris.FsImgDisk <> fsimg_log_clean thm
+R5686:5688 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5655:5659 xv6iris.LogDefs <> hdr_n def
+R5662:5668 xv6iris.FsImgDisk <> fsimg_P def
+R5671:5681 xv6iris.LogDefs <> log_hdr_bno def
+R5701:5715 xv6iris.FsImgDisk <> fsimg_log_clean thm
+R5727:5731 Corelib.Init.Logic <> proj2 thm
+R5734:5750 xv6iris.FsCrash <> fs_recovery_clean thm
+R5752:5758 xv6iris.FsImgDisk <> fsimg_P def
+R5761:5768 xv6iris.FsImgDisk <> fsimg_D0 def
+R5727:5731 Corelib.Init.Logic <> proj2 thm
+R5734:5750 xv6iris.FsCrash <> fs_recovery_clean thm
+R5752:5758 xv6iris.FsImgDisk <> fsimg_P def
+R5761:5768 xv6iris.FsImgDisk <> fsimg_D0 def

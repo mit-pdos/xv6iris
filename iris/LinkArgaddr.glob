@@ -1,0 +1,7 @@
+DIGEST 8a8c5eee662bb782f2008f192f424733
+Fxv6iris.LinkArgaddr
+R84:93 xv6iris.LinkArgraw <> <> lib
+R95:106 xv6iris.ProofArgaddr <> <> lib
+R128:139 xv6iris.ProofArgaddr ArgaddrProof <> modtype
+R141:146 xv6iris.LinkArgraw Argraw <> modtype
+mod 117:123 <> Argaddr

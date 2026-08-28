@@ -1584,7 +1584,7 @@ Section ProofAllocproc.
             "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
               %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
               %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
-          iDestruct (tf_page_of_page_own tfp ltac:(rewrite Hbasetf; exact Hpvtf)
+          iDestruct (tf_page_of_page_own tfp _ ltac:(rewrite Hbasetf; exact Hpvtf)
                        with "Hkmapb [Hpgown]")
             as (tfws) "Htfpage".
           { rewrite Hbasetf. iExact "Hpgown". }
@@ -1827,7 +1827,8 @@ Section ProofAllocproc.
           exact (Hpt_rest r Hr Ncsp N8 N9 N18). }
         (* +0x62 jal ra,memset : zero the 112-byte save area *)
         iDestruct (own_ctx_bytes (p_context (proc_addr k)) with "Hctx") as "[Hbw Hctxback]".
-        iDestruct (bb_any_named (p_context (proc_addr k)) 112 with "Hbw") as (fb) "Hbw".
+        (* A6.87: [byte_any] IS the visibility-free byte, so the window goes
+           straight into the free memset engine -- there is nothing to name. *)
         iApply (wp_jal_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x62)) ap_ra (mword_of_int 2093330 : mword 21)
                   G3 (trap_res b + (K - 4))%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
@@ -1860,7 +1861,7 @@ Section ProofAllocproc.
         (* memset's contract is context-indexed; this caller is not yet
            converted, so it mints a context for the call (SC-only move,
            becomes a compile error at cutover -- the leftover-work marker). *)
-        iApply (MS.wp_memset_sconf KT1 KT0 (CID := CIDf) G4 (trap_res b + (K - 4))%nat 112 (zero_reg : mword 64) fb false pme
+        iApply (MS.wp_memset_free_sconf KT1 KT0 (CID := CIDf) G4 (trap_res b + (K - 4))%nat 112 (zero_reg : mword 64) false pme
                   ltac:(pose proof (ap_K2 K HK); lia) ltac:(vm_compute; reflexivity) HG4a1 HG4a2
                   with "Hcg Htext Hpc [Hbw]").
         (* the byte window is ALREADY a ctx fact (ByteBuf is flipped) and so is
@@ -2003,7 +2004,7 @@ Section ProofAllocproc.
           "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
             %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
             %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
-        iDestruct (tf_page_of_page_own tfp ltac:(rewrite Hbasetf; exact Hpvtf)
+        iDestruct (tf_page_of_page_own tfp _ ltac:(rewrite Hbasetf; exact Hpvtf)
                      with "Hkmapb [Hpgown]")
           as (tfws) "Htfpage".
         { rewrite Hbasetf. iExact "Hpgown". }

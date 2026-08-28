@@ -549,18 +549,20 @@ Section ProofUvmcreate.
     { rewrite /M4. rewrite upd_ne; [| reg_neq]. rewrite /M3 upd_eq. reflexivity. }
     assert (HM4a2 : M4 !!! Regidx (mword_of_int 12 : mword 5) = mword_of_int (Z.of_nat 4096)).
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
+    (* A6.87: kalloc hands back its own memset run; this memset only wants
+       the ownership, so it downgrades. *)
+    iDestruct (page_own_of_filled with "Hpage") as "Hpage".
     iEval (rewrite /page_own /byte_any) in "Hpage".
-    iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
     (* A6.68: memset's contract is context-indexed AND so is the buffer
        ([↦ₘ] is the ctx tower), so the two shim crossings that used to
        bracket this call were IDENTITIES and are simply gone. *)
-    iApply (MS.wp_memset_sconf KT1 KT0 M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
+    iApply (MS.wp_memset_free_sconf KT1 KT0 M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
-              with "Hcg Htext Hpc [Hbuf]").
+              with "Hcg Htext Hpc [Hpage]").
     { (* [page_own]'s bytes are ALREADY context-indexed (KallocInv's [byte_any]
          flipped with ↦ₘ), so no shim crossing here: only the address form
          differs. *)
-      iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
+      iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
     iIntros (CID13 Hs13 mfin) "Hcg Hpc Hbytes %Hmcs".
     assert (Hret1a : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uvmcreate + 0x1a)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }

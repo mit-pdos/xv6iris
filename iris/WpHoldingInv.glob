@@ -1,0 +1,89 @@
+DIGEST d4c09840c00b4361de4cfd28262b4e84
+Fxv6iris.WpHoldingInv
+R983:988 Stdlib.ZArith.ZArith <> <> lib
+R1017:1020 stdpp.gmap <> <> lib
+R1022:1042 stdpp.bitvector.definitions <> <> lib
+R1080:1088 iris.proofmode.proofmode <> <> lib
+R1130:1137 iris.program_logic.language <> <> lib
+R1139:1145 iris.program_logic.lifting <> <> lib
+R1188:1196 iris.base_logic.lib.ghost_var <> <> lib
+R1214:1243 SailStdpp.ConcurrencyInterface <> <> lib
+R1245:1282 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R1284:1318 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R1320:1345 SailStdpp.Operators_mwords <> <> lib
+R1363:1379 Riscv.rv64d_types <> <> lib
+R1381:1391 Riscv.rv64d <> <> lib
+R1393:1410 Riscv.riscv_extras <> <> lib
+R1428:1441 SailStdpp.Base <> <> lib
+R1443:1461 SailStdpp.TypeCasts <> <> lib
+R1463:1478 SailStdpp.Values <> <> lib
+R1480:1500 SailStdpp.MachineWord <> <> lib
+R1518:1526 xv6iris.RiscvLang <> <> lib
+R1528:1537 xv6iris.RiscvPtsto <> <> lib
+R1555:1569 xv6iris.WpSmodeLeafBase <> <> lib
+R1592:1603 Kernel.KernelInstrs <> <> lib
+R1626:1635 Kernel.KernelSyms <> <> lib
+R1653:1656 xv6iris.Xv6G <> <> lib
+R1721:1726 xv6iris.TsoCtx <> <> lib
+R1762:1765 Riscv.rv64d_types Defs <> mod
+prf 1857:1867 <> seqz_sub_eq
+R1876:1880 SailStdpp.Values <> mword def
+binder 1870:1870 <> a:1
+binder 1872:1872 <> b:2
+R1907:1912 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1900:1902 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1890:1895 SailStdpp.Operators_mwords <> eq_vec def
+R1899:1899 xv6iris.WpHoldingInv <> b:2 var
+R1897:1897 xv6iris.WpHoldingInv <> a:1 var
+R1903:1906 Corelib.Init.Datatypes <> true constr
+R2018:2021 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2047:2047 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1913:1924 Riscv.rv64d_types <> zero_extend' def
+R1930:1940 Riscv.rv64d <> bool_to_bit def
+R1943:1951 Riscv.rv64d <> zopz0zI_u def
+R1972:1983 Riscv.rv64d <> sign_extend' def
+R2006:2010 SailStdpp.Values <> mword def
+R1989:2000 SailStdpp.Values <> mword_of_int def
+R1954:1960 SailStdpp.Operators_mwords <> sub_vec def
+R1964:1964 xv6iris.WpHoldingInv <> b:2 var
+R1962:1962 xv6iris.WpHoldingInv <> a:1 var
+R2039:2043 SailStdpp.Values <> mword def
+R2022:2033 SailStdpp.Values <> mword_of_int def
+R2086:2088 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2102:2116 SailStdpp.Operators_mwords <> eq_vec_true_iff thm
+R2086:2088 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2102:2116 SailStdpp.Operators_mwords <> eq_vec_true_iff thm
+R2152:2158 SailStdpp.Operators_mwords <> sub_vec def
+R2183:2187 SailStdpp.Values <> mword def
+R2171:2176 Riscv.rv64d <> zeros' def
+R2206:2210 stdpp.bitvector.definitions <> bv_eq thm
+R2152:2158 SailStdpp.Operators_mwords <> sub_vec def
+R2183:2187 SailStdpp.Values <> mword def
+R2171:2176 Riscv.rv64d <> zeros' def
+R2206:2210 stdpp.bitvector.definitions <> bv_eq thm
+R2250:2254 stdpp.bitvector.definitions <> bv_eq thm
+R2250:2254 stdpp.bitvector.definitions <> bv_eq thm
+R2266:2272 SailStdpp.Operators_mwords <> sub_vec def
+R2275:2301 SailStdpp.Operators_mwords <> word_binop def
+R2304:2330 SailStdpp.Operators_mwords <> with_word' def
+R2337:2362 SailStdpp.Values <> with_word def
+R2365:2371 SailStdpp.Values <> to_word def
+R2374:2381 SailStdpp.Values <> get_word def
+R2384:2410 SailStdpp.MachineWord MachineWord sub def
+R2423:2437 stdpp.bitvector.definitions <> bv_sub_unsigned thm
+R2423:2437 stdpp.bitvector.definitions <> bv_sub_unsigned thm
+R2423:2437 stdpp.bitvector.definitions <> bv_sub_unsigned thm
+R2448:2457 Stdlib.ZArith.BinInt Z sub_diag thm
+R2448:2457 Stdlib.ZArith.BinInt Z sub_diag thm
+R2448:2457 Stdlib.ZArith.BinInt Z sub_diag thm
+sec 2487:2498 <> WpHoldingInv
+R2514:2520 xv6iris.RiscvPtsto <> riscvGS class
+R2527:2530 xv6iris.Xv6G <> xv6G class
+R2532:2533 xv6iris.WpHoldingInv <> Σ:3 var
+var  2549:2551 WpHoldingInv GEN
+var  2564:2566 WpHoldingInv CID
+var  2579:2580 WpHoldingInv XI
+R2555:2559 xv6iris.RiscvLang <> GenId class
+R2570:2574 xv6iris.RiscvLang <> CpuId class
+R2584:2589 xv6iris.TsoCtx <> CurCtx class
+R2911:2922 xv6iris.WpHoldingInv WpHoldingInv <> sec

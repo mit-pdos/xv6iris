@@ -2163,7 +2163,8 @@ Section BootCarveMain.
                  eq_refl E with "H") as "H".
     iDestruct (boot_cran_mem_run g lo 4096%nat Hmem Hlo Hhi' with "Hcl H") as "Hbs".
     rewrite /page_own. iApply (big_sepL_mono with "Hbs").
-    iIntros (j x _) "Hb". rewrite /byte_any. iExists _. iExact "Hb".
+    iIntros (j x _) "Hb". rewrite /byte_any.
+    by iApply TsoCtx.ctx_pointsto_free.
   Qed.
 
   (* ...and the whole run, by the same downward induction as §9's stack:

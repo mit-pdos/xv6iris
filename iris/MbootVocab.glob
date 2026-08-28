@@ -1,0 +1,139 @@
+DIGEST 7a23f89b031f68508868b7415cafb180
+Fxv6iris.MbootVocab
+R1981:1986 Stdlib.ZArith.ZArith <> <> lib
+R2015:2035 stdpp.bitvector.definitions <> <> lib
+R2053:2082 SailStdpp.ConcurrencyInterface <> <> lib
+R2084:2121 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R2123:2157 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R2159:2184 SailStdpp.Operators_mwords <> <> lib
+R2202:2218 Riscv.rv64d_types <> <> lib
+R2220:2230 Riscv.rv64d <> <> lib
+R2232:2249 Riscv.riscv_extras <> <> lib
+R2267:2280 SailStdpp.Base <> <> lib
+R2282:2300 SailStdpp.TypeCasts <> <> lib
+R2302:2317 SailStdpp.Values <> <> lib
+R2319:2339 SailStdpp.MachineWord <> <> lib
+R2357:2366 xv6iris.RiscvPtsto <> <> lib
+R2368:2378 xv6iris.RiscvExtras <> <> lib
+R2396:2403 xv6iris.WpDecode <> <> lib
+R2405:2414 xv6iris.ExecCommon <> <> lib
+R2416:2430 xv6iris.WpMmodeLeafBase <> <> lib
+R2453:2462 Kernel.KernelSyms <> <> lib
+R2498:2501 Riscv.rv64d_types Defs <> mod
+def 2968:2975 <> mb_ld_ea
+R2979:2983 SailStdpp.Values <> mword def
+R2993:2999 SailStdpp.Operators_mwords <> add_vec def
+R3088:3099 Riscv.rv64d <> sign_extend' def
+R3104:3109 xv6iris.WpDecode <> imm_ld def
+R3002:3008 SailStdpp.Operators_mwords <> add_vec def
+R3055:3063 xv6iris.RiscvExtras <> auipc_off def
+R3065:3073 xv6iris.WpDecode <> imm_auipc def
+R3044:3048 SailStdpp.Values <> mword def
+R3011:3022 SailStdpp.Values <> mword_of_int def
+R3024:3040 Kernel.KernelSyms <> _entry def
+def 3580:3590 <> mb_entry_sp
+R3615:3619 SailStdpp.Values <> mword def
+binder 3593:3600 <> v_stack0:1
+binder 3602:3611 <> mhartid_in:2
+R3627:3631 SailStdpp.Values <> mword def
+R3641:3647 SailStdpp.Operators_mwords <> add_vec def
+R3663:3679 Riscv.rv64d <> mult_to_bits_half def
+R3681:3684 Riscv.rv64d <> xlen def
+R3705:3721 Riscv.rv64d_types <> mul_op_signed_rs1 proj
+R3694:3702 xv6iris.ExecCommon <> mulop_mul def
+R3737:3753 Riscv.rv64d_types <> mul_op_signed_rs2 proj
+R3726:3734 xv6iris.ExecCommon <> mulop_mul def
+R3765:3770 xv6iris.WpMmodeLeafBase <> luival def
+R3773:3784 Riscv.rv64d <> sign_extend' def
+R3789:3796 xv6iris.ExecCommon <> imm_clui def
+R3808:3814 SailStdpp.Operators_mwords <> add_vec def
+R3828:3839 Riscv.rv64d <> sign_extend' def
+R3862:3866 SailStdpp.Values <> mword def
+R3845:3856 SailStdpp.Values <> mword_of_int def
+R3816:3825 xv6iris.MbootVocab <> mhartid_in:2 var
+R3892:3909 Riscv.rv64d_types <> mul_op_result_part proj
+R3881:3889 xv6iris.ExecCommon <> mulop_mul def
+R3649:3656 xv6iris.MbootVocab <> v_stack0:1 var
+def 4305:4312 <> mb_frame
+R4321:4325 SailStdpp.Values <> mword def
+binder 4315:4317 <> sp0:3
+R4333:4337 SailStdpp.Values <> mword def
+R4347:4353 SailStdpp.Operators_mwords <> add_vec def
+R4360:4371 SailStdpp.Values <> mword_of_int def
+R4355:4357 xv6iris.MbootVocab <> sp0:3 var
+def 4608:4615 <> mb_ti_ra
+R4624:4628 SailStdpp.Values <> mword def
+binder 4618:4620 <> sp0:4
+R4636:4640 SailStdpp.Values <> mword def
+R4650:4656 SailStdpp.Operators_mwords <> add_vec def
+R4685:4696 SailStdpp.Values <> mword_of_int def
+R4659:4666 xv6iris.MbootVocab <> mb_frame def
+R4669:4676 xv6iris.MbootVocab <> mb_frame def
+R4678:4680 xv6iris.MbootVocab <> sp0:4 var
+def 4713:4720 <> mb_ti_s0
+R4729:4733 SailStdpp.Values <> mword def
+binder 4723:4725 <> sp0:5
+R4741:4745 SailStdpp.Values <> mword def
+R4755:4762 xv6iris.MbootVocab <> mb_frame def
+R4765:4772 xv6iris.MbootVocab <> mb_frame def
+R4774:4776 xv6iris.MbootVocab <> sp0:5 var
+def 5153:5158 <> mb_tpv
+R5166:5170 SailStdpp.Values <> mword def
+binder 5161:5162 <> mh:6
+R5178:5182 SailStdpp.Values <> mword def
+R5192:5203 Riscv.rv64d <> sign_extend' def
+R5209:5224 SailStdpp.Operators_mwords <> subrange_vec_dec def
+R5226:5227 xv6iris.MbootVocab <> mh:6 var
+def 5545:5555 <> mb_pmp_open
+R5564:5579 Riscv.rv64d_types <> type_of_register def
+R5581:5588 Riscv.rv64d_types <> pmpcfg_n constr
+binder 5558:5560 <> cfg:7
+R5602:5617 Riscv.rv64d_types <> type_of_register def
+R5619:5627 Riscv.rv64d_types <> pmpaddr_n constr
+binder 5596:5598 <> adr:8
+R5724:5729 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R5718:5720 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5642:5674 Riscv.rv64d <> pmpAddrMatchType_encdec_backwards def
+R5677:5693 Riscv.rv64d <> _get_Pmpcfg_ent_A def
+R5696:5709 SailStdpp.Values <> vec_access_dec def
+R5711:5713 xv6iris.MbootVocab <> cfg:7 var
+R5721:5723 Riscv.rv64d_types <> TOR constr
+R5784:5789 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R5776:5778 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5730:5740 Riscv.rv64d <> zopz0zKzJ_u def
+R5755:5768 SailStdpp.Values <> vec_access_dec def
+R5770:5772 xv6iris.MbootVocab <> adr:8 var
+R5743:5748 Riscv.rv64d <> zeros' def
+R5779:5783 Corelib.Init.Datatypes <> false constr
+R5854:5859 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R5847:5849 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5790:5795 SailStdpp.Operators_mwords <> eq_vec def
+R5841:5842 SailStdpp.Values <> :::'''b'_x not
+R5798:5814 Riscv.rv64d <> _get_Pmpcfg_ent_X def
+R5817:5830 SailStdpp.Values <> vec_access_dec def
+R5832:5834 xv6iris.MbootVocab <> cfg:7 var
+R5850:5853 Corelib.Init.Datatypes <> true constr
+R5924:5929 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R5917:5919 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5860:5865 SailStdpp.Operators_mwords <> eq_vec def
+R5911:5912 SailStdpp.Values <> :::'''b'_x not
+R5868:5884 Riscv.rv64d <> _get_Pmpcfg_ent_W def
+R5887:5900 SailStdpp.Values <> vec_access_dec def
+R5902:5904 xv6iris.MbootVocab <> cfg:7 var
+R5920:5923 Corelib.Init.Datatypes <> true constr
+R5994:5999 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R5987:5989 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5930:5935 SailStdpp.Operators_mwords <> eq_vec def
+R5981:5982 SailStdpp.Values <> :::'''b'_x not
+R5938:5954 Riscv.rv64d <> _get_Pmpcfg_ent_R def
+R5957:5970 SailStdpp.Values <> vec_access_dec def
+R5972:5974 xv6iris.MbootVocab <> cfg:7 var
+R5990:5993 Corelib.Init.Datatypes <> true constr
+R6020:6023 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R6009:6011 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R6001:6008 xv6iris.RiscvPtsto <> ram_base def
+R6012:6019 xv6iris.RiscvPtsto <> ram_size def
+R6051:6053 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R6024:6027 SailStdpp.Operators_mwords <> uint def
+R6030:6043 SailStdpp.Values <> vec_access_dec def
+R6045:6047 xv6iris.MbootVocab <> adr:8 var

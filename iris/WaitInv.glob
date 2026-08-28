@@ -1,0 +1,614 @@
+DIGEST f9541230c92405501a2a4d76dd7a4ee1
+Fxv6iris.WaitInv
+R1668:1673 Stdlib.ZArith.ZArith <> <> lib
+R1675:1678 Stdlib.Lists.List <> <> lib
+R1707:1710 stdpp.gmap <> <> lib
+R1712:1715 stdpp.list <> <> lib
+R1717:1737 stdpp.bitvector.definitions <> <> lib
+R1775:1783 iris.proofmode.proofmode <> <> lib
+R1826:1833 iris.base_logic.lib.gen_heap <> <> lib
+R1851:1864 SailStdpp.Base <> <> lib
+R1866:1891 SailStdpp.Operators_mwords <> <> lib
+R1893:1908 SailStdpp.Values <> <> lib
+R1926:1942 Riscv.rv64d_types <> <> lib
+R1944:1954 Riscv.rv64d <> <> lib
+R1972:1981 xv6iris.RiscvPtsto <> <> lib
+R1999:2004 xv6iris.TsoCtx <> <> lib
+R2573:2580 xv6iris.ProcGeom <> <> lib
+def 3019:3025 <> rp_slot
+R3037:3041 SailStdpp.Values <> mword def
+binder 3028:3028 <> p:1
+binder 3030:3031 <> ip:2
+binder 3033:3033 <> v:3
+R3049:3053 SailStdpp.Values <> mword def
+R3063:3065 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3076:3081 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3084:3089 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3090:3090 xv6iris.WaitInv <> v:3 var
+R3082:3083 xv6iris.WaitInv <> ip:2 var
+R3066:3071 SailStdpp.Operators_mwords <> eq_vec def
+R3075:3075 xv6iris.WaitInv <> p:1 var
+R3073:3073 xv6iris.WaitInv <> v:3 var
+def 3105:3110 <> rp_map
+R3120:3124 SailStdpp.Values <> mword def
+binder 3113:3113 <> p:4
+binder 3115:3116 <> ip:5
+R3136:3139 Corelib.Init.Datatypes <> list ind
+R3142:3146 SailStdpp.Values <> mword def
+binder 3131:3132 <> ps:6
+R3155:3158 Corelib.Init.Datatypes <> list ind
+R3161:3165 SailStdpp.Values <> mword def
+R3188:3192 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R3176:3182 xv6iris.WaitInv <> rp_slot def
+R3184:3184 xv6iris.WaitInv <> p:4 var
+R3186:3187 xv6iris.WaitInv <> ip:5 var
+R3193:3194 xv6iris.WaitInv <> ps:6 var
+def 3288:3294 <> rp_upto
+R3304:3308 SailStdpp.Values <> mword def
+binder 3297:3297 <> p:7
+binder 3299:3300 <> ip:8
+R3319:3321 Corelib.Init.Datatypes <> nat ind
+binder 3315:3315 <> k:9
+R3330:3333 Corelib.Init.Datatypes <> list ind
+R3336:3340 SailStdpp.Values <> mword def
+binder 3325:3326 <> ps:10
+R3349:3352 Corelib.Init.Datatypes <> list ind
+R3355:3359 SailStdpp.Values <> mword def
+R3394:3397 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R3371:3376 xv6iris.WaitInv <> rp_map def
+R3378:3378 xv6iris.WaitInv <> p:7 var
+R3380:3381 xv6iris.WaitInv <> ip:8 var
+R3384:3387 stdpp.list_basics <> take abbrev
+R3391:3392 xv6iris.WaitInv <> ps:10 var
+R3389:3389 xv6iris.WaitInv <> k:9 var
+R3398:3401 stdpp.list_basics <> drop abbrev
+R3405:3406 xv6iris.WaitInv <> ps:10 var
+R3403:3403 xv6iris.WaitInv <> k:9 var
+prf 3422:3434 <> rp_map_length
+R3444:3448 SailStdpp.Values <> mword def
+binder 3437:3437 <> p:11
+binder 3439:3440 <> ip:12
+R3460:3463 Corelib.Init.Datatypes <> list ind
+R3466:3470 SailStdpp.Values <> mword def
+binder 3455:3456 <> ps:13
+R3504:3506 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3481:3486 Stdlib.Lists.List <> length abbrev
+R3489:3494 xv6iris.WaitInv <> rp_map def
+R3496:3496 xv6iris.WaitInv <> p:11 var
+R3498:3499 xv6iris.WaitInv <> ip:12 var
+R3501:3502 xv6iris.WaitInv <> ps:13 var
+R3507:3512 Stdlib.Lists.List <> length abbrev
+R3514:3515 xv6iris.WaitInv <> ps:13 var
+R3531:3541 stdpp.list_monad <> length_fmap thm
+R3531:3541 stdpp.list_monad <> length_fmap thm
+prf 3556:3569 <> rp_upto_length
+R3579:3583 SailStdpp.Values <> mword def
+binder 3572:3572 <> p:14
+binder 3574:3575 <> ip:15
+R3594:3596 Corelib.Init.Datatypes <> nat ind
+binder 3590:3590 <> k:16
+R3605:3608 Corelib.Init.Datatypes <> list ind
+R3611:3615 SailStdpp.Values <> mword def
+binder 3600:3601 <> ps:17
+R3652:3654 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3626:3631 Stdlib.Lists.List <> length abbrev
+R3634:3640 xv6iris.WaitInv <> rp_upto def
+R3642:3642 xv6iris.WaitInv <> p:14 var
+R3644:3645 xv6iris.WaitInv <> ip:15 var
+R3647:3647 xv6iris.WaitInv <> k:16 var
+R3649:3650 xv6iris.WaitInv <> ps:17 var
+R3655:3660 Stdlib.Lists.List <> length abbrev
+R3662:3663 xv6iris.WaitInv <> ps:17 var
+R3682:3688 xv6iris.WaitInv <> rp_upto def
+R3699:3708 Stdlib.Lists.List <> length_app thm
+R3710:3722 xv6iris.WaitInv <> rp_map_length thm
+R3724:3734 stdpp.list_basics <> length_take thm
+R3736:3746 stdpp.list_basics <> length_drop thm
+R3699:3708 Stdlib.Lists.List <> length_app thm
+R3699:3708 Stdlib.Lists.List <> length_app thm
+R3710:3722 xv6iris.WaitInv <> rp_map_length thm
+R3710:3722 xv6iris.WaitInv <> rp_map_length thm
+R3724:3734 stdpp.list_basics <> length_take thm
+R3724:3734 stdpp.list_basics <> length_take thm
+R3736:3746 stdpp.list_basics <> length_drop thm
+R3736:3746 stdpp.list_basics <> length_drop thm
+prf 3766:3774 <> rp_upto_0
+R3784:3788 SailStdpp.Values <> mword def
+binder 3777:3777 <> p:18
+binder 3779:3780 <> ip:19
+R3800:3803 Corelib.Init.Datatypes <> list ind
+R3806:3810 SailStdpp.Values <> mword def
+binder 3795:3796 <> ps:20
+R3838:3840 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3821:3827 xv6iris.WaitInv <> rp_upto def
+R3829:3829 xv6iris.WaitInv <> p:18 var
+R3831:3832 xv6iris.WaitInv <> ip:19 var
+R3836:3837 xv6iris.WaitInv <> ps:20 var
+R3841:3842 xv6iris.WaitInv <> ps:20 var
+R3859:3865 xv6iris.WaitInv <> rp_upto def
+R3868:3873 xv6iris.WaitInv <> rp_map def
+R3884:3889 stdpp.list_basics <> take_0 thm
+R3891:3896 stdpp.list_basics <> drop_0 thm
+R3884:3889 stdpp.list_basics <> take_0 thm
+R3884:3889 stdpp.list_basics <> take_0 thm
+R3891:3896 stdpp.list_basics <> drop_0 thm
+R3891:3896 stdpp.list_basics <> drop_0 thm
+prf 3924:3934 <> rp_upto_all
+R3944:3948 SailStdpp.Values <> mword def
+binder 3937:3937 <> p:21
+binder 3939:3940 <> ip:22
+R3959:3961 Corelib.Init.Datatypes <> nat ind
+binder 3955:3955 <> k:23
+R3970:3973 Corelib.Init.Datatypes <> list ind
+R3976:3980 SailStdpp.Values <> mword def
+binder 3965:3966 <> ps:24
+R4011:4014 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4001:4004 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R3992:3997 Stdlib.Lists.List <> length abbrev
+R3999:4000 xv6iris.WaitInv <> ps:24 var
+R4005:4005 xv6iris.WaitInv <> k:23 var
+R4032:4034 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4015:4021 xv6iris.WaitInv <> rp_upto def
+R4023:4023 xv6iris.WaitInv <> p:21 var
+R4025:4026 xv6iris.WaitInv <> ip:22 var
+R4028:4028 xv6iris.WaitInv <> k:23 var
+R4030:4031 xv6iris.WaitInv <> ps:24 var
+R4035:4040 xv6iris.WaitInv <> rp_map def
+R4042:4042 xv6iris.WaitInv <> p:21 var
+R4044:4045 xv6iris.WaitInv <> ip:22 var
+R4047:4048 xv6iris.WaitInv <> ps:24 var
+R4077:4083 xv6iris.WaitInv <> rp_upto def
+R4097:4103 stdpp.list_basics <> take_ge thm
+R4115:4121 stdpp.list_basics <> drop_ge thm
+R4132:4140 Stdlib.Lists.List <> app_nil_r thm
+R4097:4103 stdpp.list_basics <> take_ge thm
+R4097:4103 stdpp.list_basics <> take_ge thm
+R4115:4121 stdpp.list_basics <> drop_ge thm
+R4115:4121 stdpp.list_basics <> drop_ge thm
+R4132:4140 Stdlib.Lists.List <> app_nil_r thm
+R4132:4140 Stdlib.Lists.List <> app_nil_r thm
+prf 4324:4339 <> rp_upto_lookup_k
+R4349:4353 SailStdpp.Values <> mword def
+binder 4342:4342 <> p:25
+binder 4344:4345 <> ip:26
+R4364:4366 Corelib.Init.Datatypes <> nat ind
+binder 4360:4360 <> k:27
+R4375:4378 Corelib.Init.Datatypes <> list ind
+R4381:4385 SailStdpp.Values <> mword def
+binder 4370:4371 <> ps:28
+R4397:4401 SailStdpp.Values <> mword def
+binder 4393:4393 <> v:29
+R4427:4430 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4418:4420 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4413:4416 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R4417:4417 xv6iris.WaitInv <> k:27 var
+R4411:4412 xv6iris.WaitInv <> ps:28 var
+R4421:4424 Corelib.Init.Datatypes <> Some constr
+R4426:4426 xv6iris.WaitInv <> v:29 var
+R4453:4455 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4448:4451 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R4452:4452 xv6iris.WaitInv <> k:27 var
+R4431:4437 xv6iris.WaitInv <> rp_upto def
+R4439:4439 xv6iris.WaitInv <> p:25 var
+R4441:4442 xv6iris.WaitInv <> ip:26 var
+R4444:4444 xv6iris.WaitInv <> k:27 var
+R4446:4447 xv6iris.WaitInv <> ps:28 var
+R4456:4459 Corelib.Init.Datatypes <> Some constr
+R4461:4461 xv6iris.WaitInv <> v:29 var
+R4490:4496 xv6iris.WaitInv <> rp_upto def
+R4548:4550 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4516:4521 Stdlib.Lists.List <> length abbrev
+R4524:4529 xv6iris.WaitInv <> rp_map def
+R4537:4540 stdpp.list_basics <> take abbrev
+R4548:4550 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4516:4521 Stdlib.Lists.List <> length abbrev
+R4524:4529 xv6iris.WaitInv <> rp_map def
+R4537:4540 stdpp.list_basics <> take abbrev
+R4567:4579 xv6iris.WaitInv <> rp_map_length thm
+R4581:4591 stdpp.list_basics <> length_take thm
+R4567:4579 xv6iris.WaitInv <> rp_map_length thm
+R4567:4579 xv6iris.WaitInv <> rp_map_length thm
+R4581:4591 stdpp.list_basics <> length_take thm
+R4581:4591 stdpp.list_basics <> length_take thm
+R4604:4617 stdpp.list_basics <> lookup_lt_Some thm
+R4604:4617 stdpp.list_basics <> lookup_lt_Some thm
+R4643:4654 stdpp.list_basics <> lookup_app_r thm
+R4643:4654 stdpp.list_basics <> lookup_app_r thm
+R4643:4654 stdpp.list_basics <> lookup_app_r thm
+R4681:4692 Stdlib.Arith.PeanoNat Nat sub_diag thm
+R4681:4692 Stdlib.Arith.PeanoNat Nat sub_diag thm
+R4681:4692 Stdlib.Arith.PeanoNat Nat sub_diag thm
+R4706:4716 stdpp.list_basics <> lookup_drop thm
+R4726:4736 Stdlib.Arith.PeanoNat Nat add_0_r thm
+R4706:4716 stdpp.list_basics <> lookup_drop thm
+R4706:4716 stdpp.list_basics <> lookup_drop thm
+R4726:4736 Stdlib.Arith.PeanoNat Nat add_0_r thm
+R4726:4736 Stdlib.Arith.PeanoNat Nat add_0_r thm
+prf 4902:4913 <> rp_upto_step
+R4923:4927 SailStdpp.Values <> mword def
+binder 4916:4916 <> p:30
+binder 4918:4919 <> ip:31
+R4938:4940 Corelib.Init.Datatypes <> nat ind
+binder 4934:4934 <> k:32
+R4949:4952 Corelib.Init.Datatypes <> list ind
+R4955:4959 SailStdpp.Values <> mword def
+binder 4944:4945 <> ps:33
+R4971:4975 SailStdpp.Values <> mword def
+binder 4967:4967 <> v:34
+R5001:5006 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4992:4994 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4987:4990 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R4991:4991 xv6iris.WaitInv <> k:32 var
+R4985:4986 xv6iris.WaitInv <> ps:33 var
+R4995:4998 Corelib.Init.Datatypes <> Some constr
+R5000:5000 xv6iris.WaitInv <> v:34 var
+R5050:5052 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5007:5008 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5010:5013 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5028:5049 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5009:5009 xv6iris.WaitInv <> k:32 var
+R5014:5020 xv6iris.WaitInv <> rp_slot def
+R5022:5022 xv6iris.WaitInv <> p:30 var
+R5024:5025 xv6iris.WaitInv <> ip:31 var
+R5027:5027 xv6iris.WaitInv <> v:34 var
+R5032:5038 xv6iris.WaitInv <> rp_upto def
+R5040:5040 xv6iris.WaitInv <> p:30 var
+R5042:5043 xv6iris.WaitInv <> ip:31 var
+R5045:5045 xv6iris.WaitInv <> k:32 var
+R5047:5048 xv6iris.WaitInv <> ps:33 var
+R5053:5059 xv6iris.WaitInv <> rp_upto def
+R5061:5061 xv6iris.WaitInv <> p:30 var
+R5063:5064 xv6iris.WaitInv <> ip:31 var
+R5067:5067 Corelib.Init.Datatypes <> S constr
+R5069:5069 xv6iris.WaitInv <> k:32 var
+R5072:5073 xv6iris.WaitInv <> ps:33 var
+R5102:5108 xv6iris.WaitInv <> rp_upto def
+R5160:5162 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5128:5133 Stdlib.Lists.List <> length abbrev
+R5136:5141 xv6iris.WaitInv <> rp_map def
+R5149:5152 stdpp.list_basics <> take abbrev
+R5160:5162 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5128:5133 Stdlib.Lists.List <> length abbrev
+R5136:5141 xv6iris.WaitInv <> rp_map def
+R5149:5152 stdpp.list_basics <> take abbrev
+R5179:5191 xv6iris.WaitInv <> rp_map_length thm
+R5193:5203 stdpp.list_basics <> length_take thm
+R5179:5191 xv6iris.WaitInv <> rp_map_length thm
+R5179:5191 xv6iris.WaitInv <> rp_map_length thm
+R5193:5203 stdpp.list_basics <> length_take thm
+R5193:5203 stdpp.list_basics <> length_take thm
+R5216:5229 stdpp.list_basics <> lookup_lt_Some thm
+R5216:5229 stdpp.list_basics <> lookup_lt_Some thm
+R5255:5270 stdpp.list_basics <> insert_app_r_alt thm
+R5255:5270 stdpp.list_basics <> insert_app_r_alt thm
+R5255:5270 stdpp.list_basics <> insert_app_r_alt thm
+R5297:5308 Stdlib.Arith.PeanoNat Nat sub_diag thm
+R5297:5308 Stdlib.Arith.PeanoNat Nat sub_diag thm
+R5297:5308 Stdlib.Arith.PeanoNat Nat sub_diag thm
+R5322:5327 stdpp.list_basics <> drop_S thm
+R5322:5327 stdpp.list_basics <> drop_S thm
+R5322:5327 stdpp.list_basics <> drop_S thm
+R5352:5359 stdpp.list_basics <> take_S_r thm
+R5352:5359 stdpp.list_basics <> take_S_r thm
+R5352:5359 stdpp.list_basics <> take_S_r thm
+R5382:5387 xv6iris.WaitInv <> rp_map def
+R5398:5405 stdpp.list_monad <> fmap_app thm
+R5398:5405 stdpp.list_monad <> fmap_app thm
+R5398:5405 stdpp.list_monad <> fmap_app thm
+R5413:5416 stdpp.base <> fmap def
+R5418:5426 stdpp.list_monad <> list_fmap inst
+R5435:5440 stdpp.base <> insert def
+R5442:5452 stdpp.list_basics <> list_insert inst
+R5467:5475 Stdlib.Lists.List <> app_assoc thm
+R5467:5475 Stdlib.Lists.List <> app_assoc thm
+R5467:5475 Stdlib.Lists.List <> app_assoc thm
+sec 5733:5739 <> WaitInv
+R5755:5761 xv6iris.RiscvPtsto <> riscvGS class
+var  5780:5781 WaitInv XI
+R5785:5790 xv6iris.TsoCtx <> CurCtx class
+def 6040:6050 <> parents_own
+R6058:6061 Corelib.Init.Datatypes <> list ind
+R6064:6068 SailStdpp.Values <> mword def
+binder 6053:6054 <> ps:38
+R6077:6081 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6083:6084 xv6iris.WaitInv <> WaitInv.Σ var
+R6117:6126 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6094:6096 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6114:6116 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6106:6108 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6097:6102 Stdlib.Lists.List <> length abbrev
+R6104:6105 xv6iris.WaitInv <> ps:38 var
+R6109:6113 xv6iris.ProcGeom <> NPROC def
+R6127:6137 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R6139:6143 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R6145:6149 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R6152:6153 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+binder 6138:6138 <> j:39
+binder 6138:6138 <> j:40
+binder 6144:6144 <> v:41
+binder 6144:6144 <> v:42
+R6176:6183 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R6154:6161 xv6iris.ProcGeom <> p_parent def
+R6164:6172 xv6iris.ProcGeom <> proc_addr def
+R6174:6174 xv6iris.WaitInv <> j:39 var
+R6184:6184 xv6iris.WaitInv <> v:41 var
+R6150:6151 xv6iris.WaitInv <> ps:38 var
+def 6373:6380 <> wait_res
+R6384:6388 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6390:6391 xv6iris.WaitInv <> WaitInv.Σ var
+R6397:6400 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6403:6404 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 6401:6402 <> ps:43
+R6405:6415 xv6iris.WaitInv <> parents_own def
+R6417:6418 xv6iris.WaitInv <> ps:43 var
+prf 6912:6931 <> parents_cells_gather
+R6940:6942 Corelib.Init.Datatypes <> nat ind
+binder 6934:6934 <> n:44
+binder 6936:6936 <> k:45
+R6951:6951 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7029:7039 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6952:6962 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R6964:6968 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R6976:6977 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 6963:6963 <> i:46
+binder 6963:6963 <> i:47
+R6978:6981 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6995:6996 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6987:6991 SailStdpp.Values <> mword def
+binder 6982:6983 <> pv:48
+R7019:7026 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R6997:7004 xv6iris.ProcGeom <> p_parent def
+R7007:7015 xv6iris.ProcGeom <> proc_addr def
+R7017:7017 xv6iris.WaitInv <> i:46 var
+R7027:7028 xv6iris.WaitInv <> pv:48 var
+R6969:6971 Corelib.Lists.ListDef <> seq def
+R6975:6975 xv6iris.WaitInv <> n:44 var
+R6973:6973 xv6iris.WaitInv <> k:45 var
+R7040:7043 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R7064:7065 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R7049:7052 Corelib.Init.Datatypes <> list ind
+R7055:7059 SailStdpp.Values <> mword def
+binder 7044:7045 <> ps:49
+R7085:7099 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7164:7164 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7066:7068 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7082:7084 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7078:7080 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7069:7074 Stdlib.Lists.List <> length abbrev
+R7076:7077 xv6iris.WaitInv <> ps:49 var
+R7081:7081 xv6iris.WaitInv <> n:44 var
+R7100:7110 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R7112:7116 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R7118:7122 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R7125:7126 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+binder 7111:7111 <> j:50
+binder 7111:7111 <> j:51
+binder 7117:7117 <> v:52
+binder 7117:7117 <> v:53
+R7155:7162 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R7127:7134 xv6iris.ProcGeom <> p_parent def
+R7137:7145 xv6iris.ProcGeom <> proc_addr def
+R7149:7151 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R7148:7148 xv6iris.WaitInv <> k:45 var
+R7152:7152 xv6iris.WaitInv <> j:50 var
+R7163:7163 xv6iris.WaitInv <> v:52 var
+R7123:7124 xv6iris.WaitInv <> ps:49 var
+R7251:7252 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R7251:7252 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R7289:7291 Corelib.Lists.ListDef <> seq def
+R7303:7315 iris.bi.big_op <> big_sepL_cons thm
+R7303:7315 iris.bi.big_op <> big_sepL_cons thm
+R7303:7315 iris.bi.big_op <> big_sepL_cons thm
+R7392:7392 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7401:7406 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7412:7412 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7397:7397 Corelib.Init.Datatypes <> S constr
+R7392:7392 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7401:7406 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7412:7412 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7397:7397 Corelib.Init.Datatypes <> S constr
+R7454:7457 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R7454:7457 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R7495:7500 Corelib.Init.Datatypes <> length def
+R7526:7538 iris.bi.big_op <> big_sepL_cons thm
+R7526:7538 iris.bi.big_op <> big_sepL_cons thm
+R7526:7538 iris.bi.big_op <> big_sepL_cons thm
+R7571:7581 Stdlib.Arith.PeanoNat Nat add_0_r thm
+R7571:7581 Stdlib.Arith.PeanoNat Nat add_0_r thm
+R7571:7581 Stdlib.Arith.PeanoNat Nat add_0_r thm
+R7614:7614 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7628:7633 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7639:7639 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7615:7627 iris.bi.big_op <> big_sepL_mono thm
+R7614:7614 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7628:7633 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7639:7639 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7615:7627 iris.bi.big_op <> big_sepL_mono thm
+R7686:7688 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R7689:7689 Corelib.Init.Datatypes <> S constr
+R7707:7709 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R7704:7704 Corelib.Init.Datatypes <> S constr
+R7686:7688 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R7689:7689 Corelib.Init.Datatypes <> S constr
+R7707:7709 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R7704:7704 Corelib.Init.Datatypes <> S constr
+prf 7913:7929 <> wait_res_of_cells
+R7937:7937 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8019:8029 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7938:7948 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R7950:7954 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R7966:7967 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 7949:7949 <> i:54
+binder 7949:7949 <> i:55
+R7968:7971 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R7985:7986 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R7977:7981 SailStdpp.Values <> mword def
+binder 7972:7973 <> pv:56
+R8009:8016 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R7987:7994 xv6iris.ProcGeom <> p_parent def
+R7997:8005 xv6iris.ProcGeom <> proc_addr def
+R8007:8007 xv6iris.WaitInv <> i:54 var
+R8017:8018 xv6iris.WaitInv <> pv:56 var
+R7955:7957 Corelib.Lists.ListDef <> seq def
+R7961:7965 xv6iris.ProcGeom <> NPROC def
+R8030:8037 xv6iris.WaitInv <> wait_res def
+R8080:8080 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8109:8114 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8118:8118 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8081:8100 xv6iris.WaitInv <> parents_cells_gather thm
+R8102:8106 xv6iris.ProcGeom <> NPROC def
+R8080:8080 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8109:8114 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8118:8118 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8081:8100 xv6iris.WaitInv <> parents_cells_gather thm
+R8102:8106 xv6iris.ProcGeom <> NPROC def
+R8166:8176 xv6iris.WaitInv <> parents_own def
+R8166:8176 xv6iris.WaitInv <> parents_own def
+R8166:8176 xv6iris.WaitInv <> parents_own def
+R8230:8230 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8244:8249 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8253:8253 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8231:8243 iris.bi.big_op <> big_sepL_mono thm
+R8230:8230 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8244:8249 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8253:8253 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8231:8243 iris.bi.big_op <> big_sepL_mono thm
+prf 8307:8324 <> parents_own_length
+binder 8326:8327 <> ps:57
+R8345:8350 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8331:8341 xv6iris.WaitInv <> parents_own def
+R8343:8344 xv6iris.WaitInv <> ps:57 var
+R8351:8353 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R8371:8373 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R8363:8365 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8354:8359 Stdlib.Lists.List <> length abbrev
+R8361:8362 xv6iris.WaitInv <> ps:57 var
+R8366:8370 xv6iris.ProcGeom <> NPROC def
+prf 8676:8690 <> parents_own_acc
+R8698:8701 Corelib.Init.Datatypes <> list ind
+R8704:8708 SailStdpp.Values <> mword def
+binder 8693:8694 <> ps:58
+R8720:8722 Corelib.Init.Datatypes <> nat ind
+binder 8716:8716 <> j:59
+R8730:8734 SailStdpp.Values <> mword def
+binder 8726:8726 <> v:60
+R8762:8769 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8753:8755 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8748:8751 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R8752:8752 xv6iris.WaitInv <> j:59 var
+R8746:8747 xv6iris.WaitInv <> ps:58 var
+R8756:8759 Corelib.Init.Datatypes <> Some constr
+R8761:8761 xv6iris.WaitInv <> v:60 var
+R8784:8793 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8770:8780 xv6iris.WaitInv <> parents_own def
+R8782:8783 xv6iris.WaitInv <> ps:58 var
+R8825:8834 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R8920:8920 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R8816:8823 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R8794:8801 xv6iris.ProcGeom <> p_parent def
+R8804:8812 xv6iris.ProcGeom <> proc_addr def
+R8814:8814 xv6iris.WaitInv <> j:59 var
+R8824:8824 xv6iris.WaitInv <> v:60 var
+R8835:8838 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R8852:8853 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R8844:8848 SailStdpp.Values <> mword def
+binder 8839:8840 <> v':61
+R8886:8891 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8876:8883 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R8854:8861 xv6iris.ProcGeom <> p_parent def
+R8864:8872 xv6iris.ProcGeom <> proc_addr def
+R8874:8874 xv6iris.WaitInv <> j:59 var
+R8884:8885 xv6iris.WaitInv <> v':61 var
+R8892:8902 xv6iris.WaitInv <> parents_own def
+R8905:8906 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R8908:8911 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R8914:8918 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R8907:8907 xv6iris.WaitInv <> j:59 var
+R8912:8913 xv6iris.WaitInv <> v':61 var
+R8917:8918 xv6iris.WaitInv <> ps:58 var
+R8986:8986 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9017:9022 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9031:9031 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8987:9005 iris.bi.big_op <> big_sepL_insert_acc thm
+R8986:8986 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9017:9022 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9031:9031 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8987:9005 iris.bi.big_op <> big_sepL_insert_acc thm
+R9120:9132 stdpp.list_basics <> length_insert thm
+R9120:9132 stdpp.list_basics <> length_insert thm
+R9120:9132 stdpp.list_basics <> length_insert thm
+R9160:9160 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9168:9173 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9178:9178 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9160:9160 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9168:9173 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9178:9178 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+prf 9332:9347 <> parents_own_read
+R9355:9358 Corelib.Init.Datatypes <> list ind
+R9361:9365 SailStdpp.Values <> mword def
+binder 9350:9351 <> ps:62
+R9377:9379 Corelib.Init.Datatypes <> nat ind
+binder 9373:9373 <> j:63
+R9387:9391 SailStdpp.Values <> mword def
+binder 9383:9383 <> v:64
+R9419:9426 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9410:9412 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9405:9408 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R9409:9409 xv6iris.WaitInv <> j:63 var
+R9403:9404 xv6iris.WaitInv <> ps:62 var
+R9413:9416 Corelib.Init.Datatypes <> Some constr
+R9418:9418 xv6iris.WaitInv <> v:64 var
+R9441:9450 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9427:9437 xv6iris.WaitInv <> parents_own def
+R9439:9440 xv6iris.WaitInv <> ps:62 var
+R9482:9487 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R9539:9539 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R9473:9480 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R9451:9458 xv6iris.ProcGeom <> p_parent def
+R9461:9469 xv6iris.ProcGeom <> proc_addr def
+R9471:9471 xv6iris.WaitInv <> j:63 var
+R9481:9481 xv6iris.WaitInv <> v:64 var
+R9519:9524 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9510:9517 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R9488:9495 xv6iris.ProcGeom <> p_parent def
+R9498:9506 xv6iris.ProcGeom <> proc_addr def
+R9508:9508 xv6iris.WaitInv <> j:63 var
+R9518:9518 xv6iris.WaitInv <> v:64 var
+R9525:9535 xv6iris.WaitInv <> parents_own def
+R9537:9538 xv6iris.WaitInv <> ps:62 var
+R9592:9592 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9618:9623 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9627:9627 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9593:9607 xv6iris.WaitInv <> parents_own_acc thm
+R9592:9592 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9618:9623 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9627:9627 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9593:9607 xv6iris.WaitInv <> parents_own_acc thm
+R9693:9693 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R9701:9704 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R9706:9711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R9716:9716 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R9693:9693 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R9701:9704 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R9706:9711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R9716:9716 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R9731:9744 stdpp.list_basics <> list_insert_id thm
+R9731:9744 stdpp.list_basics <> list_insert_id thm
+R9731:9744 stdpp.list_basics <> list_insert_id thm
+R9789:9795 xv6iris.WaitInv WaitInv <> sec
+prf 10020:10032 <> p_parent_sext
+R10040:10044 SailStdpp.Values <> mword def
+binder 10035:10036 <> pa:65
+R10111:10113 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10054:10060 SailStdpp.Operators_mwords <> add_vec def
+R10066:10077 Riscv.rv64d <> sign_extend' def
+R10101:10105 SailStdpp.Values <> mword def
+R10083:10094 SailStdpp.Values <> mword_of_int def
+R10062:10063 xv6iris.WaitInv <> pa:65 var
+R10114:10121 xv6iris.ProcGeom <> p_parent def
+R10123:10124 xv6iris.WaitInv <> pa:65 var
+R10143:10150 xv6iris.ProcGeom <> p_parent def
+R10159:10165 Corelib.Init.Logic <> f_equal thm
+R10159:10165 Corelib.Init.Logic <> f_equal thm
+R10174:10178 stdpp.bitvector.definitions <> bv_eq thm
+R10174:10178 stdpp.bitvector.definitions <> bv_eq thm

@@ -1,0 +1,24 @@
+DIGEST bc385c4d614976f6a310f430520309d9
+Fxv6iris.InodeDefs
+R106:109 Stdlib.Lists.List <> <> lib
+R138:141 stdpp.list <> <> lib
+R143:163 stdpp.bitvector.definitions <> <> lib
+R181:196 SailStdpp.Values <> <> lib
+R214:220 xv6iris.BioDefs <> <> lib
+def 307:315 <> file_byte
+R328:331 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R325:327 Corelib.Init.Datatypes <> nat ind
+R332:335 Corelib.Init.Datatypes <> list ind
+R338:339 stdpp.bitvector.definitions <> bv rec
+binder 318:321 <> data:1
+R350:352 Corelib.Init.Datatypes <> nat ind
+binder 346:346 <> k:2
+R357:358 stdpp.bitvector.definitions <> bv rec
+R391:395 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R398:404 stdpp.numbers <> ::nat_scope:x_'`mod`'_x not
+R397:397 xv6iris.InodeDefs <> k:2 var
+R405:409 xv6iris.BioDefs <> BSIZE def
+R367:370 xv6iris.InodeDefs <> data:1 var
+R374:380 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R373:373 xv6iris.InodeDefs <> k:2 var
+R381:385 xv6iris.BioDefs <> BSIZE def

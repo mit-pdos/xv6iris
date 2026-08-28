@@ -1,0 +1,9 @@
+DIGEST dc5ac82db3ae8130dd5cda9f616b1c5d
+Fxv6iris.LinkConsoleinit
+R192:203 xv6iris.LinkInitlock <> <> lib
+R205:216 xv6iris.LinkUartinit <> <> lib
+R218:233 xv6iris.ProofConsoleinit <> <> lib
+R259:274 xv6iris.ProofConsoleinit ConsoleinitProof <> modtype
+R276:283 xv6iris.LinkInitlock Initlock <> modtype
+R285:292 xv6iris.LinkUartinit Uartinit <> modtype
+mod 244:254 <> Consoleinit

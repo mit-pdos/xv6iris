@@ -1,0 +1,415 @@
+DIGEST 6c730dd15ecbe4cbd352edcc79efada5
+Fxv6iris.WpGprMretWp
+R35:43 iris.proofmode.proofmode <> <> lib
+R85:92 iris.program_logic.language <> <> lib
+R110:135 SailStdpp.Operators_mwords <> <> lib
+R153:169 Riscv.rv64d_types <> <> lib
+R171:181 Riscv.rv64d <> <> lib
+R199:209 xv6iris.RiscvExtras <> <> lib
+R227:240 SailStdpp.Base <> <> lib
+R258:266 xv6iris.RiscvLang <> <> lib
+R268:277 xv6iris.RiscvPtsto <> <> lib
+R279:287 xv6iris.RiscvExec <> <> lib
+R289:300 xv6iris.RiscvTryStep <> <> lib
+R302:315 xv6iris.RiscvFetchExec <> <> lib
+R317:324 xv6iris.WpDecode <> <> lib
+R367:376 iris.base_logic.lib.invariants <> <> lib
+R394:399 xv6iris.TsoCtx <> <> lib
+def 673:678 <> w_mret
+R682:686 SailStdpp.Values <> mword def
+R694:705 SailStdpp.Values <> mword_of_int def
+prf 726:736 <> decode_mret
+binder 738:738 <> s:1
+R801:806 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R794:796 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R744:751 xv6iris.RiscvFetchExec <> priv_mSU def
+R754:768 Riscv.rv64d_types <> register_lookup def
+R770:782 Riscv.rv64d_types <> cur_privilege constr
+R785:789 xv6iris.RiscvLang <> sregs proj
+R791:791 xv6iris.WpGprMretWp <> s:1 var
+R797:800 Corelib.Init.Datatypes <> true constr
+R833:835 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R807:810 xv6iris.RiscvExec <> exec def
+R832:832 xv6iris.WpGprMretWp <> s:1 var
+R813:822 Riscv.rv64d <> ext_decode def
+R824:829 xv6iris.WpGprMretWp <> w_mret def
+R836:839 Corelib.Init.Datatypes <> Some constr
+R841:841 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R849:850 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R852:852 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R842:845 Riscv.rv64d_types <> MRET constr
+R847:848 Corelib.Init.Datatypes <> tt constr
+R851:851 xv6iris.WpGprMretWp <> s:1 var
+R886:895 Riscv.rv64d <> ext_decode def
+R898:913 Riscv.rv64d <> encdec_backwards def
+R1075:1080 SailStdpp.Operators_mwords <> eq_vec def
+R1082:1087 xv6iris.WpGprMretWp <> w_mret def
+R1075:1080 SailStdpp.Operators_mwords <> eq_vec def
+R1082:1087 xv6iris.WpGprMretWp <> w_mret def
+R1109:1114 SailStdpp.Operators_mwords <> eq_vec def
+R1116:1121 xv6iris.WpGprMretWp <> w_mret def
+R1131:1135 Corelib.Init.Datatypes <> false constr
+R1109:1114 SailStdpp.Operators_mwords <> eq_vec def
+R1116:1121 xv6iris.WpGprMretWp <> w_mret def
+R1131:1135 Corelib.Init.Datatypes <> false constr
+R1200:1205 SailStdpp.Operators_mwords <> eq_vec def
+R1208:1223 SailStdpp.Operators_mwords <> subrange_vec_dec def
+R1225:1230 xv6iris.WpGprMretWp <> w_mret def
+R1200:1205 SailStdpp.Operators_mwords <> eq_vec def
+R1208:1223 SailStdpp.Operators_mwords <> subrange_vec_dec def
+R1225:1230 xv6iris.WpGprMretWp <> w_mret def
+R1258:1263 SailStdpp.Operators_mwords <> eq_vec def
+R1266:1281 SailStdpp.Operators_mwords <> subrange_vec_dec def
+R1283:1288 xv6iris.WpGprMretWp <> w_mret def
+R1304:1308 Corelib.Init.Datatypes <> false constr
+R1258:1263 SailStdpp.Operators_mwords <> eq_vec def
+R1266:1281 SailStdpp.Operators_mwords <> subrange_vec_dec def
+R1283:1288 xv6iris.WpGprMretWp <> w_mret def
+R1304:1308 Corelib.Init.Datatypes <> false constr
+R1434:1452 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1360:1363 xv6iris.RiscvExec <> exec def
+R1366:1379 Riscv.rv64d_types Defs and_boolM def
+R1417:1423 Riscv.rv64d_types <> returnM def
+R1425:1429 Corelib.Init.Datatypes <> false constr
+R1382:1397 Riscv.rv64d <> currentlyEnabled def
+R1399:1413 Riscv.rv64d_types <> Ext_Zihintpause constr
+R1453:1456 Corelib.Init.Datatypes <> Some constr
+R1458:1458 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1464:1465 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1467:1467 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1459:1463 Corelib.Init.Datatypes <> false constr
+R1434:1452 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1360:1363 xv6iris.RiscvExec <> exec def
+R1366:1379 Riscv.rv64d_types Defs and_boolM def
+R1417:1423 Riscv.rv64d_types <> returnM def
+R1425:1429 Corelib.Init.Datatypes <> false constr
+R1382:1397 Riscv.rv64d <> currentlyEnabled def
+R1399:1413 Riscv.rv64d_types <> Ext_Zihintpause constr
+R1453:1456 Corelib.Init.Datatypes <> Some constr
+R1458:1458 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1464:1465 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1467:1467 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1459:1463 Corelib.Init.Datatypes <> false constr
+R1485:1497 xv6iris.WpDecode <> exec_cE_pause thm
+R1485:1497 xv6iris.WpDecode <> exec_cE_pause thm
+R1528:1546 xv6iris.RiscvTryStep <> exec_and_boolM_Some thm
+R1528:1546 xv6iris.RiscvTryStep <> exec_and_boolM_Some thm
+R1528:1546 xv6iris.RiscvTryStep <> exec_and_boolM_Some thm
+R1584:1595 xv6iris.RiscvExec <> exec_returnm thm
+R1584:1595 xv6iris.RiscvExec <> exec_returnm thm
+R1626:1639 xv6iris.RiscvExec <> exec_bind_Some thm
+R1626:1639 xv6iris.RiscvExec <> exec_bind_Some thm
+R1626:1639 xv6iris.RiscvExec <> exec_bind_Some thm
+R1678:1686 xv6iris.RiscvExec <> exec_bind thm
+R1678:1686 xv6iris.RiscvExec <> exec_bind thm
+R1678:1686 xv6iris.RiscvExec <> exec_bind thm
+R1775:1793 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1705:1708 xv6iris.RiscvExec <> exec def
+R1711:1724 Riscv.rv64d_types Defs and_boolM def
+R1758:1764 Riscv.rv64d_types <> returnM def
+R1766:1770 Corelib.Init.Datatypes <> false constr
+R1727:1742 Riscv.rv64d <> currentlyEnabled def
+R1744:1754 Riscv.rv64d_types <> Ext_Zicfilp constr
+R1794:1797 Corelib.Init.Datatypes <> Some constr
+R1799:1799 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1805:1806 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1808:1808 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1800:1804 Corelib.Init.Datatypes <> false constr
+R1775:1793 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1705:1708 xv6iris.RiscvExec <> exec def
+R1711:1724 Riscv.rv64d_types Defs and_boolM def
+R1758:1764 Riscv.rv64d_types <> returnM def
+R1766:1770 Corelib.Init.Datatypes <> false constr
+R1727:1742 Riscv.rv64d <> currentlyEnabled def
+R1744:1754 Riscv.rv64d_types <> Ext_Zicfilp constr
+R1794:1797 Corelib.Init.Datatypes <> Some constr
+R1799:1799 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1805:1806 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1808:1808 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1800:1804 Corelib.Init.Datatypes <> false constr
+R1826:1844 xv6iris.WpDecode <> exec_cE_zicfilp_mSU thm
+R1826:1844 xv6iris.WpDecode <> exec_cE_zicfilp_mSU thm
+R1881:1899 xv6iris.RiscvTryStep <> exec_and_boolM_Some thm
+R1881:1899 xv6iris.RiscvTryStep <> exec_and_boolM_Some thm
+R1881:1899 xv6iris.RiscvTryStep <> exec_and_boolM_Some thm
+R1937:1948 xv6iris.RiscvExec <> exec_returnm thm
+R1937:1948 xv6iris.RiscvExec <> exec_returnm thm
+R1979:1992 xv6iris.RiscvExec <> exec_bind_Some thm
+R1979:1992 xv6iris.RiscvExec <> exec_bind_Some thm
+R1979:1992 xv6iris.RiscvExec <> exec_bind_Some thm
+R2112:2114 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2117:2122 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2124:2129 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2130:2136 Riscv.rv64d_types <> returnM def
+R2138:2141 Corelib.Init.Datatypes <> None constr
+R2112:2114 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2117:2122 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2124:2129 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2130:2136 Riscv.rv64d_types <> returnM def
+R2138:2141 Corelib.Init.Datatypes <> None constr
+R2166:2170 Corelib.Init.Datatypes <> false constr
+R2166:2170 Corelib.Init.Datatypes <> false constr
+R2230:2241 xv6iris.RiscvTryStep <> exec_returnM thm
+R2245:2248 Corelib.Init.Datatypes <> None constr
+R2250:2260 Riscv.rv64d_types <> instruction ind
+R2230:2241 xv6iris.RiscvTryStep <> exec_returnM thm
+R2245:2248 Corelib.Init.Datatypes <> None constr
+R2250:2260 Riscv.rv64d_types <> instruction ind
+R2230:2241 xv6iris.RiscvTryStep <> exec_returnM thm
+R2245:2248 Corelib.Init.Datatypes <> None constr
+R2250:2260 Riscv.rv64d_types <> instruction ind
+R2443:2445 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2448:2453 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2479:2484 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2454:2460 Riscv.rv64d_types <> returnM def
+R2463:2466 Corelib.Init.Datatypes <> Some constr
+R2469:2473 Riscv.rv64d_types <> ECALL constr
+R2475:2476 Corelib.Init.Datatypes <> tt constr
+R2443:2445 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2448:2453 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2479:2484 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2454:2460 Riscv.rv64d_types <> returnM def
+R2463:2466 Corelib.Init.Datatypes <> Some constr
+R2469:2473 Riscv.rv64d_types <> ECALL constr
+R2475:2476 Corelib.Init.Datatypes <> tt constr
+R2510:2514 Corelib.Init.Datatypes <> false constr
+R2510:2514 Corelib.Init.Datatypes <> false constr
+R2579:2581 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2584:2589 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2614:2619 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2590:2596 Riscv.rv64d_types <> returnM def
+R2599:2602 Corelib.Init.Datatypes <> Some constr
+R2605:2608 Riscv.rv64d_types <> MRET constr
+R2610:2611 Corelib.Init.Datatypes <> tt constr
+R2579:2581 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2584:2589 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2614:2619 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R2590:2596 Riscv.rv64d_types <> returnM def
+R2599:2602 Corelib.Init.Datatypes <> Some constr
+R2605:2608 Riscv.rv64d_types <> MRET constr
+R2610:2611 Corelib.Init.Datatypes <> tt constr
+R2645:2648 Corelib.Init.Datatypes <> true constr
+R2645:2648 Corelib.Init.Datatypes <> true constr
+R2708:2721 xv6iris.RiscvExec <> exec_bind_Some thm
+R2734:2745 xv6iris.RiscvTryStep <> exec_returnM thm
+R2748:2751 Corelib.Init.Datatypes <> Some constr
+R2754:2757 Riscv.rv64d_types <> MRET constr
+R2759:2760 Corelib.Init.Datatypes <> tt constr
+R2708:2721 xv6iris.RiscvExec <> exec_bind_Some thm
+R2734:2745 xv6iris.RiscvTryStep <> exec_returnM thm
+R2748:2751 Corelib.Init.Datatypes <> Some constr
+R2754:2757 Riscv.rv64d_types <> MRET constr
+R2759:2760 Corelib.Init.Datatypes <> tt constr
+R2708:2721 xv6iris.RiscvExec <> exec_bind_Some thm
+R2734:2745 xv6iris.RiscvTryStep <> exec_returnM thm
+R2748:2751 Corelib.Init.Datatypes <> Some constr
+R2754:2757 Riscv.rv64d_types <> MRET constr
+R2759:2760 Corelib.Init.Datatypes <> tt constr
+R2788:2799 xv6iris.RiscvTryStep <> exec_returnM thm
+R2788:2799 xv6iris.RiscvTryStep <> exec_returnM thm
+sec 3049:3059 <> ForwardMRET
+var  3073:3073 ForwardMRET s
+var  3086:3087 ForwardMRET pc
+var  3102:3102 ForwardMRET b
+var  3123:3129 ForwardMRET newpriv
+var  3145:3147 ForwardMRET lpe
+R3077:3082 xv6iris.RiscvLang <> mstate rec
+R3091:3095 SailStdpp.Values <> mword def
+R3106:3109 Corelib.Init.Datatypes <> bool ind
+R3133:3141 Riscv.rv64d_types <> Privilege ind
+R3151:3154 Corelib.Init.Datatypes <> bool ind
+var 3171:3179 ForwardMRET Hfetch_at
+R3244:3252 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3187:3190 xv6iris.RiscvExec <> exec def
+R3204:3210 xv6iris.RiscvLang <> set_reg def
+R3212:3212 xv6iris.WpGprMretWp <> ForwardMRET.s var
+R3215:3220 Riscv.rv64d_types <> R_bool constr
+R3222:3239 Riscv.rv64d_types <> minstret_increment constr
+R3242:3242 xv6iris.WpGprMretWp <> ForwardMRET.b var
+R3193:3197 Riscv.rv64d <> fetch def
+R3199:3200 Corelib.Init.Datatypes <> tt constr
+R3253:3256 Corelib.Init.Datatypes <> Some constr
+R3258:3258 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3272:3273 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3313:3313 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3259:3264 Riscv.rv64d_types <> F_Base constr
+R3266:3271 xv6iris.WpGprMretWp <> w_mret def
+R3274:3280 xv6iris.RiscvLang <> set_reg def
+R3282:3282 xv6iris.WpGprMretWp <> ForwardMRET.s var
+R3285:3290 Riscv.rv64d_types <> R_bool constr
+R3292:3309 Riscv.rv64d_types <> minstret_increment constr
+R3312:3312 xv6iris.WpGprMretWp <> ForwardMRET.b var
+var 3329:3333 ForwardMRET Hsi_s
+R3373:3375 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3337:3340 xv6iris.RiscvExec <> exec def
+R3372:3372 xv6iris.WpGprMretWp <> ForwardMRET.s var
+R3343:3361 Riscv.rv64d <> should_inc_minstret def
+R3363:3369 Riscv.rv64d_types <> Machine constr
+R3376:3379 Corelib.Init.Datatypes <> Some constr
+R3381:3381 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3383:3384 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3386:3386 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3382:3382 xv6iris.WpGprMretWp <> ForwardMRET.b var
+R3385:3385 xv6iris.WpGprMretWp <> ForwardMRET.s var
+def 3403:3405 <> sAm
+R3409:3414 xv6iris.RiscvLang <> mstate rec
+R3419:3425 xv6iris.RiscvLang <> set_reg def
+R3427:3427 xv6iris.WpGprMretWp <> ForwardMRET.s var
+R3430:3435 Riscv.rv64d_types <> R_bool constr
+R3437:3454 Riscv.rv64d_types <> minstret_increment constr
+R3457:3457 xv6iris.WpGprMretWp <> ForwardMRET.b var
+def 3473:3477 <> s_pcm
+R3481:3486 xv6iris.RiscvLang <> mstate rec
+R3491:3497 xv6iris.RiscvLang <> set_reg def
+R3499:3501 xv6iris.WpGprMretWp <> sAm def
+R3503:3508 Riscv.rv64d_types <> nextPC constr
+R3511:3521 SailStdpp.Operators_mwords <> add_vec_int def
+R3523:3524 xv6iris.WpGprMretWp <> ForwardMRET.pc var
+var 3617:3619 ForwardMRET ms0
+R3624:3638 Riscv.rv64d_types <> register_lookup def
+R3640:3646 Riscv.rv64d_types <> mstatus constr
+R3655:3659 xv6iris.RiscvLang <> sregs proj
+R3648:3652 xv6iris.WpGprMretWp <> s_pcm def
+var 3669:3671 ForwardMRET ms1
+R3676:3698 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R3709:3725 Riscv.rv64d <> _get_Mstatus_MPIE def
+R3727:3729 xv6iris.WpGprMretWp <> ForwardMRET.ms0 var
+R3700:3702 xv6iris.WpGprMretWp <> ForwardMRET.ms0 var
+var 3739:3741 ForwardMRET ms2
+R3746:3768 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R3779:3780 SailStdpp.Values <> :::'''b'_x not
+R3770:3772 xv6iris.WpGprMretWp <> ForwardMRET.ms1 var
+var 3793:3795 ForwardMRET ms3
+R3800:3822 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R3835:3851 Riscv.rv64d <> privLevel_to_bits def
+R3853:3856 Riscv.rv64d_types <> User constr
+R3824:3826 xv6iris.WpGprMretWp <> ForwardMRET.ms2 var
+var 3866:3868 ForwardMRET ms4
+R3873:3895 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R3908:3909 SailStdpp.Values <> :::'''b'_x not
+R3897:3899 xv6iris.WpGprMretWp <> ForwardMRET.ms3 var
+var 3922:3924 ForwardMRET ms5
+R3929:3951 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R3964:3989 Riscv.rv64d <> landing_pad_bits_backwards def
+R3991:4004 Riscv.rv64d_types <> NO_LP_EXPECTED constr
+R3953:3955 xv6iris.WpGprMretWp <> ForwardMRET.ms4 var
+var 4014:4017 ForwardMRET elpv
+R4022:4024 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R4028:4033 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R4056:4061 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R4062:4087 Riscv.rv64d <> landing_pad_bits_backwards def
+R4089:4102 Riscv.rv64d_types <> NO_LP_EXPECTED constr
+R4034:4051 Riscv.rv64d <> _get_Mstatus_MPELP def
+R4053:4055 xv6iris.WpGprMretWp <> ForwardMRET.ms4 var
+R4025:4027 xv6iris.WpGprMretWp <> ForwardMRET.lpe var
+var 4111:4113 ForwardMRET tgt
+R4118:4123 xv6iris.RiscvExtras <> ret_pc def
+R4126:4140 Riscv.rv64d_types <> register_lookup def
+R4142:4145 Riscv.rv64d_types <> mepc constr
+R4154:4158 xv6iris.RiscvLang <> sregs proj
+R4147:4151 xv6iris.WpGprMretWp <> s_pcm def
+var 4261:4263 ForwardMRET Hmu
+R4328:4330 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4267:4272 SailStdpp.Operators_mwords <> eq_vec def
+R4322:4323 SailStdpp.Values <> :::'''b'_x not
+R4275:4285 Riscv.rv64d <> _get_Misa_U def
+R4288:4302 Riscv.rv64d_types <> register_lookup def
+R4304:4307 Riscv.rv64d_types <> misa constr
+R4312:4316 xv6iris.RiscvLang <> sregs proj
+R4309:4309 xv6iris.WpGprMretWp <> ForwardMRET.s var
+R4331:4334 Corelib.Init.Datatypes <> true constr
+var 4350:4352 ForwardMRET Hmc
+R4417:4419 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4356:4361 SailStdpp.Operators_mwords <> eq_vec def
+R4411:4412 SailStdpp.Values <> :::'''b'_x not
+R4364:4374 Riscv.rv64d <> _get_Misa_C def
+R4377:4391 Riscv.rv64d_types <> register_lookup def
+R4393:4396 Riscv.rv64d_types <> misa constr
+R4401:4405 xv6iris.RiscvLang <> sregs proj
+R4398:4398 xv6iris.WpGprMretWp <> ForwardMRET.s var
+R4420:4423 Corelib.Init.Datatypes <> true constr
+var 4439:4441 ForwardMRET Hnp
+R4500:4502 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4445:4467 Riscv.rv64d <> privLevel_bits_forwards def
+R4469:4469 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4490:4492 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4498:4499 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4470:4485 Riscv.rv64d <> _get_Mstatus_MPP def
+R4487:4489 xv6iris.WpGprMretWp <> ForwardMRET.ms2 var
+R4493:4494 SailStdpp.Values <> :::'''b'_x not
+R4503:4509 Riscv.rv64d_types <> returnM def
+R4511:4517 xv6iris.WpGprMretWp <> ForwardMRET.newpriv var
+var 4533:4536 ForwardMRET Hnpm
+R4567:4569 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4540:4550 SailStdpp.Instances <> generic_neq def
+R4560:4566 Riscv.rv64d_types <> Machine constr
+R4552:4558 xv6iris.WpGprMretWp <> ForwardMRET.newpriv var
+R4570:4573 Corelib.Init.Datatypes <> true constr
+var 4589:4592 ForwardMRET Hlpe
+R4596:4602 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4605:4606 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 4603:4604 <> sz:19
+R4633:4635 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4607:4610 xv6iris.RiscvExec <> exec def
+R4631:4632 xv6iris.WpGprMretWp <> sz:19 var
+R4613:4620 Riscv.rv64d <> get_xLPE def
+R4622:4628 xv6iris.WpGprMretWp <> ForwardMRET.newpriv var
+R4636:4639 Corelib.Init.Datatypes <> Some constr
+R4641:4641 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4645:4646 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4649:4649 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4642:4644 xv6iris.WpGprMretWp <> ForwardMRET.lpe var
+R4647:4648 xv6iris.WpGprMretWp <> sz:19 var
+R4657:4667 xv6iris.WpGprMretWp ForwardMRET <> sec
+sec 4912:4919 <> StepMRET
+R4935:4941 xv6iris.RiscvPtsto <> riscvGS class
+var  4960:4962 StepMRET GEN
+var  4975:4977 StepMRET CID
+var  4990:4991 StepMRET XI
+R4966:4970 xv6iris.RiscvLang <> GenId class
+R4981:4985 xv6iris.RiscvLang <> CpuId class
+R4995:5000 xv6iris.TsoCtx <> CurCtx class
+var  5015:5017 StepMRET dqc
+R5021:5025 iris.algebra.dfrac <> dfrac ind
+sec 5201:5209 StepMRET CleanMRET
+var  5225:5225 StepMRET.CleanMRET s
+var  5238:5239 StepMRET.CleanMRET pc
+var  5254:5254 StepMRET.CleanMRET b
+var  5277:5283 StepMRET.CleanMRET newpriv
+var  5299:5301 StepMRET.CleanMRET lpe
+var  5324:5331 StepMRET.CleanMRET mstatus0
+var  5333:5337 StepMRET.CleanMRET mepc0
+var  5352:5355 StepMRET.CleanMRET mst0
+R5229:5234 xv6iris.RiscvLang <> mstate rec
+R5243:5247 SailStdpp.Values <> mword def
+R5258:5261 Corelib.Init.Datatypes <> bool ind
+R5287:5295 Riscv.rv64d_types <> Privilege ind
+R5305:5308 Corelib.Init.Datatypes <> bool ind
+R5341:5345 SailStdpp.Values <> mword def
+R5359:5363 SailStdpp.Values <> mword def
+def 5385:5388 <> cms1
+R5393:5415 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R5431:5447 Riscv.rv64d <> _get_Mstatus_MPIE def
+R5449:5456 xv6iris.WpGprMretWp <> StepMRET.CleanMRET.mstatus0 var
+R5417:5424 xv6iris.WpGprMretWp <> StepMRET.CleanMRET.mstatus0 var
+def 5475:5478 <> cms2
+R5483:5505 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R5517:5518 SailStdpp.Values <> :::'''b'_x not
+R5507:5510 xv6iris.WpGprMretWp <> cms1 def
+def 5540:5543 <> cms3
+R5548:5570 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R5584:5600 Riscv.rv64d <> privLevel_to_bits def
+R5602:5605 Riscv.rv64d_types <> User constr
+R5572:5575 xv6iris.WpGprMretWp <> cms2 def
+def 5624:5627 <> cms4
+R5632:5654 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R5668:5669 SailStdpp.Values <> :::'''b'_x not
+R5656:5659 xv6iris.WpGprMretWp <> cms3 def
+def 5691:5694 <> cms5
+R5699:5721 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R5735:5760 Riscv.rv64d <> landing_pad_bits_backwards def
+R5762:5775 Riscv.rv64d_types <> NO_LP_EXPECTED constr
+R5723:5726 xv6iris.WpGprMretWp <> cms4 def
+R5806:5828 Riscv.rv64d_types <> irrelevant_register_set thm
+R5869:5877 xv6iris.WpGprMretWp StepMRET.CleanMRET <> sec
+R5885:5892 xv6iris.WpGprMretWp StepMRET <> sec

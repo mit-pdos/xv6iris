@@ -1,0 +1,237 @@
+DIGEST c5201a99e04c03dce00f833b4f5bd614
+Fxv6iris.SpecFreewalk
+R2404:2412 Stdlib.Logic.Eqdep_dec <> <> lib
+R2414:2419 Stdlib.ZArith.ZArith <> <> lib
+R2421:2423 Stdlib.micromega.Lia <> <> lib
+R2425:2428 Stdlib.Lists.List <> <> lib
+R2457:2460 stdpp.gmap <> <> lib
+R2462:2465 stdpp.list <> <> lib
+R2467:2476 stdpp.list_monad <> <> lib
+R2478:2498 stdpp.bitvector.definitions <> <> lib
+R2500:2516 stdpp.bitvector.tactics <> <> lib
+R2554:2562 iris.proofmode.proofmode <> <> lib
+R2598:2601 iris.algebra.excl <> <> lib
+R2644:2651 iris.base_logic.lib.gen_heap <> <> lib
+R2653:2662 iris.base_logic.lib.invariants <> <> lib
+R2664:2672 iris.base_logic.lib.ghost_var <> <> lib
+R2674:2682 iris.base_logic.lib.ghost_map <> <> lib
+R2724:2731 iris.program_logic.language <> <> lib
+R2733:2742 iris.program_logic.weakestpre <> <> lib
+R2744:2750 iris.program_logic.lifting <> <> lib
+R2768:2781 SailStdpp.Base <> <> lib
+R2783:2808 SailStdpp.Operators_mwords <> <> lib
+R2810:2825 SailStdpp.Values <> <> lib
+R2843:2859 Riscv.rv64d_types <> <> lib
+R2861:2871 Riscv.rv64d <> <> lib
+R2873:2890 Riscv.riscv_extras <> <> lib
+R2908:2917 xv6iris.RiscvPtsto <> <> lib
+R2919:2927 xv6iris.RiscvLang <> <> lib
+R2945:2955 xv6iris.RiscvExtras <> <> lib
+R2973:2982 xv6iris.InstrBytes <> <> lib
+R2984:2993 xv6iris.KernelText <> <> lib
+R3011:3018 xv6iris.LockRank <> <> lib
+R3036:3042 xv6iris.RegFile <> <> lib
+R3044:3049 xv6iris.WpNext <> <> lib
+R3067:3077 xv6iris.CalleeSaved <> <> lib
+R3095:3102 xv6iris.IntrDefs <> <> lib
+R3120:3125 xv6iris.CpuOwn <> <> lib
+R3143:3148 xv6iris.PtTree <> <> lib
+R3150:3156 xv6iris.KvmSpec <> <> lib
+R3174:3179 xv6iris.PtFree <> <> lib
+R3202:3211 Kernel.KernelSyms <> <> lib
+R3229:3232 xv6iris.Xv6G <> <> lib
+R3297:3302 xv6iris.TsoCtx <> <> lib
+R3312:3315 Riscv.rv64d_types Defs <> mod
+def 3331:3352 <> wp_freewalk_sconf_body
+R3357:3363 xv6iris.RiscvPtsto <> riscvGS class
+binder 3365:3366 <> Σ:1
+binder 3356:3366 <> riscvGS0:2
+R3370:3373 xv6iris.Xv6G <> xv6G class
+R3375:3376 xv6iris.SpecFreewalk <> Σ:1 var
+binder 3369:3376 <> xv6G0:3
+R3387:3391 xv6iris.RiscvLang <> GenId class
+binder 3381:3383 <> GEN:4
+R3402:3406 xv6iris.RiscvLang <> CpuId class
+binder 3396:3398 <> CID:5
+R3416:3421 xv6iris.TsoCtx <> CurCtx class
+binder 3411:3412 <> XI:6
+R3435:3439 iris.base_logic.lib.iprop <> gname def
+binder 3429:3431 <> γa:7
+R3448:3454 xv6iris.RegFile <> regfile def
+binder 3443:3444 <> mm:8
+R3466:3470 xv6iris.PtreeType <> ptree ind
+binder 3462:3462 <> t:9
+R3480:3482 Corelib.Init.Datatypes <> nat ind
+binder 3474:3476 <> lvl:10
+R3490:3492 Corelib.Init.Datatypes <> nat ind
+binder 3486:3486 <> K:11
+R3501:3504 Corelib.Init.Datatypes <> bool ind
+binder 3496:3497 <> eb:12
+R3512:3516 SailStdpp.Values <> mword def
+binder 3508:3508 <> p:13
+R3534:3536 Corelib.Init.Datatypes <> nat ind
+binder 3527:3530 <> ilvl:14
+R3544:3547 Corelib.Init.Datatypes <> bool ind
+binder 3540:3540 <> b:15
+R3557:3560 stdpp.gmap <> gset def
+R3562:3567 Stdlib.Strings.String <> string ind
+binder 3551:3553 <> lks:16
+R3597:3608 SailStdpp.Values <> mword_of_int def
+R3610:3628 Kernel.KernelSyms <> freewalk def
+R3585:3589 SailStdpp.Values <> mword def
+binder 3579:3581 <> pcE:17
+R3650:3655 xv6iris.RiscvExtras <> ret_pc def
+R3660:3664 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R3665:3670 Riscv.rv64d_types <> Regidx constr
+R3673:3684 SailStdpp.Values <> mword_of_int def
+R3658:3659 xv6iris.SpecFreewalk <> mm:8 var
+binder 3639:3645 <> ret_tgt:18
+R3833:4137 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3823:3826 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R3818:3820 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R3810:3812 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R3813:3813 Corelib.Init.Datatypes <> S constr
+R3815:3817 xv6iris.SpecFreewalk <> lvl:10 var
+R3827:3827 xv6iris.SpecFreewalk <> K:11 var
+R4168:4230 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4156:4158 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R4152:4154 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4139:4146 Stdlib.ZArith.BinInt Z of_nat def
+R4148:4151 xv6iris.SpecFreewalk <> ilvl:14 var
+R4160:4162 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R4286:4345 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4262:4264 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4233:4237 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R4238:4243 Riscv.rv64d_types <> Regidx constr
+R4246:4257 SailStdpp.Values <> mword_of_int def
+R4231:4232 xv6iris.SpecFreewalk <> mm:8 var
+R4265:4273 xv6iris.PageGeom <> page_base def
+R4276:4282 xv6iris.PtreeType <> pt_base def
+R4284:4284 xv6iris.SpecFreewalk <> t:9 var
+R4362:4561 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4346:4355 xv6iris.PtFree <> pt_free_ok def
+R4357:4359 xv6iris.SpecFreewalk <> lvl:10 var
+R4361:4361 xv6iris.SpecFreewalk <> t:9 var
+R4584:4589 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4562:4572 xv6iris.LockRank <> locks_below def
+R4574:4576 xv6iris.SpecFreewalk <> lks:16 var
+R4614:4621 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4590:4600 xv6iris.IntrDefs <> sie_cap_gpr def
+R4602:4604 xv6iris.Ktier <> KT1 constr
+R4606:4607 xv6iris.SpecFreewalk <> mm:8 var
+R4609:4609 xv6iris.SpecFreewalk <> K:11 var
+R4611:4611 xv6iris.SpecFreewalk <> b:15 var
+R4613:4613 xv6iris.SpecFreewalk <> p:13 var
+R4645:4652 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4622:4628 xv6iris.CpuOwn <> cpu_own def
+R4630:4633 xv6iris.SpecFreewalk <> ilvl:14 var
+R4635:4636 xv6iris.SpecFreewalk <> eb:12 var
+R4638:4638 xv6iris.SpecFreewalk <> p:13 var
+R4640:4640 xv6iris.SpecFreewalk <> b:15 var
+R4642:4644 xv6iris.SpecFreewalk <> lks:16 var
+R4664:4671 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4653:4663 xv6iris.KernelText <> kernel_text def
+R4681:4688 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4672:4676 xv6iris.InstrBytes <> pc_is def
+R4678:4680 xv6iris.SpecFreewalk <> pcE:17 var
+R4717:4724 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4689:4697 xv6iris.PtTree <> ptree_own abbrev
+R4699:4701 xv6iris.SpecFreewalk <> lvl:10 var
+R4704:4711 iris.algebra.dfrac <> DfracOwn constr
+R4716:4716 xv6iris.SpecFreewalk <> t:9 var
+R4744:4751 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4725:4734 xv6iris.KvmSpec <> kalloc_env def
+R4736:4738 xv6iris.SpecFreewalk <> γa:7 var
+R4740:4743 Corelib.Init.Datatypes <> None constr
+R4966:4973 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4752:4758 xv6iris.WpNext <> wp_next def
+R4776:4780 xv6iris.RiscvLang <> CpuId class
+binder 4770:4772 <> CID:19
+R4790:4794 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R4807:4813 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R4800:4806 xv6iris.RegFile <> regfile def
+binder 4795:4796 <> mr:20
+R4838:4847 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4814:4824 xv6iris.IntrDefs <> sie_cap_gpr def
+R4826:4828 xv6iris.Ktier <> KT1 constr
+R4830:4831 xv6iris.SpecFreewalk <> mr:20 var
+R4833:4833 xv6iris.SpecFreewalk <> K:11 var
+R4835:4835 xv6iris.SpecFreewalk <> b:15 var
+R4837:4837 xv6iris.SpecFreewalk <> p:13 var
+R4871:4880 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4848:4854 xv6iris.CpuOwn <> cpu_own def
+R4856:4859 xv6iris.SpecFreewalk <> ilvl:14 var
+R4861:4862 xv6iris.SpecFreewalk <> eb:12 var
+R4864:4864 xv6iris.SpecFreewalk <> p:13 var
+R4866:4866 xv6iris.SpecFreewalk <> b:15 var
+R4868:4870 xv6iris.SpecFreewalk <> lks:16 var
+R4894:4903 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4881:4885 xv6iris.InstrBytes <> pc_is def
+R4887:4893 xv6iris.SpecFreewalk <> ret_tgt:18 var
+R4928:4937 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4904:4906 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4925:4927 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4907:4918 xv6iris.CalleeSaved <> callee_saved def
+R4920:4921 xv6iris.SpecFreewalk <> mm:8 var
+R4923:4924 xv6iris.SpecFreewalk <> mr:20 var
+R4938:4941 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R4964:4964 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R4949:4952 iris.program_logic.language <> expr proj
+R4954:4963 xv6iris.RiscvLang <> riscv_lang def
+R4942:4945 xv6iris.RiscvLang <> Loop abbrev
+R4762:4762 xv6iris.SpecFreewalk <> p:13 var
+R4760:4760 xv6iris.SpecFreewalk <> b:15 var
+R4974:4977 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R5000:5000 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R4985:4988 iris.program_logic.language <> expr proj
+R4990:4999 xv6iris.RiscvLang <> riscv_lang def
+R4978:4981 xv6iris.RiscvLang <> Loop abbrev
+modtype 5016:5023 <> FREEWALK
+ax 5038:5054 FREEWALK wp_freewalk_sconf
+R5062:5070 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5289:5297 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5072:5078 xv6iris.RiscvPtsto <> riscvGS class
+binder 5080:5081 <> Σ:21
+binder 5071:5081 <> riscvGS0:22
+R5085:5088 xv6iris.Xv6G <> xv6G class
+R5090:5091 xv6iris.SpecFreewalk <> Σ:21 var
+binder 5084:5091 <> xv6G0:23
+R5102:5106 xv6iris.RiscvLang <> GenId class
+binder 5096:5098 <> GEN:24
+R5117:5121 xv6iris.RiscvLang <> CpuId class
+binder 5111:5113 <> CID:25
+R5131:5136 xv6iris.TsoCtx <> CurCtx class
+binder 5126:5127 <> XI:26
+R5152:5156 iris.base_logic.lib.iprop <> gname def
+binder 5146:5148 <> γa:27
+R5165:5171 xv6iris.RegFile <> regfile def
+binder 5160:5161 <> mm:28
+R5185:5189 xv6iris.PtreeType <> ptree ind
+binder 5181:5181 <> t:29
+R5199:5201 Corelib.Init.Datatypes <> nat ind
+binder 5193:5195 <> lvl:30
+R5209:5211 Corelib.Init.Datatypes <> nat ind
+binder 5205:5205 <> K:31
+R5220:5223 Corelib.Init.Datatypes <> bool ind
+binder 5215:5216 <> eb:32
+R5231:5235 SailStdpp.Values <> mword def
+binder 5227:5227 <> p:33
+R5255:5257 Corelib.Init.Datatypes <> nat ind
+binder 5248:5251 <> ilvl:34
+R5265:5268 Corelib.Init.Datatypes <> bool ind
+binder 5261:5261 <> b:35
+R5278:5281 stdpp.gmap <> gset def
+R5283:5288 Stdlib.Strings.String <> string ind
+binder 5272:5274 <> lks:36
+R5298:5319 xv6iris.SpecFreewalk <> wp_freewalk_sconf_body def
+R5348:5350 xv6iris.SpecFreewalk <> lks:36 var
+R5346:5346 xv6iris.SpecFreewalk <> b:35 var
+R5341:5344 xv6iris.SpecFreewalk <> ilvl:34 var
+R5339:5339 xv6iris.SpecFreewalk <> p:33 var
+R5336:5337 xv6iris.SpecFreewalk <> eb:32 var
+R5334:5334 xv6iris.SpecFreewalk <> K:31 var
+R5330:5332 xv6iris.SpecFreewalk <> lvl:30 var
+R5328:5328 xv6iris.SpecFreewalk <> t:29 var
+R5325:5326 xv6iris.SpecFreewalk <> mm:28 var
+R5321:5323 xv6iris.SpecFreewalk <> γa:27 var
+R5357:5364 xv6iris.SpecFreewalk FREEWALK <> modtype

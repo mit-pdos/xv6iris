@@ -1,0 +1,5 @@
+DIGEST 7d991f8bebe9f64e9ae4c8d7912ecde6
+Fxv6iris.LinkMycpu
+R151:160 xv6iris.ProofMycpu <> <> lib
+R180:189 xv6iris.ProofMycpu MycpuProof <> modtype
+mod 171:175 <> Mycpu

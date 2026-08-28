@@ -2431,8 +2431,7 @@ Section SysExecFree.
               (mword_of_int (KernelSyms.kmem + 24)) M2 None 0%nat eb pj
               (K - 60)%nat b lks K14 eq_refl eq_refl sx_noff0 Hlb
               with "Hcg Hcnt Htext Hpc Hlk [Hpage] Hav").
-    { rewrite /kfree_pre HM2a0. iSplitR; [iPureIntro; exact Hpgv |].
-      (* §0.26′ *) iApply (page_own_free with "Hpage"). }
+    { rewrite /kfree_pre HM2a0. iSplitR; [iPureIntro; exact Hpgv |]. iExact "Hpage". }
     iIntros (CID4 Hq4 Mk) "Hcg Hcnt Hpc %Hcsk Hav2".
     iEval (rewrite HM2ra Hret) in "Hpc".
     (* ===== +base+8 c.addi s1,8 ===== *)
@@ -3488,7 +3487,12 @@ Section SysExecStep.
     assert (HQ6a2 : (Q6 !!! Regidx Ra2 : mword 64)
                     = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite /Q6 upd_ne; [exact HQ5a2 | nz]).
-    iDestruct (bb_page_named (mr !!! Regidx Ra0) with "Hpage") as (fpg) "Hpg".
+    (* A6.87: the page is the one kalloc memset; its run is named at
+       [kalloc_junk]. *)
+    iEval (rewrite /page_filled) in "Hpage".
+    iDestruct (bb_any_named (mr !!! Regidx Ra0) 4096 with "[Hpage]") as (fpg) "Hpg".
+    { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H".
+      by iExists KallocInv.kalloc_junk. }
     iEval (rewrite -HQ6a1) in "Hpg".
     iDestruct (cpu_own_transport CID11 CID17 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

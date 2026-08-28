@@ -1,0 +1,693 @@
+DIGEST cc94dd5c329d4e031644df5308f25ce2
+Fxv6iris.WpVirtio
+R2623:2626 stdpp.gmap <> <> lib
+R2628:2648 stdpp.bitvector.definitions <> <> lib
+R2686:2694 iris.proofmode.proofmode <> <> lib
+R2737:2744 iris.base_logic.lib.gen_heap <> <> lib
+R2746:2754 iris.base_logic.lib.ghost_map <> <> lib
+R2756:2764 iris.base_logic.lib.ghost_var <> <> lib
+R2806:2815 iris.program_logic.weakestpre <> <> lib
+R2833:2858 SailStdpp.Operators_mwords <> <> lib
+R2876:2892 Riscv.rv64d_types <> <> lib
+R2894:2904 Riscv.rv64d <> <> lib
+R2922:2931 xv6iris.RiscvPtsto <> <> lib
+R3150:3155 xv6iris.TsoCtx <> <> lib
+R3173:3180 xv6iris.DevModel <> <> lib
+R3743:3755 xv6iris.FastSetSolver <> <> lib
+sec 3767:3774 <> WpVirtio
+R3790:3796 xv6iris.RiscvPtsto <> riscvGS class
+prf 4046:4068 <> dev_interp_agree_virtio
+binder 4070:4070 <> d:3
+binder 4072:4072 <> v:4
+R4092:4097 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4080:4089 xv6iris.RiscvPtsto <> dev_interp def
+R4091:4091 xv6iris.WpVirtio <> d:3 var
+R4111:4116 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4098:4108 xv6iris.RiscvPtsto <> virtio_frag def
+R4110:4110 xv6iris.WpVirtio <> v:4 var
+R4117:4119 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4133:4135 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4129:4131 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4120:4126 xv6iris.DevModel <> dvirtio proj
+R4128:4128 xv6iris.WpVirtio <> d:3 var
+R4132:4132 xv6iris.WpVirtio <> v:4 var
+R4196:4196 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4209:4214 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4223:4223 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4197:4208 xv6iris.RiscvPtsto <> virtio_agree thm
+R4196:4196 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4209:4214 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4223:4223 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4197:4208 xv6iris.RiscvPtsto <> virtio_agree thm
+prf 4249:4272 <> dev_interp_update_virtio
+binder 4274:4274 <> d:5
+binder 4276:4276 <> v:6
+binder 4278:4279 <> v':7
+R4299:4304 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4287:4296 xv6iris.RiscvPtsto <> dev_interp def
+R4298:4298 xv6iris.WpVirtio <> d:5 var
+R4318:4324 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R4305:4315 xv6iris.RiscvPtsto <> virtio_frag def
+R4317:4317 xv6iris.WpVirtio <> v:6 var
+R4354:4358 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4325:4334 xv6iris.RiscvPtsto <> dev_interp def
+R4337:4347 xv6iris.DevModel <> set_dvirtio def
+R4349:4349 xv6iris.WpVirtio <> d:5 var
+R4351:4352 xv6iris.WpVirtio <> v':7 var
+R4359:4369 xv6iris.RiscvPtsto <> virtio_frag def
+R4371:4372 xv6iris.WpVirtio <> v':7 var
+R4429:4429 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4443:4448 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4457:4457 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4430:4442 xv6iris.RiscvPtsto <> virtio_update thm
+R4429:4429 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4443:4448 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4457:4457 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4430:4442 xv6iris.RiscvPtsto <> virtio_update thm
+R4484:4494 xv6iris.DevModel <> set_dvirtio def
+R4497:4506 xv6iris.RiscvPtsto <> dev_interp def
+R4484:4494 xv6iris.DevModel <> set_dvirtio def
+R4484:4494 xv6iris.DevModel <> set_dvirtio def
+R4497:4506 xv6iris.RiscvPtsto <> dev_interp def
+R4497:4506 xv6iris.RiscvPtsto <> dev_interp def
+def 5553:5559 <> dma_own
+R5568:5571 stdpp.gmap <> gmap rec
+R5582:5583 stdpp.bitvector.definitions <> bv rec
+R5573:5579 Riscv.rv64d_types Arch pa def
+binder 5562:5564 <> dma:8
+R5591:5595 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R5597:5598 xv6iris.WpVirtio <> WpVirtio.Σ var
+R5608:5617 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R5619:5623 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R5625:5629 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R5633:5634 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 5618:5618 <> a:9
+binder 5618:5618 <> a:10
+binder 5624:5624 <> b:11
+binder 5624:5624 <> b:12
+R5635:5645 xv6iris.TsoCtx <> phys_ledger def
+R5647:5647 xv6iris.WpVirtio <> a:9 var
+R5650:5657 iris.algebra.dfrac <> DfracOwn constr
+R5662:5662 xv6iris.WpVirtio <> b:11 var
+R5630:5632 xv6iris.WpVirtio <> dma:8 var
+inst 5687:5708 <> phys_pointsto_timeless
+binder 5710:5710 <> a:13
+binder 5712:5713 <> dq:14
+binder 5715:5715 <> b:15
+R5723:5730 iris.bi.derived_connectives <> Timeless class
+R5733:5745 xv6iris.RiscvPtsto <> phys_pointsto def
+R5752:5752 xv6iris.WpVirtio <> b:15 var
+R5749:5750 xv6iris.WpVirtio <> dq:14 var
+R5747:5747 xv6iris.WpVirtio <> a:13 var
+R5774:5786 xv6iris.RiscvPtsto <> phys_pointsto def
+R5774:5786 xv6iris.RiscvPtsto <> phys_pointsto def
+R5774:5786 xv6iris.RiscvPtsto <> phys_pointsto def
+inst 5822:5837 <> dma_own_timeless
+binder 5839:5841 <> dma:16
+R5845:5852 iris.bi.derived_connectives <> Timeless class
+R5855:5861 xv6iris.WpVirtio <> dma_own def
+R5863:5865 xv6iris.WpVirtio <> dma:16 var
+R5887:5893 xv6iris.WpVirtio <> dma_own def
+R5887:5893 xv6iris.WpVirtio <> dma_own def
+R5887:5893 xv6iris.WpVirtio <> dma_own def
+R5902:5918 iris.bi.big_op <> big_sepM_timeless thm
+R5902:5918 iris.bi.big_op <> big_sepM_timeless thm
+prf 6014:6022 <> dma_agree
+R6033:6036 stdpp.gmap <> gmap rec
+R6047:6048 stdpp.bitvector.definitions <> bv rec
+R6038:6044 Riscv.rv64d_types Arch pa def
+binder 6025:6025 <> m:17
+binder 6027:6029 <> dma:18
+R6077:6082 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6060:6074 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R6076:6076 xv6iris.WpVirtio <> m:17 var
+R6094:6099 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6083:6089 xv6iris.WpVirtio <> dma_own def
+R6091:6093 xv6iris.WpVirtio <> dma:18 var
+R6100:6102 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6112:6114 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6106:6110 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R6103:6105 xv6iris.WpVirtio <> dma:18 var
+R6111:6111 xv6iris.WpVirtio <> m:17 var
+R6183:6189 stdpp.fin_maps <> map_ind thm
+R6183:6189 stdpp.fin_maps <> map_ind thm
+R6237:6254 stdpp.fin_maps <> map_empty_subseteq thm
+R6237:6254 stdpp.fin_maps <> map_empty_subseteq thm
+R6272:6278 xv6iris.WpVirtio <> dma_own def
+R6280:6294 iris.bi.big_op <> big_sepM_insert thm
+R6272:6278 xv6iris.WpVirtio <> dma_own def
+R6272:6278 xv6iris.WpVirtio <> dma_own def
+R6280:6294 iris.bi.big_op <> big_sepM_insert thm
+R6280:6294 iris.bi.big_op <> big_sepM_insert thm
+R6360:6360 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6379:6384 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6389:6389 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6361:6378 xv6iris.TsoCtx <> phys_ledger_forget thm
+R6360:6360 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6379:6384 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6389:6389 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6361:6378 xv6iris.TsoCtx <> phys_ledger_forget thm
+R6420:6432 xv6iris.RiscvPtsto <> phys_pointsto def
+R6420:6432 xv6iris.RiscvPtsto <> phys_pointsto def
+R6420:6432 xv6iris.RiscvPtsto <> phys_pointsto def
+R6486:6486 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6501:6506 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6514:6514 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6487:6500 iris.base_logic.lib.gen_heap <> gen_heap_valid thm
+R6486:6486 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6501:6506 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6514:6514 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6487:6500 iris.base_logic.lib.gen_heap <> gen_heap_valid thm
+R6539:6539 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6544:6549 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6558:6558 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6539:6539 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6544:6549 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6558:6558 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6595:6611 stdpp.fin_maps <> insert_subseteq_l thm
+R6595:6611 stdpp.fin_maps <> insert_subseteq_l thm
+prf 7354:7360 <> dma_acc
+R7371:7374 stdpp.gmap <> gmap rec
+R7385:7386 stdpp.bitvector.definitions <> bv rec
+R7376:7382 Riscv.rv64d_types Arch pa def
+binder 7363:7363 <> w:19
+binder 7365:7367 <> dma:20
+R7415:7422 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7403:7407 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R7398:7400 stdpp.base <> dom def
+R7402:7402 xv6iris.WpVirtio <> w:19 var
+R7408:7410 stdpp.base <> dom def
+R7412:7414 xv6iris.WpVirtio <> dma:20 var
+R7434:7443 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7423:7429 xv6iris.WpVirtio <> dma_own def
+R7431:7433 xv6iris.WpVirtio <> dma:20 var
+R7444:7447 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R7473:7474 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R7454:7457 stdpp.gmap <> gmap rec
+R7468:7469 stdpp.bitvector.definitions <> bv rec
+R7459:7465 Riscv.rv64d_types Arch pa def
+binder 7448:7450 <> old:21
+R7496:7500 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7475:7477 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7493:7495 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7485:7487 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7478:7480 stdpp.base <> dom def
+R7482:7484 xv6iris.WpVirtio <> old:21 var
+R7488:7490 stdpp.base <> dom def
+R7492:7492 xv6iris.WpVirtio <> w:19 var
+R7518:7528 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7501:7503 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7515:7517 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7507:7511 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R7504:7506 xv6iris.WpVirtio <> old:21 var
+R7512:7514 xv6iris.WpVirtio <> dma:20 var
+R7529:7529 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7585:7597 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7678:7678 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7530:7539 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7541:7545 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7547:7551 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7555:7556 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 7540:7540 <> a:22
+binder 7540:7540 <> a:23
+binder 7546:7546 <> b:24
+binder 7546:7546 <> b:25
+R7557:7567 xv6iris.TsoCtx <> phys_ledger def
+R7569:7569 xv6iris.WpVirtio <> a:22 var
+R7572:7579 iris.algebra.dfrac <> DfracOwn constr
+R7584:7584 xv6iris.WpVirtio <> b:24 var
+R7552:7554 xv6iris.WpVirtio <> old:21 var
+R7598:7598 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7652:7658 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7599:7608 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7610:7614 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7616:7620 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7622:7623 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 7609:7609 <> a:26
+binder 7609:7609 <> a:27
+binder 7615:7615 <> b:28
+binder 7615:7615 <> b:29
+R7624:7634 xv6iris.TsoCtx <> phys_ledger def
+R7636:7636 xv6iris.WpVirtio <> a:26 var
+R7639:7646 iris.algebra.dfrac <> DfracOwn constr
+R7651:7651 xv6iris.WpVirtio <> b:28 var
+R7621:7621 xv6iris.WpVirtio <> w:19 var
+R7659:7665 xv6iris.WpVirtio <> dma_own def
+R7669:7673 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R7668:7668 xv6iris.WpVirtio <> w:19 var
+R7674:7676 xv6iris.WpVirtio <> dma:20 var
+R7734:7739 stdpp.base <> filter def
+binder 7746:7746 <> p:30
+R7754:7758 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R7752:7753 stdpp.base <> :::x_'.1' not
+R7751:7751 xv6iris.WpVirtio <> p:30 var
+R7759:7761 stdpp.base <> dom def
+R7734:7739 stdpp.base <> filter def
+binder 7746:7746 <> p:31
+R7754:7758 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R7752:7753 stdpp.base <> :::x_'.1' not
+R7751:7751 xv6iris.WpVirtio <> p:31 var
+R7759:7761 stdpp.base <> dom def
+R7843:7847 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R7791:7796 stdpp.base <> filter def
+R7814:7816 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R7807:7813 Riscv.rv64d_types Arch pa def
+R7817:7818 stdpp.bitvector.definitions <> bv rec
+binder 7803:7803 <> p:32
+R7828:7832 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R7826:7827 stdpp.base <> :::x_'.1' not
+R7825:7825 xv6iris.WpVirtio <> p:32 var
+R7833:7835 stdpp.base <> dom def
+R7868:7886 stdpp.fin_maps <> map_filter_subseteq thm
+R7843:7847 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R7791:7796 stdpp.base <> filter def
+R7814:7816 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R7807:7813 Riscv.rv64d_types Arch pa def
+R7817:7818 stdpp.bitvector.definitions <> bv rec
+binder 7803:7803 <> p:33
+R7828:7832 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R7826:7827 stdpp.base <> :::x_'.1' not
+R7825:7825 xv6iris.WpVirtio <> p:33 var
+R7833:7835 stdpp.base <> dom def
+R7868:7886 stdpp.fin_maps <> map_filter_subseteq thm
+R7967:7989 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7909:7911 stdpp.base <> dom def
+R7914:7919 stdpp.base <> filter def
+R7937:7939 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R7930:7936 Riscv.rv64d_types Arch pa def
+R7940:7941 stdpp.bitvector.definitions <> bv rec
+binder 7926:7926 <> p:34
+R7951:7955 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R7949:7950 stdpp.base <> :::x_'.1' not
+R7948:7948 xv6iris.WpVirtio <> p:34 var
+R7956:7958 stdpp.base <> dom def
+R7990:7992 stdpp.base <> dom def
+R7967:7989 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7909:7911 stdpp.base <> dom def
+R7914:7919 stdpp.base <> filter def
+R7937:7939 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R7930:7936 Riscv.rv64d_types Arch pa def
+R7940:7941 stdpp.bitvector.definitions <> bv rec
+binder 7926:7926 <> p:35
+R7951:7955 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R7949:7950 stdpp.base <> :::x_'.1' not
+R7948:7948 xv6iris.WpVirtio <> p:35 var
+R7956:7958 stdpp.base <> dom def
+R7990:7992 stdpp.base <> dom def
+R8010:8015 stdpp.sets <> set_eq thm
+R8010:8015 stdpp.sets <> set_eq thm
+R8036:8046 stdpp.fin_map_dom <> elem_of_dom meth
+R8036:8046 stdpp.fin_map_dom <> elem_of_dom meth
+R8036:8046 stdpp.fin_map_dom <> elem_of_dom meth
+R8085:8106 stdpp.fin_maps <> map_lookup_filter_Some thm
+R8085:8106 stdpp.fin_maps <> map_lookup_filter_Some thm
+R8185:8195 stdpp.fin_map_dom <> elem_of_dom meth
+R8185:8195 stdpp.fin_map_dom <> elem_of_dom meth
+R8239:8260 stdpp.fin_maps <> map_lookup_filter_Some thm
+R8239:8260 stdpp.fin_maps <> map_lookup_filter_Some thm
+R8344:8350 xv6iris.WpVirtio <> dma_own def
+R8357:8383 stdpp.fin_maps <> map_filter_union_complement thm
+R8415:8417 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R8408:8414 Riscv.rv64d_types Arch pa def
+R8418:8419 stdpp.bitvector.definitions <> bv rec
+binder 8404:8404 <> p:36
+R8429:8433 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R8427:8428 stdpp.base <> :::x_'.1' not
+R8426:8426 xv6iris.WpVirtio <> p:36 var
+R8434:8436 stdpp.base <> dom def
+R8344:8350 xv6iris.WpVirtio <> dma_own def
+R8344:8350 xv6iris.WpVirtio <> dma_own def
+R8357:8383 stdpp.fin_maps <> map_filter_union_complement thm
+R8415:8417 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R8408:8414 Riscv.rv64d_types Arch pa def
+R8418:8419 stdpp.bitvector.definitions <> bv rec
+binder 8404:8404 <> p:37
+R8429:8433 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R8427:8428 stdpp.base <> :::x_'.1' not
+R8426:8426 xv6iris.WpVirtio <> p:37 var
+R8434:8436 stdpp.base <> dom def
+R8357:8383 stdpp.fin_maps <> map_filter_union_complement thm
+R8415:8417 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R8408:8414 Riscv.rv64d_types Arch pa def
+R8418:8419 stdpp.bitvector.definitions <> bv rec
+binder 8404:8404 <> p:38
+R8429:8433 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R8427:8428 stdpp.base <> :::x_'.1' not
+R8426:8426 xv6iris.WpVirtio <> p:38 var
+R8434:8436 stdpp.base <> dom def
+R8459:8472 iris.bi.big_op <> big_sepM_union thm
+R8486:8515 stdpp.fin_maps <> map_disjoint_filter_complement thm
+R8459:8472 iris.bi.big_op <> big_sepM_union thm
+R8459:8472 iris.bi.big_op <> big_sepM_union thm
+R8486:8515 stdpp.fin_maps <> map_disjoint_filter_complement thm
+R8582:8588 xv6iris.WpVirtio <> dma_own def
+R8582:8588 xv6iris.WpVirtio <> dma_own def
+R8582:8588 xv6iris.WpVirtio <> dma_own def
+R8743:8759 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8735:8739 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R8761:8765 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R8766:8771 stdpp.base <> filter def
+R8789:8791 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R8782:8788 Riscv.rv64d_types Arch pa def
+R8792:8793 stdpp.bitvector.definitions <> bv rec
+binder 8778:8778 <> p:39
+R8800:8803 Stdlib.Unicode.Utf8_core <> ::type_scope:'¬'_x not
+R8817:8817 Stdlib.Unicode.Utf8_core <> ::type_scope:'¬'_x not
+R8807:8811 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R8805:8806 stdpp.base <> :::x_'.1' not
+R8804:8804 xv6iris.WpVirtio <> p:39 var
+R8812:8814 stdpp.base <> dom def
+R8743:8759 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8735:8739 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R8761:8765 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R8766:8771 stdpp.base <> filter def
+R8789:8791 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R8782:8788 Riscv.rv64d_types Arch pa def
+R8792:8793 stdpp.bitvector.definitions <> bv rec
+binder 8778:8778 <> p:40
+R8800:8803 Stdlib.Unicode.Utf8_core <> ::type_scope:'¬'_x not
+R8817:8817 Stdlib.Unicode.Utf8_core <> ::type_scope:'¬'_x not
+R8807:8811 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R8805:8806 stdpp.base <> :::x_'.1' not
+R8804:8804 xv6iris.WpVirtio <> p:40 var
+R8812:8814 stdpp.base <> dom def
+R8838:8843 stdpp.fin_maps <> map_eq meth
+R8838:8843 stdpp.fin_maps <> map_eq meth
+R8867:8870 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R8867:8870 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R8911:8929 stdpp.fin_maps <> lookup_union_Some_l thm
+R8911:8929 stdpp.fin_maps <> lookup_union_Some_l thm
+R8911:8929 stdpp.fin_maps <> lookup_union_Some_l thm
+R8911:8929 stdpp.fin_maps <> lookup_union_Some_l thm
+R8911:8929 stdpp.fin_maps <> lookup_union_Some_l thm
+R8962:8975 stdpp.fin_maps <> lookup_union_r thm
+R8962:8975 stdpp.fin_maps <> lookup_union_r thm
+R8962:8975 stdpp.fin_maps <> lookup_union_r thm
+R8962:8975 stdpp.fin_maps <> lookup_union_r thm
+R8962:8975 stdpp.fin_maps <> lookup_union_r thm
+R9011:9014 Stdlib.Unicode.Utf8_core <> ::type_scope:'¬'_x not
+R9026:9026 Stdlib.Unicode.Utf8_core <> ::type_scope:'¬'_x not
+R9016:9020 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R9021:9023 stdpp.base <> dom def
+R9051:9065 stdpp.fin_map_dom <> not_elem_of_dom thm
+R9011:9014 Stdlib.Unicode.Utf8_core <> ::type_scope:'¬'_x not
+R9026:9026 Stdlib.Unicode.Utf8_core <> ::type_scope:'¬'_x not
+R9016:9020 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R9021:9023 stdpp.base <> dom def
+R9051:9065 stdpp.fin_map_dom <> not_elem_of_dom thm
+R9051:9065 stdpp.fin_map_dom <> not_elem_of_dom thm
+R9100:9103 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R9100:9103 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R9150:9171 stdpp.fin_maps <> map_lookup_filter_Some thm
+R9150:9171 stdpp.fin_maps <> map_lookup_filter_Some thm
+R9210:9231 stdpp.fin_maps <> map_lookup_filter_None thm
+R9210:9231 stdpp.fin_maps <> map_lookup_filter_None thm
+R9261:9274 iris.bi.big_op <> big_sepM_union thm
+R9261:9274 iris.bi.big_op <> big_sepM_union thm
+R9261:9274 iris.bi.big_op <> big_sepM_union thm
+R9301:9316 stdpp.fin_map_dom <> map_disjoint_dom thm
+R9301:9316 stdpp.fin_map_dom <> map_disjoint_dom thm
+R9347:9357 stdpp.fin_map_dom <> elem_of_dom meth
+R9347:9357 stdpp.fin_map_dom <> elem_of_dom meth
+R9389:9410 stdpp.fin_maps <> map_lookup_filter_Some thm
+R9389:9410 stdpp.fin_maps <> map_lookup_filter_Some thm
+def 10130:10141 <> virtio_lease
+R10148:10159 xv6iris.VirtioModel <> virtio_state rec
+binder 10144:10144 <> v:41
+R10164:10168 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R10170:10171 xv6iris.WpVirtio <> WpVirtio.Σ var
+R10181:10185 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R10247:10256 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R10196:10199 stdpp.gmap <> gmap rec
+R10210:10211 stdpp.bitvector.definitions <> bv rec
+R10201:10207 Riscv.rv64d_types Arch pa def
+binder 10186:10188 <> ctl:42
+R10196:10199 stdpp.gmap <> gmap rec
+R10210:10211 stdpp.bitvector.definitions <> bv rec
+R10201:10207 Riscv.rv64d_types Arch pa def
+binder 10190:10192 <> dma:43
+R10222:10225 stdpp.gmap <> gset def
+R10228:10229 stdpp.bitvector.definitions <> bv rec
+binder 10218:10218 <> S:44
+R10242:10243 stdpp.bitvector.definitions <> bv rec
+binder 10237:10238 <> ai:45
+R10268:10272 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10257:10263 xv6iris.WpVirtio <> dma_own def
+R10265:10267 xv6iris.WpVirtio <> dma:43 var
+R10290:10301 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10273:10275 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10287:10289 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10279:10283 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R10276:10278 xv6iris.WpVirtio <> ctl:42 var
+R10284:10286 xv6iris.WpVirtio <> dma:43 var
+R10302:10304 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10360:10362 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10305:10319 xv6iris.VirtioModel <> virtio_queue_ok def
+R10322:10326 xv6iris.VirtioModel <> v_cfg proj
+R10328:10328 xv6iris.WpVirtio <> v:41 var
+R10331:10333 xv6iris.WpVirtio <> ctl:42 var
+R10336:10338 stdpp.base <> dom def
+R10340:10342 xv6iris.WpVirtio <> dma:43 var
+R10345:10345 xv6iris.WpVirtio <> S:44 var
+R10347:10348 xv6iris.WpVirtio <> ai:45 var
+R10351:10356 xv6iris.VirtioModel <> v_seen proj
+R10358:10358 xv6iris.WpVirtio <> v:41 var
+inst 10387:10407 <> virtio_lease_timeless
+binder 10409:10409 <> v:46
+R10413:10420 iris.bi.derived_connectives <> Timeless class
+R10423:10434 xv6iris.WpVirtio <> virtio_lease def
+R10436:10436 xv6iris.WpVirtio <> v:46 var
+R10458:10469 xv6iris.WpVirtio <> virtio_lease def
+R10458:10469 xv6iris.WpVirtio <> virtio_lease def
+R10458:10469 xv6iris.WpVirtio <> virtio_lease def
+prf 10783:10801 <> virtio_lease_stable
+R10811:10822 xv6iris.VirtioModel <> virtio_state rec
+binder 10804:10804 <> v:47
+binder 10806:10807 <> v':48
+R10849:10852 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10839:10841 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10831:10835 xv6iris.VirtioModel <> v_cfg proj
+R10837:10838 xv6iris.WpVirtio <> v':48 var
+R10842:10846 xv6iris.VirtioModel <> v_cfg proj
+R10848:10848 xv6iris.WpVirtio <> v:47 var
+R10873:10880 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10862:10864 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10853:10858 xv6iris.VirtioModel <> v_seen proj
+R10860:10861 xv6iris.WpVirtio <> v':48 var
+R10865:10870 xv6iris.VirtioModel <> v_seen proj
+R10872:10872 xv6iris.WpVirtio <> v:47 var
+R10895:10900 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10881:10892 xv6iris.WpVirtio <> virtio_lease def
+R10894:10894 xv6iris.WpVirtio <> v:47 var
+R10901:10912 xv6iris.WpVirtio <> virtio_lease def
+R10914:10915 xv6iris.WpVirtio <> v':48 var
+R10950:10961 xv6iris.WpVirtio <> virtio_lease def
+R10950:10961 xv6iris.WpVirtio <> virtio_lease def
+R10950:10961 xv6iris.WpVirtio <> virtio_lease def
+prf 11222:11238 <> virtio_lease_init
+R11245:11256 xv6iris.VirtioModel <> virtio_state rec
+binder 11241:11241 <> v:49
+R11294:11297 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11286:11288 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11265:11275 xv6iris.VirtioModel <> virtio_live def
+R11278:11282 xv6iris.VirtioModel <> v_cfg proj
+R11284:11284 xv6iris.WpVirtio <> v:49 var
+R11289:11293 Corelib.Init.Datatypes <> false constr
+R11298:11301 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R11302:11313 xv6iris.WpVirtio <> virtio_lease def
+R11315:11315 xv6iris.WpVirtio <> v:49 var
+R11353:11364 xv6iris.WpVirtio <> virtio_lease def
+R11353:11364 xv6iris.WpVirtio <> virtio_lease def
+R11353:11364 xv6iris.WpVirtio <> virtio_lease def
+R11379:11381 stdpp.base <> ::stdpp_scope:'∅' not
+R11384:11386 stdpp.base <> ::stdpp_scope:'∅' not
+R11389:11391 stdpp.base <> ::stdpp_scope:'∅' not
+R11394:11399 xv6iris.VirtioModel <> zero16 def
+R11379:11381 stdpp.base <> ::stdpp_scope:'∅' not
+R11384:11386 stdpp.base <> ::stdpp_scope:'∅' not
+R11389:11391 stdpp.base <> ::stdpp_scope:'∅' not
+R11394:11399 xv6iris.VirtioModel <> zero16 def
+R11411:11417 xv6iris.WpVirtio <> dma_own def
+R11419:11432 iris.bi.big_op <> big_sepM_empty thm
+R11411:11417 xv6iris.WpVirtio <> dma_own def
+R11411:11417 xv6iris.WpVirtio <> dma_own def
+R11419:11432 iris.bi.big_op <> big_sepM_empty thm
+R11419:11432 iris.bi.big_op <> big_sepM_empty thm
+R11483:11500 stdpp.fin_maps <> map_empty_subseteq thm
+R11483:11500 stdpp.fin_maps <> map_empty_subseteq thm
+R11530:11553 xv6iris.VirtioModel <> virtio_queue_ok_not_live thm
+R11530:11553 xv6iris.VirtioModel <> virtio_queue_ok_not_live thm
+prf 11979:12002 <> virtio_lease_not_stalled
+R12009:12012 stdpp.gmap <> gmap rec
+R12023:12024 stdpp.bitvector.definitions <> bv rec
+R12014:12020 Riscv.rv64d_types Arch pa def
+binder 12005:12005 <> m:50
+R12035:12046 xv6iris.VirtioModel <> virtio_state rec
+binder 12031:12031 <> v:51
+R12061:12064 xv6iris.VirtioModel <> vmem def
+binder 12056:12057 <> mv:52
+R12086:12093 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12073:12080 xv6iris.VirtioModel <> mem_view def
+R12082:12082 xv6iris.WpVirtio <> m:50 var
+R12084:12085 xv6iris.WpVirtio <> mv:52 var
+R12111:12116 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12094:12108 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R12110:12110 xv6iris.WpVirtio <> m:50 var
+R12131:12136 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12117:12128 xv6iris.WpVirtio <> virtio_lease def
+R12130:12130 xv6iris.WpVirtio <> v:51 var
+R12137:12139 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R12167:12169 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R12159:12161 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12140:12153 xv6iris.VirtioModel <> virtio_stalled def
+R12155:12155 xv6iris.WpVirtio <> v:51 var
+R12157:12158 xv6iris.WpVirtio <> mv:52 var
+R12162:12166 Corelib.Init.Datatypes <> false constr
+R12284:12284 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12294:12299 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12307:12307 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12285:12293 xv6iris.WpVirtio <> dma_agree thm
+R12284:12284 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12294:12299 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12307:12307 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12285:12293 xv6iris.WpVirtio <> dma_agree thm
+R12346:12369 xv6iris.VirtioModel <> virtio_queue_not_stalled thm
+R12378:12380 stdpp.base <> dom def
+R12346:12369 xv6iris.VirtioModel <> virtio_queue_not_stalled thm
+R12378:12380 stdpp.base <> dom def
+R12412:12428 xv6iris.VirtioModel <> mem_view_subseteq thm
+R12412:12428 xv6iris.VirtioModel <> mem_view_subseteq thm
+prf 13281:13296 <> virtio_lease_acc
+R13303:13314 xv6iris.VirtioModel <> virtio_state rec
+binder 13299:13299 <> v:53
+R13322:13325 stdpp.gmap <> gmap rec
+R13336:13337 stdpp.bitvector.definitions <> bv rec
+R13327:13333 Riscv.rv64d_types Arch pa def
+binder 13318:13318 <> m:54
+R13355:13358 xv6iris.VirtioModel <> vmem def
+binder 13350:13351 <> mv:55
+R13367:13378 xv6iris.VirtioModel <> virtio_state rec
+binder 13362:13363 <> v':56
+R13386:13389 stdpp.gmap <> gmap rec
+R13400:13401 stdpp.bitvector.definitions <> bv rec
+R13391:13397 Riscv.rv64d_types Arch pa def
+binder 13382:13382 <> w:57
+R13426:13433 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13413:13420 xv6iris.VirtioModel <> mem_view def
+R13422:13422 xv6iris.WpVirtio <> m:54 var
+R13424:13425 xv6iris.WpVirtio <> mv:55 var
+R13469:13476 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13454:13456 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13434:13448 xv6iris.VirtioModel <> virtio_req_step def
+R13450:13450 xv6iris.WpVirtio <> v:53 var
+R13452:13453 xv6iris.WpVirtio <> mv:55 var
+R13457:13460 Corelib.Init.Datatypes <> Some constr
+R13462:13462 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13465:13466 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13468:13468 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13463:13464 xv6iris.WpVirtio <> v':56 var
+R13467:13467 xv6iris.WpVirtio <> w:57 var
+R13494:13499 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R13477:13491 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R13493:13493 xv6iris.WpVirtio <> m:54 var
+R13514:13525 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13500:13511 xv6iris.WpVirtio <> virtio_lease def
+R13513:13513 xv6iris.WpVirtio <> v:53 var
+R13543:13553 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13526:13540 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R13542:13542 xv6iris.WpVirtio <> m:54 var
+R13554:13557 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R13583:13584 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R13564:13567 stdpp.gmap <> gmap rec
+R13578:13579 stdpp.bitvector.definitions <> bv rec
+R13569:13575 Riscv.rv64d_types Arch pa def
+binder 13558:13560 <> old:58
+R13606:13618 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13585:13587 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13603:13605 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13595:13597 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13588:13590 stdpp.base <> dom def
+R13592:13594 xv6iris.WpVirtio <> old:58 var
+R13598:13600 stdpp.base <> dom def
+R13602:13602 xv6iris.WpVirtio <> w:57 var
+R13619:13619 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13675:13689 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13766:13766 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13620:13629 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R13631:13635 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R13637:13641 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R13645:13646 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 13630:13630 <> a:59
+binder 13630:13630 <> a:60
+binder 13636:13636 <> b:61
+binder 13636:13636 <> b:62
+R13647:13657 xv6iris.TsoCtx <> phys_ledger def
+R13659:13659 xv6iris.WpVirtio <> a:59 var
+R13662:13669 iris.algebra.dfrac <> DfracOwn constr
+R13674:13674 xv6iris.WpVirtio <> b:61 var
+R13642:13644 xv6iris.WpVirtio <> old:58 var
+R13690:13690 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13744:13750 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13691:13700 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R13702:13706 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R13708:13712 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R13714:13715 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 13701:13701 <> a:63
+binder 13701:13701 <> a:64
+binder 13707:13707 <> b:65
+binder 13707:13707 <> b:66
+R13716:13726 xv6iris.TsoCtx <> phys_ledger def
+R13728:13728 xv6iris.WpVirtio <> a:63 var
+R13731:13738 iris.algebra.dfrac <> DfracOwn constr
+R13743:13743 xv6iris.WpVirtio <> b:65 var
+R13713:13713 xv6iris.WpVirtio <> w:57 var
+R13751:13762 xv6iris.WpVirtio <> virtio_lease def
+R13764:13765 xv6iris.WpVirtio <> v':56 var
+R13887:13887 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13897:13902 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13910:13910 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13888:13896 xv6iris.WpVirtio <> dma_agree thm
+R13887:13887 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13897:13902 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13910:13910 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13888:13896 xv6iris.WpVirtio <> dma_agree thm
+R13945:13949 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R13945:13949 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R14018:14025 xv6iris.VirtioModel <> mem_view def
+R14052:14068 xv6iris.VirtioModel <> mem_view_subseteq thm
+R14018:14025 xv6iris.VirtioModel <> mem_view def
+R14052:14068 xv6iris.VirtioModel <> mem_view_subseteq thm
+R14108:14127 xv6iris.VirtioModel <> virtio_queue_ok_step thm
+R14136:14138 stdpp.base <> dom def
+R14108:14127 xv6iris.VirtioModel <> virtio_queue_ok_step thm
+R14136:14138 stdpp.base <> dom def
+R14237:14237 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14255:14260 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14265:14265 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14238:14244 xv6iris.WpVirtio <> dma_acc thm
+R14237:14237 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14255:14260 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14265:14265 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14238:14244 xv6iris.WpVirtio <> dma_acc thm
+R14402:14402 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14410:14415 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14422:14422 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14402:14402 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14410:14415 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14422:14422 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14452:14456 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R14452:14456 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R14520:14535 xv6iris.VirtioModel <> virtio_ctl_union thm
+R14520:14535 xv6iris.VirtioModel <> virtio_ctl_union thm
+R14611:14613 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14596:14598 stdpp.base <> dom def
+R14602:14606 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R14614:14616 stdpp.base <> dom def
+R14611:14613 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14596:14598 stdpp.base <> dom def
+R14602:14606 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R14614:14616 stdpp.base <> dom def
+R14638:14648 stdpp.fin_map_dom <> dom_union_L thm
+R14638:14648 stdpp.fin_map_dom <> dom_union_L thm
+R14638:14648 stdpp.fin_map_dom <> dom_union_L thm
+R14706:14713 xv6iris.WpVirtio WpVirtio <> sec

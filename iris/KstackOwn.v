@@ -280,10 +280,13 @@ Section ladder.
      is [kvm_pas_ok] = [node_kdata] (which is genuinely weaker -- a page
      between [etext] and [end] is RAM but not kalloc'able), and this ladder
      is also run at the KSTACK va, which is nowhere near [kmem_hi]. *)
-  Lemma bwin_words8 (p : mword 64) (n : nat) :
+  (* A6.87: NAMED, because the forward direction is off the write.  The
+     stack page this ladder runs on is the one [proc_mapstacks] just
+     memset; [byte_any] promises nothing to assemble. *)
+  Lemma bwin_words8 (p : mword 64) (n : nat) (f : nat -> bv 8) :
     (forall o : nat, (o + 8 <= 8 * n)%nat -> (8 | Z.of_nat o) ->
        is_aligned_paddr (Physaddr (pa_add p o)) 8 = true) ->
-    ([∗ list] j ∈ seq 0 (8 * n), byte_any (pa_add p j)) ⊢
+    ([∗ list] j ∈ seq 0 (8 * n), (pa_add p j) ↦ₘ (f j)) ⊢
     ∃ ws : list (bv 64), ⌜length ws = n⌝ ∗
       ([∗ list] k ↦ w ∈ ws,
          TsoCtx.ctx_word_pointsto (KTR := KT0) XI (pa_add p (8 * k)%nat)
@@ -292,12 +295,12 @@ Section ladder.
     induction n as [|n IH]; intro Hal.
     - iIntros "_". iExists []. by iSplit.
     - replace (8 * S n)%nat with (8 * n + 8)%nat by lia.
-      rewrite (bwin_split p 0 (8 * n) 8).
+      rewrite (bwin_named_split p 0 (8 * n) 8).
       iIntros "[Hpre Hlast]".
       iDestruct (IH ltac:(intros o Ho Hd; apply Hal; [lia | exact Hd]) with "Hpre")
         as (ws) "[%Hlen Hws]".
-      rewrite Nat.add_0_l bwin_rebase.
-      iDestruct (bytes_word8 (pa_add p (8 * n)%nat)
+      rewrite Nat.add_0_l bwin_named_rebase.
+      iDestruct (bytes_named_word8 (pa_add p (8 * n)%nat) _
                    (Hal (8 * n)%nat ltac:(lia) (kstk_dvd8 n)) with "Hlast")
         as (w) "Hw".
       iExists (ws ++ [w])%list.
@@ -368,16 +371,19 @@ Section mint.
      out ARE the whole KSTACK(i) page owned at its virtual address, KT1 --
      512 doubleword slots below KSTACK(i)+4096, which is the sp a fresh
      process's context is parked at ([SpecForkretParkPaid]). *)
-  Lemma kstack_own_intro (i : nat) (ppn : mword 44) :
+  (* A6.87: the page comes in FILLED -- it is the one kalloc memset before
+     handing it over ([KallocInv.page_filled]), and a stack's slots are
+     word cells, which no visibility-free window can supply. *)
+  Lemma kstack_own_intro (i : nat) (ppn : mword 44) (c : bv 8) :
     (i < 64)%nat -> node_kdata ppn ->
     kmap_at (kstack_vpn i) ppn KP_rw -∗
-    page_own (page_base ppn) -∗
+    page_filled (page_base ppn) c -∗
     stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) 512.
   Proof.
     intros Hi Hkd. iIntros "#Hcl Hpg".
-    rewrite /page_own.
+    rewrite /page_filled.
     replace 4096%nat with (8 * 512)%nat by lia.
-    iDestruct (bwin_words8 (page_base ppn) 512
+    iDestruct (bwin_words8 (page_base ppn) 512 (fun _ => c)
                  ltac:(intros o Ho Hd; apply page_base_aligned8;
                        [exact Hkd | lia | exact Hd])
                  with "Hpg") as (ws) "[%Hlen Hws]".
@@ -402,10 +408,10 @@ Section mint.
     ([∗ list] i ∈ seq 0 64,
        stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) 512)%I.
 
-  Lemma kstack_bank_intro (pas : nat -> mword 44) :
+  Lemma kstack_bank_intro (pas : nat -> mword 44) (c : bv 8) :
     kvm_pas_ok pas ->
     ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
-    ([∗ list] i ∈ seq 0 64, page_own (page_base (pas i))) -∗
+    ([∗ list] i ∈ seq 0 64, page_filled (page_base (pas i)) c) -∗
     kstack_bank.
   Proof.
     intros Hok. iIntros "#Hcl Hpg". rewrite /kstack_bank.
@@ -414,7 +420,7 @@ Section mint.
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     iDestruct (big_sepL_lookup _ (seq 0 64) k (0 + k)%nat with "Hcl") as "Hci".
     { apply lookup_seq. split; [reflexivity | lia]. }
-    iApply (kstack_own_intro (0 + k)%nat (pas (0 + k)%nat) ltac:(lia)
+    iApply (kstack_own_intro (0 + k)%nat (pas (0 + k)%nat) c ltac:(lia)
               (Hok (0 + k)%nat ltac:(lia)) with "Hci Hp").
   Qed.
 

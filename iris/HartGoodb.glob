@@ -1,0 +1,625 @@
+DIGEST ce98b084f8122f1606e1ed9513827b86
+Fxv6iris.HartGoodb
+R1415:1420 Stdlib.ZArith.ZArith <> <> lib
+R1449:1452 stdpp.gmap <> <> lib
+R1470:1495 SailStdpp.Operators_mwords <> <> lib
+R1513:1529 Riscv.rv64d_types <> <> lib
+R1531:1541 Riscv.rv64d <> <> lib
+R1559:1567 xv6iris.RiscvLang <> <> lib
+R1569:1578 xv6iris.RiscvPtsto <> <> lib
+R1580:1588 xv6iris.RiscvExec <> <> lib
+R1590:1601 xv6iris.RiscvTryStep <> <> lib
+R1619:1626 xv6iris.HartSpan <> <> lib
+R1628:1639 xv6iris.HartSpanChar <> <> lib
+R1641:1654 xv6iris.WpDecodeBridge <> <> lib
+prf 1764:1777 <> hfrun_of_goodb
+binder 1780:1780 <> X:1
+R1804:1807 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1796:1803 Riscv.rv64d_types <> register variant
+R1808:1811 Corelib.Init.Datatypes <> bool ind
+binder 1791:1792 <> Db:2
+R1823:1826 stdpp.gmap <> gset def
+R1828:1835 Riscv.rv64d_types <> register variant
+binder 1815:1815 <> D:3
+binder 1817:1819 <> Drw:4
+R1847:1847 Riscv.rv64d_types <> M def
+R1849:1849 xv6iris.HartGoodb <> X:1 var
+binder 1843:1843 <> m:5
+R1857:1862 xv6iris.RiscvLang <> mstate rec
+binder 1853:1853 <> s:6
+R1869:1869 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1913:1919 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1870:1876 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R1889:1890 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R1881:1888 Riscv.rv64d_types <> register variant
+binder 1877:1877 <> r:7
+R1902:1905 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1895:1897 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1891:1892 xv6iris.HartGoodb <> Db:2 var
+R1894:1894 xv6iris.HartGoodb <> r:7 var
+R1898:1901 Corelib.Init.Datatypes <> true constr
+R1907:1911 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R1906:1906 xv6iris.HartGoodb <> r:7 var
+R1912:1912 xv6iris.HartGoodb <> D:3 var
+R1939:1944 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1932:1934 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1920:1924 xv6iris.WpDecodeBridge <> goodb def
+R1931:1931 xv6iris.HartGoodb <> s:6 var
+R1929:1929 xv6iris.HartGoodb <> m:5 var
+R1926:1927 xv6iris.HartGoodb <> Db:2 var
+R1935:1938 Corelib.Init.Datatypes <> true constr
+R1945:1952 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R1968:1974 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R1957:1959 Corelib.Init.Datatypes <> nat ind
+binder 1953:1953 <> n:8
+R1967:1967 xv6iris.HartGoodb <> X:1 var
+binder 1963:1963 <> x:9
+R2022:2025 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R2000:2002 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1975:1979 xv6iris.HartSpan <> hfrun def
+R1999:1999 xv6iris.HartGoodb <> m:5 var
+R1992:1996 xv6iris.RiscvLang <> sregs proj
+R1989:1989 xv6iris.HartGoodb <> s:6 var
+R1985:1987 xv6iris.HartGoodb <> Drw:4 var
+R1983:1983 xv6iris.HartGoodb <> D:3 var
+R1981:1981 xv6iris.HartGoodb <> n:8 var
+R2003:2006 Corelib.Init.Datatypes <> Some constr
+R2008:2008 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2010:2011 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2021:2021 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2009:2009 xv6iris.HartGoodb <> x:9 var
+R2015:2019 xv6iris.RiscvLang <> sregs proj
+R2012:2012 xv6iris.HartGoodb <> s:6 var
+R2034:2036 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2026:2029 xv6iris.RiscvExec <> exec def
+R2033:2033 xv6iris.HartGoodb <> s:6 var
+R2031:2031 xv6iris.HartGoodb <> m:5 var
+R2037:2040 Corelib.Init.Datatypes <> Some constr
+R2042:2042 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2044:2045 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2047:2047 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2043:2043 xv6iris.HartGoodb <> x:9 var
+R2046:2046 xv6iris.HartGoodb <> s:6 var
+R2310:2318 Corelib.Init.Datatypes <> andb_prop thm
+R2310:2318 Corelib.Init.Datatypes <> andb_prop thm
+R2399:2399 Corelib.Init.Datatypes <> S constr
+R2399:2399 Corelib.Init.Datatypes <> S constr
+R2439:2459 stdpp.decidable <> bool_decide_eq_true_2 thm
+R2439:2459 stdpp.decidable <> bool_decide_eq_true_2 thm
+R2439:2459 stdpp.decidable <> bool_decide_eq_true_2 thm
+R2597:2597 Corelib.Init.Datatypes <> S constr
+R2597:2597 Corelib.Init.Datatypes <> S constr
+R2724:2724 Corelib.Init.Datatypes <> S constr
+R2724:2724 Corelib.Init.Datatypes <> S constr
+R2844:2844 Corelib.Init.Datatypes <> S constr
+R2844:2844 Corelib.Init.Datatypes <> S constr
+R2964:2964 Corelib.Init.Datatypes <> S constr
+R2964:2964 Corelib.Init.Datatypes <> S constr
+R3082:3082 Corelib.Init.Datatypes <> S constr
+R3082:3082 Corelib.Init.Datatypes <> S constr
+R3208:3208 Corelib.Init.Datatypes <> S constr
+R3208:3208 Corelib.Init.Datatypes <> S constr
+R3336:3336 Corelib.Init.Datatypes <> S constr
+R3336:3336 Corelib.Init.Datatypes <> S constr
+R3465:3465 Corelib.Init.Datatypes <> S constr
+R3465:3465 Corelib.Init.Datatypes <> S constr
+R3592:3592 Corelib.Init.Datatypes <> S constr
+R3592:3592 Corelib.Init.Datatypes <> S constr
+R3718:3718 Corelib.Init.Datatypes <> S constr
+R3718:3718 Corelib.Init.Datatypes <> S constr
+R3841:3841 Corelib.Init.Datatypes <> S constr
+R3841:3841 Corelib.Init.Datatypes <> S constr
+R3961:3961 Corelib.Init.Datatypes <> S constr
+R3961:3961 Corelib.Init.Datatypes <> S constr
+prf 4159:4169 <> goodb_congr
+binder 4172:4172 <> X:10
+R4196:4199 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4188:4195 Riscv.rv64d_types <> register variant
+R4200:4203 Corelib.Init.Datatypes <> bool ind
+binder 4183:4184 <> Db:11
+R4211:4211 Riscv.rv64d_types <> M def
+R4213:4213 xv6iris.HartGoodb <> X:10 var
+binder 4207:4207 <> m:12
+R4225:4230 xv6iris.RiscvLang <> mstate rec
+binder 4217:4218 <> s1:13
+binder 4220:4221 <> s2:14
+R4237:4237 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4338:4344 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4238:4244 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4257:4258 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4249:4256 Riscv.rv64d_types <> register variant
+binder 4245:4245 <> r:15
+R4270:4278 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4263:4265 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4259:4260 xv6iris.HartGoodb <> Db:11 var
+R4262:4262 xv6iris.HartGoodb <> r:15 var
+R4266:4269 Corelib.Init.Datatypes <> true constr
+R4307:4309 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4279:4293 Riscv.rv64d_types <> register_lookup def
+R4295:4295 xv6iris.HartGoodb <> r:15 var
+R4301:4305 xv6iris.RiscvLang <> sregs proj
+R4297:4298 xv6iris.HartGoodb <> s1:13 var
+R4310:4324 Riscv.rv64d_types <> register_lookup def
+R4326:4326 xv6iris.HartGoodb <> r:15 var
+R4332:4336 xv6iris.RiscvLang <> sregs proj
+R4328:4329 xv6iris.HartGoodb <> s2:14 var
+R4365:4368 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4358:4360 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4345:4349 xv6iris.WpDecodeBridge <> goodb def
+R4356:4357 xv6iris.HartGoodb <> s1:13 var
+R4354:4354 xv6iris.HartGoodb <> m:12 var
+R4351:4352 xv6iris.HartGoodb <> Db:11 var
+R4361:4364 Corelib.Init.Datatypes <> true constr
+R4382:4384 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4369:4373 xv6iris.WpDecodeBridge <> goodb def
+R4380:4381 xv6iris.HartGoodb <> s2:14 var
+R4378:4378 xv6iris.HartGoodb <> m:12 var
+R4375:4376 xv6iris.HartGoodb <> Db:11 var
+R4385:4388 Corelib.Init.Datatypes <> true constr
+R4557:4565 Corelib.Init.Datatypes <> andb_prop thm
+R4557:4565 Corelib.Init.Datatypes <> andb_prop thm
+prf 5907:5916 <> goodb_mono
+R5936:5939 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5928:5935 Riscv.rv64d_types <> register variant
+R5940:5943 Corelib.Init.Datatypes <> bool ind
+binder 5919:5920 <> Db:16
+binder 5922:5924 <> Db':17
+binder 5947:5947 <> E:18
+binder 5949:5949 <> X:19
+R5968:5977 Riscv.rv64d_types Defs monad def
+R5979:5979 xv6iris.HartGoodb <> E:18 var
+R5981:5981 xv6iris.HartGoodb <> X:19 var
+binder 5964:5964 <> m:20
+R5989:5994 xv6iris.RiscvLang <> mstate rec
+binder 5985:5985 <> s:21
+R6001:6001 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6050:6056 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6002:6008 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R6021:6022 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R6013:6020 Riscv.rv64d_types <> register variant
+binder 6009:6009 <> r:22
+R6034:6037 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6027:6029 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6023:6024 xv6iris.HartGoodb <> Db:16 var
+R6026:6026 xv6iris.HartGoodb <> r:22 var
+R6030:6033 Corelib.Init.Datatypes <> true constr
+R6043:6045 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6038:6040 xv6iris.HartGoodb <> Db':17 var
+R6042:6042 xv6iris.HartGoodb <> r:22 var
+R6046:6049 Corelib.Init.Datatypes <> true constr
+R6076:6079 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6069:6071 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6057:6061 xv6iris.WpDecodeBridge <> goodb def
+R6068:6068 xv6iris.HartGoodb <> s:21 var
+R6066:6066 xv6iris.HartGoodb <> m:20 var
+R6063:6064 xv6iris.HartGoodb <> Db:16 var
+R6072:6075 Corelib.Init.Datatypes <> true constr
+R6093:6095 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6080:6084 xv6iris.WpDecodeBridge <> goodb def
+R6092:6092 xv6iris.HartGoodb <> s:21 var
+R6090:6090 xv6iris.HartGoodb <> m:20 var
+R6086:6088 xv6iris.HartGoodb <> Db':17 var
+R6096:6099 Corelib.Init.Datatypes <> true constr
+R6214:6218 xv6iris.WpDecodeBridge <> goodb def
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6279:6280 Corelib.Init.Datatypes <> tt constr
+R6327:6335 Corelib.Init.Datatypes <> andb_prop thm
+R6327:6335 Corelib.Init.Datatypes <> andb_prop thm
+R6380:6383 Corelib.Init.Datatypes <> andb def
+R6406:6420 Riscv.rv64d_types <> register_lookup def
+R6427:6431 xv6iris.RiscvLang <> sregs proj
+R6406:6420 Riscv.rv64d_types <> register_lookup def
+R6427:6431 xv6iris.RiscvLang <> sregs proj
+prf 6450:6464 <> goodb_try_catch
+R6480:6483 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6472:6479 Riscv.rv64d_types <> register variant
+R6484:6487 Corelib.Init.Datatypes <> bool ind
+binder 6467:6468 <> Db:23
+binder 6491:6491 <> X:24
+binder 6493:6494 <> E1:25
+binder 6496:6497 <> E2:26
+R6516:6525 Riscv.rv64d_types Defs monad def
+R6527:6528 xv6iris.HartGoodb <> E1:25 var
+R6530:6530 xv6iris.HartGoodb <> X:24 var
+binder 6512:6512 <> m:27
+R6540:6543 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6538:6539 xv6iris.HartGoodb <> E1:25 var
+R6544:6553 Riscv.rv64d_types Defs monad def
+R6555:6556 xv6iris.HartGoodb <> E2:26 var
+R6558:6558 xv6iris.HartGoodb <> X:24 var
+binder 6534:6534 <> h:28
+R6566:6571 xv6iris.RiscvLang <> mstate rec
+binder 6562:6562 <> s:29
+R6597:6600 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6590:6592 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6578:6582 xv6iris.WpDecodeBridge <> goodb def
+R6589:6589 xv6iris.HartGoodb <> s:29 var
+R6587:6587 xv6iris.HartGoodb <> m:27 var
+R6584:6585 xv6iris.HartGoodb <> Db:23 var
+R6593:6596 Corelib.Init.Datatypes <> true constr
+R6632:6634 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6601:6605 xv6iris.WpDecodeBridge <> goodb def
+R6631:6631 xv6iris.HartGoodb <> s:29 var
+R6611:6624 Riscv.rv64d_types Defs try_catch def
+R6628:6628 xv6iris.HartGoodb <> h:28 var
+R6626:6626 xv6iris.HartGoodb <> m:27 var
+R6607:6608 xv6iris.HartGoodb <> Db:23 var
+R6635:6638 Corelib.Init.Datatypes <> true constr
+R6741:6754 Riscv.rv64d_types Defs try_catch def
+R6756:6760 xv6iris.WpDecodeBridge <> goodb def
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6821:6822 Corelib.Init.Datatypes <> tt constr
+R6944:6952 Corelib.Init.Datatypes <> andb_prop thm
+R6944:6952 Corelib.Init.Datatypes <> andb_prop thm
+R6989:6992 Corelib.Init.Datatypes <> andb def
+R7015:7029 Riscv.rv64d_types <> register_lookup def
+R7036:7040 xv6iris.RiscvLang <> sregs proj
+R7015:7029 Riscv.rv64d_types <> register_lookup def
+R7036:7040 xv6iris.RiscvLang <> sregs proj
+prf 7355:7365 <> goodb_liftR
+R7381:7384 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7373:7380 Riscv.rv64d_types <> register variant
+R7385:7388 Corelib.Init.Datatypes <> bool ind
+binder 7368:7369 <> Db:30
+binder 7392:7392 <> X:31
+binder 7394:7394 <> R:32
+R7413:7413 Riscv.rv64d_types <> M def
+R7415:7415 xv6iris.HartGoodb <> X:31 var
+binder 7409:7409 <> m:33
+R7423:7428 xv6iris.RiscvLang <> mstate rec
+binder 7419:7419 <> s:34
+R7454:7457 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7447:7449 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7435:7439 xv6iris.WpDecodeBridge <> goodb def
+R7446:7446 xv6iris.HartGoodb <> s:34 var
+R7444:7444 xv6iris.HartGoodb <> m:33 var
+R7441:7442 xv6iris.HartGoodb <> Db:30 var
+R7450:7453 Corelib.Init.Datatypes <> true constr
+R7492:7494 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7458:7462 xv6iris.WpDecodeBridge <> goodb def
+R7491:7491 xv6iris.HartGoodb <> s:34 var
+R7468:7477 Riscv.rv64d_types Defs liftR def
+R7488:7488 xv6iris.HartGoodb <> m:33 var
+R7485:7485 xv6iris.HartGoodb <> R:32 var
+R7464:7465 xv6iris.HartGoodb <> Db:30 var
+R7495:7498 Corelib.Init.Datatypes <> true constr
+R7514:7528 xv6iris.HartGoodb <> goodb_try_catch thm
+R7514:7528 xv6iris.HartGoodb <> goodb_try_catch thm
+prf 7543:7551 <> goodb_cer
+R7567:7570 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7559:7566 Riscv.rv64d_types <> register variant
+R7571:7574 Corelib.Init.Datatypes <> bool ind
+binder 7554:7555 <> Db:35
+binder 7578:7578 <> X:36
+R7597:7607 Riscv.rv64d_types Defs monadR def
+R7609:7609 xv6iris.HartGoodb <> X:36 var
+R7611:7619 Riscv.rv64d_types <> exception ind
+R7621:7621 xv6iris.HartGoodb <> X:36 var
+binder 7593:7593 <> m:37
+R7629:7634 xv6iris.RiscvLang <> mstate rec
+binder 7625:7625 <> s:38
+R7660:7663 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7653:7655 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7641:7645 xv6iris.WpDecodeBridge <> goodb def
+R7652:7652 xv6iris.HartGoodb <> s:38 var
+R7650:7650 xv6iris.HartGoodb <> m:37 var
+R7647:7648 xv6iris.HartGoodb <> Db:35 var
+R7656:7659 Corelib.Init.Datatypes <> true constr
+R7702:7704 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7664:7668 xv6iris.WpDecodeBridge <> goodb def
+R7701:7701 xv6iris.HartGoodb <> s:38 var
+R7674:7696 Riscv.rv64d_types Defs catch_early_return def
+R7698:7698 xv6iris.HartGoodb <> m:37 var
+R7670:7671 xv6iris.HartGoodb <> Db:35 var
+R7705:7708 Corelib.Init.Datatypes <> true constr
+R7724:7738 xv6iris.HartGoodb <> goodb_try_catch thm
+R7724:7738 xv6iris.HartGoodb <> goodb_try_catch thm
+prf 8240:8250 <> goodb_bindR
+R8266:8269 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8258:8265 Riscv.rv64d_types <> register variant
+R8270:8273 Corelib.Init.Datatypes <> bool ind
+binder 8253:8254 <> Db:39
+binder 8277:8277 <> R:40
+binder 8279:8279 <> X:41
+binder 8281:8281 <> Y:42
+R8300:8310 Riscv.rv64d_types Defs monadR def
+R8312:8312 xv6iris.HartGoodb <> R:40 var
+R8314:8322 Riscv.rv64d_types <> exception ind
+R8324:8324 xv6iris.HartGoodb <> X:41 var
+binder 8296:8296 <> m:43
+R8333:8336 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8332:8332 xv6iris.HartGoodb <> X:41 var
+R8337:8347 Riscv.rv64d_types Defs monadR def
+R8349:8349 xv6iris.HartGoodb <> R:40 var
+R8351:8359 Riscv.rv64d_types <> exception ind
+R8361:8361 xv6iris.HartGoodb <> Y:42 var
+binder 8328:8328 <> f:44
+R8373:8378 xv6iris.RiscvLang <> mstate rec
+binder 8369:8369 <> s:45
+R8386:8386 xv6iris.HartGoodb <> X:41 var
+binder 8382:8382 <> x:46
+R8412:8415 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8405:8407 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8393:8397 xv6iris.WpDecodeBridge <> goodb def
+R8404:8404 xv6iris.HartGoodb <> s:45 var
+R8402:8402 xv6iris.HartGoodb <> m:43 var
+R8399:8400 xv6iris.HartGoodb <> Db:39 var
+R8408:8411 Corelib.Init.Datatypes <> true constr
+R8443:8448 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8425:8427 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8416:8420 xv6iris.RiscvTryStep <> execR def
+R8424:8424 xv6iris.HartGoodb <> s:45 var
+R8422:8422 xv6iris.HartGoodb <> m:43 var
+R8428:8431 Corelib.Init.Datatypes <> Some constr
+R8433:8433 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8439:8440 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8442:8442 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8434:8436 Corelib.Init.Datatypes <> inr constr
+R8438:8438 xv6iris.HartGoodb <> x:46 var
+R8441:8441 xv6iris.HartGoodb <> s:45 var
+R8475:8477 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8449:8453 xv6iris.WpDecodeBridge <> goodb def
+R8474:8474 xv6iris.HartGoodb <> s:45 var
+R8459:8467 Riscv.rv64d_types Defs bind def
+R8471:8471 xv6iris.HartGoodb <> f:44 var
+R8469:8469 xv6iris.HartGoodb <> m:43 var
+R8455:8456 xv6iris.HartGoodb <> Db:39 var
+R8478:8482 xv6iris.WpDecodeBridge <> goodb def
+R8493:8493 xv6iris.HartGoodb <> s:45 var
+R8488:8488 xv6iris.HartGoodb <> f:44 var
+R8490:8490 xv6iris.HartGoodb <> x:46 var
+R8484:8485 xv6iris.HartGoodb <> Db:39 var
+R8572:8576 xv6iris.RiscvTryStep <> execR def
+R8600:8602 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8600:8602 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8665:8669 xv6iris.WpDecodeBridge <> goodb def
+R8671:8675 xv6iris.RiscvTryStep <> execR def
+R8677:8685 Riscv.rv64d_types Defs bind def
+R8687:8705 Riscv.rv64d_types Interface iMon_bind def
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+R8781:8789 Corelib.Init.Datatypes <> andb_prop thm
+R8880:8881 Corelib.Init.Datatypes <> tt constr
+prf 8941:8952 <> goodb_bind0R
+R8968:8971 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8960:8967 Riscv.rv64d_types <> register variant
+R8972:8975 Corelib.Init.Datatypes <> bool ind
+binder 8955:8956 <> Db:47
+binder 8979:8979 <> R:48
+binder 8981:8981 <> Y:49
+R9000:9010 Riscv.rv64d_types Defs monadR def
+R9012:9012 xv6iris.HartGoodb <> R:48 var
+R9014:9022 Riscv.rv64d_types <> exception ind
+R9024:9027 Corelib.Init.Datatypes <> unit ind
+binder 8996:8996 <> m:50
+R9035:9045 Riscv.rv64d_types Defs monadR def
+R9047:9047 xv6iris.HartGoodb <> R:48 var
+R9049:9057 Riscv.rv64d_types <> exception ind
+R9059:9059 xv6iris.HartGoodb <> Y:49 var
+binder 9031:9031 <> n:51
+R9071:9076 xv6iris.RiscvLang <> mstate rec
+binder 9067:9067 <> s:52
+R9102:9105 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9095:9097 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9083:9087 xv6iris.WpDecodeBridge <> goodb def
+R9094:9094 xv6iris.HartGoodb <> s:52 var
+R9092:9092 xv6iris.HartGoodb <> m:50 var
+R9089:9090 xv6iris.HartGoodb <> Db:47 var
+R9098:9101 Corelib.Init.Datatypes <> true constr
+R9134:9139 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9115:9117 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9106:9110 xv6iris.RiscvTryStep <> execR def
+R9114:9114 xv6iris.HartGoodb <> s:52 var
+R9112:9112 xv6iris.HartGoodb <> m:50 var
+R9118:9121 Corelib.Init.Datatypes <> Some constr
+R9123:9123 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9130:9131 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9133:9133 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9124:9126 Corelib.Init.Datatypes <> inr constr
+R9128:9129 Corelib.Init.Datatypes <> tt constr
+R9132:9132 xv6iris.HartGoodb <> s:52 var
+R9167:9169 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9140:9144 xv6iris.WpDecodeBridge <> goodb def
+R9166:9166 xv6iris.HartGoodb <> s:52 var
+R9150:9159 Riscv.rv64d_types Defs bind0 def
+R9163:9163 xv6iris.HartGoodb <> n:51 var
+R9161:9161 xv6iris.HartGoodb <> m:50 var
+R9146:9147 xv6iris.HartGoodb <> Db:47 var
+R9170:9174 xv6iris.WpDecodeBridge <> goodb def
+R9181:9181 xv6iris.HartGoodb <> s:52 var
+R9179:9179 xv6iris.HartGoodb <> n:51 var
+R9176:9177 xv6iris.HartGoodb <> Db:47 var
+R9212:9222 xv6iris.HartGoodb <> goodb_bindR thm
+R9244:9245 Corelib.Init.Datatypes <> tt constr
+R9212:9222 xv6iris.HartGoodb <> goodb_bindR thm
+R9244:9245 Corelib.Init.Datatypes <> tt constr
+prf 9810:9822 <> hval_of_goodb
+binder 9825:9825 <> X:53
+R9849:9852 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9841:9848 Riscv.rv64d_types <> register variant
+R9853:9856 Corelib.Init.Datatypes <> bool ind
+binder 9836:9837 <> Db:54
+R9868:9871 stdpp.gmap <> gset def
+R9873:9880 Riscv.rv64d_types <> register variant
+binder 9860:9860 <> D:55
+binder 9862:9864 <> Drw:56
+R9892:9892 Riscv.rv64d_types <> M def
+R9894:9894 xv6iris.HartGoodb <> X:53 var
+binder 9888:9888 <> m:57
+R9904:9909 xv6iris.RiscvLang <> mstate rec
+binder 9898:9900 <> dst:58
+R9918:9925 Riscv.rv64d_types <> regstate rec
+binder 9913:9914 <> rs:59
+R9933:9933 xv6iris.HartGoodb <> X:53 var
+binder 9929:9929 <> x:60
+R9940:9940 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9984:9990 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9941:9947 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R9960:9961 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R9952:9959 Riscv.rv64d_types <> register variant
+binder 9948:9948 <> r:61
+R9973:9976 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9966:9968 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9962:9963 xv6iris.HartGoodb <> Db:54 var
+R9965:9965 xv6iris.HartGoodb <> r:61 var
+R9969:9972 Corelib.Init.Datatypes <> true constr
+R9978:9982 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R9977:9977 xv6iris.HartGoodb <> r:61 var
+R9983:9983 xv6iris.HartGoodb <> D:55 var
+R9991:9991 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10085:10091 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9992:9998 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R10011:10012 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R10003:10010 Riscv.rv64d_types <> register variant
+binder 9999:9999 <> r:62
+R10024:10032 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10017:10019 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10013:10014 xv6iris.HartGoodb <> Db:54 var
+R10016:10016 xv6iris.HartGoodb <> r:62 var
+R10020:10023 Corelib.Init.Datatypes <> true constr
+R10053:10055 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10033:10047 Riscv.rv64d_types <> register_lookup def
+R10049:10049 xv6iris.HartGoodb <> r:62 var
+R10051:10052 xv6iris.HartGoodb <> rs:59 var
+R10056:10070 Riscv.rv64d_types <> register_lookup def
+R10072:10072 xv6iris.HartGoodb <> r:62 var
+R10079:10083 xv6iris.RiscvLang <> sregs proj
+R10074:10076 xv6iris.HartGoodb <> dst:58 var
+R10113:10118 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10106:10108 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10092:10096 xv6iris.WpDecodeBridge <> goodb def
+R10103:10105 xv6iris.HartGoodb <> dst:58 var
+R10101:10101 xv6iris.HartGoodb <> m:57 var
+R10098:10099 xv6iris.HartGoodb <> Db:54 var
+R10109:10112 Corelib.Init.Datatypes <> true constr
+R10145:10150 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10129:10131 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10119:10122 xv6iris.RiscvExec <> exec def
+R10126:10128 xv6iris.HartGoodb <> dst:58 var
+R10124:10124 xv6iris.HartGoodb <> m:57 var
+R10132:10135 Corelib.Init.Datatypes <> Some constr
+R10137:10137 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10139:10140 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10144:10144 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10138:10138 xv6iris.HartGoodb <> x:60 var
+R10141:10143 xv6iris.HartGoodb <> dst:58 var
+R10151:10154 xv6iris.HartSpan <> hval def
+R10169:10170 xv6iris.HartGoodb <> rs:59 var
+R10167:10167 xv6iris.HartGoodb <> x:60 var
+R10165:10165 xv6iris.HartGoodb <> m:57 var
+R10162:10163 xv6iris.HartGoodb <> rs:59 var
+R10158:10160 xv6iris.HartGoodb <> Drw:56 var
+R10156:10156 xv6iris.HartGoodb <> D:55 var
+R10220:10226 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R10228:10229 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 10227:10227 <> r:63
+R10241:10256 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10234:10236 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10233:10233 xv6iris.HartGoodb <> r:63 var
+R10237:10240 Corelib.Init.Datatypes <> true constr
+R10286:10300 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10257:10271 Riscv.rv64d_types <> register_lookup def
+R10273:10273 xv6iris.HartGoodb <> r:63 var
+R10280:10284 xv6iris.RiscvLang <> sregs proj
+R10301:10315 Riscv.rv64d_types <> register_lookup def
+R10317:10317 xv6iris.HartGoodb <> r:63 var
+R10353:10357 xv6iris.RiscvLang <> sregs proj
+R10320:10325 xv6iris.RiscvLang <> MState constr
+R10335:10337 xv6iris.RiscvLang <> mem proj
+R10345:10348 xv6iris.RiscvLang <> mdev proj
+R10220:10226 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R10228:10229 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 10227:10227 <> r:64
+R10241:10256 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10234:10236 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10233:10233 xv6iris.HartGoodb <> r:64 var
+R10237:10240 Corelib.Init.Datatypes <> true constr
+R10286:10300 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10257:10271 Riscv.rv64d_types <> register_lookup def
+R10273:10273 xv6iris.HartGoodb <> r:64 var
+R10280:10284 xv6iris.RiscvLang <> sregs proj
+R10301:10315 Riscv.rv64d_types <> register_lookup def
+R10317:10317 xv6iris.HartGoodb <> r:64 var
+R10353:10357 xv6iris.RiscvLang <> sregs proj
+R10320:10325 xv6iris.RiscvLang <> MState constr
+R10335:10337 xv6iris.RiscvLang <> mem proj
+R10345:10348 xv6iris.RiscvLang <> mdev proj
+R10470:10472 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10427:10431 xv6iris.WpDecodeBridge <> goodb def
+R10439:10444 xv6iris.RiscvLang <> MState constr
+R10454:10456 xv6iris.RiscvLang <> mem proj
+R10464:10467 xv6iris.RiscvLang <> mdev proj
+R10473:10476 Corelib.Init.Datatypes <> true constr
+R10493:10503 xv6iris.HartGoodb <> goodb_congr thm
+R10470:10472 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10427:10431 xv6iris.WpDecodeBridge <> goodb def
+R10439:10444 xv6iris.RiscvLang <> MState constr
+R10454:10456 xv6iris.RiscvLang <> mem proj
+R10464:10467 xv6iris.RiscvLang <> mdev proj
+R10473:10476 Corelib.Init.Datatypes <> true constr
+R10493:10503 xv6iris.HartGoodb <> goodb_congr thm
+R10538:10551 xv6iris.HartGoodb <> hfrun_of_goodb thm
+R10565:10570 xv6iris.RiscvLang <> MState constr
+R10580:10582 xv6iris.RiscvLang <> mem proj
+R10590:10593 xv6iris.RiscvLang <> mdev proj
+R10538:10551 xv6iris.HartGoodb <> hfrun_of_goodb thm
+R10565:10570 xv6iris.RiscvLang <> MState constr
+R10580:10582 xv6iris.RiscvLang <> mem proj
+R10590:10593 xv6iris.RiscvLang <> mdev proj
+R10645:10660 xv6iris.WpDecodeBridge <> exec_goodb_congr thm
+R10672:10677 xv6iris.RiscvLang <> MState constr
+R10687:10689 xv6iris.RiscvLang <> mem proj
+R10697:10700 xv6iris.RiscvLang <> mdev proj
+R10645:10660 xv6iris.WpDecodeBridge <> exec_goodb_congr thm
+R10672:10677 xv6iris.RiscvLang <> MState constr
+R10687:10689 xv6iris.RiscvLang <> mem proj
+R10697:10700 xv6iris.RiscvLang <> mdev proj
+R10849:10858 xv6iris.HartSpanChar <> hfrun_hval thm
+R10849:10858 xv6iris.HartSpanChar <> hfrun_hval thm

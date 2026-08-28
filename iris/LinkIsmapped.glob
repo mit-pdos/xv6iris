@@ -1,0 +1,7 @@
+DIGEST e41140a4d02714ca497cf6e3e693b5ab
+Fxv6iris.LinkIsmapped
+R179:193 xv6iris.LinkWalkNoalloc <> <> lib
+R195:207 xv6iris.ProofIsmapped <> <> lib
+R230:242 xv6iris.ProofIsmapped IsmappedProof <> modtype
+R244:254 xv6iris.LinkWalkNoalloc WalkNoalloc <> modtype
+mod 218:225 <> Ismapped

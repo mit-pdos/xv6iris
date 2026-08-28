@@ -1,0 +1,99 @@
+DIGEST a91e53dd7d60cf16fc9f674d971bbded
+Fxv6iris.SpecUser
+R3300:3305 Stdlib.ZArith.ZArith <> <> lib
+R3307:3310 Stdlib.Bool.Bool <> <> lib
+R3312:3314 Stdlib.micromega.Lia <> <> lib
+R3343:3346 stdpp.gmap <> <> lib
+R3348:3368 stdpp.bitvector.definitions <> <> lib
+R3406:3414 iris.proofmode.proofmode <> <> lib
+R3457:3466 iris.base_logic.lib.invariants <> <> lib
+R3468:3475 iris.base_logic.lib.gen_heap <> <> lib
+R3517:3524 iris.program_logic.language <> <> lib
+R3526:3532 iris.program_logic.lifting <> <> lib
+R3550:3579 SailStdpp.ConcurrencyInterface <> <> lib
+R3581:3618 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R3620:3654 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R3656:3681 SailStdpp.Operators_mwords <> <> lib
+R3699:3715 Riscv.rv64d_types <> <> lib
+R3717:3727 Riscv.rv64d <> <> lib
+R3745:3758 SailStdpp.Base <> <> lib
+R3760:3778 SailStdpp.TypeCasts <> <> lib
+R3780:3795 SailStdpp.Values <> <> lib
+R3797:3817 SailStdpp.MachineWord <> <> lib
+R3835:3843 xv6iris.RiscvLang <> <> lib
+R3845:3854 xv6iris.RiscvPtsto <> <> lib
+R3856:3869 xv6iris.RiscvFetchExec <> <> lib
+R3887:3897 xv6iris.MinstretInv <> <> lib
+R3899:3905 xv6iris.WireInv <> <> lib
+R3923:3932 xv6iris.UserPtTree <> <> lib
+R3934:3941 xv6iris.UserExec <> <> lib
+R3959:3964 xv6iris.TsoCtx <> <> lib
+R4000:4003 Riscv.rv64d_types Defs <> mod
+def 4018:4041 <> wp_user_exec_closed_body
+R4046:4052 xv6iris.RiscvPtsto <> riscvGS class
+binder 4054:4055 <> Σ:1
+binder 4045:4055 <> riscvGS0:2
+R4066:4070 xv6iris.RiscvLang <> GenId class
+binder 4060:4062 <> GEN:3
+R4081:4085 xv6iris.RiscvLang <> CpuId class
+binder 4075:4077 <> CID:4
+R4095:4100 xv6iris.TsoCtx <> CurCtx class
+binder 4090:4091 <> XI:5
+R4112:4115 xv6iris.UserExec <> ucfg rec
+binder 4108:4108 <> C:6
+R4124:4127 xv6iris.UserPtTree <> uptd rec
+binder 4119:4120 <> pt:7
+R4141:4144 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4137:4140 xv6iris.UserPtTree <> uptd rec
+R4145:4149 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4151:4152 xv6iris.SpecUser <> Σ:1 var
+binder 4131:4133 <> Rut:8
+R4169:4174 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4160:4168 xv6iris.RiscvFetchExec <> hw_config def
+R4187:4192 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4175:4186 xv6iris.MinstretInv <> minstret_inv def
+R4201:4208 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4193:4200 xv6iris.WireInv <> wire_inv def
+R4226:4231 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4209:4216 xv6iris.UserExec <> user_inv def
+R4223:4225 xv6iris.SpecUser <> Rut:8 var
+R4220:4221 xv6iris.SpecUser <> pt:7 var
+R4218:4218 xv6iris.SpecUser <> C:6 var
+R4261:4268 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4232:4235 iris.bi.interface <> ::bi_scope:'▷'_x not
+R4236:4251 xv6iris.UserExec <> stvec_handler_wp def
+R4258:4260 xv6iris.SpecUser <> Rut:8 var
+R4255:4256 xv6iris.SpecUser <> pt:7 var
+R4253:4253 xv6iris.SpecUser <> C:6 var
+R4269:4272 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R4295:4295 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R4280:4283 iris.program_logic.language <> expr proj
+R4285:4294 xv6iris.RiscvLang <> riscv_lang def
+R4273:4276 xv6iris.RiscvLang <> Loop abbrev
+modtype 4311:4314 <> USER
+ax 4329:4347 USER wp_user_exec_closed
+R4355:4363 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4474:4482 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4365:4371 xv6iris.RiscvPtsto <> riscvGS class
+binder 4373:4374 <> Σ:9
+binder 4364:4374 <> riscvGS0:10
+R4385:4389 xv6iris.RiscvLang <> GenId class
+binder 4379:4381 <> GEN:11
+R4400:4404 xv6iris.RiscvLang <> CpuId class
+binder 4394:4396 <> CID:12
+R4414:4419 xv6iris.TsoCtx <> CurCtx class
+binder 4409:4410 <> XI:13
+R4433:4436 xv6iris.UserExec <> ucfg rec
+binder 4429:4429 <> C:14
+R4445:4448 xv6iris.UserPtTree <> uptd rec
+binder 4440:4441 <> pt:15
+R4462:4465 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4458:4461 xv6iris.UserPtTree <> uptd rec
+R4466:4470 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4472:4473 xv6iris.SpecUser <> Σ:9 var
+binder 4452:4454 <> Rut:16
+R4483:4506 xv6iris.SpecUser <> wp_user_exec_closed_body def
+R4513:4515 xv6iris.SpecUser <> Rut:16 var
+R4510:4511 xv6iris.SpecUser <> pt:15 var
+R4508:4508 xv6iris.SpecUser <> C:14 var
+R4522:4525 xv6iris.SpecUser USER <> modtype

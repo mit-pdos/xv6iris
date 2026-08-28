@@ -288,6 +288,46 @@ Section Lock.
   Definition lock_word (lk : mword 64) (v : mword 32) : iProp Σ :=
     TsoCtx.phys_ledger_word4 lk (DfracOwn 1) v.
 
+  (* >>> A6.88: THE WORD'S HELD ARM CARRIES THE HOLDER'S OWN-WRITE RECEIPT,
+     and it is [lk_cpu_cell_ex]'s shape one field over.  [holding()] reads
+     BOTH lock fields and the holder's read of each must be EXACT; A6.78
+     §(2) named the asymmetry for the owner CELL and A6.84 implemented it
+     there, and the word wants it for the identical reason -- the invariant
+     knows the CURRENT value, and under TSO a load may return an older one
+     unless the reader can point at its own write.
+
+     The state SELECTS the arm, exactly as [lk_cpu_cell_ex] does: a free
+     lock's word is nobody's own write and carries no receipt; a held one
+     is the holder's AMO and carries its message fragment. <<< *)
+  Definition lock_word_ex (ex : option CPU) (lk : mword 64) (v : mword 32)
+      : iProp Σ :=
+    match ex with
+    | Some i => TsoCtx.phys_ledger_word4_vis (hart_agent i) 0 lk (DfracOwn 1) v
+    | None   => lock_word lk v
+    end.
+
+  Global Instance lock_word_ex_timeless ex lk v : Timeless (lock_word_ex ex lk v).
+  Proof. destruct ex; rewrite /lock_word_ex /lock_word; apply _. Qed.
+
+  (* the held arm forgets its receipt: what release spends on the way out *)
+  Lemma lock_word_ex_forget ex lk v : lock_word_ex ex lk v ⊢ lock_word lk v.
+  Proof.
+    destruct ex as [i|]; [| by iIntros "$"].
+    rewrite /lock_word_ex /lock_word.
+    iIntros "H". by iApply TsoCtx.phys_ledger_word4_vis_forget.
+  Qed.
+
+  Lemma lock_word_ex_free lk v : lock_word_ex None lk v ⊣⊢ lock_word lk v.
+  Proof. reflexivity. Qed.
+
+  Lemma lock_word_ex_aligned_p ex lk v :
+    lock_word_ex ex lk v ⊢ ⌜is_aligned_paddr (Physaddr lk) 4 = true⌝.
+  Proof.
+    destruct ex as [i|].
+    - iApply TsoCtx.phys_ledger_word4_vis_aligned_p.
+    - iApply TsoCtx.phys_ledger_word4_aligned_p.
+  Qed.
+
   (* the INTRODUCTION leg, which is all the creators need.  ONE-WAY, and
      deliberately: the lock's word never goes back to the ctx tower. *)
   Lemma lock_word_intro (lk : mword 64) (v : mword 32) :
@@ -368,7 +408,14 @@ Section Lock.
           ∃ ppj : mword 44,
             kmap_at (svpn_of (pa_add a j)) ppj KP_rw ∗
             ⌜(uint (pa_add a j) < 274877906944)%Z⌝ ∗
-            ⌜ktier_pin KT0 ppj (pa_add a j)⌝))%I.
+            ⌜ktier_pin KT0 ppj (pa_add a j)⌝ ∗
+            (* A6.87: RAM-ness PER BYTE.  [TsoCtx.ledger_read_any_word_ok]
+               -- the gate that makes the free-path word read own nothing --
+               asks for it at every byte of the window, and the producer has
+               it for free off the very ctx byte it is reading the mapping
+               off.  Stated at [pa_add a j] rather than at [pa_of ppj _]
+               because the tier pin identifies them (A6.84's [ktier_pin_id]). *)
+            ⌜addr_is_ram (pa_add a j)⌝))%I.
 
   Global Instance lk_addr_claim_persistent a width :
     Persistent (lk_addr_claim a width).
@@ -381,8 +428,20 @@ Section Lock.
       ∃ ppj : mword 44,
         kmap_at (svpn_of (pa_add a j)) ppj KP_rw ∗
         ⌜(uint (pa_add a j) < 274877906944)%Z⌝ ∗
-        ⌜ktier_pin KT0 ppj (pa_add a j)⌝.
+        ⌜ktier_pin KT0 ppj (pa_add a j)⌝ ∗
+        ⌜addr_is_ram (pa_add a j)⌝.
   Proof. rewrite /lk_addr_claim. by iIntros "(_ & % & _ & _ & _ & _ & $)". Qed.
+
+  (* the pure half, which is all [ledger_read_any_word_ok] wants *)
+  Lemma lk_addr_claim_ram (a : Arch.pa) (width : Z) :
+    lk_addr_claim a width ⊢
+    ⌜forall j : nat, (j < Z.to_nat width)%nat -> addr_is_ram (pa_add a j)⌝.
+  Proof.
+    rewrite lk_addr_claim_bytes. iIntros "Hb". iIntros (j Hj).
+    iDestruct (big_sepL_lookup _ _ j j with "Hb") as (ppj) "(_ & _ & _ & %Hr)".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    by iPureIntro.
+  Qed.
 
   (* the generic producer: a ctx WORD of any width carries its own claim --
      the base one off byte 0, the per-byte ones off each byte. *)
@@ -399,10 +458,13 @@ Section Lock.
                ∃ ppj : mword 44,
                  kmap_at (svpn_of (pa_add a j)) ppj KP_rw ∗
                  ⌜(uint (pa_add a j) < 274877906944)%Z⌝ ∗
-                 ⌜ktier_pin KT0 ppj (pa_add a j)⌝)%I as "#Hbytes".
+                 ⌜ktier_pin KT0 ppj (pa_add a j)⌝ ∗
+                 ⌜addr_is_ram (pa_add a j)⌝)%I as "#Hbytes".
     { iApply (big_sepL_impl with "Hb"). iIntros "!>" (k j _) "H".
       iEval (rewrite (ctx_pointsto_phys (KTR := KT0))) in "H".
-      iDestruct "H" as (ppj) "(#Hk & %Hc & %Hp & _)".
+      iDestruct "H" as (ppj) "(#Hk & %Hc & %Hp & Hph)".
+      iDestruct (ctx_phys_pointsto_ram with "Hph") as %Hr.
+      rewrite (ktier_pin_id ppj (pa_add a j) Hp) in Hr.
       iExists ppj. iFrame "Hk". by iPureIntro. }
     iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "Hb0".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -684,7 +746,7 @@ Section Lock.
     iDestruct (lk_addr_claim_bytes with "Hcl") as "#Hb".
     change (Z.to_nat 8) with 8%nat.
     iApply (big_sepL_impl with "Hp"). iIntros "!>" (k j Hk) "(%t & Hw)".
-    iDestruct (big_sepL_lookup _ _ k j Hk with "Hb") as (ppj) "(#Hkj & %Hcj & %Hpj)".
+    iDestruct (big_sepL_lookup _ _ k j Hk with "Hb") as (ppj) "(#Hkj & %Hcj & %Hpj & _)".
     rewrite /TsoCtx.mem_free. iExists ppj. iFrame "Hkj".
     iSplitR; [done|]. iSplitR; [done|].
     rewrite (ktier_pin_id ppj (pa_add (lock_cpu lk) j) Hpj).
@@ -782,16 +844,36 @@ Section Lock.
      than what they replaced -- [lock_claims] used to have to take the
      cell APART to read a claim off it, and that is where the last live
      [TsoCtxShim] use lived. *)
-  Definition lock_inv (γ : gname) (lk : mword 64) (s : string)
+  (* A6.87: THE BODY IS NAMED.  Every leaf opens the invariant to work on
+     the CELLS; the two address claims are persistent scenery that has to
+     be put back untouched.  Naming the ∃-part keeps each leaf's
+     [iDestruct] shape exactly what it was before the M4 flip -- the leaf
+     peels the claims off once with [lock_inv_open] and hands them back
+     with [lock_inv_close], and nothing else about it moves. *)
+  Definition lock_body (γ : gname) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) : iProp Σ :=
-    ((∃ (v : mword 32) (st : lock_state),
-        lock_word lk v ∗
+    (∃ (v : mword 32) (st : lock_state),
+        lock_word_ex (lk_ex st) lk v ∗
         lk_cpu_res st lk s ∗
         lock_auth γ st ∗
         (⌜st = None⌝ ∗ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ lock_frag γ None ∗
            lock_pay R
-         ∨ ⌜st ≠ None⌝ ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝)) ∗
+         ∨ ⌜st ≠ None⌝ ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝))%I.
+
+  Definition lock_inv (γ : gname) (lk : mword 64) (s : string)
+      (R : CtxId → iProp Σ) : iProp Σ :=
+    (lock_body γ lk s R ∗
      lk_addr_claim lk 4 ∗ lk_addr_claim (lock_cpu lk) 8)%I.
+
+  Lemma lock_inv_open γ lk s R :
+    lock_inv γ lk s R ⊢
+    lock_body γ lk s R ∗ lk_addr_claim lk 4 ∗ lk_addr_claim (lock_cpu lk) 8.
+  Proof. by rewrite /lock_inv. Qed.
+
+  Lemma lock_inv_close γ lk s R :
+    lk_addr_claim lk 4 -∗ lk_addr_claim (lock_cpu lk) 8 -∗
+    lock_body γ lk s R -∗ lock_inv γ lk s R.
+  Proof. rewrite /lock_inv. iIntros "#H4 #H8 $". by iFrame "H4 H8". Qed.
 
   (* the lock's NAME: [lk->name] (the 8-byte pointer field at +8) holds the
      address of a NUL-terminated string [s].  initlock writes the field once
@@ -995,7 +1077,7 @@ Section Lock.
     iIntros "[Hclose _] Hauth Hfrag Hword [#Hc8 Hcpu] HR".
     iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
-    iNext. rewrite /lock_inv. iFrame "Hc4 Hc8".
+    iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8".
     iExists (mword_of_int 0 : mword 32), None.
     iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Hauth".
@@ -1049,7 +1131,7 @@ Section Lock.
     iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
                      : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
-    iModIntro. iExists γ. rewrite /lock_inv. iFrame "Hc4 Hc8".
+    iModIntro. iExists γ. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8".
     iExists (mword_of_int 0 : mword 32), None.
     iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
@@ -1077,7 +1159,7 @@ Section Lock.
     iMod (lock_pay_intro (CtxMorph0 := HmR) R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
     iApply (inv_alloc lockN E (lock_inv γ lk s R ∨ D)).
-    iNext. iLeft. rewrite /lock_inv. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None.
+    iNext. iLeft. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None.
     iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
     iLeft. iFrame "Hf HR". done.
@@ -1130,7 +1212,7 @@ Section Lock.
     iMod (lock_pay_intro (CtxMorph0 := HmR) R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
     iMod (inv_alloc lockN E (lock_inv γ lk s R) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
-    { iNext. rewrite /lock_inv. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None.
+    { iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None.
       iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
       iLeft. iFrame "Hf HR". done. }

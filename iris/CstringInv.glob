@@ -1,0 +1,166 @@
+DIGEST c5b9c23b4683778e51b4ded9d33569a4
+Fxv6iris.CstringInv
+R779:784 Stdlib.ZArith.ZArith <> <> lib
+R786:789 Stdlib.Lists.List <> <> lib
+R791:794 Stdlib.Bool.Bool <> <> lib
+R796:800 Stdlib.Strings.Ascii <> <> lib
+R802:807 Stdlib.Strings.String <> <> lib
+R809:811 Stdlib.micromega.Lia <> <> lib
+R840:843 stdpp.list <> <> lib
+R845:865 stdpp.bitvector.definitions <> <> lib
+R883:892 xv6iris.RiscvPtsto <> <> lib
+R910:918 xv6iris.PrintkFmt <> <> lib
+R928:940 Stdlib.Lists.List ListNotations <> mod
+def 981:990 <> byte_ascii
+R997:998 stdpp.bitvector.definitions <> bv rec
+binder 993:993 <> b:1
+R1005:1009 Stdlib.Strings.Ascii <> ascii ind
+R1016:1031 Stdlib.Strings.Ascii <> ascii_of_N def
+R1034:1039 Stdlib.ZArith.BinInt Z to_N def
+R1042:1052 stdpp.bitvector.definitions <> bv_unsigned proj
+R1054:1054 xv6iris.CstringInv <> b:1 var
+def 1069:1080 <> bytes_string
+R1088:1091 Corelib.Init.Datatypes <> list ind
+R1094:1095 stdpp.bitvector.definitions <> bv rec
+binder 1083:1084 <> bs:2
+R1103:1108 Stdlib.Strings.String <> string ind
+R1121:1122 xv6iris.CstringInv <> bs:2 var
+R1133:1134 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R1139:1149 Stdlib.Strings.String <> EmptyString constr
+R1156:1159 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R1176:1186 stdpp.decidable <> bool_decide def
+R1190:1192 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1193:1199 stdpp.bitvector.definitions <> Z_to_bv def
+R1234:1239 Stdlib.Strings.String <> String constr
+R1242:1251 xv6iris.CstringInv <> byte_ascii def
+R1257:1268 xv6iris.CstringInv <> bytes_string:3 def
+R1211:1221 Stdlib.Strings.String <> EmptyString constr
+prf 1400:1419 <> byte_ascii_roundtrip
+R1426:1427 stdpp.bitvector.definitions <> bv rec
+binder 1422:1422 <> b:5
+R1488:1490 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1436:1442 stdpp.bitvector.definitions <> Z_to_bv def
+R1447:1452 Stdlib.ZArith.BinInt Z of_N def
+R1455:1470 Stdlib.Strings.Ascii <> N_of_ascii def
+R1473:1482 xv6iris.CstringInv <> byte_ascii def
+R1484:1484 xv6iris.CstringInv <> b:5 var
+R1491:1491 xv6iris.CstringInv <> b:5 var
+R1510:1519 xv6iris.CstringInv <> byte_ascii def
+R1532:1554 Stdlib.Strings.Ascii <> N_ascii_embedding thm
+R1532:1554 Stdlib.Strings.Ascii <> N_ascii_embedding thm
+R1532:1554 Stdlib.Strings.Ascii <> N_ascii_embedding thm
+R1532:1554 Stdlib.Strings.Ascii <> N_ascii_embedding thm
+R1569:1574 Stdlib.ZArith.Znat Z2N id thm
+R1586:1605 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R1569:1574 Stdlib.ZArith.Znat Z2N id thm
+R1569:1574 Stdlib.ZArith.Znat Z2N id thm
+R1569:1574 Stdlib.ZArith.Znat Z2N id thm
+R1586:1605 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R1619:1623 stdpp.bitvector.definitions <> bv_eq thm
+R1619:1623 stdpp.bitvector.definitions <> bv_eq thm
+R1634:1649 stdpp.bitvector.definitions <> Z_to_bv_unsigned thm
+R1634:1649 stdpp.bitvector.definitions <> Z_to_bv_unsigned thm
+R1634:1649 stdpp.bitvector.definitions <> Z_to_bv_unsigned thm
+R1662:1674 stdpp.bitvector.definitions <> bv_wrap_small thm
+R1662:1674 stdpp.bitvector.definitions <> bv_wrap_small thm
+R1683:1702 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R1683:1702 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R1721:1740 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R1721:1740 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R1765:1774 stdpp.bitvector.definitions <> bv_modulus def
+prf 1929:1944 <> byte_ascii_nonul
+R1951:1952 stdpp.bitvector.definitions <> bv rec
+binder 1947:1947 <> b:6
+R1977:1980 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1962:1965 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R1961:1961 xv6iris.CstringInv <> b:6 var
+R1966:1972 stdpp.bitvector.definitions <> Z_to_bv def
+R2012:2014 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1981:1989 Stdlib.Strings.Ascii <> eqb def
+R1992:2001 xv6iris.CstringInv <> byte_ascii def
+R2003:2003 xv6iris.CstringInv <> b:6 var
+R2006:2011 xv6iris.PrintkFmt <> pk_nul def
+R2015:2019 Corelib.Init.Datatypes <> false constr
+R2047:2068 Stdlib.Bool.Bool <> not_true_is_false thm
+R2047:2068 Stdlib.Bool.Bool <> not_true_is_false thm
+R2089:2100 Stdlib.Strings.Ascii <> eqb_eq thm
+R2089:2100 Stdlib.Strings.Ascii <> eqb_eq thm
+R2133:2152 xv6iris.CstringInv <> byte_ascii_roundtrip thm
+R2133:2152 xv6iris.CstringInv <> byte_ascii_roundtrip thm
+R2133:2152 xv6iris.CstringInv <> byte_ascii_roundtrip thm
+R2208:2210 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2185:2200 Stdlib.Strings.Ascii <> N_of_ascii def
+R2202:2207 xv6iris.PrintkFmt <> pk_nul def
+R2208:2210 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2185:2200 Stdlib.Strings.Ascii <> N_of_ascii def
+R2202:2207 xv6iris.PrintkFmt <> pk_nul def
+prf 2285:2302 <> bytes_string_nonul
+R2310:2313 Corelib.Init.Datatypes <> list ind
+R2316:2317 stdpp.bitvector.definitions <> bv rec
+binder 2305:2306 <> bs:7
+R2348:2350 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2325:2329 xv6iris.PrintkFmt <> nonul def
+R2332:2343 xv6iris.CstringInv <> bytes_string def
+R2345:2346 xv6iris.CstringInv <> bs:7 var
+R2351:2354 Corelib.Init.Datatypes <> true constr
+R2476:2491 xv6iris.CstringInv <> byte_ascii_nonul thm
+R2476:2491 xv6iris.CstringInv <> byte_ascii_nonul thm
+R2476:2491 xv6iris.CstringInv <> byte_ascii_nonul thm
+prf 2724:2741 <> cstring_bytes_cons
+R2748:2752 Stdlib.Strings.Ascii <> ascii ind
+binder 2744:2744 <> c:8
+R2760:2765 Stdlib.Strings.String <> string ind
+binder 2756:2756 <> s:9
+R2798:2802 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2772:2784 xv6iris.RiscvPtsto <> cstring_bytes def
+R2787:2792 Stdlib.Strings.String <> String constr
+R2794:2794 xv6iris.CstringInv <> c:8 var
+R2796:2796 xv6iris.CstringInv <> s:9 var
+R2842:2845 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R2803:2809 stdpp.bitvector.definitions <> Z_to_bv def
+R2814:2819 Stdlib.ZArith.BinInt Z of_N def
+R2822:2837 Stdlib.Strings.Ascii <> N_of_ascii def
+R2839:2839 xv6iris.CstringInv <> c:8 var
+R2846:2858 xv6iris.RiscvPtsto <> cstring_bytes def
+R2860:2860 xv6iris.CstringInv <> s:9 var
+prf 3012:3029 <> bytes_string_split
+R3037:3040 Corelib.Init.Datatypes <> list ind
+R3043:3044 stdpp.bitvector.definitions <> bv rec
+binder 3032:3033 <> bs:10
+R3054:3054 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3116:3122 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3055:3061 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R3063:3064 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 3062:3062 <> k:11
+R3084:3087 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R3067:3069 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R3066:3066 xv6iris.CstringInv <> k:11 var
+R3070:3075 stdpp.base <> length abbrev
+R3077:3078 xv6iris.CstringInv <> bs:10 var
+R3095:3097 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3090:3093 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R3094:3094 xv6iris.CstringInv <> k:11 var
+R3088:3089 xv6iris.CstringInv <> bs:10 var
+R3098:3101 Corelib.Init.Datatypes <> Some constr
+R3104:3110 stdpp.bitvector.definitions <> Z_to_bv def
+R3123:3129 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R3147:3148 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R3136:3139 Corelib.Init.Datatypes <> list ind
+R3142:3143 stdpp.bitvector.definitions <> bv rec
+binder 3130:3132 <> pad:12
+R3151:3153 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3149:3150 xv6iris.CstringInv <> bs:10 var
+R3185:3188 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R3154:3166 xv6iris.RiscvPtsto <> cstring_bytes def
+R3169:3180 xv6iris.CstringInv <> bytes_string def
+R3182:3183 xv6iris.CstringInv <> bs:10 var
+R3189:3191 xv6iris.CstringInv <> pad:12 var
+R3281:3292 xv6iris.CstringInv <> bytes_string def
+R3342:3354 xv6iris.RiscvPtsto <> cstring_bytes def
+R3601:3618 xv6iris.CstringInv <> cstring_bytes_cons thm
+R3601:3618 xv6iris.CstringInv <> cstring_bytes_cons thm
+R3601:3618 xv6iris.CstringInv <> cstring_bytes_cons thm
+R3629:3648 xv6iris.CstringInv <> byte_ascii_roundtrip thm
+R3629:3648 xv6iris.CstringInv <> byte_ascii_roundtrip thm
+R3629:3648 xv6iris.CstringInv <> byte_ascii_roundtrip thm
+R3660:3662 Corelib.Init.Datatypes <> app def

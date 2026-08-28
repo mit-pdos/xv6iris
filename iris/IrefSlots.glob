@@ -1,0 +1,616 @@
+DIGEST bc41ca4227222c8820c85fb1ffc0c11c
+Fxv6iris.IrefSlots
+R2298:2303 Stdlib.ZArith.ZArith <> <> lib
+R2305:2307 Stdlib.micromega.Lia <> <> lib
+R2309:2312 Stdlib.Lists.List <> <> lib
+R2341:2344 stdpp.gmap <> <> lib
+R2346:2349 stdpp.list <> <> lib
+R2385:2388 iris.algebra.auth <> <> lib
+R2390:2396 iris.algebra.numbers <> <> lib
+R2398:2402 iris.algebra.ufrac <> <> lib
+R2437:2446 iris.bi.lib.fractional <> <> lib
+R2484:2492 iris.proofmode.proofmode <> <> lib
+R2535:2537 iris.base_logic.lib.own <> <> lib
+R2555:2562 xv6iris.ProcGeom <> <> lib
+R2580:2586 xv6iris.FdSlots <> <> lib
+def 2750:2758 <> IREFSPARE
+R2762:2764 Corelib.Init.Datatypes <> nat ind
+def 3328:3335 <> IREFBOOT
+R3339:3341 Corelib.Init.Datatypes <> nat ind
+def 3472:3480 <> IREFSLOTS
+R3484:3486 Corelib.Init.Datatypes <> nat ind
+R3523:3525 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R3515:3517 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R3497:3500 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R3514:3514 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R3492:3496 xv6iris.ProcGeom <> NPROC def
+R3502:3504 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R3505:3513 xv6iris.IrefSlots <> IREFSPARE def
+R3518:3522 xv6iris.FdSlots <> NFILE def
+R3526:3533 xv6iris.IrefSlots <> IREFBOOT def
+def 4273:4282 <> irefslotUR
+R4286:4290 iris.algebra.cmra <> ucmra rec
+R4295:4300 iris.algebra.auth <> authUR def
+R4303:4310 iris.algebra.cmra <> optionUR canonstruc
+R4312:4317 iris.algebra.ufrac <> ufracR canonstruc
+def 4678:4686 <> nat_ufrac
+R4693:4695 Corelib.Init.Datatypes <> nat ind
+binder 4689:4689 <> n:1
+R4700:4707 iris.algebra.cmra <> optionUR canonstruc
+R4709:4714 iris.algebra.ufrac <> ufracR canonstruc
+R4727:4727 xv6iris.IrefSlots <> n:1 var
+R4738:4738 Corelib.Init.Datatypes <> O constr
+R4746:4749 Corelib.Init.Datatypes <> None constr
+R4755:4755 Corelib.Init.Datatypes <> S constr
+R4763:4766 Corelib.Init.Datatypes <> Some constr
+R4769:4777 stdpp.numbers <> pos_to_Qp def
+R4780:4794 Stdlib.PArith.BinPos Pos of_succ_nat def
+prf 4814:4824 <> nat_ufrac_1
+R4839:4841 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4828:4836 xv6iris.IrefSlots <> nat_ufrac def
+R4842:4845 Corelib.Init.Datatypes <> Some constr
+prf 4885:4896 <> nat_ufrac_op
+R4905:4907 Corelib.Init.Datatypes <> nat ind
+binder 4899:4899 <> a:3
+binder 4901:4901 <> b:4
+R4929:4931 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4912:4920 xv6iris.IrefSlots <> nat_ufrac def
+R4924:4926 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4923:4923 xv6iris.IrefSlots <> a:3 var
+R4927:4927 xv6iris.IrefSlots <> b:4 var
+R4943:4947 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R4932:4940 xv6iris.IrefSlots <> nat_ufrac def
+R4942:4942 xv6iris.IrefSlots <> a:3 var
+R4948:4956 xv6iris.IrefSlots <> nat_ufrac def
+R4958:4958 xv6iris.IrefSlots <> b:4 var
+R5040:5050 Stdlib.Arith.PeanoNat Nat add_0_r thm
+R5040:5050 Stdlib.Arith.PeanoNat Nat add_0_r thm
+R5040:5050 Stdlib.Arith.PeanoNat Nat add_0_r thm
+R5066:5072 iris.algebra.cmra <> Some_op def
+R5074:5081 iris.algebra.ufrac <> ufrac_op thm
+R5083:5095 stdpp.numbers <> pos_to_Qp_add thm
+R5066:5072 iris.algebra.cmra <> Some_op def
+R5066:5072 iris.algebra.cmra <> Some_op def
+R5074:5081 iris.algebra.ufrac <> ufrac_op thm
+R5074:5081 iris.algebra.ufrac <> ufrac_op thm
+R5083:5095 stdpp.numbers <> pos_to_Qp_add thm
+R5083:5095 stdpp.numbers <> pos_to_Qp_add thm
+prf 5203:5216 <> nat_ufrac_incl
+R5225:5227 Corelib.Init.Datatypes <> nat ind
+binder 5219:5219 <> n:5
+binder 5221:5221 <> m:6
+R5261:5264 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5245:5249 iris.algebra.cmra <> ::stdpp_scope:x_'≼'_x not
+R5234:5242 xv6iris.IrefSlots <> nat_ufrac def
+R5244:5244 xv6iris.IrefSlots <> n:5 var
+R5250:5258 xv6iris.IrefSlots <> nat_ufrac def
+R5260:5260 xv6iris.IrefSlots <> m:6 var
+R5267:5270 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R5266:5266 xv6iris.IrefSlots <> n:5 var
+R5271:5271 xv6iris.IrefSlots <> m:6 var
+R5419:5433 iris.algebra.cmra <> option_included thm
+R5419:5433 iris.algebra.cmra <> option_included thm
+R5591:5603 stdpp.base <> leibniz_equiv def
+R5591:5603 stdpp.base <> leibniz_equiv def
+R5619:5631 stdpp.numbers <> pos_to_Qp_inj thm
+R5619:5631 stdpp.numbers <> pos_to_Qp_inj thm
+R5658:5671 iris.algebra.ufrac <> ufrac_included thm
+R5658:5671 iris.algebra.ufrac <> ufrac_included thm
+R5693:5708 stdpp.numbers <> pos_to_Qp_inj_lt thm
+R5693:5708 stdpp.numbers <> pos_to_Qp_inj_lt thm
+rec 6010:6022 <> irefslotGpreS
+proj 6046:6061 <> irefslot_pre_inG
+R6030:6038 iris.base_logic.lib.iprop <> gFunctors rec
+binder 6025:6026 <> Σ:7
+R6066:6068 iris.base_logic.lib.own <> inG class
+R6070:6071 xv6iris.IrefSlots <> Σ:7 var
+R6073:6082 xv6iris.IrefSlots <> irefslotUR def
+rec 6093:6101 <> irefslotG
+proj 6137:6148 <> irefslot_inG
+proj 6174:6186 <> irefslot_name
+R6109:6117 iris.base_logic.lib.iprop <> gFunctors rec
+binder 6104:6105 <> Σ:10
+R6153:6155 iris.base_logic.lib.own <> inG class
+R6157:6158 xv6iris.IrefSlots <> Σ:10 var
+R6160:6169 xv6iris.IrefSlots <> irefslotUR def
+R6190:6194 iris.base_logic.lib.iprop <> gname def
+inst 6216:6229 <> irefslotG_preS
+R6234:6242 xv6iris.IrefSlots <> irefslotG class
+binder 6244:6245 <> Σ:14
+binder 6233:6245 <> irefslotG0:15
+R6250:6262 xv6iris.IrefSlots <> irefslotGpreS class
+R6264:6265 xv6iris.IrefSlots <> Σ:14 var
+R6275:6290 xv6iris.IrefSlots <> irefslot_pre_inG meth
+R6275:6290 xv6iris.IrefSlots <> irefslot_pre_inG meth
+R6275:6290 xv6iris.IrefSlots <> irefslot_pre_inG meth
+R6295:6306 xv6iris.IrefSlots <> irefslot_inG meth
+def 6323:6332 <> irefslotΣ
+R6336:6344 iris.base_logic.lib.iprop <> gFunctors rec
+R6349:6350 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6370:6370 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R6351:6358 iris.base_logic.lib.iprop <> GFunctor constr
+R6360:6369 xv6iris.IrefSlots <> irefslotUR def
+inst 6389:6403 <> subG_irefslotΣ
+binder 6406:6407 <> Σ:16
+R6430:6433 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6412:6415 iris.base_logic.lib.iprop <> subG class
+R6428:6429 xv6iris.IrefSlots <> Σ:16 var
+R6417:6426 xv6iris.IrefSlots <> irefslotΣ def
+R6434:6446 xv6iris.IrefSlots <> irefslotGpreS class
+R6448:6449 xv6iris.IrefSlots <> Σ:16 var
+sec 6484:6492 <> IrefSlots
+R6508:6516 xv6iris.IrefSlots <> irefslotG class
+def 6831:6839 <> iref_frac
+R6846:6847 stdpp.numbers <> Qp rec
+binder 6842:6842 <> q:19
+R6852:6856 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6858:6859 xv6iris.IrefSlots <> IrefSlots.Σ var
+R6868:6870 iris.base_logic.lib.own <> own def
+R6887:6891 iris.algebra.auth <> :::'◯'_x not
+R6916:6916 iris.algebra.auth <> :::'◯'_x not
+R6901:6908 iris.algebra.cmra <> optionUR canonstruc
+R6910:6915 iris.algebra.ufrac <> ufracR canonstruc
+R6892:6895 Corelib.Init.Datatypes <> Some constr
+R6897:6897 xv6iris.IrefSlots <> q:19 var
+R6872:6884 xv6iris.IrefSlots <> irefslot_name meth
+def 6998:7007 <> iref_slots
+R7014:7016 Corelib.Init.Datatypes <> nat ind
+binder 7010:7010 <> n:20
+R7021:7025 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R7027:7028 xv6iris.IrefSlots <> IrefSlots.Σ var
+R7033:7035 iris.base_logic.lib.own <> own def
+R7052:7055 iris.algebra.auth <> :::'◯'_x not
+R7056:7064 xv6iris.IrefSlots <> nat_ufrac def
+R7066:7066 xv6iris.IrefSlots <> n:20 var
+R7037:7049 xv6iris.IrefSlots <> irefslot_name meth
+def 7083:7091 <> iref_slot
+R7095:7099 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R7101:7102 xv6iris.IrefSlots <> IrefSlots.Σ var
+R7107:7116 xv6iris.IrefSlots <> iref_slots def
+prf 7130:7143 <> iref_slot_frac
+R7156:7163 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R7147:7155 xv6iris.IrefSlots <> iref_slot def
+R7164:7172 xv6iris.IrefSlots <> iref_frac def
+R7195:7203 xv6iris.IrefSlots <> iref_slot def
+R7206:7215 xv6iris.IrefSlots <> iref_slots def
+R7218:7226 xv6iris.IrefSlots <> iref_frac def
+R7228:7238 xv6iris.IrefSlots <> nat_ufrac_1 thm
+R7195:7203 xv6iris.IrefSlots <> iref_slot def
+R7195:7203 xv6iris.IrefSlots <> iref_slot def
+R7206:7215 xv6iris.IrefSlots <> iref_slots def
+R7206:7215 xv6iris.IrefSlots <> iref_slots def
+R7218:7226 xv6iris.IrefSlots <> iref_frac def
+R7218:7226 xv6iris.IrefSlots <> iref_frac def
+R7228:7238 xv6iris.IrefSlots <> nat_ufrac_1 thm
+R7228:7238 xv6iris.IrefSlots <> nat_ufrac_1 thm
+def 7334:7348 <> iref_slots_auth
+R7352:7356 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R7358:7359 xv6iris.IrefSlots <> IrefSlots.Σ var
+R7368:7370 iris.base_logic.lib.own <> own def
+R7387:7389 iris.algebra.auth <> :::'●'_x_x not
+R7390:7390 iris.algebra.auth <> :::'●'_x_x not
+R7391:7399 xv6iris.IrefSlots <> nat_ufrac def
+R7401:7409 xv6iris.IrefSlots <> IREFSLOTS def
+R7372:7384 xv6iris.IrefSlots <> irefslot_name meth
+inst 7432:7450 <> iref_slots_timeless
+binder 7452:7452 <> n:21
+R7456:7463 iris.bi.derived_connectives <> Timeless class
+R7466:7475 xv6iris.IrefSlots <> iref_slots def
+R7477:7477 xv6iris.IrefSlots <> n:21 var
+prf 7659:7671 <> iref_slots_op
+binder 7673:7673 <> a:22
+binder 7675:7675 <> b:23
+R7697:7704 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R7679:7688 xv6iris.IrefSlots <> iref_slots def
+R7692:7694 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R7691:7691 xv6iris.IrefSlots <> a:22 var
+R7695:7695 xv6iris.IrefSlots <> b:23 var
+R7717:7721 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7705:7714 xv6iris.IrefSlots <> iref_slots def
+R7716:7716 xv6iris.IrefSlots <> a:22 var
+R7722:7731 xv6iris.IrefSlots <> iref_slots def
+R7733:7733 xv6iris.IrefSlots <> b:23 var
+R7758:7767 xv6iris.IrefSlots <> iref_slots def
+R7769:7780 xv6iris.IrefSlots <> nat_ufrac_op thm
+R7758:7767 xv6iris.IrefSlots <> iref_slots def
+R7758:7767 xv6iris.IrefSlots <> iref_slots def
+R7769:7780 xv6iris.IrefSlots <> nat_ufrac_op thm
+R7769:7780 xv6iris.IrefSlots <> nat_ufrac_op thm
+R7801:7801 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7848:7869 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7838:7847 xv6iris.IrefSlots <> irefslotUR def
+R7802:7806 iris.algebra.auth <> :::'◯'_x not
+R7834:7834 iris.algebra.auth <> :::'◯'_x not
+R7818:7822 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R7807:7815 xv6iris.IrefSlots <> nat_ufrac def
+R7823:7831 xv6iris.IrefSlots <> nat_ufrac def
+R7885:7889 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R7870:7873 iris.algebra.auth <> :::'◯'_x not
+R7874:7882 xv6iris.IrefSlots <> nat_ufrac def
+R7890:7893 iris.algebra.auth <> :::'◯'_x not
+R7894:7902 xv6iris.IrefSlots <> nat_ufrac def
+R7926:7937 iris.algebra.auth <> auth_frag_op thm
+R7801:7801 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7848:7869 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7838:7847 xv6iris.IrefSlots <> irefslotUR def
+R7802:7806 iris.algebra.auth <> :::'◯'_x not
+R7834:7834 iris.algebra.auth <> :::'◯'_x not
+R7818:7822 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R7807:7815 xv6iris.IrefSlots <> nat_ufrac def
+R7823:7831 xv6iris.IrefSlots <> nat_ufrac def
+R7885:7889 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R7870:7873 iris.algebra.auth <> :::'◯'_x not
+R7874:7882 xv6iris.IrefSlots <> nat_ufrac def
+R7890:7893 iris.algebra.auth <> :::'◯'_x not
+R7894:7902 xv6iris.IrefSlots <> nat_ufrac def
+R7926:7937 iris.algebra.auth <> auth_frag_op thm
+R7926:7937 iris.algebra.auth <> auth_frag_op thm
+R7970:7975 iris.base_logic.lib.own <> own_op thm
+R7970:7975 iris.base_logic.lib.own <> own_op thm
+R7970:7975 iris.base_logic.lib.own <> own_op thm
+prf 8116:8127 <> iref_frac_op
+binder 8129:8130 <> q1:24
+binder 8132:8133 <> q2:25
+R8156:8163 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R8137:8145 xv6iris.IrefSlots <> iref_frac def
+R8150:8152 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R8148:8149 xv6iris.IrefSlots <> q1:24 var
+R8153:8154 xv6iris.IrefSlots <> q2:25 var
+R8176:8180 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R8164:8172 xv6iris.IrefSlots <> iref_frac def
+R8174:8175 xv6iris.IrefSlots <> q1:24 var
+R8181:8189 xv6iris.IrefSlots <> iref_frac def
+R8191:8192 xv6iris.IrefSlots <> q2:25 var
+R8217:8225 xv6iris.IrefSlots <> iref_frac def
+R8217:8225 xv6iris.IrefSlots <> iref_frac def
+R8217:8225 xv6iris.IrefSlots <> iref_frac def
+R8246:8246 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8301:8322 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8291:8300 xv6iris.IrefSlots <> irefslotUR def
+R8247:8251 iris.algebra.auth <> :::'◯'_x not
+R8287:8287 iris.algebra.auth <> :::'◯'_x not
+R8272:8279 iris.algebra.cmra <> optionUR canonstruc
+R8281:8286 iris.algebra.ufrac <> ufracR canonstruc
+R8252:8255 Corelib.Init.Datatypes <> Some constr
+R8260:8262 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R8354:8358 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R8323:8327 iris.algebra.auth <> :::'◯'_x not
+R8353:8353 iris.algebra.auth <> :::'◯'_x not
+R8338:8345 iris.algebra.cmra <> optionUR canonstruc
+R8347:8352 iris.algebra.ufrac <> ufracR canonstruc
+R8328:8331 Corelib.Init.Datatypes <> Some constr
+R8359:8363 iris.algebra.auth <> :::'◯'_x not
+R8389:8389 iris.algebra.auth <> :::'◯'_x not
+R8374:8381 iris.algebra.cmra <> optionUR canonstruc
+R8383:8388 iris.algebra.ufrac <> ufracR canonstruc
+R8364:8367 Corelib.Init.Datatypes <> Some constr
+R8411:8422 iris.algebra.auth <> auth_frag_op thm
+R8425:8431 iris.algebra.cmra <> Some_op def
+R8433:8440 iris.algebra.ufrac <> ufrac_op thm
+R8246:8246 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8301:8322 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8291:8300 xv6iris.IrefSlots <> irefslotUR def
+R8247:8251 iris.algebra.auth <> :::'◯'_x not
+R8287:8287 iris.algebra.auth <> :::'◯'_x not
+R8272:8279 iris.algebra.cmra <> optionUR canonstruc
+R8281:8286 iris.algebra.ufrac <> ufracR canonstruc
+R8252:8255 Corelib.Init.Datatypes <> Some constr
+R8260:8262 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R8354:8358 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R8323:8327 iris.algebra.auth <> :::'◯'_x not
+R8353:8353 iris.algebra.auth <> :::'◯'_x not
+R8338:8345 iris.algebra.cmra <> optionUR canonstruc
+R8347:8352 iris.algebra.ufrac <> ufracR canonstruc
+R8328:8331 Corelib.Init.Datatypes <> Some constr
+R8359:8363 iris.algebra.auth <> :::'◯'_x not
+R8389:8389 iris.algebra.auth <> :::'◯'_x not
+R8374:8381 iris.algebra.cmra <> optionUR canonstruc
+R8383:8388 iris.algebra.ufrac <> ufracR canonstruc
+R8364:8367 Corelib.Init.Datatypes <> Some constr
+R8411:8422 iris.algebra.auth <> auth_frag_op thm
+R8411:8422 iris.algebra.auth <> auth_frag_op thm
+R8425:8431 iris.algebra.cmra <> Some_op def
+R8425:8431 iris.algebra.cmra <> Some_op def
+R8433:8440 iris.algebra.ufrac <> ufrac_op thm
+R8433:8440 iris.algebra.ufrac <> ufrac_op thm
+R8473:8478 iris.base_logic.lib.own <> own_op thm
+R8473:8478 iris.base_logic.lib.own <> own_op thm
+R8473:8478 iris.base_logic.lib.own <> own_op thm
+prf 8510:8524 <> iref_frac_split
+binder 8526:8527 <> q1:26
+binder 8529:8530 <> q2:27
+R8553:8558 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8534:8542 xv6iris.IrefSlots <> iref_frac def
+R8547:8549 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R8545:8546 xv6iris.IrefSlots <> q1:26 var
+R8550:8551 xv6iris.IrefSlots <> q2:27 var
+R8571:8575 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R8559:8567 xv6iris.IrefSlots <> iref_frac def
+R8569:8570 xv6iris.IrefSlots <> q1:26 var
+R8576:8584 xv6iris.IrefSlots <> iref_frac def
+R8586:8587 xv6iris.IrefSlots <> q2:27 var
+R8607:8618 xv6iris.IrefSlots <> iref_frac_op thm
+R8607:8618 xv6iris.IrefSlots <> iref_frac_op thm
+R8607:8618 xv6iris.IrefSlots <> iref_frac_op thm
+prf 8647:8663 <> iref_frac_combine
+binder 8665:8666 <> q1:28
+binder 8668:8669 <> q2:29
+R8685:8690 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8673:8681 xv6iris.IrefSlots <> iref_frac def
+R8683:8684 xv6iris.IrefSlots <> q1:28 var
+R8703:8708 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8691:8699 xv6iris.IrefSlots <> iref_frac def
+R8701:8702 xv6iris.IrefSlots <> q2:29 var
+R8709:8717 xv6iris.IrefSlots <> iref_frac def
+R8722:8724 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R8720:8721 xv6iris.IrefSlots <> q1:28 var
+R8725:8726 xv6iris.IrefSlots <> q2:29 var
+R8764:8775 xv6iris.IrefSlots <> iref_frac_op thm
+R8764:8775 xv6iris.IrefSlots <> iref_frac_op thm
+R8764:8775 xv6iris.IrefSlots <> iref_frac_op thm
+inst 8810:8829 <> iref_frac_fractional
+R8833:8842 iris.bi.lib.fractional <> Fractional class
+R8844:8852 xv6iris.IrefSlots <> iref_frac def
+R8884:8895 xv6iris.IrefSlots <> iref_frac_op thm
+R8884:8895 xv6iris.IrefSlots <> iref_frac_op thm
+inst 8921:8943 <> iref_frac_as_fractional
+binder 8945:8945 <> q:30
+R8953:8964 iris.bi.lib.fractional <> AsFractional class
+R8990:8990 xv6iris.IrefSlots <> q:30 var
+R8980:8988 xv6iris.IrefSlots <> iref_frac def
+R8967:8975 xv6iris.IrefSlots <> iref_frac def
+R8977:8977 xv6iris.IrefSlots <> q:30 var
+inst 9058:9075 <> iref_frac_timeless
+binder 9077:9077 <> q:31
+R9081:9088 iris.bi.derived_connectives <> Timeless class
+R9091:9099 xv6iris.IrefSlots <> iref_frac def
+R9101:9101 xv6iris.IrefSlots <> q:31 var
+prf 9137:9152 <> iref_slots_split
+binder 9154:9154 <> a:32
+binder 9156:9156 <> b:33
+R9178:9183 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9160:9169 xv6iris.IrefSlots <> iref_slots def
+R9173:9175 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R9172:9172 xv6iris.IrefSlots <> a:32 var
+R9176:9176 xv6iris.IrefSlots <> b:33 var
+R9196:9200 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R9184:9193 xv6iris.IrefSlots <> iref_slots def
+R9195:9195 xv6iris.IrefSlots <> a:32 var
+R9201:9210 xv6iris.IrefSlots <> iref_slots def
+R9212:9212 xv6iris.IrefSlots <> b:33 var
+R9232:9244 xv6iris.IrefSlots <> iref_slots_op thm
+R9232:9244 xv6iris.IrefSlots <> iref_slots_op thm
+R9232:9244 xv6iris.IrefSlots <> iref_slots_op thm
+prf 9273:9290 <> iref_slots_combine
+binder 9292:9292 <> a:34
+binder 9294:9294 <> b:35
+R9310:9315 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9298:9307 xv6iris.IrefSlots <> iref_slots def
+R9309:9309 xv6iris.IrefSlots <> a:34 var
+R9328:9333 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9316:9325 xv6iris.IrefSlots <> iref_slots def
+R9327:9327 xv6iris.IrefSlots <> b:35 var
+R9334:9343 xv6iris.IrefSlots <> iref_slots def
+R9347:9349 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R9346:9346 xv6iris.IrefSlots <> a:34 var
+R9350:9350 xv6iris.IrefSlots <> b:35 var
+R9388:9400 xv6iris.IrefSlots <> iref_slots_op thm
+R9388:9400 xv6iris.IrefSlots <> iref_slots_op thm
+R9388:9400 xv6iris.IrefSlots <> iref_slots_op thm
+prf 9550:9565 <> iref_slots_bound
+binder 9567:9567 <> n:36
+R9590:9595 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9575:9589 xv6iris.IrefSlots <> iref_slots_auth def
+R9608:9613 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9596:9605 xv6iris.IrefSlots <> iref_slots def
+R9607:9607 xv6iris.IrefSlots <> n:36 var
+R9614:9616 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9637:9639 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9619:9622 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R9618:9618 xv6iris.IrefSlots <> n:36 var
+R9623:9631 xv6iris.IrefSlots <> IREFSLOTS def
+R9664:9678 xv6iris.IrefSlots <> iref_slots_auth def
+R9681:9690 xv6iris.IrefSlots <> iref_slots def
+R9664:9678 xv6iris.IrefSlots <> iref_slots_auth def
+R9664:9678 xv6iris.IrefSlots <> iref_slots_auth def
+R9681:9690 xv6iris.IrefSlots <> iref_slots def
+R9681:9690 xv6iris.IrefSlots <> iref_slots def
+R9724:9724 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9736:9741 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9749:9749 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9725:9735 iris.base_logic.lib.own <> own_valid_2 thm
+R9765:9788 iris.algebra.auth <> auth_both_valid_discrete thm
+R9724:9724 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9736:9741 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9749:9749 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9725:9735 iris.base_logic.lib.own <> own_valid_2 thm
+R9765:9788 iris.algebra.auth <> auth_both_valid_discrete thm
+R9816:9829 xv6iris.IrefSlots <> nat_ufrac_incl thm
+R9816:9829 xv6iris.IrefSlots <> nat_ufrac_incl thm
+prf 10459:10480 <> iref_slots_no_overflow
+R10487:10494 Corelib.Numbers.BinNums <> positive ind
+binder 10483:10483 <> n:37
+R10518:10523 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10503:10517 xv6iris.IrefSlots <> iref_slots_auth def
+R10549:10558 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10524:10533 xv6iris.IrefSlots <> iref_slots def
+R10536:10545 Stdlib.PArith.BinPos Pos to_nat def
+R10547:10547 xv6iris.IrefSlots <> n:37 var
+R10559:10561 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10617:10619 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R10582:10585 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R10570:10572 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R10563:10567 Stdlib.ZArith.BinInt Z pos abbrev
+R10569:10569 xv6iris.IrefSlots <> n:37 var
+R10574:10576 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R10605:10607 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R10587:10591 Stdlib.ZArith.BinInt Z pos abbrev
+R10594:10601 Stdlib.PArith.BinPos Pos succ def
+R10603:10603 xv6iris.IrefSlots <> n:37 var
+R10609:10611 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R10666:10666 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10683:10688 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10696:10696 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10667:10682 xv6iris.IrefSlots <> iref_slots_bound thm
+R10666:10666 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10683:10688 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10696:10696 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10667:10682 xv6iris.IrefSlots <> iref_slots_bound thm
+R10748:10750 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10743:10745 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R10748:10750 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10743:10745 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R10822:10824 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10813:10821 xv6iris.IrefSlots <> IREFSLOTS def
+R10822:10824 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10813:10821 xv6iris.IrefSlots <> IREFSLOTS def
+R10912:10915 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R10905:10909 Stdlib.ZArith.BinInt Z pos abbrev
+R10912:10915 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R10905:10909 Stdlib.ZArith.BinInt Z pos abbrev
+R10940:10953 Stdlib.ZArith.Znat <> positive_nat_Z thm
+R10940:10953 Stdlib.ZArith.Znat <> positive_nat_Z thm
+R10940:10953 Stdlib.ZArith.Znat <> positive_nat_Z thm
+prf 11239:11256 <> iref_slots_split_n
+R11265:11267 Corelib.Init.Datatypes <> nat ind
+binder 11259:11259 <> n:38
+binder 11261:11261 <> m:39
+R11294:11299 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11276:11285 xv6iris.IrefSlots <> iref_slots def
+R11289:11291 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R11288:11288 xv6iris.IrefSlots <> n:38 var
+R11292:11292 xv6iris.IrefSlots <> m:39 var
+R11300:11310 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11312:11316 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11324:11325 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 11311:11311 <> pat:40
+R11326:11335 xv6iris.IrefSlots <> iref_slots def
+R11337:11337 xv6iris.IrefSlots <> m:39 var
+R11317:11319 Corelib.Lists.ListDef <> seq def
+R11323:11323 xv6iris.IrefSlots <> n:38 var
+R11411:11415 Stdlib.Lists.List <> seq_S thm
+R11417:11428 iris.bi.big_op <> big_sepL_app thm
+R11411:11415 Stdlib.Lists.List <> seq_S thm
+R11411:11415 Stdlib.Lists.List <> seq_S thm
+R11417:11428 iris.bi.big_op <> big_sepL_app thm
+R11417:11428 iris.bi.big_op <> big_sepL_app thm
+R11450:11452 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R11447:11447 Corelib.Init.Datatypes <> S constr
+R11467:11469 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R11471:11473 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R11450:11452 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R11447:11447 Corelib.Init.Datatypes <> S constr
+R11467:11469 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R11471:11473 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R11503:11503 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11520:11525 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11529:11529 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11504:11519 xv6iris.IrefSlots <> iref_slots_split thm
+R11503:11503 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11520:11525 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11529:11529 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11504:11519 xv6iris.IrefSlots <> iref_slots_split thm
+prf 11609:11625 <> iref_slots_to_any
+binder 11628:11628 <> A:41
+R11636:11639 Corelib.Init.Datatypes <> list ind
+R11641:11641 xv6iris.IrefSlots <> A:41 var
+binder 11632:11632 <> l:42
+R11671:11676 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11650:11659 xv6iris.IrefSlots <> iref_slots def
+R11662:11667 Corelib.Init.Datatypes <> length def
+R11669:11669 xv6iris.IrefSlots <> l:42 var
+R11677:11687 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11689:11693 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R11695:11696 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 11688:11688 <> pat:43
+R11697:11705 xv6iris.IrefSlots <> iref_slot def
+R11694:11694 xv6iris.IrefSlots <> l:42 var
+R11778:11783 Corelib.Init.Datatypes <> length def
+R11785:11791 iris.algebra.big_op <> big_opL def
+R11808:11808 Corelib.Init.Datatypes <> S constr
+R11811:11816 Corelib.Init.Datatypes <> length def
+R11836:11838 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R11828:11833 Corelib.Init.Datatypes <> length def
+R11808:11808 Corelib.Init.Datatypes <> S constr
+R11811:11816 Corelib.Init.Datatypes <> length def
+R11836:11838 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R11828:11833 Corelib.Init.Datatypes <> length def
+R11868:11868 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11885:11890 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11894:11894 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11869:11884 xv6iris.IrefSlots <> iref_slots_split thm
+R11868:11868 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11885:11890 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11894:11894 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11869:11884 xv6iris.IrefSlots <> iref_slots_split thm
+prf 11974:11991 <> iref_slots_to_list
+binder 11993:11993 <> n:44
+R12013:12018 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12001:12010 xv6iris.IrefSlots <> iref_slots def
+R12012:12012 xv6iris.IrefSlots <> n:44 var
+R12019:12029 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R12031:12035 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R12043:12044 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 12030:12030 <> pat:45
+R12045:12053 xv6iris.IrefSlots <> iref_slot def
+R12036:12038 Corelib.Lists.ListDef <> seq def
+R12042:12042 xv6iris.IrefSlots <> n:44 var
+R12132:12136 Stdlib.Lists.List <> seq_S thm
+R12138:12149 iris.bi.big_op <> big_sepL_app thm
+R12132:12136 Stdlib.Lists.List <> seq_S thm
+R12132:12136 Stdlib.Lists.List <> seq_S thm
+R12138:12149 iris.bi.big_op <> big_sepL_app thm
+R12138:12149 iris.bi.big_op <> big_sepL_app thm
+R12170:12170 Corelib.Init.Datatypes <> S constr
+R12182:12184 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R12170:12170 Corelib.Init.Datatypes <> S constr
+R12182:12184 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R12216:12216 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12233:12238 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12242:12242 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12217:12232 xv6iris.IrefSlots <> iref_slots_split thm
+R12216:12216 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12233:12238 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12242:12242 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12217:12232 xv6iris.IrefSlots <> iref_slots_split thm
+R12328:12336 xv6iris.IrefSlots IrefSlots <> sec
+prf 12559:12574 <> iref_slots_alloc
+R12579:12591 xv6iris.IrefSlots <> irefslotGpreS class
+binder 12593:12594 <> Σ:46
+binder 12578:12594 <> irefslotGpreS0:47
+R12601:12604 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R12605:12609 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R12610:12613 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R12630:12631 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R12618:12626 xv6iris.IrefSlots <> irefslotG class
+R12628:12629 xv6iris.IrefSlots <> Σ:46 var
+R12647:12651 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R12632:12646 xv6iris.IrefSlots <> iref_slots_auth def
+R12652:12661 xv6iris.IrefSlots <> iref_slots def
+R12663:12671 xv6iris.IrefSlots <> IREFSLOTS def
+R12689:12697 iris.base_logic.lib.own <> own_alloc thm
+R12723:12727 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R12700:12702 iris.algebra.auth <> :::'●'_x_x not
+R12703:12703 iris.algebra.auth <> :::'●'_x_x not
+R12704:12712 xv6iris.IrefSlots <> nat_ufrac def
+R12714:12722 xv6iris.IrefSlots <> IREFSLOTS def
+R12728:12731 iris.algebra.auth <> :::'◯'_x not
+R12732:12740 xv6iris.IrefSlots <> nat_ufrac def
+R12742:12750 xv6iris.IrefSlots <> IREFSLOTS def
+R12689:12697 iris.base_logic.lib.own <> own_alloc thm
+R12723:12727 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R12700:12702 iris.algebra.auth <> :::'●'_x_x not
+R12703:12703 iris.algebra.auth <> :::'●'_x_x not
+R12704:12712 xv6iris.IrefSlots <> nat_ufrac def
+R12714:12722 xv6iris.IrefSlots <> IREFSLOTS def
+R12728:12731 iris.algebra.auth <> :::'◯'_x not
+R12732:12740 xv6iris.IrefSlots <> nat_ufrac def
+R12742:12750 xv6iris.IrefSlots <> IREFSLOTS def
+R12783:12806 iris.algebra.auth <> auth_both_valid_discrete thm
+R12783:12806 iris.algebra.auth <> auth_both_valid_discrete thm
+R12837:12845 xv6iris.IrefSlots <> nat_ufrac def
+R12847:12855 xv6iris.IrefSlots <> IREFSLOTS def
+R12837:12845 xv6iris.IrefSlots <> nat_ufrac def
+R12847:12855 xv6iris.IrefSlots <> IREFSLOTS def
+R12884:12892 xv6iris.IrefSlots <> IrefSlotG constr
+R12884:12892 xv6iris.IrefSlots <> IrefSlotG constr

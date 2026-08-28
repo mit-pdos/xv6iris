@@ -1,0 +1,5 @@
+DIGEST 058834ae11936ffe8f5bc7402d52b7eb
+Fxv6iris.LinkStrncmp
+R297:308 xv6iris.ProofStrncmp <> <> lib
+R330:341 xv6iris.ProofStrncmp StrncmpProof <> modtype
+mod 319:325 <> Strncmp

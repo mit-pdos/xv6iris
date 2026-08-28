@@ -1,0 +1,289 @@
+DIGEST 836e05ed158708bd9cd4381185de126d
+Fxv6iris.PStringBytes
+R1928:1933 Stdlib.ZArith.ZArith <> <> lib
+R1935:1938 Stdlib.Lists.List <> <> lib
+R1940:1942 Stdlib.micromega.Lia <> <> lib
+R1980:1986 Stdlib.Strings.PString <> <> lib
+R2015:2018 stdpp.list <> <> lib
+R2057:2067 stdpp.bitvector.definitions <> <> lib
+def 2465:2476 <> pstring_char
+R2483:2499 Corelib.Strings.PrimString <> string prim
+binder 2479:2479 <> s:1
+R2507:2507 Corelib.Numbers.BinNums <> Z ind
+binder 2503:2503 <> i:2
+R2512:2512 Corelib.Numbers.BinNums <> Z ind
+R2519:2529 Stdlib.Numbers.Cyclic.Int63.Uint63 <> to_Z abbrev
+R2532:2545 Corelib.Strings.PrimString <> get prim
+R2547:2547 xv6iris.PStringBytes <> s:1 var
+R2550:2560 Stdlib.Numbers.Cyclic.Int63.Uint63 <> of_Z abbrev
+R2562:2562 xv6iris.PStringBytes <> i:2 var
+def 2628:2640 <> hex_digit_val
+R2647:2647 Corelib.Numbers.BinNums <> Z ind
+binder 2643:2643 <> c:3
+R2652:2652 Corelib.Numbers.BinNums <> Z ind
+R2661:2664 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<?'_x not
+R2660:2660 xv6iris.PStringBytes <> c:3 var
+R2686:2688 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R2685:2685 xv6iris.PStringBytes <> c:3 var
+R2674:2676 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R2673:2673 xv6iris.PStringBytes <> c:3 var
+def 2780:2797 <> pstring_hex_length
+R2804:2820 Corelib.Strings.PrimString <> string prim
+binder 2800:2800 <> s:4
+R2825:2825 Corelib.Numbers.BinNums <> Z ind
+R2865:2867 Stdlib.ZArith.BinInt <> ::Z_scope:x_'/'_x not
+R2832:2842 Stdlib.Numbers.Cyclic.Int63.Uint63 <> to_Z abbrev
+R2845:2861 Corelib.Strings.PrimString <> length prim
+R2863:2863 xv6iris.PStringBytes <> s:4 var
+def 2941:2956 <> pstring_hex_byte
+R2963:2979 Corelib.Strings.PrimString <> string prim
+binder 2959:2959 <> s:5
+R2987:2987 Corelib.Numbers.BinNums <> Z ind
+binder 2983:2983 <> i:6
+R2992:2993 stdpp.bitvector.definitions <> bv rec
+R3002:3008 stdpp.bitvector.definitions <> Z_to_bv def
+R3056:3071 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R3051:3053 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R3013:3025 xv6iris.PStringBytes <> hex_digit_val def
+R3028:3039 xv6iris.PStringBytes <> pstring_char def
+R3041:3041 xv6iris.PStringBytes <> s:5 var
+R3045:3047 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R3048:3048 xv6iris.PStringBytes <> i:6 var
+R3072:3084 xv6iris.PStringBytes <> hex_digit_val def
+R3087:3098 xv6iris.PStringBytes <> pstring_char def
+R3100:3100 xv6iris.PStringBytes <> s:5 var
+R3108:3110 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R3104:3106 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R3107:3107 xv6iris.PStringBytes <> i:6 var
+def 3360:3374 <> pstring_hex_aux
+R3381:3397 Corelib.Strings.PrimString <> string prim
+binder 3377:3377 <> s:7
+R3408:3410 Corelib.Init.Datatypes <> nat ind
+binder 3401:3404 <> fuel:8
+R3418:3418 Corelib.Numbers.BinNums <> Z ind
+binder 3414:3414 <> i:9
+R3453:3456 Corelib.Init.Datatypes <> list ind
+R3459:3460 stdpp.bitvector.definitions <> bv rec
+binder 3447:3449 <> acc:10
+R3468:3471 Corelib.Init.Datatypes <> list ind
+R3474:3475 stdpp.bitvector.definitions <> bv rec
+R3491:3494 xv6iris.PStringBytes <> fuel:8 var
+R3505:3505 Corelib.Init.Datatypes <> O constr
+R3510:3512 xv6iris.PStringBytes <> acc:10 var
+R3518:3518 Corelib.Init.Datatypes <> S constr
+R3525:3539 xv6iris.PStringBytes <> pstring_hex_aux:11 def
+R3574:3577 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R3554:3569 xv6iris.PStringBytes <> pstring_hex_byte def
+R3571:3571 xv6iris.PStringBytes <> s:7 var
+R3573:3573 xv6iris.PStringBytes <> i:9 var
+R3578:3580 xv6iris.PStringBytes <> acc:10 var
+R3547:3549 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R3546:3546 xv6iris.PStringBytes <> i:9 var
+R3541:3541 xv6iris.PStringBytes <> s:7 var
+def 3602:3618 <> pstring_hex_bytes
+R3625:3641 Corelib.Strings.PrimString <> string prim
+binder 3621:3621 <> s:13
+R3646:3649 Corelib.Init.Datatypes <> list ind
+R3652:3653 stdpp.bitvector.definitions <> bv rec
+R3663:3677 xv6iris.PStringBytes <> pstring_hex_aux def
+R3679:3679 xv6iris.PStringBytes <> s:13 var
+R3682:3689 Stdlib.ZArith.BinInt Z to_nat def
+R3692:3709 xv6iris.PStringBytes <> pstring_hex_length def
+R3711:3711 xv6iris.PStringBytes <> s:13 var
+R3736:3738 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R3716:3733 xv6iris.PStringBytes <> pstring_hex_length def
+R3735:3735 xv6iris.PStringBytes <> s:13 var
+R3742:3744 Corelib.Init.Datatypes <> nil constr
+prf 3987:4011 <> pstring_hex_length_nonneg
+R4018:4034 Corelib.Strings.PrimString <> string prim
+binder 4014:4014 <> s:14
+R4040:4043 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R4044:4061 xv6iris.PStringBytes <> pstring_hex_length def
+R4063:4063 xv6iris.PStringBytes <> s:14 var
+R4082:4099 xv6iris.PStringBytes <> pstring_hex_length def
+R4116:4134 Stdlib.Numbers.Cyclic.Int63.Uint63 <> to_Z_bounded thm
+R4137:4153 Corelib.Strings.PrimString <> length prim
+R4116:4134 Stdlib.Numbers.Cyclic.Int63.Uint63 <> to_Z_bounded thm
+R4137:4153 Corelib.Strings.PrimString <> length prim
+R4168:4176 Stdlib.ZArith.BinInt Z div_pos thm
+R4168:4176 Stdlib.ZArith.BinInt Z div_pos thm
+prf 4273:4292 <> pstring_hex_aux_spec
+R4299:4315 Corelib.Strings.PrimString <> string prim
+binder 4295:4295 <> s:15
+R4326:4328 Corelib.Init.Datatypes <> nat ind
+binder 4319:4322 <> fuel:16
+R4339:4339 Corelib.Numbers.BinNums <> Z ind
+binder 4332:4335 <> base:17
+R4376:4379 Corelib.Init.Datatypes <> list ind
+R4382:4383 stdpp.bitvector.definitions <> bv rec
+binder 4370:4372 <> acc:18
+R4446:4450 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4393:4407 xv6iris.PStringBytes <> pstring_hex_aux def
+R4409:4409 xv6iris.PStringBytes <> s:15 var
+R4411:4414 xv6iris.PStringBytes <> fuel:16 var
+R4437:4439 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R4421:4423 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4417:4420 xv6iris.PStringBytes <> base:17 var
+R4424:4431 Stdlib.ZArith.BinInt Z of_nat def
+R4433:4436 xv6iris.PStringBytes <> fuel:16 var
+R4443:4445 xv6iris.PStringBytes <> acc:18 var
+R4517:4520 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R4451:4453 Corelib.Lists.ListDef <> map def
+R4506:4508 Corelib.Lists.ListDef <> seq def
+R4512:4515 xv6iris.PStringBytes <> fuel:16 var
+binder 4460:4460 <> k:19
+R4465:4480 xv6iris.PStringBytes <> pstring_hex_byte def
+R4482:4482 xv6iris.PStringBytes <> s:15 var
+R4489:4491 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4485:4488 xv6iris.PStringBytes <> base:17 var
+R4492:4499 Stdlib.ZArith.BinInt Z of_nat def
+R4501:4501 xv6iris.PStringBytes <> k:19 var
+R4521:4523 xv6iris.PStringBytes <> acc:18 var
+R4634:4636 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R4617:4619 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4620:4627 Stdlib.ZArith.BinInt Z of_nat def
+R4630:4630 Corelib.Init.Datatypes <> S constr
+R4650:4652 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4653:4660 Stdlib.ZArith.BinInt Z of_nat def
+R4634:4636 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R4617:4619 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4620:4627 Stdlib.ZArith.BinInt Z of_nat def
+R4630:4630 Corelib.Init.Datatypes <> S constr
+R4650:4652 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4653:4660 Stdlib.ZArith.BinInt Z of_nat def
+R4681:4695 xv6iris.PStringBytes <> pstring_hex_aux def
+R4712:4716 Stdlib.Lists.List <> seq_S thm
+R4719:4725 Stdlib.Lists.List <> map_app thm
+R4731:4739 Stdlib.Lists.List <> app_assoc thm
+R4712:4716 Stdlib.Lists.List <> seq_S thm
+R4712:4716 Stdlib.Lists.List <> seq_S thm
+R4719:4725 Stdlib.Lists.List <> map_app thm
+R4719:4725 Stdlib.Lists.List <> map_app thm
+R4731:4739 Stdlib.Lists.List <> app_assoc thm
+R4731:4739 Stdlib.Lists.List <> app_assoc thm
+prf 4774:4795 <> pstring_hex_bytes_spec
+R4802:4818 Corelib.Strings.PrimString <> string prim
+binder 4798:4798 <> s:20
+R4844:4848 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4825:4841 xv6iris.PStringBytes <> pstring_hex_bytes def
+R4843:4843 xv6iris.PStringBytes <> s:20 var
+R4849:4851 Corelib.Lists.ListDef <> map def
+R4905:4907 Corelib.Lists.ListDef <> seq def
+R4912:4919 Stdlib.ZArith.BinInt Z to_nat def
+R4922:4939 xv6iris.PStringBytes <> pstring_hex_length def
+R4941:4941 xv6iris.PStringBytes <> s:20 var
+binder 4858:4858 <> k:21
+R4863:4878 xv6iris.PStringBytes <> pstring_hex_byte def
+R4880:4880 xv6iris.PStringBytes <> s:20 var
+R4883:4890 Stdlib.ZArith.BinInt Z of_nat def
+R4892:4892 xv6iris.PStringBytes <> k:21 var
+R4963:4979 xv6iris.PStringBytes <> pstring_hex_bytes def
+R4996:5020 xv6iris.PStringBytes <> pstring_hex_length_nonneg thm
+R4996:5020 xv6iris.PStringBytes <> pstring_hex_length_nonneg thm
+R5057:5059 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R5037:5054 xv6iris.PStringBytes <> pstring_hex_length def
+R5119:5121 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R5074:5076 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5077:5084 Stdlib.ZArith.BinInt Z of_nat def
+R5087:5094 Stdlib.ZArith.BinInt Z to_nat def
+R5097:5114 xv6iris.PStringBytes <> pstring_hex_length def
+R5057:5059 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R5037:5054 xv6iris.PStringBytes <> pstring_hex_length def
+R5119:5121 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R5074:5076 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5077:5084 Stdlib.ZArith.BinInt Z of_nat def
+R5087:5094 Stdlib.ZArith.BinInt Z to_nat def
+R5097:5114 xv6iris.PStringBytes <> pstring_hex_length def
+R5143:5162 xv6iris.PStringBytes <> pstring_hex_aux_spec thm
+R5165:5173 Stdlib.Lists.List <> app_nil_r thm
+R5143:5162 xv6iris.PStringBytes <> pstring_hex_aux_spec thm
+R5143:5162 xv6iris.PStringBytes <> pstring_hex_aux_spec thm
+R5165:5173 Stdlib.Lists.List <> app_nil_r thm
+R5165:5173 Stdlib.Lists.List <> app_nil_r thm
+R5184:5190 Stdlib.Lists.List <> map_ext thm
+R5184:5190 Stdlib.Lists.List <> map_ext thm
+prf 5378:5401 <> pstring_hex_bytes_length
+R5408:5424 Corelib.Strings.PrimString <> string prim
+binder 5404:5404 <> s:22
+R5470:5472 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5431:5438 Stdlib.ZArith.BinInt Z of_nat def
+R5441:5446 stdpp.base <> length abbrev
+R5449:5465 xv6iris.PStringBytes <> pstring_hex_bytes def
+R5467:5467 xv6iris.PStringBytes <> s:22 var
+R5473:5490 xv6iris.PStringBytes <> pstring_hex_length def
+R5492:5492 xv6iris.PStringBytes <> s:22 var
+R5516:5540 xv6iris.PStringBytes <> pstring_hex_length_nonneg thm
+R5516:5540 xv6iris.PStringBytes <> pstring_hex_length_nonneg thm
+R5556:5577 xv6iris.PStringBytes <> pstring_hex_bytes_spec thm
+R5580:5589 Stdlib.Lists.List <> length_map thm
+R5592:5601 Stdlib.Lists.List <> length_seq thm
+R5556:5577 xv6iris.PStringBytes <> pstring_hex_bytes_spec thm
+R5556:5577 xv6iris.PStringBytes <> pstring_hex_bytes_spec thm
+R5580:5589 Stdlib.Lists.List <> length_map thm
+R5580:5589 Stdlib.Lists.List <> length_map thm
+R5592:5601 Stdlib.Lists.List <> length_seq thm
+R5592:5601 Stdlib.Lists.List <> length_seq thm
+prf 5621:5644 <> pstring_hex_bytes_lookup
+R5651:5667 Corelib.Strings.PrimString <> string prim
+binder 5647:5647 <> s:23
+R5675:5677 Corelib.Init.Datatypes <> nat ind
+binder 5671:5671 <> k:24
+R5717:5722 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5694:5696 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R5684:5691 Stdlib.ZArith.BinInt Z of_nat def
+R5693:5693 xv6iris.PStringBytes <> k:24 var
+R5697:5714 xv6iris.PStringBytes <> pstring_hex_length def
+R5716:5716 xv6iris.PStringBytes <> s:23 var
+R5747:5749 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5742:5745 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5746:5746 xv6iris.PStringBytes <> k:24 var
+R5723:5739 xv6iris.PStringBytes <> pstring_hex_bytes def
+R5741:5741 xv6iris.PStringBytes <> s:23 var
+R5750:5753 Corelib.Init.Datatypes <> Some constr
+R5756:5771 xv6iris.PStringBytes <> pstring_hex_byte def
+R5773:5773 xv6iris.PStringBytes <> s:23 var
+R5776:5783 Stdlib.ZArith.BinInt Z of_nat def
+R5785:5785 xv6iris.PStringBytes <> k:24 var
+R5822:5846 xv6iris.PStringBytes <> pstring_hex_length_nonneg thm
+R5822:5846 xv6iris.PStringBytes <> pstring_hex_length_nonneg thm
+R5862:5883 xv6iris.PStringBytes <> pstring_hex_bytes_spec thm
+R5862:5883 xv6iris.PStringBytes <> pstring_hex_bytes_spec thm
+R5862:5883 xv6iris.PStringBytes <> pstring_hex_bytes_spec thm
+R5903:5910 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5941:5943 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5918:5921 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5915:5917 Corelib.Init.Datatypes <> nat ind
+R5922:5923 stdpp.bitvector.definitions <> bv rec
+binder 5911:5911 <> g:25
+R5933:5936 Corelib.Init.Datatypes <> list ind
+R5938:5940 Corelib.Init.Datatypes <> nat ind
+binder 5929:5929 <> l:26
+R5951:5953 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5944:5946 Corelib.Lists.ListDef <> map def
+R5950:5950 xv6iris.PStringBytes <> l:26 var
+R5948:5948 xv6iris.PStringBytes <> g:25 var
+R5955:5959 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R5954:5954 xv6iris.PStringBytes <> g:25 var
+R5960:5960 xv6iris.PStringBytes <> l:26 var
+R5903:5910 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5941:5943 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5918:5921 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5915:5917 Corelib.Init.Datatypes <> nat ind
+R5922:5923 stdpp.bitvector.definitions <> bv rec
+binder 5911:5911 <> g:27
+R5933:5936 Corelib.Init.Datatypes <> list ind
+R5938:5940 Corelib.Init.Datatypes <> nat ind
+binder 5929:5929 <> l:28
+R5951:5953 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5944:5946 Corelib.Lists.ListDef <> map def
+R5950:5950 xv6iris.PStringBytes <> l:28 var
+R5948:5948 xv6iris.PStringBytes <> g:27 var
+R5955:5959 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R5954:5954 xv6iris.PStringBytes <> g:27 var
+R5960:5960 xv6iris.PStringBytes <> l:28 var
+R6078:6093 stdpp.list_monad <> list_lookup_fmap thm
+R6096:6108 stdpp.list_numbers <> lookup_seq_lt thm
+R6078:6093 stdpp.list_monad <> list_lookup_fmap thm
+R6078:6093 stdpp.list_monad <> list_lookup_fmap thm
+R6096:6108 stdpp.list_numbers <> lookup_seq_lt thm
+R6096:6108 stdpp.list_numbers <> lookup_seq_lt thm

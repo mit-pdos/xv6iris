@@ -1,0 +1,56 @@
+DIGEST b16482fe7d34d1849f7ff3d1d5d06de3
+Fxv6iris.FsCfg
+R2713:2718 Stdlib.ZArith.ZArith <> <> lib
+R2720:2723 Stdlib.Lists.List <> <> lib
+R2752:2755 stdpp.gmap <> <> lib
+R2757:2760 stdpp.list <> <> lib
+R2762:2782 stdpp.bitvector.definitions <> <> lib
+R2825:2827 iris.base_logic.lib.own <> <> lib
+R2861:2874 SailStdpp.Base <> <> lib
+R2876:2894 SailStdpp.TypeCasts <> <> lib
+R2896:2911 SailStdpp.Values <> <> lib
+R2913:2933 SailStdpp.MachineWord <> <> lib
+R2951:2967 Riscv.rv64d_types <> <> lib
+R2969:2979 Riscv.rv64d <> <> lib
+R2981:2998 Riscv.riscv_extras <> <> lib
+R3016:3021 xv6iris.WpUart <> <> lib
+R3065:3073 xv6iris.DiskPtsto <> <> lib
+R3114:3120 xv6iris.BioDefs <> <> lib
+R3163:3170 xv6iris.FsBlocks <> <> lib
+R3212:3223 xv6iris.IcacheEscrow <> <> lib
+rec 3279:3283 <> fscfg
+proj 3365:3374 <> fsc_printk
+proj 3430:3439 <> fsc_kalloc
+proj 4042:4051 <> fsc_kpages
+proj 4177:4184 <> fsc_uart
+proj 4204:4211 <> fsc_disk
+proj 4231:4239 <> fsc_dlock
+proj 5973:5979 <> fsc_bio
+proj 5999:6004 <> fsc_fs
+proj 6139:6146 <> fsc_ireg
+proj 6161:6166 <> fsc_ic
+proj 6186:6195 <> fsc_itlock
+proj 6358:6364 <> fsc_cov
+proj 6381:6389 <> fsc_logst
+proj 7216:7228 <> fsc_bmapstart
+proj 7237:7244 <> fsc_size
+proj 7258:7268 <> fsc_ninodes
+R3378:3382 iris.base_logic.lib.iprop <> gname def
+R3443:3447 iris.base_logic.lib.iprop <> gname def
+R4060:4062 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R4055:4059 iris.base_logic.lib.iprop <> gname def
+R4063:4067 iris.base_logic.lib.iprop <> gname def
+R4190:4199 xv6iris.WpUart <> uart_names rec
+R4217:4226 xv6iris.DiskPtsto <> disk_names rec
+R4244:4248 iris.base_logic.lib.iprop <> gname def
+R5986:5994 xv6iris.BioDefs <> bio_names rec
+R6012:6019 xv6iris.FsBlocks <> fs_names rec
+R6152:6156 iris.base_logic.lib.iprop <> gname def
+R6174:6181 xv6iris.IcacheEscrow <> ic_names rec
+R6199:6203 iris.base_logic.lib.iprop <> gname def
+R6371:6374 stdpp.gmap <> gset def
+R6376:6376 Corelib.Numbers.BinNums <> Z ind
+R6394:6394 Corelib.Numbers.BinNums <> Z ind
+R7232:7232 Corelib.Numbers.BinNums <> Z ind
+R7253:7253 Corelib.Numbers.BinNums <> Z ind
+R7274:7274 Corelib.Numbers.BinNums <> Z ind

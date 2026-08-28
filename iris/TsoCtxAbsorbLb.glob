@@ -1,0 +1,272 @@
+DIGEST bd64acda3a32a03f21c90f3d2c1e509d
+Fxv6iris.TsoCtxAbsorbLb
+R1778:1783 Stdlib.ZArith.ZArith <> <> lib
+R1785:1787 Stdlib.micromega.Lia <> <> lib
+R1816:1819 stdpp.gmap <> <> lib
+R1857:1865 iris.proofmode.proofmode <> <> lib
+R1901:1904 iris.algebra.auth <> <> lib
+R1947:1955 iris.base_logic.lib.ghost_map <> <> lib
+R1957:1964 iris.base_logic.lib.mono_nat <> <> lib
+R1982:1990 xv6iris.RiscvLang <> <> lib
+R1992:2001 xv6iris.RiscvPtsto <> <> lib
+R2019:2026 xv6iris.TsoMemPa <> <> lib
+R2028:2035 xv6iris.TsoGhost <> <> lib
+R2053:2058 xv6iris.TsoCtx <> <> lib
+sec 2070:2077 <> AbsorbLb
+R2093:2099 xv6iris.RiscvPtsto <> riscvGS class
+prf 2305:2315 <> view_lb_max
+R2326:2330 iris.base_logic.lib.iprop <> gname def
+binder 2318:2319 <> gv:3
+binder 2321:2322 <> gl:4
+R2338:2340 Corelib.Init.Datatypes <> nat ind
+binder 2334:2334 <> h:5
+R2352:2354 Corelib.Init.Datatypes <> nat ind
+binder 2344:2345 <> K1:6
+binder 2347:2348 <> K2:7
+R2381:2386 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R2363:2369 xv6iris.TsoGhost <> view_lb def
+R2371:2372 xv6iris.TsoCtxAbsorbLb <> gv:3 var
+R2374:2375 xv6iris.TsoCtxAbsorbLb <> gl:4 var
+R2377:2377 xv6iris.TsoCtxAbsorbLb <> h:5 var
+R2379:2380 xv6iris.TsoCtxAbsorbLb <> K1:6 var
+R2405:2410 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R2387:2393 xv6iris.TsoGhost <> view_lb def
+R2395:2396 xv6iris.TsoCtxAbsorbLb <> gv:3 var
+R2398:2399 xv6iris.TsoCtxAbsorbLb <> gl:4 var
+R2401:2401 xv6iris.TsoCtxAbsorbLb <> h:5 var
+R2403:2404 xv6iris.TsoCtxAbsorbLb <> K2:7 var
+R2411:2417 xv6iris.TsoGhost <> view_lb def
+R2419:2420 xv6iris.TsoCtxAbsorbLb <> gv:3 var
+R2422:2423 xv6iris.TsoCtxAbsorbLb <> gl:4 var
+R2425:2425 xv6iris.TsoCtxAbsorbLb <> h:5 var
+R2428:2434 Stdlib.Arith.PeanoNat Nat max def
+R2436:2437 xv6iris.TsoCtxAbsorbLb <> K1:6 var
+R2439:2440 xv6iris.TsoCtxAbsorbLb <> K2:7 var
+R2488:2502 Stdlib.Arith.PeanoNat Nat le_ge_cases thm
+R2488:2502 Stdlib.Arith.PeanoNat Nat le_ge_cases thm
+R2540:2548 Stdlib.Arith.PeanoNat Nat max_r thm
+R2540:2548 Stdlib.Arith.PeanoNat Nat max_r thm
+R2540:2548 Stdlib.Arith.PeanoNat Nat max_r thm
+R2588:2596 Stdlib.Arith.PeanoNat Nat max_l thm
+R2588:2596 Stdlib.Arith.PeanoNat Nat max_l thm
+R2588:2596 Stdlib.Arith.PeanoNat Nat max_l thm
+prf 2637:2652 <> hart_view_lb_max
+R2662:2666 xv6iris.RiscvLang <> CpuId class
+binder 2656:2658 <> CID:8
+R2678:2680 Corelib.Init.Datatypes <> nat ind
+binder 2670:2671 <> K1:9
+binder 2673:2674 <> K2:10
+R2704:2709 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R2689:2700 xv6iris.TsoCtx <> hart_view_lb def
+R2702:2703 xv6iris.TsoCtxAbsorbLb <> K1:9 var
+R2725:2730 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R2710:2721 xv6iris.TsoCtx <> hart_view_lb def
+R2723:2724 xv6iris.TsoCtxAbsorbLb <> K2:10 var
+R2731:2742 xv6iris.TsoCtx <> hart_view_lb def
+R2745:2751 Stdlib.Arith.PeanoNat Nat max def
+R2753:2754 xv6iris.TsoCtxAbsorbLb <> K1:9 var
+R2756:2757 xv6iris.TsoCtxAbsorbLb <> K2:10 var
+R2783:2801 xv6iris.TsoCtx <> hart_view_lb_unseal thm
+R2804:2819 xv6iris.TsoCtx <> hart_view_lb_def def
+R2783:2801 xv6iris.TsoCtx <> hart_view_lb_unseal thm
+R2783:2801 xv6iris.TsoCtx <> hart_view_lb_unseal thm
+R2783:2801 xv6iris.TsoCtx <> hart_view_lb_unseal thm
+R2783:2801 xv6iris.TsoCtx <> hart_view_lb_unseal thm
+R2783:2801 xv6iris.TsoCtx <> hart_view_lb_unseal thm
+R2804:2819 xv6iris.TsoCtx <> hart_view_lb_def def
+R2804:2819 xv6iris.TsoCtx <> hart_view_lb_def def
+R2828:2838 xv6iris.TsoCtxAbsorbLb <> view_lb_max thm
+R2828:2838 xv6iris.TsoCtxAbsorbLb <> view_lb_max thm
+prf 3159:3178 <> ctx_dom_of_parked_lb
+R3188:3192 xv6iris.RiscvLang <> CpuId class
+binder 3182:3184 <> CID:11
+R3205:3209 xv6iris.TsoCtx <> CtxId rec
+binder 3196:3197 <> xi:12
+binder 3199:3201 <> xi':13
+R3219:3221 Corelib.Init.Datatypes <> nat ind
+binder 3213:3213 <> T:14
+binder 3215:3215 <> K:15
+R3242:3249 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3232:3235 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R3231:3231 xv6iris.TsoCtxAbsorbLb <> T:14 var
+R3236:3236 xv6iris.TsoCtxAbsorbLb <> K:15 var
+R3264:3269 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R3250:3261 xv6iris.TsoCtx <> hart_view_lb def
+R3263:3263 xv6iris.TsoCtxAbsorbLb <> K:15 var
+R3285:3290 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3270:3280 xv6iris.TsoCtx <> own_context def
+R3282:3284 xv6iris.TsoCtxAbsorbLb <> xi':13 var
+R3306:3316 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R3291:3300 xv6iris.TsoCtx <> ctx_parked def
+R3302:3303 xv6iris.TsoCtxAbsorbLb <> xi:12 var
+R3305:3305 xv6iris.TsoCtxAbsorbLb <> T:14 var
+R3332:3336 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3317:3327 xv6iris.TsoCtx <> own_context def
+R3329:3331 xv6iris.TsoCtxAbsorbLb <> xi':13 var
+R3351:3356 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3392:3392 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3337:3343 xv6iris.TsoCtx <> ctx_dom def
+R3345:3346 xv6iris.TsoCtxAbsorbLb <> xi:12 var
+R3348:3350 xv6iris.TsoCtxAbsorbLb <> xi':13 var
+R3371:3376 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3357:3363 xv6iris.TsoCtx <> ctx_dom def
+R3365:3366 xv6iris.TsoCtxAbsorbLb <> xi:12 var
+R3368:3370 xv6iris.TsoCtxAbsorbLb <> xi':13 var
+R3377:3386 xv6iris.TsoCtx <> ctx_parked def
+R3388:3389 xv6iris.TsoCtxAbsorbLb <> xi:12 var
+R3391:3391 xv6iris.TsoCtxAbsorbLb <> T:14 var
+R3457:3474 xv6iris.TsoCtx <> own_context_unseal thm
+R3477:3491 xv6iris.TsoCtx <> own_context_def def
+R3457:3474 xv6iris.TsoCtx <> own_context_unseal thm
+R3457:3474 xv6iris.TsoCtx <> own_context_unseal thm
+R3477:3491 xv6iris.TsoCtx <> own_context_def def
+R3477:3491 xv6iris.TsoCtx <> own_context_def def
+R3524:3540 xv6iris.TsoCtx <> ctx_parked_unseal thm
+R3543:3556 xv6iris.TsoCtx <> ctx_parked_def def
+R3524:3540 xv6iris.TsoCtx <> ctx_parked_unseal thm
+R3524:3540 xv6iris.TsoCtx <> ctx_parked_unseal thm
+R3543:3556 xv6iris.TsoCtx <> ctx_parked_def def
+R3543:3556 xv6iris.TsoCtx <> ctx_parked_def def
+R3881:3899 xv6iris.TsoCtx <> hart_view_lb_unseal thm
+R3902:3917 xv6iris.TsoCtx <> hart_view_lb_def def
+R3881:3899 xv6iris.TsoCtx <> hart_view_lb_unseal thm
+R3881:3899 xv6iris.TsoCtx <> hart_view_lb_unseal thm
+R3902:3917 xv6iris.TsoCtx <> hart_view_lb_def def
+R3902:3917 xv6iris.TsoCtx <> hart_view_lb_def def
+R3943:3943 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3966:3971 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3980:3980 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3944:3954 xv6iris.TsoCtxAbsorbLb <> view_lb_max thm
+R3943:3943 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3966:3971 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3980:3980 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3944:3954 xv6iris.TsoCtxAbsorbLb <> view_lb_max thm
+R4002:4002 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4037:4042 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4048:4048 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4003:4021 iris.base_logic.lib.mono_nat <> mono_nat_own_update thm
+R4024:4030 Stdlib.Arith.PeanoNat Nat max def
+R4002:4002 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4037:4042 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4048:4048 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4003:4021 iris.base_logic.lib.mono_nat <> mono_nat_own_update thm
+R4024:4030 Stdlib.Arith.PeanoNat Nat max def
+R4099:4099 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4113:4118 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4124:4124 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4100:4112 xv6iris.TsoCtx <> ctx_at_halves thm
+R4099:4099 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4113:4118 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4124:4124 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4100:4112 xv6iris.TsoCtx <> ctx_at_halves thm
+R4171:4188 xv6iris.TsoCtx <> own_context_unseal thm
+R4191:4205 xv6iris.TsoCtx <> own_context_def def
+R4219:4232 xv6iris.TsoCtx <> ctx_dom_unseal thm
+R4235:4245 xv6iris.TsoCtx <> ctx_dom_def def
+R4259:4275 xv6iris.TsoCtx <> ctx_parked_unseal thm
+R4278:4291 xv6iris.TsoCtx <> ctx_parked_def def
+R4171:4188 xv6iris.TsoCtx <> own_context_unseal thm
+R4171:4188 xv6iris.TsoCtx <> own_context_unseal thm
+R4191:4205 xv6iris.TsoCtx <> own_context_def def
+R4191:4205 xv6iris.TsoCtx <> own_context_def def
+R4219:4232 xv6iris.TsoCtx <> ctx_dom_unseal thm
+R4219:4232 xv6iris.TsoCtx <> ctx_dom_unseal thm
+R4235:4245 xv6iris.TsoCtx <> ctx_dom_def def
+R4235:4245 xv6iris.TsoCtx <> ctx_dom_def def
+R4259:4275 xv6iris.TsoCtx <> ctx_parked_unseal thm
+R4259:4275 xv6iris.TsoCtx <> ctx_parked_unseal thm
+R4278:4291 xv6iris.TsoCtx <> ctx_parked_def def
+R4278:4291 xv6iris.TsoCtx <> ctx_parked_def def
+R4332:4338 Stdlib.Arith.PeanoNat Nat max def
+R4348:4354 Stdlib.Arith.PeanoNat Nat max def
+R4332:4338 Stdlib.Arith.PeanoNat Nat max def
+R4348:4354 Stdlib.Arith.PeanoNat Nat max def
+R4503:4503 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4517:4522 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4529:4529 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4504:4516 iris.bi.big_op <> big_sepM_impl thm
+R4503:4503 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4517:4522 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4529:4529 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4504:4516 iris.bi.big_op <> big_sepM_impl thm
+R4575:4575 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4589:4594 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4600:4600 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4576:4588 xv6iris.TsoGhost <> dirty_ok_mono thm
+R4575:4575 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4589:4594 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4600:4600 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4576:4588 xv6iris.TsoGhost <> dirty_ok_mono thm
+R4651:4657 Stdlib.Arith.PeanoNat Nat max def
+R4651:4657 Stdlib.Arith.PeanoNat Nat max def
+R4811:4811 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4824:4829 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4841:4841 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4812:4823 xv6iris.TsoCtx <> ctx_at_agree thm
+R4811:4811 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4824:4829 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4841:4841 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4812:4823 xv6iris.TsoCtx <> ctx_at_agree thm
+R4900:4912 xv6iris.TsoCtx <> ctx_at_halves thm
+R4900:4912 xv6iris.TsoCtx <> ctx_at_halves thm
+R4900:4912 xv6iris.TsoCtx <> ctx_at_halves thm
+prf 5120:5132 <> ctx_absorb_lb
+R5142:5146 xv6iris.RiscvLang <> CpuId class
+binder 5136:5138 <> CID:16
+R5159:5162 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5154:5158 xv6iris.TsoCtx <> CtxId rec
+R5163:5167 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R5169:5170 xv6iris.TsoCtxAbsorbLb <> AbsorbLb.Σ var
+binder 5150:5150 <> R:17
+R5176:5183 xv6iris.TsoCtx <> CtxMorph class
+R5185:5185 xv6iris.TsoCtxAbsorbLb <> R:17 var
+binder 5175:5185 <> CtxMorph0:18
+R5204:5208 xv6iris.TsoCtx <> CtxId rec
+binder 5195:5196 <> xi:19
+binder 5198:5200 <> xi':20
+R5218:5220 Corelib.Init.Datatypes <> nat ind
+binder 5212:5212 <> T:21
+binder 5214:5214 <> K:22
+R5241:5248 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5231:5234 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R5230:5230 xv6iris.TsoCtxAbsorbLb <> T:21 var
+R5235:5235 xv6iris.TsoCtxAbsorbLb <> K:22 var
+R5264:5269 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5249:5259 xv6iris.TsoCtx <> own_context def
+R5261:5263 xv6iris.TsoCtxAbsorbLb <> xi':20 var
+R5284:5289 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5270:5281 xv6iris.TsoCtx <> hart_view_lb def
+R5283:5283 xv6iris.TsoCtxAbsorbLb <> K:22 var
+R5305:5310 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5290:5299 xv6iris.TsoCtx <> ctx_parked def
+R5301:5302 xv6iris.TsoCtxAbsorbLb <> xi:19 var
+R5304:5304 xv6iris.TsoCtxAbsorbLb <> T:21 var
+R5315:5325 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R5311:5311 xv6iris.TsoCtxAbsorbLb <> R:17 var
+R5313:5314 xv6iris.TsoCtxAbsorbLb <> xi:19 var
+R5341:5345 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5326:5336 xv6iris.TsoCtx <> own_context def
+R5338:5340 xv6iris.TsoCtxAbsorbLb <> xi':20 var
+R5361:5365 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5346:5355 xv6iris.TsoCtx <> ctx_parked def
+R5357:5358 xv6iris.TsoCtxAbsorbLb <> xi:19 var
+R5360:5360 xv6iris.TsoCtxAbsorbLb <> T:21 var
+R5366:5366 xv6iris.TsoCtxAbsorbLb <> R:17 var
+R5368:5370 xv6iris.TsoCtxAbsorbLb <> xi':20 var
+R5428:5428 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5464:5469 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5483:5483 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5429:5448 xv6iris.TsoCtxAbsorbLb <> ctx_dom_of_parked_lb thm
+R5428:5428 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5464:5469 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5483:5483 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5429:5448 xv6iris.TsoCtxAbsorbLb <> ctx_dom_of_parked_lb thm
+R5528:5528 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5538:5543 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5553:5553 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5529:5537 xv6iris.TsoCtx <> ctx_morph def
+R5528:5528 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5538:5543 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5553:5553 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5529:5537 xv6iris.TsoCtx <> ctx_morph def
+R5635:5642 xv6iris.TsoCtxAbsorbLb AbsorbLb <> sec

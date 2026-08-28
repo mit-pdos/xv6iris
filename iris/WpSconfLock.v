@@ -50,6 +50,8 @@ Require Import WpLock.
 Require Import ProcGeom.
 Require Import SRegime.
 Require Import IntrDefs WpSmodeIntr.
+Require Import TsoMemPa.  (* A6.87: [pwmsg]/[agent]/[bytemap] -- the free-path
+   word read is stated over the LOG, not over a cell *)
 Require Import WpSconfMem.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -138,8 +140,8 @@ Section WpSconfLock.
     ↑lockN ⊆ E ->
     (⊢ T -∗ Dc -∗ False) ->
     lock_openable γl lk str R Dc -∗ T ={E}=∗
-      wordw_claim (KTR := KT0) 4 lk ∗
-      wordw_claim (KTR := KT0) 8 (lock_cpu lk) ∗ T.
+      WpLock.lk_addr_claim lk 4 ∗
+      WpLock.lk_addr_claim (lock_cpu lk) 8 ∗ T.
   (* A6.86: IT IS A PEEK NOW, AND NOTHING COMES OUT OF THE BODY.  A ledger
      cell carries no MAPPING, so after the M4 flip the invariant holds the
      two [lk_addr_claim]s explicitly -- persistent, about the ADDRESS -- and
@@ -155,14 +157,53 @@ Section WpSconfLock.
     iDestruct "Hbody" as "(Hcore & >#Hcl4 & >#Hcl8)".
     iMod ("Hclose" with "[Hcore]") as "_".
     { iNext. rewrite /lock_inv. iFrame "Hcore Hcl4 Hcl8". }
-    iModIntro. iFrame "HT".
-    iSplitL; [ iApply (lk_addr_claim_wordw with "Hcl4")
-             | iApply (lk_addr_claim_wordw with "Hcl8") ].
+    iModIntro. iFrame "HT". iSplitL; [ iExact "Hcl4" | iExact "Hcl8" ].
   Qed.
 
   (* ------------------------------------------------------------------- *)
   (* The lock word at +0.                                                 *)
   (* ------------------------------------------------------------------- *)
+
+  (* >>> A6.87: THE READ THAT CONCLUDES NOTHING ALSO OWNS NOTHING.
+     A6.78 §(2) predicted this and the M4 flip is what makes it true.  At
+     the ledger tier the lock word carries no context, so a read that
+     promises its caller NOTHING about the value needs no resource from the
+     invariant at all -- the obligation is discharged from RAM-ness (which
+     the address claim now carries per byte, A6.87) and the interp, through
+     [TsoCtx.ledger_read_any_word_ok].  The lock is never opened.
+
+     STATED AS ITS OWN LEMMA because the AU's obligation is a Coq premise:
+     an [_] for it is SHELVED, not a goal, so it has to be passed by name.
+     [Hram] rides in front of the telescope the AU fixes. <<< *)
+  Local Lemma lock_word_read_any (ea : mword 64)
+      (Hram : forall j : nat, (j < 4)%nat -> addr_is_ram (pa_add ea j)) :
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+           (V : agent -> nat) (ppn : mword 44),
+      (uint ea < 274877906944)%Z ->
+      (bv_unsigned (subrange_vec_dec ea 11 0) + 4 <= 4096)%Z ->
+      ktier_pin KT0 ppn ea ->
+      kmap_at (svpn_of ea) ppn KP_rw -∗
+      gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
+      emp -∗
+      ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+         exists v : mword (8*4),
+           tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+             (pa_of ppn ea) (Z.to_N 4) v /\ True⌝.
+  Proof.
+    intros CIDw img sigma log V ppn Hcan Hoff Hid.
+    iIntros "#Hk Hmem Htso Hctx _".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+               sigma.(sregs) sigma.(mdev) Hpin).
+    rewrite (ktier_pin_id ppn ea Hid).
+    iDestruct (TsoCtx.ledger_read_any_word_ok (CID := CIDw)
+                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                 ea 4%nat 32 ltac:(lia) Hram with "Htso") as %Hrd4.
+    iPureIntro. intros tvr _. destruct (Hrd4 tvr) as [w Hw].
+    exists w. split; [exact Hw | done].
+  Qed.
 
   (* holding's [lw a5,0(a0)]: any value, no evidence in or out. *)
   Lemma wp_clw_lockopen_s_sconf
@@ -198,25 +239,35 @@ Section WpSconfLock.
     iApply fupd_wp.
     iMod (lock_claims γl lk s R Tc Dc ⊤ ltac:(solve_ndisj) Href
             with "Hlock HTc") as "(#Hc4 & #Hc8 & HTc)".
-    iApply (wp_load_s_sconf_au (kt := kt) (ktd := KT0) 4 true false pc rd rs1 imm m n
-              (fun w => sign_extend' 64 w) (fun _ => Tc)
-              (⊤ ∖ ↑minstretN ∖ ↑lockN) b
+    (* >>> A6.87: THE READ THAT CONCLUDES NOTHING ALSO OWNS NOTHING.
+       A6.78 §(2) predicted this and the M4 flip is what makes it true: at
+       the ledger tier the lock word carries no context, so a read that
+       promises the caller no information about the value needs NO RESOURCE
+       FROM THE INVARIANT AT ALL.  The lock is never opened here -- the
+       obligation is discharged from RAM-ness (which the address claim now
+       carries per byte) and the interp, through
+       [TsoCtx.ledger_read_any_word_ok].  The value-UNKNOWN AU ([_exv],
+       A6.78) is the shape that lets the datum be a value-INDEPENDENT
+       resource; here that resource is [emp].  <<< *)
+    iDestruct (WpLock.lk_addr_claim_ram lk 4 with "Hc4") as %Hram.
+    iApply (wp_load_s_sconf_au_exv (kt := kt) (ktd := KT0) 4 true false pc rd rs1 imm m n
+              (fun w => sign_extend' 64 w)
+              (⊤ ∖ ↑minstretN) b
+              (fun _ => True) emp%I Tc
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [HTc] [Hcont]").
+              ltac:(solve_ndisj)
+              (lock_word_read_any (add_vec (rget m rs1) (sign_extend' 64 imm))
+                 ltac:(intros j Hj;
+                       replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
+                         by (symmetry; exact Hpalk);
+                       exact (Hram j Hj)))
+              with "Hcg Hpc Hinstr [] [HTc] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
-        by (symmetry; exact Hpalk). iExact "Hc4". }
-    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) Tc with "[%] [] HTc")
-        as "(Hbody & HTc & [Hclose _])"; [solve_ndisj| iApply Href |].
-      iDestruct "Hbody" as (w st) "(>Hword & Hrest)".
-      iModIntro. iExists w.
-      iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
-      iIntros "Hword".
-      iMod ("Hclose" with "[Hword Hrest]") as "_".
-      { iNext. iExists w, st.
-        iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | iExact "Hrest" ]. }
-      iModIntro. iExact "HTc". }
-    iIntros (v). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc HTc".
+        by (symmetry; exact Hpalk).
+      iApply (lk_addr_claim_wordw with "Hc4"). }
+    { iModIntro. iFrame "HTc". iIntros "_". by iModIntro. }
+    iIntros (v). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc _ HTc".
     iApply ("Hcont" $! v CID1 with "[] HTc Hcg Hpc").
     iPureIntro. exact Hs1.
   Qed.
@@ -270,9 +321,12 @@ Section WpSconfLock.
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Htok] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
-        by (symmetry; exact Hpalk). iExact "Hc4". }
+        by (symmetry; exact Hpalk). iApply (lk_addr_claim_wordw with "Hc4"). }
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked γl h0) with "[%] [] Htok")
         as "(Hbody & Htok & [Hclose _])"; [solve_ndisj| iApply Href |].
+      (* A6.87: peel the M4 invariant's two address claims; hand them
+         back at the close.  Everything between is the pre-flip text. *)
+      iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
       iDestruct (locked_state with "Hg Htok") as %Hst.
       iDestruct "Hbr" as "[(>%Hnone & _) | (_ & >%Hwnz)]"; [ congruence | ].
@@ -280,7 +334,7 @@ Section WpSconfLock.
       iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
       iIntros "Hword".
       iMod ("Hclose" with "[Hword Hcpu Hg]") as "_".
-      { iNext. iExists w, st. iFrame "Hcpu Hg".
+      { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8". iExists w, st. iFrame "Hcpu Hg".
         iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
         iRight. iPureIntro. split; [ rewrite Hst; discriminate | exact Hwnz ]. }
       iModIntro. iFrame "Htok". iPureIntro. exact Hwnz. }
@@ -353,9 +407,12 @@ Section WpSconfLock.
               exec_write_ram_plain_4 (store_ext_4 (tp_pin m !!! Regidx (mword_of_int 0 : mword 5)))
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Htok HRes Hfin] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
-        by (symmetry; exact Hpalk). iExact "Hc4". }
+        by (symmetry; exact Hpalk). iApply (lk_addr_claim_wordw with "Hc4"). }
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked_pre γl cpu_id) with "[%] [] Htok")
         as "(Hbody & Htok & Hchoice)"; [solve_ndisj| iApply Href |].
+      (* A6.87: peel the M4 invariant's two address claims; hand them
+         back at the close.  Everything between is the pre-flip text. *)
+      iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
       iMod (lock_give γl st cpu_id with "Hg Htok") as "(%Hst & Hg & Hfrag)".
       iDestruct "Hbr" as "[(>%Hnone & _) | (_ & >%Hwnz)]"; [ congruence | ].
@@ -432,9 +489,12 @@ Section WpSconfLock.
               exec_read_ram_plain_8 data2_ext_8 Hrd Hrdok
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [HT] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with (lock_cpu lk)
-        by (symmetry; exact Hpacpu). iExact "Hc8". }
+        by (symmetry; exact Hpacpu). iApply (lk_addr_claim_wordw with "Hc8"). }
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) T with "[%] [] HT")
         as "(Hbody & HT & [Hclose _])"; [solve_ndisj| iApply Href |].
+      (* A6.87: peel the M4 invariant's two address claims; hand them
+         back at the close.  Everything between is the pre-flip text. *)
+      iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpures & >Hg & Hbr)".
       (* the invariant owns the cell WHOLE in every state, so the AU's [dqm],
          chosen outside this fupd where [st] is still existential, is simply
@@ -453,7 +513,7 @@ Section WpSconfLock.
       iIntros "Hcpu".
       iEval (rewrite wordw8_ctx) in "Hcpu".
       iMod ("Hclose" with "[Hword Hcpu Hrest Hg Hbr]") as "_".
-      { iNext. iExists w, st. iFrame "Hword Hg Hbr".
+      { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8". iExists w, st. iFrame "Hword Hg Hbr".
         rewrite /lk_cpu_res. iFrame "Hrest". rewrite lk_cpu_cell_acc.
         rewrite -Hpacpu. iExact "Hcpu". }
       iModIntro. iFrame "HT". iPureIntro. exact Hphi. }
@@ -688,9 +748,12 @@ Section WpSconfLock.
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [HT] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with (lock_cpu lk)
-        by (symmetry; exact Hpacpu). iExact "Hc8". }
+        by (symmetry; exact Hpacpu). iApply (lk_addr_claim_wordw with "Hc8"). }
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) T with "[%] [] HT")
         as "(Hbody & HT & [Hclose _])"; [solve_ndisj| iApply Href |].
+      (* A6.87: peel the M4 invariant's two address claims; hand them
+         back at the close.  Everything between is the pre-flip text. *)
+      iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpures & >Hg & Hbr)".
       iMod (Hupd st with "Hg Hcpures HT")
         as "(%Hstne & %Hstnne & Hg & Hcpu & Hback)".
@@ -706,7 +769,7 @@ Section WpSconfLock.
       iMod ("Hback" with "[Hcpu]") as "[Hcpures HT']".
       { rewrite Hsv -Hpacpu. iExact "Hcpu". }
       iMod ("Hclose" with "[Hword Hcpures Hg]") as "_".
-      { iNext. iExists w, stn. iFrame "Hword Hg Hcpures".
+      { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8". iExists w, stn. iFrame "Hword Hg Hcpures".
         iRight. iPureIntro. split; [ exact Hstnne | exact Hwnz ]. }
       iModIntro. iFrame "HT'". }
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc HT'".
@@ -984,6 +1047,9 @@ Section WpSconfLock.
       iApply (swp_fupd (CID := CID)).
       iMod ("Hlock" $! ⊤ Tc with "[%] [] HTc")
         as "(Hbody & HTc & [Hclose _])"; [solve_ndisj | iApply Href |].
+      (* A6.87: peel the M4 invariant's two address claims; hand them
+         back at the close.  Everything between is the pre-flip text. *)
+      iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
       iDestruct "Hbody" as (w0 st0) "(>Hw & Hcpu & Hg & Hbr)".
       iEval (rewrite /lock_word -Hpalk) in "Hw".
       iAssert (⌜is_aligned_paddr (Physaddr pa) 4 = true⌝)%I as %Hpalign4.
@@ -998,7 +1064,7 @@ Section WpSconfLock.
       iEval (rewrite -(pa_add_0 pa)) in "Hb0".
       iDestruct ("Hbcl" with "Hb0") as "Hb".
       iMod ("Hclose" with "[Hb Hcpu Hg Hbr]") as "_".
-      { iNext. iExists w0, st0. iFrame "Hcpu Hg Hbr".
+      { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8". iExists w0, st0. iFrame "Hcpu Hg Hbr".
         rewrite /lock_word -Hpalk /word4_pointsto. iFrame "Hb".
         iPureIntro. exact Hpalign4. }
       iModIntro.
@@ -1081,6 +1147,9 @@ Section WpSconfLock.
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod ("Hlock" $! ⊤ Tc with "[%] [] HTc")
               as "(Hbody & HTc & [Hcl _])"; [solve_ndisj | iApply Href |].
+            (* A6.87: peel the M4 invariant's two address claims; hand them
+               back at the close.  Everything between is the pre-flip text. *)
+            iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
             iDestruct "Hbody" as (v1 st1) "(>Hw & Hcpu & Hg & Hbr)".
             iEval (rewrite /lock_word -Hpalk /word4_pointsto) in "Hw".
             iDestruct "Hw" as "[%Hal1 Hb]".
@@ -1088,7 +1157,7 @@ Section WpSconfLock.
                          (DfracOwn 1) ltac:(lia) ltac:(lia) (fun k => eq_refl)
                          Hoff Hcan with "Hmem Hk Hb") as %(Hbf & _ & _ & _).
             iMod ("Hcl" with "[Hb Hcpu Hg Hbr]") as "_".
-            { iNext. iExists v1, st1. iFrame "Hcpu Hg Hbr".
+            { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8". iExists v1, st1. iFrame "Hcpu Hg Hbr".
               rewrite /lock_word -Hpalk /word4_pointsto. iFrame "Hb".
               iPureIntro. exact Hal1. }
             iMod (fupd_mask_subseteq ∅) as "Hclm"; [set_solver|].
@@ -1102,6 +1171,9 @@ Section WpSconfLock.
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod ("Hlock" $! ⊤ Tc with "[%] [] HTc")
               as "(Hbody & HTc & [Hcl _])"; [solve_ndisj | iApply Href |].
+            (* A6.87: peel the M4 invariant's two address claims; hand them
+               back at the close.  Everything between is the pre-flip text. *)
+            iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
             iDestruct "Hbody" as (v2 st2) "(>Hw & >Hcpu & >Hg & Hbr)".
             iEval (rewrite /lock_word -Hpalk /word4_pointsto) in "Hw".
             iDestruct "Hw" as "[%Hal2 Hb]".
@@ -1128,7 +1200,7 @@ Section WpSconfLock.
               - subst st2.
                 iMod (lock_take γl h0 with "Hg Hfrag2") as "[Hg Hpre]".
                 iMod ("Hcl" with "[Hw Hcpu Hg]") as "_".
-                { iNext. iExists (amoswap_stored (rget m rs2)),
+                { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8". iExists (amoswap_stored (rget m rs2)),
                                  (Some (h0, false)).
                   iFrame "Hg".
                   iSplitL "Hw";
@@ -1138,7 +1210,7 @@ Section WpSconfLock.
                   iRight. iPureIntro. split; [discriminate | exact Hstz]. }
                 iModIntro. iLeft. iFrame "Hpre HR". iPureIntro. exact Hw0.
               - iMod ("Hcl" with "[Hw Hcpu Hg]") as "_".
-                { iNext. iExists (amoswap_stored (rget m rs2)), st2.
+                { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8". iExists (amoswap_stored (rget m rs2)), st2.
                   iFrame "Hg Hcpu".
                   iSplitL "Hw";
                     [ rewrite /lock_word -Hpalk; iExact "Hw" | ].

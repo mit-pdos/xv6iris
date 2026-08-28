@@ -1,0 +1,467 @@
+DIGEST 50c1965f2778101ef43eccc526444d27
+Fxv6iris.EscrowInode
+R434:439 Stdlib.ZArith.ZArith <> <> lib
+R441:443 Stdlib.micromega.Lia <> <> lib
+R472:475 stdpp.gmap <> <> lib
+R511:514 iris.algebra.excl <> <> lib
+R552:560 iris.proofmode.proofmode <> <> lib
+R603:612 iris.base_logic.lib.invariants <> <> lib
+R614:622 iris.base_logic.lib.ghost_map <> <> lib
+R624:631 iris.base_logic.lib.mono_nat <> <> lib
+R633:635 iris.base_logic.lib.own <> <> lib
+R653:662 xv6iris.RiscvPtsto <> <> lib
+R680:688 xv6iris.IcacheRef <> <> lib
+R706:716 xv6iris.DirViewLend <> <> lib
+R792:801 xv6iris.EscrowDefs <> <> lib
+R819:829 xv6iris.InodeRegion <> <> lib
+R847:850 xv6iris.Xv6G <> <> lib
+sec 909:919 <> EscrowInode
+R935:941 xv6iris.RiscvPtsto <> riscvGS class
+R948:951 xv6iris.Xv6G <> xv6G class
+R953:954 xv6iris.EscrowInode <> Σ:1 var
+var  970:973 EscrowInode ICFG
+R977:980 xv6iris.IcacheRef <> icfg class
+def 3773:3781 <> escA_body
+R3799:3803 iris.base_logic.lib.iprop <> gname def
+binder 3784:3785 <> ge:5
+binder 3787:3788 <> gr:6
+binder 3790:3791 <> gd:7
+binder 3793:3795 <> γi:8
+R3811:3811 Corelib.Numbers.BinNums <> Z ind
+binder 3807:3807 <> z:9
+R3820:3823 Corelib.Init.Datatypes <> bool ind
+binder 3815:3816 <> rg:10
+R3828:3832 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3834:3835 xv6iris.EscrowInode <> EscrowInode.Σ var
+R3846:3846 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R3900:3909 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R3878:3882 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3847:3863 iris.base_logic.lib.mono_nat <> mono_nat_auth_own def
+R3870:3877 xv6iris.EscrowDefs <> ST_EMPTY abbrev
+R3865:3866 xv6iris.EscrowInode <> ge:5 var
+R3883:3894 xv6iris.IcacheRef <> ifreeze_post def
+R3896:3897 xv6iris.EscrowInode <> rg:10 var
+R3899:3899 xv6iris.EscrowInode <> z:9 var
+R3910:3910 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R4018:4028 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R4114:4114 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R3943:3947 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3911:3927 iris.base_logic.lib.mono_nat <> mono_nat_auth_own def
+R3934:3942 xv6iris.EscrowDefs <> ST_FILLED abbrev
+R3929:3930 xv6iris.EscrowInode <> ge:5 var
+R3971:3982 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3948:3964 xv6iris.InodeRegion <> imark def
+R3966:3968 xv6iris.EscrowInode <> γi:8 var
+R3970:3970 xv6iris.EscrowInode <> z:9 var
+R3996:4000 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3983:3993 xv6iris.IcacheRef <> ifreeze_off def
+R3995:3995 xv6iris.EscrowInode <> z:9 var
+R4001:4014 xv6iris.EscrowDefs <> redeem_ticketA def
+R4016:4017 xv6iris.EscrowInode <> gd:7 var
+R4063:4067 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4029:4045 iris.base_logic.lib.mono_nat <> mono_nat_auth_own def
+R4052:4062 xv6iris.EscrowDefs <> ST_REDEEMED abbrev
+R4047:4048 xv6iris.EscrowInode <> ge:5 var
+R4085:4096 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4068:4081 xv6iris.EscrowDefs <> redeem_ticketA def
+R4083:4084 xv6iris.EscrowInode <> gr:6 var
+R4097:4110 xv6iris.EscrowDefs <> redeem_ticketA def
+R4112:4113 xv6iris.EscrowInode <> gd:7 var
+def 4135:4139 <> escAN
+R4146:4146 Corelib.Numbers.BinNums <> Z ind
+binder 4142:4142 <> z:11
+R4151:4159 stdpp.namespaces <> namespace def
+R4164:4164 stdpp.namespaces <> ::stdpp_scope:x_'.@'_x not
+R4182:4186 stdpp.namespaces <> ::stdpp_scope:x_'.@'_x not
+R4170:4173 stdpp.namespaces <> ::stdpp_scope:x_'.@'_x not
+R4165:4169 stdpp.namespaces <> nroot def
+R4187:4187 xv6iris.EscrowInode <> z:11 var
+def 4203:4210 <> escA_inv
+R4228:4232 iris.base_logic.lib.iprop <> gname def
+binder 4213:4214 <> ge:12
+binder 4216:4217 <> gr:13
+binder 4219:4220 <> gd:14
+binder 4222:4224 <> γi:15
+R4240:4240 Corelib.Numbers.BinNums <> Z ind
+binder 4236:4236 <> z:16
+R4249:4252 Corelib.Init.Datatypes <> bool ind
+binder 4244:4245 <> rg:17
+R4257:4261 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4263:4264 xv6iris.EscrowInode <> EscrowInode.Σ var
+R4273:4275 iris.base_logic.lib.invariants <> inv def
+R4288:4296 xv6iris.EscrowInode <> escA_body def
+R4298:4299 xv6iris.EscrowInode <> ge:12 var
+R4301:4302 xv6iris.EscrowInode <> gr:13 var
+R4304:4305 xv6iris.EscrowInode <> gd:14 var
+R4307:4309 xv6iris.EscrowInode <> γi:15 var
+R4311:4311 xv6iris.EscrowInode <> z:16 var
+R4313:4314 xv6iris.EscrowInode <> rg:17 var
+R4278:4282 xv6iris.EscrowInode <> escAN def
+R4284:4284 xv6iris.EscrowInode <> z:16 var
+inst 4336:4354 <> escA_inv_persistent
+binder 4356:4357 <> ge:18
+binder 4359:4360 <> gr:19
+binder 4362:4363 <> gd:20
+binder 4365:4367 <> γi:21
+binder 4369:4369 <> z:22
+binder 4371:4372 <> rg:23
+R4380:4389 iris.bi.derived_connectives <> Persistent class
+R4392:4399 xv6iris.EscrowInode <> escA_inv def
+R4401:4402 xv6iris.EscrowInode <> ge:18 var
+R4404:4405 xv6iris.EscrowInode <> gr:19 var
+R4407:4408 xv6iris.EscrowInode <> gd:20 var
+R4410:4412 xv6iris.EscrowInode <> γi:21 var
+R4414:4414 xv6iris.EscrowInode <> z:22 var
+R4416:4417 xv6iris.EscrowInode <> rg:23 var
+R4439:4446 xv6iris.EscrowInode <> escA_inv def
+R4439:4446 xv6iris.EscrowInode <> escA_inv def
+R4439:4446 xv6iris.EscrowInode <> escA_inv def
+prf 4653:4662 <> escA_alloc
+binder 4664:4664 <> E:24
+binder 4666:4668 <> γi:25
+binder 4670:4670 <> z:26
+binder 4672:4673 <> rg:27
+R4908:4910 iris.bi.updates <> ::stdpp_scope:x_'={'_x_'}=∗'_x not
+R4912:4917 iris.bi.updates <> ::stdpp_scope:x_'={'_x_'}=∗'_x not
+R4891:4902 xv6iris.IcacheRef <> ifreeze_post def
+R4904:4905 xv6iris.EscrowInode <> rg:27 var
+R4907:4907 xv6iris.EscrowInode <> z:26 var
+R4911:4911 xv6iris.EscrowInode <> E:24 var
+R4911:4911 xv6iris.EscrowInode <> E:24 var
+R4918:4921 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R4930:4937 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 4922:4923 <> ge:28
+binder 4925:4926 <> gr:29
+binder 4928:4929 <> gd:30
+R4964:4968 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4938:4945 xv6iris.EscrowInode <> escA_inv def
+R4947:4948 xv6iris.EscrowInode <> ge:28 var
+R4950:4951 xv6iris.EscrowInode <> gr:29 var
+R4953:4954 xv6iris.EscrowInode <> gd:30 var
+R4956:4958 xv6iris.EscrowInode <> γi:25 var
+R4960:4960 xv6iris.EscrowInode <> z:26 var
+R4962:4963 xv6iris.EscrowInode <> rg:27 var
+R4986:4990 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4969:4982 xv6iris.EscrowDefs <> redeem_ticketA def
+R4984:4985 xv6iris.EscrowInode <> gr:29 var
+R4991:5004 xv6iris.EscrowDefs <> redeem_ticketA def
+R5006:5007 xv6iris.EscrowInode <> gd:30 var
+R5048:5065 iris.base_logic.lib.mono_nat <> mono_nat_own_alloc thm
+R5067:5074 xv6iris.EscrowDefs <> ST_EMPTY abbrev
+R5048:5065 iris.base_logic.lib.mono_nat <> mono_nat_own_alloc thm
+R5067:5074 xv6iris.EscrowDefs <> ST_EMPTY abbrev
+R5108:5116 iris.base_logic.lib.own <> own_alloc thm
+R5119:5122 iris.algebra.excl <> Excl constr
+R5124:5125 Stdlib.Program.Syntax <> :::'()' not
+R5108:5116 iris.base_logic.lib.own <> own_alloc thm
+R5119:5122 iris.algebra.excl <> Excl constr
+R5124:5125 Stdlib.Program.Syntax <> :::'()' not
+R5165:5173 iris.base_logic.lib.own <> own_alloc thm
+R5176:5179 iris.algebra.excl <> Excl constr
+R5181:5182 Stdlib.Program.Syntax <> :::'()' not
+R5165:5173 iris.base_logic.lib.own <> own_alloc thm
+R5176:5179 iris.algebra.excl <> Excl constr
+R5181:5182 Stdlib.Program.Syntax <> :::'()' not
+R5220:5220 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5272:5277 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5291:5291 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5221:5229 iris.base_logic.lib.invariants <> inv_alloc thm
+R5232:5236 xv6iris.EscrowInode <> escAN def
+R5244:5252 xv6iris.EscrowInode <> escA_body def
+R5220:5220 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5272:5277 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5291:5291 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5221:5229 iris.base_logic.lib.invariants <> inv_alloc thm
+R5232:5236 xv6iris.EscrowInode <> escAN def
+R5244:5252 xv6iris.EscrowInode <> escA_body def
+prf 6230:6245 <> escA_deposit_acc
+binder 6247:6247 <> E:31
+binder 6249:6250 <> ge:32
+binder 6252:6253 <> gr:33
+binder 6255:6256 <> gd:34
+binder 6258:6260 <> γi:35
+binder 6262:6262 <> z:36
+binder 6264:6265 <> rg:37
+R6289:6297 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R6283:6287 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R6273:6275 stdpp.base <> :::'↑'_x not
+R6276:6280 xv6iris.EscrowInode <> escAN def
+R6282:6282 xv6iris.EscrowInode <> z:36 var
+R6288:6288 xv6iris.EscrowInode <> E:31 var
+R6324:6329 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6298:6305 xv6iris.EscrowInode <> escA_inv def
+R6307:6308 xv6iris.EscrowInode <> ge:32 var
+R6310:6311 xv6iris.EscrowInode <> gr:33 var
+R6313:6314 xv6iris.EscrowInode <> gd:34 var
+R6316:6318 xv6iris.EscrowInode <> γi:35 var
+R6320:6320 xv6iris.EscrowInode <> z:36 var
+R6322:6323 xv6iris.EscrowInode <> rg:37 var
+R6347:6355 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R6357:6358 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R6375:6386 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R6330:6343 xv6iris.EscrowDefs <> redeem_ticketA def
+R6345:6346 xv6iris.EscrowInode <> gd:34 var
+R6356:6356 xv6iris.EscrowInode <> E:31 var
+R6360:6364 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R6359:6359 xv6iris.EscrowInode <> E:31 var
+R6365:6367 stdpp.base <> :::'↑'_x not
+R6368:6372 xv6iris.EscrowInode <> escAN def
+R6374:6374 xv6iris.EscrowInode <> z:36 var
+R6404:6415 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6508:6508 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6387:6398 xv6iris.IcacheRef <> ifreeze_post def
+R6400:6401 xv6iris.EscrowInode <> rg:37 var
+R6403:6403 xv6iris.EscrowInode <> z:36 var
+R6439:6444 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6416:6432 xv6iris.InodeRegion <> imark def
+R6434:6436 xv6iris.EscrowInode <> γi:35 var
+R6438:6438 xv6iris.EscrowInode <> z:36 var
+R6458:6469 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R6486:6487 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R6489:6494 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R6445:6455 xv6iris.IcacheRef <> ifreeze_off def
+R6457:6457 xv6iris.EscrowInode <> z:36 var
+R6471:6475 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R6470:6470 xv6iris.EscrowInode <> E:31 var
+R6476:6478 stdpp.base <> :::'↑'_x not
+R6479:6483 xv6iris.EscrowInode <> escAN def
+R6485:6485 xv6iris.EscrowInode <> z:36 var
+R6488:6488 xv6iris.EscrowInode <> E:31 var
+R6495:6504 xv6iris.EscrowDefs <> committedA def
+R6506:6507 xv6iris.EscrowInode <> ge:32 var
+R6753:6753 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6783:6788 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6796:6796 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6754:6772 iris.base_logic.lib.mono_nat <> mono_nat_own_update thm
+R6774:6782 xv6iris.EscrowDefs <> ST_FILLED abbrev
+R6753:6753 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6783:6788 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6796:6796 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6754:6772 iris.base_logic.lib.mono_nat <> mono_nat_own_update thm
+R6774:6782 xv6iris.EscrowDefs <> ST_FILLED abbrev
+R6843:6843 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6849:6854 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6878:6878 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6843:6843 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6849:6854 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6878:6878 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7004:7004 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7024:7029 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7040:7040 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7005:7023 xv6iris.EscrowDefs <> redeem_ticketA_excl thm
+R7004:7004 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7024:7029 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7040:7040 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7005:7023 xv6iris.EscrowDefs <> redeem_ticketA_excl thm
+R7066:7066 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7086:7091 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7102:7102 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7067:7085 xv6iris.EscrowDefs <> redeem_ticketA_excl thm
+R7066:7066 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7086:7091 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7102:7102 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7067:7085 xv6iris.EscrowDefs <> redeem_ticketA_excl thm
+prf 7195:7205 <> escA_redeem
+binder 7207:7207 <> E:38
+binder 7209:7210 <> ge:39
+binder 7212:7213 <> gr:40
+binder 7215:7216 <> gd:41
+binder 7218:7220 <> γi:42
+binder 7222:7222 <> z:43
+binder 7224:7225 <> rg:44
+R7249:7257 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R7243:7247 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R7233:7235 stdpp.base <> :::'↑'_x not
+R7236:7240 xv6iris.EscrowInode <> escAN def
+R7242:7242 xv6iris.EscrowInode <> z:43 var
+R7248:7248 xv6iris.EscrowInode <> E:38 var
+R7284:7289 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7258:7265 xv6iris.EscrowInode <> escA_inv def
+R7267:7268 xv6iris.EscrowInode <> ge:39 var
+R7270:7271 xv6iris.EscrowInode <> gr:40 var
+R7273:7274 xv6iris.EscrowInode <> gd:41 var
+R7276:7278 xv6iris.EscrowInode <> γi:42 var
+R7280:7280 xv6iris.EscrowInode <> z:43 var
+R7282:7283 xv6iris.EscrowInode <> rg:44 var
+R7307:7312 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7290:7303 xv6iris.EscrowDefs <> redeem_ticketA def
+R7305:7306 xv6iris.EscrowInode <> gr:40 var
+R7326:7334 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R7336:7341 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R7313:7322 xv6iris.EscrowDefs <> committedA def
+R7324:7325 xv6iris.EscrowInode <> ge:39 var
+R7335:7335 xv6iris.EscrowInode <> E:38 var
+R7335:7335 xv6iris.EscrowInode <> E:38 var
+R7365:7369 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7342:7358 xv6iris.InodeRegion <> imark def
+R7360:7362 xv6iris.EscrowInode <> γi:42 var
+R7364:7364 xv6iris.EscrowInode <> z:43 var
+R7370:7380 xv6iris.IcacheRef <> ifreeze_off def
+R7382:7382 xv6iris.EscrowInode <> z:43 var
+R7582:7582 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7604:7609 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7622:7622 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7583:7603 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_valid thm
+R7582:7582 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7604:7609 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7622:7622 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7583:7603 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_valid thm
+R7653:7653 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7685:7690 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7698:7698 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7654:7672 iris.base_logic.lib.mono_nat <> mono_nat_own_update thm
+R7674:7684 xv6iris.EscrowDefs <> ST_REDEEMED abbrev
+R7653:7653 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7685:7690 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7698:7698 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7654:7672 iris.base_logic.lib.mono_nat <> mono_nat_own_update thm
+R7674:7684 xv6iris.EscrowDefs <> ST_REDEEMED abbrev
+R7742:7742 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7748:7753 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7772:7772 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7742:7742 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7748:7753 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7772:7772 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7899:7899 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7919:7924 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7939:7939 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7900:7918 xv6iris.EscrowDefs <> redeem_ticketA_excl thm
+R7899:7899 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7919:7924 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7939:7939 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7900:7918 xv6iris.EscrowDefs <> redeem_ticketA_excl thm
+prf 8415:8429 <> escA_await_peel
+binder 8431:8431 <> E:45
+binder 8433:8434 <> ge:46
+binder 8436:8437 <> gr:47
+binder 8439:8440 <> gd:48
+binder 8442:8444 <> γi:49
+binder 8446:8446 <> z:50
+binder 8448:8449 <> rg:51
+R8456:8460 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R8462:8463 xv6iris.EscrowInode <> EscrowInode.Σ var
+binder 8452:8452 <> P:52
+R8488:8496 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R8482:8486 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R8472:8474 stdpp.base <> :::'↑'_x not
+R8475:8479 xv6iris.EscrowInode <> escAN def
+R8481:8481 xv6iris.EscrowInode <> z:50 var
+R8487:8487 xv6iris.EscrowInode <> E:45 var
+R8523:8528 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8497:8504 xv6iris.EscrowInode <> escA_inv def
+R8506:8507 xv6iris.EscrowInode <> ge:46 var
+R8509:8510 xv6iris.EscrowInode <> gr:47 var
+R8512:8513 xv6iris.EscrowInode <> gd:48 var
+R8515:8517 xv6iris.EscrowInode <> γi:49 var
+R8519:8519 xv6iris.EscrowInode <> z:50 var
+R8521:8522 xv6iris.EscrowInode <> rg:51 var
+R8546:8712 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8529:8542 xv6iris.EscrowDefs <> redeem_ticketA def
+R8544:8545 xv6iris.EscrowInode <> gr:47 var
+R8714:9083 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8713:8713 xv6iris.EscrowInode <> P:52 var
+R9084:9084 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R9139:9148 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R9150:9155 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R9086:9091 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9085:9085 xv6iris.EscrowInode <> P:52 var
+R9109:9111 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R9128:9133 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R9092:9103 xv6iris.IcacheRef <> ifreeze_post def
+R9105:9106 xv6iris.EscrowInode <> rg:51 var
+R9108:9108 xv6iris.EscrowInode <> z:50 var
+R9113:9117 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R9112:9112 xv6iris.EscrowInode <> E:45 var
+R9118:9120 stdpp.base <> :::'↑'_x not
+R9121:9125 xv6iris.EscrowInode <> escAN def
+R9127:9127 xv6iris.EscrowInode <> z:50 var
+R9113:9117 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R9112:9112 xv6iris.EscrowInode <> E:45 var
+R9118:9120 stdpp.base <> :::'↑'_x not
+R9121:9125 xv6iris.EscrowInode <> escAN def
+R9127:9127 xv6iris.EscrowInode <> z:50 var
+R9134:9138 iris.bi.interface <> ::bi_scope:'False' not
+R9149:9149 xv6iris.EscrowInode <> E:45 var
+R9149:9149 xv6iris.EscrowInode <> E:45 var
+R9157:9161 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R9156:9156 xv6iris.EscrowInode <> P:52 var
+R9185:9189 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R9162:9178 xv6iris.InodeRegion <> imark def
+R9180:9182 xv6iris.EscrowInode <> γi:49 var
+R9184:9184 xv6iris.EscrowInode <> z:50 var
+R9190:9200 xv6iris.IcacheRef <> ifreeze_off def
+R9202:9202 xv6iris.EscrowInode <> z:50 var
+R9401:9401 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9408:9413 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9422:9422 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9401:9401 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9408:9413 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9422:9422 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9444:9444 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9476:9481 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9489:9489 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9445:9463 iris.base_logic.lib.mono_nat <> mono_nat_own_update thm
+R9465:9475 xv6iris.EscrowDefs <> ST_REDEEMED abbrev
+R9444:9444 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9476:9481 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9489:9489 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9445:9463 iris.base_logic.lib.mono_nat <> mono_nat_own_update thm
+R9465:9475 xv6iris.EscrowDefs <> ST_REDEEMED abbrev
+R9533:9533 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9539:9544 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9563:9563 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9533:9533 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9539:9544 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9563:9563 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9693:9693 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9713:9718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9733:9733 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9694:9712 xv6iris.EscrowDefs <> redeem_ticketA_excl thm
+R9693:9693 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9713:9718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9733:9733 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9694:9712 xv6iris.EscrowDefs <> redeem_ticketA_excl thm
+def 11003:11014 <> pool_pending
+R11023:11027 iris.base_logic.lib.iprop <> gname def
+binder 11017:11019 <> γi:53
+R11035:11035 Corelib.Numbers.BinNums <> Z ind
+binder 11031:11031 <> z:54
+R11040:11044 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R11046:11047 xv6iris.EscrowInode <> EscrowInode.Σ var
+R11057:11060 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R11080:11089 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 11061:11062 <> ge:55
+binder 11064:11065 <> gr:56
+binder 11067:11068 <> gd:57
+R11076:11079 Corelib.Init.Datatypes <> bool ind
+binder 11071:11072 <> rg:58
+R11116:11120 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11090:11097 xv6iris.EscrowInode <> escA_inv def
+R11099:11100 xv6iris.EscrowInode <> ge:55 var
+R11102:11103 xv6iris.EscrowInode <> gr:56 var
+R11105:11106 xv6iris.EscrowInode <> gd:57 var
+R11108:11110 xv6iris.EscrowInode <> γi:53 var
+R11112:11112 xv6iris.EscrowInode <> z:54 var
+R11114:11115 xv6iris.EscrowInode <> rg:58 var
+R11134:11138 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11121:11130 xv6iris.EscrowDefs <> committedA def
+R11132:11133 xv6iris.EscrowInode <> ge:55 var
+R11156:11167 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11139:11152 xv6iris.EscrowDefs <> redeem_ticketA def
+R11154:11155 xv6iris.EscrowInode <> gr:56 var
+R11168:11168 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11187:11193 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11212:11212 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11169:11172 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R11174:11175 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 11173:11173 <> e:59
+R11176:11182 xv6iris.DirViewLend <> dv_ride def
+R11184:11184 xv6iris.EscrowInode <> z:54 var
+R11186:11186 xv6iris.EscrowInode <> e:59 var
+R11194:11197 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R11199:11200 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 11198:11198 <> b:60
+R11201:11207 xv6iris.DirViewLend <> fv_ride def
+R11209:11209 xv6iris.EscrowInode <> z:54 var
+R11211:11211 xv6iris.EscrowInode <> b:60 var
+R11373:11383 xv6iris.EscrowInode EscrowInode <> sec

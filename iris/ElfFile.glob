@@ -1,0 +1,2690 @@
+DIGEST 824f60ec6fec8801d8fc7cfc1fc838fd
+Fxv6iris.ElfFile
+R3901:3906 Stdlib.ZArith.ZArith <> <> lib
+R3908:3910 Stdlib.micromega.Lia <> <> lib
+R3912:3915 Stdlib.Lists.List <> <> lib
+R3944:3947 stdpp.gmap <> <> lib
+R3976:3996 stdpp.bitvector.definitions <> <> lib
+R4014:4028 xv6iris.RiscvModelBytes <> <> lib
+def 4125:4133 <> elf_bytes
+R4138:4141 Corelib.Init.Datatypes <> list ind
+R4144:4145 stdpp.bitvector.definitions <> bv rec
+def 4469:4477 <> elf_le_at
+R4484:4492 xv6iris.ElfFile <> elf_bytes def
+binder 4480:4480 <> l:1
+R4502:4504 Corelib.Init.Datatypes <> nat ind
+binder 4496:4496 <> o:2
+binder 4498:4498 <> n:3
+R4509:4509 Corelib.Numbers.BinNums <> Z ind
+R4516:4529 xv6iris.RiscvModelBytes <> assemble_bytes def
+R4532:4534 Corelib.Lists.ListDef <> map def
+R4566:4568 Corelib.Lists.ListDef <> seq def
+R4572:4572 xv6iris.ElfFile <> n:3 var
+binder 4541:4541 <> j:4
+R4547:4551 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R4554:4556 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4553:4553 xv6iris.ElfFile <> o:2 var
+R4557:4557 xv6iris.ElfFile <> j:4 var
+R4546:4546 xv6iris.ElfFile <> l:1 var
+prf 4660:4674 <> elf_map_is_fmap
+binder 4677:4677 <> A:5
+binder 4679:4679 <> B:6
+R4695:4698 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4694:4694 xv6iris.ElfFile <> A:5 var
+R4699:4699 xv6iris.ElfFile <> B:6 var
+binder 4690:4690 <> g:7
+R4707:4710 Corelib.Init.Datatypes <> list ind
+R4712:4712 xv6iris.ElfFile <> A:5 var
+binder 4703:4703 <> l:8
+R4724:4726 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4717:4719 Corelib.Lists.ListDef <> map def
+R4723:4723 xv6iris.ElfFile <> l:8 var
+R4721:4721 xv6iris.ElfFile <> g:7 var
+R4728:4732 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R4727:4727 xv6iris.ElfFile <> g:7 var
+R4733:4733 xv6iris.ElfFile <> l:8 var
+prf 4829:4847 <> elf_le_bytes_length
+R4854:4862 xv6iris.ElfFile <> elf_bytes def
+binder 4850:4850 <> l:9
+R4872:4874 Corelib.Init.Datatypes <> nat ind
+binder 4866:4866 <> o:10
+binder 4868:4868 <> n:11
+R4932:4934 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4881:4886 Corelib.Init.Datatypes <> length def
+R4889:4891 Corelib.Lists.ListDef <> map def
+R4923:4925 Corelib.Lists.ListDef <> seq def
+R4929:4929 xv6iris.ElfFile <> n:11 var
+binder 4898:4898 <> j:12
+R4904:4908 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R4911:4913 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4910:4910 xv6iris.ElfFile <> o:10 var
+R4914:4914 xv6iris.ElfFile <> j:12 var
+R4903:4903 xv6iris.ElfFile <> l:9 var
+R4935:4935 xv6iris.ElfFile <> n:11 var
+R4953:4967 xv6iris.ElfFile <> elf_map_is_fmap thm
+R4970:4980 stdpp.list_monad <> length_fmap thm
+R4983:4992 Stdlib.Lists.List <> length_seq thm
+R4953:4967 xv6iris.ElfFile <> elf_map_is_fmap thm
+R4953:4967 xv6iris.ElfFile <> elf_map_is_fmap thm
+R4970:4980 stdpp.list_monad <> length_fmap thm
+R4970:4980 stdpp.list_monad <> length_fmap thm
+R4983:4992 Stdlib.Lists.List <> length_seq thm
+R4983:4992 Stdlib.Lists.List <> length_seq thm
+prf 5136:5157 <> elf_le_bytes_take_drop
+R5164:5172 xv6iris.ElfFile <> elf_bytes def
+binder 5160:5160 <> l:13
+R5182:5184 Corelib.Init.Datatypes <> nat ind
+binder 5176:5176 <> o:14
+binder 5178:5178 <> n:15
+R5214:5219 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5197:5200 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R5193:5195 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5192:5192 xv6iris.ElfFile <> o:14 var
+R5196:5196 xv6iris.ElfFile <> n:15 var
+R5201:5206 Corelib.Init.Datatypes <> length def
+R5208:5208 xv6iris.ElfFile <> l:13 var
+R5262:5264 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5220:5222 Corelib.Lists.ListDef <> map def
+R5254:5256 Corelib.Lists.ListDef <> seq def
+R5260:5260 xv6iris.ElfFile <> n:15 var
+binder 5229:5229 <> j:16
+R5235:5239 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R5242:5244 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5241:5241 xv6iris.ElfFile <> o:14 var
+R5245:5245 xv6iris.ElfFile <> j:16 var
+R5234:5234 xv6iris.ElfFile <> l:13 var
+R5265:5268 stdpp.list_basics <> take abbrev
+R5273:5276 stdpp.list_basics <> drop abbrev
+R5280:5280 xv6iris.ElfFile <> l:13 var
+R5278:5278 xv6iris.ElfFile <> o:14 var
+R5270:5270 xv6iris.ElfFile <> n:15 var
+R5312:5318 stdpp.list_basics <> list_eq thm
+R5312:5318 stdpp.list_basics <> list_eq thm
+R5341:5355 xv6iris.ElfFile <> elf_map_is_fmap thm
+R5358:5373 stdpp.list_monad <> list_lookup_fmap thm
+R5341:5355 xv6iris.ElfFile <> elf_map_is_fmap thm
+R5341:5355 xv6iris.ElfFile <> elf_map_is_fmap thm
+R5358:5373 stdpp.list_monad <> list_lookup_fmap thm
+R5358:5373 stdpp.list_monad <> list_lookup_fmap thm
+R5388:5402 Stdlib.Arith.PeanoNat Nat lt_ge_cases thm
+R5388:5402 Stdlib.Arith.PeanoNat Nat lt_ge_cases thm
+R5433:5445 stdpp.list_numbers <> lookup_seq_lt thm
+R5433:5445 stdpp.list_numbers <> lookup_seq_lt thm
+R5433:5445 stdpp.list_numbers <> lookup_seq_lt thm
+R5479:5489 stdpp.list_basics <> lookup_take thm
+R5479:5489 stdpp.list_basics <> lookup_take thm
+R5479:5489 stdpp.list_basics <> lookup_take thm
+R5512:5522 stdpp.list_basics <> lookup_drop thm
+R5512:5522 stdpp.list_basics <> lookup_drop thm
+R5512:5522 stdpp.list_basics <> lookup_drop thm
+R5538:5564 stdpp.list_basics <> list_lookup_lookup_total_lt thm
+R5570:5572 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5538:5564 stdpp.list_basics <> list_lookup_lookup_total_lt thm
+R5570:5572 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5538:5564 stdpp.list_basics <> list_lookup_lookup_total_lt thm
+R5570:5572 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5647:5656 Stdlib.Lists.List <> length_seq thm
+R5618:5633 stdpp.list_basics <> lookup_ge_None_2 thm
+R5618:5633 stdpp.list_basics <> lookup_ge_None_2 thm
+R5647:5656 Stdlib.Lists.List <> length_seq thm
+R5647:5656 Stdlib.Lists.List <> length_seq thm
+R5618:5633 stdpp.list_basics <> lookup_ge_None_2 thm
+R5692:5707 stdpp.list_basics <> lookup_ge_None_2 thm
+R5692:5707 stdpp.list_basics <> lookup_ge_None_2 thm
+R5722:5732 stdpp.list_basics <> length_take thm
+R5735:5745 stdpp.list_basics <> length_drop thm
+R5722:5732 stdpp.list_basics <> length_take thm
+R5722:5732 stdpp.list_basics <> length_take thm
+R5735:5745 stdpp.list_basics <> length_drop thm
+R5735:5745 stdpp.list_basics <> length_drop thm
+def 5898:5906 <> elf_avail
+R5913:5921 xv6iris.ElfFile <> elf_bytes def
+binder 5909:5909 <> l:17
+R5931:5933 Corelib.Init.Datatypes <> nat ind
+binder 5925:5925 <> o:18
+binder 5927:5927 <> n:19
+R5938:5941 Corelib.Init.Datatypes <> bool ind
+R5954:5954 xv6iris.ElfFile <> n:19 var
+R5965:5965 Corelib.Init.Datatypes <> O constr
+R5970:5973 Corelib.Init.Datatypes <> true constr
+R5979:5979 Corelib.Init.Datatypes <> S constr
+R5993:5996 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5999:6001 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5998:5998 xv6iris.ElfFile <> o:18 var
+R5992:5992 xv6iris.ElfFile <> l:17 var
+R6014:6017 Corelib.Init.Datatypes <> Some constr
+R6024:6027 Corelib.Init.Datatypes <> true constr
+R6031:6034 Corelib.Init.Datatypes <> None constr
+R6039:6043 Corelib.Init.Datatypes <> false constr
+prf 6063:6076 <> elf_avail_spec
+R6083:6091 xv6iris.ElfFile <> elf_bytes def
+binder 6079:6079 <> l:21
+R6101:6103 Corelib.Init.Datatypes <> nat ind
+binder 6095:6095 <> o:22
+binder 6097:6097 <> n:23
+R6121:6125 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6176:6176 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6112:6114 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R6115:6115 xv6iris.ElfFile <> n:23 var
+R6148:6152 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R6141:6143 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6126:6134 xv6iris.ElfFile <> elf_avail def
+R6136:6136 xv6iris.ElfFile <> l:21 var
+R6138:6138 xv6iris.ElfFile <> o:22 var
+R6140:6140 xv6iris.ElfFile <> n:23 var
+R6144:6147 Corelib.Init.Datatypes <> true constr
+R6159:6162 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R6155:6157 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R6154:6154 xv6iris.ElfFile <> o:22 var
+R6158:6158 xv6iris.ElfFile <> n:23 var
+R6163:6168 Corelib.Init.Datatypes <> length def
+R6170:6170 xv6iris.ElfFile <> l:21 var
+R6233:6241 xv6iris.ElfFile <> elf_avail def
+R6257:6260 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R6263:6265 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R6257:6260 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R6263:6265 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R6327:6340 stdpp.list_basics <> lookup_lt_Some thm
+R6327:6340 stdpp.list_basics <> lookup_lt_Some thm
+R6411:6417 stdpp.option <> is_Some def
+R6421:6424 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R6427:6429 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R6449:6467 stdpp.list_basics <> lookup_lt_is_Some_2 thm
+R6411:6417 stdpp.option <> is_Some def
+R6421:6424 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R6427:6429 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R6449:6467 stdpp.list_basics <> lookup_lt_is_Some_2 thm
+def 6689:6696 <> elf_read
+R6703:6711 xv6iris.ElfFile <> elf_bytes def
+binder 6699:6699 <> f:24
+R6719:6719 Corelib.Numbers.BinNums <> Z ind
+binder 6715:6715 <> o:25
+R6727:6729 Corelib.Init.Datatypes <> nat ind
+binder 6723:6723 <> n:26
+R6734:6739 Corelib.Init.Datatypes <> option ind
+R6741:6741 Corelib.Numbers.BinNums <> Z ind
+R6751:6751 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R6759:6763 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R6753:6757 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R6758:6758 xv6iris.ElfFile <> o:25 var
+R6764:6772 xv6iris.ElfFile <> elf_avail def
+R6774:6774 xv6iris.ElfFile <> f:24 var
+R6777:6784 Stdlib.ZArith.BinInt Z to_nat def
+R6786:6786 xv6iris.ElfFile <> o:25 var
+R6789:6789 xv6iris.ElfFile <> n:26 var
+R6837:6840 Corelib.Init.Datatypes <> None constr
+R6798:6801 Corelib.Init.Datatypes <> Some constr
+R6804:6812 xv6iris.ElfFile <> elf_le_at def
+R6814:6814 xv6iris.ElfFile <> f:24 var
+R6817:6824 Stdlib.ZArith.BinInt Z to_nat def
+R6826:6826 xv6iris.ElfFile <> o:25 var
+R6829:6829 xv6iris.ElfFile <> n:26 var
+def 6855:6865 <> elf_read_u8
+R6873:6881 xv6iris.ElfFile <> elf_bytes def
+binder 6869:6869 <> f:27
+R6889:6889 Corelib.Numbers.BinNums <> Z ind
+binder 6885:6885 <> o:28
+R6894:6899 Corelib.Init.Datatypes <> option ind
+R6901:6901 Corelib.Numbers.BinNums <> Z ind
+R6906:6913 xv6iris.ElfFile <> elf_read def
+R6915:6915 xv6iris.ElfFile <> f:27 var
+R6917:6917 xv6iris.ElfFile <> o:28 var
+def 6933:6944 <> elf_read_u16
+R6951:6959 xv6iris.ElfFile <> elf_bytes def
+binder 6947:6947 <> f:29
+R6967:6967 Corelib.Numbers.BinNums <> Z ind
+binder 6963:6963 <> o:30
+R6972:6977 Corelib.Init.Datatypes <> option ind
+R6979:6979 Corelib.Numbers.BinNums <> Z ind
+R6984:6991 xv6iris.ElfFile <> elf_read def
+R6993:6993 xv6iris.ElfFile <> f:29 var
+R6995:6995 xv6iris.ElfFile <> o:30 var
+def 7011:7022 <> elf_read_u32
+R7029:7037 xv6iris.ElfFile <> elf_bytes def
+binder 7025:7025 <> f:31
+R7045:7045 Corelib.Numbers.BinNums <> Z ind
+binder 7041:7041 <> o:32
+R7050:7055 Corelib.Init.Datatypes <> option ind
+R7057:7057 Corelib.Numbers.BinNums <> Z ind
+R7062:7069 xv6iris.ElfFile <> elf_read def
+R7071:7071 xv6iris.ElfFile <> f:31 var
+R7073:7073 xv6iris.ElfFile <> o:32 var
+def 7089:7100 <> elf_read_u64
+R7107:7115 xv6iris.ElfFile <> elf_bytes def
+binder 7103:7103 <> f:33
+R7123:7123 Corelib.Numbers.BinNums <> Z ind
+binder 7119:7119 <> o:34
+R7128:7133 Corelib.Init.Datatypes <> option ind
+R7135:7135 Corelib.Numbers.BinNums <> Z ind
+R7140:7147 xv6iris.ElfFile <> elf_read def
+R7149:7149 xv6iris.ElfFile <> f:33 var
+R7151:7151 xv6iris.ElfFile <> o:34 var
+prf 7163:7175 <> elf_read_Some
+R7182:7190 xv6iris.ElfFile <> elf_bytes def
+binder 7178:7178 <> f:35
+R7198:7198 Corelib.Numbers.BinNums <> Z ind
+binder 7194:7194 <> o:36
+R7206:7208 Corelib.Init.Datatypes <> nat ind
+binder 7202:7202 <> n:37
+R7216:7216 Corelib.Numbers.BinNums <> Z ind
+binder 7212:7212 <> v:38
+R7234:7240 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7360:7360 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7225:7227 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R7228:7228 xv6iris.ElfFile <> n:37 var
+R7264:7271 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R7255:7257 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7241:7248 xv6iris.ElfFile <> elf_read def
+R7250:7250 xv6iris.ElfFile <> f:35 var
+R7252:7252 xv6iris.ElfFile <> o:36 var
+R7254:7254 xv6iris.ElfFile <> n:37 var
+R7258:7261 Corelib.Init.Datatypes <> Some constr
+R7263:7263 xv6iris.ElfFile <> v:38 var
+R7278:7281 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R7273:7276 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R7277:7277 xv6iris.ElfFile <> o:36 var
+R7319:7329 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R7296:7299 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R7283:7285 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R7282:7282 xv6iris.ElfFile <> o:36 var
+R7286:7293 Stdlib.ZArith.BinInt Z of_nat def
+R7295:7295 xv6iris.ElfFile <> n:37 var
+R7300:7307 Stdlib.ZArith.BinInt Z of_nat def
+R7310:7315 Corelib.Init.Datatypes <> length def
+R7317:7317 xv6iris.ElfFile <> f:35 var
+R7331:7333 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7330:7330 xv6iris.ElfFile <> v:38 var
+R7334:7342 xv6iris.ElfFile <> elf_le_at def
+R7344:7344 xv6iris.ElfFile <> f:35 var
+R7347:7354 Stdlib.ZArith.BinInt Z to_nat def
+R7356:7356 xv6iris.ElfFile <> o:36 var
+R7359:7359 xv6iris.ElfFile <> n:37 var
+R7390:7397 xv6iris.ElfFile <> elf_read def
+R7413:7417 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R7413:7417 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R7446:7453 Stdlib.ZArith.BinInt Z leb_le thm
+R7446:7453 Stdlib.ZArith.BinInt Z leb_le thm
+R7476:7484 xv6iris.ElfFile <> elf_avail def
+R7489:7496 Stdlib.ZArith.BinInt Z to_nat def
+R7476:7484 xv6iris.ElfFile <> elf_avail def
+R7489:7496 Stdlib.ZArith.BinInt Z to_nat def
+R7526:7539 xv6iris.ElfFile <> elf_avail_spec thm
+R7544:7551 Stdlib.ZArith.BinInt Z to_nat def
+R7526:7539 xv6iris.ElfFile <> elf_avail_spec thm
+R7544:7551 Stdlib.ZArith.BinInt Z to_nat def
+R7801:7803 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7775:7783 xv6iris.ElfFile <> elf_avail def
+R7788:7795 Stdlib.ZArith.BinInt Z to_nat def
+R7804:7807 Corelib.Init.Datatypes <> true constr
+R7829:7842 xv6iris.ElfFile <> elf_avail_spec thm
+R7847:7854 Stdlib.ZArith.BinInt Z to_nat def
+R7801:7803 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7775:7783 xv6iris.ElfFile <> elf_avail def
+R7788:7795 Stdlib.ZArith.BinInt Z to_nat def
+R7804:7807 Corelib.Init.Datatypes <> true constr
+R7829:7842 xv6iris.ElfFile <> elf_avail_spec thm
+R7847:7854 Stdlib.ZArith.BinInt Z to_nat def
+R7929:7936 Stdlib.ZArith.BinInt Z leb_gt thm
+R7929:7936 Stdlib.ZArith.BinInt Z leb_gt thm
+rec 8241:8248 <> elf_ehdr
+proj 8265:8272 <> ee_entry
+proj 8316:8323 <> ee_phoff
+proj 8367:8378 <> ee_phentsize
+proj 8418:8425 <> ee_phnum
+proj 8469:8476 <> ee_shoff
+proj 8520:8531 <> ee_shentsize
+proj 8571:8578 <> ee_shnum
+proj 8622:8632 <> ee_shstrndx
+R8276:8276 Corelib.Numbers.BinNums <> Z ind
+R8327:8327 Corelib.Numbers.BinNums <> Z ind
+R8382:8382 Corelib.Numbers.BinNums <> Z ind
+R8429:8429 Corelib.Numbers.BinNums <> Z ind
+R8480:8480 Corelib.Numbers.BinNums <> Z ind
+R8535:8535 Corelib.Numbers.BinNums <> Z ind
+R8582:8582 Corelib.Numbers.BinNums <> Z ind
+R8636:8636 Corelib.Numbers.BinNums <> Z ind
+rec 8682:8689 <> elf_phdr
+proj 8706:8712 <> ep_type
+proj 8752:8759 <> ep_flags
+proj 8798:8806 <> ep_offset
+proj 8844:8851 <> ep_vaddr
+proj 8890:8897 <> ep_paddr
+proj 8936:8944 <> ep_filesz
+proj 8982:8989 <> ep_memsz
+proj 9028:9035 <> ep_align
+R8716:8716 Corelib.Numbers.BinNums <> Z ind
+R8763:8763 Corelib.Numbers.BinNums <> Z ind
+R8810:8810 Corelib.Numbers.BinNums <> Z ind
+R8855:8855 Corelib.Numbers.BinNums <> Z ind
+R8901:8901 Corelib.Numbers.BinNums <> Z ind
+R8948:8948 Corelib.Numbers.BinNums <> Z ind
+R8993:8993 Corelib.Numbers.BinNums <> Z ind
+R9039:9039 Corelib.Numbers.BinNums <> Z ind
+rec 9083:9090 <> elf_shdr
+proj 9107:9113 <> es_name
+proj 9154:9160 <> es_type
+proj 9201:9208 <> es_flags
+proj 9248:9254 <> es_addr
+proj 9295:9303 <> es_offset
+proj 9342:9348 <> es_size
+R9117:9117 Corelib.Numbers.BinNums <> Z ind
+R9164:9164 Corelib.Numbers.BinNums <> Z ind
+R9212:9212 Corelib.Numbers.BinNums <> Z ind
+R9258:9258 Corelib.Numbers.BinNums <> Z ind
+R9307:9307 Corelib.Numbers.BinNums <> Z ind
+R9352:9352 Corelib.Numbers.BinNums <> Z ind
+inst 9407:9421 <> elf_ehdr_eq_dec
+R9425:9434 stdpp.base <> EqDecision abbrev
+R9436:9443 xv6iris.ElfFile <> elf_ehdr rec
+inst 9494:9508 <> elf_phdr_eq_dec
+R9512:9521 stdpp.base <> EqDecision abbrev
+R9523:9530 xv6iris.ElfFile <> elf_phdr rec
+inst 9581:9595 <> elf_shdr_eq_dec
+R9599:9608 stdpp.base <> EqDecision abbrev
+R9610:9617 xv6iris.ElfFile <> elf_shdr rec
+def 9896:9906 <> elf_byte_is
+R9913:9921 xv6iris.ElfFile <> elf_bytes def
+binder 9909:9909 <> f:64
+R9931:9931 Corelib.Numbers.BinNums <> Z ind
+binder 9925:9925 <> o:65
+binder 9927:9927 <> v:66
+R9936:9939 Corelib.Init.Datatypes <> bool ind
+R9952:9962 xv6iris.ElfFile <> elf_read_u8 def
+R9964:9964 xv6iris.ElfFile <> f:64 var
+R9966:9966 xv6iris.ElfFile <> o:65 var
+R9973:9976 Corelib.Init.Datatypes <> Some constr
+R9983:9987 Stdlib.ZArith.BinInt Z eqb def
+R9991:9991 xv6iris.ElfFile <> v:66 var
+R9995:9998 Corelib.Init.Datatypes <> None constr
+R10003:10007 Corelib.Init.Datatypes <> false constr
+def 10103:10114 <> elf_magic_ok
+R10121:10129 xv6iris.ElfFile <> elf_bytes def
+binder 10117:10117 <> f:67
+R10134:10137 Corelib.Init.Datatypes <> bool ind
+R10261:10264 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R10238:10243 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R10214:10217 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R10188:10193 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R10164:10167 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R10144:10154 xv6iris.ElfFile <> elf_byte_is def
+R10156:10156 xv6iris.ElfFile <> f:67 var
+R10168:10178 xv6iris.ElfFile <> elf_byte_is def
+R10180:10180 xv6iris.ElfFile <> f:67 var
+R10194:10204 xv6iris.ElfFile <> elf_byte_is def
+R10206:10206 xv6iris.ElfFile <> f:67 var
+R10218:10228 xv6iris.ElfFile <> elf_byte_is def
+R10230:10230 xv6iris.ElfFile <> f:67 var
+R10244:10254 xv6iris.ElfFile <> elf_byte_is def
+R10256:10256 xv6iris.ElfFile <> f:67 var
+R10265:10275 xv6iris.ElfFile <> elf_byte_is def
+R10277:10277 xv6iris.ElfFile <> f:67 var
+def 10296:10309 <> elf_parse_ehdr
+R10316:10324 xv6iris.ElfFile <> elf_bytes def
+binder 10312:10312 <> f:68
+R10329:10334 Corelib.Init.Datatypes <> option ind
+R10336:10343 xv6iris.ElfFile <> elf_ehdr rec
+R10355:10359 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10379:10382 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10350:10354 <> entry:69
+R10388:10392 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10412:10415 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10383:10387 <> phoff:70
+R10421:10425 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10445:10448 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10416:10420 <> shoff:71
+R10458:10462 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10482:10485 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10449:10457 <> phentsize:72
+R10491:10495 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10515:10518 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10486:10490 <> phnum:73
+R10528:10532 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10552:10555 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10519:10527 <> shentsize:74
+R10561:10565 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10585:10588 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10556:10560 <> shnum:75
+R10597:10601 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10621:10624 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10589:10596 <> shstrndx:76
+R10625:10628 Corelib.Init.Datatypes <> Some constr
+R10631:10637 xv6iris.ElfFile <> ElfEhdr constr
+R10639:10643 xv6iris.ElfFile <> entry:69 var
+R10645:10649 xv6iris.ElfFile <> phoff:70 var
+R10651:10659 xv6iris.ElfFile <> phentsize:72 var
+R10661:10665 xv6iris.ElfFile <> phnum:73 var
+R10667:10671 xv6iris.ElfFile <> shoff:71 var
+R10673:10681 xv6iris.ElfFile <> shentsize:74 var
+R10683:10687 xv6iris.ElfFile <> shnum:75 var
+R10689:10696 xv6iris.ElfFile <> shstrndx:76 var
+R10602:10613 xv6iris.ElfFile <> elf_read_u16 def
+R10615:10615 xv6iris.ElfFile <> f:68 var
+R10566:10577 xv6iris.ElfFile <> elf_read_u16 def
+R10579:10579 xv6iris.ElfFile <> f:68 var
+R10533:10544 xv6iris.ElfFile <> elf_read_u16 def
+R10546:10546 xv6iris.ElfFile <> f:68 var
+R10496:10507 xv6iris.ElfFile <> elf_read_u16 def
+R10509:10509 xv6iris.ElfFile <> f:68 var
+R10463:10474 xv6iris.ElfFile <> elf_read_u16 def
+R10476:10476 xv6iris.ElfFile <> f:68 var
+R10426:10437 xv6iris.ElfFile <> elf_read_u64 def
+R10439:10439 xv6iris.ElfFile <> f:68 var
+R10393:10404 xv6iris.ElfFile <> elf_read_u64 def
+R10406:10406 xv6iris.ElfFile <> f:68 var
+R10360:10371 xv6iris.ElfFile <> elf_read_u64 def
+R10373:10373 xv6iris.ElfFile <> f:68 var
+def 10712:10725 <> elf_parse_phdr
+R10732:10740 xv6iris.ElfFile <> elf_bytes def
+binder 10728:10728 <> f:77
+R10748:10748 Corelib.Numbers.BinNums <> Z ind
+binder 10744:10744 <> o:78
+R10753:10758 Corelib.Init.Datatypes <> option ind
+R10760:10767 xv6iris.ElfFile <> elf_phdr rec
+R10776:10780 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10797:10800 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10774:10775 <> ty:79
+R10803:10807 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10830:10833 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10801:10802 <> fl:80
+R10837:10841 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10864:10867 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10834:10836 <> off:81
+R10870:10874 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10898:10901 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10868:10869 <> va:82
+R10904:10908 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10932:10935 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10902:10903 <> pa:83
+R10939:10943 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R10967:10970 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10936:10938 <> fsz:84
+R10974:10978 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R11002:11005 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 10971:10973 <> msz:85
+R11008:11012 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R11036:11039 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 11006:11007 <> al:86
+R11040:11043 Corelib.Init.Datatypes <> Some constr
+R11046:11052 xv6iris.ElfFile <> ElfPhdr constr
+R11054:11055 xv6iris.ElfFile <> ty:79 var
+R11057:11058 xv6iris.ElfFile <> fl:80 var
+R11060:11062 xv6iris.ElfFile <> off:81 var
+R11064:11065 xv6iris.ElfFile <> va:82 var
+R11067:11068 xv6iris.ElfFile <> pa:83 var
+R11070:11072 xv6iris.ElfFile <> fsz:84 var
+R11074:11076 xv6iris.ElfFile <> msz:85 var
+R11078:11079 xv6iris.ElfFile <> al:86 var
+R11013:11024 xv6iris.ElfFile <> elf_read_u64 def
+R11026:11026 xv6iris.ElfFile <> f:77 var
+R11030:11032 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11029:11029 xv6iris.ElfFile <> o:78 var
+R10979:10990 xv6iris.ElfFile <> elf_read_u64 def
+R10992:10992 xv6iris.ElfFile <> f:77 var
+R10996:10998 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R10995:10995 xv6iris.ElfFile <> o:78 var
+R10944:10955 xv6iris.ElfFile <> elf_read_u64 def
+R10957:10957 xv6iris.ElfFile <> f:77 var
+R10961:10963 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R10960:10960 xv6iris.ElfFile <> o:78 var
+R10909:10920 xv6iris.ElfFile <> elf_read_u64 def
+R10922:10922 xv6iris.ElfFile <> f:77 var
+R10926:10928 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R10925:10925 xv6iris.ElfFile <> o:78 var
+R10875:10886 xv6iris.ElfFile <> elf_read_u64 def
+R10888:10888 xv6iris.ElfFile <> f:77 var
+R10892:10894 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R10891:10891 xv6iris.ElfFile <> o:78 var
+R10842:10853 xv6iris.ElfFile <> elf_read_u64 def
+R10855:10855 xv6iris.ElfFile <> f:77 var
+R10859:10861 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R10858:10858 xv6iris.ElfFile <> o:78 var
+R10808:10819 xv6iris.ElfFile <> elf_read_u32 def
+R10821:10821 xv6iris.ElfFile <> f:77 var
+R10825:10827 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R10824:10824 xv6iris.ElfFile <> o:78 var
+R10781:10792 xv6iris.ElfFile <> elf_read_u32 def
+R10794:10794 xv6iris.ElfFile <> f:77 var
+R10796:10796 xv6iris.ElfFile <> o:78 var
+def 11095:11108 <> elf_parse_shdr
+R11115:11123 xv6iris.ElfFile <> elf_bytes def
+binder 11111:11111 <> f:87
+R11131:11131 Corelib.Numbers.BinNums <> Z ind
+binder 11127:11127 <> o:88
+R11136:11141 Corelib.Init.Datatypes <> option ind
+R11143:11150 xv6iris.ElfFile <> elf_shdr rec
+R11159:11163 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R11180:11183 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 11157:11158 <> nm:89
+R11186:11190 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R11213:11216 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 11184:11185 <> ty:90
+R11219:11223 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R11246:11249 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 11217:11218 <> fl:91
+R11252:11256 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R11280:11283 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 11250:11251 <> ad:92
+R11287:11291 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R11315:11318 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 11284:11286 <> off:93
+R11321:11325 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R11349:11352 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 11319:11320 <> sz:94
+R11353:11356 Corelib.Init.Datatypes <> Some constr
+R11359:11365 xv6iris.ElfFile <> ElfShdr constr
+R11367:11368 xv6iris.ElfFile <> nm:89 var
+R11370:11371 xv6iris.ElfFile <> ty:90 var
+R11373:11374 xv6iris.ElfFile <> fl:91 var
+R11376:11377 xv6iris.ElfFile <> ad:92 var
+R11379:11381 xv6iris.ElfFile <> off:93 var
+R11383:11384 xv6iris.ElfFile <> sz:94 var
+R11326:11337 xv6iris.ElfFile <> elf_read_u64 def
+R11339:11339 xv6iris.ElfFile <> f:87 var
+R11343:11345 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11342:11342 xv6iris.ElfFile <> o:88 var
+R11292:11303 xv6iris.ElfFile <> elf_read_u64 def
+R11305:11305 xv6iris.ElfFile <> f:87 var
+R11309:11311 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11308:11308 xv6iris.ElfFile <> o:88 var
+R11257:11268 xv6iris.ElfFile <> elf_read_u64 def
+R11270:11270 xv6iris.ElfFile <> f:87 var
+R11274:11276 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11273:11273 xv6iris.ElfFile <> o:88 var
+R11224:11235 xv6iris.ElfFile <> elf_read_u64 def
+R11237:11237 xv6iris.ElfFile <> f:87 var
+R11241:11243 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11240:11240 xv6iris.ElfFile <> o:88 var
+R11191:11202 xv6iris.ElfFile <> elf_read_u32 def
+R11204:11204 xv6iris.ElfFile <> f:87 var
+R11208:11210 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11207:11207 xv6iris.ElfFile <> o:88 var
+R11164:11175 xv6iris.ElfFile <> elf_read_u32 def
+R11177:11177 xv6iris.ElfFile <> f:87 var
+R11179:11179 xv6iris.ElfFile <> o:88 var
+def 11584:11592 <> elf_table
+binder 11595:11595 <> A:95
+R11615:11618 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11614:11614 Corelib.Numbers.BinNums <> Z ind
+R11619:11624 Corelib.Init.Datatypes <> option ind
+R11626:11626 xv6iris.ElfFile <> A:95 var
+binder 11606:11610 <> parse:96
+R11639:11639 Corelib.Numbers.BinNums <> Z ind
+binder 11630:11630 <> o:97
+binder 11632:11635 <> step:98
+R11647:11649 Corelib.Init.Datatypes <> nat ind
+binder 11643:11643 <> n:99
+R11656:11661 Corelib.Init.Datatypes <> option ind
+R11664:11667 Corelib.Init.Datatypes <> list ind
+R11669:11669 xv6iris.ElfFile <> A:95 var
+R11683:11683 xv6iris.ElfFile <> n:99 var
+R11694:11694 Corelib.Init.Datatypes <> O constr
+R11699:11702 Corelib.Init.Datatypes <> Some constr
+R11704:11706 Corelib.Init.Datatypes <> nil constr
+R11712:11712 Corelib.Init.Datatypes <> S constr
+R11720:11724 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R11732:11733 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 11719:11719 <> a:102
+R11735:11739 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R11773:11774 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 11734:11734 <> r:103
+R11775:11778 Corelib.Init.Datatypes <> Some constr
+R11782:11785 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R11781:11781 xv6iris.ElfFile <> a:102 var
+R11786:11786 xv6iris.ElfFile <> r:103 var
+R11740:11748 xv6iris.ElfFile <> elf_table:100 def
+R11767:11770 xv6iris.ElfFile <> step:98 var
+R11758:11760 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11757:11757 xv6iris.ElfFile <> o:97 var
+R11761:11764 xv6iris.ElfFile <> step:98 var
+R11750:11754 xv6iris.ElfFile <> parse:96 var
+R11725:11729 xv6iris.ElfFile <> parse:96 var
+R11731:11731 xv6iris.ElfFile <> o:97 var
+def 11808:11816 <> elf_phdrs
+R11823:11831 xv6iris.ElfFile <> elf_bytes def
+binder 11819:11819 <> f:104
+R11836:11841 Corelib.Init.Datatypes <> option ind
+R11844:11847 Corelib.Init.Datatypes <> list ind
+R11849:11856 xv6iris.ElfFile <> elf_phdr rec
+R11865:11869 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R11886:11889 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 11864:11864 <> e:105
+R11890:11898 xv6iris.ElfFile <> elf_table def
+R11950:11957 Stdlib.ZArith.BinInt Z to_nat def
+R11960:11967 xv6iris.ElfFile <> ee_phnum proj
+R11969:11969 xv6iris.ElfFile <> e:105 var
+R11933:11944 xv6iris.ElfFile <> ee_phentsize proj
+R11946:11946 xv6iris.ElfFile <> e:105 var
+R11920:11927 xv6iris.ElfFile <> ee_phoff proj
+R11929:11929 xv6iris.ElfFile <> e:105 var
+R11901:11914 xv6iris.ElfFile <> elf_parse_phdr def
+R11916:11916 xv6iris.ElfFile <> f:104 var
+R11870:11883 xv6iris.ElfFile <> elf_parse_ehdr def
+R11885:11885 xv6iris.ElfFile <> f:104 var
+def 11986:11994 <> elf_shdrs
+R12001:12009 xv6iris.ElfFile <> elf_bytes def
+binder 11997:11997 <> f:106
+R12014:12019 Corelib.Init.Datatypes <> option ind
+R12022:12025 Corelib.Init.Datatypes <> list ind
+R12027:12034 xv6iris.ElfFile <> elf_shdr rec
+R12043:12047 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R12064:12067 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 12042:12042 <> e:107
+R12068:12076 xv6iris.ElfFile <> elf_table def
+R12128:12135 Stdlib.ZArith.BinInt Z to_nat def
+R12138:12145 xv6iris.ElfFile <> ee_shnum proj
+R12147:12147 xv6iris.ElfFile <> e:107 var
+R12111:12122 xv6iris.ElfFile <> ee_shentsize proj
+R12124:12124 xv6iris.ElfFile <> e:107 var
+R12098:12105 xv6iris.ElfFile <> ee_shoff proj
+R12107:12107 xv6iris.ElfFile <> e:107 var
+R12079:12092 xv6iris.ElfFile <> elf_parse_shdr def
+R12094:12094 xv6iris.ElfFile <> f:106 var
+R12048:12061 xv6iris.ElfFile <> elf_parse_ehdr def
+R12063:12063 xv6iris.ElfFile <> f:106 var
+def 12242:12250 <> elf_loads
+R12257:12265 xv6iris.ElfFile <> elf_bytes def
+binder 12253:12253 <> f:108
+R12270:12273 Corelib.Init.Datatypes <> list ind
+R12275:12282 xv6iris.ElfFile <> elf_phdr rec
+R12295:12303 xv6iris.ElfFile <> elf_phdrs def
+R12305:12305 xv6iris.ElfFile <> f:108 var
+R12316:12319 Corelib.Init.Datatypes <> Some constr
+R12327:12337 Stdlib.Lists.List <> filter def
+binder 12344:12344 <> p:109
+R12349:12353 Stdlib.ZArith.BinInt Z eqb def
+R12356:12362 xv6iris.ElfFile <> ep_type proj
+R12364:12364 xv6iris.ElfFile <> p:109 var
+R12377:12380 Corelib.Init.Datatypes <> None constr
+R12385:12387 Corelib.Init.Datatypes <> nil constr
+def 12408:12416 <> elf_entry
+R12423:12431 xv6iris.ElfFile <> elf_bytes def
+binder 12419:12419 <> f:110
+R12436:12441 Corelib.Init.Datatypes <> option ind
+R12443:12443 Corelib.Numbers.BinNums <> Z ind
+R12456:12460 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R12448:12455 xv6iris.ElfFile <> ee_entry proj
+R12461:12474 xv6iris.ElfFile <> elf_parse_ehdr def
+R12476:12476 xv6iris.ElfFile <> f:110 var
+def 12723:12735 <> elf_zero_byte
+R12739:12740 stdpp.bitvector.definitions <> bv rec
+R12747:12753 stdpp.bitvector.definitions <> Z_to_bv def
+def 12837:12850 <> seg_file_bytes
+R12857:12865 xv6iris.ElfFile <> elf_bytes def
+binder 12853:12853 <> f:111
+R12873:12880 xv6iris.ElfFile <> elf_phdr rec
+binder 12869:12869 <> p:112
+R12885:12888 Corelib.Init.Datatypes <> list ind
+R12891:12892 stdpp.bitvector.definitions <> bv rec
+R12902:12905 stdpp.list_basics <> take abbrev
+R12933:12936 stdpp.list_basics <> drop abbrev
+R12963:12963 xv6iris.ElfFile <> f:111 var
+R12939:12946 Stdlib.ZArith.BinInt Z to_nat def
+R12949:12957 xv6iris.ElfFile <> ep_offset proj
+R12959:12959 xv6iris.ElfFile <> p:112 var
+R12908:12915 Stdlib.ZArith.BinInt Z to_nat def
+R12918:12926 xv6iris.ElfFile <> ep_filesz proj
+R12928:12928 xv6iris.ElfFile <> p:112 var
+def 12979:12990 <> seg_file_map
+R12997:13005 xv6iris.ElfFile <> elf_bytes def
+binder 12993:12993 <> f:113
+R13013:13020 xv6iris.ElfFile <> elf_phdr rec
+binder 13009:13009 <> p:114
+R13025:13028 stdpp.gmap <> gmap rec
+R13033:13034 stdpp.bitvector.definitions <> bv rec
+R13030:13030 Corelib.Numbers.BinNums <> Z ind
+R13044:13051 stdpp.fin_maps <> map_seqZ def
+R13067:13080 xv6iris.ElfFile <> seg_file_bytes def
+R13082:13082 xv6iris.ElfFile <> f:113 var
+R13084:13084 xv6iris.ElfFile <> p:114 var
+R13054:13061 xv6iris.ElfFile <> ep_vaddr proj
+R13063:13063 xv6iris.ElfFile <> p:114 var
+def 13172:13185 <> seg_zero_bytes
+R13192:13199 xv6iris.ElfFile <> elf_phdr rec
+binder 13188:13188 <> p:115
+R13204:13207 Corelib.Init.Datatypes <> list ind
+R13210:13211 stdpp.bitvector.definitions <> bv rec
+R13221:13229 stdpp.list_basics <> replicate def
+R13269:13281 xv6iris.ElfFile <> elf_zero_byte def
+R13232:13239 Stdlib.ZArith.BinInt Z to_nat def
+R13252:13254 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13242:13249 xv6iris.ElfFile <> ep_memsz proj
+R13251:13251 xv6iris.ElfFile <> p:115 var
+R13255:13263 xv6iris.ElfFile <> ep_filesz proj
+R13265:13265 xv6iris.ElfFile <> p:115 var
+def 13296:13307 <> seg_zero_map
+R13314:13321 xv6iris.ElfFile <> elf_phdr rec
+binder 13310:13310 <> p:116
+R13326:13329 stdpp.gmap <> gmap rec
+R13334:13335 stdpp.bitvector.definitions <> bv rec
+R13331:13331 Corelib.Numbers.BinNums <> Z ind
+R13345:13352 stdpp.fin_maps <> map_seqZ def
+R13382:13395 xv6iris.ElfFile <> seg_zero_bytes def
+R13397:13397 xv6iris.ElfFile <> p:116 var
+R13365:13367 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R13355:13362 xv6iris.ElfFile <> ep_vaddr proj
+R13364:13364 xv6iris.ElfFile <> p:116 var
+R13368:13376 xv6iris.ElfFile <> ep_filesz proj
+R13378:13378 xv6iris.ElfFile <> p:116 var
+def 13413:13419 <> seg_map
+R13426:13434 xv6iris.ElfFile <> elf_bytes def
+binder 13422:13422 <> f:117
+R13442:13449 xv6iris.ElfFile <> elf_phdr rec
+binder 13438:13438 <> p:118
+R13454:13457 stdpp.gmap <> gmap rec
+R13462:13463 stdpp.bitvector.definitions <> bv rec
+R13459:13459 Corelib.Numbers.BinNums <> Z ind
+R13489:13493 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R13473:13484 xv6iris.ElfFile <> seg_file_map def
+R13486:13486 xv6iris.ElfFile <> f:117 var
+R13488:13488 xv6iris.ElfFile <> p:118 var
+R13494:13505 xv6iris.ElfFile <> seg_zero_map def
+R13507:13507 xv6iris.ElfFile <> p:118 var
+def 13580:13589 <> segs_union
+binder 13592:13592 <> A:119
+R13608:13611 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13607:13607 xv6iris.ElfFile <> A:119 var
+R13612:13615 stdpp.gmap <> gmap rec
+R13620:13621 stdpp.bitvector.definitions <> bv rec
+R13617:13617 Corelib.Numbers.BinNums <> Z ind
+binder 13603:13603 <> g:120
+R13633:13636 Corelib.Init.Datatypes <> list ind
+R13638:13638 xv6iris.ElfFile <> A:119 var
+binder 13628:13629 <> ps:121
+R13645:13648 stdpp.gmap <> gmap rec
+R13653:13654 stdpp.bitvector.definitions <> bv rec
+R13650:13650 Corelib.Numbers.BinNums <> Z ind
+R13662:13666 stdpp.list_basics <> foldr abbrev
+R13695:13696 xv6iris.ElfFile <> ps:121 var
+R13691:13693 stdpp.base <> ::stdpp_scope:'∅' not
+binder 13673:13673 <> p:122
+binder 13675:13675 <> m:123
+R13683:13687 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R13680:13680 xv6iris.ElfFile <> g:120 var
+R13682:13682 xv6iris.ElfFile <> p:122 var
+R13688:13688 xv6iris.ElfFile <> m:123 var
+def 13711:13724 <> elf_file_image
+R13731:13739 xv6iris.ElfFile <> elf_bytes def
+binder 13727:13727 <> f:124
+R13744:13747 stdpp.gmap <> gmap rec
+R13752:13753 stdpp.bitvector.definitions <> bv rec
+R13749:13749 Corelib.Numbers.BinNums <> Z ind
+R13763:13772 xv6iris.ElfFile <> segs_union def
+R13792:13800 xv6iris.ElfFile <> elf_loads def
+R13802:13802 xv6iris.ElfFile <> f:124 var
+R13775:13786 xv6iris.ElfFile <> seg_file_map def
+R13788:13788 xv6iris.ElfFile <> f:124 var
+def 13817:13830 <> elf_zero_image
+R13837:13845 xv6iris.ElfFile <> elf_bytes def
+binder 13833:13833 <> f:125
+R13850:13853 stdpp.gmap <> gmap rec
+R13858:13859 stdpp.bitvector.definitions <> bv rec
+R13855:13855 Corelib.Numbers.BinNums <> Z ind
+R13869:13878 xv6iris.ElfFile <> segs_union def
+R13894:13902 xv6iris.ElfFile <> elf_loads def
+R13904:13904 xv6iris.ElfFile <> f:125 var
+R13880:13891 xv6iris.ElfFile <> seg_zero_map def
+def 13919:13927 <> elf_image
+R13934:13942 xv6iris.ElfFile <> elf_bytes def
+binder 13930:13930 <> f:126
+R13947:13950 stdpp.gmap <> gmap rec
+R13955:13956 stdpp.bitvector.definitions <> bv rec
+R13952:13952 Corelib.Numbers.BinNums <> Z ind
+R13966:13975 xv6iris.ElfFile <> segs_union def
+R13990:13998 xv6iris.ElfFile <> elf_loads def
+R14000:14000 xv6iris.ElfFile <> f:126 var
+R13978:13984 xv6iris.ElfFile <> seg_map def
+R13986:13986 xv6iris.ElfFile <> f:126 var
+def 14248:14256 <> zlist_min
+R14263:14266 Corelib.Init.Datatypes <> list ind
+R14268:14268 Corelib.Numbers.BinNums <> Z ind
+binder 14259:14259 <> l:127
+R14273:14278 Corelib.Init.Datatypes <> option ind
+R14280:14280 Corelib.Numbers.BinNums <> Z ind
+R14293:14293 xv6iris.ElfFile <> l:127 var
+R14300:14302 Corelib.Init.Datatypes <> nil constr
+R14307:14310 Corelib.Init.Datatypes <> None constr
+R14315:14318 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R14324:14327 Corelib.Init.Datatypes <> Some constr
+R14330:14334 stdpp.list_basics <> foldr abbrev
+R14336:14340 Stdlib.ZArith.BinInt Z min def
+def 14363:14371 <> zlist_max
+R14378:14381 Corelib.Init.Datatypes <> list ind
+R14383:14383 Corelib.Numbers.BinNums <> Z ind
+binder 14374:14374 <> l:129
+R14388:14393 Corelib.Init.Datatypes <> option ind
+R14395:14395 Corelib.Numbers.BinNums <> Z ind
+R14408:14408 xv6iris.ElfFile <> l:129 var
+R14415:14417 Corelib.Init.Datatypes <> nil constr
+R14422:14425 Corelib.Init.Datatypes <> None constr
+R14430:14433 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R14439:14442 Corelib.Init.Datatypes <> Some constr
+R14445:14449 stdpp.list_basics <> foldr abbrev
+R14451:14455 Stdlib.ZArith.BinInt Z max def
+def 14479:14490 <> elf_mem_base
+R14497:14505 xv6iris.ElfFile <> elf_bytes def
+binder 14493:14493 <> f:131
+R14510:14515 Corelib.Init.Datatypes <> option ind
+R14517:14517 Corelib.Numbers.BinNums <> Z ind
+R14524:14532 xv6iris.ElfFile <> zlist_min def
+R14543:14547 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R14535:14542 xv6iris.ElfFile <> ep_vaddr proj
+R14548:14556 xv6iris.ElfFile <> elf_loads def
+R14558:14558 xv6iris.ElfFile <> f:131 var
+def 14573:14583 <> elf_mem_end
+R14590:14598 xv6iris.ElfFile <> elf_bytes def
+binder 14586:14586 <> f:132
+R14603:14608 Corelib.Init.Datatypes <> option ind
+R14610:14610 Corelib.Numbers.BinNums <> Z ind
+R14617:14625 xv6iris.ElfFile <> zlist_max def
+R14628:14628 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R14661:14666 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+binder 14633:14633 <> p:133
+R14648:14650 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14638:14645 xv6iris.ElfFile <> ep_vaddr proj
+R14647:14647 xv6iris.ElfFile <> p:133 var
+R14651:14658 xv6iris.ElfFile <> ep_memsz proj
+R14660:14660 xv6iris.ElfFile <> p:133 var
+R14667:14675 xv6iris.ElfFile <> elf_loads def
+R14677:14677 xv6iris.ElfFile <> f:132 var
+def 14821:14832 <> elf_segments
+R14839:14847 xv6iris.ElfFile <> elf_bytes def
+binder 14835:14835 <> f:134
+R14852:14857 Corelib.Init.Datatypes <> option ind
+R14860:14863 Corelib.Init.Datatypes <> list ind
+R14875:14877 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R14871:14873 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R14867:14869 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R14866:14866 Corelib.Numbers.BinNums <> Z ind
+R14870:14870 Corelib.Numbers.BinNums <> Z ind
+R14874:14874 Corelib.Numbers.BinNums <> Z ind
+R14878:14878 Corelib.Numbers.BinNums <> Z ind
+R14889:14893 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R14905:14908 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 14887:14888 <> ps:135
+R14909:14912 Corelib.Init.Datatypes <> Some constr
+R14915:14915 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R14974:14989 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+binder 14920:14920 <> p:136
+R14925:14925 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14936:14937 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14949:14950 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14961:14962 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14973:14973 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14926:14933 xv6iris.ElfFile <> ep_vaddr proj
+R14935:14935 xv6iris.ElfFile <> p:136 var
+R14938:14946 xv6iris.ElfFile <> ep_filesz proj
+R14948:14948 xv6iris.ElfFile <> p:136 var
+R14951:14958 xv6iris.ElfFile <> ep_memsz proj
+R14960:14960 xv6iris.ElfFile <> p:136 var
+R14963:14970 xv6iris.ElfFile <> ep_flags proj
+R14972:14972 xv6iris.ElfFile <> p:136 var
+R14990:15000 Stdlib.Lists.List <> filter def
+R15033:15034 xv6iris.ElfFile <> ps:135 var
+binder 15007:15007 <> p:137
+R15012:15016 Stdlib.ZArith.BinInt Z eqb def
+R15019:15025 xv6iris.ElfFile <> ep_type proj
+R15027:15027 xv6iris.ElfFile <> p:137 var
+R14894:14902 xv6iris.ElfFile <> elf_phdrs def
+R14904:14904 xv6iris.ElfFile <> f:134 var
+def 15320:15333 <> sh_alloc_write
+R15340:15347 xv6iris.ElfFile <> elf_shdr rec
+binder 15336:15336 <> s:138
+R15352:15355 Corelib.Init.Datatypes <> bool ind
+R15400:15403 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R15362:15365 Corelib.Init.Datatypes <> negb def
+R15368:15372 Stdlib.ZArith.BinInt Z eqb def
+R15375:15380 Stdlib.ZArith.BinInt Z land def
+R15383:15390 xv6iris.ElfFile <> es_flags proj
+R15392:15392 xv6iris.ElfFile <> s:138 var
+R15404:15407 Corelib.Init.Datatypes <> negb def
+R15410:15414 Stdlib.ZArith.BinInt Z eqb def
+R15417:15422 Stdlib.ZArith.BinInt Z land def
+R15425:15432 xv6iris.ElfFile <> es_flags proj
+R15434:15434 xv6iris.ElfFile <> s:138 var
+def 15456:15469 <> elf_rodata_end
+R15476:15484 xv6iris.ElfFile <> elf_bytes def
+binder 15472:15472 <> f:139
+R15489:15494 Corelib.Init.Datatypes <> option ind
+R15496:15496 Corelib.Numbers.BinNums <> Z ind
+R15505:15509 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+R15521:15524 stdpp.base <> ::stdpp_scope:x_'←'_x_';'_x not
+binder 15503:15504 <> ss:140
+R15531:15539 xv6iris.ElfFile <> zlist_min def
+R15549:15553 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R15542:15548 xv6iris.ElfFile <> es_addr proj
+R15554:15564 Stdlib.Lists.List <> filter def
+R15581:15582 xv6iris.ElfFile <> ss:140 var
+R15566:15579 xv6iris.ElfFile <> sh_alloc_write def
+R15594:15597 Corelib.Init.Datatypes <> Some constr
+R15604:15607 Corelib.Init.Datatypes <> Some constr
+R15615:15618 Corelib.Init.Datatypes <> None constr
+R15623:15633 xv6iris.ElfFile <> elf_mem_end def
+R15635:15635 xv6iris.ElfFile <> f:139 var
+R15510:15518 xv6iris.ElfFile <> elf_shdrs def
+R15520:15520 xv6iris.ElfFile <> f:139 var
+def 15888:15894 <> phdr_wf
+R15901:15909 xv6iris.ElfFile <> elf_bytes def
+binder 15897:15897 <> f:141
+R15917:15924 xv6iris.ElfFile <> elf_phdr rec
+binder 15913:15913 <> p:142
+R15929:15932 Corelib.Init.Datatypes <> bool ind
+R16096:16100 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16134:16134 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16072:16078 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16095:16095 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16038:16044 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16071:16071 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R15981:15987 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16037:16037 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R15939:15939 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R15957:15962 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R15980:15980 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R15941:15945 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R15946:15954 xv6iris.ElfFile <> ep_offset proj
+R15956:15956 xv6iris.ElfFile <> p:142 var
+R15964:15968 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R15969:15977 xv6iris.ElfFile <> ep_filesz proj
+R15979:15979 xv6iris.ElfFile <> p:142 var
+R16013:16017 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R15999:16001 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R15988:15996 xv6iris.ElfFile <> ep_offset proj
+R15998:15998 xv6iris.ElfFile <> p:142 var
+R16002:16010 xv6iris.ElfFile <> ep_filesz proj
+R16012:16012 xv6iris.ElfFile <> p:142 var
+R16018:16025 Stdlib.ZArith.BinInt Z of_nat def
+R16028:16033 Corelib.Init.Datatypes <> length def
+R16035:16035 xv6iris.ElfFile <> f:141 var
+R16056:16060 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R16045:16053 xv6iris.ElfFile <> ep_filesz proj
+R16055:16055 xv6iris.ElfFile <> p:142 var
+R16061:16068 xv6iris.ElfFile <> ep_memsz proj
+R16070:16070 xv6iris.ElfFile <> p:142 var
+R16080:16084 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R16085:16092 xv6iris.ElfFile <> ep_vaddr proj
+R16094:16094 xv6iris.ElfFile <> p:142 var
+R16124:16127 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<?'_x not
+R16111:16113 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R16101:16108 xv6iris.ElfFile <> ep_vaddr proj
+R16110:16110 xv6iris.ElfFile <> p:142 var
+R16114:16121 xv6iris.ElfFile <> ep_memsz proj
+R16123:16123 xv6iris.ElfFile <> p:142 var
+R16129:16131 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+def 16284:16295 <> range_disj_b
+R16304:16311 xv6iris.ElfFile <> elf_phdr rec
+binder 16298:16298 <> p:143
+binder 16300:16300 <> q:144
+R16316:16319 Corelib.Init.Datatypes <> bool ind
+R16434:16438 Corelib.Init.Datatypes <> ::bool_scope:x_'||'_x not
+R16455:16455 Corelib.Init.Datatypes <> ::bool_scope:x_'||'_x not
+R16410:16416 Corelib.Init.Datatypes <> ::bool_scope:x_'||'_x not
+R16433:16433 Corelib.Init.Datatypes <> ::bool_scope:x_'||'_x not
+R16326:16326 Corelib.Init.Datatypes <> ::bool_scope:x_'||'_x not
+R16365:16370 Corelib.Init.Datatypes <> ::bool_scope:x_'||'_x not
+R16409:16409 Corelib.Init.Datatypes <> ::bool_scope:x_'||'_x not
+R16350:16354 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R16337:16339 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R16327:16334 xv6iris.ElfFile <> ep_vaddr proj
+R16336:16336 xv6iris.ElfFile <> p:143 var
+R16340:16347 xv6iris.ElfFile <> ep_memsz proj
+R16349:16349 xv6iris.ElfFile <> p:143 var
+R16355:16362 xv6iris.ElfFile <> ep_vaddr proj
+R16364:16364 xv6iris.ElfFile <> q:144 var
+R16394:16398 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R16381:16383 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R16371:16378 xv6iris.ElfFile <> ep_vaddr proj
+R16380:16380 xv6iris.ElfFile <> q:144 var
+R16384:16391 xv6iris.ElfFile <> ep_memsz proj
+R16393:16393 xv6iris.ElfFile <> q:144 var
+R16399:16406 xv6iris.ElfFile <> ep_vaddr proj
+R16408:16408 xv6iris.ElfFile <> p:143 var
+R16427:16431 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R16417:16424 xv6iris.ElfFile <> ep_memsz proj
+R16426:16426 xv6iris.ElfFile <> p:143 var
+R16449:16453 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R16439:16446 xv6iris.ElfFile <> ep_memsz proj
+R16448:16448 xv6iris.ElfFile <> q:144 var
+def 16468:16483 <> loads_disjoint_b
+R16491:16494 Corelib.Init.Datatypes <> list ind
+R16496:16503 xv6iris.ElfFile <> elf_phdr rec
+binder 16486:16487 <> ps:145
+R16508:16511 Corelib.Init.Datatypes <> bool ind
+R16524:16525 xv6iris.ElfFile <> ps:145 var
+R16536:16538 Corelib.Init.Datatypes <> nil constr
+R16543:16546 Corelib.Init.Datatypes <> true constr
+R16553:16556 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R16593:16596 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16562:16573 Stdlib.Lists.List <> forallb def
+R16576:16587 xv6iris.ElfFile <> range_disj_b def
+R16597:16612 xv6iris.ElfFile <> loads_disjoint_b:146 def
+def 16635:16640 <> elf_wf
+R16647:16655 xv6iris.ElfFile <> elf_bytes def
+binder 16643:16643 <> f:148
+R16660:16663 Corelib.Init.Datatypes <> bool ind
+R16694:16702 xv6iris.ElfFile <> elf_phdrs def
+R16704:16704 xv6iris.ElfFile <> f:148 var
+R16676:16689 xv6iris.ElfFile <> elf_parse_ehdr def
+R16691:16691 xv6iris.ElfFile <> f:148 var
+R16715:16718 Corelib.Init.Datatypes <> Some constr
+R16723:16726 Corelib.Init.Datatypes <> Some constr
+R16947:16956 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16899:16908 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16835:16845 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16898:16898 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16813:16817 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16834:16834 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16785:16795 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16812:16812 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16753:16763 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16784:16784 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R16739:16750 xv6iris.ElfFile <> elf_magic_ok def
+R16752:16752 xv6iris.ElfFile <> f:148 var
+R16778:16781 Stdlib.ZArith.BinInt <> ::Z_scope:x_'=?'_x not
+R16764:16775 xv6iris.ElfFile <> ee_phentsize proj
+R16797:16801 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R16802:16809 xv6iris.ElfFile <> ee_phoff proj
+R16819:16823 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R16824:16831 xv6iris.ElfFile <> ee_phnum proj
+R16874:16878 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R16856:16858 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R16846:16853 xv6iris.ElfFile <> ee_phoff proj
+R16869:16871 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R16859:16866 xv6iris.ElfFile <> ee_phnum proj
+R16879:16886 Stdlib.ZArith.BinInt Z of_nat def
+R16889:16894 Corelib.Init.Datatypes <> length def
+R16896:16896 xv6iris.ElfFile <> f:148 var
+R16909:16920 Stdlib.Lists.List <> forallb def
+R16935:16943 xv6iris.ElfFile <> elf_loads def
+R16945:16945 xv6iris.ElfFile <> f:148 var
+R16923:16929 xv6iris.ElfFile <> phdr_wf def
+R16931:16931 xv6iris.ElfFile <> f:148 var
+R16957:16972 xv6iris.ElfFile <> loads_disjoint_b def
+R16975:16983 xv6iris.ElfFile <> elf_loads def
+R16985:16985 xv6iris.ElfFile <> f:148 var
+R17000:17004 Corelib.Init.Datatypes <> false constr
+def 17201:17215 <> elf_sections_wf
+R17222:17230 xv6iris.ElfFile <> elf_bytes def
+binder 17218:17218 <> f:149
+R17235:17238 Corelib.Init.Datatypes <> bool ind
+R17269:17277 xv6iris.ElfFile <> elf_shdrs def
+R17279:17279 xv6iris.ElfFile <> f:149 var
+R17251:17264 xv6iris.ElfFile <> elf_parse_ehdr def
+R17266:17266 xv6iris.ElfFile <> f:149 var
+R17290:17293 Corelib.Init.Datatypes <> Some constr
+R17298:17301 Corelib.Init.Datatypes <> Some constr
+R17386:17396 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R17449:17449 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R17364:17368 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R17385:17385 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R17314:17314 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R17335:17346 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R17363:17363 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R17329:17332 Stdlib.ZArith.BinInt <> ::Z_scope:x_'=?'_x not
+R17315:17326 xv6iris.ElfFile <> ee_shentsize proj
+R17348:17352 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R17353:17360 xv6iris.ElfFile <> ee_shoff proj
+R17370:17374 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R17375:17382 xv6iris.ElfFile <> ee_shnum proj
+R17425:17429 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R17407:17409 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R17397:17404 xv6iris.ElfFile <> ee_shoff proj
+R17420:17422 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R17410:17417 xv6iris.ElfFile <> ee_shnum proj
+R17430:17437 Stdlib.ZArith.BinInt Z of_nat def
+R17440:17445 Corelib.Init.Datatypes <> length def
+R17447:17447 xv6iris.ElfFile <> f:149 var
+R17463:17467 Corelib.Init.Datatypes <> false constr
+rec 17716:17722 <> phdr_ok
+proj 17769:17777 <> po_offset
+proj 17801:17809 <> po_filesz
+proj 17833:17841 <> po_window
+proj 17897:17904 <> po_memsz
+proj 17937:17944 <> po_vaddr
+proj 17967:17972 <> po_top
+R17729:17737 xv6iris.ElfFile <> elf_bytes def
+binder 17725:17725 <> f:150
+R17745:17752 xv6iris.ElfFile <> elf_phdr rec
+binder 17741:17741 <> p:151
+R17782:17785 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R17786:17794 xv6iris.ElfFile <> ep_offset proj
+R17796:17796 xv6iris.ElfFile <> p:151 var
+R17814:17817 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R17818:17826 xv6iris.ElfFile <> ep_filesz proj
+R17828:17828 xv6iris.ElfFile <> p:151 var
+R17870:17873 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R17856:17858 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R17845:17853 xv6iris.ElfFile <> ep_offset proj
+R17855:17855 xv6iris.ElfFile <> p:151 var
+R17859:17867 xv6iris.ElfFile <> ep_filesz proj
+R17869:17869 xv6iris.ElfFile <> p:151 var
+R17874:17881 Stdlib.ZArith.BinInt Z of_nat def
+R17884:17889 Corelib.Init.Datatypes <> length def
+R17891:17891 xv6iris.ElfFile <> f:150 var
+R17919:17922 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R17908:17916 xv6iris.ElfFile <> ep_filesz proj
+R17918:17918 xv6iris.ElfFile <> p:151 var
+R17923:17930 xv6iris.ElfFile <> ep_memsz proj
+R17932:17932 xv6iris.ElfFile <> p:151 var
+R17949:17952 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R17953:17960 xv6iris.ElfFile <> ep_vaddr proj
+R17962:17962 xv6iris.ElfFile <> p:151 var
+R17999:18001 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R17986:17988 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R17976:17983 xv6iris.ElfFile <> ep_vaddr proj
+R17985:17985 xv6iris.ElfFile <> p:151 var
+R17989:17996 xv6iris.ElfFile <> ep_memsz proj
+R17998:17998 xv6iris.ElfFile <> p:151 var
+R18003:18005 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+prf 18020:18029 <> phdr_wf_ok
+R18036:18044 xv6iris.ElfFile <> elf_bytes def
+binder 18032:18032 <> f:159
+R18052:18059 xv6iris.ElfFile <> elf_phdr rec
+binder 18048:18048 <> p:160
+R18082:18085 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18075:18077 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18064:18070 xv6iris.ElfFile <> phdr_wf def
+R18072:18072 xv6iris.ElfFile <> f:159 var
+R18074:18074 xv6iris.ElfFile <> p:160 var
+R18078:18081 Corelib.Init.Datatypes <> true constr
+R18086:18092 xv6iris.ElfFile <> phdr_ok rec
+R18094:18094 xv6iris.ElfFile <> f:159 var
+R18096:18096 xv6iris.ElfFile <> p:160 var
+R18115:18121 xv6iris.ElfFile <> phdr_wf def
+R18145:18157 Stdlib.Bool.Bool <> andb_true_iff thm
+R18145:18157 Stdlib.Bool.Bool <> andb_true_iff thm
+R18145:18157 Stdlib.Bool.Bool <> andb_true_iff thm
+R18145:18157 Stdlib.Bool.Bool <> andb_true_iff thm
+R18145:18157 Stdlib.Bool.Bool <> andb_true_iff thm
+R18145:18157 Stdlib.Bool.Bool <> andb_true_iff thm
+R18145:18157 Stdlib.Bool.Bool <> andb_true_iff thm
+R18145:18157 Stdlib.Bool.Bool <> andb_true_iff thm
+R18218:18225 Stdlib.ZArith.BinInt Z leb_le thm
+R18218:18225 Stdlib.ZArith.BinInt Z leb_le thm
+R18218:18225 Stdlib.ZArith.BinInt Z leb_le thm
+R18218:18225 Stdlib.ZArith.BinInt Z leb_le thm
+R18218:18225 Stdlib.ZArith.BinInt Z leb_le thm
+R18218:18225 Stdlib.ZArith.BinInt Z leb_le thm
+R18256:18263 Stdlib.ZArith.BinInt Z ltb_lt thm
+R18256:18263 Stdlib.ZArith.BinInt Z ltb_lt thm
+def 18361:18366 <> in_seg
+R18373:18380 xv6iris.ElfFile <> elf_phdr rec
+binder 18369:18369 <> p:161
+R18388:18388 Corelib.Numbers.BinNums <> Z ind
+binder 18384:18384 <> a:162
+R18413:18416 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R18418:18420 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R18403:18410 xv6iris.ElfFile <> ep_vaddr proj
+R18412:18412 xv6iris.ElfFile <> p:161 var
+R18417:18417 xv6iris.ElfFile <> a:162 var
+R18417:18417 xv6iris.ElfFile <> a:162 var
+R18431:18433 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R18421:18428 xv6iris.ElfFile <> ep_vaddr proj
+R18430:18430 xv6iris.ElfFile <> p:161 var
+R18434:18441 xv6iris.ElfFile <> ep_memsz proj
+R18443:18443 xv6iris.ElfFile <> p:161 var
+prf 18453:18469 <> range_disj_b_spec
+R18478:18485 xv6iris.ElfFile <> elf_phdr rec
+binder 18472:18472 <> p:163
+binder 18474:18474 <> q:164
+R18493:18493 Corelib.Numbers.BinNums <> Z ind
+binder 18489:18489 <> a:165
+R18523:18526 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18516:18518 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18500:18511 xv6iris.ElfFile <> range_disj_b def
+R18513:18513 xv6iris.ElfFile <> p:163 var
+R18515:18515 xv6iris.ElfFile <> q:164 var
+R18519:18522 Corelib.Init.Datatypes <> true constr
+R18537:18540 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18527:18532 xv6iris.ElfFile <> in_seg def
+R18534:18534 xv6iris.ElfFile <> p:163 var
+R18536:18536 xv6iris.ElfFile <> a:165 var
+R18551:18554 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18541:18546 xv6iris.ElfFile <> in_seg def
+R18548:18548 xv6iris.ElfFile <> q:164 var
+R18550:18550 xv6iris.ElfFile <> a:165 var
+R18555:18559 stdpp.base <> ::type_scope:'False' not
+R18578:18589 xv6iris.ElfFile <> range_disj_b def
+R18592:18597 xv6iris.ElfFile <> in_seg def
+R18609:18620 Stdlib.Bool.Bool <> orb_true_iff thm
+R18624:18631 Stdlib.ZArith.BinInt Z leb_le thm
+R18609:18620 Stdlib.Bool.Bool <> orb_true_iff thm
+R18609:18620 Stdlib.Bool.Bool <> orb_true_iff thm
+R18609:18620 Stdlib.Bool.Bool <> orb_true_iff thm
+R18609:18620 Stdlib.Bool.Bool <> orb_true_iff thm
+R18609:18620 Stdlib.Bool.Bool <> orb_true_iff thm
+R18624:18631 Stdlib.ZArith.BinInt Z leb_le thm
+R18624:18631 Stdlib.ZArith.BinInt Z leb_le thm
+R18624:18631 Stdlib.ZArith.BinInt Z leb_le thm
+R18624:18631 Stdlib.ZArith.BinInt Z leb_le thm
+R18624:18631 Stdlib.ZArith.BinInt Z leb_le thm
+R18624:18631 Stdlib.ZArith.BinInt Z leb_le thm
+prf 18651:18671 <> loads_disjoint_b_spec
+R18679:18682 Corelib.Init.Datatypes <> list ind
+R18684:18691 xv6iris.ElfFile <> elf_phdr rec
+binder 18674:18675 <> ps:166
+R18701:18708 xv6iris.ElfFile <> elf_phdr rec
+binder 18695:18695 <> p:167
+binder 18697:18697 <> q:168
+R18741:18744 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18734:18736 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18715:18730 xv6iris.ElfFile <> loads_disjoint_b def
+R18732:18733 xv6iris.ElfFile <> ps:166 var
+R18737:18740 Corelib.Init.Datatypes <> true constr
+R18753:18756 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18746:18750 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R18745:18745 xv6iris.ElfFile <> p:167 var
+R18751:18752 xv6iris.ElfFile <> ps:166 var
+R18765:18768 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18758:18762 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R18757:18757 xv6iris.ElfFile <> q:168 var
+R18763:18764 xv6iris.ElfFile <> ps:166 var
+R18775:18780 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18770:18773 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R18769:18769 xv6iris.ElfFile <> p:167 var
+R18774:18774 xv6iris.ElfFile <> q:168 var
+R18797:18799 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18781:18792 xv6iris.ElfFile <> range_disj_b def
+R18794:18794 xv6iris.ElfFile <> p:167 var
+R18796:18796 xv6iris.ElfFile <> q:168 var
+R18800:18803 Corelib.Init.Datatypes <> true constr
+R18905:18917 Stdlib.Bool.Bool <> andb_true_iff thm
+R18905:18917 Stdlib.Bool.Bool <> andb_true_iff thm
+R18949:18960 stdpp.list_basics <> elem_of_cons thm
+R18949:18960 stdpp.list_basics <> elem_of_cons thm
+R18949:18960 stdpp.list_basics <> elem_of_cons thm
+R18983:19001 Stdlib.Lists.List <> forallb_forall thm
+R18983:19001 Stdlib.Lists.List <> forallb_forall thm
+R18983:19001 Stdlib.Lists.List <> forallb_forall thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19032:19046 stdpp.base <> elem_of_list_In thm
+R19185:19196 xv6iris.ElfFile <> range_disj_b def
+R19213:19224 Stdlib.Bool.Bool <> orb_true_iff thm
+R19213:19224 Stdlib.Bool.Bool <> orb_true_iff thm
+R19213:19224 Stdlib.Bool.Bool <> orb_true_iff thm
+R19213:19224 Stdlib.Bool.Bool <> orb_true_iff thm
+R19213:19224 Stdlib.Bool.Bool <> orb_true_iff thm
+R19213:19224 Stdlib.Bool.Bool <> orb_true_iff thm
+prf 19277:19290 <> elf_wf_phdr_ok
+R19297:19305 xv6iris.ElfFile <> elf_bytes def
+binder 19293:19293 <> f:169
+R19313:19320 xv6iris.ElfFile <> elf_phdr rec
+binder 19309:19309 <> p:170
+R19342:19345 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19335:19337 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19327:19332 xv6iris.ElfFile <> elf_wf def
+R19334:19334 xv6iris.ElfFile <> f:169 var
+R19338:19341 Corelib.Init.Datatypes <> true constr
+R19363:19366 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19347:19351 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R19346:19346 xv6iris.ElfFile <> p:170 var
+R19352:19360 xv6iris.ElfFile <> elf_loads def
+R19362:19362 xv6iris.ElfFile <> f:169 var
+R19367:19373 xv6iris.ElfFile <> phdr_ok rec
+R19375:19375 xv6iris.ElfFile <> f:169 var
+R19377:19377 xv6iris.ElfFile <> p:170 var
+R19396:19401 xv6iris.ElfFile <> elf_wf def
+R19414:19427 xv6iris.ElfFile <> elf_parse_ehdr def
+R19414:19427 xv6iris.ElfFile <> elf_parse_ehdr def
+R19470:19478 xv6iris.ElfFile <> elf_phdrs def
+R19470:19478 xv6iris.ElfFile <> elf_phdrs def
+R19533:19545 Stdlib.Bool.Bool <> andb_true_iff thm
+R19533:19545 Stdlib.Bool.Bool <> andb_true_iff thm
+R19570:19582 Stdlib.Bool.Bool <> andb_true_iff thm
+R19570:19582 Stdlib.Bool.Bool <> andb_true_iff thm
+R19612:19630 Stdlib.Lists.List <> forallb_forall thm
+R19612:19630 Stdlib.Lists.List <> forallb_forall thm
+R19612:19630 Stdlib.Lists.List <> forallb_forall thm
+R19649:19658 xv6iris.ElfFile <> phdr_wf_ok thm
+R19667:19681 stdpp.base <> elem_of_list_In thm
+R19649:19658 xv6iris.ElfFile <> phdr_wf_ok thm
+R19667:19681 stdpp.base <> elem_of_list_In thm
+prf 19700:19716 <> elf_wf_loads_disj
+R19723:19731 xv6iris.ElfFile <> elf_bytes def
+binder 19719:19719 <> f:171
+R19741:19748 xv6iris.ElfFile <> elf_phdr rec
+binder 19735:19735 <> p:172
+binder 19737:19737 <> q:173
+R19756:19756 Corelib.Numbers.BinNums <> Z ind
+binder 19752:19752 <> a:174
+R19778:19781 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19771:19773 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19763:19768 xv6iris.ElfFile <> elf_wf def
+R19770:19770 xv6iris.ElfFile <> f:171 var
+R19774:19777 Corelib.Init.Datatypes <> true constr
+R19799:19802 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19783:19787 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R19782:19782 xv6iris.ElfFile <> p:172 var
+R19788:19796 xv6iris.ElfFile <> elf_loads def
+R19798:19798 xv6iris.ElfFile <> f:171 var
+R19820:19823 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19804:19808 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R19803:19803 xv6iris.ElfFile <> q:173 var
+R19809:19817 xv6iris.ElfFile <> elf_loads def
+R19819:19819 xv6iris.ElfFile <> f:171 var
+R19830:19835 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19825:19828 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R19824:19824 xv6iris.ElfFile <> p:172 var
+R19829:19829 xv6iris.ElfFile <> q:173 var
+R19846:19849 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19836:19841 xv6iris.ElfFile <> in_seg def
+R19843:19843 xv6iris.ElfFile <> p:172 var
+R19845:19845 xv6iris.ElfFile <> a:174 var
+R19860:19863 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19850:19855 xv6iris.ElfFile <> in_seg def
+R19857:19857 xv6iris.ElfFile <> q:173 var
+R19859:19859 xv6iris.ElfFile <> a:174 var
+R19864:19868 stdpp.base <> ::type_scope:'False' not
+R19909:19925 xv6iris.ElfFile <> range_disj_b_spec thm
+R19909:19925 xv6iris.ElfFile <> range_disj_b_spec thm
+R19937:19957 xv6iris.ElfFile <> loads_disjoint_b_spec thm
+R19937:19957 xv6iris.ElfFile <> loads_disjoint_b_spec thm
+R20013:20018 xv6iris.ElfFile <> elf_wf def
+R20033:20046 xv6iris.ElfFile <> elf_parse_ehdr def
+R20033:20046 xv6iris.ElfFile <> elf_parse_ehdr def
+R20089:20097 xv6iris.ElfFile <> elf_phdrs def
+R20089:20097 xv6iris.ElfFile <> elf_phdrs def
+R20140:20152 Stdlib.Bool.Bool <> andb_true_iff thm
+R20140:20152 Stdlib.Bool.Bool <> andb_true_iff thm
+R20140:20152 Stdlib.Bool.Bool <> andb_true_iff thm
+R20140:20152 Stdlib.Bool.Bool <> andb_true_iff thm
+R20140:20152 Stdlib.Bool.Bool <> andb_true_iff thm
+R20140:20152 Stdlib.Bool.Bool <> andb_true_iff thm
+R20140:20152 Stdlib.Bool.Bool <> andb_true_iff thm
+R20140:20152 Stdlib.Bool.Bool <> andb_true_iff thm
+R20140:20152 Stdlib.Bool.Bool <> andb_true_iff thm
+prf 20406:20426 <> seg_file_bytes_length
+R20433:20441 xv6iris.ElfFile <> elf_bytes def
+binder 20429:20429 <> f:175
+R20449:20456 xv6iris.ElfFile <> elf_phdr rec
+binder 20445:20445 <> p:176
+R20474:20477 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20463:20469 xv6iris.ElfFile <> phdr_ok rec
+R20471:20471 xv6iris.ElfFile <> f:175 var
+R20473:20473 xv6iris.ElfFile <> p:176 var
+R20516:20518 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20478:20485 Stdlib.ZArith.BinInt Z of_nat def
+R20488:20493 Corelib.Init.Datatypes <> length def
+R20496:20509 xv6iris.ElfFile <> seg_file_bytes def
+R20511:20511 xv6iris.ElfFile <> f:175 var
+R20513:20513 xv6iris.ElfFile <> p:176 var
+R20519:20527 xv6iris.ElfFile <> ep_filesz proj
+R20529:20529 xv6iris.ElfFile <> p:176 var
+R20576:20589 xv6iris.ElfFile <> seg_file_bytes def
+R20602:20612 stdpp.list_basics <> length_take thm
+R20615:20625 stdpp.list_basics <> length_drop thm
+R20602:20612 stdpp.list_basics <> length_take thm
+R20602:20612 stdpp.list_basics <> length_take thm
+R20615:20625 stdpp.list_basics <> length_drop thm
+R20615:20625 stdpp.list_basics <> length_drop thm
+prf 20645:20665 <> seg_file_bytes_lookup
+R20672:20680 xv6iris.ElfFile <> elf_bytes def
+binder 20668:20668 <> f:177
+R20688:20695 xv6iris.ElfFile <> elf_phdr rec
+binder 20684:20684 <> p:178
+R20703:20705 Corelib.Init.Datatypes <> nat ind
+binder 20699:20699 <> k:179
+R20723:20726 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20712:20718 xv6iris.ElfFile <> phdr_ok rec
+R20720:20720 xv6iris.ElfFile <> f:177 var
+R20722:20722 xv6iris.ElfFile <> p:178 var
+R20727:20727 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20752:20758 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20738:20740 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R20728:20735 Stdlib.ZArith.BinInt Z of_nat def
+R20737:20737 xv6iris.ElfFile <> k:179 var
+R20741:20749 xv6iris.ElfFile <> ep_filesz proj
+R20751:20751 xv6iris.ElfFile <> p:178 var
+R20782:20784 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20777:20780 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R20781:20781 xv6iris.ElfFile <> k:179 var
+R20759:20772 xv6iris.ElfFile <> seg_file_bytes def
+R20774:20774 xv6iris.ElfFile <> f:177 var
+R20776:20776 xv6iris.ElfFile <> p:178 var
+R20786:20789 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R20813:20815 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R20791:20798 Stdlib.ZArith.BinInt Z to_nat def
+R20801:20809 xv6iris.ElfFile <> ep_offset proj
+R20811:20811 xv6iris.ElfFile <> p:178 var
+R20816:20816 xv6iris.ElfFile <> k:179 var
+R20785:20785 xv6iris.ElfFile <> f:177 var
+R20871:20884 xv6iris.ElfFile <> seg_file_bytes def
+R20897:20907 stdpp.list_basics <> lookup_take thm
+R20897:20907 stdpp.list_basics <> lookup_take thm
+R20897:20907 stdpp.list_basics <> lookup_take thm
+R20925:20935 stdpp.list_basics <> lookup_drop thm
+R20925:20935 stdpp.list_basics <> lookup_drop thm
+R20925:20935 stdpp.list_basics <> lookup_drop thm
+prf 20963:20981 <> lookup_seg_file_map
+R20988:20996 xv6iris.ElfFile <> elf_bytes def
+binder 20984:20984 <> f:180
+R21004:21011 xv6iris.ElfFile <> elf_phdr rec
+binder 21000:21000 <> p:181
+R21019:21019 Corelib.Numbers.BinNums <> Z ind
+binder 21015:21015 <> a:182
+R21027:21028 stdpp.bitvector.definitions <> bv rec
+binder 21023:21023 <> b:183
+R21048:21054 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21201:21201 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21037:21043 xv6iris.ElfFile <> phdr_ok rec
+R21045:21045 xv6iris.ElfFile <> f:180 var
+R21047:21047 xv6iris.ElfFile <> p:181 var
+R21085:21092 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R21076:21078 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21071:21074 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R21075:21075 xv6iris.ElfFile <> a:182 var
+R21055:21066 xv6iris.ElfFile <> seg_file_map def
+R21068:21068 xv6iris.ElfFile <> f:180 var
+R21070:21070 xv6iris.ElfFile <> p:181 var
+R21079:21082 Corelib.Init.Datatypes <> Some constr
+R21084:21084 xv6iris.ElfFile <> b:183 var
+R21135:21145 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R21103:21106 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R21108:21110 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R21093:21100 xv6iris.ElfFile <> ep_vaddr proj
+R21102:21102 xv6iris.ElfFile <> p:181 var
+R21107:21107 xv6iris.ElfFile <> a:182 var
+R21107:21107 xv6iris.ElfFile <> a:182 var
+R21121:21123 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21111:21118 xv6iris.ElfFile <> ep_vaddr proj
+R21120:21120 xv6iris.ElfFile <> p:181 var
+R21124:21132 xv6iris.ElfFile <> ep_filesz proj
+R21134:21134 xv6iris.ElfFile <> p:181 var
+R21192:21194 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21147:21150 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R21151:21158 Stdlib.ZArith.BinInt Z to_nat def
+R21172:21175 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21190:21190 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21161:21169 xv6iris.ElfFile <> ep_offset proj
+R21171:21171 xv6iris.ElfFile <> p:181 var
+R21177:21179 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R21176:21176 xv6iris.ElfFile <> a:182 var
+R21180:21187 xv6iris.ElfFile <> ep_vaddr proj
+R21189:21189 xv6iris.ElfFile <> p:181 var
+R21146:21146 xv6iris.ElfFile <> f:180 var
+R21195:21198 Corelib.Init.Datatypes <> Some constr
+R21200:21200 xv6iris.ElfFile <> b:183 var
+R21278:21298 xv6iris.ElfFile <> seg_file_bytes_length thm
+R21278:21298 xv6iris.ElfFile <> seg_file_bytes_length thm
+R21327:21338 xv6iris.ElfFile <> seg_file_map def
+R21349:21368 stdpp.fin_maps <> lookup_map_seqZ_Some thm
+R21349:21368 stdpp.fin_maps <> lookup_map_seqZ_Some thm
+R21349:21368 stdpp.fin_maps <> lookup_map_seqZ_Some thm
+R21415:21428 stdpp.list_basics <> lookup_lt_Some thm
+R21415:21428 stdpp.list_basics <> lookup_lt_Some thm
+R21466:21468 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R21479:21481 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21469:21476 xv6iris.ElfFile <> ep_vaddr proj
+R21482:21490 xv6iris.ElfFile <> ep_filesz proj
+R21466:21468 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R21479:21481 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21469:21476 xv6iris.ElfFile <> ep_vaddr proj
+R21482:21490 xv6iris.ElfFile <> ep_filesz proj
+R21515:21535 xv6iris.ElfFile <> seg_file_bytes_lookup thm
+R21515:21535 xv6iris.ElfFile <> seg_file_bytes_lookup thm
+R21515:21535 xv6iris.ElfFile <> seg_file_bytes_lookup thm
+R21598:21605 Stdlib.ZArith.BinInt Z to_nat def
+R21619:21622 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21637:21637 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21608:21616 xv6iris.ElfFile <> ep_offset proj
+R21624:21626 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R21627:21634 xv6iris.ElfFile <> ep_vaddr proj
+R21675:21677 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R21653:21660 Stdlib.ZArith.BinInt Z to_nat def
+R21663:21671 xv6iris.ElfFile <> ep_offset proj
+R21678:21685 Stdlib.ZArith.BinInt Z to_nat def
+R21689:21691 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R21692:21699 xv6iris.ElfFile <> ep_vaddr proj
+R21598:21605 Stdlib.ZArith.BinInt Z to_nat def
+R21619:21622 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21637:21637 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21608:21616 xv6iris.ElfFile <> ep_offset proj
+R21624:21626 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R21627:21634 xv6iris.ElfFile <> ep_vaddr proj
+R21675:21677 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R21653:21660 Stdlib.ZArith.BinInt Z to_nat def
+R21663:21671 xv6iris.ElfFile <> ep_offset proj
+R21678:21685 Stdlib.ZArith.BinInt Z to_nat def
+R21689:21691 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R21692:21699 xv6iris.ElfFile <> ep_vaddr proj
+R21782:21802 xv6iris.ElfFile <> seg_file_bytes_lookup thm
+R21782:21802 xv6iris.ElfFile <> seg_file_bytes_lookup thm
+R21782:21802 xv6iris.ElfFile <> seg_file_bytes_lookup thm
+R21862:21864 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R21840:21847 Stdlib.ZArith.BinInt Z to_nat def
+R21850:21858 xv6iris.ElfFile <> ep_offset proj
+R21865:21872 Stdlib.ZArith.BinInt Z to_nat def
+R21876:21878 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R21879:21886 xv6iris.ElfFile <> ep_vaddr proj
+R21908:21915 Stdlib.ZArith.BinInt Z to_nat def
+R21929:21932 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21947:21947 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21918:21926 xv6iris.ElfFile <> ep_offset proj
+R21934:21936 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R21937:21944 xv6iris.ElfFile <> ep_vaddr proj
+R21862:21864 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R21840:21847 Stdlib.ZArith.BinInt Z to_nat def
+R21850:21858 xv6iris.ElfFile <> ep_offset proj
+R21865:21872 Stdlib.ZArith.BinInt Z to_nat def
+R21876:21878 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R21879:21886 xv6iris.ElfFile <> ep_vaddr proj
+R21908:21915 Stdlib.ZArith.BinInt Z to_nat def
+R21929:21932 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21947:21947 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R21918:21926 xv6iris.ElfFile <> ep_offset proj
+R21934:21936 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R21937:21944 xv6iris.ElfFile <> ep_vaddr proj
+prf 21985:22005 <> seg_zero_bytes_length
+R22012:22019 xv6iris.ElfFile <> elf_phdr rec
+binder 22008:22008 <> p:184
+R22051:22056 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22037:22040 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R22026:22034 xv6iris.ElfFile <> ep_filesz proj
+R22036:22036 xv6iris.ElfFile <> p:184 var
+R22041:22048 xv6iris.ElfFile <> ep_memsz proj
+R22050:22050 xv6iris.ElfFile <> p:184 var
+R22093:22095 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22057:22064 Stdlib.ZArith.BinInt Z of_nat def
+R22067:22072 Corelib.Init.Datatypes <> length def
+R22075:22088 xv6iris.ElfFile <> seg_zero_bytes def
+R22090:22090 xv6iris.ElfFile <> p:184 var
+R22106:22108 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R22096:22103 xv6iris.ElfFile <> ep_memsz proj
+R22105:22105 xv6iris.ElfFile <> p:184 var
+R22109:22117 xv6iris.ElfFile <> ep_filesz proj
+R22119:22119 xv6iris.ElfFile <> p:184 var
+R22146:22159 xv6iris.ElfFile <> seg_zero_bytes def
+R22170:22185 stdpp.list_basics <> length_replicate thm
+R22170:22185 stdpp.list_basics <> length_replicate thm
+R22170:22185 stdpp.list_basics <> length_replicate thm
+prf 22205:22223 <> lookup_seg_zero_map
+R22230:22237 xv6iris.ElfFile <> elf_phdr rec
+binder 22226:22226 <> p:185
+R22245:22245 Corelib.Numbers.BinNums <> Z ind
+binder 22241:22241 <> a:186
+R22253:22254 stdpp.bitvector.definitions <> bv rec
+binder 22249:22249 <> b:187
+R22288:22294 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22407:22407 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22274:22277 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R22263:22271 xv6iris.ElfFile <> ep_filesz proj
+R22273:22273 xv6iris.ElfFile <> p:185 var
+R22278:22285 xv6iris.ElfFile <> ep_memsz proj
+R22287:22287 xv6iris.ElfFile <> p:185 var
+R22323:22330 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R22314:22316 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22309:22312 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R22313:22313 xv6iris.ElfFile <> a:186 var
+R22295:22306 xv6iris.ElfFile <> seg_zero_map def
+R22308:22308 xv6iris.ElfFile <> p:185 var
+R22317:22320 Corelib.Init.Datatypes <> Some constr
+R22322:22322 xv6iris.ElfFile <> b:187 var
+R22386:22389 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R22355:22358 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R22360:22362 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R22341:22343 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R22331:22338 xv6iris.ElfFile <> ep_vaddr proj
+R22340:22340 xv6iris.ElfFile <> p:185 var
+R22344:22352 xv6iris.ElfFile <> ep_filesz proj
+R22354:22354 xv6iris.ElfFile <> p:185 var
+R22359:22359 xv6iris.ElfFile <> a:186 var
+R22359:22359 xv6iris.ElfFile <> a:186 var
+R22373:22375 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R22363:22370 xv6iris.ElfFile <> ep_vaddr proj
+R22372:22372 xv6iris.ElfFile <> p:185 var
+R22376:22383 xv6iris.ElfFile <> ep_memsz proj
+R22385:22385 xv6iris.ElfFile <> p:185 var
+R22391:22393 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22390:22390 xv6iris.ElfFile <> b:187 var
+R22394:22406 xv6iris.ElfFile <> elf_zero_byte def
+R22437:22448 xv6iris.ElfFile <> seg_zero_map def
+R22451:22464 xv6iris.ElfFile <> seg_zero_bytes def
+R22477:22496 stdpp.fin_maps <> lookup_map_seqZ_Some thm
+R22477:22496 stdpp.fin_maps <> lookup_map_seqZ_Some thm
+R22477:22496 stdpp.fin_maps <> lookup_map_seqZ_Some thm
+R22533:22548 stdpp.list_basics <> lookup_replicate thm
+R22533:22548 stdpp.list_basics <> lookup_replicate thm
+R22648:22663 stdpp.list_basics <> lookup_replicate thm
+R22648:22663 stdpp.list_basics <> lookup_replicate thm
+prf 22704:22725 <> seg_file_zero_disjoint
+R22732:22740 xv6iris.ElfFile <> elf_bytes def
+binder 22728:22728 <> f:188
+R22748:22755 xv6iris.ElfFile <> elf_phdr rec
+binder 22744:22744 <> p:189
+R22773:22776 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22762:22768 xv6iris.ElfFile <> phdr_ok rec
+R22770:22770 xv6iris.ElfFile <> f:188 var
+R22772:22772 xv6iris.ElfFile <> p:189 var
+R22793:22799 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R22777:22788 xv6iris.ElfFile <> seg_file_map def
+R22790:22790 xv6iris.ElfFile <> f:188 var
+R22792:22792 xv6iris.ElfFile <> p:189 var
+R22800:22811 xv6iris.ElfFile <> seg_zero_map def
+R22813:22813 xv6iris.ElfFile <> p:189 var
+R22849:22869 xv6iris.ElfFile <> seg_file_bytes_length thm
+R22849:22869 xv6iris.ElfFile <> seg_file_bytes_length thm
+R22898:22909 xv6iris.ElfFile <> seg_file_map def
+R22912:22923 xv6iris.ElfFile <> seg_zero_map def
+R22932:22948 stdpp.fin_maps <> map_seqZ_disjoint thm
+R22932:22948 stdpp.fin_maps <> map_seqZ_disjoint thm
+prf 22968:22981 <> lookup_seg_map
+R22988:22996 xv6iris.ElfFile <> elf_bytes def
+binder 22984:22984 <> f:190
+R23004:23011 xv6iris.ElfFile <> elf_phdr rec
+binder 23000:23000 <> p:191
+R23019:23019 Corelib.Numbers.BinNums <> Z ind
+binder 23015:23015 <> a:192
+R23027:23028 stdpp.bitvector.definitions <> bv rec
+binder 23023:23023 <> b:193
+R23048:23054 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23299:23299 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23037:23043 xv6iris.ElfFile <> phdr_ok rec
+R23045:23045 xv6iris.ElfFile <> f:190 var
+R23047:23047 xv6iris.ElfFile <> p:191 var
+R23080:23087 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R23071:23073 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23066:23069 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R23070:23070 xv6iris.ElfFile <> a:192 var
+R23055:23061 xv6iris.ElfFile <> seg_map def
+R23063:23063 xv6iris.ElfFile <> f:190 var
+R23065:23065 xv6iris.ElfFile <> p:191 var
+R23074:23077 Corelib.Init.Datatypes <> Some constr
+R23079:23079 xv6iris.ElfFile <> b:193 var
+R23088:23088 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R23198:23210 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R23298:23298 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R23131:23142 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R23099:23102 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R23104:23106 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R23089:23096 xv6iris.ElfFile <> ep_vaddr proj
+R23098:23098 xv6iris.ElfFile <> p:191 var
+R23103:23103 xv6iris.ElfFile <> a:192 var
+R23103:23103 xv6iris.ElfFile <> a:192 var
+R23117:23119 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R23107:23114 xv6iris.ElfFile <> ep_vaddr proj
+R23116:23116 xv6iris.ElfFile <> p:191 var
+R23120:23128 xv6iris.ElfFile <> ep_filesz proj
+R23130:23130 xv6iris.ElfFile <> p:191 var
+R23189:23191 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23144:23147 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R23148:23155 Stdlib.ZArith.BinInt Z to_nat def
+R23169:23172 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R23187:23187 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R23158:23166 xv6iris.ElfFile <> ep_offset proj
+R23168:23168 xv6iris.ElfFile <> p:191 var
+R23174:23176 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R23173:23173 xv6iris.ElfFile <> a:192 var
+R23177:23184 xv6iris.ElfFile <> ep_vaddr proj
+R23186:23186 xv6iris.ElfFile <> p:191 var
+R23143:23143 xv6iris.ElfFile <> f:190 var
+R23192:23195 Corelib.Init.Datatypes <> Some constr
+R23197:23197 xv6iris.ElfFile <> b:193 var
+R23266:23280 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R23235:23238 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R23240:23242 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R23221:23223 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R23211:23218 xv6iris.ElfFile <> ep_vaddr proj
+R23220:23220 xv6iris.ElfFile <> p:191 var
+R23224:23232 xv6iris.ElfFile <> ep_filesz proj
+R23234:23234 xv6iris.ElfFile <> p:191 var
+R23239:23239 xv6iris.ElfFile <> a:192 var
+R23239:23239 xv6iris.ElfFile <> a:192 var
+R23253:23255 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R23243:23250 xv6iris.ElfFile <> ep_vaddr proj
+R23252:23252 xv6iris.ElfFile <> p:191 var
+R23256:23263 xv6iris.ElfFile <> ep_memsz proj
+R23265:23265 xv6iris.ElfFile <> p:191 var
+R23282:23284 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23281:23281 xv6iris.ElfFile <> b:193 var
+R23285:23297 xv6iris.ElfFile <> elf_zero_byte def
+R23371:23377 xv6iris.ElfFile <> seg_map def
+R23418:23439 xv6iris.ElfFile <> seg_file_zero_disjoint thm
+R23390:23406 stdpp.fin_maps <> lookup_union_Some thm
+R23390:23406 stdpp.fin_maps <> lookup_union_Some thm
+R23418:23439 xv6iris.ElfFile <> seg_file_zero_disjoint thm
+R23390:23406 stdpp.fin_maps <> lookup_union_Some thm
+R23458:23476 xv6iris.ElfFile <> lookup_seg_file_map thm
+R23458:23476 xv6iris.ElfFile <> lookup_seg_file_map thm
+R23458:23476 xv6iris.ElfFile <> lookup_seg_file_map thm
+R23502:23520 xv6iris.ElfFile <> lookup_seg_zero_map thm
+R23502:23520 xv6iris.ElfFile <> lookup_seg_zero_map thm
+R23502:23520 xv6iris.ElfFile <> lookup_seg_zero_map thm
+prf 23562:23575 <> seg_map_in_seg
+R23582:23590 xv6iris.ElfFile <> elf_bytes def
+binder 23578:23578 <> f:194
+R23598:23605 xv6iris.ElfFile <> elf_phdr rec
+binder 23594:23594 <> p:195
+R23613:23613 Corelib.Numbers.BinNums <> Z ind
+binder 23609:23609 <> a:196
+R23631:23635 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23677:23677 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23620:23626 xv6iris.ElfFile <> phdr_ok rec
+R23628:23628 xv6iris.ElfFile <> f:194 var
+R23630:23630 xv6iris.ElfFile <> p:195 var
+R23662:23666 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R23636:23642 stdpp.option <> is_Some def
+R23656:23659 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R23660:23660 xv6iris.ElfFile <> a:196 var
+R23645:23651 xv6iris.ElfFile <> seg_map def
+R23653:23653 xv6iris.ElfFile <> f:194 var
+R23655:23655 xv6iris.ElfFile <> p:195 var
+R23667:23672 xv6iris.ElfFile <> in_seg def
+R23674:23674 xv6iris.ElfFile <> p:195 var
+R23676:23676 xv6iris.ElfFile <> a:196 var
+R23747:23752 xv6iris.ElfFile <> in_seg def
+R23787:23800 xv6iris.ElfFile <> lookup_seg_map thm
+R23787:23800 xv6iris.ElfFile <> lookup_seg_map thm
+R23876:23886 Stdlib.ZArith.ZArith_dec <> Z_lt_le_dec thm
+R23901:23903 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R23891:23898 xv6iris.ElfFile <> ep_vaddr proj
+R23904:23912 xv6iris.ElfFile <> ep_filesz proj
+R23876:23886 Stdlib.ZArith.ZArith_dec <> Z_lt_le_dec thm
+R23901:23903 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R23891:23898 xv6iris.ElfFile <> ep_vaddr proj
+R23904:23912 xv6iris.ElfFile <> ep_filesz proj
+R23993:23995 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R23952:23959 Stdlib.ZArith.BinInt Z to_nat def
+R23973:23976 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R23991:23991 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R23962:23970 xv6iris.ElfFile <> ep_offset proj
+R23978:23980 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R23981:23988 xv6iris.ElfFile <> ep_vaddr proj
+R23996:24001 Corelib.Init.Datatypes <> length def
+R23993:23995 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R23952:23959 Stdlib.ZArith.BinInt Z to_nat def
+R23973:23976 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R23991:23991 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R23962:23970 xv6iris.ElfFile <> ep_offset proj
+R23978:23980 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R23981:23988 xv6iris.ElfFile <> ep_vaddr proj
+R23996:24001 Corelib.Init.Datatypes <> length def
+R24031:24049 stdpp.list_basics <> lookup_lt_is_Some_2 thm
+R24031:24049 stdpp.list_basics <> lookup_lt_is_Some_2 thm
+R24090:24103 xv6iris.ElfFile <> lookup_seg_map thm
+R24090:24103 xv6iris.ElfFile <> lookup_seg_map thm
+R24162:24174 xv6iris.ElfFile <> elf_zero_byte def
+R24162:24174 xv6iris.ElfFile <> elf_zero_byte def
+R24183:24196 xv6iris.ElfFile <> lookup_seg_map thm
+R24183:24196 xv6iris.ElfFile <> lookup_seg_map thm
+prf 24264:24279 <> seg_map_disjoint
+R24286:24294 xv6iris.ElfFile <> elf_bytes def
+binder 24282:24282 <> f:197
+R24304:24311 xv6iris.ElfFile <> elf_phdr rec
+binder 24298:24298 <> p:198
+binder 24300:24300 <> q:199
+R24329:24332 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24318:24324 xv6iris.ElfFile <> phdr_ok rec
+R24326:24326 xv6iris.ElfFile <> f:197 var
+R24328:24328 xv6iris.ElfFile <> p:198 var
+R24344:24349 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24333:24339 xv6iris.ElfFile <> phdr_ok rec
+R24341:24341 xv6iris.ElfFile <> f:197 var
+R24343:24343 xv6iris.ElfFile <> q:199 var
+R24350:24350 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24394:24400 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24351:24357 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R24359:24360 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 24358:24358 <> a:200
+R24371:24374 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24361:24366 xv6iris.ElfFile <> in_seg def
+R24368:24368 xv6iris.ElfFile <> p:198 var
+R24370:24370 xv6iris.ElfFile <> a:200 var
+R24385:24388 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24375:24380 xv6iris.ElfFile <> in_seg def
+R24382:24382 xv6iris.ElfFile <> q:199 var
+R24384:24384 xv6iris.ElfFile <> a:200 var
+R24389:24393 stdpp.base <> ::type_scope:'False' not
+R24412:24418 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R24401:24407 xv6iris.ElfFile <> seg_map def
+R24409:24409 xv6iris.ElfFile <> f:197 var
+R24411:24411 xv6iris.ElfFile <> p:198 var
+R24419:24425 xv6iris.ElfFile <> seg_map def
+R24427:24427 xv6iris.ElfFile <> f:197 var
+R24429:24429 xv6iris.ElfFile <> q:199 var
+R24467:24483 stdpp.fin_maps <> map_disjoint_spec thm
+R24467:24483 stdpp.fin_maps <> map_disjoint_spec thm
+R24536:24549 xv6iris.ElfFile <> seg_map_in_seg thm
+R24536:24549 xv6iris.ElfFile <> seg_map_in_seg thm
+R24593:24606 xv6iris.ElfFile <> seg_map_in_seg thm
+R24593:24606 xv6iris.ElfFile <> seg_map_in_seg thm
+prf 24651:24678 <> seg_file_zero_disjoint_cross
+R24685:24693 xv6iris.ElfFile <> elf_bytes def
+binder 24681:24681 <> f:201
+R24703:24710 xv6iris.ElfFile <> elf_phdr rec
+binder 24697:24697 <> p:202
+binder 24699:24699 <> q:203
+R24728:24731 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24717:24723 xv6iris.ElfFile <> phdr_ok rec
+R24725:24725 xv6iris.ElfFile <> f:201 var
+R24727:24727 xv6iris.ElfFile <> p:202 var
+R24743:24748 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24732:24738 xv6iris.ElfFile <> phdr_ok rec
+R24740:24740 xv6iris.ElfFile <> f:201 var
+R24742:24742 xv6iris.ElfFile <> q:203 var
+R24749:24749 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24804:24810 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24755:24759 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R24803:24803 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R24751:24753 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24750:24750 xv6iris.ElfFile <> p:202 var
+R24754:24754 xv6iris.ElfFile <> q:203 var
+R24760:24766 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R24768:24769 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 24767:24767 <> a:204
+R24780:24783 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24770:24775 xv6iris.ElfFile <> in_seg def
+R24777:24777 xv6iris.ElfFile <> p:202 var
+R24779:24779 xv6iris.ElfFile <> a:204 var
+R24794:24797 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24784:24789 xv6iris.ElfFile <> in_seg def
+R24791:24791 xv6iris.ElfFile <> q:203 var
+R24793:24793 xv6iris.ElfFile <> a:204 var
+R24798:24802 stdpp.base <> ::type_scope:'False' not
+R24827:24833 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R24811:24822 xv6iris.ElfFile <> seg_file_map def
+R24824:24824 xv6iris.ElfFile <> f:201 var
+R24826:24826 xv6iris.ElfFile <> p:202 var
+R24834:24845 xv6iris.ElfFile <> seg_zero_map def
+R24847:24847 xv6iris.ElfFile <> q:203 var
+R24891:24912 xv6iris.ElfFile <> seg_file_zero_disjoint thm
+R24891:24912 xv6iris.ElfFile <> seg_file_zero_disjoint thm
+R24930:24948 stdpp.fin_maps <> map_disjoint_weaken thm
+R24969:24975 xv6iris.ElfFile <> seg_map def
+R24953:24959 xv6iris.ElfFile <> seg_map def
+R24930:24948 stdpp.fin_maps <> map_disjoint_weaken thm
+R24969:24975 xv6iris.ElfFile <> seg_map def
+R24953:24959 xv6iris.ElfFile <> seg_map def
+R24994:25009 xv6iris.ElfFile <> seg_map_disjoint thm
+R24994:25009 xv6iris.ElfFile <> seg_map_disjoint thm
+R25034:25053 stdpp.fin_maps <> map_union_subseteq_l thm
+R25034:25053 stdpp.fin_maps <> map_union_subseteq_l thm
+R25066:25085 stdpp.fin_maps <> map_union_subseteq_r thm
+R25088:25109 xv6iris.ElfFile <> seg_file_zero_disjoint thm
+R25066:25085 stdpp.fin_maps <> map_union_subseteq_r thm
+R25088:25109 xv6iris.ElfFile <> seg_file_zero_disjoint thm
+sec 25362:25365 <> segs
+var  25379:25379 segs A
+R25391:25400 stdpp.base <> EqDecision abbrev
+R25402:25402 xv6iris.ElfFile <> A:205 var
+R25428:25431 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25427:25427 xv6iris.ElfFile <> segs.A var
+R25432:25435 stdpp.gmap <> gmap rec
+R25440:25441 stdpp.bitvector.definitions <> bv rec
+R25437:25437 Corelib.Numbers.BinNums <> Z ind
+prf 25456:25476 <> segs_union_lookup_inv
+binder 25478:25478 <> g:207
+R25486:25489 Corelib.Init.Datatypes <> list ind
+R25491:25491 xv6iris.ElfFile <> segs.A var
+binder 25481:25482 <> ps:208
+R25499:25499 Corelib.Numbers.BinNums <> Z ind
+binder 25495:25495 <> a:209
+R25507:25508 stdpp.bitvector.definitions <> bv rec
+binder 25503:25503 <> b:210
+R25548:25551 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25539:25541 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25534:25537 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R25538:25538 xv6iris.ElfFile <> a:209 var
+R25519:25528 xv6iris.ElfFile <> segs_union def
+R25532:25533 xv6iris.ElfFile <> ps:208 var
+R25530:25530 xv6iris.ElfFile <> g:207 var
+R25542:25545 Corelib.Init.Datatypes <> Some constr
+R25547:25547 xv6iris.ElfFile <> b:210 var
+R25552:25558 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R25560:25561 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 25559:25559 <> p:211
+R25570:25573 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R25563:25567 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R25562:25562 xv6iris.ElfFile <> p:211 var
+R25568:25569 xv6iris.ElfFile <> ps:208 var
+R25582:25584 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25577:25580 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R25581:25581 xv6iris.ElfFile <> a:209 var
+R25574:25574 xv6iris.ElfFile <> g:207 var
+R25576:25576 xv6iris.ElfFile <> p:211 var
+R25585:25588 Corelib.Init.Datatypes <> Some constr
+R25590:25590 xv6iris.ElfFile <> b:210 var
+R25655:25666 stdpp.fin_maps <> lookup_empty meth
+R25655:25666 stdpp.fin_maps <> lookup_empty meth
+R25655:25666 stdpp.fin_maps <> lookup_empty meth
+R25705:25725 stdpp.fin_maps <> lookup_union_Some_raw thm
+R25705:25725 stdpp.fin_maps <> lookup_union_Some_raw thm
+R25776:25792 stdpp.base <> elem_of_list_here constr
+R25776:25792 stdpp.base <> elem_of_list_here constr
+R25870:25889 stdpp.base <> elem_of_list_further constr
+R25870:25889 stdpp.base <> elem_of_list_further constr
+prf 25922:25942 <> segs_union_disjoint_l
+binder 25944:25945 <> g1:212
+binder 25947:25948 <> g2:213
+R25955:25955 xv6iris.ElfFile <> segs.A var
+binder 25951:25951 <> p:214
+R25964:25967 Corelib.Init.Datatypes <> list ind
+R25969:25969 xv6iris.ElfFile <> segs.A var
+binder 25959:25960 <> qs:215
+R25978:25978 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26016:26020 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25979:25985 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R25987:25988 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 25986:25986 <> q:216
+R25997:26000 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25990:25994 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R25989:25989 xv6iris.ElfFile <> q:216 var
+R25995:25996 xv6iris.ElfFile <> qs:215 var
+R26005:26011 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R26001:26002 xv6iris.ElfFile <> g1:212 var
+R26004:26004 xv6iris.ElfFile <> p:214 var
+R26012:26013 xv6iris.ElfFile <> g2:213 var
+R26015:26015 xv6iris.ElfFile <> q:216 var
+R26025:26031 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R26021:26022 xv6iris.ElfFile <> g1:212 var
+R26024:26024 xv6iris.ElfFile <> p:214 var
+R26032:26041 xv6iris.ElfFile <> segs_union def
+R26046:26047 xv6iris.ElfFile <> qs:215 var
+R26043:26044 xv6iris.ElfFile <> g2:213 var
+R26120:26139 stdpp.fin_maps <> map_disjoint_empty_r thm
+R26120:26139 stdpp.fin_maps <> map_disjoint_empty_r thm
+R26154:26175 stdpp.fin_maps <> map_disjoint_union_r_2 thm
+R26154:26175 stdpp.fin_maps <> map_disjoint_union_r_2 thm
+R26193:26209 stdpp.base <> elem_of_list_here constr
+R26193:26209 stdpp.base <> elem_of_list_here constr
+R26250:26269 stdpp.base <> elem_of_list_further constr
+R26250:26269 stdpp.base <> elem_of_list_further constr
+prf 26292:26310 <> segs_union_disjoint
+binder 26312:26313 <> g1:217
+binder 26315:26316 <> g2:218
+R26327:26330 Corelib.Init.Datatypes <> list ind
+R26332:26332 xv6iris.ElfFile <> segs.A var
+binder 26319:26320 <> ps:219
+binder 26322:26323 <> qs:220
+R26341:26341 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26393:26401 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26342:26348 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R26352:26353 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 26349:26349 <> p:221
+binder 26351:26351 <> q:222
+R26362:26365 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26355:26359 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R26354:26354 xv6iris.ElfFile <> p:221 var
+R26360:26361 xv6iris.ElfFile <> ps:219 var
+R26374:26377 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26367:26371 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R26366:26366 xv6iris.ElfFile <> q:222 var
+R26372:26373 xv6iris.ElfFile <> qs:220 var
+R26382:26388 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R26378:26379 xv6iris.ElfFile <> g1:217 var
+R26381:26381 xv6iris.ElfFile <> p:221 var
+R26389:26390 xv6iris.ElfFile <> g2:218 var
+R26392:26392 xv6iris.ElfFile <> q:222 var
+R26418:26424 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R26402:26411 xv6iris.ElfFile <> segs_union def
+R26416:26417 xv6iris.ElfFile <> ps:219 var
+R26413:26414 xv6iris.ElfFile <> g1:217 var
+R26425:26434 xv6iris.ElfFile <> segs_union def
+R26439:26440 xv6iris.ElfFile <> qs:220 var
+R26436:26437 xv6iris.ElfFile <> g2:218 var
+R26513:26532 stdpp.fin_maps <> map_disjoint_empty_l thm
+R26513:26532 stdpp.fin_maps <> map_disjoint_empty_l thm
+R26547:26568 stdpp.fin_maps <> map_disjoint_union_l_2 thm
+R26547:26568 stdpp.fin_maps <> map_disjoint_union_l_2 thm
+R26583:26603 xv6iris.ElfFile <> segs_union_disjoint_l thm
+R26583:26603 xv6iris.ElfFile <> segs_union_disjoint_l thm
+R26641:26657 stdpp.base <> elem_of_list_here constr
+R26641:26657 stdpp.base <> elem_of_list_here constr
+R26726:26745 stdpp.base <> elem_of_list_further constr
+R26726:26745 stdpp.base <> elem_of_list_further constr
+prf 26778:26794 <> segs_union_lookup
+binder 26796:26796 <> g:223
+R26804:26807 Corelib.Init.Datatypes <> list ind
+R26809:26809 xv6iris.ElfFile <> segs.A var
+binder 26799:26800 <> ps:224
+R26817:26817 Corelib.Numbers.BinNums <> Z ind
+binder 26813:26813 <> a:225
+R26825:26826 stdpp.bitvector.definitions <> bv rec
+binder 26821:26821 <> b:226
+R26837:26837 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26897:26906 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26980:26980 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26838:26844 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R26848:26849 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 26845:26845 <> p:227
+binder 26847:26847 <> q:228
+R26858:26861 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26851:26855 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R26850:26850 xv6iris.ElfFile <> p:227 var
+R26856:26857 xv6iris.ElfFile <> ps:224 var
+R26870:26873 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26863:26867 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R26862:26862 xv6iris.ElfFile <> q:228 var
+R26868:26869 xv6iris.ElfFile <> ps:224 var
+R26880:26883 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26875:26878 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R26874:26874 xv6iris.ElfFile <> p:227 var
+R26879:26879 xv6iris.ElfFile <> q:228 var
+R26887:26893 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R26884:26884 xv6iris.ElfFile <> g:223 var
+R26886:26886 xv6iris.ElfFile <> p:227 var
+R26894:26894 xv6iris.ElfFile <> g:223 var
+R26896:26896 xv6iris.ElfFile <> q:228 var
+R26936:26940 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R26927:26929 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26922:26925 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R26926:26926 xv6iris.ElfFile <> a:225 var
+R26907:26916 xv6iris.ElfFile <> segs_union def
+R26920:26921 xv6iris.ElfFile <> ps:224 var
+R26918:26918 xv6iris.ElfFile <> g:223 var
+R26930:26933 Corelib.Init.Datatypes <> Some constr
+R26935:26935 xv6iris.ElfFile <> b:226 var
+R26941:26947 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R26949:26950 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 26948:26948 <> p:229
+R26959:26962 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R26952:26956 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R26951:26951 xv6iris.ElfFile <> p:229 var
+R26957:26958 xv6iris.ElfFile <> ps:224 var
+R26971:26973 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26966:26969 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R26970:26970 xv6iris.ElfFile <> a:225 var
+R26963:26963 xv6iris.ElfFile <> g:223 var
+R26965:26965 xv6iris.ElfFile <> p:229 var
+R26974:26977 Corelib.Init.Datatypes <> Some constr
+R26979:26979 xv6iris.ElfFile <> b:226 var
+R27024:27044 xv6iris.ElfFile <> segs_union_lookup_inv thm
+R27024:27044 xv6iris.ElfFile <> segs_union_lookup_inv thm
+R27162:27173 stdpp.list_basics <> elem_of_cons thm
+R27162:27173 stdpp.list_basics <> elem_of_cons thm
+R27162:27173 stdpp.list_basics <> elem_of_cons thm
+R27218:27236 stdpp.fin_maps <> lookup_union_Some_l thm
+R27218:27236 stdpp.fin_maps <> lookup_union_Some_l thm
+R27285:27287 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27280:27283 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R27265:27274 xv6iris.ElfFile <> segs_union def
+R27288:27291 Corelib.Init.Datatypes <> Some constr
+R27285:27287 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27280:27283 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R27265:27274 xv6iris.ElfFile <> segs_union def
+R27288:27291 Corelib.Init.Datatypes <> Some constr
+R27405:27424 stdpp.base <> elem_of_list_further constr
+R27458:27477 stdpp.base <> elem_of_list_further constr
+R27405:27424 stdpp.base <> elem_of_list_further constr
+R27458:27477 stdpp.base <> elem_of_list_further constr
+R27513:27518 stdpp.base <> decide def
+R27522:27524 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27513:27518 stdpp.base <> decide def
+R27522:27524 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27556:27574 stdpp.fin_maps <> lookup_union_Some_l thm
+R27556:27574 stdpp.fin_maps <> lookup_union_Some_l thm
+R27595:27615 stdpp.fin_maps <> lookup_union_Some_raw thm
+R27595:27615 stdpp.fin_maps <> lookup_union_Some_raw thm
+R27663:27681 stdpp.fin_maps <> map_disjoint_Some_l thm
+R27663:27681 stdpp.fin_maps <> map_disjoint_Some_l thm
+R27742:27761 stdpp.base <> elem_of_list_further constr
+R27795:27811 stdpp.base <> elem_of_list_here constr
+R27742:27761 stdpp.base <> elem_of_list_further constr
+R27795:27811 stdpp.base <> elem_of_list_here constr
+prf 27842:27863 <> segs_union_elem_of_dom
+binder 27865:27865 <> g:230
+R27873:27876 Corelib.Init.Datatypes <> list ind
+R27878:27878 xv6iris.ElfFile <> segs.A var
+binder 27868:27869 <> ps:231
+R27886:27886 Corelib.Numbers.BinNums <> Z ind
+binder 27882:27882 <> a:232
+R27922:27926 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R27896:27900 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R27895:27895 xv6iris.ElfFile <> a:232 var
+R27901:27903 stdpp.base <> dom def
+R27906:27915 xv6iris.ElfFile <> segs_union def
+R27919:27920 xv6iris.ElfFile <> ps:231 var
+R27917:27917 xv6iris.ElfFile <> g:230 var
+R27927:27933 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R27935:27936 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 27934:27934 <> p:233
+R27945:27948 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R27938:27942 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R27937:27937 xv6iris.ElfFile <> p:233 var
+R27943:27944 xv6iris.ElfFile <> ps:231 var
+R27950:27954 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R27949:27949 xv6iris.ElfFile <> a:232 var
+R27955:27957 stdpp.base <> dom def
+R27960:27960 xv6iris.ElfFile <> g:230 var
+R27962:27962 xv6iris.ElfFile <> p:233 var
+R28028:28038 stdpp.fin_map_dom <> dom_empty_L thm
+R28041:28053 stdpp.sets <> elem_of_empty thm
+R28028:28038 stdpp.fin_map_dom <> dom_empty_L thm
+R28028:28038 stdpp.fin_map_dom <> dom_empty_L thm
+R28041:28053 stdpp.sets <> elem_of_empty thm
+R28041:28053 stdpp.sets <> elem_of_empty thm
+R28134:28144 stdpp.fin_map_dom <> dom_union_L thm
+R28147:28159 stdpp.base <> elem_of_union meth
+R28134:28144 stdpp.fin_map_dom <> dom_union_L thm
+R28134:28144 stdpp.fin_map_dom <> dom_union_L thm
+R28147:28159 stdpp.base <> elem_of_union meth
+R28147:28159 stdpp.base <> elem_of_union meth
+R28235:28251 stdpp.base <> elem_of_list_here constr
+R28235:28251 stdpp.base <> elem_of_list_here constr
+R28295:28314 stdpp.base <> elem_of_list_further constr
+R28295:28314 stdpp.base <> elem_of_list_further constr
+R28365:28376 stdpp.list_basics <> elem_of_cons thm
+R28365:28376 stdpp.list_basics <> elem_of_cons thm
+R28365:28376 stdpp.list_basics <> elem_of_cons thm
+prf 28484:28499 <> segs_union_split
+binder 28501:28502 <> g1:234
+binder 28504:28505 <> g2:235
+R28513:28516 Corelib.Init.Datatypes <> list ind
+R28518:28518 xv6iris.ElfFile <> segs.A var
+binder 28508:28509 <> ps:236
+R28527:28527 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28579:28587 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28528:28534 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R28538:28539 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 28535:28535 <> p:237
+binder 28537:28537 <> q:238
+R28548:28551 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28541:28545 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R28540:28540 xv6iris.ElfFile <> p:237 var
+R28546:28547 xv6iris.ElfFile <> ps:236 var
+R28560:28563 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28553:28557 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R28552:28552 xv6iris.ElfFile <> q:238 var
+R28558:28559 xv6iris.ElfFile <> ps:236 var
+R28568:28574 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R28564:28565 xv6iris.ElfFile <> g1:234 var
+R28567:28567 xv6iris.ElfFile <> p:237 var
+R28575:28576 xv6iris.ElfFile <> g2:235 var
+R28578:28578 xv6iris.ElfFile <> q:238 var
+R28626:28628 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R28588:28597 xv6iris.ElfFile <> segs_union def
+R28624:28625 xv6iris.ElfFile <> ps:236 var
+binder 28604:28604 <> p:239
+R28613:28617 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R28609:28610 xv6iris.ElfFile <> g1:234 var
+R28612:28612 xv6iris.ElfFile <> p:239 var
+R28618:28619 xv6iris.ElfFile <> g2:235 var
+R28621:28621 xv6iris.ElfFile <> p:239 var
+R28645:28649 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R28629:28638 xv6iris.ElfFile <> segs_union def
+R28643:28644 xv6iris.ElfFile <> ps:236 var
+R28640:28641 xv6iris.ElfFile <> g1:234 var
+R28650:28659 xv6iris.ElfFile <> segs_union def
+R28664:28665 xv6iris.ElfFile <> ps:236 var
+R28661:28662 xv6iris.ElfFile <> g2:235 var
+R28741:28749 stdpp.base <> left_id_L thm
+R28755:28759 stdpp.base <> ::stdpp_scope:'(∪)' not
+R28751:28753 stdpp.base <> ::stdpp_scope:'∅' not
+R28741:28749 stdpp.base <> left_id_L thm
+R28755:28759 stdpp.base <> ::stdpp_scope:'(∪)' not
+R28751:28753 stdpp.base <> ::stdpp_scope:'∅' not
+R28741:28749 stdpp.base <> left_id_L thm
+R28755:28759 stdpp.base <> ::stdpp_scope:'(∪)' not
+R28751:28753 stdpp.base <> ::stdpp_scope:'∅' not
+R28849:28868 stdpp.base <> elem_of_list_further constr
+R28849:28868 stdpp.base <> elem_of_list_further constr
+R28849:28868 stdpp.base <> elem_of_list_further constr
+R28906:28912 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R28913:28922 xv6iris.ElfFile <> segs_union def
+R28906:28912 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R28913:28922 xv6iris.ElfFile <> segs_union def
+R28944:28964 xv6iris.ElfFile <> segs_union_disjoint_l thm
+R28944:28964 xv6iris.ElfFile <> segs_union_disjoint_l thm
+R28986:28993 Corelib.Classes.RelationClasses <> symmetry def
+R28986:28993 Corelib.Classes.RelationClasses <> symmetry def
+R29018:29037 stdpp.base <> elem_of_list_further constr
+R29049:29065 stdpp.base <> elem_of_list_here constr
+R29018:29037 stdpp.base <> elem_of_list_further constr
+R29049:29065 stdpp.base <> elem_of_list_here constr
+R29088:29094 stdpp.base <> assoc_L thm
+R29096:29100 stdpp.base <> ::stdpp_scope:'(∪)' not
+R29088:29094 stdpp.base <> assoc_L thm
+R29096:29100 stdpp.base <> ::stdpp_scope:'(∪)' not
+R29088:29094 stdpp.base <> assoc_L thm
+R29096:29100 stdpp.base <> ::stdpp_scope:'(∪)' not
+R29088:29094 stdpp.base <> assoc_L thm
+R29096:29100 stdpp.base <> ::stdpp_scope:'(∪)' not
+R29088:29094 stdpp.base <> assoc_L thm
+R29096:29100 stdpp.base <> ::stdpp_scope:'(∪)' not
+R29127:29133 stdpp.base <> assoc_L thm
+R29135:29139 stdpp.base <> ::stdpp_scope:'(∪)' not
+R29127:29133 stdpp.base <> assoc_L thm
+R29135:29139 stdpp.base <> ::stdpp_scope:'(∪)' not
+R29127:29133 stdpp.base <> assoc_L thm
+R29135:29139 stdpp.base <> ::stdpp_scope:'(∪)' not
+R29127:29133 stdpp.base <> assoc_L thm
+R29135:29139 stdpp.base <> ::stdpp_scope:'(∪)' not
+R29127:29133 stdpp.base <> assoc_L thm
+R29135:29139 stdpp.base <> ::stdpp_scope:'(∪)' not
+R29152:29165 stdpp.fin_maps <> map_union_comm thm
+R29152:29165 stdpp.fin_maps <> map_union_comm thm
+R29152:29165 stdpp.fin_maps <> map_union_comm thm
+R29201:29204 xv6iris.ElfFile segs <> sec
+prf 29446:29468 <> elf_wf_seg_map_disjoint
+R29475:29483 xv6iris.ElfFile <> elf_bytes def
+binder 29471:29471 <> f:240
+R29493:29500 xv6iris.ElfFile <> elf_phdr rec
+binder 29487:29487 <> p:241
+binder 29489:29489 <> q:242
+R29522:29525 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29515:29517 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29507:29512 xv6iris.ElfFile <> elf_wf def
+R29514:29514 xv6iris.ElfFile <> f:240 var
+R29518:29521 Corelib.Init.Datatypes <> true constr
+R29543:29546 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29527:29531 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R29526:29526 xv6iris.ElfFile <> p:241 var
+R29532:29540 xv6iris.ElfFile <> elf_loads def
+R29542:29542 xv6iris.ElfFile <> f:240 var
+R29564:29567 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29548:29552 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R29547:29547 xv6iris.ElfFile <> q:242 var
+R29553:29561 xv6iris.ElfFile <> elf_loads def
+R29563:29563 xv6iris.ElfFile <> f:240 var
+R29574:29579 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29569:29572 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R29568:29568 xv6iris.ElfFile <> p:241 var
+R29573:29573 xv6iris.ElfFile <> q:242 var
+R29591:29597 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R29580:29586 xv6iris.ElfFile <> seg_map def
+R29588:29588 xv6iris.ElfFile <> f:240 var
+R29590:29590 xv6iris.ElfFile <> p:241 var
+R29598:29604 xv6iris.ElfFile <> seg_map def
+R29606:29606 xv6iris.ElfFile <> f:240 var
+R29608:29608 xv6iris.ElfFile <> q:242 var
+R29648:29663 xv6iris.ElfFile <> seg_map_disjoint thm
+R29648:29663 xv6iris.ElfFile <> seg_map_disjoint thm
+R29677:29690 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R29677:29690 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R29717:29730 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R29717:29730 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R29767:29783 xv6iris.ElfFile <> elf_wf_loads_disj thm
+R29767:29783 xv6iris.ElfFile <> elf_wf_loads_disj thm
+prf 29811:29835 <> elf_wf_file_zero_disjoint
+R29842:29850 xv6iris.ElfFile <> elf_bytes def
+binder 29838:29838 <> f:243
+R29860:29867 xv6iris.ElfFile <> elf_phdr rec
+binder 29854:29854 <> p:244
+binder 29856:29856 <> q:245
+R29889:29892 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29882:29884 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29874:29879 xv6iris.ElfFile <> elf_wf def
+R29881:29881 xv6iris.ElfFile <> f:243 var
+R29885:29888 Corelib.Init.Datatypes <> true constr
+R29910:29913 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29894:29898 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R29893:29893 xv6iris.ElfFile <> p:244 var
+R29899:29907 xv6iris.ElfFile <> elf_loads def
+R29909:29909 xv6iris.ElfFile <> f:243 var
+R29931:29936 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29915:29919 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R29914:29914 xv6iris.ElfFile <> q:245 var
+R29920:29928 xv6iris.ElfFile <> elf_loads def
+R29930:29930 xv6iris.ElfFile <> f:243 var
+R29953:29959 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R29937:29948 xv6iris.ElfFile <> seg_file_map def
+R29950:29950 xv6iris.ElfFile <> f:243 var
+R29952:29952 xv6iris.ElfFile <> p:244 var
+R29960:29971 xv6iris.ElfFile <> seg_zero_map def
+R29973:29973 xv6iris.ElfFile <> q:245 var
+R30020:30026 xv6iris.ElfFile <> phdr_ok rec
+R30044:30057 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R30020:30026 xv6iris.ElfFile <> phdr_ok rec
+R30044:30057 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R30091:30097 xv6iris.ElfFile <> phdr_ok rec
+R30115:30128 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R30091:30097 xv6iris.ElfFile <> phdr_ok rec
+R30115:30128 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R30153:30180 xv6iris.ElfFile <> seg_file_zero_disjoint_cross thm
+R30153:30180 xv6iris.ElfFile <> seg_file_zero_disjoint_cross thm
+R30221:30226 stdpp.base <> decide def
+R30230:30232 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30221:30226 stdpp.base <> decide def
+R30230:30232 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30298:30314 xv6iris.ElfFile <> elf_wf_loads_disj thm
+R30298:30314 xv6iris.ElfFile <> elf_wf_loads_disj thm
+prf 30417:30431 <> elf_image_split
+R30438:30446 xv6iris.ElfFile <> elf_bytes def
+binder 30434:30434 <> f:246
+R30468:30473 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30461:30463 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30453:30458 xv6iris.ElfFile <> elf_wf def
+R30460:30460 xv6iris.ElfFile <> f:246 var
+R30464:30467 Corelib.Init.Datatypes <> true constr
+R30525:30530 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R30485:30487 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30474:30482 xv6iris.ElfFile <> elf_image def
+R30484:30484 xv6iris.ElfFile <> f:246 var
+R30504:30508 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R30488:30501 xv6iris.ElfFile <> elf_file_image def
+R30503:30503 xv6iris.ElfFile <> f:246 var
+R30509:30522 xv6iris.ElfFile <> elf_zero_image def
+R30524:30524 xv6iris.ElfFile <> f:246 var
+R30547:30553 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R30531:30544 xv6iris.ElfFile <> elf_file_image def
+R30546:30546 xv6iris.ElfFile <> f:246 var
+R30554:30567 xv6iris.ElfFile <> elf_zero_image def
+R30569:30569 xv6iris.ElfFile <> f:246 var
+R30611:30619 xv6iris.ElfFile <> elf_image def
+R30622:30635 xv6iris.ElfFile <> elf_file_image def
+R30638:30651 xv6iris.ElfFile <> elf_zero_image def
+R30654:30660 xv6iris.ElfFile <> seg_map def
+R30673:30688 xv6iris.ElfFile <> segs_union_split thm
+R30673:30688 xv6iris.ElfFile <> segs_union_split thm
+R30720:30744 xv6iris.ElfFile <> elf_wf_file_zero_disjoint thm
+R30720:30744 xv6iris.ElfFile <> elf_wf_file_zero_disjoint thm
+R30771:30784 xv6iris.ElfFile <> elf_file_image def
+R30787:30800 xv6iris.ElfFile <> elf_zero_image def
+R30813:30831 xv6iris.ElfFile <> segs_union_disjoint thm
+R30813:30831 xv6iris.ElfFile <> segs_union_disjoint thm
+R30863:30887 xv6iris.ElfFile <> elf_wf_file_zero_disjoint thm
+R30863:30887 xv6iris.ElfFile <> elf_wf_file_zero_disjoint thm
+prf 31054:31069 <> elf_image_lookup
+R31076:31084 xv6iris.ElfFile <> elf_bytes def
+binder 31072:31072 <> f:247
+R31092:31092 Corelib.Numbers.BinNums <> Z ind
+binder 31088:31088 <> a:248
+R31100:31101 stdpp.bitvector.definitions <> bv rec
+binder 31096:31096 <> b:249
+R31125:31131 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31427:31427 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31118:31120 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31110:31115 xv6iris.ElfFile <> elf_wf def
+R31117:31117 xv6iris.ElfFile <> f:247 var
+R31121:31124 Corelib.Init.Datatypes <> true constr
+R31157:31164 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R31148:31150 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31143:31146 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R31147:31147 xv6iris.ElfFile <> a:248 var
+R31132:31140 xv6iris.ElfFile <> elf_image def
+R31142:31142 xv6iris.ElfFile <> f:247 var
+R31151:31154 Corelib.Init.Datatypes <> Some constr
+R31156:31156 xv6iris.ElfFile <> b:249 var
+R31165:31171 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R31173:31174 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 31172:31172 <> p:250
+R31192:31205 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R31426:31426 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R31176:31180 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R31175:31175 xv6iris.ElfFile <> p:250 var
+R31181:31189 xv6iris.ElfFile <> elf_loads def
+R31191:31191 xv6iris.ElfFile <> f:247 var
+R31206:31206 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R31319:31334 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R31425:31425 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R31249:31263 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R31217:31220 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R31222:31224 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R31207:31214 xv6iris.ElfFile <> ep_vaddr proj
+R31216:31216 xv6iris.ElfFile <> p:250 var
+R31221:31221 xv6iris.ElfFile <> a:248 var
+R31221:31221 xv6iris.ElfFile <> a:248 var
+R31235:31237 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R31225:31232 xv6iris.ElfFile <> ep_vaddr proj
+R31234:31234 xv6iris.ElfFile <> p:250 var
+R31238:31246 xv6iris.ElfFile <> ep_filesz proj
+R31248:31248 xv6iris.ElfFile <> p:250 var
+R31310:31312 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31265:31268 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R31269:31276 Stdlib.ZArith.BinInt Z to_nat def
+R31290:31293 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R31308:31308 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R31279:31287 xv6iris.ElfFile <> ep_offset proj
+R31289:31289 xv6iris.ElfFile <> p:250 var
+R31295:31297 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R31294:31294 xv6iris.ElfFile <> a:248 var
+R31298:31305 xv6iris.ElfFile <> ep_vaddr proj
+R31307:31307 xv6iris.ElfFile <> p:250 var
+R31264:31264 xv6iris.ElfFile <> f:247 var
+R31313:31316 Corelib.Init.Datatypes <> Some constr
+R31318:31318 xv6iris.ElfFile <> b:249 var
+R31390:31407 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R31359:31362 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R31364:31366 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R31345:31347 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R31335:31342 xv6iris.ElfFile <> ep_vaddr proj
+R31344:31344 xv6iris.ElfFile <> p:250 var
+R31348:31356 xv6iris.ElfFile <> ep_filesz proj
+R31358:31358 xv6iris.ElfFile <> p:250 var
+R31363:31363 xv6iris.ElfFile <> a:248 var
+R31363:31363 xv6iris.ElfFile <> a:248 var
+R31377:31379 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R31367:31374 xv6iris.ElfFile <> ep_vaddr proj
+R31376:31376 xv6iris.ElfFile <> p:250 var
+R31380:31387 xv6iris.ElfFile <> ep_memsz proj
+R31389:31389 xv6iris.ElfFile <> p:250 var
+R31409:31411 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31408:31408 xv6iris.ElfFile <> b:249 var
+R31412:31424 xv6iris.ElfFile <> elf_zero_byte def
+R31458:31466 xv6iris.ElfFile <> elf_image def
+R31534:31556 xv6iris.ElfFile <> elf_wf_seg_map_disjoint thm
+R31479:31495 xv6iris.ElfFile <> segs_union_lookup thm
+R31479:31495 xv6iris.ElfFile <> segs_union_lookup thm
+R31534:31556 xv6iris.ElfFile <> elf_wf_seg_map_disjoint thm
+R31479:31495 xv6iris.ElfFile <> segs_union_lookup thm
+R31646:31659 xv6iris.ElfFile <> lookup_seg_map thm
+R31670:31683 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R31646:31659 xv6iris.ElfFile <> lookup_seg_map thm
+R31670:31683 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R31776:31789 xv6iris.ElfFile <> lookup_seg_map thm
+R31800:31813 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R31776:31789 xv6iris.ElfFile <> lookup_seg_map thm
+R31800:31813 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+prf 31854:31874 <> elf_file_image_lookup
+R31881:31889 xv6iris.ElfFile <> elf_bytes def
+binder 31877:31877 <> f:251
+R31897:31897 Corelib.Numbers.BinNums <> Z ind
+binder 31893:31893 <> a:252
+R31905:31906 stdpp.bitvector.definitions <> bv rec
+binder 31901:31901 <> b:253
+R31930:31936 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32125:32125 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31923:31925 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31915:31920 xv6iris.ElfFile <> elf_wf def
+R31922:31922 xv6iris.ElfFile <> f:251 var
+R31926:31929 Corelib.Init.Datatypes <> true constr
+R31967:31974 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R31958:31960 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31953:31956 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R31957:31957 xv6iris.ElfFile <> a:252 var
+R31937:31950 xv6iris.ElfFile <> elf_file_image def
+R31952:31952 xv6iris.ElfFile <> f:251 var
+R31961:31964 Corelib.Init.Datatypes <> Some constr
+R31966:31966 xv6iris.ElfFile <> b:253 var
+R31975:31981 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R31983:31984 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 31982:31982 <> p:254
+R32002:32014 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R31986:31990 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R31985:31985 xv6iris.ElfFile <> p:254 var
+R31991:31999 xv6iris.ElfFile <> elf_loads def
+R32001:32001 xv6iris.ElfFile <> f:251 var
+R32057:32069 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R32025:32028 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R32030:32032 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R32015:32022 xv6iris.ElfFile <> ep_vaddr proj
+R32024:32024 xv6iris.ElfFile <> p:254 var
+R32029:32029 xv6iris.ElfFile <> a:252 var
+R32029:32029 xv6iris.ElfFile <> a:252 var
+R32043:32045 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R32033:32040 xv6iris.ElfFile <> ep_vaddr proj
+R32042:32042 xv6iris.ElfFile <> p:254 var
+R32046:32054 xv6iris.ElfFile <> ep_filesz proj
+R32056:32056 xv6iris.ElfFile <> p:254 var
+R32116:32118 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32071:32074 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R32075:32082 Stdlib.ZArith.BinInt Z to_nat def
+R32096:32099 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R32114:32114 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R32085:32093 xv6iris.ElfFile <> ep_offset proj
+R32095:32095 xv6iris.ElfFile <> p:254 var
+R32101:32103 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R32100:32100 xv6iris.ElfFile <> a:252 var
+R32104:32111 xv6iris.ElfFile <> ep_vaddr proj
+R32113:32113 xv6iris.ElfFile <> p:254 var
+R32070:32070 xv6iris.ElfFile <> f:251 var
+R32119:32122 Corelib.Init.Datatypes <> Some constr
+R32124:32124 xv6iris.ElfFile <> b:253 var
+R32156:32169 xv6iris.ElfFile <> elf_file_image def
+R32182:32198 xv6iris.ElfFile <> segs_union_lookup thm
+R32182:32198 xv6iris.ElfFile <> segs_union_lookup thm
+R32182:32198 xv6iris.ElfFile <> segs_union_lookup thm
+R32182:32198 xv6iris.ElfFile <> segs_union_lookup thm
+R32260:32278 xv6iris.ElfFile <> lookup_seg_file_map thm
+R32296:32309 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R32260:32278 xv6iris.ElfFile <> lookup_seg_file_map thm
+R32296:32309 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R32431:32449 xv6iris.ElfFile <> lookup_seg_file_map thm
+R32460:32473 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R32431:32449 xv6iris.ElfFile <> lookup_seg_file_map thm
+R32460:32473 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R32539:32557 stdpp.fin_maps <> map_disjoint_weaken thm
+R32578:32584 xv6iris.ElfFile <> seg_map def
+R32562:32568 xv6iris.ElfFile <> seg_map def
+R32539:32557 stdpp.fin_maps <> map_disjoint_weaken thm
+R32578:32584 xv6iris.ElfFile <> seg_map def
+R32562:32568 xv6iris.ElfFile <> seg_map def
+R32606:32628 xv6iris.ElfFile <> elf_wf_seg_map_disjoint thm
+R32606:32628 xv6iris.ElfFile <> elf_wf_seg_map_disjoint thm
+R32656:32675 stdpp.fin_maps <> map_union_subseteq_l thm
+R32656:32675 stdpp.fin_maps <> map_union_subseteq_l thm
+R32690:32709 stdpp.fin_maps <> map_union_subseteq_l thm
+R32690:32709 stdpp.fin_maps <> map_union_subseteq_l thm
+prf 32724:32744 <> elf_zero_image_lookup
+R32751:32759 xv6iris.ElfFile <> elf_bytes def
+binder 32747:32747 <> f:255
+R32767:32767 Corelib.Numbers.BinNums <> Z ind
+binder 32763:32763 <> a:256
+R32775:32776 stdpp.bitvector.definitions <> bv rec
+binder 32771:32771 <> b:257
+R32800:32806 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32970:32970 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32793:32795 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32785:32790 xv6iris.ElfFile <> elf_wf def
+R32792:32792 xv6iris.ElfFile <> f:255 var
+R32796:32799 Corelib.Init.Datatypes <> true constr
+R32837:32844 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R32828:32830 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32823:32826 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R32827:32827 xv6iris.ElfFile <> a:256 var
+R32807:32820 xv6iris.ElfFile <> elf_zero_image def
+R32822:32822 xv6iris.ElfFile <> f:255 var
+R32831:32834 Corelib.Init.Datatypes <> Some constr
+R32836:32836 xv6iris.ElfFile <> b:257 var
+R32845:32851 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R32853:32854 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 32852:32852 <> p:258
+R32872:32884 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R32856:32860 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R32855:32855 xv6iris.ElfFile <> p:258 var
+R32861:32869 xv6iris.ElfFile <> elf_loads def
+R32871:32871 xv6iris.ElfFile <> f:255 var
+R32940:32952 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R32909:32912 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R32914:32916 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R32895:32897 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R32885:32892 xv6iris.ElfFile <> ep_vaddr proj
+R32894:32894 xv6iris.ElfFile <> p:258 var
+R32898:32906 xv6iris.ElfFile <> ep_filesz proj
+R32908:32908 xv6iris.ElfFile <> p:258 var
+R32913:32913 xv6iris.ElfFile <> a:256 var
+R32913:32913 xv6iris.ElfFile <> a:256 var
+R32927:32929 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R32917:32924 xv6iris.ElfFile <> ep_vaddr proj
+R32926:32926 xv6iris.ElfFile <> p:258 var
+R32930:32937 xv6iris.ElfFile <> ep_memsz proj
+R32939:32939 xv6iris.ElfFile <> p:258 var
+R32954:32956 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32953:32953 xv6iris.ElfFile <> b:257 var
+R32957:32969 xv6iris.ElfFile <> elf_zero_byte def
+R33001:33014 xv6iris.ElfFile <> elf_zero_image def
+R33027:33043 xv6iris.ElfFile <> segs_union_lookup thm
+R33027:33043 xv6iris.ElfFile <> segs_union_lookup thm
+R33027:33043 xv6iris.ElfFile <> segs_union_lookup thm
+R33027:33043 xv6iris.ElfFile <> segs_union_lookup thm
+R33113:33119 xv6iris.ElfFile <> phdr_ok rec
+R33137:33150 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R33113:33119 xv6iris.ElfFile <> phdr_ok rec
+R33137:33150 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R33179:33197 xv6iris.ElfFile <> lookup_seg_zero_map thm
+R33179:33197 xv6iris.ElfFile <> lookup_seg_zero_map thm
+R33333:33339 xv6iris.ElfFile <> phdr_ok rec
+R33357:33370 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R33333:33339 xv6iris.ElfFile <> phdr_ok rec
+R33357:33370 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R33399:33417 xv6iris.ElfFile <> lookup_seg_zero_map thm
+R33399:33417 xv6iris.ElfFile <> lookup_seg_zero_map thm
+R33490:33496 xv6iris.ElfFile <> phdr_ok rec
+R33514:33527 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R33490:33496 xv6iris.ElfFile <> phdr_ok rec
+R33514:33527 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R33563:33569 xv6iris.ElfFile <> phdr_ok rec
+R33587:33600 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R33563:33569 xv6iris.ElfFile <> phdr_ok rec
+R33587:33600 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R33628:33646 stdpp.fin_maps <> map_disjoint_weaken thm
+R33667:33673 xv6iris.ElfFile <> seg_map def
+R33651:33657 xv6iris.ElfFile <> seg_map def
+R33628:33646 stdpp.fin_maps <> map_disjoint_weaken thm
+R33667:33673 xv6iris.ElfFile <> seg_map def
+R33651:33657 xv6iris.ElfFile <> seg_map def
+R33695:33717 xv6iris.ElfFile <> elf_wf_seg_map_disjoint thm
+R33695:33717 xv6iris.ElfFile <> elf_wf_seg_map_disjoint thm
+R33745:33764 stdpp.fin_maps <> map_union_subseteq_r thm
+R33767:33788 xv6iris.ElfFile <> seg_file_zero_disjoint thm
+R33745:33764 stdpp.fin_maps <> map_union_subseteq_r thm
+R33767:33788 xv6iris.ElfFile <> seg_file_zero_disjoint thm
+R33809:33828 stdpp.fin_maps <> map_union_subseteq_r thm
+R33831:33852 xv6iris.ElfFile <> seg_file_zero_disjoint thm
+R33809:33828 stdpp.fin_maps <> map_union_subseteq_r thm
+R33831:33852 xv6iris.ElfFile <> seg_file_zero_disjoint thm
+prf 34014:34026 <> elf_image_dom
+R34033:34041 xv6iris.ElfFile <> elf_bytes def
+binder 34029:34029 <> f:259
+R34049:34049 Corelib.Numbers.BinNums <> Z ind
+binder 34045:34045 <> a:260
+R34071:34077 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R34147:34147 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R34064:34066 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R34056:34061 xv6iris.ElfFile <> elf_wf def
+R34063:34063 xv6iris.ElfFile <> f:259 var
+R34067:34070 Corelib.Init.Datatypes <> true constr
+R34101:34105 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R34079:34083 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R34078:34078 xv6iris.ElfFile <> a:260 var
+R34084:34086 stdpp.base <> dom def
+R34089:34097 xv6iris.ElfFile <> elf_image def
+R34099:34099 xv6iris.ElfFile <> f:259 var
+R34106:34112 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R34114:34115 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 34113:34113 <> p:261
+R34133:34136 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R34117:34121 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R34116:34116 xv6iris.ElfFile <> p:261 var
+R34122:34130 xv6iris.ElfFile <> elf_loads def
+R34132:34132 xv6iris.ElfFile <> f:259 var
+R34137:34142 xv6iris.ElfFile <> in_seg def
+R34144:34144 xv6iris.ElfFile <> p:261 var
+R34146:34146 xv6iris.ElfFile <> a:260 var
+R34178:34186 xv6iris.ElfFile <> elf_image def
+R34197:34218 xv6iris.ElfFile <> segs_union_elem_of_dom thm
+R34197:34218 xv6iris.ElfFile <> segs_union_elem_of_dom thm
+R34197:34218 xv6iris.ElfFile <> segs_union_elem_of_dom thm
+R34293:34306 xv6iris.ElfFile <> seg_map_in_seg thm
+R34324:34337 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R34293:34306 xv6iris.ElfFile <> seg_map_in_seg thm
+R34324:34337 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R34365:34375 stdpp.fin_map_dom <> elem_of_dom meth
+R34365:34375 stdpp.fin_map_dom <> elem_of_dom meth
+R34446:34456 stdpp.fin_map_dom <> elem_of_dom meth
+R34460:34473 xv6iris.ElfFile <> seg_map_in_seg thm
+R34497:34510 xv6iris.ElfFile <> elf_wf_phdr_ok thm
+R34446:34456 stdpp.fin_map_dom <> elem_of_dom meth
+R34460:34473 xv6iris.ElfFile <> seg_map_in_seg thm
+R34497:34510 xv6iris.ElfFile <> elf_wf_phdr_ok thm

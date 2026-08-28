@@ -45,10 +45,10 @@
          kalloc()  {{ r, kalloc_post γk on r }}
         kalloc_post γk on r :=
             (r = null ∗ avail_zero on ∗ kalloc_avail γk on)
-          ∨ (page_valid r ∗ page_own r ∗ kalloc_avail γk (avail_dec on))
+          ∨ (page_valid r ∗ page_filled r kalloc_junk ∗ kalloc_avail γk (avail_dec on))
      {{ is_kmem γ γk lk fl ∗ kfree_pre p ∗ kalloc_avail γk on }}
          kfree(p)  {{ kalloc_avail γk (avail_inc on) }}
-        kfree_pre p := page_valid p ∗ page_free p    (* §0.26′ *)
+        kfree_pre p := page_valid p ∗ page_own p      (* §0.26′, A6.87 *)
    i.e. kalloc hands back full ownership of a fresh 4KB page (or null -- but
    only when the count is unknown or exactly 0), decrementing the count; kfree
    absorbs the page and increments it.  Boot code threads [Some n]; after
@@ -122,7 +122,32 @@ Section Kalloc.
      section) is the one place that quantifies over it. *)
   Context `{XIk : CurCtx}.
 
-  Definition byte_any (a : Arch.pa) : iProp Σ := (∃ b : bv 8, a ↦ₘ b)%I.
+  (* ================================================================== *)
+  (* A6.87 OWNER RULING: [byte_any] IS THE VISIBILITY-FREE BYTE.          *)
+  (*                                                                    *)
+  (* A6.85 introduced a SECOND page tier for kfree and kept [byte_any] at *)
+  (* the registered one.  The ruling drops the second name: the           *)
+  (* justification-free physical fact IS what "some byte is here" means,  *)
+  (* and the valued form had no remaining customer.                       *)
+  (*                                                                    *)
+  (* WHAT LICENSES THE COLLAPSE is the audit A6.85 §(3) ran: NO kalloc     *)
+  (* CLIENT READS A FRESH PAGE BEFORE WRITING IT.  xv6's kalloc memsets    *)
+  (* the page it returns, so the only reader of allocator storage is the   *)
+  (* allocator, and every client's first touch is a write.  Once no client *)
+  (* can read an unwritten byte, [∃ x, a ↦ x] and "the future half of the  *)
+  (* ownership of a" have exactly the same set of customers -- and         *)
+  (* preserving the stronger one was a distinction without a difference.   *)
+  (* (If a client is ever found reading first, that is a KERNEL BUG to be  *)
+  (* reported, not a reason to restore the valued body.)                   *)
+  (*                                                                    *)
+  (* DETERMINACY IS REGAINED BY WRITING, and that is now the standard      *)
+  (* story rather than a special path: the store leaf takes a [byte_any]   *)
+  (* and hands back a registered byte ([WpSconfMem.wp_sb_free_s_sconf]),   *)
+  (* so a client that wants named contents gets them from its own memset   *)
+  (* -- which is where [kalloc_post] hands them out ([page_filled]).       *)
+  (* ================================================================== *)
+  Definition byte_any (a : Arch.pa) : iProp Σ :=
+    TsoCtx.mem_free a (DfracOwn 1).
   (* an 8-byte little-endian word, now expressed via the word points-to
      abstraction (so it also carries the doubleword-alignment of [a]). *)
   Definition word_at (a : mword 64) (w : mword 64) : iProp Σ :=
@@ -144,74 +169,45 @@ Section Kalloc.
      degeneracy as the ProofKfree/157GB lesson, caught by [coqc -time]. *)
   Global Typeclasses Opaque byte_any word_at page_head8 page_rest page_own run_page.
 
-  (* ================================================================== *)
-  (* §0.26′ / A6.85: THE FREER'S PAGE.                                   *)
-  (*                                                                   *)
-  (* [kfree]'s precondition is NOT [page_own].  The owner's ruling:      *)
-  (* [exists x, a |-> x] asserts the freer holds a value DETERMINATE AT  *)
-  (* ITS OWN CPU VIEW, and under TSO that is surplus -- a page whose     *)
-  (* lock another CPU just released has no value well-known to the       *)
-  (* freer, and freeing must not require one.  What kfree needs is the   *)
-  (* FUTURE half of ownership: exclusivity plus the timestamp element    *)
-  (* any future write must pay.  [page_free] is that, and nothing else.  *)
-  (*                                                                   *)
-  (* THE ASYMMETRY IS THE DESIGN, and it is why the client cascade is    *)
-  (* one line per free SITE and zero lines everywhere else:              *)
-  (*   - [kfree_pre] is [page_free]   -- the freer owes only the future; *)
-  (*   - [kalloc_post] is [page_own]  -- because kalloc MEMSETS the page *)
-  (*     it returns (xv6 memsets it with 5 before returning), and that   *)
-  (*     store RE-MINTS determinacy with no evidence at all.  So every   *)
-  (*     kalloc client keeps exactly the resource it has today.          *)
-  (*                                                                   *)
-  (* AND THE FREE LIST STAYS REGISTERED.  kfree memsets BEFORE it pushes *)
-  (* (memset with 1, then the r->next store), so every page on the       *)
-  (* list was written by its freer after the mint: [run_page] /          *)
-  (* [freelist_chain] / [kmem_res] are untouched, and so is kalloc's own *)
-  (* read of r->next -- which is the allocator's own protocol under      *)
-  (* the kmem lock, not a client reading allocator junk.                 *)
-  (* ================================================================== *)
-  (* NO ∃ HERE: [TsoCtx.mem_free] already hides the value, and re-adding
-     it would be re-introducing exactly the thing the tier exists to
-     drop.  A free byte is a fraction and a timestamp element; that is
-     the whole of it. *)
-  Definition byte_free (a : Arch.pa) : iProp Σ :=
-    TsoCtx.mem_free a (DfracOwn 1).
-  Definition page_free (p : mword 64) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4096, byte_free (pa_add p j))%I.
+  (* the page a memset (or any full-page write) hands back: the same
+     4096 cells, REGISTERED and NAMED at the byte the write stored.  This
+     is what [kalloc_post] carries -- xv6's kalloc memsets with 5 before
+     returning -- and it is strictly more informative than [page_own],
+     which it downgrades to for free. *)
+  (* the byte xv6's kalloc fills a returned page with -- `memset(r, 5, PGSIZE)`,
+     "fill with junk".  A6.87: naming it is what lets [kalloc_post] be the
+     VALUED run, which is strictly more informative than [page_own] and is
+     what keeps [allocproc]'s trapframe honest: the first process's
+     [userret] restores GPRs from slots only this memset ever wrote. *)
+  Definition kalloc_junk : bv 8 := nth_byte (mword_of_int 5 : mword 64) 0.
 
-  Global Typeclasses Opaque byte_free page_free.
+  Definition page_filled (p : mword 64) (c : bv 8) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 4096, (pa_add p j) ↦ₘ c)%I.
 
-  Lemma byte_any_free a : byte_any a ⊢ byte_free a.
+  Global Typeclasses Opaque page_filled.
+
+  Lemma page_own_of_filled p c : page_filled p c ⊢ page_own p.
   Proof.
-    rewrite /byte_any /byte_free. iIntros "(%b & H)".
+    rewrite /page_filled /page_own. apply big_sepL_mono.
+    intros k j _. rewrite /byte_any. iIntros "H".
     by iApply TsoCtx.ctx_pointsto_free.
   Qed.
 
-  (* THE ONE LINE EVERY [kfree] CALL SITE NEEDS.  A caller that holds the
-     page registered to its own context owns strictly more than kfree
-     asks -- so this is where the ruling costs its clients anything at
-     all, and it costs them this. *)
-  Lemma page_own_free p : page_own p ⊢ page_free p.
+  (* ...and the same for a caller holding the bytes named by a FUNCTION
+     (a copy, a boot carve) rather than by one constant. *)
+  Lemma page_own_of_named p (f : nat -> bv 8) :
+    ([∗ list] j ∈ seq 0 4096, (pa_add p j) ↦ₘ (f j)) ⊢ page_own p.
   Proof.
-    rewrite /page_own /page_free. apply big_sepL_mono.
-    intros ? ? _. apply byte_any_free.
-  Qed.
-
-  (* ...and the same for a caller holding the bytes NAMED (the shape the
-     post-memset / post-copy free sites are in). *)
-  Lemma page_free_of_named p (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 4096, (pa_add p j) ↦ₘ (f j)) ⊢ page_free p.
-  Proof.
-    rewrite /page_free. apply big_sepL_mono. intros k j _.
-    rewrite /byte_free. iIntros "H".
+    rewrite /page_own. apply big_sepL_mono. intros k j _.
+    rewrite /byte_any. iIntros "H".
     by iApply TsoCtx.ctx_pointsto_free.
   Qed.
 
-  Lemma page_free_of_named_ex p (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 4096, ∃ b : bv 8, (pa_add p j) ↦ₘ b) ⊢ page_free p.
+  Lemma page_own_of_named_ex p :
+    ([∗ list] j ∈ seq 0 4096, ∃ b : bv 8, (pa_add p j) ↦ₘ b) ⊢ page_own p.
   Proof.
-    rewrite /page_free. apply big_sepL_mono. intros k j _.
-    rewrite /byte_free. iIntros "(%b & H)".
+    rewrite /page_own. apply big_sepL_mono. intros k j _.
+    rewrite /byte_any. iIntros "(%b & H)".
     by iApply TsoCtx.ctx_pointsto_free.
   Qed.
 
@@ -225,35 +221,53 @@ Section Kalloc.
   Lemma word_at_head8 p w : word_at p w ⊢ page_head8 p.
   Proof.
     rewrite /word_at /page_head8 ctx_word_pointsto_unfold. iIntros "[_ H]".
-    iApply (big_sepL_mono with "H"). iIntros (k j _) "Hb". iExists _. iExact "Hb".
+    iApply (big_sepL_mono with "H"). iIntros (k j _) "Hb".
+    rewrite /byte_any. by iApply TsoCtx.ctx_pointsto_free.
   Qed.
 
-  (* the converse direction kfree's [sd r->next] needs: the 8 arbitrary bytes of
-     a page's head slot can be viewed as SOME 64-bit word window ready to be
-     overwritten (word_pointsto also carries the required 8-alignment). *)
-  Lemma page_head8_word_at p :
-    page_valid p -> page_head8 p ⊢ ∃ w : mword 64, word_at p w.
+  (* A6.87: THE FORWARD DIRECTION IS OFF THE *WRITE*, NOT OFF THE PAGE.
+     [page_head8_word_at] used to read a word window out of eight anonymous
+     bytes; at the visibility-free tier that is exactly the claim the ruling
+     removes -- eight bytes nobody has written have no value to assemble.
+     What kfree actually has when it needs the [r->next] slot is the result
+     of its OWN memset, so the lemma moves onto the FILLED run and the
+     assembly is the same eight lines with the [∃]-destructs gone. *)
+  Lemma page_filled_split8 p c :
+    page_filled p c ⊣⊢
+    ([∗ list] j ∈ seq 0 8, (pa_add p j) ↦ₘ c) ∗
+    ([∗ list] j ∈ seq 8 4088, (pa_add p j) ↦ₘ c).
   Proof.
-    intros Hv. rewrite /page_head8 /byte_any.
+    rewrite /page_filled. replace 4096%nat with (8 + 4088)%nat by lia.
+    rewrite seq_app big_sepL_app //.
+  Qed.
+
+  Lemma filled_rest_page_rest p c :
+    ([∗ list] j ∈ seq 8 4088, (pa_add p j) ↦ₘ c) ⊢ page_rest p.
+  Proof.
+    rewrite /page_rest. apply big_sepL_mono. intros k j _.
+    rewrite /byte_any. iIntros "H". by iApply TsoCtx.ctx_pointsto_free.
+  Qed.
+
+  Lemma filled_head8_word_at p c :
+    page_valid p ->
+    ([∗ list] j ∈ seq 0 8, (pa_add p j) ↦ₘ c) ⊢ ∃ w : mword 64, word_at p w.
+  Proof.
+    intros Hv.
     change (seq 0 8) with [0;1;2;3;4;5;6;7]%nat.
     iIntros "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & _)".
-    iDestruct "H0" as (b0) "H0". iDestruct "H1" as (b1) "H1".
-    iDestruct "H2" as (b2) "H2". iDestruct "H3" as (b3) "H3".
-    iDestruct "H4" as (b4) "H4". iDestruct "H5" as (b5) "H5".
-    iDestruct "H6" as (b6) "H6". iDestruct "H7" as (b7) "H7".
-    set (bs := [b0;b1;b2;b3;b4;b5;b6;b7]).
+    set (bs := [c;c;c;c;c;c;c;c]).
     set (w := Z_to_bv 64 (assemble_bytes bs) : mword 64).
     iExists w.
     rewrite /word_at /ctx_word_pointsto.
     iSplitR; [iPureIntro; by apply page_valid_aligned8|].
-    assert (E0 : nth_byte w 0%nat = b0) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E1 : nth_byte w 1%nat = b1) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E2 : nth_byte w 2%nat = b2) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E3 : nth_byte w 3%nat = b3) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E4 : nth_byte w 4%nat = b4) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E5 : nth_byte w 5%nat = b5) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E6 : nth_byte w 6%nat = b6) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
-    assert (E7 : nth_byte w 7%nat = b7) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E0 : nth_byte w 0%nat = c) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E1 : nth_byte w 1%nat = c) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E2 : nth_byte w 2%nat = c) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E3 : nth_byte w 3%nat = c) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E4 : nth_byte w 4%nat = c) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E5 : nth_byte w 5%nat = c) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E6 : nth_byte w 6%nat = c) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E7 : nth_byte w 7%nat = c) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
     change (seq 0 8) with [0;1;2;3;4;5;6;7]%nat. simpl.
     rewrite E0 E1 E2 E3 E4 E5 E6 E7. iFrame.
   Qed.
@@ -421,25 +435,45 @@ Section Kalloc.
   (* ---- the caller-facing pre/post conditions ---- *)
   Definition kalloc_post (γk : gname * gname) (on : option nat) (r : mword 64) : iProp Σ :=
     ((⌜r = nullp⌝ ∗ ⌜avail_zero on⌝ ∗ kalloc_avail γk on)
-     ∨ (⌜page_valid r⌝ ∗ page_own r ∗ kalloc_avail γk (avail_dec on)))%I.
-  (* §0.26′: THE FREER OWES ONLY THE FUTURE.  See the [page_free] block
-     above for the ruling; [kfree_pre_of_own] is the one line a caller
-     that holds the page registered has to add. *)
+     ∨ (⌜page_valid r⌝ ∗ page_filled r kalloc_junk ∗
+          kalloc_avail γk (avail_dec on)))%I.
+  (* §0.26′ / A6.87: SAME TEXT, HONEST MEANING.  [page_own] is the
+     visibility-free page now, so kfree's precondition says what the
+     ruling says it should -- the freer owes the page's FUTURE and no
+     claim about its contents -- in the spelling it always had. *)
   Definition kfree_pre (p : mword 64) : iProp Σ :=
-    (⌜page_valid p⌝ ∗ page_free p)%I.
+    (⌜page_valid p⌝ ∗ page_own p)%I.
 
-  Lemma kfree_pre_of_own p : ⌜page_valid p⌝ -∗ page_own p -∗ kfree_pre p.
+  (* boot-mode corollary: with a positive exact count, kalloc CANNOT fail.
+     A6.87: kept at [page_own], so that no client of it moves -- the ones
+     that want the allocator's junk bytes by name take
+     [kalloc_post_success_filled] instead, and the two differ by one
+     [page_own_of_filled]. *)
+  Lemma kalloc_post_success_filled γk k r :
+    kalloc_post γk (Some (S k)) r -∗
+    ⌜page_valid r⌝ ∗ page_filled r kalloc_junk ∗ kalloc_avail γk (Some k).
   Proof.
-    iIntros (Hv) "H". rewrite /kfree_pre. iSplitR; [done|].
-    by iApply page_own_free.
+    iIntros "[(_ & %Hz & _) | H]"; [discriminate | iExact "H"].
   Qed.
 
-  (* boot-mode corollary: with a positive exact count, kalloc CANNOT fail *)
   Lemma kalloc_post_success γk k r :
     kalloc_post γk (Some (S k)) r -∗
     ⌜page_valid r⌝ ∗ page_own r ∗ kalloc_avail γk (Some k).
   Proof.
-    iIntros "[(_ & %Hz & _) | H]"; [discriminate | iExact "H"].
+    iIntros "H".
+    iDestruct (kalloc_post_success_filled with "H") as "($ & Hp & $)".
+    by iApply page_own_of_filled.
+  Qed.
+
+  (* ...and the same downgrade straight on the post, for the clients that
+     pattern-match it themselves. *)
+  Lemma kalloc_post_own γk on r :
+    kalloc_post γk on r -∗
+    (⌜r = nullp⌝ ∗ ⌜avail_zero on⌝ ∗ kalloc_avail γk on)
+    ∨ (⌜page_valid r⌝ ∗ page_own r ∗ kalloc_avail γk (avail_dec on)).
+  Proof.
+    iIntros "[Hl | (%Hv & Hp & Ha)]"; [by iLeft |].
+    iRight. iSplitR; [done|]. iFrame "Ha". by iApply page_own_of_filled.
   Qed.
 
   (* Intended Hoare triples -- the operation is the kernel's kalloc/kfree
@@ -465,14 +499,14 @@ Section KallocCtx.
      the structural instances are applied AS TERMS throughout (the
      recipe's rule 3). *)
 
+  (* A6.87: [byte_any] IS CONTEXT-FREE NOW, and so is [page_rest] over it.
+     The transport obligation the M3 sweep pays per row degenerates to the
+     identity here -- there is nothing indexed to carry.  That is the
+     ruling's collapse showing up one tier down: a byte nobody may read
+     has no context to be registered to. *)
   Global Instance byte_any_morph (a : Arch.pa) :
-    CtxMorph (λ ξ0 : CtxId, byte_any (XIk := ξ0) a).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /byte_any.
-    iDestruct "H" as (b) "H".
-    iMod (ctx_morph_pointsto _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]".
-    iModIntro. iFrame "Hd". iExists b. iExact "H".
-  Qed.
+    CtxMorph (λ _ : CtxId, byte_any a).
+  Proof. iIntros (ξ ξ') "Hd H". iModIntro. iFrame. Qed.
 
   Global Instance word_at_morph (a w : mword 64) :
     CtxMorph (λ ξ0 : CtxId, word_at (XIk := ξ0) a w).
@@ -483,15 +517,8 @@ Section KallocCtx.
   Qed.
 
   Global Instance page_rest_morph (p : mword 64) :
-    CtxMorph (λ ξ0 : CtxId, page_rest (XIk := ξ0) p).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /page_rest.
-    iMod (ctx_morph_big_sepL (seq 8 4088)
-            (λ _ j ξ0, byte_any (XIk := ξ0) (pa_add p j))
-            (λ i x, byte_any_morph _)
-            ξ ξ' with "Hd H") as "[Hd H]".
-    iModIntro. iFrame.
-  Qed.
+    CtxMorph (λ _ : CtxId, page_rest p).
+  Proof. iIntros (ξ ξ') "Hd H". iModIntro. iFrame. Qed.
 
   Global Instance run_page_morph (p next : mword 64) :
     CtxMorph (λ ξ0 : CtxId, run_page (XIk := ξ0) p next).

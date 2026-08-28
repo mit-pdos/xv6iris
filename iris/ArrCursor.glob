@@ -1,0 +1,277 @@
+DIGEST d07be9b7f67abff95b36dcb93e1d3709
+Fxv6iris.ArrCursor
+R890:895 Stdlib.ZArith.ZArith <> <> lib
+R897:899 Stdlib.micromega.Lia <> <> lib
+R928:948 stdpp.bitvector.definitions <> <> lib
+R966:991 SailStdpp.Operators_mwords <> <> lib
+R1009:1022 SailStdpp.Base <> <> lib
+R1024:1042 SailStdpp.TypeCasts <> <> lib
+R1044:1059 SailStdpp.Values <> <> lib
+R1061:1081 SailStdpp.MachineWord <> <> lib
+R1099:1115 Riscv.rv64d_types <> <> lib
+R1117:1127 Riscv.rv64d <> <> lib
+R1145:1155 xv6iris.RiscvExtras <> <> lib
+def 1351:1354 <> acur
+R1371:1371 Corelib.Numbers.BinNums <> Z ind
+binder 1357:1360 <> base:1
+binder 1362:1367 <> stride:2
+R1379:1381 Corelib.Init.Datatypes <> nat ind
+binder 1375:1375 <> i:3
+R1386:1390 SailStdpp.Values <> mword def
+R1400:1411 SailStdpp.Values <> mword_of_int def
+R1418:1420 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R1414:1417 xv6iris.ArrCursor <> base:1 var
+R1427:1429 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R1421:1426 xv6iris.ArrCursor <> stride:2 var
+R1430:1437 Stdlib.ZArith.BinInt Z of_nat def
+R1439:1439 xv6iris.ArrCursor <> i:3 var
+prf 1684:1692 <> acur_step
+R1709:1709 Corelib.Numbers.BinNums <> Z ind
+binder 1695:1698 <> base:4
+binder 1700:1705 <> stride:5
+R1717:1719 Corelib.Init.Datatypes <> nat ind
+binder 1713:1713 <> i:6
+R1727:1731 SailStdpp.Values <> mword def
+binder 1723:1723 <> o:7
+R1777:1782 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1742:1745 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1776:1776 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1741:1741 xv6iris.ArrCursor <> o:7 var
+R1768:1772 SailStdpp.Values <> mword def
+R1746:1757 SailStdpp.Values <> mword_of_int def
+R1759:1764 xv6iris.ArrCursor <> stride:5 var
+R1813:1815 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1783:1789 SailStdpp.Operators_mwords <> add_vec def
+R1812:1812 xv6iris.ArrCursor <> o:7 var
+R1792:1795 xv6iris.ArrCursor <> acur def
+R1797:1800 xv6iris.ArrCursor <> base:4 var
+R1802:1807 xv6iris.ArrCursor <> stride:5 var
+R1809:1809 xv6iris.ArrCursor <> i:6 var
+R1816:1819 xv6iris.ArrCursor <> acur def
+R1821:1824 xv6iris.ArrCursor <> base:4 var
+R1826:1831 xv6iris.ArrCursor <> stride:5 var
+R1834:1834 Corelib.Init.Datatypes <> S constr
+R1836:1836 xv6iris.ArrCursor <> i:6 var
+R1867:1870 xv6iris.ArrCursor <> acur def
+R1883:1889 SailStdpp.Operators_mwords <> add_vec def
+R1947:1958 SailStdpp.Values <> mword_of_int def
+R1936:1940 SailStdpp.Values <> mword def
+R1892:1903 SailStdpp.Values <> mword_of_int def
+R1910:1912 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R1919:1921 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R1922:1929 Stdlib.ZArith.BinInt Z of_nat def
+R1979:1989 SailStdpp.Operators_mwords <> add_vec_int def
+R2036:2040 SailStdpp.Values <> mword def
+R1992:2003 SailStdpp.Values <> mword_of_int def
+R2010:2012 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R2019:2021 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R2022:2029 Stdlib.ZArith.BinInt Z of_nat def
+R1883:1889 SailStdpp.Operators_mwords <> add_vec def
+R1947:1958 SailStdpp.Values <> mword_of_int def
+R1936:1940 SailStdpp.Values <> mword def
+R1892:1903 SailStdpp.Values <> mword_of_int def
+R1910:1912 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R1919:1921 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R1922:1929 Stdlib.ZArith.BinInt Z of_nat def
+R1979:1989 SailStdpp.Operators_mwords <> add_vec_int def
+R2036:2040 SailStdpp.Values <> mword def
+R1992:2003 SailStdpp.Values <> mword_of_int def
+R2010:2012 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R2019:2021 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R2022:2029 Stdlib.ZArith.BinInt Z of_nat def
+R2065:2073 xv6iris.RiscvExtras <> avi_mword thm
+R2065:2073 xv6iris.RiscvExtras <> avi_mword thm
+R2065:2073 xv6iris.RiscvExtras <> avi_mword thm
+R2093:2106 Stdlib.ZArith.Znat Nat2Z inj_succ thm
+R2093:2106 Stdlib.ZArith.Znat Nat2Z inj_succ thm
+R2093:2106 Stdlib.ZArith.Znat Nat2Z inj_succ thm
+prf 2540:2552 <> acur_unsigned
+R2569:2569 Corelib.Numbers.BinNums <> Z ind
+binder 2555:2558 <> base:8
+binder 2560:2565 <> stride:9
+R2579:2581 Corelib.Init.Datatypes <> nat ind
+binder 2573:2573 <> i:10
+binder 2575:2575 <> n:11
+R2597:2600 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2589:2592 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R2593:2596 xv6iris.ArrCursor <> base:8 var
+R2611:2616 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2602:2604 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R2605:2610 xv6iris.ArrCursor <> stride:9 var
+R2652:2655 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2643:2645 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R2621:2623 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R2617:2620 xv6iris.ArrCursor <> base:8 var
+R2630:2632 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R2624:2629 xv6iris.ArrCursor <> stride:9 var
+R2633:2640 Stdlib.ZArith.BinInt Z of_nat def
+R2642:2642 xv6iris.ArrCursor <> n:11 var
+R2647:2649 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R2668:2673 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2658:2661 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R2657:2657 xv6iris.ArrCursor <> i:10 var
+R2662:2662 xv6iris.ArrCursor <> n:11 var
+R2706:2708 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2674:2684 stdpp.bitvector.definitions <> bv_unsigned proj
+R2687:2690 xv6iris.ArrCursor <> acur def
+R2692:2695 xv6iris.ArrCursor <> base:8 var
+R2697:2702 xv6iris.ArrCursor <> stride:9 var
+R2704:2704 xv6iris.ArrCursor <> i:10 var
+R2713:2715 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R2709:2712 xv6iris.ArrCursor <> base:8 var
+R2722:2724 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R2716:2721 xv6iris.ArrCursor <> stride:9 var
+R2725:2732 Stdlib.ZArith.BinInt Z of_nat def
+R2734:2734 xv6iris.ArrCursor <> i:10 var
+R2801:2803 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2788:2797 stdpp.bitvector.definitions <> bv_modulus def
+R2805:2807 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R2823:2832 stdpp.bitvector.definitions <> bv_modulus def
+R2801:2803 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2788:2797 stdpp.bitvector.definitions <> bv_modulus def
+R2805:2807 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R2882:2885 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R2869:2871 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R2872:2879 Stdlib.ZArith.BinInt Z of_nat def
+R2892:2894 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R2895:2902 Stdlib.ZArith.BinInt Z of_nat def
+R2924:2945 Stdlib.ZArith.BinInt Z mul_le_mono_nonneg_l thm
+R2961:2966 Stdlib.ZArith.Znat <> inj_le def
+R2882:2885 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R2869:2871 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R2872:2879 Stdlib.ZArith.BinInt Z of_nat def
+R2892:2894 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R2895:2902 Stdlib.ZArith.BinInt Z of_nat def
+R2924:2945 Stdlib.ZArith.BinInt Z mul_le_mono_nonneg_l thm
+R2961:2966 Stdlib.ZArith.Znat <> inj_le def
+R2991:2994 xv6iris.ArrCursor <> acur def
+R3005:3018 xv6iris.RiscvExtras <> moi64_unsigned thm
+R3005:3018 xv6iris.RiscvExtras <> moi64_unsigned thm
+R3005:3018 xv6iris.RiscvExtras <> moi64_unsigned thm
+R3027:3039 stdpp.bitvector.definitions <> bv_wrap_small thm
+R3027:3039 stdpp.bitvector.definitions <> bv_wrap_small thm
+R3084:3102 Stdlib.ZArith.BinInt Z add_nonneg_nonneg thm
+R3118:3136 Stdlib.ZArith.BinInt Z mul_nonneg_nonneg thm
+R3084:3102 Stdlib.ZArith.BinInt Z add_nonneg_nonneg thm
+R3118:3136 Stdlib.ZArith.BinInt Z mul_nonneg_nonneg thm
+prf 3295:3302 <> acur_neq
+R3319:3319 Corelib.Numbers.BinNums <> Z ind
+binder 3305:3308 <> base:12
+binder 3310:3315 <> stride:13
+R3329:3331 Corelib.Init.Datatypes <> nat ind
+binder 3323:3323 <> i:14
+binder 3325:3325 <> n:15
+R3347:3350 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3339:3342 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R3343:3346 xv6iris.ArrCursor <> base:12 var
+R3361:3366 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3352:3354 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R3355:3360 xv6iris.ArrCursor <> stride:13 var
+R3402:3407 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3393:3395 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R3371:3373 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R3367:3370 xv6iris.ArrCursor <> base:12 var
+R3380:3382 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R3374:3379 xv6iris.ArrCursor <> stride:13 var
+R3383:3390 Stdlib.ZArith.BinInt Z of_nat def
+R3392:3392 xv6iris.ArrCursor <> n:15 var
+R3397:3399 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R3420:3425 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3410:3413 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R3409:3409 xv6iris.ArrCursor <> i:14 var
+R3414:3414 xv6iris.ArrCursor <> n:15 var
+R3475:3477 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3426:3432 SailStdpp.Operators_mwords <> neq_vec def
+R3456:3459 xv6iris.ArrCursor <> acur def
+R3461:3464 xv6iris.ArrCursor <> base:12 var
+R3466:3471 xv6iris.ArrCursor <> stride:13 var
+R3473:3473 xv6iris.ArrCursor <> n:15 var
+R3435:3438 xv6iris.ArrCursor <> acur def
+R3440:3443 xv6iris.ArrCursor <> base:12 var
+R3445:3450 xv6iris.ArrCursor <> stride:13 var
+R3452:3452 xv6iris.ArrCursor <> i:14 var
+R3478:3481 Corelib.Init.Datatypes <> negb def
+R3484:3490 Stdlib.Arith.PeanoNat Nat eqb def
+R3492:3492 xv6iris.ArrCursor <> i:14 var
+R3494:3494 xv6iris.ArrCursor <> n:15 var
+R3544:3556 xv6iris.ArrCursor <> acur_unsigned thm
+R3544:3556 xv6iris.ArrCursor <> acur_unsigned thm
+R3612:3624 xv6iris.ArrCursor <> acur_unsigned thm
+R3654:3664 Stdlib.Arith.PeanoNat Nat le_refl thm
+R3612:3624 xv6iris.ArrCursor <> acur_unsigned thm
+R3654:3664 Stdlib.Arith.PeanoNat Nat le_refl thm
+R3687:3693 SailStdpp.Operators_mwords <> neq_vec def
+R3717:3728 Stdlib.Arith.PeanoNat Nat eqb_spec thm
+R3717:3728 Stdlib.Arith.PeanoNat Nat eqb_spec thm
+R3760:3774 SailStdpp.Operators_mwords <> eq_vec_true_iff thm
+R3760:3774 SailStdpp.Operators_mwords <> eq_vec_true_iff thm
+R3800:3815 SailStdpp.Operators_mwords <> eq_vec_false_iff thm
+R3800:3815 SailStdpp.Operators_mwords <> eq_vec_false_iff thm
+R3835:3841 Corelib.Init.Logic <> f_equal thm
+R3843:3853 stdpp.bitvector.definitions <> bv_unsigned proj
+R3835:3841 Corelib.Init.Logic <> f_equal thm
+R3843:3853 stdpp.bitvector.definitions <> bv_unsigned proj
+R3918:3920 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3908:3915 Stdlib.ZArith.BinInt Z of_nat def
+R3921:3928 Stdlib.ZArith.BinInt Z of_nat def
+R3918:3920 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3908:3915 Stdlib.ZArith.BinInt Z of_nat def
+R3921:3928 Stdlib.ZArith.BinInt Z of_nat def
+R3951:3959 Stdlib.ZArith.Znat Nat2Z inj thm
+R3951:3959 Stdlib.ZArith.Znat Nat2Z inj thm
+prf 4237:4244 <> acur_inj
+R4261:4261 Corelib.Numbers.BinNums <> Z ind
+binder 4247:4250 <> base:16
+binder 4252:4257 <> stride:17
+R4273:4275 Corelib.Init.Datatypes <> nat ind
+binder 4265:4265 <> i:18
+binder 4267:4267 <> j:19
+binder 4269:4269 <> n:20
+R4291:4294 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4283:4286 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R4287:4290 xv6iris.ArrCursor <> base:16 var
+R4305:4310 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4296:4298 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R4299:4304 xv6iris.ArrCursor <> stride:17 var
+R4346:4351 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4337:4339 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R4315:4317 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R4311:4314 xv6iris.ArrCursor <> base:16 var
+R4324:4326 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R4318:4323 xv6iris.ArrCursor <> stride:17 var
+R4327:4334 Stdlib.ZArith.BinInt Z of_nat def
+R4336:4336 xv6iris.ArrCursor <> n:20 var
+R4341:4343 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R4364:4367 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4354:4357 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R4353:4353 xv6iris.ArrCursor <> i:18 var
+R4358:4358 xv6iris.ArrCursor <> n:20 var
+R4380:4385 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4370:4373 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R4369:4369 xv6iris.ArrCursor <> j:19 var
+R4374:4374 xv6iris.ArrCursor <> n:20 var
+R4425:4428 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4404:4406 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4386:4389 xv6iris.ArrCursor <> acur def
+R4391:4394 xv6iris.ArrCursor <> base:16 var
+R4396:4401 xv6iris.ArrCursor <> stride:17 var
+R4403:4403 xv6iris.ArrCursor <> i:18 var
+R4407:4410 xv6iris.ArrCursor <> acur def
+R4412:4415 xv6iris.ArrCursor <> base:16 var
+R4417:4422 xv6iris.ArrCursor <> stride:17 var
+R4424:4424 xv6iris.ArrCursor <> j:19 var
+R4430:4432 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4429:4429 xv6iris.ArrCursor <> i:18 var
+R4433:4433 xv6iris.ArrCursor <> j:19 var
+R4485:4491 Corelib.Init.Logic <> f_equal thm
+R4493:4503 stdpp.bitvector.definitions <> bv_unsigned proj
+R4485:4491 Corelib.Init.Logic <> f_equal thm
+R4493:4503 stdpp.bitvector.definitions <> bv_unsigned proj
+R4525:4537 xv6iris.ArrCursor <> acur_unsigned thm
+R4525:4537 xv6iris.ArrCursor <> acur_unsigned thm
+R4525:4537 xv6iris.ArrCursor <> acur_unsigned thm
+R4590:4602 xv6iris.ArrCursor <> acur_unsigned thm
+R4590:4602 xv6iris.ArrCursor <> acur_unsigned thm
+R4590:4602 xv6iris.ArrCursor <> acur_unsigned thm
+R4652:4660 Stdlib.ZArith.Znat Nat2Z inj thm
+R4652:4660 Stdlib.ZArith.Znat Nat2Z inj thm

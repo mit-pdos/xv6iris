@@ -938,8 +938,8 @@ Section KvmmakeBody.
      site below mints its own context, this file not being converted yet. *)
   Hypothesis wp_memset :
     forall `{CID : CpuId} `{XI0 : CurCtx} (m0 : regfile) (n : nat) (len : nat)
-      (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
-      wp_memset_sconf_body KT0 KT0 m0 n len cval olds b pcur.
+      (cval : mword 64) (b : bool) (pcur : mword 64),
+      wp_memset_free_sconf_body KT0 KT0 m0 n len cval b pcur.
   Hypothesis wp_kvmmap :
     forall `{CID : CpuId} (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
@@ -1156,14 +1156,13 @@ Section KvmmakeBody.
     assert (HM4a2 : M4 !!! Regidx (mword_of_int 12 : mword 5) = mword_of_int (Z.of_nat 4096)).
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite /page_own /byte_any) in "Hpage".
-    iDestruct (bb_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
     (* memset's contract is context-indexed AND so is [page_own] since the M1
        flip: both sides are the SAME ctx fact, so there is no crossing here
        any more (only the per-byte tier annotation is re-fixed below). *)
-    iApply (wp_memset M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
+    iApply (wp_memset M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
-              with "Hcg Htext Hpc [Hbuf]").
-    { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
+              with "Hcg Htext Hpc [Hpage]").
+    { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
     iIntros (CID12 Hs12 mfin) "Hcg Hpc Hbytes %Hmcs".
     assert (Hret18 : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x18)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -2296,7 +2295,7 @@ Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTAC
       : wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks :=
     wp_kvmmake_sconf_gen
       (fun (CID' : CpuId) => AK.wp_kalloc_sconf KT0 (CID := CID'))
-      (fun (CID' : CpuId) (XI' : CurCtx) => MS.wp_memset_sconf KT0 KT0 (CID := CID') (XI := XI'))
+      (fun (CID' : CpuId) (XI' : CurCtx) => MS.wp_memset_free_sconf KT0 KT0 (CID := CID') (XI := XI'))
       (fun (CID' : CpuId) => KM.wp_kvmmap_sconf (CID := CID'))
       (fun (CID' : CpuId) => PM.wp_proc_mapstacks_sconf (CID := CID'))
       γa γk mm lvl K eb p on b lks.

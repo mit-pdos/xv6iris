@@ -1112,7 +1112,8 @@ Section ProofVmfault.
       iApply (MemsetPage.wp_memset_page_val_sconf KT1 A6 (K - 6)%nat (mword_of_int 0 : mword 64) b p
                 ltac:(lia) ltac:(rewrite HA6a0; exact Hpv) HA6a1 HA6a2
                 with "Hcg Htext Hpc [Hpage]").
-      { iEval (rewrite HA6a0). iExact "Hpage". }
+      (* A6.87: kalloc's run downgrades to the ownership this memset wants *)
+      { iEval (rewrite HA6a0). iApply (page_own_of_filled with "Hpage"). }
       iIntros (Cse Hsse ms) "Hcg Hpc Hzpage %Hmscs".
       iEval (rewrite HA6a0) in "Hzpage".
       assert (Hcb : nth_byte (autocast (T := mword)
@@ -1528,8 +1529,9 @@ Section ProofVmfault.
       all: try lkbelow.
       { rewrite /kfree_pre HF2a0.
         iSplitR; [iPureIntro; exact Hpv |].
-        (* §0.26′: contents-existential AND visibility-free *)
-        iApply page_own_free. rewrite /page_own /byte_any.
+        (* §0.26′: contents-existential AND visibility-free, in the
+           MEANING of [page_own] rather than in this text *)
+        iApply page_own_of_named_ex.
         iApply (big_sepL_impl with "Hzpage"). iIntros "!>" (k x Hx) "Hj".
         iExists _. iExact "Hj". }
       iIntros (Cfr Hsfr mfk) "Hcg Hcnt Hpc %Hfcs _".

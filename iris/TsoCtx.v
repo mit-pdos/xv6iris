@@ -4269,6 +4269,64 @@ Section ctx.
     ([∗ list] j ∈ seq 0 4, phys_ledger (pa_add a j) dq (nth_byte w j)).
   Proof. reflexivity. Qed.
 
+  (* ================================================================== *)
+  (* A6.88: THE WORD'S HELD ARM -- the same asymmetry A6.78 §(2) named for  *)
+  (* the owner CELL, one field over.  [holding()] reads BOTH lock fields,   *)
+  (* and the holder's read of the word it wrote itself must be EXACT for    *)
+  (* the same reason the owner cell's is: the invariant knows the CURRENT   *)
+  (* value, and under TSO a load may return an older one unless the reader  *)
+  (* can point at its OWN write.  [ledger_vis]'s author arm is that point.  *)
+  (*                                                                      *)
+  (* Nothing new is needed underneath: the store gate already hands the     *)
+  (* append's own message fragment back ([ledger_store_win_at_ok]) and      *)
+  (* [ledger_read_bytes_vis_ok] already consumes exactly this shape.  This  *)
+  (* is the word-width wrapper for the pair.                                *)
+  (* ================================================================== *)
+  Definition phys_ledger_word4_vis (h : agent) (B : nat) (a : Arch.pa)
+      (dq : dfrac) (w : bv 32) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr a) 4 = true⌝ ∗
+     [∗ list] j ∈ seq 0 4, ∃ t : nat,
+       ledger_vis h B t ∗ phys_ledger_at (pa_add a j) dq (nth_byte w j) t)%I.
+
+  Global Instance phys_ledger_word4_vis_timeless h B a dq w :
+    Timeless (phys_ledger_word4_vis h B a dq w).
+  Proof. rewrite /phys_ledger_word4_vis. apply _. Qed.
+
+  (* the held form forgets its receipt and becomes the ordinary word, at
+     the cost of the exactness the holder had -- [lk_cpu_cell_ex_forget]'s
+     twin, and what release spends on the way out *)
+  Lemma phys_ledger_word4_vis_forget h B a dq w :
+    phys_ledger_word4_vis h B a dq w ⊢ phys_ledger_word4 a dq w.
+  Proof.
+    rewrite /phys_ledger_word4_vis /phys_ledger_word4.
+    iIntros "[$ Hb]". iApply (big_sepL_impl with "Hb").
+    iIntros "!>" (k j _) "(%t & _ & Hbj)".
+    by iApply phys_ledger_at_ledger.
+  Qed.
+
+  Lemma phys_ledger_word4_vis_aligned_p h B a dq w :
+    phys_ledger_word4_vis h B a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 4 = true⌝.
+  Proof. iIntros "[$ _]". Qed.
+
+
+  (* THE MINT, off the store gate's own message fragment: a word this hart
+     JUST WROTE is visible to it at every view, by forwarding. *)
+  Lemma phys_ledger_word4_vis_of_store (h : agent) (i : nat)
+      (a : Arch.pa) (w : bv 32) (msg : pwmsg) :
+    pm_tid msg = h ->
+    is_aligned_paddr (Physaddr a) 4 = true ->
+    ledger_msg_at i msg -∗
+    ([∗ list] j ∈ seq 0 4,
+       phys_ledger_at (pa_add a j) (DfracOwn 1) (nth_byte w j) (S i)) -∗
+    phys_ledger_word4_vis h 0 a (DfracOwn 1) w.
+  Proof.
+    intros Hh Hal. iIntros "#Hm Hb".
+    rewrite /phys_ledger_word4_vis. iSplitR; [done|].
+    iApply (big_sepL_impl with "Hb"). iIntros "!>" (k j _) "Hbj".
+    iExists (S i). iFrame "Hbj". rewrite /ledger_vis.
+    iRight. iExists i, msg. iFrame "Hm". by iPureIntro.
+  Qed.
+
   Lemma phys_ledger_word4_aligned_p a dq w :
     phys_ledger_word4 a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 4 = true⌝.
   Proof. iIntros "[$ _]". Qed.
@@ -4820,6 +4878,23 @@ Section ctx.
       iApply (ledger_read_vis_ok g (pa_add a j) dq (nth_byte w j) t B
                 with "Hgh Hint HB Hvis Hbj"). }
     iPureIntro. intros tv' Htv' j Hj. exact (HH j Hj tv' Htv').
+  Qed.
+
+  (* THE HOLDER'S EXACT READ.  [B := 0] because the author arm is what pays
+     here -- the reader IS the writer, so no view receipt beyond the trivial
+     one is wanted ([TsoGhost.view_lb_0]). *)
+  Lemma ledger_read_word4_vis_ok `{CID : CpuId} (g : gstate)
+      (a : Arch.pa) (dq : dfrac) (w : bv 32) :
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    phys_ledger_word4_vis (hart_agent cpu_id) 0 a dq w -∗
+    ⌜forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
+       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv' a 4 w⌝.
+  Proof.
+    iIntros "Hgh Hint [%Hal Hb]".
+    iApply (ledger_read_bytes_vis_ok g a 4 w dq 0 with "Hgh Hint [] [Hb]").
+    { iApply view_lb_0. }
+    { change (N.to_nat 4) with 4%nat. iExact "Hb". }
   Qed.
 
   Lemma ledger_read_at_ok `{CID : CpuId} (g : gstate)

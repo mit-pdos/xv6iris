@@ -1,0 +1,32 @@
+DIGEST 4653fef5af00997d457b4405601c9049
+Fxv6iris.TsoCtxShim
+R1358:1363 Stdlib.ZArith.ZArith <> <> lib
+R1365:1367 Stdlib.micromega.Lia <> <> lib
+R1396:1416 stdpp.bitvector.definitions <> <> lib
+R1418:1421 stdpp.gmap <> <> lib
+R1459:1467 iris.proofmode.proofmode <> <> lib
+R1503:1507 iris.algebra.dfrac <> <> lib
+R1550:1558 iris.base_logic.lib.ghost_var <> <> lib
+R1576:1591 SailStdpp.Values <> <> lib
+R1609:1625 Riscv.rv64d_types <> <> lib
+R1643:1657 xv6iris.RiscvModelBytes <> <> lib
+R1659:1667 xv6iris.RiscvLang <> <> lib
+R1669:1678 xv6iris.RiscvPtsto <> <> lib
+R1680:1684 xv6iris.Ktier <> <> lib
+R1702:1707 xv6iris.TsoCtx <> <> lib
+sec 1719:1722 <> shim
+R1738:1744 xv6iris.RiscvPtsto <> riscvGS class
+prf 1995:2011 <> own_context_alloc
+R2021:2025 xv6iris.RiscvLang <> CpuId class
+binder 2015:2017 <> CID:3
+R2030:2033 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R2034:2038 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R2039:2042 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R2053:2054 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R2048:2052 xv6iris.TsoCtx <> CtxId rec
+binder 2043:2044 <> ξ:4
+R2055:2065 xv6iris.TsoCtx <> own_context def
+R2067:2068 xv6iris.TsoCtxShim <> ξ:4 var
+R2086:2101 xv6iris.TsoCtx <> own_context_boot thm
+R2086:2101 xv6iris.TsoCtx <> own_context_boot thm
+R2113:2116 xv6iris.TsoCtxShim shim <> sec

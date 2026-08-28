@@ -1,0 +1,30 @@
+DIGEST db70558a8cdd3e6308d61516c2aa1055
+Fxv6iris.InodeRef
+R1605:1610 Stdlib.ZArith.ZArith <> <> lib
+R1612:1614 Stdlib.micromega.Lia <> <> lib
+R1616:1619 Stdlib.Lists.List <> <> lib
+R1648:1668 stdpp.bitvector.definitions <> <> lib
+R1686:1699 SailStdpp.Base <> <> lib
+R1701:1719 SailStdpp.TypeCasts <> <> lib
+R1721:1736 SailStdpp.Values <> <> lib
+R1738:1758 SailStdpp.MachineWord <> <> lib
+R1776:1792 Riscv.rv64d_types <> <> lib
+R1794:1804 Riscv.rv64d <> <> lib
+R1806:1823 Riscv.riscv_extras <> <> lib
+R1841:1849 xv6iris.IrefSlots <> <> lib
+R1867:1875 xv6iris.IcacheRef <> <> lib
+prf 2153:2166 <> ientry_nonzero
+R2173:2175 Corelib.Init.Datatypes <> nat ind
+binder 2169:2169 <> k:1
+R2199:2202 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2184:2187 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R2183:2183 xv6iris.InodeRef <> k:1 var
+R2188:2193 xv6iris.IcacheRef <> NINODE def
+R2211:2215 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R2235:2235 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R2203:2208 xv6iris.IcacheRef <> ientry def
+R2210:2210 xv6iris.InodeRef <> k:1 var
+R2227:2231 SailStdpp.Values <> mword def
+R2216:2223 Riscv.rv64d <> zero_reg def
+R2251:2264 xv6iris.IcacheRef <> ientry_ne_zero thm
+R2251:2264 xv6iris.IcacheRef <> ientry_ne_zero thm

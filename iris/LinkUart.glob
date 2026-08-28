@@ -1,0 +1,5 @@
+DIGEST d503a12cad14fd0c11fe0d85e28de557
+Fxv6iris.LinkUart
+R149:157 xv6iris.ProofUart <> <> lib
+R176:184 xv6iris.ProofUart UartProof <> modtype
+mod 168:171 <> Uart

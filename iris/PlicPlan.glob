@@ -1,0 +1,494 @@
+DIGEST 43d1d65a5a7b01ae0ff56891b10871bc
+Fxv6iris.PlicPlan
+R1917:1922 Stdlib.ZArith.ZArith <> <> lib
+R1924:1927 Stdlib.Lists.List <> <> lib
+R1929:1932 Stdlib.Bool.Bool <> <> lib
+R1961:1981 stdpp.bitvector.definitions <> <> lib
+R1999:2006 xv6iris.DevModel <> <> lib
+R2016:2028 Stdlib.Lists.List ListNotations <> mod
+def 2266:2282 <> plic_dev_irq_mask
+R2286:2286 Corelib.Numbers.BinNums <> Z ind
+R2293:2297 Stdlib.ZArith.BinInt Z lor def
+R2300:2307 Stdlib.ZArith.BinInt Z shiftl def
+R2312:2317 Stdlib.ZArith.BinInt Z of_N def
+R2319:2329 xv6iris.DevModel <> uart_irq_id def
+R2334:2341 Stdlib.ZArith.BinInt Z shiftl def
+R2346:2351 Stdlib.ZArith.BinInt Z of_N def
+R2353:2365 xv6iris.DevModel <> virtio_irq_id def
+def 2382:2398 <> plic_dev_irq_word
+R2405:2407 Corelib.Init.Datatypes <> nat ind
+binder 2401:2401 <> w:1
+R2412:2412 Corelib.Numbers.BinNums <> Z ind
+R2422:2428 Stdlib.Arith.PeanoNat Nat eqb def
+R2430:2430 xv6iris.PlicPlan <> w:1 var
+R2439:2455 xv6iris.PlicPlan <> plic_dev_irq_mask def
+def 2477:2491 <> plic_senable_ok
+R2498:2500 Corelib.Init.Datatypes <> nat ind
+binder 2494:2494 <> w:2
+R2511:2512 stdpp.bitvector.definitions <> bv rec
+binder 2504:2507 <> word:3
+R2577:2579 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2530:2535 Stdlib.ZArith.BinInt Z land def
+R2538:2548 stdpp.bitvector.definitions <> bv_unsigned proj
+R2550:2553 xv6iris.PlicPlan <> word:3 var
+R2557:2573 xv6iris.PlicPlan <> plic_dev_irq_word def
+R2575:2575 xv6iris.PlicPlan <> w:2 var
+R2580:2590 stdpp.bitvector.definitions <> bv_unsigned proj
+R2592:2595 xv6iris.PlicPlan <> word:3 var
+def 2698:2704 <> plic_ok
+R2711:2720 xv6iris.DevModel <> plic_state rec
+binder 2707:2707 <> p:4
+R2735:2741 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2751:2752 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2748:2750 Corelib.Init.Datatypes <> nat ind
+binder 2742:2742 <> c:5
+R2748:2750 Corelib.Init.Datatypes <> nat ind
+binder 2744:2744 <> w:6
+R2753:2767 xv6iris.PlicPlan <> plic_senable_ok def
+R2769:2769 xv6iris.PlicPlan <> w:6 var
+R2772:2779 xv6iris.DevModel <> p_enable proj
+R2781:2781 xv6iris.PlicPlan <> p:4 var
+R2783:2783 xv6iris.PlicPlan <> c:5 var
+R2785:2785 xv6iris.PlicPlan <> w:6 var
+prf 3078:3090 <> plic_ok_plic0
+R3094:3100 xv6iris.PlicPlan <> plic_ok def
+R3102:3112 xv6iris.DevModel <> plic0_state def
+R3143:3157 xv6iris.PlicPlan <> plic_senable_ok def
+R3165:3172 xv6iris.DevModel <> p_enable proj
+R3174:3184 xv6iris.DevModel <> plic0_state def
+R3200:3206 Stdlib.Arith.PeanoNat Nat eqb def
+R3200:3206 Stdlib.Arith.PeanoNat Nat eqb def
+prf 3473:3491 <> plic_ok_wupd_enable
+R3498:3507 xv6iris.DevModel <> plic_state rec
+binder 3494:3494 <> p:7
+R3518:3520 Corelib.Init.Datatypes <> nat ind
+binder 3511:3511 <> c:8
+binder 3513:3514 <> wi:9
+R3528:3529 stdpp.bitvector.definitions <> bv rec
+binder 3524:3524 <> w:10
+R3548:3551 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3539:3545 xv6iris.PlicPlan <> plic_ok def
+R3547:3547 xv6iris.PlicPlan <> p:7 var
+R3572:3577 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3552:3566 xv6iris.PlicPlan <> plic_senable_ok def
+R3568:3569 xv6iris.PlicPlan <> wi:9 var
+R3571:3571 xv6iris.PlicPlan <> w:10 var
+R3578:3584 xv6iris.PlicPlan <> plic_ok def
+R3587:3595 xv6iris.DevModel <> PlicState constr
+R3598:3603 xv6iris.DevModel <> p_prio proj
+R3605:3605 xv6iris.PlicPlan <> p:7 var
+R3609:3617 xv6iris.DevModel <> p_pending proj
+R3619:3619 xv6iris.PlicPlan <> p:7 var
+R3623:3631 xv6iris.DevModel <> p_claimed proj
+R3633:3633 xv6iris.PlicPlan <> p:7 var
+R3658:3661 xv6iris.DevModel <> wupd def
+R3664:3671 xv6iris.DevModel <> p_enable proj
+R3673:3673 xv6iris.PlicPlan <> p:7 var
+R3676:3676 xv6iris.PlicPlan <> c:8 var
+R3678:3679 xv6iris.PlicPlan <> wi:9 var
+R3681:3681 xv6iris.PlicPlan <> w:10 var
+R3685:3692 xv6iris.DevModel <> p_thresh proj
+R3694:3694 xv6iris.PlicPlan <> p:7 var
+R3733:3740 xv6iris.DevModel <> p_enable proj
+R3751:3754 xv6iris.DevModel <> wupd def
+R3769:3775 Stdlib.Arith.PeanoNat Nat eqb def
+R3796:3799 Corelib.Init.Datatypes <> andb def
+R3769:3775 Stdlib.Arith.PeanoNat Nat eqb def
+R3817:3823 Stdlib.Arith.PeanoNat Nat eqb def
+R3817:3823 Stdlib.Arith.PeanoNat Nat eqb def
+R3867:3876 Stdlib.Arith.PeanoNat Nat eqb_eq thm
+R3867:3876 Stdlib.Arith.PeanoNat Nat eqb_eq thm
+prf 3987:4005 <> plic_ok_hupd_thresh
+R4012:4021 xv6iris.DevModel <> plic_state rec
+binder 4008:4008 <> p:11
+R4029:4031 Corelib.Init.Datatypes <> nat ind
+binder 4025:4025 <> h:12
+R4039:4040 stdpp.bitvector.definitions <> bv rec
+binder 4035:4035 <> w:13
+R4059:4064 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4050:4056 xv6iris.PlicPlan <> plic_ok def
+R4058:4058 xv6iris.PlicPlan <> p:11 var
+R4065:4071 xv6iris.PlicPlan <> plic_ok def
+R4074:4082 xv6iris.DevModel <> PlicState constr
+R4085:4090 xv6iris.DevModel <> p_prio proj
+R4092:4092 xv6iris.PlicPlan <> p:11 var
+R4096:4104 xv6iris.DevModel <> p_pending proj
+R4106:4106 xv6iris.PlicPlan <> p:11 var
+R4110:4118 xv6iris.DevModel <> p_claimed proj
+R4120:4120 xv6iris.PlicPlan <> p:11 var
+R4145:4152 xv6iris.DevModel <> p_enable proj
+R4154:4154 xv6iris.PlicPlan <> p:11 var
+R4158:4161 xv6iris.DevModel <> hupd def
+R4178:4178 xv6iris.PlicPlan <> w:13 var
+R4176:4176 xv6iris.PlicPlan <> h:12 var
+R4164:4171 xv6iris.DevModel <> p_thresh proj
+R4173:4173 xv6iris.PlicPlan <> p:11 var
+prf 4291:4307 <> plic_ok_nupd_prio
+R4314:4323 xv6iris.DevModel <> plic_state rec
+binder 4310:4310 <> p:14
+R4331:4331 Corelib.Numbers.BinNums <> N ind
+binder 4327:4327 <> i:15
+R4339:4340 stdpp.bitvector.definitions <> bv rec
+binder 4335:4335 <> w:16
+R4359:4364 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4350:4356 xv6iris.PlicPlan <> plic_ok def
+R4358:4358 xv6iris.PlicPlan <> p:14 var
+R4365:4371 xv6iris.PlicPlan <> plic_ok def
+R4374:4382 xv6iris.DevModel <> PlicState constr
+R4385:4388 xv6iris.DevModel <> nupd def
+R4403:4403 xv6iris.PlicPlan <> w:16 var
+R4401:4401 xv6iris.PlicPlan <> i:15 var
+R4391:4396 xv6iris.DevModel <> p_prio proj
+R4398:4398 xv6iris.PlicPlan <> p:14 var
+R4407:4415 xv6iris.DevModel <> p_pending proj
+R4417:4417 xv6iris.PlicPlan <> p:14 var
+R4421:4429 xv6iris.DevModel <> p_claimed proj
+R4431:4431 xv6iris.PlicPlan <> p:14 var
+R4456:4463 xv6iris.DevModel <> p_enable proj
+R4465:4465 xv6iris.PlicPlan <> p:14 var
+R4469:4476 xv6iris.DevModel <> p_thresh proj
+R4478:4478 xv6iris.PlicPlan <> p:14 var
+prf 5061:5078 <> plic_write_prio_ok
+R5085:5094 xv6iris.DevModel <> plic_state rec
+binder 5081:5081 <> p:17
+R5104:5104 Corelib.Numbers.BinNums <> Z ind
+binder 5098:5100 <> off:18
+R5112:5112 Corelib.Numbers.BinNums <> N ind
+binder 5108:5108 <> i:19
+R5120:5121 stdpp.bitvector.definitions <> bv rec
+binder 5116:5116 <> v:20
+R5157:5162 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5148:5150 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5131:5143 xv6iris.DevModel <> plic_prio_src def
+R5145:5147 xv6iris.PlicPlan <> off:18 var
+R5151:5154 Corelib.Init.Datatypes <> Some constr
+R5156:5156 xv6iris.PlicPlan <> i:19 var
+R5172:5177 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5163:5169 xv6iris.PlicPlan <> plic_ok def
+R5171:5171 xv6iris.PlicPlan <> p:17 var
+R5178:5184 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R5187:5188 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 5185:5186 <> p':21
+R5217:5220 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R5207:5209 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5189:5198 xv6iris.DevModel <> plic_write def
+R5200:5200 xv6iris.PlicPlan <> p:17 var
+R5202:5204 xv6iris.PlicPlan <> off:18 var
+R5206:5206 xv6iris.PlicPlan <> v:20 var
+R5210:5213 Corelib.Init.Datatypes <> Some constr
+R5215:5216 xv6iris.PlicPlan <> p':21 var
+R5221:5227 xv6iris.PlicPlan <> plic_ok def
+R5229:5230 xv6iris.PlicPlan <> p':21 var
+R5265:5274 xv6iris.DevModel <> plic_write def
+R5456:5459 Stdlib.NArith.BinNat <> ::N_scope:x_'=?'_x not
+R5456:5459 Stdlib.NArith.BinNat <> ::N_scope:x_'=?'_x not
+R5563:5579 xv6iris.PlicPlan <> plic_ok_nupd_prio thm
+R5563:5579 xv6iris.PlicPlan <> plic_ok_nupd_prio thm
+prf 5709:5721 <> plic_ok_latch
+R5731:5740 xv6iris.DevModel <> plic_state rec
+binder 5724:5724 <> p:22
+binder 5726:5727 <> p':23
+R5748:5748 Corelib.Numbers.BinNums <> N ind
+binder 5744:5744 <> i:24
+R5779:5782 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5769:5771 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5755:5764 xv6iris.DevModel <> plic_latch def
+R5766:5766 xv6iris.PlicPlan <> p:22 var
+R5768:5768 xv6iris.PlicPlan <> i:24 var
+R5772:5775 Corelib.Init.Datatypes <> Some constr
+R5777:5778 xv6iris.PlicPlan <> p':23 var
+R5792:5795 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5783:5789 xv6iris.PlicPlan <> plic_ok def
+R5791:5791 xv6iris.PlicPlan <> p:22 var
+R5796:5802 xv6iris.PlicPlan <> plic_ok def
+R5804:5805 xv6iris.PlicPlan <> p':23 var
+R5824:5833 xv6iris.DevModel <> plic_latch def
+R5868:5871 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R5848:5851 Corelib.Init.Datatypes <> negb def
+R5854:5862 xv6iris.DevModel <> p_pending proj
+R5872:5875 Corelib.Init.Datatypes <> negb def
+R5878:5886 xv6iris.DevModel <> p_claimed proj
+R5868:5871 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R5848:5851 Corelib.Init.Datatypes <> negb def
+R5854:5862 xv6iris.DevModel <> p_pending proj
+R5872:5875 Corelib.Init.Datatypes <> negb def
+R5878:5886 xv6iris.DevModel <> p_claimed proj
+prf 6072:6091 <> plic_senable_ok_mask
+R6095:6109 xv6iris.PlicPlan <> plic_senable_ok def
+R6114:6120 stdpp.bitvector.definitions <> Z_to_bv def
+R6125:6141 xv6iris.PlicPlan <> plic_dev_irq_mask def
+R6159:6173 xv6iris.PlicPlan <> plic_senable_ok def
+prf 6284:6303 <> plic_senable_ok_zero
+R6310:6312 Corelib.Init.Datatypes <> nat ind
+binder 6306:6306 <> w:25
+R6317:6331 xv6iris.PlicPlan <> plic_senable_ok def
+R6333:6333 xv6iris.PlicPlan <> w:25 var
+R6336:6342 stdpp.bitvector.definitions <> Z_to_bv def
+R6367:6381 xv6iris.PlicPlan <> plic_senable_ok def
+R6394:6400 Stdlib.Arith.PeanoNat Nat eqb def
+R6394:6400 Stdlib.Arith.PeanoNat Nat eqb def
+def 7014:7030 <> plic_claim_ret_ok
+R7037:7038 stdpp.bitvector.definitions <> bv rec
+binder 7033:7033 <> v:26
+R7072:7077 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R7057:7059 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7056:7056 xv6iris.PlicPlan <> v:26 var
+R7060:7066 stdpp.bitvector.definitions <> Z_to_bv def
+R7113:7118 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R7079:7081 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7078:7078 xv6iris.PlicPlan <> v:26 var
+R7082:7088 stdpp.bitvector.definitions <> Z_to_bv def
+R7094:7099 Stdlib.ZArith.BinInt Z of_N def
+R7101:7111 xv6iris.DevModel <> uart_irq_id def
+R7120:7122 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7119:7119 xv6iris.PlicPlan <> v:26 var
+R7123:7129 stdpp.bitvector.definitions <> Z_to_bv def
+R7135:7140 Stdlib.ZArith.BinInt Z of_N def
+R7142:7154 xv6iris.DevModel <> virtio_irq_id def
+prf 7352:7365 <> plic_fold_best
+R7372:7381 xv6iris.DevModel <> plic_state rec
+binder 7368:7368 <> p:27
+R7389:7391 Corelib.Init.Datatypes <> nat ind
+binder 7385:7385 <> c:28
+R7398:7405 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R7441:7447 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R7410:7413 Corelib.Init.Datatypes <> list ind
+R7415:7415 Corelib.Numbers.BinNums <> N ind
+binder 7406:7406 <> l:29
+R7425:7430 Corelib.Init.Datatypes <> option ind
+R7432:7432 Corelib.Numbers.BinNums <> N ind
+binder 7419:7421 <> acc:30
+R7440:7440 Corelib.Numbers.BinNums <> N ind
+binder 7436:7436 <> i:31
+R7464:7471 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7448:7451 Stdlib.Lists.List <> incl def
+R7455:7463 xv6iris.DevModel <> plic_srcs def
+R7453:7453 xv6iris.PlicPlan <> l:29 var
+R7472:7472 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7539:7547 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7473:7479 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R7481:7482 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 7480:7480 <> j:32
+R7495:7498 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7486:7488 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7483:7485 xv6iris.PlicPlan <> acc:30 var
+R7489:7492 Corelib.Init.Datatypes <> Some constr
+R7494:7494 xv6iris.PlicPlan <> j:32 var
+R7513:7516 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R7499:7500 Stdlib.Lists.List <> In def
+R7504:7512 xv6iris.DevModel <> plic_srcs def
+R7502:7502 xv6iris.PlicPlan <> j:32 var
+R7532:7534 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7517:7525 xv6iris.DevModel <> plic_cand def
+R7527:7527 xv6iris.PlicPlan <> p:27 var
+R7529:7529 xv6iris.PlicPlan <> c:28 var
+R7531:7531 xv6iris.PlicPlan <> j:32 var
+R7535:7538 Corelib.Init.Datatypes <> true constr
+R7826:7833 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7817:7819 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7548:7556 Stdlib.Lists.List <> fold_left def
+R7814:7816 xv6iris.PlicPlan <> acc:30 var
+R7812:7812 xv6iris.PlicPlan <> l:29 var
+binder 7563:7566 <> best:33
+binder 7568:7568 <> k:34
+R7593:7601 xv6iris.DevModel <> plic_cand def
+R7603:7603 xv6iris.PlicPlan <> p:27 var
+R7605:7605 xv6iris.PlicPlan <> c:28 var
+R7607:7607 xv6iris.PlicPlan <> k:34 var
+R7806:7809 xv6iris.PlicPlan <> best:33 var
+R7639:7642 xv6iris.PlicPlan <> best:33 var
+R7670:7673 Corelib.Init.Datatypes <> None constr
+R7678:7681 Corelib.Init.Datatypes <> Some constr
+R7683:7683 xv6iris.PlicPlan <> k:34 var
+R7706:7709 Corelib.Init.Datatypes <> Some constr
+R7719:7729 xv6iris.DevModel <> plic_better def
+R7731:7731 xv6iris.PlicPlan <> p:27 var
+R7733:7733 xv6iris.PlicPlan <> k:34 var
+R7754:7757 Corelib.Init.Datatypes <> Some constr
+R7742:7745 Corelib.Init.Datatypes <> Some constr
+R7747:7747 xv6iris.PlicPlan <> k:34 var
+R7820:7823 Corelib.Init.Datatypes <> Some constr
+R7825:7825 xv6iris.PlicPlan <> i:31 var
+R7848:7851 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R7834:7835 Stdlib.Lists.List <> In def
+R7839:7847 xv6iris.DevModel <> plic_srcs def
+R7837:7837 xv6iris.PlicPlan <> i:31 var
+R7867:7869 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7852:7860 xv6iris.DevModel <> plic_cand def
+R7862:7862 xv6iris.PlicPlan <> p:27 var
+R7864:7864 xv6iris.PlicPlan <> c:28 var
+R7866:7866 xv6iris.PlicPlan <> i:31 var
+R7870:7873 Corelib.Init.Datatypes <> true constr
+R7947:7955 Stdlib.Lists.List <> fold_left def
+R8086:8094 xv6iris.DevModel <> plic_cand def
+R8086:8094 xv6iris.DevModel <> plic_cand def
+R8185:8195 xv6iris.DevModel <> plic_better def
+R8185:8195 xv6iris.DevModel <> plic_better def
+R8311:8317 Corelib.Init.Logic <> eq_refl constr
+R8311:8317 Corelib.Init.Logic <> eq_refl constr
+prf 8414:8427 <> plic_best_spec
+R8434:8443 xv6iris.DevModel <> plic_state rec
+binder 8430:8430 <> p:36
+R8451:8453 Corelib.Init.Datatypes <> nat ind
+binder 8447:8447 <> c:37
+R8461:8461 Corelib.Numbers.BinNums <> N ind
+binder 8457:8457 <> i:38
+R8490:8493 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8481:8483 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8468:8476 xv6iris.DevModel <> plic_best def
+R8478:8478 xv6iris.PlicPlan <> p:36 var
+R8480:8480 xv6iris.PlicPlan <> c:37 var
+R8484:8487 Corelib.Init.Datatypes <> Some constr
+R8489:8489 xv6iris.PlicPlan <> i:38 var
+R8508:8511 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R8494:8495 Stdlib.Lists.List <> In def
+R8499:8507 xv6iris.DevModel <> plic_srcs def
+R8497:8497 xv6iris.PlicPlan <> i:38 var
+R8527:8529 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8512:8520 xv6iris.DevModel <> plic_cand def
+R8522:8522 xv6iris.PlicPlan <> p:36 var
+R8524:8524 xv6iris.PlicPlan <> c:37 var
+R8526:8526 xv6iris.PlicPlan <> i:38 var
+R8530:8533 Corelib.Init.Datatypes <> true constr
+R8552:8560 xv6iris.DevModel <> plic_best def
+R8582:8595 xv6iris.PlicPlan <> plic_fold_best thm
+R8601:8609 xv6iris.DevModel <> plic_srcs def
+R8611:8614 Corelib.Init.Datatypes <> None constr
+R8619:8627 Stdlib.Lists.List <> incl_refl thm
+R8582:8595 xv6iris.PlicPlan <> plic_fold_best thm
+R8601:8609 xv6iris.DevModel <> plic_srcs def
+R8611:8614 Corelib.Init.Datatypes <> None constr
+R8619:8627 Stdlib.Lists.List <> incl_refl thm
+prf 9124:9140 <> plic_enabled_srcs
+R9147:9156 xv6iris.DevModel <> plic_state rec
+binder 9143:9143 <> p:39
+R9164:9166 Corelib.Init.Datatypes <> nat ind
+binder 9160:9160 <> c:40
+R9174:9174 Corelib.Numbers.BinNums <> N ind
+binder 9170:9170 <> i:41
+R9190:9193 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9181:9187 xv6iris.PlicPlan <> plic_ok def
+R9189:9189 xv6iris.PlicPlan <> p:39 var
+R9208:9211 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9194:9195 Stdlib.Lists.List <> In def
+R9199:9207 xv6iris.DevModel <> plic_srcs def
+R9197:9197 xv6iris.PlicPlan <> i:41 var
+R9237:9242 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9230:9232 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9212:9223 xv6iris.DevModel <> plic_enabled def
+R9225:9225 xv6iris.PlicPlan <> p:39 var
+R9227:9227 xv6iris.PlicPlan <> c:40 var
+R9229:9229 xv6iris.PlicPlan <> i:41 var
+R9233:9236 Corelib.Init.Datatypes <> true constr
+R9258:9261 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R9244:9246 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9243:9243 xv6iris.PlicPlan <> i:41 var
+R9247:9257 xv6iris.DevModel <> uart_irq_id def
+R9263:9265 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9262:9262 xv6iris.PlicPlan <> i:41 var
+R9266:9278 xv6iris.DevModel <> virtio_irq_id def
+R9420:9422 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9329:9337 Stdlib.ZArith.BinInt Z testbit def
+R9340:9356 xv6iris.PlicPlan <> plic_dev_irq_word def
+R9359:9371 xv6iris.DevModel <> plic_src_word def
+R9405:9416 xv6iris.DevModel <> plic_src_bit def
+R9423:9426 Corelib.Init.Datatypes <> true constr
+R9420:9422 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9329:9337 Stdlib.ZArith.BinInt Z testbit def
+R9340:9356 xv6iris.PlicPlan <> plic_dev_irq_word def
+R9359:9371 xv6iris.DevModel <> plic_src_word def
+R9405:9416 xv6iris.DevModel <> plic_src_bit def
+R9423:9426 Corelib.Init.Datatypes <> true constr
+R9441:9452 xv6iris.DevModel <> plic_enabled def
+R9469:9475 xv6iris.PlicPlan <> plic_ok def
+R9478:9492 xv6iris.PlicPlan <> plic_senable_ok def
+R9529:9541 xv6iris.DevModel <> plic_src_word def
+R9529:9541 xv6iris.DevModel <> plic_src_word def
+R9529:9541 xv6iris.DevModel <> plic_src_word def
+R9563:9573 Stdlib.ZArith.BinInt Z land_spec thm
+R9563:9573 Stdlib.ZArith.BinInt Z land_spec thm
+R9563:9573 Stdlib.ZArith.BinInt Z land_spec thm
+R9593:9601 Corelib.Init.Datatypes <> andb_prop thm
+R9593:9601 Corelib.Init.Datatypes <> andb_prop thm
+prf 9839:9852 <> plic_claim_ret
+R9859:9868 xv6iris.DevModel <> plic_state rec
+binder 9855:9855 <> p:42
+R9876:9878 Corelib.Init.Datatypes <> nat ind
+binder 9872:9872 <> c:43
+R9894:9897 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9885:9891 xv6iris.PlicPlan <> plic_ok def
+R9893:9893 xv6iris.PlicPlan <> p:42 var
+R9898:9914 xv6iris.PlicPlan <> plic_claim_ret_ok def
+R9917:9919 Corelib.Init.Datatypes <> fst def
+R9922:9931 xv6iris.DevModel <> plic_claim def
+R9933:9933 xv6iris.PlicPlan <> p:42 var
+R9935:9935 xv6iris.PlicPlan <> c:43 var
+R9969:9978 xv6iris.DevModel <> plic_claim def
+R9993:10001 xv6iris.DevModel <> plic_best def
+R10032:10034 Corelib.Init.Datatypes <> fst def
+R9993:10001 xv6iris.DevModel <> plic_best def
+R10075:10088 xv6iris.PlicPlan <> plic_best_spec thm
+R10075:10088 xv6iris.PlicPlan <> plic_best_spec thm
+R10153:10155 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10135:10146 xv6iris.DevModel <> plic_enabled def
+R10156:10159 Corelib.Init.Datatypes <> true constr
+R10153:10155 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10135:10146 xv6iris.DevModel <> plic_enabled def
+R10156:10159 Corelib.Init.Datatypes <> true constr
+R10174:10182 xv6iris.DevModel <> plic_cand def
+R10204:10212 Corelib.Init.Datatypes <> andb_prop thm
+R10204:10212 Corelib.Init.Datatypes <> andb_prop thm
+R10240:10248 Corelib.Init.Datatypes <> andb_prop thm
+R10240:10248 Corelib.Init.Datatypes <> andb_prop thm
+R10291:10307 xv6iris.PlicPlan <> plic_enabled_srcs thm
+R10291:10307 xv6iris.PlicPlan <> plic_enabled_srcs thm
+prf 10488:10500 <> plic_ok_claim
+R10507:10516 xv6iris.DevModel <> plic_state rec
+binder 10503:10503 <> p:44
+R10524:10526 Corelib.Init.Datatypes <> nat ind
+binder 10520:10520 <> c:45
+R10542:10545 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10533:10539 xv6iris.PlicPlan <> plic_ok def
+R10541:10541 xv6iris.PlicPlan <> p:44 var
+R10546:10552 xv6iris.PlicPlan <> plic_ok def
+R10555:10557 Corelib.Init.Datatypes <> snd def
+R10560:10569 xv6iris.DevModel <> plic_claim def
+R10571:10571 xv6iris.PlicPlan <> p:44 var
+R10573:10573 xv6iris.PlicPlan <> c:45 var
+R10607:10616 xv6iris.DevModel <> plic_claim def
+R10631:10639 xv6iris.DevModel <> plic_best def
+R10652:10654 Corelib.Init.Datatypes <> snd def
+R10631:10639 xv6iris.DevModel <> plic_best def
+R10697:10704 xv6iris.DevModel <> p_enable proj
+prf 10886:10901 <> plic_ok_complete
+R10908:10917 xv6iris.DevModel <> plic_state rec
+binder 10904:10904 <> p:46
+R10925:10925 Corelib.Numbers.BinNums <> N ind
+binder 10921:10921 <> i:47
+R10941:10944 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10932:10938 xv6iris.PlicPlan <> plic_ok def
+R10940:10940 xv6iris.PlicPlan <> p:46 var
+R10945:10951 xv6iris.PlicPlan <> plic_ok def
+R10954:10966 xv6iris.DevModel <> plic_complete def
+R10968:10968 xv6iris.PlicPlan <> p:46 var
+R10970:10970 xv6iris.PlicPlan <> i:47 var
+R11003:11015 xv6iris.DevModel <> plic_complete def
+R11030:11030 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R11045:11050 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R11081:11081 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R11032:11036 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R11037:11042 Stdlib.ZArith.BinInt Z of_N def
+R11059:11062 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<?'_x not
+R11051:11056 Stdlib.ZArith.BinInt Z of_N def
+R11063:11070 Stdlib.ZArith.BinInt Z of_nat def
+R11072:11080 xv6iris.DevModel <> plic_nsrc def
+R11030:11030 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R11045:11050 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R11081:11081 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R11032:11036 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<=?'_x not
+R11037:11042 Stdlib.ZArith.BinInt Z of_N def
+R11059:11062 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<?'_x not
+R11051:11056 Stdlib.ZArith.BinInt Z of_N def
+R11063:11070 Stdlib.ZArith.BinInt Z of_nat def
+R11072:11080 xv6iris.DevModel <> plic_nsrc def
+R11129:11136 xv6iris.DevModel <> p_enable proj

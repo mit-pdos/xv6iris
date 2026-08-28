@@ -1,0 +1,28 @@
+DIGEST 79f9b05622f177159d18762d094502f8
+Fxv6iris.ResvAxioms
+R6185:6190 Stdlib.ZArith.ZArith <> <> lib
+R6208:6221 SailStdpp.Base <> <> lib
+R6239:6255 Riscv.rv64d_types <> <> lib
+R6257:6276 Riscv.xv6iris_extras <> <> lib
+R6278:6288 Riscv.rv64d <> <> lib
+R6298:6301 Riscv.rv64d_types Defs <> mod
+prf 6311:6331 <> load_reservation_term
+R6349:6353 SailStdpp.Values <> mword def
+R6361:6364 Stdlib.ZArith.BinInt <> ::Z_scope:x_'=?'_x not
+binder 6345:6345 <> a:1
+R6391:6391 Corelib.Numbers.BinNums <> Z ind
+binder 6387:6387 <> n:2
+R6419:6421 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6399:6414 Riscv.xv6iris_extras <> load_reservation def
+R6418:6418 xv6iris.ResvAxioms <> n:2 var
+R6416:6416 xv6iris.ResvAxioms <> a:1 var
+R6422:6433 Riscv.rv64d_types Defs returnm def
+R6435:6436 Corelib.Init.Datatypes <> tt constr
+prf 6471:6493 <> cancel_reservation_term
+R6511:6514 Corelib.Init.Datatypes <> unit ind
+binder 6507:6507 <> u:3
+R6538:6540 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6518:6535 Riscv.xv6iris_extras <> cancel_reservation def
+R6537:6537 xv6iris.ResvAxioms <> u:3 var
+R6541:6552 Riscv.rv64d_types Defs returnm def
+R6554:6555 Corelib.Init.Datatypes <> tt constr

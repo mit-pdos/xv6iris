@@ -1,0 +1,3691 @@
+DIGEST fd612a1e75b0e366fb419284d19466fe
+Fxv6iris.FsDurWire
+R11349:11354 Stdlib.ZArith.ZArith <> <> lib
+R11356:11358 Stdlib.micromega.Lia <> <> lib
+R11360:11363 Stdlib.Lists.List <> <> lib
+R11392:11395 stdpp.base <> <> lib
+R11397:11405 stdpp.countable <> <> lib
+R11407:11410 stdpp.gmap <> <> lib
+R11412:11415 stdpp.list <> <> lib
+R11417:11437 stdpp.bitvector.definitions <> <> lib
+R11475:11483 iris.proofmode.proofmode <> <> lib
+R11526:11530 iris.base_logic.lib.iprop <> <> lib
+R11532:11540 iris.base_logic.lib.ghost_map <> <> lib
+R11542:11550 iris.base_logic.lib.ghost_var <> <> lib
+R11568:11574 xv6iris.BioDefs <> <> lib
+R11647:11655 xv6iris.BitmapEnc <> <> lib
+R11726:11734 xv6iris.DinodeEnc <> <> lib
+R11805:11809 xv6iris.FsImg <> <> lib
+R11884:11893 xv6iris.RiscvPtsto <> <> lib
+R11963:11969 xv6iris.LogDefs <> <> lib
+R12042:12049 xv6iris.FsBlocks <> <> lib
+R12121:12130 xv6iris.FsDurBytes <> <> lib
+R12200:12206 xv6iris.FsState <> <> lib
+R12279:12289 xv6iris.FsDurRefute <> <> lib
+R12358:12367 xv6iris.FsDurDefer <> <> lib
+R12437:12444 xv6iris.FsDurObj <> <> lib
+sec 12841:12860 <> PoolAtTheDurableView
+var  12874:12875 PoolAtTheDurableView Σ
+R12879:12887 iris.base_logic.lib.iprop <> gFunctors rec
+R12904:12911 xv6iris.DiskImg <> diskImgG class
+R12913:12914 xv6iris.FsDurWire <> PoolAtTheDurableView.Σ var
+R12918:12924 xv6iris.Xv6Cameras <> fsLinkG class
+R12926:12927 xv6iris.FsDurWire <> PoolAtTheDurableView.Σ var
+R12931:12936 xv6iris.Xv6Cameras <> fsTopG class
+R12938:12939 xv6iris.FsDurWire <> PoolAtTheDurableView.Σ var
+prf 13106:13114 <> dres_slot
+R13122:13134 xv6iris.FsStateDefs <> fs_view_names rec
+R13136:13137 xv6iris.FsDurWire <> PoolAtTheDurableView.Σ var
+binder 13117:13118 <> Γ:5
+R13145:13149 xv6iris.FsDurObj <> dgeom rec
+binder 13141:13141 <> G:6
+R13157:13157 Corelib.Numbers.BinNums <> Z ind
+binder 13153:13153 <> i:7
+R13165:13171 xv6iris.FsNode <> fs_node rec
+binder 13161:13161 <> n:8
+R13210:13221 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R13180:13183 xv6iris.FsDurObj <> dres def
+R13185:13186 xv6iris.FsDurWire <> Γ:5 var
+R13188:13188 xv6iris.FsDurWire <> G:6 var
+R13191:13195 xv6iris.FsDurObj <> DSlot constr
+R13197:13197 xv6iris.FsDurWire <> i:7 var
+R13201:13206 xv6iris.FsDurObj <> OVNode constr
+R13208:13208 xv6iris.FsDurWire <> n:8 var
+R13261:13273 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13222:13233 xv6iris.FsStateInode <> rec_owned_at def
+R13235:13236 xv6iris.FsDurWire <> Γ:5 var
+R13239:13244 xv6iris.FsDurObj <> dg_ist proj
+R13246:13246 xv6iris.FsDurWire <> G:6 var
+R13249:13249 xv6iris.FsDurWire <> i:7 var
+R13252:13257 xv6iris.FsNode <> fn_rec proj
+R13259:13259 xv6iris.FsDurWire <> n:8 var
+R13289:13293 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13274:13281 xv6iris.FsState <> top_frag def
+R13283:13284 xv6iris.FsDurWire <> Γ:5 var
+R13286:13286 xv6iris.FsDurWire <> i:7 var
+R13288:13288 xv6iris.FsDurWire <> n:8 var
+R13294:13304 xv6iris.FsStateInode <> inode_ghost def
+R13306:13307 xv6iris.FsDurWire <> Γ:5 var
+R13309:13309 xv6iris.FsDurWire <> i:7 var
+R13311:13311 xv6iris.FsDurWire <> n:8 var
+prf 13343:13354 <> byte_range_D
+R13361:13365 iris.base_logic.lib.iprop <> gname def
+binder 13357:13357 <> g:9
+R13375:13386 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 13369:13371 <> Γd:10
+R13398:13398 Corelib.Numbers.BinNums <> Z ind
+binder 13390:13390 <> b:11
+binder 13392:13394 <> off:12
+R13413:13416 Corelib.Init.Datatypes <> list ind
+R13419:13420 stdpp.bitvector.definitions <> bv rec
+binder 13408:13409 <> bs:13
+R13470:13481 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R13432:13441 xv6iris.FsStateDefs <> byte_range def
+R13444:13453 xv6iris.FsDurBytes <> fs_gamma_D def
+R13455:13455 xv6iris.FsDurWire <> g:9 var
+R13457:13459 xv6iris.FsDurWire <> Γd:10 var
+R13462:13462 xv6iris.FsDurWire <> b:11 var
+R13464:13466 xv6iris.FsDurWire <> off:12 var
+R13468:13469 xv6iris.FsDurWire <> bs:13 var
+R13483:13493 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R13495:13499 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R13501:13505 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R13508:13509 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+binder 13494:13494 <> k:14
+binder 13494:13494 <> k:15
+binder 13500:13500 <> v:16
+binder 13500:13500 <> v:17
+R13510:13510 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R13541:13546 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R13548:13548 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R13549:13549 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R13547:13547 xv6iris.FsDurWire <> g:9 var
+R13528:13530 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R13522:13524 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R13512:13514 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R13511:13511 xv6iris.FsDurWire <> b:11 var
+R13515:13521 xv6iris.FsImg <> BSIZE_z def
+R13525:13527 xv6iris.FsDurWire <> off:12 var
+R13531:13538 Stdlib.ZArith.BinInt Z of_nat def
+R13540:13540 xv6iris.FsDurWire <> k:14 var
+R13550:13550 xv6iris.FsDurWire <> v:16 var
+R13506:13507 xv6iris.FsDurWire <> bs:13 var
+prf 14011:14029 <> dur_elem_move_False
+R14036:14040 iris.base_logic.lib.iprop <> gname def
+binder 14032:14032 <> g:18
+R14048:14051 stdpp.gmap <> gmap rec
+R14056:14057 stdpp.bitvector.definitions <> bv rec
+R14053:14053 Corelib.Numbers.BinNums <> Z ind
+binder 14044:14044 <> B:19
+R14074:14074 Corelib.Numbers.BinNums <> Z ind
+binder 14070:14070 <> a:20
+R14085:14086 stdpp.bitvector.definitions <> bv rec
+binder 14078:14078 <> v:21
+binder 14080:14081 <> v':22
+R14104:14111 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14098:14101 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R14097:14097 xv6iris.FsDurWire <> v:21 var
+R14102:14103 xv6iris.FsDurWire <> v':22 var
+R14132:14137 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R14112:14125 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R14127:14127 xv6iris.FsDurWire <> g:18 var
+R14131:14131 xv6iris.FsDurWire <> B:19 var
+R14148:14153 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14139:14143 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14145:14145 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14146:14146 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14144:14144 xv6iris.FsDurWire <> g:18 var
+R14138:14138 xv6iris.FsDurWire <> a:20 var
+R14147:14147 xv6iris.FsDurWire <> v:21 var
+R14154:14154 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R14183:14196 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R14165:14171 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R14156:14160 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14162:14162 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14163:14163 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14161:14161 xv6iris.FsDurWire <> g:18 var
+R14155:14155 xv6iris.FsDurWire <> a:20 var
+R14164:14164 xv6iris.FsDurWire <> v:21 var
+R14173:14177 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14179:14179 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14180:14180 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14178:14178 xv6iris.FsDurWire <> g:18 var
+R14172:14172 xv6iris.FsDurWire <> a:20 var
+R14181:14182 xv6iris.FsDurWire <> v':22 var
+R14197:14199 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14205:14207 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14200:14204 stdpp.base <> ::type_scope:'False' not
+R14267:14267 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14284:14289 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14298:14298 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14268:14283 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+R14267:14267 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14284:14289 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14298:14298 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14268:14283 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+R14319:14319 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14327:14332 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14338:14338 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14319:14319 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14327:14332 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14338:14338 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14365:14365 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14382:14387 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14397:14397 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14366:14381 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+R14365:14365 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14382:14387 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14397:14397 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14366:14381 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+prf 14680:14700 <> byte_range_move_False
+R14707:14711 iris.base_logic.lib.iprop <> gname def
+binder 14703:14703 <> g:23
+R14721:14732 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 14715:14717 <> Γd:24
+R14746:14749 stdpp.gmap <> gmap rec
+R14754:14755 stdpp.bitvector.definitions <> bv rec
+R14751:14751 Corelib.Numbers.BinNums <> Z ind
+binder 14742:14742 <> B:25
+R14770:14770 Corelib.Numbers.BinNums <> Z ind
+binder 14762:14762 <> b:26
+binder 14764:14766 <> off:27
+R14783:14786 Corelib.Init.Datatypes <> list ind
+R14789:14790 stdpp.bitvector.definitions <> bv rec
+binder 14774:14775 <> bs:28
+binder 14777:14779 <> bs':29
+R14807:14809 Corelib.Init.Datatypes <> nat ind
+binder 14803:14803 <> k:30
+R14820:14821 stdpp.bitvector.definitions <> bv rec
+binder 14813:14813 <> v:31
+binder 14815:14816 <> v':32
+R14848:14851 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14839:14841 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14834:14837 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R14838:14838 xv6iris.FsDurWire <> k:30 var
+R14832:14833 xv6iris.FsDurWire <> bs:28 var
+R14842:14845 Corelib.Init.Datatypes <> Some constr
+R14847:14847 xv6iris.FsDurWire <> v:31 var
+R14870:14873 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14860:14862 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14855:14858 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R14859:14859 xv6iris.FsDurWire <> k:30 var
+R14852:14854 xv6iris.FsDurWire <> bs':29 var
+R14863:14866 Corelib.Init.Datatypes <> Some constr
+R14868:14869 xv6iris.FsDurWire <> v':32 var
+R14881:14888 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14875:14878 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R14874:14874 xv6iris.FsDurWire <> v:31 var
+R14879:14880 xv6iris.FsDurWire <> v':32 var
+R14909:14918 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R14889:14902 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R14904:14904 xv6iris.FsDurWire <> g:23 var
+R14908:14908 xv6iris.FsDurWire <> B:25 var
+R14957:14966 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14919:14928 xv6iris.FsStateDefs <> byte_range def
+R14931:14940 xv6iris.FsDurBytes <> fs_gamma_D def
+R14942:14942 xv6iris.FsDurWire <> g:23 var
+R14944:14946 xv6iris.FsDurWire <> Γd:24 var
+R14949:14949 xv6iris.FsDurWire <> b:26 var
+R14951:14953 xv6iris.FsDurWire <> off:27 var
+R14955:14956 xv6iris.FsDurWire <> bs:28 var
+R14967:14967 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R15057:15070 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R15006:15017 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R14968:14977 xv6iris.FsStateDefs <> byte_range def
+R14980:14989 xv6iris.FsDurBytes <> fs_gamma_D def
+R14991:14991 xv6iris.FsDurWire <> g:23 var
+R14993:14995 xv6iris.FsDurWire <> Γd:24 var
+R14998:14998 xv6iris.FsDurWire <> b:26 var
+R15000:15002 xv6iris.FsDurWire <> off:27 var
+R15004:15005 xv6iris.FsDurWire <> bs:28 var
+R15018:15027 xv6iris.FsStateDefs <> byte_range def
+R15030:15039 xv6iris.FsDurBytes <> fs_gamma_D def
+R15041:15041 xv6iris.FsDurWire <> g:23 var
+R15043:15045 xv6iris.FsDurWire <> Γd:24 var
+R15048:15048 xv6iris.FsDurWire <> b:26 var
+R15050:15052 xv6iris.FsDurWire <> off:27 var
+R15054:15056 xv6iris.FsDurWire <> bs':29 var
+R15071:15073 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15079:15081 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15074:15078 stdpp.base <> ::type_scope:'False' not
+R15147:15158 xv6iris.FsDurWire <> byte_range_D thm
+R15147:15158 xv6iris.FsDurWire <> byte_range_D thm
+R15147:15158 xv6iris.FsDurWire <> byte_range_D thm
+R15147:15158 xv6iris.FsDurWire <> byte_range_D thm
+R15147:15158 xv6iris.FsDurWire <> byte_range_D thm
+R15175:15175 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15206:15211 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15217:15217 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15176:15194 iris.bi.big_op <> big_sepL_lookup_acc thm
+R15175:15175 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15206:15211 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15217:15217 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15176:15194 iris.bi.big_op <> big_sepL_lookup_acc thm
+R15249:15249 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15266:15271 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15280:15280 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15250:15265 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+R15249:15249 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15266:15271 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15280:15280 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15250:15265 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+R15306:15306 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15312:15317 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15323:15323 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15306:15306 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15312:15317 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15323:15323 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15344:15344 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15352:15357 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15363:15363 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15344:15344 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15352:15357 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15363:15363 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15390:15390 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15419:15424 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15431:15431 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15391:15405 iris.bi.big_op <> big_sepL_lookup thm
+R15390:15390 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15419:15424 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15431:15431 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15391:15405 iris.bi.big_op <> big_sepL_lookup thm
+R15458:15458 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15475:15480 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15490:15490 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15459:15474 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+R15458:15458 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15475:15480 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15490:15490 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15459:15474 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+prf 16541:16559 <> dpend_dur_blk_False
+R16566:16570 iris.base_logic.lib.iprop <> gname def
+binder 16562:16562 <> g:33
+R16580:16591 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 16574:16576 <> Γd:34
+R16599:16603 xv6iris.FsDurObj <> dgeom rec
+binder 16595:16595 <> G:35
+R16617:16620 stdpp.gmap <> gmap rec
+R16625:16626 stdpp.bitvector.definitions <> bv rec
+R16622:16622 Corelib.Numbers.BinNums <> Z ind
+binder 16613:16613 <> B:36
+R16637:16637 Corelib.Numbers.BinNums <> Z ind
+binder 16633:16633 <> b:37
+R16650:16653 Corelib.Init.Datatypes <> list ind
+R16656:16657 stdpp.bitvector.definitions <> bv rec
+binder 16641:16642 <> bs:38
+binder 16644:16646 <> bs':39
+R16674:16676 Corelib.Init.Datatypes <> nat ind
+binder 16670:16670 <> k:40
+R16687:16688 stdpp.bitvector.definitions <> bv rec
+binder 16680:16680 <> v:41
+binder 16682:16683 <> v':42
+R16715:16718 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16706:16708 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16701:16704 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R16705:16705 xv6iris.FsDurWire <> k:40 var
+R16699:16700 xv6iris.FsDurWire <> bs:38 var
+R16709:16712 Corelib.Init.Datatypes <> Some constr
+R16714:16714 xv6iris.FsDurWire <> v:41 var
+R16737:16740 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16727:16729 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16722:16725 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R16726:16726 xv6iris.FsDurWire <> k:40 var
+R16719:16721 xv6iris.FsDurWire <> bs':39 var
+R16730:16733 Corelib.Init.Datatypes <> Some constr
+R16735:16736 xv6iris.FsDurWire <> v':42 var
+R16748:16755 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16742:16745 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R16741:16741 xv6iris.FsDurWire <> v:41 var
+R16746:16747 xv6iris.FsDurWire <> v':42 var
+R16776:16785 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R16756:16769 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R16771:16771 xv6iris.FsDurWire <> g:33 var
+R16775:16775 xv6iris.FsDurWire <> B:36 var
+R16838:16847 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16786:16794 xv6iris.FsDurObj <> dres_flat def
+R16797:16806 xv6iris.FsDurBytes <> fs_gamma_D def
+R16808:16808 xv6iris.FsDurWire <> g:33 var
+R16810:16812 xv6iris.FsDurWire <> Γd:34 var
+R16815:16815 xv6iris.FsDurWire <> G:35 var
+R16818:16821 xv6iris.FsDurObj <> DBlk constr
+R16823:16823 xv6iris.FsDurWire <> b:37 var
+R16827:16833 xv6iris.FsDurObj <> OVBytes constr
+R16835:16836 xv6iris.FsDurWire <> bs:38 var
+R16927:16939 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R16848:16852 xv6iris.FsDurObj <> dpend def
+R16855:16863 xv6iris.FsDurObj <> dres_flat def
+R16866:16875 xv6iris.FsDurBytes <> fs_gamma_D def
+R16877:16877 xv6iris.FsDurWire <> g:33 var
+R16879:16881 xv6iris.FsDurWire <> Γd:34 var
+R16884:16884 xv6iris.FsDurWire <> G:35 var
+R16888:16891 xv6iris.FsDurObj <> DBlk constr
+R16893:16893 xv6iris.FsDurWire <> b:37 var
+R16902:16902 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16913:16914 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16926:16926 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16903:16909 xv6iris.FsDurObj <> OVBytes constr
+R16911:16912 xv6iris.FsDurWire <> bs:38 var
+R16915:16921 xv6iris.FsDurObj <> OVBytes constr
+R16923:16925 xv6iris.FsDurWire <> bs':39 var
+R16940:16942 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R16948:16950 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R16943:16947 stdpp.base <> ::type_scope:'False' not
+R17017:17021 xv6iris.FsDurObj <> dpend def
+R17017:17021 xv6iris.FsDurObj <> dpend def
+R17017:17021 xv6iris.FsDurObj <> dpend def
+R17029:17031 Corelib.Init.Datatypes <> fst def
+R17033:17035 Corelib.Init.Datatypes <> snd def
+R17052:17068 xv6iris.FsDurObj <> dres_flat_not_bit thm
+R17071:17080 xv6iris.FsDurBytes <> fs_gamma_D def
+R17092:17095 xv6iris.FsDurObj <> DBlk constr
+R17101:17107 xv6iris.FsDurObj <> OVBytes constr
+R17052:17068 xv6iris.FsDurObj <> dres_flat_not_bit thm
+R17071:17080 xv6iris.FsDurBytes <> fs_gamma_D def
+R17092:17095 xv6iris.FsDurObj <> DBlk constr
+R17101:17107 xv6iris.FsDurObj <> OVBytes constr
+R17052:17068 xv6iris.FsDurObj <> dres_flat_not_bit thm
+R17071:17080 xv6iris.FsDurBytes <> fs_gamma_D def
+R17092:17095 xv6iris.FsDurObj <> DBlk constr
+R17101:17107 xv6iris.FsDurObj <> OVBytes constr
+R17163:17179 xv6iris.FsDurObj <> dres_flat_not_bit thm
+R17182:17191 xv6iris.FsDurBytes <> fs_gamma_D def
+R17203:17206 xv6iris.FsDurObj <> DBlk constr
+R17212:17218 xv6iris.FsDurObj <> OVBytes constr
+R17163:17179 xv6iris.FsDurObj <> dres_flat_not_bit thm
+R17182:17191 xv6iris.FsDurBytes <> fs_gamma_D def
+R17203:17206 xv6iris.FsDurObj <> DBlk constr
+R17212:17218 xv6iris.FsDurObj <> OVBytes constr
+R17163:17179 xv6iris.FsDurObj <> dres_flat_not_bit thm
+R17182:17191 xv6iris.FsDurBytes <> fs_gamma_D def
+R17203:17206 xv6iris.FsDurObj <> DBlk constr
+R17212:17218 xv6iris.FsDurObj <> OVBytes constr
+R17275:17282 xv6iris.FsDurObj <> dres_blk thm
+R17285:17293 xv6iris.FsStateDefs <> blk_owned def
+R17275:17282 xv6iris.FsDurObj <> dres_blk thm
+R17275:17282 xv6iris.FsDurObj <> dres_blk thm
+R17275:17282 xv6iris.FsDurObj <> dres_blk thm
+R17275:17282 xv6iris.FsDurObj <> dres_blk thm
+R17285:17293 xv6iris.FsStateDefs <> blk_owned def
+R17285:17293 xv6iris.FsStateDefs <> blk_owned def
+R17346:17346 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17405:17424 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17441:17441 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17347:17367 xv6iris.FsDurWire <> byte_range_move_False thm
+R17346:17346 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17405:17424 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17441:17441 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17347:17367 xv6iris.FsDurWire <> byte_range_move_False thm
+R17472:17472 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17480:17485 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17493:17493 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17472:17472 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17480:17485 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17493:17493 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+prf 18172:18190 <> dpool_run_dur_False
+R18197:18201 iris.base_logic.lib.iprop <> gname def
+binder 18193:18193 <> g:43
+R18211:18222 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 18205:18207 <> Γd:44
+R18230:18234 xv6iris.FsDurObj <> dgeom rec
+binder 18226:18226 <> G:45
+R18248:18251 stdpp.gmap <> gmap rec
+R18256:18257 stdpp.bitvector.definitions <> bv rec
+R18253:18253 Corelib.Numbers.BinNums <> Z ind
+binder 18244:18244 <> B:46
+R18268:18271 stdpp.gmap <> gmap rec
+R18283:18285 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R18279:18282 xv6iris.FsDurObj <> oval ind
+R18286:18289 xv6iris.FsDurObj <> oval ind
+R18273:18276 xv6iris.FsDurObj <> dobj ind
+binder 18264:18264 <> P:47
+R18304:18304 Corelib.Numbers.BinNums <> Z ind
+binder 18300:18300 <> b:48
+R18317:18320 Corelib.Init.Datatypes <> list ind
+R18323:18324 stdpp.bitvector.definitions <> bv rec
+binder 18308:18309 <> bs:49
+binder 18311:18313 <> bs':50
+R18335:18337 Corelib.Init.Datatypes <> nat ind
+binder 18331:18331 <> k:51
+R18348:18349 stdpp.bitvector.definitions <> bv rec
+binder 18341:18341 <> v:52
+binder 18343:18344 <> v':53
+R18404:18411 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18371:18373 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18361:18364 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R18365:18368 xv6iris.FsDurObj <> DBlk constr
+R18370:18370 xv6iris.FsDurWire <> b:48 var
+R18360:18360 xv6iris.FsDurWire <> P:47 var
+R18374:18377 Corelib.Init.Datatypes <> Some constr
+R18379:18379 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18390:18391 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18403:18403 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18380:18386 xv6iris.FsDurObj <> OVBytes constr
+R18388:18389 xv6iris.FsDurWire <> bs:49 var
+R18392:18398 xv6iris.FsDurObj <> OVBytes constr
+R18400:18402 xv6iris.FsDurWire <> bs':50 var
+R18428:18431 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18419:18421 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18414:18417 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R18418:18418 xv6iris.FsDurWire <> k:51 var
+R18412:18413 xv6iris.FsDurWire <> bs:49 var
+R18422:18425 Corelib.Init.Datatypes <> Some constr
+R18427:18427 xv6iris.FsDurWire <> v:52 var
+R18450:18453 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18440:18442 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18435:18438 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R18439:18439 xv6iris.FsDurWire <> k:51 var
+R18432:18434 xv6iris.FsDurWire <> bs':50 var
+R18443:18446 Corelib.Init.Datatypes <> Some constr
+R18448:18449 xv6iris.FsDurWire <> v':53 var
+R18461:18468 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18455:18458 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R18454:18454 xv6iris.FsDurWire <> v:52 var
+R18459:18460 xv6iris.FsDurWire <> v':53 var
+R18489:18498 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R18469:18482 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R18484:18484 xv6iris.FsDurWire <> g:43 var
+R18488:18488 xv6iris.FsDurWire <> B:46 var
+R18539:18548 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R18499:18503 xv6iris.FsDurObj <> dpool def
+R18506:18514 xv6iris.FsDurObj <> dres_flat def
+R18517:18526 xv6iris.FsDurBytes <> fs_gamma_D def
+R18528:18528 xv6iris.FsDurWire <> g:43 var
+R18530:18532 xv6iris.FsDurWire <> Γd:44 var
+R18535:18535 xv6iris.FsDurWire <> G:45 var
+R18538:18538 xv6iris.FsDurWire <> P:47 var
+R18604:18616 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R18549:18556 xv6iris.FsDurObj <> dres_map def
+R18559:18567 xv6iris.FsDurObj <> dres_flat def
+R18570:18579 xv6iris.FsDurBytes <> fs_gamma_D def
+R18581:18581 xv6iris.FsDurWire <> g:43 var
+R18583:18585 xv6iris.FsDurWire <> Γd:44 var
+R18588:18588 xv6iris.FsDurWire <> G:45 var
+R18592:18600 xv6iris.FsDurObj <> dvals_old def
+R18602:18602 xv6iris.FsDurWire <> P:47 var
+R18617:18619 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R18625:18627 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R18620:18624 stdpp.base <> ::type_scope:'False' not
+R18692:18696 xv6iris.FsDurObj <> dpool def
+R18699:18706 xv6iris.FsDurObj <> dres_map def
+R18709:18717 xv6iris.FsDurObj <> dvals_old def
+R18692:18696 xv6iris.FsDurObj <> dpool def
+R18692:18696 xv6iris.FsDurObj <> dpool def
+R18699:18706 xv6iris.FsDurObj <> dres_map def
+R18699:18706 xv6iris.FsDurObj <> dres_map def
+R18709:18717 xv6iris.FsDurObj <> dvals_old def
+R18709:18717 xv6iris.FsDurObj <> dvals_old def
+R18734:18734 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18792:18814 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18819:18819 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18735:18749 iris.bi.big_op <> big_sepM_lookup thm
+R18764:18764 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18775:18776 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18788:18788 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18765:18771 xv6iris.FsDurObj <> OVBytes constr
+R18777:18783 xv6iris.FsDurObj <> OVBytes constr
+R18756:18759 xv6iris.FsDurObj <> DBlk constr
+R18734:18734 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18792:18814 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18819:18819 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18735:18749 iris.bi.big_op <> big_sepM_lookup thm
+R18764:18764 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18775:18776 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18788:18788 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R18765:18771 xv6iris.FsDurObj <> OVBytes constr
+R18777:18783 xv6iris.FsDurObj <> OVBytes constr
+R18756:18759 xv6iris.FsDurObj <> DBlk constr
+R18872:18874 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18851:18851 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R18861:18865 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R18866:18869 xv6iris.FsDurObj <> DBlk constr
+R18855:18859 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R18852:18854 Corelib.Init.Datatypes <> fst def
+R18875:18878 Corelib.Init.Datatypes <> Some constr
+R18881:18887 xv6iris.FsDurObj <> OVBytes constr
+R18872:18874 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18851:18851 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R18861:18865 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R18866:18869 xv6iris.FsDurObj <> DBlk constr
+R18855:18859 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R18852:18854 Corelib.Init.Datatypes <> fst def
+R18875:18878 Corelib.Init.Datatypes <> Some constr
+R18881:18887 xv6iris.FsDurObj <> OVBytes constr
+R18909:18919 stdpp.fin_maps <> lookup_fmap meth
+R18909:18919 stdpp.fin_maps <> lookup_fmap meth
+R18909:18919 stdpp.fin_maps <> lookup_fmap meth
+R18944:18944 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19000:19022 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19027:19027 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18945:18959 iris.bi.big_op <> big_sepM_lookup thm
+R18985:18991 xv6iris.FsDurObj <> OVBytes constr
+R18976:18979 xv6iris.FsDurObj <> DBlk constr
+R18967:18971 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R18964:18966 Corelib.Init.Datatypes <> fst def
+R18944:18944 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19000:19022 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19027:19027 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18945:18959 iris.bi.big_op <> big_sepM_lookup thm
+R18985:18991 xv6iris.FsDurObj <> OVBytes constr
+R18976:18979 xv6iris.FsDurObj <> DBlk constr
+R18967:18971 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R18964:18966 Corelib.Init.Datatypes <> fst def
+R19051:19051 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19108:19127 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19143:19143 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19052:19070 xv6iris.FsDurWire <> dpend_dur_blk_False thm
+R19051:19051 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19108:19127 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19143:19143 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19052:19070 xv6iris.FsDurWire <> dpend_dur_blk_False thm
+prf 19899:19918 <> dpend_dur_slot_False
+R19925:19929 iris.base_logic.lib.iprop <> gname def
+binder 19921:19921 <> g:54
+R19939:19950 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 19933:19935 <> Γd:55
+R19958:19962 xv6iris.FsDurObj <> dgeom rec
+binder 19954:19954 <> G:56
+R19976:19979 stdpp.gmap <> gmap rec
+R19983:19989 xv6iris.FsNode <> fs_node rec
+R19981:19981 Corelib.Numbers.BinNums <> Z ind
+binder 19972:19972 <> M:57
+R19997:19997 Corelib.Numbers.BinNums <> Z ind
+binder 19993:19993 <> i:58
+R20008:20014 xv6iris.FsNode <> fs_node rec
+binder 20001:20001 <> n:59
+binder 20003:20004 <> n':60
+R20030:20037 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20024:20027 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R20023:20023 xv6iris.FsDurWire <> n:59 var
+R20028:20029 xv6iris.FsDurWire <> n':60 var
+R20070:20079 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R20038:20051 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R20054:20060 xv6iris.RiscvPtsto <> fdn_top proj
+R20062:20064 xv6iris.FsDurWire <> Γd:55 var
+R20069:20069 xv6iris.FsDurWire <> M:57 var
+R20126:20135 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R20080:20083 xv6iris.FsDurObj <> dres def
+R20086:20095 xv6iris.FsDurBytes <> fs_gamma_D def
+R20097:20097 xv6iris.FsDurWire <> g:54 var
+R20099:20101 xv6iris.FsDurWire <> Γd:55 var
+R20104:20104 xv6iris.FsDurWire <> G:56 var
+R20107:20111 xv6iris.FsDurObj <> DSlot constr
+R20113:20113 xv6iris.FsDurWire <> i:58 var
+R20117:20122 xv6iris.FsDurObj <> OVNode constr
+R20124:20124 xv6iris.FsDurWire <> n:59 var
+R20201:20213 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R20136:20140 xv6iris.FsDurObj <> dpend def
+R20143:20146 xv6iris.FsDurObj <> dres def
+R20149:20158 xv6iris.FsDurBytes <> fs_gamma_D def
+R20160:20160 xv6iris.FsDurWire <> g:54 var
+R20162:20164 xv6iris.FsDurWire <> Γd:55 var
+R20167:20167 xv6iris.FsDurWire <> G:56 var
+R20171:20175 xv6iris.FsDurObj <> DSlot constr
+R20177:20177 xv6iris.FsDurWire <> i:58 var
+R20180:20180 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R20189:20190 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R20200:20200 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R20181:20186 xv6iris.FsDurObj <> OVNode constr
+R20188:20188 xv6iris.FsDurWire <> n:59 var
+R20191:20196 xv6iris.FsDurObj <> OVNode constr
+R20198:20199 xv6iris.FsDurWire <> n':60 var
+R20214:20216 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20222:20224 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20217:20221 stdpp.base <> ::type_scope:'False' not
+R20284:20288 xv6iris.FsDurObj <> dpend def
+R20284:20288 xv6iris.FsDurObj <> dpend def
+R20284:20288 xv6iris.FsDurObj <> dpend def
+R20296:20298 Corelib.Init.Datatypes <> fst def
+R20300:20302 Corelib.Init.Datatypes <> snd def
+R20315:20323 xv6iris.FsDurWire <> dres_slot thm
+R20326:20333 xv6iris.FsState <> top_frag def
+R20315:20323 xv6iris.FsDurWire <> dres_slot thm
+R20315:20323 xv6iris.FsDurWire <> dres_slot thm
+R20315:20323 xv6iris.FsDurWire <> dres_slot thm
+R20315:20323 xv6iris.FsDurWire <> dres_slot thm
+R20326:20333 xv6iris.FsState <> top_frag def
+R20326:20333 xv6iris.FsState <> top_frag def
+R20392:20392 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20409:20414 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20422:20422 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20393:20408 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+R20392:20392 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20409:20414 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20422:20422 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20393:20408 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+R20443:20443 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20451:20456 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20472:20472 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20443:20443 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20451:20456 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20472:20472 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20508:20508 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20525:20530 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20539:20539 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20509:20524 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+R20508:20508 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20525:20530 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20539:20539 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20509:20524 iris.base_logic.lib.ghost_map <> ghost_map_lookup thm
+prf 21034:21054 <> dpend_dur_bit_trivial
+R21061:21065 iris.base_logic.lib.iprop <> gname def
+binder 21057:21057 <> g:61
+R21075:21086 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 21069:21071 <> Γd:62
+R21094:21098 xv6iris.FsDurObj <> dgeom rec
+binder 21090:21090 <> G:63
+R21112:21112 Corelib.Numbers.BinNums <> Z ind
+binder 21108:21108 <> b:64
+R21123:21126 Corelib.Init.Datatypes <> bool ind
+binder 21116:21116 <> u:65
+binder 21118:21119 <> u':66
+R21135:21138 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R21139:21143 xv6iris.FsDurObj <> dpend def
+R21146:21154 xv6iris.FsDurObj <> dres_flat def
+R21157:21166 xv6iris.FsDurBytes <> fs_gamma_D def
+R21168:21168 xv6iris.FsDurWire <> g:61 var
+R21170:21172 xv6iris.FsDurWire <> Γd:62 var
+R21175:21175 xv6iris.FsDurWire <> G:63 var
+R21179:21182 xv6iris.FsDurObj <> DBit constr
+R21184:21184 xv6iris.FsDurWire <> b:64 var
+R21187:21187 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21195:21196 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21205:21205 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21188:21192 xv6iris.FsDurObj <> OVBit constr
+R21194:21194 xv6iris.FsDurWire <> u:65 var
+R21197:21201 xv6iris.FsDurObj <> OVBit constr
+R21203:21204 xv6iris.FsDurWire <> u':66 var
+R21224:21237 xv6iris.FsDurObj <> dpend_flat_bit thm
+R21224:21237 xv6iris.FsDurObj <> dpend_flat_bit thm
+R21250:21269 xv6iris.FsDurWire PoolAtTheDurableView <> sec
+sec 21511:21533 <> StrictBodyAtTheFullPool
+var  21547:21548 StrictBodyAtTheFullPool Σ
+R21552:21560 iris.base_logic.lib.iprop <> gFunctors rec
+R21577:21583 xv6iris.Xv6Cameras <> fsLinkG class
+R21585:21586 xv6iris.FsDurWire <> StrictBodyAtTheFullPool.Σ var
+R21590:21595 xv6iris.Xv6Cameras <> fsTopG class
+R21597:21598 xv6iris.FsDurWire <> StrictBodyAtTheFullPool.Σ var
+R21624:21636 xv6iris.FsStateDefs <> fs_view_names rec
+R21638:21639 xv6iris.FsDurWire <> StrictBodyAtTheFullPool.Σ var
+prf 21908:21932 <> free_bitmap_at_full_False
+binder 21934:21935 <> Γ:70
+R21944:21951 xv6iris.FsStateDefs <> phi_excl def
+R21953:21954 xv6iris.FsDurWire <> Γ:70 var
+binder 21938:21940 <> Hex:71
+R21967:21967 Corelib.Numbers.BinNums <> Z ind
+binder 21958:21960 <> bms:72
+binder 21962:21963 <> nb:73
+R21981:21984 stdpp.gmap <> gset def
+R21986:21986 Corelib.Numbers.BinNums <> Z ind
+binder 21977:21977 <> u:74
+R22008:22015 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21996:21999 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R22003:22005 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R22000:22002 xv6iris.FsDurWire <> bms:72 var
+R22000:22002 xv6iris.FsDurWire <> bms:72 var
+R22006:22007 xv6iris.FsDurWire <> nb:73 var
+R22042:22051 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22016:22029 xv6iris.FsStateBitmap <> free_bitmap_at def
+R22031:22032 xv6iris.FsDurWire <> Γ:70 var
+R22034:22036 xv6iris.FsDurWire <> bms:72 var
+R22038:22039 xv6iris.FsDurWire <> nb:73 var
+R22041:22041 xv6iris.FsDurWire <> u:74 var
+R22096:22101 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R22052:22063 xv6iris.FsDurRefute <> free_pool_at def
+R22065:22066 xv6iris.FsDurWire <> Γ:70 var
+R22068:22069 xv6iris.FsDurWire <> nb:73 var
+R22072:22082 stdpp.base <> list_to_set def
+R22085:22088 stdpp.list_numbers <> seqZ def
+R22092:22093 xv6iris.FsDurWire <> nb:73 var
+R22102:22106 iris.bi.interface <> ::bi_scope:'False' not
+R22144:22157 xv6iris.FsStateBitmap <> free_bitmap_at def
+R22144:22157 xv6iris.FsStateBitmap <> free_bitmap_at def
+R22144:22157 xv6iris.FsStateBitmap <> free_bitmap_at def
+R22197:22213 xv6iris.FsDurObj <> free_pool_at_full thm
+R22197:22213 xv6iris.FsDurObj <> free_pool_at_full thm
+R22197:22213 xv6iris.FsDurObj <> free_pool_at_full thm
+R22257:22259 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R22234:22241 Stdlib.ZArith.BinInt Z of_nat def
+R22244:22251 Stdlib.ZArith.BinInt Z to_nat def
+R22257:22259 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R22234:22241 Stdlib.ZArith.BinInt Z of_nat def
+R22244:22251 Stdlib.ZArith.BinInt Z to_nat def
+R22288:22302 xv6iris.FsStateBitmap <> seqZ_lookup_nat thm
+R22308:22315 Stdlib.ZArith.BinInt Z to_nat def
+R22288:22302 xv6iris.FsStateBitmap <> seqZ_lookup_nat thm
+R22308:22315 Stdlib.ZArith.BinInt Z to_nat def
+R22347:22354 Stdlib.ZArith.Znat Z2Nat id thm
+R22347:22354 Stdlib.ZArith.Znat Z2Nat id thm
+R22347:22354 Stdlib.ZArith.Znat Z2Nat id thm
+R22387:22387 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22430:22435 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22443:22443 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22388:22402 iris.bi.big_op <> big_sepL_lookup thm
+R22409:22416 Stdlib.ZArith.BinInt Z to_nat def
+R22387:22387 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22430:22435 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22443:22443 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22388:22402 iris.bi.big_op <> big_sepL_lookup thm
+R22409:22416 Stdlib.ZArith.BinInt Z to_nat def
+R22481:22481 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22503:22508 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22519:22519 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22482:22495 xv6iris.FsStateDefs <> blk_owned_excl thm
+R22481:22481 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22503:22508 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22519:22519 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22482:22495 xv6iris.FsStateDefs <> blk_owned_excl thm
+prf 22651:22674 <> fs_state_full_pool_False
+binder 22676:22677 <> Γ:75
+R22686:22693 xv6iris.FsStateDefs <> phi_excl def
+R22695:22696 xv6iris.FsDurWire <> Γ:75 var
+binder 22680:22682 <> Hex:76
+R22704:22715 xv6iris.FsState <> fs_state_rec rec
+binder 22700:22700 <> S:77
+R22773:22780 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22725:22728 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R22752:22754 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R22729:22740 xv6iris.FsImg <> sb_bmapstart proj
+R22743:22748 xv6iris.FsState <> fss_sb proj
+R22750:22750 xv6iris.FsDurWire <> S:77 var
+R22729:22740 xv6iris.FsImg <> sb_bmapstart proj
+R22743:22748 xv6iris.FsState <> fss_sb proj
+R22750:22750 xv6iris.FsDurWire <> S:77 var
+R22755:22761 xv6iris.FsImg <> sb_size proj
+R22764:22769 xv6iris.FsState <> fss_sb proj
+R22771:22771 xv6iris.FsDurWire <> S:77 var
+R22794:22803 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22781:22788 xv6iris.FsState <> fs_state def
+R22790:22791 xv6iris.FsDurWire <> Γ:75 var
+R22793:22793 xv6iris.FsDurWire <> S:77 var
+R22890:22895 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R22804:22815 xv6iris.FsDurRefute <> free_pool_at def
+R22817:22818 xv6iris.FsDurWire <> Γ:75 var
+R22821:22827 xv6iris.FsImg <> sb_size proj
+R22830:22835 xv6iris.FsState <> fss_sb proj
+R22837:22837 xv6iris.FsDurWire <> S:77 var
+R22848:22858 stdpp.base <> list_to_set def
+R22861:22864 stdpp.list_numbers <> seqZ def
+R22869:22875 xv6iris.FsImg <> sb_size proj
+R22878:22883 xv6iris.FsState <> fss_sb proj
+R22885:22885 xv6iris.FsDurWire <> S:77 var
+R22896:22900 iris.bi.interface <> ::bi_scope:'False' not
+R22938:22945 xv6iris.FsState <> fs_state def
+R22948:22958 xv6iris.FsStateBitmap <> free_bitmap def
+R22938:22945 xv6iris.FsState <> fs_state def
+R22938:22945 xv6iris.FsState <> fs_state def
+R22948:22958 xv6iris.FsStateBitmap <> free_bitmap def
+R22948:22958 xv6iris.FsStateBitmap <> free_bitmap def
+R23007:23007 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23062:23081 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23093:23093 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23008:23032 xv6iris.FsDurWire <> free_bitmap_at_full_False thm
+R23046:23053 xv6iris.FsState <> fss_used proj
+R23007:23007 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23062:23081 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23093:23093 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23008:23032 xv6iris.FsDurWire <> free_bitmap_at_full_False thm
+R23046:23053 xv6iris.FsState <> fss_used proj
+R23108:23130 xv6iris.FsDurWire StrictBodyAtTheFullPool <> sec
+sec 23372:23377 <> Rebase
+var  23391:23392 Rebase Σ
+R23396:23404 iris.base_logic.lib.iprop <> gFunctors rec
+R23421:23426 xv6iris.Xv6Cameras <> fsTopG class
+R23428:23429 xv6iris.FsDurWire <> Rebase.Σ var
+prf 23878:23887 <> top_rebase
+R23895:23899 iris.base_logic.lib.iprop <> gname def
+binder 23890:23891 <> γ:80
+R23910:23913 stdpp.gmap <> gmap rec
+R23917:23923 xv6iris.FsNode <> fs_node rec
+R23915:23915 Corelib.Numbers.BinNums <> Z ind
+binder 23903:23903 <> M:81
+binder 23905:23906 <> M':82
+R23953:23958 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R23932:23945 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R23947:23948 xv6iris.FsDurWire <> γ:80 var
+R23952:23952 xv6iris.FsDurWire <> M:81 var
+R23959:23959 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R23996:24009 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R23960:23969 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R23971:23975 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R23977:23981 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R23983:23984 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 23970:23970 <> i:83
+binder 23970:23970 <> i:84
+binder 23976:23976 <> n:85
+binder 23976:23976 <> n:86
+R23986:23990 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R23993:23993 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R23994:23994 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R23991:23992 xv6iris.FsDurWire <> γ:80 var
+R23985:23985 xv6iris.FsDurWire <> i:83 var
+R23995:23995 xv6iris.FsDurWire <> n:85 var
+R23982:23982 xv6iris.FsDurWire <> M:81 var
+R24032:24037 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R24075:24075 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R24010:24023 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R24025:24026 xv6iris.FsDurWire <> γ:80 var
+R24030:24031 xv6iris.FsDurWire <> M':82 var
+R24038:24047 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R24049:24053 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R24055:24059 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R24062:24063 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 24048:24048 <> i:87
+binder 24048:24048 <> i:88
+binder 24054:24054 <> n:89
+binder 24054:24054 <> n:90
+R24065:24069 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R24072:24072 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R24073:24073 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R24070:24071 xv6iris.FsDurWire <> γ:80 var
+R24064:24064 xv6iris.FsDurWire <> i:87 var
+R24074:24074 xv6iris.FsDurWire <> n:89 var
+R24060:24061 xv6iris.FsDurWire <> M':82 var
+R24118:24118 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24141:24146 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24155:24155 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24119:24138 iris.base_logic.lib.ghost_map <> ghost_map_delete_big thm
+R24118:24118 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24141:24146 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24155:24155 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24119:24138 iris.base_logic.lib.ghost_map <> ghost_map_delete_big thm
+R24178:24196 stdpp.fin_maps <> map_difference_diag thm
+R24178:24196 stdpp.fin_maps <> map_difference_diag thm
+R24178:24196 stdpp.fin_maps <> map_difference_diag thm
+R24208:24208 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24232:24237 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24242:24242 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24209:24228 iris.base_logic.lib.ghost_map <> ghost_map_insert_big thm
+R24272:24291 stdpp.fin_maps <> map_disjoint_empty_r thm
+R24208:24208 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24232:24237 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24242:24242 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24209:24228 iris.base_logic.lib.ghost_map <> ghost_map_insert_big thm
+R24272:24291 stdpp.fin_maps <> map_disjoint_empty_r thm
+R24309:24318 stdpp.base <> right_id_L thm
+R24309:24318 stdpp.base <> right_id_L thm
+R24309:24318 stdpp.base <> right_id_L thm
+R24344:24349 xv6iris.FsDurWire Rebase <> sec
+def 24851:24862 <> dwire_bridge
+R24870:24873 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24869:24869 Corelib.Numbers.BinNums <> Z ind
+R24874:24881 xv6iris.FsDurObj <> blk_kind ind
+binder 24865:24865 <> K:91
+R24889:24892 stdpp.gmap <> gmap rec
+R24897:24900 Corelib.Init.Datatypes <> list ind
+R24903:24904 stdpp.bitvector.definitions <> bv rec
+R24894:24894 Corelib.Numbers.BinNums <> Z ind
+binder 24885:24885 <> D:92
+R24922:24925 stdpp.gmap <> gset def
+R24927:24927 Corelib.Numbers.BinNums <> Z ind
+binder 24916:24918 <> cov:93
+R24936:24936 Corelib.Numbers.BinNums <> Z ind
+binder 24931:24932 <> ls:94
+R24977:24983 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R25052:25052 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R24956:24958 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24951:24953 stdpp.base <> dom def
+R24955:24955 xv6iris.FsDurWire <> D:92 var
+R24959:24969 xv6iris.LogDefs <> fs_home_set def
+R24971:24973 xv6iris.FsDurWire <> cov:93 var
+R24975:24976 xv6iris.FsDurWire <> ls:94 var
+R24984:24990 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R24992:24993 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 24991:24991 <> b:95
+R25018:25021 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24995:24999 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R24994:24994 xv6iris.FsDurWire <> b:95 var
+R25000:25010 xv6iris.LogDefs <> fs_home_set def
+R25012:25014 xv6iris.FsDurWire <> cov:93 var
+R25016:25017 xv6iris.FsDurWire <> ls:94 var
+R25028:25030 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25023:25026 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R25027:25027 xv6iris.FsDurWire <> b:95 var
+R25022:25022 xv6iris.FsDurWire <> D:92 var
+R25031:25034 Corelib.Init.Datatypes <> Some constr
+R25037:25044 xv6iris.FsDurObj <> kind_enc def
+R25047:25047 xv6iris.FsDurWire <> K:91 var
+R25049:25049 xv6iris.FsDurWire <> b:95 var
+def 25112:25127 <> kinds_blocksized
+R25135:25138 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25134:25134 Corelib.Numbers.BinNums <> Z ind
+R25139:25146 xv6iris.FsDurObj <> blk_kind ind
+binder 25130:25130 <> K:96
+R25156:25159 stdpp.gmap <> gset def
+R25161:25161 Corelib.Numbers.BinNums <> Z ind
+binder 25150:25152 <> cov:97
+R25170:25170 Corelib.Numbers.BinNums <> Z ind
+binder 25165:25166 <> ls:98
+R25189:25195 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R25197:25198 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 25196:25196 <> b:99
+R25223:25226 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25200:25204 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R25199:25199 xv6iris.FsDurWire <> b:99 var
+R25205:25215 xv6iris.LogDefs <> fs_home_set def
+R25217:25219 xv6iris.FsDurWire <> cov:97 var
+R25221:25222 xv6iris.FsDurWire <> ls:98 var
+R25250:25252 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25227:25232 Corelib.Init.Datatypes <> length def
+R25235:25242 xv6iris.FsDurObj <> kind_enc def
+R25245:25245 xv6iris.FsDurWire <> K:96 var
+R25247:25247 xv6iris.FsDurWire <> b:99 var
+R25253:25257 xv6iris.BioDefs <> BSIZE def
+prf 25267:25289 <> dwire_bridge_blocksized
+R25297:25300 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25296:25296 Corelib.Numbers.BinNums <> Z ind
+R25301:25308 xv6iris.FsDurObj <> blk_kind ind
+binder 25292:25292 <> K:100
+R25320:25323 stdpp.gmap <> gmap rec
+R25328:25331 Corelib.Init.Datatypes <> list ind
+R25334:25335 stdpp.bitvector.definitions <> bv rec
+R25325:25325 Corelib.Numbers.BinNums <> Z ind
+binder 25316:25316 <> D:101
+R25349:25352 stdpp.gmap <> gset def
+R25354:25354 Corelib.Numbers.BinNums <> Z ind
+binder 25343:25345 <> cov:102
+R25363:25363 Corelib.Numbers.BinNums <> Z ind
+binder 25358:25359 <> ls:103
+R25393:25396 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25370:25381 xv6iris.FsDurWire <> dwire_bridge def
+R25383:25383 xv6iris.FsDurWire <> K:100 var
+R25385:25385 xv6iris.FsDurWire <> D:101 var
+R25387:25389 xv6iris.FsDurWire <> cov:102 var
+R25391:25392 xv6iris.FsDurWire <> ls:103 var
+R25422:25427 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25397:25412 xv6iris.FsDurWire <> kinds_blocksized def
+R25414:25414 xv6iris.FsDurWire <> K:100 var
+R25416:25418 xv6iris.FsDurWire <> cov:102 var
+R25420:25421 xv6iris.FsDurWire <> ls:103 var
+R25428:25434 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R25439:25440 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 25435:25435 <> b:104
+binder 25437:25438 <> bs:105
+R25457:25460 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25447:25449 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25442:25445 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R25446:25446 xv6iris.FsDurWire <> b:104 var
+R25441:25441 xv6iris.FsDurWire <> D:101 var
+R25450:25453 Corelib.Init.Datatypes <> Some constr
+R25455:25456 xv6iris.FsDurWire <> bs:105 var
+R25470:25472 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25461:25466 Corelib.Init.Datatypes <> length def
+R25468:25469 xv6iris.FsDurWire <> bs:105 var
+R25473:25477 xv6iris.BioDefs <> BSIZE def
+R25539:25543 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R25544:25554 xv6iris.LogDefs <> fs_home_set def
+R25539:25543 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R25544:25554 xv6iris.LogDefs <> fs_home_set def
+R25590:25600 stdpp.fin_map_dom <> elem_of_dom meth
+R25590:25600 stdpp.fin_map_dom <> elem_of_dom meth
+prf 25993:26010 <> dwire_bridge_close
+R26018:26021 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26017:26017 Corelib.Numbers.BinNums <> Z ind
+R26022:26029 xv6iris.FsDurObj <> blk_kind ind
+binder 26013:26013 <> K:106
+R26044:26047 stdpp.gmap <> gmap rec
+R26052:26055 Corelib.Init.Datatypes <> list ind
+R26058:26059 stdpp.bitvector.definitions <> bv rec
+R26049:26049 Corelib.Numbers.BinNums <> Z ind
+binder 26037:26038 <> D':107
+binder 26040:26040 <> L:108
+R26073:26076 stdpp.gmap <> gset def
+R26078:26078 Corelib.Numbers.BinNums <> Z ind
+binder 26067:26069 <> cov:109
+R26087:26087 Corelib.Numbers.BinNums <> Z ind
+binder 26082:26083 <> ls:110
+R26118:26123 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26094:26105 xv6iris.FsDurWire <> dwire_bridge def
+R26107:26107 xv6iris.FsDurWire <> K:106 var
+R26109:26110 xv6iris.FsDurWire <> D':107 var
+R26112:26114 xv6iris.FsDurWire <> cov:109 var
+R26116:26117 xv6iris.FsDurWire <> ls:110 var
+R26124:26124 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26193:26199 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26125:26131 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R26133:26134 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 26132:26132 <> b:111
+R26159:26162 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26136:26140 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R26135:26135 xv6iris.FsDurWire <> b:111 var
+R26141:26151 xv6iris.LogDefs <> fs_home_set def
+R26153:26155 xv6iris.FsDurWire <> cov:109 var
+R26157:26158 xv6iris.FsDurWire <> ls:110 var
+R26169:26171 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26164:26167 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R26168:26168 xv6iris.FsDurWire <> b:111 var
+R26163:26163 xv6iris.FsDurWire <> L:108 var
+R26172:26175 Corelib.Init.Datatypes <> Some constr
+R26178:26185 xv6iris.FsDurObj <> kind_enc def
+R26188:26188 xv6iris.FsDurWire <> K:106 var
+R26190:26190 xv6iris.FsDurWire <> b:111 var
+R26202:26204 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26200:26201 xv6iris.FsDurWire <> D':107 var
+R26205:26213 xv6iris.LogDefs <> lm_logged def
+R26215:26215 xv6iris.FsDurWire <> L:108 var
+R26217:26219 xv6iris.FsDurWire <> cov:109 var
+R26221:26222 xv6iris.FsDurWire <> ls:110 var
+R26264:26273 xv6iris.FsDurObj <> dobj_close thm
+R26264:26273 xv6iris.FsDurObj <> dobj_close thm
+def 29889:29898 <> dwire_geom
+R29905:29909 xv6iris.FsDurObj <> dgeom rec
+binder 29901:29901 <> G:112
+R29924:29930 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R29936:29937 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R29935:29935 Corelib.Numbers.BinNums <> Z ind
+binder 29931:29931 <> j:113
+R29944:29947 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29939:29942 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R29943:29943 xv6iris.FsDurWire <> j:113 var
+R29960:29963 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R29956:29958 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R29948:29953 xv6iris.FsDurObj <> dg_ist proj
+R29955:29955 xv6iris.FsDurWire <> G:112 var
+R29959:29959 xv6iris.FsDurWire <> j:113 var
+R29964:29970 xv6iris.FsDurObj <> dg_bmap proj
+R29972:29972 xv6iris.FsDurWire <> G:112 var
+rec 31075:31088 <> kinds_of_state
+proj 31184:31192 <> ko_bitmap
+proj 31236:31246 <> ko_inodeblk
+proj 31356:31362 <> ko_slot
+proj 31579:31586 <> ko_recwf
+R31095:31099 xv6iris.FsDurObj <> dgeom rec
+binder 31091:31091 <> G:114
+R31109:31109 Corelib.Numbers.BinNums <> Z ind
+binder 31103:31105 <> nin:115
+R31117:31128 xv6iris.FsState <> fs_state_rec rec
+binder 31113:31113 <> S:116
+R31141:31144 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31140:31140 Corelib.Numbers.BinNums <> Z ind
+R31145:31152 xv6iris.FsDurObj <> blk_kind ind
+binder 31136:31136 <> K:117
+R31209:31211 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31196:31196 xv6iris.FsDurWire <> K:117 var
+R31199:31205 xv6iris.FsDurObj <> dg_bmap proj
+R31207:31207 xv6iris.FsDurWire <> G:114 var
+R31212:31218 xv6iris.FsDurObj <> KBitmap constr
+R31221:31228 xv6iris.FsState <> fss_used proj
+R31230:31230 xv6iris.FsDurWire <> S:116 var
+R31250:31256 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31262:31263 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31261:31261 Corelib.Numbers.BinNums <> Z ind
+binder 31257:31257 <> j:120
+R31270:31273 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31265:31268 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R31269:31269 xv6iris.FsDurWire <> j:120 var
+R31286:31295 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31280:31282 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R31276:31278 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R31279:31279 xv6iris.FsDurWire <> j:120 var
+R31283:31285 xv6iris.FsDurWire <> nin:115 var
+R31296:31302 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R31322:31323 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R31311:31314 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31308:31310 Corelib.Init.Datatypes <> nat ind
+R31315:31321 xv6iris.FsNode <> fs_node rec
+binder 31303:31304 <> nd:121
+R31340:31342 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31324:31324 xv6iris.FsDurWire <> K:117 var
+R31335:31337 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R31327:31332 xv6iris.FsDurObj <> dg_ist proj
+R31334:31334 xv6iris.FsDurWire <> G:114 var
+R31338:31338 xv6iris.FsDurWire <> j:120 var
+R31343:31348 xv6iris.FsDurObj <> KInode constr
+R31350:31351 xv6iris.FsDurWire <> nd:121 var
+R31366:31373 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31393:31395 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31378:31378 Corelib.Numbers.BinNums <> Z ind
+binder 31374:31374 <> i:123
+R31386:31392 xv6iris.FsNode <> fs_node rec
+binder 31382:31382 <> n:124
+R31422:31431 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31413:31415 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31408:31411 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R31412:31412 xv6iris.FsDurWire <> i:123 var
+R31396:31405 xv6iris.FsState <> fss_inodes proj
+R31407:31407 xv6iris.FsDurWire <> S:116 var
+R31416:31419 Corelib.Init.Datatypes <> Some constr
+R31421:31421 xv6iris.FsDurWire <> n:124 var
+R31444:31453 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R31433:31436 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R31438:31440 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R31437:31437 xv6iris.FsDurWire <> i:123 var
+R31437:31437 xv6iris.FsDurWire <> i:123 var
+R31441:31443 xv6iris.FsDurWire <> nin:115 var
+R31454:31460 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R31480:31492 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R31469:31472 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31466:31468 Corelib.Init.Datatypes <> nat ind
+R31473:31479 xv6iris.FsNode <> fs_node rec
+binder 31461:31462 <> nd:125
+R31530:31544 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R31518:31520 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31493:31493 xv6iris.FsDurWire <> K:117 var
+R31504:31506 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R31496:31501 xv6iris.FsDurObj <> dg_ist proj
+R31503:31503 xv6iris.FsDurWire <> G:114 var
+R31508:31514 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R31507:31507 xv6iris.FsDurWire <> i:123 var
+R31521:31526 xv6iris.FsDurObj <> KInode constr
+R31528:31529 xv6iris.FsDurWire <> nd:125 var
+R31571:31573 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31545:31546 xv6iris.FsDurWire <> nd:125 var
+R31549:31556 Stdlib.ZArith.BinInt Z to_nat def
+R31560:31566 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R31559:31559 xv6iris.FsDurWire <> i:123 var
+R31574:31574 xv6iris.FsDurWire <> n:124 var
+R31590:31597 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31625:31627 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31602:31602 Corelib.Numbers.BinNums <> Z ind
+binder 31598:31598 <> b:127
+R31614:31617 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31611:31613 Corelib.Init.Datatypes <> nat ind
+R31618:31624 xv6iris.FsNode <> fs_node rec
+binder 31606:31607 <> nd:128
+R31643:31652 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31631:31633 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31628:31628 xv6iris.FsDurWire <> K:117 var
+R31630:31630 xv6iris.FsDurWire <> b:127 var
+R31634:31639 xv6iris.FsDurObj <> KInode constr
+R31641:31642 xv6iris.FsDurWire <> nd:128 var
+R31653:31659 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31667:31668 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31664:31666 Corelib.Init.Datatypes <> nat ind
+binder 31660:31660 <> j:129
+R31669:31677 xv6iris.DinodeEnc <> dinode_wf def
+R31680:31685 xv6iris.FsNode <> fn_rec proj
+R31688:31689 xv6iris.FsDurWire <> nd:128 var
+R31691:31691 xv6iris.FsDurWire <> j:129 var
+def 31840:31847 <> kind_upd
+R31855:31858 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31854:31854 Corelib.Numbers.BinNums <> Z ind
+R31859:31866 xv6iris.FsDurObj <> blk_kind ind
+binder 31850:31850 <> K:131
+R31874:31874 Corelib.Numbers.BinNums <> Z ind
+binder 31870:31870 <> b:132
+R31882:31889 xv6iris.FsDurObj <> blk_kind ind
+binder 31878:31878 <> k:133
+R31899:31902 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31898:31898 Corelib.Numbers.BinNums <> Z ind
+R31903:31910 xv6iris.FsDurObj <> blk_kind ind
+binder 31921:31921 <> c:134
+R31926:31928 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31943:31948 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31950:31955 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31956:31956 xv6iris.FsDurWire <> K:131 var
+R31958:31958 xv6iris.FsDurWire <> c:134 var
+R31949:31949 xv6iris.FsDurWire <> k:133 var
+R31929:31934 stdpp.base <> decide def
+R31938:31940 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31937:31937 xv6iris.FsDurWire <> c:134 var
+R31941:31941 xv6iris.FsDurWire <> b:132 var
+prf 31968:31978 <> kind_upd_at
+R31986:31989 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31985:31985 Corelib.Numbers.BinNums <> Z ind
+R31990:31997 xv6iris.FsDurObj <> blk_kind ind
+binder 31981:31981 <> K:135
+R32005:32005 Corelib.Numbers.BinNums <> Z ind
+binder 32001:32001 <> b:136
+R32013:32020 xv6iris.FsDurObj <> blk_kind ind
+binder 32009:32009 <> k:137
+R32043:32045 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32027:32034 xv6iris.FsDurWire <> kind_upd def
+R32036:32036 xv6iris.FsDurWire <> K:135 var
+R32038:32038 xv6iris.FsDurWire <> b:136 var
+R32040:32040 xv6iris.FsDurWire <> k:137 var
+R32042:32042 xv6iris.FsDurWire <> b:136 var
+R32046:32046 xv6iris.FsDurWire <> k:137 var
+R32067:32074 xv6iris.FsDurWire <> kind_upd def
+R32067:32074 xv6iris.FsDurWire <> kind_upd def
+R32067:32074 xv6iris.FsDurWire <> kind_upd def
+R32087:32092 stdpp.base <> decide def
+R32096:32098 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32156:32162 Corelib.Init.Logic <> eq_refl constr
+R32087:32092 stdpp.base <> decide def
+R32096:32098 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32156:32162 Corelib.Init.Logic <> eq_refl constr
+prf 32179:32189 <> kind_upd_ne
+R32197:32200 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32196:32196 Corelib.Numbers.BinNums <> Z ind
+R32201:32208 xv6iris.FsDurObj <> blk_kind ind
+binder 32192:32192 <> K:138
+R32216:32216 Corelib.Numbers.BinNums <> Z ind
+binder 32212:32212 <> b:139
+R32224:32231 xv6iris.FsDurObj <> blk_kind ind
+binder 32220:32220 <> k:140
+R32239:32239 Corelib.Numbers.BinNums <> Z ind
+binder 32235:32235 <> c:141
+R32252:32255 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32247:32250 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R32246:32246 xv6iris.FsDurWire <> c:141 var
+R32251:32251 xv6iris.FsDurWire <> b:139 var
+R32272:32274 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32256:32263 xv6iris.FsDurWire <> kind_upd def
+R32265:32265 xv6iris.FsDurWire <> K:138 var
+R32267:32267 xv6iris.FsDurWire <> b:139 var
+R32269:32269 xv6iris.FsDurWire <> k:140 var
+R32271:32271 xv6iris.FsDurWire <> c:141 var
+R32275:32275 xv6iris.FsDurWire <> K:138 var
+R32277:32277 xv6iris.FsDurWire <> c:141 var
+R32310:32317 xv6iris.FsDurWire <> kind_upd def
+R32310:32317 xv6iris.FsDurWire <> kind_upd def
+R32310:32317 xv6iris.FsDurWire <> kind_upd def
+R32330:32335 stdpp.base <> decide def
+R32339:32341 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32330:32335 stdpp.base <> decide def
+R32339:32341 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+prf 32546:32563 <> dwire_bridge_write
+R32571:32574 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32570:32570 Corelib.Numbers.BinNums <> Z ind
+R32575:32582 xv6iris.FsDurObj <> blk_kind ind
+binder 32566:32566 <> K:142
+R32590:32593 stdpp.gmap <> gmap rec
+R32598:32601 Corelib.Init.Datatypes <> list ind
+R32604:32605 stdpp.bitvector.definitions <> bv rec
+R32595:32595 Corelib.Numbers.BinNums <> Z ind
+binder 32586:32586 <> D:143
+R32623:32626 stdpp.gmap <> gset def
+R32628:32628 Corelib.Numbers.BinNums <> Z ind
+binder 32617:32619 <> cov:144
+R32637:32637 Corelib.Numbers.BinNums <> Z ind
+binder 32632:32633 <> ls:145
+R32645:32645 Corelib.Numbers.BinNums <> Z ind
+binder 32641:32641 <> b:146
+R32653:32660 xv6iris.FsDurObj <> blk_kind ind
+binder 32649:32649 <> k:147
+R32690:32693 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32667:32678 xv6iris.FsDurWire <> dwire_bridge def
+R32680:32680 xv6iris.FsDurWire <> K:142 var
+R32682:32682 xv6iris.FsDurWire <> D:143 var
+R32684:32686 xv6iris.FsDurWire <> cov:144 var
+R32688:32689 xv6iris.FsDurWire <> ls:145 var
+R32718:32723 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32695:32699 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R32694:32694 xv6iris.FsDurWire <> b:146 var
+R32700:32710 xv6iris.LogDefs <> fs_home_set def
+R32712:32714 xv6iris.FsDurWire <> cov:144 var
+R32716:32717 xv6iris.FsDurWire <> ls:145 var
+R32724:32735 xv6iris.FsDurWire <> dwire_bridge def
+R32738:32745 xv6iris.FsDurWire <> kind_upd def
+R32747:32747 xv6iris.FsDurWire <> K:142 var
+R32749:32749 xv6iris.FsDurWire <> b:146 var
+R32751:32751 xv6iris.FsDurWire <> k:147 var
+R32755:32756 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R32758:32761 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R32772:32775 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R32757:32757 xv6iris.FsDurWire <> b:146 var
+R32762:32769 xv6iris.FsDurObj <> kind_enc def
+R32771:32771 xv6iris.FsDurWire <> k:147 var
+R32775:32775 xv6iris.FsDurWire <> D:143 var
+R32778:32780 xv6iris.FsDurWire <> cov:144 var
+R32782:32783 xv6iris.FsDurWire <> ls:145 var
+R32837:32848 stdpp.fin_map_dom <> dom_insert_L thm
+R32837:32848 stdpp.fin_map_dom <> dom_insert_L thm
+R32837:32848 stdpp.fin_map_dom <> dom_insert_L thm
+R32895:32900 stdpp.base <> decide def
+R32904:32906 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32895:32900 stdpp.base <> decide def
+R32904:32906 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32940:32952 stdpp.fin_maps <> lookup_insert thm
+R32954:32964 xv6iris.FsDurWire <> kind_upd_at thm
+R32940:32952 stdpp.fin_maps <> lookup_insert thm
+R32940:32952 stdpp.fin_maps <> lookup_insert thm
+R32954:32964 xv6iris.FsDurWire <> kind_upd_at thm
+R32954:32964 xv6iris.FsDurWire <> kind_upd_at thm
+R32984:32999 stdpp.fin_maps <> lookup_insert_ne thm
+R33012:33021 Corelib.Init.Logic <> not_eq_sym thm
+R32984:32999 stdpp.fin_maps <> lookup_insert_ne thm
+R32984:32999 stdpp.fin_maps <> lookup_insert_ne thm
+R33012:33021 Corelib.Init.Logic <> not_eq_sym thm
+R33045:33055 xv6iris.FsDurWire <> kind_upd_ne thm
+R33045:33055 xv6iris.FsDurWire <> kind_upd_ne thm
+R33045:33055 xv6iris.FsDurWire <> kind_upd_ne thm
+prf 33102:33123 <> kinds_blocksized_write
+R33131:33134 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33130:33130 Corelib.Numbers.BinNums <> Z ind
+R33135:33142 xv6iris.FsDurObj <> blk_kind ind
+binder 33126:33126 <> K:148
+R33152:33155 stdpp.gmap <> gset def
+R33157:33157 Corelib.Numbers.BinNums <> Z ind
+binder 33146:33148 <> cov:149
+R33166:33166 Corelib.Numbers.BinNums <> Z ind
+binder 33161:33162 <> ls:150
+R33178:33178 Corelib.Numbers.BinNums <> Z ind
+binder 33174:33174 <> b:151
+R33186:33193 xv6iris.FsDurObj <> blk_kind ind
+binder 33182:33182 <> k:152
+R33225:33228 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33200:33215 xv6iris.FsDurWire <> kinds_blocksized def
+R33217:33217 xv6iris.FsDurWire <> K:148 var
+R33219:33221 xv6iris.FsDurWire <> cov:149 var
+R33223:33224 xv6iris.FsDurWire <> ls:150 var
+R33256:33261 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33248:33250 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R33229:33234 Corelib.Init.Datatypes <> length def
+R33237:33244 xv6iris.FsDurObj <> kind_enc def
+R33246:33246 xv6iris.FsDurWire <> k:152 var
+R33251:33255 xv6iris.BioDefs <> BSIZE def
+R33262:33277 xv6iris.FsDurWire <> kinds_blocksized def
+R33280:33287 xv6iris.FsDurWire <> kind_upd def
+R33289:33289 xv6iris.FsDurWire <> K:148 var
+R33291:33291 xv6iris.FsDurWire <> b:151 var
+R33293:33293 xv6iris.FsDurWire <> k:152 var
+R33296:33298 xv6iris.FsDurWire <> cov:149 var
+R33300:33301 xv6iris.FsDurWire <> ls:150 var
+R33342:33347 stdpp.base <> decide def
+R33351:33353 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R33342:33347 stdpp.base <> decide def
+R33351:33353 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R33385:33395 xv6iris.FsDurWire <> kind_upd_at thm
+R33385:33395 xv6iris.FsDurWire <> kind_upd_at thm
+R33385:33395 xv6iris.FsDurWire <> kind_upd_at thm
+R33421:33431 xv6iris.FsDurWire <> kind_upd_ne thm
+R33421:33431 xv6iris.FsDurWire <> kind_upd_ne thm
+R33421:33431 xv6iris.FsDurWire <> kind_upd_ne thm
+sec 33478:33481 <> Body
+var  33495:33496 Body Σ
+R33500:33508 iris.base_logic.lib.iprop <> gFunctors rec
+R33525:33532 xv6iris.DiskImg <> diskImgG class
+R33534:33535 xv6iris.FsDurWire <> Body.Σ var
+R33539:33545 xv6iris.Xv6Cameras <> fsLinkG class
+R33547:33548 xv6iris.FsDurWire <> Body.Σ var
+R33552:33557 xv6iris.Xv6Cameras <> fsTopG class
+R33559:33560 xv6iris.FsDurWire <> Body.Σ var
+def 34785:34792 <> P_wf_dec
+R34799:34803 iris.base_logic.lib.iprop <> gname def
+binder 34795:34795 <> g:157
+R34813:34824 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 34807:34809 <> Γd:158
+R34832:34836 xv6iris.FsDurObj <> dgeom rec
+binder 34828:34828 <> G:159
+R34846:34846 Corelib.Numbers.BinNums <> Z ind
+binder 34840:34842 <> nin:160
+R34862:34865 stdpp.gmap <> gset def
+R34867:34867 Corelib.Numbers.BinNums <> Z ind
+binder 34856:34858 <> cov:161
+R34876:34876 Corelib.Numbers.BinNums <> Z ind
+binder 34871:34872 <> ls:162
+R34884:34887 stdpp.gmap <> gmap rec
+R34892:34895 Corelib.Init.Datatypes <> list ind
+R34898:34899 stdpp.bitvector.definitions <> bv rec
+R34889:34889 Corelib.Numbers.BinNums <> Z ind
+binder 34880:34880 <> D:163
+R34908:34912 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R34914:34915 xv6iris.FsDurWire <> Body.Σ var
+R34925:34929 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R34966:34975 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R34934:34945 xv6iris.FsState <> fs_state_rec rec
+binder 34930:34930 <> S:164
+R34954:34957 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R34953:34953 Corelib.Numbers.BinNums <> Z ind
+R34958:34965 xv6iris.FsDurObj <> blk_kind ind
+binder 34949:34949 <> K:165
+R35005:35009 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R34976:34978 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R35002:35004 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R34979:34990 xv6iris.FsDurWire <> dwire_bridge def
+R34992:34992 xv6iris.FsDurWire <> K:165 var
+R34994:34994 xv6iris.FsDurWire <> D:163 var
+R34996:34998 xv6iris.FsDurWire <> cov:161 var
+R35000:35001 xv6iris.FsDurWire <> ls:162 var
+R35041:35052 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35010:35012 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R35038:35040 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R35013:35028 xv6iris.FsDurWire <> kinds_blocksized def
+R35030:35030 xv6iris.FsDurWire <> K:165 var
+R35032:35034 xv6iris.FsDurWire <> cov:161 var
+R35036:35037 xv6iris.FsDurWire <> ls:162 var
+R35083:35094 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35053:35055 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R35080:35082 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R35056:35069 xv6iris.FsDurWire <> kinds_of_state rec
+R35071:35071 xv6iris.FsDurWire <> G:159 var
+R35073:35075 xv6iris.FsDurWire <> nin:160 var
+R35077:35077 xv6iris.FsDurWire <> S:164 var
+R35079:35079 xv6iris.FsDurWire <> K:165 var
+R35119:35130 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35095:35102 xv6iris.LogDefs <> fs_dview def
+R35104:35104 xv6iris.FsDurWire <> g:157 var
+R35107:35115 xv6iris.LogDefs <> fs_dbytes def
+R35117:35117 xv6iris.FsDurWire <> D:163 var
+R35176:35188 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35256:35256 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35131:35144 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R35147:35153 xv6iris.RiscvPtsto <> fdn_top proj
+R35155:35157 xv6iris.FsDurWire <> Γd:158 var
+R35163:35172 xv6iris.FsState <> fss_inodes proj
+R35174:35174 xv6iris.FsDurWire <> S:164 var
+R35189:35198 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R35200:35204 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R35206:35210 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R35223:35224 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 35199:35199 <> i:166
+binder 35199:35199 <> i:167
+binder 35205:35205 <> n:168
+binder 35205:35205 <> n:169
+R35225:35232 xv6iris.FsState <> top_frag def
+R35235:35244 xv6iris.FsDurBytes <> fs_gamma_D def
+R35246:35246 xv6iris.FsDurWire <> g:157 var
+R35248:35250 xv6iris.FsDurWire <> Γd:158 var
+R35253:35253 xv6iris.FsDurWire <> i:166 var
+R35255:35255 xv6iris.FsDurWire <> n:168 var
+R35211:35220 xv6iris.FsState <> fss_inodes proj
+R35222:35222 xv6iris.FsDurWire <> S:164 var
+inst 35503:35519 <> P_wf_dec_timeless
+binder 35521:35521 <> g:170
+binder 35523:35525 <> Γd:171
+binder 35527:35527 <> G:172
+binder 35529:35531 <> nin:173
+binder 35533:35535 <> cov:174
+binder 35537:35538 <> ls:175
+binder 35540:35540 <> D:176
+R35548:35555 iris.bi.derived_connectives <> Timeless class
+R35558:35565 xv6iris.FsDurWire <> P_wf_dec def
+R35567:35567 xv6iris.FsDurWire <> g:170 var
+R35569:35571 xv6iris.FsDurWire <> Γd:171 var
+R35573:35573 xv6iris.FsDurWire <> G:172 var
+R35575:35577 xv6iris.FsDurWire <> nin:173 var
+R35579:35581 xv6iris.FsDurWire <> cov:174 var
+R35583:35584 xv6iris.FsDurWire <> ls:175 var
+R35586:35586 xv6iris.FsDurWire <> D:176 var
+R35608:35615 xv6iris.FsDurWire <> P_wf_dec def
+R35618:35625 xv6iris.FsState <> top_frag def
+R35608:35615 xv6iris.FsDurWire <> P_wf_dec def
+R35608:35615 xv6iris.FsDurWire <> P_wf_dec def
+R35618:35625 xv6iris.FsState <> top_frag def
+R35618:35625 xv6iris.FsState <> top_frag def
+prf 35928:35942 <> P_wf_dec_blocks
+R35949:35953 iris.base_logic.lib.iprop <> gname def
+binder 35945:35945 <> g:177
+R35963:35974 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 35957:35959 <> Γd:178
+R35983:35987 xv6iris.FsDurObj <> dgeom rec
+binder 35978:35979 <> Gr:179
+R36002:36005 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R36001:36001 Corelib.Numbers.BinNums <> Z ind
+R36006:36013 xv6iris.FsDurObj <> blk_kind ind
+binder 35997:35997 <> K:180
+R36021:36024 stdpp.gmap <> gmap rec
+R36029:36032 Corelib.Init.Datatypes <> list ind
+R36035:36036 stdpp.bitvector.definitions <> bv rec
+R36026:36026 Corelib.Numbers.BinNums <> Z ind
+binder 36017:36017 <> D:181
+R36050:36053 stdpp.gmap <> gset def
+R36055:36055 Corelib.Numbers.BinNums <> Z ind
+binder 36044:36046 <> cov:182
+R36064:36064 Corelib.Numbers.BinNums <> Z ind
+binder 36059:36060 <> ls:183
+R36096:36099 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R36073:36084 xv6iris.FsDurWire <> dwire_bridge def
+R36086:36086 xv6iris.FsDurWire <> K:180 var
+R36088:36088 xv6iris.FsDurWire <> D:181 var
+R36090:36092 xv6iris.FsDurWire <> cov:182 var
+R36094:36095 xv6iris.FsDurWire <> ls:183 var
+R36125:36132 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R36100:36115 xv6iris.FsDurWire <> kinds_blocksized def
+R36117:36117 xv6iris.FsDurWire <> K:180 var
+R36119:36121 xv6iris.FsDurWire <> cov:182 var
+R36123:36124 xv6iris.FsDurWire <> ls:183 var
+R36157:36169 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R36259:36259 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R36133:36140 xv6iris.LogDefs <> fs_dview def
+R36142:36142 xv6iris.FsDurWire <> g:177 var
+R36145:36153 xv6iris.LogDefs <> fs_dbytes def
+R36155:36155 xv6iris.FsDurWire <> D:181 var
+R36170:36179 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R36181:36185 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R36188:36192 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R36194:36205 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 36180:36180 <> b:184
+binder 36180:36180 <> b:185
+binder 36186:36187 <> bs:186
+binder 36186:36187 <> bs:187
+R36206:36214 xv6iris.FsDurObj <> dres_flat def
+R36217:36226 xv6iris.FsDurBytes <> fs_gamma_D def
+R36228:36228 xv6iris.FsDurWire <> g:177 var
+R36230:36232 xv6iris.FsDurWire <> Γd:178 var
+R36235:36236 xv6iris.FsDurWire <> Gr:179 var
+R36239:36242 xv6iris.FsDurObj <> DBlk constr
+R36244:36244 xv6iris.FsDurWire <> b:184 var
+R36248:36254 xv6iris.FsDurObj <> OVBytes constr
+R36256:36257 xv6iris.FsDurWire <> bs:186 var
+R36193:36193 xv6iris.FsDurWire <> D:181 var
+R36305:36319 xv6iris.FsDurBytes <> fs_dview_dbytes thm
+R36345:36367 xv6iris.FsDurWire <> dwire_bridge_blocksized thm
+R36305:36319 xv6iris.FsDurBytes <> fs_dview_dbytes thm
+R36345:36367 xv6iris.FsDurWire <> dwire_bridge_blocksized thm
+R36305:36319 xv6iris.FsDurBytes <> fs_dview_dbytes thm
+R36345:36367 xv6iris.FsDurWire <> dwire_bridge_blocksized thm
+R36402:36416 iris.bi.big_op <> big_sepM_proper thm
+R36402:36416 iris.bi.big_op <> big_sepM_proper thm
+R36447:36463 xv6iris.FsDurObj <> dres_flat_not_bit thm
+R36466:36475 xv6iris.FsDurBytes <> fs_gamma_D def
+R36488:36491 xv6iris.FsDurObj <> DBlk constr
+R36497:36503 xv6iris.FsDurObj <> OVBytes constr
+R36447:36463 xv6iris.FsDurObj <> dres_flat_not_bit thm
+R36466:36475 xv6iris.FsDurBytes <> fs_gamma_D def
+R36488:36491 xv6iris.FsDurObj <> DBlk constr
+R36497:36503 xv6iris.FsDurObj <> OVBytes constr
+R36447:36463 xv6iris.FsDurObj <> dres_flat_not_bit thm
+R36466:36475 xv6iris.FsDurBytes <> fs_gamma_D def
+R36488:36491 xv6iris.FsDurObj <> DBlk constr
+R36497:36503 xv6iris.FsDurObj <> OVBytes constr
+R36558:36565 xv6iris.FsDurObj <> dres_blk thm
+R36558:36565 xv6iris.FsDurObj <> dres_blk thm
+R36558:36565 xv6iris.FsDurObj <> dres_blk thm
+def 36776:36784 <> dstep_dec
+R36791:36795 iris.base_logic.lib.iprop <> gname def
+binder 36787:36787 <> g:188
+R36805:36816 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 36799:36801 <> Γd:189
+R36824:36828 xv6iris.FsDurObj <> dgeom rec
+binder 36820:36820 <> G:190
+R36838:36838 Corelib.Numbers.BinNums <> Z ind
+binder 36832:36834 <> nin:191
+R36854:36857 stdpp.gmap <> gset def
+R36859:36859 Corelib.Numbers.BinNums <> Z ind
+binder 36848:36850 <> cov:192
+R36868:36868 Corelib.Numbers.BinNums <> Z ind
+binder 36863:36864 <> ls:193
+R36879:36882 stdpp.gmap <> gmap rec
+R36887:36890 Corelib.Init.Datatypes <> list ind
+R36893:36894 stdpp.bitvector.definitions <> bv rec
+R36884:36884 Corelib.Numbers.BinNums <> Z ind
+binder 36872:36872 <> D:194
+binder 36874:36875 <> D':195
+R36903:36907 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R36909:36910 xv6iris.FsDurWire <> Body.Σ var
+R36952:36957 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R36920:36933 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R36935:36935 xv6iris.FsDurWire <> g:188 var
+R36940:36948 xv6iris.LogDefs <> fs_dbytes def
+R36950:36950 xv6iris.FsDurWire <> D:194 var
+R36987:36998 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R36958:36965 xv6iris.FsDurWire <> P_wf_dec def
+R36967:36967 xv6iris.FsDurWire <> g:188 var
+R36969:36971 xv6iris.FsDurWire <> Γd:189 var
+R36973:36973 xv6iris.FsDurWire <> G:190 var
+R36975:36977 xv6iris.FsDurWire <> nin:191 var
+R36979:36981 xv6iris.FsDurWire <> cov:192 var
+R36983:36984 xv6iris.FsDurWire <> ls:193 var
+R36986:36986 xv6iris.FsDurWire <> D:194 var
+R37032:37036 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R36999:37012 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R37014:37014 xv6iris.FsDurWire <> g:188 var
+R37019:37027 xv6iris.LogDefs <> fs_dbytes def
+R37029:37030 xv6iris.FsDurWire <> D':195 var
+R37037:37044 xv6iris.FsDurWire <> P_wf_dec def
+R37046:37046 xv6iris.FsDurWire <> g:188 var
+R37048:37050 xv6iris.FsDurWire <> Γd:189 var
+R37052:37052 xv6iris.FsDurWire <> G:190 var
+R37054:37056 xv6iris.FsDurWire <> nin:191 var
+R37058:37060 xv6iris.FsDurWire <> cov:192 var
+R37062:37063 xv6iris.FsDurWire <> ls:193 var
+R37065:37066 xv6iris.FsDurWire <> D':195 var
+prf 37081:37092 <> dstep_dec_id
+binder 37094:37094 <> g:196
+binder 37096:37098 <> Γd:197
+binder 37100:37100 <> G:198
+binder 37102:37104 <> nin:199
+binder 37106:37108 <> cov:200
+binder 37110:37111 <> ls:201
+binder 37113:37113 <> D:202
+R37121:37124 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R37125:37133 xv6iris.FsDurWire <> dstep_dec def
+R37135:37135 xv6iris.FsDurWire <> g:196 var
+R37137:37139 xv6iris.FsDurWire <> Γd:197 var
+R37141:37141 xv6iris.FsDurWire <> G:198 var
+R37143:37145 xv6iris.FsDurWire <> nin:199 var
+R37147:37149 xv6iris.FsDurWire <> cov:200 var
+R37151:37152 xv6iris.FsDurWire <> ls:201 var
+R37154:37154 xv6iris.FsDurWire <> D:202 var
+R37156:37156 xv6iris.FsDurWire <> D:202 var
+R37177:37185 xv6iris.FsDurWire <> dstep_dec def
+R37177:37185 xv6iris.FsDurWire <> dstep_dec def
+R37177:37185 xv6iris.FsDurWire <> dstep_dec def
+prf 37238:37252 <> dstep_dec_trans
+binder 37254:37254 <> g:203
+binder 37256:37258 <> Γd:204
+binder 37260:37260 <> G:205
+binder 37262:37264 <> nin:206
+binder 37266:37268 <> cov:207
+binder 37270:37271 <> ls:208
+binder 37273:37273 <> D:209
+binder 37275:37276 <> D':210
+binder 37278:37280 <> D'':211
+R37321:37326 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R37288:37296 xv6iris.FsDurWire <> dstep_dec def
+R37298:37298 xv6iris.FsDurWire <> g:203 var
+R37300:37302 xv6iris.FsDurWire <> Γd:204 var
+R37304:37304 xv6iris.FsDurWire <> G:205 var
+R37306:37308 xv6iris.FsDurWire <> nin:206 var
+R37310:37312 xv6iris.FsDurWire <> cov:207 var
+R37314:37315 xv6iris.FsDurWire <> ls:208 var
+R37317:37317 xv6iris.FsDurWire <> D:209 var
+R37319:37320 xv6iris.FsDurWire <> D':210 var
+R37362:37371 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R37327:37335 xv6iris.FsDurWire <> dstep_dec def
+R37337:37337 xv6iris.FsDurWire <> g:203 var
+R37339:37341 xv6iris.FsDurWire <> Γd:204 var
+R37343:37343 xv6iris.FsDurWire <> G:205 var
+R37345:37347 xv6iris.FsDurWire <> nin:206 var
+R37349:37351 xv6iris.FsDurWire <> cov:207 var
+R37353:37354 xv6iris.FsDurWire <> ls:208 var
+R37356:37357 xv6iris.FsDurWire <> D':210 var
+R37359:37361 xv6iris.FsDurWire <> D'':211 var
+R37372:37380 xv6iris.FsDurWire <> dstep_dec def
+R37382:37382 xv6iris.FsDurWire <> g:203 var
+R37384:37386 xv6iris.FsDurWire <> Γd:204 var
+R37388:37388 xv6iris.FsDurWire <> G:205 var
+R37390:37392 xv6iris.FsDurWire <> nin:206 var
+R37394:37396 xv6iris.FsDurWire <> cov:207 var
+R37398:37399 xv6iris.FsDurWire <> ls:208 var
+R37401:37401 xv6iris.FsDurWire <> D:209 var
+R37403:37405 xv6iris.FsDurWire <> D'':211 var
+R37430:37438 xv6iris.FsDurWire <> dstep_dec def
+R37430:37438 xv6iris.FsDurWire <> dstep_dec def
+R37430:37438 xv6iris.FsDurWire <> dstep_dec def
+R37473:37473 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37478:37483 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37491:37491 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37473:37473 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37478:37483 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37491:37491 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37518:37518 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37523:37528 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37536:37536 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37518:37518 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37523:37528 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37536:37536 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+prf 38380:38398 <> dstep_dec_of_bridge
+R38405:38409 iris.base_logic.lib.iprop <> gname def
+binder 38401:38401 <> g:212
+R38419:38430 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 38413:38415 <> Γd:213
+R38444:38448 xv6iris.FsDurObj <> dgeom rec
+binder 38440:38440 <> G:214
+R38458:38458 Corelib.Numbers.BinNums <> Z ind
+binder 38452:38454 <> nin:215
+R38468:38471 stdpp.gmap <> gset def
+R38473:38473 Corelib.Numbers.BinNums <> Z ind
+binder 38462:38464 <> cov:216
+R38482:38482 Corelib.Numbers.BinNums <> Z ind
+binder 38477:38478 <> ls:217
+R38499:38502 stdpp.gmap <> gmap rec
+R38507:38510 Corelib.Init.Datatypes <> list ind
+R38513:38514 stdpp.bitvector.definitions <> bv rec
+R38504:38504 Corelib.Numbers.BinNums <> Z ind
+binder 38492:38492 <> D:218
+binder 38494:38495 <> D':219
+R38533:38544 xv6iris.FsState <> fs_state_rec rec
+binder 38528:38529 <> S':220
+R38554:38557 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R38553:38553 Corelib.Numbers.BinNums <> Z ind
+R38558:38565 xv6iris.FsDurObj <> blk_kind ind
+binder 38548:38549 <> K':221
+R38599:38602 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R38574:38585 xv6iris.FsDurWire <> dwire_bridge def
+R38587:38588 xv6iris.FsDurWire <> K':221 var
+R38590:38591 xv6iris.FsDurWire <> D':219 var
+R38593:38595 xv6iris.FsDurWire <> cov:216 var
+R38597:38598 xv6iris.FsDurWire <> ls:217 var
+R38629:38636 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R38603:38618 xv6iris.FsDurWire <> kinds_blocksized def
+R38620:38621 xv6iris.FsDurWire <> K':221 var
+R38623:38625 xv6iris.FsDurWire <> cov:216 var
+R38627:38628 xv6iris.FsDurWire <> ls:217 var
+R38663:38670 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R38637:38650 xv6iris.FsDurWire <> kinds_of_state rec
+R38652:38652 xv6iris.FsDurWire <> G:214 var
+R38654:38656 xv6iris.FsDurWire <> nin:215 var
+R38658:38659 xv6iris.FsDurWire <> S':220 var
+R38661:38662 xv6iris.FsDurWire <> K':221 var
+R38671:38674 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R38675:38683 xv6iris.FsDurWire <> dstep_dec def
+R38685:38685 xv6iris.FsDurWire <> g:212 var
+R38687:38689 xv6iris.FsDurWire <> Γd:213 var
+R38691:38691 xv6iris.FsDurWire <> G:214 var
+R38693:38695 xv6iris.FsDurWire <> nin:215 var
+R38697:38699 xv6iris.FsDurWire <> cov:216 var
+R38701:38702 xv6iris.FsDurWire <> ls:217 var
+R38704:38704 xv6iris.FsDurWire <> D:218 var
+R38706:38707 xv6iris.FsDurWire <> D':219 var
+R38753:38761 xv6iris.FsDurWire <> dstep_dec def
+R38764:38771 xv6iris.FsDurWire <> P_wf_dec def
+R38753:38761 xv6iris.FsDurWire <> dstep_dec def
+R38753:38761 xv6iris.FsDurWire <> dstep_dec def
+R38764:38771 xv6iris.FsDurWire <> P_wf_dec def
+R38764:38771 xv6iris.FsDurWire <> P_wf_dec def
+R38865:38865 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38912:38917 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38925:38925 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38866:38880 xv6iris.LogDefs <> fs_dview_rebase thm
+R38885:38893 xv6iris.LogDefs <> fs_dbytes def
+R38899:38907 xv6iris.LogDefs <> fs_dbytes def
+R38865:38865 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38912:38917 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38925:38925 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38866:38880 xv6iris.LogDefs <> fs_dview_rebase thm
+R38885:38893 xv6iris.LogDefs <> fs_dbytes def
+R38899:38907 xv6iris.LogDefs <> fs_dbytes def
+R38960:38967 xv6iris.FsState <> top_frag def
+R38960:38967 xv6iris.FsState <> top_frag def
+R38960:38967 xv6iris.FsState <> top_frag def
+R38979:38979 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39035:39052 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39063:39063 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38980:38989 xv6iris.FsDurWire <> top_rebase thm
+R38992:38998 xv6iris.RiscvPtsto <> fdn_top proj
+R39006:39015 xv6iris.FsState <> fss_inodes proj
+R39021:39030 xv6iris.FsState <> fss_inodes proj
+R38979:38979 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39035:39052 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39063:39063 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38980:38989 xv6iris.FsDurWire <> top_rebase thm
+R38992:38998 xv6iris.RiscvPtsto <> fdn_top proj
+R39006:39015 xv6iris.FsState <> fss_inodes proj
+R39021:39030 xv6iris.FsState <> fss_inodes proj
+prf 39572:39591 <> dur_stands_at_logged
+R39598:39602 iris.base_logic.lib.iprop <> gname def
+binder 39594:39594 <> g:222
+R39612:39623 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 39606:39608 <> Γd:223
+R39637:39641 xv6iris.FsDurObj <> dgeom rec
+binder 39633:39633 <> G:224
+R39651:39651 Corelib.Numbers.BinNums <> Z ind
+binder 39645:39647 <> nin:225
+R39661:39664 stdpp.gmap <> gset def
+R39666:39666 Corelib.Numbers.BinNums <> Z ind
+binder 39655:39657 <> cov:226
+R39675:39675 Corelib.Numbers.BinNums <> Z ind
+binder 39670:39671 <> ls:227
+R39690:39693 stdpp.gmap <> gmap rec
+R39698:39701 Corelib.Init.Datatypes <> list ind
+R39704:39705 stdpp.bitvector.definitions <> bv rec
+R39695:39695 Corelib.Numbers.BinNums <> Z ind
+binder 39685:39686 <> D0:228
+R39723:39726 stdpp.gmap <> gmap rec
+R39731:39734 Corelib.Init.Datatypes <> list ind
+R39737:39738 stdpp.bitvector.definitions <> bv rec
+R39728:39728 Corelib.Numbers.BinNums <> Z ind
+binder 39719:39719 <> L:229
+R39751:39762 xv6iris.FsState <> fs_state_rec rec
+binder 39746:39747 <> S':230
+R39772:39775 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39771:39771 Corelib.Numbers.BinNums <> Z ind
+R39776:39783 xv6iris.FsDurObj <> blk_kind ind
+binder 39766:39767 <> K':231
+R39835:39842 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39792:39803 xv6iris.FsDurWire <> dwire_bridge def
+R39805:39806 xv6iris.FsDurWire <> K':231 var
+R39809:39817 xv6iris.LogDefs <> lm_logged def
+R39819:39819 xv6iris.FsDurWire <> L:229 var
+R39821:39823 xv6iris.FsDurWire <> cov:226 var
+R39825:39826 xv6iris.FsDurWire <> ls:227 var
+R39829:39831 xv6iris.FsDurWire <> cov:226 var
+R39833:39834 xv6iris.FsDurWire <> ls:227 var
+R39869:39872 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39843:39858 xv6iris.FsDurWire <> kinds_blocksized def
+R39860:39861 xv6iris.FsDurWire <> K':231 var
+R39863:39865 xv6iris.FsDurWire <> cov:226 var
+R39867:39868 xv6iris.FsDurWire <> ls:227 var
+R39899:39906 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39873:39886 xv6iris.FsDurWire <> kinds_of_state rec
+R39888:39888 xv6iris.FsDurWire <> G:224 var
+R39890:39892 xv6iris.FsDurWire <> nin:225 var
+R39894:39895 xv6iris.FsDurWire <> S':230 var
+R39897:39898 xv6iris.FsDurWire <> K':231 var
+R39940:39945 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R39907:39920 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R39922:39922 xv6iris.FsDurWire <> g:222 var
+R39927:39935 xv6iris.LogDefs <> fs_dbytes def
+R39937:39938 xv6iris.FsDurWire <> D0:228 var
+R39976:39988 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R39946:39953 xv6iris.FsDurWire <> P_wf_dec def
+R39955:39955 xv6iris.FsDurWire <> g:222 var
+R39957:39959 xv6iris.FsDurWire <> Γd:223 var
+R39961:39961 xv6iris.FsDurWire <> G:224 var
+R39963:39965 xv6iris.FsDurWire <> nin:225 var
+R39967:39969 xv6iris.FsDurWire <> cov:226 var
+R39971:39972 xv6iris.FsDurWire <> ls:227 var
+R39974:39975 xv6iris.FsDurWire <> D0:228 var
+R40040:40050 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R39989:40002 iris.base_logic.lib.ghost_map <> ghost_map_auth def
+R40004:40004 xv6iris.FsDurWire <> g:222 var
+R40009:40017 xv6iris.LogDefs <> fs_dbytes def
+R40020:40028 xv6iris.LogDefs <> lm_logged def
+R40030:40030 xv6iris.FsDurWire <> L:229 var
+R40032:40034 xv6iris.FsDurWire <> cov:226 var
+R40036:40037 xv6iris.FsDurWire <> ls:227 var
+R40051:40058 xv6iris.FsDurWire <> P_wf_dec def
+R40060:40060 xv6iris.FsDurWire <> g:222 var
+R40062:40064 xv6iris.FsDurWire <> Γd:223 var
+R40066:40066 xv6iris.FsDurWire <> G:224 var
+R40068:40070 xv6iris.FsDurWire <> nin:225 var
+R40072:40074 xv6iris.FsDurWire <> cov:226 var
+R40076:40077 xv6iris.FsDurWire <> ls:227 var
+R40080:40088 xv6iris.LogDefs <> lm_logged def
+R40090:40090 xv6iris.FsDurWire <> L:229 var
+R40092:40094 xv6iris.FsDurWire <> cov:226 var
+R40096:40097 xv6iris.FsDurWire <> ls:227 var
+R40163:40163 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40259:40264 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40272:40272 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40164:40182 xv6iris.FsDurWire <> dstep_dec_of_bridge thm
+R40207:40215 xv6iris.LogDefs <> lm_logged def
+R40163:40163 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40259:40264 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40272:40272 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40164:40182 xv6iris.FsDurWire <> dstep_dec_of_bridge thm
+R40207:40215 xv6iris.LogDefs <> lm_logged def
+R40287:40290 xv6iris.FsDurWire Body <> sec
+def 41872:41884 <> kind_write_ok
+R41891:41895 xv6iris.FsDurObj <> dgeom rec
+binder 41887:41887 <> G:232
+R41905:41905 Corelib.Numbers.BinNums <> Z ind
+binder 41899:41901 <> nin:233
+R41915:41918 stdpp.gmap <> gset def
+R41920:41920 Corelib.Numbers.BinNums <> Z ind
+binder 41909:41911 <> cov:234
+R41929:41929 Corelib.Numbers.BinNums <> Z ind
+binder 41924:41925 <> ls:235
+R41941:41941 Corelib.Numbers.BinNums <> Z ind
+binder 41937:41937 <> b:236
+R41956:41959 Corelib.Init.Datatypes <> list ind
+R41962:41963 stdpp.bitvector.definitions <> bv rec
+binder 41945:41949 <> oldbs:237
+binder 41951:41952 <> bs:238
+R41981:41988 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R42025:42031 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R41993:42004 xv6iris.FsState <> fs_state_rec rec
+binder 41989:41989 <> S:239
+R42013:42016 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42012:42012 Corelib.Numbers.BinNums <> Z ind
+R42017:42024 xv6iris.FsDurObj <> blk_kind ind
+binder 42008:42008 <> K:240
+R42057:42060 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42032:42047 xv6iris.FsDurWire <> kinds_blocksized def
+R42049:42049 xv6iris.FsDurWire <> K:240 var
+R42051:42053 xv6iris.FsDurWire <> cov:234 var
+R42055:42056 xv6iris.FsDurWire <> ls:235 var
+R42085:42092 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42061:42074 xv6iris.FsDurWire <> kinds_of_state rec
+R42076:42076 xv6iris.FsDurWire <> G:232 var
+R42078:42080 xv6iris.FsDurWire <> nin:233 var
+R42082:42082 xv6iris.FsDurWire <> S:239 var
+R42084:42084 xv6iris.FsDurWire <> K:240 var
+R42115:42122 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42107:42109 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R42093:42100 xv6iris.FsDurObj <> kind_enc def
+R42103:42103 xv6iris.FsDurWire <> K:240 var
+R42105:42105 xv6iris.FsDurWire <> b:236 var
+R42110:42114 xv6iris.FsDurWire <> oldbs:237 var
+R42123:42130 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R42164:42172 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R42136:42147 xv6iris.FsState <> fs_state_rec rec
+binder 42131:42132 <> S':241
+R42156:42163 xv6iris.FsDurObj <> blk_kind ind
+binder 42151:42152 <> k':242
+R42189:42192 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R42184:42186 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R42173:42180 xv6iris.FsDurObj <> kind_enc def
+R42182:42183 xv6iris.FsDurWire <> k':242 var
+R42187:42188 xv6iris.FsDurWire <> bs:238 var
+R42193:42206 xv6iris.FsDurWire <> kinds_of_state rec
+R42208:42208 xv6iris.FsDurWire <> G:232 var
+R42210:42212 xv6iris.FsDurWire <> nin:233 var
+R42214:42215 xv6iris.FsDurWire <> S':241 var
+R42218:42225 xv6iris.FsDurWire <> kind_upd def
+R42227:42227 xv6iris.FsDurWire <> K:240 var
+R42229:42229 xv6iris.FsDurWire <> b:236 var
+R42231:42232 xv6iris.FsDurWire <> k':242 var
+sec 42245:42251 <> Payload
+var  42265:42266 Payload Σ
+R42270:42278 iris.base_logic.lib.iprop <> gFunctors rec
+R42295:42302 xv6iris.DiskImg <> diskImgG class
+R42304:42305 xv6iris.FsDurWire <> Payload.Σ var
+R42309:42315 xv6iris.Xv6Cameras <> fsLinkG class
+R42317:42318 xv6iris.FsDurWire <> Payload.Σ var
+R42322:42327 xv6iris.Xv6Cameras <> fsTopG class
+R42329:42330 xv6iris.FsDurWire <> Payload.Σ var
+def 42348:42354 <> Psi_dec
+R42361:42365 xv6iris.FsDurObj <> dgeom rec
+binder 42357:42357 <> G:247
+R42375:42375 Corelib.Numbers.BinNums <> Z ind
+binder 42369:42371 <> nin:248
+R42385:42388 stdpp.gmap <> gset def
+R42390:42390 Corelib.Numbers.BinNums <> Z ind
+binder 42379:42381 <> cov:249
+R42399:42399 Corelib.Numbers.BinNums <> Z ind
+binder 42394:42395 <> ls:250
+R42417:42420 stdpp.gmap <> gmap rec
+R42425:42428 Corelib.Init.Datatypes <> list ind
+R42431:42432 stdpp.bitvector.definitions <> bv rec
+R42422:42422 Corelib.Numbers.BinNums <> Z ind
+binder 42409:42410 <> D0:251
+binder 42412:42413 <> Dc:252
+R42441:42445 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R42447:42448 xv6iris.FsDurWire <> Payload.Σ var
+R42458:42462 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R42499:42508 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R42467:42478 xv6iris.FsState <> fs_state_rec rec
+binder 42463:42463 <> S:253
+R42487:42490 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42486:42486 Corelib.Numbers.BinNums <> Z ind
+R42491:42498 xv6iris.FsDurObj <> blk_kind ind
+binder 42482:42482 <> K:254
+R42539:42543 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R42509:42511 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R42536:42538 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R42512:42523 xv6iris.FsDurWire <> dwire_bridge def
+R42525:42525 xv6iris.FsDurWire <> K:254 var
+R42527:42528 xv6iris.FsDurWire <> Dc:252 var
+R42530:42532 xv6iris.FsDurWire <> cov:249 var
+R42534:42535 xv6iris.FsDurWire <> ls:250 var
+R42575:42586 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R42544:42546 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R42572:42574 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R42547:42562 xv6iris.FsDurWire <> kinds_blocksized def
+R42564:42564 xv6iris.FsDurWire <> K:254 var
+R42566:42568 xv6iris.FsDurWire <> cov:249 var
+R42570:42571 xv6iris.FsDurWire <> ls:250 var
+R42587:42589 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R42614:42616 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R42590:42603 xv6iris.FsDurWire <> kinds_of_state rec
+R42605:42605 xv6iris.FsDurWire <> G:247 var
+R42607:42609 xv6iris.FsDurWire <> nin:248 var
+R42611:42611 xv6iris.FsDurWire <> S:253 var
+R42613:42613 xv6iris.FsDurWire <> K:254 var
+inst 42641:42658 <> Psi_dec_persistent
+binder 42660:42660 <> G:255
+binder 42662:42664 <> nin:256
+binder 42666:42668 <> cov:257
+binder 42670:42671 <> ls:258
+binder 42673:42674 <> D0:259
+binder 42676:42677 <> Dc:260
+R42685:42694 iris.bi.derived_connectives <> Persistent class
+R42697:42703 xv6iris.FsDurWire <> Psi_dec def
+R42705:42705 xv6iris.FsDurWire <> G:255 var
+R42707:42709 xv6iris.FsDurWire <> nin:256 var
+R42711:42713 xv6iris.FsDurWire <> cov:257 var
+R42715:42716 xv6iris.FsDurWire <> ls:258 var
+R42718:42719 xv6iris.FsDurWire <> D0:259 var
+R42721:42722 xv6iris.FsDurWire <> Dc:260 var
+R42744:42750 xv6iris.FsDurWire <> Psi_dec def
+R42744:42750 xv6iris.FsDurWire <> Psi_dec def
+R42744:42750 xv6iris.FsDurWire <> Psi_dec def
+def 43048:43061 <> psi_commit_law
+R43096:43099 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43076:43079 stdpp.gmap <> gmap rec
+R43084:43087 Corelib.Init.Datatypes <> list ind
+R43090:43091 stdpp.bitvector.definitions <> bv rec
+R43081:43081 Corelib.Numbers.BinNums <> Z ind
+R43120:43123 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43100:43103 stdpp.gmap <> gmap rec
+R43108:43111 Corelib.Init.Datatypes <> list ind
+R43114:43115 stdpp.bitvector.definitions <> bv rec
+R43105:43105 Corelib.Numbers.BinNums <> Z ind
+R43124:43128 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R43130:43131 xv6iris.FsDurWire <> Payload.Σ var
+binder 43070:43072 <> Psi:261
+R43145:43149 iris.base_logic.lib.iprop <> gname def
+binder 43141:43141 <> g:262
+R43159:43170 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 43153:43155 <> Γd:263
+R43178:43182 xv6iris.FsDurObj <> dgeom rec
+binder 43174:43174 <> G:264
+R43192:43192 Corelib.Numbers.BinNums <> Z ind
+binder 43186:43188 <> nin:265
+R43208:43211 stdpp.gmap <> gset def
+R43213:43213 Corelib.Numbers.BinNums <> Z ind
+binder 43202:43204 <> cov:266
+R43222:43222 Corelib.Numbers.BinNums <> Z ind
+binder 43217:43218 <> ls:267
+R43227:43231 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R43233:43234 xv6iris.FsDurWire <> Payload.Σ var
+R43244:43247 iris.bi.derived_connectives <> ::bi_scope:'□'_x not
+R43248:43251 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R43280:43289 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R43260:43263 stdpp.gmap <> gmap rec
+R43268:43271 Corelib.Init.Datatypes <> list ind
+R43274:43275 stdpp.bitvector.definitions <> bv rec
+R43265:43265 Corelib.Numbers.BinNums <> Z ind
+binder 43252:43253 <> D0:268
+R43260:43263 stdpp.gmap <> gmap rec
+R43268:43271 Corelib.Init.Datatypes <> list ind
+R43274:43275 stdpp.bitvector.definitions <> bv rec
+R43265:43265 Corelib.Numbers.BinNums <> Z ind
+binder 43255:43256 <> Dc:269
+R43299:43305 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R43290:43292 xv6iris.FsDurWire <> Psi:261 var
+R43297:43298 xv6iris.FsDurWire <> Dc:269 var
+R43294:43295 xv6iris.FsDurWire <> D0:268 var
+R43315:43319 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R43306:43308 xv6iris.FsDurWire <> Psi:261 var
+R43313:43314 xv6iris.FsDurWire <> Dc:269 var
+R43310:43311 xv6iris.FsDurWire <> Dc:269 var
+R43320:43328 xv6iris.FsDurWire <> dstep_dec def
+R43330:43330 xv6iris.FsDurWire <> g:262 var
+R43332:43334 xv6iris.FsDurWire <> Γd:263 var
+R43336:43336 xv6iris.FsDurWire <> G:264 var
+R43338:43340 xv6iris.FsDurWire <> nin:265 var
+R43342:43344 xv6iris.FsDurWire <> cov:266 var
+R43346:43347 xv6iris.FsDurWire <> ls:267 var
+R43349:43350 xv6iris.FsDurWire <> D0:268 var
+R43352:43353 xv6iris.FsDurWire <> Dc:269 var
+prf 43370:43383 <> Psi_dec_commit
+R43390:43394 iris.base_logic.lib.iprop <> gname def
+binder 43386:43386 <> g:270
+R43404:43415 xv6iris.RiscvPtsto <> fs_dur_names rec
+binder 43398:43400 <> Γd:271
+R43423:43427 xv6iris.FsDurObj <> dgeom rec
+binder 43419:43419 <> G:272
+R43443:43443 Corelib.Numbers.BinNums <> Z ind
+binder 43437:43439 <> nin:273
+R43453:43456 stdpp.gmap <> gset def
+R43458:43458 Corelib.Numbers.BinNums <> Z ind
+binder 43447:43449 <> cov:274
+R43467:43467 Corelib.Numbers.BinNums <> Z ind
+binder 43462:43463 <> ls:275
+R43476:43479 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R43480:43493 xv6iris.FsDurWire <> psi_commit_law def
+R43496:43502 xv6iris.FsDurWire <> Psi_dec def
+R43504:43504 xv6iris.FsDurWire <> G:272 var
+R43506:43508 xv6iris.FsDurWire <> nin:273 var
+R43510:43512 xv6iris.FsDurWire <> cov:274 var
+R43514:43515 xv6iris.FsDurWire <> ls:275 var
+R43518:43518 xv6iris.FsDurWire <> g:270 var
+R43520:43522 xv6iris.FsDurWire <> Γd:271 var
+R43524:43524 xv6iris.FsDurWire <> G:272 var
+R43526:43528 xv6iris.FsDurWire <> nin:273 var
+R43530:43532 xv6iris.FsDurWire <> cov:274 var
+R43534:43535 xv6iris.FsDurWire <> ls:275 var
+R43560:43573 xv6iris.FsDurWire <> psi_commit_law def
+R43560:43573 xv6iris.FsDurWire <> psi_commit_law def
+R43560:43573 xv6iris.FsDurWire <> psi_commit_law def
+R43843:43861 xv6iris.FsDurWire <> dstep_dec_of_bridge thm
+R43843:43861 xv6iris.FsDurWire <> dstep_dec_of_bridge thm
+def 44296:44308 <> psi_write_law
+R44343:44346 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R44323:44326 stdpp.gmap <> gmap rec
+R44331:44334 Corelib.Init.Datatypes <> list ind
+R44337:44338 stdpp.bitvector.definitions <> bv rec
+R44328:44328 Corelib.Numbers.BinNums <> Z ind
+R44367:44370 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R44347:44350 stdpp.gmap <> gmap rec
+R44355:44358 Corelib.Init.Datatypes <> list ind
+R44361:44362 stdpp.bitvector.definitions <> bv rec
+R44352:44352 Corelib.Numbers.BinNums <> Z ind
+R44371:44375 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R44377:44378 xv6iris.FsDurWire <> Payload.Σ var
+binder 44317:44319 <> Psi:276
+R44392:44396 xv6iris.FsDurObj <> dgeom rec
+binder 44388:44388 <> G:277
+R44406:44406 Corelib.Numbers.BinNums <> Z ind
+binder 44400:44402 <> nin:278
+R44416:44419 stdpp.gmap <> gset def
+R44421:44421 Corelib.Numbers.BinNums <> Z ind
+binder 44410:44412 <> cov:279
+R44430:44430 Corelib.Numbers.BinNums <> Z ind
+binder 44425:44426 <> ls:280
+R44435:44439 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R44441:44442 xv6iris.FsDurWire <> Payload.Σ var
+R44452:44455 iris.bi.derived_connectives <> ::bi_scope:'□'_x not
+R44456:44460 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R44522:44532 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R44469:44472 stdpp.gmap <> gmap rec
+R44477:44480 Corelib.Init.Datatypes <> list ind
+R44483:44484 stdpp.bitvector.definitions <> bv rec
+R44474:44474 Corelib.Numbers.BinNums <> Z ind
+binder 44461:44462 <> D0:281
+R44469:44472 stdpp.gmap <> gmap rec
+R44477:44480 Corelib.Init.Datatypes <> list ind
+R44483:44484 stdpp.bitvector.definitions <> bv rec
+R44474:44474 Corelib.Numbers.BinNums <> Z ind
+binder 44464:44465 <> Dc:282
+R44496:44496 Corelib.Numbers.BinNums <> Z ind
+binder 44492:44492 <> b:283
+R44511:44514 Corelib.Init.Datatypes <> list ind
+R44517:44518 stdpp.bitvector.definitions <> bv rec
+binder 44500:44504 <> oldbs:284
+R44511:44514 Corelib.Init.Datatypes <> list ind
+R44517:44518 stdpp.bitvector.definitions <> bv rec
+binder 44506:44507 <> bs:285
+R44563:44568 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R44533:44535 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R44560:44562 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R44537:44541 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R44536:44536 xv6iris.FsDurWire <> b:283 var
+R44542:44552 xv6iris.LogDefs <> fs_home_set def
+R44554:44556 xv6iris.FsDurWire <> cov:279 var
+R44558:44559 xv6iris.FsDurWire <> ls:280 var
+R44595:44608 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R44569:44571 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R44592:44594 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R44579:44581 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R44574:44577 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R44578:44578 xv6iris.FsDurWire <> b:283 var
+R44572:44573 xv6iris.FsDurWire <> Dc:282 var
+R44582:44585 Corelib.Init.Datatypes <> Some constr
+R44587:44591 xv6iris.FsDurWire <> oldbs:284 var
+R44632:44637 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R44609:44611 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R44629:44631 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R44621:44623 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R44612:44617 Corelib.Init.Datatypes <> length def
+R44619:44620 xv6iris.FsDurWire <> bs:285 var
+R44624:44628 xv6iris.BioDefs <> BSIZE def
+R44681:44694 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R44638:44640 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R44678:44680 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R44641:44653 xv6iris.FsDurWire <> kind_write_ok def
+R44655:44655 xv6iris.FsDurWire <> G:277 var
+R44657:44659 xv6iris.FsDurWire <> nin:278 var
+R44661:44663 xv6iris.FsDurWire <> cov:279 var
+R44665:44666 xv6iris.FsDurWire <> ls:280 var
+R44668:44668 xv6iris.FsDurWire <> b:283 var
+R44670:44674 xv6iris.FsDurWire <> oldbs:284 var
+R44676:44677 xv6iris.FsDurWire <> bs:285 var
+R44704:44710 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R44695:44697 xv6iris.FsDurWire <> Psi:276 var
+R44702:44703 xv6iris.FsDurWire <> Dc:282 var
+R44699:44700 xv6iris.FsDurWire <> D0:281 var
+R44711:44713 xv6iris.FsDurWire <> Psi:276 var
+R44719:44720 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R44722:44725 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R44728:44732 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R44721:44721 xv6iris.FsDurWire <> b:283 var
+R44726:44727 xv6iris.FsDurWire <> bs:285 var
+R44731:44732 xv6iris.FsDurWire <> Dc:282 var
+R44715:44716 xv6iris.FsDurWire <> D0:281 var
+prf 44750:44767 <> Psi_dec_write_tied
+R44774:44778 xv6iris.FsDurObj <> dgeom rec
+binder 44770:44770 <> G:286
+R44788:44788 Corelib.Numbers.BinNums <> Z ind
+binder 44782:44784 <> nin:287
+R44798:44801 stdpp.gmap <> gset def
+R44803:44803 Corelib.Numbers.BinNums <> Z ind
+binder 44792:44794 <> cov:288
+R44812:44812 Corelib.Numbers.BinNums <> Z ind
+binder 44807:44808 <> ls:289
+R44830:44833 stdpp.gmap <> gmap rec
+R44838:44841 Corelib.Init.Datatypes <> list ind
+R44844:44845 stdpp.bitvector.definitions <> bv rec
+R44835:44835 Corelib.Numbers.BinNums <> Z ind
+binder 44822:44823 <> D0:290
+binder 44825:44826 <> Dc:291
+R44857:44857 Corelib.Numbers.BinNums <> Z ind
+binder 44853:44853 <> b:292
+R44872:44875 Corelib.Init.Datatypes <> list ind
+R44878:44879 stdpp.bitvector.definitions <> bv rec
+binder 44861:44865 <> oldbs:293
+binder 44867:44868 <> bs:294
+R44915:44918 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R44892:44896 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R44891:44891 xv6iris.FsDurWire <> b:292 var
+R44897:44907 xv6iris.LogDefs <> fs_home_set def
+R44909:44911 xv6iris.FsDurWire <> cov:288 var
+R44913:44914 xv6iris.FsDurWire <> ls:289 var
+R44939:44942 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R44926:44928 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R44921:44924 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R44925:44925 xv6iris.FsDurWire <> b:292 var
+R44919:44920 xv6iris.FsDurWire <> Dc:291 var
+R44929:44932 Corelib.Init.Datatypes <> Some constr
+R44934:44938 xv6iris.FsDurWire <> oldbs:293 var
+R44960:44967 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R44952:44954 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R44943:44948 Corelib.Init.Datatypes <> length def
+R44950:44951 xv6iris.FsDurWire <> bs:294 var
+R44955:44959 xv6iris.BioDefs <> BSIZE def
+R45005:45012 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R44968:44980 xv6iris.FsDurWire <> kind_write_ok def
+R44982:44982 xv6iris.FsDurWire <> G:286 var
+R44984:44986 xv6iris.FsDurWire <> nin:287 var
+R44988:44990 xv6iris.FsDurWire <> cov:288 var
+R44992:44993 xv6iris.FsDurWire <> ls:289 var
+R44995:44995 xv6iris.FsDurWire <> b:292 var
+R44997:45001 xv6iris.FsDurWire <> oldbs:293 var
+R45003:45004 xv6iris.FsDurWire <> bs:294 var
+R45039:45045 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R45013:45019 xv6iris.FsDurWire <> Psi_dec def
+R45021:45021 xv6iris.FsDurWire <> G:286 var
+R45023:45025 xv6iris.FsDurWire <> nin:287 var
+R45027:45029 xv6iris.FsDurWire <> cov:288 var
+R45031:45032 xv6iris.FsDurWire <> ls:289 var
+R45034:45035 xv6iris.FsDurWire <> D0:290 var
+R45037:45038 xv6iris.FsDurWire <> Dc:291 var
+R45046:45052 xv6iris.FsDurWire <> Psi_dec def
+R45054:45054 xv6iris.FsDurWire <> G:286 var
+R45056:45058 xv6iris.FsDurWire <> nin:287 var
+R45060:45062 xv6iris.FsDurWire <> cov:288 var
+R45064:45065 xv6iris.FsDurWire <> ls:289 var
+R45067:45068 xv6iris.FsDurWire <> D0:290 var
+R45071:45072 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R45074:45077 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R45080:45084 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R45073:45073 xv6iris.FsDurWire <> b:292 var
+R45078:45079 xv6iris.FsDurWire <> bs:294 var
+R45083:45084 xv6iris.FsDurWire <> Dc:291 var
+R45231:45233 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R45217:45224 xv6iris.FsDurObj <> kind_enc def
+R45231:45233 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R45217:45224 xv6iris.FsDurObj <> kind_enc def
+R45423:45430 xv6iris.FsDurWire <> kind_upd def
+R45423:45430 xv6iris.FsDurWire <> kind_upd def
+R45499:45516 xv6iris.FsDurWire <> dwire_bridge_write thm
+R45499:45516 xv6iris.FsDurWire <> dwire_bridge_write thm
+R45584:45605 xv6iris.FsDurWire <> kinds_blocksized_write thm
+R45584:45605 xv6iris.FsDurWire <> kinds_blocksized_write thm
+prf 45706:45722 <> Psi_dec_write_law
+R45729:45733 xv6iris.FsDurObj <> dgeom rec
+binder 45725:45725 <> G:295
+R45743:45743 Corelib.Numbers.BinNums <> Z ind
+binder 45737:45739 <> nin:296
+R45753:45756 stdpp.gmap <> gset def
+R45758:45758 Corelib.Numbers.BinNums <> Z ind
+binder 45747:45749 <> cov:297
+R45767:45767 Corelib.Numbers.BinNums <> Z ind
+binder 45762:45763 <> ls:298
+R45776:45779 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R45780:45792 xv6iris.FsDurWire <> psi_write_law def
+R45795:45801 xv6iris.FsDurWire <> Psi_dec def
+R45803:45803 xv6iris.FsDurWire <> G:295 var
+R45805:45807 xv6iris.FsDurWire <> nin:296 var
+R45809:45811 xv6iris.FsDurWire <> cov:297 var
+R45813:45814 xv6iris.FsDurWire <> ls:298 var
+R45817:45817 xv6iris.FsDurWire <> G:295 var
+R45819:45821 xv6iris.FsDurWire <> nin:296 var
+R45823:45825 xv6iris.FsDurWire <> cov:297 var
+R45827:45828 xv6iris.FsDurWire <> ls:298 var
+R45853:45865 xv6iris.FsDurWire <> psi_write_law def
+R45853:45865 xv6iris.FsDurWire <> psi_write_law def
+R45853:45865 xv6iris.FsDurWire <> psi_write_law def
+R45952:45952 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46034:46039 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46046:46046 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45953:45970 xv6iris.FsDurWire <> Psi_dec_write_tied thm
+R45952:45952 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46034:46039 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46046:46046 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45953:45970 xv6iris.FsDurWire <> Psi_dec_write_tied thm
+R46061:46067 xv6iris.FsDurWire Payload <> sec
+def 46952:46963 <> state_bm_upd
+R46970:46981 xv6iris.FsState <> fs_state_rec rec
+binder 46966:46966 <> S:299
+R46990:46993 stdpp.gmap <> gset def
+R46995:46995 Corelib.Numbers.BinNums <> Z ind
+binder 46985:46986 <> u':300
+R47000:47011 xv6iris.FsState <> fs_state_rec rec
+R47018:47022 xv6iris.FsState <> MkFsS constr
+R47025:47030 xv6iris.FsState <> fss_sb proj
+R47032:47032 xv6iris.FsDurWire <> S:299 var
+R47036:47042 xv6iris.FsState <> fss_sbb proj
+R47044:47044 xv6iris.FsDurWire <> S:299 var
+R47048:47057 xv6iris.FsState <> fss_inodes proj
+R47059:47059 xv6iris.FsDurWire <> S:299 var
+R47062:47063 xv6iris.FsDurWire <> u':300 var
+prf 47073:47089 <> kinds_of_state_bm
+R47096:47100 xv6iris.FsDurObj <> dgeom rec
+binder 47092:47092 <> G:301
+R47110:47110 Corelib.Numbers.BinNums <> Z ind
+binder 47104:47106 <> nin:302
+R47118:47129 xv6iris.FsState <> fs_state_rec rec
+binder 47114:47114 <> S:303
+R47142:47145 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R47141:47141 Corelib.Numbers.BinNums <> Z ind
+R47146:47153 xv6iris.FsDurObj <> blk_kind ind
+binder 47137:47137 <> K:304
+R47162:47165 stdpp.gmap <> gset def
+R47167:47167 Corelib.Numbers.BinNums <> Z ind
+binder 47157:47158 <> u':305
+R47198:47201 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R47174:47187 xv6iris.FsDurWire <> kinds_of_state rec
+R47189:47189 xv6iris.FsDurWire <> G:301 var
+R47191:47193 xv6iris.FsDurWire <> nin:302 var
+R47195:47195 xv6iris.FsDurWire <> S:303 var
+R47197:47197 xv6iris.FsDurWire <> K:304 var
+R47214:47219 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R47202:47211 xv6iris.FsDurWire <> dwire_geom def
+R47213:47213 xv6iris.FsDurWire <> G:301 var
+R47220:47233 xv6iris.FsDurWire <> kinds_of_state rec
+R47235:47235 xv6iris.FsDurWire <> G:301 var
+R47237:47239 xv6iris.FsDurWire <> nin:302 var
+R47242:47253 xv6iris.FsDurWire <> state_bm_upd def
+R47255:47255 xv6iris.FsDurWire <> S:303 var
+R47257:47258 xv6iris.FsDurWire <> u':305 var
+R47266:47273 xv6iris.FsDurWire <> kind_upd def
+R47275:47275 xv6iris.FsDurWire <> K:304 var
+R47278:47284 xv6iris.FsDurObj <> dg_bmap proj
+R47286:47286 xv6iris.FsDurWire <> G:301 var
+R47290:47296 xv6iris.FsDurObj <> KBitmap constr
+R47298:47299 xv6iris.FsDurWire <> u':305 var
+R47360:47371 xv6iris.FsDurWire <> state_bm_upd def
+R47373:47378 xv6iris.FsState <> fss_sb proj
+R47380:47389 xv6iris.FsState <> fss_inodes proj
+R47391:47398 xv6iris.FsState <> fss_used proj
+R47417:47427 xv6iris.FsDurWire <> kind_upd_at thm
+R47417:47427 xv6iris.FsDurWire <> kind_upd_at thm
+R47417:47427 xv6iris.FsDurWire <> kind_upd_at thm
+R47509:47519 xv6iris.FsDurWire <> kind_upd_ne thm
+R47524:47530 xv6iris.FsDurObj <> dg_bmap proj
+R47536:47542 xv6iris.FsDurObj <> KBitmap constr
+R47572:47574 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R47564:47569 xv6iris.FsDurObj <> dg_ist proj
+R47509:47519 xv6iris.FsDurWire <> kind_upd_ne thm
+R47524:47530 xv6iris.FsDurObj <> dg_bmap proj
+R47536:47542 xv6iris.FsDurObj <> KBitmap constr
+R47572:47574 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R47564:47569 xv6iris.FsDurObj <> dg_ist proj
+R47509:47519 xv6iris.FsDurWire <> kind_upd_ne thm
+R47524:47530 xv6iris.FsDurObj <> dg_bmap proj
+R47536:47542 xv6iris.FsDurObj <> KBitmap constr
+R47572:47574 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R47564:47569 xv6iris.FsDurObj <> dg_ist proj
+R47756:47759 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R47761:47767 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R47782:47790 Stdlib.ZArith.BinInt Z div_pos thm
+R47756:47759 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R47761:47767 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R47782:47790 Stdlib.ZArith.BinInt Z div_pos thm
+R47812:47822 xv6iris.FsDurWire <> kind_upd_ne thm
+R47827:47833 xv6iris.FsDurObj <> dg_bmap proj
+R47839:47845 xv6iris.FsDurObj <> KBitmap constr
+R47875:47877 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R47867:47872 xv6iris.FsDurObj <> dg_ist proj
+R47879:47885 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R47812:47822 xv6iris.FsDurWire <> kind_upd_ne thm
+R47827:47833 xv6iris.FsDurObj <> dg_bmap proj
+R47839:47845 xv6iris.FsDurObj <> KBitmap constr
+R47875:47877 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R47867:47872 xv6iris.FsDurObj <> dg_ist proj
+R47879:47885 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R47812:47822 xv6iris.FsDurWire <> kind_upd_ne thm
+R47827:47833 xv6iris.FsDurObj <> dg_bmap proj
+R47839:47845 xv6iris.FsDurObj <> KBitmap constr
+R47875:47877 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R47867:47872 xv6iris.FsDurObj <> dg_ist proj
+R47879:47885 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R47957:47962 stdpp.base <> decide def
+R47966:47968 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R47969:47975 xv6iris.FsDurObj <> dg_bmap proj
+R47957:47962 stdpp.base <> decide def
+R47966:47968 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R47969:47975 xv6iris.FsDurObj <> dg_bmap proj
+R48010:48020 xv6iris.FsDurWire <> kind_upd_at thm
+R48010:48020 xv6iris.FsDurWire <> kind_upd_at thm
+R48010:48020 xv6iris.FsDurWire <> kind_upd_at thm
+R48059:48069 xv6iris.FsDurWire <> kind_upd_ne thm
+R48074:48080 xv6iris.FsDurObj <> dg_bmap proj
+R48086:48092 xv6iris.FsDurObj <> KBitmap constr
+R48059:48069 xv6iris.FsDurWire <> kind_upd_ne thm
+R48074:48080 xv6iris.FsDurObj <> dg_bmap proj
+R48086:48092 xv6iris.FsDurObj <> KBitmap constr
+R48059:48069 xv6iris.FsDurWire <> kind_upd_ne thm
+R48074:48080 xv6iris.FsDurObj <> dg_bmap proj
+R48086:48092 xv6iris.FsDurObj <> KBitmap constr
+prf 48576:48594 <> bm_write_obligation
+R48601:48605 xv6iris.FsDurObj <> dgeom rec
+binder 48597:48597 <> G:306
+R48615:48615 Corelib.Numbers.BinNums <> Z ind
+binder 48609:48611 <> nin:307
+R48625:48628 stdpp.gmap <> gset def
+R48630:48630 Corelib.Numbers.BinNums <> Z ind
+binder 48619:48621 <> cov:308
+R48639:48639 Corelib.Numbers.BinNums <> Z ind
+binder 48634:48635 <> ls:309
+R48652:48655 stdpp.gmap <> gset def
+R48657:48657 Corelib.Numbers.BinNums <> Z ind
+binder 48647:48648 <> u':310
+R48669:48672 Corelib.Init.Datatypes <> list ind
+R48675:48676 stdpp.bitvector.definitions <> bv rec
+binder 48661:48665 <> oldbs:311
+R48698:48703 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R48686:48695 xv6iris.FsDurWire <> dwire_geom def
+R48697:48697 xv6iris.FsDurWire <> G:306 var
+R48704:48716 xv6iris.FsDurWire <> kind_write_ok def
+R48718:48718 xv6iris.FsDurWire <> G:306 var
+R48720:48722 xv6iris.FsDurWire <> nin:307 var
+R48724:48726 xv6iris.FsDurWire <> cov:308 var
+R48728:48729 xv6iris.FsDurWire <> ls:309 var
+R48732:48738 xv6iris.FsDurObj <> dg_bmap proj
+R48740:48740 xv6iris.FsDurWire <> G:306 var
+R48743:48747 xv6iris.FsDurWire <> oldbs:311 var
+R48750:48757 xv6iris.BitmapEnc <> bm_bytes def
+R48759:48763 xv6iris.BioDefs <> BSIZE def
+R48765:48766 xv6iris.FsDurWire <> u':310 var
+R48814:48825 xv6iris.FsDurWire <> state_bm_upd def
+R48835:48841 xv6iris.FsDurObj <> KBitmap constr
+R48814:48825 xv6iris.FsDurWire <> state_bm_upd def
+R48835:48841 xv6iris.FsDurObj <> KBitmap constr
+R48881:48897 xv6iris.FsDurWire <> kinds_of_state_bm thm
+R48881:48897 xv6iris.FsDurWire <> kinds_of_state_bm thm
+prf 49006:49030 <> bm_write_bytes_are_a_kind
+R49037:49040 stdpp.gmap <> gset def
+R49042:49042 Corelib.Numbers.BinNums <> Z ind
+binder 49033:49033 <> u:312
+R49051:49051 Corelib.Numbers.BinNums <> Z ind
+binder 49046:49047 <> bi:313
+R49059:49062 Corelib.Init.Datatypes <> bool ind
+binder 49055:49055 <> v:314
+R49097:49102 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R49070:49073 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R49076:49078 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R49074:49075 xv6iris.FsDurWire <> bi:313 var
+R49074:49075 xv6iris.FsDurWire <> bi:313 var
+R49080:49082 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R49083:49090 Stdlib.ZArith.BinInt Z of_nat def
+R49092:49096 xv6iris.BioDefs <> BSIZE def
+R49152:49156 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49103:49114 xv6iris.FsDurObj <> bm_blk_write def
+R49117:49124 xv6iris.BitmapEnc <> bm_bytes def
+R49126:49130 xv6iris.BioDefs <> BSIZE def
+R49132:49132 xv6iris.FsDurWire <> u:312 var
+R49136:49140 xv6iris.FsDurObj <> bm_wr def
+R49142:49142 xv6iris.FsDurWire <> u:312 var
+R49144:49145 xv6iris.FsDurWire <> bi:313 var
+R49147:49147 xv6iris.FsDurWire <> v:314 var
+R49150:49151 xv6iris.FsDurWire <> bi:313 var
+R49157:49164 xv6iris.FsDurObj <> kind_enc def
+R49167:49173 xv6iris.FsDurObj <> KBitmap constr
+R49176:49180 xv6iris.FsDurObj <> bm_wr def
+R49182:49182 xv6iris.FsDurWire <> u:312 var
+R49184:49185 xv6iris.FsDurWire <> bi:313 var
+R49187:49187 xv6iris.FsDurWire <> v:314 var
+R49214:49221 xv6iris.FsDurObj <> kind_enc def
+R49232:49247 xv6iris.FsDurObj <> bm_blk_write_enc thm
+R49232:49247 xv6iris.FsDurObj <> bm_blk_write_enc thm
+prf 49361:49377 <> bm_kind_blocksize
+R49384:49387 stdpp.gmap <> gset def
+R49389:49389 Corelib.Numbers.BinNums <> Z ind
+binder 49380:49380 <> u:315
+R49425:49427 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R49396:49401 Corelib.Init.Datatypes <> length def
+R49404:49411 xv6iris.FsDurObj <> kind_enc def
+R49414:49420 xv6iris.FsDurObj <> KBitmap constr
+R49422:49422 xv6iris.FsDurWire <> u:315 var
+R49428:49432 xv6iris.BioDefs <> BSIZE def
+R49447:49454 xv6iris.FsDurObj <> kind_enc def
+R49464:49478 xv6iris.BitmapEnc <> bm_bytes_length thm
+R49464:49478 xv6iris.BitmapEnc <> bm_bytes_length thm
+prf 49912:49932 <> data_write_obligation
+R49939:49943 xv6iris.FsDurObj <> dgeom rec
+binder 49935:49935 <> G:316
+R49953:49953 Corelib.Numbers.BinNums <> Z ind
+binder 49947:49949 <> nin:317
+R49963:49966 stdpp.gmap <> gset def
+R49968:49968 Corelib.Numbers.BinNums <> Z ind
+binder 49957:49959 <> cov:318
+R49977:49977 Corelib.Numbers.BinNums <> Z ind
+binder 49972:49973 <> ls:319
+R49989:49989 Corelib.Numbers.BinNums <> Z ind
+binder 49985:49985 <> b:320
+R50004:50007 Corelib.Init.Datatypes <> list ind
+R50010:50011 stdpp.bitvector.definitions <> bv rec
+binder 49993:49997 <> oldbs:321
+binder 49999:50000 <> bs:322
+R50035:50040 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R50022:50025 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R50021:50021 xv6iris.FsDurWire <> b:320 var
+R50026:50032 xv6iris.FsDurObj <> dg_bmap proj
+R50034:50034 xv6iris.FsDurWire <> G:316 var
+R50041:50041 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R50099:50105 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R50042:50048 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R50054:50055 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R50053:50053 Corelib.Numbers.BinNums <> Z ind
+binder 50049:50049 <> j:323
+R50062:50065 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R50057:50060 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R50061:50061 xv6iris.FsDurWire <> j:323 var
+R50078:50081 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R50072:50074 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R50068:50070 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R50071:50071 xv6iris.FsDurWire <> j:323 var
+R50075:50077 xv6iris.FsDurWire <> nin:317 var
+R50083:50086 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R50082:50082 xv6iris.FsDurWire <> b:320 var
+R50095:50097 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R50087:50092 xv6iris.FsDurObj <> dg_ist proj
+R50094:50094 xv6iris.FsDurWire <> G:316 var
+R50098:50098 xv6iris.FsDurWire <> j:323 var
+R50106:50118 xv6iris.FsDurWire <> kind_write_ok def
+R50120:50120 xv6iris.FsDurWire <> G:316 var
+R50122:50124 xv6iris.FsDurWire <> nin:317 var
+R50126:50128 xv6iris.FsDurWire <> cov:318 var
+R50130:50131 xv6iris.FsDurWire <> ls:319 var
+R50133:50133 xv6iris.FsDurWire <> b:320 var
+R50135:50139 xv6iris.FsDurWire <> oldbs:321 var
+R50141:50142 xv6iris.FsDurWire <> bs:322 var
+R50213:50217 xv6iris.FsDurObj <> KData constr
+R50213:50217 xv6iris.FsDurObj <> KData constr
+R50268:50278 xv6iris.FsDurWire <> kind_upd_ne thm
+R50285:50289 xv6iris.FsDurObj <> KData constr
+R50296:50302 xv6iris.FsDurObj <> dg_bmap proj
+R50308:50317 Corelib.Init.Logic <> not_eq_sym thm
+R50268:50278 xv6iris.FsDurWire <> kind_upd_ne thm
+R50285:50289 xv6iris.FsDurObj <> KData constr
+R50296:50302 xv6iris.FsDurObj <> dg_bmap proj
+R50308:50317 Corelib.Init.Logic <> not_eq_sym thm
+R50268:50278 xv6iris.FsDurWire <> kind_upd_ne thm
+R50285:50289 xv6iris.FsDurObj <> KData constr
+R50296:50302 xv6iris.FsDurObj <> dg_bmap proj
+R50308:50317 Corelib.Init.Logic <> not_eq_sym thm
+R50421:50431 xv6iris.FsDurWire <> kind_upd_ne thm
+R50438:50442 xv6iris.FsDurObj <> KData constr
+R50457:50459 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R50449:50454 xv6iris.FsDurObj <> dg_ist proj
+R50479:50488 Corelib.Init.Logic <> not_eq_sym thm
+R50421:50431 xv6iris.FsDurWire <> kind_upd_ne thm
+R50438:50442 xv6iris.FsDurObj <> KData constr
+R50457:50459 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R50449:50454 xv6iris.FsDurObj <> dg_ist proj
+R50479:50488 Corelib.Init.Logic <> not_eq_sym thm
+R50421:50431 xv6iris.FsDurWire <> kind_upd_ne thm
+R50438:50442 xv6iris.FsDurObj <> KData constr
+R50457:50459 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R50449:50454 xv6iris.FsDurObj <> dg_ist proj
+R50479:50488 Corelib.Init.Logic <> not_eq_sym thm
+R50671:50674 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R50676:50682 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R50697:50705 Stdlib.ZArith.BinInt Z div_pos thm
+R50671:50674 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R50676:50682 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R50697:50705 Stdlib.ZArith.BinInt Z div_pos thm
+R50750:50752 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R50735:50738 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R50749:50749 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R50740:50746 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R50750:50752 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R50735:50738 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R50749:50749 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R50740:50746 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R50777:50788 Stdlib.ZArith.BinInt Z mul_div_le thm
+R50777:50788 Stdlib.ZArith.BinInt Z mul_div_le thm
+R50835:50845 xv6iris.FsDurWire <> kind_upd_ne thm
+R50852:50856 xv6iris.FsDurObj <> KData constr
+R50871:50873 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R50863:50868 xv6iris.FsDurObj <> dg_ist proj
+R50875:50881 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R50902:50911 Corelib.Init.Logic <> not_eq_sym thm
+R50921:50927 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R50835:50845 xv6iris.FsDurWire <> kind_upd_ne thm
+R50852:50856 xv6iris.FsDurObj <> KData constr
+R50871:50873 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R50863:50868 xv6iris.FsDurObj <> dg_ist proj
+R50875:50881 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R50902:50911 Corelib.Init.Logic <> not_eq_sym thm
+R50921:50927 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R50835:50845 xv6iris.FsDurWire <> kind_upd_ne thm
+R50852:50856 xv6iris.FsDurObj <> KData constr
+R50871:50873 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R50863:50868 xv6iris.FsDurObj <> dg_ist proj
+R50875:50881 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R50902:50911 Corelib.Init.Logic <> not_eq_sym thm
+R50921:50927 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R50996:51001 stdpp.base <> decide def
+R51005:51007 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R50996:51001 stdpp.base <> decide def
+R51005:51007 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R51041:51051 xv6iris.FsDurWire <> kind_upd_at thm
+R51041:51051 xv6iris.FsDurWire <> kind_upd_at thm
+R51041:51051 xv6iris.FsDurWire <> kind_upd_at thm
+R51090:51100 xv6iris.FsDurWire <> kind_upd_ne thm
+R51107:51111 xv6iris.FsDurObj <> KData constr
+R51090:51100 xv6iris.FsDurWire <> kind_upd_ne thm
+R51107:51111 xv6iris.FsDurObj <> KData constr
+R51090:51100 xv6iris.FsDurWire <> kind_upd_ne thm
+R51107:51111 xv6iris.FsDurObj <> KData constr
+prf 51174:51192 <> data_kind_blocksize
+R51200:51203 Corelib.Init.Datatypes <> list ind
+R51206:51207 stdpp.bitvector.definitions <> bv rec
+binder 51195:51196 <> bs:324
+R51234:51237 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R51226:51228 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R51217:51222 Corelib.Init.Datatypes <> length def
+R51224:51225 xv6iris.FsDurWire <> bs:324 var
+R51229:51233 xv6iris.BioDefs <> BSIZE def
+R51266:51268 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R51238:51243 Corelib.Init.Datatypes <> length def
+R51246:51253 xv6iris.FsDurObj <> kind_enc def
+R51256:51260 xv6iris.FsDurObj <> KData constr
+R51262:51263 xv6iris.FsDurWire <> bs:324 var
+R51269:51273 xv6iris.BioDefs <> BSIZE def
+R51298:51305 xv6iris.FsDurObj <> kind_enc def
+def 51512:51525 <> state_slot_upd
+R51532:51543 xv6iris.FsState <> fs_state_rec rec
+binder 51528:51528 <> S:325
+R51551:51551 Corelib.Numbers.BinNums <> Z ind
+binder 51547:51547 <> i:326
+R51559:51565 xv6iris.FsNode <> fs_node rec
+binder 51555:51555 <> n:327
+R51574:51585 xv6iris.FsState <> fs_state_rec rec
+R51592:51596 xv6iris.FsState <> MkFsS constr
+R51599:51604 xv6iris.FsState <> fss_sb proj
+R51606:51606 xv6iris.FsDurWire <> S:325 var
+R51610:51616 xv6iris.FsState <> fss_sbb proj
+R51618:51618 xv6iris.FsDurWire <> S:325 var
+R51622:51623 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R51625:51628 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R51630:51646 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R51624:51624 xv6iris.FsDurWire <> i:326 var
+R51629:51629 xv6iris.FsDurWire <> n:327 var
+R51634:51643 xv6iris.FsState <> fss_inodes proj
+R51645:51645 xv6iris.FsDurWire <> S:325 var
+R51650:51657 xv6iris.FsState <> fss_used proj
+R51659:51659 xv6iris.FsDurWire <> S:325 var
+prf 51815:51825 <> slot_mod_lt
+R51832:51832 Corelib.Numbers.BinNums <> Z ind
+binder 51828:51828 <> i:328
+R51859:51861 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R51838:51845 Stdlib.ZArith.BinInt Z to_nat def
+R51849:51855 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R51848:51848 xv6iris.FsDurWire <> i:328 var
+R51892:51906 Stdlib.ZArith.BinInt Z mod_pos_bound thm
+R51892:51906 Stdlib.ZArith.BinInt Z mod_pos_bound thm
+prf 52177:52185 <> nd_upd_at
+R52196:52199 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R52193:52195 Corelib.Init.Datatypes <> nat ind
+R52200:52206 xv6iris.FsNode <> fs_node rec
+binder 52188:52189 <> nd:329
+R52214:52216 Corelib.Init.Datatypes <> nat ind
+binder 52210:52210 <> k:330
+R52224:52230 xv6iris.FsNode <> fs_node rec
+binder 52220:52220 <> n:331
+R52252:52254 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R52237:52242 xv6iris.FsDurObj <> nd_upd def
+R52244:52245 xv6iris.FsDurWire <> nd:329 var
+R52247:52247 xv6iris.FsDurWire <> k:330 var
+R52249:52249 xv6iris.FsDurWire <> n:331 var
+R52251:52251 xv6iris.FsDurWire <> k:330 var
+R52255:52255 xv6iris.FsDurWire <> n:331 var
+R52276:52281 xv6iris.FsDurObj <> nd_upd def
+R52276:52281 xv6iris.FsDurObj <> nd_upd def
+R52276:52281 xv6iris.FsDurObj <> nd_upd def
+R52294:52303 stdpp.numbers Nat eq_dec inst
+R52365:52371 Corelib.Init.Logic <> eq_refl constr
+R52294:52303 stdpp.numbers Nat eq_dec inst
+R52365:52371 Corelib.Init.Logic <> eq_refl constr
+prf 52388:52396 <> nd_upd_ne
+R52407:52410 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R52404:52406 Corelib.Init.Datatypes <> nat ind
+R52411:52417 xv6iris.FsNode <> fs_node rec
+binder 52399:52400 <> nd:332
+R52425:52427 Corelib.Init.Datatypes <> nat ind
+binder 52421:52421 <> k:333
+R52435:52441 xv6iris.FsNode <> fs_node rec
+binder 52431:52431 <> n:334
+R52449:52451 Corelib.Init.Datatypes <> nat ind
+binder 52445:52445 <> j:335
+R52464:52467 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R52459:52462 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R52458:52458 xv6iris.FsDurWire <> j:335 var
+R52463:52463 xv6iris.FsDurWire <> k:333 var
+R52483:52485 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R52468:52473 xv6iris.FsDurObj <> nd_upd def
+R52475:52476 xv6iris.FsDurWire <> nd:332 var
+R52478:52478 xv6iris.FsDurWire <> k:333 var
+R52480:52480 xv6iris.FsDurWire <> n:334 var
+R52482:52482 xv6iris.FsDurWire <> j:335 var
+R52486:52487 xv6iris.FsDurWire <> nd:332 var
+R52489:52489 xv6iris.FsDurWire <> j:335 var
+R52522:52527 xv6iris.FsDurObj <> nd_upd def
+R52522:52527 xv6iris.FsDurObj <> nd_upd def
+R52522:52527 xv6iris.FsDurObj <> nd_upd def
+R52540:52549 stdpp.numbers Nat eq_dec inst
+R52540:52549 stdpp.numbers Nat eq_dec inst
+prf 52626:52640 <> slot_same_block
+R52650:52650 Corelib.Numbers.BinNums <> Z ind
+binder 52643:52643 <> i:336
+binder 52645:52646 <> i':337
+R52681:52686 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R52668:52670 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R52659:52665 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R52657:52658 xv6iris.FsDurWire <> i':337 var
+R52672:52678 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R52671:52671 xv6iris.FsDurWire <> i:336 var
+R52733:52736 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R52709:52711 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R52687:52694 Stdlib.ZArith.BinInt Z to_nat def
+R52699:52705 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R52697:52698 xv6iris.FsDurWire <> i':337 var
+R52712:52719 Stdlib.ZArith.BinInt Z to_nat def
+R52723:52729 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R52722:52722 xv6iris.FsDurWire <> i:336 var
+R52739:52741 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R52737:52738 xv6iris.FsDurWire <> i':337 var
+R52742:52742 xv6iris.FsDurWire <> i:336 var
+R52786:52800 Stdlib.ZArith.BinInt Z mod_pos_bound thm
+R52786:52800 Stdlib.ZArith.BinInt Z mod_pos_bound thm
+R52845:52859 Stdlib.ZArith.BinInt Z mod_pos_bound thm
+R52845:52859 Stdlib.ZArith.BinInt Z mod_pos_bound thm
+R52917:52919 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R52908:52914 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R52921:52927 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R52917:52919 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R52908:52914 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R52921:52927 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R52954:52962 Stdlib.ZArith.BinInt Z div_mod thm
+R52954:52962 Stdlib.ZArith.BinInt Z div_mod thm
+R53002:53010 Stdlib.ZArith.BinInt Z div_mod thm
+R53002:53010 Stdlib.ZArith.BinInt Z div_mod thm
+prf 53081:53099 <> kinds_of_state_slot
+R53106:53110 xv6iris.FsDurObj <> dgeom rec
+binder 53102:53102 <> G:338
+R53120:53120 Corelib.Numbers.BinNums <> Z ind
+binder 53114:53116 <> nin:339
+R53128:53139 xv6iris.FsState <> fs_state_rec rec
+binder 53124:53124 <> S:340
+R53152:53155 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53151:53151 Corelib.Numbers.BinNums <> Z ind
+R53156:53163 xv6iris.FsDurObj <> blk_kind ind
+binder 53147:53147 <> K:341
+R53171:53171 Corelib.Numbers.BinNums <> Z ind
+binder 53167:53167 <> i:342
+R53183:53186 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53180:53182 Corelib.Init.Datatypes <> nat ind
+R53187:53193 xv6iris.FsNode <> fs_node rec
+binder 53175:53176 <> nd:343
+R53201:53207 xv6iris.FsNode <> fs_node rec
+binder 53197:53197 <> n:344
+R53238:53241 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53214:53227 xv6iris.FsDurWire <> kinds_of_state rec
+R53229:53229 xv6iris.FsDurWire <> G:338 var
+R53231:53233 xv6iris.FsDurWire <> nin:339 var
+R53235:53235 xv6iris.FsDurWire <> S:340 var
+R53237:53237 xv6iris.FsDurWire <> K:341 var
+R53254:53257 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53242:53251 xv6iris.FsDurWire <> dwire_geom def
+R53253:53253 xv6iris.FsDurWire <> G:338 var
+R53270:53275 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53259:53262 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R53264:53266 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R53263:53263 xv6iris.FsDurWire <> i:342 var
+R53263:53263 xv6iris.FsDurWire <> i:342 var
+R53267:53269 xv6iris.FsDurWire <> nin:339 var
+R53313:53318 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53301:53303 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R53276:53276 xv6iris.FsDurWire <> K:341 var
+R53287:53289 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R53279:53284 xv6iris.FsDurObj <> dg_ist proj
+R53286:53286 xv6iris.FsDurWire <> G:338 var
+R53291:53297 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53290:53290 xv6iris.FsDurWire <> i:342 var
+R53304:53309 xv6iris.FsDurObj <> KInode constr
+R53311:53312 xv6iris.FsDurWire <> nd:343 var
+R53339:53344 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R53319:53327 xv6iris.DinodeEnc <> dinode_wf def
+R53330:53335 xv6iris.FsNode <> fn_rec proj
+R53337:53337 xv6iris.FsDurWire <> n:344 var
+R53345:53358 xv6iris.FsDurWire <> kinds_of_state rec
+R53360:53360 xv6iris.FsDurWire <> G:338 var
+R53362:53364 xv6iris.FsDurWire <> nin:339 var
+R53367:53380 xv6iris.FsDurWire <> state_slot_upd def
+R53382:53382 xv6iris.FsDurWire <> S:340 var
+R53384:53384 xv6iris.FsDurWire <> i:342 var
+R53386:53386 xv6iris.FsDurWire <> n:344 var
+R53394:53401 xv6iris.FsDurWire <> kind_upd def
+R53403:53403 xv6iris.FsDurWire <> K:341 var
+R53414:53416 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R53406:53411 xv6iris.FsDurObj <> dg_ist proj
+R53413:53413 xv6iris.FsDurWire <> G:338 var
+R53418:53424 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53417:53417 xv6iris.FsDurWire <> i:342 var
+R53437:53442 xv6iris.FsDurObj <> KInode constr
+R53445:53450 xv6iris.FsDurObj <> nd_upd def
+R53452:53453 xv6iris.FsDurWire <> nd:343 var
+R53456:53463 Stdlib.ZArith.BinInt Z to_nat def
+R53467:53473 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R53466:53466 xv6iris.FsDurWire <> i:342 var
+R53479:53479 xv6iris.FsDurWire <> n:344 var
+R53578:53581 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R53583:53589 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53604:53612 Stdlib.ZArith.BinInt Z div_pos thm
+R53578:53581 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R53583:53589 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53604:53612 Stdlib.ZArith.BinInt Z div_pos thm
+R53635:53648 xv6iris.FsDurWire <> state_slot_upd def
+R53650:53655 xv6iris.FsState <> fss_sb proj
+R53657:53666 xv6iris.FsState <> fss_inodes proj
+R53668:53675 xv6iris.FsState <> fss_used proj
+R53692:53702 xv6iris.FsDurWire <> kind_upd_ne thm
+R53715:53717 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R53707:53712 xv6iris.FsDurObj <> dg_ist proj
+R53719:53725 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53746:53751 xv6iris.FsDurObj <> KInode constr
+R53754:53759 xv6iris.FsDurObj <> nd_upd def
+R53765:53772 Stdlib.ZArith.BinInt Z to_nat def
+R53776:53782 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R53793:53799 xv6iris.FsDurObj <> dg_bmap proj
+R53820:53829 Corelib.Init.Logic <> not_eq_sym thm
+R53839:53845 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53692:53702 xv6iris.FsDurWire <> kind_upd_ne thm
+R53715:53717 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R53707:53712 xv6iris.FsDurObj <> dg_ist proj
+R53719:53725 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53746:53751 xv6iris.FsDurObj <> KInode constr
+R53754:53759 xv6iris.FsDurObj <> nd_upd def
+R53765:53772 Stdlib.ZArith.BinInt Z to_nat def
+R53776:53782 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R53793:53799 xv6iris.FsDurObj <> dg_bmap proj
+R53820:53829 Corelib.Init.Logic <> not_eq_sym thm
+R53839:53845 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53692:53702 xv6iris.FsDurWire <> kind_upd_ne thm
+R53715:53717 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R53707:53712 xv6iris.FsDurObj <> dg_ist proj
+R53719:53725 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53746:53751 xv6iris.FsDurObj <> KInode constr
+R53754:53759 xv6iris.FsDurObj <> nd_upd def
+R53765:53772 Stdlib.ZArith.BinInt Z to_nat def
+R53776:53782 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R53793:53799 xv6iris.FsDurObj <> dg_bmap proj
+R53820:53829 Corelib.Init.Logic <> not_eq_sym thm
+R53839:53845 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53910:53915 stdpp.base <> decide def
+R53919:53921 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R53923:53929 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53910:53915 stdpp.base <> decide def
+R53919:53921 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R53923:53929 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R53965:53970 xv6iris.FsDurObj <> nd_upd def
+R53976:53983 Stdlib.ZArith.BinInt Z to_nat def
+R53987:53993 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R53965:53970 xv6iris.FsDurObj <> nd_upd def
+R53976:53983 Stdlib.ZArith.BinInt Z to_nat def
+R53987:53993 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R54011:54021 xv6iris.FsDurWire <> kind_upd_at thm
+R54011:54021 xv6iris.FsDurWire <> kind_upd_at thm
+R54011:54021 xv6iris.FsDurWire <> kind_upd_at thm
+R54116:54119 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R54112:54114 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R54104:54109 xv6iris.FsDurObj <> dg_ist proj
+R54128:54130 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R54120:54125 xv6iris.FsDurObj <> dg_ist proj
+R54132:54138 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R54116:54119 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R54112:54114 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R54104:54109 xv6iris.FsDurObj <> dg_ist proj
+R54128:54130 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R54120:54125 xv6iris.FsDurObj <> dg_ist proj
+R54132:54138 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R54166:54176 xv6iris.FsDurWire <> kind_upd_ne thm
+R54189:54191 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R54181:54186 xv6iris.FsDurObj <> dg_ist proj
+R54193:54199 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R54222:54227 xv6iris.FsDurObj <> KInode constr
+R54230:54235 xv6iris.FsDurObj <> nd_upd def
+R54241:54248 Stdlib.ZArith.BinInt Z to_nat def
+R54252:54258 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R54294:54296 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R54286:54291 xv6iris.FsDurObj <> dg_ist proj
+R54166:54176 xv6iris.FsDurWire <> kind_upd_ne thm
+R54189:54191 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R54181:54186 xv6iris.FsDurObj <> dg_ist proj
+R54193:54199 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R54222:54227 xv6iris.FsDurObj <> KInode constr
+R54230:54235 xv6iris.FsDurObj <> nd_upd def
+R54241:54248 Stdlib.ZArith.BinInt Z to_nat def
+R54252:54258 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R54294:54296 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R54286:54291 xv6iris.FsDurObj <> dg_ist proj
+R54166:54176 xv6iris.FsDurWire <> kind_upd_ne thm
+R54189:54191 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R54181:54186 xv6iris.FsDurObj <> dg_ist proj
+R54193:54199 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R54222:54227 xv6iris.FsDurObj <> KInode constr
+R54230:54235 xv6iris.FsDurObj <> nd_upd def
+R54241:54248 Stdlib.ZArith.BinInt Z to_nat def
+R54252:54258 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R54294:54296 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R54286:54291 xv6iris.FsDurObj <> dg_ist proj
+R54360:54365 stdpp.base <> decide def
+R54370:54372 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R54360:54365 stdpp.base <> decide def
+R54370:54372 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R54407:54419 stdpp.fin_maps <> lookup_insert thm
+R54407:54419 stdpp.fin_maps <> lookup_insert thm
+R54407:54419 stdpp.fin_maps <> lookup_insert thm
+R54485:54490 xv6iris.FsDurObj <> nd_upd def
+R54496:54503 Stdlib.ZArith.BinInt Z to_nat def
+R54507:54513 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R54485:54490 xv6iris.FsDurObj <> nd_upd def
+R54496:54503 Stdlib.ZArith.BinInt Z to_nat def
+R54507:54513 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R54552:54562 xv6iris.FsDurWire <> kind_upd_at thm
+R54552:54562 xv6iris.FsDurWire <> kind_upd_at thm
+R54552:54562 xv6iris.FsDurWire <> kind_upd_at thm
+R54582:54590 xv6iris.FsDurWire <> nd_upd_at thm
+R54582:54590 xv6iris.FsDurWire <> nd_upd_at thm
+R54607:54622 stdpp.fin_maps <> lookup_insert_ne thm
+R54642:54651 Corelib.Init.Logic <> not_eq_sym thm
+R54607:54622 stdpp.fin_maps <> lookup_insert_ne thm
+R54607:54622 stdpp.fin_maps <> lookup_insert_ne thm
+R54642:54651 Corelib.Init.Logic <> not_eq_sym thm
+R54769:54774 stdpp.base <> decide def
+R54788:54790 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R54779:54785 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R54792:54798 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R54769:54774 stdpp.base <> decide def
+R54788:54790 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R54779:54785 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R54792:54798 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R54900:54905 xv6iris.FsDurObj <> nd_upd def
+R54911:54918 Stdlib.ZArith.BinInt Z to_nat def
+R54922:54928 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R54900:54905 xv6iris.FsDurObj <> nd_upd def
+R54911:54918 Stdlib.ZArith.BinInt Z to_nat def
+R54922:54928 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R54966:54976 xv6iris.FsDurWire <> kind_upd_at thm
+R54966:54976 xv6iris.FsDurWire <> kind_upd_at thm
+R54966:54976 xv6iris.FsDurWire <> kind_upd_at thm
+R55004:55013 stdpp.numbers Nat eq_dec inst
+R55016:55023 Stdlib.ZArith.BinInt Z to_nat def
+R55028:55034 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55063:55070 Stdlib.ZArith.BinInt Z to_nat def
+R55074:55080 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55004:55013 stdpp.numbers Nat eq_dec inst
+R55016:55023 Stdlib.ZArith.BinInt Z to_nat def
+R55028:55034 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55063:55070 Stdlib.ZArith.BinInt Z to_nat def
+R55074:55080 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55137:55151 xv6iris.FsDurWire <> slot_same_block thm
+R55137:55151 xv6iris.FsDurWire <> slot_same_block thm
+R55189:55197 xv6iris.FsDurWire <> nd_upd_ne thm
+R55203:55210 Stdlib.ZArith.BinInt Z to_nat def
+R55214:55220 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55252:55259 Stdlib.ZArith.BinInt Z to_nat def
+R55264:55270 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55189:55197 xv6iris.FsDurWire <> nd_upd_ne thm
+R55203:55210 Stdlib.ZArith.BinInt Z to_nat def
+R55214:55220 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55252:55259 Stdlib.ZArith.BinInt Z to_nat def
+R55264:55270 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55189:55197 xv6iris.FsDurWire <> nd_upd_ne thm
+R55203:55210 Stdlib.ZArith.BinInt Z to_nat def
+R55214:55220 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55252:55259 Stdlib.ZArith.BinInt Z to_nat def
+R55264:55270 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55396:55399 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R55382:55384 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55374:55379 xv6iris.FsDurObj <> dg_ist proj
+R55387:55393 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55408:55410 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55400:55405 xv6iris.FsDurObj <> dg_ist proj
+R55412:55418 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55396:55399 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R55382:55384 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55374:55379 xv6iris.FsDurObj <> dg_ist proj
+R55387:55393 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55408:55410 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55400:55405 xv6iris.FsDurObj <> dg_ist proj
+R55412:55418 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55458:55468 xv6iris.FsDurWire <> kind_upd_ne thm
+R55481:55483 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55473:55478 xv6iris.FsDurObj <> dg_ist proj
+R55485:55491 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55516:55521 xv6iris.FsDurObj <> KInode constr
+R55524:55529 xv6iris.FsDurObj <> nd_upd def
+R55535:55542 Stdlib.ZArith.BinInt Z to_nat def
+R55546:55552 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55590:55592 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55582:55587 xv6iris.FsDurObj <> dg_ist proj
+R55595:55601 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55458:55468 xv6iris.FsDurWire <> kind_upd_ne thm
+R55481:55483 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55473:55478 xv6iris.FsDurObj <> dg_ist proj
+R55485:55491 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55516:55521 xv6iris.FsDurObj <> KInode constr
+R55524:55529 xv6iris.FsDurObj <> nd_upd def
+R55535:55542 Stdlib.ZArith.BinInt Z to_nat def
+R55546:55552 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55590:55592 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55582:55587 xv6iris.FsDurObj <> dg_ist proj
+R55595:55601 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55458:55468 xv6iris.FsDurWire <> kind_upd_ne thm
+R55481:55483 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55473:55478 xv6iris.FsDurObj <> dg_ist proj
+R55485:55491 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55516:55521 xv6iris.FsDurObj <> KInode constr
+R55524:55529 xv6iris.FsDurObj <> nd_upd def
+R55535:55542 Stdlib.ZArith.BinInt Z to_nat def
+R55546:55552 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55590:55592 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55582:55587 xv6iris.FsDurObj <> dg_ist proj
+R55595:55601 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55670:55675 stdpp.base <> decide def
+R55679:55681 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R55690:55692 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55682:55687 xv6iris.FsDurObj <> dg_ist proj
+R55694:55700 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55670:55675 stdpp.base <> decide def
+R55679:55681 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R55690:55692 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R55682:55687 xv6iris.FsDurObj <> dg_ist proj
+R55694:55700 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R55736:55746 xv6iris.FsDurWire <> kind_upd_at thm
+R55736:55746 xv6iris.FsDurWire <> kind_upd_at thm
+R55736:55746 xv6iris.FsDurWire <> kind_upd_at thm
+R55793:55802 stdpp.numbers Nat eq_dec inst
+R55807:55814 Stdlib.ZArith.BinInt Z to_nat def
+R55818:55824 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55793:55802 stdpp.numbers Nat eq_dec inst
+R55807:55814 Stdlib.ZArith.BinInt Z to_nat def
+R55818:55824 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55863:55871 xv6iris.FsDurWire <> nd_upd_at thm
+R55863:55871 xv6iris.FsDurWire <> nd_upd_at thm
+R55863:55871 xv6iris.FsDurWire <> nd_upd_at thm
+R55901:55909 xv6iris.FsDurWire <> nd_upd_ne thm
+R55915:55922 Stdlib.ZArith.BinInt Z to_nat def
+R55926:55932 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55901:55909 xv6iris.FsDurWire <> nd_upd_ne thm
+R55915:55922 Stdlib.ZArith.BinInt Z to_nat def
+R55926:55932 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55901:55909 xv6iris.FsDurWire <> nd_upd_ne thm
+R55915:55922 Stdlib.ZArith.BinInt Z to_nat def
+R55926:55932 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55995:56005 xv6iris.FsDurWire <> kind_upd_ne thm
+R56018:56020 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R56010:56015 xv6iris.FsDurObj <> dg_ist proj
+R56022:56028 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R56051:56056 xv6iris.FsDurObj <> KInode constr
+R56059:56064 xv6iris.FsDurObj <> nd_upd def
+R56070:56077 Stdlib.ZArith.BinInt Z to_nat def
+R56081:56087 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55995:56005 xv6iris.FsDurWire <> kind_upd_ne thm
+R56018:56020 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R56010:56015 xv6iris.FsDurObj <> dg_ist proj
+R56022:56028 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R56051:56056 xv6iris.FsDurObj <> KInode constr
+R56059:56064 xv6iris.FsDurObj <> nd_upd def
+R56070:56077 Stdlib.ZArith.BinInt Z to_nat def
+R56081:56087 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R55995:56005 xv6iris.FsDurWire <> kind_upd_ne thm
+R56018:56020 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R56010:56015 xv6iris.FsDurObj <> dg_ist proj
+R56022:56028 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R56051:56056 xv6iris.FsDurObj <> KInode constr
+R56059:56064 xv6iris.FsDurObj <> nd_upd def
+R56070:56077 Stdlib.ZArith.BinInt Z to_nat def
+R56081:56087 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+prf 56825:56843 <> di_write_obligation
+R56850:56854 xv6iris.FsDurObj <> dgeom rec
+binder 56846:56846 <> G:345
+R56864:56864 Corelib.Numbers.BinNums <> Z ind
+binder 56858:56860 <> nin:346
+R56874:56877 stdpp.gmap <> gset def
+R56879:56879 Corelib.Numbers.BinNums <> Z ind
+binder 56868:56870 <> cov:347
+R56888:56888 Corelib.Numbers.BinNums <> Z ind
+binder 56883:56884 <> ls:348
+R56900:56900 Corelib.Numbers.BinNums <> Z ind
+binder 56896:56896 <> i:349
+R56908:56914 xv6iris.FsNode <> fs_node rec
+binder 56904:56904 <> n:350
+R56926:56929 Corelib.Init.Datatypes <> list ind
+R56932:56933 stdpp.bitvector.definitions <> bv rec
+binder 56918:56922 <> oldbs:351
+R56955:56958 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R56943:56952 xv6iris.FsDurWire <> dwire_geom def
+R56954:56954 xv6iris.FsDurWire <> G:345 var
+R56971:56974 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R56960:56963 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R56965:56967 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R56964:56964 xv6iris.FsDurWire <> i:349 var
+R56964:56964 xv6iris.FsDurWire <> i:349 var
+R56968:56970 xv6iris.FsDurWire <> nin:346 var
+R56995:57000 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R56975:56983 xv6iris.DinodeEnc <> dinode_wf def
+R56986:56991 xv6iris.FsNode <> fn_rec proj
+R56993:56993 xv6iris.FsDurWire <> n:350 var
+R57001:57013 xv6iris.FsDurWire <> kind_write_ok def
+R57015:57015 xv6iris.FsDurWire <> G:345 var
+R57017:57019 xv6iris.FsDurWire <> nin:346 var
+R57021:57023 xv6iris.FsDurWire <> cov:347 var
+R57025:57026 xv6iris.FsDurWire <> ls:348 var
+R57037:57039 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R57029:57034 xv6iris.FsDurObj <> dg_ist proj
+R57036:57036 xv6iris.FsDurWire <> G:345 var
+R57041:57047 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R57040:57040 xv6iris.FsDurWire <> i:349 var
+R57052:57056 xv6iris.FsDurWire <> oldbs:351 var
+R57063:57074 xv6iris.FsDurObj <> di_blk_write def
+R57076:57080 xv6iris.FsDurWire <> oldbs:351 var
+R57083:57090 Stdlib.ZArith.BinInt Z to_nat def
+R57094:57100 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R57093:57093 xv6iris.FsDurWire <> i:349 var
+R57107:57112 xv6iris.FsNode <> fn_rec proj
+R57114:57114 xv6iris.FsDurWire <> n:350 var
+R57181:57184 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R57186:57192 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R57207:57215 Stdlib.ZArith.BinInt Z div_pos thm
+R57181:57184 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R57186:57192 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R57207:57215 Stdlib.ZArith.BinInt Z div_pos thm
+R57258:57260 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R57243:57246 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R57257:57257 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R57248:57254 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R57258:57260 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R57243:57246 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R57257:57257 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R57248:57254 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R57283:57294 Stdlib.ZArith.BinInt Z mul_div_le thm
+R57283:57294 Stdlib.ZArith.BinInt Z mul_div_le thm
+R57340:57350 xv6iris.FsDurWire <> ko_inodeblk proj
+R57368:57374 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R57340:57350 xv6iris.FsDurWire <> ko_inodeblk proj
+R57368:57374 stdpp.numbers <> ::Z_scope:x_'`div`'_x not
+R57413:57426 xv6iris.FsDurWire <> state_slot_upd def
+R57446:57451 xv6iris.FsDurObj <> KInode constr
+R57454:57459 xv6iris.FsDurObj <> nd_upd def
+R57465:57472 Stdlib.ZArith.BinInt Z to_nat def
+R57476:57482 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R57413:57426 xv6iris.FsDurWire <> state_slot_upd def
+R57446:57451 xv6iris.FsDurObj <> KInode constr
+R57454:57459 xv6iris.FsDurObj <> nd_upd def
+R57465:57472 Stdlib.ZArith.BinInt Z to_nat def
+R57476:57482 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R57529:57536 xv6iris.FsDurObj <> kind_enc def
+R57561:57571 xv6iris.FsDurObj <> di_vals_enc thm
+R57577:57584 Stdlib.ZArith.BinInt Z to_nat def
+R57588:57594 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R57616:57623 xv6iris.FsDurWire <> ko_recwf proj
+R57652:57662 xv6iris.FsDurWire <> slot_mod_lt thm
+R57561:57571 xv6iris.FsDurObj <> di_vals_enc thm
+R57577:57584 Stdlib.ZArith.BinInt Z to_nat def
+R57588:57594 stdpp.numbers <> ::Z_scope:x_'`mod`'_x not
+R57616:57623 xv6iris.FsDurWire <> ko_recwf proj
+R57652:57662 xv6iris.FsDurWire <> slot_mod_lt thm
+R57680:57698 xv6iris.FsDurWire <> kinds_of_state_slot thm
+R57680:57698 xv6iris.FsDurWire <> kinds_of_state_slot thm
+prf 57786:57802 <> di_kind_blocksize
+R57813:57816 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57810:57812 Corelib.Init.Datatypes <> nat ind
+R57817:57823 xv6iris.FsNode <> fs_node rec
+binder 57805:57806 <> nd:352
+R57830:57830 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57866:57872 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R57831:57837 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R57839:57840 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 57838:57838 <> j:353
+R57841:57849 xv6iris.DinodeEnc <> dinode_wf def
+R57852:57857 xv6iris.FsNode <> fn_rec proj
+R57860:57861 xv6iris.FsDurWire <> nd:352 var
+R57863:57863 xv6iris.FsDurWire <> j:353 var
+R57902:57904 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R57873:57878 Corelib.Init.Datatypes <> length def
+R57881:57888 xv6iris.FsDurObj <> kind_enc def
+R57891:57896 xv6iris.FsDurObj <> KInode constr
+R57898:57899 xv6iris.FsDurWire <> nd:352 var
+R57905:57909 xv6iris.BioDefs <> BSIZE def
+R57939:57946 xv6iris.FsDurObj <> kind_enc def
+R57961:57978 xv6iris.DinodeEnc <> diblk_bytes_length thm
+R57981:57987 xv6iris.FsDurObj <> di_recs def
+R57961:57978 xv6iris.DinodeEnc <> diblk_bytes_length thm
+R57981:57987 xv6iris.FsDurObj <> di_recs def
+R57961:57978 xv6iris.DinodeEnc <> diblk_bytes_length thm
+R57981:57987 xv6iris.FsDurObj <> di_recs def
+R58007:58020 xv6iris.FsDurObj <> di_recs_length thm
+R58007:58020 xv6iris.FsDurObj <> di_recs_length thm
+R58007:58020 xv6iris.FsDurObj <> di_recs_length thm
+R58046:58060 stdpp.list_relations <> Forall_lookup_2 thm
+R58046:58060 stdpp.list_relations <> Forall_lookup_2 thm
+R58092:58106 Stdlib.Arith.PeanoNat Nat lt_ge_cases thm
+R58092:58106 Stdlib.Arith.PeanoNat Nat lt_ge_cases thm
+R58147:58160 xv6iris.FsDurObj <> di_recs_lookup thm
+R58147:58160 xv6iris.FsDurObj <> di_recs_lookup thm
+R58147:58160 xv6iris.FsDurObj <> di_recs_lookup thm
+R58234:58249 stdpp.list_basics <> lookup_ge_None_2 thm
+R58290:58303 xv6iris.FsDurObj <> di_recs_length thm
+R58234:58249 stdpp.list_basics <> lookup_ge_None_2 thm
+R58234:58249 stdpp.list_basics <> lookup_ge_None_2 thm
+R58290:58303 xv6iris.FsDurObj <> di_recs_length thm
+R58290:58303 xv6iris.FsDurObj <> di_recs_length thm
+prf 59448:59473 <> kinds_geom_underdetermined
+R59481:59484 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R59480:59480 Corelib.Numbers.BinNums <> Z ind
+R59485:59488 stdpp.gmap <> gset def
+R59490:59490 Corelib.Numbers.BinNums <> Z ind
+binder 59476:59476 <> u:354
+R59506:59506 Corelib.Numbers.BinNums <> Z ind
+binder 59494:59495 <> b1:355
+binder 59497:59498 <> b2:356
+binder 59500:59502 <> ist:357
+R59519:59523 xv6iris.FsImg <> fs_sb rec
+binder 59514:59515 <> sb:358
+R59533:59536 Corelib.Init.Datatypes <> list ind
+R59539:59540 stdpp.bitvector.definitions <> bv rec
+binder 59527:59529 <> sbb:359
+R59567:59567 Corelib.Numbers.BinNums <> Z ind
+binder 59563:59563 <> c:360
+R59572:59578 xv6iris.FsDurObj <> KBitmap constr
+R59581:59581 xv6iris.FsDurWire <> u:354 var
+R59583:59583 xv6iris.FsDurWire <> c:360 var
+binder 59554:59554 <> K:361
+R59652:59657 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R59591:59604 xv6iris.FsDurWire <> kinds_of_state rec
+R59607:59613 xv6iris.FsDurObj <> MkDGeom constr
+R59615:59616 xv6iris.FsDurWire <> b1:355 var
+R59618:59620 xv6iris.FsDurWire <> ist:357 var
+R59626:59630 xv6iris.FsState <> MkFsS constr
+R59632:59633 xv6iris.FsDurWire <> sb:358 var
+R59635:59637 xv6iris.FsDurWire <> sbb:359 var
+R59639:59641 stdpp.base <> ::stdpp_scope:'∅' not
+R59644:59644 xv6iris.FsDurWire <> u:354 var
+R59646:59647 xv6iris.FsDurWire <> b1:355 var
+R59651:59651 xv6iris.FsDurWire <> K:361 var
+R59658:59671 xv6iris.FsDurWire <> kinds_of_state rec
+R59674:59680 xv6iris.FsDurObj <> MkDGeom constr
+R59682:59683 xv6iris.FsDurWire <> b2:356 var
+R59685:59687 xv6iris.FsDurWire <> ist:357 var
+R59693:59697 xv6iris.FsState <> MkFsS constr
+R59699:59700 xv6iris.FsDurWire <> sb:358 var
+R59702:59704 xv6iris.FsDurWire <> sbb:359 var
+R59706:59708 stdpp.base <> ::stdpp_scope:'∅' not
+R59711:59711 xv6iris.FsDurWire <> u:354 var
+R59713:59714 xv6iris.FsDurWire <> b2:356 var
+R59718:59718 xv6iris.FsDurWire <> K:361 var
+R59763:59769 xv6iris.FsDurObj <> dg_bmap proj
+R59771:59776 xv6iris.FsDurObj <> dg_ist proj
+R59778:59783 xv6iris.FsState <> fss_sb proj
+R59785:59791 xv6iris.FsState <> fss_sbb proj
+R59793:59802 xv6iris.FsState <> fss_inodes proj
+R59804:59811 xv6iris.FsState <> fss_used proj
+R59893:59904 stdpp.fin_maps <> lookup_empty meth
+R59893:59904 stdpp.fin_maps <> lookup_empty meth
+R59893:59904 stdpp.fin_maps <> lookup_empty meth
+R60042:60053 stdpp.fin_maps <> lookup_empty meth
+R60042:60053 stdpp.fin_maps <> lookup_empty meth
+R60042:60053 stdpp.fin_maps <> lookup_empty meth
+prf 60937:60967 <> kind_write_geom_free_degenerate
+R60974:60978 xv6iris.FsDurObj <> dgeom rec
+binder 60970:60970 <> G:362
+R60988:60988 Corelib.Numbers.BinNums <> Z ind
+binder 60982:60984 <> nin:363
+R61000:61011 xv6iris.FsState <> fs_state_rec rec
+binder 60996:60996 <> S:364
+R61020:61023 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R61019:61019 Corelib.Numbers.BinNums <> Z ind
+R61024:61031 xv6iris.FsDurObj <> blk_kind ind
+binder 61015:61015 <> K:365
+R61039:61039 Corelib.Numbers.BinNums <> Z ind
+binder 61035:61035 <> b:366
+R61048:61051 stdpp.gmap <> gset def
+R61053:61053 Corelib.Numbers.BinNums <> Z ind
+binder 61043:61044 <> u':367
+R61084:61089 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R61060:61073 xv6iris.FsDurWire <> kinds_of_state rec
+R61075:61075 xv6iris.FsDurWire <> G:362 var
+R61077:61079 xv6iris.FsDurWire <> nin:363 var
+R61081:61081 xv6iris.FsDurWire <> S:364 var
+R61083:61083 xv6iris.FsDurWire <> K:365 var
+R61090:61097 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R61139:61145 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R61103:61107 xv6iris.FsDurObj <> dgeom rec
+binder 61098:61099 <> G':368
+R61118:61118 Corelib.Numbers.BinNums <> Z ind
+binder 61111:61114 <> nin':369
+R61127:61138 xv6iris.FsState <> fs_state_rec rec
+binder 61122:61123 <> S':370
+R61199:61206 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R61146:61159 xv6iris.FsDurWire <> kinds_of_state rec
+R61161:61162 xv6iris.FsDurWire <> G':368 var
+R61164:61167 xv6iris.FsDurWire <> nin':369 var
+R61169:61170 xv6iris.FsDurWire <> S':370 var
+R61173:61180 xv6iris.FsDurWire <> kind_upd def
+R61182:61182 xv6iris.FsDurWire <> K:365 var
+R61184:61184 xv6iris.FsDurWire <> b:366 var
+R61187:61193 xv6iris.FsDurObj <> KBitmap constr
+R61195:61196 xv6iris.FsDurWire <> u':367 var
+R61226:61229 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R61220:61222 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R61207:61216 xv6iris.FsState <> fss_inodes proj
+R61218:61219 xv6iris.FsDurWire <> S':370 var
+R61223:61225 stdpp.base <> ::stdpp_scope:'∅' not
+R61234:61236 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R61230:61233 xv6iris.FsDurWire <> nin':369 var
+R61287:61293 xv6iris.FsDurObj <> MkDGeom constr
+R61298:61303 xv6iris.FsDurObj <> dg_ist proj
+R61314:61318 xv6iris.FsState <> MkFsS constr
+R61321:61326 xv6iris.FsState <> fss_sb proj
+R61332:61338 xv6iris.FsState <> fss_sbb proj
+R61343:61345 stdpp.base <> ::stdpp_scope:'∅' not
+R61287:61293 xv6iris.FsDurObj <> MkDGeom constr
+R61298:61303 xv6iris.FsDurObj <> dg_ist proj
+R61314:61318 xv6iris.FsState <> MkFsS constr
+R61321:61326 xv6iris.FsState <> fss_sb proj
+R61332:61338 xv6iris.FsState <> fss_sbb proj
+R61343:61345 stdpp.base <> ::stdpp_scope:'∅' not
+R61399:61405 xv6iris.FsDurObj <> dg_bmap proj
+R61407:61412 xv6iris.FsDurObj <> dg_ist proj
+R61414:61419 xv6iris.FsState <> fss_sb proj
+R61421:61427 xv6iris.FsState <> fss_sbb proj
+R61429:61438 xv6iris.FsState <> fss_inodes proj
+R61440:61447 xv6iris.FsState <> fss_used proj
+R61466:61476 xv6iris.FsDurWire <> kind_upd_at thm
+R61466:61476 xv6iris.FsDurWire <> kind_upd_at thm
+R61466:61476 xv6iris.FsDurWire <> kind_upd_at thm
+R61540:61551 stdpp.fin_maps <> lookup_empty meth
+R61540:61551 stdpp.fin_maps <> lookup_empty meth
+R61540:61551 stdpp.fin_maps <> lookup_empty meth
+R61611:61616 stdpp.base <> decide def
+R61620:61622 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R61611:61616 stdpp.base <> decide def
+R61620:61622 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R61656:61666 xv6iris.FsDurWire <> kind_upd_at thm
+R61656:61666 xv6iris.FsDurWire <> kind_upd_at thm
+R61656:61666 xv6iris.FsDurWire <> kind_upd_at thm
+R61705:61715 xv6iris.FsDurWire <> kind_upd_ne thm
+R61722:61728 xv6iris.FsDurObj <> KBitmap constr
+R61705:61715 xv6iris.FsDurWire <> kind_upd_ne thm
+R61722:61728 xv6iris.FsDurObj <> KBitmap constr
+R61705:61715 xv6iris.FsDurWire <> kind_upd_ne thm
+R61722:61728 xv6iris.FsDurObj <> KBitmap constr
+def 62357:62370 <> dwire_wit_node
+R62374:62380 xv6iris.FsNode <> fs_node rec
+R62387:62392 xv6iris.FsNode <> MkNode constr
+R62394:62408 xv6iris.FsDurObj <> dobj_wit_dinode def
+R62410:62411 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R62413:62415 stdpp.base <> ::stdpp_scope:'∅' not
+prf 62425:62441 <> dwire_wit_node_wf
+R62445:62453 xv6iris.DinodeEnc <> dinode_wf def
+R62456:62461 xv6iris.FsNode <> fn_rec proj
+R62463:62476 xv6iris.FsDurWire <> dwire_wit_node def
+R62493:62510 xv6iris.FsDurObj <> dobj_wit_dinode_wf thm
+R62493:62510 xv6iris.FsDurObj <> dobj_wit_dinode_wf thm
+def 62719:62733 <> dwire_wit_state
+R62741:62745 xv6iris.FsImg <> fs_sb rec
+binder 62736:62737 <> sb:371
+R62755:62758 Corelib.Init.Datatypes <> list ind
+R62761:62762 stdpp.bitvector.definitions <> bv rec
+binder 62749:62751 <> sbb:372
+R62773:62776 stdpp.gmap <> gset def
+R62778:62778 Corelib.Numbers.BinNums <> Z ind
+binder 62769:62769 <> u:373
+R62787:62798 xv6iris.FsState <> fs_state_rec rec
+R62803:62807 xv6iris.FsState <> MkFsS constr
+R62809:62810 xv6iris.FsDurWire <> sb:371 var
+R62812:62814 xv6iris.FsDurWire <> sbb:372 var
+R62816:62818 stdpp.base <> ::stdpp_scope:'∅' not
+R62820:62820 xv6iris.FsDurWire <> u:373 var
+def 62835:62849 <> dwire_wit_kinds
+R62856:62860 xv6iris.FsDurObj <> dgeom rec
+binder 62852:62852 <> G:374
+R62868:62871 stdpp.gmap <> gset def
+R62873:62873 Corelib.Numbers.BinNums <> Z ind
+binder 62864:62864 <> u:375
+R62879:62882 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R62878:62878 Corelib.Numbers.BinNums <> Z ind
+R62883:62890 xv6iris.FsDurObj <> blk_kind ind
+R62897:62904 xv6iris.FsDurWire <> kind_upd def
+R62916:62921 xv6iris.FsDurObj <> KInode constr
+R62933:62946 xv6iris.FsDurWire <> dwire_wit_node def
+R62955:62961 xv6iris.FsDurObj <> dg_bmap proj
+R62963:62963 xv6iris.FsDurWire <> G:374 var
+R62967:62973 xv6iris.FsDurObj <> KBitmap constr
+R62975:62975 xv6iris.FsDurWire <> u:375 var
+prf 62986:63009 <> dwire_wit_kinds_of_state
+R63016:63020 xv6iris.FsDurObj <> dgeom rec
+binder 63012:63012 <> G:376
+R63030:63030 Corelib.Numbers.BinNums <> Z ind
+binder 63024:63026 <> nin:377
+R63039:63043 xv6iris.FsImg <> fs_sb rec
+binder 63034:63035 <> sb:378
+R63057:63060 Corelib.Init.Datatypes <> list ind
+R63063:63064 stdpp.bitvector.definitions <> bv rec
+binder 63051:63053 <> sbb:379
+R63075:63078 stdpp.gmap <> gset def
+R63080:63080 Corelib.Numbers.BinNums <> Z ind
+binder 63071:63071 <> u:380
+R63099:63104 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R63087:63096 xv6iris.FsDurWire <> dwire_geom def
+R63098:63098 xv6iris.FsDurWire <> G:376 var
+R63105:63118 xv6iris.FsDurWire <> kinds_of_state rec
+R63120:63120 xv6iris.FsDurWire <> G:376 var
+R63122:63124 xv6iris.FsDurWire <> nin:377 var
+R63127:63141 xv6iris.FsDurWire <> dwire_wit_state def
+R63143:63144 xv6iris.FsDurWire <> sb:378 var
+R63146:63148 xv6iris.FsDurWire <> sbb:379 var
+R63150:63150 xv6iris.FsDurWire <> u:380 var
+R63154:63168 xv6iris.FsDurWire <> dwire_wit_kinds def
+R63170:63170 xv6iris.FsDurWire <> G:376 var
+R63172:63172 xv6iris.FsDurWire <> u:380 var
+R63210:63224 xv6iris.FsDurWire <> dwire_wit_state def
+R63226:63231 xv6iris.FsState <> fss_sb proj
+R63233:63242 xv6iris.FsState <> fss_inodes proj
+R63244:63251 xv6iris.FsState <> fss_used proj
+R63268:63282 xv6iris.FsDurWire <> dwire_wit_kinds def
+R63284:63294 xv6iris.FsDurWire <> kind_upd_at thm
+R63268:63282 xv6iris.FsDurWire <> dwire_wit_kinds def
+R63268:63282 xv6iris.FsDurWire <> dwire_wit_kinds def
+R63284:63294 xv6iris.FsDurWire <> kind_upd_at thm
+R63284:63294 xv6iris.FsDurWire <> kind_upd_at thm
+R63336:63349 xv6iris.FsDurWire <> dwire_wit_node def
+R63336:63349 xv6iris.FsDurWire <> dwire_wit_node def
+R63366:63380 xv6iris.FsDurWire <> dwire_wit_kinds def
+R63366:63380 xv6iris.FsDurWire <> dwire_wit_kinds def
+R63366:63380 xv6iris.FsDurWire <> dwire_wit_kinds def
+R63396:63406 xv6iris.FsDurWire <> kind_upd_ne thm
+R63418:63423 xv6iris.FsDurObj <> KInode constr
+R63435:63448 xv6iris.FsDurWire <> dwire_wit_node def
+R63468:63474 xv6iris.FsDurObj <> dg_bmap proj
+R63480:63486 xv6iris.FsDurObj <> KBitmap constr
+R63500:63502 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R63492:63497 xv6iris.FsDurObj <> dg_ist proj
+R63396:63406 xv6iris.FsDurWire <> kind_upd_ne thm
+R63418:63423 xv6iris.FsDurObj <> KInode constr
+R63435:63448 xv6iris.FsDurWire <> dwire_wit_node def
+R63468:63474 xv6iris.FsDurObj <> dg_bmap proj
+R63480:63486 xv6iris.FsDurObj <> KBitmap constr
+R63500:63502 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R63492:63497 xv6iris.FsDurObj <> dg_ist proj
+R63396:63406 xv6iris.FsDurWire <> kind_upd_ne thm
+R63418:63423 xv6iris.FsDurObj <> KInode constr
+R63435:63448 xv6iris.FsDurWire <> dwire_wit_node def
+R63468:63474 xv6iris.FsDurObj <> dg_bmap proj
+R63480:63486 xv6iris.FsDurObj <> KBitmap constr
+R63500:63502 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R63492:63497 xv6iris.FsDurObj <> dg_ist proj
+R63550:63561 stdpp.fin_maps <> lookup_empty meth
+R63550:63561 stdpp.fin_maps <> lookup_empty meth
+R63550:63561 stdpp.fin_maps <> lookup_empty meth
+R63616:63630 xv6iris.FsDurWire <> dwire_wit_kinds def
+R63616:63630 xv6iris.FsDurWire <> dwire_wit_kinds def
+R63616:63630 xv6iris.FsDurWire <> dwire_wit_kinds def
+R63654:63659 stdpp.base <> decide def
+R63663:63665 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R63666:63672 xv6iris.FsDurObj <> dg_bmap proj
+R63654:63659 stdpp.base <> decide def
+R63663:63665 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R63666:63672 xv6iris.FsDurObj <> dg_bmap proj
+R63707:63717 xv6iris.FsDurWire <> kind_upd_at thm
+R63707:63717 xv6iris.FsDurWire <> kind_upd_at thm
+R63707:63717 xv6iris.FsDurWire <> kind_upd_at thm
+R63756:63766 xv6iris.FsDurWire <> kind_upd_ne thm
+R63778:63783 xv6iris.FsDurObj <> KInode constr
+R63795:63808 xv6iris.FsDurWire <> dwire_wit_node def
+R63830:63836 xv6iris.FsDurObj <> dg_bmap proj
+R63842:63848 xv6iris.FsDurObj <> KBitmap constr
+R63756:63766 xv6iris.FsDurWire <> kind_upd_ne thm
+R63778:63783 xv6iris.FsDurObj <> KInode constr
+R63795:63808 xv6iris.FsDurWire <> dwire_wit_node def
+R63830:63836 xv6iris.FsDurObj <> dg_bmap proj
+R63842:63848 xv6iris.FsDurObj <> KBitmap constr
+R63756:63766 xv6iris.FsDurWire <> kind_upd_ne thm
+R63778:63783 xv6iris.FsDurObj <> KInode constr
+R63795:63808 xv6iris.FsDurWire <> dwire_wit_node def
+R63830:63836 xv6iris.FsDurObj <> dg_bmap proj
+R63842:63848 xv6iris.FsDurObj <> KBitmap constr
+R63901:63917 xv6iris.FsDurWire <> dwire_wit_node_wf thm
+R63901:63917 xv6iris.FsDurWire <> dwire_wit_node_wf thm
+prf 63932:63951 <> dwire_wit_blocksized
+R63958:63962 xv6iris.FsDurObj <> dgeom rec
+binder 63954:63954 <> G:381
+R63970:63973 stdpp.gmap <> gset def
+R63975:63975 Corelib.Numbers.BinNums <> Z ind
+binder 63966:63966 <> u:382
+R63985:63988 stdpp.gmap <> gset def
+R63990:63990 Corelib.Numbers.BinNums <> Z ind
+binder 63979:63981 <> cov:383
+R63999:63999 Corelib.Numbers.BinNums <> Z ind
+binder 63994:63995 <> ls:384
+R64006:64021 xv6iris.FsDurWire <> kinds_blocksized def
+R64024:64038 xv6iris.FsDurWire <> dwire_wit_kinds def
+R64040:64040 xv6iris.FsDurWire <> G:381 var
+R64042:64042 xv6iris.FsDurWire <> u:382 var
+R64045:64047 xv6iris.FsDurWire <> cov:383 var
+R64049:64050 xv6iris.FsDurWire <> ls:384 var
+R64083:64097 xv6iris.FsDurWire <> dwire_wit_kinds def
+R64083:64097 xv6iris.FsDurWire <> dwire_wit_kinds def
+R64083:64097 xv6iris.FsDurWire <> dwire_wit_kinds def
+R64112:64117 stdpp.base <> decide def
+R64121:64123 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R64124:64130 xv6iris.FsDurObj <> dg_bmap proj
+R64112:64117 stdpp.base <> decide def
+R64121:64123 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R64124:64130 xv6iris.FsDurObj <> dg_bmap proj
+R64163:64173 xv6iris.FsDurWire <> kind_upd_at thm
+R64163:64173 xv6iris.FsDurWire <> kind_upd_at thm
+R64163:64173 xv6iris.FsDurWire <> kind_upd_at thm
+R64182:64198 xv6iris.FsDurWire <> bm_kind_blocksize thm
+R64182:64198 xv6iris.FsDurWire <> bm_kind_blocksize thm
+R64214:64224 xv6iris.FsDurWire <> kind_upd_ne thm
+R64236:64241 xv6iris.FsDurObj <> KInode constr
+R64253:64266 xv6iris.FsDurWire <> dwire_wit_node def
+R64286:64292 xv6iris.FsDurObj <> dg_bmap proj
+R64298:64304 xv6iris.FsDurObj <> KBitmap constr
+R64214:64224 xv6iris.FsDurWire <> kind_upd_ne thm
+R64236:64241 xv6iris.FsDurObj <> KInode constr
+R64253:64266 xv6iris.FsDurWire <> dwire_wit_node def
+R64286:64292 xv6iris.FsDurObj <> dg_bmap proj
+R64298:64304 xv6iris.FsDurObj <> KBitmap constr
+R64214:64224 xv6iris.FsDurWire <> kind_upd_ne thm
+R64236:64241 xv6iris.FsDurObj <> KInode constr
+R64253:64266 xv6iris.FsDurWire <> dwire_wit_node def
+R64286:64292 xv6iris.FsDurObj <> dg_bmap proj
+R64298:64304 xv6iris.FsDurObj <> KBitmap constr
+R64327:64343 xv6iris.FsDurWire <> di_kind_blocksize thm
+R64327:64343 xv6iris.FsDurWire <> di_kind_blocksize thm
+R64362:64378 xv6iris.FsDurWire <> dwire_wit_node_wf thm
+R64362:64378 xv6iris.FsDurWire <> dwire_wit_node_wf thm
+prf 64542:64557 <> dwire_bridge_wit
+R64565:64568 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R64564:64564 Corelib.Numbers.BinNums <> Z ind
+R64569:64576 xv6iris.FsDurObj <> blk_kind ind
+binder 64560:64560 <> K:385
+R64586:64589 stdpp.gmap <> gset def
+R64591:64591 Corelib.Numbers.BinNums <> Z ind
+binder 64580:64582 <> cov:386
+R64600:64600 Corelib.Numbers.BinNums <> Z ind
+binder 64595:64596 <> ls:387
+R64607:64618 xv6iris.FsDurWire <> dwire_bridge def
+R64620:64620 xv6iris.FsDurWire <> K:385 var
+R64623:64633 xv6iris.LogDefs <> fs_restrict def
+binder 64640:64640 <> b:388
+R64645:64652 xv6iris.FsDurObj <> kind_enc def
+R64655:64655 xv6iris.FsDurWire <> K:385 var
+R64657:64657 xv6iris.FsDurWire <> b:388 var
+R64662:64672 xv6iris.LogDefs <> fs_home_set def
+R64674:64676 xv6iris.FsDurWire <> cov:386 var
+R64678:64679 xv6iris.FsDurWire <> ls:387 var
+R64687:64689 xv6iris.FsDurWire <> cov:386 var
+R64691:64692 xv6iris.FsDurWire <> ls:387 var
+R64718:64732 xv6iris.LogDefs <> fs_restrict_dom thm
+R64718:64732 xv6iris.LogDefs <> fs_restrict_dom thm
+R64762:64784 xv6iris.LogDefs <> fs_restrict_lookup_Some thm
+R64762:64784 xv6iris.LogDefs <> fs_restrict_lookup_Some thm
+prf 65133:65146 <> dwire_geom_wit
+R65150:65159 xv6iris.FsDurWire <> dwire_geom def
+R65162:65168 xv6iris.FsDurObj <> MkDGeom constr
+sec 65220:65226 <> Witness
+var  65240:65241 Witness Σ
+R65245:65253 iris.base_logic.lib.iprop <> gFunctors rec
+R65270:65277 xv6iris.DiskImg <> diskImgG class
+R65279:65280 xv6iris.FsDurWire <> Witness.Σ var
+R65284:65290 xv6iris.Xv6Cameras <> fsLinkG class
+R65292:65293 xv6iris.FsDurWire <> Witness.Σ var
+R65297:65302 xv6iris.Xv6Cameras <> fsTopG class
+R65304:65305 xv6iris.FsDurWire <> Witness.Σ var
+prf 65464:65474 <> Psi_dec_wit
+R65481:65485 xv6iris.FsDurObj <> dgeom rec
+binder 65477:65477 <> G:393
+R65495:65495 Corelib.Numbers.BinNums <> Z ind
+binder 65489:65491 <> nin:394
+R65505:65508 stdpp.gmap <> gset def
+R65510:65510 Corelib.Numbers.BinNums <> Z ind
+binder 65499:65501 <> cov:395
+R65519:65519 Corelib.Numbers.BinNums <> Z ind
+binder 65514:65515 <> ls:396
+R65534:65538 xv6iris.FsImg <> fs_sb rec
+binder 65529:65530 <> sb:397
+R65548:65551 Corelib.Init.Datatypes <> list ind
+R65554:65555 stdpp.bitvector.definitions <> bv rec
+binder 65542:65544 <> sbb:398
+R65566:65569 stdpp.gmap <> gset def
+R65571:65571 Corelib.Numbers.BinNums <> Z ind
+binder 65562:65562 <> u:399
+R65592:65599 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R65580:65589 xv6iris.FsDurWire <> dwire_geom def
+R65591:65591 xv6iris.FsDurWire <> G:393 var
+R65600:65603 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R65604:65610 xv6iris.FsDurWire <> Psi_dec def
+R65623:65623 xv6iris.FsDurWire <> G:393 var
+R65625:65627 xv6iris.FsDurWire <> nin:394 var
+R65629:65631 xv6iris.FsDurWire <> cov:395 var
+R65633:65634 xv6iris.FsDurWire <> ls:396 var
+R65636:65638 stdpp.base <> ::stdpp_scope:'∅' not
+R65649:65659 xv6iris.LogDefs <> fs_restrict def
+binder 65666:65666 <> b:400
+R65671:65678 xv6iris.FsDurObj <> kind_enc def
+R65681:65695 xv6iris.FsDurWire <> dwire_wit_kinds def
+R65697:65697 xv6iris.FsDurWire <> G:393 var
+R65699:65699 xv6iris.FsDurWire <> u:399 var
+R65701:65701 xv6iris.FsDurWire <> b:400 var
+R65717:65727 xv6iris.LogDefs <> fs_home_set def
+R65729:65731 xv6iris.FsDurWire <> cov:395 var
+R65733:65734 xv6iris.FsDurWire <> ls:396 var
+R65619:65620 xv6iris.FsDurWire <> Witness.Σ var
+R65778:65792 xv6iris.FsDurWire <> dwire_wit_state def
+R65806:65820 xv6iris.FsDurWire <> dwire_wit_kinds def
+R65778:65792 xv6iris.FsDurWire <> dwire_wit_state def
+R65806:65820 xv6iris.FsDurWire <> dwire_wit_kinds def
+R65860:65875 xv6iris.FsDurWire <> dwire_bridge_wit thm
+R65860:65875 xv6iris.FsDurWire <> dwire_bridge_wit thm
+R65914:65933 xv6iris.FsDurWire <> dwire_wit_blocksized thm
+R65914:65933 xv6iris.FsDurWire <> dwire_wit_blocksized thm
+R65974:65997 xv6iris.FsDurWire <> dwire_wit_kinds_of_state thm
+R65974:65997 xv6iris.FsDurWire <> dwire_wit_kinds_of_state thm
+prf 66375:66392 <> Psi_dec_nontrivial
+R66399:66403 xv6iris.FsDurObj <> dgeom rec
+binder 66395:66395 <> G:401
+R66413:66413 Corelib.Numbers.BinNums <> Z ind
+binder 66407:66409 <> nin:402
+R66423:66426 stdpp.gmap <> gset def
+R66428:66428 Corelib.Numbers.BinNums <> Z ind
+binder 66417:66419 <> cov:403
+R66437:66437 Corelib.Numbers.BinNums <> Z ind
+binder 66432:66433 <> ls:404
+R66452:66455 stdpp.gmap <> gmap rec
+R66460:66463 Corelib.Init.Datatypes <> list ind
+R66466:66467 stdpp.bitvector.definitions <> bv rec
+R66457:66457 Corelib.Numbers.BinNums <> Z ind
+binder 66447:66448 <> D0:405
+R66505:66512 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R66498:66501 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R66480:66490 xv6iris.LogDefs <> fs_home_set def
+R66492:66494 xv6iris.FsDurWire <> cov:403 var
+R66496:66497 xv6iris.FsDurWire <> ls:404 var
+R66502:66504 stdpp.base <> ::stdpp_scope:'∅' not
+R66551:66555 iris.bi.interface <> ::stdpp_scope:x_'⊢'_x not
+R66513:66519 xv6iris.FsDurWire <> Psi_dec def
+R66532:66532 xv6iris.FsDurWire <> G:401 var
+R66534:66536 xv6iris.FsDurWire <> nin:402 var
+R66538:66540 xv6iris.FsDurWire <> cov:403 var
+R66542:66543 xv6iris.FsDurWire <> ls:404 var
+R66545:66546 xv6iris.FsDurWire <> D0:405 var
+R66548:66550 stdpp.base <> ::stdpp_scope:'∅' not
+R66528:66529 xv6iris.FsDurWire <> Witness.Σ var
+R66556:66560 iris.bi.interface <> ::bi_scope:'False' not
+R66698:66708 stdpp.fin_map_dom <> dom_empty_L thm
+R66698:66708 stdpp.fin_map_dom <> dom_empty_L thm
+R66698:66708 stdpp.fin_map_dom <> dom_empty_L thm
+R66726:66732 xv6iris.FsDurWire Witness <> sec

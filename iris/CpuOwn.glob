@@ -1,0 +1,785 @@
+DIGEST cf796ef74318af8b8e46bdd508b84ea1
+Fxv6iris.CpuOwn
+R2814:2819 Stdlib.ZArith.ZArith <> <> lib
+R2821:2823 Stdlib.micromega.Lia <> <> lib
+R2825:2828 Stdlib.Lists.List <> <> lib
+R2857:2860 stdpp.gmap <> <> lib
+R2862:2882 stdpp.bitvector.definitions <> <> lib
+R2920:2928 iris.proofmode.proofmode <> <> lib
+R2971:2979 iris.base_logic.lib.ghost_var <> <> lib
+R2981:2990 iris.base_logic.lib.invariants <> <> lib
+R3008:3021 SailStdpp.Base <> <> lib
+R3023:3048 SailStdpp.Operators_mwords <> <> lib
+R3050:3065 SailStdpp.Values <> <> lib
+R3083:3099 Riscv.rv64d_types <> <> lib
+R3101:3111 Riscv.rv64d <> <> lib
+R3129:3138 xv6iris.RiscvPtsto <> <> lib
+R3140:3148 xv6iris.RiscvLang <> <> lib
+R3150:3155 xv6iris.HartTp <> <> lib
+R3173:3179 xv6iris.RegFile <> <> lib
+R3254:3261 xv6iris.IntrDefs <> <> lib
+R3279:3286 xv6iris.ProcGeom <> <> lib
+R3304:3307 xv6iris.Xv6G <> <> lib
+R3372:3377 xv6iris.TsoCtx <> <> lib
+sec 3415:3420 <> CpuOwn
+R3436:3442 xv6iris.RiscvPtsto <> riscvGS class
+R3462:3465 xv6iris.Xv6G <> xv6G class
+R3467:3468 xv6iris.CpuOwn <> CpuOwn.Σ var
+var  3484:3486 CpuOwn GEN
+var  3499:3501 CpuOwn CID
+var  3514:3515 CpuOwn XI
+R3490:3494 xv6iris.RiscvLang <> GenId class
+R3505:3509 xv6iris.RiscvLang <> CpuId class
+R3519:3524 xv6iris.TsoCtx <> CurCtx class
+var  3540:3541 CpuOwn kt
+R3545:3549 xv6iris.Ktier <> ktier ind
+def 3566:3572 <> cpu_own
+R3579:3581 Corelib.Init.Datatypes <> nat ind
+binder 3575:3575 <> n:8
+R3590:3593 Corelib.Init.Datatypes <> bool ind
+binder 3585:3586 <> eb:9
+R3601:3605 SailStdpp.Values <> mword def
+binder 3597:3597 <> p:10
+R3622:3625 Corelib.Init.Datatypes <> bool ind
+binder 3618:3618 <> b:11
+R3635:3638 stdpp.gmap <> gset def
+R3640:3645 Stdlib.Strings.String <> string ind
+binder 3629:3631 <> lks:12
+R3650:3654 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3656:3657 xv6iris.CpuOwn <> CpuOwn.Σ var
+R3667:3669 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3671:3676 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3720:3725 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3726:3733 xv6iris.IntrDefs <> cpu_hart def
+R3735:3735 xv6iris.CpuOwn <> n:8 var
+R3737:3738 xv6iris.CpuOwn <> eb:9 var
+R3740:3740 xv6iris.CpuOwn <> p:10 var
+R3742:3744 xv6iris.CpuOwn <> lks:12 var
+R3677:3680 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3716:3719 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3690:3693 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R3682:3684 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3681:3681 xv6iris.CpuOwn <> n:8 var
+R3703:3706 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R3696:3698 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3694:3695 xv6iris.CpuOwn <> eb:9 var
+R3699:3702 Corelib.Init.Datatypes <> true constr
+R3710:3712 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3707:3709 xv6iris.CpuOwn <> lks:12 var
+R3713:3715 stdpp.base <> ::stdpp_scope:'∅' not
+R3670:3670 xv6iris.CpuOwn <> b:11 var
+prf 3825:3835 <> cpu_own_off
+R3842:3844 Corelib.Init.Datatypes <> nat ind
+binder 3838:3838 <> n:13
+R3853:3856 Corelib.Init.Datatypes <> bool ind
+binder 3848:3849 <> eb:14
+R3864:3868 SailStdpp.Values <> mword def
+binder 3860:3860 <> p:15
+R3881:3884 stdpp.gmap <> gset def
+R3886:3891 Stdlib.Strings.String <> string ind
+binder 3875:3877 <> lks:16
+R3924:3931 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R3900:3906 xv6iris.CpuOwn <> cpu_own def
+R3908:3908 xv6iris.CpuOwn <> n:13 var
+R3910:3911 xv6iris.CpuOwn <> eb:14 var
+R3913:3913 xv6iris.CpuOwn <> p:15 var
+R3915:3919 Corelib.Init.Datatypes <> false constr
+R3921:3923 xv6iris.CpuOwn <> lks:16 var
+R3932:3939 xv6iris.IntrDefs <> cpu_hart def
+R3941:3941 xv6iris.CpuOwn <> n:13 var
+R3943:3944 xv6iris.CpuOwn <> eb:14 var
+R3946:3946 xv6iris.CpuOwn <> p:15 var
+R3948:3950 xv6iris.CpuOwn <> lks:16 var
+prf 4398:4407 <> cpu_own_on
+R4414:4416 Corelib.Init.Datatypes <> nat ind
+binder 4410:4410 <> n:17
+R4425:4428 Corelib.Init.Datatypes <> bool ind
+binder 4420:4421 <> eb:18
+R4436:4440 SailStdpp.Values <> mword def
+binder 4432:4432 <> p:19
+R4453:4456 stdpp.gmap <> gset def
+R4458:4463 Stdlib.Strings.String <> string ind
+binder 4447:4449 <> lks:20
+R4495:4502 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R4472:4478 xv6iris.CpuOwn <> cpu_own def
+R4480:4480 xv6iris.CpuOwn <> n:17 var
+R4482:4483 xv6iris.CpuOwn <> eb:18 var
+R4485:4485 xv6iris.CpuOwn <> p:19 var
+R4487:4490 Corelib.Init.Datatypes <> true constr
+R4492:4494 xv6iris.CpuOwn <> lks:20 var
+R4503:4506 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4542:4545 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4516:4519 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R4508:4510 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4507:4507 xv6iris.CpuOwn <> n:17 var
+R4529:4532 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R4522:4524 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4520:4521 xv6iris.CpuOwn <> eb:18 var
+R4525:4528 Corelib.Init.Datatypes <> true constr
+R4536:4538 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4533:4535 xv6iris.CpuOwn <> lks:20 var
+R4539:4541 stdpp.base <> ::stdpp_scope:'∅' not
+prf 4584:4599 <> cpu_own_on_intro
+R4606:4610 SailStdpp.Values <> mword def
+binder 4602:4602 <> p:21
+R4622:4625 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R4626:4632 xv6iris.CpuOwn <> cpu_own def
+R4636:4639 Corelib.Init.Datatypes <> true constr
+R4641:4641 xv6iris.CpuOwn <> p:21 var
+R4643:4646 Corelib.Init.Datatypes <> true constr
+R4648:4650 stdpp.base <> ::stdpp_scope:'∅' not
+prf 4769:4782 <> cpu_own_of_arm
+R4789:4791 Corelib.Init.Datatypes <> nat ind
+binder 4785:4785 <> n:22
+R4800:4803 Corelib.Init.Datatypes <> bool ind
+binder 4795:4796 <> eb:23
+R4811:4815 SailStdpp.Values <> mword def
+binder 4807:4807 <> p:24
+R4828:4831 stdpp.gmap <> gset def
+R4833:4838 Stdlib.Strings.String <> string ind
+binder 4822:4824 <> lks:25
+R4870:4879 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4847:4853 xv6iris.CpuOwn <> cpu_own def
+R4855:4855 xv6iris.CpuOwn <> n:22 var
+R4857:4858 xv6iris.CpuOwn <> eb:23 var
+R4860:4860 xv6iris.CpuOwn <> p:24 var
+R4862:4865 Corelib.Init.Datatypes <> true constr
+R4867:4869 xv6iris.CpuOwn <> lks:25 var
+R4901:4910 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4880:4887 xv6iris.IntrDefs <> cpu_hart def
+R4891:4894 Corelib.Init.Datatypes <> true constr
+R4896:4896 xv6iris.CpuOwn <> p:24 var
+R4898:4900 stdpp.base <> ::stdpp_scope:'∅' not
+R4911:4917 xv6iris.CpuOwn <> cpu_own def
+R4921:4924 Corelib.Init.Datatypes <> true constr
+R4926:4926 xv6iris.CpuOwn <> p:24 var
+R4928:4932 Corelib.Init.Datatypes <> false constr
+R4934:4936 stdpp.base <> ::stdpp_scope:'∅' not
+prf 4991:5004 <> cpu_own_to_arm
+R5011:5015 SailStdpp.Values <> mword def
+binder 5007:5007 <> p:26
+R5053:5062 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5027:5033 xv6iris.CpuOwn <> cpu_own def
+R5037:5040 Corelib.Init.Datatypes <> true constr
+R5042:5042 xv6iris.CpuOwn <> p:26 var
+R5044:5048 Corelib.Init.Datatypes <> false constr
+R5050:5052 stdpp.base <> ::stdpp_scope:'∅' not
+R5084:5088 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5063:5070 xv6iris.IntrDefs <> cpu_hart def
+R5074:5077 Corelib.Init.Datatypes <> true constr
+R5079:5079 xv6iris.CpuOwn <> p:26 var
+R5081:5083 stdpp.base <> ::stdpp_scope:'∅' not
+R5089:5095 xv6iris.CpuOwn <> cpu_own def
+R5099:5102 Corelib.Init.Datatypes <> true constr
+R5104:5104 xv6iris.CpuOwn <> p:26 var
+R5106:5109 Corelib.Init.Datatypes <> true constr
+R5111:5113 stdpp.base <> ::stdpp_scope:'∅' not
+prf 5261:5273 <> cpu_hart_excl
+R5283:5285 Corelib.Init.Datatypes <> nat ind
+binder 5276:5276 <> n:27
+binder 5278:5279 <> n':28
+R5298:5301 Corelib.Init.Datatypes <> bool ind
+binder 5289:5290 <> eb:29
+binder 5292:5294 <> eb':30
+R5312:5316 SailStdpp.Values <> mword def
+binder 5305:5305 <> p:31
+binder 5307:5308 <> p':32
+R5340:5343 stdpp.gmap <> gset def
+R5345:5350 Stdlib.Strings.String <> string ind
+binder 5329:5331 <> lks:33
+binder 5333:5336 <> lks':34
+R5378:5383 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5359:5366 xv6iris.IntrDefs <> cpu_hart def
+R5368:5368 xv6iris.CpuOwn <> n:27 var
+R5370:5371 xv6iris.CpuOwn <> eb:29 var
+R5373:5373 xv6iris.CpuOwn <> p:31 var
+R5375:5377 xv6iris.CpuOwn <> lks:33 var
+R5407:5412 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5384:5391 xv6iris.IntrDefs <> cpu_hart def
+R5393:5394 xv6iris.CpuOwn <> n':28 var
+R5396:5398 xv6iris.CpuOwn <> eb':30 var
+R5400:5401 xv6iris.CpuOwn <> p':32 var
+R5403:5406 xv6iris.CpuOwn <> lks':34 var
+R5413:5417 iris.bi.interface <> ::bi_scope:'False' not
+R5517:5517 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5542:5547 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5552:5552 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5518:5541 xv6iris.TsoCtx <> ctx_word4_pointsto_bytes thm
+R5517:5517 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5542:5547 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5552:5552 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5518:5541 xv6iris.TsoCtx <> ctx_word4_pointsto_bytes thm
+R5577:5577 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5602:5607 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5613:5613 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5578:5601 xv6iris.TsoCtx <> ctx_word4_pointsto_bytes thm
+R5577:5577 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5602:5607 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5613:5613 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5578:5601 xv6iris.TsoCtx <> ctx_word4_pointsto_bytes thm
+R5634:5636 Corelib.Lists.ListDef <> seq def
+R5712:5712 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5735:5740 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5749:5749 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5713:5734 xv6iris.TsoCtx <> ctx_pointsto_ne thm
+R5712:5712 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5735:5740 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5749:5749 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5713:5734 xv6iris.TsoCtx <> ctx_pointsto_ne thm
+prf 5782:5797 <> cpu_own_arm_excl
+R5807:5809 Corelib.Init.Datatypes <> nat ind
+binder 5800:5800 <> n:35
+binder 5802:5803 <> n':36
+R5822:5825 Corelib.Init.Datatypes <> bool ind
+binder 5813:5814 <> eb:37
+binder 5816:5818 <> eb':38
+R5836:5840 SailStdpp.Values <> mword def
+binder 5829:5829 <> p:39
+binder 5831:5832 <> p':40
+R5859:5862 stdpp.gmap <> gset def
+R5864:5869 Stdlib.Strings.String <> string ind
+binder 5853:5855 <> lks:41
+R5895:5900 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5878:5884 xv6iris.IntrDefs <> sie_arm def
+R5886:5887 xv6iris.CpuOwn <> CpuOwn.kt var
+R5889:5892 Corelib.Init.Datatypes <> true constr
+R5894:5894 xv6iris.CpuOwn <> p:39 var
+R5928:5933 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5901:5907 xv6iris.CpuOwn <> cpu_own def
+R5909:5910 xv6iris.CpuOwn <> n':36 var
+R5912:5914 xv6iris.CpuOwn <> eb':38 var
+R5916:5917 xv6iris.CpuOwn <> p':40 var
+R5919:5923 Corelib.Init.Datatypes <> false constr
+R5925:5927 xv6iris.CpuOwn <> lks:41 var
+R5934:5938 iris.bi.interface <> ::bi_scope:'False' not
+R6017:6017 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6031:6036 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6045:6045 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6018:6030 xv6iris.CpuOwn <> cpu_hart_excl thm
+R6017:6017 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6031:6036 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6045:6045 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6018:6030 xv6iris.CpuOwn <> cpu_hart_excl thm
+prf 7906:7921 <> cpu_own_eb_agree
+R7928:7934 xv6iris.RegFile <> regfile def
+binder 7924:7924 <> m:42
+R7942:7944 Corelib.Init.Datatypes <> nat ind
+binder 7938:7938 <> K:43
+R7952:7954 Corelib.Init.Datatypes <> nat ind
+binder 7948:7948 <> n:44
+R7963:7966 Corelib.Init.Datatypes <> bool ind
+binder 7958:7959 <> eb:45
+R7980:7984 SailStdpp.Values <> mword def
+binder 7976:7976 <> p:46
+R7995:7998 Corelib.Init.Datatypes <> bool ind
+binder 7991:7991 <> b:47
+R8008:8011 stdpp.gmap <> gset def
+R8013:8018 Stdlib.Strings.String <> string ind
+binder 8002:8004 <> lks:48
+R8049:8054 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8027:8037 xv6iris.IntrDefs <> sie_cap_gpr def
+R8039:8040 xv6iris.CpuOwn <> CpuOwn.kt var
+R8042:8042 xv6iris.CpuOwn <> m:42 var
+R8044:8044 xv6iris.CpuOwn <> K:43 var
+R8046:8046 xv6iris.CpuOwn <> b:47 var
+R8048:8048 xv6iris.CpuOwn <> p:46 var
+R8075:8084 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8055:8061 xv6iris.CpuOwn <> cpu_own def
+R8063:8063 xv6iris.CpuOwn <> n:44 var
+R8065:8066 xv6iris.CpuOwn <> eb:45 var
+R8068:8068 xv6iris.CpuOwn <> p:46 var
+R8070:8070 xv6iris.CpuOwn <> b:47 var
+R8072:8074 xv6iris.CpuOwn <> lks:48 var
+R8085:8088 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R8132:8135 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R8128:8130 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8095:8095 xv6iris.CpuOwn <> n:44 var
+R8102:8102 Corelib.Init.Datatypes <> O constr
+R8107:8108 xv6iris.CpuOwn <> eb:45 var
+R8112:8112 Corelib.Init.Datatypes <> S constr
+R8119:8123 Corelib.Init.Datatypes <> false constr
+R8131:8131 xv6iris.CpuOwn <> b:47 var
+R8352:8352 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8370:8375 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8381:8381 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8353:8369 xv6iris.IntrDefs <> sie_cap_gpr_split thm
+R8352:8352 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8370:8375 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8381:8381 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8353:8369 xv6iris.IntrDefs <> sie_cap_gpr_split thm
+R8499:8499 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8515:8520 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8531:8531 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8500:8514 iris.base_logic.lib.ghost_var <> ghost_var_agree thm
+R8499:8499 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8515:8520 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8531:8531 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8500:8514 iris.base_logic.lib.ghost_var <> ghost_var_agree thm
+R8569:8575 Corelib.Init.Logic <> f_equal thm
+R8579:8589 stdpp.bitvector.definitions <> bv_unsigned proj
+R8569:8575 Corelib.Init.Logic <> f_equal thm
+R8579:8589 stdpp.bitvector.definitions <> bv_unsigned proj
+prf 8968:8984 <> cpu_own_forces_on
+R8991:8997 xv6iris.RegFile <> regfile def
+binder 8987:8987 <> m:50
+R9005:9007 Corelib.Init.Datatypes <> nat ind
+binder 9001:9001 <> K:51
+R9015:9019 SailStdpp.Values <> mword def
+binder 9011:9011 <> p:52
+R9036:9039 Corelib.Init.Datatypes <> bool ind
+binder 9032:9032 <> b:53
+R9049:9052 stdpp.gmap <> gset def
+R9054:9059 Stdlib.Strings.String <> string ind
+binder 9043:9045 <> lks:54
+R9090:9095 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9068:9078 xv6iris.IntrDefs <> sie_cap_gpr def
+R9080:9081 xv6iris.CpuOwn <> CpuOwn.kt var
+R9083:9083 xv6iris.CpuOwn <> m:50 var
+R9085:9085 xv6iris.CpuOwn <> K:51 var
+R9087:9087 xv6iris.CpuOwn <> b:53 var
+R9089:9089 xv6iris.CpuOwn <> p:52 var
+R9118:9123 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9096:9102 xv6iris.CpuOwn <> cpu_own def
+R9106:9109 Corelib.Init.Datatypes <> true constr
+R9111:9111 xv6iris.CpuOwn <> p:52 var
+R9113:9113 xv6iris.CpuOwn <> b:53 var
+R9115:9117 xv6iris.CpuOwn <> lks:54 var
+R9124:9127 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9136:9139 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9129:9131 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9128:9128 xv6iris.CpuOwn <> b:53 var
+R9132:9135 Corelib.Init.Datatypes <> true constr
+R9228:9228 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9245:9250 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9261:9261 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9229:9244 xv6iris.CpuOwn <> cpu_own_eb_agree thm
+R9228:9228 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9245:9250 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9261:9261 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9229:9244 xv6iris.CpuOwn <> cpu_own_eb_agree thm
+prf 9441:9458 <> cpu_own_forces_off
+R9465:9467 Corelib.Init.Datatypes <> nat ind
+binder 9461:9461 <> n:55
+R9476:9479 Corelib.Init.Datatypes <> bool ind
+binder 9471:9472 <> eb:56
+R9487:9491 SailStdpp.Values <> mword def
+binder 9483:9483 <> p:57
+R9510:9513 stdpp.gmap <> gset def
+R9515:9520 Stdlib.Strings.String <> string ind
+binder 9504:9506 <> lks:58
+R9556:9561 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9529:9535 xv6iris.CpuOwn <> cpu_own def
+R9538:9538 Corelib.Init.Datatypes <> S constr
+R9540:9540 xv6iris.CpuOwn <> n:55 var
+R9543:9544 xv6iris.CpuOwn <> eb:56 var
+R9546:9546 xv6iris.CpuOwn <> p:57 var
+R9548:9551 Corelib.Init.Datatypes <> true constr
+R9553:9555 xv6iris.CpuOwn <> lks:58 var
+R9562:9566 iris.bi.interface <> ::bi_scope:'False' not
+prf 10021:10037 <> cpu_own_init_boot
+R10044:10048 SailStdpp.Values <> mword def
+binder 10040:10040 <> p:59
+R10063:10067 SailStdpp.Values <> mword def
+binder 10055:10056 <> nv:60
+binder 10058:10059 <> iv:61
+R10091:10095 SailStdpp.Values <> mword def
+binder 10080:10083 <> sscr:62
+binder 10085:10087 <> mdl:63
+R10122:10129 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10109:10111 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10107:10108 xv6iris.CpuOwn <> nv:60 var
+R10112:10119 xv6iris.IntrDefs <> noff_val def
+R10145:10152 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10133:10135 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10130:10132 xv6iris.CpuOwn <> mdl:63 var
+R10136:10144 xv6iris.IntrDefs <> MEDELEG_S def
+R10182:10191 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10172:10179 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R10153:10162 xv6iris.ProcGeom <> a_cpu_noff def
+R10164:10171 xv6iris.HartTp <> cid_word def
+R10180:10181 xv6iris.CpuOwn <> nv:60 var
+R10220:10229 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10210:10217 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R10192:10200 xv6iris.ProcGeom <> a_cpu_int def
+R10202:10209 xv6iris.HartTp <> cid_word def
+R10218:10219 xv6iris.CpuOwn <> iv:61 var
+R10242:10251 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10230:10241 xv6iris.IntrDefs <> intr_off_tok def
+R10262:10271 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10252:10259 xv6iris.ProcGeom <> cur_proc def
+R10261:10261 xv6iris.CpuOwn <> p:59 var
+R10290:10299 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10272:10278 xv6iris.LockSet <> lk_auth def
+R10280:10285 xv6iris.RiscvLang <> cpu_id def
+R10287:10289 stdpp.base <> ::stdpp_scope:'∅' not
+R10320:10329 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10308:10315 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R10300:10307 Riscv.rv64d_types <> sscratch constr
+R10316:10319 xv6iris.CpuOwn <> sscr:62 var
+R10351:10360 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10337:10347 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ□'_x not
+R10330:10336 Riscv.rv64d_types <> medeleg constr
+R10348:10350 xv6iris.CpuOwn <> mdl:63 var
+R10408:10417 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10370:10381 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ□'_x not
+R10407:10407 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ□'_x not
+R10361:10369 Riscv.rv64d_types <> mstateen0 constr
+R10399:10403 SailStdpp.Values <> mword def
+R10382:10393 SailStdpp.Values <> mword_of_int def
+R10465:10474 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10427:10438 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ□'_x not
+R10464:10464 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ□'_x not
+R10418:10426 Riscv.rv64d_types <> sstateen0 constr
+R10456:10460 SailStdpp.Values <> mword def
+R10439:10450 SailStdpp.Values <> mword_of_int def
+R10475:10481 xv6iris.CpuOwn <> cpu_own def
+R10485:10489 Corelib.Init.Datatypes <> false constr
+R10491:10491 xv6iris.CpuOwn <> p:59 var
+R10493:10497 Corelib.Init.Datatypes <> false constr
+R10499:10501 stdpp.base <> ::stdpp_scope:'∅' not
+R10618:10618 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10638:10643 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10650:10650 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10619:10637 xv6iris.IntrDefs <> intr_count_init_off thm
+R10618:10618 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10638:10643 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10650:10650 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10619:10637 xv6iris.IntrDefs <> intr_count_init_off thm
+R10840:10858 xv6iris.LockSet <> cpu_locks_lvl_intro thm
+R10862:10864 stdpp.base <> ::stdpp_scope:'∅' not
+R10878:10887 stdpp.fin_sets <> size_empty thm
+R10909:10909 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10931:10936 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10942:10942 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10910:10930 xv6iris.LockSet <> cpu_locks_intro_empty thm
+R10840:10858 xv6iris.LockSet <> cpu_locks_lvl_intro thm
+R10862:10864 stdpp.base <> ::stdpp_scope:'∅' not
+R10878:10887 stdpp.fin_sets <> size_empty thm
+R10878:10887 stdpp.fin_sets <> size_empty thm
+R10909:10909 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10931:10936 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10942:10942 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10910:10930 xv6iris.LockSet <> cpu_locks_intro_empty thm
+prf 11611:11627 <> cpu_own_csrs_open
+R11634:11636 Corelib.Init.Datatypes <> nat ind
+binder 11630:11630 <> n:64
+R11645:11648 Corelib.Init.Datatypes <> bool ind
+binder 11640:11641 <> eb:65
+R11656:11660 SailStdpp.Values <> mword def
+binder 11652:11652 <> p:66
+R11679:11682 stdpp.gmap <> gset def
+R11684:11689 Stdlib.Strings.String <> string ind
+binder 11673:11675 <> lks:67
+R11722:11731 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11698:11704 xv6iris.CpuOwn <> cpu_own def
+R11706:11706 xv6iris.CpuOwn <> n:64 var
+R11708:11709 xv6iris.CpuOwn <> eb:65 var
+R11711:11711 xv6iris.CpuOwn <> p:66 var
+R11713:11717 Corelib.Init.Datatypes <> false constr
+R11719:11721 xv6iris.CpuOwn <> lks:67 var
+R11741:11746 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11786:11786 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11732:11740 xv6iris.IntrDefs <> hart_csrs def
+R11756:11761 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11747:11755 xv6iris.IntrDefs <> hart_csrs def
+R11762:11768 xv6iris.CpuOwn <> cpu_own def
+R11770:11770 xv6iris.CpuOwn <> n:64 var
+R11772:11773 xv6iris.CpuOwn <> eb:65 var
+R11775:11775 xv6iris.CpuOwn <> p:66 var
+R11777:11781 Corelib.Init.Datatypes <> false constr
+R11783:11785 xv6iris.CpuOwn <> lks:67 var
+R11836:11842 xv6iris.CpuOwn <> cpu_own def
+R11845:11852 xv6iris.IntrDefs <> cpu_hart def
+R11855:11862 xv6iris.IntrDefs <> cpu_priv def
+R11836:11842 xv6iris.CpuOwn <> cpu_own def
+R11836:11842 xv6iris.CpuOwn <> cpu_own def
+R11845:11852 xv6iris.IntrDefs <> cpu_hart def
+R11845:11852 xv6iris.IntrDefs <> cpu_hart def
+R11855:11862 xv6iris.IntrDefs <> cpu_priv def
+R11855:11862 xv6iris.IntrDefs <> cpu_priv def
+R11982:11988 xv6iris.CpuOwn <> cpu_own def
+R11991:11998 xv6iris.IntrDefs <> cpu_hart def
+R12001:12008 xv6iris.IntrDefs <> cpu_priv def
+R11982:11988 xv6iris.CpuOwn <> cpu_own def
+R11982:11988 xv6iris.CpuOwn <> cpu_own def
+R11991:11998 xv6iris.IntrDefs <> cpu_hart def
+R11991:11998 xv6iris.IntrDefs <> cpu_hart def
+R12001:12008 xv6iris.IntrDefs <> cpu_priv def
+R12001:12008 xv6iris.IntrDefs <> cpu_priv def
+prf 13493:13507 <> cpu_own_size_le
+R13514:13516 Corelib.Init.Datatypes <> nat ind
+binder 13510:13510 <> n:68
+R13525:13528 Corelib.Init.Datatypes <> bool ind
+binder 13520:13521 <> eb:69
+R13536:13540 SailStdpp.Values <> mword def
+binder 13532:13532 <> p:70
+R13557:13560 Corelib.Init.Datatypes <> bool ind
+binder 13553:13553 <> b:71
+R13570:13573 stdpp.gmap <> gset def
+R13575:13580 Stdlib.Strings.String <> string ind
+binder 13564:13566 <> lks:72
+R13609:13614 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R13589:13595 xv6iris.CpuOwn <> cpu_own def
+R13597:13597 xv6iris.CpuOwn <> n:68 var
+R13599:13600 xv6iris.CpuOwn <> eb:69 var
+R13602:13602 xv6iris.CpuOwn <> p:70 var
+R13604:13604 xv6iris.CpuOwn <> b:71 var
+R13606:13608 xv6iris.CpuOwn <> lks:72 var
+R13640:13644 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13615:13617 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13637:13639 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13627:13630 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R13619:13622 stdpp.base <> size def
+R13624:13626 xv6iris.CpuOwn <> lks:72 var
+R13631:13631 xv6iris.CpuOwn <> n:68 var
+R13645:13651 xv6iris.CpuOwn <> cpu_own def
+R13653:13653 xv6iris.CpuOwn <> n:68 var
+R13655:13656 xv6iris.CpuOwn <> eb:69 var
+R13658:13658 xv6iris.CpuOwn <> p:70 var
+R13660:13660 xv6iris.CpuOwn <> b:71 var
+R13662:13664 xv6iris.CpuOwn <> lks:72 var
+R13793:13802 stdpp.fin_sets <> size_empty thm
+R13793:13802 stdpp.fin_sets <> size_empty thm
+R13793:13802 stdpp.fin_sets <> size_empty thm
+R13878:13885 xv6iris.IntrDefs <> cpu_hart def
+R13888:13895 xv6iris.IntrDefs <> cpu_priv def
+R13878:13885 xv6iris.IntrDefs <> cpu_hart def
+R13878:13885 xv6iris.IntrDefs <> cpu_hart def
+R13888:13895 xv6iris.IntrDefs <> cpu_priv def
+R13888:13895 xv6iris.IntrDefs <> cpu_priv def
+R13983:13983 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14002:14007 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14014:14014 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13984:14001 xv6iris.LockSet <> cpu_locks_lvl_elim thm
+R13983:13983 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14002:14007 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14014:14014 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13984:14001 xv6iris.LockSet <> cpu_locks_lvl_elim thm
+R14093:14100 xv6iris.IntrDefs <> cpu_hart def
+R14103:14110 xv6iris.IntrDefs <> cpu_priv def
+R14093:14100 xv6iris.IntrDefs <> cpu_hart def
+R14093:14100 xv6iris.IntrDefs <> cpu_hart def
+R14103:14110 xv6iris.IntrDefs <> cpu_priv def
+R14103:14110 xv6iris.IntrDefs <> cpu_priv def
+R14154:14154 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14184:14189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14196:14196 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14155:14173 xv6iris.LockSet <> cpu_locks_lvl_intro thm
+R14154:14154 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14184:14189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14196:14196 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14155:14173 xv6iris.LockSet <> cpu_locks_lvl_intro thm
+prf 14696:14713 <> cpu_own_zero_empty
+R14721:14724 Corelib.Init.Datatypes <> bool ind
+binder 14716:14717 <> eb:73
+R14732:14736 SailStdpp.Values <> mword def
+binder 14728:14728 <> p:74
+R14753:14756 Corelib.Init.Datatypes <> bool ind
+binder 14749:14749 <> b:75
+R14766:14769 stdpp.gmap <> gset def
+R14771:14776 Stdlib.Strings.String <> string ind
+binder 14760:14762 <> lks:76
+R14809:14814 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R14785:14791 xv6iris.CpuOwn <> cpu_own def
+R14799:14800 xv6iris.CpuOwn <> eb:73 var
+R14802:14802 xv6iris.CpuOwn <> p:74 var
+R14804:14804 xv6iris.CpuOwn <> b:75 var
+R14806:14808 xv6iris.CpuOwn <> lks:76 var
+R14830:14834 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14815:14817 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14827:14829 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14821:14823 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14818:14820 xv6iris.CpuOwn <> lks:76 var
+R14824:14826 stdpp.base <> ::stdpp_scope:'∅' not
+R14835:14841 xv6iris.CpuOwn <> cpu_own def
+R14849:14850 xv6iris.CpuOwn <> eb:73 var
+R14852:14852 xv6iris.CpuOwn <> p:74 var
+R14854:14854 xv6iris.CpuOwn <> b:75 var
+R14856:14858 xv6iris.CpuOwn <> lks:76 var
+R14897:14897 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14913:14918 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14922:14922 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14898:14912 xv6iris.CpuOwn <> cpu_own_size_le thm
+R14897:14897 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14913:14918 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14922:14922 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14898:14912 xv6iris.CpuOwn <> cpu_own_size_le thm
+R14974:14991 xv6iris.LockRank <> size_le_zero_empty thm
+R14974:14991 xv6iris.LockRank <> size_le_zero_empty thm
+prf 15019:15036 <> cpu_own_locks_swap
+R15043:15045 Corelib.Init.Datatypes <> nat ind
+binder 15039:15039 <> n:77
+R15054:15057 Corelib.Init.Datatypes <> bool ind
+binder 15049:15050 <> eb:78
+R15065:15069 SailStdpp.Values <> mword def
+binder 15061:15061 <> p:79
+R15088:15091 stdpp.gmap <> gset def
+R15093:15098 Stdlib.Strings.String <> string ind
+binder 15082:15084 <> lks:80
+R15131:15140 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R15107:15113 xv6iris.CpuOwn <> cpu_own def
+R15115:15115 xv6iris.CpuOwn <> n:77 var
+R15117:15118 xv6iris.CpuOwn <> eb:78 var
+R15120:15120 xv6iris.CpuOwn <> p:79 var
+R15122:15126 Corelib.Init.Datatypes <> false constr
+R15128:15130 xv6iris.CpuOwn <> lks:80 var
+R15154:15158 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15141:15149 xv6iris.LockSet <> cpu_locks def
+R15151:15153 xv6iris.CpuOwn <> lks:80 var
+R15184:15193 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15302:15302 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15159:15161 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15181:15183 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15171:15174 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R15163:15166 stdpp.base <> size def
+R15168:15170 xv6iris.CpuOwn <> lks:80 var
+R15175:15175 xv6iris.CpuOwn <> n:77 var
+R15194:15197 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R15216:15224 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R15205:15208 stdpp.gmap <> gset def
+R15210:15215 Stdlib.Strings.String <> string ind
+binder 15198:15201 <> lks':81
+R15251:15256 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15225:15227 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15248:15250 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15238:15241 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R15229:15232 stdpp.base <> size def
+R15234:15237 xv6iris.CpuOwn <> lks':81 var
+R15242:15242 xv6iris.CpuOwn <> n:77 var
+R15271:15276 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15257:15265 xv6iris.LockSet <> cpu_locks def
+R15267:15270 xv6iris.CpuOwn <> lks':81 var
+R15277:15283 xv6iris.CpuOwn <> cpu_own def
+R15285:15285 xv6iris.CpuOwn <> n:77 var
+R15287:15288 xv6iris.CpuOwn <> eb:78 var
+R15290:15290 xv6iris.CpuOwn <> p:79 var
+R15292:15296 Corelib.Init.Datatypes <> false constr
+R15298:15301 xv6iris.CpuOwn <> lks':81 var
+R15352:15359 xv6iris.IntrDefs <> cpu_hart def
+R15362:15369 xv6iris.IntrDefs <> cpu_priv def
+R15352:15359 xv6iris.IntrDefs <> cpu_hart def
+R15352:15359 xv6iris.IntrDefs <> cpu_hart def
+R15362:15369 xv6iris.IntrDefs <> cpu_priv def
+R15362:15369 xv6iris.IntrDefs <> cpu_priv def
+R15453:15453 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15472:15477 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15484:15484 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15454:15471 xv6iris.LockSet <> cpu_locks_lvl_elim thm
+R15453:15453 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15472:15477 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15484:15484 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15454:15471 xv6iris.LockSet <> cpu_locks_lvl_elim thm
+R15606:15612 xv6iris.CpuOwn <> cpu_own def
+R15615:15622 xv6iris.IntrDefs <> cpu_hart def
+R15625:15632 xv6iris.IntrDefs <> cpu_priv def
+R15606:15612 xv6iris.CpuOwn <> cpu_own def
+R15606:15612 xv6iris.CpuOwn <> cpu_own def
+R15615:15622 xv6iris.IntrDefs <> cpu_hart def
+R15615:15622 xv6iris.IntrDefs <> cpu_hart def
+R15625:15632 xv6iris.IntrDefs <> cpu_priv def
+R15625:15632 xv6iris.IntrDefs <> cpu_priv def
+R15674:15674 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15706:15711 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15718:15718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15675:15693 xv6iris.LockSet <> cpu_locks_lvl_intro thm
+R15674:15674 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15706:15711 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15718:15718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15675:15693 xv6iris.LockSet <> cpu_locks_lvl_intro thm
+prf 16188:16203 <> cpu_own_set_proc
+R16210:16212 Corelib.Init.Datatypes <> nat ind
+binder 16206:16206 <> n:82
+R16221:16224 Corelib.Init.Datatypes <> bool ind
+binder 16216:16217 <> eb:83
+R16241:16245 SailStdpp.Values <> mword def
+binder 16234:16234 <> p:84
+binder 16236:16237 <> p':85
+R16258:16261 stdpp.gmap <> gset def
+R16263:16268 Stdlib.Strings.String <> string ind
+binder 16252:16254 <> lks:86
+R16301:16311 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R16376:16376 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R16277:16283 xv6iris.CpuOwn <> cpu_own def
+R16285:16285 xv6iris.CpuOwn <> n:82 var
+R16287:16288 xv6iris.CpuOwn <> eb:83 var
+R16290:16290 xv6iris.CpuOwn <> p:84 var
+R16292:16296 Corelib.Init.Datatypes <> false constr
+R16298:16300 xv6iris.CpuOwn <> lks:86 var
+R16322:16332 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16375:16375 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16312:16319 xv6iris.ProcGeom <> cur_proc def
+R16321:16321 xv6iris.CpuOwn <> p:84 var
+R16344:16349 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16333:16340 xv6iris.ProcGeom <> cur_proc def
+R16342:16343 xv6iris.CpuOwn <> p':85 var
+R16350:16356 xv6iris.CpuOwn <> cpu_own def
+R16358:16358 xv6iris.CpuOwn <> n:82 var
+R16360:16361 xv6iris.CpuOwn <> eb:83 var
+R16363:16364 xv6iris.CpuOwn <> p':85 var
+R16366:16370 Corelib.Init.Datatypes <> false constr
+R16372:16374 xv6iris.CpuOwn <> lks:86 var
+R16570:16575 xv6iris.CpuOwn CpuOwn <> sec
+prf 17807:17823 <> cpu_own_transport
+R17828:17834 xv6iris.RiscvPtsto <> riscvGS class
+binder 17836:17837 <> Σ:87
+binder 17827:17837 <> riscvGS0:88
+R17841:17844 xv6iris.Xv6G <> xv6G class
+R17846:17847 xv6iris.CpuOwn <> Σ:87 var
+binder 17840:17847 <> xv6G0:89
+R17858:17862 xv6iris.RiscvLang <> GenId class
+binder 17852:17854 <> GEN:90
+R17872:17877 xv6iris.TsoCtx <> CurCtx class
+binder 17867:17868 <> XI:91
+R17897:17901 xv6iris.RiscvLang <> CpuId class
+binder 17885:17888 <> CID0:92
+binder 17890:17893 <> CID1:93
+R17909:17911 Corelib.Init.Datatypes <> nat ind
+binder 17905:17905 <> n:94
+R17920:17923 Corelib.Init.Datatypes <> bool ind
+binder 17915:17916 <> eb:95
+R17931:17935 SailStdpp.Values <> mword def
+binder 17927:17927 <> p:96
+R17950:17953 Corelib.Init.Datatypes <> bool ind
+binder 17946:17946 <> b:97
+R17963:17966 stdpp.gmap <> gset def
+R17968:17973 Stdlib.Strings.String <> string ind
+binder 17957:17959 <> lks:98
+R17980:17980 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18037:18043 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18006:18009 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17990:17993 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R17982:17984 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17981:17981 xv6iris.CpuOwn <> b:97 var
+R17985:17989 Corelib.Init.Datatypes <> false constr
+R17995:17997 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17994:17994 xv6iris.CpuOwn <> p:96 var
+R17998:18005 Riscv.rv64d <> zero_reg def
+R18010:18010 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18021:18025 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18036:18036 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18018:18020 xv6iris.RiscvLang <> CPU def
+R18011:18014 xv6iris.CpuOwn <> CID1:93 var
+R18033:18035 xv6iris.RiscvLang <> CPU def
+R18026:18029 xv6iris.CpuOwn <> CID0:92 var
+R18078:18083 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R18044:18050 xv6iris.CpuOwn <> cpu_own def
+R18066:18066 xv6iris.CpuOwn <> n:94 var
+R18068:18069 xv6iris.CpuOwn <> eb:95 var
+R18071:18071 xv6iris.CpuOwn <> p:96 var
+R18073:18073 xv6iris.CpuOwn <> b:97 var
+R18075:18077 xv6iris.CpuOwn <> lks:98 var
+R18060:18063 xv6iris.CpuOwn <> CID0:92 var
+R18084:18090 xv6iris.CpuOwn <> cpu_own def
+R18106:18106 xv6iris.CpuOwn <> n:94 var
+R18108:18109 xv6iris.CpuOwn <> eb:95 var
+R18111:18111 xv6iris.CpuOwn <> p:96 var
+R18113:18113 xv6iris.CpuOwn <> b:97 var
+R18115:18117 xv6iris.CpuOwn <> lks:98 var
+R18100:18103 xv6iris.CpuOwn <> CID1:93 var
+R18346:18348 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18384:18392 Corelib.Init.Logic <> or_introl constr
+R18394:18400 Corelib.Init.Logic <> eq_refl constr
+R18346:18348 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18346:18348 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18384:18392 Corelib.Init.Logic <> or_introl constr
+R18394:18400 Corelib.Init.Logic <> eq_refl constr

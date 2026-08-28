@@ -1,0 +1,253 @@
+DIGEST 143ae14a67bde3495f7968addc829ae3
+Fxv6iris.StartedInv
+R2857:2862 Stdlib.ZArith.ZArith <> <> lib
+R2891:2911 stdpp.bitvector.definitions <> <> lib
+R2949:2957 iris.proofmode.proofmode <> <> lib
+R3000:3009 iris.base_logic.lib.invariants <> <> lib
+R3027:3040 SailStdpp.Base <> <> lib
+R3042:3067 SailStdpp.Operators_mwords <> <> lib
+R3085:3095 Riscv.rv64d <> <> lib
+R3113:3122 xv6iris.RiscvPtsto <> <> lib
+R3124:3132 xv6iris.RiscvLang <> <> lib
+R3155:3164 Kernel.KernelSyms <> <> lib
+R3182:3187 xv6iris.TsoCtx <> <> lib
+def 3287:3298 <> started_addr
+R3302:3306 SailStdpp.Values <> mword def
+R3314:3325 SailStdpp.Values <> mword_of_int def
+R3327:3344 Kernel.KernelSyms <> started def
+def 3358:3370 <> started_clear
+R3374:3378 SailStdpp.Values <> mword def
+R3386:3397 SailStdpp.Values <> mword_of_int def
+def 3413:3423 <> started_set
+R3427:3431 SailStdpp.Values <> mword def
+R3439:3450 SailStdpp.Values <> mword_of_int def
+prf 3933:3950 <> started_clear_sext
+R4001:4003 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3954:3959 SailStdpp.Operators_mwords <> eq_vec def
+R3993:4000 Riscv.rv64d <> zero_reg def
+R3962:3973 Riscv.rv64d <> sign_extend' def
+R3978:3990 xv6iris.StartedInv <> started_clear def
+R4004:4007 Corelib.Init.Datatypes <> true constr
+prf 4190:4209 <> started_sext_nonzero
+R4216:4220 SailStdpp.Values <> mword def
+binder 4212:4212 <> v:1
+R4273:4276 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4265:4267 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4230:4235 SailStdpp.Operators_mwords <> eq_vec def
+R4257:4264 Riscv.rv64d <> zero_reg def
+R4238:4249 Riscv.rv64d <> sign_extend' def
+R4254:4254 xv6iris.StartedInv <> v:1 var
+R4268:4272 Corelib.Init.Datatypes <> false constr
+R4278:4281 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R4277:4277 xv6iris.StartedInv <> v:1 var
+R4282:4294 xv6iris.StartedInv <> started_clear def
+R4334:4351 xv6iris.StartedInv <> started_clear_sext thm
+R4334:4351 xv6iris.StartedInv <> started_clear_sext thm
+R4334:4351 xv6iris.StartedInv <> started_clear_sext thm
+sec 4389:4398 <> StartedInv
+R4414:4420 xv6iris.RiscvPtsto <> riscvGS class
+var  4439:4441 StartedInv GEN
+var  4454:4456 StartedInv CID
+var  4469:4470 StartedInv XI
+R4445:4449 xv6iris.RiscvLang <> GenId class
+R4460:4464 xv6iris.RiscvLang <> CpuId class
+R4474:4479 xv6iris.TsoCtx <> CurCtx class
+def 4497:4504 <> startedN
+R4508:4516 stdpp.namespaces <> namespace def
+R4526:4529 stdpp.namespaces <> ::stdpp_scope:x_'.@'_x not
+R4521:4525 stdpp.namespaces <> nroot def
+def 4555:4566 <> started_body
+R4573:4577 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4579:4580 xv6iris.StartedInv <> StartedInv.Σ var
+binder 4569:4569 <> P:7
+R4585:4589 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4591:4592 xv6iris.StartedInv <> StartedInv.Σ var
+R4602:4605 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R4618:4626 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R4610:4614 SailStdpp.Values <> mword def
+binder 4606:4606 <> v:8
+R4648:4653 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4683:4683 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4639:4646 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R4627:4638 xv6iris.StartedInv <> started_addr def
+R4647:4647 xv6iris.StartedInv <> v:8 var
+R4677:4681 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R4654:4656 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4674:4676 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4658:4660 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4657:4657 xv6iris.StartedInv <> v:8 var
+R4661:4673 xv6iris.StartedInv <> started_clear def
+R4682:4682 xv6iris.StartedInv <> P:7 var
+def 4703:4713 <> started_inv
+R4720:4724 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4726:4727 xv6iris.StartedInv <> StartedInv.Σ var
+binder 4716:4716 <> P:9
+R4732:4736 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4738:4739 xv6iris.StartedInv <> StartedInv.Σ var
+R4748:4750 iris.base_logic.lib.invariants <> inv def
+R4762:4773 xv6iris.StartedInv <> started_body def
+R4775:4775 xv6iris.StartedInv <> P:9 var
+R4752:4759 xv6iris.StartedInv <> startedN def
+inst 4798:4819 <> started_inv_persistent
+binder 4821:4821 <> P:10
+R4825:4834 iris.bi.derived_connectives <> Persistent class
+R4837:4847 xv6iris.StartedInv <> started_inv def
+R4849:4849 xv6iris.StartedInv <> P:10 var
+prf 5502:5518 <> started_inv_alloc
+R5525:5530 stdpp.coPset <> coPset def
+binder 5521:5521 <> E:11
+R5538:5542 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R5544:5545 xv6iris.StartedInv <> StartedInv.Σ var
+binder 5534:5534 <> P:12
+R5587:5589 iris.bi.updates <> ::stdpp_scope:x_'={'_x_'}=∗'_x not
+R5591:5596 iris.bi.updates <> ::stdpp_scope:x_'={'_x_'}=∗'_x not
+R5566:5573 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R5554:5565 xv6iris.StartedInv <> started_addr def
+R5574:5586 xv6iris.StartedInv <> started_clear def
+R5590:5590 xv6iris.StartedInv <> E:11 var
+R5590:5590 xv6iris.StartedInv <> E:11 var
+R5597:5607 xv6iris.StartedInv <> started_inv def
+R5609:5609 xv6iris.StartedInv <> P:12 var
+R5650:5658 iris.base_logic.lib.invariants <> inv_alloc thm
+R5650:5658 iris.base_logic.lib.invariants <> inv_alloc thm
+R5676:5688 xv6iris.StartedInv <> started_clear def
+R5676:5688 xv6iris.StartedInv <> started_clear def
+prf 6639:6657 <> started_inv_load_au
+R6665:6670 stdpp.coPset <> coPset def
+binder 6660:6661 <> Eo:13
+R6678:6682 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6684:6685 xv6iris.StartedInv <> StartedInv.Σ var
+binder 6674:6674 <> P:14
+R6691:6700 iris.bi.derived_connectives <> Persistent class
+R6702:6702 xv6iris.StartedInv <> P:14 var
+binder 6690:6702 <> Persistent0:15
+R6729:6736 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6722:6726 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R6711:6713 stdpp.base <> :::'↑'_x not
+R6714:6721 xv6iris.StartedInv <> startedN def
+R6727:6728 xv6iris.StartedInv <> Eo:13 var
+R6750:6760 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6950:6950 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6737:6747 xv6iris.StartedInv <> started_inv def
+R6749:6749 xv6iris.StartedInv <> P:14 var
+R6761:6763 iris.bi.updates <> ::bi_scope:'|={'_x_','_x_'}=>'_x not
+R6766:6767 iris.bi.updates <> ::bi_scope:'|={'_x_','_x_'}=>'_x not
+R6786:6789 iris.bi.updates <> ::bi_scope:'|={'_x_','_x_'}=>'_x not
+R6764:6765 xv6iris.StartedInv <> Eo:13 var
+R6770:6774 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R6768:6769 xv6iris.StartedInv <> Eo:13 var
+R6775:6777 stdpp.base <> :::'↑'_x not
+R6778:6785 xv6iris.StartedInv <> startedN def
+R6790:6793 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6806:6815 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6798:6802 SailStdpp.Values <> mword def
+binder 6794:6794 <> v:16
+R6837:6850 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6949:6949 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6828:6835 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R6816:6827 xv6iris.StartedInv <> started_addr def
+R6836:6836 xv6iris.StartedInv <> v:16 var
+R6872:6874 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R6893:6894 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R6897:6913 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R6863:6870 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R6851:6862 xv6iris.StartedInv <> started_addr def
+R6871:6871 xv6iris.StartedInv <> v:16 var
+R6877:6881 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R6875:6876 xv6iris.StartedInv <> Eo:13 var
+R6882:6884 stdpp.base <> :::'↑'_x not
+R6885:6892 xv6iris.StartedInv <> startedN def
+R6895:6896 xv6iris.StartedInv <> Eo:13 var
+R6914:6918 iris.bi.interface <> ::bi_scope:'▷'_x not
+R6948:6948 iris.bi.interface <> ::bi_scope:'▷'_x not
+R6942:6946 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R6919:6921 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6939:6941 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R6923:6925 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6922:6922 xv6iris.StartedInv <> v:16 var
+R6926:6938 xv6iris.StartedInv <> started_clear def
+R6947:6947 xv6iris.StartedInv <> P:14 var
+R6997:6997 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7017:7022 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7029:7029 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6998:7004 iris.base_logic.lib.invariants <> inv_acc thm
+R7009:7016 xv6iris.StartedInv <> startedN def
+R6997:6997 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7017:7022 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7029:7029 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6998:7004 iris.base_logic.lib.invariants <> inv_acc thm
+R7009:7016 xv6iris.StartedInv <> startedN def
+R7366:7366 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7375:7380 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7390:7390 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7366:7366 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7375:7380 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7390:7390 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+prf 8210:8229 <> started_inv_store_au
+R8237:8242 stdpp.coPset <> coPset def
+binder 8232:8233 <> Eo:17
+R8250:8254 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R8256:8257 xv6iris.StartedInv <> StartedInv.Σ var
+binder 8246:8246 <> P:18
+R8263:8272 iris.bi.derived_connectives <> Persistent class
+R8274:8274 xv6iris.StartedInv <> P:18 var
+binder 8262:8274 <> Persistent0:19
+R8301:8308 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8294:8298 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R8283:8285 stdpp.base <> :::'↑'_x not
+R8286:8293 xv6iris.StartedInv <> startedN def
+R8299:8300 xv6iris.StartedInv <> Eo:17 var
+R8322:8327 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8309:8319 xv6iris.StartedInv <> started_inv def
+R8321:8321 xv6iris.StartedInv <> P:18 var
+R8329:8339 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8503:8503 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8328:8328 xv6iris.StartedInv <> P:18 var
+R8340:8342 iris.bi.updates <> ::bi_scope:'|={'_x_','_x_'}=>'_x not
+R8345:8346 iris.bi.updates <> ::bi_scope:'|={'_x_','_x_'}=>'_x not
+R8365:8368 iris.bi.updates <> ::bi_scope:'|={'_x_','_x_'}=>'_x not
+R8343:8344 xv6iris.StartedInv <> Eo:17 var
+R8349:8353 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8347:8348 xv6iris.StartedInv <> Eo:17 var
+R8354:8356 stdpp.base <> :::'↑'_x not
+R8357:8364 xv6iris.StartedInv <> startedN def
+R8369:8372 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R8388:8397 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R8380:8384 SailStdpp.Values <> mword def
+binder 8373:8376 <> vold:20
+R8422:8435 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R8502:8502 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R8410:8417 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R8398:8409 xv6iris.StartedInv <> started_addr def
+R8418:8421 xv6iris.StartedInv <> vold:20 var
+R8467:8469 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R8488:8489 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R8492:8497 iris.bi.updates <> ::bi_scope:x_'={'_x_','_x_'}=∗'_x not
+R8448:8455 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R8436:8447 xv6iris.StartedInv <> started_addr def
+R8456:8466 xv6iris.StartedInv <> started_set def
+R8472:8476 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8470:8471 xv6iris.StartedInv <> Eo:17 var
+R8477:8479 stdpp.base <> :::'↑'_x not
+R8480:8487 xv6iris.StartedInv <> startedN def
+R8490:8491 xv6iris.StartedInv <> Eo:17 var
+R8498:8501 iris.bi.interface <> ::bi_scope:'True' not
+R8553:8553 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8573:8578 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8585:8585 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8554:8560 iris.base_logic.lib.invariants <> inv_acc thm
+R8565:8572 xv6iris.StartedInv <> startedN def
+R8553:8553 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8573:8578 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8585:8585 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8554:8560 iris.base_logic.lib.invariants <> inv_acc thm
+R8565:8572 xv6iris.StartedInv <> startedN def
+R8747:8747 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8756:8761 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8774:8774 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8747:8747 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8756:8761 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8774:8774 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8805:8815 xv6iris.StartedInv <> started_set def
+R8805:8815 xv6iris.StartedInv <> started_set def
+R8887:8896 xv6iris.StartedInv StartedInv <> sec

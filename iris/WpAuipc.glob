@@ -1,0 +1,138 @@
+DIGEST 60d9e2a56849b00df1c4a22ee1570559
+Fxv6iris.WpAuipc
+R126:134 iris.proofmode.proofmode <> <> lib
+R176:183 iris.program_logic.language <> <> lib
+R201:226 SailStdpp.Operators_mwords <> <> lib
+R244:257 SailStdpp.Base <> <> lib
+R275:291 Riscv.rv64d_types <> <> lib
+R293:303 Riscv.rv64d <> <> lib
+R321:329 xv6iris.RiscvLang <> <> lib
+R331:340 xv6iris.RiscvPtsto <> <> lib
+R342:350 xv6iris.RiscvExec <> <> lib
+R393:402 iris.base_logic.lib.invariants <> <> lib
+R420:425 xv6iris.TsoCtx <> <> lib
+R461:464 Riscv.rv64d_types Defs <> mod
+prf 475:490 <> exec_get_arch_pc
+binder 492:492 <> s:1
+R521:523 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R498:501 xv6iris.RiscvExec <> exec def
+R520:520 xv6iris.WpAuipc <> s:1 var
+R504:514 Riscv.rv64d <> get_arch_pc def
+R516:517 Corelib.Init.Datatypes <> tt constr
+R524:527 Corelib.Init.Datatypes <> Some constr
+R529:529 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R558:559 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R561:561 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R530:544 Riscv.rv64d_types <> register_lookup def
+R546:547 Riscv.rv64d_types <> PC constr
+R552:556 xv6iris.RiscvLang <> sregs proj
+R549:549 xv6iris.WpAuipc <> s:1 var
+R560:560 xv6iris.WpAuipc <> s:1 var
+R578:588 Riscv.rv64d <> get_arch_pc def
+R598:610 xv6iris.RiscvExec <> exec_read_reg thm
+R612:613 Riscv.rv64d_types <> PC constr
+R598:610 xv6iris.RiscvExec <> exec_read_reg thm
+R612:613 Riscv.rv64d_types <> PC constr
+sec 1262:1273 <> ForwardAUIPC
+var  1287:1287 ForwardAUIPC s
+var  1300:1300 ForwardAUIPC w
+var  1315:1316 ForwardAUIPC pc
+var  1331:1333 ForwardAUIPC imm
+var  1358:1358 ForwardAUIPC i
+var  1372:1372 ForwardAUIPC b
+R1291:1296 xv6iris.RiscvLang <> mstate rec
+R1304:1308 SailStdpp.Values <> mword def
+R1320:1324 SailStdpp.Values <> mword def
+R1337:1341 SailStdpp.Values <> mword def
+R1362:1366 SailStdpp.Values <> mword def
+R1376:1379 Corelib.Init.Datatypes <> bool ind
+var 1397:1398 ForwardAUIPC Hi
+R1408:1410 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1402:1405 SailStdpp.Operators_mwords <> uint def
+R1407:1407 xv6iris.WpAuipc <> ForwardAUIPC.i var
+var 1427:1435 ForwardAUIPC Hfetch_at
+R1500:1508 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1443:1446 xv6iris.RiscvExec <> exec def
+R1460:1466 xv6iris.RiscvLang <> set_reg def
+R1468:1468 xv6iris.WpAuipc <> ForwardAUIPC.s var
+R1471:1476 Riscv.rv64d_types <> R_bool constr
+R1478:1495 Riscv.rv64d_types <> minstret_increment constr
+R1498:1498 xv6iris.WpAuipc <> ForwardAUIPC.b var
+R1449:1453 Riscv.rv64d <> fetch def
+R1455:1456 Corelib.Init.Datatypes <> tt constr
+R1509:1512 Corelib.Init.Datatypes <> Some constr
+R1514:1514 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1523:1524 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1564:1564 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1515:1520 Riscv.rv64d_types <> F_Base constr
+R1522:1522 xv6iris.WpAuipc <> ForwardAUIPC.w var
+R1525:1531 xv6iris.RiscvLang <> set_reg def
+R1533:1533 xv6iris.WpAuipc <> ForwardAUIPC.s var
+R1536:1541 Riscv.rv64d_types <> R_bool constr
+R1543:1560 Riscv.rv64d_types <> minstret_increment constr
+R1563:1563 xv6iris.WpAuipc <> ForwardAUIPC.b var
+var 1580:1587 ForwardAUIPC Hdec_gen
+R1591:1597 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R1609:1614 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R1603:1608 xv6iris.RiscvLang <> mstate rec
+binder 1598:1599 <> s0:12
+R1665:1672 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1655:1657 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1615:1629 Riscv.rv64d_types <> register_lookup def
+R1631:1643 Riscv.rv64d_types <> cur_privilege constr
+R1646:1650 xv6iris.RiscvLang <> sregs proj
+R1652:1653 xv6iris.WpAuipc <> s0:12 var
+R1658:1664 Riscv.rv64d_types <> Machine constr
+R1695:1697 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1673:1676 xv6iris.RiscvExec <> exec def
+R1693:1694 xv6iris.WpAuipc <> s0:12 var
+R1679:1688 Riscv.rv64d <> ext_decode def
+R1690:1690 xv6iris.WpAuipc <> ForwardAUIPC.w var
+R1698:1701 Corelib.Init.Datatypes <> Some constr
+R1703:1703 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1732:1733 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1736:1736 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1704:1708 Riscv.rv64d_types <> UTYPE constr
+R1710:1710 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1714:1715 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1724:1725 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1731:1731 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1711:1713 xv6iris.WpAuipc <> ForwardAUIPC.imm var
+R1716:1721 Riscv.rv64d_types <> Regidx constr
+R1723:1723 xv6iris.WpAuipc <> ForwardAUIPC.i var
+R1726:1730 Riscv.rv64d_types <> AUIPC constr
+R1734:1735 xv6iris.WpAuipc <> s0:12 var
+var 1752:1756 ForwardAUIPC Hsi_s
+R1796:1798 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1760:1763 xv6iris.RiscvExec <> exec def
+R1795:1795 xv6iris.WpAuipc <> ForwardAUIPC.s var
+R1766:1784 Riscv.rv64d <> should_inc_minstret def
+R1786:1792 Riscv.rv64d_types <> Machine constr
+R1799:1802 Corelib.Init.Datatypes <> Some constr
+R1804:1804 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1806:1807 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1809:1809 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R1805:1805 xv6iris.WpAuipc <> ForwardAUIPC.b var
+R1808:1808 xv6iris.WpAuipc <> ForwardAUIPC.s var
+var 1875:1878 ForwardAUIPC mst0
+R1882:1886 SailStdpp.Values <> mword def
+var 1905:1910 ForwardAUIPC Lmst_a
+R1948:1950 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R1914:1928 Riscv.rv64d_types <> register_lookup def
+R1930:1937 Riscv.rv64d_types <> minstret constr
+R1942:1946 xv6iris.RiscvLang <> sregs proj
+R1939:1939 xv6iris.WpAuipc <> ForwardAUIPC.s var
+R1951:1954 xv6iris.WpAuipc <> ForwardAUIPC.mst0 var
+R1983:2005 Riscv.rv64d_types <> irrelevant_register_set thm
+R2045:2056 xv6iris.WpAuipc ForwardAUIPC <> sec
+sec 2068:2076 <> StepAUIPC
+R2092:2098 xv6iris.RiscvPtsto <> riscvGS class
+var  2117:2119 StepAUIPC GEN
+var  2132:2134 StepAUIPC CID
+var  2147:2148 StepAUIPC XI
+R2123:2127 xv6iris.RiscvLang <> GenId class
+R2138:2142 xv6iris.RiscvLang <> CpuId class
+R2152:2157 xv6iris.TsoCtx <> CurCtx class
+var  2172:2174 StepAUIPC dqc
+R2178:2182 iris.algebra.dfrac <> dfrac ind
+R2509:2517 xv6iris.WpAuipc StepAUIPC <> sec

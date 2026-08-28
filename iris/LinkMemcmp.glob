@@ -1,0 +1,5 @@
+DIGEST dcd2ab6b9a9852d7125a07e85ccba6ee
+Fxv6iris.LinkMemcmp
+R292:302 xv6iris.ProofMemcmp <> <> lib
+R323:333 xv6iris.ProofMemcmp MemcmpProof <> modtype
+mod 313:318 <> Memcmp

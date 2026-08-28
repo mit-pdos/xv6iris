@@ -1,0 +1,311 @@
+DIGEST 721413626541883056425b1ff776e329
+Fxv6iris.KvmSpec
+R4941:4946 Stdlib.ZArith.ZArith <> <> lib
+R4948:4951 Stdlib.Bool.Bool <> <> lib
+R4953:4955 Stdlib.micromega.Lia <> <> lib
+R4957:4960 Stdlib.Lists.List <> <> lib
+R4989:4992 stdpp.gmap <> <> lib
+R4994:5014 stdpp.bitvector.definitions <> <> lib
+R5052:5060 iris.proofmode.proofmode <> <> lib
+R5102:5109 iris.program_logic.language <> <> lib
+R5111:5117 iris.program_logic.lifting <> <> lib
+R5160:5167 iris.base_logic.lib.gen_heap <> <> lib
+R5169:5177 iris.base_logic.lib.ghost_map <> <> lib
+R5179:5187 iris.base_logic.lib.ghost_var <> <> lib
+R5189:5198 iris.base_logic.lib.invariants <> <> lib
+R5216:5245 SailStdpp.ConcurrencyInterface <> <> lib
+R5247:5284 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R5286:5320 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R5322:5347 SailStdpp.Operators_mwords <> <> lib
+R5365:5378 SailStdpp.Base <> <> lib
+R5380:5398 SailStdpp.TypeCasts <> <> lib
+R5400:5415 SailStdpp.Values <> <> lib
+R5417:5437 SailStdpp.MachineWord <> <> lib
+R5455:5463 xv6iris.RiscvLang <> <> lib
+R5465:5474 xv6iris.RiscvPtsto <> <> lib
+R5492:5500 xv6iris.KallocInv <> <> lib
+R5502:5507 xv6iris.WpLock <> <> lib
+R5525:5541 Riscv.rv64d_types <> <> lib
+R5543:5553 Riscv.rv64d <> <> lib
+R5576:5585 Kernel.KernelSyms <> <> lib
+R5603:5606 xv6iris.Xv6G <> <> lib
+R5671:5676 xv6iris.TsoCtx <> <> lib
+R5712:5715 Riscv.rv64d_types Defs <> mod
+abbrev 6430:6438 <> K_kvmmake
+sec 6478:6485 <> KvmSpecs
+R6501:6507 xv6iris.RiscvPtsto <> riscvGS class
+R6514:6517 xv6iris.Xv6G <> xv6G class
+R6519:6520 xv6iris.KvmSpec <> Σ:1 var
+var  6536:6538 KvmSpecs GEN
+var  6551:6553 KvmSpecs CID
+var  6566:6567 KvmSpecs XI
+R6542:6546 xv6iris.RiscvLang <> GenId class
+R6557:6561 xv6iris.RiscvLang <> CpuId class
+R6571:6576 xv6iris.TsoCtx <> CurCtx class
+def 7395:7404 <> kalloc_env
+R7412:7416 iris.base_logic.lib.iprop <> gname def
+binder 7407:7408 <> γ:7
+R7425:7430 Corelib.Init.Datatypes <> option ind
+R7432:7434 Corelib.Init.Datatypes <> nat ind
+binder 7420:7421 <> on:8
+R7439:7443 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R7445:7446 xv6iris.KvmSpec <> KvmSpecs.Σ var
+R7456:7459 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R7479:7486 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R7471:7473 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R7466:7470 iris.base_logic.lib.iprop <> gname def
+R7474:7478 iris.base_logic.lib.iprop <> gname def
+binder 7460:7462 <> γk:9
+R7630:7640 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7487:7493 xv6iris.WpLock <> is_lock def
+R7495:7496 xv6iris.KvmSpec <> γ:7 var
+R7499:7510 SailStdpp.Values <> mword_of_int def
+R7512:7526 Kernel.KernelSyms <> kmem def
+R7552:7554 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R7565:7566 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R7560:7564 xv6iris.TsoCtx <> CtxId rec
+binder 7555:7556 <> ξ:10
+R7567:7574 xv6iris.KallocInv <> kmem_res def
+R7588:7590 xv6iris.KvmSpec <> γk:9 var
+R7593:7604 SailStdpp.Values <> mword_of_int def
+R7622:7624 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R7607:7621 Kernel.KernelSyms <> kmem def
+R7584:7585 xv6iris.KvmSpec <> ξ:10 var
+R7641:7652 xv6iris.KallocInv <> kalloc_avail def
+R7654:7656 xv6iris.KvmSpec <> γk:9 var
+R7658:7659 xv6iris.KvmSpec <> on:8 var
+def 8641:8653 <> kalloc_env_at
+R8661:8665 iris.base_logic.lib.iprop <> gname def
+binder 8656:8657 <> γ:11
+R8680:8682 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R8675:8679 iris.base_logic.lib.iprop <> gname def
+R8683:8687 iris.base_logic.lib.iprop <> gname def
+binder 8669:8671 <> γk:12
+R8702:8707 Corelib.Init.Datatypes <> option ind
+R8709:8711 Corelib.Init.Datatypes <> nat ind
+binder 8697:8698 <> on:13
+R8716:8720 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R8722:8723 xv6iris.KvmSpec <> KvmSpecs.Σ var
+R8875:8884 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R8733:8739 xv6iris.WpLock <> is_lock def
+R8741:8742 xv6iris.KvmSpec <> γ:11 var
+R8745:8756 SailStdpp.Values <> mword_of_int def
+R8758:8772 Kernel.KernelSyms <> kmem def
+R8797:8799 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R8810:8811 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R8805:8809 xv6iris.TsoCtx <> CtxId rec
+binder 8800:8801 <> ξ:14
+R8812:8819 xv6iris.KallocInv <> kmem_res def
+R8833:8835 xv6iris.KvmSpec <> γk:12 var
+R8838:8849 SailStdpp.Values <> mword_of_int def
+R8867:8869 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R8852:8866 Kernel.KernelSyms <> kmem def
+R8829:8830 xv6iris.KvmSpec <> ξ:14 var
+R8885:8896 xv6iris.KallocInv <> kalloc_avail def
+R8898:8900 xv6iris.KvmSpec <> γk:12 var
+R8902:8903 xv6iris.KvmSpec <> on:13 var
+inst 9175:9203 <> kalloc_env_at_None_persistent
+R9211:9215 iris.base_logic.lib.iprop <> gname def
+binder 9206:9207 <> γ:15
+R9230:9232 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R9225:9229 iris.base_logic.lib.iprop <> gname def
+R9233:9237 iris.base_logic.lib.iprop <> gname def
+binder 9219:9221 <> γk:16
+R9246:9255 iris.bi.derived_connectives <> Persistent class
+R9258:9270 xv6iris.KvmSpec <> kalloc_env_at def
+R9272:9273 xv6iris.KvmSpec <> γ:15 var
+R9275:9277 xv6iris.KvmSpec <> γk:16 var
+R9279:9282 Corelib.Init.Datatypes <> None constr
+R9304:9316 xv6iris.KvmSpec <> kalloc_env_at def
+R9304:9316 xv6iris.KvmSpec <> kalloc_env_at def
+R9304:9316 xv6iris.KvmSpec <> kalloc_env_at def
+prf 9385:9401 <> kalloc_env_at_env
+R9409:9413 iris.base_logic.lib.iprop <> gname def
+binder 9404:9405 <> γ:17
+R9428:9430 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R9423:9427 iris.base_logic.lib.iprop <> gname def
+R9431:9435 iris.base_logic.lib.iprop <> gname def
+binder 9417:9419 <> γk:18
+R9444:9449 Corelib.Init.Datatypes <> option ind
+R9451:9453 Corelib.Init.Datatypes <> nat ind
+binder 9439:9440 <> on:19
+R9485:9490 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9462:9474 xv6iris.KvmSpec <> kalloc_env_at def
+R9476:9477 xv6iris.KvmSpec <> γ:17 var
+R9479:9481 xv6iris.KvmSpec <> γk:18 var
+R9483:9484 xv6iris.KvmSpec <> on:19 var
+R9491:9500 xv6iris.KvmSpec <> kalloc_env def
+R9502:9503 xv6iris.KvmSpec <> γ:17 var
+R9505:9506 xv6iris.KvmSpec <> on:19 var
+R9531:9543 xv6iris.KvmSpec <> kalloc_env_at def
+R9546:9555 xv6iris.KvmSpec <> kalloc_env def
+R9531:9543 xv6iris.KvmSpec <> kalloc_env_at def
+R9531:9543 xv6iris.KvmSpec <> kalloc_env_at def
+R9546:9555 xv6iris.KvmSpec <> kalloc_env def
+R9546:9555 xv6iris.KvmSpec <> kalloc_env def
+prf 9631:9648 <> kalloc_env_at_lock
+R9656:9660 iris.base_logic.lib.iprop <> gname def
+binder 9651:9652 <> γ:20
+R9675:9677 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R9670:9674 iris.base_logic.lib.iprop <> gname def
+R9678:9682 iris.base_logic.lib.iprop <> gname def
+binder 9664:9666 <> γk:21
+R9691:9696 Corelib.Init.Datatypes <> option ind
+R9698:9700 Corelib.Init.Datatypes <> nat ind
+binder 9686:9687 <> on:22
+R9732:9741 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9709:9721 xv6iris.KvmSpec <> kalloc_env_at def
+R9723:9724 xv6iris.KvmSpec <> γ:20 var
+R9726:9728 xv6iris.KvmSpec <> γk:21 var
+R9730:9731 xv6iris.KvmSpec <> on:22 var
+R9742:9748 xv6iris.WpLock <> is_lock def
+R9750:9751 xv6iris.KvmSpec <> γ:20 var
+R9754:9765 SailStdpp.Values <> mword_of_int def
+R9767:9781 Kernel.KernelSyms <> kmem def
+R9805:9807 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R9818:9819 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R9813:9817 xv6iris.TsoCtx <> CtxId rec
+binder 9808:9809 <> ξ:23
+R9820:9827 xv6iris.KallocInv <> kmem_res def
+R9841:9843 xv6iris.KvmSpec <> γk:21 var
+R9846:9857 SailStdpp.Values <> mword_of_int def
+R9875:9877 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R9860:9874 Kernel.KernelSyms <> kmem def
+R9837:9838 xv6iris.KvmSpec <> ξ:23 var
+R9903:9915 xv6iris.KvmSpec <> kalloc_env_at def
+R9903:9915 xv6iris.KvmSpec <> kalloc_env_at def
+R9903:9915 xv6iris.KvmSpec <> kalloc_env_at def
+prf 9953:9971 <> kalloc_env_at_avail
+R9979:9983 iris.base_logic.lib.iprop <> gname def
+binder 9974:9975 <> γ:24
+R9998:10000 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R9993:9997 iris.base_logic.lib.iprop <> gname def
+R10001:10005 iris.base_logic.lib.iprop <> gname def
+binder 9987:9989 <> γk:25
+R10014:10019 Corelib.Init.Datatypes <> option ind
+R10021:10023 Corelib.Init.Datatypes <> nat ind
+binder 10009:10010 <> on:26
+R10055:10060 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10032:10044 xv6iris.KvmSpec <> kalloc_env_at def
+R10046:10047 xv6iris.KvmSpec <> γ:24 var
+R10049:10051 xv6iris.KvmSpec <> γk:25 var
+R10053:10054 xv6iris.KvmSpec <> on:26 var
+R10061:10072 xv6iris.KallocInv <> kalloc_avail def
+R10074:10076 xv6iris.KvmSpec <> γk:25 var
+R10078:10079 xv6iris.KvmSpec <> on:26 var
+R10100:10112 xv6iris.KvmSpec <> kalloc_env_at def
+R10100:10112 xv6iris.KvmSpec <> kalloc_env_at def
+R10100:10112 xv6iris.KvmSpec <> kalloc_env_at def
+prf 10149:10167 <> kalloc_env_at_intro
+R10175:10179 iris.base_logic.lib.iprop <> gname def
+binder 10170:10171 <> γ:27
+R10194:10196 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R10189:10193 iris.base_logic.lib.iprop <> gname def
+R10197:10201 iris.base_logic.lib.iprop <> gname def
+binder 10183:10185 <> γk:28
+R10210:10215 Corelib.Init.Datatypes <> option ind
+R10217:10219 Corelib.Init.Datatypes <> nat ind
+binder 10205:10206 <> on:29
+R10369:10378 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10228:10234 xv6iris.WpLock <> is_lock def
+R10236:10237 xv6iris.KvmSpec <> γ:27 var
+R10240:10251 SailStdpp.Values <> mword_of_int def
+R10253:10267 Kernel.KernelSyms <> kmem def
+R10291:10293 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R10304:10305 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R10299:10303 xv6iris.TsoCtx <> CtxId rec
+binder 10294:10295 <> ξ:30
+R10306:10313 xv6iris.KallocInv <> kmem_res def
+R10327:10329 xv6iris.KvmSpec <> γk:28 var
+R10332:10343 SailStdpp.Values <> mword_of_int def
+R10361:10363 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R10346:10360 Kernel.KernelSyms <> kmem def
+R10323:10324 xv6iris.KvmSpec <> ξ:30 var
+R10398:10403 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10379:10390 xv6iris.KallocInv <> kalloc_avail def
+R10392:10394 xv6iris.KvmSpec <> γk:28 var
+R10396:10397 xv6iris.KvmSpec <> on:29 var
+R10404:10416 xv6iris.KvmSpec <> kalloc_env_at def
+R10418:10419 xv6iris.KvmSpec <> γ:27 var
+R10421:10423 xv6iris.KvmSpec <> γk:28 var
+R10425:10426 xv6iris.KvmSpec <> on:29 var
+R10447:10459 xv6iris.KvmSpec <> kalloc_env_at def
+R10447:10459 xv6iris.KvmSpec <> kalloc_env_at def
+R10447:10459 xv6iris.KvmSpec <> kalloc_env_at def
+prf 10514:10531 <> kalloc_env_at_seal
+R10539:10543 iris.base_logic.lib.iprop <> gname def
+binder 10534:10535 <> γ:31
+R10558:10560 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R10553:10557 iris.base_logic.lib.iprop <> gname def
+R10561:10565 iris.base_logic.lib.iprop <> gname def
+binder 10547:10549 <> γk:32
+R10574:10579 Corelib.Init.Datatypes <> option ind
+R10581:10583 Corelib.Init.Datatypes <> nat ind
+binder 10569:10570 <> on:33
+R10615:10621 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R10592:10604 xv6iris.KvmSpec <> kalloc_env_at def
+R10606:10607 xv6iris.KvmSpec <> γ:31 var
+R10609:10611 xv6iris.KvmSpec <> γk:32 var
+R10613:10614 xv6iris.KvmSpec <> on:33 var
+R10622:10634 xv6iris.KvmSpec <> kalloc_env_at def
+R10636:10637 xv6iris.KvmSpec <> γ:31 var
+R10639:10641 xv6iris.KvmSpec <> γk:32 var
+R10643:10646 Corelib.Init.Datatypes <> None constr
+R10671:10683 xv6iris.KvmSpec <> kalloc_env_at def
+R10671:10683 xv6iris.KvmSpec <> kalloc_env_at def
+R10671:10683 xv6iris.KvmSpec <> kalloc_env_at def
+R10744:10744 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10762:10767 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10773:10773 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10745:10761 xv6iris.KallocInv <> kalloc_avail_seal thm
+R10744:10744 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10762:10767 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10773:10773 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10745:10761 xv6iris.KallocInv <> kalloc_avail_seal thm
+inst 11316:11341 <> kalloc_env_None_persistent
+R11349:11353 iris.base_logic.lib.iprop <> gname def
+binder 11344:11345 <> γ:34
+R11362:11371 iris.bi.derived_connectives <> Persistent class
+R11374:11383 xv6iris.KvmSpec <> kalloc_env def
+R11385:11386 xv6iris.KvmSpec <> γ:34 var
+R11388:11391 Corelib.Init.Datatypes <> None constr
+R11413:11422 xv6iris.KvmSpec <> kalloc_env def
+R11413:11422 xv6iris.KvmSpec <> kalloc_env def
+R11413:11422 xv6iris.KvmSpec <> kalloc_env def
+prf 11982:12001 <> kalloc_env_seal_Some
+R12009:12013 iris.base_logic.lib.iprop <> gname def
+binder 12004:12005 <> γ:35
+R12021:12023 Corelib.Init.Datatypes <> nat ind
+binder 12017:12017 <> n:36
+R12054:12060 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R12032:12041 xv6iris.KvmSpec <> kalloc_env def
+R12043:12044 xv6iris.KvmSpec <> γ:35 var
+R12047:12050 Corelib.Init.Datatypes <> Some constr
+R12052:12052 xv6iris.KvmSpec <> n:36 var
+R12061:12070 xv6iris.KvmSpec <> kalloc_env def
+R12072:12073 xv6iris.KvmSpec <> γ:35 var
+R12075:12078 Corelib.Init.Datatypes <> None constr
+R12134:12134 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12152:12157 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12163:12163 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12135:12151 xv6iris.KallocInv <> kalloc_avail_seal thm
+R12134:12134 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12152:12157 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12163:12163 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12135:12151 xv6iris.KallocInv <> kalloc_avail_seal thm
+prf 12389:12403 <> kalloc_env_seal
+R12411:12415 iris.base_logic.lib.iprop <> gname def
+binder 12406:12407 <> γ:37
+R12424:12429 Corelib.Init.Datatypes <> option ind
+R12431:12433 Corelib.Init.Datatypes <> nat ind
+binder 12419:12420 <> on:38
+R12458:12464 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R12442:12451 xv6iris.KvmSpec <> kalloc_env def
+R12453:12454 xv6iris.KvmSpec <> γ:37 var
+R12456:12457 xv6iris.KvmSpec <> on:38 var
+R12465:12474 xv6iris.KvmSpec <> kalloc_env def
+R12476:12477 xv6iris.KvmSpec <> γ:37 var
+R12479:12482 Corelib.Init.Datatypes <> None constr
+R12526:12545 xv6iris.KvmSpec <> kalloc_env_seal_Some thm
+R12526:12545 xv6iris.KvmSpec <> kalloc_env_seal_Some thm
+R14490:14497 xv6iris.KvmSpec KvmSpecs <> sec

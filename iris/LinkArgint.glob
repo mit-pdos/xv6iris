@@ -1,0 +1,7 @@
+DIGEST dc647e6536db046d7699f565a8a53df5
+Fxv6iris.LinkArgint
+R161:170 xv6iris.LinkArgraw <> <> lib
+R172:182 xv6iris.ProofArgint <> <> lib
+R203:213 xv6iris.ProofArgint ArgintProof <> modtype
+R215:220 xv6iris.LinkArgraw Argraw <> modtype
+mod 193:198 <> Argint

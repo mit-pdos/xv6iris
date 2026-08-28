@@ -1,0 +1,1545 @@
+DIGEST 58c2afb0d40cba380c518ed832d0c660
+Fxv6iris.HartSwp
+R2802:2805 stdpp.gmap <> <> lib
+R2807:2827 stdpp.bitvector.definitions <> <> lib
+R2865:2873 iris.proofmode.proofmode <> <> lib
+R2916:2923 iris.base_logic.lib.gen_heap <> <> lib
+R2925:2933 iris.base_logic.lib.ghost_map <> <> lib
+R2975:2982 iris.program_logic.language <> <> lib
+R2984:2993 iris.program_logic.weakestpre <> <> lib
+R3011:3036 SailStdpp.Operators_mwords <> <> lib
+R3054:3070 Riscv.rv64d_types <> <> lib
+R3072:3082 Riscv.rv64d <> <> lib
+R3100:3114 xv6iris.RiscvModelBytes <> <> lib
+R3132:3140 xv6iris.RiscvLang <> <> lib
+R3142:3151 xv6iris.RiscvPtsto <> <> lib
+R3153:3161 xv6iris.RiscvExec <> <> lib
+R3179:3184 xv6iris.TsoCtx <> <> lib
+def 3851:3858 <> is_extra
+binder 3861:3861 <> T:1
+R3877:3893 Riscv.rv64d_types Interface outcome ind
+R3916:3916 xv6iris.HartSwp <> T:1 var
+R3905:3913 Riscv.rv64d_types <> exception ind
+binder 3872:3873 <> oc:2
+R3925:3928 Corelib.Init.Datatypes <> bool ind
+R3941:3942 xv6iris.HartSwp <> oc:2 var
+R3953:3974 Riscv.rv64d_types Interface ExtraOutcome constr
+R3981:3984 Corelib.Init.Datatypes <> true constr
+R3995:3999 Corelib.Init.Datatypes <> false constr
+def 4290:4293 <> mctx
+binder 4296:4296 <> X:4
+R4314:4317 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4311:4311 Riscv.rv64d_types <> M def
+R4313:4313 xv6iris.HartSwp <> X:4 var
+R4318:4318 Riscv.rv64d_types <> M def
+R4320:4323 Corelib.Init.Datatypes <> unit ind
+binder 4307:4307 <> C:5
+R4338:4345 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4426:4432 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 4346:4346 <> T:6
+R4362:4378 Riscv.rv64d_types Interface outcome ind
+R4401:4401 xv6iris.HartSwp <> T:6 var
+R4390:4398 Riscv.rv64d_types <> exception ind
+binder 4357:4358 <> oc:7
+R4419:4422 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4418:4418 xv6iris.HartSwp <> T:6 var
+R4423:4423 Riscv.rv64d_types <> M def
+R4425:4425 xv6iris.HartSwp <> X:4 var
+binder 4414:4414 <> k:8
+R4452:4459 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4444:4446 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4433:4440 xv6iris.HartSwp <> is_extra def
+R4442:4443 xv6iris.HartSwp <> oc:7 var
+R4447:4451 Corelib.Init.Datatypes <> false constr
+R4483:4485 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4460:4460 xv6iris.HartSwp <> C:5 var
+R4463:4476 Riscv.rv64d_types Interface Next constr
+R4481:4481 xv6iris.HartSwp <> k:8 var
+R4478:4479 xv6iris.HartSwp <> oc:7 var
+R4486:4499 Riscv.rv64d_types Interface Next constr
+binder 4509:4509 <> v:9
+R4514:4514 xv6iris.HartSwp <> C:5 var
+R4517:4517 xv6iris.HartSwp <> k:8 var
+R4519:4519 xv6iris.HartSwp <> v:9 var
+R4501:4502 xv6iris.HartSwp <> oc:7 var
+prf 4604:4610 <> mctx_id
+R4614:4617 xv6iris.HartSwp <> mctx def
+R4628:4628 Riscv.rv64d_types <> M def
+R4630:4633 Corelib.Init.Datatypes <> unit ind
+binder 4624:4624 <> m:10
+R4638:4638 xv6iris.HartSwp <> m:10 var
+prf 4768:4776 <> mctx_bind
+binder 4779:4779 <> X:11
+binder 4781:4781 <> Y:12
+R4797:4800 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4796:4796 xv6iris.HartSwp <> X:11 var
+R4801:4801 Riscv.rv64d_types <> M def
+R4803:4803 xv6iris.HartSwp <> Y:12 var
+binder 4792:4792 <> f:13
+R4814:4817 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4811:4811 Riscv.rv64d_types <> M def
+R4813:4813 xv6iris.HartSwp <> Y:12 var
+R4818:4818 Riscv.rv64d_types <> M def
+R4820:4823 Corelib.Init.Datatypes <> unit ind
+binder 4807:4807 <> C:14
+R4836:4839 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4830:4833 xv6iris.HartSwp <> mctx def
+R4835:4835 xv6iris.HartSwp <> C:14 var
+R4840:4843 xv6iris.HartSwp <> mctx def
+R4854:4854 Riscv.rv64d_types <> M def
+R4856:4856 xv6iris.HartSwp <> X:11 var
+binder 4850:4850 <> m:15
+R4861:4861 xv6iris.HartSwp <> C:14 var
+R4864:4872 Riscv.rv64d_types Defs bind def
+R4876:4876 xv6iris.HartSwp <> f:13 var
+R4874:4874 xv6iris.HartSwp <> m:15 var
+R4918:4926 Riscv.rv64d_types Defs bind def
+R4918:4926 Riscv.rv64d_types Defs bind def
+R4918:4926 Riscv.rv64d_types Defs bind def
+prf 5014:5022 <> mctx_comp
+binder 5025:5025 <> X:16
+binder 5027:5027 <> Y:17
+R5045:5048 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5042:5042 Riscv.rv64d_types <> M def
+R5044:5044 xv6iris.HartSwp <> X:16 var
+R5049:5049 Riscv.rv64d_types <> M def
+R5051:5051 xv6iris.HartSwp <> Y:17 var
+binder 5038:5038 <> F:18
+R5062:5065 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5059:5059 Riscv.rv64d_types <> M def
+R5061:5061 xv6iris.HartSwp <> Y:17 var
+R5066:5066 Riscv.rv64d_types <> M def
+R5068:5071 Corelib.Init.Datatypes <> unit ind
+binder 5055:5055 <> C:19
+R5084:5089 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5078:5081 xv6iris.HartSwp <> mctx def
+R5083:5083 xv6iris.HartSwp <> C:19 var
+R5090:5090 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5259:5265 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5091:5097 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5161:5168 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 5098:5098 <> T:20
+R5106:5122 Riscv.rv64d_types Interface outcome ind
+R5145:5145 xv6iris.HartSwp <> T:20 var
+R5134:5142 Riscv.rv64d_types <> exception ind
+binder 5101:5102 <> oc:21
+R5154:5157 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5153:5153 xv6iris.HartSwp <> T:20 var
+R5158:5158 Riscv.rv64d_types <> M def
+R5160:5160 xv6iris.HartSwp <> X:16 var
+binder 5149:5149 <> k:22
+R5188:5196 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5180:5182 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5169:5176 xv6iris.HartSwp <> is_extra def
+R5178:5179 xv6iris.HartSwp <> oc:21 var
+R5183:5187 Corelib.Init.Datatypes <> false constr
+R5220:5222 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5197:5197 xv6iris.HartSwp <> F:18 var
+R5200:5213 Riscv.rv64d_types Interface Next constr
+R5218:5218 xv6iris.HartSwp <> k:22 var
+R5215:5216 xv6iris.HartSwp <> oc:21 var
+R5223:5236 Riscv.rv64d_types Interface Next constr
+binder 5246:5246 <> v:23
+R5251:5251 xv6iris.HartSwp <> F:18 var
+R5254:5254 xv6iris.HartSwp <> k:22 var
+R5256:5256 xv6iris.HartSwp <> v:23 var
+R5238:5239 xv6iris.HartSwp <> oc:21 var
+R5266:5269 xv6iris.HartSwp <> mctx def
+R5280:5280 Riscv.rv64d_types <> M def
+R5282:5282 xv6iris.HartSwp <> X:16 var
+binder 5276:5276 <> m:24
+R5287:5287 xv6iris.HartSwp <> C:19 var
+R5290:5290 xv6iris.HartSwp <> F:18 var
+R5292:5292 xv6iris.HartSwp <> m:24 var
+def 5851:5859 <> is_extraE
+binder 5862:5862 <> E:25
+binder 5873:5873 <> T:26
+R5893:5909 Riscv.rv64d_types Interface outcome ind
+R5924:5924 xv6iris.HartSwp <> T:26 var
+R5921:5921 xv6iris.HartSwp <> E:25 var
+binder 5888:5889 <> oc:27
+R5929:5932 Corelib.Init.Datatypes <> bool ind
+R5945:5946 xv6iris.HartSwp <> oc:27 var
+R5957:5978 Riscv.rv64d_types Interface ExtraOutcome constr
+R5985:5988 Corelib.Init.Datatypes <> true constr
+R5999:6003 Corelib.Init.Datatypes <> false constr
+def 6024:6028 <> mctxE
+binder 6031:6031 <> E:29
+binder 6033:6033 <> X:30
+binder 6035:6035 <> Y:31
+R6068:6071 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6054:6063 Riscv.rv64d_types Defs monad def
+R6065:6065 xv6iris.HartSwp <> E:29 var
+R6067:6067 xv6iris.HartSwp <> X:30 var
+R6072:6081 Riscv.rv64d_types Defs monad def
+R6083:6083 xv6iris.HartSwp <> E:29 var
+R6085:6085 xv6iris.HartSwp <> Y:31 var
+binder 6050:6050 <> F:32
+R6100:6107 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R6191:6197 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 6108:6108 <> T:33
+R6124:6140 Riscv.rv64d_types Interface outcome ind
+R6155:6155 xv6iris.HartSwp <> T:33 var
+R6152:6152 xv6iris.HartSwp <> E:29 var
+binder 6119:6120 <> oc:34
+R6173:6176 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6172:6172 xv6iris.HartSwp <> T:33 var
+R6177:6186 Riscv.rv64d_types Defs monad def
+R6188:6188 xv6iris.HartSwp <> E:29 var
+R6190:6190 xv6iris.HartSwp <> X:30 var
+binder 6168:6168 <> k:35
+R6218:6225 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6210:6212 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6198:6206 xv6iris.HartSwp <> is_extraE def
+R6208:6209 xv6iris.HartSwp <> oc:34 var
+R6213:6217 Corelib.Init.Datatypes <> false constr
+R6249:6251 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6226:6226 xv6iris.HartSwp <> F:32 var
+R6229:6242 Riscv.rv64d_types Interface Next constr
+R6247:6247 xv6iris.HartSwp <> k:35 var
+R6244:6245 xv6iris.HartSwp <> oc:34 var
+R6252:6265 Riscv.rv64d_types Interface Next constr
+binder 6275:6275 <> v:36
+R6280:6280 xv6iris.HartSwp <> F:32 var
+R6283:6283 xv6iris.HartSwp <> k:35 var
+R6285:6285 xv6iris.HartSwp <> v:36 var
+R6267:6268 xv6iris.HartSwp <> oc:34 var
+prf 6297:6304 <> mctxE_id
+binder 6307:6307 <> E:37
+binder 6309:6309 <> X:38
+R6321:6325 xv6iris.HartSwp <> mctxE def
+R6336:6345 Riscv.rv64d_types Defs monad def
+R6347:6347 xv6iris.HartSwp <> E:37 var
+R6349:6349 xv6iris.HartSwp <> X:38 var
+binder 6332:6332 <> m:39
+R6354:6354 xv6iris.HartSwp <> m:39 var
+prf 6407:6416 <> mctxE_bind
+binder 6419:6419 <> E:40
+binder 6421:6421 <> X:41
+binder 6423:6423 <> Y:42
+binder 6425:6425 <> Z:43
+R6441:6444 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6440:6440 xv6iris.HartSwp <> X:41 var
+R6445:6454 Riscv.rv64d_types Defs monad def
+R6456:6456 xv6iris.HartSwp <> E:40 var
+R6458:6458 xv6iris.HartSwp <> Y:42 var
+binder 6436:6436 <> f:44
+R6484:6487 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6470:6479 Riscv.rv64d_types Defs monad def
+R6481:6481 xv6iris.HartSwp <> E:40 var
+R6483:6483 xv6iris.HartSwp <> Y:42 var
+R6488:6497 Riscv.rv64d_types Defs monad def
+R6499:6499 xv6iris.HartSwp <> E:40 var
+R6501:6501 xv6iris.HartSwp <> Z:43 var
+binder 6466:6466 <> F:45
+R6515:6518 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6508:6512 xv6iris.HartSwp <> mctxE def
+R6514:6514 xv6iris.HartSwp <> F:45 var
+R6519:6523 xv6iris.HartSwp <> mctxE def
+R6534:6543 Riscv.rv64d_types Defs monad def
+R6545:6545 xv6iris.HartSwp <> E:40 var
+R6547:6547 xv6iris.HartSwp <> X:41 var
+binder 6530:6530 <> m:46
+R6552:6552 xv6iris.HartSwp <> F:45 var
+R6555:6563 Riscv.rv64d_types Defs bind def
+R6567:6567 xv6iris.HartSwp <> f:44 var
+R6565:6565 xv6iris.HartSwp <> m:46 var
+R6609:6617 Riscv.rv64d_types Defs bind def
+R6609:6617 Riscv.rv64d_types Defs bind def
+R6609:6617 Riscv.rv64d_types Defs bind def
+prf 6648:6658 <> mctxE_bind0
+binder 6661:6661 <> E:47
+binder 6663:6663 <> Y:48
+binder 6665:6665 <> Z:49
+R6680:6689 Riscv.rv64d_types Defs monad def
+R6691:6691 xv6iris.HartSwp <> E:47 var
+R6693:6693 xv6iris.HartSwp <> Y:48 var
+binder 6676:6676 <> n:50
+R6719:6722 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6705:6714 Riscv.rv64d_types Defs monad def
+R6716:6716 xv6iris.HartSwp <> E:47 var
+R6718:6718 xv6iris.HartSwp <> Y:48 var
+R6723:6732 Riscv.rv64d_types Defs monad def
+R6734:6734 xv6iris.HartSwp <> E:47 var
+R6736:6736 xv6iris.HartSwp <> Z:49 var
+binder 6701:6701 <> F:51
+R6750:6753 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6743:6747 xv6iris.HartSwp <> mctxE def
+R6749:6749 xv6iris.HartSwp <> F:51 var
+R6754:6758 xv6iris.HartSwp <> mctxE def
+R6769:6778 Riscv.rv64d_types Defs monad def
+R6780:6780 xv6iris.HartSwp <> E:47 var
+R6782:6785 Corelib.Init.Datatypes <> unit ind
+binder 6765:6765 <> m:52
+R6790:6790 xv6iris.HartSwp <> F:51 var
+R6793:6802 Riscv.rv64d_types Defs bind0 def
+R6806:6806 xv6iris.HartSwp <> n:50 var
+R6804:6804 xv6iris.HartSwp <> m:52 var
+R6848:6857 Riscv.rv64d_types Defs bind0 def
+R6860:6868 Riscv.rv64d_types Defs bind def
+R6848:6857 Riscv.rv64d_types Defs bind0 def
+R6848:6857 Riscv.rv64d_types Defs bind0 def
+R6860:6868 Riscv.rv64d_types Defs bind def
+R6860:6868 Riscv.rv64d_types Defs bind def
+prf 7614:7627 <> mctx_cer_liftR
+binder 7630:7630 <> X:53
+binder 7632:7632 <> R:54
+R7648:7651 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7647:7647 xv6iris.HartSwp <> X:53 var
+R7652:7653 Riscv.rv64d_types <> MR def
+R7655:7655 xv6iris.HartSwp <> R:54 var
+R7657:7657 xv6iris.HartSwp <> R:54 var
+binder 7643:7643 <> K:55
+R7668:7671 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7665:7665 Riscv.rv64d_types <> M def
+R7667:7667 xv6iris.HartSwp <> R:54 var
+R7672:7672 Riscv.rv64d_types <> M def
+R7674:7677 Corelib.Init.Datatypes <> unit ind
+binder 7661:7661 <> C:56
+R7690:7695 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7684:7687 xv6iris.HartSwp <> mctx def
+R7689:7689 xv6iris.HartSwp <> C:56 var
+R7696:7699 xv6iris.HartSwp <> mctx def
+R7710:7710 Riscv.rv64d_types <> M def
+R7712:7712 xv6iris.HartSwp <> X:53 var
+binder 7706:7706 <> m:57
+R7727:7727 xv6iris.HartSwp <> C:56 var
+R7730:7752 Riscv.rv64d_types Defs catch_early_return def
+R7755:7763 Riscv.rv64d_types Defs bind def
+R7789:7789 xv6iris.HartSwp <> K:55 var
+R7766:7775 Riscv.rv64d_types Defs liftR def
+R7786:7786 xv6iris.HartSwp <> m:57 var
+R7783:7783 xv6iris.HartSwp <> R:54 var
+R7932:7938 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7845:7867 Riscv.rv64d_types Defs catch_early_return def
+R7876:7884 Riscv.rv64d_types Defs bind def
+R7887:7896 Riscv.rv64d_types Defs liftR def
+R7908:7921 Riscv.rv64d_types Interface Next constr
+R7939:7952 Riscv.rv64d_types Interface Next constr
+binder 7970:7970 <> v:58
+R7975:7997 Riscv.rv64d_types Defs catch_early_return def
+R8020:8028 Riscv.rv64d_types Defs bind def
+R8031:8040 Riscv.rv64d_types Defs liftR def
+R8054:8054 xv6iris.HartSwp <> v:58 var
+R7932:7938 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7845:7867 Riscv.rv64d_types Defs catch_early_return def
+R7876:7884 Riscv.rv64d_types Defs bind def
+R7887:7896 Riscv.rv64d_types Defs liftR def
+R7908:7921 Riscv.rv64d_types Interface Next constr
+R7939:7952 Riscv.rv64d_types Interface Next constr
+binder 7970:7970 <> v:59
+R7975:7997 Riscv.rv64d_types Defs catch_early_return def
+R8020:8028 Riscv.rv64d_types Defs bind def
+R8031:8040 Riscv.rv64d_types Defs liftR def
+R8054:8054 xv6iris.HartSwp <> v:59 var
+prf 8321:8330 <> mctx_cer_F
+binder 8333:8333 <> X:60
+binder 8335:8335 <> R:61
+R8356:8359 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8350:8351 Riscv.rv64d_types <> MR def
+R8353:8353 xv6iris.HartSwp <> R:61 var
+R8355:8355 xv6iris.HartSwp <> X:60 var
+R8360:8361 Riscv.rv64d_types <> MR def
+R8363:8363 xv6iris.HartSwp <> R:61 var
+R8365:8365 xv6iris.HartSwp <> R:61 var
+binder 8346:8346 <> F:62
+R8376:8379 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8373:8373 Riscv.rv64d_types <> M def
+R8375:8375 xv6iris.HartSwp <> R:61 var
+R8380:8380 Riscv.rv64d_types <> M def
+R8382:8385 Corelib.Init.Datatypes <> unit ind
+binder 8369:8369 <> C:63
+R8398:8401 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8392:8395 xv6iris.HartSwp <> mctx def
+R8397:8397 xv6iris.HartSwp <> C:63 var
+R8409:8414 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8402:8406 xv6iris.HartSwp <> mctxE def
+R8408:8408 xv6iris.HartSwp <> F:62 var
+R8415:8418 xv6iris.HartSwp <> mctx def
+R8429:8429 Riscv.rv64d_types <> M def
+R8431:8431 xv6iris.HartSwp <> X:60 var
+binder 8425:8425 <> m:64
+R8436:8436 xv6iris.HartSwp <> C:63 var
+R8439:8461 Riscv.rv64d_types Defs catch_early_return def
+R8464:8464 xv6iris.HartSwp <> F:62 var
+R8467:8476 Riscv.rv64d_types Defs liftR def
+R8487:8487 xv6iris.HartSwp <> m:64 var
+R8484:8484 xv6iris.HartSwp <> R:61 var
+R8573:8582 Riscv.rv64d_types Defs liftR def
+R8584:8597 Riscv.rv64d_types Defs try_catch def
+prf 9032:9041 <> mbind0_ret
+binder 9044:9044 <> E:65
+binder 9046:9046 <> A:66
+R9061:9070 Riscv.rv64d_types Defs monad def
+R9072:9072 xv6iris.HartSwp <> E:65 var
+R9074:9074 xv6iris.HartSwp <> A:66 var
+binder 9057:9057 <> x:67
+R9112:9114 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9081:9090 Riscv.rv64d_types Defs bind0 def
+R9111:9111 xv6iris.HartSwp <> x:67 var
+R9093:9105 Riscv.rv64d_types Interface Ret constr
+R9107:9108 Corelib.Init.Datatypes <> tt constr
+R9115:9115 xv6iris.HartSwp <> x:67 var
+prf 9150:9158 <> mbind_ret
+binder 9161:9161 <> E:68
+binder 9163:9163 <> A:69
+binder 9165:9165 <> B:70
+R9180:9180 xv6iris.HartSwp <> A:69 var
+binder 9176:9176 <> v:71
+R9189:9192 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9188:9188 xv6iris.HartSwp <> A:69 var
+R9193:9202 Riscv.rv64d_types Defs monad def
+R9204:9204 xv6iris.HartSwp <> E:68 var
+R9206:9206 xv6iris.HartSwp <> B:70 var
+binder 9184:9184 <> f:72
+R9242:9244 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9213:9221 Riscv.rv64d_types Defs bind def
+R9241:9241 xv6iris.HartSwp <> f:72 var
+R9224:9236 Riscv.rv64d_types Interface Ret constr
+R9238:9238 xv6iris.HartSwp <> v:71 var
+R9245:9245 xv6iris.HartSwp <> f:72 var
+R9247:9247 xv6iris.HartSwp <> v:71 var
+prf 9282:9291 <> mliftR_ret
+binder 9294:9294 <> E:73
+binder 9296:9296 <> R:74
+binder 9298:9298 <> A:75
+R9313:9313 xv6iris.HartSwp <> A:75 var
+binder 9309:9309 <> v:76
+R9366:9368 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9320:9329 Riscv.rv64d_types Defs liftR def
+R9350:9362 Riscv.rv64d_types Interface Ret constr
+R9364:9364 xv6iris.HartSwp <> v:76 var
+R9337:9337 xv6iris.HartSwp <> E:73 var
+R9346:9346 xv6iris.HartSwp <> R:74 var
+R9369:9381 Riscv.rv64d_types Interface Ret constr
+R9383:9383 xv6iris.HartSwp <> v:76 var
+prf 9418:9425 <> mcer_ret
+binder 9428:9428 <> E:77
+binder 9430:9430 <> A:78
+R9445:9445 xv6iris.HartSwp <> A:78 var
+binder 9441:9441 <> v:79
+R9502:9504 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9452:9474 Riscv.rv64d_types Defs catch_early_return def
+R9486:9498 Riscv.rv64d_types Interface Ret constr
+R9500:9500 xv6iris.HartSwp <> v:79 var
+R9482:9482 xv6iris.HartSwp <> E:77 var
+R9505:9517 Riscv.rv64d_types Interface Ret constr
+R9519:9519 xv6iris.HartSwp <> v:79 var
+sec 9789:9791 <> swp
+R9807:9813 xv6iris.RiscvPtsto <> riscvGS class
+var  9832:9834 swp GEN
+var  9847:9849 swp CID
+var  9862:9863 swp XI
+R9838:9842 xv6iris.RiscvLang <> GenId class
+R9853:9857 xv6iris.RiscvLang <> CpuId class
+R9867:9872 xv6iris.TsoCtx <> CurCtx class
+def 9890:9892 <> swp
+binder 9895:9895 <> X:85
+R9910:9910 Riscv.rv64d_types <> M def
+R9912:9912 xv6iris.HartSwp <> X:85 var
+binder 9906:9906 <> m:86
+R9922:9925 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9921:9921 xv6iris.HartSwp <> X:85 var
+R9926:9930 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R9932:9933 xv6iris.HartSwp <> swp.Σ var
+binder 9916:9917 <> Φ:87
+R9938:9942 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R9944:9945 xv6iris.HartSwp <> swp.Σ var
+R9955:9958 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R9976:9984 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R9966:9969 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9963:9963 Riscv.rv64d_types <> M def
+R9965:9965 xv6iris.HartSwp <> X:85 var
+R9970:9970 Riscv.rv64d_types <> M def
+R9972:9975 Corelib.Init.Datatypes <> unit ind
+binder 9959:9959 <> C:88
+R9997:10009 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9985:9987 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9994:9996 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9988:9991 xv6iris.HartSwp <> mctx def
+R9993:9993 xv6iris.HartSwp <> C:88 var
+R10010:10010 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10124:10137 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10011:10014 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R10020:10021 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R10019:10019 xv6iris.HartSwp <> X:85 var
+binder 10015:10015 <> v:89
+R10026:10031 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10022:10023 xv6iris.HartSwp <> Φ:87 var
+R10025:10025 xv6iris.HartSwp <> v:89 var
+R10032:10035 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R10123:10123 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R10108:10111 iris.program_logic.language <> expr proj
+R10113:10122 xv6iris.RiscvLang <> riscv_lang def
+R10036:10040 xv6iris.RiscvLang <> HartE constr
+R10042:10047 xv6iris.RiscvLang <> gen_id def
+R10049:10054 xv6iris.RiscvLang <> cpu_id def
+R10057:10057 xv6iris.HartSwp <> C:88 var
+R10060:10072 Riscv.rv64d_types Interface Ret constr
+R10074:10074 xv6iris.HartSwp <> v:89 var
+R10138:10141 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R10185:10185 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R10170:10173 iris.program_logic.language <> expr proj
+R10175:10184 xv6iris.RiscvLang <> riscv_lang def
+R10142:10146 xv6iris.RiscvLang <> HartE constr
+R10148:10153 xv6iris.RiscvLang <> gen_id def
+R10155:10160 xv6iris.RiscvLang <> cpu_id def
+R10163:10163 xv6iris.HartSwp <> C:88 var
+R10165:10165 xv6iris.HartSwp <> m:86 var
+inst 10210:10215 <> swp_ne
+binder 10218:10218 <> X:90
+R10226:10226 Riscv.rv64d_types <> M def
+R10228:10228 xv6iris.HartSwp <> X:90 var
+binder 10222:10222 <> m:91
+binder 10231:10231 <> n:92
+R10239:10244 Corelib.Classes.Morphisms <> Proper class
+R10290:10292 xv6iris.HartSwp <> swp def
+R10294:10294 xv6iris.HartSwp <> m:91 var
+R10276:10280 Corelib.Classes.Morphisms ProperNotations ::signature_scope:x_'==>'_x not
+R10247:10264 Corelib.Classes.Morphisms <> pointwise_relation def
+R10269:10272 iris.algebra.ofe <> dist def
+R10274:10274 xv6iris.HartSwp <> n:92 var
+R10266:10266 xv6iris.HartSwp <> X:90 var
+R10281:10284 iris.algebra.ofe <> dist def
+R10286:10286 xv6iris.HartSwp <> n:92 var
+R10316:10318 xv6iris.HartSwp <> swp def
+R10316:10318 xv6iris.HartSwp <> swp def
+R10316:10318 xv6iris.HartSwp <> swp def
+inst 10358:10367 <> swp_proper
+binder 10370:10370 <> X:93
+R10378:10378 Riscv.rv64d_types <> M def
+R10380:10380 xv6iris.HartSwp <> X:93 var
+binder 10374:10374 <> m:94
+R10389:10394 Corelib.Classes.Morphisms <> Proper class
+R10436:10438 xv6iris.HartSwp <> swp def
+R10440:10440 xv6iris.HartSwp <> m:94 var
+R10423:10427 Corelib.Classes.Morphisms ProperNotations ::signature_scope:x_'==>'_x not
+R10397:10414 Corelib.Classes.Morphisms <> pointwise_relation def
+R10418:10422 stdpp.base <> ::stdpp_scope:'(≡)' not
+R10416:10416 xv6iris.HartSwp <> X:93 var
+R10428:10432 stdpp.base <> ::stdpp_scope:'(≡)' not
+R10462:10464 xv6iris.HartSwp <> swp def
+R10462:10464 xv6iris.HartSwp <> swp def
+R10462:10464 xv6iris.HartSwp <> swp def
+prf 10596:10602 <> swp_ret
+binder 10605:10605 <> X:95
+R10613:10613 xv6iris.HartSwp <> X:95 var
+binder 10609:10609 <> x:96
+R10623:10626 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10622:10622 xv6iris.HartSwp <> X:95 var
+R10627:10631 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R10633:10634 xv6iris.HartSwp <> swp.Σ var
+binder 10617:10618 <> Φ:97
+R10643:10648 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10639:10640 xv6iris.HartSwp <> Φ:97 var
+R10642:10642 xv6iris.HartSwp <> x:96 var
+R10649:10651 xv6iris.HartSwp <> swp def
+R10671:10672 xv6iris.HartSwp <> Φ:97 var
+R10654:10666 Riscv.rv64d_types Interface Ret constr
+R10668:10668 xv6iris.HartSwp <> x:96 var
+prf 10935:10941 <> swp_use
+binder 10944:10944 <> X:98
+R10952:10952 Riscv.rv64d_types <> M def
+R10954:10954 xv6iris.HartSwp <> X:98 var
+binder 10948:10948 <> m:99
+R10964:10967 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10963:10963 xv6iris.HartSwp <> X:98 var
+R10968:10972 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R10974:10975 xv6iris.HartSwp <> swp.Σ var
+binder 10958:10959 <> Φ:100
+R10986:10989 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10983:10983 Riscv.rv64d_types <> M def
+R10985:10985 xv6iris.HartSwp <> X:98 var
+R10990:10990 Riscv.rv64d_types <> M def
+R10992:10995 Corelib.Init.Datatypes <> unit ind
+binder 10979:10979 <> C:101
+R11010:11017 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11004:11007 xv6iris.HartSwp <> mctx def
+R11009:11009 xv6iris.HartSwp <> C:101 var
+R11026:11035 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11018:11020 xv6iris.HartSwp <> swp def
+R11024:11025 xv6iris.HartSwp <> Φ:100 var
+R11022:11022 xv6iris.HartSwp <> m:99 var
+R11036:11036 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11147:11157 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11037:11040 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R11046:11047 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R11045:11045 xv6iris.HartSwp <> X:98 var
+binder 11041:11041 <> v:102
+R11052:11057 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11048:11049 xv6iris.HartSwp <> Φ:100 var
+R11051:11051 xv6iris.HartSwp <> v:102 var
+R11058:11061 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11146:11146 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11131:11134 iris.program_logic.language <> expr proj
+R11136:11145 xv6iris.RiscvLang <> riscv_lang def
+R11062:11066 xv6iris.RiscvLang <> HartE constr
+R11068:11073 xv6iris.RiscvLang <> gen_id def
+R11075:11080 xv6iris.RiscvLang <> cpu_id def
+R11083:11083 xv6iris.HartSwp <> C:101 var
+R11086:11098 Riscv.rv64d_types Interface Ret constr
+R11100:11100 xv6iris.HartSwp <> v:102 var
+R11158:11161 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11205:11205 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11190:11193 iris.program_logic.language <> expr proj
+R11195:11204 xv6iris.RiscvLang <> riscv_lang def
+R11162:11166 xv6iris.RiscvLang <> HartE constr
+R11168:11173 xv6iris.RiscvLang <> gen_id def
+R11175:11180 xv6iris.RiscvLang <> cpu_id def
+R11183:11183 xv6iris.HartSwp <> C:101 var
+R11185:11185 xv6iris.HartSwp <> m:99 var
+R11250:11250 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11257:11260 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11262:11267 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11275:11275 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11250:11250 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11257:11260 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11262:11267 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11275:11275 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+prf 11292:11299 <> swp_mono
+binder 11302:11302 <> X:103
+R11310:11310 Riscv.rv64d_types <> M def
+R11312:11312 xv6iris.HartSwp <> X:103 var
+binder 11306:11306 <> m:104
+R11325:11328 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11324:11324 xv6iris.HartSwp <> X:103 var
+R11329:11333 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R11335:11336 xv6iris.HartSwp <> swp.Σ var
+binder 11316:11317 <> Φ:105
+binder 11319:11320 <> Ψ:106
+R11345:11345 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11367:11373 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11346:11349 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R11351:11352 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+binder 11350:11350 <> v:107
+R11357:11362 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11353:11354 xv6iris.HartSwp <> Φ:105 var
+R11356:11356 xv6iris.HartSwp <> v:107 var
+R11363:11364 xv6iris.HartSwp <> Ψ:106 var
+R11366:11366 xv6iris.HartSwp <> v:107 var
+R11382:11387 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11374:11376 xv6iris.HartSwp <> swp def
+R11380:11381 xv6iris.HartSwp <> Φ:105 var
+R11378:11378 xv6iris.HartSwp <> m:104 var
+R11388:11390 xv6iris.HartSwp <> swp def
+R11394:11395 xv6iris.HartSwp <> Ψ:106 var
+R11392:11392 xv6iris.HartSwp <> m:104 var
+R11452:11452 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11459:11462 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11464:11469 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11481:11481 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11452:11452 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11459:11462 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11464:11469 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R11481:11481 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+prf 11554:11564 <> swp_frame_l
+binder 11567:11567 <> X:108
+R11575:11575 Riscv.rv64d_types <> M def
+R11577:11577 xv6iris.HartSwp <> X:108 var
+binder 11571:11571 <> m:109
+R11587:11590 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11586:11586 xv6iris.HartSwp <> X:108 var
+R11591:11595 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R11597:11598 xv6iris.HartSwp <> swp.Σ var
+binder 11581:11582 <> Φ:110
+R11606:11610 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R11612:11613 xv6iris.HartSwp <> swp.Σ var
+binder 11602:11602 <> R:111
+R11623:11628 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11622:11622 xv6iris.HartSwp <> R:111 var
+R11637:11642 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11629:11631 xv6iris.HartSwp <> swp def
+R11635:11636 xv6iris.HartSwp <> Φ:110 var
+R11633:11633 xv6iris.HartSwp <> m:109 var
+R11643:11645 xv6iris.HartSwp <> swp def
+binder 11654:11654 <> v:112
+R11660:11664 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11659:11659 xv6iris.HartSwp <> R:111 var
+R11665:11666 xv6iris.HartSwp <> Φ:110 var
+R11668:11668 xv6iris.HartSwp <> v:112 var
+R11647:11647 xv6iris.HartSwp <> m:109 var
+R11711:11711 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11720:11725 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11737:11737 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11712:11719 xv6iris.HartSwp <> swp_mono thm
+R11711:11711 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11720:11725 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11737:11737 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11712:11719 xv6iris.HartSwp <> swp_mono thm
+prf 12001:12008 <> swp_bind
+binder 12011:12011 <> X:113
+binder 12013:12013 <> Y:114
+R12021:12021 Riscv.rv64d_types <> M def
+R12023:12023 xv6iris.HartSwp <> X:113 var
+binder 12017:12017 <> m:115
+R12032:12035 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12031:12031 xv6iris.HartSwp <> X:113 var
+R12036:12036 Riscv.rv64d_types <> M def
+R12038:12038 xv6iris.HartSwp <> Y:114 var
+binder 12027:12027 <> f:116
+R12048:12051 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12047:12047 xv6iris.HartSwp <> Y:114 var
+R12052:12056 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R12058:12059 xv6iris.HartSwp <> swp.Σ var
+binder 12042:12043 <> Φ:117
+R12097:12102 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12068:12070 xv6iris.HartSwp <> swp def
+binder 12079:12079 <> v:118
+R12084:12086 xv6iris.HartSwp <> swp def
+R12094:12095 xv6iris.HartSwp <> Φ:117 var
+R12089:12089 xv6iris.HartSwp <> f:116 var
+R12091:12091 xv6iris.HartSwp <> v:118 var
+R12072:12072 xv6iris.HartSwp <> m:115 var
+R12103:12105 xv6iris.HartSwp <> swp def
+R12123:12124 xv6iris.HartSwp <> Φ:117 var
+R12108:12116 Riscv.rv64d_types Defs bind def
+R12120:12120 xv6iris.HartSwp <> f:116 var
+R12118:12118 xv6iris.HartSwp <> m:115 var
+R12179:12179 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12186:12190 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12219:12239 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12249:12249 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+binder 12195:12196 <> m':119
+R12204:12212 Riscv.rv64d_types Defs bind def
+R12214:12215 xv6iris.HartSwp <> m':119 var
+R12262:12270 xv6iris.HartSwp <> mctx_bind thm
+R12179:12179 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12186:12190 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12219:12239 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12249:12249 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+binder 12195:12196 <> m':120
+R12204:12212 Riscv.rv64d_types Defs bind def
+R12214:12215 xv6iris.HartSwp <> m':120 var
+R12262:12270 xv6iris.HartSwp <> mctx_bind thm
+R12308:12308 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12317:12320 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12322:12327 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12337:12337 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12308:12308 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12317:12320 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12322:12327 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R12337:12337 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+prf 12418:12426 <> swp_bind0
+binder 12429:12429 <> Y:121
+R12437:12437 Riscv.rv64d_types <> M def
+R12439:12442 Corelib.Init.Datatypes <> unit ind
+binder 12433:12433 <> m:122
+R12450:12450 Riscv.rv64d_types <> M def
+R12452:12452 xv6iris.HartSwp <> Y:121 var
+binder 12446:12446 <> n:123
+R12462:12465 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12461:12461 xv6iris.HartSwp <> Y:121 var
+R12466:12470 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R12472:12473 xv6iris.HartSwp <> swp.Σ var
+binder 12456:12457 <> Φ:124
+R12507:12512 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12482:12484 xv6iris.HartSwp <> swp def
+R12498:12500 xv6iris.HartSwp <> swp def
+R12504:12505 xv6iris.HartSwp <> Φ:124 var
+R12502:12502 xv6iris.HartSwp <> n:123 var
+R12486:12486 xv6iris.HartSwp <> m:122 var
+R12513:12515 xv6iris.HartSwp <> swp def
+R12534:12535 xv6iris.HartSwp <> Φ:124 var
+R12518:12527 Riscv.rv64d_types Defs bind0 def
+R12531:12531 xv6iris.HartSwp <> n:123 var
+R12529:12529 xv6iris.HartSwp <> m:122 var
+R12556:12565 Riscv.rv64d_types Defs bind0 def
+R12556:12565 Riscv.rv64d_types Defs bind0 def
+R12556:12565 Riscv.rv64d_types Defs bind0 def
+R12575:12582 xv6iris.HartSwp <> swp_bind thm
+R12575:12582 xv6iris.HartSwp <> swp_bind thm
+prf 12819:12824 <> swp_wp
+R12831:12831 Riscv.rv64d_types <> M def
+R12833:12836 Corelib.Init.Datatypes <> unit ind
+binder 12827:12827 <> m:125
+R12849:12852 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12845:12848 Corelib.Init.Datatypes <> unit ind
+R12853:12857 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R12859:12860 xv6iris.HartSwp <> swp.Σ var
+binder 12840:12841 <> Φ:126
+R12877:12886 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12869:12871 xv6iris.HartSwp <> swp def
+R12875:12876 xv6iris.HartSwp <> Φ:126 var
+R12873:12873 xv6iris.HartSwp <> m:125 var
+R12887:12887 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12939:12949 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12888:12891 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R12900:12901 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R12896:12899 Corelib.Init.Datatypes <> unit ind
+binder 12892:12892 <> v:127
+R12906:12911 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12902:12903 xv6iris.HartSwp <> Φ:126 var
+R12905:12905 xv6iris.HartSwp <> v:127 var
+R12912:12915 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R12938:12938 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R12923:12926 iris.program_logic.language <> expr proj
+R12928:12937 xv6iris.RiscvLang <> riscv_lang def
+R12916:12919 xv6iris.RiscvLang <> Loop abbrev
+R12950:12953 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R12993:12993 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R12978:12981 iris.program_logic.language <> expr proj
+R12983:12992 xv6iris.RiscvLang <> riscv_lang def
+R12954:12958 xv6iris.RiscvLang <> HartE constr
+R12960:12965 xv6iris.RiscvLang <> gen_id def
+R12967:12972 xv6iris.RiscvLang <> cpu_id def
+R12974:12974 xv6iris.HartSwp <> m:125 var
+R13038:13038 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R13045:13049 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R13071:13077 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R13087:13087 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R13059:13059 Riscv.rv64d_types <> M def
+R13061:13064 Corelib.Init.Datatypes <> unit ind
+binder 13054:13055 <> m':128
+R13069:13070 xv6iris.HartSwp <> m':128 var
+R13103:13109 xv6iris.HartSwp <> mctx_id thm
+R13038:13038 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R13045:13049 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R13071:13077 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R13087:13087 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R13059:13059 Riscv.rv64d_types <> M def
+R13061:13064 Corelib.Init.Datatypes <> unit ind
+binder 13054:13055 <> m':129
+R13069:13070 xv6iris.HartSwp <> m':129 var
+R13103:13109 xv6iris.HartSwp <> mctx_id thm
+R13146:13150 xv6iris.RiscvLang <> LoopE def
+R13146:13150 xv6iris.RiscvLang <> LoopE def
+R13146:13150 xv6iris.RiscvLang <> LoopE def
+prf 13258:13268 <> swp_wp_loop
+R13275:13275 Riscv.rv64d_types <> M def
+R13277:13280 Corelib.Init.Datatypes <> unit ind
+binder 13271:13271 <> m:130
+R13333:13342 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R13289:13291 xv6iris.HartSwp <> swp def
+R13305:13308 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R13331:13331 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R13316:13319 iris.program_logic.language <> expr proj
+R13321:13330 xv6iris.RiscvLang <> riscv_lang def
+R13309:13312 xv6iris.RiscvLang <> Loop abbrev
+R13293:13293 xv6iris.HartSwp <> m:130 var
+R13343:13346 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R13386:13386 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R13371:13374 iris.program_logic.language <> expr proj
+R13376:13385 xv6iris.RiscvLang <> riscv_lang def
+R13347:13351 xv6iris.RiscvLang <> HartE constr
+R13353:13358 xv6iris.RiscvLang <> gen_id def
+R13360:13365 xv6iris.RiscvLang <> cpu_id def
+R13367:13367 xv6iris.HartSwp <> m:130 var
+R13421:13421 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13428:13433 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13440:13440 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13422:13427 xv6iris.HartSwp <> swp_wp thm
+R13421:13421 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13428:13433 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13440:13440 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13422:13427 xv6iris.HartSwp <> swp_wp thm
+prf 13895:13902 <> swp_loop
+R13910:13915 Corelib.Init.Datatypes <> option ind
+R13917:13920 xv6iris.RiscvLang <> resv def
+binder 13905:13906 <> rr:131
+R13937:13946 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R13929:13936 xv6iris.RiscvPtsto <> gen_cert def
+R13966:13975 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13947:13955 xv6iris.RiscvPtsto <> resv_frag def
+R13964:13965 xv6iris.HartSwp <> rr:131 var
+R13957:13962 xv6iris.RiscvLang <> cpu_id def
+R14104:14113 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13976:13980 iris.bi.interface <> ::bi_scope:'▷'_x not
+R14103:14103 iris.bi.interface <> ::bi_scope:'▷'_x not
+R13981:13984 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R13996:14006 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R13992:13995 Corelib.Init.Datatypes <> bool ind
+binder 13985:13988 <> tick:132
+R14028:14042 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14007:14015 xv6iris.RiscvPtsto <> resv_frag def
+R14024:14027 Corelib.Init.Datatypes <> None constr
+R14017:14022 xv6iris.RiscvLang <> cpu_id def
+R14043:14045 xv6iris.HartSwp <> swp def
+R14075:14078 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R14101:14101 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R14086:14089 iris.program_logic.language <> expr proj
+R14091:14100 xv6iris.RiscvLang <> riscv_lang def
+R14079:14082 xv6iris.RiscvLang <> Loop abbrev
+R14048:14057 xv6iris.RiscvLang <> riscv_step def
+R14059:14062 xv6iris.HartSwp <> tick:132 var
+R14114:14117 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R14140:14140 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R14125:14128 iris.program_logic.language <> expr proj
+R14130:14139 xv6iris.RiscvLang <> riscv_lang def
+R14118:14121 xv6iris.RiscvLang <> Loop abbrev
+R14189:14189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14208:14213 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14227:14227 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14190:14204 xv6iris.RiscvExec <> wp_hart_restart thm
+R14189:14189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14208:14213 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14227:14227 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14190:14204 xv6iris.RiscvExec <> wp_hart_restart thm
+R14272:14282 xv6iris.HartSwp <> swp_wp_loop thm
+R14272:14282 xv6iris.HartSwp <> swp_wp_loop thm
+R14292:14292 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14296:14301 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14309:14309 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14292:14292 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14296:14301 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14309:14309 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+prf 14398:14405 <> swp_fupd
+binder 14408:14408 <> X:133
+R14416:14416 Riscv.rv64d_types <> M def
+R14418:14418 xv6iris.HartSwp <> X:133 var
+binder 14412:14412 <> m:134
+R14428:14431 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14427:14427 xv6iris.HartSwp <> X:133 var
+R14432:14436 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R14438:14439 xv6iris.HartSwp <> swp.Σ var
+binder 14422:14423 <> Φ:135
+R14448:14448 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R14467:14473 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R14449:14451 iris.bi.updates <> ::bi_scope:'|={'_x_'}=>'_x not
+R14455:14458 iris.bi.updates <> ::bi_scope:'|={'_x_'}=>'_x not
+R14452:14454 stdpp.base <> ::stdpp_scope:'⊤' not
+R14452:14454 stdpp.base <> ::stdpp_scope:'⊤' not
+R14459:14461 xv6iris.HartSwp <> swp def
+R14465:14466 xv6iris.HartSwp <> Φ:135 var
+R14463:14463 xv6iris.HartSwp <> m:134 var
+R14474:14476 xv6iris.HartSwp <> swp def
+R14480:14481 xv6iris.HartSwp <> Φ:135 var
+R14478:14478 xv6iris.HartSwp <> m:134 var
+R14532:14538 iris.program_logic.weakestpre <> fupd_wp thm
+R14532:14538 iris.program_logic.weakestpre <> fupd_wp thm
+R14579:14579 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14586:14589 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14591:14596 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14604:14604 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14579:14579 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14586:14589 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14591:14596 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14604:14604 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+prf 14623:14635 <> swp_fupd_post
+binder 14638:14638 <> X:136
+R14646:14646 Riscv.rv64d_types <> M def
+R14648:14648 xv6iris.HartSwp <> X:136 var
+binder 14642:14642 <> m:137
+R14658:14661 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14657:14657 xv6iris.HartSwp <> X:136 var
+R14662:14666 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R14668:14669 xv6iris.HartSwp <> swp.Σ var
+binder 14652:14653 <> Φ:138
+R14709:14714 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R14678:14680 xv6iris.HartSwp <> swp def
+binder 14689:14689 <> v:139
+R14694:14696 iris.bi.updates <> ::bi_scope:'|={'_x_'}=>'_x not
+R14700:14703 iris.bi.updates <> ::bi_scope:'|={'_x_'}=>'_x not
+R14697:14699 stdpp.base <> ::stdpp_scope:'⊤' not
+R14697:14699 stdpp.base <> ::stdpp_scope:'⊤' not
+R14704:14705 xv6iris.HartSwp <> Φ:138 var
+R14707:14707 xv6iris.HartSwp <> v:139 var
+R14682:14682 xv6iris.HartSwp <> m:137 var
+R14715:14717 xv6iris.HartSwp <> swp def
+R14721:14722 xv6iris.HartSwp <> Φ:138 var
+R14719:14719 xv6iris.HartSwp <> m:137 var
+R14773:14773 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14780:14783 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14785:14790 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14802:14802 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14773:14773 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14780:14783 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14785:14790 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14802:14802 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14835:14841 iris.program_logic.weakestpre <> fupd_wp thm
+R14835:14841 iris.program_logic.weakestpre <> fupd_wp thm
+prf 15552:15562 <> swp_use_cer
+binder 15565:15565 <> X:140
+binder 15567:15567 <> R:141
+R15582:15582 Riscv.rv64d_types <> M def
+R15584:15584 xv6iris.HartSwp <> X:140 var
+binder 15578:15578 <> m:142
+R15594:15597 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15593:15593 xv6iris.HartSwp <> X:140 var
+R15598:15602 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R15604:15605 xv6iris.HartSwp <> swp.Σ var
+binder 15588:15589 <> Φ:143
+R15620:15623 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15619:15619 xv6iris.HartSwp <> X:140 var
+R15624:15625 Riscv.rv64d_types <> MR def
+R15627:15627 xv6iris.HartSwp <> R:141 var
+R15629:15629 xv6iris.HartSwp <> R:141 var
+binder 15615:15615 <> K:144
+R15640:15643 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15637:15637 Riscv.rv64d_types <> M def
+R15639:15639 xv6iris.HartSwp <> R:141 var
+R15644:15644 Riscv.rv64d_types <> M def
+R15646:15649 Corelib.Init.Datatypes <> unit ind
+binder 15633:15633 <> C:145
+R15664:15671 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15658:15661 xv6iris.HartSwp <> mctx def
+R15663:15663 xv6iris.HartSwp <> C:145 var
+R15680:15689 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R15672:15674 xv6iris.HartSwp <> swp def
+R15678:15679 xv6iris.HartSwp <> Φ:143 var
+R15676:15676 xv6iris.HartSwp <> m:142 var
+R15690:15690 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15808:15818 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15691:15694 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R15700:15701 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R15699:15699 xv6iris.HartSwp <> X:140 var
+binder 15695:15695 <> v:146
+R15706:15718 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15702:15703 xv6iris.HartSwp <> Φ:143 var
+R15705:15705 xv6iris.HartSwp <> v:146 var
+R15719:15722 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R15807:15807 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R15792:15795 iris.program_logic.language <> expr proj
+R15797:15806 xv6iris.RiscvLang <> riscv_lang def
+R15723:15727 xv6iris.RiscvLang <> HartE constr
+R15729:15734 xv6iris.RiscvLang <> gen_id def
+R15736:15741 xv6iris.RiscvLang <> cpu_id def
+R15744:15744 xv6iris.HartSwp <> C:145 var
+R15747:15769 Riscv.rv64d_types Defs catch_early_return def
+R15772:15772 xv6iris.HartSwp <> K:144 var
+R15774:15774 xv6iris.HartSwp <> v:146 var
+R15819:15822 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R15946:15946 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R15931:15934 iris.program_logic.language <> expr proj
+R15936:15945 xv6iris.RiscvLang <> riscv_lang def
+R15823:15827 xv6iris.RiscvLang <> HartE constr
+R15829:15834 xv6iris.RiscvLang <> gen_id def
+R15836:15841 xv6iris.RiscvLang <> cpu_id def
+R15854:15854 xv6iris.HartSwp <> C:145 var
+R15857:15879 Riscv.rv64d_types Defs catch_early_return def
+R15882:15890 Riscv.rv64d_types Defs bind def
+R15916:15916 xv6iris.HartSwp <> K:144 var
+R15893:15902 Riscv.rv64d_types Defs liftR def
+R15913:15913 xv6iris.HartSwp <> m:142 var
+R15910:15910 xv6iris.HartSwp <> R:141 var
+R15996:15996 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16035:16040 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16049:16049 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15997:16003 xv6iris.HartSwp <> swp_use thm
+R16013:16026 xv6iris.HartSwp <> mctx_cer_liftR thm
+R15996:15996 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16035:16040 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16049:16049 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15997:16003 xv6iris.HartSwp <> swp_use thm
+R16013:16026 xv6iris.HartSwp <> mctx_cer_liftR thm
+prf 16261:16272 <> swp_use_cer0
+binder 16275:16275 <> R:147
+R16290:16290 Riscv.rv64d_types <> M def
+R16292:16292 xv6iris.HartSwp <> R:147 var
+binder 16286:16286 <> m:148
+R16302:16305 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16301:16301 xv6iris.HartSwp <> R:147 var
+R16306:16310 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R16312:16313 xv6iris.HartSwp <> swp.Σ var
+binder 16296:16297 <> Φ:149
+R16330:16333 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16327:16327 Riscv.rv64d_types <> M def
+R16329:16329 xv6iris.HartSwp <> R:147 var
+R16334:16334 Riscv.rv64d_types <> M def
+R16336:16339 Corelib.Init.Datatypes <> unit ind
+binder 16323:16323 <> C:150
+R16354:16361 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16348:16351 xv6iris.HartSwp <> mctx def
+R16353:16353 xv6iris.HartSwp <> C:150 var
+R16370:16379 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R16362:16364 xv6iris.HartSwp <> swp def
+R16368:16369 xv6iris.HartSwp <> Φ:149 var
+R16366:16366 xv6iris.HartSwp <> m:148 var
+R16380:16380 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16473:16483 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16381:16384 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R16390:16391 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R16389:16389 xv6iris.HartSwp <> R:147 var
+binder 16385:16385 <> v:151
+R16396:16408 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R16392:16393 xv6iris.HartSwp <> Φ:149 var
+R16395:16395 xv6iris.HartSwp <> v:151 var
+R16409:16412 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16472:16472 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16457:16460 iris.program_logic.language <> expr proj
+R16462:16471 xv6iris.RiscvLang <> riscv_lang def
+R16413:16417 xv6iris.RiscvLang <> HartE constr
+R16419:16424 xv6iris.RiscvLang <> gen_id def
+R16426:16431 xv6iris.RiscvLang <> cpu_id def
+R16434:16434 xv6iris.HartSwp <> C:150 var
+R16437:16449 Riscv.rv64d_types Interface Ret constr
+R16451:16451 xv6iris.HartSwp <> v:151 var
+R16484:16487 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16597:16597 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R16582:16585 iris.program_logic.language <> expr proj
+R16587:16596 xv6iris.RiscvLang <> riscv_lang def
+R16488:16492 xv6iris.RiscvLang <> HartE constr
+R16494:16499 xv6iris.RiscvLang <> gen_id def
+R16501:16506 xv6iris.RiscvLang <> cpu_id def
+R16519:16519 xv6iris.HartSwp <> C:150 var
+R16522:16544 Riscv.rv64d_types Defs catch_early_return def
+R16547:16556 Riscv.rv64d_types Defs liftR def
+R16567:16567 xv6iris.HartSwp <> m:148 var
+R16564:16564 xv6iris.HartSwp <> R:147 var
+R16647:16647 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16716:16721 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16730:16730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16648:16654 xv6iris.HartSwp <> swp_use thm
+R16678:16687 xv6iris.HartSwp <> mctx_cer_F thm
+R16707:16714 xv6iris.HartSwp <> mctxE_id thm
+binder 16694:16694 <> h:152
+R16699:16699 xv6iris.HartSwp <> h:152 var
+R16647:16647 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16716:16721 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16730:16730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16648:16654 xv6iris.HartSwp <> swp_use thm
+R16678:16687 xv6iris.HartSwp <> mctx_cer_F thm
+R16707:16714 xv6iris.HartSwp <> mctxE_id thm
+binder 16694:16694 <> h:153
+R16699:16699 xv6iris.HartSwp <> h:153 var
+prf 17190:17201 <> swp_use_cer2
+binder 17204:17204 <> X:154
+binder 17206:17206 <> A:155
+binder 17208:17208 <> R:156
+R17223:17223 Riscv.rv64d_types <> M def
+R17225:17225 xv6iris.HartSwp <> X:154 var
+binder 17219:17219 <> m:157
+R17235:17238 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17234:17234 xv6iris.HartSwp <> X:154 var
+R17239:17243 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R17245:17246 xv6iris.HartSwp <> swp.Σ var
+binder 17229:17230 <> Φ:158
+R17262:17265 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17261:17261 xv6iris.HartSwp <> X:154 var
+R17266:17267 Riscv.rv64d_types <> MR def
+R17269:17269 xv6iris.HartSwp <> R:156 var
+R17271:17271 xv6iris.HartSwp <> A:155 var
+binder 17256:17257 <> K0:159
+R17281:17284 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17280:17280 xv6iris.HartSwp <> A:155 var
+R17285:17286 Riscv.rv64d_types <> MR def
+R17288:17288 xv6iris.HartSwp <> R:156 var
+R17290:17290 xv6iris.HartSwp <> R:156 var
+binder 17275:17276 <> K1:160
+R17301:17304 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17298:17298 Riscv.rv64d_types <> M def
+R17300:17300 xv6iris.HartSwp <> R:156 var
+R17305:17305 Riscv.rv64d_types <> M def
+R17307:17310 Corelib.Init.Datatypes <> unit ind
+binder 17294:17294 <> C:161
+R17325:17332 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17319:17322 xv6iris.HartSwp <> mctx def
+R17324:17324 xv6iris.HartSwp <> C:161 var
+R17341:17350 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R17333:17335 xv6iris.HartSwp <> swp def
+R17339:17340 xv6iris.HartSwp <> Φ:158 var
+R17337:17337 xv6iris.HartSwp <> m:157 var
+R17351:17351 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R17498:17508 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R17352:17355 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R17361:17362 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R17360:17360 xv6iris.HartSwp <> X:154 var
+binder 17356:17356 <> v:162
+R17367:17379 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R17363:17364 xv6iris.HartSwp <> Φ:158 var
+R17366:17366 xv6iris.HartSwp <> v:162 var
+R17380:17383 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R17497:17497 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R17482:17485 iris.program_logic.language <> expr proj
+R17487:17496 xv6iris.RiscvLang <> riscv_lang def
+R17384:17388 xv6iris.RiscvLang <> HartE constr
+R17390:17395 xv6iris.RiscvLang <> gen_id def
+R17397:17402 xv6iris.RiscvLang <> cpu_id def
+R17418:17418 xv6iris.HartSwp <> C:161 var
+R17421:17443 Riscv.rv64d_types Defs catch_early_return def
+R17446:17454 Riscv.rv64d_types Defs bind def
+R17463:17464 xv6iris.HartSwp <> K1:160 var
+R17457:17458 xv6iris.HartSwp <> K0:159 var
+R17460:17460 xv6iris.HartSwp <> v:162 var
+R17509:17512 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R17668:17668 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R17653:17656 iris.program_logic.language <> expr proj
+R17658:17667 xv6iris.RiscvLang <> riscv_lang def
+R17513:17517 xv6iris.RiscvLang <> HartE constr
+R17519:17524 xv6iris.RiscvLang <> gen_id def
+R17526:17531 xv6iris.RiscvLang <> cpu_id def
+R17544:17544 xv6iris.HartSwp <> C:161 var
+R17547:17569 Riscv.rv64d_types Defs catch_early_return def
+R17588:17596 Riscv.rv64d_types Defs bind def
+R17637:17638 xv6iris.HartSwp <> K1:160 var
+R17599:17607 Riscv.rv64d_types Defs bind def
+R17633:17634 xv6iris.HartSwp <> K0:159 var
+R17610:17619 Riscv.rv64d_types Defs liftR def
+R17630:17630 xv6iris.HartSwp <> m:157 var
+R17627:17627 xv6iris.HartSwp <> R:156 var
+R17718:17718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17868:17887 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17896:17896 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17719:17725 xv6iris.HartSwp <> swp_use thm
+R17749:17758 xv6iris.HartSwp <> mctx_cer_F thm
+R17824:17833 xv6iris.HartSwp <> mctxE_bind thm
+R17841:17850 xv6iris.HartSwp <> mctxE_bind thm
+R17857:17864 xv6iris.HartSwp <> mctxE_id thm
+binder 17765:17765 <> h:163
+R17770:17778 Riscv.rv64d_types Defs bind def
+R17781:17789 Riscv.rv64d_types Defs bind def
+R17791:17791 xv6iris.HartSwp <> h:163 var
+R17718:17718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17868:17887 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17896:17896 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17719:17725 xv6iris.HartSwp <> swp_use thm
+R17749:17758 xv6iris.HartSwp <> mctx_cer_F thm
+R17824:17833 xv6iris.HartSwp <> mctxE_bind thm
+R17841:17850 xv6iris.HartSwp <> mctxE_bind thm
+R17857:17864 xv6iris.HartSwp <> mctxE_id thm
+binder 17765:17765 <> h:164
+R17770:17778 Riscv.rv64d_types Defs bind def
+R17781:17789 Riscv.rv64d_types Defs bind def
+R17791:17791 xv6iris.HartSwp <> h:164 var
+prf 17915:17926 <> swp_use_cer3
+binder 17929:17929 <> X:165
+binder 17931:17931 <> A:166
+binder 17933:17933 <> B:167
+binder 17935:17935 <> R:168
+R17950:17950 Riscv.rv64d_types <> M def
+R17952:17952 xv6iris.HartSwp <> X:165 var
+binder 17946:17946 <> m:169
+R17962:17965 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17961:17961 xv6iris.HartSwp <> X:165 var
+R17966:17970 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R17972:17973 xv6iris.HartSwp <> swp.Σ var
+binder 17956:17957 <> Φ:170
+R17989:17992 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17988:17988 xv6iris.HartSwp <> X:165 var
+R17993:17994 Riscv.rv64d_types <> MR def
+R17996:17996 xv6iris.HartSwp <> R:168 var
+R17998:17998 xv6iris.HartSwp <> A:166 var
+binder 17983:17984 <> K0:171
+R18008:18011 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18007:18007 xv6iris.HartSwp <> A:166 var
+R18012:18013 Riscv.rv64d_types <> MR def
+R18015:18015 xv6iris.HartSwp <> R:168 var
+R18017:18017 xv6iris.HartSwp <> B:167 var
+binder 18002:18003 <> K1:172
+R18027:18030 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18026:18026 xv6iris.HartSwp <> B:167 var
+R18031:18032 Riscv.rv64d_types <> MR def
+R18034:18034 xv6iris.HartSwp <> R:168 var
+R18036:18036 xv6iris.HartSwp <> R:168 var
+binder 18021:18022 <> K2:173
+R18053:18056 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18050:18050 Riscv.rv64d_types <> M def
+R18052:18052 xv6iris.HartSwp <> R:168 var
+R18057:18057 Riscv.rv64d_types <> M def
+R18059:18062 Corelib.Init.Datatypes <> unit ind
+binder 18046:18046 <> C:174
+R18077:18084 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18071:18074 xv6iris.HartSwp <> mctx def
+R18076:18076 xv6iris.HartSwp <> C:174 var
+R18093:18102 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R18085:18087 xv6iris.HartSwp <> swp def
+R18091:18092 xv6iris.HartSwp <> Φ:170 var
+R18089:18089 xv6iris.HartSwp <> m:169 var
+R18103:18103 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R18284:18294 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R18104:18107 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R18113:18114 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R18112:18112 xv6iris.HartSwp <> X:165 var
+binder 18108:18108 <> v:175
+R18119:18131 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R18115:18116 xv6iris.HartSwp <> Φ:170 var
+R18118:18118 xv6iris.HartSwp <> v:175 var
+R18132:18135 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R18283:18283 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R18268:18271 iris.program_logic.language <> expr proj
+R18273:18282 xv6iris.RiscvLang <> riscv_lang def
+R18136:18140 xv6iris.RiscvLang <> HartE constr
+R18142:18147 xv6iris.RiscvLang <> gen_id def
+R18149:18154 xv6iris.RiscvLang <> cpu_id def
+R18170:18170 xv6iris.HartSwp <> C:174 var
+R18173:18195 Riscv.rv64d_types Defs catch_early_return def
+R18217:18225 Riscv.rv64d_types Defs bind def
+R18249:18250 xv6iris.HartSwp <> K2:173 var
+R18228:18236 Riscv.rv64d_types Defs bind def
+R18245:18246 xv6iris.HartSwp <> K1:172 var
+R18239:18240 xv6iris.HartSwp <> K0:171 var
+R18242:18242 xv6iris.HartSwp <> v:175 var
+R18295:18298 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R18499:18499 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R18484:18487 iris.program_logic.language <> expr proj
+R18489:18498 xv6iris.RiscvLang <> riscv_lang def
+R18299:18303 xv6iris.RiscvLang <> HartE constr
+R18305:18310 xv6iris.RiscvLang <> gen_id def
+R18312:18317 xv6iris.RiscvLang <> cpu_id def
+R18330:18330 xv6iris.HartSwp <> C:174 var
+R18333:18355 Riscv.rv64d_types Defs catch_early_return def
+R18374:18382 Riscv.rv64d_types Defs bind def
+R18468:18469 xv6iris.HartSwp <> K2:173 var
+R18385:18393 Riscv.rv64d_types Defs bind def
+R18464:18465 xv6iris.HartSwp <> K1:172 var
+R18396:18404 Riscv.rv64d_types Defs bind def
+R18430:18431 xv6iris.HartSwp <> K0:171 var
+R18407:18416 Riscv.rv64d_types Defs liftR def
+R18427:18427 xv6iris.HartSwp <> m:169 var
+R18424:18424 xv6iris.HartSwp <> R:168 var
+R18549:18549 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18749:18768 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18777:18777 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18550:18556 xv6iris.HartSwp <> swp_use thm
+R18580:18589 xv6iris.HartSwp <> mctx_cer_F thm
+R18687:18696 xv6iris.HartSwp <> mctxE_bind thm
+R18704:18713 xv6iris.HartSwp <> mctxE_bind thm
+R18721:18730 xv6iris.HartSwp <> mctxE_bind thm
+R18737:18744 xv6iris.HartSwp <> mctxE_id thm
+binder 18613:18613 <> h:176
+R18618:18626 Riscv.rv64d_types Defs bind def
+R18629:18637 Riscv.rv64d_types Defs bind def
+R18640:18648 Riscv.rv64d_types Defs bind def
+R18650:18650 xv6iris.HartSwp <> h:176 var
+R18549:18549 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18749:18768 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18777:18777 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18550:18556 xv6iris.HartSwp <> swp_use thm
+R18580:18589 xv6iris.HartSwp <> mctx_cer_F thm
+R18687:18696 xv6iris.HartSwp <> mctxE_bind thm
+R18704:18713 xv6iris.HartSwp <> mctxE_bind thm
+R18721:18730 xv6iris.HartSwp <> mctxE_bind thm
+R18737:18744 xv6iris.HartSwp <> mctxE_id thm
+binder 18613:18613 <> h:177
+R18618:18626 Riscv.rv64d_types Defs bind def
+R18629:18637 Riscv.rv64d_types Defs bind def
+R18640:18648 Riscv.rv64d_types Defs bind def
+R18650:18650 xv6iris.HartSwp <> h:177 var
+prf 18943:18955 <> swp_bind0_use
+binder 18958:18958 <> Y:178
+R18973:18973 Riscv.rv64d_types <> M def
+R18975:18978 Corelib.Init.Datatypes <> unit ind
+binder 18969:18969 <> m:179
+R18986:18986 Riscv.rv64d_types <> M def
+R18988:18988 xv6iris.HartSwp <> Y:178 var
+binder 18982:18982 <> n:180
+R19007:19010 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19003:19006 Corelib.Init.Datatypes <> unit ind
+R19011:19015 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R19017:19018 xv6iris.HartSwp <> swp.Σ var
+binder 18998:18999 <> Φ:181
+R19028:19031 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19027:19027 xv6iris.HartSwp <> Y:178 var
+R19032:19036 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R19038:19039 xv6iris.HartSwp <> swp.Σ var
+binder 19022:19023 <> Ψ:182
+R19056:19061 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R19048:19050 xv6iris.HartSwp <> swp def
+R19054:19055 xv6iris.HartSwp <> Φ:181 var
+R19052:19052 xv6iris.HartSwp <> m:179 var
+R19062:19062 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19095:19101 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19063:19066 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R19075:19076 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R19071:19074 Corelib.Init.Datatypes <> unit ind
+binder 19067:19067 <> v:183
+R19081:19086 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19077:19078 xv6iris.HartSwp <> Φ:181 var
+R19080:19080 xv6iris.HartSwp <> v:183 var
+R19087:19089 xv6iris.HartSwp <> swp def
+R19093:19094 xv6iris.HartSwp <> Ψ:182 var
+R19091:19091 xv6iris.HartSwp <> n:180 var
+R19102:19104 xv6iris.HartSwp <> swp def
+R19123:19124 xv6iris.HartSwp <> Ψ:182 var
+R19107:19116 Riscv.rv64d_types Defs bind0 def
+R19120:19120 xv6iris.HartSwp <> n:180 var
+R19118:19118 xv6iris.HartSwp <> m:179 var
+R19164:19172 xv6iris.HartSwp <> swp_bind0 thm
+R19164:19172 xv6iris.HartSwp <> swp_bind0 thm
+R19186:19186 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19195:19200 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19210:19210 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19187:19194 xv6iris.HartSwp <> swp_mono thm
+R19186:19186 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19195:19200 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19210:19210 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19187:19194 xv6iris.HartSwp <> swp_mono thm
+prf 19264:19275 <> swp_bind_use
+binder 19278:19278 <> X:184
+binder 19280:19280 <> Y:185
+R19295:19295 Riscv.rv64d_types <> M def
+R19297:19297 xv6iris.HartSwp <> X:184 var
+binder 19291:19291 <> m:186
+R19306:19309 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19305:19305 xv6iris.HartSwp <> X:184 var
+R19310:19310 Riscv.rv64d_types <> M def
+R19312:19312 xv6iris.HartSwp <> Y:185 var
+binder 19301:19301 <> f:187
+R19328:19331 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19327:19327 xv6iris.HartSwp <> X:184 var
+R19332:19336 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R19338:19339 xv6iris.HartSwp <> swp.Σ var
+binder 19322:19323 <> Φ:188
+R19349:19352 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19348:19348 xv6iris.HartSwp <> Y:185 var
+R19353:19357 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R19359:19360 xv6iris.HartSwp <> swp.Σ var
+binder 19343:19344 <> Ψ:189
+R19377:19382 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R19369:19371 xv6iris.HartSwp <> swp def
+R19375:19376 xv6iris.HartSwp <> Φ:188 var
+R19373:19373 xv6iris.HartSwp <> m:186 var
+R19383:19383 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19417:19423 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19384:19387 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R19393:19394 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R19392:19392 xv6iris.HartSwp <> X:184 var
+binder 19388:19388 <> v:190
+R19399:19404 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19395:19396 xv6iris.HartSwp <> Φ:188 var
+R19398:19398 xv6iris.HartSwp <> v:190 var
+R19405:19407 xv6iris.HartSwp <> swp def
+R19415:19416 xv6iris.HartSwp <> Ψ:189 var
+R19410:19410 xv6iris.HartSwp <> f:187 var
+R19412:19412 xv6iris.HartSwp <> v:190 var
+R19424:19426 xv6iris.HartSwp <> swp def
+R19444:19445 xv6iris.HartSwp <> Ψ:189 var
+R19429:19437 Riscv.rv64d_types Defs bind def
+R19441:19441 xv6iris.HartSwp <> f:187 var
+R19439:19439 xv6iris.HartSwp <> m:186 var
+R19485:19492 xv6iris.HartSwp <> swp_bind thm
+R19485:19492 xv6iris.HartSwp <> swp_bind thm
+R19506:19506 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19515:19520 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19530:19530 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19507:19514 xv6iris.HartSwp <> swp_mono thm
+R19506:19506 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19515:19520 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19530:19530 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19507:19514 xv6iris.HartSwp <> swp_mono thm
+prf 19584:19595 <> swp_use_cer4
+binder 19598:19598 <> X:191
+binder 19600:19600 <> A:192
+binder 19602:19602 <> B:193
+binder 19604:19605 <> E1:194
+binder 19607:19607 <> R:195
+R19622:19622 Riscv.rv64d_types <> M def
+R19624:19624 xv6iris.HartSwp <> X:191 var
+binder 19618:19618 <> m:196
+R19634:19637 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19633:19633 xv6iris.HartSwp <> X:191 var
+R19638:19642 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R19644:19645 xv6iris.HartSwp <> swp.Σ var
+binder 19628:19629 <> Φ:197
+R19661:19664 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19660:19660 xv6iris.HartSwp <> X:191 var
+R19665:19666 Riscv.rv64d_types <> MR def
+R19668:19668 xv6iris.HartSwp <> R:195 var
+R19670:19670 xv6iris.HartSwp <> A:192 var
+binder 19655:19656 <> K0:198
+R19680:19683 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19679:19679 xv6iris.HartSwp <> A:192 var
+R19684:19685 Riscv.rv64d_types <> MR def
+R19687:19687 xv6iris.HartSwp <> R:195 var
+R19689:19689 xv6iris.HartSwp <> B:193 var
+binder 19674:19675 <> K1:199
+R19699:19702 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19698:19698 xv6iris.HartSwp <> B:193 var
+R19703:19704 Riscv.rv64d_types <> MR def
+R19706:19706 xv6iris.HartSwp <> R:195 var
+R19708:19709 xv6iris.HartSwp <> E1:194 var
+binder 19693:19694 <> K2:200
+R19726:19729 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19724:19725 xv6iris.HartSwp <> E1:194 var
+R19730:19731 Riscv.rv64d_types <> MR def
+R19733:19733 xv6iris.HartSwp <> R:195 var
+R19735:19735 xv6iris.HartSwp <> R:195 var
+binder 19719:19720 <> K3:201
+R19746:19749 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19743:19743 Riscv.rv64d_types <> M def
+R19745:19745 xv6iris.HartSwp <> R:195 var
+R19750:19750 Riscv.rv64d_types <> M def
+R19752:19755 Corelib.Init.Datatypes <> unit ind
+binder 19739:19739 <> C:202
+R19770:19777 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19764:19767 xv6iris.HartSwp <> mctx def
+R19769:19769 xv6iris.HartSwp <> C:202 var
+R19786:19795 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R19778:19780 xv6iris.HartSwp <> swp def
+R19784:19785 xv6iris.HartSwp <> Φ:197 var
+R19782:19782 xv6iris.HartSwp <> m:196 var
+R19796:19796 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19992:20002 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19797:19800 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R19806:19807 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R19805:19805 xv6iris.HartSwp <> X:191 var
+binder 19801:19801 <> v:203
+R19812:19824 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19808:19809 xv6iris.HartSwp <> Φ:197 var
+R19811:19811 xv6iris.HartSwp <> v:203 var
+R19825:19828 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R19991:19991 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R19976:19979 iris.program_logic.language <> expr proj
+R19981:19990 xv6iris.RiscvLang <> riscv_lang def
+R19829:19833 xv6iris.RiscvLang <> HartE constr
+R19835:19840 xv6iris.RiscvLang <> gen_id def
+R19842:19847 xv6iris.RiscvLang <> cpu_id def
+R19863:19863 xv6iris.HartSwp <> C:202 var
+R19866:19888 Riscv.rv64d_types Defs catch_early_return def
+R19910:19918 Riscv.rv64d_types Defs bind def
+R19957:19958 xv6iris.HartSwp <> K3:201 var
+R19921:19929 Riscv.rv64d_types Defs bind def
+R19953:19954 xv6iris.HartSwp <> K2:200 var
+R19932:19940 Riscv.rv64d_types Defs bind def
+R19949:19950 xv6iris.HartSwp <> K1:199 var
+R19943:19944 xv6iris.HartSwp <> K0:198 var
+R19946:19946 xv6iris.HartSwp <> v:203 var
+R20003:20006 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R20211:20211 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R20196:20199 iris.program_logic.language <> expr proj
+R20201:20210 xv6iris.RiscvLang <> riscv_lang def
+R20007:20011 xv6iris.RiscvLang <> HartE constr
+R20013:20018 xv6iris.RiscvLang <> gen_id def
+R20020:20025 xv6iris.RiscvLang <> cpu_id def
+R20038:20038 xv6iris.HartSwp <> C:202 var
+R20041:20063 Riscv.rv64d_types Defs catch_early_return def
+R20082:20090 Riscv.rv64d_types Defs bind def
+R20180:20181 xv6iris.HartSwp <> K3:201 var
+R20093:20101 Riscv.rv64d_types Defs bind def
+R20176:20177 xv6iris.HartSwp <> K2:200 var
+R20104:20112 Riscv.rv64d_types Defs bind def
+R20172:20173 xv6iris.HartSwp <> K1:199 var
+R20134:20142 Riscv.rv64d_types Defs bind def
+R20168:20169 xv6iris.HartSwp <> K0:198 var
+R20145:20154 Riscv.rv64d_types Defs liftR def
+R20165:20165 xv6iris.HartSwp <> m:196 var
+R20162:20162 xv6iris.HartSwp <> R:195 var
+R20261:20261 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20544:20563 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20572:20572 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20262:20268 xv6iris.HartSwp <> swp_use thm
+R20292:20301 xv6iris.HartSwp <> mctx_cer_F thm
+R20444:20453 xv6iris.HartSwp <> mctxE_bind thm
+R20461:20470 xv6iris.HartSwp <> mctxE_bind thm
+R20498:20507 xv6iris.HartSwp <> mctxE_bind thm
+R20515:20524 xv6iris.HartSwp <> mctxE_bind thm
+R20531:20538 xv6iris.HartSwp <> mctxE_id thm
+binder 20325:20325 <> h:204
+R20330:20338 Riscv.rv64d_types Defs bind def
+R20341:20349 Riscv.rv64d_types Defs bind def
+R20352:20360 Riscv.rv64d_types Defs bind def
+R20393:20401 Riscv.rv64d_types Defs bind def
+R20403:20403 xv6iris.HartSwp <> h:204 var
+R20261:20261 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20544:20563 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20572:20572 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20262:20268 xv6iris.HartSwp <> swp_use thm
+R20292:20301 xv6iris.HartSwp <> mctx_cer_F thm
+R20444:20453 xv6iris.HartSwp <> mctxE_bind thm
+R20461:20470 xv6iris.HartSwp <> mctxE_bind thm
+R20498:20507 xv6iris.HartSwp <> mctxE_bind thm
+R20515:20524 xv6iris.HartSwp <> mctxE_bind thm
+R20531:20538 xv6iris.HartSwp <> mctxE_id thm
+binder 20325:20325 <> h:205
+R20330:20338 Riscv.rv64d_types Defs bind def
+R20341:20349 Riscv.rv64d_types Defs bind def
+R20352:20360 Riscv.rv64d_types Defs bind def
+R20393:20401 Riscv.rv64d_types Defs bind def
+R20403:20403 xv6iris.HartSwp <> h:205 var
+R20587:20589 xv6iris.HartSwp swp <> sec
+R20610:20612 xv6iris.HartSwp <> swp def
+R20610:20612 xv6iris.HartSwp <> swp def
+R20748:20750 xv6iris.HartSwp <> swp def
+binder 20759:20759 <> v:206
+not 20721:20721 <> :::'SWP'_x_'{{'_x_','_x_'}'_'}'
+R20925:20927 xv6iris.HartSwp <> swp def
+not 20902:20902 <> :::'SWP'_x_'{{'_x_'}'_'}'

@@ -1002,7 +1002,8 @@ Section ProofUvmalloc.
     iApply (MemsetPage.wp_memset_page_val_sconf KT1 B5 (K - 10)%nat
               (mword_of_int 0 : mword 64) b p
               HKms Hmspv HB5a1 HB5a2 with "Hcg Htext Hpc [Hpage]").
-    { iEval (rewrite HB5a0). iExact "Hpage". }
+    (* A6.87: kalloc's run downgrades to the ownership this memset wants *)
+    { iEval (rewrite HB5a0). iApply (page_own_of_filled with "Hpage"). }
     iIntros (CIDu18 Hsu18 ms) "Hcg Hpc Hpage %Hmscs".
     (* the page really READS AS ZERO now -- what the lazily-backed vas at
        these addresses already claimed, and what makes the view's growth
@@ -1601,9 +1602,9 @@ Section ProofUvmalloc.
     all: try lkbelow.
     { rewrite /kfree_pre HF2a0.
       iSplitR; [iPureIntro; exact Hpv |].
-      (* kfree is contents-blind AND view-blind (§0.26′): forget the
-         zeros, then forget that they were ever determinate *)
-      iApply page_own_free. rewrite /page_own /byte_any.
+      (* kfree is contents-blind (§0.26′ makes it view-blind too, in the
+         MEANING of [page_own] rather than in this text): forget the zeros *)
+      iApply page_own_of_named_ex.
       iApply (big_sepL_impl with "Hpage"). iIntros "!>" (kk x Hx) "Hj".
       iExists _. iExact "Hj". }
     iIntros (CIDu38 Hsu38 mfk) "Hcg Hcnt Hpc %Hfcs _".

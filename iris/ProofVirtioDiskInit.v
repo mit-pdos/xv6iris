@@ -1924,14 +1924,13 @@ Section ProofVirtioDiskInit.
     assert (Hcb : nth_byte (autocast (T := mword) (subrange_vec_dec (mword_of_int 0 : mword 64)
                      (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 = byte_zero) by bvc.
     iEval (rewrite /page_own /byte_any) in "Hpdpg".
-    iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add pd j) ↦ₘ b)%I) with "Hpdpg") as (opd) "Hbufd".
     (* memset's contract is context-indexed and so is [page_own] (KallocInv
        is converted): the buffer goes in and comes back at the ambient
        context -- no crossing, no shim. *)
-    iApply (MS.wp_memset_sconf KT1 KT0 E7 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opd false pp
+    iApply (MS.wp_memset_free_sconf KT1 KT0 E7 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) false pp
               Hc2 ltac:(vm_compute; reflexivity) ltac:(peel; bvc) ltac:(peel; bvc)
-              with "Hcg Htext Hpc [Hbufd]").
-    { iApply (big_sepL_impl with "Hbufd"). iIntros "!>" (k j _) "H". rewrite HE7a0. iExact "H". }
+              with "Hcg Htext Hpc [Hpdpg]").
+    { iApply (big_sepL_impl with "Hpdpg"). iIntros "!>" (k j _) "H". rewrite HE7a0. iExact "H". }
     iApply wp_next_off_intro.
     iIntros (ms1) "Hcg Hpc Hbpd %Hms1cs".
     iEval (rewrite Hcb HE7a0) in "Hbpd".
@@ -2007,14 +2006,13 @@ Section ProofVirtioDiskInit.
     assert (HF6s1 : F6 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact HF2s1).
     assert (HF6s2 : F6 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11) by (peel; exact Hms1s2).
     iEval (rewrite /page_own /byte_any) in "Hpavpg".
-    iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add pav j) ↦ₘ b)%I) with "Hpavpg") as (opav) "Hbufa".
     (* memset's contract is context-indexed and so is [page_own] (KallocInv
        is converted): the buffer goes in and comes back at the ambient
        context -- no crossing, no shim. *)
-    iApply (MS.wp_memset_sconf KT1 KT0 F6 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opav false pp
+    iApply (MS.wp_memset_free_sconf KT1 KT0 F6 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) false pp
               Hc2 ltac:(vm_compute; reflexivity) ltac:(peel; bvc) ltac:(peel; bvc)
-              with "Hcg Htext Hpc [Hbufa]").
-    { iApply (big_sepL_impl with "Hbufa"). iIntros "!>" (k j _) "H". rewrite HF6a0. iExact "H". }
+              with "Hcg Htext Hpc [Hpavpg]").
+    { iApply (big_sepL_impl with "Hpavpg"). iIntros "!>" (k j _) "H". rewrite HF6a0. iExact "H". }
     iApply wp_next_off_intro.
     iIntros (ms2) "Hcg Hpc Hbpav %Hms2cs".
     iEval (rewrite Hcb HF6a0) in "Hbpav".
@@ -2073,14 +2071,13 @@ Section ProofVirtioDiskInit.
     assert (HG4s1 : G4 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact Hms2s1).
     assert (HG4s2 : G4 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11) by (peel; exact Hms2s2).
     iEval (rewrite /page_own /byte_any) in "Hpupg".
-    iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add pu j) ↦ₘ b)%I) with "Hpupg") as (opu) "Hbufu".
     (* memset's contract is context-indexed and so is [page_own] (KallocInv
        is converted): the buffer goes in and comes back at the ambient
        context -- no crossing, no shim. *)
-    iApply (MS.wp_memset_sconf KT1 KT0 G4 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opu false pp
+    iApply (MS.wp_memset_free_sconf KT1 KT0 G4 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) false pp
               Hc2 ltac:(vm_compute; reflexivity) ltac:(peel; bvc) ltac:(peel; bvc)
-              with "Hcg Htext Hpc [Hbufu]").
-    { iApply (big_sepL_impl with "Hbufu"). iIntros "!>" (k j _) "H". rewrite HG4a0. iExact "H". }
+              with "Hcg Htext Hpc [Hpupg]").
+    { iApply (big_sepL_impl with "Hpupg"). iIntros "!>" (k j _) "H". rewrite HG4a0. iExact "H". }
     iApply wp_next_off_intro.
     iIntros (ms3) "Hcg Hpc Hbpu %Hms3cs".
     iEval (rewrite Hcb HG4a0) in "Hbpu".

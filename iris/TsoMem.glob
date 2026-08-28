@@ -1,0 +1,1035 @@
+DIGEST 4d516732597c167704621f76495e3872
+Fxv6iris.TsoMem
+R2820:2828 Stdlib.ssr.ssreflect <> <> lib
+R2857:2860 stdpp.gmap <> <> lib
+R2862:2867 stdpp.finite <> <> lib
+R2869:2872 stdpp.list <> <> lib
+R2901:2921 stdpp.bitvector.definitions <> <> lib
+abbrev 3028:3032 <> agent
+R3037:3039 Corelib.Init.Datatypes <> nat ind
+def 3098:3102 <> image
+R3115:3119 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R3114:3114 Corelib.Numbers.BinNums <> Z ind
+R3120:3125 Corelib.Init.Datatypes <> option ind
+R3128:3129 stdpp.bitvector.definitions <> bv rec
+rec 3555:3558 <> wmsg
+proj 3572:3576 <> wm_pa
+proj 3587:3593 <> wm_data
+proj 3612:3617 <> wm_tid
+R3582:3582 Corelib.Numbers.BinNums <> Z ind
+R3597:3600 Corelib.Init.Datatypes <> list ind
+R3603:3604 stdpp.bitvector.definitions <> bv rec
+R3622:3626 xv6iris.TsoMem <> agent abbrev
+inst 3680:3690 <> wmsg_eq_dec
+R3694:3703 stdpp.base <> EqDecision abbrev
+R3705:3708 xv6iris.TsoMem <> wmsg rec
+def 3831:3838 <> msg_byte
+R3845:3848 xv6iris.TsoMem <> wmsg rec
+binder 3841:3841 <> m:5
+R3856:3856 Corelib.Numbers.BinNums <> Z ind
+binder 3852:3852 <> a:6
+R3861:3866 Corelib.Init.Datatypes <> option ind
+R3869:3870 stdpp.bitvector.definitions <> bv rec
+R3880:3882 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R3910:3917 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R3953:3960 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R3883:3893 stdpp.decidable <> bool_decide def
+R3903:3907 stdpp.numbers <> ::Z_scope:x_'≤'_x not
+R3896:3900 xv6iris.TsoMem <> wm_pa proj
+R3902:3902 xv6iris.TsoMem <> m:5 var
+R3908:3908 xv6iris.TsoMem <> a:6 var
+R3927:3930 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R3931:3938 Stdlib.ZArith.BinInt Z to_nat def
+R3942:3944 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R3941:3941 xv6iris.TsoMem <> a:6 var
+R3945:3949 xv6iris.TsoMem <> wm_pa proj
+R3951:3951 xv6iris.TsoMem <> m:5 var
+R3918:3924 xv6iris.TsoMem <> wm_data proj
+R3926:3926 xv6iris.TsoMem <> m:5 var
+R3961:3964 Corelib.Init.Datatypes <> None constr
+def 4059:4066 <> log_byte
+R4075:4079 xv6iris.TsoMem <> image def
+binder 4069:4071 <> img:7
+R4089:4092 Corelib.Init.Datatypes <> list ind
+R4094:4097 xv6iris.TsoMem <> wmsg rec
+binder 4083:4085 <> log:8
+R4105:4107 Corelib.Init.Datatypes <> nat ind
+binder 4101:4101 <> t:9
+R4115:4115 Corelib.Numbers.BinNums <> Z ind
+binder 4111:4111 <> a:10
+R4124:4129 Corelib.Init.Datatypes <> option ind
+R4132:4133 stdpp.bitvector.definitions <> bv rec
+R4149:4149 xv6iris.TsoMem <> t:9 var
+R4160:4160 Corelib.Init.Datatypes <> O constr
+R4165:4167 xv6iris.TsoMem <> img:7 var
+R4169:4169 xv6iris.TsoMem <> a:10 var
+R4175:4175 Corelib.Init.Datatypes <> S constr
+R4191:4194 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R4188:4190 xv6iris.TsoMem <> log:8 var
+R4202:4205 Corelib.Init.Datatypes <> Some constr
+R4212:4219 xv6iris.TsoMem <> msg_byte def
+R4223:4223 xv6iris.TsoMem <> a:10 var
+R4227:4230 Corelib.Init.Datatypes <> None constr
+R4235:4238 Corelib.Init.Datatypes <> None constr
+abbrev 4416:4420 <> tview
+R4425:4427 Corelib.Init.Datatypes <> nat ind
+def 4516:4523 <> visibleb
+R4530:4534 xv6iris.TsoMem <> agent abbrev
+binder 4526:4526 <> h:12
+R4543:4547 xv6iris.TsoMem <> tview abbrev
+binder 4538:4539 <> tv:13
+R4557:4560 Corelib.Init.Datatypes <> list ind
+R4562:4565 xv6iris.TsoMem <> wmsg rec
+binder 4551:4553 <> log:14
+R4573:4575 Corelib.Init.Datatypes <> nat ind
+binder 4569:4569 <> t:15
+R4584:4587 Corelib.Init.Datatypes <> bool ind
+R4620:4625 Corelib.Init.Datatypes <> ::bool_scope:x_'||'_x not
+R4594:4604 stdpp.decidable <> bool_decide def
+R4608:4612 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R4607:4607 xv6iris.TsoMem <> t:15 var
+R4613:4614 xv6iris.TsoMem <> tv:13 var
+R4632:4632 xv6iris.TsoMem <> t:15 var
+R4643:4643 Corelib.Init.Datatypes <> O constr
+R4648:4651 Corelib.Init.Datatypes <> true constr
+R4657:4657 Corelib.Init.Datatypes <> S constr
+R4673:4676 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R4670:4672 xv6iris.TsoMem <> log:14 var
+R4697:4700 Corelib.Init.Datatypes <> Some constr
+R4707:4717 stdpp.decidable <> bool_decide def
+R4728:4730 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4720:4725 xv6iris.TsoMem <> wm_tid proj
+R4731:4731 xv6iris.TsoMem <> h:12 var
+R4747:4750 Corelib.Init.Datatypes <> None constr
+R4755:4759 Corelib.Init.Datatypes <> false constr
+prf 4790:4803 <> visibleb_below
+binder 4805:4805 <> h:17
+binder 4807:4808 <> tv:18
+binder 4810:4812 <> log:19
+binder 4814:4814 <> t:20
+R4834:4838 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R4822:4826 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R4821:4821 xv6iris.TsoMem <> t:20 var
+R4827:4828 xv6iris.TsoMem <> tv:18 var
+R4858:4860 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4839:4846 xv6iris.TsoMem <> visibleb def
+R4848:4848 xv6iris.TsoMem <> h:17 var
+R4850:4851 xv6iris.TsoMem <> tv:18 var
+R4853:4855 xv6iris.TsoMem <> log:19 var
+R4857:4857 xv6iris.TsoMem <> t:20 var
+R4861:4864 Corelib.Init.Datatypes <> true constr
+R4883:4890 xv6iris.TsoMem <> visibleb def
+R4883:4890 xv6iris.TsoMem <> visibleb def
+R4883:4890 xv6iris.TsoMem <> visibleb def
+R4907:4927 stdpp.decidable <> bool_decide_eq_true_2 thm
+R4907:4927 stdpp.decidable <> bool_decide_eq_true_2 thm
+R4907:4927 stdpp.decidable <> bool_decide_eq_true_2 thm
+prf 4945:4956 <> visibleb_own
+binder 4958:4958 <> h:21
+binder 4960:4961 <> tv:22
+binder 4963:4965 <> log:23
+binder 4967:4967 <> i:24
+binder 4969:4969 <> m:25
+R4992:4996 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R4983:4985 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4978:4981 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R4982:4982 xv6iris.TsoMem <> i:24 var
+R4975:4977 xv6iris.TsoMem <> log:23 var
+R4986:4989 Corelib.Init.Datatypes <> Some constr
+R4991:4991 xv6iris.TsoMem <> m:25 var
+R5009:5013 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R5005:5007 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4997:5002 xv6iris.TsoMem <> wm_tid proj
+R5004:5004 xv6iris.TsoMem <> m:25 var
+R5008:5008 xv6iris.TsoMem <> h:21 var
+R5037:5039 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5014:5021 xv6iris.TsoMem <> visibleb def
+R5023:5023 xv6iris.TsoMem <> h:21 var
+R5025:5026 xv6iris.TsoMem <> tv:22 var
+R5028:5030 xv6iris.TsoMem <> log:23 var
+R5033:5033 Corelib.Init.Datatypes <> S constr
+R5035:5035 xv6iris.TsoMem <> i:24 var
+R5040:5043 Corelib.Init.Datatypes <> true constr
+R5064:5071 xv6iris.TsoMem <> visibleb def
+R5064:5071 xv6iris.TsoMem <> visibleb def
+R5064:5071 xv6iris.TsoMem <> visibleb def
+R5155:5175 stdpp.decidable <> bool_decide_eq_true_2 thm
+R5138:5140 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5119:5129 stdpp.decidable <> bool_decide def
+R5133:5135 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5141:5144 Corelib.Init.Datatypes <> true constr
+R5155:5175 stdpp.decidable <> bool_decide_eq_true_2 thm
+R5193:5203 stdpp.decidable <> bool_decide def
+R5209:5213 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R5206:5206 Corelib.Init.Datatypes <> S constr
+R5193:5203 stdpp.decidable <> bool_decide def
+R5209:5213 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R5206:5206 Corelib.Init.Datatypes <> S constr
+prf 5236:5246 <> visibleb_le
+binder 5248:5248 <> h:26
+binder 5250:5251 <> tv:27
+binder 5253:5255 <> tv':28
+binder 5257:5259 <> log:29
+binder 5261:5261 <> t:30
+R5283:5287 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R5270:5274 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R5268:5269 xv6iris.TsoMem <> tv:27 var
+R5275:5277 xv6iris.TsoMem <> tv':28 var
+R5314:5318 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R5307:5309 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5288:5295 xv6iris.TsoMem <> visibleb def
+R5297:5297 xv6iris.TsoMem <> h:26 var
+R5299:5300 xv6iris.TsoMem <> tv:27 var
+R5302:5304 xv6iris.TsoMem <> log:29 var
+R5306:5306 xv6iris.TsoMem <> t:30 var
+R5310:5313 Corelib.Init.Datatypes <> true constr
+R5339:5341 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5319:5326 xv6iris.TsoMem <> visibleb def
+R5328:5328 xv6iris.TsoMem <> h:26 var
+R5330:5332 xv6iris.TsoMem <> tv':28 var
+R5334:5336 xv6iris.TsoMem <> log:29 var
+R5338:5338 xv6iris.TsoMem <> t:30 var
+R5342:5345 Corelib.Init.Datatypes <> true constr
+R5366:5373 xv6iris.TsoMem <> visibleb def
+R5366:5373 xv6iris.TsoMem <> visibleb def
+R5366:5373 xv6iris.TsoMem <> visibleb def
+R5395:5405 stdpp.decidable <> bool_decide def
+R5409:5413 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R5395:5405 stdpp.decidable <> bool_decide def
+R5409:5413 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R5458:5476 stdpp.decidable <> bool_decide_eq_true thm
+R5458:5476 stdpp.decidable <> bool_decide_eq_true thm
+R5549:5569 stdpp.decidable <> bool_decide_eq_true_2 thm
+R5526:5528 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5499:5509 stdpp.decidable <> bool_decide def
+R5513:5517 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R5529:5532 Corelib.Init.Datatypes <> true constr
+R5549:5569 stdpp.decidable <> bool_decide_eq_true_2 thm
+R5628:5638 stdpp.decidable <> bool_decide def
+R5642:5646 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R5628:5638 stdpp.decidable <> bool_decide def
+R5642:5646 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+prf 5670:5682 <> visibleb_true
+binder 5684:5684 <> h:31
+binder 5686:5687 <> tv:32
+binder 5689:5691 <> log:33
+binder 5693:5693 <> t:34
+R5725:5731 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R5718:5720 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5699:5706 xv6iris.TsoMem <> visibleb def
+R5708:5708 xv6iris.TsoMem <> h:31 var
+R5710:5711 xv6iris.TsoMem <> tv:32 var
+R5713:5715 xv6iris.TsoMem <> log:33 var
+R5717:5717 xv6iris.TsoMem <> t:34 var
+R5721:5724 Corelib.Init.Datatypes <> true constr
+R5746:5750 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'∨'_x not
+R5734:5738 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R5733:5733 xv6iris.TsoMem <> t:34 var
+R5739:5740 xv6iris.TsoMem <> tv:32 var
+R5751:5754 Stdlib.Unicode.Utf8_core <> ::type_scope:'∃'_x_'..'_x_','_x not
+R5758:5759 Stdlib.Unicode.Utf8_core <> ::type_scope:'∃'_x_'..'_x_','_x not
+binder 5755:5755 <> i:35
+binder 5757:5757 <> m:36
+R5767:5771 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'∧'_x not
+R5761:5763 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5760:5760 xv6iris.TsoMem <> t:34 var
+R5764:5764 Corelib.Init.Datatypes <> S constr
+R5766:5766 xv6iris.TsoMem <> i:35 var
+R5789:5793 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'∧'_x not
+R5780:5782 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5775:5778 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5779:5779 xv6iris.TsoMem <> i:35 var
+R5772:5774 xv6iris.TsoMem <> log:33 var
+R5783:5786 Corelib.Init.Datatypes <> Some constr
+R5788:5788 xv6iris.TsoMem <> m:36 var
+R5802:5804 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5794:5799 xv6iris.TsoMem <> wm_tid proj
+R5801:5801 xv6iris.TsoMem <> m:36 var
+R5805:5805 xv6iris.TsoMem <> h:31 var
+R5826:5833 xv6iris.TsoMem <> visibleb def
+R5826:5833 xv6iris.TsoMem <> visibleb def
+R5826:5833 xv6iris.TsoMem <> visibleb def
+R5848:5858 stdpp.decidable <> bool_decide def
+R5862:5866 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R5848:5858 stdpp.decidable <> bool_decide def
+R5862:5866 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R5920:5938 stdpp.decidable <> bool_decide_eq_true thm
+R5920:5938 stdpp.decidable <> bool_decide_eq_true thm
+R6017:6020 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R6017:6020 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R6088:6098 stdpp.decidable <> bool_decide def
+R6109:6111 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6101:6106 xv6iris.TsoMem <> wm_tid proj
+R6088:6098 stdpp.decidable <> bool_decide def
+R6109:6111 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6101:6106 xv6iris.TsoMem <> wm_tid proj
+R6232:6250 stdpp.decidable <> bool_decide_eq_true thm
+R6232:6250 stdpp.decidable <> bool_decide_eq_true thm
+def 6618:6626 <> read_down
+R6635:6639 xv6iris.TsoMem <> image def
+binder 6629:6631 <> img:37
+R6649:6652 Corelib.Init.Datatypes <> list ind
+R6654:6657 xv6iris.TsoMem <> wmsg rec
+binder 6643:6645 <> log:38
+R6665:6669 xv6iris.TsoMem <> agent abbrev
+binder 6661:6661 <> h:39
+R6678:6682 xv6iris.TsoMem <> tview abbrev
+binder 6673:6674 <> tv:40
+R6694:6694 Corelib.Numbers.BinNums <> Z ind
+binder 6690:6690 <> a:41
+R6702:6704 Corelib.Init.Datatypes <> nat ind
+binder 6698:6698 <> t:42
+R6709:6714 Corelib.Init.Datatypes <> option ind
+R6717:6718 stdpp.bitvector.definitions <> bv rec
+R6735:6737 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R6757:6762 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R6783:6788 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R6738:6745 xv6iris.TsoMem <> visibleb def
+R6747:6747 xv6iris.TsoMem <> h:39 var
+R6749:6750 xv6iris.TsoMem <> tv:40 var
+R6752:6754 xv6iris.TsoMem <> log:38 var
+R6756:6756 xv6iris.TsoMem <> t:42 var
+R6763:6770 xv6iris.TsoMem <> log_byte def
+R6772:6774 xv6iris.TsoMem <> img:37 var
+R6776:6778 xv6iris.TsoMem <> log:38 var
+R6780:6780 xv6iris.TsoMem <> t:42 var
+R6782:6782 xv6iris.TsoMem <> a:41 var
+R6789:6792 Corelib.Init.Datatypes <> None constr
+R6804:6807 Corelib.Init.Datatypes <> Some constr
+R6814:6817 Corelib.Init.Datatypes <> Some constr
+R6825:6828 Corelib.Init.Datatypes <> None constr
+R6839:6839 xv6iris.TsoMem <> t:42 var
+R6846:6846 Corelib.Init.Datatypes <> O constr
+R6851:6854 Corelib.Init.Datatypes <> None constr
+R6858:6858 Corelib.Init.Datatypes <> S constr
+R6866:6874 xv6iris.TsoMem <> read_down:43 def
+R6889:6889 xv6iris.TsoMem <> a:41 var
+R6886:6887 xv6iris.TsoMem <> tv:40 var
+R6884:6884 xv6iris.TsoMem <> h:39 var
+R6880:6882 xv6iris.TsoMem <> log:38 var
+R6876:6878 xv6iris.TsoMem <> img:37 var
+def 6976:6983 <> tso_read
+R6992:6996 xv6iris.TsoMem <> image def
+binder 6986:6988 <> img:45
+R7006:7009 Corelib.Init.Datatypes <> list ind
+R7011:7014 xv6iris.TsoMem <> wmsg rec
+binder 7000:7002 <> log:46
+R7022:7026 xv6iris.TsoMem <> agent abbrev
+binder 7018:7018 <> h:47
+R7035:7039 xv6iris.TsoMem <> tview abbrev
+binder 7030:7031 <> tv:48
+R7051:7051 Corelib.Numbers.BinNums <> Z ind
+binder 7047:7047 <> a:49
+R7056:7061 Corelib.Init.Datatypes <> option ind
+R7064:7065 stdpp.bitvector.definitions <> bv rec
+R7075:7083 xv6iris.TsoMem <> read_down def
+R7085:7087 xv6iris.TsoMem <> img:45 var
+R7089:7091 xv6iris.TsoMem <> log:46 var
+R7093:7093 xv6iris.TsoMem <> h:47 var
+R7095:7096 xv6iris.TsoMem <> tv:48 var
+R7098:7098 xv6iris.TsoMem <> a:49 var
+R7101:7106 Corelib.Init.Datatypes <> length def
+R7108:7110 xv6iris.TsoMem <> log:46 var
+def 7185:7198 <> tso_read_bytes
+R7207:7211 xv6iris.TsoMem <> image def
+binder 7201:7203 <> img:50
+R7221:7224 Corelib.Init.Datatypes <> list ind
+R7226:7229 xv6iris.TsoMem <> wmsg rec
+binder 7215:7217 <> log:51
+R7237:7241 xv6iris.TsoMem <> agent abbrev
+binder 7233:7233 <> h:52
+R7254:7258 xv6iris.TsoMem <> tview abbrev
+binder 7249:7250 <> tv:53
+R7266:7266 Corelib.Numbers.BinNums <> Z ind
+binder 7262:7262 <> a:54
+R7274:7276 Corelib.Init.Datatypes <> nat ind
+binder 7270:7270 <> n:55
+R7281:7284 Corelib.Init.Datatypes <> list ind
+R7287:7292 Corelib.Init.Datatypes <> option ind
+R7295:7296 stdpp.bitvector.definitions <> bv rec
+R7307:7307 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R7352:7357 stdpp.base <> ::stdpp_scope:x_'<$>'_x not
+R7308:7310 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R7312:7313 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 7311:7311 <> i:56
+R7314:7321 xv6iris.TsoMem <> tso_read def
+R7323:7325 xv6iris.TsoMem <> img:50 var
+R7327:7329 xv6iris.TsoMem <> log:51 var
+R7331:7331 xv6iris.TsoMem <> h:52 var
+R7333:7334 xv6iris.TsoMem <> tv:53 var
+R7338:7340 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R7337:7337 xv6iris.TsoMem <> a:54 var
+R7341:7348 Stdlib.ZArith.BinInt Z of_nat def
+R7350:7350 xv6iris.TsoMem <> i:56 var
+R7358:7360 Corelib.Lists.ListDef <> seq def
+R7364:7364 xv6iris.TsoMem <> n:55 var
+def 7553:7559 <> own_pub
+R7566:7570 xv6iris.TsoMem <> agent abbrev
+binder 7562:7562 <> h:57
+R7580:7583 Corelib.Init.Datatypes <> list ind
+R7585:7588 xv6iris.TsoMem <> wmsg rec
+binder 7574:7576 <> log:58
+R7593:7595 Corelib.Init.Datatypes <> nat ind
+R7602:7606 stdpp.list_basics <> foldr abbrev
+R7627:7630 stdpp.list_monad <> imap def
+R7692:7694 xv6iris.TsoMem <> log:58 var
+R7633:7635 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R7639:7640 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 7636:7636 <> i:59
+binder 7638:7638 <> m:60
+R7641:7643 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R7670:7675 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R7679:7684 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R7644:7654 stdpp.decidable <> bool_decide def
+R7665:7667 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7657:7662 xv6iris.TsoMem <> wm_tid proj
+R7664:7664 xv6iris.TsoMem <> m:60 var
+R7668:7668 xv6iris.TsoMem <> h:57 var
+R7676:7676 Corelib.Init.Datatypes <> S constr
+R7678:7678 xv6iris.TsoMem <> i:59 var
+R7608:7614 Stdlib.Arith.PeanoNat Nat max def
+def 7787:7793 <> load_ok
+R7802:7806 xv6iris.TsoMem <> image def
+binder 7796:7798 <> img:61
+R7816:7819 Corelib.Init.Datatypes <> list ind
+R7821:7824 xv6iris.TsoMem <> wmsg rec
+binder 7810:7812 <> log:62
+R7832:7836 xv6iris.TsoMem <> agent abbrev
+binder 7828:7828 <> h:63
+R7853:7857 xv6iris.TsoMem <> tview abbrev
+binder 7844:7845 <> tv:64
+binder 7847:7849 <> tv':65
+R7865:7865 Corelib.Numbers.BinNums <> Z ind
+binder 7861:7861 <> a:66
+R7873:7874 stdpp.bitvector.definitions <> bv rec
+binder 7869:7869 <> v:67
+R7907:7911 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'∧'_x not
+R7894:7898 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R7892:7893 xv6iris.TsoMem <> tv:64 var
+R7899:7901 xv6iris.TsoMem <> tv':65 var
+R7936:7942 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'∧'_x not
+R7916:7920 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R7913:7915 xv6iris.TsoMem <> tv':65 var
+R7921:7926 Corelib.Init.Datatypes <> length def
+R7928:7930 xv6iris.TsoMem <> log:62 var
+R7967:7969 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7943:7950 xv6iris.TsoMem <> tso_read def
+R7952:7954 xv6iris.TsoMem <> img:61 var
+R7956:7958 xv6iris.TsoMem <> log:62 var
+R7960:7960 xv6iris.TsoMem <> h:63 var
+R7962:7964 xv6iris.TsoMem <> tv':65 var
+R7966:7966 xv6iris.TsoMem <> a:66 var
+R7970:7973 Corelib.Init.Datatypes <> Some constr
+R7975:7975 xv6iris.TsoMem <> v:67 var
+def 8047:8055 <> store_log
+R8064:8067 Corelib.Init.Datatypes <> list ind
+R8069:8072 xv6iris.TsoMem <> wmsg rec
+binder 8058:8060 <> log:68
+R8080:8084 xv6iris.TsoMem <> agent abbrev
+binder 8076:8076 <> h:69
+R8092:8092 Corelib.Numbers.BinNums <> Z ind
+binder 8088:8088 <> a:70
+R8107:8110 Corelib.Init.Datatypes <> list ind
+R8113:8114 stdpp.bitvector.definitions <> bv rec
+binder 8100:8103 <> data:71
+R8122:8125 Corelib.Init.Datatypes <> list ind
+R8127:8130 xv6iris.TsoMem <> wmsg rec
+R8140:8143 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R8137:8139 xv6iris.TsoMem <> log:68 var
+R8144:8144 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R8158:8158 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R8145:8148 xv6iris.TsoMem <> WMsg constr
+R8150:8150 xv6iris.TsoMem <> a:70 var
+R8152:8155 xv6iris.TsoMem <> data:71 var
+R8157:8157 xv6iris.TsoMem <> h:69 var
+def 8387:8396 <> fence_post
+R8403:8407 xv6iris.TsoMem <> agent abbrev
+binder 8399:8399 <> h:72
+R8417:8420 Corelib.Init.Datatypes <> list ind
+R8422:8425 xv6iris.TsoMem <> wmsg rec
+binder 8411:8413 <> log:73
+R8447:8450 Corelib.Init.Datatypes <> bool ind
+binder 8433:8434 <> pr:74
+binder 8436:8437 <> pw:75
+binder 8439:8440 <> sr:76
+binder 8442:8443 <> sw:77
+R8459:8463 xv6iris.TsoMem <> tview abbrev
+binder 8454:8455 <> tv:78
+R8468:8472 xv6iris.TsoMem <> tview abbrev
+R8479:8481 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R8490:8495 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R8522:8527 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R8484:8487 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R8482:8483 xv6iris.TsoMem <> pw:75 var
+R8488:8489 xv6iris.TsoMem <> sr:76 var
+R8496:8502 Stdlib.Arith.PeanoNat Nat max def
+R8504:8505 xv6iris.TsoMem <> tv:78 var
+R8508:8514 xv6iris.TsoMem <> own_pub def
+R8516:8516 xv6iris.TsoMem <> h:72 var
+R8518:8520 xv6iris.TsoMem <> log:73 var
+R8528:8529 xv6iris.TsoMem <> tv:78 var
+def 8678:8689 <> excl_read_ok
+R8698:8702 xv6iris.TsoMem <> image def
+binder 8692:8694 <> img:79
+R8712:8715 Corelib.Init.Datatypes <> list ind
+R8717:8720 xv6iris.TsoMem <> wmsg rec
+binder 8706:8708 <> log:80
+R8728:8732 xv6iris.TsoMem <> agent abbrev
+binder 8724:8724 <> h:81
+R8745:8749 xv6iris.TsoMem <> tview abbrev
+binder 8740:8741 <> tv:82
+R8757:8757 Corelib.Numbers.BinNums <> Z ind
+binder 8753:8753 <> a:83
+R8765:8766 stdpp.bitvector.definitions <> bv rec
+binder 8761:8761 <> v:84
+R8816:8818 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8783:8790 xv6iris.TsoMem <> tso_read def
+R8792:8794 xv6iris.TsoMem <> img:79 var
+R8796:8798 xv6iris.TsoMem <> log:80 var
+R8800:8800 xv6iris.TsoMem <> h:81 var
+R8803:8808 Corelib.Init.Datatypes <> length def
+R8810:8812 xv6iris.TsoMem <> log:80 var
+R8815:8815 xv6iris.TsoMem <> a:83 var
+R8819:8822 Corelib.Init.Datatypes <> Some constr
+R8824:8824 xv6iris.TsoMem <> v:84 var
+def 8915:8923 <> amo_store
+R8932:8935 Corelib.Init.Datatypes <> list ind
+R8937:8940 xv6iris.TsoMem <> wmsg rec
+binder 8926:8928 <> log:85
+R8948:8952 xv6iris.TsoMem <> agent abbrev
+binder 8944:8944 <> h:86
+R8960:8960 Corelib.Numbers.BinNums <> Z ind
+binder 8956:8956 <> a:87
+R8975:8978 Corelib.Init.Datatypes <> list ind
+R8981:8982 stdpp.bitvector.definitions <> bv rec
+binder 8968:8971 <> data:88
+R8999:9001 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R8990:8993 Corelib.Init.Datatypes <> list ind
+R8995:8998 xv6iris.TsoMem <> wmsg rec
+R9002:9006 xv6iris.TsoMem <> tview abbrev
+R9013:9013 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9036:9037 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9052:9052 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9014:9022 xv6iris.TsoMem <> store_log def
+R9024:9026 xv6iris.TsoMem <> log:85 var
+R9028:9028 xv6iris.TsoMem <> h:86 var
+R9030:9030 xv6iris.TsoMem <> a:87 var
+R9032:9035 xv6iris.TsoMem <> data:88 var
+R9038:9038 Corelib.Init.Datatypes <> S constr
+R9041:9046 Corelib.Init.Datatypes <> length def
+R9048:9050 xv6iris.TsoMem <> log:85 var
+prf 9237:9247 <> read_down_S
+binder 9249:9251 <> img:89
+binder 9253:9255 <> log:90
+binder 9257:9257 <> h:91
+binder 9259:9260 <> tv:92
+binder 9262:9262 <> a:93
+binder 9264:9264 <> t:94
+R9300:9304 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9270:9278 xv6iris.TsoMem <> read_down def
+R9280:9282 xv6iris.TsoMem <> img:89 var
+R9284:9286 xv6iris.TsoMem <> log:90 var
+R9288:9288 xv6iris.TsoMem <> h:91 var
+R9290:9291 xv6iris.TsoMem <> tv:92 var
+R9293:9293 xv6iris.TsoMem <> a:93 var
+R9296:9296 Corelib.Init.Datatypes <> S constr
+R9298:9298 xv6iris.TsoMem <> t:94 var
+R9312:9314 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R9338:9343 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R9368:9373 Corelib.ssr.ssreflect <> ::boolean_if_scope:'if'_x_'then'_x_'else'_x not
+R9315:9322 xv6iris.TsoMem <> visibleb def
+R9324:9324 xv6iris.TsoMem <> h:91 var
+R9326:9327 xv6iris.TsoMem <> tv:92 var
+R9329:9331 xv6iris.TsoMem <> log:90 var
+R9334:9334 Corelib.Init.Datatypes <> S constr
+R9336:9336 xv6iris.TsoMem <> t:94 var
+R9344:9351 xv6iris.TsoMem <> log_byte def
+R9353:9355 xv6iris.TsoMem <> img:89 var
+R9357:9359 xv6iris.TsoMem <> log:90 var
+R9362:9362 Corelib.Init.Datatypes <> S constr
+R9364:9364 xv6iris.TsoMem <> t:94 var
+R9367:9367 xv6iris.TsoMem <> a:93 var
+R9374:9377 Corelib.Init.Datatypes <> None constr
+R9391:9394 Corelib.Init.Datatypes <> Some constr
+R9401:9404 Corelib.Init.Datatypes <> Some constr
+R9412:9415 Corelib.Init.Datatypes <> None constr
+R9420:9428 xv6iris.TsoMem <> read_down def
+R9430:9432 xv6iris.TsoMem <> img:89 var
+R9434:9436 xv6iris.TsoMem <> log:90 var
+R9438:9438 xv6iris.TsoMem <> h:91 var
+R9440:9441 xv6iris.TsoMem <> tv:92 var
+R9443:9443 xv6iris.TsoMem <> a:93 var
+R9445:9445 xv6iris.TsoMem <> t:94 var
+prf 9479:9489 <> read_down_0
+binder 9491:9493 <> img:95
+binder 9495:9497 <> log:96
+binder 9499:9499 <> h:97
+binder 9501:9502 <> tv:98
+binder 9504:9504 <> a:99
+R9536:9538 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9510:9518 xv6iris.TsoMem <> read_down def
+R9520:9522 xv6iris.TsoMem <> img:95 var
+R9524:9526 xv6iris.TsoMem <> log:96 var
+R9528:9528 xv6iris.TsoMem <> h:97 var
+R9530:9531 xv6iris.TsoMem <> tv:98 var
+R9533:9533 xv6iris.TsoMem <> a:99 var
+R9539:9541 xv6iris.TsoMem <> img:95 var
+R9543:9543 xv6iris.TsoMem <> a:99 var
+R9575:9585 stdpp.decidable <> bool_decide def
+R9589:9593 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R9575:9585 stdpp.decidable <> bool_decide def
+R9589:9593 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+prf 9701:9712 <> read_down_le
+binder 9714:9716 <> img:100
+binder 9718:9720 <> log:101
+binder 9722:9722 <> h:102
+binder 9724:9725 <> tv:103
+binder 9727:9727 <> a:104
+binder 9729:9729 <> t:105
+R9735:9738 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+R9740:9741 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+binder 9739:9739 <> v:106
+R9777:9783 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R9768:9770 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9742:9750 xv6iris.TsoMem <> read_down def
+R9752:9754 xv6iris.TsoMem <> img:100 var
+R9756:9758 xv6iris.TsoMem <> log:101 var
+R9760:9760 xv6iris.TsoMem <> h:102 var
+R9762:9763 xv6iris.TsoMem <> tv:103 var
+R9765:9765 xv6iris.TsoMem <> a:104 var
+R9767:9767 xv6iris.TsoMem <> t:105 var
+R9771:9774 Corelib.Init.Datatypes <> Some constr
+R9776:9776 xv6iris.TsoMem <> v:106 var
+R9784:9787 Stdlib.Unicode.Utf8_core <> ::type_scope:'∃'_x_'..'_x_','_x not
+R9790:9791 Stdlib.Unicode.Utf8_core <> ::type_scope:'∃'_x_'..'_x_','_x not
+binder 9788:9789 <> t':107
+R9806:9810 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'∧'_x not
+R9795:9799 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R9793:9794 xv6iris.TsoMem <> t':107 var
+R9800:9800 xv6iris.TsoMem <> t:105 var
+R9838:9850 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'∧'_x not
+R9831:9833 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9811:9818 xv6iris.TsoMem <> visibleb def
+R9820:9820 xv6iris.TsoMem <> h:102 var
+R9822:9823 xv6iris.TsoMem <> tv:103 var
+R9825:9827 xv6iris.TsoMem <> log:101 var
+R9829:9830 xv6iris.TsoMem <> t':107 var
+R9834:9837 Corelib.Init.Datatypes <> true constr
+R9872:9874 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9851:9858 xv6iris.TsoMem <> log_byte def
+R9860:9862 xv6iris.TsoMem <> img:100 var
+R9864:9866 xv6iris.TsoMem <> log:101 var
+R9868:9869 xv6iris.TsoMem <> t':107 var
+R9871:9871 xv6iris.TsoMem <> a:104 var
+R9875:9878 Corelib.Init.Datatypes <> Some constr
+R9880:9880 xv6iris.TsoMem <> v:106 var
+R9933:9943 xv6iris.TsoMem <> read_down_0 thm
+R9933:9943 xv6iris.TsoMem <> read_down_0 thm
+R9933:9943 xv6iris.TsoMem <> read_down_0 thm
+R9998:10011 xv6iris.TsoMem <> visibleb_below thm
+R9998:10011 xv6iris.TsoMem <> visibleb_below thm
+R10040:10050 xv6iris.TsoMem <> read_down_S thm
+R10040:10050 xv6iris.TsoMem <> read_down_S thm
+R10040:10050 xv6iris.TsoMem <> read_down_S thm
+R10067:10074 xv6iris.TsoMem <> visibleb def
+R10086:10086 Corelib.Init.Datatypes <> S constr
+R10067:10074 xv6iris.TsoMem <> visibleb def
+R10086:10086 Corelib.Init.Datatypes <> S constr
+R10116:10123 xv6iris.TsoMem <> log_byte def
+R10134:10134 Corelib.Init.Datatypes <> S constr
+R10116:10123 xv6iris.TsoMem <> log_byte def
+R10134:10134 Corelib.Init.Datatypes <> S constr
+R10180:10180 Corelib.Init.Datatypes <> S constr
+R10180:10180 Corelib.Init.Datatypes <> S constr
+prf 10564:10579 <> read_down_latest
+binder 10581:10583 <> img:108
+binder 10585:10587 <> log:109
+binder 10589:10589 <> h:110
+binder 10591:10592 <> tv:111
+binder 10594:10594 <> a:112
+binder 10596:10596 <> t:113
+binder 10598:10599 <> t':114
+binder 10601:10602 <> v':115
+R10622:10626 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R10611:10615 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R10609:10610 xv6iris.TsoMem <> t':114 var
+R10616:10616 xv6iris.TsoMem <> t:113 var
+R10654:10660 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R10647:10649 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10627:10634 xv6iris.TsoMem <> visibleb def
+R10636:10636 xv6iris.TsoMem <> h:110 var
+R10638:10639 xv6iris.TsoMem <> tv:111 var
+R10641:10643 xv6iris.TsoMem <> log:109 var
+R10645:10646 xv6iris.TsoMem <> t':114 var
+R10650:10653 Corelib.Init.Datatypes <> true constr
+R10692:10698 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R10682:10684 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10661:10668 xv6iris.TsoMem <> log_byte def
+R10670:10672 xv6iris.TsoMem <> img:108 var
+R10674:10676 xv6iris.TsoMem <> log:109 var
+R10678:10679 xv6iris.TsoMem <> t':114 var
+R10681:10681 xv6iris.TsoMem <> a:112 var
+R10685:10688 Corelib.Init.Datatypes <> Some constr
+R10690:10691 xv6iris.TsoMem <> v':115 var
+R10699:10702 Stdlib.Unicode.Utf8_core <> ::type_scope:'∃'_x_'..'_x_','_x not
+R10710:10711 Stdlib.Unicode.Utf8_core <> ::type_scope:'∃'_x_'..'_x_','_x not
+binder 10703:10705 <> t'':116
+binder 10707:10709 <> v'':117
+R10728:10732 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'∧'_x not
+R10715:10719 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R10713:10714 xv6iris.TsoMem <> t':114 var
+R10720:10722 xv6iris.TsoMem <> t'':116 var
+R10770:10787 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'∧'_x not
+R10759:10761 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10733:10741 xv6iris.TsoMem <> read_down def
+R10743:10745 xv6iris.TsoMem <> img:108 var
+R10747:10749 xv6iris.TsoMem <> log:109 var
+R10751:10751 xv6iris.TsoMem <> h:110 var
+R10753:10754 xv6iris.TsoMem <> tv:111 var
+R10756:10756 xv6iris.TsoMem <> a:112 var
+R10758:10758 xv6iris.TsoMem <> t:113 var
+R10762:10765 Corelib.Init.Datatypes <> Some constr
+R10767:10769 xv6iris.TsoMem <> v'':117 var
+R10816:10833 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'∧'_x not
+R10809:10811 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10788:10795 xv6iris.TsoMem <> visibleb def
+R10797:10797 xv6iris.TsoMem <> h:110 var
+R10799:10800 xv6iris.TsoMem <> tv:111 var
+R10802:10804 xv6iris.TsoMem <> log:109 var
+R10806:10808 xv6iris.TsoMem <> t'':116 var
+R10812:10815 Corelib.Init.Datatypes <> true constr
+R10856:10858 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10834:10841 xv6iris.TsoMem <> log_byte def
+R10843:10845 xv6iris.TsoMem <> img:108 var
+R10847:10849 xv6iris.TsoMem <> log:109 var
+R10851:10853 xv6iris.TsoMem <> t'':116 var
+R10855:10855 xv6iris.TsoMem <> a:112 var
+R10859:10862 Corelib.Init.Datatypes <> Some constr
+R10864:10866 xv6iris.TsoMem <> v'':117 var
+R10931:10933 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10931:10933 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11014:11024 xv6iris.TsoMem <> read_down_0 thm
+R11014:11024 xv6iris.TsoMem <> read_down_0 thm
+R11014:11024 xv6iris.TsoMem <> read_down_0 thm
+R11083:11093 xv6iris.TsoMem <> read_down_S thm
+R11083:11093 xv6iris.TsoMem <> read_down_S thm
+R11083:11093 xv6iris.TsoMem <> read_down_S thm
+R11110:11117 xv6iris.TsoMem <> visibleb def
+R11129:11129 Corelib.Init.Datatypes <> S constr
+R11110:11117 xv6iris.TsoMem <> visibleb def
+R11129:11129 Corelib.Init.Datatypes <> S constr
+R11159:11166 xv6iris.TsoMem <> log_byte def
+R11177:11177 Corelib.Init.Datatypes <> S constr
+R11159:11166 xv6iris.TsoMem <> log_byte def
+R11177:11177 Corelib.Init.Datatypes <> S constr
+R11210:11210 Corelib.Init.Datatypes <> S constr
+R11210:11210 Corelib.Init.Datatypes <> S constr
+R11271:11276 stdpp.base <> decide def
+R11281:11283 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11284:11284 Corelib.Init.Datatypes <> S constr
+R11271:11276 stdpp.base <> decide def
+R11281:11283 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11284:11284 Corelib.Init.Datatypes <> S constr
+R11491:11496 stdpp.base <> decide def
+R11501:11503 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11504:11504 Corelib.Init.Datatypes <> S constr
+R11491:11496 stdpp.base <> decide def
+R11501:11503 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11504:11504 Corelib.Init.Datatypes <> S constr
+prf 11862:11880 <> read_down_app_below
+binder 11882:11884 <> img:118
+binder 11886:11888 <> log:119
+binder 11890:11890 <> m:120
+binder 11892:11892 <> h:121
+binder 11894:11895 <> tv:122
+binder 11897:11899 <> tv':123
+binder 11901:11901 <> a:124
+binder 11903:11903 <> t:125
+R11931:11935 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R11911:11915 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R11910:11910 xv6iris.TsoMem <> t:125 var
+R11916:11921 Corelib.Init.Datatypes <> length def
+R11923:11925 xv6iris.TsoMem <> log:119 var
+R11950:11954 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R11938:11942 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R11937:11937 xv6iris.TsoMem <> t:125 var
+R11943:11944 xv6iris.TsoMem <> tv:122 var
+R11970:11976 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R11957:11961 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R11956:11956 xv6iris.TsoMem <> t:125 var
+R11962:11964 xv6iris.TsoMem <> tv':123 var
+R12013:12015 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11977:11985 xv6iris.TsoMem <> read_down def
+R11987:11989 xv6iris.TsoMem <> img:118 var
+R11995:11998 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R11992:11994 xv6iris.TsoMem <> log:119 var
+R11999:11999 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12001:12001 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12000:12000 xv6iris.TsoMem <> m:120 var
+R12004:12004 xv6iris.TsoMem <> h:121 var
+R12006:12008 xv6iris.TsoMem <> tv':123 var
+R12010:12010 xv6iris.TsoMem <> a:124 var
+R12012:12012 xv6iris.TsoMem <> t:125 var
+R12016:12024 xv6iris.TsoMem <> read_down def
+R12026:12028 xv6iris.TsoMem <> img:118 var
+R12030:12032 xv6iris.TsoMem <> log:119 var
+R12034:12034 xv6iris.TsoMem <> h:121 var
+R12036:12037 xv6iris.TsoMem <> tv:122 var
+R12039:12039 xv6iris.TsoMem <> a:124 var
+R12041:12041 xv6iris.TsoMem <> t:125 var
+R12110:12120 xv6iris.TsoMem <> read_down_0 thm
+R12110:12120 xv6iris.TsoMem <> read_down_0 thm
+R12110:12120 xv6iris.TsoMem <> read_down_0 thm
+R12110:12120 xv6iris.TsoMem <> read_down_0 thm
+R12110:12120 xv6iris.TsoMem <> read_down_0 thm
+R12136:12146 xv6iris.TsoMem <> read_down_S thm
+R12136:12146 xv6iris.TsoMem <> read_down_S thm
+R12136:12146 xv6iris.TsoMem <> read_down_S thm
+R12136:12146 xv6iris.TsoMem <> read_down_S thm
+R12136:12146 xv6iris.TsoMem <> read_down_S thm
+R12219:12232 xv6iris.TsoMem <> visibleb_below thm
+R12196:12198 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12163:12170 xv6iris.TsoMem <> visibleb def
+R12182:12185 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12186:12186 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12188:12188 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12192:12192 Corelib.Init.Datatypes <> S constr
+R12199:12202 Corelib.Init.Datatypes <> true constr
+R12219:12232 xv6iris.TsoMem <> visibleb_below thm
+R12294:12307 xv6iris.TsoMem <> visibleb_below thm
+R12277:12279 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12254:12261 xv6iris.TsoMem <> visibleb def
+R12273:12273 Corelib.Init.Datatypes <> S constr
+R12280:12283 Corelib.Init.Datatypes <> true constr
+R12294:12307 xv6iris.TsoMem <> visibleb_below thm
+R12368:12379 stdpp.list_basics <> lookup_app_l thm
+R12347:12349 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12330:12330 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R12341:12345 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R12334:12337 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12338:12338 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12340:12340 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12353:12356 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R12368:12379 stdpp.list_basics <> lookup_app_l thm
+R12403:12410 xv6iris.TsoMem <> log_byte def
+R12403:12410 xv6iris.TsoMem <> log_byte def
+R12403:12410 xv6iris.TsoMem <> log_byte def
+R12437:12440 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R12437:12440 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R12478:12485 xv6iris.TsoMem <> msg_byte def
+R12478:12485 xv6iris.TsoMem <> msg_byte def
+prf 12703:12718 <> tso_read_own_top
+binder 12720:12722 <> img:126
+binder 12724:12726 <> log:127
+binder 12728:12728 <> h:128
+binder 12730:12730 <> a:129
+binder 12732:12732 <> m:130
+binder 12734:12734 <> v:131
+R12752:12756 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R12748:12750 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12740:12745 xv6iris.TsoMem <> wm_tid proj
+R12747:12747 xv6iris.TsoMem <> m:130 var
+R12751:12751 xv6iris.TsoMem <> h:128 var
+R12778:12784 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R12769:12771 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12757:12764 xv6iris.TsoMem <> msg_byte def
+R12766:12766 xv6iris.TsoMem <> m:130 var
+R12768:12768 xv6iris.TsoMem <> a:129 var
+R12772:12775 Corelib.Init.Datatypes <> Some constr
+R12777:12777 xv6iris.TsoMem <> v:131 var
+R12785:12788 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+R12791:12792 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+binder 12789:12790 <> tv:132
+R12825:12827 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12793:12800 xv6iris.TsoMem <> tso_read def
+R12802:12804 xv6iris.TsoMem <> img:126 var
+R12810:12813 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12807:12809 xv6iris.TsoMem <> log:127 var
+R12814:12814 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12816:12816 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12815:12815 xv6iris.TsoMem <> m:130 var
+R12819:12819 xv6iris.TsoMem <> h:128 var
+R12821:12822 xv6iris.TsoMem <> tv:132 var
+R12824:12824 xv6iris.TsoMem <> a:129 var
+R12828:12831 Corelib.Init.Datatypes <> Some constr
+R12833:12833 xv6iris.TsoMem <> v:131 var
+R12874:12881 xv6iris.TsoMem <> tso_read def
+R12874:12881 xv6iris.TsoMem <> tso_read def
+R12874:12881 xv6iris.TsoMem <> tso_read def
+R12915:12917 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12896:12901 Corelib.Init.Datatypes <> length def
+R12907:12910 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12911:12911 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12913:12913 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12918:12918 Corelib.Init.Datatypes <> S constr
+R12921:12926 Corelib.Init.Datatypes <> length def
+R12946:12955 Stdlib.Lists.List <> length_app thm
+R12946:12955 Stdlib.Lists.List <> length_app thm
+R12946:12955 Stdlib.Lists.List <> length_app thm
+R13007:13009 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12981:12981 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R12992:12996 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R12997:13002 Corelib.Init.Datatypes <> length def
+R12985:12988 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12989:12989 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12991:12991 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R13010:13013 Corelib.Init.Datatypes <> Some constr
+R13031:13048 stdpp.list_basics <> list_lookup_middle thm
+R13031:13048 stdpp.list_basics <> list_lookup_middle thm
+R13063:13073 xv6iris.TsoMem <> read_down_S thm
+R13063:13073 xv6iris.TsoMem <> read_down_S thm
+R13063:13073 xv6iris.TsoMem <> read_down_S thm
+R13153:13164 xv6iris.TsoMem <> visibleb_own thm
+R13131:13133 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13088:13095 xv6iris.TsoMem <> visibleb def
+R13106:13109 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R13110:13110 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R13112:13112 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R13116:13116 Corelib.Init.Datatypes <> S constr
+R13119:13124 Corelib.Init.Datatypes <> length def
+R13134:13137 Corelib.Init.Datatypes <> true constr
+R13153:13164 xv6iris.TsoMem <> visibleb_own thm
+R13184:13191 xv6iris.TsoMem <> log_byte def
+R13184:13191 xv6iris.TsoMem <> log_byte def
+R13184:13191 xv6iris.TsoMem <> log_byte def
+def 13491:13494 <> flat
+R13503:13507 xv6iris.TsoMem <> image def
+binder 13497:13499 <> img:133
+R13517:13520 Corelib.Init.Datatypes <> list ind
+R13522:13525 xv6iris.TsoMem <> wmsg rec
+binder 13511:13513 <> log:134
+R13533:13533 Corelib.Numbers.BinNums <> Z ind
+binder 13529:13529 <> a:135
+R13538:13543 Corelib.Init.Datatypes <> option ind
+R13546:13547 stdpp.bitvector.definitions <> bv rec
+R13557:13561 stdpp.list_basics <> foldl def
+R13650:13652 xv6iris.TsoMem <> log:134 var
+R13643:13645 xv6iris.TsoMem <> img:133 var
+R13647:13647 xv6iris.TsoMem <> a:135 var
+R13564:13566 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R13572:13573 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 13567:13569 <> acc:136
+binder 13571:13571 <> m:137
+R13580:13587 xv6iris.TsoMem <> msg_byte def
+R13589:13589 xv6iris.TsoMem <> m:137 var
+R13591:13591 xv6iris.TsoMem <> a:135 var
+R13598:13601 Corelib.Init.Datatypes <> Some constr
+R13608:13611 Corelib.Init.Datatypes <> Some constr
+R13617:13620 Corelib.Init.Datatypes <> None constr
+R13625:13627 xv6iris.TsoMem <> acc:136 var
+prf 13662:13670 <> flat_snoc
+binder 13672:13674 <> img:138
+binder 13676:13678 <> log:139
+binder 13680:13680 <> m:140
+binder 13682:13682 <> a:141
+R13711:13715 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13688:13691 xv6iris.TsoMem <> flat def
+R13693:13695 xv6iris.TsoMem <> img:138 var
+R13701:13704 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R13698:13700 xv6iris.TsoMem <> log:139 var
+R13705:13705 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R13707:13707 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R13706:13706 xv6iris.TsoMem <> m:140 var
+R13710:13710 xv6iris.TsoMem <> a:141 var
+R13722:13729 xv6iris.TsoMem <> msg_byte def
+R13731:13731 xv6iris.TsoMem <> m:140 var
+R13733:13733 xv6iris.TsoMem <> a:141 var
+R13740:13743 Corelib.Init.Datatypes <> Some constr
+R13750:13753 Corelib.Init.Datatypes <> Some constr
+R13759:13762 Corelib.Init.Datatypes <> None constr
+R13767:13770 xv6iris.TsoMem <> flat def
+R13772:13774 xv6iris.TsoMem <> img:138 var
+R13776:13778 xv6iris.TsoMem <> log:139 var
+R13780:13780 xv6iris.TsoMem <> a:141 var
+R13803:13806 xv6iris.TsoMem <> flat def
+R13808:13816 stdpp.list_monad <> foldl_app thm
+R13803:13806 xv6iris.TsoMem <> flat def
+R13803:13806 xv6iris.TsoMem <> flat def
+R13808:13816 stdpp.list_monad <> foldl_app thm
+R13808:13816 stdpp.list_monad <> foldl_app thm
+prf 13834:13850 <> tso_read_top_flat
+binder 13852:13854 <> img:142
+binder 13856:13858 <> log:143
+binder 13860:13860 <> h:144
+binder 13862:13862 <> a:145
+R13901:13903 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13868:13875 xv6iris.TsoMem <> tso_read def
+R13877:13879 xv6iris.TsoMem <> img:142 var
+R13881:13883 xv6iris.TsoMem <> log:143 var
+R13885:13885 xv6iris.TsoMem <> h:144 var
+R13888:13893 Corelib.Init.Datatypes <> length def
+R13895:13897 xv6iris.TsoMem <> log:143 var
+R13900:13900 xv6iris.TsoMem <> a:145 var
+R13904:13907 xv6iris.TsoMem <> flat def
+R13909:13911 xv6iris.TsoMem <> img:142 var
+R13913:13915 xv6iris.TsoMem <> log:143 var
+R13917:13917 xv6iris.TsoMem <> a:145 var
+R13964:13970 Stdlib.Lists.List <> rev_ind thm
+R13964:13970 Stdlib.Lists.List <> rev_ind thm
+R13986:13993 xv6iris.TsoMem <> tso_read def
+R13996:13999 xv6iris.TsoMem <> flat def
+R13986:13993 xv6iris.TsoMem <> tso_read def
+R13986:13993 xv6iris.TsoMem <> tso_read def
+R13996:13999 xv6iris.TsoMem <> flat def
+R13996:13999 xv6iris.TsoMem <> flat def
+R14040:14047 xv6iris.TsoMem <> tso_read def
+R14049:14057 xv6iris.TsoMem <> flat_snoc thm
+R14040:14047 xv6iris.TsoMem <> tso_read def
+R14040:14047 xv6iris.TsoMem <> tso_read def
+R14049:14057 xv6iris.TsoMem <> flat_snoc thm
+R14049:14057 xv6iris.TsoMem <> flat_snoc thm
+R14093:14095 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14074:14079 Corelib.Init.Datatypes <> length def
+R14085:14088 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R14089:14089 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R14091:14091 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R14096:14096 Corelib.Init.Datatypes <> S constr
+R14099:14104 Corelib.Init.Datatypes <> length def
+R14126:14135 Stdlib.Lists.List <> length_app thm
+R14126:14135 Stdlib.Lists.List <> length_app thm
+R14126:14135 Stdlib.Lists.List <> length_app thm
+R14189:14191 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14163:14163 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R14174:14178 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R14179:14184 Corelib.Init.Datatypes <> length def
+R14167:14170 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R14171:14171 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R14173:14173 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R14192:14195 Corelib.Init.Datatypes <> Some constr
+R14215:14232 stdpp.list_basics <> list_lookup_middle thm
+R14215:14232 stdpp.list_basics <> list_lookup_middle thm
+R14249:14259 xv6iris.TsoMem <> read_down_S thm
+R14249:14259 xv6iris.TsoMem <> read_down_S thm
+R14249:14259 xv6iris.TsoMem <> read_down_S thm
+R14356:14369 xv6iris.TsoMem <> visibleb_below thm
+R14333:14335 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14276:14283 xv6iris.TsoMem <> visibleb def
+R14288:14288 Corelib.Init.Datatypes <> S constr
+R14291:14296 Corelib.Init.Datatypes <> length def
+R14308:14311 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R14312:14312 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R14314:14314 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R14318:14318 Corelib.Init.Datatypes <> S constr
+R14321:14326 Corelib.Init.Datatypes <> length def
+R14336:14339 Corelib.Init.Datatypes <> true constr
+R14356:14369 xv6iris.TsoMem <> visibleb_below thm
+R14393:14400 xv6iris.TsoMem <> log_byte def
+R14393:14400 xv6iris.TsoMem <> log_byte def
+R14393:14400 xv6iris.TsoMem <> log_byte def
+R14424:14431 xv6iris.TsoMem <> msg_byte def
+R14424:14431 xv6iris.TsoMem <> msg_byte def
+R14471:14489 xv6iris.TsoMem <> read_down_app_below thm
+R14504:14509 Corelib.Init.Datatypes <> length def
+R14517:14517 Corelib.Init.Datatypes <> S constr
+R14520:14525 Corelib.Init.Datatypes <> length def
+R14551:14556 Corelib.Init.Datatypes <> length def
+R14471:14489 xv6iris.TsoMem <> read_down_app_below thm
+R14504:14509 Corelib.Init.Datatypes <> length def
+R14517:14517 Corelib.Init.Datatypes <> S constr
+R14520:14525 Corelib.Init.Datatypes <> length def
+R14551:14556 Corelib.Init.Datatypes <> length def
+R14471:14489 xv6iris.TsoMem <> read_down_app_below thm
+R14504:14509 Corelib.Init.Datatypes <> length def
+R14517:14517 Corelib.Init.Datatypes <> S constr
+R14520:14525 Corelib.Init.Datatypes <> length def
+R14551:14556 Corelib.Init.Datatypes <> length def

@@ -1,0 +1,49 @@
+DIGEST 94defd871b26492b11e28d1acef52908
+FUser.InitElfRaw
+R1088:1093 Stdlib.ZArith.ZArith <> <> lib
+R1095:1098 Stdlib.Lists.List <> <> lib
+R1136:1142 Stdlib.Strings.PString <> <> lib
+R1152:1164 Stdlib.Lists.List ListNotations <> mod
+def 1430:1448 <> init_elf_hex_chunk0
+R1452:1468 Corelib.Strings.PrimString <> string prim
+def 9688:9706 <> init_elf_hex_chunk1
+R9710:9726 Corelib.Strings.PrimString <> string prim
+def 17946:17964 <> init_elf_hex_chunk2
+R17968:17984 Corelib.Strings.PrimString <> string prim
+def 26204:26222 <> init_elf_hex_chunk3
+R26226:26242 Corelib.Strings.PrimString <> string prim
+def 34462:34480 <> init_elf_hex_chunk4
+R34484:34500 Corelib.Strings.PrimString <> string prim
+def 42720:42738 <> init_elf_hex_chunk5
+R42742:42758 Corelib.Strings.PrimString <> string prim
+def 50978:50996 <> init_elf_hex_chunk6
+R51000:51016 Corelib.Strings.PrimString <> string prim
+def 59236:59254 <> init_elf_hex_chunk7
+R59258:59274 Corelib.Strings.PrimString <> string prim
+def 67494:67512 <> init_elf_hex_chunk8
+R67516:67532 Corelib.Strings.PrimString <> string prim
+def 73977:73988 <> init_elf_hex
+R73992:74008 Corelib.Strings.PrimString <> string prim
+R74015:74028 Stdlib.Lists.List <> fold_left def
+R74045:74045 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R74065:74066 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R74086:74087 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R74107:74108 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R74128:74129 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R74149:74150 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R74170:74171 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R74191:74192 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R74212:74213 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R74233:74233 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R74046:74064 User.InitElfRaw <> init_elf_hex_chunk0 def
+R74067:74085 User.InitElfRaw <> init_elf_hex_chunk1 def
+R74088:74106 User.InitElfRaw <> init_elf_hex_chunk2 def
+R74109:74127 User.InitElfRaw <> init_elf_hex_chunk3 def
+R74130:74148 User.InitElfRaw <> init_elf_hex_chunk4 def
+R74151:74169 User.InitElfRaw <> init_elf_hex_chunk5 def
+R74172:74190 User.InitElfRaw <> init_elf_hex_chunk6 def
+R74193:74211 User.InitElfRaw <> init_elf_hex_chunk7 def
+R74214:74232 User.InitElfRaw <> init_elf_hex_chunk8 def
+R74030:74043 Corelib.Strings.PrimString <> cat prim
+def 74336:74348 <> init_elf_size
+R74352:74352 Corelib.Numbers.BinNums <> Z ind

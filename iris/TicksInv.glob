@@ -1,0 +1,135 @@
+DIGEST de510cb10b89ddca1b2c4968e90685a6
+Fxv6iris.TicksInv
+R1172:1180 iris.proofmode.proofmode <> <> lib
+R1216:1219 iris.algebra.excl <> <> lib
+R1262:1271 iris.base_logic.lib.invariants <> <> lib
+R1273:1275 iris.base_logic.lib.own <> <> lib
+R1293:1306 SailStdpp.Base <> <> lib
+R1308:1333 SailStdpp.Operators_mwords <> <> lib
+R1351:1361 Riscv.rv64d <> <> lib
+R1379:1388 xv6iris.RiscvPtsto <> <> lib
+R1406:1411 xv6iris.WpLock <> <> lib
+R1429:1434 xv6iris.TsoCtx <> <> lib
+R1506:1515 Kernel.KernelSyms <> <> lib
+R1533:1536 xv6iris.Xv6G <> <> lib
+sec 1621:1628 <> TicksInv
+R1644:1650 xv6iris.RiscvPtsto <> riscvGS class
+R1657:1660 xv6iris.Xv6G <> xv6G class
+R1662:1663 xv6iris.TicksInv <> Σ:1 var
+var  1679:1680 TicksInv XI
+R1684:1689 xv6iris.TsoCtx <> CurCtx class
+def 1858:1864 <> a_ticks
+R1868:1872 SailStdpp.Values <> mword def
+R1880:1891 SailStdpp.Values <> mword_of_int def
+R1893:1908 Kernel.KernelSyms <> ticks def
+def 1924:1934 <> a_tickslock
+R1938:1942 SailStdpp.Values <> mword def
+R1950:1961 SailStdpp.Values <> mword_of_int def
+R1963:1982 Kernel.KernelSyms <> tickslock def
+def 2071:2079 <> ticks_res
+R2083:2087 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R2089:2090 xv6iris.TicksInv <> TicksInv.Σ var
+R2096:2099 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R2112:2113 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R2104:2108 SailStdpp.Values <> mword def
+binder 2100:2100 <> t:5
+R2121:2128 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R2114:2120 xv6iris.TicksInv <> a_ticks def
+R2129:2129 xv6iris.TicksInv <> t:5 var
+prf 2144:2158 <> ticks_res_intro
+R2165:2169 SailStdpp.Values <> mword def
+binder 2161:2161 <> t:6
+R2193:2198 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R2184:2191 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R2177:2183 xv6iris.TicksInv <> a_ticks def
+R2192:2192 xv6iris.TicksInv <> t:6 var
+R2199:2207 xv6iris.TicksInv <> ticks_res def
+def 2274:2285 <> is_tickslock
+R2294:2298 iris.base_logic.lib.iprop <> gname def
+binder 2288:2290 <> γl:7
+R2303:2307 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R2309:2310 xv6iris.TicksInv <> TicksInv.Σ var
+R2319:2325 xv6iris.WpLock <> is_lock def
+R2327:2329 xv6iris.TicksInv <> γl:7 var
+R2331:2341 xv6iris.TicksInv <> a_tickslock def
+R2357:2359 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R2369:2371 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R2360:2368 xv6iris.TicksInv <> ticks_res def
+inst 2393:2415 <> is_tickslock_persistent
+binder 2417:2419 <> γl:8
+R2423:2432 iris.bi.derived_connectives <> Persistent class
+R2435:2446 xv6iris.TicksInv <> is_tickslock def
+R2448:2450 xv6iris.TicksInv <> γl:8 var
+prf 2486:2502 <> is_tickslock_lock
+binder 2504:2506 <> γl:9
+R2530:2535 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R2514:2525 xv6iris.TicksInv <> is_tickslock def
+R2527:2529 xv6iris.TicksInv <> γl:9 var
+R2536:2542 xv6iris.WpLock <> is_lock def
+R2544:2546 xv6iris.TicksInv <> γl:9 var
+R2548:2558 xv6iris.TicksInv <> a_tickslock def
+R2574:2576 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R2586:2588 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R2577:2585 xv6iris.TicksInv <> ticks_res def
+prf 2992:3004 <> new_tickslock
+R3014:3028 xv6iris.RiscvLang <> CpuId class
+binder 3008:3010 <> CID:10
+binder 3031:3031 <> E:11
+R3038:3042 SailStdpp.Values <> mword def
+binder 3034:3034 <> t:12
+R3089:3098 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R3054:3062 xv6iris.WpLock <> lock_name def
+R3064:3074 xv6iris.TicksInv <> a_tickslock def
+R3118:3127 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3099:3109 xv6iris.TsoCtx <> own_context def
+R3111:3117 xv6iris.TsoCtx <> cur_ctx def
+R3174:3183 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3139:3147 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R3173:3173 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R3128:3138 xv6iris.TicksInv <> a_tickslock def
+R3165:3169 SailStdpp.Values <> mword def
+R3148:3159 SailStdpp.Values <> mword_of_int def
+R3215:3224 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3184:3202 xv6iris.WpLock <> lk_cpu_fresh def
+R3204:3214 xv6iris.TicksInv <> a_tickslock def
+R3241:3243 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R3245:3250 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R3232:3239 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R3225:3231 xv6iris.TicksInv <> a_ticks def
+R3240:3240 xv6iris.TicksInv <> t:12 var
+R3244:3244 xv6iris.TicksInv <> E:11 var
+R3244:3244 xv6iris.TicksInv <> E:11 var
+R3270:3274 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3251:3261 xv6iris.TsoCtx <> own_context def
+R3263:3269 xv6iris.TsoCtx <> cur_ctx def
+R3275:3278 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3290:3291 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3285:3289 iris.base_logic.lib.iprop <> gname def
+binder 3279:3281 <> γl:13
+R3292:3303 xv6iris.TicksInv <> is_tickslock def
+R3305:3307 xv6iris.TicksInv <> γl:13 var
+R3372:3372 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3424:3443 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3473:3473 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3373:3379 xv6iris.WpLock <> newlock thm
+R3409:3411 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R3421:3423 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R3412:3420 xv6iris.TicksInv <> ticks_res def
+R3383:3393 xv6iris.TicksInv <> a_tickslock def
+R3372:3372 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3424:3443 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3473:3473 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3373:3379 xv6iris.WpLock <> newlock thm
+R3409:3411 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R3421:3423 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R3412:3420 xv6iris.TicksInv <> ticks_res def
+R3383:3393 xv6iris.TicksInv <> a_tickslock def
+R3487:3487 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3503:3508 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3517:3517 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3488:3502 xv6iris.TicksInv <> ticks_res_intro thm
+R3487:3487 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3503:3508 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3517:3517 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3488:3502 xv6iris.TicksInv <> ticks_res_intro thm
+R3532:3539 xv6iris.TicksInv TicksInv <> sec

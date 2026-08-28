@@ -1,0 +1,960 @@
+DIGEST 09f5fd89ada9cb5a81ca66ec77150d01
+Fxv6iris.MstatusBits
+R1001:1006 Stdlib.ZArith.ZArith <> <> lib
+R1008:1011 Stdlib.Bool.Bool <> <> lib
+R1040:1060 stdpp.bitvector.definitions <> <> lib
+R1062:1078 stdpp.bitvector.tactics <> <> lib
+R1096:1121 SailStdpp.Operators_mwords <> <> lib
+R1139:1157 SailStdpp.TypeCasts <> <> lib
+R1159:1174 SailStdpp.Values <> <> lib
+R1176:1196 SailStdpp.MachineWord <> <> lib
+R1214:1230 Riscv.rv64d_types <> <> lib
+R1232:1242 Riscv.rv64d <> <> lib
+R1606:1621 SailStdpp.Operators_mwords <> subrange_vec_dec def
+R1624:1646 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R1658:1681 SailStdpp.MachineWord MachineWord update_slice def
+R1684:1700 SailStdpp.MachineWord MachineWord slice def
+R1710:1717 SailStdpp.Values <> get_word def
+R1732:1744 SailStdpp.TypeCasts <> autocast_refl thm
+R1756:1766 SailStdpp.Values <> to_word_idx def
+R1769:1775 SailStdpp.Values <> to_word def
+R1778:1785 SailStdpp.Values <> get_word def
+R1799:1835 SailStdpp.MachineWord MachineWord cast_idx_refl thm
+R1999:2015 SailStdpp.MachineWord MachineWord Z_idx def
+R1999:2015 SailStdpp.MachineWord MachineWord Z_idx def
+R2048:2064 SailStdpp.MachineWord MachineWord Z_idx def
+R2117:2121 Stdlib.NArith.BinNat N add def
+R2117:2121 Stdlib.NArith.BinNat N add def
+R2184:2188 Stdlib.NArith.BinNat N sub def
+R2184:2188 Stdlib.NArith.BinNat N sub def
+R2224:2228 Stdlib.NArith.BinNat N sub def
+R2157:2161 Stdlib.NArith.BinNat N add def
+R2283:2288 Stdlib.ZArith.BinInt Z of_N def
+R2283:2288 Stdlib.ZArith.BinInt Z of_N def
+R2321:2326 Stdlib.ZArith.BinInt Z of_N def
+R3251:3269 stdpp.bitvector.definitions <> bv_extract_unsigned thm
+R3281:3299 stdpp.bitvector.definitions <> bv_concat_unsigned' thm
+R3586:3604 stdpp.bitvector.definitions <> bv_extract_unsigned thm
+R3620:3638 stdpp.bitvector.definitions <> bv_concat_unsigned' thm
+R3654:3669 stdpp.bitvector.definitions <> bv_wrap_spec_low thm
+R3692:3708 stdpp.bitvector.definitions <> bv_wrap_spec_high thm
+R3731:3740 Stdlib.ZArith.BinInt Z lor_spec thm
+R3756:3768 Stdlib.ZArith.BinInt Z shiftl_spec thm
+R3791:3803 Stdlib.ZArith.BinInt Z shiftr_spec thm
+R3826:3840 Stdlib.ZArith.BinInt Z testbit_neg_r thm
+R3863:3870 Stdlib.ZArith.BinInt Z bits_0 thm
+R3919:3929 Stdlib.Bool.Bool <> orb_false_l thm
+R3933:3943 Stdlib.Bool.Bool <> orb_false_r thm
+R3947:3957 Stdlib.Bool.Bool <> andb_true_l thm
+R3961:3972 Stdlib.Bool.Bool <> andb_false_l thm
+prf 4156:4168 <> bv_eq_testbit
+R4175:4175 Corelib.Numbers.BinNums <> N ind
+binder 4171:4171 <> n:1
+R4185:4186 stdpp.bitvector.definitions <> bv rec
+R4188:4188 xv6iris.MstatusBits <> n:1 var
+binder 4179:4179 <> y:2
+binder 4181:4181 <> z:3
+R4195:4195 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4289:4295 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4196:4202 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4204:4205 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 4203:4203 <> k:4
+R4223:4231 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4207:4210 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R4212:4214 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R4211:4211 xv6iris.MstatusBits <> k:4 var
+R4211:4211 xv6iris.MstatusBits <> k:4 var
+R4215:4220 Stdlib.ZArith.BinInt Z of_N def
+R4222:4222 xv6iris.MstatusBits <> n:1 var
+R4259:4261 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4232:4240 Stdlib.ZArith.BinInt Z testbit def
+R4243:4253 stdpp.bitvector.definitions <> bv_unsigned proj
+R4255:4255 xv6iris.MstatusBits <> y:2 var
+R4258:4258 xv6iris.MstatusBits <> k:4 var
+R4262:4270 Stdlib.ZArith.BinInt Z testbit def
+R4273:4283 stdpp.bitvector.definitions <> bv_unsigned proj
+R4285:4285 xv6iris.MstatusBits <> z:3 var
+R4288:4288 xv6iris.MstatusBits <> k:4 var
+R4297:4299 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4296:4296 xv6iris.MstatusBits <> y:2 var
+R4300:4300 xv6iris.MstatusBits <> z:3 var
+R4328:4332 stdpp.bitvector.definitions <> bv_eq thm
+R4328:4332 stdpp.bitvector.definitions <> bv_eq thm
+R4349:4367 stdpp.bitvector.definitions <> bv_wrap_bv_unsigned thm
+R4379:4397 stdpp.bitvector.definitions <> bv_wrap_bv_unsigned thm
+R4349:4367 stdpp.bitvector.definitions <> bv_wrap_bv_unsigned thm
+R4349:4367 stdpp.bitvector.definitions <> bv_wrap_bv_unsigned thm
+R4379:4397 stdpp.bitvector.definitions <> bv_wrap_bv_unsigned thm
+R4379:4397 stdpp.bitvector.definitions <> bv_wrap_bv_unsigned thm
+R4413:4423 Stdlib.ZArith.BinInt Z bits_inj' thm
+R4413:4423 Stdlib.ZArith.BinInt Z bits_inj' thm
+R4451:4456 stdpp.base <> decide def
+R4460:4462 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R4463:4468 Stdlib.ZArith.BinInt Z of_N def
+R4451:4456 stdpp.base <> decide def
+R4460:4462 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R4463:4468 Stdlib.ZArith.BinInt Z of_N def
+R4488:4503 stdpp.bitvector.definitions <> bv_wrap_spec_low thm
+R4488:4503 stdpp.bitvector.definitions <> bv_wrap_spec_low thm
+R4488:4503 stdpp.bitvector.definitions <> bv_wrap_spec_low thm
+R4488:4503 stdpp.bitvector.definitions <> bv_wrap_spec_low thm
+R4488:4503 stdpp.bitvector.definitions <> bv_wrap_spec_low thm
+R4540:4556 stdpp.bitvector.definitions <> bv_wrap_spec_high thm
+R4540:4556 stdpp.bitvector.definitions <> bv_wrap_spec_high thm
+R4540:4556 stdpp.bitvector.definitions <> bv_wrap_spec_high thm
+R4540:4556 stdpp.bitvector.definitions <> bv_wrap_spec_high thm
+R4540:4556 stdpp.bitvector.definitions <> bv_wrap_spec_high thm
+R4678:4690 xv6iris.MstatusBits <> bv_eq_testbit thm
+R4730:4732 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4776:4788 xv6iris.MstatusBits <> bv_eq_testbit thm
+R4829:4834 stdpp.base <> decide def
+R4838:4840 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4879:4881 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+def 5305:5311 <> trap_ms
+R5322:5326 SailStdpp.Values <> mword def
+binder 5314:5318 <> elp_v:5
+R5337:5341 SailStdpp.Values <> mword def
+binder 5332:5333 <> ms:6
+R5349:5353 SailStdpp.Values <> mword def
+R5375:5397 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R5408:5412 xv6iris.MstatusBits <> elp_v:5 var
+R5399:5400 xv6iris.MstatusBits <> ms:6 var
+binder 5367:5370 <> ms_e:7
+R5431:5453 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R5465:5480 Riscv.rv64d <> _get_Mstatus_SIE def
+R5482:5485 xv6iris.MstatusBits <> ms_e:7 var
+R5455:5458 xv6iris.MstatusBits <> ms_e:7 var
+binder 5423:5426 <> ms_a:8
+R5505:5527 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R5539:5540 SailStdpp.Values <> :::'''b'_x not
+R5529:5532 xv6iris.MstatusBits <> ms_a:8 var
+binder 5497:5500 <> ms_b:9
+R5551:5573 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R5585:5586 SailStdpp.Values <> :::'''b'_x not
+R5575:5578 xv6iris.MstatusBits <> ms_b:9 var
+prf 5600:5610 <> trap_ms_SIE
+R5621:5625 SailStdpp.Values <> mword def
+binder 5613:5617 <> elp_v:10
+R5636:5640 SailStdpp.Values <> mword def
+binder 5631:5632 <> ms:11
+R5685:5688 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5704:5704 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5650:5665 Riscv.rv64d <> _get_Mstatus_SIE def
+R5668:5674 xv6iris.MstatusBits <> trap_ms def
+R5676:5680 xv6iris.MstatusBits <> elp_v:10 var
+R5682:5683 xv6iris.MstatusBits <> ms:11 var
+R5697:5701 SailStdpp.Values <> mword def
+R5689:5690 SailStdpp.Values <> :::'''b'_x not
+R5721:5727 xv6iris.MstatusBits <> trap_ms def
+R5730:5745 Riscv.rv64d <> _get_Mstatus_SIE def
+prf 5784:5795 <> trap_ms_SPIE
+R5806:5810 SailStdpp.Values <> mword def
+binder 5798:5802 <> elp_v:12
+R5821:5825 SailStdpp.Values <> mword def
+binder 5816:5817 <> ms:13
+R5871:5873 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5835:5851 Riscv.rv64d <> _get_Mstatus_SPIE def
+R5854:5860 xv6iris.MstatusBits <> trap_ms def
+R5862:5866 xv6iris.MstatusBits <> elp_v:12 var
+R5868:5869 xv6iris.MstatusBits <> ms:13 var
+R5874:5889 Riscv.rv64d <> _get_Mstatus_SIE def
+R5891:5892 xv6iris.MstatusBits <> ms:13 var
+R5909:5915 xv6iris.MstatusBits <> trap_ms def
+R5918:5934 Riscv.rv64d <> _get_Mstatus_SPIE def
+R5937:5952 Riscv.rv64d <> _get_Mstatus_SIE def
+prf 5991:6001 <> trap_ms_SPP
+R6012:6016 SailStdpp.Values <> mword def
+binder 6004:6008 <> elp_v:14
+R6027:6031 SailStdpp.Values <> mword def
+binder 6022:6023 <> ms:15
+R6076:6079 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6095:6095 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6041:6056 Riscv.rv64d <> _get_Mstatus_SPP def
+R6059:6065 xv6iris.MstatusBits <> trap_ms def
+R6067:6071 xv6iris.MstatusBits <> elp_v:14 var
+R6073:6074 xv6iris.MstatusBits <> ms:15 var
+R6088:6092 SailStdpp.Values <> mword def
+R6080:6081 SailStdpp.Values <> :::'''b'_x not
+R6112:6118 xv6iris.MstatusBits <> trap_ms def
+R6121:6136 Riscv.rv64d <> _get_Mstatus_SPP def
+prf 6175:6186 <> trap_ms_MPRV
+R6197:6201 SailStdpp.Values <> mword def
+binder 6189:6193 <> elp_v:16
+R6212:6216 SailStdpp.Values <> mword def
+binder 6207:6208 <> ms:17
+R6262:6264 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6226:6242 Riscv.rv64d <> _get_Mstatus_MPRV def
+R6245:6251 xv6iris.MstatusBits <> trap_ms def
+R6253:6257 xv6iris.MstatusBits <> elp_v:16 var
+R6259:6260 xv6iris.MstatusBits <> ms:17 var
+R6265:6281 Riscv.rv64d <> _get_Mstatus_MPRV def
+R6283:6284 xv6iris.MstatusBits <> ms:17 var
+R6301:6307 xv6iris.MstatusBits <> trap_ms def
+R6310:6326 Riscv.rv64d <> _get_Mstatus_MPRV def
+prf 6365:6375 <> trap_ms_MXR
+R6386:6390 SailStdpp.Values <> mword def
+binder 6378:6382 <> elp_v:18
+R6401:6405 SailStdpp.Values <> mword def
+binder 6396:6397 <> ms:19
+R6450:6452 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6415:6430 Riscv.rv64d <> _get_Mstatus_MXR def
+R6433:6439 xv6iris.MstatusBits <> trap_ms def
+R6441:6445 xv6iris.MstatusBits <> elp_v:18 var
+R6447:6448 xv6iris.MstatusBits <> ms:19 var
+R6453:6468 Riscv.rv64d <> _get_Mstatus_MXR def
+R6470:6471 xv6iris.MstatusBits <> ms:19 var
+R6488:6494 xv6iris.MstatusBits <> trap_ms def
+R6497:6512 Riscv.rv64d <> _get_Mstatus_MXR def
+prf 6551:6561 <> trap_ms_TSR
+R6572:6576 SailStdpp.Values <> mword def
+binder 6564:6568 <> elp_v:20
+R6587:6591 SailStdpp.Values <> mword def
+binder 6582:6583 <> ms:21
+R6636:6638 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6601:6616 Riscv.rv64d <> _get_Mstatus_TSR def
+R6619:6625 xv6iris.MstatusBits <> trap_ms def
+R6627:6631 xv6iris.MstatusBits <> elp_v:20 var
+R6633:6634 xv6iris.MstatusBits <> ms:21 var
+R6639:6654 Riscv.rv64d <> _get_Mstatus_TSR def
+R6656:6657 xv6iris.MstatusBits <> ms:21 var
+R6674:6680 xv6iris.MstatusBits <> trap_ms def
+R6683:6698 Riscv.rv64d <> _get_Mstatus_TSR def
+prf 6737:6747 <> trap_ms_SXL
+R6758:6762 SailStdpp.Values <> mword def
+binder 6750:6754 <> elp_v:22
+R6773:6777 SailStdpp.Values <> mword def
+binder 6768:6769 <> ms:23
+R6822:6824 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6787:6802 Riscv.rv64d <> _get_Mstatus_SXL def
+R6805:6811 xv6iris.MstatusBits <> trap_ms def
+R6813:6817 xv6iris.MstatusBits <> elp_v:22 var
+R6819:6820 xv6iris.MstatusBits <> ms:23 var
+R6825:6840 Riscv.rv64d <> _get_Mstatus_SXL def
+R6842:6843 xv6iris.MstatusBits <> ms:23 var
+R6860:6866 xv6iris.MstatusBits <> trap_ms def
+R6869:6884 Riscv.rv64d <> _get_Mstatus_SXL def
+prf 6923:6933 <> trap_ms_TVM
+R6944:6948 SailStdpp.Values <> mword def
+binder 6936:6940 <> elp_v:24
+R6959:6963 SailStdpp.Values <> mword def
+binder 6954:6955 <> ms:25
+R7008:7010 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6973:6988 Riscv.rv64d <> _get_Mstatus_TVM def
+R6991:6997 xv6iris.MstatusBits <> trap_ms def
+R6999:7003 xv6iris.MstatusBits <> elp_v:24 var
+R7005:7006 xv6iris.MstatusBits <> ms:25 var
+R7011:7026 Riscv.rv64d <> _get_Mstatus_TVM def
+R7028:7029 xv6iris.MstatusBits <> ms:25 var
+R7046:7052 xv6iris.MstatusBits <> trap_ms def
+R7055:7070 Riscv.rv64d <> _get_Mstatus_TVM def
+def 7578:7585 <> sret_ms1
+R7594:7598 SailStdpp.Values <> mword def
+binder 7588:7590 <> ms0:26
+R7607:7629 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R7640:7656 Riscv.rv64d <> _get_Mstatus_SPIE def
+R7658:7660 xv6iris.MstatusBits <> ms0:26 var
+R7631:7633 xv6iris.MstatusBits <> ms0:26 var
+def 7675:7682 <> sret_ms2
+R7691:7695 SailStdpp.Values <> mword def
+binder 7685:7687 <> ms0:27
+R7704:7726 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R7748:7749 SailStdpp.Values <> :::'''b'_x not
+R7729:7736 xv6iris.MstatusBits <> sret_ms1 def
+R7738:7740 xv6iris.MstatusBits <> ms0:27 var
+def 7767:7778 <> sret_newpriv
+R7787:7791 SailStdpp.Values <> mword def
+binder 7781:7783 <> ms0:28
+R7799:7807 Riscv.rv64d_types <> Privilege ind
+R7817:7822 SailStdpp.Operators_mwords <> eq_vec def
+R7859:7860 SailStdpp.Values <> :::'''b'_x not
+R7825:7840 Riscv.rv64d <> _get_Mstatus_SPP def
+R7843:7850 xv6iris.MstatusBits <> sret_ms2 def
+R7852:7854 xv6iris.MstatusBits <> ms0:28 var
+R7887:7890 Riscv.rv64d_types <> User constr
+R7871:7880 Riscv.rv64d_types <> Supervisor constr
+def 7904:7911 <> sret_ms3
+R7920:7924 SailStdpp.Values <> mword def
+binder 7914:7916 <> ms0:29
+R7933:7955 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R7977:7978 SailStdpp.Values <> :::'''b'_x not
+R7958:7965 xv6iris.MstatusBits <> sret_ms2 def
+R7967:7969 xv6iris.MstatusBits <> ms0:29 var
+def 7996:8003 <> sret_ms4
+R8012:8016 SailStdpp.Values <> mword def
+binder 8006:8008 <> ms0:30
+R8025:8047 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R8071:8072 SailStdpp.Values <> :::'''b'_x not
+R8050:8057 xv6iris.MstatusBits <> sret_ms3 def
+R8059:8061 xv6iris.MstatusBits <> ms0:30 var
+def 8090:8097 <> sret_ms5
+R8106:8110 SailStdpp.Values <> mword def
+binder 8100:8102 <> ms0:31
+R8119:8141 SailStdpp.Operators_mwords <> update_subrange_vec_dec def
+R8165:8190 Riscv.rv64d <> landing_pad_bits_backwards def
+R8192:8205 Riscv.rv64d_types <> NO_LP_EXPECTED constr
+R8144:8151 xv6iris.MstatusBits <> sret_ms4 def
+R8153:8155 xv6iris.MstatusBits <> ms0:31 var
+prf 8446:8457 <> sret_ms5_SIE
+R8464:8468 SailStdpp.Values <> mword def
+binder 8460:8460 <> x:32
+R8507:8509 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8478:8493 Riscv.rv64d <> _get_Mstatus_SIE def
+R8496:8503 xv6iris.MstatusBits <> sret_ms5 def
+R8505:8505 xv6iris.MstatusBits <> x:32 var
+R8510:8526 Riscv.rv64d <> _get_Mstatus_SPIE def
+R8528:8528 xv6iris.MstatusBits <> x:32 var
+R8547:8554 xv6iris.MstatusBits <> sret_ms5 def
+R8557:8564 xv6iris.MstatusBits <> sret_ms4 def
+R8567:8574 xv6iris.MstatusBits <> sret_ms3 def
+R8577:8584 xv6iris.MstatusBits <> sret_ms2 def
+R8587:8594 xv6iris.MstatusBits <> sret_ms1 def
+R8601:8616 Riscv.rv64d <> _get_Mstatus_SIE def
+R8619:8635 Riscv.rv64d <> _get_Mstatus_SPIE def
+prf 8666:8678 <> sret_ms5_MPRV
+R8685:8689 SailStdpp.Values <> mword def
+binder 8681:8681 <> x:33
+R8729:8732 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8748:8748 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8699:8715 Riscv.rv64d <> _get_Mstatus_MPRV def
+R8718:8725 xv6iris.MstatusBits <> sret_ms5 def
+R8727:8727 xv6iris.MstatusBits <> x:33 var
+R8741:8745 SailStdpp.Values <> mword def
+R8733:8734 SailStdpp.Values <> :::'''b'_x not
+R8767:8774 xv6iris.MstatusBits <> sret_ms5 def
+R8777:8784 xv6iris.MstatusBits <> sret_ms4 def
+R8787:8794 xv6iris.MstatusBits <> sret_ms3 def
+R8797:8804 xv6iris.MstatusBits <> sret_ms2 def
+R8807:8814 xv6iris.MstatusBits <> sret_ms1 def
+R8817:8833 Riscv.rv64d <> _get_Mstatus_MPRV def
+prf 8864:8875 <> sret_ms5_MXR
+R8882:8886 SailStdpp.Values <> mword def
+binder 8878:8878 <> x:34
+R8925:8927 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8896:8911 Riscv.rv64d <> _get_Mstatus_MXR def
+R8914:8921 xv6iris.MstatusBits <> sret_ms5 def
+R8923:8923 xv6iris.MstatusBits <> x:34 var
+R8928:8943 Riscv.rv64d <> _get_Mstatus_MXR def
+R8945:8945 xv6iris.MstatusBits <> x:34 var
+R8964:8971 xv6iris.MstatusBits <> sret_ms5 def
+R8974:8981 xv6iris.MstatusBits <> sret_ms4 def
+R8984:8991 xv6iris.MstatusBits <> sret_ms3 def
+R8994:9001 xv6iris.MstatusBits <> sret_ms2 def
+R9004:9011 xv6iris.MstatusBits <> sret_ms1 def
+R9014:9029 Riscv.rv64d <> _get_Mstatus_MXR def
+prf 9060:9071 <> sret_ms5_TSR
+R9078:9082 SailStdpp.Values <> mword def
+binder 9074:9074 <> x:35
+R9121:9123 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9092:9107 Riscv.rv64d <> _get_Mstatus_TSR def
+R9110:9117 xv6iris.MstatusBits <> sret_ms5 def
+R9119:9119 xv6iris.MstatusBits <> x:35 var
+R9124:9139 Riscv.rv64d <> _get_Mstatus_TSR def
+R9141:9141 xv6iris.MstatusBits <> x:35 var
+R9160:9167 xv6iris.MstatusBits <> sret_ms5 def
+R9170:9177 xv6iris.MstatusBits <> sret_ms4 def
+R9180:9187 xv6iris.MstatusBits <> sret_ms3 def
+R9190:9197 xv6iris.MstatusBits <> sret_ms2 def
+R9200:9207 xv6iris.MstatusBits <> sret_ms1 def
+R9210:9225 Riscv.rv64d <> _get_Mstatus_TSR def
+prf 9256:9267 <> sret_ms5_SXL
+R9274:9278 SailStdpp.Values <> mword def
+binder 9270:9270 <> x:36
+R9317:9319 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9288:9303 Riscv.rv64d <> _get_Mstatus_SXL def
+R9306:9313 xv6iris.MstatusBits <> sret_ms5 def
+R9315:9315 xv6iris.MstatusBits <> x:36 var
+R9320:9335 Riscv.rv64d <> _get_Mstatus_SXL def
+R9337:9337 xv6iris.MstatusBits <> x:36 var
+R9356:9363 xv6iris.MstatusBits <> sret_ms5 def
+R9366:9373 xv6iris.MstatusBits <> sret_ms4 def
+R9376:9383 xv6iris.MstatusBits <> sret_ms3 def
+R9386:9393 xv6iris.MstatusBits <> sret_ms2 def
+R9396:9403 xv6iris.MstatusBits <> sret_ms1 def
+R9406:9421 Riscv.rv64d <> _get_Mstatus_SXL def
+prf 9452:9463 <> sret_ms5_TVM
+R9470:9474 SailStdpp.Values <> mword def
+binder 9466:9466 <> x:37
+R9513:9515 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9484:9499 Riscv.rv64d <> _get_Mstatus_TVM def
+R9502:9509 xv6iris.MstatusBits <> sret_ms5 def
+R9511:9511 xv6iris.MstatusBits <> x:37 var
+R9516:9531 Riscv.rv64d <> _get_Mstatus_TVM def
+R9533:9533 xv6iris.MstatusBits <> x:37 var
+R9552:9559 xv6iris.MstatusBits <> sret_ms5 def
+R9562:9569 xv6iris.MstatusBits <> sret_ms4 def
+R9572:9579 xv6iris.MstatusBits <> sret_ms3 def
+R9582:9589 xv6iris.MstatusBits <> sret_ms2 def
+R9592:9599 xv6iris.MstatusBits <> sret_ms1 def
+R9602:9617 Riscv.rv64d <> _get_Mstatus_TVM def
+prf 9725:9736 <> sret_ms2_SPP
+R9743:9747 SailStdpp.Values <> mword def
+binder 9739:9739 <> x:38
+R9786:9788 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9757:9772 Riscv.rv64d <> _get_Mstatus_SPP def
+R9775:9782 xv6iris.MstatusBits <> sret_ms2 def
+R9784:9784 xv6iris.MstatusBits <> x:38 var
+R9789:9804 Riscv.rv64d <> _get_Mstatus_SPP def
+R9806:9806 xv6iris.MstatusBits <> x:38 var
+R9825:9832 xv6iris.MstatusBits <> sret_ms2 def
+R9835:9842 xv6iris.MstatusBits <> sret_ms1 def
+R9845:9860 Riscv.rv64d <> _get_Mstatus_SPP def
+prf 9966:9985 <> sret_newpriv_trap_ms
+R9996:10000 SailStdpp.Values <> mword def
+binder 9988:9992 <> elp_v:39
+R10011:10015 SailStdpp.Values <> mword def
+binder 10006:10007 <> ms:40
+R10056:10058 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10025:10036 xv6iris.MstatusBits <> sret_newpriv def
+R10039:10045 xv6iris.MstatusBits <> trap_ms def
+R10047:10051 xv6iris.MstatusBits <> elp_v:39 var
+R10053:10054 xv6iris.MstatusBits <> ms:40 var
+R10059:10068 Riscv.rv64d_types <> Supervisor constr
+R10087:10098 xv6iris.MstatusBits <> sret_newpriv def
+R10109:10120 xv6iris.MstatusBits <> sret_ms2_SPP thm
+R10109:10120 xv6iris.MstatusBits <> sret_ms2_SPP thm
+R10109:10120 xv6iris.MstatusBits <> sret_ms2_SPP thm
+R10131:10141 xv6iris.MstatusBits <> trap_ms_SPP thm
+R10131:10141 xv6iris.MstatusBits <> trap_ms_SPP thm
+R10131:10141 xv6iris.MstatusBits <> trap_ms_SPP thm
+prf 10262:10274 <> roundtrip_SIE
+R10285:10289 SailStdpp.Values <> mword def
+binder 10277:10281 <> elp_v:41
+R10300:10304 SailStdpp.Values <> mword def
+binder 10295:10296 <> ms:42
+R10360:10362 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10314:10329 Riscv.rv64d <> _get_Mstatus_SIE def
+R10332:10339 xv6iris.MstatusBits <> sret_ms5 def
+R10342:10348 xv6iris.MstatusBits <> trap_ms def
+R10350:10354 xv6iris.MstatusBits <> elp_v:41 var
+R10356:10357 xv6iris.MstatusBits <> ms:42 var
+R10363:10378 Riscv.rv64d <> _get_Mstatus_SIE def
+R10380:10381 xv6iris.MstatusBits <> ms:42 var
+R10399:10410 xv6iris.MstatusBits <> sret_ms5_SIE thm
+R10399:10410 xv6iris.MstatusBits <> sret_ms5_SIE thm
+R10399:10410 xv6iris.MstatusBits <> sret_ms5_SIE thm
+R10419:10430 xv6iris.MstatusBits <> trap_ms_SPIE thm
+R10419:10430 xv6iris.MstatusBits <> trap_ms_SPIE thm
+prf 10511:10527 <> trap_ms_SIE_false
+R10538:10542 SailStdpp.Values <> mword def
+binder 10530:10534 <> elp_v:43
+R10553:10557 SailStdpp.Values <> mword def
+binder 10548:10549 <> ms:44
+R10619:10621 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10567:10572 SailStdpp.Operators_mwords <> eq_vec def
+R10613:10614 SailStdpp.Values <> :::'''b'_x not
+R10575:10590 Riscv.rv64d <> _get_Mstatus_SIE def
+R10593:10599 xv6iris.MstatusBits <> trap_ms def
+R10601:10605 xv6iris.MstatusBits <> elp_v:43 var
+R10607:10608 xv6iris.MstatusBits <> ms:44 var
+R10622:10626 Corelib.Init.Datatypes <> false constr
+R10644:10654 xv6iris.MstatusBits <> trap_ms_SIE thm
+R10644:10654 xv6iris.MstatusBits <> trap_ms_SIE thm
+R10644:10654 xv6iris.MstatusBits <> trap_ms_SIE thm
+prf 10694:10711 <> roundtrip_SIE_true
+R10722:10726 SailStdpp.Values <> mword def
+binder 10714:10718 <> elp_v:45
+R10737:10741 SailStdpp.Values <> mword def
+binder 10732:10733 <> ms:46
+R10794:10799 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10787:10789 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10751:10756 SailStdpp.Operators_mwords <> eq_vec def
+R10781:10782 SailStdpp.Values <> :::'''b'_x not
+R10759:10774 Riscv.rv64d <> _get_Mstatus_SIE def
+R10776:10777 xv6iris.MstatusBits <> ms:46 var
+R10790:10793 Corelib.Init.Datatypes <> true constr
+R10863:10865 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10800:10805 SailStdpp.Operators_mwords <> eq_vec def
+R10857:10858 SailStdpp.Values <> :::'''b'_x not
+R10808:10823 Riscv.rv64d <> _get_Mstatus_SIE def
+R10826:10833 xv6iris.MstatusBits <> sret_ms5 def
+R10836:10842 xv6iris.MstatusBits <> trap_ms def
+R10844:10848 xv6iris.MstatusBits <> elp_v:45 var
+R10850:10851 xv6iris.MstatusBits <> ms:46 var
+R10866:10869 Corelib.Init.Datatypes <> true constr
+R10897:10909 xv6iris.MstatusBits <> roundtrip_SIE thm
+R10897:10909 xv6iris.MstatusBits <> roundtrip_SIE thm
+R10897:10909 xv6iris.MstatusBits <> roundtrip_SIE thm
+prf 10933:10950 <> trap_ms_MPRV_false
+R10961:10965 SailStdpp.Values <> mword def
+binder 10953:10957 <> elp_v:47
+R10976:10980 SailStdpp.Values <> mword def
+binder 10971:10972 <> ms:48
+R11035:11040 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11027:11029 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10990:10995 SailStdpp.Operators_mwords <> eq_vec def
+R11021:11022 SailStdpp.Values <> :::'''b'_x not
+R10998:11014 Riscv.rv64d <> _get_Mstatus_MPRV def
+R11016:11017 xv6iris.MstatusBits <> ms:48 var
+R11030:11034 Corelib.Init.Datatypes <> false constr
+R11094:11096 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11041:11046 SailStdpp.Operators_mwords <> eq_vec def
+R11088:11089 SailStdpp.Values <> :::'''b'_x not
+R11049:11065 Riscv.rv64d <> _get_Mstatus_MPRV def
+R11068:11074 xv6iris.MstatusBits <> trap_ms def
+R11076:11080 xv6iris.MstatusBits <> elp_v:47 var
+R11082:11083 xv6iris.MstatusBits <> ms:48 var
+R11097:11101 Corelib.Init.Datatypes <> false constr
+R11129:11140 xv6iris.MstatusBits <> trap_ms_MPRV thm
+R11129:11140 xv6iris.MstatusBits <> trap_ms_MPRV thm
+R11129:11140 xv6iris.MstatusBits <> trap_ms_MPRV thm
+prf 11164:11183 <> roundtrip_MPRV_false
+R11194:11198 SailStdpp.Values <> mword def
+binder 11186:11190 <> elp_v:49
+R11209:11213 SailStdpp.Values <> mword def
+binder 11204:11205 <> ms:50
+R11287:11289 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11223:11228 SailStdpp.Operators_mwords <> eq_vec def
+R11281:11282 SailStdpp.Values <> :::'''b'_x not
+R11231:11247 Riscv.rv64d <> _get_Mstatus_MPRV def
+R11250:11257 xv6iris.MstatusBits <> sret_ms5 def
+R11260:11266 xv6iris.MstatusBits <> trap_ms def
+R11268:11272 xv6iris.MstatusBits <> elp_v:49 var
+R11274:11275 xv6iris.MstatusBits <> ms:50 var
+R11290:11294 Corelib.Init.Datatypes <> false constr
+R11312:11324 xv6iris.MstatusBits <> sret_ms5_MPRV thm
+R11312:11324 xv6iris.MstatusBits <> sret_ms5_MPRV thm
+R11312:11324 xv6iris.MstatusBits <> sret_ms5_MPRV thm
+prf 11364:11379 <> trap_ms_MXR_true
+R11390:11394 SailStdpp.Values <> mword def
+binder 11382:11386 <> elp_v:51
+R11405:11409 SailStdpp.Values <> mword def
+binder 11400:11401 <> ms:52
+R11462:11467 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11455:11457 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11419:11424 SailStdpp.Operators_mwords <> eq_vec def
+R11449:11450 SailStdpp.Values <> :::'''b'_x not
+R11427:11442 Riscv.rv64d <> _get_Mstatus_MXR def
+R11444:11445 xv6iris.MstatusBits <> ms:52 var
+R11458:11461 Corelib.Init.Datatypes <> true constr
+R11520:11522 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11468:11473 SailStdpp.Operators_mwords <> eq_vec def
+R11514:11515 SailStdpp.Values <> :::'''b'_x not
+R11476:11491 Riscv.rv64d <> _get_Mstatus_MXR def
+R11494:11500 xv6iris.MstatusBits <> trap_ms def
+R11502:11506 xv6iris.MstatusBits <> elp_v:51 var
+R11508:11509 xv6iris.MstatusBits <> ms:52 var
+R11523:11526 Corelib.Init.Datatypes <> true constr
+R11554:11564 xv6iris.MstatusBits <> trap_ms_MXR thm
+R11554:11564 xv6iris.MstatusBits <> trap_ms_MXR thm
+R11554:11564 xv6iris.MstatusBits <> trap_ms_MXR thm
+prf 11588:11605 <> roundtrip_MXR_true
+R11616:11620 SailStdpp.Values <> mword def
+binder 11608:11612 <> elp_v:53
+R11631:11635 SailStdpp.Values <> mword def
+binder 11626:11627 <> ms:54
+R11688:11693 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11681:11683 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11645:11650 SailStdpp.Operators_mwords <> eq_vec def
+R11675:11676 SailStdpp.Values <> :::'''b'_x not
+R11653:11668 Riscv.rv64d <> _get_Mstatus_MXR def
+R11670:11671 xv6iris.MstatusBits <> ms:54 var
+R11684:11687 Corelib.Init.Datatypes <> true constr
+R11757:11759 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11694:11699 SailStdpp.Operators_mwords <> eq_vec def
+R11751:11752 SailStdpp.Values <> :::'''b'_x not
+R11702:11717 Riscv.rv64d <> _get_Mstatus_MXR def
+R11720:11727 xv6iris.MstatusBits <> sret_ms5 def
+R11730:11736 xv6iris.MstatusBits <> trap_ms def
+R11738:11742 xv6iris.MstatusBits <> elp_v:53 var
+R11744:11745 xv6iris.MstatusBits <> ms:54 var
+R11760:11763 Corelib.Init.Datatypes <> true constr
+R11791:11802 xv6iris.MstatusBits <> sret_ms5_MXR thm
+R11791:11802 xv6iris.MstatusBits <> sret_ms5_MXR thm
+R11791:11802 xv6iris.MstatusBits <> sret_ms5_MXR thm
+R11813:11823 xv6iris.MstatusBits <> trap_ms_MXR thm
+R11813:11823 xv6iris.MstatusBits <> trap_ms_MXR thm
+R11813:11823 xv6iris.MstatusBits <> trap_ms_MXR thm
+prf 11847:11863 <> trap_ms_TSR_false
+R11874:11878 SailStdpp.Values <> mword def
+binder 11866:11870 <> elp_v:55
+R11889:11893 SailStdpp.Values <> mword def
+binder 11884:11885 <> ms:56
+R11947:11952 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11939:11941 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11903:11908 SailStdpp.Operators_mwords <> eq_vec def
+R11933:11934 SailStdpp.Values <> :::'''b'_x not
+R11911:11926 Riscv.rv64d <> _get_Mstatus_TSR def
+R11928:11929 xv6iris.MstatusBits <> ms:56 var
+R11942:11946 Corelib.Init.Datatypes <> false constr
+R12005:12007 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11953:11958 SailStdpp.Operators_mwords <> eq_vec def
+R11999:12000 SailStdpp.Values <> :::'''b'_x not
+R11961:11976 Riscv.rv64d <> _get_Mstatus_TSR def
+R11979:11985 xv6iris.MstatusBits <> trap_ms def
+R11987:11991 xv6iris.MstatusBits <> elp_v:55 var
+R11993:11994 xv6iris.MstatusBits <> ms:56 var
+R12008:12012 Corelib.Init.Datatypes <> false constr
+R12040:12050 xv6iris.MstatusBits <> trap_ms_TSR thm
+R12040:12050 xv6iris.MstatusBits <> trap_ms_TSR thm
+R12040:12050 xv6iris.MstatusBits <> trap_ms_TSR thm
+prf 12074:12092 <> roundtrip_TSR_false
+R12103:12107 SailStdpp.Values <> mword def
+binder 12095:12099 <> elp_v:57
+R12118:12122 SailStdpp.Values <> mword def
+binder 12113:12114 <> ms:58
+R12176:12181 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12168:12170 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12132:12137 SailStdpp.Operators_mwords <> eq_vec def
+R12162:12163 SailStdpp.Values <> :::'''b'_x not
+R12140:12155 Riscv.rv64d <> _get_Mstatus_TSR def
+R12157:12158 xv6iris.MstatusBits <> ms:58 var
+R12171:12175 Corelib.Init.Datatypes <> false constr
+R12245:12247 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12182:12187 SailStdpp.Operators_mwords <> eq_vec def
+R12239:12240 SailStdpp.Values <> :::'''b'_x not
+R12190:12205 Riscv.rv64d <> _get_Mstatus_TSR def
+R12208:12215 xv6iris.MstatusBits <> sret_ms5 def
+R12218:12224 xv6iris.MstatusBits <> trap_ms def
+R12226:12230 xv6iris.MstatusBits <> elp_v:57 var
+R12232:12233 xv6iris.MstatusBits <> ms:58 var
+R12248:12252 Corelib.Init.Datatypes <> false constr
+R12280:12291 xv6iris.MstatusBits <> sret_ms5_TSR thm
+R12280:12291 xv6iris.MstatusBits <> sret_ms5_TSR thm
+R12280:12291 xv6iris.MstatusBits <> sret_ms5_TSR thm
+R12302:12312 xv6iris.MstatusBits <> trap_ms_TSR thm
+R12302:12312 xv6iris.MstatusBits <> trap_ms_TSR thm
+R12302:12312 xv6iris.MstatusBits <> trap_ms_TSR thm
+prf 12336:12354 <> roundtrip_TVM_false
+R12365:12369 SailStdpp.Values <> mword def
+binder 12357:12361 <> elp_v:59
+R12380:12384 SailStdpp.Values <> mword def
+binder 12375:12376 <> ms:60
+R12438:12443 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12430:12432 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12394:12399 SailStdpp.Operators_mwords <> eq_vec def
+R12424:12425 SailStdpp.Values <> :::'''b'_x not
+R12402:12417 Riscv.rv64d <> _get_Mstatus_TVM def
+R12419:12420 xv6iris.MstatusBits <> ms:60 var
+R12433:12437 Corelib.Init.Datatypes <> false constr
+R12507:12509 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12444:12449 SailStdpp.Operators_mwords <> eq_vec def
+R12501:12502 SailStdpp.Values <> :::'''b'_x not
+R12452:12467 Riscv.rv64d <> _get_Mstatus_TVM def
+R12470:12477 xv6iris.MstatusBits <> sret_ms5 def
+R12480:12486 xv6iris.MstatusBits <> trap_ms def
+R12488:12492 xv6iris.MstatusBits <> elp_v:59 var
+R12494:12495 xv6iris.MstatusBits <> ms:60 var
+R12510:12514 Corelib.Init.Datatypes <> false constr
+R12542:12553 xv6iris.MstatusBits <> sret_ms5_TVM thm
+R12542:12553 xv6iris.MstatusBits <> sret_ms5_TVM thm
+R12542:12553 xv6iris.MstatusBits <> sret_ms5_TVM thm
+R12564:12574 xv6iris.MstatusBits <> trap_ms_TVM thm
+R12564:12574 xv6iris.MstatusBits <> trap_ms_TVM thm
+R12564:12574 xv6iris.MstatusBits <> trap_ms_TVM thm
+prf 12598:12611 <> trap_ms_SXL_eq
+R12622:12626 SailStdpp.Values <> mword def
+binder 12614:12618 <> elp_v:61
+R12637:12641 SailStdpp.Values <> mword def
+binder 12632:12633 <> ms:62
+R12691:12696 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12670:12673 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12690:12690 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12651:12666 Riscv.rv64d <> _get_Mstatus_SXL def
+R12668:12669 xv6iris.MstatusBits <> ms:62 var
+R12683:12687 SailStdpp.Values <> mword def
+R12674:12675 SailStdpp.Values <> :::'''b'_x not
+R12732:12735 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12752:12752 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12697:12712 Riscv.rv64d <> _get_Mstatus_SXL def
+R12715:12721 xv6iris.MstatusBits <> trap_ms def
+R12723:12727 xv6iris.MstatusBits <> elp_v:61 var
+R12729:12730 xv6iris.MstatusBits <> ms:62 var
+R12745:12749 SailStdpp.Values <> mword def
+R12736:12737 SailStdpp.Values <> :::'''b'_x not
+R12780:12790 xv6iris.MstatusBits <> trap_ms_SXL thm
+R12780:12790 xv6iris.MstatusBits <> trap_ms_SXL thm
+R12780:12790 xv6iris.MstatusBits <> trap_ms_SXL thm
+prf 12814:12829 <> roundtrip_SXL_eq
+R12840:12844 SailStdpp.Values <> mword def
+binder 12832:12836 <> elp_v:63
+R12855:12859 SailStdpp.Values <> mword def
+binder 12850:12851 <> ms:64
+R12909:12914 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12888:12891 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12908:12908 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12869:12884 Riscv.rv64d <> _get_Mstatus_SXL def
+R12886:12887 xv6iris.MstatusBits <> ms:64 var
+R12901:12905 SailStdpp.Values <> mword def
+R12892:12893 SailStdpp.Values <> :::'''b'_x not
+R12961:12964 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12981:12981 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12915:12930 Riscv.rv64d <> _get_Mstatus_SXL def
+R12933:12940 xv6iris.MstatusBits <> sret_ms5 def
+R12943:12949 xv6iris.MstatusBits <> trap_ms def
+R12951:12955 xv6iris.MstatusBits <> elp_v:63 var
+R12957:12958 xv6iris.MstatusBits <> ms:64 var
+R12974:12978 SailStdpp.Values <> mword def
+R12965:12966 SailStdpp.Values <> :::'''b'_x not
+R13009:13020 xv6iris.MstatusBits <> sret_ms5_SXL thm
+R13009:13020 xv6iris.MstatusBits <> sret_ms5_SXL thm
+R13009:13020 xv6iris.MstatusBits <> sret_ms5_SXL thm
+R13031:13041 xv6iris.MstatusBits <> trap_ms_SXL thm
+R13031:13041 xv6iris.MstatusBits <> trap_ms_SXL thm
+R13031:13041 xv6iris.MstatusBits <> trap_ms_SXL thm
+prf 13530:13539 <> trap_ms_XS
+R13550:13554 SailStdpp.Values <> mword def
+binder 13542:13546 <> elp_v:65
+R13565:13569 SailStdpp.Values <> mword def
+binder 13560:13561 <> ms:66
+R13613:13615 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13579:13593 Riscv.rv64d <> _get_Mstatus_XS def
+R13596:13602 xv6iris.MstatusBits <> trap_ms def
+R13604:13608 xv6iris.MstatusBits <> elp_v:65 var
+R13610:13611 xv6iris.MstatusBits <> ms:66 var
+R13616:13630 Riscv.rv64d <> _get_Mstatus_XS def
+R13632:13633 xv6iris.MstatusBits <> ms:66 var
+R13650:13656 xv6iris.MstatusBits <> trap_ms def
+R13659:13673 Riscv.rv64d <> _get_Mstatus_XS def
+prf 13712:13721 <> trap_ms_FS
+R13732:13736 SailStdpp.Values <> mword def
+binder 13724:13728 <> elp_v:67
+R13747:13751 SailStdpp.Values <> mword def
+binder 13742:13743 <> ms:68
+R13795:13797 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13761:13775 Riscv.rv64d <> _get_Mstatus_FS def
+R13778:13784 xv6iris.MstatusBits <> trap_ms def
+R13786:13790 xv6iris.MstatusBits <> elp_v:67 var
+R13792:13793 xv6iris.MstatusBits <> ms:68 var
+R13798:13812 Riscv.rv64d <> _get_Mstatus_FS def
+R13814:13815 xv6iris.MstatusBits <> ms:68 var
+R13832:13838 xv6iris.MstatusBits <> trap_ms def
+R13841:13855 Riscv.rv64d <> _get_Mstatus_FS def
+prf 13894:13903 <> trap_ms_VS
+R13914:13918 SailStdpp.Values <> mword def
+binder 13906:13910 <> elp_v:69
+R13929:13933 SailStdpp.Values <> mword def
+binder 13924:13925 <> ms:70
+R13977:13979 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13943:13957 Riscv.rv64d <> _get_Mstatus_VS def
+R13960:13966 xv6iris.MstatusBits <> trap_ms def
+R13968:13972 xv6iris.MstatusBits <> elp_v:69 var
+R13974:13975 xv6iris.MstatusBits <> ms:70 var
+R13980:13994 Riscv.rv64d <> _get_Mstatus_VS def
+R13996:13997 xv6iris.MstatusBits <> ms:70 var
+R14014:14020 xv6iris.MstatusBits <> trap_ms def
+R14023:14037 Riscv.rv64d <> _get_Mstatus_VS def
+prf 14076:14086 <> trap_ms_MPP
+R14097:14101 SailStdpp.Values <> mword def
+binder 14089:14093 <> elp_v:71
+R14112:14116 SailStdpp.Values <> mword def
+binder 14107:14108 <> ms:72
+R14161:14163 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14126:14141 Riscv.rv64d <> _get_Mstatus_MPP def
+R14144:14150 xv6iris.MstatusBits <> trap_ms def
+R14152:14156 xv6iris.MstatusBits <> elp_v:71 var
+R14158:14159 xv6iris.MstatusBits <> ms:72 var
+R14164:14179 Riscv.rv64d <> _get_Mstatus_MPP def
+R14181:14182 xv6iris.MstatusBits <> ms:72 var
+R14199:14205 xv6iris.MstatusBits <> trap_ms def
+R14208:14223 Riscv.rv64d <> _get_Mstatus_MPP def
+prf 14262:14271 <> trap_ms_SD
+R14282:14286 SailStdpp.Values <> mword def
+binder 14274:14278 <> elp_v:73
+R14297:14301 SailStdpp.Values <> mword def
+binder 14292:14293 <> ms:74
+R14345:14347 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14311:14325 Riscv.rv64d <> _get_Mstatus_SD def
+R14328:14334 xv6iris.MstatusBits <> trap_ms def
+R14336:14340 xv6iris.MstatusBits <> elp_v:73 var
+R14342:14343 xv6iris.MstatusBits <> ms:74 var
+R14348:14362 Riscv.rv64d <> _get_Mstatus_SD def
+R14364:14365 xv6iris.MstatusBits <> ms:74 var
+R14382:14388 xv6iris.MstatusBits <> trap_ms def
+R14391:14405 Riscv.rv64d <> _get_Mstatus_SD def
+prf 14444:14454 <> sret_ms5_XS
+R14461:14465 SailStdpp.Values <> mword def
+binder 14457:14457 <> x:75
+R14503:14505 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14475:14489 Riscv.rv64d <> _get_Mstatus_XS def
+R14492:14499 xv6iris.MstatusBits <> sret_ms5 def
+R14501:14501 xv6iris.MstatusBits <> x:75 var
+R14506:14520 Riscv.rv64d <> _get_Mstatus_XS def
+R14522:14522 xv6iris.MstatusBits <> x:75 var
+R14539:14546 xv6iris.MstatusBits <> sret_ms5 def
+R14549:14556 xv6iris.MstatusBits <> sret_ms4 def
+R14559:14566 xv6iris.MstatusBits <> sret_ms3 def
+R14569:14576 xv6iris.MstatusBits <> sret_ms2 def
+R14579:14586 xv6iris.MstatusBits <> sret_ms1 def
+R14589:14603 Riscv.rv64d <> _get_Mstatus_XS def
+prf 14632:14642 <> sret_ms5_FS
+R14649:14653 SailStdpp.Values <> mword def
+binder 14645:14645 <> x:76
+R14691:14693 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14663:14677 Riscv.rv64d <> _get_Mstatus_FS def
+R14680:14687 xv6iris.MstatusBits <> sret_ms5 def
+R14689:14689 xv6iris.MstatusBits <> x:76 var
+R14694:14708 Riscv.rv64d <> _get_Mstatus_FS def
+R14710:14710 xv6iris.MstatusBits <> x:76 var
+R14727:14734 xv6iris.MstatusBits <> sret_ms5 def
+R14737:14744 xv6iris.MstatusBits <> sret_ms4 def
+R14747:14754 xv6iris.MstatusBits <> sret_ms3 def
+R14757:14764 xv6iris.MstatusBits <> sret_ms2 def
+R14767:14774 xv6iris.MstatusBits <> sret_ms1 def
+R14777:14791 Riscv.rv64d <> _get_Mstatus_FS def
+prf 14820:14830 <> sret_ms5_VS
+R14837:14841 SailStdpp.Values <> mword def
+binder 14833:14833 <> x:77
+R14879:14881 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14851:14865 Riscv.rv64d <> _get_Mstatus_VS def
+R14868:14875 xv6iris.MstatusBits <> sret_ms5 def
+R14877:14877 xv6iris.MstatusBits <> x:77 var
+R14882:14896 Riscv.rv64d <> _get_Mstatus_VS def
+R14898:14898 xv6iris.MstatusBits <> x:77 var
+R14915:14922 xv6iris.MstatusBits <> sret_ms5 def
+R14925:14932 xv6iris.MstatusBits <> sret_ms4 def
+R14935:14942 xv6iris.MstatusBits <> sret_ms3 def
+R14945:14952 xv6iris.MstatusBits <> sret_ms2 def
+R14955:14962 xv6iris.MstatusBits <> sret_ms1 def
+R14965:14979 Riscv.rv64d <> _get_Mstatus_VS def
+prf 15008:15019 <> sret_ms5_MPP
+R15026:15030 SailStdpp.Values <> mword def
+binder 15022:15022 <> x:78
+R15069:15071 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15040:15055 Riscv.rv64d <> _get_Mstatus_MPP def
+R15058:15065 xv6iris.MstatusBits <> sret_ms5 def
+R15067:15067 xv6iris.MstatusBits <> x:78 var
+R15072:15087 Riscv.rv64d <> _get_Mstatus_MPP def
+R15089:15089 xv6iris.MstatusBits <> x:78 var
+R15106:15113 xv6iris.MstatusBits <> sret_ms5 def
+R15116:15123 xv6iris.MstatusBits <> sret_ms4 def
+R15126:15133 xv6iris.MstatusBits <> sret_ms3 def
+R15136:15143 xv6iris.MstatusBits <> sret_ms2 def
+R15146:15153 xv6iris.MstatusBits <> sret_ms1 def
+R15156:15171 Riscv.rv64d <> _get_Mstatus_MPP def
+prf 15200:15210 <> sret_ms5_SD
+R15217:15221 SailStdpp.Values <> mword def
+binder 15213:15213 <> x:79
+R15259:15261 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15231:15245 Riscv.rv64d <> _get_Mstatus_SD def
+R15248:15255 xv6iris.MstatusBits <> sret_ms5 def
+R15257:15257 xv6iris.MstatusBits <> x:79 var
+R15262:15276 Riscv.rv64d <> _get_Mstatus_SD def
+R15278:15278 xv6iris.MstatusBits <> x:79 var
+R15295:15302 xv6iris.MstatusBits <> sret_ms5 def
+R15305:15312 xv6iris.MstatusBits <> sret_ms4 def
+R15315:15322 xv6iris.MstatusBits <> sret_ms3 def
+R15325:15332 xv6iris.MstatusBits <> sret_ms2 def
+R15335:15342 xv6iris.MstatusBits <> sret_ms1 def
+R15345:15359 Riscv.rv64d <> _get_Mstatus_SD def
+prf 15756:15767 <> sret_ms5_SPP
+R15774:15778 SailStdpp.Values <> mword def
+binder 15770:15770 <> x:80
+R15817:15820 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15836:15836 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15788:15803 Riscv.rv64d <> _get_Mstatus_SPP def
+R15806:15813 xv6iris.MstatusBits <> sret_ms5 def
+R15815:15815 xv6iris.MstatusBits <> x:80 var
+R15829:15833 SailStdpp.Values <> mword def
+R15821:15822 SailStdpp.Values <> :::'''b'_x not
+R15853:15860 xv6iris.MstatusBits <> sret_ms5 def
+R15863:15870 xv6iris.MstatusBits <> sret_ms4 def
+R15873:15880 xv6iris.MstatusBits <> sret_ms3 def
+R15883:15890 xv6iris.MstatusBits <> sret_ms2 def
+R15893:15900 xv6iris.MstatusBits <> sret_ms1 def
+R15903:15918 Riscv.rv64d <> _get_Mstatus_SPP def
+prf 15947:15959 <> sret_ms5_SPIE
+R15966:15970 SailStdpp.Values <> mword def
+binder 15962:15962 <> x:81
+R16010:16013 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16029:16029 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15980:15996 Riscv.rv64d <> _get_Mstatus_SPIE def
+R15999:16006 xv6iris.MstatusBits <> sret_ms5 def
+R16008:16008 xv6iris.MstatusBits <> x:81 var
+R16022:16026 SailStdpp.Values <> mword def
+R16014:16015 SailStdpp.Values <> :::'''b'_x not
+R16046:16053 xv6iris.MstatusBits <> sret_ms5 def
+R16056:16063 xv6iris.MstatusBits <> sret_ms4 def
+R16066:16073 xv6iris.MstatusBits <> sret_ms3 def
+R16076:16083 xv6iris.MstatusBits <> sret_ms2 def
+R16086:16093 xv6iris.MstatusBits <> sret_ms1 def
+R16096:16112 Riscv.rv64d <> _get_Mstatus_SPIE def
+prf 16141:16152 <> roundtrip_XS
+R16163:16167 SailStdpp.Values <> mword def
+binder 16155:16159 <> elp_v:82
+R16178:16182 SailStdpp.Values <> mword def
+binder 16173:16174 <> ms:83
+R16237:16239 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16192:16206 Riscv.rv64d <> _get_Mstatus_XS def
+R16209:16216 xv6iris.MstatusBits <> sret_ms5 def
+R16219:16225 xv6iris.MstatusBits <> trap_ms def
+R16227:16231 xv6iris.MstatusBits <> elp_v:82 var
+R16233:16234 xv6iris.MstatusBits <> ms:83 var
+R16240:16254 Riscv.rv64d <> _get_Mstatus_XS def
+R16256:16257 xv6iris.MstatusBits <> ms:83 var
+R16275:16285 xv6iris.MstatusBits <> sret_ms5_XS thm
+R16275:16285 xv6iris.MstatusBits <> sret_ms5_XS thm
+R16275:16285 xv6iris.MstatusBits <> sret_ms5_XS thm
+R16294:16303 xv6iris.MstatusBits <> trap_ms_XS thm
+R16294:16303 xv6iris.MstatusBits <> trap_ms_XS thm
+prf 16318:16329 <> roundtrip_FS
+R16340:16344 SailStdpp.Values <> mword def
+binder 16332:16336 <> elp_v:84
+R16355:16359 SailStdpp.Values <> mword def
+binder 16350:16351 <> ms:85
+R16414:16416 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16369:16383 Riscv.rv64d <> _get_Mstatus_FS def
+R16386:16393 xv6iris.MstatusBits <> sret_ms5 def
+R16396:16402 xv6iris.MstatusBits <> trap_ms def
+R16404:16408 xv6iris.MstatusBits <> elp_v:84 var
+R16410:16411 xv6iris.MstatusBits <> ms:85 var
+R16417:16431 Riscv.rv64d <> _get_Mstatus_FS def
+R16433:16434 xv6iris.MstatusBits <> ms:85 var
+R16452:16462 xv6iris.MstatusBits <> sret_ms5_FS thm
+R16452:16462 xv6iris.MstatusBits <> sret_ms5_FS thm
+R16452:16462 xv6iris.MstatusBits <> sret_ms5_FS thm
+R16471:16480 xv6iris.MstatusBits <> trap_ms_FS thm
+R16471:16480 xv6iris.MstatusBits <> trap_ms_FS thm
+prf 16495:16506 <> roundtrip_VS
+R16517:16521 SailStdpp.Values <> mword def
+binder 16509:16513 <> elp_v:86
+R16532:16536 SailStdpp.Values <> mword def
+binder 16527:16528 <> ms:87
+R16591:16593 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16546:16560 Riscv.rv64d <> _get_Mstatus_VS def
+R16563:16570 xv6iris.MstatusBits <> sret_ms5 def
+R16573:16579 xv6iris.MstatusBits <> trap_ms def
+R16581:16585 xv6iris.MstatusBits <> elp_v:86 var
+R16587:16588 xv6iris.MstatusBits <> ms:87 var
+R16594:16608 Riscv.rv64d <> _get_Mstatus_VS def
+R16610:16611 xv6iris.MstatusBits <> ms:87 var
+R16629:16639 xv6iris.MstatusBits <> sret_ms5_VS thm
+R16629:16639 xv6iris.MstatusBits <> sret_ms5_VS thm
+R16629:16639 xv6iris.MstatusBits <> sret_ms5_VS thm
+R16648:16657 xv6iris.MstatusBits <> trap_ms_VS thm
+R16648:16657 xv6iris.MstatusBits <> trap_ms_VS thm
+prf 16672:16684 <> roundtrip_MPP
+R16695:16699 SailStdpp.Values <> mword def
+binder 16687:16691 <> elp_v:88
+R16710:16714 SailStdpp.Values <> mword def
+binder 16705:16706 <> ms:89
+R16770:16772 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16724:16739 Riscv.rv64d <> _get_Mstatus_MPP def
+R16742:16749 xv6iris.MstatusBits <> sret_ms5 def
+R16752:16758 xv6iris.MstatusBits <> trap_ms def
+R16760:16764 xv6iris.MstatusBits <> elp_v:88 var
+R16766:16767 xv6iris.MstatusBits <> ms:89 var
+R16773:16788 Riscv.rv64d <> _get_Mstatus_MPP def
+R16790:16791 xv6iris.MstatusBits <> ms:89 var
+R16809:16820 xv6iris.MstatusBits <> sret_ms5_MPP thm
+R16809:16820 xv6iris.MstatusBits <> sret_ms5_MPP thm
+R16809:16820 xv6iris.MstatusBits <> sret_ms5_MPP thm
+R16829:16839 xv6iris.MstatusBits <> trap_ms_MPP thm
+R16829:16839 xv6iris.MstatusBits <> trap_ms_MPP thm
+prf 16854:16865 <> roundtrip_SD
+R16876:16880 SailStdpp.Values <> mword def
+binder 16868:16872 <> elp_v:90
+R16891:16895 SailStdpp.Values <> mword def
+binder 16886:16887 <> ms:91
+R16950:16952 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16905:16919 Riscv.rv64d <> _get_Mstatus_SD def
+R16922:16929 xv6iris.MstatusBits <> sret_ms5 def
+R16932:16938 xv6iris.MstatusBits <> trap_ms def
+R16940:16944 xv6iris.MstatusBits <> elp_v:90 var
+R16946:16947 xv6iris.MstatusBits <> ms:91 var
+R16953:16967 Riscv.rv64d <> _get_Mstatus_SD def
+R16969:16970 xv6iris.MstatusBits <> ms:91 var
+R16988:16998 xv6iris.MstatusBits <> sret_ms5_SD thm
+R16988:16998 xv6iris.MstatusBits <> sret_ms5_SD thm
+R16988:16998 xv6iris.MstatusBits <> sret_ms5_SD thm
+R17007:17016 xv6iris.MstatusBits <> trap_ms_SD thm
+R17007:17016 xv6iris.MstatusBits <> trap_ms_SD thm

@@ -665,13 +665,19 @@ Section ByteBufPage.
   Context `{!riscvGS Σ}.
   Context `{XI : CurCtx}.
 
-  Lemma bb_page_named (q : mword 64) :
-    page_own q ⊢ ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j.
-  Proof. rewrite /page_own /byte_any. apply bb_any_named. Qed.
+  (* A6.87: [bb_page_named] IS GONE.  It read a named byte run out of
+     [page_own], and [page_own] is the visibility-free page now -- naming
+     bytes nobody has written is exactly the claim the ruling removes.
+     What its three callers actually held is the page kalloc MEMSET, so
+     they take the run off [KallocInv.page_filled] instead, which is what
+     [page_filled_named] hands them. *)
+  Lemma page_filled_named (q : mword 64) (c : bv 8) :
+    page_filled q c ⊢ ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j.
+  Proof. rewrite /page_filled. iIntros "H". by iExists (fun _ => c). Qed.
 
   Lemma bb_page_of_named (q : mword 64) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j) ⊢ page_own q.
-  Proof. rewrite /page_own /byte_any. apply bb_named_any. Qed.
+  Proof. apply page_own_of_named. Qed.
 End ByteBufPage.
 
 

@@ -1,0 +1,7 @@
+DIGEST ff5180bdfabd2e31c2404997e8e4ecbc
+Fxv6iris.LinkFdalloc
+R84:93 xv6iris.LinkMyproc <> <> lib
+R95:106 xv6iris.ProofFdalloc <> <> lib
+R128:139 xv6iris.ProofFdalloc FdallocProof <> modtype
+R141:146 xv6iris.LinkMyproc Myproc <> modtype
+mod 117:123 <> Fdalloc

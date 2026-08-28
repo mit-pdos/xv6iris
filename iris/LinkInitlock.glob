@@ -1,0 +1,5 @@
+DIGEST fa250c24739322b6c4d5448e6da1f149
+Fxv6iris.LinkInitlock
+R157:169 xv6iris.ProofInitlock <> <> lib
+R192:204 xv6iris.ProofInitlock InitlockProof <> modtype
+mod 180:187 <> Initlock

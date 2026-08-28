@@ -1,0 +1,96 @@
+DIGEST 9dc55e1f6640089b7166b8a9a9e271b0
+Fxv6iris.BufOwn
+R1394:1399 Stdlib.ZArith.ZArith <> <> lib
+R1401:1403 Stdlib.micromega.Lia <> <> lib
+R1405:1408 Stdlib.Lists.List <> <> lib
+R1437:1440 stdpp.gmap <> <> lib
+R1442:1462 stdpp.bitvector.definitions <> <> lib
+R1500:1508 iris.proofmode.proofmode <> <> lib
+R1551:1558 iris.base_logic.lib.gen_heap <> <> lib
+R1576:1601 SailStdpp.Operators_mwords <> <> lib
+R1619:1635 Riscv.rv64d_types <> <> lib
+R1637:1647 Riscv.rv64d <> <> lib
+R1665:1679 xv6iris.RiscvModelBytes <> <> lib
+R1697:1706 xv6iris.RiscvPtsto <> <> lib
+R1724:1729 xv6iris.TsoCtx <> <> lib
+def 1890:1896 <> b_valid
+R1905:1911 Riscv.rv64d_types Arch pa def
+binder 1901:1901 <> b:1
+R1916:1922 Riscv.rv64d_types Arch pa def
+R1927:1927 xv6iris.BufOwn <> b:1 var
+def 1941:1946 <> b_disk
+R1956:1962 Riscv.rv64d_types Arch pa def
+binder 1952:1952 <> b:2
+R1967:1973 Riscv.rv64d_types Arch pa def
+R1978:1983 xv6iris.RiscvModelBytes <> pa_add def
+R1985:1985 xv6iris.BufOwn <> b:2 var
+def 2001:2005 <> b_dev
+R2016:2022 Riscv.rv64d_types Arch pa def
+binder 2012:2012 <> b:3
+R2027:2033 Riscv.rv64d_types Arch pa def
+R2038:2043 xv6iris.RiscvModelBytes <> pa_add def
+R2045:2045 xv6iris.BufOwn <> b:3 var
+def 2061:2069 <> b_blockno
+R2076:2082 Riscv.rv64d_types Arch pa def
+binder 2072:2072 <> b:4
+R2087:2093 Riscv.rv64d_types Arch pa def
+R2098:2103 xv6iris.RiscvModelBytes <> pa_add def
+R2105:2105 xv6iris.BufOwn <> b:4 var
+def 2122:2127 <> b_data
+R2137:2143 Riscv.rv64d_types Arch pa def
+binder 2133:2133 <> b:5
+R2148:2154 Riscv.rv64d_types Arch pa def
+R2159:2164 xv6iris.RiscvModelBytes <> pa_add def
+R2166:2166 xv6iris.BufOwn <> b:5 var
+def 2527:2533 <> buf_own
+R2538:2544 xv6iris.RiscvPtsto <> riscvGS class
+binder 2546:2547 <> Σ:6
+binder 2537:2547 <> riscvGS0:7
+R2557:2562 xv6iris.TsoCtx <> CurCtx class
+binder 2552:2553 <> XI:8
+R2570:2576 Riscv.rv64d_types Arch pa def
+binder 2566:2566 <> b:9
+R2590:2611 SailStdpp.Values <> mword def
+binder 2584:2586 <> bno:10
+R2628:2649 SailStdpp.Values <> mword def
+binder 2622:2624 <> dsk:11
+R2661:2664 Corelib.Init.Datatypes <> list ind
+R2667:2668 stdpp.bitvector.definitions <> bv rec
+binder 2656:2657 <> bs:12
+R2676:2680 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R2682:2683 xv6iris.BufOwn <> Σ:6 var
+R2729:2736 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2702:2709 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R2724:2725 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄{'_x_'}'_x not
+R2691:2699 xv6iris.BufOwn <> b_blockno def
+R2701:2701 xv6iris.BufOwn <> b:9 var
+R2710:2717 iris.algebra.dfrac <> DfracOwn constr
+R2721:2721 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R2726:2728 xv6iris.BufOwn <> bno:10 var
+R2756:2763 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2745:2752 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R2737:2742 xv6iris.BufOwn <> b_disk def
+R2744:2744 xv6iris.BufOwn <> b:9 var
+R2753:2755 xv6iris.BufOwn <> dsk:11 var
+R2790:2798 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2860:2860 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2764:2766 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R2787:2789 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R2776:2778 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2767:2772 Corelib.Init.Datatypes <> length def
+R2774:2775 xv6iris.BufOwn <> bs:12 var
+R2799:2809 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R2811:2815 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R2820:2824 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R2827:2828 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+binder 2810:2810 <> j:13
+binder 2810:2810 <> j:14
+binder 2816:2819 <> byte:15
+binder 2816:2819 <> byte:16
+R2848:2855 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
+R2829:2834 xv6iris.RiscvModelBytes <> pa_add def
+R2837:2842 xv6iris.BufOwn <> b_data def
+R2844:2844 xv6iris.BufOwn <> b:9 var
+R2847:2847 xv6iris.BufOwn <> j:13 var
+R2856:2859 xv6iris.BufOwn <> byte:15 var
+R2825:2826 xv6iris.BufOwn <> bs:12 var

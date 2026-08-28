@@ -1,0 +1,29 @@
+DIGEST 2a0e197d9dc93bac279ed05057da86cc
+Fxv6iris.SetShrink
+R809:813 Ltac2.Ltac2 <> <> lib
+R835:840 Ltac2.Constr <> <> lib
+R842:848 Ltac2.Control <> <> lib
+R850:852 Ltac2.Std <> <> lib
+R854:857 Ltac2.List <> <> lib
+R859:863 Ltac2.Array <> <> lib
+R865:869 Ltac2.Ident <> <> lib
+R871:873 Ltac2.Int <> <> lib
+R875:878 Ltac2.Bool <> <> lib
+R880:886 Ltac2.Message <> <> lib
+R915:918 stdpp.base <> <> lib
+R1920:1926 stdpp.base <> elem_of def
+R1939:1946 stdpp.base <> subseteq def
+R1959:1966 stdpp.base <> disjoint def
+R1983:1987 stdpp.base <> union def
+R2000:2011 stdpp.base <> intersection def
+R2024:2033 stdpp.base <> difference def
+R2050:2058 stdpp.base <> singleton def
+R2071:2075 stdpp.base <> empty def
+R2088:2092 stdpp.base <> equiv def
+R3164:3166 Corelib.Init.Logic <> not def
+R3178:3180 Corelib.Init.Logic <> and ind
+R3192:3193 Corelib.Init.Logic <> or ind
+R3205:3207 Corelib.Init.Logic <> iff def
+R3219:3220 Corelib.Init.Logic <> ex ind
+R3237:3238 Corelib.Init.Logic <> eq ind
+R5225:5229 stdpp.base <> ::type_scope:'False' not

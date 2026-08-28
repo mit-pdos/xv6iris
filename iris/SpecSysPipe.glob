@@ -1,0 +1,466 @@
+DIGEST 1a51d17eb0e7e9b8064759fd02135d4b
+Fxv6iris.SpecSysPipe
+R4720:4725 Stdlib.ZArith.ZArith <> <> lib
+R4727:4729 Stdlib.micromega.Lia <> <> lib
+R4731:4734 Stdlib.Lists.List <> <> lib
+R4763:4766 stdpp.gmap <> <> lib
+R4768:4771 stdpp.list <> <> lib
+R4773:4793 stdpp.bitvector.definitions <> <> lib
+R4831:4839 iris.proofmode.proofmode <> <> lib
+R4881:4888 iris.program_logic.language <> <> lib
+R4890:4896 iris.program_logic.lifting <> <> lib
+R4939:4947 iris.base_logic.lib.ghost_var <> <> lib
+R4949:4958 iris.base_logic.lib.invariants <> <> lib
+R4960:4967 iris.base_logic.lib.gen_heap <> <> lib
+R4985:5014 SailStdpp.ConcurrencyInterface <> <> lib
+R5016:5053 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R5055:5089 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R5091:5116 SailStdpp.Operators_mwords <> <> lib
+R5134:5147 SailStdpp.Base <> <> lib
+R5149:5167 SailStdpp.TypeCasts <> <> lib
+R5169:5184 SailStdpp.Values <> <> lib
+R5186:5206 SailStdpp.MachineWord <> <> lib
+R5224:5232 xv6iris.RiscvLang <> <> lib
+R5234:5243 xv6iris.RiscvPtsto <> <> lib
+R5261:5270 xv6iris.InstrBytes <> <> lib
+R5288:5294 xv6iris.RegFile <> <> lib
+R5312:5322 xv6iris.RiscvExtras <> <> lib
+R5340:5350 xv6iris.CalleeSaved <> <> lib
+R5352:5361 xv6iris.KernelText <> <> lib
+R5363:5375 xv6iris.KernelDataInv <> <> lib
+R5393:5400 xv6iris.IntrDefs <> <> lib
+R5418:5423 xv6iris.WpNext <> <> lib
+R5441:5448 xv6iris.LockRank <> <> lib
+R5466:5473 xv6iris.ProcGeom <> <> lib
+R5475:5480 xv6iris.CpuOwn <> <> lib
+R5498:5504 xv6iris.KvmSpec <> <> lib
+R5522:5531 xv6iris.UserPtTree <> <> lib
+R5549:5557 xv6iris.ProcPtOwn <> <> lib
+R5575:5581 xv6iris.FdSlots <> <> lib
+R5583:5589 xv6iris.FileInv <> <> lib
+R5591:5597 xv6iris.ProcInv <> <> lib
+R5615:5623 xv6iris.SpecPanic <> <> lib
+R5641:5651 xv6iris.SpecFdalloc <> <> lib
+R5669:5677 xv6iris.IrefSlots <> <> lib
+R5695:5707 xv6iris.SpecFileclose <> <> lib
+R5730:5739 Kernel.KernelSyms <> <> lib
+R5757:5773 Riscv.rv64d_types <> <> lib
+R5775:5785 Riscv.rv64d <> <> lib
+R5787:5804 Riscv.riscv_extras <> <> lib
+R5822:5830 xv6iris.ProcAvail <> <> lib
+R5848:5851 xv6iris.Xv6G <> <> lib
+R5916:5921 xv6iris.TsoCtx <> <> lib
+R5931:5934 Riscv.rv64d_types Defs <> mod
+abbrev 6240:6253 <> sys_pipe_stack
+sec 6291:6301 <> SpecSysPipe
+R6317:6323 xv6iris.RiscvPtsto <> riscvGS class
+R6330:6333 xv6iris.Xv6G <> xv6G class
+R6335:6336 xv6iris.SpecSysPipe <> Σ:1 var
+R6340:6347 xv6iris.Xv6Cameras <> bioslotG class
+R6349:6350 xv6iris.SpecSysPipe <> Σ:1 var
+R6354:6358 xv6iris.FileInvDefs <> fileG class
+R6360:6361 xv6iris.SpecSysPipe <> Σ:1 var
+R6365:6371 xv6iris.FdSlots <> fdslotG class
+R6373:6374 xv6iris.SpecSysPipe <> Σ:1 var
+R6378:6386 xv6iris.IrefSlots <> irefslotG class
+R6388:6389 xv6iris.SpecSysPipe <> Σ:1 var
+R6393:6396 xv6iris.ProcAvail <> pavG class
+R6398:6399 xv6iris.SpecSysPipe <> Σ:1 var
+var  6637:6639 SpecSysPipe GEN
+R6643:6647 xv6iris.RiscvLang <> GenId class
+def 7033:7045 <> sys_pipe_post
+R7054:7059 xv6iris.TsoCtx <> CurCtx class
+binder 7049:7050 <> XI:10
+R7069:7073 iris.base_logic.lib.iprop <> gname def
+binder 7063:7065 <> γf:11
+R7081:7085 SailStdpp.Values <> mword def
+binder 7077:7077 <> p:12
+R7098:7102 SailStdpp.Values <> mword def
+binder 7092:7094 <> pid:13
+R7119:7126 xv6iris.ProcDefs <> pprivate rec
+binder 7115:7115 <> W:14
+R7134:7138 SailStdpp.Values <> mword def
+binder 7130:7130 <> r:15
+R7146:7150 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R7152:7153 xv6iris.SpecSysPipe <> SpecSysPipe.Σ var
+R7162:7479 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7900:7909 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7546:7672 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R7520:7524 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7480:7482 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7517:7519 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7484:7487 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7516:7516 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7483:7483 xv6iris.SpecSysPipe <> r:15 var
+R7508:7512 SailStdpp.Values <> mword def
+R7488:7499 SailStdpp.Values <> mword_of_int def
+R7525:7533 xv6iris.ProcInv <> proc_priv def
+R7535:7537 xv6iris.SpecSysPipe <> γf:11 var
+R7539:7539 xv6iris.SpecSysPipe <> p:12 var
+R7541:7543 xv6iris.SpecSysPipe <> pid:13 var
+R7545:7545 xv6iris.SpecSysPipe <> W:14 var
+R7673:7677 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R7720:7729 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R7688:7690 Corelib.Init.Datatypes <> nat ind
+binder 7678:7680 <> fd0:16
+R7688:7690 Corelib.Init.Datatypes <> nat ind
+binder 7682:7684 <> fd1:17
+R7698:7701 Corelib.Init.Datatypes <> list ind
+R7703:7705 Corelib.Init.Datatypes <> nat ind
+binder 7694:7694 <> l:18
+R7717:7719 Corelib.Init.Datatypes <> nat ind
+binder 7709:7710 <> k0:19
+R7717:7719 Corelib.Init.Datatypes <> nat ind
+binder 7712:7713 <> k1:20
+R7804:7815 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7730:7732 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7801:7803 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7758:7761 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R7734:7737 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7757:7757 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7733:7733 xv6iris.SpecSysPipe <> r:15 var
+R7749:7753 SailStdpp.Values <> mword def
+R7738:7745 Riscv.rv64d <> zero_reg def
+R7783:7785 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7762:7769 xv6iris.SpecFdalloc <> fd_frees def
+R7772:7779 xv6iris.ProcDefs <> pv_ofile proj
+R7781:7781 xv6iris.SpecSysPipe <> W:14 var
+R7789:7792 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R7786:7788 xv6iris.SpecSysPipe <> fd0:16 var
+R7796:7799 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R7793:7795 xv6iris.SpecSysPipe <> fd1:17 var
+R7800:7800 xv6iris.SpecSysPipe <> l:18 var
+R7816:7824 xv6iris.ProcInv <> proc_priv def
+R7826:7828 xv6iris.SpecSysPipe <> γf:11 var
+R7830:7830 xv6iris.SpecSysPipe <> p:12 var
+R7832:7834 xv6iris.SpecSysPipe <> pid:13 var
+R7846:7854 xv6iris.ProcInv <> upd_ofile def
+R7857:7865 xv6iris.ProcInv <> upd_ofile def
+R7867:7867 xv6iris.SpecSysPipe <> W:14 var
+R7869:7871 xv6iris.SpecSysPipe <> fd0:16 var
+R7874:7878 xv6iris.FileInvDefs <> fnode def
+R7880:7881 xv6iris.SpecSysPipe <> k0:19 var
+R7885:7887 xv6iris.SpecSysPipe <> fd1:17 var
+R7890:7894 xv6iris.FileInvDefs <> fnode def
+R7896:7897 xv6iris.SpecSysPipe <> k1:20 var
+R7917:7921 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7910:7916 xv6iris.FdSlots <> fd_slot def
+R7922:7928 xv6iris.FdSlots <> fd_slot def
+R7936:7946 xv6iris.SpecSysPipe SpecSysPipe <> sec
+def 7961:7982 <> wp_sys_pipe_sconf_body
+R7991:7997 xv6iris.RiscvPtsto <> riscvGS class
+binder 7999:8000 <> Σ:21
+binder 7990:8000 <> riscvGS0:22
+R8004:8007 xv6iris.Xv6G <> xv6G class
+R8009:8010 xv6iris.SpecSysPipe <> Σ:21 var
+binder 8003:8010 <> xv6G0:23
+R8014:8021 xv6iris.Xv6Cameras <> bioslotG class
+R8023:8024 xv6iris.SpecSysPipe <> Σ:21 var
+binder 8013:8024 <> bioslotG0:24
+R8028:8034 xv6iris.FdSlots <> fdslotG class
+R8036:8037 xv6iris.SpecSysPipe <> Σ:21 var
+binder 8027:8037 <> fdslotG0:25
+R8041:8045 xv6iris.FileInvDefs <> fileG class
+R8047:8048 xv6iris.SpecSysPipe <> Σ:21 var
+binder 8040:8048 <> fileG0:26
+R8058:8066 xv6iris.IrefSlots <> irefslotG class
+R8068:8069 xv6iris.SpecSysPipe <> Σ:21 var
+binder 8057:8069 <> irefslotG0:27
+R8073:8076 xv6iris.ProcAvail <> pavG class
+R8078:8079 xv6iris.SpecSysPipe <> Σ:21 var
+binder 8072:8079 <> pavG0:28
+R8090:8094 xv6iris.RiscvLang <> GenId class
+binder 8084:8086 <> GEN:29
+R8105:8109 xv6iris.RiscvLang <> CpuId class
+binder 8099:8101 <> CID:30
+R8119:8124 xv6iris.TsoCtx <> CurCtx class
+binder 8114:8115 <> XI:31
+R8138:8142 iris.base_logic.lib.iprop <> gname def
+binder 8132:8134 <> γa:32
+R8158:8162 iris.base_logic.lib.iprop <> gname def
+binder 8147:8150 <> γfl:33
+binder 8152:8154 <> γf:34
+R8175:8186 xv6iris.SpecFileclose <> fclose_names rec
+binder 8170:8171 <> fn:35
+R8195:8200 Corelib.Init.Datatypes <> option ind
+R8202:8204 Corelib.Init.Datatypes <> nat ind
+binder 8190:8191 <> on:36
+R8216:8222 xv6iris.RegFile <> regfile def
+binder 8212:8212 <> m:37
+R8231:8233 Corelib.Init.Datatypes <> nat ind
+binder 8226:8227 <> av:38
+R8242:8245 Corelib.Init.Datatypes <> bool ind
+binder 8237:8238 <> eb:39
+R8253:8257 SailStdpp.Values <> mword def
+binder 8249:8249 <> p:40
+R8272:8276 SailStdpp.Values <> mword def
+binder 8268:8268 <> v:41
+R8289:8293 SailStdpp.Values <> mword def
+binder 8283:8285 <> pid:42
+R8304:8311 xv6iris.ProcDefs <> pprivate rec
+binder 8300:8300 <> V:43
+R8319:8322 Corelib.Init.Datatypes <> bool ind
+binder 8315:8315 <> b:44
+R8332:8335 stdpp.gmap <> gset def
+R8337:8342 Stdlib.Strings.String <> string ind
+binder 8326:8328 <> lks:45
+R8820:8831 SailStdpp.Values <> mword_of_int def
+R8833:8851 Kernel.KernelSyms <> sys_pipe def
+R8808:8812 SailStdpp.Values <> mword def
+binder 8802:8804 <> pcE:46
+R8873:8878 xv6iris.RiscvExtras <> ret_pc def
+R8882:8886 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R8887:8892 Riscv.rv64d_types <> Regidx constr
+R8912:8916 SailStdpp.Values <> mword def
+R8895:8906 SailStdpp.Values <> mword_of_int def
+R8881:8881 xv6iris.SpecSysPipe <> m:37 var
+binder 8862:8868 <> ret_tgt:47
+R9182:9187 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9173:9175 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9157:9160 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R9161:9170 xv6iris.ProcGeom <> tf_arg_idx def
+R9150:9154 xv6iris.ProcDefs <> pv_tf proj
+R9156:9156 xv6iris.SpecSysPipe <> V:43 var
+R9176:9179 Corelib.Init.Datatypes <> Some constr
+R9181:9181 xv6iris.SpecSysPipe <> v:41 var
+R9214:9429 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9203:9206 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R9189:9202 xv6iris.SpecSysPipe <> sys_pipe_stack abbrev
+R9207:9208 xv6iris.SpecSysPipe <> av:38 var
+R9451:10817 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9430:9440 xv6iris.LockRank <> locks_below def
+R9442:9444 xv6iris.SpecSysPipe <> lks:45 var
+R10834:10839 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10828:10830 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10818:10824 xv6iris.SpecFileclose <> fcn_pid proj
+R10826:10827 xv6iris.SpecSysPipe <> fn:35 var
+R10831:10833 xv6iris.SpecSysPipe <> pid:42 var
+R10866:10871 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10849:10851 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10840:10845 xv6iris.SpecFileclose <> fcn_dq proj
+R10847:10848 xv6iris.SpecSysPipe <> fn:35 var
+R10852:10859 iris.algebra.dfrac <> DfracOwn constr
+R10863:10863 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10896:11085 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10872:10882 xv6iris.IntrDefs <> sie_cap_gpr def
+R10884:10886 xv6iris.Ktier <> KT1 constr
+R10888:10888 xv6iris.SpecSysPipe <> m:37 var
+R10890:10891 xv6iris.SpecSysPipe <> av:38 var
+R10893:10893 xv6iris.SpecSysPipe <> b:44 var
+R10895:10895 xv6iris.SpecSysPipe <> p:40 var
+R11110:11687 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11086:11092 xv6iris.CpuOwn <> cpu_own def
+R11100:11101 xv6iris.SpecSysPipe <> eb:39 var
+R11103:11103 xv6iris.SpecSysPipe <> p:40 var
+R11105:11105 xv6iris.SpecSysPipe <> b:44 var
+R11107:11109 xv6iris.SpecSysPipe <> lks:45 var
+R11708:11715 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11688:11700 xv6iris.IntrDefs <> trap_csrs_ext def
+R11702:11704 xv6iris.Ktier <> KT1 constr
+R11706:11707 xv6iris.SpecSysPipe <> eb:39 var
+R11734:11741 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11716:11728 xv6iris.IntrDefs <> cpu_claim_ext def
+R11730:11731 xv6iris.SpecSysPipe <> eb:39 var
+R11733:11733 xv6iris.SpecSysPipe <> p:40 var
+R11753:11758 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11742:11752 xv6iris.KernelText <> kernel_text def
+R11770:11775 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11759:11769 xv6iris.KernelDataInv <> kernel_data def
+R11785:11792 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11776:11780 xv6iris.InstrBytes <> pc_is def
+R11782:11784 xv6iris.SpecSysPipe <> pcE:46 var
+R11802:11809 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11793:11801 xv6iris.SpecPanic <> panic_env def
+R11828:12033 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11810:11818 xv6iris.FileInv <> is_ftable def
+R11820:11823 xv6iris.SpecSysPipe <> γfl:33 var
+R11825:11827 xv6iris.SpecSysPipe <> γf:34 var
+R12053:12060 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12034:12043 xv6iris.KvmSpec <> kalloc_env def
+R12045:12047 xv6iris.SpecSysPipe <> γa:32 var
+R12049:12052 Corelib.Init.Datatypes <> None constr
+R12082:12218 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12061:12069 xv6iris.ProcInv <> proc_priv def
+R12071:12073 xv6iris.SpecSysPipe <> γf:34 var
+R12075:12075 xv6iris.SpecSysPipe <> p:40 var
+R12077:12079 xv6iris.SpecSysPipe <> pid:42 var
+R12081:12081 xv6iris.SpecSysPipe <> V:43 var
+R12226:12231 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12219:12225 xv6iris.FdSlots <> fd_slot def
+R12239:12579 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12232:12238 xv6iris.FdSlots <> fd_slot def
+R12589:13092 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12580:12588 xv6iris.IrefSlots <> iref_slot def
+R13123:13130 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13093:13110 xv6iris.SpecFileclose <> fileclose_pipe_env def
+R13112:13113 xv6iris.SpecSysPipe <> fn:35 var
+R13115:13116 xv6iris.SpecSysPipe <> on:36 var
+R13167:13456 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13131:13152 xv6iris.SpecFileclose <> fileclose_fs_env_nopid def
+R13154:13155 xv6iris.SpecSysPipe <> fn:35 var
+R13163:13164 xv6iris.SpecSysPipe <> eb:39 var
+R13166:13166 xv6iris.SpecSysPipe <> p:40 var
+R14132:14139 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13457:13463 xv6iris.WpNext <> wp_next def
+R13484:13488 xv6iris.RiscvLang <> CpuId class
+binder 13478:13480 <> CID:48
+R13498:13502 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R13527:13535 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R13508:13514 xv6iris.RegFile <> regfile def
+binder 13503:13504 <> mf:49
+R13523:13526 xv6iris.UserPtTree <> uptd rec
+binder 13518:13519 <> P':50
+R13559:13570 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13536:13538 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13556:13558 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13539:13550 xv6iris.CalleeSaved <> callee_saved def
+R13552:13552 xv6iris.SpecSysPipe <> m:37 var
+R13554:13555 xv6iris.SpecSysPipe <> mf:49 var
+R13599:13610 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13571:13573 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13596:13598 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R13574:13581 xv6iris.ProcPtOwn <> uptd_ext def
+R13584:13589 xv6iris.ProcDefs <> pv_upt proj
+R13591:13591 xv6iris.SpecSysPipe <> V:43 var
+R13594:13595 xv6iris.SpecSysPipe <> P':50 var
+R13636:13647 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13611:13621 xv6iris.IntrDefs <> sie_cap_gpr def
+R13623:13625 xv6iris.Ktier <> KT1 constr
+R13627:13628 xv6iris.SpecSysPipe <> mf:49 var
+R13630:13631 xv6iris.SpecSysPipe <> av:38 var
+R13633:13633 xv6iris.SpecSysPipe <> b:44 var
+R13635:13635 xv6iris.SpecSysPipe <> p:40 var
+R13672:13683 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13648:13654 xv6iris.CpuOwn <> cpu_own def
+R13662:13663 xv6iris.SpecSysPipe <> eb:39 var
+R13665:13665 xv6iris.SpecSysPipe <> p:40 var
+R13667:13667 xv6iris.SpecSysPipe <> b:44 var
+R13669:13671 xv6iris.SpecSysPipe <> lks:45 var
+R13704:13715 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13684:13696 xv6iris.IntrDefs <> trap_csrs_ext def
+R13698:13700 xv6iris.Ktier <> KT1 constr
+R13702:13703 xv6iris.SpecSysPipe <> eb:39 var
+R13734:13745 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13716:13728 xv6iris.IntrDefs <> cpu_claim_ext def
+R13730:13731 xv6iris.SpecSysPipe <> eb:39 var
+R13733:13733 xv6iris.SpecSysPipe <> p:40 var
+R13759:13770 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13746:13750 xv6iris.InstrBytes <> pc_is def
+R13752:13758 xv6iris.SpecSysPipe <> ret_tgt:47 var
+R13861:13872 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13771:13783 xv6iris.SpecSysPipe <> sys_pipe_post def
+R13821:13825 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R13826:13831 Riscv.rv64d_types <> Regidx constr
+R13852:13856 SailStdpp.Values <> mword def
+R13834:13845 SailStdpp.Values <> mword_of_int def
+R13819:13820 xv6iris.SpecSysPipe <> mf:49 var
+R13796:13802 xv6iris.ProcInv <> upd_upt def
+R13804:13804 xv6iris.SpecSysPipe <> V:43 var
+R13806:13807 xv6iris.SpecSysPipe <> P':50 var
+R13791:13793 xv6iris.SpecSysPipe <> pid:42 var
+R13789:13789 xv6iris.SpecSysPipe <> p:40 var
+R13785:13787 xv6iris.SpecSysPipe <> γf:34 var
+R13882:14001 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13873:13881 xv6iris.IrefSlots <> iref_slot def
+R14002:14002 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14043:14055 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14003:14006 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R14010:14011 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 14007:14009 <> on':51
+R14012:14029 xv6iris.SpecFileclose <> fileclose_pipe_env def
+R14031:14032 xv6iris.SpecSysPipe <> fn:35 var
+R14034:14036 xv6iris.SpecSysPipe <> on':51 var
+R14092:14103 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14056:14077 xv6iris.SpecFileclose <> fileclose_fs_env_nopid def
+R14079:14080 xv6iris.SpecSysPipe <> fn:35 var
+R14088:14089 xv6iris.SpecSysPipe <> eb:39 var
+R14091:14091 xv6iris.SpecSysPipe <> p:40 var
+R14104:14107 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R14130:14130 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R14115:14118 iris.program_logic.language <> expr proj
+R14120:14129 xv6iris.RiscvLang <> riscv_lang def
+R14108:14111 xv6iris.RiscvLang <> Loop abbrev
+R13470:13470 xv6iris.SpecSysPipe <> p:40 var
+R13465:13468 Corelib.Init.Datatypes <> true constr
+R14140:14143 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R14166:14166 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R14151:14154 iris.program_logic.language <> expr proj
+R14156:14165 xv6iris.RiscvLang <> riscv_lang def
+R14144:14147 xv6iris.RiscvLang <> Loop abbrev
+modtype 14182:14188 <> SYSPIPE
+ax 14203:14219 SYSPIPE wp_sys_pipe_sconf
+R14227:14235 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R14603:14611 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R14237:14243 xv6iris.RiscvPtsto <> riscvGS class
+binder 14245:14246 <> Σ:52
+binder 14236:14246 <> riscvGS0:53
+R14250:14253 xv6iris.Xv6G <> xv6G class
+R14255:14256 xv6iris.SpecSysPipe <> Σ:52 var
+binder 14249:14256 <> xv6G0:54
+R14260:14267 xv6iris.Xv6Cameras <> bioslotG class
+R14269:14270 xv6iris.SpecSysPipe <> Σ:52 var
+binder 14259:14270 <> bioslotG0:55
+R14274:14280 xv6iris.FdSlots <> fdslotG class
+R14282:14283 xv6iris.SpecSysPipe <> Σ:52 var
+binder 14273:14283 <> fdslotG0:56
+R14287:14291 xv6iris.FileInvDefs <> fileG class
+R14293:14294 xv6iris.SpecSysPipe <> Σ:52 var
+binder 14286:14294 <> fileG0:57
+R14311:14319 xv6iris.IrefSlots <> irefslotG class
+R14321:14322 xv6iris.SpecSysPipe <> Σ:52 var
+binder 14310:14322 <> irefslotG0:58
+R14326:14329 xv6iris.ProcAvail <> pavG class
+R14331:14332 xv6iris.SpecSysPipe <> Σ:52 var
+binder 14325:14332 <> pavG0:59
+R14343:14347 xv6iris.RiscvLang <> GenId class
+binder 14337:14339 <> GEN:60
+R14358:14362 xv6iris.RiscvLang <> CpuId class
+binder 14352:14354 <> CID:61
+R14372:14377 xv6iris.TsoCtx <> CurCtx class
+binder 14367:14368 <> XI:62
+R14393:14397 iris.base_logic.lib.iprop <> gname def
+binder 14387:14389 <> γa:63
+R14412:14416 iris.base_logic.lib.iprop <> gname def
+binder 14401:14404 <> γfl:64
+R14412:14416 iris.base_logic.lib.iprop <> gname def
+binder 14406:14408 <> γf:65
+R14431:14442 xv6iris.SpecFileclose <> fclose_names rec
+binder 14426:14427 <> fn:66
+R14451:14456 Corelib.Init.Datatypes <> option ind
+R14458:14460 Corelib.Init.Datatypes <> nat ind
+binder 14446:14447 <> on:67
+R14474:14480 xv6iris.RegFile <> regfile def
+binder 14470:14470 <> m:68
+R14489:14491 Corelib.Init.Datatypes <> nat ind
+binder 14484:14485 <> av:69
+R14500:14503 Corelib.Init.Datatypes <> bool ind
+binder 14495:14496 <> eb:70
+R14511:14515 SailStdpp.Values <> mword def
+binder 14507:14507 <> p:71
+R14532:14536 SailStdpp.Values <> mword def
+binder 14528:14528 <> v:72
+R14549:14553 SailStdpp.Values <> mword def
+binder 14543:14545 <> pid:73
+R14564:14571 xv6iris.ProcDefs <> pprivate rec
+binder 14560:14560 <> V:74
+R14579:14582 Corelib.Init.Datatypes <> bool ind
+binder 14575:14575 <> b:75
+R14592:14595 stdpp.gmap <> gset def
+R14597:14602 Stdlib.Strings.String <> string ind
+binder 14586:14588 <> lks:76
+R14612:14633 xv6iris.SpecSysPipe <> wp_sys_pipe_sconf_body def
+R14674:14676 xv6iris.SpecSysPipe <> lks:76 var
+R14672:14672 xv6iris.SpecSysPipe <> b:75 var
+R14670:14670 xv6iris.SpecSysPipe <> V:74 var
+R14666:14668 xv6iris.SpecSysPipe <> pid:73 var
+R14664:14664 xv6iris.SpecSysPipe <> v:72 var
+R14662:14662 xv6iris.SpecSysPipe <> p:71 var
+R14659:14660 xv6iris.SpecSysPipe <> eb:70 var
+R14656:14657 xv6iris.SpecSysPipe <> av:69 var
+R14654:14654 xv6iris.SpecSysPipe <> m:68 var
+R14651:14652 xv6iris.SpecSysPipe <> on:67 var
+R14648:14649 xv6iris.SpecSysPipe <> fn:66 var
+R14644:14646 xv6iris.SpecSysPipe <> γf:65 var
+R14639:14642 xv6iris.SpecSysPipe <> γfl:64 var
+R14635:14637 xv6iris.SpecSysPipe <> γa:63 var
+R14683:14689 xv6iris.SpecSysPipe SYSPIPE <> modtype

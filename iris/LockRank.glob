@@ -1,0 +1,525 @@
+DIGEST d005feadaedce26f75e3bae99dc2a0a3
+Fxv6iris.LockRank
+R1651:1656 Stdlib.Strings.String <> <> lib
+R1658:1661 Stdlib.Lists.List <> <> lib
+R1663:1665 Stdlib.micromega.Lia <> <> lib
+R1694:1697 stdpp.gmap <> <> lib
+R1699:1702 stdpp.sets <> <> lib
+def 3403:3412 <> lock_ranks
+R3416:3419 Corelib.Init.Datatypes <> list ind
+R3428:3430 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R3422:3427 Stdlib.Strings.String <> string ind
+R3431:3433 Corelib.Init.Datatypes <> nat ind
+R3441:3442 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3462:3466 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3486:3516 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3536:3540 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3560:3564 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3584:3588 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3608:3612 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3632:3636 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3656:3660 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3680:3721 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3741:3775 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3795:5204 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5224:5228 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5248:5252 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5272:5300 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5320:5367 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3443:3443 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3449:3459 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3461:3461 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3467:3467 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3476:3483 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3485:3485 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3517:3517 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3524:3533 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3535:3535 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3541:3541 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3554:3557 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3559:3559 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3565:3565 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3572:3581 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3583:3583 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3589:3589 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3596:3605 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3607:3607 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3613:3613 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3627:3629 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3631:3631 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3637:3637 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3649:3653 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3655:3655 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3661:3661 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3668:3677 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3679:3679 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3722:3722 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3732:3737 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3740:3740 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3776:3776 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3783:3791 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3794:3794 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5205:5205 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5214:5220 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5223:5223 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5229:5229 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5238:5244 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5247:5247 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5253:5253 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5258:5268 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5271:5271 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5301:5301 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5308:5316 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5319:5319 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+def 5380:5390 <> rank_lookup
+R5397:5400 Corelib.Init.Datatypes <> list ind
+R5409:5411 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R5403:5408 Stdlib.Strings.String <> string ind
+R5412:5414 Corelib.Init.Datatypes <> nat ind
+binder 5393:5393 <> l:1
+R5423:5428 Stdlib.Strings.String <> string ind
+binder 5419:5419 <> s:2
+R5433:5435 Corelib.Init.Datatypes <> nat ind
+R5448:5448 xv6iris.LockRank <> l:1 var
+R5459:5461 Corelib.Init.Datatypes <> nil constr
+R5472:5475 Corelib.Init.Datatypes <> cons constr
+R5477:5477 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5479:5480 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5482:5482 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5493:5502 Stdlib.Strings.String <> eqb def
+R5504:5504 xv6iris.LockRank <> s:2 var
+R5520:5530 xv6iris.LockRank <> rank_lookup:3 def
+R5535:5535 xv6iris.LockRank <> s:2 var
+def 5556:5564 <> lock_rank
+R5571:5576 Stdlib.Strings.String <> string ind
+binder 5567:5567 <> s:5
+R5581:5583 Corelib.Init.Datatypes <> nat ind
+R5588:5598 xv6iris.LockRank <> rank_lookup def
+R5600:5609 xv6iris.LockRank <> lock_ranks def
+R5611:5611 xv6iris.LockRank <> s:5 var
+prf 5767:5780 <> lock_rank_proc
+R5800:5802 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5784:5792 xv6iris.LockRank <> lock_rank def
+prf 5837:5850 <> lock_rank_kmem
+R5870:5872 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5854:5862 xv6iris.LockRank <> lock_rank def
+def 6600:6610 <> locks_below
+R6617:6620 stdpp.gmap <> gset def
+R6622:6627 Stdlib.Strings.String <> string ind
+binder 6613:6613 <> S:6
+R6635:6640 Stdlib.Strings.String <> string ind
+binder 6631:6631 <> r:7
+R6655:6661 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R6663:6664 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 6662:6662 <> q:8
+R6672:6675 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6666:6670 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R6665:6665 xv6iris.LockRank <> q:8 var
+R6671:6671 xv6iris.LockRank <> S:6 var
+R6687:6689 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R6676:6684 xv6iris.LockRank <> lock_rank def
+R6686:6686 xv6iris.LockRank <> q:8 var
+R6690:6698 xv6iris.LockRank <> lock_rank def
+R6700:6700 xv6iris.LockRank <> r:7 var
+inst 6720:6734 <> locks_below_dec
+binder 6736:6736 <> S:9
+binder 6738:6738 <> r:10
+R6742:6749 stdpp.base <> Decision class
+R6752:6762 xv6iris.LockRank <> locks_below def
+R6764:6764 xv6iris.LockRank <> S:9 var
+R6766:6766 xv6iris.LockRank <> r:10 var
+R6786:6796 xv6iris.LockRank <> locks_below def
+R6811:6816 stdpp.base <> decide def
+R6819:6828 stdpp.sets <> set_Forall def
+binder 6835:6835 <> q:11
+R6851:6853 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R6840:6848 xv6iris.LockRank <> lock_rank def
+R6850:6850 xv6iris.LockRank <> q:11 var
+R6854:6862 xv6iris.LockRank <> lock_rank def
+R6811:6816 stdpp.base <> decide def
+R6819:6828 stdpp.sets <> set_Forall def
+binder 6835:6835 <> q:12
+R6851:6853 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R6840:6848 xv6iris.LockRank <> lock_rank def
+R6850:6850 xv6iris.LockRank <> q:12 var
+R6854:6862 xv6iris.LockRank <> lock_rank def
+prf 6979:6995 <> locks_below_empty
+R7002:7007 Stdlib.Strings.String <> string ind
+binder 6998:6998 <> r:13
+R7012:7022 xv6iris.LockRank <> locks_below def
+R7024:7026 stdpp.base <> ::stdpp_scope:'∅' not
+R7028:7028 xv6iris.LockRank <> r:13 var
+prf 7245:7264 <> locks_below_not_elem
+R7271:7274 stdpp.gmap <> gset def
+R7276:7281 Stdlib.Strings.String <> string ind
+binder 7267:7267 <> S:14
+R7289:7294 Stdlib.Strings.String <> string ind
+binder 7285:7285 <> r:15
+R7316:7319 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7301:7311 xv6iris.LockRank <> locks_below def
+R7313:7313 xv6iris.LockRank <> S:14 var
+R7315:7315 xv6iris.LockRank <> r:15 var
+R7321:7325 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R7320:7320 xv6iris.LockRank <> r:15 var
+R7326:7326 xv6iris.LockRank <> S:14 var
+R7358:7370 Stdlib.Arith.PeanoNat Nat lt_irrefl thm
+R7358:7370 Stdlib.Arith.PeanoNat Nat lt_irrefl thm
+prf 7511:7537 <> locks_below_union_singleton
+R7544:7547 stdpp.gmap <> gset def
+R7549:7554 Stdlib.Strings.String <> string ind
+binder 7540:7540 <> S:16
+R7565:7570 Stdlib.Strings.String <> string ind
+binder 7558:7558 <> r:17
+binder 7560:7561 <> r':18
+R7603:7606 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7588:7590 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R7577:7585 xv6iris.LockRank <> lock_rank def
+R7587:7587 xv6iris.LockRank <> r:17 var
+R7591:7599 xv6iris.LockRank <> lock_rank def
+R7601:7602 xv6iris.LockRank <> r':18 var
+R7623:7626 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7607:7617 xv6iris.LockRank <> locks_below def
+R7619:7619 xv6iris.LockRank <> S:16 var
+R7621:7622 xv6iris.LockRank <> r':18 var
+R7627:7637 xv6iris.LockRank <> locks_below def
+R7645:7649 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R7640:7641 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7643:7644 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R7642:7642 xv6iris.LockRank <> r:17 var
+R7650:7650 xv6iris.LockRank <> S:16 var
+R7653:7654 xv6iris.LockRank <> r':18 var
+R7692:7704 stdpp.base <> elem_of_union meth
+R7692:7704 stdpp.base <> elem_of_union meth
+R7736:7752 stdpp.base <> elem_of_singleton meth
+R7736:7752 stdpp.base <> elem_of_singleton meth
+prf 7814:7829 <> locks_below_mono
+R7836:7839 stdpp.gmap <> gset def
+R7841:7846 Stdlib.Strings.String <> string ind
+binder 7832:7832 <> S:19
+R7857:7862 Stdlib.Strings.String <> string ind
+binder 7850:7850 <> r:20
+binder 7852:7853 <> r':21
+R7884:7887 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7869:7879 xv6iris.LockRank <> locks_below def
+R7881:7881 xv6iris.LockRank <> S:19 var
+R7883:7883 xv6iris.LockRank <> r:20 var
+R7915:7918 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7899:7902 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R7888:7896 xv6iris.LockRank <> lock_rank def
+R7898:7898 xv6iris.LockRank <> r:20 var
+R7903:7911 xv6iris.LockRank <> lock_rank def
+R7913:7914 xv6iris.LockRank <> r':21 var
+R7919:7929 xv6iris.LockRank <> locks_below def
+R7931:7931 xv6iris.LockRank <> S:19 var
+R7933:7934 xv6iris.LockRank <> r':21 var
+prf 8054:8075 <> locks_below_difference
+R8082:8085 stdpp.gmap <> gset def
+R8087:8092 Stdlib.Strings.String <> string ind
+binder 8078:8078 <> S:22
+R8100:8103 stdpp.gmap <> gset def
+R8105:8110 Stdlib.Strings.String <> string ind
+binder 8096:8096 <> X:23
+R8118:8123 Stdlib.Strings.String <> string ind
+binder 8114:8114 <> r:24
+R8145:8148 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8130:8140 xv6iris.LockRank <> locks_below def
+R8142:8142 xv6iris.LockRank <> S:22 var
+R8144:8144 xv6iris.LockRank <> r:24 var
+R8149:8159 xv6iris.LockRank <> locks_below def
+R8163:8167 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R8162:8162 xv6iris.LockRank <> S:22 var
+R8168:8168 xv6iris.LockRank <> X:23 var
+R8171:8171 xv6iris.LockRank <> r:24 var
+prf 9131:9143 <> locks_add_del
+R9150:9155 Stdlib.Strings.String <> string ind
+binder 9146:9146 <> r:25
+R9165:9168 stdpp.gmap <> gset def
+R9170:9175 Stdlib.Strings.String <> string ind
+binder 9159:9161 <> lks:26
+R9191:9194 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9183:9187 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R9182:9182 xv6iris.LockRank <> r:25 var
+R9188:9190 xv6iris.LockRank <> lks:26 var
+R9220:9222 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9195:9195 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R9209:9214 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R9201:9205 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9196:9197 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R9199:9200 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R9198:9198 xv6iris.LockRank <> r:25 var
+R9206:9208 xv6iris.LockRank <> lks:26 var
+R9215:9216 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R9218:9219 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R9217:9217 xv6iris.LockRank <> r:25 var
+R9223:9225 xv6iris.LockRank <> lks:26 var
+prf 9421:9428 <> size_add
+R9435:9440 Stdlib.Strings.String <> string ind
+binder 9431:9431 <> r:27
+R9450:9453 stdpp.gmap <> gset def
+R9455:9460 Stdlib.Strings.String <> string ind
+binder 9444:9446 <> lks:28
+R9476:9479 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9468:9472 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R9467:9467 xv6iris.LockRank <> r:27 var
+R9473:9475 xv6iris.LockRank <> lks:28 var
+R9500:9502 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9480:9483 stdpp.base <> size def
+R9491:9495 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9486:9487 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R9489:9490 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R9488:9488 xv6iris.LockRank <> r:27 var
+R9496:9498 xv6iris.LockRank <> lks:28 var
+R9503:9503 Corelib.Init.Datatypes <> S constr
+R9506:9509 stdpp.base <> size def
+R9511:9513 xv6iris.LockRank <> lks:28 var
+R9547:9556 stdpp.fin_sets <> size_union thm
+R9547:9556 stdpp.fin_sets <> size_union thm
+R9547:9556 stdpp.fin_sets <> size_union thm
+R9547:9556 stdpp.fin_sets <> size_union thm
+R9586:9599 stdpp.fin_sets <> size_singleton thm
+R9586:9599 stdpp.fin_sets <> size_singleton thm
+R9586:9599 stdpp.fin_sets <> size_singleton thm
+prf 9683:9690 <> size_del
+R9697:9702 Stdlib.Strings.String <> string ind
+binder 9693:9693 <> r:29
+R9712:9715 stdpp.gmap <> gset def
+R9717:9722 Stdlib.Strings.String <> string ind
+binder 9706:9708 <> lks:30
+R9747:9750 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R9727:9730 stdpp.base <> size def
+R9736:9740 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R9733:9735 xv6iris.LockRank <> lks:30 var
+R9741:9742 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R9744:9745 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R9743:9743 xv6iris.LockRank <> r:29 var
+R9751:9754 stdpp.base <> size def
+R9756:9758 xv6iris.LockRank <> lks:30 var
+R9774:9786 stdpp.fin_sets <> subseteq_size thm
+R9774:9786 stdpp.fin_sets <> subseteq_size thm
+prf 10018:10028 <> size_del_lt
+R10035:10040 Stdlib.Strings.String <> string ind
+binder 10031:10031 <> r:31
+R10050:10053 stdpp.gmap <> gset def
+R10055:10060 Stdlib.Strings.String <> string ind
+binder 10044:10046 <> lks:32
+R10068:10070 Corelib.Init.Datatypes <> nat ind
+binder 10064:10064 <> n:33
+R10086:10089 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10078:10082 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R10077:10077 xv6iris.LockRank <> r:31 var
+R10083:10085 xv6iris.LockRank <> lks:32 var
+R10105:10108 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10098:10101 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10090:10093 stdpp.base <> size def
+R10095:10097 xv6iris.LockRank <> lks:32 var
+R10102:10102 Corelib.Init.Datatypes <> S constr
+R10104:10104 xv6iris.LockRank <> n:33 var
+R10129:10132 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10109:10112 stdpp.base <> size def
+R10118:10122 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R10115:10117 xv6iris.LockRank <> lks:32 var
+R10123:10124 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R10126:10127 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R10125:10125 xv6iris.LockRank <> r:31 var
+R10133:10133 xv6iris.LockRank <> n:33 var
+R10171:10185 stdpp.fin_sets <> size_difference thm
+R10171:10185 stdpp.fin_sets <> size_difference thm
+R10171:10185 stdpp.fin_sets <> size_difference thm
+R10171:10185 stdpp.fin_sets <> size_difference thm
+R10215:10228 stdpp.fin_sets <> size_singleton thm
+R10215:10228 stdpp.fin_sets <> size_singleton thm
+R10215:10228 stdpp.fin_sets <> size_singleton thm
+R10242:10244 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R10245:10248 stdpp.base <> size def
+R10242:10244 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R10245:10248 stdpp.base <> size def
+R10270:10275 stdpp.base <> decide def
+R10286:10288 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10278:10281 stdpp.base <> size def
+R10270:10275 stdpp.base <> decide def
+R10286:10288 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10278:10281 stdpp.base <> size def
+R10327:10340 stdpp.fin_sets <> size_empty_inv thm
+R10327:10340 stdpp.fin_sets <> size_empty_inv thm
+prf 10528:10545 <> size_le_zero_empty
+R10554:10557 stdpp.gmap <> gset def
+R10559:10564 Stdlib.Strings.String <> string ind
+binder 10548:10550 <> lks:34
+R10582:10585 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10577:10580 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10569:10572 stdpp.base <> size def
+R10574:10576 xv6iris.LockRank <> lks:34 var
+R10589:10591 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10586:10588 xv6iris.LockRank <> lks:34 var
+R10592:10594 stdpp.base <> ::stdpp_scope:'∅' not
+R10620:10632 stdpp.base <> leibniz_equiv def
+R10635:10648 stdpp.fin_sets <> size_empty_inv thm
+R10620:10632 stdpp.base <> leibniz_equiv def
+R10635:10648 stdpp.fin_sets <> size_empty_inv thm
+prf 10806:10818 <> size_empty_le
+R10825:10827 Corelib.Init.Datatypes <> nat ind
+binder 10821:10821 <> n:35
+R10856:10859 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10832:10835 stdpp.base <> size def
+R10844:10847 stdpp.gmap <> gset def
+R10849:10854 Stdlib.Strings.String <> string ind
+R10838:10840 stdpp.base <> ::stdpp_scope:'∅' not
+R10860:10860 xv6iris.LockRank <> n:35 var
+R10878:10887 stdpp.fin_sets <> size_empty thm
+R10878:10887 stdpp.fin_sets <> size_empty thm
+R10878:10887 stdpp.fin_sets <> size_empty thm
+prf 11119:11129 <> size_add_le
+R11136:11141 Stdlib.Strings.String <> string ind
+binder 11132:11132 <> r:36
+R11151:11154 stdpp.gmap <> gset def
+R11156:11161 Stdlib.Strings.String <> string ind
+binder 11145:11147 <> lks:37
+R11169:11171 Corelib.Init.Datatypes <> nat ind
+binder 11165:11165 <> n:38
+R11187:11190 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11179:11183 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R11178:11178 xv6iris.LockRank <> r:36 var
+R11184:11186 xv6iris.LockRank <> lks:37 var
+R11204:11207 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11199:11202 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11191:11194 stdpp.base <> size def
+R11196:11198 xv6iris.LockRank <> lks:37 var
+R11203:11203 xv6iris.LockRank <> n:38 var
+R11228:11231 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11208:11211 stdpp.base <> size def
+R11219:11223 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11214:11215 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11217:11218 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11216:11216 xv6iris.LockRank <> r:36 var
+R11224:11226 xv6iris.LockRank <> lks:37 var
+R11232:11232 Corelib.Init.Datatypes <> S constr
+R11234:11234 xv6iris.LockRank <> n:38 var
+R11270:11277 xv6iris.LockRank <> size_add thm
+R11270:11277 xv6iris.LockRank <> size_add thm
+R11270:11277 xv6iris.LockRank <> size_add thm
+prf 11309:11319 <> size_del_le
+R11326:11331 Stdlib.Strings.String <> string ind
+binder 11322:11322 <> r:39
+R11341:11344 stdpp.gmap <> gset def
+R11346:11351 Stdlib.Strings.String <> string ind
+binder 11335:11337 <> lks:40
+R11359:11361 Corelib.Init.Datatypes <> nat ind
+binder 11355:11355 <> n:41
+R11381:11384 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11376:11379 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11368:11371 stdpp.base <> size def
+R11373:11375 xv6iris.LockRank <> lks:40 var
+R11380:11380 xv6iris.LockRank <> n:41 var
+R11405:11408 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11385:11388 stdpp.base <> size def
+R11394:11398 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R11391:11393 xv6iris.LockRank <> lks:40 var
+R11399:11400 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11402:11403 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11401:11401 xv6iris.LockRank <> r:39 var
+R11409:11409 xv6iris.LockRank <> n:41 var
+R11443:11450 xv6iris.LockRank <> size_del thm
+R11443:11450 xv6iris.LockRank <> size_del thm
+prf 11618:11631 <> locks_self_del
+R11638:11643 Stdlib.Strings.String <> string ind
+binder 11634:11634 <> r:42
+R11679:11681 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11648:11648 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R11668:11673 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R11657:11660 stdpp.gmap <> gset def
+R11662:11667 Stdlib.Strings.String <> string ind
+R11649:11650 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11652:11653 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11651:11651 xv6iris.LockRank <> r:42 var
+R11674:11675 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11677:11678 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11676:11676 xv6iris.LockRank <> r:42 var
+R11682:11684 stdpp.base <> ::stdpp_scope:'∅' not
+prf 11717:11733 <> locks_union_empty
+R11740:11745 Stdlib.Strings.String <> string ind
+binder 11736:11736 <> r:43
+R11779:11781 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11750:11750 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11770:11775 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11759:11762 stdpp.gmap <> gset def
+R11764:11769 Stdlib.Strings.String <> string ind
+R11751:11752 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11754:11755 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11753:11753 xv6iris.LockRank <> r:43 var
+R11776:11778 stdpp.base <> ::stdpp_scope:'∅' not
+R11782:11783 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11785:11786 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11784:11784 xv6iris.LockRank <> r:43 var
+prf 12097:12111 <> locks_empty_del
+R12118:12121 stdpp.gmap <> gset def
+R12123:12128 Stdlib.Strings.String <> string ind
+binder 12114:12114 <> X:44
+R12158:12160 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12133:12133 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R12151:12156 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R12140:12143 stdpp.gmap <> gset def
+R12145:12150 Stdlib.Strings.String <> string ind
+R12134:12136 stdpp.base <> ::stdpp_scope:'∅' not
+R12157:12157 xv6iris.LockRank <> X:44 var
+R12161:12163 stdpp.base <> ::stdpp_scope:'∅' not
+prf 12251:12269 <> locks_add_del_below
+R12276:12281 Stdlib.Strings.String <> string ind
+binder 12272:12272 <> r:45
+R12291:12294 stdpp.gmap <> gset def
+R12296:12301 Stdlib.Strings.String <> string ind
+binder 12285:12287 <> lks:46
+R12325:12328 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12308:12318 xv6iris.LockRank <> locks_below def
+R12320:12322 xv6iris.LockRank <> lks:46 var
+R12324:12324 xv6iris.LockRank <> r:45 var
+R12354:12356 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12329:12329 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R12343:12348 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R12335:12339 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R12330:12331 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12333:12334 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12332:12332 xv6iris.LockRank <> r:45 var
+R12340:12342 xv6iris.LockRank <> lks:46 var
+R12349:12350 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12352:12353 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12351:12351 xv6iris.LockRank <> r:45 var
+R12357:12359 xv6iris.LockRank <> lks:46 var
+R12386:12398 xv6iris.LockRank <> locks_add_del thm
+R12401:12420 xv6iris.LockRank <> locks_below_not_elem thm
+R12386:12398 xv6iris.LockRank <> locks_add_del thm
+R12401:12420 xv6iris.LockRank <> locks_below_not_elem thm
+prf 12644:12664 <> locks_below_singleton
+R12674:12679 Stdlib.Strings.String <> string ind
+binder 12667:12667 <> r:47
+binder 12669:12670 <> r':48
+R12712:12715 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12697:12699 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R12686:12694 xv6iris.LockRank <> lock_rank def
+R12696:12696 xv6iris.LockRank <> r:47 var
+R12700:12708 xv6iris.LockRank <> lock_rank def
+R12710:12711 xv6iris.LockRank <> r':48 var
+R12716:12726 xv6iris.LockRank <> locks_below def
+R12728:12729 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12731:12732 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12730:12730 xv6iris.LockRank <> r:47 var
+R12734:12735 xv6iris.LockRank <> r':48 var
+R12768:12784 stdpp.base <> elem_of_singleton meth
+R12768:12784 stdpp.base <> elem_of_singleton meth
+R13716:13732 xv6iris.LockRank <> locks_below_empty thm
+R13766:13786 xv6iris.LockRank <> locks_below_singleton thm
+R13817:13843 xv6iris.LockRank <> locks_below_union_singleton thm
+R13891:13912 xv6iris.LockRank <> locks_below_difference thm
+R13962:13972 xv6iris.LockRank <> locks_below def
+R13962:13972 xv6iris.LockRank <> locks_below def
+R13984:13994 xv6iris.LockRank <> locks_below def
+R13984:13994 xv6iris.LockRank <> locks_below def
+R14024:14039 xv6iris.LockRank <> locks_below_mono thm
+R14326:14328 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14329:14331 stdpp.base <> ::stdpp_scope:'∅' not
+R14326:14328 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14329:14331 stdpp.base <> ::stdpp_scope:'∅' not
+R14336:14346 xv6iris.LockRank <> locks_below def
+R14336:14346 xv6iris.LockRank <> locks_below def
+R14386:14402 xv6iris.LockRank <> locks_below_empty thm
+R14902:14912 xv6iris.LockRank <> locks_below def
+R14902:14912 xv6iris.LockRank <> locks_below def

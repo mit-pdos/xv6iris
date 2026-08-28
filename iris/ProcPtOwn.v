@@ -3213,18 +3213,21 @@ Section ProcPt.
                  (pa_of_id a Hc)) with "Hk0 H").
   Qed.
 
-  Lemma page_own_to_phys (ppn : mword 44) :
+  (* A6.87: the page comes in FILLED.  A page-table page's slots are
+     REGISTERED cells, and a visibility-free window cannot supply one --
+     the page this runs on is the one kalloc memset. *)
+  Lemma page_filled_to_phys (ppn : mword 44) (c : bv 8) :
     page_valid (page_base ppn) ->
-    kmap_static_claims -∗ page_own (page_base ppn) -∗ phys_page_own ppn.
+    kmap_static_claims -∗ page_filled (page_base ppn) c -∗ phys_page_own ppn.
   Proof.
     intros Hv. iIntros "#Hb Hp".
-    rewrite /page_own /phys_page_own.
+    rewrite /page_filled /phys_page_own.
     iApply (big_sepL_impl with "Hp").
     iIntros "!>" (k j Hk) "H".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    rewrite /byte_any /phys_byte_any. iDestruct "H" as (b) "H".
-    iExists b.
-    iApply (ctx_ident_phys (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
+    rewrite /phys_byte_any.
+    iExists c.
+    iApply (ctx_ident_phys (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) c
               (page_valid_kmap_static ppn (0 + k)%nat Hv ltac:(lia)) with "Hb H").
   Qed.
 
@@ -3237,8 +3240,9 @@ Section ProcPt.
     iApply (big_sepL_impl with "Hp").
     iIntros "!>" (k j Hk) "H".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    rewrite /byte_any /phys_byte_any. iDestruct "H" as (b) "H".
-    iExists b.
+    rewrite /phys_byte_any. iDestruct "H" as (b) "H".
+    rewrite /byte_any.
+    iApply TsoCtx.ctx_pointsto_free.
     iApply (phys_ident_ctx (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
               (page_valid_kmap_static ppn (0 + k)%nat Hv ltac:(lia))
               (page_valid_canon ppn (0 + k)%nat Hv ltac:(lia)) with "Hb H").
@@ -3316,9 +3320,9 @@ Section ProcPt.
   Qed.
 
   (* kalloc's page, at the ppn the vmfault leaf names *)
-  Lemma page_own_to_phys_vmfault (r : mword 64) :
+  Lemma page_filled_to_phys_vmfault (r : mword 64) (c : bv 8) :
     page_valid r ->
-    kmap_static_claims -∗ page_own r -∗ phys_page_own (pte_ppn (vmfault_pte r)).
+    kmap_static_claims -∗ page_filled r c -∗ phys_page_own (pte_ppn (vmfault_pte r)).
   Proof.
     intros Hval.
     pose proof (page_base_of_valid r Hval) as Hpb.
@@ -3327,7 +3331,7 @@ Section ProcPt.
       by (rewrite Hpb; exact Hval).
     iIntros "#Hb Hp".
     rewrite pte_ppn_vmfault.
-    iApply (page_own_to_phys _ Hv' with "Hb").
+    iApply (page_filled_to_phys _ c Hv' with "Hb").
     rewrite Hpb. iExact "Hp".
   Qed.
 
@@ -4845,8 +4849,10 @@ Section ProcPt.
      user map is not a separate premise; and the page's OWNERSHIP is what
      makes it distinct from the pages already mapped.  The MAXVA bound is
      genuinely needed (see §3b). *)
+  (* A6.87: the page comes in FILLED -- a user page joins the table only
+     after its own memset/copy, and the table's slots are registered cells. *)
   Lemma proc_pt_grow_uvm (P : uptd) (perm : Z) (vpn : mword 27) (r : mword 64)
-      (t' : ptree) (m_ad : gmap (mword 27) (mword 64)) :
+      (t' : ptree) (m_ad : gmap (mword 27) (mword 64)) (c : bv 8) :
     uvm_perm_ok perm ->
     proc_pt_wf P -> upt_ad_view P.(ud_tfp) P.(ud_um) m_ad ->
     m_ad !! vpn = None ->
@@ -4854,7 +4860,7 @@ Section ProcPt.
     pt_rep0 t' (<[vpn := uvm_pte perm r]> m_ad) -> pt_base t' = P.(ud_root) ->
     page_valid r ->
     kmap_static_claims -∗ ptree_own 2 (DfracOwn 1) t' -∗
-    page_own r -∗ proc_pt_own P -∗
+    page_filled r c -∗ proc_pt_own P -∗
     proc_pt (uptd_insert_perm P perm vpn r).
   Proof.
     intros Hperm (Hmwf & Hawf & Hpwf & Hinj & Htfv) Hview Hnone Hlt Hrep Hbase Hval.
@@ -4872,7 +4878,7 @@ Section ProcPt.
     iAssert (phys_page_own (pte_ppn (uvm_pte perm r))) with "[Hpg]" as "Hph".
     { assert (Hv' : page_valid (page_base (pte_ppn (uvm_pte perm r))))
         by (rewrite Hpb; exact Hval).
-      iApply (page_own_to_phys _ Hv' with "Hb"). rewrite Hpb. iExact "Hpg". }
+      iApply (page_filled_to_phys _ c Hv' with "Hb"). rewrite Hpb. iExact "Hpg". }
     iDestruct (upt_pages_own_fresh P.(ud_um) (pte_ppn (uvm_pte perm r))
                  with "Hph Hown") as %Hfresh.
     rewrite /proc_pt /proc_pt_own /uptd_insert_perm.
@@ -4898,16 +4904,16 @@ Section ProcPt.
   Qed.
 
   Lemma proc_pt_grow (P : uptd) (vpn : mword 27) (r : mword 64)
-      (t' : ptree) (m_ad : gmap (mword 27) (mword 64)) :
+      (t' : ptree) (m_ad : gmap (mword 27) (mword 64)) (c : bv 8) :
     proc_pt_wf P -> upt_ad_view P.(ud_tfp) P.(ud_um) m_ad ->
     m_ad !! vpn = None ->
     (bv_unsigned vpn < 67108864)%Z ->
     pt_rep0 t' (<[vpn := vmfault_pte r]> m_ad) -> pt_base t' = P.(ud_root) ->
     page_valid r ->
     kmap_static_claims -∗ ptree_own 2 (DfracOwn 1) t' -∗
-    page_own r -∗ proc_pt_own P -∗
+    page_filled r c -∗ proc_pt_own P -∗
     proc_pt (uptd_insert P vpn r).
-  Proof. exact (proc_pt_grow_uvm P 22 vpn r t' m_ad uvm_perm_ok_22). Qed.
+  Proof. exact (proc_pt_grow_uvm P 22 vpn r t' m_ad c uvm_perm_ok_22). Qed.
 
   (* ------------------------------------------------------------------ *)
   (* THE UNMAP STEP -- the inverse of [proc_pt_grow].  uvmunmap clears one *)
@@ -5094,11 +5100,49 @@ Section ProcPt.
   (* moves, so the closing wand needs no pure premise -- only             *)
   (* [kmap_static_claims], which is persistent and so is captured.        *)
   (* ------------------------------------------------------------------ *)
+  (* A6.87: THE BORROWED PAGE IS NAMED, not [page_own].  A mapped page is
+     borrowed in order to be READ (copyin/copyout/exec), and [page_own] is
+     the visibility-free page now -- it promises nothing to read.  The
+     accessor therefore hands out the run at its actual contents and takes
+     any run back; the closing leg is where the borrower's own writes are
+     absorbed.  [page_named] is one ∃ over the byte function. *)
+  Definition page_named (p : mword 64) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 4096, ∃ b : bv 8, (pa_add p j) ↦ₘ b)%I.
+
+  Lemma phys_to_page_named (ppn : mword 44) :
+    page_valid (page_base ppn) ->
+    kmap_static_claims -∗ phys_page_own ppn -∗ page_named (page_base ppn).
+  Proof.
+    intros Hv. iIntros "#Hb Hp".
+    rewrite /phys_page_own /page_named.
+    iApply (big_sepL_impl with "Hp").
+    iIntros "!>" (k j Hk) "H".
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    rewrite /phys_byte_any. iDestruct "H" as (b) "H". iExists b.
+    iApply (phys_ident_ctx (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
+              (page_valid_kmap_static ppn (0 + k)%nat Hv ltac:(lia))
+              (page_valid_canon ppn (0 + k)%nat Hv ltac:(lia)) with "Hb H").
+  Qed.
+
+  Lemma page_named_to_phys (ppn : mword 44) :
+    page_valid (page_base ppn) ->
+    kmap_static_claims -∗ page_named (page_base ppn) -∗ phys_page_own ppn.
+  Proof.
+    intros Hv. iIntros "#Hb Hp".
+    rewrite /phys_page_own /page_named.
+    iApply (big_sepL_impl with "Hp").
+    iIntros "!>" (k j Hk) "H".
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    rewrite /phys_byte_any. iDestruct "H" as (b) "H". iExists b.
+    iApply (ctx_ident_phys (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
+              (page_valid_kmap_static ppn (0 + k)%nat Hv ltac:(lia)) with "Hb H").
+  Qed.
+
   Lemma proc_pt_page_acc (P : uptd) (vpn : mword 27) (w : mword 64) :
     P.(ud_um) !! vpn = Some w ->
     kmap_static_claims -∗ proc_pt P -∗
-      page_own (page_base (pte_ppn w)) ∗
-      (page_own (page_base (pte_ppn w)) -∗ proc_pt P).
+      page_named (page_base (pte_ppn w)) ∗
+      (page_named (page_base (pte_ppn w)) -∗ proc_pt P).
   Proof.
     intros Hl.
     assert (Hin : pte_ppn w ∈ um_ppns P.(ud_um)).
@@ -5109,10 +5153,10 @@ Section ProcPt.
                 (um_ppns P.(ud_um)) (pte_ppn w) Hin)) in "H".
     iDestruct "H" as "(%Hwf & Ht & Hp & Hrest)".
     pose proof (um_page_valid P vpn w Hwf Hl) as Hval.
-    iDestruct (phys_to_page_own (pte_ppn w) Hval with "Hb Hp") as "Hpg".
+    iDestruct (phys_to_page_named (pte_ppn w) Hval with "Hb Hp") as "Hpg".
     iSplitL "Hpg"; [iExact "Hpg" |].
     iIntros "Hpg".
-    iDestruct (page_own_to_phys (pte_ppn w) Hval with "Hb Hpg") as "Hp".
+    iDestruct (page_named_to_phys (pte_ppn w) Hval with "Hb Hpg") as "Hp".
     rewrite /proc_pt /proc_pt_own /upt_pages_own.
     rewrite (big_sepS_delete (fun q => phys_page_own q)
                (um_ppns P.(ud_um)) (pte_ppn w) Hin).
@@ -5126,7 +5170,7 @@ Section ProcPt.
   Lemma proc_pt_page_acc_vmfault (P : uptd) (vpn : mword 27) (r : mword 64) :
     page_valid r ->
     kmap_static_claims -∗ proc_pt (uptd_insert P vpn r) -∗
-      page_own r ∗ (page_own r -∗ proc_pt (uptd_insert P vpn r)).
+      page_named r ∗ (page_named r -∗ proc_pt (uptd_insert P vpn r)).
   Proof.
     intros Hval.
     assert (Hl : (uptd_insert P vpn r).(ud_um) !! vpn = Some (vmfault_pte r)).

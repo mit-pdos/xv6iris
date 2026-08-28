@@ -1,0 +1,89 @@
+DIGEST bad2041ff65dae98bf6f3f5d841b4a99
+Fxv6iris.SieCapCtx
+R1186:1194 iris.proofmode.proofmode <> <> lib
+R1445:1453 iris.base_logic.lib.ghost_var <> <> lib
+R1455:1463 iris.base_logic.lib.ghost_map <> <> lib
+R1465:1474 iris.base_logic.lib.invariants <> <> lib
+R1476:1483 iris.base_logic.lib.gen_heap <> <> lib
+R1485:1487 iris.base_logic.lib.own <> <> lib
+R1505:1534 SailStdpp.ConcurrencyInterface <> <> lib
+R1536:1573 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R1575:1609 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R1611:1636 SailStdpp.Operators_mwords <> <> lib
+R1654:1667 SailStdpp.Base <> <> lib
+R1669:1687 SailStdpp.TypeCasts <> <> lib
+R1689:1704 SailStdpp.Values <> <> lib
+R1706:1726 SailStdpp.MachineWord <> <> lib
+R1744:1760 Riscv.rv64d_types <> <> lib
+R1762:1772 Riscv.rv64d <> <> lib
+R1774:1791 Riscv.riscv_extras <> <> lib
+R1809:1817 xv6iris.RiscvLang <> <> lib
+R1819:1828 xv6iris.RiscvPtsto <> <> lib
+R1846:1852 xv6iris.RegFile <> <> lib
+R1870:1877 xv6iris.StackOwn <> <> lib
+R1895:1902 xv6iris.IntrDefs <> <> lib
+R1920:1923 xv6iris.Xv6G <> <> lib
+R1941:1946 xv6iris.TsoCtx <> <> lib
+sec 1958:1966 <> SieCapCtx
+R1982:1988 xv6iris.RiscvPtsto <> riscvGS class
+R2008:2011 xv6iris.Xv6G <> xv6G class
+R2013:2014 xv6iris.SieCapCtx <> SieCapCtx.Σ var
+R2018:2025 xv6iris.Xv6Cameras <> bioslotG class
+R2027:2028 xv6iris.SieCapCtx <> SieCapCtx.Σ var
+var  2044:2046 SieCapCtx GEN
+var  2059:2061 SieCapCtx CID
+var  2074:2075 SieCapCtx XI
+R2050:2054 xv6iris.RiscvLang <> GenId class
+R2065:2069 xv6iris.RiscvLang <> CpuId class
+R2079:2084 xv6iris.TsoCtx <> CurCtx class
+prf 2347:2369 <> sie_cap_gpr_own_ctx_acc
+R2377:2381 xv6iris.Ktier <> ktier ind
+binder 2372:2373 <> kt:8
+R2395:2401 xv6iris.RegFile <> regfile def
+binder 2391:2391 <> m:9
+R2413:2415 Corelib.Init.Datatypes <> nat ind
+binder 2405:2409 <> avail:10
+R2423:2426 Corelib.Init.Datatypes <> bool ind
+binder 2419:2419 <> b:11
+R2434:2438 SailStdpp.Values <> mword def
+binder 2430:2430 <> p:12
+R2476:2485 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R2450:2460 xv6iris.IntrDefs <> sie_cap_gpr def
+R2462:2463 xv6iris.SieCapCtx <> kt:8 var
+R2465:2465 xv6iris.SieCapCtx <> m:9 var
+R2467:2471 xv6iris.SieCapCtx <> avail:10 var
+R2473:2473 xv6iris.SieCapCtx <> b:11 var
+R2475:2475 xv6iris.SieCapCtx <> p:12 var
+R2505:2510 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2562:2562 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2486:2496 xv6iris.TsoCtx <> own_context def
+R2498:2504 xv6iris.TsoCtx <> cur_ctx def
+R2530:2535 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R2511:2521 xv6iris.TsoCtx <> own_context def
+R2523:2529 xv6iris.TsoCtx <> cur_ctx def
+R2536:2546 xv6iris.IntrDefs <> sie_cap_gpr def
+R2548:2549 xv6iris.SieCapCtx <> kt:8 var
+R2551:2551 xv6iris.SieCapCtx <> m:9 var
+R2553:2557 xv6iris.SieCapCtx <> avail:10 var
+R2559:2559 xv6iris.SieCapCtx <> b:11 var
+R2561:2561 xv6iris.SieCapCtx <> p:12 var
+R2607:2607 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2625:2630 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2636:2636 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2608:2624 xv6iris.IntrDefs <> sie_cap_gpr_split thm
+R2607:2607 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2625:2630 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2636:2636 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2608:2624 xv6iris.IntrDefs <> sie_cap_gpr_split thm
+R2786:2786 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2803:2808 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2845:2845 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2787:2802 xv6iris.IntrDefs <> sie_cap_gpr_join thm
+R2786:2786 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2803:2808 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2845:2845 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2787:2802 xv6iris.IntrDefs <> sie_cap_gpr_join thm
+R2861:2867 xv6iris.IntrDefs <> sie_cap def
+R2861:2867 xv6iris.IntrDefs <> sie_cap def
+R2861:2867 xv6iris.IntrDefs <> sie_cap def
+R2920:2928 xv6iris.SieCapCtx SieCapCtx <> sec

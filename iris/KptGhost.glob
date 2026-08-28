@@ -1,0 +1,281 @@
+DIGEST 421ecbe23ad8e7905d98e131320c9b1d
+Fxv6iris.KptGhost
+R1414:1419 Stdlib.ZArith.ZArith <> <> lib
+R1421:1424 Stdlib.Bool.Bool <> <> lib
+R1453:1456 stdpp.gmap <> <> lib
+R1458:1467 stdpp.namespaces <> <> lib
+R1503:1506 iris.algebra.csum <> <> lib
+R1508:1511 iris.algebra.excl <> <> lib
+R1513:1517 iris.algebra.agree <> <> lib
+R1560:1562 iris.base_logic.lib.own <> <> lib
+R1600:1608 iris.proofmode.proofmode <> <> lib
+R1626:1635 xv6iris.RiscvPtsto <> <> lib
+R1653:1660 xv6iris.TsoMemPa <> <> lib
+R1662:1669 xv6iris.TsoGhost <> <> lib
+R1733:1738 xv6iris.PtTree <> <> lib
+sec 1750:1757 <> KptGhost
+R1773:1779 xv6iris.RiscvPtsto <> riscvGS class
+def 1859:1867 <> kpt_unset
+R1871:1875 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R1877:1878 xv6iris.KptGhost <> KptGhost.Σ var
+R1887:1889 iris.base_logic.lib.own <> own def
+R1918:1921 xv6iris.RiscvPtsto <> kptR def
+R1901:1904 iris.algebra.csum <> Cinl constr
+R1907:1910 iris.algebra.excl <> Excl constr
+R1912:1913 Stdlib.Program.Syntax <> :::'()' not
+R1891:1898 xv6iris.RiscvPtsto <> kpt_name def
+def 2072:2077 <> kpt_lb
+R2084:2088 xv6iris.PtreeType <> ptree ind
+binder 2080:2080 <> t:3
+R2093:2097 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R2099:2100 xv6iris.KptGhost <> KptGhost.Σ var
+R2109:2111 iris.base_logic.lib.own <> own def
+R2174:2177 xv6iris.RiscvPtsto <> kptR def
+R2123:2126 iris.algebra.csum <> Cinr constr
+R2129:2136 iris.algebra.agree <> to_agree def
+R2155:2162 iris.algebra.ofe <> leibnizO abbrev
+R2164:2168 xv6iris.PtreeType <> ptree ind
+R2139:2149 xv6iris.PtTree <> ptree_canon def
+R2151:2151 xv6iris.KptGhost <> t:3 var
+R2113:2120 xv6iris.RiscvPtsto <> kpt_name def
+inst 2200:2217 <> kpt_unset_timeless
+R2221:2228 iris.bi.derived_connectives <> Timeless class
+R2230:2238 xv6iris.KptGhost <> kpt_unset def
+inst 2282:2296 <> kpt_lb_timeless
+binder 2298:2298 <> t:4
+R2302:2309 iris.bi.derived_connectives <> Timeless class
+R2312:2317 xv6iris.KptGhost <> kpt_lb def
+R2319:2319 xv6iris.KptGhost <> t:4 var
+inst 2364:2380 <> kpt_lb_persistent
+binder 2382:2382 <> t:5
+R2386:2395 iris.bi.derived_connectives <> Persistent class
+R2398:2403 xv6iris.KptGhost <> kpt_lb def
+R2405:2405 xv6iris.KptGhost <> t:5 var
+R2427:2432 xv6iris.KptGhost <> kpt_lb def
+R2427:2432 xv6iris.KptGhost <> kpt_lb def
+R2427:2432 xv6iris.KptGhost <> kpt_lb def
+R2441:2459 iris.base_logic.lib.own <> own_core_persistent inst
+R2462:2473 iris.algebra.csum <> Cinr_core_id inst
+R2441:2459 iris.base_logic.lib.own <> own_core_persistent inst
+R2462:2473 iris.algebra.csum <> Cinr_core_id inst
+prf 2545:2553 <> kpt_shoot
+R2560:2564 xv6iris.PtreeType <> ptree ind
+binder 2556:2556 <> t:6
+R2578:2584 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R2569:2577 xv6iris.KptGhost <> kpt_unset def
+R2585:2590 xv6iris.KptGhost <> kpt_lb def
+R2592:2592 xv6iris.KptGhost <> t:6 var
+R2628:2628 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2639:2644 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2648:2648 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2629:2638 iris.base_logic.lib.own <> own_update thm
+R2628:2628 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2639:2644 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2648:2648 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2629:2638 iris.base_logic.lib.own <> own_update thm
+R2661:2681 iris.algebra.updates <> cmra_update_exclusive thm
+R2661:2681 iris.algebra.updates <> cmra_update_exclusive thm
+prf 2773:2784 <> kpt_lb_agree
+R2794:2798 xv6iris.PtreeType <> ptree ind
+binder 2787:2787 <> t:7
+binder 2789:2790 <> t':8
+R2815:2820 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R2807:2812 xv6iris.KptGhost <> kpt_lb def
+R2814:2814 xv6iris.KptGhost <> t:7 var
+R2830:2835 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R2821:2826 xv6iris.KptGhost <> kpt_lb def
+R2828:2829 xv6iris.KptGhost <> t':8 var
+R2836:2839 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R2870:2873 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R2853:2855 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2840:2850 xv6iris.PtTree <> ptree_canon def
+R2852:2852 xv6iris.KptGhost <> t:7 var
+R2856:2866 xv6iris.PtTree <> ptree_canon def
+R2868:2869 xv6iris.KptGhost <> t':8 var
+R2920:2920 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2932:2937 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2945:2945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2921:2931 iris.base_logic.lib.own <> own_valid_2 thm
+R2920:2920 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2932:2937 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2945:2945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2921:2931 iris.base_logic.lib.own <> own_valid_2 thm
+R2968:2974 iris.algebra.csum <> Cinr_op thm
+R2976:2985 iris.algebra.csum <> Cinr_valid thm
+R2968:2974 iris.algebra.csum <> Cinr_op thm
+R2968:2974 iris.algebra.csum <> Cinr_op thm
+R2976:2985 iris.algebra.csum <> Cinr_valid thm
+R2976:2985 iris.algebra.csum <> Cinr_valid thm
+R3017:3033 iris.algebra.agree <> to_agree_op_inv_L thm
+R3017:3033 iris.algebra.agree <> to_agree_op_inv_L thm
+prf 3246:3257 <> kpt_lb_canon
+R3267:3271 xv6iris.PtreeType <> ptree ind
+binder 3260:3260 <> t:9
+binder 3262:3263 <> t':10
+R3310:3313 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3293:3295 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3280:3290 xv6iris.PtTree <> ptree_canon def
+R3292:3292 xv6iris.KptGhost <> t:9 var
+R3296:3306 xv6iris.PtTree <> ptree_canon def
+R3308:3309 xv6iris.KptGhost <> t':10 var
+R3322:3327 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R3314:3319 xv6iris.KptGhost <> kpt_lb def
+R3321:3321 xv6iris.KptGhost <> t:9 var
+R3328:3333 xv6iris.KptGhost <> kpt_lb def
+R3335:3336 xv6iris.KptGhost <> t':10 var
+R3368:3373 xv6iris.KptGhost <> kpt_lb def
+R3368:3373 xv6iris.KptGhost <> kpt_lb def
+R3368:3373 xv6iris.KptGhost <> kpt_lb def
+def 4101:4110 <> kptb_unset
+R4114:4118 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4120:4121 xv6iris.KptGhost <> KptGhost.Σ var
+R4130:4132 iris.base_logic.lib.own <> own def
+R4162:4166 xv6iris.RiscvPtsto <> kptbR def
+R4145:4148 iris.algebra.csum <> Cinl constr
+R4151:4154 iris.algebra.excl <> Excl constr
+R4156:4157 Stdlib.Program.Syntax <> :::'()' not
+R4134:4142 xv6iris.RiscvPtsto <> kptb_name def
+def 4820:4828 <> kpt_bound
+R4835:4837 Corelib.Init.Datatypes <> nat ind
+binder 4831:4831 <> B:11
+R4842:4846 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4848:4849 xv6iris.KptGhost <> KptGhost.Σ var
+R4917:4926 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4859:4861 iris.base_logic.lib.own <> own def
+R4911:4915 xv6iris.RiscvPtsto <> kptbR def
+R4874:4877 iris.algebra.csum <> Cinr constr
+R4880:4887 iris.algebra.agree <> to_agree def
+R4894:4901 iris.algebra.ofe <> leibnizO abbrev
+R4903:4905 Corelib.Init.Datatypes <> nat ind
+R4890:4890 xv6iris.KptGhost <> B:11 var
+R4863:4871 xv6iris.RiscvPtsto <> kptb_name def
+R4927:4929 xv6iris.TsoGhost <> llb def
+R4931:4941 xv6iris.RiscvPtsto <> loglen_name def
+R4943:4943 xv6iris.KptGhost <> B:11 var
+inst 4968:4986 <> kptb_unset_timeless
+R4990:4997 iris.bi.derived_connectives <> Timeless class
+R4999:5008 xv6iris.KptGhost <> kptb_unset def
+inst 5052:5069 <> kpt_bound_timeless
+binder 5071:5071 <> B:12
+R5075:5082 iris.bi.derived_connectives <> Timeless class
+R5085:5093 xv6iris.KptGhost <> kpt_bound def
+R5095:5095 xv6iris.KptGhost <> B:12 var
+inst 5140:5159 <> kpt_bound_persistent
+binder 5161:5161 <> B:13
+R5165:5174 iris.bi.derived_connectives <> Persistent class
+R5177:5185 xv6iris.KptGhost <> kpt_bound def
+R5187:5187 xv6iris.KptGhost <> B:13 var
+R5213:5221 xv6iris.KptGhost <> kpt_bound def
+R5213:5221 xv6iris.KptGhost <> kpt_bound def
+R5213:5221 xv6iris.KptGhost <> kpt_bound def
+R5230:5246 iris.bi.derived_laws bi sep_persistent inst
+R5230:5246 iris.bi.derived_laws bi sep_persistent inst
+R5271:5289 iris.base_logic.lib.own <> own_core_persistent inst
+R5292:5303 iris.algebra.csum <> Cinr_core_id inst
+R5271:5289 iris.base_logic.lib.own <> own_core_persistent inst
+R5292:5303 iris.algebra.csum <> Cinr_core_id inst
+prf 5543:5552 <> kptb_shoot
+R5559:5561 Corelib.Init.Datatypes <> nat ind
+binder 5555:5555 <> B:14
+R5583:5588 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5566:5568 xv6iris.TsoGhost <> llb def
+R5570:5580 xv6iris.RiscvPtsto <> loglen_name def
+R5582:5582 xv6iris.KptGhost <> B:14 var
+R5599:5605 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R5589:5598 xv6iris.KptGhost <> kptb_unset def
+R5606:5614 xv6iris.KptGhost <> kpt_bound def
+R5616:5616 xv6iris.KptGhost <> B:14 var
+R5660:5660 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5671:5676 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5680:5680 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5661:5670 iris.base_logic.lib.own <> own_update thm
+R5703:5723 iris.algebra.updates <> cmra_update_exclusive thm
+R5660:5660 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5671:5676 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5680:5680 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5661:5670 iris.base_logic.lib.own <> own_update thm
+R5703:5723 iris.algebra.updates <> cmra_update_exclusive thm
+prf 5768:5780 <> kpt_bound_llb
+R5787:5789 Corelib.Init.Datatypes <> nat ind
+binder 5783:5783 <> B:15
+R5805:5810 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5794:5802 xv6iris.KptGhost <> kpt_bound def
+R5804:5804 xv6iris.KptGhost <> B:15 var
+R5811:5813 xv6iris.TsoGhost <> llb def
+R5815:5825 xv6iris.RiscvPtsto <> loglen_name def
+R5827:5827 xv6iris.KptGhost <> B:15 var
+prf 5873:5887 <> kpt_bound_agree
+R5897:5899 Corelib.Init.Datatypes <> nat ind
+binder 5890:5890 <> B:16
+binder 5892:5893 <> B':17
+R5919:5924 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5908:5916 xv6iris.KptGhost <> kpt_bound def
+R5918:5918 xv6iris.KptGhost <> B:16 var
+R5937:5942 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5925:5933 xv6iris.KptGhost <> kpt_bound def
+R5935:5936 xv6iris.KptGhost <> B':17 var
+R5943:5946 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5953:5956 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5948:5950 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5947:5947 xv6iris.KptGhost <> B:16 var
+R5951:5952 xv6iris.KptGhost <> B':17 var
+R6011:6011 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6023:6028 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6036:6036 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6012:6022 iris.base_logic.lib.own <> own_valid_2 thm
+R6011:6011 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6023:6028 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6036:6036 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6012:6022 iris.base_logic.lib.own <> own_valid_2 thm
+R6059:6065 iris.algebra.csum <> Cinr_op thm
+R6067:6076 iris.algebra.csum <> Cinr_valid thm
+R6078:6096 iris.algebra.agree <> to_agree_op_valid_L thm
+R6059:6065 iris.algebra.csum <> Cinr_op thm
+R6059:6065 iris.algebra.csum <> Cinr_op thm
+R6067:6076 iris.algebra.csum <> Cinr_valid thm
+R6067:6076 iris.algebra.csum <> Cinr_valid thm
+R6078:6096 iris.algebra.agree <> to_agree_op_valid_L thm
+R6078:6096 iris.algebra.agree <> to_agree_op_valid_L thm
+R6137:6144 xv6iris.KptGhost KptGhost <> sec
+def 6425:6428 <> kptN
+R6432:6440 stdpp.namespaces <> namespace def
+R6450:6453 stdpp.namespaces <> ::stdpp_scope:x_'.@'_x not
+R6445:6449 stdpp.namespaces <> nroot def
+prf 6535:6549 <> kpt_ghost_alloc
+R6554:6556 iris.base_logic.lib.own <> inG class
+R6561:6564 xv6iris.RiscvPtsto <> kptR def
+binder 6558:6559 <> Σ:18
+binder 6553:6564 <> inG0:19
+R6571:6574 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R6575:6579 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R6580:6583 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6594:6595 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6589:6593 iris.base_logic.lib.iprop <> gname def
+binder 6584:6585 <> γ:20
+R6596:6598 iris.base_logic.lib.own <> own def
+R6621:6624 xv6iris.RiscvPtsto <> kptR def
+R6604:6607 iris.algebra.csum <> Cinl constr
+R6610:6613 iris.algebra.excl <> Excl constr
+R6615:6616 Stdlib.Program.Syntax <> :::'()' not
+R6600:6601 xv6iris.KptGhost <> γ:20 var
+R6642:6650 iris.base_logic.lib.own <> own_alloc thm
+R6642:6650 iris.base_logic.lib.own <> own_alloc thm
+prf 6724:6739 <> kptb_ghost_alloc
+R6744:6746 iris.base_logic.lib.own <> inG class
+R6751:6755 xv6iris.RiscvPtsto <> kptbR def
+binder 6748:6749 <> Σ:21
+binder 6743:6755 <> inG0:22
+R6762:6765 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R6766:6770 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R6771:6774 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6785:6786 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6780:6784 iris.base_logic.lib.iprop <> gname def
+binder 6775:6776 <> γ:23
+R6787:6789 iris.base_logic.lib.own <> own def
+R6812:6816 xv6iris.RiscvPtsto <> kptbR def
+R6795:6798 iris.algebra.csum <> Cinl constr
+R6801:6804 iris.algebra.excl <> Excl constr
+R6806:6807 Stdlib.Program.Syntax <> :::'()' not
+R6791:6792 xv6iris.KptGhost <> γ:23 var
+R6834:6842 iris.base_logic.lib.own <> own_alloc thm
+R6834:6842 iris.base_logic.lib.own <> own_alloc thm

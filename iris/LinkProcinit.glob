@@ -1,0 +1,7 @@
+DIGEST a4bf3a0d3421c9a8ddcb1263ecdd2784
+Fxv6iris.LinkProcinit
+R172:183 xv6iris.LinkInitlock <> <> lib
+R185:197 xv6iris.ProofProcinit <> <> lib
+R220:232 xv6iris.ProofProcinit ProcinitProof <> modtype
+R234:241 xv6iris.LinkInitlock Initlock <> modtype
+mod 208:215 <> Procinit

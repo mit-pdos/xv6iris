@@ -1,0 +1,9 @@
+DIGEST debee9adef1849169eb06886f12a9fa1
+Fxv6iris.LinkUartinit
+R763:770 xv6iris.LinkUart <> <> lib
+R772:783 xv6iris.LinkInitlock <> <> lib
+R785:797 xv6iris.ProofUartinit <> <> lib
+R820:832 xv6iris.ProofUartinit UartinitProof <> modtype
+R834:837 xv6iris.LinkUart Uart <> modtype
+R839:846 xv6iris.LinkInitlock Initlock <> modtype
+mod 808:815 <> Uartinit

@@ -1,0 +1,27 @@
+DIGEST c5c032a453700de6aed9a4f9a2fc4fc5
+Fxv6iris.FsNode
+R1371:1376 Stdlib.ZArith.ZArith <> <> lib
+R1378:1381 Stdlib.Lists.List <> <> lib
+R1410:1413 stdpp.gmap <> <> lib
+R1415:1418 stdpp.list <> <> lib
+R1420:1440 stdpp.bitvector.definitions <> <> lib
+R1458:1466 xv6iris.DinodeEnc <> <> lib
+rec 1504:1510 <> fs_node
+proj 1526:1531 <> fn_rec
+proj 1604:1609 <> fn_ent
+proj 1682:1687 <> fn_blk
+R1535:1540 xv6iris.DinodeEnc <> dinode rec
+R1613:1616 Corelib.Init.Datatypes <> list ind
+R1619:1620 stdpp.bitvector.definitions <> bv rec
+R1691:1694 stdpp.gmap <> gmap rec
+R1701:1704 Corelib.Init.Datatypes <> list ind
+R1707:1708 stdpp.bitvector.definitions <> bv rec
+R1696:1698 Corelib.Init.Datatypes <> nat ind
+inst 1778:1794 <> fs_node_inhabited
+R1798:1806 stdpp.base <> Inhabited class
+R1808:1814 xv6iris.FsNode <> fs_node rec
+R1821:1828 stdpp.base <> populate constr
+R1831:1836 xv6iris.FsNode <> MkNode constr
+R1838:1847 stdpp.base <> inhabitant meth
+R1849:1850 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R1852:1854 stdpp.base <> ::stdpp_scope:'∅' not

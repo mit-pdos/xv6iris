@@ -1,0 +1,3781 @@
+DIGEST 78aeefc34d345510aafcb77578ef1d7f
+Fxv6iris.DirViewLend
+R6977:6982 Stdlib.ZArith.ZArith <> <> lib
+R6984:6986 Stdlib.micromega.Lia <> <> lib
+R7015:7018 stdpp.gmap <> <> lib
+R7020:7023 stdpp.list <> <> lib
+R7025:7034 stdpp.namespaces <> <> lib
+R7036:7056 stdpp.bitvector.definitions <> <> lib
+R7092:7095 iris.algebra.gmap <> <> lib
+R7097:7101 iris.algebra.dfrac <> <> lib
+R7103:7106 iris.algebra.excl <> <> lib
+R7108:7114 iris.algebra.updates <> <> lib
+R7154:7164 iris.algebra.lib.dfrac_agree <> <> lib
+R7199:7208 iris.bi.lib.fractional <> <> lib
+R7246:7254 iris.proofmode.proofmode <> <> lib
+R7297:7299 iris.base_logic.lib.own <> <> lib
+R7301:7309 iris.base_logic.lib.ghost_map <> <> lib
+R7327:7342 SailStdpp.Values <> <> lib
+R7360:7368 xv6iris.DinodeEnc <> <> lib
+R7439:7444 xv6iris.FsTree <> <> lib
+R7518:7526 xv6iris.IcacheRef <> <> lib
+R7597:7604 xv6iris.DirViewG <> <> lib
+def 8148:8152 <> dvl_k
+R8159:8159 Corelib.Numbers.BinNums <> Z ind
+binder 8155:8155 <> z:1
+R8164:8164 Corelib.Numbers.BinNums <> Z ind
+R8177:8179 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R8169:8170 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
+R8176:8176 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
+R8172:8174 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R8175:8175 xv6iris.DirViewLend <> z:1 var
+def 8194:8198 <> dvl_l
+R8205:8205 Corelib.Numbers.BinNums <> Z ind
+binder 8201:8201 <> z:2
+R8210:8210 Corelib.Numbers.BinNums <> Z ind
+R8223:8225 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R8215:8216 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
+R8222:8222 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
+R8218:8220 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R8221:8221 xv6iris.DirViewLend <> z:2 var
+def 8336:8340 <> fvl_k
+R8347:8347 Corelib.Numbers.BinNums <> Z ind
+binder 8343:8343 <> z:3
+R8352:8352 Corelib.Numbers.BinNums <> Z ind
+R8365:8367 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R8357:8358 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
+R8364:8364 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
+R8360:8362 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R8363:8363 xv6iris.DirViewLend <> z:3 var
+def 8382:8386 <> fvl_l
+R8393:8393 Corelib.Numbers.BinNums <> Z ind
+binder 8389:8389 <> z:4
+R8398:8398 Corelib.Numbers.BinNums <> Z ind
+R8411:8413 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R8403:8404 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
+R8410:8410 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
+R8406:8408 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R8409:8409 xv6iris.DirViewLend <> z:4 var
+prf 8424:8432 <> dvl_k_neg
+R8439:8439 Corelib.Numbers.BinNums <> Z ind
+binder 8435:8435 <> z:5
+R8450:8453 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8445:8448 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R8449:8449 xv6iris.DirViewLend <> z:5 var
+R8461:8463 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R8454:8458 xv6iris.DirViewLend <> dvl_k def
+R8460:8460 xv6iris.DirViewLend <> z:5 var
+R8483:8487 xv6iris.DirViewLend <> dvl_k def
+R8483:8487 xv6iris.DirViewLend <> dvl_k def
+R8483:8487 xv6iris.DirViewLend <> dvl_k def
+prf 8506:8514 <> dvl_l_neg
+R8521:8521 Corelib.Numbers.BinNums <> Z ind
+binder 8517:8517 <> z:6
+R8532:8535 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8527:8530 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R8531:8531 xv6iris.DirViewLend <> z:6 var
+R8543:8545 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R8536:8540 xv6iris.DirViewLend <> dvl_l def
+R8542:8542 xv6iris.DirViewLend <> z:6 var
+R8565:8569 xv6iris.DirViewLend <> dvl_l def
+R8565:8569 xv6iris.DirViewLend <> dvl_l def
+R8565:8569 xv6iris.DirViewLend <> dvl_l def
+prf 8588:8596 <> fvl_k_neg
+R8603:8603 Corelib.Numbers.BinNums <> Z ind
+binder 8599:8599 <> z:7
+R8614:8617 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8609:8612 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R8613:8613 xv6iris.DirViewLend <> z:7 var
+R8625:8627 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R8618:8622 xv6iris.DirViewLend <> fvl_k def
+R8624:8624 xv6iris.DirViewLend <> z:7 var
+R8647:8651 xv6iris.DirViewLend <> fvl_k def
+R8647:8651 xv6iris.DirViewLend <> fvl_k def
+R8647:8651 xv6iris.DirViewLend <> fvl_k def
+prf 8670:8678 <> fvl_l_neg
+R8685:8685 Corelib.Numbers.BinNums <> Z ind
+binder 8681:8681 <> z:8
+R8696:8699 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8691:8694 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R8695:8695 xv6iris.DirViewLend <> z:8 var
+R8707:8709 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R8700:8704 xv6iris.DirViewLend <> fvl_l def
+R8706:8706 xv6iris.DirViewLend <> z:8 var
+R8729:8733 xv6iris.DirViewLend <> fvl_l def
+R8729:8733 xv6iris.DirViewLend <> fvl_l def
+R8729:8733 xv6iris.DirViewLend <> fvl_l def
+prf 8932:8941 <> dvl_k_l_ne
+R8952:8952 Corelib.Numbers.BinNums <> Z ind
+binder 8944:8945 <> z1:9
+binder 8947:8948 <> z2:10
+R8965:8968 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R8957:8961 xv6iris.DirViewLend <> dvl_k def
+R8963:8964 xv6iris.DirViewLend <> z1:9 var
+R8969:8973 xv6iris.DirViewLend <> dvl_l def
+R8975:8976 xv6iris.DirViewLend <> z2:10 var
+R8995:8999 xv6iris.DirViewLend <> dvl_k def
+R9002:9006 xv6iris.DirViewLend <> dvl_l def
+R8995:8999 xv6iris.DirViewLend <> dvl_k def
+R8995:8999 xv6iris.DirViewLend <> dvl_k def
+R9002:9006 xv6iris.DirViewLend <> dvl_l def
+R9002:9006 xv6iris.DirViewLend <> dvl_l def
+prf 9025:9038 <> dvl_k_fvl_k_ne
+R9049:9049 Corelib.Numbers.BinNums <> Z ind
+binder 9041:9042 <> z1:11
+binder 9044:9045 <> z2:12
+R9062:9065 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R9054:9058 xv6iris.DirViewLend <> dvl_k def
+R9060:9061 xv6iris.DirViewLend <> z1:11 var
+R9066:9070 xv6iris.DirViewLend <> fvl_k def
+R9072:9073 xv6iris.DirViewLend <> z2:12 var
+R9092:9096 xv6iris.DirViewLend <> dvl_k def
+R9099:9103 xv6iris.DirViewLend <> fvl_k def
+R9092:9096 xv6iris.DirViewLend <> dvl_k def
+R9092:9096 xv6iris.DirViewLend <> dvl_k def
+R9099:9103 xv6iris.DirViewLend <> fvl_k def
+R9099:9103 xv6iris.DirViewLend <> fvl_k def
+prf 9122:9135 <> dvl_k_fvl_l_ne
+R9146:9146 Corelib.Numbers.BinNums <> Z ind
+binder 9138:9139 <> z1:13
+binder 9141:9142 <> z2:14
+R9159:9162 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R9151:9155 xv6iris.DirViewLend <> dvl_k def
+R9157:9158 xv6iris.DirViewLend <> z1:13 var
+R9163:9167 xv6iris.DirViewLend <> fvl_l def
+R9169:9170 xv6iris.DirViewLend <> z2:14 var
+R9189:9193 xv6iris.DirViewLend <> dvl_k def
+R9196:9200 xv6iris.DirViewLend <> fvl_l def
+R9189:9193 xv6iris.DirViewLend <> dvl_k def
+R9189:9193 xv6iris.DirViewLend <> dvl_k def
+R9196:9200 xv6iris.DirViewLend <> fvl_l def
+R9196:9200 xv6iris.DirViewLend <> fvl_l def
+prf 9219:9232 <> dvl_l_fvl_k_ne
+R9243:9243 Corelib.Numbers.BinNums <> Z ind
+binder 9235:9236 <> z1:15
+binder 9238:9239 <> z2:16
+R9256:9259 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R9248:9252 xv6iris.DirViewLend <> dvl_l def
+R9254:9255 xv6iris.DirViewLend <> z1:15 var
+R9260:9264 xv6iris.DirViewLend <> fvl_k def
+R9266:9267 xv6iris.DirViewLend <> z2:16 var
+R9286:9290 xv6iris.DirViewLend <> dvl_l def
+R9293:9297 xv6iris.DirViewLend <> fvl_k def
+R9286:9290 xv6iris.DirViewLend <> dvl_l def
+R9286:9290 xv6iris.DirViewLend <> dvl_l def
+R9293:9297 xv6iris.DirViewLend <> fvl_k def
+R9293:9297 xv6iris.DirViewLend <> fvl_k def
+prf 9316:9329 <> dvl_l_fvl_l_ne
+R9340:9340 Corelib.Numbers.BinNums <> Z ind
+binder 9332:9333 <> z1:17
+binder 9335:9336 <> z2:18
+R9353:9356 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R9345:9349 xv6iris.DirViewLend <> dvl_l def
+R9351:9352 xv6iris.DirViewLend <> z1:17 var
+R9357:9361 xv6iris.DirViewLend <> fvl_l def
+R9363:9364 xv6iris.DirViewLend <> z2:18 var
+R9383:9387 xv6iris.DirViewLend <> dvl_l def
+R9390:9394 xv6iris.DirViewLend <> fvl_l def
+R9383:9387 xv6iris.DirViewLend <> dvl_l def
+R9383:9387 xv6iris.DirViewLend <> dvl_l def
+R9390:9394 xv6iris.DirViewLend <> fvl_l def
+R9390:9394 xv6iris.DirViewLend <> fvl_l def
+prf 9413:9422 <> fvl_k_l_ne
+R9433:9433 Corelib.Numbers.BinNums <> Z ind
+binder 9425:9426 <> z1:19
+binder 9428:9429 <> z2:20
+R9446:9449 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R9438:9442 xv6iris.DirViewLend <> fvl_k def
+R9444:9445 xv6iris.DirViewLend <> z1:19 var
+R9450:9454 xv6iris.DirViewLend <> fvl_l def
+R9456:9457 xv6iris.DirViewLend <> z2:20 var
+R9476:9480 xv6iris.DirViewLend <> fvl_k def
+R9483:9487 xv6iris.DirViewLend <> fvl_l def
+R9476:9480 xv6iris.DirViewLend <> fvl_k def
+R9476:9480 xv6iris.DirViewLend <> fvl_k def
+R9483:9487 xv6iris.DirViewLend <> fvl_l def
+R9483:9487 xv6iris.DirViewLend <> fvl_l def
+inst 9517:9525 <> dvl_k_inj
+R9529:9531 stdpp.base <> Inj class
+R9539:9543 xv6iris.DirViewLend <> dvl_k def
+R9536:9537 Corelib.Init.Logic <> eq ind
+R9533:9534 Corelib.Init.Logic <> eq ind
+R9576:9580 xv6iris.DirViewLend <> dvl_k def
+R9576:9580 xv6iris.DirViewLend <> dvl_k def
+R9576:9580 xv6iris.DirViewLend <> dvl_k def
+inst 9609:9617 <> dvl_l_inj
+R9621:9623 stdpp.base <> Inj class
+R9631:9635 xv6iris.DirViewLend <> dvl_l def
+R9628:9629 Corelib.Init.Logic <> eq ind
+R9625:9626 Corelib.Init.Logic <> eq ind
+R9668:9672 xv6iris.DirViewLend <> dvl_l def
+R9668:9672 xv6iris.DirViewLend <> dvl_l def
+R9668:9672 xv6iris.DirViewLend <> dvl_l def
+inst 9701:9709 <> fvl_k_inj
+R9713:9715 stdpp.base <> Inj class
+R9723:9727 xv6iris.DirViewLend <> fvl_k def
+R9720:9721 Corelib.Init.Logic <> eq ind
+R9717:9718 Corelib.Init.Logic <> eq ind
+R9760:9764 xv6iris.DirViewLend <> fvl_k def
+R9760:9764 xv6iris.DirViewLend <> fvl_k def
+R9760:9764 xv6iris.DirViewLend <> fvl_k def
+inst 9793:9801 <> fvl_l_inj
+R9805:9807 stdpp.base <> Inj class
+R9815:9819 xv6iris.DirViewLend <> fvl_l def
+R9812:9813 Corelib.Init.Logic <> eq ind
+R9809:9810 Corelib.Init.Logic <> eq ind
+R9852:9856 xv6iris.DirViewLend <> fvl_l def
+R9852:9856 xv6iris.DirViewLend <> fvl_l def
+R9852:9856 xv6iris.DirViewLend <> fvl_l def
+prf 9925:9934 <> dfrac_1_hh
+R9948:9950 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9938:9945 iris.algebra.dfrac <> DfracOwn constr
+R9965:9969 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R9951:9958 iris.algebra.dfrac <> DfracOwn constr
+R9962:9962 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R9970:9977 iris.algebra.dfrac <> DfracOwn constr
+R9981:9981 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10001:10012 iris.algebra.dfrac <> dfrac_op_own thm
+R10001:10012 iris.algebra.dfrac <> dfrac_op_own thm
+R10001:10012 iris.algebra.dfrac <> dfrac_op_own thm
+R10026:10037 stdpp.numbers Qp half_half thm
+R10026:10037 stdpp.numbers Qp half_half thm
+R10026:10037 stdpp.numbers Qp half_half thm
+prf 10051:10065 <> dvl_q_over_1_12
+R10071:10073 stdpp.numbers Qp.notations ::Qp_scope:x_'<'_x not
+R10075:10077 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R10079:10079 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10100:10110 stdpp.numbers Qp lt_add_l thm
+R10100:10110 stdpp.numbers Qp lt_add_l thm
+prf 10124:10139 <> dvl_q_over_34_12
+R10145:10147 stdpp.numbers Qp.notations ::Qp_scope:x_'<'_x not
+R10151:10153 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R10149:10149 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10155:10155 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10198:10200 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10188:10190 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R10186:10186 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10192:10192 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10203:10205 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R10207:10207 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10198:10200 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10188:10190 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R10186:10186 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10192:10192 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10203:10205 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R10207:10207 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10251:10261 stdpp.numbers Qp lt_add_l thm
+R10251:10261 stdpp.numbers Qp lt_add_l thm
+prf 10275:10289 <> dvl_q_over_1_14
+R10295:10297 stdpp.numbers Qp.notations ::Qp_scope:x_'<'_x not
+R10299:10301 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R10303:10303 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R10324:10334 stdpp.numbers Qp lt_add_l thm
+R10324:10334 stdpp.numbers Qp lt_add_l thm
+sec 10351:10365 <> DirViewLendDefs
+R10381:10387 xv6iris.Xv6Cameras <> icacheG class
+var  10406:10409 DirViewLendDefs ICFG
+R10413:10416 xv6iris.IcacheRef <> icfg class
+def 11414:11420 <> dvl_dom
+R11427:11427 Corelib.Numbers.BinNums <> Z ind
+binder 11423:11423 <> z:24
+R11441:11444 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11446:11448 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11445:11445 xv6iris.DirViewLend <> z:24 var
+R11445:11445 xv6iris.DirViewLend <> z:24 var
+R11451:11453 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R11454:11461 Stdlib.ZArith.BinInt Z of_nat def
+R11463:11470 xv6iris.IcacheRef <> icfg_nib meth
+def 11564:11571 <> dvl_slot
+R11578:11578 Corelib.Numbers.BinNums <> Z ind
+binder 11574:11574 <> z:25
+R11587:11591 iris.algebra.dfrac <> dfrac ind
+binder 11582:11583 <> dq:26
+R11604:11606 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R11599:11603 iris.base_logic.lib.iprop <> gname def
+R11607:11611 iris.base_logic.lib.iprop <> gname def
+binder 11595:11595 <> g:27
+R11616:11620 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R11622:11623 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R11640:11644 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R11653:11653 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R11658:11658 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R11645:11652 xv6iris.IcacheRef <> icfg_reg meth
+R11633:11637 xv6iris.DirViewLend <> dvl_k def
+R11639:11639 xv6iris.DirViewLend <> z:25 var
+R11654:11654 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R11657:11657 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R11655:11656 xv6iris.DirViewLend <> dq:26 var
+R11659:11659 xv6iris.DirViewLend <> g:27 var
+def 11824:11829 <> dv_lic
+R11836:11836 Corelib.Numbers.BinNums <> Z ind
+binder 11832:11832 <> z:28
+R11841:11845 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R11847:11848 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R11858:11861 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R11879:11880 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R11871:11873 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R11866:11870 iris.base_logic.lib.iprop <> gname def
+R11874:11878 iris.base_logic.lib.iprop <> gname def
+binder 11862:11862 <> g:29
+R11888:11892 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R11901:11901 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R11902:11902 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R11893:11900 xv6iris.IcacheRef <> icfg_reg meth
+R11881:11885 xv6iris.DirViewLend <> dvl_l def
+R11887:11887 xv6iris.DirViewLend <> z:28 var
+R11903:11903 xv6iris.DirViewLend <> g:29 var
+def 12130:12137 <> dvl_cell
+R12145:12149 iris.base_logic.lib.iprop <> gname def
+binder 12140:12141 <> γ:30
+R12157:12157 Corelib.Numbers.BinNums <> Z ind
+binder 12153:12153 <> z:31
+R12166:12170 iris.algebra.dfrac <> dfrac ind
+binder 12161:12162 <> dq:32
+R12178:12181 stdpp.gmap <> gmap rec
+R12189:12189 Corelib.Numbers.BinNums <> Z ind
+R12183:12187 xv6iris.FsTree <> fname def
+binder 12174:12174 <> e:33
+R12198:12202 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R12204:12205 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R12214:12216 iris.base_logic.lib.own <> own def
+R12283:12289 xv6iris.Xv6Cameras <> dviewUR def
+R12222:12224 stdpp.base <> ::stdpp_scope:'{['_x_':='_x_']}' not
+R12226:12229 stdpp.base <> ::stdpp_scope:'{['_x_':='_x_']}' not
+R12277:12279 stdpp.base <> ::stdpp_scope:'{['_x_':='_x_']}' not
+R12225:12225 xv6iris.DirViewLend <> z:31 var
+R12230:12243 iris.algebra.lib.dfrac_agree <> to_dfrac_agree def
+R12253:12260 iris.algebra.ofe <> leibnizO abbrev
+R12263:12266 stdpp.gmap <> gmap rec
+R12274:12274 Corelib.Numbers.BinNums <> Z ind
+R12268:12272 xv6iris.FsTree <> fname def
+R12249:12249 xv6iris.DirViewLend <> e:33 var
+R12245:12246 xv6iris.DirViewLend <> dq:32 var
+R12218:12219 xv6iris.DirViewLend <> γ:30 var
+def 12456:12463 <> dv_ctick
+R12472:12476 iris.base_logic.lib.iprop <> gname def
+binder 12466:12468 <> γc:34
+R12484:12484 Corelib.Numbers.BinNums <> Z ind
+binder 12480:12480 <> z:35
+R12492:12495 stdpp.gmap <> gmap rec
+R12503:12503 Corelib.Numbers.BinNums <> Z ind
+R12497:12501 xv6iris.FsTree <> fname def
+binder 12488:12488 <> e:36
+R12508:12512 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R12514:12515 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R12524:12531 xv6iris.DirViewLend <> dvl_cell def
+R12533:12535 xv6iris.DirViewLend <> γc:34 var
+R12537:12537 xv6iris.DirViewLend <> z:35 var
+R12540:12547 iris.algebra.dfrac <> DfracOwn constr
+R12552:12552 xv6iris.DirViewLend <> e:36 var
+def 12709:12716 <> dv_cshot
+R12725:12729 iris.base_logic.lib.iprop <> gname def
+binder 12719:12721 <> γc:37
+R12737:12737 Corelib.Numbers.BinNums <> Z ind
+binder 12733:12733 <> z:38
+R12745:12748 stdpp.gmap <> gmap rec
+R12756:12756 Corelib.Numbers.BinNums <> Z ind
+R12750:12754 xv6iris.FsTree <> fname def
+binder 12741:12741 <> e:39
+R12761:12765 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R12767:12768 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R12777:12784 xv6iris.DirViewLend <> dvl_cell def
+R12786:12788 xv6iris.DirViewLend <> γc:37 var
+R12790:12790 xv6iris.DirViewLend <> z:38 var
+R12792:12805 iris.algebra.dfrac <> DfracDiscarded constr
+R12807:12807 xv6iris.DirViewLend <> e:39 var
+def 12892:12898 <> dv_vwit
+R12907:12911 iris.base_logic.lib.iprop <> gname def
+binder 12901:12903 <> γv:40
+R12919:12919 Corelib.Numbers.BinNums <> Z ind
+binder 12915:12915 <> z:41
+R12927:12930 stdpp.gmap <> gmap rec
+R12938:12938 Corelib.Numbers.BinNums <> Z ind
+R12932:12936 xv6iris.FsTree <> fname def
+binder 12923:12923 <> e:42
+R12943:12947 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R12949:12950 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R12959:12966 xv6iris.DirViewLend <> dvl_cell def
+R12968:12970 xv6iris.DirViewLend <> γv:40 var
+R12972:12972 xv6iris.DirViewLend <> z:41 var
+R12975:12982 iris.algebra.dfrac <> DfracOwn constr
+R12986:12986 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R12991:12991 xv6iris.DirViewLend <> e:42 var
+def 13438:13444 <> dv_lcol
+R13451:13451 Corelib.Numbers.BinNums <> Z ind
+binder 13447:13447 <> z:43
+R13456:13460 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R13462:13463 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R13623:13623 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R13769:13925 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R13624:13627 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R13643:13653 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R13638:13642 iris.base_logic.lib.iprop <> gname def
+binder 13628:13630 <> γc:44
+R13638:13642 iris.base_logic.lib.iprop <> gname def
+binder 13632:13634 <> γv:45
+R13688:13701 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13654:13661 xv6iris.DirViewLend <> dvl_slot def
+R13663:13663 xv6iris.DirViewLend <> z:43 var
+R13666:13673 iris.algebra.dfrac <> DfracOwn constr
+R13678:13678 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13682:13683 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13687:13687 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13679:13681 xv6iris.DirViewLend <> γc:44 var
+R13684:13686 xv6iris.DirViewLend <> γv:45 var
+R13733:13737 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13702:13709 xv6iris.DirViewLend <> dvl_cell def
+R13711:13713 xv6iris.DirViewLend <> γc:44 var
+R13715:13715 xv6iris.DirViewLend <> z:43 var
+R13718:13725 iris.algebra.dfrac <> DfracOwn constr
+R13730:13732 stdpp.base <> ::stdpp_scope:'∅' not
+R13738:13745 xv6iris.DirViewLend <> dvl_cell def
+R13747:13749 xv6iris.DirViewLend <> γv:45 var
+R13751:13751 xv6iris.DirViewLend <> z:43 var
+R13754:13761 iris.algebra.dfrac <> DfracOwn constr
+R13766:13768 stdpp.base <> ::stdpp_scope:'∅' not
+R13926:13926 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R14112:14260 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R14413:14413 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R13927:13931 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R13966:13977 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R13942:13946 iris.base_logic.lib.iprop <> gname def
+binder 13932:13934 <> γc:46
+R13942:13946 iris.base_logic.lib.iprop <> gname def
+binder 13936:13938 <> γv:47
+R13954:13957 stdpp.gmap <> gmap rec
+R13965:13965 Corelib.Numbers.BinNums <> Z ind
+R13959:13963 xv6iris.FsTree <> fname def
+binder 13950:13950 <> e:48
+R14016:14020 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R13978:13985 xv6iris.DirViewLend <> dvl_slot def
+R13987:13987 xv6iris.DirViewLend <> z:43 var
+R13990:13997 iris.algebra.dfrac <> DfracOwn constr
+R14001:14001 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R14006:14006 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14010:14011 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14015:14015 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14007:14009 xv6iris.DirViewLend <> γc:46 var
+R14012:14014 xv6iris.DirViewLend <> γv:47 var
+R14029:14042 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14021:14026 xv6iris.DirViewLend <> dv_lic def
+R14028:14028 xv6iris.DirViewLend <> z:43 var
+R14071:14075 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14043:14049 xv6iris.DirViewG <> dv_half def
+R14051:14051 xv6iris.DirViewLend <> z:43 var
+R14054:14061 iris.algebra.dfrac <> DfracOwn constr
+R14065:14065 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R14070:14070 xv6iris.DirViewLend <> e:48 var
+R14092:14096 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14076:14083 xv6iris.DirViewLend <> dv_ctick def
+R14085:14087 xv6iris.DirViewLend <> γc:46 var
+R14089:14089 xv6iris.DirViewLend <> z:43 var
+R14091:14091 xv6iris.DirViewLend <> e:48 var
+R14097:14103 xv6iris.DirViewLend <> dv_vwit def
+R14105:14107 xv6iris.DirViewLend <> γv:47 var
+R14109:14109 xv6iris.DirViewLend <> z:43 var
+R14111:14111 xv6iris.DirViewLend <> e:48 var
+R14261:14265 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R14300:14311 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R14276:14280 iris.base_logic.lib.iprop <> gname def
+binder 14266:14268 <> γc:49
+R14276:14280 iris.base_logic.lib.iprop <> gname def
+binder 14270:14272 <> γv:50
+R14288:14291 stdpp.gmap <> gmap rec
+R14299:14299 Corelib.Numbers.BinNums <> Z ind
+R14293:14297 xv6iris.FsTree <> fname def
+binder 14284:14284 <> e:51
+R14350:14354 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14312:14319 xv6iris.DirViewLend <> dvl_slot def
+R14321:14321 xv6iris.DirViewLend <> z:43 var
+R14324:14331 iris.algebra.dfrac <> DfracOwn constr
+R14335:14335 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R14340:14340 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14344:14345 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14349:14349 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14341:14343 xv6iris.DirViewLend <> γc:49 var
+R14346:14348 xv6iris.DirViewLend <> γv:50 var
+R14363:14376 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14355:14360 xv6iris.DirViewLend <> dv_lic def
+R14362:14362 xv6iris.DirViewLend <> z:43 var
+R14393:14397 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14377:14384 xv6iris.DirViewLend <> dv_cshot def
+R14386:14388 xv6iris.DirViewLend <> γc:49 var
+R14390:14390 xv6iris.DirViewLend <> z:43 var
+R14392:14392 xv6iris.DirViewLend <> e:51 var
+R14398:14404 xv6iris.DirViewLend <> dv_vwit def
+R14406:14408 xv6iris.DirViewLend <> γv:50 var
+R14410:14410 xv6iris.DirViewLend <> z:43 var
+R14412:14412 xv6iris.DirViewLend <> e:51 var
+def 14703:14710 <> dv_lentm
+R14717:14717 Corelib.Numbers.BinNums <> Z ind
+binder 14713:14713 <> z:52
+R14725:14728 stdpp.gmap <> gmap rec
+R14736:14736 Corelib.Numbers.BinNums <> Z ind
+R14730:14734 xv6iris.FsTree <> fname def
+binder 14721:14721 <> e:53
+R14741:14745 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R14747:14748 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R14773:14777 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14758:14760 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14770:14772 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14761:14767 xv6iris.DirViewLend <> dvl_dom def
+R14769:14769 xv6iris.DirViewLend <> z:52 var
+R14778:14781 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R14799:14800 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R14791:14793 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R14786:14790 iris.base_logic.lib.iprop <> gname def
+R14794:14798 iris.base_logic.lib.iprop <> gname def
+binder 14782:14782 <> g:54
+R14801:14808 xv6iris.DirViewLend <> dvl_slot def
+R14810:14810 xv6iris.DirViewLend <> z:52 var
+R14813:14820 iris.algebra.dfrac <> DfracOwn constr
+R14824:14824 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R14829:14829 xv6iris.DirViewLend <> g:54 var
+def 14993:14999 <> dv_ride
+R15006:15006 Corelib.Numbers.BinNums <> Z ind
+binder 15002:15002 <> z:55
+R15014:15017 stdpp.gmap <> gmap rec
+R15025:15025 Corelib.Numbers.BinNums <> Z ind
+R15019:15023 xv6iris.FsTree <> fname def
+binder 15010:15010 <> e:56
+R15030:15034 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R15036:15037 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R15058:15063 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R15109:15109 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R15047:15053 xv6iris.DirViewG <> dv_hold def
+R15055:15055 xv6iris.DirViewLend <> z:55 var
+R15057:15057 xv6iris.DirViewLend <> e:56 var
+R15092:15096 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15064:15070 xv6iris.DirViewG <> dv_half def
+R15072:15072 xv6iris.DirViewLend <> z:55 var
+R15075:15082 iris.algebra.dfrac <> DfracOwn constr
+R15086:15086 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R15091:15091 xv6iris.DirViewLend <> e:56 var
+R15097:15104 xv6iris.DirViewLend <> dv_lentm def
+R15106:15106 xv6iris.DirViewLend <> z:55 var
+R15108:15108 xv6iris.DirViewLend <> e:56 var
+def 15274:15279 <> dv_pin
+R15286:15286 Corelib.Numbers.BinNums <> Z ind
+binder 15282:15282 <> z:57
+R15294:15297 stdpp.gmap <> gmap rec
+R15305:15305 Corelib.Numbers.BinNums <> Z ind
+R15299:15303 xv6iris.FsTree <> fname def
+binder 15290:15290 <> e:58
+R15310:15314 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R15316:15317 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R15342:15346 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15327:15329 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15339:15341 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R15330:15336 xv6iris.DirViewLend <> dvl_dom def
+R15338:15338 xv6iris.DirViewLend <> z:57 var
+R15347:15350 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R15366:15374 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R15361:15365 iris.base_logic.lib.iprop <> gname def
+binder 15351:15353 <> γc:59
+R15361:15365 iris.base_logic.lib.iprop <> gname def
+binder 15355:15357 <> γv:60
+R15413:15417 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15375:15382 xv6iris.DirViewLend <> dvl_slot def
+R15384:15384 xv6iris.DirViewLend <> z:57 var
+R15387:15394 iris.algebra.dfrac <> DfracOwn constr
+R15398:15398 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R15403:15403 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15407:15408 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15412:15412 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15404:15406 xv6iris.DirViewLend <> γc:59 var
+R15409:15411 xv6iris.DirViewLend <> γv:60 var
+R15418:15424 xv6iris.DirViewLend <> dv_vwit def
+R15426:15428 xv6iris.DirViewLend <> γv:60 var
+R15430:15430 xv6iris.DirViewLend <> z:57 var
+R15432:15432 xv6iris.DirViewLend <> e:58 var
+def 15690:15701 <> dv_pin_spent
+R15708:15708 Corelib.Numbers.BinNums <> Z ind
+binder 15704:15704 <> z:61
+R15716:15719 stdpp.gmap <> gmap rec
+R15727:15727 Corelib.Numbers.BinNums <> Z ind
+R15721:15725 xv6iris.FsTree <> fname def
+binder 15712:15712 <> e:62
+R15732:15736 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R15738:15739 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R15748:15753 xv6iris.DirViewLend <> dv_pin def
+R15755:15755 xv6iris.DirViewLend <> z:61 var
+R15757:15757 xv6iris.DirViewLend <> e:62 var
+def 16066:16077 <> dv_cancelled
+R16084:16084 Corelib.Numbers.BinNums <> Z ind
+binder 16080:16080 <> z:63
+R16092:16095 stdpp.gmap <> gmap rec
+R16103:16103 Corelib.Numbers.BinNums <> Z ind
+R16097:16101 xv6iris.FsTree <> fname def
+binder 16088:16088 <> e:64
+R16108:16112 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R16114:16115 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R16125:16128 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R16144:16152 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R16139:16143 iris.base_logic.lib.iprop <> gname def
+binder 16129:16131 <> γc:65
+R16139:16143 iris.base_logic.lib.iprop <> gname def
+binder 16133:16135 <> γv:66
+R16189:16193 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16153:16160 xv6iris.DirViewLend <> dvl_slot def
+R16162:16162 xv6iris.DirViewLend <> z:63 var
+R16164:16177 iris.algebra.dfrac <> DfracDiscarded constr
+R16179:16179 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16183:16184 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16188:16188 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16180:16182 xv6iris.DirViewLend <> γc:65 var
+R16185:16187 xv6iris.DirViewLend <> γv:66 var
+R16194:16201 xv6iris.DirViewLend <> dv_cshot def
+R16203:16205 xv6iris.DirViewLend <> γc:65 var
+R16207:16207 xv6iris.DirViewLend <> z:63 var
+R16209:16209 xv6iris.DirViewLend <> e:64 var
+inst 16465:16481 <> dvl_slot_timeless
+binder 16483:16483 <> z:67
+binder 16485:16486 <> dq:68
+binder 16488:16488 <> g:69
+R16492:16499 iris.bi.derived_connectives <> Timeless class
+R16502:16509 xv6iris.DirViewLend <> dvl_slot def
+R16511:16511 xv6iris.DirViewLend <> z:67 var
+R16513:16514 xv6iris.DirViewLend <> dq:68 var
+R16516:16516 xv6iris.DirViewLend <> g:69 var
+R16538:16545 xv6iris.DirViewLend <> dvl_slot def
+R16538:16545 xv6iris.DirViewLend <> dvl_slot def
+R16538:16545 xv6iris.DirViewLend <> dvl_slot def
+inst 16580:16594 <> dv_lic_timeless
+binder 16596:16596 <> z:70
+R16600:16607 iris.bi.derived_connectives <> Timeless class
+R16610:16615 xv6iris.DirViewLend <> dv_lic def
+R16617:16617 xv6iris.DirViewLend <> z:70 var
+R16639:16644 xv6iris.DirViewLend <> dv_lic def
+R16639:16644 xv6iris.DirViewLend <> dv_lic def
+R16639:16644 xv6iris.DirViewLend <> dv_lic def
+inst 16679:16695 <> dvl_cell_timeless
+binder 16697:16698 <> γ:71
+binder 16700:16700 <> z:72
+binder 16702:16703 <> dq:73
+binder 16705:16705 <> e:74
+R16709:16716 iris.bi.derived_connectives <> Timeless class
+R16719:16726 xv6iris.DirViewLend <> dvl_cell def
+R16728:16729 xv6iris.DirViewLend <> γ:71 var
+R16731:16731 xv6iris.DirViewLend <> z:72 var
+R16733:16734 xv6iris.DirViewLend <> dq:73 var
+R16736:16736 xv6iris.DirViewLend <> e:74 var
+inst 16781:16797 <> dv_ctick_timeless
+binder 16799:16801 <> γc:75
+binder 16803:16803 <> z:76
+binder 16805:16805 <> e:77
+R16809:16816 iris.bi.derived_connectives <> Timeless class
+R16819:16826 xv6iris.DirViewLend <> dv_ctick def
+R16828:16830 xv6iris.DirViewLend <> γc:75 var
+R16832:16832 xv6iris.DirViewLend <> z:76 var
+R16834:16834 xv6iris.DirViewLend <> e:77 var
+inst 16879:16895 <> dv_cshot_timeless
+binder 16897:16899 <> γc:78
+binder 16901:16901 <> z:79
+binder 16903:16903 <> e:80
+R16907:16914 iris.bi.derived_connectives <> Timeless class
+R16917:16924 xv6iris.DirViewLend <> dv_cshot def
+R16926:16928 xv6iris.DirViewLend <> γc:78 var
+R16930:16930 xv6iris.DirViewLend <> z:79 var
+R16932:16932 xv6iris.DirViewLend <> e:80 var
+inst 16977:16992 <> dv_vwit_timeless
+binder 16994:16996 <> γv:81
+binder 16998:16998 <> z:82
+binder 17000:17000 <> e:83
+R17004:17011 iris.bi.derived_connectives <> Timeless class
+R17014:17020 xv6iris.DirViewLend <> dv_vwit def
+R17022:17024 xv6iris.DirViewLend <> γv:81 var
+R17026:17026 xv6iris.DirViewLend <> z:82 var
+R17028:17028 xv6iris.DirViewLend <> e:83 var
+inst 17074:17092 <> dv_cshot_persistent
+binder 17094:17096 <> γc:84
+binder 17098:17098 <> z:85
+binder 17100:17100 <> e:86
+R17104:17113 iris.bi.derived_connectives <> Persistent class
+R17116:17123 xv6iris.DirViewLend <> dv_cshot def
+R17125:17127 xv6iris.DirViewLend <> γc:84 var
+R17129:17129 xv6iris.DirViewLend <> z:85 var
+R17131:17131 xv6iris.DirViewLend <> e:86 var
+R17157:17164 xv6iris.DirViewLend <> dv_cshot def
+R17167:17174 xv6iris.DirViewLend <> dvl_cell def
+R17177:17190 iris.algebra.lib.dfrac_agree <> to_dfrac_agree def
+R17157:17164 xv6iris.DirViewLend <> dv_cshot def
+R17157:17164 xv6iris.DirViewLend <> dv_cshot def
+R17167:17174 xv6iris.DirViewLend <> dvl_cell def
+R17167:17174 xv6iris.DirViewLend <> dvl_cell def
+R17177:17190 iris.algebra.lib.dfrac_agree <> to_dfrac_agree def
+R17177:17190 iris.algebra.lib.dfrac_agree <> to_dfrac_agree def
+R17203:17221 iris.base_logic.lib.own <> own_core_persistent inst
+R17203:17221 iris.base_logic.lib.own <> own_core_persistent inst
+inst 17253:17268 <> dv_lcol_timeless
+binder 17270:17270 <> z:87
+R17274:17281 iris.bi.derived_connectives <> Timeless class
+R17284:17290 xv6iris.DirViewLend <> dv_lcol def
+R17292:17292 xv6iris.DirViewLend <> z:87 var
+R17314:17320 xv6iris.DirViewLend <> dv_lcol def
+R17314:17320 xv6iris.DirViewLend <> dv_lcol def
+R17314:17320 xv6iris.DirViewLend <> dv_lcol def
+inst 17355:17371 <> dv_lentm_timeless
+binder 17373:17373 <> z:88
+binder 17375:17375 <> e:89
+R17379:17386 iris.bi.derived_connectives <> Timeless class
+R17389:17396 xv6iris.DirViewLend <> dv_lentm def
+R17398:17398 xv6iris.DirViewLend <> z:88 var
+R17400:17400 xv6iris.DirViewLend <> e:89 var
+R17422:17429 xv6iris.DirViewLend <> dv_lentm def
+R17422:17429 xv6iris.DirViewLend <> dv_lentm def
+R17422:17429 xv6iris.DirViewLend <> dv_lentm def
+inst 17464:17479 <> dv_ride_timeless
+binder 17481:17481 <> z:90
+binder 17483:17483 <> e:91
+R17487:17494 iris.bi.derived_connectives <> Timeless class
+R17497:17503 xv6iris.DirViewLend <> dv_ride def
+R17505:17505 xv6iris.DirViewLend <> z:90 var
+R17507:17507 xv6iris.DirViewLend <> e:91 var
+R17529:17535 xv6iris.DirViewLend <> dv_ride def
+R17529:17535 xv6iris.DirViewLend <> dv_ride def
+R17529:17535 xv6iris.DirViewLend <> dv_ride def
+inst 17570:17584 <> dv_pin_timeless
+binder 17586:17586 <> z:92
+binder 17588:17588 <> e:93
+R17592:17599 iris.bi.derived_connectives <> Timeless class
+R17602:17607 xv6iris.DirViewLend <> dv_pin def
+R17609:17609 xv6iris.DirViewLend <> z:92 var
+R17611:17611 xv6iris.DirViewLend <> e:93 var
+R17633:17638 xv6iris.DirViewLend <> dv_pin def
+R17633:17638 xv6iris.DirViewLend <> dv_pin def
+R17633:17638 xv6iris.DirViewLend <> dv_pin def
+inst 17673:17693 <> dv_cancelled_timeless
+binder 17695:17695 <> z:94
+binder 17697:17697 <> e:95
+R17701:17708 iris.bi.derived_connectives <> Timeless class
+R17711:17722 xv6iris.DirViewLend <> dv_cancelled def
+R17724:17724 xv6iris.DirViewLend <> z:94 var
+R17726:17726 xv6iris.DirViewLend <> e:95 var
+R17748:17759 xv6iris.DirViewLend <> dv_cancelled def
+R17748:17759 xv6iris.DirViewLend <> dv_cancelled def
+R17748:17759 xv6iris.DirViewLend <> dv_cancelled def
+inst 17795:17817 <> dv_cancelled_persistent
+binder 17819:17819 <> z:96
+binder 17821:17821 <> e:97
+R17825:17834 iris.bi.derived_connectives <> Persistent class
+R17837:17848 xv6iris.DirViewLend <> dv_cancelled def
+R17850:17850 xv6iris.DirViewLend <> z:96 var
+R17852:17852 xv6iris.DirViewLend <> e:97 var
+R17874:17885 xv6iris.DirViewLend <> dv_cancelled def
+R17874:17885 xv6iris.DirViewLend <> dv_cancelled def
+R17874:17885 xv6iris.DirViewLend <> dv_cancelled def
+prf 18147:18160 <> dvl_slot_split
+R18167:18167 Corelib.Numbers.BinNums <> Z ind
+binder 18163:18163 <> z:98
+R18177:18178 stdpp.numbers <> Qp rec
+binder 18171:18171 <> p:99
+binder 18173:18173 <> q:100
+R18191:18193 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R18186:18190 iris.base_logic.lib.iprop <> gname def
+R18194:18198 iris.base_logic.lib.iprop <> gname def
+binder 18182:18182 <> g:101
+R18238:18251 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R18207:18214 xv6iris.DirViewLend <> dvl_slot def
+R18216:18216 xv6iris.DirViewLend <> z:98 var
+R18219:18226 iris.algebra.dfrac <> DfracOwn constr
+R18230:18232 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R18229:18229 xv6iris.DirViewLend <> p:99 var
+R18233:18233 xv6iris.DirViewLend <> q:100 var
+R18237:18237 xv6iris.DirViewLend <> g:101 var
+R18277:18281 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R18252:18259 xv6iris.DirViewLend <> dvl_slot def
+R18261:18261 xv6iris.DirViewLend <> z:98 var
+R18264:18271 iris.algebra.dfrac <> DfracOwn constr
+R18273:18273 xv6iris.DirViewLend <> p:99 var
+R18276:18276 xv6iris.DirViewLend <> g:101 var
+R18282:18289 xv6iris.DirViewLend <> dvl_slot def
+R18291:18291 xv6iris.DirViewLend <> z:98 var
+R18294:18301 iris.algebra.dfrac <> DfracOwn constr
+R18303:18303 xv6iris.DirViewLend <> q:100 var
+R18306:18306 xv6iris.DirViewLend <> g:101 var
+R18331:18338 xv6iris.DirViewLend <> dvl_slot def
+R18331:18338 xv6iris.DirViewLend <> dvl_slot def
+R18331:18338 xv6iris.DirViewLend <> dvl_slot def
+R18352:18361 iris.bi.lib.fractional <> fractional def
+binder 18374:18374 <> q:102
+R18387:18391 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R18400:18400 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R18405:18405 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R18392:18399 xv6iris.IcacheRef <> icfg_reg meth
+R18380:18384 xv6iris.DirViewLend <> dvl_k def
+R18401:18402 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R18404:18404 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R18403:18403 xv6iris.DirViewLend <> q:102 var
+R18352:18361 iris.bi.lib.fractional <> fractional def
+binder 18374:18374 <> q:103
+R18387:18391 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R18400:18400 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R18405:18405 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R18392:18399 xv6iris.IcacheRef <> icfg_reg meth
+R18380:18384 xv6iris.DirViewLend <> dvl_k def
+R18401:18402 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R18404:18404 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R18403:18403 xv6iris.DirViewLend <> q:103 var
+prf 18430:18442 <> dvl_slot_join
+R18449:18449 Corelib.Numbers.BinNums <> Z ind
+binder 18445:18445 <> z:104
+R18459:18460 stdpp.numbers <> Qp rec
+binder 18453:18453 <> p:105
+binder 18455:18455 <> q:106
+R18477:18479 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R18472:18476 iris.base_logic.lib.iprop <> gname def
+R18480:18484 iris.base_logic.lib.iprop <> gname def
+binder 18464:18465 <> g1:107
+binder 18467:18468 <> g2:108
+R18519:18524 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R18493:18500 xv6iris.DirViewLend <> dvl_slot def
+R18502:18502 xv6iris.DirViewLend <> z:104 var
+R18505:18512 iris.algebra.dfrac <> DfracOwn constr
+R18514:18514 xv6iris.DirViewLend <> p:105 var
+R18517:18518 xv6iris.DirViewLend <> g1:107 var
+R18551:18560 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R18525:18532 xv6iris.DirViewLend <> dvl_slot def
+R18534:18534 xv6iris.DirViewLend <> z:104 var
+R18537:18544 iris.algebra.dfrac <> DfracOwn constr
+R18546:18546 xv6iris.DirViewLend <> q:106 var
+R18549:18550 xv6iris.DirViewLend <> g2:108 var
+R18574:18578 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R18561:18563 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R18571:18573 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R18566:18568 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18564:18565 xv6iris.DirViewLend <> g1:107 var
+R18569:18570 xv6iris.DirViewLend <> g2:108 var
+R18579:18586 xv6iris.DirViewLend <> dvl_slot def
+R18588:18588 xv6iris.DirViewLend <> z:104 var
+R18591:18598 iris.algebra.dfrac <> DfracOwn constr
+R18602:18604 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R18601:18601 xv6iris.DirViewLend <> p:105 var
+R18605:18605 xv6iris.DirViewLend <> q:106 var
+R18609:18610 xv6iris.DirViewLend <> g1:107 var
+R18635:18642 xv6iris.DirViewLend <> dvl_slot def
+R18635:18642 xv6iris.DirViewLend <> dvl_slot def
+R18635:18642 xv6iris.DirViewLend <> dvl_slot def
+R18676:18676 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18697:18702 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18710:18710 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18677:18696 iris.base_logic.lib.ghost_map <> ghost_map_elem_agree thm
+R18676:18676 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18697:18702 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18710:18710 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18677:18696 iris.base_logic.lib.ghost_map <> ghost_map_elem_agree thm
+R18768:18768 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18791:18796 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18804:18804 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18769:18790 iris.base_logic.lib.ghost_map <> ghost_map_elem_combine thm
+R18768:18768 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18791:18796 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18804:18804 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18769:18790 iris.base_logic.lib.ghost_map <> ghost_map_elem_combine thm
+R18830:18841 iris.algebra.dfrac <> dfrac_op_own thm
+R18830:18841 iris.algebra.dfrac <> dfrac_op_own thm
+R18830:18841 iris.algebra.dfrac <> dfrac_op_own thm
+prf 19006:19017 <> dvl_slot_cut
+R19024:19024 Corelib.Numbers.BinNums <> Z ind
+binder 19020:19020 <> z:109
+R19037:19039 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R19032:19036 iris.base_logic.lib.iprop <> gname def
+R19040:19044 iris.base_logic.lib.iprop <> gname def
+binder 19028:19028 <> g:110
+R19078:19091 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R19053:19060 xv6iris.DirViewLend <> dvl_slot def
+R19062:19062 xv6iris.DirViewLend <> z:109 var
+R19065:19072 iris.algebra.dfrac <> DfracOwn constr
+R19077:19077 xv6iris.DirViewLend <> g:110 var
+R19121:19125 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R19092:19099 xv6iris.DirViewLend <> dvl_slot def
+R19101:19101 xv6iris.DirViewLend <> z:109 var
+R19104:19111 iris.algebra.dfrac <> DfracOwn constr
+R19115:19115 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19120:19120 xv6iris.DirViewLend <> g:110 var
+R19155:19165 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R19126:19133 xv6iris.DirViewLend <> dvl_slot def
+R19135:19135 xv6iris.DirViewLend <> z:109 var
+R19138:19145 iris.algebra.dfrac <> DfracOwn constr
+R19149:19149 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19154:19154 xv6iris.DirViewLend <> g:110 var
+R19166:19173 xv6iris.DirViewLend <> dvl_slot def
+R19175:19175 xv6iris.DirViewLend <> z:109 var
+R19178:19185 iris.algebra.dfrac <> DfracOwn constr
+R19189:19189 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19194:19194 xv6iris.DirViewLend <> g:110 var
+R19220:19233 xv6iris.DirViewLend <> dvl_slot_split thm
+R19239:19239 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19245:19245 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19220:19233 xv6iris.DirViewLend <> dvl_slot_split thm
+R19239:19239 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19245:19245 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19220:19233 xv6iris.DirViewLend <> dvl_slot_split thm
+R19239:19239 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19245:19245 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19267:19280 xv6iris.DirViewLend <> dvl_slot_split thm
+R19286:19286 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19294:19296 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R19292:19292 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19298:19298 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19267:19280 xv6iris.DirViewLend <> dvl_slot_split thm
+R19286:19286 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19294:19296 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R19292:19292 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19298:19298 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19267:19280 xv6iris.DirViewLend <> dvl_slot_split thm
+R19286:19286 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19294:19296 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R19292:19292 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19298:19298 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19343:19345 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19325:19328 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R19338:19338 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R19323:19323 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19332:19334 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R19330:19330 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19336:19336 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19343:19345 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19325:19328 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R19338:19338 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R19323:19323 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19332:19334 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R19330:19330 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19336:19336 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+prf 19391:19405 <> dvl_slot_join34
+R19412:19412 Corelib.Numbers.BinNums <> Z ind
+binder 19408:19408 <> z:111
+R19429:19431 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R19424:19428 iris.base_logic.lib.iprop <> gname def
+R19432:19436 iris.base_logic.lib.iprop <> gname def
+binder 19416:19417 <> g1:112
+binder 19419:19420 <> g2:113
+R19475:19480 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R19445:19452 xv6iris.DirViewLend <> dvl_slot def
+R19454:19454 xv6iris.DirViewLend <> z:111 var
+R19457:19464 iris.algebra.dfrac <> DfracOwn constr
+R19468:19468 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19473:19474 xv6iris.DirViewLend <> g1:112 var
+R19511:19520 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19481:19488 xv6iris.DirViewLend <> dvl_slot def
+R19490:19490 xv6iris.DirViewLend <> z:111 var
+R19493:19500 iris.algebra.dfrac <> DfracOwn constr
+R19504:19504 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19509:19510 xv6iris.DirViewLend <> g2:113 var
+R19534:19538 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R19521:19523 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R19531:19533 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R19526:19528 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19524:19525 xv6iris.DirViewLend <> g1:112 var
+R19529:19530 xv6iris.DirViewLend <> g2:113 var
+R19539:19546 xv6iris.DirViewLend <> dvl_slot def
+R19548:19548 xv6iris.DirViewLend <> z:111 var
+R19551:19558 iris.algebra.dfrac <> DfracOwn constr
+R19562:19562 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19567:19568 xv6iris.DirViewLend <> g1:112 var
+R19615:19615 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19629:19634 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19642:19642 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19616:19628 xv6iris.DirViewLend <> dvl_slot_join thm
+R19615:19615 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19629:19634 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19642:19642 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19616:19628 xv6iris.DirViewLend <> dvl_slot_join thm
+R19704:19706 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19698:19698 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19711:19713 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R19709:19709 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19715:19715 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19704:19706 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19698:19698 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19711:19713 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R19709:19709 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R19715:19715 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+prf 19762:19775 <> dvl_slot_agree
+R19782:19782 Corelib.Numbers.BinNums <> Z ind
+binder 19778:19778 <> z:114
+R19796:19800 iris.algebra.dfrac <> dfrac ind
+binder 19786:19788 <> dq1:115
+binder 19790:19792 <> dq2:116
+R19817:19819 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R19812:19816 iris.base_logic.lib.iprop <> gname def
+R19820:19824 iris.base_logic.lib.iprop <> gname def
+binder 19804:19805 <> g1:117
+binder 19807:19808 <> g2:118
+R19850:19855 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R19833:19840 xv6iris.DirViewLend <> dvl_slot def
+R19842:19842 xv6iris.DirViewLend <> z:114 var
+R19844:19846 xv6iris.DirViewLend <> dq1:115 var
+R19848:19849 xv6iris.DirViewLend <> g1:117 var
+R19873:19878 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19856:19863 xv6iris.DirViewLend <> dvl_slot def
+R19865:19865 xv6iris.DirViewLend <> z:114 var
+R19867:19869 xv6iris.DirViewLend <> dq2:116 var
+R19871:19872 xv6iris.DirViewLend <> g2:118 var
+R19879:19881 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R19889:19891 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R19884:19886 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19882:19883 xv6iris.DirViewLend <> g1:117 var
+R19887:19888 xv6iris.DirViewLend <> g2:118 var
+R19916:19923 xv6iris.DirViewLend <> dvl_slot def
+R19916:19923 xv6iris.DirViewLend <> dvl_slot def
+R19916:19923 xv6iris.DirViewLend <> dvl_slot def
+R19960:19960 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19981:19986 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19994:19994 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19961:19980 iris.base_logic.lib.ghost_map <> ghost_map_elem_agree thm
+R19960:19960 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19981:19986 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19994:19994 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19961:19980 iris.base_logic.lib.ghost_map <> ghost_map_elem_agree thm
+prf 20141:20153 <> dvl_slot_over
+R20160:20160 Corelib.Numbers.BinNums <> Z ind
+binder 20156:20156 <> z:119
+R20170:20171 stdpp.numbers <> Qp rec
+binder 20164:20164 <> p:120
+binder 20166:20166 <> q:121
+R20188:20190 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R20183:20187 iris.base_logic.lib.iprop <> gname def
+R20191:20195 iris.base_logic.lib.iprop <> gname def
+binder 20175:20176 <> g1:122
+binder 20178:20179 <> g2:123
+R20218:20225 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20206:20208 stdpp.numbers Qp.notations ::Qp_scope:x_'<'_x not
+R20210:20212 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R20209:20209 xv6iris.DirViewLend <> p:120 var
+R20213:20213 xv6iris.DirViewLend <> q:121 var
+R20252:20257 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R20226:20233 xv6iris.DirViewLend <> dvl_slot def
+R20235:20235 xv6iris.DirViewLend <> z:119 var
+R20238:20245 iris.algebra.dfrac <> DfracOwn constr
+R20247:20247 xv6iris.DirViewLend <> p:120 var
+R20250:20251 xv6iris.DirViewLend <> g1:122 var
+R20284:20289 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R20258:20265 xv6iris.DirViewLend <> dvl_slot def
+R20267:20267 xv6iris.DirViewLend <> z:119 var
+R20270:20277 iris.algebra.dfrac <> DfracOwn constr
+R20279:20279 xv6iris.DirViewLend <> q:121 var
+R20282:20283 xv6iris.DirViewLend <> g2:123 var
+R20290:20294 iris.bi.interface <> ::bi_scope:'False' not
+R20331:20338 xv6iris.DirViewLend <> dvl_slot def
+R20331:20338 xv6iris.DirViewLend <> dvl_slot def
+R20331:20338 xv6iris.DirViewLend <> dvl_slot def
+R20372:20372 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20395:20400 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20408:20408 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20373:20394 iris.base_logic.lib.ghost_map <> ghost_map_elem_valid_2 thm
+R20372:20372 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20395:20400 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20408:20408 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20373:20394 iris.base_logic.lib.ghost_map <> ghost_map_elem_valid_2 thm
+R20443:20454 iris.algebra.dfrac <> dfrac_op_own thm
+R20456:20470 iris.algebra.dfrac <> dfrac_valid_own thm
+R20443:20454 iris.algebra.dfrac <> dfrac_op_own thm
+R20443:20454 iris.algebra.dfrac <> dfrac_op_own thm
+R20456:20470 iris.algebra.dfrac <> dfrac_valid_own thm
+R20456:20470 iris.algebra.dfrac <> dfrac_valid_own thm
+R20490:20494 Corelib.Init.Logic <> proj1 thm
+R20497:20505 stdpp.numbers Qp lt_nge thm
+R20490:20494 Corelib.Init.Logic <> proj1 thm
+R20497:20505 stdpp.numbers Qp lt_nge thm
+prf 20537:20547 <> dv_lic_excl
+R20554:20554 Corelib.Numbers.BinNums <> Z ind
+binder 20550:20550 <> z:124
+R20567:20572 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R20559:20564 xv6iris.DirViewLend <> dv_lic def
+R20566:20566 xv6iris.DirViewLend <> z:124 var
+R20581:20586 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R20573:20578 xv6iris.DirViewLend <> dv_lic def
+R20580:20580 xv6iris.DirViewLend <> z:124 var
+R20587:20591 iris.bi.interface <> ::bi_scope:'False' not
+R20616:20621 xv6iris.DirViewLend <> dv_lic def
+R20616:20621 xv6iris.DirViewLend <> dv_lic def
+R20616:20621 xv6iris.DirViewLend <> dv_lic def
+R20667:20667 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20690:20695 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20703:20703 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20668:20689 iris.base_logic.lib.ghost_map <> ghost_map_elem_valid_2 thm
+R20667:20667 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20690:20695 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20703:20703 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20668:20689 iris.base_logic.lib.ghost_map <> ghost_map_elem_valid_2 thm
+R20738:20749 iris.algebra.dfrac <> dfrac_op_own thm
+R20751:20765 iris.algebra.dfrac <> dfrac_valid_own thm
+R20738:20749 iris.algebra.dfrac <> dfrac_op_own thm
+R20738:20749 iris.algebra.dfrac <> dfrac_op_own thm
+R20751:20765 iris.algebra.dfrac <> dfrac_valid_own thm
+R20751:20765 iris.algebra.dfrac <> dfrac_valid_own thm
+R20785:20799 stdpp.numbers Qp not_add_le_l thm
+R20785:20799 stdpp.numbers Qp not_add_le_l thm
+prf 21064:21073 <> dfrac_1_34
+R21087:21089 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21077:21084 iris.algebra.dfrac <> DfracOwn constr
+R21104:21108 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R21090:21097 iris.algebra.dfrac <> DfracOwn constr
+R21101:21101 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R21109:21116 iris.algebra.dfrac <> DfracOwn constr
+R21120:21120 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R21142:21153 iris.algebra.dfrac <> dfrac_op_own thm
+R21142:21153 iris.algebra.dfrac <> dfrac_op_own thm
+R21142:21153 iris.algebra.dfrac <> dfrac_op_own thm
+R21167:21190 stdpp.numbers Qp three_quarter_quarter thm
+R21167:21190 stdpp.numbers Qp three_quarter_quarter thm
+R21167:21190 stdpp.numbers Qp three_quarter_quarter thm
+prf 21207:21221 <> dv_hold_split34
+R21228:21228 Corelib.Numbers.BinNums <> Z ind
+binder 21224:21224 <> z:125
+R21236:21239 stdpp.gmap <> gmap rec
+R21247:21247 Corelib.Numbers.BinNums <> Z ind
+R21241:21245 xv6iris.FsTree <> fname def
+binder 21232:21232 <> e:126
+R21267:21274 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R21256:21262 xv6iris.DirViewG <> dv_hold def
+R21264:21264 xv6iris.DirViewLend <> z:125 var
+R21266:21266 xv6iris.DirViewLend <> e:126 var
+R21303:21307 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R21275:21281 xv6iris.DirViewG <> dv_half def
+R21283:21283 xv6iris.DirViewLend <> z:125 var
+R21286:21293 iris.algebra.dfrac <> DfracOwn constr
+R21297:21297 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R21302:21302 xv6iris.DirViewLend <> e:126 var
+R21308:21314 xv6iris.DirViewG <> dv_half def
+R21316:21316 xv6iris.DirViewLend <> z:125 var
+R21319:21326 iris.algebra.dfrac <> DfracOwn constr
+R21330:21330 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R21335:21335 xv6iris.DirViewLend <> e:126 var
+R21356:21362 xv6iris.DirViewG <> dv_hold def
+R21367:21376 xv6iris.DirViewLend <> dfrac_1_34 thm
+R21356:21362 xv6iris.DirViewG <> dv_hold def
+R21356:21362 xv6iris.DirViewG <> dv_hold def
+R21367:21376 xv6iris.DirViewLend <> dfrac_1_34 thm
+R21367:21376 xv6iris.DirViewLend <> dfrac_1_34 thm
+R21385:21392 xv6iris.DirViewG <> dv_split thm
+R21385:21392 xv6iris.DirViewG <> dv_split thm
+prf 21409:21417 <> dv_join34
+R21424:21424 Corelib.Numbers.BinNums <> Z ind
+binder 21420:21420 <> z:127
+R21432:21435 stdpp.gmap <> gmap rec
+R21443:21443 Corelib.Numbers.BinNums <> Z ind
+R21437:21441 xv6iris.FsTree <> fname def
+binder 21428:21428 <> e:128
+R21480:21485 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R21452:21458 xv6iris.DirViewG <> dv_half def
+R21460:21460 xv6iris.DirViewLend <> z:127 var
+R21463:21470 iris.algebra.dfrac <> DfracOwn constr
+R21474:21474 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R21479:21479 xv6iris.DirViewLend <> e:128 var
+R21514:21523 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R21486:21492 xv6iris.DirViewG <> dv_half def
+R21494:21494 xv6iris.DirViewLend <> z:127 var
+R21497:21504 iris.algebra.dfrac <> DfracOwn constr
+R21508:21508 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R21513:21513 xv6iris.DirViewLend <> e:128 var
+R21524:21530 xv6iris.DirViewG <> dv_hold def
+R21532:21532 xv6iris.DirViewLend <> z:127 var
+R21534:21534 xv6iris.DirViewLend <> e:128 var
+R21571:21585 xv6iris.DirViewLend <> dv_hold_split34 thm
+R21571:21585 xv6iris.DirViewLend <> dv_hold_split34 thm
+R21571:21585 xv6iris.DirViewLend <> dv_hold_split34 thm
+prf 21760:21776 <> dv_hold_half_excl
+R21783:21783 Corelib.Numbers.BinNums <> Z ind
+binder 21779:21779 <> z:129
+R21792:21796 iris.algebra.dfrac <> dfrac ind
+binder 21787:21788 <> dq:130
+R21808:21811 stdpp.gmap <> gmap rec
+R21819:21819 Corelib.Numbers.BinNums <> Z ind
+R21813:21817 xv6iris.FsTree <> fname def
+binder 21800:21801 <> e1:131
+binder 21803:21804 <> e2:132
+R21840:21845 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R21828:21834 xv6iris.DirViewG <> dv_hold def
+R21836:21836 xv6iris.DirViewLend <> z:129 var
+R21838:21839 xv6iris.DirViewLend <> e1:131 var
+R21861:21866 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R21846:21852 xv6iris.DirViewG <> dv_half def
+R21854:21854 xv6iris.DirViewLend <> z:129 var
+R21856:21857 xv6iris.DirViewLend <> dq:130 var
+R21859:21860 xv6iris.DirViewLend <> e2:132 var
+R21867:21871 iris.bi.interface <> ::bi_scope:'False' not
+R21896:21902 xv6iris.DirViewG <> dv_hold def
+R21905:21911 xv6iris.DirViewG <> dv_half def
+R21896:21902 xv6iris.DirViewG <> dv_hold def
+R21896:21902 xv6iris.DirViewG <> dv_hold def
+R21905:21911 xv6iris.DirViewG <> dv_half def
+R21905:21911 xv6iris.DirViewG <> dv_half def
+R21945:21945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21957:21962 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21970:21970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21946:21956 iris.base_logic.lib.own <> own_valid_2 thm
+R21945:21945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21957:21962 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21970:21970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21946:21956 iris.base_logic.lib.own <> own_valid_2 thm
+R21992:22003 iris.algebra.gmap <> singleton_op thm
+R22005:22019 iris.algebra.gmap <> singleton_valid thm
+R21992:22003 iris.algebra.gmap <> singleton_op thm
+R21992:22003 iris.algebra.gmap <> singleton_op thm
+R22005:22019 iris.algebra.gmap <> singleton_valid thm
+R22005:22019 iris.algebra.gmap <> singleton_valid thm
+R22041:22051 iris.algebra.cmra <> exclusive_l thm
+R22069:22092 iris.algebra.lib.dfrac_agree <> to_dfrac_agree_exclusive inst
+R22041:22051 iris.algebra.cmra <> exclusive_l thm
+R22069:22092 iris.algebra.lib.dfrac_agree <> to_dfrac_agree_exclusive inst
+prf 22394:22407 <> dv_half34_excl
+R22414:22414 Corelib.Numbers.BinNums <> Z ind
+binder 22410:22410 <> z:133
+R22426:22429 stdpp.gmap <> gmap rec
+R22437:22437 Corelib.Numbers.BinNums <> Z ind
+R22431:22435 xv6iris.FsTree <> fname def
+binder 22418:22419 <> e1:134
+binder 22421:22422 <> e2:135
+R22475:22480 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22446:22452 xv6iris.DirViewG <> dv_half def
+R22454:22454 xv6iris.DirViewLend <> z:133 var
+R22457:22464 iris.algebra.dfrac <> DfracOwn constr
+R22468:22468 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R22473:22474 xv6iris.DirViewLend <> e1:134 var
+R22510:22515 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R22481:22487 xv6iris.DirViewG <> dv_half def
+R22489:22489 xv6iris.DirViewLend <> z:133 var
+R22492:22499 iris.algebra.dfrac <> DfracOwn constr
+R22503:22503 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R22508:22509 xv6iris.DirViewLend <> e2:135 var
+R22516:22520 iris.bi.interface <> ::bi_scope:'False' not
+R22545:22551 xv6iris.DirViewG <> dv_half def
+R22545:22551 xv6iris.DirViewG <> dv_half def
+R22545:22551 xv6iris.DirViewG <> dv_half def
+R22585:22585 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22597:22602 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22610:22610 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22586:22596 iris.base_logic.lib.own <> own_valid_2 thm
+R22585:22585 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22597:22602 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22610:22610 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22586:22596 iris.base_logic.lib.own <> own_valid_2 thm
+R22632:22643 iris.algebra.gmap <> singleton_op thm
+R22645:22659 iris.algebra.gmap <> singleton_valid thm
+R22632:22643 iris.algebra.gmap <> singleton_op thm
+R22632:22643 iris.algebra.gmap <> singleton_op thm
+R22645:22659 iris.algebra.gmap <> singleton_valid thm
+R22645:22659 iris.algebra.gmap <> singleton_valid thm
+R22678:22699 iris.algebra.lib.dfrac_agree <> dfrac_agree_op_valid_L thm
+R22678:22699 iris.algebra.lib.dfrac_agree <> dfrac_agree_op_valid_L thm
+R22730:22741 iris.algebra.dfrac <> dfrac_op_own thm
+R22743:22757 iris.algebra.dfrac <> dfrac_valid_own thm
+R22730:22741 iris.algebra.dfrac <> dfrac_op_own thm
+R22730:22741 iris.algebra.dfrac <> dfrac_op_own thm
+R22743:22757 iris.algebra.dfrac <> dfrac_valid_own thm
+R22743:22757 iris.algebra.dfrac <> dfrac_valid_own thm
+R22797:22799 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22787:22789 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R22785:22785 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R22791:22791 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R22802:22804 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R22806:22806 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R22797:22799 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22787:22789 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R22785:22785 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R22791:22791 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R22802:22804 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R22806:22806 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R22863:22877 stdpp.numbers Qp not_add_le_l thm
+R22883:22883 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R22863:22877 stdpp.numbers Qp not_add_le_l thm
+R22883:22883 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+prf 23023:23034 <> dv_ride_excl
+R23041:23041 Corelib.Numbers.BinNums <> Z ind
+binder 23037:23037 <> z:136
+R23053:23056 stdpp.gmap <> gmap rec
+R23064:23064 Corelib.Numbers.BinNums <> Z ind
+R23058:23062 xv6iris.FsTree <> fname def
+binder 23045:23046 <> e1:137
+binder 23048:23049 <> e2:138
+R23085:23090 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R23073:23079 xv6iris.DirViewLend <> dv_ride def
+R23081:23081 xv6iris.DirViewLend <> z:136 var
+R23083:23084 xv6iris.DirViewLend <> e1:137 var
+R23103:23108 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R23091:23097 xv6iris.DirViewLend <> dv_ride def
+R23099:23099 xv6iris.DirViewLend <> z:136 var
+R23101:23102 xv6iris.DirViewLend <> e2:138 var
+R23109:23113 iris.bi.interface <> ::bi_scope:'False' not
+R23138:23144 xv6iris.DirViewLend <> dv_ride def
+R23138:23144 xv6iris.DirViewLend <> dv_ride def
+R23138:23144 xv6iris.DirViewLend <> dv_ride def
+R23195:23195 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23208:23213 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23221:23221 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23196:23207 xv6iris.DirViewG <> dv_hold_excl thm
+R23195:23195 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23208:23213 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23221:23221 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23196:23207 xv6iris.DirViewG <> dv_hold_excl thm
+R23237:23237 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23255:23260 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23268:23268 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23238:23254 xv6iris.DirViewLend <> dv_hold_half_excl thm
+R23237:23237 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23255:23260 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23268:23268 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23238:23254 xv6iris.DirViewLend <> dv_hold_half_excl thm
+R23284:23284 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23302:23307 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23315:23315 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23285:23301 xv6iris.DirViewLend <> dv_hold_half_excl thm
+R23284:23284 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23302:23307 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23315:23315 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23285:23301 xv6iris.DirViewLend <> dv_hold_half_excl thm
+R23331:23331 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23346:23351 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23359:23359 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23332:23345 xv6iris.DirViewLend <> dv_half34_excl thm
+R23331:23331 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23346:23351 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23359:23359 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23332:23345 xv6iris.DirViewLend <> dv_half34_excl thm
+prf 23378:23392 <> dv_ride_of_hold
+R23399:23399 Corelib.Numbers.BinNums <> Z ind
+binder 23395:23395 <> z:139
+R23407:23410 stdpp.gmap <> gmap rec
+R23418:23418 Corelib.Numbers.BinNums <> Z ind
+R23412:23416 xv6iris.FsTree <> fname def
+binder 23403:23403 <> e:140
+R23438:23443 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R23427:23433 xv6iris.DirViewG <> dv_hold def
+R23435:23435 xv6iris.DirViewLend <> z:139 var
+R23437:23437 xv6iris.DirViewLend <> e:140 var
+R23444:23450 xv6iris.DirViewLend <> dv_ride def
+R23452:23452 xv6iris.DirViewLend <> z:139 var
+R23454:23454 xv6iris.DirViewLend <> e:140 var
+R23488:23494 xv6iris.DirViewLend <> dv_ride def
+R23488:23494 xv6iris.DirViewLend <> dv_ride def
+R23488:23494 xv6iris.DirViewLend <> dv_ride def
+prf 23671:23682 <> dv_ride_size
+R23689:23689 Corelib.Numbers.BinNums <> Z ind
+binder 23685:23685 <> z:141
+R23703:23708 xv6iris.DinodeEnc <> dinode rec
+binder 23693:23695 <> dn1:142
+binder 23697:23699 <> dn2:143
+R23722:23725 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23719:23721 Corelib.Init.Datatypes <> nat ind
+R23726:23729 Corelib.Init.Datatypes <> list ind
+R23732:23733 stdpp.bitvector.definitions <> bv rec
+binder 23712:23715 <> data:144
+R23770:23777 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23756:23758 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23745:23751 xv6iris.DinodeEnc <> di_size proj
+R23753:23755 xv6iris.DirViewLend <> dn1:142 var
+R23759:23765 xv6iris.DinodeEnc <> di_size proj
+R23767:23769 xv6iris.DirViewLend <> dn2:143 var
+R23804:23809 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R23778:23784 xv6iris.DirViewLend <> dv_ride def
+R23786:23786 xv6iris.DirViewLend <> z:141 var
+R23789:23793 xv6iris.DirViewG <> dv_of def
+R23795:23797 xv6iris.DirViewLend <> dn1:142 var
+R23799:23802 xv6iris.DirViewLend <> data:144 var
+R23810:23816 xv6iris.DirViewLend <> dv_ride def
+R23818:23818 xv6iris.DirViewLend <> z:141 var
+R23821:23825 xv6iris.DirViewG <> dv_of def
+R23827:23829 xv6iris.DirViewLend <> dn2:143 var
+R23831:23834 xv6iris.DirViewLend <> data:144 var
+R23871:23880 xv6iris.DirViewG <> dv_of_size thm
+R23871:23880 xv6iris.DirViewG <> dv_of_size thm
+R23871:23880 xv6iris.DirViewG <> dv_of_size thm
+prf 24163:24184 <> dv_lend_no_second_mint
+R24191:24191 Corelib.Numbers.BinNums <> Z ind
+binder 24187:24187 <> z:145
+R24203:24206 stdpp.gmap <> gmap rec
+R24214:24214 Corelib.Numbers.BinNums <> Z ind
+R24208:24212 xv6iris.FsTree <> fname def
+binder 24195:24196 <> e1:146
+binder 24198:24199 <> e2:147
+R24252:24257 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R24223:24229 xv6iris.DirViewG <> dv_half def
+R24231:24231 xv6iris.DirViewLend <> z:145 var
+R24234:24241 iris.algebra.dfrac <> DfracOwn constr
+R24245:24245 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R24250:24251 xv6iris.DirViewLend <> e1:146 var
+R24271:24276 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R24258:24265 xv6iris.DirViewLend <> dv_lentm def
+R24267:24267 xv6iris.DirViewLend <> z:145 var
+R24269:24270 xv6iris.DirViewLend <> e1:146 var
+R24289:24294 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R24277:24283 xv6iris.DirViewG <> dv_hold def
+R24285:24285 xv6iris.DirViewLend <> z:145 var
+R24287:24288 xv6iris.DirViewLend <> e2:147 var
+R24295:24299 iris.bi.interface <> ::bi_scope:'False' not
+R24342:24342 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24360:24365 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24374:24374 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24343:24359 xv6iris.DirViewLend <> dv_hold_half_excl thm
+R24342:24342 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24360:24365 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24374:24374 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24343:24359 xv6iris.DirViewLend <> dv_hold_half_excl thm
+prf 24629:24642 <> dvl_cell_agree
+R24650:24654 iris.base_logic.lib.iprop <> gname def
+binder 24645:24646 <> γ:148
+R24662:24662 Corelib.Numbers.BinNums <> Z ind
+binder 24658:24658 <> z:149
+R24676:24680 iris.algebra.dfrac <> dfrac ind
+binder 24666:24668 <> dq1:150
+binder 24670:24672 <> dq2:151
+R24698:24701 stdpp.gmap <> gmap rec
+R24709:24709 Corelib.Numbers.BinNums <> Z ind
+R24703:24707 xv6iris.FsTree <> fname def
+binder 24690:24691 <> e1:152
+binder 24693:24694 <> e2:153
+R24738:24743 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R24718:24725 xv6iris.DirViewLend <> dvl_cell def
+R24727:24728 xv6iris.DirViewLend <> γ:148 var
+R24730:24730 xv6iris.DirViewLend <> z:149 var
+R24732:24734 xv6iris.DirViewLend <> dq1:150 var
+R24736:24737 xv6iris.DirViewLend <> e1:152 var
+R24764:24769 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R24744:24751 xv6iris.DirViewLend <> dvl_cell def
+R24753:24754 xv6iris.DirViewLend <> γ:148 var
+R24756:24756 xv6iris.DirViewLend <> z:149 var
+R24758:24760 xv6iris.DirViewLend <> dq2:151 var
+R24762:24763 xv6iris.DirViewLend <> e2:153 var
+R24770:24772 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R24780:24782 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R24775:24777 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24773:24774 xv6iris.DirViewLend <> e1:152 var
+R24778:24779 xv6iris.DirViewLend <> e2:153 var
+R24807:24814 xv6iris.DirViewLend <> dvl_cell def
+R24807:24814 xv6iris.DirViewLend <> dvl_cell def
+R24807:24814 xv6iris.DirViewLend <> dvl_cell def
+R24848:24848 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24860:24865 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24873:24873 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24849:24859 iris.base_logic.lib.own <> own_valid_2 thm
+R24848:24848 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24860:24865 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24873:24873 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24849:24859 iris.base_logic.lib.own <> own_valid_2 thm
+R24895:24906 iris.algebra.gmap <> singleton_op thm
+R24908:24922 iris.algebra.gmap <> singleton_valid thm
+R24895:24906 iris.algebra.gmap <> singleton_op thm
+R24895:24906 iris.algebra.gmap <> singleton_op thm
+R24908:24922 iris.algebra.gmap <> singleton_valid thm
+R24908:24922 iris.algebra.gmap <> singleton_valid thm
+R24956:24977 iris.algebra.lib.dfrac_agree <> dfrac_agree_op_valid_L thm
+R24956:24977 iris.algebra.lib.dfrac_agree <> dfrac_agree_op_valid_L thm
+prf 25012:25024 <> dv_vwit_agree
+R25033:25037 iris.base_logic.lib.iprop <> gname def
+binder 25027:25029 <> γv:154
+R25045:25045 Corelib.Numbers.BinNums <> Z ind
+binder 25041:25041 <> z:155
+R25057:25060 stdpp.gmap <> gmap rec
+R25068:25068 Corelib.Numbers.BinNums <> Z ind
+R25062:25066 xv6iris.FsTree <> fname def
+binder 25049:25050 <> e1:156
+binder 25052:25053 <> e2:157
+R25093:25098 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R25077:25083 xv6iris.DirViewLend <> dv_vwit def
+R25085:25087 xv6iris.DirViewLend <> γv:154 var
+R25089:25089 xv6iris.DirViewLend <> z:155 var
+R25091:25092 xv6iris.DirViewLend <> e1:156 var
+R25115:25120 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R25099:25105 xv6iris.DirViewLend <> dv_vwit def
+R25107:25109 xv6iris.DirViewLend <> γv:154 var
+R25111:25111 xv6iris.DirViewLend <> z:155 var
+R25113:25114 xv6iris.DirViewLend <> e2:157 var
+R25121:25123 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R25131:25133 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R25126:25128 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25124:25125 xv6iris.DirViewLend <> e1:156 var
+R25129:25130 xv6iris.DirViewLend <> e2:157 var
+R25154:25160 xv6iris.DirViewLend <> dv_vwit def
+R25154:25160 xv6iris.DirViewLend <> dv_vwit def
+R25154:25160 xv6iris.DirViewLend <> dv_vwit def
+R25169:25182 xv6iris.DirViewLend <> dvl_cell_agree thm
+R25169:25182 xv6iris.DirViewLend <> dvl_cell_agree thm
+prf 25199:25212 <> dvl_cell_split
+R25220:25224 iris.base_logic.lib.iprop <> gname def
+binder 25215:25216 <> γ:158
+R25232:25232 Corelib.Numbers.BinNums <> Z ind
+binder 25228:25228 <> z:159
+R25246:25250 iris.algebra.dfrac <> dfrac ind
+binder 25236:25238 <> dq1:160
+binder 25240:25242 <> dq2:161
+R25264:25267 stdpp.gmap <> gmap rec
+R25275:25275 Corelib.Numbers.BinNums <> Z ind
+R25269:25273 xv6iris.FsTree <> fname def
+binder 25260:25260 <> e:162
+R25313:25320 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R25284:25291 xv6iris.DirViewLend <> dvl_cell def
+R25293:25294 xv6iris.DirViewLend <> γ:158 var
+R25296:25296 xv6iris.DirViewLend <> z:159 var
+R25302:25306 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R25299:25301 xv6iris.DirViewLend <> dq1:160 var
+R25307:25309 xv6iris.DirViewLend <> dq2:161 var
+R25312:25312 xv6iris.DirViewLend <> e:162 var
+R25340:25344 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25321:25328 xv6iris.DirViewLend <> dvl_cell def
+R25330:25331 xv6iris.DirViewLend <> γ:158 var
+R25333:25333 xv6iris.DirViewLend <> z:159 var
+R25335:25337 xv6iris.DirViewLend <> dq1:160 var
+R25339:25339 xv6iris.DirViewLend <> e:162 var
+R25345:25352 xv6iris.DirViewLend <> dvl_cell def
+R25354:25355 xv6iris.DirViewLend <> γ:158 var
+R25357:25357 xv6iris.DirViewLend <> z:159 var
+R25359:25361 xv6iris.DirViewLend <> dq2:161 var
+R25363:25363 xv6iris.DirViewLend <> e:162 var
+R25388:25395 xv6iris.DirViewLend <> dvl_cell def
+R25398:25403 iris.base_logic.lib.own <> own_op thm
+R25405:25416 iris.algebra.gmap <> singleton_op thm
+R25388:25395 xv6iris.DirViewLend <> dvl_cell def
+R25388:25395 xv6iris.DirViewLend <> dvl_cell def
+R25398:25403 iris.base_logic.lib.own <> own_op thm
+R25398:25403 iris.base_logic.lib.own <> own_op thm
+R25405:25416 iris.algebra.gmap <> singleton_op thm
+R25405:25416 iris.algebra.gmap <> singleton_op thm
+R25435:25448 iris.algebra.lib.dfrac_agree <> dfrac_agree_op thm
+R25435:25448 iris.algebra.lib.dfrac_agree <> dfrac_agree_op thm
+R25435:25448 iris.algebra.lib.dfrac_agree <> dfrac_agree_op thm
+prf 25467:25478 <> dvl_cell_cut
+R25486:25490 iris.base_logic.lib.iprop <> gname def
+binder 25481:25482 <> γ:163
+R25498:25498 Corelib.Numbers.BinNums <> Z ind
+binder 25494:25494 <> z:164
+R25506:25509 stdpp.gmap <> gmap rec
+R25517:25517 Corelib.Numbers.BinNums <> Z ind
+R25511:25515 xv6iris.FsTree <> fname def
+binder 25502:25502 <> e:165
+R25554:25567 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R25526:25533 xv6iris.DirViewLend <> dvl_cell def
+R25535:25536 xv6iris.DirViewLend <> γ:163 var
+R25538:25538 xv6iris.DirViewLend <> z:164 var
+R25541:25548 iris.algebra.dfrac <> DfracOwn constr
+R25553:25553 xv6iris.DirViewLend <> e:165 var
+R25600:25604 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25568:25575 xv6iris.DirViewLend <> dvl_cell def
+R25577:25578 xv6iris.DirViewLend <> γ:163 var
+R25580:25580 xv6iris.DirViewLend <> z:164 var
+R25583:25590 iris.algebra.dfrac <> DfracOwn constr
+R25594:25594 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R25599:25599 xv6iris.DirViewLend <> e:165 var
+R25605:25612 xv6iris.DirViewLend <> dvl_cell def
+R25614:25615 xv6iris.DirViewLend <> γ:163 var
+R25617:25617 xv6iris.DirViewLend <> z:164 var
+R25620:25627 iris.algebra.dfrac <> DfracOwn constr
+R25631:25631 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R25636:25636 xv6iris.DirViewLend <> e:165 var
+R25657:25670 xv6iris.DirViewLend <> dvl_cell_split thm
+R25673:25682 xv6iris.DirViewLend <> dfrac_1_hh thm
+R25657:25670 xv6iris.DirViewLend <> dvl_cell_split thm
+R25657:25670 xv6iris.DirViewLend <> dvl_cell_split thm
+R25673:25682 xv6iris.DirViewLend <> dfrac_1_hh thm
+R25673:25682 xv6iris.DirViewLend <> dfrac_1_hh thm
+prf 25769:25780 <> dvl_cell_set
+R25788:25792 iris.base_logic.lib.iprop <> gname def
+binder 25783:25784 <> γ:166
+R25800:25800 Corelib.Numbers.BinNums <> Z ind
+binder 25796:25796 <> z:167
+R25811:25814 stdpp.gmap <> gmap rec
+R25822:25822 Corelib.Numbers.BinNums <> Z ind
+R25816:25820 xv6iris.FsTree <> fname def
+binder 25804:25804 <> e:168
+binder 25806:25807 <> e':169
+R25859:25865 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R25831:25838 xv6iris.DirViewLend <> dvl_cell def
+R25840:25841 xv6iris.DirViewLend <> γ:166 var
+R25843:25843 xv6iris.DirViewLend <> z:167 var
+R25846:25853 iris.algebra.dfrac <> DfracOwn constr
+R25858:25858 xv6iris.DirViewLend <> e:168 var
+R25866:25873 xv6iris.DirViewLend <> dvl_cell def
+R25875:25876 xv6iris.DirViewLend <> γ:166 var
+R25878:25878 xv6iris.DirViewLend <> z:167 var
+R25881:25888 iris.algebra.dfrac <> DfracOwn constr
+R25893:25894 xv6iris.DirViewLend <> e':169 var
+R25919:25926 xv6iris.DirViewLend <> dvl_cell def
+R25919:25926 xv6iris.DirViewLend <> dvl_cell def
+R25919:25926 xv6iris.DirViewLend <> dvl_cell def
+R25953:25953 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25964:25969 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25973:25973 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25954:25963 iris.base_logic.lib.own <> own_update thm
+R25953:25953 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25964:25969 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25973:25973 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25954:25963 iris.base_logic.lib.own <> own_update thm
+R25986:26001 iris.algebra.gmap <> singleton_update thm
+R26004:26024 iris.algebra.updates <> cmra_update_exclusive thm
+R25986:26001 iris.algebra.gmap <> singleton_update thm
+R26004:26024 iris.algebra.updates <> cmra_update_exclusive thm
+prf 26060:26068 <> dv_cshoot
+R26077:26081 iris.base_logic.lib.iprop <> gname def
+binder 26071:26073 <> γc:170
+R26089:26089 Corelib.Numbers.BinNums <> Z ind
+binder 26085:26085 <> z:171
+R26097:26100 stdpp.gmap <> gmap rec
+R26108:26108 Corelib.Numbers.BinNums <> Z ind
+R26102:26106 xv6iris.FsTree <> fname def
+binder 26093:26093 <> e:172
+R26133:26139 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R26117:26124 xv6iris.DirViewLend <> dv_ctick def
+R26126:26128 xv6iris.DirViewLend <> γc:170 var
+R26130:26130 xv6iris.DirViewLend <> z:171 var
+R26132:26132 xv6iris.DirViewLend <> e:172 var
+R26140:26147 xv6iris.DirViewLend <> dv_cshot def
+R26149:26151 xv6iris.DirViewLend <> γc:170 var
+R26153:26153 xv6iris.DirViewLend <> z:171 var
+R26155:26155 xv6iris.DirViewLend <> e:172 var
+R26180:26187 xv6iris.DirViewLend <> dv_ctick def
+R26190:26197 xv6iris.DirViewLend <> dv_cshot def
+R26200:26207 xv6iris.DirViewLend <> dvl_cell def
+R26180:26187 xv6iris.DirViewLend <> dv_ctick def
+R26180:26187 xv6iris.DirViewLend <> dv_ctick def
+R26190:26197 xv6iris.DirViewLend <> dv_cshot def
+R26190:26197 xv6iris.DirViewLend <> dv_cshot def
+R26200:26207 xv6iris.DirViewLend <> dvl_cell def
+R26200:26207 xv6iris.DirViewLend <> dvl_cell def
+R26234:26234 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26245:26250 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26254:26254 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26235:26244 iris.base_logic.lib.own <> own_update thm
+R26234:26234 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26245:26250 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26254:26254 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R26235:26244 iris.base_logic.lib.own <> own_update thm
+R26267:26282 iris.algebra.gmap <> singleton_update thm
+R26285:26303 iris.algebra.lib.dfrac_agree <> dfrac_agree_persist thm
+R26267:26282 iris.algebra.gmap <> singleton_update thm
+R26285:26303 iris.algebra.lib.dfrac_agree <> dfrac_agree_persist thm
+prf 27235:27245 <> dv_col_mint
+R27252:27252 Corelib.Numbers.BinNums <> Z ind
+binder 27248:27248 <> z:173
+R27260:27263 stdpp.gmap <> gmap rec
+R27271:27271 Corelib.Numbers.BinNums <> Z ind
+R27265:27269 xv6iris.FsTree <> fname def
+binder 27256:27256 <> e:174
+R27289:27296 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R27280:27286 xv6iris.DirViewLend <> dvl_dom def
+R27288:27288 xv6iris.DirViewLend <> z:173 var
+R27305:27310 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R27297:27302 xv6iris.DirViewLend <> dv_lic def
+R27304:27304 xv6iris.DirViewLend <> z:173 var
+R27322:27327 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R27311:27317 xv6iris.DirViewG <> dv_hold def
+R27319:27319 xv6iris.DirViewLend <> z:173 var
+R27321:27321 xv6iris.DirViewLend <> e:174 var
+R27337:27349 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R27328:27334 xv6iris.DirViewLend <> dv_lcol def
+R27336:27336 xv6iris.DirViewLend <> z:173 var
+R27359:27363 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R27350:27356 xv6iris.DirViewLend <> dv_lcol def
+R27358:27358 xv6iris.DirViewLend <> z:173 var
+R27364:27364 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R27410:27415 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R27393:27397 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R27365:27371 xv6iris.DirViewG <> dv_half def
+R27373:27373 xv6iris.DirViewLend <> z:173 var
+R27376:27383 iris.algebra.dfrac <> DfracOwn constr
+R27387:27387 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R27392:27392 xv6iris.DirViewLend <> e:174 var
+R27398:27405 xv6iris.DirViewLend <> dv_lentm def
+R27407:27407 xv6iris.DirViewLend <> z:173 var
+R27409:27409 xv6iris.DirViewLend <> e:174 var
+R27416:27421 xv6iris.DirViewLend <> dv_pin def
+R27423:27423 xv6iris.DirViewLend <> z:173 var
+R27425:27425 xv6iris.DirViewLend <> e:174 var
+R27488:27494 xv6iris.DirViewLend <> dv_lcol def
+R27488:27494 xv6iris.DirViewLend <> dv_lcol def
+R27488:27494 xv6iris.DirViewLend <> dv_lcol def
+R27668:27668 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27680:27685 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27698:27698 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27669:27679 xv6iris.DirViewLend <> dv_lic_excl thm
+R27726:27726 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27738:27743 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27756:27756 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27727:27737 xv6iris.DirViewLend <> dv_lic_excl thm
+R27668:27668 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27680:27685 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27698:27698 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27669:27679 xv6iris.DirViewLend <> dv_lic_excl thm
+R27726:27726 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27738:27743 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27756:27756 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27727:27737 xv6iris.DirViewLend <> dv_lic_excl thm
+R27912:27912 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27937:27942 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27948:27948 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27913:27924 xv6iris.DirViewLend <> dvl_cell_set thm
+R27932:27934 stdpp.base <> ::stdpp_scope:'∅' not
+R27912:27912 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27937:27942 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27948:27948 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27913:27924 xv6iris.DirViewLend <> dvl_cell_set thm
+R27932:27934 stdpp.base <> ::stdpp_scope:'∅' not
+R27969:27969 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27994:27999 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28005:28005 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27970:27981 xv6iris.DirViewLend <> dvl_cell_set thm
+R27989:27991 stdpp.base <> ::stdpp_scope:'∅' not
+R27969:27969 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27994:27999 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28005:28005 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27970:27981 xv6iris.DirViewLend <> dvl_cell_set thm
+R27989:27991 stdpp.base <> ::stdpp_scope:'∅' not
+R28036:28047 xv6iris.DirViewLend <> dvl_cell_cut thm
+R28036:28047 xv6iris.DirViewLend <> dvl_cell_cut thm
+R28036:28047 xv6iris.DirViewLend <> dvl_cell_cut thm
+R28117:28128 xv6iris.DirViewLend <> dvl_slot_cut thm
+R28117:28128 xv6iris.DirViewLend <> dvl_slot_cut thm
+R28117:28128 xv6iris.DirViewLend <> dvl_slot_cut thm
+R28202:28216 xv6iris.DirViewLend <> dv_hold_split34 thm
+R28202:28216 xv6iris.DirViewLend <> dv_hold_split34 thm
+R28202:28216 xv6iris.DirViewLend <> dv_hold_split34 thm
+R28318:28324 xv6iris.DirViewLend <> dv_lcol def
+R28318:28324 xv6iris.DirViewLend <> dv_lcol def
+R28318:28324 xv6iris.DirViewLend <> dv_lcol def
+R28429:28436 xv6iris.DirViewLend <> dv_lentm def
+R28429:28436 xv6iris.DirViewLend <> dv_lentm def
+R28429:28436 xv6iris.DirViewLend <> dv_lentm def
+R28481:28481 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28485:28486 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28490:28490 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28481:28481 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28485:28486 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28490:28490 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28524:28529 xv6iris.DirViewLend <> dv_pin def
+R28524:28529 xv6iris.DirViewLend <> dv_pin def
+R28524:28529 xv6iris.DirViewLend <> dv_pin def
+prf 28946:28955 <> dv_col_set
+R28962:28962 Corelib.Numbers.BinNums <> Z ind
+binder 28958:28958 <> z:175
+R28973:28976 stdpp.gmap <> gmap rec
+R28984:28984 Corelib.Numbers.BinNums <> Z ind
+R28978:28982 xv6iris.FsTree <> fname def
+binder 28966:28966 <> e:176
+binder 28968:28969 <> e':177
+R29021:29026 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R28993:28999 xv6iris.DirViewG <> dv_half def
+R29001:29001 xv6iris.DirViewLend <> z:175 var
+R29004:29011 iris.algebra.dfrac <> DfracOwn constr
+R29015:29015 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R29020:29020 xv6iris.DirViewLend <> e:176 var
+R29039:29044 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R29027:29034 xv6iris.DirViewLend <> dv_lentm def
+R29036:29036 xv6iris.DirViewLend <> z:175 var
+R29038:29038 xv6iris.DirViewLend <> e:176 var
+R29054:29066 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R29045:29051 xv6iris.DirViewLend <> dv_lcol def
+R29053:29053 xv6iris.DirViewLend <> z:175 var
+R29076:29080 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R29067:29073 xv6iris.DirViewLend <> dv_lcol def
+R29075:29075 xv6iris.DirViewLend <> z:175 var
+R29081:29087 xv6iris.DirViewG <> dv_hold def
+R29089:29089 xv6iris.DirViewLend <> z:175 var
+R29091:29092 xv6iris.DirViewLend <> e':177 var
+R29189:29195 xv6iris.DirViewLend <> dv_lcol def
+R29189:29195 xv6iris.DirViewLend <> dv_lcol def
+R29189:29195 xv6iris.DirViewLend <> dv_lcol def
+R29393:29393 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29437:29442 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29454:29454 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29394:29406 xv6iris.DirViewLend <> dvl_slot_over thm
+R29414:29414 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R29422:29436 xv6iris.DirViewLend <> dvl_q_over_1_12 thm
+R29393:29393 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29437:29442 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29454:29454 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29394:29406 xv6iris.DirViewLend <> dvl_slot_over thm
+R29414:29414 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R29422:29436 xv6iris.DirViewLend <> dvl_q_over_1_12 thm
+R29546:29546 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29562:29567 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29579:29579 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29547:29561 xv6iris.DirViewLend <> dvl_slot_join34 thm
+R29546:29546 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29562:29567 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29579:29579 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29547:29561 xv6iris.DirViewLend <> dvl_slot_join34 thm
+R29615:29615 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29624:29629 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29641:29641 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29616:29623 xv6iris.DirViewG <> dv_agree thm
+R29615:29615 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29624:29629 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29641:29641 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29616:29623 xv6iris.DirViewG <> dv_agree thm
+R29667:29667 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29677:29682 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29694:29694 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29668:29676 xv6iris.DirViewLend <> dv_join34 thm
+R29667:29667 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29677:29682 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29694:29694 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29668:29676 xv6iris.DirViewLend <> dv_join34 thm
+R29716:29716 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29730:29735 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29740:29740 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29717:29722 xv6iris.DirViewG <> dv_set thm
+R29716:29716 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29730:29735 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29740:29740 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29717:29722 xv6iris.DirViewG <> dv_set thm
+R29762:29762 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29772:29777 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29783:29783 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29763:29771 xv6iris.DirViewLend <> dv_cshoot thm
+R29762:29762 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29772:29777 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29783:29783 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29763:29771 xv6iris.DirViewLend <> dv_cshoot thm
+R29841:29847 xv6iris.DirViewLend <> dv_lcol def
+R29841:29847 xv6iris.DirViewLend <> dv_lcol def
+R29841:29847 xv6iris.DirViewLend <> dv_lcol def
+R29948:29948 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29997:30021 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30033:30033 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29949:29961 xv6iris.DirViewLend <> dvl_slot_over thm
+R29967:29967 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R29973:29973 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R29981:29996 xv6iris.DirViewLend <> dvl_q_over_34_12 thm
+R29948:29948 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29997:30021 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30033:30033 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29949:29961 xv6iris.DirViewLend <> dvl_slot_over thm
+R29967:29967 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R29973:29973 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R29981:29996 xv6iris.DirViewLend <> dvl_q_over_34_12 thm
+prf 30412:30424 <> dv_col_redeem
+R30431:30431 Corelib.Numbers.BinNums <> Z ind
+binder 30427:30427 <> z:178
+R30444:30447 stdpp.gmap <> gmap rec
+R30455:30455 Corelib.Numbers.BinNums <> Z ind
+R30449:30453 xv6iris.FsTree <> fname def
+binder 30435:30435 <> e:179
+binder 30437:30440 <> ents:180
+R30465:30469 iris.algebra.dfrac <> dfrac ind
+binder 30459:30461 <> dqv:181
+R30488:30493 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R30478:30483 xv6iris.DirViewLend <> dv_pin def
+R30485:30485 xv6iris.DirViewLend <> z:178 var
+R30487:30487 xv6iris.DirViewLend <> e:179 var
+R30512:30517 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R30494:30500 xv6iris.DirViewG <> dv_half def
+R30502:30502 xv6iris.DirViewLend <> z:178 var
+R30504:30506 xv6iris.DirViewLend <> dqv:181 var
+R30508:30511 xv6iris.DirViewLend <> ents:180 var
+R30527:30539 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R30518:30524 xv6iris.DirViewLend <> dv_lcol def
+R30526:30526 xv6iris.DirViewLend <> z:178 var
+R30549:30553 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R30540:30546 xv6iris.DirViewLend <> dv_lcol def
+R30548:30548 xv6iris.DirViewLend <> z:178 var
+R30572:30583 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R30636:30636 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R30554:30560 xv6iris.DirViewG <> dv_half def
+R30562:30562 xv6iris.DirViewLend <> z:178 var
+R30564:30566 xv6iris.DirViewLend <> dqv:181 var
+R30568:30571 xv6iris.DirViewLend <> ents:180 var
+R30584:30584 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R30614:30619 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R30599:30603 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R30585:30587 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R30596:30598 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R30592:30594 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30588:30591 xv6iris.DirViewLend <> ents:180 var
+R30595:30595 xv6iris.DirViewLend <> e:179 var
+R30604:30609 xv6iris.DirViewLend <> dv_pin def
+R30611:30611 xv6iris.DirViewLend <> z:178 var
+R30613:30613 xv6iris.DirViewLend <> e:179 var
+R30620:30631 xv6iris.DirViewLend <> dv_cancelled def
+R30633:30633 xv6iris.DirViewLend <> z:178 var
+R30635:30635 xv6iris.DirViewLend <> e:179 var
+R30756:30762 xv6iris.DirViewLend <> dv_lcol def
+R30756:30762 xv6iris.DirViewLend <> dv_lcol def
+R30756:30762 xv6iris.DirViewLend <> dv_lcol def
+R30978:30978 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31022:31027 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31038:31038 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30979:30991 xv6iris.DirViewLend <> dvl_slot_over thm
+R30999:30999 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R31007:31021 xv6iris.DirViewLend <> dvl_q_over_1_14 thm
+R30978:30978 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31022:31027 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31038:31038 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30979:30991 xv6iris.DirViewLend <> dvl_slot_over thm
+R30999:30999 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R31007:31021 xv6iris.DirViewLend <> dvl_q_over_1_14 thm
+R31189:31189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31204:31209 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31220:31220 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31190:31203 xv6iris.DirViewLend <> dvl_slot_agree thm
+R31189:31189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31204:31209 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31220:31220 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31190:31203 xv6iris.DirViewLend <> dvl_slot_agree thm
+R31277:31277 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31291:31296 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31307:31307 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31278:31290 xv6iris.DirViewLend <> dv_vwit_agree thm
+R31277:31277 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31291:31296 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31307:31307 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31278:31290 xv6iris.DirViewLend <> dv_vwit_agree thm
+R31333:31333 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31342:31347 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31359:31359 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31334:31341 xv6iris.DirViewG <> dv_agree thm
+R31333:31333 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31342:31347 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31359:31359 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31334:31341 xv6iris.DirViewG <> dv_agree thm
+R31437:31443 xv6iris.DirViewLend <> dv_lcol def
+R31437:31443 xv6iris.DirViewLend <> dv_lcol def
+R31437:31443 xv6iris.DirViewLend <> dv_lcol def
+R31553:31558 xv6iris.DirViewLend <> dv_pin def
+R31553:31558 xv6iris.DirViewLend <> dv_pin def
+R31553:31558 xv6iris.DirViewLend <> dv_pin def
+R31690:31690 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31705:31710 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31721:31721 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31691:31704 xv6iris.DirViewLend <> dvl_slot_agree thm
+R31690:31690 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31705:31710 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31721:31721 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31691:31704 xv6iris.DirViewLend <> dvl_slot_agree thm
+R31778:31778 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31792:31797 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31808:31808 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31779:31791 xv6iris.DirViewLend <> dv_vwit_agree thm
+R31778:31778 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31792:31797 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31808:31808 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31779:31791 xv6iris.DirViewLend <> dv_vwit_agree thm
+R31833:31840 xv6iris.DirViewLend <> dvl_slot def
+R31833:31840 xv6iris.DirViewLend <> dvl_slot def
+R31833:31840 xv6iris.DirViewLend <> dvl_slot def
+R31854:31854 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31877:31882 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31889:31889 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31855:31876 iris.base_logic.lib.ghost_map <> ghost_map_elem_persist thm
+R31854:31854 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31877:31882 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31889:31889 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R31855:31876 iris.base_logic.lib.ghost_map <> ghost_map_elem_persist thm
+R31961:31967 xv6iris.DirViewLend <> dv_lcol def
+R31961:31967 xv6iris.DirViewLend <> dv_lcol def
+R31961:31967 xv6iris.DirViewLend <> dv_lcol def
+R32091:32102 xv6iris.DirViewLend <> dv_cancelled def
+R32091:32102 xv6iris.DirViewLend <> dv_cancelled def
+R32091:32102 xv6iris.DirViewLend <> dv_cancelled def
+prf 32893:32906 <> dvl_boot_split
+R32914:32918 iris.base_logic.lib.iprop <> gname def
+binder 32909:32910 <> γ:182
+R32926:32929 stdpp.gmap <> gset def
+R32931:32931 Corelib.Numbers.BinNums <> Z ind
+binder 32922:32922 <> P:183
+R32965:32969 iris.bi.interface <> ::stdpp_scope:x_'⊢'_x not
+R32940:32942 iris.base_logic.lib.own <> own def
+R32948:32961 xv6iris.IcacheRef <> dview_boot_map def
+R32963:32963 xv6iris.DirViewLend <> P:183 var
+R32944:32945 xv6iris.DirViewLend <> γ:182 var
+R32970:32979 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R32981:32985 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R32987:32988 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+binder 32980:32980 <> z:184
+binder 32980:32980 <> z:185
+R32989:32996 xv6iris.DirViewLend <> dvl_cell def
+R32998:32999 xv6iris.DirViewLend <> γ:182 var
+R33001:33001 xv6iris.DirViewLend <> z:184 var
+R33004:33011 iris.algebra.dfrac <> DfracOwn constr
+R33016:33018 stdpp.base <> ::stdpp_scope:'∅' not
+R32986:32986 xv6iris.DirViewLend <> P:183 var
+R33043:33056 xv6iris.IcacheRef <> dview_boot_map def
+R33071:33093 xv6iris.IcacheRef <> gset_to_gmap_singletons thm
+R33101:33112 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
+R33115:33122 iris.algebra.ofe <> leibnizO abbrev
+R33125:33128 stdpp.gmap <> gmap rec
+R33136:33136 Corelib.Numbers.BinNums <> Z ind
+R33130:33134 xv6iris.FsTree <> fname def
+R33043:33056 xv6iris.IcacheRef <> dview_boot_map def
+R33043:33056 xv6iris.IcacheRef <> dview_boot_map def
+R33071:33093 xv6iris.IcacheRef <> gset_to_gmap_singletons thm
+R33101:33112 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
+R33115:33122 iris.algebra.ofe <> leibnizO abbrev
+R33125:33128 stdpp.gmap <> gmap rec
+R33136:33136 Corelib.Numbers.BinNums <> Z ind
+R33130:33134 xv6iris.FsTree <> fname def
+R33071:33093 xv6iris.IcacheRef <> gset_to_gmap_singletons thm
+R33101:33112 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
+R33115:33122 iris.algebra.ofe <> leibnizO abbrev
+R33125:33128 stdpp.gmap <> gmap rec
+R33136:33136 Corelib.Numbers.BinNums <> Z ind
+R33130:33134 xv6iris.FsTree <> fname def
+R33155:33167 iris.base_logic.lib.own <> big_opS_own_1 thm
+R33155:33167 iris.base_logic.lib.own <> big_opS_own_1 thm
+R33155:33167 iris.base_logic.lib.own <> big_opS_own_1 thm
+R33194:33194 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R33208:33213 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R33217:33217 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R33195:33207 iris.bi.big_op <> big_sepS_mono thm
+R33194:33194 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R33208:33213 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R33217:33217 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R33195:33207 iris.bi.big_op <> big_sepS_mono thm
+R33258:33265 xv6iris.DirViewLend <> dvl_cell def
+R33258:33265 xv6iris.DirViewLend <> dvl_cell def
+R33258:33265 xv6iris.DirViewLend <> dvl_cell def
+prf 33296:33307 <> dv_lcol_boot
+R33314:33314 Corelib.Numbers.BinNums <> Z ind
+binder 33310:33310 <> z:186
+R33328:33332 iris.base_logic.lib.iprop <> gname def
+binder 33318:33320 <> γc:187
+binder 33322:33324 <> γv:188
+R33375:33384 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R33341:33348 xv6iris.DirViewLend <> dvl_slot def
+R33350:33350 xv6iris.DirViewLend <> z:186 var
+R33353:33360 iris.algebra.dfrac <> DfracOwn constr
+R33365:33365 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R33369:33370 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R33374:33374 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R33366:33368 xv6iris.DirViewLend <> γc:187 var
+R33371:33373 xv6iris.DirViewLend <> γv:188 var
+R33416:33421 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R33385:33392 xv6iris.DirViewLend <> dvl_cell def
+R33394:33396 xv6iris.DirViewLend <> γc:187 var
+R33398:33398 xv6iris.DirViewLend <> z:186 var
+R33401:33408 iris.algebra.dfrac <> DfracOwn constr
+R33413:33415 stdpp.base <> ::stdpp_scope:'∅' not
+R33453:33462 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R33422:33429 xv6iris.DirViewLend <> dvl_cell def
+R33431:33433 xv6iris.DirViewLend <> γv:188 var
+R33435:33435 xv6iris.DirViewLend <> z:186 var
+R33438:33445 iris.algebra.dfrac <> DfracOwn constr
+R33450:33452 stdpp.base <> ::stdpp_scope:'∅' not
+R33463:33469 xv6iris.DirViewLend <> dv_lcol def
+R33471:33471 xv6iris.DirViewLend <> z:186 var
+R33519:33525 xv6iris.DirViewLend <> dv_lcol def
+R33519:33525 xv6iris.DirViewLend <> dv_lcol def
+R33519:33525 xv6iris.DirViewLend <> dv_lcol def
+def 34629:34636 <> fvl_slot
+R34643:34643 Corelib.Numbers.BinNums <> Z ind
+binder 34639:34639 <> z:189
+R34652:34656 iris.algebra.dfrac <> dfrac ind
+binder 34647:34648 <> dq:190
+R34669:34671 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R34664:34668 iris.base_logic.lib.iprop <> gname def
+R34672:34676 iris.base_logic.lib.iprop <> gname def
+binder 34660:34660 <> g:191
+R34681:34685 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R34687:34688 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R34705:34709 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R34718:34718 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R34723:34723 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R34710:34717 xv6iris.IcacheRef <> icfg_reg meth
+R34698:34702 xv6iris.DirViewLend <> fvl_k def
+R34704:34704 xv6iris.DirViewLend <> z:189 var
+R34719:34719 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R34722:34722 iris.algebra.dfrac <> :dfrac::'{'_x_'}' not
+R34720:34721 xv6iris.DirViewLend <> dq:190 var
+R34724:34724 xv6iris.DirViewLend <> g:191 var
+def 34744:34749 <> fv_lic
+R34756:34756 Corelib.Numbers.BinNums <> Z ind
+binder 34752:34752 <> z:192
+R34761:34765 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R34767:34768 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R34778:34781 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R34799:34800 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R34791:34793 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R34786:34790 iris.base_logic.lib.iprop <> gname def
+R34794:34798 iris.base_logic.lib.iprop <> gname def
+binder 34782:34782 <> g:193
+R34808:34812 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R34821:34821 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R34822:34822 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R34813:34820 xv6iris.IcacheRef <> icfg_reg meth
+R34801:34805 xv6iris.DirViewLend <> fvl_l def
+R34807:34807 xv6iris.DirViewLend <> z:192 var
+R34823:34823 xv6iris.DirViewLend <> g:193 var
+def 34843:34850 <> fvl_cell
+R34858:34862 iris.base_logic.lib.iprop <> gname def
+binder 34853:34854 <> γ:194
+R34870:34870 Corelib.Numbers.BinNums <> Z ind
+binder 34866:34866 <> z:195
+R34879:34883 iris.algebra.dfrac <> dfrac ind
+binder 34874:34875 <> dq:196
+R34891:34894 Corelib.Init.Datatypes <> list ind
+R34897:34898 stdpp.bitvector.definitions <> bv rec
+binder 34887:34887 <> b:197
+R34910:34914 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R34916:34917 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R34926:34928 iris.base_logic.lib.own <> own def
+R34994:35000 xv6iris.Xv6Cameras <> fviewUR def
+R34934:34936 stdpp.base <> ::stdpp_scope:'{['_x_':='_x_']}' not
+R34938:34941 stdpp.base <> ::stdpp_scope:'{['_x_':='_x_']}' not
+R34988:34990 stdpp.base <> ::stdpp_scope:'{['_x_':='_x_']}' not
+R34937:34937 xv6iris.DirViewLend <> z:195 var
+R34942:34955 iris.algebra.lib.dfrac_agree <> to_dfrac_agree def
+R34965:34972 iris.algebra.ofe <> leibnizO abbrev
+R34975:34978 Corelib.Init.Datatypes <> list ind
+R34981:34982 stdpp.bitvector.definitions <> bv rec
+R34961:34961 xv6iris.DirViewLend <> b:197 var
+R34957:34958 xv6iris.DirViewLend <> dq:196 var
+R34930:34931 xv6iris.DirViewLend <> γ:194 var
+def 35018:35025 <> fv_ctick
+R35034:35038 iris.base_logic.lib.iprop <> gname def
+binder 35028:35030 <> γc:198
+R35046:35046 Corelib.Numbers.BinNums <> Z ind
+binder 35042:35042 <> z:199
+R35054:35057 Corelib.Init.Datatypes <> list ind
+R35060:35061 stdpp.bitvector.definitions <> bv rec
+binder 35050:35050 <> b:200
+R35069:35073 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R35075:35076 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R35085:35092 xv6iris.DirViewLend <> fvl_cell def
+R35094:35096 xv6iris.DirViewLend <> γc:198 var
+R35098:35098 xv6iris.DirViewLend <> z:199 var
+R35101:35108 iris.algebra.dfrac <> DfracOwn constr
+R35113:35113 xv6iris.DirViewLend <> b:200 var
+def 35130:35137 <> fv_cshot
+R35146:35150 iris.base_logic.lib.iprop <> gname def
+binder 35140:35142 <> γc:201
+R35158:35158 Corelib.Numbers.BinNums <> Z ind
+binder 35154:35154 <> z:202
+R35166:35169 Corelib.Init.Datatypes <> list ind
+R35172:35173 stdpp.bitvector.definitions <> bv rec
+binder 35162:35162 <> b:203
+R35181:35185 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R35187:35188 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R35197:35204 xv6iris.DirViewLend <> fvl_cell def
+R35206:35208 xv6iris.DirViewLend <> γc:201 var
+R35210:35210 xv6iris.DirViewLend <> z:202 var
+R35212:35225 iris.algebra.dfrac <> DfracDiscarded constr
+R35227:35227 xv6iris.DirViewLend <> b:203 var
+def 35244:35250 <> fv_vwit
+R35259:35263 iris.base_logic.lib.iprop <> gname def
+binder 35253:35255 <> γv:204
+R35271:35271 Corelib.Numbers.BinNums <> Z ind
+binder 35267:35267 <> z:205
+R35279:35282 Corelib.Init.Datatypes <> list ind
+R35285:35286 stdpp.bitvector.definitions <> bv rec
+binder 35275:35275 <> b:206
+R35294:35298 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R35300:35301 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R35310:35317 xv6iris.DirViewLend <> fvl_cell def
+R35319:35321 xv6iris.DirViewLend <> γv:204 var
+R35323:35323 xv6iris.DirViewLend <> z:205 var
+R35326:35333 iris.algebra.dfrac <> DfracOwn constr
+R35337:35337 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R35342:35342 xv6iris.DirViewLend <> b:206 var
+def 35498:35504 <> fv_lcol
+R35511:35511 Corelib.Numbers.BinNums <> Z ind
+binder 35507:35507 <> z:207
+R35516:35520 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R35522:35523 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R35534:35534 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R35678:35687 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R35535:35538 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R35554:35564 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R35549:35553 iris.base_logic.lib.iprop <> gname def
+binder 35539:35541 <> γc:208
+R35549:35553 iris.base_logic.lib.iprop <> gname def
+binder 35543:35545 <> γv:209
+R35599:35612 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35565:35572 xv6iris.DirViewLend <> fvl_slot def
+R35574:35574 xv6iris.DirViewLend <> z:207 var
+R35577:35584 iris.algebra.dfrac <> DfracOwn constr
+R35589:35589 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R35593:35594 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R35598:35598 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R35590:35592 xv6iris.DirViewLend <> γc:208 var
+R35595:35597 xv6iris.DirViewLend <> γv:209 var
+R35643:35647 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35613:35620 xv6iris.DirViewLend <> fvl_cell def
+R35622:35624 xv6iris.DirViewLend <> γc:208 var
+R35626:35626 xv6iris.DirViewLend <> z:207 var
+R35629:35636 iris.algebra.dfrac <> DfracOwn constr
+R35641:35642 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R35648:35655 xv6iris.DirViewLend <> fvl_cell def
+R35657:35659 xv6iris.DirViewLend <> γv:209 var
+R35661:35661 xv6iris.DirViewLend <> z:207 var
+R35664:35671 iris.algebra.dfrac <> DfracOwn constr
+R35676:35677 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R35688:35688 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R35873:35883 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R36035:36035 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R35689:35693 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R35727:35738 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R35704:35708 iris.base_logic.lib.iprop <> gname def
+binder 35694:35696 <> γc:210
+R35704:35708 iris.base_logic.lib.iprop <> gname def
+binder 35698:35700 <> γv:211
+R35716:35719 Corelib.Init.Datatypes <> list ind
+R35722:35723 stdpp.bitvector.definitions <> bv rec
+binder 35712:35712 <> b:212
+R35777:35781 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35739:35746 xv6iris.DirViewLend <> fvl_slot def
+R35748:35748 xv6iris.DirViewLend <> z:207 var
+R35751:35758 iris.algebra.dfrac <> DfracOwn constr
+R35762:35762 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R35767:35767 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R35771:35772 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R35776:35776 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R35768:35770 xv6iris.DirViewLend <> γc:210 var
+R35773:35775 xv6iris.DirViewLend <> γv:211 var
+R35790:35803 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35782:35787 xv6iris.DirViewLend <> fv_lic def
+R35789:35789 xv6iris.DirViewLend <> z:207 var
+R35832:35836 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35804:35810 xv6iris.DirViewG <> fv_half def
+R35812:35812 xv6iris.DirViewLend <> z:207 var
+R35815:35822 iris.algebra.dfrac <> DfracOwn constr
+R35826:35826 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R35831:35831 xv6iris.DirViewLend <> b:212 var
+R35853:35857 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35837:35844 xv6iris.DirViewLend <> fv_ctick def
+R35846:35848 xv6iris.DirViewLend <> γc:210 var
+R35850:35850 xv6iris.DirViewLend <> z:207 var
+R35852:35852 xv6iris.DirViewLend <> b:212 var
+R35858:35864 xv6iris.DirViewLend <> fv_vwit def
+R35866:35868 xv6iris.DirViewLend <> γv:211 var
+R35870:35870 xv6iris.DirViewLend <> z:207 var
+R35872:35872 xv6iris.DirViewLend <> b:212 var
+R35884:35888 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R35922:35933 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R35899:35903 iris.base_logic.lib.iprop <> gname def
+binder 35889:35891 <> γc:213
+R35899:35903 iris.base_logic.lib.iprop <> gname def
+binder 35893:35895 <> γv:214
+R35911:35914 Corelib.Init.Datatypes <> list ind
+R35917:35918 stdpp.bitvector.definitions <> bv rec
+binder 35907:35907 <> b:215
+R35972:35976 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35934:35941 xv6iris.DirViewLend <> fvl_slot def
+R35943:35943 xv6iris.DirViewLend <> z:207 var
+R35946:35953 iris.algebra.dfrac <> DfracOwn constr
+R35957:35957 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R35962:35962 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R35966:35967 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R35971:35971 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R35963:35965 xv6iris.DirViewLend <> γc:213 var
+R35968:35970 xv6iris.DirViewLend <> γv:214 var
+R35985:35998 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35977:35982 xv6iris.DirViewLend <> fv_lic def
+R35984:35984 xv6iris.DirViewLend <> z:207 var
+R36015:36019 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R35999:36006 xv6iris.DirViewLend <> fv_cshot def
+R36008:36010 xv6iris.DirViewLend <> γc:213 var
+R36012:36012 xv6iris.DirViewLend <> z:207 var
+R36014:36014 xv6iris.DirViewLend <> b:215 var
+R36020:36026 xv6iris.DirViewLend <> fv_vwit def
+R36028:36030 xv6iris.DirViewLend <> γv:214 var
+R36032:36032 xv6iris.DirViewLend <> z:207 var
+R36034:36034 xv6iris.DirViewLend <> b:215 var
+def 36056:36063 <> fv_lentm
+R36070:36070 Corelib.Numbers.BinNums <> Z ind
+binder 36066:36066 <> z:216
+R36078:36081 Corelib.Init.Datatypes <> list ind
+R36084:36085 stdpp.bitvector.definitions <> bv rec
+binder 36074:36074 <> b:217
+R36093:36097 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R36099:36100 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R36125:36129 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R36110:36112 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R36122:36124 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R36113:36119 xv6iris.DirViewLend <> dvl_dom def
+R36121:36121 xv6iris.DirViewLend <> z:216 var
+R36130:36133 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R36151:36152 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R36143:36145 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R36138:36142 iris.base_logic.lib.iprop <> gname def
+R36146:36150 iris.base_logic.lib.iprop <> gname def
+binder 36134:36134 <> g:218
+R36153:36160 xv6iris.DirViewLend <> fvl_slot def
+R36162:36162 xv6iris.DirViewLend <> z:216 var
+R36165:36172 iris.algebra.dfrac <> DfracOwn constr
+R36176:36176 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R36181:36181 xv6iris.DirViewLend <> g:218 var
+def 36201:36207 <> fv_ride
+R36214:36214 Corelib.Numbers.BinNums <> Z ind
+binder 36210:36210 <> z:219
+R36222:36225 Corelib.Init.Datatypes <> list ind
+R36228:36229 stdpp.bitvector.definitions <> bv rec
+binder 36218:36218 <> b:220
+R36237:36241 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R36243:36244 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R36265:36270 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R36316:36316 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R36254:36260 xv6iris.DirViewG <> fv_hold def
+R36262:36262 xv6iris.DirViewLend <> z:219 var
+R36264:36264 xv6iris.DirViewLend <> b:220 var
+R36299:36303 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R36271:36277 xv6iris.DirViewG <> fv_half def
+R36279:36279 xv6iris.DirViewLend <> z:219 var
+R36282:36289 iris.algebra.dfrac <> DfracOwn constr
+R36293:36293 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R36298:36298 xv6iris.DirViewLend <> b:220 var
+R36304:36311 xv6iris.DirViewLend <> fv_lentm def
+R36313:36313 xv6iris.DirViewLend <> z:219 var
+R36315:36315 xv6iris.DirViewLend <> b:220 var
+def 36336:36341 <> fv_pin
+R36348:36348 Corelib.Numbers.BinNums <> Z ind
+binder 36344:36344 <> z:221
+R36356:36359 Corelib.Init.Datatypes <> list ind
+R36362:36363 stdpp.bitvector.definitions <> bv rec
+binder 36352:36352 <> b:222
+R36371:36375 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R36377:36378 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R36403:36407 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R36388:36390 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R36400:36402 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R36391:36397 xv6iris.DirViewLend <> dvl_dom def
+R36399:36399 xv6iris.DirViewLend <> z:221 var
+R36408:36411 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R36427:36435 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R36422:36426 iris.base_logic.lib.iprop <> gname def
+binder 36412:36414 <> γc:223
+R36422:36426 iris.base_logic.lib.iprop <> gname def
+binder 36416:36418 <> γv:224
+R36474:36478 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R36436:36443 xv6iris.DirViewLend <> fvl_slot def
+R36445:36445 xv6iris.DirViewLend <> z:221 var
+R36448:36455 iris.algebra.dfrac <> DfracOwn constr
+R36459:36459 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R36464:36464 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36468:36469 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36473:36473 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36465:36467 xv6iris.DirViewLend <> γc:223 var
+R36470:36472 xv6iris.DirViewLend <> γv:224 var
+R36479:36485 xv6iris.DirViewLend <> fv_vwit def
+R36487:36489 xv6iris.DirViewLend <> γv:224 var
+R36491:36491 xv6iris.DirViewLend <> z:221 var
+R36493:36493 xv6iris.DirViewLend <> b:222 var
+def 36513:36524 <> fv_pin_spent
+R36531:36531 Corelib.Numbers.BinNums <> Z ind
+binder 36527:36527 <> z:225
+R36539:36542 Corelib.Init.Datatypes <> list ind
+R36545:36546 stdpp.bitvector.definitions <> bv rec
+binder 36535:36535 <> b:226
+R36554:36558 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R36560:36561 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R36570:36575 xv6iris.DirViewLend <> fv_pin def
+R36577:36577 xv6iris.DirViewLend <> z:225 var
+R36579:36579 xv6iris.DirViewLend <> b:226 var
+def 36596:36607 <> fv_cancelled
+R36614:36614 Corelib.Numbers.BinNums <> Z ind
+binder 36610:36610 <> z:227
+R36622:36625 Corelib.Init.Datatypes <> list ind
+R36628:36629 stdpp.bitvector.definitions <> bv rec
+binder 36618:36618 <> b:228
+R36637:36641 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R36643:36644 xv6iris.DirViewLend <> DirViewLendDefs.Σ var
+R36654:36657 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R36673:36681 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R36668:36672 iris.base_logic.lib.iprop <> gname def
+binder 36658:36660 <> γc:229
+R36668:36672 iris.base_logic.lib.iprop <> gname def
+binder 36662:36664 <> γv:230
+R36718:36722 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R36682:36689 xv6iris.DirViewLend <> fvl_slot def
+R36691:36691 xv6iris.DirViewLend <> z:227 var
+R36693:36706 iris.algebra.dfrac <> DfracDiscarded constr
+R36708:36708 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36712:36713 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36717:36717 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36709:36711 xv6iris.DirViewLend <> γc:229 var
+R36714:36716 xv6iris.DirViewLend <> γv:230 var
+R36723:36730 xv6iris.DirViewLend <> fv_cshot def
+R36732:36734 xv6iris.DirViewLend <> γc:229 var
+R36736:36736 xv6iris.DirViewLend <> z:227 var
+R36738:36738 xv6iris.DirViewLend <> b:228 var
+inst 36994:37010 <> fvl_slot_timeless
+binder 37012:37012 <> z:231
+binder 37014:37015 <> dq:232
+binder 37017:37017 <> g:233
+R37021:37028 iris.bi.derived_connectives <> Timeless class
+R37031:37038 xv6iris.DirViewLend <> fvl_slot def
+R37040:37040 xv6iris.DirViewLend <> z:231 var
+R37042:37043 xv6iris.DirViewLend <> dq:232 var
+R37045:37045 xv6iris.DirViewLend <> g:233 var
+R37067:37074 xv6iris.DirViewLend <> fvl_slot def
+R37067:37074 xv6iris.DirViewLend <> fvl_slot def
+R37067:37074 xv6iris.DirViewLend <> fvl_slot def
+inst 37109:37123 <> fv_lic_timeless
+binder 37125:37125 <> z:234
+R37129:37136 iris.bi.derived_connectives <> Timeless class
+R37139:37144 xv6iris.DirViewLend <> fv_lic def
+R37146:37146 xv6iris.DirViewLend <> z:234 var
+R37168:37173 xv6iris.DirViewLend <> fv_lic def
+R37168:37173 xv6iris.DirViewLend <> fv_lic def
+R37168:37173 xv6iris.DirViewLend <> fv_lic def
+inst 37208:37224 <> fvl_cell_timeless
+binder 37226:37227 <> γ:235
+binder 37229:37229 <> z:236
+binder 37231:37232 <> dq:237
+binder 37234:37234 <> b:238
+R37238:37245 iris.bi.derived_connectives <> Timeless class
+R37248:37255 xv6iris.DirViewLend <> fvl_cell def
+R37257:37258 xv6iris.DirViewLend <> γ:235 var
+R37260:37260 xv6iris.DirViewLend <> z:236 var
+R37262:37263 xv6iris.DirViewLend <> dq:237 var
+R37265:37265 xv6iris.DirViewLend <> b:238 var
+inst 37310:37326 <> fv_ctick_timeless
+binder 37328:37330 <> γc:239
+binder 37332:37332 <> z:240
+binder 37334:37334 <> b:241
+R37338:37345 iris.bi.derived_connectives <> Timeless class
+R37348:37355 xv6iris.DirViewLend <> fv_ctick def
+R37357:37359 xv6iris.DirViewLend <> γc:239 var
+R37361:37361 xv6iris.DirViewLend <> z:240 var
+R37363:37363 xv6iris.DirViewLend <> b:241 var
+inst 37408:37424 <> fv_cshot_timeless
+binder 37426:37428 <> γc:242
+binder 37430:37430 <> z:243
+binder 37432:37432 <> b:244
+R37436:37443 iris.bi.derived_connectives <> Timeless class
+R37446:37453 xv6iris.DirViewLend <> fv_cshot def
+R37455:37457 xv6iris.DirViewLend <> γc:242 var
+R37459:37459 xv6iris.DirViewLend <> z:243 var
+R37461:37461 xv6iris.DirViewLend <> b:244 var
+inst 37506:37521 <> fv_vwit_timeless
+binder 37523:37525 <> γv:245
+binder 37527:37527 <> z:246
+binder 37529:37529 <> b:247
+R37533:37540 iris.bi.derived_connectives <> Timeless class
+R37543:37549 xv6iris.DirViewLend <> fv_vwit def
+R37551:37553 xv6iris.DirViewLend <> γv:245 var
+R37555:37555 xv6iris.DirViewLend <> z:246 var
+R37557:37557 xv6iris.DirViewLend <> b:247 var
+inst 37603:37621 <> fv_cshot_persistent
+binder 37623:37625 <> γc:248
+binder 37627:37627 <> z:249
+binder 37629:37629 <> b:250
+R37633:37642 iris.bi.derived_connectives <> Persistent class
+R37645:37652 xv6iris.DirViewLend <> fv_cshot def
+R37654:37656 xv6iris.DirViewLend <> γc:248 var
+R37658:37658 xv6iris.DirViewLend <> z:249 var
+R37660:37660 xv6iris.DirViewLend <> b:250 var
+R37686:37693 xv6iris.DirViewLend <> fv_cshot def
+R37696:37703 xv6iris.DirViewLend <> fvl_cell def
+R37706:37719 iris.algebra.lib.dfrac_agree <> to_dfrac_agree def
+R37686:37693 xv6iris.DirViewLend <> fv_cshot def
+R37686:37693 xv6iris.DirViewLend <> fv_cshot def
+R37696:37703 xv6iris.DirViewLend <> fvl_cell def
+R37696:37703 xv6iris.DirViewLend <> fvl_cell def
+R37706:37719 iris.algebra.lib.dfrac_agree <> to_dfrac_agree def
+R37706:37719 iris.algebra.lib.dfrac_agree <> to_dfrac_agree def
+R37732:37750 iris.base_logic.lib.own <> own_core_persistent inst
+R37732:37750 iris.base_logic.lib.own <> own_core_persistent inst
+inst 37782:37797 <> fv_lcol_timeless
+binder 37799:37799 <> z:251
+R37803:37810 iris.bi.derived_connectives <> Timeless class
+R37813:37819 xv6iris.DirViewLend <> fv_lcol def
+R37821:37821 xv6iris.DirViewLend <> z:251 var
+R37843:37849 xv6iris.DirViewLend <> fv_lcol def
+R37843:37849 xv6iris.DirViewLend <> fv_lcol def
+R37843:37849 xv6iris.DirViewLend <> fv_lcol def
+inst 37884:37900 <> fv_lentm_timeless
+binder 37902:37902 <> z:252
+binder 37904:37904 <> b:253
+R37908:37915 iris.bi.derived_connectives <> Timeless class
+R37918:37925 xv6iris.DirViewLend <> fv_lentm def
+R37927:37927 xv6iris.DirViewLend <> z:252 var
+R37929:37929 xv6iris.DirViewLend <> b:253 var
+R37951:37958 xv6iris.DirViewLend <> fv_lentm def
+R37951:37958 xv6iris.DirViewLend <> fv_lentm def
+R37951:37958 xv6iris.DirViewLend <> fv_lentm def
+inst 37993:38008 <> fv_ride_timeless
+binder 38010:38010 <> z:254
+binder 38012:38012 <> b:255
+R38016:38023 iris.bi.derived_connectives <> Timeless class
+R38026:38032 xv6iris.DirViewLend <> fv_ride def
+R38034:38034 xv6iris.DirViewLend <> z:254 var
+R38036:38036 xv6iris.DirViewLend <> b:255 var
+R38058:38064 xv6iris.DirViewLend <> fv_ride def
+R38058:38064 xv6iris.DirViewLend <> fv_ride def
+R38058:38064 xv6iris.DirViewLend <> fv_ride def
+inst 38099:38113 <> fv_pin_timeless
+binder 38115:38115 <> z:256
+binder 38117:38117 <> b:257
+R38121:38128 iris.bi.derived_connectives <> Timeless class
+R38131:38136 xv6iris.DirViewLend <> fv_pin def
+R38138:38138 xv6iris.DirViewLend <> z:256 var
+R38140:38140 xv6iris.DirViewLend <> b:257 var
+R38162:38167 xv6iris.DirViewLend <> fv_pin def
+R38162:38167 xv6iris.DirViewLend <> fv_pin def
+R38162:38167 xv6iris.DirViewLend <> fv_pin def
+inst 38202:38222 <> fv_cancelled_timeless
+binder 38224:38224 <> z:258
+binder 38226:38226 <> b:259
+R38230:38237 iris.bi.derived_connectives <> Timeless class
+R38240:38251 xv6iris.DirViewLend <> fv_cancelled def
+R38253:38253 xv6iris.DirViewLend <> z:258 var
+R38255:38255 xv6iris.DirViewLend <> b:259 var
+R38277:38288 xv6iris.DirViewLend <> fv_cancelled def
+R38277:38288 xv6iris.DirViewLend <> fv_cancelled def
+R38277:38288 xv6iris.DirViewLend <> fv_cancelled def
+inst 38324:38346 <> fv_cancelled_persistent
+binder 38348:38348 <> z:260
+binder 38350:38350 <> b:261
+R38354:38363 iris.bi.derived_connectives <> Persistent class
+R38366:38377 xv6iris.DirViewLend <> fv_cancelled def
+R38379:38379 xv6iris.DirViewLend <> z:260 var
+R38381:38381 xv6iris.DirViewLend <> b:261 var
+R38403:38414 xv6iris.DirViewLend <> fv_cancelled def
+R38403:38414 xv6iris.DirViewLend <> fv_cancelled def
+R38403:38414 xv6iris.DirViewLend <> fv_cancelled def
+prf 38518:38531 <> fvl_slot_split
+R38538:38538 Corelib.Numbers.BinNums <> Z ind
+binder 38534:38534 <> z:262
+R38548:38549 stdpp.numbers <> Qp rec
+binder 38542:38542 <> p:263
+binder 38544:38544 <> q:264
+R38562:38564 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R38557:38561 iris.base_logic.lib.iprop <> gname def
+R38565:38569 iris.base_logic.lib.iprop <> gname def
+binder 38553:38553 <> g:265
+R38609:38622 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R38578:38585 xv6iris.DirViewLend <> fvl_slot def
+R38587:38587 xv6iris.DirViewLend <> z:262 var
+R38590:38597 iris.algebra.dfrac <> DfracOwn constr
+R38601:38603 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R38600:38600 xv6iris.DirViewLend <> p:263 var
+R38604:38604 xv6iris.DirViewLend <> q:264 var
+R38608:38608 xv6iris.DirViewLend <> g:265 var
+R38648:38652 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R38623:38630 xv6iris.DirViewLend <> fvl_slot def
+R38632:38632 xv6iris.DirViewLend <> z:262 var
+R38635:38642 iris.algebra.dfrac <> DfracOwn constr
+R38644:38644 xv6iris.DirViewLend <> p:263 var
+R38647:38647 xv6iris.DirViewLend <> g:265 var
+R38653:38660 xv6iris.DirViewLend <> fvl_slot def
+R38662:38662 xv6iris.DirViewLend <> z:262 var
+R38665:38672 iris.algebra.dfrac <> DfracOwn constr
+R38674:38674 xv6iris.DirViewLend <> q:264 var
+R38677:38677 xv6iris.DirViewLend <> g:265 var
+R38702:38709 xv6iris.DirViewLend <> fvl_slot def
+R38702:38709 xv6iris.DirViewLend <> fvl_slot def
+R38702:38709 xv6iris.DirViewLend <> fvl_slot def
+R38723:38732 iris.bi.lib.fractional <> fractional def
+binder 38745:38745 <> q:266
+R38758:38762 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R38771:38771 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R38776:38776 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R38763:38770 xv6iris.IcacheRef <> icfg_reg meth
+R38751:38755 xv6iris.DirViewLend <> fvl_k def
+R38772:38773 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R38775:38775 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R38774:38774 xv6iris.DirViewLend <> q:266 var
+R38723:38732 iris.bi.lib.fractional <> fractional def
+binder 38745:38745 <> q:267
+R38758:38762 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R38771:38771 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R38776:38776 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R38763:38770 xv6iris.IcacheRef <> icfg_reg meth
+R38751:38755 xv6iris.DirViewLend <> fvl_k def
+R38772:38773 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R38775:38775 iris.algebra.dfrac <> :dfrac::'{#'_x_'}' not
+R38774:38774 xv6iris.DirViewLend <> q:267 var
+prf 38801:38813 <> fvl_slot_join
+R38820:38820 Corelib.Numbers.BinNums <> Z ind
+binder 38816:38816 <> z:268
+R38830:38831 stdpp.numbers <> Qp rec
+binder 38824:38824 <> p:269
+binder 38826:38826 <> q:270
+R38848:38850 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R38843:38847 iris.base_logic.lib.iprop <> gname def
+R38851:38855 iris.base_logic.lib.iprop <> gname def
+binder 38835:38836 <> g1:271
+binder 38838:38839 <> g2:272
+R38890:38895 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R38864:38871 xv6iris.DirViewLend <> fvl_slot def
+R38873:38873 xv6iris.DirViewLend <> z:268 var
+R38876:38883 iris.algebra.dfrac <> DfracOwn constr
+R38885:38885 xv6iris.DirViewLend <> p:269 var
+R38888:38889 xv6iris.DirViewLend <> g1:271 var
+R38922:38931 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R38896:38903 xv6iris.DirViewLend <> fvl_slot def
+R38905:38905 xv6iris.DirViewLend <> z:268 var
+R38908:38915 iris.algebra.dfrac <> DfracOwn constr
+R38917:38917 xv6iris.DirViewLend <> q:270 var
+R38920:38921 xv6iris.DirViewLend <> g2:272 var
+R38945:38949 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R38932:38934 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R38942:38944 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R38937:38939 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R38935:38936 xv6iris.DirViewLend <> g1:271 var
+R38940:38941 xv6iris.DirViewLend <> g2:272 var
+R38950:38957 xv6iris.DirViewLend <> fvl_slot def
+R38959:38959 xv6iris.DirViewLend <> z:268 var
+R38962:38969 iris.algebra.dfrac <> DfracOwn constr
+R38973:38975 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R38972:38972 xv6iris.DirViewLend <> p:269 var
+R38976:38976 xv6iris.DirViewLend <> q:270 var
+R38980:38981 xv6iris.DirViewLend <> g1:271 var
+R39006:39013 xv6iris.DirViewLend <> fvl_slot def
+R39006:39013 xv6iris.DirViewLend <> fvl_slot def
+R39006:39013 xv6iris.DirViewLend <> fvl_slot def
+R39047:39047 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39068:39073 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39081:39081 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39048:39067 iris.base_logic.lib.ghost_map <> ghost_map_elem_agree thm
+R39047:39047 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39068:39073 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39081:39081 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39048:39067 iris.base_logic.lib.ghost_map <> ghost_map_elem_agree thm
+R39139:39139 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39162:39167 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39175:39175 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39140:39161 iris.base_logic.lib.ghost_map <> ghost_map_elem_combine thm
+R39139:39139 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39162:39167 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39175:39175 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39140:39161 iris.base_logic.lib.ghost_map <> ghost_map_elem_combine thm
+R39201:39212 iris.algebra.dfrac <> dfrac_op_own thm
+R39201:39212 iris.algebra.dfrac <> dfrac_op_own thm
+R39201:39212 iris.algebra.dfrac <> dfrac_op_own thm
+prf 39243:39254 <> fvl_slot_cut
+R39261:39261 Corelib.Numbers.BinNums <> Z ind
+binder 39257:39257 <> z:273
+R39274:39276 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R39269:39273 iris.base_logic.lib.iprop <> gname def
+R39277:39281 iris.base_logic.lib.iprop <> gname def
+binder 39265:39265 <> g:274
+R39315:39328 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R39290:39297 xv6iris.DirViewLend <> fvl_slot def
+R39299:39299 xv6iris.DirViewLend <> z:273 var
+R39302:39309 iris.algebra.dfrac <> DfracOwn constr
+R39314:39314 xv6iris.DirViewLend <> g:274 var
+R39358:39362 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R39329:39336 xv6iris.DirViewLend <> fvl_slot def
+R39338:39338 xv6iris.DirViewLend <> z:273 var
+R39341:39348 iris.algebra.dfrac <> DfracOwn constr
+R39352:39352 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39357:39357 xv6iris.DirViewLend <> g:274 var
+R39392:39402 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R39363:39370 xv6iris.DirViewLend <> fvl_slot def
+R39372:39372 xv6iris.DirViewLend <> z:273 var
+R39375:39382 iris.algebra.dfrac <> DfracOwn constr
+R39386:39386 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39391:39391 xv6iris.DirViewLend <> g:274 var
+R39403:39410 xv6iris.DirViewLend <> fvl_slot def
+R39412:39412 xv6iris.DirViewLend <> z:273 var
+R39415:39422 iris.algebra.dfrac <> DfracOwn constr
+R39426:39426 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39431:39431 xv6iris.DirViewLend <> g:274 var
+R39457:39470 xv6iris.DirViewLend <> fvl_slot_split thm
+R39476:39476 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39482:39482 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39457:39470 xv6iris.DirViewLend <> fvl_slot_split thm
+R39476:39476 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39482:39482 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39457:39470 xv6iris.DirViewLend <> fvl_slot_split thm
+R39476:39476 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39482:39482 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39504:39517 xv6iris.DirViewLend <> fvl_slot_split thm
+R39523:39523 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39531:39533 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R39529:39529 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39535:39535 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39504:39517 xv6iris.DirViewLend <> fvl_slot_split thm
+R39523:39523 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39531:39533 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R39529:39529 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39535:39535 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39504:39517 xv6iris.DirViewLend <> fvl_slot_split thm
+R39523:39523 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39531:39533 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R39529:39529 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39535:39535 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39580:39582 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39562:39565 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R39575:39575 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R39560:39560 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39569:39571 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R39567:39567 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39573:39573 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39580:39582 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39562:39565 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R39575:39575 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R39560:39560 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39569:39571 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R39567:39567 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39573:39573 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+prf 39628:39642 <> fvl_slot_join34
+R39649:39649 Corelib.Numbers.BinNums <> Z ind
+binder 39645:39645 <> z:275
+R39666:39668 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R39661:39665 iris.base_logic.lib.iprop <> gname def
+R39669:39673 iris.base_logic.lib.iprop <> gname def
+binder 39653:39654 <> g1:276
+binder 39656:39657 <> g2:277
+R39712:39717 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R39682:39689 xv6iris.DirViewLend <> fvl_slot def
+R39691:39691 xv6iris.DirViewLend <> z:275 var
+R39694:39701 iris.algebra.dfrac <> DfracOwn constr
+R39705:39705 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39710:39711 xv6iris.DirViewLend <> g1:276 var
+R39748:39757 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R39718:39725 xv6iris.DirViewLend <> fvl_slot def
+R39727:39727 xv6iris.DirViewLend <> z:275 var
+R39730:39737 iris.algebra.dfrac <> DfracOwn constr
+R39741:39741 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39746:39747 xv6iris.DirViewLend <> g2:277 var
+R39771:39775 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R39758:39760 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R39768:39770 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R39763:39765 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39761:39762 xv6iris.DirViewLend <> g1:276 var
+R39766:39767 xv6iris.DirViewLend <> g2:277 var
+R39776:39783 xv6iris.DirViewLend <> fvl_slot def
+R39785:39785 xv6iris.DirViewLend <> z:275 var
+R39788:39795 iris.algebra.dfrac <> DfracOwn constr
+R39799:39799 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39804:39805 xv6iris.DirViewLend <> g1:276 var
+R39852:39852 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39866:39871 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39879:39879 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39853:39865 xv6iris.DirViewLend <> fvl_slot_join thm
+R39852:39852 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39866:39871 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39879:39879 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R39853:39865 xv6iris.DirViewLend <> fvl_slot_join thm
+R39941:39943 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39935:39935 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39948:39950 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R39946:39946 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39952:39952 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39941:39943 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39935:39935 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39948:39950 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R39946:39946 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R39952:39952 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+prf 39999:40012 <> fvl_slot_agree
+R40019:40019 Corelib.Numbers.BinNums <> Z ind
+binder 40015:40015 <> z:278
+R40033:40037 iris.algebra.dfrac <> dfrac ind
+binder 40023:40025 <> dq1:279
+binder 40027:40029 <> dq2:280
+R40054:40056 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R40049:40053 iris.base_logic.lib.iprop <> gname def
+R40057:40061 iris.base_logic.lib.iprop <> gname def
+binder 40041:40042 <> g1:281
+binder 40044:40045 <> g2:282
+R40087:40092 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R40070:40077 xv6iris.DirViewLend <> fvl_slot def
+R40079:40079 xv6iris.DirViewLend <> z:278 var
+R40081:40083 xv6iris.DirViewLend <> dq1:279 var
+R40085:40086 xv6iris.DirViewLend <> g1:281 var
+R40110:40115 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R40093:40100 xv6iris.DirViewLend <> fvl_slot def
+R40102:40102 xv6iris.DirViewLend <> z:278 var
+R40104:40106 xv6iris.DirViewLend <> dq2:280 var
+R40108:40109 xv6iris.DirViewLend <> g2:282 var
+R40116:40118 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R40126:40128 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R40121:40123 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R40119:40120 xv6iris.DirViewLend <> g1:281 var
+R40124:40125 xv6iris.DirViewLend <> g2:282 var
+R40153:40160 xv6iris.DirViewLend <> fvl_slot def
+R40153:40160 xv6iris.DirViewLend <> fvl_slot def
+R40153:40160 xv6iris.DirViewLend <> fvl_slot def
+R40197:40197 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40218:40223 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40231:40231 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40198:40217 iris.base_logic.lib.ghost_map <> ghost_map_elem_agree thm
+R40197:40197 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40218:40223 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40231:40231 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40198:40217 iris.base_logic.lib.ghost_map <> ghost_map_elem_agree thm
+prf 40257:40269 <> fvl_slot_over
+R40276:40276 Corelib.Numbers.BinNums <> Z ind
+binder 40272:40272 <> z:283
+R40286:40287 stdpp.numbers <> Qp rec
+binder 40280:40280 <> p:284
+binder 40282:40282 <> q:285
+R40304:40306 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R40299:40303 iris.base_logic.lib.iprop <> gname def
+R40307:40311 iris.base_logic.lib.iprop <> gname def
+binder 40291:40292 <> g1:286
+binder 40294:40295 <> g2:287
+R40334:40341 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40322:40324 stdpp.numbers Qp.notations ::Qp_scope:x_'<'_x not
+R40326:40328 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R40325:40325 xv6iris.DirViewLend <> p:284 var
+R40329:40329 xv6iris.DirViewLend <> q:285 var
+R40368:40373 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R40342:40349 xv6iris.DirViewLend <> fvl_slot def
+R40351:40351 xv6iris.DirViewLend <> z:283 var
+R40354:40361 iris.algebra.dfrac <> DfracOwn constr
+R40363:40363 xv6iris.DirViewLend <> p:284 var
+R40366:40367 xv6iris.DirViewLend <> g1:286 var
+R40400:40405 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R40374:40381 xv6iris.DirViewLend <> fvl_slot def
+R40383:40383 xv6iris.DirViewLend <> z:283 var
+R40386:40393 iris.algebra.dfrac <> DfracOwn constr
+R40395:40395 xv6iris.DirViewLend <> q:285 var
+R40398:40399 xv6iris.DirViewLend <> g2:287 var
+R40406:40410 iris.bi.interface <> ::bi_scope:'False' not
+R40447:40454 xv6iris.DirViewLend <> fvl_slot def
+R40447:40454 xv6iris.DirViewLend <> fvl_slot def
+R40447:40454 xv6iris.DirViewLend <> fvl_slot def
+R40488:40488 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40511:40516 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40524:40524 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40489:40510 iris.base_logic.lib.ghost_map <> ghost_map_elem_valid_2 thm
+R40488:40488 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40511:40516 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40524:40524 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40489:40510 iris.base_logic.lib.ghost_map <> ghost_map_elem_valid_2 thm
+R40559:40570 iris.algebra.dfrac <> dfrac_op_own thm
+R40572:40586 iris.algebra.dfrac <> dfrac_valid_own thm
+R40559:40570 iris.algebra.dfrac <> dfrac_op_own thm
+R40559:40570 iris.algebra.dfrac <> dfrac_op_own thm
+R40572:40586 iris.algebra.dfrac <> dfrac_valid_own thm
+R40572:40586 iris.algebra.dfrac <> dfrac_valid_own thm
+R40606:40610 Corelib.Init.Logic <> proj1 thm
+R40613:40621 stdpp.numbers Qp lt_nge thm
+R40606:40610 Corelib.Init.Logic <> proj1 thm
+R40613:40621 stdpp.numbers Qp lt_nge thm
+prf 40653:40663 <> fv_lic_excl
+R40670:40670 Corelib.Numbers.BinNums <> Z ind
+binder 40666:40666 <> z:288
+R40683:40688 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R40675:40680 xv6iris.DirViewLend <> fv_lic def
+R40682:40682 xv6iris.DirViewLend <> z:288 var
+R40697:40702 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R40689:40694 xv6iris.DirViewLend <> fv_lic def
+R40696:40696 xv6iris.DirViewLend <> z:288 var
+R40703:40707 iris.bi.interface <> ::bi_scope:'False' not
+R40732:40737 xv6iris.DirViewLend <> fv_lic def
+R40732:40737 xv6iris.DirViewLend <> fv_lic def
+R40732:40737 xv6iris.DirViewLend <> fv_lic def
+R40783:40783 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40806:40811 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40819:40819 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40784:40805 iris.base_logic.lib.ghost_map <> ghost_map_elem_valid_2 thm
+R40783:40783 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40806:40811 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40819:40819 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40784:40805 iris.base_logic.lib.ghost_map <> ghost_map_elem_valid_2 thm
+R40854:40865 iris.algebra.dfrac <> dfrac_op_own thm
+R40867:40881 iris.algebra.dfrac <> dfrac_valid_own thm
+R40854:40865 iris.algebra.dfrac <> dfrac_op_own thm
+R40854:40865 iris.algebra.dfrac <> dfrac_op_own thm
+R40867:40881 iris.algebra.dfrac <> dfrac_valid_own thm
+R40867:40881 iris.algebra.dfrac <> dfrac_valid_own thm
+R40901:40915 stdpp.numbers Qp not_add_le_l thm
+R40901:40915 stdpp.numbers Qp not_add_le_l thm
+prf 41020:41034 <> fv_hold_split34
+R41041:41041 Corelib.Numbers.BinNums <> Z ind
+binder 41037:41037 <> z:289
+R41049:41052 Corelib.Init.Datatypes <> list ind
+R41055:41056 stdpp.bitvector.definitions <> bv rec
+binder 41045:41045 <> b:290
+R41079:41086 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R41068:41074 xv6iris.DirViewG <> fv_hold def
+R41076:41076 xv6iris.DirViewLend <> z:289 var
+R41078:41078 xv6iris.DirViewLend <> b:290 var
+R41115:41119 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R41087:41093 xv6iris.DirViewG <> fv_half def
+R41095:41095 xv6iris.DirViewLend <> z:289 var
+R41098:41105 iris.algebra.dfrac <> DfracOwn constr
+R41109:41109 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R41114:41114 xv6iris.DirViewLend <> b:290 var
+R41120:41126 xv6iris.DirViewG <> fv_half def
+R41128:41128 xv6iris.DirViewLend <> z:289 var
+R41131:41138 iris.algebra.dfrac <> DfracOwn constr
+R41142:41142 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R41147:41147 xv6iris.DirViewLend <> b:290 var
+R41168:41174 xv6iris.DirViewG <> fv_hold def
+R41179:41188 xv6iris.DirViewLend <> dfrac_1_34 thm
+R41168:41174 xv6iris.DirViewG <> fv_hold def
+R41168:41174 xv6iris.DirViewG <> fv_hold def
+R41179:41188 xv6iris.DirViewLend <> dfrac_1_34 thm
+R41179:41188 xv6iris.DirViewLend <> dfrac_1_34 thm
+R41197:41204 xv6iris.DirViewG <> fv_split thm
+R41197:41204 xv6iris.DirViewG <> fv_split thm
+prf 41221:41229 <> fv_join34
+R41236:41236 Corelib.Numbers.BinNums <> Z ind
+binder 41232:41232 <> z:291
+R41244:41247 Corelib.Init.Datatypes <> list ind
+R41250:41251 stdpp.bitvector.definitions <> bv rec
+binder 41240:41240 <> b:292
+R41291:41296 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R41263:41269 xv6iris.DirViewG <> fv_half def
+R41271:41271 xv6iris.DirViewLend <> z:291 var
+R41274:41281 iris.algebra.dfrac <> DfracOwn constr
+R41285:41285 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R41290:41290 xv6iris.DirViewLend <> b:292 var
+R41325:41334 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R41297:41303 xv6iris.DirViewG <> fv_half def
+R41305:41305 xv6iris.DirViewLend <> z:291 var
+R41308:41315 iris.algebra.dfrac <> DfracOwn constr
+R41319:41319 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R41324:41324 xv6iris.DirViewLend <> b:292 var
+R41335:41341 xv6iris.DirViewG <> fv_hold def
+R41343:41343 xv6iris.DirViewLend <> z:291 var
+R41345:41345 xv6iris.DirViewLend <> b:292 var
+R41382:41396 xv6iris.DirViewLend <> fv_hold_split34 thm
+R41382:41396 xv6iris.DirViewLend <> fv_hold_split34 thm
+R41382:41396 xv6iris.DirViewLend <> fv_hold_split34 thm
+prf 41421:41437 <> fv_hold_half_excl
+R41444:41444 Corelib.Numbers.BinNums <> Z ind
+binder 41440:41440 <> z:293
+R41453:41457 iris.algebra.dfrac <> dfrac ind
+binder 41448:41449 <> dq:294
+R41469:41472 Corelib.Init.Datatypes <> list ind
+R41475:41476 stdpp.bitvector.definitions <> bv rec
+binder 41461:41462 <> b1:295
+binder 41464:41465 <> b2:296
+R41500:41505 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R41488:41494 xv6iris.DirViewG <> fv_hold def
+R41496:41496 xv6iris.DirViewLend <> z:293 var
+R41498:41499 xv6iris.DirViewLend <> b1:295 var
+R41521:41526 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R41506:41512 xv6iris.DirViewG <> fv_half def
+R41514:41514 xv6iris.DirViewLend <> z:293 var
+R41516:41517 xv6iris.DirViewLend <> dq:294 var
+R41519:41520 xv6iris.DirViewLend <> b2:296 var
+R41527:41531 iris.bi.interface <> ::bi_scope:'False' not
+R41556:41562 xv6iris.DirViewG <> fv_hold def
+R41565:41571 xv6iris.DirViewG <> fv_half def
+R41556:41562 xv6iris.DirViewG <> fv_hold def
+R41556:41562 xv6iris.DirViewG <> fv_hold def
+R41565:41571 xv6iris.DirViewG <> fv_half def
+R41565:41571 xv6iris.DirViewG <> fv_half def
+R41605:41605 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41617:41622 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41630:41630 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41606:41616 iris.base_logic.lib.own <> own_valid_2 thm
+R41605:41605 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41617:41622 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41630:41630 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41606:41616 iris.base_logic.lib.own <> own_valid_2 thm
+R41652:41663 iris.algebra.gmap <> singleton_op thm
+R41665:41679 iris.algebra.gmap <> singleton_valid thm
+R41652:41663 iris.algebra.gmap <> singleton_op thm
+R41652:41663 iris.algebra.gmap <> singleton_op thm
+R41665:41679 iris.algebra.gmap <> singleton_valid thm
+R41665:41679 iris.algebra.gmap <> singleton_valid thm
+R41701:41711 iris.algebra.cmra <> exclusive_l thm
+R41729:41752 iris.algebra.lib.dfrac_agree <> to_dfrac_agree_exclusive inst
+R41701:41711 iris.algebra.cmra <> exclusive_l thm
+R41729:41752 iris.algebra.lib.dfrac_agree <> to_dfrac_agree_exclusive inst
+prf 41772:41785 <> fv_half34_excl
+R41792:41792 Corelib.Numbers.BinNums <> Z ind
+binder 41788:41788 <> z:297
+R41804:41807 Corelib.Init.Datatypes <> list ind
+R41810:41811 stdpp.bitvector.definitions <> bv rec
+binder 41796:41797 <> b1:298
+binder 41799:41800 <> b2:299
+R41852:41857 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R41823:41829 xv6iris.DirViewG <> fv_half def
+R41831:41831 xv6iris.DirViewLend <> z:297 var
+R41834:41841 iris.algebra.dfrac <> DfracOwn constr
+R41845:41845 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R41850:41851 xv6iris.DirViewLend <> b1:298 var
+R41887:41892 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R41858:41864 xv6iris.DirViewG <> fv_half def
+R41866:41866 xv6iris.DirViewLend <> z:297 var
+R41869:41876 iris.algebra.dfrac <> DfracOwn constr
+R41880:41880 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R41885:41886 xv6iris.DirViewLend <> b2:299 var
+R41893:41897 iris.bi.interface <> ::bi_scope:'False' not
+R41922:41928 xv6iris.DirViewG <> fv_half def
+R41922:41928 xv6iris.DirViewG <> fv_half def
+R41922:41928 xv6iris.DirViewG <> fv_half def
+R41962:41962 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41974:41979 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41987:41987 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41963:41973 iris.base_logic.lib.own <> own_valid_2 thm
+R41962:41962 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41974:41979 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41987:41987 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R41963:41973 iris.base_logic.lib.own <> own_valid_2 thm
+R42009:42020 iris.algebra.gmap <> singleton_op thm
+R42022:42036 iris.algebra.gmap <> singleton_valid thm
+R42009:42020 iris.algebra.gmap <> singleton_op thm
+R42009:42020 iris.algebra.gmap <> singleton_op thm
+R42022:42036 iris.algebra.gmap <> singleton_valid thm
+R42022:42036 iris.algebra.gmap <> singleton_valid thm
+R42055:42076 iris.algebra.lib.dfrac_agree <> dfrac_agree_op_valid_L thm
+R42055:42076 iris.algebra.lib.dfrac_agree <> dfrac_agree_op_valid_L thm
+R42107:42118 iris.algebra.dfrac <> dfrac_op_own thm
+R42120:42134 iris.algebra.dfrac <> dfrac_valid_own thm
+R42107:42118 iris.algebra.dfrac <> dfrac_op_own thm
+R42107:42118 iris.algebra.dfrac <> dfrac_op_own thm
+R42120:42134 iris.algebra.dfrac <> dfrac_valid_own thm
+R42120:42134 iris.algebra.dfrac <> dfrac_valid_own thm
+R42174:42176 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R42164:42166 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R42162:42162 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R42168:42168 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R42179:42181 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R42183:42183 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R42174:42176 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R42164:42166 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R42162:42162 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R42168:42168 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R42179:42181 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R42183:42183 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R42240:42254 stdpp.numbers Qp not_add_le_l thm
+R42260:42260 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R42240:42254 stdpp.numbers Qp not_add_le_l thm
+R42260:42260 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+prf 42288:42299 <> fv_ride_excl
+R42306:42306 Corelib.Numbers.BinNums <> Z ind
+binder 42302:42302 <> z:300
+R42318:42321 Corelib.Init.Datatypes <> list ind
+R42324:42325 stdpp.bitvector.definitions <> bv rec
+binder 42310:42311 <> b1:301
+binder 42313:42314 <> b2:302
+R42349:42354 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R42337:42343 xv6iris.DirViewLend <> fv_ride def
+R42345:42345 xv6iris.DirViewLend <> z:300 var
+R42347:42348 xv6iris.DirViewLend <> b1:301 var
+R42367:42372 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R42355:42361 xv6iris.DirViewLend <> fv_ride def
+R42363:42363 xv6iris.DirViewLend <> z:300 var
+R42365:42366 xv6iris.DirViewLend <> b2:302 var
+R42373:42377 iris.bi.interface <> ::bi_scope:'False' not
+R42402:42408 xv6iris.DirViewLend <> fv_ride def
+R42402:42408 xv6iris.DirViewLend <> fv_ride def
+R42402:42408 xv6iris.DirViewLend <> fv_ride def
+R42459:42459 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42472:42477 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42485:42485 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42460:42471 xv6iris.DirViewG <> fv_hold_excl thm
+R42459:42459 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42472:42477 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42485:42485 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42460:42471 xv6iris.DirViewG <> fv_hold_excl thm
+R42501:42501 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42519:42524 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42532:42532 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42502:42518 xv6iris.DirViewLend <> fv_hold_half_excl thm
+R42501:42501 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42519:42524 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42532:42532 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42502:42518 xv6iris.DirViewLend <> fv_hold_half_excl thm
+R42548:42548 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42566:42571 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42579:42579 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42549:42565 xv6iris.DirViewLend <> fv_hold_half_excl thm
+R42548:42548 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42566:42571 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42579:42579 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42549:42565 xv6iris.DirViewLend <> fv_hold_half_excl thm
+R42595:42595 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42610:42615 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42623:42623 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42596:42609 xv6iris.DirViewLend <> fv_half34_excl thm
+R42595:42595 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42610:42615 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42623:42623 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R42596:42609 xv6iris.DirViewLend <> fv_half34_excl thm
+prf 42642:42656 <> fv_ride_of_hold
+R42663:42663 Corelib.Numbers.BinNums <> Z ind
+binder 42659:42659 <> z:303
+R42671:42674 Corelib.Init.Datatypes <> list ind
+R42677:42678 stdpp.bitvector.definitions <> bv rec
+binder 42667:42667 <> b:304
+R42701:42706 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R42690:42696 xv6iris.DirViewG <> fv_hold def
+R42698:42698 xv6iris.DirViewLend <> z:303 var
+R42700:42700 xv6iris.DirViewLend <> b:304 var
+R42707:42713 xv6iris.DirViewLend <> fv_ride def
+R42715:42715 xv6iris.DirViewLend <> z:303 var
+R42717:42717 xv6iris.DirViewLend <> b:304 var
+R42751:42757 xv6iris.DirViewLend <> fv_ride def
+R42751:42757 xv6iris.DirViewLend <> fv_ride def
+R42751:42757 xv6iris.DirViewLend <> fv_ride def
+prf 42784:42795 <> fv_ride_size
+R42802:42802 Corelib.Numbers.BinNums <> Z ind
+binder 42798:42798 <> z:305
+R42816:42821 xv6iris.DinodeEnc <> dinode rec
+binder 42806:42808 <> dn1:306
+binder 42810:42812 <> dn2:307
+R42835:42838 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42832:42834 Corelib.Init.Datatypes <> nat ind
+R42839:42842 Corelib.Init.Datatypes <> list ind
+R42845:42846 stdpp.bitvector.definitions <> bv rec
+binder 42825:42828 <> data:308
+R42883:42890 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42869:42871 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R42858:42864 xv6iris.DinodeEnc <> di_size proj
+R42866:42868 xv6iris.DirViewLend <> dn1:306 var
+R42872:42878 xv6iris.DinodeEnc <> di_size proj
+R42880:42882 xv6iris.DirViewLend <> dn2:307 var
+R42917:42922 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R42891:42897 xv6iris.DirViewLend <> fv_ride def
+R42899:42899 xv6iris.DirViewLend <> z:305 var
+R42902:42906 xv6iris.DirViewG <> fv_of def
+R42908:42910 xv6iris.DirViewLend <> dn1:306 var
+R42912:42915 xv6iris.DirViewLend <> data:308 var
+R42923:42929 xv6iris.DirViewLend <> fv_ride def
+R42931:42931 xv6iris.DirViewLend <> z:305 var
+R42934:42938 xv6iris.DirViewG <> fv_of def
+R42940:42942 xv6iris.DirViewLend <> dn2:307 var
+R42944:42947 xv6iris.DirViewLend <> data:308 var
+R42984:42993 xv6iris.DirViewG <> fv_of_size thm
+R42984:42993 xv6iris.DirViewG <> fv_of_size thm
+R42984:42993 xv6iris.DirViewG <> fv_of_size thm
+prf 43054:43075 <> fv_lend_no_second_mint
+R43082:43082 Corelib.Numbers.BinNums <> Z ind
+binder 43078:43078 <> z:309
+R43094:43097 Corelib.Init.Datatypes <> list ind
+R43100:43101 stdpp.bitvector.definitions <> bv rec
+binder 43086:43087 <> b1:310
+binder 43089:43090 <> b2:311
+R43142:43147 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R43113:43119 xv6iris.DirViewG <> fv_half def
+R43121:43121 xv6iris.DirViewLend <> z:309 var
+R43124:43131 iris.algebra.dfrac <> DfracOwn constr
+R43135:43135 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R43140:43141 xv6iris.DirViewLend <> b1:310 var
+R43161:43166 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R43148:43155 xv6iris.DirViewLend <> fv_lentm def
+R43157:43157 xv6iris.DirViewLend <> z:309 var
+R43159:43160 xv6iris.DirViewLend <> b1:310 var
+R43179:43184 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R43167:43173 xv6iris.DirViewG <> fv_hold def
+R43175:43175 xv6iris.DirViewLend <> z:309 var
+R43177:43178 xv6iris.DirViewLend <> b2:311 var
+R43185:43189 iris.bi.interface <> ::bi_scope:'False' not
+R43232:43232 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43250:43255 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43264:43264 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43233:43249 xv6iris.DirViewLend <> fv_hold_half_excl thm
+R43232:43232 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43250:43255 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43264:43264 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43233:43249 xv6iris.DirViewLend <> fv_hold_half_excl thm
+prf 43361:43374 <> fvl_cell_agree
+R43382:43386 iris.base_logic.lib.iprop <> gname def
+binder 43377:43378 <> γ:312
+R43394:43394 Corelib.Numbers.BinNums <> Z ind
+binder 43390:43390 <> z:313
+R43408:43412 iris.algebra.dfrac <> dfrac ind
+binder 43398:43400 <> dq1:314
+binder 43402:43404 <> dq2:315
+R43430:43433 Corelib.Init.Datatypes <> list ind
+R43436:43437 stdpp.bitvector.definitions <> bv rec
+binder 43422:43423 <> b1:316
+binder 43425:43426 <> b2:317
+R43469:43474 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R43449:43456 xv6iris.DirViewLend <> fvl_cell def
+R43458:43459 xv6iris.DirViewLend <> γ:312 var
+R43461:43461 xv6iris.DirViewLend <> z:313 var
+R43463:43465 xv6iris.DirViewLend <> dq1:314 var
+R43467:43468 xv6iris.DirViewLend <> b1:316 var
+R43495:43500 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R43475:43482 xv6iris.DirViewLend <> fvl_cell def
+R43484:43485 xv6iris.DirViewLend <> γ:312 var
+R43487:43487 xv6iris.DirViewLend <> z:313 var
+R43489:43491 xv6iris.DirViewLend <> dq2:315 var
+R43493:43494 xv6iris.DirViewLend <> b2:317 var
+R43501:43503 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R43511:43513 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R43506:43508 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R43504:43505 xv6iris.DirViewLend <> b1:316 var
+R43509:43510 xv6iris.DirViewLend <> b2:317 var
+R43538:43545 xv6iris.DirViewLend <> fvl_cell def
+R43538:43545 xv6iris.DirViewLend <> fvl_cell def
+R43538:43545 xv6iris.DirViewLend <> fvl_cell def
+R43579:43579 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43591:43596 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43604:43604 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43580:43590 iris.base_logic.lib.own <> own_valid_2 thm
+R43579:43579 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43591:43596 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43604:43604 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R43580:43590 iris.base_logic.lib.own <> own_valid_2 thm
+R43626:43637 iris.algebra.gmap <> singleton_op thm
+R43639:43653 iris.algebra.gmap <> singleton_valid thm
+R43626:43637 iris.algebra.gmap <> singleton_op thm
+R43626:43637 iris.algebra.gmap <> singleton_op thm
+R43639:43653 iris.algebra.gmap <> singleton_valid thm
+R43639:43653 iris.algebra.gmap <> singleton_valid thm
+R43687:43708 iris.algebra.lib.dfrac_agree <> dfrac_agree_op_valid_L thm
+R43687:43708 iris.algebra.lib.dfrac_agree <> dfrac_agree_op_valid_L thm
+prf 43743:43755 <> fv_vwit_agree
+R43764:43768 iris.base_logic.lib.iprop <> gname def
+binder 43758:43760 <> γv:318
+R43776:43776 Corelib.Numbers.BinNums <> Z ind
+binder 43772:43772 <> z:319
+R43788:43791 Corelib.Init.Datatypes <> list ind
+R43794:43795 stdpp.bitvector.definitions <> bv rec
+binder 43780:43781 <> b1:320
+binder 43783:43784 <> b2:321
+R43823:43828 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R43807:43813 xv6iris.DirViewLend <> fv_vwit def
+R43815:43817 xv6iris.DirViewLend <> γv:318 var
+R43819:43819 xv6iris.DirViewLend <> z:319 var
+R43821:43822 xv6iris.DirViewLend <> b1:320 var
+R43845:43850 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R43829:43835 xv6iris.DirViewLend <> fv_vwit def
+R43837:43839 xv6iris.DirViewLend <> γv:318 var
+R43841:43841 xv6iris.DirViewLend <> z:319 var
+R43843:43844 xv6iris.DirViewLend <> b2:321 var
+R43851:43853 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R43861:43863 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R43856:43858 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R43854:43855 xv6iris.DirViewLend <> b1:320 var
+R43859:43860 xv6iris.DirViewLend <> b2:321 var
+R43884:43890 xv6iris.DirViewLend <> fv_vwit def
+R43884:43890 xv6iris.DirViewLend <> fv_vwit def
+R43884:43890 xv6iris.DirViewLend <> fv_vwit def
+R43899:43912 xv6iris.DirViewLend <> fvl_cell_agree thm
+R43899:43912 xv6iris.DirViewLend <> fvl_cell_agree thm
+prf 43929:43942 <> fvl_cell_split
+R43950:43954 iris.base_logic.lib.iprop <> gname def
+binder 43945:43946 <> γ:322
+R43962:43962 Corelib.Numbers.BinNums <> Z ind
+binder 43958:43958 <> z:323
+R43976:43980 iris.algebra.dfrac <> dfrac ind
+binder 43966:43968 <> dq1:324
+binder 43970:43972 <> dq2:325
+R43994:43997 Corelib.Init.Datatypes <> list ind
+R44000:44001 stdpp.bitvector.definitions <> bv rec
+binder 43990:43990 <> b:326
+R44042:44049 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R44013:44020 xv6iris.DirViewLend <> fvl_cell def
+R44022:44023 xv6iris.DirViewLend <> γ:322 var
+R44025:44025 xv6iris.DirViewLend <> z:323 var
+R44031:44035 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R44028:44030 xv6iris.DirViewLend <> dq1:324 var
+R44036:44038 xv6iris.DirViewLend <> dq2:325 var
+R44041:44041 xv6iris.DirViewLend <> b:326 var
+R44069:44073 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R44050:44057 xv6iris.DirViewLend <> fvl_cell def
+R44059:44060 xv6iris.DirViewLend <> γ:322 var
+R44062:44062 xv6iris.DirViewLend <> z:323 var
+R44064:44066 xv6iris.DirViewLend <> dq1:324 var
+R44068:44068 xv6iris.DirViewLend <> b:326 var
+R44074:44081 xv6iris.DirViewLend <> fvl_cell def
+R44083:44084 xv6iris.DirViewLend <> γ:322 var
+R44086:44086 xv6iris.DirViewLend <> z:323 var
+R44088:44090 xv6iris.DirViewLend <> dq2:325 var
+R44092:44092 xv6iris.DirViewLend <> b:326 var
+R44117:44124 xv6iris.DirViewLend <> fvl_cell def
+R44127:44132 iris.base_logic.lib.own <> own_op thm
+R44134:44145 iris.algebra.gmap <> singleton_op thm
+R44117:44124 xv6iris.DirViewLend <> fvl_cell def
+R44117:44124 xv6iris.DirViewLend <> fvl_cell def
+R44127:44132 iris.base_logic.lib.own <> own_op thm
+R44127:44132 iris.base_logic.lib.own <> own_op thm
+R44134:44145 iris.algebra.gmap <> singleton_op thm
+R44134:44145 iris.algebra.gmap <> singleton_op thm
+R44164:44177 iris.algebra.lib.dfrac_agree <> dfrac_agree_op thm
+R44164:44177 iris.algebra.lib.dfrac_agree <> dfrac_agree_op thm
+R44164:44177 iris.algebra.lib.dfrac_agree <> dfrac_agree_op thm
+prf 44196:44207 <> fvl_cell_cut
+R44215:44219 iris.base_logic.lib.iprop <> gname def
+binder 44210:44211 <> γ:327
+R44227:44227 Corelib.Numbers.BinNums <> Z ind
+binder 44223:44223 <> z:328
+R44235:44238 Corelib.Init.Datatypes <> list ind
+R44241:44242 stdpp.bitvector.definitions <> bv rec
+binder 44231:44231 <> b:329
+R44282:44295 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R44254:44261 xv6iris.DirViewLend <> fvl_cell def
+R44263:44264 xv6iris.DirViewLend <> γ:327 var
+R44266:44266 xv6iris.DirViewLend <> z:328 var
+R44269:44276 iris.algebra.dfrac <> DfracOwn constr
+R44281:44281 xv6iris.DirViewLend <> b:329 var
+R44328:44332 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R44296:44303 xv6iris.DirViewLend <> fvl_cell def
+R44305:44306 xv6iris.DirViewLend <> γ:327 var
+R44308:44308 xv6iris.DirViewLend <> z:328 var
+R44311:44318 iris.algebra.dfrac <> DfracOwn constr
+R44322:44322 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R44327:44327 xv6iris.DirViewLend <> b:329 var
+R44333:44340 xv6iris.DirViewLend <> fvl_cell def
+R44342:44343 xv6iris.DirViewLend <> γ:327 var
+R44345:44345 xv6iris.DirViewLend <> z:328 var
+R44348:44355 iris.algebra.dfrac <> DfracOwn constr
+R44359:44359 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R44364:44364 xv6iris.DirViewLend <> b:329 var
+R44385:44398 xv6iris.DirViewLend <> fvl_cell_split thm
+R44401:44410 xv6iris.DirViewLend <> dfrac_1_hh thm
+R44385:44398 xv6iris.DirViewLend <> fvl_cell_split thm
+R44385:44398 xv6iris.DirViewLend <> fvl_cell_split thm
+R44401:44410 xv6iris.DirViewLend <> dfrac_1_hh thm
+R44401:44410 xv6iris.DirViewLend <> dfrac_1_hh thm
+prf 44433:44444 <> fvl_cell_set
+R44452:44456 iris.base_logic.lib.iprop <> gname def
+binder 44447:44448 <> γ:330
+R44464:44464 Corelib.Numbers.BinNums <> Z ind
+binder 44460:44460 <> z:331
+R44475:44478 Corelib.Init.Datatypes <> list ind
+R44481:44482 stdpp.bitvector.definitions <> bv rec
+binder 44468:44468 <> b:332
+binder 44470:44471 <> b':333
+R44522:44528 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R44494:44501 xv6iris.DirViewLend <> fvl_cell def
+R44503:44504 xv6iris.DirViewLend <> γ:330 var
+R44506:44506 xv6iris.DirViewLend <> z:331 var
+R44509:44516 iris.algebra.dfrac <> DfracOwn constr
+R44521:44521 xv6iris.DirViewLend <> b:332 var
+R44529:44536 xv6iris.DirViewLend <> fvl_cell def
+R44538:44539 xv6iris.DirViewLend <> γ:330 var
+R44541:44541 xv6iris.DirViewLend <> z:331 var
+R44544:44551 iris.algebra.dfrac <> DfracOwn constr
+R44556:44557 xv6iris.DirViewLend <> b':333 var
+R44582:44589 xv6iris.DirViewLend <> fvl_cell def
+R44582:44589 xv6iris.DirViewLend <> fvl_cell def
+R44582:44589 xv6iris.DirViewLend <> fvl_cell def
+R44616:44616 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44627:44632 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44636:44636 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44617:44626 iris.base_logic.lib.own <> own_update thm
+R44616:44616 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44627:44632 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44636:44636 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44617:44626 iris.base_logic.lib.own <> own_update thm
+R44649:44664 iris.algebra.gmap <> singleton_update thm
+R44667:44687 iris.algebra.updates <> cmra_update_exclusive thm
+R44649:44664 iris.algebra.gmap <> singleton_update thm
+R44667:44687 iris.algebra.updates <> cmra_update_exclusive thm
+prf 44723:44731 <> fv_cshoot
+R44740:44744 iris.base_logic.lib.iprop <> gname def
+binder 44734:44736 <> γc:334
+R44752:44752 Corelib.Numbers.BinNums <> Z ind
+binder 44748:44748 <> z:335
+R44760:44763 Corelib.Init.Datatypes <> list ind
+R44766:44767 stdpp.bitvector.definitions <> bv rec
+binder 44756:44756 <> b:336
+R44795:44801 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R44779:44786 xv6iris.DirViewLend <> fv_ctick def
+R44788:44790 xv6iris.DirViewLend <> γc:334 var
+R44792:44792 xv6iris.DirViewLend <> z:335 var
+R44794:44794 xv6iris.DirViewLend <> b:336 var
+R44802:44809 xv6iris.DirViewLend <> fv_cshot def
+R44811:44813 xv6iris.DirViewLend <> γc:334 var
+R44815:44815 xv6iris.DirViewLend <> z:335 var
+R44817:44817 xv6iris.DirViewLend <> b:336 var
+R44842:44849 xv6iris.DirViewLend <> fv_ctick def
+R44852:44859 xv6iris.DirViewLend <> fv_cshot def
+R44862:44869 xv6iris.DirViewLend <> fvl_cell def
+R44842:44849 xv6iris.DirViewLend <> fv_ctick def
+R44842:44849 xv6iris.DirViewLend <> fv_ctick def
+R44852:44859 xv6iris.DirViewLend <> fv_cshot def
+R44852:44859 xv6iris.DirViewLend <> fv_cshot def
+R44862:44869 xv6iris.DirViewLend <> fvl_cell def
+R44862:44869 xv6iris.DirViewLend <> fvl_cell def
+R44896:44896 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44907:44912 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44916:44916 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44897:44906 iris.base_logic.lib.own <> own_update thm
+R44896:44896 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44907:44912 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44916:44916 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R44897:44906 iris.base_logic.lib.own <> own_update thm
+R44929:44944 iris.algebra.gmap <> singleton_update thm
+R44947:44965 iris.algebra.lib.dfrac_agree <> dfrac_agree_persist thm
+R44929:44944 iris.algebra.gmap <> singleton_update thm
+R44947:44965 iris.algebra.lib.dfrac_agree <> dfrac_agree_persist thm
+prf 45062:45072 <> fv_col_mint
+R45079:45079 Corelib.Numbers.BinNums <> Z ind
+binder 45075:45075 <> z:337
+R45087:45090 Corelib.Init.Datatypes <> list ind
+R45093:45094 stdpp.bitvector.definitions <> bv rec
+binder 45083:45083 <> b:338
+R45115:45122 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R45106:45112 xv6iris.DirViewLend <> dvl_dom def
+R45114:45114 xv6iris.DirViewLend <> z:337 var
+R45131:45136 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R45123:45128 xv6iris.DirViewLend <> fv_lic def
+R45130:45130 xv6iris.DirViewLend <> z:337 var
+R45148:45153 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R45137:45143 xv6iris.DirViewG <> fv_hold def
+R45145:45145 xv6iris.DirViewLend <> z:337 var
+R45147:45147 xv6iris.DirViewLend <> b:338 var
+R45163:45175 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R45154:45160 xv6iris.DirViewLend <> fv_lcol def
+R45162:45162 xv6iris.DirViewLend <> z:337 var
+R45185:45189 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R45176:45182 xv6iris.DirViewLend <> fv_lcol def
+R45184:45184 xv6iris.DirViewLend <> z:337 var
+R45190:45190 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R45236:45241 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R45219:45223 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R45191:45197 xv6iris.DirViewG <> fv_half def
+R45199:45199 xv6iris.DirViewLend <> z:337 var
+R45202:45209 iris.algebra.dfrac <> DfracOwn constr
+R45213:45213 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R45218:45218 xv6iris.DirViewLend <> b:338 var
+R45224:45231 xv6iris.DirViewLend <> fv_lentm def
+R45233:45233 xv6iris.DirViewLend <> z:337 var
+R45235:45235 xv6iris.DirViewLend <> b:338 var
+R45242:45247 xv6iris.DirViewLend <> fv_pin def
+R45249:45249 xv6iris.DirViewLend <> z:337 var
+R45251:45251 xv6iris.DirViewLend <> b:338 var
+R45314:45320 xv6iris.DirViewLend <> fv_lcol def
+R45314:45320 xv6iris.DirViewLend <> fv_lcol def
+R45314:45320 xv6iris.DirViewLend <> fv_lcol def
+R45494:45494 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45506:45511 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45524:45524 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45495:45505 xv6iris.DirViewLend <> fv_lic_excl thm
+R45552:45552 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45564:45569 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45582:45582 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45553:45563 xv6iris.DirViewLend <> fv_lic_excl thm
+R45494:45494 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45506:45511 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45524:45524 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45495:45505 xv6iris.DirViewLend <> fv_lic_excl thm
+R45552:45552 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45564:45569 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45582:45582 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45553:45563 xv6iris.DirViewLend <> fv_lic_excl thm
+R45602:45602 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45626:45631 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45637:45637 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45603:45614 xv6iris.DirViewLend <> fvl_cell_set thm
+R45622:45623 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R45602:45602 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45626:45631 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45637:45637 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45603:45614 xv6iris.DirViewLend <> fvl_cell_set thm
+R45622:45623 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R45658:45658 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45682:45687 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45693:45693 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45659:45670 xv6iris.DirViewLend <> fvl_cell_set thm
+R45678:45679 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R45658:45658 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45682:45687 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45693:45693 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R45659:45670 xv6iris.DirViewLend <> fvl_cell_set thm
+R45678:45679 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R45724:45735 xv6iris.DirViewLend <> fvl_cell_cut thm
+R45724:45735 xv6iris.DirViewLend <> fvl_cell_cut thm
+R45724:45735 xv6iris.DirViewLend <> fvl_cell_cut thm
+R45805:45816 xv6iris.DirViewLend <> fvl_slot_cut thm
+R45805:45816 xv6iris.DirViewLend <> fvl_slot_cut thm
+R45805:45816 xv6iris.DirViewLend <> fvl_slot_cut thm
+R45890:45904 xv6iris.DirViewLend <> fv_hold_split34 thm
+R45890:45904 xv6iris.DirViewLend <> fv_hold_split34 thm
+R45890:45904 xv6iris.DirViewLend <> fv_hold_split34 thm
+R46006:46012 xv6iris.DirViewLend <> fv_lcol def
+R46006:46012 xv6iris.DirViewLend <> fv_lcol def
+R46006:46012 xv6iris.DirViewLend <> fv_lcol def
+R46117:46124 xv6iris.DirViewLend <> fv_lentm def
+R46117:46124 xv6iris.DirViewLend <> fv_lentm def
+R46117:46124 xv6iris.DirViewLend <> fv_lentm def
+R46169:46169 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R46173:46174 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R46178:46178 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R46169:46169 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R46173:46174 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R46178:46178 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R46212:46217 xv6iris.DirViewLend <> fv_pin def
+R46212:46217 xv6iris.DirViewLend <> fv_pin def
+R46212:46217 xv6iris.DirViewLend <> fv_pin def
+prf 46290:46299 <> fv_col_set
+R46306:46306 Corelib.Numbers.BinNums <> Z ind
+binder 46302:46302 <> z:339
+R46317:46320 Corelib.Init.Datatypes <> list ind
+R46323:46324 stdpp.bitvector.definitions <> bv rec
+binder 46310:46310 <> b:340
+binder 46312:46313 <> b':341
+R46364:46369 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R46336:46342 xv6iris.DirViewG <> fv_half def
+R46344:46344 xv6iris.DirViewLend <> z:339 var
+R46347:46354 iris.algebra.dfrac <> DfracOwn constr
+R46358:46358 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R46363:46363 xv6iris.DirViewLend <> b:340 var
+R46382:46387 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R46370:46377 xv6iris.DirViewLend <> fv_lentm def
+R46379:46379 xv6iris.DirViewLend <> z:339 var
+R46381:46381 xv6iris.DirViewLend <> b:340 var
+R46397:46409 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R46388:46394 xv6iris.DirViewLend <> fv_lcol def
+R46396:46396 xv6iris.DirViewLend <> z:339 var
+R46419:46423 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R46410:46416 xv6iris.DirViewLend <> fv_lcol def
+R46418:46418 xv6iris.DirViewLend <> z:339 var
+R46424:46430 xv6iris.DirViewG <> fv_hold def
+R46432:46432 xv6iris.DirViewLend <> z:339 var
+R46434:46435 xv6iris.DirViewLend <> b':341 var
+R46532:46538 xv6iris.DirViewLend <> fv_lcol def
+R46532:46538 xv6iris.DirViewLend <> fv_lcol def
+R46532:46538 xv6iris.DirViewLend <> fv_lcol def
+R46736:46736 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46780:46785 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46797:46797 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46737:46749 xv6iris.DirViewLend <> fvl_slot_over thm
+R46757:46757 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R46765:46779 xv6iris.DirViewLend <> dvl_q_over_1_12 thm
+R46736:46736 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46780:46785 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46797:46797 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46737:46749 xv6iris.DirViewLend <> fvl_slot_over thm
+R46757:46757 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R46765:46779 xv6iris.DirViewLend <> dvl_q_over_1_12 thm
+R46831:46831 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46847:46852 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46864:46864 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46832:46846 xv6iris.DirViewLend <> fvl_slot_join34 thm
+R46831:46831 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46847:46852 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46864:46864 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46832:46846 xv6iris.DirViewLend <> fvl_slot_join34 thm
+R46900:46900 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46909:46914 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46926:46926 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46901:46908 xv6iris.DirViewG <> fv_agree thm
+R46900:46900 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46909:46914 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46926:46926 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46901:46908 xv6iris.DirViewG <> fv_agree thm
+R46952:46952 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46962:46967 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46979:46979 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46953:46961 xv6iris.DirViewLend <> fv_join34 thm
+R46952:46952 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46962:46967 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46979:46979 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R46953:46961 xv6iris.DirViewLend <> fv_join34 thm
+R47001:47001 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47015:47020 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47025:47025 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47002:47007 xv6iris.DirViewG <> fv_set thm
+R47001:47001 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47015:47020 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47025:47025 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47002:47007 xv6iris.DirViewG <> fv_set thm
+R47047:47047 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47057:47062 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47068:47068 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47048:47056 xv6iris.DirViewLend <> fv_cshoot thm
+R47047:47047 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47057:47062 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47068:47068 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47048:47056 xv6iris.DirViewLend <> fv_cshoot thm
+R47126:47132 xv6iris.DirViewLend <> fv_lcol def
+R47126:47132 xv6iris.DirViewLend <> fv_lcol def
+R47126:47132 xv6iris.DirViewLend <> fv_lcol def
+R47233:47233 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47282:47306 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47318:47318 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47234:47246 xv6iris.DirViewLend <> fvl_slot_over thm
+R47252:47252 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R47258:47258 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R47266:47281 xv6iris.DirViewLend <> dvl_q_over_34_12 thm
+R47233:47233 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47282:47306 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47318:47318 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47234:47246 xv6iris.DirViewLend <> fvl_slot_over thm
+R47252:47252 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R47258:47258 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R47266:47281 xv6iris.DirViewLend <> dvl_q_over_34_12 thm
+prf 47344:47356 <> fv_col_redeem
+R47363:47363 Corelib.Numbers.BinNums <> Z ind
+binder 47359:47359 <> z:342
+R47374:47377 Corelib.Init.Datatypes <> list ind
+R47380:47381 stdpp.bitvector.definitions <> bv rec
+binder 47367:47367 <> b:343
+binder 47369:47370 <> bs:344
+R47394:47398 iris.algebra.dfrac <> dfrac ind
+binder 47388:47390 <> dqv:345
+R47417:47422 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R47407:47412 xv6iris.DirViewLend <> fv_pin def
+R47414:47414 xv6iris.DirViewLend <> z:342 var
+R47416:47416 xv6iris.DirViewLend <> b:343 var
+R47439:47444 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R47423:47429 xv6iris.DirViewG <> fv_half def
+R47431:47431 xv6iris.DirViewLend <> z:342 var
+R47433:47435 xv6iris.DirViewLend <> dqv:345 var
+R47437:47438 xv6iris.DirViewLend <> bs:344 var
+R47454:47466 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R47445:47451 xv6iris.DirViewLend <> fv_lcol def
+R47453:47453 xv6iris.DirViewLend <> z:342 var
+R47476:47480 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R47467:47473 xv6iris.DirViewLend <> fv_lcol def
+R47475:47475 xv6iris.DirViewLend <> z:342 var
+R47497:47508 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R47559:47559 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R47481:47487 xv6iris.DirViewG <> fv_half def
+R47489:47489 xv6iris.DirViewLend <> z:342 var
+R47491:47493 xv6iris.DirViewLend <> dqv:345 var
+R47495:47496 xv6iris.DirViewLend <> bs:344 var
+R47509:47509 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R47537:47542 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R47522:47526 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R47510:47512 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R47519:47521 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R47515:47517 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R47513:47514 xv6iris.DirViewLend <> bs:344 var
+R47518:47518 xv6iris.DirViewLend <> b:343 var
+R47527:47532 xv6iris.DirViewLend <> fv_pin def
+R47534:47534 xv6iris.DirViewLend <> z:342 var
+R47536:47536 xv6iris.DirViewLend <> b:343 var
+R47543:47554 xv6iris.DirViewLend <> fv_cancelled def
+R47556:47556 xv6iris.DirViewLend <> z:342 var
+R47558:47558 xv6iris.DirViewLend <> b:343 var
+R47679:47685 xv6iris.DirViewLend <> fv_lcol def
+R47679:47685 xv6iris.DirViewLend <> fv_lcol def
+R47679:47685 xv6iris.DirViewLend <> fv_lcol def
+R47901:47901 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47945:47950 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47961:47961 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47902:47914 xv6iris.DirViewLend <> fvl_slot_over thm
+R47922:47922 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R47930:47944 xv6iris.DirViewLend <> dvl_q_over_1_14 thm
+R47901:47901 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47945:47950 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47961:47961 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47902:47914 xv6iris.DirViewLend <> fvl_slot_over thm
+R47922:47922 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R47930:47944 xv6iris.DirViewLend <> dvl_q_over_1_14 thm
+R47995:47995 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48010:48015 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48026:48026 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47996:48009 xv6iris.DirViewLend <> fvl_slot_agree thm
+R47995:47995 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48010:48015 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48026:48026 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R47996:48009 xv6iris.DirViewLend <> fvl_slot_agree thm
+R48083:48083 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48097:48102 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48113:48113 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48084:48096 xv6iris.DirViewLend <> fv_vwit_agree thm
+R48083:48083 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48097:48102 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48113:48113 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48084:48096 xv6iris.DirViewLend <> fv_vwit_agree thm
+R48139:48139 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48148:48153 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48165:48165 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48140:48147 xv6iris.DirViewG <> fv_agree thm
+R48139:48139 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48148:48153 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48165:48165 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48140:48147 xv6iris.DirViewG <> fv_agree thm
+R48243:48249 xv6iris.DirViewLend <> fv_lcol def
+R48243:48249 xv6iris.DirViewLend <> fv_lcol def
+R48243:48249 xv6iris.DirViewLend <> fv_lcol def
+R48359:48364 xv6iris.DirViewLend <> fv_pin def
+R48359:48364 xv6iris.DirViewLend <> fv_pin def
+R48359:48364 xv6iris.DirViewLend <> fv_pin def
+R48428:48428 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48443:48448 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48459:48459 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48429:48442 xv6iris.DirViewLend <> fvl_slot_agree thm
+R48428:48428 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48443:48448 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48459:48459 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48429:48442 xv6iris.DirViewLend <> fvl_slot_agree thm
+R48516:48516 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48530:48535 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48546:48546 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48517:48529 xv6iris.DirViewLend <> fv_vwit_agree thm
+R48516:48516 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48530:48535 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48546:48546 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48517:48529 xv6iris.DirViewLend <> fv_vwit_agree thm
+R48571:48578 xv6iris.DirViewLend <> fvl_slot def
+R48571:48578 xv6iris.DirViewLend <> fvl_slot def
+R48571:48578 xv6iris.DirViewLend <> fvl_slot def
+R48592:48592 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48615:48620 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48627:48627 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48593:48614 iris.base_logic.lib.ghost_map <> ghost_map_elem_persist thm
+R48592:48592 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48615:48620 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48627:48627 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R48593:48614 iris.base_logic.lib.ghost_map <> ghost_map_elem_persist thm
+R48699:48705 xv6iris.DirViewLend <> fv_lcol def
+R48699:48705 xv6iris.DirViewLend <> fv_lcol def
+R48699:48705 xv6iris.DirViewLend <> fv_lcol def
+R48829:48840 xv6iris.DirViewLend <> fv_cancelled def
+R48829:48840 xv6iris.DirViewLend <> fv_cancelled def
+R48829:48840 xv6iris.DirViewLend <> fv_cancelled def
+prf 49003:49016 <> fvl_boot_split
+R49024:49028 iris.base_logic.lib.iprop <> gname def
+binder 49019:49020 <> γ:346
+R49036:49039 stdpp.gmap <> gset def
+R49041:49041 Corelib.Numbers.BinNums <> Z ind
+binder 49032:49032 <> P:347
+R49075:49079 iris.bi.interface <> ::stdpp_scope:x_'⊢'_x not
+R49050:49052 iris.base_logic.lib.own <> own def
+R49058:49071 xv6iris.IcacheRef <> fview_boot_map def
+R49073:49073 xv6iris.DirViewLend <> P:347 var
+R49054:49055 xv6iris.DirViewLend <> γ:346 var
+R49080:49089 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R49091:49095 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R49097:49098 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+binder 49090:49090 <> z:348
+binder 49090:49090 <> z:349
+R49099:49106 xv6iris.DirViewLend <> fvl_cell def
+R49108:49109 xv6iris.DirViewLend <> γ:346 var
+R49111:49111 xv6iris.DirViewLend <> z:348 var
+R49114:49121 iris.algebra.dfrac <> DfracOwn constr
+R49126:49127 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R49096:49096 xv6iris.DirViewLend <> P:347 var
+R49152:49165 xv6iris.IcacheRef <> fview_boot_map def
+R49180:49202 xv6iris.IcacheRef <> gset_to_gmap_singletons thm
+R49210:49221 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
+R49224:49231 iris.algebra.ofe <> leibnizO abbrev
+R49234:49237 Corelib.Init.Datatypes <> list ind
+R49240:49241 stdpp.bitvector.definitions <> bv rec
+R49152:49165 xv6iris.IcacheRef <> fview_boot_map def
+R49152:49165 xv6iris.IcacheRef <> fview_boot_map def
+R49180:49202 xv6iris.IcacheRef <> gset_to_gmap_singletons thm
+R49210:49221 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
+R49224:49231 iris.algebra.ofe <> leibnizO abbrev
+R49234:49237 Corelib.Init.Datatypes <> list ind
+R49240:49241 stdpp.bitvector.definitions <> bv rec
+R49180:49202 xv6iris.IcacheRef <> gset_to_gmap_singletons thm
+R49210:49221 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
+R49224:49231 iris.algebra.ofe <> leibnizO abbrev
+R49234:49237 Corelib.Init.Datatypes <> list ind
+R49240:49241 stdpp.bitvector.definitions <> bv rec
+R49263:49275 iris.base_logic.lib.own <> big_opS_own_1 thm
+R49263:49275 iris.base_logic.lib.own <> big_opS_own_1 thm
+R49263:49275 iris.base_logic.lib.own <> big_opS_own_1 thm
+R49302:49302 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R49316:49321 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R49325:49325 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R49303:49315 iris.bi.big_op <> big_sepS_mono thm
+R49302:49302 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R49316:49321 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R49325:49325 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R49303:49315 iris.bi.big_op <> big_sepS_mono thm
+R49366:49373 xv6iris.DirViewLend <> fvl_cell def
+R49366:49373 xv6iris.DirViewLend <> fvl_cell def
+R49366:49373 xv6iris.DirViewLend <> fvl_cell def
+prf 49404:49415 <> fv_lcol_boot
+R49422:49422 Corelib.Numbers.BinNums <> Z ind
+binder 49418:49418 <> z:350
+R49436:49440 iris.base_logic.lib.iprop <> gname def
+binder 49426:49428 <> γc:351
+binder 49430:49432 <> γv:352
+R49483:49492 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R49449:49456 xv6iris.DirViewLend <> fvl_slot def
+R49458:49458 xv6iris.DirViewLend <> z:350 var
+R49461:49468 iris.algebra.dfrac <> DfracOwn constr
+R49473:49473 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R49477:49478 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R49482:49482 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R49474:49476 xv6iris.DirViewLend <> γc:351 var
+R49479:49481 xv6iris.DirViewLend <> γv:352 var
+R49523:49528 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R49493:49500 xv6iris.DirViewLend <> fvl_cell def
+R49502:49504 xv6iris.DirViewLend <> γc:351 var
+R49506:49506 xv6iris.DirViewLend <> z:350 var
+R49509:49516 iris.algebra.dfrac <> DfracOwn constr
+R49521:49522 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R49559:49568 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R49529:49536 xv6iris.DirViewLend <> fvl_cell def
+R49538:49540 xv6iris.DirViewLend <> γv:352 var
+R49542:49542 xv6iris.DirViewLend <> z:350 var
+R49545:49552 iris.algebra.dfrac <> DfracOwn constr
+R49557:49558 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R49569:49575 xv6iris.DirViewLend <> fv_lcol def
+R49577:49577 xv6iris.DirViewLend <> z:350 var
+R49625:49631 xv6iris.DirViewLend <> fv_lcol def
+R49625:49631 xv6iris.DirViewLend <> fv_lcol def
+R49625:49631 xv6iris.DirViewLend <> fv_lcol def
+R49683:49697 xv6iris.DirViewLend DirViewLendDefs <> sec

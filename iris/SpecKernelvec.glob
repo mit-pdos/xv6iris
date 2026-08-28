@@ -1,0 +1,171 @@
+DIGEST 8bfae2f73b59166f7c20d3009afa9696
+Fxv6iris.SpecKernelvec
+R1380:1385 Stdlib.ZArith.ZArith <> <> lib
+R1414:1434 stdpp.bitvector.definitions <> <> lib
+R1472:1480 iris.proofmode.proofmode <> <> lib
+R1523:1531 iris.base_logic.lib.ghost_var <> <> lib
+R1573:1580 iris.program_logic.language <> <> lib
+R1582:1588 iris.program_logic.lifting <> <> lib
+R1606:1631 SailStdpp.Operators_mwords <> <> lib
+R1649:1665 Riscv.rv64d_types <> <> lib
+R1667:1677 Riscv.rv64d <> <> lib
+R1695:1710 SailStdpp.Values <> <> lib
+R1712:1732 SailStdpp.MachineWord <> <> lib
+R1750:1758 xv6iris.RiscvLang <> <> lib
+R1760:1769 xv6iris.RiscvPtsto <> <> lib
+R1771:1784 xv6iris.RiscvFetchExec <> <> lib
+R1802:1812 xv6iris.MinstretInv <> <> lib
+R1830:1839 xv6iris.KernelText <> <> lib
+R1857:1866 xv6iris.WpIntrCore <> <> lib
+R1884:1891 xv6iris.IntrDefs <> <> lib
+R2250:2256 xv6iris.FdSlots <> <> lib
+R2258:2266 xv6iris.IrefSlots <> <> lib
+R2268:2275 xv6iris.ProcGeom <> <> lib
+R2277:2285 xv6iris.DiskPtsto <> <> lib
+R2287:2292 xv6iris.WpUart <> <> lib
+R2310:2320 xv6iris.SpecDevintr <> <> lib
+R2343:2352 Kernel.KernelSyms <> <> lib
+R2370:2378 xv6iris.ProcAvail <> <> lib
+R2396:2399 xv6iris.Xv6G <> <> lib
+R2464:2469 xv6iris.TsoCtx <> <> lib
+R2505:2508 Riscv.rv64d_types Defs <> mod
+prf 2645:2663 <> kernelvec_tv_direct
+R2761:2763 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2669:2691 Riscv.rv64d <> trapVectorMode_forwards def
+R2698:2712 Riscv.rv64d <> _get_Mtvec_Mode def
+R2751:2755 SailStdpp.Values <> mword def
+R2715:2726 SailStdpp.Values <> mword_of_int def
+R2728:2747 Kernel.KernelSyms <> kernelvec def
+R2764:2772 Riscv.rv64d_types <> TV_Direct constr
+prf 2819:2838 <> kernelvec_stvec_base
+R2901:2908 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2953:2953 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2844:2853 xv6iris.WpIntrCore <> stvec_base def
+R2892:2896 SailStdpp.Values <> mword def
+R2856:2867 SailStdpp.Values <> mword_of_int def
+R2869:2888 Kernel.KernelSyms <> kernelvec def
+R2945:2949 SailStdpp.Values <> mword def
+R2909:2920 SailStdpp.Values <> mword_of_int def
+R2922:2941 Kernel.KernelSyms <> kernelvec def
+R2969:2973 stdpp.bitvector.definitions <> bv_eq thm
+R2969:2973 stdpp.bitvector.definitions <> bv_eq thm
+def 3930:3956 <> kernelvec_handler_spec_body
+R3965:3971 xv6iris.RiscvPtsto <> riscvGS class
+binder 3973:3974 <> Σ:1
+binder 3964:3974 <> riscvGS0:2
+R3978:3981 xv6iris.Xv6G <> xv6G class
+R3983:3984 xv6iris.SpecKernelvec <> Σ:1 var
+binder 3977:3984 <> xv6G0:3
+R3988:3995 xv6iris.Xv6Cameras <> bioslotG class
+R3997:3998 xv6iris.SpecKernelvec <> Σ:1 var
+binder 3987:3998 <> bioslotG0:4
+R4002:4008 xv6iris.FdSlots <> fdslotG class
+R4010:4011 xv6iris.SpecKernelvec <> Σ:1 var
+binder 4001:4011 <> fdslotG0:5
+R4015:4023 xv6iris.IrefSlots <> irefslotG class
+R4025:4026 xv6iris.SpecKernelvec <> Σ:1 var
+binder 4014:4026 <> irefslotG0:6
+R4030:4033 xv6iris.ProcAvail <> pavG class
+R4035:4036 xv6iris.SpecKernelvec <> Σ:1 var
+binder 4029:4036 <> pavG0:7
+R4047:4051 xv6iris.RiscvLang <> GenId class
+binder 4041:4043 <> GEN:8
+R4062:4066 xv6iris.RiscvLang <> CpuId class
+binder 4056:4058 <> CID:9
+R4076:4081 xv6iris.TsoCtx <> CurCtx class
+binder 4071:4072 <> XI:10
+R4095:4104 xv6iris.WpUart <> uart_names rec
+binder 4089:4091 <> γu:11
+R4114:4123 xv6iris.DiskPtsto <> disk_names rec
+binder 4108:4110 <> γv:12
+R4139:4143 iris.base_logic.lib.iprop <> gname def
+binder 4127:4130 <> γdk:13
+binder 4132:4135 <> γtl:14
+R4157:4160 Corelib.Init.Datatypes <> list ind
+R4162:4166 iris.base_logic.lib.iprop <> gname def
+binder 4151:4153 <> γs:15
+R4182:4186 SailStdpp.Values <> mword def
+binder 4170:4171 <> pd:16
+binder 4173:4175 <> pav:17
+binder 4177:4178 <> pu:18
+R4215:4220 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4207:4209 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4197:4202 Stdlib.Lists.List <> length abbrev
+R4204:4206 xv6iris.SpecKernelvec <> γs:15 var
+R4210:4214 xv6iris.ProcGeom <> NPROC def
+R4230:4237 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4221:4229 xv6iris.RiscvFetchExec <> hw_config def
+R4250:4257 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4238:4249 xv6iris.MinstretInv <> minstret_inv def
+R4269:4276 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4258:4268 xv6iris.KernelText <> kernel_text def
+R4321:4328 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4277:4288 xv6iris.SpecDevintr <> devintr_caps def
+R4290:4292 xv6iris.SpecKernelvec <> γu:11 var
+R4294:4296 xv6iris.SpecKernelvec <> γv:12 var
+R4298:4301 xv6iris.SpecKernelvec <> γdk:13 var
+R4303:4306 xv6iris.SpecKernelvec <> γtl:14 var
+R4308:4310 xv6iris.SpecKernelvec <> γs:15 var
+R4312:4313 xv6iris.SpecKernelvec <> pd:16 var
+R4315:4317 xv6iris.SpecKernelvec <> pav:17 var
+R4319:4320 xv6iris.SpecKernelvec <> pu:18 var
+R4329:4345 xv6iris.IntrDefs <> intr_handler_spec def
+R4347:4349 xv6iris.Ktier <> KT1 constr
+R4388:4392 SailStdpp.Values <> mword def
+R4352:4363 SailStdpp.Values <> mword_of_int def
+R4365:4384 Kernel.KernelSyms <> kernelvec def
+modtype 4412:4420 <> KERNELVEC
+ax 4435:4456 KERNELVEC kernelvec_handler_spec
+R4464:4472 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4703:4711 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4474:4480 xv6iris.RiscvPtsto <> riscvGS class
+binder 4482:4483 <> Σ:19
+binder 4473:4483 <> riscvGS0:20
+R4487:4490 xv6iris.Xv6G <> xv6G class
+R4492:4493 xv6iris.SpecKernelvec <> Σ:19 var
+binder 4486:4493 <> xv6G0:21
+R4497:4504 xv6iris.Xv6Cameras <> bioslotG class
+R4506:4507 xv6iris.SpecKernelvec <> Σ:19 var
+binder 4496:4507 <> bioslotG0:22
+R4511:4517 xv6iris.FdSlots <> fdslotG class
+R4519:4520 xv6iris.SpecKernelvec <> Σ:19 var
+binder 4510:4520 <> fdslotG0:23
+R4524:4532 xv6iris.IrefSlots <> irefslotG class
+R4534:4535 xv6iris.SpecKernelvec <> Σ:19 var
+binder 4523:4535 <> irefslotG0:24
+R4539:4542 xv6iris.ProcAvail <> pavG class
+R4544:4545 xv6iris.SpecKernelvec <> Σ:19 var
+binder 4538:4545 <> pavG0:25
+R4556:4560 xv6iris.RiscvLang <> GenId class
+binder 4550:4552 <> GEN:26
+R4571:4575 xv6iris.RiscvLang <> CpuId class
+binder 4565:4567 <> CID:27
+R4585:4590 xv6iris.TsoCtx <> CurCtx class
+binder 4580:4581 <> XI:28
+R4606:4615 xv6iris.WpUart <> uart_names rec
+binder 4600:4602 <> γu:29
+R4625:4634 xv6iris.DiskPtsto <> disk_names rec
+binder 4619:4621 <> γv:30
+R4650:4654 iris.base_logic.lib.iprop <> gname def
+binder 4638:4641 <> γdk:31
+R4650:4654 iris.base_logic.lib.iprop <> gname def
+binder 4643:4646 <> γtl:32
+R4670:4673 Corelib.Init.Datatypes <> list ind
+R4675:4679 iris.base_logic.lib.iprop <> gname def
+binder 4664:4666 <> γs:33
+R4695:4699 SailStdpp.Values <> mword def
+binder 4683:4684 <> pd:34
+R4695:4699 SailStdpp.Values <> mword def
+binder 4686:4688 <> pav:35
+R4695:4699 SailStdpp.Values <> mword def
+binder 4690:4691 <> pu:36
+R4712:4738 xv6iris.SpecKernelvec <> kernelvec_handler_spec_body def
+R4769:4770 xv6iris.SpecKernelvec <> pu:36 var
+R4765:4767 xv6iris.SpecKernelvec <> pav:35 var
+R4762:4763 xv6iris.SpecKernelvec <> pd:34 var
+R4758:4760 xv6iris.SpecKernelvec <> γs:33 var
+R4753:4756 xv6iris.SpecKernelvec <> γtl:32 var
+R4748:4751 xv6iris.SpecKernelvec <> γdk:31 var
+R4744:4746 xv6iris.SpecKernelvec <> γv:30 var
+R4740:4742 xv6iris.SpecKernelvec <> γu:29 var
+R4777:4785 xv6iris.SpecKernelvec KERNELVEC <> modtype

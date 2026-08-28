@@ -1,0 +1,7 @@
+DIGEST bfadb3edb1bebffa88a4c0e5987d5ff9
+Fxv6iris.LinkPrepareReturn
+R179:188 xv6iris.LinkMyproc <> <> lib
+R190:207 xv6iris.ProofPrepareReturn <> <> lib
+R235:252 xv6iris.ProofPrepareReturn PrepareReturnProof <> modtype
+R254:259 xv6iris.LinkMyproc Myproc <> modtype
+mod 218:230 <> PrepareReturn

@@ -1,0 +1,9 @@
+DIGEST ffbc73d580c203f560f9581af4b031b2
+Fxv6iris.LinkIinit
+R185:196 xv6iris.LinkInitlock <> <> lib
+R198:214 xv6iris.LinkInitsleeplock <> <> lib
+R216:225 xv6iris.ProofIinit <> <> lib
+R245:254 xv6iris.ProofIinit IinitProof <> modtype
+R256:263 xv6iris.LinkInitlock Initlock <> modtype
+R265:277 xv6iris.LinkInitsleeplock Initsleeplock <> modtype
+mod 236:240 <> Iinit

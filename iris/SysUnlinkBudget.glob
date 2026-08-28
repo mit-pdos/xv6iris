@@ -1,0 +1,411 @@
+DIGEST b0fda55c5dfeb1ed56c3115782f9ec6a
+Fxv6iris.SysUnlinkBudget
+R3737:3742 Stdlib.ZArith.ZArith <> <> lib
+R3744:3746 Stdlib.micromega.Lia <> <> lib
+R3748:3751 Stdlib.Lists.List <> <> lib
+R3769:3774 xv6iris.LogInv <> <> lib
+R3792:3799 xv6iris.SpecIput <> <> lib
+R3817:3826 xv6iris.SpecWritei <> <> lib
+R3844:3852 xv6iris.SpecNamex <> <> lib
+def 4401:4405 <> su_iu
+R4414:4417 Corelib.Init.Datatypes <> bool ind
+binder 4408:4410 <> cru:1
+R4422:4424 Corelib.Init.Datatypes <> nat ind
+R4432:4434 xv6iris.SysUnlinkBudget <> cru:1 var
+def 5070:5074 <> su_u0
+R5078:5080 Corelib.Init.Datatypes <> nat ind
+R5085:5095 xv6iris.LogInv <> MAXOPBLOCKS def
+prf 5105:5115 <> su_u0_value
+R5124:5126 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5119:5123 xv6iris.SysUnlinkBudget <> su_u0 def
+def 5228:5232 <> su_u1
+R5240:5243 Corelib.Init.Datatypes <> bool ind
+binder 5235:5236 <> w1:2
+R5248:5250 Corelib.Init.Datatypes <> nat ind
+R5261:5263 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R5256:5260 xv6iris.SysUnlinkBudget <> su_u0 def
+R5264:5273 xv6iris.SpecNamex <> walk_spend def
+R5275:5276 xv6iris.SysUnlinkBudget <> w1:2 var
+def 5295:5300 <> su_u1f
+R5308:5311 Corelib.Init.Datatypes <> bool ind
+binder 5303:5304 <> w1:3
+R5316:5318 Corelib.Init.Datatypes <> nat ind
+R5329:5332 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R5350:5350 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R5324:5328 xv6iris.SysUnlinkBudget <> su_u0 def
+R5346:5348 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5333:5342 xv6iris.SpecNamex <> walk_spend def
+R5344:5345 xv6iris.SysUnlinkBudget <> w1:3 var
+prf 5365:5376 <> su_u1_values
+R5400:5403 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R5391:5393 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5380:5384 xv6iris.SysUnlinkBudget <> su_u1 def
+R5386:5390 Corelib.Init.Datatypes <> false constr
+R5414:5416 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5404:5408 xv6iris.SysUnlinkBudget <> su_u1 def
+R5410:5413 Corelib.Init.Datatypes <> true constr
+prf 5475:5483 <> su_u1_ge9
+R5491:5494 Corelib.Init.Datatypes <> bool ind
+binder 5486:5487 <> w1:4
+R5501:5504 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R5505:5509 xv6iris.SysUnlinkBudget <> su_u1 def
+R5511:5512 xv6iris.SysUnlinkBudget <> w1:4 var
+prf 5663:5681 <> su_walk_need_closes
+R5688:5690 Corelib.Init.Datatypes <> nat ind
+binder 5684:5684 <> L:5
+R5707:5710 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R5696:5704 xv6iris.SpecNamex <> walk_need def
+R5706:5706 xv6iris.SysUnlinkBudget <> L:5 var
+R5711:5715 xv6iris.SysUnlinkBudget <> su_u0 def
+prf 6193:6199 <> su_corr
+R6207:6210 Corelib.Init.Datatypes <> bool ind
+binder 6202:6203 <> w1:6
+R6224:6227 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R6217:6219 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6215:6216 xv6iris.SysUnlinkBudget <> w1:6 var
+R6220:6223 Corelib.Init.Datatypes <> true constr
+R6236:6238 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6228:6232 xv6iris.SysUnlinkBudget <> su_u1 def
+R6234:6235 xv6iris.SysUnlinkBudget <> w1:6 var
+prf 6716:6747 <> su_argstr_arm_has_no_transaction
+R6751:6754 Corelib.Init.Logic <> True ind
+R6770:6770 Corelib.Init.Logic <> I constr
+R6770:6770 Corelib.Init.Logic <> I constr
+prf 6984:7008 <> su_bad_nameiparent_closes
+R7016:7019 Corelib.Init.Datatypes <> bool ind
+binder 7011:7012 <> w1:7
+R7026:7029 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R7030:7035 xv6iris.SysUnlinkBudget <> su_u1f def
+R7037:7038 xv6iris.SysUnlinkBudget <> w1:7 var
+prf 7247:7265 <> su_bad_early_closes
+R7273:7276 Corelib.Init.Datatypes <> bool ind
+binder 7268:7269 <> w1:8
+R7292:7295 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R7282:7291 xv6iris.SpecIput <> iput_units def
+R7296:7300 xv6iris.SysUnlinkBudget <> su_u1 def
+R7302:7303 xv6iris.SysUnlinkBudget <> w1:8 var
+prf 7733:7756 <> su_bad_isdirempty_closes
+R7771:7774 Corelib.Init.Datatypes <> bool ind
+binder 7759:7760 <> w1:9
+binder 7762:7763 <> wi:10
+binder 7765:7767 <> crb:11
+R7799:7801 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R7791:7795 xv6iris.SysUnlinkBudget <> su_u1 def
+R7797:7798 xv6iris.SysUnlinkBudget <> w1:9 var
+R7802:7811 xv6iris.SpecIput <> ip_spend_w def
+R7813:7814 xv6iris.SysUnlinkBudget <> wi:10 var
+R7820:7823 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R7817:7819 xv6iris.SysUnlinkBudget <> crb:11 var
+R7824:7828 Corelib.Init.Datatypes <> false constr
+R7831:7835 Corelib.Init.Datatypes <> false constr
+binder 7785:7785 <> u:12
+R7875:7878 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R7858:7861 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R7848:7857 xv6iris.SpecIput <> iput_units def
+R7862:7866 xv6iris.SysUnlinkBudget <> su_u1 def
+R7868:7869 xv6iris.SysUnlinkBudget <> w1:9 var
+R7890:7893 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R7880:7889 xv6iris.SpecIput <> iput_units def
+R7894:7894 xv6iris.SysUnlinkBudget <> u:12 var
+prf 8083:8111 <> su_two_frees_cost_at_most_two
+R8122:8125 Corelib.Init.Datatypes <> bool ind
+binder 8114:8115 <> wi:13
+binder 8117:8118 <> wd:14
+R8186:8189 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R8158:8160 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R8133:8142 xv6iris.SpecIput <> ip_spend_w def
+R8144:8145 xv6iris.SysUnlinkBudget <> wi:13 var
+R8147:8151 Corelib.Init.Datatypes <> false constr
+R8153:8157 Corelib.Init.Datatypes <> false constr
+R8161:8170 xv6iris.SpecIput <> ip_spend_w def
+R8172:8173 xv6iris.SysUnlinkBudget <> wd:14 var
+R8175:8179 Corelib.Init.Datatypes <> false constr
+R8181:8185 Corelib.Init.Datatypes <> false constr
+def 9054:9058 <> su_u2
+R9085:9088 Corelib.Init.Datatypes <> bool ind
+binder 9061:9062 <> w1:15
+binder 9064:9066 <> crb:16
+binder 9068:9070 <> crd:17
+binder 9072:9074 <> cru:18
+binder 9076:9077 <> al:19
+binder 9079:9081 <> ind:20
+R9093:9095 Corelib.Init.Datatypes <> nat ind
+R9111:9113 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R9103:9107 xv6iris.SysUnlinkBudget <> su_u1 def
+R9109:9110 xv6iris.SysUnlinkBudget <> w1:15 var
+R9114:9123 xv6iris.SpecWritei <> wi16_spend def
+R9125:9127 xv6iris.SysUnlinkBudget <> crb:16 var
+R9129:9131 xv6iris.SysUnlinkBudget <> crd:17 var
+R9133:9135 xv6iris.SysUnlinkBudget <> cru:18 var
+R9137:9138 xv6iris.SysUnlinkBudget <> al:19 var
+R9140:9142 xv6iris.SysUnlinkBudget <> ind:20 var
+prf 9215:9231 <> su_wi_need_closes
+R9247:9250 Corelib.Init.Datatypes <> bool ind
+binder 9234:9235 <> w1:21
+binder 9237:9239 <> crb:22
+binder 9241:9243 <> ind:23
+R9275:9278 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R9258:9266 xv6iris.SpecWritei <> wi16_need def
+R9268:9270 xv6iris.SysUnlinkBudget <> crb:22 var
+R9272:9274 xv6iris.SysUnlinkBudget <> ind:23 var
+R9279:9283 xv6iris.SysUnlinkBudget <> su_u1 def
+R9285:9286 xv6iris.SysUnlinkBudget <> w1:21 var
+prf 9395:9403 <> su_u2_ge5
+R9430:9433 Corelib.Init.Datatypes <> bool ind
+binder 9406:9407 <> w1:24
+binder 9409:9411 <> crb:25
+binder 9413:9415 <> crd:26
+binder 9417:9419 <> cru:27
+binder 9421:9422 <> al:28
+binder 9424:9426 <> ind:29
+R9442:9445 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R9446:9450 xv6iris.SysUnlinkBudget <> su_u2 def
+R9452:9453 xv6iris.SysUnlinkBudget <> w1:24 var
+R9455:9457 xv6iris.SysUnlinkBudget <> crb:25 var
+R9459:9461 xv6iris.SysUnlinkBudget <> crd:26 var
+R9463:9465 xv6iris.SysUnlinkBudget <> cru:27 var
+R9467:9468 xv6iris.SysUnlinkBudget <> al:28 var
+R9470:9472 xv6iris.SysUnlinkBudget <> ind:29 var
+prf 9962:9977 <> su_ok_dir_closes
+R10010:10013 Corelib.Init.Datatypes <> bool ind
+binder 9980:9981 <> w1:30
+binder 9983:9985 <> crb:31
+binder 9987:9989 <> crd:32
+binder 9991:9993 <> cru:33
+binder 9995:9996 <> al:34
+binder 9998:10000 <> ind:35
+binder 10002:10003 <> wd:36
+binder 10005:10006 <> wp:37
+R10030:10034 xv6iris.SysUnlinkBudget <> su_u2 def
+R10036:10037 xv6iris.SysUnlinkBudget <> w1:30 var
+R10039:10041 xv6iris.SysUnlinkBudget <> crb:31 var
+R10043:10045 xv6iris.SysUnlinkBudget <> crd:32 var
+R10047:10049 xv6iris.SysUnlinkBudget <> cru:33 var
+R10051:10052 xv6iris.SysUnlinkBudget <> al:34 var
+R10054:10056 xv6iris.SysUnlinkBudget <> ind:35 var
+binder 10024:10025 <> u2:38
+R10076:10078 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R10074:10075 xv6iris.SysUnlinkBudget <> u2:38 var
+R10079:10083 xv6iris.SysUnlinkBudget <> su_iu def
+R10085:10088 Corelib.Init.Datatypes <> true constr
+binder 10067:10068 <> u3:39
+R10155:10157 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R10153:10154 xv6iris.SysUnlinkBudget <> u3:39 var
+R10158:10167 xv6iris.SpecIput <> ip_spend_w def
+R10169:10170 xv6iris.SysUnlinkBudget <> wd:36 var
+R10172:10175 Corelib.Init.Datatypes <> true constr
+R10177:10181 Corelib.Init.Datatypes <> false constr
+binder 10146:10147 <> u4:40
+R10234:10236 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R10232:10233 xv6iris.SysUnlinkBudget <> u4:40 var
+R10237:10241 xv6iris.SysUnlinkBudget <> su_iu def
+R10243:10247 Corelib.Init.Datatypes <> false constr
+binder 10225:10226 <> u5:41
+R10313:10316 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R10302:10305 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10306:10307 xv6iris.SysUnlinkBudget <> u2:38 var
+R10339:10342 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R10328:10331 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10318:10327 xv6iris.SpecIput <> iput_units def
+R10332:10333 xv6iris.SysUnlinkBudget <> u3:39 var
+R10356:10361 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R10345:10348 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10349:10350 xv6iris.SysUnlinkBudget <> u4:40 var
+R10384:10389 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R10373:10376 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10363:10372 xv6iris.SpecIput <> iput_units def
+R10377:10378 xv6iris.SysUnlinkBudget <> u5:41 var
+R10392:10395 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10398:10400 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R10396:10397 xv6iris.SysUnlinkBudget <> u5:41 var
+R10401:10410 xv6iris.SpecIput <> ip_spend_w def
+R10412:10413 xv6iris.SysUnlinkBudget <> wp:37 var
+R10415:10418 Corelib.Init.Datatypes <> true constr
+R10420:10424 Corelib.Init.Datatypes <> false constr
+prf 10703:10719 <> su_ok_file_closes
+R10752:10755 Corelib.Init.Datatypes <> bool ind
+binder 10722:10723 <> w1:42
+binder 10725:10727 <> crb:43
+binder 10729:10731 <> crd:44
+binder 10733:10735 <> cru:45
+binder 10737:10738 <> al:46
+binder 10740:10742 <> ind:47
+binder 10744:10745 <> wd:48
+binder 10747:10748 <> wp:49
+R10772:10776 xv6iris.SysUnlinkBudget <> su_u2 def
+R10778:10779 xv6iris.SysUnlinkBudget <> w1:42 var
+R10781:10783 xv6iris.SysUnlinkBudget <> crb:43 var
+R10785:10787 xv6iris.SysUnlinkBudget <> crd:44 var
+R10789:10791 xv6iris.SysUnlinkBudget <> cru:45 var
+R10793:10794 xv6iris.SysUnlinkBudget <> al:46 var
+R10796:10798 xv6iris.SysUnlinkBudget <> ind:47 var
+binder 10766:10767 <> u2:50
+R10818:10820 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R10816:10817 xv6iris.SysUnlinkBudget <> u2:50 var
+R10821:10830 xv6iris.SpecIput <> ip_spend_w def
+R10832:10833 xv6iris.SysUnlinkBudget <> wd:48 var
+R10835:10838 Corelib.Init.Datatypes <> true constr
+R10840:10844 Corelib.Init.Datatypes <> false constr
+binder 10809:10810 <> u4:51
+R10897:10899 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R10895:10896 xv6iris.SysUnlinkBudget <> u4:51 var
+R10900:10904 xv6iris.SysUnlinkBudget <> su_iu def
+R10906:10910 Corelib.Init.Datatypes <> false constr
+binder 10888:10889 <> u5:52
+R10985:10988 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R10974:10977 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10964:10973 xv6iris.SpecIput <> iput_units def
+R10978:10979 xv6iris.SysUnlinkBudget <> u2:50 var
+R11002:11007 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R10991:10994 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10995:10996 xv6iris.SysUnlinkBudget <> u4:51 var
+R11030:11035 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R11019:11022 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11009:11018 xv6iris.SpecIput <> iput_units def
+R11023:11024 xv6iris.SysUnlinkBudget <> u5:52 var
+R11038:11041 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11044:11046 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R11042:11043 xv6iris.SysUnlinkBudget <> u5:52 var
+R11047:11056 xv6iris.SpecIput <> ip_spend_w def
+R11058:11059 xv6iris.SysUnlinkBudget <> wp:49 var
+R11061:11064 Corelib.Init.Datatypes <> true constr
+R11066:11070 Corelib.Init.Datatypes <> false constr
+prf 11626:11643 <> su_ok_uncorrelated
+R11669:11672 Corelib.Init.Datatypes <> bool ind
+binder 11646:11648 <> crd:53
+binder 11650:11652 <> cru:54
+binder 11654:11655 <> al:55
+binder 11657:11659 <> ind:56
+binder 11661:11662 <> wd:57
+binder 11664:11665 <> wp:58
+R11689:11693 xv6iris.SysUnlinkBudget <> su_u2 def
+R11695:11698 Corelib.Init.Datatypes <> true constr
+R11700:11704 Corelib.Init.Datatypes <> false constr
+R11706:11708 xv6iris.SysUnlinkBudget <> crd:53 var
+R11710:11712 xv6iris.SysUnlinkBudget <> cru:54 var
+R11714:11715 xv6iris.SysUnlinkBudget <> al:55 var
+R11717:11719 xv6iris.SysUnlinkBudget <> ind:56 var
+binder 11683:11684 <> u2:59
+R11739:11741 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R11737:11738 xv6iris.SysUnlinkBudget <> u2:59 var
+R11742:11746 xv6iris.SysUnlinkBudget <> su_iu def
+R11748:11751 Corelib.Init.Datatypes <> true constr
+binder 11730:11731 <> u3:60
+R11776:11778 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R11774:11775 xv6iris.SysUnlinkBudget <> u3:60 var
+R11779:11788 xv6iris.SpecIput <> ip_spend_w def
+R11790:11791 xv6iris.SysUnlinkBudget <> wd:57 var
+R11793:11796 Corelib.Init.Datatypes <> true constr
+R11798:11802 Corelib.Init.Datatypes <> false constr
+binder 11767:11768 <> u4:61
+R11827:11829 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R11825:11826 xv6iris.SysUnlinkBudget <> u4:61 var
+R11830:11834 xv6iris.SysUnlinkBudget <> su_iu def
+R11836:11840 Corelib.Init.Datatypes <> false constr
+binder 11818:11819 <> u5:62
+R11863:11866 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11853:11862 xv6iris.SpecIput <> iput_units def
+R11867:11868 xv6iris.SysUnlinkBudget <> u5:62 var
+prf 12189:12209 <> su_ok_corner_is_exact
+R12225:12229 xv6iris.SysUnlinkBudget <> su_u2 def
+R12231:12234 Corelib.Init.Datatypes <> true constr
+R12236:12240 Corelib.Init.Datatypes <> false constr
+R12242:12246 Corelib.Init.Datatypes <> false constr
+R12248:12252 Corelib.Init.Datatypes <> false constr
+R12254:12257 Corelib.Init.Datatypes <> true constr
+R12259:12262 Corelib.Init.Datatypes <> true constr
+binder 12219:12220 <> u2:63
+R12282:12284 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R12280:12281 xv6iris.SysUnlinkBudget <> u2:63 var
+R12285:12289 xv6iris.SysUnlinkBudget <> su_iu def
+R12291:12294 Corelib.Init.Datatypes <> true constr
+binder 12273:12274 <> u3:64
+R12319:12321 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R12317:12318 xv6iris.SysUnlinkBudget <> u3:64 var
+R12322:12331 xv6iris.SpecIput <> ip_spend_w def
+R12333:12336 Corelib.Init.Datatypes <> true constr
+R12338:12341 Corelib.Init.Datatypes <> true constr
+R12343:12347 Corelib.Init.Datatypes <> false constr
+binder 12310:12311 <> u4:65
+R12372:12374 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R12370:12371 xv6iris.SysUnlinkBudget <> u4:65 var
+R12375:12379 xv6iris.SysUnlinkBudget <> su_iu def
+R12381:12385 Corelib.Init.Datatypes <> false constr
+binder 12363:12364 <> u5:66
+R12399:12401 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12397:12398 xv6iris.SysUnlinkBudget <> u5:66 var
+R12402:12411 xv6iris.SpecIput <> iput_units def
+prf 12688:12716 <> su_ok_dir_floor_is_iput_units
+R12746:12749 Corelib.Init.Datatypes <> bool ind
+binder 12719:12720 <> w1:67
+binder 12722:12724 <> crb:68
+binder 12726:12728 <> crd:69
+binder 12730:12732 <> cru:70
+binder 12734:12735 <> al:71
+binder 12737:12739 <> ind:72
+binder 12741:12742 <> wd:73
+R12766:12770 xv6iris.SysUnlinkBudget <> su_u2 def
+R12772:12773 xv6iris.SysUnlinkBudget <> w1:67 var
+R12775:12777 xv6iris.SysUnlinkBudget <> crb:68 var
+R12779:12781 xv6iris.SysUnlinkBudget <> crd:69 var
+R12783:12785 xv6iris.SysUnlinkBudget <> cru:70 var
+R12787:12788 xv6iris.SysUnlinkBudget <> al:71 var
+R12790:12792 xv6iris.SysUnlinkBudget <> ind:72 var
+binder 12760:12761 <> u2:74
+R12812:12814 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R12810:12811 xv6iris.SysUnlinkBudget <> u2:74 var
+R12815:12819 xv6iris.SysUnlinkBudget <> su_iu def
+R12821:12824 Corelib.Init.Datatypes <> true constr
+binder 12803:12804 <> u3:75
+R12849:12851 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R12847:12848 xv6iris.SysUnlinkBudget <> u3:75 var
+R12852:12861 xv6iris.SpecIput <> ip_spend_w def
+R12863:12864 xv6iris.SysUnlinkBudget <> wd:73 var
+R12866:12869 Corelib.Init.Datatypes <> true constr
+R12871:12875 Corelib.Init.Datatypes <> false constr
+binder 12840:12841 <> u4:76
+R12900:12902 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R12898:12899 xv6iris.SysUnlinkBudget <> u4:76 var
+R12903:12907 xv6iris.SysUnlinkBudget <> su_iu def
+R12909:12913 Corelib.Init.Datatypes <> false constr
+binder 12891:12892 <> u5:77
+R12947:12950 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R12936:12939 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R12926:12935 xv6iris.SpecIput <> iput_units def
+R12940:12941 xv6iris.SysUnlinkBudget <> u5:77 var
+R12954:12957 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R12952:12953 xv6iris.SysUnlinkBudget <> u5:77 var
+prf 13449:13487 <> su_ok_busts_without_the_membership_trio
+R13503:13507 xv6iris.SysUnlinkBudget <> su_u2 def
+R13509:13512 Corelib.Init.Datatypes <> true constr
+R13514:13518 Corelib.Init.Datatypes <> false constr
+R13520:13524 Corelib.Init.Datatypes <> false constr
+R13526:13530 Corelib.Init.Datatypes <> false constr
+R13532:13535 Corelib.Init.Datatypes <> true constr
+R13537:13540 Corelib.Init.Datatypes <> true constr
+binder 13497:13498 <> u2:78
+R13560:13562 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R13558:13559 xv6iris.SysUnlinkBudget <> u2:78 var
+R13563:13567 xv6iris.SysUnlinkBudget <> su_iu def
+R13569:13573 Corelib.Init.Datatypes <> false constr
+binder 13551:13552 <> u3:79
+R13598:13600 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R13596:13597 xv6iris.SysUnlinkBudget <> u3:79 var
+R13601:13610 xv6iris.SpecIput <> ip_spend_w def
+R13612:13615 Corelib.Init.Datatypes <> true constr
+R13617:13621 Corelib.Init.Datatypes <> false constr
+R13623:13627 Corelib.Init.Datatypes <> false constr
+binder 13589:13590 <> u4:80
+R13652:13654 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R13650:13651 xv6iris.SysUnlinkBudget <> u4:80 var
+R13655:13659 xv6iris.SysUnlinkBudget <> su_iu def
+R13661:13665 Corelib.Init.Datatypes <> false constr
+binder 13643:13644 <> u5:81
+R13680:13682 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R13678:13679 xv6iris.SysUnlinkBudget <> u5:81 var
+R13683:13692 xv6iris.SpecIput <> iput_units def
+def 14594:14609 <> sys_unlink_slots
+R14613:14615 Corelib.Init.Datatypes <> nat ind
+prf 14634:14655 <> sys_unlink_slots_value
+R14675:14677 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14659:14674 xv6iris.SysUnlinkBudget <> sys_unlink_slots def

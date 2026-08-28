@@ -1,0 +1,224 @@
+DIGEST c1ce089883bda051b4d6a985edc2867d
+Fxv6iris.HartTp
+R2325:2330 Stdlib.ZArith.ZArith <> <> lib
+R2332:2355 Stdlib.Logic.FunctionalExtensionality <> <> lib
+R2384:2387 stdpp.gmap <> <> lib
+R2389:2394 stdpp.finite <> <> lib
+R2396:2416 stdpp.bitvector.definitions <> <> lib
+R2434:2447 SailStdpp.Base <> <> lib
+R2449:2464 SailStdpp.Values <> <> lib
+R2466:2486 SailStdpp.MachineWord <> <> lib
+R2488:2513 SailStdpp.Operators_mwords <> <> lib
+R2531:2547 Riscv.rv64d_types <> <> lib
+R2565:2573 xv6iris.RiscvLang <> <> lib
+R2575:2581 xv6iris.RegFile <> <> lib
+abbrev 2645:2647 <> Rtp
+R2670:2674 SailStdpp.Values <> mword def
+R2653:2664 SailStdpp.Values <> mword_of_int def
+def 2881:2891 <> cid_word_of
+R2898:2900 xv6iris.RiscvLang <> CPU def
+binder 2894:2894 <> i:1
+R2905:2909 SailStdpp.Values <> mword def
+R2919:2930 SailStdpp.Values <> mword_of_int def
+R2933:2940 Stdlib.ZArith.BinInt Z of_nat def
+R2943:2952 stdpp.fin <> fin_to_nat def
+R2954:2954 xv6iris.HartTp <> i:1 var
+def 2971:2978 <> cid_word
+R2988:2992 xv6iris.RiscvLang <> CpuId class
+binder 2982:2984 <> CID:2
+R2997:3001 SailStdpp.Values <> mword def
+R3009:3019 xv6iris.HartTp <> cid_word_of def
+R3021:3026 xv6iris.RiscvLang <> cpu_id def
+def 3165:3170 <> tp_pin
+R3180:3184 xv6iris.RiscvLang <> CpuId class
+binder 3174:3176 <> CID:3
+R3192:3198 xv6iris.RegFile <> regfile def
+binder 3188:3188 <> m:4
+R3203:3209 xv6iris.RegFile <> regfile def
+R3216:3217 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3228:3231 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3250:3253 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R3218:3223 Riscv.rv64d_types <> Regidx constr
+R3225:3227 xv6iris.HartTp <> Rtp abbrev
+R3232:3242 xv6iris.HartTp <> cid_word_of def
+R3244:3249 xv6iris.RiscvLang <> cpu_id def
+R3253:3253 xv6iris.HartTp <> m:4 var
+def 3333:3336 <> rget
+R3346:3350 xv6iris.RiscvLang <> CpuId class
+binder 3340:3342 <> CID:5
+R3358:3364 xv6iris.RegFile <> regfile def
+binder 3354:3354 <> m:6
+R3372:3376 SailStdpp.Values <> mword def
+binder 3368:3368 <> k:7
+R3383:3387 SailStdpp.Values <> mword def
+R3405:3409 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R3410:3415 Riscv.rv64d_types <> Regidx constr
+R3417:3417 xv6iris.HartTp <> k:7 var
+R3397:3402 xv6iris.HartTp <> tp_pin def
+R3404:3404 xv6iris.HartTp <> m:6 var
+prf 3566:3572 <> rget_ne
+R3582:3586 xv6iris.RiscvLang <> CpuId class
+binder 3576:3578 <> CID:8
+R3594:3600 xv6iris.RegFile <> regfile def
+binder 3590:3590 <> m:9
+R3608:3612 SailStdpp.Values <> mword def
+binder 3604:3604 <> k:10
+R3643:3646 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3629:3632 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R3621:3626 Riscv.rv64d_types <> Regidx constr
+R3628:3628 xv6iris.HartTp <> k:10 var
+R3633:3638 Riscv.rv64d_types <> Regidx constr
+R3640:3642 xv6iris.HartTp <> Rtp abbrev
+R3655:3657 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3647:3650 xv6iris.HartTp <> rget def
+R3654:3654 xv6iris.HartTp <> k:10 var
+R3652:3652 xv6iris.HartTp <> m:9 var
+R3659:3663 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R3664:3669 Riscv.rv64d_types <> Regidx constr
+R3671:3671 xv6iris.HartTp <> k:10 var
+R3658:3658 xv6iris.HartTp <> m:9 var
+R3699:3702 xv6iris.HartTp <> rget def
+R3705:3710 xv6iris.HartTp <> tp_pin def
+R3722:3727 xv6iris.RegFile <> upd_ne thm
+R3722:3727 xv6iris.RegFile <> upd_ne thm
+prf 3742:3748 <> rget_tp
+R3758:3762 xv6iris.RiscvLang <> CpuId class
+binder 3752:3754 <> CID:11
+R3770:3776 xv6iris.RegFile <> regfile def
+binder 3766:3766 <> m:12
+R3791:3793 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3781:3784 xv6iris.HartTp <> rget def
+R3788:3790 xv6iris.HartTp <> Rtp abbrev
+R3786:3786 xv6iris.HartTp <> m:12 var
+R3794:3804 xv6iris.HartTp <> cid_word_of def
+R3806:3811 xv6iris.RiscvLang <> cpu_id def
+R3828:3831 xv6iris.HartTp <> rget def
+R3834:3839 xv6iris.HartTp <> tp_pin def
+R3851:3856 xv6iris.RegFile <> upd_eq thm
+R3851:3856 xv6iris.RegFile <> upd_eq thm
+prf 4306:4318 <> rget_tp_agree
+R4328:4332 xv6iris.RiscvLang <> CpuId class
+binder 4322:4324 <> CID:13
+R4344:4350 xv6iris.RegFile <> regfile def
+binder 4336:4337 <> m1:14
+binder 4339:4340 <> m2:15
+R4366:4368 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4355:4358 xv6iris.HartTp <> rget def
+R4363:4365 xv6iris.HartTp <> Rtp abbrev
+R4360:4361 xv6iris.HartTp <> m1:14 var
+R4369:4372 xv6iris.HartTp <> rget def
+R4377:4379 xv6iris.HartTp <> Rtp abbrev
+R4374:4375 xv6iris.HartTp <> m2:15 var
+R4401:4407 xv6iris.HartTp <> rget_tp thm
+R4401:4407 xv6iris.HartTp <> rget_tp thm
+R4401:4407 xv6iris.HartTp <> rget_tp thm
+R4401:4407 xv6iris.HartTp <> rget_tp thm
+R4401:4407 xv6iris.HartTp <> rget_tp thm
+prf 4422:4432 <> rget_tp_all
+R4442:4446 xv6iris.RiscvLang <> CpuId class
+binder 4436:4438 <> CID:16
+R4451:4457 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4469:4470 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4462:4468 xv6iris.RegFile <> regfile def
+binder 4458:4458 <> m:17
+R4481:4483 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4471:4474 xv6iris.HartTp <> rget def
+R4478:4480 xv6iris.HartTp <> Rtp abbrev
+R4476:4476 xv6iris.HartTp <> m:17 var
+R4484:4494 xv6iris.HartTp <> cid_word_of def
+R4496:4501 xv6iris.RiscvLang <> cpu_id def
+R4517:4523 xv6iris.HartTp <> rget_tp thm
+R4517:4523 xv6iris.HartTp <> rget_tp thm
+prf 5716:5730 <> rget_hart_indep
+R5737:5743 xv6iris.RegFile <> regfile def
+binder 5733:5733 <> m:18
+R5752:5756 SailStdpp.Values <> mword def
+binder 5747:5748 <> rs:19
+R5788:5793 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5774:5777 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R5765:5770 Riscv.rv64d_types <> Regidx constr
+R5772:5773 xv6iris.HartTp <> rs:19 var
+R5778:5783 Riscv.rv64d_types <> Regidx constr
+R5785:5787 xv6iris.HartTp <> Rtp abbrev
+R5794:5800 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5814:5815 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5809:5813 xv6iris.RiscvLang <> CpuId class
+binder 5801:5802 <> c1:20
+R5809:5813 xv6iris.RiscvLang <> CpuId class
+binder 5804:5805 <> c2:21
+R5837:5839 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5816:5819 xv6iris.HartTp <> rget def
+R5835:5836 xv6iris.HartTp <> rs:19 var
+R5833:5833 xv6iris.HartTp <> m:18 var
+R5829:5830 xv6iris.HartTp <> c1:20 var
+R5840:5843 xv6iris.HartTp <> rget def
+R5859:5860 xv6iris.HartTp <> rs:19 var
+R5857:5857 xv6iris.HartTp <> m:18 var
+R5853:5854 xv6iris.HartTp <> c2:21 var
+R5904:5910 xv6iris.HartTp <> rget_ne thm
+R5936:5942 xv6iris.HartTp <> rget_ne thm
+R5904:5910 xv6iris.HartTp <> rget_ne thm
+R5904:5910 xv6iris.HartTp <> rget_ne thm
+R5936:5942 xv6iris.HartTp <> rget_ne thm
+R5936:5942 xv6iris.HartTp <> rget_ne thm
+prf 6117:6125 <> tp_pin_id
+R6135:6139 xv6iris.RiscvLang <> CpuId class
+binder 6129:6131 <> CID:22
+R6147:6153 xv6iris.RegFile <> regfile def
+binder 6143:6143 <> m:23
+R6197:6200 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6176:6178 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6161:6165 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R6166:6171 Riscv.rv64d_types <> Regidx constr
+R6173:6175 xv6iris.HartTp <> Rtp abbrev
+R6160:6160 xv6iris.HartTp <> m:23 var
+R6179:6189 xv6iris.HartTp <> cid_word_of def
+R6191:6196 xv6iris.RiscvLang <> cpu_id def
+R6209:6211 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6201:6206 xv6iris.HartTp <> tp_pin def
+R6208:6208 xv6iris.HartTp <> m:23 var
+R6212:6212 xv6iris.HartTp <> m:23 var
+R6242:6247 xv6iris.HartTp <> tp_pin def
+R6250:6255 stdpp.base <> insert def
+R6258:6271 xv6iris.RegFile <> regfile_insert inst
+R6274:6279 xv6iris.RegFile <> rf_upd def
+R6290:6314 Stdlib.Logic.FunctionalExtensionality <> functional_extensionality thm
+R6290:6314 Stdlib.Logic.FunctionalExtensionality <> functional_extensionality thm
+prf 6563:6572 <> tp_pin_upd
+R6582:6586 xv6iris.RiscvLang <> CpuId class
+binder 6576:6578 <> CID:24
+R6594:6600 xv6iris.RegFile <> regfile def
+binder 6590:6590 <> m:25
+R6609:6613 SailStdpp.Values <> mword def
+binder 6604:6605 <> rd:26
+R6623:6627 SailStdpp.Values <> mword def
+binder 6619:6619 <> v:27
+R6660:6665 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6646:6649 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R6637:6642 Riscv.rv64d_types <> Regidx constr
+R6644:6645 xv6iris.HartTp <> rd:26 var
+R6650:6655 Riscv.rv64d_types <> Regidx constr
+R6657:6659 xv6iris.HartTp <> Rtp abbrev
+R6695:6697 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6666:6667 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R6677:6680 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R6682:6694 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R6668:6673 Riscv.rv64d_types <> Regidx constr
+R6675:6676 xv6iris.HartTp <> rd:26 var
+R6681:6681 xv6iris.HartTp <> v:27 var
+R6686:6691 xv6iris.HartTp <> tp_pin def
+R6693:6693 xv6iris.HartTp <> m:25 var
+R6698:6703 xv6iris.HartTp <> tp_pin def
+R6706:6707 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R6717:6720 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R6722:6725 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R6708:6713 Riscv.rv64d_types <> Regidx constr
+R6715:6716 xv6iris.HartTp <> rd:26 var
+R6721:6721 xv6iris.HartTp <> v:27 var
+R6725:6725 xv6iris.HartTp <> m:25 var
+R6757:6762 xv6iris.HartTp <> tp_pin def
+R6765:6770 stdpp.base <> insert def
+R6773:6786 xv6iris.RegFile <> regfile_insert inst
+R6789:6794 xv6iris.RegFile <> rf_upd def
+R6805:6829 Stdlib.Logic.FunctionalExtensionality <> functional_extensionality thm
+R6805:6829 Stdlib.Logic.FunctionalExtensionality <> functional_extensionality thm

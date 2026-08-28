@@ -1351,6 +1351,7 @@ Section KexecB2Loops.
           #Hkmapb & _)".
       iDestruct (proc_pt_page_acc P (svpn_of vai) w0 Hum0 with "Hkmapb Hpt")
         as "[Hpage Hgive]".
+      iEval (rewrite /ProcPtOwn.page_named) in "Hpage".
       iDestruct (kxc_page_take (page_base (pte_ppn w0)) nn ltac:(lia)
                    with "Hpage") as (fpg) "[Hdst Hrest]".
       iEval (rewrite -HD6a2) in "Hdst".

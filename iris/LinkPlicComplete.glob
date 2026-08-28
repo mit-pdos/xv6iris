@@ -1,0 +1,7 @@
+DIGEST d1e3703b771ccf3296cc54ba9b47feed
+Fxv6iris.LinkPlicComplete
+R172:180 xv6iris.LinkCpuid <> <> lib
+R182:198 xv6iris.ProofPlicComplete <> <> lib
+R225:241 xv6iris.ProofPlicComplete PlicCompleteProof <> modtype
+R243:247 xv6iris.LinkCpuid Cpuid <> modtype
+mod 209:220 <> PlicComplete

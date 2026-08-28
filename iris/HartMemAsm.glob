@@ -1,0 +1,3109 @@
+DIGEST 92ba4f42baa7f1bd4204378ade15f01f
+Fxv6iris.HartMemAsm
+R2487:2492 Stdlib.ZArith.ZArith <> <> lib
+R2494:2497 Stdlib.Bool.Bool <> <> lib
+R2499:2501 Stdlib.micromega.Lia <> <> lib
+R2530:2533 stdpp.gmap <> <> lib
+R2535:2555 stdpp.bitvector.definitions <> <> lib
+R2573:2598 SailStdpp.Operators_mwords <> <> lib
+R2616:2632 Riscv.rv64d_types <> <> lib
+R2634:2644 Riscv.rv64d <> <> lib
+R2662:2676 xv6iris.RiscvModelBytes <> <> lib
+R2694:2702 xv6iris.RiscvLang <> <> lib
+R2704:2712 xv6iris.RiscvExec <> <> lib
+R2714:2725 xv6iris.RiscvTryStep <> <> lib
+R2727:2740 xv6iris.RiscvFetchExec <> <> lib
+R2758:2767 xv6iris.HartMemRun <> <> lib
+prf 3509:3520 <> mm_after_dom
+R3539:3542 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3531:3538 Riscv.rv64d_types <> register variant
+R3543:3546 Corelib.Init.Datatypes <> bool ind
+binder 3523:3524 <> Dr:1
+binder 3526:3527 <> Dw:2
+binder 3550:3550 <> E:3
+binder 3552:3552 <> X:4
+R3560:3569 Riscv.rv64d_types Defs monad def
+R3571:3571 xv6iris.HartMemAsm <> E:3 var
+R3573:3573 xv6iris.HartMemAsm <> X:4 var
+binder 3556:3556 <> m:5
+R3580:3587 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3602:3607 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3592:3597 xv6iris.RiscvLang <> mstate rec
+binder 3588:3588 <> s:6
+binder 3600:3601 <> mm:7
+R3634:3637 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3627:3629 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3608:3613 xv6iris.HartMemRun <> goodmb def
+R3625:3626 xv6iris.HartMemAsm <> mm:7 var
+R3623:3623 xv6iris.HartMemAsm <> s:6 var
+R3621:3621 xv6iris.HartMemAsm <> m:5 var
+R3618:3619 xv6iris.HartMemAsm <> Dw:2 var
+R3615:3616 xv6iris.HartMemAsm <> Dr:1 var
+R3630:3633 Corelib.Init.Datatypes <> true constr
+R3659:3661 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3638:3640 stdpp.base <> dom def
+R3643:3650 xv6iris.HartMemRun <> mm_after def
+R3656:3657 xv6iris.HartMemAsm <> mm:7 var
+R3654:3654 xv6iris.HartMemAsm <> s:6 var
+R3652:3652 xv6iris.HartMemAsm <> m:5 var
+R3662:3664 stdpp.base <> dom def
+R3666:3667 xv6iris.HartMemAsm <> mm:7 var
+R3942:3947 xv6iris.HartMemRun <> goodmb def
+R3949:3956 xv6iris.HartMemRun <> mm_after def
+R4002:4010 Corelib.Init.Datatypes <> andb_prop thm
+R4002:4010 Corelib.Init.Datatypes <> andb_prop thm
+R4063:4071 Corelib.Init.Datatypes <> andb_prop thm
+R4063:4071 Corelib.Init.Datatypes <> andb_prop thm
+R4103:4104 Corelib.Init.Datatypes <> tt constr
+R4103:4104 Corelib.Init.Datatypes <> tt constr
+R4125:4133 Corelib.Init.Datatypes <> andb_prop thm
+R4125:4133 Corelib.Init.Datatypes <> andb_prop thm
+R4167:4176 xv6iris.RiscvModelBytes <> read_bytes def
+R4181:4183 xv6iris.RiscvLang <> mem proj
+R4187:4206 Riscv.rv64d_types Interface.ReadReq pa proj
+R4167:4176 xv6iris.RiscvModelBytes <> read_bytes def
+R4181:4183 xv6iris.RiscvLang <> mem proj
+R4187:4206 Riscv.rv64d_types Interface.ReadReq pa proj
+R4281:4289 Corelib.Init.Datatypes <> andb_prop thm
+R4281:4289 Corelib.Init.Datatypes <> andb_prop thm
+R4317:4325 Corelib.Init.Datatypes <> andb_prop thm
+R4317:4325 Corelib.Init.Datatypes <> andb_prop thm
+R4363:4365 Corelib.Init.Datatypes <> inl constr
+R4367:4370 Corelib.Init.Datatypes <> None constr
+R4363:4365 Corelib.Init.Datatypes <> inl constr
+R4367:4370 Corelib.Init.Datatypes <> None constr
+R4363:4365 Corelib.Init.Datatypes <> inl constr
+R4367:4370 Corelib.Init.Datatypes <> None constr
+R4392:4406 xv6iris.HartMemRun <> write_bytes_dom thm
+R4392:4406 xv6iris.HartMemRun <> write_bytes_dom thm
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+R4439:4440 Corelib.Init.Datatypes <> tt constr
+prf 4547:4562 <> goodmb_after_dom
+R4581:4584 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4573:4580 Riscv.rv64d_types <> register variant
+R4585:4588 Corelib.Init.Datatypes <> bool ind
+binder 4565:4566 <> Dr:8
+binder 4568:4569 <> Dw:9
+binder 4592:4592 <> E:10
+binder 4594:4594 <> X:11
+R4602:4611 Riscv.rv64d_types Defs monad def
+R4613:4613 xv6iris.HartMemAsm <> E:10 var
+R4615:4615 xv6iris.HartMemAsm <> X:11 var
+binder 4598:4598 <> m:12
+binder 4623:4624 <> E':13
+binder 4626:4626 <> Y:14
+R4634:4643 Riscv.rv64d_types Defs monad def
+R4645:4646 xv6iris.HartMemAsm <> E':13 var
+R4648:4648 xv6iris.HartMemAsm <> Y:14 var
+binder 4630:4630 <> n:15
+R4659:4664 xv6iris.RiscvLang <> mstate rec
+binder 4652:4653 <> s0:16
+binder 4655:4655 <> s:17
+binder 4667:4668 <> mm:18
+R4701:4706 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4694:4696 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4674:4679 xv6iris.HartMemRun <> goodmb def
+R4692:4693 xv6iris.HartMemAsm <> mm:18 var
+R4689:4690 xv6iris.HartMemAsm <> s0:16 var
+R4687:4687 xv6iris.HartMemAsm <> m:12 var
+R4684:4685 xv6iris.HartMemAsm <> Dw:9 var
+R4681:4682 xv6iris.HartMemAsm <> Dr:8 var
+R4697:4700 Corelib.Init.Datatypes <> true constr
+R4742:4744 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4707:4712 xv6iris.HartMemRun <> goodmb def
+R4725:4732 xv6iris.HartMemRun <> mm_after def
+R4739:4740 xv6iris.HartMemAsm <> mm:18 var
+R4736:4737 xv6iris.HartMemAsm <> s0:16 var
+R4734:4734 xv6iris.HartMemAsm <> m:12 var
+R4722:4722 xv6iris.HartMemAsm <> s:17 var
+R4720:4720 xv6iris.HartMemAsm <> n:15 var
+R4717:4718 xv6iris.HartMemAsm <> Dw:9 var
+R4714:4715 xv6iris.HartMemAsm <> Dr:8 var
+R4745:4750 xv6iris.HartMemRun <> goodmb def
+R4762:4763 xv6iris.HartMemAsm <> mm:18 var
+R4760:4760 xv6iris.HartMemAsm <> s:17 var
+R4758:4758 xv6iris.HartMemAsm <> n:15 var
+R4755:4756 xv6iris.HartMemAsm <> Dw:9 var
+R4752:4753 xv6iris.HartMemAsm <> Dr:8 var
+R4792:4801 xv6iris.HartMemRun <> goodmb_dom thm
+R4792:4801 xv6iris.HartMemRun <> goodmb_dom thm
+R4811:4822 xv6iris.HartMemAsm <> mm_after_dom thm
+R4811:4822 xv6iris.HartMemAsm <> mm_after_dom thm
+prf 5088:5094 <> gm_bind
+R5113:5116 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5105:5112 Riscv.rv64d_types <> register variant
+R5117:5120 Corelib.Init.Datatypes <> bool ind
+binder 5097:5098 <> Dr:19
+binder 5100:5101 <> Dw:20
+binder 5124:5124 <> X:21
+binder 5126:5126 <> Y:22
+R5134:5134 Riscv.rv64d_types <> M def
+R5136:5136 xv6iris.HartMemAsm <> X:21 var
+binder 5130:5130 <> m:23
+R5145:5148 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5144:5144 xv6iris.HartMemAsm <> X:21 var
+R5149:5149 Riscv.rv64d_types <> M def
+R5151:5151 xv6iris.HartMemAsm <> Y:22 var
+binder 5140:5140 <> f:24
+R5166:5171 xv6iris.RiscvLang <> mstate rec
+binder 5159:5159 <> s:25
+binder 5161:5162 <> s':26
+binder 5174:5175 <> mm:27
+R5182:5182 xv6iris.HartMemAsm <> X:21 var
+binder 5178:5178 <> x:28
+R5215:5220 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5208:5210 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5189:5194 xv6iris.HartMemRun <> goodmb def
+R5206:5207 xv6iris.HartMemAsm <> mm:27 var
+R5204:5204 xv6iris.HartMemAsm <> s:25 var
+R5202:5202 xv6iris.HartMemAsm <> m:23 var
+R5199:5200 xv6iris.HartMemAsm <> Dw:20 var
+R5196:5197 xv6iris.HartMemAsm <> Dr:19 var
+R5211:5214 Corelib.Init.Datatypes <> true constr
+R5244:5249 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5229:5231 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5221:5224 xv6iris.RiscvExec <> exec def
+R5228:5228 xv6iris.HartMemAsm <> s:25 var
+R5226:5226 xv6iris.HartMemAsm <> m:23 var
+R5232:5235 Corelib.Init.Datatypes <> Some constr
+R5237:5237 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5239:5240 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5243:5243 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5238:5238 xv6iris.HartMemAsm <> x:28 var
+R5241:5242 xv6iris.HartMemAsm <> s':26 var
+R5283:5285 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5250:5255 xv6iris.HartMemRun <> goodmb def
+R5281:5282 xv6iris.HartMemAsm <> mm:27 var
+R5279:5279 xv6iris.HartMemAsm <> s:25 var
+R5264:5272 Riscv.rv64d_types Defs bind def
+R5276:5276 xv6iris.HartMemAsm <> f:24 var
+R5274:5274 xv6iris.HartMemAsm <> m:23 var
+R5260:5261 xv6iris.HartMemAsm <> Dw:20 var
+R5257:5258 xv6iris.HartMemAsm <> Dr:19 var
+R5286:5291 xv6iris.HartMemRun <> goodmb def
+R5308:5309 xv6iris.HartMemAsm <> mm:27 var
+R5305:5306 xv6iris.HartMemAsm <> s':26 var
+R5300:5300 xv6iris.HartMemAsm <> f:24 var
+R5302:5302 xv6iris.HartMemAsm <> x:28 var
+R5296:5297 xv6iris.HartMemAsm <> Dw:20 var
+R5293:5294 xv6iris.HartMemAsm <> Dr:19 var
+R5344:5354 xv6iris.HartMemRun <> goodmb_bind thm
+R5344:5354 xv6iris.HartMemRun <> goodmb_bind thm
+R5344:5354 xv6iris.HartMemRun <> goodmb_bind thm
+R5393:5408 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R5393:5408 xv6iris.HartMemAsm <> goodmb_after_dom thm
+prf 5449:5456 <> gm_bind0
+R5475:5478 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5467:5474 Riscv.rv64d_types <> register variant
+R5479:5482 Corelib.Init.Datatypes <> bool ind
+binder 5459:5460 <> Dr:29
+binder 5462:5463 <> Dw:30
+binder 5486:5486 <> Y:31
+R5494:5494 Riscv.rv64d_types <> M def
+R5496:5499 Corelib.Init.Datatypes <> unit ind
+binder 5490:5490 <> m:32
+R5507:5507 Riscv.rv64d_types <> M def
+R5509:5509 xv6iris.HartMemAsm <> Y:31 var
+binder 5503:5503 <> n:33
+R5524:5529 xv6iris.RiscvLang <> mstate rec
+binder 5517:5517 <> s:34
+binder 5519:5520 <> s':35
+binder 5532:5533 <> mm:36
+R5565:5570 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5558:5560 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5539:5544 xv6iris.HartMemRun <> goodmb def
+R5556:5557 xv6iris.HartMemAsm <> mm:36 var
+R5554:5554 xv6iris.HartMemAsm <> s:34 var
+R5552:5552 xv6iris.HartMemAsm <> m:32 var
+R5549:5550 xv6iris.HartMemAsm <> Dw:30 var
+R5546:5547 xv6iris.HartMemAsm <> Dr:29 var
+R5561:5564 Corelib.Init.Datatypes <> true constr
+R5595:5600 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5579:5581 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5571:5574 xv6iris.RiscvExec <> exec def
+R5578:5578 xv6iris.HartMemAsm <> s:34 var
+R5576:5576 xv6iris.HartMemAsm <> m:32 var
+R5582:5585 Corelib.Init.Datatypes <> Some constr
+R5587:5587 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5590:5591 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5594:5594 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5588:5589 Corelib.Init.Datatypes <> tt constr
+R5592:5593 xv6iris.HartMemAsm <> s':35 var
+R5635:5637 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5601:5606 xv6iris.HartMemRun <> goodmb def
+R5633:5634 xv6iris.HartMemAsm <> mm:36 var
+R5631:5631 xv6iris.HartMemAsm <> s:34 var
+R5615:5624 Riscv.rv64d_types Defs bind0 def
+R5628:5628 xv6iris.HartMemAsm <> n:33 var
+R5626:5626 xv6iris.HartMemAsm <> m:32 var
+R5611:5612 xv6iris.HartMemAsm <> Dw:30 var
+R5608:5609 xv6iris.HartMemAsm <> Dr:29 var
+R5638:5643 xv6iris.HartMemRun <> goodmb def
+R5656:5657 xv6iris.HartMemAsm <> mm:36 var
+R5653:5654 xv6iris.HartMemAsm <> s':35 var
+R5651:5651 xv6iris.HartMemAsm <> n:33 var
+R5648:5649 xv6iris.HartMemAsm <> Dw:30 var
+R5645:5646 xv6iris.HartMemAsm <> Dr:29 var
+R5688:5694 xv6iris.HartMemAsm <> gm_bind thm
+R5725:5726 Corelib.Init.Datatypes <> tt constr
+R5688:5694 xv6iris.HartMemAsm <> gm_bind thm
+R5725:5726 Corelib.Init.Datatypes <> tt constr
+prf 5748:5755 <> gm_bindR
+R5774:5777 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5766:5773 Riscv.rv64d_types <> register variant
+R5778:5781 Corelib.Init.Datatypes <> bool ind
+binder 5758:5759 <> Dr:37
+binder 5761:5762 <> Dw:38
+binder 5785:5785 <> R:39
+binder 5787:5787 <> X:40
+binder 5789:5789 <> Y:41
+R5808:5818 Riscv.rv64d_types Defs monadR def
+R5820:5820 xv6iris.HartMemAsm <> R:39 var
+R5822:5830 Riscv.rv64d_types <> exception ind
+R5832:5832 xv6iris.HartMemAsm <> X:40 var
+binder 5804:5804 <> m:42
+R5841:5844 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5840:5840 xv6iris.HartMemAsm <> X:40 var
+R5845:5855 Riscv.rv64d_types Defs monadR def
+R5857:5857 xv6iris.HartMemAsm <> R:39 var
+R5859:5867 Riscv.rv64d_types <> exception ind
+R5869:5869 xv6iris.HartMemAsm <> Y:41 var
+binder 5836:5836 <> f:43
+R5884:5889 xv6iris.RiscvLang <> mstate rec
+binder 5877:5877 <> s:44
+binder 5879:5880 <> s':45
+binder 5892:5893 <> mm:46
+R5900:5900 xv6iris.HartMemAsm <> X:40 var
+binder 5896:5896 <> x:47
+R5933:5938 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5926:5928 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5907:5912 xv6iris.HartMemRun <> goodmb def
+R5924:5925 xv6iris.HartMemAsm <> mm:46 var
+R5922:5922 xv6iris.HartMemAsm <> s:44 var
+R5920:5920 xv6iris.HartMemAsm <> m:42 var
+R5917:5918 xv6iris.HartMemAsm <> Dw:38 var
+R5914:5915 xv6iris.HartMemAsm <> Dr:37 var
+R5929:5932 Corelib.Init.Datatypes <> true constr
+R5967:5972 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5948:5950 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5939:5943 xv6iris.RiscvTryStep <> execR def
+R5947:5947 xv6iris.HartMemAsm <> s:44 var
+R5945:5945 xv6iris.HartMemAsm <> m:42 var
+R5951:5954 Corelib.Init.Datatypes <> Some constr
+R5956:5956 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5962:5963 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5966:5966 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5957:5959 Corelib.Init.Datatypes <> inr constr
+R5961:5961 xv6iris.HartMemAsm <> x:47 var
+R5964:5965 xv6iris.HartMemAsm <> s':45 var
+R6006:6008 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5973:5978 xv6iris.HartMemRun <> goodmb def
+R6004:6005 xv6iris.HartMemAsm <> mm:46 var
+R6002:6002 xv6iris.HartMemAsm <> s:44 var
+R5987:5995 Riscv.rv64d_types Defs bind def
+R5999:5999 xv6iris.HartMemAsm <> f:43 var
+R5997:5997 xv6iris.HartMemAsm <> m:42 var
+R5983:5984 xv6iris.HartMemAsm <> Dw:38 var
+R5980:5981 xv6iris.HartMemAsm <> Dr:37 var
+R6009:6014 xv6iris.HartMemRun <> goodmb def
+R6031:6032 xv6iris.HartMemAsm <> mm:46 var
+R6028:6029 xv6iris.HartMemAsm <> s':45 var
+R6023:6023 xv6iris.HartMemAsm <> f:43 var
+R6025:6025 xv6iris.HartMemAsm <> x:47 var
+R6019:6020 xv6iris.HartMemAsm <> Dw:38 var
+R6016:6017 xv6iris.HartMemAsm <> Dr:37 var
+R6067:6078 xv6iris.HartMemRun <> goodmb_bindR thm
+R6067:6078 xv6iris.HartMemRun <> goodmb_bindR thm
+R6067:6078 xv6iris.HartMemRun <> goodmb_bindR thm
+R6117:6132 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R6117:6132 xv6iris.HartMemAsm <> goodmb_after_dom thm
+prf 6173:6181 <> gm_bind0R
+R6200:6203 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6192:6199 Riscv.rv64d_types <> register variant
+R6204:6207 Corelib.Init.Datatypes <> bool ind
+binder 6184:6185 <> Dr:48
+binder 6187:6188 <> Dw:49
+binder 6211:6211 <> R:50
+binder 6213:6213 <> Y:51
+R6232:6242 Riscv.rv64d_types Defs monadR def
+R6244:6244 xv6iris.HartMemAsm <> R:50 var
+R6246:6254 Riscv.rv64d_types <> exception ind
+R6256:6259 Corelib.Init.Datatypes <> unit ind
+binder 6228:6228 <> m:52
+R6267:6277 Riscv.rv64d_types Defs monadR def
+R6279:6279 xv6iris.HartMemAsm <> R:50 var
+R6281:6289 Riscv.rv64d_types <> exception ind
+R6291:6291 xv6iris.HartMemAsm <> Y:51 var
+binder 6263:6263 <> n:53
+R6306:6311 xv6iris.RiscvLang <> mstate rec
+binder 6299:6299 <> s:54
+binder 6301:6302 <> s':55
+binder 6314:6315 <> mm:56
+R6347:6352 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6340:6342 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6321:6326 xv6iris.HartMemRun <> goodmb def
+R6338:6339 xv6iris.HartMemAsm <> mm:56 var
+R6336:6336 xv6iris.HartMemAsm <> s:54 var
+R6334:6334 xv6iris.HartMemAsm <> m:52 var
+R6331:6332 xv6iris.HartMemAsm <> Dw:49 var
+R6328:6329 xv6iris.HartMemAsm <> Dr:48 var
+R6343:6346 Corelib.Init.Datatypes <> true constr
+R6382:6387 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6362:6364 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6353:6357 xv6iris.RiscvTryStep <> execR def
+R6361:6361 xv6iris.HartMemAsm <> s:54 var
+R6359:6359 xv6iris.HartMemAsm <> m:52 var
+R6365:6368 Corelib.Init.Datatypes <> Some constr
+R6370:6370 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6377:6378 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6381:6381 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6371:6373 Corelib.Init.Datatypes <> inr constr
+R6375:6376 Corelib.Init.Datatypes <> tt constr
+R6379:6380 xv6iris.HartMemAsm <> s':55 var
+R6422:6424 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6388:6393 xv6iris.HartMemRun <> goodmb def
+R6420:6421 xv6iris.HartMemAsm <> mm:56 var
+R6418:6418 xv6iris.HartMemAsm <> s:54 var
+R6402:6411 Riscv.rv64d_types Defs bind0 def
+R6415:6415 xv6iris.HartMemAsm <> n:53 var
+R6413:6413 xv6iris.HartMemAsm <> m:52 var
+R6398:6399 xv6iris.HartMemAsm <> Dw:49 var
+R6395:6396 xv6iris.HartMemAsm <> Dr:48 var
+R6425:6430 xv6iris.HartMemRun <> goodmb def
+R6443:6444 xv6iris.HartMemAsm <> mm:56 var
+R6440:6441 xv6iris.HartMemAsm <> s':55 var
+R6438:6438 xv6iris.HartMemAsm <> n:53 var
+R6435:6436 xv6iris.HartMemAsm <> Dw:49 var
+R6432:6433 xv6iris.HartMemAsm <> Dr:48 var
+R6475:6482 xv6iris.HartMemAsm <> gm_bindR thm
+R6513:6514 Corelib.Init.Datatypes <> tt constr
+R6475:6482 xv6iris.HartMemAsm <> gm_bindR thm
+R6513:6514 Corelib.Init.Datatypes <> tt constr
+prf 6536:6547 <> gm_bind_nest
+R6566:6569 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6558:6565 Riscv.rv64d_types <> register variant
+R6570:6573 Corelib.Init.Datatypes <> bool ind
+binder 6550:6551 <> Dr:57
+binder 6553:6554 <> Dw:58
+binder 6577:6577 <> X:59
+binder 6579:6579 <> Y:60
+binder 6581:6581 <> Z:61
+R6600:6600 Riscv.rv64d_types <> M def
+R6602:6602 xv6iris.HartMemAsm <> X:59 var
+binder 6596:6596 <> m:62
+R6611:6614 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6610:6610 xv6iris.HartMemAsm <> X:59 var
+R6615:6615 Riscv.rv64d_types <> M def
+R6617:6617 xv6iris.HartMemAsm <> Y:60 var
+binder 6606:6606 <> g:63
+R6626:6629 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6625:6625 xv6iris.HartMemAsm <> Y:60 var
+R6630:6630 Riscv.rv64d_types <> M def
+R6632:6632 xv6iris.HartMemAsm <> Z:61 var
+binder 6621:6621 <> f:64
+R6643:6648 xv6iris.RiscvLang <> mstate rec
+binder 6636:6636 <> s:65
+binder 6638:6639 <> s':66
+binder 6651:6652 <> mm:67
+R6659:6659 xv6iris.HartMemAsm <> X:59 var
+binder 6655:6655 <> x:68
+R6692:6697 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6685:6687 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6666:6671 xv6iris.HartMemRun <> goodmb def
+R6683:6684 xv6iris.HartMemAsm <> mm:67 var
+R6681:6681 xv6iris.HartMemAsm <> s:65 var
+R6679:6679 xv6iris.HartMemAsm <> m:62 var
+R6676:6677 xv6iris.HartMemAsm <> Dw:58 var
+R6673:6674 xv6iris.HartMemAsm <> Dr:57 var
+R6688:6691 Corelib.Init.Datatypes <> true constr
+R6721:6726 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6706:6708 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6698:6701 xv6iris.RiscvExec <> exec def
+R6705:6705 xv6iris.HartMemAsm <> s:65 var
+R6703:6703 xv6iris.HartMemAsm <> m:62 var
+R6709:6712 Corelib.Init.Datatypes <> Some constr
+R6714:6714 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6716:6717 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6720:6720 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6715:6715 xv6iris.HartMemAsm <> x:68 var
+R6718:6719 xv6iris.HartMemAsm <> s':66 var
+R6774:6778 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6727:6732 xv6iris.HartMemRun <> goodmb def
+R6772:6773 xv6iris.HartMemAsm <> mm:67 var
+R6770:6770 xv6iris.HartMemAsm <> s:65 var
+R6741:6749 Riscv.rv64d_types Defs bind def
+R6767:6767 xv6iris.HartMemAsm <> f:64 var
+R6752:6760 Riscv.rv64d_types Defs bind def
+R6764:6764 xv6iris.HartMemAsm <> g:63 var
+R6762:6762 xv6iris.HartMemAsm <> m:62 var
+R6737:6738 xv6iris.HartMemAsm <> Dw:58 var
+R6734:6735 xv6iris.HartMemAsm <> Dr:57 var
+R6779:6784 xv6iris.HartMemRun <> goodmb def
+R6815:6816 xv6iris.HartMemAsm <> mm:67 var
+R6812:6813 xv6iris.HartMemAsm <> s':66 var
+R6793:6801 Riscv.rv64d_types Defs bind def
+R6809:6809 xv6iris.HartMemAsm <> f:64 var
+R6804:6804 xv6iris.HartMemAsm <> g:63 var
+R6806:6806 xv6iris.HartMemAsm <> x:68 var
+R6789:6790 xv6iris.HartMemAsm <> Dw:58 var
+R6786:6787 xv6iris.HartMemAsm <> Dr:57 var
+R6851:6866 xv6iris.HartMemRun <> goodmb_bind_nest thm
+R6851:6866 xv6iris.HartMemRun <> goodmb_bind_nest thm
+R6851:6866 xv6iris.HartMemRun <> goodmb_bind_nest thm
+R6907:6922 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R6933:6941 Riscv.rv64d_types Defs bind def
+R6907:6922 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R6933:6941 Riscv.rv64d_types Defs bind def
+prf 7368:7385 <> goodmb_liftR_execR
+binder 7388:7388 <> R:69
+binder 7390:7390 <> X:70
+R7398:7398 Riscv.rv64d_types <> M def
+R7400:7400 xv6iris.HartMemAsm <> X:70 var
+binder 7394:7394 <> m:71
+R7411:7416 xv6iris.RiscvLang <> mstate rec
+binder 7404:7404 <> s:72
+binder 7406:7407 <> s':73
+R7424:7424 xv6iris.HartMemAsm <> X:70 var
+binder 7420:7420 <> x:74
+R7454:7459 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7439:7441 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7431:7434 xv6iris.RiscvExec <> exec def
+R7438:7438 xv6iris.HartMemAsm <> s:72 var
+R7436:7436 xv6iris.HartMemAsm <> m:71 var
+R7442:7445 Corelib.Init.Datatypes <> Some constr
+R7447:7447 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7449:7450 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7453:7453 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7448:7448 xv6iris.HartMemAsm <> x:74 var
+R7451:7452 xv6iris.HartMemAsm <> s':73 var
+R7491:7493 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7460:7464 xv6iris.RiscvTryStep <> execR def
+R7490:7490 xv6iris.HartMemAsm <> s:72 var
+R7467:7476 Riscv.rv64d_types Defs liftR def
+R7487:7487 xv6iris.HartMemAsm <> m:71 var
+R7484:7484 xv6iris.HartMemAsm <> R:69 var
+R7494:7497 Corelib.Init.Datatypes <> Some constr
+R7499:7499 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7505:7506 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7509:7509 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7500:7502 Corelib.Init.Datatypes <> inr constr
+R7504:7504 xv6iris.HartMemAsm <> x:74 var
+R7507:7508 xv6iris.HartMemAsm <> s':73 var
+R7538:7548 xv6iris.RiscvTryStep <> execR_liftR thm
+R7538:7548 xv6iris.RiscvTryStep <> execR_liftR thm
+R7538:7548 xv6iris.RiscvTryStep <> execR_liftR thm
+prf 7588:7599 <> gm_liftR_seq
+R7618:7621 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7610:7617 Riscv.rv64d_types <> register variant
+R7622:7625 Corelib.Init.Datatypes <> bool ind
+binder 7602:7603 <> Dr:75
+binder 7605:7606 <> Dw:76
+binder 7629:7629 <> R:77
+binder 7631:7631 <> X:78
+binder 7633:7633 <> Y:79
+R7645:7645 Riscv.rv64d_types <> M def
+R7647:7647 xv6iris.HartMemAsm <> Y:79 var
+binder 7641:7641 <> m:80
+R7656:7659 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7655:7655 xv6iris.HartMemAsm <> Y:79 var
+R7660:7670 Riscv.rv64d_types Defs monadR def
+R7672:7672 xv6iris.HartMemAsm <> R:77 var
+R7674:7682 Riscv.rv64d_types <> exception ind
+R7684:7684 xv6iris.HartMemAsm <> X:78 var
+binder 7651:7651 <> f:81
+R7699:7704 xv6iris.RiscvLang <> mstate rec
+binder 7692:7692 <> s:82
+binder 7694:7695 <> s':83
+binder 7707:7708 <> mm:84
+R7715:7715 xv6iris.HartMemAsm <> Y:79 var
+binder 7711:7711 <> y:85
+R7748:7753 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7741:7743 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7722:7727 xv6iris.HartMemRun <> goodmb def
+R7739:7740 xv6iris.HartMemAsm <> mm:84 var
+R7737:7737 xv6iris.HartMemAsm <> s:82 var
+R7735:7735 xv6iris.HartMemAsm <> m:80 var
+R7732:7733 xv6iris.HartMemAsm <> Dw:76 var
+R7729:7730 xv6iris.HartMemAsm <> Dr:75 var
+R7744:7747 Corelib.Init.Datatypes <> true constr
+R7777:7782 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7762:7764 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7754:7757 xv6iris.RiscvExec <> exec def
+R7761:7761 xv6iris.HartMemAsm <> s:82 var
+R7759:7759 xv6iris.HartMemAsm <> m:80 var
+R7765:7768 Corelib.Init.Datatypes <> Some constr
+R7770:7770 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7772:7773 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7776:7776 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7771:7771 xv6iris.HartMemAsm <> y:85 var
+R7774:7775 xv6iris.HartMemAsm <> s':83 var
+R7829:7831 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7783:7788 xv6iris.HartMemRun <> goodmb def
+R7827:7828 xv6iris.HartMemAsm <> mm:84 var
+R7825:7825 xv6iris.HartMemAsm <> s:82 var
+R7797:7805 Riscv.rv64d_types Defs bind def
+R7822:7822 xv6iris.HartMemAsm <> f:81 var
+R7808:7817 Riscv.rv64d_types Defs liftR def
+R7819:7819 xv6iris.HartMemAsm <> m:80 var
+R7793:7794 xv6iris.HartMemAsm <> Dw:76 var
+R7790:7791 xv6iris.HartMemAsm <> Dr:75 var
+R7832:7837 xv6iris.HartMemRun <> goodmb def
+R7854:7855 xv6iris.HartMemAsm <> mm:84 var
+R7851:7852 xv6iris.HartMemAsm <> s':83 var
+R7846:7846 xv6iris.HartMemAsm <> f:81 var
+R7848:7848 xv6iris.HartMemAsm <> y:85 var
+R7842:7843 xv6iris.HartMemAsm <> Dw:76 var
+R7839:7840 xv6iris.HartMemAsm <> Dr:75 var
+R7890:7897 xv6iris.HartMemAsm <> gm_bindR thm
+R7975:7992 xv6iris.HartMemAsm <> goodmb_liftR_execR thm
+R7944:7955 xv6iris.HartMemRun <> goodmb_liftR thm
+R7906:7915 Riscv.rv64d_types Defs liftR def
+R7890:7897 xv6iris.HartMemAsm <> gm_bindR thm
+R7975:7992 xv6iris.HartMemAsm <> goodmb_liftR_execR thm
+R7944:7955 xv6iris.HartMemRun <> goodmb_liftR thm
+R7906:7915 Riscv.rv64d_types Defs liftR def
+prf 8021:8033 <> gm_liftR_seq0
+R8052:8055 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8044:8051 Riscv.rv64d_types <> register variant
+R8056:8059 Corelib.Init.Datatypes <> bool ind
+binder 8036:8037 <> Dr:86
+binder 8039:8040 <> Dw:87
+binder 8063:8063 <> R:88
+binder 8065:8065 <> X:89
+R8077:8077 Riscv.rv64d_types <> M def
+R8079:8082 Corelib.Init.Datatypes <> unit ind
+binder 8073:8073 <> m:90
+R8090:8100 Riscv.rv64d_types Defs monadR def
+R8102:8102 xv6iris.HartMemAsm <> R:88 var
+R8104:8112 Riscv.rv64d_types <> exception ind
+R8114:8114 xv6iris.HartMemAsm <> X:89 var
+binder 8086:8086 <> n:91
+R8125:8130 xv6iris.RiscvLang <> mstate rec
+binder 8118:8118 <> s:92
+binder 8120:8121 <> s':93
+binder 8133:8134 <> mm:94
+R8166:8171 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8159:8161 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8140:8145 xv6iris.HartMemRun <> goodmb def
+R8157:8158 xv6iris.HartMemAsm <> mm:94 var
+R8155:8155 xv6iris.HartMemAsm <> s:92 var
+R8153:8153 xv6iris.HartMemAsm <> m:90 var
+R8150:8151 xv6iris.HartMemAsm <> Dw:87 var
+R8147:8148 xv6iris.HartMemAsm <> Dr:86 var
+R8162:8165 Corelib.Init.Datatypes <> true constr
+R8196:8201 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8180:8182 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8172:8175 xv6iris.RiscvExec <> exec def
+R8179:8179 xv6iris.HartMemAsm <> s:92 var
+R8177:8177 xv6iris.HartMemAsm <> m:90 var
+R8183:8186 Corelib.Init.Datatypes <> Some constr
+R8188:8188 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8191:8192 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8195:8195 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8189:8190 Corelib.Init.Datatypes <> tt constr
+R8193:8194 xv6iris.HartMemAsm <> s':93 var
+R8249:8251 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8202:8207 xv6iris.HartMemRun <> goodmb def
+R8247:8248 xv6iris.HartMemAsm <> mm:94 var
+R8245:8245 xv6iris.HartMemAsm <> s:92 var
+R8216:8225 Riscv.rv64d_types Defs bind0 def
+R8242:8242 xv6iris.HartMemAsm <> n:91 var
+R8228:8237 Riscv.rv64d_types Defs liftR def
+R8239:8239 xv6iris.HartMemAsm <> m:90 var
+R8212:8213 xv6iris.HartMemAsm <> Dw:87 var
+R8209:8210 xv6iris.HartMemAsm <> Dr:86 var
+R8252:8257 xv6iris.HartMemRun <> goodmb def
+R8270:8271 xv6iris.HartMemAsm <> mm:94 var
+R8267:8268 xv6iris.HartMemAsm <> s':93 var
+R8265:8265 xv6iris.HartMemAsm <> n:91 var
+R8262:8263 xv6iris.HartMemAsm <> Dw:87 var
+R8259:8260 xv6iris.HartMemAsm <> Dr:86 var
+R8304:8315 xv6iris.HartMemAsm <> gm_liftR_seq thm
+R8346:8347 Corelib.Init.Datatypes <> tt constr
+R8304:8315 xv6iris.HartMemAsm <> gm_liftR_seq thm
+R8346:8347 Corelib.Init.Datatypes <> tt constr
+prf 8602:8613 <> gm_and_boolM
+R8632:8635 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8624:8631 Riscv.rv64d_types <> register variant
+R8636:8639 Corelib.Init.Datatypes <> bool ind
+binder 8616:8617 <> Dr:95
+binder 8619:8620 <> Dw:96
+R8649:8649 Riscv.rv64d_types <> M def
+R8651:8654 Corelib.Init.Datatypes <> bool ind
+binder 8643:8643 <> l:97
+binder 8645:8645 <> r:98
+R8669:8674 xv6iris.RiscvLang <> mstate rec
+binder 8662:8662 <> s:99
+binder 8664:8665 <> sl:100
+binder 8677:8678 <> mm:101
+R8686:8689 Corelib.Init.Datatypes <> bool ind
+binder 8681:8682 <> bl:102
+R8722:8727 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8715:8717 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8696:8701 xv6iris.HartMemRun <> goodmb def
+R8713:8714 xv6iris.HartMemAsm <> mm:101 var
+R8711:8711 xv6iris.HartMemAsm <> s:99 var
+R8709:8709 xv6iris.HartMemAsm <> l:97 var
+R8706:8707 xv6iris.HartMemAsm <> Dw:96 var
+R8703:8704 xv6iris.HartMemAsm <> Dr:95 var
+R8718:8721 Corelib.Init.Datatypes <> true constr
+R8752:8757 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8736:8738 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8728:8731 xv6iris.RiscvExec <> exec def
+R8735:8735 xv6iris.HartMemAsm <> s:99 var
+R8733:8733 xv6iris.HartMemAsm <> l:97 var
+R8739:8742 Corelib.Init.Datatypes <> Some constr
+R8744:8744 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8747:8748 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8751:8751 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8745:8746 xv6iris.HartMemAsm <> bl:102 var
+R8749:8750 xv6iris.HartMemAsm <> sl:100 var
+R8796:8801 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8843:8843 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8758:8763 xv6iris.HartMemRun <> goodmb def
+R8794:8795 xv6iris.HartMemAsm <> mm:101 var
+R8792:8792 xv6iris.HartMemAsm <> s:99 var
+R8772:8785 Riscv.rv64d_types Defs and_boolM def
+R8789:8789 xv6iris.HartMemAsm <> r:98 var
+R8787:8787 xv6iris.HartMemAsm <> l:97 var
+R8768:8769 xv6iris.HartMemAsm <> Dw:96 var
+R8765:8766 xv6iris.HartMemAsm <> Dr:95 var
+R8805:8806 xv6iris.HartMemAsm <> bl:102 var
+R8839:8842 Corelib.Init.Datatypes <> true constr
+R8813:8818 xv6iris.HartMemRun <> goodmb def
+R8831:8832 xv6iris.HartMemAsm <> mm:101 var
+R8828:8829 xv6iris.HartMemAsm <> sl:100 var
+R8826:8826 xv6iris.HartMemAsm <> r:98 var
+R8823:8824 xv6iris.HartMemAsm <> Dw:96 var
+R8820:8821 xv6iris.HartMemAsm <> Dr:95 var
+R8876:8889 Riscv.rv64d_types Defs and_boolM def
+R8903:8909 xv6iris.HartMemAsm <> gm_bind thm
+R8903:8909 xv6iris.HartMemAsm <> gm_bind thm
+R8903:8909 xv6iris.HartMemAsm <> gm_bind thm
+prf 8968:8978 <> gm_or_boolM
+R8997:9000 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8989:8996 Riscv.rv64d_types <> register variant
+R9001:9004 Corelib.Init.Datatypes <> bool ind
+binder 8981:8982 <> Dr:103
+binder 8984:8985 <> Dw:104
+R9014:9014 Riscv.rv64d_types <> M def
+R9016:9019 Corelib.Init.Datatypes <> bool ind
+binder 9008:9008 <> l:105
+binder 9010:9010 <> r:106
+R9034:9039 xv6iris.RiscvLang <> mstate rec
+binder 9027:9027 <> s:107
+binder 9029:9030 <> sl:108
+binder 9042:9043 <> mm:109
+R9051:9054 Corelib.Init.Datatypes <> bool ind
+binder 9046:9047 <> bl:110
+R9087:9092 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9080:9082 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9061:9066 xv6iris.HartMemRun <> goodmb def
+R9078:9079 xv6iris.HartMemAsm <> mm:109 var
+R9076:9076 xv6iris.HartMemAsm <> s:107 var
+R9074:9074 xv6iris.HartMemAsm <> l:105 var
+R9071:9072 xv6iris.HartMemAsm <> Dw:104 var
+R9068:9069 xv6iris.HartMemAsm <> Dr:103 var
+R9083:9086 Corelib.Init.Datatypes <> true constr
+R9117:9122 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9101:9103 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9093:9096 xv6iris.RiscvExec <> exec def
+R9100:9100 xv6iris.HartMemAsm <> s:107 var
+R9098:9098 xv6iris.HartMemAsm <> l:105 var
+R9104:9107 Corelib.Init.Datatypes <> Some constr
+R9109:9109 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9112:9113 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9116:9116 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9110:9111 xv6iris.HartMemAsm <> bl:110 var
+R9114:9115 xv6iris.HartMemAsm <> sl:108 var
+R9160:9165 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9207:9207 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9123:9128 xv6iris.HartMemRun <> goodmb def
+R9158:9159 xv6iris.HartMemAsm <> mm:109 var
+R9156:9156 xv6iris.HartMemAsm <> s:107 var
+R9137:9149 Riscv.rv64d_types Defs or_boolM def
+R9153:9153 xv6iris.HartMemAsm <> r:106 var
+R9151:9151 xv6iris.HartMemAsm <> l:105 var
+R9133:9134 xv6iris.HartMemAsm <> Dw:104 var
+R9130:9131 xv6iris.HartMemAsm <> Dr:103 var
+R9169:9170 xv6iris.HartMemAsm <> bl:110 var
+R9187:9192 xv6iris.HartMemRun <> goodmb def
+R9205:9206 xv6iris.HartMemAsm <> mm:109 var
+R9202:9203 xv6iris.HartMemAsm <> sl:108 var
+R9200:9200 xv6iris.HartMemAsm <> r:106 var
+R9197:9198 xv6iris.HartMemAsm <> Dw:104 var
+R9194:9195 xv6iris.HartMemAsm <> Dr:103 var
+R9177:9180 Corelib.Init.Datatypes <> true constr
+R9240:9252 Riscv.rv64d_types Defs or_boolM def
+R9266:9272 xv6iris.HartMemAsm <> gm_bind thm
+R9266:9272 xv6iris.HartMemAsm <> gm_bind thm
+R9266:9272 xv6iris.HartMemAsm <> gm_bind thm
+prf 9801:9817 <> mcer_early_return
+binder 9820:9820 <> X:111
+binder 9822:9822 <> Y:112
+R9837:9837 xv6iris.HartMemAsm <> X:111 var
+binder 9833:9833 <> r:113
+R9850:9853 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9849:9849 xv6iris.HartMemAsm <> Y:112 var
+R9854:9864 Riscv.rv64d_types Defs monadR def
+R9866:9866 xv6iris.HartMemAsm <> X:111 var
+R9868:9876 Riscv.rv64d_types <> exception ind
+R9878:9878 xv6iris.HartMemAsm <> X:111 var
+binder 9845:9845 <> K:114
+R9944:9949 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9970:9970 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9885:9907 Riscv.rv64d_types Defs catch_early_return def
+R9910:9918 Riscv.rv64d_types Defs bind def
+R9942:9942 xv6iris.HartMemAsm <> K:114 var
+R9921:9937 Riscv.rv64d_types Defs early_return def
+R9939:9939 xv6iris.HartMemAsm <> r:113 var
+R9967:9967 Riscv.rv64d_types <> M def
+R9969:9969 xv6iris.HartMemAsm <> X:111 var
+R9950:9961 Riscv.rv64d_types Defs returnm def
+R9963:9963 xv6iris.HartMemAsm <> r:113 var
+prf 10005:10022 <> mcer_early_return0
+binder 10025:10025 <> X:115
+R10040:10040 xv6iris.HartMemAsm <> X:115 var
+binder 10036:10036 <> r:116
+R10048:10058 Riscv.rv64d_types Defs monadR def
+R10060:10060 xv6iris.HartMemAsm <> X:115 var
+R10062:10070 Riscv.rv64d_types <> exception ind
+R10072:10072 xv6iris.HartMemAsm <> X:115 var
+binder 10044:10044 <> K:117
+R10139:10144 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10165:10165 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10079:10101 Riscv.rv64d_types Defs catch_early_return def
+R10104:10113 Riscv.rv64d_types Defs bind0 def
+R10137:10137 xv6iris.HartMemAsm <> K:117 var
+R10116:10132 Riscv.rv64d_types Defs early_return def
+R10134:10134 xv6iris.HartMemAsm <> r:116 var
+R10162:10162 Riscv.rv64d_types <> M def
+R10164:10164 xv6iris.HartMemAsm <> X:115 var
+R10145:10156 Riscv.rv64d_types Defs returnm def
+R10158:10158 xv6iris.HartMemAsm <> r:116 var
+prf 10200:10210 <> gm_cer_bind
+R10229:10232 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10221:10228 Riscv.rv64d_types <> register variant
+R10233:10236 Corelib.Init.Datatypes <> bool ind
+binder 10213:10214 <> Dr:118
+binder 10216:10217 <> Dw:119
+binder 10240:10240 <> X:120
+binder 10242:10242 <> Y:121
+R10261:10271 Riscv.rv64d_types Defs monadR def
+R10273:10273 xv6iris.HartMemAsm <> X:120 var
+R10275:10283 Riscv.rv64d_types <> exception ind
+R10285:10285 xv6iris.HartMemAsm <> Y:121 var
+binder 10257:10257 <> m:122
+R10294:10297 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10293:10293 xv6iris.HartMemAsm <> Y:121 var
+R10298:10308 Riscv.rv64d_types Defs monadR def
+R10310:10310 xv6iris.HartMemAsm <> X:120 var
+R10312:10320 Riscv.rv64d_types <> exception ind
+R10322:10322 xv6iris.HartMemAsm <> X:120 var
+binder 10289:10289 <> f:123
+R10337:10342 xv6iris.RiscvLang <> mstate rec
+binder 10330:10330 <> s:124
+binder 10332:10333 <> s':125
+binder 10345:10346 <> mm:126
+R10353:10353 xv6iris.HartMemAsm <> Y:121 var
+binder 10349:10349 <> x:127
+R10386:10391 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10379:10381 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10360:10365 xv6iris.HartMemRun <> goodmb def
+R10377:10378 xv6iris.HartMemAsm <> mm:126 var
+R10375:10375 xv6iris.HartMemAsm <> s:124 var
+R10373:10373 xv6iris.HartMemAsm <> m:122 var
+R10370:10371 xv6iris.HartMemAsm <> Dw:119 var
+R10367:10368 xv6iris.HartMemAsm <> Dr:118 var
+R10382:10385 Corelib.Init.Datatypes <> true constr
+R10420:10425 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10401:10403 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10392:10396 xv6iris.RiscvTryStep <> execR def
+R10400:10400 xv6iris.HartMemAsm <> s:124 var
+R10398:10398 xv6iris.HartMemAsm <> m:122 var
+R10404:10407 Corelib.Init.Datatypes <> Some constr
+R10409:10409 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10415:10416 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10419:10419 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10410:10412 Corelib.Init.Datatypes <> inr constr
+R10414:10414 xv6iris.HartMemAsm <> x:127 var
+R10417:10418 xv6iris.HartMemAsm <> s':125 var
+R10485:10489 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10426:10431 xv6iris.HartMemRun <> goodmb def
+R10483:10484 xv6iris.HartMemAsm <> mm:126 var
+R10481:10481 xv6iris.HartMemAsm <> s:124 var
+R10440:10462 Riscv.rv64d_types Defs catch_early_return def
+R10465:10473 Riscv.rv64d_types Defs bind def
+R10477:10477 xv6iris.HartMemAsm <> f:123 var
+R10475:10475 xv6iris.HartMemAsm <> m:122 var
+R10436:10437 xv6iris.HartMemAsm <> Dw:119 var
+R10433:10434 xv6iris.HartMemAsm <> Dr:118 var
+R10490:10495 xv6iris.HartMemRun <> goodmb def
+R10538:10539 xv6iris.HartMemAsm <> mm:126 var
+R10535:10536 xv6iris.HartMemAsm <> s':125 var
+R10504:10526 Riscv.rv64d_types Defs catch_early_return def
+R10529:10529 xv6iris.HartMemAsm <> f:123 var
+R10531:10531 xv6iris.HartMemAsm <> x:127 var
+R10500:10501 xv6iris.HartMemAsm <> Dw:119 var
+R10497:10498 xv6iris.HartMemAsm <> Dr:118 var
+R10574:10588 xv6iris.HartMemRun <> goodmb_cer_bind thm
+R10574:10588 xv6iris.HartMemRun <> goodmb_cer_bind thm
+R10574:10588 xv6iris.HartMemRun <> goodmb_cer_bind thm
+R10627:10642 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R10653:10675 Riscv.rv64d_types Defs catch_early_return def
+R10627:10642 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R10653:10675 Riscv.rv64d_types Defs catch_early_return def
+prf 10709:10720 <> gm_cer_bind0
+R10739:10742 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10731:10738 Riscv.rv64d_types <> register variant
+R10743:10746 Corelib.Init.Datatypes <> bool ind
+binder 10723:10724 <> Dr:128
+binder 10726:10727 <> Dw:129
+binder 10750:10750 <> X:130
+R10769:10779 Riscv.rv64d_types Defs monadR def
+R10781:10781 xv6iris.HartMemAsm <> X:130 var
+R10783:10791 Riscv.rv64d_types <> exception ind
+R10793:10796 Corelib.Init.Datatypes <> unit ind
+binder 10765:10765 <> m:131
+R10804:10814 Riscv.rv64d_types Defs monadR def
+R10816:10816 xv6iris.HartMemAsm <> X:130 var
+R10818:10826 Riscv.rv64d_types <> exception ind
+R10828:10828 xv6iris.HartMemAsm <> X:130 var
+binder 10800:10800 <> n:132
+R10843:10848 xv6iris.RiscvLang <> mstate rec
+binder 10836:10836 <> s:133
+binder 10838:10839 <> s':134
+binder 10851:10852 <> mm:135
+R10884:10889 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10877:10879 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10858:10863 xv6iris.HartMemRun <> goodmb def
+R10875:10876 xv6iris.HartMemAsm <> mm:135 var
+R10873:10873 xv6iris.HartMemAsm <> s:133 var
+R10871:10871 xv6iris.HartMemAsm <> m:131 var
+R10868:10869 xv6iris.HartMemAsm <> Dw:129 var
+R10865:10866 xv6iris.HartMemAsm <> Dr:128 var
+R10880:10883 Corelib.Init.Datatypes <> true constr
+R10919:10924 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10899:10901 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10890:10894 xv6iris.RiscvTryStep <> execR def
+R10898:10898 xv6iris.HartMemAsm <> s:133 var
+R10896:10896 xv6iris.HartMemAsm <> m:131 var
+R10902:10905 Corelib.Init.Datatypes <> Some constr
+R10907:10907 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10914:10915 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10918:10918 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10908:10910 Corelib.Init.Datatypes <> inr constr
+R10912:10913 Corelib.Init.Datatypes <> tt constr
+R10916:10917 xv6iris.HartMemAsm <> s':134 var
+R10985:10989 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10925:10930 xv6iris.HartMemRun <> goodmb def
+R10983:10984 xv6iris.HartMemAsm <> mm:135 var
+R10981:10981 xv6iris.HartMemAsm <> s:133 var
+R10939:10961 Riscv.rv64d_types Defs catch_early_return def
+R10964:10973 Riscv.rv64d_types Defs bind0 def
+R10977:10977 xv6iris.HartMemAsm <> n:132 var
+R10975:10975 xv6iris.HartMemAsm <> m:131 var
+R10935:10936 xv6iris.HartMemAsm <> Dw:129 var
+R10932:10933 xv6iris.HartMemAsm <> Dr:128 var
+R10990:10995 xv6iris.HartMemRun <> goodmb def
+R11034:11035 xv6iris.HartMemAsm <> mm:135 var
+R11031:11032 xv6iris.HartMemAsm <> s':134 var
+R11004:11026 Riscv.rv64d_types Defs catch_early_return def
+R11028:11028 xv6iris.HartMemAsm <> n:132 var
+R11000:11001 xv6iris.HartMemAsm <> Dw:129 var
+R10997:10998 xv6iris.HartMemAsm <> Dr:128 var
+R11066:11076 xv6iris.HartMemAsm <> gm_cer_bind thm
+R11107:11108 Corelib.Init.Datatypes <> tt constr
+R11066:11076 xv6iris.HartMemAsm <> gm_cer_bind thm
+R11107:11108 Corelib.Init.Datatypes <> tt constr
+prf 11130:11145 <> gm_cer_bind_nest
+R11164:11167 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11156:11163 Riscv.rv64d_types <> register variant
+R11168:11171 Corelib.Init.Datatypes <> bool ind
+binder 11148:11149 <> Dr:136
+binder 11151:11152 <> Dw:137
+binder 11175:11175 <> X:138
+binder 11177:11177 <> Y:139
+binder 11179:11179 <> Z:140
+R11198:11208 Riscv.rv64d_types Defs monadR def
+R11210:11210 xv6iris.HartMemAsm <> X:138 var
+R11212:11220 Riscv.rv64d_types <> exception ind
+R11222:11222 xv6iris.HartMemAsm <> Y:139 var
+binder 11194:11194 <> m:141
+R11231:11234 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11230:11230 xv6iris.HartMemAsm <> Y:139 var
+R11235:11245 Riscv.rv64d_types Defs monadR def
+R11247:11247 xv6iris.HartMemAsm <> X:138 var
+R11249:11257 Riscv.rv64d_types <> exception ind
+R11259:11259 xv6iris.HartMemAsm <> Z:140 var
+binder 11226:11226 <> g:142
+R11272:11275 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11271:11271 xv6iris.HartMemAsm <> Z:140 var
+R11276:11286 Riscv.rv64d_types Defs monadR def
+R11288:11288 xv6iris.HartMemAsm <> X:138 var
+R11290:11298 Riscv.rv64d_types <> exception ind
+R11300:11300 xv6iris.HartMemAsm <> X:138 var
+binder 11267:11267 <> f:143
+R11311:11316 xv6iris.RiscvLang <> mstate rec
+binder 11304:11304 <> s:144
+binder 11306:11307 <> s':145
+binder 11319:11320 <> mm:146
+R11327:11327 xv6iris.HartMemAsm <> Y:139 var
+binder 11323:11323 <> y:147
+R11360:11365 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11353:11355 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11334:11339 xv6iris.HartMemRun <> goodmb def
+R11351:11352 xv6iris.HartMemAsm <> mm:146 var
+R11349:11349 xv6iris.HartMemAsm <> s:144 var
+R11347:11347 xv6iris.HartMemAsm <> m:141 var
+R11344:11345 xv6iris.HartMemAsm <> Dw:137 var
+R11341:11342 xv6iris.HartMemAsm <> Dr:136 var
+R11356:11359 Corelib.Init.Datatypes <> true constr
+R11394:11399 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11375:11377 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11366:11370 xv6iris.RiscvTryStep <> execR def
+R11374:11374 xv6iris.HartMemAsm <> s:144 var
+R11372:11372 xv6iris.HartMemAsm <> m:141 var
+R11378:11381 Corelib.Init.Datatypes <> Some constr
+R11383:11383 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R11389:11390 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R11393:11393 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R11384:11386 Corelib.Init.Datatypes <> inr constr
+R11388:11388 xv6iris.HartMemAsm <> y:147 var
+R11391:11392 xv6iris.HartMemAsm <> s':145 var
+R11473:11477 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11400:11405 xv6iris.HartMemRun <> goodmb def
+R11471:11472 xv6iris.HartMemAsm <> mm:146 var
+R11469:11469 xv6iris.HartMemAsm <> s:144 var
+R11414:11436 Riscv.rv64d_types Defs catch_early_return def
+R11439:11447 Riscv.rv64d_types Defs bind def
+R11465:11465 xv6iris.HartMemAsm <> f:143 var
+R11450:11458 Riscv.rv64d_types Defs bind def
+R11462:11462 xv6iris.HartMemAsm <> g:142 var
+R11460:11460 xv6iris.HartMemAsm <> m:141 var
+R11410:11411 xv6iris.HartMemAsm <> Dw:137 var
+R11407:11408 xv6iris.HartMemAsm <> Dr:136 var
+R11478:11483 xv6iris.HartMemRun <> goodmb def
+R11540:11541 xv6iris.HartMemAsm <> mm:146 var
+R11537:11538 xv6iris.HartMemAsm <> s':145 var
+R11492:11514 Riscv.rv64d_types Defs catch_early_return def
+R11517:11525 Riscv.rv64d_types Defs bind def
+R11533:11533 xv6iris.HartMemAsm <> f:143 var
+R11528:11528 xv6iris.HartMemAsm <> g:142 var
+R11530:11530 xv6iris.HartMemAsm <> y:147 var
+R11488:11489 xv6iris.HartMemAsm <> Dw:137 var
+R11485:11486 xv6iris.HartMemAsm <> Dr:136 var
+R11576:11595 xv6iris.HartMemRun <> goodmb_cer_bind_nest thm
+R11576:11595 xv6iris.HartMemRun <> goodmb_cer_bind_nest thm
+R11576:11595 xv6iris.HartMemRun <> goodmb_cer_bind_nest thm
+R11636:11651 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R11673:11695 Riscv.rv64d_types Defs catch_early_return def
+R11698:11706 Riscv.rv64d_types Defs bind def
+R11636:11651 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R11673:11695 Riscv.rv64d_types Defs catch_early_return def
+R11698:11706 Riscv.rv64d_types Defs bind def
+prf 11961:11976 <> gm_cer_liftR_seq
+R11995:11998 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11987:11994 Riscv.rv64d_types <> register variant
+R11999:12002 Corelib.Init.Datatypes <> bool ind
+binder 11979:11980 <> Dr:148
+binder 11982:11983 <> Dw:149
+binder 12006:12006 <> X:150
+binder 12008:12008 <> Y:151
+R12027:12027 Riscv.rv64d_types <> M def
+R12029:12029 xv6iris.HartMemAsm <> Y:151 var
+binder 12023:12023 <> m:152
+R12038:12041 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12037:12037 xv6iris.HartMemAsm <> Y:151 var
+R12042:12052 Riscv.rv64d_types Defs monadR def
+R12054:12054 xv6iris.HartMemAsm <> X:150 var
+R12056:12064 Riscv.rv64d_types <> exception ind
+R12066:12066 xv6iris.HartMemAsm <> X:150 var
+binder 12033:12033 <> f:153
+R12077:12082 xv6iris.RiscvLang <> mstate rec
+binder 12070:12070 <> s:154
+binder 12072:12073 <> s':155
+binder 12085:12086 <> mm:156
+R12093:12093 xv6iris.HartMemAsm <> Y:151 var
+binder 12089:12089 <> y:157
+R12126:12131 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12119:12121 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12100:12105 xv6iris.HartMemRun <> goodmb def
+R12117:12118 xv6iris.HartMemAsm <> mm:156 var
+R12115:12115 xv6iris.HartMemAsm <> s:154 var
+R12113:12113 xv6iris.HartMemAsm <> m:152 var
+R12110:12111 xv6iris.HartMemAsm <> Dw:149 var
+R12107:12108 xv6iris.HartMemAsm <> Dr:148 var
+R12122:12125 Corelib.Init.Datatypes <> true constr
+R12155:12160 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12140:12142 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12132:12135 xv6iris.RiscvExec <> exec def
+R12139:12139 xv6iris.HartMemAsm <> s:154 var
+R12137:12137 xv6iris.HartMemAsm <> m:152 var
+R12143:12146 Corelib.Init.Datatypes <> Some constr
+R12148:12148 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12150:12151 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12154:12154 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12149:12149 xv6iris.HartMemAsm <> y:157 var
+R12152:12153 xv6iris.HartMemAsm <> s':155 var
+R12233:12237 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12161:12166 xv6iris.HartMemRun <> goodmb def
+R12231:12232 xv6iris.HartMemAsm <> mm:156 var
+R12229:12229 xv6iris.HartMemAsm <> s:154 var
+R12175:12197 Riscv.rv64d_types Defs catch_early_return def
+R12200:12208 Riscv.rv64d_types Defs bind def
+R12225:12225 xv6iris.HartMemAsm <> f:153 var
+R12211:12220 Riscv.rv64d_types Defs liftR def
+R12222:12222 xv6iris.HartMemAsm <> m:152 var
+R12171:12172 xv6iris.HartMemAsm <> Dw:149 var
+R12168:12169 xv6iris.HartMemAsm <> Dr:148 var
+R12238:12243 xv6iris.HartMemRun <> goodmb def
+R12286:12287 xv6iris.HartMemAsm <> mm:156 var
+R12283:12284 xv6iris.HartMemAsm <> s':155 var
+R12252:12274 Riscv.rv64d_types Defs catch_early_return def
+R12277:12277 xv6iris.HartMemAsm <> f:153 var
+R12279:12279 xv6iris.HartMemAsm <> y:157 var
+R12248:12249 xv6iris.HartMemAsm <> Dw:149 var
+R12245:12246 xv6iris.HartMemAsm <> Dr:148 var
+R12322:12332 xv6iris.HartMemAsm <> gm_cer_bind thm
+R12410:12427 xv6iris.HartMemAsm <> goodmb_liftR_execR thm
+R12379:12390 xv6iris.HartMemRun <> goodmb_liftR thm
+R12341:12350 Riscv.rv64d_types Defs liftR def
+R12322:12332 xv6iris.HartMemAsm <> gm_cer_bind thm
+R12410:12427 xv6iris.HartMemAsm <> goodmb_liftR_execR thm
+R12379:12390 xv6iris.HartMemRun <> goodmb_liftR thm
+R12341:12350 Riscv.rv64d_types Defs liftR def
+prf 12456:12472 <> gm_cer_liftR_seq0
+R12491:12494 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12483:12490 Riscv.rv64d_types <> register variant
+R12495:12498 Corelib.Init.Datatypes <> bool ind
+binder 12475:12476 <> Dr:158
+binder 12478:12479 <> Dw:159
+binder 12502:12502 <> X:160
+R12521:12521 Riscv.rv64d_types <> M def
+R12523:12526 Corelib.Init.Datatypes <> unit ind
+binder 12517:12517 <> m:161
+R12534:12544 Riscv.rv64d_types Defs monadR def
+R12546:12546 xv6iris.HartMemAsm <> X:160 var
+R12548:12556 Riscv.rv64d_types <> exception ind
+R12558:12558 xv6iris.HartMemAsm <> X:160 var
+binder 12530:12530 <> n:162
+R12569:12574 xv6iris.RiscvLang <> mstate rec
+binder 12562:12562 <> s:163
+binder 12564:12565 <> s':164
+binder 12577:12578 <> mm:165
+R12610:12615 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12603:12605 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12584:12589 xv6iris.HartMemRun <> goodmb def
+R12601:12602 xv6iris.HartMemAsm <> mm:165 var
+R12599:12599 xv6iris.HartMemAsm <> s:163 var
+R12597:12597 xv6iris.HartMemAsm <> m:161 var
+R12594:12595 xv6iris.HartMemAsm <> Dw:159 var
+R12591:12592 xv6iris.HartMemAsm <> Dr:158 var
+R12606:12609 Corelib.Init.Datatypes <> true constr
+R12640:12645 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12624:12626 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12616:12619 xv6iris.RiscvExec <> exec def
+R12623:12623 xv6iris.HartMemAsm <> s:163 var
+R12621:12621 xv6iris.HartMemAsm <> m:161 var
+R12627:12630 Corelib.Init.Datatypes <> Some constr
+R12632:12632 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12635:12636 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12639:12639 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12633:12634 Corelib.Init.Datatypes <> tt constr
+R12637:12638 xv6iris.HartMemAsm <> s':164 var
+R12719:12723 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12646:12651 xv6iris.HartMemRun <> goodmb def
+R12717:12718 xv6iris.HartMemAsm <> mm:165 var
+R12715:12715 xv6iris.HartMemAsm <> s:163 var
+R12660:12682 Riscv.rv64d_types Defs catch_early_return def
+R12685:12694 Riscv.rv64d_types Defs bind0 def
+R12711:12711 xv6iris.HartMemAsm <> n:162 var
+R12697:12706 Riscv.rv64d_types Defs liftR def
+R12708:12708 xv6iris.HartMemAsm <> m:161 var
+R12656:12657 xv6iris.HartMemAsm <> Dw:159 var
+R12653:12654 xv6iris.HartMemAsm <> Dr:158 var
+R12724:12729 xv6iris.HartMemRun <> goodmb def
+R12768:12769 xv6iris.HartMemAsm <> mm:165 var
+R12765:12766 xv6iris.HartMemAsm <> s':164 var
+R12738:12760 Riscv.rv64d_types Defs catch_early_return def
+R12762:12762 xv6iris.HartMemAsm <> n:162 var
+R12734:12735 xv6iris.HartMemAsm <> Dw:159 var
+R12731:12732 xv6iris.HartMemAsm <> Dr:158 var
+R12802:12817 xv6iris.HartMemAsm <> gm_cer_liftR_seq thm
+R12848:12849 Corelib.Init.Datatypes <> tt constr
+R12802:12817 xv6iris.HartMemAsm <> gm_cer_liftR_seq thm
+R12848:12849 Corelib.Init.Datatypes <> tt constr
+prf 12871:12887 <> gm_cer_liftR_nest
+R12906:12909 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12898:12905 Riscv.rv64d_types <> register variant
+R12910:12913 Corelib.Init.Datatypes <> bool ind
+binder 12890:12891 <> Dr:166
+binder 12893:12894 <> Dw:167
+binder 12917:12917 <> X:168
+binder 12919:12919 <> Y:169
+binder 12921:12921 <> Z:170
+R12940:12940 Riscv.rv64d_types <> M def
+R12942:12942 xv6iris.HartMemAsm <> Y:169 var
+binder 12936:12936 <> m:171
+R12951:12954 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12950:12950 xv6iris.HartMemAsm <> Y:169 var
+R12955:12965 Riscv.rv64d_types Defs monadR def
+R12967:12967 xv6iris.HartMemAsm <> X:168 var
+R12969:12977 Riscv.rv64d_types <> exception ind
+R12979:12979 xv6iris.HartMemAsm <> Z:170 var
+binder 12946:12946 <> g:172
+R12992:12995 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12991:12991 xv6iris.HartMemAsm <> Z:170 var
+R12996:13006 Riscv.rv64d_types Defs monadR def
+R13008:13008 xv6iris.HartMemAsm <> X:168 var
+R13010:13018 Riscv.rv64d_types <> exception ind
+R13020:13020 xv6iris.HartMemAsm <> X:168 var
+binder 12987:12987 <> f:173
+R13031:13036 xv6iris.RiscvLang <> mstate rec
+binder 13024:13024 <> s:174
+binder 13026:13027 <> s':175
+binder 13039:13040 <> mm:176
+R13047:13047 xv6iris.HartMemAsm <> Y:169 var
+binder 13043:13043 <> y:177
+R13080:13085 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13073:13075 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13054:13059 xv6iris.HartMemRun <> goodmb def
+R13071:13072 xv6iris.HartMemAsm <> mm:176 var
+R13069:13069 xv6iris.HartMemAsm <> s:174 var
+R13067:13067 xv6iris.HartMemAsm <> m:171 var
+R13064:13065 xv6iris.HartMemAsm <> Dw:167 var
+R13061:13062 xv6iris.HartMemAsm <> Dr:166 var
+R13076:13079 Corelib.Init.Datatypes <> true constr
+R13109:13114 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13094:13096 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13086:13089 xv6iris.RiscvExec <> exec def
+R13093:13093 xv6iris.HartMemAsm <> s:174 var
+R13091:13091 xv6iris.HartMemAsm <> m:171 var
+R13097:13100 Corelib.Init.Datatypes <> Some constr
+R13102:13102 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13104:13105 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13108:13108 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13103:13103 xv6iris.HartMemAsm <> y:177 var
+R13106:13107 xv6iris.HartMemAsm <> s':175 var
+R13205:13209 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13115:13120 xv6iris.HartMemRun <> goodmb def
+R13203:13204 xv6iris.HartMemAsm <> mm:176 var
+R13201:13201 xv6iris.HartMemAsm <> s:174 var
+R13133:13155 Riscv.rv64d_types Defs catch_early_return def
+R13158:13166 Riscv.rv64d_types Defs bind def
+R13197:13197 xv6iris.HartMemAsm <> f:173 var
+R13169:13177 Riscv.rv64d_types Defs bind def
+R13194:13194 xv6iris.HartMemAsm <> g:172 var
+R13180:13189 Riscv.rv64d_types Defs liftR def
+R13191:13191 xv6iris.HartMemAsm <> m:171 var
+R13125:13126 xv6iris.HartMemAsm <> Dw:167 var
+R13122:13123 xv6iris.HartMemAsm <> Dr:166 var
+R13210:13215 xv6iris.HartMemRun <> goodmb def
+R13272:13273 xv6iris.HartMemAsm <> mm:176 var
+R13269:13270 xv6iris.HartMemAsm <> s':175 var
+R13224:13246 Riscv.rv64d_types Defs catch_early_return def
+R13249:13257 Riscv.rv64d_types Defs bind def
+R13265:13265 xv6iris.HartMemAsm <> f:173 var
+R13260:13260 xv6iris.HartMemAsm <> g:172 var
+R13262:13262 xv6iris.HartMemAsm <> y:177 var
+R13220:13221 xv6iris.HartMemAsm <> Dw:167 var
+R13217:13218 xv6iris.HartMemAsm <> Dr:166 var
+R13308:13323 xv6iris.HartMemAsm <> gm_cer_bind_nest thm
+R13403:13420 xv6iris.HartMemAsm <> goodmb_liftR_execR thm
+R13372:13383 xv6iris.HartMemRun <> goodmb_liftR thm
+R13332:13341 Riscv.rv64d_types Defs liftR def
+R13308:13323 xv6iris.HartMemAsm <> gm_cer_bind_nest thm
+R13403:13420 xv6iris.HartMemAsm <> goodmb_liftR_execR thm
+R13372:13383 xv6iris.HartMemRun <> goodmb_liftR thm
+R13332:13341 Riscv.rv64d_types Defs liftR def
+R13960:13967 xv6iris.HartMemAsm <> gm_bind0 thm
+R14006:14012 xv6iris.HartMemAsm <> gm_bind thm
+R14052:14059 xv6iris.HartMemAsm <> gm_bind0 thm
+R14104:14110 xv6iris.HartMemAsm <> gm_bind thm
+R14156:14164 xv6iris.HartMemAsm <> gm_bind0R thm
+R14208:14215 xv6iris.HartMemAsm <> gm_bindR thm
+R14260:14269 Riscv.rv64d_types Defs bind0 def
+R14297:14308 xv6iris.HartMemAsm <> gm_bind_nest thm
+R14362:14368 xv6iris.HartMemAsm <> gm_bind thm
+R14456:14468 xv6iris.HartMemAsm <> gm_liftR_seq0 thm
+R14515:14526 xv6iris.HartMemAsm <> gm_liftR_seq thm
+R14574:14590 xv6iris.HartMemAsm <> gm_cer_liftR_seq0 thm
+R14633:14648 xv6iris.HartMemAsm <> gm_cer_liftR_seq thm
+R14692:14708 xv6iris.HartMemAsm <> gm_cer_liftR_nest thm
+R14776:14783 xv6iris.HartMemAsm <> gm_bind0 thm
+R14796:14809 xv6iris.HartMemRun <> goodmb_returnm thm
+R14819:14830 xv6iris.RiscvExec <> exec_returnm thm
+R14853:14859 xv6iris.HartMemAsm <> gm_bind thm
+R14873:14886 xv6iris.HartMemRun <> goodmb_returnm thm
+R14896:14907 xv6iris.RiscvExec <> exec_returnm thm
+R14957:14963 xv6iris.HartMemAsm <> gm_bind thm
+R15001:15015 xv6iris.HartMemRun <> goodmb_read_reg thm
+R15048:15060 xv6iris.RiscvExec <> exec_read_reg thm
+R15082:15089 xv6iris.HartMemAsm <> gm_bind0 thm
+R15127:15141 xv6iris.HartMemRun <> goodmb_read_reg thm
+R15174:15186 xv6iris.RiscvExec <> exec_read_reg thm
+R15208:15219 xv6iris.HartMemAsm <> gm_bind_nest thm
+R15257:15271 xv6iris.HartMemRun <> goodmb_read_reg thm
+R15304:15316 xv6iris.RiscvExec <> exec_read_reg thm
+R15369:15376 xv6iris.HartMemAsm <> gm_bind0 thm
+R15414:15429 xv6iris.HartMemRun <> goodmb_write_reg thm
+R15462:15475 xv6iris.RiscvExec <> exec_write_reg thm
+R15499:15505 xv6iris.HartMemAsm <> gm_bind thm
+R15543:15558 xv6iris.HartMemRun <> goodmb_write_reg thm
+R15591:15604 xv6iris.RiscvExec <> exec_write_reg thm
+R15628:15639 xv6iris.HartMemAsm <> gm_bind_nest thm
+R15677:15692 xv6iris.HartMemRun <> goodmb_write_reg thm
+R15725:15738 xv6iris.RiscvExec <> exec_write_reg thm
+prf 16464:16473 <> gm_MemRead
+R16492:16495 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16484:16491 Riscv.rv64d_types <> register variant
+R16496:16499 Corelib.Init.Datatypes <> bool ind
+binder 16476:16477 <> Dr:178
+binder 16479:16480 <> Dw:179
+binder 16503:16503 <> X:180
+R16511:16511 Corelib.Numbers.BinNums <> N ind
+binder 16507:16507 <> n:181
+R16525:16543 Riscv.rv64d_types Interface.ReadReq t rec
+R16545:16545 xv6iris.HartMemAsm <> n:181 var
+binder 16519:16521 <> req:182
+R16601:16604 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16582:16584 Corelib.Init.Datatypes <> ::type_scope:x_'+'_x not
+R16568:16570 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R16558:16559 stdpp.bitvector.definitions <> bv rec
+R16563:16565 Stdlib.NArith.BinNat <> ::N_scope:x_'*'_x not
+R16566:16566 xv6iris.HartMemAsm <> n:181 var
+R16571:16576 Corelib.Init.Datatypes <> option ind
+R16578:16581 Corelib.Init.Datatypes <> bool ind
+R16585:16594 Riscv.rv64d_types Arch abort def
+R16605:16605 Riscv.rv64d_types <> M def
+R16607:16607 xv6iris.HartMemAsm <> X:180 var
+binder 16553:16553 <> k:183
+binder 16610:16610 <> s:184
+binder 16612:16613 <> mm:185
+R16662:16667 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16654:16656 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16619:16626 xv6iris.DevModel <> dev_addr def
+R16629:16648 Riscv.rv64d_types Interface.ReadReq pa proj
+R16650:16652 xv6iris.HartMemAsm <> req:182 var
+R16657:16661 Corelib.Init.Datatypes <> false constr
+R16718:16723 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16711:16713 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16668:16678 xv6iris.HartMemRun <> bytes_owned def
+R16680:16681 xv6iris.HartMemAsm <> mm:185 var
+R16684:16703 Riscv.rv64d_types Interface.ReadReq pa proj
+R16705:16707 xv6iris.HartMemAsm <> req:182 var
+R16710:16710 xv6iris.HartMemAsm <> n:181 var
+R16714:16717 Corelib.Init.Datatypes <> true constr
+R16786:16790 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16724:16729 xv6iris.HartMemRun <> goodmb def
+R16784:16785 xv6iris.HartMemAsm <> mm:185 var
+R16782:16782 xv6iris.HartMemAsm <> s:184 var
+R16738:16751 Riscv.rv64d_types Interface Next constr
+R16779:16779 xv6iris.HartMemAsm <> k:183 var
+R16754:16770 Riscv.rv64d_types Interface MemRead constr
+R16772:16772 xv6iris.HartMemAsm <> n:181 var
+R16774:16776 xv6iris.HartMemAsm <> req:182 var
+R16734:16735 xv6iris.HartMemAsm <> Dw:179 var
+R16731:16732 xv6iris.HartMemAsm <> Dr:178 var
+R16797:16806 xv6iris.RiscvModelBytes <> read_bytes def
+R16811:16813 xv6iris.RiscvLang <> mem proj
+R16808:16808 xv6iris.HartMemAsm <> s:184 var
+R16817:16836 Riscv.rv64d_types Interface.ReadReq pa proj
+R16838:16840 xv6iris.HartMemAsm <> req:182 var
+R16843:16843 xv6iris.HartMemAsm <> n:181 var
+R16856:16859 Corelib.Init.Datatypes <> Some constr
+R16866:16871 xv6iris.HartMemRun <> goodmb def
+R16901:16902 xv6iris.HartMemAsm <> mm:185 var
+R16899:16899 xv6iris.HartMemAsm <> s:184 var
+R16880:16880 xv6iris.HartMemAsm <> k:183 var
+R16883:16885 Corelib.Init.Datatypes <> inl constr
+R16887:16887 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16889:16890 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16895:16895 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16891:16894 Corelib.Init.Datatypes <> None constr
+R16876:16877 xv6iris.HartMemAsm <> Dw:179 var
+R16873:16874 xv6iris.HartMemAsm <> Dr:178 var
+R16910:16913 Corelib.Init.Datatypes <> None constr
+R16918:16922 Corelib.Init.Datatypes <> false constr
+R16962:16967 xv6iris.HartMemRun <> goodmb def
+R17003:17006 Corelib.Init.Datatypes <> negb def
+R17008:17011 Corelib.Init.Datatypes <> andb def
+prf 17040:17050 <> gm_MemWrite
+R17069:17072 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17061:17068 Riscv.rv64d_types <> register variant
+R17073:17076 Corelib.Init.Datatypes <> bool ind
+binder 17053:17054 <> Dr:186
+binder 17056:17057 <> Dw:187
+binder 17080:17080 <> X:188
+R17088:17088 Corelib.Numbers.BinNums <> N ind
+binder 17084:17084 <> n:189
+R17102:17121 Riscv.rv64d_types Interface.WriteReq t rec
+R17123:17123 xv6iris.HartMemAsm <> n:189 var
+binder 17096:17098 <> req:190
+R17166:17169 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17147:17149 Corelib.Init.Datatypes <> ::type_scope:x_'+'_x not
+R17136:17141 Corelib.Init.Datatypes <> option ind
+R17143:17146 Corelib.Init.Datatypes <> bool ind
+R17150:17159 Riscv.rv64d_types Arch abort def
+R17170:17170 Riscv.rv64d_types <> M def
+R17172:17172 xv6iris.HartMemAsm <> X:188 var
+binder 17131:17131 <> k:191
+binder 17175:17175 <> s:192
+binder 17177:17178 <> mm:193
+R17228:17233 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17220:17222 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17184:17191 xv6iris.DevModel <> dev_addr def
+R17194:17214 Riscv.rv64d_types Interface.WriteReq pa proj
+R17216:17218 xv6iris.HartMemAsm <> req:190 var
+R17223:17227 Corelib.Init.Datatypes <> false constr
+R17285:17290 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17278:17280 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17234:17244 xv6iris.HartMemRun <> bytes_owned def
+R17246:17247 xv6iris.HartMemAsm <> mm:193 var
+R17250:17270 Riscv.rv64d_types Interface.WriteReq pa proj
+R17272:17274 xv6iris.HartMemAsm <> req:190 var
+R17277:17277 xv6iris.HartMemAsm <> n:189 var
+R17281:17284 Corelib.Init.Datatypes <> true constr
+R17354:17358 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17291:17296 xv6iris.HartMemRun <> goodmb def
+R17352:17353 xv6iris.HartMemAsm <> mm:193 var
+R17350:17350 xv6iris.HartMemAsm <> s:192 var
+R17305:17318 Riscv.rv64d_types Interface Next constr
+R17347:17347 xv6iris.HartMemAsm <> k:191 var
+R17321:17338 Riscv.rv64d_types Interface MemWrite constr
+R17340:17340 xv6iris.HartMemAsm <> n:189 var
+R17342:17344 xv6iris.HartMemAsm <> req:190 var
+R17301:17302 xv6iris.HartMemAsm <> Dw:187 var
+R17298:17299 xv6iris.HartMemAsm <> Dr:186 var
+R17359:17364 xv6iris.HartMemRun <> goodmb def
+R17525:17526 xv6iris.HartMemAsm <> mm:193 var
+R17394:17399 xv6iris.RiscvLang <> MState constr
+R17404:17408 xv6iris.RiscvLang <> sregs proj
+R17401:17401 xv6iris.HartMemAsm <> s:192 var
+R17421:17431 xv6iris.RiscvModelBytes <> write_bytes def
+R17484:17507 Riscv.rv64d_types Interface.WriteReq value proj
+R17509:17511 xv6iris.HartMemAsm <> req:190 var
+R17469:17469 xv6iris.HartMemAsm <> n:189 var
+R17442:17462 Riscv.rv64d_types Interface.WriteReq pa proj
+R17464:17466 xv6iris.HartMemAsm <> req:190 var
+R17436:17438 xv6iris.RiscvLang <> mem proj
+R17433:17433 xv6iris.HartMemAsm <> s:192 var
+R17518:17521 xv6iris.RiscvLang <> mdev proj
+R17515:17515 xv6iris.HartMemAsm <> s:192 var
+R17373:17373 xv6iris.HartMemAsm <> k:191 var
+R17376:17378 Corelib.Init.Datatypes <> inl constr
+R17380:17383 Corelib.Init.Datatypes <> None constr
+R17369:17370 xv6iris.HartMemAsm <> Dw:187 var
+R17366:17367 xv6iris.HartMemAsm <> Dr:186 var
+R17558:17563 xv6iris.HartMemRun <> goodmb def
+R17599:17602 Corelib.Init.Datatypes <> negb def
+R17604:17607 Corelib.Init.Datatypes <> andb def
+R17617:17626 xv6iris.HartMemRun <> goodmb_dom thm
+R17617:17626 xv6iris.HartMemRun <> goodmb_dom thm
+R17638:17652 xv6iris.HartMemRun <> write_bytes_dom thm
+R17638:17652 xv6iris.HartMemRun <> write_bytes_dom thm
+def 18287:18295 <> rk_ram_ok
+R18303:18311 Riscv.rv64d_types <> read_kind ind
+binder 18298:18299 <> rk:194
+R18316:18319 Corelib.Init.Datatypes <> bool ind
+R18332:18333 xv6iris.HartMemAsm <> rk:194 var
+R18344:18353 Riscv.rv64d_types <> Read_plain constr
+R18357:18367 Riscv.rv64d_types <> Read_ifetch constr
+R18371:18389 Riscv.rv64d_types <> Read_RISCV_reserved constr
+R18395:18421 Riscv.rv64d_types <> Read_RISCV_reserved_acquire constr
+R18425:18458 Riscv.rv64d_types <> Read_RISCV_reserved_strong_acquire constr
+R18463:18466 Corelib.Init.Datatypes <> true constr
+R18463:18466 Corelib.Init.Datatypes <> true constr
+R18463:18466 Corelib.Init.Datatypes <> true constr
+R18463:18466 Corelib.Init.Datatypes <> true constr
+R18463:18466 Corelib.Init.Datatypes <> true constr
+R18477:18481 Corelib.Init.Datatypes <> false constr
+def 18502:18510 <> wk_ram_ok
+R18518:18527 Riscv.rv64d_types <> write_kind ind
+binder 18513:18514 <> wk:196
+R18532:18535 Corelib.Init.Datatypes <> bool ind
+R18548:18549 xv6iris.HartMemAsm <> wk:196 var
+R18560:18570 Riscv.rv64d_types <> Write_plain constr
+R18574:18596 Riscv.rv64d_types <> Write_RISCV_conditional constr
+R18602:18632 Riscv.rv64d_types <> Write_RISCV_conditional_release constr
+R18638:18675 Riscv.rv64d_types <> Write_RISCV_conditional_strong_release constr
+R18680:18683 Corelib.Init.Datatypes <> true constr
+R18680:18683 Corelib.Init.Datatypes <> true constr
+R18680:18683 Corelib.Init.Datatypes <> true constr
+R18680:18683 Corelib.Init.Datatypes <> true constr
+R18694:18698 Corelib.Init.Datatypes <> false constr
+prf 18714:18728 <> goodmb_read_ram
+R18747:18750 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18739:18746 Riscv.rv64d_types <> register variant
+R18751:18754 Corelib.Init.Datatypes <> bool ind
+binder 18731:18732 <> Dr:198
+binder 18734:18735 <> Dw:199
+R18763:18771 Riscv.rv64d_types <> read_kind ind
+binder 18758:18759 <> rk:200
+R18783:18783 Corelib.Numbers.BinNums <> Z ind
+binder 18775:18779 <> width:201
+R18798:18819 SailStdpp.Values <> mword def
+binder 18791:18794 <> addr:202
+R18833:18836 Corelib.Init.Datatypes <> bool ind
+binder 18826:18829 <> meta:203
+binder 18839:18839 <> s:204
+binder 18841:18842 <> mm:205
+R18867:18872 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18860:18862 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18848:18856 xv6iris.HartMemAsm <> rk_ram_ok def
+R18858:18859 xv6iris.HartMemAsm <> rk:200 var
+R18863:18866 Corelib.Init.Datatypes <> true constr
+R18894:18899 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18886:18888 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18873:18880 xv6iris.DevModel <> dev_addr def
+R18882:18885 xv6iris.HartMemAsm <> addr:202 var
+R18889:18893 Corelib.Init.Datatypes <> false constr
+R18941:18946 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18934:18936 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18900:18910 xv6iris.HartMemRun <> bytes_owned def
+R18912:18913 xv6iris.HartMemAsm <> mm:205 var
+R18915:18918 xv6iris.HartMemAsm <> addr:202 var
+R18921:18926 Stdlib.ZArith.BinInt Z to_N def
+R18928:18932 xv6iris.HartMemAsm <> width:201 var
+R18937:18940 Corelib.Init.Datatypes <> true constr
+R18993:18998 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18985:18988 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R18947:18956 xv6iris.RiscvModelBytes <> read_bytes def
+R18961:18963 xv6iris.RiscvLang <> mem proj
+R18958:18958 xv6iris.HartMemAsm <> s:204 var
+R18966:18969 xv6iris.HartMemAsm <> addr:202 var
+R18972:18977 Stdlib.ZArith.BinInt Z to_N def
+R18979:18983 xv6iris.HartMemAsm <> width:201 var
+R18989:18992 Corelib.Init.Datatypes <> None constr
+R19057:19059 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18999:19004 xv6iris.HartMemRun <> goodmb def
+R19055:19056 xv6iris.HartMemAsm <> mm:205 var
+R19053:19053 xv6iris.HartMemAsm <> s:204 var
+R19013:19020 Riscv.rv64d <> read_ram def
+R19022:19023 xv6iris.HartMemAsm <> rk:200 var
+R19026:19033 Riscv.rv64d_types <> Physaddr constr
+R19035:19038 xv6iris.HartMemAsm <> addr:202 var
+R19041:19045 xv6iris.HartMemAsm <> width:201 var
+R19047:19050 xv6iris.HartMemAsm <> meta:203 var
+R19009:19010 xv6iris.HartMemAsm <> Dw:199 var
+R19006:19007 xv6iris.HartMemAsm <> Dr:198 var
+R19060:19063 Corelib.Init.Datatypes <> true constr
+R19109:19116 Riscv.rv64d <> read_ram def
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19200:19213 xv6iris.HartMemRun <> goodmb_returnm thm
+R19223:19234 xv6iris.RiscvExec <> exec_returnm thm
+R19271:19288 Riscv.rv64d_types Defs sail_mem_read def
+R19318:19326 Riscv.rv64d_types Defs bind def
+R19334:19352 Riscv.rv64d_types Interface iMon_bind def
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19451:19460 xv6iris.RiscvModelBytes <> read_bytes def
+R19451:19460 xv6iris.RiscvModelBytes <> read_bytes def
+R19494:19503 xv6iris.RiscvModelBytes <> read_bytes def
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19200:19213 xv6iris.HartMemRun <> goodmb_returnm thm
+R19223:19234 xv6iris.RiscvExec <> exec_returnm thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19494:19503 xv6iris.RiscvModelBytes <> read_bytes def
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19200:19213 xv6iris.HartMemRun <> goodmb_returnm thm
+R19223:19234 xv6iris.RiscvExec <> exec_returnm thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19494:19503 xv6iris.RiscvModelBytes <> read_bytes def
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19200:19213 xv6iris.HartMemRun <> goodmb_returnm thm
+R19223:19234 xv6iris.RiscvExec <> exec_returnm thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19494:19503 xv6iris.RiscvModelBytes <> read_bytes def
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19200:19213 xv6iris.HartMemRun <> goodmb_returnm thm
+R19223:19234 xv6iris.RiscvExec <> exec_returnm thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19494:19503 xv6iris.RiscvModelBytes <> read_bytes def
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19181:19187 xv6iris.HartMemAsm <> gm_bind thm
+R19200:19213 xv6iris.HartMemRun <> goodmb_returnm thm
+R19223:19234 xv6iris.RiscvExec <> exec_returnm thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19370:19379 xv6iris.HartMemAsm <> gm_MemRead thm
+R19494:19503 xv6iris.RiscvModelBytes <> read_bytes def
+prf 20205:20234 <> read_bytes_ne_of_exec_read_ram
+R20242:20250 Riscv.rv64d_types <> read_kind ind
+binder 20237:20238 <> rk:206
+R20262:20262 Corelib.Numbers.BinNums <> Z ind
+binder 20254:20258 <> width:207
+R20277:20298 SailStdpp.Values <> mword def
+binder 20270:20273 <> addr:208
+R20312:20315 Corelib.Init.Datatypes <> bool ind
+binder 20305:20308 <> meta:209
+R20362:20364 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R20328:20349 SailStdpp.Values <> mword def
+R20353:20355 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R20356:20360 xv6iris.HartMemAsm <> width:207 var
+R20365:20368 Corelib.Init.Datatypes <> unit ind
+binder 20323:20323 <> r:210
+R20385:20390 xv6iris.RiscvLang <> mstate rec
+binder 20378:20378 <> s:211
+binder 20380:20381 <> s':212
+R20416:20421 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20409:20411 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20397:20405 xv6iris.HartMemAsm <> rk_ram_ok def
+R20407:20408 xv6iris.HartMemAsm <> rk:206 var
+R20412:20415 Corelib.Init.Datatypes <> true constr
+R20443:20448 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20435:20437 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20422:20429 xv6iris.DevModel <> dev_addr def
+R20431:20434 xv6iris.HartMemAsm <> addr:208 var
+R20438:20442 Corelib.Init.Datatypes <> false constr
+R20511:20516 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20496:20498 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20449:20452 xv6iris.RiscvExec <> exec def
+R20495:20495 xv6iris.HartMemAsm <> s:211 var
+R20455:20462 Riscv.rv64d <> read_ram def
+R20464:20465 xv6iris.HartMemAsm <> rk:206 var
+R20468:20475 Riscv.rv64d_types <> Physaddr constr
+R20477:20480 xv6iris.HartMemAsm <> addr:208 var
+R20483:20487 xv6iris.HartMemAsm <> width:207 var
+R20489:20492 xv6iris.HartMemAsm <> meta:209 var
+R20499:20502 Corelib.Init.Datatypes <> Some constr
+R20504:20504 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R20506:20507 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R20510:20510 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R20505:20505 xv6iris.HartMemAsm <> r:210 var
+R20508:20509 xv6iris.HartMemAsm <> s':212 var
+R20555:20558 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R20517:20526 xv6iris.RiscvModelBytes <> read_bytes def
+R20531:20533 xv6iris.RiscvLang <> mem proj
+R20528:20528 xv6iris.HartMemAsm <> s:211 var
+R20536:20539 xv6iris.HartMemAsm <> addr:208 var
+R20542:20547 Stdlib.ZArith.BinInt Z to_N def
+R20549:20553 xv6iris.HartMemAsm <> width:207 var
+R20559:20562 Corelib.Init.Datatypes <> None constr
+R20609:20616 Riscv.rv64d <> read_ram def
+R20693:20706 xv6iris.RiscvExec <> exec_bind_Some thm
+R20719:20730 xv6iris.RiscvTryStep <> exec_returnM thm
+R20783:20800 Riscv.rv64d_types Defs sail_mem_read def
+R20842:20850 Riscv.rv64d_types Defs bind def
+R20864:20882 Riscv.rv64d_types Interface iMon_bind def
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20988:20997 xv6iris.RiscvModelBytes <> read_bytes def
+R20988:20997 xv6iris.RiscvModelBytes <> read_bytes def
+R21031:21040 xv6iris.RiscvModelBytes <> read_bytes def
+R21056:21059 Corelib.Init.Datatypes <> None constr
+R21062:21063 stdpp.bitvector.definitions <> bv rec
+R21067:21069 Stdlib.NArith.BinNat <> ::N_scope:x_'*'_x not
+R20693:20706 xv6iris.RiscvExec <> exec_bind_Some thm
+R20719:20730 xv6iris.RiscvTryStep <> exec_returnM thm
+R20693:20706 xv6iris.RiscvExec <> exec_bind_Some thm
+R20719:20730 xv6iris.RiscvTryStep <> exec_returnM thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20693:20706 xv6iris.RiscvExec <> exec_bind_Some thm
+R20719:20730 xv6iris.RiscvTryStep <> exec_returnM thm
+R20693:20706 xv6iris.RiscvExec <> exec_bind_Some thm
+R20719:20730 xv6iris.RiscvTryStep <> exec_returnM thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20693:20706 xv6iris.RiscvExec <> exec_bind_Some thm
+R20719:20730 xv6iris.RiscvTryStep <> exec_returnM thm
+R20693:20706 xv6iris.RiscvExec <> exec_bind_Some thm
+R20719:20730 xv6iris.RiscvTryStep <> exec_returnM thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20693:20706 xv6iris.RiscvExec <> exec_bind_Some thm
+R20719:20730 xv6iris.RiscvTryStep <> exec_returnM thm
+R20693:20706 xv6iris.RiscvExec <> exec_bind_Some thm
+R20719:20730 xv6iris.RiscvTryStep <> exec_returnM thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20693:20706 xv6iris.RiscvExec <> exec_bind_Some thm
+R20719:20730 xv6iris.RiscvTryStep <> exec_returnM thm
+R20693:20706 xv6iris.RiscvExec <> exec_bind_Some thm
+R20719:20730 xv6iris.RiscvTryStep <> exec_returnM thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R20906:20917 xv6iris.RiscvFetchExec <> exec_MemRead thm
+R21031:21040 xv6iris.RiscvModelBytes <> read_bytes def
+R21056:21059 Corelib.Init.Datatypes <> None constr
+R21062:21063 stdpp.bitvector.definitions <> bv rec
+R21067:21069 Stdlib.NArith.BinNat <> ::N_scope:x_'*'_x not
+R21031:21040 xv6iris.RiscvModelBytes <> read_bytes def
+R21056:21059 Corelib.Init.Datatypes <> None constr
+R21062:21063 stdpp.bitvector.definitions <> bv rec
+R21067:21069 Stdlib.NArith.BinNat <> ::N_scope:x_'*'_x not
+R21031:21040 xv6iris.RiscvModelBytes <> read_bytes def
+R21056:21059 Corelib.Init.Datatypes <> None constr
+R21062:21063 stdpp.bitvector.definitions <> bv rec
+R21067:21069 Stdlib.NArith.BinNat <> ::N_scope:x_'*'_x not
+R21031:21040 xv6iris.RiscvModelBytes <> read_bytes def
+R21056:21059 Corelib.Init.Datatypes <> None constr
+R21062:21063 stdpp.bitvector.definitions <> bv rec
+R21067:21069 Stdlib.NArith.BinNat <> ::N_scope:x_'*'_x not
+R21031:21040 xv6iris.RiscvModelBytes <> read_bytes def
+R21056:21059 Corelib.Init.Datatypes <> None constr
+R21062:21063 stdpp.bitvector.definitions <> bv rec
+R21067:21069 Stdlib.NArith.BinNat <> ::N_scope:x_'*'_x not
+prf 21181:21203 <> goodmb_read_ram_of_exec
+R21222:21225 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21214:21221 Riscv.rv64d_types <> register variant
+R21226:21229 Corelib.Init.Datatypes <> bool ind
+binder 21206:21207 <> Dr:213
+binder 21209:21210 <> Dw:214
+R21238:21246 Riscv.rv64d_types <> read_kind ind
+binder 21233:21234 <> rk:215
+R21262:21262 Corelib.Numbers.BinNums <> Z ind
+binder 21254:21258 <> width:216
+R21273:21294 SailStdpp.Values <> mword def
+binder 21266:21269 <> addr:217
+R21308:21311 Corelib.Init.Datatypes <> bool ind
+binder 21301:21304 <> meta:218
+R21358:21360 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R21324:21345 SailStdpp.Values <> mword def
+R21349:21351 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R21352:21356 xv6iris.HartMemAsm <> width:216 var
+R21361:21364 Corelib.Init.Datatypes <> unit ind
+binder 21319:21319 <> r:219
+R21381:21386 xv6iris.RiscvLang <> mstate rec
+binder 21374:21374 <> s:220
+binder 21376:21377 <> s':221
+binder 21389:21390 <> mm:222
+R21415:21420 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21408:21410 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21396:21404 xv6iris.HartMemAsm <> rk_ram_ok def
+R21406:21407 xv6iris.HartMemAsm <> rk:215 var
+R21411:21414 Corelib.Init.Datatypes <> true constr
+R21442:21447 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21434:21436 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21421:21428 xv6iris.DevModel <> dev_addr def
+R21430:21433 xv6iris.HartMemAsm <> addr:217 var
+R21437:21441 Corelib.Init.Datatypes <> false constr
+R21489:21494 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21482:21484 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21448:21458 xv6iris.HartMemRun <> bytes_owned def
+R21460:21461 xv6iris.HartMemAsm <> mm:222 var
+R21463:21466 xv6iris.HartMemAsm <> addr:217 var
+R21469:21474 Stdlib.ZArith.BinInt Z to_N def
+R21476:21480 xv6iris.HartMemAsm <> width:216 var
+R21485:21488 Corelib.Init.Datatypes <> true constr
+R21557:21562 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21542:21544 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21495:21498 xv6iris.RiscvExec <> exec def
+R21541:21541 xv6iris.HartMemAsm <> s:220 var
+R21501:21508 Riscv.rv64d <> read_ram def
+R21510:21511 xv6iris.HartMemAsm <> rk:215 var
+R21514:21521 Riscv.rv64d_types <> Physaddr constr
+R21523:21526 xv6iris.HartMemAsm <> addr:217 var
+R21529:21533 xv6iris.HartMemAsm <> width:216 var
+R21535:21538 xv6iris.HartMemAsm <> meta:218 var
+R21545:21548 Corelib.Init.Datatypes <> Some constr
+R21550:21550 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21552:21553 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21556:21556 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21551:21551 xv6iris.HartMemAsm <> r:219 var
+R21554:21555 xv6iris.HartMemAsm <> s':221 var
+R21621:21623 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21563:21568 xv6iris.HartMemRun <> goodmb def
+R21619:21620 xv6iris.HartMemAsm <> mm:222 var
+R21617:21617 xv6iris.HartMemAsm <> s:220 var
+R21577:21584 Riscv.rv64d <> read_ram def
+R21586:21587 xv6iris.HartMemAsm <> rk:215 var
+R21590:21597 Riscv.rv64d_types <> Physaddr constr
+R21599:21602 xv6iris.HartMemAsm <> addr:217 var
+R21605:21609 xv6iris.HartMemAsm <> width:216 var
+R21611:21614 xv6iris.HartMemAsm <> meta:218 var
+R21573:21574 xv6iris.HartMemAsm <> Dw:214 var
+R21570:21571 xv6iris.HartMemAsm <> Dr:213 var
+R21624:21627 Corelib.Init.Datatypes <> true constr
+R21672:21686 xv6iris.HartMemAsm <> goodmb_read_ram thm
+R21743:21772 xv6iris.HartMemAsm <> read_bytes_ne_of_exec_read_ram thm
+R21672:21686 xv6iris.HartMemAsm <> goodmb_read_ram thm
+R21743:21772 xv6iris.HartMemAsm <> read_bytes_ne_of_exec_read_ram thm
+prf 21827:21842 <> goodmb_write_ram
+R21861:21864 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21853:21860 Riscv.rv64d_types <> register variant
+R21865:21868 Corelib.Init.Datatypes <> bool ind
+binder 21845:21846 <> Dr:223
+binder 21848:21849 <> Dw:224
+R21877:21886 Riscv.rv64d_types <> write_kind ind
+binder 21872:21873 <> wk:225
+R21898:21898 Corelib.Numbers.BinNums <> Z ind
+binder 21890:21894 <> width:226
+R21913:21934 SailStdpp.Values <> mword def
+binder 21906:21909 <> addr:227
+R21952:21973 SailStdpp.Values <> mword def
+R21977:21979 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R21980:21984 xv6iris.HartMemAsm <> width:226 var
+binder 21945:21948 <> data:228
+binder 21988:21988 <> s:229
+binder 21990:21991 <> mm:230
+R22016:22021 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22009:22011 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21997:22005 xv6iris.HartMemAsm <> wk_ram_ok def
+R22007:22008 xv6iris.HartMemAsm <> wk:225 var
+R22012:22015 Corelib.Init.Datatypes <> true constr
+R22043:22048 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22035:22037 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22022:22029 xv6iris.DevModel <> dev_addr def
+R22031:22034 xv6iris.HartMemAsm <> addr:227 var
+R22038:22042 Corelib.Init.Datatypes <> false constr
+R22090:22095 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22083:22085 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22049:22059 xv6iris.HartMemRun <> bytes_owned def
+R22061:22062 xv6iris.HartMemAsm <> mm:230 var
+R22064:22067 xv6iris.HartMemAsm <> addr:227 var
+R22070:22075 Stdlib.ZArith.BinInt Z to_N def
+R22077:22081 xv6iris.HartMemAsm <> width:226 var
+R22086:22089 Corelib.Init.Datatypes <> true constr
+R22158:22160 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22096:22101 xv6iris.HartMemRun <> goodmb def
+R22156:22157 xv6iris.HartMemAsm <> mm:230 var
+R22154:22154 xv6iris.HartMemAsm <> s:229 var
+R22110:22118 Riscv.rv64d <> write_ram def
+R22120:22121 xv6iris.HartMemAsm <> wk:225 var
+R22124:22131 Riscv.rv64d_types <> Physaddr constr
+R22133:22136 xv6iris.HartMemAsm <> addr:227 var
+R22139:22143 xv6iris.HartMemAsm <> width:226 var
+R22145:22148 xv6iris.HartMemAsm <> data:228 var
+R22150:22151 Corelib.Init.Datatypes <> tt constr
+R22106:22107 xv6iris.HartMemAsm <> Dw:224 var
+R22103:22104 xv6iris.HartMemAsm <> Dr:223 var
+R22161:22164 Corelib.Init.Datatypes <> true constr
+R22206:22214 Riscv.rv64d <> write_ram def
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22298:22311 xv6iris.HartMemRun <> goodmb_returnm thm
+R22321:22332 xv6iris.RiscvExec <> exec_returnm thm
+R22369:22387 Riscv.rv64d_types Defs sail_mem_write def
+R22426:22474 SailStdpp.ConcurrencyInterfaceTypes <> Mem_write_request_value proj
+R22490:22498 Riscv.rv64d_types Defs bind def
+R22506:22524 Riscv.rv64d_types Interface iMon_bind def
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22298:22311 xv6iris.HartMemRun <> goodmb_returnm thm
+R22321:22332 xv6iris.RiscvExec <> exec_returnm thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22298:22311 xv6iris.HartMemRun <> goodmb_returnm thm
+R22321:22332 xv6iris.RiscvExec <> exec_returnm thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22298:22311 xv6iris.HartMemRun <> goodmb_returnm thm
+R22321:22332 xv6iris.RiscvExec <> exec_returnm thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22279:22285 xv6iris.HartMemAsm <> gm_bind thm
+R22298:22311 xv6iris.HartMemRun <> goodmb_returnm thm
+R22321:22332 xv6iris.RiscvExec <> exec_returnm thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+R22542:22552 xv6iris.HartMemAsm <> gm_MemWrite thm
+prf 24423:24434 <> gm_ctx_after
+R24453:24456 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24445:24452 Riscv.rv64d_types <> register variant
+R24457:24460 Corelib.Init.Datatypes <> bool ind
+binder 24437:24438 <> Dr:231
+binder 24440:24441 <> Dw:232
+binder 24464:24464 <> Y:233
+binder 24466:24466 <> Z:234
+R24490:24493 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24487:24487 Riscv.rv64d_types <> M def
+R24489:24489 xv6iris.HartMemAsm <> Y:233 var
+R24494:24494 Riscv.rv64d_types <> M def
+R24496:24496 xv6iris.HartMemAsm <> Z:234 var
+binder 24481:24483 <> Phi:235
+R24505:24508 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24504:24504 xv6iris.HartMemAsm <> Y:233 var
+R24509:24509 Riscv.rv64d_types <> M def
+R24511:24511 xv6iris.HartMemAsm <> Z:234 var
+binder 24500:24500 <> G:236
+R24526:24532 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R24534:24535 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 24533:24533 <> y:237
+R24557:24559 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24536:24538 xv6iris.HartMemAsm <> Phi:235 var
+R24541:24553 Riscv.rv64d_types Interface Ret constr
+R24555:24555 xv6iris.HartMemAsm <> y:237 var
+R24560:24560 xv6iris.HartMemAsm <> G:236 var
+R24562:24562 xv6iris.HartMemAsm <> y:237 var
+binder 24519:24522 <> Hret:238
+R24578:24585 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R24638:24647 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 24586:24586 <> T:239
+R24602:24618 Riscv.rv64d_types Interface outcome ind
+R24622:24622 xv6iris.HartMemAsm <> T:239 var
+binder 24597:24598 <> oc:240
+R24631:24634 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24630:24630 xv6iris.HartMemAsm <> T:239 var
+R24635:24635 Riscv.rv64d_types <> M def
+R24637:24637 xv6iris.HartMemAsm <> Y:233 var
+binder 24626:24626 <> k:241
+R24673:24675 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24648:24650 xv6iris.HartMemAsm <> Phi:235 var
+R24653:24666 Riscv.rv64d_types Interface Next constr
+R24671:24671 xv6iris.HartMemAsm <> k:241 var
+R24668:24669 xv6iris.HartMemAsm <> oc:240 var
+R24676:24689 Riscv.rv64d_types Interface Next constr
+binder 24699:24699 <> t:242
+R24704:24706 xv6iris.HartMemAsm <> Phi:235 var
+R24709:24709 xv6iris.HartMemAsm <> k:241 var
+R24711:24711 xv6iris.HartMemAsm <> t:242 var
+R24691:24692 xv6iris.HartMemAsm <> oc:240 var
+binder 24570:24574 <> Hnext:243
+R24725:24725 Riscv.rv64d_types <> M def
+R24727:24727 xv6iris.HartMemAsm <> Y:233 var
+binder 24721:24721 <> m:244
+R24734:24741 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R24766:24772 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R24749:24754 xv6iris.RiscvLang <> mstate rec
+binder 24742:24742 <> s:245
+R24749:24754 xv6iris.RiscvLang <> mstate rec
+binder 24744:24745 <> s':246
+binder 24757:24758 <> mm:247
+R24765:24765 xv6iris.HartMemAsm <> Y:233 var
+binder 24761:24761 <> y:248
+R24799:24806 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24792:24794 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24773:24778 xv6iris.HartMemRun <> goodmb def
+R24790:24791 xv6iris.HartMemAsm <> mm:247 var
+R24788:24788 xv6iris.HartMemAsm <> s:245 var
+R24786:24786 xv6iris.HartMemAsm <> m:244 var
+R24783:24784 xv6iris.HartMemAsm <> Dw:232 var
+R24780:24781 xv6iris.HartMemAsm <> Dr:231 var
+R24795:24798 Corelib.Init.Datatypes <> true constr
+R24830:24837 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24815:24817 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24807:24810 xv6iris.RiscvExec <> exec def
+R24814:24814 xv6iris.HartMemAsm <> s:245 var
+R24812:24812 xv6iris.HartMemAsm <> m:244 var
+R24818:24821 Corelib.Init.Datatypes <> Some constr
+R24823:24823 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R24825:24826 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R24829:24829 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R24824:24824 xv6iris.HartMemAsm <> y:248 var
+R24827:24828 xv6iris.HartMemAsm <> s':246 var
+R24863:24865 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24838:24843 xv6iris.HartMemRun <> goodmb def
+R24861:24862 xv6iris.HartMemAsm <> mm:247 var
+R24859:24859 xv6iris.HartMemAsm <> s:245 var
+R24852:24854 xv6iris.HartMemAsm <> Phi:235 var
+R24856:24856 xv6iris.HartMemAsm <> m:244 var
+R24848:24849 xv6iris.HartMemAsm <> Dw:232 var
+R24845:24846 xv6iris.HartMemAsm <> Dr:231 var
+R24866:24871 xv6iris.HartMemRun <> goodmb def
+R24889:24896 xv6iris.HartMemRun <> mm_after def
+R24902:24903 xv6iris.HartMemAsm <> mm:247 var
+R24900:24900 xv6iris.HartMemAsm <> s:245 var
+R24898:24898 xv6iris.HartMemAsm <> m:244 var
+R24885:24886 xv6iris.HartMemAsm <> s':246 var
+R24880:24880 xv6iris.HartMemAsm <> G:236 var
+R24882:24882 xv6iris.HartMemAsm <> y:248 var
+R24876:24877 xv6iris.HartMemAsm <> Dw:232 var
+R24873:24874 xv6iris.HartMemAsm <> Dr:231 var
+R24982:24985 xv6iris.RiscvExec <> exec def
+R25023:25030 xv6iris.HartMemRun <> mm_after def
+R25277:25282 xv6iris.HartMemRun <> goodmb def
+R25284:25287 xv6iris.RiscvExec <> exec def
+R25289:25296 xv6iris.HartMemRun <> mm_after def
+R25348:25356 Corelib.Init.Datatypes <> andb_prop thm
+R25348:25356 Corelib.Init.Datatypes <> andb_prop thm
+R25393:25396 Corelib.Init.Datatypes <> andb def
+R25447:25455 Corelib.Init.Datatypes <> andb_prop thm
+R25447:25455 Corelib.Init.Datatypes <> andb_prop thm
+R25492:25495 Corelib.Init.Datatypes <> andb def
+R25518:25519 Corelib.Init.Datatypes <> tt constr
+R25518:25519 Corelib.Init.Datatypes <> tt constr
+R25547:25555 Corelib.Init.Datatypes <> andb_prop thm
+R25547:25555 Corelib.Init.Datatypes <> andb_prop thm
+R25583:25591 Corelib.Init.Datatypes <> andb_prop thm
+R25583:25591 Corelib.Init.Datatypes <> andb_prop thm
+R25627:25639 Stdlib.Bool.Bool <> negb_true_iff thm
+R25627:25639 Stdlib.Bool.Bool <> negb_true_iff thm
+R25699:25702 Corelib.Init.Datatypes <> negb def
+R25704:25707 Corelib.Init.Datatypes <> andb def
+R25727:25736 xv6iris.RiscvModelBytes <> read_bytes def
+R25741:25743 xv6iris.RiscvLang <> mem proj
+R25747:25766 Riscv.rv64d_types Interface.ReadReq pa proj
+R25727:25736 xv6iris.RiscvModelBytes <> read_bytes def
+R25741:25743 xv6iris.RiscvLang <> mem proj
+R25747:25766 Riscv.rv64d_types Interface.ReadReq pa proj
+R25884:25892 Corelib.Init.Datatypes <> andb_prop thm
+R25884:25892 Corelib.Init.Datatypes <> andb_prop thm
+R25920:25928 Corelib.Init.Datatypes <> andb_prop thm
+R25920:25928 Corelib.Init.Datatypes <> andb_prop thm
+R25964:25976 Stdlib.Bool.Bool <> negb_true_iff thm
+R25964:25976 Stdlib.Bool.Bool <> negb_true_iff thm
+R26036:26039 Corelib.Init.Datatypes <> negb def
+R26041:26044 Corelib.Init.Datatypes <> andb def
+R26083:26085 Corelib.Init.Datatypes <> inl constr
+R26087:26090 Corelib.Init.Datatypes <> None constr
+R26083:26085 Corelib.Init.Datatypes <> inl constr
+R26087:26090 Corelib.Init.Datatypes <> None constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+R26136:26137 Corelib.Init.Datatypes <> tt constr
+prf 26195:26207 <> gm_ctxR_after
+R26226:26229 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26218:26225 Riscv.rv64d_types <> register variant
+R26230:26233 Corelib.Init.Datatypes <> bool ind
+binder 26210:26211 <> Dr:249
+binder 26213:26214 <> Dw:250
+binder 26237:26237 <> R:251
+binder 26239:26239 <> Y:252
+binder 26241:26241 <> Z:253
+R26287:26290 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26262:26272 Riscv.rv64d_types Defs monadR def
+R26274:26274 xv6iris.HartMemAsm <> R:251 var
+R26276:26284 Riscv.rv64d_types <> exception ind
+R26286:26286 xv6iris.HartMemAsm <> Y:252 var
+R26291:26301 Riscv.rv64d_types Defs monadR def
+R26303:26303 xv6iris.HartMemAsm <> R:251 var
+R26305:26313 Riscv.rv64d_types <> exception ind
+R26315:26315 xv6iris.HartMemAsm <> Z:253 var
+binder 26256:26258 <> Phi:254
+R26328:26331 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26327:26327 xv6iris.HartMemAsm <> Y:252 var
+R26332:26342 Riscv.rv64d_types Defs monadR def
+R26344:26344 xv6iris.HartMemAsm <> R:251 var
+R26346:26354 Riscv.rv64d_types <> exception ind
+R26356:26356 xv6iris.HartMemAsm <> Z:253 var
+binder 26323:26323 <> G:255
+R26371:26377 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R26379:26380 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 26378:26378 <> y:256
+R26402:26404 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26381:26383 xv6iris.HartMemAsm <> Phi:254 var
+R26386:26398 Riscv.rv64d_types Interface Ret constr
+R26400:26400 xv6iris.HartMemAsm <> y:256 var
+R26405:26405 xv6iris.HartMemAsm <> G:255 var
+R26407:26407 xv6iris.HartMemAsm <> y:256 var
+binder 26364:26367 <> Hret:257
+R26423:26430 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R26525:26534 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 26431:26431 <> T:258
+R26447:26463 Riscv.rv64d_types Interface outcome ind
+R26467:26467 xv6iris.HartMemAsm <> T:258 var
+binder 26442:26443 <> oc:259
+R26496:26499 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26495:26495 xv6iris.HartMemAsm <> T:258 var
+R26500:26510 Riscv.rv64d_types Defs monadR def
+R26512:26512 xv6iris.HartMemAsm <> R:251 var
+R26514:26522 Riscv.rv64d_types <> exception ind
+R26524:26524 xv6iris.HartMemAsm <> Y:252 var
+binder 26491:26491 <> k:260
+R26560:26562 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26535:26537 xv6iris.HartMemAsm <> Phi:254 var
+R26540:26553 Riscv.rv64d_types Interface Next constr
+R26558:26558 xv6iris.HartMemAsm <> k:260 var
+R26555:26556 xv6iris.HartMemAsm <> oc:259 var
+R26563:26576 Riscv.rv64d_types Interface Next constr
+binder 26586:26586 <> t:261
+R26591:26593 xv6iris.HartMemAsm <> Phi:254 var
+R26596:26596 xv6iris.HartMemAsm <> k:260 var
+R26598:26598 xv6iris.HartMemAsm <> t:261 var
+R26578:26579 xv6iris.HartMemAsm <> oc:259 var
+binder 26415:26419 <> Hnext:262
+R26612:26622 Riscv.rv64d_types Defs monadR def
+R26624:26624 xv6iris.HartMemAsm <> R:251 var
+R26626:26634 Riscv.rv64d_types <> exception ind
+R26636:26636 xv6iris.HartMemAsm <> Y:252 var
+binder 26608:26608 <> m:263
+R26643:26650 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R26675:26681 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R26658:26663 xv6iris.RiscvLang <> mstate rec
+binder 26651:26651 <> s:264
+R26658:26663 xv6iris.RiscvLang <> mstate rec
+binder 26653:26654 <> s':265
+binder 26666:26667 <> mm:266
+R26674:26674 xv6iris.HartMemAsm <> Y:252 var
+binder 26670:26670 <> y:267
+R26708:26715 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26701:26703 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26682:26687 xv6iris.HartMemRun <> goodmb def
+R26699:26700 xv6iris.HartMemAsm <> mm:266 var
+R26697:26697 xv6iris.HartMemAsm <> s:264 var
+R26695:26695 xv6iris.HartMemAsm <> m:263 var
+R26692:26693 xv6iris.HartMemAsm <> Dw:250 var
+R26689:26690 xv6iris.HartMemAsm <> Dr:249 var
+R26704:26707 Corelib.Init.Datatypes <> true constr
+R26744:26751 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26725:26727 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26716:26720 xv6iris.RiscvTryStep <> execR def
+R26724:26724 xv6iris.HartMemAsm <> s:264 var
+R26722:26722 xv6iris.HartMemAsm <> m:263 var
+R26728:26731 Corelib.Init.Datatypes <> Some constr
+R26733:26733 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R26739:26740 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R26743:26743 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R26734:26736 Corelib.Init.Datatypes <> inr constr
+R26738:26738 xv6iris.HartMemAsm <> y:267 var
+R26741:26742 xv6iris.HartMemAsm <> s':265 var
+R26777:26779 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26752:26757 xv6iris.HartMemRun <> goodmb def
+R26775:26776 xv6iris.HartMemAsm <> mm:266 var
+R26773:26773 xv6iris.HartMemAsm <> s:264 var
+R26766:26768 xv6iris.HartMemAsm <> Phi:254 var
+R26770:26770 xv6iris.HartMemAsm <> m:263 var
+R26762:26763 xv6iris.HartMemAsm <> Dw:250 var
+R26759:26760 xv6iris.HartMemAsm <> Dr:249 var
+R26780:26785 xv6iris.HartMemRun <> goodmb def
+R26803:26810 xv6iris.HartMemRun <> mm_after def
+R26816:26817 xv6iris.HartMemAsm <> mm:266 var
+R26814:26814 xv6iris.HartMemAsm <> s:264 var
+R26812:26812 xv6iris.HartMemAsm <> m:263 var
+R26799:26800 xv6iris.HartMemAsm <> s':265 var
+R26794:26794 xv6iris.HartMemAsm <> G:255 var
+R26796:26796 xv6iris.HartMemAsm <> y:267 var
+R26790:26791 xv6iris.HartMemAsm <> Dw:250 var
+R26787:26788 xv6iris.HartMemAsm <> Dr:249 var
+R26896:26900 xv6iris.RiscvTryStep <> execR def
+R26928:26930 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26928:26930 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26965:26967 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26965:26967 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27007:27014 xv6iris.HartMemRun <> mm_after def
+R27261:27266 xv6iris.HartMemRun <> goodmb def
+R27268:27272 xv6iris.RiscvTryStep <> execR def
+R27274:27281 xv6iris.HartMemRun <> mm_after def
+R27333:27341 Corelib.Init.Datatypes <> andb_prop thm
+R27333:27341 Corelib.Init.Datatypes <> andb_prop thm
+R27378:27381 Corelib.Init.Datatypes <> andb def
+R27432:27440 Corelib.Init.Datatypes <> andb_prop thm
+R27432:27440 Corelib.Init.Datatypes <> andb_prop thm
+R27477:27480 Corelib.Init.Datatypes <> andb def
+R27503:27504 Corelib.Init.Datatypes <> tt constr
+R27503:27504 Corelib.Init.Datatypes <> tt constr
+R27532:27540 Corelib.Init.Datatypes <> andb_prop thm
+R27532:27540 Corelib.Init.Datatypes <> andb_prop thm
+R27568:27576 Corelib.Init.Datatypes <> andb_prop thm
+R27568:27576 Corelib.Init.Datatypes <> andb_prop thm
+R27612:27624 Stdlib.Bool.Bool <> negb_true_iff thm
+R27612:27624 Stdlib.Bool.Bool <> negb_true_iff thm
+R27684:27687 Corelib.Init.Datatypes <> negb def
+R27689:27692 Corelib.Init.Datatypes <> andb def
+R27712:27721 xv6iris.RiscvModelBytes <> read_bytes def
+R27726:27728 xv6iris.RiscvLang <> mem proj
+R27732:27751 Riscv.rv64d_types Interface.ReadReq pa proj
+R27712:27721 xv6iris.RiscvModelBytes <> read_bytes def
+R27726:27728 xv6iris.RiscvLang <> mem proj
+R27732:27751 Riscv.rv64d_types Interface.ReadReq pa proj
+R27869:27877 Corelib.Init.Datatypes <> andb_prop thm
+R27869:27877 Corelib.Init.Datatypes <> andb_prop thm
+R27905:27913 Corelib.Init.Datatypes <> andb_prop thm
+R27905:27913 Corelib.Init.Datatypes <> andb_prop thm
+R27949:27961 Stdlib.Bool.Bool <> negb_true_iff thm
+R27949:27961 Stdlib.Bool.Bool <> negb_true_iff thm
+R28021:28024 Corelib.Init.Datatypes <> negb def
+R28026:28029 Corelib.Init.Datatypes <> andb def
+R28068:28070 Corelib.Init.Datatypes <> inl constr
+R28072:28075 Corelib.Init.Datatypes <> None constr
+R28068:28070 Corelib.Init.Datatypes <> inl constr
+R28072:28075 Corelib.Init.Datatypes <> None constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+R28121:28122 Corelib.Init.Datatypes <> tt constr
+prf 28180:28195 <> gm_cer_ctx_after
+R28214:28217 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28206:28213 Riscv.rv64d_types <> register variant
+R28218:28221 Corelib.Init.Datatypes <> bool ind
+binder 28198:28199 <> Dr:268
+binder 28201:28202 <> Dw:269
+binder 28225:28225 <> R:270
+binder 28227:28227 <> Y:271
+R28273:28276 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28248:28258 Riscv.rv64d_types Defs monadR def
+R28260:28260 xv6iris.HartMemAsm <> R:270 var
+R28262:28270 Riscv.rv64d_types <> exception ind
+R28272:28272 xv6iris.HartMemAsm <> Y:271 var
+R28277:28287 Riscv.rv64d_types Defs monadR def
+R28289:28289 xv6iris.HartMemAsm <> R:270 var
+R28291:28299 Riscv.rv64d_types <> exception ind
+R28301:28301 xv6iris.HartMemAsm <> R:270 var
+binder 28242:28244 <> Phi:272
+R28314:28317 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28313:28313 xv6iris.HartMemAsm <> Y:271 var
+R28318:28328 Riscv.rv64d_types Defs monadR def
+R28330:28330 xv6iris.HartMemAsm <> R:270 var
+R28332:28340 Riscv.rv64d_types <> exception ind
+R28342:28342 xv6iris.HartMemAsm <> R:270 var
+binder 28309:28309 <> G:273
+R28357:28363 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R28365:28366 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 28364:28364 <> y:274
+R28388:28390 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R28367:28369 xv6iris.HartMemAsm <> Phi:272 var
+R28372:28384 Riscv.rv64d_types Interface Ret constr
+R28386:28386 xv6iris.HartMemAsm <> y:274 var
+R28391:28391 xv6iris.HartMemAsm <> G:273 var
+R28393:28393 xv6iris.HartMemAsm <> y:274 var
+binder 28350:28353 <> Hret:275
+R28409:28416 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R28511:28520 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 28417:28417 <> T:276
+R28433:28449 Riscv.rv64d_types Interface outcome ind
+R28453:28453 xv6iris.HartMemAsm <> T:276 var
+binder 28428:28429 <> oc:277
+R28482:28485 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28481:28481 xv6iris.HartMemAsm <> T:276 var
+R28486:28496 Riscv.rv64d_types Defs monadR def
+R28498:28498 xv6iris.HartMemAsm <> R:270 var
+R28500:28508 Riscv.rv64d_types <> exception ind
+R28510:28510 xv6iris.HartMemAsm <> Y:271 var
+binder 28477:28477 <> k:278
+R28546:28548 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R28521:28523 xv6iris.HartMemAsm <> Phi:272 var
+R28526:28539 Riscv.rv64d_types Interface Next constr
+R28544:28544 xv6iris.HartMemAsm <> k:278 var
+R28541:28542 xv6iris.HartMemAsm <> oc:277 var
+R28549:28562 Riscv.rv64d_types Interface Next constr
+binder 28572:28572 <> t:279
+R28577:28579 xv6iris.HartMemAsm <> Phi:272 var
+R28582:28582 xv6iris.HartMemAsm <> k:278 var
+R28584:28584 xv6iris.HartMemAsm <> t:279 var
+R28564:28565 xv6iris.HartMemAsm <> oc:277 var
+binder 28401:28405 <> Hnext:280
+R28598:28608 Riscv.rv64d_types Defs monadR def
+R28610:28610 xv6iris.HartMemAsm <> R:270 var
+R28612:28620 Riscv.rv64d_types <> exception ind
+R28622:28622 xv6iris.HartMemAsm <> Y:271 var
+binder 28594:28594 <> m:281
+R28629:28636 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R28661:28667 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R28644:28649 xv6iris.RiscvLang <> mstate rec
+binder 28637:28637 <> s:282
+R28644:28649 xv6iris.RiscvLang <> mstate rec
+binder 28639:28640 <> s':283
+binder 28652:28653 <> mm:284
+R28660:28660 xv6iris.HartMemAsm <> Y:271 var
+binder 28656:28656 <> y:285
+R28694:28701 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28687:28689 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R28668:28673 xv6iris.HartMemRun <> goodmb def
+R28685:28686 xv6iris.HartMemAsm <> mm:284 var
+R28683:28683 xv6iris.HartMemAsm <> s:282 var
+R28681:28681 xv6iris.HartMemAsm <> m:281 var
+R28678:28679 xv6iris.HartMemAsm <> Dw:269 var
+R28675:28676 xv6iris.HartMemAsm <> Dr:268 var
+R28690:28693 Corelib.Init.Datatypes <> true constr
+R28730:28737 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R28711:28713 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R28702:28706 xv6iris.RiscvTryStep <> execR def
+R28710:28710 xv6iris.HartMemAsm <> s:282 var
+R28708:28708 xv6iris.HartMemAsm <> m:281 var
+R28714:28717 Corelib.Init.Datatypes <> Some constr
+R28719:28719 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28725:28726 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28729:28729 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28720:28722 Corelib.Init.Datatypes <> inr constr
+R28724:28724 xv6iris.HartMemAsm <> y:285 var
+R28727:28728 xv6iris.HartMemAsm <> s':283 var
+R28789:28795 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R28738:28743 xv6iris.HartMemRun <> goodmb def
+R28787:28788 xv6iris.HartMemAsm <> mm:284 var
+R28785:28785 xv6iris.HartMemAsm <> s:282 var
+R28752:28774 Riscv.rv64d_types Defs catch_early_return def
+R28777:28779 xv6iris.HartMemAsm <> Phi:272 var
+R28781:28781 xv6iris.HartMemAsm <> m:281 var
+R28748:28749 xv6iris.HartMemAsm <> Dw:269 var
+R28745:28746 xv6iris.HartMemAsm <> Dr:268 var
+R28796:28801 xv6iris.HartMemRun <> goodmb def
+R28845:28852 xv6iris.HartMemRun <> mm_after def
+R28858:28859 xv6iris.HartMemAsm <> mm:284 var
+R28856:28856 xv6iris.HartMemAsm <> s:282 var
+R28854:28854 xv6iris.HartMemAsm <> m:281 var
+R28841:28842 xv6iris.HartMemAsm <> s':283 var
+R28810:28832 Riscv.rv64d_types Defs catch_early_return def
+R28835:28835 xv6iris.HartMemAsm <> G:273 var
+R28837:28837 xv6iris.HartMemAsm <> y:285 var
+R28806:28807 xv6iris.HartMemAsm <> Dw:269 var
+R28803:28804 xv6iris.HartMemAsm <> Dr:268 var
+R28938:28942 xv6iris.RiscvTryStep <> execR def
+R28970:28972 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R28970:28972 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29007:29009 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29007:29009 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29049:29056 xv6iris.HartMemRun <> mm_after def
+R29303:29308 xv6iris.HartMemRun <> goodmb def
+R29310:29314 xv6iris.RiscvTryStep <> execR def
+R29316:29323 xv6iris.HartMemRun <> mm_after def
+R29325:29347 Riscv.rv64d_types Defs catch_early_return def
+R29349:29362 Riscv.rv64d_types Defs try_catch def
+R29422:29430 Corelib.Init.Datatypes <> andb_prop thm
+R29422:29430 Corelib.Init.Datatypes <> andb_prop thm
+R29467:29470 Corelib.Init.Datatypes <> andb def
+R29521:29529 Corelib.Init.Datatypes <> andb_prop thm
+R29521:29529 Corelib.Init.Datatypes <> andb_prop thm
+R29566:29569 Corelib.Init.Datatypes <> andb def
+R29592:29593 Corelib.Init.Datatypes <> tt constr
+R29592:29593 Corelib.Init.Datatypes <> tt constr
+R29621:29629 Corelib.Init.Datatypes <> andb_prop thm
+R29621:29629 Corelib.Init.Datatypes <> andb_prop thm
+R29657:29665 Corelib.Init.Datatypes <> andb_prop thm
+R29657:29665 Corelib.Init.Datatypes <> andb_prop thm
+R29701:29713 Stdlib.Bool.Bool <> negb_true_iff thm
+R29701:29713 Stdlib.Bool.Bool <> negb_true_iff thm
+R29773:29776 Corelib.Init.Datatypes <> negb def
+R29778:29781 Corelib.Init.Datatypes <> andb def
+R29801:29810 xv6iris.RiscvModelBytes <> read_bytes def
+R29815:29817 xv6iris.RiscvLang <> mem proj
+R29821:29840 Riscv.rv64d_types Interface.ReadReq pa proj
+R29801:29810 xv6iris.RiscvModelBytes <> read_bytes def
+R29815:29817 xv6iris.RiscvLang <> mem proj
+R29821:29840 Riscv.rv64d_types Interface.ReadReq pa proj
+R29958:29966 Corelib.Init.Datatypes <> andb_prop thm
+R29958:29966 Corelib.Init.Datatypes <> andb_prop thm
+R29994:30002 Corelib.Init.Datatypes <> andb_prop thm
+R29994:30002 Corelib.Init.Datatypes <> andb_prop thm
+R30038:30050 Stdlib.Bool.Bool <> negb_true_iff thm
+R30038:30050 Stdlib.Bool.Bool <> negb_true_iff thm
+R30110:30113 Corelib.Init.Datatypes <> negb def
+R30115:30118 Corelib.Init.Datatypes <> andb def
+R30157:30159 Corelib.Init.Datatypes <> inl constr
+R30161:30164 Corelib.Init.Datatypes <> None constr
+R30157:30159 Corelib.Init.Datatypes <> inl constr
+R30161:30164 Corelib.Init.Datatypes <> None constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+R30210:30211 Corelib.Init.Datatypes <> tt constr
+prf 30665:30670 <> gm_ctx
+R30689:30692 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30681:30688 Riscv.rv64d_types <> register variant
+R30693:30696 Corelib.Init.Datatypes <> bool ind
+binder 30673:30674 <> Dr:286
+binder 30676:30677 <> Dw:287
+binder 30700:30700 <> Y:288
+binder 30702:30702 <> Z:289
+R30726:30729 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30723:30723 Riscv.rv64d_types <> M def
+R30725:30725 xv6iris.HartMemAsm <> Y:288 var
+R30730:30730 Riscv.rv64d_types <> M def
+R30732:30732 xv6iris.HartMemAsm <> Z:289 var
+binder 30717:30719 <> Phi:290
+R30741:30744 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30740:30740 xv6iris.HartMemAsm <> Y:288 var
+R30745:30745 Riscv.rv64d_types <> M def
+R30747:30747 xv6iris.HartMemAsm <> Z:289 var
+binder 30736:30736 <> G:291
+R30759:30759 Riscv.rv64d_types <> M def
+R30761:30761 xv6iris.HartMemAsm <> Y:288 var
+binder 30755:30755 <> m:292
+R30772:30777 xv6iris.RiscvLang <> mstate rec
+binder 30765:30765 <> s:293
+binder 30767:30768 <> s':294
+binder 30780:30781 <> mm:295
+R30788:30788 xv6iris.HartMemAsm <> Y:288 var
+binder 30784:30784 <> y:296
+R30795:30795 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30836:30842 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30796:30802 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R30805:30806 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 30803:30804 <> y0:297
+R30829:30831 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30807:30809 xv6iris.HartMemAsm <> Phi:290 var
+R30812:30824 Riscv.rv64d_types Interface Ret constr
+R30826:30827 xv6iris.HartMemAsm <> y0:297 var
+R30832:30832 xv6iris.HartMemAsm <> G:291 var
+R30834:30835 xv6iris.HartMemAsm <> y0:297 var
+R30843:30843 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30978:30984 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30844:30851 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R30904:30911 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 30852:30852 <> T:298
+R30868:30884 Riscv.rv64d_types Interface outcome ind
+R30888:30888 xv6iris.HartMemAsm <> T:298 var
+binder 30863:30864 <> oc:299
+R30897:30900 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R30896:30896 xv6iris.HartMemAsm <> T:298 var
+R30901:30901 Riscv.rv64d_types <> M def
+R30903:30903 xv6iris.HartMemAsm <> Y:288 var
+binder 30892:30892 <> k:300
+R30937:30939 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30912:30914 xv6iris.HartMemAsm <> Phi:290 var
+R30917:30930 Riscv.rv64d_types Interface Next constr
+R30935:30935 xv6iris.HartMemAsm <> k:300 var
+R30932:30933 xv6iris.HartMemAsm <> oc:299 var
+R30940:30953 Riscv.rv64d_types Interface Next constr
+binder 30963:30963 <> t:301
+R30968:30970 xv6iris.HartMemAsm <> Phi:290 var
+R30973:30973 xv6iris.HartMemAsm <> k:300 var
+R30975:30975 xv6iris.HartMemAsm <> t:301 var
+R30955:30956 xv6iris.HartMemAsm <> oc:299 var
+R31011:31016 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31004:31006 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30985:30990 xv6iris.HartMemRun <> goodmb def
+R31002:31003 xv6iris.HartMemAsm <> mm:295 var
+R31000:31000 xv6iris.HartMemAsm <> s:293 var
+R30998:30998 xv6iris.HartMemAsm <> m:292 var
+R30995:30996 xv6iris.HartMemAsm <> Dw:287 var
+R30992:30993 xv6iris.HartMemAsm <> Dr:286 var
+R31007:31010 Corelib.Init.Datatypes <> true constr
+R31040:31045 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31025:31027 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31017:31020 xv6iris.RiscvExec <> exec def
+R31024:31024 xv6iris.HartMemAsm <> s:293 var
+R31022:31022 xv6iris.HartMemAsm <> m:292 var
+R31028:31031 Corelib.Init.Datatypes <> Some constr
+R31033:31033 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31035:31036 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31039:31039 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31034:31034 xv6iris.HartMemAsm <> y:296 var
+R31037:31038 xv6iris.HartMemAsm <> s':294 var
+R31071:31073 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31046:31051 xv6iris.HartMemRun <> goodmb def
+R31069:31070 xv6iris.HartMemAsm <> mm:295 var
+R31067:31067 xv6iris.HartMemAsm <> s:293 var
+R31060:31062 xv6iris.HartMemAsm <> Phi:290 var
+R31064:31064 xv6iris.HartMemAsm <> m:292 var
+R31056:31057 xv6iris.HartMemAsm <> Dw:287 var
+R31053:31054 xv6iris.HartMemAsm <> Dr:286 var
+R31074:31079 xv6iris.HartMemRun <> goodmb def
+R31096:31097 xv6iris.HartMemAsm <> mm:295 var
+R31093:31094 xv6iris.HartMemAsm <> s':294 var
+R31088:31088 xv6iris.HartMemAsm <> G:291 var
+R31090:31090 xv6iris.HartMemAsm <> y:296 var
+R31084:31085 xv6iris.HartMemAsm <> Dw:287 var
+R31081:31082 xv6iris.HartMemAsm <> Dr:286 var
+R31145:31156 xv6iris.HartMemAsm <> gm_ctx_after thm
+R31145:31156 xv6iris.HartMemAsm <> gm_ctx_after thm
+R31145:31156 xv6iris.HartMemAsm <> gm_ctx_after thm
+R31210:31225 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R31210:31225 xv6iris.HartMemAsm <> goodmb_after_dom thm
+prf 31266:31272 <> gm_ctxR
+R31291:31294 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31283:31290 Riscv.rv64d_types <> register variant
+R31295:31298 Corelib.Init.Datatypes <> bool ind
+binder 31275:31276 <> Dr:302
+binder 31278:31279 <> Dw:303
+binder 31302:31302 <> R:304
+binder 31304:31304 <> Y:305
+binder 31306:31306 <> Z:306
+R31352:31355 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31327:31337 Riscv.rv64d_types Defs monadR def
+R31339:31339 xv6iris.HartMemAsm <> R:304 var
+R31341:31349 Riscv.rv64d_types <> exception ind
+R31351:31351 xv6iris.HartMemAsm <> Y:305 var
+R31356:31366 Riscv.rv64d_types Defs monadR def
+R31368:31368 xv6iris.HartMemAsm <> R:304 var
+R31370:31378 Riscv.rv64d_types <> exception ind
+R31380:31380 xv6iris.HartMemAsm <> Z:306 var
+binder 31321:31323 <> Phi:307
+R31393:31396 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31392:31392 xv6iris.HartMemAsm <> Y:305 var
+R31397:31407 Riscv.rv64d_types Defs monadR def
+R31409:31409 xv6iris.HartMemAsm <> R:304 var
+R31411:31419 Riscv.rv64d_types <> exception ind
+R31421:31421 xv6iris.HartMemAsm <> Z:306 var
+binder 31388:31388 <> G:308
+R31433:31443 Riscv.rv64d_types Defs monadR def
+R31445:31445 xv6iris.HartMemAsm <> R:304 var
+R31447:31455 Riscv.rv64d_types <> exception ind
+R31457:31457 xv6iris.HartMemAsm <> Y:305 var
+binder 31429:31429 <> m:309
+R31468:31473 xv6iris.RiscvLang <> mstate rec
+binder 31461:31461 <> s:310
+binder 31463:31464 <> s':311
+binder 31476:31477 <> mm:312
+R31484:31484 xv6iris.HartMemAsm <> Y:305 var
+binder 31480:31480 <> y:313
+R31491:31491 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31532:31538 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31492:31498 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31501:31502 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 31499:31500 <> y0:314
+R31525:31527 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31503:31505 xv6iris.HartMemAsm <> Phi:307 var
+R31508:31520 Riscv.rv64d_types Interface Ret constr
+R31522:31523 xv6iris.HartMemAsm <> y0:314 var
+R31528:31528 xv6iris.HartMemAsm <> G:308 var
+R31530:31531 xv6iris.HartMemAsm <> y0:314 var
+R31539:31539 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31706:31712 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31540:31547 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31632:31639 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 31548:31548 <> T:315
+R31564:31580 Riscv.rv64d_types Interface outcome ind
+R31584:31584 xv6iris.HartMemAsm <> T:315 var
+binder 31559:31560 <> oc:316
+R31603:31606 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31602:31602 xv6iris.HartMemAsm <> T:315 var
+R31607:31617 Riscv.rv64d_types Defs monadR def
+R31619:31619 xv6iris.HartMemAsm <> R:304 var
+R31621:31629 Riscv.rv64d_types <> exception ind
+R31631:31631 xv6iris.HartMemAsm <> Y:305 var
+binder 31598:31598 <> k:317
+R31665:31667 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31640:31642 xv6iris.HartMemAsm <> Phi:307 var
+R31645:31658 Riscv.rv64d_types Interface Next constr
+R31663:31663 xv6iris.HartMemAsm <> k:317 var
+R31660:31661 xv6iris.HartMemAsm <> oc:316 var
+R31668:31681 Riscv.rv64d_types Interface Next constr
+binder 31691:31691 <> t:318
+R31696:31698 xv6iris.HartMemAsm <> Phi:307 var
+R31701:31701 xv6iris.HartMemAsm <> k:317 var
+R31703:31703 xv6iris.HartMemAsm <> t:318 var
+R31683:31684 xv6iris.HartMemAsm <> oc:316 var
+R31739:31744 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31732:31734 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31713:31718 xv6iris.HartMemRun <> goodmb def
+R31730:31731 xv6iris.HartMemAsm <> mm:312 var
+R31728:31728 xv6iris.HartMemAsm <> s:310 var
+R31726:31726 xv6iris.HartMemAsm <> m:309 var
+R31723:31724 xv6iris.HartMemAsm <> Dw:303 var
+R31720:31721 xv6iris.HartMemAsm <> Dr:302 var
+R31735:31738 Corelib.Init.Datatypes <> true constr
+R31773:31778 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31754:31756 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31745:31749 xv6iris.RiscvTryStep <> execR def
+R31753:31753 xv6iris.HartMemAsm <> s:310 var
+R31751:31751 xv6iris.HartMemAsm <> m:309 var
+R31757:31760 Corelib.Init.Datatypes <> Some constr
+R31762:31762 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31768:31769 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31772:31772 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31763:31765 Corelib.Init.Datatypes <> inr constr
+R31767:31767 xv6iris.HartMemAsm <> y:313 var
+R31770:31771 xv6iris.HartMemAsm <> s':311 var
+R31804:31806 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31779:31784 xv6iris.HartMemRun <> goodmb def
+R31802:31803 xv6iris.HartMemAsm <> mm:312 var
+R31800:31800 xv6iris.HartMemAsm <> s:310 var
+R31793:31795 xv6iris.HartMemAsm <> Phi:307 var
+R31797:31797 xv6iris.HartMemAsm <> m:309 var
+R31789:31790 xv6iris.HartMemAsm <> Dw:303 var
+R31786:31787 xv6iris.HartMemAsm <> Dr:302 var
+R31807:31812 xv6iris.HartMemRun <> goodmb def
+R31829:31830 xv6iris.HartMemAsm <> mm:312 var
+R31826:31827 xv6iris.HartMemAsm <> s':311 var
+R31821:31821 xv6iris.HartMemAsm <> G:308 var
+R31823:31823 xv6iris.HartMemAsm <> y:313 var
+R31817:31818 xv6iris.HartMemAsm <> Dw:303 var
+R31814:31815 xv6iris.HartMemAsm <> Dr:302 var
+R31878:31890 xv6iris.HartMemAsm <> gm_ctxR_after thm
+R31878:31890 xv6iris.HartMemAsm <> gm_ctxR_after thm
+R31878:31890 xv6iris.HartMemAsm <> gm_ctxR_after thm
+R31944:31959 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R31944:31959 xv6iris.HartMemAsm <> goodmb_after_dom thm
+prf 32000:32009 <> gm_cer_ctx
+R32028:32031 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32020:32027 Riscv.rv64d_types <> register variant
+R32032:32035 Corelib.Init.Datatypes <> bool ind
+binder 32012:32013 <> Dr:319
+binder 32015:32016 <> Dw:320
+binder 32039:32039 <> R:321
+binder 32041:32041 <> Y:322
+R32087:32090 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32062:32072 Riscv.rv64d_types Defs monadR def
+R32074:32074 xv6iris.HartMemAsm <> R:321 var
+R32076:32084 Riscv.rv64d_types <> exception ind
+R32086:32086 xv6iris.HartMemAsm <> Y:322 var
+R32091:32101 Riscv.rv64d_types Defs monadR def
+R32103:32103 xv6iris.HartMemAsm <> R:321 var
+R32105:32113 Riscv.rv64d_types <> exception ind
+R32115:32115 xv6iris.HartMemAsm <> R:321 var
+binder 32056:32058 <> Phi:323
+R32128:32131 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32127:32127 xv6iris.HartMemAsm <> Y:322 var
+R32132:32142 Riscv.rv64d_types Defs monadR def
+R32144:32144 xv6iris.HartMemAsm <> R:321 var
+R32146:32154 Riscv.rv64d_types <> exception ind
+R32156:32156 xv6iris.HartMemAsm <> R:321 var
+binder 32123:32123 <> G:324
+R32168:32178 Riscv.rv64d_types Defs monadR def
+R32180:32180 xv6iris.HartMemAsm <> R:321 var
+R32182:32190 Riscv.rv64d_types <> exception ind
+R32192:32192 xv6iris.HartMemAsm <> Y:322 var
+binder 32164:32164 <> m:325
+R32203:32208 xv6iris.RiscvLang <> mstate rec
+binder 32196:32196 <> s:326
+binder 32198:32199 <> s':327
+binder 32211:32212 <> mm:328
+R32219:32219 xv6iris.HartMemAsm <> Y:322 var
+binder 32215:32215 <> y:329
+R32226:32226 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32267:32273 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32227:32233 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R32236:32237 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 32234:32235 <> y0:330
+R32260:32262 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32238:32240 xv6iris.HartMemAsm <> Phi:323 var
+R32243:32255 Riscv.rv64d_types Interface Ret constr
+R32257:32258 xv6iris.HartMemAsm <> y0:330 var
+R32263:32263 xv6iris.HartMemAsm <> G:324 var
+R32265:32266 xv6iris.HartMemAsm <> y0:330 var
+R32274:32274 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32441:32447 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32275:32282 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R32367:32374 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 32283:32283 <> T:331
+R32299:32315 Riscv.rv64d_types Interface outcome ind
+R32319:32319 xv6iris.HartMemAsm <> T:331 var
+binder 32294:32295 <> oc:332
+R32338:32341 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32337:32337 xv6iris.HartMemAsm <> T:331 var
+R32342:32352 Riscv.rv64d_types Defs monadR def
+R32354:32354 xv6iris.HartMemAsm <> R:321 var
+R32356:32364 Riscv.rv64d_types <> exception ind
+R32366:32366 xv6iris.HartMemAsm <> Y:322 var
+binder 32333:32333 <> k:333
+R32400:32402 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32375:32377 xv6iris.HartMemAsm <> Phi:323 var
+R32380:32393 Riscv.rv64d_types Interface Next constr
+R32398:32398 xv6iris.HartMemAsm <> k:333 var
+R32395:32396 xv6iris.HartMemAsm <> oc:332 var
+R32403:32416 Riscv.rv64d_types Interface Next constr
+binder 32426:32426 <> t:334
+R32431:32433 xv6iris.HartMemAsm <> Phi:323 var
+R32436:32436 xv6iris.HartMemAsm <> k:333 var
+R32438:32438 xv6iris.HartMemAsm <> t:334 var
+R32418:32419 xv6iris.HartMemAsm <> oc:332 var
+R32474:32479 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32467:32469 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32448:32453 xv6iris.HartMemRun <> goodmb def
+R32465:32466 xv6iris.HartMemAsm <> mm:328 var
+R32463:32463 xv6iris.HartMemAsm <> s:326 var
+R32461:32461 xv6iris.HartMemAsm <> m:325 var
+R32458:32459 xv6iris.HartMemAsm <> Dw:320 var
+R32455:32456 xv6iris.HartMemAsm <> Dr:319 var
+R32470:32473 Corelib.Init.Datatypes <> true constr
+R32508:32513 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32489:32491 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32480:32484 xv6iris.RiscvTryStep <> execR def
+R32488:32488 xv6iris.HartMemAsm <> s:326 var
+R32486:32486 xv6iris.HartMemAsm <> m:325 var
+R32492:32495 Corelib.Init.Datatypes <> Some constr
+R32497:32497 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R32503:32504 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R32507:32507 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R32498:32500 Corelib.Init.Datatypes <> inr constr
+R32502:32502 xv6iris.HartMemAsm <> y:329 var
+R32505:32506 xv6iris.HartMemAsm <> s':327 var
+R32565:32569 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32514:32519 xv6iris.HartMemRun <> goodmb def
+R32563:32564 xv6iris.HartMemAsm <> mm:328 var
+R32561:32561 xv6iris.HartMemAsm <> s:326 var
+R32528:32550 Riscv.rv64d_types Defs catch_early_return def
+R32553:32555 xv6iris.HartMemAsm <> Phi:323 var
+R32557:32557 xv6iris.HartMemAsm <> m:325 var
+R32524:32525 xv6iris.HartMemAsm <> Dw:320 var
+R32521:32522 xv6iris.HartMemAsm <> Dr:319 var
+R32570:32575 xv6iris.HartMemRun <> goodmb def
+R32618:32619 xv6iris.HartMemAsm <> mm:328 var
+R32615:32616 xv6iris.HartMemAsm <> s':327 var
+R32584:32606 Riscv.rv64d_types Defs catch_early_return def
+R32609:32609 xv6iris.HartMemAsm <> G:324 var
+R32611:32611 xv6iris.HartMemAsm <> y:329 var
+R32580:32581 xv6iris.HartMemAsm <> Dw:320 var
+R32577:32578 xv6iris.HartMemAsm <> Dr:319 var
+R32667:32682 xv6iris.HartMemAsm <> gm_cer_ctx_after thm
+R32667:32682 xv6iris.HartMemAsm <> gm_cer_ctx_after thm
+R32667:32682 xv6iris.HartMemAsm <> gm_cer_ctx_after thm
+R32736:32751 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R32762:32784 Riscv.rv64d_types Defs catch_early_return def
+R32736:32751 xv6iris.HartMemAsm <> goodmb_after_dom thm
+R32762:32784 Riscv.rv64d_types Defs catch_early_return def
+prf 32924:32938 <> gm_cer_ctx_lift
+R32957:32960 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32949:32956 Riscv.rv64d_types <> register variant
+R32961:32964 Corelib.Init.Datatypes <> bool ind
+binder 32941:32942 <> Dr:335
+binder 32944:32945 <> Dw:336
+binder 32968:32968 <> R:337
+binder 32970:32970 <> Y:338
+R33016:33019 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32991:33001 Riscv.rv64d_types Defs monadR def
+R33003:33003 xv6iris.HartMemAsm <> R:337 var
+R33005:33013 Riscv.rv64d_types <> exception ind
+R33015:33015 xv6iris.HartMemAsm <> Y:338 var
+R33020:33030 Riscv.rv64d_types Defs monadR def
+R33032:33032 xv6iris.HartMemAsm <> R:337 var
+R33034:33042 Riscv.rv64d_types <> exception ind
+R33044:33044 xv6iris.HartMemAsm <> R:337 var
+binder 32985:32987 <> Phi:339
+R33057:33060 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33056:33056 xv6iris.HartMemAsm <> Y:338 var
+R33061:33071 Riscv.rv64d_types Defs monadR def
+R33073:33073 xv6iris.HartMemAsm <> R:337 var
+R33075:33083 Riscv.rv64d_types <> exception ind
+R33085:33085 xv6iris.HartMemAsm <> R:337 var
+binder 33052:33052 <> G:340
+R33097:33097 Riscv.rv64d_types <> M def
+R33099:33099 xv6iris.HartMemAsm <> Y:338 var
+binder 33093:33093 <> m:341
+R33110:33115 xv6iris.RiscvLang <> mstate rec
+binder 33103:33103 <> s:342
+binder 33105:33106 <> s':343
+binder 33118:33119 <> mm:344
+R33126:33126 xv6iris.HartMemAsm <> Y:338 var
+binder 33122:33122 <> y:345
+R33133:33133 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33174:33180 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33134:33140 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R33143:33144 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 33141:33142 <> y0:346
+R33167:33169 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R33145:33147 xv6iris.HartMemAsm <> Phi:339 var
+R33150:33162 Riscv.rv64d_types Interface Ret constr
+R33164:33165 xv6iris.HartMemAsm <> y0:346 var
+R33170:33170 xv6iris.HartMemAsm <> G:340 var
+R33172:33173 xv6iris.HartMemAsm <> y0:346 var
+R33181:33181 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33348:33354 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33182:33189 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R33274:33281 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 33190:33190 <> T:347
+R33206:33222 Riscv.rv64d_types Interface outcome ind
+R33226:33226 xv6iris.HartMemAsm <> T:347 var
+binder 33201:33202 <> oc:348
+R33245:33248 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33244:33244 xv6iris.HartMemAsm <> T:347 var
+R33249:33259 Riscv.rv64d_types Defs monadR def
+R33261:33261 xv6iris.HartMemAsm <> R:337 var
+R33263:33271 Riscv.rv64d_types <> exception ind
+R33273:33273 xv6iris.HartMemAsm <> Y:338 var
+binder 33240:33240 <> k:349
+R33307:33309 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R33282:33284 xv6iris.HartMemAsm <> Phi:339 var
+R33287:33300 Riscv.rv64d_types Interface Next constr
+R33305:33305 xv6iris.HartMemAsm <> k:349 var
+R33302:33303 xv6iris.HartMemAsm <> oc:348 var
+R33310:33323 Riscv.rv64d_types Interface Next constr
+binder 33333:33333 <> t:350
+R33338:33340 xv6iris.HartMemAsm <> Phi:339 var
+R33343:33343 xv6iris.HartMemAsm <> k:349 var
+R33345:33345 xv6iris.HartMemAsm <> t:350 var
+R33325:33326 xv6iris.HartMemAsm <> oc:348 var
+R33381:33386 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33374:33376 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R33355:33360 xv6iris.HartMemRun <> goodmb def
+R33372:33373 xv6iris.HartMemAsm <> mm:344 var
+R33370:33370 xv6iris.HartMemAsm <> s:342 var
+R33368:33368 xv6iris.HartMemAsm <> m:341 var
+R33365:33366 xv6iris.HartMemAsm <> Dw:336 var
+R33362:33363 xv6iris.HartMemAsm <> Dr:335 var
+R33377:33380 Corelib.Init.Datatypes <> true constr
+R33410:33415 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33395:33397 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R33387:33390 xv6iris.RiscvExec <> exec def
+R33394:33394 xv6iris.HartMemAsm <> s:342 var
+R33392:33392 xv6iris.HartMemAsm <> m:341 var
+R33398:33401 Corelib.Init.Datatypes <> Some constr
+R33403:33403 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R33405:33406 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R33409:33409 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R33404:33404 xv6iris.HartMemAsm <> y:345 var
+R33407:33408 xv6iris.HartMemAsm <> s':343 var
+R33480:33484 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R33416:33421 xv6iris.HartMemRun <> goodmb def
+R33478:33479 xv6iris.HartMemAsm <> mm:344 var
+R33476:33476 xv6iris.HartMemAsm <> s:342 var
+R33430:33452 Riscv.rv64d_types Defs catch_early_return def
+R33455:33457 xv6iris.HartMemAsm <> Phi:339 var
+R33460:33469 Riscv.rv64d_types Defs liftR def
+R33471:33471 xv6iris.HartMemAsm <> m:341 var
+R33426:33427 xv6iris.HartMemAsm <> Dw:336 var
+R33423:33424 xv6iris.HartMemAsm <> Dr:335 var
+R33485:33490 xv6iris.HartMemRun <> goodmb def
+R33533:33534 xv6iris.HartMemAsm <> mm:344 var
+R33530:33531 xv6iris.HartMemAsm <> s':343 var
+R33499:33521 Riscv.rv64d_types Defs catch_early_return def
+R33524:33524 xv6iris.HartMemAsm <> G:340 var
+R33526:33526 xv6iris.HartMemAsm <> y:345 var
+R33495:33496 xv6iris.HartMemAsm <> Dw:336 var
+R33492:33493 xv6iris.HartMemAsm <> Dr:335 var
+R33580:33589 xv6iris.HartMemAsm <> gm_cer_ctx thm
+R33682:33699 xv6iris.HartMemAsm <> goodmb_liftR_execR thm
+R33651:33662 xv6iris.HartMemRun <> goodmb_liftR thm
+R33604:33613 Riscv.rv64d_types Defs liftR def
+R33580:33589 xv6iris.HartMemAsm <> gm_cer_ctx thm
+R33682:33699 xv6iris.HartMemAsm <> goodmb_liftR_execR thm
+R33651:33662 xv6iris.HartMemRun <> goodmb_liftR thm
+R33604:33613 Riscv.rv64d_types Defs liftR def
+prf 33728:33738 <> gm_ctx_lift
+R33757:33760 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33749:33756 Riscv.rv64d_types <> register variant
+R33761:33764 Corelib.Init.Datatypes <> bool ind
+binder 33741:33742 <> Dr:351
+binder 33744:33745 <> Dw:352
+binder 33768:33768 <> R:353
+binder 33770:33770 <> Y:354
+binder 33772:33772 <> Z:355
+R33818:33821 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33793:33803 Riscv.rv64d_types Defs monadR def
+R33805:33805 xv6iris.HartMemAsm <> R:353 var
+R33807:33815 Riscv.rv64d_types <> exception ind
+R33817:33817 xv6iris.HartMemAsm <> Y:354 var
+R33822:33832 Riscv.rv64d_types Defs monadR def
+R33834:33834 xv6iris.HartMemAsm <> R:353 var
+R33836:33844 Riscv.rv64d_types <> exception ind
+R33846:33846 xv6iris.HartMemAsm <> Z:355 var
+binder 33787:33789 <> Phi:356
+R33859:33862 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33858:33858 xv6iris.HartMemAsm <> Y:354 var
+R33863:33873 Riscv.rv64d_types Defs monadR def
+R33875:33875 xv6iris.HartMemAsm <> R:353 var
+R33877:33885 Riscv.rv64d_types <> exception ind
+R33887:33887 xv6iris.HartMemAsm <> Z:355 var
+binder 33854:33854 <> G:357
+R33899:33899 Riscv.rv64d_types <> M def
+R33901:33901 xv6iris.HartMemAsm <> Y:354 var
+binder 33895:33895 <> m:358
+R33912:33917 xv6iris.RiscvLang <> mstate rec
+binder 33905:33905 <> s:359
+binder 33907:33908 <> s':360
+binder 33920:33921 <> mm:361
+R33928:33928 xv6iris.HartMemAsm <> Y:354 var
+binder 33924:33924 <> y:362
+R33935:33935 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33976:33982 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33936:33942 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R33945:33946 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 33943:33944 <> y0:363
+R33969:33971 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R33947:33949 xv6iris.HartMemAsm <> Phi:356 var
+R33952:33964 Riscv.rv64d_types Interface Ret constr
+R33966:33967 xv6iris.HartMemAsm <> y0:363 var
+R33972:33972 xv6iris.HartMemAsm <> G:357 var
+R33974:33975 xv6iris.HartMemAsm <> y0:363 var
+R33983:33983 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R34150:34156 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33984:33991 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R34076:34083 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 33992:33992 <> T:364
+R34008:34024 Riscv.rv64d_types Interface outcome ind
+R34028:34028 xv6iris.HartMemAsm <> T:364 var
+binder 34003:34004 <> oc:365
+R34047:34050 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R34046:34046 xv6iris.HartMemAsm <> T:364 var
+R34051:34061 Riscv.rv64d_types Defs monadR def
+R34063:34063 xv6iris.HartMemAsm <> R:353 var
+R34065:34073 Riscv.rv64d_types <> exception ind
+R34075:34075 xv6iris.HartMemAsm <> Y:354 var
+binder 34042:34042 <> k:366
+R34109:34111 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R34084:34086 xv6iris.HartMemAsm <> Phi:356 var
+R34089:34102 Riscv.rv64d_types Interface Next constr
+R34107:34107 xv6iris.HartMemAsm <> k:366 var
+R34104:34105 xv6iris.HartMemAsm <> oc:365 var
+R34112:34125 Riscv.rv64d_types Interface Next constr
+binder 34135:34135 <> t:367
+R34140:34142 xv6iris.HartMemAsm <> Phi:356 var
+R34145:34145 xv6iris.HartMemAsm <> k:366 var
+R34147:34147 xv6iris.HartMemAsm <> t:367 var
+R34127:34128 xv6iris.HartMemAsm <> oc:365 var
+R34183:34188 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R34176:34178 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R34157:34162 xv6iris.HartMemRun <> goodmb def
+R34174:34175 xv6iris.HartMemAsm <> mm:361 var
+R34172:34172 xv6iris.HartMemAsm <> s:359 var
+R34170:34170 xv6iris.HartMemAsm <> m:358 var
+R34167:34168 xv6iris.HartMemAsm <> Dw:352 var
+R34164:34165 xv6iris.HartMemAsm <> Dr:351 var
+R34179:34182 Corelib.Init.Datatypes <> true constr
+R34212:34217 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R34197:34199 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R34189:34192 xv6iris.RiscvExec <> exec def
+R34196:34196 xv6iris.HartMemAsm <> s:359 var
+R34194:34194 xv6iris.HartMemAsm <> m:358 var
+R34200:34203 Corelib.Init.Datatypes <> Some constr
+R34205:34205 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R34207:34208 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R34211:34211 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R34206:34206 xv6iris.HartMemAsm <> y:362 var
+R34209:34210 xv6iris.HartMemAsm <> s':360 var
+R34256:34258 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R34218:34223 xv6iris.HartMemRun <> goodmb def
+R34254:34255 xv6iris.HartMemAsm <> mm:361 var
+R34252:34252 xv6iris.HartMemAsm <> s:359 var
+R34232:34234 xv6iris.HartMemAsm <> Phi:356 var
+R34237:34246 Riscv.rv64d_types Defs liftR def
+R34248:34248 xv6iris.HartMemAsm <> m:358 var
+R34228:34229 xv6iris.HartMemAsm <> Dw:352 var
+R34225:34226 xv6iris.HartMemAsm <> Dr:351 var
+R34259:34264 xv6iris.HartMemRun <> goodmb def
+R34281:34282 xv6iris.HartMemAsm <> mm:361 var
+R34278:34279 xv6iris.HartMemAsm <> s':360 var
+R34273:34273 xv6iris.HartMemAsm <> G:357 var
+R34275:34275 xv6iris.HartMemAsm <> y:362 var
+R34269:34270 xv6iris.HartMemAsm <> Dw:352 var
+R34266:34267 xv6iris.HartMemAsm <> Dr:351 var
+R34328:34334 xv6iris.HartMemAsm <> gm_ctxR thm
+R34427:34444 xv6iris.HartMemAsm <> goodmb_liftR_execR thm
+R34396:34407 xv6iris.HartMemRun <> goodmb_liftR thm
+R34349:34358 Riscv.rv64d_types Defs liftR def
+R34328:34334 xv6iris.HartMemAsm <> gm_ctxR thm
+R34427:34444 xv6iris.HartMemAsm <> goodmb_liftR_execR thm
+R34396:34407 xv6iris.HartMemRun <> goodmb_liftR thm
+R34349:34358 Riscv.rv64d_types Defs liftR def
+prf 35654:35662 <> mbind_Ret
+binder 35665:35665 <> E:368
+binder 35667:35667 <> X:369
+binder 35669:35669 <> Y:370
+R35677:35677 xv6iris.HartMemAsm <> X:369 var
+binder 35673:35673 <> x:371
+R35686:35689 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35685:35685 xv6iris.HartMemAsm <> X:369 var
+R35690:35699 Riscv.rv64d_types Defs monad def
+R35701:35701 xv6iris.HartMemAsm <> E:368 var
+R35703:35703 xv6iris.HartMemAsm <> Y:370 var
+binder 35681:35681 <> f:372
+R35739:35741 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R35710:35718 Riscv.rv64d_types Defs bind def
+R35738:35738 xv6iris.HartMemAsm <> f:372 var
+R35721:35733 Riscv.rv64d_types Interface Ret constr
+R35735:35735 xv6iris.HartMemAsm <> x:371 var
+R35742:35742 xv6iris.HartMemAsm <> f:372 var
+R35744:35744 xv6iris.HartMemAsm <> x:371 var
+prf 35779:35788 <> mbind_Next
+binder 35791:35791 <> E:373
+binder 35793:35793 <> X:374
+binder 35795:35795 <> Y:375
+binder 35799:35799 <> T:376
+R35815:35831 Riscv.rv64d_types Interface outcome ind
+R35835:35835 xv6iris.HartMemAsm <> T:376 var
+binder 35810:35811 <> oc:377
+R35848:35851 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35847:35847 xv6iris.HartMemAsm <> T:376 var
+R35852:35861 Riscv.rv64d_types Defs monad def
+R35863:35863 xv6iris.HartMemAsm <> E:373 var
+R35865:35865 xv6iris.HartMemAsm <> X:374 var
+binder 35843:35843 <> k:378
+R35874:35877 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35873:35873 xv6iris.HartMemAsm <> X:374 var
+R35878:35887 Riscv.rv64d_types Defs monad def
+R35889:35889 xv6iris.HartMemAsm <> E:373 var
+R35891:35891 xv6iris.HartMemAsm <> Y:375 var
+binder 35869:35869 <> f:379
+R35931:35935 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R35898:35906 Riscv.rv64d_types Defs bind def
+R35930:35930 xv6iris.HartMemAsm <> f:379 var
+R35909:35922 Riscv.rv64d_types Interface Next constr
+R35927:35927 xv6iris.HartMemAsm <> k:378 var
+R35924:35925 xv6iris.HartMemAsm <> oc:377 var
+R35936:35949 Riscv.rv64d_types Interface Next constr
+binder 35959:35959 <> t:380
+R35964:35972 Riscv.rv64d_types Defs bind def
+R35980:35980 xv6iris.HartMemAsm <> f:379 var
+R35975:35975 xv6iris.HartMemAsm <> k:378 var
+R35977:35977 xv6iris.HartMemAsm <> t:380 var
+R35951:35952 xv6iris.HartMemAsm <> oc:377 var
+prf 36016:36025 <> mbind0_Ret
+binder 36028:36028 <> E:381
+binder 36030:36030 <> Y:382
+R36038:36041 Corelib.Init.Datatypes <> unit ind
+binder 36034:36034 <> x:383
+R36049:36058 Riscv.rv64d_types Defs monad def
+R36060:36060 xv6iris.HartMemAsm <> E:381 var
+R36062:36062 xv6iris.HartMemAsm <> Y:382 var
+binder 36045:36045 <> n:384
+R36099:36101 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R36069:36078 Riscv.rv64d_types Defs bind0 def
+R36098:36098 xv6iris.HartMemAsm <> n:384 var
+R36081:36093 Riscv.rv64d_types Interface Ret constr
+R36095:36095 xv6iris.HartMemAsm <> x:383 var
+R36102:36102 xv6iris.HartMemAsm <> n:384 var
+prf 36139:36149 <> mbind0_Next
+binder 36152:36152 <> E:385
+binder 36154:36154 <> Y:386
+binder 36158:36158 <> T:387
+R36174:36190 Riscv.rv64d_types Interface outcome ind
+R36194:36194 xv6iris.HartMemAsm <> T:387 var
+binder 36169:36170 <> oc:388
+R36207:36210 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R36206:36206 xv6iris.HartMemAsm <> T:387 var
+R36211:36220 Riscv.rv64d_types Defs monad def
+R36222:36222 xv6iris.HartMemAsm <> E:385 var
+R36224:36227 Corelib.Init.Datatypes <> unit ind
+binder 36202:36202 <> k:389
+R36235:36244 Riscv.rv64d_types Defs monad def
+R36246:36246 xv6iris.HartMemAsm <> E:385 var
+R36248:36248 xv6iris.HartMemAsm <> Y:386 var
+binder 36231:36231 <> n:390
+R36289:36293 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R36255:36264 Riscv.rv64d_types Defs bind0 def
+R36288:36288 xv6iris.HartMemAsm <> n:390 var
+R36267:36280 Riscv.rv64d_types Interface Next constr
+R36285:36285 xv6iris.HartMemAsm <> k:389 var
+R36282:36283 xv6iris.HartMemAsm <> oc:388 var
+R36294:36307 Riscv.rv64d_types Interface Next constr
+binder 36317:36317 <> t:391
+R36322:36331 Riscv.rv64d_types Defs bind0 def
+R36339:36339 xv6iris.HartMemAsm <> n:390 var
+R36334:36334 xv6iris.HartMemAsm <> k:389 var
+R36336:36336 xv6iris.HartMemAsm <> t:391 var
+R36309:36310 xv6iris.HartMemAsm <> oc:388 var
+R36431:36439 xv6iris.HartMemAsm <> mbind_Ret thm
+R36451:36460 xv6iris.HartMemAsm <> mbind0_Ret thm
+R36492:36501 xv6iris.HartMemAsm <> mbind_Next thm
+R36513:36523 xv6iris.HartMemAsm <> mbind0_Next thm
+R37722:37724 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R37705:37710 xv6iris.HartMemRun <> goodmb def
+R37725:37728 Corelib.Init.Datatypes <> true constr
+R37722:37724 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R37705:37710 xv6iris.HartMemRun <> goodmb def
+R37725:37728 Corelib.Init.Datatypes <> true constr
+R37794:37796 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R37770:37775 xv6iris.HartMemRun <> goodmb def
+R37794:37796 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R37770:37775 xv6iris.HartMemRun <> goodmb def
+R37920:37925 xv6iris.HartMemAsm <> gm_ctx thm
+binder 37940:37941 <> y0:392
+R37949:37961 Riscv.rv64d_types Interface Ret constr
+R37963:37964 xv6iris.HartMemAsm <> y0:392 var
+R38211:38213 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R38194:38199 xv6iris.HartMemRun <> goodmb def
+R38214:38217 Corelib.Init.Datatypes <> true constr
+R38211:38213 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R38194:38199 xv6iris.HartMemRun <> goodmb def
+R38214:38217 Corelib.Init.Datatypes <> true constr
+R38283:38285 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R38259:38264 xv6iris.HartMemRun <> goodmb def
+R38283:38285 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R38259:38264 xv6iris.HartMemRun <> goodmb def
+R38409:38415 xv6iris.HartMemAsm <> gm_ctxR thm
+binder 38430:38431 <> y0:393
+R38439:38451 Riscv.rv64d_types Interface Ret constr
+R38453:38454 xv6iris.HartMemAsm <> y0:393 var
+R38701:38703 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R38684:38689 xv6iris.HartMemRun <> goodmb def
+R38704:38707 Corelib.Init.Datatypes <> true constr
+R38701:38703 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R38684:38689 xv6iris.HartMemRun <> goodmb def
+R38704:38707 Corelib.Init.Datatypes <> true constr
+R38799:38801 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R38749:38754 xv6iris.HartMemRun <> goodmb def
+R38765:38787 Riscv.rv64d_types Defs catch_early_return def
+R38799:38801 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R38749:38754 xv6iris.HartMemRun <> goodmb def
+R38765:38787 Riscv.rv64d_types Defs catch_early_return def
+R38925:38934 xv6iris.HartMemAsm <> gm_cer_ctx thm
+binder 38949:38950 <> y0:394
+R38958:38970 Riscv.rv64d_types Interface Ret constr
+R38972:38973 xv6iris.HartMemAsm <> y0:394 var
+R39220:39222 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39203:39208 xv6iris.HartMemRun <> goodmb def
+R39223:39226 Corelib.Init.Datatypes <> true constr
+R39220:39222 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39203:39208 xv6iris.HartMemRun <> goodmb def
+R39223:39226 Corelib.Init.Datatypes <> true constr
+R39318:39320 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39268:39273 xv6iris.HartMemRun <> goodmb def
+R39284:39306 Riscv.rv64d_types Defs catch_early_return def
+R39318:39320 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39268:39273 xv6iris.HartMemRun <> goodmb def
+R39284:39306 Riscv.rv64d_types Defs catch_early_return def
+R39376:39385 Riscv.rv64d_types Defs liftR def
+R39376:39385 Riscv.rv64d_types Defs liftR def
+R39441:39450 Riscv.rv64d_types Defs liftR def
+R39557:39571 xv6iris.HartMemAsm <> gm_cer_ctx_lift thm
+binder 39616:39617 <> y0:395
+R39625:39637 Riscv.rv64d_types Interface Ret constr
+R39639:39640 xv6iris.HartMemAsm <> y0:395 var
+R39888:39890 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39871:39876 xv6iris.HartMemRun <> goodmb def
+R39891:39894 Corelib.Init.Datatypes <> true constr
+R39888:39890 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39871:39876 xv6iris.HartMemRun <> goodmb def
+R39891:39894 Corelib.Init.Datatypes <> true constr
+R39960:39962 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39936:39941 xv6iris.HartMemRun <> goodmb def
+R39960:39962 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R39936:39941 xv6iris.HartMemRun <> goodmb def
+R40018:40027 Riscv.rv64d_types Defs liftR def
+R40018:40027 Riscv.rv64d_types Defs liftR def
+R40083:40092 Riscv.rv64d_types Defs liftR def
+R40199:40209 xv6iris.HartMemAsm <> gm_ctx_lift thm
+binder 40254:40255 <> y0:396
+R40263:40275 Riscv.rv64d_types Interface Ret constr
+R40277:40278 xv6iris.HartMemAsm <> y0:396 var

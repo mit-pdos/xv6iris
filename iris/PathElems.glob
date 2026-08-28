@@ -1,0 +1,1822 @@
+DIGEST 82b96a9f12d7d32e36ccdee862f34f5e
+Fxv6iris.PathElems
+R3598:3603 Stdlib.ZArith.ZArith <> <> lib
+R3605:3607 Stdlib.micromega.Lia <> <> lib
+R3609:3612 Stdlib.Lists.List <> <> lib
+R3641:3644 stdpp.list <> <> lib
+R3646:3666 stdpp.bitvector.definitions <> <> lib
+R3684:3699 SailStdpp.Values <> <> lib
+R3717:3725 xv6iris.DirentEnc <> <> lib
+def 4030:4034 <> SLASH
+R4038:4039 stdpp.bitvector.definitions <> bv rec
+R4065:4069 SailStdpp.Values <> mword def
+R4047:4058 SailStdpp.Values <> mword_of_int def
+def 4087:4093 <> noslash
+R4100:4103 Corelib.Init.Datatypes <> list ind
+R4106:4107 stdpp.bitvector.definitions <> bv rec
+binder 4096:4096 <> l:1
+R4123:4128 Corelib.Lists.ListDef <> Forall ind
+R4152:4152 xv6iris.PathElems <> l:1 var
+binder 4135:4135 <> b:2
+R4141:4144 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R4140:4140 xv6iris.PathElems <> b:2 var
+R4145:4149 xv6iris.PathElems <> SLASH def
+def 4200:4206 <> pe_skip
+R4213:4216 Corelib.Init.Datatypes <> list ind
+R4219:4220 stdpp.bitvector.definitions <> bv rec
+binder 4209:4209 <> p:3
+R4228:4231 Corelib.Init.Datatypes <> list ind
+R4234:4235 stdpp.bitvector.definitions <> bv rec
+R4251:4251 xv6iris.PathElems <> p:3 var
+R4262:4263 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R4268:4269 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R4276:4279 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R4289:4299 stdpp.decidable <> bool_decide def
+R4303:4305 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4306:4310 xv6iris.PathElems <> SLASH def
+R4335:4338 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R4318:4324 xv6iris.PathElems <> pe_skip:4 def
+def 4430:4436 <> pe_elem
+R4443:4446 Corelib.Init.Datatypes <> list ind
+R4449:4450 stdpp.bitvector.definitions <> bv rec
+binder 4439:4439 <> p:6
+R4458:4461 Corelib.Init.Datatypes <> list ind
+R4464:4465 stdpp.bitvector.definitions <> bv rec
+R4481:4481 xv6iris.PathElems <> p:6 var
+R4492:4493 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R4498:4499 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R4506:4509 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R4519:4529 stdpp.decidable <> bool_decide def
+R4533:4535 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4536:4540 xv6iris.PathElems <> SLASH def
+R4557:4560 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R4561:4567 xv6iris.PathElems <> pe_elem:7 def
+R4548:4549 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+def 4637:4643 <> pe_rest
+R4650:4653 Corelib.Init.Datatypes <> list ind
+R4656:4657 stdpp.bitvector.definitions <> bv rec
+binder 4646:4646 <> p:9
+R4665:4668 Corelib.Init.Datatypes <> list ind
+R4671:4672 stdpp.bitvector.definitions <> bv rec
+R4688:4688 xv6iris.PathElems <> p:9 var
+R4699:4700 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R4705:4706 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R4713:4716 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R4726:4736 stdpp.decidable <> bool_decide def
+R4740:4742 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4743:4747 xv6iris.PathElems <> SLASH def
+R4768:4774 xv6iris.PathElems <> pe_rest:10 def
+R4756:4759 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+def 4926:4932 <> pe_norm
+R4939:4942 Corelib.Init.Datatypes <> list ind
+R4945:4946 stdpp.bitvector.definitions <> bv rec
+binder 4935:4935 <> p:12
+R4971:4973 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4962:4968 xv6iris.PathElems <> pe_skip def
+R4970:4970 xv6iris.PathElems <> p:12 var
+R4974:4974 xv6iris.PathElems <> p:12 var
+def 5115:5122 <> skipelem
+R5129:5132 Corelib.Init.Datatypes <> list ind
+R5135:5136 stdpp.bitvector.definitions <> bv rec
+binder 5125:5125 <> p:13
+R5144:5149 Corelib.Init.Datatypes <> option ind
+R5163:5165 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R5152:5155 Corelib.Init.Datatypes <> list ind
+R5158:5159 stdpp.bitvector.definitions <> bv rec
+R5166:5169 Corelib.Init.Datatypes <> list ind
+R5172:5173 stdpp.bitvector.definitions <> bv rec
+R5190:5196 xv6iris.PathElems <> pe_skip def
+R5198:5198 xv6iris.PathElems <> p:13 var
+R5209:5210 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R5215:5218 Corelib.Init.Datatypes <> None constr
+R5225:5228 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R5234:5237 Corelib.Init.Datatypes <> Some constr
+R5239:5239 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5269:5270 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5300:5300 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R5240:5243 stdpp.list_basics <> take abbrev
+R5249:5255 xv6iris.PathElems <> pe_elem def
+R5258:5264 xv6iris.PathElems <> pe_skip def
+R5266:5266 xv6iris.PathElems <> p:13 var
+R5271:5277 xv6iris.PathElems <> pe_skip def
+R5280:5286 xv6iris.PathElems <> pe_rest def
+R5289:5295 xv6iris.PathElems <> pe_skip def
+R5297:5297 xv6iris.PathElems <> p:13 var
+prf 5549:5561 <> pe_skip_slash
+R5568:5571 Corelib.Init.Datatypes <> list ind
+R5574:5575 stdpp.bitvector.definitions <> bv rec
+binder 5564:5564 <> p:14
+R5603:5605 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5583:5589 xv6iris.PathElems <> pe_skip def
+R5597:5600 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R5592:5596 xv6iris.PathElems <> SLASH def
+R5601:5601 xv6iris.PathElems <> p:14 var
+R5606:5612 xv6iris.PathElems <> pe_skip def
+R5614:5614 xv6iris.PathElems <> p:14 var
+R5639:5654 stdpp.decidable <> bool_decide_true abbrev
+R5639:5654 stdpp.decidable <> bool_decide_true abbrev
+R5639:5654 stdpp.decidable <> bool_decide_true abbrev
+prf 5697:5706 <> pe_skip_ne
+R5713:5714 stdpp.bitvector.definitions <> bv rec
+binder 5709:5709 <> b:15
+R5724:5727 Corelib.Init.Datatypes <> list ind
+R5730:5731 stdpp.bitvector.definitions <> bv rec
+binder 5720:5720 <> p:16
+R5751:5754 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5742:5745 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R5741:5741 xv6iris.PathElems <> b:15 var
+R5746:5750 xv6iris.PathElems <> SLASH def
+R5771:5773 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5755:5761 xv6iris.PathElems <> pe_skip def
+R5765:5768 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R5764:5764 xv6iris.PathElems <> b:15 var
+R5769:5769 xv6iris.PathElems <> p:16 var
+R5775:5778 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R5774:5774 xv6iris.PathElems <> b:15 var
+R5779:5779 xv6iris.PathElems <> p:16 var
+R5815:5831 stdpp.decidable <> bool_decide_false abbrev
+R5815:5831 stdpp.decidable <> bool_decide_false abbrev
+R5815:5831 stdpp.decidable <> bool_decide_false abbrev
+prf 5871:5884 <> pe_skip_length
+R5891:5894 Corelib.Init.Datatypes <> list ind
+R5897:5898 stdpp.bitvector.definitions <> bv rec
+binder 5887:5887 <> p:17
+R5925:5928 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R5907:5912 Stdlib.Lists.List <> length abbrev
+R5915:5921 xv6iris.PathElems <> pe_skip def
+R5923:5923 xv6iris.PathElems <> p:17 var
+R5929:5934 Stdlib.Lists.List <> length abbrev
+R5936:5936 xv6iris.PathElems <> p:17 var
+R6014:6024 stdpp.decidable <> bool_decide def
+R6028:6030 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6031:6035 xv6iris.PathElems <> SLASH def
+R6014:6024 stdpp.decidable <> bool_decide def
+R6028:6030 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6031:6035 xv6iris.PathElems <> SLASH def
+prf 6064:6075 <> pe_skip_head
+R6082:6085 Corelib.Init.Datatypes <> list ind
+R6088:6089 stdpp.bitvector.definitions <> bv rec
+binder 6078:6078 <> p:18
+R6100:6101 stdpp.bitvector.definitions <> bv rec
+binder 6096:6096 <> b:19
+R6111:6114 Corelib.Init.Datatypes <> list ind
+R6117:6118 stdpp.bitvector.definitions <> bv rec
+binder 6107:6107 <> q:20
+R6146:6149 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6137:6139 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6128:6134 xv6iris.PathElems <> pe_skip def
+R6136:6136 xv6iris.PathElems <> p:18 var
+R6141:6144 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R6140:6140 xv6iris.PathElems <> b:19 var
+R6145:6145 xv6iris.PathElems <> q:20 var
+R6151:6154 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R6150:6150 xv6iris.PathElems <> b:19 var
+R6155:6159 xv6iris.PathElems <> SLASH def
+R6264:6274 stdpp.decidable <> bool_decide def
+R6278:6280 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6281:6285 xv6iris.PathElems <> SLASH def
+R6264:6274 stdpp.decidable <> bool_decide def
+R6278:6280 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6281:6285 xv6iris.PathElems <> SLASH def
+R6329:6348 stdpp.decidable <> bool_decide_eq_false thm
+R6329:6348 stdpp.decidable <> bool_decide_eq_false thm
+prf 6424:6435 <> pe_skip_idem
+R6442:6445 Corelib.Init.Datatypes <> list ind
+R6448:6449 stdpp.bitvector.definitions <> bv rec
+binder 6438:6438 <> p:21
+R6476:6478 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6457:6463 xv6iris.PathElems <> pe_skip def
+R6466:6472 xv6iris.PathElems <> pe_skip def
+R6474:6474 xv6iris.PathElems <> p:21 var
+R6479:6485 xv6iris.PathElems <> pe_skip def
+R6487:6487 xv6iris.PathElems <> p:21 var
+R6509:6515 xv6iris.PathElems <> pe_skip def
+R6509:6515 xv6iris.PathElems <> pe_skip def
+R6561:6570 xv6iris.PathElems <> pe_skip_ne thm
+R6561:6570 xv6iris.PathElems <> pe_skip_ne thm
+R6580:6591 xv6iris.PathElems <> pe_skip_head thm
+R6580:6591 xv6iris.PathElems <> pe_skip_head thm
+prf 6615:6626 <> pe_skip_norm
+R6633:6636 Corelib.Init.Datatypes <> list ind
+R6639:6640 stdpp.bitvector.definitions <> bv rec
+binder 6629:6629 <> p:22
+R6648:6654 xv6iris.PathElems <> pe_norm def
+R6657:6663 xv6iris.PathElems <> pe_skip def
+R6665:6665 xv6iris.PathElems <> p:22 var
+R6683:6689 xv6iris.PathElems <> pe_norm def
+R6698:6709 xv6iris.PathElems <> pe_skip_idem thm
+R6698:6709 xv6iris.PathElems <> pe_skip_idem thm
+prf 6724:6734 <> pe_norm_nil
+R6741:6744 Corelib.Init.Datatypes <> list ind
+R6747:6748 stdpp.bitvector.definitions <> bv rec
+binder 6737:6737 <> p:23
+R6765:6768 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6756:6762 xv6iris.PathElems <> pe_norm def
+R6764:6764 xv6iris.PathElems <> p:23 var
+R6783:6786 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6778:6780 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6769:6775 xv6iris.PathElems <> pe_skip def
+R6777:6777 xv6iris.PathElems <> p:23 var
+R6781:6782 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R6788:6790 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6787:6787 xv6iris.PathElems <> p:23 var
+R6791:6792 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R6809:6815 xv6iris.PathElems <> pe_norm def
+prf 6919:6930 <> pe_elem_rest
+R6937:6940 Corelib.Init.Datatypes <> list ind
+R6943:6944 stdpp.bitvector.definitions <> bv rec
+binder 6933:6933 <> p:24
+R6974:6976 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6961:6964 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R6952:6958 xv6iris.PathElems <> pe_elem def
+R6960:6960 xv6iris.PathElems <> p:24 var
+R6965:6971 xv6iris.PathElems <> pe_rest def
+R6973:6973 xv6iris.PathElems <> p:24 var
+R6977:6977 xv6iris.PathElems <> p:24 var
+R7050:7060 stdpp.decidable <> bool_decide def
+R7064:7066 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7067:7071 xv6iris.PathElems <> SLASH def
+R7050:7060 stdpp.decidable <> bool_decide def
+R7064:7066 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7067:7071 xv6iris.PathElems <> SLASH def
+prf 7138:7156 <> pe_elem_rest_length
+R7163:7166 Corelib.Init.Datatypes <> list ind
+R7169:7170 stdpp.bitvector.definitions <> bv rec
+binder 7159:7159 <> p:25
+R7225:7227 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7199:7201 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R7181:7186 Stdlib.Lists.List <> length abbrev
+R7189:7195 xv6iris.PathElems <> pe_elem def
+R7197:7197 xv6iris.PathElems <> p:25 var
+R7202:7207 Stdlib.Lists.List <> length abbrev
+R7210:7216 xv6iris.PathElems <> pe_rest def
+R7218:7218 xv6iris.PathElems <> p:25 var
+R7228:7233 Stdlib.Lists.List <> length abbrev
+R7235:7235 xv6iris.PathElems <> p:25 var
+R7257:7268 xv6iris.PathElems <> pe_elem_rest thm
+R7257:7268 xv6iris.PathElems <> pe_elem_rest thm
+R7257:7268 xv6iris.PathElems <> pe_elem_rest thm
+R7287:7296 Stdlib.Lists.List <> length_app thm
+R7287:7296 Stdlib.Lists.List <> length_app thm
+R7287:7296 Stdlib.Lists.List <> length_app thm
+prf 7324:7338 <> pe_elem_noslash
+R7345:7348 Corelib.Init.Datatypes <> list ind
+R7351:7352 stdpp.bitvector.definitions <> bv rec
+binder 7341:7341 <> p:26
+R7360:7366 xv6iris.PathElems <> noslash def
+R7369:7375 xv6iris.PathElems <> pe_elem def
+R7377:7377 xv6iris.PathElems <> p:26 var
+R7397:7403 xv6iris.PathElems <> noslash def
+R7467:7477 stdpp.decidable <> bool_decide def
+R7481:7483 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7484:7488 xv6iris.PathElems <> SLASH def
+R7467:7477 stdpp.decidable <> bool_decide def
+R7481:7483 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7484:7488 xv6iris.PathElems <> SLASH def
+R7524:7543 stdpp.decidable <> bool_decide_eq_false thm
+R7524:7543 stdpp.decidable <> bool_decide_eq_false thm
+prf 7600:7609 <> pe_elem_ne
+R7616:7617 stdpp.bitvector.definitions <> bv rec
+binder 7612:7612 <> b:27
+R7627:7630 Corelib.Init.Datatypes <> list ind
+R7633:7634 stdpp.bitvector.definitions <> bv rec
+binder 7623:7623 <> p:28
+R7654:7657 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7645:7648 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R7644:7644 xv6iris.PathElems <> b:27 var
+R7649:7653 xv6iris.PathElems <> SLASH def
+R7674:7676 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7658:7664 xv6iris.PathElems <> pe_elem def
+R7668:7671 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R7667:7667 xv6iris.PathElems <> b:27 var
+R7672:7672 xv6iris.PathElems <> p:28 var
+R7678:7681 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R7677:7677 xv6iris.PathElems <> b:27 var
+R7682:7688 xv6iris.PathElems <> pe_elem def
+R7690:7690 xv6iris.PathElems <> p:28 var
+R7726:7742 stdpp.decidable <> bool_decide_false abbrev
+R7726:7742 stdpp.decidable <> bool_decide_false abbrev
+R7726:7742 stdpp.decidable <> bool_decide_false abbrev
+prf 7782:7791 <> pe_rest_ne
+R7798:7799 stdpp.bitvector.definitions <> bv rec
+binder 7794:7794 <> b:29
+R7809:7812 Corelib.Init.Datatypes <> list ind
+R7815:7816 stdpp.bitvector.definitions <> bv rec
+binder 7805:7805 <> p:30
+R7836:7839 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7827:7830 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R7826:7826 xv6iris.PathElems <> b:29 var
+R7831:7835 xv6iris.PathElems <> SLASH def
+R7856:7858 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7840:7846 xv6iris.PathElems <> pe_rest def
+R7850:7853 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R7849:7849 xv6iris.PathElems <> b:29 var
+R7854:7854 xv6iris.PathElems <> p:30 var
+R7859:7865 xv6iris.PathElems <> pe_rest def
+R7867:7867 xv6iris.PathElems <> p:30 var
+R7903:7919 stdpp.decidable <> bool_decide_false abbrev
+R7903:7919 stdpp.decidable <> bool_decide_false abbrev
+R7903:7919 stdpp.decidable <> bool_decide_false abbrev
+prf 8032:8045 <> pe_elem_Forall
+R8056:8059 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8052:8053 stdpp.bitvector.definitions <> bv rec
+binder 8048:8048 <> P:31
+R8071:8074 Corelib.Init.Datatypes <> list ind
+R8077:8078 stdpp.bitvector.definitions <> bv rec
+binder 8067:8067 <> p:32
+R8098:8101 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8088:8093 Corelib.Lists.ListDef <> Forall ind
+R8097:8097 xv6iris.PathElems <> p:32 var
+R8095:8095 xv6iris.PathElems <> P:31 var
+R8102:8107 Corelib.Lists.ListDef <> Forall ind
+R8112:8118 xv6iris.PathElems <> pe_elem def
+R8120:8120 xv6iris.PathElems <> p:32 var
+R8109:8109 xv6iris.PathElems <> P:31 var
+R8200:8210 stdpp.decidable <> bool_decide def
+R8214:8216 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8217:8221 xv6iris.PathElems <> SLASH def
+R8200:8210 stdpp.decidable <> bool_decide def
+R8214:8216 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8217:8221 xv6iris.PathElems <> SLASH def
+prf 8292:8305 <> pe_rest_Forall
+R8316:8319 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8312:8313 stdpp.bitvector.definitions <> bv rec
+binder 8308:8308 <> P:33
+R8331:8334 Corelib.Init.Datatypes <> list ind
+R8337:8338 stdpp.bitvector.definitions <> bv rec
+binder 8327:8327 <> p:34
+R8358:8361 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8348:8353 Corelib.Lists.ListDef <> Forall ind
+R8357:8357 xv6iris.PathElems <> p:34 var
+R8355:8355 xv6iris.PathElems <> P:33 var
+R8362:8367 Corelib.Lists.ListDef <> Forall ind
+R8372:8378 xv6iris.PathElems <> pe_rest def
+R8380:8380 xv6iris.PathElems <> p:34 var
+R8369:8369 xv6iris.PathElems <> P:33 var
+R8460:8470 stdpp.decidable <> bool_decide def
+R8474:8476 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8477:8481 xv6iris.PathElems <> SLASH def
+R8460:8470 stdpp.decidable <> bool_decide def
+R8474:8476 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8477:8481 xv6iris.PathElems <> SLASH def
+prf 8536:8549 <> pe_skip_Forall
+R8560:8563 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8556:8557 stdpp.bitvector.definitions <> bv rec
+binder 8552:8552 <> P:35
+R8575:8578 Corelib.Init.Datatypes <> list ind
+R8581:8582 stdpp.bitvector.definitions <> bv rec
+binder 8571:8571 <> p:36
+R8602:8605 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8592:8597 Corelib.Lists.ListDef <> Forall ind
+R8601:8601 xv6iris.PathElems <> p:36 var
+R8599:8599 xv6iris.PathElems <> P:35 var
+R8606:8611 Corelib.Lists.ListDef <> Forall ind
+R8616:8622 xv6iris.PathElems <> pe_skip def
+R8624:8624 xv6iris.PathElems <> p:36 var
+R8613:8613 xv6iris.PathElems <> P:35 var
+R8704:8714 stdpp.decidable <> bool_decide def
+R8718:8720 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8721:8725 xv6iris.PathElems <> SLASH def
+R8704:8714 stdpp.decidable <> bool_decide def
+R8718:8720 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8721:8725 xv6iris.PathElems <> SLASH def
+prf 8824:8837 <> pe_skip_app_ns
+R8846:8849 Corelib.Init.Datatypes <> list ind
+R8852:8853 stdpp.bitvector.definitions <> bv rec
+binder 8840:8840 <> u:37
+binder 8842:8842 <> v:38
+R8872:8875 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8863:8869 xv6iris.PathElems <> noslash def
+R8871:8871 xv6iris.PathElems <> u:37 var
+R8883:8886 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8877:8880 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R8876:8876 xv6iris.PathElems <> u:37 var
+R8881:8882 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R8903:8905 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8887:8893 xv6iris.PathElems <> pe_skip def
+R8897:8900 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R8896:8896 xv6iris.PathElems <> u:37 var
+R8901:8901 xv6iris.PathElems <> v:38 var
+R8907:8910 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R8906:8906 xv6iris.PathElems <> u:37 var
+R8911:8911 xv6iris.PathElems <> v:38 var
+R8930:8936 xv6iris.PathElems <> noslash def
+R9067:9079 Stdlib.Lists.List <> app_comm_cons thm
+R9067:9079 Stdlib.Lists.List <> app_comm_cons thm
+R9067:9079 Stdlib.Lists.List <> app_comm_cons thm
+R9088:9097 xv6iris.PathElems <> pe_skip_ne thm
+R9088:9097 xv6iris.PathElems <> pe_skip_ne thm
+prf 9122:9135 <> pe_elem_app_ns
+R9144:9147 Corelib.Init.Datatypes <> list ind
+R9150:9151 stdpp.bitvector.definitions <> bv rec
+binder 9138:9138 <> u:39
+binder 9140:9140 <> v:40
+R9170:9173 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9161:9167 xv6iris.PathElems <> noslash def
+R9169:9169 xv6iris.PathElems <> u:39 var
+R9190:9192 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9174:9180 xv6iris.PathElems <> pe_elem def
+R9184:9187 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R9183:9183 xv6iris.PathElems <> u:39 var
+R9188:9188 xv6iris.PathElems <> v:40 var
+R9194:9197 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R9193:9193 xv6iris.PathElems <> u:39 var
+R9198:9204 xv6iris.PathElems <> pe_elem def
+R9206:9206 xv6iris.PathElems <> v:40 var
+R9225:9231 xv6iris.PathElems <> noslash def
+R9295:9307 Stdlib.Lists.List <> app_comm_cons thm
+R9310:9319 xv6iris.PathElems <> pe_elem_ne thm
+R9295:9307 Stdlib.Lists.List <> app_comm_cons thm
+R9295:9307 Stdlib.Lists.List <> app_comm_cons thm
+R9310:9319 xv6iris.PathElems <> pe_elem_ne thm
+R9310:9319 xv6iris.PathElems <> pe_elem_ne thm
+prf 9371:9384 <> pe_rest_app_ns
+R9393:9396 Corelib.Init.Datatypes <> list ind
+R9399:9400 stdpp.bitvector.definitions <> bv rec
+binder 9387:9387 <> u:41
+binder 9389:9389 <> v:42
+R9419:9422 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9410:9416 xv6iris.PathElems <> noslash def
+R9418:9418 xv6iris.PathElems <> u:41 var
+R9439:9441 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9423:9429 xv6iris.PathElems <> pe_rest def
+R9433:9436 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R9432:9432 xv6iris.PathElems <> u:41 var
+R9437:9437 xv6iris.PathElems <> v:42 var
+R9442:9448 xv6iris.PathElems <> pe_rest def
+R9450:9450 xv6iris.PathElems <> v:42 var
+R9469:9475 xv6iris.PathElems <> noslash def
+R9539:9551 Stdlib.Lists.List <> app_comm_cons thm
+R9554:9563 xv6iris.PathElems <> pe_rest_ne thm
+R9539:9551 Stdlib.Lists.List <> app_comm_cons thm
+R9539:9551 Stdlib.Lists.List <> app_comm_cons thm
+R9554:9563 xv6iris.PathElems <> pe_rest_ne thm
+R9554:9563 xv6iris.PathElems <> pe_rest_ne thm
+def 9680:9688 <> pe_at_sep
+R9695:9698 Corelib.Init.Datatypes <> list ind
+R9701:9702 stdpp.bitvector.definitions <> bv rec
+binder 9691:9691 <> v:43
+R9726:9729 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R9721:9723 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9720:9720 xv6iris.PathElems <> v:43 var
+R9724:9725 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R9730:9736 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R9739:9740 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 9737:9738 <> v':44
+R9742:9744 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9741:9741 xv6iris.PathElems <> v:43 var
+R9750:9753 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R9745:9749 xv6iris.PathElems <> SLASH def
+R9754:9755 xv6iris.PathElems <> v':44 var
+prf 9765:9778 <> pe_elem_at_sep
+R9785:9788 Corelib.Init.Datatypes <> list ind
+R9791:9792 stdpp.bitvector.definitions <> bv rec
+binder 9781:9781 <> v:45
+R9811:9814 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9800:9808 xv6iris.PathElems <> pe_at_sep def
+R9810:9810 xv6iris.PathElems <> v:45 var
+R9824:9826 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9815:9821 xv6iris.PathElems <> pe_elem def
+R9823:9823 xv6iris.PathElems <> v:45 var
+R9827:9828 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R9894:9909 stdpp.decidable <> bool_decide_true abbrev
+R9894:9909 stdpp.decidable <> bool_decide_true abbrev
+R9894:9909 stdpp.decidable <> bool_decide_true abbrev
+prf 9952:9965 <> pe_rest_at_sep
+R9972:9975 Corelib.Init.Datatypes <> list ind
+R9978:9979 stdpp.bitvector.definitions <> bv rec
+binder 9968:9968 <> v:46
+R9998:10001 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9987:9995 xv6iris.PathElems <> pe_at_sep def
+R9997:9997 xv6iris.PathElems <> v:46 var
+R10011:10013 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10002:10008 xv6iris.PathElems <> pe_rest def
+R10010:10010 xv6iris.PathElems <> v:46 var
+R10014:10014 xv6iris.PathElems <> v:46 var
+R10080:10095 stdpp.decidable <> bool_decide_true abbrev
+R10080:10095 stdpp.decidable <> bool_decide_true abbrev
+R10080:10095 stdpp.decidable <> bool_decide_true abbrev
+prf 10138:10155 <> pe_rest_at_sep_gen
+R10162:10165 Corelib.Init.Datatypes <> list ind
+R10168:10169 stdpp.bitvector.definitions <> bv rec
+binder 10158:10158 <> p:47
+R10177:10185 xv6iris.PathElems <> pe_at_sep def
+R10188:10194 xv6iris.PathElems <> pe_rest def
+R10196:10196 xv6iris.PathElems <> p:47 var
+R10216:10224 xv6iris.PathElems <> pe_at_sep def
+R10294:10304 stdpp.decidable <> bool_decide def
+R10308:10310 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10311:10315 xv6iris.PathElems <> SLASH def
+R10294:10304 stdpp.decidable <> bool_decide def
+R10308:10310 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10311:10315 xv6iris.PathElems <> SLASH def
+R10349:10367 stdpp.decidable <> bool_decide_eq_true thm
+R10349:10367 stdpp.decidable <> bool_decide_eq_true thm
+prf 10663:10675 <> skipelem_none
+R10682:10685 Corelib.Init.Datatypes <> list ind
+R10688:10689 stdpp.bitvector.definitions <> bv rec
+binder 10678:10678 <> p:48
+R10711:10714 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10706:10708 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10697:10703 xv6iris.PathElems <> pe_skip def
+R10705:10705 xv6iris.PathElems <> p:48 var
+R10709:10710 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R10725:10727 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10715:10722 xv6iris.PathElems <> skipelem def
+R10724:10724 xv6iris.PathElems <> p:48 var
+R10728:10731 Corelib.Init.Datatypes <> None constr
+R10758:10765 xv6iris.PathElems <> skipelem def
+prf 10804:10816 <> skipelem_some
+R10823:10826 Corelib.Init.Datatypes <> list ind
+R10829:10830 stdpp.bitvector.definitions <> bv rec
+binder 10819:10819 <> p:49
+R10855:10860 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10849:10852 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R10840:10846 xv6iris.PathElems <> pe_skip def
+R10848:10848 xv6iris.PathElems <> p:49 var
+R10853:10854 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R10871:10873 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10861:10868 xv6iris.PathElems <> skipelem def
+R10870:10870 xv6iris.PathElems <> p:49 var
+R10874:10877 Corelib.Init.Datatypes <> Some constr
+R10879:10879 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10909:10910 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10940:10940 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10880:10883 stdpp.list_basics <> take abbrev
+R10889:10895 xv6iris.PathElems <> pe_elem def
+R10898:10904 xv6iris.PathElems <> pe_skip def
+R10906:10906 xv6iris.PathElems <> p:49 var
+R10911:10917 xv6iris.PathElems <> pe_skip def
+R10920:10926 xv6iris.PathElems <> pe_rest def
+R10929:10935 xv6iris.PathElems <> pe_skip def
+R10937:10937 xv6iris.PathElems <> p:49 var
+R10971:10978 xv6iris.PathElems <> skipelem def
+R10993:10999 xv6iris.PathElems <> pe_skip def
+R10993:10999 xv6iris.PathElems <> pe_skip def
+prf 11084:11095 <> skipelem_nil
+R11110:11112 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11099:11106 xv6iris.PathElems <> skipelem def
+R11108:11109 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R11113:11116 Corelib.Init.Datatypes <> None constr
+R11132:11144 xv6iris.PathElems <> skipelem_none thm
+R11132:11144 xv6iris.PathElems <> skipelem_none thm
+prf 11172:11185 <> skipelem_slash
+R11192:11195 Corelib.Init.Datatypes <> list ind
+R11198:11199 stdpp.bitvector.definitions <> bv rec
+binder 11188:11188 <> p:50
+R11228:11230 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11207:11214 xv6iris.PathElems <> skipelem def
+R11222:11225 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R11217:11221 xv6iris.PathElems <> SLASH def
+R11226:11226 xv6iris.PathElems <> p:50 var
+R11231:11238 xv6iris.PathElems <> skipelem def
+R11240:11240 xv6iris.PathElems <> p:50 var
+R11257:11264 xv6iris.PathElems <> skipelem def
+R11275:11287 xv6iris.PathElems <> pe_skip_slash thm
+R11275:11287 xv6iris.PathElems <> pe_skip_slash thm
+R11275:11287 xv6iris.PathElems <> pe_skip_slash thm
+prf 11315:11331 <> skipelem_None_iff
+R11338:11341 Corelib.Init.Datatypes <> list ind
+R11344:11345 stdpp.bitvector.definitions <> bv rec
+binder 11334:11334 <> p:51
+R11370:11374 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R11363:11365 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11353:11360 xv6iris.PathElems <> skipelem def
+R11362:11362 xv6iris.PathElems <> p:51 var
+R11366:11369 Corelib.Init.Datatypes <> None constr
+R11384:11386 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11375:11381 xv6iris.PathElems <> pe_skip def
+R11383:11383 xv6iris.PathElems <> p:51 var
+R11387:11388 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R11431:11437 xv6iris.PathElems <> pe_skip def
+R11431:11437 xv6iris.PathElems <> pe_skip def
+R11488:11500 xv6iris.PathElems <> skipelem_some thm
+R11488:11500 xv6iris.PathElems <> skipelem_some thm
+R11488:11500 xv6iris.PathElems <> skipelem_some thm
+R11566:11578 xv6iris.PathElems <> skipelem_none thm
+R11566:11578 xv6iris.PathElems <> skipelem_none thm
+prf 11930:11943 <> skipelem_split
+R11952:11955 Corelib.Init.Datatypes <> list ind
+R11958:11959 stdpp.bitvector.definitions <> bv rec
+binder 11946:11946 <> u:52
+binder 11948:11948 <> v:53
+R11978:11981 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11969:11975 xv6iris.PathElems <> noslash def
+R11977:11977 xv6iris.PathElems <> u:52 var
+R11989:11992 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11983:11986 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R11982:11982 xv6iris.PathElems <> u:52 var
+R11987:11988 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R12004:12009 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11993:12001 xv6iris.PathElems <> pe_at_sep def
+R12003:12003 xv6iris.PathElems <> v:53 var
+R12027:12029 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12010:12017 xv6iris.PathElems <> skipelem def
+R12021:12024 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12020:12020 xv6iris.PathElems <> u:52 var
+R12025:12025 xv6iris.PathElems <> v:53 var
+R12030:12033 Corelib.Init.Datatypes <> Some constr
+R12035:12035 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12045:12046 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12056:12056 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12036:12039 stdpp.list_basics <> take abbrev
+R12044:12044 xv6iris.PathElems <> u:52 var
+R12047:12053 xv6iris.PathElems <> pe_skip def
+R12055:12055 xv6iris.PathElems <> v:53 var
+R12117:12119 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12101:12107 xv6iris.PathElems <> pe_skip def
+R12111:12114 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12121:12124 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12138:12151 xv6iris.PathElems <> pe_skip_app_ns thm
+R12117:12119 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12101:12107 xv6iris.PathElems <> pe_skip def
+R12111:12114 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12121:12124 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12138:12151 xv6iris.PathElems <> pe_skip_app_ns thm
+R12178:12190 xv6iris.PathElems <> skipelem_some thm
+R12194:12197 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12178:12190 xv6iris.PathElems <> skipelem_some thm
+R12194:12197 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12178:12190 xv6iris.PathElems <> skipelem_some thm
+R12194:12197 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R12313:12326 xv6iris.PathElems <> pe_elem_app_ns thm
+R12338:12351 xv6iris.PathElems <> pe_rest_app_ns thm
+R12313:12326 xv6iris.PathElems <> pe_elem_app_ns thm
+R12313:12326 xv6iris.PathElems <> pe_elem_app_ns thm
+R12338:12351 xv6iris.PathElems <> pe_rest_app_ns thm
+R12338:12351 xv6iris.PathElems <> pe_rest_app_ns thm
+R12373:12386 xv6iris.PathElems <> pe_elem_at_sep thm
+R12396:12409 xv6iris.PathElems <> pe_rest_at_sep thm
+R12418:12426 Stdlib.Lists.List <> app_nil_r thm
+R12373:12386 xv6iris.PathElems <> pe_elem_at_sep thm
+R12373:12386 xv6iris.PathElems <> pe_elem_at_sep thm
+R12396:12409 xv6iris.PathElems <> pe_rest_at_sep thm
+R12396:12409 xv6iris.PathElems <> pe_rest_at_sep thm
+R12418:12426 Stdlib.Lists.List <> app_nil_r thm
+R12418:12426 Stdlib.Lists.List <> app_nil_r thm
+prf 12532:12543 <> skipelem_inv
+R12554:12557 Corelib.Init.Datatypes <> list ind
+R12560:12561 stdpp.bitvector.definitions <> bv rec
+binder 12546:12546 <> p:54
+binder 12548:12548 <> e:55
+binder 12550:12550 <> r:56
+R12595:12600 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12581:12583 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12571:12578 xv6iris.PathElems <> skipelem def
+R12580:12580 xv6iris.PathElems <> p:54 var
+R12584:12587 Corelib.Init.Datatypes <> Some constr
+R12589:12589 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12591:12592 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12594:12594 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12590:12590 xv6iris.PathElems <> e:55 var
+R12593:12593 xv6iris.PathElems <> r:56 var
+R12616:12619 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R12610:12613 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R12601:12607 xv6iris.PathElems <> pe_skip def
+R12609:12609 xv6iris.PathElems <> p:54 var
+R12614:12615 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R12653:12658 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R12621:12623 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12620:12620 xv6iris.PathElems <> e:55 var
+R12624:12627 stdpp.list_basics <> take abbrev
+R12633:12639 xv6iris.PathElems <> pe_elem def
+R12642:12648 xv6iris.PathElems <> pe_skip def
+R12650:12650 xv6iris.PathElems <> p:54 var
+R12660:12662 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12659:12659 xv6iris.PathElems <> r:56 var
+R12663:12669 xv6iris.PathElems <> pe_skip def
+R12672:12678 xv6iris.PathElems <> pe_rest def
+R12681:12687 xv6iris.PathElems <> pe_skip def
+R12689:12689 xv6iris.PathElems <> p:54 var
+R12725:12731 xv6iris.PathElems <> pe_skip def
+R12725:12731 xv6iris.PathElems <> pe_skip def
+R12766:12778 xv6iris.PathElems <> skipelem_none thm
+R12766:12778 xv6iris.PathElems <> skipelem_none thm
+R12766:12778 xv6iris.PathElems <> skipelem_none thm
+R12818:12830 xv6iris.PathElems <> skipelem_some thm
+R12818:12830 xv6iris.PathElems <> skipelem_some thm
+R12818:12830 xv6iris.PathElems <> skipelem_some thm
+prf 13025:13040 <> skipelem_elem_wf
+R13051:13054 Corelib.Init.Datatypes <> list ind
+R13057:13058 stdpp.bitvector.definitions <> bv rec
+binder 13043:13043 <> p:57
+binder 13045:13045 <> e:58
+binder 13047:13047 <> r:59
+R13092:13097 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13078:13080 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13068:13075 xv6iris.PathElems <> skipelem def
+R13077:13077 xv6iris.PathElems <> p:57 var
+R13081:13084 Corelib.Init.Datatypes <> Some constr
+R13086:13086 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13088:13089 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13091:13091 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13087:13087 xv6iris.PathElems <> e:58 var
+R13090:13090 xv6iris.PathElems <> r:59 var
+R13105:13108 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R13099:13102 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R13098:13098 xv6iris.PathElems <> e:58 var
+R13103:13104 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R13129:13132 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R13118:13121 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R13110:13115 Stdlib.Lists.List <> length abbrev
+R13117:13117 xv6iris.PathElems <> e:58 var
+R13133:13139 xv6iris.PathElems <> noslash def
+R13141:13141 xv6iris.PathElems <> e:58 var
+R13169:13180 xv6iris.PathElems <> skipelem_inv thm
+R13169:13180 xv6iris.PathElems <> skipelem_inv thm
+R13217:13223 xv6iris.PathElems <> pe_skip def
+R13217:13223 xv6iris.PathElems <> pe_skip def
+R13293:13302 xv6iris.PathElems <> pe_elem_ne thm
+R13309:13320 xv6iris.PathElems <> pe_skip_head thm
+R13293:13302 xv6iris.PathElems <> pe_elem_ne thm
+R13309:13320 xv6iris.PathElems <> pe_skip_head thm
+R13293:13302 xv6iris.PathElems <> pe_elem_ne thm
+R13309:13320 xv6iris.PathElems <> pe_skip_head thm
+R13412:13422 stdpp.list_basics <> length_take thm
+R13412:13422 stdpp.list_basics <> length_take thm
+R13412:13422 stdpp.list_basics <> length_take thm
+R13453:13459 xv6iris.PathElems <> noslash def
+R13468:13478 stdpp.list_relations <> Forall_take thm
+R13468:13478 stdpp.list_relations <> Forall_take thm
+R13506:13517 xv6iris.PathElems <> pe_skip_head thm
+R13536:13550 xv6iris.PathElems <> pe_elem_noslash thm
+R13506:13517 xv6iris.PathElems <> pe_skip_head thm
+R13536:13550 xv6iris.PathElems <> pe_elem_noslash thm
+prf 13706:13719 <> skipelem_nonul
+R13730:13733 Corelib.Init.Datatypes <> list ind
+R13736:13737 stdpp.bitvector.definitions <> bv rec
+binder 13722:13722 <> p:60
+binder 13724:13724 <> e:61
+binder 13726:13726 <> r:62
+R13775:13778 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13747:13752 Corelib.Lists.ListDef <> Forall ind
+R13774:13774 xv6iris.PathElems <> p:60 var
+binder 13759:13759 <> b:63
+R13765:13768 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R13764:13764 xv6iris.PathElems <> b:63 var
+R13769:13771 xv6iris.DirentEnc <> NUL def
+R13803:13808 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13789:13791 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13779:13786 xv6iris.PathElems <> skipelem def
+R13788:13788 xv6iris.PathElems <> p:60 var
+R13792:13795 Corelib.Init.Datatypes <> Some constr
+R13797:13797 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13799:13800 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13802:13802 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13798:13798 xv6iris.PathElems <> e:61 var
+R13801:13801 xv6iris.PathElems <> r:62 var
+R13816:13819 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R13809:13813 xv6iris.DirentEnc <> nonul def
+R13815:13815 xv6iris.PathElems <> e:61 var
+R13820:13825 Corelib.Lists.ListDef <> Forall ind
+R13847:13847 xv6iris.PathElems <> r:62 var
+binder 13832:13832 <> b:64
+R13838:13841 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R13837:13837 xv6iris.PathElems <> b:64 var
+R13842:13844 xv6iris.DirentEnc <> NUL def
+R13878:13889 xv6iris.PathElems <> skipelem_inv thm
+R13878:13889 xv6iris.PathElems <> skipelem_inv thm
+R13926:13939 xv6iris.PathElems <> pe_skip_Forall thm
+R13926:13939 xv6iris.PathElems <> pe_skip_Forall thm
+R13988:13992 xv6iris.DirentEnc <> nonul def
+R14001:14011 stdpp.list_relations <> Forall_take thm
+R14014:14027 xv6iris.PathElems <> pe_elem_Forall thm
+R14001:14011 stdpp.list_relations <> Forall_take thm
+R14014:14027 xv6iris.PathElems <> pe_elem_Forall thm
+R14056:14069 xv6iris.PathElems <> pe_skip_Forall thm
+R14072:14085 xv6iris.PathElems <> pe_rest_Forall thm
+R14056:14069 xv6iris.PathElems <> pe_skip_Forall thm
+R14072:14085 xv6iris.PathElems <> pe_rest_Forall thm
+prf 14226:14243 <> skipelem_rest_norm
+R14254:14257 Corelib.Init.Datatypes <> list ind
+R14260:14261 stdpp.bitvector.definitions <> bv rec
+binder 14246:14246 <> p:65
+binder 14248:14248 <> e:66
+binder 14250:14250 <> r:67
+R14295:14298 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14281:14283 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14271:14278 xv6iris.PathElems <> skipelem def
+R14280:14280 xv6iris.PathElems <> p:65 var
+R14284:14287 Corelib.Init.Datatypes <> Some constr
+R14289:14289 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14291:14292 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14294:14294 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14290:14290 xv6iris.PathElems <> e:66 var
+R14293:14293 xv6iris.PathElems <> r:67 var
+R14299:14305 xv6iris.PathElems <> pe_norm def
+R14307:14307 xv6iris.PathElems <> r:67 var
+R14335:14346 xv6iris.PathElems <> skipelem_inv thm
+R14335:14346 xv6iris.PathElems <> skipelem_inv thm
+R14388:14399 xv6iris.PathElems <> pe_skip_norm thm
+R14388:14399 xv6iris.PathElems <> pe_skip_norm thm
+prf 14457:14469 <> skipelem_decr
+R14480:14483 Corelib.Init.Datatypes <> list ind
+R14486:14487 stdpp.bitvector.definitions <> bv rec
+binder 14472:14472 <> p:68
+binder 14474:14474 <> e:69
+binder 14476:14476 <> r:70
+R14521:14524 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14507:14509 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14497:14504 xv6iris.PathElems <> skipelem def
+R14506:14506 xv6iris.PathElems <> p:68 var
+R14510:14513 Corelib.Init.Datatypes <> Some constr
+R14515:14515 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14517:14518 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14520:14520 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14516:14516 xv6iris.PathElems <> e:69 var
+R14519:14519 xv6iris.PathElems <> r:70 var
+R14534:14536 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14526:14531 Stdlib.Lists.List <> length abbrev
+R14533:14533 xv6iris.PathElems <> r:70 var
+R14537:14542 Stdlib.Lists.List <> length abbrev
+R14544:14544 xv6iris.PathElems <> p:68 var
+R14577:14588 xv6iris.PathElems <> skipelem_inv thm
+R14577:14588 xv6iris.PathElems <> skipelem_inv thm
+R14625:14631 xv6iris.PathElems <> pe_skip def
+R14625:14631 xv6iris.PathElems <> pe_skip def
+R14704:14717 xv6iris.PathElems <> pe_skip_length thm
+R14704:14717 xv6iris.PathElems <> pe_skip_length thm
+R14762:14780 xv6iris.PathElems <> pe_elem_rest_length thm
+R14784:14787 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R14762:14780 xv6iris.PathElems <> pe_elem_rest_length thm
+R14784:14787 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R14814:14823 xv6iris.PathElems <> pe_elem_ne thm
+R14830:14841 xv6iris.PathElems <> pe_skip_head thm
+R14814:14823 xv6iris.PathElems <> pe_elem_ne thm
+R14830:14841 xv6iris.PathElems <> pe_skip_head thm
+R14814:14823 xv6iris.PathElems <> pe_elem_ne thm
+R14830:14841 xv6iris.PathElems <> pe_skip_head thm
+R14878:14891 xv6iris.PathElems <> pe_skip_length thm
+R14894:14900 xv6iris.PathElems <> pe_rest def
+R14904:14907 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R14878:14891 xv6iris.PathElems <> pe_skip_length thm
+R14894:14900 xv6iris.PathElems <> pe_rest def
+R14904:14907 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R14932:14942 Stdlib.Lists.List <> length_cons thm
+R14932:14942 Stdlib.Lists.List <> length_cons thm
+R14932:14942 Stdlib.Lists.List <> length_cons thm
+R14932:14942 Stdlib.Lists.List <> length_cons thm
+R14932:14942 Stdlib.Lists.List <> length_cons thm
+R14963:14973 Stdlib.Lists.List <> length_cons thm
+R14963:14973 Stdlib.Lists.List <> length_cons thm
+R14963:14973 Stdlib.Lists.List <> length_cons thm
+def 15250:15264 <> path_elems_fuel
+R15271:15273 Corelib.Init.Datatypes <> nat ind
+binder 15267:15267 <> n:71
+R15281:15284 Corelib.Init.Datatypes <> list ind
+R15287:15288 stdpp.bitvector.definitions <> bv rec
+binder 15277:15277 <> p:72
+R15296:15299 Corelib.Init.Datatypes <> list ind
+R15302:15305 Corelib.Init.Datatypes <> list ind
+R15308:15309 stdpp.bitvector.definitions <> bv rec
+R15326:15326 xv6iris.PathElems <> n:71 var
+R15346:15347 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R15353:15353 Corelib.Init.Datatypes <> S constr
+R15367:15374 xv6iris.PathElems <> skipelem def
+R15376:15376 xv6iris.PathElems <> p:72 var
+R15397:15400 Corelib.Init.Datatypes <> None constr
+R15405:15406 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R15422:15425 Corelib.Init.Datatypes <> Some constr
+R15427:15427 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15429:15430 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15432:15432 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15438:15441 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R15442:15456 xv6iris.PathElems <> path_elems_fuel:73 def
+def 15498:15507 <> path_elems
+R15514:15517 Corelib.Init.Datatypes <> list ind
+R15520:15521 stdpp.bitvector.definitions <> bv rec
+binder 15510:15510 <> p:75
+R15529:15532 Corelib.Init.Datatypes <> list ind
+R15535:15538 Corelib.Init.Datatypes <> list ind
+R15541:15542 stdpp.bitvector.definitions <> bv rec
+R15553:15567 xv6iris.PathElems <> path_elems_fuel def
+R15570:15575 Stdlib.Lists.List <> length abbrev
+R15577:15577 xv6iris.PathElems <> p:75 var
+R15580:15580 xv6iris.PathElems <> p:75 var
+prf 15590:15610 <> path_elems_fuel_indep
+R15617:15619 Corelib.Init.Datatypes <> nat ind
+binder 15613:15613 <> n:76
+R15626:15633 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R15659:15665 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R15638:15640 Corelib.Init.Datatypes <> nat ind
+binder 15634:15634 <> m:77
+R15648:15651 Corelib.Init.Datatypes <> list ind
+R15654:15655 stdpp.bitvector.definitions <> bv rec
+binder 15644:15644 <> p:78
+R15685:15688 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15675:15678 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R15667:15672 Stdlib.Lists.List <> length abbrev
+R15674:15674 xv6iris.PathElems <> p:78 var
+R15679:15679 xv6iris.PathElems <> n:76 var
+R15708:15715 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15698:15701 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R15690:15695 Stdlib.Lists.List <> length abbrev
+R15697:15697 xv6iris.PathElems <> p:78 var
+R15702:15702 xv6iris.PathElems <> m:77 var
+R15735:15737 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15716:15730 xv6iris.PathElems <> path_elems_fuel def
+R15732:15732 xv6iris.PathElems <> n:76 var
+R15734:15734 xv6iris.PathElems <> p:78 var
+R15738:15752 xv6iris.PathElems <> path_elems_fuel def
+R15754:15754 xv6iris.PathElems <> m:77 var
+R15756:15756 xv6iris.PathElems <> p:78 var
+R15828:15830 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15831:15832 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R15845:15858 stdpp.list_basics <> nil_length_inv thm
+R15828:15830 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15831:15832 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R15845:15858 stdpp.list_basics <> nil_length_inv thm
+R15925:15939 xv6iris.PathElems <> path_elems_fuel def
+R15951:15962 xv6iris.PathElems <> skipelem_nil thm
+R15951:15962 xv6iris.PathElems <> skipelem_nil thm
+R15951:15962 xv6iris.PathElems <> skipelem_nil thm
+R16022:16024 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16025:16026 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R16039:16052 stdpp.list_basics <> nil_length_inv thm
+R16022:16024 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16025:16026 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R16039:16052 stdpp.list_basics <> nil_length_inv thm
+R16081:16095 xv6iris.PathElems <> path_elems_fuel def
+R16107:16118 xv6iris.PathElems <> skipelem_nil thm
+R16107:16118 xv6iris.PathElems <> skipelem_nil thm
+R16107:16118 xv6iris.PathElems <> skipelem_nil thm
+R16145:16159 xv6iris.PathElems <> path_elems_fuel def
+R16177:16184 xv6iris.PathElems <> skipelem def
+R16177:16184 xv6iris.PathElems <> skipelem def
+R16241:16253 xv6iris.PathElems <> skipelem_decr thm
+R16241:16253 xv6iris.PathElems <> skipelem_decr thm
+prf 16406:16422 <> path_elems_unfold
+R16429:16432 Corelib.Init.Datatypes <> list ind
+R16435:16436 stdpp.bitvector.definitions <> bv rec
+binder 16425:16425 <> p:79
+R16458:16462 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16446:16455 xv6iris.PathElems <> path_elems def
+R16457:16457 xv6iris.PathElems <> p:79 var
+R16469:16476 xv6iris.PathElems <> skipelem def
+R16478:16478 xv6iris.PathElems <> p:79 var
+R16489:16492 Corelib.Init.Datatypes <> None constr
+R16497:16498 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R16504:16507 Corelib.Init.Datatypes <> Some constr
+R16509:16509 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16511:16512 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16514:16514 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16520:16523 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R16524:16533 xv6iris.PathElems <> path_elems def
+R16560:16569 xv6iris.PathElems <> path_elems def
+R16589:16594 Stdlib.Lists.List <> length abbrev
+R16589:16594 Stdlib.Lists.List <> length abbrev
+R16634:16636 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16637:16638 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R16651:16664 stdpp.list_basics <> nil_length_inv thm
+R16634:16636 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16637:16638 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R16651:16664 stdpp.list_basics <> nil_length_inv thm
+R16694:16705 xv6iris.PathElems <> skipelem_nil thm
+R16694:16705 xv6iris.PathElems <> skipelem_nil thm
+R16694:16705 xv6iris.PathElems <> skipelem_nil thm
+R16730:16744 xv6iris.PathElems <> path_elems_fuel def
+R16762:16769 xv6iris.PathElems <> skipelem def
+R16762:16769 xv6iris.PathElems <> skipelem def
+R16826:16838 xv6iris.PathElems <> skipelem_decr thm
+R16826:16838 xv6iris.PathElems <> skipelem_decr thm
+R16887:16896 xv6iris.PathElems <> path_elems def
+R16908:16928 xv6iris.PathElems <> path_elems_fuel_indep thm
+R16933:16938 Stdlib.Lists.List <> length abbrev
+R16908:16928 xv6iris.PathElems <> path_elems_fuel_indep thm
+R16933:16938 Stdlib.Lists.List <> length abbrev
+R16908:16928 xv6iris.PathElems <> path_elems_fuel_indep thm
+R16933:16938 Stdlib.Lists.List <> length abbrev
+R16908:16928 xv6iris.PathElems <> path_elems_fuel_indep thm
+R16933:16938 Stdlib.Lists.List <> length abbrev
+R16908:16928 xv6iris.PathElems <> path_elems_fuel_indep thm
+R16933:16938 Stdlib.Lists.List <> length abbrev
+prf 16992:17006 <> path_elems_None
+R17013:17016 Corelib.Init.Datatypes <> list ind
+R17019:17020 stdpp.bitvector.definitions <> bv rec
+binder 17009:17009 <> p:80
+R17047:17050 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17040:17042 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17030:17037 xv6iris.PathElems <> skipelem def
+R17039:17039 xv6iris.PathElems <> p:80 var
+R17043:17046 Corelib.Init.Datatypes <> None constr
+R17063:17065 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17051:17060 xv6iris.PathElems <> path_elems def
+R17062:17062 xv6iris.PathElems <> p:80 var
+R17066:17067 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R17095:17111 xv6iris.PathElems <> path_elems_unfold thm
+R17095:17111 xv6iris.PathElems <> path_elems_unfold thm
+R17095:17111 xv6iris.PathElems <> path_elems_unfold thm
+prf 17142:17156 <> path_elems_Some
+R17167:17170 Corelib.Init.Datatypes <> list ind
+R17173:17174 stdpp.bitvector.definitions <> bv rec
+binder 17159:17159 <> p:81
+binder 17161:17161 <> e:82
+binder 17163:17163 <> r:83
+R17208:17211 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R17194:17196 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17184:17191 xv6iris.PathElems <> skipelem def
+R17193:17193 xv6iris.PathElems <> p:81 var
+R17197:17200 Corelib.Init.Datatypes <> Some constr
+R17202:17202 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R17204:17205 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R17207:17207 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R17203:17203 xv6iris.PathElems <> e:82 var
+R17206:17206 xv6iris.PathElems <> r:83 var
+R17224:17226 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17212:17221 xv6iris.PathElems <> path_elems def
+R17223:17223 xv6iris.PathElems <> p:81 var
+R17228:17231 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R17227:17227 xv6iris.PathElems <> e:82 var
+R17232:17241 xv6iris.PathElems <> path_elems def
+R17243:17243 xv6iris.PathElems <> r:83 var
+R17271:17287 xv6iris.PathElems <> path_elems_unfold thm
+R17271:17287 xv6iris.PathElems <> path_elems_unfold thm
+R17271:17287 xv6iris.PathElems <> path_elems_unfold thm
+prf 17588:17601 <> path_elems_nil
+R17618:17620 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17605:17614 xv6iris.PathElems <> path_elems def
+R17616:17617 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R17621:17622 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R17638:17652 xv6iris.PathElems <> path_elems_None thm
+R17655:17666 xv6iris.PathElems <> skipelem_nil thm
+R17638:17652 xv6iris.PathElems <> path_elems_None thm
+R17655:17666 xv6iris.PathElems <> skipelem_nil thm
+prf 17734:17751 <> path_elems_slashes
+R17758:17760 Corelib.Init.Datatypes <> nat ind
+binder 17754:17754 <> n:84
+R17795:17797 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17765:17774 xv6iris.PathElems <> path_elems def
+R17777:17785 stdpp.list_basics <> replicate def
+R17789:17793 xv6iris.PathElems <> SLASH def
+R17787:17787 xv6iris.PathElems <> n:84 var
+R17798:17799 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R17817:17831 xv6iris.PathElems <> path_elems_None thm
+R17834:17846 xv6iris.PathElems <> skipelem_none thm
+R17817:17831 xv6iris.PathElems <> path_elems_None thm
+R17834:17846 xv6iris.PathElems <> skipelem_none thm
+R17901:17911 stdpp.list_basics <> replicate_S thm
+R17914:17926 xv6iris.PathElems <> pe_skip_slash thm
+R17901:17911 stdpp.list_basics <> replicate_S thm
+R17901:17911 stdpp.list_basics <> replicate_S thm
+R17914:17926 xv6iris.PathElems <> pe_skip_slash thm
+R17914:17926 xv6iris.PathElems <> pe_skip_slash thm
+prf 17951:17965 <> path_elems_root
+R17987:17989 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R17969:17978 xv6iris.PathElems <> path_elems def
+R17980:17980 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R17986:17986 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R17981:17985 xv6iris.PathElems <> SLASH def
+R17990:17991 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R18008:18025 xv6iris.PathElems <> path_elems_slashes thm
+R18008:18025 xv6iris.PathElems <> path_elems_slashes thm
+prf 18115:18130 <> path_elems_slash
+R18137:18140 Corelib.Init.Datatypes <> list ind
+R18143:18144 stdpp.bitvector.definitions <> bv rec
+binder 18133:18133 <> p:85
+R18177:18179 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18154:18163 xv6iris.PathElems <> path_elems def
+R18171:18174 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R18166:18170 xv6iris.PathElems <> SLASH def
+R18175:18175 xv6iris.PathElems <> p:85 var
+R18180:18189 xv6iris.PathElems <> path_elems def
+R18191:18191 xv6iris.PathElems <> p:85 var
+R18212:18228 xv6iris.PathElems <> path_elems_unfold thm
+R18236:18239 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R18231:18235 xv6iris.PathElems <> SLASH def
+R18245:18258 xv6iris.PathElems <> skipelem_slash thm
+R18268:18284 xv6iris.PathElems <> path_elems_unfold thm
+R18212:18228 xv6iris.PathElems <> path_elems_unfold thm
+R18236:18239 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R18231:18235 xv6iris.PathElems <> SLASH def
+R18212:18228 xv6iris.PathElems <> path_elems_unfold thm
+R18236:18239 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R18231:18235 xv6iris.PathElems <> SLASH def
+R18245:18258 xv6iris.PathElems <> skipelem_slash thm
+R18245:18258 xv6iris.PathElems <> skipelem_slash thm
+R18268:18284 xv6iris.PathElems <> path_elems_unfold thm
+R18268:18284 xv6iris.PathElems <> path_elems_unfold thm
+prf 18362:18376 <> path_elems_skip
+R18383:18386 Corelib.Init.Datatypes <> list ind
+R18389:18390 stdpp.bitvector.definitions <> bv rec
+binder 18379:18379 <> p:86
+R18420:18422 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18398:18407 xv6iris.PathElems <> path_elems def
+R18410:18416 xv6iris.PathElems <> pe_skip def
+R18418:18418 xv6iris.PathElems <> p:86 var
+R18423:18432 xv6iris.PathElems <> path_elems def
+R18434:18434 xv6iris.PathElems <> p:86 var
+R18455:18471 xv6iris.PathElems <> path_elems_unfold thm
+R18474:18480 xv6iris.PathElems <> pe_skip def
+R18488:18504 xv6iris.PathElems <> path_elems_unfold thm
+R18455:18471 xv6iris.PathElems <> path_elems_unfold thm
+R18474:18480 xv6iris.PathElems <> pe_skip def
+R18455:18471 xv6iris.PathElems <> path_elems_unfold thm
+R18474:18480 xv6iris.PathElems <> pe_skip def
+R18488:18504 xv6iris.PathElems <> path_elems_unfold thm
+R18488:18504 xv6iris.PathElems <> path_elems_unfold thm
+R18519:18526 xv6iris.PathElems <> skipelem def
+R18537:18548 xv6iris.PathElems <> pe_skip_idem thm
+R18537:18548 xv6iris.PathElems <> pe_skip_idem thm
+R18537:18548 xv6iris.PathElems <> pe_skip_idem thm
+prf 18576:18593 <> path_elems_nil_iff
+R18600:18603 Corelib.Init.Datatypes <> list ind
+R18606:18607 stdpp.bitvector.definitions <> bv rec
+binder 18596:18596 <> p:87
+R18634:18638 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R18629:18631 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18617:18626 xv6iris.PathElems <> path_elems def
+R18628:18628 xv6iris.PathElems <> p:87 var
+R18632:18633 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R18648:18650 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18639:18645 xv6iris.PathElems <> pe_skip def
+R18647:18647 xv6iris.PathElems <> p:87 var
+R18651:18652 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R18672:18688 xv6iris.PathElems <> path_elems_unfold thm
+R18672:18688 xv6iris.PathElems <> path_elems_unfold thm
+R18672:18688 xv6iris.PathElems <> path_elems_unfold thm
+R18722:18729 xv6iris.PathElems <> skipelem def
+R18722:18729 xv6iris.PathElems <> skipelem def
+R18786:18802 xv6iris.PathElems <> skipelem_None_iff thm
+R18786:18802 xv6iris.PathElems <> skipelem_None_iff thm
+R18838:18850 xv6iris.PathElems <> skipelem_none thm
+R18838:18850 xv6iris.PathElems <> skipelem_none thm
+R18838:18850 xv6iris.PathElems <> skipelem_none thm
+prf 19029:19047 <> path_elems_nil_norm
+R19054:19057 Corelib.Init.Datatypes <> list ind
+R19060:19061 stdpp.bitvector.definitions <> bv rec
+binder 19050:19050 <> p:88
+R19080:19084 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19113:19113 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19071:19077 xv6iris.PathElems <> pe_norm def
+R19079:19079 xv6iris.PathElems <> p:88 var
+R19102:19106 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R19097:19099 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19085:19094 xv6iris.PathElems <> path_elems def
+R19096:19096 xv6iris.PathElems <> p:88 var
+R19100:19101 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R19108:19110 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19107:19107 xv6iris.PathElems <> p:88 var
+R19111:19112 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R19144:19161 xv6iris.PathElems <> path_elems_nil_iff thm
+R19144:19161 xv6iris.PathElems <> path_elems_nil_iff thm
+R19144:19161 xv6iris.PathElems <> path_elems_nil_iff thm
+R19191:19201 xv6iris.PathElems <> pe_norm_nil thm
+R19191:19201 xv6iris.PathElems <> pe_norm_nil thm
+prf 19256:19276 <> skipelem_rest_nil_iff
+R19287:19290 Corelib.Init.Datatypes <> list ind
+R19293:19294 stdpp.bitvector.definitions <> bv rec
+binder 19279:19279 <> p:89
+binder 19281:19281 <> e:90
+binder 19283:19283 <> r:91
+R19328:19332 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19361:19361 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19314:19316 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19304:19311 xv6iris.PathElems <> skipelem def
+R19313:19313 xv6iris.PathElems <> p:89 var
+R19317:19320 Corelib.Init.Datatypes <> Some constr
+R19322:19322 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R19324:19325 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R19327:19327 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R19323:19323 xv6iris.PathElems <> e:90 var
+R19326:19326 xv6iris.PathElems <> r:91 var
+R19339:19343 Corelib.Init.Logic <> ::type_scope:x_'<->'_x not
+R19334:19336 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19333:19333 xv6iris.PathElems <> r:91 var
+R19337:19338 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R19356:19358 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19344:19353 xv6iris.PathElems <> path_elems def
+R19355:19355 xv6iris.PathElems <> r:91 var
+R19359:19360 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R19392:19410 xv6iris.PathElems <> path_elems_nil_norm thm
+R19415:19432 xv6iris.PathElems <> skipelem_rest_norm thm
+R19392:19410 xv6iris.PathElems <> path_elems_nil_norm thm
+R19415:19432 xv6iris.PathElems <> skipelem_rest_norm thm
+R19392:19410 xv6iris.PathElems <> path_elems_nil_norm thm
+R19415:19432 xv6iris.PathElems <> skipelem_rest_norm thm
+prf 19515:19530 <> pe_skip_snoc_nil
+R19537:19540 Corelib.Init.Datatypes <> list ind
+R19543:19544 stdpp.bitvector.definitions <> bv rec
+binder 19533:19533 <> x:92
+R19568:19571 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19563:19565 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19554:19560 xv6iris.PathElems <> pe_skip def
+R19562:19562 xv6iris.PathElems <> x:92 var
+R19566:19567 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R19594:19596 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19572:19578 xv6iris.PathElems <> pe_skip def
+R19582:19585 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R19581:19581 xv6iris.PathElems <> x:92 var
+R19586:19586 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R19592:19592 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R19587:19591 xv6iris.PathElems <> SLASH def
+R19597:19598 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R19691:19701 stdpp.decidable <> bool_decide def
+R19705:19707 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19708:19712 xv6iris.PathElems <> SLASH def
+R19691:19701 stdpp.decidable <> bool_decide def
+R19705:19707 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19708:19712 xv6iris.PathElems <> SLASH def
+prf 19760:19774 <> pe_skip_snoc_ne
+R19781:19784 Corelib.Init.Datatypes <> list ind
+R19787:19788 stdpp.bitvector.definitions <> bv rec
+binder 19777:19777 <> x:93
+R19813:19816 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19807:19810 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R19798:19804 xv6iris.PathElems <> pe_skip def
+R19806:19806 xv6iris.PathElems <> x:93 var
+R19811:19812 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R19839:19841 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19817:19823 xv6iris.PathElems <> pe_skip def
+R19827:19830 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R19826:19826 xv6iris.PathElems <> x:93 var
+R19831:19831 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R19837:19837 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R19832:19836 xv6iris.PathElems <> SLASH def
+R19851:19854 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R19842:19848 xv6iris.PathElems <> pe_skip def
+R19850:19850 xv6iris.PathElems <> x:93 var
+R19855:19855 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R19861:19861 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R19856:19860 xv6iris.PathElems <> SLASH def
+R19974:19984 stdpp.decidable <> bool_decide def
+R19988:19990 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19991:19995 xv6iris.PathElems <> SLASH def
+R19974:19984 stdpp.decidable <> bool_decide def
+R19988:19990 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R19991:19995 xv6iris.PathElems <> SLASH def
+prf 20042:20059 <> pe_elem_snoc_slash
+R20066:20069 Corelib.Init.Datatypes <> list ind
+R20072:20073 stdpp.bitvector.definitions <> bv rec
+binder 20062:20062 <> x:94
+R20105:20107 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20083:20089 xv6iris.PathElems <> pe_elem def
+R20093:20096 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R20092:20092 xv6iris.PathElems <> x:94 var
+R20097:20097 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R20103:20103 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R20098:20102 xv6iris.PathElems <> SLASH def
+R20108:20114 xv6iris.PathElems <> pe_elem def
+R20116:20116 xv6iris.PathElems <> x:94 var
+R20173:20188 stdpp.decidable <> bool_decide_true abbrev
+R20173:20188 stdpp.decidable <> bool_decide_true abbrev
+R20173:20188 stdpp.decidable <> bool_decide_true abbrev
+R20240:20250 stdpp.decidable <> bool_decide def
+R20254:20256 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20257:20261 xv6iris.PathElems <> SLASH def
+R20240:20250 stdpp.decidable <> bool_decide def
+R20254:20256 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20257:20261 xv6iris.PathElems <> SLASH def
+prf 20323:20338 <> pe_rest_snoc_nil
+R20345:20348 Corelib.Init.Datatypes <> list ind
+R20351:20352 stdpp.bitvector.definitions <> bv rec
+binder 20341:20341 <> x:95
+R20376:20379 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20371:20373 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20362:20368 xv6iris.PathElems <> pe_rest def
+R20370:20370 xv6iris.PathElems <> x:95 var
+R20374:20375 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R20402:20404 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20380:20386 xv6iris.PathElems <> pe_rest def
+R20390:20393 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R20389:20389 xv6iris.PathElems <> x:95 var
+R20394:20394 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R20400:20400 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R20395:20399 xv6iris.PathElems <> SLASH def
+R20405:20405 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R20411:20411 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R20406:20410 xv6iris.PathElems <> SLASH def
+R20478:20493 stdpp.decidable <> bool_decide_true abbrev
+R20478:20493 stdpp.decidable <> bool_decide_true abbrev
+R20478:20493 stdpp.decidable <> bool_decide_true abbrev
+R20555:20565 stdpp.decidable <> bool_decide def
+R20569:20571 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20572:20576 xv6iris.PathElems <> SLASH def
+R20555:20565 stdpp.decidable <> bool_decide def
+R20569:20571 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20572:20576 xv6iris.PathElems <> SLASH def
+prf 20624:20638 <> pe_rest_snoc_ne
+R20645:20648 Corelib.Init.Datatypes <> list ind
+R20651:20652 stdpp.bitvector.definitions <> bv rec
+binder 20641:20641 <> x:96
+R20677:20680 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20671:20674 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R20662:20668 xv6iris.PathElems <> pe_rest def
+R20670:20670 xv6iris.PathElems <> x:96 var
+R20675:20676 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R20703:20705 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20681:20687 xv6iris.PathElems <> pe_rest def
+R20691:20694 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R20690:20690 xv6iris.PathElems <> x:96 var
+R20695:20695 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R20701:20701 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R20696:20700 xv6iris.PathElems <> SLASH def
+R20715:20718 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R20706:20712 xv6iris.PathElems <> pe_rest def
+R20714:20714 xv6iris.PathElems <> x:96 var
+R20719:20719 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R20725:20725 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R20720:20724 xv6iris.PathElems <> SLASH def
+R20838:20848 stdpp.decidable <> bool_decide def
+R20852:20854 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20855:20859 xv6iris.PathElems <> SLASH def
+R20838:20848 stdpp.decidable <> bool_decide def
+R20852:20854 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20855:20859 xv6iris.PathElems <> SLASH def
+prf 20906:20930 <> path_elems_snoc_slash_aux
+R20937:20939 Corelib.Init.Datatypes <> nat ind
+binder 20933:20933 <> n:97
+R20946:20952 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R20968:20969 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R20957:20960 Corelib.Init.Datatypes <> list ind
+R20963:20964 stdpp.bitvector.definitions <> bv rec
+binder 20953:20953 <> p:98
+R20989:20996 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20979:20982 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R20971:20976 Stdlib.Lists.List <> length abbrev
+R20978:20978 xv6iris.PathElems <> p:98 var
+R20983:20983 xv6iris.PathElems <> n:97 var
+R21022:21024 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20997:21006 xv6iris.PathElems <> path_elems def
+R21010:21013 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R21009:21009 xv6iris.PathElems <> p:98 var
+R21014:21014 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R21020:21020 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R21015:21019 xv6iris.PathElems <> SLASH def
+R21025:21034 xv6iris.PathElems <> path_elems def
+R21036:21036 xv6iris.PathElems <> p:98 var
+R21103:21105 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21106:21107 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R21120:21133 stdpp.list_basics <> nil_length_inv thm
+R21103:21105 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21106:21107 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R21120:21133 stdpp.list_basics <> nil_length_inv thm
+R21163:21171 Stdlib.Lists.List <> app_nil_l thm
+R21174:21188 xv6iris.PathElems <> path_elems_root thm
+R21191:21204 xv6iris.PathElems <> path_elems_nil thm
+R21163:21171 Stdlib.Lists.List <> app_nil_l thm
+R21163:21171 Stdlib.Lists.List <> app_nil_l thm
+R21174:21188 xv6iris.PathElems <> path_elems_root thm
+R21174:21188 xv6iris.PathElems <> path_elems_root thm
+R21191:21204 xv6iris.PathElems <> path_elems_nil thm
+R21191:21204 xv6iris.PathElems <> path_elems_nil thm
+R21234:21240 xv6iris.PathElems <> pe_skip def
+R21234:21240 xv6iris.PathElems <> pe_skip def
+R21275:21289 xv6iris.PathElems <> path_elems_None thm
+R21294:21306 xv6iris.PathElems <> skipelem_none thm
+R21275:21289 xv6iris.PathElems <> path_elems_None thm
+R21294:21306 xv6iris.PathElems <> skipelem_none thm
+R21275:21289 xv6iris.PathElems <> path_elems_None thm
+R21294:21306 xv6iris.PathElems <> skipelem_none thm
+R21325:21339 xv6iris.PathElems <> path_elems_None thm
+R21342:21354 xv6iris.PathElems <> skipelem_none thm
+R21357:21372 xv6iris.PathElems <> pe_skip_snoc_nil thm
+R21325:21339 xv6iris.PathElems <> path_elems_None thm
+R21342:21354 xv6iris.PathElems <> skipelem_none thm
+R21357:21372 xv6iris.PathElems <> pe_skip_snoc_nil thm
+R21405:21408 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R21396:21402 xv6iris.PathElems <> pe_skip def
+R21409:21410 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R21405:21408 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R21396:21402 xv6iris.PathElems <> pe_skip def
+R21409:21410 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R21454:21468 xv6iris.PathElems <> path_elems_Some thm
+R21477:21489 xv6iris.PathElems <> skipelem_some thm
+R21454:21468 xv6iris.PathElems <> path_elems_Some thm
+R21477:21489 xv6iris.PathElems <> skipelem_some thm
+R21454:21468 xv6iris.PathElems <> path_elems_Some thm
+R21477:21489 xv6iris.PathElems <> skipelem_some thm
+R21539:21542 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R21517:21523 xv6iris.PathElems <> pe_skip def
+R21527:21530 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R21531:21531 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R21537:21537 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R21532:21536 xv6iris.PathElems <> SLASH def
+R21543:21544 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R21564:21578 xv6iris.PathElems <> pe_skip_snoc_ne thm
+R21539:21542 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R21517:21523 xv6iris.PathElems <> pe_skip def
+R21527:21530 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R21531:21531 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R21537:21537 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R21532:21536 xv6iris.PathElems <> SLASH def
+R21543:21544 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R21564:21578 xv6iris.PathElems <> pe_skip_snoc_ne thm
+R21564:21578 xv6iris.PathElems <> pe_skip_snoc_ne thm
+R21617:21631 xv6iris.PathElems <> path_elems_Some thm
+R21640:21652 xv6iris.PathElems <> skipelem_some thm
+R21617:21631 xv6iris.PathElems <> path_elems_Some thm
+R21640:21652 xv6iris.PathElems <> skipelem_some thm
+R21617:21631 xv6iris.PathElems <> path_elems_Some thm
+R21640:21652 xv6iris.PathElems <> skipelem_some thm
+R21675:21689 xv6iris.PathElems <> pe_skip_snoc_ne thm
+R21699:21716 xv6iris.PathElems <> pe_elem_snoc_slash thm
+R21675:21689 xv6iris.PathElems <> pe_skip_snoc_ne thm
+R21675:21689 xv6iris.PathElems <> pe_skip_snoc_ne thm
+R21699:21716 xv6iris.PathElems <> pe_elem_snoc_slash thm
+R21699:21716 xv6iris.PathElems <> pe_elem_snoc_slash thm
+R21803:21808 stdpp.base <> decide def
+R21830:21832 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21811:21817 xv6iris.PathElems <> pe_rest def
+R21820:21826 xv6iris.PathElems <> pe_skip def
+R21833:21834 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R21803:21808 stdpp.base <> decide def
+R21830:21832 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21811:21817 xv6iris.PathElems <> pe_rest def
+R21820:21826 xv6iris.PathElems <> pe_skip def
+R21833:21834 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R21863:21878 xv6iris.PathElems <> pe_rest_snoc_nil thm
+R21881:21887 xv6iris.PathElems <> pe_skip def
+R21901:21913 xv6iris.PathElems <> pe_skip_slash thm
+R21863:21878 xv6iris.PathElems <> pe_rest_snoc_nil thm
+R21881:21887 xv6iris.PathElems <> pe_skip def
+R21863:21878 xv6iris.PathElems <> pe_rest_snoc_nil thm
+R21881:21887 xv6iris.PathElems <> pe_skip def
+R21901:21913 xv6iris.PathElems <> pe_skip_slash thm
+R21901:21913 xv6iris.PathElems <> pe_skip_slash thm
+R21942:21956 xv6iris.PathElems <> pe_rest_snoc_ne thm
+R21959:21965 xv6iris.PathElems <> pe_skip def
+R21942:21956 xv6iris.PathElems <> pe_rest_snoc_ne thm
+R21959:21965 xv6iris.PathElems <> pe_skip def
+R21942:21956 xv6iris.PathElems <> pe_rest_snoc_ne thm
+R21959:21965 xv6iris.PathElems <> pe_skip def
+R21989:21994 stdpp.base <> decide def
+R22026:22028 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21997:22003 xv6iris.PathElems <> pe_skip def
+R22006:22012 xv6iris.PathElems <> pe_rest def
+R22015:22021 xv6iris.PathElems <> pe_skip def
+R22029:22030 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R21989:21994 stdpp.base <> decide def
+R22026:22028 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21997:22003 xv6iris.PathElems <> pe_skip def
+R22006:22012 xv6iris.PathElems <> pe_rest def
+R22015:22021 xv6iris.PathElems <> pe_skip def
+R22029:22030 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R22065:22080 xv6iris.PathElems <> pe_skip_snoc_nil thm
+R22065:22080 xv6iris.PathElems <> pe_skip_snoc_nil thm
+R22065:22080 xv6iris.PathElems <> pe_skip_snoc_nil thm
+R22117:22131 xv6iris.PathElems <> pe_skip_snoc_ne thm
+R22117:22131 xv6iris.PathElems <> pe_skip_snoc_ne thm
+R22117:22131 xv6iris.PathElems <> pe_skip_snoc_ne thm
+R22158:22170 xv6iris.PathElems <> skipelem_decr thm
+R22179:22191 xv6iris.PathElems <> skipelem_some thm
+R22158:22170 xv6iris.PathElems <> skipelem_decr thm
+R22179:22191 xv6iris.PathElems <> skipelem_some thm
+prf 22241:22261 <> path_elems_snoc_slash
+R22268:22271 Corelib.Init.Datatypes <> list ind
+R22274:22275 stdpp.bitvector.definitions <> bv rec
+binder 22264:22264 <> p:99
+R22310:22312 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22285:22294 xv6iris.PathElems <> path_elems def
+R22298:22301 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R22297:22297 xv6iris.PathElems <> p:99 var
+R22302:22302 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R22308:22308 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R22303:22307 xv6iris.PathElems <> SLASH def
+R22313:22322 xv6iris.PathElems <> path_elems def
+R22324:22324 xv6iris.PathElems <> p:99 var
+R22341:22365 xv6iris.PathElems <> path_elems_snoc_slash_aux thm
+R22368:22373 Stdlib.Lists.List <> length abbrev
+R22341:22365 xv6iris.PathElems <> path_elems_snoc_slash_aux thm
+R22368:22373 Stdlib.Lists.List <> length abbrev
+prf 22520:22533 <> skipelem_short
+R22542:22545 Corelib.Init.Datatypes <> list ind
+R22548:22549 stdpp.bitvector.definitions <> bv rec
+binder 22536:22536 <> u:100
+binder 22538:22538 <> v:101
+R22568:22571 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22559:22565 xv6iris.PathElems <> noslash def
+R22567:22567 xv6iris.PathElems <> u:100 var
+R22579:22582 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22573:22576 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R22572:22572 xv6iris.PathElems <> u:100 var
+R22577:22578 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R22603:22606 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22592:22595 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R22584:22589 Stdlib.Lists.List <> length abbrev
+R22591:22591 xv6iris.PathElems <> u:100 var
+R22618:22623 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22607:22615 xv6iris.PathElems <> pe_at_sep def
+R22617:22617 xv6iris.PathElems <> v:101 var
+R22641:22643 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22624:22631 xv6iris.PathElems <> skipelem def
+R22635:22638 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R22634:22634 xv6iris.PathElems <> u:100 var
+R22639:22639 xv6iris.PathElems <> v:101 var
+R22644:22647 Corelib.Init.Datatypes <> Some constr
+R22649:22649 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R22651:22652 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R22662:22662 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R22650:22650 xv6iris.PathElems <> u:100 var
+R22653:22659 xv6iris.PathElems <> pe_skip def
+R22661:22661 xv6iris.PathElems <> v:101 var
+R22708:22721 xv6iris.PathElems <> skipelem_split thm
+R22739:22745 stdpp.list_basics <> take_ge thm
+R22708:22721 xv6iris.PathElems <> skipelem_split thm
+R22708:22721 xv6iris.PathElems <> skipelem_split thm
+R22739:22745 stdpp.list_basics <> take_ge thm
+R22739:22745 stdpp.list_basics <> take_ge thm
+prf 22787:22802 <> skipelem_exact14
+R22811:22814 Corelib.Init.Datatypes <> list ind
+R22817:22818 stdpp.bitvector.definitions <> bv rec
+binder 22805:22805 <> u:102
+binder 22807:22807 <> v:103
+R22837:22840 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22828:22834 xv6iris.PathElems <> noslash def
+R22836:22836 xv6iris.PathElems <> u:102 var
+R22858:22861 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22849:22851 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22841:22846 Stdlib.Lists.List <> length abbrev
+R22848:22848 xv6iris.PathElems <> u:102 var
+R22873:22878 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22862:22870 xv6iris.PathElems <> pe_at_sep def
+R22872:22872 xv6iris.PathElems <> v:103 var
+R22896:22898 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22879:22886 xv6iris.PathElems <> skipelem def
+R22890:22893 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R22889:22889 xv6iris.PathElems <> u:102 var
+R22894:22894 xv6iris.PathElems <> v:103 var
+R22899:22902 Corelib.Init.Datatypes <> Some constr
+R22904:22904 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R22906:22907 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R22917:22917 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R22905:22905 xv6iris.PathElems <> u:102 var
+R22908:22914 xv6iris.PathElems <> pe_skip def
+R22916:22916 xv6iris.PathElems <> v:103 var
+R22954:22967 xv6iris.PathElems <> skipelem_short thm
+R22954:22967 xv6iris.PathElems <> skipelem_short thm
+prf 23060:23072 <> skipelem_long
+R23081:23084 Corelib.Init.Datatypes <> list ind
+R23087:23088 stdpp.bitvector.definitions <> bv rec
+binder 23075:23075 <> u:104
+binder 23077:23077 <> v:105
+R23107:23110 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23098:23104 xv6iris.PathElems <> noslash def
+R23106:23106 xv6iris.PathElems <> u:104 var
+R23131:23134 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23114:23117 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23118:23123 Stdlib.Lists.List <> length abbrev
+R23125:23125 xv6iris.PathElems <> u:104 var
+R23146:23151 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23135:23143 xv6iris.PathElems <> pe_at_sep def
+R23145:23145 xv6iris.PathElems <> v:105 var
+R23199:23204 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R23169:23171 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23152:23159 xv6iris.PathElems <> skipelem def
+R23163:23166 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R23162:23162 xv6iris.PathElems <> u:104 var
+R23167:23167 xv6iris.PathElems <> v:105 var
+R23172:23175 Corelib.Init.Datatypes <> Some constr
+R23177:23177 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R23187:23188 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R23198:23198 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R23178:23181 stdpp.list_basics <> take abbrev
+R23186:23186 xv6iris.PathElems <> u:104 var
+R23189:23195 xv6iris.PathElems <> pe_skip def
+R23197:23197 xv6iris.PathElems <> v:105 var
+R23223:23225 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23205:23210 Stdlib.Lists.List <> length abbrev
+R23213:23216 stdpp.list_basics <> take abbrev
+R23221:23221 xv6iris.PathElems <> u:104 var
+R23279:23282 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R23283:23284 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R23279:23282 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R23283:23284 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R23362:23375 xv6iris.PathElems <> skipelem_split thm
+R23362:23375 xv6iris.PathElems <> skipelem_split thm
+R23402:23412 stdpp.list_basics <> length_take thm
+R23402:23412 stdpp.list_basics <> length_take thm
+R23402:23412 stdpp.list_basics <> length_take thm
+prf 23665:23677 <> list_snoc_inv
+binder 23680:23680 <> A:106
+R23695:23698 Corelib.Init.Datatypes <> list ind
+R23700:23700 xv6iris.PathElems <> A:106 var
+binder 23691:23691 <> l:107
+R23713:23716 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R23708:23710 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23707:23707 xv6iris.PathElems <> l:107 var
+R23711:23712 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R23717:23723 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R23728:23729 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 23724:23725 <> l':108
+binder 23727:23727 <> x:109
+R23731:23733 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R23730:23730 xv6iris.PathElems <> l:107 var
+R23736:23739 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R23734:23735 xv6iris.PathElems <> l':108 var
+R23740:23740 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R23742:23742 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R23741:23741 xv6iris.PathElems <> x:109 var
+R23855:23856 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R23855:23856 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R23900:23903 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R23900:23903 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+def 24223:24236 <> nameiparent_of
+R24243:24246 Corelib.Init.Datatypes <> list ind
+R24249:24250 stdpp.bitvector.definitions <> bv rec
+binder 24239:24239 <> p:110
+R24262:24265 Corelib.Init.Datatypes <> list ind
+R24268:24271 Corelib.Init.Datatypes <> list ind
+R24274:24275 stdpp.bitvector.definitions <> bv rec
+binder 24257:24258 <> es:111
+R24291:24294 Corelib.Init.Datatypes <> list ind
+R24297:24298 stdpp.bitvector.definitions <> bv rec
+binder 24287:24287 <> e:112
+R24326:24328 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24314:24323 xv6iris.PathElems <> path_elems def
+R24325:24325 xv6iris.PathElems <> p:110 var
+R24331:24334 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R24329:24330 xv6iris.PathElems <> es:111 var
+R24335:24335 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R24337:24337 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R24336:24336 xv6iris.PathElems <> e:112 var
+prf 24347:24364 <> nameiparent_exists
+R24371:24374 Corelib.Init.Datatypes <> list ind
+R24377:24378 stdpp.bitvector.definitions <> bv rec
+binder 24367:24367 <> p:113
+R24406:24409 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24400:24403 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R24388:24397 xv6iris.PathElems <> path_elems def
+R24399:24399 xv6iris.PathElems <> p:113 var
+R24404:24405 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R24410:24416 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R24421:24422 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 24417:24418 <> es:114
+binder 24420:24420 <> e:115
+R24423:24436 xv6iris.PathElems <> nameiparent_of def
+R24438:24438 xv6iris.PathElems <> p:113 var
+R24440:24441 xv6iris.PathElems <> es:114 var
+R24443:24443 xv6iris.PathElems <> e:115 var
+R24472:24485 xv6iris.PathElems <> nameiparent_of def
+R24500:24512 xv6iris.PathElems <> list_snoc_inv thm
+R24515:24524 xv6iris.PathElems <> path_elems def
+R24500:24512 xv6iris.PathElems <> list_snoc_inv thm
+R24515:24524 xv6iris.PathElems <> path_elems def
+prf 24621:24636 <> nameiparent_uniq
+R24643:24646 Corelib.Init.Datatypes <> list ind
+R24649:24650 stdpp.bitvector.definitions <> bv rec
+binder 24639:24639 <> p:116
+R24667:24670 Corelib.Init.Datatypes <> list ind
+R24673:24676 Corelib.Init.Datatypes <> list ind
+R24679:24680 stdpp.bitvector.definitions <> bv rec
+binder 24657:24659 <> es1:117
+binder 24661:24663 <> es2:118
+R24700:24703 Corelib.Init.Datatypes <> list ind
+R24706:24707 stdpp.bitvector.definitions <> bv rec
+binder 24692:24693 <> e1:119
+binder 24695:24696 <> e2:120
+R24740:24743 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24717:24730 xv6iris.PathElems <> nameiparent_of def
+R24732:24732 xv6iris.PathElems <> p:116 var
+R24734:24736 xv6iris.PathElems <> es1:117 var
+R24738:24739 xv6iris.PathElems <> e1:119 var
+R24767:24770 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R24744:24757 xv6iris.PathElems <> nameiparent_of def
+R24759:24759 xv6iris.PathElems <> p:116 var
+R24761:24763 xv6iris.PathElems <> es2:118 var
+R24765:24766 xv6iris.PathElems <> e2:120 var
+R24780:24783 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R24774:24776 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24771:24773 xv6iris.PathElems <> es1:117 var
+R24777:24779 xv6iris.PathElems <> es2:118 var
+R24786:24788 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24784:24785 xv6iris.PathElems <> e1:119 var
+R24789:24790 xv6iris.PathElems <> e2:120 var
+R24809:24822 xv6iris.PathElems <> nameiparent_of def
+R24865:24876 Stdlib.Lists.List <> app_inj_tail thm
+R24865:24876 Stdlib.Lists.List <> app_inj_tail thm
+prf 25055:25070 <> skipelem_is_last
+R25081:25084 Corelib.Init.Datatypes <> list ind
+R25087:25088 stdpp.bitvector.definitions <> bv rec
+binder 25073:25073 <> p:121
+binder 25075:25075 <> e:122
+binder 25077:25077 <> r:123
+R25122:25125 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25108:25110 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25098:25105 xv6iris.PathElems <> skipelem def
+R25107:25107 xv6iris.PathElems <> p:121 var
+R25111:25114 Corelib.Init.Datatypes <> Some constr
+R25116:25116 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R25118:25119 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R25121:25121 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R25117:25117 xv6iris.PathElems <> e:122 var
+R25120:25120 xv6iris.PathElems <> r:123 var
+R25132:25135 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25127:25129 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25126:25126 xv6iris.PathElems <> r:123 var
+R25130:25131 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R25148:25150 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25136:25145 xv6iris.PathElems <> path_elems def
+R25147:25147 xv6iris.PathElems <> p:121 var
+R25151:25151 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R25153:25153 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R25152:25152 xv6iris.PathElems <> e:122 var
+R25187:25201 xv6iris.PathElems <> path_elems_Some thm
+R25217:25230 xv6iris.PathElems <> path_elems_nil thm
+R25187:25201 xv6iris.PathElems <> path_elems_Some thm
+R25187:25201 xv6iris.PathElems <> path_elems_Some thm
+R25217:25230 xv6iris.PathElems <> path_elems_nil thm
+R25217:25230 xv6iris.PathElems <> path_elems_nil thm
+prf 25260:25276 <> skipelem_not_last
+R25287:25290 Corelib.Init.Datatypes <> list ind
+R25293:25294 stdpp.bitvector.definitions <> bv rec
+binder 25279:25279 <> p:124
+binder 25281:25281 <> e:125
+binder 25283:25283 <> r:126
+R25328:25331 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25314:25316 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25304:25311 xv6iris.PathElems <> skipelem def
+R25313:25313 xv6iris.PathElems <> p:124 var
+R25317:25320 Corelib.Init.Datatypes <> Some constr
+R25322:25322 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R25324:25325 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R25327:25327 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R25323:25323 xv6iris.PathElems <> e:125 var
+R25326:25326 xv6iris.PathElems <> r:126 var
+R25339:25344 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R25333:25336 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R25332:25332 xv6iris.PathElems <> r:126 var
+R25337:25338 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R25377:25380 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R25357:25359 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25345:25354 xv6iris.PathElems <> path_elems def
+R25356:25356 xv6iris.PathElems <> p:124 var
+R25361:25364 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R25360:25360 xv6iris.PathElems <> e:125 var
+R25365:25374 xv6iris.PathElems <> path_elems def
+R25376:25376 xv6iris.PathElems <> r:126 var
+R25393:25396 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R25381:25390 xv6iris.PathElems <> path_elems def
+R25392:25392 xv6iris.PathElems <> r:126 var
+R25397:25398 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R25438:25452 xv6iris.PathElems <> path_elems_Some thm
+R25438:25452 xv6iris.PathElems <> path_elems_Some thm
+R25493:25497 Corelib.Init.Logic <> proj1 thm
+R25500:25518 xv6iris.PathElems <> path_elems_nil_norm thm
+R25523:25540 xv6iris.PathElems <> skipelem_rest_norm thm
+R25493:25497 Corelib.Init.Logic <> proj1 thm
+R25500:25518 xv6iris.PathElems <> path_elems_nil_norm thm
+R25523:25540 xv6iris.PathElems <> skipelem_rest_norm thm
+prf 26110:26127 <> skipelem_name_view
+R26138:26141 Corelib.Init.Datatypes <> list ind
+R26144:26145 stdpp.bitvector.definitions <> bv rec
+binder 26130:26130 <> p:127
+binder 26132:26132 <> e:128
+binder 26134:26134 <> r:129
+R26159:26162 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26156:26158 Corelib.Init.Datatypes <> nat ind
+R26163:26164 stdpp.bitvector.definitions <> bv rec
+binder 26152:26152 <> f:130
+R26201:26206 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26173:26178 Corelib.Lists.ListDef <> Forall ind
+R26200:26200 xv6iris.PathElems <> p:127 var
+binder 26185:26185 <> b:131
+R26191:26194 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R26190:26190 xv6iris.PathElems <> b:131 var
+R26195:26197 xv6iris.DirentEnc <> NUL def
+R26231:26236 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26217:26219 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26207:26214 xv6iris.PathElems <> skipelem def
+R26216:26216 xv6iris.PathElems <> p:127 var
+R26220:26223 Corelib.Init.Datatypes <> Some constr
+R26225:26225 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R26227:26228 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R26230:26230 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R26226:26226 xv6iris.PathElems <> e:128 var
+R26229:26229 xv6iris.PathElems <> r:129 var
+R26237:26237 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26283:26289 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26238:26244 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R26246:26247 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 26245:26245 <> j:132
+R26266:26269 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26250:26252 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R26249:26249 xv6iris.PathElems <> j:132 var
+R26253:26258 Stdlib.Lists.List <> length abbrev
+R26260:26260 xv6iris.PathElems <> e:128 var
+R26273:26275 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26270:26270 xv6iris.PathElems <> f:130 var
+R26272:26272 xv6iris.PathElems <> j:132 var
+R26277:26281 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R26282:26282 xv6iris.PathElems <> j:132 var
+R26276:26276 xv6iris.PathElems <> e:128 var
+R26290:26290 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26332:26338 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26310:26313 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26300:26302 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R26292:26297 Stdlib.Lists.List <> length abbrev
+R26299:26299 xv6iris.PathElems <> e:128 var
+R26326:26328 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26314:26314 xv6iris.PathElems <> f:130 var
+R26317:26322 Stdlib.Lists.List <> length abbrev
+R26324:26324 xv6iris.PathElems <> e:128 var
+R26329:26331 xv6iris.DirentEnc <> NUL def
+R26349:26351 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26339:26343 xv6iris.DirentEnc <> bname def
+R26348:26348 xv6iris.PathElems <> f:130 var
+R26352:26352 xv6iris.PathElems <> e:128 var
+R26399:26414 xv6iris.PathElems <> skipelem_elem_wf thm
+R26399:26414 xv6iris.PathElems <> skipelem_elem_wf thm
+R26455:26468 xv6iris.PathElems <> skipelem_nonul thm
+R26455:26468 xv6iris.PathElems <> skipelem_nonul thm
+R26503:26514 xv6iris.DirentEnc <> bname_of_buf thm
+R26503:26514 xv6iris.DirentEnc <> bname_of_buf thm

@@ -1,0 +1,5 @@
+DIGEST f1719369973688228d5c5f059724ed8a
+Fxv6iris.LinkCpuid
+R202:211 xv6iris.ProofCpuid <> <> lib
+R231:240 xv6iris.ProofCpuid CpuidProof <> modtype
+mod 222:226 <> Cpuid

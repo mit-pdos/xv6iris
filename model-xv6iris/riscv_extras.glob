@@ -1,0 +1,147 @@
+DIGEST f27db3f19d19e170b0bec8fb7b01b1e0
+FRiscv.riscv_extras
+R660:673 SailStdpp.Base <> <> lib
+R691:694 Stdlib.Lists.List <> <> lib
+R712:714 Stdlib.micromega.Lia <> <> lib
+R724:741 Stdlib.Lists.List ListNotations <> mod
+def 770:784 <> shift_bits_left
+binder 787:787 <> a:1
+binder 789:789 <> b:2
+R797:801 SailStdpp.Values <> mword def
+R803:803 Riscv.riscv_extras <> a:1 var
+binder 793:793 <> v:3
+R811:815 SailStdpp.Values <> mword def
+R817:817 Riscv.riscv_extras <> b:2 var
+binder 807:807 <> n:4
+R822:826 SailStdpp.Values <> mword def
+R828:828 Riscv.riscv_extras <> a:1 var
+R835:840 SailStdpp.Operators_mwords <> shiftl def
+R845:856 SailStdpp.Values <> int_of_mword def
+R864:864 Riscv.riscv_extras <> n:4 var
+R858:862 Corelib.Init.Datatypes <> false constr
+R842:842 Riscv.riscv_extras <> v:3 var
+def 880:895 <> shift_bits_right
+binder 898:898 <> a:5
+binder 900:900 <> b:6
+R908:912 SailStdpp.Values <> mword def
+R914:914 Riscv.riscv_extras <> a:5 var
+binder 904:904 <> v:7
+R922:926 SailStdpp.Values <> mword def
+R928:928 Riscv.riscv_extras <> b:6 var
+binder 918:918 <> n:8
+R933:937 SailStdpp.Values <> mword def
+R939:939 Riscv.riscv_extras <> a:5 var
+R946:951 SailStdpp.Operators_mwords <> shiftr def
+R956:967 SailStdpp.Values <> int_of_mword def
+R975:975 Riscv.riscv_extras <> n:8 var
+R969:973 Corelib.Init.Datatypes <> false constr
+R953:953 Riscv.riscv_extras <> v:7 var
+def 991:1012 <> shift_bits_right_arith
+binder 1015:1015 <> a:9
+binder 1017:1017 <> b:10
+R1025:1029 SailStdpp.Values <> mword def
+R1031:1031 Riscv.riscv_extras <> a:9 var
+binder 1021:1021 <> v:11
+R1039:1043 SailStdpp.Values <> mword def
+R1045:1045 Riscv.riscv_extras <> b:10 var
+binder 1035:1035 <> n:12
+R1050:1054 SailStdpp.Values <> mword def
+R1056:1056 Riscv.riscv_extras <> a:9 var
+R1063:1074 SailStdpp.Operators_mwords <> arith_shiftr def
+R1079:1090 SailStdpp.Values <> int_of_mword def
+R1098:1098 Riscv.riscv_extras <> n:12 var
+R1092:1096 Corelib.Init.Datatypes <> false constr
+R1076:1076 Riscv.riscv_extras <> v:11 var
+def 1152:1162 <> get_time_ns
+R1167:1170 Corelib.Init.Datatypes <> unit ind
+R1175:1175 Corelib.Numbers.BinNums <> Z ind
+def 1322:1355 <> sys_enable_experimental_extensions
+R1360:1363 Corelib.Init.Datatypes <> unit ind
+R1368:1371 Corelib.Init.Datatypes <> bool ind
+R1376:1380 Corelib.Init.Datatypes <> false constr
+def 1436:1444 <> mults_vec
+binder 1447:1447 <> n:13
+R1455:1459 SailStdpp.Values <> mword def
+R1461:1461 Riscv.riscv_extras <> n:13 var
+binder 1451:1451 <> l:14
+R1469:1473 SailStdpp.Values <> mword def
+R1475:1475 Riscv.riscv_extras <> n:13 var
+binder 1465:1465 <> r:15
+R1480:1484 SailStdpp.Values <> mword def
+R1488:1490 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R1491:1491 Riscv.riscv_extras <> n:13 var
+R1497:1505 SailStdpp.Operators_mwords <> mults_vec def
+R1509:1509 Riscv.riscv_extras <> r:15 var
+R1507:1507 Riscv.riscv_extras <> l:14 var
+def 1523:1530 <> mult_vec
+binder 1533:1533 <> n:16
+R1541:1545 SailStdpp.Values <> mword def
+R1547:1547 Riscv.riscv_extras <> n:16 var
+binder 1537:1537 <> l:17
+R1555:1559 SailStdpp.Values <> mword def
+R1561:1561 Riscv.riscv_extras <> n:16 var
+binder 1551:1551 <> r:18
+R1566:1570 SailStdpp.Values <> mword def
+R1574:1576 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R1577:1577 Riscv.riscv_extras <> n:16 var
+R1583:1590 SailStdpp.Operators_mwords <> mult_vec def
+R1594:1594 Riscv.riscv_extras <> r:18 var
+R1592:1592 Riscv.riscv_extras <> l:17 var
+def 1608:1619 <> print_string
+R1626:1631 Stdlib.Strings.String <> string ind
+R1636:1639 Corelib.Init.Datatypes <> unit ind
+R1644:1645 Corelib.Init.Datatypes <> tt constr
+ax 1655:1670 <> load_reservation
+R1692:1695 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+binder 1682:1684 <> Mon:19
+R1704:1712 stdpp.base <> MRet class
+R1714:1716 Riscv.riscv_extras <> Mon:19 var
+binder 1704:1716 <> H:20
+binder 1720:1720 <> n:21
+R1731:1734 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1724:1728 SailStdpp.Values <> mword def
+R1730:1730 Riscv.riscv_extras <> n:21 var
+R1736:1739 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1735:1735 Corelib.Numbers.BinNums <> Z ind
+R1740:1742 Riscv.riscv_extras <> Mon:19 var
+R1744:1747 Corelib.Init.Datatypes <> unit ind
+ax 1756:1773 <> cancel_reservation
+R1795:1798 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+binder 1785:1787 <> Mon:24
+R1807:1815 stdpp.base <> MRet class
+R1817:1819 Riscv.riscv_extras <> Mon:24 var
+binder 1807:1819 <> H:25
+R1827:1830 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1823:1826 Corelib.Init.Datatypes <> unit ind
+R1831:1833 Riscv.riscv_extras <> Mon:24 var
+R1835:1838 Corelib.Init.Datatypes <> unit ind
+ax 1847:1863 <> match_reservation
+binder 1875:1875 <> n:28
+R1886:1889 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1879:1883 SailStdpp.Values <> mword def
+R1885:1885 Riscv.riscv_extras <> n:28 var
+R1890:1893 Corelib.Init.Datatypes <> bool ind
+ax 1902:1918 <> valid_reservation
+R1926:1929 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R1922:1925 Corelib.Init.Datatypes <> unit ind
+R1930:1933 Corelib.Init.Datatypes <> bool ind
+ax 1942:1956 <> plat_term_write
+R1978:1981 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+binder 1968:1970 <> Mon:33
+R1990:1998 stdpp.base <> MRet class
+R2000:2002 Riscv.riscv_extras <> Mon:33 var
+binder 1990:2002 <> H:34
+R2013:2016 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2006:2010 SailStdpp.Values <> mword def
+R2017:2019 Riscv.riscv_extras <> Mon:33 var
+R2021:2024 Corelib.Init.Datatypes <> unit ind
+ax 2033:2046 <> plat_term_read
+R2068:2071 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+binder 2058:2060 <> Mon:37
+R2080:2088 stdpp.base <> MRet class
+R2090:2092 Riscv.riscv_extras <> Mon:37 var
+binder 2080:2092 <> H:38
+R2100:2103 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2096:2099 Corelib.Init.Datatypes <> unit ind
+R2104:2106 Riscv.riscv_extras <> Mon:37 var
+R2109:2113 SailStdpp.Values <> mword def

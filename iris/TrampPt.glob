@@ -1,0 +1,43 @@
+DIGEST 37f4ebdf972eea779f63173d41a1383a
+Fxv6iris.TrampPt
+R1881:1886 Stdlib.ZArith.ZArith <> <> lib
+R1915:1935 stdpp.bitvector.definitions <> <> lib
+R1953:1982 SailStdpp.ConcurrencyInterface <> <> lib
+R1984:2021 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R2023:2057 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R2059:2084 SailStdpp.Operators_mwords <> <> lib
+R2102:2118 Riscv.rv64d_types <> <> lib
+R2120:2130 Riscv.rv64d <> <> lib
+R2148:2161 SailStdpp.Base <> <> lib
+R2163:2181 SailStdpp.TypeCasts <> <> lib
+R2183:2198 SailStdpp.Values <> <> lib
+R2200:2220 SailStdpp.MachineWord <> <> lib
+R2243:2252 Kernel.KernelSyms <> <> lib
+R2270:2279 xv6iris.KptExecMap <> <> lib
+R2315:2318 Riscv.rv64d_types Defs <> mod
+def 2563:2572 <> TRAMPOLINE
+R2576:2576 Corelib.Numbers.BinNums <> Z ind
+def 2606:2614 <> TRAPFRAME
+R2619:2619 Corelib.Numbers.BinNums <> Z ind
+def 2650:2655 <> tf_vpn
+R2662:2666 SailStdpp.Values <> mword def
+R2674:2685 SailStdpp.Values <> mword_of_int def
+def 3156:3160 <> tf_pa
+R3169:3173 SailStdpp.Values <> mword def
+binder 3163:3165 <> tfp:1
+R3186:3186 Corelib.Numbers.BinNums <> Z ind
+binder 3180:3182 <> off:2
+R3191:3195 SailStdpp.Values <> mword def
+R3205:3216 Riscv.rv64d_types <> zero_extend' def
+R3222:3231 SailStdpp.Operators_mwords <> concat_vec def
+R3242:3257 SailStdpp.Operators_mwords <> subrange_vec_dec def
+R3330:3334 Stdlib.ZArith.BinInt Z sub def
+R3336:3348 Riscv.rv64d <> pagesize_bits def
+R3260:3275 Riscv.rv64d <> bits_of_virtaddr def
+R3278:3285 Riscv.rv64d_types <> Virtaddr constr
+R3288:3299 SailStdpp.Values <> mword_of_int def
+R3311:3313 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R3302:3310 xv6iris.TrampPt <> TRAPFRAME def
+R3314:3316 xv6iris.TrampPt <> off:2 var
+R3233:3235 xv6iris.TrampPt <> tfp:1 var
+R3806:3813 xv6iris.Pt4kWalk <> <> lib

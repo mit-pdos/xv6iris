@@ -1,0 +1,1033 @@
+DIGEST 3bb7858c93af21d5d3aacd222f023a5b
+Fxv6iris.TfPage36
+R894:899 Stdlib.ZArith.ZArith <> <> lib
+R901:903 Stdlib.micromega.Lia <> <> lib
+R905:908 Stdlib.Lists.List <> <> lib
+R937:940 stdpp.gmap <> <> lib
+R942:945 stdpp.list <> <> lib
+R947:967 stdpp.bitvector.definitions <> <> lib
+R1003:1007 iris.algebra.dfrac <> <> lib
+R1050:1054 iris.base_logic.lib.iprop <> <> lib
+R1092:1100 iris.proofmode.proofmode <> <> lib
+R1118:1147 SailStdpp.ConcurrencyInterface <> <> lib
+R1149:1186 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R1188:1222 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R1224:1249 SailStdpp.Operators_mwords <> <> lib
+R1267:1280 SailStdpp.Base <> <> lib
+R1282:1300 SailStdpp.TypeCasts <> <> lib
+R1302:1317 SailStdpp.Values <> <> lib
+R1319:1339 SailStdpp.MachineWord <> <> lib
+R1357:1373 Riscv.rv64d_types <> <> lib
+R1375:1385 Riscv.rv64d <> <> lib
+R1403:1412 xv6iris.RiscvPtsto <> <> lib
+R1430:1436 xv6iris.TrampPt <> <> lib
+R1454:1461 xv6iris.ProcGeom <> <> lib
+R1479:1486 xv6iris.ProcDefs <> <> lib
+R1522:1525 Riscv.rv64d_types Defs <> mod
+sec 1537:1544 <> TfPage36
+R1560:1566 xv6iris.RiscvPtsto <> riscvGS class
+var  1734:1735 TfPage36 XI
+R1739:1751 xv6iris.TsoCtx <> CurCtx class
+R2698:2726 xv6iris.TsoCtx <> ctx_phys_word_pointsto def
+R2728:2729 xv6iris.TfPage36 <> TfPage36.XI var
+R2734:2741 iris.algebra.dfrac <> DfracOwn constr
+not 2673:2673 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x
+prf 3073:3082 <> tf_words36
+R3091:3095 SailStdpp.Values <> mword def
+binder 3085:3087 <> tfp:4
+R3244:3248 SailStdpp.Values <> mword def
+binder 3108:3109 <> w0:5
+binder 3111:3112 <> w1:6
+binder 3114:3115 <> w2:7
+binder 3117:3118 <> w3:8
+binder 3120:3121 <> w4:9
+binder 3123:3124 <> w5:10
+binder 3126:3127 <> w6:11
+binder 3129:3130 <> w7:12
+binder 3132:3133 <> w8:13
+binder 3135:3136 <> w9:14
+binder 3138:3140 <> w10:15
+binder 3142:3144 <> w11:16
+binder 3146:3148 <> w12:17
+binder 3150:3152 <> w13:18
+binder 3154:3156 <> w14:19
+binder 3158:3160 <> w15:20
+binder 3162:3164 <> w16:21
+binder 3166:3168 <> w17:22
+binder 3170:3172 <> w18:23
+binder 3174:3176 <> w19:24
+binder 3178:3180 <> w20:25
+binder 3182:3184 <> w21:26
+binder 3186:3188 <> w22:27
+binder 3190:3192 <> w23:28
+binder 3194:3196 <> w24:29
+binder 3198:3200 <> w25:30
+binder 3202:3204 <> w26:31
+binder 3206:3208 <> w27:32
+binder 3210:3212 <> w28:33
+binder 3214:3216 <> w29:34
+binder 3218:3220 <> w30:35
+binder 3222:3224 <> w31:36
+binder 3226:3228 <> w32:37
+binder 3230:3232 <> w33:38
+binder 3234:3236 <> w34:39
+binder 3238:3240 <> w35:40
+R3260:3260 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R3420:3432 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R3412:3416 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3418:3419 xv6iris.TfPage36 <> TfPage36.Σ var
+R3261:3268 xv6iris.ProcDefs <> tf_words def
+R3270:3272 xv6iris.TfPage36 <> tfp:4 var
+R3274:3274 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3277:3277 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3280:3280 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3283:3283 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3286:3286 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3289:3289 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3292:3292 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3295:3295 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3298:3298 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3301:3301 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3304:3304 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3308:3308 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3312:3312 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3316:3316 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3320:3320 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3324:3324 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3328:3328 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3332:3332 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3336:3336 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3340:3340 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3344:3344 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3348:3348 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3352:3352 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3356:3356 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3360:3360 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3364:3364 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3368:3368 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3372:3372 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3376:3376 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3380:3380 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3384:3384 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3388:3388 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3392:3392 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3396:3396 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3400:3400 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3404:3404 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3408:3408 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R3275:3276 xv6iris.TfPage36 <> w0:5 var
+R3278:3279 xv6iris.TfPage36 <> w1:6 var
+R3281:3282 xv6iris.TfPage36 <> w2:7 var
+R3284:3285 xv6iris.TfPage36 <> w3:8 var
+R3287:3288 xv6iris.TfPage36 <> w4:9 var
+R3290:3291 xv6iris.TfPage36 <> w5:10 var
+R3293:3294 xv6iris.TfPage36 <> w6:11 var
+R3296:3297 xv6iris.TfPage36 <> w7:12 var
+R3299:3300 xv6iris.TfPage36 <> w8:13 var
+R3302:3303 xv6iris.TfPage36 <> w9:14 var
+R3305:3307 xv6iris.TfPage36 <> w10:15 var
+R3309:3311 xv6iris.TfPage36 <> w11:16 var
+R3313:3315 xv6iris.TfPage36 <> w12:17 var
+R3317:3319 xv6iris.TfPage36 <> w13:18 var
+R3321:3323 xv6iris.TfPage36 <> w14:19 var
+R3325:3327 xv6iris.TfPage36 <> w15:20 var
+R3329:3331 xv6iris.TfPage36 <> w16:21 var
+R3333:3335 xv6iris.TfPage36 <> w17:22 var
+R3337:3339 xv6iris.TfPage36 <> w18:23 var
+R3341:3343 xv6iris.TfPage36 <> w19:24 var
+R3345:3347 xv6iris.TfPage36 <> w20:25 var
+R3349:3351 xv6iris.TfPage36 <> w21:26 var
+R3353:3355 xv6iris.TfPage36 <> w22:27 var
+R3357:3359 xv6iris.TfPage36 <> w23:28 var
+R3361:3363 xv6iris.TfPage36 <> w24:29 var
+R3365:3367 xv6iris.TfPage36 <> w25:30 var
+R3369:3371 xv6iris.TfPage36 <> w26:31 var
+R3373:3375 xv6iris.TfPage36 <> w27:32 var
+R3377:3379 xv6iris.TfPage36 <> w28:33 var
+R3381:3383 xv6iris.TfPage36 <> w29:34 var
+R3385:3387 xv6iris.TfPage36 <> w30:35 var
+R3389:3391 xv6iris.TfPage36 <> w31:36 var
+R3393:3395 xv6iris.TfPage36 <> w32:37 var
+R3397:3399 xv6iris.TfPage36 <> w33:38 var
+R3401:3403 xv6iris.TfPage36 <> w34:39 var
+R3405:3407 xv6iris.TfPage36 <> w35:40 var
+R3459:3468 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3445:3456 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3434:3438 xv6iris.TrampPt <> tf_pa def
+R3440:3442 xv6iris.TfPage36 <> tfp:4 var
+R3457:3458 xv6iris.TfPage36 <> w0:5 var
+R3494:3503 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3480:3491 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3469:3473 xv6iris.TrampPt <> tf_pa def
+R3475:3477 xv6iris.TfPage36 <> tfp:4 var
+R3492:3493 xv6iris.TfPage36 <> w1:6 var
+R3530:3539 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3516:3527 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3504:3508 xv6iris.TrampPt <> tf_pa def
+R3510:3512 xv6iris.TfPage36 <> tfp:4 var
+R3528:3529 xv6iris.TfPage36 <> w2:7 var
+R3566:3575 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3552:3563 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3540:3544 xv6iris.TrampPt <> tf_pa def
+R3546:3548 xv6iris.TfPage36 <> tfp:4 var
+R3564:3565 xv6iris.TfPage36 <> w3:8 var
+R3602:3611 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3588:3599 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3576:3580 xv6iris.TrampPt <> tf_pa def
+R3582:3584 xv6iris.TfPage36 <> tfp:4 var
+R3600:3601 xv6iris.TfPage36 <> w4:9 var
+R3638:3647 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3624:3635 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3612:3616 xv6iris.TrampPt <> tf_pa def
+R3618:3620 xv6iris.TfPage36 <> tfp:4 var
+R3636:3637 xv6iris.TfPage36 <> w5:10 var
+R3674:3683 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3660:3671 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3648:3652 xv6iris.TrampPt <> tf_pa def
+R3654:3656 xv6iris.TfPage36 <> tfp:4 var
+R3672:3673 xv6iris.TfPage36 <> w6:11 var
+R3710:3719 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3696:3707 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3684:3688 xv6iris.TrampPt <> tf_pa def
+R3690:3692 xv6iris.TfPage36 <> tfp:4 var
+R3708:3709 xv6iris.TfPage36 <> w7:12 var
+R3746:3755 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3732:3743 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3720:3724 xv6iris.TrampPt <> tf_pa def
+R3726:3728 xv6iris.TfPage36 <> tfp:4 var
+R3744:3745 xv6iris.TfPage36 <> w8:13 var
+R3782:3791 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3768:3779 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3756:3760 xv6iris.TrampPt <> tf_pa def
+R3762:3764 xv6iris.TfPage36 <> tfp:4 var
+R3780:3781 xv6iris.TfPage36 <> w9:14 var
+R3819:3828 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3804:3815 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3792:3796 xv6iris.TrampPt <> tf_pa def
+R3798:3800 xv6iris.TfPage36 <> tfp:4 var
+R3816:3818 xv6iris.TfPage36 <> w10:15 var
+R3856:3865 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3841:3852 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3829:3833 xv6iris.TrampPt <> tf_pa def
+R3835:3837 xv6iris.TfPage36 <> tfp:4 var
+R3853:3855 xv6iris.TfPage36 <> w11:16 var
+R3893:3902 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3878:3889 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3866:3870 xv6iris.TrampPt <> tf_pa def
+R3872:3874 xv6iris.TfPage36 <> tfp:4 var
+R3890:3892 xv6iris.TfPage36 <> w12:17 var
+R3931:3940 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3916:3927 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3903:3907 xv6iris.TrampPt <> tf_pa def
+R3909:3911 xv6iris.TfPage36 <> tfp:4 var
+R3928:3930 xv6iris.TfPage36 <> w13:18 var
+R3969:3978 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3954:3965 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3941:3945 xv6iris.TrampPt <> tf_pa def
+R3947:3949 xv6iris.TfPage36 <> tfp:4 var
+R3966:3968 xv6iris.TfPage36 <> w14:19 var
+R4007:4016 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3992:4003 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R3979:3983 xv6iris.TrampPt <> tf_pa def
+R3985:3987 xv6iris.TfPage36 <> tfp:4 var
+R4004:4006 xv6iris.TfPage36 <> w15:20 var
+R4045:4054 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4030:4041 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4017:4021 xv6iris.TrampPt <> tf_pa def
+R4023:4025 xv6iris.TfPage36 <> tfp:4 var
+R4042:4044 xv6iris.TfPage36 <> w16:21 var
+R4083:4092 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4068:4079 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4055:4059 xv6iris.TrampPt <> tf_pa def
+R4061:4063 xv6iris.TfPage36 <> tfp:4 var
+R4080:4082 xv6iris.TfPage36 <> w17:22 var
+R4121:4130 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4106:4117 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4093:4097 xv6iris.TrampPt <> tf_pa def
+R4099:4101 xv6iris.TfPage36 <> tfp:4 var
+R4118:4120 xv6iris.TfPage36 <> w18:23 var
+R4159:4168 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4144:4155 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4131:4135 xv6iris.TrampPt <> tf_pa def
+R4137:4139 xv6iris.TfPage36 <> tfp:4 var
+R4156:4158 xv6iris.TfPage36 <> w19:24 var
+R4197:4206 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4182:4193 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4169:4173 xv6iris.TrampPt <> tf_pa def
+R4175:4177 xv6iris.TfPage36 <> tfp:4 var
+R4194:4196 xv6iris.TfPage36 <> w20:25 var
+R4235:4244 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4220:4231 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4207:4211 xv6iris.TrampPt <> tf_pa def
+R4213:4215 xv6iris.TfPage36 <> tfp:4 var
+R4232:4234 xv6iris.TfPage36 <> w21:26 var
+R4273:4282 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4258:4269 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4245:4249 xv6iris.TrampPt <> tf_pa def
+R4251:4253 xv6iris.TfPage36 <> tfp:4 var
+R4270:4272 xv6iris.TfPage36 <> w22:27 var
+R4311:4320 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4296:4307 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4283:4287 xv6iris.TrampPt <> tf_pa def
+R4289:4291 xv6iris.TfPage36 <> tfp:4 var
+R4308:4310 xv6iris.TfPage36 <> w23:28 var
+R4349:4358 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4334:4345 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4321:4325 xv6iris.TrampPt <> tf_pa def
+R4327:4329 xv6iris.TfPage36 <> tfp:4 var
+R4346:4348 xv6iris.TfPage36 <> w24:29 var
+R4387:4396 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4372:4383 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4359:4363 xv6iris.TrampPt <> tf_pa def
+R4365:4367 xv6iris.TfPage36 <> tfp:4 var
+R4384:4386 xv6iris.TfPage36 <> w25:30 var
+R4425:4434 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4410:4421 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4397:4401 xv6iris.TrampPt <> tf_pa def
+R4403:4405 xv6iris.TfPage36 <> tfp:4 var
+R4422:4424 xv6iris.TfPage36 <> w26:31 var
+R4463:4472 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4448:4459 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4435:4439 xv6iris.TrampPt <> tf_pa def
+R4441:4443 xv6iris.TfPage36 <> tfp:4 var
+R4460:4462 xv6iris.TfPage36 <> w27:32 var
+R4501:4510 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4486:4497 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4473:4477 xv6iris.TrampPt <> tf_pa def
+R4479:4481 xv6iris.TfPage36 <> tfp:4 var
+R4498:4500 xv6iris.TfPage36 <> w28:33 var
+R4539:4548 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4524:4535 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4511:4515 xv6iris.TrampPt <> tf_pa def
+R4517:4519 xv6iris.TfPage36 <> tfp:4 var
+R4536:4538 xv6iris.TfPage36 <> w29:34 var
+R4577:4586 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4562:4573 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4549:4553 xv6iris.TrampPt <> tf_pa def
+R4555:4557 xv6iris.TfPage36 <> tfp:4 var
+R4574:4576 xv6iris.TfPage36 <> w30:35 var
+R4615:4624 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4600:4611 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4587:4591 xv6iris.TrampPt <> tf_pa def
+R4593:4595 xv6iris.TfPage36 <> tfp:4 var
+R4612:4614 xv6iris.TfPage36 <> w31:36 var
+R4653:4662 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4638:4649 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4625:4629 xv6iris.TrampPt <> tf_pa def
+R4631:4633 xv6iris.TfPage36 <> tfp:4 var
+R4650:4652 xv6iris.TfPage36 <> w32:37 var
+R4691:4700 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4676:4687 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4663:4667 xv6iris.TrampPt <> tf_pa def
+R4669:4671 xv6iris.TfPage36 <> tfp:4 var
+R4688:4690 xv6iris.TfPage36 <> w33:38 var
+R4729:4738 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4714:4725 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4701:4705 xv6iris.TrampPt <> tf_pa def
+R4707:4709 xv6iris.TfPage36 <> tfp:4 var
+R4726:4728 xv6iris.TfPage36 <> w34:39 var
+R4752:4763 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R4739:4743 xv6iris.TrampPt <> tf_pa def
+R4745:4747 xv6iris.TfPage36 <> tfp:4 var
+R4764:4766 xv6iris.TfPage36 <> w35:40 var
+R4790:4797 xv6iris.ProcDefs <> tf_words def
+R4802:4811 iris.bi.derived_laws bi sep_emp inst
+R4790:4797 xv6iris.ProcDefs <> tf_words def
+R4790:4797 xv6iris.ProcDefs <> tf_words def
+R4802:4811 iris.bi.derived_laws bi sep_emp inst
+R4802:4811 iris.bi.derived_laws bi sep_emp inst
+prf 4841:4854 <> tf_page_open36
+R4863:4867 SailStdpp.Values <> mword def
+binder 4857:4859 <> tfp:41
+R4879:4882 Corelib.Init.Datatypes <> list ind
+R4885:4889 SailStdpp.Values <> mword def
+binder 4874:4875 <> ws:42
+R4921:4928 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4911:4913 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4902:4907 Stdlib.Lists.List <> length abbrev
+R4909:4910 xv6iris.TfPage36 <> ws:42 var
+R4914:4920 xv6iris.ProcGeom <> TFWORDS def
+R4943:4952 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4929:4935 xv6iris.ProcDefs <> tf_page def
+R4937:4939 xv6iris.TfPage36 <> tfp:41 var
+R4941:4942 xv6iris.TfPage36 <> ws:42 var
+R4953:4956 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5101:5108 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5093:5097 SailStdpp.Values <> mword def
+binder 4957:4958 <> w0:43
+R5093:5097 SailStdpp.Values <> mword def
+binder 4960:4961 <> w1:44
+R5093:5097 SailStdpp.Values <> mword def
+binder 4963:4964 <> w2:45
+R5093:5097 SailStdpp.Values <> mword def
+binder 4966:4967 <> w3:46
+R5093:5097 SailStdpp.Values <> mword def
+binder 4969:4970 <> w4:47
+R5093:5097 SailStdpp.Values <> mword def
+binder 4972:4973 <> w5:48
+R5093:5097 SailStdpp.Values <> mword def
+binder 4975:4976 <> w6:49
+R5093:5097 SailStdpp.Values <> mword def
+binder 4978:4979 <> w7:50
+R5093:5097 SailStdpp.Values <> mword def
+binder 4981:4982 <> w8:51
+R5093:5097 SailStdpp.Values <> mword def
+binder 4984:4985 <> w9:52
+R5093:5097 SailStdpp.Values <> mword def
+binder 4987:4989 <> w10:53
+R5093:5097 SailStdpp.Values <> mword def
+binder 4991:4993 <> w11:54
+R5093:5097 SailStdpp.Values <> mword def
+binder 4995:4997 <> w12:55
+R5093:5097 SailStdpp.Values <> mword def
+binder 4999:5001 <> w13:56
+R5093:5097 SailStdpp.Values <> mword def
+binder 5003:5005 <> w14:57
+R5093:5097 SailStdpp.Values <> mword def
+binder 5007:5009 <> w15:58
+R5093:5097 SailStdpp.Values <> mword def
+binder 5011:5013 <> w16:59
+R5093:5097 SailStdpp.Values <> mword def
+binder 5015:5017 <> w17:60
+R5093:5097 SailStdpp.Values <> mword def
+binder 5019:5021 <> w18:61
+R5093:5097 SailStdpp.Values <> mword def
+binder 5023:5025 <> w19:62
+R5093:5097 SailStdpp.Values <> mword def
+binder 5027:5029 <> w20:63
+R5093:5097 SailStdpp.Values <> mword def
+binder 5031:5033 <> w21:64
+R5093:5097 SailStdpp.Values <> mword def
+binder 5035:5037 <> w22:65
+R5093:5097 SailStdpp.Values <> mword def
+binder 5039:5041 <> w23:66
+R5093:5097 SailStdpp.Values <> mword def
+binder 5043:5045 <> w24:67
+R5093:5097 SailStdpp.Values <> mword def
+binder 5047:5049 <> w25:68
+R5093:5097 SailStdpp.Values <> mword def
+binder 5051:5053 <> w26:69
+R5093:5097 SailStdpp.Values <> mword def
+binder 5055:5057 <> w27:70
+R5093:5097 SailStdpp.Values <> mword def
+binder 5059:5061 <> w28:71
+R5093:5097 SailStdpp.Values <> mword def
+binder 5063:5065 <> w29:72
+R5093:5097 SailStdpp.Values <> mword def
+binder 5067:5069 <> w30:73
+R5093:5097 SailStdpp.Values <> mword def
+binder 5071:5073 <> w31:74
+R5093:5097 SailStdpp.Values <> mword def
+binder 5075:5077 <> w32:75
+R5093:5097 SailStdpp.Values <> mword def
+binder 5079:5081 <> w33:76
+R5093:5097 SailStdpp.Values <> mword def
+binder 5083:5085 <> w34:77
+R5093:5097 SailStdpp.Values <> mword def
+binder 5087:5089 <> w35:78
+R5255:5265 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5109:5111 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5252:5254 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5114:5116 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5112:5113 xv6iris.TfPage36 <> ws:42 var
+R5117:5117 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5120:5120 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5123:5123 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5126:5126 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5129:5129 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5132:5132 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5135:5135 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5138:5138 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5141:5141 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5144:5144 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5147:5147 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5151:5151 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5155:5155 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5159:5159 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5163:5163 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5167:5167 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5171:5171 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5175:5175 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5179:5179 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5183:5183 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5187:5187 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5191:5191 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5195:5195 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5199:5199 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5203:5203 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5207:5207 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5211:5211 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5215:5215 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5219:5219 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5223:5223 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5227:5227 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5231:5231 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5235:5235 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5239:5239 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5243:5243 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5247:5247 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5251:5251 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R5118:5119 xv6iris.TfPage36 <> w0:43 var
+R5121:5122 xv6iris.TfPage36 <> w1:44 var
+R5124:5125 xv6iris.TfPage36 <> w2:45 var
+R5127:5128 xv6iris.TfPage36 <> w3:46 var
+R5130:5131 xv6iris.TfPage36 <> w4:47 var
+R5133:5134 xv6iris.TfPage36 <> w5:48 var
+R5136:5137 xv6iris.TfPage36 <> w6:49 var
+R5139:5140 xv6iris.TfPage36 <> w7:50 var
+R5142:5143 xv6iris.TfPage36 <> w8:51 var
+R5145:5146 xv6iris.TfPage36 <> w9:52 var
+R5148:5150 xv6iris.TfPage36 <> w10:53 var
+R5152:5154 xv6iris.TfPage36 <> w11:54 var
+R5156:5158 xv6iris.TfPage36 <> w12:55 var
+R5160:5162 xv6iris.TfPage36 <> w13:56 var
+R5164:5166 xv6iris.TfPage36 <> w14:57 var
+R5168:5170 xv6iris.TfPage36 <> w15:58 var
+R5172:5174 xv6iris.TfPage36 <> w16:59 var
+R5176:5178 xv6iris.TfPage36 <> w17:60 var
+R5180:5182 xv6iris.TfPage36 <> w18:61 var
+R5184:5186 xv6iris.TfPage36 <> w19:62 var
+R5188:5190 xv6iris.TfPage36 <> w20:63 var
+R5192:5194 xv6iris.TfPage36 <> w21:64 var
+R5196:5198 xv6iris.TfPage36 <> w22:65 var
+R5200:5202 xv6iris.TfPage36 <> w23:66 var
+R5204:5206 xv6iris.TfPage36 <> w24:67 var
+R5208:5210 xv6iris.TfPage36 <> w25:68 var
+R5212:5214 xv6iris.TfPage36 <> w26:69 var
+R5216:5218 xv6iris.TfPage36 <> w27:70 var
+R5220:5222 xv6iris.TfPage36 <> w28:71 var
+R5224:5226 xv6iris.TfPage36 <> w29:72 var
+R5228:5230 xv6iris.TfPage36 <> w30:73 var
+R5232:5234 xv6iris.TfPage36 <> w31:74 var
+R5236:5238 xv6iris.TfPage36 <> w32:75 var
+R5240:5242 xv6iris.TfPage36 <> w33:76 var
+R5244:5246 xv6iris.TfPage36 <> w34:77 var
+R5248:5250 xv6iris.TfPage36 <> w35:78 var
+R5291:5299 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5277:5288 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5266:5270 xv6iris.TrampPt <> tf_pa def
+R5272:5274 xv6iris.TfPage36 <> tfp:41 var
+R5289:5290 xv6iris.TfPage36 <> w0:43 var
+R5325:5333 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5311:5322 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5300:5304 xv6iris.TrampPt <> tf_pa def
+R5306:5308 xv6iris.TfPage36 <> tfp:41 var
+R5323:5324 xv6iris.TfPage36 <> w1:44 var
+R5360:5368 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5346:5357 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5334:5338 xv6iris.TrampPt <> tf_pa def
+R5340:5342 xv6iris.TfPage36 <> tfp:41 var
+R5358:5359 xv6iris.TfPage36 <> w2:45 var
+R5395:5403 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5381:5392 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5369:5373 xv6iris.TrampPt <> tf_pa def
+R5375:5377 xv6iris.TfPage36 <> tfp:41 var
+R5393:5394 xv6iris.TfPage36 <> w3:46 var
+R5430:5438 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5416:5427 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5404:5408 xv6iris.TrampPt <> tf_pa def
+R5410:5412 xv6iris.TfPage36 <> tfp:41 var
+R5428:5429 xv6iris.TfPage36 <> w4:47 var
+R5465:5473 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5451:5462 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5439:5443 xv6iris.TrampPt <> tf_pa def
+R5445:5447 xv6iris.TfPage36 <> tfp:41 var
+R5463:5464 xv6iris.TfPage36 <> w5:48 var
+R5500:5508 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5486:5497 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5474:5478 xv6iris.TrampPt <> tf_pa def
+R5480:5482 xv6iris.TfPage36 <> tfp:41 var
+R5498:5499 xv6iris.TfPage36 <> w6:49 var
+R5535:5543 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5521:5532 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5509:5513 xv6iris.TrampPt <> tf_pa def
+R5515:5517 xv6iris.TfPage36 <> tfp:41 var
+R5533:5534 xv6iris.TfPage36 <> w7:50 var
+R5570:5578 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5556:5567 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5544:5548 xv6iris.TrampPt <> tf_pa def
+R5550:5552 xv6iris.TfPage36 <> tfp:41 var
+R5568:5569 xv6iris.TfPage36 <> w8:51 var
+R5605:5613 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5591:5602 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5579:5583 xv6iris.TrampPt <> tf_pa def
+R5585:5587 xv6iris.TfPage36 <> tfp:41 var
+R5603:5604 xv6iris.TfPage36 <> w9:52 var
+R5641:5649 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5626:5637 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5614:5618 xv6iris.TrampPt <> tf_pa def
+R5620:5622 xv6iris.TfPage36 <> tfp:41 var
+R5638:5640 xv6iris.TfPage36 <> w10:53 var
+R5677:5685 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5662:5673 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5650:5654 xv6iris.TrampPt <> tf_pa def
+R5656:5658 xv6iris.TfPage36 <> tfp:41 var
+R5674:5676 xv6iris.TfPage36 <> w11:54 var
+R5713:5721 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5698:5709 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5686:5690 xv6iris.TrampPt <> tf_pa def
+R5692:5694 xv6iris.TfPage36 <> tfp:41 var
+R5710:5712 xv6iris.TfPage36 <> w12:55 var
+R5750:5758 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5735:5746 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5722:5726 xv6iris.TrampPt <> tf_pa def
+R5728:5730 xv6iris.TfPage36 <> tfp:41 var
+R5747:5749 xv6iris.TfPage36 <> w13:56 var
+R5787:5795 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5772:5783 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5759:5763 xv6iris.TrampPt <> tf_pa def
+R5765:5767 xv6iris.TfPage36 <> tfp:41 var
+R5784:5786 xv6iris.TfPage36 <> w14:57 var
+R5824:5832 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5809:5820 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5796:5800 xv6iris.TrampPt <> tf_pa def
+R5802:5804 xv6iris.TfPage36 <> tfp:41 var
+R5821:5823 xv6iris.TfPage36 <> w15:58 var
+R5861:5869 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5846:5857 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5833:5837 xv6iris.TrampPt <> tf_pa def
+R5839:5841 xv6iris.TfPage36 <> tfp:41 var
+R5858:5860 xv6iris.TfPage36 <> w16:59 var
+R5898:5906 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5883:5894 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5870:5874 xv6iris.TrampPt <> tf_pa def
+R5876:5878 xv6iris.TfPage36 <> tfp:41 var
+R5895:5897 xv6iris.TfPage36 <> w17:60 var
+R5935:5943 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5920:5931 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5907:5911 xv6iris.TrampPt <> tf_pa def
+R5913:5915 xv6iris.TfPage36 <> tfp:41 var
+R5932:5934 xv6iris.TfPage36 <> w18:61 var
+R5972:5980 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5957:5968 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5944:5948 xv6iris.TrampPt <> tf_pa def
+R5950:5952 xv6iris.TfPage36 <> tfp:41 var
+R5969:5971 xv6iris.TfPage36 <> w19:62 var
+R6009:6017 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5994:6005 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R5981:5985 xv6iris.TrampPt <> tf_pa def
+R5987:5989 xv6iris.TfPage36 <> tfp:41 var
+R6006:6008 xv6iris.TfPage36 <> w20:63 var
+R6046:6054 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6031:6042 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6018:6022 xv6iris.TrampPt <> tf_pa def
+R6024:6026 xv6iris.TfPage36 <> tfp:41 var
+R6043:6045 xv6iris.TfPage36 <> w21:64 var
+R6083:6091 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6068:6079 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6055:6059 xv6iris.TrampPt <> tf_pa def
+R6061:6063 xv6iris.TfPage36 <> tfp:41 var
+R6080:6082 xv6iris.TfPage36 <> w22:65 var
+R6120:6128 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6105:6116 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6092:6096 xv6iris.TrampPt <> tf_pa def
+R6098:6100 xv6iris.TfPage36 <> tfp:41 var
+R6117:6119 xv6iris.TfPage36 <> w23:66 var
+R6157:6165 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6142:6153 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6129:6133 xv6iris.TrampPt <> tf_pa def
+R6135:6137 xv6iris.TfPage36 <> tfp:41 var
+R6154:6156 xv6iris.TfPage36 <> w24:67 var
+R6194:6202 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6179:6190 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6166:6170 xv6iris.TrampPt <> tf_pa def
+R6172:6174 xv6iris.TfPage36 <> tfp:41 var
+R6191:6193 xv6iris.TfPage36 <> w25:68 var
+R6231:6239 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6216:6227 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6203:6207 xv6iris.TrampPt <> tf_pa def
+R6209:6211 xv6iris.TfPage36 <> tfp:41 var
+R6228:6230 xv6iris.TfPage36 <> w26:69 var
+R6268:6276 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6253:6264 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6240:6244 xv6iris.TrampPt <> tf_pa def
+R6246:6248 xv6iris.TfPage36 <> tfp:41 var
+R6265:6267 xv6iris.TfPage36 <> w27:70 var
+R6305:6313 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6290:6301 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6277:6281 xv6iris.TrampPt <> tf_pa def
+R6283:6285 xv6iris.TfPage36 <> tfp:41 var
+R6302:6304 xv6iris.TfPage36 <> w28:71 var
+R6342:6350 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6327:6338 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6314:6318 xv6iris.TrampPt <> tf_pa def
+R6320:6322 xv6iris.TfPage36 <> tfp:41 var
+R6339:6341 xv6iris.TfPage36 <> w29:72 var
+R6379:6387 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6364:6375 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6351:6355 xv6iris.TrampPt <> tf_pa def
+R6357:6359 xv6iris.TfPage36 <> tfp:41 var
+R6376:6378 xv6iris.TfPage36 <> w30:73 var
+R6416:6424 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6401:6412 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6388:6392 xv6iris.TrampPt <> tf_pa def
+R6394:6396 xv6iris.TfPage36 <> tfp:41 var
+R6413:6415 xv6iris.TfPage36 <> w31:74 var
+R6453:6461 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6438:6449 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6425:6429 xv6iris.TrampPt <> tf_pa def
+R6431:6433 xv6iris.TfPage36 <> tfp:41 var
+R6450:6452 xv6iris.TfPage36 <> w32:75 var
+R6490:6498 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6475:6486 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6462:6466 xv6iris.TrampPt <> tf_pa def
+R6468:6470 xv6iris.TfPage36 <> tfp:41 var
+R6487:6489 xv6iris.TfPage36 <> w33:76 var
+R6527:6535 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6512:6523 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6499:6503 xv6iris.TrampPt <> tf_pa def
+R6505:6507 xv6iris.TfPage36 <> tfp:41 var
+R6524:6526 xv6iris.TfPage36 <> w34:77 var
+R6564:6574 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6549:6560 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R6536:6540 xv6iris.TrampPt <> tf_pa def
+R6542:6544 xv6iris.TfPage36 <> tfp:41 var
+R6561:6563 xv6iris.TfPage36 <> w35:78 var
+R6575:6581 xv6iris.ProcDefs <> tf_tail def
+R6583:6585 xv6iris.TfPage36 <> tfp:41 var
+R6622:6628 xv6iris.ProcDefs <> tf_page def
+R6622:6628 xv6iris.ProcDefs <> tf_page def
+R6622:6628 xv6iris.ProcDefs <> tf_page def
+R9093:9102 xv6iris.TfPage36 <> tf_words36 thm
+R9093:9102 xv6iris.TfPage36 <> tf_words36 thm
+R9093:9102 xv6iris.TfPage36 <> tf_words36 thm
+prf 9968:9982 <> tf_page_close36
+R9991:9995 SailStdpp.Values <> mword def
+binder 9985:9987 <> tfp:79
+R10013:10017 SailStdpp.Values <> mword def
+binder 10008:10009 <> w0:80
+R10029:10033 SailStdpp.Values <> mword def
+binder 10024:10025 <> w1:81
+R10045:10049 SailStdpp.Values <> mword def
+binder 10040:10041 <> w2:82
+R10061:10065 SailStdpp.Values <> mword def
+binder 10056:10057 <> w3:83
+R10077:10081 SailStdpp.Values <> mword def
+binder 10072:10073 <> w4:84
+R10093:10097 SailStdpp.Values <> mword def
+binder 10088:10089 <> w5:85
+R10109:10113 SailStdpp.Values <> mword def
+binder 10104:10105 <> w6:86
+R10125:10129 SailStdpp.Values <> mword def
+binder 10120:10121 <> w7:87
+R10141:10145 SailStdpp.Values <> mword def
+binder 10136:10137 <> w8:88
+R10157:10161 SailStdpp.Values <> mword def
+binder 10152:10153 <> w9:89
+R10174:10178 SailStdpp.Values <> mword def
+binder 10168:10170 <> w10:90
+R10191:10195 SailStdpp.Values <> mword def
+binder 10185:10187 <> w11:91
+R10208:10212 SailStdpp.Values <> mword def
+binder 10202:10204 <> w12:92
+R10225:10229 SailStdpp.Values <> mword def
+binder 10219:10221 <> w13:93
+R10242:10246 SailStdpp.Values <> mword def
+binder 10236:10238 <> w14:94
+R10259:10263 SailStdpp.Values <> mword def
+binder 10253:10255 <> w15:95
+R10276:10280 SailStdpp.Values <> mword def
+binder 10270:10272 <> w16:96
+R10293:10297 SailStdpp.Values <> mword def
+binder 10287:10289 <> w17:97
+R10310:10314 SailStdpp.Values <> mword def
+binder 10304:10306 <> w18:98
+R10327:10331 SailStdpp.Values <> mword def
+binder 10321:10323 <> w19:99
+R10344:10348 SailStdpp.Values <> mword def
+binder 10338:10340 <> w20:100
+R10361:10365 SailStdpp.Values <> mword def
+binder 10355:10357 <> w21:101
+R10378:10382 SailStdpp.Values <> mword def
+binder 10372:10374 <> w22:102
+R10395:10399 SailStdpp.Values <> mword def
+binder 10389:10391 <> w23:103
+R10412:10416 SailStdpp.Values <> mword def
+binder 10406:10408 <> w24:104
+R10429:10433 SailStdpp.Values <> mword def
+binder 10423:10425 <> w25:105
+R10446:10450 SailStdpp.Values <> mword def
+binder 10440:10442 <> w26:106
+R10463:10467 SailStdpp.Values <> mword def
+binder 10457:10459 <> w27:107
+R10480:10484 SailStdpp.Values <> mword def
+binder 10474:10476 <> w28:108
+R10497:10501 SailStdpp.Values <> mword def
+binder 10491:10493 <> w29:109
+R10514:10518 SailStdpp.Values <> mword def
+binder 10508:10510 <> w30:110
+R10531:10535 SailStdpp.Values <> mword def
+binder 10525:10527 <> w31:111
+R10548:10552 SailStdpp.Values <> mword def
+binder 10542:10544 <> w32:112
+R10565:10569 SailStdpp.Values <> mword def
+binder 10559:10561 <> w33:113
+R10582:10586 SailStdpp.Values <> mword def
+binder 10576:10578 <> w34:114
+R10599:10603 SailStdpp.Values <> mword def
+binder 10593:10595 <> w35:115
+R10640:10649 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10626:10637 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R10615:10619 xv6iris.TrampPt <> tf_pa def
+R10621:10623 xv6iris.TfPage36 <> tfp:79 var
+R10638:10639 xv6iris.TfPage36 <> w0:80 var
+R10675:10684 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10661:10672 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R10650:10654 xv6iris.TrampPt <> tf_pa def
+R10656:10658 xv6iris.TfPage36 <> tfp:79 var
+R10673:10674 xv6iris.TfPage36 <> w1:81 var
+R10711:10720 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10697:10708 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R10685:10689 xv6iris.TrampPt <> tf_pa def
+R10691:10693 xv6iris.TfPage36 <> tfp:79 var
+R10709:10710 xv6iris.TfPage36 <> w2:82 var
+R10747:10756 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10733:10744 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R10721:10725 xv6iris.TrampPt <> tf_pa def
+R10727:10729 xv6iris.TfPage36 <> tfp:79 var
+R10745:10746 xv6iris.TfPage36 <> w3:83 var
+R10783:10792 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10769:10780 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R10757:10761 xv6iris.TrampPt <> tf_pa def
+R10763:10765 xv6iris.TfPage36 <> tfp:79 var
+R10781:10782 xv6iris.TfPage36 <> w4:84 var
+R10819:10828 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10805:10816 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R10793:10797 xv6iris.TrampPt <> tf_pa def
+R10799:10801 xv6iris.TfPage36 <> tfp:79 var
+R10817:10818 xv6iris.TfPage36 <> w5:85 var
+R10855:10864 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10841:10852 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R10829:10833 xv6iris.TrampPt <> tf_pa def
+R10835:10837 xv6iris.TfPage36 <> tfp:79 var
+R10853:10854 xv6iris.TfPage36 <> w6:86 var
+R10891:10900 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10877:10888 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R10865:10869 xv6iris.TrampPt <> tf_pa def
+R10871:10873 xv6iris.TfPage36 <> tfp:79 var
+R10889:10890 xv6iris.TfPage36 <> w7:87 var
+R10927:10936 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10913:10924 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R10901:10905 xv6iris.TrampPt <> tf_pa def
+R10907:10909 xv6iris.TfPage36 <> tfp:79 var
+R10925:10926 xv6iris.TfPage36 <> w8:88 var
+R10963:10972 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10949:10960 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R10937:10941 xv6iris.TrampPt <> tf_pa def
+R10943:10945 xv6iris.TfPage36 <> tfp:79 var
+R10961:10962 xv6iris.TfPage36 <> w9:89 var
+R11000:11009 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10985:10996 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R10973:10977 xv6iris.TrampPt <> tf_pa def
+R10979:10981 xv6iris.TfPage36 <> tfp:79 var
+R10997:10999 xv6iris.TfPage36 <> w10:90 var
+R11037:11046 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11022:11033 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11010:11014 xv6iris.TrampPt <> tf_pa def
+R11016:11018 xv6iris.TfPage36 <> tfp:79 var
+R11034:11036 xv6iris.TfPage36 <> w11:91 var
+R11074:11083 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11059:11070 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11047:11051 xv6iris.TrampPt <> tf_pa def
+R11053:11055 xv6iris.TfPage36 <> tfp:79 var
+R11071:11073 xv6iris.TfPage36 <> w12:92 var
+R11112:11121 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11097:11108 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11084:11088 xv6iris.TrampPt <> tf_pa def
+R11090:11092 xv6iris.TfPage36 <> tfp:79 var
+R11109:11111 xv6iris.TfPage36 <> w13:93 var
+R11150:11159 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11135:11146 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11122:11126 xv6iris.TrampPt <> tf_pa def
+R11128:11130 xv6iris.TfPage36 <> tfp:79 var
+R11147:11149 xv6iris.TfPage36 <> w14:94 var
+R11188:11197 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11173:11184 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11160:11164 xv6iris.TrampPt <> tf_pa def
+R11166:11168 xv6iris.TfPage36 <> tfp:79 var
+R11185:11187 xv6iris.TfPage36 <> w15:95 var
+R11226:11235 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11211:11222 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11198:11202 xv6iris.TrampPt <> tf_pa def
+R11204:11206 xv6iris.TfPage36 <> tfp:79 var
+R11223:11225 xv6iris.TfPage36 <> w16:96 var
+R11264:11273 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11249:11260 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11236:11240 xv6iris.TrampPt <> tf_pa def
+R11242:11244 xv6iris.TfPage36 <> tfp:79 var
+R11261:11263 xv6iris.TfPage36 <> w17:97 var
+R11302:11311 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11287:11298 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11274:11278 xv6iris.TrampPt <> tf_pa def
+R11280:11282 xv6iris.TfPage36 <> tfp:79 var
+R11299:11301 xv6iris.TfPage36 <> w18:98 var
+R11340:11349 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11325:11336 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11312:11316 xv6iris.TrampPt <> tf_pa def
+R11318:11320 xv6iris.TfPage36 <> tfp:79 var
+R11337:11339 xv6iris.TfPage36 <> w19:99 var
+R11378:11387 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11363:11374 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11350:11354 xv6iris.TrampPt <> tf_pa def
+R11356:11358 xv6iris.TfPage36 <> tfp:79 var
+R11375:11377 xv6iris.TfPage36 <> w20:100 var
+R11416:11425 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11401:11412 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11388:11392 xv6iris.TrampPt <> tf_pa def
+R11394:11396 xv6iris.TfPage36 <> tfp:79 var
+R11413:11415 xv6iris.TfPage36 <> w21:101 var
+R11454:11463 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11439:11450 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11426:11430 xv6iris.TrampPt <> tf_pa def
+R11432:11434 xv6iris.TfPage36 <> tfp:79 var
+R11451:11453 xv6iris.TfPage36 <> w22:102 var
+R11492:11501 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11477:11488 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11464:11468 xv6iris.TrampPt <> tf_pa def
+R11470:11472 xv6iris.TfPage36 <> tfp:79 var
+R11489:11491 xv6iris.TfPage36 <> w23:103 var
+R11530:11539 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11515:11526 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11502:11506 xv6iris.TrampPt <> tf_pa def
+R11508:11510 xv6iris.TfPage36 <> tfp:79 var
+R11527:11529 xv6iris.TfPage36 <> w24:104 var
+R11568:11577 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11553:11564 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11540:11544 xv6iris.TrampPt <> tf_pa def
+R11546:11548 xv6iris.TfPage36 <> tfp:79 var
+R11565:11567 xv6iris.TfPage36 <> w25:105 var
+R11606:11615 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11591:11602 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11578:11582 xv6iris.TrampPt <> tf_pa def
+R11584:11586 xv6iris.TfPage36 <> tfp:79 var
+R11603:11605 xv6iris.TfPage36 <> w26:106 var
+R11644:11653 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11629:11640 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11616:11620 xv6iris.TrampPt <> tf_pa def
+R11622:11624 xv6iris.TfPage36 <> tfp:79 var
+R11641:11643 xv6iris.TfPage36 <> w27:107 var
+R11682:11691 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11667:11678 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11654:11658 xv6iris.TrampPt <> tf_pa def
+R11660:11662 xv6iris.TfPage36 <> tfp:79 var
+R11679:11681 xv6iris.TfPage36 <> w28:108 var
+R11720:11729 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11705:11716 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11692:11696 xv6iris.TrampPt <> tf_pa def
+R11698:11700 xv6iris.TfPage36 <> tfp:79 var
+R11717:11719 xv6iris.TfPage36 <> w29:109 var
+R11758:11767 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11743:11754 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11730:11734 xv6iris.TrampPt <> tf_pa def
+R11736:11738 xv6iris.TfPage36 <> tfp:79 var
+R11755:11757 xv6iris.TfPage36 <> w30:110 var
+R11796:11805 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11781:11792 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11768:11772 xv6iris.TrampPt <> tf_pa def
+R11774:11776 xv6iris.TfPage36 <> tfp:79 var
+R11793:11795 xv6iris.TfPage36 <> w31:111 var
+R11834:11843 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11819:11830 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11806:11810 xv6iris.TrampPt <> tf_pa def
+R11812:11814 xv6iris.TfPage36 <> tfp:79 var
+R11831:11833 xv6iris.TfPage36 <> w32:112 var
+R11872:11881 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11857:11868 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11844:11848 xv6iris.TrampPt <> tf_pa def
+R11850:11852 xv6iris.TfPage36 <> tfp:79 var
+R11869:11871 xv6iris.TfPage36 <> w33:113 var
+R11910:11919 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11895:11906 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11882:11886 xv6iris.TrampPt <> tf_pa def
+R11888:11890 xv6iris.TfPage36 <> tfp:79 var
+R11907:11909 xv6iris.TfPage36 <> w34:114 var
+R11948:11957 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11933:11944 xv6iris.TfPage36 TfPage36 ::bi_scope:x_'↦ₚ₈c'_x not
+R11920:11924 xv6iris.TrampPt <> tf_pa def
+R11926:11928 xv6iris.TfPage36 <> tfp:79 var
+R11945:11947 xv6iris.TfPage36 <> w35:115 var
+R11969:11978 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11958:11964 xv6iris.ProcDefs <> tf_tail def
+R11966:11968 xv6iris.TfPage36 <> tfp:79 var
+R11979:11985 xv6iris.ProcDefs <> tf_page def
+R11987:11989 xv6iris.TfPage36 <> tfp:79 var
+R11991:11991 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R11994:11994 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R11997:11997 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12000:12000 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12003:12003 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12006:12006 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12009:12009 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12012:12012 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12015:12015 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12018:12018 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12021:12021 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12025:12025 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12029:12029 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12033:12033 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12037:12037 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12041:12041 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12045:12045 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12049:12049 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12053:12053 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12057:12057 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12061:12061 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12065:12065 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12069:12069 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12073:12073 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12077:12077 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12081:12081 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12085:12085 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12089:12089 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12093:12093 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12097:12097 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12101:12101 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12105:12105 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12109:12109 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12113:12113 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12117:12117 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12121:12121 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12125:12125 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R11992:11993 xv6iris.TfPage36 <> w0:80 var
+R11995:11996 xv6iris.TfPage36 <> w1:81 var
+R11998:11999 xv6iris.TfPage36 <> w2:82 var
+R12001:12002 xv6iris.TfPage36 <> w3:83 var
+R12004:12005 xv6iris.TfPage36 <> w4:84 var
+R12007:12008 xv6iris.TfPage36 <> w5:85 var
+R12010:12011 xv6iris.TfPage36 <> w6:86 var
+R12013:12014 xv6iris.TfPage36 <> w7:87 var
+R12016:12017 xv6iris.TfPage36 <> w8:88 var
+R12019:12020 xv6iris.TfPage36 <> w9:89 var
+R12022:12024 xv6iris.TfPage36 <> w10:90 var
+R12026:12028 xv6iris.TfPage36 <> w11:91 var
+R12030:12032 xv6iris.TfPage36 <> w12:92 var
+R12034:12036 xv6iris.TfPage36 <> w13:93 var
+R12038:12040 xv6iris.TfPage36 <> w14:94 var
+R12042:12044 xv6iris.TfPage36 <> w15:95 var
+R12046:12048 xv6iris.TfPage36 <> w16:96 var
+R12050:12052 xv6iris.TfPage36 <> w17:97 var
+R12054:12056 xv6iris.TfPage36 <> w18:98 var
+R12058:12060 xv6iris.TfPage36 <> w19:99 var
+R12062:12064 xv6iris.TfPage36 <> w20:100 var
+R12066:12068 xv6iris.TfPage36 <> w21:101 var
+R12070:12072 xv6iris.TfPage36 <> w22:102 var
+R12074:12076 xv6iris.TfPage36 <> w23:103 var
+R12078:12080 xv6iris.TfPage36 <> w24:104 var
+R12082:12084 xv6iris.TfPage36 <> w25:105 var
+R12086:12088 xv6iris.TfPage36 <> w26:106 var
+R12090:12092 xv6iris.TfPage36 <> w27:107 var
+R12094:12096 xv6iris.TfPage36 <> w28:108 var
+R12098:12100 xv6iris.TfPage36 <> w29:109 var
+R12102:12104 xv6iris.TfPage36 <> w30:110 var
+R12106:12108 xv6iris.TfPage36 <> w31:111 var
+R12110:12112 xv6iris.TfPage36 <> w32:112 var
+R12114:12116 xv6iris.TfPage36 <> w33:113 var
+R12118:12120 xv6iris.TfPage36 <> w34:114 var
+R12122:12124 xv6iris.TfPage36 <> w35:115 var
+R12341:12347 xv6iris.ProcDefs <> tf_page def
+R12341:12347 xv6iris.ProcDefs <> tf_page def
+R12341:12347 xv6iris.ProcDefs <> tf_page def
+R12720:12729 xv6iris.TfPage36 <> tf_words36 thm
+R12720:12729 xv6iris.TfPage36 <> tf_words36 thm
+R12720:12729 xv6iris.TfPage36 <> tf_words36 thm
+R12956:12963 xv6iris.TfPage36 TfPage36 <> sec

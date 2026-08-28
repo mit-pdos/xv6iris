@@ -1,0 +1,223 @@
+DIGEST 97f51ac1ef0be9bef08ba305a6aa94ec
+Fxv6iris.WpMemsetPage
+R658:666 Stdlib.Logic.Eqdep_dec <> <> lib
+R668:673 Stdlib.ZArith.ZArith <> <> lib
+R675:677 Stdlib.micromega.Lia <> <> lib
+R679:682 Stdlib.Lists.List <> <> lib
+R711:714 stdpp.gmap <> <> lib
+R716:719 stdpp.list <> <> lib
+R721:730 stdpp.list_monad <> <> lib
+R732:752 stdpp.bitvector.definitions <> <> lib
+R754:770 stdpp.bitvector.tactics <> <> lib
+R808:816 iris.proofmode.proofmode <> <> lib
+R859:866 iris.base_logic.lib.gen_heap <> <> lib
+R868:877 iris.base_logic.lib.invariants <> <> lib
+R919:926 iris.program_logic.language <> <> lib
+R928:937 iris.program_logic.weakestpre <> <> lib
+R939:945 iris.program_logic.lifting <> <> lib
+R963:992 SailStdpp.ConcurrencyInterface <> <> lib
+R994:1031 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R1033:1067 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R1069:1094 SailStdpp.Operators_mwords <> <> lib
+R1112:1128 Riscv.rv64d_types <> <> lib
+R1130:1140 Riscv.rv64d <> <> lib
+R1142:1159 Riscv.riscv_extras <> <> lib
+R1177:1191 xv6iris.RiscvModelBytes <> <> lib
+R1209:1222 SailStdpp.Base <> <> lib
+R1224:1242 SailStdpp.TypeCasts <> <> lib
+R1244:1259 SailStdpp.Values <> <> lib
+R1261:1281 SailStdpp.MachineWord <> <> lib
+R1299:1307 xv6iris.RiscvLang <> <> lib
+R1309:1318 xv6iris.RiscvPtsto <> <> lib
+R1336:1340 xv6iris.WpGpr <> <> lib
+R1358:1372 xv6iris.WpMmodeLeafBase <> <> lib
+R1390:1398 xv6iris.WpMemsetS <> <> lib
+R1416:1426 xv6iris.RiscvExtras <> <> lib
+R1449:1460 Kernel.KernelInstrs <> <> lib
+R1483:1492 Kernel.KernelSyms <> <> lib
+R1510:1513 xv6iris.Xv6G <> <> lib
+R1578:1583 xv6iris.TsoCtx <> <> lib
+R1619:1622 Riscv.rv64d_types Defs <> mod
+prf 2213:2220 <> ms_a8_id
+R2229:2233 SailStdpp.Values <> mword def
+binder 2223:2225 <> cur:1
+R2250:2252 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2241:2245 xv6iris.WpMemsetS <> ms_a8 def
+R2247:2249 xv6iris.WpMemsetPage <> cur:1 var
+R2253:2255 xv6iris.WpMemsetPage <> cur:1 var
+R2274:2278 xv6iris.WpMemsetS <> ms_a8 def
+R2339:2342 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2368:2368 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2296:2307 Riscv.rv64d <> sign_extend' def
+R2330:2334 SailStdpp.Values <> mword def
+R2313:2324 SailStdpp.Values <> mword_of_int def
+R2360:2364 SailStdpp.Values <> mword def
+R2343:2354 SailStdpp.Values <> mword_of_int def
+R2385:2389 stdpp.bitvector.definitions <> bv_eq thm
+R2339:2342 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2368:2368 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2296:2307 Riscv.rv64d <> sign_extend' def
+R2330:2334 SailStdpp.Values <> mword def
+R2313:2324 SailStdpp.Values <> mword_of_int def
+R2360:2364 SailStdpp.Values <> mword def
+R2343:2354 SailStdpp.Values <> mword_of_int def
+R2385:2389 stdpp.bitvector.definitions <> bv_eq thm
+R2486:2488 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2447:2453 SailStdpp.Operators_mwords <> add_vec def
+R2477:2481 SailStdpp.Values <> mword def
+R2460:2471 SailStdpp.Values <> mword_of_int def
+R2505:2508 xv6iris.RiscvExtras <> avi0 thm
+R2486:2488 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2447:2453 SailStdpp.Operators_mwords <> add_vec def
+R2477:2481 SailStdpp.Values <> mword def
+R2460:2471 SailStdpp.Values <> mword_of_int def
+R2505:2508 xv6iris.RiscvExtras <> avi0 thm
+R2539:2549 xv6iris.WpGpr <> subrange_id thm
+R2539:2549 xv6iris.WpGpr <> subrange_id thm
+R2539:2549 xv6iris.WpGpr <> subrange_id thm
+R2560:2574 xv6iris.WpMmodeLeafBase <> sign_extend'_id thm
+R2560:2574 xv6iris.WpMmodeLeafBase <> sign_extend'_id thm
+R2560:2574 xv6iris.WpMmodeLeafBase <> sign_extend'_id thm
+prf 2602:2609 <> ms_pa_id
+R2618:2622 SailStdpp.Values <> mword def
+binder 2612:2614 <> cur:2
+R2639:2641 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2630:2634 xv6iris.WpMemsetS <> ms_pa def
+R2636:2638 xv6iris.WpMemsetPage <> cur:2 var
+R2642:2644 xv6iris.WpMemsetPage <> cur:2 var
+R2663:2667 xv6iris.WpMemsetS <> ms_pa def
+R2679:2681 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R2679:2681 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R2707:2710 xv6iris.RiscvExtras <> avi0 thm
+R2707:2710 xv6iris.RiscvExtras <> avi0 thm
+R2707:2710 xv6iris.RiscvExtras <> avi0 thm
+R2721:2735 xv6iris.RiscvExtras <> zero_extend'_id thm
+R2721:2735 xv6iris.RiscvExtras <> zero_extend'_id thm
+R2721:2735 xv6iris.RiscvExtras <> zero_extend'_id thm
+R2744:2751 xv6iris.WpMemsetPage <> ms_a8_id thm
+R2744:2751 xv6iris.WpMemsetPage <> ms_a8_id thm
+prf 2766:2778 <> ms_pa_ms_addr
+R2785:2789 SailStdpp.Values <> mword def
+binder 2781:2781 <> p:3
+R2800:2802 Corelib.Init.Datatypes <> nat ind
+binder 2796:2796 <> j:4
+R2826:2828 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2807:2811 xv6iris.WpMemsetS <> ms_pa def
+R2814:2820 xv6iris.WpMemsetS <> ms_addr def
+R2822:2822 xv6iris.WpMemsetPage <> p:3 var
+R2824:2824 xv6iris.WpMemsetPage <> j:4 var
+R2829:2834 xv6iris.RiscvModelBytes <> pa_add def
+R2836:2836 xv6iris.WpMemsetPage <> p:3 var
+R2838:2838 xv6iris.WpMemsetPage <> j:4 var
+R2856:2863 xv6iris.WpMemsetPage <> ms_pa_id thm
+R2856:2863 xv6iris.WpMemsetPage <> ms_pa_id thm
+R2856:2863 xv6iris.WpMemsetPage <> ms_pa_id thm
+R2872:2885 xv6iris.WpMemsetS <> ms_addr_pa_add thm
+R2872:2885 xv6iris.WpMemsetS <> ms_addr_pa_add thm
+sec 3376:3387 <> WpMemsetPage
+R3403:3409 xv6iris.RiscvPtsto <> riscvGS class
+R3416:3419 xv6iris.Xv6G <> xv6G class
+R3421:3422 xv6iris.WpMemsetPage <> Σ:5 var
+var  3438:3440 WpMemsetPage GEN
+var  3453:3455 WpMemsetPage CID
+var  3468:3469 WpMemsetPage XI
+R3444:3448 xv6iris.RiscvLang <> GenId class
+R3459:3463 xv6iris.RiscvLang <> CpuId class
+R3473:3478 xv6iris.TsoCtx <> CurCtx class
+prf 3720:3731 <> bytes_choose
+R3738:3740 Corelib.Init.Datatypes <> nat ind
+binder 3734:3734 <> n:11
+R3749:3756 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3798:3804 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3765:3767 Corelib.Init.Datatypes <> nat ind
+binder 3757:3761 <> start:12
+R3778:3781 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3775:3777 Corelib.Init.Datatypes <> nat ind
+R3786:3789 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3782:3783 stdpp.bitvector.definitions <> bv rec
+R3790:3794 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3796:3797 xv6iris.WpMemsetPage <> WpMemsetPage.Σ var
+binder 3771:3771 <> P:13
+R3805:3805 iris.bi.interface <> ::stdpp_scope:x_'⊢'_x not
+R3855:3864 iris.bi.interface <> ::stdpp_scope:x_'⊢'_x not
+R3806:3816 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R3818:3822 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R3834:3835 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 3817:3817 <> k:14
+binder 3817:3817 <> k:15
+R3836:3839 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3848:3849 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3844:3845 stdpp.bitvector.definitions <> bv rec
+binder 3840:3840 <> b:16
+R3850:3850 xv6iris.WpMemsetPage <> P:13 var
+R3854:3854 xv6iris.WpMemsetPage <> b:16 var
+R3852:3852 xv6iris.WpMemsetPage <> k:14 var
+R3823:3825 Corelib.Lists.ListDef <> seq def
+R3833:3833 xv6iris.WpMemsetPage <> n:11 var
+R3827:3831 xv6iris.WpMemsetPage <> start:12 var
+R3865:3868 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3884:3885 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3876:3879 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3873:3875 Corelib.Init.Datatypes <> nat ind
+R3880:3881 stdpp.bitvector.definitions <> bv rec
+binder 3869:3869 <> f:17
+R3886:3896 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R3898:3902 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R3914:3915 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 3897:3897 <> k:18
+binder 3897:3897 <> k:19
+R3916:3916 xv6iris.WpMemsetPage <> P:13 var
+R3921:3921 xv6iris.WpMemsetPage <> f:17 var
+R3923:3923 xv6iris.WpMemsetPage <> k:18 var
+R3918:3918 xv6iris.WpMemsetPage <> k:18 var
+R3903:3905 Corelib.Lists.ListDef <> seq def
+R3913:3913 xv6iris.WpMemsetPage <> n:11 var
+R3907:3911 xv6iris.WpMemsetPage <> start:12 var
+R4017:4020 stdpp.bitvector.definitions <> bv_0 def
+R4017:4020 stdpp.bitvector.definitions <> bv_0 def
+R4043:4045 Corelib.Lists.ListDef <> seq def
+R4057:4069 iris.bi.big_op <> big_sepL_cons thm
+R4057:4069 iris.bi.big_op <> big_sepL_cons thm
+R4057:4069 iris.bi.big_op <> big_sepL_cons thm
+R4141:4141 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4156:4161 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4166:4166 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4146:4146 Corelib.Init.Datatypes <> S constr
+R4141:4141 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4156:4161 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4166:4166 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4146:4146 Corelib.Init.Datatypes <> S constr
+binder 4200:4200 <> k:20
+R4205:4207 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R4226:4231 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R4233:4238 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R4241:4241 xv6iris.WpMemsetPage <> k:20 var
+R4208:4217 Stdlib.Arith.PeanoNat Nat eq_dec thm
+R4219:4219 xv6iris.WpMemsetPage <> k:20 var
+binder 4200:4200 <> k:21
+R4205:4207 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R4226:4231 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R4233:4238 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R4241:4241 xv6iris.WpMemsetPage <> k:21 var
+R4208:4217 Stdlib.Arith.PeanoNat Nat eq_dec thm
+R4219:4219 xv6iris.WpMemsetPage <> k:21 var
+R4259:4271 iris.bi.big_op <> big_sepL_cons thm
+R4259:4271 iris.bi.big_op <> big_sepL_cons thm
+R4259:4271 iris.bi.big_op <> big_sepL_cons thm
+R4306:4315 Stdlib.Arith.PeanoNat Nat eq_dec thm
+R4306:4315 Stdlib.Arith.PeanoNat Nat eq_dec thm
+R4381:4381 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4395:4400 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4405:4405 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4382:4394 iris.bi.big_op <> big_sepL_impl thm
+R4381:4381 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4395:4400 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4405:4405 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4382:4394 iris.bi.big_op <> big_sepL_impl thm
+R4453:4462 Stdlib.Arith.PeanoNat Nat eq_dec thm
+R4453:4462 Stdlib.Arith.PeanoNat Nat eq_dec thm
+R4509:4529 stdpp.list_basics <> elem_of_list_lookup_2 thm
+R4509:4529 stdpp.list_basics <> elem_of_list_lookup_2 thm
+R4544:4554 stdpp.list_numbers <> elem_of_seq thm
+R4544:4554 stdpp.list_numbers <> elem_of_seq thm
+R5236:5247 xv6iris.WpMemsetPage WpMemsetPage <> sec

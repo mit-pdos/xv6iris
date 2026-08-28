@@ -1,0 +1,317 @@
+DIGEST 4dd5a45c57793e0701192629b1715df5
+Fxv6iris.FsOpIreclaim
+R1795:1800 Stdlib.ZArith.ZArith <> <> lib
+R1802:1804 Stdlib.micromega.Lia <> <> lib
+R1806:1809 Stdlib.Lists.List <> <> lib
+R1838:1841 stdpp.gmap <> <> lib
+R1843:1846 stdpp.list <> <> lib
+R1848:1868 stdpp.bitvector.definitions <> <> lib
+R1886:1900 xv6iris.RiscvModelBytes <> <> lib
+R1918:1926 xv6iris.DinodeEnc <> <> lib
+R1944:1948 xv6iris.FsImg <> <> lib
+R1966:1969 xv6iris.FsWf <> <> lib
+R1987:1995 xv6iris.FsEffBase <> <> lib
+R2013:2024 xv6iris.FsOpIputFree <> <> lib
+def 2402:2412 <> eff_reclaim
+R2420:2423 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2419:2419 Corelib.Numbers.BinNums <> Z ind
+R2424:2427 Corelib.Init.Datatypes <> list ind
+R2430:2431 stdpp.bitvector.definitions <> bv rec
+binder 2415:2415 <> P:1
+R2443:2447 xv6iris.FsImg <> fs_sb rec
+binder 2438:2439 <> sb:2
+R2455:2458 Corelib.Init.Datatypes <> list ind
+R2460:2460 Corelib.Numbers.BinNums <> Z ind
+binder 2451:2451 <> l:3
+R2468:2471 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2467:2467 Corelib.Numbers.BinNums <> Z ind
+R2472:2475 Corelib.Init.Datatypes <> list ind
+R2478:2479 stdpp.bitvector.definitions <> bv rec
+R2495:2495 xv6iris.FsOpIreclaim <> l:3 var
+R2506:2507 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R2512:2512 xv6iris.FsOpIreclaim <> P:1 var
+R2519:2522 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R2529:2539 xv6iris.FsOpIreclaim <> eff_reclaim:4 def
+R2564:2565 xv6iris.FsOpIreclaim <> sb:2 var
+R2542:2554 xv6iris.FsOpIputFree <> eff_iput_free def
+R2556:2556 xv6iris.FsOpIreclaim <> P:1 var
+R2558:2559 xv6iris.FsOpIreclaim <> sb:2 var
+def 2656:2667 <> fs_orphan_at
+R2675:2678 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2674:2674 Corelib.Numbers.BinNums <> Z ind
+R2679:2682 Corelib.Init.Datatypes <> list ind
+R2685:2686 stdpp.bitvector.definitions <> bv rec
+binder 2670:2670 <> P:6
+R2698:2702 xv6iris.FsImg <> fs_sb rec
+binder 2693:2694 <> sb:7
+R2710:2710 Corelib.Numbers.BinNums <> Z ind
+binder 2706:2706 <> i:8
+R2749:2754 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R2728:2731 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R2733:2735 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R2732:2732 xv6iris.FsOpIreclaim <> i:8 var
+R2732:2732 xv6iris.FsOpIreclaim <> i:8 var
+R2736:2745 xv6iris.FsImg <> sb_ninodes proj
+R2747:2748 xv6iris.FsOpIreclaim <> sb:7 var
+R2800:2805 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R2795:2798 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R2755:2765 stdpp.bitvector.definitions <> bv_unsigned proj
+R2768:2774 xv6iris.DinodeEnc <> di_type proj
+R2777:2785 xv6iris.FsImg <> fs_dinode def
+R2787:2787 xv6iris.FsOpIreclaim <> P:6 var
+R2789:2790 xv6iris.FsOpIreclaim <> sb:7 var
+R2792:2792 xv6iris.FsOpIreclaim <> i:8 var
+R2847:2849 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2806:2816 stdpp.bitvector.definitions <> bv_unsigned proj
+R2819:2826 xv6iris.DinodeEnc <> di_nlink proj
+R2829:2837 xv6iris.FsImg <> fs_dinode def
+R2839:2839 xv6iris.FsOpIreclaim <> P:6 var
+R2841:2842 xv6iris.FsOpIreclaim <> sb:7 var
+R2844:2844 xv6iris.FsOpIreclaim <> i:8 var
+prf 2930:2949 <> op_ireclaim_step_wfv
+R2957:2960 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2956:2956 Corelib.Numbers.BinNums <> Z ind
+R2961:2964 Corelib.Init.Datatypes <> list ind
+R2967:2968 stdpp.bitvector.definitions <> bv rec
+binder 2952:2952 <> P:9
+R2980:2984 xv6iris.FsImg <> fs_sb rec
+binder 2975:2976 <> sb:10
+R2992:2992 Corelib.Numbers.BinNums <> Z ind
+binder 2988:2988 <> i:11
+R3019:3022 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2999:3016 xv6iris.FsWf <> fs_durable_wf_view def
+R3018:3018 xv6iris.FsOpIreclaim <> P:9 var
+R3046:3051 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3036:3038 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3023:3033 xv6iris.FsImg <> fs_parse_sb def
+R3035:3035 xv6iris.FsOpIreclaim <> P:9 var
+R3039:3042 Corelib.Init.Datatypes <> Some constr
+R3044:3045 xv6iris.FsOpIreclaim <> sb:10 var
+R3071:3076 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3052:3063 xv6iris.FsOpIreclaim <> fs_orphan_at def
+R3065:3065 xv6iris.FsOpIreclaim <> P:9 var
+R3067:3068 xv6iris.FsOpIreclaim <> sb:10 var
+R3070:3070 xv6iris.FsOpIreclaim <> i:11 var
+R3077:3094 xv6iris.FsWf <> fs_durable_wf_view def
+R3097:3109 xv6iris.FsOpIputFree <> eff_iput_free def
+R3111:3111 xv6iris.FsOpIreclaim <> P:9 var
+R3113:3114 xv6iris.FsOpIreclaim <> sb:10 var
+R3116:3116 xv6iris.FsOpIreclaim <> i:11 var
+R3171:3186 xv6iris.FsOpIputFree <> op_iput_free_wfv thm
+R3171:3186 xv6iris.FsOpIputFree <> op_iput_free_wfv thm
+prf 3296:3316 <> op_ireclaim_step_keep
+R3324:3327 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3323:3323 Corelib.Numbers.BinNums <> Z ind
+R3328:3331 Corelib.Init.Datatypes <> list ind
+R3334:3335 stdpp.bitvector.definitions <> bv rec
+binder 3319:3319 <> P:12
+R3347:3351 xv6iris.FsImg <> fs_sb rec
+binder 3342:3343 <> sb:13
+R3361:3361 Corelib.Numbers.BinNums <> Z ind
+binder 3355:3355 <> i:14
+binder 3357:3357 <> j:15
+R3379:3382 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3368:3375 xv6iris.FsImg <> fs_sb_ok rec
+R3377:3378 xv6iris.FsOpIreclaim <> sb:13 var
+R3405:3410 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3384:3387 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R3389:3391 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R3388:3388 xv6iris.FsOpIreclaim <> i:14 var
+R3388:3388 xv6iris.FsOpIreclaim <> i:14 var
+R3392:3401 xv6iris.FsImg <> sb_ninodes proj
+R3403:3404 xv6iris.FsOpIreclaim <> sb:13 var
+R3430:3433 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3411:3422 xv6iris.FsOpIreclaim <> fs_orphan_at def
+R3424:3424 xv6iris.FsOpIreclaim <> P:12 var
+R3426:3427 xv6iris.FsOpIreclaim <> sb:13 var
+R3429:3429 xv6iris.FsOpIreclaim <> j:15 var
+R3440:3445 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3435:3438 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R3434:3434 xv6iris.FsOpIreclaim <> j:15 var
+R3439:3439 xv6iris.FsOpIreclaim <> i:14 var
+R3446:3457 xv6iris.FsOpIreclaim <> fs_orphan_at def
+R3460:3472 xv6iris.FsOpIputFree <> eff_iput_free def
+R3474:3474 xv6iris.FsOpIreclaim <> P:12 var
+R3476:3477 xv6iris.FsOpIreclaim <> sb:13 var
+R3479:3479 xv6iris.FsOpIreclaim <> i:14 var
+R3482:3483 xv6iris.FsOpIreclaim <> sb:13 var
+R3485:3485 xv6iris.FsOpIreclaim <> j:15 var
+R3544:3555 xv6iris.FsOpIreclaim <> fs_orphan_at def
+R3569:3586 xv6iris.FsOpIputFree <> eff_iput_free_fuse thm
+R3600:3611 xv6iris.FsEffBase <> iblk_z_range thm
+R3569:3586 xv6iris.FsOpIputFree <> eff_iput_free_fuse thm
+R3600:3611 xv6iris.FsEffBase <> iblk_z_range thm
+R3569:3586 xv6iris.FsOpIputFree <> eff_iput_free_fuse thm
+R3600:3611 xv6iris.FsEffBase <> iblk_z_range thm
+R3635:3655 xv6iris.FsOpIputFree <> eff_free_inode_dinode thm
+R3671:3682 xv6iris.FsEffBase <> iblk_z_range thm
+R3707:3718 xv6iris.FsEffBase <> iblk_z_range thm
+R3635:3655 xv6iris.FsOpIputFree <> eff_free_inode_dinode thm
+R3671:3682 xv6iris.FsEffBase <> iblk_z_range thm
+R3707:3718 xv6iris.FsEffBase <> iblk_z_range thm
+R3635:3655 xv6iris.FsOpIputFree <> eff_free_inode_dinode thm
+R3671:3682 xv6iris.FsEffBase <> iblk_z_range thm
+R3707:3718 xv6iris.FsEffBase <> iblk_z_range thm
+R3741:3752 stdpp.decidable <> decide_False thm
+R3741:3752 stdpp.decidable <> decide_False thm
+R3741:3752 stdpp.decidable <> decide_False thm
+prf 3836:3857 <> op_ireclaim_step_parse
+R3865:3868 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3864:3864 Corelib.Numbers.BinNums <> Z ind
+R3869:3872 Corelib.Init.Datatypes <> list ind
+R3875:3876 stdpp.bitvector.definitions <> bv rec
+binder 3860:3860 <> P:16
+R3888:3892 xv6iris.FsImg <> fs_sb rec
+binder 3883:3884 <> sb:17
+R3900:3900 Corelib.Numbers.BinNums <> Z ind
+binder 3896:3896 <> i:18
+R3918:3921 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3907:3914 xv6iris.FsImg <> fs_sb_ok rec
+R3916:3917 xv6iris.FsOpIreclaim <> sb:17 var
+R3944:3949 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3923:3926 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R3928:3930 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R3927:3927 xv6iris.FsOpIreclaim <> i:18 var
+R3927:3927 xv6iris.FsOpIreclaim <> i:18 var
+R3931:3940 xv6iris.FsImg <> sb_ninodes proj
+R3942:3943 xv6iris.FsOpIreclaim <> sb:17 var
+R3973:3978 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3963:3965 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3950:3960 xv6iris.FsImg <> fs_parse_sb def
+R3962:3962 xv6iris.FsOpIreclaim <> P:16 var
+R3966:3969 Corelib.Init.Datatypes <> Some constr
+R3971:3972 xv6iris.FsOpIreclaim <> sb:17 var
+R4013:4015 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3979:3989 xv6iris.FsImg <> fs_parse_sb def
+R3992:4004 xv6iris.FsOpIputFree <> eff_iput_free def
+R4006:4006 xv6iris.FsOpIreclaim <> P:16 var
+R4008:4009 xv6iris.FsOpIreclaim <> sb:17 var
+R4011:4011 xv6iris.FsOpIreclaim <> i:18 var
+R4016:4019 Corelib.Init.Datatypes <> Some constr
+R4021:4022 xv6iris.FsOpIreclaim <> sb:17 var
+R4063:4080 xv6iris.FsOpIputFree <> eff_iput_free_fuse thm
+R4094:4105 xv6iris.FsEffBase <> iblk_z_range thm
+R4063:4080 xv6iris.FsOpIputFree <> eff_iput_free_fuse thm
+R4094:4105 xv6iris.FsEffBase <> iblk_z_range thm
+R4063:4080 xv6iris.FsOpIputFree <> eff_iput_free_fuse thm
+R4094:4105 xv6iris.FsEffBase <> iblk_z_range thm
+R4127:4146 xv6iris.FsOpIputFree <> eff_free_inode_parse thm
+R4160:4171 xv6iris.FsEffBase <> iblk_z_range thm
+R4127:4146 xv6iris.FsOpIputFree <> eff_free_inode_parse thm
+R4160:4171 xv6iris.FsEffBase <> iblk_z_range thm
+prf 4432:4446 <> op_ireclaim_wfv
+R4454:4457 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4453:4453 Corelib.Numbers.BinNums <> Z ind
+R4458:4461 Corelib.Init.Datatypes <> list ind
+R4464:4465 stdpp.bitvector.definitions <> bv rec
+binder 4449:4449 <> P:19
+R4477:4481 xv6iris.FsImg <> fs_sb rec
+binder 4472:4473 <> sb:20
+R4489:4492 Corelib.Init.Datatypes <> list ind
+R4494:4494 Corelib.Numbers.BinNums <> Z ind
+binder 4485:4485 <> l:21
+R4521:4524 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4501:4518 xv6iris.FsWf <> fs_durable_wf_view def
+R4520:4520 xv6iris.FsOpIreclaim <> P:19 var
+R4548:4553 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4538:4540 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4525:4535 xv6iris.FsImg <> fs_parse_sb def
+R4537:4537 xv6iris.FsOpIreclaim <> P:19 var
+R4541:4544 Corelib.Init.Datatypes <> Some constr
+R4546:4547 xv6iris.FsOpIreclaim <> sb:20 var
+R4561:4566 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4554:4558 stdpp.base <> NoDup ind
+R4560:4560 xv6iris.FsOpIreclaim <> l:21 var
+R4567:4567 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4612:4618 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4568:4574 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4580:4581 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4579:4579 Corelib.Numbers.BinNums <> Z ind
+binder 4575:4575 <> i:22
+R4589:4592 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4583:4587 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R4582:4582 xv6iris.FsOpIreclaim <> i:22 var
+R4588:4588 xv6iris.FsOpIreclaim <> l:21 var
+R4593:4604 xv6iris.FsOpIreclaim <> fs_orphan_at def
+R4606:4606 xv6iris.FsOpIreclaim <> P:19 var
+R4608:4609 xv6iris.FsOpIreclaim <> sb:20 var
+R4611:4611 xv6iris.FsOpIreclaim <> i:22 var
+R4619:4636 xv6iris.FsWf <> fs_durable_wf_view def
+R4639:4649 xv6iris.FsOpIreclaim <> eff_reclaim def
+R4651:4651 xv6iris.FsOpIreclaim <> P:19 var
+R4653:4654 xv6iris.FsOpIreclaim <> sb:20 var
+R4656:4656 xv6iris.FsOpIreclaim <> l:21 var
+R4764:4779 xv6iris.FsOpIputFree <> fs_wf_view_sb_ok thm
+R4764:4779 xv6iris.FsOpIputFree <> fs_wf_view_sb_ok thm
+R4815:4828 stdpp.list_relations <> NoDup_cons_1_1 thm
+R4815:4828 stdpp.list_relations <> NoDup_cons_1_1 thm
+R4861:4874 stdpp.list_relations <> NoDup_cons_1_2 thm
+R4861:4874 stdpp.list_relations <> NoDup_cons_1_2 thm
+R4926:4937 stdpp.list_basics <> elem_of_cons thm
+R4926:4937 stdpp.list_basics <> elem_of_cons thm
+R4926:4937 stdpp.list_basics <> elem_of_cons thm
+R4994:5004 xv6iris.FsOpIreclaim <> eff_reclaim def
+R5031:5046 xv6iris.FsOpIputFree <> op_iput_free_wfv thm
+R5031:5046 xv6iris.FsOpIputFree <> op_iput_free_wfv thm
+R5087:5108 xv6iris.FsOpIreclaim <> op_ireclaim_step_parse thm
+R5087:5108 xv6iris.FsOpIreclaim <> op_ireclaim_step_parse thm
+R5173:5193 xv6iris.FsOpIreclaim <> op_ireclaim_step_keep thm
+R5173:5193 xv6iris.FsOpIreclaim <> op_ireclaim_step_keep thm
+R5232:5243 stdpp.list_basics <> elem_of_cons thm
+R5232:5243 stdpp.list_basics <> elem_of_cons thm
+prf 5468:5489 <> op_ireclaim_prefix_wfv
+R5497:5500 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5496:5496 Corelib.Numbers.BinNums <> Z ind
+R5501:5504 Corelib.Init.Datatypes <> list ind
+R5507:5508 stdpp.bitvector.definitions <> bv rec
+binder 5492:5492 <> P:23
+R5520:5524 xv6iris.FsImg <> fs_sb rec
+binder 5515:5516 <> sb:24
+R5542:5545 Corelib.Init.Datatypes <> list ind
+R5547:5547 Corelib.Numbers.BinNums <> Z ind
+binder 5532:5532 <> l:25
+binder 5534:5535 <> l1:26
+binder 5537:5538 <> l2:27
+R5574:5577 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5554:5571 xv6iris.FsWf <> fs_durable_wf_view def
+R5573:5573 xv6iris.FsOpIreclaim <> P:23 var
+R5601:5606 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5591:5593 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5578:5588 xv6iris.FsImg <> fs_parse_sb def
+R5590:5590 xv6iris.FsOpIreclaim <> P:23 var
+R5594:5597 Corelib.Init.Datatypes <> Some constr
+R5599:5600 xv6iris.FsOpIreclaim <> sb:24 var
+R5614:5619 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5607:5611 stdpp.base <> NoDup ind
+R5613:5613 xv6iris.FsOpIreclaim <> l:25 var
+R5620:5620 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5665:5671 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5621:5627 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5633:5634 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5632:5632 Corelib.Numbers.BinNums <> Z ind
+binder 5628:5628 <> i:28
+R5642:5645 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5636:5640 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R5635:5635 xv6iris.FsOpIreclaim <> i:28 var
+R5641:5641 xv6iris.FsOpIreclaim <> l:25 var
+R5646:5657 xv6iris.FsOpIreclaim <> fs_orphan_at def
+R5659:5659 xv6iris.FsOpIreclaim <> P:23 var
+R5661:5662 xv6iris.FsOpIreclaim <> sb:24 var
+R5664:5664 xv6iris.FsOpIreclaim <> i:28 var
+R5691:5696 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5673:5675 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5672:5672 xv6iris.FsOpIreclaim <> l:25 var
+R5679:5682 Corelib.Init.Datatypes <> ::list_scope:x_'++'_x not
+R5677:5678 xv6iris.FsOpIreclaim <> l1:26 var
+R5683:5684 xv6iris.FsOpIreclaim <> l2:27 var
+R5697:5714 xv6iris.FsWf <> fs_durable_wf_view def
+R5717:5727 xv6iris.FsOpIreclaim <> eff_reclaim def
+R5729:5729 xv6iris.FsOpIreclaim <> P:23 var
+R5731:5732 xv6iris.FsOpIreclaim <> sb:24 var
+R5734:5735 xv6iris.FsOpIreclaim <> l1:26 var
+R5783:5806 stdpp.list_relations <> NoDup_app thm
+R5783:5806 stdpp.list_relations <> NoDup_app thm
+R5843:5857 xv6iris.FsOpIreclaim <> op_ireclaim_wfv thm
+R5843:5857 xv6iris.FsOpIreclaim <> op_ireclaim_wfv thm
+R5908:5918 stdpp.list_basics <> elem_of_app thm
+R5908:5918 stdpp.list_basics <> elem_of_app thm

@@ -1,0 +1,7 @@
+DIGEST 7338dbabcb1ed16253031b422e35adea
+Fxv6iris.LinkPlicClaim
+R166:174 xv6iris.LinkCpuid <> <> lib
+R176:189 xv6iris.ProofPlicClaim <> <> lib
+R213:226 xv6iris.ProofPlicClaim PlicClaimProof <> modtype
+R228:232 xv6iris.LinkCpuid Cpuid <> modtype
+mod 200:208 <> PlicClaim

@@ -1,0 +1,603 @@
+DIGEST dc9f73f6d11bf9d83fed1bd19cfe4ee8
+Fxv6iris.PrintkFmt
+R1850:1855 Stdlib.ZArith.ZArith <> <> lib
+R1857:1860 Stdlib.Lists.List <> <> lib
+R1862:1865 Stdlib.Bool.Bool <> <> lib
+R1867:1871 Stdlib.Strings.Ascii <> <> lib
+R1873:1878 Stdlib.Strings.String <> <> lib
+R1880:1882 Stdlib.micromega.Lia <> <> lib
+R1892:1904 Stdlib.Lists.List ListNotations <> mod
+ind 2129:2135 <> pk_kind
+constr 2140:2144 <> PkNum
+constr 2148:2152 <> PkStr
+scheme 2129:2135 <> pk_kind_rect
+scheme 2129:2135 <> pk_kind_ind
+scheme 2129:2135 <> pk_kind_rec
+scheme 2129:2135 <> pk_kind_sind
+def 2167:2172 <> pk_nul
+R2176:2180 Stdlib.Strings.Ascii <> ascii ind
+R2185:2202 Stdlib.Strings.Ascii <> ascii_of_nat def
+def 2603:2608 <> pk_dir
+R2622:2626 Stdlib.Strings.Ascii <> ascii ind
+binder 2611:2612 <> c0:3
+binder 2614:2615 <> c1:4
+binder 2617:2618 <> c2:5
+R2645:2647 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R2631:2636 Corelib.Init.Datatypes <> option ind
+R2638:2644 xv6iris.PrintkFmt <> pk_kind ind
+R2648:2650 Corelib.Init.Datatypes <> nat ind
+R2660:2668 Stdlib.Strings.Ascii <> eqb def
+R2670:2671 xv6iris.PrintkFmt <> c0:3 var
+R2708:2716 Stdlib.Strings.Ascii <> eqb def
+R2718:2719 xv6iris.PrintkFmt <> c0:3 var
+R2756:2764 Stdlib.Strings.Ascii <> eqb def
+R2766:2767 xv6iris.PrintkFmt <> c0:3 var
+R2804:2812 Stdlib.Strings.Ascii <> eqb def
+R2814:2815 xv6iris.PrintkFmt <> c0:3 var
+R2852:2860 Stdlib.Strings.Ascii <> eqb def
+R2862:2863 xv6iris.PrintkFmt <> c0:3 var
+R2900:2908 Stdlib.Strings.Ascii <> eqb def
+R2910:2911 xv6iris.PrintkFmt <> c0:3 var
+R2948:2956 Stdlib.Strings.Ascii <> eqb def
+R2958:2959 xv6iris.PrintkFmt <> c0:3 var
+R3362:3362 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3367:3368 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3370:3370 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3363:3366 Corelib.Init.Datatypes <> None constr
+R2978:2986 Stdlib.Strings.Ascii <> eqb def
+R2988:2989 xv6iris.PrintkFmt <> c1:4 var
+R3029:3037 Stdlib.Strings.Ascii <> eqb def
+R3039:3040 xv6iris.PrintkFmt <> c1:4 var
+R3080:3088 Stdlib.Strings.Ascii <> eqb def
+R3090:3091 xv6iris.PrintkFmt <> c1:4 var
+R3131:3139 Stdlib.Strings.Ascii <> eqb def
+R3141:3142 xv6iris.PrintkFmt <> c1:4 var
+R3344:3344 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3349:3350 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3352:3352 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3345:3348 Corelib.Init.Datatypes <> None constr
+R3164:3172 Stdlib.Strings.Ascii <> eqb def
+R3174:3175 xv6iris.PrintkFmt <> c2:5 var
+R3218:3226 Stdlib.Strings.Ascii <> eqb def
+R3228:3229 xv6iris.PrintkFmt <> c2:5 var
+R3272:3280 Stdlib.Strings.Ascii <> eqb def
+R3282:3283 xv6iris.PrintkFmt <> c2:5 var
+R3323:3323 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3328:3329 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3331:3331 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3324:3327 Corelib.Init.Datatypes <> None constr
+R3294:3294 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3305:3306 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3308:3308 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3295:3298 Corelib.Init.Datatypes <> Some constr
+R3300:3304 xv6iris.PrintkFmt <> PkNum constr
+R3240:3240 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3251:3252 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3254:3254 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3241:3244 Corelib.Init.Datatypes <> Some constr
+R3246:3250 xv6iris.PrintkFmt <> PkNum constr
+R3186:3186 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3197:3198 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3200:3200 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3187:3190 Corelib.Init.Datatypes <> Some constr
+R3192:3196 xv6iris.PrintkFmt <> PkNum constr
+R3102:3102 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3113:3114 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3116:3116 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3103:3106 Corelib.Init.Datatypes <> Some constr
+R3108:3112 xv6iris.PrintkFmt <> PkNum constr
+R3051:3051 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3062:3063 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3065:3065 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3052:3055 Corelib.Init.Datatypes <> Some constr
+R3057:3061 xv6iris.PrintkFmt <> PkNum constr
+R3000:3000 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3011:3012 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3014:3014 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3001:3004 Corelib.Init.Datatypes <> Some constr
+R3006:3010 xv6iris.PrintkFmt <> PkNum constr
+R2922:2922 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2933:2934 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2936:2936 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2923:2926 Corelib.Init.Datatypes <> Some constr
+R2928:2932 xv6iris.PrintkFmt <> PkStr constr
+R2874:2874 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2885:2886 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2888:2888 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2875:2878 Corelib.Init.Datatypes <> Some constr
+R2880:2884 xv6iris.PrintkFmt <> PkNum constr
+R2826:2826 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2837:2838 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2840:2840 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2827:2830 Corelib.Init.Datatypes <> Some constr
+R2832:2836 xv6iris.PrintkFmt <> PkNum constr
+R2778:2778 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2789:2790 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2792:2792 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2779:2782 Corelib.Init.Datatypes <> Some constr
+R2784:2788 xv6iris.PrintkFmt <> PkNum constr
+R2730:2730 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2741:2742 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2744:2744 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2731:2734 Corelib.Init.Datatypes <> Some constr
+R2736:2740 xv6iris.PrintkFmt <> PkNum constr
+R2682:2682 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2693:2694 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2696:2696 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R2683:2686 Corelib.Init.Datatypes <> Some constr
+R2688:2692 xv6iris.PrintkFmt <> PkNum constr
+def 3656:3660 <> pk_ch
+R3667:3672 Stdlib.Strings.String <> string ind
+binder 3663:3663 <> f:6
+R3680:3682 Corelib.Init.Datatypes <> nat ind
+binder 3676:3676 <> j:7
+R3687:3691 Stdlib.Strings.Ascii <> ascii ind
+R3707:3707 xv6iris.PrintkFmt <> j:7 var
+R3704:3704 xv6iris.PrintkFmt <> f:6 var
+R3718:3728 Stdlib.Strings.String <> EmptyString constr
+R3736:3741 xv6iris.PrintkFmt <> pk_nul def
+R3747:3752 Stdlib.Strings.String <> String constr
+R3759:3759 Corelib.Init.Datatypes <> O constr
+R3770:3775 Stdlib.Strings.String <> String constr
+R3782:3782 Corelib.Init.Datatypes <> S constr
+R3790:3794 xv6iris.PrintkFmt <> pk_ch:8 def
+def 3820:3826 <> pk_cons
+R3833:3838 Corelib.Init.Datatypes <> option ind
+R3840:3846 xv6iris.PrintkFmt <> pk_kind ind
+binder 3829:3829 <> o:11
+R3855:3858 Corelib.Init.Datatypes <> list ind
+R3860:3866 xv6iris.PrintkFmt <> pk_kind ind
+binder 3850:3851 <> ks:12
+R3871:3874 Corelib.Init.Datatypes <> list ind
+R3876:3882 xv6iris.PrintkFmt <> pk_kind ind
+R3895:3895 xv6iris.PrintkFmt <> o:11 var
+R3902:3905 Corelib.Init.Datatypes <> None constr
+R3910:3911 xv6iris.PrintkFmt <> ks:12 var
+R3915:3918 Corelib.Init.Datatypes <> Some constr
+R3926:3929 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R3930:3931 xv6iris.PrintkFmt <> ks:12 var
+def 4105:4112 <> pk_kinds
+R4119:4124 Stdlib.Strings.String <> string ind
+binder 4115:4115 <> f:14
+R4129:4132 Corelib.Init.Datatypes <> list ind
+R4134:4140 xv6iris.PrintkFmt <> pk_kind ind
+R4153:4153 xv6iris.PrintkFmt <> f:14 var
+R4164:4174 Stdlib.Strings.String <> EmptyString constr
+R4179:4180 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R4186:4191 Stdlib.Strings.String <> String constr
+R4207:4210 Corelib.Init.Datatypes <> negb def
+R4213:4221 Stdlib.Strings.Ascii <> eqb def
+R4282:4292 Stdlib.Strings.String <> EmptyString constr
+R4297:4298 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R4360:4365 Stdlib.Strings.String <> String constr
+R4408:4418 Stdlib.Strings.String <> EmptyString constr
+R4476:4482 xv6iris.PrintkFmt <> pk_cons def
+R4485:4487 Corelib.Init.Datatypes <> fst def
+R4490:4495 xv6iris.PrintkFmt <> pk_dir def
+R4500:4505 xv6iris.PrintkFmt <> pk_nul def
+R4507:4512 xv6iris.PrintkFmt <> pk_nul def
+R4516:4517 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R4529:4534 Stdlib.Strings.String <> String constr
+R4581:4591 Stdlib.Strings.String <> EmptyString constr
+R4651:4656 xv6iris.PrintkFmt <> pk_dir def
+R4664:4669 xv6iris.PrintkFmt <> pk_nul def
+binder 4646:4646 <> d:20
+R4686:4692 xv6iris.PrintkFmt <> pk_cons def
+R4695:4697 Corelib.Init.Datatypes <> fst def
+R4699:4699 xv6iris.PrintkFmt <> d:20 var
+R4709:4711 Corelib.Init.Datatypes <> snd def
+R4713:4713 xv6iris.PrintkFmt <> d:20 var
+R4720:4720 Corelib.Init.Datatypes <> O constr
+R4725:4732 xv6iris.PrintkFmt <> pk_kinds:15 def
+R4744:4751 xv6iris.PrintkFmt <> pk_kinds:15 def
+R4773:4778 Stdlib.Strings.String <> String constr
+R4810:4815 xv6iris.PrintkFmt <> pk_dir def
+binder 4805:4805 <> d:21
+R4841:4847 xv6iris.PrintkFmt <> pk_cons def
+R4850:4852 Corelib.Init.Datatypes <> fst def
+R4854:4854 xv6iris.PrintkFmt <> d:21 var
+R4864:4866 Corelib.Init.Datatypes <> snd def
+R4868:4868 xv6iris.PrintkFmt <> d:21 var
+R4906:4906 Corelib.Init.Datatypes <> O constr
+R4911:4918 xv6iris.PrintkFmt <> pk_kinds:15 def
+R4954:4954 Corelib.Init.Datatypes <> S constr
+R4956:4956 Corelib.Init.Datatypes <> O constr
+R4961:4968 xv6iris.PrintkFmt <> pk_kinds:15 def
+R5009:5016 xv6iris.PrintkFmt <> pk_kinds:15 def
+R4235:4242 xv6iris.PrintkFmt <> pk_kinds:15 def
+def 5148:5152 <> nonul
+R5159:5164 Stdlib.Strings.String <> string ind
+binder 5155:5155 <> s:22
+R5169:5172 Corelib.Init.Datatypes <> bool ind
+R5185:5185 xv6iris.PrintkFmt <> s:22 var
+R5196:5206 Stdlib.Strings.String <> EmptyString constr
+R5211:5214 Corelib.Init.Datatypes <> true constr
+R5220:5225 Stdlib.Strings.String <> String constr
+R5259:5262 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R5234:5237 Corelib.Init.Datatypes <> negb def
+R5240:5248 Stdlib.Strings.Ascii <> eqb def
+R5252:5257 xv6iris.PrintkFmt <> pk_nul def
+R5263:5267 xv6iris.PrintkFmt <> nonul:23 def
+def 5911:5918 <> str_drop
+R5925:5927 Corelib.Init.Datatypes <> nat ind
+binder 5921:5921 <> i:25
+R5935:5940 Stdlib.Strings.String <> string ind
+binder 5931:5931 <> f:26
+R5945:5950 Stdlib.Strings.String <> string ind
+R5966:5966 xv6iris.PrintkFmt <> f:26 var
+R5963:5963 xv6iris.PrintkFmt <> i:25 var
+R5977:5977 Corelib.Init.Datatypes <> O constr
+R5985:5985 xv6iris.PrintkFmt <> f:26 var
+R5991:5991 Corelib.Init.Datatypes <> S constr
+R5996:6006 Stdlib.Strings.String <> EmptyString constr
+R6011:6021 Stdlib.Strings.String <> EmptyString constr
+R6027:6027 Corelib.Init.Datatypes <> S constr
+R6033:6038 Stdlib.Strings.String <> String constr
+R6047:6054 xv6iris.PrintkFmt <> str_drop:27 def
+prf 6075:6084 <> str_drop_0
+R6091:6096 Stdlib.Strings.String <> string ind
+binder 6087:6087 <> f:30
+R6113:6115 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6101:6108 xv6iris.PrintkFmt <> str_drop def
+R6112:6112 xv6iris.PrintkFmt <> f:30 var
+R6116:6116 xv6iris.PrintkFmt <> f:30 var
+prf 6151:6160 <> str_drop_S
+R6167:6169 Corelib.Init.Datatypes <> nat ind
+binder 6163:6163 <> i:31
+R6177:6181 Stdlib.Strings.Ascii <> ascii ind
+binder 6173:6173 <> c:32
+R6189:6194 Stdlib.Strings.String <> string ind
+binder 6185:6185 <> f:33
+R6228:6230 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6201:6208 xv6iris.PrintkFmt <> str_drop def
+R6211:6211 Corelib.Init.Datatypes <> S constr
+R6213:6213 xv6iris.PrintkFmt <> i:31 var
+R6217:6222 Stdlib.Strings.String <> String constr
+R6224:6224 xv6iris.PrintkFmt <> c:32 var
+R6226:6226 xv6iris.PrintkFmt <> f:33 var
+R6231:6238 xv6iris.PrintkFmt <> str_drop def
+R6240:6240 xv6iris.PrintkFmt <> i:31 var
+R6242:6242 xv6iris.PrintkFmt <> f:33 var
+prf 6277:6288 <> str_drop_len
+R6295:6300 Stdlib.Strings.String <> string ind
+binder 6291:6291 <> f:34
+R6308:6310 Corelib.Init.Datatypes <> nat ind
+binder 6304:6304 <> i:35
+R6345:6347 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6317:6329 Stdlib.Strings.String <> length def
+R6332:6339 xv6iris.PrintkFmt <> str_drop def
+R6341:6341 xv6iris.PrintkFmt <> i:35 var
+R6343:6343 xv6iris.PrintkFmt <> f:34 var
+R6364:6366 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R6349:6361 Stdlib.Strings.String <> length def
+R6363:6363 xv6iris.PrintkFmt <> f:34 var
+R6367:6367 xv6iris.PrintkFmt <> i:35 var
+prf 6479:6488 <> pk_ch_drop
+R6495:6500 Stdlib.Strings.String <> string ind
+binder 6491:6491 <> f:36
+R6510:6512 Corelib.Init.Datatypes <> nat ind
+binder 6504:6504 <> i:37
+binder 6506:6506 <> j:38
+R6539:6541 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6517:6521 xv6iris.PrintkFmt <> pk_ch def
+R6524:6531 xv6iris.PrintkFmt <> str_drop def
+R6533:6533 xv6iris.PrintkFmt <> i:37 var
+R6535:6535 xv6iris.PrintkFmt <> f:36 var
+R6538:6538 xv6iris.PrintkFmt <> j:38 var
+R6542:6546 xv6iris.PrintkFmt <> pk_ch def
+R6548:6548 xv6iris.PrintkFmt <> f:36 var
+R6552:6554 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R6551:6551 xv6iris.PrintkFmt <> i:37 var
+R6555:6555 xv6iris.PrintkFmt <> j:38 var
+prf 6715:6724 <> nonul_drop
+R6731:6736 Stdlib.Strings.String <> string ind
+binder 6727:6727 <> f:39
+R6744:6746 Corelib.Init.Datatypes <> nat ind
+binder 6740:6740 <> i:40
+R6765:6768 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6758:6760 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6751:6755 xv6iris.PrintkFmt <> nonul def
+R6757:6757 xv6iris.PrintkFmt <> f:39 var
+R6761:6764 Corelib.Init.Datatypes <> true constr
+R6789:6791 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6769:6773 xv6iris.PrintkFmt <> nonul def
+R6776:6783 xv6iris.PrintkFmt <> str_drop def
+R6785:6785 xv6iris.PrintkFmt <> i:40 var
+R6787:6787 xv6iris.PrintkFmt <> f:39 var
+R6792:6795 Corelib.Init.Datatypes <> true constr
+R6927:6935 Corelib.Init.Datatypes <> andb_prop thm
+R6927:6935 Corelib.Init.Datatypes <> andb_prop thm
+prf 7062:7074 <> pk_dir_snd_le
+R7088:7092 Stdlib.Strings.Ascii <> ascii ind
+binder 7077:7078 <> c0:41
+binder 7080:7081 <> c1:42
+binder 7083:7084 <> c2:43
+R7119:7122 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R7098:7100 Corelib.Init.Datatypes <> snd def
+R7103:7108 xv6iris.PrintkFmt <> pk_dir def
+R7110:7111 xv6iris.PrintkFmt <> c0:41 var
+R7113:7114 xv6iris.PrintkFmt <> c1:42 var
+R7116:7117 xv6iris.PrintkFmt <> c2:43 var
+R7147:7152 xv6iris.PrintkFmt <> pk_dir def
+prf 7256:7266 <> pk_dir_nul1
+R7277:7281 Stdlib.Strings.Ascii <> ascii ind
+binder 7269:7270 <> c0:44
+binder 7272:7273 <> c2:45
+R7311:7313 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7286:7288 Corelib.Init.Datatypes <> snd def
+R7291:7296 xv6iris.PrintkFmt <> pk_dir def
+R7298:7299 xv6iris.PrintkFmt <> c0:44 var
+R7301:7306 xv6iris.PrintkFmt <> pk_nul def
+R7308:7309 xv6iris.PrintkFmt <> c2:45 var
+R7337:7342 xv6iris.PrintkFmt <> pk_dir def
+R7386:7394 Stdlib.Strings.Ascii <> eqb def
+R7386:7394 Stdlib.Strings.Ascii <> eqb def
+R7430:7438 Stdlib.Strings.Ascii <> eqb def
+R7430:7438 Stdlib.Strings.Ascii <> eqb def
+R7430:7438 Stdlib.Strings.Ascii <> eqb def
+R7430:7438 Stdlib.Strings.Ascii <> eqb def
+R7430:7438 Stdlib.Strings.Ascii <> eqb def
+R7430:7438 Stdlib.Strings.Ascii <> eqb def
+R7430:7438 Stdlib.Strings.Ascii <> eqb def
+R7430:7438 Stdlib.Strings.Ascii <> eqb def
+prf 7486:7496 <> pk_dir_nul2
+R7507:7511 Stdlib.Strings.Ascii <> ascii ind
+binder 7499:7500 <> c0:46
+binder 7502:7503 <> c1:47
+R7542:7545 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R7517:7519 Corelib.Init.Datatypes <> snd def
+R7522:7527 xv6iris.PrintkFmt <> pk_dir def
+R7529:7530 xv6iris.PrintkFmt <> c0:46 var
+R7532:7533 xv6iris.PrintkFmt <> c1:47 var
+R7535:7540 xv6iris.PrintkFmt <> pk_nul def
+R7570:7575 xv6iris.PrintkFmt <> pk_dir def
+R7746:7754 Stdlib.Strings.Ascii <> eqb def
+R7756:7761 xv6iris.PrintkFmt <> pk_nul def
+R7773:7777 Corelib.Init.Datatypes <> false constr
+R7746:7754 Stdlib.Strings.Ascii <> eqb def
+R7756:7761 xv6iris.PrintkFmt <> pk_nul def
+R7773:7777 Corelib.Init.Datatypes <> false constr
+R7820:7828 Stdlib.Strings.Ascii <> eqb def
+R7830:7835 xv6iris.PrintkFmt <> pk_nul def
+R7847:7851 Corelib.Init.Datatypes <> false constr
+R7820:7828 Stdlib.Strings.Ascii <> eqb def
+R7830:7835 xv6iris.PrintkFmt <> pk_nul def
+R7847:7851 Corelib.Init.Datatypes <> false constr
+R7894:7902 Stdlib.Strings.Ascii <> eqb def
+R7904:7909 xv6iris.PrintkFmt <> pk_nul def
+R7921:7925 Corelib.Init.Datatypes <> false constr
+R7894:7902 Stdlib.Strings.Ascii <> eqb def
+R7904:7909 xv6iris.PrintkFmt <> pk_nul def
+R7921:7925 Corelib.Init.Datatypes <> false constr
+prf 8364:8377 <> pk_dir_snd1_c1
+R8391:8395 Stdlib.Strings.Ascii <> ascii ind
+binder 8380:8381 <> c0:48
+binder 8383:8384 <> c1:49
+binder 8386:8387 <> c2:50
+R8431:8434 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8423:8425 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8402:8404 Corelib.Init.Datatypes <> snd def
+R8407:8412 xv6iris.PrintkFmt <> pk_dir def
+R8414:8415 xv6iris.PrintkFmt <> c0:48 var
+R8417:8418 xv6iris.PrintkFmt <> c1:49 var
+R8420:8421 xv6iris.PrintkFmt <> c2:50 var
+R8437:8440 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R8435:8436 xv6iris.PrintkFmt <> c1:49 var
+R8441:8446 xv6iris.PrintkFmt <> pk_nul def
+R8465:8470 xv6iris.PrintkFmt <> pk_dir def
+R8485:8493 Stdlib.Strings.Ascii <> eqb def
+R8485:8493 Stdlib.Strings.Ascii <> eqb def
+R8540:8548 Stdlib.Strings.Ascii <> eqb def
+R8540:8548 Stdlib.Strings.Ascii <> eqb def
+R8595:8603 Stdlib.Strings.Ascii <> eqb def
+R8595:8603 Stdlib.Strings.Ascii <> eqb def
+R8650:8658 Stdlib.Strings.Ascii <> eqb def
+R8650:8658 Stdlib.Strings.Ascii <> eqb def
+R8705:8713 Stdlib.Strings.Ascii <> eqb def
+R8705:8713 Stdlib.Strings.Ascii <> eqb def
+R8760:8768 Stdlib.Strings.Ascii <> eqb def
+R8760:8768 Stdlib.Strings.Ascii <> eqb def
+R8815:8823 Stdlib.Strings.Ascii <> eqb def
+R8815:8823 Stdlib.Strings.Ascii <> eqb def
+R8870:8878 Stdlib.Strings.Ascii <> eqb def
+R8870:8878 Stdlib.Strings.Ascii <> eqb def
+R8969:8977 Stdlib.Strings.Ascii <> eqb def
+R8969:8977 Stdlib.Strings.Ascii <> eqb def
+R9068:9076 Stdlib.Strings.Ascii <> eqb def
+R9068:9076 Stdlib.Strings.Ascii <> eqb def
+R9167:9175 Stdlib.Strings.Ascii <> eqb def
+R9167:9175 Stdlib.Strings.Ascii <> eqb def
+R9222:9230 Stdlib.Strings.Ascii <> eqb def
+R9222:9230 Stdlib.Strings.Ascii <> eqb def
+R9277:9285 Stdlib.Strings.Ascii <> eqb def
+R9277:9285 Stdlib.Strings.Ascii <> eqb def
+R9332:9340 Stdlib.Strings.Ascii <> eqb def
+R9332:9340 Stdlib.Strings.Ascii <> eqb def
+prf 9382:9395 <> pk_dir_snd2_c2
+R9409:9413 Stdlib.Strings.Ascii <> ascii ind
+binder 9398:9399 <> c0:51
+binder 9401:9402 <> c1:52
+binder 9404:9405 <> c2:53
+R9449:9452 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9441:9443 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9420:9422 Corelib.Init.Datatypes <> snd def
+R9425:9430 xv6iris.PrintkFmt <> pk_dir def
+R9432:9433 xv6iris.PrintkFmt <> c0:51 var
+R9435:9436 xv6iris.PrintkFmt <> c1:52 var
+R9438:9439 xv6iris.PrintkFmt <> c2:53 var
+R9455:9458 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R9453:9454 xv6iris.PrintkFmt <> c2:53 var
+R9459:9464 xv6iris.PrintkFmt <> pk_nul def
+R9483:9488 xv6iris.PrintkFmt <> pk_dir def
+R9503:9511 Stdlib.Strings.Ascii <> eqb def
+R9503:9511 Stdlib.Strings.Ascii <> eqb def
+R9558:9566 Stdlib.Strings.Ascii <> eqb def
+R9558:9566 Stdlib.Strings.Ascii <> eqb def
+R9613:9621 Stdlib.Strings.Ascii <> eqb def
+R9613:9621 Stdlib.Strings.Ascii <> eqb def
+R9668:9676 Stdlib.Strings.Ascii <> eqb def
+R9668:9676 Stdlib.Strings.Ascii <> eqb def
+R9723:9731 Stdlib.Strings.Ascii <> eqb def
+R9723:9731 Stdlib.Strings.Ascii <> eqb def
+R9778:9786 Stdlib.Strings.Ascii <> eqb def
+R9778:9786 Stdlib.Strings.Ascii <> eqb def
+R9833:9841 Stdlib.Strings.Ascii <> eqb def
+R9833:9841 Stdlib.Strings.Ascii <> eqb def
+R9888:9896 Stdlib.Strings.Ascii <> eqb def
+R9888:9896 Stdlib.Strings.Ascii <> eqb def
+R9943:9951 Stdlib.Strings.Ascii <> eqb def
+R9943:9951 Stdlib.Strings.Ascii <> eqb def
+R9998:10006 Stdlib.Strings.Ascii <> eqb def
+R9998:10006 Stdlib.Strings.Ascii <> eqb def
+R10053:10061 Stdlib.Strings.Ascii <> eqb def
+R10053:10061 Stdlib.Strings.Ascii <> eqb def
+R10108:10116 Stdlib.Strings.Ascii <> eqb def
+R10108:10116 Stdlib.Strings.Ascii <> eqb def
+R10207:10215 Stdlib.Strings.Ascii <> eqb def
+R10207:10215 Stdlib.Strings.Ascii <> eqb def
+R10306:10314 Stdlib.Strings.Ascii <> eqb def
+R10306:10314 Stdlib.Strings.Ascii <> eqb def
+prf 10491:10503 <> pk_kinds_step
+R10510:10515 Stdlib.Strings.String <> string ind
+binder 10506:10506 <> f:54
+R10523:10525 Corelib.Init.Datatypes <> nat ind
+binder 10519:10519 <> p:55
+R10546:10549 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10539:10541 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10532:10536 xv6iris.PrintkFmt <> nonul def
+R10538:10538 xv6iris.PrintkFmt <> f:54 var
+R10542:10545 Corelib.Init.Datatypes <> true constr
+R10575:10580 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10552:10554 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R10551:10551 xv6iris.PrintkFmt <> p:55 var
+R10555:10567 Stdlib.Strings.String <> length def
+R10569:10569 xv6iris.PrintkFmt <> f:54 var
+R10604:10610 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10581:10588 xv6iris.PrintkFmt <> pk_kinds def
+R10591:10598 xv6iris.PrintkFmt <> str_drop def
+R10600:10600 xv6iris.PrintkFmt <> p:55 var
+R10602:10602 xv6iris.PrintkFmt <> f:54 var
+R10614:10617 Corelib.Init.Datatypes <> negb def
+R10620:10628 Stdlib.Strings.Ascii <> eqb def
+R10631:10635 xv6iris.PrintkFmt <> pk_ch def
+R10637:10637 xv6iris.PrintkFmt <> f:54 var
+R10639:10639 xv6iris.PrintkFmt <> p:55 var
+R10692:10700 Stdlib.Strings.Ascii <> eqb def
+R10703:10707 xv6iris.PrintkFmt <> pk_ch def
+R10709:10709 xv6iris.PrintkFmt <> f:54 var
+R10712:10712 Corelib.Init.Datatypes <> S constr
+R10714:10714 xv6iris.PrintkFmt <> p:55 var
+R10718:10723 xv6iris.PrintkFmt <> pk_nul def
+R10751:10756 xv6iris.PrintkFmt <> pk_dir def
+R10759:10763 xv6iris.PrintkFmt <> pk_ch def
+R10765:10765 xv6iris.PrintkFmt <> f:54 var
+R10768:10768 Corelib.Init.Datatypes <> S constr
+R10770:10770 xv6iris.PrintkFmt <> p:55 var
+R10775:10779 xv6iris.PrintkFmt <> pk_ch def
+R10781:10781 xv6iris.PrintkFmt <> f:54 var
+R10784:10784 Corelib.Init.Datatypes <> S constr
+R10787:10787 Corelib.Init.Datatypes <> S constr
+R10789:10789 xv6iris.PrintkFmt <> p:55 var
+R10795:10799 xv6iris.PrintkFmt <> pk_ch def
+R10801:10801 xv6iris.PrintkFmt <> f:54 var
+R10804:10804 Corelib.Init.Datatypes <> S constr
+R10807:10807 Corelib.Init.Datatypes <> S constr
+R10810:10810 Corelib.Init.Datatypes <> S constr
+R10812:10812 xv6iris.PrintkFmt <> p:55 var
+binder 10746:10746 <> d:56
+R10830:10836 xv6iris.PrintkFmt <> pk_cons def
+R10839:10841 Corelib.Init.Datatypes <> fst def
+R10843:10843 xv6iris.PrintkFmt <> d:56 var
+R10847:10854 xv6iris.PrintkFmt <> pk_kinds def
+R10857:10864 xv6iris.PrintkFmt <> str_drop def
+R10874:10876 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R10867:10867 Corelib.Init.Datatypes <> S constr
+R10870:10870 Corelib.Init.Datatypes <> S constr
+R10872:10872 xv6iris.PrintkFmt <> p:55 var
+R10877:10879 Corelib.Init.Datatypes <> snd def
+R10881:10881 xv6iris.PrintkFmt <> d:56 var
+R10884:10884 xv6iris.PrintkFmt <> f:54 var
+R10730:10731 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R10652:10659 xv6iris.PrintkFmt <> pk_kinds def
+R10662:10669 xv6iris.PrintkFmt <> str_drop def
+R10672:10672 Corelib.Init.Datatypes <> S constr
+R10674:10674 xv6iris.PrintkFmt <> p:55 var
+R10677:10677 xv6iris.PrintkFmt <> f:54 var
+R11014:11022 Corelib.Init.Datatypes <> andb_prop thm
+R11014:11022 Corelib.Init.Datatypes <> andb_prop thm
+R11115:11119 xv6iris.PrintkFmt <> pk_ch def
+R11121:11128 xv6iris.PrintkFmt <> str_drop def
+R11130:11136 Stdlib.Arith.PeanoNat Nat add def
+R11147:11151 xv6iris.PrintkFmt <> nonul def
+R11167:11175 Corelib.Init.Datatypes <> andb_prop thm
+R11167:11175 Corelib.Init.Datatypes <> andb_prop thm
+R11207:11210 Corelib.Init.Datatypes <> negb def
+R11213:11221 Stdlib.Strings.Ascii <> eqb def
+R11207:11210 Corelib.Init.Datatypes <> negb def
+R11213:11221 Stdlib.Strings.Ascii <> eqb def
+R11250:11257 xv6iris.PrintkFmt <> pk_kinds def
+R11297:11304 xv6iris.PrintkFmt <> pk_kinds def
+R11373:11377 xv6iris.PrintkFmt <> pk_ch def
+R11391:11395 xv6iris.PrintkFmt <> nonul def
+R11411:11419 Corelib.Init.Datatypes <> andb_prop thm
+R11411:11419 Corelib.Init.Datatypes <> andb_prop thm
+R11451:11459 Stdlib.Strings.Ascii <> eqb def
+R11464:11469 xv6iris.PrintkFmt <> pk_nul def
+R11477:11481 Corelib.Init.Datatypes <> false constr
+R11507:11519 Stdlib.Bool.Bool <> negb_true_iff thm
+R11451:11459 Stdlib.Strings.Ascii <> eqb def
+R11464:11469 xv6iris.PrintkFmt <> pk_nul def
+R11477:11481 Corelib.Init.Datatypes <> false constr
+R11507:11519 Stdlib.Bool.Bool <> negb_true_iff thm
+R11577:11581 xv6iris.PrintkFmt <> pk_ch def
+R11583:11590 xv6iris.PrintkFmt <> str_drop def
+R11602:11612 xv6iris.PrintkFmt <> pk_dir_nul1 thm
+R11602:11612 xv6iris.PrintkFmt <> pk_dir_nul1 thm
+R11602:11612 xv6iris.PrintkFmt <> pk_dir_nul1 thm
+R11637:11641 xv6iris.PrintkFmt <> pk_ch def
+R11686:11690 xv6iris.PrintkFmt <> pk_ch def
+R11692:11699 xv6iris.PrintkFmt <> str_drop def
+R11721:11731 xv6iris.PrintkFmt <> pk_dir_nul2 thm
+R11721:11731 xv6iris.PrintkFmt <> pk_dir_nul2 thm
+R11764:11766 Corelib.Init.Datatypes <> snd def
+R11769:11774 xv6iris.PrintkFmt <> pk_dir def
+R11782:11787 xv6iris.PrintkFmt <> pk_nul def
+R11764:11766 Corelib.Init.Datatypes <> snd def
+R11769:11774 xv6iris.PrintkFmt <> pk_dir def
+R11782:11787 xv6iris.PrintkFmt <> pk_nul def
+R11856:11860 xv6iris.PrintkFmt <> pk_ch def
+R11862:11869 xv6iris.PrintkFmt <> str_drop def
+R11891:11903 xv6iris.PrintkFmt <> pk_dir_snd_le thm
+R11891:11903 xv6iris.PrintkFmt <> pk_dir_snd_le thm
+R11939:11941 Corelib.Init.Datatypes <> snd def
+R11944:11949 xv6iris.PrintkFmt <> pk_dir def
+R11939:11941 Corelib.Init.Datatypes <> snd def
+R11944:11949 xv6iris.PrintkFmt <> pk_dir def
+def 12107:12120 <> pk_kinds_panic
+R12142:12144 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12124:12131 xv6iris.PrintkFmt <> pk_kinds def
+R12145:12146 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+def 12182:12191 <> pk_kinds_s
+R12209:12211 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12195:12202 xv6iris.PrintkFmt <> pk_kinds def
+R12212:12212 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12218:12218 Stdlib.Lists.List ListNotations ::list_scope:'['_x_']' not
+R12213:12217 xv6iris.PrintkFmt <> PkStr constr
+def 12254:12267 <> pk_kinds_mixed
+R12308:12310 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12271:12278 xv6iris.PrintkFmt <> pk_kinds def
+R12311:12311 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12317:12318 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12324:12325 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12331:12331 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R12312:12316 xv6iris.PrintkFmt <> PkNum constr
+R12319:12323 xv6iris.PrintkFmt <> PkStr constr
+R12326:12330 xv6iris.PrintkFmt <> PkNum constr
+def 12367:12383 <> pk_kinds_dangling
+R12402:12404 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12387:12394 xv6iris.PrintkFmt <> pk_kinds def
+R12405:12406 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+def 12442:12457 <> pk_kinds_unknown
+R12478:12480 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12461:12468 xv6iris.PrintkFmt <> pk_kinds def
+R12481:12482 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not

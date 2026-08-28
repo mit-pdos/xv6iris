@@ -1,0 +1,7 @@
+DIGEST 2a433774b139490e3623bc68ae34bdd8
+Fxv6iris.LinkFileinit
+R155:166 xv6iris.LinkInitlock <> <> lib
+R168:180 xv6iris.ProofFileinit <> <> lib
+R203:215 xv6iris.ProofFileinit FileinitProof <> modtype
+R217:224 xv6iris.LinkInitlock Initlock <> modtype
+mod 191:198 <> Fileinit

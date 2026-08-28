@@ -1,0 +1,7 @@
+DIGEST b1078e7f38c17704d023166553c7ec53
+Fxv6iris.LinkNamecmp
+R191:201 xv6iris.LinkStrncmp <> <> lib
+R203:214 xv6iris.ProofNamecmp <> <> lib
+R236:247 xv6iris.ProofNamecmp NamecmpProof <> modtype
+R249:255 xv6iris.LinkStrncmp Strncmp <> modtype
+mod 225:231 <> Namecmp

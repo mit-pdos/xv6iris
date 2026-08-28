@@ -1,0 +1,73 @@
+DIGEST fecfdfdc133ac7747f6d4986f96b25d2
+Fxv6iris.ProofUsertrapParts
+R1412:1417 Stdlib.ZArith.ZArith <> <> lib
+R1419:1421 Stdlib.micromega.Lia <> <> lib
+R1423:1426 Stdlib.Lists.List <> <> lib
+R1455:1458 stdpp.gmap <> <> lib
+R1460:1480 stdpp.bitvector.definitions <> <> lib
+R1518:1526 iris.proofmode.proofmode <> <> lib
+R1544:1573 SailStdpp.ConcurrencyInterface <> <> lib
+R1575:1612 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R1614:1648 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R1650:1675 SailStdpp.Operators_mwords <> <> lib
+R1693:1706 SailStdpp.Base <> <> lib
+R1708:1726 SailStdpp.TypeCasts <> <> lib
+R1728:1743 SailStdpp.Values <> <> lib
+R1745:1765 SailStdpp.MachineWord <> <> lib
+R1783:1799 Riscv.rv64d_types <> <> lib
+R1801:1811 Riscv.rv64d <> <> lib
+R1829:1843 xv6iris.WpGprCsrwCommon <> <> lib
+R1845:1854 xv6iris.WpGprCsrwC <> <> lib
+R1877:1886 Kernel.KernelSyms <> <> lib
+R1922:1925 Riscv.rv64d_types Defs <> mod
+abbrev 2003:2004 <> UT
+R2009:2027 Kernel.KernelSyms <> usertrap def
+sec 2054:2066 <> UsertrapParts
+prf 2358:2372 <> ut_spp_clear_eq
+R2380:2384 SailStdpp.Values <> mword def
+binder 2375:2376 <> ms:1
+R2435:2442 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2415:2418 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2434:2434 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2396:2411 Riscv.rv64d <> _get_Mstatus_SPP def
+R2413:2414 xv6iris.ProofUsertrapParts <> ms:1 var
+R2427:2431 SailStdpp.Values <> mword def
+R2419:2420 SailStdpp.Values <> :::'''b'_x not
+R2548:2550 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2443:2448 SailStdpp.Operators_mwords <> eq_vec def
+R2540:2547 Riscv.rv64d <> zero_reg def
+R2451:2457 SailStdpp.Operators_mwords <> and_vec def
+R2492:2503 Riscv.rv64d <> sign_extend' def
+R2528:2532 SailStdpp.Values <> mword def
+R2509:2520 SailStdpp.Values <> mword_of_int def
+R2460:2471 xv6iris.WpGprCsrwCommon <> sstatus_read def
+R2473:2474 xv6iris.ProofUsertrapParts <> ms:1 var
+R2551:2554 Corelib.Init.Datatypes <> true constr
+R2594:2620 xv6iris.WpGprCsrwC <> sstatus_spp_mask thm
+R2594:2620 xv6iris.WpGprCsrwC <> sstatus_spp_mask thm
+R2594:2620 xv6iris.WpGprCsrwC <> sstatus_spp_mask thm
+prf 2990:3005 <> ut_spp_clear_neq
+R3013:3017 SailStdpp.Values <> mword def
+binder 3008:3009 <> ms:2
+R3068:3075 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3048:3051 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3067:3067 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3029:3044 Riscv.rv64d <> _get_Mstatus_SPP def
+R3046:3047 xv6iris.ProofUsertrapParts <> ms:2 var
+R3060:3064 SailStdpp.Values <> mword def
+R3052:3053 SailStdpp.Values <> :::'''b'_x not
+R3182:3184 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3076:3082 SailStdpp.Operators_mwords <> neq_vec def
+R3174:3181 Riscv.rv64d <> zero_reg def
+R3085:3091 SailStdpp.Operators_mwords <> and_vec def
+R3126:3137 Riscv.rv64d <> sign_extend' def
+R3162:3166 SailStdpp.Values <> mword def
+R3143:3154 SailStdpp.Values <> mword_of_int def
+R3094:3105 xv6iris.WpGprCsrwCommon <> sstatus_read def
+R3107:3108 xv6iris.ProofUsertrapParts <> ms:2 var
+R3185:3189 Corelib.Init.Datatypes <> false constr
+R3217:3223 SailStdpp.Operators_mwords <> neq_vec def
+R3235:3249 xv6iris.ProofUsertrapParts <> ut_spp_clear_eq thm
+R3235:3249 xv6iris.ProofUsertrapParts <> ut_spp_clear_eq thm
+R3235:3249 xv6iris.ProofUsertrapParts <> ut_spp_clear_eq thm
+R3281:3293 xv6iris.ProofUsertrapParts UsertrapParts <> sec

@@ -1,0 +1,21 @@
+DIGEST 27016df3cc50e17bef5fd54ad8e56ffc
+Fxv6iris.KernelConsts
+R830:835 Stdlib.ZArith.ZArith <> <> lib
+def 1008:1022 <> mycpu_cpus_addi
+R1026:1026 Corelib.Numbers.BinNums <> Z ind
+def 1154:1169 <> mycpu_cpus_auipc
+R1173:1173 Corelib.Numbers.BinNums <> Z ind
+def 1333:1351 <> myproc_pidlock_addi
+R1355:1355 Corelib.Numbers.BinNums <> Z ind
+def 1485:1504 <> myproc_pidlock_auipc
+R1508:1508 Corelib.Numbers.BinNums <> Z ind
+def 1660:1672 <> entry_ld_word
+R1676:1676 Corelib.Numbers.BinNums <> Z ind
+def 1829:1837 <> entry_got
+R1841:1841 Corelib.Numbers.BinNums <> Z ind
+def 1980:1997 <> kernelvec_jal_word
+R2001:2001 Corelib.Numbers.BinNums <> Z ind
+def 2142:2158 <> kernelvec_jal_imm
+R2162:2162 Corelib.Numbers.BinNums <> Z ind
+def 2319:2333 <> start_main_addi
+R2337:2337 Corelib.Numbers.BinNums <> Z ind

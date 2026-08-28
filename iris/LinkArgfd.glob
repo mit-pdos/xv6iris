@@ -1,0 +1,9 @@
+DIGEST 99169c6ad1e7e97220722f602112e972
+Fxv6iris.LinkArgfd
+R242:251 xv6iris.LinkArgint <> <> lib
+R253:262 xv6iris.LinkMyproc <> <> lib
+R264:273 xv6iris.ProofArgfd <> <> lib
+R293:302 xv6iris.ProofArgfd ArgfdProof <> modtype
+R304:309 xv6iris.LinkArgint Argint <> modtype
+R311:316 xv6iris.LinkMyproc Myproc <> modtype
+mod 284:288 <> Argfd

@@ -1,0 +1,5 @@
+DIGEST 1009db21558998a9fc33f1d3bc0138f0
+Fxv6iris.LinkStrncpy
+R158:169 xv6iris.ProofStrncpy <> <> lib
+R191:202 xv6iris.ProofStrncpy StrncpyProof <> modtype
+mod 180:186 <> Strncpy

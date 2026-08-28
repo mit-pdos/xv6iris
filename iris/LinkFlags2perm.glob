@@ -1,0 +1,5 @@
+DIGEST b90737cbc266ea58afe05b5c2c5cbeb3
+Fxv6iris.LinkFlags2perm
+R222:236 xv6iris.ProofFlags2perm <> <> lib
+R261:275 xv6iris.ProofFlags2perm Flags2permProof <> modtype
+mod 247:256 <> Flags2perm

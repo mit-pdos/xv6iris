@@ -1,0 +1,9 @@
+DIGEST e3af01ef15ae53491a3bd45a638a23a2
+Fxv6iris.LinkBinit
+R185:196 xv6iris.LinkInitlock <> <> lib
+R198:214 xv6iris.LinkInitsleeplock <> <> lib
+R216:225 xv6iris.ProofBinit <> <> lib
+R245:254 xv6iris.ProofBinit BinitProof <> modtype
+R256:263 xv6iris.LinkInitlock Initlock <> modtype
+R265:277 xv6iris.LinkInitsleeplock Initsleeplock <> modtype
+mod 236:240 <> Binit

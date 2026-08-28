@@ -413,16 +413,22 @@ Section KexecB2Res.
   (*  [nn] of them NAMED (its post is stated over the old contents), and   *)
   (*  the giveback wants them anonymous again.                            *)
   (* ------------------------------------------------------------------ *)
+  (* A6.87: the page comes in NAMED (pointwise) -- kexec carves a page it
+     BORROWED from the process table, whose contents it is about to read,
+     and [page_own] is the visibility-free page now.  This is
+     [ProcPtOwn.page_named] spelled out, so the accessor's output drops
+     straight in. *)
   Lemma kxc_page_take `{XI : CurCtx} (q : mword 64) (nn : nat) :
     (nn <= 4096)%nat ->
-    page_own q ⊢
+    ([∗ list] j ∈ seq 0 4096, ∃ b : bv 8, pa_add q j ↦ₘ b) ⊢
     ∃ f : nat -> bv 8,
       ([∗ list] j ∈ seq 0 nn, pa_add q j ↦ₘ f j) ∗
       ([∗ list] j ∈ seq 0 (4096 - nn), pa_add (pa_add q nn) j ↦ₘ f (nn + j)%nat).
   Proof.
-    intro Hn. rewrite /page_own.
+    intro Hn.
     iIntros "H". iDestruct (bb_any_named q 4096 with "H") as (f) "H".
-    iExists f. rewrite (bb_split3 q nn (4096 - nn) 0 4096 f (DfracOwn 1) ltac:(lia)).
+    iExists f.
+    rewrite (bb_split3 q nn (4096 - nn) 0 4096 f (DfracOwn 1) ltac:(lia)).
     iDestruct "H" as "(A & B & _)". iSplitL "A"; [iExact "A" | iExact "B"].
   Qed.
 
@@ -430,9 +436,9 @@ Section KexecB2Res.
     (nn <= 4096)%nat ->
     ([∗ list] j ∈ seq 0 nn, pa_add q j ↦ₘ h j) -∗
     ([∗ list] j ∈ seq 0 (4096 - nn), pa_add (pa_add q nn) j ↦ₘ f (nn + j)%nat) -∗
-    page_own q.
+    ([∗ list] j ∈ seq 0 4096, ∃ b : bv 8, pa_add q j ↦ₘ b).
   Proof.
-    intro Hn. iIntros "A B". rewrite /page_own /byte_any.
+    intro Hn. iIntros "A B".
     iApply (bb_named_any q 4096 (fun j => if decide (j < nn)%nat then h j
                                           else f j)).
     rewrite (bb_split3 q nn (4096 - nn) 0 4096

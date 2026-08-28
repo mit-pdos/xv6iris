@@ -1,0 +1,281 @@
+DIGEST 420151e64be1491bf494c5ea0c9ef80a
+Fxv6iris.UsertrapAux
+R1464:1469 Stdlib.ZArith.ZArith <> <> lib
+R1471:1473 Stdlib.micromega.Lia <> <> lib
+R1475:1478 Stdlib.Lists.List <> <> lib
+R1480:1485 Stdlib.Strings.String <> <> lib
+R1487:1491 Stdlib.Strings.Ascii <> <> lib
+R1520:1523 stdpp.gmap <> <> lib
+R1525:1528 stdpp.list <> <> lib
+R1530:1550 stdpp.bitvector.definitions <> <> lib
+R1588:1596 iris.proofmode.proofmode <> <> lib
+R1639:1643 iris.base_logic.lib.iprop <> <> lib
+R1645:1654 iris.base_logic.lib.invariants <> <> lib
+R1696:1703 iris.program_logic.language <> <> lib
+R1721:1746 SailStdpp.Operators_mwords <> <> lib
+R1764:1780 Riscv.rv64d_types <> <> lib
+R1782:1792 Riscv.rv64d <> <> lib
+R1810:1823 SailStdpp.Base <> <> lib
+R1825:1843 SailStdpp.TypeCasts <> <> lib
+R1845:1860 SailStdpp.Values <> <> lib
+R1862:1882 SailStdpp.MachineWord <> <> lib
+R1900:1908 xv6iris.RiscvLang <> <> lib
+R1910:1919 xv6iris.RiscvPtsto <> <> lib
+R1937:1943 xv6iris.RegFile <> <> lib
+R1961:1973 xv6iris.KernelDataInv <> <> lib
+R1991:1999 xv6iris.PrintkFmt <> <> lib
+R2017:2026 xv6iris.PrintkArgs <> <> lib
+R2089:2098 Kernel.KernelSyms <> <> lib
+R2121:2130 Kernel.KernelData <> <> lib
+R2148:2153 xv6iris.TsoCtx <> <> lib
+R2189:2192 Riscv.rv64d_types Defs <> mod
+def 3367:3375 <> ut_fmt1_a
+R3379:3379 Corelib.Numbers.BinNums <> Z ind
+def 3407:3415 <> ut_fmt2_a
+R3419:3419 Corelib.Numbers.BinNums <> Z ind
+def 3448:3452 <> ut_nl
+R3456:3461 Stdlib.Strings.String <> string ind
+R3466:3471 Stdlib.Strings.String <> String constr
+R3474:3485 Stdlib.Strings.Ascii <> ascii_of_nat def
+R3491:3501 Stdlib.Strings.String <> EmptyString constr
+def 3516:3522 <> ut_fmt1
+R3526:3531 Stdlib.Strings.String <> string ind
+R3538:3550 Stdlib.Strings.String <> append def
+R3597:3601 xv6iris.UsertrapAux <> ut_nl def
+def 3615:3621 <> ut_fmt2
+R3625:3630 Stdlib.Strings.String <> string ind
+R3637:3649 Stdlib.Strings.String <> append def
+R3688:3692 xv6iris.UsertrapAux <> ut_nl def
+def 3707:3715 <> ut_fmt1_p
+R3719:3723 SailStdpp.Values <> mword def
+R3731:3742 SailStdpp.Values <> mword_of_int def
+R3744:3752 xv6iris.UsertrapAux <> ut_fmt1_a def
+def 3766:3774 <> ut_fmt2_p
+R3778:3782 SailStdpp.Values <> mword def
+R3790:3801 SailStdpp.Values <> mword_of_int def
+R3803:3811 xv6iris.UsertrapAux <> ut_fmt2_a def
+def 3971:3983 <> ut_fmt1_descs
+R3987:3990 Corelib.Init.Datatypes <> list ind
+R3992:4002 xv6iris.PrintkArgs <> pk_arg_desc ind
+R4007:4007 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R4014:4015 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R4022:4022 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R4008:4013 xv6iris.PrintkArgs <> PkANum constr
+R4016:4021 xv6iris.PrintkArgs <> PkANum constr
+def 4036:4048 <> ut_fmt2_descs
+R4052:4055 Corelib.Init.Datatypes <> list ind
+R4057:4067 xv6iris.PrintkArgs <> pk_arg_desc ind
+R4072:4072 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R4079:4080 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R4087:4087 Stdlib.Lists.List ListNotations ::list_scope:'['_x_';'_x_';'_'..'_';'_x_']' not
+R4073:4078 xv6iris.PrintkArgs <> PkANum constr
+R4081:4086 xv6iris.PrintkArgs <> PkANum constr
+prf 4327:4339 <> ut_fmt1_nonul
+R4356:4358 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4343:4347 xv6iris.PrintkFmt <> nonul def
+R4349:4355 xv6iris.UsertrapAux <> ut_fmt1 def
+R4359:4362 Corelib.Init.Datatypes <> true constr
+prf 4408:4420 <> ut_fmt2_nonul
+R4437:4439 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4424:4428 xv6iris.PrintkFmt <> nonul def
+R4430:4436 xv6iris.UsertrapAux <> ut_fmt2 def
+R4440:4443 Corelib.Init.Datatypes <> true constr
+prf 4490:4502 <> ut_fmt1_kinds
+R4522:4524 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4506:4513 xv6iris.PrintkFmt <> pk_kinds def
+R4515:4521 xv6iris.UsertrapAux <> ut_fmt1 def
+R4525:4527 Corelib.Lists.ListDef <> map def
+R4542:4554 xv6iris.UsertrapAux <> ut_fmt1_descs def
+R4529:4540 xv6iris.PrintkArgs <> pk_desc_kind def
+prf 4600:4612 <> ut_fmt2_kinds
+R4632:4634 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4616:4623 xv6iris.PrintkFmt <> pk_kinds def
+R4625:4631 xv6iris.UsertrapAux <> ut_fmt2 def
+R4635:4637 Corelib.Lists.ListDef <> map def
+R4652:4664 xv6iris.UsertrapAux <> ut_fmt2_descs def
+R4639:4650 xv6iris.PrintkArgs <> pk_desc_kind def
+prf 4711:4721 <> ut_fmt1_len
+R4758:4760 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R4726:4733 Stdlib.ZArith.BinInt Z of_nat def
+R4736:4748 Stdlib.Strings.String <> length def
+R4750:4756 xv6iris.UsertrapAux <> ut_fmt1 def
+prf 4819:4829 <> ut_fmt2_len
+R4866:4868 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R4834:4841 Stdlib.ZArith.BinInt Z of_nat def
+R4844:4856 Stdlib.Strings.String <> length def
+R4858:4864 xv6iris.UsertrapAux <> ut_fmt2 def
+prf 4928:4941 <> ut_fmt1_ndescs
+R4966:4969 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R4946:4951 Stdlib.Lists.List <> length abbrev
+R4953:4965 xv6iris.UsertrapAux <> ut_fmt1_descs def
+R4992:5004 xv6iris.UsertrapAux <> ut_fmt1_descs def
+R5012:5017 Corelib.Init.Datatypes <> length def
+prf 5037:5050 <> ut_fmt2_ndescs
+R5075:5078 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R5055:5060 Stdlib.Lists.List <> length abbrev
+R5062:5074 xv6iris.UsertrapAux <> ut_fmt2_descs def
+R5101:5113 xv6iris.UsertrapAux <> ut_fmt2_descs def
+R5121:5126 Corelib.Init.Datatypes <> length def
+prf 5377:5389 <> ut_fmt1_bytes
+R5395:5401 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5405:5406 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 5402:5402 <> j:1
+binder 5404:5404 <> b:2
+R5442:5449 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5433:5435 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5428:5431 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5432:5432 xv6iris.UsertrapAux <> j:1 var
+R5407:5419 xv6iris.RiscvPtsto <> cstring_bytes def
+R5421:5427 xv6iris.UsertrapAux <> ut_fmt1 def
+R5436:5439 Corelib.Init.Datatypes <> Some constr
+R5441:5441 xv6iris.UsertrapAux <> b:2 var
+R5502:5504 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5472:5475 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5486:5488 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5477:5485 xv6iris.UsertrapAux <> ut_fmt1_a def
+R5489:5496 Stdlib.ZArith.BinInt Z of_nat def
+R5498:5498 xv6iris.UsertrapAux <> j:1 var
+R5450:5471 Kernel.KernelData <> kernel_data def
+R5505:5508 Corelib.Init.Datatypes <> Some constr
+R5510:5510 xv6iris.UsertrapAux <> b:2 var
+prf 5654:5666 <> ut_fmt2_bytes
+R5672:5678 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R5682:5683 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 5679:5679 <> j:3
+binder 5681:5681 <> b:4
+R5719:5726 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5710:5712 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5705:5708 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5709:5709 xv6iris.UsertrapAux <> j:3 var
+R5684:5696 xv6iris.RiscvPtsto <> cstring_bytes def
+R5698:5704 xv6iris.UsertrapAux <> ut_fmt2 def
+R5713:5716 Corelib.Init.Datatypes <> Some constr
+R5718:5718 xv6iris.UsertrapAux <> b:4 var
+R5779:5781 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5749:5752 stdpp.base <> ::stdpp_scope:x_'!!'_x not
+R5763:5765 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5754:5762 xv6iris.UsertrapAux <> ut_fmt2_a def
+R5766:5773 Stdlib.ZArith.BinInt Z of_nat def
+R5775:5775 xv6iris.UsertrapAux <> j:3 var
+R5727:5748 Kernel.KernelData <> kernel_data def
+R5782:5785 Corelib.Init.Datatypes <> Some constr
+R5787:5787 xv6iris.UsertrapAux <> b:4 var
+sec 5933:5944 <> UsertrapData
+R5960:5966 xv6iris.RiscvPtsto <> riscvGS class
+var  5985:5987 UsertrapData GEN
+var  6000:6002 UsertrapData CID
+var  6015:6016 UsertrapData XI
+R5991:5995 xv6iris.RiscvLang <> GenId class
+R6006:6010 xv6iris.RiscvLang <> CpuId class
+R6020:6025 xv6iris.TsoCtx <> CurCtx class
+prf 6038:6048 <> ut_fmt1_str
+R6052:6052 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6075:6081 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6067:6071 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6073:6074 xv6iris.UsertrapAux <> UsertrapData.Σ var
+R6053:6063 xv6iris.KernelDataInv <> kernel_data def
+R6091:6101 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₛ□'_x not
+R6082:6090 xv6iris.UsertrapAux <> ut_fmt1_p def
+R6102:6108 xv6iris.UsertrapAux <> ut_fmt1 def
+R6150:6150 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6310:6315 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6320:6320 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6151:6168 xv6iris.KernelDataInv <> kernel_data_string thm
+R6170:6178 xv6iris.UsertrapAux <> ut_fmt1_a def
+R6180:6186 xv6iris.UsertrapAux <> ut_fmt1 def
+R6190:6196 Corelib.Init.Logic <> eq_refl constr
+R6225:6232 xv6iris.RiscvPtsto <> text_end def
+R6235:6243 xv6iris.UsertrapAux <> ut_fmt1_a def
+R6297:6309 xv6iris.UsertrapAux <> ut_fmt1_bytes thm
+R6150:6150 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6310:6315 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6320:6320 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6151:6168 xv6iris.KernelDataInv <> kernel_data_string thm
+R6170:6178 xv6iris.UsertrapAux <> ut_fmt1_a def
+R6180:6186 xv6iris.UsertrapAux <> ut_fmt1 def
+R6190:6196 Corelib.Init.Logic <> eq_refl constr
+R6225:6232 xv6iris.RiscvPtsto <> text_end def
+R6235:6243 xv6iris.UsertrapAux <> ut_fmt1_a def
+R6297:6309 xv6iris.UsertrapAux <> ut_fmt1_bytes thm
+prf 6339:6349 <> ut_fmt2_str
+R6353:6353 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6376:6382 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6368:6372 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6374:6375 xv6iris.UsertrapAux <> UsertrapData.Σ var
+R6354:6364 xv6iris.KernelDataInv <> kernel_data def
+R6392:6402 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₛ□'_x not
+R6383:6391 xv6iris.UsertrapAux <> ut_fmt2_p def
+R6403:6409 xv6iris.UsertrapAux <> ut_fmt2 def
+R6451:6451 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6611:6616 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6621:6621 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6452:6469 xv6iris.KernelDataInv <> kernel_data_string thm
+R6471:6479 xv6iris.UsertrapAux <> ut_fmt2_a def
+R6481:6487 xv6iris.UsertrapAux <> ut_fmt2 def
+R6491:6497 Corelib.Init.Logic <> eq_refl constr
+R6526:6533 xv6iris.RiscvPtsto <> text_end def
+R6536:6544 xv6iris.UsertrapAux <> ut_fmt2_a def
+R6598:6610 xv6iris.UsertrapAux <> ut_fmt2_bytes thm
+R6451:6451 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6611:6616 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6621:6621 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6452:6469 xv6iris.KernelDataInv <> kernel_data_string thm
+R6471:6479 xv6iris.UsertrapAux <> ut_fmt2_a def
+R6481:6487 xv6iris.UsertrapAux <> ut_fmt2 def
+R6491:6497 Corelib.Init.Logic <> eq_refl constr
+R6526:6533 xv6iris.RiscvPtsto <> text_end def
+R6536:6544 xv6iris.UsertrapAux <> ut_fmt2_a def
+R6598:6610 xv6iris.UsertrapAux <> ut_fmt2_bytes thm
+prf 6905:6921 <> ut_fmt1_descs_res
+R6928:6934 xv6iris.RegFile <> regfile def
+binder 6924:6924 <> m:10
+R6943:6947 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R7015:7015 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R6948:6958 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R6960:6964 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R6966:6970 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R6984:6985 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+binder 6959:6959 <> j:11
+binder 6959:6959 <> j:12
+binder 6965:6965 <> d:13
+binder 6965:6965 <> d:14
+R6986:6996 xv6iris.PrintkArgs <> pk_desc_res def
+R7014:7014 xv6iris.UsertrapAux <> d:13 var
+R6999:7007 xv6iris.PrintkArgs <> pk_vararg def
+R7009:7009 xv6iris.UsertrapAux <> m:10 var
+R7011:7011 xv6iris.UsertrapAux <> j:11 var
+R6971:6983 xv6iris.UsertrapAux <> ut_fmt1_descs def
+R7036:7048 xv6iris.UsertrapAux <> ut_fmt1_descs def
+R7051:7061 xv6iris.PrintkArgs <> pk_desc_res def
+R7036:7048 xv6iris.UsertrapAux <> ut_fmt1_descs def
+R7036:7048 xv6iris.UsertrapAux <> ut_fmt1_descs def
+R7051:7061 xv6iris.PrintkArgs <> pk_desc_res def
+R7051:7061 xv6iris.PrintkArgs <> pk_desc_res def
+R7069:7075 iris.algebra.big_op <> big_opL def
+prf 7099:7115 <> ut_fmt2_descs_res
+R7122:7128 xv6iris.RegFile <> regfile def
+binder 7118:7118 <> m:15
+R7137:7141 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R7209:7209 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R7142:7152 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R7154:7158 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R7160:7164 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R7178:7179 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+binder 7153:7153 <> j:16
+binder 7153:7153 <> j:17
+binder 7159:7159 <> d:18
+binder 7159:7159 <> d:19
+R7180:7190 xv6iris.PrintkArgs <> pk_desc_res def
+R7208:7208 xv6iris.UsertrapAux <> d:18 var
+R7193:7201 xv6iris.PrintkArgs <> pk_vararg def
+R7203:7203 xv6iris.UsertrapAux <> m:15 var
+R7205:7205 xv6iris.UsertrapAux <> j:16 var
+R7165:7177 xv6iris.UsertrapAux <> ut_fmt2_descs def
+R7230:7242 xv6iris.UsertrapAux <> ut_fmt2_descs def
+R7245:7255 xv6iris.PrintkArgs <> pk_desc_res def
+R7230:7242 xv6iris.UsertrapAux <> ut_fmt2_descs def
+R7230:7242 xv6iris.UsertrapAux <> ut_fmt2_descs def
+R7245:7255 xv6iris.PrintkArgs <> pk_desc_res def
+R7245:7255 xv6iris.PrintkArgs <> pk_desc_res def
+R7263:7269 iris.algebra.big_op <> big_opL def
+R7289:7300 xv6iris.UsertrapAux UsertrapData <> sec

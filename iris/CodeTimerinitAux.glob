@@ -1,0 +1,621 @@
+DIGEST 9e9d1e1f7bbee5d940604587c7496854
+Fxv6iris.CodeTimerinitAux
+R652:657 Stdlib.ZArith.ZArith <> <> lib
+R686:689 stdpp.gmap <> <> lib
+R691:711 stdpp.bitvector.definitions <> <> lib
+R749:757 iris.proofmode.proofmode <> <> lib
+R799:806 iris.program_logic.language <> <> lib
+R824:849 SailStdpp.Operators_mwords <> <> lib
+R867:883 Riscv.rv64d_types <> <> lib
+R885:895 Riscv.rv64d <> <> lib
+R897:914 Riscv.riscv_extras <> <> lib
+R932:945 SailStdpp.Base <> <> lib
+R963:971 xv6iris.RiscvLang <> <> lib
+R973:982 xv6iris.RiscvPtsto <> <> lib
+R1000:1014 xv6iris.WpMmodeLeafBase <> <> lib
+R1032:1041 xv6iris.WpGprCsrrA <> <> lib
+R1043:1052 xv6iris.WpGprCsrrB <> <> lib
+R1054:1063 xv6iris.WpGprCsrwA <> <> lib
+R1065:1074 xv6iris.WpGprCsrwB <> <> lib
+R1092:1101 xv6iris.InstrBytes <> <> lib
+R1119:1128 xv6iris.KernelText <> <> lib
+R1171:1180 iris.base_logic.lib.invariants <> <> lib
+R1203:1214 Kernel.KernelInstrs <> <> lib
+R1237:1246 Kernel.KernelSyms <> <> lib
+R1264:1276 xv6iris.CodeTimerinit <> <> lib
+R1294:1299 xv6iris.TsoCtx <> <> lib
+def 1723:1727 <> ti_ra
+R1731:1735 SailStdpp.Values <> mword def
+R1742:1753 SailStdpp.Values <> mword_of_int def
+def 1782:1786 <> ti_s0
+R1790:1794 SailStdpp.Values <> mword def
+R1801:1812 SailStdpp.Values <> mword_of_int def
+def 1841:1845 <> ti_a4
+R1849:1853 SailStdpp.Values <> mword def
+R1860:1871 SailStdpp.Values <> mword_of_int def
+def 1900:1904 <> ti_a5
+R1908:1912 SailStdpp.Values <> mword def
+R1919:1930 SailStdpp.Values <> mword_of_int def
+def 1959:1964 <> ti_cs0
+R1968:1974 Riscv.rv64d_types <> cregidx ind
+R1979:1985 Riscv.rv64d_types <> Cregidx constr
+R1988:1999 SailStdpp.Values <> mword_of_int def
+def 2035:2040 <> ti_ca4
+R2044:2050 Riscv.rv64d_types <> cregidx ind
+R2055:2061 Riscv.rv64d_types <> Cregidx constr
+R2064:2075 SailStdpp.Values <> mword_of_int def
+def 2111:2116 <> ti_ca5
+R2120:2126 Riscv.rv64d_types <> cregidx ind
+R2131:2137 Riscv.rv64d_types <> Cregidx constr
+R2140:2151 SailStdpp.Values <> mword_of_int def
+def 2188:2189 <> i9
+R2195:2199 SailStdpp.Values <> mword def
+R2207:2218 SailStdpp.Values <> mword_of_int def
+def 2268:2270 <> u10
+R2275:2279 SailStdpp.Values <> mword def
+R2287:2298 SailStdpp.Values <> mword_of_int def
+def 2350:2352 <> u11
+R2357:2361 SailStdpp.Values <> mword def
+R2369:2380 SailStdpp.Values <> mword_of_int def
+def 2432:2435 <> nz12
+R2439:2443 SailStdpp.Values <> mword def
+R2451:2462 SailStdpp.Values <> mword_of_int def
+def 2514:2516 <> i14
+R2521:2525 SailStdpp.Values <> mword def
+R2533:2544 SailStdpp.Values <> mword_of_int def
+def 2596:2599 <> sh15
+R2603:2607 SailStdpp.Values <> mword def
+R2615:2626 SailStdpp.Values <> mword_of_int def
+def 2678:2680 <> i19
+R2685:2689 SailStdpp.Values <> mword def
+R2697:2708 SailStdpp.Values <> mword_of_int def
+def 2760:2762 <> i22
+R2767:2771 SailStdpp.Values <> mword def
+R2779:2790 SailStdpp.Values <> mword_of_int def
+def 2842:2844 <> i23
+R2849:2853 SailStdpp.Values <> mword def
+R2861:2872 SailStdpp.Values <> mword_of_int def
+def 2924:2926 <> i28
+R2931:2935 SailStdpp.Values <> mword def
+R2943:2954 SailStdpp.Values <> mword_of_int def
+R4612:4636 xv6iris.KptPt <> instr_window_static thm
+R4661:4672 xv6iris.RiscvPtsto <> addr_is_text def
+sec 4789:4799 <> WpTimerinit
+R4815:4821 xv6iris.RiscvPtsto <> riscvGS class
+var  4840:4842 WpTimerinit GEN
+var  4855:4857 WpTimerinit CID
+var  4870:4871 WpTimerinit XI
+R4846:4850 xv6iris.RiscvLang <> GenId class
+R4861:4865 xv6iris.RiscvLang <> CpuId class
+R4875:4880 xv6iris.TsoCtx <> CurCtx class
+def 4934:4939 <> ti_pc9
+R4944:4948 SailStdpp.Values <> mword def
+R4956:4967 SailStdpp.Values <> mword_of_int def
+R4970:4989 Kernel.KernelSyms <> timerinit def
+def 5006:5012 <> ti_pc10
+R5016:5020 SailStdpp.Values <> mword def
+R5028:5039 SailStdpp.Values <> mword_of_int def
+R5062:5064 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5042:5061 Kernel.KernelSyms <> timerinit def
+def 5084:5090 <> ti_pc11
+R5094:5098 SailStdpp.Values <> mword def
+R5106:5117 SailStdpp.Values <> mword_of_int def
+R5140:5142 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5120:5139 Kernel.KernelSyms <> timerinit def
+def 5162:5168 <> ti_pc12
+R5172:5176 SailStdpp.Values <> mword def
+R5184:5195 SailStdpp.Values <> mword_of_int def
+R5218:5220 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5198:5217 Kernel.KernelSyms <> timerinit def
+def 5240:5246 <> ti_pc13
+R5250:5254 SailStdpp.Values <> mword def
+R5262:5273 SailStdpp.Values <> mword_of_int def
+R5296:5298 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5276:5295 Kernel.KernelSyms <> timerinit def
+def 5318:5324 <> ti_pc14
+R5328:5332 SailStdpp.Values <> mword def
+R5340:5351 SailStdpp.Values <> mword_of_int def
+R5374:5376 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5354:5373 Kernel.KernelSyms <> timerinit def
+def 5396:5402 <> ti_pc15
+R5406:5410 SailStdpp.Values <> mword def
+R5418:5429 SailStdpp.Values <> mword_of_int def
+R5452:5454 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5432:5451 Kernel.KernelSyms <> timerinit def
+def 5474:5480 <> ti_pc16
+R5484:5488 SailStdpp.Values <> mword def
+R5496:5507 SailStdpp.Values <> mword_of_int def
+R5530:5532 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5510:5529 Kernel.KernelSyms <> timerinit def
+def 5553:5559 <> ti_pc17
+R5563:5567 SailStdpp.Values <> mword def
+R5575:5586 SailStdpp.Values <> mword_of_int def
+R5609:5611 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5589:5608 Kernel.KernelSyms <> timerinit def
+def 5632:5638 <> ti_pc18
+R5642:5646 SailStdpp.Values <> mword def
+R5654:5665 SailStdpp.Values <> mword_of_int def
+R5688:5690 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5668:5687 Kernel.KernelSyms <> timerinit def
+def 5711:5717 <> ti_pc19
+R5721:5725 SailStdpp.Values <> mword def
+R5733:5744 SailStdpp.Values <> mword_of_int def
+R5767:5769 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5747:5766 Kernel.KernelSyms <> timerinit def
+def 5790:5796 <> ti_pc20
+R5800:5804 SailStdpp.Values <> mword def
+R5812:5823 SailStdpp.Values <> mword_of_int def
+R5846:5848 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5826:5845 Kernel.KernelSyms <> timerinit def
+def 5869:5875 <> ti_pc21
+R5879:5883 SailStdpp.Values <> mword def
+R5891:5902 SailStdpp.Values <> mword_of_int def
+R5925:5927 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5905:5924 Kernel.KernelSyms <> timerinit def
+def 5948:5954 <> ti_pc22
+R5958:5962 SailStdpp.Values <> mword def
+R5970:5981 SailStdpp.Values <> mword_of_int def
+R6004:6006 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R5984:6003 Kernel.KernelSyms <> timerinit def
+def 6027:6033 <> ti_pc23
+R6037:6041 SailStdpp.Values <> mword def
+R6049:6060 SailStdpp.Values <> mword_of_int def
+R6083:6085 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R6063:6082 Kernel.KernelSyms <> timerinit def
+def 6106:6112 <> ti_pc24
+R6116:6120 SailStdpp.Values <> mword def
+R6128:6139 SailStdpp.Values <> mword_of_int def
+R6162:6164 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R6142:6161 Kernel.KernelSyms <> timerinit def
+def 6185:6191 <> ti_pc25
+R6195:6199 SailStdpp.Values <> mword def
+R6207:6218 SailStdpp.Values <> mword_of_int def
+R6241:6243 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R6221:6240 Kernel.KernelSyms <> timerinit def
+def 6264:6270 <> ti_pc26
+R6274:6278 SailStdpp.Values <> mword def
+R6286:6297 SailStdpp.Values <> mword_of_int def
+R6320:6322 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R6300:6319 Kernel.KernelSyms <> timerinit def
+def 6343:6349 <> ti_pc27
+R6353:6357 SailStdpp.Values <> mword def
+R6365:6376 SailStdpp.Values <> mword_of_int def
+R6399:6401 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R6379:6398 Kernel.KernelSyms <> timerinit def
+def 6422:6428 <> ti_pc28
+R6432:6436 SailStdpp.Values <> mword def
+R6444:6455 SailStdpp.Values <> mword_of_int def
+R6478:6480 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R6458:6477 Kernel.KernelSyms <> timerinit def
+def 6501:6507 <> ti_pc29
+R6511:6515 SailStdpp.Values <> mword def
+R6523:6534 SailStdpp.Values <> mword_of_int def
+R6557:6559 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R6537:6556 Kernel.KernelSyms <> timerinit def
+prf 6846:6854 <> ti_instr9
+R6873:6878 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R6862:6872 xv6iris.KernelText <> kernel_text def
+R6879:6883 xv6iris.InstrBytes <> instr def
+R6885:6890 xv6iris.CodeTimerinitAux <> ti_pc9 def
+R6892:6895 Corelib.Init.Datatypes <> true constr
+R6898:6902 Riscv.rv64d_types <> ITYPE constr
+R6904:6904 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6923:6924 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6939:6940 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6955:6956 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6961:6961 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6905:6916 Riscv.rv64d <> sign_extend' def
+R6921:6922 xv6iris.CodeTimerinitAux <> i9 def
+R6925:6930 Riscv.rv64d_types <> Regidx constr
+R6932:6938 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R6941:6946 Riscv.rv64d_types <> Regidx constr
+R6948:6954 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R6957:6960 Riscv.rv64d_types <> ADDI constr
+R6980:6985 xv6iris.CodeTimerinit <> tmi_00 thm
+R6980:6985 xv6iris.CodeTimerinit <> tmi_00 thm
+prf 7002:7011 <> ti_instr10
+R7030:7035 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7019:7029 xv6iris.KernelText <> kernel_text def
+R7036:7040 xv6iris.InstrBytes <> instr def
+R7042:7048 xv6iris.CodeTimerinitAux <> ti_pc10 def
+R7050:7053 Corelib.Init.Datatypes <> true constr
+R7056:7060 Riscv.rv64d_types <> STORE constr
+R7062:7062 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7105:7106 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7119:7120 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7135:7136 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7138:7138 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7063:7074 Riscv.rv64d_types <> zero_extend' def
+R7080:7089 SailStdpp.Operators_mwords <> concat_vec def
+R7096:7097 SailStdpp.Values <> :::'''b'_x not
+R7091:7093 xv6iris.CodeTimerinitAux <> u10 def
+R7107:7112 Riscv.rv64d_types <> Regidx constr
+R7114:7118 xv6iris.CodeTimerinitAux <> ti_ra def
+R7121:7126 Riscv.rv64d_types <> Regidx constr
+R7128:7134 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R7157:7162 xv6iris.CodeTimerinit <> tmi_02 thm
+R7157:7162 xv6iris.CodeTimerinit <> tmi_02 thm
+prf 7179:7188 <> ti_instr11
+R7207:7212 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7196:7206 xv6iris.KernelText <> kernel_text def
+R7213:7217 xv6iris.InstrBytes <> instr def
+R7219:7225 xv6iris.CodeTimerinitAux <> ti_pc11 def
+R7227:7230 Corelib.Init.Datatypes <> true constr
+R7233:7237 Riscv.rv64d_types <> STORE constr
+R7239:7239 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7282:7283 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7296:7297 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7312:7313 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7315:7315 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7240:7251 Riscv.rv64d_types <> zero_extend' def
+R7257:7266 SailStdpp.Operators_mwords <> concat_vec def
+R7273:7274 SailStdpp.Values <> :::'''b'_x not
+R7268:7270 xv6iris.CodeTimerinitAux <> u11 def
+R7284:7289 Riscv.rv64d_types <> Regidx constr
+R7291:7295 xv6iris.CodeTimerinitAux <> ti_s0 def
+R7298:7303 Riscv.rv64d_types <> Regidx constr
+R7305:7311 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R7334:7339 xv6iris.CodeTimerinit <> tmi_04 thm
+R7334:7339 xv6iris.CodeTimerinit <> tmi_04 thm
+prf 7356:7365 <> ti_instr12
+R7384:7389 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7373:7383 xv6iris.KernelText <> kernel_text def
+R7390:7394 xv6iris.InstrBytes <> instr def
+R7396:7402 xv6iris.CodeTimerinitAux <> ti_pc12 def
+R7404:7407 Corelib.Init.Datatypes <> true constr
+R7410:7414 Riscv.rv64d_types <> ITYPE constr
+R7416:7416 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7435:7436 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7451:7452 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7465:7466 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7471:7471 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7417:7429 xv6iris.WpMmodeLeafBase <> caddi4spn_imm def
+R7431:7434 xv6iris.CodeTimerinitAux <> nz12 def
+R7437:7442 Riscv.rv64d_types <> Regidx constr
+R7444:7450 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R7453:7458 Riscv.rv64d_types <> Regidx constr
+R7460:7464 xv6iris.CodeTimerinitAux <> ti_s0 def
+R7467:7470 Riscv.rv64d_types <> ADDI constr
+R7490:7495 xv6iris.CodeTimerinit <> tmi_06 thm
+R7490:7495 xv6iris.CodeTimerinit <> tmi_06 thm
+prf 7512:7521 <> ti_instr13
+R7540:7545 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7529:7539 xv6iris.KernelText <> kernel_text def
+R7546:7550 xv6iris.InstrBytes <> instr def
+R7552:7558 xv6iris.CodeTimerinitAux <> ti_pc13 def
+R7560:7564 Corelib.Init.Datatypes <> false constr
+R7567:7572 Riscv.rv64d_types <> CSRReg constr
+R7574:7574 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7597:7598 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7603:7604 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7617:7618 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7624:7624 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7575:7596 xv6iris.WpGprCsrrB <> csr_menvcfg def
+R7599:7602 Riscv.rv64d <> zreg def
+R7605:7610 Riscv.rv64d_types <> Regidx constr
+R7612:7616 xv6iris.CodeTimerinitAux <> ti_a5 def
+R7619:7623 Riscv.rv64d_types <> CSRRS constr
+R7643:7648 xv6iris.CodeTimerinit <> tmi_08 thm
+R7643:7648 xv6iris.CodeTimerinit <> tmi_08 thm
+prf 7665:7674 <> ti_instr14
+R7693:7698 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7682:7692 xv6iris.KernelText <> kernel_text def
+R7699:7703 xv6iris.InstrBytes <> instr def
+R7705:7711 xv6iris.CodeTimerinitAux <> ti_pc14 def
+R7713:7716 Corelib.Init.Datatypes <> true constr
+R7719:7723 Riscv.rv64d_types <> ITYPE constr
+R7725:7725 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7745:7746 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7761:7762 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7775:7776 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7781:7781 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7726:7737 Riscv.rv64d <> sign_extend' def
+R7742:7744 xv6iris.CodeTimerinitAux <> i14 def
+R7747:7752 Riscv.rv64d_types <> Regidx constr
+R7754:7760 xv6iris.WpMmodeLeafBase <> cli_rs1 def
+R7763:7768 Riscv.rv64d_types <> Regidx constr
+R7770:7774 xv6iris.CodeTimerinitAux <> ti_a4 def
+R7777:7780 Riscv.rv64d_types <> ADDI constr
+R7800:7805 xv6iris.CodeTimerinit <> tmi_0c thm
+R7800:7805 xv6iris.CodeTimerinit <> tmi_0c thm
+prf 7822:7831 <> ti_instr15
+R7850:7855 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7839:7849 xv6iris.KernelText <> kernel_text def
+R7856:7860 xv6iris.InstrBytes <> instr def
+R7862:7868 xv6iris.CodeTimerinitAux <> ti_pc15 def
+R7870:7873 Corelib.Init.Datatypes <> true constr
+R7876:7883 Riscv.rv64d_types <> SHIFTIOP constr
+R7885:7885 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7890:7891 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7904:7905 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7918:7919 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7924:7924 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R7886:7889 xv6iris.CodeTimerinitAux <> sh15 def
+R7892:7897 Riscv.rv64d_types <> Regidx constr
+R7899:7903 xv6iris.CodeTimerinitAux <> ti_a4 def
+R7906:7911 Riscv.rv64d_types <> Regidx constr
+R7913:7917 xv6iris.CodeTimerinitAux <> ti_a4 def
+R7920:7923 Riscv.rv64d_types <> SLLI constr
+R7943:7948 xv6iris.CodeTimerinit <> tmi_0e thm
+R7943:7948 xv6iris.CodeTimerinit <> tmi_0e thm
+prf 7965:7974 <> ti_instr16
+R7993:7998 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7982:7992 xv6iris.KernelText <> kernel_text def
+R7999:8003 xv6iris.InstrBytes <> instr def
+R8005:8011 xv6iris.CodeTimerinitAux <> ti_pc16 def
+R8013:8016 Corelib.Init.Datatypes <> true constr
+R8019:8023 Riscv.rv64d_types <> RTYPE constr
+R8025:8025 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8038:8039 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8052:8053 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8066:8067 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8070:8070 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8026:8031 Riscv.rv64d_types <> Regidx constr
+R8033:8037 xv6iris.CodeTimerinitAux <> ti_a4 def
+R8040:8045 Riscv.rv64d_types <> Regidx constr
+R8047:8051 xv6iris.CodeTimerinitAux <> ti_a5 def
+R8054:8059 Riscv.rv64d_types <> Regidx constr
+R8061:8065 xv6iris.CodeTimerinitAux <> ti_a5 def
+R8068:8069 Riscv.rv64d_types <> OR constr
+R8089:8094 xv6iris.CodeTimerinit <> tmi_10 thm
+R8089:8094 xv6iris.CodeTimerinit <> tmi_10 thm
+prf 8111:8120 <> ti_instr17
+R8139:8144 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8128:8138 xv6iris.KernelText <> kernel_text def
+R8145:8149 xv6iris.InstrBytes <> instr def
+R8151:8157 xv6iris.CodeTimerinitAux <> ti_pc17 def
+R8159:8163 Corelib.Init.Datatypes <> false constr
+R8166:8171 Riscv.rv64d_types <> CSRReg constr
+R8173:8173 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8196:8197 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8210:8211 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8216:8217 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8223:8223 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8174:8195 xv6iris.WpGprCsrwA <> csr_menvcfg def
+R8198:8203 Riscv.rv64d_types <> Regidx constr
+R8205:8209 xv6iris.CodeTimerinitAux <> ti_a5 def
+R8212:8215 Riscv.rv64d <> zreg def
+R8218:8222 Riscv.rv64d_types <> CSRRW constr
+R8242:8247 xv6iris.CodeTimerinit <> tmi_12 thm
+R8242:8247 xv6iris.CodeTimerinit <> tmi_12 thm
+prf 8264:8273 <> ti_instr18
+R8292:8297 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8281:8291 xv6iris.KernelText <> kernel_text def
+R8298:8302 xv6iris.InstrBytes <> instr def
+R8304:8310 xv6iris.CodeTimerinitAux <> ti_pc18 def
+R8312:8316 Corelib.Init.Datatypes <> false constr
+R8319:8324 Riscv.rv64d_types <> CSRReg constr
+R8326:8326 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8352:8353 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8358:8359 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8372:8373 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8379:8379 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8327:8351 xv6iris.WpGprCsrrA <> csr_mcounteren def
+R8354:8357 Riscv.rv64d <> zreg def
+R8360:8365 Riscv.rv64d_types <> Regidx constr
+R8367:8371 xv6iris.CodeTimerinitAux <> ti_a5 def
+R8374:8378 Riscv.rv64d_types <> CSRRS constr
+R8398:8403 xv6iris.CodeTimerinit <> tmi_16 thm
+R8398:8403 xv6iris.CodeTimerinit <> tmi_16 thm
+prf 8420:8429 <> ti_instr19
+R8448:8453 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8437:8447 xv6iris.KernelText <> kernel_text def
+R8454:8458 xv6iris.InstrBytes <> instr def
+R8460:8466 xv6iris.CodeTimerinitAux <> ti_pc19 def
+R8468:8472 Corelib.Init.Datatypes <> false constr
+R8475:8479 Riscv.rv64d_types <> ITYPE constr
+R8481:8481 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8485:8486 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8499:8500 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8513:8514 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8518:8518 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8482:8484 xv6iris.CodeTimerinitAux <> i19 def
+R8487:8492 Riscv.rv64d_types <> Regidx constr
+R8494:8498 xv6iris.CodeTimerinitAux <> ti_a5 def
+R8501:8506 Riscv.rv64d_types <> Regidx constr
+R8508:8512 xv6iris.CodeTimerinitAux <> ti_a5 def
+R8515:8517 Riscv.rv64d_types <> ORI constr
+R8537:8542 xv6iris.CodeTimerinit <> tmi_1a thm
+R8537:8542 xv6iris.CodeTimerinit <> tmi_1a thm
+prf 8559:8568 <> ti_instr20
+R8587:8592 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8576:8586 xv6iris.KernelText <> kernel_text def
+R8593:8597 xv6iris.InstrBytes <> instr def
+R8599:8605 xv6iris.CodeTimerinitAux <> ti_pc20 def
+R8607:8611 Corelib.Init.Datatypes <> false constr
+R8614:8619 Riscv.rv64d_types <> CSRReg constr
+R8621:8621 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8647:8648 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8661:8662 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8667:8668 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8674:8674 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8622:8646 xv6iris.WpGprCsrwA <> csr_mcounteren def
+R8649:8654 Riscv.rv64d_types <> Regidx constr
+R8656:8660 xv6iris.CodeTimerinitAux <> ti_a5 def
+R8663:8666 Riscv.rv64d <> zreg def
+R8669:8673 Riscv.rv64d_types <> CSRRW constr
+R8693:8698 xv6iris.CodeTimerinit <> tmi_1e thm
+R8693:8698 xv6iris.CodeTimerinit <> tmi_1e thm
+prf 8715:8724 <> ti_instr21
+R8743:8748 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8732:8742 xv6iris.KernelText <> kernel_text def
+R8749:8753 xv6iris.InstrBytes <> instr def
+R8755:8761 xv6iris.CodeTimerinitAux <> ti_pc21 def
+R8763:8767 Corelib.Init.Datatypes <> false constr
+R8770:8775 Riscv.rv64d_types <> CSRReg constr
+R8777:8777 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8797:8798 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8803:8804 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8817:8818 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8824:8824 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8778:8796 xv6iris.WpGprCsrrB <> csr_time def
+R8799:8802 Riscv.rv64d <> zreg def
+R8805:8810 Riscv.rv64d_types <> Regidx constr
+R8812:8816 xv6iris.CodeTimerinitAux <> ti_a5 def
+R8819:8823 Riscv.rv64d_types <> CSRRS constr
+R8843:8848 xv6iris.CodeTimerinit <> tmi_22 thm
+R8843:8848 xv6iris.CodeTimerinit <> tmi_22 thm
+prf 8865:8874 <> ti_instr22
+R8893:8898 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8882:8892 xv6iris.KernelText <> kernel_text def
+R8899:8903 xv6iris.InstrBytes <> instr def
+R8905:8911 xv6iris.CodeTimerinitAux <> ti_pc22 def
+R8913:8917 Corelib.Init.Datatypes <> false constr
+R8920:8924 Riscv.rv64d_types <> UTYPE constr
+R8926:8926 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8930:8931 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8944:8945 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8949:8949 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8927:8929 xv6iris.CodeTimerinitAux <> i22 def
+R8932:8937 Riscv.rv64d_types <> Regidx constr
+R8939:8943 xv6iris.CodeTimerinitAux <> ti_a4 def
+R8946:8948 Riscv.rv64d_types <> LUI constr
+R8968:8973 xv6iris.CodeTimerinit <> tmi_26 thm
+R8968:8973 xv6iris.CodeTimerinit <> tmi_26 thm
+prf 8990:8999 <> ti_instr23
+R9018:9023 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9007:9017 xv6iris.KernelText <> kernel_text def
+R9024:9028 xv6iris.InstrBytes <> instr def
+R9030:9036 xv6iris.CodeTimerinitAux <> ti_pc23 def
+R9038:9042 Corelib.Init.Datatypes <> false constr
+R9045:9049 Riscv.rv64d_types <> ITYPE constr
+R9051:9051 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9055:9056 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9069:9070 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9083:9084 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9089:9089 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9052:9054 xv6iris.CodeTimerinitAux <> i23 def
+R9057:9062 Riscv.rv64d_types <> Regidx constr
+R9064:9068 xv6iris.CodeTimerinitAux <> ti_a4 def
+R9071:9076 Riscv.rv64d_types <> Regidx constr
+R9078:9082 xv6iris.CodeTimerinitAux <> ti_a4 def
+R9085:9088 Riscv.rv64d_types <> ADDI constr
+R9108:9113 xv6iris.CodeTimerinit <> tmi_2a thm
+R9108:9113 xv6iris.CodeTimerinit <> tmi_2a thm
+prf 9130:9139 <> ti_instr24
+R9158:9163 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9147:9157 xv6iris.KernelText <> kernel_text def
+R9164:9168 xv6iris.InstrBytes <> instr def
+R9170:9176 xv6iris.CodeTimerinitAux <> ti_pc24 def
+R9178:9181 Corelib.Init.Datatypes <> true constr
+R9184:9188 Riscv.rv64d_types <> RTYPE constr
+R9190:9190 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9203:9204 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9217:9218 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9231:9232 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9236:9236 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9191:9196 Riscv.rv64d_types <> Regidx constr
+R9198:9202 xv6iris.CodeTimerinitAux <> ti_a4 def
+R9205:9210 Riscv.rv64d_types <> Regidx constr
+R9212:9216 xv6iris.CodeTimerinitAux <> ti_a5 def
+R9219:9224 Riscv.rv64d_types <> Regidx constr
+R9226:9230 xv6iris.CodeTimerinitAux <> ti_a5 def
+R9233:9235 Riscv.rv64d_types <> ADD constr
+R9255:9260 xv6iris.CodeTimerinit <> tmi_2e thm
+R9255:9260 xv6iris.CodeTimerinit <> tmi_2e thm
+prf 9277:9286 <> ti_instr25
+R9305:9310 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9294:9304 xv6iris.KernelText <> kernel_text def
+R9311:9315 xv6iris.InstrBytes <> instr def
+R9317:9323 xv6iris.CodeTimerinitAux <> ti_pc25 def
+R9325:9329 Corelib.Init.Datatypes <> false constr
+R9332:9337 Riscv.rv64d_types <> CSRReg constr
+R9339:9339 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9363:9364 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9377:9378 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9383:9384 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9390:9390 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9340:9362 xv6iris.WpGprCsrwB <> csr_stimecmp def
+R9365:9370 Riscv.rv64d_types <> Regidx constr
+R9372:9376 xv6iris.CodeTimerinitAux <> ti_a5 def
+R9379:9382 Riscv.rv64d <> zreg def
+R9385:9389 Riscv.rv64d_types <> CSRRW constr
+R9409:9414 xv6iris.CodeTimerinit <> tmi_30 thm
+R9409:9414 xv6iris.CodeTimerinit <> tmi_30 thm
+prf 9431:9440 <> ti_instr26
+R9459:9464 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9448:9458 xv6iris.KernelText <> kernel_text def
+R9465:9469 xv6iris.InstrBytes <> instr def
+R9471:9477 xv6iris.CodeTimerinitAux <> ti_pc26 def
+R9479:9482 Corelib.Init.Datatypes <> true constr
+R9485:9488 Riscv.rv64d_types <> LOAD constr
+R9490:9490 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9533:9534 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9549:9550 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9563:9564 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9570:9571 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9573:9573 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9491:9502 Riscv.rv64d_types <> zero_extend' def
+R9508:9517 SailStdpp.Operators_mwords <> concat_vec def
+R9524:9525 SailStdpp.Values <> :::'''b'_x not
+R9519:9521 xv6iris.CodeTimerinitAux <> u10 def
+R9535:9540 Riscv.rv64d_types <> Regidx constr
+R9542:9548 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R9551:9556 Riscv.rv64d_types <> Regidx constr
+R9558:9562 xv6iris.CodeTimerinitAux <> ti_ra def
+R9565:9569 Corelib.Init.Datatypes <> false constr
+R9592:9597 xv6iris.CodeTimerinit <> tmi_34 thm
+R9592:9597 xv6iris.CodeTimerinit <> tmi_34 thm
+prf 9614:9623 <> ti_instr27
+R9642:9647 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9631:9641 xv6iris.KernelText <> kernel_text def
+R9648:9652 xv6iris.InstrBytes <> instr def
+R9654:9660 xv6iris.CodeTimerinitAux <> ti_pc27 def
+R9662:9665 Corelib.Init.Datatypes <> true constr
+R9668:9671 Riscv.rv64d_types <> LOAD constr
+R9673:9673 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9716:9717 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9732:9733 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9746:9747 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9753:9754 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9756:9756 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9674:9685 Riscv.rv64d_types <> zero_extend' def
+R9691:9700 SailStdpp.Operators_mwords <> concat_vec def
+R9707:9708 SailStdpp.Values <> :::'''b'_x not
+R9702:9704 xv6iris.CodeTimerinitAux <> u11 def
+R9718:9723 Riscv.rv64d_types <> Regidx constr
+R9725:9731 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R9734:9739 Riscv.rv64d_types <> Regidx constr
+R9741:9745 xv6iris.CodeTimerinitAux <> ti_s0 def
+R9748:9752 Corelib.Init.Datatypes <> false constr
+R9775:9780 xv6iris.CodeTimerinit <> tmi_36 thm
+R9775:9780 xv6iris.CodeTimerinit <> tmi_36 thm
+prf 9797:9806 <> ti_instr28
+R9825:9830 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9814:9824 xv6iris.KernelText <> kernel_text def
+R9831:9835 xv6iris.InstrBytes <> instr def
+R9837:9843 xv6iris.CodeTimerinitAux <> ti_pc28 def
+R9845:9848 Corelib.Init.Datatypes <> true constr
+R9851:9855 Riscv.rv64d_types <> ITYPE constr
+R9857:9857 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9877:9878 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9893:9894 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9909:9910 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9915:9915 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R9858:9869 Riscv.rv64d <> sign_extend' def
+R9874:9876 xv6iris.CodeTimerinitAux <> i28 def
+R9879:9884 Riscv.rv64d_types <> Regidx constr
+R9886:9892 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R9895:9900 Riscv.rv64d_types <> Regidx constr
+R9902:9908 xv6iris.WpMmodeLeafBase <> csp_rs1 def
+R9911:9914 Riscv.rv64d_types <> ADDI constr
+R9934:9939 xv6iris.CodeTimerinit <> tmi_38 thm
+R9934:9939 xv6iris.CodeTimerinit <> tmi_38 thm
+prf 9956:9965 <> ti_instr29
+R9984:9989 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9973:9983 xv6iris.KernelText <> kernel_text def
+R9990:9994 xv6iris.InstrBytes <> instr def
+R9996:10002 xv6iris.CodeTimerinitAux <> ti_pc29 def
+R10004:10007 Corelib.Init.Datatypes <> true constr
+R10010:10013 Riscv.rv64d_types <> JALR constr
+R10015:10015 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10025:10026 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10039:10040 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10045:10045 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R10016:10021 Riscv.rv64d <> zeros' def
+R10027:10032 Riscv.rv64d_types <> Regidx constr
+R10034:10038 xv6iris.CodeTimerinitAux <> ti_ra def
+R10041:10044 Riscv.rv64d <> zreg def
+R10064:10069 xv6iris.CodeTimerinit <> tmi_3a thm
+R10064:10069 xv6iris.CodeTimerinit <> tmi_3a thm
+R10082:10092 xv6iris.CodeTimerinitAux WpTimerinit <> sec

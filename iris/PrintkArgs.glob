@@ -1,0 +1,109 @@
+DIGEST 4a97808aa08dcbe80211de6d67fb9124
+Fxv6iris.PrintkArgs
+R1190:1195 Stdlib.ZArith.ZArith <> <> lib
+R1197:1200 Stdlib.Bool.Bool <> <> lib
+R1202:1205 Stdlib.Lists.List <> <> lib
+R1207:1212 Stdlib.Strings.String <> <> lib
+R1214:1218 Stdlib.Strings.Ascii <> <> lib
+R1247:1250 stdpp.gmap <> <> lib
+R1252:1255 stdpp.list <> <> lib
+R1257:1277 stdpp.bitvector.definitions <> <> lib
+R1313:1317 iris.algebra.dfrac <> <> lib
+R1355:1363 iris.proofmode.proofmode <> <> lib
+R1406:1413 iris.base_logic.lib.gen_heap <> <> lib
+R1431:1456 SailStdpp.Operators_mwords <> <> lib
+R1474:1487 SailStdpp.Base <> <> lib
+R1489:1507 SailStdpp.TypeCasts <> <> lib
+R1509:1524 SailStdpp.Values <> <> lib
+R1526:1546 SailStdpp.MachineWord <> <> lib
+R1564:1580 Riscv.rv64d_types <> <> lib
+R1582:1592 Riscv.rv64d <> <> lib
+R1610:1618 xv6iris.RiscvLang <> <> lib
+R1620:1629 xv6iris.RiscvPtsto <> <> lib
+R1647:1653 xv6iris.RegFile <> <> lib
+R1671:1679 xv6iris.PrintkFmt <> <> lib
+R1898:1903 xv6iris.TsoCtx <> <> lib
+R1926:1935 Kernel.KernelSyms <> <> lib
+R1971:1974 Riscv.rv64d_types Defs <> mod
+ind 2220:2230 <> pk_arg_desc
+constr 2239:2244 <> PkANum
+constr 2317:2323 <> PkANull
+constr 2398:2403 <> PkAStr
+R2411:2415 iris.algebra.dfrac <> dfrac ind
+binder 2406:2407 <> dq:3
+R2423:2428 Stdlib.Strings.String <> string ind
+binder 2419:2419 <> s:4
+scheme 2220:2230 <> pk_arg_desc_rect
+scheme 2220:2230 <> pk_arg_desc_ind
+scheme 2220:2230 <> pk_arg_desc_rec
+scheme 2220:2230 <> pk_arg_desc_sind
+def 2484:2495 <> pk_desc_kind
+R2502:2512 xv6iris.PrintkArgs <> pk_arg_desc ind
+binder 2498:2498 <> d:5
+R2517:2523 xv6iris.PrintkFmt <> pk_kind ind
+R2536:2536 xv6iris.PrintkArgs <> d:5 var
+R2547:2552 xv6iris.PrintkArgs <> PkANum constr
+R2557:2561 xv6iris.PrintkFmt <> PkNum constr
+R2567:2573 xv6iris.PrintkArgs <> PkANull constr
+R2578:2582 xv6iris.PrintkFmt <> PkStr constr
+R2588:2593 xv6iris.PrintkArgs <> PkAStr constr
+R2602:2606 xv6iris.PrintkFmt <> PkStr constr
+def 2806:2816 <> pk_desc_res
+R2821:2827 xv6iris.RiscvPtsto <> riscvGS class
+binder 2829:2830 <> Σ:7
+binder 2820:2830 <> riscvGS0:8
+R2841:2845 xv6iris.RiscvLang <> GenId class
+binder 2835:2837 <> GEN:9
+R2855:2860 xv6iris.TsoCtx <> CurCtx class
+binder 2850:2851 <> XI:10
+R2868:2872 SailStdpp.Values <> mword def
+binder 2864:2864 <> v:11
+R2883:2893 xv6iris.PrintkArgs <> pk_arg_desc ind
+binder 2879:2879 <> d:12
+R2898:2902 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R2904:2905 xv6iris.PrintkArgs <> Σ:7 var
+R2918:2918 xv6iris.PrintkArgs <> d:12 var
+R2929:2934 xv6iris.PrintkArgs <> PkANum constr
+R2939:2942 iris.bi.interface <> ::bi_scope:'True' not
+R3177:3183 xv6iris.PrintkArgs <> PkANull constr
+R3188:3190 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3203:3205 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3192:3194 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3191:3191 xv6iris.PrintkArgs <> v:11 var
+R3195:3202 Riscv.rv64d <> zero_reg def
+R3211:3216 xv6iris.PrintkArgs <> PkAStr constr
+R3246:3250 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3226:3228 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3243:3245 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3236:3238 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3229:3233 xv6iris.PrintkFmt <> nonul def
+R3239:3242 Corelib.Init.Datatypes <> true constr
+R3282:3286 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3251:3253 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3279:3281 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3271:3273 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3254:3259 SailStdpp.Operators_mwords <> eq_vec def
+R3263:3270 Riscv.rv64d <> zero_reg def
+R3261:3261 xv6iris.PrintkArgs <> v:11 var
+R3274:3278 Corelib.Init.Datatypes <> false constr
+R3288:3295 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₛ{'_x_'}'_x not
+R3298:3299 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₛ{'_x_'}'_x not
+R3287:3287 xv6iris.PrintkArgs <> v:11 var
+def 3587:3595 <> pk_vararg
+R3602:3608 xv6iris.RegFile <> regfile def
+binder 3598:3598 <> m:14
+R3616:3618 Corelib.Init.Datatypes <> nat ind
+binder 3612:3612 <> j:15
+R3623:3627 SailStdpp.Values <> mword def
+R3638:3642 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R3643:3648 Riscv.rv64d_types <> Regidx constr
+R3684:3688 SailStdpp.Values <> mword def
+R3651:3662 SailStdpp.Values <> mword_of_int def
+R3667:3669 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R3670:3677 Stdlib.ZArith.BinInt Z of_nat def
+R3679:3679 xv6iris.PrintkArgs <> j:15 var
+R3637:3637 xv6iris.PrintkArgs <> m:14 var
+def 3993:4002 <> pk_pr_lock
+R4006:4010 SailStdpp.Values <> mword def
+R4018:4029 SailStdpp.Values <> mword_of_int def
+R4031:4043 Kernel.KernelSyms <> pr def

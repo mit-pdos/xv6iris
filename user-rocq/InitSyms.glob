@@ -1,0 +1,99 @@
+DIGEST 71b2a1b6dc201df664b506a7fd22ed20
+FUser.InitSyms
+R693:698 Stdlib.ZArith.ZArith <> <> lib
+def 713:716 <> main
+R720:720 Corelib.Numbers.BinNums <> Z ind
+def 743:747 <> start
+R751:751 Corelib.Numbers.BinNums <> Z ind
+def 775:780 <> strcpy
+R784:784 Corelib.Numbers.BinNums <> Z ind
+def 808:813 <> strcmp
+R817:817 Corelib.Numbers.BinNums <> Z ind
+def 841:846 <> strlen
+R850:850 Corelib.Numbers.BinNums <> Z ind
+def 875:880 <> memset
+R884:884 Corelib.Numbers.BinNums <> Z ind
+def 909:914 <> strchr
+R918:918 Corelib.Numbers.BinNums <> Z ind
+def 943:946 <> gets
+R950:950 Corelib.Numbers.BinNums <> Z ind
+def 975:978 <> stat
+R982:982 Corelib.Numbers.BinNums <> Z ind
+def 1007:1010 <> atoi
+R1014:1014 Corelib.Numbers.BinNums <> Z ind
+def 1039:1045 <> memmove
+R1049:1049 Corelib.Numbers.BinNums <> Z ind
+def 1074:1079 <> memcmp
+R1083:1083 Corelib.Numbers.BinNums <> Z ind
+def 1108:1113 <> memcpy
+R1117:1117 Corelib.Numbers.BinNums <> Z ind
+def 1142:1145 <> sbrk
+R1149:1149 Corelib.Numbers.BinNums <> Z ind
+def 1174:1181 <> sbrklazy
+R1185:1185 Corelib.Numbers.BinNums <> Z ind
+def 1210:1213 <> fork
+R1217:1217 Corelib.Numbers.BinNums <> Z ind
+def 1242:1245 <> exit
+R1249:1249 Corelib.Numbers.BinNums <> Z ind
+def 1274:1277 <> wait
+R1281:1281 Corelib.Numbers.BinNums <> Z ind
+def 1306:1309 <> pipe
+R1313:1313 Corelib.Numbers.BinNums <> Z ind
+def 1338:1341 <> read
+R1345:1345 Corelib.Numbers.BinNums <> Z ind
+def 1370:1374 <> write
+R1378:1378 Corelib.Numbers.BinNums <> Z ind
+def 1403:1407 <> close
+R1411:1411 Corelib.Numbers.BinNums <> Z ind
+def 1436:1439 <> kill
+R1443:1443 Corelib.Numbers.BinNums <> Z ind
+def 1468:1471 <> exec
+R1475:1475 Corelib.Numbers.BinNums <> Z ind
+def 1500:1503 <> open
+R1507:1507 Corelib.Numbers.BinNums <> Z ind
+def 1532:1536 <> mknod
+R1540:1540 Corelib.Numbers.BinNums <> Z ind
+def 1565:1570 <> unlink
+R1574:1574 Corelib.Numbers.BinNums <> Z ind
+def 1599:1603 <> fstat
+R1607:1607 Corelib.Numbers.BinNums <> Z ind
+def 1632:1635 <> link
+R1639:1639 Corelib.Numbers.BinNums <> Z ind
+def 1664:1668 <> mkdir
+R1672:1672 Corelib.Numbers.BinNums <> Z ind
+def 1697:1701 <> chdir
+R1705:1705 Corelib.Numbers.BinNums <> Z ind
+def 1730:1732 <> dup
+R1736:1736 Corelib.Numbers.BinNums <> Z ind
+def 1761:1766 <> getpid
+R1770:1770 Corelib.Numbers.BinNums <> Z ind
+def 1795:1802 <> sys_sbrk
+R1806:1806 Corelib.Numbers.BinNums <> Z ind
+def 1831:1835 <> pause
+R1839:1839 Corelib.Numbers.BinNums <> Z ind
+def 1864:1869 <> uptime
+R1873:1873 Corelib.Numbers.BinNums <> Z ind
+def 1898:1901 <> sync
+R1905:1905 Corelib.Numbers.BinNums <> Z ind
+def 1930:1933 <> putc
+R1937:1937 Corelib.Numbers.BinNums <> Z ind
+def 1962:1969 <> printint
+R1973:1973 Corelib.Numbers.BinNums <> Z ind
+def 1998:2004 <> vprintf
+R2008:2008 Corelib.Numbers.BinNums <> Z ind
+def 2033:2039 <> fprintf
+R2043:2043 Corelib.Numbers.BinNums <> Z ind
+def 2068:2073 <> printf
+R2077:2077 Corelib.Numbers.BinNums <> Z ind
+def 2102:2105 <> free
+R2109:2109 Corelib.Numbers.BinNums <> Z ind
+def 2134:2139 <> malloc
+R2143:2143 Corelib.Numbers.BinNums <> Z ind
+def 2168:2173 <> digits
+R2177:2177 Corelib.Numbers.BinNums <> Z ind
+def 2202:2205 <> argv
+R2209:2209 Corelib.Numbers.BinNums <> Z ind
+def 2235:2239 <> freep
+R2243:2243 Corelib.Numbers.BinNums <> Z ind
+def 2269:2272 <> base
+R2276:2276 Corelib.Numbers.BinNums <> Z ind

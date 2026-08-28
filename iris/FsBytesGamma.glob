@@ -1,0 +1,139 @@
+DIGEST 98116ec6984948e9618df4c11d550495
+Fxv6iris.FsBytesGamma
+R1743:1748 Stdlib.ZArith.ZArith <> <> lib
+R1750:1752 Stdlib.micromega.Lia <> <> lib
+R1754:1757 Stdlib.Lists.List <> <> lib
+R1786:1789 stdpp.gmap <> <> lib
+R1791:1794 stdpp.list <> <> lib
+R1796:1816 stdpp.bitvector.definitions <> <> lib
+R1854:1862 iris.proofmode.proofmode <> <> lib
+R1898:1902 iris.algebra.dfrac <> <> lib
+R1945:1953 iris.base_logic.lib.ghost_map <> <> lib
+R1971:1996 SailStdpp.Operators_mwords <> <> lib
+R2014:2030 Riscv.rv64d_types <> <> lib
+R2048:2057 xv6iris.RiscvPtsto <> <> lib
+R2075:2084 xv6iris.Xv6Cameras <> <> lib
+R2102:2109 xv6iris.FsBlocks <> <> lib
+R2127:2137 xv6iris.FsStateDefs <> <> lib
+sec 2176:2181 <> Bridge
+R2197:2203 xv6iris.RiscvPtsto <> riscvGS class
+R2210:2219 xv6iris.Xv6Cameras <> diskGhostG class
+R2221:2222 xv6iris.FsBytesGamma <> Σ:1 var
+R2226:2231 xv6iris.Xv6Cameras <> fsLogG class
+R2233:2234 xv6iris.FsBytesGamma <> Σ:1 var
+def 2252:2261 <> fs_gamma_L
+R2271:2278 xv6iris.FsBlocks <> fs_names rec
+binder 2264:2267 <> γfs:5
+R2283:2295 xv6iris.FsStateDefs <> fs_view_names rec
+R2297:2298 xv6iris.FsBytesGamma <> Bridge.Σ var
+R2307:2314 xv6iris.FsStateDefs <> MkFsView constr
+R2326:2326 Corelib.Numbers.BinNums <> Z ind
+binder 2322:2322 <> a:6
+R2334:2335 stdpp.bitvector.definitions <> bv rec
+binder 2330:2330 <> v:7
+R2345:2349 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R2363:2363 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R2364:2364 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R2350:2357 xv6iris.FsBlocks <> fs_bytes proj
+R2359:2362 xv6iris.FsBytesGamma <> γfs:5 var
+R2344:2344 xv6iris.FsBytesGamma <> a:6 var
+R2365:2365 xv6iris.FsBytesGamma <> v:7 var
+R2385:2391 xv6iris.FsBlocks <> fs_link proj
+R2393:2396 xv6iris.FsBytesGamma <> γfs:5 var
+R2400:2405 xv6iris.FsBlocks <> fs_top proj
+R2407:2410 xv6iris.FsBytesGamma <> γfs:5 var
+prf 2605:2619 <> fs_gamma_L_excl
+R2629:2636 xv6iris.FsBlocks <> fs_names rec
+binder 2622:2625 <> γfs:8
+R2641:2648 xv6iris.FsStateDefs <> phi_excl def
+R2651:2660 xv6iris.FsBytesGamma <> fs_gamma_L def
+R2662:2665 xv6iris.FsBytesGamma <> γfs:8 var
+R2705:2714 xv6iris.FsBytesGamma <> fs_gamma_L def
+R2717:2724 xv6iris.FsStateDefs <> phi_excl def
+R2705:2714 xv6iris.FsBytesGamma <> fs_gamma_L def
+R2705:2714 xv6iris.FsBytesGamma <> fs_gamma_L def
+R2717:2724 xv6iris.FsStateDefs <> phi_excl def
+R2717:2724 xv6iris.FsStateDefs <> phi_excl def
+R2767:2767 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2790:2795 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2803:2803 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2768:2789 iris.base_logic.lib.ghost_map <> ghost_map_elem_valid_2 thm
+R2767:2767 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2790:2795 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2803:2803 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2768:2789 iris.base_logic.lib.ghost_map <> ghost_map_elem_valid_2 thm
+R2837:2847 iris.algebra.cmra <> exclusive_l thm
+R2863:2870 iris.algebra.dfrac <> DfracOwn constr
+R2850:2857 iris.algebra.dfrac <> DfracOwn constr
+R2837:2847 iris.algebra.cmra <> exclusive_l thm
+R2863:2870 iris.algebra.dfrac <> DfracOwn constr
+R2850:2857 iris.algebra.dfrac <> DfracOwn constr
+inst 2906:2924 <> fs_gamma_L_timeless
+R2934:2941 xv6iris.FsBlocks <> fs_names rec
+binder 2927:2930 <> γfs:9
+R2950:2958 xv6iris.FsStateDefs <> GTimeless class
+R2961:2970 xv6iris.FsBytesGamma <> fs_gamma_L def
+R2972:2975 xv6iris.FsBytesGamma <> γfs:9 var
+R3009:3018 xv6iris.FsBytesGamma <> fs_gamma_L def
+R3009:3018 xv6iris.FsBytesGamma <> fs_gamma_L def
+R3009:3018 xv6iris.FsBytesGamma <> fs_gamma_L def
+prf 3123:3138 <> gamma_byte_range
+R3148:3155 xv6iris.FsBlocks <> fs_names rec
+binder 3141:3144 <> γfs:10
+R3167:3167 Corelib.Numbers.BinNums <> Z ind
+binder 3159:3159 <> b:11
+binder 3161:3163 <> off:12
+R3176:3179 Corelib.Init.Datatypes <> list ind
+R3182:3183 stdpp.bitvector.definitions <> bv rec
+binder 3171:3172 <> bs:13
+R3244:3255 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R3195:3216 xv6iris.FsStateDefs <> byte_range def
+R3219:3228 xv6iris.FsBytesGamma <> fs_gamma_L def
+R3230:3233 xv6iris.FsBytesGamma <> γfs:10 var
+R3236:3236 xv6iris.FsBytesGamma <> b:11 var
+R3238:3240 xv6iris.FsBytesGamma <> off:12 var
+R3242:3243 xv6iris.FsBytesGamma <> bs:13 var
+R3256:3274 xv6iris.FsBlocks <> byte_range def
+R3277:3284 xv6iris.FsBlocks <> fs_bytes proj
+R3286:3289 xv6iris.FsBytesGamma <> γfs:10 var
+R3292:3292 xv6iris.FsBytesGamma <> b:11 var
+R3294:3296 xv6iris.FsBytesGamma <> off:12 var
+R3298:3299 xv6iris.FsBytesGamma <> bs:13 var
+R3324:3345 xv6iris.FsStateDefs <> byte_range def
+R3348:3366 xv6iris.FsBlocks <> byte_range def
+R3369:3378 xv6iris.FsBytesGamma <> fs_gamma_L def
+R3324:3345 xv6iris.FsStateDefs <> byte_range def
+R3324:3345 xv6iris.FsStateDefs <> byte_range def
+R3348:3366 xv6iris.FsBlocks <> byte_range def
+R3348:3366 xv6iris.FsBlocks <> byte_range def
+R3369:3378 xv6iris.FsBytesGamma <> fs_gamma_L def
+R3369:3378 xv6iris.FsBytesGamma <> fs_gamma_L def
+prf 3417:3431 <> gamma_blk_owned
+R3441:3448 xv6iris.FsBlocks <> fs_names rec
+binder 3434:3437 <> γfs:14
+R3456:3456 Corelib.Numbers.BinNums <> Z ind
+binder 3452:3452 <> b:15
+R3465:3468 Corelib.Init.Datatypes <> list ind
+R3471:3472 stdpp.bitvector.definitions <> bv rec
+binder 3460:3461 <> bs:16
+R3516:3523 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R3484:3492 xv6iris.FsStateDefs <> blk_owned def
+R3495:3504 xv6iris.FsBytesGamma <> fs_gamma_L def
+R3506:3509 xv6iris.FsBytesGamma <> γfs:14 var
+R3512:3512 xv6iris.FsBytesGamma <> b:15 var
+R3514:3515 xv6iris.FsBytesGamma <> bs:16 var
+R3524:3530 xv6iris.FsBlocks <> fsblock def
+R3533:3540 xv6iris.FsBlocks <> fs_bytes proj
+R3542:3545 xv6iris.FsBytesGamma <> γfs:14 var
+R3548:3548 xv6iris.FsBytesGamma <> b:15 var
+R3550:3551 xv6iris.FsBytesGamma <> bs:16 var
+R3576:3584 xv6iris.FsStateDefs <> blk_owned def
+R3587:3593 xv6iris.FsBlocks <> fsblock def
+R3595:3610 xv6iris.FsBytesGamma <> gamma_byte_range thm
+R3576:3584 xv6iris.FsStateDefs <> blk_owned def
+R3576:3584 xv6iris.FsStateDefs <> blk_owned def
+R3587:3593 xv6iris.FsBlocks <> fsblock def
+R3587:3593 xv6iris.FsBlocks <> fsblock def
+R3595:3610 xv6iris.FsBytesGamma <> gamma_byte_range thm
+R3595:3610 xv6iris.FsBytesGamma <> gamma_byte_range thm
+R3638:3643 xv6iris.FsBytesGamma Bridge <> sec

@@ -1,0 +1,312 @@
+DIGEST a1df5f536d3830f6ac20014926220d27
+Fxv6iris.SpecVirtioDiskIntr
+R1041:1046 Stdlib.ZArith.ZArith <> <> lib
+R1048:1050 Stdlib.micromega.Lia <> <> lib
+R1052:1055 Stdlib.Lists.List <> <> lib
+R1084:1087 stdpp.gmap <> <> lib
+R1089:1109 stdpp.bitvector.definitions <> <> lib
+R1147:1155 iris.proofmode.proofmode <> <> lib
+R1197:1204 iris.program_logic.language <> <> lib
+R1206:1215 iris.program_logic.weakestpre <> <> lib
+R1217:1223 iris.program_logic.lifting <> <> lib
+R1266:1274 iris.base_logic.lib.ghost_var <> <> lib
+R1276:1285 iris.base_logic.lib.invariants <> <> lib
+R1287:1294 iris.base_logic.lib.gen_heap <> <> lib
+R1312:1341 SailStdpp.ConcurrencyInterface <> <> lib
+R1343:1380 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R1382:1416 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R1418:1443 SailStdpp.Operators_mwords <> <> lib
+R1461:1474 SailStdpp.Base <> <> lib
+R1476:1494 SailStdpp.TypeCasts <> <> lib
+R1496:1511 SailStdpp.Values <> <> lib
+R1513:1533 SailStdpp.MachineWord <> <> lib
+R1551:1559 xv6iris.RiscvLang <> <> lib
+R1561:1570 xv6iris.RiscvPtsto <> <> lib
+R1588:1597 xv6iris.InstrBytes <> <> lib
+R1615:1621 xv6iris.RegFile <> <> lib
+R1639:1649 xv6iris.RiscvExtras <> <> lib
+R1667:1677 xv6iris.CalleeSaved <> <> lib
+R1679:1688 xv6iris.KernelText <> <> lib
+R1706:1713 xv6iris.IntrDefs <> <> lib
+R1731:1736 xv6iris.WpNext <> <> lib
+R1754:1759 xv6iris.WpLock <> <> lib
+R1777:1783 xv6iris.FdSlots <> <> lib
+R1801:1808 xv6iris.ProcGeom <> <> lib
+R1826:1831 xv6iris.CpuOwn <> <> lib
+R1849:1856 xv6iris.SchedCtx <> <> lib
+R1874:1879 xv6iris.WpUart <> <> lib
+R1897:1905 xv6iris.DiskPtsto <> <> lib
+R1907:1913 xv6iris.DiskInv <> <> lib
+R1931:1947 Riscv.rv64d_types <> <> lib
+R1949:1959 Riscv.rv64d <> <> lib
+R1961:1978 Riscv.riscv_extras <> <> lib
+R1996:2004 xv6iris.ProcAvail <> <> lib
+R2022:2025 xv6iris.Xv6G <> <> lib
+R2090:2095 xv6iris.TsoCtx <> <> lib
+R2105:2108 Riscv.rv64d_types Defs <> mod
+abbrev 2201:2218 <> K_virtio_disk_intr
+def 2259:2288 <> wp_virtio_disk_intr_sconf_body
+R2297:2303 xv6iris.RiscvPtsto <> riscvGS class
+binder 2305:2306 <> Σ:1
+binder 2296:2306 <> riscvGS0:2
+R2310:2313 xv6iris.Xv6G <> xv6G class
+R2315:2316 xv6iris.SpecVirtioDiskIntr <> Σ:1 var
+binder 2309:2316 <> xv6G0:3
+R2320:2327 xv6iris.Xv6Cameras <> bioslotG class
+R2329:2330 xv6iris.SpecVirtioDiskIntr <> Σ:1 var
+binder 2319:2330 <> bioslotG0:4
+R2334:2340 xv6iris.FdSlots <> fdslotG class
+R2342:2343 xv6iris.SpecVirtioDiskIntr <> Σ:1 var
+binder 2333:2343 <> fdslotG0:5
+R2347:2355 xv6iris.IrefSlots <> irefslotG class
+R2357:2358 xv6iris.SpecVirtioDiskIntr <> Σ:1 var
+binder 2346:2358 <> irefslotG0:6
+R2362:2365 xv6iris.ProcAvail <> pavG class
+R2367:2368 xv6iris.SpecVirtioDiskIntr <> Σ:1 var
+binder 2361:2368 <> pavG0:7
+R2379:2383 xv6iris.RiscvLang <> GenId class
+binder 2373:2375 <> GEN:8
+R2394:2398 xv6iris.RiscvLang <> CpuId class
+binder 2388:2390 <> CID:9
+R2408:2413 xv6iris.TsoCtx <> CurCtx class
+binder 2403:2404 <> XI:10
+R2428:2431 Corelib.Init.Datatypes <> list ind
+R2433:2437 iris.base_logic.lib.iprop <> gname def
+binder 2422:2424 <> γs:11
+R2451:2460 xv6iris.WpUart <> uart_names rec
+binder 2445:2447 <> γu:12
+R2470:2479 xv6iris.DiskPtsto <> disk_names rec
+binder 2464:2466 <> γd:13
+R2489:2493 iris.base_logic.lib.iprop <> gname def
+binder 2483:2485 <> γk:14
+R2513:2517 SailStdpp.Values <> mword def
+binder 2501:2502 <> pd:15
+binder 2504:2506 <> pav:16
+binder 2508:2509 <> pu:17
+R2532:2538 xv6iris.RegFile <> regfile def
+binder 2528:2528 <> m:18
+R2550:2552 Corelib.Init.Datatypes <> nat ind
+binder 2542:2542 <> K:19
+binder 2544:2546 <> lvl:20
+R2561:2564 Corelib.Init.Datatypes <> bool ind
+binder 2556:2557 <> eb:21
+R2574:2578 SailStdpp.Values <> mword def
+binder 2568:2570 <> pme:22
+R2589:2592 Corelib.Init.Datatypes <> bool ind
+binder 2585:2585 <> b:23
+R2602:2605 stdpp.gmap <> gset def
+R2607:2612 Stdlib.Strings.String <> string ind
+binder 2596:2598 <> lks:24
+R2642:2653 SailStdpp.Values <> mword_of_int def
+R2655:2681 Kernel.KernelSyms <> virtio_disk_intr def
+R2630:2634 SailStdpp.Values <> mword def
+binder 2624:2626 <> pcE:25
+R2703:2708 xv6iris.RiscvExtras <> ret_pc def
+R2712:2716 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R2717:2722 Riscv.rv64d_types <> Regidx constr
+R2742:2746 SailStdpp.Values <> mword def
+R2725:2736 SailStdpp.Values <> mword_of_int def
+R2711:2711 xv6iris.SpecVirtioDiskIntr <> m:18 var
+binder 2692:2698 <> ret_tgt:26
+R2786:2791 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2776:2779 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R2758:2775 xv6iris.SpecVirtioDiskIntr <> K_virtio_disk_intr abbrev
+R2780:2780 xv6iris.SpecVirtioDiskIntr <> K:19 var
+R2792:2792 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2836:2842 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2793:2799 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2810:2811 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2804:2809 Riscv.rv64d_types <> regidx ind
+binder 2800:2800 <> r:27
+R2813:2817 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R2812:2812 xv6iris.SpecVirtioDiskIntr <> r:27 var
+R2818:2820 stdpp.base <> dom def
+R2823:2832 xv6iris.RegFile <> rf_to_gmap def
+R2834:2834 xv6iris.SpecVirtioDiskIntr <> m:18 var
+R2861:2866 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2853:2855 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2843:2848 Stdlib.Lists.List <> length abbrev
+R2850:2852 xv6iris.SpecVirtioDiskIntr <> γs:11 var
+R2856:2860 xv6iris.ProcGeom <> NPROC def
+R2896:3137 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2884:2886 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R2880:2882 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R2868:2875 Stdlib.ZArith.BinInt Z of_nat def
+R2877:2879 xv6iris.SpecVirtioDiskIntr <> lvl:20 var
+R2888:2890 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R3167:3172 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3138:3148 xv6iris.LockRank <> locks_below def
+R3150:3152 xv6iris.SpecVirtioDiskIntr <> lks:24 var
+R3198:3205 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R3173:3183 xv6iris.IntrDefs <> sie_cap_gpr def
+R3185:3187 xv6iris.Ktier <> KT1 constr
+R3189:3189 xv6iris.SpecVirtioDiskIntr <> m:18 var
+R3191:3191 xv6iris.SpecVirtioDiskIntr <> K:19 var
+R3193:3193 xv6iris.SpecVirtioDiskIntr <> b:23 var
+R3195:3197 xv6iris.SpecVirtioDiskIntr <> pme:22 var
+R3230:3237 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3206:3212 xv6iris.CpuOwn <> cpu_own def
+R3214:3216 xv6iris.SpecVirtioDiskIntr <> lvl:20 var
+R3218:3219 xv6iris.SpecVirtioDiskIntr <> eb:21 var
+R3221:3223 xv6iris.SpecVirtioDiskIntr <> pme:22 var
+R3225:3225 xv6iris.SpecVirtioDiskIntr <> b:23 var
+R3227:3229 xv6iris.SpecVirtioDiskIntr <> lks:24 var
+R3249:3254 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3238:3248 xv6iris.KernelText <> kernel_text def
+R3264:3270 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3255:3259 xv6iris.InstrBytes <> pc_is def
+R3261:3263 xv6iris.SpecVirtioDiskIntr <> pcE:25 var
+R3284:3291 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3271:3279 xv6iris.SchedCtx <> procs_inv def
+R3281:3283 xv6iris.SpecVirtioDiskIntr <> γs:11 var
+R3307:3314 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3292:3298 xv6iris.WpUart <> dev_inv def
+R3300:3302 xv6iris.SpecVirtioDiskIntr <> γu:12 var
+R3304:3306 xv6iris.SpecVirtioDiskIntr <> γd:13 var
+R3338:3345 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3315:3323 xv6iris.DiskInv <> disk_geom def
+R3325:3327 xv6iris.SpecVirtioDiskIntr <> γd:13 var
+R3329:3330 xv6iris.SpecVirtioDiskIntr <> pd:15 var
+R3332:3334 xv6iris.SpecVirtioDiskIntr <> pav:16 var
+R3336:3337 xv6iris.SpecVirtioDiskIntr <> pu:17 var
+R3414:3421 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3346:3352 xv6iris.WpLock <> is_lock def
+R3354:3356 xv6iris.SpecVirtioDiskIntr <> γk:14 var
+R3358:3363 xv6iris.DiskInv <> d_lock def
+R3386:3388 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R3411:3413 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R3389:3396 xv6iris.DiskInv <> disk_res def
+R3398:3400 xv6iris.SpecVirtioDiskIntr <> γd:13 var
+R3402:3403 xv6iris.SpecVirtioDiskIntr <> pd:15 var
+R3405:3407 xv6iris.SpecVirtioDiskIntr <> pav:16 var
+R3409:3410 xv6iris.SpecVirtioDiskIntr <> pu:17 var
+R3715:3722 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3422:3428 xv6iris.WpNext <> wp_next def
+R3448:3452 xv6iris.RiscvLang <> CpuId class
+binder 3442:3444 <> CID:28
+R3462:3465 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R3478:3485 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R3471:3477 xv6iris.RegFile <> regfile def
+binder 3466:3467 <> mf:29
+R3559:3570 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3486:3488 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3556:3558 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3506:3510 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R3555:3555 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R3489:3500 xv6iris.CalleeSaved <> callee_saved def
+R3502:3502 xv6iris.SpecVirtioDiskIntr <> m:18 var
+R3504:3505 xv6iris.SpecVirtioDiskIntr <> mf:29 var
+R3511:3517 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3528:3529 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3522:3527 Riscv.rv64d_types <> regidx ind
+binder 3518:3518 <> r:30
+R3531:3535 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R3530:3530 xv6iris.SpecVirtioDiskIntr <> r:30 var
+R3536:3538 stdpp.base <> dom def
+R3541:3550 xv6iris.RegFile <> rf_to_gmap def
+R3552:3553 xv6iris.SpecVirtioDiskIntr <> mf:29 var
+R3597:3608 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3571:3581 xv6iris.IntrDefs <> sie_cap_gpr def
+R3583:3585 xv6iris.Ktier <> KT1 constr
+R3587:3588 xv6iris.SpecVirtioDiskIntr <> mf:29 var
+R3590:3590 xv6iris.SpecVirtioDiskIntr <> K:19 var
+R3592:3592 xv6iris.SpecVirtioDiskIntr <> b:23 var
+R3594:3596 xv6iris.SpecVirtioDiskIntr <> pme:22 var
+R3633:3644 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3609:3615 xv6iris.CpuOwn <> cpu_own def
+R3617:3619 xv6iris.SpecVirtioDiskIntr <> lvl:20 var
+R3621:3622 xv6iris.SpecVirtioDiskIntr <> eb:21 var
+R3624:3626 xv6iris.SpecVirtioDiskIntr <> pme:22 var
+R3628:3628 xv6iris.SpecVirtioDiskIntr <> b:23 var
+R3630:3632 xv6iris.SpecVirtioDiskIntr <> lks:24 var
+R3656:3661 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3645:3655 xv6iris.KernelText <> kernel_text def
+R3675:3686 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3662:3666 xv6iris.InstrBytes <> pc_is def
+R3668:3674 xv6iris.SpecVirtioDiskIntr <> ret_tgt:26 var
+R3687:3690 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R3713:3713 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R3698:3701 iris.program_logic.language <> expr proj
+R3703:3712 xv6iris.RiscvLang <> riscv_lang def
+R3691:3694 xv6iris.RiscvLang <> Loop abbrev
+R3432:3434 xv6iris.SpecVirtioDiskIntr <> pme:22 var
+R3430:3430 xv6iris.SpecVirtioDiskIntr <> b:23 var
+R3723:3726 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R3749:3749 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R3734:3737 iris.program_logic.language <> expr proj
+R3739:3748 xv6iris.RiscvLang <> riscv_lang def
+R3727:3730 xv6iris.RiscvLang <> Loop abbrev
+modtype 3765:3778 <> VIRTIODISKINTR
+ax 3793:3817 VIRTIODISKINTR wp_virtio_disk_intr_sconf
+R3825:3833 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4159:4167 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3835:3841 xv6iris.RiscvPtsto <> riscvGS class
+binder 3843:3844 <> Σ:31
+binder 3834:3844 <> riscvGS0:32
+R3848:3851 xv6iris.Xv6G <> xv6G class
+R3853:3854 xv6iris.SpecVirtioDiskIntr <> Σ:31 var
+binder 3847:3854 <> xv6G0:33
+R3858:3865 xv6iris.Xv6Cameras <> bioslotG class
+R3867:3868 xv6iris.SpecVirtioDiskIntr <> Σ:31 var
+binder 3857:3868 <> bioslotG0:34
+R3872:3878 xv6iris.FdSlots <> fdslotG class
+R3880:3881 xv6iris.SpecVirtioDiskIntr <> Σ:31 var
+binder 3871:3881 <> fdslotG0:35
+R3885:3893 xv6iris.IrefSlots <> irefslotG class
+R3895:3896 xv6iris.SpecVirtioDiskIntr <> Σ:31 var
+binder 3884:3896 <> irefslotG0:36
+R3900:3903 xv6iris.ProcAvail <> pavG class
+R3905:3906 xv6iris.SpecVirtioDiskIntr <> Σ:31 var
+binder 3899:3906 <> pavG0:37
+R3917:3921 xv6iris.RiscvLang <> GenId class
+binder 3911:3913 <> GEN:38
+R3932:3936 xv6iris.RiscvLang <> CpuId class
+binder 3926:3928 <> CID:39
+R3946:3951 xv6iris.TsoCtx <> CurCtx class
+binder 3941:3942 <> XI:40
+R3968:3971 Corelib.Init.Datatypes <> list ind
+R3973:3977 iris.base_logic.lib.iprop <> gname def
+binder 3962:3964 <> γs:41
+R3993:4002 xv6iris.WpUart <> uart_names rec
+binder 3987:3989 <> γu:42
+R4012:4021 xv6iris.DiskPtsto <> disk_names rec
+binder 4006:4008 <> γd:43
+R4031:4035 iris.base_logic.lib.iprop <> gname def
+binder 4025:4027 <> γk:44
+R4057:4061 SailStdpp.Values <> mword def
+binder 4045:4046 <> pd:45
+R4057:4061 SailStdpp.Values <> mword def
+binder 4048:4050 <> pav:46
+R4057:4061 SailStdpp.Values <> mword def
+binder 4052:4053 <> pu:47
+R4078:4084 xv6iris.RegFile <> regfile def
+binder 4074:4074 <> m:48
+R4096:4098 Corelib.Init.Datatypes <> nat ind
+binder 4088:4088 <> K:49
+R4096:4098 Corelib.Init.Datatypes <> nat ind
+binder 4090:4092 <> lvl:50
+R4107:4110 Corelib.Init.Datatypes <> bool ind
+binder 4102:4103 <> eb:51
+R4120:4124 SailStdpp.Values <> mword def
+binder 4114:4116 <> pme:52
+R4135:4138 Corelib.Init.Datatypes <> bool ind
+binder 4131:4131 <> b:53
+R4148:4151 stdpp.gmap <> gset def
+R4153:4158 Stdlib.Strings.String <> string ind
+binder 4142:4144 <> lks:54
+R4168:4197 xv6iris.SpecVirtioDiskIntr <> wp_virtio_disk_intr_sconf_body def
+R4242:4244 xv6iris.SpecVirtioDiskIntr <> lks:54 var
+R4240:4240 xv6iris.SpecVirtioDiskIntr <> b:53 var
+R4236:4238 xv6iris.SpecVirtioDiskIntr <> pme:52 var
+R4233:4234 xv6iris.SpecVirtioDiskIntr <> eb:51 var
+R4229:4231 xv6iris.SpecVirtioDiskIntr <> lvl:50 var
+R4227:4227 xv6iris.SpecVirtioDiskIntr <> K:49 var
+R4225:4225 xv6iris.SpecVirtioDiskIntr <> m:48 var
+R4222:4223 xv6iris.SpecVirtioDiskIntr <> pu:47 var
+R4218:4220 xv6iris.SpecVirtioDiskIntr <> pav:46 var
+R4215:4216 xv6iris.SpecVirtioDiskIntr <> pd:45 var
+R4211:4213 xv6iris.SpecVirtioDiskIntr <> γk:44 var
+R4207:4209 xv6iris.SpecVirtioDiskIntr <> γd:43 var
+R4203:4205 xv6iris.SpecVirtioDiskIntr <> γu:42 var
+R4199:4201 xv6iris.SpecVirtioDiskIntr <> γs:41 var
+R4251:4264 xv6iris.SpecVirtioDiskIntr VIRTIODISKINTR <> modtype

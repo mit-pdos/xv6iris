@@ -1,0 +1,174 @@
+DIGEST 41487b5d2c016672c4d55efd114ff0ff
+Fxv6iris.TimerCap
+R1942:1947 Stdlib.ZArith.ZArith <> <> lib
+R1976:1996 stdpp.bitvector.definitions <> <> lib
+R2034:2042 iris.proofmode.proofmode <> <> lib
+R2085:2094 iris.base_logic.lib.invariants <> <> lib
+R2096:2098 iris.base_logic.lib.own <> <> lib
+R2116:2129 SailStdpp.Base <> <> lib
+R2131:2146 SailStdpp.Values <> <> lib
+R2148:2168 SailStdpp.MachineWord <> <> lib
+R2170:2195 SailStdpp.Operators_mwords <> <> lib
+R2213:2229 Riscv.rv64d_types <> <> lib
+R2231:2241 Riscv.rv64d <> <> lib
+R2259:2267 xv6iris.RiscvLang <> <> lib
+R2269:2278 xv6iris.RiscvPtsto <> <> lib
+R2296:2301 xv6iris.TsoCtx <> <> lib
+prf 2732:2750 <> counteren_TM_access
+R2757:2761 SailStdpp.Values <> mword def
+binder 2753:2753 <> v:1
+R2787:2789 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2769:2782 SailStdpp.Operators_mwords <> access_vec_dec def
+R2784:2784 xv6iris.TimerCap <> v:1 var
+R2790:2806 Riscv.rv64d <> _get_Counteren_TM def
+R2808:2808 xv6iris.TimerCap <> v:1 var
+sec 2845:2852 <> TimerCap
+R2868:2874 xv6iris.RiscvPtsto <> riscvGS class
+var  2893:2895 TimerCap GEN
+var  2908:2910 TimerCap CID
+var  2923:2924 TimerCap XI
+R2899:2903 xv6iris.RiscvLang <> GenId class
+R2914:2918 xv6iris.RiscvLang <> CpuId class
+R2928:2933 xv6iris.TsoCtx <> CurCtx class
+def 3028:3039 <> sstc_enabled
+R3043:3047 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3049:3050 xv6iris.TimerCap <> TimerCap.Σ var
+R3060:3063 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3079:3087 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3071:3075 SailStdpp.Values <> mword def
+binder 3064:3067 <> mcen:7
+R3113:3117 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3098:3108 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ□'_x not
+R3088:3097 Riscv.rv64d_types <> mcounteren constr
+R3109:3112 xv6iris.TimerCap <> mcen:7 var
+R3118:3121 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3168:3171 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3161:3163 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3122:3127 SailStdpp.Operators_mwords <> eq_vec def
+R3155:3156 SailStdpp.Values <> :::'''b'_x not
+R3130:3146 Riscv.rv64d <> _get_Counteren_TM def
+R3148:3151 xv6iris.TimerCap <> mcen:7 var
+R3164:3167 Corelib.Init.Datatypes <> true constr
+inst 3196:3218 <> sstc_enabled_persistent
+R3222:3231 iris.bi.derived_connectives <> Persistent class
+R3233:3244 xv6iris.TimerCap <> sstc_enabled def
+def 3333:3345 <> stimecmp_free
+R3349:3353 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3355:3356 xv6iris.TimerCap <> TimerCap.Σ var
+R3362:3365 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3378:3379 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3370:3374 SailStdpp.Values <> mword def
+binder 3366:3366 <> d:8
+R3388:3395 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R3380:3387 Riscv.rv64d_types <> stimecmp constr
+R3396:3396 xv6iris.TimerCap <> d:8 var
+prf 3411:3429 <> stimecmp_free_intro
+R3436:3440 SailStdpp.Values <> mword def
+binder 3432:3432 <> d:9
+R3465:3470 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R3456:3463 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R3448:3455 Riscv.rv64d_types <> stimecmp constr
+R3464:3464 xv6iris.TimerCap <> d:9 var
+R3471:3483 xv6iris.TimerCap <> stimecmp_free def
+def 4394:4399 <> timerN
+R4403:4411 stdpp.namespaces <> namespace def
+R4421:4424 stdpp.namespaces <> ::stdpp_scope:x_'.@'_x not
+R4416:4420 stdpp.namespaces <> nroot def
+def 4448:4459 <> stimecmp_inv
+R4463:4467 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4469:4470 xv6iris.TimerCap <> TimerCap.Σ var
+R4475:4477 iris.base_logic.lib.invariants <> inv def
+R4486:4498 xv6iris.TimerCap <> stimecmp_free def
+R4479:4484 xv6iris.TimerCap <> timerN def
+def 4592:4600 <> timer_cap
+R4604:4608 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4610:4611 xv6iris.TimerCap <> TimerCap.Σ var
+R4629:4633 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4617:4628 xv6iris.TimerCap <> sstc_enabled def
+R4634:4645 xv6iris.TimerCap <> stimecmp_inv def
+inst 4670:4689 <> timer_cap_persistent
+R4693:4702 iris.bi.derived_connectives <> Persistent class
+R4704:4712 xv6iris.TimerCap <> timer_cap def
+prf 4945:4962 <> sstc_enabled_intro
+R4970:4974 iris.algebra.dfrac <> dfrac ind
+binder 4965:4966 <> dq:10
+R4985:4989 SailStdpp.Values <> mword def
+binder 4978:4981 <> mcen:11
+R5047:5054 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5040:5042 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5001:5006 SailStdpp.Operators_mwords <> eq_vec def
+R5034:5035 SailStdpp.Values <> :::'''b'_x not
+R5009:5025 Riscv.rv64d <> _get_Counteren_TM def
+R5027:5030 xv6iris.TimerCap <> mcen:11 var
+R5043:5046 Corelib.Init.Datatypes <> true constr
+R5086:5092 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R5055:5066 xv6iris.RiscvPtsto <> reg_pointsto def
+R5082:5085 xv6iris.TimerCap <> mcen:11 var
+R5079:5080 xv6iris.TimerCap <> dq:10 var
+R5068:5077 Riscv.rv64d_types <> mcounteren constr
+R5093:5104 xv6iris.TimerCap <> sstc_enabled def
+R5152:5152 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5173:5178 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5186:5186 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5153:5172 xv6iris.RiscvPtsto <> reg_pointsto_persist thm
+R5152:5152 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5173:5178 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5186:5186 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5153:5172 xv6iris.RiscvPtsto <> reg_pointsto_persist thm
+prf 5414:5428 <> timer_cap_intro
+binder 5430:5430 <> E:12
+R5438:5442 iris.algebra.dfrac <> dfrac ind
+binder 5433:5434 <> dq:13
+R5453:5457 SailStdpp.Values <> mword def
+binder 5446:5449 <> mcen:14
+R5468:5472 SailStdpp.Values <> mword def
+binder 5464:5464 <> d:15
+R5530:5537 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R5523:5525 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5484:5489 SailStdpp.Operators_mwords <> eq_vec def
+R5517:5518 SailStdpp.Values <> :::'''b'_x not
+R5492:5508 Riscv.rv64d <> _get_Counteren_TM def
+R5510:5513 xv6iris.TimerCap <> mcen:14 var
+R5526:5529 Corelib.Init.Datatypes <> true constr
+R5569:5574 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R5538:5549 xv6iris.RiscvPtsto <> reg_pointsto def
+R5565:5568 xv6iris.TimerCap <> mcen:14 var
+R5562:5563 xv6iris.TimerCap <> dq:13 var
+R5551:5560 Riscv.rv64d_types <> mcounteren constr
+R5592:5594 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R5596:5601 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
+R5583:5590 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R5575:5582 Riscv.rv64d_types <> stimecmp constr
+R5591:5591 xv6iris.TimerCap <> d:15 var
+R5595:5595 xv6iris.TimerCap <> E:12 var
+R5595:5595 xv6iris.TimerCap <> E:12 var
+R5602:5610 xv6iris.TimerCap <> timer_cap def
+R5663:5663 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5694:5699 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5707:5707 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5664:5681 xv6iris.TimerCap <> sstc_enabled_intro thm
+R5663:5663 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5694:5699 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5707:5707 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5664:5681 xv6iris.TimerCap <> sstc_enabled_intro thm
+R5729:5729 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5762:5767 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5776:5776 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5730:5738 iris.base_logic.lib.invariants <> inv_alloc thm
+R5740:5745 xv6iris.TimerCap <> timerN def
+R5749:5761 xv6iris.TimerCap <> stimecmp_free def
+R5729:5729 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5762:5767 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5776:5776 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5730:5738 iris.base_logic.lib.invariants <> inv_alloc thm
+R5740:5745 xv6iris.TimerCap <> timerN def
+R5749:5761 xv6iris.TimerCap <> stimecmp_free def
+R5810:5810 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5830:5835 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5842:5842 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5811:5829 xv6iris.TimerCap <> stimecmp_free_intro thm
+R5810:5810 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5830:5835 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5842:5842 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5811:5829 xv6iris.TimerCap <> stimecmp_free_intro thm
+R5893:5900 xv6iris.TimerCap TimerCap <> sec

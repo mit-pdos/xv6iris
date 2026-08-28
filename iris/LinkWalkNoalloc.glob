@@ -1,0 +1,7 @@
+DIGEST ef2a49d7ecb633e994468bc3d53b3d2c
+Fxv6iris.LinkWalkNoalloc
+R250:257 xv6iris.SpecWalk <> <> lib
+R275:290 xv6iris.ProofWalkNoalloc <> <> lib
+R315:326 xv6iris.SpecWalk WALK_NOALLOC <> mod
+R331:346 xv6iris.ProofWalkNoalloc WalkNoallocProof <> modtype
+mod 301:311 <> WalkNoalloc

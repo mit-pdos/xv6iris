@@ -1,0 +1,2364 @@
+DIGEST 5ad2ab566db72469948701e89c129d24
+Fxv6iris.HartSpan
+R1918:1921 stdpp.gmap <> <> lib
+R1923:1931 stdpp.relations <> <> lib
+R1933:1953 stdpp.bitvector.definitions <> <> lib
+R1991:1999 iris.proofmode.proofmode <> <> lib
+R2042:2049 iris.base_logic.lib.gen_heap <> <> lib
+R2051:2059 iris.base_logic.lib.ghost_map <> <> lib
+R2101:2108 iris.program_logic.language <> <> lib
+R2110:2119 iris.program_logic.weakestpre <> <> lib
+R2137:2162 SailStdpp.Operators_mwords <> <> lib
+R2180:2196 Riscv.rv64d_types <> <> lib
+R2198:2208 Riscv.rv64d <> <> lib
+R2226:2240 xv6iris.RiscvModelBytes <> <> lib
+R2258:2266 xv6iris.RiscvLang <> <> lib
+R2268:2277 xv6iris.RiscvPtsto <> <> lib
+R2279:2287 xv6iris.RiscvExec <> <> lib
+R2289:2295 xv6iris.HartSwp <> <> lib
+R2297:2304 xv6iris.HartLift <> <> lib
+R2322:2327 xv6iris.TsoCtx <> <> lib
+def 2807:2816 <> hspan_node
+binder 2819:2819 <> X:1
+R2836:2839 stdpp.gmap <> gset def
+R2841:2848 Riscv.rv64d_types <> register variant
+binder 2830:2832 <> Drw:2
+R2866:2868 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R2863:2863 Riscv.rv64d_types <> M def
+R2865:2865 xv6iris.HartSpan <> X:1 var
+R2869:2876 Riscv.rv64d_types <> regstate rec
+binder 2856:2856 <> c:3
+binder 2858:2859 <> c':4
+R2902:2903 stdpp.base <> :::x_'.1' not
+R2901:2901 xv6iris.HartSpan <> c:3 var
+R2914:2926 Riscv.rv64d_types Interface Ret constr
+R2933:2937 stdpp.base <> ::type_scope:'False' not
+R2943:2956 Riscv.rv64d_types Interface Next constr
+R2985:3001 Riscv.rv64d_types Interface outcome ind
+R3014:3014 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3023:3027 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3016:3019 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3015:3015 xv6iris.HartSpan <> T:5 var
+R3020:3020 Riscv.rv64d_types <> M def
+R3022:3022 xv6iris.HartSpan <> X:1 var
+R3047:3063 Riscv.rv64d_types Interface RegRead constr
+binder 3083:3083 <> k:7
+R3101:3103 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3099:3100 xv6iris.HartSpan <> c':4 var
+R3104:3104 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3130:3131 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3135:3135 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3105:3105 xv6iris.HartSpan <> k:7 var
+R3108:3122 Riscv.rv64d_types <> register_lookup def
+R3127:3128 stdpp.base <> :::x_'.2' not
+R3126:3126 xv6iris.HartSpan <> c:3 var
+R3133:3134 stdpp.base <> :::x_'.2' not
+R3132:3132 xv6iris.HartSpan <> c:3 var
+R3146:3163 Riscv.rv64d_types Interface RegWrite constr
+binder 3182:3182 <> k:8
+R3207:3210 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R3199:3203 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R3204:3206 xv6iris.HartSpan <> Drw:2 var
+R3213:3215 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3211:3212 xv6iris.HartSpan <> c':4 var
+R3216:3216 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3221:3222 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3243:3243 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3217:3217 xv6iris.HartSpan <> k:8 var
+R3219:3220 Corelib.Init.Datatypes <> tt constr
+R3223:3234 Riscv.rv64d_types <> register_set def
+R3241:3242 stdpp.base <> :::x_'.2' not
+R3240:3240 xv6iris.HartSpan <> c:3 var
+R3254:3276 Riscv.rv64d_types Interface InstrAnnounce constr
+binder 3290:3290 <> k:9
+R3297:3299 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3295:3296 xv6iris.HartSpan <> c':4 var
+R3300:3300 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3305:3306 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3310:3310 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3301:3301 xv6iris.HartSpan <> k:9 var
+R3303:3304 Corelib.Init.Datatypes <> tt constr
+R3308:3309 stdpp.base <> :::x_'.2' not
+R3307:3307 xv6iris.HartSpan <> c:3 var
+R3321:3344 Riscv.rv64d_types Interface BranchAnnounce constr
+binder 3357:3357 <> k:10
+R3364:3366 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3362:3363 xv6iris.HartSpan <> c':4 var
+R3367:3367 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3372:3373 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3377:3377 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3368:3368 xv6iris.HartSpan <> k:10 var
+R3370:3371 Corelib.Init.Datatypes <> tt constr
+R3375:3376 stdpp.base <> :::x_'.2' not
+R3374:3374 xv6iris.HartSpan <> c:3 var
+R3388:3404 Riscv.rv64d_types Interface Barrier constr
+binder 3424:3424 <> k:11
+R3431:3433 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3429:3430 xv6iris.HartSpan <> c':4 var
+R3434:3434 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3439:3440 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3444:3444 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3435:3435 xv6iris.HartSpan <> k:11 var
+R3437:3438 Corelib.Init.Datatypes <> tt constr
+R3442:3443 stdpp.base <> :::x_'.2' not
+R3441:3441 xv6iris.HartSpan <> c:3 var
+R3455:3471 Riscv.rv64d_types Interface CacheOp constr
+binder 3491:3491 <> k:12
+R3498:3500 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3496:3497 xv6iris.HartSpan <> c':4 var
+R3501:3501 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3506:3507 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3511:3511 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3502:3502 xv6iris.HartSpan <> k:12 var
+R3504:3505 Corelib.Init.Datatypes <> tt constr
+R3509:3510 stdpp.base <> :::x_'.2' not
+R3508:3508 xv6iris.HartSpan <> c:3 var
+R3522:3536 Riscv.rv64d_types Interface TlbOp constr
+binder 3558:3558 <> k:13
+R3565:3567 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3563:3564 xv6iris.HartSpan <> c':4 var
+R3568:3568 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3573:3574 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3578:3578 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3569:3569 xv6iris.HartSpan <> k:13 var
+R3571:3572 Corelib.Init.Datatypes <> tt constr
+R3576:3577 stdpp.base <> :::x_'.2' not
+R3575:3575 xv6iris.HartSpan <> c:3 var
+R3589:3611 Riscv.rv64d_types Interface TakeException constr
+binder 3625:3625 <> k:14
+R3632:3634 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3630:3631 xv6iris.HartSpan <> c':4 var
+R3635:3635 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3640:3641 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3645:3645 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3636:3636 xv6iris.HartSpan <> k:14 var
+R3638:3639 Corelib.Init.Datatypes <> tt constr
+R3643:3644 stdpp.base <> :::x_'.2' not
+R3642:3642 xv6iris.HartSpan <> c:3 var
+R3656:3680 Riscv.rv64d_types Interface ReturnException constr
+binder 3692:3692 <> k:15
+R3699:3701 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3697:3698 xv6iris.HartSpan <> c':4 var
+R3702:3702 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3707:3708 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3712:3712 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3703:3703 xv6iris.HartSpan <> k:15 var
+R3705:3706 Corelib.Init.Datatypes <> tt constr
+R3710:3711 stdpp.base <> :::x_'.2' not
+R3709:3709 xv6iris.HartSpan <> c:3 var
+R3723:3748 Riscv.rv64d_types Interface TranslationStart constr
+binder 3759:3759 <> k:16
+R3766:3768 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3764:3765 xv6iris.HartSpan <> c':4 var
+R3769:3769 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3774:3775 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3779:3779 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3770:3770 xv6iris.HartSpan <> k:16 var
+R3772:3773 Corelib.Init.Datatypes <> tt constr
+R3777:3778 stdpp.base <> :::x_'.2' not
+R3776:3776 xv6iris.HartSpan <> c:3 var
+R3790:3813 Riscv.rv64d_types Interface TranslationEnd constr
+binder 3826:3826 <> k:17
+R3833:3835 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3831:3832 xv6iris.HartSpan <> c':4 var
+R3836:3836 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3841:3842 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3846:3846 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3837:3837 xv6iris.HartSpan <> k:17 var
+R3839:3840 Corelib.Init.Datatypes <> tt constr
+R3844:3845 stdpp.base <> :::x_'.2' not
+R3843:3843 xv6iris.HartSpan <> c:3 var
+R3857:3876 Riscv.rv64d_types Interface CycleCount constr
+binder 3893:3893 <> k:18
+R3900:3902 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3898:3899 xv6iris.HartSpan <> c':4 var
+R3903:3903 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3908:3909 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3913:3913 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3904:3904 xv6iris.HartSpan <> k:18 var
+R3906:3907 Corelib.Init.Datatypes <> tt constr
+R3911:3912 stdpp.base <> :::x_'.2' not
+R3910:3910 xv6iris.HartSpan <> c:3 var
+R3924:3940 Riscv.rv64d_types Interface Message constr
+binder 3960:3960 <> k:19
+R3967:3969 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3965:3966 xv6iris.HartSpan <> c':4 var
+R3970:3970 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3975:3976 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3980:3980 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R3971:3971 xv6iris.HartSpan <> k:19 var
+R3973:3974 Corelib.Init.Datatypes <> tt constr
+R3978:3979 stdpp.base <> :::x_'.2' not
+R3977:3977 xv6iris.HartSpan <> c:3 var
+R3991:4013 Riscv.rv64d_types Interface GetCycleCount constr
+binder 4027:4027 <> k:20
+R4034:4036 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4032:4033 xv6iris.HartSpan <> c':4 var
+R4037:4037 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4043:4044 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4048:4048 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4038:4038 xv6iris.HartSpan <> k:20 var
+R4046:4047 stdpp.base <> :::x_'.2' not
+R4045:4045 xv6iris.HartSpan <> c:3 var
+R4073:4077 stdpp.base <> ::type_scope:'False' not
+def 4299:4304 <> hspani
+binder 4307:4307 <> X:21
+R4326:4329 stdpp.gmap <> gset def
+R4331:4338 Riscv.rv64d_types <> register variant
+binder 4318:4318 <> D:22
+binder 4320:4322 <> Drw:23
+R4356:4358 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R4353:4353 Riscv.rv64d_types <> M def
+R4355:4355 xv6iris.HartSpan <> X:21 var
+R4359:4366 Riscv.rv64d_types <> regstate rec
+binder 4346:4346 <> c:24
+binder 4348:4349 <> c':25
+R4385:4391 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R4406:4411 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R4398:4405 Riscv.rv64d_types <> regstate rec
+binder 4392:4394 <> rs1:26
+R4434:4437 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R4412:4423 xv6iris.HartLift <> reg_agree_on def
+R4425:4425 xv6iris.HartSpan <> D:22 var
+R4427:4429 xv6iris.HartSpan <> rs1:26 var
+R4432:4433 stdpp.base <> :::x_'.2' not
+R4431:4431 xv6iris.HartSpan <> c:24 var
+R4438:4447 xv6iris.HartSpan <> hspan_node def
+R4464:4465 xv6iris.HartSpan <> c':25 var
+R4453:4453 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4457:4458 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4462:4462 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R4455:4456 stdpp.base <> :::x_'.1' not
+R4454:4454 xv6iris.HartSpan <> c:24 var
+R4459:4461 xv6iris.HartSpan <> rs1:26 var
+R4449:4451 xv6iris.HartSpan <> Drw:23 var
+def 4480:4484 <> hspan
+binder 4487:4487 <> X:27
+R4506:4509 stdpp.gmap <> gset def
+R4511:4518 Riscv.rv64d_types <> register variant
+binder 4498:4498 <> D:28
+binder 4500:4502 <> Drw:29
+R4527:4534 Corelib.Relations.Relation_Definitions <> relation def
+R4540:4542 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R4537:4537 Riscv.rv64d_types <> M def
+R4539:4539 xv6iris.HartSpan <> X:27 var
+R4543:4550 Riscv.rv64d_types <> regstate rec
+R4558:4560 stdpp.relations <> rtc ind
+R4563:4568 xv6iris.HartSpan <> hspani def
+R4572:4574 xv6iris.HartSpan <> Drw:29 var
+R4570:4570 xv6iris.HartSpan <> D:28 var
+def 4897:4907 <> hspan_stops
+binder 4910:4910 <> X:30
+R4927:4930 stdpp.gmap <> gset def
+R4932:4939 Riscv.rv64d_types <> register variant
+binder 4921:4923 <> Drw:31
+R4947:4947 Riscv.rv64d_types <> M def
+R4949:4949 xv6iris.HartSpan <> X:30 var
+binder 4943:4943 <> m:32
+R4954:4957 Corelib.Init.Datatypes <> bool ind
+R4970:4970 xv6iris.HartSpan <> m:32 var
+R4981:4993 Riscv.rv64d_types Interface Ret constr
+R5000:5003 Corelib.Init.Datatypes <> true constr
+R5009:5022 Riscv.rv64d_types Interface Next constr
+R5060:5076 Riscv.rv64d_types Interface RegRead constr
+R5085:5089 Corelib.Init.Datatypes <> false constr
+R5099:5116 Riscv.rv64d_types Interface RegWrite constr
+R5127:5137 stdpp.decidable <> bool_decide def
+R5141:5145 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R5146:5148 xv6iris.HartSpan <> Drw:31 var
+R5159:5175 Riscv.rv64d_types Interface MemRead constr
+R5184:5187 Corelib.Init.Datatypes <> true constr
+R5197:5214 Riscv.rv64d_types Interface MemWrite constr
+R5223:5226 Corelib.Init.Datatypes <> true constr
+R5236:5251 Riscv.rv64d_types Interface Choose constr
+R5258:5261 Corelib.Init.Datatypes <> true constr
+R5271:5291 Riscv.rv64d_types Interface GenericFail constr
+R5298:5301 Corelib.Init.Datatypes <> true constr
+R5311:5327 Riscv.rv64d_types Interface Discard constr
+R5332:5335 Corelib.Init.Datatypes <> true constr
+R5345:5366 Riscv.rv64d_types Interface ExtraOutcome constr
+R5373:5376 Corelib.Init.Datatypes <> true constr
+R5391:5395 Corelib.Init.Datatypes <> false constr
+def 6607:6610 <> hval
+binder 6613:6613 <> X:35
+R6632:6635 stdpp.gmap <> gset def
+R6637:6644 Riscv.rv64d_types <> register variant
+binder 6624:6624 <> D:36
+binder 6626:6628 <> Drw:37
+R6653:6660 Riscv.rv64d_types <> regstate rec
+binder 6648:6649 <> rs:38
+R6672:6672 Riscv.rv64d_types <> M def
+R6674:6674 xv6iris.HartSpan <> X:35 var
+binder 6668:6668 <> m:39
+R6682:6682 xv6iris.HartSpan <> X:35 var
+binder 6678:6678 <> x:40
+R6692:6699 Riscv.rv64d_types <> regstate rec
+binder 6686:6688 <> rs':41
+R6714:6721 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R6757:6763 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R6728:6735 Riscv.rv64d_types <> regstate rec
+binder 6722:6724 <> rs0:42
+R6746:6748 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R6743:6743 Riscv.rv64d_types <> M def
+R6745:6745 xv6iris.HartSpan <> X:35 var
+R6749:6756 Riscv.rv64d_types <> regstate rec
+binder 6739:6739 <> l:43
+R6785:6792 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6764:6775 xv6iris.HartLift <> reg_agree_on def
+R6777:6777 xv6iris.HartSpan <> D:36 var
+R6779:6781 xv6iris.HartSpan <> rs0:42 var
+R6783:6784 xv6iris.HartSpan <> rs:38 var
+R6815:6822 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6793:6797 xv6iris.HartSpan <> hspan def
+R6814:6814 xv6iris.HartSpan <> l:43 var
+R6805:6805 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6807:6808 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6812:6812 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R6806:6806 xv6iris.HartSpan <> m:39 var
+R6809:6811 xv6iris.HartSpan <> rs0:42 var
+R6801:6803 xv6iris.HartSpan <> Drw:37 var
+R6799:6799 xv6iris.HartSpan <> D:36 var
+R6849:6856 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6842:6844 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6823:6833 xv6iris.HartSpan <> hspan_stops def
+R6840:6841 stdpp.base <> :::x_'.1' not
+R6839:6839 xv6iris.HartSpan <> l:43 var
+R6835:6837 xv6iris.HartSpan <> Drw:37 var
+R6845:6848 Corelib.Init.Datatypes <> true constr
+R6878:6881 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R6860:6862 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6858:6859 stdpp.base <> :::x_'.1' not
+R6857:6857 xv6iris.HartSpan <> l:43 var
+R6863:6875 Riscv.rv64d_types Interface Ret constr
+R6877:6877 xv6iris.HartSpan <> x:40 var
+R6882:6893 xv6iris.HartLift <> reg_agree_on def
+R6895:6895 xv6iris.HartSpan <> D:36 var
+R6898:6899 stdpp.base <> :::x_'.2' not
+R6897:6897 xv6iris.HartSpan <> l:43 var
+R6901:6903 xv6iris.HartSpan <> rs':41 var
+def 8022:8026 <> hvalE
+binder 8029:8029 <> X:44
+R8048:8051 stdpp.gmap <> gset def
+R8053:8060 Riscv.rv64d_types <> register variant
+binder 8040:8040 <> D:45
+binder 8042:8044 <> Drw:46
+R8069:8076 Riscv.rv64d_types <> regstate rec
+binder 8064:8065 <> rs:47
+R8088:8088 Riscv.rv64d_types <> M def
+R8090:8090 xv6iris.HartSpan <> X:44 var
+binder 8084:8084 <> m:48
+R8099:8102 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8098:8098 xv6iris.HartSpan <> X:44 var
+R8111:8114 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8103:8110 Riscv.rv64d_types <> regstate rec
+binder 8094:8094 <> Q:49
+R8133:8140 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R8176:8182 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R8147:8154 Riscv.rv64d_types <> regstate rec
+binder 8141:8143 <> rs0:50
+R8165:8167 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R8162:8162 Riscv.rv64d_types <> M def
+R8164:8164 xv6iris.HartSpan <> X:44 var
+R8168:8175 Riscv.rv64d_types <> regstate rec
+binder 8158:8158 <> l:51
+R8204:8211 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8183:8194 xv6iris.HartLift <> reg_agree_on def
+R8196:8196 xv6iris.HartSpan <> D:45 var
+R8198:8200 xv6iris.HartSpan <> rs0:50 var
+R8202:8203 xv6iris.HartSpan <> rs:47 var
+R8234:8241 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8212:8216 xv6iris.HartSpan <> hspan def
+R8233:8233 xv6iris.HartSpan <> l:51 var
+R8224:8224 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8226:8227 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8231:8231 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R8225:8225 xv6iris.HartSpan <> m:48 var
+R8228:8230 xv6iris.HartSpan <> rs0:50 var
+R8220:8222 xv6iris.HartSpan <> Drw:46 var
+R8218:8218 xv6iris.HartSpan <> D:45 var
+R8268:8275 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8261:8263 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8242:8252 xv6iris.HartSpan <> hspan_stops def
+R8259:8260 stdpp.base <> :::x_'.1' not
+R8258:8258 xv6iris.HartSpan <> l:51 var
+R8254:8256 xv6iris.HartSpan <> Drw:46 var
+R8264:8267 Corelib.Init.Datatypes <> true constr
+R8276:8283 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R8306:8314 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R8288:8288 xv6iris.HartSpan <> X:44 var
+binder 8284:8284 <> x:52
+R8298:8305 Riscv.rv64d_types <> regstate rec
+binder 8292:8294 <> rs':53
+R8322:8325 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R8315:8315 xv6iris.HartSpan <> Q:49 var
+R8319:8321 xv6iris.HartSpan <> rs':53 var
+R8317:8317 xv6iris.HartSpan <> x:52 var
+R8347:8350 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R8329:8331 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8327:8328 stdpp.base <> :::x_'.1' not
+R8326:8326 xv6iris.HartSpan <> l:51 var
+R8332:8344 Riscv.rv64d_types Interface Ret constr
+R8346:8346 xv6iris.HartSpan <> x:52 var
+R8351:8362 xv6iris.HartLift <> reg_agree_on def
+R8364:8364 xv6iris.HartSpan <> D:45 var
+R8367:8368 stdpp.base <> :::x_'.2' not
+R8366:8366 xv6iris.HartSpan <> l:51 var
+R8370:8372 xv6iris.HartSpan <> rs':53 var
+prf 8382:8391 <> hval_hvalE
+binder 8394:8394 <> X:54
+R8413:8416 stdpp.gmap <> gset def
+R8418:8425 Riscv.rv64d_types <> register variant
+binder 8405:8405 <> D:55
+binder 8407:8409 <> Drw:56
+R8434:8441 Riscv.rv64d_types <> regstate rec
+binder 8429:8430 <> rs:57
+R8453:8453 Riscv.rv64d_types <> M def
+R8455:8455 xv6iris.HartSpan <> X:54 var
+binder 8449:8449 <> m:58
+R8463:8463 xv6iris.HartSpan <> X:54 var
+binder 8459:8459 <> x:59
+R8473:8480 Riscv.rv64d_types <> regstate rec
+binder 8467:8469 <> rs':60
+R8508:8513 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8487:8490 xv6iris.HartSpan <> hval def
+R8505:8507 xv6iris.HartSpan <> rs':60 var
+R8503:8503 xv6iris.HartSpan <> x:59 var
+R8501:8501 xv6iris.HartSpan <> m:58 var
+R8498:8499 xv6iris.HartSpan <> rs:57 var
+R8494:8496 xv6iris.HartSpan <> Drw:56 var
+R8492:8492 xv6iris.HartSpan <> D:55 var
+R8514:8518 xv6iris.HartSpan <> hvalE def
+binder 8536:8536 <> v:61
+binder 8538:8541 <> rs'':62
+R8551:8554 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R8547:8549 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8546:8546 xv6iris.HartSpan <> v:61 var
+R8550:8550 xv6iris.HartSpan <> x:59 var
+R8559:8561 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8555:8558 xv6iris.HartSpan <> rs'':62 var
+R8562:8564 xv6iris.HartSpan <> rs':60 var
+R8529:8529 xv6iris.HartSpan <> m:58 var
+R8526:8527 xv6iris.HartSpan <> rs:57 var
+R8522:8524 xv6iris.HartSpan <> Drw:56 var
+R8520:8520 xv6iris.HartSpan <> D:55 var
+prf 8757:8770 <> reg_agree_refl
+R8777:8780 stdpp.gmap <> gset def
+R8782:8789 Riscv.rv64d_types <> register variant
+binder 8773:8773 <> D:63
+R8798:8805 Riscv.rv64d_types <> regstate rec
+binder 8793:8794 <> rs:64
+R8812:8823 xv6iris.HartLift <> reg_agree_on def
+R8825:8825 xv6iris.HartSpan <> D:63 var
+R8827:8828 xv6iris.HartSpan <> rs:64 var
+R8830:8831 xv6iris.HartSpan <> rs:64 var
+prf 8878:8892 <> reg_agree_trans
+R8899:8902 stdpp.gmap <> gset def
+R8904:8911 Riscv.rv64d_types <> register variant
+binder 8895:8895 <> D:65
+R8929:8936 Riscv.rv64d_types <> regstate rec
+binder 8915:8917 <> rs1:66
+binder 8919:8921 <> rs2:67
+binder 8923:8925 <> rs3:68
+R8965:8968 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8943:8954 xv6iris.HartLift <> reg_agree_on def
+R8956:8956 xv6iris.HartSpan <> D:65 var
+R8958:8960 xv6iris.HartSpan <> rs1:66 var
+R8962:8964 xv6iris.HartSpan <> rs2:67 var
+R8991:8994 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8969:8980 xv6iris.HartLift <> reg_agree_on def
+R8982:8982 xv6iris.HartSpan <> D:65 var
+R8984:8986 xv6iris.HartSpan <> rs2:67 var
+R8988:8990 xv6iris.HartSpan <> rs3:68 var
+R8995:9006 xv6iris.HartLift <> reg_agree_on def
+R9008:9008 xv6iris.HartSpan <> D:65 var
+R9010:9012 xv6iris.HartSpan <> rs1:66 var
+R9014:9016 xv6iris.HartSpan <> rs3:68 var
+prf 9100:9113 <> reg_agree_mono
+R9123:9126 stdpp.gmap <> gset def
+R9128:9135 Riscv.rv64d_types <> register variant
+binder 9116:9116 <> D:69
+binder 9118:9119 <> D':70
+R9148:9155 Riscv.rv64d_types <> regstate rec
+binder 9139:9140 <> rs:71
+binder 9142:9144 <> rs':72
+R9170:9173 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9164:9168 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R9162:9163 xv6iris.HartSpan <> D':70 var
+R9169:9169 xv6iris.HartSpan <> D:69 var
+R9195:9198 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9174:9185 xv6iris.HartLift <> reg_agree_on def
+R9187:9187 xv6iris.HartSpan <> D:69 var
+R9189:9190 xv6iris.HartSpan <> rs:71 var
+R9192:9194 xv6iris.HartSpan <> rs':72 var
+R9199:9210 xv6iris.HartLift <> reg_agree_on def
+R9212:9213 xv6iris.HartSpan <> D':70 var
+R9215:9216 xv6iris.HartSpan <> rs:71 var
+R9218:9220 xv6iris.HartSpan <> rs':72 var
+prf 9284:9296 <> reg_agree_set
+R9303:9306 stdpp.gmap <> gset def
+R9308:9315 Riscv.rv64d_types <> register variant
+binder 9299:9299 <> D:73
+R9323:9330 Riscv.rv64d_types <> register variant
+binder 9319:9319 <> r:74
+R9342:9357 Riscv.rv64d_types <> type_of_register def
+R9359:9359 xv6iris.HartSpan <> r:74 var
+binder 9338:9338 <> v:75
+R9372:9379 Riscv.rv64d_types <> regstate rec
+binder 9363:9364 <> rs:76
+binder 9366:9368 <> rs':77
+R9407:9412 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9386:9397 xv6iris.HartLift <> reg_agree_on def
+R9399:9399 xv6iris.HartSpan <> D:73 var
+R9401:9402 xv6iris.HartSpan <> rs:76 var
+R9404:9406 xv6iris.HartSpan <> rs':77 var
+R9413:9424 xv6iris.HartLift <> reg_agree_on def
+R9426:9426 xv6iris.HartSpan <> D:73 var
+R9429:9440 Riscv.rv64d_types <> register_set def
+R9442:9442 xv6iris.HartSpan <> r:74 var
+R9444:9444 xv6iris.HartSpan <> v:75 var
+R9446:9447 xv6iris.HartSpan <> rs:76 var
+R9451:9462 Riscv.rv64d_types <> register_set def
+R9464:9464 xv6iris.HartSpan <> r:74 var
+R9466:9466 xv6iris.HartSpan <> v:75 var
+R9468:9470 xv6iris.HartSpan <> rs':77 var
+R9512:9517 stdpp.base <> decide def
+R9522:9524 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9512:9517 stdpp.base <> decide def
+R9522:9524 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9558:9576 Riscv.rv64d_types <> register_lookup_set thm
+R9558:9576 Riscv.rv64d_types <> register_lookup_set thm
+R9558:9576 Riscv.rv64d_types <> register_lookup_set thm
+R9558:9576 Riscv.rv64d_types <> register_lookup_set thm
+R9558:9576 Riscv.rv64d_types <> register_lookup_set thm
+R9593:9615 Riscv.rv64d_types <> irrelevant_register_set thm
+R9627:9644 xv6iris.RiscvPtsto <> register_beq_false thm
+R9593:9615 Riscv.rv64d_types <> irrelevant_register_set thm
+R9627:9644 xv6iris.RiscvPtsto <> register_beq_false thm
+R9593:9615 Riscv.rv64d_types <> irrelevant_register_set thm
+R9627:9644 xv6iris.RiscvPtsto <> register_beq_false thm
+R9593:9615 Riscv.rv64d_types <> irrelevant_register_set thm
+R9627:9644 xv6iris.RiscvPtsto <> register_beq_false thm
+R9593:9615 Riscv.rv64d_types <> irrelevant_register_set thm
+R9627:9644 xv6iris.RiscvPtsto <> register_beq_false thm
+def 11505:11509 <> hfrun
+binder 11512:11512 <> X:78
+R11527:11529 Corelib.Init.Datatypes <> nat ind
+binder 11523:11523 <> n:79
+R11541:11544 stdpp.gmap <> gset def
+R11546:11553 Riscv.rv64d_types <> register variant
+binder 11533:11533 <> D:80
+binder 11535:11537 <> Drw:81
+R11562:11569 Riscv.rv64d_types <> regstate rec
+binder 11557:11558 <> rs:82
+R11581:11581 Riscv.rv64d_types <> M def
+R11583:11583 xv6iris.HartSpan <> X:78 var
+binder 11577:11577 <> m:83
+R11599:11604 Corelib.Init.Datatypes <> option ind
+R11608:11610 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R11607:11607 xv6iris.HartSpan <> X:78 var
+R11611:11618 Riscv.rv64d_types <> regstate rec
+R11632:11632 xv6iris.HartSpan <> n:79 var
+R11652:11655 Corelib.Init.Datatypes <> None constr
+R11661:11661 Corelib.Init.Datatypes <> S constr
+R11681:11681 xv6iris.HartSpan <> m:83 var
+R11696:11708 Riscv.rv64d_types Interface Ret constr
+R11715:11718 Corelib.Init.Datatypes <> Some constr
+R11720:11720 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R11722:11723 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R11726:11726 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R11724:11725 xv6iris.HartSpan <> rs:82 var
+R11736:11749 Riscv.rv64d_types Interface Next constr
+R11782:11798 Riscv.rv64d_types Interface outcome ind
+R11828:11828 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11837:11841 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11830:11833 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11829:11829 xv6iris.HartSpan <> T:87 var
+R11834:11834 Riscv.rv64d_types <> M def
+R11836:11836 xv6iris.HartSpan <> X:78 var
+R11842:11847 Corelib.Init.Datatypes <> option ind
+R11851:11853 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R11850:11850 xv6iris.HartSpan <> X:78 var
+R11854:11861 Riscv.rv64d_types <> regstate rec
+R11882:11898 Riscv.rv64d_types Interface RegRead constr
+binder 11911:11911 <> k:89
+R11931:11933 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R11955:11975 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R12020:12040 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R12041:12044 Corelib.Init.Datatypes <> None constr
+R11976:11980 xv6iris.HartSpan <> hfrun:84 def
+R11995:11995 xv6iris.HartSpan <> k:89 var
+R11998:12012 Riscv.rv64d_types <> register_lookup def
+R12016:12017 xv6iris.HartSpan <> rs:82 var
+R11991:11992 xv6iris.HartSpan <> rs:82 var
+R11987:11989 xv6iris.HartSpan <> Drw:81 var
+R11985:11985 xv6iris.HartSpan <> D:80 var
+R11934:11944 stdpp.decidable <> bool_decide def
+R11948:11952 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R11953:11953 xv6iris.HartSpan <> D:80 var
+R12059:12076 Riscv.rv64d_types Interface RegWrite constr
+binder 12091:12091 <> k:90
+R12111:12113 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R12137:12157 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R12201:12221 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R12222:12225 Corelib.Init.Datatypes <> None constr
+R12158:12162 xv6iris.HartSpan <> hfrun:84 def
+R12196:12196 xv6iris.HartSpan <> k:90 var
+R12198:12199 Corelib.Init.Datatypes <> tt constr
+R12174:12185 Riscv.rv64d_types <> register_set def
+R12191:12192 xv6iris.HartSpan <> rs:82 var
+R12169:12171 xv6iris.HartSpan <> Drw:81 var
+R12167:12167 xv6iris.HartSpan <> D:80 var
+R12114:12124 stdpp.decidable <> bool_decide def
+R12128:12132 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R12133:12135 xv6iris.HartSpan <> Drw:81 var
+R12240:12262 Riscv.rv64d_types Interface InstrAnnounce constr
+binder 12276:12276 <> k:91
+R12281:12285 xv6iris.HartSpan <> hfrun:84 def
+R12300:12300 xv6iris.HartSpan <> k:91 var
+R12302:12303 Corelib.Init.Datatypes <> tt constr
+R12296:12297 xv6iris.HartSpan <> rs:82 var
+R12292:12294 xv6iris.HartSpan <> Drw:81 var
+R12290:12290 xv6iris.HartSpan <> D:80 var
+R12319:12342 Riscv.rv64d_types Interface BranchAnnounce constr
+binder 12355:12355 <> k:92
+R12360:12364 xv6iris.HartSpan <> hfrun:84 def
+R12379:12379 xv6iris.HartSpan <> k:92 var
+R12381:12382 Corelib.Init.Datatypes <> tt constr
+R12375:12376 xv6iris.HartSpan <> rs:82 var
+R12371:12373 xv6iris.HartSpan <> Drw:81 var
+R12369:12369 xv6iris.HartSpan <> D:80 var
+R12398:12414 Riscv.rv64d_types Interface Barrier constr
+binder 12434:12434 <> k:93
+R12439:12443 xv6iris.HartSpan <> hfrun:84 def
+R12458:12458 xv6iris.HartSpan <> k:93 var
+R12460:12461 Corelib.Init.Datatypes <> tt constr
+R12454:12455 xv6iris.HartSpan <> rs:82 var
+R12450:12452 xv6iris.HartSpan <> Drw:81 var
+R12448:12448 xv6iris.HartSpan <> D:80 var
+R12477:12493 Riscv.rv64d_types Interface CacheOp constr
+binder 12513:12513 <> k:94
+R12518:12522 xv6iris.HartSpan <> hfrun:84 def
+R12537:12537 xv6iris.HartSpan <> k:94 var
+R12539:12540 Corelib.Init.Datatypes <> tt constr
+R12533:12534 xv6iris.HartSpan <> rs:82 var
+R12529:12531 xv6iris.HartSpan <> Drw:81 var
+R12527:12527 xv6iris.HartSpan <> D:80 var
+R12556:12570 Riscv.rv64d_types Interface TlbOp constr
+binder 12592:12592 <> k:95
+R12597:12601 xv6iris.HartSpan <> hfrun:84 def
+R12616:12616 xv6iris.HartSpan <> k:95 var
+R12618:12619 Corelib.Init.Datatypes <> tt constr
+R12612:12613 xv6iris.HartSpan <> rs:82 var
+R12608:12610 xv6iris.HartSpan <> Drw:81 var
+R12606:12606 xv6iris.HartSpan <> D:80 var
+R12635:12657 Riscv.rv64d_types Interface TakeException constr
+binder 12671:12671 <> k:96
+R12676:12680 xv6iris.HartSpan <> hfrun:84 def
+R12695:12695 xv6iris.HartSpan <> k:96 var
+R12697:12698 Corelib.Init.Datatypes <> tt constr
+R12691:12692 xv6iris.HartSpan <> rs:82 var
+R12687:12689 xv6iris.HartSpan <> Drw:81 var
+R12685:12685 xv6iris.HartSpan <> D:80 var
+R12714:12738 Riscv.rv64d_types Interface ReturnException constr
+binder 12750:12750 <> k:97
+R12755:12759 xv6iris.HartSpan <> hfrun:84 def
+R12774:12774 xv6iris.HartSpan <> k:97 var
+R12776:12777 Corelib.Init.Datatypes <> tt constr
+R12770:12771 xv6iris.HartSpan <> rs:82 var
+R12766:12768 xv6iris.HartSpan <> Drw:81 var
+R12764:12764 xv6iris.HartSpan <> D:80 var
+R12793:12818 Riscv.rv64d_types Interface TranslationStart constr
+binder 12829:12829 <> k:98
+R12834:12838 xv6iris.HartSpan <> hfrun:84 def
+R12853:12853 xv6iris.HartSpan <> k:98 var
+R12855:12856 Corelib.Init.Datatypes <> tt constr
+R12849:12850 xv6iris.HartSpan <> rs:82 var
+R12845:12847 xv6iris.HartSpan <> Drw:81 var
+R12843:12843 xv6iris.HartSpan <> D:80 var
+R12872:12895 Riscv.rv64d_types Interface TranslationEnd constr
+binder 12908:12908 <> k:99
+R12913:12917 xv6iris.HartSpan <> hfrun:84 def
+R12932:12932 xv6iris.HartSpan <> k:99 var
+R12934:12935 Corelib.Init.Datatypes <> tt constr
+R12928:12929 xv6iris.HartSpan <> rs:82 var
+R12924:12926 xv6iris.HartSpan <> Drw:81 var
+R12922:12922 xv6iris.HartSpan <> D:80 var
+R12951:12970 Riscv.rv64d_types Interface CycleCount constr
+binder 12987:12987 <> k:100
+R12992:12996 xv6iris.HartSpan <> hfrun:84 def
+R13011:13011 xv6iris.HartSpan <> k:100 var
+R13013:13014 Corelib.Init.Datatypes <> tt constr
+R13007:13008 xv6iris.HartSpan <> rs:82 var
+R13003:13005 xv6iris.HartSpan <> Drw:81 var
+R13001:13001 xv6iris.HartSpan <> D:80 var
+R13030:13046 Riscv.rv64d_types Interface Message constr
+binder 13066:13066 <> k:101
+R13071:13075 xv6iris.HartSpan <> hfrun:84 def
+R13090:13090 xv6iris.HartSpan <> k:101 var
+R13092:13093 Corelib.Init.Datatypes <> tt constr
+R13086:13087 xv6iris.HartSpan <> rs:82 var
+R13082:13084 xv6iris.HartSpan <> Drw:81 var
+R13080:13080 xv6iris.HartSpan <> D:80 var
+R13109:13131 Riscv.rv64d_types Interface GetCycleCount constr
+binder 13145:13145 <> k:102
+R13150:13154 xv6iris.HartSpan <> hfrun:84 def
+R13169:13169 xv6iris.HartSpan <> k:102 var
+R13165:13166 xv6iris.HartSpan <> rs:82 var
+R13161:13163 xv6iris.HartSpan <> Drw:81 var
+R13159:13159 xv6iris.HartSpan <> D:80 var
+R13203:13206 Corelib.Init.Datatypes <> None constr
+prf 13866:13874 <> hfrun_ret
+binder 13877:13877 <> X:103
+R13892:13894 Corelib.Init.Datatypes <> nat ind
+binder 13888:13888 <> n:104
+R13906:13909 stdpp.gmap <> gset def
+R13911:13918 Riscv.rv64d_types <> register variant
+binder 13898:13898 <> D:105
+binder 13900:13902 <> Drw:106
+R13931:13938 Riscv.rv64d_types <> regstate rec
+binder 13926:13927 <> rs:107
+R13946:13946 xv6iris.HartSpan <> X:103 var
+binder 13942:13942 <> x:108
+R13991:13993 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13953:13957 xv6iris.HartSpan <> hfrun def
+R13975:13987 Riscv.rv64d_types Interface Ret constr
+R13989:13989 xv6iris.HartSpan <> x:108 var
+R13971:13972 xv6iris.HartSpan <> rs:107 var
+R13967:13969 xv6iris.HartSpan <> Drw:106 var
+R13965:13965 xv6iris.HartSpan <> D:105 var
+R13960:13960 Corelib.Init.Datatypes <> S constr
+R13962:13962 xv6iris.HartSpan <> n:104 var
+R13994:13997 Corelib.Init.Datatypes <> Some constr
+R13999:13999 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14001:14002 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14005:14005 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R14000:14000 xv6iris.HartSpan <> x:108 var
+R14003:14004 xv6iris.HartSpan <> rs:107 var
+prf 14040:14049 <> hfrun_read
+binder 14052:14052 <> X:109
+R14067:14069 Corelib.Init.Datatypes <> nat ind
+binder 14063:14063 <> n:110
+R14081:14084 stdpp.gmap <> gset def
+R14086:14093 Riscv.rv64d_types <> register variant
+binder 14073:14073 <> D:111
+binder 14075:14077 <> Drw:112
+R14106:14113 Riscv.rv64d_types <> regstate rec
+binder 14101:14102 <> rs:113
+R14121:14128 Riscv.rv64d_types <> register variant
+binder 14117:14117 <> r:114
+R14137:14142 Corelib.Init.Datatypes <> option ind
+R14144:14147 Corelib.Init.Datatypes <> unit ind
+binder 14132:14133 <> ak:115
+R14177:14180 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14159:14174 Riscv.rv64d_types <> type_of_register def
+R14176:14176 xv6iris.HartSpan <> r:114 var
+R14181:14181 Riscv.rv64d_types <> M def
+R14183:14183 xv6iris.HartSpan <> X:109 var
+binder 14155:14155 <> k:116
+R14254:14258 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14190:14194 xv6iris.HartSpan <> hfrun def
+R14212:14225 Riscv.rv64d_types Interface Next constr
+R14252:14252 xv6iris.HartSpan <> k:116 var
+R14228:14244 Riscv.rv64d_types Interface RegRead constr
+R14246:14246 xv6iris.HartSpan <> r:114 var
+R14248:14249 xv6iris.HartSpan <> ak:115 var
+R14208:14209 xv6iris.HartSpan <> rs:113 var
+R14204:14206 xv6iris.HartSpan <> Drw:112 var
+R14202:14202 xv6iris.HartSpan <> D:111 var
+R14197:14197 Corelib.Init.Datatypes <> S constr
+R14199:14199 xv6iris.HartSpan <> n:110 var
+R14259:14261 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R14283:14292 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R14336:14345 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R14346:14349 Corelib.Init.Datatypes <> None constr
+R14293:14297 xv6iris.HartSpan <> hfrun def
+R14311:14311 xv6iris.HartSpan <> k:116 var
+R14314:14328 Riscv.rv64d_types <> register_lookup def
+R14330:14330 xv6iris.HartSpan <> r:114 var
+R14332:14333 xv6iris.HartSpan <> rs:113 var
+R14307:14308 xv6iris.HartSpan <> rs:113 var
+R14303:14305 xv6iris.HartSpan <> Drw:112 var
+R14301:14301 xv6iris.HartSpan <> D:111 var
+R14299:14299 xv6iris.HartSpan <> n:110 var
+R14262:14272 stdpp.decidable <> bool_decide def
+R14276:14280 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R14275:14275 xv6iris.HartSpan <> r:114 var
+R14281:14281 xv6iris.HartSpan <> D:111 var
+prf 14384:14394 <> hfrun_write
+binder 14397:14397 <> X:117
+R14412:14414 Corelib.Init.Datatypes <> nat ind
+binder 14408:14408 <> n:118
+R14426:14429 stdpp.gmap <> gset def
+R14431:14438 Riscv.rv64d_types <> register variant
+binder 14418:14418 <> D:119
+binder 14420:14422 <> Drw:120
+R14451:14458 Riscv.rv64d_types <> regstate rec
+binder 14446:14447 <> rs:121
+R14466:14473 Riscv.rv64d_types <> register variant
+binder 14462:14462 <> r:122
+R14482:14487 Corelib.Init.Datatypes <> option ind
+R14489:14492 Corelib.Init.Datatypes <> unit ind
+binder 14477:14478 <> ak:123
+R14504:14519 Riscv.rv64d_types <> type_of_register def
+R14521:14521 xv6iris.HartSpan <> r:122 var
+binder 14500:14500 <> v:124
+R14533:14536 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14529:14532 Corelib.Init.Datatypes <> unit ind
+R14537:14537 Riscv.rv64d_types <> M def
+R14539:14539 xv6iris.HartSpan <> X:117 var
+binder 14525:14525 <> k:125
+R14613:14617 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14546:14550 xv6iris.HartSpan <> hfrun def
+R14568:14581 Riscv.rv64d_types Interface Next constr
+R14611:14611 xv6iris.HartSpan <> k:125 var
+R14584:14601 Riscv.rv64d_types Interface RegWrite constr
+R14603:14603 xv6iris.HartSpan <> r:122 var
+R14605:14606 xv6iris.HartSpan <> ak:123 var
+R14608:14608 xv6iris.HartSpan <> v:124 var
+R14564:14565 xv6iris.HartSpan <> rs:121 var
+R14560:14562 xv6iris.HartSpan <> Drw:120 var
+R14558:14558 xv6iris.HartSpan <> D:119 var
+R14553:14553 Corelib.Init.Datatypes <> S constr
+R14555:14555 xv6iris.HartSpan <> n:118 var
+R14618:14620 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R14644:14653 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R14696:14705 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R14706:14709 Corelib.Init.Datatypes <> None constr
+R14654:14658 xv6iris.HartSpan <> hfrun def
+R14691:14691 xv6iris.HartSpan <> k:125 var
+R14693:14694 Corelib.Init.Datatypes <> tt constr
+R14669:14680 Riscv.rv64d_types <> register_set def
+R14682:14682 xv6iris.HartSpan <> r:122 var
+R14684:14684 xv6iris.HartSpan <> v:124 var
+R14686:14687 xv6iris.HartSpan <> rs:121 var
+R14664:14666 xv6iris.HartSpan <> Drw:120 var
+R14662:14662 xv6iris.HartSpan <> D:119 var
+R14660:14660 xv6iris.HartSpan <> n:118 var
+R14621:14631 stdpp.decidable <> bool_decide def
+R14635:14639 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R14634:14634 xv6iris.HartSpan <> r:122 var
+R14640:14642 xv6iris.HartSpan <> Drw:120 var
+prf 15141:15150 <> hfrun_mono
+binder 15153:15153 <> X:126
+R15171:15173 Corelib.Init.Datatypes <> nat ind
+binder 15164:15164 <> n:127
+binder 15166:15167 <> n':128
+R15185:15188 stdpp.gmap <> gset def
+R15190:15197 Riscv.rv64d_types <> register variant
+binder 15177:15177 <> D:129
+binder 15179:15181 <> Drw:130
+R15210:15217 Riscv.rv64d_types <> regstate rec
+binder 15205:15206 <> rs:131
+R15225:15225 Riscv.rv64d_types <> M def
+R15227:15227 xv6iris.HartSpan <> X:126 var
+binder 15221:15221 <> m:132
+R15236:15238 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R15235:15235 xv6iris.HartSpan <> X:126 var
+R15239:15246 Riscv.rv64d_types <> regstate rec
+binder 15231:15231 <> r:133
+R15266:15269 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15255:15258 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R15254:15254 xv6iris.HartSpan <> n:127 var
+R15259:15260 xv6iris.HartSpan <> n':128 var
+R15297:15300 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15288:15290 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15270:15274 xv6iris.HartSpan <> hfrun def
+R15287:15287 xv6iris.HartSpan <> m:132 var
+R15284:15285 xv6iris.HartSpan <> rs:131 var
+R15280:15282 xv6iris.HartSpan <> Drw:130 var
+R15278:15278 xv6iris.HartSpan <> D:129 var
+R15276:15276 xv6iris.HartSpan <> n:127 var
+R15291:15294 Corelib.Init.Datatypes <> Some constr
+R15296:15296 xv6iris.HartSpan <> r:133 var
+R15320:15322 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15301:15305 xv6iris.HartSpan <> hfrun def
+R15319:15319 xv6iris.HartSpan <> m:132 var
+R15316:15317 xv6iris.HartSpan <> rs:131 var
+R15312:15314 xv6iris.HartSpan <> Drw:130 var
+R15310:15310 xv6iris.HartSpan <> D:129 var
+R15307:15308 xv6iris.HartSpan <> n':128 var
+R15323:15326 Corelib.Init.Datatypes <> Some constr
+R15328:15328 xv6iris.HartSpan <> r:133 var
+R15568:15578 stdpp.decidable <> bool_decide def
+R15584:15588 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R15628:15638 stdpp.decidable <> bool_decide def
+R15644:15648 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R15568:15578 stdpp.decidable <> bool_decide def
+R15584:15588 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R15628:15638 stdpp.decidable <> bool_decide def
+R15644:15648 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+prf 15734:15743 <> hfrun_bind
+binder 15746:15746 <> X:134
+binder 15748:15748 <> Y:135
+R15765:15767 Corelib.Init.Datatypes <> nat ind
+binder 15759:15759 <> n:136
+binder 15761:15761 <> k:137
+R15779:15782 stdpp.gmap <> gset def
+R15784:15791 Riscv.rv64d_types <> register variant
+binder 15771:15771 <> D:138
+binder 15773:15775 <> Drw:139
+R15813:15820 Riscv.rv64d_types <> regstate rec
+binder 15799:15800 <> rs:140
+binder 15802:15804 <> rs':141
+binder 15806:15809 <> rs'':142
+R15828:15828 Riscv.rv64d_types <> M def
+R15830:15830 xv6iris.HartSpan <> X:134 var
+binder 15824:15824 <> m:143
+R15839:15842 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15838:15838 xv6iris.HartSpan <> X:134 var
+R15843:15843 Riscv.rv64d_types <> M def
+R15845:15845 xv6iris.HartSpan <> Y:135 var
+binder 15834:15834 <> f:144
+R15853:15853 xv6iris.HartSpan <> X:134 var
+binder 15849:15849 <> x:145
+R15861:15861 xv6iris.HartSpan <> Y:135 var
+binder 15857:15857 <> y:146
+R15902:15907 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15886:15888 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15868:15872 xv6iris.HartSpan <> hfrun def
+R15885:15885 xv6iris.HartSpan <> m:143 var
+R15882:15883 xv6iris.HartSpan <> rs:140 var
+R15878:15880 xv6iris.HartSpan <> Drw:139 var
+R15876:15876 xv6iris.HartSpan <> D:138 var
+R15874:15874 xv6iris.HartSpan <> n:136 var
+R15889:15892 Corelib.Init.Datatypes <> Some constr
+R15894:15894 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15896:15897 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15901:15901 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15895:15895 xv6iris.HartSpan <> x:145 var
+R15898:15900 xv6iris.HartSpan <> rs':141 var
+R15948:15953 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R15931:15933 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15908:15912 xv6iris.HartSpan <> hfrun def
+R15927:15927 xv6iris.HartSpan <> f:144 var
+R15929:15929 xv6iris.HartSpan <> x:145 var
+R15922:15924 xv6iris.HartSpan <> rs':141 var
+R15918:15920 xv6iris.HartSpan <> Drw:139 var
+R15916:15916 xv6iris.HartSpan <> D:138 var
+R15914:15914 xv6iris.HartSpan <> k:137 var
+R15934:15937 Corelib.Init.Datatypes <> Some constr
+R15939:15939 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15941:15942 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15947:15947 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R15940:15940 xv6iris.HartSpan <> y:146 var
+R15943:15946 xv6iris.HartSpan <> rs'':142 var
+R15992:15994 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15954:15958 xv6iris.HartSpan <> hfrun def
+R15978:15986 Riscv.rv64d_types Defs bind def
+R15990:15990 xv6iris.HartSpan <> f:144 var
+R15988:15988 xv6iris.HartSpan <> m:143 var
+R15974:15975 xv6iris.HartSpan <> rs:140 var
+R15970:15972 xv6iris.HartSpan <> Drw:139 var
+R15968:15968 xv6iris.HartSpan <> D:138 var
+R15962:15964 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R15961:15961 xv6iris.HartSpan <> n:136 var
+R15965:15965 xv6iris.HartSpan <> k:137 var
+R15995:15998 Corelib.Init.Datatypes <> Some constr
+R16000:16000 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16002:16003 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16008:16008 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16001:16001 xv6iris.HartSpan <> y:146 var
+R16004:16007 xv6iris.HartSpan <> rs'':142 var
+R16174:16183 xv6iris.HartSpan <> hfrun_mono thm
+R16212:16212 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16214:16215 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16220:16220 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16191:16193 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R16188:16188 Corelib.Init.Datatypes <> S constr
+R16174:16183 xv6iris.HartSpan <> hfrun_mono thm
+R16212:16212 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16214:16215 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16220:16220 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16191:16193 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R16188:16188 Corelib.Init.Datatypes <> S constr
+R16308:16318 stdpp.decidable <> bool_decide def
+R16324:16328 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R16308:16318 stdpp.decidable <> bool_decide def
+R16324:16328 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R16383:16393 stdpp.decidable <> bool_decide def
+R16399:16403 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R16383:16393 stdpp.decidable <> bool_decide def
+R16399:16403 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+prf 16684:16694 <> hfrun_bind0
+binder 16697:16697 <> Y:147
+R16714:16716 Corelib.Init.Datatypes <> nat ind
+binder 16708:16708 <> n:148
+binder 16710:16710 <> k:149
+R16728:16731 stdpp.gmap <> gset def
+R16733:16740 Riscv.rv64d_types <> register variant
+binder 16720:16720 <> D:150
+binder 16722:16724 <> Drw:151
+R16762:16769 Riscv.rv64d_types <> regstate rec
+binder 16748:16749 <> rs:152
+binder 16751:16753 <> rs':153
+binder 16755:16758 <> rs'':154
+R16777:16777 Riscv.rv64d_types <> M def
+R16779:16782 Corelib.Init.Datatypes <> unit ind
+binder 16773:16773 <> m:155
+R16791:16791 Riscv.rv64d_types <> M def
+R16793:16793 xv6iris.HartSpan <> Y:147 var
+binder 16786:16787 <> n0:156
+R16801:16801 xv6iris.HartSpan <> Y:147 var
+binder 16797:16797 <> y:157
+R16843:16848 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16826:16828 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16808:16812 xv6iris.HartSpan <> hfrun def
+R16825:16825 xv6iris.HartSpan <> m:155 var
+R16822:16823 xv6iris.HartSpan <> rs:152 var
+R16818:16820 xv6iris.HartSpan <> Drw:151 var
+R16816:16816 xv6iris.HartSpan <> D:150 var
+R16814:16814 xv6iris.HartSpan <> n:148 var
+R16829:16832 Corelib.Init.Datatypes <> Some constr
+R16834:16834 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16837:16838 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16842:16842 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16835:16836 Corelib.Init.Datatypes <> tt constr
+R16839:16841 xv6iris.HartSpan <> rs':153 var
+R16886:16891 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16869:16871 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16849:16853 xv6iris.HartSpan <> hfrun def
+R16867:16868 xv6iris.HartSpan <> n0:156 var
+R16863:16865 xv6iris.HartSpan <> rs':153 var
+R16859:16861 xv6iris.HartSpan <> Drw:151 var
+R16857:16857 xv6iris.HartSpan <> D:150 var
+R16855:16855 xv6iris.HartSpan <> k:149 var
+R16872:16875 Corelib.Init.Datatypes <> Some constr
+R16877:16877 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16879:16880 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16885:16885 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16878:16878 xv6iris.HartSpan <> y:157 var
+R16881:16884 xv6iris.HartSpan <> rs'':154 var
+R16932:16934 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R16892:16896 xv6iris.HartSpan <> hfrun def
+R16916:16925 Riscv.rv64d_types Defs bind0 def
+R16929:16930 xv6iris.HartSpan <> n0:156 var
+R16927:16927 xv6iris.HartSpan <> m:155 var
+R16912:16913 xv6iris.HartSpan <> rs:152 var
+R16908:16910 xv6iris.HartSpan <> Drw:151 var
+R16906:16906 xv6iris.HartSpan <> D:150 var
+R16900:16902 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R16899:16899 xv6iris.HartSpan <> n:148 var
+R16903:16903 xv6iris.HartSpan <> k:149 var
+R16935:16938 Corelib.Init.Datatypes <> Some constr
+R16940:16940 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16942:16943 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16948:16948 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R16941:16941 xv6iris.HartSpan <> y:157 var
+R16944:16947 xv6iris.HartSpan <> rs'':154 var
+R16979:16988 xv6iris.HartSpan <> hfrun_bind thm
+R17016:17017 Corelib.Init.Datatypes <> tt constr
+R16979:16988 xv6iris.HartSpan <> hfrun_bind thm
+R17016:17017 Corelib.Init.Datatypes <> tt constr
+def 17908:17913 <> mchild
+binder 17916:17916 <> X:158
+R17933:17933 Riscv.rv64d_types <> M def
+R17935:17935 xv6iris.HartSpan <> X:158 var
+binder 17927:17927 <> y:159
+binder 17929:17929 <> m:160
+R17956:17956 xv6iris.HartSpan <> m:160 var
+R17967:17979 Riscv.rv64d_types Interface Ret constr
+R17986:17990 stdpp.base <> ::type_scope:'False' not
+R17996:18009 Riscv.rv64d_types Interface Next constr
+R18018:18024 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R18026:18027 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+binder 18025:18025 <> v:162
+R18029:18031 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R18028:18028 xv6iris.HartSpan <> y:159 var
+R18034:18034 xv6iris.HartSpan <> v:162 var
+def 18053:18056 <> macc
+binder 18059:18059 <> X:163
+R18074:18074 Riscv.rv64d_types <> M def
+R18076:18076 xv6iris.HartSpan <> X:163 var
+binder 18070:18070 <> m:164
+R18092:18094 Corelib.Init.Wf <> Acc ind
+R18103:18103 xv6iris.HartSpan <> m:164 var
+R18096:18101 xv6iris.HartSpan <> mchild def
+prf 18250:18258 <> mchild_wf
+binder 18261:18261 <> X:166
+R18273:18284 Corelib.Init.Wf <> well_founded def
+R18288:18293 xv6iris.HartSpan <> mchild def
+R18295:18295 xv6iris.HartSpan <> X:166 var
+R18312:18315 xv6iris.HartSpan <> macc def
+R18312:18315 xv6iris.HartSpan <> macc def
+prf 18375:18391 <> hspan_node_mchild
+binder 18394:18394 <> X:167
+R18411:18414 stdpp.gmap <> gset def
+R18416:18423 Riscv.rv64d_types <> register variant
+binder 18405:18407 <> Drw:168
+R18441:18443 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R18438:18438 Riscv.rv64d_types <> M def
+R18440:18440 xv6iris.HartSpan <> X:167 var
+R18444:18451 Riscv.rv64d_types <> regstate rec
+binder 18431:18431 <> c:169
+binder 18433:18434 <> c':170
+R18477:18480 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18458:18467 xv6iris.HartSpan <> hspan_node def
+R18475:18476 xv6iris.HartSpan <> c':170 var
+R18473:18473 xv6iris.HartSpan <> c:169 var
+R18469:18471 xv6iris.HartSpan <> Drw:168 var
+R18481:18486 xv6iris.HartSpan <> mchild def
+R18494:18495 stdpp.base <> :::x_'.1' not
+R18493:18493 xv6iris.HartSpan <> c:169 var
+R18490:18491 stdpp.base <> :::x_'.1' not
+R18488:18489 xv6iris.HartSpan <> c':170 var
+sec 19195:19198 <> span
+R19214:19220 xv6iris.RiscvPtsto <> riscvGS class
+var  19239:19241 span GEN
+var  19254:19256 span CID
+var  19269:19270 span XI
+R19245:19249 xv6iris.RiscvLang <> GenId class
+R19260:19264 xv6iris.RiscvLang <> CpuId class
+R19274:19279 xv6iris.TsoCtx <> CurCtx class
+def 19490:19502 <> hreg_frame_ro
+R19518:19521 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19510:19517 Riscv.rv64d_types <> register variant
+R19522:19526 iris.algebra.dfrac <> dfrac ind
+binder 19505:19506 <> Df:197
+R19535:19542 Riscv.rv64d_types <> regstate rec
+binder 19530:19531 <> rs:198
+R19558:19561 stdpp.gmap <> gset def
+R19563:19570 Riscv.rv64d_types <> register variant
+binder 19552:19554 <> Dro:199
+R19575:19579 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R19581:19582 xv6iris.HartSpan <> span.Σ var
+R19592:19601 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R19603:19607 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R19611:19612 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+binder 19602:19602 <> r:200
+binder 19602:19602 <> r:201
+R19613:19624 xv6iris.RiscvPtsto <> reg_pointsto def
+R19636:19650 Riscv.rv64d_types <> register_lookup def
+R19652:19652 xv6iris.HartSpan <> r:200 var
+R19654:19655 xv6iris.HartSpan <> rs:198 var
+R19629:19630 xv6iris.HartSpan <> Df:197 var
+R19632:19632 xv6iris.HartSpan <> r:200 var
+R19626:19626 xv6iris.HartSpan <> r:200 var
+R19608:19610 xv6iris.HartSpan <> Dro:199 var
+prf 19671:19689 <> hreg_frame_ro_agree
+binder 19691:19692 <> Df:202
+binder 19694:19695 <> rs:203
+binder 19697:19699 <> Dro:204
+R19708:19715 Riscv.rv64d_types <> regstate rec
+binder 19702:19704 <> rs0:205
+R19738:19743 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R19724:19733 xv6iris.RiscvPtsto <> reg_interp def
+R19735:19737 xv6iris.HartSpan <> rs0:205 var
+R19767:19776 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19744:19756 xv6iris.HartSpan <> hreg_frame_ro def
+R19758:19759 xv6iris.HartSpan <> Df:202 var
+R19761:19762 xv6iris.HartSpan <> rs:203 var
+R19764:19766 xv6iris.HartSpan <> Dro:204 var
+R19777:19779 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R19803:19805 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R19780:19791 xv6iris.HartLift <> reg_agree_on def
+R19793:19795 xv6iris.HartSpan <> Dro:204 var
+R19797:19798 xv6iris.HartSpan <> rs:203 var
+R19800:19802 xv6iris.HartSpan <> rs0:205 var
+R19904:19916 xv6iris.HartSpan <> hreg_frame_ro def
+R19904:19916 xv6iris.HartSpan <> hreg_frame_ro def
+R19904:19916 xv6iris.HartSpan <> hreg_frame_ro def
+R19948:19961 iris.bi.derived_laws bi pure_forall thm
+R19948:19961 iris.bi.derived_laws bi pure_forall thm
+R19948:19961 iris.bi.derived_laws bi pure_forall thm
+R19985:19996 iris.bi.derived_laws bi pure_impl thm
+R19985:19996 iris.bi.derived_laws bi pure_impl thm
+R19985:19996 iris.bi.derived_laws bi pure_impl thm
+R20027:20027 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20053:20058 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20063:20063 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20028:20043 iris.bi.big_op <> big_sepS_elem_of thm
+R20027:20027 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20053:20058 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20063:20063 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20028:20043 iris.bi.big_op <> big_sepS_elem_of thm
+R20088:20088 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20137:20142 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20150:20150 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20089:20100 xv6iris.RiscvPtsto <> reg_valid_dq thm
+R20116:20130 Riscv.rv64d_types <> register_lookup def
+R20088:20088 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20137:20142 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20150:20150 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20089:20100 xv6iris.RiscvPtsto <> reg_valid_dq thm
+R20116:20130 Riscv.rv64d_types <> register_lookup def
+prf 20567:20583 <> hreg_frame_ro_ext
+binder 20585:20586 <> Df:206
+binder 20588:20589 <> rs:207
+binder 20591:20593 <> rs':208
+binder 20595:20597 <> Dro:209
+R20628:20635 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20605:20616 xv6iris.HartLift <> reg_agree_on def
+R20618:20620 xv6iris.HartSpan <> Dro:209 var
+R20622:20623 xv6iris.HartSpan <> rs:207 var
+R20625:20627 xv6iris.HartSpan <> rs':208 var
+R20659:20666 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R20636:20648 xv6iris.HartSpan <> hreg_frame_ro def
+R20650:20651 xv6iris.HartSpan <> Df:206 var
+R20653:20654 xv6iris.HartSpan <> rs:207 var
+R20656:20658 xv6iris.HartSpan <> Dro:209 var
+R20667:20679 xv6iris.HartSpan <> hreg_frame_ro def
+R20681:20682 xv6iris.HartSpan <> Df:206 var
+R20684:20686 xv6iris.HartSpan <> rs':208 var
+R20688:20690 xv6iris.HartSpan <> Dro:209 var
+R20727:20739 xv6iris.HartSpan <> hreg_frame_ro def
+R20727:20739 xv6iris.HartSpan <> hreg_frame_ro def
+R20727:20739 xv6iris.HartSpan <> hreg_frame_ro def
+R20748:20762 iris.bi.big_op <> big_sepS_proper thm
+R20748:20762 iris.bi.big_op <> big_sepS_proper thm
+prf 21550:21568 <> wp_hspan_node_local
+binder 21571:21571 <> X:210
+R21589:21592 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21586:21586 Riscv.rv64d_types <> M def
+R21588:21588 xv6iris.HartSpan <> X:210 var
+R21593:21593 Riscv.rv64d_types <> M def
+R21595:21598 Corelib.Init.Datatypes <> unit ind
+binder 21582:21582 <> C:211
+R21618:21621 stdpp.gmap <> gset def
+R21623:21630 Riscv.rv64d_types <> register variant
+binder 21608:21610 <> Drw:212
+binder 21612:21614 <> Dro:213
+R21653:21656 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21645:21652 Riscv.rv64d_types <> register variant
+R21657:21661 iris.algebra.dfrac <> dfrac ind
+binder 21640:21641 <> Df:214
+R21670:21677 Riscv.rv64d_types <> regstate rec
+binder 21665:21666 <> rs:215
+R21685:21685 Riscv.rv64d_types <> M def
+R21687:21687 xv6iris.HartSpan <> X:210 var
+binder 21681:21681 <> m:216
+R21702:21709 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21696:21699 xv6iris.HartSwp <> mctx def
+R21701:21701 xv6iris.HartSpan <> C:211 var
+R21720:21727 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21713:21716 stdpp.base <> ::stdpp_scope:x_'##'_x not
+R21710:21712 xv6iris.HartSpan <> Drw:212 var
+R21717:21719 xv6iris.HartSpan <> Dro:213 var
+R21753:21760 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R21745:21747 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R21728:21738 xv6iris.HartSpan <> hspan_stops def
+R21744:21744 xv6iris.HartSpan <> m:216 var
+R21740:21742 xv6iris.HartSpan <> Drw:212 var
+R21748:21752 Corelib.Init.Datatypes <> false constr
+R21761:21764 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R21773:21784 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R21765:21772 xv6iris.RiscvPtsto <> gen_cert def
+R21802:21813 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R21785:21794 xv6iris.HartLift <> hreg_frame def
+R21796:21797 xv6iris.HartSpan <> rs:215 var
+R21799:21801 xv6iris.HartSpan <> Drw:212 var
+R21837:21848 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R21814:21826 xv6iris.HartSpan <> hreg_frame_ro def
+R21828:21829 xv6iris.HartSpan <> Df:214 var
+R21831:21832 xv6iris.HartSpan <> rs:215 var
+R21834:21836 xv6iris.HartSpan <> Dro:213 var
+R22140:22151 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R21849:21853 iris.bi.interface <> ::bi_scope:'▷'_x not
+R22139:22139 iris.bi.interface <> ::bi_scope:'▷'_x not
+R21854:21858 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R21888:21901 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R21864:21864 Riscv.rv64d_types <> M def
+R21866:21866 xv6iris.HartSpan <> X:210 var
+binder 21859:21860 <> m2:217
+R21880:21887 Riscv.rv64d_types <> regstate rec
+binder 21870:21872 <> rsM:218
+R21880:21887 Riscv.rv64d_types <> regstate rec
+binder 21874:21876 <> rs2:219
+R21941:21957 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R21902:21904 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R21938:21940 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R21905:21916 xv6iris.HartLift <> reg_agree_on def
+R21922:21926 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R21919:21921 xv6iris.HartSpan <> Drw:212 var
+R21927:21929 xv6iris.HartSpan <> Dro:213 var
+R21932:21933 xv6iris.HartSpan <> rs:215 var
+R21935:21937 xv6iris.HartSpan <> rsM:218 var
+R21997:22013 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R21958:21960 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R21994:21996 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R21961:21970 xv6iris.HartSpan <> hspan_node def
+R21985:21985 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21988:21989 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21993:21993 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21986:21987 xv6iris.HartSpan <> m2:217 var
+R21990:21992 xv6iris.HartSpan <> rs2:219 var
+R21976:21976 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21978:21979 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21983:21983 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R21977:21977 xv6iris.HartSpan <> m:216 var
+R21980:21982 xv6iris.HartSpan <> rsM:218 var
+R21972:21974 xv6iris.HartSpan <> Drw:212 var
+R22032:22048 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R22014:22023 xv6iris.HartLift <> hreg_frame def
+R22025:22027 xv6iris.HartSpan <> rs2:219 var
+R22029:22031 xv6iris.HartSpan <> Drw:212 var
+R22073:22089 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R22049:22061 xv6iris.HartSpan <> hreg_frame_ro def
+R22063:22064 xv6iris.HartSpan <> Df:214 var
+R22066:22068 xv6iris.HartSpan <> rs2:219 var
+R22070:22072 xv6iris.HartSpan <> Dro:213 var
+R22090:22093 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R22138:22138 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R22123:22126 iris.program_logic.language <> expr proj
+R22128:22137 xv6iris.RiscvLang <> riscv_lang def
+R22094:22098 xv6iris.RiscvLang <> HartE constr
+R22100:22105 xv6iris.RiscvLang <> gen_id def
+R22107:22112 xv6iris.RiscvLang <> cpu_id def
+R22115:22115 xv6iris.HartSpan <> C:211 var
+R22117:22118 xv6iris.HartSpan <> m2:217 var
+R22152:22155 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R22199:22199 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R22184:22187 iris.program_logic.language <> expr proj
+R22189:22198 xv6iris.RiscvLang <> riscv_lang def
+R22156:22160 xv6iris.RiscvLang <> HartE constr
+R22162:22167 xv6iris.RiscvLang <> gen_id def
+R22169:22174 xv6iris.RiscvLang <> cpu_id def
+R22177:22177 xv6iris.HartSpan <> C:211 var
+R22179:22179 xv6iris.HartSpan <> m:216 var
+R22338:22340 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22327:22334 xv6iris.HartSwp <> is_extra def
+R22341:22345 Corelib.Init.Datatypes <> false constr
+R22338:22340 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22327:22334 xv6iris.HartSwp <> is_extra def
+R22341:22345 Corelib.Init.Datatypes <> false constr
+R22447:22447 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22460:22465 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22473:22473 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22448:22459 xv6iris.RiscvExec <> wp_hart_step thm
+R22447:22447 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22460:22465 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22473:22473 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22448:22459 xv6iris.RiscvExec <> wp_hart_step thm
+R22876:22876 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22904:22909 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22919:22919 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22877:22892 xv6iris.HartLift <> hreg_frame_agree thm
+R22876:22876 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22904:22909 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22919:22919 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22877:22892 xv6iris.HartLift <> hreg_frame_agree thm
+R22945:22945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22979:22984 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22994:22994 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22946:22964 xv6iris.HartSpan <> hreg_frame_ro_agree thm
+R22945:22945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22979:22984 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22994:22994 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22946:22964 xv6iris.HartSpan <> hreg_frame_ro_agree thm
+R23024:23035 xv6iris.HartLift <> reg_agree_on def
+R23041:23045 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R23024:23035 xv6iris.HartLift <> reg_agree_on def
+R23041:23045 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R23087:23099 stdpp.base <> elem_of_union meth
+R23087:23099 stdpp.base <> elem_of_union meth
+R23633:23635 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R23658:23660 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R23639:23642 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23643:23648 Corelib.Init.Datatypes <> length def
+R23633:23635 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R23658:23660 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R23639:23642 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23643:23648 Corelib.Init.Datatypes <> length def
+R23823:23846 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23805:23814 xv6iris.RiscvLang <> hart_agent def
+R23816:23821 xv6iris.RiscvLang <> cpu_id def
+R23847:23853 xv6iris.HartLift <> hbar_tv def
+R23856:23865 xv6iris.RiscvLang <> hart_agent def
+R23867:23872 xv6iris.RiscvLang <> cpu_id def
+R23920:23929 xv6iris.HartLift <> hbar_tv_ge thm
+R23823:23846 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23805:23814 xv6iris.RiscvLang <> hart_agent def
+R23816:23821 xv6iris.RiscvLang <> cpu_id def
+R23847:23853 xv6iris.HartLift <> hbar_tv def
+R23856:23865 xv6iris.RiscvLang <> hart_agent def
+R23867:23872 xv6iris.RiscvLang <> cpu_id def
+R23920:23929 xv6iris.HartLift <> hbar_tv_ge thm
+R23942:23942 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24121:24137 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24144:24144 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23943:23963 xv6iris.RiscvExec <> tso_interp_of_advance thm
+R23983:23992 xv6iris.RiscvLang <> hart_agent def
+R23994:23999 xv6iris.RiscvLang <> cpu_id def
+R24015:24021 xv6iris.HartLift <> hbar_tv def
+R24024:24033 xv6iris.RiscvLang <> hart_agent def
+R24035:24040 xv6iris.RiscvLang <> cpu_id def
+R24067:24079 stdpp.fin <> fin_to_nat_lt thm
+R24081:24086 xv6iris.RiscvLang <> cpu_id def
+R24095:24104 xv6iris.HartLift <> hbar_tv_le thm
+R23942:23942 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24121:24137 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24144:24144 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R23943:23963 xv6iris.RiscvExec <> tso_interp_of_advance thm
+R23983:23992 xv6iris.RiscvLang <> hart_agent def
+R23994:23999 xv6iris.RiscvLang <> cpu_id def
+R24015:24021 xv6iris.HartLift <> hbar_tv def
+R24024:24033 xv6iris.RiscvLang <> hart_agent def
+R24035:24040 xv6iris.RiscvLang <> cpu_id def
+R24067:24079 stdpp.fin <> fin_to_nat_lt thm
+R24081:24086 xv6iris.RiscvLang <> cpu_id def
+R24095:24104 xv6iris.HartLift <> hbar_tv_le thm
+R24342:24363 stdpp.decidable <> bool_decide_eq_false_1 thm
+R24366:24375 stdpp.decidable <> dec_stable thm
+R24342:24363 stdpp.decidable <> bool_decide_eq_false_1 thm
+R24366:24375 stdpp.decidable <> dec_stable thm
+R24408:24412 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R24408:24412 stdpp.base <> ::stdpp_scope:x_'∉'_x not
+R24455:24466 xv6iris.HartLift <> reg_agree_on def
+R24473:24484 Riscv.rv64d_types <> register_set def
+R24526:24537 Riscv.rv64d_types <> register_set def
+R24455:24466 xv6iris.HartLift <> reg_agree_on def
+R24473:24484 Riscv.rv64d_types <> register_set def
+R24526:24537 Riscv.rv64d_types <> register_set def
+R24590:24595 stdpp.base <> decide def
+R24600:24602 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24590:24595 stdpp.base <> decide def
+R24600:24602 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R24644:24662 Riscv.rv64d_types <> register_lookup_set thm
+R24644:24662 Riscv.rv64d_types <> register_lookup_set thm
+R24644:24662 Riscv.rv64d_types <> register_lookup_set thm
+R24644:24662 Riscv.rv64d_types <> register_lookup_set thm
+R24644:24662 Riscv.rv64d_types <> register_lookup_set thm
+R24685:24707 Riscv.rv64d_types <> irrelevant_register_set thm
+R24748:24765 xv6iris.RiscvPtsto <> register_beq_false thm
+R24685:24707 Riscv.rv64d_types <> irrelevant_register_set thm
+R24748:24765 xv6iris.RiscvPtsto <> register_beq_false thm
+R24685:24707 Riscv.rv64d_types <> irrelevant_register_set thm
+R24748:24765 xv6iris.RiscvPtsto <> register_beq_false thm
+R24685:24707 Riscv.rv64d_types <> irrelevant_register_set thm
+R24748:24765 xv6iris.RiscvPtsto <> register_beq_false thm
+R24685:24707 Riscv.rv64d_types <> irrelevant_register_set thm
+R24748:24765 xv6iris.RiscvPtsto <> register_beq_false thm
+R24830:24841 xv6iris.HartLift <> reg_agree_on def
+R24851:24862 Riscv.rv64d_types <> register_set def
+R24830:24841 xv6iris.HartLift <> reg_agree_on def
+R24851:24862 Riscv.rv64d_types <> register_set def
+R24929:24932 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R24929:24932 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R24985:25007 Riscv.rv64d_types <> irrelevant_register_set thm
+R25047:25064 xv6iris.RiscvPtsto <> register_beq_false thm
+R24985:25007 Riscv.rv64d_types <> irrelevant_register_set thm
+R25047:25064 xv6iris.RiscvPtsto <> register_beq_false thm
+R24985:25007 Riscv.rv64d_types <> irrelevant_register_set thm
+R25047:25064 xv6iris.RiscvPtsto <> register_beq_false thm
+R25118:25132 iris.bi.updates <> fupd_mask_intro thm
+R25142:25155 stdpp.sets <> empty_subseteq thm
+R25118:25132 iris.bi.updates <> fupd_mask_intro thm
+R25142:25155 stdpp.sets <> empty_subseteq thm
+R25197:25198 Corelib.Init.Datatypes <> tt constr
+R25204:25209 xv6iris.RiscvLang <> MState constr
+R25212:25223 Riscv.rv64d_types <> register_set def
+R25197:25198 Corelib.Init.Datatypes <> tt constr
+R25204:25209 xv6iris.RiscvLang <> MState constr
+R25212:25223 Riscv.rv64d_types <> register_set def
+R25451:25453 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25454:25459 xv6iris.RiscvLang <> MState constr
+R25462:25473 Riscv.rv64d_types <> register_set def
+R25451:25453 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25454:25459 xv6iris.RiscvLang <> MState constr
+R25462:25473 Riscv.rv64d_types <> register_set def
+R25542:25542 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25586:25591 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25601:25601 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25543:25559 xv6iris.HartLift <> hreg_frame_update thm
+R25542:25542 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25586:25591 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25601:25601 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R25543:25559 xv6iris.HartLift <> hreg_frame_update thm
+R25777:25777 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25781:25785 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25790:25791 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25795:25796 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25824:25846 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25868:25868 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25788:25789 Corelib.Init.Datatypes <> tt constr
+R25797:25808 Riscv.rv64d_types <> register_set def
+R25777:25777 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25781:25785 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25790:25791 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25795:25796 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25824:25846 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25868:25868 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R25788:25789 Corelib.Init.Datatypes <> tt constr
+R25797:25808 Riscv.rv64d_types <> register_set def
+R25956:25969 xv6iris.HartLift <> hreg_frame_ext thm
+R25972:25983 Riscv.rv64d_types <> register_set def
+R26022:26033 Riscv.rv64d_types <> register_set def
+R25956:25969 xv6iris.HartLift <> hreg_frame_ext thm
+R25972:25983 Riscv.rv64d_types <> register_set def
+R26022:26033 Riscv.rv64d_types <> register_set def
+R26082:26098 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26107:26118 Riscv.rv64d_types <> register_set def
+R26082:26098 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26107:26118 Riscv.rv64d_types <> register_set def
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R26252:26266 iris.bi.updates <> fupd_mask_intro thm
+R26276:26289 stdpp.sets <> empty_subseteq thm
+R26332:26337 xv6iris.RiscvLang <> MState constr
+R26702:26702 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26706:26709 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26711:26711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26715:26715 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26719:26724 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26746:26746 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R26822:26835 xv6iris.HartLift <> hreg_frame_ext thm
+R26876:26892 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+prf 27085:27102 <> hspani_shift_local
+binder 27105:27105 <> X:220
+R27124:27127 stdpp.gmap <> gset def
+R27129:27136 Riscv.rv64d_types <> register variant
+binder 27116:27116 <> D:221
+binder 27118:27120 <> Drw:222
+R27156:27163 Riscv.rv64d_types <> regstate rec
+binder 27146:27148 <> rsA:223
+binder 27150:27152 <> rsB:224
+R27171:27171 Riscv.rv64d_types <> M def
+R27173:27173 xv6iris.HartSpan <> X:220 var
+binder 27167:27167 <> m:225
+R27185:27187 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R27182:27182 Riscv.rv64d_types <> M def
+R27184:27184 xv6iris.HartSpan <> X:220 var
+R27188:27195 Riscv.rv64d_types <> regstate rec
+binder 27177:27178 <> c':226
+R27226:27233 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R27204:27215 xv6iris.HartLift <> reg_agree_on def
+R27217:27217 xv6iris.HartSpan <> D:221 var
+R27219:27221 xv6iris.HartSpan <> rsA:223 var
+R27223:27225 xv6iris.HartSpan <> rsB:224 var
+R27258:27261 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R27234:27239 xv6iris.HartSpan <> hspani def
+R27256:27257 xv6iris.HartSpan <> c':226 var
+R27247:27247 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R27249:27250 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R27254:27254 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R27248:27248 xv6iris.HartSpan <> m:225 var
+R27251:27253 xv6iris.HartSpan <> rsA:223 var
+R27243:27245 xv6iris.HartSpan <> Drw:222 var
+R27241:27241 xv6iris.HartSpan <> D:221 var
+R27262:27267 xv6iris.HartSpan <> hspani def
+R27284:27285 xv6iris.HartSpan <> c':226 var
+R27275:27275 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R27277:27278 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R27282:27282 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R27276:27276 xv6iris.HartSpan <> m:225 var
+R27279:27281 xv6iris.HartSpan <> rsB:224 var
+R27271:27273 xv6iris.HartSpan <> Drw:222 var
+R27269:27269 xv6iris.HartSpan <> D:221 var
+prf 27615:27636 <> wp_hart_span_acc_local
+R27649:27652 stdpp.gmap <> gset def
+R27654:27661 Riscv.rv64d_types <> register variant
+binder 27639:27641 <> Drw:227
+binder 27643:27645 <> Dro:228
+R27684:27687 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R27676:27683 Riscv.rv64d_types <> register variant
+R27688:27692 iris.algebra.dfrac <> dfrac ind
+binder 27671:27672 <> Df:229
+R27711:27718 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R27704:27707 stdpp.base <> ::stdpp_scope:x_'##'_x not
+R27701:27703 xv6iris.HartSpan <> Drw:227 var
+R27708:27710 xv6iris.HartSpan <> Dro:228 var
+R27719:27725 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R27736:27737 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R27730:27730 Riscv.rv64d_types <> M def
+R27732:27735 Corelib.Init.Datatypes <> unit ind
+binder 27726:27726 <> m:230
+R27750:27757 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R27738:27740 Corelib.Init.Wf <> Acc ind
+R27749:27749 xv6iris.HartSpan <> m:230 var
+R27742:27747 xv6iris.HartSpan <> mchild def
+R27758:27764 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R27778:27783 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R27770:27777 Riscv.rv64d_types <> regstate rec
+binder 27765:27766 <> rs:231
+R27809:27816 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R27801:27803 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R27784:27794 xv6iris.HartSpan <> hspan_stops def
+R27800:27800 xv6iris.HartSpan <> m:230 var
+R27796:27798 xv6iris.HartSpan <> Drw:227 var
+R27804:27808 Corelib.Init.Datatypes <> false constr
+R27817:27820 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R27829:27840 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R27821:27828 xv6iris.RiscvPtsto <> gen_cert def
+R27858:27869 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R27841:27850 xv6iris.HartLift <> hreg_frame def
+R27852:27853 xv6iris.HartSpan <> rs:231 var
+R27855:27857 xv6iris.HartSpan <> Drw:227 var
+R27893:27904 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R27870:27882 xv6iris.HartSpan <> hreg_frame_ro def
+R27884:27885 xv6iris.HartSpan <> Df:229 var
+R27887:27888 xv6iris.HartSpan <> rs:231 var
+R27890:27892 xv6iris.HartSpan <> Dro:228 var
+R28275:28286 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R27905:27909 iris.bi.interface <> ::bi_scope:'▷'_x not
+R28274:28274 iris.bi.interface <> ::bi_scope:'▷'_x not
+R27910:27914 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R27943:27956 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R27920:27920 Riscv.rv64d_types <> M def
+R27922:27925 Corelib.Init.Datatypes <> unit ind
+binder 27915:27916 <> m':232
+R27935:27942 Riscv.rv64d_types <> regstate rec
+binder 27929:27931 <> rs':233
+R28136:28152 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R27957:27959 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R28133:28135 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R27960:27966 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R27981:27996 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R27973:27980 Riscv.rv64d_types <> regstate rec
+binder 27967:27969 <> rs0:234
+R28030:28047 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R27997:28008 xv6iris.HartLift <> reg_agree_on def
+R28014:28018 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R28011:28013 xv6iris.HartSpan <> Drw:227 var
+R28019:28021 xv6iris.HartSpan <> Dro:228 var
+R28024:28025 xv6iris.HartSpan <> rs:231 var
+R28027:28029 xv6iris.HartSpan <> rs0:234 var
+R28090:28107 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R28048:28052 xv6iris.HartSpan <> hspan def
+R28081:28081 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28084:28085 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28089:28089 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28082:28083 xv6iris.HartSpan <> m':232 var
+R28086:28088 xv6iris.HartSpan <> rs':233 var
+R28072:28072 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28074:28075 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28079:28079 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R28073:28073 xv6iris.HartSpan <> m:230 var
+R28076:28078 xv6iris.HartSpan <> rs0:234 var
+R28068:28070 xv6iris.HartSpan <> Drw:227 var
+R28058:28062 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R28055:28057 xv6iris.HartSpan <> Drw:227 var
+R28063:28065 xv6iris.HartSpan <> Dro:228 var
+R28126:28128 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R28108:28118 xv6iris.HartSpan <> hspan_stops def
+R28124:28125 xv6iris.HartSpan <> m':232 var
+R28120:28122 xv6iris.HartSpan <> Drw:227 var
+R28129:28132 Corelib.Init.Datatypes <> true constr
+R28171:28187 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28153:28162 xv6iris.HartLift <> hreg_frame def
+R28164:28166 xv6iris.HartSpan <> rs':233 var
+R28168:28170 xv6iris.HartSpan <> Drw:227 var
+R28212:28228 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28188:28200 xv6iris.HartSpan <> hreg_frame_ro def
+R28202:28203 xv6iris.HartSpan <> Df:229 var
+R28205:28207 xv6iris.HartSpan <> rs':233 var
+R28209:28211 xv6iris.HartSpan <> Dro:228 var
+R28229:28232 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R28273:28273 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R28258:28261 iris.program_logic.language <> expr proj
+R28263:28272 xv6iris.RiscvLang <> riscv_lang def
+R28233:28237 xv6iris.RiscvLang <> HartE constr
+R28239:28244 xv6iris.RiscvLang <> gen_id def
+R28246:28251 xv6iris.RiscvLang <> cpu_id def
+R28253:28254 xv6iris.HartSpan <> m':232 var
+R28287:28290 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R28330:28330 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R28315:28318 iris.program_logic.language <> expr proj
+R28320:28329 xv6iris.RiscvLang <> riscv_lang def
+R28291:28295 xv6iris.RiscvLang <> HartE constr
+R28297:28302 xv6iris.RiscvLang <> gen_id def
+R28304:28309 xv6iris.RiscvLang <> cpu_id def
+R28311:28311 xv6iris.HartSpan <> m:230 var
+R28457:28457 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28549:28554 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28578:28578 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28458:28476 xv6iris.HartSpan <> wp_hspan_node_local thm
+R28532:28538 xv6iris.HartSwp <> mctx_id thm
+R28488:28488 Riscv.rv64d_types <> M def
+R28490:28493 Corelib.Init.Datatypes <> unit ind
+binder 28483:28484 <> m':235
+R28498:28499 xv6iris.HartSpan <> m':235 var
+R28457:28457 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28549:28554 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28578:28578 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28458:28476 xv6iris.HartSpan <> wp_hspan_node_local thm
+R28532:28538 xv6iris.HartSwp <> mctx_id thm
+R28488:28488 Riscv.rv64d_types <> M def
+R28490:28493 Corelib.Init.Datatypes <> unit ind
+binder 28483:28484 <> m':236
+R28498:28499 xv6iris.HartSpan <> m':236 var
+R28650:28660 xv6iris.HartSpan <> hspan_stops def
+R28650:28660 xv6iris.HartSpan <> hspan_stops def
+R28769:28769 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R28777:28780 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R28783:28783 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R28787:28792 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R28806:28806 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R28769:28769 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R28777:28780 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R28783:28783 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R28787:28792 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R28806:28806 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R28881:28888 stdpp.relations <> rtc_once thm
+R28881:28888 stdpp.relations <> rtc_once thm
+R29047:29047 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29110:29131 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29155:29155 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29055:29071 xv6iris.HartSpan <> hspan_node_mchild thm
+R29086:29086 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29089:29090 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29094:29094 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29077:29077 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29079:29080 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29084:29084 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29047:29047 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29110:29131 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29155:29155 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29055:29071 xv6iris.HartSpan <> hspan_node_mchild thm
+R29086:29086 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29089:29090 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29094:29094 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29077:29077 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29079:29080 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29084:29084 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R29219:29219 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R29227:29230 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R29233:29233 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R29237:29242 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R29256:29256 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R29219:29219 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R29227:29230 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R29233:29233 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R29237:29242 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R29256:29256 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R29328:29334 stdpp.relations <> rtc_inv thm
+R29328:29334 stdpp.relations <> rtc_inv thm
+R29511:29515 stdpp.relations <> rtc_l constr
+R29511:29515 stdpp.relations <> rtc_l constr
+R29602:29606 stdpp.relations <> rtc_l constr
+R29602:29606 stdpp.relations <> rtc_l constr
+R29638:29655 xv6iris.HartSpan <> hspani_shift_local thm
+R29661:29665 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R29638:29655 xv6iris.HartSpan <> hspani_shift_local thm
+R29661:29665 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+prf 31424:31435 <> wp_hart_span
+R31448:31451 stdpp.gmap <> gset def
+R31453:31460 Riscv.rv64d_types <> register variant
+binder 31438:31440 <> Drw:237
+binder 31442:31444 <> Dro:238
+R31477:31480 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31469:31476 Riscv.rv64d_types <> register variant
+R31481:31485 iris.algebra.dfrac <> dfrac ind
+binder 31464:31465 <> Df:239
+R31500:31507 Riscv.rv64d_types <> regstate rec
+binder 31495:31496 <> rs:240
+R31515:31515 Riscv.rv64d_types <> M def
+R31517:31520 Corelib.Init.Datatypes <> unit ind
+binder 31511:31511 <> m:241
+R31539:31546 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31532:31535 stdpp.base <> ::stdpp_scope:x_'##'_x not
+R31529:31531 xv6iris.HartSpan <> Drw:237 var
+R31536:31538 xv6iris.HartSpan <> Dro:238 var
+R31572:31579 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31564:31566 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31547:31557 xv6iris.HartSpan <> hspan_stops def
+R31563:31563 xv6iris.HartSpan <> m:241 var
+R31559:31561 xv6iris.HartSpan <> Drw:237 var
+R31567:31571 Corelib.Init.Datatypes <> false constr
+R31588:31597 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R31580:31587 xv6iris.RiscvPtsto <> gen_cert def
+R31615:31624 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31598:31607 xv6iris.HartLift <> hreg_frame def
+R31609:31610 xv6iris.HartSpan <> rs:240 var
+R31612:31614 xv6iris.HartSpan <> Drw:237 var
+R31648:31657 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31625:31637 xv6iris.HartSpan <> hreg_frame_ro def
+R31639:31640 xv6iris.HartSpan <> Df:239 var
+R31642:31643 xv6iris.HartSpan <> rs:240 var
+R31645:31647 xv6iris.HartSpan <> Dro:238 var
+R32014:32023 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31658:31662 iris.bi.interface <> ::bi_scope:'▷'_x not
+R32013:32013 iris.bi.interface <> ::bi_scope:'▷'_x not
+R31663:31667 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R31696:31707 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R31673:31673 Riscv.rv64d_types <> M def
+R31675:31678 Corelib.Init.Datatypes <> unit ind
+binder 31668:31669 <> m':242
+R31688:31695 Riscv.rv64d_types <> regstate rec
+binder 31682:31684 <> rs':243
+R31881:31895 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31708:31710 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R31878:31880 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R31711:31717 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R31732:31745 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R31724:31731 Riscv.rv64d_types <> regstate rec
+binder 31718:31720 <> rs0:244
+R31779:31794 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R31746:31757 xv6iris.HartLift <> reg_agree_on def
+R31763:31767 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R31760:31762 xv6iris.HartSpan <> Drw:237 var
+R31768:31770 xv6iris.HartSpan <> Dro:238 var
+R31773:31774 xv6iris.HartSpan <> rs:240 var
+R31776:31778 xv6iris.HartSpan <> rs0:244 var
+R31837:31852 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R31795:31799 xv6iris.HartSpan <> hspan def
+R31828:31828 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31831:31832 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31836:31836 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31829:31830 xv6iris.HartSpan <> m':242 var
+R31833:31835 xv6iris.HartSpan <> rs':243 var
+R31819:31819 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31821:31822 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31826:31826 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R31820:31820 xv6iris.HartSpan <> m:241 var
+R31823:31825 xv6iris.HartSpan <> rs0:244 var
+R31815:31817 xv6iris.HartSpan <> Drw:237 var
+R31805:31809 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R31802:31804 xv6iris.HartSpan <> Drw:237 var
+R31810:31812 xv6iris.HartSpan <> Dro:238 var
+R31871:31873 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R31853:31863 xv6iris.HartSpan <> hspan_stops def
+R31869:31870 xv6iris.HartSpan <> m':242 var
+R31865:31867 xv6iris.HartSpan <> Drw:237 var
+R31874:31877 Corelib.Init.Datatypes <> true constr
+R31914:31928 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31896:31905 xv6iris.HartLift <> hreg_frame def
+R31907:31909 xv6iris.HartSpan <> rs':243 var
+R31911:31913 xv6iris.HartSpan <> Drw:237 var
+R31953:31967 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31929:31941 xv6iris.HartSpan <> hreg_frame_ro def
+R31943:31944 xv6iris.HartSpan <> Df:239 var
+R31946:31948 xv6iris.HartSpan <> rs':243 var
+R31950:31952 xv6iris.HartSpan <> Dro:238 var
+R31968:31971 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R32012:32012 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R31997:32000 iris.program_logic.language <> expr proj
+R32002:32011 xv6iris.RiscvLang <> riscv_lang def
+R31972:31976 xv6iris.RiscvLang <> HartE constr
+R31978:31983 xv6iris.RiscvLang <> gen_id def
+R31985:31990 xv6iris.RiscvLang <> cpu_id def
+R31992:31993 xv6iris.HartSpan <> m':242 var
+R32024:32027 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R32067:32067 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R32052:32055 iris.program_logic.language <> expr proj
+R32057:32066 xv6iris.RiscvLang <> riscv_lang def
+R32028:32032 xv6iris.RiscvLang <> HartE constr
+R32034:32039 xv6iris.RiscvLang <> gen_id def
+R32041:32046 xv6iris.RiscvLang <> cpu_id def
+R32048:32048 xv6iris.HartSpan <> m:241 var
+R34384:34405 xv6iris.HartSpan <> wp_hart_span_acc_local thm
+R34427:34430 xv6iris.HartSpan <> macc def
+R34384:34405 xv6iris.HartSpan <> wp_hart_span_acc_local thm
+R34427:34430 xv6iris.HartSpan <> macc def
+prf 35329:35348 <> reg_agree_refl_local
+R35355:35358 stdpp.gmap <> gset def
+R35360:35367 Riscv.rv64d_types <> register variant
+binder 35351:35351 <> D:245
+R35376:35383 Riscv.rv64d_types <> regstate rec
+binder 35371:35372 <> rs:246
+R35392:35403 xv6iris.HartLift <> reg_agree_on def
+R35405:35405 xv6iris.HartSpan <> D:245 var
+R35407:35408 xv6iris.HartSpan <> rs:246 var
+R35410:35411 xv6iris.HartSpan <> rs:246 var
+prf 35468:35487 <> reg_agree_mono_local
+R35497:35500 stdpp.gmap <> gset def
+R35502:35509 Riscv.rv64d_types <> register variant
+binder 35490:35490 <> D:247
+binder 35492:35493 <> D':248
+R35522:35529 Riscv.rv64d_types <> regstate rec
+binder 35513:35514 <> rs:249
+binder 35516:35518 <> rs':250
+R35546:35549 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35540:35544 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R35538:35539 xv6iris.HartSpan <> D':248 var
+R35545:35545 xv6iris.HartSpan <> D:247 var
+R35571:35574 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35550:35561 xv6iris.HartLift <> reg_agree_on def
+R35563:35563 xv6iris.HartSpan <> D:247 var
+R35565:35566 xv6iris.HartSpan <> rs:249 var
+R35568:35570 xv6iris.HartSpan <> rs':250 var
+R35575:35586 xv6iris.HartLift <> reg_agree_on def
+R35588:35589 xv6iris.HartSpan <> D':248 var
+R35591:35592 xv6iris.HartSpan <> rs:249 var
+R35594:35596 xv6iris.HartSpan <> rs':250 var
+prf 35670:35687 <> swp_span_acc_local
+binder 35690:35690 <> X:251
+R35711:35714 stdpp.gmap <> gset def
+R35716:35723 Riscv.rv64d_types <> register variant
+binder 35701:35703 <> Drw:252
+binder 35705:35707 <> Dro:253
+R35746:35749 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35738:35745 Riscv.rv64d_types <> register variant
+R35750:35754 iris.algebra.dfrac <> dfrac ind
+binder 35733:35734 <> Df:254
+R35773:35780 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35766:35769 stdpp.base <> ::stdpp_scope:x_'##'_x not
+R35763:35765 xv6iris.HartSpan <> Drw:252 var
+R35770:35772 xv6iris.HartSpan <> Dro:253 var
+R35781:35788 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R35796:35798 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R35793:35793 Riscv.rv64d_types <> M def
+R35795:35795 xv6iris.HartSpan <> X:251 var
+binder 35789:35789 <> m:255
+R35811:35818 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35799:35801 Corelib.Init.Wf <> Acc ind
+R35810:35810 xv6iris.HartSpan <> m:255 var
+R35803:35808 xv6iris.HartSpan <> mchild def
+R35819:35826 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R35868:35874 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R35832:35839 Riscv.rv64d_types <> regstate rec
+binder 35827:35828 <> rs:256
+R35848:35851 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35847:35847 xv6iris.HartSpan <> X:251 var
+R35860:35863 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35852:35859 Riscv.rv64d_types <> regstate rec
+binder 35843:35843 <> Q:257
+R35905:35912 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R35875:35879 xv6iris.HartSpan <> hvalE def
+R35904:35904 xv6iris.HartSpan <> Q:257 var
+R35902:35902 xv6iris.HartSpan <> m:255 var
+R35899:35900 xv6iris.HartSpan <> rs:256 var
+R35895:35897 xv6iris.HartSpan <> Drw:252 var
+R35885:35889 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R35882:35884 xv6iris.HartSpan <> Drw:252 var
+R35890:35892 xv6iris.HartSpan <> Dro:253 var
+R35921:35930 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R35913:35920 xv6iris.RiscvPtsto <> gen_cert def
+R35948:35957 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R35931:35940 xv6iris.HartLift <> hreg_frame def
+R35942:35943 xv6iris.HartSpan <> rs:256 var
+R35945:35947 xv6iris.HartSpan <> Drw:252 var
+R35981:35990 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R35958:35970 xv6iris.HartSpan <> hreg_frame_ro def
+R35972:35973 xv6iris.HartSpan <> Df:254 var
+R35975:35976 xv6iris.HartSpan <> rs:256 var
+R35978:35980 xv6iris.HartSpan <> Dro:253 var
+R35991:35993 xv6iris.HartSwp <> swp def
+binder 36002:36002 <> v:258
+R36007:36010 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R36014:36015 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 36011:36013 <> rs':259
+R36029:36053 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R36016:36018 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R36026:36028 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R36019:36019 xv6iris.HartSpan <> Q:257 var
+R36023:36025 xv6iris.HartSpan <> rs':259 var
+R36021:36021 xv6iris.HartSpan <> v:258 var
+R36072:36076 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R36054:36063 xv6iris.HartLift <> hreg_frame def
+R36065:36067 xv6iris.HartSpan <> rs':259 var
+R36069:36071 xv6iris.HartSpan <> Drw:252 var
+R36077:36089 xv6iris.HartSpan <> hreg_frame_ro def
+R36091:36092 xv6iris.HartSpan <> Df:254 var
+R36094:36096 xv6iris.HartSpan <> rs':259 var
+R36098:36100 xv6iris.HartSpan <> Dro:253 var
+R35995:35995 xv6iris.HartSpan <> m:255 var
+R36223:36225 xv6iris.HartSwp <> swp def
+R36223:36225 xv6iris.HartSwp <> swp def
+R36223:36225 xv6iris.HartSwp <> swp def
+R36267:36277 xv6iris.HartSpan <> hspan_stops def
+R36267:36277 xv6iris.HartSpan <> hspan_stops def
+R36468:36468 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36470:36471 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36474:36474 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36477:36496 xv6iris.HartSpan <> reg_agree_refl_local thm
+R36522:36529 stdpp.relations <> rtc_refl constr
+R36468:36468 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36470:36471 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36474:36474 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R36477:36496 xv6iris.HartSpan <> reg_agree_refl_local thm
+R36522:36529 stdpp.relations <> rtc_refl constr
+R36619:36619 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R36627:36630 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R36632:36632 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R36619:36619 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R36627:36630 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R36632:36632 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R36702:36702 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36806:36828 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36834:36834 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36703:36716 xv6iris.HartLift <> hreg_frame_ext thm
+R36748:36767 xv6iris.HartSpan <> reg_agree_mono_local thm
+R36780:36795 stdpp.sets <> union_subseteq_l thm
+R36702:36702 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36806:36828 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36834:36834 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36703:36716 xv6iris.HartLift <> hreg_frame_ext thm
+R36748:36767 xv6iris.HartSpan <> reg_agree_mono_local thm
+R36780:36795 stdpp.sets <> union_subseteq_l thm
+R36852:36852 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36962:36984 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36990:36990 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36853:36869 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R36904:36923 xv6iris.HartSpan <> reg_agree_mono_local thm
+R36936:36951 stdpp.sets <> union_subseteq_r thm
+R36852:36852 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36962:36984 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36990:36990 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R36853:36869 xv6iris.HartSpan <> hreg_frame_ro_ext thm
+R36904:36923 xv6iris.HartSpan <> reg_agree_mono_local thm
+R36936:36951 stdpp.sets <> union_subseteq_r thm
+R37126:37126 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37176:37197 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37221:37221 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37127:37145 xv6iris.HartSpan <> wp_hspan_node_local thm
+R37126:37126 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37176:37197 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37221:37221 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R37127:37145 xv6iris.HartSpan <> wp_hspan_node_local thm
+R37711:37715 xv6iris.HartSpan <> hvalE def
+R37721:37725 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R37711:37715 xv6iris.HartSpan <> hvalE def
+R37721:37725 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R37813:37818 xv6iris.HartSpan <> hspani def
+R37846:37846 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37849:37850 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37854:37854 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37838:37838 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37840:37841 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37844:37844 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37824:37828 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R37813:37818 xv6iris.HartSpan <> hspani def
+R37846:37846 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37849:37850 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37854:37854 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37838:37838 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37840:37841 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37844:37844 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R37824:37828 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R37970:37976 stdpp.relations <> rtc_inv thm
+R37970:37976 stdpp.relations <> rtc_inv thm
+R38122:38122 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38125:38126 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38130:38130 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38133:38152 xv6iris.HartSpan <> reg_agree_refl_local thm
+R38182:38189 stdpp.relations <> rtc_once thm
+R38122:38122 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38125:38126 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38130:38130 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38133:38152 xv6iris.HartSpan <> reg_agree_refl_local thm
+R38182:38189 stdpp.relations <> rtc_once thm
+R38443:38447 xv6iris.HartSpan <> hspan def
+R38467:38467 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38469:38470 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38473:38473 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38453:38457 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R38443:38447 xv6iris.HartSpan <> hspan def
+R38467:38467 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38469:38470 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38473:38473 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38453:38457 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R38498:38502 stdpp.relations <> rtc_l constr
+R38498:38502 stdpp.relations <> rtc_l constr
+R38541:38545 stdpp.relations <> rtc_l constr
+R38541:38545 stdpp.relations <> rtc_l constr
+R38583:38600 xv6iris.HartSpan <> hspani_shift_local thm
+R38606:38610 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R38583:38600 xv6iris.HartSpan <> hspani_shift_local thm
+R38606:38610 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R38703:38722 xv6iris.HartSpan <> reg_agree_refl_local thm
+R38703:38722 xv6iris.HartSpan <> reg_agree_refl_local thm
+R38760:38760 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38778:38783 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38801:38801 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38761:38767 xv6iris.HartSwp <> swp_use thm
+R38760:38760 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38778:38783 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38801:38801 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38761:38767 xv6iris.HartSwp <> swp_use thm
+R38817:38817 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38900:38905 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38921:38921 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38825:38841 xv6iris.HartSpan <> hspan_node_mchild thm
+R38856:38856 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38859:38860 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38864:38864 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38847:38847 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38849:38850 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38854:38854 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38817:38817 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38900:38905 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38921:38921 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R38825:38841 xv6iris.HartSpan <> hspan_node_mchild thm
+R38856:38856 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38859:38860 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38864:38864 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38847:38847 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38849:38850 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R38854:38854 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+prf 39247:39255 <> swp_spanE
+binder 39258:39258 <> X:260
+R39279:39282 stdpp.gmap <> gset def
+R39284:39291 Riscv.rv64d_types <> register variant
+binder 39269:39271 <> Drw:261
+binder 39273:39275 <> Dro:262
+R39314:39317 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39306:39313 Riscv.rv64d_types <> register variant
+R39318:39322 iris.algebra.dfrac <> dfrac ind
+binder 39301:39302 <> Df:263
+R39331:39338 Riscv.rv64d_types <> regstate rec
+binder 39326:39327 <> rs:264
+R39346:39346 Riscv.rv64d_types <> M def
+R39348:39348 xv6iris.HartSpan <> X:260 var
+binder 39342:39342 <> m:265
+R39363:39366 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39362:39362 xv6iris.HartSpan <> X:260 var
+R39375:39378 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39367:39374 Riscv.rv64d_types <> regstate rec
+binder 39358:39358 <> Q:266
+R39401:39408 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39394:39397 stdpp.base <> ::stdpp_scope:x_'##'_x not
+R39391:39393 xv6iris.HartSpan <> Drw:261 var
+R39398:39400 xv6iris.HartSpan <> Dro:262 var
+R39439:39446 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39409:39413 xv6iris.HartSpan <> hvalE def
+R39438:39438 xv6iris.HartSpan <> Q:266 var
+R39436:39436 xv6iris.HartSpan <> m:265 var
+R39433:39434 xv6iris.HartSpan <> rs:264 var
+R39429:39431 xv6iris.HartSpan <> Drw:261 var
+R39419:39423 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R39416:39418 xv6iris.HartSpan <> Drw:261 var
+R39424:39426 xv6iris.HartSpan <> Dro:262 var
+R39455:39464 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R39447:39454 xv6iris.RiscvPtsto <> gen_cert def
+R39482:39491 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R39465:39474 xv6iris.HartLift <> hreg_frame def
+R39476:39477 xv6iris.HartSpan <> rs:264 var
+R39479:39481 xv6iris.HartSpan <> Drw:261 var
+R39515:39524 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R39492:39504 xv6iris.HartSpan <> hreg_frame_ro def
+R39506:39507 xv6iris.HartSpan <> Df:263 var
+R39509:39510 xv6iris.HartSpan <> rs:264 var
+R39512:39514 xv6iris.HartSpan <> Dro:262 var
+R39525:39527 xv6iris.HartSwp <> swp def
+binder 39536:39536 <> v:267
+R39541:39544 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R39548:39549 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 39545:39547 <> rs':268
+R39563:39587 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R39550:39552 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R39560:39562 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R39553:39553 xv6iris.HartSpan <> Q:266 var
+R39557:39559 xv6iris.HartSpan <> rs':268 var
+R39555:39555 xv6iris.HartSpan <> v:267 var
+R39606:39610 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R39588:39597 xv6iris.HartLift <> hreg_frame def
+R39599:39601 xv6iris.HartSpan <> rs':268 var
+R39603:39605 xv6iris.HartSpan <> Drw:261 var
+R39611:39623 xv6iris.HartSpan <> hreg_frame_ro def
+R39625:39626 xv6iris.HartSpan <> Df:263 var
+R39628:39630 xv6iris.HartSpan <> rs':268 var
+R39632:39634 xv6iris.HartSpan <> Dro:262 var
+R39529:39529 xv6iris.HartSpan <> m:265 var
+R39681:39698 xv6iris.HartSpan <> swp_span_acc_local thm
+R39720:39723 xv6iris.HartSpan <> macc def
+R39681:39698 xv6iris.HartSpan <> swp_span_acc_local thm
+R39720:39723 xv6iris.HartSpan <> macc def
+prf 39756:39763 <> swp_span
+binder 39766:39766 <> X:269
+R39787:39790 stdpp.gmap <> gset def
+R39792:39799 Riscv.rv64d_types <> register variant
+binder 39777:39779 <> Drw:270
+binder 39781:39783 <> Dro:271
+R39822:39825 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39814:39821 Riscv.rv64d_types <> register variant
+R39826:39830 iris.algebra.dfrac <> dfrac ind
+binder 39809:39810 <> Df:272
+R39843:39850 Riscv.rv64d_types <> regstate rec
+binder 39834:39835 <> rs:273
+binder 39837:39839 <> rs':274
+R39858:39858 Riscv.rv64d_types <> M def
+R39860:39860 xv6iris.HartSpan <> X:269 var
+binder 39854:39854 <> m:275
+R39868:39868 xv6iris.HartSpan <> X:269 var
+binder 39864:39864 <> x:276
+R39887:39894 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39880:39883 stdpp.base <> ::stdpp_scope:x_'##'_x not
+R39877:39879 xv6iris.HartSpan <> Drw:270 var
+R39884:39886 xv6iris.HartSpan <> Dro:271 var
+R39928:39935 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R39895:39898 xv6iris.HartSpan <> hval def
+R39925:39927 xv6iris.HartSpan <> rs':274 var
+R39923:39923 xv6iris.HartSpan <> x:276 var
+R39921:39921 xv6iris.HartSpan <> m:275 var
+R39918:39919 xv6iris.HartSpan <> rs:273 var
+R39914:39916 xv6iris.HartSpan <> Drw:270 var
+R39904:39908 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R39901:39903 xv6iris.HartSpan <> Drw:270 var
+R39909:39911 xv6iris.HartSpan <> Dro:271 var
+R39944:39953 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R39936:39943 xv6iris.RiscvPtsto <> gen_cert def
+R39971:39980 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R39954:39963 xv6iris.HartLift <> hreg_frame def
+R39965:39966 xv6iris.HartSpan <> rs:273 var
+R39968:39970 xv6iris.HartSpan <> Drw:270 var
+R40004:40013 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R39981:39993 xv6iris.HartSpan <> hreg_frame_ro def
+R39995:39996 xv6iris.HartSpan <> Df:272 var
+R39998:39999 xv6iris.HartSpan <> rs:273 var
+R40001:40003 xv6iris.HartSpan <> Dro:271 var
+R40014:40016 xv6iris.HartSwp <> swp def
+binder 40025:40025 <> v:277
+R40041:40045 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R40030:40032 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R40038:40040 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R40034:40036 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R40033:40033 xv6iris.HartSpan <> v:277 var
+R40037:40037 xv6iris.HartSpan <> x:276 var
+R40064:40068 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R40046:40055 xv6iris.HartLift <> hreg_frame def
+R40057:40059 xv6iris.HartSpan <> rs':274 var
+R40061:40063 xv6iris.HartSpan <> Drw:270 var
+R40069:40081 xv6iris.HartSpan <> hreg_frame_ro def
+R40083:40084 xv6iris.HartSpan <> Df:272 var
+R40086:40088 xv6iris.HartSpan <> rs':274 var
+R40090:40092 xv6iris.HartSpan <> Dro:271 var
+R40018:40018 xv6iris.HartSpan <> m:275 var
+R40165:40165 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40174:40179 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40188:40188 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40166:40173 xv6iris.HartSwp <> swp_mono thm
+R40206:40206 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40270:40293 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40309:40309 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40207:40215 xv6iris.HartSpan <> swp_spanE thm
+R40242:40251 xv6iris.HartSpan <> hval_hvalE thm
+R40165:40165 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40174:40179 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40188:40188 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40166:40173 xv6iris.HartSwp <> swp_mono thm
+R40206:40206 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40270:40293 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40309:40309 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R40207:40215 xv6iris.HartSpan <> swp_spanE thm
+R40242:40251 xv6iris.HartSpan <> hval_hvalE thm
+R40400:40403 xv6iris.HartSpan span <> sec

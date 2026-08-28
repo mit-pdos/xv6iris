@@ -1,0 +1,7 @@
+DIGEST 700a9df06cd7990da62de517a5cbee96
+Fxv6iris.LinkSysGetpid
+R167:176 xv6iris.LinkMyproc <> <> lib
+R178:191 xv6iris.ProofSysGetpid <> <> lib
+R215:228 xv6iris.ProofSysGetpid SysGetpidProof <> modtype
+R230:235 xv6iris.LinkMyproc Myproc <> modtype
+mod 202:210 <> SysGetpid

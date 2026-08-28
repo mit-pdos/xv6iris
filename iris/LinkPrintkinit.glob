@@ -1,0 +1,7 @@
+DIGEST c4bf101aa4610b85536a62cbd4a80c46
+Fxv6iris.LinkPrintkinit
+R160:171 xv6iris.LinkInitlock <> <> lib
+R173:187 xv6iris.ProofPrintkinit <> <> lib
+R212:226 xv6iris.ProofPrintkinit PrintkinitProof <> modtype
+R228:235 xv6iris.LinkInitlock Initlock <> modtype
+mod 198:207 <> Printkinit

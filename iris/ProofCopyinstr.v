@@ -1120,8 +1120,9 @@ Section ProofCopyinstr.
         sie_cap_gpr KT1 mc (K - 12)%nat b pcur -∗
         cpu_own lvl eb pcur b lks -∗
         pc_is (mword_of_int (KernelSyms.copyinstr + 0x8a) : mword 64) -∗
-        page_own pa0 -∗
-        (page_own pa0 -∗ proc_pt Pd) -∗
+        (* A6.87: the BORROWED page is named -- it is read here *)
+        ProcPtOwn.page_named pa0 -∗
+        (ProcPtOwn.page_named pa0 -∗ proc_pt Pd) -∗
         ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] f j) -∗
         EXIT -∗
         WP (Loop : expr riscv_lang))%I with "[]" as "CHUNK".
@@ -1250,7 +1251,10 @@ Section ProofCopyinstr.
                   C5 !!! Regidx r = C5 !!! Regidx r)
           by (intros; reflexivity).
         (* carve the source window out of the borrowed page *)
-        iDestruct (bb_page_named (pa0) with "Hpg") as (fpg) "Hpg".
+        (* A6.87: the borrowed page comes NAMED pointwise; choose the
+           function once, exactly as [bb_page_named] used to. *)
+        iEval (rewrite /ProcPtOwn.page_named) in "Hpg".
+        iDestruct (bb_any_named (pa0) 4096 with "Hpg") as (fpg) "Hpg".
         assert (Hsplitp : (off + n + (4096 - off - n) = 4096)%nat) by lia.
         iEval (rewrite (bb_split3 (pa0) off n (4096 - off - n) 4096
                           fpg (DfracOwn 1) Hsplitp)) in "Hpg".
@@ -1270,7 +1274,8 @@ Section ProofCopyinstr.
           iDestruct (bb_join3 (pa0) off n (4096 - off - n) 4096 fpg
                        (fun j => fpg (off + j)%nat) (fun j => fpg (off + (n + j))%nat)
                        Hsplitp with "Hpg0 Hsrc Hpg2") as (fpg') "Hpg".
-          iDestruct (bb_page_of_named (pa0) fpg' with "Hpg") as "Hpg".
+          iEval (rewrite /ProcPtOwn.page_named).
+          iDestruct (bb_named_any (pa0) 4096 fpg' with "Hpg") as "Hpg".
           iDestruct ("Hback" with "Hpg") as "Hpt".
           (* ---- +0x26: sb zero,0(a5) -- plant the terminator ---- *)
           assert (Hdi : (done + i' < maxn)%nat) by lia.
@@ -1341,7 +1346,8 @@ Section ProofCopyinstr.
           iDestruct (bb_join3 (pa0) off n (4096 - off - n) 4096 fpg
                        (fun j => fpg (off + j)%nat) (fun j => fpg (off + (n + j))%nat)
                        Hsplitp with "Hpg0 Hsrc Hpg2") as (fpg') "Hpg".
-          iDestruct (bb_page_of_named (pa0) fpg' with "Hpg") as "Hpg".
+          iEval (rewrite /ProcPtOwn.page_named).
+          iDestruct (bb_named_any (pa0) 4096 fpg' with "Hpg") as "Hpg".
           iDestruct ("Hback" with "Hpg") as "Hpt".
           (* the register facts the chunk left standing *)
           assert (Hcs1 : Mc !!! Regidx Rs3 = pa_add dst done)

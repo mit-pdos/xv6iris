@@ -1,0 +1,7 @@
+DIGEST 7a76fb1082efade106905bc3bfb77b33
+Fxv6iris.LinkUvmclear
+R183:197 xv6iris.LinkWalkNoalloc <> <> lib
+R199:211 xv6iris.ProofUvmclear <> <> lib
+R234:246 xv6iris.ProofUvmclear UvmclearProof <> modtype
+R248:258 xv6iris.LinkWalkNoalloc WalkNoalloc <> modtype
+mod 222:229 <> Uvmclear

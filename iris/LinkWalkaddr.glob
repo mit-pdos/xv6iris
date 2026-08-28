@@ -1,0 +1,7 @@
+DIGEST 3495757f9432095e5d8c65fee5b712c8
+Fxv6iris.LinkWalkaddr
+R179:193 xv6iris.LinkWalkNoalloc <> <> lib
+R195:207 xv6iris.ProofWalkaddr <> <> lib
+R230:242 xv6iris.ProofWalkaddr WalkaddrProof <> modtype
+R244:254 xv6iris.LinkWalkNoalloc WalkNoalloc <> modtype
+mod 218:225 <> Walkaddr

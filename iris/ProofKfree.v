@@ -392,7 +392,7 @@ Section ProofKfree.
     (* §0.26′: the page arrives VISIBILITY-FREE, so the memset that
        poisons it runs on [page_free] -- and its store is what re-mints
        determinacy, which is why everything from here on is unchanged. *)
-    iApply (MemsetPage.wp_memset_page_free_sconf kt Mms (K - 4)%nat (mword_of_int 1 : mword 64) b pcur
+    iApply (MemsetPage.wp_memset_page_val_sconf kt Mms (K - 4)%nat (mword_of_int 1 : mword 64) b pcur
               ltac:(lia)
               ltac:(rewrite HMmsa0; exact Hpv) HMmsa1 HMmsa2
               with "Hcg Htext Hpc [Hpown]").
@@ -527,9 +527,15 @@ Section ProofKfree.
     assert (Hpp48 : add_vec_int (mword_of_int (KernelSyms.kfree + 0x44) : mword 64) 4 = mword_of_int (KernelSyms.kfree + 0x48)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp48) in "Hpc".
     (* +0x48 c.sd a5,0(s1) : p->next := head *)
-    iEval (rewrite page_own_split) in "Hpage".
+    (* A6.87: the [r->next] slot comes off kfree's OWN memset, not off the
+       page it was handed.  The page arrived visibility-free (that is the
+       whole of §0.26'); the eight bytes the store needs are determinate
+       because THIS function just wrote them. *)
+    iEval (replace 4096%nat with (8 + 4088)%nat by lia) in "Hpage".
+    iEval (rewrite seq_app big_sepL_app) in "Hpage".
     iDestruct "Hpage" as "[Hpghead Hpgrest]".
-    iDestruct (page_head8_word_at p Hpv with "Hpghead") as (wold) "Hpw".
+    iDestruct (filled_head8_word_at p _ Hpv with "Hpghead") as (wold) "Hpw".
+    iDestruct (filled_rest_page_rest p with "Hpgrest") as "Hpgrest".
     assert (Hsdaddr : add_vec (Rld !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))) = p).
     { replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000"))) : mword 64)
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).

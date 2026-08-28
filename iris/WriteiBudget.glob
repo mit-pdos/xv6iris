@@ -1,0 +1,2252 @@
+DIGEST 984ca8a7f032ae54f77ac6863212775c
+Fxv6iris.WriteiBudget
+R4794:4799 Stdlib.ZArith.ZArith <> <> lib
+R4801:4803 Stdlib.micromega.Lia <> <> lib
+R4805:4808 Stdlib.Lists.List <> <> lib
+R4837:4840 stdpp.gmap <> <> lib
+R4842:4845 stdpp.list <> <> lib
+R4847:4867 stdpp.bitvector.definitions <> <> lib
+R4905:4913 iris.proofmode.proofmode <> <> lib
+R4949:4952 iris.algebra.auth <> <> lib
+R4954:4957 iris.algebra.gmap <> <> lib
+R4959:4962 iris.algebra.frac <> <> lib
+R5005:5013 iris.base_logic.lib.ghost_map <> <> lib
+R5248:5257 xv6iris.RiscvPtsto <> <> lib
+R5325:5331 xv6iris.BioDefs <> <> lib
+R5367:5374 xv6iris.InodeInv <> <> lib
+R5431:5436 xv6iris.LogInv <> <> lib
+R5496:5504 xv6iris.BitmapInv <> <> lib
+R5560:5569 xv6iris.SpecWritei <> <> lib
+R5631:5638 xv6iris.SpecBmap <> <> lib
+R6256:6268 xv6iris.FastSetSolver <> <> lib
+R6286:6289 xv6iris.Xv6G <> <> lib
+def 6915:6920 <> FW_MAX
+R6924:6926 Corelib.Init.Datatypes <> nat ind
+R6932:6932 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R6962:6965 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R6933:6933 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'/'_x not
+R6957:6960 Stdlib.Arith.PeanoNat <> ::nat_scope:x_'/'_x not
+R6953:6955 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R6949:6951 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R6945:6947 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R6934:6944 xv6iris.LogInv <> MAXOPBLOCKS def
+R6966:6970 xv6iris.BioDefs <> BSIZE def
+prf 6985:6996 <> fw_max_value
+R7006:7008 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7000:7005 xv6iris.WriteiBudget <> FW_MAX def
+prf 7339:7351 <> wi_blocks_le4
+R7362:7364 Corelib.Init.Datatypes <> nat ind
+binder 7354:7356 <> off:1
+binder 7358:7358 <> n:2
+R7386:7389 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7371:7374 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R7370:7370 xv6iris.WriteiBudget <> n:2 var
+R7375:7380 xv6iris.WriteiBudget <> FW_MAX def
+R7406:7409 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R7391:7399 xv6iris.SpecWritei <> wi_blocks def
+R7401:7403 xv6iris.WriteiBudget <> off:1 var
+R7405:7405 xv6iris.WriteiBudget <> n:2 var
+R7435:7446 xv6iris.WriteiBudget <> fw_max_value thm
+R7435:7446 xv6iris.WriteiBudget <> fw_max_value thm
+R7435:7446 xv6iris.WriteiBudget <> fw_max_value thm
+R7467:7475 xv6iris.SpecWritei <> wi_blocks def
+R7509:7511 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R7497:7503 stdpp.numbers <> ::nat_scope:x_'`mod`'_x not
+R7504:7508 xv6iris.BioDefs <> BSIZE def
+R7512:7516 xv6iris.BioDefs <> BSIZE def
+R7538:7556 Stdlib.Arith.PeanoNat Nat mod_upper_bound def
+R7566:7570 xv6iris.BioDefs <> BSIZE def
+R7509:7511 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R7497:7503 stdpp.numbers <> ::nat_scope:x_'`mod`'_x not
+R7504:7508 xv6iris.BioDefs <> BSIZE def
+R7512:7516 xv6iris.BioDefs <> BSIZE def
+R7538:7556 Stdlib.Arith.PeanoNat Nat mod_upper_bound def
+R7641:7643 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R7596:7596 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R7628:7635 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R7624:7626 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R7616:7618 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R7612:7614 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R7600:7606 stdpp.numbers <> ::nat_scope:x_'`mod`'_x not
+R7607:7611 xv6iris.BioDefs <> BSIZE def
+R7619:7623 xv6iris.BioDefs <> BSIZE def
+R7636:7640 xv6iris.BioDefs <> BSIZE def
+R7641:7643 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R7596:7596 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R7628:7635 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R7624:7626 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R7616:7618 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R7612:7614 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R7600:7606 stdpp.numbers <> ::nat_scope:x_'`mod`'_x not
+R7607:7611 xv6iris.BioDefs <> BSIZE def
+R7619:7623 xv6iris.BioDefs <> BSIZE def
+R7636:7640 xv6iris.BioDefs <> BSIZE def
+R7663:7684 stdpp.numbers Nat div_lt_upper_bound thm
+R7694:7698 xv6iris.BioDefs <> BSIZE def
+R7663:7684 stdpp.numbers Nat div_lt_upper_bound thm
+prf 7792:7813 <> wi_blocks_four_reached
+R7838:7840 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7817:7825 xv6iris.SpecWritei <> wi_blocks def
+R7832:7837 xv6iris.WriteiBudget <> FW_MAX def
+prf 8056:8072 <> wi_blocks_dirlink
+R8079:8081 Corelib.Init.Datatypes <> nat ind
+binder 8075:8075 <> k:3
+R8098:8101 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8088:8090 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R8087:8087 xv6iris.WriteiBudget <> k:3 var
+R8123:8125 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8102:8110 xv6iris.SpecWritei <> wi_blocks def
+R8115:8117 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8118:8118 xv6iris.WriteiBudget <> k:3 var
+R8160:8168 xv6iris.SpecWritei <> wi_blocks def
+R8207:8209 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8187:8187 stdpp.numbers <> ::nat_scope:x_'`mod`'_x not
+R8194:8201 stdpp.numbers <> ::nat_scope:x_'`mod`'_x not
+R8190:8192 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8202:8206 xv6iris.BioDefs <> BSIZE def
+R8212:8214 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8207:8209 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8187:8187 stdpp.numbers <> ::nat_scope:x_'`mod`'_x not
+R8194:8201 stdpp.numbers <> ::nat_scope:x_'`mod`'_x not
+R8190:8192 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8202:8206 xv6iris.BioDefs <> BSIZE def
+R8212:8214 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8234:8246 Stdlib.Arith.PeanoNat Nat mod_small def
+R8234:8246 Stdlib.Arith.PeanoNat Nat mod_small def
+R8256:8260 xv6iris.BioDefs <> BSIZE def
+R8301:8304 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R8305:8305 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R8329:8336 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R8325:8327 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R8317:8319 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R8312:8314 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R8308:8310 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8320:8324 xv6iris.BioDefs <> BSIZE def
+R8337:8341 xv6iris.BioDefs <> BSIZE def
+R8301:8304 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R8305:8305 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R8329:8336 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R8325:8327 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R8317:8319 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R8312:8314 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R8308:8310 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8320:8324 xv6iris.BioDefs <> BSIZE def
+R8337:8341 xv6iris.BioDefs <> BSIZE def
+R8360:8381 Stdlib.Arith.PeanoNat Nat div_le_lower_bound def
+R8391:8395 xv6iris.BioDefs <> BSIZE def
+R8360:8381 Stdlib.Arith.PeanoNat Nat div_le_lower_bound def
+R8458:8460 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R8421:8421 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R8445:8452 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R8441:8443 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R8433:8435 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R8428:8430 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R8424:8426 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8436:8440 xv6iris.BioDefs <> BSIZE def
+R8453:8457 xv6iris.BioDefs <> BSIZE def
+R8458:8460 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R8421:8421 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R8445:8452 stdpp.numbers <> ::nat_scope:x_'`div`'_x not
+R8441:8443 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R8433:8435 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R8428:8430 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R8424:8426 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R8436:8440 xv6iris.BioDefs <> BSIZE def
+R8453:8457 xv6iris.BioDefs <> BSIZE def
+R8480:8501 stdpp.numbers Nat div_lt_upper_bound thm
+R8511:8515 xv6iris.BioDefs <> BSIZE def
+R8480:8501 stdpp.numbers Nat div_lt_upper_bound thm
+prf 8687:8705 <> wi_cost_loose_value
+R8728:8730 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8709:8715 xv6iris.SpecWritei <> wi_cost def
+R8722:8727 xv6iris.WriteiBudget <> FW_MAX def
+prf 8783:8801 <> wi_cost_loose_busts
+R8817:8819 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R8806:8816 xv6iris.LogInv <> MAXOPBLOCKS def
+R8820:8826 xv6iris.SpecWritei <> wi_cost def
+R8833:8838 xv6iris.WriteiBudget <> FW_MAX def
+prf 9349:9364 <> one_bitmap_block
+R9373:9376 stdpp.gmap <> gset def
+R9378:9378 Corelib.Numbers.BinNums <> Z ind
+binder 9367:9369 <> cov:4
+R9412:9412 Corelib.Numbers.BinNums <> Z ind
+binder 9382:9389 <> logstart:5
+binder 9391:9399 <> bmapstart:6
+binder 9401:9406 <> fssize:7
+binder 9408:9408 <> b:8
+R9463:9468 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9419:9432 xv6iris.BitmapInv <> bitmap_geom_ok def
+R9434:9436 xv6iris.WriteiBudget <> cov:4 var
+R9438:9445 xv6iris.WriteiBudget <> logstart:5 var
+R9447:9455 xv6iris.WriteiBudget <> bmapstart:6 var
+R9457:9462 xv6iris.WriteiBudget <> fssize:7 var
+R9484:9489 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9470:9473 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R9475:9477 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R9474:9474 xv6iris.WriteiBudget <> b:8 var
+R9474:9474 xv6iris.WriteiBudget <> b:8 var
+R9478:9483 xv6iris.WriteiBudget <> fssize:7 var
+R9508:9510 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9490:9495 xv6iris.BitmapInv <> BBLOCK def
+R9497:9497 xv6iris.WriteiBudget <> b:8 var
+R9499:9507 xv6iris.WriteiBudget <> bmapstart:6 var
+R9511:9519 xv6iris.WriteiBudget <> bmapstart:6 var
+R9565:9577 xv6iris.BitmapInv <> BBLOCK_single thm
+R9565:9577 xv6iris.BitmapInv <> BBLOCK_single thm
+R9593:9601 xv6iris.BitmapInv <> BPB_value thm
+R9593:9601 xv6iris.BitmapInv <> BPB_value thm
+prf 9851:9868 <> gset_size_union_le
+R9877:9880 stdpp.gmap <> gset def
+R9882:9882 Corelib.Numbers.BinNums <> Z ind
+binder 9871:9871 <> X:9
+binder 9873:9873 <> Y:10
+R9902:9905 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R9888:9891 stdpp.base <> size def
+R9895:9899 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R9894:9894 xv6iris.WriteiBudget <> X:9 var
+R9900:9900 xv6iris.WriteiBudget <> Y:10 var
+R9912:9914 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R9906:9909 stdpp.base <> size def
+R9911:9911 xv6iris.WriteiBudget <> X:9 var
+R9915:9918 stdpp.base <> size def
+R9920:9920 xv6iris.WriteiBudget <> Y:10 var
+R9945:9958 stdpp.fin_sets <> size_union_alt thm
+R9945:9958 stdpp.fin_sets <> size_union_alt thm
+R9945:9958 stdpp.fin_sets <> size_union_alt thm
+R9983:9987 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R9977:9981 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R9983:9987 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R9977:9981 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R10020:10032 stdpp.fin_sets <> subseteq_size thm
+R10020:10032 stdpp.fin_sets <> subseteq_size thm
+prf 10060:10078 <> size_list_to_set_le
+R10085:10088 Corelib.Init.Datatypes <> list ind
+R10090:10090 Corelib.Numbers.BinNums <> Z ind
+binder 10081:10081 <> l:11
+R10127:10130 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R10098:10101 stdpp.base <> size def
+R10120:10123 stdpp.gmap <> gset def
+R10125:10125 Corelib.Numbers.BinNums <> Z ind
+R10104:10114 stdpp.base <> list_to_set def
+R10116:10116 xv6iris.WriteiBudget <> l:11 var
+R10131:10136 Corelib.Init.Datatypes <> length def
+R10138:10138 xv6iris.WriteiBudget <> l:11 var
+R10190:10195 Corelib.Init.Datatypes <> length def
+R10224:10227 stdpp.gmap <> gset def
+R10229:10229 Corelib.Numbers.BinNums <> Z ind
+R10207:10217 stdpp.base <> list_to_set def
+R10219:10220 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R10244:10247 stdpp.gmap <> gset def
+R10249:10249 Corelib.Numbers.BinNums <> Z ind
+R10238:10240 stdpp.base <> ::stdpp_scope:'∅' not
+R10224:10227 stdpp.gmap <> gset def
+R10229:10229 Corelib.Numbers.BinNums <> Z ind
+R10207:10217 stdpp.base <> list_to_set def
+R10219:10220 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R10244:10247 stdpp.gmap <> gset def
+R10249:10249 Corelib.Numbers.BinNums <> Z ind
+R10238:10240 stdpp.base <> ::stdpp_scope:'∅' not
+R10265:10274 stdpp.fin_sets <> size_empty thm
+R10265:10274 stdpp.fin_sets <> size_empty thm
+R10265:10274 stdpp.fin_sets <> size_empty thm
+R10291:10296 Corelib.Init.Datatypes <> length def
+R10335:10338 stdpp.gmap <> gset def
+R10340:10340 Corelib.Numbers.BinNums <> Z ind
+R10312:10322 stdpp.base <> list_to_set def
+R10326:10329 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R10360:10365 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R10388:10388 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R10355:10356 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R10358:10359 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R10382:10385 stdpp.gmap <> gset def
+R10387:10387 Corelib.Numbers.BinNums <> Z ind
+R10366:10376 stdpp.base <> list_to_set def
+R10335:10338 stdpp.gmap <> gset def
+R10340:10340 Corelib.Numbers.BinNums <> Z ind
+R10312:10322 stdpp.base <> list_to_set def
+R10326:10329 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R10360:10365 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R10388:10388 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R10355:10356 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R10358:10359 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R10382:10385 stdpp.gmap <> gset def
+R10387:10387 Corelib.Numbers.BinNums <> Z ind
+R10366:10376 stdpp.base <> list_to_set def
+R10411:10428 xv6iris.WriteiBudget <> gset_size_union_le thm
+R10411:10428 xv6iris.WriteiBudget <> gset_size_union_le thm
+R10441:10454 stdpp.fin_sets <> size_singleton thm
+R10441:10454 stdpp.fin_sets <> size_singleton thm
+R10441:10454 stdpp.fin_sets <> size_singleton thm
+def 11094:11102 <> wi_logset
+R11131:11131 Corelib.Numbers.BinNums <> Z ind
+binder 11105:11113 <> bmapstart:12
+binder 11115:11120 <> indblk:13
+binder 11122:11127 <> inoblk:14
+R11143:11146 Corelib.Init.Datatypes <> list ind
+R11148:11148 Corelib.Numbers.BinNums <> Z ind
+binder 11135:11139 <> dblks:15
+R11153:11156 stdpp.gmap <> gset def
+R11158:11158 Corelib.Numbers.BinNums <> Z ind
+R11208:11212 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11193:11197 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11178:11182 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11165:11166 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11176:11177 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11167:11175 xv6iris.WriteiBudget <> bmapstart:12 var
+R11183:11184 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11191:11192 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11185:11190 xv6iris.WriteiBudget <> indblk:13 var
+R11198:11199 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11206:11207 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11200:11205 xv6iris.WriteiBudget <> inoblk:14 var
+R11213:11223 stdpp.base <> list_to_set def
+R11225:11229 xv6iris.WriteiBudget <> dblks:15 var
+prf 11239:11252 <> wi_logset_size
+R11281:11281 Corelib.Numbers.BinNums <> Z ind
+binder 11255:11263 <> bmapstart:16
+binder 11265:11270 <> indblk:17
+binder 11272:11277 <> inoblk:18
+R11293:11296 Corelib.Init.Datatypes <> list ind
+R11298:11298 Corelib.Numbers.BinNums <> Z ind
+binder 11285:11289 <> dblks:19
+R11352:11355 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11306:11309 stdpp.base <> size def
+R11312:11320 xv6iris.WriteiBudget <> wi_logset def
+R11322:11330 xv6iris.WriteiBudget <> bmapstart:16 var
+R11332:11337 xv6iris.WriteiBudget <> indblk:17 var
+R11339:11344 xv6iris.WriteiBudget <> inoblk:18 var
+R11346:11350 xv6iris.WriteiBudget <> dblks:19 var
+R11357:11359 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R11360:11365 Corelib.Init.Datatypes <> length def
+R11367:11371 xv6iris.WriteiBudget <> dblks:19 var
+R11395:11403 xv6iris.WriteiBudget <> wi_logset def
+R11423:11440 xv6iris.WriteiBudget <> gset_size_union_le thm
+R11423:11440 xv6iris.WriteiBudget <> gset_size_union_le thm
+R11459:11477 xv6iris.WriteiBudget <> size_list_to_set_le thm
+R11459:11477 xv6iris.WriteiBudget <> size_list_to_set_le thm
+R11568:11571 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11509:11512 stdpp.base <> size def
+R11561:11564 stdpp.gmap <> gset def
+R11566:11566 Corelib.Numbers.BinNums <> Z ind
+R11543:11547 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11528:11532 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11515:11516 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11526:11527 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11533:11534 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11541:11542 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11548:11549 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11556:11557 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11568:11571 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11509:11512 stdpp.base <> size def
+R11561:11564 stdpp.gmap <> gset def
+R11566:11566 Corelib.Numbers.BinNums <> Z ind
+R11543:11547 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11528:11532 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11515:11516 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11526:11527 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11533:11534 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11541:11542 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11548:11549 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11556:11557 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11600:11617 xv6iris.WriteiBudget <> gset_size_union_le thm
+R11600:11617 xv6iris.WriteiBudget <> gset_size_union_le thm
+R11684:11687 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11640:11643 stdpp.base <> size def
+R11677:11680 stdpp.gmap <> gset def
+R11682:11682 Corelib.Numbers.BinNums <> Z ind
+R11659:11663 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11646:11647 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11657:11658 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11664:11665 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11672:11673 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11684:11687 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11640:11643 stdpp.base <> size def
+R11677:11680 stdpp.gmap <> gset def
+R11682:11682 Corelib.Numbers.BinNums <> Z ind
+R11659:11663 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R11646:11647 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11657:11658 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11664:11665 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11672:11673 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R11718:11735 xv6iris.WriteiBudget <> gset_size_union_le thm
+R11718:11735 xv6iris.WriteiBudget <> gset_size_union_le thm
+R11749:11762 stdpp.fin_sets <> size_singleton thm
+R11749:11762 stdpp.fin_sets <> size_singleton thm
+R11749:11762 stdpp.fin_sets <> size_singleton thm
+R11749:11762 stdpp.fin_sets <> size_singleton thm
+R11749:11762 stdpp.fin_sets <> size_singleton thm
+R11784:11797 stdpp.fin_sets <> size_singleton thm
+R11784:11797 stdpp.fin_sets <> size_singleton thm
+R11784:11797 stdpp.fin_sets <> size_singleton thm
+prf 11935:11948 <> wi_logset_fits
+R11977:11977 Corelib.Numbers.BinNums <> Z ind
+binder 11951:11959 <> bmapstart:20
+binder 11961:11966 <> indblk:21
+binder 11968:11973 <> inoblk:22
+R11989:11992 Corelib.Init.Datatypes <> list ind
+R11994:11994 Corelib.Numbers.BinNums <> Z ind
+binder 11981:11985 <> dblks:23
+R12024:12029 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12014:12017 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R12002:12007 Corelib.Init.Datatypes <> length def
+R12009:12013 xv6iris.WriteiBudget <> dblks:23 var
+R12077:12080 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R12031:12034 stdpp.base <> size def
+R12037:12045 xv6iris.WriteiBudget <> wi_logset def
+R12047:12055 xv6iris.WriteiBudget <> bmapstart:20 var
+R12057:12062 xv6iris.WriteiBudget <> indblk:21 var
+R12064:12069 xv6iris.WriteiBudget <> inoblk:22 var
+R12071:12075 xv6iris.WriteiBudget <> dblks:23 var
+R12081:12091 xv6iris.LogInv <> MAXOPBLOCKS def
+R12131:12144 xv6iris.WriteiBudget <> wi_logset_size thm
+R12131:12144 xv6iris.WriteiBudget <> wi_logset_size thm
+R12187:12197 xv6iris.LogInv <> MAXOPBLOCKS def
+def 12571:12583 <> wi_cost_tight
+R12594:12596 Corelib.Init.Datatypes <> nat ind
+binder 12586:12588 <> off:24
+binder 12590:12590 <> n:25
+R12601:12603 Corelib.Init.Datatypes <> nat ind
+R12624:12626 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R12609:12617 xv6iris.SpecWritei <> wi_blocks def
+R12619:12621 xv6iris.WriteiBudget <> off:24 var
+R12623:12623 xv6iris.WriteiBudget <> n:25 var
+prf 12766:12783 <> wi_cost_tight_fits
+R12794:12796 Corelib.Init.Datatypes <> nat ind
+binder 12786:12788 <> off:26
+binder 12790:12790 <> n:27
+R12820:12823 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12805:12808 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R12804:12804 xv6iris.WriteiBudget <> n:27 var
+R12809:12814 xv6iris.WriteiBudget <> FW_MAX def
+R12844:12847 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R12825:12837 xv6iris.WriteiBudget <> wi_cost_tight def
+R12839:12841 xv6iris.WriteiBudget <> off:26 var
+R12843:12843 xv6iris.WriteiBudget <> n:27 var
+R12848:12858 xv6iris.LogInv <> MAXOPBLOCKS def
+R12893:12905 xv6iris.WriteiBudget <> wi_cost_tight def
+R12922:12934 xv6iris.WriteiBudget <> wi_blocks_le4 thm
+R12922:12934 xv6iris.WriteiBudget <> wi_blocks_le4 thm
+R12954:12964 xv6iris.LogInv <> MAXOPBLOCKS def
+prf 12984:13002 <> wi_cost_tight_worst
+R13031:13033 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13006:13018 xv6iris.WriteiBudget <> wi_cost_tight def
+R13025:13030 xv6iris.WriteiBudget <> FW_MAX def
+prf 13255:13275 <> wi_cost_tight_dirlink
+R13282:13284 Corelib.Init.Datatypes <> nat ind
+binder 13278:13278 <> k:28
+R13303:13306 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13293:13295 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R13292:13292 xv6iris.WriteiBudget <> k:28 var
+R13332:13334 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13307:13319 xv6iris.WriteiBudget <> wi_cost_tight def
+R13324:13326 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R13327:13327 xv6iris.WriteiBudget <> k:28 var
+R13369:13381 xv6iris.WriteiBudget <> wi_cost_tight def
+R13393:13409 xv6iris.WriteiBudget <> wi_blocks_dirlink thm
+R13393:13409 xv6iris.WriteiBudget <> wi_blocks_dirlink thm
+R13393:13409 xv6iris.WriteiBudget <> wi_blocks_dirlink thm
+prf 14380:14401 <> wi_cost_tight_le_loose
+R14412:14414 Corelib.Init.Datatypes <> nat ind
+binder 14404:14406 <> off:29
+binder 14408:14408 <> n:30
+R14447:14450 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14423:14426 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R14427:14435 xv6iris.SpecWritei <> wi_blocks def
+R14437:14439 xv6iris.WriteiBudget <> off:29 var
+R14441:14441 xv6iris.WriteiBudget <> n:30 var
+R14471:14474 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R14452:14464 xv6iris.WriteiBudget <> wi_cost_tight def
+R14466:14468 xv6iris.WriteiBudget <> off:29 var
+R14470:14470 xv6iris.WriteiBudget <> n:30 var
+R14475:14481 xv6iris.SpecWritei <> wi_cost def
+R14483:14485 xv6iris.WriteiBudget <> off:29 var
+R14487:14487 xv6iris.WriteiBudget <> n:30 var
+R14519:14531 xv6iris.WriteiBudget <> wi_cost_tight def
+R14534:14540 xv6iris.SpecWritei <> wi_cost def
+prf 14560:14585 <> wi_cost_tight_incomparable
+R14601:14603 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14590:14596 xv6iris.SpecWritei <> wi_cost def
+R14604:14616 xv6iris.WriteiBudget <> wi_cost_tight def
+def 15106:15121 <> wi_cost_armaware
+R15132:15134 Corelib.Init.Datatypes <> nat ind
+binder 15124:15126 <> off:31
+binder 15128:15128 <> n:32
+R15139:15141 Corelib.Init.Datatypes <> nat ind
+R15166:15168 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R15148:15150 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R15151:15159 xv6iris.SpecWritei <> wi_blocks def
+R15161:15163 xv6iris.WriteiBudget <> off:31 var
+R15165:15165 xv6iris.WriteiBudget <> n:32 var
+prf 15184:15205 <> wi_cost_armaware_value
+R15237:15239 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15209:15224 xv6iris.WriteiBudget <> wi_cost_armaware def
+R15231:15236 xv6iris.WriteiBudget <> FW_MAX def
+prf 15292:15313 <> wi_cost_armaware_busts
+R15329:15331 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R15318:15328 xv6iris.LogInv <> MAXOPBLOCKS def
+R15332:15347 xv6iris.WriteiBudget <> wi_cost_armaware def
+R15354:15359 xv6iris.WriteiBudget <> FW_MAX def
+def 15553:15565 <> wi_cost_noabs
+R15576:15578 Corelib.Init.Datatypes <> nat ind
+binder 15568:15570 <> off:33
+binder 15572:15572 <> n:34
+R15583:15585 Corelib.Init.Datatypes <> nat ind
+R15610:15612 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R15592:15594 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R15595:15603 xv6iris.SpecWritei <> wi_blocks def
+R15605:15607 xv6iris.WriteiBudget <> off:33 var
+R15609:15609 xv6iris.WriteiBudget <> n:34 var
+prf 15628:15646 <> wi_cost_noabs_value
+R15675:15677 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15650:15662 xv6iris.WriteiBudget <> wi_cost_noabs def
+R15669:15674 xv6iris.WriteiBudget <> FW_MAX def
+prf 15730:15748 <> wi_cost_noabs_busts
+R15764:15766 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R15753:15763 xv6iris.LogInv <> MAXOPBLOCKS def
+R15767:15779 xv6iris.WriteiBudget <> wi_cost_noabs def
+R15786:15791 xv6iris.WriteiBudget <> FW_MAX def
+prf 16140:16163 <> wi_cost_noabs_three_fits
+R16190:16193 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R16168:16180 xv6iris.WriteiBudget <> wi_cost_noabs def
+R16184:16189 xv6iris.WriteiBudget <> FW_MAX def
+R16194:16204 xv6iris.LogInv <> MAXOPBLOCKS def
+sec 16480:16487 <> LogAmort
+R17188:17194 xv6iris.RiscvPtsto <> riscvGS class
+R17201:17204 xv6iris.Xv6G <> xv6G class
+R17206:17207 xv6iris.WriteiBudget <> Σ:35 var
+def 17640:17648 <> log_amort
+R17656:17664 xv6iris.LogDefs <> log_names rec
+binder 17651:17652 <> γ:38
+R17672:17675 stdpp.gmap <> gset def
+R17677:17677 Corelib.Numbers.BinNums <> Z ind
+binder 17668:17668 <> F:39
+R17685:17687 Corelib.Init.Datatypes <> nat ind
+binder 17681:17681 <> u:40
+R17692:17696 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R17698:17699 xv6iris.WriteiBudget <> LogAmort.Σ var
+R17709:17713 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R17735:17744 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R17719:17722 stdpp.gmap <> gset def
+R17724:17724 Corelib.Numbers.BinNums <> Z ind
+binder 17714:17715 <> Sb:41
+R17732:17734 Corelib.Init.Datatypes <> nat ind
+binder 17728:17728 <> v:42
+R17781:17785 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R17745:17747 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R17778:17780 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R17768:17771 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R17750:17752 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R17749:17749 xv6iris.WriteiBudget <> u:40 var
+R17753:17756 stdpp.base <> size def
+R17760:17764 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R17759:17759 xv6iris.WriteiBudget <> F:39 var
+R17765:17766 xv6iris.WriteiBudget <> Sb:41 var
+R17772:17772 xv6iris.WriteiBudget <> v:42 var
+R17786:17792 xv6iris.LogInv <> log_opS def
+R17794:17795 xv6iris.WriteiBudget <> γ:38 var
+R17797:17797 xv6iris.WriteiBudget <> v:42 var
+R17799:17800 xv6iris.WriteiBudget <> Sb:41 var
+inst 17825:17842 <> log_amort_timeless
+binder 17844:17845 <> γ:43
+binder 17847:17847 <> F:44
+binder 17849:17849 <> u:45
+R17853:17860 iris.bi.derived_connectives <> Timeless class
+R17863:17871 xv6iris.WriteiBudget <> log_amort def
+R17873:17874 xv6iris.WriteiBudget <> γ:43 var
+R17876:17876 xv6iris.WriteiBudget <> F:44 var
+R17878:17878 xv6iris.WriteiBudget <> u:45 var
+R17900:17908 xv6iris.WriteiBudget <> log_amort def
+R17900:17908 xv6iris.WriteiBudget <> log_amort def
+R17900:17908 xv6iris.WriteiBudget <> log_amort def
+prf 18106:18120 <> log_amort_intro
+binder 18122:18123 <> γ:46
+binder 18125:18125 <> F:47
+binder 18127:18127 <> u:48
+binder 18129:18129 <> v:49
+R18158:18161 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R18148:18151 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R18139:18141 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R18138:18138 xv6iris.WriteiBudget <> u:48 var
+R18142:18145 stdpp.base <> size def
+R18147:18147 xv6iris.WriteiBudget <> F:47 var
+R18152:18152 xv6iris.WriteiBudget <> v:49 var
+R18173:18178 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R18162:18167 xv6iris.LogInv <> log_op def
+R18169:18170 xv6iris.WriteiBudget <> γ:46 var
+R18172:18172 xv6iris.WriteiBudget <> v:49 var
+R18179:18187 xv6iris.WriteiBudget <> log_amort def
+R18189:18190 xv6iris.WriteiBudget <> γ:46 var
+R18192:18192 xv6iris.WriteiBudget <> F:47 var
+R18194:18194 xv6iris.WriteiBudget <> u:48 var
+R18237:18242 xv6iris.LogInv <> log_op def
+R18245:18253 xv6iris.WriteiBudget <> log_amort def
+R18237:18242 xv6iris.LogInv <> log_op def
+R18237:18242 xv6iris.LogInv <> log_op def
+R18245:18253 xv6iris.WriteiBudget <> log_amort def
+R18245:18253 xv6iris.WriteiBudget <> log_amort def
+R18353:18357 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R18346:18350 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R18353:18357 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R18346:18350 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R18392:18404 stdpp.fin_sets <> subseteq_size thm
+R18392:18404 stdpp.fin_sets <> subseteq_size thm
+prf 18574:18587 <> log_amort_elim
+binder 18589:18590 <> γ:50
+binder 18592:18592 <> F:51
+binder 18594:18594 <> u:52
+R18618:18623 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R18602:18610 xv6iris.WriteiBudget <> log_amort def
+R18612:18613 xv6iris.WriteiBudget <> γ:50 var
+R18615:18615 xv6iris.WriteiBudget <> F:51 var
+R18617:18617 xv6iris.WriteiBudget <> u:52 var
+R18624:18627 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R18635:18636 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R18632:18634 Corelib.Init.Datatypes <> nat ind
+binder 18628:18628 <> v:53
+R18655:18659 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R18637:18639 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R18652:18654 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R18642:18645 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R18641:18641 xv6iris.WriteiBudget <> u:52 var
+R18646:18646 xv6iris.WriteiBudget <> v:53 var
+R18660:18665 xv6iris.LogInv <> log_op def
+R18667:18668 xv6iris.WriteiBudget <> γ:50 var
+R18670:18670 xv6iris.WriteiBudget <> v:53 var
+R18708:18716 xv6iris.WriteiBudget <> log_amort def
+R18708:18716 xv6iris.WriteiBudget <> log_amort def
+R18708:18716 xv6iris.WriteiBudget <> log_amort def
+R18807:18807 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18818:18823 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18827:18827 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18808:18817 xv6iris.LogInv <> log_opS_op thm
+R18807:18807 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18818:18823 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18827:18827 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18808:18817 xv6iris.LogInv <> log_opS_op thm
+prf 18987:19002 <> log_amort_weaken
+binder 19004:19005 <> γ:54
+binder 19007:19007 <> F:55
+binder 19009:19009 <> u:56
+binder 19011:19012 <> u':57
+R19033:19036 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19023:19026 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R19021:19022 xv6iris.WriteiBudget <> u':57 var
+R19027:19027 xv6iris.WriteiBudget <> u:56 var
+R19053:19058 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R19037:19045 xv6iris.WriteiBudget <> log_amort def
+R19047:19048 xv6iris.WriteiBudget <> γ:54 var
+R19050:19050 xv6iris.WriteiBudget <> F:55 var
+R19052:19052 xv6iris.WriteiBudget <> u:56 var
+R19059:19067 xv6iris.WriteiBudget <> log_amort def
+R19069:19070 xv6iris.WriteiBudget <> γ:54 var
+R19072:19072 xv6iris.WriteiBudget <> F:55 var
+R19074:19075 xv6iris.WriteiBudget <> u':57 var
+R19118:19126 xv6iris.WriteiBudget <> log_amort def
+R19118:19126 xv6iris.WriteiBudget <> log_amort def
+R19118:19126 xv6iris.WriteiBudget <> log_amort def
+prf 19226:19241 <> log_amort_shrink
+binder 19243:19244 <> γ:58
+binder 19246:19246 <> F:59
+binder 19248:19249 <> F':60
+binder 19251:19251 <> u:61
+R19267:19270 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R19261:19265 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R19259:19260 xv6iris.WriteiBudget <> F':60 var
+R19266:19266 xv6iris.WriteiBudget <> F:59 var
+R19287:19292 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R19271:19279 xv6iris.WriteiBudget <> log_amort def
+R19281:19282 xv6iris.WriteiBudget <> γ:58 var
+R19284:19284 xv6iris.WriteiBudget <> F:59 var
+R19286:19286 xv6iris.WriteiBudget <> u:61 var
+R19293:19301 xv6iris.WriteiBudget <> log_amort def
+R19303:19304 xv6iris.WriteiBudget <> γ:58 var
+R19306:19307 xv6iris.WriteiBudget <> F':60 var
+R19309:19309 xv6iris.WriteiBudget <> u:61 var
+R19352:19360 xv6iris.WriteiBudget <> log_amort def
+R19352:19360 xv6iris.WriteiBudget <> log_amort def
+R19352:19360 xv6iris.WriteiBudget <> log_amort def
+R19467:19471 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R19460:19464 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R19473:19477 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R19467:19471 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R19460:19464 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R19473:19477 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R19513:19525 stdpp.fin_sets <> subseteq_size thm
+R19513:19525 stdpp.fin_sets <> subseteq_size thm
+prf 20133:20149 <> log_amort_present
+binder 20151:20152 <> γ:62
+binder 20154:20154 <> F:63
+binder 20156:20156 <> u:64
+R20163:20163 Corelib.Numbers.BinNums <> Z ind
+binder 20159:20159 <> b:65
+R20179:20186 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20173:20177 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R20172:20172 xv6iris.WriteiBudget <> b:65 var
+R20178:20178 xv6iris.WriteiBudget <> F:63 var
+R20207:20216 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R20187:20195 xv6iris.WriteiBudget <> log_amort def
+R20197:20198 xv6iris.WriteiBudget <> γ:62 var
+R20200:20200 xv6iris.WriteiBudget <> F:63 var
+R20203:20203 Corelib.Init.Datatypes <> S constr
+R20205:20205 xv6iris.WriteiBudget <> u:64 var
+R20217:20221 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R20255:20263 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R20227:20230 stdpp.gmap <> gset def
+R20232:20232 Corelib.Numbers.BinNums <> Z ind
+binder 20222:20223 <> Sb:66
+R20240:20242 Corelib.Init.Datatypes <> nat ind
+binder 20236:20236 <> v:67
+R20251:20254 Corelib.Init.Datatypes <> bool ind
+binder 20246:20247 <> cr:68
+R20291:20301 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20264:20266 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20288:20290 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20276:20279 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20269:20271 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20267:20268 xv6iris.WriteiBudget <> cr:68 var
+R20272:20275 Corelib.Init.Datatypes <> true constr
+R20281:20285 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R20280:20280 xv6iris.WriteiBudget <> b:65 var
+R20286:20287 xv6iris.WriteiBudget <> Sb:66 var
+R20321:20332 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20408:20408 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20302:20308 xv6iris.LogInv <> log_opS def
+R20310:20311 xv6iris.WriteiBudget <> γ:62 var
+R20314:20314 Corelib.Init.Datatypes <> S constr
+R20316:20316 xv6iris.WriteiBudget <> v:67 var
+R20319:20320 xv6iris.WriteiBudget <> Sb:66 var
+R20382:20387 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R20333:20339 xv6iris.LogInv <> log_opS def
+R20341:20342 xv6iris.WriteiBudget <> γ:62 var
+R20345:20347 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R20350:20355 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R20359:20364 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R20365:20365 xv6iris.WriteiBudget <> v:67 var
+R20356:20356 Corelib.Init.Datatypes <> S constr
+R20358:20358 xv6iris.WriteiBudget <> v:67 var
+R20348:20349 xv6iris.WriteiBudget <> cr:68 var
+R20371:20375 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R20369:20370 xv6iris.WriteiBudget <> Sb:66 var
+R20376:20377 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R20379:20380 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R20378:20378 xv6iris.WriteiBudget <> b:65 var
+R20388:20396 xv6iris.WriteiBudget <> log_amort def
+R20398:20399 xv6iris.WriteiBudget <> γ:62 var
+R20401:20401 xv6iris.WriteiBudget <> F:63 var
+R20404:20404 Corelib.Init.Datatypes <> S constr
+R20406:20406 xv6iris.WriteiBudget <> u:64 var
+R20452:20460 xv6iris.WriteiBudget <> log_amort def
+R20452:20460 xv6iris.WriteiBudget <> log_amort def
+R20452:20460 xv6iris.WriteiBudget <> log_amort def
+R20518:20523 stdpp.base <> decide def
+R20527:20531 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R20518:20523 stdpp.base <> decide def
+R20527:20531 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R20669:20672 Corelib.Init.Datatypes <> true constr
+R20669:20672 Corelib.Init.Datatypes <> true constr
+R20747:20751 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R20752:20753 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R20755:20756 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R20761:20761 Corelib.Init.Datatypes <> S constr
+R20747:20751 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R20752:20753 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R20755:20756 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R20761:20761 Corelib.Init.Datatypes <> S constr
+R20835:20839 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R20816:20821 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R20834:20834 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R20824:20828 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R20829:20830 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R20832:20833 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R20841:20845 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R20835:20839 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R20816:20821 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R20834:20834 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R20824:20828 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R20829:20830 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R20832:20833 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R20841:20845 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R20883:20895 stdpp.fin_sets <> subseteq_size thm
+R20883:20895 stdpp.fin_sets <> subseteq_size thm
+R21013:21017 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R21019:21023 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21013:21017 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R21019:21023 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21065:21068 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R21069:21072 stdpp.base <> size def
+R21076:21080 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21065:21068 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R21069:21072 stdpp.base <> size def
+R21076:21080 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21118:21122 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R21113:21114 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21116:21117 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21124:21128 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21118:21122 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R21113:21114 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21116:21117 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21124:21128 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21168:21180 stdpp.fin_sets <> subseteq_size thm
+R21168:21180 stdpp.fin_sets <> subseteq_size thm
+R21199:21212 stdpp.fin_sets <> size_singleton thm
+R21199:21212 stdpp.fin_sets <> size_singleton thm
+R21199:21212 stdpp.fin_sets <> size_singleton thm
+R21284:21288 Corelib.Init.Datatypes <> false constr
+R21284:21288 Corelib.Init.Datatypes <> false constr
+R21371:21375 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R21376:21377 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21379:21380 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21371:21375 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R21376:21377 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21379:21380 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21455:21459 stdpp.base <> ::stdpp_scope:x_'⊂'_x not
+R21436:21441 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21454:21454 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21444:21448 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R21449:21450 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21452:21453 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21461:21465 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21455:21459 stdpp.base <> ::stdpp_scope:x_'⊂'_x not
+R21436:21441 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21454:21454 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21444:21448 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R21449:21450 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21452:21453 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R21461:21465 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R21503:21513 stdpp.fin_sets <> subset_size thm
+R21503:21513 stdpp.fin_sets <> subset_size thm
+prf 21863:21877 <> log_amort_spend
+binder 21879:21880 <> γ:69
+binder 21882:21882 <> F:70
+binder 21884:21884 <> u:71
+R21912:21921 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R21892:21900 xv6iris.WriteiBudget <> log_amort def
+R21902:21903 xv6iris.WriteiBudget <> γ:69 var
+R21905:21905 xv6iris.WriteiBudget <> F:70 var
+R21908:21908 Corelib.Init.Datatypes <> S constr
+R21910:21910 xv6iris.WriteiBudget <> u:71 var
+R21922:21926 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R21948:21956 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R21932:21935 stdpp.gmap <> gset def
+R21937:21937 Corelib.Numbers.BinNums <> Z ind
+binder 21927:21928 <> Sb:72
+R21945:21947 Corelib.Init.Datatypes <> nat ind
+binder 21941:21941 <> v:73
+R21976:21987 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R22066:22066 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R21957:21963 xv6iris.LogInv <> log_opS def
+R21965:21966 xv6iris.WriteiBudget <> γ:69 var
+R21969:21969 Corelib.Init.Datatypes <> S constr
+R21971:21971 xv6iris.WriteiBudget <> v:73 var
+R21974:21975 xv6iris.WriteiBudget <> Sb:72 var
+R21988:21991 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R22004:22005 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R21998:22001 stdpp.gmap <> gset def
+R22003:22003 Corelib.Numbers.BinNums <> Z ind
+binder 21992:21994 <> Sb':74
+R22022:22027 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R22006:22008 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R22019:22021 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R22011:22015 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R22009:22010 xv6iris.WriteiBudget <> Sb:72 var
+R22016:22018 xv6iris.WriteiBudget <> Sb':74 var
+R22044:22049 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R22028:22034 xv6iris.LogInv <> log_opS def
+R22036:22037 xv6iris.WriteiBudget <> γ:69 var
+R22039:22039 xv6iris.WriteiBudget <> v:73 var
+R22041:22043 xv6iris.WriteiBudget <> Sb':74 var
+R22050:22058 xv6iris.WriteiBudget <> log_amort def
+R22060:22061 xv6iris.WriteiBudget <> γ:69 var
+R22063:22063 xv6iris.WriteiBudget <> F:70 var
+R22065:22065 xv6iris.WriteiBudget <> u:71 var
+R22104:22112 xv6iris.WriteiBudget <> log_amort def
+R22104:22112 xv6iris.WriteiBudget <> log_amort def
+R22104:22112 xv6iris.WriteiBudget <> log_amort def
+R22313:22317 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R22305:22309 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R22319:22323 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R22313:22317 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R22305:22309 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R22319:22323 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R22359:22371 stdpp.fin_sets <> subseteq_size thm
+R22359:22371 stdpp.fin_sets <> subseteq_size thm
+prf 22476:22492 <> log_amort_reframe
+binder 22494:22495 <> γ:75
+binder 22497:22497 <> F:76
+binder 22499:22499 <> u:77
+R22507:22510 stdpp.gmap <> gset def
+R22512:22512 Corelib.Numbers.BinNums <> Z ind
+binder 22502:22503 <> Sb:78
+R22520:22522 Corelib.Init.Datatypes <> nat ind
+binder 22516:22516 <> v:79
+R22561:22564 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22551:22554 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R22533:22535 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R22532:22532 xv6iris.WriteiBudget <> u:77 var
+R22536:22539 stdpp.base <> size def
+R22543:22547 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R22542:22542 xv6iris.WriteiBudget <> F:76 var
+R22548:22549 xv6iris.WriteiBudget <> Sb:78 var
+R22555:22555 xv6iris.WriteiBudget <> v:79 var
+R22580:22585 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22565:22571 xv6iris.LogInv <> log_opS def
+R22573:22574 xv6iris.WriteiBudget <> γ:75 var
+R22576:22576 xv6iris.WriteiBudget <> v:79 var
+R22578:22579 xv6iris.WriteiBudget <> Sb:78 var
+R22586:22594 xv6iris.WriteiBudget <> log_amort def
+R22596:22597 xv6iris.WriteiBudget <> γ:75 var
+R22599:22599 xv6iris.WriteiBudget <> F:76 var
+R22601:22601 xv6iris.WriteiBudget <> u:77 var
+prf 23105:23119 <> log_amort_adopt
+binder 23121:23122 <> γ:80
+binder 23124:23124 <> F:81
+binder 23126:23126 <> u:82
+R23133:23133 Corelib.Numbers.BinNums <> Z ind
+binder 23129:23129 <> b:83
+R23142:23145 stdpp.gmap <> gset def
+R23147:23147 Corelib.Numbers.BinNums <> Z ind
+binder 23137:23138 <> Sb:84
+R23155:23157 Corelib.Init.Datatypes <> nat ind
+binder 23151:23151 <> v:85
+R23174:23181 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23167:23171 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R23166:23166 xv6iris.WriteiBudget <> b:83 var
+R23172:23173 xv6iris.WriteiBudget <> Sb:84 var
+R23212:23219 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23202:23205 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23184:23186 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R23183:23183 xv6iris.WriteiBudget <> u:82 var
+R23187:23190 stdpp.base <> size def
+R23194:23198 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R23193:23193 xv6iris.WriteiBudget <> F:81 var
+R23199:23200 xv6iris.WriteiBudget <> Sb:84 var
+R23206:23206 xv6iris.WriteiBudget <> v:85 var
+R23235:23240 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R23220:23226 xv6iris.LogInv <> log_opS def
+R23228:23229 xv6iris.WriteiBudget <> γ:80 var
+R23231:23231 xv6iris.WriteiBudget <> v:85 var
+R23233:23234 xv6iris.WriteiBudget <> Sb:84 var
+R23241:23249 xv6iris.WriteiBudget <> log_amort def
+R23251:23252 xv6iris.WriteiBudget <> γ:80 var
+R23260:23264 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R23255:23256 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R23258:23259 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R23257:23257 xv6iris.WriteiBudget <> b:83 var
+R23265:23265 xv6iris.WriteiBudget <> F:81 var
+R23268:23268 xv6iris.WriteiBudget <> u:82 var
+R23378:23382 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R23358:23358 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R23370:23375 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R23364:23368 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R23359:23360 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R23362:23363 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R23384:23388 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R23378:23382 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R23358:23358 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R23370:23375 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R23364:23368 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R23359:23360 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R23362:23363 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R23384:23388 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R23424:23436 stdpp.fin_sets <> subseteq_size thm
+R23424:23436 stdpp.fin_sets <> subseteq_size thm
+def 23751:23758 <> wi_amort
+R23766:23774 xv6iris.LogDefs <> log_names rec
+binder 23761:23762 <> γ:86
+R23790:23790 Corelib.Numbers.BinNums <> Z ind
+binder 23778:23786 <> bmapstart:87
+R23800:23800 Corelib.Numbers.BinNums <> Z ind
+binder 23794:23796 <> ind:88
+R23808:23810 Corelib.Init.Datatypes <> nat ind
+binder 23804:23804 <> u:89
+R23815:23819 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R23821:23822 xv6iris.WriteiBudget <> LogAmort.Σ var
+R23831:23839 xv6iris.WriteiBudget <> log_amort def
+R23841:23842 xv6iris.WriteiBudget <> γ:86 var
+R23858:23862 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R23845:23846 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R23856:23857 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R23847:23855 xv6iris.WriteiBudget <> bmapstart:87 var
+R23863:23864 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R23868:23869 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R23865:23867 xv6iris.WriteiBudget <> ind:88 var
+R23872:23872 xv6iris.WriteiBudget <> u:89 var
+prf 23884:23897 <> wi_amort_intro
+binder 23899:23900 <> γ:90
+binder 23902:23910 <> bmapstart:91
+binder 23912:23914 <> ind:92
+binder 23916:23916 <> u:93
+binder 23918:23918 <> v:94
+R23942:23945 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R23932:23935 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R23928:23930 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R23927:23927 xv6iris.WriteiBudget <> u:93 var
+R23936:23936 xv6iris.WriteiBudget <> v:94 var
+R23957:23962 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R23946:23951 xv6iris.LogInv <> log_op def
+R23953:23954 xv6iris.WriteiBudget <> γ:90 var
+R23956:23956 xv6iris.WriteiBudget <> v:94 var
+R23963:23970 xv6iris.WriteiBudget <> wi_amort def
+R23972:23973 xv6iris.WriteiBudget <> γ:90 var
+R23975:23983 xv6iris.WriteiBudget <> bmapstart:91 var
+R23985:23987 xv6iris.WriteiBudget <> ind:92 var
+R23989:23989 xv6iris.WriteiBudget <> u:93 var
+R24032:24039 xv6iris.WriteiBudget <> wi_amort def
+R24032:24039 xv6iris.WriteiBudget <> wi_amort def
+R24032:24039 xv6iris.WriteiBudget <> wi_amort def
+R24053:24053 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24069:24074 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24078:24078 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24054:24068 xv6iris.WriteiBudget <> log_amort_intro thm
+R24053:24053 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24069:24074 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24078:24078 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R24054:24068 xv6iris.WriteiBudget <> log_amort_intro thm
+R24140:24143 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R24099:24102 stdpp.base <> size def
+R24133:24136 stdpp.gmap <> gset def
+R24138:24138 Corelib.Numbers.BinNums <> Z ind
+R24118:24122 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R24105:24106 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R24116:24117 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R24123:24124 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R24128:24129 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R24140:24143 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R24099:24102 stdpp.base <> size def
+R24133:24136 stdpp.gmap <> gset def
+R24138:24138 Corelib.Numbers.BinNums <> Z ind
+R24118:24122 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R24105:24106 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R24116:24117 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R24123:24124 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R24128:24129 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R24174:24191 xv6iris.WriteiBudget <> gset_size_union_le thm
+R24174:24191 xv6iris.WriteiBudget <> gset_size_union_le thm
+R24205:24218 stdpp.fin_sets <> size_singleton thm
+R24205:24218 stdpp.fin_sets <> size_singleton thm
+R24205:24218 stdpp.fin_sets <> size_singleton thm
+R24205:24218 stdpp.fin_sets <> size_singleton thm
+R24205:24218 stdpp.fin_sets <> size_singleton thm
+prf 24253:24265 <> wi_amort_elim
+binder 24267:24268 <> γ:95
+binder 24270:24278 <> bmapstart:96
+binder 24280:24282 <> ind:97
+binder 24284:24284 <> u:98
+R24319:24324 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R24292:24299 xv6iris.WriteiBudget <> wi_amort def
+R24301:24302 xv6iris.WriteiBudget <> γ:95 var
+R24304:24312 xv6iris.WriteiBudget <> bmapstart:96 var
+R24314:24316 xv6iris.WriteiBudget <> ind:97 var
+R24318:24318 xv6iris.WriteiBudget <> u:98 var
+R24325:24328 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R24336:24337 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R24333:24335 Corelib.Init.Datatypes <> nat ind
+binder 24329:24329 <> v:99
+R24356:24360 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R24338:24340 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R24353:24355 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R24343:24346 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R24342:24342 xv6iris.WriteiBudget <> u:98 var
+R24347:24347 xv6iris.WriteiBudget <> v:99 var
+R24361:24366 xv6iris.LogInv <> log_op def
+R24368:24369 xv6iris.WriteiBudget <> γ:95 var
+R24371:24371 xv6iris.WriteiBudget <> v:99 var
+R24392:24399 xv6iris.WriteiBudget <> wi_amort def
+R24392:24399 xv6iris.WriteiBudget <> wi_amort def
+R24392:24399 xv6iris.WriteiBudget <> wi_amort def
+R24409:24422 xv6iris.WriteiBudget <> log_amort_elim thm
+R24409:24422 xv6iris.WriteiBudget <> log_amort_elim thm
+prf 24941:24957 <> log_amort_reserve
+binder 24959:24960 <> γ:100
+binder 24962:24962 <> F:101
+binder 24964:24964 <> u:102
+R24971:24971 Corelib.Numbers.BinNums <> Z ind
+binder 24967:24967 <> x:103
+R25000:25005 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R24980:24988 xv6iris.WriteiBudget <> log_amort def
+R24990:24991 xv6iris.WriteiBudget <> γ:100 var
+R24993:24993 xv6iris.WriteiBudget <> F:101 var
+R24996:24996 Corelib.Init.Datatypes <> S constr
+R24998:24998 xv6iris.WriteiBudget <> u:102 var
+R25006:25014 xv6iris.WriteiBudget <> log_amort def
+R25016:25017 xv6iris.WriteiBudget <> γ:100 var
+R25025:25029 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R25020:25021 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25023:25024 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25022:25022 xv6iris.WriteiBudget <> x:103 var
+R25030:25030 xv6iris.WriteiBudget <> F:101 var
+R25033:25033 xv6iris.WriteiBudget <> u:102 var
+R25071:25079 xv6iris.WriteiBudget <> log_amort def
+R25071:25079 xv6iris.WriteiBudget <> log_amort def
+R25071:25079 xv6iris.WriteiBudget <> log_amort def
+R25196:25198 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25176:25176 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25188:25193 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25182:25186 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R25177:25178 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25180:25181 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25199:25199 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R25212:25218 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R25227:25227 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R25205:25209 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25200:25201 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25203:25204 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25220:25224 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25196:25198 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25176:25176 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25188:25193 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25182:25186 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R25177:25178 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25180:25181 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25199:25199 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R25212:25218 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R25227:25227 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R25205:25209 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25200:25201 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25203:25204 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25220:25224 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25278:25295 xv6iris.WriteiBudget <> gset_size_union_le thm
+R25303:25307 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25298:25299 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25301:25302 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25314:25318 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25278:25295 xv6iris.WriteiBudget <> gset_size_union_le thm
+R25303:25307 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25298:25299 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25301:25302 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25314:25318 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25348:25348 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R25361:25367 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R25382:25382 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R25354:25358 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25349:25350 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25352:25353 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25376:25379 stdpp.gmap <> gset def
+R25381:25381 Corelib.Numbers.BinNums <> Z ind
+R25368:25369 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25371:25372 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25348:25348 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R25361:25367 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R25382:25382 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R25354:25358 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R25349:25350 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25352:25353 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25376:25379 stdpp.gmap <> gset def
+R25381:25381 Corelib.Numbers.BinNums <> Z ind
+R25368:25369 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25371:25372 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R25416:25428 stdpp.fin_sets <> subseteq_size thm
+R25416:25428 stdpp.fin_sets <> subseteq_size thm
+R25453:25466 stdpp.fin_sets <> size_singleton thm
+R25453:25466 stdpp.fin_sets <> size_singleton thm
+R25453:25466 stdpp.fin_sets <> size_singleton thm
+prf 26230:26252 <> log_amort_present_spend
+binder 26254:26255 <> γ:104
+binder 26257:26257 <> F:105
+binder 26259:26259 <> u:106
+R26266:26266 Corelib.Numbers.BinNums <> Z ind
+binder 26262:26262 <> b:107
+R26282:26289 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26276:26280 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R26275:26275 xv6iris.WriteiBudget <> b:107 var
+R26281:26281 xv6iris.WriteiBudget <> F:105 var
+R26314:26323 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R26290:26298 xv6iris.WriteiBudget <> log_amort def
+R26300:26301 xv6iris.WriteiBudget <> γ:104 var
+R26303:26303 xv6iris.WriteiBudget <> F:105 var
+R26306:26306 Corelib.Init.Datatypes <> S constr
+R26309:26309 Corelib.Init.Datatypes <> S constr
+R26311:26311 xv6iris.WriteiBudget <> u:106 var
+R26324:26328 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R26362:26370 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R26334:26337 stdpp.gmap <> gset def
+R26339:26339 Corelib.Numbers.BinNums <> Z ind
+binder 26329:26330 <> Sb:108
+R26347:26349 Corelib.Init.Datatypes <> nat ind
+binder 26343:26343 <> v:109
+R26358:26361 Corelib.Init.Datatypes <> bool ind
+binder 26353:26354 <> cr:110
+R26398:26408 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R26371:26373 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R26395:26397 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R26383:26386 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R26376:26378 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26374:26375 xv6iris.WriteiBudget <> cr:110 var
+R26379:26382 Corelib.Init.Datatypes <> true constr
+R26388:26392 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R26387:26387 xv6iris.WriteiBudget <> b:107 var
+R26393:26394 xv6iris.WriteiBudget <> Sb:108 var
+R26432:26443 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R26576:26576 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R26409:26415 xv6iris.LogInv <> log_opS def
+R26417:26418 xv6iris.WriteiBudget <> γ:104 var
+R26421:26421 Corelib.Init.Datatypes <> S constr
+R26424:26424 Corelib.Init.Datatypes <> S constr
+R26426:26426 xv6iris.WriteiBudget <> v:109 var
+R26430:26431 xv6iris.WriteiBudget <> Sb:108 var
+R26444:26447 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R26460:26470 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R26454:26457 stdpp.gmap <> gset def
+R26459:26459 Corelib.Numbers.BinNums <> Z ind
+binder 26448:26450 <> Sb':111
+R26497:26511 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R26471:26473 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R26494:26496 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R26486:26490 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R26476:26480 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R26474:26475 xv6iris.WriteiBudget <> Sb:108 var
+R26481:26482 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R26484:26485 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R26483:26483 xv6iris.WriteiBudget <> b:107 var
+R26491:26493 xv6iris.WriteiBudget <> Sb':111 var
+R26550:26555 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R26512:26518 xv6iris.LogInv <> log_opS def
+R26520:26521 xv6iris.WriteiBudget <> γ:104 var
+R26524:26526 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R26529:26534 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R26538:26543 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R26544:26544 xv6iris.WriteiBudget <> v:109 var
+R26535:26535 Corelib.Init.Datatypes <> S constr
+R26537:26537 xv6iris.WriteiBudget <> v:109 var
+R26527:26528 xv6iris.WriteiBudget <> cr:110 var
+R26547:26549 xv6iris.WriteiBudget <> Sb':111 var
+R26556:26564 xv6iris.WriteiBudget <> log_amort def
+R26566:26567 xv6iris.WriteiBudget <> γ:104 var
+R26569:26569 xv6iris.WriteiBudget <> F:105 var
+R26572:26572 Corelib.Init.Datatypes <> S constr
+R26574:26574 xv6iris.WriteiBudget <> u:106 var
+R26620:26628 xv6iris.WriteiBudget <> log_amort def
+R26620:26628 xv6iris.WriteiBudget <> log_amort def
+R26620:26628 xv6iris.WriteiBudget <> log_amort def
+R26686:26691 stdpp.base <> decide def
+R26695:26699 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R26686:26691 stdpp.base <> decide def
+R26695:26699 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R26882:26885 Corelib.Init.Datatypes <> true constr
+R26882:26885 Corelib.Init.Datatypes <> true constr
+R26975:26975 Corelib.Init.Datatypes <> S constr
+R26975:26975 Corelib.Init.Datatypes <> S constr
+R27030:27034 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R27022:27026 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27036:27040 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27030:27034 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R27022:27026 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27036:27040 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27078:27090 stdpp.fin_sets <> subseteq_size thm
+R27078:27090 stdpp.fin_sets <> subseteq_size thm
+R27294:27298 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R27300:27304 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27294:27298 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R27300:27304 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27346:27349 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R27350:27353 stdpp.base <> size def
+R27357:27361 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27346:27349 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R27350:27353 stdpp.base <> size def
+R27357:27361 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27399:27403 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R27394:27395 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R27397:27398 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R27405:27409 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27399:27403 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R27394:27395 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R27397:27398 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R27405:27409 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27449:27461 stdpp.fin_sets <> subseteq_size thm
+R27449:27461 stdpp.fin_sets <> subseteq_size thm
+R27480:27493 stdpp.fin_sets <> size_singleton thm
+R27480:27493 stdpp.fin_sets <> size_singleton thm
+R27480:27493 stdpp.fin_sets <> size_singleton thm
+R27595:27599 Corelib.Init.Datatypes <> false constr
+R27595:27599 Corelib.Init.Datatypes <> false constr
+R27751:27755 stdpp.base <> ::stdpp_scope:x_'⊂'_x not
+R27743:27747 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27757:27761 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27751:27755 stdpp.base <> ::stdpp_scope:x_'⊂'_x not
+R27743:27747 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27757:27761 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27830:27834 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R27836:27840 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27830:27834 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R27836:27840 stdpp.base <> ::stdpp_scope:x_'∖'_x not
+R27908:27918 stdpp.fin_sets <> subset_size thm
+R27908:27918 stdpp.fin_sets <> subset_size thm
+R27949:27956 xv6iris.WriteiBudget LogAmort <> sec
+def 28702:28710 <> wi_indset
+R28718:28723 xv6iris.InodeInv <> blkmap rec
+binder 28713:28714 <> bm:112
+R28728:28731 stdpp.gmap <> gset def
+R28733:28733 Corelib.Numbers.BinNums <> Z ind
+R28740:28742 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R28779:28784 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R28788:28795 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R28796:28797 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R28821:28822 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R28798:28808 stdpp.bitvector.definitions <> bv_unsigned proj
+R28811:28816 xv6iris.InodeInv <> bm_ind proj
+R28818:28819 xv6iris.WriteiBudget <> bm:112 var
+R28785:28787 stdpp.base <> ::stdpp_scope:'∅' not
+R28743:28748 stdpp.base <> decide def
+R28774:28776 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R28751:28761 stdpp.bitvector.definitions <> bv_unsigned proj
+R28764:28769 xv6iris.InodeInv <> bm_ind proj
+R28771:28772 xv6iris.WriteiBudget <> bm:112 var
+def 28837:28843 <> wi_fset
+R28858:28858 Corelib.Numbers.BinNums <> Z ind
+binder 28846:28854 <> bmapstart:113
+R28867:28872 xv6iris.InodeInv <> blkmap rec
+binder 28862:28863 <> bm:114
+R28877:28880 stdpp.gmap <> gset def
+R28882:28882 Corelib.Numbers.BinNums <> Z ind
+R28902:28906 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R28889:28890 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R28900:28901 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R28891:28899 xv6iris.WriteiBudget <> bmapstart:113 var
+R28907:28915 xv6iris.WriteiBudget <> wi_indset def
+R28917:28918 xv6iris.WriteiBudget <> bm:114 var
+prf 28928:28939 <> wi_fset_size
+R28954:28954 Corelib.Numbers.BinNums <> Z ind
+binder 28942:28950 <> bmapstart:115
+R28963:28968 xv6iris.InodeInv <> blkmap rec
+binder 28958:28959 <> bm:116
+R29003:29006 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R28976:28979 stdpp.base <> size def
+R28982:28988 xv6iris.WriteiBudget <> wi_fset def
+R28990:28998 xv6iris.WriteiBudget <> bmapstart:115 var
+R29000:29001 xv6iris.WriteiBudget <> bm:116 var
+R29031:29037 xv6iris.WriteiBudget <> wi_fset def
+R29040:29048 xv6iris.WriteiBudget <> wi_indset def
+R29061:29066 stdpp.base <> decide def
+R29092:29094 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29069:29079 stdpp.bitvector.definitions <> bv_unsigned proj
+R29082:29087 xv6iris.InodeInv <> bm_ind proj
+R29061:29066 stdpp.base <> decide def
+R29092:29094 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29069:29079 stdpp.bitvector.definitions <> bv_unsigned proj
+R29082:29087 xv6iris.InodeInv <> bm_ind proj
+R29112:29121 stdpp.base <> right_id_L thm
+R29123:29136 stdpp.fin_sets <> size_singleton thm
+R29112:29121 stdpp.base <> right_id_L thm
+R29112:29121 stdpp.base <> right_id_L thm
+R29123:29136 stdpp.fin_sets <> size_singleton thm
+R29123:29136 stdpp.fin_sets <> size_singleton thm
+R29163:29180 xv6iris.WriteiBudget <> gset_size_union_le thm
+R29163:29180 xv6iris.WriteiBudget <> gset_size_union_le thm
+R29194:29207 stdpp.fin_sets <> size_singleton thm
+R29194:29207 stdpp.fin_sets <> size_singleton thm
+R29194:29207 stdpp.fin_sets <> size_singleton thm
+R29194:29207 stdpp.fin_sets <> size_singleton thm
+R29194:29207 stdpp.fin_sets <> size_singleton thm
+prf 29302:29313 <> wi_fset_same
+R29328:29328 Corelib.Numbers.BinNums <> Z ind
+binder 29316:29324 <> bmapstart:117
+R29341:29346 xv6iris.InodeInv <> blkmap rec
+binder 29332:29333 <> bm:118
+binder 29335:29337 <> bm':119
+R29375:29378 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29363:29365 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29353:29358 xv6iris.InodeInv <> bm_ind proj
+R29360:29362 xv6iris.WriteiBudget <> bm':119 var
+R29366:29371 xv6iris.InodeInv <> bm_ind proj
+R29373:29374 xv6iris.WriteiBudget <> bm:118 var
+R29400:29402 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29379:29385 xv6iris.WriteiBudget <> wi_fset def
+R29387:29395 xv6iris.WriteiBudget <> bmapstart:117 var
+R29397:29399 xv6iris.WriteiBudget <> bm':119 var
+R29403:29409 xv6iris.WriteiBudget <> wi_fset def
+R29411:29419 xv6iris.WriteiBudget <> bmapstart:117 var
+R29421:29422 xv6iris.WriteiBudget <> bm:118 var
+R29449:29455 xv6iris.WriteiBudget <> wi_fset def
+R29458:29466 xv6iris.WriteiBudget <> wi_indset def
+prf 29684:29695 <> wi_fset_grow
+R29710:29710 Corelib.Numbers.BinNums <> Z ind
+binder 29698:29706 <> bmapstart:120
+R29723:29728 xv6iris.InodeInv <> blkmap rec
+binder 29714:29715 <> bm:121
+binder 29717:29719 <> bm':122
+R29762:29767 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R29758:29760 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29735:29745 stdpp.bitvector.definitions <> bv_unsigned proj
+R29748:29753 xv6iris.InodeInv <> bm_ind proj
+R29755:29756 xv6iris.WriteiBudget <> bm:121 var
+R29845:29850 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R29789:29791 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29768:29774 xv6iris.WriteiBudget <> wi_fset def
+R29776:29784 xv6iris.WriteiBudget <> bmapstart:120 var
+R29786:29788 xv6iris.WriteiBudget <> bm':122 var
+R29820:29824 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R29792:29793 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R29818:29819 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R29794:29804 stdpp.bitvector.definitions <> bv_unsigned proj
+R29807:29812 xv6iris.InodeInv <> bm_ind proj
+R29814:29816 xv6iris.WriteiBudget <> bm':122 var
+R29825:29831 xv6iris.WriteiBudget <> wi_fset def
+R29833:29841 xv6iris.WriteiBudget <> bmapstart:120 var
+R29843:29844 xv6iris.WriteiBudget <> bm:121 var
+R29872:29874 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29851:29857 xv6iris.WriteiBudget <> wi_fset def
+R29859:29867 xv6iris.WriteiBudget <> bmapstart:120 var
+R29869:29871 xv6iris.WriteiBudget <> bm':122 var
+R29875:29881 xv6iris.WriteiBudget <> wi_fset def
+R29883:29891 xv6iris.WriteiBudget <> bmapstart:120 var
+R29893:29894 xv6iris.WriteiBudget <> bm:121 var
+R29924:29930 xv6iris.WriteiBudget <> wi_fset def
+R29933:29941 xv6iris.WriteiBudget <> wi_indset def
+R29956:29961 stdpp.base <> decide def
+R29987:29989 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29964:29974 stdpp.bitvector.definitions <> bv_unsigned proj
+R29977:29982 xv6iris.InodeInv <> bm_ind proj
+R29956:29961 stdpp.base <> decide def
+R29987:29989 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R29964:29974 stdpp.bitvector.definitions <> bv_unsigned proj
+R29977:29982 xv6iris.InodeInv <> bm_ind proj
+R30035:30040 stdpp.base <> decide def
+R30067:30069 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30043:30053 stdpp.bitvector.definitions <> bv_unsigned proj
+R30056:30061 xv6iris.InodeInv <> bm_ind proj
+R30035:30040 stdpp.base <> decide def
+R30067:30069 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R30043:30053 stdpp.bitvector.definitions <> bv_unsigned proj
+R30056:30061 xv6iris.InodeInv <> bm_ind proj
+def 31701:31712 <> bm_iter_cost
+R31735:31738 Corelib.Init.Datatypes <> bool ind
+binder 31715:31717 <> crb:123
+binder 31719:31721 <> cri:124
+binder 31723:31724 <> ai:125
+binder 31726:31727 <> ad:126
+binder 31729:31731 <> ind:127
+R31743:31745 Corelib.Init.Datatypes <> nat ind
+R31935:31997 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R32017:32017 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R31862:31868 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R31934:31934 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R31835:31841 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R31861:31861 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R31753:31753 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R31807:31814 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R31834:31834 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R31754:31756 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31772:31778 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31799:31805 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31779:31781 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31785:31790 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31792:31797 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31782:31784 xv6iris.WriteiBudget <> crb:123 var
+R31760:31763 Corelib.Init.Datatypes <> ::bool_scope:x_'||'_x not
+R31758:31759 xv6iris.WriteiBudget <> ai:125 var
+R31764:31765 xv6iris.WriteiBudget <> ad:126 var
+R31815:31817 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31820:31825 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31827:31832 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31818:31819 xv6iris.WriteiBudget <> ai:125 var
+R31842:31844 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31847:31852 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31854:31859 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31845:31846 xv6iris.WriteiBudget <> ad:126 var
+R31869:31871 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31899:31905 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31926:31932 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31906:31908 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31912:31917 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31919:31924 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R31909:31911 xv6iris.WriteiBudget <> cri:124 var
+R31882:31885 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R31875:31878 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R31873:31874 xv6iris.WriteiBudget <> ad:126 var
+R31879:31881 xv6iris.WriteiBudget <> ind:127 var
+R31886:31889 Corelib.Init.Datatypes <> negb def
+R31891:31892 xv6iris.WriteiBudget <> ai:125 var
+R31998:32000 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32003:32008 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32010:32015 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32001:32002 xv6iris.WriteiBudget <> ad:126 var
+prf 32248:32263 <> bm_iter_cost_max
+R32286:32289 Corelib.Init.Datatypes <> bool ind
+binder 32266:32268 <> crb:128
+binder 32270:32272 <> cri:129
+binder 32274:32275 <> ai:130
+binder 32277:32278 <> ad:131
+binder 32280:32282 <> ind:132
+R32327:32330 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R32297:32308 xv6iris.WriteiBudget <> bm_iter_cost def
+R32310:32312 xv6iris.WriteiBudget <> crb:128 var
+R32314:32316 xv6iris.WriteiBudget <> cri:129 var
+R32318:32319 xv6iris.WriteiBudget <> ai:130 var
+R32321:32322 xv6iris.WriteiBudget <> ad:131 var
+R32324:32326 xv6iris.WriteiBudget <> ind:132 var
+prf 32778:32793 <> bm_iter_cost_one
+R32816:32819 Corelib.Init.Datatypes <> bool ind
+binder 32796:32798 <> crb:133
+binder 32800:32802 <> cri:134
+binder 32804:32805 <> ai:135
+binder 32807:32808 <> ad:136
+binder 32810:32812 <> ind:137
+R32857:32862 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R32827:32838 xv6iris.WriteiBudget <> bm_iter_cost def
+R32840:32842 xv6iris.WriteiBudget <> crb:133 var
+R32844:32846 xv6iris.WriteiBudget <> cri:134 var
+R32848:32849 xv6iris.WriteiBudget <> ai:135 var
+R32851:32852 xv6iris.WriteiBudget <> ad:136 var
+R32854:32856 xv6iris.WriteiBudget <> ind:137 var
+R33003:33013 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R33033:33033 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R32926:32936 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R33002:33002 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R32864:32866 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R32867:32867 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R32888:32892 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R32925:32925 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R32868:32870 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32874:32879 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32881:32886 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32871:32873 xv6iris.WriteiBudget <> crb:133 var
+R32893:32895 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32911:32916 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32918:32923 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32899:32902 Corelib.Init.Datatypes <> ::bool_scope:x_'||'_x not
+R32897:32898 xv6iris.WriteiBudget <> ai:135 var
+R32903:32904 xv6iris.WriteiBudget <> ad:136 var
+R32937:32939 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32967:32973 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32994:33000 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32974:32976 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32980:32985 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32987:32992 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R32977:32979 xv6iris.WriteiBudget <> cri:134 var
+R32950:32953 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R32943:32946 Corelib.Init.Datatypes <> ::bool_scope:x_'&&'_x not
+R32941:32942 xv6iris.WriteiBudget <> ad:136 var
+R32947:32949 xv6iris.WriteiBudget <> ind:137 var
+R32954:32957 Corelib.Init.Datatypes <> negb def
+R32959:32960 xv6iris.WriteiBudget <> ai:135 var
+R33014:33016 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R33019:33024 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R33026:33031 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R33017:33018 xv6iris.WriteiBudget <> ai:135 var
+prf 33290:33310 <> bm_iter_cost_credited
+R33322:33325 Corelib.Init.Datatypes <> bool ind
+binder 33313:33314 <> ad:138
+binder 33316:33318 <> ind:139
+R33367:33369 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R33332:33343 xv6iris.WriteiBudget <> bm_iter_cost def
+R33345:33348 Corelib.Init.Datatypes <> true constr
+R33350:33353 Corelib.Init.Datatypes <> true constr
+R33355:33359 Corelib.Init.Datatypes <> false constr
+R33361:33362 xv6iris.WriteiBudget <> ad:138 var
+R33364:33366 xv6iris.WriteiBudget <> ind:139 var
+prf 36109:36128 <> wi_cost_bmonly_value
+R36158:36160 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R36132:36145 xv6iris.SpecWritei <> wi_cost_bmonly def
+R36152:36157 xv6iris.WriteiBudget <> FW_MAX def
+prf 36213:36231 <> wi_cost_bmonly_fits
+R36242:36244 Corelib.Init.Datatypes <> nat ind
+binder 36234:36236 <> off:140
+binder 36238:36238 <> n:141
+R36268:36271 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R36253:36256 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R36252:36252 xv6iris.WriteiBudget <> n:141 var
+R36257:36262 xv6iris.WriteiBudget <> FW_MAX def
+R36293:36296 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R36273:36286 xv6iris.SpecWritei <> wi_cost_bmonly def
+R36288:36290 xv6iris.WriteiBudget <> off:140 var
+R36292:36292 xv6iris.WriteiBudget <> n:141 var
+R36297:36307 xv6iris.LogInv <> MAXOPBLOCKS def
+R36342:36355 xv6iris.SpecWritei <> wi_cost_bmonly def
+R36372:36384 xv6iris.WriteiBudget <> wi_blocks_le4 thm
+R36372:36384 xv6iris.WriteiBudget <> wi_blocks_le4 thm
+R36404:36414 xv6iris.LogInv <> MAXOPBLOCKS def
+prf 36746:36768 <> wi_cost_bmonly_no_slack
+R36800:36802 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R36774:36787 xv6iris.SpecWritei <> wi_cost_bmonly def
+R36794:36799 xv6iris.WriteiBudget <> FW_MAX def
+R36803:36813 xv6iris.LogInv <> MAXOPBLOCKS def
+prf 36860:36878 <> wi_cost_tight_slack
+R36914:36916 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R36910:36912 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R36885:36897 xv6iris.WriteiBudget <> wi_cost_tight def
+R36904:36909 xv6iris.WriteiBudget <> FW_MAX def
+R36917:36927 xv6iris.LogInv <> MAXOPBLOCKS def
+def 38332:38337 <> bm_pot
+R38346:38346 Corelib.Numbers.BinNums <> Z ind
+binder 38340:38342 <> bms:142
+R38354:38357 stdpp.gmap <> gset def
+R38359:38359 Corelib.Numbers.BinNums <> Z ind
+binder 38350:38350 <> S:143
+R38364:38366 Corelib.Init.Datatypes <> nat ind
+R38373:38375 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R38394:38399 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R38405:38410 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R38376:38381 stdpp.base <> decide def
+R38387:38391 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R38384:38386 xv6iris.WriteiBudget <> bms:142 var
+R38392:38392 xv6iris.WriteiBudget <> S:143 var
+prf 38425:38434 <> bm_pot_le1
+R38443:38443 Corelib.Numbers.BinNums <> Z ind
+binder 38437:38439 <> bms:144
+R38451:38454 stdpp.gmap <> gset def
+R38456:38456 Corelib.Numbers.BinNums <> Z ind
+binder 38447:38447 <> S:145
+R38474:38477 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R38462:38467 xv6iris.WriteiBudget <> bm_pot def
+R38469:38471 xv6iris.WriteiBudget <> bms:144 var
+R38473:38473 xv6iris.WriteiBudget <> S:145 var
+R38500:38505 xv6iris.WriteiBudget <> bm_pot def
+R38518:38523 stdpp.base <> decide def
+R38529:38533 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R38518:38523 stdpp.base <> decide def
+R38529:38533 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+prf 38556:38564 <> bm_pot_in
+R38573:38573 Corelib.Numbers.BinNums <> Z ind
+binder 38567:38569 <> bms:146
+R38581:38584 stdpp.gmap <> gset def
+R38586:38586 Corelib.Numbers.BinNums <> Z ind
+binder 38577:38577 <> S:147
+R38600:38603 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R38594:38598 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R38591:38593 xv6iris.WriteiBudget <> bms:146 var
+R38599:38599 xv6iris.WriteiBudget <> S:147 var
+R38616:38618 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R38604:38609 xv6iris.WriteiBudget <> bm_pot def
+R38611:38613 xv6iris.WriteiBudget <> bms:146 var
+R38615:38615 xv6iris.WriteiBudget <> S:147 var
+R38652:38657 xv6iris.WriteiBudget <> bm_pot def
+R38672:38677 stdpp.base <> decide def
+R38683:38687 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R38672:38677 stdpp.base <> decide def
+R38683:38687 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+prf 38875:38885 <> bm_pot_mono
+R38894:38894 Corelib.Numbers.BinNums <> Z ind
+binder 38888:38890 <> bms:148
+R38905:38908 stdpp.gmap <> gset def
+R38910:38910 Corelib.Numbers.BinNums <> Z ind
+binder 38898:38898 <> S:149
+binder 38900:38901 <> S':150
+R38925:38928 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R38918:38922 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R38917:38917 xv6iris.WriteiBudget <> S:149 var
+R38923:38924 xv6iris.WriteiBudget <> S':150 var
+R38943:38946 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R38930:38935 xv6iris.WriteiBudget <> bm_pot def
+R38937:38939 xv6iris.WriteiBudget <> bms:148 var
+R38941:38942 xv6iris.WriteiBudget <> S':150 var
+R38947:38952 xv6iris.WriteiBudget <> bm_pot def
+R38954:38956 xv6iris.WriteiBudget <> bms:148 var
+R38958:38958 xv6iris.WriteiBudget <> S:149 var
+R38995:39000 xv6iris.WriteiBudget <> bm_pot def
+R39015:39020 stdpp.base <> decide def
+R39026:39030 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R39015:39020 stdpp.base <> decide def
+R39026:39030 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R39068:39073 stdpp.base <> decide def
+R39079:39083 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R39068:39073 stdpp.base <> decide def
+R39079:39083 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R39137:39150 stdpp.sets <> elem_of_weaken thm
+R39137:39150 stdpp.sets <> elem_of_weaken thm
+def 39524:39533 <> wi_inv_bud
+R39542:39542 Corelib.Numbers.BinNums <> Z ind
+binder 39536:39538 <> bms:151
+R39553:39555 Corelib.Init.Datatypes <> nat ind
+binder 39546:39546 <> W:152
+binder 39548:39549 <> nI:153
+R39564:39567 stdpp.gmap <> gset def
+R39569:39569 Corelib.Numbers.BinNums <> Z ind
+binder 39559:39560 <> SI:154
+R39610:39613 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R39594:39596 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R39590:39592 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R39586:39588 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R39589:39589 xv6iris.WriteiBudget <> W:152 var
+R39597:39602 xv6iris.WriteiBudget <> bm_pot def
+R39604:39606 xv6iris.WriteiBudget <> bms:151 var
+R39608:39609 xv6iris.WriteiBudget <> SI:154 var
+R39614:39615 xv6iris.WriteiBudget <> nI:153 var
+def 39635:39646 <> wi_inv_spent
+R39655:39655 Corelib.Numbers.BinNums <> Z ind
+binder 39649:39651 <> bms:155
+R39675:39677 Corelib.Init.Datatypes <> nat ind
+binder 39659:39664 <> ncount:156
+binder 39666:39667 <> nI:157
+binder 39669:39669 <> B:158
+binder 39671:39671 <> W:159
+R39686:39689 stdpp.gmap <> gset def
+R39691:39691 Corelib.Numbers.BinNums <> Z ind
+binder 39681:39682 <> SI:160
+R39729:39732 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R39713:39715 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R39707:39712 xv6iris.WriteiBudget <> ncount:156 var
+R39716:39721 xv6iris.WriteiBudget <> bm_pot def
+R39723:39725 xv6iris.WriteiBudget <> bms:155 var
+R39727:39728 xv6iris.WriteiBudget <> SI:160 var
+R39749:39751 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R39735:39737 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R39733:39734 xv6iris.WriteiBudget <> nI:157 var
+R39739:39742 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R39748:39748 Corelib.Init.Peano <> ::nat_scope:x_'*'_x not
+R39744:39746 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R39743:39743 xv6iris.WriteiBudget <> B:158 var
+R39747:39747 xv6iris.WriteiBudget <> W:159 var
+prf 39980:39991 <> wi_inv_enter
+R40000:40000 Corelib.Numbers.BinNums <> Z ind
+binder 39994:39996 <> bms:161
+R40019:40021 Corelib.Init.Datatypes <> nat ind
+binder 40004:40009 <> ncount:162
+binder 40011:40013 <> off:163
+binder 40015:40015 <> n:164
+R40029:40032 stdpp.gmap <> gset def
+R40034:40034 Corelib.Numbers.BinNums <> Z ind
+binder 40025:40025 <> S:165
+R40077:40082 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40062:40065 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R40042:40055 xv6iris.SpecWritei <> wi_cost_bmonly def
+R40057:40059 xv6iris.WriteiBudget <> off:163 var
+R40061:40061 xv6iris.WriteiBudget <> n:164 var
+R40066:40071 xv6iris.WriteiBudget <> ncount:162 var
+R40124:40129 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R40083:40092 xv6iris.WriteiBudget <> wi_inv_bud def
+R40094:40096 xv6iris.WriteiBudget <> bms:161 var
+R40099:40107 xv6iris.SpecWritei <> wi_blocks def
+R40109:40111 xv6iris.WriteiBudget <> off:163 var
+R40113:40113 xv6iris.WriteiBudget <> n:164 var
+R40116:40121 xv6iris.WriteiBudget <> ncount:162 var
+R40123:40123 xv6iris.WriteiBudget <> S:165 var
+R40130:40141 xv6iris.WriteiBudget <> wi_inv_spent def
+R40143:40145 xv6iris.WriteiBudget <> bms:161 var
+R40147:40152 xv6iris.WriteiBudget <> ncount:162 var
+R40154:40159 xv6iris.WriteiBudget <> ncount:162 var
+R40162:40170 xv6iris.SpecWritei <> wi_blocks def
+R40172:40174 xv6iris.WriteiBudget <> off:163 var
+R40176:40176 xv6iris.WriteiBudget <> n:164 var
+R40180:40188 xv6iris.SpecWritei <> wi_blocks def
+R40190:40192 xv6iris.WriteiBudget <> off:163 var
+R40194:40194 xv6iris.WriteiBudget <> n:164 var
+R40197:40197 xv6iris.WriteiBudget <> S:165 var
+R40226:40235 xv6iris.WriteiBudget <> wi_inv_bud def
+R40238:40249 xv6iris.WriteiBudget <> wi_inv_spent def
+R40252:40265 xv6iris.SpecWritei <> wi_cost_bmonly def
+R40287:40296 xv6iris.WriteiBudget <> bm_pot_le1 thm
+R40287:40296 xv6iris.WriteiBudget <> bm_pot_le1 thm
+prf 40425:40439 <> wi_bmap_need_ok
+R40448:40448 Corelib.Numbers.BinNums <> Z ind
+binder 40442:40444 <> bms:166
+R40459:40461 Corelib.Init.Datatypes <> nat ind
+binder 40452:40452 <> W:167
+binder 40454:40455 <> nI:168
+R40470:40473 stdpp.gmap <> gset def
+R40475:40475 Corelib.Numbers.BinNums <> Z ind
+binder 40465:40466 <> SI:169
+R40485:40488 Corelib.Init.Datatypes <> bool ind
+binder 40479:40481 <> ind:170
+R40507:40510 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40497:40500 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R40501:40501 xv6iris.WriteiBudget <> W:167 var
+R40533:40538 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R40511:40520 xv6iris.WriteiBudget <> wi_inv_bud def
+R40522:40524 xv6iris.WriteiBudget <> bms:166 var
+R40526:40526 xv6iris.WriteiBudget <> W:167 var
+R40528:40529 xv6iris.WriteiBudget <> nI:168 var
+R40531:40532 xv6iris.WriteiBudget <> SI:169 var
+R40580:40583 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R40540:40548 xv6iris.SpecBmap <> bmap_need def
+R40551:40561 stdpp.decidable <> bool_decide def
+R40567:40571 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R40564:40566 xv6iris.WriteiBudget <> bms:166 var
+R40572:40573 xv6iris.WriteiBudget <> SI:169 var
+R40577:40579 xv6iris.WriteiBudget <> ind:170 var
+R40584:40585 xv6iris.WriteiBudget <> nI:168 var
+R40622:40631 xv6iris.WriteiBudget <> wi_inv_bud def
+R40634:40639 xv6iris.WriteiBudget <> bm_pot def
+R40642:40650 xv6iris.SpecBmap <> bmap_need def
+R40670:40675 stdpp.base <> decide def
+R40681:40685 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R40670:40675 stdpp.base <> decide def
+R40681:40685 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R40716:40736 stdpp.decidable <> bool_decide_eq_true_2 thm
+R40716:40736 stdpp.decidable <> bool_decide_eq_true_2 thm
+R40716:40736 stdpp.decidable <> bool_decide_eq_true_2 thm
+R40777:40798 stdpp.decidable <> bool_decide_eq_false_2 thm
+R40777:40798 stdpp.decidable <> bool_decide_eq_false_2 thm
+R40777:40798 stdpp.decidable <> bool_decide_eq_false_2 thm
+prf 40981:40995 <> wi_bmap_cost_le
+R41004:41004 Corelib.Numbers.BinNums <> Z ind
+binder 40998:41000 <> bms:171
+R41013:41016 stdpp.gmap <> gset def
+R41018:41018 Corelib.Numbers.BinNums <> Z ind
+binder 41008:41009 <> SI:172
+R41031:41034 Corelib.Init.Datatypes <> bool ind
+binder 41022:41023 <> al:173
+binder 41025:41027 <> ind:174
+R41085:41088 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R41042:41050 xv6iris.SpecBmap <> bmap_cost def
+R41053:41063 stdpp.decidable <> bool_decide def
+R41069:41073 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R41066:41068 xv6iris.WriteiBudget <> bms:171 var
+R41074:41075 xv6iris.WriteiBudget <> SI:172 var
+R41079:41080 xv6iris.WriteiBudget <> al:173 var
+R41082:41084 xv6iris.WriteiBudget <> ind:174 var
+R41090:41092 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R41093:41098 xv6iris.WriteiBudget <> bm_pot def
+R41100:41102 xv6iris.WriteiBudget <> bms:171 var
+R41104:41105 xv6iris.WriteiBudget <> SI:172 var
+R41129:41137 xv6iris.SpecBmap <> bmap_cost def
+R41140:41145 xv6iris.WriteiBudget <> bm_pot def
+R41158:41163 stdpp.base <> decide def
+R41169:41173 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R41158:41163 stdpp.base <> decide def
+R41169:41173 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R41204:41224 stdpp.decidable <> bool_decide_eq_true_2 thm
+R41204:41224 stdpp.decidable <> bool_decide_eq_true_2 thm
+R41204:41224 stdpp.decidable <> bool_decide_eq_true_2 thm
+R41274:41295 stdpp.decidable <> bool_decide_eq_false_2 thm
+R41274:41295 stdpp.decidable <> bool_decide_eq_false_2 thm
+R41274:41295 stdpp.decidable <> bool_decide_eq_false_2 thm
+prf 41510:41524 <> wi_step_noalloc
+R41533:41533 Corelib.Numbers.BinNums <> Z ind
+binder 41527:41529 <> bms:175
+R41557:41559 Corelib.Init.Datatypes <> nat ind
+binder 41537:41542 <> ncount:176
+binder 41544:41545 <> nI:177
+binder 41547:41549 <> nI':178
+binder 41551:41551 <> B:179
+binder 41553:41553 <> W:180
+R41572:41575 stdpp.gmap <> gset def
+R41577:41577 Corelib.Numbers.BinNums <> Z ind
+binder 41563:41564 <> SI:181
+binder 41566:41568 <> SI':182
+R41596:41599 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41586:41589 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R41590:41590 xv6iris.WriteiBudget <> W:180 var
+R41612:41617 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41602:41605 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R41601:41601 xv6iris.WriteiBudget <> W:180 var
+R41606:41606 xv6iris.WriteiBudget <> B:179 var
+R41640:41645 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41618:41627 xv6iris.WriteiBudget <> wi_inv_bud def
+R41629:41631 xv6iris.WriteiBudget <> bms:175 var
+R41633:41633 xv6iris.WriteiBudget <> W:180 var
+R41635:41636 xv6iris.WriteiBudget <> nI:177 var
+R41638:41639 xv6iris.WriteiBudget <> SI:181 var
+R41679:41684 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41646:41657 xv6iris.WriteiBudget <> wi_inv_spent def
+R41659:41661 xv6iris.WriteiBudget <> bms:175 var
+R41663:41668 xv6iris.WriteiBudget <> ncount:176 var
+R41670:41671 xv6iris.WriteiBudget <> nI:177 var
+R41673:41673 xv6iris.WriteiBudget <> B:179 var
+R41675:41675 xv6iris.WriteiBudget <> W:180 var
+R41677:41678 xv6iris.WriteiBudget <> SI:181 var
+R41695:41700 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41687:41691 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R41685:41686 xv6iris.WriteiBudget <> SI:181 var
+R41692:41694 xv6iris.WriteiBudget <> SI':182 var
+R41720:41723 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41704:41707 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R41702:41703 xv6iris.WriteiBudget <> nI:177 var
+R41711:41713 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R41708:41710 xv6iris.WriteiBudget <> nI':178 var
+R41739:41744 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R41728:41731 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R41725:41727 xv6iris.WriteiBudget <> nI':178 var
+R41732:41733 xv6iris.WriteiBudget <> nI:177 var
+R41775:41780 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R41745:41754 xv6iris.WriteiBudget <> wi_inv_bud def
+R41756:41758 xv6iris.WriteiBudget <> bms:175 var
+R41762:41764 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R41761:41761 xv6iris.WriteiBudget <> W:180 var
+R41768:41770 xv6iris.WriteiBudget <> nI':178 var
+R41772:41774 xv6iris.WriteiBudget <> SI':182 var
+R41781:41792 xv6iris.WriteiBudget <> wi_inv_spent def
+R41794:41796 xv6iris.WriteiBudget <> bms:175 var
+R41798:41803 xv6iris.WriteiBudget <> ncount:176 var
+R41805:41807 xv6iris.WriteiBudget <> nI':178 var
+R41809:41809 xv6iris.WriteiBudget <> B:179 var
+R41813:41815 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R41812:41812 xv6iris.WriteiBudget <> W:180 var
+R41819:41821 xv6iris.WriteiBudget <> SI':182 var
+R41881:41891 xv6iris.WriteiBudget <> bm_pot_mono thm
+R41881:41891 xv6iris.WriteiBudget <> bm_pot_mono thm
+R41920:41929 xv6iris.WriteiBudget <> wi_inv_bud def
+R41932:41943 xv6iris.WriteiBudget <> wi_inv_spent def
+prf 42270:42282 <> wi_step_alloc
+R42291:42291 Corelib.Numbers.BinNums <> Z ind
+binder 42285:42287 <> bms:183
+R42315:42317 Corelib.Init.Datatypes <> nat ind
+binder 42295:42300 <> ncount:184
+binder 42302:42303 <> nI:185
+binder 42305:42307 <> nI':186
+binder 42309:42309 <> B:187
+binder 42311:42311 <> W:188
+R42330:42333 stdpp.gmap <> gset def
+R42335:42335 Corelib.Numbers.BinNums <> Z ind
+binder 42321:42322 <> SI:189
+binder 42324:42326 <> SI':190
+R42354:42357 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42344:42347 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R42348:42348 xv6iris.WriteiBudget <> W:188 var
+R42370:42375 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42360:42363 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R42359:42359 xv6iris.WriteiBudget <> W:188 var
+R42364:42364 xv6iris.WriteiBudget <> B:187 var
+R42398:42403 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42376:42385 xv6iris.WriteiBudget <> wi_inv_bud def
+R42387:42389 xv6iris.WriteiBudget <> bms:183 var
+R42391:42391 xv6iris.WriteiBudget <> W:188 var
+R42393:42394 xv6iris.WriteiBudget <> nI:185 var
+R42396:42397 xv6iris.WriteiBudget <> SI:189 var
+R42437:42442 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42404:42415 xv6iris.WriteiBudget <> wi_inv_spent def
+R42417:42419 xv6iris.WriteiBudget <> bms:183 var
+R42421:42426 xv6iris.WriteiBudget <> ncount:184 var
+R42428:42429 xv6iris.WriteiBudget <> nI:185 var
+R42431:42431 xv6iris.WriteiBudget <> B:187 var
+R42433:42433 xv6iris.WriteiBudget <> W:188 var
+R42435:42436 xv6iris.WriteiBudget <> SI:189 var
+R42453:42456 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42445:42449 stdpp.base <> ::stdpp_scope:x_'⊆'_x not
+R42443:42444 xv6iris.WriteiBudget <> SI:189 var
+R42450:42452 xv6iris.WriteiBudget <> SI':190 var
+R42468:42473 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42460:42464 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R42457:42459 xv6iris.WriteiBudget <> bms:183 var
+R42465:42467 xv6iris.WriteiBudget <> SI':190 var
+R42509:42512 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42477:42480 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R42475:42476 xv6iris.WriteiBudget <> nI:185 var
+R42488:42490 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R42484:42486 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R42481:42483 xv6iris.WriteiBudget <> nI':186 var
+R42491:42496 xv6iris.WriteiBudget <> bm_pot def
+R42498:42500 xv6iris.WriteiBudget <> bms:183 var
+R42502:42503 xv6iris.WriteiBudget <> SI:189 var
+R42528:42533 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R42517:42520 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R42514:42516 xv6iris.WriteiBudget <> nI':186 var
+R42521:42522 xv6iris.WriteiBudget <> nI:185 var
+R42564:42569 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R42534:42543 xv6iris.WriteiBudget <> wi_inv_bud def
+R42545:42547 xv6iris.WriteiBudget <> bms:183 var
+R42551:42553 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R42550:42550 xv6iris.WriteiBudget <> W:188 var
+R42557:42559 xv6iris.WriteiBudget <> nI':186 var
+R42561:42563 xv6iris.WriteiBudget <> SI':190 var
+R42570:42581 xv6iris.WriteiBudget <> wi_inv_spent def
+R42583:42585 xv6iris.WriteiBudget <> bms:183 var
+R42587:42592 xv6iris.WriteiBudget <> ncount:184 var
+R42594:42596 xv6iris.WriteiBudget <> nI':186 var
+R42598:42598 xv6iris.WriteiBudget <> B:187 var
+R42602:42604 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R42601:42601 xv6iris.WriteiBudget <> W:188 var
+R42608:42610 xv6iris.WriteiBudget <> SI':190 var
+R42674:42682 xv6iris.WriteiBudget <> bm_pot_in thm
+R42674:42682 xv6iris.WriteiBudget <> bm_pot_in thm
+R42718:42727 xv6iris.WriteiBudget <> bm_pot_le1 thm
+R42718:42727 xv6iris.WriteiBudget <> bm_pot_le1 thm
+R42747:42756 xv6iris.WriteiBudget <> wi_inv_bud def
+R42759:42770 xv6iris.WriteiBudget <> wi_inv_spent def
+prf 42976:42989 <> wi_inv_bud_pos
+R42998:42998 Corelib.Numbers.BinNums <> Z ind
+binder 42992:42994 <> bms:191
+R43009:43011 Corelib.Init.Datatypes <> nat ind
+binder 43002:43002 <> W:192
+binder 43004:43005 <> nI:193
+R43020:43023 stdpp.gmap <> gset def
+R43025:43025 Corelib.Numbers.BinNums <> Z ind
+binder 43015:43016 <> SI:194
+R43054:43057 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43032:43041 xv6iris.WriteiBudget <> wi_inv_bud def
+R43043:43045 xv6iris.WriteiBudget <> bms:191 var
+R43047:43047 xv6iris.WriteiBudget <> W:192 var
+R43049:43050 xv6iris.WriteiBudget <> nI:193 var
+R43052:43053 xv6iris.WriteiBudget <> SI:194 var
+R43060:43063 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R43064:43065 xv6iris.WriteiBudget <> nI:193 var
+R43087:43096 xv6iris.WriteiBudget <> wi_inv_bud def
+prf 43234:43244 <> wi_inv_exit
+R43253:43253 Corelib.Numbers.BinNums <> Z ind
+binder 43247:43249 <> bms:195
+R43284:43286 Corelib.Init.Datatypes <> nat ind
+binder 43257:43262 <> ncount:196
+binder 43264:43265 <> nI:197
+binder 43267:43270 <> nfin:198
+binder 43272:43272 <> B:199
+binder 43274:43274 <> W:200
+binder 43276:43278 <> off:201
+binder 43280:43280 <> n:202
+R43295:43298 stdpp.gmap <> gset def
+R43300:43300 Corelib.Numbers.BinNums <> Z ind
+binder 43290:43291 <> SI:203
+R43319:43322 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43309:43312 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R43308:43308 xv6iris.WriteiBudget <> W:200 var
+R43313:43313 xv6iris.WriteiBudget <> B:199 var
+R43342:43347 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43324:43326 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R43323:43323 xv6iris.WriteiBudget <> B:199 var
+R43327:43335 xv6iris.SpecWritei <> wi_blocks def
+R43337:43339 xv6iris.WriteiBudget <> off:201 var
+R43341:43341 xv6iris.WriteiBudget <> n:202 var
+R43381:43386 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43348:43359 xv6iris.WriteiBudget <> wi_inv_spent def
+R43361:43363 xv6iris.WriteiBudget <> bms:195 var
+R43365:43370 xv6iris.WriteiBudget <> ncount:196 var
+R43372:43373 xv6iris.WriteiBudget <> nI:197 var
+R43375:43375 xv6iris.WriteiBudget <> B:199 var
+R43377:43377 xv6iris.WriteiBudget <> W:200 var
+R43379:43380 xv6iris.WriteiBudget <> SI:203 var
+R43405:43410 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43390:43393 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R43388:43389 xv6iris.WriteiBudget <> nI:197 var
+R43394:43399 xv6iris.WriteiBudget <> ncount:196 var
+R43431:43434 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43414:43417 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R43412:43413 xv6iris.WriteiBudget <> nI:197 var
+R43422:43424 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R43418:43421 xv6iris.WriteiBudget <> nfin:198 var
+R43451:43456 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R43440:43443 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R43436:43439 xv6iris.WriteiBudget <> nfin:198 var
+R43444:43445 xv6iris.WriteiBudget <> nI:197 var
+R43506:43509 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R43493:43496 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R43465:43467 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R43459:43464 xv6iris.WriteiBudget <> ncount:196 var
+R43468:43481 xv6iris.SpecWritei <> wi_cost_bmonly def
+R43483:43485 xv6iris.WriteiBudget <> off:201 var
+R43487:43487 xv6iris.WriteiBudget <> n:202 var
+R43497:43500 xv6iris.WriteiBudget <> nfin:198 var
+R43515:43518 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R43511:43514 xv6iris.WriteiBudget <> nfin:198 var
+R43519:43524 xv6iris.WriteiBudget <> ncount:196 var
+R43580:43591 xv6iris.WriteiBudget <> wi_inv_spent def
+R43594:43607 xv6iris.SpecWritei <> wi_cost_bmonly def
+R43629:43638 xv6iris.WriteiBudget <> bm_pot_le1 thm
+R43629:43638 xv6iris.WriteiBudget <> bm_pot_le1 thm
+prf 45002:45017 <> wi_ad_of_alloced
+R45026:45029 stdpp.gmap <> gset def
+R45031:45031 Corelib.Numbers.BinNums <> Z ind
+binder 45020:45022 <> cov:204
+R45046:45046 Corelib.Numbers.BinNums <> Z ind
+binder 45035:45042 <> logstart:205
+R45059:45064 xv6iris.InodeInv <> blkmap rec
+binder 45050:45051 <> bm:206
+binder 45053:45055 <> bm':207
+R45078:45080 Corelib.Init.Datatypes <> nat ind
+binder 45072:45074 <> fbn:208
+R45112:45117 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R45087:45095 xv6iris.InodeInv <> blkmap_wf def
+R45097:45099 xv6iris.WriteiBudget <> cov:204 var
+R45101:45108 xv6iris.WriteiBudget <> logstart:205 var
+R45110:45111 xv6iris.WriteiBudget <> bm:206 var
+R45137:45142 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R45122:45124 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R45119:45121 xv6iris.WriteiBudget <> fbn:208 var
+R45125:45131 xv6iris.InodeInv <> MAXFILE def
+R45180:45185 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R45175:45178 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R45143:45153 stdpp.bitvector.definitions <> bv_unsigned proj
+R45156:45165 xv6iris.InodeInv <> blkmap_get def
+R45167:45169 xv6iris.WriteiBudget <> bm':207 var
+R45171:45173 xv6iris.WriteiBudget <> fbn:208 var
+R45205:45210 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R45198:45200 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R45186:45193 xv6iris.SpecBmap <> bmap_ind def
+R45195:45197 xv6iris.WriteiBudget <> fbn:208 var
+R45201:45204 Corelib.Init.Datatypes <> true constr
+R45241:45246 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R45234:45236 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R45211:45222 xv6iris.SpecBmap <> bmap_alloced def
+R45224:45225 xv6iris.WriteiBudget <> bm:206 var
+R45227:45229 xv6iris.WriteiBudget <> bm':207 var
+R45231:45233 xv6iris.WriteiBudget <> fbn:208 var
+R45237:45240 Corelib.Init.Datatypes <> true constr
+R45265:45267 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R45247:45253 xv6iris.SpecBmap <> bmap_ad def
+R45255:45256 xv6iris.WriteiBudget <> bm:206 var
+R45258:45260 xv6iris.WriteiBudget <> bm':207 var
+R45262:45264 xv6iris.WriteiBudget <> fbn:208 var
+R45268:45271 Corelib.Init.Datatypes <> true constr
+R45321:45327 xv6iris.SpecBmap <> bmap_ad def
+R45336:45354 stdpp.decidable <> bool_decide_eq_true thm
+R45336:45354 stdpp.decidable <> bool_decide_eq_true thm
+R45459:45464 stdpp.base <> decide def
+R45498:45500 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R45467:45477 stdpp.bitvector.definitions <> bv_unsigned proj
+R45480:45489 xv6iris.InodeInv <> blkmap_get def
+R45459:45464 stdpp.base <> decide def
+R45498:45500 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R45467:45477 stdpp.bitvector.definitions <> bv_unsigned proj
+R45480:45489 xv6iris.InodeInv <> blkmap_get def
+R45635:45637 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R45617:45623 xv6iris.SpecBmap <> bmap_ad def
+R45638:45642 Corelib.Init.Datatypes <> false constr
+R45635:45637 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R45617:45623 xv6iris.SpecBmap <> bmap_ad def
+R45638:45642 Corelib.Init.Datatypes <> false constr
+R45657:45663 xv6iris.SpecBmap <> bmap_ad def
+R45672:45691 stdpp.decidable <> bool_decide_eq_false thm
+R45672:45691 stdpp.decidable <> bool_decide_eq_false thm
+R45762:45764 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R45748:45754 xv6iris.SpecBmap <> bmap_ai def
+R45765:45768 Corelib.Init.Datatypes <> true constr
+R45762:45764 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R45748:45754 xv6iris.SpecBmap <> bmap_ai def
+R45765:45768 Corelib.Init.Datatypes <> true constr
+R45783:45794 xv6iris.SpecBmap <> bmap_alloced def
+R45816:45826 Stdlib.Bool.Bool <> orb_false_r thm
+R45816:45826 Stdlib.Bool.Bool <> orb_false_r thm
+R45816:45826 Stdlib.Bool.Bool <> orb_false_r thm
+R45933:45951 stdpp.decidable <> bool_decide_eq_true thm
+R45933:45951 stdpp.decidable <> bool_decide_eq_true thm
+R45997:46004 xv6iris.SpecBmap <> bmap_ind def
+R46021:46039 stdpp.decidable <> bool_decide_eq_true thm
+R46021:46039 stdpp.decidable <> bool_decide_eq_true thm
+R46059:46074 xv6iris.InodeInv <> blkmap_wf_ind_nz thm
+R46059:46074 xv6iris.InodeInv <> blkmap_wf_ind_nz thm
+prf 46391:46409 <> wi_iter_alloc_bound
+R46418:46418 Corelib.Numbers.BinNums <> Z ind
+binder 46412:46414 <> bms:209
+R46433:46435 Corelib.Init.Datatypes <> nat ind
+binder 46422:46423 <> nI:210
+binder 46425:46426 <> nB:211
+binder 46428:46429 <> nL:212
+R46444:46447 stdpp.gmap <> gset def
+R46449:46449 Corelib.Numbers.BinNums <> Z ind
+binder 46439:46440 <> SI:213
+R46471:46474 Corelib.Init.Datatypes <> bool ind
+binder 46457:46460 <> crlw:214
+binder 46462:46463 <> al:215
+binder 46465:46467 <> ind:216
+R46541:46546 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46484:46487 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R46482:46483 xv6iris.WriteiBudget <> nI:210 var
+R46490:46492 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R46488:46489 xv6iris.WriteiBudget <> nB:211 var
+R46493:46501 xv6iris.SpecBmap <> bmap_cost def
+R46504:46514 stdpp.decidable <> bool_decide def
+R46520:46524 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R46517:46519 xv6iris.WriteiBudget <> bms:209 var
+R46525:46526 xv6iris.WriteiBudget <> SI:213 var
+R46530:46531 xv6iris.WriteiBudget <> al:215 var
+R46533:46535 xv6iris.WriteiBudget <> ind:216 var
+R46587:46592 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46550:46553 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R46548:46549 xv6iris.WriteiBudget <> nB:211 var
+R46556:46559 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R46581:46581 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R46554:46555 xv6iris.WriteiBudget <> nL:212 var
+R46560:46562 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R46567:46572 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R46574:46579 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R46563:46566 xv6iris.WriteiBudget <> crlw:214 var
+R46593:46593 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46632:46638 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46603:46606 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46596:46598 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R46594:46595 xv6iris.WriteiBudget <> al:215 var
+R46599:46602 Corelib.Init.Datatypes <> true constr
+R46617:46620 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R46610:46612 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R46607:46609 xv6iris.WriteiBudget <> ind:216 var
+R46613:46616 Corelib.Init.Datatypes <> true constr
+R46625:46627 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R46621:46624 xv6iris.WriteiBudget <> crlw:214 var
+R46628:46631 Corelib.Init.Datatypes <> true constr
+R46642:46645 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R46640:46641 xv6iris.WriteiBudget <> nI:210 var
+R46652:46654 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R46648:46650 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R46646:46647 xv6iris.WriteiBudget <> nL:212 var
+R46655:46660 xv6iris.WriteiBudget <> bm_pot def
+R46662:46664 xv6iris.WriteiBudget <> bms:209 var
+R46666:46667 xv6iris.WriteiBudget <> SI:213 var
+R46691:46699 xv6iris.SpecBmap <> bmap_cost def
+R46702:46707 xv6iris.WriteiBudget <> bm_pot def
+R46722:46727 stdpp.base <> decide def
+R46733:46737 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R46722:46727 stdpp.base <> decide def
+R46733:46737 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R46770:46790 stdpp.decidable <> bool_decide_eq_true_2 thm
+R46770:46790 stdpp.decidable <> bool_decide_eq_true_2 thm
+R46770:46790 stdpp.decidable <> bool_decide_eq_true_2 thm
+R46879:46885 Corelib.Init.Logic <> eq_refl constr
+R46887:46893 Corelib.Init.Logic <> eq_refl constr
+R46924:46945 stdpp.decidable <> bool_decide_eq_false_2 thm
+R46924:46945 stdpp.decidable <> bool_decide_eq_false_2 thm
+R46924:46945 stdpp.decidable <> bool_decide_eq_false_2 thm
+R47034:47040 Corelib.Init.Logic <> eq_refl constr
+R47042:47048 Corelib.Init.Logic <> eq_refl constr
+prf 47203:47223 <> wi_iter_noalloc_bound
+R47232:47232 Corelib.Numbers.BinNums <> Z ind
+binder 47226:47228 <> bms:217
+R47247:47249 Corelib.Init.Datatypes <> nat ind
+binder 47236:47237 <> nI:218
+binder 47239:47240 <> nB:219
+binder 47242:47243 <> nL:220
+R47258:47261 stdpp.gmap <> gset def
+R47263:47263 Corelib.Numbers.BinNums <> Z ind
+binder 47253:47254 <> SI:221
+R47282:47285 Corelib.Init.Datatypes <> bool ind
+binder 47271:47274 <> crlw:222
+binder 47276:47278 <> ind:223
+R47355:47360 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R47295:47298 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R47293:47294 xv6iris.WriteiBudget <> nI:218 var
+R47301:47303 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R47299:47300 xv6iris.WriteiBudget <> nB:219 var
+R47304:47312 xv6iris.SpecBmap <> bmap_cost def
+R47315:47325 stdpp.decidable <> bool_decide def
+R47331:47335 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R47328:47330 xv6iris.WriteiBudget <> bms:217 var
+R47336:47337 xv6iris.WriteiBudget <> SI:221 var
+R47341:47345 Corelib.Init.Datatypes <> false constr
+R47347:47349 xv6iris.WriteiBudget <> ind:223 var
+R47401:47406 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R47364:47367 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R47362:47363 xv6iris.WriteiBudget <> nB:219 var
+R47370:47373 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R47395:47395 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R47368:47369 xv6iris.WriteiBudget <> nL:220 var
+R47374:47376 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R47381:47386 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R47388:47393 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R47377:47380 xv6iris.WriteiBudget <> crlw:222 var
+R47410:47413 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R47408:47409 xv6iris.WriteiBudget <> nI:218 var
+R47416:47418 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R47414:47415 xv6iris.WriteiBudget <> nL:220 var
+R47441:47449 xv6iris.SpecBmap <> bmap_cost def
+prf 47676:47693 <> wi_inv_enter_maxop
+R47702:47702 Corelib.Numbers.BinNums <> Z ind
+binder 47696:47698 <> bms:224
+R47714:47716 Corelib.Init.Datatypes <> nat ind
+binder 47706:47708 <> off:225
+binder 47710:47710 <> n:226
+R47724:47727 stdpp.gmap <> gset def
+R47729:47729 Corelib.Numbers.BinNums <> Z ind
+binder 47720:47720 <> S:227
+R47753:47758 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R47738:47741 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R47737:47737 xv6iris.WriteiBudget <> n:226 var
+R47742:47747 xv6iris.WriteiBudget <> FW_MAX def
+R47805:47810 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R47759:47768 xv6iris.WriteiBudget <> wi_inv_bud def
+R47770:47772 xv6iris.WriteiBudget <> bms:224 var
+R47775:47783 xv6iris.SpecWritei <> wi_blocks def
+R47785:47787 xv6iris.WriteiBudget <> off:225 var
+R47789:47789 xv6iris.WriteiBudget <> n:226 var
+R47792:47802 xv6iris.LogInv <> MAXOPBLOCKS def
+R47804:47804 xv6iris.WriteiBudget <> S:227 var
+R47811:47822 xv6iris.WriteiBudget <> wi_inv_spent def
+R47824:47826 xv6iris.WriteiBudget <> bms:224 var
+R47828:47838 xv6iris.LogInv <> MAXOPBLOCKS def
+R47840:47850 xv6iris.LogInv <> MAXOPBLOCKS def
+R47871:47879 xv6iris.SpecWritei <> wi_blocks def
+R47881:47883 xv6iris.WriteiBudget <> off:225 var
+R47885:47885 xv6iris.WriteiBudget <> n:226 var
+R47889:47897 xv6iris.SpecWritei <> wi_blocks def
+R47899:47901 xv6iris.WriteiBudget <> off:225 var
+R47903:47903 xv6iris.WriteiBudget <> n:226 var
+R47906:47906 xv6iris.WriteiBudget <> S:227 var
+R47935:47946 xv6iris.WriteiBudget <> wi_inv_enter thm
+R47935:47946 xv6iris.WriteiBudget <> wi_inv_enter thm
+R47956:47974 xv6iris.WriteiBudget <> wi_cost_bmonly_fits thm
+R47956:47974 xv6iris.WriteiBudget <> wi_cost_bmonly_fits thm
