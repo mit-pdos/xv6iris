@@ -162,14 +162,29 @@ EXPOSED while subsystems convert, so converted and unconverted files
 coexist green; it is deleted at Slice 4's seal.  Each subsystem tranche
 is one green landing with the close-or-revert rule.
 
-### 5.1 THE CORRECTED SHAPES — land these directly, not the M-leg's drafts
+### 5.1 THE CORRECTED SHAPES — with their VALIDATION STATUS
 
 This is the heart of the handoff.  The T-leg refuted several M-leg first
-drafts; main must land the corrected forms so it never repeats the
-retrofits.  Each entry: the shape, the ruling/finding, the reference.
+drafts; main should land the corrected forms so it never repeats the
+retrofits.  **But entries below differ in how validated they are, and
+the difference is load-bearing** (an owner audit caught this document
+presenting a ruled-but-unbuilt sketch as a finished shape).  Each entry
+is tagged:
+- **[LANDED]** — built and certified green on the T-leg: land the shape
+  as the T-leg spells it (diff against the CURRENT tso-flip tip, not
+  this document — the doc can lag the leg).
+- **[MEASURED]** — the necessity is measured and/or one instance exists,
+  but the full conversion is unlanded: land the *principle*, take the
+  spelling from the existing instance, and expect the T-leg to refine.
+- **[RULED-ONLY]** — an owner ruling names the mechanism but the T-leg
+  has NOT built it: do NOT land any concrete spelling from this
+  document.  Either wait for the T-leg's landing, or land only the
+  weakest statement-level placeholder the ruling forces, marked for
+  revision.  History says ruled-only sketches get reshaped by the
+  build (three times for the lock word alone).
 
-**(a) λ-payloads for every context-mentioning lock payload — NEVER the
-constant embedding.**  The single biggest avoidable cost.  The intr lane
+**(a) [MEASURED] λ-payloads for every context-mentioning lock payload —
+NEVER the constant embedding.**  The single biggest avoidable cost.  The intr lane
 measured (tso-intr-lane.md) that `<{ P }>`/const_pay embeds the payload
 AT the handle's context, so the same lock at two contexts names two
 DIFFERENT Iris invariants — no freshness premise can ever bridge them —
@@ -182,8 +197,8 @@ payload (XI:=ξ) …)` — one invariant serving all contexts, with a real
 When converting a lock's clients on main, convert its payload to λ-form
 IN THE SAME TRANCHE.
 
-**(b) `is_lock` is context-relative, with the internal floor and the
-lk_floor disjunction.**  Rulings §0.35′ + §0.38′; implementation
+**(b) [LANDED] `is_lock` is context-relative, with the internal floor
+and the lk_floor disjunction.**  Rulings §0.35′ + §0.38′; implementation
 A6.105/A6.109 (T-leg `WpLock.v`).  The handle bundles, inside, per
 context: `lk_floor ξ lo := ctx_floor ξ lo ∨ (install-receipt at lo)` —
 "you received this handle, or you wrote this lock".  On SC both arms are
@@ -197,7 +212,8 @@ structural (`holding()` runs BEFORE acquire's AMO), so the two floor
 sources (era-image 0 for .bss locks; the install store's position for
 dynamic ones) are two different FLOORS, not two distributions (A6.100).
 
-**(c) The context-relative treatment for ALL persistent memory-fact
+**(c) [LANDED for is_lock/is_pipe/KPT; RULED-ONLY for the handler
+contract] The context-relative treatment for ALL persistent memory-fact
 families.**  The uniform rule (§0.35′/§0.36′/§0.39′, and the paper form
 in §0.36′): "persistent" means never invalidated, NOT free to whoever
 finds it — every persistent fact about memory carries a context axis and
@@ -215,15 +231,19 @@ consumers move — is designed and recorded in tso-intr-lane.md; it
 depends on (a) being done for the trap-path payloads).  On SC every
 freshness premise is trivially discharged; land the statements.
 
-**(d) Acquire's postcondition exports the USABLE receipt pair.**  The
+**(d) [MEASURED; export in flight on the T-leg] Acquire's
+postcondition exports the USABLE receipt.**  The
 M2-era post `(∃K, hart_view_lb K)` exists on both legs but K is
 existential and tied to nothing — half a transport (K11 correction,
-tso-kpt-lane.md).  Land the corrected post: the pair
-`hart_view_lb K ∗ ⌜U ≤ K⌝` against the lock's bound (see (f)), or
-equivalently the already-upgraded floor for handles crossing in the
-payload.  On SC: trivial.  Shape matters.
+tso-kpt-lane.md).  The T-leg's agreed export form (coordinated across its lanes) is the
+**ctx_floor form** — the AMO leaf hands back `ctx_floor cur_ctx T` for
+each install receipt presented, with consumers deriving the
+`view_lb ∗ ⌜T ≤ K⌝` pair via `own_context_floor_view` when they want
+that spelling; nobody exports the bare pair.  On SC: trivial.  Take the
+final spelling from the T-leg when its lock file closes.
 
-**(e) The no-migration premise family on instruction obligations.**
+**(e) [LANDED] The no-migration premise family on instruction
+obligations.**
 A6.89/A6.109/A6.112: load-datum, store, and value-unknown obligations
 each carry `(b = false ∨ p = zero_reg → CID = CID0)` — the wp_next
 same-CPU promise threaded down, discharged at `holding()`-class sites by
@@ -235,14 +255,21 @@ token — refutation written beside `locked` in T-leg WpLock.v; the token
 crosses wp_next continuations at fresh CpuIds and cannot carry hart
 identity).
 
-**(f) §0.27′'s relational bound in the p->lock payload.**  The lock
-invariant ties the parked context's stamp T to the release write
-(`⌜T ≤ U⌝`, U instantiated by the free arm at the lock element's
-timestamp); acquire exports the resume-ready bundle.  On SC: vacuous
-content, real shape.  This is what makes swtch/scheduler statements
-converge.  Depends on (a) for the p->lock payload's λ-form.
+**(f) [RULED-ONLY — DO NOT LAND A SPELLING] §0.27′'s resume tie.**
+The ruling: the p->lock invariant ties the parked context's stamp T to
+the release write's position, and acquire exports the resume-ready
+bundle.  The T-leg has NOT built it (ProofSwtch red; queued behind the
+lock-file close and the λ-conversion), and the ruling-era sketch (a
+relational parameter `U` on the payload type) is EXPECTED TO BE WRONG
+IN FORM: the T-leg's arity law has twice taken exactly this kind of
+~160-site parameter estimate to zero by bundling the fact inside the
+existing shape, and every bound-relation actually landed since
+(lk_floor, the floor hoist, the KPT credential) went the bundled route.
+Land NOTHING for this on main until the T-leg's §0.27′ lands; then take
+its spelling verbatim.  Depends on (a) for the p->lock payload's
+λ-form regardless.
 
-**(g) Page-currency statement discipline.**  §0.32′/A6.88: `byte_any`/
+**(g) [LANDED] Page-currency statement discipline.**  §0.32′/A6.88: `byte_any`/
 `page_own` keep their names with the visibility-free meaning (on SC the
 bodies coincide with today's — the SEALING is what lands); `kalloc`'s
 success post is the VALUED run of the allocator's own memset
@@ -253,7 +280,8 @@ read-before-write audit rides along: no kalloc client may read a byte it
 has not written (§0.32′; audit was completed once on `tso` — re-run on
 main, it is the soundness condition for the sealed meaning).
 
-**(h) What is already right on main — do not churn.**  §0.33′: the
+**(h) [MEASURED on main] What is already right on main — do not
+churn.**  §0.33′: the
 started-deposit membership (all nine rows), devsw's park-chain
 distribution, `StartedInv.v` itself (parameter P — never changed on any
 leg), the virtio ring pointers' lock-payload placement.  Touch these
