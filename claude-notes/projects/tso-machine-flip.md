@@ -64,7 +64,29 @@ at line numbers: `ProofSwtch:157`'s conjured resume receipt, and
 `ProofKernelvec:1704`'s ξ-indexed `devintr_caps` -- whose index enters
 through `<{ P }>` at a `P` that is itself ambient-ξ (`cons_res`,
 `tx_res`), not through `is_lock`, which is ξ-free.
-**A6.78 through A6.81 together are the record and the handoff.**
+**THE FLOOR WAS THEN RULED AND PROBED** (A6.82).  The owner's ruling on
+§(4) is option (a) REFINED WITH A FLOOR: the window payload carries
+`Bm`, the position of the MINT STORE, and `wpin`/`own_last` constrain
+only messages at or above it, so a kalloc'd page's pre-mint garbage is
+unconstrained; the reader pays with the stable pair
+`hart_view_lb K ∗ ⌜Bm ≤ K⌝`, and **this is the canon pin's `B` and the
+parked record's stamp a third time -- every history-shaped claim in this
+port carries a floor and is claimed against a monotone receipt.**  THE
+PROBE IS GREEN (twelve results, all closed) and its pure layer is landed
+as `TsoMemPa` §12d, additively: `own_last` / `writer_pin` / `win_ok` are
+the `Bm = 0` instances, proved as `iff`s.  The ruling's own claim is one
+line (`read_down_shadow` IS `read_down_latest` at `t' := Bm`), but the
+probe names a THIRD claim the sketch does not: **`win_ok` has to be
+relativised too**, because xv6's `memset` is a byte loop and `kfree`'s
+`memset(pa, 1, PGSIZE)` therefore appends PGSIZE one-byte messages, each
+writing a proper subset of the window -- so the whole-window-or-none
+property is false below the floor at exactly the cell the ruling exists
+for, and the REASSEMBLY (`read_down_win`) takes it at every timestamp.
+It survives, by the same shadow, as `read_down_win_fl`.  **AND THE FLOOR
+INVERTS A6.79's FORCED ORDER: it must be STORE-then-mint**, because the
+floor is the store's own position and conjunct (2b) asks that the floor
+message have happened.
+**A6.78 through A6.82 together are the record and the handoff.**
 
 STEP 5, THE RULINGS TRANCHE (2026-08-27, latest session).  **CLEAN ROUND:
 1083 of 1333, RED 14.**  Four owner rulings executed and one gate found missing.
@@ -9575,6 +9597,263 @@ anything but a grep hit.
 4. Unchanged: the DMA/virtio lane, `UtResFits`, the two U-mode files.
 
 **ACCEPTANCE for the M4 unit is unchanged** and is still gated on §(4).
+
+
+### A6.82 THE FLOOR PROBE IS GREEN — AND IT NAMES A THIRD CLAIM THE
+### RULING'S SKETCH DOES NOT: `win_ok` HAS TO BE RELATIVISED TOO
+
+Executing the coordinator's ruling on A6.81 §(4) — option (a), the window
+payload gains a FLOOR `Bm` (the position of the mint store), `wpin` and
+`own_last` constrain only messages at or above it, and the reader pays
+with `hart_view_lb K ∗ ⌜Bm ≤ K⌝`.  Step (1) of the ordered plan was
+**PROBE FIRST**.
+
+**THE PROBE PASSES.**  Twelve results, all `Closed under the global
+context`; no `Admitted`, no `admit`, no `Axiom`.  Its pure layer is
+LANDED as `TsoMemPa.v` §12d (421 lines, ADDITIVE — see §(4)), and the
+probe file is archived at the flip workspace root as `ZZFloorProbe.v`
+beside `ZZRacyProbe` / `ZZWinProbe` / `ZZPinProbe`.
+
+**1091 of 1296, RED 9 — UNCHANGED**, over a whole-tree round that
+rebuilt `TsoMemPa`'s 1257-file cone (1061 targets) from the bottom, and a
+confirm round that then recompiled **exactly the nine red targets and
+failed on all nine**.  That the number did not move IS the check that
+§12d is additive.  No `Admitted`, no `admit`, no `Axiom`; the one `Abort`
+is still `UsertrapRes.ut_res_bare_park`.
+
+#### (1) THE RULING'S CENTRAL CLAIM IS ONE LINE, AND IT WAS ALREADY IN TREE
+
+The shadow — *a reader whose view has passed the floor cannot resolve
+below it* — is `read_down_latest` at `t' := Bm`, with visibility from
+`visibleb_below`:
+
+```coq
+  Lemma read_down_shadow (h : agent) (tv Bm : nat) (a : Arch.pa) (bm : bv 8) :
+    (Bm <= tv)%nat -> (Bm <= length log)%nat ->
+    log_byte img log Bm a = Some bm ->
+    exists (T : nat) (v : bv 8),
+      (Bm <= T)%nat /\ tso_read img log h tv a = Some v
+      /\ visibleb h tv log T = true /\ log_byte img log T a = Some v.
+```
+
+Four tactic lines.  `racy_read_split_fl` — the per-byte theorem
+relativised — is the unrelativised proof with **two extra `lia`s**: the
+timestamp the read settles on is at or above the ANCHOR, and the anchor
+is at or above the floor, so both relativised gates apply to it.
+
+**AND THE PREMISE A NON-WRITER CAN ACTUALLY HOLD NOW EXISTS**, which is
+the whole point of the exercise:
+
+```coq
+  Lemma own_last_fl_anchor (Bm : nat) (h : agent) (a : Arch.pa) :
+    (forall i m, (Bm <= S i)%nat -> log !! i = Some m -> pm_tid m = h ->
+       msg_byte m a = None) ->
+    own_last_fl Bm h a Bm.
+```
+
+*"I have written nothing to this byte since the mint"* — which a hart
+that memset the page in a previous life can say and `own_last`'s
+unrelativised *"I have never written this byte"* it cannot.
+
+#### (2) THE THIRD CLAIM: `win_ok`, AND THE REASON IS `memset`
+
+**The ruling relativises `wpin` and `own_last`.  `win_ok` is a third
+history claim and it needs the same treatment — for a reason that is a
+fact about the kernel's C, not about the kit.**
+
+`TsoMemPa.read_down_win` is the REASSEMBLY: it is what makes one
+timestamp serve every byte of the window, and it is what defeats the
+byte-layout forgery the M4 memo §3 computed.  It takes `win_ok` — *every
+timestamp writes the whole window or none of it* — **at every
+timestamp**.  Measured against the source:
+
+```c
+  /* kalloc.c */   kfree(void *pa) { ... memset(pa, 1, PGSIZE); ... }
+  /* string.c */   memset(...) { char *cdst = dst;
+                                 for (i = 0; i < n; i++) cdst[i] = c; }
+```
+
+xv6's `memset` is a **byte loop**, so `kfree` appends PGSIZE ONE-BYTE
+messages and every one of them writes a PROPER SUBSET of any window
+wider than a byte.  `win_ok` is therefore FALSE below the floor **at
+exactly the cell this ruling exists for**, and a floor that relativised
+only `wpin`/`own_last` would leave the reassembly unprovable.
+
+**IT STILL GOES THROUGH, AND FOR THE SAME REASON THE RULING GIVES.**
+
+```coq
+  Definition win_ok_fl (Bm : nat) : Prop :=
+    forall t : nat, (Bm <= t)%nat ->
+      (forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j)))
+      \/ (forall j, (j < n)%nat -> log_byte img log t (pa_add a j) = None).
+
+  Lemma read_down_win_fl (h : agent) (tv Bm t j : nat) :
+    win_ok_fl Bm -> (j < n)%nat -> (Bm <= tv)%nat -> (Bm <= t)%nat ->
+    (forall k, (k < n)%nat -> is_Some (log_byte img log Bm (pa_add a k))) ->
+    read_down img log h tv (pa_add a j) t
+    = match find_top h tv t with
+      | Some T => log_byte img log T (pa_add a j) | None => None end.
+```
+
+`read_down_win`'s induction with the base case moved from 0 to `Bm`: at
+`t = Bm` the mint store is visible (`Bm ≤ tv`) and writes every byte, so
+the scan HALTS there and never asks `win_ok` about anything below.  The
+step case is the original, verbatim.  `find_top_spec` / `find_top_max`
+need no floor at all — they never mention `win_ok`.
+
+> **THE RULE THIS LEAVES.**  *Relativising a history claim to a floor is
+> not a premise weakening — it is a re-proof of everything that SCANS.*
+> The predicates (`own_last`, `writer_pin`, `wpin`) weaken for free and
+> their frame arms cost nothing; the lemma that walks the log down
+> (`read_down_win`) has to learn where to stop.  The tell for the next
+> instance: a claim quantified over `∀ t` with a proof by induction on
+> `t` will need its base case moved, and a claim quantified over
+> `∀ i, log !! i = Some m -> …` will not.
+
+#### (3) TWO MEASUREMENTS THAT SIZE THE IRIS SIDE
+
+- **`win_ok` lifts the reader's obligation from `n` facts to ONE.**  In
+  `racy_read_window_floor` the reader's anchor premise is stated only
+  about byte 0 — *"no message of mine at or above the floor writes
+  `pa_add a 0`"* — and `win_ok_fl` carries it to every byte of the
+  window (a message that wrote byte `j` would have had to write byte 0).
+  So what a `notheld` reader must hold in Iris is one own-last fact, not
+  a window of them.
+- **The maintenance lemmas are the unrelativised ones with a hypothesis
+  DROPPED.**  `own_last_fl_app_frame` / `writer_pin_fl_app` are the
+  originals with `(Bm ≤ S i)` threaded and ignored, because a premise
+  that quantifies over FEWER messages is weaker.  The store gates'
+  frame arms therefore do not move.
+
+#### (4) WHY §12d IS ADDITIVE, AND WHAT IS STILL OWED
+
+`own_last`, `writer_pin` and `win_ok` are **literally the `Bm = 0`
+instances** — `own_last_fl_0`, `writer_pin_fl_0` and `win_ok_fl_0` are
+proved as `iff`s — so §12d adds names and takes none away, and nothing
+that consumes them moves.  `lkcpu_not_mine_floor0` is the corollary that
+matters for the eight `.bss` callers: at floor 0 the receipt is free
+(`0 ≤ tv`; `TsoGhost.view_lb_0` in Iris) **and the "reader never wrote"
+premise carries no floor bound at all**, so the boot mint's clients pay
+nothing for the relativisation.
+
+**STEP (2) IS NOW THE FIELD AND THE GATES, and its surface is measured:**
+
+| symbol | refs | files |
+|---|---|---|
+| `TsWin` | 11 | `TsoMemPa`, `TsoCtx` |
+| `win_ok1` | 16 | + one COMMENT in `BootCarve` |
+| `ts_pay_win` | 11 | `TsoMemPa`, `TsoCtx` |
+| `ts_ok_win` | 8 | `TsoMemPa`, `TsoCtx` |
+
+**Two files of code.**  The dev loop is cheap — `make TsoCtx.vo` rebuilds
+**five** files — and only the closing round is the 1257-file cone.
+
+The shape `win_ok1` wants, with the two conjuncts that change and the one
+that is new:
+
+```coq
+  Record ts_win := TsWin { … the six existing fields …; tw_lo : nat }.
+
+  Definition win_ok1 img log a W : Prop :=
+    a = pa_add (tw_base W) (tw_j W)
+    /\ (tw_j W < tw_n W)%nat
+    (* (1) RELATIVISED *)
+    /\ (forall i m, (tw_lo W <= S i)%nat -> log !! i = Some m ->
+          is_Some (msg_byte m a) -> (z-arm \/ cp-arm))
+    (* (2) image coverage -- unchanged *)
+    /\ (forall k, (k < tw_n W)%nat -> is_Some (img !! pa_add (tw_base W) k))
+    (* (2b) NEW: THE FLOOR ITSELF wrote the whole window with the clear
+       word, and it is a legal log position.  This is what the reader's
+       anchor and [win_ok_fl]'s base case both consume. *)
+    /\ (tw_lo W <= length log)%nat
+    /\ (forall k, (k < tw_n W)%nat ->
+          log_byte img log (tw_lo W) (pa_add (tw_base W) k) = Some (tw_z W k))
+    (* (3) per agent, AT OR ABOVE THE FLOOR *)
+    /\ (forall h t, tw_own W h = Some t ->
+          (tw_lo W <= t)%nat /\ (t <= length log)%nat
+          /\ (forall tv, visibleb h tv log t = true)
+          /\ log_byte img log t a = Some (tw_z W (tw_j W))
+          /\ own_last_fl (tw_lo W) log h a t)
+```
+
+> **(2b) IS A STRENGTHENING AT FLOOR 0 AND IT IS PAYABLE THERE**, which
+> is the check that the degenerate case survives: at `tw_lo = 0` it says
+> the ERA IMAGE holds `tw_z` across the window, and `ledger_wpay_mint`
+> already has all `n` cells in hand at their own values — `tw_z` IS that
+> function, and the interp's tie at a timestamp-0 element says the cell's
+> value is the image byte.  The current conjunct (3) asks for the same
+> fact at ONE byte; (2b) is it at all of them.
+
+**AND CONJUNCT (3)'s VISIBILITY CLAUSE MUST BE RELATIVISED WITH THE
+REST** — `∀ tv, visibleb h tv log t = true` is free at `t = 0` and FALSE
+at any `t > 0` for a non-author, so it becomes
+`∀ tv, (tw_lo W ≤ tv)%nat → visibleb h tv log t = true`, which
+`visibleb_below` gives at `t = tw_lo`.  The reader supplies the bound
+from its receipt.  That is the same pair the ruling names, arriving in
+the payload rather than at the gate.
+
+> **AND THAT INVERTS A6.79's FORCED ORDER: WITH A FLOOR IT IS
+> STORE-THEN-MINT, NOT MINT-THEN-STORE.**  A6.79 ruled the order forced
+> the other way, and its argument was precise: minting after the store
+> leaves conjunct (3) unprovable for the other harts, because
+> `own_last log h a 0` has become *"no message writes `a`"* and the
+> author's own store has just falsified it.  **The floor is exactly what
+> repairs that**, and it has to be the store's own position — so the
+> store must have HAPPENED:
+>
+> - minting BEFORE the store would set `tw_lo := S (length glog)`, a
+>   message that does not exist yet, and (2b) is false until it does;
+> - minting AFTER it sets `tw_lo := S (length glog_before)`, the store's
+>   own index — a real past message that wrote the whole window with the
+>   clear word, which is (2b) verbatim, and conjunct (3) then holds for
+>   every agent at `own h := Some tw_lo` (`own_last_fl tw_lo` asks only
+>   about messages at or above the floor, and the only one there is the
+>   floor itself, whose author's own bound `S i ≤ tw_lo` is an equality).
+>
+> So the leaf that item 2 needs is a **store-then-mint** leaf, which is
+> the cheaper one: `wp_store_s_sconf_au_dat`'s obligation runs the store
+> gate first and the mint second, both inside the one `==∗`.
+>
+> **The author is not a special case at the READ, either.**  The hart
+> that ran `initlock` HAS written at the floor, so `own_last_fl_anchor`'s
+> "wrote nothing at or above `Bm`" is too strong for it — but
+> `racy_read_window_fl` at `t := Bm` needs only `own_last_fl Bm h a Bm`,
+> which the author satisfies with the same equality.  Only the
+> convenience wrapper `racy_read_window_floor` uses the never-wrote form.
+
+#### HANDOFF
+
+1. **Step (2)**: the `tw_lo` field + `win_ok1` above + `win_ok1_app_store`
+   / `win_ok1_app_frame` / `ts_ok_win`, then `TsoCtx`'s three gates —
+   `ledger_wpay_mint` (its premise stops being `e.1 = 0` and becomes the
+   floor's own coverage, and its ORDER inverts — see §(4)),
+   `ledger_store_wpay_ok` (the floor is FRAMED: both arms keep `tw_lo`
+   unchanged, exactly as they keep `tw_z` and `tw_cp`), and
+   `ledger_read_racy_word_ok`.  **The read gate's shape change is the
+   one to look at first**: today it is VIEW-FREE (`⌜∀ tv, …⌝`, because
+   `own h = Some t` with `t` visible at every view was enough), and with
+   the floor it becomes `ledger_read_pin_ok`'s shape —
+   `view_lb view_name loglen_name (hart_agent cpu_id) K` in the premise,
+   `⌜tw_lo W ≤ K⌝` beside it, and `⌜∀ tv', (g.(gtv) cpu_id ≤ tv')%nat →
+   …⌝` in the conclusion.  That makes the racy gate structurally
+   identical to the pin's, which is the design rhyme showing up at the
+   Iris tier as well as the pure one.  Two files.
+2. **Step (3)**: item 2 with NO `SpecInitlock` fork — the floor rides the
+   payload, `pipealloc` mints at its own `initlock` store with
+   `tw_lo :=` that store's position, and the eight `.bss` callers take
+   the floor-0 instance.  Then the atomic unit (A6.78's corrected leaf
+   list) per the standing discipline.
+3. **Where each reader's receipt comes from** is the one thing still to
+   write down per call site: `holding()`'s `notheld` read is under
+   `acquire`, whose AMO drains (`hart_view_lb_get`), so the receipt is at
+   the log top and dominates any floor; the boot callers are floor 0 and
+   free.  That is the ruling's "whoever can NAME a lock received its
+   address through a synchronized handoff whose stamp dominates the
+   mint", and it should be recorded per site as the leaves are re-proved.
+4. Queued and characterised, not started: `ProofSwtch`'s stamp tie (the
+   park-port family) and `ProofKernelvec`'s payload ξ-functions (the M3
+   recipe on `cons_res` / `tx_res` / `disk_geom`'s pointer row) —
+   A6.81 §(5).
 
 
 ## 7. Order of work
