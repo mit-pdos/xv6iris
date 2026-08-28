@@ -105,6 +105,18 @@ Qed.
 Definition gpr_srliw_val (rs1 : mword 5) (shamt : mword 5) (s : mstate) : mword 64 :=
   sign_extend' 64 (shift_bits_right (subrange_vec_dec (gpr_src rs1 s) 31 0 : mword 32) shamt).
 
+Lemma exec_execute_SHIFTIWOP_SRLIW_gpr (rs1 rd : mword 5) (shamt : mword 5) s :
+  exec (execute (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SRLIW))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_srliw_val rs1 shamt s))).
+Proof.
+  unfold gpr_srliw_val, gpr_src.
+  eapply exec_execute_SHIFTIWOP_SRLIW.
+  - apply (exec_rX_bits_gpr rs1 s).
+  - apply (exec_wX_bits_gpr rd _ s).
+Qed.
 
 Lemma exec_execute_SHIFTIWOP_SRAIW (shamt : mword 5) (rs1 rd : regidx)
     (a : mword 64) s s' :
@@ -127,12 +139,40 @@ Definition gpr_sraiw_val (rs1 : mword 5) (shamt : mword 5) (s : mstate) : mword 
   sign_extend' 64
     (shift_bits_right_arith (subrange_vec_dec (gpr_src rs1 s) 31 0 : mword 32) shamt).
 
+Lemma exec_execute_SHIFTIWOP_SRAIW_gpr (rs1 rd : mword 5) (shamt : mword 5) s :
+  exec (execute (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SRAIW))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_sraiw_val rs1 shamt s))).
+Proof.
+  unfold gpr_sraiw_val, gpr_src.
+  eapply exec_execute_SHIFTIWOP_SRAIW.
+  - apply (exec_rX_bits_gpr rs1 s).
+  - apply (exec_wX_bits_gpr rd _ s).
+Qed.
 
 Definition gpr_sllw_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
   sign_extend' 64
     (shift_bits_left (subrange_vec_dec (gpr_src rs1 s) 31 0 : mword 32)
        (subrange_vec_dec (subrange_vec_dec (gpr_src rs2 s) 31 0 : mword 32) 4 0)).
 
+Lemma exec_execute_RTYPEW_SLLW_gpr (rs2 rs1 rd : mword 5) s :
+  exec (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_sllw_val rs2 rs1 s))).
+Proof.
+  unfold gpr_sllw_val, gpr_src.
+  change (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)))
+    with (execute_RTYPEW (Regidx rs2) (Regidx rs1) (Regidx rd) SLLW).
+  unfold execute_RTYPEW. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnm.
+Qed.
 
 
 Section WpSconfAlu.
