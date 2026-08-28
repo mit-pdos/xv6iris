@@ -1340,3 +1340,11 @@ FsDurSyscall.v
 FsAbs.v
 FsAbsSeam.v
 SpecSysMknodAU.v
+FsAbsPins.v
+FsAbsEra.v
+SpecNamexEra.v
+ProofNamexEra.v
+LinkNamexEra.v
+SpecNameiEra.v
+ProofNameiEra.v
+LinkNameiEra.v
