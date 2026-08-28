@@ -87,6 +87,28 @@ Section Lock.
     own γ ((◯E (st : leibnizO lock_state)) : lockUR).
 
   (* THE holder token: hart [i] holds the lock and [lk->cpu = cpus_ptr i]. *)
+  (* >>> A6.89 (owner ruling on A6.87 §(7), spelling (a)): STRENGTHENING
+     THIS TOKEN WITH THE AMBIENT HART WAS TRIED AND THE BUILD REFUTED IT.
+     The experiment was [locked `{CID : CpuId} γ i := lock_frag γ (Some
+     (i,true)) ∗ ⌜cpu_id = i⌝] (plus [CpuId] binders on the six kit
+     lemmas, which all went through).  It dies at the first CONSUMER:
+     every lock leaf hands the token THROUGH its instruction step, and
+     the continuation's [locked γ i] is elaborated at the [CpuId] the
+     [wp_next] lambda binds -- the RESUMING hart -- while the one in hand
+     is at the entry hart.  The two print identically and do not unify
+     (WpSconfLock:414, [iSpecialize: cannot instantiate ... with (locked
+     γl h0)]): A6.63''/§0.20′'s CpuId re-park hazard, now inside the
+     token itself.  The equality holds at [b = false], but [locked]
+     travels through b-GENERIC contracts (SpecAcquire, the syscall path,
+     the park chain -- 69 files mention it), so the premise would have to
+     be carried at every crossing, and the LEAF would still need the
+     step-level pin regardless.
+     THE HART IS ALREADY BOUND HERE -- it is the argument [i] -- and the
+     lock leaves already demand [locked γ cpu_id], so a token sent across
+     harts is already unusable at every consumer.  The no-migration fact
+     is not a property of the token but of the STEP, and it is delivered
+     where the step is: [WpSconfMem.wp_load_s_sconf_au_dat]'s obligation
+     now takes [wp_next]'s own same-CPU promise. <<< *)
   Definition locked (γ : gname) (i : CPU) : iProp Σ :=
     lock_frag γ (Some (i, true)).
   (* the same, in the window where [lk->cpu] is still 0 (internal to the
@@ -105,6 +127,27 @@ Section Lock.
      the HOLDER, and nobody else (see [lk_own_ok] below). *)
   Definition lk_ex (st : lock_state) : option CPU :=
     match st with Some (i, true) => Some i | _ => None end.
+
+  (* >>> A6.89: THE WORD'S OWN-WRITE SELECTOR IS NOT THE CELL'S, and the
+     difference is exactly one state.  [lk_ex] is about the OWNER CELL,
+     whose author is the acquirer's [lk->cpu = mycpu()] store -- so the
+     cell has an author only while HELD.  The lock WORD's author is the
+     AMO, which fires one instruction EARLIER: from the amoswap until
+     release's [sw x0] the word is the acquirer's own write, and that
+     interval covers BOTH [Some (i,false)] windows (acquire's, before the
+     cpu field is set, and release's, after it is cleared) as well as
+     [Some (i,true)].
+     Getting this wrong is not a soundness hole, it is an unprovable
+     frame: the cpu-field stores do not touch the word, so the word's arm
+     must be INVARIANT across them -- and with [lk_ex] it flips, which is
+     where the store leaf's [iFrame] refuses. <<< *)
+  Definition lk_wex (st : lock_state) : option CPU :=
+    match st with Some (i, _) => Some i | None => None end.
+
+  Lemma lk_wex_none : lk_wex None = None.
+  Proof. reflexivity. Qed.
+  Lemma lk_wex_some (i : CPU) (o : bool) : lk_wex (Some (i, o)) = Some i.
+  Proof. reflexivity. Qed.
 
   Lemma lk_cpu_val_none : lk_cpu_val None = (zero_reg : mword 64).
   Proof. reflexivity. Qed.
@@ -730,6 +773,41 @@ Section Lock.
   Definition lk_cpu_fresh (lk : mword 64) : iProp Σ :=
     (lk_addr_claim (lock_cpu lk) 8 ∗ lk_cpu_cell lk (zero_reg : mword 64))%I.
 
+  (* >>> A6.89: THE WORD'S TWIN OF [lk_cpu_fresh], AND IT IS OWED FOR THE
+     SAME REASON ONE FIELD OVER.  Release's [sw x0] leaves a LEDGER word
+     behind ([lock_word] = [phys_ledger_word4]); the ctx tower cannot take
+     it back (that needs a drain, A6.84 §(2)), so the FINISHER's word slot
+     -- the thing release hands over at the instant the lock goes free --
+     can no longer be the ctx word [lk ↦₄ 0] it was before the M4 flip.
+     It is the ledger word plus the address claim a ledger cell does not
+     carry: exactly [lk_cpu_fresh]'s shape.
+
+     The CREATORS are untouched: [initlock] genuinely holds a ctx word and
+     converts it once, one-way, with [lock_word_intro].  Only the exit
+     moves. <<< *)
+  Definition lock_word_fresh (lk : mword 64) : iProp Σ :=
+    (lk_addr_claim lk 4 ∗ lock_word lk (mword_of_int 0 : mword 32))%I.
+
+  (* the same reclamation [lk_cpu_fresh_free] does for the owner cell: a
+     lock on a kalloc'd page must be able to die, and the word's four
+     bytes go home to [kfree] at the visibility-free tier (§0.26′/§0.32′). *)
+  Lemma lock_word_fresh_free (lk : mword 64) :
+    lock_word_fresh lk ⊢
+    [∗ list] j ∈ seq 0 4,
+      TsoCtx.mem_free (KTR := KT0) (pa_add lk j) (DfracOwn 1).
+  Proof.
+    rewrite /lock_word_fresh /lock_word TsoCtx.phys_ledger_word4_unfold.
+    iIntros "[#Hcl [_ Hp]]".
+    iDestruct (lk_addr_claim_bytes with "Hcl") as "#Hb".
+    change (Z.to_nat 4) with 4%nat.
+    iApply (big_sepL_impl with "Hp"). iIntros "!>" (k j Hk) "Hw".
+    iDestruct (big_sepL_lookup _ _ k j Hk with "Hb") as (ppj) "(#Hkj & %Hcj & %Hpj & _)".
+    rewrite /TsoCtx.mem_free. iExists ppj. iFrame "Hkj".
+    iSplitR; [done|]. iSplitR; [done|].
+    rewrite (ktier_pin_id ppj (pa_add lk j) Hpj).
+    by iApply TsoCtx.phys_ledger_free.
+  Qed.
+
   (* THE RECLAMATION, AND IT IS THE WHOLE POINT (tso-port.md §0.26′).
      A lock on a kalloc'd page must be able to DIE.  Its owner word is a
      ledger cell and cannot re-enter the ctx tower -- that needs a drain
@@ -853,7 +931,7 @@ Section Lock.
   Definition lock_body (γ : gname) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) : iProp Σ :=
     (∃ (v : mword 32) (st : lock_state),
-        lock_word_ex (lk_ex st) lk v ∗
+        lock_word_ex (lk_wex st) lk v ∗
         lk_cpu_res st lk s ∗
         lock_auth γ st ∗
         (⌜st = None⌝ ∗ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ lock_frag γ None ∗
@@ -1065,7 +1143,9 @@ Section Lock.
     ( ((▷ lock_inv γ lk s R ={E ∖ ↑lockN, E}=∗ True)
        ∧ (D ={E ∖ ↑lockN, E}=∗ True)) -∗
       lock_auth γ None -∗ lock_frag γ None -∗
-      lk ↦₄ (mword_of_int 0 : mword 32) -∗
+      (* A6.89: the LEDGER word plus its claim, not the ctx word.  See
+         [lock_word_fresh]: release cannot hand back a ctx cell. *)
+      lock_word_fresh lk -∗
       lk_cpu_fresh lk -∗
       lock_pay R -∗
       |={E ∖ ↑lockN, E}=> Out)%I.
@@ -1074,12 +1154,10 @@ Section Lock.
      merely still has other holders -- [D] is not used, only not taken. *)
   Lemma lock_finisher_close γ lk s R D E : ⊢ lock_finisher γ lk s R D emp E.
   Proof.
-    iIntros "[Hclose _] Hauth Hfrag Hword [#Hc8 Hcpu] HR".
-    iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
+    iIntros "[Hclose _] Hauth Hfrag [#Hc4 Hword] [#Hc8 Hcpu] HR".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
     iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8".
     iExists (mword_of_int 0 : mword 32), None.
-    iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Hauth".
     iLeft. by iFrame "Hfrag HR".
   Qed.
@@ -1093,7 +1171,7 @@ Section Lock.
   Lemma lock_finisher_destroy γ lk s R D Out E :
     (lock_frag γ None -∗ lock_pay R ==∗ D ∗ Out) -∗
     lock_finisher γ lk s R D
-      (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lk_cpu_fresh lk ∗ Out) E.
+      (lock_word_fresh lk ∗ lk_cpu_fresh lk ∗ Out) E.
   Proof.
     iIntros "Hcomplete [_ Hdispose] Hauth Hfrag Hword Hcpu HR".
     iMod ("Hcomplete" with "Hfrag HR") as "[HD HOut]".

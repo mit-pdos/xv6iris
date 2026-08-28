@@ -520,7 +520,8 @@ Section ProofHolding.
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
     iApply (wp_clw_lockopen_locked_s_sconf γl lka s R Dc pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n false
-              Hlka ltac:(vm_compute; discriminate) ltac:(rdok) Href
+              Hlka ltac:(vm_compute; discriminate) ltac:(rdok)
+              (or_introl eq_refl) Href
               with "Hcg Hpc [] Hlock Htok").
     { iApply (hi_00 with "Htext"). }
     iIntros (lockv). iApply wp_next_off_intro.

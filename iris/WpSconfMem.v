@@ -584,6 +584,22 @@ Section WpSconfMem.
        (uint ea < 274877906944)%Z ->
        (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
        ktier_pin ktd ppn ea ->
+       (* >>> A6.89: THE STEP'S OWN NO-MIGRATION PROMISE, HANDED TO THE
+          OBLIGATION.  [CIDw] is the FRESH [CpuId] the instruction
+          obligation binds (A6.63'' / tso-port.md §0.20′), and until now the
+          supplier knew NOTHING about it -- which is fine for a
+          CONTEXT-relative fact ([wordw_pointsto_load_c] reads through
+          [own_context], and a context travels with its thread) and fatal
+          for a HART-relative one (an author receipt names a hart, A6.87
+          §(7)).  The promise is [WpNext.wp_next]'s own, verbatim: the
+          binder above was introduced by [iIntros (CID Hs)] against
+          [wp_next b p _], so [Hs] is in scope at the application site and
+          is passed straight through.  At [b = false] -- interrupts off,
+          which is what [push_off] buys and what every lock leaf runs under
+          -- it says the step's hart IS the leaf's, so an own-write receipt
+          minted by the holder is redeemable by the reader.  A supplier that
+          does not need it takes one more [_]. <<< *)
+       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
        kmap_at (svpn_of ea) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
        tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
@@ -816,7 +832,7 @@ Section WpSconfMem.
             iAssert (⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
                        tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
                          (pa_of ppn ea) (Z.to_N width) v⌝)%I as %Hrb.
-            { iApply (Hload CID img sigma log V ppn v Hcan Hoff Hid
+            { iApply (Hload CID img sigma log V ppn v Hcan Hoff Hid Hs
                         with "Hk Hmem Htso Hctx Hbw"). }
             iMod ("Hcl" with "Hbw") as "HPsi".
             iMod "Hb1" as "_".
@@ -933,7 +949,9 @@ Section WpSconfMem.
     exact (wp_load_s_sconf_au_dat (ktd := ktd) width c uns pc rd rs1 imm m n ext Ψ Em b
              (wordw_pointsto (KTR := ktd) width ea dqm)
              Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext Hrd Hrdok HkptEm
-             (fun CIDw img sigma log V ppn v Hcan Hoff _Hid =>
+             (* A6.89: the ctx tower's supplier is CONTEXT-relative and wants
+                nothing from the no-migration promise -- one more [_]. *)
+             (fun CIDw img sigma log V ppn v Hcan Hoff _Hid _Hsame =>
                 wordw_pointsto_load_c (KTR := ktd) (CIDw := CIDw) width img sigma
                   log V ea ppn v dqm Hw0 Hcan Hoff)).
   Qed.

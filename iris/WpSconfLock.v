@@ -272,6 +272,62 @@ Section WpSconfLock.
     iPureIntro. exact Hs1.
   Qed.
 
+  (* >>> A6.89: THE HOLDER'S EXACT READ, AND THE NO-MIGRATION FACT THAT
+     PAYS FOR IT.  The invariant's held arm carries the acquire's own
+     message fragment ([lock_word_ex (Some h0)] = [phys_ledger_word4_vis
+     (hart_agent h0) 0]); [TsoCtx.ledger_read_word4_vis_ok] redeems such a
+     receipt only for a reader that IS its author, so this obligation --
+     discharged at the FRESH [CpuId] the instruction binds -- owes
+     [(CIDw : CPU) = h0].
+
+     THAT FACT IS NOT AN ASSUMPTION AND NOT NEW MACHINERY: it is
+     [WpNext.wp_next]'s own promise, which the load leaf now threads into
+     the obligation (A6.89, [WpSconfMem.wp_load_s_sconf_au_dat]).  At
+     [b = false] -- interrupts off, which is exactly what [push_off] buys
+     and the literal index [holding()]'s contract is stated at
+     (SpecHolding.v) -- the step cannot change harts, so the holder reads
+     the word it wrote.  A6.87 §(7) characterized this as a design class:
+     at the ctx tower exactness was CONTEXT-relative and migration-safe;
+     at the ledger tier with an author receipt it is HART-relative, and the
+     kernel's reason it is sound (no migration while holding) had to become
+     a stated premise.  This is that premise, and it is one line.
+
+     STATED AS ITS OWN LEMMA for A6.87's reason: the AU's obligation is a
+     COQ premise, so an [_] for it is SHELVED, not opened as a goal. <<< *)
+  Local Lemma lock_word_read_vis (ea : mword 64) (b : bool)
+      (Hbp : b = false \/ p = zero_reg) :
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+           (V : agent -> nat) (ppn : mword 44) (v : mword (8*4)),
+      (uint ea < 274877906944)%Z ->
+      (bv_unsigned (subrange_vec_dec ea 11 0) + 4 <= 4096)%Z ->
+      ktier_pin KT0 ppn ea ->
+      (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
+      kmap_at (svpn_of ea) ppn KP_rw -∗
+      gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
+      TsoCtx.phys_ledger_word4_vis (hart_agent (@cpu_id CID)) 0 ea (DfracOwn 1) v -∗
+      ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+         tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+           (pa_of ppn ea) (Z.to_N 4) v⌝.
+  Proof.
+    intros CIDw img sigma log V ppn v Hcan Hoff Hid Hsame.
+    pose proof (Hsame Hbp) as Hcid.
+    assert (Hcid' : (@cpu_id CIDw : CPU) = (@cpu_id CID : CPU)) by exact Hcid.
+    assert (Hag : hart_agent (@cpu_id CIDw) = hart_agent (@cpu_id CID))
+      by (rewrite Hcid'; reflexivity).
+    iIntros "#Hk Hmem Htso Hctx Hw".
+    iEval (rewrite -Hag) in "Hw".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+               sigma.(sregs) sigma.(mdev) Hpin).
+    rewrite (ktier_pin_id ppn ea Hid).
+    iDestruct (TsoCtx.ledger_read_word4_vis_ok (CID := CIDw)
+                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                 ea (DfracOwn 1) v with "Hmem Htso Hw") as %Hrd.
+    iPureIntro. intros tvr Hle. exact (Hrd tvr Hle).
+  Qed.
+
   (* [h0] is the ENTRY hart's identity, LET-BOUND OUTSIDE the [wp_next]
      lambda: the holder token describes who currently holds the lock, a
      fact fixed before this load even runs, so writing [cpu_id] literally
@@ -287,6 +343,12 @@ Section WpSconfLock.
     pa = lk ->
     uint rd <> 0 ->
     rd_ok rd ->
+    (* A6.89: PUSH_OFF'S PROMISE, AS A PREMISE.  [holding()] runs with
+       interrupts off, so this step cannot change harts and the holder's
+       own-write receipt is redeemable here; see [lock_word_read_vis].
+       [holding]'s contract is already stated at the LITERAL [false]
+       (SpecHolding.v), so its call site discharges this by [eq_refl]. *)
+    (b = false \/ p = zero_reg) ->
     (⊢ locked γl h0 -∗ Dc -∗ False) ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
@@ -302,7 +364,7 @@ Section WpSconfLock.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pa h0 Hpalk Hrd Hrdok Href.
+    intros pa h0 Hpalk Hrd Hrdok Hbp Href.
     (* the class, consumed at [rs1] -- the one line the funnel change needs,
        and this leaf's wiring check.  See the family note at the head of this
        section. *)
@@ -313,16 +375,26 @@ Section WpSconfLock.
     iApply fupd_wp.
     iMod (lock_claims γl lk s R (locked γl h0) Dc ⊤ ltac:(solve_ndisj) Href
             with "Hlock Htok") as "(#Hc4 & #Hc8 & Htok)".
-    iApply (wp_load_s_sconf_au (kt := kt) (ktd := KT0) 4 true false pc rd rs1 imm m n
+    (* >>> A6.89: THE DATUM IS THE HELD ARM, so the leaf goes through the
+       datum-parametric load ([_dat]) rather than the [wordw_pointsto]
+       wrapper: at the ledger tier the word IS [phys_ledger_word4_vis] and
+       the exactness comes from the receipt, not from a ctx-tower cell. <<< *)
+    iApply (wp_load_s_sconf_au_dat (kt := kt) (ktd := KT0) 4 true false pc rd rs1 imm m n
               (fun w => sign_extend' 64 w)
               (fun w => (⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝ ∗ locked γl h0)%I)
               (⊤ ∖ ↑minstretN ∖ ↑lockN) b
+              (fun w => lock_word_ex (Some h0)
+                          (add_vec (rget m rs1) (sign_extend' 64 imm)) w)
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Htok] [Hcont]").
+              ltac:(solve_ndisj)
+              (lock_word_read_vis (add_vec (rget m rs1) (sign_extend' 64 imm)) b Hbp)
+              with "Hcg Hpc Hinstr [] [Htok] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
         by (symmetry; exact Hpalk). iApply (lk_addr_claim_wordw with "Hc4"). }
-    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked γl h0) with "[%] [] Htok")
+    { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
+        by (symmetry; exact Hpalk).
+      iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked γl h0) with "[%] [] Htok")
         as "(Hbody & Htok & [Hclose _])"; [solve_ndisj| iApply Href |].
       (* A6.87: peel the M4 invariant's two address claims; hand them
          back at the close.  Everything between is the pre-flip text. *)
@@ -331,17 +403,91 @@ Section WpSconfLock.
       iDestruct (locked_state with "Hg Htok") as %Hst.
       iDestruct "Hbr" as "[(>%Hnone & _) | (_ & >%Hwnz)]"; [ congruence | ].
       iModIntro. iExists w.
-      iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
+      iSplitL "Hword"; [ rewrite Hst; iExact "Hword" | ].
       iIntros "Hword".
       iMod ("Hclose" with "[Hword Hcpu Hg]") as "_".
       { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8". iExists w, st. iFrame "Hcpu Hg".
-        iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
+        iSplitL "Hword"; [ rewrite Hst; iExact "Hword" | ].
         iRight. iPureIntro. split; [ rewrite Hst; discriminate | exact Hwnz ]. }
       iModIntro. iFrame "Htok". iPureIntro. exact Hwnz. }
     iIntros (v). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc (%Hvnz & Htok)".
     iApply ("Hcont" $! v CID1 with "[] [] Htok Hcg Hpc").
     - iPureIntro. exact Hs1.
     - iPureIntro. exact Hvnz.
+  Qed.
+
+  (* >>> A6.89: THE PLAIN WORD-4 LEDGER STORE, which is release's [sw x0].
+     [word_pointsto_wpay_mint_c]'s shape (SmodeCorePt.v) at width 4 and
+     WITHOUT the window payload: the lock WORD carries no [own] record --
+     only the owner CELL does -- so the store gate is the bare
+     [ledger_store_win_at_ok] and what comes out is the ordinary
+     [phys_ledger_word4], which is [lock_word] and therefore
+     [lock_word_ex None]: a free lock's word is nobody's own write. <<< *)
+  Local Lemma lock_word_store_plain (ea : mword 64) (vnew : mword 32) :
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate)
+           (log : list pwmsg) (V : agent -> nat) (ppn : mword 44),
+      (uint ea < 274877906944)%Z ->
+      (bv_unsigned (subrange_vec_dec ea 11 0) + 4 <= 4096)%Z ->
+      ktier_pin KT0 ppn ea ->
+      kmap_at (svpn_of ea) ppn KP_rw -∗
+      gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
+      (∃ vold : mword 32, TsoCtx.phys_ledger_word4 ea (DfracOwn 1) vold) ==∗
+      gen_heap_interp (hG := riscv_memGS)
+        (write_bytes sigma.(mem) (pa_of ppn ea) (Z.to_N 4) vnew) ∗
+      tso_interp_of riscv_eraGS img
+        (write_bytes sigma.(mem) (pa_of ppn ea) (Z.to_N 4) vnew)
+        (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N 4) vnew)
+                   (hart_agent (@cpu_id CIDw))])%list
+        (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
+           (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N 4) vnew)
+                      (hart_agent (@cpu_id CIDw))])%list V) ∗
+      TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
+      TsoCtx.phys_ledger_word4 ea (DfracOwn 1) vnew.
+  Proof.
+    intros CIDw img sigma log V ppn Hcan Hoff Hid.
+    rewrite (ktier_pin_id ppn ea Hid).
+    iIntros "#Hk Hm Htso Hctx (%vold & %Hal & Hb)".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    iDestruct (tso_interp_of_bound with "Htso") as %Hbd.
+    set (log' := (log ++ [PWMsg (snap_of ea (Z.to_N 4) vnew)
+                            (hart_agent (@cpu_id CIDw))])%list).
+    set (V' := vstep (hart_agent (@cpu_id CIDw))
+                 (V (hart_agent (@cpu_id CIDw))) log' V).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+    { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
+      - exfalso. subst h. pose proof (fin_to_nat_lt (@cpu_id CIDw)).
+        rewrite /hart_agent in Hh. lia.
+      - destruct (lt_dec h NCPU); [lia | reflexivity]. }
+    assert (Htvc : forall c : CPU, V' (hart_agent c) = V (hart_agent c)).
+    { intros c. rewrite /V' /vstep. case_decide as Hd.
+      - by rewrite Hd.
+      - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first reflexivity.
+        exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
+    assert (Htvmono : forall c : CPU, (V (hart_agent c) <= V' (hart_agent c))%nat)
+      by (intros c; rewrite Htvc; lia).
+    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
+    { intros c. rewrite Htvc /log' length_app /=.
+      have := Hbd (hart_agent c). lia. }
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+               sigma.(sregs) sigma.(mdev) Hpin).
+    iMod (TsoCtx.ledger_store_win_at_ok (CID := CIDw)
+            (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+            (gs_of img (write_bytes sigma.(mem) ea (Z.to_N 4) vnew) log' V'
+               sigma.(sregs) sigma.(mdev))
+            ea (Z.to_N 4) vold vnew
+            ltac:(vm_compute; discriminate) eq_refl eq_refl eq_refl
+            Htvmono Htvtop with "Hm Htso Hb") as "(Hm & Htso & _ & Hnew)".
+    iModIntro. iFrame "Hm Hctx".
+    iSplitL "Htso".
+    { rewrite -(tso_interp_of_at_gs riscv_eraGS img
+                  (write_bytes sigma.(mem) ea (Z.to_N 4) vnew) log' V'
+                  sigma.(sregs) sigma.(mdev) Hpin').
+      iExact "Htso". }
+    rewrite /TsoCtx.phys_ledger_word4. iSplitR; [done|].
+    iApply (big_sepL_impl with "Hnew"). iIntros "!>" (k j _) "H".
+    by iApply TsoCtx.phys_ledger_at_ledger.
   Qed.
 
   (* The word clear with the fate of the invariant left to the CALLER.  At
@@ -370,7 +516,11 @@ Section WpSconfLock.
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
     lock_openable γl lk s R Dc -∗
     locked_pre γl cpu_id -∗
-    (∃ ξ : CtxId, R ξ) -∗
+    (* A6.89: the payload comes back DEPOSITED ([lock_pay], the parked
+       record the free arm holds) rather than as a bare ∃ξ -- the M4 free
+       arm is [lock_pay R] and the releaser is where [own_context] is, so
+       the deposit belongs at the release call site ([lock_pay_intro]). *)
+    lock_pay R -∗
     lock_finisher γl lk s R Dc Out (⊤ ∖ ↑minstretN) -∗
     wp_next b p (fun (CID : CpuId) =>
       Out -∗
@@ -399,16 +549,28 @@ Section WpSconfLock.
     assert (Hzero : trunc32 (tp_pin m !!! Regidx (mword_of_int 0 : mword 5))
                     = (mword_of_int 0 : mword 32))
       by (rewrite Hz; apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_store_s_sconf_au (kt := kt) (ktd := KT0) 4 false pc (mword_of_int 0 : mword 5) rs1 imm m n
+    (* >>> A6.89: THE DATUM IS THE LEDGER WORD, so the release store goes
+       through [_dat] with [lock_word_store_plain] as its write gate. <<< *)
+    iApply (wp_store_s_sconf_au_dat (kt := kt) (ktd := KT0) 4 false pc (mword_of_int 0 : mword 5) rs1 imm m n
               (trunc32 (tp_pin m !!! Regidx (mword_of_int 0 : mword 5)))
               Out
               (⊤ ∖ ↑minstretN ∖ ↑lockN) b
+              (∃ vold : mword 32, TsoCtx.phys_ledger_word4
+                 (add_vec (rget m rs1) (sign_extend' 64 imm)) (DfracOwn 1) vold)%I
+              (TsoCtx.phys_ledger_word4
+                 (add_vec (rget m rs1) (sign_extend' 64 imm)) (DfracOwn 1)
+                 (trunc32 (tp_pin m !!! Regidx (mword_of_int 0 : mword 5))))
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (tp_pin m !!! Regidx (mword_of_int 0 : mword 5)))
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Htok HRes Hfin] [Hcont]").
+              ltac:(solve_ndisj)
+              (lock_word_store_plain (add_vec (rget m rs1) (sign_extend' 64 imm))
+                 (trunc32 (tp_pin m !!! Regidx (mword_of_int 0 : mword 5))))
+              with "Hcg Hpc Hinstr [] [Htok HRes Hfin] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
         by (symmetry; exact Hpalk). iApply (lk_addr_claim_wordw with "Hc4"). }
-    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked_pre γl cpu_id) with "[%] [] Htok")
+    { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
+        by (symmetry; exact Hpalk).
+      iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked_pre γl cpu_id) with "[%] [] Htok")
         as "(Hbody & Htok & Hchoice)"; [solve_ndisj| iApply Href |].
       (* A6.87: peel the M4 invariant's two address claims; hand them
          back at the close.  Everything between is the pre-flip text. *)
@@ -420,11 +582,22 @@ Section WpSconfLock.
       (* the lock is in release's window, so the cpu field is home WHOLE and
          at 0 -- the finisher's view of it is unchanged (WpLock.v). *)
       iEval (rewrite lk_cpu_res_win) in "Hcpu".
-      iModIntro. iExists w.
-      iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
+      iModIntro.
+      (* A6.89: at [Some (i,false)] the word still carries the AMO's own
+         receipt ([lk_wex]); the store gate wants the plain ledger word,
+         and release is exactly where the receipt is spent. *)
+      iEval (rewrite lock_word_ex_forget) in "Hword".
+      iSplitL "Hword"; [ iExists w; iExact "Hword" | ].
       iIntros "Hword".
-      iApply ("Hfin" with "Hchoice Hg Hfrag [Hword] Hcpu HRes").
-      rewrite -Hzero -Hpalk. iExact "Hword". }
+      iApply ("Hfin" with "Hchoice Hg Hfrag [Hword] [Hcpu] HRes").
+      { (* A6.89: the WORD slot is [lock_word_fresh] now -- the ledger word
+           plus its address claim, the invariant's own, peeled at the open. *)
+        rewrite /lock_word_fresh. iFrame "Hcl4".
+        rewrite /lock_word -Hzero. iExact "Hword". }
+      (* A6.89: the finisher takes the owner cell as [lk_cpu_fresh] -- the
+         cell PLUS the address claim a ledger cell does not carry.  The
+         claim is the invariant's own, peeled at the open. *)
+      { rewrite /lk_cpu_fresh. iFrame "Hcl8". iExact "Hcpu". } }
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc HOut".
     iApply ("Hcont" $! CID1 with "[] HOut Hcg Hpc").
     iPureIntro. exact Hs1.
@@ -434,6 +607,230 @@ Section WpSconfLock.
   (* The cpu word at +16.  It belongs to the invariant; what a caller     *)
   (* brings is the ghost evidence that decides what the word says.        *)
   (* ------------------------------------------------------------------- *)
+
+  (* >>> A6.89: THE OWNER CELL'S NO-EVIDENCE READ ALSO OWNS NOTHING, and it
+     is [wp_clw_lockopen_s_sconf]'s argument one field over: at the ledger
+     tier a read that promises its caller NOTHING about the value needs no
+     resource from the invariant at all, so the lock is never opened.
+     RAM-ness comes from the invariant's persistent 8-byte address claim,
+     which [lock_claims] peeks out without opening the body. <<< *)
+  Local Lemma lock_cell_read_any (ea : mword 64)
+      (Hram : forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) :
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+           (V : agent -> nat) (ppn : mword 44),
+      (uint ea < 274877906944)%Z ->
+      (bv_unsigned (subrange_vec_dec ea 11 0) + 8 <= 4096)%Z ->
+      ktier_pin KT0 ppn ea ->
+      kmap_at (svpn_of ea) ppn KP_rw -∗
+      gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
+      emp -∗
+      ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+         exists v : mword (8*8),
+           tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+             (pa_of ppn ea) (Z.to_N 8) v /\ True⌝.
+  Proof.
+    intros CIDw img sigma log V ppn Hcan Hoff Hid.
+    iIntros "#Hk Hmem Htso Hctx _".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+               sigma.(sregs) sigma.(mdev) Hpin).
+    rewrite (ktier_pin_id ppn ea Hid).
+    iDestruct (TsoCtx.ledger_read_any_word_ok (CID := CIDw)
+                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                 ea 8%nat 64 ltac:(lia) Hram with "Htso") as %Hrd8.
+    iPureIntro. intros tvr _. destruct (Hrd8 tvr) as [w Hw].
+    exists w. split; [exact Hw | done].
+  Qed.
+
+  (* holding's [ld a5,16(a0)] with NO evidence: the recorded owner word is
+     whatever it is (a non-holder learns nothing about it -- which is why
+     holding() may answer either way, and acquire's panic arm is real). *)
+  Lemma wp_cld_lkcpu_lockopen_s_sconf
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Tc Dc : iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (b : bool) :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    pa = lock_cpu lk ->
+    uint rd <> 0 ->
+    rd_ok rd ->
+    (⊢ Tc -∗ Dc -∗ False) ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    lock_openable γl lk s R Dc -∗
+    Tc -∗
+    ( ∀ c : mword 64,
+      wp_next b p (fun (CID : CpuId) =>
+        Tc -∗
+        sie_cap_gpr kt (<[Regidx rd := regval_into_reg c]> m) n b p -∗
+        pc_is (add_vec_int pc 2) -∗
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa Hpacpu Hrd Hrdok Href.
+    (* the class, consumed at [rs1] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    iIntros "Hcg Hpc Hinstr #Hlock HTc Hcont".
+    iApply fupd_wp.
+    iMod (lock_claims γl lk s R Tc Dc ⊤ ltac:(solve_ndisj) Href
+            with "Hlock HTc") as "(#Hc4 & #Hc8 & HTc)".
+    iDestruct (WpLock.lk_addr_claim_ram (lock_cpu lk) 8 with "Hc8") as %Hram.
+    iApply (wp_load_s_sconf_au_exv (kt := kt) (ktd := KT0) 8 true false pc rd rs1 imm m n
+              (fun w => w)
+              (⊤ ∖ ↑minstretN) b
+              (fun _ => True) emp%I Tc
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_read_ram_plain_8 data2_ext_8 Hrd Hrdok
+              ltac:(solve_ndisj)
+              (lock_cell_read_any (add_vec (rget m rs1) (sign_extend' 64 imm))
+                 ltac:(intros j Hj;
+                       replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with (lock_cpu lk)
+                         by (symmetry; exact Hpacpu);
+                       exact (Hram j Hj)))
+              with "Hcg Hpc Hinstr [] [HTc] [Hcont]").
+    { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with (lock_cpu lk)
+        by (symmetry; exact Hpacpu).
+      iApply (lk_addr_claim_wordw with "Hc8"). }
+    { iModIntro. iFrame "HTc". iIntros "_". by iModIntro. }
+    iIntros (v). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc _ HTc".
+    iApply ("Hcont" $! v CID1 with "[] HTc Hcg Hpc").
+    iPureIntro. exact Hs1.
+  Qed.
+
+  (* >>> A6.89: THE HOLDER'S EXACT READ OF THE OWNER CELL -- the SECOND
+     field of A6.87 §(7)'s "one item, two fields", and it is the word
+     leaf's argument verbatim.  [lk_cpu_pay_vis] (A6.84) is the held arm's
+     author receipt; [TsoCtx.ledger_read_wpay_bytes_vis_ok] redeems it only
+     for the reader that IS its author, and the no-migration pin the load
+     leaf now threads is what identifies the two.  [B := 0] because the
+     author arm is what pays ([TsoGhost.view_lb_0]). <<< *)
+  Local Lemma lock_cell_read_vis (ea lk : mword 64) (b : bool)
+      (Hea : ea = lock_cpu lk)
+      (Hbp : b = false \/ p = zero_reg) :
+    forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+           (V : agent -> nat) (ppn : mword 44) (v : mword (8*8)),
+      (uint ea < 274877906944)%Z ->
+      (bv_unsigned (subrange_vec_dec ea 11 0) + 8 <= 4096)%Z ->
+      ktier_pin KT0 ppn ea ->
+      (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
+      kmap_at (svpn_of ea) ppn KP_rw -∗
+      gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+      tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+      TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
+      lk_cpu_cell_ex lk v (Some (@cpu_id CID)) -∗
+      ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+         tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+           (pa_of ppn ea) (Z.to_N 8) v⌝.
+  Proof.
+    subst ea.
+    intros CIDw img sigma log V ppn v Hcan Hoff Hid Hsame.
+    pose proof (Hsame Hbp) as Hcid.
+    assert (Hcid' : (@cpu_id CIDw : CPU) = (@cpu_id CID : CPU)) by exact Hcid.
+    assert (Hag : hart_agent (@cpu_id CIDw) = hart_agent (@cpu_id CID))
+      by (rewrite Hcid'; reflexivity).
+    iIntros "#Hk Hmem Htso Hctx Hcell".
+    iEval (rewrite /lk_cpu_cell_ex) in "Hcell".
+    iDestruct "Hcell" as (own lo) "[_ Hb]".
+    iEval (simpl) in "Hb".
+    iEval (rewrite -Hag) in "Hb".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+               sigma.(sregs) sigma.(mdev) Hpin).
+    rewrite (ktier_pin_id ppn (lock_cpu lk) Hid).
+    iDestruct (TsoCtx.ledger_read_wpay_bytes_vis_ok (CID := CIDw)
+                 (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                 (lock_cpu lk) 8%nat v (DfracOwn 1) 0
+                 (fun j => TsoMemPa.TsWin (lock_cpu lk) 8 j lkcpu_z lkcpu_cp own lo)
+                 with "Hmem Htso [] [Hb]") as %Hrd.
+    { iApply TsoGhost.view_lb_0. }
+    { rewrite /lk_cpu_pay_vis. iExact "Hb". }
+    iPureIntro. intros tvr Hle. exact (Hrd tvr Hle).
+  Qed.
+
+  (* the same read as the HOLDER: the token pins the word to mycpu(), so
+     holding() returns 1. *)
+  (* [h0]/[cpuv] are the ENTRY hart's identity, LET-BOUND OUTSIDE the
+     [wp_next] lambda: they describe who the memory word [lk->cpu] was
+     written for (a fact about the ENTRY hart, fixed before this load
+     even runs), so writing them literally inside the continuation would
+     silently rebind them to whichever hart the step resumes on. *)
+  Lemma wp_cld_lkcpu_lockopen_locked_s_sconf
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc : iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (b : bool) :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let h0 := cpu_id in
+    let cpuv := mycpu_ret cid_word in
+    pa = lock_cpu lk ->
+    uint rd <> 0 ->
+    rd_ok rd ->
+    (* A6.89: push_off's promise, as a premise -- see [lock_cell_read_vis]
+       and the word leaf's twin.  [holding()] is stated at the literal
+       [false], so its call site discharges this by [eq_refl]. *)
+    (b = false \/ p = zero_reg) ->
+    (⊢ locked γl h0 -∗ Dc -∗ False) ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    lock_openable γl lk s R Dc -∗
+    locked γl h0 -∗
+    wp_next b p (fun (CID : CpuId) =>
+      locked γl h0 -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg cpuv]> m) n b p -∗
+      pc_is (add_vec_int pc 2) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa h0 cpuv Hpacpu Hrd Hrdok Hbp Href.
+    (* the class, consumed at [rs1] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
+    iApply fupd_wp.
+    iMod (lock_claims γl lk s R (locked γl h0) Dc ⊤ ltac:(solve_ndisj) Href
+            with "Hlock Htok") as "(#Hc4 & #Hc8 & Htok)".
+    iApply (wp_load_s_sconf_au_dat (kt := kt) (ktd := KT0) 8 true false pc rd rs1 imm m n
+              (fun w => w)
+              (fun c => (⌜c = cpuv⌝ ∗ locked γl h0)%I)
+              (⊤ ∖ ↑minstretN ∖ ↑lockN) b
+              (fun c => lk_cpu_cell_ex lk c (Some h0))
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_read_ram_plain_8 data2_ext_8 Hrd Hrdok
+              ltac:(solve_ndisj)
+              (lock_cell_read_vis (add_vec (rget m rs1) (sign_extend' 64 imm)) lk b Hpacpu Hbp)
+              with "Hcg Hpc Hinstr [] [Htok] [Hcont]").
+    { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with (lock_cpu lk)
+        by (symmetry; exact Hpacpu).
+      iApply (lk_addr_claim_wordw with "Hc8"). }
+    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked γl h0) with "[%] [] Htok")
+        as "(Hbody & Htok & [Hclose _])"; [solve_ndisj| iApply Href |].
+      iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
+      iDestruct "Hbody" as (w st) "(>Hword & >Hcpures & >Hg & Hbr)".
+      iDestruct (locked_state with "Hg Htok") as %Hst.
+      iEval (rewrite /lk_cpu_res) in "Hcpures".
+      iDestruct "Hcpures" as "[Hcpu Hrest]".
+      iModIntro. iExists (lk_cpu_val st).
+      iSplitL "Hcpu"; [ rewrite Hst; iExact "Hcpu" | ].
+      iIntros "Hcpu".
+      iMod ("Hclose" with "[Hword Hcpu Hrest Hg Hbr]") as "_".
+      { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8". iExists w, st. iFrame "Hword Hg Hbr".
+        rewrite /lk_cpu_res. iFrame "Hrest". rewrite Hst. iExact "Hcpu". }
+      iModIntro. iFrame "Htok". iPureIntro.
+      rewrite Hst /cpuv -cpus_ptr_cid. reflexivity. }
+    iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc (%Hc & Htok)".
+    subst c.
+    iApply ("Hcont" $! CID1 with "[] Htok Hcg Hpc").
+    iPureIntro. exact Hs1.
+  Qed.
 
   (* the generic read: the caller's evidence [T] (a ticket or the holder
      token) determines a fact [phi] about the recorded owner word. *)
@@ -523,49 +920,6 @@ Section WpSconfLock.
     iApply ("Hcont" with "HT Hcg Hpc").
   Qed.
 
-  (* holding's [ld a5,16(a0)] with NO evidence: the recorded owner word is
-     whatever it is (a non-holder learns nothing about it -- which is why
-     holding() may answer either way, and acquire's panic arm is real). *)
-  Lemma wp_cld_lkcpu_lockopen_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Tc Dc : iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
-      (m : regfile) (n : nat) (b : bool) :
-    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
-    pa = lock_cpu lk ->
-    uint rd <> 0 ->
-    rd_ok rd ->
-    (⊢ Tc -∗ Dc -∗ False) ->
-    sie_cap_gpr kt m n b p -∗
-    pc_is pc -∗
-    instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    lock_openable γl lk s R Dc -∗
-    Tc -∗
-    ( ∀ c : mword 64,
-      wp_next b p (fun (CID : CpuId) =>
-        Tc -∗
-        sie_cap_gpr kt (<[Regidx rd := regval_into_reg c]> m) n b p -∗
-        pc_is (add_vec_int pc 2) -∗
-        WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros pa Hpacpu Hrd Hrdok Href.
-    (* the class, consumed at [rs1] -- the one line the funnel change needs,
-       and this leaf's wiring check.  See the family note at the head of this
-       section. *)
-    assert (Hpa_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
-      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hlock HTc Hcont".
-    iApply (wp_ld_lkcpu_lockopen_gen true γl lk s R Dc pc rd rs1 imm m n
-              Tc (fun _ => True) b
-              Hpacpu Hrd Hrdok
-              ltac:(intro st; iIntros "_ _ _"; done) Href
-              with "Hcg Hpc Hinstr Hlock HTc [Hcont]").
-    iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "_ HTc Hcg Hpc".
-    iApply ("Hcont" $! c CID1 with "[] HTc Hcg Hpc").
-    iPureIntro. exact Hs1.
-  Qed.
-
   (* THE SAME READ, BY A HART THAT PROVABLY DOES NOT HOLD THE LOCK.  The
      evidence is this hart's held-set AUTHORITY plus [s ∉ lks]: were the lock
      held BY THIS HART, the invariant would be keeping [lk_in cpu_id s]
@@ -640,56 +994,6 @@ Section WpSconfLock.
     iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "%Hc [HTc Hlks] Hcg Hpc".
     iApply ("Hcont" $! c CID1 with "[] [%] HTc Hlks Hcg Hpc");
       [ iPureIntro; exact Hs1 | exact Hc ].
-  Qed.
-
-  (* the same read as the HOLDER: the token pins the word to mycpu(), so
-     holding() returns 1. *)
-  (* [h0]/[cpuv] are the ENTRY hart's identity, LET-BOUND OUTSIDE the
-     [wp_next] lambda: they describe who the memory word [lk->cpu] was
-     written for (a fact about the ENTRY hart, fixed before this load
-     even runs), so writing them literally inside the continuation would
-     silently rebind them to whichever hart the step resumes on. *)
-  Lemma wp_cld_lkcpu_lockopen_locked_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc : iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
-      (m : regfile) (n : nat) (b : bool) :
-    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
-    let h0 := cpu_id in
-    let cpuv := mycpu_ret cid_word in
-    pa = lock_cpu lk ->
-    uint rd <> 0 ->
-    rd_ok rd ->
-    (⊢ locked γl h0 -∗ Dc -∗ False) ->
-    sie_cap_gpr kt m n b p -∗
-    pc_is pc -∗
-    instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    lock_openable γl lk s R Dc -∗
-    locked γl h0 -∗
-    wp_next b p (fun (CID : CpuId) =>
-      locked γl h0 -∗
-      sie_cap_gpr kt (<[Regidx rd := regval_into_reg cpuv]> m) n b p -∗
-      pc_is (add_vec_int pc 2) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros pa h0 cpuv Hpacpu Hrd Hrdok Href.
-    (* the class, consumed at [rs1] -- the one line the funnel change needs,
-       and this leaf's wiring check.  See the family note at the head of this
-       section. *)
-    assert (Hpa_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
-      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
-    iApply (wp_ld_lkcpu_lockopen_gen true γl lk s R Dc pc rd rs1 imm m n
-              (locked γl h0)
-              (fun c => c = cpuv) b
-              Hpacpu Hrd Hrdok
-              ltac:(intro st; iIntros "Hg _ Htok"; unfold cpuv; rewrite -cpus_ptr_cid;
-                    iApply (locked_cpu_eq with "Hg Htok")) Href
-              with "Hcg Hpc Hinstr Hlock Htok [Hcont]").
-    iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "%Hc Htok Hcg Hpc". subst c.
-    iApply ("Hcont" $! CID1 with "[] Htok Hcg Hpc").
-    iPureIntro. exact Hs1.
   Qed.
 
   (* the generic write of the cpu word: the caller's evidence [T] becomes
