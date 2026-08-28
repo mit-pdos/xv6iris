@@ -2705,6 +2705,191 @@ Section WpSconfMem.
   (* needs is not its value but a receipt dominating it, and the payload    *)
   (* itself carries [tw_lo <= length glog] ([win_ok1] conjunct (2b)).       *)
   (* ==================================================================== *)
+  (* >>> A6.104: THE FLOOR-FRAMING TWIN OF THE STORE-THEN-MINT GATE.
+     [word_pointsto_wpay_mint_c] takes a ctx word and MINTS the racy window
+     at its own store's position; this one takes a window that is ALREADY
+     minted and gives it back AT THE SAME FLOOR, with only [own] moved.
+
+     That is the whole difference the floor-0 route turns on (A6.101): a
+     `.bss` lock's owner field is an era-image cell, so its window can be
+     minted at 0 BEFORE [initlock] runs, and [initlock]'s `sd x0` must then
+     FRAME that floor rather than set a new one -- which is what makes
+     [ctx_floor ξ 0] free at every boot-static handle and breaks the
+     bootstrap (the first acquire of the first lock cannot buy its floor).
+
+     NOTHING NEW UNDERNEATH.  [TsoCtx.ledger_store_win_wpay_ok] is the gate
+     and it has been in the tree since the M4 unit with NO CLIENT -- its two
+     arms were written for exactly these two stores ([initlock]'s and
+     release's clear-write take the first; acquire's [lk->cpu = mycpu()]
+     takes the second).  All this wrapper adds is the interp bookkeeping
+     [lock_word_store_plain] (A6.89) already spells: the pin, the [gs_of]
+     bridge, and the [vstep] monotonicity triple. <<< *)
+  Local Lemma word_wpay_frame_store_c {CIDw : CpuId}
+      (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg)
+      (V : agent -> nat) (a : Arch.pa) (vold : mword 64)
+      (z : nat -> bv 8) (cp : agent -> nat -> bv 8)
+      (own : agent -> option nat) (lo : nat) :
+    (forall j : nat, (j < 8)%nat -> nth_byte (zero_reg : mword 64) j = z j) ->
+    gen_heap_interp (hG := riscv_memGS) σ.(mem) -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    ([∗ list] j ∈ seq 0 8, ∃ t : nat,
+       TsoCtx.phys_ledger_wpay (pa_add a j) (DfracOwn 1) (nth_byte vold j) t
+         (TsoMemPa.TsWin a 8 j z cp own lo)) ==∗
+    gen_heap_interp (hG := riscv_memGS)
+      (write_bytes σ.(mem) a 8 (zero_reg : mword 64)) ∗
+    tso_interp_of riscv_eraGS img
+      (write_bytes σ.(mem) a 8 (zero_reg : mword 64))
+      (log ++ [PWMsg (snap_of a 8 (zero_reg : mword 64))
+                 (hart_agent (@cpu_id CIDw))])%list
+      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
+         (log ++ [PWMsg (snap_of a 8 (zero_reg : mword 64))
+                    (hart_agent (@cpu_id CIDw))])%list V) ∗
+    ([∗ list] j ∈ seq 0 8,
+       TsoCtx.phys_ledger_wpay (pa_add a j) (DfracOwn 1)
+         (nth_byte (zero_reg : mword 64) j) (S (length log))
+         (TsoMemPa.TsWin a 8 j z cp
+            (fun h => if decide (h = hart_agent (@cpu_id CIDw))
+                      then Some (S (length log)) else own h) lo)).
+  Proof.
+    intros Hz. iIntros "Hm Htso Hold".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    iDestruct (tso_interp_of_bound with "Htso") as %Hbd.
+    set (vnew := (zero_reg : mword 64)).
+    set (log' := (log ++ [PWMsg (snap_of a 8 vnew)
+                            (hart_agent (@cpu_id CIDw))])%list).
+    set (V' := vstep (hart_agent (@cpu_id CIDw))
+                 (V (hart_agent (@cpu_id CIDw))) log' V).
+    set (own' := fun h => if decide (h = hart_agent (@cpu_id CIDw))
+                          then Some (S (length log)) else own h).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+    { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
+      - exfalso. subst h. pose proof (fin_to_nat_lt (@cpu_id CIDw)).
+        rewrite /hart_agent in Hh. lia.
+      - destruct (lt_dec h NCPU); [lia | reflexivity]. }
+    assert (Htvc : forall c : CPU, V' (hart_agent c) = V (hart_agent c)).
+    { intros c. rewrite /V' /vstep. case_decide as Hd.
+      - by rewrite Hd.
+      - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first reflexivity.
+        exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
+    assert (Htvmono : forall c : CPU, (V (hart_agent c) <= V' (hart_agent c))%nat)
+      by (intros c; rewrite Htvc; lia).
+    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
+    { intros c. rewrite Htvc /log' length_app /=.
+      have := Hbd (hart_agent c). lia. }
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+               σ.(sregs) σ.(mdev) Hpin).
+    iMod (TsoCtx.ledger_store_win_wpay_ok (CID := CIDw)
+            (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
+            (gs_of img (write_bytes σ.(mem) a 8 vnew) log' V'
+               σ.(sregs) σ.(mdev))
+            a 8%N vold vnew lo z cp own own'
+            ltac:(vm_compute; discriminate)
+            ltac:(left; split;
+                  [ intros j Hj; exact (Hz j Hj)
+                  | rewrite /own'; by rewrite decide_True ])
+            ltac:(intros h Hne; rewrite /own'; by rewrite decide_False)
+            eq_refl eq_refl eq_refl Htvmono Htvtop
+            with "Hm Htso Hold") as "(Hm & Htso & _ & Hnew)".
+    iModIntro. iFrame "Hm Hnew".
+    rewrite -(tso_interp_of_at_gs riscv_eraGS img
+                (write_bytes σ.(mem) a 8 vnew) log' V'
+                σ.(sregs) σ.(mdev) Hpin').
+    iExact "Htso".
+  Qed.
+
+  (* >>> A6.104: `sd x0` ON AN ALREADY-MINTED WINDOW.  The twin of
+     [wp_sd_zero_wpay_s_sconf]: same instruction, same plumbing, but the
+     racy window goes IN at floor [lo] and comes back OUT at [lo], with
+     only [own] moved -- [ledger_store_win_wpay_ok]'s first arm.
+
+     The [own] premise and conclusion are the shape [WpLock.lk_own_ok]
+     consumes at the FREE state ("every agent has an own-last record"): the
+     floor-0 mint gives [fun _ => Some lo], the store's first arm re-stamps
+     the author and FRAMES everyone else, so the property survives. <<< *)
+  Lemma wp_sd_zero_wpay_frame_s_sconf
+      (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (vold : mword 64) (b : bool) `{!KtierLe KT0 kt}
+      (z : nat -> bv 8) (cp : agent -> nat -> bv 8)
+      (own : agent -> option nat) (lo : nat) :
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    (forall j : nat, (j < 8)%nat -> nth_byte (zero_reg : mword 64) j = z j) ->
+    (forall h : agent, own h <> None) ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8)) -∗
+    wordw_claim (KTR := KT0) 8 ea -∗
+    ([∗ list] j ∈ seq 0 8, ∃ t : nat,
+       TsoCtx.phys_ledger_wpay (pa_add ea j) (DfracOwn 1) (nth_byte vold j) t
+         (TsoMemPa.TsWin ea 8 j z cp own lo)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      (∃ own' : agent -> option nat,
+         ⌜forall h : agent, own' h <> None⌝ ∗
+         [∗ list] j ∈ seq 0 8, ∃ t : nat,
+           TsoCtx.phys_ledger_wpay (pa_add ea j) (DfracOwn 1) (z j) t
+             (TsoMemPa.TsWin ea 8 j z cp own' lo)) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros ea Hz Hown.
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = ea)
+      by (intros hh; unfold ea; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    iIntros "Hcg Hpc #Hinstr #Hclaim Hwin Hcont".
+    (* A PREMISE ABOUT AN x0 OPERAND CANNOT BE PURE (see [wp_sd_zero_s_sconf]). *)
+    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
+    iDestruct (gpr_file_x0 (tp_pin m) (mword_of_int 0 : mword 5)
+                 ltac:(vm_compute; reflexivity) with "Hfile") as "[%Hx0 Hfile]".
+    iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
+    assert (Hsv : (autocast (T := mword)
+              (subrange_vec_dec (rget m (mword_of_int 0 : mword 5)) (8*8-1) 0)
+              : mword (8*8)) = (zero_reg : mword 64)).
+    { unfold rget. rewrite Hx0. exact (store_ext_8 zero_reg). }
+    iApply (wp_store_s_sconf_au_dat (ktd := KT0) 8 false pc
+              (mword_of_int 0 : mword 5) rs1 imm m n (zero_reg : mword 64)
+              (∃ (pl : Arch.pa) (own' : agent -> option nat), ⌜pl = ea⌝ ∗
+                 ⌜forall h : agent, own' h <> None⌝ ∗
+                 [∗ list] j ∈ seq 0 8, ∃ t : nat,
+                   TsoCtx.phys_ledger_wpay (pa_add pl j) (DfracOwn 1) (z j) t
+                     (TsoMemPa.TsWin pl 8 j z cp own' lo))%I
+              (⊤ ∖ ↑minstretN) b
+              ([∗ list] j ∈ seq 0 8, ∃ t : nat,
+                 TsoCtx.phys_ledger_wpay (pa_add ea j) (DfracOwn 1)
+                   (nth_byte vold j) t (TsoMemPa.TsWin ea 8 j z cp own lo))%I
+              (∃ (pl : Arch.pa) (own' : agent -> option nat), ⌜pl = ea⌝ ∗
+                 ⌜forall h : agent, own' h <> None⌝ ∗
+                 [∗ list] j ∈ seq 0 8, ∃ t : nat,
+                   TsoCtx.phys_ledger_wpay (pa_add pl j) (DfracOwn 1) (z j) t
+                     (TsoMemPa.TsWin pl 8 j z cp own' lo))%I
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia)
+              ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_write_ram_plain_8 Hsv ltac:(solve_ndisj)
+              with "Hcg Hpc Hinstr Hclaim [Hwin] [Hcont]").
+    { (* THE WRITE OBLIGATION: the floor-FRAMING gate, at the physical
+         address the tier pin identifies with [ea]. *)
+      intros CIDw img sigma log V ppn Hcan Hoff Hid.
+      iIntros "#Hk Hmem Htso Hctx Hbw".
+      rewrite (ktier_pin_id ppn ea Hid).
+      iMod (word_wpay_frame_store_c (CIDw := CIDw) img sigma log V ea vold
+              z cp own lo Hz with "Hmem Htso Hbw") as "(Hmem & Htso & Hnew)".
+      iModIntro. iFrame "Hmem Htso Hctx".
+      iExists ea, (fun h => if decide (h = hart_agent (@cpu_id CIDw))
+                            then Some (S (length log)) else own h).
+      iSplitR; [ done | ].
+      iSplitR.
+      { iPureIntro. intros h. case_decide as Hd; [ discriminate | exact (Hown h) ]. }
+      iApply (big_sepL_impl with "Hnew"). iIntros "!>" (kk j Hj) "H".
+      iExists (S (length log)). rewrite (Hz j ltac:(apply lookup_seq in Hj; lia)).
+      iExact "H". }
+    { iModIntro. iFrame "Hwin". iIntros "Hp". by iModIntro. }
+    iIntros (CID1 Hs1) "Hcg Hpc Hp".
+    iDestruct "Hp" as (pl own') "(-> & %Hown' & Hp)".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc [Hp]").
+    { iPureIntro. exact Hs1. }
+    { iExists own'. by iFrame "Hp". }
+  Qed.
+
   Lemma wp_sd_zero_wpay_s_sconf
       (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) `{!KtierLe KT0 kt}
