@@ -3966,3 +3966,21 @@ statements already converged.  This is the working content of
 three-case confidence gate is exactly these channel refactorings,
 SC-proven, in the barrier style — main churns once (0.23′), and it
 churns into the shape the TSO proof already validated.
+
+### 0.31′ (2026-08-28): the first main replay is AUTHORIZED and SPECIFIED
+— /shared/tmp/main-channel-refactor-design.md
+
+The owner authorized landing the first two channel refactorings on
+`main` ahead of the full three-case gate, as pure-SC structural work
+per 0.30′: (1) visibility-free page ownership for kalloc/kfree
+(byte_free/page_free sealed beside byte_any/page_own; kfree's pre
+moves, kalloc's post stays, downgrade lemmas + regain-by-write; the
+read-before-write audit rides along); (2) the started-barrier
+re-homing (devsw_table and the measured pattern class — initproc,
+the kernel_pagetable word, the kstack pointer cells — into
+started_inv's P; the lock-payload counter-pattern for the ring
+pointers; the per-fact channel table as the deliverable).  The
+design document at /shared/tmp/main-channel-refactor-design.md is
+the implementation spec for the main-side agent: main's verified
+names, the measured cascades from the TSO-side implementations, the
+pitfalls, and the do-not-touch list.
