@@ -162,8 +162,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-Eight remain open; each file's top banner says precisely what is left (the
-first four were audited against the tree 2026-08-22):
+Six are open and one is a finished project's residue stub; each file's top
+banner says precisely what is left.  Audited against the tree 2026-08-28,
+when four more moved to [`completed/`](completed/).
 
 - **[`user-wp-slot.md`](projects/user-wp-slot.md)** — the PER-PROCESS
   user-execution WP slot, step 3: making a verified process run IN PLACE
@@ -172,13 +173,6 @@ first four were audited against the tree 2026-08-22):
   `design/user-wp-slot.md`); the file is the six-item ledger, including
   the two rulings to get before the residue re-key and the deliberately
   undesigned deposit-covering formulation.
-
-- **[`xv6-rev-7d258aa.md`](projects/xv6-rev-7d258aa.md)** — the `XV6_REV` bump
-  31f115a -> 7d258aa: DONE and green, awaiting a rebase onto main.  The
-  hand-derived scheduler and kexec offset maps (the tools get both wrong on
-  this one), three `relayout` defects and the audits that catch their classes,
-  the REGISTER-value vs SLOT-value distinction that a narrowed spill range
-  forces, and how to tell a wrong proof from a slow one.
 
 - **[`durable-disk.md`](projects/durable-disk.md)** — FINISHED; the file is
   a 76-line stub carrying only the residue.  xv6 is correct across crashes
@@ -190,28 +184,26 @@ first four were audited against the tree 2026-08-22):
   `design/durable-fs-plan.md` for the design; the stub is worth opening
   only for what is left (Rank 4 parked, BT-4/5 priced and not run, three
   design-level items nobody has proposed, four cosmetic leftovers).
-- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
-  crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`
-  (today both carry a clean-image premise), `sys_sync`'s empty
-  postcondition, and the phase-D2 read-data-indexed-permit decision. The
-  boot composition's wiring is done; it inherits the clean-image premise.
+- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4, and
+  ONE item is left of the four: **`sys_sync`'s postcondition**, which is
+  empty and honestly so (`SpecSysSync.v` says why).  Real `n > 0` recovery,
+  the boot composition and the D2 permit are all closed by the durable-disk
+  lanes; the body's live-sounding passages about them are history and the
+  banner says so.  What the receipt needs is named: a partial slot record on
+  `LogInv.log_mirror_at`, and a faithful commit counter with the committer's
+  receipt deposited beside it.
 - **[`sp-migration.md`](projects/sp-migration.md)** — owning memory at a
   NON-IDENTITY kernel va: the settled design (ktier-indexed `↦ₘ[kt]`,
   `kpt_on` witness, `KtierLe` inference) and the KSTACK campaign are
   LANDED (K4 via `ParkCap.v`); what is NEXT is the `instr` ktier sweep
   (~330 statement-identical files) and the uservec/userret trampoline-fetch
   project that consumes `TrampText.tramp_text_mint`.
-- **[`instr-subgoal-sweep.md`](projects/instr-subgoal-sweep.md)** — the
-  performance discipline that replaced posing instruction facts: close the
-  leaf's `instr` premise as a `[]` subgoal from `kernel_text` instead. Measured
-  −46 % wall / −61 % `Qed` / −69 % proof term on the reference conversion. The
-  file is the mechanical recipe, the traps, and the scoreboard for the
-  remaining 214 files.
-- **[`continuation-folds.md`](projects/continuation-folds.md)** — the tree-wide
-  survey for optimization.md's "fold the block continuation" lever: where the
-  shape still occurs, what each instance is worth, and the expensive files that
-  are NOT instances. ProofSysUnlink (−13.4 %) and the kexec cone (−7.8 %) are
-  landed; `ProofPrintk`'s fourteen lemmas are the richest one left.
+- **[`fs-syscall-specs.md`](projects/fs-syscall-specs.md)** — the
+  file-system BEHAVIOUR specification: what each syscall does to the
+  abstract state.  Design: `design/fs-syscall-specs.md`.  It is what
+  durable-disk handed its per-syscall durability statements to, and it owns
+  the port of `namei-pinned-lookup.md`'s results (its lane P).
+
 - **[`device-conformance.md`](projects/device-conformance.md)** — the
   device semantics differentially tested against QEMU: one bare-metal image
   run on both machines, the model side EXHIBITING one execution by
@@ -229,8 +221,11 @@ first four were audited against the tree 2026-08-22):
   them, and the seven `*Pinned*`/`DirViewPin` rows of `iris/_CoqProject` are
   commented out (source kept). The banner lists them and says who ports
   them. M2 (`dvrt`, the pin through the trap seam) and stage C (threading
-  `proc_ptm` through kexec) are gated on the owner's call. §10 is the
-  long-run tree-level direction.
+  `proc_ptm` through kexec) are gated on the owner's call — which is why the
+  file is PAUSED rather than finished; note that stage C's actual content is
+  being executed under `user-wp-slot.md`'s `proc_pt_any` campaign, and
+  nothing has said so in either file. §10 is the long-run tree-level
+  direction.
 
 ## `completed/` — finished projects, archived for reference
 
@@ -271,6 +266,16 @@ of a fact that must survive several openings of an invariant, and nothing
 persistent is needed), the ring window is a pigeonhole over descriptor
 heads instead of a count of triples, why the receipt has exactly two arms,
 and why a one-shot accessor needs a read-only twin.
+
+Three arrived on 2026-08-28 with the durable-disk archive, all audited
+against the tree first: `instr-subgoal-sweep.md` (the sweep is DONE — the
+tree's own oracle grep finds no per-instruction pose left — but the file is
+still the RECIPE a new proof must follow, and `tools/instr_subgoal.py` is
+the tool), `continuation-folds.md` (every instance folded; read it for the
+METHOD and for the files that look like instances and are not, so nobody
+re-measures what it already priced at zero), and `xv6-rev-7d258aa.md` (the
+bump landed and has been superseded twice, but four of its lessons are
+bump-independent and `xv6-bump-playbook.md` now points at them).
 
 `panic.md` is the one to open before proving any arm that ends in a `jal
 panic` — `forkret`'s `if (first)` is the only such arm left. It carries the arm

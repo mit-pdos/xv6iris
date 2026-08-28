@@ -7,6 +7,17 @@ finished when it is not.
 Read [`durable-notes.md`](durable-notes.md) first for the build and the
 cross-cutting gotchas; this file is only about version bumps.
 
+**And read the last bump's own record before starting**:
+[`completed/xv6-rev-7d258aa.md`](completed/xv6-rev-7d258aa.md) carries four
+lessons this playbook does not, all bump-independent — §2 (the
+`relayout_map.py` REGISTER-INDEX defect, and the three-line audit that
+catches its class), §4b-quater (the five ways a scripted rename fails,
+including the sticky anchor), §4b-sexies (**a 15-minute file is a WRONG
+proof, not a slow one**, and the `-time` last-line trick that tells you
+which), and §4b-septies (the REGISTER value vs SLOT value distinction a
+narrowed spill range forces).  Its offset maps and file counts are about a
+revision the tree has left behind; the four lessons are not.
+
 ---
 
 ## 0. The one-paragraph version

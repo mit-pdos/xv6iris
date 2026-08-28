@@ -335,7 +335,7 @@ The WAL is FILE-SYSTEM-AGNOSTIC in the strong sense: its lock resource
 carries no client proposition, its context names no client payload, and
 `end_op` has no FS-facing premise and no FS-facing postcondition.  A
 `log_write` proves nothing about the file system, so nothing
-file-system-shaped is threaded through the ~75 files that name `log_ctx`
+file-system-shaped is threaded through the ~90 files that name `log_ctx`
 and that context is arity-fixed.
 
 What the log DOES expose is byte-keyed ownership plus two logically-atomic
