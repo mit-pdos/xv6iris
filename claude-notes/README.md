@@ -162,11 +162,24 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-Four are open; each file's top banner says precisely what is left.
+Five are open; each file's top banner says precisely what is left.
 Audited against the tree 2026-08-28, when six moved to
 [`completed/`](completed/) — the last two of them `durable-disk.md`
 (finished) and `sp-migration.md` (archived by the owner with work still
 outstanding; see the `completed/` section below).
+
+- **[`main-tso-readiness.md`](projects/main-tso-readiness.md)** — getting
+  `main` ready for the eventual TSO cutover, in SLICES that each leave main
+  FULLY GREEN.  The goal is "TSO-ready SC": a tree whose STATEMENTS (specs,
+  resource shapes, channels, obligation premises) are converged with the TSO
+  proof's, over sealed SC bodies, so that the cutover becomes a below-seal
+  swap.  Nothing in it introduces weak memory; every slice is SC-provable.
+  The file is the owner-authorized handoff brief from the TSO port (branches
+  `tso`/`tso-flip`) — mission, the seal principle that decides what lands and
+  what never does, the corrected shapes to land DIRECTLY rather than the
+  M-leg's refuted first drafts, and the process law distilled from that
+  port's measured mistakes — followed by AMENDMENT 1, Slice 0's inventory of
+  today's main, which corrects the brief in three places.
 
 - **[`user-wp-slot.md`](projects/user-wp-slot.md)** — the PER-PROCESS
   user-execution WP slot, step 3: making a verified process run IN PLACE
