@@ -1375,3 +1375,4 @@ FsInitPin.v
 SpecSysOpenAU.v
 FsAbsStart.v
 SpecSysDupAU.v
+SpecSysWriteConsAU.v
