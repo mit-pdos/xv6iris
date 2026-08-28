@@ -55,20 +55,36 @@ those is inside the noise of a 48 s file. Compare `ProofSysUnlink.su_w3`:
 **one** lemma, 26.5 s, with a 48 % item in its Δ — that is the regime where
 the fold pays.
 
-**THE PREDICTOR IS ABSOLUTE BYTES REMOVED FROM Δ, NOT SHARE**, times how long
-they sit there. Every result so far fits it and nothing else does:
+**THE PREDICTOR IS THE SIZE OF THE SEPARATION-LOGIC TREE THE CONTINUATION
+ADDS TO Δ** — its `-∗`/`∗` count — times how long Δ carries it. Printed bytes
+is a proxy for that and, in this tree, a tight one: bytes per `-∗` runs 45–155
+across every case measured, so the two rankings barely differ. Nine A/Bs:
 
-| | removed from Δ | result |
-|---|---|---|
-| ProofSysUnlink | ~6.5 kB, whole walk | **−13.4 %** |
-| kexec (B3/C/A) | ~0.8 kB, 67 s walk | **−7.8 %** |
-| ProofNamex/Tr | ~1 kB, part of the walk | −1.2 / −1.6 % |
-| ProofCopyout `co_loop` | 0.46 kB | nil (+0.5 %, `.vo` −4.0 %) |
-| ProofPrintk ×11 | 0.35 kB, 0.3–2.7 s lemmas | nil |
+| case | `-∗` | bytes | result |
+|---|---|---|---|
+| `SysUnlink su_w3` | 88 | 7.0 kB | −13.4 % |
+| `Iput ip_free_entry` | 82 | 9.8 kB | −6.5 % |
+| `Dirlink dl_scan` | 61 | 5.4 kB | −7.7 % |
+| `KforkB6 kfk_prologue` | 33 | 4.8 kB | **−23.0 %** |
+| `KexecA kxc_a2` | 32 | 3.0 kB | −7.0 % |
+| `Iput ip_free_locked` | 25 | 3.9 kB | −4.4 % |
+| kexec closer (×36 sites) | 19 | 2.8 kB | −7.8 % |
+| `Namex nx_skip` | 19 | 1.2 kB | −1.4 % |
+| `Iupdate iu_main_gen` | 16 | 0.7 kB | **nil** |
+| `Printk arm tail` | 8 | 0.4 kB | **nil** |
+| `Copyout co_exit` | 6 | 0.6 kB | **nil** |
 
-**Below ~1 kB removed, do not bother** — share can read 30–50 % and still be
-worth nothing, because per-step cost is `|Δ|` ABSOLUTE. Attribute cost with
-`coqc -time` per enclosing `Lemma` (the `Chars` offsets are BYTES).
+**The bar: ≥ ~19 `-∗`, in a carrier lemma that costs ≥15 s.** Every null is
+below it, every win above. The two metrics are COLLINEAR here so this data
+cannot say which is the real cause; if anything the ratio cuts weakly against
+connectives (the most `-∗`-dense case, `iu_main_gen` at 45 B per wand, is a
+null, while the sparsest, the kexec closer at 148, wins) — but both of those
+are confounded. Prefer the connective count when they disagree: it is the
+quantity the proofmode actually walks, and bytes inflates with long
+identifiers and big literal arguments that cost nothing structurally.
+
+Attribute carrier cost with `coqc -time` per enclosing `Lemma` (the
+`Chars` offsets are BYTES).
 
 ## Remaining, ranked — bytes removable × the cost of the lemma that CARRIES them
 
