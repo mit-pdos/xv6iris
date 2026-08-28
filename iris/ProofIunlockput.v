@@ -42,6 +42,7 @@ Require Import InodeInv.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
+Require Import TxPin.   (* [tx_pin_elem]: the pin and the raw element *)
 Require Import CodeIunlockput.
 Require Import SpecIunlock SpecIput.
 Require Import SpecIunlockput.
@@ -372,6 +373,10 @@ Section ProofIunlockputMain.
              %Hssub %Hwbm %Hwc %Hbud Hlogop Htx Hslot _".
 
     iRename "Htx" into "Hside".
+    (* iput's post hands the element back RAW, and since rank 5
+       [IcacheEscrow.ic_dep_side_of_tx] is stated at [TxPin.tx_pin]; spell it
+       that way before folding the descriptor's own reading back in. *)
+    iEval (rewrite -tx_pin_elem) in "Hside".
     rewrite -(ic_dep_side_of_tx d tid qtx Hdside).
     assert (Hpc16 : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x16))

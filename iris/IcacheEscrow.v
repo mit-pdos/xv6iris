@@ -1792,14 +1792,32 @@ Section IcacheEscrow.
     | _ => None
     end.
 
-  Definition ic_dep_side (d : ic_dep) : iProp Σ :=
+  (* WHICH TRANSACTION THE DESCRIPTOR PINS, as a PURE reading of it -- the
+     [option] shape [TxPin.tx_pin_o] is stated at, and hence what makes
+     [ic_dep_side] one instance of the vocabulary rather than a match of its
+     own.  It lived in [SpecIunlockput] (the walk that needed to NAME the
+     [(t, q)] without destructing a descriptor); its home is here, beside
+     [ic_dep_shr], which reads the descriptor's OTHER half. *)
+  Definition ic_dep_side_tx (d : ic_dep) : option (nat * Qp) :=
     match d with
-    | DepTx _ _ _ _ t q => tx_pin icfg_log t q
-    | _ => emp%I
+    | DepTx _ _ _ _ t q => Some (t, q)
+    | _ => None
     end.
 
+  Definition ic_dep_side (d : ic_dep) : iProp Σ :=
+    tx_pin_o icfg_log (ic_dep_side_tx d).
+
+  (* the equation the two generic [iunlockput] bodies take as a pure premise:
+     with the descriptor's pin NAMED, the side condition IS the pin.  It is a
+     LEIBNIZ equality between propositions, discharged by [reflexivity] --
+     which is what [tx_pin]'s transparency buys ([TxPin]'s header). *)
+  Lemma ic_dep_side_of_tx (d : ic_dep) (t : nat) (q : Qp) :
+    ic_dep_side_tx d = Some (t, q) ->
+    ic_dep_side d = tx_pin icfg_log t q.
+  Proof. rewrite /ic_dep_side. intros ->. reflexivity. Qed.
+
   Global Instance ic_dep_side_timeless d : Timeless (ic_dep_side d).
-  Proof. rewrite /ic_dep_side. destruct d; tl_struct. Qed.
+  Proof. rewrite /ic_dep_side. apply _. Qed.
 
   Lemma ic_dep_gname_of_shr d (s : Qp) (dev inum : mword 32) (g : gname) :
     ic_dep_shr d = Some (s, dev, inum, g) -> ic_dep_gname d = Some g.

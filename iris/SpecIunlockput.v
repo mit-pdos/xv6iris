@@ -112,26 +112,12 @@ Local Open Scope Z_scope.
    them at an empty authority; [SpecIput.wp_iput_gen_body] therefore takes
    one.  iunlockput needs no caller to supply it: it is [iunlock] then
    [iput], and the share the WRITE ARM parked comes home at the first of the
-   two ([IcacheEscrow.ic_dep_side]).  This is that observation as a pure
-   equation on the descriptor, so the two generic bodies below can name the
-   [(t, q)] without destructing anything. *)
-Definition ic_dep_side_tx (d : ic_dep) : option (nat * Qp) :=
-  match d with
-  | DepTx _ _ _ _ t q => Some (t, q)
-  | _ => None
-  end.
-
-Section IunlockputSide.
-  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg}.
-
-  Lemma ic_dep_side_of_tx (d : ic_dep) (t : nat) (q : Qp) :
-    ic_dep_side_tx d = Some (t, q) ->
-    ic_dep_side d = (t ↪[ln_tx icfg_log]{#q} ())%I.
-  Proof.
-    destruct d; try discriminate. cbn. intro H.
-    injection H as -> ->. reflexivity.
-  Qed.
-End IunlockputSide.
+   two ([IcacheEscrow.ic_dep_side]).  That observation is a pure equation on
+   the descriptor, so the two generic bodies below can name the [(t, q)]
+   without destructing anything -- and since rank 5 it is not this file's:
+   [IcacheEscrow.ic_dep_side_tx] IS [ic_dep_side]'s own [TxPin.tx_pin_o]
+   index, and [IcacheEscrow.ic_dep_side_of_tx] is its reading.  The two
+   contracts below keep the premise at the same spelling. *)
 
 (* iunlockput's own frame is 32 bytes (4 slots: ra@24 s0@16 s1@8, one hole);
    its deepest callee is iput (60).  iunlock wants 26.
