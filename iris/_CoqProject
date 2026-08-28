@@ -1360,3 +1360,10 @@ SpecNparWrapEra.v
 ProofNparWrapEra.v
 LinkNparWrapEra.v
 SpecSysReadAU.v
+FsAbsMknodFire.v
+SpecCreateAU.v
+ProofCreateAU.v
+LinkCreateAU.v
+SpecSysMknodAUEra.v
+ProofSysMknodAU.v
+LinkSysMknodAU.v
