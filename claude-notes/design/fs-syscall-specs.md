@@ -583,7 +583,7 @@ carriers, identical in shape for every mutator.
 | `mknod` | δ_create(ADev) | trace + AU | exists |
 | `link` | δ_link | trace×2 + AU | target is dir, new exists, cross-of-life (target unlinked between instants — the two-instant shape makes this arm STATABLE) |
 | `unlink` | δ_unlink (+dir arm) | trace + AU | ".": refused; dir non-empty; gone |
-| `read` | — | per-chunk AU (readi) | off past size (ret 0) |
+| `read` | — | ONE AU — fileread's inode arm is a single ilock/readi/iunlock hold, no per-chunk unlock ("per-chunk" here was pessimistic; as-verified 2026-08-28, lane W, `SpecSysReadAU.v`) | off past size (ret 0); n<0 guard and copyout fault (ret −1, this fork) |
 | `write` | δ_write per chunk | per-chunk AU | full disk mid-write (partial ret) |
 | `close`/`iput` | δ_free when last | AU at iput | — |
 | `chdir` | — | trace + cwd swap | not a dir |
