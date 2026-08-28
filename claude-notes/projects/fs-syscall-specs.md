@@ -171,6 +171,75 @@ things, and the answer differs:
   unchanged).  The `dv_*` column retires when the new walk replaces the
   dv-firing one as the consumed form.  This is now lane A-iii's work
   item, Opus-sized (the proof follows ProofNamexTr's structure).
+  **(b) LANDED, NAMEI SIDE, 2026-08-28** (Opus lane; ten new files, all
+  EC2-green, zero `Admitted`, and the era cone's `Print Assumptions` is
+  BYTE-IDENTICAL to `LinkNameiTr`'s — `resv_matches`, `resv_is_valid`,
+  funext).  Files and what each seals:
+  - `FsAbsPins.v` — the PIN-RETURNING package (owner ruling, relayed
+    mid-lane): `apr_pins` is the client's WHOLE bundle carried through
+    every hop (`big_sepL_lookup_acc`: read the k-th pin, put it straight
+    back) instead of `apn_pins`'s shrinking `drop k`.  `apr_P_final`
+    returns the shares beside the answer; `apr_P_pins` returns them at
+    any death index.  `apr_pins_is_apn_pins` is a `reflexivity` receipt
+    that it IS the landed accumulator at hop 0.  A NEW LEAF rather than
+    an append to `FsAbs.v` for one mechanical reason: the mirror forbids
+    touching a tracked file.  Fuse the two when `FsAbs.v` is next edited.
+  - `FsAbsEra.v` — THE LEND.  `elend Γ d dq ents := ∃ n, top_frag_q Γ dq
+    d n ∗ ⌜fn_is_dir n = true ∧ dir_entries n = ents⌝`.  Node
+    existential (`ax_hop`'s `F` signature is frozen), but the fire SPLITS
+    the walk's element (lend ½, keep ½) so agreement pins the returned
+    node — that is why the fire does not lend `DfracOwn 1`.
+    Directory-ness IS carried (the walk has already run its
+    `ip->type == T_DIR` test), so this lend discharges the STRONG law
+    `lend_agrees`, not just `lend_reads`.  `elend_astate` is what it is
+    all for: read the parent's row off the AUTHORITY at the hop instant,
+    no client share needed.  Also: `ex_hop`/`ex_hops_from` (= `ax_hop`
+    /`ax_hops_from` at `elend`, by `reflexivity`), the two fire lemmas,
+    `apn_walk_era` and `apr_walk_era`.
+  - `SpecNamexEra.v` / `ProofNamexEra.v` / `LinkNamexEra.v` and
+    `SpecNameiEra.v` / `ProofNameiEra.v` / `LinkNameiEra.v` — the
+    parallel walk.  `ProofNamexEra` is `ProofNamexTr` with 300 diff lines
+    out of 4990, ~130 of them header: split `Hfview` into `Hfv Htop` once
+    before the `found` case split, fire off `Htop` instead of `Hdview`,
+    re-frame `Hfv Htop`, and read `Htyd` as `Htydz : bv_unsigned (di_type
+    dnl) = T_DIR_z`.  `Hdview` is never touched.  1m57s to compile, so no
+    split was needed.  TRANSITIONAL BY DESIGN — the retirement step
+    deletes the dv-firing original once consumers move.
+  - `FsAbsEraMknod.v` — lane W's two fire points, DISCHARGED IN ADVANCE:
+    `era_dlookup_fire` (its prover's `dlookup_commit` consumed at an era
+    hop, lend and state both returned) and `era_acre_fire` (`acre_commit`
+    phase 1, with `cre_pre`'s ROW conjunct coming from the lend and the
+    other two from the caller), plus `mknod_walk_pre_era` /
+    `mknod_walk_dead_era`, the era twins of lane W's walk predicates.
+  AS-LANDED FINDINGS:
+  1. **The pinned walk is still VACUOUS for a live inum, and a second
+     walk was never going to change that.**  The walk's custody is the
+     WHOLE element (namex's `ilock` takes the write arm), so
+     `FsAbsSeam`'s finding 3 stands: a client holding any `nview` share
+     of a directory on the chain is refuted.  `apn_walk_era` /
+     `apr_walk_era` are theorems and compose, but the NON-VACUOUS
+     consumption route is `elend_astate` — the hop reads the authority's
+     row, which needs no client share.  A non-vacuous pin waits for the
+     tree layer's exclusivity fact, as the ruling itself says.
+  2. **`lend_agrees` turned out to be the right law after all** — for
+     THIS lend.  `FsAbsSeam` had to weaken to `lend_reads` because
+     `dv_half` rides a file too; the era fragment carries the type, so
+     `FsAbs` section 4 and section 4a' both instantiate.
+  REMAINING (lane A-iii): **the NAMEIPARENT walk.**  It is NOT a question
+  about the lend — the fire is shared by both sides of namex's `a1` test
+  and would be copied verbatim.  What is missing is (i) an npar-generic
+  trace CONTRACT: nameiparent fires L−1 hops and returns the PARENT, so
+  the success arm is `P (L−1) iL` beside the UNFIRED last hop and the
+  `nameiparent_of` name clause, and (ii) namex's two npar exits proven
+  carrying the trace rows — `L_par` (+0x84, iunlock and return the
+  parent) and the nameiparent-of-"/" iput (+0x140's fall-through), which
+  `ProofNamexTr` REFUTES from `Ha1` at its three use sites (2290, 3884,
+  and the 4985 `Hpfun0`).  Sizing measured: `diff ProofNamex ProofNamexTr`
+  is 1766 changed lines (1432 deletions = the npar arms + the relative
+  start, ~334 additions = the trace rows), so the npar-generic trace
+  proof is a re-derivation from `ProofNamex.v` (6088 lines) rather than a
+  patch of `ProofNamexEra`, and the three new exits' trace arms are
+  genuinely new proof content.  Lane-sized, not spike-sized.
 - [~] **W — the first increment's AU specs.**  mknod STATEMENT DONE
   2026-08-28 (Fable lane, `iris/SpecSysMknodAU.v`, 856 lines, green,
   zero admits — a statement file; the proof is a later Opus lane):
