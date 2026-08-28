@@ -326,30 +326,59 @@ Proof.
     as [Hc | _]; [exfalso; exact (Hd Hc) | reflexivity].
 Qed.
 
-(* THE PROJECTION THAT READS THE BYTES BACK, AND WHY IT IS HERE.  The
-   obvious [injection H] on
+(* ---------------------------------------------------------------------- *)
+(*  THE ONE PERFORMANCE RULE THIS FILE HAD TO LEARN, MEASURED               *)
+(*                                                                        *)
+(*  [Some (NFile _)] IS INJECTIVE -- AND IT MUST BE PROVED AT VARIABLES.    *)
+(*  Closing the /init instance DIRECTLY, by [injection] on or [exact]       *)
+(*  against an equation one of whose sides is the 35,976-byte literal,      *)
+(*  DOES NOT FINISH.  Both spellings were measured on the mirror with       *)
+(*  [coqc -time] and truncation probes: sections 1-2 compile in 35 s and    *)
+(*  every sentence up to and including [node_at_nondir] is 0.00 s, while a  *)
+(*  file ending at this lemma ran past 15 minutes in either spelling.  The  *)
+(*  reason is [FsImgCheck.v]'s header rule: conversion is free to unfold    *)
+(*  [FsTree.file_bytes] rather than the projection, and [file_bytes] is     *)
+(*  QUADRATIC in the file size and rebuilds the block once per byte -- at   *)
+(*  58 kB, that header says, the computation does not terminate usefully.   *)
+(*                                                                        *)
+(*  AT VARIABLES [b], [b'] the same proof is ONE IOTA STEP: the variable is *)
+(*  rigid, so the projection is the only thing conversion CAN unfold, and   *)
+(*  no file's contents are ever entered.  The instance below then closes by *)
+(*  transitivity through [node_at] -- where both sides are the SAME term    *)
+(*  syntactically, so the kernel compares nothing.                          *)
+(* ---------------------------------------------------------------------- *)
 
-       Some (NFile <file_bytes ...>) = Some (NFile ElfUser.init_elf)
-
-   NORMALISES THE 35,976-BYTE LITERAL and does not finish: measured with
-   [coqc -time] on this very file, that one sentence ran past 4 minutes
-   while every other sentence in sections 1-3 was 0.00 s.  Going through a
-   projection instead makes both sides WEAK-HEAD reduce in one iota step,
-   and the literal is never entered (claude-notes/optimization.md's rule:
-   never let a tactic walk a file's contents). *)
 Definition nfile_bytes (o : option fsnode) : list (bv 8) :=
   match o with Some (NFile b) => b | _ => [] end.
+
+Lemma nfile_inj (b b' : list (bv 8)) :
+  Some (NFile b) = Some (NFile b') -> b = b'.
+Proof. intros H. exact (f_equal nfile_bytes H). Qed.
+
+(* the two side conditions of [node_at_nondir] at /init, hoisted to
+   top-level lemmas so the instance below can pass them as ARGUMENTS and
+   never open a side goal beside the big term (durable-notes: hoist). *)
+Lemma fsimg_init_type_nz :
+  bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb INIT_INO)) <> 0.
+Proof. cbv [INIT_INO]. rewrite fsimg_init_type. cbv [T_FILE_z]. lia. Qed.
+
+Lemma fsimg_init_type_nd :
+  bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb INIT_INO)) <> T_DIR_z.
+Proof.
+  cbv [INIT_INO]. rewrite fsimg_init_type. cbv [T_FILE_z T_DIR_z]. lia.
+Qed.
 
 Lemma fsimg_init_file_bytes :
   file_bytes (fs_data_of fsimg_P (fs_dinode fsimg_P fsimg_sb INIT_INO))
     (Z.to_nat (bv_unsigned (di_size (fs_dinode fsimg_P fsimg_sb INIT_INO))))
   = init_bytes.
 Proof.
-  pose proof (f_equal nfile_bytes fsimg_init_at) as H.
-  rewrite (node_at_nondir fsimg_P fsimg_sb INIT_INO) in H.
-  - exact H.
-  - rewrite fsimg_init_type. cbv [T_FILE_z]. lia.
-  - rewrite fsimg_init_type. cbv [T_FILE_z T_DIR_z]. lia.
+  apply nfile_inj.
+  transitivity (node_at fsimg_P fsimg_sb INIT_INO).
+  - symmetry.
+    exact (node_at_nondir fsimg_P fsimg_sb INIT_INO
+             fsimg_init_type_nz fsimg_init_type_nd).
+  - exact fsimg_init_at.
 Qed.
 
 (* THE IMAGE'S /init ROW, as an abstract node.  This is the CONTENT PIN's
@@ -421,7 +450,10 @@ Theorem era0_init_arun (S : fs_state_rec) :
        [FsImg.ROOTINO; INIT_INO].
 Proof.
   intros HS.
-  apply ARun_cons; [| apply ARun_nil].
+  (* [eapply]: [ARun_cons]'s hop target [c] is not in its conclusion, so it
+     is fixed by the TAIL run ([ARun_nil] at [[INIT_INO]]) and read back
+     into the hop's goal. *)
+  eapply ARun_cons; [| apply ARun_nil].
   rewrite (img_astep_root fsimg_P fsimg_sb _ fname_init fsimg_wf_ok).
   - exact fsimg_init_path.
   - cbv [fsimg_sb FsImg.ROOTINO FsImg.sb_ninodes]. lia.
@@ -468,7 +500,10 @@ Section Era0Live.
     intros HS. iIntros "Hst Hn".
     iDestruct (astate_nview with "Hst Hn") as %Hav.
     iPureIntro.
-    rewrite (era0_init_content_pin S HS) in Hav. by injection Hav.
+    rewrite (era0_init_content_pin S HS) in Hav.
+    (* [Some_inj], NOT [injection]: see section 3's performance rule -- the
+       row carries [init_bytes] and [injection] would normalise it. *)
+    apply Some_inj in Hav. symmetry. exact Hav.
   Qed.
 
 End Era0Live.

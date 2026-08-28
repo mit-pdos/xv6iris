@@ -33,6 +33,20 @@
 > beyond what that family already pays, and are not pinned-lookup results.
 > The port has to re-derive the two pins from the fs-syscall-specs abstract
 > state; nothing else about these files changed.
+>
+> **THE PORT IS DONE (2026-08-28): `iris/FsInitPin.v`**, fs-syscall-specs
+> lane P.  Both pins are re-derived as PURE facts about era 0's own durable
+> map (`era0_D`, named off `SystemAdequacy.fsimg_snap_ok`), quantified over
+> every state that map denotes — so they are eternal for era 0, persistent
+> for free, and carry no ghost, no lend, no cancellation arm and no mask
+> premise.  `era0_init_path_pin` is `apath_at av ROOTINO ["init"] = Some 7`;
+> `era0_init_content_pin` is `av !! 7 = Some (MkAnode (AFile init_elf) 1)`;
+> `era0_init_arun` is the `arun` premise `FsAbsPins.apr_walk` takes.  The
+> seven files above are NOT re-enabled and could not be — their
+> `dv_lend_mint`/`dv_pin_redeem`/`fv_pin_redeem` were deleted at
+> `226aaab5` — and re-enabling remains the owner's call.  See lane P of
+> [`fs-syscall-specs.md`](fs-syscall-specs.md) for the statements, the
+> consumer-site map and the one remaining transport gap.
 
 # namei, pinned: a ghost-state spec for WHICH inode the walk returns
 
