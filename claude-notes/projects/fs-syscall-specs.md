@@ -268,8 +268,23 @@ things, and the answer differs:
   the tree layer or waits for a cross-syscall pin producer?
   Gotchas: `FsImg` must be `Require`d not `Import`ed at syscall
   altitude; stdpp `last` = `list_basics.last` in this import mix.
-  REMAINING: unlink → write AUs (same mold), then open/read/close/
-  fstat/chdir, mechanical.  NOTE (2026-08-27): the fd-state ghost
+  WRITE STATEMENT DONE 2026-08-28 (Fable lane, `iris/SpecSysWriteAU.v`,
+  810 lines, green): `delta_write` reuses `FsBlocks.blk_splice` (the
+  splice IS the landed one; `delta_write_chain` = a chained run is one
+  delta of the concatenation); per-chunk two-phase commits, bundle
+  bounded by `wchunks n = ⌈n/FW_MAX⌉` (a COUNT of instants, boundaries
+  existential); per-chunk offsets EXISTENTIAL (f->off moves unlocked on
+  a shared struct file — chaining offsets is not a truth of the
+  concurrent kernel); arms are TWO (n or −1 — the doc sketch's
+  "partial ret" corrected: filewrite answers nothing between); fd side
+  = the landed `fd_st` fragment, returned unchanged; stable corollary
+  sealed with an UN-KEYED escape disjunct (no observable keys it) and
+  the usual vacuity caveat.  OWNER QUESTIONS (header): wchunks
+  exposure vs a stream commit; keep the sealed stable form or wait for
+  exclusivity; sharper −1 tie?; lane A(iv) offset seam is now
+  CONSUMER-MOTIVATED (first consumer = this contract).
+  REMAINING: unlink AU (wants the npar walk's contract shape), then
+  open/read/close/fstat/chdir, mechanical.  NOTE (2026-08-27): the fd-state ghost
   landed upstream (`FdSlots.fd_frags` beside `ut_own`; `fdstate` =
   open-or-closed + `fdtype`, two-halves algebra, commits 28d707dc +
   3199a1b6; `FdInode` carries its INUM as of d1411776, riding on
