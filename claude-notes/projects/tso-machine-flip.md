@@ -12208,3 +12208,139 @@ run and no mirror refresh was due.  **Red-list delta: 0.**  `^Abort` /
 3. Unchanged with the owner: the merged lock-word/`notheld` ruling,
    `intr_handler_spec`'s layering, `ProofMain`'s publication credential,
    `ProofForkretPark`'s re-park hazard, §0.27′'s surface.
+
+### A6.95 THE DMA LEAF IS NOT A FIFTH QUESTION — THE MODEL PAYS BOTH HALVES,
+### AND WHAT IS MISSING IS THE MERGED QUESTION'S BOUND-RELATION, THIRD INSTANCE
+
+Measured before spelling, as instructed.  **No machine change is needed and no
+new visibility arm for a non-hart agent is needed** — both were the failure
+modes the coordinator asked me to watch for, and neither obtains.  What blocks
+the leaf is the tie the owner is already holding a ruling on.
+
+#### (1) HOW DEVICE WRITES ENTER THE MODEL — THE AUTHOR SIDE IS ALREADY PAID
+
+Three facts, from the model itself:
+
+- **The disk is an AGENT of the log.**  `RiscvLang`'s `DiskLoopE` arm:
+  `log' = g.(glog) ++ [PWMsg W disk_agent]` with
+  `disk_agent := NCPU`, appending its whole write set as ONE authored
+  message and updating the flat cache in lock-step.  `agent` is `nat` and
+  `TsoMemPa`'s gates are agent-GENERIC (`cp : agent → nat → bv 8`,
+  `visibleb h tv log t`), so **the DMA writer is already a first-class author
+  and needs no new arm.**
+- **The queue words are ALREADY LEDGER CELLS.**
+  `VirtioProto.phys_word2 a w := [∗ list] j ∈ seq 0 2, phys_ledger (pa_add a j) (DfracOwn 1) (nth_byte w j)`.
+  So the "phys twin whose datum is `phys_word2`" needs no new tier: the datum
+  is a ledger window, exactly what `TsoCtx`'s read gates consume.
+- **MMIO moves nothing** (`RULING 2`: device reads and writes are strongly
+  ordered — "no log, no view action"), so the interrupt itself carries no
+  ordering; the queue words are ORDINARY RAM and go through the plain arms.
+
+**So the seam A6.94 named is real but narrower than it looked**: the failure is
+not "a DMA word has no owning context and therefore no story", it is that
+`DiskInv.phys_to_word2` bridges the ledger window into the RAW VA-keyed tower
+(`word2_pointsto`, three arguments) while the flipped AU leaf's datum is
+`WpSconfMem.wordw_pointsto 2` (= `ctx_pointsto cur_ctx`).  The bridge is
+pre-flip; the leaf is post-flip; the cell is fine.
+
+#### (2) THE RECEIPT SIDE IS ALSO ALREADY PAID — BY THE LOCK
+
+`virtio_disk_intr`'s C is, in order:
+
+```c
+    acquire(&disk.vdisk_lock);
+    __sync_synchronize();
+    while (disk.used_idx != disk.used->idx) { … }
+```
+
+and both halves are real in the model:
+
+- `acquire` ends in the AMO, and `RiscvLang`'s exclusive-read arm sets
+  `tv' = length log` — **the reader's view goes to the LOG TOP**, which is
+  strictly stronger than any fence and covers every device message ever
+  appended.  (Its own comment: *"the view-at-top is what mints the acquire
+  receipt in the lock leaves"* — A6.92 used the same arm for `t_rel`.)
+- `__sync_synchronize()` is `virtio_disk_intr+0x2c`, decoded as
+  `FENCE (0, 15, 15)` = `Barrier_RISCV_rw_rw`, one of the **four draining
+  fences in the whole kernel** (A6.90 §(4)) — and `virtio_disk_rw` has the
+  other two.
+
+> **THAT IS THE CONTRAST WITH A6.90 WORTH KEEPING.**  `main` wanted a drain
+> and the image has none; the virtio path wanted one and the image has BOTH a
+> drain and an AMO.  *The kernel's real barriers are all in the driver, and
+> the driver is the one place the port has not been able to spend them.*
+
+#### (3) WHAT IS ACTUALLY MISSING, AND IT IS THE MERGED QUESTION AGAIN
+
+The read must conclude a RANGE — `wp_vdiskintr`'s Ψ is
+`∃ nc, ⌜w = wrap16 nc⌝ ∗ ⌜nr ≤ nc ≤ np⌝ ∗ disk_done_lb γd nc ∗ disk_pub γd np`,
+and the ghost `disk_done_lb γd nc` is indexed by the value read, so the
+value-UNKNOWN gate (`ledger_read_any_word_ok`) is too weak.  The two gates
+that are strong enough both want the same thing:
+
+| gate | premise |
+|---|---|
+| `ledger_read_at_ok` (exact) | `view_lb F` **and `⌜t ≤ F⌝`** |
+| `ledger_read_pin_ok` (in a set) | `view_lb B` **and the pin at floor `B`** |
+
+and `VirtioProto.virtio_proto_used_idx_acc` hands out
+`phys_word2 (used_idx_pa (v_cfg v)) (wrap16 nc)` with **no timestamp and no
+view fact** — `t` is existential inside `phys_ledger`, `K` is existential
+inside the acquire's `∃ K, hart_view_lb K`, and nothing relates them.
+
+**This is not a fifth question.  It is the THIRD INSTANCE of the merged
+lock-word/`notheld` one**, and the unification is the finding:
+
+| site | reader | what it lacks |
+|---|---|---|
+| the lock WORD's holder read (A6.92 §(3)) | holds the lock | a tie from the cell's stamp to its receipt |
+| the `notheld` OWNER cell (A6.89 §(7)) | spinning acquirer | the floor `lo` vs its receipt `K` |
+| the DMA QUEUE words (here) | holds `vdisk_lock` | the cell's `t` vs its receipt `K` |
+| §0.27′'s park resume tie (A6.91 §(1)) | the resuming scheduler | the parked stamp `T` vs `t_rel` |
+
+**In three of the four the receipt already EXISTS in the code and is an
+acquire's AMO** — the strongest receipt the machine has (`tv' = length log`).
+What is missing everywhere is the same object: *a resource may publish a stamp
+`U` with `⌜t ≤ U⌝`, and an acquire exports `⌜U ≤ K⌝ ∗ view_lb K`.*  §0.27′
+already names it (`U`, "every stamp parked here ≤ U", "instantiated by the free
+arm at the lock element's timestamp") — **so the ruling the owner is holding
+for the lock word settles all four, and the virtio pair comes with it.**
+
+#### (4) WHAT IS READY TO LAND THE MOMENT IT DOES
+
+Measured, and it is small: the phys-tier AU leaf needs no new tier and no new
+gate — datum `phys_word2` (already a ledger window), claim from
+`kmap_static_claims` (which both proofs already build, via
+`disk_geom_static` / `disk_geom_canonical`), obligation through the existing
+agent-generic ledger read gates.  **Neither virtio file needs any other
+change**: both fail at exactly one site apiece
+(`ProofVirtioDiskIntr:1165`, `ProofVirtioDiskRwD:686`), the single
+`phys_to_word2` → `wordw_claim_of` datum mismatch, and everything else in both
+proofs is untouched by the flip.  `ProofVirtioDiskRwD`'s cell is the AVAIL
+index — driver-written, under the same lock — so it wants the identical tie
+and no device reasoning at all.
+
+**Characterized and stopped; nothing was edited.**  §0.28′'s `disk_geom`
+ring-pointer re-homing was left untouched as instructed and remains
+independent of all of this (A6.94 §(2)).
+
+#### (5) THE NUMBER
+
+**1100 of 1296, RED 9 — unchanged**, sentinel-backed at A6.93's round
+(`MAKEEXIT=2`); no source file was edited in this tranche or the previous one,
+so no round was run and no mirror refresh was due (mirror verified identical
+to the fliptree sources).  **Red-list delta: 0.**  `^Abort` / `^Admitted` /
+`^Axiom` all 0.
+
+#### (6) THE FRONTIER, AND IT IS NOW ONE RULING WIDE
+
+1. **The bound-relation ruling** (the merged lock-word/`notheld` question,
+   §(3)): four sites, one mechanism.  It gates `WpSconfLock`, both virtio
+   files, and §0.27′ → `ProofSwtch`.
+2. **The U-mode token lane** — `UptWalkPt` + `UserMemPt`, one exit-path
+   ruling (A6.94 §(1)).
+3. `intr_handler_spec`'s layering → `ProofKernelvec`; the publication
+   credential → `ProofMain`; `ProofForkretPark`'s re-park hazard.
+
+*Every remaining red is now behind one of these four rulings, and no
+buildable item is left on the frontier.*
