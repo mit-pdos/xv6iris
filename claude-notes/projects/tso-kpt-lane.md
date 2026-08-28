@@ -614,3 +614,131 @@ Two traps found on the way, both worth keeping:
    `kpt_inv_alloc`, and the eighth argument to `wp_kvminithart_sconf`;
    `ProofMainSecondary` takes `kpt_stamp_passed T` where it already takes
    `kpt_creds` (`SpecMainSecondary.v:179`).
+
+---
+
+## K12. BOUNDARY: THE WALK IS OFF THE PIN AND ONTO THE SEEN TIER
+
+### K12a. THE NUMBER
+
+**1102 `.vo` of 1340 `.v`**, sentinel-backed (`MAKEEXIT=2` + `DONE`, round r11),
+and the no-`.vo` list is **`diff`-IDENTICAL to the r0 baseline** — RED-9 held,
+**red-list delta 0**.  The validating round (r9) recompiled **554 files** —
+`HartSKpt`'s whole reverse cone — with the baseline's nine error roots and
+nothing else.  `^Admitted` / `^Abort` / `^Axiom` are 0 in every file touched.
+
+### K12b. WHAT MOVED
+
+**`KptShare.kpt_creds` is restated** — §0.36′(c)/(d) literally:
+
+```coq
+  (* was, A6.55 *)            ∃ B, kpt_bound B ∗ view_lb … (hart_agent cpu_id) B
+  (* is *)                    ∃ t, kpt_lb t ∗
+                                ptree_own_at (STier (hart_agent cpu_id)) 2 □ t
+```
+
+The credential stopped being *a receipt about a bound* and became *the table, at
+the tier this hart can see it*.  It is still persistent, still arity-free, and
+still **not** ξ-indexed — so `tlb_res_pt` does not become context-relative and
+its mention sites do not move.  It is HART-indexed, which costs nothing:
+`tlb_res_pt` already holds this hart's `satp` and `tlb` CELLS, so it never
+crosses a `wp_next`.
+
+**The walk follows it.**  `HartSKpt.kpt_path_obl` no longer opens `kptN` for the
+tree and no longer spends a `view_lb`: it takes `kpt_creds`, reconciles the
+snapshot with `kpt_lb_agree` exactly as before, pulls the path's three slots
+with `PtTree.ptree_own_path_ro_at` **at `STier`** — the same tier-generic
+extractor, unchanged — and spends `kpt_slot_bytes_seen`.  `kpt_open_slots`, the
+four `_node` lemmas, the three `_obl` lemmas, the two `_canon` wrappers and
+`swp_translate_kpt` all lose their `(B : nat)` parameter and their
+`kpt_bound`/`view_lb` premises and gain `kpt_creds`.  `SRegime.kpt_swp_translate`
+stops destructuring the credential and simply forwards it; `kpt_res_at` /
+`kpt_swp_res` / `sr_swp_translate` keep their SHAPE, so **`IntrDefs`' two call
+sites are untouched**.
+
+**Also landed** (K12d): `KptCtxTravel.kpt_stamp_passed_of_floor` and
+`kpt_travel_absorb_floor`.
+
+### K12c. MERGE LIST
+
+| file | what |
+|---|---|
+| `iris/PhysSeen.v` | NEW (K11) |
+| `iris/KptCtxTravel.v` | NEW (K11) + K12d's two lemmas |
+| `iris/PtTree.v` | `STier` (K11) |
+| `iris/HartSKpt.v` | `kpt_slot_bytes_ctx`, `kpt_slot_set_self`, `kpt_slot_bytes_seen`; `kpt_open_slots` / `kpt_path_obl` / `kpt_pte{2,1}_obl` / `kpt_leaf_obl` / `kpt_slot_node` / `kpt_pte{2,1}_node` / `kpt_leaf_node` / `kpt_leaf_node_canon{,_obl}` / `swp_translate_kpt` off the seen tier |
+| `iris/KptShare.v` | `kpt_creds`, `kpt_creds_intro`, `tlb_res_pt_intro`, `tlb_inv_pt_share`, the `translateAddr_at` reseal |
+| `iris/SRegime.v` | `kpt_swp_translate` forwards the credential |
+| `iris/ProofKvminithart.v` | the reseal at `csrw satp` |
+| `iris/_CoqProject` | two lines |
+
+### K12d. THE LOCK LANE'S EXPORT, CONSUMED IN THE AGREED FORM
+
+The coordinator's ruling — *the AMO leaf exports `ctx_floor cur_ctx T` for each
+`llb loglen_name T` presented at the leaf; derive the stable pair from it rather
+than asking for a second shape* — is taken, and it is **strictly better for this
+lane** than the bare receipt: `ctx_floor` is ξ-relative, so it survives a
+migration, which `hart_view_lb`'s hart-indexed pair does not.  Landed:
+
+```coq
+  kpt_stamp_passed_of_floor : own_context ξ -∗ ctx_floor ξ T -∗
+                              own_context ξ ∗ kpt_stamp_passed T
+  kpt_travel_absorb_floor   : own_context ξ' -∗ ctx_floor ξ' T -∗
+                              ctx_parked ξp T -∗ ptree_own_at (UTier ξp) lvl □ t
+                              ==∗ … ∗ ptree_own_at (UTier ξ') lvl □ t
+```
+
+both off `TsoCtx.own_context_floor_view` and **needing no interp**.  The `llb`
+to present at the acquire is the parked record's own (`TsoCtx.ctx_parked_llb`),
+for exactly the stamp `kpt_travel_deposit` returns — so the round trip closes
+with nothing invented.  `ctx_floor_dom` is noted for `ProofMainSecondary`'s
+threading and not yet needed: nothing in this lane's chain crosses a `ctx_dom`
+with a floor in hand.
+
+### K12e. THE LAST OBSTRUCTION, MEASURED — and it is the Svadu write-back's fraction
+
+`kpt_body` still holds `kptree_own B 2 (DfracOwn 1) t`, and ProofMain still
+cannot produce it (K3).  Dropping it from the invariant is now blocked by
+**exactly one live consumer**, and the measurement is:
+
+* `KptShare.tlb_res_pt_translateAddr_at` opens `kptN` for the tree and hands it
+  to `KptTree.ptree_translateAddr_own`, whose PAYER premise is typed at
+  `pt_slot_own PTT a (DfracOwn 1) wold` — a **full fraction, hard-coded**, for
+  the Svadu A/D write-back.  A shared, never-written table cannot supply it: the
+  seen tier is `DfracDiscarded` by construction (that is what makes it
+  shareable).
+* And the lemma IS live: `SRegime.res_absorb` fills the `sr_absorb` field, which
+  `sr_absorb_ktier` dispatches, and its clients are `SmodeCorePt`'s
+  instruction-FETCH translate (five call sites, `:964`–`:1189`).
+* **The write-back is dead in fact.**  `HartSKpt.kpt_noupd` proves
+  `update_PTE_Bits (mk_pte ppn (kperm_flags pc)) acc = None` for EVERY access
+  kind, because A and D are preset in the two real kvmmake flag bytes.  What
+  blocks the proof is that `kpt_tree_spec_gen` deliberately states the kernel
+  leaf up to an A/D VARIANT (`pte_set_ad leaf a0 d0`, `a0 d0` existential) —
+  a slack that existed precisely because write-backs used to be possible.
+
+**The route, and it is short because the pure half is already written.**
+`KptTree.ptree_translateAddr_cases` (`:824`) is OWNERSHIP-FREE: it takes only
+three `pt_slot_mem σ` facts — which the seen tier supplies through
+`PtTree.pt_slot_own_forget` exactly as `kpt_open_slots` already does — and
+concludes the three-way case split on `σ'`.  So:
+
+1. a `_noupd` refinement of `ptree_translateAddr_cases` that drops its THIRD
+   disjunct under `update_PTE_Bits p0 acc = None`;
+2. the kernel leaf's A/D pinned at `(1,1)` in `kpt_tree_spec_gen` (or a
+   side-condition carried in `kpt_creds`), so `kpt_noupd_variant` applies;
+3. `tlb_res_pt_translateAddr_at` rebuilt on (1) — no tree, no payer, no `kptN`
+   open for ownership;
+4. then `kpt_body` drops the tree and `kpt_bound`, `kpt_inv_alloc` returns to a
+   near-pre-A6.71 arity (`kmap_auth`, `kpt_unset`; no tree, no `llb`, no
+   `kptb_unset`), and `ProofMain:996` is a two-line change;
+5. `ProofMain`: `kpt_travel_deposit` after `kvminit`,
+   `KptCtxTravel.ptree_own_at_project` through
+   `SieCapCtx.sie_cap_gpr_own_ctx_acc` (already used in that file), then
+   `kpt_creds_intro`; `ProofMainSecondary` takes the deposit's
+   `ctx_parked`/`ctx_floor` pair where it already takes `kpt_creds`
+   (`SpecMainSecondary.v:179`) and absorbs with `kpt_travel_absorb_floor` +
+   `ptree_own_at_project`.
+
+Nothing in (1)–(5) needs a forbidden file, and nothing needs anything further
+from the lock lane.
