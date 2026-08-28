@@ -4485,7 +4485,7 @@ the rows below and in `design/fs-ghost-state.md`).
   lanes; three of the four holders are already predicate-vocabulary; the
   payoff is the commit handing a real `fs_state` to the transport.  Runs
   AFTER rank 1 or before it, never concurrently (same payload bodies).
-  Stages 1, 2 (EV1) and 3 (EV3) are LANDED; 4 and 5 remain.
+  Stages 1, 2 (EV1), 3 (EV3) and 4 (EV4) are LANDED; 5 remains.
 
   **AS LANDED — EV1 (stages 1 and 2).  Whole tree green (zero `Error`,
   `MAKEEXIT=0`), `tools/dethread_check.py` at "0 declarations out of
@@ -4656,6 +4656,101 @@ the rows below and in `design/fs-ghost-state.md`).
     "price the proper fix" is now half-paid: the four definitions have the
     `blk_owned Γ` shape, so a Γ-generic restatement is an ARITY move on
     four definitions (358 dependents) and no longer a change of shape.
+
+  **AS LANDED — EV4 (stage 4).  Whole tree green (zero `Error`,
+  `MAKEEXIT=0`), `tools/dethread_check.py` at "0 declarations out of
+  scope", and `iris/SystemAdequacy.v` / `iris/SystemAssumptions.v`
+  byte-identical to main.**
+
+  - **THE STAGE IS ONE DEFINITION: `IcacheEscrow.ic_inode_leg γfs dq γi
+    inum n` = `FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum)
+    n ∗ FsStateEra.inode_owned_era_q γfs dq γi inum n`** — everything a
+    slot holds of ONE inode, at a share.  The four bundles were ALREADY in
+    EV1's vocabulary through the era bundle (whose data leg has been
+    `inode_dat_q` since stage 2); what was missing was that the two pieces
+    the collection needs — the data leg and the entry TOKENS — were two
+    conjuncts in three arms and were spelled out flat a fourth time in
+    `ic_slot_cover`.  Naming them once is the whole of stage 4.
+  - **IT WENT IN `dlinks`' OWN CONJUNCT POSITION** (durable-notes,
+    "replacing one conjunct of a big payload"), absorbing the
+    `inode_owned_era` beside it, in `ic_loaded`, `ipool_alloc` and
+    `ic_rd_arm`.  `dlinks γfs (bv_unsigned inum) dn bm data` IS
+    `ent_toks_x _ (bv_unsigned inum) (era_node dn bm data)`, so no arm's
+    textual order moved and each lost exactly one conjunct.
+    `ic_inode_leg_era_open`/`_era_intro` are the two directions at the
+    era's `(dn, bm, data)` triple, `_open`/`_intro` at a bare node.
+  - **`ic_rd_held` NEEDED NOTHING.**  Its data leg is
+    `FsStateEra.inode_rd_era`, which stage 2 already restated as
+    `inode_dat_q` beside `top_frag_q`; the read arm keeps the entry tokens
+    on the ARM side (they are the Φ-free half and do not split), so there
+    is no pair to name there.  What stage 4 gave it instead is the leg's
+    own `ic_inode_leg_shed_to`/`_shed_of` and `ic_inode_leg_rd_agree`, so
+    `ic_loaded_shed` and `ic_rd_join` never open the leg at all.
+  - **THE THREE COLLECTION READINGS ARE THE POINT.**
+    `ic_inode_leg_phi_at` takes the leg at fraction 1 and ONE
+    `FsStateInode.rec_owned_at` to `inode_phi_at`;
+    `ic_inode_leg_ghost` is `FsStateInode.inode_ghost_of` with the leg
+    supplying the tokens and `inode_local`; `ic_inode_leg_owned` is the
+    two together at a superblock, yielding `FsStateInode.inode_owned`
+    outright.  `inode_phi_sb`'s `0 ≤ i < 2^32` premise is FREE there —
+    `bv_unsigned_in_range 32 inum` after `unfold bv_modulus`, `exact` (not
+    `lia`: `cbn` turns the bound into a literal and `lia` then treats
+    `2^32` as an opaque atom and reports "Cannot find witness" on what
+    looks like a reflexive inequality).  Each reading leaves the era's
+    residue — `dinode_at` and `top_frag` — which the collection consumes
+    neither of.  The premise `fn_ity_ok n v` is real and has a supplier:
+    `InodeRegion.ireg_reg_ok`, read off the same `ireg_lnk_at` peel that
+    produces the `link_auth`.
+  - **THE STATEMENTS THAT WERE FIXED STAYED FIXED.**
+    `ic_loaded_flat_body`, `ic_loaded_open`, `ic_loaded_flat` and
+    `ic_mk_loaded` are unchanged and are now bridges from the new body
+    (one `ic_inode_leg_era_open` in the open, one `_era_intro` in the
+    close).  **NOT ONE CONSUMER OF THE THREE MOVED** — the fifteen files
+    that `iDestruct (ic_loaded_open …)` or `iApply ic_loaded_flat` are
+    untouched — and neither did
+    `ic_unloaded`, `ipool_shape_np`, `ipool_ord`, `ic_loaded_shed` or
+    `ic_rd_join`.  THREE FILES CHANGED OUTSIDE `IcacheEscrow.v`, four
+    hunks in total: `IcacheBoot.ipool_shape_alloc` (the pool's
+    constructor), `FsCollectAll.ipool_shape_np_side` and
+    `ic_slot_cover_side` (the two `col_side` boundaries), and
+    `ProofIlock`'s fill — which is not an `ic_loaded` site at all: it
+    destructs the POOL's allocated arm flat, and gained one
+    `ic_inode_leg_era_open`.
+  - **`ic_slot_cover` LENDS THE LEG NOW**, as does
+    `ic_loaded_lend_owned`/`ic_rd_arm_lend_owned`: one conjunct where
+    there were two.  `FsCollect.col_side` was deliberately left spelling
+    the pair out — that is stage 5's file — so the boundary is exactly the
+    two `ic_inode_leg_open`s in `FsCollectAll`.
+  - **SEALED, AND THE SEAL'S `Timeless` PROOF MUST NAME ITS INSTANCES.**
+    `Local Typeclasses Opaque ic_inode_leg` makes it a fourth seal in the
+    file (beside `ic_rd_arm ic_rd_held`, `ic_out_rd`, `ic_lend`) and the
+    six existing `Timeless` instances over the arms all still close
+    through `tl_struct`.  **The new instance does not, and that cost 19.5
+    seconds on ONE sentence**: `tl_struct` falls through to a bare
+    `apply _` at a leaf, and at `Timeless (ent_toks_x Γ i n)` with the
+    node a VARIABLE nothing in the body reduces to cut the search short
+    even though a declared instance exists.  Measured, standalone, same
+    VM, against the base tree beside it: `IcacheEscrow.v` 23.7/24.0 s
+    base → 42.4/42.6 s with the search, → 23.8 s once the proof names
+    `FsStateInode.ent_toks_x_timeless` and
+    `FsStateEra.inode_owned_era_q_timeless` explicitly.  Peak RSS flat
+    (1.147 → 1.157 GB).  No other file's cost moved: every consumer
+    reaches the arms through lemmas whose statements did not change.
+  - **WHAT STAGE 5 CAN NOW TAKE OFF A SLOT, WITHOUT RE-ASSOCIATION.**
+    `FsCollectAll.ic_slot_cover_side`'s bundle arm hands out
+    `ic_inode_leg γfs dq γi inum n` beside `⌜node_dir_local⌝` and the
+    share condition `⌜~ ✓ (dq ⋅ dq)⌝`.  At `dq = DfracOwn 1` (the parked
+    and the pool-allocated arms) that leg plus `col_recs_by_inum`'s
+    `rec_owned_at` plus the region's `link_auth` is `inode_owned` by
+    `ic_inode_leg_owned` — one lemma, no unfolding — with `dinode_at` and
+    `top_frag` as the residue.  What stage 5 still owes is what EV1
+    already priced and stage 4 did not touch: peeling
+    `InodeRegion.ireg_lnk_at` (the multiplicity bridge
+    `FsCfgSnap.fn_mult_ireg` and the ROOT's unspendable `ireg_keep`), and
+    the READ arm's `dq = 3/4`, where the leg is short of a quarter and the
+    holder's `ic_rd_held` has it — `ic_inode_leg_shed_of` is the join, but
+    at a commit no read-locker is standing, so the quarter arrives through
+    the share condition and not through a resource.
 - [ ] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
   and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
   ledger, `CrpPre`; ten `_no_ops` → one): APPROVED (owner, 2026-08-27),

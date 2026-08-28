@@ -624,9 +624,20 @@ Section IcacheEscrow.
     (FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n
      ∗ inode_owned_era_q γfs dq γi inum n)%I.
 
+  (* NAMED, NOT SEARCHED, and the difference is 19 seconds -- measured, on
+     this one sentence.  Both leaves have declared instances, but a bare
+     [apply _] (which is what [tl_struct] falls through to at a leaf) has
+     to REACH them past every other [Timeless] instance in scope, with the
+     node a VARIABLE so nothing in [ent_toks_x]'s body reduces to cut the
+     search short.  Naming the two instances makes the sentence free. *)
   Global Instance ic_inode_leg_timeless γfs dq γi inum n :
     Timeless (ic_inode_leg γfs dq γi inum n).
-  Proof. rewrite /ic_inode_leg. tl_struct. Qed.
+  Proof.
+    rewrite /ic_inode_leg.
+    apply bi.sep_timeless;
+      [apply FsStateInode.ent_toks_x_timeless
+      | apply inode_owned_era_q_timeless].
+  Qed.
 
   (* SEALED THE DAY IT IS WRITTEN (durable-notes, the [iFrame]-up-to-delta
      rule): it rides inside [ic_loaded] and [ipool_alloc], whose framing

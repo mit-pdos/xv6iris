@@ -1906,7 +1906,9 @@ without touching `DirLinks.v`.
 holder has the inode checked out.  **In the ERA instance the authority
 lives in the inode REGION** (`InodeRegion.ireg_lnk`, beside the record's own
 bytes) and only the TOKENS ride in the checked-out payload
-(`FsStateInode.ent_toks` inside `IcacheEscrow.ic_loaded`).  It is the same
+(`FsStateInode.ent_toks_x`, inside `IcacheEscrow.ic_inode_leg` — the
+per-inode leg every escrow arm and pool row carries — and so inside
+`ic_loaded` / `ipool_alloc` / `ic_rd_arm`).  It is the same
 distribution ruling (i) already made for `rec_owned`, and it is forced:
 
 - The one CONSUMER of the RA's law that is not about the holder's own inode

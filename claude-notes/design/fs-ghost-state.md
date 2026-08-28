@@ -831,8 +831,9 @@ collapse, and the `"."` fragment's guard then reads `dir_inum dat 1 = dp`.
 (`FsStateInode.node_exact`, §5a), not a region clause at all.
 
 **THE TOKENS ARE NOT HERE.**  A directory's fragments ride in its CHECKED-OUT
-PAYLOAD (`FsStateInode.ent_toks`, inside `IcacheEscrow.ic_loaded` /
-`ipool_alloc`); what the region keeps is the per-inum AUTHORITY, plus
+PAYLOAD (`FsStateInode.ent_toks_x`, inside `IcacheEscrow.ic_inode_leg` and
+so inside `ic_loaded` / `ipool_alloc` / `ic_rd_arm`); what the region keeps
+is the per-inum AUTHORITY, plus
 `ireg_keep` — the ROOT's one keep-alive fragment, which nothing can spend.
 `ent_tokenless self orph s t` exempts every self-naming record EXCEPT `"."`,
 and at an ORPHAN either dot name.  The root's `".."` names the root, so it
