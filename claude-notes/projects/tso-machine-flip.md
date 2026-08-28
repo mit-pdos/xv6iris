@@ -12075,3 +12075,136 @@ was edited.
 3. Unchanged with the owner: the merged lock-word/`notheld` ruling,
    `intr_handler_spec`'s layering, `ProofMain`'s publication credential,
    `ProofForkretPark`'s re-park hazard, §0.27′'s surface.
+
+### A6.94 BOTH ITEMS MEASURE TO THE SAME MISSING THING — THE U-MODE TIER HAS
+### NEITHER THE TOKEN NOR THE INTERP; AND THE VIRTIO PAIR'S BLOCKER IS NOT THE
+### RE-HOMING AT ALL
+
+Two measurements, no edits.  **Nothing was opened and nothing changed**, so the
+boundary is A6.93's, unmoved.
+
+#### (1) `UserMemPt`: THE STORE PATH NEEDS THE TOKEN, AND ITS EXIT IS THE
+#### OWNER-GATED QUESTION — CHARACTERIZED AND NOT OPENED
+
+A6.92 measured that `UserMemPt` has no `tso_interp_of` anywhere and that
+`udata_own_upd` is a gen_heap-only ghost update.  Both hold.  **What the
+re-do actually needs is one step further, and it is the blocker:**
+
+`UserPtTree.udata_own` is
+`∃ dm, ⌜dom dm = data⌝ ∗ [∗ map] a ↦ b ∈ dm, TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) b`
+— the user's data bytes are CONTEXT-INDEXED, and correctly so: user code is
+the same thread of control as the kernel thread that entered it (same hart,
+same process, same ξ), so its stores are that context's stores.  A ctx store
+therefore goes through `TsoCtx.ctx_store_win_ok`, whose premises are
+
+```coq
+    gen_heap_interp … -∗ tso_interp_at … -∗ own_context ξ -∗ …bytes… ==∗ …
+```
+
+**and the U-mode tier carries neither.**  Measured, `own_context` /
+`tso_interp` occurrence counts:
+
+| file | `own_context` | `tso_interp` |
+|---|---|---|
+| `UserMemPt` | 0 | 0 |
+| `UserMemAccess` | 0 | 0 |
+| `UserMemMis` | 0 | 0 |
+| `UserExec` | 0 | 0 |
+| `ProofUser` | 0 | 0 |
+| `UserPtTree`, `UserBytes` | 0 | 0 |
+
+The only files in the whole U-mode neighbourhood that mention the token are
+`UptWalkPt` (red), `UptTree` (one mention) and `UsertrapRes`.  So the interp
+re-do is not "thread the interp in from the callers": **it is threading the
+TOKEN into a tier that has never had one**, and the token's exit path through
+a step engine whose post is caller-chosen is exactly A6.93 §(2)'s open
+question — one of the four with the owner.
+
+> **THE TWO REDS ARE ONE LANE, and that is the useful correction.**
+> `UptWalkPt` (the user WALK's A/D write-back) and `UserMemPt` (the user
+> STORE) both fail for the same missing resource, at the same tier, with the
+> same unanswered exit question.  A6.93 §(2) priced the walk's tranche as
+> "one green file plus an exit choice"; **the store shares that exit choice**,
+> so one ruling closes both reds rather than one.  Whichever answer the owner
+> picks for the walk — `W`, a `spt_run_post` slot, the sub-obligations, or the
+> `Res`/`upt_res_pt` shortcut — is the answer for the store as well.
+>
+> *Ruling out the shortcuts, for the record: `udata_own` cannot go back to the
+> raw tower (the flip's premise is that every RAM byte is a ledger byte), and
+> it cannot go to the visibility-free tier (§0.32′) either — the user READS
+> its own data, which is exactly the client §0.26′'s audit flags.*
+
+**Characterized and stopped per the coordinator's own condition; no file was
+edited, so there is nothing to close back.**
+
+#### (2) THE VIRTIO PAIR: SEPARABLE FROM THE LAYERING QUESTION — BUT THE
+#### RE-HOMING IS NOT WHAT BLOCKS THEM
+
+Report only, as asked.  Two findings, and the second is the one that matters.
+
+**(a) SEPARABLE, decisively.**  Neither file mentions the trap-entry package
+at all:
+
+```
+  grep -c "devintr_caps\|intr_handler_spec\|ihs_entry_of\|kernelvec"
+    ProofVirtioDiskIntr.v  ->  0
+    ProofVirtioDiskRwD.v   ->  0
+```
+
+There is **no entanglement** with the pending `intr_handler_spec` layering
+question, in either direction.
+
+**(b) BUT RUNNING §0.28′'s RING RE-HOMING WOULD NOT GREEN EITHER FILE.**  Both
+fail on the identical error, and it is one tier below the pointers:
+
+```
+  ProofVirtioDiskIntr:1165 / ProofVirtioDiskRwD:686
+  iSpecialize: cannot instantiate
+    (wordw_pointsto 2 (pa_add pu 2) (DfracOwn 1) (wrap16 ncp) -∗ wordw_claim 2 …)
+  with (word2_pointsto (pa_add pu 2) (DfracOwn 1) (wrap16 ncp))
+```
+
+`WpSconfMem.wordw_pointsto 2` unfolds to `ctx_pointsto cur_ctx` — the CTX
+tower — while the cell arrives from `VirtioProto.virtio_proto_avail_idx_acc`
+at the RAW/PHYS tower (`VirtioProto.phys_word2`).  **The failing cells are the
+avail/used ring INDEX words** (`pa_add pav 2`, `pa_add pu 2`), which are
+DMA-shared: they live inside `dev_inv` → `disk_inv` → `virtio_proto`, and they
+cannot be context-indexed, because **the device is not a thread of control**.
+
+§0.28′'s re-homing is a different set of cells: `disk_geom`'s three POINTER
+words (`d_desc_ptr` / `d_avail_ptr` / `d_used_ptr`, written once by
+`virtio_disk_init`, read only under `vdisk_lock`), which move out of their
+naked discarded points-tos into the lock's payload.  That ruling stands and is
+not refuted — **it is simply not this red's cause.**
+
+> **SO THE ANSWER TO THE QUESTION ASKED IS: SEPARABLE, AND NOT SUFFICIENT.**
+> What greens the pair is a DMA-tier atomic-update load leaf — the raw/phys
+> twin of `wp_load_s_sconf_au`, whose datum is `phys_word2` rather than
+> `wordw_pointsto` — which is the "DMA/virtio lane" already on the frontier
+> (A6.72 §(4)'s ruling 3).  The re-homing can be run before or after it and
+> neither ordering blocks the other; the re-homing alone leaves both files red
+> at the same line.
+>
+> *And the tier boundary is the real content: the M1/M4 flip's rule is "every
+> RAM byte is a ledger byte, indexed by the context that owns it", and a
+> DMA-shared queue word has no owning context.  The virtio lane is where the
+> port meets a writer that is not a thread — which is why it needs its own
+> leaf family rather than a spelling bridge.*
+
+#### (3) THE NUMBER
+
+**1100 of 1296, RED 9 — unchanged**, sentinel-backed at A6.93's round
+(`MAKEEXIT=2`); no source file was edited this tranche, so no new round was
+run and no mirror refresh was due.  **Red-list delta: 0.**  `^Abort` /
+`^Admitted` / `^Axiom` all 0.
+
+#### (4) THE FRONTIER, WITH ONE MERGE
+
+1. **The U-mode token lane, now TWO reds** — `UptWalkPt` (walk) and
+   `UserMemPt` (store) share the exit-path question; one ruling closes both.
+2. **The DMA/virtio lane** — §(2)(b): a phys-tier AU load leaf; greens
+   `ProofVirtioDiskIntr` and `ProofVirtioDiskRwD`, independent of §0.28′'s
+   re-homing and of the layering question.
+3. Unchanged with the owner: the merged lock-word/`notheld` ruling,
+   `intr_handler_spec`'s layering, `ProofMain`'s publication credential,
+   `ProofForkretPark`'s re-park hazard, §0.27′'s surface.
