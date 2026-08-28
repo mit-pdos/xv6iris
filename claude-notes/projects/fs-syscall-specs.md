@@ -387,8 +387,52 @@ things, and the answer differs:
   exposure vs a stream commit; keep the sealed stable form or wait for
   exclusivity; sharper −1 tie?; lane A(iv) offset seam is now
   CONSUMER-MOTIVATED (first consumer = this contract).
+  **OPEN'S PLAIN ARM IS PROVEN** (Opus lane): `SpecSysOpenAUPlain.v` seals
+  `SYSOPEN_AU_PLAIN` — `SpecSysOpenAU.wp_sys_open_au_plain_body` byte for
+  byte, the O_CREATE parameter split off — and `LinkSysOpenAU.v`
+  instantiates the functor against real callee proofs, with
+  `Print Assumptions` BYTE-IDENTICAL to `LinkNameiEra`'s (`resv_matches`,
+  `resv_is_valid`, funext).  Ten new files, ~6200 lines, zero `Admitted`.
+  WHAT MADE IT AFFORDABLE, and it is the rule for the remaining syscalls:
+  **the landed failure tails and parts layer are RESOURCE-GENERIC and were
+  reused verbatim.**  `ProofSysOpenTails`'s seven tails take an abstract
+  `wp_next` continuation, not `sys_open_post`, so an AU walk frames its
+  residue through them untouched; only the blocks that (a) fire a commit or
+  (b) mint the success post had to be re-derived — the entry, the walk, the
+  join, the alloc, the stores and the publication.  Check this before
+  sizing unlink/read/close: if a syscall's tails are equally generic, its
+  AU proof is the same five blocks.
+  THREE AS-LANDED FINDINGS:
+  1. **The observed-row tie is a DATA tie, and it forces the payload to
+     travel PEELED.**  The FILE arm shares one `bs0` between the terminal
+     observation (fired at `ilock`, because every post-walk failure must
+     deliver a fired receipt) and the O_TRUNC receipt (fired at the retag,
+     far below).  `IcacheEscrow.ic_loaded` binds its `data` EXISTENTIALLY,
+     so a peel-reseal-repeel in between yields two unrelated witnesses and
+     two `fn_file_bytes` terms.  `ProofSysOpenAUParts.so_flat` is
+     `ic_loaded_flat_body` with `data` exposed; the blocks below the fire
+     carry it and close it back only where a failure tail's `iunlockput`
+     wants the sealed form.
+  2. **The trunc commit CANNOT be split across the retag.**  Phase 2 needs
+     the authority AT the delta, and any other row may move between the
+     retag and a later phase-2 — so the fire is FUSED with the retag it
+     replaces (`FsAbsOpenFire.opf_atrunc_fire` in `mkf_acre_fire`'s mold).
+     Same premise as `ireg_top_retag`, same payout, plus the receipt.
+  3. **The success post is a STRENGTHENING of an existing output, not new
+     work.**  `so_publish` already computes the typed `stpub`; the AU
+     publication only opens the bundle with `fd_frags_acc` instead of
+     `fd_frags_any_acc` so the row survives, and reads `stpub`'s shape off
+     `fdstate_ok_inj`.
+  REMAINING ON OPEN: **the O_CREATE arm**, which is the expensive half and
+  is NOT a variant of the above — it needs a create-AU carrying
+  `ty = T_FILE`, and `SpecCreateAU` is T_DEVICE-PINNED BY CONSTRUCTION (its
+  header, difference (2): the pin refutes the mkdir half and the found-arm
+  type inspection, −3,900 lines).  So the arm costs a general-`ty` or
+  T_FILE-twin `ProofCreateAU` (7,121 lines) before any sys_open work
+  starts; size it as a lane of its own.  When it lands, delete
+  `SpecSysOpenAUPlain.v` and seal `SYSOPEN_AU` whole.
   REMAINING: unlink AU (wants the npar walk's contract shape), then
-  open/read/close/fstat/chdir, mechanical.  NOTE (2026-08-27): the fd-state ghost
+  read/close/fstat/chdir, mechanical.  NOTE (2026-08-27): the fd-state ghost
   landed upstream (`FdSlots.fd_frags` beside `ut_own`; `fdstate` =
   open-or-closed + `fdtype`, two-halves algebra, commits 28d707dc +
   3199a1b6; `FdInode` carries its INUM as of d1411776, riding on

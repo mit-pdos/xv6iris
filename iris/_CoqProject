@@ -1384,3 +1384,14 @@ SpecSysWriteConsAU.v
 # the landed empty one, which does not move.  Nothing requires either.
 FsFlushed.v
 SpecSysSyncFlush.v
+FsAbsOpenFire.v
+ProofSysOpenAUBits.v
+ProofSysOpenAUParts.v
+ProofSysOpenAUPub.v
+ProofSysOpenAUStores.v
+ProofSysOpenAUAlloc.v
+ProofSysOpenAUJoin.v
+ProofSysOpenAUWalk.v
+SpecSysOpenAUPlain.v
+ProofSysOpenAU.v
+LinkSysOpenAU.v
