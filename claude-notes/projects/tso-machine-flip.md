@@ -14218,3 +14218,84 @@ Mirror refreshed.  `WpSconfLock` remains the single file held open, unchanged
 in status since the baseline; its `notheld` read is now blocked on (2) alone,
 with every piece it needs — the kit (A6.111), the pin (§3a) and the opener
 (§3b) — landed and green.
+
+---
+
+## A6.113 — CORRECTION to A6.112 §3b, and (2)'s real shape: the upgrade is UNIVERSAL
+
+*(Amendment A6.113, fliptree lane.  No source touched; tree stands at r24's
+boundary — RED 9, delta 0.  Opening (2) on the corrected picture.)*
+
+### §1. THE CORRECTION, FIRST
+
+A6.112 §3b claimed `lock_openable_c_inv_0` gives every boot-static lock its
+left arm "for nothing, because floor 0 is `ctx_floor_0`".  **That is wrong, and
+it is wrong because of A6.105's own reversal.**  `grep` settles it in one line:
+
+```
+  ProofInitlock.v:307:  iExists lo. iFrame "Hcpu". iApply WpLock.lk_floor_of_llb. iExact "Hlb".
+```
+
+A6.105 put `initlock` back on the **store-then-MINT** leaf, so a lock's floor is
+its own `sd x0`'s log position — never 0 — and **every handle in the tree,
+boot-static ones included, carries `lk_floor`'s RIGHT arm.**  `ctx_floor_0`
+occurs nowhere outside `lock_openable_c_inv_0`'s own proof: the lemma is
+correct and has **no producer**.  A6.101's floor-0 route was measured away in
+A6.105 §2 (an interp-needing mint threaded through twelve callers) and I
+carried its conclusion forward past the point where it stopped being true.
+
+**Consequence: the crossing upgrade is not a minority path.  It is the only
+path, for every lock and every hart except the one that wrote the floor.**
+
+### §2. WHAT THAT MAKES (2)
+
+The partition A6.110 §5 recorded still holds, but its weights invert:
+
+| case | arm | status |
+|---|---|---|
+| the hart that **wrote** the floor, before it has written the owner cell again | creator (A6.111) | kit landed; **carrier open**, see §3 |
+| **every other** hart, and the creator after any crossing | left, via the upgrade | **(2), now universal** |
+
+The upgrade itself is unchanged and is what I will build: at acquire's AMO the
+hart holds a log-top view, so `hart_view_lb_get` + `ctx_bound_raise` convert
+`llb loglen_name lo` into `ctx_floor cur_ctx lo` for every handle the crossing
+payload carries — `lock_openable` ⇝ `lock_openable_c`.  What changes is where
+it must be *installed*: not opportunistically on payloads that happen to carry
+nested handles, but as the standing shape of `is_lock` at any hart that has
+acquired anything at all.
+
+### §3. THE ONE THING THE CORRECTION OPENS
+
+The creator's arm needs `(lo ≤ K) ∨ t = lo` and `ledger_vis h K lo`.  The
+second is carryable (persistent, and `initlock`'s store hands out the message
+fragment).  The first is not, yet: `t = lo` says *my* own-record in the window
+is still the floor, and the invariant's `lk_own_ok` does not record it —
+`own` is existential and only says the holder may be `None`.
+
+The honest options, unmeasured as yet and listed for the next pass:
+
+1. **Strengthen `lk_own_ok`** to "every agent's record is the floor unless it
+   is the holder or has released" — provable at the mint (`own = fun _ => Some
+   lo`) and preserved by both store arms, since each moves only the writer's
+   entry.  Cheapest if it goes through.
+2. **Weaken the anchor premise** from `t = lo` to "`t` is visible to me",
+   which the creator has for `t = lo` by authorship and for any later `t` by
+   authorship of that write too — but the window's clause exposes visibility
+   only through the floor, so this needs `win_ok1`'s per-agent record to
+   carry authorship.  Deeper.
+3. **Skip it**: if (2) makes the left arm available to the creator as well —
+   and it does, at the creator's *next* AMO — then the creator arm is needed
+   only strictly between `initlock` and that AMO.  Whether any first acquire
+   in xv6 falls in that gap is a measurement I have not made; A6.110 §6 named
+   `sys_pipe`'s `filealloc` as one intervening AMO but recorded relying on it
+   as forbidden reasoning.
+
+Option 1 is the one to price first.
+
+### §4. STATE
+
+Tree unchanged at r24: **RED 9, delta 0**, sentinel-backed.  A6.112's two
+landings stand — the `_exv` no-migration pin is needed either way, and
+`lock_openable_c` is exactly (2)'s target shape; only its `_inv_0` producer is
+idle, and it is three lines, kept because floor-0 locks become reachable again
+the moment the era-image mint is wired for any reason.
