@@ -166,6 +166,12 @@ Require Import DirViewLend.
    and hence in the context of the four files that STATE something over
    [ireg_inv] -- the enumerated sweep. *)
 Require Import LogInv.
+(* THE TRANSACTION PIN (rank 5).  The region's three parks -- the f column's
+   freeze window [ireg_fpin], the c column's claim box [ireg_cpin] and the
+   armed registry's [ireg_parked] -- all keep a share of an open
+   transaction's [ln_tx] element, and every refutation the commit reads off
+   them is an instance of [TxPin.tx_pin_no_ops]. *)
+Require Import TxPin.
 (* [add_vec_unsigned], for (L4)'s two bridge lemmas below.  Already in this
    file's transitive closure (through [IcacheRef]); named here because a
    [Require Import] in a sibling does not put its lemmas in scope. *)
@@ -1815,7 +1821,7 @@ Section InodeRegion.
      where the freezer's own [IcacheRef.ifreeze_pre] / [ifreeze_post] fragment
      already re-identifies it, so no new ghost and no new column. *)
   Definition ireg_fpin (rg : frzidx) : iProp Σ :=
-    (rg.2.1 ↪[ln_tx icfg_log]{#(rg.2.2)} tt)%I.
+    tx_pin icfg_log rg.2.1 rg.2.2.
 
   Global Instance ireg_fpin_timeless rg : Timeless (ireg_fpin rg).
   Proof. rewrite /ireg_fpin. apply _. Qed.
@@ -1860,11 +1866,9 @@ Section InodeRegion.
     intros Hfrz. iIntros "Ha Hp".
     destruct f as [[[| rg | rg] |] |]; [by iPureIntro | | | |].
     - iDestruct "Hp" as "[_ Hp]". rewrite /ireg_fpin.
-      iDestruct (ghost_map_lookup with "Ha Hp") as %Hbad.
-      rewrite lookup_empty in Hbad. discriminate.
+      iDestruct (tx_pin_no_ops with "Ha Hp") as %[].
     - iDestruct "Hp" as "[_ Hp]". rewrite /ireg_fpin.
-      iDestruct (ghost_map_lookup with "Ha Hp") as %Hbad.
-      rewrite lookup_empty in Hbad. discriminate.
+      iDestruct (tx_pin_no_ops with "Ha Hp") as %[].
     - exfalso. exact Hfrz.
     - exfalso. exact Hfrz.
   Qed.
@@ -2560,21 +2564,28 @@ Section InodeRegion.
   (*  [IcacheRef.link_claim_agree] re-identifies [(t, q)] at the fill --   *)
   (*  which is why [Xv6Cameras.ctyval] carries the pair as FIELDS and not  *)
   (*  existentially: two halves of one element are not the whole.          *)
-  Definition ireg_cpin (c : ctyUR) : iProp Σ :=
+  (* WHICH TRANSACTION THE COLUMN PINS, as a PURE reading of it: the value's
+     second field at a live claim, nothing at an empty or invalid one.  The
+     [ExclBot] arm reads [None] here and is killed by [ireg_claim_ok]
+     instead -- which is exactly why [ireg_cpin_no_ops] keeps that premise. *)
+  Definition cty_pin (c : ctyUR) : option (nat * Qp) :=
     match c with
-    | Some (Excl v) => (v.2.1 ↪[ln_tx icfg_log]{#(v.2.2)} tt)%I
-    | _             => emp%I
+    | Some (Excl v) => Some v.2
+    | _             => None
     end.
 
+  Definition ireg_cpin (c : ctyUR) : iProp Σ :=
+    tx_pin_o icfg_log (cty_pin c).
+
   Global Instance ireg_cpin_timeless c : Timeless (ireg_cpin c).
-  Proof. rewrite /ireg_cpin. destruct c as [[v |] |]; apply _. Qed.
+  Proof. rewrite /ireg_cpin. apply _. Qed.
 
   Lemma ireg_cpin_none : ⊢ ireg_cpin None.
-  Proof. rewrite /ireg_cpin. done. Qed.
+  Proof. rewrite /ireg_cpin /cty_pin /tx_pin_o. done. Qed.
 
   Lemma ireg_cpin_some (v : ctyval) :
     v.2.1 ↪[ln_tx icfg_log]{#(v.2.2)} tt -∗ ireg_cpin (Some (Excl v)).
-  Proof. iIntros "H". iExact "H". Qed.
+  Proof. rewrite /ireg_cpin /cty_pin /tx_pin_o /tx_pin. iIntros "H". iExact "H". Qed.
 
 
   (* THE REFUTATION THE COMMIT READS.  A standing claim holds a positive
@@ -2588,12 +2599,11 @@ Section InodeRegion.
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ireg_cpin c -∗ ⌜c = None⌝.
   Proof.
-    intros Hclm. iIntros "Ha Hp". destruct c as [[v |] |].
-    - rewrite /ireg_cpin.
-      iDestruct (ghost_map_lookup with "Ha Hp") as %Hbad.
-      rewrite lookup_empty in Hbad. discriminate.
+    intros Hclm. iIntros "Ha Hp". rewrite /ireg_cpin.
+    iDestruct (tx_pin_o_no_ops with "Ha Hp") as %Hnone.
+    iPureIntro. destruct c as [[v |] |]; [| | reflexivity].
+    - cbn in Hnone. discriminate.
     - exfalso. exact (proj2 (proj2 Hclm)).
-    - done.
   Qed.
 
   (* THE SHELTER AND THE PIN, AS ONE CONJUNCT, in [ireg_fsh]'s own position
@@ -3063,7 +3073,7 @@ Section InodeRegion.
 
   (* what an arm parks: its transaction's element, at the arm's own share *)
   Definition ireg_parked (e : ireg_arm_ent) : iProp Σ :=
-    (e.1.1 ↪[ln_tx icfg_log]{#(e.1.2)} tt)%I.
+    tx_pin icfg_log e.1.1 e.1.2.
 
   Global Instance ireg_parked_timeless e : Timeless (ireg_parked e).
   Proof. rewrite /ireg_parked. apply _. Qed.
@@ -3148,7 +3158,7 @@ Section InodeRegion.
       iFrame "Hta Hla".
       iSplitL "Hpark Ht".
       { rewrite big_sepM_insert; [| exact Hfree].
-        rewrite /ireg_parked. cbn [fst snd]. iFrame "Ht Hpark". }
+        rewrite /ireg_parked /tx_pin. cbn [fst snd]. iFrame "Ht Hpark". }
       iPureIntro. intros j m Hj Hun. apply (Hcl j m Hj).
       intros k' t' q' S' Hk'. apply (Hun k' t' q' S').
       rewrite lookup_insert_ne; [exact Hk' |].
@@ -3191,7 +3201,7 @@ Section InodeRegion.
                    (t, q, S ∖ {[i]})); [| by rewrite lookup_insert].
         rewrite (big_sepM_delete _ A k (t, q, S)); [| exact HAt].
         iDestruct "Hpark" as "[Ht Hrest]".
-        rewrite /ireg_parked. cbn [fst snd]. iFrame "Ht".
+        rewrite /ireg_parked /tx_pin. cbn [fst snd]. iFrame "Ht".
         rewrite delete_insert_delete. iExact "Hrest". }
       iPureIntro. intros j m Hj Hun.
       destruct (decide (j = i)) as [->|Hne].
@@ -3219,7 +3229,7 @@ Section InodeRegion.
     iDestruct (ghost_map_lookup with "Hla Hrec") as %HAt.
     rewrite (big_sepM_delete _ A k (t, q, ∅)); [| exact HAt].
     iDestruct "Hpark" as "[Ht Hpark]".
-    rewrite /ireg_parked. cbn [fst snd].
+    rewrite /ireg_parked /tx_pin. cbn [fst snd].
     iMod (ghost_map_delete with "Hla Hrec") as "Hla".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists I, (delete k A).
@@ -3257,13 +3267,15 @@ Section InodeRegion.
     iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     (* nothing is armed: an entry would park a token the empty authority
        cannot account for *)
+    (* THE REGISTRY'S ROWS ARE A [TxPin.tx_pins] LEDGER at the arm ids, once
+       the entry's third field (the suspended inums) is projected away: the
+       refutation is [tx_pins_no_ops] and not an eleventh copy of the
+       [lookup_empty] idiom. *)
     iAssert (⌜A = ∅⌝)%I as %HA.
-    { destruct (decide (A = ∅)) as [->|Hne]; [done |].
-      apply map_choose in Hne as (k & e & HAk).
-      iDestruct (big_sepM_lookup _ _ k e HAk with "Hpark") as "Ht".
-      rewrite /ireg_parked.
-      iDestruct (ghost_map_lookup with "Htxa Ht") as %Hbad.
-      rewrite lookup_empty in Hbad. discriminate. }
+    { iDestruct (tx_pins_no_ops icfg_log (fst <$> A) with "Htxa [Hpark]")
+        as %Hemp.
+      { rewrite /tx_pins big_sepM_fmap. iExact "Hpark". }
+      iPureIntro. exact (fmap_empty_inv _ _ Hemp). }
     subst A.
     iModIntro. iExists I. iFrame "Hta Htxa".
     iSplitR.
@@ -4831,7 +4843,7 @@ Section InodeRegion.
         (* THE PARKED SHARE, IDENTIFIED.  The claimant's own fragment pins
            the column, hence the pair the region parked, so what comes out
            is the very element create handed ialloc. *)
-        iEval (rewrite Hcl /ireg_cpin /=) in "Hcpin".
+        iEval (rewrite Hcl /ireg_cpin /cty_pin /tx_pin_o /tx_pin /=) in "Hcpin".
         iDestruct (IcacheRef.link_rc_ge with "Hla Hru") as %Hrcge.
         destruct rcl as [| rcl0]; [exfalso; lia |].
         iMod (IcacheRef.link_spend_refc with "Hla Hru") as "Hla".
