@@ -4485,14 +4485,20 @@ the rows below and in `design/fs-ghost-state.md`).
   lanes; three of the four holders are already predicate-vocabulary; the
   payoff is the commit handing a real `fs_state` to the transport.  Runs
   AFTER rank 1 or before it, never concurrently (same payload bodies).
-- [ ] **Rank 4 — the `dview`/`fview` ghosts and the pinned-lookup island**:
-  AWAITING RULING (keep for the fs-syscall-specs port, or delete).
 - [ ] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
   and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
-  ledger, `CrpPre`; ten `_no_ops` → one): AWAITING RULING; independent
-  of the others.
-- [ ] Ranks 6/7 (`frzown`; `icnt` into the reference columns): probe-gated,
-  last.
+  ledger, `CrpPre`; ten `_no_ops` → one): APPROVED (owner, 2026-08-27),
+  runs AFTER EV completes (EV stage 4 rewrites the same escrow bodies).
+- [ ] **Small leftovers** (APPROVED, one lane after rank 5): `FsDurBytes`'s
+  three dead lemmas and `inode_link_tok_nz`; the caller-less
+  `img_fs_snap_alloc`/`img_boot_P_fs_dur`; `eo_minst`/`lm_install`
+  unification; iput's double-parked window; prose retirement of
+  `fs-state.md` §4½–§4⁹ and the `crash.md` narrative.  NOT the five
+  off-build pinned-`/init` files — owner: do nothing about them.
+- [ ] Ranks 6/7 (`frzown`; `icnt` into the reference columns): read-only
+  probes AFTER the leftovers land, then lanes only if the probes pay.
+- [ ] **Rank 4 — the `dview`/`fview` ghosts and the pinned-lookup island**:
+  PARKED (owner: leave for now; the fs-syscall-specs port decides).
 
 ## Sizing notes for whoever runs the lanes
 
