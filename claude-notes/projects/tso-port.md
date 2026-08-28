@@ -3984,3 +3984,23 @@ design document at /shared/tmp/main-channel-refactor-design.md is
 the implementation spec for the main-side agent: main's verified
 names, the measured cascades from the TSO-side implementations, the
 pitfalls, and the do-not-touch list.
+
+### 0.32′ OWNER RULING (2026-08-28): byte_any/page_own REDEFINE to the
+visibility-free bodies — the byte_free/page_free names are dropped, and
+refactoring 1 is withdrawn from main
+
+The two-name split preserved a distinction with no remaining customer:
+once the read-before-write audit guarantees no client reads an
+unwritten byte, nobody wants the valued ∃x form as their page
+resource.  On the TSO branch: byte_any := the justification-free
+physical fact (∃ v e), page_own its 4096-run, both sealed; kfree's
+pre reverts to its ORIGINAL spelling (page_valid ∗ page_own) with the
+honest meaning and the nine A6.85 coercions delete; kalloc's post
+becomes the VALUED run of the allocator's own memset bytes
+(preserving the allocproc/userret trapframe read; downgradable);
+regain-by-write is the standard byte_any store leaf.  MAIN NEEDS
+NOTHING: on SC old and new bodies coincide, so the cutover swaps
+byte_any's sealed body — refactoring 1 is withdrawn from the main
+design doc (updated in place at
+/shared/tmp/main-channel-refactor-design.md); refactoring 2 (the
+started-barrier re-homing) remains main's work.
