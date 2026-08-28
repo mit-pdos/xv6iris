@@ -180,27 +180,16 @@ first four were audited against the tree 2026-08-22):
   the REGISTER-value vs SLOT-value distinction that a narrowed spill range
   forces, and how to tell a wrong proof from a slow one.
 
-- **[`durable-disk.md`](projects/durable-disk.md)** — WORKLIST for xv6
-  correctness across crashes incl. FS consistency.  Design of record:
-  `design/durable-fs-plan.md` (snapshot commits: the durable FS predicate is
-  re-allocated per commit, never updated; a locked-inode registry keyed on
-  transaction ids gives "all inodes clean at commit").  **THE THEOREM IS
-  TRUE**: `SystemAdequacy.xv6_power_adequacy` assumes the file system's
-  image at `g`'s own disk ONCE and nothing about any later era, and
-  `SystemAdequacy`'s two corollaries discharge that at the literal mkfs
-  image and conclude, at EVERY reachable state of every power cycle, that
-  the physical disk still recovers to a committed view that IS a file
-  system.  Landed: the log's contract, the nested predicate, the whole era
-  instance, the durable allocator, the COMMIT's snapshot step, the boot
-  mint READING THE SNAPSHOT (`FsCfgSnap.fs_cfg_alloc_snap`), the WAL's
-  EXCEPTION SET for the dirty-header recovery window (`initlog` seals it
-  into `LogInv.log_ctx`, so no reader of the byte view above the WAL
-  changed), and the boot chain's snapshot-side premise
-  (`FsCfgBoot.fs_boot_snap_wf`, with `FirstTok`'s `_of_snap` producers).
-  What is LEFT: lane H (the value-first allocator is a mistake to clean up)
-  and the caller-less image routing in `FsCfgBoot`/`FsCfgSnap`.
-  Lanes A–H in the file.
-  History in `completed/durable-disk-2026-08-23-to-25.md`.
+- **[`durable-disk.md`](projects/durable-disk.md)** — FINISHED; the file is
+  a 76-line stub carrying only the residue.  xv6 is correct across crashes
+  including FS consistency: `SystemAdequacy.xv6_power_adequacy` assumes the
+  image at `g`'s own disk ONCE and nothing about any later era, and its two
+  corollaries discharge that at the literal mkfs image and conclude, at
+  EVERY reachable state of every power cycle, that the physical disk still
+  recovers to a committed view that IS a file system.  Read
+  `design/durable-fs-plan.md` for the design; the stub is worth opening
+  only for what is left (Rank 4 parked, BT-4/5 priced and not run, three
+  design-level items nobody has proposed, four cosmetic leftovers).
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`
   (today both carry a clean-image premise), `sys_sync`'s empty
@@ -245,11 +234,14 @@ first four were audited against the tree 2026-08-22):
 
 ## `completed/` — finished projects, archived for reference
 
-`durable-disk-byteview.md` (the byte-view attempt) and
-`durable-disk-2026-08-23-to-25.md` (the rulings/refutations/lane reports
-of the SL redesign) are NOT finished projects: they are the archived
-history of the live durable-disk effort; `projects/durable-disk.md` is
-current and `design/durable-fs-plan.md` is the design.
+Three files carry the durable-disk project's history, oldest first:
+`durable-disk-byteview.md` (the byte-view attempt),
+`durable-disk-2026-08-23-to-25.md` (the SL redesign's rulings and
+refutations) and `durable-disk-2026-08-26-to-28.md` (the lanes, the
+simplification campaign and the boot-side transport, to the finish).  Read
+a lane's spec THROUGH its "AS LANDED" paragraph — several specs were
+refuted by the lane that ran them.  The design is
+`design/durable-fs-plan.md`.
 
 Kept for their durable design notes, gotchas and reusable recipes; `ls` them.
 **Nobody reads these for current guidance**, so they are the one place a
