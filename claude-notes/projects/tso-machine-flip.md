@@ -11817,3 +11817,144 @@ file.  `md5sum kernel-rocq/*.v user-rocq/*.v` unchanged
    raw-vs-ctx boundary as §(4) (`UserMemPt:427` wants
    `pa_add pa x ↦ₚ b` and holds `ctx_phys_pointsto XI …`), so they are ONE
    tranche with it, not three.
+
+### A6.92 THE LEDGER AMO GATE IS BUILT AND GREEN — AND IT REFUTES A6.89's OWN
+### HELD ARM: A CONTENDING AMO IS A WRITE, SO THE LOCK WORD HAS NO STABLE AUTHOR
+
+Executing the coordinator's two authorized items.  **Item (2) produced the
+gate and, at the leaf that consumes it, a refutation of my own A6.89 design.
+Item (1) was measured and NOT opened** — the three sub-tranches it was
+supposed to be are three different problems, and my A6.91 claim that they
+were one mechanical tranche is corrected below.
+
+#### (1) ITEM (1) IS THREE TRANCHES, NOT ONE — AND A6.91's CLAIM IS WITHDRAWN
+
+A6.91 §(6) said `ProofUserretClosed`, `UserMemPt` and `UptWalkPt` were "ONE
+tranche, not three", on the strength of the two error messages both mentioning
+a raw-vs-ctx mismatch.  **Measured, they are three different problems**, and
+only one of them is a tier flip:
+
+| file | what it actually is | size |
+|---|---|---|
+| `ProofUserretClosed` | `SpecUserret`'s 62 trapframe slots are raw `↦ₚ₈` while `ProcInv.tf_words` is `ctx_phys_word_pointsto` — a TIER flip, and a forget will not do because `wp_userret_user` hands the words BACK | `SpecUserret` + `UserretUser` (both GREEN) + the leaves |
+| `UserMemPt` | `udata_own_upd` is a **gen_heap-only** ghost update (`phys_update`) on what are now ctx bytes.  **`UserMemPt.v` contains no `tso_interp_of` at all** — the whole file is at the pre-flip interp — so flipping it means threading the tso interp in from its callers, i.e. the U-mode STORE path | a tier flip of the U-mode memory lane |
+| `UptWalkPt` | the walk's A/D write-back token: `swp_translate_upt` takes `own_context` as its first premise and `tramp_tr_obl` (a `□`-obligation) cannot capture one | **already documented in-tree** |
+
+The third is not a discovery of mine — `TrampStepPt.v` carries the note
+verbatim: *"A6.61 / lane 2, MEASURED AND NOT LANDED HERE … The token must
+therefore become a parameter of this ∀ … the measurement says SIX files —
+TrampStepPt, Pt2WalkPt, TransPt, UptWalkPt, UservecExitPt, UserretEntryPt —
+and the five `iApply "Htr"` sites BELOW … must SUPPLY a token, so that lemma
+gains an `own_context` premise and the cascade runs out through
+`wp_instr_tramp_pt` / `wp_instr_ktramp_pt_share` into the four trap-handler
+files.  **Its own tranche, against a green tree.**"*
+
+> **So the tranche was CLOSED BY NOT OPENING IT.**  The discipline says do not
+> leave it half-open; the cheapest way to honour that is to measure first and
+> not touch a green file at all.  Nothing in the userret/U-mode cone was
+> edited.  *A6.91's error is worth naming: two errors that quote the same two
+> type constructors are not the same problem — one was a TIER, one was an
+> INTERP, one was a TOKEN, and only the shape of the message was shared.*
+
+#### (2) THE LEDGER AMO GATE, BUILT AND GREEN
+
+Three pieces landed in `WpSconfLock`, all verified under a probe (the file's
+own red is earlier, at the owner-gated `notheld` leaf, so the AMO tranche is
+checked with that leaf and the cpu-store family stubbed; probe deleted):
+
+- **`lock_word_amo_mint`** — the gate.  It is `lock_word_store_plain`'s script
+  with the two differences the AMO makes, and **both are in the MACHINE's own
+  arms, not invented**: `RiscvLang`'s exclusive read takes the view to
+  `length log` and its exclusive write to `S (length log)` (the model's own
+  comment on that arm: *"the view-at-top is what mints the acquire receipt in
+  the lock leaves"*), and the word that comes out carries the append's own
+  message fragment, so `TsoCtx.phys_ledger_word4_vis_of_store` mints the HELD
+  arm.  **No machine change was needed** — this is the one place a fence would
+  have been wanted (contrast A6.90 §(4)) and the AMO already provides it.
+- **`lock_word_flat_bytes`** — the exclusive read is *"drain, then read
+  memory"*, so its node obligation wants four gen_heap cells, not a ledger
+  fact: `phys_ledger_forget` then `phys_valid`, per byte.
+- **THE PEEK IS RETIRED.**  The pre-flip leaf opened the invariant, took the
+  WORD APART to read a `mem_pointsto`'s mapping off byte 0, and put it back —
+  the same shim-shaped dance A6.87 §(1) killed in `lock_claims`.  A6.87 put
+  the address claims INSIDE the invariant, so the `ppn`, canonicality,
+  RAM-ness and tier pin all come off `lk_addr_claim` without touching a cell.
+  That is also the only shape that survives the word becoming a ledger cell,
+  which has no mapping to read.
+
+#### (3) THE FINDING, AND IT REFUTES A6.89 §(3): THE LOCK WORD HAS NO STABLE
+#### AUTHOR, BECAUSE A **FAILING** AMO IS STILL A WRITE
+
+A6.89 §(3) introduced `lk_wex` — the word's own-write selector — and argued
+it must cover both `Some (i,false)` windows as well as `Some (i,true)`,
+because the AMO is the word's author and its authorship survives until
+release's `sw x0`.  **That argument is wrong, and the AMO leaf is where it
+shows.**  xv6's acquire is
+
+```c
+    while(__sync_lock_test_and_set(&lk->locked, 1) != 0) ;
+```
+
+so **every spinning hart writes the word on every loop iteration.**  Take hart
+`i` holding the lock and hart `j` spinning:
+
+- the invariant is at `st = Some (i, true)`, so `lk_wex st = Some i` and the
+  word slot is `phys_ledger_word4_vis (hart_agent i) 0` — *i*'s receipt;
+- `j`'s AMO writes the word and gets the mint at `hart_agent j`;
+- `j`'s failing branch must close the invariant at the SAME `st`, which
+  demands the receipt at `hart_agent i`.  **`j` does not have it and cannot
+  get it.**  (`WpSconfLock`'s failing arm is the `iRight` close at `st2`.)
+
+The invariant is not unsound — it is UNMAINTAINABLE: no acquire can restore
+it.  So **A6.89's holder-read leaf `wp_clw_lockopen_locked_s_sconf`, though
+green, rests on an arm nothing can re-establish**, and `lk_wex` should be
+withdrawn along with `lock_word_ex`'s held arm.
+
+> **AND THE RIGHT SHAPE IS THE ONE THE OWNER CELL ALREADY HAS.**  The owner
+> cell survives contention precisely because it is NOT an author receipt but
+> the RACY WINDOW kit (`lk_cpu_pay` / `TsWin` / `lkcpu_read_not_mine`): every
+> writer's value is in a known set, and the reader concludes from the SET, not
+> from authorship.  The lock word's writers write `0` (release) or `1`
+> (any acquire attempt), which is the same kit with a two-element byteset —
+> and the holder's "≠ 0" then follows from "the only writer of `0` is release,
+> which needs the token I hold".
+>
+> *THE GENERAL LESSON, and it is the sharper form of A6.89 §(5)'s: an
+> own-write receipt is only stable on a cell nobody else writes.  The lock
+> word is the most contended word in the kernel.  A6.89 asked "when one field
+> of a racy pair needs an own-write receipt, does the other?" — the answer
+> for the WORD is no, and the reason is not symmetry but who else writes it.*
+
+**This lands the word in the same machinery as the `notheld` route**, whose
+floor-receipt channel is with the owner (A6.89 §(7)).  Per the coordinator's
+fence, the thread is **characterized and STOPPED** here: the write node was
+left at its pre-flip text, nothing was reverted, and the two gates plus the
+peek retirement stay — they are needed by whichever shape the ruling picks
+(the mint is `t_rel`'s only producer either way, and the flat read and the
+claim peek are arm-independent).
+
+#### (4) THE NUMBER, AND THE BOUNDARY IS EXACTLY WHERE IT WAS
+
+**1099 of 1296, RED 10** — sentinel-backed (`MAKEEXIT=2`), the A6.91 set file
+for file.  **Red-list delta: 0.**  `WpSconfLock`'s single error moved from
+`:902` to `:1001` and is the SAME error (`lk_cpu_cell_acc`, the owner-gated
+`notheld` generic) — the shift is exactly the ~99 lines the two new gates add
+above it.  `md5sum kernel-rocq/*.v user-rocq/*.v` unchanged
+(`edd91972b6bc1b944fd98a2cc2363815`).  `^Abort` / `^Admitted` / `^Axiom` all
+0; probe deleted.  No green file was touched by either item.  Mirror
+refreshed.
+
+#### (5) THE FRONTIER
+
+1. **The lock word's arm** — §(3): withdraw `lk_wex`/`lock_word_ex`'s held arm
+   and put the word on the racy kit, which merges it with the `notheld`
+   floor-receipt question already with the owner.  **One ruling now settles
+   both**, and `wp_clw_lockopen_locked_s_sconf` re-does under it.
+2. **§0.27′** stays gated: `t_rel`'s mint (`lock_word_amo_mint`) now EXISTS,
+   but the leaf that calls it is stopped by §(3), so the build order has not
+   actually opened yet.
+3. **The userret/U-mode cone** — §(1)'s three tranches, in the order
+   `UptWalkPt`'s token (A6.61's own, six files + four trap-handler files),
+   `UserMemPt`'s interp, `SpecUserret`'s tier.
+4. Unchanged with the owner: the `notheld` floor channel (now merged with
+   §(3)), `intr_handler_spec`'s layering, `ProofMain`'s publication credential.
