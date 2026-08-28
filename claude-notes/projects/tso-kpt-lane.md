@@ -742,3 +742,113 @@ concludes the three-way case split on `σ'`.  So:
 
 Nothing in (1)–(5) needs a forbidden file, and nothing needs anything further
 from the lock lane.
+
+---
+
+## K13. BOUNDARY: K12e STEPS 1–2 LANDED — the write branch now says WHY, and the preset fact that refutes it exists
+
+### K13a. THE NUMBER
+
+**1102 `.vo` of 1340 `.v`**, sentinel-backed (`MAKEEXIT=2` + `DONE`, round r18,
+**584 files recompiled** — `KptTree`'s whole reverse cone), and the no-`.vo` list
+is **`diff`-IDENTICAL to the r0 baseline**: RED-9 held, **red-list delta 0**.
+`^Admitted` / `^Abort` / `^Axiom` are 0 in every file touched.
+
+### K13b. WHAT LANDED
+
+**(1) The write branch now carries its own side condition.**  Both pure case
+lemmas' THIRD disjunct is strengthened from
+
+```coq
+  ∃ a1 d1, σ' = …write-back…
+  (* to *)
+  ∃ a1 d1, update_PTE_Bits (p0 : mword 64) acc = Some (pte_set_ad p0 a1 d1) ∧ σ' = …
+```
+
+in `KptTree.ptree_translate_miss_core` and `KptTree.ptree_translateAddr_cases`.
+This is the enabling move for the whole tranche, and it had to be a
+STRENGTHENING of the conclusion rather than a `_noupd` corollary: once the
+disjunction is formed the reason is gone, so no corollary can recover it, and
+the alternative — copying a 93-line and a 236-line proof — is not maintainable.
+Consumers cost four one-line destructuring patches (`KptTree:1208`,
+`Pt2Walk` ×2, `UserFetchCert:1788`, `TransPt:201`).
+
+**(2) The fact that refutes it.**  In `KptTree`, beside `kpt_leaf_pte_of`:
+
+| | |
+|---|---|
+| `kpt_leaf_pte_noupd` | `update_PTE_Bits (kpt_leaf_pte_of vpn e) acc = None` at EVERY access kind — `HartSKpt.kpt_noupd`'s fact, restated here because `KptShare` sits BELOW `HartSKpt` |
+| `kpt_ad_preset root M t` | `kpt_tree_spec_gen` WITHOUT the A/D slack: the mapped leaf is exactly `kpt_leaf_pte_of vpn e` |
+| `kpt_ad_preset_spec` | preset ⇒ the old spec, so nothing that only reads the spec moves |
+| `kpt_ad_preset_noupd` | preset + `M !! vpn = Some e` + `ptree_maps t vpn p2 p1 p0` ⇒ `update_PTE_Bits p0 acc = None` — the refuter, at the shape the case lemmas' third disjunct presents |
+
+**Why the slack existed and why it is now a liability**, recorded once:
+`kpt_tree_spec_gen` states an M entry's leaf up to an A/D VARIANT for exactly
+one reason — the Svadu walker used to be able to write A/D back into the shared
+table.  Under §0.36′(a) it cannot: the table is held at the seen tier,
+`DfracDiscarded`, which is what makes it shareable at all.  So the slack is now
+the only thing between the walk's write branch and a refutation.
+
+### K13c. MERGE LIST (this boundary)
+
+`iris/KptTree.v`, `iris/Pt2Walk.v`, `iris/TransPt.v`, `iris/UserFetchCert.v`
+(the four destructuring patches + the two new definitions and three lemmas).
+Cumulative, all boundaries: `PhysSeen.v`, `KptCtxTravel.v` (new);
+`PtTree.v`, `HartSKpt.v`, `KptShare.v`, `SRegime.v`, `ProofKvminithart.v`,
+`KptTree.v`, `Pt2Walk.v`, `TransPt.v`, `UserFetchCert.v`, `_CoqProject`.
+
+### K13d. THE MEASUREMENT THAT RE-PRICES STEPS 3–5 — there are FOUR shared-table writers, not one
+
+K12e said "exactly one live consumer".  Measured properly, the shared
+`kpt_inv`/`kpt_body` tree is written at **four** sites, and only one of them is
+the exec lane:
+
+| site | lemma | how it reaches the tree | consumers |
+|---|---|---|---|
+| `HartSKpt.v:968` | `kpt_leaf_write_node` (`:871`) | `inv_acc ⊤ kptN` at `:892` | `HartSKpt:1221`, **`Pt2WalkPt:1018`, `Pt2WalkPt:1361`** |
+| `KptShare.v:484` | `tlb_res_pt_translateAddr_at` (`:340`) | `iInv "Hkinv"` at `:433` | `SRegime:1364` (`res_absorb`) |
+| `TransPt.v:1336` | `pt2_tramp_fetch_habs_kcur` (`:1139`) | `iInv "Hkinv"` at `:1240`, the `kpt_inv rc` inside `tlb_inv_pt2_kcur` (`:577`) | **`UservecExitPt:412`** |
+| `TransPt.v:1691` | `pt2_tramp_fetch_habs_kprev` (`:1446`) | `iInv "Hkinv"` at `:1550`, `kpt_inv kroot` inside `tlb_inv_pt2_kprev` (`:687`) | **`UserretEntryPt:341`** |
+
+And two side facts that change the plan:
+
+* **`KptTree.tlb_inv_pt` is DEAD.**  Its only producer `tlb_inv_pt_intro`
+  (`:654`) is applied only inside `tlb_inv_pt_translateAddr_at` (`:1289`), which
+  itself has no consumers; and `KptShare.tlb_inv_pt_share` — the file header's
+  "one-way door" — has **no callers**.  The live kernel root is published
+  directly by `ProofMain:996`'s `kpt_inv_alloc`.  So the fifth
+  `kpt_tree_spec_gen_set_leaf` site (`KptTree:1418`) is dead code, and the
+  earlier worry that tightening the spec would break a legitimate
+  exclusive-bundle write-back is unfounded — the only exclusive-bundle writer
+  has no callers.
+* **The payer's type is pinned in a FORBIDDEN file.**  `IntrDefs.v:1310–1315`
+  and `:1402–1407` state it verbatim, `pt_slot_own (KTier B) a (DfracOwn 1)`.
+  So step 3 may not change the payer's TYPE — but it does not need to: once the
+  write branch is refuted the payer is simply never invoked, and the premise
+  rides unused.
+
+### K13e. WHAT REMAINS, RE-PRICED
+
+3. **Refute the write branch at the four sites.**  `KptShare:484` is direct:
+   `kpt_ad_preset_noupd` against `ptree_translateAddr_cases`' strengthened third
+   disjunct.  `HartSKpt.kpt_leaf_write_node` needs an `acc` parameter and the
+   premise `update_PTE_Bits m0 acc = Some m0'` first — its CALLERS already hold
+   that fact (`HartSKpt:~1212`'s `Hwr` iAssert), it is simply not in the
+   lemma's statement.  The two `TransPt` sites are the same shape.
+4. **`kpt_body`**: swap `⌜kpt_tree_spec_gen⌝` for `⌜kpt_ad_preset⌝` (the reader
+   side is free via `kpt_ad_preset_spec`), then drop the tree and `kpt_bound`;
+   `kpt_inv_alloc` returns to a near-pre-A6.71 arity.  `kvm_bridge` must produce
+   the preset form — it builds the table from `kvmmake`'s canonical leaves, so
+   this is a strengthening at the source, not a new obligation.
+5. **`ProofMain` / `ProofMainSecondary`** as in K12e.
+
+> **THE ONE CAVEAT ON VERIFIABILITY, and it is why this boundary stops here.**
+> Two of the four write sites have consumers that are RED and DELIBERATELY so
+> under §0.37′: `Pt2WalkPt` (blocked behind `UserMemPt`/`WpSconfLock`) and
+> `UservecExitPt` / `UserretEntryPt` (the U-mode tier).  Edits to
+> `kpt_leaf_write_node`'s arity and to `TransPt`'s two lemmas therefore CANNOT
+> be validated in this tree — the compiler never reaches their callers.  Landing
+> them blind would put unverified churn into files the U-mode rework will touch
+> anyway.  Recommended: take step 3 for `KptShare:484` (fully verifiable — its
+> consumer `SRegime.res_absorb` is green) and hold the other three until the
+> §0.37′ rework lands, or until the owner accepts unverified edits in that cone.
