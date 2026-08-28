@@ -4004,3 +4004,62 @@ byte_any's sealed body — refactoring 1 is withdrawn from the main
 design doc (updated in place at
 /shared/tmp/main-channel-refactor-design.md); refactoring 2 (the
 started-barrier re-homing) remains main's work.
+
+### 0.33′ REFUTATION BY MEASUREMENT (2026-08-28): devsw was never
+invariant-distributed — 0.29′'s exemplar is withdrawn, refactoring 2 is
+withdrawn from main; the principle stands, and both trees already obey it
+
+The owner's main-side agent, mid-implementation, traced devsw's ACTUAL
+distribution on main: ProofMain's consoleinit segment mints devsw_table →
+console_ready → handed to userinit → packed into SyscParkEnv.park_world →
+into the ParkCap parked with the first process's saved context → a
+secondary hart claims it when scheduler() acquires that proc's p->lock and
+swtches in → UsertrapRes.ut_caps → syscall_env; kfork copies park_world
+into the child's park, so children inherit by the same channel.  Measured
+on both trees to confirm: despite its name, `console_inv` is NOT an Iris
+`inv` — it is a plain persistent bundle (is_conslock γ ∗ devsw_table,
+ConsoleInv.v) passed BY VALUE, and the only two extraction sites in the
+system (ProofSyscall.v:3479 via console_ready, SpecFileread.v:402 via
+fileread_devsw_of_console) both project from a bundle the consumer already
+HOLDS out of syscall_env.  Every consumer is syscall-path; the ancestry
+crosses only same-CPU threading, p->lock acquires, and the park protocol —
+all proper channels — and the real-TSO fliptree proves the chain AS-IS
+(the §0.16′ CtxMorph transport instances are exactly this crossing).
+Moreover origin/main (2412ae13) ALREADY HAS the started deposit with the
+correct membership: main_deposit (SpecMainSecondary.v:105) carries
+printk_env, procs_inv, console_caps (the trap path's credential — the one
+consumer family that is NOT process-threaded, since an interrupt does not
+descend from a park), the virtio lock handle + disk_geom, kpt_inv + the
+kernel_pagetable root word, the trampoline kmap, and the 64 kstack kmaps.
+
+Consequences: (a) 0.29′'s "devsw's entries become rows of the started
+deposit" is WITHDRAWN — devsw's channel is the park chain and the proof
+already names it; (b) refactoring 2 is WITHDRAWN FROM MAIN — main already
+has the barrier-channel shape, so the design doc at
+/shared/tmp/main-channel-refactor-design.md now withdraws BOTH
+refactorings and the main-side agent stands down; (c) the ROOT ERROR: the
+doc's membership test was writer-side ("written on hart 0 before started,
+never written again, read without the writer's lock") when the correct
+test is CONSUMER-side ("does every consumer's resource ancestry already
+pass through a fence-bearing channel?") — devsw passes the writer-side
+test and fails the consumer-side test's premise, because its consumers all
+descend from the park.
+
+Paper tidbit (keep): the proof had already obeyed "an invariant is a
+container, not a channel" BEFORE the principle was articulated — §0.16′'s
+transportability demand (every parked deposit row needs a CtxMorph) forced
+every persistent fact to travel in-band through a real channel, so when
+the principle was later stated and an exemplar violation was proposed from
+memory, measurement refuted the exemplar while confirming the principle.
+The per-fact channel table that refactoring 2 wanted as a deliverable
+EXISTS as this ruling's inventory: devsw → park chain (park_world);
+console_caps, kpt word, kstack/trampoline kmaps, disk lock handle →
+started deposit; ring pointers → vdisk_lock payload (disk_res);
+fsinit's publications → fs_ready/first.
+
+What remains TRUE and OPEN (per the owner's follow-up): the crossing
+MECHANISM — persistent-but-CONTEXT-DEPENDENT iProps across the started
+and first barriers — is load-bearing and is exactly the fliptree's
+remaining producer wiring in ProofMain (the third strans_res_at/kpt_res_at
+arm) plus the §0.27′ park resume tie; once those land, the membership is
+already correct everywhere and nothing re-homes.
