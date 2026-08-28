@@ -98,7 +98,16 @@ Local Open Scope Z_scope.
    and the fragment cannot be forged. *)
 Definition lock_state : Type := option (CPU * bool).
 
-Definition lockUR : ucmra := excl_authUR (leibnizO lock_state).
+(* >>> A6.119 (1'): THE LOCK'S GHOST CARRIES A SECOND, AGREED COMPONENT --
+   the ACQUIRE POSITION, which the holder and the invariant must agree on so
+   that the word's value-set pin can be read (§0.35'(iv) case 2).  A PRODUCT
+   rather than a wider [lock_state]: the position is a fact two parties agree
+   on, not a component every consumer of the state must see, and this way no
+   arity moves and every existing ghost step keeps its shape.  Both halves
+   hide it existentially at the [lock_auth] / [lock_frag] level; the [_at]
+   forms below expose it to the two places that need it. <<< *)
+Definition lockUR : ucmra :=
+  prodUR (excl_authUR (leibnizO lock_state)) (excl_authUR (leibnizO nat)).
 
 (* The SLEEPlock's ghost state, inside [lockG] rather than a class of its
    own: a sleeplock already needs [lockG] for its inner spinlock, so a

@@ -50,8 +50,11 @@ Section LockAt.
 
   Lemma lock_ghost_alloc : ⊢ |==> ∃ γ : gname, lock_free_tok γ.
   Proof.
-    iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
-                     : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
+    iMod (own_alloc ((((●E (None : leibnizO lock_state)),
+                       (●E (0%nat : leibnizO nat)))
+                      ⋅ ((◯E (None : leibnizO lock_state)),
+                         (◯E (0%nat : leibnizO nat)))) : lockUR)) as (γ) "H";
+      [ split; apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ.
     rewrite /lock_free_tok /lock_auth /lock_frag. iFrame "Ha Hf".

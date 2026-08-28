@@ -79,12 +79,37 @@ Section Lock.
   (* ---- the ghost pieces ---------------------------------------------- *)
 
   (* the authority on the lock's state; lives in the invariant. *)
+  (* A6.119: the position-exposing forms.  [lock_auth_at] is what the
+     invariant holds beside the word's pin; [lock_frag_at] is what the holder
+     token carries.  The agreement between them is the whole point. *)
+  Definition lock_auth_at (γ : gname) (st : lock_state) (B : nat) : iProp Σ :=
+    own γ ((●E (st : leibnizO lock_state), ●E (B : leibnizO nat)) : lockUR).
+  Definition lock_frag_at (γ : gname) (st : lock_state) (B : nat) : iProp Σ :=
+    own γ ((◯E (st : leibnizO lock_state), ◯E (B : leibnizO nat)) : lockUR).
+
   Definition lock_auth (γ : gname) (st : lock_state) : iProp Σ :=
-    own γ ((●E (st : leibnizO lock_state)) : lockUR).
+    (∃ B : nat, lock_auth_at γ st B)%I.
   (* the state fragment; the free one lives in the invariant, a held one is
      the holder's token (see [locked] / [locked_pre]). *)
   Definition lock_frag (γ : gname) (st : lock_state) : iProp Σ :=
-    own γ ((◯E (st : leibnizO lock_state)) : lockUR).
+    (∃ B : nat, lock_frag_at γ st B)%I.
+
+  Global Instance lock_auth_at_timeless γ st B : Timeless (lock_auth_at γ st B).
+  Proof. apply _. Qed.
+  Global Instance lock_frag_at_timeless γ st B : Timeless (lock_frag_at γ st B).
+  Proof. apply _. Qed.
+
+  (* THE AGREEMENT, and it is the tie the word's pin needs: the position the
+     invariant minted at the AMO is the position the holder was handed. *)
+  Lemma lock_pos_agree γ st st' B B' :
+    lock_auth_at γ st B -∗ lock_frag_at γ st' B' -∗ ⌜st = st' /\ B = B'⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (own_valid_2 with "Ha Hf") as %[Hv1 Hv2].
+    iPureIntro. split.
+    - exact (excl_auth_agree_L _ _ Hv1).
+    - exact (excl_auth_agree_L _ _ Hv2).
+  Qed.
 
   (* THE holder token: hart [i] holds the lock and [lk->cpu = cpus_ptr i]. *)
   (* >>> A6.89 (owner ruling on A6.87 §(7), spelling (a)): STRENGTHENING
@@ -168,9 +193,8 @@ Section Lock.
   Lemma lock_frag_agree γ st st' :
     lock_auth γ st -∗ lock_frag γ st' -∗ ⌜st = st'⌝.
   Proof.
-    iIntros "Ha Hf".
-    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
-    iPureIntro. exact (excl_auth_agree_L _ _ Hv).
+    iIntros "(%B & Ha) (%B' & Hf)".
+    iDestruct (lock_pos_agree with "Ha Hf") as %[-> _]. done.
   Qed.
 
 
@@ -179,9 +203,9 @@ Section Lock.
   Lemma lock_frag_exclusive γ st st' :
     lock_frag γ st -∗ lock_frag γ st' -∗ False.
   Proof.
-    iIntros "H1 H2".
-    iDestruct (own_valid_2 with "H1 H2") as %Hv.
-    destruct (proj1 (excl_auth_frag_op_valid _ _) Hv).
+    iIntros "(%B & H1) (%B' & H2)".
+    iDestruct (own_valid_2 with "H1 H2") as %[Hv1 _].
+    destruct (proj1 (excl_auth_frag_op_valid _ _) Hv1).
   Qed.
 
   Lemma locked_exclusive γ i j : locked γ i -∗ locked γ j -∗ False.
@@ -202,9 +226,10 @@ Section Lock.
 
   Lemma lock_tok_excl_alloc : ⊢ |==> ∃ γ : gname, lock_tok_excl γ.
   Proof.
-    iMod (own_alloc ((◯E (None : leibnizO lock_state)) : lockUR)) as (γ) "H".
-    { apply auth_frag_valid. done. }
-    iModIntro. iExists γ. iExact "H".
+    iMod (own_alloc (((◯E (None : leibnizO lock_state)),
+                      (◯E (0%nat : leibnizO nat))) : lockUR)) as (γ) "H".
+    { split; apply auth_frag_valid; done. }
+    iModIntro. iExists γ. iExists 0%nat. iExact "H".
   Qed.
 
   (* THE holder law: the token pins the owner word to your own [struct cpu]. *)
@@ -225,13 +250,25 @@ Section Lock.
 
   (* ---- the four state transitions (one per lock instruction) --------- *)
 
+  (* A6.119: the update moves BOTH components; the position is a parameter so
+     the AMO can set it and the other three steps can keep it. *)
+  Local Lemma lock_state_update_at γ st st' B B' :
+    lock_auth_at γ st B -∗ lock_frag_at γ st B ==∗
+    lock_auth_at γ st' B' ∗ lock_frag_at γ st' B'.
+  Proof.
+    iIntros "Ha Hf".
+    rewrite /lock_auth_at /lock_frag_at -own_op.
+    iApply (own_update_2 with "Ha Hf").
+    apply prod_update; apply excl_auth_update.
+  Qed.
+
   Local Lemma lock_state_update γ st st' :
     lock_auth γ st -∗ lock_frag γ st ==∗ lock_auth γ st' ∗ lock_frag γ st'.
   Proof.
-    iIntros "Ha Hf".
-    rewrite -own_op.
-    iApply (own_update_2 with "Ha Hf").
-    apply excl_auth_update.
+    iIntros "(%B & Ha) (%B' & Hf)".
+    iDestruct (lock_pos_agree with "Ha Hf") as %[_ ->].
+    iMod (lock_state_update_at γ st st' B' B' with "Ha Hf") as "[Ha Hf]".
+    iModIntro. iSplitL "Ha"; by iExists B'.
   Qed.
 
   (* acquire's amoswap: a free lock becomes "held by i, cpu not yet
@@ -643,7 +680,7 @@ Section Lock.
      out of [lk->cpu], AT EVERY view it can reach.  That is the whole
      content of [SpecAcquire]'s dead panic arm. *)
   Lemma lkcpu_read_not_mine `{CID : CpuId} (g : gstate) (lk : mword 64)
-      (dq : dfrac) (f : nat -> bv 8) (ts : nat -> nat)
+      (dq : dfrac) (f : nat -> bv 8)
       (own : agent -> option nat) (lo t K : nat) :
     own (hart_agent cpu_id) = Some t ->
     tso_interp_at riscv_eraGS g -∗
@@ -653,8 +690,10 @@ Section Lock.
        what makes this work for every hart and not only the creator. *)
     TsoCtx.ledger_vis (hart_agent cpu_id) K lo -∗
     TsoCtx.ledger_vis (hart_agent cpu_id) lo t -∗
-    ([∗ list] j ∈ seq 0 8,
-       TsoCtx.phys_ledger_wpay (pa_add (lock_cpu lk) j) dq (f j) (ts j)
+    (* A6.119: the ∃-form window -- [lk_cpu_pay]'s own shape, so the cell
+       goes in without a bridge. *)
+    ([∗ list] j ∈ seq 0 8, ∃ tj : nat,
+       TsoCtx.phys_ledger_wpay (pa_add (lock_cpu lk) j) dq (f j) tj
          (TsoMemPa.TsWin (lock_cpu lk) 8 j lkcpu_z lkcpu_cp own lo)) -∗
     ⌜forall (tv : nat), (g.(gtv) cpu_id <= tv)%nat -> forall w : mword 64,
        tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv (lock_cpu lk)
@@ -674,7 +713,7 @@ Section Lock.
     { intros h' Hne. rewrite /lkcpu_cp (agent_cpus_ptr_hart cpu_id).
       apply nth_byte_ne. exact (agent_cpus_ptr_ne h' cpu_id Hne). }
     iIntros "Hint #HK #Hfv #Hav Hb".
-    iApply (TsoCtx.ledger_read_racy_word_ok g (lock_cpu lk) 8%nat dq f ts
+    iApply (TsoCtx.ledger_read_racy_word_ok g (lock_cpu lk) 8%nat dq f
               lkcpu_z lkcpu_cp own lo t K (m := 64) (cpus_ptr cpu_id)
               ltac:(lia) Hown Hcpw Hzk Hinj with "Hint HK Hfv Hav Hb").
   Qed.
@@ -802,6 +841,36 @@ Section Lock.
 
   Definition lk_cpu_cell (lo : nat) (lk : mword 64) (v : mword 64) : iProp Σ :=
     lk_cpu_cell_ex lo lk v None.
+
+  (* A6.119: THE CELL AS A PLAIN WINDOW, AT EITHER ARM.  The racy read does
+     not care who holds the lock -- it only needs the window, the per-agent
+     record and the anchor -- so it takes this projection rather than
+     case-splitting on [ex] at every site.  The held arm's author fragment is
+     dropped ([lk_cpu_pay_vis_forget]); the free arm is already this shape. *)
+  Lemma lk_cpu_cell_ex_pay (lo : nat) (lk : mword 64) (v : mword 64)
+      (ex : option CPU) :
+    lk_cpu_cell_ex lo lk v ex ⊢
+    ∃ own : agent -> option nat,
+      ⌜lk_own_ok ex own⌝ ∗ lk_own_anchored lo own ∗ lk_cpu_pay lk v own lo.
+  Proof.
+    iIntros "(%own & %Hok & #Han & Hb)". iExists own.
+    iSplitR; [done|]. iFrame "Han".
+    destruct ex as [i|]; [ by iApply lk_cpu_pay_vis_forget | iExact "Hb" ].
+  Qed.
+
+  (* the reader's own-last record, out of [lk_own_ok] at a state it does not
+     hold: only the HOLDER may be missing one. *)
+  Lemma lk_own_ok_some (ex : option CPU) (own : agent -> option nat)
+      (i : CPU) :
+    lk_own_ok ex own -> ex <> Some i ->
+    exists t : nat, own (hart_agent i) = Some t.
+  Proof.
+    intros Hok Hne. destruct (own (hart_agent i)) as [t|] eqn:Heq.
+    - by exists t.
+    - destruct (Hok _ Heq) as (i' & -> & Hag).
+      exfalso. apply Hne. f_equal. symmetry.
+      apply fin_to_nat_inj. exact Hag.
+  Qed.
 
   (* the held cell forgets its author fragment and becomes an ordinary
      one, at the cost of the exactness the holder had *)
@@ -1046,8 +1115,27 @@ Section Lock.
      carries the matching [TsoCtx.ctx_floor ξ lo]. *)
   Definition lock_body (γ : gname) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) (lo : nat) : iProp Σ :=
+    (* >>> A6.119 (executing A6.92's own conclusion, and §0.35′(iv) case 2).
+       THE WORD'S AUTHORSHIP ARM COMES OUT OF THE INVARIANT.  [lk_wex] indexed
+       it by the state's [Some i], i.e. by the HOLDER -- and `amoswap` writes
+       UNCONDITIONALLY, so a spinner that finds the lock held still stores the
+       word.  After a failed acquire the word is the SPINNER's own write while
+       the state, and hence [lk_wex], still names the holder: the invariant
+       cannot be re-established, and no premise repairs it.  A6.92 refuted the
+       held arm on exactly this ground and recorded that [lk_wex] should be
+       withdrawn with it; this is that withdrawal, reaching the one site the
+       file's red-upstream had hidden.
+
+       WHY THE PLAIN WORD SUFFICES, measured rather than assumed: nothing
+       outside this definition consumed the held arm.  [lock_word_ex] stays,
+       and stays USED -- inside [WpSconfLock]'s AMO plumbing, where the
+       acquiring hart really does own its write between its own mint and the
+       close -- but it is no longer an INVARIANT INDEX.  §0.35′(iv) case 2
+       reads the locked word on the racy kit against a value-set, not against
+       an authorship arm, so the exact form was never what the reads wanted.
+       [lk_wex] demotes to a pure state function. <<< *)
     (∃ (v : mword 32) (st : lock_state),
-        lock_word_ex (lk_wex st) lk v ∗
+        lock_word lk v ∗
         lk_cpu_res lo st lk s ∗
         lock_auth γ st ∗
         (⌜st = None⌝ ∗ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ lock_frag γ None ∗
@@ -1449,8 +1537,11 @@ Section Lock.
     iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
     iMod (lock_pay_intro R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
-    iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
-                     : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
+    iMod (own_alloc ((((●E (None : leibnizO lock_state)),
+                       (●E (0%nat : leibnizO nat)))
+                      ⋅ ((◯E (None : leibnizO lock_state)),
+                         (◯E (0%nat : leibnizO nat)))) : lockUR)) as (γ) "H";
+      [ split; apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8".
     iExists (mword_of_int 0 : mword 32), None.
@@ -1473,8 +1564,11 @@ Section Lock.
   Proof.
     iIntros "Hword [#Hc8 Hcpu]".
     iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
-    iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
-                     : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
+    iMod (own_alloc ((((●E (None : leibnizO lock_state)),
+                       (●E (0%nat : leibnizO nat)))
+                      ⋅ ((◯E (None : leibnizO lock_state)),
+                         (◯E (0%nat : leibnizO nat)))) : lockUR)) as (γ) "H";
+      [ split; apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ. iIntros (R D) "%HmR Hrun HR".
     iMod (lock_pay_intro (CtxMorph0 := HmR) R with "Hrun HR") as "[Hrun HR]".
@@ -1535,8 +1629,11 @@ Section Lock.
     rewrite /lk_cpu_ready /lk_cpu_ready_at.
     iDestruct "Hready" as (lo) "[[#Hc8 Hcpu] #Hfl]".
     iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
-    iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
-                     : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
+    iMod (own_alloc ((((●E (None : leibnizO lock_state)),
+                       (●E (0%nat : leibnizO nat)))
+                      ⋅ ((◯E (None : leibnizO lock_state)),
+                         (◯E (0%nat : leibnizO nat)))) : lockUR)) as (γ) "H";
+      [ split; apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ. iIntros (R) "%HmR Hrun HR".
     iMod (lock_pay_intro (CtxMorph0 := HmR) R with "Hrun HR") as "[Hrun HR]".

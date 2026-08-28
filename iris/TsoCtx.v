@@ -4896,7 +4896,7 @@ Section ctx.
 
   Lemma ledger_read_racy_ok `{CID : CpuId} (g : gstate)
       (base : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8)
-      (ts : nat -> nat) (z : nat -> bv 8) (cp : agent -> nat -> bv 8)
+      (z : nat -> bv 8) (cp : agent -> nat -> bv 8)
       (own : agent -> option nat) (lo t K : nat) :
     (0 < n)%nat ->
     (* MY own-last record AT OR ABOVE THE FLOOR: where my last write to
@@ -4933,8 +4933,12 @@ Section ctx.
     ledger_vis (hart_agent cpu_id) K lo -∗
     (* the ANCHOR's, off the cell's own invariant (A6.114 §2) *)
     ledger_vis (hart_agent cpu_id) lo t -∗
-    ([∗ list] j ∈ seq 0 n,
-       phys_ledger_wpay (pa_add base j) dq (f j) (ts j)
+    (* A6.119: the ∃-FORM window, which is what every producer in the tree
+       hands out ([ledger_store_win_wpay_ok], [WpLock.lk_cpu_pay]).  The
+       [ts]-function spelling was the outlier and nothing here needed it:
+       the proof reads only the per-byte WINDOW claim off each element. *)
+    ([∗ list] j ∈ seq 0 n, ∃ tj : nat,
+       phys_ledger_wpay (pa_add base j) dq (f j) tj
          (TsWin base n j z cp own lo)) -∗
     ⌜forall tv : nat, (g.(gtv) cpu_id <= tv)%nat -> exists k, (k < n)%nat /\
        tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add base k)
@@ -4950,7 +4954,7 @@ Section ctx.
                win_ok1 g.(gimg) g.(glog) (pa_add base j)
                  (win_at base n z cp own lo j)⌝)%I as %Hcov.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
-      iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hb") as "[_ Hej]".
+      iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hb") as (tj) "[_ Hej]".
       { rewrite lookup_seq_lt; [reflexivity|lia]. }
       iDestruct (ghost_map_lookup with "Hauth Hej") as %HTMj.
       iPureIntro.
@@ -5064,7 +5068,7 @@ Section ctx.
      the general width so the [bv] step is done once. *)
   Lemma ledger_read_racy_word_ok `{CID : CpuId} (g : gstate)
       (base : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8)
-      (ts : nat -> nat) (z : nat -> bv 8) (cp : agent -> nat -> bv 8)
+      (z : nat -> bv 8) (cp : agent -> nat -> bv 8)
       (own : agent -> option nat) (lo t K : nat) {m : N} (cpw : bv m) :
     (0 < n)%nat ->
     own (hart_agent cpu_id) = Some t ->
@@ -5076,15 +5080,15 @@ Section ctx.
     view_lb view_name loglen_name (hart_agent cpu_id) K -∗
     ledger_vis (hart_agent cpu_id) K lo -∗
     ledger_vis (hart_agent cpu_id) lo t -∗
-    ([∗ list] j ∈ seq 0 n,
-       phys_ledger_wpay (pa_add base j) dq (f j) (ts j)
+    ([∗ list] j ∈ seq 0 n, ∃ tj : nat,
+       phys_ledger_wpay (pa_add base j) dq (f j) tj
          (TsWin base n j z cp own lo)) -∗
     ⌜forall (tv : nat), (g.(gtv) cpu_id <= tv)%nat -> forall (w : bv m),
        tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv base
          (N.of_nat n) w -> w <> cpw⌝.
   Proof.
     iIntros (Hn Hown Hcpw Hzk Hinj) "Hint #HK #Hfv #Hav Hb".
-    iDestruct (ledger_read_racy_ok g base n dq f ts z cp own lo t K
+    iDestruct (ledger_read_racy_ok g base n dq f z cp own lo t K
                  Hn Hown Hzk Hinj with "Hint HK Hfv Hav Hb") as %Hex.
     iPureIntro. intros tv Htv w Hrd ->.
     destruct (Hex tv Htv) as (k & Hk & Hne). apply Hne.
