@@ -11186,7 +11186,9 @@ whole ~25-file collapse.
 > whose `KallocInv` changed, so effectively everything downstream rebuilt;
 > it is NOT a `rm -f *.vo` round.  A6.38's clean-round rule bites after a
 > MACHINE change and none happened here, but the next lane should still
-> open with one.
+> open with one.  The round DID complete (`MAKEEXIT=2`, as `-k` gives with
+> reds) -- the count is sentinel-backed, not read off a mid-round poll,
+> which is the distinction A6.86 §(7) exists to enforce.
 
 #### (5) THE FRONTIER, RESTATED AFTER THIS SESSION
 
