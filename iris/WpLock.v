@@ -646,13 +646,13 @@ Section Lock.
       (dq : dfrac) (f : nat -> bv 8) (ts : nat -> nat)
       (own : agent -> option nat) (lo t K : nat) :
     own (hart_agent cpu_id) = Some t ->
-    (* A6.111: two-armed -- the reader either passed the floor or WROTE it.
-       [t = lo] is the creator's case: [initlock]'s store is the mint store,
-       so its own anchor IS the floor. *)
-    ((lo <= K)%nat \/ t = lo) ->
     tso_interp_at riscv_eraGS g -∗
     TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) K -∗
+    (* A6.111: the FLOOR, two-armed -- the reader either passed it or WROTE
+       it.  A6.115: and the ANCHOR, off the cell's own invariant, which is
+       what makes this work for every hart and not only the creator. *)
     TsoCtx.ledger_vis (hart_agent cpu_id) K lo -∗
+    TsoCtx.ledger_vis (hart_agent cpu_id) lo t -∗
     ([∗ list] j ∈ seq 0 8,
        TsoCtx.phys_ledger_wpay (pa_add (lock_cpu lk) j) dq (f j) (ts j)
          (TsoMemPa.TsWin (lock_cpu lk) 8 j lkcpu_z lkcpu_cp own lo)) -∗
@@ -660,7 +660,7 @@ Section Lock.
        tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv (lock_cpu lk)
          (N.of_nat 8) w -> w <> cpus_ptr cpu_id⌝.
   Proof.
-    intros Hown HloK.
+    intros Hown.
     assert (Hcpw : forall k, (k < 8)%nat ->
               nth_byte (cpus_ptr cpu_id) k = lkcpu_cp (hart_agent cpu_id) k).
     { intros k Hk. by rewrite /lkcpu_cp agent_cpus_ptr_hart. }
@@ -673,10 +673,10 @@ Section Lock.
                 lkcpu_cp h' k <> lkcpu_cp (hart_agent cpu_id) k).
     { intros h' Hne. rewrite /lkcpu_cp (agent_cpus_ptr_hart cpu_id).
       apply nth_byte_ne. exact (agent_cpus_ptr_ne h' cpu_id Hne). }
-    iIntros "Hint #HK #Hfv Hb".
+    iIntros "Hint #HK #Hfv #Hav Hb".
     iApply (TsoCtx.ledger_read_racy_word_ok g (lock_cpu lk) 8%nat dq f ts
               lkcpu_z lkcpu_cp own lo t K (m := 64) (cpus_ptr cpu_id)
-              ltac:(lia) Hown HloK Hcpw Hzk Hinj with "Hint HK Hfv Hb").
+              ltac:(lia) Hown Hcpw Hzk Hinj with "Hint HK Hfv Hav Hb").
   Qed.
 
   (* [s] -- the lock's NAME -- rather than a bare rank: [is_lock] already
@@ -758,10 +758,43 @@ Section Lock.
      discharge against it ([TsoCtx.own_context_floor_view]).
      [own] stays existential: it is per-agent bookkeeping the reads consume
      through [lk_own_ok], not something a handle can name. <<< *)
+  (* >>> A6.115 (approved on A6.114's pricing): THE CELL'S PER-AGENT ANCHOR.
+     Every agent's own-last record is either the FLOOR itself or its OWN
+     message -- which is [TsoCtx.ledger_vis h lo t] read at [(lo, t)], since
+     [win_ok1] already gives [lo ≤ t] and so collapses that predicate's left
+     arm to [t = lo].
+
+     PRESERVED BY EVERY TRANSITION, and each discharge is one lemma: the mint
+     sets [own = fun _ => Some lo] ([ledger_vis_below], free); acquire's store
+     sets the writer's entry to [None] (nothing to prove); release's sets it
+     to the store's own position ([ledger_vis_own] on the message fragment
+     [WpSconfMem.word_wpay_frame_store_gen_c] now hands back, A6.114 §4).  Both
+     store arms move only the writer's entry, so every other agent's clause
+     rides across untouched.
+
+     WHAT IT BUYS: the racy read's ANCHOR premise, for EVERY hart rather than
+     only the lock's creator -- left arm and the anchor IS the floor, right arm
+     and it is visible by authorship at any view.  A6.110 §5's two arguments
+     collapse into one. <<< *)
+  Definition lk_own_anchored (lo : nat) (own : agent -> option nat) : iProp Σ :=
+    (∀ (h : agent) (t : nat),
+       ⌜own h = Some t⌝ -∗ TsoCtx.ledger_vis h lo t)%I.
+
+  Global Instance lk_own_anchored_persistent lo own :
+    Persistent (lk_own_anchored lo own).
+  Proof. apply _. Qed.
+
+  Lemma lk_own_anchored_mint (lo : nat) :
+    ⊢ lk_own_anchored lo (fun _ => Some lo).
+  Proof.
+    iIntros (h t) "%Heq". injection Heq as <-.
+    iApply TsoCtx.ledger_vis_below. lia.
+  Qed.
+
   Definition lk_cpu_cell_ex (lo : nat) (lk : mword 64) (v : mword 64)
       (ex : option CPU) : iProp Σ :=
     (∃ (own : agent -> option nat),
-       ⌜lk_own_ok ex own⌝ ∗
+       ⌜lk_own_ok ex own⌝ ∗ lk_own_anchored lo own ∗
        match ex with
        | Some i => lk_cpu_pay_vis (hart_agent i) lk v own lo
        | None => lk_cpu_pay lk v own lo
@@ -775,9 +808,9 @@ Section Lock.
   Lemma lk_cpu_cell_ex_forget lo lk v ex :
     lk_cpu_cell_ex lo lk v ex ⊢ lk_cpu_cell lo lk v ∨ ⌜is_Some ex⌝.
   Proof.
-    iIntros "(%own & %Hok & Hb)". destruct ex as [i|].
+    iIntros "(%own & %Hok & #Han & Hb)". destruct ex as [i|].
     - iRight. iPureIntro. by eexists.
-    - iLeft. iExists own. by iFrame "Hb".
+    - iLeft. iExists own. by iFrame "Han Hb".
   Qed.
 
   (* what [initlock]'s post hands over and every creator takes: the
@@ -901,7 +934,7 @@ Section Lock.
       TsoCtx.mem_free (KTR := KT0) (pa_add (lock_cpu lk) j) (DfracOwn 1).
   Proof.
     rewrite /lk_cpu_fresh /lk_cpu_at /lk_cpu_cell /lk_cpu_cell_ex /lk_cpu_pay.
-    iIntros "[#Hcl (%own & _ & Hp)]".
+    iIntros "[#Hcl (%own & _ & _ & Hp)]".
     iDestruct (lk_addr_claim_bytes with "Hcl") as "#Hb".
     change (Z.to_nat 8) with 8%nat.
     iApply (big_sepL_impl with "Hp"). iIntros "!>" (k j Hk) "(%t & Hw)".

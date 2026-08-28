@@ -2822,6 +2822,27 @@ Section ctx.
       apply (visibleb_own _ _ _ _ mg); [by rewrite -HLM | done].
   Qed.
 
+  (* A6.115: the ANCHOR projection.  [ledger_vis h B t] read the other way:
+     either [t] is at or below [B], or the write at [t] is mine and visible at
+     EVERY view.  This is the form the window's reassembly consumes, and it is
+     why the owner cell's per-agent invariant ([ledger_vis h lo t], A6.114 §2)
+     discharges the anchor for every hart rather than only the creator. *)
+  Lemma ledger_vis_anchor `{CID : CpuId} (g : gstate) (B t : nat) :
+    tso_interp_at riscv_eraGS g -∗
+    ledger_vis (hart_agent cpu_id) B t -∗
+    ⌜(t ≤ B)%nat \/
+     forall tv : nat, visibleb (hart_agent cpu_id) tv g.(glog) t = true⌝.
+  Proof.
+    iIntros "Hint Hvis".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    iDestruct "Hvis" as "[%HtB | (%i & %mg & %Hti & Hi & %Htid)]".
+    - iPureIntro. by left.
+    - iDestruct (ghost_map_lookup with "Hm Hi") as %HLi.
+      iPureIntro. right. intros tv. rewrite Hti.
+      apply (visibleb_own _ _ _ _ mg); [by rewrite -HLM | done].
+  Qed.
+
   Lemma ledger_vis_mono (h : agent) (B B' t : nat) :
     (B ≤ B')%nat -> ledger_vis h B t -∗ ledger_vis h B' t.
   Proof.
@@ -4877,7 +4898,6 @@ Section ctx.
        handle at once" is TRUE ([hart_view_lb_get] does it, and `sys_pipe`'s
        [filealloc] does in fact intervene) but must never be the story -- it
        makes [initlock]'s contract depend on what its caller does next. <<< *)
-    ((lo <= K)%nat \/ t = lo) ->
     (* the clear word is not mine ... *)
     (exists k, (k < n)%nat /\ z k <> cp (hart_agent cpu_id) k) ->
     (* ... and no other agent's word is mine.  BOTH premises are
@@ -4888,7 +4908,11 @@ Section ctx.
        exists k, (k < n)%nat /\ cp h' k <> cp (hart_agent cpu_id) k) ->
     tso_interp_at riscv_eraGS g -∗
     view_lb view_name loglen_name (hart_agent cpu_id) K -∗
+    (* the FLOOR's visibility: [lo ≤ K] for a hart that received the handle,
+       authorship for the one that wrote it *)
     ledger_vis (hart_agent cpu_id) K lo -∗
+    (* the ANCHOR's, off the cell's own invariant (A6.114 §2) *)
+    ledger_vis (hart_agent cpu_id) lo t -∗
     ([∗ list] j ∈ seq 0 n,
        phys_ledger_wpay (pa_add base j) dq (f j) (ts j)
          (TsWin base n j z cp own lo)) -∗
@@ -4896,7 +4920,7 @@ Section ctx.
        tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add base k)
        <> Some (cp (hart_agent cpu_id) k)⌝.
   Proof.
-    iIntros (Hn Hown HloK Hzk Hinj) "Hint #HK #Hfv Hb".
+    iIntros (Hn Hown Hzk Hinj) "Hint #HK #Hfv #Hav Hb".
     iDestruct "Hint"
       as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
     iDestruct (view_auth_valid with "Hvw HK") as %HKtvs.
@@ -4913,12 +4937,12 @@ Section ctx.
       exact (ts_ok_win _ _ _ _ _ _ (Htie _ _ HTMj) eq_refl). }
     iDestruct (ledger_vis_visibleb g K lo with "[$Hauth $Hm $Hlen $Hvw //] Hfv")
       as %Hfvis.
+    iDestruct (ledger_vis_anchor g lo t with "[$Hauth $Hm $Hlen $Hvw //] Hav")
+      as %Hanc.
     iPureIntro. intros tv Htv.
     exact (win_assemble_not_mine g.(gimg) g.(glog) base n z cp own lo Hn Hcov
              (hart_agent cpu_id) t tv Hown
-             (Hfvis tv ltac:(lia))
-             ltac:(destruct HloK as [Hle|Heq]; [left; lia | by right])
-             Hzk Hinj).
+             (Hfvis tv ltac:(lia)) Hanc Hzk Hinj).
   Qed.
 
   (* (5) THE "NO EVIDENCE" GATE (tso-machine-flip.md A6.74 §(3)'s third kit
@@ -5024,7 +5048,6 @@ Section ctx.
       (own : agent -> option nat) (lo t K : nat) {m : N} (cpw : bv m) :
     (0 < n)%nat ->
     own (hart_agent cpu_id) = Some t ->
-    ((lo <= K)%nat \/ t = lo) ->
     (forall k, (k < n)%nat -> nth_byte cpw k = cp (hart_agent cpu_id) k) ->
     (exists k, (k < n)%nat /\ z k <> cp (hart_agent cpu_id) k) ->
     (forall h', h' <> hart_agent cpu_id ->
@@ -5032,6 +5055,7 @@ Section ctx.
     tso_interp_at riscv_eraGS g -∗
     view_lb view_name loglen_name (hart_agent cpu_id) K -∗
     ledger_vis (hart_agent cpu_id) K lo -∗
+    ledger_vis (hart_agent cpu_id) lo t -∗
     ([∗ list] j ∈ seq 0 n,
        phys_ledger_wpay (pa_add base j) dq (f j) (ts j)
          (TsWin base n j z cp own lo)) -∗
@@ -5039,9 +5063,9 @@ Section ctx.
        tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv base
          (N.of_nat n) w -> w <> cpw⌝.
   Proof.
-    iIntros (Hn Hown HloK Hcpw Hzk Hinj) "Hint #HK #Hfv Hb".
+    iIntros (Hn Hown Hcpw Hzk Hinj) "Hint #HK #Hfv #Hav Hb".
     iDestruct (ledger_read_racy_ok g base n dq f ts z cp own lo t K
-                 Hn Hown HloK Hzk Hinj with "Hint HK Hfv Hb") as %Hex.
+                 Hn Hown Hzk Hinj with "Hint HK Hfv Hav Hb") as %Hex.
     iPureIntro. intros tv Htv w Hrd ->.
     destruct (Hex tv Htv) as (k & Hk & Hne). apply Hne.
     rewrite (Hrd k ltac:(lia)). by rewrite (Hcpw k Hk).

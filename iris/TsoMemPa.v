@@ -1997,7 +1997,13 @@ Section assemble.
   Lemma win_assemble_not_mine (h : agent) (t tv : nat) :
     own h = Some t ->
     visibleb h tv log lo = true ->
-    ((lo <= tv)%nat \/ t = lo) ->
+    (* A6.115: the ANCHOR, and it no longer mentions the reader's view at
+       all.  Either my record IS the floor (and the floor's visibility above
+       covers it), or the write at [t] is MINE and visible at every view --
+       which is the owner cell's own invariant, [ledger_vis h lo t], carried
+       in the cell since A6.114 §2 and re-established free at the mint and off
+       the store's message fragment at a release. *)
+    ((t <= lo)%nat \/ (forall tv' : nat, visibleb h tv' log t = true)) ->
     (exists k, (k < n)%nat /\ z k <> cp h k) ->
     (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
     exists k, (k < n)%nat /\ tso_read img log h tv (pa_add base k) <> Some (cp h k).
@@ -2010,10 +2016,9 @@ Section assemble.
       by (have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov 0%nat Hn;
           by have [_ [? _]] := H3 h t Hown).
     have Hvis : visibleb h tv log t = true.
-    { case: Hanc => [Htv|Hteq].
-      - have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov 0%nat Hn.
-        have [_ [_ [Hv _]]] := H3 h t Hown. exact (Hv tv Htv).
-      - by rewrite Hteq. }
+    { case: Hanc => [Hle|Hown']; last exact (Hown' tv).
+      have Hteq : t = lo by lia.
+      by rewrite Hteq. }
     have Hz : forall j, (j < n)%nat ->
                 log_byte img log t (pa_add base j) = Some (z j).
     { move => j Hj. have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov j Hj.

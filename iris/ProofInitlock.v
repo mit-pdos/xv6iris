@@ -221,6 +221,9 @@ Section ProofInitlock.
       iExists (fun _ => Some lo).
       iSplitR.
       { iPureIntro. intros h Hh. discriminate. }
+      (* A6.115: the cell's per-agent anchor, free at the mint -- every
+         agent's record IS the floor here. *)
+      iSplitR; [ iApply WpLock.lk_own_anchored_mint | ].
       rewrite /WpLock.lk_cpu_pay.
       iApply (big_sepL_mono with "Hp"). iIntros (kk j _) "H".
       iExists lo. iExact "H". }
