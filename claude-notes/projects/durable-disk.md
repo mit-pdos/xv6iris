@@ -4485,7 +4485,7 @@ the rows below and in `design/fs-ghost-state.md`).
   lanes; three of the four holders are already predicate-vocabulary; the
   payoff is the commit handing a real `fs_state` to the transport.  Runs
   AFTER rank 1 or before it, never concurrently (same payload bodies).
-  Stages 1 and 2 are LANDED (EV1 below); 3–5 remain.
+  Stages 1, 2 (EV1) and 3 (EV3) are LANDED; 4 and 5 remain.
 
   **AS LANDED — EV1 (stages 1 and 2).  Whole tree green (zero `Error`,
   `MAKEEXIT=0`), `tools/dethread_check.py` at "0 declarations out of
@@ -4569,6 +4569,7 @@ the rows below and in `design/fs-ghost-state.md`).
     (fn_type n)`) and the ROOT's `ireg_keep`, an unspendable keep-alive
     `link_tok` that is `emp` at every other inum and must come out as
     RESIDUE, not be folded into `inode_ghost`.
+
   - **WHAT STAGE 3 SHOULD KNOW.**  (a) The leg is class-free, so
     re-basing `blk_res_q`/`ind_blk_q` on `blk_owned_q` needs no new
     binder.  (b) The two bridges left in `FsStateEra` are
@@ -4582,6 +4583,79 @@ the rows below and in `design/fs-ghost-state.md`).
     `rec_owned_at` PER INUM, so `inode_phi_at` + `inode_phi_sb` is the
     assembled `inode_phi`, and `inode_ghost_of` the assembled
     `inode_ghost`; what is missing is the peel of `ireg_lnk_at` above.
+
+  **AS LANDED — EV3 (stage 3).  Whole tree green (zero `Error`,
+  `MAKEEXIT=0`, the 356-file `InodeInv` cone rebuilt — the plan's
+  estimate was 355), `tools/dethread_check.py` at "0
+  declarations out of scope", and `iris/SystemAdequacy.v` /
+  `iris/SystemAssumptions.v` byte-identical to main.**
+
+  - **THE FOUR BLOCK-INDEXED VIEWS ARE THE ABSTRACT RUNS NOW.**
+    `InodeInv.blk_res`/`blk_res_q`/`ind_blk`/`ind_blk_q` are
+    `FsStateDefs.blk_owned`/`blk_owned_q` at `FsBytesGamma.fs_gamma_L
+    γfs` under the same `decide` guard; `ind_res`/`ind_res_q`/
+    `inode_blocks`/`inode_blocks_q`/`inode_map`/`inode_map_q` are the
+    unchanged wrappers, every `_1` equation is still `reflexivity`, and
+    `InodeInv.v` gained one `Require Import FsBytesGamma`.  **NOT ONE
+    STATEMENT IN THE FILE MOVED**, which is why the plan's risk list
+    (`SpecLogWrite`'s 16 `fsblock`, `BitmapInv`'s 9, `ProofBalloc`'s 5,
+    `ProofBmapParts`/`ProofReadiParts`) cost nothing at all: those files
+    reach the views only through lemmas, and the lemmas still speak
+    `fsblock`.
+  - **THE CROSSING IS FOUR LEMMAS, AND THAT IS THE WHOLE MECHANISM.**
+    `blk_res_run` / `blk_res_q_run` / `ind_blk_nz` / `ind_blk_q_nz` are
+    the `decide`-peel and `gamma_blk_owned`/`_q` in ONE rewrite, taking
+    the slot's nonzero-ness as premise.  They exist because the two heads
+    are convertible but BOTH `Typeclasses Opaque`, so `iExact`/`iFrame`
+    will not cross on its own — and because a bare `rewrite
+    gamma_blk_owned` after a `rewrite /blk_res` picks whichever
+    occurrence it meets first in `Δ` and is a coin flip.  Naming the
+    arguments is what makes the rewrite deterministic.  Every proof in
+    the tree that used to unfold a view and land on `fsblock` now goes
+    through one of the four: twelve uses inside `InodeInv` itself, three
+    in `ProofItruncParts`, five in `ProofBmap`.  `FsStateEra` keeps four
+    direct `gamma_blk_owned` rewrites, in `inode_owned_era_home_slot`
+    alone, because that lemma crosses to `FsBlocks.fsblock_home_open` and
+    not to a view.  FOUR FILES CHANGED IN TOTAL — `InodeInv`,
+    `FsStateEra`, `ProofBmap`, `ProofItruncParts` — plus two stale
+    comments in `FsBlocks`/`FsStateEra`.
+  - **THE ERA'S BRIDGES STOPPED CROSSING A VOCABULARY, AND THE PLAN WAS
+    WRONG ABOUT WHAT THAT BUYS.**  `inode_blocks_era`/`_q` lost their
+    `gamma_blk_owned`/`_q` step (the branch is `rewrite /fn_data Hbs //`)
+    and `ind_res_era`/`_q`'s nonzero branch is now `done` — those two are
+    the guard peel alone.  But `inode_dat_era_to`/`_of` and their callers
+    `inode_rd_era_era_node_to`/`_of` DID NOT die and could not: what they
+    carry is a change of GRANULARITY, the 268-slot `big_sepL` with `True`
+    holes against the `big_sepM` over `fn_blk n`, and that needs
+    `inode_local` to make the two index sets agree.  No re-basing of the
+    views can remove it; only re-basing `inode_blocks_q` itself on the
+    map would, and the plan's own KEEP list forbids that.  **Stage 3's
+    real deliverable is that the era side names no bridge at all any
+    more**, not that the bridges died.
+  - **NO `FsBytesGamma` LEMMA BECAME CALLER-LESS**, so none was retired.
+    `gamma_blk_owned_q`'s callers moved rather than vanished: the two in
+    `FsStateEra` are gone, and what is left is `InodeInv`'s three `_q`
+    crossings plus `FsCollect.col_blk`.  `gamma_blk_owned` keeps the
+    bitmap/superblock/collect family (`BitmapInv` 7, `FsCfgSnap` 2,
+    `FsCollectImg` 1, `FsCollectAll` 1, `FsCollect` 1, `InodeRegion` 1)
+    and four sites in `FsStateEra.inode_owned_era_home_slot`, which
+    crosses for a DIFFERENT reason — `FsBlocks.fsblock_home_open` is a
+    byte-invariant lemma in the concrete vocabulary.  Retiring the bridge
+    outright would mean restating `FsBlocks`' predicates over the view
+    record, i.e. moving `FsStateDefs` below `FsBlocks`; that is a
+    log-layer restructuring, not a stage of this campaign.
+  - **WHAT STAGES 4 AND 5 SHOULD KNOW.**  (a) `IcacheEscrow`'s
+    `ind_blk_timeless`/`blk_res_timeless` (odd home, unmoved) now resolve
+    through `blk_owned_timeless` + `fs_gamma_L_timeless`; that file
+    already imported `FsBytesGamma`, so nothing there moved and stage 4
+    inherits the seal list unchanged.  (b) Stage 5's collect side is the
+    only remaining `gamma_blk_owned_q` caller outside `InodeInv`
+    (`FsCollect.col_blk`), and `inode_blocks_of_slots`/`_of_blocks` are
+    still `fsblock`-facing on purpose — the image and the free pool are
+    genuinely in the concrete vocabulary.  (c) fs-state.md §2c-body's
+    "price the proper fix" is now half-paid: the four definitions have the
+    `blk_owned Γ` shape, so a Γ-generic restatement is an ARITY move on
+    four definitions (358 dependents) and no longer a change of shape.
 - [ ] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
   and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
   ledger, `CrpPre`; ten `_no_ops` → one): APPROVED (owner, 2026-08-27),

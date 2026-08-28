@@ -41,7 +41,7 @@ before it) holds the cache's parked half `fs_chalf`.
 
 | piece | type / home | meaning |
 |---|---|---|
-| `fsblock (fs_bytes γfs) bno bs` | a run of BSIZE `ghost_map Z (bv 8)` elements at `DfracOwn 1` (`FsBlocks.v`) | block `bno`'s bytes in the LOGGED VIEW `L`, owned EXCLUSIVELY.  THIS is what every home-block owner above the log holds: `BitmapInv`'s bitmap block and free pool, `SbPark.sb_park`'s block 1, `InodeRegion.ireg_recs`/`ireg_blk`, `InodeInv.ind_blk`/`blk_res`, the icache escrow's payloads, `FsImgBridge`'s boot bundle.  Sealed with `Typeclasses Opaque` — see the trap below. |
+| `fsblock (fs_bytes γfs) bno bs` | a run of BSIZE `ghost_map Z (bv 8)` elements at `DfracOwn 1` (`FsBlocks.v`) | block `bno`'s bytes in the LOGGED VIEW `L`, owned EXCLUSIVELY.  THIS is what every home-block owner above the log holds: `BitmapInv`'s bitmap block and free pool, `SbPark.sb_park`'s block 1, `InodeRegion.ireg_recs`/`ireg_blk`, the icache escrow's payloads, `FsImgBridge`'s boot bundle.  `InodeInv.ind_blk`/`blk_res` hold the SAME run under the ABSTRACT spelling — `FsStateDefs.blk_owned (FsBytesGamma.fs_gamma_L γfs)`, convertible to this one and sealed on its own side (era-vocabulary unification, stage 3).  Sealed with `Typeclasses Opaque` — see the trap below. |
 | `fsblock_q (fs_bytes γfs) dq bno bs`, `byte_range_q gL dq b off bs` | the same runs at a SHARE (`FsBlocks.v`) | what a READ-LOCKED inode's bytes are held at.  The unsuffixed names ARE the `DfracOwn 1` readings — `fsblock_1`, `byte_range_1`, both `reflexivity`, since `k ↪[γ] v` IS `k ↪[γ]{DfracOwn 1} v` — which is why no site spelling a full run moved. |
 | `fs_chalf γfs bno bs` | ½ of `bno ↪[fs_cache γfs] bs` (`ghost_map`, `FsBlocks.v`) | the PARKED half of block `bno`'s cache entry — what the buffer cache believes.  Two kinds of holder are left: the log's own storage (`log_state`'s header + slot rows; `SpecWriteHead`, `ProofEndOp`'s write_log, install_trans's log copies), and a handle's MACHINERY half carried out of a bio payload (`ds_held_L`, `IgetLic`'s `BufL`).  A HOME block's parked half lives inside `fs_bytes_inv` and no mortal ever holds one. |
 | `fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs) home Xv` | `inv fsbN …` (`FsBlocks.v`) | the tie: the byte auth, the home blocks' parked cache halves, `bytes_dom`, and — since lane E-except — an EXCEPTION SET `X` with its authority `exc_auth`.  `bytes_tie_exc` holds on `home ∖ X`; on `X` the byte view holds `Xv b`, the LOGGED value (`bytes_exc_val`).  `X` is nonempty ONLY in the recovery window of a dirty on-disk header, where the era's byte view was minted at `FsCrash.fr_D` while the cache still reads the crashed disk. |
@@ -74,11 +74,35 @@ instance after recovery) needs none of it.
 `ind_owned`/`inode_dat`/`inode_owned_era` all have `_q` twins with the
 unsuffixed names as their `DfracOwn 1` readings (`blk_owned_1`,
 `ind_owned_1`, `inode_dat_1`, `inode_owned_era_1`).  `FsBytesGamma.gamma_blk_owned_q` and
-`gamma_byte_range_q` are what carry a share across into the `InodeInv`
-vocabulary — the fraction-1-only bridge was what kept anything at ¾ or ¼
-out of it — and `InodeInv` accordingly has `inode_map_q`/`inode_blocks_q`/
-`blk_res_q`/`ind_blk_q`/`ind_res_q` beside the landed names
-(`inode_map_1`, `inode_blocks_1`, `blk_res_1`, `ind_blk_1`, `ind_res_1`).
+`gamma_byte_range_q` are what carry a share between the abstract runs and
+`FsBlocks`' concrete ones — the fraction-1-only bridge was what kept
+anything at ¾ or ¼ out of the `InodeInv` vocabulary — and `InodeInv`
+accordingly has `inode_map_q`/`inode_blocks_q`/`blk_res_q`/`ind_blk_q`/
+`ind_res_q` beside the landed names (`inode_map_1`, `inode_blocks_1`,
+`blk_res_1`, `ind_blk_1`, `ind_res_1`).
+
+**SINCE STAGE 3 OF THE ERA-VOCABULARY UNIFICATION THERE IS ONLY ONE
+CROSSING SURFACE, AND IT IS FOUR LEMMAS.**  `InodeInv`'s four block views
+are the ABSTRACT runs (`blk_owned`/`blk_owned_q` at `fs_gamma_L γfs`), so
+nothing between them and the state predicates crosses at all: the era's
+`inode_blocks_era`/`_q` and `ind_res_era`/`_q` are pure changes of
+GRANULARITY now (a 268-slot `big_sepL` with `True` holes against a
+`big_sepM` over the allocated slots), and the indirect one is the guard
+peel and nothing else.  What still crosses is the SUPPLIER side —
+`SpecLogWrite`'s `log_write`, balloc's fresh run, the boot bundle,
+`FsBlocks`' home lemmas — all of which speak `fsblock`, and every proof
+that used to unfold a view and land on one goes through
+`InodeInv.blk_res_run` / `blk_res_q_run` / `ind_blk_nz` / `ind_blk_q_nz`:
+the `decide`-peel and the vocabulary step in one rewrite, taking the
+slot's nonzero-ness as its premise, with the arguments NAMED (a bare
+`rewrite gamma_blk_owned` after a `rewrite /blk_res` takes whichever
+occurrence it meets first in `Δ`).  The one place that still crosses by
+hand is `FsStateEra.inode_owned_era_home_slot`, whose consumer
+`FsBlocks.fsblock_home_open` is a byte-invariant lemma rather than a
+view.  The `fsblock`-spelled STATEMENTS in `InodeInv`
+(`inode_blocks_acc`, `_insert`, `inode_fresh*`,
+`inode_blocks_of_slots`/`_of_blocks`, `ind_blk_run`/`ind_blk_q_run`) did
+not move, so no walk file saw the change.
 
 The exclusivity law is fraction-aware: `phi_excl Γ` is
 `fsΦ dq1 a v ∗ fsΦ dq2 a w ⊢ ⌜✓ (dq1 ⋅ dq2)⌝`, and `phi_frac` is the
@@ -1279,7 +1303,7 @@ contract in the tree.
 | **iput's share** (`SpecIput`, plan §3/§4) | iput's three windows — `DepFrz`, the mid-free park and `ic_held` (§5b) — each park a positive share of an open transaction's `ln_tx` element, so `wp_iput_gen_body` takes `LogInv.log_opSet g u Sb e t q` (the epoch-named reservation and the share, bundled in `log_opSe`'s own position) and hands `log_opS` plus the share back on EVERY arm, under the pure premise `g = icfg_log` (the escrow parks at the ambient log and has no `log_names` parameter).  `wp_iput_sconf` gains ONLY that equation: its `log_op` carries the WHOLE element and the derivation halves it.  **NO CALLER OF `iunlockput` FINDS A SHARE**: iunlockput is `iunlock` then `iput`, and the share the write arm parked comes home at the FIRST of the two, so `SpecIunlockput`'s two generic bodies take the pure premise `ic_dep_side_tx d = Some (t, q)` — "the park is a write arm's", which every iunlockput in this kernel is — and relay `ic_dep_side d` on.  A direct `wp_dirlink_gen` caller does lend one: dirlink holds no token of its own, so the gen form takes a share in and out and the counted form halves its `log_op`. |
 | `LogInv.log_tx icfg_log` — the open-transaction token (§2) | what a transactional walk hands IN at the lock and gets back at the unlock; in between it holds no token at all, which is why every interior contract such a walk calls must be the `log_opS`/GEN form.  The tx-form contracts are `SpecIlock.wp_ilock_tx_sconf_body` (`log_tx` in, `IcacheEscrow.ic_tx_dep` out), `SpecIunlock.wp_iunlock_tx_sconf_body`, `SpecIunlockput.wp_iunlockput_tx_sconf_body` (`log_opb` in, `log_op` out — the caller's token is part-parked, so it cannot present `log_op`) and `wp_iunlockput_tx_gen_body` (`log_opSe` in, `log_opS ∗ log_tx` out).  Each is an INSTANCE of that function's ONE generic body at `DepTx` (`wp_ilock_tx_of_dep`, `wp_iunlock_tx_of_dep`, `wp_iunlockput_tx_of_dep_sconf`/`_gen`), so the arm is taken at the checkout's own ghost step and retired at the park's — no fupd of a caller's stands between two program steps.  A walk that holds TWO write locks carries two `IcacheEscrow.ic_tx_dep_at` at a QUARTER each and moves between the shapes with `ic_shrink_tx`/`ic_grow_tx`; a walk that releases one lock while the other is still held passes the descriptor to the `_dep_` form directly and gets its quarter back in the post. |
 | what a WALK holds across a WRITE-LOCKED window | half the transaction's element and `ic_tx_dep`, which is the descriptor and that half bundled.  Four shapes for what the rest of the walk carries, decided by what its interior calls want: `log_opb` (the budget half), `log_opS` (the set form, when the interior writes — `filewrite`, which therefore calls `Writei.wp_writei_gen`), `log_opSt` (namex, which must be HOLDING the token at each per-level `ilock`), and NOTHING AT ALL where the stage's own token is inside the descriptor.  A walk that arms must also know its own `g` IS the ambient log, because the escrow parks a share of `icfg_log`'s element and carries no `log_names` parameter — since rank 1c there is nothing left to know: an fs contract NAMES `icfg_log`, and `SpecKexec.fs_fabric`'s tie conjunct went with the threaded copy. |
-| what a READER holds | `IcacheEscrow.ic_rd_held`: the in-memory cells at fraction 1 and `FsStateEra.inode_rd_era γfs (DfracOwn (1/4)) inum n`.  `inode_dat_era_to`/`_of` turn that quarter into `readi`'s `InodeInv.inode_map_q` / `inode_blocks_q` pair under `inode_local` (`inode_rd_era_era_node_to`/`_of` are the `ic_rd_held` readings).  `SpecReadi.wp_readi_sconf_body` and `SpecBmap.wp_bmap_noalloc_sconf_body` take the fraction in a binder that was already vestigially there, so NO ARITY MOVED; only the ALLOCATING bmap arms need `dq = DfracOwn 1` (balloc's fresh-block deposits and the indirect block's `log_write`).  `stati`/`filestat` touch no byte-layer resource at all. |
+| what a READER holds | `IcacheEscrow.ic_rd_held`: the in-memory cells at fraction 1 and `FsStateEra.inode_rd_era γfs (DfracOwn (1/4)) inum n`.  `inode_dat_era_to`/`_of` turn that quarter into `readi`'s `InodeInv.inode_map_q` / `inode_blocks_q` pair under `inode_local` (`inode_rd_era_era_node_to`/`_of` are the `ic_rd_held` readings).  Since stage 3 of the era-vocabulary unification those four are a pure change of GRANULARITY — the `big_sepM` over `fn_blk n` against the 268-slot `big_sepL` — and no longer a change of vocabulary; the `inode_local` premise is exactly what they need for it and is why they cannot collapse to `reflexivity`.  `SpecReadi.wp_readi_sconf_body` and `SpecBmap.wp_bmap_noalloc_sconf_body` take the fraction in a binder that was already vestigially there, so NO ARITY MOVED; only the ALLOCATING bmap arms need `dq = DfracOwn 1` (balloc's fresh-block deposits and the indirect block's `log_write`).  `stati`/`filestat` touch no byte-layer resource at all. |
 | `FsStateEra.inode_owned_era_q γfs dq γi inum n` | the checked-out bundle at a share: `dinode_at` (the record PROXY — the record's own bytes stay region-side), the data blocks' and the indirect block's byte legs at `dq`, `FsState.top_frag_q Γ dq i n`, and `⌜inode_local⌝`.  `inode_owned_era` is its `DfracOwn 1` reading (`inode_owned_era_1`).  **The byte legs are not a predicate of the era's own**: they are `FsStateInode.inode_dat_q Γ dq n` — `inode_phi` MINUS its record — and the era's twin of it (`inode_bytes_era`) is gone.  `inode_rd_era` is that leg beside the abstract fragment, which is what a reader carries.  Readings at a share: `inode_owned_era_q_slot_inj` (hence `_34_slot_inj`), `inode_owned_era_q_local`, and the read-only borrow `inode_owned_era_q_blk_read` (off `inode_dat_q_blk_acc`). |
 | contract facts | `SpecIdup` carries `!logG` + `ireg_inv` (the region handle its count move needs — `ireg_inv`'s type really does mention `logG`, via the epoch coupling).  It is stated over `inode_held`: **`inode_held (ientry k)` in, `inode_held ∗ inode_held` out**, because both of its callers (`ProofKforkB4`'s parent cwd, `ProofNamex`'s cwd) HOLD `inode_held` already — the shed/gather lives INSIDE the contract.  There are no `s`/`inum` binders; a pure `dev = icfg_dev` tie rides in their place (the `sysc_fs_env` pattern), because `inode_held` is pointer-keyed at the cache's own device.  `K_iput = 74`, `K_iunlockput = 78`. |
 

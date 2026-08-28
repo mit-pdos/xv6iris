@@ -1974,26 +1974,30 @@ differs is only which byte map's full element `fsΦ` is.
   existential CONTENTS, so no `⊣⊢` between the elements and the state can
   be stated, and returning the leftover is what keeps the tie honest
   without a domain sweep.
-- **THE Γ IS FUNCTORIAL, AND THE TREE DOES NOT YET SAY SO.**
+- **THE Γ IS FUNCTORIAL, AND THE TREE HALF-SAYS SO NOW.**
   `FsStateEra.inode_blocks_era`/`ind_res_era` and
-  `FsImgBridge.img_inode_blocks_res` are stated at `fs_gamma_L` but use
-  only `gamma_blk_owned`, so they hold at ANY `Γ`.  Until they are
-  restated Γ-generically, `FsDurImg.fs_dur_bundle` makes `Γ_D` an instance
-  of `fs_gamma_L` (fill `fs_bytes`/`fs_link`/`fs_top` with the durable
+  `FsImgBridge.img_inode_blocks_res` are stated at `fs_gamma_L` but say
+  nothing about it, so they hold at ANY `Γ`.  Until they are restated
+  Γ-generically, `FsDurImg.fs_dur_bundle` makes `Γ_D` an instance of
+  `fs_gamma_L` (fill `fs_bytes`/`fs_link`/`fs_top` with the durable
   gnames; the two cache-side fields are never read) and
   `fs_gamma_L (fs_dur_bundle g Γd) = fs_gamma_D g Γd` by `reflexivity`.
 
-  **PRICE THE PROPER FIX BEFORE STARTING IT (2c-body).**  The three
-  lemmas' `Γ` reaches them only through `InodeInv`'s
-  `inode_blocks`/`ind_res`/`blk_res`/`ind_blk`, which are stated over
-  `fsblock (fs_bytes γfs)`, so a Γ-generic restatement needs Γ-generic
-  TWINS of those four — and they must sit below BOTH `FsStateEra` and
-  `FsImgBridge`, which are siblings (neither is in the other's cone).
-  That means `InodeInv.v` itself (358 dependents), with the four
-  definitions re-based on `blk_owned Γ` and the landed names derived at
-  `fs_gamma_L γfs`; a new leaf file cannot serve both siblings and would
-  duplicate `inode_blocks_of_slots`/`_of_blocks`, which is the
-  near-duplicate family the guiding principle forbids.  Do it when a
+  **HALF OF THE PROPER FIX IS DONE (2c-body).**  The three lemmas' `Γ`
+  reaches them only through `InodeInv`'s
+  `inode_blocks`/`ind_res`/`blk_res`/`ind_blk`, and those four USED to be
+  stated over `fsblock (fs_bytes γfs)`.  Since stage 3 of the
+  era-vocabulary unification their bodies ARE `blk_owned`/`blk_owned_q` at
+  `fs_gamma_L γfs`, so what is left of the Γ-generic restatement is
+  abstracting the `γfs` argument into a `Γ` one — a change of ARITY on
+  four definitions in a file with 358 dependents, not a change of shape,
+  and the `fsblock`-facing lemma statements (which is what the walk files
+  see) are already isolated behind
+  `blk_res_run`/`blk_res_q_run`/`ind_blk_nz`/`ind_blk_q_nz`.  A new leaf
+  file is still the wrong answer: it cannot serve both `FsStateEra` and
+  `FsImgBridge` (siblings, neither in the other's cone) without
+  duplicating `inode_blocks_of_slots`/`_of_blocks`, the near-duplicate
+  family the guiding principle forbids.  Do the arity move when a
   supplier's `Γ_D` step actually needs the instance, not before.
 - **TWO IMAGE FACTS THE `Γ`-PREDICATES NEED AND `fs_boot_image_wf` DOES
   NOT CARRY**, both premises today and both recorded in
