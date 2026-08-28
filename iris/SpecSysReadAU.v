@@ -105,9 +105,9 @@
    ==== THE FD SIDE =====================================================
 
    The landed fd-state vocabulary, nothing minted (the write mold's
-   pattern): the caller holds [FdSlots.fd_st (pv_fdg V) fd
+   pattern): the caller holds [FdSlots.fd_st (pv_fdg (us_V U)) fd
    (FdOpen true wb (FdInode i))] -- open, READABLE, an inode descriptor
-   naming inum [i] -- plus the pure premise [arg_fd v (pv_ofile V) =
+   naming inum [i] -- plus the pure premise [arg_fd v (pv_ofile (us_V U)) =
    Some (fd, fv)].  The fragment is returned UNCHANGED: a read moves the
    offset, never the descriptor's state.  Consequences: argfd cannot
    fail, fileread's [f->readable == 0] arm cannot fire, and the pipe /
@@ -597,7 +597,7 @@ Definition wp_sys_read_au_frame
     (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process    *)
     (fn : fread_names)                           (* the fs ghosts          *)
-    (pidv : mword 32) (V : pprivate)
+    (pidv : mword 32) (U : ustate)
     (v v2 : mword 64)                            (* syscall args 0, 2      *)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64)                   (* the descriptor's slot  *)
@@ -610,43 +610,43 @@ Definition wp_sys_read_au_frame
   (j < NPROC)%nat ->
   γs !! j = Some γlp ->
   length γs = NPROC ->
-  pv_tf V !! tf_arg_idx 0 = Some v ->
-  (exists v1 : mword 64, pv_tf V !! tf_arg_idx 1 = Some v1) ->
-  pv_tf V !! tf_arg_idx 2 = Some v2 ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
+  (exists v1 : mword 64, pv_tf (us_V U) !! tf_arg_idx 1 = Some v1) ->
+  pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
   frn_rp fn = ConsoleInv.devsw_read_val ->
   frn_dqv fn = (fun _ => DfracDiscarded) ->
   eb = true ->
   (* THE FD SIDE's pure half: argument 0 names slot [fd] of the caller's
      own table, and the cell holds [fv] (non-zero by [arg_fd]'s shape) *)
-  arg_fd v (pv_ofile V) = Some (fd, fv) ->
+  arg_fd v (pv_ofile (us_V U)) = Some (fd, fv) ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  proc_priv γf pj pidv V -∗
+  proc_priv γf pj pidv U -∗
   kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   fileread_fs_env γf fn -∗
   ConsoleInv.console_inv (frn_cons fn) -∗
   (* THE FD SIDE's resource half: the caller's own fragment -- open,
      READABLE, an inode descriptor at inum [i] *)
-  fd_st (pv_fdg V) fd (FdOpen true wb (FdInode i)) -∗
+  fd_st (pv_fdg (us_V U)) fd (FdOpen true wb (FdInode i)) -∗
   (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd),
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pidv (upd_upt V P') -∗
+      proc_priv γf pj pidv (upd_usM (us_upt U P') M') -∗
       kalloc_env fsc_kalloc None -∗
       fileread_fs_out fn -∗
       (* the descriptor's state does not move: a read advances the
          offset, never the fd table *)
-      fd_st (pv_fdg V) fd (FdOpen true wb (FdInode i)) -∗
+      fd_st (pv_fdg (us_V U)) fd (FdOpen true wb (FdInode i)) -∗
       (* the armed post on the returned a0 (implies [sys_read_ret]) *)
       ARMS r -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -664,14 +664,14 @@ Definition wp_sys_read_au_body
     (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fread_names)
-    (pidv : mword 32) (V : pprivate)
+    (pidv : mword 32) (U : ustate)
     (v v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
     (Φr : aview -> nat -> anode -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
-  wp_sys_read_au_frame γf γs j γlp fn pidv V v v2 m K eb b lks
+  wp_sys_read_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
     fd fv wb i
     (aread_commit Γfs ∅ i Φr)
     (read_arms Γfs i n Φr).
@@ -694,7 +694,7 @@ Definition wp_sys_read_au_stable_body
     (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fread_names)
-    (pidv : mword 32) (V : pprivate)
+    (pidv : mword 32) (U : ustate)
     (v v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
@@ -703,7 +703,7 @@ Definition wp_sys_read_au_stable_body
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   0 <= sys_rw_count v2 ->
-  wp_sys_read_au_frame γf γs j γlp fn pidv V v v2 m K eb b lks
+  wp_sys_read_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
     fd fv wb i
     (nview Γfs q i (MkAnode (AFile bs0) nl)
      ∗ aread_commit Γfs ∅ i Φr)%I
@@ -720,12 +720,12 @@ Module Type SYSREAD_AU.
       (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (v v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
       (Φr : aview -> nat -> anode -> iProp Σ),
-      wp_sys_read_au_body γf γs j γlp fn pidv V v v2 m K eb b lks
+      wp_sys_read_au_body γf γs j γlp fn pidv U v v2 m K eb b lks
         fd fv wb i Φr.
 
   (* owed as a DERIVATION from [wp_sys_read_au] + the agreement seed
@@ -738,12 +738,12 @@ Module Type SYSREAD_AU.
       (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (v v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φr : aview -> nat -> anode -> iProp Σ),
-      wp_sys_read_au_stable_body γf γs j γlp fn pidv V v v2 m K eb b
+      wp_sys_read_au_stable_body γf γs j γlp fn pidv U v v2 m K eb b
         lks fd fv wb i q bs0 nl Φr.
 End SYSREAD_AU.
