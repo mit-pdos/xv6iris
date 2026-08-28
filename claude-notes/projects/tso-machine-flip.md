@@ -12922,3 +12922,59 @@ are.**
 unchanged (`edd91972b6bc1b944fd98a2cc2363815`).  `^Abort` / `^Admitted` /
 `^Axiom` all 0.  The three `TsoCtx` additions (A6.96, A6.97) remain green and
 untouched.
+
+### A6.102 THE TRANCHE'S GATE IS OPEN — ALL FOUR PIECES OF THE FLOOR-0 CHAIN
+### EXIST, AND A6.80 BUILT THE DECISIVE ONE FOR EXACTLY THIS
+
+Step (1) of the six-step order: *can a `.bss` lock's owner bytes be handed as
+era-image ledger cells at `t = 0`?*  **Yes.  The gate does not refuse**, and
+the chain is complete with no new machinery.  Nothing edited; boundary held.
+
+#### (1) THE CHAIN, PIECE BY PIECE, ALL PRESENT
+
+| step | lemma | what it gives |
+|---|---|---|
+| the era-image elements for a static WORD | `BootCarve.boot_led_word` | `[∗ list] j ∈ seq 0 8, ledger_elem0 (pa_add (pa_of_z base) j) (DfracOwn 1)` — **eight elements at a static base, which is exactly a lock's owner field** |
+| element + raw cell → floor-0 ledger byte | `TsoCtx.phys_ledger_at0_of_elem` | `phys_ledger_at a dq v 0` |
+| the window mint at `t = 0` | `TsoCtx.ledger_wpay_mint` | the racy window floored at `0` (A6.83 §(2): one lemma, two instances) |
+| `initlock`'s `sd x0` keeps the floor | `TsoCtx.ledger_store_wpay_ok` | *"THE FLOOR IS FRAMED: both arms keep `lo`… Only `own` moves."* |
+
+#### (2) AND THE CONDITION WAS WRITTEN DOWN BEFORE IT WAS NEEDED
+
+`TsoCtx`'s own header on `phys_ledger_at0_of_elem` (A6.80) states the gate's
+condition verbatim:
+
+> *"`ledger_elem0` IS that element, so the carve's cells reach the mint with
+> no conversion at all.  What has to be arranged on the path is only that the
+> timestamp is not SEALED away: `phys_ledger_of_elem` above is the sealing
+> one, and every cell that will carry the racy payload must take THIS one
+> instead.  Both directions, because the carve builds and the mint consumes."*
+
+So the tranche's condition is not a new obligation but a ROUTING choice that
+A6.80 anticipated and provided both sides of: **the four static locks' owner
+fields must travel from the carve through the timestamp-EXPOSING combinator
+rather than the sealing one.**  A `.bss` lock's owner field is untouched until
+`initlock` runs, so the fact is true; it is only a matter of which lemma the
+path takes.
+
+> **THIS IS THE THIRD TIME THIS LANE HAS FOUND THE ANSWER ALREADY BUILT.**
+> A6.98's `lo` was existential inside the cell; A6.100's timestamp was hidden
+> inside the ctx word; here the exposing combinator was written eighteen
+> amendments ago against exactly this need.  *The port's difficulty is
+> repeatedly not that a fact is missing but that a type is hiding it — and the
+> fix each time is to choose the combinator that does not seal.*
+
+#### (3) WHAT THE NEXT PASS EXECUTES, UNCHANGED FROM A6.101 §(4)
+
+The gate being open, steps (2)–(6) stand as written.  The one thing this
+measurement adds is that step (4)'s four static callers each need a ROUTING
+edit (take `boot_led_word`'s elements to `phys_ledger_at0_of_elem`, not to
+`ctx_phys_pointsto_of_elem`), which is mechanical and local; the two dynamic
+callers are unaffected and keep the purchase chain.
+
+#### (4) THE NUMBER
+
+**1100 of 1296, RED 9 — unchanged**, sentinel-backed at A6.101's round
+(`MAKEEXIT=2`); no source edited this pass.  **Red-list delta: 0.**
+`^Abort` / `^Admitted` / `^Axiom` all 0; mirror in sync; the twice-validated
+surface text still parked at `…/scratchpad/WpLock.v.surface-move`.
