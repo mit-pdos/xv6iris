@@ -227,6 +227,37 @@ Section ctx.
     (lo' <= lo)%nat -> ctx_floor xi lo -∗ ctx_floor xi lo'.
   Proof. intros. rewrite !ctx_floor_unseal /ctx_floor_def. auto. Qed.
 
+  (* ================================================================== *)
+  (* THE INSTALL RECEIPT -- the RIGHT arm of §0.38''s [lk_floor].        *)
+  (*                                                                    *)
+  (* "[lo] is a real log position."  At TSO this is the T-leg's          *)
+  (* [TsoGhost.llb loglen_name lo], handed out by the store leaf beside  *)
+  (* the window it writes; here it is trivial.  It is NOT a floor and    *)
+  (* not a view receipt -- it is the weaker thing a WRITER can honestly  *)
+  (* produce, which is the whole content of A6.101/A6.103's creator      *)
+  (* bootstrap: [initlock]'s store-then-mint cannot buy [ctx_floor]      *)
+  (* because [ctx_bound_raise] wants a receipt at [lo] and a plain store *)
+  (* is buffered, so the writer's own bound has not passed its own       *)
+  (* append.  The floor is bought later, by the READER that needs it     *)
+  (* exact, at its first AMO -- see [WpLock.lk_floor_absorb].            *)
+  (* ================================================================== *)
+  Definition log_lb_def (lo : nat) : iProp Σ := True%I.
+  Lemma log_lb_aux : { f | f = log_lb_def }.
+  Proof. by eexists. Qed.
+  Definition log_lb (lo : nat) : iProp Σ := proj1_sig log_lb_aux lo.
+  Lemma log_lb_unseal (lo : nat) : log_lb lo = log_lb_def lo.
+  Proof. unfold log_lb. by rewrite (proj2_sig log_lb_aux). Qed.
+
+  Global Instance log_lb_persistent lo : Persistent (log_lb lo).
+  Proof. rewrite log_lb_unseal /log_lb_def. apply _. Qed.
+  Global Instance log_lb_timeless lo : Timeless (log_lb lo).
+  Proof. rewrite log_lb_unseal /log_lb_def. apply _. Qed.
+
+  Lemma log_lb_0 : ⊢ log_lb 0.
+  Proof. rewrite log_lb_unseal /log_lb_def. auto. Qed.
+  Lemma log_lb_le lo lo' : (lo' <= lo)%nat -> log_lb lo -∗ log_lb lo'.
+  Proof. intros. rewrite !log_lb_unseal /log_lb_def. auto. Qed.
+
   (* ------------------------------------------------------------------ *)
   (* BUY -- §0.35'(iii)'s absorb, "B_xi rises to K".                     *)
   (*                                                                    *)

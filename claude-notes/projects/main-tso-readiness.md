@@ -733,3 +733,83 @@ receipt) were both on the wrong side of.
 
 `MAKEEXIT=0`, 0 `Error`, 470 files recompiled, dumps unchanged,
 `audit-only` = the sanctioned 13.
+
+---
+
+# AMENDMENT 4 (2026-08-28) — SLICE 2, CHUNK 2: THE LOCK KIT'S CONTEXT LAWS
+
+Additive only (142 insertions, 0 deletions): `TsoCtx.log_lb`, and in
+`WpLock.v` the `lk_floor` family and the parked-record payload.  Nothing
+existing changed; `lock_inv`/`is_lock`/acquire/release convert in chunk 3,
+per §6(e) (land laws at a standalone green boundary, convert consumers
+after).
+
+## 4.1 PROVENANCE — every statement copied, none derived here
+
+The owner's instruction, and it caught a real error: *"be sure to confirm
+how the tso and tso-flip branches are defining the lock payload; it's done
+a lot of engineering to get it right, and it's really subtle… DO NOT
+INVENT ANYTHING HERE."*
+
+| landed | source | note |
+|---|---|---|
+| `lock_pay R := ∃ ξ T, ctx_parked ξ T ∗ R ξ` | `tso` WpLock.v:388 **and** `tso-flip` WpLock.v:1002 | both branches character-identical |
+| `lock_pay_intro` | `tso-flip` WpLock.v:1022 | the HONEST form; see §4.3 |
+| `lk_floor ξ lo := ctx_floor ξ lo ∨ ⟨install receipt⟩` | `tso-flip` WpLock.v:869 | absent from the M-leg entirely (pre-§0.38′) |
+| `lk_floor_0` / `_of_ctx` / `_of_log` / persistence | `tso-flip` WpLock.v:872–881 | `_of_log` is the T-leg's `_of_llb` |
+
+## 4.2 TWO INVENTIONS CAUGHT AND REMOVED — recorded so they stay removed
+
+A first draft of this chunk added two things to `lock_pay` that looked
+natural and are **refuted by both branches**.  Both are now written into
+the source beside the definition.
+
+- **A bound parameter `U`.**  §0.27′'s relational bound belongs to the
+  PROCESS RECORD, not to the generic lock payload; neither branch's
+  `lock_pay` carries one.  The absorb's `T ≤ K` premise is discharged at
+  the ACQUIRE SITE from the AMO's own receipt — and at SC by the trivially
+  valid pair (`K := T`, reflexivity; `tso` ProofAcquire.v).  Carrying `U`
+  in the payload gives a fact that already has a home a second, wrong one.
+- **An elim lemma.**  Neither branch has one, and that is *by design*:
+  the token does not survive the held phase.  A record is minted per
+  PUBLICATION, at release, and abandoned by the winner that claims it,
+  because `ctx_absorb` hands the token back — so keeping it would force
+  release's `ctx_deposit` inside the word-clear store's ATOMIC UPDATE,
+  where no `own_context` is in scope (§0.17′'s measured rule), or make it
+  ride inside `locked`, a resource change under every lock client.  The
+  elimination is `ctx_absorb` applied where the receipt is.
+
+The general lesson, and it is the §6(b) motto turned around: the expensive
+step is not building the law, it is noticing the law is already built —
+**and noticing when the thing you are about to add was already considered
+and rejected.**  Both of these compiled green.  A wrong statement that
+compiles is the defect class `durable-notes.md` calls out as the worst.
+
+## 4.3 TWO JUDGMENT CALLS, FLAGGED FOR RATIFICATION
+
+Neither is an invention, but both are choices this file made:
+
+1. **`TsoCtx.log_lb` is a NAME this tree coined.**  The T-leg's right arm
+   is `TsoGhost.llb loglen_name lo`, which is BELOW the seal, so it cannot
+   land.  §5.1(b) sanctions the concept ("`ctx_floor ξ lo ∨ (install-receipt
+   at lo)`… on SC both arms are trivial; land the SHAPE"), and §2's test
+   passes (the statement has an SC proof with a trivial body).  The ARM is
+   the ruling's; the NAME is ours, and at leg C it is what `llb
+   loglen_name` swaps into.
+2. **`lock_pay_intro` is the T-leg's form, not the M-leg's, and that
+   imports a cascade.**  `tso`'s is weaker (`R cur_ctx ==∗ lock_pay R`)
+   and buys the weakness with a shim quarantine at `ctx_dom_sc`, because
+   at SC it had no way to move a payload onto a fresh parked record.  Main
+   HAS the real `ctx_deposit` (slice 1), so the T-leg proof goes through
+   verbatim and no quarantine is needed anywhere on the lock's transport
+   path.  What it costs is named on the M-leg and is real: `ctx_deposit`
+   wants the creator's running token, so every `newlock` wrapper gains one
+   — the **19-call-site creator cascade** (12 in the newlock family, 7 at
+   `WpLockAt.newlock_at`) that §0.18′ priced and DEFERRED.  Chunk 3 pays
+   it.  §5.1 says land the corrected shapes directly, which is why it was
+   taken; it is flagged because the M-leg's deferral was deliberate.
+
+## 4.4 Gate
+
+`MAKEEXIT=0`, 0 `Error`, 780 files recompiled, dumps unchanged,
+`audit-only` = the sanctioned 13.

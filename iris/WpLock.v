@@ -46,6 +46,12 @@ Require Import RiscvPtsto RiscvLang.
 Require Export LockSet.
 Require Import ProcGeom.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
+(* SLICE 2 chunk 2: the lock kit's context laws, landed ADDITIVELY (§6(e) --
+   laws first at a standalone green boundary, consumers after).  RiscvPtsto is
+   re-imported after TsoCtx so this file's own notations stay raw until the M1
+   flip. *)
+Require Import TsoCtx.
+Require Import RiscvPtsto.
 Local Open Scope Z_scope.
 
 
@@ -335,6 +341,111 @@ Section Lock.
      Everything a consumer needs is lemma-driven ([is_lock_name] /
      [is_lock_inv] / [is_lock_intro] below), so nothing needs the unfolding. *)
   Global Typeclasses Opaque is_lock.
+
+  (* ================================================================== *)
+  (* SLICE 2 CHUNK 2 -- THE CONTEXT LAWS OF THE LOCK KIT.               *)
+  (*                                                                    *)
+  (* Additive: nothing above this point changed.  These are the objects  *)
+  (* chunk 3 converts [lock_inv] / [is_lock] / acquire / release ONTO.    *)
+  (*                                                                    *)
+  (* EVERY STATEMENT HERE IS TAKEN FROM THE PROTOTYPE BRANCHES, NOT      *)
+  (* DERIVED HERE.  The lock payload was engineered over days on `tso`   *)
+  (* and `tso-flip` and it is subtle; this file copies, it does not      *)
+  (* improve.  Provenance is recorded per definition.  If something      *)
+  (* below looks like it wants a parameter or a companion law, the       *)
+  (* answer is on those branches or it does not exist -- see the two     *)
+  (* NEGATIVE RESULTS recorded at [lock_pay]. *)
+  (* ================================================================== *)
+
+  (* ------------------------------------------------------------------ *)
+  (* §0.38': THE HANDLE'S FLOOR, TWO-ARMED.   [tso-flip WpLock.v:869]    *)
+  (*                                                                    *)
+  (* "You RECEIVED this handle, or you WROTE this lock."  The left arm is *)
+  (* what every channel crossing delivers; the right arm's only resting   *)
+  (* holder is the creator's own thread before its first AMO, whose reads *)
+  (* are covered by store forwarding.  [ctx_pointsto]'s clean-vs-own-write*)
+  (* disjunction surfacing one tier up, and what makes the creator        *)
+  (* bootstrap STRUCTURAL rather than a second distribution (A6.100): two *)
+  (* FLOOR SOURCES, not two channels.                                     *)
+  (*                                                                    *)
+  (* NOT ON THE M-LEG AT ALL -- `tso`'s [is_lock] is pre-§0.38' and has   *)
+  (* no floor.  This is one of the corrected shapes §5.1(b) exists to     *)
+  (* make main land directly.                                            *)
+  (*                                                                    *)
+  (* The T-leg's right arm is [TsoGhost.llb loglen_name lo], which is     *)
+  (* BELOW the seal.  [TsoCtx.log_lb] is its above-seal name (§2's test:  *)
+  (* the statement has an SC proof with a trivial body).  The name is     *)
+  (* this tree's; the ARM is the ruling's. *)
+  Definition lk_floor (xi : TsoCtx.CtxId) (lo : nat) : iProp Σ :=
+    (TsoCtx.ctx_floor xi lo ∨ TsoCtx.log_lb lo)%I.
+
+  Global Instance lk_floor_persistent xi lo : Persistent (lk_floor xi lo).
+  Proof. rewrite /lk_floor. apply _. Qed.
+
+  Lemma lk_floor_0 xi : ⊢ lk_floor xi 0.
+  Proof. iLeft. iApply TsoCtx.ctx_floor_0. Qed.
+  Lemma lk_floor_of_ctx xi lo : TsoCtx.ctx_floor xi lo -∗ lk_floor xi lo.
+  Proof. iIntros "H". by iLeft. Qed.
+  Lemma lk_floor_of_log xi lo : TsoCtx.log_lb lo -∗ lk_floor xi lo.
+  Proof. iIntros "H". by iRight. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* §0.18': THE PAYLOAD IS A PARKED RECORD.   [tso WpLock.v:388,        *)
+  (*                                            tso-flip WpLock.v:1002]  *)
+  (* BOTH branches, character-identical.                                  *)
+  (*                                                                    *)
+  (* This is what makes the lambda payload ONE invariant serving every    *)
+  (* context, and the reason §5.1(a) forbids the constant embedding: [R]  *)
+  (* is stored at an EXISTENTIAL context beside that context's own parked *)
+  (* token, so the invariant body mentions no ambient at all.             *)
+  (*                                                                    *)
+  (* TWO NEGATIVE RESULTS, recorded so nobody re-adds them (I tried both  *)
+  (* and the branches refute both):                                       *)
+  (*                                                                    *)
+  (* (1) THERE IS NO BOUND PARAMETER.  §0.27''s relational [U] belongs to *)
+  (*     the PROCESS RECORD, not to the generic lock payload; neither     *)
+  (*     branch's [lock_pay] takes one.  The absorb's [T <= K] premise is *)
+  (*     discharged AT THE ACQUIRE SITE out of the AMO's own receipt --   *)
+  (*     and at SC by the trivially valid pair ([K := T], reflexivity;    *)
+  (*     `tso` ProofAcquire.v).  Adding [U] here would be a second, wrong *)
+  (*     home for a fact that already has one.                            *)
+  (*                                                                    *)
+  (* (2) THERE IS NO ELIM LEMMA, on either branch, and that is by design. *)
+  (*     The token DOES NOT SURVIVE THE HELD PHASE: a record is minted    *)
+  (*     per PUBLICATION, at release, and abandoned by the winner that    *)
+  (*     claims it.  [ctx_absorb] hands the token back, so keeping it     *)
+  (*     would force release's [ctx_deposit] to run inside the word-clear *)
+  (*     store's ATOMIC UPDATE, where no [own_context] is in scope        *)
+  (*     (§0.17''s measured rule) -- or to ride inside [locked], a        *)
+  (*     resource change under every lock client.  Neither is needed      *)
+  (*     because the stamp tie is per-publication.  The elimination is    *)
+  (*     [ctx_absorb] applied at the acquire proof, where the receipt is. *)
+  Definition lock_pay (R : TsoCtx.CtxId -> iProp Σ) : iProp Σ :=
+    (∃ (xi : TsoCtx.CtxId) (T : nat), TsoCtx.ctx_parked xi T ∗ R xi)%I.
+
+  (* THE CREATOR'S MINT.  [tso-flip WpLock.v:1022] -- the HONEST form.
+     The M-leg's [tso WpLock.v:404] is weaker ([R cur_ctx ==∗ lock_pay R])
+     and buys that weakness with a shim quarantine at [ctx_dom_sc],
+     because at SC it had no way to move a payload onto a fresh parked
+     record.  THIS tree has the real [ctx_deposit] (slice 1), so the T-leg
+     proof goes through verbatim and no quarantine is needed anywhere on
+     the lock's transport path.
+     WHAT IT COSTS is named on the M-leg and is real: [ctx_deposit] wants
+     the creator's running token, so every [newlock] wrapper gains a token
+     it must already have in scope -- the 19-call-site creator cascade
+     (12 in the newlock family, 7 at [WpLockAt.newlock_at]) that §0.18'
+     priced and DEFERRED.  Chunk 3 pays it. *)
+  Lemma lock_pay_intro `{CID : CpuId} `{XI : TsoCtx.CurCtx}
+      (R : TsoCtx.CtxId -> iProp Σ) `{!TsoCtx.CtxMorph R} :
+    TsoCtx.own_context TsoCtx.cur_ctx -∗ R TsoCtx.cur_ctx ==∗
+    TsoCtx.own_context TsoCtx.cur_ctx ∗ lock_pay R.
+  Proof.
+    iIntros "Hrun HR".
+    iMod TsoCtx.ctx_parked_alloc as (xic) "Hpk".
+    iMod (TsoCtx.ctx_deposit R TsoCtx.cur_ctx xic 0 with "Hrun Hpk HR")
+      as "(Hrun & %T' & _ & Hpk & HR)".
+    iModIntro. iFrame "Hrun". iExists xic, T'. iFrame "Hpk HR".
+  Qed.
 
   (* the two projections + the introduction rule (the only interface the
      lock leaves and [newlock] need). *)
