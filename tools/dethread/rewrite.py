@@ -13,17 +13,27 @@ NOSCOPE = {
     ('ProofWritei.v', 'wi16_pre_spend'), ('ProofWritei.v', 'wi16_pre_join'),
     ('SpecDirlink.v', 'dl16_post'), ('SpecDirlink.v', 'ireg_blocks_ok'),
     ('SpecWritei.v', 'wi16_post'), ('SpecWritei.v', 'wi16_spend_any'),
+    ('ProofFilewrite.v', 'fw_dir_ok_wi'), ('ProofFilewrite.v', 'fw_dir_ok_same'),
 }
 # untyped binders the parser cannot classify: drop these names explicitly.
 MANUAL = {
-    ('FsSyscalls.v', 'fs_world_persistent'): {'glog', 'inodestart', 'nib', 'dev'},
-    ('FsSyscalls.v', 'fs_world_all'):        {'glog', 'inodestart', 'nib', 'dev'},
-    ('ProofKexecTail.v', 'fs_fabric_mk'):    {'g'},
-    ('SpecItrunc.v', 'bm_paid_intro'):       {'γ'},
-    ('SpecItrunc.v', 'bm_paidS_intro'):      {'γ'},
-    ('SpecItrunc.v', 'bm_paidS_elim'):       {'γ'},
-    ('SpecItrunc.v', 'bm_paid_elim'):        {'γ'},
+    ('ProofKexecTail.v', 'fs_fabric_mk'):    {'g', 'gu', 'gd', 'gk', 'bn'},
+    ('SpecKexec.v', 'fs_fabric_persistent'): {'gu', 'gd', 'gk', 'bn'},
+    ('SpecItrunc.v', 'bm_paid_intro'):       {'γ', 'bmapstart'},
+    ('SpecItrunc.v', 'bm_paidS_intro'):      {'γ', 'bmapstart'},
+    ('SpecItrunc.v', 'bm_paidS_elim'):       {'γ', 'bmapstart'},
+    ('SpecItrunc.v', 'bm_paid_elim'):        {'γ', 'bmapstart'},
     ('SpecCreate.v', 'create_locked_mk'):    {'dev'},
+}
+# the field an untyped MANUAL binder stands for, by name alone
+MANUAL_FIELD = {
+    'dev': 'icfg_dev', 'nib': 'icfg_nib', 'inodestart': 'icfg_ist',
+    'g': 'icfg_log', 'γ': 'icfg_log', 'glog': 'icfg_log', 'γlog': 'icfg_log',
+    'bn': 'fsc_bio', 'gu': 'fsc_uart', 'γu': 'fsc_uart',
+    'gd': 'fsc_disk', 'γd': 'fsc_disk', 'gk': 'fsc_dlock', 'γk': 'fsc_dlock',
+    'ga': 'fsc_kalloc', 'γa': 'fsc_kalloc', 'γkl': 'fsc_kalloc',
+    'gpr': 'fsc_printk', 'γpr': 'fsc_printk', 'γka': 'fsc_kpages',
+    'bmapstart': 'fsc_bmapstart', 'size': 'fsc_size', 'ninodes': 'fsc_ninodes',
 }
 
 IDCHAR = "A-Za-z0-9_'Ͱ-Ͽἀ-῿"
@@ -84,9 +94,7 @@ def analyse_file(path):
             for nm, sp in b['names']:
                 fld = TARGET.get((nm, ty))
                 if fld is None and nm in manual:
-                    fld = TARGET.get((nm, 'log_names')) if nm in ('g', 'γ', 'glog') else \
-                          {'dev': 'icfg_dev', 'nib': 'icfg_nib',
-                           'inodestart': 'icfg_ist'}.get(nm)
+                    fld = MANUAL_FIELD.get(nm)
                 if fld:
                     drops.append((pos, nm, fld, sp, b))
                 pos += 1
@@ -147,9 +155,18 @@ def args_of(t, i, limit):
 
 EXPECT = {'dev', 'nib', 'inodestart', 'g', 'γ', 'glog', 'γlog',
           "dev'", "nib'", "inodestart'", "g'", "γ'", "glog'", 'cdev',
-          'icfg_dev', 'icfg_nib', 'icfg_ist', 'icfg_log', '_'}
+          'icfg_dev', 'icfg_nib', 'icfg_ist', 'icfg_log', '_',
+          # ---- rank 1d ----
+          'bn', 'γu', 'gu', 'γd', 'gd', 'γk', 'gk', 'γa', 'ga', 'γkl',
+          'γpr', 'gpr', 'γka', 'bmapstart', 'size', 'ninodes',
+          "bn'", "γu'", "gu'", "γd'", "gd'", "γk'", "gk'", "γa'", "ga'",
+          "γpr'", "gpr'", "γkl'", "γka'", "bmapstart'", "size'", "ninodes'",
+          'fsc_bio', 'fsc_uart', 'fsc_disk', 'fsc_dlock', 'fsc_kalloc',
+          'fsc_kpages', 'fsc_printk', 'fsc_bmapstart', 'fsc_size',
+          'fsc_ninodes'}
 # the names records' projections (fclose_names & co.) lose these fields too
-PROJ = re.compile(r'^\(\s*(fcn|frn|fwn|fsn|un)_(dev|nib|inodestart|log|ist|glog|lg)\s+'
+PROJ = re.compile(r'^\(\s*(fcn|frn|fwn|fsn|un)_(dev|nib|inodestart|log|ist|glog|lg'
+                  r'|bio|bn|uart|disk|dlock|kmem|kalloc|bmapstart|size|u|v|k|kl|ka|pr)\s+'
                   r'[' + IDCHAR + r']+\s*\)$')
 
 def expected(a):
