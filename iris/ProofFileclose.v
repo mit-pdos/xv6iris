@@ -1147,7 +1147,7 @@ Section ProofFileclose.
         iDestruct "Hcore" as "(#Hispipe & Hpref & Hiru)".
         (* the environment is keyed on the descriptor's STATE and the code
            branched on [f->type]; [fdstate_ok] is what makes those one fact *)
-        destruct (fdstate_ok_pipe _ _ _ Hok Hpipe) as [bdir Hstp].
+        destruct (fdstate_ok_pipe _ _ _ Hok Hpipe) as (bdr & bdw & Hstp).
         iEval (rewrite Hstp /fileclose_env) in "Henv".
         rewrite /fileclose_pipe_env.
         iDestruct "Henv" as "(%Hn2 & #Hprocs & #Hkmem & Hav)".
@@ -1324,8 +1324,8 @@ Section ProofFileclose.
           iAssert (fileclose_fs_env fn n eb p) with "[Henv]" as "Henv".
           { rewrite /fileclose_env.
             destruct Hinode as [Ht | Ht];
-              [ rewrite (fdstate_ok_inode _ _ _ Hok Ht)
-              | rewrite (fdstate_ok_device _ _ _ Hok Ht) ]; iExact "Henv". }
+              [ destruct (fdstate_ok_inode _ _ _ Hok Ht) as (? & ? & ->)
+              | destruct (fdstate_ok_device _ _ _ Hok Ht) as (? & ? & ->) ]; iExact "Henv". }
           (* THE PAYLOAD IS THE REFERENCE, and this closer holds ALL of it:
              [file_rest_join] gave fraction one, so the cancel token is
              whole and [FileInv.inode_pay_cancel] turns it into the inode
@@ -1668,8 +1668,8 @@ Section ProofFileclose.
              on [Hislot].) *)
           { rewrite /fileclose_env_out.
             destruct Hinode as [Ht | Ht];
-              [ rewrite (fdstate_ok_inode _ _ _ Hok Ht)
-              | rewrite (fdstate_ok_device _ _ _ Hok Ht) ];
+              [ destruct (fdstate_ok_inode _ _ _ Hok Ht) as (? & ? & ->)
+              | destruct (fdstate_ok_device _ _ _ Hok Ht) as (? & ? & ->) ];
               rewrite /fileclose_fs_out; iExact "Hbsl". }
         * (* ======== FD_NONE (or anything else): nothing to do ========== *)
           iApply (wp_bgeu_fall_s_sconf (mword_of_int (FC + 0x60))

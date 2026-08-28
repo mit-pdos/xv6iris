@@ -99,7 +99,8 @@ Section SpecPipealloc.
      IT IS NO LONGER IN THE POSTCONDITION.  A reference hides its [fcontent]
      ([FileInvDefs.file_ref]), so the post cannot name a [C] to say this
      about; what survives is the half a DESCRIPTOR can see, which is the
-     direction, and that rides in the state as [FdSlots.FdPipe b].  The
+     direction, and that rides in the state as [FdOpen]'s two mode flags.
+     The
      conjunct that has no home yet is [fc_pipe C = pi] -- "both ends belong
      to one pipe" -- which would need [FdPipe] to carry the pipe's identity
      the way [FdInode] carries its inum.  Kept here because it is the
@@ -138,12 +139,13 @@ Section SpecPipealloc.
         reads the end off exactly those fields. *)
      ⌜r = (zero_reg : mword 64)⌝ ∗
      kalloc_avail γk (avail_dec on) ∗
-     (* WHICH END IS WHICH, IN THE STATE ITSELF.  [FdPipe false] is the read
-        end and [FdPipe true] the write end -- the direction is tied to
-        [f->writable] by [FileInvDefs.fdstate_ok], and on a pipe that field
-        is the WHOLE of what distinguishes the two files (same type, same
-        [f->pipe]).  So the post still says fd[0] reads and fd[1] writes,
-        with no [fcontent] named anywhere.
+     (* WHICH END IS WHICH, IN THE STATE ITSELF.  [FdOpen true false FdPipe]
+        is the read end and [FdOpen false true FdPipe] the write end -- the
+        two flags are tied to [f->readable] / [f->writable] by
+        [FileInvDefs.fdstate_ok], and on a pipe they are the WHOLE of what
+        distinguishes the two files (same type, same [f->pipe]).  So the post
+        says fd[0] reads and fd[1] writes -- and says it about BOTH cells now,
+        not just the writable one -- with no [fcontent] named anywhere.
         What it no longer says is that the two are ends of the SAME pipe:
         that was [pipe_file pi _ C]'s [fc_pipe] conjunct, and a reference
         hides its content.  No caller consumed it -- sys_pipe's own proof
@@ -153,8 +155,8 @@ Section SpecPipealloc.
      (∃ (k0 k1 : nat),
         ⌜(k0 < NFILE)%nat /\ (k1 < NFILE)%nat⌝ ∗
         pf0 ↦₈[KT1] fnode k0 ∗ pf1 ↦₈[KT1] fnode k1 ∗
-        file_ref γf k0 1 (FdOpen (FdPipe false)) ∗
-        file_ref γf k1 1 (FdOpen (FdPipe true))))%I.
+        file_ref γf k0 1 (FdOpen true false FdPipe) ∗
+        file_ref γf k1 1 (FdOpen false true FdPipe)))%I.
 
 End SpecPipealloc.
 

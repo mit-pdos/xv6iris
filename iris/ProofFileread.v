@@ -336,7 +336,7 @@ Section ProofFileread.
     fdstate_ok inum Cf' st' -> fc_type Cf' = FD_DEVICE ->
     fileread_env γf' fn' st' -∗ fileread_dev_env fn' (dev_major Cf').
   Proof.
-    intros Hok Ht. rewrite (fdstate_ok_device inum Cf' st' Hok Ht). by iIntros "$".
+    intros Hok Ht. destruct (fdstate_ok_device inum Cf' st' Hok Ht) as (? & ? & ->). by iIntros "$".
   Qed.
 
   Local Lemma fr_env_out_dev (fn' : fread_names)
@@ -344,7 +344,7 @@ Section ProofFileread.
     fdstate_ok inum Cf' st' -> fc_type Cf' = FD_DEVICE ->
     fileread_dev_env fn' (dev_major Cf') -∗ fileread_env_out fn' st'.
   Proof.
-    intros Hok Ht. rewrite (fdstate_ok_device inum Cf' st' Hok Ht). by iIntros "$".
+    intros Hok Ht. destruct (fdstate_ok_device inum Cf' st' Hok Ht) as (? & ? & ->). by iIntros "$".
   Qed.
 
   Local Lemma fr_dev_in (fn' : fread_names) (Cf' : fcontent) :
@@ -388,7 +388,7 @@ Section ProofFileread.
     fdstate_ok inum Cf' st' -> fc_type Cf' = FD_INODE ->
     fileread_env γf' fn' st' -∗ fileread_fs_env γf' fn'.
   Proof.
-    intros Hok Ht. rewrite (fdstate_ok_inode inum Cf' st' Hok Ht). by iIntros "$".
+    intros Hok Ht. destruct (fdstate_ok_inode inum Cf' st' Hok Ht) as (? & ? & ->). by iIntros "$".
   Qed.
 
   Local Lemma fr_env_out_fs (fn' : fread_names)
@@ -396,7 +396,7 @@ Section ProofFileread.
     fdstate_ok inum Cf' st' -> fc_type Cf' = FD_INODE ->
     fileread_fs_out fn' -∗ fileread_env_out fn' st'.
   Proof.
-    intros Hok Ht. rewrite (fdstate_ok_inode inum Cf' st' Hok Ht). by iIntros "$".
+    intros Hok Ht. destruct (fdstate_ok_inode inum Cf' st' Hok Ht) as (? & ? & ->). by iIntros "$".
   Qed.
 
   Lemma wp_fileread_sconf 

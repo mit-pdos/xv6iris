@@ -273,6 +273,11 @@ Section ProofSysOpenBody.
     fc_ip C = ientry kk ->
     (fc_type C = FD_INODE \/ fc_type C = FD_DEVICE) ->
     fc_writable C = trunc8 (so_wr_word om) ->
+    (* ...and the READABLE cell, which nothing used to ask for: it is what
+       the published descriptor's [FdSlots.FdOpen] reports as its read flag,
+       so the tail now has to carry it down to [so_publish] alongside the
+       writable one. *)
+    fc_readable C = trunc8 (so_rd_word om) ->
     (bv_unsigned (di_type dn) = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
     off_wf voff ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
@@ -357,7 +362,7 @@ Section ProofSysOpenBody.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf Hfdlt
-           Hlen Hfrees Hip Htyor Hwrb Hdir Hwf Hsp0 HMsp HMthr HMs1
+           Hlen Hfrees Hip Htyor Hwrb Hrdw Hdir Hwf Hsp0 HMsp HMthr HMs1
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitinv #Hesck #Hslkk Hslkd Hdep Hidev Hiinum Hivalid
@@ -383,9 +388,16 @@ Section ProofSysOpenBody.
                                          Hpbare Hshr".
     iDestruct ("Hcback" with "Hpbare") as "Hcore".
     (* ---- THE PUBLICATION: one ghost step ---- *)
+    (* the two mode cells are C bools, and THAT is what the descriptor's
+       [FdOpen rb wb] will claim: [f->readable] is [!(omode & O_WRONLY)] and
+       [f->writable] the [snez], both a bit by construction. *)
+    destruct (so_rd_byte_bool om) as [rb Hrdb].
+    destruct (so_wr_byte_bool om) as [wb Hwdb].
     iApply fupd_wp.
-    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om voff
-            ltac:(solve_ndisj) ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb Hdir
+    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om voff rb wb
+            ltac:(solve_ndisj) ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
+            ltac:(rewrite Hrdw; exact Hrdb) ltac:(rewrite Hwrb; exact Hwdb)
+            Hdir
             Hwf
             with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hfip Hfoff")
       as (stpub) "[%Hokpub Href]".
@@ -829,7 +841,7 @@ Section ProofSysOpenBody.
                 (S (S u2)) pidv dqb dqs V m N6 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp
                 HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
-                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl Hdir Hwf
+                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
                 Hsp0 HN6sp HN6thr HN6s1 HN6s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
@@ -927,7 +939,7 @@ Section ProofSysOpenBody.
                 (S (S u2)) pidv dqb dqs V m N8 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp
                 HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
-                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl Hdir Hwf
+                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
                 Hsp0 HN8sp HN8thr HN8s1 HN8s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
@@ -1130,7 +1142,7 @@ Section ProofSysOpenBody.
               om voff nsj u3 pidv dqb dqs V m mit sp0 K
               eb b lks w6 (word_of_words lo om) w24 bp
               HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
-              Hfdlt Hlen Hfrees eq_refl Htyor eq_refl Hdir Hwf
+              Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
               Hsp0 Hitsp Hitthr Hits1 Hits3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid

@@ -136,7 +136,7 @@ Section SpecSysWrite.
     (filewrite_env_out fn st -∗ filewrite_fs_out fn ∗ filewrite_devsw fn).
   Proof.
     iIntros "Hfs Hdev". rewrite /filewrite_env /filewrite_env_out.
-    destruct st as [|[?|?|mj]].
+    destruct st as [|? ? [?| |mj]].
     { (* CLOSED *)
       iSplitR; [done|]. iIntros "_".
       iDestruct (filewrite_fs_env_out with "Hfs") as "Hout".

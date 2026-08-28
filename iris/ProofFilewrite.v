@@ -993,7 +993,7 @@ Section ProofFilewrite.
     fdstate_ok inum Cf' st' -> fc_type Cf' = FD_DEVICE ->
     filewrite_env γf' fn' st' -∗ filewrite_dev_env fn' (dev_major Cf').
   Proof.
-    intros Hok Ht. rewrite (fdstate_ok_device inum Cf' st' Hok Ht). by iIntros "$".
+    intros Hok Ht. destruct (fdstate_ok_device inum Cf' st' Hok Ht) as (? & ? & ->). by iIntros "$".
   Qed.
 
   Local Lemma fw_env_out_dev (fn' : fwrite_names)
@@ -1001,7 +1001,7 @@ Section ProofFilewrite.
     fdstate_ok inum Cf' st' -> fc_type Cf' = FD_DEVICE ->
     filewrite_dev_env fn' (dev_major Cf') -∗ filewrite_env_out fn' st'.
   Proof.
-    intros Hok Ht. rewrite (fdstate_ok_device inum Cf' st' Hok Ht). by iIntros "$".
+    intros Hok Ht. destruct (fdstate_ok_device inum Cf' st' Hok Ht) as (? & ? & ->). by iIntros "$".
   Qed.
 
   Local Lemma fw_dev_in (fn' : fwrite_names) (Cf' : fcontent) :
@@ -1052,7 +1052,7 @@ Section ProofFilewrite.
     fdstate_ok inum Cf' st' -> fc_type Cf' = FD_INODE ->
     filewrite_env gf' fn' st' -∗ filewrite_fs_env gf' fn'.
   Proof.
-    intros Hok Ht. rewrite (fdstate_ok_inode inum Cf' st' Hok Ht). by iIntros "$".
+    intros Hok Ht. destruct (fdstate_ok_inode inum Cf' st' Hok Ht) as (? & ? & ->). by iIntros "$".
   Qed.
 
   Local Lemma fw_env_out_fs (fn' : fwrite_names)
@@ -1060,7 +1060,7 @@ Section ProofFilewrite.
     fdstate_ok inum Cf' st' -> fc_type Cf' = FD_INODE ->
     filewrite_fs_out fn' -∗ filewrite_env_out fn' st'.
   Proof.
-    intros Hok Ht. rewrite (fdstate_ok_inode inum Cf' st' Hok Ht). by iIntros "$".
+    intros Hok Ht. destruct (fdstate_ok_inode inum Cf' st' Hok Ht) as (? & ? & ->). by iIntros "$".
   Qed.
 
   (* =================================================================== *)

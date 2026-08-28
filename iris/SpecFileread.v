@@ -502,17 +502,17 @@ Section SpecFileread.
   Definition fileread_env (γf : gname)
       (fn : fread_names) (st : fdstate) : iProp Σ :=
     (match st with
-     | FdOpen (FdPipe _)    => emp
-     | FdOpen (FdDevice mj) => fileread_dev_env fn mj
-     | FdOpen (FdInode _)   => fileread_fs_env γf fn
+     | FdOpen _ _ FdPipe        => emp
+     | FdOpen _ _ (FdDevice mj) => fileread_dev_env fn mj
+     | FdOpen _ _ (FdInode _)   => fileread_fs_env γf fn
      | FdClosed             => emp
      end)%I.
 
   Definition fileread_env_out (fn : fread_names) (st : fdstate) : iProp Σ :=
     (match st with
-     | FdOpen (FdPipe _)    => emp
-     | FdOpen (FdDevice mj) => fileread_dev_out fn mj
-     | FdOpen (FdInode _)   => fileread_fs_out fn
+     | FdOpen _ _ FdPipe        => emp
+     | FdOpen _ _ (FdDevice mj) => fileread_dev_out fn mj
+     | FdOpen _ _ (FdInode _)   => fileread_fs_out fn
      | FdClosed             => emp
      end)%I.
 
@@ -532,7 +532,7 @@ Section SpecFileread.
     fileread_env γf fn st -∗ fileread_env_out fn st.
   Proof.
     rewrite /fileread_env /fileread_env_out.
-    destruct st as [|[?|?|?]]; try by iIntros "$".
+    destruct st as [|? ? [?| |?]]; try by iIntros "$".
     iApply fileread_fs_env_out.
   Qed.
 

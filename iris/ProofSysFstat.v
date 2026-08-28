@@ -164,7 +164,7 @@ Section ProofSysFstat.
     filestat_fs_env fn -∗
     filestat_env fn st ∗ (filestat_env_out fn st -∗ filestat_fs_out fn).
   Proof.
-    rewrite /filestat_env /filestat_env_out. destruct st as [|[?|?|?]].
+    rewrite /filestat_env /filestat_env_out. destruct st as [|? ? [?| |?]].
     - iIntros "H". iSplitR; [done|]. iIntros "_".
       iApply (filestat_fs_env_out with "H").
     - iIntros "H". iSplitL "H"; [iExact "H"|]. iIntros "$".

@@ -288,13 +288,13 @@ Section SpecFilestat.
      condition, for [filestat_pay_carve], which is inside the reference. *)
   Definition filestat_env (fn : fstat_names) (st : fdstate) : iProp Σ :=
     (match st with
-     | FdOpen (FdInode _) | FdOpen (FdDevice _) => filestat_fs_env fn
+     | FdOpen _ _ (FdInode _) | FdOpen _ _ (FdDevice _) => filestat_fs_env fn
      | _ => emp
      end)%I.
 
   Definition filestat_env_out (fn : fstat_names) (st : fdstate) : iProp Σ :=
     (match st with
-     | FdOpen (FdInode _) | FdOpen (FdDevice _) => filestat_fs_out fn
+     | FdOpen _ _ (FdInode _) | FdOpen _ _ (FdDevice _) => filestat_fs_out fn
      | _ => emp
      end)%I.
 
@@ -315,7 +315,7 @@ Section SpecFilestat.
     filestat_env fn st -∗ filestat_env_out fn st.
   Proof.
     rewrite /filestat_env /filestat_env_out.
-    destruct st as [|[?|?|?]]; try by iIntros "$".
+    destruct st as [|? ? [?| |?]]; try by iIntros "$".
     all: iApply filestat_fs_env_out.
   Qed.
 
@@ -451,10 +451,10 @@ Section SpecFilestat.
   (* A file that carries no inode costs its stat-er nothing. *)
   Lemma filestat_env_none fn st :
     match st with
-    | FdOpen (FdInode _) | FdOpen (FdDevice _) => False
+    | FdOpen _ _ (FdInode _) | FdOpen _ _ (FdDevice _) => False
     | _ => True
     end -> ⊢ filestat_env fn st.
-  Proof. destruct st as [|[?|?|?]]; done. Qed.
+  Proof. destruct st as [|? ? [?| |?]]; done. Qed.
 
 End SpecFilestat.
 

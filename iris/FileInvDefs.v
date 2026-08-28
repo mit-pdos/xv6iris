@@ -489,72 +489,93 @@ Record fcontent := MkFContent {
    the [FdDevice] arm, and this is the only site that would change. *)
 Definition fdstate_ok (inum : mword 32) (C : fcontent) (st : fdstate) : Prop :=
   match st with
-  | FdClosed             => fc_type C = FD_NONE
-  | FdOpen (FdPipe b)    => fc_type C = FD_PIPE /\
-                            fc_writable C
-                              = ((if b then mword_of_int 1
-                                        else mword_of_int 0) : mword 8)
-  | FdOpen (FdInode n)   => fc_type C = FD_INODE /\ n = bv_unsigned inum
-  | FdOpen (FdDevice mj) => fc_type C = FD_DEVICE
-                            /\ mj = bv_unsigned (fc_major C)
+  | FdClosed => fc_type C = FD_NONE
+  | FdOpen r w t =>
+      fc_readable C = ((if r then mword_of_int 1 else mword_of_int 0) : mword 8)
+      /\ fc_writable C = ((if w then mword_of_int 1 else mword_of_int 0) : mword 8)
+      /\ match t with
+         | FdPipe        => fc_type C = FD_PIPE
+         | FdInode n     => fc_type C = FD_INODE /\ n = bv_unsigned inum
+         | FdDevice mj   => fc_type C = FD_DEVICE /\ mj = bv_unsigned (fc_major C)
+         end
   end.
 
 (* THE FORWARD READINGS, one per type code.  A proof that has just loaded
    [f->type] and branched on it learns which state its descriptor is in --
    which is how the [st]-keyed environments in SpecFileread and friends line
-   up with the arm the code took.  (The converse direction is the definition
-   above and needs no lemma.) *)
-(* the pipe reading names its DIRECTION existentially: which end a
-   descriptor holds is produced by pipealloc and consumed by nobody in the
-   kernel -- the closers only need to know it is a pipe. *)
+   up with the arm the code took.  The mode flags come out with it, since a
+   typed state cannot fail to name them.  (The converse direction is the
+   definition above and needs no lemma.) *)
 Lemma fdstate_ok_pipe (inum : mword 32) (C : fcontent) (st : fdstate) :
   fdstate_ok inum C st -> fc_type C = FD_PIPE ->
-  ∃ b : bool, st = FdOpen (FdPipe b).
+  ∃ r w : bool, st = FdOpen r w FdPipe.
 Proof.
-  destruct st as [|[n|b|mj]]; cbn; intros Hok Ht.
+  destruct st as [|r w [n| |mj]]; cbn; intros Hok Ht.
   - exfalso. rewrite Ht in Hok. apply (f_equal bv_unsigned) in Hok.
     by vm_compute in Hok.
-  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+  - exfalso. destruct Hok as (_ & _ & Hc & _). rewrite Ht in Hc.
     apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
-  - by exists b.
-  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+  - by exists r, w.
+  - exfalso. destruct Hok as (_ & _ & Hc & _). rewrite Ht in Hc.
     apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
 Qed.
 
 Lemma fdstate_ok_inode (inum : mword 32) (C : fcontent) (st : fdstate) :
   fdstate_ok inum C st -> fc_type C = FD_INODE ->
-  st = FdOpen (FdInode (bv_unsigned inum)).
+  ∃ r w : bool, st = FdOpen r w (FdInode (bv_unsigned inum)).
 Proof.
-  destruct st as [|[n|wr|mj]]; cbn; intros Hok Ht.
+  destruct st as [|r w [n| |mj]]; cbn; intros Hok Ht.
   - exfalso. rewrite Ht in Hok. apply (f_equal bv_unsigned) in Hok.
     by vm_compute in Hok.
-  - destruct Hok as [_ ->]. reflexivity.
-  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+  - destruct Hok as (_ & _ & _ & ->). by exists r, w.
+  - exfalso. destruct Hok as (_ & _ & Hc). rewrite Ht in Hc.
     apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
-  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+  - exfalso. destruct Hok as (_ & _ & Hc & _). rewrite Ht in Hc.
     apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
 Qed.
 
 Lemma fdstate_ok_device (inum : mword 32) (C : fcontent) (st : fdstate) :
   fdstate_ok inum C st -> fc_type C = FD_DEVICE ->
-  st = FdOpen (FdDevice (bv_unsigned (fc_major C))).
+  ∃ r w : bool, st = FdOpen r w (FdDevice (bv_unsigned (fc_major C))).
 Proof.
-  destruct st as [|[n|wr|mj]]; cbn; intros Hok Ht.
+  destruct st as [|r w [n| |mj]]; cbn; intros Hok Ht.
   - exfalso. rewrite Ht in Hok. apply (f_equal bv_unsigned) in Hok.
     by vm_compute in Hok.
-  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+  - exfalso. destruct Hok as (_ & _ & Hc & _). rewrite Ht in Hc.
     apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
-  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+  - exfalso. destruct Hok as (_ & _ & Hc). rewrite Ht in Hc.
     apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
-  - destruct Hok as [_ ->]. reflexivity.
+  - destruct Hok as (_ & _ & _ & ->). by exists r, w.
 Qed.
 
 Lemma fdstate_ok_none (inum : mword 32) (C : fcontent) (st : fdstate) :
   fdstate_ok inum C st -> fc_type C = FD_NONE -> st = FdClosed.
 Proof.
-  destruct st as [|[n|wr|mj]]; cbn; intros Hok Ht; [reflexivity | | |];
-    exfalso; destruct Hok as [Hc _]; rewrite Ht in Hc;
-    apply (f_equal bv_unsigned) in Hc; by vm_compute in Hc.
+  destruct st as [|r w [n| |mj]]; cbn; intros Hok Ht; [reflexivity | | |];
+    exfalso;
+    [ destruct Hok as (_ & _ & Hc & _) | destruct Hok as (_ & _ & Hc)
+    | destruct Hok as (_ & _ & Hc & _) ];
+    rewrite Ht in Hc; apply (f_equal bv_unsigned) in Hc; by vm_compute in Hc.
+Qed.
+
+(* THE MODE FLAGS, read off the cells.  What a proof that has just branched
+   on [beqz f->readable] learns about the state it was handed. *)
+Lemma fdstate_ok_rw (inum : mword 32) (C : fcontent) (r w : bool) (t : fdtype) :
+  fdstate_ok inum C (FdOpen r w t) ->
+  fc_readable C = ((if r then mword_of_int 1 else mword_of_int 0) : mword 8)
+  /\ fc_writable C = ((if w then mword_of_int 1 else mword_of_int 0) : mword 8).
+Proof. destruct t; cbn; intros (H1 & H2 & _); by split. Qed.
+
+(* A FLAG IS DETERMINED BY ITS CELL.  One byte, two possible readings, and
+   they are distinct -- so the mode a state reports cannot drift from the
+   [struct file] it reports it for. *)
+Lemma fdstate_bit_inj (b1 b2 : bool) (v : mword 8) :
+  v = ((if b1 then mword_of_int 1 else mword_of_int 0) : mword 8) ->
+  v = ((if b2 then mword_of_int 1 else mword_of_int 0) : mword 8) ->
+  b1 = b2.
+Proof.
+  destruct b1, b2; intros H1 H2; try reflexivity; exfalso;
+    rewrite H1 in H2; apply (f_equal bv_unsigned) in H2; by vm_compute in H2.
 Qed.
 
 (* IT IS STILL FUNCTIONAL, which is the half of "projection" worth keeping:
@@ -566,17 +587,20 @@ Qed.
 Lemma fdstate_ok_inj (inum : mword 32) (C : fcontent) (st1 st2 : fdstate) :
   fdstate_ok inum C st1 -> fdstate_ok inum C st2 -> st1 = st2.
 Proof.
-  destruct st1 as [|[n1|wr1|m1]]; cbn; intros H1 H2.
+  destruct st1 as [|r1 w1 [n1| |m1]]; cbn; intros H1 H2.
   - by rewrite (fdstate_ok_none inum C st2 H2 H1).
-  - destruct H1 as [Ht ->]. by rewrite (fdstate_ok_inode inum C st2 H2 Ht).
-  - destruct H1 as [Ht Hw1].
-    destruct (fdstate_ok_pipe inum C st2 H2 Ht) as [b2 ->].
-    destruct H2 as [_ Hw2]. cbn in Hw2.
-    (* the two directions agree because the CELL does *)
-    destruct wr1, b2; try reflexivity; exfalso;
-      rewrite Hw1 in Hw2; apply (f_equal bv_unsigned) in Hw2;
-      by vm_compute in Hw2.
-  - destruct H1 as [Ht ->]. by rewrite (fdstate_ok_device inum C st2 H2 Ht).
+  - destruct H1 as (Hr & Hw & Ht & ->).
+    destruct (fdstate_ok_inode inum C st2 H2 Ht) as (r2 & w2 & ->).
+    destruct (fdstate_ok_rw inum C r2 w2 _ H2) as [Hr2 Hw2].
+    by rewrite (fdstate_bit_inj r1 r2 _ Hr Hr2) (fdstate_bit_inj w1 w2 _ Hw Hw2).
+  - destruct H1 as (Hr & Hw & Ht).
+    destruct (fdstate_ok_pipe inum C st2 H2 Ht) as (r2 & w2 & ->).
+    destruct (fdstate_ok_rw inum C r2 w2 _ H2) as [Hr2 Hw2].
+    by rewrite (fdstate_bit_inj r1 r2 _ Hr Hr2) (fdstate_bit_inj w1 w2 _ Hw Hw2).
+  - destruct H1 as (Hr & Hw & Ht & ->).
+    destruct (fdstate_ok_device inum C st2 H2 Ht) as (r2 & w2 & ->).
+    destruct (fdstate_ok_rw inum C r2 w2 _ H2) as [Hr2 Hw2].
+    by rewrite (fdstate_bit_inj r1 r2 _ Hr Hr2) (fdstate_bit_inj w1 w2 _ Hw Hw2).
 Qed.
 
 (* the three ways a descriptor's file can be typed, as ONE fact -- what
@@ -587,9 +611,9 @@ Lemma fdstate_ok_open (inum : mword 32) (C : fcontent) (st : fdstate) :
   st <> FdClosed.
 Proof.
   intros Hok [H|[H|H]].
-  - destruct (fdstate_ok_pipe inum C st Hok H) as [b ->]. discriminate.
-  - rewrite (fdstate_ok_inode inum C st Hok H). discriminate.
-  - rewrite (fdstate_ok_device inum C st Hok H). discriminate.
+  - destruct (fdstate_ok_pipe   inum C st Hok H) as (? & ? & ->). discriminate.
+  - destruct (fdstate_ok_inode  inum C st Hok H) as (? & ? & ->). discriminate.
+  - destruct (fdstate_ok_device inum C st Hok H) as (? & ? & ->). discriminate.
 Qed.
 
 (* ------------------------------------------------------------------ *)

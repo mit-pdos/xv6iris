@@ -517,18 +517,18 @@ Section SpecFilewrite.
   Definition filewrite_env (γf : gname)
       (fn : fwrite_names) (st : fdstate) : iProp Σ :=
     (match st with
-     | FdOpen (FdPipe _)    => emp
-     | FdOpen (FdDevice mj) => filewrite_dev_env fn mj
-     | FdOpen (FdInode _)   => filewrite_fs_env γf fn
+     | FdOpen _ _ FdPipe        => emp
+     | FdOpen _ _ (FdDevice mj) => filewrite_dev_env fn mj
+     | FdOpen _ _ (FdInode _)   => filewrite_fs_env γf fn
      | FdClosed             => emp
      end)%I.
 
   Definition filewrite_env_out (fn : fwrite_names) (st : fdstate)
       : iProp Σ :=
     (match st with
-     | FdOpen (FdPipe _)    => emp
-     | FdOpen (FdDevice mj) => filewrite_dev_out fn mj
-     | FdOpen (FdInode _)   => filewrite_fs_out fn
+     | FdOpen _ _ FdPipe        => emp
+     | FdOpen _ _ (FdDevice mj) => filewrite_dev_out fn mj
+     | FdOpen _ _ (FdInode _)   => filewrite_fs_out fn
      | FdClosed             => emp
      end)%I.
 
@@ -549,7 +549,7 @@ Section SpecFilewrite.
     filewrite_env γf fn st -∗ filewrite_env_out fn st.
   Proof.
     rewrite /filewrite_env /filewrite_env_out.
-    destruct st as [|[?|?|?]]; try by iIntros "$".
+    destruct st as [|? ? [?| |?]]; try by iIntros "$".
     iApply filewrite_fs_env_out.
   Qed.
 

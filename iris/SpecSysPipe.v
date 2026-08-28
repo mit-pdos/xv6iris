@@ -154,7 +154,8 @@ Section SpecSysPipe.
        proc_priv γf p pid
          (upd_ofile (upd_ofile W fd0 (fnode k0)) fd1 (fnode k1)))
     (* THE fd-STATE FRAGMENT BUNDLE, in and out.  The success arm spends TWO
-       accesses -- both descriptors go from [FdClosed] to [FdOpen FdPipe] --
+       accesses -- fd[0] goes from [FdClosed] to [FdOpen true false FdPipe]
+       and fd[1] to [FdOpen false true FdPipe] --
        and every failure arm hands it straight back: each of them nulls
        whatever it had installed, so no descriptor's state has moved. *)
     ∗ fd_frags_any (pv_fdg W) ∗ fd_slot ∗ fd_slot.

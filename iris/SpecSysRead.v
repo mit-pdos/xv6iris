@@ -244,7 +244,7 @@ Section SpecSysRead.
     (fileread_env_out fn st -∗ fileread_fs_out fn ∗ fileread_devsw fn).
   Proof.
     iIntros "Hfs Hdev". rewrite /fileread_env /fileread_env_out.
-    destruct st as [|[?|?|mj]].
+    destruct st as [|? ? [?| |mj]].
     { (* CLOSED -- the panic arm; argfd never hands one over, but the
          environment is total. *)
       iSplitR; [done|]. iIntros "_".
