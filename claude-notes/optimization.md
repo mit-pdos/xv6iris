@@ -1308,7 +1308,14 @@ splice a closer into argument position.
   proofs the same three `Strategy` lines were all inside noise, and one file does
   not even compile with them (it `unfold`s `tp_pin`). The outlier had both a
   20+-link `pose` chain and a large Iris context; that combination is what makes
-  conversion dominate. The cost is invisible to tactic profiling — it lands in
+  conversion dominate. **`ProofSysUnlink` is the best-fitting candidate left
+  (101 links, the tree's largest context) and it is a NULL: 128.0 s → 129.5 s,
+  min of two (2026-08-27), compiling with no `rget_ne` repair needed.** So the
+  lever really is confined to `ProofVirtioDiskInit`'s shape; stop looking.
+  A caution from that same A/B: the first pair read **−15.8 %** because the
+  base arm happened to run at load 52 and the sealed arm at load 81 — the
+  inversion this file's Diagnosis section warns about, seen live. Only the
+  second pair, at load 9–15, showed the truth. The cost is invisible to tactic profiling — it lands in
   the kernel at `Qed` and inside `iEval`/`pm_reduce`.
 - **Invert a symbolic-step executor over its ABSTRACT parameters** — never
   `cbn`/`unfold` it into a hypothesis and destruct the guards there. Each
