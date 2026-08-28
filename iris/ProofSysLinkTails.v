@@ -142,7 +142,7 @@ Section ProofSysLinkTails.
       (u : nat) (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 : mword 64)
-      (bnm bw bo : nat -> bv 8) (Vpr : pprivate) :
+      (bnm bw bo : nat -> bv 8) (Upr : ustate) :
     (K_end_op <= K - 38)%nat -> (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
@@ -161,7 +161,7 @@ Section ProofSysLinkTails.
     log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    proc_priv_bare (proc_addr jx) pidv Vpr -∗
+    proc_priv_bare (proc_addr jx) pidv Upr -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -183,7 +183,7 @@ Section ProofSysLinkTails.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr jx) pidv Vpr -∗
+        proc_priv_bare (proc_addr jx) pidv Upr -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -223,7 +223,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
               icfg_log fsc_fs fsc_cov fsc_logst icfg_dev u pidv dq M1 (K - 38)%nat eb b lks
-              Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
+              Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID2 Hq2 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
@@ -350,7 +350,7 @@ Section ProofSysLinkTails.
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 : mword 64)
-      (bnm bw bo : nat -> bv 8) (Vpr : pprivate) :
+      (bnm bw bo : nat -> bv 8) (Upr : ustate) :
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
     (kk < NINODE)%nat ->
@@ -405,7 +405,7 @@ Section ProofSysLinkTails.
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-    proc_priv_bare (proc_addr jx) pidv Vpr -∗
+    proc_priv_bare (proc_addr jx) pidv Upr -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -431,7 +431,7 @@ Section ProofSysLinkTails.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr jx) pidv Vpr -∗
+        proc_priv_bare (proc_addr jx) pidv Upr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
@@ -502,7 +502,7 @@ Section ProofSysLinkTails.
               pd pav pu gil gisl
  kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 38)%nat eb b lks
-              Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
+              Upr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
@@ -555,7 +555,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
               icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n2 pidv dq M3 (K - 38)%nat eb b lks
-              Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
+              Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID5 Hq5 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
@@ -671,7 +671,7 @@ Section ProofSysLinkTails.
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 : mword 64)
-      (bnm bw bo : nat -> bv 8) (Vpr : pprivate) :
+      (bnm bw bo : nat -> bv 8) (Upr : ustate) :
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
     (kk < NINODE)%nat ->
@@ -726,7 +726,7 @@ Section ProofSysLinkTails.
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-    proc_priv_bare (proc_addr jx) pidv Vpr -∗
+    proc_priv_bare (proc_addr jx) pidv Upr -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -752,7 +752,7 @@ Section ProofSysLinkTails.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr jx) pidv Vpr -∗
+        proc_priv_bare (proc_addr jx) pidv Upr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
@@ -823,7 +823,7 @@ Section ProofSysLinkTails.
               pd pav pu gil gisl
  kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 38)%nat eb b lks
-              Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
+              Upr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
@@ -876,7 +876,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
               icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n2 pidv dq M3 (K - 38)%nat eb b lks
-              Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
+              Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID5 Hq5 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
@@ -1023,7 +1023,7 @@ Section ProofSysLinkTails.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (bnm bw bo : nat -> bv 8) (Vpr : pprivate) :
+      (bnm bw bo : nat -> bv 8) (Upr : ustate) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
@@ -1082,7 +1082,7 @@ Section ProofSysLinkTails.
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-    proc_priv_bare (proc_addr jx) pidv Vpr -∗
+    proc_priv_bare (proc_addr jx) pidv Upr -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -1108,7 +1108,7 @@ Section ProofSysLinkTails.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr jx) pidv Vpr -∗
+        proc_priv_bare (proc_addr jx) pidv Upr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
@@ -1181,7 +1181,7 @@ Section ProofSysLinkTails.
               gil gisl kk s gy PlainK
  inum
               pidv dq dqs M2 (K - 38)%nat eb b lks
-              Vpr HKil Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HM2a0
+              Upr HKil Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck Hireg
                     Hslkk Hshr Hru Hsbi Hpid Hprocs Hdev Hgeo Hdlk Hbs1 Htx").
@@ -1363,7 +1363,7 @@ Section ProofSysLinkTails.
  (ientry kk) inum
               dn' dn bm u Sb true uty pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               P4 (K - 38)%nat eb b lks
-              Vpr HKiup ltac:(intros _; exact Hmem) Hgeom Hist0 Hiblk Hiblog Hinb
+              Upr HKiup ltac:(intros _; exact Hmem) Hgeom Hist0 Hiblk Hiblog Hinb
               ltac:(exact (sl_setnl_type_stable dn (sl_ndec (di_nlink dn))))
               Htynz Hdec
               Haddreq Hdirlen Hj Hgl HP4a0 Heb
@@ -1503,7 +1503,7 @@ Section ProofSysLinkTails.
               pd pav pu gil gisl
  kk qi s gy inum dn' bm (S u) pidv dq
               dqb dqs Q2 (K - 38)%nat eb b lks
-              Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
+              Upr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HQ2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
@@ -1550,7 +1550,7 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (EndOp.wp_end_op_sconf (CID := CID13) gs jx gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
               icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n2 pidv dq Q3 (K - 38)%nat eb b lks
-              Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
+              Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -1686,7 +1686,7 @@ Section ProofSysLinkTails.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (bnm bw bo : nat -> bv 8) (Vpr : pprivate) :
+      (bnm bw bo : nat -> bv 8) (Upr : ustate) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
@@ -1771,7 +1771,7 @@ Section ProofSysLinkTails.
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-    proc_priv_bare (proc_addr jx) pidv Vpr -∗
+    proc_priv_bare (proc_addr jx) pidv Upr -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -1797,7 +1797,7 @@ Section ProofSysLinkTails.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr jx) pidv Vpr -∗
+        proc_priv_bare (proc_addr jx) pidv Upr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
@@ -1867,7 +1867,7 @@ Section ProofSysLinkTails.
  kd qd sd gyd dinum dnd bmd
               n Sb crb cru false e0 pidv dq dqb dqs
               M2 (K - 38)%nat eb b lks
-              Vpr HKup Hkd Hcrb Hcru Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
+              Upr HKup Hkd Hcrb Hcru Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
@@ -1903,7 +1903,7 @@ Section ProofSysLinkTails.
               gil gisl
               kk qi s gy inum ty u1 Sb1 uty pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
-              Vpr HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
+              Upr HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
@@ -1958,7 +1958,7 @@ Section ProofSysLinkTails.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (bnm bw bo : nat -> bv 8) (Vpr : pprivate) :
+      (bnm bw bo : nat -> bv 8) (Upr : ustate) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
@@ -2042,7 +2042,7 @@ Section ProofSysLinkTails.
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-    proc_priv_bare (proc_addr jx) pidv Vpr -∗
+    proc_priv_bare (proc_addr jx) pidv Upr -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -2068,7 +2068,7 @@ Section ProofSysLinkTails.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr jx) pidv Vpr -∗
+        proc_priv_bare (proc_addr jx) pidv Upr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
@@ -2138,7 +2138,7 @@ Section ProofSysLinkTails.
  kd qd sd gyd dinum dnd bmd
               n Sb false false false e0 pidv dq dqb dqs
               M2 (K - 38)%nat eb b lks
-              Vpr HKup Hkd ltac:(discriminate) ltac:(discriminate) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
+              Upr HKup Hkd ltac:(discriminate) ltac:(discriminate) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
@@ -2194,7 +2194,7 @@ Section ProofSysLinkTails.
               gil gisl
               kk qi s gy inum ty u1 Sb1 uty pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
-              Vpr HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
+              Upr HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv

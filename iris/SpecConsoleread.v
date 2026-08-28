@@ -108,7 +108,7 @@ Definition wp_consoleread_sconf_body
     (γa : gname) (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname) (γc : gname)
     (m : regfile) (av : nat) (eb : bool)
-    (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleread in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -142,13 +142,15 @@ Definition wp_consoleread_sconf_body
      three indices (ConsoleInv.v).  Persistent, so nothing about the console
      is threaded and nothing comes back. *)
   is_conslock γc -∗
-  proc_priv_core pj pid V -∗
+  proc_priv_core pj pid U -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
   wp_next b pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (r : Z) (P' : uptd),
+    (* the image moves: the copy leaf may fault a page in, and copyout
+       writes user memory -- milestone J item 1's ∃-weakened staging *)
+  ∀ (mf : regfile) (r : Z) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       (* the whole of what a device read promises: it delivered somewhere
          between "failed" and "all of it". *)
       ⌜(-1 <= r <= Z.max 0 n)%Z⌝ -∗
@@ -156,7 +158,7 @@ Definition wp_consoleread_sconf_body
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv_core pj pid (upd_upt V P') -∗
+      proc_priv_core pj pid (upd_usM (us_upt U P') M') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -166,6 +168,6 @@ Module Type CONSOLEREAD.
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γc : gname)
       (m : regfile) (av : nat) (eb : bool)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string),
-      wp_consoleread_sconf_body γa γf γs j γlp γc m av eb pid V n b lks.
+      (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string),
+      wp_consoleread_sconf_body γa γf γs j γlp γc m av eb pid U n b lks.
 End CONSOLEREAD.

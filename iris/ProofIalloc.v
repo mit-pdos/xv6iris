@@ -482,7 +482,7 @@ Section IallocDefs.
   Definition ia_cont `{GEN : GenId} `{CID0 : CpuId}
  (ty : mword 16)
       (u : nat) (Sb : gset Z) (pidv : mword 32) (dq dqs dqn : dfrac) (j : nat)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate)
+      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Upr : ustate)
       (t : nat) (qt : Qp) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (alloc : bool) (kslot : nat) (q : Qp) (inum : mword 32)
@@ -493,7 +493,7 @@ Section IallocDefs.
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-        proc_priv_bare (proc_addr j) pidv Vpr -∗
+        proc_priv_bare (proc_addr j) pidv Upr -∗
         bslots 2 -∗
         (if alloc
          then ⌜mf !!! Regidx Ra0 = ientry kslot
@@ -549,7 +549,7 @@ Section IallocEpilogue.
  (ty : mword 16)
       (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Upr : ustate) :
     (K_ialloc <= K)%nat ->
     (* NOT in the parked statement: the claim arm has to hand [ia_cont] the
        [fresh_shape dn'] conjunct, and [ialloc_fresh_shape] is exactly
@@ -564,14 +564,14 @@ Section IallocEpilogue.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ialloc + 0x80) : mword 64) -∗
     ia_frame m -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 2 -∗
     ia_arms ty u Sb t qt
             (M !!! Regidx Ra0 : mword 64) -∗
     ia_cont (CID0 := CID0) ty u Sb
-            pidv dq dqs dqn j m K b lks Vpr t qt -∗
+            pidv dq dqs dqn j m K b lks Upr t qt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hty Htyk Hsp Hthr.
@@ -775,7 +775,7 @@ Section IallocOut.
  (ty : mword 16)
       (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Upr : ustate) :
     (K_ialloc <= K)%nat ->
     bv_unsigned ty <> 0 ->          (* threaded to [ia_epilogue]; see there *)
     InodeRegion.ireg_ty_ok (ialloc_fresh ty) ->
@@ -788,7 +788,7 @@ Section IallocOut.
     pc_is (mword_of_int (KernelSyms.ialloc + 0x66) : mword 64) -∗
     printk_env fsc_printk fsc_uart fsc_disk -∗
     ia_frame m -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 2 -∗
@@ -799,7 +799,7 @@ Section IallocOut.
        stands, returned unspent on the no-inodes arm. *)
     t ↪[ln_tx icfg_log]{#qt} tt -∗
     ia_cont (CID0 := CID0) ty u Sb
-            pidv dq dqs dqn j m K b lks Vpr t qt -∗
+            pidv dq dqs dqn j m K b lks Upr t qt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hty Htyk Hpk Hsp Hthr.
@@ -1080,7 +1080,7 @@ Section IallocOut.
     iDestruct (cpu_own_transport CID10 CID11 0 true (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (ia_epilogue (CID0 := CID11) j ty u Sb
-              t qt pidv dq dqs dqn m QB K b lks Vpr HK Hty Htyk HQBsp HQBthr
+              t qt pidv dq dqs dqn m QB K b lks Upr HK Hty Htyk HQBsp HQBthr
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsl
                     [Hiref Hop Htx] [Hcont]").
     { rewrite /ia_arms. iLeft.
@@ -1116,7 +1116,7 @@ Section IallocClaim.
       (t : nat) (qt : Qp)
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Upr : ustate) :
     (K_ialloc <= K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     (* the scan's state at +0x88 *)
@@ -1165,7 +1165,7 @@ Section IallocClaim.
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     iref_slot -∗
     ia_frame m -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 1 -∗
@@ -1177,7 +1177,7 @@ Section IallocClaim.
     bio_held fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) kk pidv icfg_dev bno
        (diblk_bytes ds) (diblk_bytes ds) bsd d0 -∗
     ia_cont (CID0 := CID0) ty u Sb
-            pidv dq dqs dqn j m K b lks Vpr t qt -∗
+            pidv dq dqs dqn j m K b lks Upr t qt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsp Hthr Hs1 Hs3 Hs5 Hs6 Hs2 Hkk Hbno Hcov Hlog
@@ -1622,7 +1622,7 @@ Section IallocClaim.
     iApply (BL.wp_brelse_sconf γs fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) kk
               pidv icfg_dev bno dq W7 (K - 8)%nat true (proc_addr j)
               (diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds))
-              bsd true b lks Vpr HKbl Hkk HW7a0
+              bsd true b lks Upr HKbl Hkk HW7a0
               (* brelse's bound is "bcache"(4); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -1958,7 +1958,7 @@ Section IallocClaim.
     iDestruct (cpu_own_transport CID16 CID23 0 true (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (ia_epilogue (CID0 := CID23) j ty u Sb
-              t qt pidv dq dqs dqn m V6 K b lks Vpr HK Hty Htyk HV6sp HV6thr
+              t qt pidv dq dqs dqn m V6 K b lks Upr HK Hty Htyk HV6sp HV6thr
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsl
                     [Href Hru Hclaim Hop] [Hcont]").
     { rewrite /ia_arms. iRight. iExists kslot, q, inum.
@@ -1990,7 +1990,7 @@ Section IallocScan.
  (ty : mword 16) (u : nat) (Sb : gset Z)
       (t : nat) (qt : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Upr : ustate) :
     (K_ialloc <= K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     0 <= icfg_ist ->
@@ -2040,7 +2040,7 @@ Section IallocScan.
          cpu_own 0 true (proc_addr j) b lks -∗
          pc_is (mword_of_int (KernelSyms.ialloc + 0x30) : mword 64) -∗
          ia_frame m -∗
-         proc_priv_bare (proc_addr j) pidv Vpr -∗
+         proc_priv_bare (proc_addr j) pidv Upr -∗
          sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
          sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
          bslots 2 -∗
@@ -2048,7 +2048,7 @@ Section IallocScan.
          log_opS icfg_log (S u) Sb -∗
          t ↪[ln_tx icfg_log]{#qt} tt -∗
          ia_cont (CID0 := CIDc) ty u Sb
-                 pidv dq dqs dqn j m K b lks Vpr t qt -∗
+                 pidv dq dqs dqn j m K b lks Upr t qt -∗
          WP (Loop : expr riscv_lang))).
   Proof.
     intros HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Hbelow.
@@ -2268,7 +2268,7 @@ Section IallocScan.
       iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
       iApply (BR.wp_bread_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
                 (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) pidv icfg_dev bno dq
-                G4 (K - 8)%nat true b lks Vpr
+                G4 (K - 8)%nat true b lks Upr
                 HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HG4a0 HG4a1
                 (* bread's bound is "bcache"(4); ia_scan's own is
                    "itable"(2), and [locks_below_mono] weakens it. *)
@@ -2581,7 +2581,7 @@ Section IallocScan.
         iApply (ia_claim (CID0 := CID13) γs j γl pd pav pu
  ty inum ds u Sb
                   t qt kk bno bsd0 d0 pidv dq dqs dqn m GA K b lks
-                  Vpr HK Hgeom HGAsp HGAthr HGAs1 HGAs3 HGAs5 HGAs6 HGAs2 Hkk
+                  Upr HK Hgeom HGAsp HGAthr HGAs1 HGAs3 HGAs5 HGAs6 HGAs2 Hkk
                   Hbno Hcov Hlog Hnib Hdswf Ht0 Hty Htyk Hinum Hslotal
                   Hbelow
                   with "Hcg Hcnt Htext Hkdata Hpc Hpanenv Hbio Hlctx Hireg Hiopen
@@ -2643,7 +2643,7 @@ Section IallocScan.
           [rewrite /bio_locked; iExact "Hheld" |].
         iApply (BL.wp_brelse_sconf γs fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) kk
                   pidv icfg_dev bno dq GB (K - 8)%nat true (proc_addr j)
-                  (diblk_bytes ds) bsd0 d0 b lks Vpr HKbl Hkk HGBa0
+                  (diblk_bytes ds) bsd0 d0 b lks Upr HKbl Hkk HGBa0
                   (* brelse's bound is "bcache"(4); ia_scan's own is
                      "itable"(2), and [locks_below_mono] weakens it. *)
                   ltac:(lkbelow)
@@ -2842,7 +2842,7 @@ Section IallocScan.
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iApply (ia_out (CID0 := CID19) j
  ty u Sb t qt pidv dq dqs dqn m GE K b lks
-                    Vpr HK Hty Htyk Hpk HGEsp HGEthr
+                    Upr HK Hty Htyk Hpk HGEsp HGEthr
                     with "Hcg Hcnt Htext Hkdata Hpc Hpenv Hframe Hppid
                           Hsbn Hsbi Hsl Hiref Hop Htx [Hcont]").
           { iApply (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID19)
@@ -2865,11 +2865,11 @@ Section IallocMain.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
       (t : nat) (qt : Qp) :
       wp_ialloc_gen_body γs j γl pd pav pu
  ty u Sb
-                         pidv dq dqs dqn m K eb b lks Vpr t qt.
+                         pidv dq dqs dqn m K eb b lks Upr t qt.
   Proof.
     cbv beta delta [wp_ialloc_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl
@@ -2896,7 +2896,7 @@ Section IallocMain.
               Hsbn Hsbi #Hireg #Hiopen Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
               #Hitb2 #Hitbl #Hesc Hiref Hop Htx Hcont".
     iAssert (ia_cont (CID0 := CID) ty u Sb
-               pidv dq dqs dqn j m K b lks Vpr t qt)%I with "[Hcont]" as "Hcont";
+               pidv dq dqs dqn j m K b lks Upr t qt)%I with "[Hcont]" as "Hcont";
       [rewrite /ia_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi16sp sp,-64 : the 8-slot frame ===== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1 : mword 64)
@@ -3317,7 +3317,7 @@ Section IallocMain.
     iPoseProof (ia_scan (CIDe := CID19) γs j γl pd pav pu
  ty u Sb
                   t qt pidv dq dqs dqn m K b lks
-                  Vpr HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Hbelow
+                  Upr HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Hbelow
                   with "Htext Hkdata Hpenv Hbio Hlctx Hireg Hiopen Hprocs
                         Hdevi Hdgeom Hdlock Hitb2 Hitbl Hesc") as "Hscan".
     (* THE FUEL THROUGH [constr:], not straight into [$!].  The proofmode
@@ -3357,11 +3357,11 @@ Section IallocMain.
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
       (t : nat) (qt : Qp) :
       wp_ialloc_sconf_body γs j γl pd pav pu
  ty u
-                           pidv dq dqs dqn m K eb b lks Vpr t qt.
+                           pidv dq dqs dqn m K eb b lks Upr t qt.
   Proof.
     cbv beta delta [wp_ialloc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl
@@ -3373,7 +3373,7 @@ Section IallocMain.
     iApply (wp_ialloc_gen (CID := CID) γs j γl pd pav pu
  ty u Sb
               pidv dq dqs dqn m K eb b lks
-              Vpr t qt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Ha0 Ha1 Heb Hbelow
+              Upr t qt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Ha0 Ha1 Heb Hbelow
               with "Hcg Hcnt Htext Hpc Hkdata Hpenv Hbio Hlctx
                     Hsbn Hsbi Hireg Hiopen Hppid Hprocs Hdevi Hdgeom Hdlock Hsl
                     Hitb2 Hitbl Hesc Hiref HopS Htxc [Hcont Htx]").

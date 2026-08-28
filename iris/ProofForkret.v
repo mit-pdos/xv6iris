@@ -185,7 +185,7 @@ End Res.
 Lemma fkr_tail
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (W : iProp Σ) (j : nat) (γf : gname)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (ks : mword 64) (mt : regfile) (av av2 : nat) (eb : bool) :
   let p   : mword 64 := proc_addr j in
   let ksp : mword 64 := add_vec ks (mword_of_int 4096) in
@@ -209,7 +209,7 @@ Lemma fkr_tail
      does not read them -- what was saved in them is dead by now -- so it
      takes the run rather than the four words. *)
   stack_own (KTR := KT1) ksp 6 -∗
-  proc_priv γf p pid V -∗
+  proc_priv γf p pid U -∗
   (* THE FILE SYSTEM AND THE SEALED [first] CELL, ON EITHER ARM.  +0x64 is
      where the two arms meet and it is the first point at which
      [first_done] is available on BOTH: the steady arm read it out of
@@ -224,7 +224,7 @@ Lemma fkr_tail
      of this walk, and a proofmode step's term carries the whole context
      twice -- see that definition's header. *)
   forkret_closer (fun h : CpuId => usertrap_res_bare (CID := h))
-                 W γf p ksp (pv_fdg V) pid av -∗
+                 W γf p ksp (pv_fdg (us_V U)) pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1.
@@ -257,7 +257,7 @@ Proof.
                ltac:(wp_next_chain) with "Hcx") as "Hcx".
   iDestruct (ut_epc_exists with "Hpv") as %[epc Hepc].
   iDestruct (ut_tf_length with "Hpv") as %Htflen0.
-  iApply (PR.wp_prepare_return_sconf γf ks pid V T5 av2 p epc eb ∅
+  iApply (PR.wp_prepare_return_sconf γf ks pid U T5 av2 p epc eb ∅
             Hpr Hepc with "Hcg Hcpu Hext Htext Hpc Hks Hpv").
   iIntros (CIDf Hkf mf ksat kroot0 vb)
     "%Hcsf %HksatM %Hksata %Hksatp #Hkinv0 Hcg Hcpu Hcpay Hsepc Hscause Hstval
@@ -290,20 +290,20 @@ Proof.
      kernel words are [tf_kernel_words_ok] at the root the satp read gave,
      at this hart ([UsertrapRes.ut_tfk]).  Built here, where the facts are,
      and carried beside the hidden record. *)
-  iAssert (∃ V' : pprivate, ⌜pv_upt V' = pv_upt V⌝ ∗
+  iAssert (∃ V' : pprivate, ⌜pv_upt V' = pv_upt (us_V U)⌝ ∗
              (* ...and its fd-state ghost name, which prepare_return's
                 [upd_tf] does not touch: the closer this proof feeds was
                 stated at the parked process's name. *)
-             ⌜pv_fdg V' = pv_fdg V⌝ ∗
-             UsertrapRes.ut_tfk (CID := CIDf) ksp V' ∗ proc_priv γf p pid V')%I
+             ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
+             UsertrapRes.ut_tfk (CID := CIDf) ksp V' ∗ proc_priv γf p pid (MkUstate V' ((us_M U))))%I
     with "[Hpv]" as (V') "(%HuptV' & %Hfg & #Htfk & Hpv)".
-  { iExists (upd_tf V (prepare_return_tf (pv_tf V) ksat ksp (cid_word (CID := CIDf)))).
+  { iExists (upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat ksp (cid_word (CID := CIDf)))).
     iFrame "Hpv". iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iApply (ut_tfk_intro (CID := CIDf) ksp
-              (upd_tf V (prepare_return_tf (pv_tf V) ksat ksp (cid_word (CID := CIDf))))
+              (upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat ksp (cid_word (CID := CIDf))))
               kroot0
-              (prepare_return_tf_kernel_words_ok (CID := CIDf) (pv_tf V) ksat
+              (prepare_return_tf_kernel_words_ok (CID := CIDf) (pv_tf (us_V U)) ksat
                  ksp kroot0 Htflen0 HksatM Hksata Hksatp) with "Hkinv0"). }
   iDestruct (proc_priv_copy with "Hpv") as "(Hsz & Hpgt & Hppt & Hpvback)".
   assert (Hc0 : creg2reg_idx (Cregidx (mword_of_int 0)) = Regidx Rs0)
@@ -539,9 +539,12 @@ Proof.
   iEval (rewrite Hp8e) in "Hpc".
   (* the process block, back in one piece *)
   iEval (rewrite Haddrpg) in "Hpgt".
-  iDestruct ("Hpvback" $! (pv_upt V') ltac:(apply uptd_ext_sz_refl)
+  iDestruct ("Hpvback" $! (pv_upt V') (us_M U) ltac:(apply uptd_ext_sz_refl)
                with "Hsz Hpgt Hppt") as "Hpv".
-  rewrite upd_upt_id.
+  (* the round trip that moved nothing, at the record *)
+  assert (Hfold : upd_usM (us_upt (MkUstate V' (us_M U)) (pv_upt V')) (us_M U)
+                  = MkUstate V' (us_M U)) by (destruct V'; reflexivity).
+  rewrite Hfold.
   (* ================================================================== *)
   (*  +0x8e: c.jalr a5 -- into userret, and never back.                   *)
   (* ================================================================== *)
@@ -640,17 +643,18 @@ Proof.
   iEval (rewrite proc_priv_split_pt) in "Hpv".
   iDestruct "Hpv" as "[Hpnopt Hpt]".
   iEval (rewrite HuptV') in "Hpt".
-  iEval (rewrite proc_pt_norm) in "Hpt".
+  iEval (rewrite proc_ptm_norm) in "Hpt".
   (* the three side conditions are [f_equal] on [HuptV'] up to the iota step
      [ud_root (ud_norm P) = ud_root P]; supplied as terms rather than as
      tactics so nothing depends on how [set] below folds them. *)
-  iEval (rewrite (proc_priv_nopt_upt_irrel γf p pid V' (ud_norm (pv_upt V))
+  iEval (rewrite (proc_priv_nopt_upt_irrel γf p pid V' (ud_norm (pv_upt (us_V U)))
                     (f_equal ud_root HuptV') (f_equal ud_tfp HuptV')
                     (f_equal ud_um HuptV'))) in "Hpnopt".
-  set (pt := ud_norm (pv_upt V)).
+  set (pt := ud_norm (pv_upt (us_V U))).
+  iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
   iEval (rewrite proc_pt_split) in "Hpt".
   iDestruct "Hpt" as "[[%Hptwf Hufr] Hdata]".
-  assert (Hnorm : ud_data pt = ud_pas pt) by exact (ud_norm_pas (pv_upt V)).
+  assert (Hnorm : ud_data pt = ud_pas pt) by exact (ud_norm_pas (pv_upt (us_V U))).
   destruct Hptwf as (Hmapwf & Haccwf & Hpv1 & Hpv2 & Hpv3).
   assert (Hptwf : proc_pt_wf pt)
     by exact (conj Hmapwf (conj Haccwf (conj Hpv1 (conj Hpv2 Hpv3)))).
@@ -721,12 +725,12 @@ Qed.
        forkret cone does not depend on the syscall proof.) ---- *)
 Lemma fkr_tfp_valid
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
-  proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
+    (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
+  proc_priv γf pa pid U -∗ ⌜page_valid (page_base (ud_tfp (pv_upt (us_V U))))⌝.
 Proof.
   iIntros "[(_ & _ & _ & _ & Hpt & _) _]".
-  rewrite /proc_pt_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
-  iDestruct (proc_pt_wf_get with "Hptt") as "%Hwf".
+  rewrite /proc_ptm_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
+  iDestruct (proc_ptm_wf with "Hptt") as "%Hwf".
   iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
 Qed.
 
@@ -747,7 +751,7 @@ Qed.
 Lemma fkr_boot
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (ks : mword 64) (mr : regfile) (av av2 : nat) (eb : bool) :
   let p   : mword 64 := proc_addr j in
   let ksp : mword 64 := add_vec ks (mword_of_int 4096) in
@@ -775,8 +779,8 @@ Lemma fkr_boot
   stack_own (KTR := KT1) ksp 6 -∗
   (* the block WITHOUT its token: the boot arm spends the token's contents
      and rebuilds it, at the steady arm, out of what fsinit returns *)
-  proc_priv_nocwd γf p pid V -∗
-  cwd_ref (pv_cwd V) -∗
+  proc_priv_nocwd γf p pid U -∗
+  cwd_ref (pv_cwd (us_V U)) -∗
   (* ...and the token's boot disjunct, opened *)
   first_addr ↦₄ (mword_of_int 1 : mword 32) -∗
   first_boot_persist -∗
@@ -793,7 +797,7 @@ Lemma fkr_boot
      of this walk, and a proofmode step's term carries the whole context
      twice -- see that definition's header. *)
   forkret_closer (fun h : CpuId => usertrap_res_bare (CID := h))
-                 W γf p ksp (pv_fdg V) pid av -∗
+                 W γf p ksp (pv_fdg (us_V U)) pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1.
@@ -1007,7 +1011,7 @@ Proof.
             (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst)) Pb
             (FsCrash.mirror_of (FsCrash.fs_blocks dk)) L D
             vlock vname vcpu v_start v_dev v_nc v_n
-            pid (DfracOwn 1) B6 av2 eb eb ∅ V
+            pid (DfracOwn 1) B6 av2 eb eb ∅ U
             sb
             Hav2fs Hlg H1cov H1log Himg
             (* block 1's two pure facts (durable-disk lane C-3a): the run
@@ -1310,7 +1314,7 @@ Proof.
     iExact "Hdlock". }
   (* ---- the process block, put back together: the token is the steady
          arm now, so this is [proc_priv] again rather than the deficit ---- *)
-  iAssert (proc_priv γf p pid V) with "[Hpbare Hcwd Hofiles]" as "Hpriv".
+  iAssert (proc_priv γf p pid U) with "[Hpbare Hcwd Hofiles]" as "Hpriv".
   { rewrite /proc_priv proc_priv_core_bare.
     iFrame "Hpbare Hcwd Hftok Hofiles". }
   (* ---- the path, at a0 ---- *)
@@ -1353,7 +1357,7 @@ Proof.
 
             5%nat fkr_init_bytes 1%nat fkr_argv
             (fun _ => 5%nat) (fun _ => 6%nat) (fun _ => fkr_init_bytes)
-            pid V
+            pid U
             DfracDiscarded DfracDiscarded (DfracOwn 1) DfracDiscarded DfracDiscarded
             D5 av2 eb eb ∅
             Hkx Hdev Hnib0 Hlg Hsize Hbm0
@@ -1368,14 +1372,15 @@ Proof.
   (* ================================================================== *)
   (*  +0x56 .. +0x60: [p->trapframe->a0 = kexec(...)], then the test.     *)
   (* ================================================================== *)
-  iIntros (CIDk Hkk mf V' entry spv szv')
+  iIntros (CIDk Hkk mf Ux entry spv szv')
     "%Hcsk %Hkok Hcg Hcpu Hextc Hclmc Hpc Hbms2 Hist2 Hka2 Hpriv
      Hpath2 Hargv Hargs2 Hsl3 Hirs2".
+  destruct Ux as [V' M'].
   (* kexec keeps the descriptor block, hence the fd-state ghost name it is
      keyed on -- [SpecKexec.kexec_ok] states it. *)
-  assert (Hfgk : pv_fdg V' = pv_fdg V).
+  assert (Hfgk : pv_fdg V' = pv_fdg (us_V U)).
   { destruct Hkok as [ (_ & HV') | Hs ].
-    - rewrite HV'. reflexivity.
+    - exact (f_equal pv_fdg HV').
     - destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & Hfg & _). exact Hfg. }
   assert (Hpck : ret_pc (D5 !!! Regidx Rra : mword 64) = mword_of_int (FR + 0x56))
     by (rewrite HD5ra; pcw).
@@ -1580,7 +1585,7 @@ Proof.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     (* ...and the two arms MEET at +0x64, which is [fkr_tail]. *)
     iApply (fkr_tail W j γf pid
-              (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V')))
+              (MkUstate (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V'))) M')
               ks E4 av av2 eb Hjlt ltac:(kxarith) Havsum HE4sp HE4s1
               with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
                     Hpriv Hdone HW [Hyield]").
@@ -1592,10 +1597,10 @@ Qed.
 Theorem wp_forkret
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :
     wp_forkret_gen_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
-      j γs γl γf pid V ks m av av2 eb.
+      j γs γl γf pid U ks m av av2 eb.
 Proof.
   cbv beta delta [wp_forkret_gen_body].
   intros pcE p ksp Hjlt Hgl Hav2 Hkx Hut Hsp.
@@ -1826,7 +1831,7 @@ Proof.
                  ltac:(wp_next_chain) with "Hext") as "Hext".
     iDestruct (cpu_claim_ext_transport CID CIDr eb p
                  ltac:(wp_next_chain) with "Hcx") as "Hcx".
-    iApply (fkr_boot (CID := CIDr) W j γs γl γf pid V ks mr av av2 eb
+    iApply (fkr_boot (CID := CIDr) W j γs γl γf pid U ks mr av av2 eb
               Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1
             with "Htext Hwire Hclaimmap Hpc Hpinv Hcg Hcpu Hext Hcx Hks
                   Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hyield"). }
@@ -1836,8 +1841,8 @@ Proof.
      the closer and take the cell out for the [c.lw] at +0x1c. *)
   iAssert (first_done) as "#Hdone2"; [iExact "Hdone"|].
   iDestruct "Hdone" as "#[Hfirst Hfsready]".
-  iAssert (proc_priv γf p pid V) with "[Hpnc Hcwd]" as "Hpv".
-  { iApply (bi.equiv_entails_1_2 _ _ (proc_priv_split_cwd γf p pid V)).
+  iAssert (proc_priv γf p pid U) with "[Hpnc Hcwd]" as "Hpv".
+  { iApply (bi.equiv_entails_1_2 _ _ (proc_priv_split_cwd γf p pid U)).
     iSplitL "Hpnc"; [iExact "Hpnc" |].
     iSplitL "Hcwd"; [iExact "Hcwd" |]. iExact "Hftok". }
   (* ================================================================== *)
@@ -1943,7 +1948,7 @@ Proof.
                ltac:(wp_next_chain) with "Hcx") as "Hcx".
   (* the steady arm's [first_done] IS [first_tok]'s persistent steady
      disjunct, read at +0x24; it goes straight to the tail. *)
-  iApply (fkr_tail (CID := CID6) W j γf pid V ks T4 av av2 eb
+  iApply (fkr_tail (CID := CID6) W j γf pid U ks T4 av av2 eb
             Hjlt Hpr Havsum HT4sp HT4s1
           with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hext Hcx Hks Hf16 Hpv
                 Hdone2 HW Hyield").

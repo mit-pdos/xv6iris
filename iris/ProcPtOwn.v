@@ -3302,10 +3302,47 @@ Section ProcPt.
   (* [tlb_inv_pt2_enter] / [_exit]), which touches only the tree         *)
   (* conjunct.                                                           *)
   (* ------------------------------------------------------------------ *)
-  Definition proc_pt (P : uptd) : iProp Σ :=
+  (* ---- M-EXPOSURE (milestone J item 1) ------------------------------
+     The page contents are NAMED.  [proc_pt P M] is the parked address
+     space with its bytes keyed by USER VIRTUAL ADDRESS -- the same
+     resource the anonymous form owned (the reindexing is
+     [proc_pt_own_umem], and both of its premises are conjuncts of
+     [proc_pt_wf P], so the conversion is available inside the predicate
+     itself).  [proc_pt_any] is the ∃-weakened spelling every consumer
+     below the [proc_priv] tier still uses; see
+     claude-notes/projects/user-wp-slot.md milestone J item 1 for the
+     staging.  Mirrors [UserPtTree.user_pt_inv] / [user_pt_any]
+     exactly, which is what keeps the satp-switch bridge a rename. *)
+  Definition proc_pt (P : uptd) (M : gmap Z (bv 8)) : iProp Σ :=
     (⌜proc_pt_wf P⌝ ∗
      pt_frame (upt_tree_spec P.(ud_root) P.(ud_tfp) P.(ud_um)) ∗
-     proc_pt_own P)%I.
+     umem_own P M)%I.
+
+  Definition proc_pt_any (P : uptd) : iProp Σ :=
+    (∃ M : gmap Z (bv 8), proc_pt P M)%I.
+
+  (* THE ONE BRIDGE.  Everything stated at the anonymous form is proved
+     through this: it is the old definition, verbatim. *)
+  Lemma proc_pt_any_unfold (P : uptd) :
+    proc_pt_any P ⊣⊢
+    (⌜proc_pt_wf P⌝ ∗
+     pt_frame (upt_tree_spec P.(ud_root) P.(ud_tfp) P.(ud_um)) ∗
+     proc_pt_own P).
+  Proof.
+    rewrite /proc_pt_any /proc_pt. iSplit.
+    - iIntros "H". iDestruct "H" as (M) "(%Hwf & Ht & Hm)".
+      iSplitR; [iPureIntro; exact Hwf |]. iFrame "Ht".
+      rewrite (proc_pt_own_umem P (proj1 Hwf) (proc_pt_wf_inj P Hwf)).
+      iExists M. iExact "Hm".
+    - iIntros "(%Hwf & Ht & Hp)".
+      rewrite (proc_pt_own_umem P (proj1 Hwf) (proc_pt_wf_inj P Hwf)).
+      iDestruct "Hp" as (M) "Hm". iExists M.
+      iSplitR; [iPureIntro; exact Hwf |]. iFrame "Ht Hm".
+  Qed.
+
+  Lemma proc_pt_forget (P : uptd) (M : gmap Z (bv 8)) :
+    proc_pt P M -∗ proc_pt_any P.
+  Proof. iIntros "H". iExists M. iExact "H". Qed.
 
   (* ------------------------------------------------------------------ *)
   (* §5c THE MEMORY-INDEXED PROCESS PAGE TABLE.                          *)
@@ -3330,9 +3367,9 @@ Section ProcPt.
      ∗ umem_lazy P sz M)%I.
 
   Lemma proc_pt_ptm (P : uptd) (sz : Z) :
-    proc_pt P ⊣⊢ ∃ M : gmap Z (bv 8), proc_ptm P sz M.
+    proc_pt_any P ⊣⊢ ∃ M : gmap Z (bv 8), proc_ptm P sz M.
   Proof.
-    rewrite /proc_pt /proc_ptm. iSplit.
+    rewrite proc_pt_any_unfold /proc_ptm. iSplit.
     - iIntros "(%Hwf & Ht & Hp)".
       iEval (rewrite (proc_pt_own_umem P (proj1 Hwf) (proc_pt_wf_inj P Hwf)))
         in "Hp".
@@ -3342,6 +3379,147 @@ Section ProcPt.
       iSplitR; [iPureIntro; exact Hwf |]. iFrame "Ht".
       rewrite (proc_pt_own_umem P (proj1 Hwf) (proc_pt_wf_inj P Hwf)).
       iApply (umem_lazy_any with "Hm").
+  Qed.
+
+  (* THE ∃-WEAKENED TIER'S RETURN, RE-VIEWED.  Everything below
+     [proc_priv] (uvmalloc, copyin, copyout, vmfault, ...) hands the
+     address space back anonymously; the block wants it at the LAZY
+     sz-region view.  [proc_pt_ptm] holds at EVERY [sz], so the crossing
+     costs nothing and the size is whatever the block is about to be
+     rebuilt at -- usually an evar at the point of use, resolved by the
+     closer that consumes the result. *)
+  Lemma proc_pt_any_ptm (P : uptd) (sz : Z) :
+    proc_pt_any P -∗ ∃ M : gmap Z (bv 8), proc_ptm P sz M.
+  Proof. rewrite (proc_pt_ptm P sz). iIntros "$". Qed.
+
+  (* THE READ-ONLY CROSSING, AS A BORROW.  A caller that must hand the
+     MAPPED view to a callee which gives it back VERBATIM (uvmcopy's parent
+     side is the one such caller) opens the lazy view into its own backed
+     submap and closes at the same one -- so nothing is lost, and unlike
+     [proc_ptm_pt] the block can be rebuilt at the image it started with.
+     [umem_lazy]'s three pure facts are exactly what the closer needs. *)
+  Lemma proc_ptm_acc_pt (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_ptm P sz M -∗ ∃ Mp : gmap Z (bv 8),
+      proc_pt P Mp ∗ (proc_pt P Mp -∗ proc_ptm P sz M).
+  Proof.
+    rewrite /proc_ptm /proc_pt /umem_lazy.
+    iIntros "(%Hwf & Ht & H)".
+    iDestruct "H" as (Mp) "(%Hsub & %Hdm & %Hz & Hm)".
+    iExists Mp. iSplitL "Ht Hm".
+    { iSplitR; [iPureIntro; exact Hwf |]. iFrame "Ht Hm". }
+    iIntros "(_ & Ht & Hm)".
+    iSplitR; [iPureIntro; exact Hwf |]. iFrame "Ht".
+    iExists Mp. iSplitR; [iPureIntro; exact Hsub |].
+    iSplitR; [iPureIntro; exact Hdm |].
+    iSplitR; [iPureIntro; exact Hz |]. iExact "Hm".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* §5c' THE TIER BRIDGE: the va-keyed image ACROSS the sz-relative one. *)
+  (*                                                                    *)
+  (* [proc_pt P M] (the MAPPED-domain view, [umem_own]) and              *)
+  (* [proc_ptm P sz M] (the LAZY sz-region view, [umem_lazy]) own the    *)
+  (* same resource and differ only in what their map RECORDS: the lazy   *)
+  (* one also carries a 0 at every live-but-unmapped va.  The mapped map *)
+  (* is nevertheless RECOVERABLE from the lazy one, because              *)
+  (* [umem_lazy]'s own existential half is a submap of the view whose    *)
+  (* domain is exactly [uva_dom P] -- and a submap is pinned by its      *)
+  (* domain.  So the round trip mapped -> lazy -> mapped is lossless,    *)
+  (* which is what lets [proc_priv] hold the LAZY view (so that vmfault  *)
+  (* and every fault-only path preserve it, per [SpecVmfault]'s          *)
+  (* memory-indexed contract) while the user-facing seam                 *)
+  (* ([UserPtTree.user_pt_inv], uservec/userret) keeps speaking the      *)
+  (* mapped one.                                                        *)
+  (*                                                                    *)
+  (* These were four [Local] lemmas in ProofUvmcopy (lane K2's precision *)
+  (* win); the [proc_priv] restructure needs them at the residue seam    *)
+  (* too, so they are public here.                                       *)
+  (* ------------------------------------------------------------------ *)
+  Lemma umem_own_dom (P : uptd) (M : gmap Z (bv 8)) :
+    umem_own P M -∗ ⌜dom M = uva_dom P⌝.
+  Proof. rewrite /umem_own. iIntros "[%H _]". iPureIntro. exact H. Qed.
+
+  (* [umem_lazy_intro]'s proof, with [Mp] FIXED to the caller's map
+     instead of chosen. *)
+  Lemma umem_lazy_of_own (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    umem_own P M -∗ ∃ Mz : gmap Z (bv 8), ⌜M ⊆ Mz⌝ ∗ umem_lazy P sz Mz.
+  Proof.
+    iIntros "Hm". iDestruct "Hm" as "[%Hdom Hm]".
+    assert (Hmp : forall va, is_Some (M !! va) <-> uva_mapped P va).
+    { intros va. rewrite <- elem_of_dom. rewrite Hdom. apply elem_of_uva_dom. }
+    assert (Hgz : forall va, is_Some (gset_to_gmap (bv_0 8) (live_set sz) !! va)
+                             <-> uva_live sz va).
+    { intros va. rewrite <- elem_of_dom. rewrite dom_gset_to_gmap.
+      apply elem_of_live_set. }
+    iExists (M ∪ gset_to_gmap (bv_0 8) (live_set sz)).
+    iSplitR; [iPureIntro; apply map_union_subseteq_l |].
+    iExists M.
+    iSplitR; [iPureIntro; apply map_union_subseteq_l |].
+    iSplitR.
+    { iPureIntro. intros va. rewrite lookup_union_is_Some.
+      rewrite (Hmp va) (Hgz va). reflexivity. }
+    iSplitR.
+    { iPureIntro. intros va Hnm Hlv.
+      rewrite lookup_union_r; [| apply not_elem_of_dom; rewrite Hdom;
+                                 intros Hin; apply Hnm; by apply elem_of_uva_dom].
+      apply lookup_gset_to_gmap_Some.
+      split; [ by apply elem_of_live_set | reflexivity]. }
+    iSplitR; [iPureIntro; exact Hdom |]. iExact "Hm".
+  Qed.
+
+  (* ...and back.  Two submaps of the same view with the same domain ARE
+     the same map, and [umem_own]'s own domain law supplies the second
+     half, so the map that comes out is the one that went in. *)
+  Lemma umem_own_of_lazy (P : uptd) (sz : Z) (M Mz : gmap Z (bv 8)) :
+    M ⊆ Mz -> dom M = uva_dom P ->
+    umem_lazy P sz Mz -∗ umem_own P M.
+  Proof.
+    intros Hsub Hdom. iIntros "H".
+    iDestruct "H" as (Mp) "(%Hsub2 & _ & _ & [%Hdom2 Hm])".
+    assert (HMp : Mp = M).
+    { apply map_eq. intros i. destruct (M !! i) as [x |] eqn:Ex.
+      - assert (Hi : is_Some (Mp !! i))
+          by (apply elem_of_dom; rewrite Hdom2 -Hdom; apply elem_of_dom; by exists x).
+        destruct Hi as [y Hy]. rewrite Hy.
+        pose proof (lookup_weaken _ _ _ _ Hy Hsub2) as H1.
+        pose proof (lookup_weaken _ _ _ _ Ex Hsub) as H2.
+        rewrite H1 in H2. by injection H2 as ->.
+      - apply not_elem_of_dom. rewrite Hdom2 -Hdom.
+        apply not_elem_of_dom. exact Ex. }
+    subst Mp. rewrite /umem_own.
+    iSplitR; [iPureIntro; exact Hdom |]. iExact "Hm".
+  Qed.
+
+  Lemma proc_ptm_of_pt (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_pt P M -∗
+    ⌜dom M = uva_dom P⌝ ∗ ∃ Mz : gmap Z (bv 8), ⌜M ⊆ Mz⌝ ∗ proc_ptm P sz Mz.
+  Proof.
+    rewrite /proc_pt /proc_ptm. iIntros "(%Hwf & Ht & Hm)".
+    iDestruct (umem_own_dom with "Hm") as "%Hdom".
+    iSplitR; [iPureIntro; exact Hdom |].
+    iDestruct (umem_lazy_of_own P sz M with "Hm") as (Mz) "[%Hsub Hm]".
+    iExists Mz. iSplitR; [iPureIntro; exact Hsub |].
+    iSplitR; [iPureIntro; exact Hwf |]. iFrame "Ht Hm".
+  Qed.
+
+  Lemma proc_pt_of_ptm (P : uptd) (sz : Z) (M Mz : gmap Z (bv 8)) :
+    M ⊆ Mz -> dom M = uva_dom P ->
+    proc_ptm P sz Mz -∗ proc_pt P M.
+  Proof.
+    intros Hsub Hdom. rewrite /proc_pt /proc_ptm.
+    iIntros "(%Hwf & Ht & Hm)".
+    iSplitR; [iPureIntro; exact Hwf |]. iFrame "Ht".
+    iApply (umem_own_of_lazy P sz M Mz Hsub Hdom with "Hm").
+  Qed.
+
+  (* the ∃-weakened crossing, both ways, in the two spellings the seam
+     actually uses: a MAPPED image becomes SOME lazy image, and a lazy
+     image is always SOME mapped one. *)
+  Lemma proc_pt_ptm_any (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_pt P M -∗ ∃ Mz : gmap Z (bv 8), proc_ptm P sz Mz.
+  Proof.
+    iIntros "H". iDestruct (proc_ptm_of_pt P sz M with "H") as "(_ & H)".
+    iDestruct "H" as (Mz) "[_ H]". iExists Mz. iExact "H".
   Qed.
 
 
@@ -3590,7 +3768,7 @@ Section ProcPt.
   Proof. iIntros "(_ & _ & Hm)". iApply (umem_lazy_dom with "Hm"). Qed.
 
   Lemma proc_ptm_pt (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
-    proc_ptm P sz M -∗ proc_pt P.
+    proc_ptm P sz M -∗ proc_pt_any P.
   Proof. iIntros "H". rewrite (proc_pt_ptm P sz). iExists M. iExact "H". Qed.
 
   (* ---- the WINDOW a copy loop borrows, and the tier it speaks -------- *)
@@ -4636,10 +4814,16 @@ Section ProcPt.
   (* ... tied to the two [struct proc] cells.  Both hold a page's identity
      kernel va, which is [page_base] of the ppn the table is described by:
      [p->pagetable] the root, [p->trapframe] the trapframe page. *)
-  Definition proc_pt_at (pa : mword 64) (P : uptd) : iProp Σ :=
+  Definition proc_pt_at (pa : mword 64) (P : uptd) (M : gmap Z (bv 8)) : iProp Σ :=
     (p_pagetable pa ↦₈ page_base P.(ud_root) ∗
      p_trapframe pa ↦₈ page_base P.(ud_tfp) ∗
-     proc_pt P)%I.
+     proc_pt P M)%I.
+
+  (* the ∃-weakened spelling, for the one consumer that cannot name the
+     bytes: [ProcDefs.proc_dormant]'s ZOMBIE arm, whose descriptor is
+     itself existential. *)
+  Definition proc_pt_at_any (pa : mword 64) (P : uptd) : iProp Σ :=
+    (∃ M : gmap Z (bv 8), proc_pt_at pa P M)%I.
 
   (* JUST THE TWO CELLS.  They name the table but are not part of it: they
      are ordinary [struct proc] words, owned by the kernel across user
@@ -4651,12 +4835,86 @@ Section ProcPt.
     (p_pagetable pa ↦₈ page_base P.(ud_root) ∗
      p_trapframe pa ↦₈ page_base P.(ud_tfp))%I.
 
-  Lemma proc_pt_at_split (pa : mword 64) (P : uptd) :
-    proc_pt_at pa P ⊣⊢ proc_pt_cells pa P ∗ proc_pt P.
+  Lemma proc_pt_at_split (pa : mword 64) (P : uptd) (M : gmap Z (bv 8)) :
+    proc_pt_at pa P M ⊣⊢ proc_pt_cells pa P ∗ proc_pt P M.
   Proof.
     rewrite /proc_pt_at /proc_pt_cells. iSplit.
     - iIntros "(H1 & H2 & H3)". iFrame "H1 H2 H3".
     - iIntros "((H1 & H2) & H3)". iFrame "H1 H2 H3".
+  Qed.
+
+  Lemma proc_pt_at_any_split (pa : mword 64) (P : uptd) :
+    proc_pt_at_any pa P ⊣⊢ proc_pt_cells pa P ∗ proc_pt_any P.
+  Proof.
+    rewrite /proc_pt_at_any /proc_pt_any. iSplit.
+    - iIntros "H". iDestruct "H" as (M) "H".
+      rewrite proc_pt_at_split. iDestruct "H" as "[$ H]". iExists M. iExact "H".
+    - iIntros "[Hc H]". iDestruct "H" as (M) "H". iExists M.
+      rewrite proc_pt_at_split. iFrame "Hc H".
+  Qed.
+
+  Lemma proc_pt_at_forget (pa : mword 64) (P : uptd) (M : gmap Z (bv 8)) :
+    proc_pt_at pa P M -∗ proc_pt_at_any pa P.
+  Proof. iIntros "H". iExists M. iExact "H". Qed.
+
+  (* ---- THE CELLS PLUS THE **LAZY** VIEW ------------------------------
+     What [ProcInv.proc_priv] holds.  Identical to [proc_pt_at] except for
+     which view of the bytes it names -- see §5c' for why the block wants
+     the sz-relative one (vmfault, and hence copyin and every fault-only
+     path, PRESERVES it) and the user-facing seam keeps the mapped one. *)
+  Definition proc_ptm_at (pa : mword 64) (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      : iProp Σ :=
+    (p_pagetable pa ↦₈ page_base P.(ud_root) ∗
+     p_trapframe pa ↦₈ page_base P.(ud_tfp) ∗
+     proc_ptm P sz M)%I.
+
+  Lemma proc_ptm_at_split (pa : mword 64) (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_ptm_at pa P sz M ⊣⊢ proc_pt_cells pa P ∗ proc_ptm P sz M.
+  Proof.
+    rewrite /proc_ptm_at /proc_pt_cells. iSplit.
+    - iIntros "(H1 & H2 & H3)". iFrame "H1 H2 H3".
+    - iIntros "((H1 & H2) & H3)". iFrame "H1 H2 H3".
+  Qed.
+
+  (* the crossing, at the cells-bearing tier: a block's memory conjunct is
+     always SOME anonymous mapped address space, and an anonymous one can
+     be re-viewed at any size. *)
+  Lemma proc_ptm_at_forget (pa : mword 64) (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_ptm_at pa P sz M -∗ proc_pt_at_any pa P.
+  Proof.
+    rewrite proc_ptm_at_split proc_pt_at_any_split.
+    iIntros "[$ H]". iApply (proc_ptm_pt with "H").
+  Qed.
+
+  Lemma proc_pt_at_ptm (pa : mword 64) (P : uptd) (sz : Z) :
+    proc_pt_at_any pa P ⊣⊢ ∃ M : gmap Z (bv 8), proc_ptm_at pa P sz M.
+  Proof.
+    rewrite proc_pt_at_any_split (proc_pt_ptm P sz). iSplit.
+    - iIntros "[Hc H]". iDestruct "H" as (M) "H". iExists M.
+      rewrite proc_ptm_at_split. iFrame "Hc H".
+    - iIntros "H". iDestruct "H" as (M) "H". rewrite proc_ptm_at_split.
+      iDestruct "H" as "[$ H]". iExists M. iExact "H".
+  Qed.
+
+  (* the two named crossings, lifted to the cells-bearing tier *)
+  Lemma proc_ptm_at_of_pt_at (pa : mword 64) (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_pt_at pa P M -∗
+    ⌜dom M = uva_dom P⌝ ∗ ∃ Mz : gmap Z (bv 8), ⌜M ⊆ Mz⌝ ∗ proc_ptm_at pa P sz Mz.
+  Proof.
+    rewrite proc_pt_at_split. iIntros "[Hc H]".
+    iDestruct (proc_ptm_of_pt P sz M with "H") as "[%Hdom H]".
+    iSplitR; [iPureIntro; exact Hdom |].
+    iDestruct "H" as (Mz) "[%Hsub H]". iExists Mz.
+    iSplitR; [iPureIntro; exact Hsub |].
+    rewrite proc_ptm_at_split. iFrame "Hc H".
+  Qed.
+
+  Lemma proc_pt_at_of_ptm_at (pa : mword 64) (P : uptd) (sz : Z) (M Mz : gmap Z (bv 8)) :
+    M ⊆ Mz -> dom M = uva_dom P ->
+    proc_ptm_at pa P sz Mz -∗ proc_pt_at pa P M.
+  Proof.
+    intros Hsub Hdom. rewrite proc_pt_at_split proc_ptm_at_split.
+    iIntros "[$ H]". iApply (proc_pt_of_ptm P sz M Mz Hsub Hdom with "H").
   Qed.
 
   (* [iFrame] must NOT search inside these.  [proc_pt] contains [pt_frame]
@@ -4664,15 +4922,25 @@ Section ProcPt.
      it turns a one-line projection into minutes and gigabytes (measured: a
      [proc_priv] projection went 2 s -> 300 s / 15.7 GB without this).  Same
      reason [phys_page_own]/[upt_pages_own] are already opaque above. *)
-  Typeclasses Opaque proc_pt proc_pt_at.
+  Typeclasses Opaque proc_pt proc_pt_at proc_pt_any proc_pt_at_any.
+  (* [proc_ptm] is now a [proc_priv] conjunct, so it is on the same
+     iFrame-search hot path the note above describes -- seal it too. *)
+  Typeclasses Opaque proc_ptm proc_ptm_at.
 
   (* READ THE PURE CONJUNCT, without opening the tree.  Every other way in
      ([proc_pt_acc_rep0] and friends) consumes the resource to get at
      [proc_pt_wf]; a caller that only wants to know the descriptor is
      well-formed -- to re-seal a generically-proved function at the [Some]
      end of BarePt's [otf] axis, say -- needs it as a plain projection. *)
-  Lemma proc_pt_wf_get (P : uptd) : proc_pt P ⊢ ⌜proc_pt_wf P⌝.
+  Lemma proc_pt_wf_get (P : uptd) (M : gmap Z (bv 8)) :
+    proc_pt P M ⊢ ⌜proc_pt_wf P⌝.
   Proof. rewrite /proc_pt. iIntros "(%Hwf & _)". iPureIntro. exact Hwf. Qed.
+
+  Lemma proc_pt_any_wf_get (P : uptd) : proc_pt_any P ⊢ ⌜proc_pt_wf P⌝.
+  Proof.
+    rewrite /proc_pt_any. iIntros "H". iDestruct "H" as (M) "H".
+    by iApply proc_pt_wf_get.
+  Qed.
 
   (* THE ROOT PAGE IS A KALLOC PAGE, and it is a fact of the RESOURCE, not of
      [proc_pt_wf] (which records it only for the trapframe page).  It comes
@@ -4683,13 +4951,20 @@ Section ProcPt.
      must NOT ask a caller for it: freeproc null-checks [p->pagetable] and has
      to refute the [c.beqz] from what it was handed, and its callers (kwait's
      ZOMBIE child, allocproc's failure tails) hold nothing but the block. *)
-  Lemma proc_pt_root_valid (P : uptd) :
-    proc_pt P ⊢ ⌜page_valid (page_base P.(ud_root))⌝.
+  Lemma proc_pt_root_valid (P : uptd) (M : gmap Z (bv 8)) :
+    proc_pt P M ⊢ ⌜page_valid (page_base P.(ud_root))⌝.
   Proof.
     rewrite /proc_pt /pt_frame.
     iIntros "(_ & Ht & _)". iDestruct "Ht" as (t) "[%Hspec Ht]".
     iDestruct (ptree_own_page_valid 2 (DfracOwn 1) t with "Ht") as %Hv.
     iPureIntro. destruct Hspec as [Hbase _]. by rewrite -Hbase.
+  Qed.
+
+  Lemma proc_pt_any_root_valid (P : uptd) :
+    proc_pt_any P ⊢ ⌜page_valid (page_base P.(ud_root))⌝.
+  Proof.
+    rewrite /proc_pt_any. iIntros "H". iDestruct "H" as (M) "H".
+    by iApply proc_pt_root_valid.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -4703,6 +4978,16 @@ Section ProcPt.
   (* that [p->trapframe] holds a page-aligned address): the trapframe      *)
   (* page, and kalloc's [page_valid] guarantee for it.                    *)
   (* ------------------------------------------------------------------ *)
+  (* an unmapped table has an EMPTY address space, so the named image at
+     the construction end is literally [∅] *)
+  Lemma uva_dom_empty (P : uptd) : P.(ud_um) = ∅ -> uva_dom P = ∅.
+  Proof.
+    intros Hum. apply set_eq. intros va.
+    rewrite elem_of_uva_dom elem_of_empty. split.
+    - intros (vpn & w & j & Hl & _). rewrite Hum lookup_empty in Hl. discriminate.
+    - intros [].
+  Qed.
+
   Definition upt_desc (root tfp : mword 44) : uptd :=
     (* the [ud_data] argument is the DERIVED footprint -- it disappears
        when the field does (see claude-notes/projects/
@@ -4718,10 +5003,10 @@ Section ProcPt.
   Lemma proc_pt_intro_empty (root tfp : mword 44) (t : ptree) :
     upt_tree_spec root tfp ∅ t ->
     page_valid (page_base tfp) ->
-    ptree_own 2 (DfracOwn 1) t -∗ proc_pt (upt_desc root tfp).
+    ptree_own 2 (DfracOwn 1) t -∗ proc_pt (upt_desc root tfp) ∅.
   Proof.
     intros Hspec Hvtf. iIntros "Ht".
-    rewrite /proc_pt /proc_pt_own /upt_desc.
+    rewrite /proc_pt /upt_desc.
     cbn [ud_root ud_tfp ud_um].
     iSplitR.
     { iPureIntro. split; [exact upt_map_wf_empty |].
@@ -4730,14 +5015,17 @@ Section ProcPt.
       split; [exact um_inj_empty | exact Hvtf]. }
     iSplitL "Ht".
     { iExists t. iFrame "Ht". iPureIntro. exact Hspec. }
-    rewrite /upt_pages_own um_ppns_empty big_sepS_empty. done.
+    rewrite /umem_own. iSplitR.
+    { iPureIntro. rewrite dom_empty_L. symmetry.
+      apply uva_dom_empty. reflexivity. }
+    rewrite big_sepM_empty. done.
   Qed.
 
   (* the instance at proc_pagetable's post, through [ProcPt.ppt_bridge] *)
   Lemma proc_pt_intro_ppt (t : ptree) (tfp : mword 44) :
     pt_rep0 t (ppt_map tfp) ->
     page_valid (page_base tfp) ->
-    ptree_own 2 (DfracOwn 1) t -∗ proc_pt (upt_desc (pt_base t) tfp).
+    ptree_own 2 (DfracOwn 1) t -∗ proc_pt (upt_desc (pt_base t) tfp) ∅.
   Proof.
     intros Hrep Hvtf.
     exact (proc_pt_intro_empty (pt_base t) tfp t (ppt_bridge t tfp Hrep) Hvtf).
@@ -4754,11 +5042,11 @@ Section ProcPt.
   (*   CLOSE   grown by one page (success arm)      [proc_pt_grow]        *)
   (* ------------------------------------------------------------------ *)
   Lemma proc_pt_acc_rep0 (P : uptd) :
-    proc_pt P ⊢ ∃ t m_ad, ⌜pt_rep0 t m_ad⌝ ∗ ⌜upt_ad_view P.(ud_tfp) P.(ud_um) m_ad⌝ ∗
+    proc_pt_any P ⊢ ∃ t m_ad, ⌜pt_rep0 t m_ad⌝ ∗ ⌜upt_ad_view P.(ud_tfp) P.(ud_um) m_ad⌝ ∗
       ⌜pt_base t = P.(ud_root)⌝ ∗ ⌜proc_pt_wf P⌝ ∗
       ptree_own 2 (DfracOwn 1) t ∗ proc_pt_own P.
   Proof.
-    iIntros "H". rewrite /proc_pt /pt_frame.
+    iIntros "H". rewrite proc_pt_any_unfold /pt_frame.
     iDestruct "H" as "(%Hwf & Ht & Hown)".
     iDestruct "Ht" as (t) "(%Hspec & Ht)".
     destruct (upt_spec_rep0 P.(ud_root) P.(ud_tfp) P.(ud_um) t Hspec)
@@ -4774,10 +5062,10 @@ Section ProcPt.
   Lemma proc_pt_rebuild (P : uptd) (t' : ptree) (m_ad : gmap (mword 27) (mword 64)) :
     proc_pt_wf P -> upt_ad_view P.(ud_tfp) P.(ud_um) m_ad ->
     pt_rep0 t' m_ad -> pt_base t' = P.(ud_root) ->
-    ptree_own 2 (DfracOwn 1) t' -∗ proc_pt_own P -∗ proc_pt P.
+    ptree_own 2 (DfracOwn 1) t' -∗ proc_pt_own P -∗ proc_pt_any P.
   Proof.
     intros Hwf Hview Hrep Hbase. iIntros "Ht Hown".
-    rewrite /proc_pt.
+    rewrite proc_pt_any_unfold.
     iSplitR; [iPureIntro; exact Hwf |].
     iSplitL "Ht"; [| iFrame "Hown"].
     rewrite /pt_frame. iExists t'. iFrame "Ht". iPureIntro.
@@ -4800,7 +5088,7 @@ Section ProcPt.
     page_valid r ->
     kmap_static_claims -∗ ptree_own 2 (DfracOwn 1) t' -∗
     page_own r -∗ proc_pt_own P -∗
-    proc_pt (uptd_insert_perm P perm vpn r).
+    proc_pt_any (uptd_insert_perm P perm vpn r).
   Proof.
     intros Hperm (Hmwf & Hawf & Hpwf & Hinj & Htfv) Hview Hnone Hlt Hrep Hbase Hval.
     destruct (proj1 (proj1 Hview vpn) Hnone) as (Hnt & Hntf & Hunone).
@@ -4820,7 +5108,7 @@ Section ProcPt.
       iApply (page_own_to_phys _ Hv' with "Hb"). rewrite Hpb. iExact "Hpg". }
     iDestruct (upt_pages_own_fresh P.(ud_um) (pte_ppn (uvm_pte perm r))
                  with "Hph Hown") as %Hfresh.
-    rewrite /proc_pt /proc_pt_own /uptd_insert_perm.
+    rewrite proc_pt_any_unfold /proc_pt_own /uptd_insert_perm.
     cbn [ud_root ud_tfp ud_um].
     iSplitR.
     { iPureIntro. unfold proc_pt_wf. cbn [ud_root ud_tfp ud_um].
@@ -4851,7 +5139,7 @@ Section ProcPt.
     page_valid r ->
     kmap_static_claims -∗ ptree_own 2 (DfracOwn 1) t' -∗
     page_own r -∗ proc_pt_own P -∗
-    proc_pt (uptd_insert P vpn r).
+    proc_pt_any (uptd_insert P vpn r).
   Proof. exact (proc_pt_grow_uvm P 22 vpn r t' m_ad uvm_perm_ok_22). Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -4955,17 +5243,37 @@ Section ProcPt.
       iPureIntro. intros va Hnm Hlv'. apply H3; [exact Hnm | by apply Hlv].
   Qed.
 
-  Lemma proc_pt_data_irrel (P Q : uptd) :
+  Lemma proc_pt_data_irrel (P Q : uptd) (M : gmap Z (bv 8)) :
     P.(ud_root) = Q.(ud_root) -> P.(ud_tfp) = Q.(ud_tfp) ->
     P.(ud_um) = Q.(ud_um) ->
-    proc_pt P ⊣⊢ proc_pt Q.
+    proc_pt P M ⊣⊢ proc_pt Q M.
   Proof.
-    intros Hr Ht Hu. rewrite /proc_pt /proc_pt_own /proc_pt_wf.
+    intros Hr Ht Hu. rewrite /proc_pt /proc_pt_wf /umem_own /uva_dom /uva_pa.
     rewrite Hr Ht Hu. reflexivity.
   Qed.
 
-  Lemma proc_pt_norm (P : uptd) : proc_pt P ⊣⊢ proc_pt (ud_norm P).
+  Lemma proc_pt_any_data_irrel (P Q : uptd) :
+    P.(ud_root) = Q.(ud_root) -> P.(ud_tfp) = Q.(ud_tfp) ->
+    P.(ud_um) = Q.(ud_um) ->
+    proc_pt_any P ⊣⊢ proc_pt_any Q.
+  Proof.
+    intros Hr Ht Hu. rewrite /proc_pt_any.
+    setoid_rewrite (proc_pt_data_irrel P Q _ Hr Ht Hu). reflexivity.
+  Qed.
+
+  Lemma proc_pt_norm (P : uptd) (M : gmap Z (bv 8)) :
+    proc_pt P M ⊣⊢ proc_pt (ud_norm P) M.
   Proof. apply proc_pt_data_irrel; reflexivity. Qed.
+
+  Lemma proc_pt_any_norm (P : uptd) : proc_pt_any P ⊣⊢ proc_pt_any (ud_norm P).
+  Proof. apply proc_pt_any_data_irrel; reflexivity. Qed.
+
+  (* the same renormalisation at the LAZY view -- what a residue that holds
+     [proc_priv]'s own memory conjunct needs before it hands the descriptor
+     to the user tier (ProofForkret's park). *)
+  Lemma proc_ptm_norm (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_ptm P sz M ⊣⊢ proc_ptm (ud_norm P) sz M.
+  Proof. apply proc_ptm_data_irrel; reflexivity. Qed.
 
   (* ------------------------------------------------------------------ *)
   (* THE SATP-SWITCH DOVETAIL.  [proc_pt] (parked, kernel view) and       *)
@@ -4986,11 +5294,11 @@ Section ProcPt.
 
   (* the parked bundle, split at the conjunct the switch converts *)
   Lemma proc_pt_split (P : uptd) :
-    proc_pt P ⊣⊢
+    proc_pt_any P ⊣⊢
     (⌜proc_pt_wf P⌝ ∗ pt_frame (upt_tree_spec P.(ud_root) P.(ud_tfp) P.(ud_um)))
       ∗ proc_pt_own P.
   Proof.
-    rewrite /proc_pt. iSplit.
+    rewrite proc_pt_any_unfold. iSplit.
     - iIntros "(%Hwf & Htr & Hpg)". iFrame "Hpg". iSplitR; [done|]. iExact "Htr".
     - iIntros "[(%Hwf & Htr) Hpg]". iSplitR; [done|]. iFrame "Htr Hpg".
   Qed.
@@ -5041,15 +5349,15 @@ Section ProcPt.
   (* ------------------------------------------------------------------ *)
   Lemma proc_pt_page_acc (P : uptd) (vpn : mword 27) (w : mword 64) :
     P.(ud_um) !! vpn = Some w ->
-    kmap_static_claims -∗ proc_pt P -∗
+    kmap_static_claims -∗ proc_pt_any P -∗
       page_own (page_base (pte_ppn w)) ∗
-      (page_own (page_base (pte_ppn w)) -∗ proc_pt P).
+      (page_own (page_base (pte_ppn w)) -∗ proc_pt_any P).
   Proof.
     intros Hl.
     assert (Hin : pte_ppn w ∈ um_ppns P.(ud_um)).
     { apply elem_of_um_ppns. exists vpn, w. split; [exact Hl | reflexivity]. }
     iIntros "#Hb H".
-    iEval (rewrite /proc_pt /proc_pt_own /upt_pages_own
+    iEval (rewrite proc_pt_any_unfold /proc_pt_own /upt_pages_own
              (big_sepS_delete (fun q => phys_page_own q)
                 (um_ppns P.(ud_um)) (pte_ppn w) Hin)) in "H".
     iDestruct "H" as "(%Hwf & Ht & Hp & Hrest)".
@@ -5058,7 +5366,7 @@ Section ProcPt.
     iSplitL "Hpg"; [iExact "Hpg" |].
     iIntros "Hpg".
     iDestruct (page_own_to_phys (pte_ppn w) Hval with "Hb Hpg") as "Hp".
-    rewrite /proc_pt /proc_pt_own /upt_pages_own.
+    rewrite proc_pt_any_unfold /proc_pt_own /upt_pages_own.
     rewrite (big_sepS_delete (fun q => phys_page_own q)
                (um_ppns P.(ud_um)) (pte_ppn w) Hin).
     iSplitR; [iPureIntro; exact Hwf |].
@@ -5070,8 +5378,8 @@ Section ProcPt.
      through [page_valid]. *)
   Lemma proc_pt_page_acc_vmfault (P : uptd) (vpn : mword 27) (r : mword 64) :
     page_valid r ->
-    kmap_static_claims -∗ proc_pt (uptd_insert P vpn r) -∗
-      page_own r ∗ (page_own r -∗ proc_pt (uptd_insert P vpn r)).
+    kmap_static_claims -∗ proc_pt_any (uptd_insert P vpn r) -∗
+      page_own r ∗ (page_own r -∗ proc_pt_any (uptd_insert P vpn r)).
   Proof.
     intros Hval.
     assert (Hl : (uptd_insert P vpn r).(ud_um) !! vpn = Some (vmfault_pte r)).

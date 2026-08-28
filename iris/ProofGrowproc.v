@@ -412,8 +412,8 @@ Section ProofGrowproc.
   (* =================================================================== *)
   Lemma wp_growproc_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_growproc_sconf_body γa γf m av eb p pid V b lks.
+      (pid : mword 32) (U : ustate) (b : bool) (lks : gset string)
+    : wp_growproc_sconf_body γa γf m av eb p pid U b lks.
   Proof.
     cbv beta delta [wp_growproc_sconf_body].
     intros pcE nv ret_tgt Hav.
@@ -592,7 +592,9 @@ Section ProofGrowproc.
     iDestruct (proc_priv_sz_maxsz with "Hpriv") as %Hszmax.
     iDestruct (proc_priv_um_below with "Hpriv") as %Hbel.
     iDestruct (proc_priv_addrspace with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
-    assert (Hszmaxz : (bv_unsigned (pv_sz V) <= 274877898752)%Z).
+    (* uvmalloc/uvmdealloc are stated at the ∃-weakened image *)
+    iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
+    assert (Hszmaxz : (bv_unsigned (pv_sz (us_V U)) <= 274877898752)%Z).
     { rewrite <- uint_unsigned. rewrite <- uvm_maxsz_val. exact Hszmax. }
     (* ---- +0x12: c.mv s2,a0 -- s2 := p ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.growproc + 0x12))
@@ -623,19 +625,19 @@ Section ProofGrowproc.
     assert (Hszaddr : add_vec (A1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p)
       by (rewrite HA1a0; reflexivity).
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.growproc + 0x14)) Ra1 Ra0
-              (mword_of_int 72 : mword 12) A1 (av - 4)%nat (pv_sz V) b (dqm := DfracOwn 1)
+              (mword_of_int 72 : mword 12) A1 (av - 4)%nat (pv_sz (us_V U)) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [Hszc]").
     { iApply (gpi_14 with "Htext"). }
     { iEval (rgne; rewrite Hszaddr). iExact "Hszc". }
     iIntros (CID11 Hn11) "Hcg Hpc Hszc".
     iEval (rgne; rewrite Hszaddr) in "Hszc".
-    set (A2 := <[Regidx Ra1 := regval_into_reg (pv_sz V)]> A1).
-    change (<[Regidx Ra1 := regval_into_reg (pv_sz V)]> A1) with A2.
+    set (A2 := <[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> A1).
+    change (<[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> A1) with A2.
     assert (Hpp16 : add_vec_int (mword_of_int (KernelSyms.growproc + 0x14) : mword 64) 2
                     = mword_of_int (KernelSyms.growproc + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp16) in "Hpc".
-    assert (HA2a1 : A2 !!! Regidx Ra1 = pv_sz V) by (rewrite /A2 upd_eq; reflexivity).
+    assert (HA2a1 : A2 !!! Regidx Ra1 = pv_sz (us_V U)) by (rewrite /A2 upd_eq; reflexivity).
     assert (HA2s2 : A2 !!! Regidx Rs2 = p)
       by (rewrite /A2 upd_ne; [exact HA1s2 | reg_neq]).
     assert (HA2a0 : A2 !!! Regidx Ra0 = p)
@@ -660,17 +662,17 @@ Section ProofGrowproc.
         ⌜Mf !!! Regidx Ra0 = rv⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
             r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> Mf !!! Regidx r = m !!! Regidx r⌝ -∗
-        ⌜ud_root P' = ud_root (pv_upt V)⌝ -∗
-        ⌜ud_tfp P' = ud_tfp (pv_upt V)⌝ -∗
+        ⌜ud_root P' = ud_root (pv_upt (us_V U))⌝ -∗
+        ⌜ud_tfp P' = ud_tfp (pv_upt (us_V U))⌝ -∗
         ⌜(uint szv' <= uvm_maxsz)%Z⌝ -∗
         ⌜um_below szv' (ud_um P')⌝ -∗
-        ⌜growproc_ok (pv_sz V) nv (pv_upt V) P' szv' rv⌝ -∗
+        ⌜growproc_ok (pv_sz (us_V U)) nv (pv_upt (us_V U)) P' szv' rv⌝ -∗
         sie_cap_gpr KT1 (CID:=CIDx) Mf (av - 4)%nat b p -∗
         cpu_own (CID:=CIDx) 0%nat eb p b lks -∗
         pc_is (CID:=CIDx) (mword_of_int (KernelSyms.growproc + 0x3c) : mword 64) -∗
         p_sz p ↦₈ szv' -∗
-        p_pagetable p ↦₈ page_base (ud_root (pv_upt V)) -∗
-        proc_pt P' -∗
+        p_pagetable p ↦₈ page_base (ud_root (pv_upt (us_V U))) -∗
+        proc_pt_any P' -∗
         word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
         word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
         word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
@@ -679,7 +681,8 @@ Section ProofGrowproc.
       with "[Hpback Hcont]" as "EXIT".
     { iIntros (CIDx Mf P' szv' rv)
         "%Hchain %Hfsp %Hfa0 %Hfthr %Hroot %Htfp %Hszb %Hbel' %Hok Hcg Hcpu Hpc Hszc Hptc Hpt Hb1 Hb2 Hb3 Hb4".
-      iDestruct ("Hpback" $! P' szv' with "[%] [%] [%] [%] Hszc Hptc Hpt") as "Hpriv";
+      iDestruct (proc_pt_any_ptm with "Hpt") as (Mo) "Hpt".
+      iDestruct ("Hpback" $! P' szv' Mo with "[%] [%] [%] [%] Hszc Hptc Hpt") as "Hpriv";
         [exact Hroot | exact Htfp | exact Hszb | exact Hbel' |].
       iApply (gp_tail m Mf av rv sp0 ra0 s00 s10 s20 b p
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl
@@ -689,7 +692,7 @@ Section ProofGrowproc.
       iDestruct (cpu_own_transport CIDx CIDf 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf P' szv' with "[%] [%] Hcg Hcpu Hpc Hpriv").
+      iApply ("Hcont" $! mf P' szv' Mo with "[%] [%] Hcg Hcpu Hpc Hpriv").
       { exact Hcsf. }
       { rewrite Hmfa0. exact Hok. } }
 
@@ -703,11 +706,11 @@ Section ProofGrowproc.
         assert (Hz0 : sint (zero_reg : mword 64) = 0%Z) by reflexivity.
         rewrite Hz0 Z.geb_leb in Hblez. apply Z.leb_gt in Hblez. exact Hblez. }
       pose proof (sint64_range nv) as Hnb.
-      pose proof (bv_unsigned_in_range _ (pv_sz V)) as [Hsz0 _].
-      assert (Hnewu : bv_unsigned (add_vec (pv_sz V) nv)
-                      = (bv_unsigned (pv_sz V) + sint nv)%Z)
+      pose proof (bv_unsigned_in_range _ (pv_sz (us_V U))) as [Hsz0 _].
+      assert (Hnewu : bv_unsigned (add_vec (pv_sz (us_V U)) nv)
+                      = (bv_unsigned (pv_sz (us_V U)) + sint nv)%Z)
         by (apply add_vec_sint_unsigned; lia).
-      assert (Hlesz : (bv_unsigned (pv_sz V) <= bv_unsigned (add_vec (pv_sz V) nv))%Z)
+      assert (Hlesz : (bv_unsigned (pv_sz (us_V U)) <= bv_unsigned (add_vec (pv_sz (us_V U)) nv))%Z)
         by lia.
       iApply (wp_bge_x0_fall_s_sconf (mword_of_int (KernelSyms.growproc + 0x16))
                 (mword_of_int 50 : mword 13) Rs1 A2 (av - 4)%nat b
@@ -720,14 +723,14 @@ Section ProofGrowproc.
       iEval (rewrite Hpp1a) in "Hpc".
       (* ---- +0x1a: add a2,s1,a1 -- a2 := sz + n ---- *)
       iApply (wp_add_s_sconf (mword_of_int (KernelSyms.growproc + 0x1a))
-                Ra2 Rs1 Ra1 (add_vec (pv_sz V) nv) A2 (av - 4)%nat b
+                Ra2 Rs1 Ra1 (add_vec (pv_sz (us_V U)) nv) A2 (av - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(rgne; rgne; rewrite HA2s1 HA2a1; apply add_vec64_comm)
                 with "Hcg Hpc []").
       { iApply (gpi_1a with "Htext"). }
       iIntros (CID13 Hn13) "Hcg Hpc".
-      set (B1 := <[Regidx Ra2 := regval_into_reg (add_vec (pv_sz V) nv)]> A2).
-      change (<[Regidx Ra2 := regval_into_reg (add_vec (pv_sz V) nv)]> A2) with B1.
+      set (B1 := <[Regidx Ra2 := regval_into_reg (add_vec (pv_sz (us_V U)) nv)]> A2).
+      change (<[Regidx Ra2 := regval_into_reg (add_vec (pv_sz (us_V U)) nv)]> A2) with B1.
       assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.growproc + 0x1a) : mword 64) 4
                       = mword_of_int (KernelSyms.growproc + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp1e) in "Hpc".
@@ -778,10 +781,10 @@ Section ProofGrowproc.
       (* the three instructions above build exactly TRAPFRAME *)
       assert (HB4a5 : B4 !!! Regidx Ra5 = (mword_of_int 274877898752 : mword 64)).
       { rewrite /B4 upd_eq /B3 upd_eq /B2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
-      assert (HB4a2 : B4 !!! Regidx Ra2 = add_vec (pv_sz V) nv).
+      assert (HB4a2 : B4 !!! Regidx Ra2 = add_vec (pv_sz (us_V U)) nv).
       { rewrite /B4 upd_ne; [| reg_neq]. rewrite /B3 upd_ne; [| reg_neq].
         rewrite /B2 upd_ne; [| reg_neq]. rewrite /B1 upd_eq. reflexivity. }
-      assert (HB4a1 : B4 !!! Regidx Ra1 = pv_sz V).
+      assert (HB4a1 : B4 !!! Regidx Ra1 = pv_sz (us_V U)).
       { rewrite /B4 upd_ne; [| reg_neq]. rewrite /B3 upd_ne; [| reg_neq].
         rewrite /B2 upd_ne; [| reg_neq]. rewrite /B1 upd_ne; [| reg_neq]. exact HA2a1. }
       assert (HB4a0 : B4 !!! Regidx Ra0 = p).
@@ -846,7 +849,7 @@ Section ProofGrowproc.
         iEval (rewrite Htgt3c) in "Hpc".
         iDestruct (cpu_own_transport CID9 CID19 0%nat eb p b ltac:(wp_next_chain)
                      with "Hcpu") as "Hcpu".
-        iApply ("EXIT" $! CID19 X1 (pv_upt V) (pv_sz V) (mword_of_int (-1) : mword 64)
+        iApply ("EXIT" $! CID19 X1 (pv_upt (us_V U)) (pv_sz (us_V U)) (mword_of_int (-1) : mword 64)
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hs1 Hs2 Hs3 Hs4").
         - wp_next_chain.
         - rewrite /X1 upd_ne; [exact HB4sp | reg_neq].
@@ -861,7 +864,7 @@ Section ProofGrowproc.
         - exact Hbel.
         - left. split; [reflexivity | split; reflexivity]. }
       (* ---- FALL: sz + n fits, call uvmalloc ---- *)
-      assert (Hnewle : (bv_unsigned (add_vec (pv_sz V) nv) <= 274877898752)%Z).
+      assert (Hnewle : (bv_unsigned (add_vec (pv_sz (us_V U)) nv) <= 274877898752)%Z).
       { rewrite HB4a5 HB4a2 in Hbltu. unfold zopz0zI_u in Hbltu.
         apply Z.ltb_ge in Hbltu. rewrite !uint_unsigned in Hbltu.
         assert (Hlit : bv_unsigned (mword_of_int 274877898752 : mword 64) = 274877898752%Z)
@@ -895,7 +898,7 @@ Section ProofGrowproc.
       assert (Hpta : add_vec (C1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                      = p_pagetable p) by (rewrite HC1a0; reflexivity).
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.growproc + 0x2c)) Ra0 Ra0
-                (mword_of_int 80 : mword 12) C1 (av - 4)%nat (page_base (ud_root (pv_upt V))) b
+                (mword_of_int 80 : mword 12) C1 (av - 4)%nat (page_base (ud_root (pv_upt (us_V U)))) b
                 (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] [Hptc]").
@@ -903,8 +906,8 @@ Section ProofGrowproc.
       { iEval (rgne; rewrite Hpta). iExact "Hptc". }
       iIntros (CID19 Hn19) "Hcg Hpc Hptc".
       iEval (rgne; rewrite Hpta) in "Hptc".
-      set (C2 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> C1).
-      change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> C1) with C2.
+      set (C2 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> C1).
+      change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> C1) with C2.
       assert (Hpp2e : add_vec_int (mword_of_int (KernelSyms.growproc + 0x2c) : mword 64) 2
                       = mword_of_int (KernelSyms.growproc + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp2e) in "Hpc".
@@ -924,12 +927,12 @@ Section ProofGrowproc.
                        = mword_of_int KernelSyms.uvmalloc)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmpua) in "Hpc".
-      assert (HC3a0 : C3 !!! Regidx Ra0 = page_base (ud_root (pv_upt V))).
+      assert (HC3a0 : C3 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U)))).
       { rewrite /C3 upd_ne; [| reg_neq]. rewrite /C2 upd_eq. reflexivity. }
-      assert (HC3a1 : C3 !!! Regidx Ra1 = pv_sz V).
+      assert (HC3a1 : C3 !!! Regidx Ra1 = pv_sz (us_V U)).
       { rewrite /C3 upd_ne; [| reg_neq]. rewrite /C2 upd_ne; [| reg_neq].
         rewrite /C1 upd_ne; [| reg_neq]. exact HB4a1. }
-      assert (HC3a2 : C3 !!! Regidx Ra2 = add_vec (pv_sz V) nv).
+      assert (HC3a2 : C3 !!! Regidx Ra2 = add_vec (pv_sz (us_V U)) nv).
       { rewrite /C3 upd_ne; [| reg_neq]. rewrite /C2 upd_ne; [| reg_neq].
         rewrite /C1 upd_ne; [| reg_neq]. exact HB4a2. }
       assert (HC3a3 : C3 !!! Regidx Ra3 = (mword_of_int 4 : mword 64)).
@@ -957,12 +960,12 @@ Section ProofGrowproc.
         rewrite /C1 upd_ne; [| congruence]. apply HthrB4; assumption. }
       (* the two premises about the RUN: it stays inside the user region,
          and -- the whole point -- it is fresh in [ud_um]. *)
-      destruct (pgroundup_maxsz (pv_sz V) ltac:(rewrite -uint_unsigned; exact Hszmax))
+      destruct (pgroundup_maxsz (pv_sz (us_V U)) ltac:(rewrite -uint_unsigned; exact Hszmax))
         as [[Hpuge Hpule] Hpumod].
       rewrite uvm_maxsz_val in Hpule.
-      pose proof (proj1 (bv_unsigned_in_range _ (pgroundup (pv_sz V)))) as Hpu0.
-      assert (Hrun : (bv_unsigned (pgroundup (pv_sz V))
-                      + 4096 * Z.of_nat (uvma_np (pv_sz V) (add_vec (pv_sz V) nv))
+      pose proof (proj1 (bv_unsigned_in_range _ (pgroundup (pv_sz (us_V U))))) as Hpu0.
+      assert (Hrun : (bv_unsigned (pgroundup (pv_sz (us_V U)))
+                      + 4096 * Z.of_nat (uvma_np (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv))
                       <= uvm_maxsz)%Z).
       { rewrite uvm_maxsz_val. unfold uvma_np.
         apply gp_z_run_end; [exact Hpu0 | exact Hpumod | exact Hpule | exact Hnewle]. }
@@ -970,13 +973,13 @@ Section ProofGrowproc.
          ignoring it -- the run is inside TRAPFRAME whatever iteration the
          loop is at ([Hrun]).  SpecUvmalloc.v's note says why the guard is
          there; it is kexec that cannot bound the run. *)
-      assert (Hfresh : forall i : nat, (i < uvma_np (pv_sz V) (add_vec (pv_sz V) nv))%nat ->
-                (bv_unsigned (pgroundup (pv_sz V)) + 4096 * Z.of_nat i + 4096
+      assert (Hfresh : forall i : nat, (i < uvma_np (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv))%nat ->
+                (bv_unsigned (pgroundup (pv_sz (us_V U))) + 4096 * Z.of_nat i + 4096
                  <= uvm_maxsz)%Z ->
-                ud_um (pv_upt V) !! vpn_at (svpn_of (pgroundup (pv_sz V))) i = None).
+                ud_um (pv_upt (us_V U)) !! vpn_at (svpn_of (pgroundup (pv_sz (us_V U)))) i = None).
       { intros i Hi _.
-        apply (um_below_run_fresh (pv_sz V) (ud_um (pv_upt V))
-                 (uvma_np (pv_sz V) (add_vec (pv_sz V) nv)) i Hbel);
+        apply (um_below_run_fresh (pv_sz (us_V U)) (ud_um (pv_upt (us_V U)))
+                 (uvma_np (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv)) i Hbel);
           [rewrite uvm_maxsz_val; exact Hszmaxz | exact Hrun | exact Hi]. }
       (* SpecUvmalloc.v still asks for the RAW entry map's tp slot
          ([mm !!! Regidx 4 = cid_word]) -- a shape this sweep left in place
@@ -1000,11 +1003,11 @@ Section ProofGrowproc.
         intro He. injection He as He2. congruence. }
       assert (HC3ptp : C3p !!! Regidx Rtp = cid_word)
         by (rewrite /C3p upd_eq; reflexivity).
-      assert (HC3pa0 : C3p !!! Regidx Ra0 = page_base (ud_root (pv_upt V)))
+      assert (HC3pa0 : C3p !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U))))
         by (rewrite (HC3pne Ra0 ltac:(reg_neq)); exact HC3a0).
-      assert (HC3pa1 : C3p !!! Regidx Ra1 = pv_sz V)
+      assert (HC3pa1 : C3p !!! Regidx Ra1 = pv_sz (us_V U))
         by (rewrite (HC3pne Ra1 ltac:(reg_neq)); exact HC3a1).
-      assert (HC3pa2 : C3p !!! Regidx Ra2 = add_vec (pv_sz V) nv)
+      assert (HC3pa2 : C3p !!! Regidx Ra2 = add_vec (pv_sz (us_V U)) nv)
         by (rewrite (HC3pne Ra2 ltac:(reg_neq)); exact HC3a2).
       assert (HC3pa3 : C3p !!! Regidx Ra3 = (mword_of_int 4 : mword 64))
         by (rewrite (HC3pne Ra3 ltac:(reg_neq)); exact HC3a3).
@@ -1023,7 +1026,7 @@ Section ProofGrowproc.
         rewrite (HC3pne r N4). apply HthrC3; assumption. }
       iDestruct (cpu_own_transport CID9 CID20 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (Uvmalloc.wp_uvmalloc_sconf γa C3p (pv_upt V) 4 (av - 4)%nat eb p b lks
+      iApply (Uvmalloc.wp_uvmalloc_sconf γa C3p (pv_upt (us_V U)) 4 (av - 4)%nat eb p b lks
                 ltac:(lia) HC3ptp HC3pa0 HC3pa3 gp_xperm_rng gp_perm_ok
                 ltac:(rewrite HC3pa1 uint_unsigned uvm_maxsz_val; exact Hszmaxz)
                 (* growproc TESTS the bound ([sz + n > TRAPFRAME] returns -1),
@@ -1116,7 +1119,7 @@ Section ProofGrowproc.
         iEval (rewrite Htgt3c2) in "Hpc".
         iDestruct (cpu_own_transport CID21 CID25 0%nat eb p b ltac:(wp_next_chain)
                      with "Hcpu") as "Hcpu".
-        iApply ("EXIT" $! CID25 X2 (pv_upt V) (pv_sz V) (mword_of_int (-1) : mword 64)
+        iApply ("EXIT" $! CID25 X2 (pv_upt (us_V U)) (pv_sz (us_V U)) (mword_of_int (-1) : mword 64)
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hs1 Hs2 Hs3 Hs4").
         - wp_next_chain.
         - rewrite /X2 upd_ne; [exact HD1sp | reg_neq].
@@ -1132,7 +1135,7 @@ Section ProofGrowproc.
         - left. split; [reflexivity | split; reflexivity]. }
       (* SUCCESS: the map gained the run, and a0 is the NEW size *)
       iDestruct "Hpost" as (P') "(%Hext & %Hdom & %Hleaf & %Hret & Hpt)".
-      assert (Hret' : mr !!! Regidx Ra0 = add_vec (pv_sz V) nv).
+      assert (Hret' : mr !!! Regidx Ra0 = add_vec (pv_sz (us_V U)) nv).
       { destruct Hret as [[Hlt _] | [_ Hr]]; [| exact Hr].
         exfalso. rewrite !uint_unsigned in Hlt.
         exact (gp_z_lt_le_absurd _ _ Hlt Hlesz). }
@@ -1140,7 +1143,7 @@ Section ProofGrowproc.
       { destruct (eq_vec (D1 !!! Regidx Ra0) (zero_reg : mword 64)) eqn:He;
           [exfalso | reflexivity].
         apply eq_vec_true_iff in He. rewrite HD1a0 Hret' in He.
-        assert (Hzu : bv_unsigned (add_vec (pv_sz V) nv) = bv_unsigned (zero_reg : mword 64))
+        assert (Hzu : bv_unsigned (add_vec (pv_sz (us_V U)) nv) = bv_unsigned (zero_reg : mword 64))
           by (rewrite He; reflexivity).
         assert (Hz0 : bv_unsigned (zero_reg : mword 64) = 0%Z) by (vm_compute; reflexivity).
         rewrite Hz0 Hnewu in Hzu.
@@ -1156,13 +1159,13 @@ Section ProofGrowproc.
                       = mword_of_int (KernelSyms.growproc + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp36) in "Hpc".
       (* ---- +0x36: the store, then the epilogue ---- *)
-      iApply (gp_store D1 av p (pv_sz V) (add_vec (pv_sz V) nv) b
+      iApply (gp_store D1 av p (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv) b
                 ltac:(rewrite HD1a1; exact Hret') HD1s2
                 with "Hcg Htext Hpc Hszc").
       iIntros (CID24 Hn24 Ms') "%Hs'a0 %Hs'thr Hcg Hpc Hszc".
       iDestruct (cpu_own_transport CID21 CID24 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply ("EXIT" $! CID24 Ms' P' (add_vec (pv_sz V) nv) (mword_of_int 0 : mword 64)
+      iApply ("EXIT" $! CID24 Ms' P' (add_vec (pv_sz (us_V U)) nv) (mword_of_int 0 : mword 64)
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hs1 Hs2 Hs3 Hs4").
       - wp_next_chain.
       - rewrite (Hs'thr csp_rs1 ltac:(reg_neq)). exact HD1sp.
@@ -1174,7 +1177,7 @@ Section ProofGrowproc.
       - exact (proj1 Hext).
       - exact (proj1 (proj2 Hext)).
       - rewrite uint_unsigned uvm_maxsz_val. exact Hnewle.
-      - apply (um_below_grow (pv_sz V) (add_vec (pv_sz V) nv) (ud_um (pv_upt V)));
+      - apply (um_below_grow (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv) (ud_um (pv_upt (us_V U))));
           [exact Hbel | exact Hlesz | rewrite uvm_maxsz_val; exact Hnewle | exact Hdom].
       - right. left.
         split; [reflexivity |].
@@ -1218,12 +1221,12 @@ Section ProofGrowproc.
       { iApply (gpi_48 with "Htext"). }
       iApply bi.later_intro. iIntros (CID13 Hn13) "Hcg Hpc".
       iEval (rewrite Htgt36) in "Hpc".
-      iApply (gp_store A2 av p (pv_sz V) (pv_sz V) b HA2a1 HA2s2
+      iApply (gp_store A2 av p (pv_sz (us_V U)) (pv_sz (us_V U)) b HA2a1 HA2s2
                 with "Hcg Htext Hpc Hszc").
       iIntros (CID14 Hn14 Ms') "%Hs'a0 %Hs'thr Hcg Hpc Hszc".
       iDestruct (cpu_own_transport CID9 CID14 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply ("EXIT" $! CID14 Ms' (pv_upt V) (pv_sz V) (mword_of_int 0 : mword 64)
+      iApply ("EXIT" $! CID14 Ms' (pv_upt (us_V U)) (pv_sz (us_V U)) (mword_of_int 0 : mword 64)
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hs1 Hs2 Hs3 Hs4").
       - wp_next_chain.
       - rewrite (Hs'thr csp_rs1 ltac:(reg_neq)). exact HA2sp.
@@ -1254,14 +1257,14 @@ Section ProofGrowproc.
     iEval (rewrite Hpp4c) in "Hpc".
     (* ---- +0x4c: add a2,s1,a1 ---- *)
     iApply (wp_add_s_sconf (mword_of_int (KernelSyms.growproc + 0x4c))
-              Ra2 Rs1 Ra1 (add_vec (pv_sz V) nv) A2 (av - 4)%nat b
+              Ra2 Rs1 Ra1 (add_vec (pv_sz (us_V U)) nv) A2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgne; rgne; rewrite HA2s1 HA2a1; apply add_vec64_comm)
               with "Hcg Hpc []").
     { iApply (gpi_4c with "Htext"). }
     iIntros (CID14 Hn14) "Hcg Hpc".
-    set (E1 := <[Regidx Ra2 := regval_into_reg (add_vec (pv_sz V) nv)]> A2).
-    change (<[Regidx Ra2 := regval_into_reg (add_vec (pv_sz V) nv)]> A2) with E1.
+    set (E1 := <[Regidx Ra2 := regval_into_reg (add_vec (pv_sz (us_V U)) nv)]> A2).
+    change (<[Regidx Ra2 := regval_into_reg (add_vec (pv_sz (us_V U)) nv)]> A2) with E1.
     assert (Hpp50 : add_vec_int (mword_of_int (KernelSyms.growproc + 0x4c) : mword 64) 4
                     = mword_of_int (KernelSyms.growproc + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp50) in "Hpc".
@@ -1270,7 +1273,7 @@ Section ProofGrowproc.
     assert (Hpta2 : add_vec (E1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                     = p_pagetable p) by (rewrite HE1a0; reflexivity).
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.growproc + 0x50)) Ra0 Ra0
-              (mword_of_int 80 : mword 12) E1 (av - 4)%nat (page_base (ud_root (pv_upt V))) b
+              (mword_of_int 80 : mword 12) E1 (av - 4)%nat (page_base (ud_root (pv_upt (us_V U)))) b
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [Hptc]").
@@ -1278,8 +1281,8 @@ Section ProofGrowproc.
     { iEval (rgne; rewrite Hpta2). iExact "Hptc". }
     iIntros (CID15 Hn15) "Hcg Hpc Hptc".
     iEval (rgne; rewrite Hpta2) in "Hptc".
-    set (E2 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> E1).
-    change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> E1) with E2.
+    set (E2 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> E1).
+    change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> E1) with E2.
     assert (Hpp52 : add_vec_int (mword_of_int (KernelSyms.growproc + 0x50) : mword 64) 2
                     = mword_of_int (KernelSyms.growproc + 0x52)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp52) in "Hpc".
@@ -1299,12 +1302,12 @@ Section ProofGrowproc.
                      = mword_of_int KernelSyms.uvmdealloc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmpud) in "Hpc".
-    assert (HE3a0 : E3 !!! Regidx Ra0 = page_base (ud_root (pv_upt V))).
+    assert (HE3a0 : E3 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U)))).
     { rewrite /E3 upd_ne; [| reg_neq]. rewrite /E2 upd_eq. reflexivity. }
-    assert (HE3a1 : E3 !!! Regidx Ra1 = pv_sz V).
+    assert (HE3a1 : E3 !!! Regidx Ra1 = pv_sz (us_V U)).
     { rewrite /E3 upd_ne; [| reg_neq]. rewrite /E2 upd_ne; [| reg_neq].
       rewrite /E1 upd_ne; [| reg_neq]. exact HA2a1. }
-    assert (HE3a2 : E3 !!! Regidx Ra2 = add_vec (pv_sz V) nv).
+    assert (HE3a2 : E3 !!! Regidx Ra2 = add_vec (pv_sz (us_V U)) nv).
     { rewrite /E3 upd_ne; [| reg_neq]. rewrite /E2 upd_ne; [| reg_neq].
       rewrite /E1 upd_eq. reflexivity. }
     assert (HE3sp : E3 !!! Regidx csp_rs1 = pa_stk sp0 4).
@@ -1329,7 +1332,7 @@ Section ProofGrowproc.
       rewrite /E1 upd_ne; [| congruence]. apply HthrA2; assumption. }
     iDestruct (cpu_own_transport CID9 CID16 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Uvmdealloc.wp_uvmdealloc_sconf γa E3 (pv_upt V) (av - 4)%nat eb p b lks
+    iApply (Uvmdealloc.wp_uvmdealloc_sconf γa E3 (pv_upt (us_V U)) (av - 4)%nat eb p b lks
               ltac:(lia) HE3a0
               ltac:(rewrite HE3a1; exact Hszmax)
               with "Hcg Hcpu Htext Hpc Hpt Henv").
@@ -1391,24 +1394,24 @@ Section ProofGrowproc.
       rewrite uint_unsigned. rewrite !uint_unsigned in Hlt.
       rewrite uvm_maxsz_val. lia. }
     assert (Hbel' : um_below (md !!! Regidx Ra0)
-              (ud_um (uptd_del_run (pv_upt V) (svpn_of (pgroundup (add_vec (pv_sz V) nv)))
-                        (uvmd_np (pv_sz V) (add_vec (pv_sz V) nv))))).
+              (ud_um (uptd_del_run (pv_upt (us_V U)) (svpn_of (pgroundup (add_vec (pv_sz (us_V U)) nv)))
+                        (uvmd_np (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv))))).
     { unfold uptd_del_run. cbn [ud_um].
       destruct Hdret as [[Hge Hr] | [Hlt Hr]]; rewrite Hr.
       - rewrite !uint_unsigned in Hge.
-        rewrite (uvmd_np_ge (pv_sz V) (add_vec (pv_sz V) nv) ltac:(lia)).
+        rewrite (uvmd_np_ge (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv) ltac:(lia)).
         cbn [um_del_run]. exact Hbel.
       - rewrite !uint_unsigned in Hlt.
-        apply (um_below_shrink (pv_sz V) (add_vec (pv_sz V) nv) (ud_um (pv_upt V)) Hbel Hlt).
+        apply (um_below_shrink (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv) (ud_um (pv_upt (us_V U))) Hbel Hlt).
         rewrite uvm_maxsz_val. exact Hszmaxz. }
-    iApply (gp_store F2 av p (pv_sz V) (md !!! Regidx Ra0) b HF2a1 HF2s2
+    iApply (gp_store F2 av p (pv_sz (us_V U)) (md !!! Regidx Ra0) b HF2a1 HF2s2
               with "Hcg Htext Hpc Hszc").
     iIntros (CID20 Hn20 Ms') "%Hs'a0 %Hs'thr Hcg Hpc Hszc".
     iDestruct (cpu_own_transport CID17 CID20 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply ("EXIT" $! CID20 Ms'
-              (uptd_del_run (pv_upt V) (svpn_of (pgroundup (add_vec (pv_sz V) nv)))
-                 (uvmd_np (pv_sz V) (add_vec (pv_sz V) nv)))
+              (uptd_del_run (pv_upt (us_V U)) (svpn_of (pgroundup (add_vec (pv_sz (us_V U)) nv)))
+                 (uvmd_np (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv)))
               (md !!! Regidx Ra0) (mword_of_int 0 : mword 64)
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hs1 Hs2 Hs3 Hs4").
     - wp_next_chain.

@@ -726,7 +726,7 @@ Section EndOpDefs.
      hart (durable-notes: a whole-function post must not be spelled inline). *)
   Definition eo_cont `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
@@ -735,16 +735,16 @@ Section EndOpDefs.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr j) pidv Vpr -∗
+        proc_priv_bare (proc_addr j) pidv Upr -∗
         WP (Loop : expr riscv_lang))%I.
 
   Lemma eo_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
        (j : nat) (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate) :
     (* the guard is at the LITERAL [true] now, matching eo_cont's own index *)
     (true = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
-    eo_cont (CID0 := CIDa)  j pidv dq m K eb b lks Vpr -∗
-    eo_cont (CID0 := CIDb)  j pidv dq m K eb b lks Vpr.
+    eo_cont (CID0 := CIDa)  j pidv dq m K eb b lks Upr -∗
+    eo_cont (CID0 := CIDb)  j pidv dq m K eb b lks Upr.
   Proof.
     intros Hs. rewrite /eo_cont /wp_next.
     iIntros "H" (CID2 Hs2). iApply "H". iPureIntro.
@@ -1164,7 +1164,7 @@ Section EndOpBlocks.
   (* ================================================================== *)
   Local Lemma eo_epi `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate) :
     (K_end_op <= K)%nat ->
     eo_regsE m M ->
     sie_cap_gpr KT1 M (K - 8)%nat b (proc_addr j) -∗
@@ -1173,10 +1173,10 @@ Section EndOpBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0x92) : mword 64) -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     eo_frame4 m -∗
     eo_frameJ m -∗
-    eo_cont (CID0 := CID0)  j pidv dq m K eb b lks Vpr -∗
+    eo_cont (CID0 := CID0)  j pidv dq m K eb b lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hregs.
@@ -1418,7 +1418,7 @@ Section EndOpBlocks.
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (eb : bool) (lks : gset string) (Upr : ustate) :
     (K_end_op <= K)%nat ->
     eo_regsE m M ->
     (* the order premise: [eo_tail] opens with its OWN re-acquire of "log"
@@ -1433,11 +1433,11 @@ Section EndOpBlocks.
     pc_is (mword_of_int (KernelSyms.end_op + 0x42) : mword 64) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     eo_frame4 m -∗
     eo_frameJ m -∗
     log_state bn γfs cov logstart 0 ∅ ∅ -∗
-    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
+    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hregs Hbelow.
@@ -1545,7 +1545,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CIDa4 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa4)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa4)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
               (log_res γ bn γfs cov logstart) E4 0%nat eb (proc_addr j)
@@ -1566,7 +1566,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDa4 CIDb1 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CIDa4) (CIDb := CIDb1)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CIDa4) (CIDb := CIDb1)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     pose proof Hacq as Hacq_cs.
     assert (Hqs1 : macq !!! Regidx Rs1 = log_addr).
@@ -1903,9 +1903,9 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDc1 CIDc2 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CIDb1) (CIDb := CIDc2)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CIDb1) (CIDb := CIDc2)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (eo_epi (CID0 := CIDc2)  j pidv dq m mr K eb eb lks Vpr HK Hregs2
+    iApply (eo_epi (CID0 := CIDc2)  j pidv dq m mr K eb eb lks Upr HK Hregs2
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hppid Hframe Hjunk Hcont").
   Qed.
 
@@ -1970,7 +1970,7 @@ Section EndOpBlocks.
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool) (Mc : log_mirror)
       (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (eb : bool) (lks : gset string) (Upr : ustate) :
     (K_end_op <= K)%nat ->
     log_geom_ok cov logstart ->
     (j < NPROC)%nat ->
@@ -2009,7 +2009,7 @@ Section EndOpBlocks.
        [bwrite]s into REAL durability fupds (FsCrash's four permits) *)
     fs_crash_seam cov logstart -∗
     era_registered gen_id riscv_eraGS -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -2028,7 +2028,7 @@ Section EndOpBlocks.
        its hand.  The copy loop writes only log SLOTS, so the map this
        stands at does not move ([eo_home_restrict_upd]). *)
     P_dur (fs_restrict (dv_of_D L) (fs_home_set cov logstart)) -∗
-    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
+    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw HMchdr HMcslot Hrow Hregs
@@ -2083,7 +2083,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CIDa1 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa1)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa1)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (WH.wp_write_head_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev n W L pidv dq A1 (K - 8)%nat eb eb
@@ -2091,7 +2091,7 @@ Section EndOpBlocks.
                  log_mirror_half (lm_upd Mc (log_hdr_bno logstart) bs')
                  ∗ fs_receipt_any
                      (fs_restrict (dv_of_D L) (fs_home_set cov logstart)))%I
-              lks Vpr
+              lks Upr
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl (conj HnW Hn30)
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1
                     [Hmirc Hepoch]").
@@ -2269,7 +2269,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDb1 CIDa3 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CIDa1) (CIDb := CIDa3)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CIDa1) (CIDb := CIDa3)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (IT.wp_install_trans_sconf γs j γl γu γd γk pd pav pu bn γfs
               1%positive
@@ -2280,7 +2280,7 @@ Section EndOpBlocks.
               (fun i : nat =>
                  log_mirror_half
                    (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
-                      (map uint W) Lw i)) lks Vpr
+                      (map uint W) Lw i)) lks Upr
               ltac:(pose proof (eo_Kit K HK); lia) Hgeom Hj Hgl HA3a0
               (conj HnW Hn30) Hnd
               (* install_trans reads only the covered-home half of the row *)
@@ -2409,7 +2409,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDb2 CIDa6 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CIDa3) (CIDb := CIDa6)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CIDa3) (CIDb := CIDa6)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     assert (Hshape0 : (0%nat = length (@nil (mword 32)) /\ (0 <= LOGBLOCKS)%nat))
       by (split; [reflexivity | unfold LOGBLOCKS; lia]).
@@ -2420,7 +2420,7 @@ Section EndOpBlocks.
                  log_mirror_half (lm_upd
                     (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
                        (map uint W) Lw n)
-                    (log_hdr_bno logstart) bs')) lks Vpr
+                    (log_hdr_bno logstart) bs')) lks (upd_usM Upr _)
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3
                     [Hmirc]").
@@ -2692,14 +2692,14 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDb3 CIDa10 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CIDa6) (CIDb := CIDa10)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CIDa6) (CIDb := CIDa10)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iDestruct (eo_frameS_J with "[Hg24 Hg16 Hg8 Hg0]") as "Hjunk2".
     { rewrite /eo_frameS. iSplitL "Hg24"; [iExact "Hg24"|].
       iSplitL "Hg16"; [iExact "Hg16"|].
       iSplitL "Hg8"; [iExact "Hg8"|]. iExact "Hg0". }
     iApply (eo_tail (CID0 := CIDa10)  γs j γl bn γ γfs cov logstart dev pidv dq
-              m B3 K eb lks Vpr HK HB3regsE Hbelow
+              m B3 K eb lks Upr HK HB3regsE Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hlctx Hprocs Hppid
                     Hframe Hjunk2 Hbatch Hcont").
   Qed.
@@ -2725,7 +2725,7 @@ Section EndOpBlocks.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (n : nat) (W : list (mword 32)) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Vpr : pprivate) (fuel : nat) :
+      (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Upr : ustate) (fuel : nat) :
     (K_end_op <= K)%nat ->
     log_geom_ok cov logstart ->
     (j < NPROC)%nat ->
@@ -2772,7 +2772,7 @@ Section EndOpBlocks.
        [bwrite]s into REAL durability fupds (FsCrash's four permits) *)
     fs_crash_seam cov logstart -∗
     era_registered gen_id riscv_eraGS -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -2788,7 +2788,7 @@ Section EndOpBlocks.
        home block, so the map it stands at is literally the same term at the
        back edge ([eo_home_restrict_upd]). *)
     P_dur (fs_restrict (dv_of_D L) (fs_home_set cov logstart)) -∗
-    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
+    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hj Hgl Hshape Hnd Hwok Hbelow.
@@ -3004,10 +3004,10 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CIDa5 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa5)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa5)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-              (fs_view γfs γd dev cov) pidv dev bnol dq A5 (K - 8)%nat eb eb lks Vpr
+              (fs_view γfs γd dev cov) pidv dev bnol dq A5 (K - 8)%nat eb eb lks Upr
               ltac:(pose proof (eo_Kbread K HK); lia)
               ltac:(rewrite Hubnol; exact (eo_lt_lit _ Hslotrange))
               ltac:(reflexivity) ltac:(rewrite Hubnol; exact Hslotcov) ltac:(reflexivity)
@@ -3178,10 +3178,10 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDb1 CIDa9 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CIDa5) (CIDb := CIDa9)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CIDa5) (CIDb := CIDa9)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-              (fs_view γfs γd dev cov) pidv dev w dq B4 (K - 8)%nat eb eb lks Vpr
+              (fs_view γfs γd dev cov) pidv dev w dq B4 (K - 8)%nat eb eb lks Upr
               ltac:(pose proof (eo_Kbread K HK); lia)
               ltac:(exact (eo_lt_lit _ Hwrange))
               ltac:(reflexivity) ltac:(exact Hwcov) ltac:(reflexivity)
@@ -3529,12 +3529,12 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDb2 CIDa17 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CIDa9) (CIDb := CIDa17)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CIDa9) (CIDb := CIDa17)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (BW.wp_bwrite_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k1 pidv dev bnol dq H2 (K - 8)%nat eb
               bs2 bsd1 eb
-              (log_mirror_half (lm_upd Mc (log_slot_bno logstart t) bs2)) lks Vpr
+              (log_mirror_half (lm_upd Mc (log_slot_bno logstart t) bs2)) lks Upr
               ltac:(pose proof (eo_Kbwrite K HK); lia)
               ltac:(rewrite Hubnol; exact (eo_lt_lit _ Hslotrange))
               ltac:(reflexivity) Hj Hgl Hk1 HH2a0
@@ -3653,10 +3653,10 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDb3 CIDa19 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CIDa17) (CIDb := CIDa19)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CIDa17) (CIDb := CIDa19)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k2 pidv dev w dq
-              H4 (K - 8)%nat eb (proc_addr j) bs2 bsd2 d2 eb lks Vpr
+              H4 (K - 8)%nat eb (proc_addr j) bs2 bsd2 d2 eb lks Upr
               ltac:(pose proof (eo_Kbrelse K HK); lia) Hk2 HH4a0
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk2").
@@ -3750,10 +3750,10 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDa19 CIDa21 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CIDa19) (CIDb := CIDa21)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CIDa19) (CIDb := CIDa21)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k1 pidv dev bnol dq
-              H6 (K - 8)%nat eb (proc_addr j) bs2 bs2 d1 eb lks Vpr
+              H6 (K - 8)%nat eb (proc_addr j) bs2 bs2 d1 eb lks Upr
               ltac:(pose proof (eo_Kbrelse K HK); lia) Hk1 HH6a0
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk1").
@@ -3989,7 +3989,7 @@ Section EndOpBlocks.
                    ltac:(wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDa21 CIDa25 eb (proc_addr j)
                    ltac:(wp_next_chain) with "Hextm") as "Hextm".
-      iDestruct (eo_cont_shift (CIDa := CIDa21) (CIDb := CIDa25)  j pidv dq m K eb eb lks Vpr
+      iDestruct (eo_cont_shift (CIDa := CIDa21) (CIDb := CIDa25)  j pidv dq m K eb eb lks Upr
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IH CIDa25 (S t) J3 (<[uint bnol := bs2]> L) Lw' Mc' Hlt
                 (eo_fuel_step t n fuel Hfuel) HLw' HMc'hdr HMc'slot Hrow'
@@ -4022,14 +4022,14 @@ Section EndOpBlocks.
                    ltac:(wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDa21 CIDa25 eb (proc_addr j)
                    ltac:(wp_next_chain) with "Hextm") as "Hextm".
-      iDestruct (eo_cont_shift (CIDa := CIDa21) (CIDb := CIDa25)  j pidv dq m K eb eb lks Vpr
+      iDestruct (eo_cont_shift (CIDa := CIDa21) (CIDb := CIDa25)  j pidv dq m K eb eb lks Upr
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       rewrite Htn in HLw'. rewrite Htn in HMc'slot.
       iEval (rewrite Htn) in "Hopen".
       iApply (eo_commit (CID0 := CIDa25)  γs j γl γu γd γk pd pav pu bn γ γfs
                 cov logstart dev
                 n W Lw' (<[uint bnol := bs2]> L) D Mc' pidv dq m J3 K eb lks
-                Vpr HK (conj Hcovok Hlogsub) Hj Hgl (conj HnW Hn30) Hnd Hwok
+                Upr HK (conj Hcovok Hlogsub) Hj Hgl (conj HnW Hn30) Hnd Hwok
                 ltac:(intros i v Hv; apply (HLw' i v);
                       [ apply lookup_lt_Some in Hv; lia | exact Hv ])
                 HMc'hdr HMc'slot Hrow'
@@ -4048,7 +4048,7 @@ Section EndOpBlocks.
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (eb : bool) (lks : gset string) (Upr : ustate) :
     (K_end_op <= K)%nat ->
     eo_regsE m M ->
     (* THE OUTER/INNER TRAP (claude-notes sweep, point 5): [eo_fast]'s own
@@ -4071,10 +4071,10 @@ Section EndOpBlocks.
     pc_is (mword_of_int (KernelSyms.end_op + 0x7a) : mword 64) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     eo_frame4 m -∗
     eo_frameJ m -∗
-    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
+    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hregs Hbelow.
@@ -4268,9 +4268,9 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CIDc1 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDc1)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDc1)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (eo_epi (CID0 := CIDc1)  j pidv dq m mr K eb eb lks Vpr HK Hregs2
+    iApply (eo_epi (CID0 := CIDc1)  j pidv dq m mr K eb eb lks Upr HK Hregs2
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hppid Hframe Hjunk Hcont").
   Qed.
 
@@ -4292,9 +4292,9 @@ Section ProofEndOp.
       (u : nat)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_end_op_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                           cov logstart dev u pidv dq m K eb b lks Vpr.
+                           cov logstart dev u pidv dq m K eb b lks Upr.
   Proof.
     cbv beta zeta delta [wp_end_op_sconf_body].
     intros HK Hgeom Hj Hgl Hbelow.
@@ -4320,7 +4320,7 @@ Section ProofEndOp.
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     cbn in Hbm. subst b.
     iPoseProof (log_ctx_lock with "Hlctx") as "#Hlock".
-    iAssert (eo_cont (CID0 := CID)  j pidv dq m K eb eb lks Vpr)%I
+    iAssert (eo_cont (CID0 := CID)  j pidv dq m K eb eb lks Upr)%I
       with "[Hcont]" as "Hcont"; [rewrite /eo_cont; iExact "Hcont"|].
     (* ===== PROLOGUE: the eight-slot frame ===== *)
     pose (R1 := <[Regidx csp_rs1 := regval_into_reg
@@ -4572,7 +4572,7 @@ Section ProofEndOp.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CID10 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CID) (CIDb := CID10)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CID) (CIDb := CID10)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
               (log_res γ bn γfs cov logstart) R6 0%nat eb (proc_addr j)
@@ -4592,7 +4592,7 @@ Section ProofEndOp.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID10 CIDq eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (eo_cont_shift (CIDa := CID10) (CIDb := CIDq)  j pidv dq m K eb eb lks Vpr
+    iDestruct (eo_cont_shift (CIDa := CID10) (CIDb := CIDq)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     assert (Hqs1 : macq !!! Regidx Rs1 = log_addr)
       by (rewrite (callee_saved_lookup Hacq Rs1 ltac:(vm_compute; reflexivity)); exact HR6s1).
@@ -5021,7 +5021,7 @@ Section ProofEndOp.
           rewrite HU5sp. exact (proj1 HqregsE).
         - intros c Hcs N2 N8 N9 N18.
           rewrite (callee_saved_lookup Hrel c Hcs). exact (HU5thr c Hcs N2 N8 N9 N18). }
-      iDestruct (eo_cont_shift (CIDa := CIDq) (CIDb := CIDr)  j pidv dq m K eb eb lks Vpr
+      iDestruct (eo_cont_shift (CIDa := CIDq) (CIDb := CIDr)  j pidv dq m K eb eb lks Upr
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       (* ---- the batch, already opened above (lane CE) ---- *)
       pose proof Hshape as [HnW Hn30].
@@ -5090,12 +5090,12 @@ Section ProofEndOp.
                      ltac:(wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDr CIDs2 eb (proc_addr j)
                      ltac:(wp_next_chain) with "Hextm") as "Hextm".
-        iDestruct (eo_cont_shift (CIDa := CIDr) (CIDb := CIDs2)  j pidv dq m K eb eb lks Vpr
+        iDestruct (eo_cont_shift (CIDa := CIDr) (CIDb := CIDs2)  j pidv dq m K eb eb lks Upr
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iDestruct (eo_open_to_batch bn γfs cov logstart L Dd (fun _ => []) ∅ M0
                      HM0hdr HM0row with "Hmirc Hopen") as "Hbatch".
         iApply (eo_tail (CID0 := CIDs2)  γs j γl bn γ γfs cov logstart dev pidv dq
-                  m V1 K eb lks Vpr HK HV1regsE Hbelow
+                  m V1 K eb lks Upr HK HV1regsE Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hlctx Hprocs Hppid
                         Hframe Hjunk Hbatch Hcont").
       + (* n > 0: save s3/s4/s5, set up the cursors, and run the copy loop *)
@@ -5271,10 +5271,10 @@ Section ProofEndOp.
                      ltac:(wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDr CIDs9 eb (proc_addr j)
                      ltac:(wp_next_chain) with "Hextm") as "Hextm".
-        iDestruct (eo_cont_shift (CIDa := CIDr) (CIDb := CIDs9)  j pidv dq m K eb eb lks Vpr
+        iDestruct (eo_cont_shift (CIDa := CIDr) (CIDb := CIDs9)  j pidv dq m K eb eb lks Upr
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply (eo_loop γs j γl γu γd γk pd pav pu bn γ γfs cov logstart dev
-                  nl W Dd pidv dq m K eb lks Vpr nl
+                  nl W Dd pidv dq m K eb lks Upr nl
                   HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok Hbelow
                   CIDs9 0%nat Y4 L (fun _ => []) M0 ltac:(lia) ltac:(lia)
                   ltac:(intros i v Hi Hv; lia) HM0hdr ltac:(intros i Hi; lia)
@@ -5346,7 +5346,7 @@ Section ProofEndOp.
       iEval (rewrite Htgt26) in "Hpc".
       clear Htgt26.
       iApply (eo_fast (CID0 := CIDq)  γs j γl bn γ γfs cov logstart dev pidv dq
-                m T4 K eb lks Vpr HK HT4regsE Hbelow
+                m T4 K eb lks Upr HK HT4regsE Hbelow
                 with "Hcg Hcnt Hpay Hextc Hextm Htok HRres Htext Hpc Hlctx Hprocs Hppid Hframe Hjunk Hcont").
   Qed.
 

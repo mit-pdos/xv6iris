@@ -330,7 +330,7 @@ Definition namex_post
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
     (plen : nat) (pfun : nat -> bv 8)
     (npar : bool) (n : nat) (pidv : mword 32)
-    (dq dqb dqs dqpv : dfrac) (Vpr : pprivate) : iProp Σ :=
+    (dq dqb dqs dqpv : dfrac) (Upr : ustate) : iProp Σ :=
   (∀ (mf : regfile) (n' : nat)
      (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
@@ -342,8 +342,8 @@ Definition namex_post
       (* EVERYTHING LOANED COMES BACK *)
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      proc_priv_bare pj pidv Vpr -∗
-      inode_held (pv_cwd Vpr) -∗
+      proc_priv_bare pj pidv Upr -∗
+      inode_held (pv_cwd (us_V Upr)) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       (* the name buffer, at an UNSPECIFIED naming function -- the short
          branch leaves the bytes above [len] alone *)
@@ -378,7 +378,7 @@ Definition namex_postS
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
     (plen : nat) (pfun : nat -> bv 8)
     (npar : bool) (n : nat) (Sb : gset Z) (pidv : mword 32)
-    (dq dqb dqs dqpv : dfrac) (Vpr : pprivate) : iProp Σ :=
+    (dq dqb dqs dqpv : dfrac) (Upr : ustate) : iProp Σ :=
   (∀ (mf : regfile) (n' : nat) (Sb' : gset Z)
      (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
@@ -390,8 +390,8 @@ Definition namex_postS
       (* EVERYTHING LOANED COMES BACK *)
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      proc_priv_bare pj pidv Vpr -∗
-      inode_held (pv_cwd Vpr) -∗
+      proc_priv_bare pj pidv Upr -∗
+      inode_held (pv_cwd (us_V Upr)) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       (* the name buffer, at an UNSPECIFIED naming function -- the short
          branch leaves the bytes above [len] alone *)
@@ -448,7 +448,7 @@ Definition wp_namex_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namex in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -531,9 +531,9 @@ Definition wp_namex_sconf_body
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* ---- the caller's own pid cell (acquiresleep records it) ---- *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
-  inode_held (pv_cwd Vpr) -∗
+  inode_held (pv_cwd (us_V Upr)) -∗
   (* ---- THE PATH: [plen] content bytes and the terminator, AT THE CALLER'S
      FRACTION [dqpv].  The rule the tree follows: a byte run the callee only
      READS takes the caller's dfrac, a run it WRITES stays whole.  namex only
@@ -565,7 +565,7 @@ Definition wp_namex_sconf_body
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
 
-               plen pfun npar n pidv dq dqb dqs dqpv Vpr) -∗
+               plen pfun npar n pidv dq dqb dqs dqpv Upr) -∗
   WP (Loop : expr riscv_lang).
 
 (* =====================================================================  *)
@@ -598,7 +598,7 @@ Definition wp_namex_gen_body
     (n : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namex in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -687,9 +687,9 @@ Definition wp_namex_gen_body
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* ---- the caller's own pid cell (acquiresleep records it) ---- *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
-  inode_held (pv_cwd Vpr) -∗
+  inode_held (pv_cwd (us_V Upr)) -∗
   (* ---- THE PATH: [plen] content bytes and the terminator, AT THE CALLER'S
      FRACTION [dqpv].  The rule the tree follows: a byte run the callee only
      READS takes the caller's dfrac, a run it WRITES stays whole.  namex only
@@ -724,7 +724,7 @@ Definition wp_namex_gen_body
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_postS (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
 
-                plen pfun npar n Sb pidv dq dqb dqs dqpv Vpr) -∗
+                plen pfun npar n Sb pidv dq dqb dqs dqpv Upr) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type NAMEX.
@@ -740,11 +740,11 @@ Module Type NAMEX.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_namex_sconf_body gs j gl pd pav pu
  gf
  plen pfun nfun npar n
-                          pidv dq dqb dqs dqpv m K eb b lks Vpr.
+                          pidv dq dqb dqs dqpv m K eb b lks Upr.
   (* the set-form contract; [wp_namex_sconf] is this at the [log_op]
      existential's own witness, with the grown set forgotten again. *)
   Parameter wp_namex_gen :
@@ -759,11 +759,11 @@ Module Type NAMEX.
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_namex_gen_body gs j gl pd pav pu
  gf
  plen pfun nfun npar n Sb
-                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
+                        pidv dq dqb dqs dqpv m K eb b lks Upr.
 End NAMEX.
 
 (* ===================================================================== *)

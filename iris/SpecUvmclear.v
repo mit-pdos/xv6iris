@@ -87,13 +87,13 @@ Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   sie_cap_gpr KT1 mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
-  proc_pt P -∗
+  proc_pt_any P -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
-    proc_pt (uptd_set P vpn (pte_clear_u w)) -∗
+    proc_pt_any (uptd_set P vpn (pte_clear_u w)) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

@@ -228,9 +228,9 @@ Section KforkArms.
   Lemma kfork_arm2
  (γf γl2 : gname) (γs : list gname) 
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
-      (pid_p : mword 32) (Vp : pprivate)
+      (pid_p : mword 32) (Up : ustate)
       (sp0 ra0 s00 s10 s50 : mword 64) (npa : mword 64) (j : nat)
-      (pid_c : mword 32) (ch : mword 64) (Vc : pprivate) (Mt : regfile) (lks : gset string) :
+      (pid_c : mword 32) (ch : mword 64) (Uc : ustate) (Mt : regfile) (lks : gset string) :
     (52 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     match lvl with O => eb | S _ => false end = b ->
@@ -238,8 +238,8 @@ Section KforkArms.
     m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs5 = s50 ->
     Mt !!! Regidx csp_rs1 = pa_stk sp0 8 -> Mt !!! Regidx Rs4 = proc_addr j ->
     npa = proc_addr j -> (j < NPROC)%nat -> γs !! j = Some γl2 ->
-    pv_ofile Vc = replicate NOFILE (zero_reg : mword 64) ->
-    pv_cwd Vc = (zero_reg : mword 64) ->
+    pv_ofile (us_V Uc) = replicate NOFILE (zero_reg : mword 64) ->
+    pv_cwd (us_V Uc) = (zero_reg : mword 64) ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
     (* THE FLOOR OF THIS CONE IS wait_lock (8), which kfork takes AFTER
@@ -261,8 +261,8 @@ Section KforkArms.
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
     (∃ w4 w5 : mword 64, ProofKfork.kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
-    proc_priv γf pme pid_p Vp -∗
-    proc_priv_nocwd γf npa pid_c Vc -∗
+    proc_priv γf pme pid_p Up -∗
+    proc_priv_nocwd γf npa pid_c Uc -∗
     SchedCtx.proc_held cpu_id j γl2 USED ch -∗
     ProcGeom.hart_at_any npa -∗
     FdSlots.fd_slots FDSPARE -∗
@@ -280,7 +280,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γf lvl eb pme b pid_p Vp K mr
+        kfork_post γf lvl eb pme b pid_p Up K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -298,9 +298,9 @@ Section KforkArms.
     iAssert (∃ w5', word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5')%I with "[Hb5]" as "Hb5x".
     { iExists w5. iExact "Hb5". }
     iDestruct (SchedCtx.procs_inv_lookup γs j γl2 Hgamma with "Hprocs") as "#Hislock".
-    iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Vc Hofnull Hcwdnull
+    iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Uc Hofnull Hcwdnull
                  with "HCpriv Hfd Hir Hbsl Hctx Hkst") as "(Hfprest & Hfppt & Hfptf)".
-    iApply (B1.kfk_exit_uvmcopy γs fsc_kalloc fsc_kpages γl2 j ch Vc pid_c (pv_upt Vc) (pv_tf Vc)
+    iApply (B1.kfk_exit_uvmcopy γs fsc_kalloc fsc_kpages γl2 j ch (us_V Uc) pid_c (pv_upt (us_V Uc)) (pv_tf (us_V Uc))
               m Mt K sp0 ra0 s00 s10 s50 pme eb b lvl lks
               HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMtthr
               with "Hcg Hcpu Hpay Htext Hpc Hb1 Hb2 Hb3 Hb4x Hb5x Hb6 Hb7 Hb8
@@ -341,7 +341,7 @@ Section KforkArms.
   Lemma kfork_arm1
  (γf : gname) 
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
-      (pid_p : mword 32) (Vp : pprivate)
+      (pid_p : mword 32) (Up : ustate)
       (sp0 ra0 s00 s10 s50 : mword 64) (Mt : regfile) (lks : gset string) :
     (8 <= K)%nat ->
     m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 -> m !!! Regidx Rs0 = s00 ->
@@ -354,7 +354,7 @@ Section KforkArms.
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
     kfk_frame sp0 ra0 s00 s10 s50 -∗
-    proc_priv γf pme pid_p Vp -∗
+    proc_priv γf pme pid_p Up -∗
     (* at [on = None] allocproc's two not-found disjuncts are the SAME
        resource -- [avail_sub None n] is [None] and [avail_zero None] is
        [True], so its "ran dry after n pages" witness says nothing -- and
@@ -364,7 +364,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γf lvl eb pme b pid_p Vp K mr
+        kfork_post γf lvl eb pme b pid_p Up K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -428,10 +428,10 @@ Section KforkArms.
   Lemma kfork_arm3
  (γf γw γl : gname) (γs : list gname)
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
-      (pid_p : mword 32) (Vp : pprivate)
+      (pid_p : mword 32) (Up : ustate)
       (sp0 ra0 s00 s10 s50 : mword 64)
       (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
-      (pid_c : mword 32) (ch : mword 64) (Vc' : pprivate) (tfsrc tfdst : mword 44) (lks : gset string) :
+      (pid_c : mword 32) (ch : mword 64) (Uc' : ustate) (tfsrc tfdst : mword 44) (lks : gset string) :
     (56 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     match lvl with O => eb | S _ => false end = b ->
@@ -443,12 +443,12 @@ Section KforkArms.
     Mt !!! Regidx Ra5 = a_tf_word tfsrc 0 ->
     Mt !!! Regidx Ra4 = a_tf_word tfdst 0 ->
     Mt !!! Regidx Ra3 = a_tf_word tfsrc 36 ->
-    ud_tfp (pv_upt Vp) = tfsrc -> ud_tfp (pv_upt Vc') = tfdst ->
+    ud_tfp (pv_upt (us_V Up)) = tfsrc -> ud_tfp (pv_upt (us_V Uc')) = tfdst ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
     npa = proc_addr j -> (j < NPROC)%nat -> γs !! j = Some γl2 ->
-    pv_ofile Vc' = replicate NOFILE (zero_reg : mword 64) ->
-    pv_cwd Vc' = (zero_reg : mword 64) ->
+    pv_ofile (us_V Uc') = replicate NOFILE (zero_reg : mword 64) ->
+    pv_cwd (us_V Uc') = (zero_reg : mword 64) ->
     (* THE FLOOR OF THIS CONE IS wait_lock (8), which kfork takes AFTER
        releasing np->lock (kernel/proc.c:295) and which ProofKforkB5 states.
        allocproc's "proc" (9) is the call the function is about and the one
@@ -468,12 +468,12 @@ Section KforkArms.
     pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
     kfk_frame_at sp0 ra0 s00 s10 s50
       (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
-    proc_priv γf pme pid_p Vp -∗
-    proc_priv_nocwd γf npa pid_c Vc' -∗
+    proc_priv γf pme pid_p Up -∗
+    proc_priv_nocwd γf npa pid_c Uc' -∗
     (* the child's descriptor-state fragments, minted with its block by
        allocproc: kfork spends one access per descriptor it duplicates and
        the rest goes into the child's residue at the park. *)
-    FdSlots.fd_frags_any (ProcDefs.pv_fdg Vc') -∗
+    FdSlots.fd_frags_any (ProcDefs.pv_fdg (us_V Uc')) -∗
     (* the slot's ALLOCATION MARKER, minted by allocproc and carried to
        whichever release finally parks the slot ([ProcAvail.v]).
        Persistent. *)
@@ -513,7 +513,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γf lvl eb pme b pid_p Vp K mr
+        kfork_post γf lvl eb pme b pid_p Up K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -537,28 +537,28 @@ Section KforkArms.
     iDestruct (ProofKforkB7.kfkb7_tf_len with "Htfp_c") as %Hlenc.
     (* [a_tf_word]-shaped (this block's own vocabulary) -> [tf_pa]-shaped
        (what the physical-native [kfk_tf_copy_loop] now wants). *)
-    rewrite (a_tf_word_eq_tf_pa (ud_tfp (pv_upt Vp)) 0 ltac:(lia)) in HMta5.
-    rewrite (a_tf_word_eq_tf_pa (ud_tfp (pv_upt Vc')) 0 ltac:(lia)) in HMta4.
-    rewrite (a_tf_word_eq_tf_pa (ud_tfp (pv_upt Vp)) 36 ltac:(lia)) in HMta3.
+    rewrite (a_tf_word_eq_tf_pa (ud_tfp (pv_upt (us_V Up))) 0 ltac:(lia)) in HMta5.
+    rewrite (a_tf_word_eq_tf_pa (ud_tfp (pv_upt (us_V Uc'))) 0 ltac:(lia)) in HMta4.
+    rewrite (a_tf_word_eq_tf_pa (ud_tfp (pv_upt (us_V Up))) 36 ltac:(lia)) in HMta3.
     (* ---- ProofKforkB2: the trapframe copy loop ---- *)
-    iApply (ProofKforkB2.kfk_tf_copy_loop Mt (ud_tfp (pv_upt Vp)) (ud_tfp (pv_upt Vc'))
-              (pv_tf Vp) (pv_tf Vc') (trap_res b + (K - 8))%nat pme
+    iApply (ProofKforkB2.kfk_tf_copy_loop Mt (ud_tfp (pv_upt (us_V Up))) (ud_tfp (pv_upt (us_V Uc')))
+              (pv_tf (us_V Up)) (pv_tf (us_V Uc')) (trap_res b + (K - 8))%nat pme
               Hpvsrc Hpvdst Hlenp Hlenc HMta5 HMta4 HMta3
               with "Hcg Htext Hpc Htfp_p Htfp_c").
     iApply wp_next_off_intro.
     iIntros (mf) "%Hpf Hcg Hpc Htfp_p Htfp_c".
     destruct Hpf as (Hcsmf & Hmfa5 & Hmfa4).
-    iDestruct ("Hclose_p" $! (pv_tf Vp) with "Htf_p Htfp_p") as "Hpv".
-    iEval (rewrite upd_tf_id) in "Hpv".
-    iDestruct ("Hclose_c" $! (pv_tf Vp) with "Htf_c Htfp_c") as "HCpriv".
-    set (V1 := upd_pt Vc' (pv_upt Vc') (pv_tf Vp)).
-    change (upd_pt Vc' (pv_upt Vc') (pv_tf Vp)) with V1.
+    iDestruct ("Hclose_p" $! (pv_tf (us_V Up)) with "Htf_p Htfp_p") as "Hpv".
+    iEval (rewrite us_tf_id) in "Hpv".
+    iDestruct ("Hclose_c" $! (pv_tf (us_V Up)) with "Htf_c Htfp_c") as "HCpriv".
+    set (V1 := upd_pt (us_V Uc') (pv_upt (us_V Uc')) (pv_tf (us_V Up))).
+    change (upd_pt (us_V Uc') (pv_upt (us_V Uc')) (pv_tf (us_V Up))) with V1.
     assert (Hmfs4 : mf !!! Regidx Rs4 = npa)
       by (rewrite (callee_saved_lookup Hcsmf Rs4 ltac:(vm_compute; reflexivity)); exact HMts4).
     assert (Hmfs5 : mf !!! Regidx Rs5 = pme)
       by (rewrite (callee_saved_lookup Hcsmf Rs5 ltac:(vm_compute; reflexivity)); exact HMts5).
     (* ---- ProofKforkB7: MY OWN block ---- *)
-    iApply (ProofKforkB7.kfk_b7 γf npa pme pid_c V1 mf (trap_res b + (K - 8))%nat pme Hmfs4 Hmfs5
+    iApply (ProofKforkB7.kfk_b7 γf npa pme pid_c (MkUstate V1 ((us_M Uc'))) mf (trap_res b + (K - 8))%nat pme Hmfs4 Hmfs5
               with "Hcg Htext Hpc HCpriv").
     iApply wp_next_off_intro.
     iIntros (Mx) "%Hpx Hcg Hpc HCpriv".
@@ -593,7 +593,7 @@ Section KforkArms.
     (* [trap_res b] is the RESERVE the in-lock window is carrying; B3 is
        arm-generic and instantiated at [b := false], so it cannot compute the
        reserve itself -- it takes it as the opaque [rsv] parameter. *)
-    iPoseProof (B3.kfkb3_fd_loop γl γf pme npa pid_p pid_c Vp V2 m (trap_res b) K (S lvl) eb false
+    iPoseProof (B3.kfkb3_fd_loop γl γf pme npa pid_p pid_c Up (MkUstate V2 (us_M Uc')) m (trap_res b) K (S lvl) eb false
                   (pa_stk sp0 8) (Mt !!! Regidx Rs0) ({["proc"]} ∪ lks)
                   ltac:(lia) ltac:(lia) HofnullV2 ltac:(lkbelow)) as "Hb3app".
     iSpecialize ("Hb3app" with "Htext Hft").
@@ -615,8 +615,8 @@ Section KforkArms.
       destruct Hregs2 as (Hd1 & Hd2 & Hd3 & Hd4 & Hd5).
       (* ---- ProofKforkB4: idup / safestrcpy / pid read ---- *)
       iApply (B4.kfk_b4 γf
-                pid_p pid_c Vp
-                (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
+                pid_p pid_c Up
+                (MkUstate (kfk_childV V2 (pv_ofile (us_V Up)) NOFILE) (us_M Uc')) pme npa
                 Mx2 (trap_res b) K (S lvl) eb ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) Hd4 Hd3
                 with "Hsc Hown Htext Hpcx Hitb Hitinv Hireg Hirs Hpvx Hfdone
@@ -628,7 +628,7 @@ Section KforkArms.
       iDestruct "Hpvcx4" as (Vc4) "(%HVc4 & Hpvcx4)".
       (* B4 moved only [cwd] and [name]; the child's fd-state ghost name is
          the one allocproc chose, which is what the park is keyed on. *)
-      assert (Hcfg4 : pv_fdg Vc4 = pv_fdg (kfk_childV V2 (pv_ofile Vp) NOFILE))
+      assert (Hcfg4 : pv_fdg Vc4 = pv_fdg (kfk_childV V2 (pv_ofile (us_V Up)) NOFILE))
         by (destruct HVc4 as (_ & _ & _ & _ & _ & Hg & _); exact Hg).
       iEval (rewrite -Hcfg4) in "Hcfrag".
       assert (Hmf4s4 : mf4 !!! Regidx Rs4 = npa).
@@ -651,7 +651,7 @@ Section KforkArms.
          the in-lock index we are handing it is spelled [trap_res b + (K - 8)],
          and B5's entry index has to be syntactically that. *)
       iApply (B5.kfk_b5 γs γf γw γl γl2 j mf4 K lvl eb b
-                pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) lks
+                pme ks pid_c (MkUstate Vc4 ((us_M Uc'))) ch rest (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hprocs Hwlock Hft Hworld Htoken Hfdone
                       Hheld Hhart Hpvcx4 Hcfrag Huwp Hmk Hfd Hirsp Hbsl Hkst Hks Hkctx").
@@ -694,7 +694,7 @@ Section KforkArms.
         iSplitL "Hpvx4"; [iExact "Hpvx4" |].
         iFrame "Hkalloc". iRight. iExists pid_c. iPureIntro.
         rewrite Hrv. reflexivity.
-    - rewrite kfk_childV_0. iExact "HCpriv".
+    - rewrite kfk_childU_0. iExact "HCpriv".
     - iApply "Hb3app".
   Qed.
 
@@ -729,10 +729,10 @@ Section KforkMain.
   Lemma wp_kfork_sconf
  (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
-      (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string)
+      (b : bool) (pid_p : mword 32) (Up : ustate) (lks : gset string)
  :
     wp_kfork_sconf_body γp γw γl γf γs
- m lvl K eb pme b pid_p Vp lks.
+ m lvl K eb pme b pid_p Up lks.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl Hbelow.
@@ -745,12 +745,12 @@ Section KforkMain.
        disjunction and, with it, two of [kfork_post]'s three arms. *)
     iApply (B6.kfk_prologue γp γw γl γf γs
               m lvl K eb pme None b
-              pid_p Vp
+              pid_p Up
               (wp_next b pme (fun (CID : CpuId) =>
                  (∀ mr : regfile,
                     ⌜ callee_saved m mr ⌝ -∗
                     pc_is (ret_pc (m !!! Regidx Rra)) -∗
-                    kfork_post γf lvl eb pme b pid_p Vp
+                    kfork_post γf lvl eb pme b pid_p Up
                       K mr (mr !!! Regidx Ra0) lks -∗
                     WP (Loop : expr riscv_lang))%I)) lks
               HK Hlvl
@@ -766,7 +766,7 @@ Section KforkMain.
          [kfork_post] state [kalloc_env_at] once instead of per-arm. *)
       iAssert (kalloc_env_at fsc_kalloc fsc_kpages None) with "[Hke]" as "Hke".
       { iDestruct "Hke" as "[$ | (% & _ & $)]". }
-      iApply (kfork_arm1 (CID0 := CID1) γf m K lvl eb b pme pid_p Vp
+      iApply (kfork_arm1 (CID0 := CID1) γf m K lvl eb b pme pid_p Up
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5) Mt lks
                 (wpk_K_ge8 K HK) eq_refl eq_refl eq_refl eq_refl eq_refl
@@ -774,14 +774,16 @@ Section KforkMain.
                 with "Hcg Hcpu Ht Hpc Hframe Hpv Hke [HR]").
       iApply (kfk_reanchor CID0 CID1 b pme _ Hx1 with "HR").
     - (* ---- arm 2: uvmcopy failed, +0x7c ---- *)
-      iIntros (CIDh Hxh). iIntros (CID2 Hx2 Mt npa j γl2 pid_c ch Vc).
+      (* the child's image, as uvmcopy left it -- [kfk_pro_exit2]'s own ∀ *)
+      iIntros (CIDh Hxh). iIntros (CID2 Hx2 Mt npa j γl2 pid_c ch Uc).
+      destruct Uc as [Vc Mc].
       iIntros "%HMtsp %HMts4 %HMts5 %HMta0 %HMtthr %Hpures".
       iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hir Hbslp Hctx Hkstk Hpay Hcpu Hke HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       iApply (kfork_arm2 (CID0 := CID2) γf γl2 γs m K lvl eb b pme
-                pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
+                pid_p Up (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
-                npa j pid_c ch Vc Mt lks
+                npa j pid_c ch (MkUstate Vc Mc) Mt lks
                 (wpk_K_ge52 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp ltac:(rewrite HMts4 Hnpa; reflexivity) Hnpa HjN Hgamma
@@ -795,7 +797,8 @@ Section KforkMain.
       { intro Hd. rewrite (Hx2 (or_introl eq_refl)). exact (Hxh Hd). }
       iApply (kfk_reanchor CID0 CID2 b pme _ Hcr2 with "HR").
     - (* ---- arm 3: uvmcopy succeeded, the copy loop's head at +0x4a ---- *)
-      iIntros (CIDh Hxh). iIntros (CID3 Hx3 Mt npa j γl2 pid_c ch Vc' tfsrc tfdst).
+      iIntros (CIDh Hxh). iIntros (CID3 Hx3 Mt npa j γl2 pid_c ch Uc' tfsrc tfdst).
+      destruct Uc' as [Vc' Mc].
       iIntros "%HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures".
       iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hcfrag #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu
                Hke #Hwl #Hft #Hit #Hiti HR".
@@ -803,9 +806,9 @@ Section KforkMain.
       destruct Htfs as (Htfsrc & Htfdst).
       iApply (kfork_arm3 (CID0 := CID3) γf γw γl γs
  m K lvl eb b pme
-                pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
+                pid_p Up (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
-                Mt npa j γl2 pid_c ch Vc' tfsrc tfdst lks
+                Mt npa j γl2 pid_c ch (MkUstate Vc' Mc) tfsrc tfdst lks
                 (wpk_K_ge56 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr

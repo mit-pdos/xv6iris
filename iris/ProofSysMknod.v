@@ -813,7 +813,7 @@ Section ProofSysMknodM1Tail.
       (u : nat) (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w19 w20 : mword 64)
-      (bf : nat -> bv 8) (Vpr : pprivate) :
+      (bf : nat -> bv 8) (Upr : ustate) :
     (K_end_op <= K - 20)%nat -> (20 <= K)%nat -> ((K - 20) + 20 = K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
@@ -832,7 +832,7 @@ Section ProofSysMknodM1Tail.
     log_ctx icfg_log fsc_bio gfs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    proc_priv_bare (proc_addr jx) pidv Vpr -∗
+    proc_priv_bare (proc_addr jx) pidv Upr -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -852,7 +852,7 @@ Section ProofSysMknodM1Tail.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr jx) pidv Vpr -∗
+        proc_priv_bare (proc_addr jx) pidv Upr -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -889,7 +889,7 @@ Section ProofSysMknodM1Tail.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
               icfg_log gfs fsc_cov fsc_logst icfg_dev u pidv dq M1 (K - 20)%nat eb b lks
-              Vpr HKeo Hgeom Hj Hgl ltac:(lkbelow)
+              Upr HKeo Hgeom Hj Hgl ltac:(lkbelow)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID2 Hq2 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
@@ -995,13 +995,13 @@ Section ProofSysMknodBody.
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v0 v1 v2 : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
     wp_sys_mknod_sconf_body gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v0 v1 v2
-                            pid V m K eb b lks.
+                            pid U m K eb b lks.
   Proof.
     cbv beta delta [wp_sys_mknod_sconf_body].
     intros pcE pj ret_tgt HK HdevR Hnib0 Hgeom
@@ -1119,12 +1119,12 @@ Section ProofSysMknodBody.
     { intros c Hc N2 N8. rewrite /M3 upd_ne; [| regne].
       exact (HM2thr c Hc N2 N8). }
     (* the process BLOCK, LENT across begin_op and taken straight back *)
-    iDestruct (proc_priv_bare_acc gf pj pid V with "Hpriv") as "[Hpbare Hpback0]".
+    iDestruct (proc_priv_bare_acc gf pj pid U with "Hpriv") as "[Hpbare Hpback0]".
     iDestruct (cpu_own_transport CID0 CID5 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (BeginOp.wp_begin_op_sconf (CID := CID5) gs j gl fsc_bio icfg_log fsc_fs fsc_cov fsc_logst
               icfg_dev pid (DfracOwn (1/4)) M3 (K - 20)%nat eb b lks
-              V ltac:(lia) Hj Hgl (Hlb "log"%string)
+              U ltac:(lia) Hj Hgl (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hpc Hlog Hpbare Hprocs").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -1219,12 +1219,12 @@ Section ProofSysMknodBody.
     (* the trapframe quarter and its page, BORROWED out of the block for the
        call and put straight back -- ProofSysExit's move, twice over. *)
     iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
-    iDestruct (proc_priv_tf gf pj pid V with "Hpriv") as "(Htf & Hpage & Hback1)".
+    iDestruct (proc_priv_tf gf pj pid U with "Hpriv") as "(Htf & Hpage & Hback1)".
     iEval (rewrite -HM6a1) in "Hmaj".
     iDestruct (cpu_own_transport CID6 CID9 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Argint.wp_argint_sconf (CID := CID9) M6 (K - 20)%nat 0%nat eb pj
-              1%nat (ud_tfp (pv_upt V)) (pv_tf V) v1 (word_hi w19)
+              1%nat (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v1 (word_hi w19)
               (DfracOwn (1/4)) b lks
               mn_arg1_lt HM6a0 Hargv1 mn_noff0 ltac:(lia) Hpv
               with "Hcg Hown Htext Hdata Hpc Htf Hpage Hmaj").
@@ -1317,12 +1317,12 @@ Section ProofSysMknodBody.
     assert (HM9thr : mn_thr m M9).
     { intros c Hc N2 N8. rewrite /M9 upd_ne; [| regne].
       exact (HM8thr c Hc N2 N8). }
-    iDestruct (proc_priv_tf gf pj pid V with "Hpriv") as "(Htf & Hpage & Hback2)".
+    iDestruct (proc_priv_tf gf pj pid U with "Hpriv") as "(Htf & Hpage & Hback2)".
     iEval (rewrite -HM9a1) in "Hmin".
     iDestruct (cpu_own_transport CID10 CID13 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Argint.wp_argint_sconf (CID := CID13) M9 (K - 20)%nat 0%nat eb pj
-              2%nat (ud_tfp (pv_upt V)) (pv_tf V) v2 (word_lo w19)
+              2%nat (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v2 (word_lo w19)
               (DfracOwn (1/4)) b lks
               mn_arg2_lt HM9a0 Hargv2 mn_noff0 ltac:(lia) Hpv
               with "Hcg Hown Htext Hdata Hpc Htf Hpage Hmin").
@@ -1450,7 +1450,7 @@ Section ProofSysMknodBody.
     iDestruct (cpu_own_transport CID14 CID18 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Argstr.wp_argstr_sconf (CID := CID18) fsc_kalloc gf M13 (K - 20)%nat 0%nat eb pj
-              0%nat v0 pid V 128%nat bf0 b lks
+              0%nat v0 pid U 128%nat bf0 b lks
               mn_arg0_lt HM13a0 Hargv0 mn_noff0 ltac:(lia) HM13a2 mn_maxpath_lt
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
@@ -1654,7 +1654,7 @@ Section ProofSysMknodBody.
  gf
  pk bf
                 SpecCreate.T_DEVICE (hw_lo (arg_int32 v1)) (hw_lo (arg_int32 v2))
-                (upd_upt V P') MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
+                (upd_usM (us_upt U P') _) MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
                 N4 (K - 20)%nat eb b lks
                 ltac:(lia) HdevR Hnib0 Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
@@ -1738,7 +1738,7 @@ Section ProofSysMknodBody.
            retires the descriptor in the ghost step that parks the payload
            and hands the whole token back. *)
         destruct (Hiregb inum ltac:(lia)) as [Hibcov Hiblog].
-        iDestruct (proc_priv_bare_acc gf pj pid (upd_upt V P') with "Hpriv")
+        iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
           as "[Hpbare Hpback]".
         iDestruct (cpu_own_transport CID26 CID28 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -1746,7 +1746,7 @@ Section ProofSysMknodBody.
                   pd pav pu gil gisl
  kk qi ss gy inum dn bm un1
                   pid (DfracOwn (1/4)) dqb dqs P0 (K - 20)%nat eb b lks
-                  (upd_upt V P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
+                  (us_upt U P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                   Hibcov Hiblog ltac:(lia) Hcovb
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
                   (Hlb "log"%string)
@@ -1797,7 +1797,7 @@ Section ProofSysMknodBody.
         iApply (EndOp.wp_end_op_sconf (CID := CID30) gs j gl fsc_uart fsc_disk fsc_dlock pd pav pu
                   fsc_bio icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n2 pid (DfracOwn (1/4))
                   P1 (K - 20)%nat eb b lks
-                  (upd_upt V P') ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
+                  (us_upt U P') ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                         Hpbare Hprocs Hdev Hgeo Hdlk Hop").
         { rewrite Heb /trap_csrs_ext. done. }
@@ -1873,14 +1873,14 @@ Section ProofSysMknodBody.
         iDestruct (mn_buf_join (pa_stk sp0 18) bf pk Hpk with "Hbufk Hbufrest")
           as "Hbytes2".
         iDestruct (mn_bytes_name (pa_stk sp0 18) 128 with "Hbytes2") as (bf1) "Hbuf".
-        iDestruct (proc_priv_bare_acc gf pj pid (upd_upt V P') with "Hpriv")
+        iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
           as "[Hpbare Hpback]".
         iDestruct (cpu_own_transport CID26 CID27 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (mn_m1_tail (CID0 := CID27) gs j gl pd pav pu fsc_fs
  un1 pid (DfracOwn (1/4))
                   m mcr sp0 K eb b lks _ _ bf1
-                  (upd_upt V P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
+                  (us_upt U P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) Hcrsp Hcrthr Hal
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                         Hpbare Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hf19 Hf20
@@ -1914,14 +1914,14 @@ Section ProofSysMknodBody.
                       = mword_of_int (MN + 0x58)) by pcw.
       iEval (rewrite Htg58) in "Hpc".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
-      iDestruct (proc_priv_bare_acc gf pj pid (upd_upt V P') with "Hpriv")
+      iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
         as "[Hpbare Hpback]".
       iDestruct (cpu_own_transport CID19 CID20 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (mn_m1_tail (CID0 := CID20) gs j gl pd pav pu fsc_fs
  MAXOPBLOCKS pid (DfracOwn (1/4))
                 m mas sp0 K eb b lks _ _ bf
-                (upd_upt V P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
+                (us_upt U P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                 ltac:(reflexivity) Hassp Hasthr Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf19 Hf20 Hbuf

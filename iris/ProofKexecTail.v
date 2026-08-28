@@ -991,7 +991,7 @@ Section KexecASeam.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m M32 : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av ipv : mword 64)
       (* THE INUM THE WALK RETURNED (N-5.2B).  [inode_held] hides it behind
@@ -1040,7 +1040,7 @@ Section KexecASeam.
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
      kalloc_env fsc_kalloc None ∗
      (* ---- the process, WHOLE (convention 2) ---- *)
-     proc_priv gf pj pidv V ∗
+     proc_priv gf pj pidv U ∗
      (* ---- the caller's buffers.  THE PATH IS FULL; see the header. ---- *)
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) ∗
      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) ∗
@@ -1082,13 +1082,13 @@ Section KexecExitQ.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (ra0 pv av : mword 64) :
     wp_next (CID0 := CIDx) true pj (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (V' : pprivate) (entry spv szv' : mword 64),
+      ∀ (mf : regfile) (U' : ustate) (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok (us_V U) (us_V U') (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K b pj -∗
           cpu_own 0 eb pj b lks -∗
           trap_csrs_ext KT1 eb -∗
@@ -1097,7 +1097,7 @@ Section KexecExitQ.
           sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
           kalloc_env fsc_kalloc None -∗
-          proc_priv gf pj pidv V' -∗
+          proc_priv gf pj pidv U' -∗
           ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
@@ -1106,16 +1106,16 @@ Section KexecExitQ.
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     wp_next (CID0 := CIDx) true pj (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc pj pidv V m (ret_pc ra0) K b eb lks dqb
+      KexecOkQ.kexec_closer Q gf fsc_kalloc pj pidv U m (ret_pc ra0) K b eb lks dqb
            dqs fsc_bmapstart na alen plen pv dqpv pfun av dqa avf
            aslen dqas afun).
   Proof.
     rewrite /wp_next. iIntros "H" (CID Hcr).
     iSpecialize ("H" $! CID with "[%]"); [exact Hcr |].
-    iIntros (mf V' entry spv szv')
+    iIntros (mf U' entry spv szv')
             "%Hcs %Hok Hsie Hcnt Htc Hcl Hpc Hbm Hin Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs".
-    iApply ("H" $! mf V' entry spv szv' with
+    iApply ("H" $! mf U' entry spv szv' with
              "[%] [%] Hsie Hcnt Htc Hcl Hpc Hbm Hin Hka Hpriv Hpath Hargv
               Hargs Hbs Hirs");
       [exact Hcs | exact (kexec_ok_q_weaken _ _ _ _ _ _ _ _ _ Hok)].
@@ -1220,7 +1220,7 @@ Section KexecAExit.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (68 <= K)%nat ->
@@ -1243,7 +1243,7 @@ Section KexecAExit.
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     kalloc_env fsc_kalloc None -∗
-    proc_priv gf pj pidv V -∗
+    proc_priv gf pj pidv U -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
@@ -1251,7 +1251,7 @@ Section KexecAExit.
     bslots 3 -∗
     iref_slots 2 -∗
     wp_next true pj (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc pj pidv V m (ret_pc ra0) K b eb lks dqb
+      KexecOkQ.kexec_closer Q gf fsc_kalloc pj pidv U m (ret_pc ra0) K b eb lks dqb
            dqs fsc_bmapstart na alen plen pv dqpv pfun av dqa avf
            aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
@@ -1271,7 +1271,7 @@ Section KexecAExit.
     iDestruct (cpu_claim_ext_transport CID0 CIDe eb pj
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! mf V (mword_of_int 0 : mword 64)
+    iApply ("Hcont" $! mf U (mword_of_int 0 : mword 64)
               (mword_of_int 0 : mword 64) (mword_of_int 0 : mword 64)
               with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
@@ -1339,7 +1339,7 @@ Section KexecABad.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat) (eb : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (K_kexec <= K)%nat ->
@@ -1397,7 +1397,7 @@ Section KexecABad.
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     kalloc_env fsc_kalloc None -∗
-    proc_priv gf (proc_addr jp) pidv V -∗
+    proc_priv gf (proc_addr jp) pidv U -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
@@ -1407,7 +1407,7 @@ Section KexecABad.
     log_opb icfg_log n2 -∗
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
@@ -1426,7 +1426,7 @@ Section KexecABad.
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct (kxa_esc_acc k Hk with "Hesc") as "#Hesck".
-    iDestruct (proc_priv_bare_cref gf (proc_addr jp) pidv V with "Hpriv")
+    iDestruct (proc_priv_bare_cref gf (proc_addr jp) pidv U with "Hpriv")
       as "(Hppid & Hcref & Hpvbk)".
     (* ---- +0x064: c.mv a0,s4 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KXA + 0x064)) Ra0 Rs4
@@ -1474,7 +1474,7 @@ Section KexecABad.
     iApply (Iunlockput.wp_iunlockput_tx_sconf gs jp gl pd pav pu
               gil gisl
               k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
-              B2 (K - 68)%nat eb eb lks V
+              B2 (K - 68)%nat eb eb lks U
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0 ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
@@ -1518,7 +1518,7 @@ Section KexecABad.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iApply (EndOp.wp_end_op_sconf gs jp gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio icfg_log fsc_fs
               fsc_cov fsc_logst icfg_dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
-              eb eb lks V ltac:(lia) Hlg Hjp Hgs
+              eb eb lks U ltac:(lia) Hlg Hjp Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
@@ -1620,16 +1620,16 @@ Section KexecABad.
       rewrite (stack_own_app (KTR := KT1)) (pa_stk_assoc sp0 13 50).
       iSplitL "Hmid"; [iExact "Hmid" | iExact "Htop"]. }
     iApply (kxc_exit_m1 Q (proc_addr jp) gf
- plen pfun na avf alen aslen afun pidv V
+ plen pfun na avf alen aslen afun pidv U
               dqb dqs dqa dqpv dqas m B5 K eb eb lks sp0 ra0 s00 s10 s20 pv av
               ltac:(lia)
               Hsp Hra Hs0 Hs1 Hs2 HB5sp HB5a0 HB5thr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfr Hbm Hins Hka Hpriv Hpath Hargv
                     Hargs Hbs Hirs2").
-    iIntros (CIDf Hsf mf V' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
+    iIntros (CIDf Hsf mf U' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
              Hbm Hins Hka2 Hpriv Hpath Hargv Hargs Hbs Hirs".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! mf V' entry spv szv'
+    iApply ("Hcont" $! mf U' entry spv szv'
               with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka2 Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
     - exact Hcs2.
@@ -1724,7 +1724,7 @@ Section KexecCBad.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat) (eb : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (P : uptd) (szf w13 : mword 64) :
@@ -1751,11 +1751,11 @@ Section KexecCBad.
     cpu_claim_ext eb (proc_addr jp) -∗
     kernel_text -∗
     pc_is (mword_of_int (KXA + 0x1d6) : mword 64) -∗
-    proc_pt P -∗
+    proc_pt_any P -∗
     kalloc_env fsc_kalloc None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    proc_priv gf (proc_addr jp) pidv V -∗
+    proc_priv gf (proc_addr jp) pidv U -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
@@ -1770,7 +1770,7 @@ Section KexecCBad.
       (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
       (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13 -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
@@ -1783,7 +1783,7 @@ Section KexecCBad.
     (* depth 0 forces the held set empty, so proc_freepagetable's order
        premise needs no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
+    iDestruct (proc_pt_any_wf_get with "Hpt") as %Hwf.
     pose proof (proc_pt_covered_maxsz P szf Hwf Hcov) as Hmax.
     (* ---- +0x1d6: c.mv a1,s3 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KXA + 0x1d6)) Ra1 Rs8
@@ -2122,7 +2122,7 @@ Section KexecCBad.
     iDestruct (cpu_claim_ext_transport CID3 CIDj eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iApply (T.kxc_exit_m1 Q (proc_addr jp) gf
- plen pfun na avf alen aslen afun pidv V
+ plen pfun na avf alen aslen afun pidv U
               dqb dqs dqa dqpv dqas m B13 K eb eb lks sp0 ra0 s00 s10 s20 pv av
               ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HB13sp HB13a0 HB13thr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfr Hbm Hins Hka Hpriv Hpath Hargv

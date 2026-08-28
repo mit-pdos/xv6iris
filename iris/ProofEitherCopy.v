@@ -421,9 +421,9 @@ Section ProofEitherCopyout.
 
   Lemma wp_either_copyout_sconf (γa : gname) (γf : gname)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
+      (pid : mword 32) (U : ustate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_either_copyout_sconf_body ktb kts γa γf m av lvl eb p pid V user len
+    : wp_either_copyout_sconf_body ktb kts γa γf m av lvl eb p pid U user len
         src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyout_sconf_body].
@@ -740,6 +740,9 @@ Section ProofEitherCopyout.
       (* the ONE borrow out of [proc_priv] *)
       iDestruct (proc_priv_core_sz_bound with "Hres") as %Hszb.
       iDestruct (proc_priv_core_copy with "Hres") as "(Hszc & Hptc & Hpt & Hpback)".
+      (* copyin/copyout are stated at the ∃-weakened image (they may fault a
+         page in, and copyout writes); the block is rebuilt at what returns. *)
+      iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
       (* ---- +0x1e: c.mv a4,s2 -- len (the psz shifted every argument down) ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x1e)) Ra4 Rs2 Am (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -782,14 +785,14 @@ Section ProofEitherCopyout.
         by (rewrite HU3a0; reflexivity).
       iEval (rewrite -Hszaddr) in "Hszc".
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.either_copyout + 0x24)) Ra1 Ra0
-                (mword_of_int 72 : mword 12) U3 (av - 6)%nat (pv_sz V) b
+                (mword_of_int 72 : mword 12) U3 (av - 6)%nat (pv_sz (us_V U)) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] Hszc").
       { iApply (eco_24 with "Htext"). }
       iIntros (CID18b Hs18b) "Hcg Hpc Hszc".
       iEval (rewrite Hszaddr) in "Hszc".
-      set (Uz := <[Regidx Ra1 := regval_into_reg (pv_sz V)]> U3).
-      change (<[Regidx Ra1 := regval_into_reg (pv_sz V)]> U3) with Uz.
+      set (Uz := <[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> U3).
+      change (<[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> U3) with Uz.
       assert (Hpp26 : add_vec_int (mword_of_int (KernelSyms.either_copyout + 0x24) : mword 64) 2 = mword_of_int (KernelSyms.either_copyout + 0x26))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp26) in "Hpc".
@@ -801,14 +804,14 @@ Section ProofEitherCopyout.
         by (rewrite HUza0; reflexivity).
       iEval (rewrite -Hptaddr) in "Hptc".
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.either_copyout + 0x26)) Ra0 Ra0
-                (mword_of_int 80 : mword 12) Uz (av - 6)%nat (page_base (ud_root (pv_upt V))) b
+                (mword_of_int 80 : mword 12) Uz (av - 6)%nat (page_base (ud_root (pv_upt (us_V U)))) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] Hptc").
       { iApply (eco_26 with "Htext"). }
       iIntros (CID19 Hs19) "Hcg Hpc Hptc".
       iEval (rewrite Hptaddr) in "Hptc".
-      set (U4 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> Uz).
-      change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> Uz) with U4.
+      set (U4 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> Uz).
+      change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> Uz) with U4.
       assert (Hpp28 : add_vec_int (mword_of_int (KernelSyms.either_copyout + 0x26) : mword 64) 2 = mword_of_int (KernelSyms.either_copyout + 0x28))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp28) in "Hpc".
@@ -830,9 +833,9 @@ Section ProofEitherCopyout.
       assert (HU5ra : U5 !!! Regidx Rra
                       = add_vec_int (mword_of_int (KernelSyms.either_copyout + 0x28) : mword 64) 4)
         by (rewrite /U5 upd_eq; reflexivity).
-      assert (HU5a0 : U5 !!! Regidx Ra0 = page_base (ud_root (pv_upt V))).
+      assert (HU5a0 : U5 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U)))).
       { rewrite /U5 upd_ne; [| reg_neq]. rewrite /U4 upd_eq. reflexivity. }
-      assert (HU5a1 : U5 !!! Regidx Ra1 = pv_sz V).
+      assert (HU5a1 : U5 !!! Regidx Ra1 = pv_sz (us_V U)).
       { rewrite /U5 upd_ne; [| reg_neq]. rewrite /U4 upd_ne; [| reg_neq].
         rewrite /Uz upd_eq. reflexivity. }
       assert (HU5a3 : U5 !!! Regidx Ra3 = src).
@@ -880,7 +883,7 @@ Section ProofEitherCopyout.
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyout. *)
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Copyout.wp_copyout_sconf kts γa U5 (pv_upt V) (pv_sz V) len src_bytes (DfracOwn 1)
+      iApply (Copyout.wp_copyout_sconf kts γa U5 (pv_upt (us_V U)) (pv_sz (us_V U)) len src_bytes (DfracOwn 1)
                 (av - 6)%nat lvl eb p b
                 _ HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hsrc").
@@ -890,8 +893,9 @@ Section ProofEitherCopyout.
         by (rewrite HU5ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc2c) in "Hpc".
       iEval (rewrite HU5a3) in "Hsrc".
-      iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
-      iDestruct ("Hpback" $! P' with "Hxe Hszc Hptc Hpt") as "Hres".
+      iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
+      iDestruct (proc_pt_any_ptm with "Hpt") as (Mo) "Hpt".
+      iDestruct ("Hpback" $! P' Mo with "Hxe Hszc Hptc Hpt") as "Hres".
       assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 6)
         by (rewrite (callee_saved_lookup Hcsr csp_rs1 ltac:(vm_compute; reflexivity)); exact HU5sp).
       assert (Hthrr : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -925,7 +929,7 @@ Section ProofEitherCopyout.
       { exact Hcsf. }
       rewrite /either_copyout_post. rewrite Hfa0.
       iSplitR; [iPureIntro; exact Hret|].
-      iExists P'. iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|]. iExact "Hres".
+      iExists P', Mo. iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|]. iExact "Hres".
     - (* ================= user_dst == 0: memmove ================= *)
       assert (Hz : eq_vec (Am !!! Regidx Rs1) zero_reg = true)
         by (rewrite HAs1; exact Hflag).
@@ -1154,9 +1158,9 @@ Section ProofEitherCopyin.
 
   Lemma wp_either_copyin_sconf (γa : gname) (γf : gname)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
+      (pid : mword 32) (U : ustate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_either_copyin_sconf_body ktb kts γa γf m av lvl eb p pid V user len
+    : wp_either_copyin_sconf_body ktb kts γa γf m av lvl eb p pid U user len
         src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyin_sconf_body].
@@ -1469,6 +1473,9 @@ Section ProofEitherCopyin.
       iEval (rewrite Hpp1e) in "Hpc".
       iDestruct (proc_priv_core_sz_bound with "Hres") as %Hszb.
       iDestruct (proc_priv_core_copy with "Hres") as "(Hszc & Hptc & Hpt & Hpback)".
+      (* copyin/copyout are stated at the ∃-weakened image (they may fault a
+         page in, and copyout writes); the block is rebuilt at what returns. *)
+      iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
       (* ---- +0x1e: c.mv a4,s2 -- len (the psz shifted every argument down) ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x1e)) Ra4 Rs2 Am (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1511,14 +1518,14 @@ Section ProofEitherCopyin.
         by (rewrite HU3a0; reflexivity).
       iEval (rewrite -Hszaddr) in "Hszc".
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.either_copyin + 0x24)) Ra1 Ra0
-                (mword_of_int 72 : mword 12) U3 (av - 6)%nat (pv_sz V) b
+                (mword_of_int 72 : mword 12) U3 (av - 6)%nat (pv_sz (us_V U)) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] Hszc").
       { iApply (eci_24 with "Htext"). }
       iIntros (CID18b Hs18b) "Hcg Hpc Hszc".
       iEval (rewrite Hszaddr) in "Hszc".
-      set (Uz := <[Regidx Ra1 := regval_into_reg (pv_sz V)]> U3).
-      change (<[Regidx Ra1 := regval_into_reg (pv_sz V)]> U3) with Uz.
+      set (Uz := <[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> U3).
+      change (<[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> U3) with Uz.
       assert (Hpp26 : add_vec_int (mword_of_int (KernelSyms.either_copyin + 0x24) : mword 64) 2 = mword_of_int (KernelSyms.either_copyin + 0x26))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp26) in "Hpc".
@@ -1530,14 +1537,14 @@ Section ProofEitherCopyin.
         by (rewrite HUza0; reflexivity).
       iEval (rewrite -Hptaddr) in "Hptc".
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.either_copyin + 0x26)) Ra0 Ra0
-                (mword_of_int 80 : mword 12) Uz (av - 6)%nat (page_base (ud_root (pv_upt V))) b
+                (mword_of_int 80 : mword 12) Uz (av - 6)%nat (page_base (ud_root (pv_upt (us_V U)))) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] Hptc").
       { iApply (eci_26 with "Htext"). }
       iIntros (CID19 Hs19) "Hcg Hpc Hptc".
       iEval (rewrite Hptaddr) in "Hptc".
-      set (U4 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> Uz).
-      change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> Uz) with U4.
+      set (U4 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> Uz).
+      change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> Uz) with U4.
       assert (Hpp28 : add_vec_int (mword_of_int (KernelSyms.either_copyin + 0x26) : mword 64) 2 = mword_of_int (KernelSyms.either_copyin + 0x28))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp28) in "Hpc".
@@ -1559,9 +1566,9 @@ Section ProofEitherCopyin.
       assert (HU5ra : U5 !!! Regidx Rra
                       = add_vec_int (mword_of_int (KernelSyms.either_copyin + 0x28) : mword 64) 4)
         by (rewrite /U5 upd_eq; reflexivity).
-      assert (HU5a0 : U5 !!! Regidx Ra0 = page_base (ud_root (pv_upt V))).
+      assert (HU5a0 : U5 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U)))).
       { rewrite /U5 upd_ne; [| reg_neq]. rewrite /U4 upd_eq. reflexivity. }
-      assert (HU5a1 : U5 !!! Regidx Ra1 = pv_sz V).
+      assert (HU5a1 : U5 !!! Regidx Ra1 = pv_sz (us_V U)).
       { rewrite /U5 upd_ne; [| reg_neq]. rewrite /U4 upd_ne; [| reg_neq].
         rewrite /Uz upd_eq. reflexivity. }
       assert (HU5a2 : U5 !!! Regidx Ra2 = dst).
@@ -1606,7 +1613,7 @@ Section ProofEitherCopyin.
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyin. *)
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Copyin.wp_copyin_sconf ktb γa U5 (pv_upt V) (pv_sz V) len dst_olds
+      iApply (Copyin.wp_copyin_sconf ktb γa U5 (pv_upt (us_V U)) (pv_sz (us_V U)) len dst_olds
                 (av - 6)%nat lvl eb p b
                 _ HK50 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hdst").
@@ -1616,8 +1623,9 @@ Section ProofEitherCopyin.
         by (rewrite HU5ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc2c) in "Hpc".
       iEval (rewrite HU5a2) in "Hdst".
-      iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
-      iDestruct ("Hpback" $! P' with "Hxe Hszc Hptc Hpt") as "Hres".
+      iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
+      iDestruct (proc_pt_any_ptm with "Hpt") as (Mo) "Hpt".
+      iDestruct ("Hpback" $! P' Mo with "Hxe Hszc Hptc Hpt") as "Hres".
       assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 6)
         by (rewrite (callee_saved_lookup Hcsr csp_rs1 ltac:(vm_compute; reflexivity)); exact HU5sp).
       assert (Hthrr : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -1652,7 +1660,7 @@ Section ProofEitherCopyin.
       rewrite /either_copyin_post. rewrite Hfa0.
       iSplitR; [iPureIntro; exact Hret|].
       iSplitL "Hres".
-      { iExists P'. iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|]. iExact "Hres". }
+      { iExists P', Mo. iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|]. iExact "Hres". }
       iExists dst_new. iExact "Hdst".
     - (* ================= user_src == 0: memmove ================= *)
       assert (Hz : eq_vec (Am !!! Regidx Rs1) zero_reg = true)

@@ -150,7 +150,7 @@ Definition wp_pipealloc_sconf_body
        the top level on every arm ([SpecFileclose]) because its file-system
        arm reaches bread's acquiresleep.  A pass-through, like the trap-CSR
        complement below: in and straight back out. *)
-    (pidv : mword 32) (Vpr : pprivate) :=
+    (pidv : mword 32) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pipealloc in
   (* a0 = f0 (the read end's slot), a1 = f1 (the write end's slot).  They are
      SEPARATE conjuncts below, which is how the spec says the caller must pass
@@ -201,7 +201,7 @@ Definition wp_pipealloc_sconf_body
      their incoming contents are arbitrary *)
   pf0 ↦₈[KT1] v0 -∗
   pf1 ↦₈[KT1] v1 -∗
-  proc_priv_bare p pidv Vpr -∗
+  proc_priv_bare p pidv Upr -∗
   (* fileclose's loan, threaded to the two error-path closes -- see
      SpecFileclose's own note. *)
   iref_slot -∗
@@ -218,7 +218,7 @@ Definition wp_pipealloc_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     pipealloc_post γf γk on pf0 pf1 (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
-    proc_priv_bare p pidv Vpr -∗
+    proc_priv_bare p pidv Upr -∗
     iref_slot -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -236,6 +236,6 @@ Module Type PIPEALLOC.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string)
-      (pidv : mword 32) (Vpr : pprivate),
-      wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p K b lks pidv Vpr.
+      (pidv : mword 32) (Upr : ustate),
+      wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p K b lks pidv Upr.
 End PIPEALLOC.

@@ -167,9 +167,9 @@ Theorem forkret_park_paid
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
-    (pid : mword 32) (V : pprivate) (av : nat) :
+    (pid : mword 32) (U : ustate) (av : nat) :
     forkret_park_paid_body (fun h : CpuId => FR.usertrap_res_bare (CID := h)) W
-      γs γf pa ks rest pid V av.
+      γs γf pa ks rest pid U av.
 Proof.
   cbv beta delta [forkret_park_paid_body].
   intros Hrest [j [Hpa Hj]] Hut.
@@ -201,7 +201,7 @@ Proof.
              ⌜proc_pt_wf pt'⌝ -∗
              (* the resumed record names the same fd-state ghost the parked
                 one did -- see [SpecForkretParkPaid.forkret_park_pkg] *)
-             ⌜pv_fdg V' = pv_fdg V⌝ -∗
+             ⌜pv_fdg V' = pv_fdg (us_V U)⌝ -∗
              UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
              first_done -∗
              W -∗
@@ -265,7 +265,7 @@ Proof.
   (* ================================================================== *)
   (* forkret, at the resuming hart.                                      *)
   (* ================================================================== *)
-  iApply (FR.wp_forkret (CID := h) W j γs γl γf pid V ks m av
+  iApply (FR.wp_forkret (CID := h) W j γs γl γf pid U ks m av
             (av - 6 - trap_res eb')%nat eb'
             Hj Hgl Hbud Hkx Hut Hsp
           with "Htext Hwire Hkmap Hpc Hpinv Hcg Hcpu Htc Hclm
@@ -287,9 +287,10 @@ Proof.
   iApply (park_token_intro_of (fun h : CpuId => FR.usertrap_res_bare (CID := h)) γs).
   { intros N av. exact (FR.usertrap_res_bare_park N av). }
   rewrite /park_cap. iModIntro.
-  iIntros (γf pa ks rest pid V av) "%Hrest %Hj %Hav Hpkg HW Hchild".
+  iIntros (γf pa ks rest pid U av) "%Hrest %Hj %Hav Hpkg HW Hchild".
+  destruct U as [V M].
   iDestruct "Hchild" as "(#Hks & Hctx & Hpriv & Hfd & Hirsp)".
-  iApply (forkret_park_paid (CID := 0%fin) (park_token γs) γs γf pa ks rest pid V av
+  iApply (forkret_park_paid (CID := 0%fin) (park_token γs) γs γf pa ks rest pid (MkUstate V M) av
             Hrest Hj Hav with "[Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
   iNext. iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".

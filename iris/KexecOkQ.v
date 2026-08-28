@@ -173,7 +173,7 @@ Definition kexec_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (Q : mword 64 -> Prop)
-    (gf ga : gname) (pj : mword 64) (pidv : mword 32) (V : pprivate)
+    (gf ga : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)
     (lks : gset string) (dqb dqs : dfrac) (bmapstart : Z)
     (na : nat) (alen : nat -> nat)
@@ -181,9 +181,11 @@ Definition kexec_closer
     (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64)
     (aslen : nat -> nat) (dqas : dfrac) (afun : nat -> nat -> bv 8)
     : iProp Σ :=
-  (∀ (mf : regfile) (V' : pprivate) (entry spv szv' : mword 64),
+  (* the moved image, exactly as [SpecKexec]'s own post binds it *)
+  (∀ (mf : regfile) (U' : ustate)
+      (entry spv szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗
-      ⌜kexec_ok_q Q V V' (mf !!! Regidx (mword_of_int 10 : mword 5))
+      ⌜kexec_ok_q Q (us_V U) (us_V U') (mf !!! Regidx (mword_of_int 10 : mword 5))
                   entry spv szv' na alen⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -193,7 +195,7 @@ Definition kexec_closer
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       kalloc_env ga None -∗
-      proc_priv gf pj pidv V' -∗
+      proc_priv gf pj pidv U' -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
       ([∗ list] i ∈ seq 0 na,

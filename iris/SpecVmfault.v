@@ -100,7 +100,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
   cpu_own lvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
-  proc_pt P -∗
+  proc_pt_any P -∗
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
@@ -108,13 +108,13 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
-    ( (⌜mr !!! Regidx (mword_of_int 10) = mword_of_int 0⌝ ∗ proc_pt P)
+    ( (⌜mr !!! Regidx (mword_of_int 10) = mword_of_int 0⌝ ∗ proc_pt_any P)
       ∨ (∃ r : mword 64,
            ⌜mr !!! Regidx (mword_of_int 10) = r⌝ ∗
            ⌜page_valid r⌝ ∗
            ⌜(uint va < uint szv)%Z⌝ ∗
            ⌜P.(ud_um) !! svpn_of va0 = None⌝ ∗
-           proc_pt (uptd_insert P (svpn_of va0) r)) ) -∗
+           proc_pt_any (uptd_insert P (svpn_of va0) r)) ) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

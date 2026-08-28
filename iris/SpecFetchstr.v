@@ -39,7 +39,8 @@
      holds.  So no SIZE PREMISE enters this contract, even though a size now
      reaches the machine.
 
-   *** [proc_priv] NO LONGER COMES BACK UNCHANGED. ***  It used to: copyinstr
+   *** [proc_priv]'s DESCRIPTOR NO LONGER COMES BACK UNCHANGED (its IMAGE
+   does). ***  It used to: copyinstr
    did not fault pages in, so the descriptor that went into
    [ProcInv.proc_priv_copy] was the descriptor that came out, and fetchstr was
    the one member of the fetch* family whose contract left the process block
@@ -108,7 +109,7 @@ Definition fetchstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
 Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (ktb : ktier) (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-    (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fetchstr in
   let buf := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -122,17 +123,23 @@ Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  proc_priv γf p pid V -∗
+  proc_priv γf p pid U -∗
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[ktb] buf_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
+  (* THE IMAGE DOES NOT MOVE.  fetchstr READS user memory; the pages
+     copyinstr faults in on the way were already in the block's view -- as
+     lazy pages reading 0 -- so vmfault does not move it either
+     ([SpecCopyinstr.wp_copyinstr_sconf_mem] is same-[M] on both arms).  Only
+     the DESCRIPTOR grows, and the block comes back at the image it was
+     handed. *)
     ∀ (mf : regfile) (P' : uptd) (buf_new : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid (upd_upt V P') -∗
+      proc_priv γf p pid (us_upt U P') -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[ktb] buf_new j) -∗
       ⌜fetchstr_ret maxn buf_new (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -142,6 +149,6 @@ Module Type FETCHSTR.
   Parameter wp_fetchstr_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (ktb : ktier) (γa : gname) (γf : gname) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string),
-      wp_fetchstr_sconf_body ktb γa γf m av n eb p pid V maxn buf_olds b lks.
+      (pid : mword 32) (U : ustate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string),
+      wp_fetchstr_sconf_body ktb γa γf m av n eb p pid U maxn buf_olds b lks.
 End FETCHSTR.

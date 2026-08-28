@@ -146,8 +146,8 @@ Section ProofFileclose.
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
-      (K : nat) (b : bool) (lks : gset string) (pidv : mword 32) (Vpr : pprivate)
-    : wp_fileclose_sconf_body γfl γf k q st fn on m n eb p K b lks pidv Vpr.
+      (K : nat) (b : bool) (lks : gset string) (pidv : mword 32) (Upr : ustate)
+    : wp_fileclose_sconf_body γfl γf k q st fn on m n eb p K b lks pidv Upr.
   Proof.
     cbv beta delta [wp_fileclose_sconf_body].
     intros pcE ret_tgt HK HnZ Ha0 Hbelow.
@@ -1441,7 +1441,7 @@ Section ProofFileclose.
           iApply (BeginOp.wp_begin_op_sconf (CID := CIDf2)  (fcn_procs fn)
                     (fcn_j fn) (fcn_plock fn) fsc_bio icfg_log fsc_fs
                     fsc_cov fsc_logst icfg_dev
-                    pidv (fcn_dq fn) B1 (K - 8)%nat eb b lks Vpr
+                    pidv (fcn_dq fn) B1 (K - 8)%nat eb b lks Upr
                     ltac:(lia) Hjlt Hgl
                     ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hpc Hlog Hpbare Hprocs").
@@ -1511,7 +1511,7 @@ Section ProofFileclose.
 
  kk qq inum MAXOPBLOCKS
                     pidv (fcn_dq fn) DfracDiscarded DfracDiscarded
-                    B3 (K - 8)%nat eb b lks Vpr
+                    B3 (K - 8)%nat eb b lks Upr
                     ltac:(lia) Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
                     Hist0 Hiblk Hiblog Hinumb Hcovb
                     ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
@@ -1561,7 +1561,7 @@ Section ProofFileclose.
                     pdd pavd pud fsc_bio
                     icfg_log fsc_fs fsc_cov fsc_logst
                     icfg_dev ni pidv (fcn_dq fn)
-                    B4 (K - 8)%nat eb b lks Vpr
+                    B4 (K - 8)%nat eb b lks Upr
                     ltac:(lia) Hgeom Hjlt Hgl
                     ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen Hpbare

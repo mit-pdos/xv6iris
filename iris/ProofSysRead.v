@@ -313,9 +313,9 @@ Section ProofSysRead.
   (* =================================================================== *)
   Lemma wp_sys_read_sconf
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (fn : fread_names) (pidv : mword 32) (V : pprivate) (v v2 : mword 64)
+      (fn : fread_names) (pidv : mword 32) (U : ustate) (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_sys_read_sconf_body γf γs j γlp fn pidv V v v2 m av eb b lks.
+    : wp_sys_read_sconf_body γf γs j γlp fn pidv U v v2 m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_read_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq Heb.
@@ -493,7 +493,7 @@ Section ProofSysRead.
     iDestruct (cpu_own_transport CID CID7 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Argaddr.wp_argaddr_sconf M5 (av - 6)%nat 0%nat eb pj 1%nat
-              (ud_tfp (pv_upt V)) (pv_tf V) v1 w5 (DfracOwn (1/4)) b lks
+              (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v1 w5 (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
               ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hs5").
@@ -572,7 +572,7 @@ Section ProofSysRead.
     iDestruct (cpu_own_transport CID8 CID11 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Argint.wp_argint_sconf B3 (av - 6)%nat 0%nat eb pj 2%nat
-              (ud_tfp (pv_upt V)) (pv_tf V) v2 (word_hi w4) (DfracOwn (1/4)) b lks
+              (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v2 (word_hi w4) (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HB3a0 Harg2 Hnoff ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp [Hs4hi]").
     { iEval (rewrite HB3a1). iExact "Hs4hi". }
@@ -679,7 +679,7 @@ Section ProofSysRead.
     (* ---- argfd(0, 0, &f).  [pfd] IS NULL and carries no resource --
        [SpecArgfd.ofd_out_null] is exactly this case. ---- *)
     iApply (Argfd.wp_argfd_sconf γf N4 (av - 6)%nat 0%nat eb pj 0%nat v
-              pidv V (bv_0 32) w3 b lks
+              pidv U (bv_0 32) w3 b lks
               ltac:(unfold NARG; lia) HN4a0 Harg0 Hnzf Hnoff
               ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs3").
@@ -789,17 +789,17 @@ Section ProofSysRead.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
-      iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt V)
+      iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U)) (us_M U)
                 with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_refl. }
       { left. split; [reflexivity | exact Hnone]. }
       { exact Hmfa0. }
-      { rewrite sr_upd_upt_id. iExact "Hpriv". }
+      { rewrite us_upt_id upd_usM_id. iExact "Hpriv". }
       { iApply (fileread_fs_env_out with "Henv"). }
     - (* ================= SUCCESS: the descriptor resolved ============= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & _ & Hfcell)".
-      pose proof (arg_fd_lookup v (pv_ofile V) fd fv Hsome)
+      pose proof (arg_fd_lookup v (pv_ofile (us_V U)) fd fv Hsome)
         as (Hfdlt & Hlk & Hfvnz & _).
       assert (HA3a5' : A3 !!! Regidx Ra5 = (zero_reg : mword 64))
         by (rewrite HA3a5; exact Hr).
@@ -915,32 +915,32 @@ Section ProofSysRead.
         by (rewrite /S4 upd_ne; [exact HS3sp | reg_neq]).
       (* ---- THE B1 SEAM.  Lend the descriptor's reference out of the block,
          keep the core for fileread, and settle the loan when it returns. ---- *)
-      iDestruct (proc_priv_lend γf pj pidv V fd fv Hlk Hfvnz with "Hpriv")
+      iDestruct (proc_priv_lend γf pj pidv U fd fv Hlk Hfvnz with "Hpriv")
         as (kk qq stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
       iDestruct (read_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Fileread.wp_fileread_sconf γf γs j γlp kk qq stf fn pidv V
+      iApply (Fileread.wp_fileread_sconf γf γs j γlp kk qq stf fn pidv U
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
                 _ ltac:(lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 (sys_rw_count_range v2) Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
-      iIntros (CID25 Hs25 mf rv P')
+      iIntros (CID25 Hs25 mf rv P' M')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
       iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
          the deficit the lend opened is literally the one this closes. *)
-      assert (Hlkk : pv_ofile V !! fd = Some (fnode kk))
+      assert (Hlkk : pv_ofile (us_V U) !! fd = Some (fnode kk))
         by (rewrite Hlk Hfvk; reflexivity).
       (* the SAME file goes back, so the SAME authority does: this arm moves
          no descriptor's state and needs no fd-state fragment. *)
-      iDestruct (proc_ofiles_repay γf (pv_fdg V) pj (pv_ofile V) ∅ fd kk qq stf
+      iDestruct (proc_ofiles_repay γf (pv_fdg (us_V U)) pj (pv_ofile (us_V U)) ∅ fd kk qq stf
                    ltac:(apply not_elem_of_empty) Hlkk Hkk Hty
                    with "[Howe] Href Hauth") as "Howe".
       { rewrite (union_empty_r_L {[fd]}). iExact "Howe". }
-      iDestruct (proc_priv_join γf pj pidv (upd_upt V P') with "[Hcore] [Howe]")
+      iDestruct (proc_priv_join γf pj pidv (upd_usM (us_upt U P') M') with "[Hcore] [Howe]")
         as "Hpriv".
       { iExact "Hcore". }
       { cbn [upd_upt pv_ofile pv_fdg]. iExact "Howe". }

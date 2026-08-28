@@ -480,9 +480,9 @@ Section BarePt.
      extra conjuncts, which [uptg] does not carry and which the live
      direction must therefore be given. *)
   Lemma proc_pt_uptg (P : uptd) :
-    proc_pt P ⊢ uptg (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um).
+    proc_pt_any P ⊢ uptg (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um).
   Proof.
-    iIntros "H". rewrite /proc_pt /uptg /proc_pt_own /pt_frame.
+    iIntros "H". rewrite proc_pt_any_unfold /uptg /proc_pt_own /pt_frame.
     iDestruct "H" as "(%Hwf & Ht & Hown)".
     iDestruct "Ht" as (t) "(%Hspec & Ht)".
     iSplitR; [iPureIntro; exact (proc_pt_wf_uptg P Hwf) |].
@@ -495,10 +495,10 @@ Section BarePt.
 
   Lemma uptg_proc_pt (P : uptd) :
     upt_acc_wf P.(ud_um) -> page_valid (page_base P.(ud_tfp)) ->
-    uptg (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um) ⊢ proc_pt P.
+    uptg (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um) ⊢ proc_pt_any P.
   Proof.
     intros Hacc Hval. iIntros "H".
-    rewrite /proc_pt /uptg /proc_pt_own /pt_frame.
+    rewrite proc_pt_any_unfold /uptg /proc_pt_own /pt_frame.
     iDestruct "H" as "(%Hwf & %Hfx & Ht & Hown)".
     iDestruct "Ht" as (t) "(%Hspec & Ht)".
     destruct Hwf as (Hm & Hp & Hi).

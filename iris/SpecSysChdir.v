@@ -162,11 +162,11 @@ Section SpecSysChdir.
      ilock/iunlock left intact.  [ipv] is existential because the entry the
      path resolves to is not something the caller named. *)
   Definition sys_chdir_post (γf : gname) (pa : mword 64) (pid : mword 32)
-      (V : pprivate) (r : mword 64) : iProp Σ :=
-    (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf pa pid V
+      (U : ustate) (r : mword 64) : iProp Σ :=
+    (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf pa pid U
      ∨ ∃ ipv : mword 64,
          ⌜r = (zero_reg : mword 64)⌝ ∗
-         proc_priv γf pa pid (upd_cwd V ipv))%I.
+         proc_priv γf pa pid (us_cwd U ipv))%I.
 
 End SpecSysChdir.
 
@@ -179,7 +179,7 @@ Definition wp_sys_chdir_sconf_body
     (pd pav pu : mword 64)
     (dqb dqs : dfrac)
     (v : mword 64)                                      (* syscall argument 0  *)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_chdir in
@@ -203,7 +203,7 @@ Definition wp_sys_chdir_sconf_body
   eb = true ->
   (* argstr reads syscall argument 0 out of the trapframe page [proc_priv]
      carries *)
-  pv_tf V !! tf_arg_idx 0 = Some v ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
   sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
      premise here where sys_close has one: the depth is pinned at ZERO, so
@@ -255,17 +255,19 @@ Definition wp_sys_chdir_sconf_body
   procs_inv gs -∗
   (* ---- the process, and the reference allowance its walk needs ---- *)
   iref_slots 2 -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_chdir sleeps (begin_op,
      namei, ilock, iput and end_op all park), so it can return on another
      hart whatever SIE was doing.  Vacuous at [true], so consuming it costs
      the caller nothing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (P' : uptd),
+  (* the image moves: the copy leaves may fault a page in, and copyout
+     writes user memory -- milestone J item 1's ∃-weakened staging *)
+  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -277,7 +279,7 @@ Definition wp_sys_chdir_sconf_body
       (* the free pool only SHRINKS -- iput's truncate arm is the only mover *)
       (* the allowance, whole: see the header's ledger *)
       iref_slots 2 -∗
-      sys_chdir_post γf pj pid (upd_upt V P')
+      sys_chdir_post γf pj pid (upd_usM (us_upt U P') M')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -290,10 +292,10 @@ Module Type SYSCHDIR.
       (pd pav pu : mword 64)
       (dqb dqs : dfrac)
       (v : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_chdir_sconf_body γf gs j gl pd pav pu
 
- dqb dqs v pid V m K eb b lks.
+ dqb dqs v pid U m K eb b lks.
 End SYSCHDIR.

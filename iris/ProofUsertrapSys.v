@@ -103,22 +103,22 @@ Section UtSysBlock.
      consuming it -- [proc_pt_wf]'s last conjunct.  A PURE-goal [iDestruct]
      does not spend the resource (durable-notes.md), so [Hpv] is still
      whole for [proc_priv_tf_upd] right afterward. *)
-  Local Lemma ut_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
-    proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
+  Local Lemma ut_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv γf pa pid U -∗ ⌜page_valid (page_base (ud_tfp (pv_upt (us_V U))))⌝.
   Proof.
     iIntros "[(_ & _ & _ & _ & Hpt & _) _]".
-    rewrite /proc_pt_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
-    iDestruct (proc_pt_wf_get with "Hptt") as "%Hwf".
+    rewrite /proc_ptm_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
+    iDestruct (proc_ptm_wf with "Hptt") as "%Hwf".
     iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
   Qed.
 
-  Lemma ut_90 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_90 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
-    ud_tfp (pv_upt V) = ud_tfp pt ->
+    ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
     add_vec (un_ks N) (mword_of_int 4096) = ksp ->
     m0 !!! Regidx csp_rs1 = ksp ->
     m !!! Regidx csp_rs1 = pa_stk ksp 4 ->
@@ -133,7 +133,7 @@ Section UtSysBlock.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
-    ut_hold (SY.syscall_env) N V false lks -∗
+    ut_hold (SY.syscall_env) N U false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -265,7 +265,7 @@ Section UtSysBlock.
       iDestruct (kstack_closer_frame (un_pj N) ksp av 4 ltac:(lia)
                    with "Hkcl Hfr") as "Hkcl4".
       iEval (rewrite -Hnx -HKsp) in "Hkcl4".
-      iApply (T.ut_kexit SY.syscall_env N V
+      iApply (T.ut_kexit SY.syscall_env N U
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
                 nx false lks Hwf' ltac:(lia)
@@ -311,7 +311,7 @@ Section UtSysBlock.
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
           %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
           %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
-      iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
+      iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt (us_V U))) Hpv_valid with "Hkmapb") as "#Hptc".
       iDestruct (tf_page_word_upd_mem _ _ tf_epc_idx uepc ltac:(vm_compute; lia) Hepc
                    with "Hptc Htfp")
         as "(Hword & Htfback)".
@@ -323,24 +323,24 @@ Section UtSysBlock.
       iEval (rewrite -Haddrtf) in "Htfc".
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0x96)) Ra4 Rs1
                 (mword_of_int 88 : mword 12) mf nx
-                (page_base (ud_tfp (pv_upt V))) false
+                (page_base (ud_tfp (pv_upt (us_V U)))) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] Htfc [-]").
       { iApply (uti_096 with "Htext"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Htfc".
       iEval (rewrite Haddrtf) in "Htfc".
       set (S1 := <[Regidx Ra4 := regval_into_reg
-                     (page_base (ud_tfp (pv_upt V)))]> mf).
+                     (page_base (ud_tfp (pv_upt (us_V U))))]> mf).
       change (<[Regidx Ra4 := regval_into_reg
-                 (page_base (ud_tfp (pv_upt V)))]> mf) with S1.
+                 (page_base (ud_tfp (pv_upt (us_V U))))]> mf) with S1.
       assert (Hp98 : add_vec_int (mword_of_int (UT + 0x96) : mword 64) 2
                      = mword_of_int (UT + 0x98)) by pcw.
       iEval (rewrite Hp98) in "Hpc".
-      assert (HS1a4 : rget S1 Ra4 = page_base (ud_tfp (pv_upt V)))
+      assert (HS1a4 : rget S1 Ra4 = page_base (ud_tfp (pv_upt (us_V U))))
         by (rgne; rewrite /S1 upd_eq; reflexivity).
       assert (Haddrw : add_vec (rget S1 Ra4)
                          (sign_extend' 64 (mword_of_int 24 : mword 12))
-                       = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat tf_epc_idx))
+                       = tf_pa (ud_tfp (pv_upt (us_V U))) (8 * Z.of_nat tf_epc_idx))
         by (rewrite HS1a4; apply prr_tf_addr_24).
       (* ---- +0x98: c.ld a5,24(a4) -- a5 := epc ---- *)
       iEval (rewrite -Haddrw) in "Hword".
@@ -374,12 +374,12 @@ Section UtSysBlock.
                      = mword_of_int (UT + 0x9c)) by pcw.
       iEval (rewrite Hp9c) in "Hpc".
       (* ---- +0x9c: c.sd a5,24(a4) ---- *)
-      assert (HS3a4 : rget S3 Ra4 = page_base (ud_tfp (pv_upt V))).
+      assert (HS3a4 : rget S3 Ra4 = page_base (ud_tfp (pv_upt (us_V U)))).
       { rgne. rewrite /S3 upd_ne; [| reg_neq]. rewrite /S2 upd_ne; [| reg_neq].
         rewrite /S1 upd_eq. reflexivity. }
       assert (Haddrw3 : add_vec (rget S3 Ra4)
                           (sign_extend' 64 (mword_of_int 24 : mword 12))
-                        = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat tf_epc_idx))
+                        = tf_pa (ud_tfp (pv_upt (us_V U))) (8 * Z.of_nat tf_epc_idx))
         by (rewrite HS3a4; apply prr_tf_addr_24).
       iEval (rewrite -Haddrw3) in "Hword".
       iApply (wp_csd_s_sconf (mword_of_int (UT + 0x9c)) Ra5 Ra4
@@ -393,12 +393,12 @@ Section UtSysBlock.
       iEval (rewrite Hp9e) in "Hpc".
       (* the page and the block, rebuilt at the bumped epc *)
       iDestruct ("Htfback" $! (rget S3 Ra5) with "Hword") as "Htfp".
-      iDestruct ("Hpvback" $! (<[tf_epc_idx := rget S3 Ra5]> (pv_tf V))
+      iDestruct ("Hpvback" $! (<[tf_epc_idx := rget S3 Ra5]> (pv_tf (us_V U)))
                    with "Htfc Htfp") as "Hpv".
-      set (V1 := upd_tf V (<[tf_epc_idx := rget S3 Ra5]> (pv_tf V))).
-      change (upd_tf V (<[tf_epc_idx := rget S3 Ra5]> (pv_tf V))) with V1.
-      assert (HV1upt : pv_upt V1 = pv_upt V)
-        by (rewrite /V1; destruct V; reflexivity).
+      set (V1 := upd_tf (us_V U) (<[tf_epc_idx := rget S3 Ra5]> (pv_tf (us_V U)))).
+      change (upd_tf (us_V U) (<[tf_epc_idx := rget S3 Ra5]> (pv_tf (us_V U)))) with V1.
+      assert (HV1upt : pv_upt V1 = pv_upt (us_V U))
+        by (rewrite /V1; destruct (us_V U); reflexivity).
       (* ---- +0x9e: csrsi sstatus,2 -- intr_on(), and the reserve is paid ---- *)
       iDestruct (ut_flip_pre (un_pj N) with "Hcpu") as "(Hcnt & Hcells)".
       (* THE CARVE, and why it needs a NAME for the remainder.  The enabling
@@ -460,7 +460,7 @@ Section UtSysBlock.
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
  (un_fn N) (un_ip N) (un_dqi N)
-                S4 n2 (un_pid N) V1 lks
+                S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) lks
                 Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
                 with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv Hufr [-]").
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
@@ -499,7 +499,11 @@ Section UtSysBlock.
           assert (Hdep : (trap_res true + n2)%nat = (av - 4)%nat)
             by (rewrite Hn2; unfold trap_res in *; lia).
           rewrite Hdep HS4sp. iExact "Hkcl4". }
-      iIntros (CID2 Hk2 mg V2) "%Hcsg %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
+      (* THE IMAGE THE DISPATCH RETURNED.  [SpecSyscall]'s post is
+         ∃-weakened in it (an entry that copies into the user buffer moves
+         it), so the residue is rebuilt at [M2], not at the entry image. *)
+      iIntros (CID2 Hk2 mg U2) "%Hcsg %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
+      destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
       iEval (rewrite Hreta6) in "Hpc".
@@ -517,7 +521,7 @@ Section UtSysBlock.
       (* the bundle comes back keyed on the ENTRY record; [Hfgg] is the
          dispatcher's own statement that no syscall moves [pv_fdg]. *)
       iEval (rewrite -Hfgg) in "Hufr".
-      iPoseProof (ut_own_rebuild SY.syscall_env N V2
+      iPoseProof (ut_own_rebuild SY.syscall_env N (MkUstate V2 M2)
                     with "Hbs Hip Hfd Hir Hpv Hufr Hsy Huwp") as "Hown".
       assert (Hmgsp : mg !!! Regidx csp_rs1 = pa_stk ksp 4)
         by (rewrite (callee_saved_lookup Hcsg csp_rs1
@@ -527,7 +531,7 @@ Section UtSysBlock.
                        ltac:(vm_compute; reflexivity)); exact HS4s1).
       assert (Hcsmg : ut_cs m0 mg)
         by exact (ut_cs_trans m0 S4 mg HcsS4 (ut_cs_of_callee_saved _ _ Hcsg)).
-      iApply (T.ut_a6 (CID := CID2) SY.syscall_env N V2 pt ksp m0 mg av
+      iApply (T.ut_a6 (CID := CID2) SY.syscall_env N (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
                 mie_v menvcfg0 lks
                 Hwf' Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)

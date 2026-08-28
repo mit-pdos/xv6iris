@@ -451,8 +451,8 @@ Section ProofArgfd.
   Lemma wp_argfd_sconf (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (v : mword 64)
-      (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset string)
-    : wp_argfd_sconf_body γf m av n eb p i v pid V oldfd oldf b lks.
+      (pid : mword 32) (U : ustate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset string)
+    : wp_argfd_sconf_body γf m av n eb p i v pid U oldfd oldf b lks.
   Proof.
     cbv beta delta [wp_argfd_sconf_body].
     intros pcE pfd pf ret_tgt Hi Ha0 Harg Hnzf Hn Hav.
@@ -689,7 +689,7 @@ Section ProofArgfd.
        re-anchor it before argint's own [cpu_own] premise can take it. *)
     iDestruct (cpu_own_transport CID CID10 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argint.wp_argint_sconf M6 (av - 6)%nat n eb p i
-              (ud_tfp (pv_upt V)) (pv_tf V) v (word_hi w5) (DfracOwn (1/4)) b
+              (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v (word_hi w5) (DfracOwn (1/4)) b
               _ Hi HM6a0 Harg Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Hpage Hs5hi").
     iIntros (CID11 Hk11 A) "%HcsA Hcg Hcpu Hpc Htfp Hpage Hs5hi".
@@ -810,7 +810,7 @@ Section ProofArgfd.
         by (subst fd; apply Z2Nat.id; exact (proj1 Hrng)).
       assert (Hsext : sign_extend' 64 (trunc32 v) = mword_of_int (Z.of_nat fd))
         by (rewrite Hfdz; apply sext32_64_moi).
-      destruct (pv_ofile V !! fd) as [fv|] eqn:Hlk; last first.
+      destruct (pv_ofile (us_V U) !! fd) as [fv|] eqn:Hlk; last first.
       { exfalso. apply lookup_ge_None_1 in Hlk. rewrite Hoflen in Hlk. lia. }
       (* ---- +0x22: jal ra,myproc ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.argfd + 0x22))
@@ -941,7 +941,7 @@ Section ProofArgfd.
       assert (HC4a0 : C4 !!! Regidx (mword_of_int 10 : mword 5) = p_ofile p fd)
         by (rewrite /C4 upd_eq HC3a0 HC3a5; reflexivity).
       (* ---- +0x34: c.ld a5,0(a0) -- f = p->ofile[fd] ---- *)
-      iDestruct (proc_priv_ofile γf p pid V fd fv Hlk with "Hpriv") as "[Hslot Hback]".
+      iDestruct (proc_priv_ofile γf p pid U fd fv Hlk with "Hpriv") as "[Hslot Hback]".
       iDestruct "Hslot" as "[Hcell Hrest]".
       assert (Haddrof : add_vec (C4 !!! Regidx (mword_of_int 10 : mword 5))
                           (sign_extend' 64 (mword_of_int 0 : mword 12)) = p_ofile p fd)
@@ -956,7 +956,7 @@ Section ProofArgfd.
       iIntros (CID21 Hk21) "Hcg Hpc Hcell".
       iEval (rewrite Haddrof) in "Hcell".
       iDestruct ("Hback" $! fv with "[Hcell Hrest]") as "Hpriv"; [by iFrame|].
-      rewrite (upd_ofile_id V fd fv Hlk).
+      rewrite (us_ofile_id U fd fv Hlk).
       set (C5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg fv]> C4).
       change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg fv]> C4) with C5.
       assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.argfd + 0x34) : mword 64) 2

@@ -2004,12 +2004,21 @@ Section ProofAllocproc.
         { rewrite Hbasetf. iExact "Hpgown". }
         iDestruct (proc_pt_intro_ppt t tfp Hrep ltac:(rewrite Hbasetf; exact Hpvtf) with "Htree") as "Hpt".
         iDestruct (p_pid_split (proc_addr k) pidn with "Hpidfull") as "[Hpidinv Hpidown]".
-        iAssert (proc_pt_at (proc_addr k) (upt_desc (pt_base t) tfp))
+        iAssert (proc_pt_at (proc_addr k) (upt_desc (pt_base t) tfp) ∅)
           with "[Hpgcell Htfcell Hpt]" as "Hptat".
         { rewrite /proc_pt_at. cbn [ud_root ud_tfp].
           iFrame "Hpt". iSplitL "Hpgcell"; [iExact "Hpgcell"|].
           iEval (rewrite -Hbasetf) in "Htfcell". iExact "Htfcell". }
-        iDestruct (proc_priv_nocwd_intro γf (proc_addr k) pidn V (upt_desc (pt_base t) tfp) tfws
+        (* THE BLOCK'S MEMORY CONJUNCT IS THE LAZY sz-REGION VIEW
+           ([ProcDefs.proc_priv_bare]), so the address space just built is
+           re-viewed at [p->sz] before it goes in.  The image is anonymous
+           here and that is right: a fresh table maps nothing, so every va
+           below the size reads as the 0 the lazy view records, and
+           [ProcPtOwn.proc_pt_at_ptm] is exactly that re-viewing. *)
+        iDestruct (proc_pt_at_forget with "Hptat") as "Hptat".
+        iEval (rewrite (proc_pt_at_ptm _ _ (uint (pv_sz V)))) in "Hptat".
+        iDestruct "Hptat" as (M0) "Hptat".
+        iDestruct (proc_priv_nocwd_intro γf (proc_addr k) pidn (MkUstate V M0) (upt_desc (pt_base t) tfp) tfws
                      Hszb (um_below_empty (pv_sz V))
                      with "Hpidown Hfields Hptat [Htfpage] Hofiles") as "Hpriv".
         { cbn [ud_tfp]. iExact "Htfpage". }
@@ -2048,12 +2057,12 @@ Section ProofAllocproc.
         iEval (rewrite Ha0f).
         (* the post is now THREE-way; the found arm is the middle one *)
         rewrite /allocproc_post. iRight. iLeft.
-        iExists k, γl, ch, pidn, (upd_pt V (upt_desc (pt_base t) tfp) tfws),
+        iExists k, γl, ch, pidn, (us_pt (MkUstate V M0) (upt_desc (pt_base t) tfp) tfws),
                 (pt_base t), tfp, ks, rest, (S (pt_nodes t)).
         iSplitR.
         { iPureIntro. split; [reflexivity|]. split; [exact Hk|]. split; [exact Hγl|].
           split; [reflexivity|].
-          cbn [upd_pt pv_ofile pv_cwd pv_fdg].
+          cbn [us_pt upd_usV us_V us_M upd_pt pv_ofile pv_cwd pv_fdg].
           split; [exact Hof|]. split; [exact Hcwd|].
           split; [exact Hrestlen|]. exact (ap_nodes_le (pt_nodes t) Hnodes). }
         iSplitL "Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv".

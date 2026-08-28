@@ -74,7 +74,7 @@ Definition wp_bread_sconf_body
     (bn : bio_names) (V : bio_view Σ)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bread in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -124,7 +124,7 @@ Definition wp_bread_sconf_body
   panic_env -∗
   bio_ctx bn V -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle threaded through acquiresleep and rw *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -149,7 +149,7 @@ Definition wp_bread_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       (* the locked buffer, keyed to the request: its bytes ARE the
          block's logical content (the payload inside indexes them) *)
       bio_locked bn V k pidv dev bno bs bsd d -∗
@@ -166,7 +166,7 @@ Module Type BREAD.
       (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_bread_sconf_body γs j γl γu γd γk pd pav pu bn V
-                          pidv dev bno dq m K eb b lks Vpr.
+                          pidv dev bno dq m K eb b lks Upr.
 End BREAD.

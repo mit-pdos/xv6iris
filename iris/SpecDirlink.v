@@ -456,7 +456,7 @@ Definition wp_dirlink_sconf_body
     (ncount : nat)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlink in
   let pj := proc_addr j in
   let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -575,7 +575,7 @@ Definition wp_dirlink_sconf_body
   ireg_open -∗
   dinode_at fsc_ireg dinum dn0 -∗
   (* ---- the caller's own pid cell ---- *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
@@ -618,7 +618,7 @@ Definition wp_dirlink_sconf_body
       sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       dinode_at fsc_ireg dinum dn0' -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       bslots 3 -∗
       (* NET ZERO on the ledger: dirlookup's iget spends one and iput
          returns one on the found arm; nothing is spent on the other. *)
@@ -720,7 +720,7 @@ Definition wp_dirlink_gen_body
     (ncount : nat) (Sb : gset Z) (tid : nat) (qtx : Qp)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlink in
   let pj := proc_addr j in
   let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -846,7 +846,7 @@ Definition wp_dirlink_gen_body
   ireg_open -∗
   dinode_at fsc_ireg dinum dn0 -∗
   (* ---- the caller's own pid cell ---- *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
@@ -895,7 +895,7 @@ Definition wp_dirlink_gen_body
       sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       dinode_at fsc_ireg dinum dn0' -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       bslots 3 -∗
       (* NET ZERO on the ledger: dirlookup's iget spends one and iput
          returns one on the found arm; nothing is spent on the other. *)
@@ -1014,12 +1014,12 @@ Module Type DIRLINK.
       (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_dirlink_sconf_body γs j γl pd pav pu
  γf
  ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
-                            m K eb b lks Vpr.
+                            m K eb b lks Upr.
 
   (* the SET-FORM contract; [wp_dirlink_sconf] above is its instance with
      the set forgotten, kept as its own parameter so that every existing
@@ -1038,10 +1038,10 @@ Module Type DIRLINK.
       (ncount : nat) (Sb : gset Z) (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_dirlink_gen_body γs j γl pd pav pu
  γf
  ip dinum bm data dn dn0 fn inum
                           ncount Sb tid qtx pidv dq dqd dqn dqs dqb dqbs dqf
-                          m K eb b lks Vpr.
+                          m K eb b lks Upr.
 End DIRLINK.

@@ -215,7 +215,7 @@ Definition wp_sys_link_sconf_body
     (pd pav pu : mword 64)
     (dqb dqs dqbs : dfrac)
     (v0 v1 : mword 64)                        (* syscall arguments 0 and 1  *)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_link in
@@ -247,8 +247,8 @@ Definition wp_sys_link_sconf_body
   eb = true ->
   (* the two argstr calls read syscall arguments 0 and 1 out of the
      trapframe page [proc_priv] carries *)
-  pv_tf V !! tf_arg_idx 0 = Some v0 ->
-  pv_tf V !! tf_arg_idx 1 = Some v1 ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
   sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
      premise here: the depth is pinned at ZERO, so [CpuOwn.cpu_own_zero_empty]
@@ -296,18 +296,20 @@ Definition wp_sys_link_sconf_body
   procs_inv gs -∗
   (* ---- the process, and the reference allowance the two walks need ---- *)
   iref_slots sys_link_slots -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_link parks in every
      one of its eleven distinct callees, so it can return on another hart
      whatever SIE was doing.
      Vacuous at [true], so consuming it costs the caller nothing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (P' : uptd),
+  (* the image moves: the copy leaves may fault a page in, and copyout
+     writes user memory -- milestone J item 1's ∃-weakened staging *)
+  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: the two fetchstrs fault user pages
          in.  [uptd_ext] is argstr's own report, composed across the pair by
          [ProcPtOwn.uptd_ext_trans]. *)
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -323,7 +325,7 @@ Definition wp_sys_link_sconf_body
       (* the allowance, whole: see the header's reference ledger *)
       iref_slots sys_link_slots -∗
       (* the process block, at the same everything but the page table *)
-      proc_priv γf pj pid (upd_upt V P') -∗
+      proc_priv γf pj pid (upd_usM (us_upt U P') M') -∗
       ⌜sys_link_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -336,11 +338,11 @@ Module Type SYSLINK.
       (pd pav pu : mword 64)
       (dqb dqs dqbs : dfrac)
       (v0 v1 : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_link_sconf_body γf gs j gl pd pav pu
 
- dqb dqs dqbs v0 v1 pid V
+ dqb dqs dqbs v0 v1 pid U
                              m K eb b lks.
 End SYSLINK.

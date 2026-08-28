@@ -1047,7 +1047,7 @@ Section ProofDirlinkMain.
      3139 B, a third to a half of that block Delta at every
      step of the walk (optimization.md, fold block continuations). *)
   Definition dl_after_exit
-      (j : nat) (m : regfile) (ip : mword 64) (nb : mword 64) (dqd : dfrac) (dqf : dfrac) (dinum : mword 32) (dn : dinode) (dn0 : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (dqn : dfrac) (fn : nat -> bv 8) (dqs : dfrac) (dqbs : dfrac) (dqb : dfrac) (pidv : mword 32) (ncount : nat) (Sb : gset Z) (tid : nat) (qtx : Qp) (K : nat) (b : bool) (eb : bool) (k0 : nat) (inum : mword 16) (nrec : nat) (s : list (bv 8)) (ret_tgt : mword 64) (lks : gset string) (Vpr : pprivate) (CIDc : CpuId) : iProp Σ :=
+      (j : nat) (m : regfile) (ip : mword 64) (nb : mword 64) (dqd : dfrac) (dqf : dfrac) (dinum : mword 32) (dn : dinode) (dn0 : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (dqn : dfrac) (fn : nat -> bv 8) (dqs : dfrac) (dqbs : dfrac) (dqb : dfrac) (pidv : mword 32) (ncount : nat) (Sb : gset Z) (tid : nat) (qtx : Qp) (K : nat) (b : bool) (eb : bool) (k0 : nat) (inum : mword 16) (nrec : nat) (s : list (bv 8)) (ret_tgt : mword 64) (lks : gset string) (Upr : ustate) (CIDc : CpuId) : iProp Σ :=
     (∀ (mf : regfile) (found : bool)
            (bm' : blkmap) (data' : nat -> list (bv 8))
            (dn' dn0' : dinode) (n' : nat) (Sb' : gset Z)
@@ -1066,7 +1066,7 @@ Section ProofDirlinkMain.
              sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
              sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
              dinode_at fsc_ireg dinum dn0' -∗
-             proc_priv_bare (proc_addr j) pidv Vpr -∗
+             proc_priv_bare (proc_addr j) pidv Upr -∗
              bslots 3 -∗
              iref_slot -∗
              IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
@@ -1123,7 +1123,7 @@ Section ProofDirlinkMain.
       (tid : nat) (qtx : Qp) (K : nat)
       (b eb : bool) (k0 : nat) (inum : mword 16) (nrec : nat)
       (s : list (bv 8)) (ret_tgt : mword 64)
-      (CIDa : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (CIDa : CpuId) (lks : gset string) (Upr : ustate) : iProp Σ :=
     (∀ (Mp : regfile) (dolz : nat -> bv 8) (w5 w6 : mword 64),
        ⌜dl_pregs m sp0 ip nb
           (zero_extend' 64 (inum : mword 16) : mword 64)
@@ -1150,7 +1150,7 @@ Section ProofDirlinkMain.
        sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
        dinode_at fsc_ireg dinum dn0 -∗
-       proc_priv_bare (proc_addr j) pidv Vpr -∗
+       proc_priv_bare (proc_addr j) pidv Upr -∗
        bslots 3 -∗
        iref_slot -∗
        log_opS icfg_log ncount Sb -∗
@@ -1160,13 +1160,13 @@ Section ProofDirlinkMain.
        tid ↪[ln_tx icfg_log]{#qtx} () -∗
        (* the borrowed ticket list, riding to the continuation (§7.1) *)
        IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
-       wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId => dl_after_exit j m ip nb dqd dqf dinum dn dn0 bm data dqn fn dqs dqbs dqb pidv ncount Sb tid qtx K b eb k0 inum nrec s ret_tgt lks Vpr CIDc) -∗
+       wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId => dl_after_exit j m ip nb dqd dqf dinum dn dn0 bm data dqn fn dqs dqbs dqb pidv ncount Sb tid qtx K b eb k0 inum nrec s ret_tgt lks Upr CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
   (* the exit continuation of [dl_scan_body], named: inline it was
      3142 B, a third to a half of that block Delta at every
      step of the walk (optimization.md, fold block continuations). *)
   Definition dl_scan_exit
-      (j : nat) (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (m : regfile) (ip : mword 64) (nb : mword 64) (inum : mword 16) (K : nat) (b : bool) (eb : bool) (dqf : dfrac) (dinum : mword 32) (bm : blkmap) (dqn : dfrac) (fn : nat -> bv 8) (dqs : dfrac) (dqbs : dfrac) (dqb : dfrac) (dn0 : dinode) (pidv : mword 32) (ncount : nat) (Sb : gset Z) (tid : nat) (qtx : Qp) (k0 : nat) (s : list (bv 8)) (ret_tgt : mword 64) (dqd : dfrac) (lks : gset string) (Vpr : pprivate) (CIDc : CpuId) : iProp Σ :=
+      (j : nat) (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (m : regfile) (ip : mword 64) (nb : mword 64) (inum : mword 16) (K : nat) (b : bool) (eb : bool) (dqf : dfrac) (dinum : mword 32) (bm : blkmap) (dqn : dfrac) (fn : nat -> bv 8) (dqs : dfrac) (dqbs : dfrac) (dqb : dfrac) (dn0 : dinode) (pidv : mword 32) (ncount : nat) (Sb : gset Z) (tid : nat) (qtx : Qp) (k0 : nat) (s : list (bv 8)) (ret_tgt : mword 64) (dqd : dfrac) (lks : gset string) (Upr : ustate) (CIDc : CpuId) : iProp Σ :=
     (∀ (mf : regfile) (found : bool)
            (bm' : blkmap) (data' : nat -> list (bv 8))
            (dn' dn0' : dinode) (n' : nat) (Sb' : gset Z)
@@ -1185,7 +1185,7 @@ Section ProofDirlinkMain.
              sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
              sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
              dinode_at fsc_ireg dinum dn0' -∗
-             proc_priv_bare (proc_addr j) pidv Vpr -∗
+             proc_priv_bare (proc_addr j) pidv Upr -∗
              bslots 3 -∗
              iref_slot -∗
              IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
@@ -1241,7 +1241,7 @@ Section ProofDirlinkMain.
       (pidv : mword 32) (ncount : nat)
       (Sb : gset Z) (tid : nat) (qtx : Qp)
       (k0 : nat) (s : list (bv 8)) (ret_tgt : mword 64) (dqd : dfrac)
-      (fuel : nat) (CIDl : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (fuel : nat) (CIDl : CpuId) (lks : gset string) (Upr : ustate) : iProp Σ :=
     (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8),
        ⌜(S nrec - i <= fuel)%nat⌝ -∗
        (* §15(b): THE LOOP TEST, not [i < nrec] -- without
@@ -1273,7 +1273,7 @@ Section ProofDirlinkMain.
        sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
        dinode_at fsc_ireg dinum dn0 -∗
-       proc_priv_bare (proc_addr j) pidv Vpr -∗
+       proc_priv_bare (proc_addr j) pidv Upr -∗
        bslot -∗
        bslots 2 -∗
        iref_slot -∗
@@ -1284,7 +1284,7 @@ Section ProofDirlinkMain.
        tid ↪[ln_tx icfg_log]{#qtx} () -∗
        (* the borrowed ticket list, riding to the continuation (§7.1) *)
        IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
-       wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId => dl_scan_exit j nrec dn data m ip nb inum K b eb dqf dinum bm dqn fn dqs dqbs dqb dn0 pidv ncount Sb tid qtx k0 s ret_tgt dqd lks Vpr CIDc) -∗
+       wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId => dl_scan_exit j nrec dn data m ip nb inum K b eb dqf dinum bm dqn fn dqs dqbs dqb dn0 pidv ncount Sb tid qtx k0 s ret_tgt dqd lks Upr CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* THE CORE, in SET FORM (fs-icache.md section 18 clause 1).
@@ -1301,12 +1301,12 @@ Section ProofDirlinkMain.
       (ncount : nat) (Sb : gset Z) (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_dirlink_gen_body gs j gl pd pav pu
  gf
  ip dinum bm data dn dn0 fn inum
                           ncount Sb tid qtx pidv dq dqd dqn dqs dqb dqbs dqf
-                          m K eb b lks Vpr.
+                          m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_dirlink_gen_body].
     intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums
@@ -1781,7 +1781,7 @@ Section ProofDirlinkMain.
     iApply (DL.wp_dirlookup_sconf gs j gl pd pav pu
  gf ip dinum bm data dn dn0 fn
               false (mword_of_int 0 : mword 32)
-              pidv dq dqd dqn R7 (K - 10)%nat eb b _ Vpr
+              pidv dq dqd dqn R7 (K - 10)%nat eb b _ Upr
               ltac:(exact HKdl) Htype Hlg Hbmwf Hbmcov Hszb Hholes Hinums
               Hdisj Horph Hdn0nz
               (* premise (6'), iclaim-ledger.md §3.3.  This is the ONE caller
@@ -1878,7 +1878,7 @@ Section ProofDirlinkMain.
       iApply (IP.wp_iput_gen gs j gl pd pav pu
                 gil gisl
                 kslot qq (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32)
-                ncount Sb false false false edl tid qtx pidv dq dqb dqs E1 (K - 10)%nat eb b lks Vpr true
+                ncount Sb false false false edl tid qtx pidv dq dqb dqs E1 (K - 10)%nat eb b lks Upr true
                 ltac:(exact HKip) Hkslot
                 ltac:(intros Hc; discriminate Hc)
                 ltac:(intros Hc; discriminate Hc)
@@ -2045,7 +2045,7 @@ Section ProofDirlinkMain.
                  dl_after_body j m sp0 ip nb dqd dqf dinum dn dn0 bm
                    data dqn fn dqs dqbs dqb
                    dq pidv ncount Sb tid qtx K b eb k0 inum
-                   nrec s ret_tgt CIDa lks Vpr))%I
+                   nrec s ret_tgt CIDa lks Upr))%I
         with "[]" as "#Hafter".
       { iModIntro.
         iIntros (CIDa Hsa Mp dolz w5 w6)
@@ -2365,7 +2365,7 @@ Section ProofDirlinkMain.
                   ip dinum bm data dn dn0
                   false (16 * k0)%nat 16%nat
                   (fun jj => dirent_bytes (de_of_name inum s) !!! jj)
-                  Vpr ncount Sb
+                  (upd_usM Upr _) ncount Sb
                   pidv dq dqd dqf dqs dqb dqbs V6 (K - 10)%nat eb b lks
                   ltac:(exact HKwi)
                   ltac:(rewrite (dl_wi_cost_bmonly k0);
@@ -2388,7 +2388,7 @@ Section ProofDirlinkMain.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' nn wrote dist dstb P'
-                 Sbw)
+                 Mwi Sbw)
           "%Hcswi %Hwf' %Hholes' %Haddrs' %Hsz' %Hcov' %Hcap' %Hsized'
            %Hdistb %Hdist0
            %Hdistk %Hrange %Htie %Harm %Hbud %Hsbw %Hwi16 %Hwiany %Hwiat %Hupt
@@ -2798,7 +2798,7 @@ Section ProofDirlinkMain.
             dl_scan_body j nrec dn data m sp0 ip nb inum K b eb dqf
               dinum bm dqn fn dqs dqbs dqb
               dn0 dq pidv ncount Sb tid qtx k0 s ret_tgt dqd
-              fuel CIDl lks Vpr))%I
+              fuel CIDl lks Upr))%I
           with "[]" as "Hloop".
         { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
           { iIntros (CIDl Hsl i Ml dol)
@@ -2979,7 +2979,7 @@ Section ProofDirlinkMain.
             by (rewrite HL6a4; apply rd_arg32_small; lia).
           iAssert (([∗ list] ii ∈ seq 0 16,
                       pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ[KT1] dol ii)
-                   ∗ proc_priv_bare (proc_addr j) pidv Vpr)%I
+                   ∗ proc_priv_bare (proc_addr j) pidv Upr)%I
             with "[Hde Hppid]" as "Hdst".
           { iEval (rewrite HL6a2). iFrame. }
           iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb (proc_addr j) b
@@ -2990,8 +2990,7 @@ Section ProofDirlinkMain.
           iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
           iApply (RD.wp_readi_sconf KT1 gs j gl pd pav pu gf
  ip bm data dn
-                    false (16 * i)%nat 16%nat dol Vpr
-                    pidv (DfracOwn 1) dqd L6 (K - 10)%nat eb b lks
+                    false (16 * i)%nat 16%nat dol (upd_usM Upr _) pidv (DfracOwn 1) dqd L6 (K - 10)%nat eb b lks
                     ltac:(exact HKrd) Hlg Hbmwf Hbmcov Hszb
                     ltac:(lia)
                     ltac:(intros _; change (Z.of_nat 16%nat) with 16; lia)
@@ -3007,7 +3006,7 @@ Section ProofDirlinkMain.
           all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          iIntros (CIDrd Hsrd mrd tot P')
+          iIntros (CIDrd Hsrd mrd tot P' Mrd)
             "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
              Hdst2 Hbs1".
           iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
@@ -3015,7 +3014,7 @@ Section ProofDirlinkMain.
           iAssert (([∗ list] ii ∈ seq 0 16,
                       pa_add (L6 !!! Regidx Ra2 : mword 64) ii
                         ↦ₘ[KT1] rd_delivered data dol (16 * i) tot ii)
-                   ∗ proc_priv_bare (proc_addr j) pidv Vpr)%I
+                   ∗ proc_priv_bare (proc_addr j) pidv Upr)%I
             with "[Hdst2]" as "[Hde Hppid]".
           { iExact "Hdst2". }
           destruct Hrdret as [[_ Hbad] | [Hra0rd Hteq]]; [discriminate |].
@@ -3515,12 +3514,12 @@ Section ProofDirlinkMain.
       (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_dirlink_sconf_body gs j gl pd pav pu
  gf
  ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
-                            m K eb b lks Vpr.
+                            m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_dirlink_sconf_body].
     intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums
@@ -3548,7 +3547,7 @@ Section ProofDirlinkMain.
     iApply (wp_dirlink_gen gs j gl pd pav pu
  gf
               ip dinum bm data dn dn0 fn inum ncount Sb0 t0 (1/2)%Qp
-              pidv dq dqd dqn dqs dqb dqbs dqf m K eb b lks Vpr
+              pidv dq dqd dqn dqs dqb dqbs dqf m K eb b lks Upr
               HK Htype Hbmcov Hszb Hinums Hdisj Horph Hstab Hnlk Hlg Hbmwf Hholes
               Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
               Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb (Hncg _ _) Hj Hgs Ha0 Ha2 Heb Hbelow

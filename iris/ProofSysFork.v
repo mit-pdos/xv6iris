@@ -98,9 +98,9 @@ Section ProofSysFork.
   Lemma wp_sys_fork_sconf
       (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
-      (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string)
+      (b : bool) (pid : mword 32) (U : ustate) (lks : gset string)
     : wp_sys_fork_sconf_body γp γw γl γf γs
- m lvl av eb p b pid V lks.
+ m lvl av eb p b pid U lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
     intros pcE ret_tgt Hav Hlvl Hbelow.
@@ -194,7 +194,7 @@ Section ProofSysFork.
     { iPoseProof UG.uexec_wp_gen as "#Hgen". iExact "Hgen". }
     iApply (Kfork.wp_kfork_sconf γp γw γl γf γs
 
-              Bj lvl (av - 2)%nat eb p b pid V lks
+              Bj lvl (av - 2)%nat eb p b pid U lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Huwp Hfdone Hpriv").

@@ -134,25 +134,43 @@ Qed.
 (* are not program-visible state); [b] joins them for the reason in the     *)
 (* header.  NOT inside a [CpuId] section: the hart is the FIRST forall.     *)
 (* ===================================================================== *)
+(* ---- KEYED ON [ProcDefs.ustate] ------------------------------------
+   One argument, not two: the slot's key is the process's user-visible
+   state, and every future component of that state (a descriptor view, the
+   pid) is a FIELD rather than an arity change here and in
+   [ProcInv.proc_priv].  See claude-notes/projects/user-wp-slot.md,
+   milestone J item 1's record ruling.
+     THE IMAGE AT THIS TIER IS THE **MAPPED** ONE ([UserPtTree.user_pt_inv]
+   pins [dom M = uva_dom pt]), while [proc_priv]'s is the LAZY sz-region
+   view.  The two are the same resource and the mapped map is recoverable
+   from the lazy one ([ProcPtOwn.proc_pt_of_ptm]: a submap is pinned by its
+   domain), so the seam is a conversion and not a loss -- but it is a
+   conversion, and where it goes is milestone J item 3's business: NOTHING
+   ties a slot to a block yet.  When the tie lands, this premise becomes
+   [∀ Mm, ⌜Mm ⊆ us_M U⌝ -∗ ⌜dom Mm = uva_dom (pv_upt (us_V U))⌝ -∗
+   user_pt_inv pt Mm -∗ …] and the sync constructor below owes two new
+   facts (its text and its stack live on MAPPED pages, so their bytes
+   survive the shrink); see the LANE K3 section of the sweep log. *)
 Definition uexec_slot `{!riscvGS Σ} `{GEN : GenId}
-    (V : pprivate) (M : gmap Z (bv 8)) : iProp Σ :=
+    (U : ustate) : iProp Σ :=
   (∀ (h : CpuId) (C : ucfg) (Rut : uptd -> iProp Σ) (b : regfile)
      (ms_v sc_v stval_v sepc_v : mword 64),
-     ⌜loop_ok C (pv_upt V)⌝ -∗
+     ⌜loop_ok C (pv_upt (us_V U))⌝ -∗
      ⌜user_mstatus_ok ms_v⌝ -∗
      hw_config (CID := h) -∗ minstret_inv -∗ wire_inv -∗
      u_regs (CID := h) (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v
-       (tf_resume_pc V) (tf_resume_pc V) (tf_resume_gpr b V) -∗
-     user_pt_inv (CID := h) (pv_upt V) M -∗
+       (tf_resume_pc (us_V U)) (tf_resume_pc (us_V U))
+       (tf_resume_gpr b (us_V U)) -∗
+     user_pt_inv (CID := h) (pv_upt (us_V U)) (us_M U) -∗
      user_cfg (CID := h) C -∗
-     Rut (pv_upt V) -∗
+     Rut (pv_upt (us_V U)) -∗
      (* the trap seam, paired as in [uexec_wp] (MILESTONE G): the frame goes
         to the kernel, the NEXT WP comes back.  The returned one is typed at
         the GENERAL [uexec_wp], not at another [uexec_slot] -- a verified
         process may hand back any successor, and that is also why this stays
         a plain definition rather than a fixpoint of its own: the recursion
         routes through [uexec_wp]. *)
-     ▷ (user_trap_frame (CID := h) C (pv_upt V) Rut ∗ uexec_wp -∗
+     ▷ (user_trap_frame (CID := h) C (pv_upt (us_V U)) Rut ∗ uexec_wp -∗
         WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -170,8 +188,8 @@ Global Typeclasses Opaque uexec_slot.
 (* program to offer deposits.                                              *)
 (* ===================================================================== *)
 Lemma uexec_wp_slot `{!riscvGS Σ} `{GEN : GenId}
-    (V : pprivate) (M : gmap Z (bv 8)) :
-  uexec_wp -∗ uexec_slot V M.
+    (U : ustate) :
+  uexec_wp -∗ uexec_slot U.
 Proof.
   iIntros "H". rewrite /uexec_slot.
   iIntros (h C Rut b ms_v sc_v stval_v sepc_v)
@@ -181,8 +199,8 @@ Proof.
      HYPOTHESIS ONLY: [Hhdl]'s own [uexec_wp] (the returned WP) is what the
      handler premise is stated at and must stay folded. *)
   iEval (rewrite uexec_wp_unfold /uexec_F) in "H".
-  iApply ("H" $! h C (pv_upt V) Rut M (tf_resume_gpr b V)
-            ms_v sc_v stval_v sepc_v (tf_resume_pc V)
+  iApply ("H" $! h C (pv_upt (us_V U)) Rut (us_M U) (tf_resume_gpr b (us_V U))
+            ms_v sc_v stval_v sepc_v (tf_resume_pc (us_V U))
             with "[] [] Hhw Hmi Hwi Hregs Hpt Hcfg Hrut Hhdl").
   - iPureIntro. exact Hlo.
   - iPureIntro. exact Hms.

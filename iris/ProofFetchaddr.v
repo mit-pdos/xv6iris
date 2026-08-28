@@ -351,8 +351,8 @@ Section ProofFetchaddr.
   (* =================================================================== *)
   Lemma wp_fetchaddr_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset string)
-    : wp_fetchaddr_sconf_body γa γf m av eb p pid V oldv b lks.
+      (pid : mword 32) (U : ustate) (oldv : mword 64) (b : bool) (lks : gset string)
+    : wp_fetchaddr_sconf_body γa γf m av eb p pid U oldv b lks.
   Proof.
     cbv beta delta [wp_fetchaddr_sconf_body].
     intros pcE addr ip ret_tgt Hav.
@@ -557,6 +557,10 @@ Section ProofFetchaddr.
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
     (* ---- the ONE borrow out of [proc_priv] ---- *)
     iDestruct (proc_priv_sz_bound with "Hpriv") as %Hszb.
+    (* copyin is taken at its MEMORY-INDEXED contract, at the block's own
+       image: it writes no user memory and the page it may fault in was
+       already in the lazy view, so [us_M U] comes back on the nose and the
+       block re-closes at it. *)
     iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
     (* ---- +0x14: c.ld a1,72(a0) -- a1 := p->sz (and it STAYS there: it is
        copyin's new [psz] argument, xv6 4f2fc8b) ---- *)
@@ -564,18 +568,18 @@ Section ProofFetchaddr.
       by (rewrite HAa0; reflexivity).
     iEval (rewrite -Hszaddr) in "Hszc".
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.fetchaddr + 0x14)) Ra1 Ra0
-              (mword_of_int 72 : mword 12) A (av - 4)%nat (pv_sz V) b
+              (mword_of_int 72 : mword 12) A (av - 4)%nat (pv_sz (us_V U)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hszc").
     { iApply (fai_14 with "Htext"). }
     iIntros (CID11 Hk11) "Hcg Hpc Hszc".
     iEval (rewrite Hszaddr) in "Hszc".
-    set (A1 := <[Regidx Ra1 := regval_into_reg (pv_sz V)]> A).
-    change (<[Regidx Ra1 := regval_into_reg (pv_sz V)]> A) with A1.
+    set (A1 := <[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> A).
+    change (<[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> A) with A1.
     assert (Hpp16 : add_vec_int (mword_of_int (KernelSyms.fetchaddr + 0x14) : mword 64) 2
                     = mword_of_int (KernelSyms.fetchaddr + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp16) in "Hpc".
-    assert (HA1a1 : A1 !!! Regidx Ra1 = pv_sz V) by (rewrite /A1 upd_eq; reflexivity).
+    assert (HA1a1 : A1 !!! Regidx Ra1 = pv_sz (us_V U)) by (rewrite /A1 upd_eq; reflexivity).
     assert (HA1s1 : A1 !!! Regidx Rs1 = addr)
       by (rewrite /A1 upd_ne; [exact HAs1 | reg_neq]).
     assert (HA1s2 : A1 !!! Regidx Rs2 = ip)
@@ -595,7 +599,7 @@ Section ProofFetchaddr.
     (* ---- +0x16: bgeu s1,a1 -- addr >=u p->sz ---- *)
     destruct (zopz0zKzJ_u (A1 !!! Regidx Rs1) (A1 !!! Regidx Ra1)) eqn:Hbge.
     - (* ======= addr >= sz: return -1 without touching *ip ======= *)
-      assert (Hbad : ~ fetch_ok addr (pv_sz V)).
+      assert (Hbad : ~ fetch_ok addr (pv_sz (us_V U))).
       { unfold fetch_ok. rewrite HA1s1 HA1a1 in Hbge.
         unfold zopz0zKzJ_u in Hbge. rewrite Z.geb_leb in Hbge.
         apply Z.leb_le in Hbge. apply fa_z_ge_bad. exact Hbge. }
@@ -652,17 +656,17 @@ Section ProofFetchaddr.
                 HE1sp HE1a0 HthrE1
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4").
       iIntros (CID15 Hk15 mf) "[%Hcsf %Hfa0] Hcg Hpc".
-      iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr";
+      iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U))⌝)%I as "#Hxr";
         [iPureIntro; apply uptd_ext_sz_refl|].
-      iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
+      iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) with "Hxr Hszc Hptc Hpt") as "Hpriv".
       iDestruct (cpu_own_transport CID10 CID15 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf (pv_upt V) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
+      iApply ("Hcont" $! mf (pv_upt (us_V U)) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
       { exact Hcsf. }
       { apply uptd_ext_refl. }
       iLeft. iFrame "Hip". iPureIntro. split; [exact Hfa0 | exact Hbad].
     - (* ======= addr < sz: on to the second test ======= *)
-      assert (Hlt : (uint addr < uint (pv_sz V))%Z).
+      assert (Hlt : (uint addr < uint (pv_sz (us_V U)))%Z).
       { rewrite HA1s1 HA1a1 in Hbge. unfold zopz0zKzJ_u in Hbge.
         rewrite Z.geb_leb in Hbge. by apply Z.leb_gt in Hbge. }
       iApply (wp_bgeu_fall_s_sconf (mword_of_int (KernelSyms.fetchaddr + 0x16))
@@ -700,7 +704,7 @@ Section ProofFetchaddr.
         rewrite add_vec64_unsigned Hc8.
         rewrite bv_wrap_small; [reflexivity|].
         rewrite Hm. exact (fa_z_range _ _ Hlo Hlt' Hszb'). }
-      assert (HA2a1 : A2 !!! Regidx Ra1 = pv_sz V)
+      assert (HA2a1 : A2 !!! Regidx Ra1 = pv_sz (us_V U))
         by (rewrite /A2 upd_ne; [exact HA1a1 | reg_neq]).
       assert (HA2s1 : A2 !!! Regidx Rs1 = addr)
         by (rewrite /A2 upd_ne; [exact HA1s1 | reg_neq]).
@@ -719,7 +723,7 @@ Section ProofFetchaddr.
       (* ---- +0x1e: bltu a1,a5 -- p->sz <u addr + 8 ---- *)
       destruct (zopz0zI_u (A2 !!! Regidx Ra1) (A2 !!! Regidx Ra5)) eqn:Hblt.
       + (* ------- sz < addr + 8: return -1 ------- *)
-        assert (Hbad : ~ fetch_ok addr (pv_sz V)).
+        assert (Hbad : ~ fetch_ok addr (pv_sz (us_V U))).
         { unfold fetch_ok. unfold zopz0zI_u in Hblt. apply Z.ltb_lt in Hblt.
           rewrite HA2a1 Ha8 in Hblt. apply fa_z_lt_bad. lia. }
         iApply (wp_bltu_taken_s_sconf (mword_of_int (KernelSyms.fetchaddr + 0x1e))
@@ -774,17 +778,17 @@ Section ProofFetchaddr.
                   HE2sp HE2a0 HthrE2
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4").
         iIntros (CID17 Hk17 mf) "[%Hcsf %Hfa0] Hcg Hpc".
-        iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr";
+        iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U))⌝)%I as "#Hxr";
           [iPureIntro; apply uptd_ext_sz_refl|].
-        iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
+        iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) with "Hxr Hszc Hptc Hpt") as "Hpriv".
         iDestruct (cpu_own_transport CID10 CID17 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
-        iApply ("Hcont" $! mf (pv_upt V) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
+        iApply ("Hcont" $! mf (pv_upt (us_V U)) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
         { exact Hcsf. }
         { apply uptd_ext_refl. }
         iLeft. iFrame "Hip". iPureIntro. split; [exact Hfa0 | exact Hbad].
       + (* ------- the whole doubleword is in range: call copyin ------- *)
-        assert (Hok : fetch_ok addr (pv_sz V)).
+        assert (Hok : fetch_ok addr (pv_sz (us_V U))).
         { unfold fetch_ok. unfold zopz0zI_u in Hblt. apply Z.ltb_ge in Hblt.
           rewrite HA2a1 Ha8 in Hblt. lia. }
         iApply (wp_bltu_fall_s_sconf (mword_of_int (KernelSyms.fetchaddr + 0x1e))
@@ -837,7 +841,7 @@ Section ProofFetchaddr.
         { rewrite /A4 upd_ne; [| reg_neq]. rewrite /A3 upd_ne; [exact HA2s2 | reg_neq]. }
         assert (HA5a2 : A5 !!! Regidx Ra2 = ip)
           by (rewrite /A5 upd_eq HA4s2; apply add_vec_zero_l).
-        assert (HA5a1 : A5 !!! Regidx Ra1 = pv_sz V).
+        assert (HA5a1 : A5 !!! Regidx Ra1 = pv_sz (us_V U)).
         { rewrite /A5 upd_ne; [| reg_neq]. rewrite /A4 upd_ne; [| reg_neq].
           rewrite /A3 upd_ne; [exact HA2a1 | reg_neq]. }
         assert (HA5a0 : A5 !!! Regidx Ra0 = p).
@@ -849,14 +853,14 @@ Section ProofFetchaddr.
           by (rewrite HA5a0; reflexivity).
         iEval (rewrite -Hptaddr) in "Hptc".
         iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.fetchaddr + 0x28)) Ra0 Ra0
-                  (mword_of_int 80 : mword 12) A5 (av - 4)%nat (page_base (ud_root (pv_upt V))) b
+                  (mword_of_int 80 : mword 12) A5 (av - 4)%nat (page_base (ud_root (pv_upt (us_V U)))) b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc [] Hptc").
         { iApply (fai_28 with "Htext"). }
         iIntros (CID18 Hk18) "Hcg Hpc Hptc".
         iEval (rewrite Hptaddr) in "Hptc".
-        set (A6 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> A5).
-        change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> A5) with A6.
+        set (A6 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> A5).
+        change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> A5) with A6.
         assert (Hpp2a : add_vec_int (mword_of_int (KernelSyms.fetchaddr + 0x28) : mword 64) 2
                         = mword_of_int (KernelSyms.fetchaddr + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp2a) in "Hpc".
@@ -878,9 +882,9 @@ Section ProofFetchaddr.
         assert (HA7ra : A7 !!! Regidx Rra
                         = add_vec_int (mword_of_int (KernelSyms.fetchaddr + 0x2a) : mword 64) 4)
           by (rewrite /A7 upd_eq; reflexivity).
-        assert (HA7a0 : A7 !!! Regidx Ra0 = page_base (ud_root (pv_upt V))).
+        assert (HA7a0 : A7 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U)))).
         { rewrite /A7 upd_ne; [| reg_neq]. rewrite /A6 upd_eq. reflexivity. }
-        assert (HA7a1 : A7 !!! Regidx Ra1 = pv_sz V).
+        assert (HA7a1 : A7 !!! Regidx Ra1 = pv_sz (us_V U)).
         { rewrite /A7 upd_ne; [| reg_neq]. rewrite /A6 upd_ne; [| reg_neq]. exact HA5a1. }
         assert (HA7a2 : A7 !!! Regidx Ra2 = ip).
         { rewrite /A7 upd_ne; [| reg_neq]. rewrite /A6 upd_ne; [| reg_neq]. exact HA5a2. }
@@ -913,13 +917,14 @@ Section ProofFetchaddr.
         assert (HK50 : (50 <= av - 4)%nat) by lia.
         assert (HA7len : A7 !!! Regidx Ra4 = (mword_of_int (Z.of_nat 8%nat) : mword 64)).
         { rewrite HA7a4. apply bv_eq; vm_compute; reflexivity. }
-        assert (Hszb38 : (uint (pv_sz V) <= 2 ^ 38)%Z) by (rewrite fa_maxva_lit; exact Hszb).
+        assert (Hszb38 : (uint (pv_sz (us_V U)) <= 2 ^ 38)%Z) by (rewrite fa_maxva_lit; exact Hszb).
         (* the caller's [uint64 *] AS copyin's byte buffer *)
         iDestruct (bb_word_acc with "Hip") as "[Hbuf Hipback]".
         iEval (rewrite -HA7a2) in "Hbuf".
         (* ---- copyin(p->pagetable, p->sz, ip, addr, 8) ---- *)
         iDestruct (cpu_own_transport CID10 CID19 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-        iApply (Copyin.wp_copyin_sconf KT1 γa A7 (pv_upt V) (pv_sz V) 8%nat
+        iApply (Copyin.wp_copyin_sconf_mem KT1 γa A7 (pv_upt (us_V U)) (us_M U)
+                  (pv_sz (us_V U)) 8%nat
                   (fun j => nth_byte (oldv : mword 64) j) (av - 4)%nat 0%nat eb p b
                   _ HK50 HA7a0 HA7a1 HA7len fa_len8 Hszb38 fa_n0
                   with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
@@ -930,8 +935,8 @@ Section ProofFetchaddr.
         iEval (rewrite Hpc2e) in "Hpc".
         iEval (rewrite HA7a2) in "Hbuf".
         iDestruct ("Hipback" $! dst_new with "Hbuf") as (wnew) "Hip".
-        iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
-        iDestruct ("Hpback" $! P' with "Hxe Hszc Hptc Hpt") as "Hpriv".
+        iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
+        iDestruct ("Hpback" $! P' (us_M U) with "Hxe Hszc Hptc Hpt") as "Hpriv".
         (* the frame and the callee-saved set survived copyin *)
         assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 4)
           by (rewrite (callee_saved_lookup Hcsr csp_rs1 ltac:(vm_compute; reflexivity)); exact HA7sp).
@@ -951,7 +956,7 @@ Section ProofFetchaddr.
                   sign_extend' 64 (sub_vec (subrange_vec_dec (zero_reg : mword 64) 31 0 : mword 32)
                                            (subrange_vec_dec sv 31 0 : mword 32)) = rv /\
                   (rv = (mword_of_int 0 : mword 64) \/ rv = (mword_of_int (-1) : mword 64))).
-        { destruct Hret as [H0 | H1].
+        { destruct Hret as [[H0 _] | H1].
           - exists (mword_of_int 0 : mword 64), (mword_of_int 0 : mword 64). rewrite H0.
             split; [apply bv_eq; vm_compute; reflexivity|].
             split; [apply bv_eq; vm_compute; reflexivity| left; reflexivity].

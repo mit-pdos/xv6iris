@@ -128,7 +128,7 @@ Definition growproc_ok (szv n : mword 64) (P P' : uptd) (szv' r : mword 64) : Pr
 Definition wp_growproc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
-    (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.growproc in
   let n := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -137,17 +137,20 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   (* [n = 0]: uvmalloc's kalloc runs with interrupts un-pushed *)
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  proc_priv γf p pid V -∗
+  proc_priv γf p pid U -∗
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (P' : uptd) (szv' : mword 64),
+    (* growproc WRITES user memory (uvmalloc's fresh pages), so the block
+       comes back at a fresh image -- milestone J item 1's ∃-weakened
+       staging; the precise effect is win-2 work. *)
+    ∀ (mf : regfile) (P' : uptd) (szv' : mword 64) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜growproc_ok (pv_sz V) n (pv_upt V) P' szv'
+      ⌜growproc_ok (pv_sz (us_V U)) n (pv_upt (us_V U)) P' szv'
          (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗
+      proc_priv γf p pid (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv')) M') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -155,6 +158,6 @@ Module Type GROWPROC.
   Parameter wp_growproc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_growproc_sconf_body γa γf m av eb p pid V b lks.
+      (pid : mword 32) (U : ustate) (b : bool) (lks : gset string),
+      wp_growproc_sconf_body γa γf m av eb p pid U b lks.
 End GROWPROC.

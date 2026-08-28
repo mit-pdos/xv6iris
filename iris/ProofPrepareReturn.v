@@ -108,12 +108,12 @@ Section ProofPrepareReturn.
      [ProofKforkParts.proc_priv_tfp_valid] takes.  A PURE-goal [iDestruct]
      does not spend the resource, so [Hpv] is still whole for
      [proc_priv_tf_upd] right afterward. *)
-  Local Lemma prr_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
-    proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
+  Local Lemma prr_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv γf pa pid U -∗ ⌜page_valid (page_base (ud_tfp (pv_upt (us_V U))))⌝.
   Proof.
     iIntros "[(_ & _ & _ & _ & Hpt & _) _]".
-    rewrite /proc_pt_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
-    iDestruct (proc_pt_wf_get with "Hptt") as "%Hwf".
+    rewrite /proc_ptm_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
+    iDestruct (proc_ptm_wf with "Hptt") as "%Hwf".
     iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
   Qed.
 
@@ -133,9 +133,9 @@ Section ProofPrepareReturn.
      map), per [ProcInv.v]'s header on [tf_page_word_mem]. *)
 
   Lemma wp_prepare_return_sconf (γf : gname) (ks : mword 64) (pid : mword 32)
-      (V : pprivate) (m : regfile) (av : nat) (p : mword 64)
+      (U : ustate) (m : regfile) (av : nat) (p : mword 64)
       (epc : mword 64) (b : bool) (lks : gset string)
-    : wp_prepare_return_sconf_body γf ks pid V m av p epc b lks.
+    : wp_prepare_return_sconf_body γf ks pid U m av p epc b lks.
   Proof.
     cbv beta delta [wp_prepare_return_sconf_body].
     intros pcE ret_tgt Hav Hepc.
@@ -447,22 +447,22 @@ Section ProofPrepareReturn.
     iDestruct (prr_tf_len with "Htfp") as %Hlen.
     (* one name for the trapframe page, folded into the three resources the
        accessor just handed out (and thus into every [Un] built below). *)
-    set (tfp := ud_tfp (pv_upt V)).
+    set (tfp := ud_tfp (pv_upt (us_V U))).
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
         %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
     iPoseProof (pt_node_claim_from_static tfp Hpv_valid with "Hkmapb") as "#Hptc".
-    assert (Hi0 : (tf_ksatp_idx < length (pv_tf V))%nat)
+    assert (Hi0 : (tf_ksatp_idx < length (pv_tf (us_V U)))%nat)
       by (rewrite Hlen; unfold TFWORDS, tf_ksatp_idx; lia).
-    assert (Hi1 : (tf_ksp_idx < length (pv_tf V))%nat)
+    assert (Hi1 : (tf_ksp_idx < length (pv_tf (us_V U)))%nat)
       by (rewrite Hlen; unfold TFWORDS, tf_ksp_idx; lia).
-    assert (Hi2 : (tf_ktrap_idx < length (pv_tf V))%nat)
+    assert (Hi2 : (tf_ktrap_idx < length (pv_tf (us_V U)))%nat)
       by (rewrite Hlen; unfold TFWORDS, tf_ktrap_idx; lia).
-    assert (Hi4 : (tf_khartid_idx < length (pv_tf V))%nat)
+    assert (Hi4 : (tf_khartid_idx < length (pv_tf (us_V U)))%nat)
       by (rewrite Hlen; unfold TFWORDS, tf_khartid_idx; lia).
-    destruct (lookup_lt_is_Some_2 (pv_tf V) tf_ksatp_idx Hi0) as [w0 Hw0].
+    destruct (lookup_lt_is_Some_2 (pv_tf (us_V U)) tf_ksatp_idx Hi0) as [w0 Hw0].
     (* ---- +0x30: c.ld a5,88(a0) -- a5 = p->trapframe ---- *)
     assert (HT9a0 : rget T9 a0_idx = p).
     { rgne. rewrite /T9 upd_ne; [| reg_neq]. rewrite /T8 upd_ne; [| reg_neq].
@@ -511,7 +511,7 @@ Section ProofPrepareReturn.
     assert (HU2a0 : rget U2 a0_idx = p).
     { rgne. rewrite /U2 upd_ne; [| reg_neq]. rewrite /U1 upd_ne; [| reg_neq].
       rewrite -HT9a0. rgne. reflexivity. }
-    iDestruct (tf_page_word_upd_mem tfp (pv_tf V) tf_ksatp_idx w0 ltac:(vm_compute; lia) Hw0
+    iDestruct (tf_page_word_upd_mem tfp (pv_tf (us_V U)) tf_ksatp_idx w0 ltac:(vm_compute; lia) Hw0
                  with "Hptc Htfp")
       as "(Hcell & Hback)".
     iEval (rewrite -(prr_tf_addr_00 tfp) -HU2a5) in "Hcell".
@@ -596,9 +596,9 @@ Section ProofPrepareReturn.
     assert (HU6a4 : rget U6 a4_idx = page_base tfp).
     { rgne. rewrite /U6 upd_ne; [| reg_neq]. rewrite /U5 upd_ne; [| reg_neq].
       rewrite /U4 upd_ne; [| reg_neq]. rewrite /U3 upd_eq. reflexivity. }
-    assert (Hlen1 : length (<[tf_ksatp_idx := ksat]> (pv_tf V)) = TFWORDS)
+    assert (Hlen1 : length (<[tf_ksatp_idx := ksat]> (pv_tf (us_V U))) = TFWORDS)
       by (rewrite length_insert; exact Hlen).
-    assert (Hj1 : (tf_ksp_idx < length (<[tf_ksatp_idx := ksat]> (pv_tf V)))%nat)
+    assert (Hj1 : (tf_ksp_idx < length (<[tf_ksatp_idx := ksat]> (pv_tf (us_V U))))%nat)
       by (rewrite Hlen1; unfold TFWORDS, tf_ksp_idx; lia).
     destruct (lookup_lt_is_Some_2 _ _ Hj1) as [w1 Hw1].
     iDestruct (tf_page_word_upd_mem tfp _ tf_ksp_idx w1 ltac:(vm_compute; lia) Hw1
@@ -668,11 +668,11 @@ Section ProofPrepareReturn.
     { rgne. rewrite /U9 upd_ne; [| reg_neq]. rewrite /U8 upd_ne; [| reg_neq].
       rewrite /U7 upd_eq. reflexivity. }
     assert (Hlen2 : length (<[tf_ksp_idx := add_vec ks (mword_of_int 4096)]>
-                             (<[tf_ksatp_idx := ksat]> (pv_tf V))) = TFWORDS)
+                             (<[tf_ksatp_idx := ksat]> (pv_tf (us_V U)))) = TFWORDS)
       by (rewrite length_insert; exact Hlen1).
     assert (Hj2 : (tf_ktrap_idx < length
                      (<[tf_ksp_idx := add_vec ks (mword_of_int 4096)]>
-                       (<[tf_ksatp_idx := ksat]> (pv_tf V))))%nat)
+                       (<[tf_ksatp_idx := ksat]> (pv_tf (us_V U)))))%nat)
       by (rewrite Hlen2; unfold TFWORDS, tf_ktrap_idx; lia).
     destruct (lookup_lt_is_Some_2 _ _ Hj2) as [w2 Hw2].
     iDestruct (tf_page_word_upd_mem tfp _ tf_ktrap_idx w2 ltac:(vm_compute; lia) Hw2
@@ -728,12 +728,12 @@ Section ProofPrepareReturn.
     { rgne. rewrite /U11 upd_ne; [| reg_neq]. rewrite /U10 upd_eq. reflexivity. }
     assert (Hlen3 : length (<[tf_ktrap_idx := (mword_of_int KernelSyms.usertrap : mword 64)]>
                              (<[tf_ksp_idx := add_vec ks (mword_of_int 4096)]>
-                               (<[tf_ksatp_idx := ksat]> (pv_tf V)))) = TFWORDS)
+                               (<[tf_ksatp_idx := ksat]> (pv_tf (us_V U))))) = TFWORDS)
       by (rewrite length_insert; exact Hlen2).
     assert (Hj4 : (tf_khartid_idx < length
                      (<[tf_ktrap_idx := (mword_of_int KernelSyms.usertrap : mword 64)]>
                        (<[tf_ksp_idx := add_vec ks (mword_of_int 4096)]>
-                         (<[tf_ksatp_idx := ksat]> (pv_tf V)))))%nat)
+                         (<[tf_ksatp_idx := ksat]> (pv_tf (us_V U))))))%nat)
       by (rewrite Hlen3; unfold TFWORDS, tf_khartid_idx; lia).
     destruct (lookup_lt_is_Some_2 _ _ Hj4) as [w4 Hw4].
     iDestruct (tf_page_word_upd_mem tfp _ tf_khartid_idx w4 ltac:(vm_compute; lia) Hw4
@@ -879,7 +879,7 @@ Section ProofPrepareReturn.
     assert (Hepc4 : (<[tf_khartid_idx := cid_word]>
                       (<[tf_ktrap_idx := (mword_of_int KernelSyms.usertrap : mword 64)]>
                         (<[tf_ksp_idx := add_vec ks (mword_of_int 4096)]>
-                          (<[tf_ksatp_idx := ksat]> (pv_tf V)))))
+                          (<[tf_ksatp_idx := ksat]> (pv_tf (us_V U))))))
                     !! tf_epc_idx = Some epc).
     { rewrite !list_lookup_insert_ne;
         try (unfold tf_khartid_idx, tf_ktrap_idx, tf_ksp_idx, tf_ksatp_idx,
@@ -1045,7 +1045,7 @@ Section ProofPrepareReturn.
         try (apply Hcsother; [vm_compute; reflexivity | reg_neq | reg_neq | reg_neq]).
       - rewrite /U19 upd_eq. reflexivity.
       - rewrite /U19 upd_ne; [| reg_neq]. rewrite /U18 upd_eq. reflexivity. }
-    iDestruct ("Hclose" $! (prepare_return_tf (pv_tf V) ksat
+    iDestruct ("Hclose" $! (prepare_return_tf (pv_tf (us_V U)) ksat
                               (add_vec ks (mword_of_int 4096)) cid_word)
                  with "Htfc Htfp") as "Hpv".
     iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].

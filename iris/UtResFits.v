@@ -101,12 +101,17 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
 
   Lemma usertrap_res_pt_close
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-    usertrap_res_bare pt ksp -∗ proc_pt pt -∗ usertrap_res_parked pt ksp.
-  Proof. exact (ut_res_pt_close (SY.syscall_env) pt ksp). Qed.
+    usertrap_res_bare pt ksp -∗ proc_pt_any pt -∗ usertrap_res_parked pt ksp.
+  Proof.
+    (* the image comes in ∃-weakened at this boundary: the bare residue does
+       not name the process's memory (milestone J item 1, decision D1). *)
+    rewrite /proc_pt_any. iIntros "Hb Hpt". iDestruct "Hpt" as (M) "Hpt".
+    iApply (ut_res_pt_close (SY.syscall_env) pt ksp M with "Hb Hpt").
+  Qed.
 
   Lemma usertrap_res_pt_open
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-    usertrap_res_parked pt ksp -∗ proc_pt pt ∗ usertrap_res_bare pt ksp.
+    usertrap_res_parked pt ksp -∗ proc_pt_any pt ∗ usertrap_res_bare pt ksp.
   Proof. exact (ut_res_pt_open (SY.syscall_env) pt ksp). Qed.
 
   Lemma usertrap_res_bare_norm

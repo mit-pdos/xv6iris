@@ -509,7 +509,7 @@ Section BfreeDefs.
       (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z)
       (Bud : iProp Σ) (pidv : mword 32) (dq dqb : dfrac) (j : nat)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
@@ -522,7 +522,7 @@ Section BfreeDefs.
         trap_csrs_ext KT1 b -∗
         cpu_claim_ext b (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr j) pidv Vpr -∗
+        proc_priv_bare (proc_addr j) pidv Upr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         bslots 2 -∗
         Bud -∗
@@ -554,7 +554,7 @@ Section BfreeTail.
       (used : gset Z) (bi : Z) (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (kk : nat) (bnoB : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqb : dfrac)
-      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Upr : ustate) :
     locks_below lks "log" ->
     (K_bfree <= K)%nat ->
     bf_sp m M ->
@@ -577,7 +577,7 @@ Section BfreeTail.
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
     bf_frame m -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots 1 -∗
     log_credit γ cr Sb e0 bmapstart -∗
@@ -588,7 +588,7 @@ Section BfreeTail.
        (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) bsd d0 -∗
     bf_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size
             (log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0)
-            pidv dq dqb j m K b lks Vpr -∗
+            pidv dq dqb j m K b lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hbelow HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hbirange.
@@ -734,7 +734,7 @@ Section BfreeTail.
        stranding as log_write above. *)
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bnoB dq T2 (K - 4)%nat b (proc_addr j)
-              (bitmap_bytes (used ∖ {[ bi ]})) bsd true b lks Vpr
+              (bitmap_bytes (used ∖ {[ bi ]})) bsd true b lks Upr
               HKbl Hkk HT2a0
               (* brelse's bound is at "bcache"(4); ours is at "log"(3), and
                  [locks_below_mono] weakens it.  This is the composition the
@@ -998,10 +998,10 @@ Section ProofBfreeMain.
       (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                         cov logstart bmapstart size dev bno bs u cr Sb e0
-                        pidv dq dqb m K eb b lks Vpr.
+                        pidv dq dqb m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_bfree_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -1042,7 +1042,7 @@ Section ProofBfreeMain.
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbe. cbn in Hbe. subst eb.
     iAssert (bf_cont (CID0 := CID) γfs bn γ cov logstart bmapstart size
                (log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0)
-               pidv dq dqb j m K b lks Vpr)%I with "[Hcont]" as "Hcont";
+               pidv dq dqb j m K b lks Upr)%I with "[Hcont]" as "Hcont";
       [rewrite /bf_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi sp,sp,-32 ===== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1 : mword 64)
@@ -1335,7 +1335,7 @@ Section ProofBfreeMain.
     iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoB dq
-              RA (K - 4)%nat b b lks Vpr
+              RA (K - 4)%nat b b lks Upr
               HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1
               ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
@@ -1801,7 +1801,7 @@ Section ProofBfreeMain.
     assert (HB11a0' : B11 !!! Regidx Ra0 = bnode kk) by exact HB11a0.
     iApply (bf_tail (CID0 := CID27)  γs j γfs γd bn γ cov logstart bmapstart size
               dev used bi u cr Sb e0 kk bnoB bsd0 d0 pidv dq dqb m B11 K b lks
-              Vpr Hbelow HK HB11sp HB11thr HB11a0' HB11s2 Hkk HbnoB Hbmcov Hbmlog
+              Upr Hbelow HK HB11sp HB11thr HB11a0' HB11s2 Hkk HbnoB Hbmcov Hbmlog
               Hbirange
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hlctx Hprocs Hframe
                     Hppid Hsb Hsl Hcredit Hop Hbminv Hblk Hheld [Hcont]").
@@ -1823,10 +1823,10 @@ Section ProofBfreeMain.
       (u : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_bfree_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart bmapstart size dev bno bs u
-                          pidv dq dqb m K eb b lks Vpr.
+                          pidv dq dqb m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_bfree_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -1843,7 +1843,7 @@ Section ProofBfreeMain.
     iApply (wp_bfree_gen γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart bmapstart size dev bno bs u false Sb e0
               pidv dq dqb m K eb b lks
-              Vpr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              Upr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hbirange Hbslen Hj Hgl Ha0 Ha1 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont Htx]").

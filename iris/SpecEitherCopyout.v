@@ -104,11 +104,18 @@ Section SpecEitherCopyout.
 
   (* What comes back, keyed by the flag and by the returned a0. *)
   Definition either_copyout_post (ktb : ktier) (user : bool) (γf : gname) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (dst : mword 64) (len : nat)
+      (pid : mword 32) (U : ustate) (dst : mword 64) (len : nat)
       (src_bytes : nat -> bv 8) (r : mword 64) : iProp Σ :=
     (if user
      then ⌜r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64)⌝ ∗
-          ∃ P' : uptd, ⌜uptd_ext (pv_upt V) P'⌝ ∗ proc_priv_core p pid (upd_upt V P')
+     (* THE IMAGE MOVES.  copyin/copyout walk the process's page table and
+        may FAULT a page in on the way, which extends the va-keyed image
+        ([UserPtTree.umem_own] pins [dom M = uva_dom P]); and copyout writes
+        user memory outright.  So the block comes back at a FRESH [M'] --
+        milestone J item 1's ∃-weakened staging, beside the ∃ [P'] that was
+        already here.  The precise window is win-2 work. *)
+          ∃ (P' : uptd) (M' : gmap Z (bv 8)),
+            ⌜uptd_ext (pv_upt (us_V U)) P'⌝ ∗ proc_priv_core p pid (upd_usM (us_upt U P') M')
      else ⌜r = (mword_of_int 0 : mword 64)⌝ ∗
           [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] src_bytes j)%I.
 
@@ -122,7 +129,7 @@ End SpecEitherCopyout.
 Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (ktb : ktier) `{!KtierLe ktb KT1} (kts : ktier) `{!KtierLe kts KT1} (γa : gname) (γf : gname)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
-    (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
+    (pid : mword 32) (U : ustate) (user : bool) (len : nat)
     (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.either_copyout in
   let dst := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -145,7 +152,7 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[kts] src_bytes j) -∗
   (if user
-   then proc_priv_core p pid V
+   then proc_priv_core p pid U
    else [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
@@ -154,7 +161,7 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !
       cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[kts] src_bytes j) -∗
-      either_copyout_post ktb user γf p pid V dst len src_bytes
+      either_copyout_post ktb user γf p pid U dst len src_bytes
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -163,8 +170,8 @@ Module Type EITHER_COPYOUT.
   Parameter wp_either_copyout_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (ktb : ktier) `{!KtierLe ktb KT1} (kts : ktier) `{!KtierLe kts KT1} (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
+      (pid : mword 32) (U : ustate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string),
-      wp_either_copyout_sconf_body ktb kts γa γf m av lvl eb p pid V user len
+      wp_either_copyout_sconf_body ktb kts γa γf m av lvl eb p pid U user len
         src_bytes dst_olds b lks.
 End EITHER_COPYOUT.

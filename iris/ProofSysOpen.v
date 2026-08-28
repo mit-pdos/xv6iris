@@ -207,7 +207,7 @@ Section ProofSysOpenBody.
   Definition so_cont `{GEN : GenId}
       (gf : gname)
       (nsj : nat) (dqb dqs : dfrac)
-      (pj : mword 64) (pidv : mword 32) (V : pprivate)
+      (pj : mword 64) (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string)
       : CpuId -> iProp Σ :=
     fun (CIDx : CpuId) =>
@@ -229,7 +229,7 @@ Section ProofSysOpenBody.
          sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
          bslots 3 -∗
          iref_slots ns' -∗
-         sys_open_post gf pj pidv V (mf !!! Regidx Ra0 : mword 64) -∗
+         sys_open_post gf pj pidv U (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
 
   (* ================================================================== *)
@@ -252,7 +252,7 @@ Section ProofSysOpenBody.
       (kf fd : nat) (l : list nat) (C : fcontent) (pn : fpnames)
       (om voff : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
-      (V : pprivate)
+      (U : ustate)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w6 w23 w24 : mword 64)
       (bp : nat -> bv 8) :
@@ -264,8 +264,8 @@ Section ProofSysOpenBody.
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     lks = ∅ ->
     (kf < NFILE)%nat -> (fd < NOFILE)%nat ->
-    length (pv_ofile V) = NOFILE ->
-    fd_frees (pv_ofile V) = fd :: l ->
+    length (pv_ofile (us_V U)) = NOFILE ->
+    fd_frees (pv_ofile (us_V U)) = fd :: l ->
     fc_ip C = ientry kk ->
     (fc_type C = FD_INODE \/ fc_type C = FD_DEVICE) ->
     fc_writable C = trunc8 (so_wr_word om) ->
@@ -322,9 +322,9 @@ Section ProofSysOpenBody.
        entry ends up holding exactly what it held before. *)
     iref_slot -∗
     (* the process, split at the descriptor table by fdalloc *)
-    proc_priv_core (proc_addr jx) pidv V -∗
-    proc_ofiles_owe gf (pv_fdg V) (proc_addr jx)
-      (pv_ofile (upd_ofile V fd (fnode kf))) ({[fd]} ∪ ∅) -∗
+    proc_priv_core (proc_addr jx) pidv U -∗
+    proc_ofiles_owe gf (pv_fdg (us_V U)) (proc_addr jx)
+      (pv_ofile (upd_ofile (us_V U) fd (fnode kf))) ({[fd]} ∪ ∅) -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -338,11 +338,11 @@ Section ProofSysOpenBody.
     fd_slot -∗
     (* the descriptor-state fragments, threaded exactly as the fd unit above
        is: sys_open spends one access, at the settle. *)
-    fd_frags_any (pv_fdg V) -∗
+    fd_frags_any (pv_fdg (us_V U)) -∗
     (* ...and the descriptor's own AUTHORITY, at [FdClosed]: fdalloc handed
        it out when it made the cell non-null, and the settle below moves it
        to the new file's type. *)
-    fd_st_auth (pv_fdg V) fd FdClosed -∗
+    fd_st_auth (pv_fdg (us_V U)) fd FdClosed -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -354,7 +354,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf nsj
-               dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv U m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf Hfdlt
@@ -369,7 +369,7 @@ Section ProofSysOpenBody.
     iApply (Tails.so_tail_s (CID0 := CID0) gs jx gl pd pav pu
               gil gisl kk s gy inum dn bm
               (mword_of_int (Z.of_nat fd) : mword 64) u pidv (DfracOwn (1/4))
-              m M sp0 K eb b lks w6 w23 w24 bp V
+              m M sp0 K eb b lks w6 w23 w24 bp U
               HKiu HKeo HK24 Kpop Hkk Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr
               HMs1 HMs3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -404,14 +404,14 @@ Section ProofSysOpenBody.
        new file's type.  fdalloc handed out its authority at [FdClosed] and
        the matching fragment comes out of the bundle -- which is why
        sys_open's contract takes [fd_frags_any] at all. *)
-    iDestruct (fd_frags_any_acc (pv_fdg V) fd Hfdlt with "Hfrag")
+    iDestruct (fd_frags_any_acc (pv_fdg (us_V U)) fd Hfdlt with "Hfrag")
       as (stq) "[Hfr Hfrback]".
-    iMod (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 stpub FdClosed stq
+    iMod (proc_priv_settle gf (proc_addr jx) pidv U fd kf 1 stpub FdClosed stq
                  Hfdlt Hlen Hkf (fdstate_ok_open _ C stpub Hokpub (or_intror Htyor))
                  with "Hcore Howe Href Hauth Hfr") as "[Hpriv Hfr]".
     iDestruct ("Hfrback" with "Hfr") as "Hfrag".
     iModIntro.
-    iAssert (sys_open_post gf (proc_addr jx) pidv V (mf !!! Regidx Ra0 : mword 64))
+    iAssert (sys_open_post gf (proc_addr jx) pidv U (mf !!! Regidx Ra0 : mword 64))
       with "[Hpriv Hfds Hfrag]" as "Hpost".
     { rewrite /sys_open_post. iSplitR "Hfds Hfrag"; [| iFrame "Hfrag Hfds"].
       iRight. iExists fd, l, kf.
@@ -491,7 +491,7 @@ Section ProofSysOpenBody.
       (tyw : mword 32) (rd0 wr0 : bv 8) (pip ipold : mword 64) (maj : bv 16)
       (om voff lo : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
-      (V : pprivate)
+      (U : ustate)
       (m N : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w6 w24 : mword 64)
       (bp : nat -> bv 8) :
@@ -513,8 +513,8 @@ Section ProofSysOpenBody.
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     lks = ∅ ->
     (kf < NFILE)%nat -> (fd < NOFILE)%nat ->
-    length (pv_ofile V) = NOFILE ->
-    fd_frees (pv_ofile V) = fd :: l ->
+    length (pv_ofile (us_V U)) = NOFILE ->
+    fd_frees (pv_ofile (us_V U)) = fd :: l ->
     (tyw = FD_INODE \/ tyw = FD_DEVICE) ->
     (bv_unsigned (di_type dn) = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
     off_wf voff ->
@@ -569,9 +569,9 @@ Section ProofSysOpenBody.
     (* the untyped slot's own unit, on its way back to the ledger -- see
        [so_tail_pub]'s row for why the entry ends up owing nothing *)
     iref_slot -∗
-    proc_priv_core (proc_addr jx) pidv V -∗
-    proc_ofiles_owe gf (pv_fdg V) (proc_addr jx)
-      (pv_ofile (upd_ofile V fd (fnode kf))) ({[fd]} ∪ ∅) -∗
+    proc_priv_core (proc_addr jx) pidv U -∗
+    proc_ofiles_owe gf (pv_fdg (us_V U)) (proc_addr jx)
+      (pv_ofile (upd_ofile (us_V U) fd (fnode kf))) ({[fd]} ∪ ∅) -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -585,11 +585,11 @@ Section ProofSysOpenBody.
     fd_slot -∗
     (* the descriptor-state fragments, threaded exactly as the fd unit above
        is: sys_open spends one access, at the settle. *)
-    fd_frags_any (pv_fdg V) -∗
+    fd_frags_any (pv_fdg (us_V U)) -∗
     (* ...and the descriptor's own AUTHORITY, at [FdClosed]: fdalloc handed
        it out when it made the cell non-null, and the settle below moves it
        to the new file's type. *)
-    fd_st_auth (pv_fdg V) fd FdClosed -∗
+    fd_st_auth (pv_fdg (us_V U)) fd FdClosed -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -602,7 +602,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf nsj
-               dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv U m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize Hbm0
@@ -830,7 +830,7 @@ Section ProofSysOpenBody.
       iApply (so_tail_pub (CID0 := CID10) gf gs jx gl pd pav pu
                 gil gisl
  kk qi s gy inum dn bm kf fd l C pn om voff nsj
-                (S (S u2)) pidv dqb dqs V m N6 sp0 K eb b lks w6
+                (S (S u2)) pidv dqb dqs U m N6 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp
                 HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
@@ -928,7 +928,7 @@ Section ProofSysOpenBody.
       iApply (so_tail_pub (CID0 := CID13) gf gs jx gl pd pav pu
                 gil gisl
  kk qi s gy inum dn bm kf fd l C pn om voff nsj
-                (S (S u2)) pidv dqb dqs V m N8 sp0 K eb b lks w6
+                (S (S u2)) pidv dqb dqs U m N8 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp
                 HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
@@ -1030,7 +1030,7 @@ Section ProofSysOpenBody.
  (ientry kk) inum dn dn bm data u2 Sb2 false false e2
               pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs
-              P2 (K - 24)%nat eb b lks V
+              P2 (K - 24)%nat eb b lks U
               HKit ltac:(discriminate)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb
               Htynz (di_type_stable_refl dn) (di_nlink_stable_refl dn Htynz)
@@ -1131,7 +1131,7 @@ Section ProofSysOpenBody.
     iApply (so_tail_pub (CID0 := CID17) gf gs jx gl pd pav pu
               gil gisl
  kk qi s gy inum (di_trunc dn) bm_empty kf fd l C pn
-              om voff nsj u3 pidv dqb dqs V m mit sp0 K
+              om voff nsj u3 pidv dqb dqs U m mit sp0 K
               eb b lks w6 (word_of_words lo om) w24 bp
               HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
               Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
@@ -1170,7 +1170,7 @@ Section ProofSysOpenBody.
       (dn : dinode) (bm : blkmap)
       (om lo : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
-      (V : pprivate)
+      (U : ustate)
       (m N : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 w5 w6 w24 : mword 64)
       (bp : nat -> bv 8) :
@@ -1233,7 +1233,7 @@ Section ProofSysOpenBody.
        [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
     runit_any (bv_unsigned inum) -∗
-    proc_priv gf (proc_addr jx) pidv V -∗
+    proc_priv gf (proc_addr jx) pidv U -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -1255,7 +1255,7 @@ Section ProofSysOpenBody.
     fd_slot -∗
     (* the descriptor-state fragments, threaded exactly as the fd unit above
        is: sys_open spends one access, at the settle. *)
-    fd_frags_any (pv_fdg V) -∗
+    fd_frags_any (pv_fdg (us_V U)) -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -1268,7 +1268,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf nsj
-               dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv U m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
@@ -1419,7 +1419,7 @@ Section ProofSysOpenBody.
                 gil gisl
  kk qi s gy inum dn bm u pidv
                 (DfracOwn (1/4)) dqb dqs m M2 sp0 K eb b lks w5 w6
-                (word_of_words lo om) w24 bp V
+                (word_of_words lo om) w24 bp U
                 HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                 Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM2sp HM2thr
                 HM2s1 HM2s3 Hal
@@ -1504,14 +1504,14 @@ Section ProofSysOpenBody.
     { intros c Hc N2b N8 N9 N18 N19. rewrite /M3 upd_ne; [| regne].
       exact (HM2thr c Hc N2b N8 N9 N18 N19). }
     iDestruct (proc_priv_split with "Hpriv") as "[Hcore Hofiles]".
-    iDestruct (proc_ofiles_owe_empty gf (pv_fdg V) (proc_addr jx) (pv_ofile V)) as "Hoeq".
-    iDestruct (bi.equiv_entails_1_2 _ _ (proc_ofiles_owe_empty gf (pv_fdg V) (proc_addr jx)
-                 (pv_ofile V)) with "Hofiles") as "Howe".
+    iDestruct (proc_ofiles_owe_empty gf (pv_fdg (us_V U)) (proc_addr jx) (pv_ofile (us_V U))) as "Hoeq".
+    iDestruct (bi.equiv_entails_1_2 _ _ (proc_ofiles_owe_empty gf (pv_fdg (us_V U)) (proc_addr jx)
+                 (pv_ofile (us_V U))) with "Hofiles") as "Howe".
     iDestruct (proc_ofiles_owe_len with "Howe") as %Hlen.
     iDestruct (cpu_own_transport CID3 CID7 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Fdalloc.wp_fdalloc_sconf (CID := CID7) gf kf ∅ M3 (K - 24)%nat
-              0%nat eb (proc_addr jx) pidv V b lks HM3a0 Hkf so_noff0 HKfd
+              0%nat eb (proc_addr jx) pidv U b lks HM3a0 Hkf so_noff0 HKfd
               with "Hcg Hown Htext Hdata Hpc Hcore Howe").
     iIntros (CID8 Hq8 mfd) "%Hcsfd Hcg Hown Hpc Hcore Hfdpost".
     assert (Hpcfd : ret_pc (M3 !!! Regidx Rra : mword 64)
@@ -1594,7 +1594,7 @@ Section ProofSysOpenBody.
  kk qi s gy inum dn bm
                 kf 1%Qp _ inhabitant None u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w6
-                (word_of_words lo om) w24 bp V
+                (word_of_words lo om) w24 bp U
                 HKup HKeo HKfc HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM4sp
                 HM4thr HM4s1 HM4s2 Hal
@@ -1817,7 +1817,7 @@ Section ProofSysOpenBody.
                 gil gisl
  kk qi s gy inum dn bm kf fd ll pn FD_DEVICE
                 (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
-                (di_major dn) om voff lo nsj u pidv dqb dqs V m M7 sp0 K eb b
+                (di_major dn) om voff lo nsj u pidv dqb dqs U m M7 sp0 K eb b
                 lks w6 w24 bp
                 HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl
@@ -1915,7 +1915,7 @@ Section ProofSysOpenBody.
  kk qi s gy inum dn bm kf fd ll pn FD_INODE
               (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
               (fc_major Cf) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb
-              dqs V m M8 sp0 K eb b lks w6 w24 bp
+              dqs U m M8 sp0 K eb b lks w6 w24 bp
               HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
               Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty
               Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir off_wf_zero
@@ -1953,7 +1953,7 @@ Section ProofSysOpenBody.
       (dn : dinode) (bm : blkmap)
       (om lo : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
-      (V : pprivate)
+      (U : ustate)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 w5 w6 w24 : mword 64)
       (bp : nat -> bv 8) :
@@ -2016,7 +2016,7 @@ Section ProofSysOpenBody.
        [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
     runit_any (bv_unsigned inum) -∗
-    proc_priv gf (proc_addr jx) pidv V -∗
+    proc_priv gf (proc_addr jx) pidv U -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -2033,7 +2033,7 @@ Section ProofSysOpenBody.
     fd_slot -∗
     (* the descriptor-state fragments, threaded exactly as the fd unit above
        is: sys_open spends one access, at the settle. *)
-    fd_frags_any (pv_fdg V) -∗
+    fd_frags_any (pv_fdg (us_V U)) -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -2046,7 +2046,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf nsj
-               dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv U m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
@@ -2145,7 +2145,7 @@ Section ProofSysOpenBody.
       iApply (so_alloc (CID0 := CID3) gfl gf gs jx gl pd pav pu
                 gil gisl
  kk qi s gy inum dn bm om lo nsj u
-                pidv dqb dqs V m M2 sp0 K eb b lks w4 w5 w6 w24 bp
+                pidv dqb dqs U m M2 sp0 K eb b lks w4 w5 w6 w24 bp
                 HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hal23 Hsp0
                 HM2sp HM2thr HM2s0 HM2s1 HM2s2 HM2s3 Hal Hnspos
@@ -2250,7 +2250,7 @@ Section ProofSysOpenBody.
                 gil gisl
  kk qi s gy inum dn bm u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w4 w5 w6
-                (word_of_words lo om) w24 bp V
+                (word_of_words lo om) w24 bp U
                 HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                 Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM4sp HM4thr
                 HM4s1 HM4s2 HM4s3 Hal
@@ -2298,7 +2298,7 @@ Section ProofSysOpenBody.
     iApply (so_alloc (CID0 := CID6) gfl gf gs jx gl pd pav pu
               gil gisl
  kk qi s gy inum dn bm om lo nsj u
-              pidv dqb dqs V m M4 sp0 K eb b lks w4 w5 w6 w24 bp
+              pidv dqb dqs U m M4 sp0 K eb b lks w4 w5 w6 w24 bp
               HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hal23 Hsp0
               HM4sp HM4thr HM4s0 HM4s1 HM4s2 HM4s3 Hal Hnspos
@@ -2358,7 +2358,7 @@ Section ProofSysOpenBody.
   Definition so_cont0 `{GEN : GenId}
       (gf : gname)
       (ns : nat) (dqb dqs dqbs dqn : dfrac)
-      (pj : mword 64) (pidv : mword 32) (V : pprivate)
+      (pj : mword 64) (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string)
       : CpuId -> iProp Σ :=
     fun (CIDx : CpuId) =>
@@ -2381,7 +2381,7 @@ Section ProofSysOpenBody.
          sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
          bslots 3 -∗
          iref_slots ns' -∗
-         sys_open_post gf pj pidv V (mf !!! Regidx Ra0 : mword 64) -∗
+         sys_open_post gf pj pidv U (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
 
   (* ================================================================== *)
@@ -2410,7 +2410,7 @@ Section ProofSysOpenBody.
       (plen : nat) (bp : nat -> bv 8)
       (om lo : mword 32) (ns : nat) (Sb : gset Z)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
-      (V : pprivate)
+      (U : ustate)
       (m N : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 w5 w6 w24 : mword 64) :
     (K_sys_open <= K)%nat -> icfg_dev = ROOTDEV -> (0 < icfg_nib)%nat ->
@@ -2465,7 +2465,7 @@ Section ProofSysOpenBody.
     sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-    proc_priv gf (proc_addr jx) pidv V -∗
+    proc_priv gf (proc_addr jx) pidv U -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -2479,7 +2479,7 @@ Section ProofSysOpenBody.
     fd_slot -∗
     (* the descriptor-state fragments, threaded exactly as the fd unit above
        is: sys_open spends one access, at the settle. *)
-    fd_frags_any (pv_fdg V) -∗
+    fd_frags_any (pv_fdg (us_V U)) -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -2492,7 +2492,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont0 gf ns
-                dqb dqs dqbs dqn (proc_addr jx) pidv V m K eb b lks) -∗
+                dqb dqs dqbs dqn (proc_addr jx) pidv U m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
@@ -2647,7 +2647,7 @@ Section ProofSysOpenBody.
  gf
  plen bp
               SpecCreate.T_FILE (mword_of_int 0) (mword_of_int 0)
-              V MAXOPBLOCKS Sb ns pidv dqb dqs dqbs dqn
+              (upd_usM U _) MAXOPBLOCKS Sb ns pidv dqb dqs dqbs dqn
               N5 (K - 24)%nat eb b lks
               HKcr HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
               Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
@@ -2738,7 +2738,7 @@ Section ProofSysOpenBody.
       iDestruct (log_opS_op with "HopS Htx") as "Hop".
       iApply (Tails.so_tail_a (CID0 := CID8) gs jx gl pd pav pu
  u1 pidv (DfracOwn (1/4)) m P1 sp0 K eb b
-                lks w4 w5 w6 (word_of_words lo om) w24 bp1 V
+                lks w4 w5 w6 (word_of_words lo om) w24 bp1 U
                 HKeo HK24 Kpop Hgeom Hj Hgl Hlkempty Hsp0 HP1sp HP1thr HP1s2
                 HP1s3 Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
@@ -2802,7 +2802,7 @@ Section ProofSysOpenBody.
        plus the join's [ns1 <= ns' <= S ns1]. ---- *)
     iAssert (wp_next true (proc_addr jx)
                (so_cont gf
-                        ns1 dqb dqs (proc_addr jx) pidv V m K eb b lks))
+                        ns1 dqb dqs (proc_addr jx) pidv U m K eb b lks))
       with "[Hcont Hsbn Hsbs]" as "Hcontj".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
       iEval (rewrite /so_cont). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -2816,7 +2816,7 @@ Section ProofSysOpenBody.
     iApply (so_join (CID0 := CID8) gfl gf gs jx gl pd pav pu
               gil gisl
  kk qi ss gy inum dn bm om lo ns1 u1 pidv dqb dqs
-              V m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
+              U m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
               HKfull Hkk ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hibcov Hiblog Hcovb
               ltac:(exact (proj2 (proj2 Hu1) eq_refl)) Hj Hgl Hlkempty Hdirw
@@ -2871,7 +2871,7 @@ Section ProofSysOpenBody.
       (plen : nat) (bp : nat -> bv 8)
       (om lo : mword 32) (ns : nat) (Sb : gset Z)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
-      (V : pprivate)
+      (U : ustate)
       (m N : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 w5 w6 w24 : mword 64) :
     (K_sys_open <= K)%nat -> icfg_dev = ROOTDEV -> (0 < icfg_nib)%nat ->
@@ -2923,7 +2923,7 @@ Section ProofSysOpenBody.
     sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-    proc_priv gf (proc_addr jx) pidv V -∗
+    proc_priv gf (proc_addr jx) pidv U -∗
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
@@ -2937,7 +2937,7 @@ Section ProofSysOpenBody.
     fd_slot -∗
     (* the descriptor-state fragments, threaded exactly as the fd unit above
        is: sys_open spends one access, at the settle. *)
-    fd_frags_any (pv_fdg V) -∗
+    fd_frags_any (pv_fdg (us_V U)) -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -2950,7 +2950,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont0 gf ns
-                dqb dqs dqbs dqn (proc_addr jx) pidv V m K eb b lks) -∗
+                dqb dqs dqbs dqn (proc_addr jx) pidv U m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
@@ -3030,7 +3030,7 @@ Section ProofSysOpenBody.
        the block's own cells now, so namei borrows it for its own load and
        nothing here carries it. ---- *)
     (* three-way now: [FirstTok.first_tok] parks beside the reference. *)
-    iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv V with "Hpriv")
+    iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv U with "Hpriv")
       as "[Hpnc [Href Hftok]]".
     iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
     iDestruct "Hpnc" as "[Hpbare Hofiles]".
@@ -3045,7 +3045,7 @@ Section ProofSysOpenBody.
  gf
  plen bp MAXOPBLOCKS Sb
               pidv (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
-              N2 (K - 24)%nat eb b lks V
+              N2 (K - 24)%nat eb b lks U
               HKna HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
               Hbmlog Hist0 Hcovb Hiregb Hpcstr
               ltac:(exact (proj2 (so_len_range plen Hplen)))
@@ -3129,7 +3129,7 @@ Section ProofSysOpenBody.
       iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
       iCombine "Hpbare Hofiles" as "Hpnc".
     iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
-      iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv V
+      iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv U
                    with "[Hpnc Href Hftok]") as "Hpriv";
         [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
       iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback2]".
@@ -3142,7 +3142,7 @@ Section ProofSysOpenBody.
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Tails.so_tail_b (CID0 := CID5) gs jx gl pd pav pu
  n1 pidv (DfracOwn (1/4)) m P1 sp0 K eb b
-                lks w4 w5 w6 (word_of_words lo om) w24 bp1 V
+                lks w4 w5 w6 (word_of_words lo om) w24 bp1 U
                 HKeo HK24 Kpop Hgeom Hj Hgl Hlkempty Hsp0 HP1sp HP1thr HP1s2
                 HP1s3 Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
@@ -3246,7 +3246,7 @@ Section ProofSysOpenBody.
               gil gisl
               kk (qq/2)%Qp gy (DepTx (qq/2)%Qp icfg_dev inum gy t (1/2)) PlainK
  inum pidv (DfracOwn (1/4)) dqs
-              P2 (K - 24)%nat eb b lks V
+              P2 (K - 24)%nat eb b lks U
               HKil eq_refl ltac:(discriminate)
               Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -3269,7 +3269,7 @@ Section ProofSysOpenBody.
     iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
     iCombine "Hpbare Hofiles" as "Hpnc".
     iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
-    iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv V
+    iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv U
                  with "[Hpnc Href Hftok]") as "Hpriv";
       [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
     assert (Hilsp : so_sp sp0 mil).
@@ -3372,7 +3372,7 @@ Section ProofSysOpenBody.
          spent one of the three. *)
       iAssert (wp_next true (proc_addr jx)
                  (so_cont gf
-                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv V m K eb b lks))
+                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv U m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
         iEval (rewrite /so_cont). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -3385,7 +3385,7 @@ Section ProofSysOpenBody.
       iApply (so_join (CID0 := CID10) gfl gf gs jx gl pd pav pu
                 gil gisl
  kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm om lo
-                (ns - 1)%nat n1 pidv dqb dqs V m Q2 sp0 K eb b lks w4 w5 w6 w24
+                (ns - 1)%nat n1 pidv dqb dqs U m Q2 sp0 K eb b lks w4 w5 w6 w24
                 bp1
                 HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdirw
@@ -3459,7 +3459,7 @@ Section ProofSysOpenBody.
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iAssert (wp_next true (proc_addr jx)
                  (so_cont gf
-                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv V m K eb b lks))
+                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv U m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
         iEval (rewrite /so_cont). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -3472,7 +3472,7 @@ Section ProofSysOpenBody.
       iApply (so_alloc (CID0 := CID12) gfl gf gs jx gl pd pav pu
                 gil gisl
  kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm om lo
-                (ns - 1)%nat n1 pidv dqb dqs V m Q3 sp0 K eb b lks w4 w5 w6 w24
+                (ns - 1)%nat n1 pidv dqb dqs U m Q3 sp0 K eb b lks w4 w5 w6 w24
                 bp1
                 HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty
@@ -3509,7 +3509,7 @@ Section ProofSysOpenBody.
               gil gisl
  kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm n1 pidv
               (DfracOwn (1/4)) dqb dqs m Q3 sp0 K eb b lks w4 w5 w6
-              (word_of_words lo om) w24 bp1 V
+              (word_of_words lo om) w24 bp1 U
               HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HQ3sp HQ3thr
               HQ3s1 HQ3s2 HQ3s3 Hal
@@ -3581,13 +3581,13 @@ Section ProofSysOpenBody.
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v vom : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
     wp_sys_open_sconf_body gfl gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v vom
-                           pid V m K eb b lks.
+                           pid U m K eb b lks.
   Proof.
     cbv beta zeta delta [wp_sys_open_sconf_body].
     intros HK HdevR Hnib0 Hgeom Hsize
@@ -3791,12 +3791,12 @@ Section ProofSysOpenBody.
       exact (HM4thr c Hc N2 N8 N9 N18 N19). }
     (* ===== argint(1, &omode) ===== *)
     iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
-    iDestruct (proc_priv_tf gf (proc_addr j) pid V with "Hpriv") as "(Htf & Hpage & Hback)".
+    iDestruct (proc_priv_tf gf (proc_addr j) pid U with "Hpriv") as "(Htf & Hpage & Hback)".
     iEval (rewrite -HM5a1) in "H23hi".
     iDestruct (cpu_own_transport CID0 CID7 0 eb (proc_addr j) b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Argint.wp_argint_sconf M5 (K - 24)%nat 0%nat eb (proc_addr j) 1%nat
-              (ud_tfp (pv_upt V)) (pv_tf V) vom (word_hi u23) (DfracOwn (1/4))
+              (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) vom (word_hi u23) (DfracOwn (1/4))
               b lks so_arg1_lt HM5a0 Hargvom so_noff0 HKai Hpv
               with "Hcg Hown Htext Hdata Hpc Htf Hpage H23hi").
     iIntros (CID8 Hq8 mai) "%Hcsai Hcg Hown Hpc Htf Hpage H23hi".
@@ -3957,7 +3957,7 @@ Section ProofSysOpenBody.
     iDestruct (cpu_own_transport CID8 CID12 0 eb (proc_addr j) b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Argstr.wp_argstr_sconf (CID := CID12) fsc_kalloc gf M9 (K - 24)%nat 0%nat
-              eb (proc_addr j) 0%nat v pid V 128%nat bf0 b lks
+              eb (proc_addr j) 0%nat v pid U 128%nat bf0 b lks
               so_arg0_lt HM9a0 Hargv so_noff0 HKas HM9a2 so_maxpath_lt
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
@@ -4119,13 +4119,13 @@ Section ProofSysOpenBody.
     assert (HR3thr : so_thr m R3).
     { intros c Hc N2 N8b N9 N18 N19. rewrite /R3 upd_ne; [| regne].
       exact (HR2thr c Hc N2 N8b N9 N18 N19). }
-    iDestruct (proc_priv_bare_acc gf (proc_addr j) pid (upd_upt V P') with "Hpriv")
+    iDestruct (proc_priv_bare_acc gf (proc_addr j) pid (us_upt U P') with "Hpriv")
       as "[Hpbare Hpback0]".
     iDestruct (cpu_own_transport CID13 CID18 0 eb (proc_addr j) b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (BeginOp.wp_begin_op_sconf (CID := CID18) gs j gl fsc_bio icfg_log fsc_fs fsc_cov
               fsc_logst icfg_dev pid (DfracOwn (1/4)) R3 (K - 24)%nat eb b lks
-              (upd_upt V P') HKbo Hj Hgl (Hlb "log"%string)
+              (us_upt U P') HKbo Hj Hgl (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hpc Hlog Hpbare Hprocs").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -4207,7 +4207,7 @@ Section ProofSysOpenBody.
     iAssert (wp_next (CID0 := CID21) true (proc_addr j)
                (so_cont0 gf
  ns dqb dqs dqbs dqn (proc_addr j) pid
-                         (upd_upt V P') m K eb b lks))
+                         (us_upt U P') m K eb b lks))
       with "[Hcont]" as "Hcont0".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
       iEval (rewrite /so_cont0). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -4243,7 +4243,7 @@ Section ProofSysOpenBody.
       iApply (so_entry_n (CID0 := CID22) gfl gf gs j gl pd pav
                 pu
  pk bf (arg_int32 vom) (word_lo u23) ns Sb0
-                pid dqb dqs dqbs dqn (upd_upt V P') m S2 sp0 K eb b lks
+                pid dqb dqs dqbs dqn (us_upt U P') m S2 sp0 K eb b lks
                 u4 u5 u6 u24
                 HKfull HdevR Hnib0 Hgeom Hsize Hbm0
                 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr Hpk Hni1 Hni2
@@ -4274,7 +4274,7 @@ Section ProofSysOpenBody.
     iApply (so_entry_c (CID0 := CID22) gfl gf gs j gl pd pav
               pu
  pk bf (arg_int32 vom) (word_lo u23) ns Sb0
-              pid dqb dqs dqbs dqn (upd_upt V P') m S2 sp0 K eb b lks
+              pid dqb dqs dqbs dqn (us_upt U P') m S2 sp0 K eb b lks
               u4 u5 u6 u24
               HKfull HdevR Hnib0 Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr Hpk Hni1 Hni2

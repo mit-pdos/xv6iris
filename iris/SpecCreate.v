@@ -542,7 +542,7 @@ Definition wp_create_sconf_body
  (γf : gname)           (* kalloc, ftable, printk *)
     (plen : nat) (pfun : nat -> bv 8)                 (* the PATH buffer     *)
     (ty major minor : mword 16)                       (* a1, a2, a3          *)
-    (V : pprivate)                                    (* the running process *)
+    (U : ustate)                                    (* the running process *)
     (u : nat) (Sb : gset Z)                           (* THE OP-WIDE LEDGER  *)
     (ns : nat)                                        (* the iref ledger     *)
     (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
@@ -639,7 +639,7 @@ Definition wp_create_sconf_body
      is taken whole rather than in pieces.  create copies nothing to or
      from user memory, so nothing else in the block is touched and the
      block comes back at the SAME [V]. *)
-  proc_priv γf pj pidv V -∗
+  proc_priv γf pj pidv U -∗
   (* ---- the caller's NUL-terminated path buffer (a kernel buffer: every
      caller ran argstr into its own frame) ---- *)
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
@@ -684,7 +684,7 @@ Definition wp_create_sconf_body
       (* NO ORDERING on the bitmap: create both ALLOCATES (balloc, under
          dirlink's writei) and FREES (itrunc, under the fail arm's
          iunlockput of a link-count-zero inode). *)
-      proc_priv γf pj pidv V -∗
+      proc_priv γf pj pidv U -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       bslots 3 -∗
       (* THE LEDGER, EXACTLY.  This used to be the interval
@@ -751,7 +751,7 @@ Module Type CREATE.
  (γf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (ty major minor : mword 16)
-      (V : pprivate)
+      (U : ustate)
       (u : nat) (Sb : gset Z)
       (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
@@ -760,5 +760,5 @@ Module Type CREATE.
       wp_create_sconf_body γs j γl pd pav pu
  γf
  plen pfun ty major minor
-                           V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.
+                           U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.
 End CREATE.

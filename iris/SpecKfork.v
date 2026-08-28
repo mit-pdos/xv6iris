@@ -189,7 +189,7 @@ Definition kfork_post
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
  (γf : gname) (lvl : nat) (eb : bool)
     (pme : mword 64)
-    (b : bool) (pid_p : mword 32) (Vp : pprivate)
+    (b : bool) (pid_p : mword 32) (Up : ustate)
     (K : nat) (mr : regfile) (rv : mword 64) (lks : gset string) : iProp Σ :=
   ( sie_cap_gpr KT1 mr K b pme ∗
     cpu_own lvl eb pme b lks ∗
@@ -198,7 +198,7 @@ Definition kfork_post
        the success path and does not run at all on the two failure paths,
        and [ProcInv.cwd_ref] hides the fraction, so the block is stated at
        the very same [Vp] either way. *)
-    proc_priv γf pme pid_p Vp ∗
+    proc_priv γf pme pid_p Up ∗
     (* THE ALLOCATOR'S STATE IS THE SAME ON EVERY ARM, so it is stated ONCE
        here rather than per-disjunct.  See the header: with no page count
        there is nothing left for the arms to disagree about. *)
@@ -215,7 +215,7 @@ Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
  (γp γw γl γf : gname)  (γs : list gname)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
-    (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string) :=
+    (b : bool) (pid_p : mword 32) (Up : ustate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_kfork <= K)%nat ->
@@ -285,12 +285,12 @@ Definition wp_kfork_sconf_body
      [FirstTok.first_tok_of_done] mints the child's token from, at the
      [sd a0,336(s4)] that closes the child's construction window. *)
   first_done -∗
-  proc_priv γf pme pid_p Vp -∗
+  proc_priv γf pme pid_p Up -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post γf lvl eb pme b pid_p Vp K mr
+      kfork_post γf lvl eb pme b pid_p Up K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -300,7 +300,7 @@ Module Type KFORK.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
  (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
-      (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string),
+      (b : bool) (pid_p : mword 32) (Up : ustate) (lks : gset string),
       wp_kfork_sconf_body γp γw γl γf γs
- m lvl K eb pme b pid_p Vp lks.
+ m lvl K eb pme b pid_p Up lks.
 End KFORK.

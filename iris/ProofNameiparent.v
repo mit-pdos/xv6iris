@@ -154,11 +154,11 @@ Section ProofNameiparentMain.
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_nameiparent_gen_body gs j gl pd pav pu
  gf
  plen pfun nfun n Sb
-                                pidv dq dqb dqs dqpv m K eb b lks Vpr.
+                                pidv dq dqb dqs dqpv m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_nameiparent_gen_body].
     intros pcE pjv pv nb ret_tgt pl L
@@ -344,7 +344,7 @@ Section ProofNameiparentMain.
     iApply (NX.wp_namex_gen gs j gl pd pav pu
  gf
               plen pfun nfun true n Sb pidv dq dqb dqs dqpv R5 (K - 2)%nat eb b
-              _ Vpr Knx Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+              _ Upr Knx Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
               ltac:(rewrite HR5a1; exact npi_a1_true)
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
@@ -547,11 +547,11 @@ Section ProofNameiparentMain.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_nameiparent_sconf_body gs j gl pd pav pu
  gf
  plen pfun nfun n
-                          pidv dq dqb dqs dqpv m K eb b lks Vpr.
+                          pidv dq dqb dqs dqpv m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_nameiparent_sconf_body].
     intros pcE pjv pv nb ret_tgt pl L
@@ -569,7 +569,7 @@ Section ProofNameiparentMain.
  gf
  plen pfun nfun n Sb0
               pidv dq dqb dqs dqpv m K eb b
-              _ Vpr HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs
+              _ Upr HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".

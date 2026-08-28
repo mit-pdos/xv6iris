@@ -137,7 +137,7 @@ Definition namex_era_post
     (n : nat) (Sb : gset Z)
     (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
     (pidv : mword 32)
-    (dq dqb dqs dqpv : dfrac) (Vpr : pprivate) : iProp Σ :=
+    (dq dqb dqs dqpv : dfrac) (Upr : ustate) : iProp Σ :=
   (∀ (mf : regfile) (n' : nat) (Sb' : gset Z)
      (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
@@ -149,8 +149,8 @@ Definition namex_era_post
       (* EVERYTHING LOANED COMES BACK *)
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      proc_priv_bare pj pidv Vpr -∗
-      inode_held (pv_cwd Vpr) -∗
+      proc_priv_bare pj pidv Upr -∗
+      inode_held (pv_cwd (us_V Upr)) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
       bslots 3 -∗
@@ -204,7 +204,7 @@ Definition wp_namex_era_body
     (Pmiss : nat -> Z -> iProp Σ)                      (* the miss receipt    *)
     (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namex in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -258,8 +258,8 @@ Definition wp_namex_era_body
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  proc_priv_bare pj pidv Vpr -∗
-  inode_held (pv_cwd Vpr) -∗
+  proc_priv_bare pj pidv Upr -∗
+  inode_held (pv_cwd (us_V Upr)) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
   bslots 3 -∗
@@ -274,7 +274,7 @@ Definition wp_namex_era_body
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_era_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
 
-                  plen pfun n Sb P Pmiss pidv dq dqb dqs dqpv Vpr) -∗
+                  plen pfun n Sb P Pmiss pidv dq dqb dqs dqpv Upr) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type NAMEX_ERA.
@@ -290,9 +290,9 @@ Module Type NAMEX_ERA.
       (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_namex_era_body gs j gl pd pav pu
  gf
  plen pfun nfun n Sb P Pmiss
-                       pidv dq dqb dqs dqpv m K eb b lks Vpr.
+                       pidv dq dqb dqs dqpv m K eb b lks Upr.
 End NAMEX_ERA.

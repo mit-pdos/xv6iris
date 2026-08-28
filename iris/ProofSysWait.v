@@ -98,8 +98,8 @@ Section ProofSysWait.
   Lemma wp_sys_wait_sconf
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-      (pid : mword 32) (V : pprivate) (v0 : mword 64)
-    : wp_sys_wait_sconf_body γa γf γw γs j γl m av eb b lks pid V v0.
+      (pid : mword 32) (U : ustate) (v0 : mword 64)
+    : wp_sys_wait_sconf_body γa γf γw γs j γl m av eb b lks pid U v0.
   Proof.
     cbv beta delta [wp_sys_wait_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hv0 Hav Heb.
@@ -237,11 +237,11 @@ Section ProofSysWait.
     iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     (* the trapframe fraction is BORROWED out of the private block: kwait
        wants the block back whole, so it goes straight back below. *)
-    iDestruct (proc_priv_tf γf pj pid V with "Hpriv") as "(Htf & Hpage & Hback)".
+    iDestruct (proc_priv_tf γf pj pid U with "Hpriv") as "(Htf & Hpage & Hback)".
     iEval (rewrite -HA4a1) in "Hb3".
     iDestruct (cpu_own_transport CID CID7 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argaddr.wp_argaddr_sconf A4 (av - 4)%nat 0%nat eb pj 0%nat
-              (ud_tfp (pv_upt V)) (pv_tf V) v0 w3 (DfracOwn (1/4)) b
+              (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v0 w3 (DfracOwn (1/4)) b
               _ sw_arg0 HA4a0 Hv0 sw_ilvl0 (sw_Kaa av Hav) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3").
     iIntros (CID8 Hk8 Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3".
@@ -291,11 +291,11 @@ Section ProofSysWait.
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact HAisp. }
     (* ===================== kwait(p) ===================== *)
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Kwait.wp_kwait_sconf γa γf γw γs j γl B2 (av - 4)%nat eb b pid V lks
+    iApply (Kwait.wp_kwait_sconf γa γf γw γs j γl B2 (av - 4)%nat eb b pid U lks
               Hj Hgl (sw_Kkw av Hav) Heb
               with "Hcg Hcpu Htext Hpc Hprocs Hlk Henv Hpriv").
     all: try lkbelow.
-    iIntros (CID11 Hk11 Mkw P' rv) "%Hkw %Hext Hcg Hcpu Hpc Hpriv".
+    iIntros (CID11 Hk11 Mkw P' rv M') "%Hkw %Hext Hcg Hcpu Hpc Hpriv".
     destruct Hkw as (HcsKw & HKwa0).
     assert (Hpp1a : ret_pc (B2 !!! Regidx Rra) = mword_of_int (SW + 0x1a))
       by (rewrite HB2ra; pcstep).
@@ -413,7 +413,7 @@ Section ProofSysWait.
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID11 CID15 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E2 P' rv with "[%] [%] Hcg Hcpu Hpc Hpriv").
+    iApply ("Hcont" $! E2 P' rv M' with "[%] [%] Hcg Hcpu Hpc Hpriv").
     { split; [| exact HE2a0].
       unfold callee_saved.
       split; [exact HE2sp|]. split; [exact HE2s0|].

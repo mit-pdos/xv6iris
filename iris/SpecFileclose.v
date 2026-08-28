@@ -505,7 +505,7 @@ Definition wp_fileclose_sconf_body
        that to [fn]'s.  acquiresleep only records whatever [p->pid] holds, so
        keying on the caller is both payable and what the code does.  This is
        what retires the [fcn_pid fn = pid] tie premise on sys_close. *)
-    (pidv : mword 32) (Vpr : pprivate) :=
+    (pidv : mword 32) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileclose in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (fileclose_stack <= K)%nat ->
@@ -539,7 +539,7 @@ Definition wp_fileclose_sconf_body
      beside [ProcInv.proc_priv].  Unconditional rather than type-selected:
      the pipe arm does not need it, but making the row an [if] over a
      content the caller cannot see buys nothing. *)
-  proc_priv_bare p pidv Vpr -∗
+  proc_priv_bare p pidv Upr -∗
   (* ONE IREF UNIT, BORROWED ACROSS THE CALL -- in here, out in the post, on
      every arm.  It is what the LAST close deposits into the slot it frees:
      [FileInvDefs.file_core] parks the entry's provisioned unit on the
@@ -575,7 +575,7 @@ Definition wp_fileclose_sconf_body
     fd_slot -∗
     iref_slot -∗
     fileclose_env_out fn on st -∗
-    proc_priv_bare p pidv Vpr -∗
+    proc_priv_bare p pidv Upr -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -586,6 +586,6 @@ Module Type FILECLOSE.
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
-      (K : nat) (b : bool) (lks : gset string) (pidv : mword 32) (Vpr : pprivate),
-      wp_fileclose_sconf_body γfl γf k q st fn on m n eb p K b lks pidv Vpr.
+      (K : nat) (b : bool) (lks : gset string) (pidv : mword 32) (Upr : ustate),
+      wp_fileclose_sconf_body γfl γf k q st fn on m n eb p K b lks pidv Upr.
 End FILECLOSE.

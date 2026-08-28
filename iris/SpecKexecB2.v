@@ -292,7 +292,7 @@ Section KexecB2Res.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) : iProp Σ :=
@@ -304,8 +304,8 @@ Section KexecB2Res.
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     proc_pt P ∗
-     proc_priv gf (proc_addr jp) pidv V ∗
+     proc_pt_any P ∗
+     proc_priv gf (proc_addr jp) pidv U ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
@@ -591,7 +591,7 @@ Definition kxc_bad324_body
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
-    (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+    (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
     (m Mt : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string) :=
@@ -640,8 +640,8 @@ Definition kxc_bad324_body
      this block's [kxc_bad64] runs iunlockput, whose iput frees into it. *)
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   kalloc_env fsc_kalloc None -∗
-  proc_pt P -∗
-  proc_priv gf (proc_addr jp) pidv V -∗
+  proc_pt_any P -∗
+  proc_priv gf (proc_addr jp) pidv U -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
@@ -657,7 +657,7 @@ Definition kxc_bad324_body
     w63 szf w67 -∗
   (* ---- kexec's own continuation, which [kxc_bad64] closes ---- *)
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
   WP (Loop : expr riscv_lang).
@@ -679,7 +679,7 @@ Definition kxc_ls_body
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
-    (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+    (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
     (m : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd)
@@ -737,7 +737,7 @@ Definition kxc_ls_body
   kalloc_env fsc_kalloc None -∗
   kxc_res jp gf
           kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
-          aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
+          aslen afun pidv U dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
           (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
           (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
           (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -748,7 +748,7 @@ Definition kxc_ls_body
      hands the continuation BACK, which is what keeps the single linear
      [wp_next] enough for both. ---- *)
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
   (* ---- THE ONE OUTPUT: +0x116, the segment is in memory.  s1 and s2
@@ -772,13 +772,13 @@ Definition kxc_ls_body
       pc_is (mword_of_int (KXB + 0x116) : mword 64) -∗
       kxc_res jp gf
               kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
-              aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
+              aslen afun pidv U dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
               (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
               (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
               w63 w65 w67 ef P -∗
       wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-        KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+        KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
              eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
              pfun av dqa avf aslen dqas afun) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -796,14 +796,14 @@ Module Type KEXECB2.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string),
     kxc_bad324_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
+      pidv U dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P szf eb lks.
 
   Parameter kxc_ls :
@@ -817,7 +817,7 @@ Module Type KEXECB2.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
@@ -825,6 +825,6 @@ Module Type KEXECB2.
     kxc_ls_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
+      pidv U dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P ip va fz po eb lks.
 End KEXECB2.

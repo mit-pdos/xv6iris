@@ -219,7 +219,7 @@ Section KexecBBody.
       (na : nat) (avf : nat -> mword 64)
       (alen : nat -> nat) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (dqb dqs dqa dqpv dqas : dfrac)
       (m M90 : regfile) (K : nat) (eb : bool) (b : bool)
       (lks : gset string)
@@ -277,7 +277,7 @@ Section KexecBBody.
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     bslots 3 -∗
     kalloc_env fsc_kalloc None -∗
-    proc_priv gf (proc_addr jp) pidv V -∗
+    proc_priv gf (proc_addr jp) pidv U -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
@@ -285,7 +285,7 @@ Section KexecBBody.
     kxc_frameA6x sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) ef -∗
     (* ---- kexec's OWN continuation: the +0x31c tail closes the -1 arm ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K b
+      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- OUTPUT 1: [elf.phnum = 0], the loop is skipped ---- *)
@@ -294,7 +294,7 @@ Section KexecBBody.
         kxc_at_1a2 jp gf
  kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
-                   plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
+                   plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -304,7 +304,7 @@ Section KexecBBody.
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K b
+          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
                eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -314,7 +314,7 @@ Section KexecBBody.
         kxc_at_12c jp gf
  kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
-                   plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
+                   plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -325,7 +325,7 @@ Section KexecBBody.
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K b
+          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
                eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -460,15 +460,15 @@ Section KexecBBody.
     { intros r Hr Nsp Ns0 Ns1 Ns2 Ns4.
       rewrite /G2 upd_ne; [| regne]. exact (HG1thr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
     (* ---- the trapframe cell, lent out of the process's block ---- *)
-    iDestruct (proc_priv_tfp_valid gf (proc_addr jp) pidv V with "Hpriv")
+    iDestruct (proc_priv_tfp_valid gf (proc_addr jp) pidv U with "Hpriv")
       as %Hpvtf.
-    iDestruct (proc_priv_trapframe gf (proc_addr jp) pidv V with "Hpriv")
+    iDestruct (proc_priv_trapframe gf (proc_addr jp) pidv U with "Hpriv")
       as "(Htfc & Hpvbk)".
-    set (tfr := page_base (ud_tfp (pv_upt V))).
+    set (tfr := page_base (ud_tfp (pv_upt (us_V U)))).
     set (tfp := (autocast (T := mword) (subrange_vec_dec tfr 55 12) : mword 44)).
     assert (Hbasetf : page_base tfp = tfr)
       by (rewrite /tfp /tfr; apply page_base_of_valid; exact Hpvtf).
-    assert (Htfpeq : tfp = ud_tfp (pv_upt V)).
+    assert (Htfpeq : tfp = ud_tfp (pv_upt (us_V U))).
     { apply kxc_page_base_inj. rewrite Hbasetf. reflexivity. }
     iDestruct (cpu_own_transport CID0 CID3 0%nat eb (proc_addr jp) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -559,9 +559,9 @@ Section KexecBBody.
       iDestruct (proc_pt_intro_ppt t tfp Hrep
                    ltac:(rewrite Hbasetf; exact Hpvtf) with "Htree") as "Hpt".
       set (P := upt_desc (pt_base t) tfp).
-      iDestruct (proc_pt_root_valid P with "Hpt") as %Hrootv.
+      iDestruct (proc_pt_root_valid P ∅ with "Hpt") as %Hrootv.
       assert (HProot : ud_root P = pt_base t) by reflexivity.
-      assert (HPtfp : ud_tfp P = ud_tfp (pv_upt V)) by exact Htfpeq.
+      assert (HPtfp : ud_tfp P = ud_tfp (pv_upt (us_V U))) by exact Htfpeq.
       assert (HPum : ud_um P = ∅) by reflexivity.
       assert (Ha0v : mr !!! Regidx Ra0 = page_base (ud_root P))
         by (rewrite Hroot HProot; reflexivity).
@@ -811,7 +811,7 @@ Section KexecBBody.
         iSplitR; [iExact "Hbits" |].
         iSplitL "Hbs"; [iExact "Hbs" |].
         iSplitR; [iExact "Hka" |].
-        iSplitL "Hpt"; [iExact "Hpt" |].
+        iSplitL "Hpt"; [iApply (proc_pt_forget with "Hpt") |].
         iSplitL "Hpriv"; [iExact "Hpriv" |].
         iSplitL "Hpath"; [iExact "Hpath" |].
         iSplitL "Hargv"; [iExact "Hargv" |].
@@ -1124,7 +1124,7 @@ Section KexecBBody.
         iSplitR; [iExact "Hbits" |].
         iSplitL "Hbs"; [iExact "Hbs" |].
         iSplitR; [iExact "Hka" |].
-        iSplitL "Hpt"; [iExact "Hpt" |].
+        iSplitL "Hpt"; [iApply (proc_pt_forget with "Hpt") |].
         iSplitL "Hpriv"; [iExact "Hpriv" |].
         iSplitL "Hpath"; [iExact "Hpath" |].
         iSplitL "Hargv"; [iExact "Hargv" |].
@@ -1232,7 +1232,7 @@ Section KexecBBody.
       iApply (A.kxc_bad64 Q gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf inumf dnf bmf n2
-                plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
+                plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
                 m B1 K eb lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
                 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr

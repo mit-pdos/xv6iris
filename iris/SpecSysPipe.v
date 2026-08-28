@@ -139,26 +139,26 @@ Section SpecSysPipe.
 
      Both arms hand back the two fd units: see the table in the header. *)
   Definition sys_pipe_post (γf : gname) (p : mword 64) (pid : mword 32)
-      (W : pprivate) (r : mword 64) : iProp Σ :=
+      (UW : ustate) (r : mword 64) : iProp Σ :=
     ((* FAILURE.  Whichever tail ran, the descriptor array is EXACTLY as it
         came in: the two arms that had already installed a descriptor null
         it again, and writing 0 back over a slot that was 0 is the identity
         ([ProcInv.upd_ofile_id], since [fd_frees] only ever names free
         slots). *)
-     ⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid W
+     ⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid UW
      ∨
      (* SUCCESS.  The two least free descriptors now hold the read and the
         write end, in that order. *)
      ∃ (fd0 fd1 : nat) (l : list nat) (k0 k1 : nat),
-       ⌜r = (zero_reg : mword 64) /\ fd_frees (pv_ofile W) = fd0 :: fd1 :: l⌝ ∗
+       ⌜r = (zero_reg : mword 64) /\ fd_frees (pv_ofile (us_V UW)) = fd0 :: fd1 :: l⌝ ∗
        proc_priv γf p pid
-         (upd_ofile (upd_ofile W fd0 (fnode k0)) fd1 (fnode k1)))
+         (upd_usV UW (upd_ofile (upd_ofile (us_V UW) fd0 (fnode k0)) fd1 (fnode k1))))
     (* THE fd-STATE FRAGMENT BUNDLE, in and out.  The success arm spends TWO
        accesses -- fd[0] goes from [FdClosed] to [FdOpen true false FdPipe]
        and fd[1] to [FdOpen false true FdPipe] --
        and every failure arm hands it straight back: each of them nulls
        whatever it had installed, so no descriptor's state has moved. *)
-    ∗ fd_frags_any (pv_fdg W) ∗ fd_slot ∗ fd_slot.
+    ∗ fd_frags_any (pv_fdg (us_V UW)) ∗ fd_slot ∗ fd_slot.
 
 End SpecSysPipe.
 
@@ -168,7 +168,7 @@ Definition wp_sys_pipe_sconf_body
     (γa : gname)  (γfl γf : gname)
     (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
-    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
+    (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string) :=
   (* [pipeG] is not a separate binder: [fileG] subsumes it (FileInv.v), and
      naming both would put TWO instance paths to [inG Σ fracR] in scope --
      they print identically and do not unify, so a [pipe_ref] built through
@@ -180,7 +180,7 @@ Definition wp_sys_pipe_sconf_body
   (* sys_pipe reads syscall argument 0 -- the user address of the two-int
      array -- out of the trapframe page [proc_priv] carries.  Nothing is
      assumed about it: argaddr does not check, and copyout is the check. *)
-  pv_tf V !! tf_arg_idx 0 = Some v ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
   (sys_pipe_stack <= av)%nat ->
   (* sys_pipe acquires no lock of its own -- it is a pure pass-through to its
      three fileclose calls (inside [sp_close2]), whose own lowest rank is
@@ -232,9 +232,9 @@ Definition wp_sys_pipe_sconf_body
      needs the allocator and copyout needs it again for vmfault, and every
      acquire on the way has its own panic arm *)
   kalloc_env γa None -∗
-  proc_priv γf p pid V -∗
+  proc_priv γf p pid U -∗
   (* the descriptor-state fragments -- spent on the two new descriptors *)
-  fd_frags_any (pv_fdg V) -∗
+  fd_frags_any (pv_fdg (us_V U)) -∗
   (* the syscall's own allowance -- two references may be live in locals
      before they reach descriptors.  Both come back. *)
   fd_slot -∗ fd_slot -∗
@@ -258,15 +258,17 @@ Definition wp_sys_pipe_sconf_body
      sys_pipe can return on another hart.  The cost is the CALLER's: it must
      supply its continuation hart-generically. *)
   wp_next true p (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (P' : uptd),
+  (* the image moves: the copies fault user pages in and write them --
+     milestone J item 1's ∃-weakened staging *)
+    ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
-      sys_pipe_post γf p pid (upd_upt V P')
+      sys_pipe_post γf p pid (upd_usM (us_upt U P') M')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       iref_slot -∗
       (* the environment back; the page count has moved if either close was
@@ -283,6 +285,6 @@ Module Type SYSPIPE.
       (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_sys_pipe_sconf_body γa γfl γf fn on m av eb p v pid V b lks.
+      (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string),
+      wp_sys_pipe_sconf_body γa γfl γf fn on m av eb p v pid U b lks.
 End SYSPIPE.

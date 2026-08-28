@@ -391,7 +391,7 @@ Section KexecPinnedABody.
       (na : nat) (avf : nat -> mword 64)
       (alen : nat -> nat) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
@@ -440,7 +440,7 @@ Section KexecPinnedABody.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
-    proc_priv gf (proc_addr jp) pidv V -∗
+    proc_priv gf (proc_addr jp) pidv U -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
@@ -463,7 +463,7 @@ Section KexecPinnedABody.
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId, KEX CX -∗
-      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
+      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs bmapstart inodestart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: the state at +0x032.
@@ -479,7 +479,7 @@ Section KexecPinnedABody.
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M32 : regfile) (ipv : mword 64) (zi : Z) (n1 : nat) (intact : bool),
         kxc_at_a2 jp bn g gfs ga gf cov logstart bmapstart inodestart size
-                  plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
+                  plen pfun na avf aslen afun pidv (us_V U) dqb dqs dqa dqpv dqas
                   m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 -∗
         (* THE WALK'S VERDICT ON THE DIRECTORY LEND.  [true]: the root was
            not written under the pin, so the inode this seam names IS the
@@ -512,7 +512,7 @@ Section KexecPinnedABody.
     (* the BLOCK and the cwd reference: [p->cwd] is one of the block's own
        cells now, so namei borrows it for its own load and nothing here has
        to carry it. *)
-    iDestruct (proc_priv_bare_cref gf (proc_addr jp) pidv V with "Hpriv")
+    iDestruct (proc_priv_bare_cref gf (proc_addr jp) pidv U with "Hpriv")
       as "(Hppid & Hcref & Hpvbk)".
     (* ---- +0x000 .. +0x01c ---- *)
     iApply (kxc_prologue m K eb (proc_addr jp) sp0 ra0 s00 s10 s20 pv av
@@ -592,7 +592,7 @@ Section KexecPinnedABody.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iApply (BeginOp.wp_begin_op_sconf gs jp gl bn g gfs cov logstart dev
               pidv (DfracOwn (1/4)) N3 (K - 68)%nat eb eb lks
-              V ltac:(lia) Hjp Hgs
+              U ltac:(lia) Hjp Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hlogc Hppid Hprocs").
     all: try lkbelow.
     iIntros (CIDb Hsb M3) "%Hcsb Hcg Hcnt Hextc Hclmc Hpc Hppid Hlog".
@@ -666,7 +666,7 @@ Section KexecPinnedABody.
               ga gf cov logstart bmapstart inodestart nib size dev
               plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs dqpv
               N5 (K - 68)%nat eb eb lks
-              V ltac:(lia) Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0
+              U ltac:(lia) Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0
               Hbmc Hbml Hins0 Hcovb Hiregb Hcstr Hplen Hslash
               ltac:(unfold walk_need, iput_units, MAXOPBLOCKS;
                     destruct (length (path_elems (bview plen pfun))); lia)
@@ -840,7 +840,7 @@ Section KexecPinnedABody.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
                 cov logstart dev n1 pidv (DfracOwn (1/4)) P1 (K - 68)%nat
-                eb eb lks V ltac:(lia) Hlg Hjp Hgs
+                eb eb lks U ltac:(lia) Hlg Hjp Hgs
                 with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
       all: try lkbelow.
@@ -899,17 +899,17 @@ Section KexecPinnedABody.
         rewrite /P1 upd_ne; [| regne].
         exact (HM4thr r Hr Nsp Ns0 Ns1 Ns2). }
       iApply (T.kxc_exit_m1 Q (proc_addr jp) bn ga gf bmapstart inodestart
-                plen pfun na avf alen aslen afun pidv V
+                plen pfun na avf alen aslen afun pidv (us_V U)
                 dqb dqs dqa dqpv dqas m P2 K eb eb lks sp0 ra0 s00 s10 s20 pv av
                 ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HP2sp HP2a0 HP2thr
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc [Hframe] Hbm Hins Hka Hpriv
                       Hpath Hargv Hargs Hbs Hirs").
       { iApply (kxc_frameA_epi with "Hframe"). }
-      iIntros (CIDf Hsf mf V' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
+      iIntros (CIDf Hsf mf V' M' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
                Hbm Hins Hka2 Hpriv Hpath Hargv Hargs Hbs Hirs".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
       iDestruct ("Hkw" $! CIDf with "Hcont") as "Hcont".
-      iApply ("Hcont" $! mf V' entry spv szv'
+      iApply ("Hcont" $! mf V' M' entry spv szv'
                 with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka2 Hpriv
                       Hpath Hargv Hargs Hbs Hirs").
       + exact Hcs2.
@@ -975,7 +975,7 @@ Section KexecPinnedAMain.
       (na : nat) (avf : nat -> mword 64)
       (alen : nat -> nat) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
@@ -1041,7 +1041,7 @@ Section KexecPinnedAMain.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
-    proc_priv gf (proc_addr jp) pidv V -∗
+    proc_priv gf (proc_addr jp) pidv U -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
@@ -1064,7 +1064,7 @@ Section KexecPinnedAMain.
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId, KEX CX -∗
-      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
+      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs bmapstart inodestart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: phase B's entry at +0x090 ---- *)
@@ -1111,7 +1111,7 @@ Section KexecPinnedAMain.
         bitmap_inv gfs bmapstart cov logstart size -∗
         bslots 3 -∗
         kalloc_env ga None -∗
-        proc_priv gf (proc_addr jp) pidv V -∗
+        proc_priv gf (proc_addr jp) pidv U -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
@@ -1148,7 +1148,7 @@ Section KexecPinnedAMain.
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     iApply (kxc_a1p (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
               cov logstart bmapstart inodestart nib size dev
-              plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
+              plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m K eb b lks sp0 ra0 s00 s10 s20 pv av KEX
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hcstr Hplen Hslash Hpelem Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
@@ -1161,7 +1161,7 @@ Section KexecPinnedAMain.
                  with "Hcont90") as "Hcont90".
     iApply (LA.kxc_a2 (CID0 := CIDs) Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
               cov logstart bmapstart inodestart nib size dev
-              plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
+              plen pfun na avf alen aslen afun pidv (us_V U) dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1
               (if intact then HD else None)
               (if intact then XCH else emp%I) KEX

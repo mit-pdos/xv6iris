@@ -111,7 +111,7 @@ Definition wp_iunlock_dep_sconf_body
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlock in
   let ip : mword 64 := ientry k in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -140,7 +140,7 @@ Definition wp_iunlock_dep_sconf_body
                    (slh_tok (icfg_isl k)) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
-  proc_priv_bare p pidv Vpr -∗
+  proc_priv_bare p pidv Upr -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
   procs_inv gs -∗
   (* THE CHECKED-OUT ENTRY, surrendered back into the escrow.  Exactly
@@ -174,7 +174,7 @@ Definition wp_iunlock_dep_sconf_body
       sie_cap_gpr KT1 mf K b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv_bare p pidv Vpr -∗
+      proc_priv_bare p pidv Upr -∗
       (* the caller's share, back whole, at ITS OWN fraction and device --
          AND AT THE GENERATION IT CAME IN ON.  The share the caller still
          holds is what denies [IcacheRef.live_gen_bump] the slot's whole
@@ -204,7 +204,7 @@ Definition wp_iunlock_tx_sconf_body
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlock in
   let ip : mword 64 := ientry k in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -227,7 +227,7 @@ Definition wp_iunlock_tx_sconf_body
                    (slh_tok (icfg_isl k)) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
-  proc_priv_bare p pidv Vpr -∗
+  proc_priv_bare p pidv Upr -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
   procs_inv gs -∗
   (* THE CHECKED-OUT ENTRY, surrendered back into the escrow.  Exactly
@@ -267,7 +267,7 @@ Definition wp_iunlock_tx_sconf_body
       sie_cap_gpr KT1 mf K b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv_bare p pidv Vpr -∗
+      proc_priv_bare p pidv Upr -∗
       (* the caller's share, back whole, at ITS OWN fraction and device --
          AND AT THE GENERATION IT CAME IN ON.  The share the caller still
          holds is what denies [IcacheRef.live_gen_bump] the slot's whole
@@ -292,12 +292,12 @@ Lemma wp_iunlock_tx_of_dep
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :
+    (b : bool) (lks : gset string) (Upr : ustate) :
   (forall d : ic_dep,
      wp_iunlock_dep_sconf_body gs gil gisl k s g d
-                               dev inum dn' bm' pidv dq m K eb p b lks Vpr) ->
+                               dev inum dn' bm' pidv dq m K eb p b lks Upr) ->
   wp_iunlock_tx_sconf_body gs gil gisl k s g dev inum
-                           dn' bm' pidv dq m K eb p b lks Vpr.
+                           dn' bm' pidv dq m K eb p b lks Upr.
 Proof.
   cbv beta delta [wp_iunlock_tx_sconf_body wp_iunlock_dep_sconf_body].
   intros Hgen pcE ip ret_tgt HK Hk Ha0 Hbelow.
@@ -329,9 +329,9 @@ Module Type IUNLOCK.
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_iunlock_dep_sconf_body gs gil gisl k s g d
-                                dev inum dn' bm' pidv dq m K eb p b lks Vpr.
+                                dev inum dn' bm' pidv dq m K eb p b lks Upr.
   (* the transactional form -- [ProofIunlock] defines it by
      [wp_iunlock_tx_of_dep]. *)
   Parameter wp_iunlock_tx_sconf :
@@ -343,7 +343,7 @@ Module Type IUNLOCK.
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_iunlock_tx_sconf_body gs gil gisl k s g dev
-                               inum dn' bm' pidv dq m K eb p b lks Vpr.
+                               inum dn' bm' pidv dq m K eb p b lks Upr.
 End IUNLOCK.

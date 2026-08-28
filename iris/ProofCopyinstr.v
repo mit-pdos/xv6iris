@@ -31,6 +31,17 @@
    the same reason it is in ProofCopyin.  The [psz] argument arrives in a1,
    shifting dst/srcva/max down to a2/a3/a4; the frame grew to 12 slots.
 
+   THE WHOLE PROOF RUNS AT THE LAZY [ProcPtOwn.proc_ptm P (uint szv) M]
+   ALTITUDE, exactly as ProofCopyin's does, and for the same payoff: [M] is
+   the SAME on the way in and on the way out.  [proc_ptm_acc_rep0] opens the
+   table into walkaddr's [pt_rep0] view, [proc_ptm_rebuild] closes it before
+   the vmfault (which wants it CLOSED), and [proc_ptm_page] borrows the one
+   page the chunk is read out of AT THE BYTES [M] NAMES and takes it back at
+   the same ones -- which is why [CHUNK] carries the page as a named
+   [[∗ list] … ↦ₘ fpg j] and rejoins it with [ByteBuf.bb_join3_fn] rather
+   than the existential [bb_join3].  Nothing in the byte loop changes: it
+   already spoke a named source buffer.
+
    THE MACHINE (offsets into CodeCopyinstr.v's byte-verified listing):
 
      +0x00 beqz a4,+0xca          max == 0: return -1 with NO frame
@@ -912,7 +923,7 @@ Section ProofCopyinstr.
      (the in-page offset, and hence [1 <= n]) is re-derived from
      [ProcPtOwn.pgd_unsigned] on the spot, exactly as in copyin. *)
   Local Lemma cs_loop (γa : gname)
-      (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool)
+      (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
       (dst spr : mword 64) (maxn : nat)
       (v10 v11 : mword 64) (b : bool) (pcur : mword 64) (lks : gset string) :
     (50 <= K)%nat ->
@@ -938,7 +949,7 @@ Section ProofCopyinstr.
     cpu_own lvl eb pcur b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0x7c) : mword 64) -∗
-    proc_pt Pc -∗
+    proc_ptm Pc (uint szv) M -∗
     kalloc_env γa None -∗
     ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] f j) -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
@@ -952,7 +963,7 @@ Section ProofCopyinstr.
       sie_cap_gpr KT1 mj (K - 12)%nat b pcur -∗
       cpu_own lvl eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
-      proc_pt P' -∗
+      proc_ptm P' (uint szv) M -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] g j) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -982,7 +993,7 @@ Section ProofCopyinstr.
       sie_cap_gpr KT1 mj (K - 12)%nat b pcur -∗
       cpu_own lvl eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
-      proc_pt P' -∗
+      proc_ptm P' (uint szv) M -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] g j) -∗
       WP (Loop : expr riscv_lang)))%I).
     (* the cursor, its page and its offset inside that page *)
@@ -1057,7 +1068,7 @@ Section ProofCopyinstr.
                     = add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x84) : mword 64) 4)
       by (rewrite /W4 upd_eq; reflexivity).
     (* ---- open the table into the exact represented view ---- *)
-    iDestruct (proc_pt_acc_rep0 Pc with "Hpt") as
+    iDestruct (proc_ptm_acc_rep0 Pc (uint szv) M with "Hpt") as
       (t m_ad) "(%Hrep & %Hview & %Hbase & %Hwf & Hptree & Hown)".
     assert (HW4root : W4 !!! Regidx Ra0
                       = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))).
@@ -1066,7 +1077,8 @@ Section ProofCopyinstr.
               ltac:(lia) HW4root Hrep with "Hcg Htext Hpc Hptree").
     iIntros (CIDl5 Hsl5 mw) "Hcg Hpc Hptree %Hwcs %Hwv".
     rewrite HW4a1 in Hwv.
-    iDestruct (proc_pt_rebuild Pc t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
+    iDestruct (proc_ptm_rebuild Pc (uint szv) M t m_ad Hwf Hview Hrep Hbase
+                 with "Hptree Hown") as "Hpt".
     assert (Hret88 : ret_pc (W4 !!! Regidx Rra) = mword_of_int (KernelSyms.copyinstr + 0x88)).
     { rewrite HW4ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret88) in "Hpc".
@@ -1100,7 +1112,8 @@ Section ProofCopyinstr.
     (*  Both the walkaddr HIT and the vmfault HIT land here, exactly as  *)
     (*  in copyin -- which is what the psz bump made copyinstr into.     *)
     (* ================================================================ *)
-    iAssert (∀ (CIDc : CpuId) (mc : regfile) (pa0 : mword 64) (Pd : uptd),
+    iAssert (∀ (CIDc : CpuId) (mc : regfile) (pa0 : mword 64) (Pd : uptd)
+               (fpg : nat -> bv 8),
         ⌜b = false \/ pcur = zero_reg -> (CIDc : CPU) = (CID0 : CPU)⌝ -∗
         ⌜uptd_ext_sz szv Pc Pd⌝ -∗
         ⌜mc !!! Regidx Ra0 = pa0⌝ -∗
@@ -1119,12 +1132,13 @@ Section ProofCopyinstr.
         sie_cap_gpr KT1 mc (K - 12)%nat b pcur -∗
         cpu_own lvl eb pcur b lks -∗
         pc_is (mword_of_int (KernelSyms.copyinstr + 0x8a) : mword 64) -∗
-        page_own pa0 -∗
-        (page_own pa0 -∗ proc_pt Pd) -∗
+        ([∗ list] j ∈ seq 0 4096, (pa_add pa0 j : Arch.pa) ↦ₘ fpg j) -∗
+        (([∗ list] j ∈ seq 0 4096, (pa_add pa0 j : Arch.pa) ↦ₘ fpg j) -∗
+           proc_ptm Pd (uint szv) M) -∗
         ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] f j) -∗
         EXIT -∗
         WP (Loop : expr riscv_lang))%I with "[]" as "CHUNK".
-    { iIntros (CIDc mc pa0 Pd) "%Hanchorc %Hextd %Hza0 %Hzsp %Hz1 %Hz2 %Hz3
+    { iIntros (CIDc mc pa0 Pd fpg) "%Hanchorc %Hextd %Hza0 %Hzsp %Hz1 %Hz2 %Hz3
                             %Hz4 %Hz5 %Hz6 %Hz7 %Hz8 %Hz9 %Hz10 %Hz11
                             Hcg Hcnt Hpc Hpg Hback Hdst HEXIT".
         (* ============================================================ *)
@@ -1248,8 +1262,10 @@ Section ProofCopyinstr.
         assert (HthrC5 : forall r : mword 5, r <> Ra1 -> r <> Ra3 -> r <> Ra4 -> r <> Ra5 ->
                   C5 !!! Regidx r = C5 !!! Regidx r)
           by (intros; reflexivity).
-        (* carve the source window out of the borrowed page *)
-        iDestruct (bb_page_named (pa0) with "Hpg") as (fpg) "Hpg".
+        (* carve the source window out of the borrowed page.  It is handed
+           over NAMED (by [fpg]) rather than at existential contents, and the
+           join below puts it back at the SAME naming -- which is what lets
+           the closer return the block at the [M] it was opened at. *)
         assert (Hsplitp : (off + n + (4096 - off - n) = 4096)%nat) by lia.
         iEval (rewrite (bb_split3 (pa0) off n (4096 - off - n) 4096
                           fpg (DfracOwn 1) Hsplitp)) in "Hpg".
@@ -1266,10 +1282,12 @@ Section ProofCopyinstr.
         { (* ---------- the NUL exit, at +0x26 ---------- *)
           iIntros (Mn i' g) "%Hi'n %Hnulg %Hna5 %Hnthr Hcg Hpc Hsrc Hdst".
           (* give the page back *)
-          iDestruct (bb_join3 (pa0) off n (4096 - off - n) 4096 fpg
+          iDestruct (bb_join3_fn (pa0) off n (4096 - off - n) 4096 fpg
                        (fun j => fpg (off + j)%nat) (fun j => fpg (off + (n + j))%nat)
-                       Hsplitp with "Hpg0 Hsrc Hpg2") as (fpg') "Hpg".
-          iDestruct (bb_page_of_named (pa0) fpg' with "Hpg") as "Hpg".
+                       fpg Hsplitp
+                       ltac:(intros; reflexivity) ltac:(intros; reflexivity)
+                       ltac:(intros; reflexivity)
+                       with "Hpg0 Hsrc Hpg2") as "Hpg".
           iDestruct ("Hback" with "Hpg") as "Hpt".
           (* ---- +0x26: sb zero,0(a5) -- plant the terminator ---- *)
           assert (Hdi : (done + i' < maxn)%nat) by lia.
@@ -1337,10 +1355,12 @@ Section ProofCopyinstr.
         { (* ---------- the chunk-done exit, at +0x4a ---------- *)
           iIntros (Mc g) "%Hnulg %Hca1 %Hca5 %Hcthr Hcg Hpc Hsrc Hdst".
           (* give the page back *)
-          iDestruct (bb_join3 (pa0) off n (4096 - off - n) 4096 fpg
+          iDestruct (bb_join3_fn (pa0) off n (4096 - off - n) 4096 fpg
                        (fun j => fpg (off + j)%nat) (fun j => fpg (off + (n + j))%nat)
-                       Hsplitp with "Hpg0 Hsrc Hpg2") as (fpg') "Hpg".
-          iDestruct (bb_page_of_named (pa0) fpg' with "Hpg") as "Hpg".
+                       fpg Hsplitp
+                       ltac:(intros; reflexivity) ltac:(intros; reflexivity)
+                       ltac:(intros; reflexivity)
+                       with "Hpg0 Hsrc Hpg2") as "Hpg".
           iDestruct ("Hback" with "Hpg") as "Hpt".
           (* the register facts the chunk left standing *)
           assert (Hcs1 : Mc !!! Regidx Rs3 = pa_add dst done)
@@ -1722,7 +1742,7 @@ Section ProofCopyinstr.
         by (rewrite (tp_pin_ne (CIDx := CIDu6) F5 Ra1 ltac:(ridx_neq)); exact HF5a1).
       assert (HF5a2' : tp_pin F5 !!! Regidx Ra2 = va0)
         by (rewrite (tp_pin_ne (CIDx := CIDu6) F5 Ra2 ltac:(ridx_neq)); exact HF5a2).
-      iApply (Vmfault.wp_vmfault_sconf γa (tp_pin F5) Pc szv (K - 12)%nat lvl eb pcur b
+      iApply (Vmfault.wp_vmfault_sconf_mem γa (tp_pin F5) Pc M szv (K - 12)%nat lvl eb pcur b
                 _ ltac:(lia) HF5tp HF5a0' HF5a1' Hszb Hlvl
                 with "Hcg Hcnt Htext Hpc Hpt Henv").
       all: try lkbelow.
@@ -1773,8 +1793,22 @@ Section ProofCopyinstr.
       iDestruct "Hvpost" as "[(%Hvz & Hpt) | Hvs]".
       2:{ (* --- faulted in: borrow the brand-new page and join at +0x8a --- *)
         iDestruct "Hvs" as (r) "(%Hva0r & %Hpvr & %Hvlt & %Hnone & Hpt)".
-        iDestruct (proc_pt_page_acc_vmfault Pc (svpn_of va0) r Hpvr with "Hkmapb Hpt")
-          as "[Hpg Hback]".
+        (* the brand-new page: vmfault mapped it and left it ZERO, and [M]
+           did not move -- it already read 0 there.  So the page is borrowed
+           at the bytes [M] names and given back at the same ones. *)
+        iDestruct (proc_ptm_wf (uptd_insert Pc (svpn_of va0) r) (uint szv) M
+                     with "Hpt") as %Hwfins.
+        assert (Hlins : (uptd_insert Pc (svpn_of va0) r).(ud_um) !! (svpn_of va0)
+                        = Some (vmfault_pte r))
+          by (unfold uptd_insert, uptd_insert_perm; cbn [ud_um]; apply lookup_insert).
+        assert (Hpb : page_base (pte_ppn (vmfault_pte r)) = r)
+          by (rewrite pte_ppn_vmfault; exact (page_base_of_valid r Hpvr)).
+        pose proof (proc_ptm_page (uptd_insert Pc (svpn_of va0) r) (uint szv) M
+                      (svpn_of va0) (vmfault_pte r)
+                      (bv_unsigned (svpn_of va0) * 4096)%Z
+                      Hwfins Hlins eq_refl) as Hacc.
+        rewrite Hpb in Hacc.
+        iDestruct (Hacc with "Hkmapb Hpt") as "[Hpg Hback]".
         iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x3a))
                   (mword_of_int 40 : mword 8) (Cregidx (mword_of_int 2)) Ra0 mv (K - 12)%nat b
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
@@ -1790,6 +1824,8 @@ Section ProofCopyinstr.
         iDestruct (cpu_own_transport CIDvf CIDvf2 lvl eb pcur b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iApply ("CHUNK" $! CIDvf2 mv r (uptd_insert Pc (svpn_of va0) r)
+                  (fun j : nat => M !!! ((bv_unsigned (svpn_of va0) * 4096)%Z
+                                         + Z.of_nat j)%Z)
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcg Hcnt Hpc Hpg Hback Hdst Hcont").
         - wp_next_chain.
@@ -1858,7 +1894,8 @@ Section ProofCopyinstr.
         by (apply elem_of_um_ppns; exists (svpn_of va0), w0; split; [exact Hl0 | reflexivity]).
       assert (Hpv : page_valid (page_base (pte_ppn w))).
       { rewrite -Hppn. exact (proj1 (proj2 (proj2 Hwf)) _ Hin0). }
-      pose proof (proc_pt_page_acc Pc (svpn_of va0) w0 Hl0) as Hacc.
+      pose proof (proc_ptm_page Pc (uint szv) M (svpn_of va0) w0
+                    (bv_unsigned (svpn_of va0) * 4096)%Z Hwf Hl0 eq_refl) as Hacc.
       rewrite Hppn in Hacc.
       iDestruct (Hacc with "Hkmapb Hpt") as "[Hpg Hback]".
       assert (Hnz0 : eq_vec (mw !!! Regidx Ra0) zero_reg = false).
@@ -1878,6 +1915,8 @@ Section ProofCopyinstr.
       iDestruct (cpu_own_transport CID0 CIDv1 lvl eb pcur b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply ("CHUNK" $! CIDv1 mw (page_base (pte_ppn w)) Pc
+                (fun j : nat => M !!! ((bv_unsigned (svpn_of va0) * 4096)%Z
+                                       + Z.of_nat j)%Z)
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                       Hcg Hcnt Hpc Hpg Hback Hdst Hcont").
       + wp_next_chain.
@@ -1900,13 +1939,14 @@ Section ProofCopyinstr.
   (* ================================================================== *)
   (*  THE CAPSTONE.                                                      *)
   (* ================================================================== *)
-  Lemma wp_copyinstr_sconf
+  Lemma wp_copyinstr_sconf_mem
       (γa : gname) (mm : regfile)
-      (P : uptd) (szv : mword 64) (maxn : nat) (dst_olds : nat -> bv 8)
+      (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (maxn : nat)
+      (dst_olds : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_copyinstr_sconf_body ktb γa mm P szv maxn dst_olds K lvl eb p b lks.
+    : wp_copyinstr_sconf_mem_body ktb γa mm P M szv maxn dst_olds K lvl eb p b lks.
   Proof.
-    cbv beta delta [wp_copyinstr_sconf_body].
+    cbv beta delta [wp_copyinstr_sconf_mem_body].
     intros pcE dst ret_tgt HK Hroot Hsza1 Hmaxr Hmax64 Hszb Hlvl Hlkbelow.
     assert (E64 : (2 ^ 64)%Z = 18446744073709551616%Z) by (vm_compute; reflexivity).
     rewrite E64 in Hmax64.
@@ -2335,7 +2375,7 @@ Section ProofCopyinstr.
       assert (Hg3 : (0 + maxn = maxn)%nat) by lia.
       iDestruct (cpu_own_transport CID CIDp18 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (cs_loop γa P szv K lvl eb dst (pa_stk sp0 12) maxn
+      iApply (cs_loop γa P M szv K lvl eb dst (pa_stk sp0 12) maxn
                 (mm !!! Regidx Rs10) (mm !!! Regidx Rs11) b p lks
                 HK Hmax64 Hszb Hlvl maxn 0%nat maxn CIDp18 P M8 dst_olds
                 Hg1 Hmax1 Hg3 (bb_nonul_0 dst_olds) (uptd_ext_sz_refl szv P)

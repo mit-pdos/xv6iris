@@ -272,7 +272,7 @@ Definition wp_fsinit_sconf_body
     (v_start v_dev v_nc v_n : mword 32)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate)
+    (b : bool) (lks : gset string) (Upr : ustate)
     (* ---- the record block 1's bytes decode to (durable-disk lane C-3a) ---- *)
     (sbrec : fs_sb) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fsinit in
@@ -453,7 +453,7 @@ Definition wp_fsinit_sconf_body
   ([∗ list] i ∈ seq 0 LOGBLOCKS,
      ∃ bs : list (bv 8), fs_chalf fsc_fs (log_slot_bno fsc_logst i) bs) -∗
   (* the caller's own pid cell *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle and the disk fabric *)
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
@@ -481,7 +481,7 @@ Definition wp_fsinit_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       (* ================================================================ *)
       (*  THE EIGHT CELLS ARE BORN.  This is the whole point of the        *)
       (*  contract: the caller handed in 32 raw .bss bytes and gets back   *)
@@ -536,7 +536,7 @@ Module Type FSINIT.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
       (sbrec : fs_sb),
       wp_fsinit_sconf_body γs j γl pd pav pu
 
@@ -544,5 +544,5 @@ Module Type FSINIT.
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
                            bs_hdr Xv M L D vlock vname vcpu v_start v_dev v_nc v_n
-                           pidv dq m K eb b lks Vpr sbrec.
+                           pidv dq m K eb b lks Upr sbrec.
 End FSINIT.

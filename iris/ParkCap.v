@@ -100,10 +100,10 @@ Section ParkCap.
 
   (* the child's own rows, the ones the park spends *)
   Definition park_child (γs : list gname) (γf : gname) (pa ks : mword 64)
-      (rest : list (mword 64)) (pid : mword 32) (V : pprivate) : iProp Σ :=
+      (rest : list (mword 64)) (pid : mword 32) (U : ustate) : iProp Σ :=
     (is_kstack pa ks ∗
      ctx_cells (p_context pa) (park_forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
-     proc_priv γf pa pid V ∗
+     proc_priv γf pa pid U ∗
      fd_slots FDSPARE ∗
      iref_slots IREFSPARE)%I.
 
@@ -113,15 +113,15 @@ Section ParkCap.
       (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
-         (pid : mword 32) (V : pprivate) (av : nat),
+         (pid : mword 32) (U : ustate) (av : nat),
        ⌜length rest = 12%nat⌝ -∗
        ⌜exists j : nat, pa = proc_addr j /\ (j < NPROC)%nat⌝ -∗
        ⌜(K_usertrap <= av)%nat⌝ -∗
-       ▷ park_pkg URB W γs γf pa ks (pv_fdg V) pid av -∗
+       ▷ park_pkg URB W γs γf pa ks (pv_fdg (us_V U)) pid av -∗
        (* ...and [W] itself, for forkret to hand the closer: under the same
           later, for the same reason *)
        ▷ W -∗
-       park_child γs γf pa ks rest pid V -∗
+       park_child γs γf pa ks rest pid U -∗
        |==> ▷ proc_ctx γs pa)%I.
 
   (* THE CHANNEL, at a given [W], as a [□] proposition under a later -- for
@@ -181,7 +181,7 @@ Section ParkCap.
   (* ------------------------------------------------------------------- *)
   (* USING IT: what userinit and kfork do at their park.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma park_token_park (N : ut_names) (rest : list (mword 64)) (V : pprivate) :
+  Lemma park_token_park (N : ut_names) (rest : list (mword 64)) (U : ustate) :
     ut_wf N ->
     length rest = 12%nat ->
     park_token (un_s N) -∗
@@ -198,7 +198,7 @@ Section ParkCap.
        built here.  allocproc minted them with the block; the resume hands
        them to [UsertrapRes.ut_own], re-keyed by the closer's own
        [pv_fdg V' = pv_fdg V] premise. *)
-    fd_frags_any (pv_fdg V) -∗
+    fd_frags_any (pv_fdg (us_V U)) -∗
     (* THE CHILD'S USER-EXECUTION WP, on the fd fragments' route exactly:
        not part of [park_child] (that bundle goes straight to the cap) but
        captured by the package's RESUME closer, built here, and spent by
@@ -206,7 +206,7 @@ Section ParkCap.
        parker has to own one, which is what makes a WP enter the world only
        at the two mint sites (userinit's park and sys_fork's kfork call). *)
     uexec_wp -∗
-    park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) V -∗
+    park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U -∗
     |==> ▷ proc_ctx (un_s N) (un_pj N).
   Proof.
     iIntros (Hwf Hrest) "#Htok #Htext #Hwire #Hkmap #Hslot Hstack #Henv Hown Hfrag Huwp Hchild".
@@ -218,7 +218,7 @@ Section ParkCap.
     { iDestruct "Henv" as "[Hcaps _]". iDestruct "Hcaps" as "($ & _)". }
     iDestruct ("Hchan" $! N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
-    iApply ("Hcap" $! (un_f N) (un_pj N) (un_ks N) rest (un_pid N) V KSTACK_AV
+    iApply ("Hcap" $! (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U KSTACK_AV
               with "[%] [%] [%] [Hstack Hown Hclose Hfrag Huwp] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].

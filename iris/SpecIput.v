@@ -138,7 +138,7 @@ Definition wp_iput_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -238,7 +238,7 @@ Definition wp_iput_sconf_body
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* the caller's own pid cell (acquiresleep records it) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle *)
   procs_inv gs -∗
   (* the disk fabric *)
@@ -263,7 +263,7 @@ Definition wp_iput_sconf_body
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
@@ -348,7 +348,7 @@ Definition wp_iput_gen_body
     (tid : nat) (qtx : Qp)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool) :=
+    (b : bool) (lks : gset string) (Upr : ustate) (rg : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -412,7 +412,7 @@ Definition wp_iput_gen_body
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
@@ -447,7 +447,7 @@ Definition wp_iput_gen_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
@@ -484,10 +484,10 @@ Module Type IPUT.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_iput_sconf_body gs j gl pd pav pu gil gisl
 
-                          k q inum n pidv dq dqb dqs m K eb b lks Vpr.
+                          k q inum n pidv dq dqb dqs m K eb b lks Upr.
   (* the credited set-form contract; [wp_iput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness ([ip_spend_w w false false <= 2], and iput's own flush is the
@@ -503,8 +503,8 @@ Module Type IPUT.
       (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool),
+      (b : bool) (lks : gset string) (Upr : ustate) (rg : bool),
       wp_iput_gen_body gs j gl pd pav pu gil gisl
 
-                       k q inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr rg.
+                       k q inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks Upr rg.
 End IPUT.

@@ -296,14 +296,14 @@ Section KexecB2Body.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string) :
     kxc_bad324_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
+      pidv U dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P szf eb lks.
   Proof.
     cbv beta delta [kxc_bad324_body].
@@ -402,7 +402,7 @@ Section KexecB2Body.
     assert (HT3s4 : T3 !!! Regidx Rs4 = ientry kf)
       by (rewrite /T3 upd_ne; [exact HT2s4 | nz]).
     (* the size bound, read off COVERAGE -- see the header *)
-    iDestruct (proc_pt_wf_get P with "Hpt") as %Hwf.
+    iDestruct (proc_pt_any_wf_get P with "Hpt") as %Hwf.
     iDestruct (cpu_own_transport CID0 CID3 0%nat eb (proc_addr jp) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CID3 eb (proc_addr jp)
@@ -652,7 +652,7 @@ Section KexecB2Body.
     iApply (A.kxc_bad64 Q gs jp gl pd pav pu
               gilf gislf gf
  kf qf sf gyf inumf dnf bmf n2
-              plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
+              plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m U8 K eb lks sp0 ra0 s00 s10 s20 pv av
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
               Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
@@ -779,7 +779,7 @@ Section KexecB2Loops.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
@@ -787,7 +787,7 @@ Section KexecB2Loops.
     kxc_ls_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
+      pidv U dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P ip va fz po eb lks.
   Proof.
     cbv beta delta [kxc_ls_body].
@@ -1332,7 +1332,7 @@ Section KexecB2Loops.
                & Hmap & Hblocks & Hdview & Hfview & Htop)".
       pose proof Hiok as Hiok'.
       destruct Hiok' as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
-      iDestruct (proc_priv_bare_acc gf (proc_addr jp) pidv V with "Hpriv")
+      iDestruct (proc_priv_bare_acc gf (proc_addr jp) pidv U with "Hpriv")
         as "[Hppid Hpvbk]".
       iDestruct (A.kxa_bs3_split with "Hbs") as "[Hbs1 Hbs2]".
       iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
@@ -1355,8 +1355,7 @@ Section KexecB2Loops.
       iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
       iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
       iApply (Readi.wp_readi_sconf KT0 gs jp gl pd pav pu gf
- (ientry kf) bmf datl dnf false offn nn fpg V
-                pidv (DfracOwn 1) (DfracOwn (1/2)) D6 (K - 68)%nat eb
+ (ientry kf) bmf datl dnf false offn nn fpg (upd_usM U _) pidv (DfracOwn 1) (DfracOwn (1/2)) D6 (K - 68)%nat eb
                 eb lks ltac:(lia) Hlg Hbmwf Hbmcov Hszb
                 ltac:(rewrite HoffnZ; lia)
                 ltac:(intros Hg; rewrite HoffnZ in Hg |- *;
@@ -1367,7 +1366,7 @@ Section KexecB2Loops.
                       Hblocks [Hdst Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
       all: try lkbelow.
       { iSplitL "Hdst"; [iExact "Hdst" | iExact "Hppid"]. }
-      iIntros (CIDrd Hsrd M2 tot P') "%Hcsrd %Hupt %Htotb %Hret Hcg Hcnt Hextc Hclmc Hpc
+      iIntros (CIDrd Hsrd M2 tot P' Mrd) "%Hcsrd %Hupt %Htotb %Hret Hcg Hcnt Hextc Hclmc Hpc
                Hidev Hmeta Hmap Hblocks [Hdst Hppid] Hbs1".
       iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
       iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
@@ -1639,7 +1638,7 @@ Section KexecB2Loops.
         iApply (kxc_bad324 (CID0 := CIDb1) Q gs jp gl pd pav pu
                   gilf gislf gf
  kf qf sf gyf inumf dnf bmf n2 plen
-                  pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M2 K
+                  pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas m M2 K
                   sp0 ra0 s00 s10 s20 pv av w63 w67 ef P w65 eb lks
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                   Hgs Hsp Hra Hs0 Hs1 Hs2

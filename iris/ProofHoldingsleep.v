@@ -70,8 +70,8 @@ Section ProofHoldingsleep.
 
   Lemma wp_holdingsleep_gen_sconf
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_holdingsleep_gen_sconf_body γl γsl s R H q m p pidv av eb b lks Vpr.
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate)
+    : wp_holdingsleep_gen_sconf_body γl γsl s R H q m p pidv av eb b lks Upr.
   Proof.
     cbv beta delta [wp_holdingsleep_gen_sconf_body].
     intros pcE slk ret_tgt Hav Hfresh.
@@ -728,14 +728,14 @@ Section ProofHoldingsleep.
   (* the untracked instance, which is what every existing caller takes *)
   Lemma wp_holdingsleep_sconf
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb b lks Vpr.
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate)
+    : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb b lks Upr.
   Proof.
     cbv beta delta [wp_holdingsleep_sconf_body].
     intros pcE slk ret_tgt Hav Hbelow.
     iIntros "Hcg Hcnt #Htext Hpc #Hslk Hsl Hpidproc Hcont".
     iDestruct "Hsl" as (q) "Hsl".
-    iApply (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked q m p pidv av eb b lks Vpr
+    iApply (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked q m p pidv av eb b lks Upr
               Hav Hbelow with "Hcg Hcnt Htext Hpc Hslk Hsl Hpidproc").
     iIntros (CIDf Hsf mf Hcs) "Hcg Hcnt Hpc Hsl Hpidproc".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].

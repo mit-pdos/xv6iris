@@ -101,6 +101,15 @@ every literal-image theorem; `SystemAssumptions.v`'s audited
 
 ## vm_compute at 2 MB — the traps this effort found (measured)
 
+- **A bare `simpl` (or `cbn` with no delta list) on any goal that merely
+  MENTIONS a dumped-literal gmap does not terminate** — measured on
+  `dom SyncInstrs.sync_bytes` (2242 entries): `Timeout 30 simpl` and
+  `Timeout 30 cbn` both time out, and a whole-file attempt sits at 1.2 GB
+  RSS for 10–20+ minutes looking exactly like a slow file (the log shows
+  only `ROCQ compile <file>`).  The goal does not have to compute with
+  the literal; mentioning it is enough.  Use an explicit delta list
+  (`cbn [fst]`-style) or targeted rewrites, never a bare simplifier, in
+  any file whose goals can name a dumped image.
 - **`FsTree.file_bytes` is per-BYTE with unary arithmetic** (`file_byte`
   does a unary `Nat.div` per byte and rebuilds the content block each
   time): ~1e9 VM steps for one 58 kB file. NEVER vm_compute `node_at` of a

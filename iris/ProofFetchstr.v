@@ -378,8 +378,8 @@ Section ProofFetchstr.
   (* =================================================================== *)
   Lemma wp_fetchstr_sconf (ktb : ktier) (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_fetchstr_sconf_body ktb γa γf m av n eb p pid V maxn buf_olds b lks.
+      (pid : mword 32) (U : ustate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string)
+    : wp_fetchstr_sconf_body ktb γa γf m av n eb p pid U maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_fetchstr_sconf_body].
     intros pcE buf ret_tgt Hn Hav Hmax Hmax31 Hlkbelow.
@@ -685,14 +685,14 @@ Section ProofFetchstr.
       by (rewrite HA3a0; reflexivity).
     iEval (rewrite -Hszaddr) in "Hszc".
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.fetchstr + 0x1e)) Ra1 Ra0
-              (mword_of_int 72 : mword 12) A3 (av - 6)%nat (pv_sz V) b
+              (mword_of_int 72 : mword 12) A3 (av - 6)%nat (pv_sz (us_V U)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hszc").
     { iApply (fsi_1e with "Htext"). }
     iIntros (CID15b Hk15b) "Hcg Hpc Hszc".
     iEval (rewrite Hszaddr) in "Hszc".
-    set (Az := <[Regidx Ra1 := regval_into_reg (pv_sz V)]> A3).
-    change (<[Regidx Ra1 := regval_into_reg (pv_sz V)]> A3) with Az.
+    set (Az := <[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> A3).
+    change (<[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> A3) with Az.
     assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x1e) : mword 64) 2
                     = mword_of_int (KernelSyms.fetchstr + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp20) in "Hpc".
@@ -704,14 +704,14 @@ Section ProofFetchstr.
       by (rewrite HAza0; reflexivity).
     iEval (rewrite -Hptaddr) in "Hptc".
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.fetchstr + 0x20)) Ra0 Ra0
-              (mword_of_int 80 : mword 12) Az (av - 6)%nat (page_base (ud_root (pv_upt V))) b
+              (mword_of_int 80 : mword 12) Az (av - 6)%nat (page_base (ud_root (pv_upt (us_V U)))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hptc").
     { iApply (fsi_20 with "Htext"). }
     iIntros (CID16 Hk16) "Hcg Hpc Hptc".
     iEval (rewrite Hptaddr) in "Hptc".
-    set (A4 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> Az).
-    change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt V)))]> Az) with A4.
+    set (A4 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> Az).
+    change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> Az) with A4.
     assert (Hpp22 : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x20) : mword 64) 2
                     = mword_of_int (KernelSyms.fetchstr + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp22) in "Hpc".
@@ -733,9 +733,9 @@ Section ProofFetchstr.
     assert (HA5ra : A5 !!! Regidx Rra
                     = add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x22) : mword 64) 4)
       by (rewrite /A5 upd_eq; reflexivity).
-    assert (HA5a0 : A5 !!! Regidx Ra0 = page_base (ud_root (pv_upt V))).
+    assert (HA5a0 : A5 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U)))).
     { rewrite /A5 upd_ne; [| reg_neq]. rewrite /A4 upd_eq. reflexivity. }
-    assert (HA5a1 : A5 !!! Regidx Ra1 = pv_sz V).
+    assert (HA5a1 : A5 !!! Regidx Ra1 = pv_sz (us_V U)).
     { rewrite /A5 upd_ne; [| reg_neq]. rewrite /A4 upd_ne; [| reg_neq].
       rewrite /Az upd_eq. reflexivity. }
     assert (HA5a2 : A5 !!! Regidx Ra2 = buf).
@@ -781,13 +781,15 @@ Section ProofFetchstr.
       by (apply fs_z_31_64; [apply Nat2Z.is_nonneg | exact Hmax31]).
     iEval (rewrite -HA5a2) in "Hbuf".
     (* ---- copyinstr(p->pagetable, p->sz, buf, addr, max) ----
-       *** THIS IS WHERE SpecFetchstr.v IS STALE (see the file header). ***
-       [wp_copyinstr_sconf] now takes the whole vmfault tier: a [γa] with
-       [kalloc_env γa None], a [cpu_own], K = 50 rather than 20, and it hands
-       back a descriptor P' EXTENDING the one it was given.  None of the four
-       can be supplied from [wp_fetchstr_sconf_body] as it stands. *)
+       copyinstr carries the whole vmfault tier (a [γa] with
+       [kalloc_env γa None], a [cpu_own], K = 50) and hands back a descriptor
+       P' EXTENDING the one it was given.  It is taken at its MEMORY-INDEXED
+       contract, at the block's own image: copyinstr writes no user memory
+       and the pages it faults in were already in the lazy view, so [us_M U]
+       comes back on the nose and the block re-closes at it. *)
     iDestruct (cpu_own_transport CID12 CID17 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Copyinstr.wp_copyinstr_sconf ktb γa A5 (pv_upt V) (pv_sz V) maxn buf_olds
+    iApply (Copyinstr.wp_copyinstr_sconf_mem ktb γa A5 (pv_upt (us_V U)) (us_M U)
+              (pv_sz (us_V U)) maxn buf_olds
               (av - 6)%nat n eb p b lks
               HK50 HA5a0 HA5a1 HA5a4 Hmax64 Hszb Hn
               with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
@@ -807,12 +809,12 @@ Section ProofFetchstr.
     { intros r Hr Ncsp N8 N9 N18 N19.
       rewrite (callee_saved_lookup Hcsr r Hr). apply HthrA5; assumption. }
     (* close the [proc_priv] borrow.  copyinstr FAULTS PAGES IN now, so the
-       descriptor that comes back is [P'], not [pv_upt V]; [fs_upd_upt_id] is
-       dead and the postcondition has to carry [upd_upt V P'] -- which
-       SpecFetchstr.v does not yet offer. *)
-    iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) P'⌝)%I as "#Hxr";
+       descriptor that comes back is [P'], not [pv_upt V] ([fs_upd_upt_id] is
+       dead) -- but the IMAGE is [us_M U] still, so the block closes at
+       [us_upt U P'] and the postcondition needs no existential. *)
+    iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxr";
       [iPureIntro; exact Hext|].
-    iDestruct ("Hpback" $! P' with "Hxr Hszc Hptc Hpt") as "Hpriv".
+    iDestruct ("Hpback" $! P' (us_M U) with "Hxr Hszc Hptc Hpt") as "Hpriv".
     (* ---- +0x24: bltz a0 -- copyinstr's answer decides the branch ---- *)
     destruct Hret as [[H0 (k & Hkmax & Hcstr)] | Hm1].
     - (* ======= copyinstr returned 0: fall through to strlen ======= *)

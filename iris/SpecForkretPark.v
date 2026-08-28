@@ -107,11 +107,11 @@ Definition forkret_park_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname)
     (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
-    (pid : mword 32) (V : pprivate) : Prop :=
+    (pid : mword 32) (U : ustate) : Prop :=
   (length rest = 12%nat) ->
   ⊢ is_kstack pa ks -∗
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
-    proc_priv γf pa pid V -∗
+    proc_priv γf pa pid U -∗
     fd_slots FDSPARE -∗
     (* the iref allowance travels beside the block for [FDSPARE]'s reason:
        a syscall borrows from it for references in flight, so it cannot live
@@ -126,6 +126,6 @@ Module Type FORKRET_PARK.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname)
       (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
-      (pid : mword 32) (V : pprivate),
-      forkret_park_body γs γf pa ks rest pid V.
+      (pid : mword 32) (U : ustate),
+      forkret_park_body γs γf pa ks rest pid U.
 End FORKRET_PARK.

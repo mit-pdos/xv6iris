@@ -459,14 +459,14 @@ Module Type USERTRAP_RES.
      into the residue. *)
   Parameter usertrap_res_pt_close :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
-      usertrap_res_bare pt ksp -∗ proc_pt pt -∗ usertrap_res_parked pt ksp.
+      usertrap_res_bare pt ksp -∗ proc_pt_any pt -∗ usertrap_res_parked pt ksp.
 
   (* userret's move: the address space is about to be installed again, so
      it comes back out, to be split into the tree the entry switch consumes
      and the pages [ProcPtOwn.user_pt_inv_close] hands the user tier. *)
   Parameter usertrap_res_pt_open :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
-      usertrap_res_parked pt ksp -∗ proc_pt pt ∗ usertrap_res_bare pt ksp.
+      usertrap_res_parked pt ksp -∗ proc_pt_any pt ∗ usertrap_res_bare pt ksp.
 
   (* THE FOOTPRINT RENORMALISATION.  The bare residue reads its descriptor
      only through [ud_root]/[ud_tfp]/[ud_um] -- [proc_pt], the one conjunct

@@ -95,34 +95,57 @@ Definition copyinstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
   (r = (mword_of_int 0 : mword 64) /\ exists k, (k < maxn)%nat /\ bb_cstr f k)
   \/ r = (mword_of_int (-1) : mword 64).
 
-Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+(* ===================================================================== *)
+(* THE CONTRACT.  IT IS MEMORY-INDEXED, AND THERE IS NO ∃-WEAKENED TWIN. *)
+(*                                                                       *)
+(* WHAT HAPPENS TO THE PROCESS'S MEMORY:                                 *)
+(*                                                                       *)
+(* Nothing.  copyinstr READS user memory and WRITES only its kernel      *)
+(* destination buffer, and the pages it faults in on the way were        *)
+(* ALREADY in the view -- as lazy pages reading 0 -- so vmfault does not *)
+(* move it either ([SpecVmfault.wp_vmfault_sconf_mem] is a noop on [M]   *)
+(* at this altitude).  The descriptor still grows ([uptd_ext_sz]); the   *)
+(* view does not.  [M] is therefore the SAME on the way in and on the    *)
+(* way out, on BOTH arms -- which is exactly what a caller holding       *)
+(* [ProcInv.proc_priv] needs in order to get its block back at the image *)
+(* it handed over, instead of at a fresh existential one.                *)
+(*                                                                       *)
+(* The BUFFER promise is unchanged: [copyinstr_ret] already says all a   *)
+(* caller uses (fetchstr runs strlen over the result), and it is a       *)
+(* property of KERNEL memory, which [M] does not describe.  Saying which *)
+(* process bytes the buffer received -- copyin's [copyin_got] -- would   *)
+(* need the copied-prefix invariant threaded through the byte loop; no   *)
+(* caller wants it, so it is deliberately not stated.                    *)
+(*                                                                       *)
+(* copyin and copyout each keep a [proc_pt]-altitude COROLLARY beside    *)
+(* their memory-indexed contract, for the callers that say nothing about *)
+(* a memory.  copyinstr has NO such caller -- fetchstr, its only one,    *)
+(* holds [ProcInv.proc_priv] and wants its block back at the image it    *)
+(* lent -- so the ∃-weakened twin is not written.  Should one ever be    *)
+(* wanted, [ProcPtOwn.proc_pt_ptm] derives it in five lines (see         *)
+(* [ProofCopyin.wp_copyin_sconf]).                                       *)
+(* ===================================================================== *)
+Definition wp_copyinstr_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (ktb : ktier) (γa : gname) (mm : regfile)
-    (P : uptd) (szv : mword 64) (maxn : nat) (dst_olds : nat -> bv 8)
+    (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (maxn : nat)
+    (dst_olds : nat -> bv 8)
     (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyinstr in
-  (* a0 = pagetable, a1 = psz, a2 = dst, a3 = srcva, a4 = max *)
   let dst := mm !!! Regidx (mword_of_int 12 : mword 5) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* 12-slot frame + vmfault's 38 (walkaddr needs 10) *)
   (50 <= K)%nat ->
-  (* the pagetable argument is the table [proc_pt P] describes -- and that is
-     the whole requirement; it need not be the running process's. *)
   mm !!! Regidx (mword_of_int 10 : mword 5) = page_base P.(ud_root) ->
-  (* the size argument, in a1 *)
   mm !!! Regidx (mword_of_int 11 : mword 5) = szv ->
   mm !!! Regidx (mword_of_int 14 : mword 5) = (mword_of_int (Z.of_nat maxn) : mword 64) ->
   (Z.of_nat maxn < 2 ^ 64)%Z ->
-  (* it respects MAXVA (vmfault's premise) *)
   (uint szv <= 2 ^ 38)%Z ->
-  (* vmfault's kalloc keeps its transient noff increment in int range *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-  (* copyinstr -> walkaddr -> walk *)
   locks_below lks "kmem" ->
   sie_cap_gpr KT1 mm K b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
-  proc_pt P -∗
+  proc_ptm P (uint szv) M -∗
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] dst_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -130,7 +153,7 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
-    proc_pt P' -∗
+    proc_ptm P' (uint szv) M -∗
     ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] dst_new j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜uptd_ext_sz szv P P'⌝ -∗
@@ -139,10 +162,11 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID
   WP (Loop : expr riscv_lang).
 
 Module Type COPYINSTR.
-  Parameter wp_copyinstr_sconf :
+  Parameter wp_copyinstr_sconf_mem :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (ktb : ktier) (γa : gname) (mm : regfile)
-      (P : uptd) (szv : mword 64) (maxn : nat) (dst_olds : nat -> bv 8)
+      (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (maxn : nat)
+      (dst_olds : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_copyinstr_sconf_body ktb γa mm P szv maxn dst_olds K lvl eb p b lks.
+      wp_copyinstr_sconf_mem_body ktb γa mm P M szv maxn dst_olds K lvl eb p b lks.
 End COPYINSTR.

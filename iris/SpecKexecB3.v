@@ -94,7 +94,7 @@ Definition kxc_b2_body
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
-    (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
+    (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
     (m M : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) :=
@@ -120,27 +120,27 @@ Definition kxc_b2_body
  -∗
   kxc_at_12c jp gf
  kf qf sf gyf inumf dnf bmf gilf gislf n2
-             plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas m M K
+             plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
              (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
              (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
              w67 ef P i szv -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (M' : regfile) (P' : uptd) (szv' : mword 64),
       kxc_at_1ae jp gf
-                 plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
+                 plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                  (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                  w67 ef P' szv' (m !!! Regidx Rs11) -∗
       wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-        KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+        KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
              eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
              pfun av dqa avf aslen dqas afun) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -160,7 +160,7 @@ Definition kxc_b2z_body
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
-    (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
+    (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
     (m M : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) :=
@@ -181,7 +181,7 @@ Definition kxc_b2z_body
  -∗
   kxc_at_1a2 jp gf
  kf qf sf gyf inumf dnf bmf gilf gislf n2
-             plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas m M K
+             plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
              (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -190,7 +190,7 @@ Definition kxc_b2z_body
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (M' : regfile),
       kxc_at_1ae jp gf
-                 plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
+                 plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -211,14 +211,14 @@ Module Type KEXECB3.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64),
     kxc_b2_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
+      pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
       ef P i szv.
 
   Parameter kxc_b2z :
@@ -231,12 +231,12 @@ Module Type KEXECB3.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd),
     kxc_b2z_body gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w13 w67 ef P.
+      pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w13 w67 ef P.
 End KEXECB3.
