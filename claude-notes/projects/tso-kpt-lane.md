@@ -403,3 +403,214 @@ is not a hang.
 
 Nothing else.  No spec signature moved; no file on the lane's forbidden list was
 opened.
+
+---
+
+## K10. THE REPAIR, AUTHORIZED AND STARTED — §0.36′(b)/(d) on §0.29′'s standing machinery
+
+*(Owner/coordinator authorization: "your parked kernel-table context is
+§0.29′'s design applied to the PT stamp, and T is literally the ruling's
+PT-validity stamp".  Cited: §0.29′ ("an invariant is a CONTAINER, not a
+CHANNEL — boot-published read-only facts distribute through the started
+barrier … the named-context parked record + per-hart absorb"), §0.36′(a)/(b)/(d).)*
+
+### K10a. THE CHANNEL WAS ALREADY BUILT — EXCEPT AT THE PHYSICAL TIER
+
+The two halves §0.36′(b) needs exist, are green, and are stated over an
+arbitrary `CtxMorph` payload:
+
+| | |
+|---|---|
+| `TsoCtx.ctx_deposit` (`:1570`) | running → parked, **interp-free**, and the parked stamp is RAISED to cover the payload, so the deposit has nothing to prove about WHEN the table was written |
+| `TsoCtxAbsorbLb.ctx_absorb_lb` (`:105`) | parked → running at a receipt, **interp-free**, so it runs OUTSIDE a WP leaf — which is what makes it usable at `main+0xac`, in `scheduler`'s regime, and at a secondary's post-`started` fence alike |
+| `TsoCtx.ctx_parked_alloc` (`:513`) | the fresh named record, at stamp 0 |
+| `TsoCtx.ctx_parked_llb` (`:1631`) | the record's own `llb loglen_name T` |
+
+`ctx_deposit`'s header even names the use: *"a fork's hand-me-downs … have
+NOTHING TO PROVE at the deposit site; the resumer's lock acquire pays the
+raised stamp."*  The KPT lane's table is that sentence with `kvminit` in place
+of the fork.
+
+**What was missing is ONLY the physical tier.**  `TsoCtx` carries `CtxMorph`
+instances for the VIRTUAL tower (`ctx_pointsto`, `ctx_word_pointsto`, and the
+structural combinators `_sep` / `_exist` / `_big_sepL` / `_const`) and **none**
+for `ctx_phys_pointsto` — and a page-table slot is
+`PtTree.pt_slot_own (UTier ξ) = ctx_phys_word_pointsto` (`PtTree.pt_slot_own_Some`).
+That gap, and the persist ladder beside it, is the whole of what §2/§1 of the
+new file build.
+
+> **EIGHTH INSTANCE OF THE LANE'S RECURRING SHAPE.**  A6.106 §4 counted six;
+> K6 added the seventh.  This is the eighth, and the largest: the entire
+> transport §0.36′(b) describes was written for the park protocol and the fork
+> hand-me-downs, and needed one tier's worth of instances to serve the kernel
+> page table.
+
+### K10b. MEASURED CORRECTION — `SpecAcquire`'s receipt is half of what the absorb consumes
+
+The coordinator's "no waiting needed" is right that the receipt EXISTS and
+wrong that it completes the transport.  Read off the file:
+
+```coq
+  (* SpecAcquire.v:172 (generic tier) and :229 (below tier), exported
+     through ACQUIRE_GEN / ACQUIRE *)
+    (∃ K : nat, hart_view_lb K) -∗
+```
+
+`K` is **existentially quantified and related to nothing**.  `ctx_absorb_lb`
+consumes the park protocol's STABLE PAIR — `hart_view_lb K` *and* `⌜T ≤ K⌝` —
+and the second half is not derivable from the first:
+
+* the parked record hands out `llb loglen_name T` (`ctx_parked_llb`) and the
+  receipt hands out `llb loglen_name K` (`TsoGhost.view_lb_llb`).  **Two lower
+  bounds on the same `mono_nat` do not compare.**
+* the only law that compares them is `TsoCtx.hart_view_lb_get`, whose premises
+  are `tso_interp_at g` and `length g.(glog) ≤ g.(gtv) cpu_id` — i.e. the state
+  interpretation and the at-the-top fact, both available only INSIDE the AMO
+  leaf.  §0.17′'s rule again: `own_context` outside a leaf, `tso_interp_at`
+  inside one.
+
+So the conjunct that would finish it is `⌜T ≤ K⌝` for a caller-supplied `T`
+with `llb loglen_name T` held before the call — a spec parameter, not a free
+strengthening.  **Recorded, not requested**: K10c makes hart 0 need no
+comparison at all, and the secondaries' half is already an explicit premise at
+`SpecMainSecondary.v:179`.
+
+### K10c. WHAT UNBLOCKS HART 0 — the author's own arm of `visibleb`, projected
+
+Every other route to the table ends in the same comparison — *"is that log
+position at or below MY view?"* — and K3/K4 measured that it is provable only
+at an AMO.  **One route does not.**  `TsoMemPa.visibleb` is a disjunction:
+
+```coq
+  visibleb h tv log t := bool_decide (t ≤ tv)  ||  (the message at t is h's own)
+```
+
+The second arm holds at **every** `tv` — it is store forwarding, in the
+model's own visibility relation — and its witness
+(`i ↪[logm_name]□ m ∗ ⌜pm_tid m = h⌝`, from `TsoGhost.dirty_ok`'s right
+disjunct) is **persistent**.  So the reader's own visibility can be projected
+out of `own_context` ONCE and carried afterwards with no token, no receipt and
+no comparison.  That is §0.36′(c) — *"the walker's read gates become two-armed
+through the ctx tower's own disjunction"* — as a byte resource:
+
+```coq
+  Definition phys_seen (a : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
+    (∃ t, phys_pointsto a dq v ∗ a ↪[ts_name]{dq} (t, ts_pay_none) ∗
+       (view_lb view_name loglen_name (hart_agent cpu_id) t            (* I passed it *)
+        ∨ ∃ i mg, ⌜t = S i⌝ ∗ i ↪[logm_name]□ mg
+                    ∗ ⌜pm_tid mg = hart_agent cpu_id⌝))%I              (* I wrote it *)
+```
+
+persistent at `DfracDiscarded`, with the read law
+`phys_seen_read : … ⊢ ⌜∀ tv' ≥ g.(gtv) cpu_id, tso_read … (hart_agent cpu_id) tv' a = Some v⌝`
+— exactly `HartMFetch.fobl_ram`'s quantifier — and the projection
+`ctx_phys_pointsto_seen : own_context ξ -∗ ctx_phys_pointsto ξ a □ v -∗
+own_context ξ ∗ phys_seen a □ v`, which spends nothing.
+
+### K10d. WHY THE PROJECTION HAPPENS OUTSIDE THE LEAF — and it is an `IntrDefs` boundary, not a preference
+
+`TsoCtx.ctx_phys_load_bytes_ok` says the same thing and is the natural gate,
+but it spends `own_context`, and **the walk cannot have it**:
+
+* the token's home is `IntrDefs.sie_cap`'s fourth conjunct
+  (`SieCapCtx.v`'s header says so; `WpIntrInv.sie_cap_rest:1946` re-bundles it);
+* the walk's residue premise is `SRegime.sr_swp_translate`'s, and that field's
+  arity is fixed by **two call sites in `IntrDefs.v` (`:1642`, `:1788`)** — a
+  file this lane may not edit;
+* and riding it inside the residue does not work either: `kpt_res_at` is tied
+  to `tlb_res_pt` by `SRegime.kpt_swp_open` / `kpt_swp_close`, `tlb_res_pt`
+  lives inside `strans_inv`'s KPT arm, and `sie_cap` holds a token of its own —
+  two would be `TsoCtx.own_context_excl`, i.e. `False`.
+
+Every whole-function proof, `ProofMain` included, already reaches the token
+through `SieCapCtx.sie_cap_gpr_own_ctx_acc` (ten files use it).  So the token is
+spent there, once, and the residue carries the persistent projection.  **The
+hart-indexing costs nothing**: `tlb_res_pt` already holds this hart's `satp` and
+`tlb` CELLS, so it never crosses a `wp_next` anyway.
+
+### K10e. THE CHANNEL IS BUILT AND GREEN
+
+`iris/PhysSeen.v` (new) and `iris/KptCtxTravel.v` (new), plus one constructor in
+`iris/PtTree.v` and one lemma in `iris/HartSKpt.v`.  See K11 for the certified
+numbers and the exact file list.
+
+---
+
+## K11. BOUNDARY: THE TRAVEL CHANNEL AND THE SEEN TIER ARE LANDED AND GREEN
+
+### K11a. THE NUMBER
+
+**1102 `.vo` of 1340 `.v`**, sentinel-backed (`MAKEEXIT=2` + `DONE`, round r7),
+and the no-`.vo` list is **`diff`-IDENTICAL to the r0 baseline** — so the two new
+files are green and
+
+> **RED-9 held: `ProofForkretPark`, `ProofKernelvec`, `ProofMain`, `ProofSwtch`,
+> `ProofVirtioDiskIntr`, `ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`,
+> `WpSconfLock` — red-list delta 0.**
+
+1102 = the 1100 baseline + `PhysSeen` + `KptCtxTravel`.  `^Admitted` / `^Abort` /
+`^Axiom` are 0 in every file this lane touched.  The `ptier` change is deep: the
+validating round (r2) recompiled **594 files** — `PtTree`'s whole reverse cone —
+with `KptCtxTravel` the only new error root, and that root closed in r7.
+
+### K11b. FILES CHANGED (the merge list)
+
+| file | what |
+|---|---|
+| `iris/PhysSeen.v` | NEW.  `phys_seen_at` / `phys_word_seen_at`, their read laws, `_forget`, and the persistence instances.  K10c. |
+| `iris/KptCtxTravel.v` | NEW.  §1 the persist ladder; §2 the physical tier's `CtxMorph` instances; §3 `kpt_travel_deposit`; §4 `kpt_travel_absorb` + `kpt_stamp_passed`; §5 the projection `ctx_phys_pointsto_seen` and its folds; §6 `pt_slots_project` / `pt_page_own_at_project` / `ptree_own_at_project`. |
+| `iris/PtTree.v` | `ptier` gains `STier (h : agent)`; three branches (`pt_slot_own`, its `Timeless`, `pt_slot_own_forget`); the two accessors `pt_slot_own_seen` (in-section) and `pt_slot_own_Seen` (outside); `Require Import PhysSeen`. |
+| `iris/HartSKpt.v` | `kpt_slot_set_self`, `kpt_slot_bytes_ctx` (K5), and now `kpt_slot_bytes_seen` — the walk gate at the seen tier, no token; `Require Import PhysSeen`. |
+| `iris/_CoqProject` | two lines: `PhysSeen.v` after `PtAdBits.v`, `KptCtxTravel.v` after `KptPublish.v`. |
+
+Nothing else.  No spec signature moved; no forbidden file opened.
+
+### K11c. THE ONE DESIGN DECISION WORTH RECORDING — `STier`, not a parallel tree
+
+The walk needs the table's three PATH slots, and the obvious spelling of the
+projection was a parallel `seen`-tree with its own extractor mirroring
+`PtTree.ptree_own_path_ro_at`.  **Measured, a third `ptier` constructor is far
+cheaper and strictly better:** `ptier` is matched in exactly THREE places in the
+whole tree (`PtTree.v:1147/1153/1163`), and every tree lemma —
+`pt_page_own_at`, `ptree_own_at`, `pt_kids_own_at`, `ptree_own_path_ro_at`,
+`ptree_own_path_mem_at`, `ptree_own_S_at` … — is TIER-GENERIC, so the projected
+object is *the same tree proposition at a different index* and the walk needs no
+new extractor at all.  The agent rides in the constructor (`STier h`) rather than
+an ambient `CpuId` precisely so that `PtTree`'s section gains no `Context`, which
+would have moved implicit arguments in ~50 files (A6.53's own measurement of that
+section).
+
+Two traps found on the way, both worth keeping:
+
+* **`generalize (seqZ 0 512)` is wrong inside a `ptree_own_at` proof.**
+  `ptree_own_at`'s body contains `seqZ 0 512` LITERALLY, so once the fixpoint has
+  been unfolded by destructing its top-level `∗`, the generalisation reaches
+  inside the fix and the recursive calls stop folding — the error surfaces far
+  away as `iSpecialize: cannot instantiate … (fix ptree_own_at … [∗ list] i ∈ (i :: l) …)`.
+  A list-PARAMETERISED helper lemma cannot do that; `KptCtxTravel.pt_slots_project`
+  is that shape and the file's comment records why.
+* **`TsoCtx.llb_valid_q` is `Local`.**  The physical `CtxMorph` instance needs the
+  fractional-authority form of `llb_valid` (`ctx_dom` holds `ctx_at ξ (1/2) …`),
+  and it is not exported; its two lines are inlined instead
+  (`mono_nat_lb_own_valid` plus the `K = 0` arm).
+
+### K11d. WHAT IS LEFT
+
+1. **`KptShare`**: `kpt_creds` becomes the seen-tree at this hart
+   (`∃ t, kpt_lb t ∗ ptree_own_at (STier (hart_agent cpu_id)) 2 □ t`) —
+   persistent, arity fixed, and NOT ξ-indexed, so `tlb_res_pt` stays ξ-free.
+2. **`HartSKpt.kpt_path_obl`** off `kpt_slot_bytes_seen` — it no longer opens the
+   invariant for the tree, because the tree is in the residue.
+3. **`kpt_body`**: the measured consequence of K3(c) is that it cannot keep the
+   tree — publication and projection are exclusive on the ts key.  Its remaining
+   content (`kpt_lb`, `kmap_auth`, the spec) is ξ-free and hart-free, so the
+   invariant survives as §0.29′'s CONTAINER while the started deposit is the
+   CHANNEL.  The one site that consumes the tree from inside it is
+   `tlb_res_pt_translateAddr_at`'s call to `ptree_translateAddr_own`
+   (`KptShare.v`, ONE occurrence) — and `HartSKpt.kpt_noupd` proves its
+   write-back branch is dead for `kperm_flags`.
+4. **`ProofMain`**: `kpt_travel_deposit` after `kvminit`, `ptree_own_at_project`
+   through `SieCapCtx.sie_cap_gpr_own_ctx_acc` (already used in that file),
+   `kpt_inv_alloc`, and the eighth argument to `wp_kvminithart_sconf`;
+   `ProofMainSecondary` takes `kpt_stamp_passed T` where it already takes
+   `kpt_creds` (`SpecMainSecondary.v:179`).
