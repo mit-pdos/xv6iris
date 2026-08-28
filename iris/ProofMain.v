@@ -992,7 +992,7 @@ Section ProofMain.
        page is carved to [KSTACK_AV] and deposited in its dormant block
        ([SpecProcinit.procs_inv_alloc]) -- so a process's kernel stack comes
        from HERE for the rest of the system's life. ---- *)
-    iDestruct (kstack_bank_intro pas Hpasok with "Hkstx Hkstacks") as "Hbank".
+    iDestruct (kstack_bank_intro pas kalloc_junk Hpasok with "Hkstx Hkstacks") as "Hbank".
     iMod (kpt_inv_alloc (pt_base t) t (kvm_M pas) ⊤
             (kvm_bridge pas t (pt_base t) Hpasok eq_refl Hrep)
             with "Htree Hauth Hunset") as "[#Hkinv #Hlbt]".

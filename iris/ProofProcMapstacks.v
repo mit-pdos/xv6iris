@@ -152,7 +152,7 @@ Section ProofPMS.
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env_at γa γk (avail_sub on (64 + g)) -∗
     ([∗ list] i ∈ seq 0 64,
-       page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
+       page_filled (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12))) kalloc_junk) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g' : nat) (pas' : nat -> mword 44),
       sie_cap_gpr KT0 mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
@@ -165,7 +165,7 @@ Section ProofPMS.
       ⌜pt_rep0 t' (kvm_stacks pas' 64 m)⌝ -∗
       ⌜(g' <= kstacks_missing t)%nat⌝ -∗
       ([∗ list] i ∈ seq 0 64,
-         page_own (zero_extend' 64 (concat_vec (pas' i) (zeros' 12 : mword 12)))) -∗
+         page_filled (zero_extend' 64 (concat_vec (pas' i) (zeros' 12 : mword 12))) kalloc_junk) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -413,8 +413,8 @@ Section ProofPMS.
   (* pas-extension congruence on the accumulated page_own list *)
   Lemma pms_pages_ext `{XI : CurCtx} (i : nat) (f g : nat -> mword 44) :
     (forall j, (j < i)%nat -> f j = g j) ->
-    ([∗ list] j ∈ seq 0 i, page_own (zero_extend' 64 (concat_vec (f j) (zeros' 12 : mword 12))))
-    ⊢ ([∗ list] j ∈ seq 0 i, page_own (zero_extend' 64 (concat_vec (g j) (zeros' 12 : mword 12)))).
+    ([∗ list] j ∈ seq 0 i, page_filled (zero_extend' 64 (concat_vec (f j) (zeros' 12 : mword 12))) kalloc_junk)
+    ⊢ ([∗ list] j ∈ seq 0 i, page_filled (zero_extend' 64 (concat_vec (g j) (zeros' 12 : mword 12))) kalloc_junk).
   Proof.
     intro Hfg. iIntros "H". iApply (big_sepL_mono with "H").
     iIntros (k y Hy) "Hp". apply lookup_seq in Hy. destruct Hy as [-> Hlt].
@@ -477,7 +477,7 @@ Section ProofPMS.
     ptree_own 2 (DfracOwn 1) tk -∗
     kalloc_env_at γa γk (avail_sub (Some nb) (i + gk)) -∗
     ([∗ list] j ∈ seq 0 i,
-       page_own (zero_extend' 64 (concat_vec (pas j) (zeros' 12 : mword 12)))) -∗
+       page_filled (zero_extend' 64 (concat_vec (pas j) (zeros' 12 : mword 12))) kalloc_junk) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g' : nat) (pas' : nat -> mword 44),
       sie_cap_gpr KT0 mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
@@ -490,7 +490,7 @@ Section ProofPMS.
       ⌜pt_rep0 t' (kvm_stacks pas' 64 m0)⌝ -∗
       ⌜(g' <= kstacks_missing t)%nat⌝ -∗
       ([∗ list] i0 ∈ seq 0 64,
-         page_own (zero_extend' 64 (concat_vec (pas' i0) (zeros' 12 : mword 12)))) -∗
+         page_filled (zero_extend' 64 (concat_vec (pas' i0) (zeros' 12 : mword 12))) kalloc_junk) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -544,7 +544,13 @@ Section ProofPMS.
     assert (Hcnt : avail_sub (Some nb) (i + gk) = Some (S (nb - (i + gk) - 1))).
     { rewrite avail_sub_Some. f_equal. lia. }
     iEval (rewrite Hcnt) in "Hkpost".
-    iDestruct (kalloc_post_success with "Hkpost") as "(%Hpv & Hpage & Havail2)".
+    (* A6.90: the KSTACK pages travel FILLED, not merely owned -- §0.32′'s
+       [kalloc_post] carries the allocator's own memset run, and
+       [KstackOwn.kstack_own_intro] needs a page somebody WROTE (a
+       visibility-free [page_own] is too weak to become a [stack_own]).
+       So the 64-page conjunct is [page_filled … kalloc_junk] from here all
+       the way to [main]'s [kstack_bank_intro]. *)
+    iDestruct (kalloc_post_success_filled with "Hkpost") as "(%Hpv & Hpage & Havail2)".
     assert (Hav1 : Some (nb - (i + gk) - 1)%nat = avail_sub (Some nb) (i + gk + 1)).
     { rewrite avail_sub_Some. f_equal. lia. }
     iEval (rewrite Hav1) in "Havail2".
@@ -876,7 +882,7 @@ Section ProofPMS.
       peel_reg_step. exact Hmr0_27. }
     (* accumulate the page_own for the new slot i *)
     iAssert ([∗ list] j ∈ seq 0 (S i),
-               page_own (zero_extend' 64 (concat_vec (pas' j) (zeros' 12 : mword 12))))%I
+               page_filled (zero_extend' 64 (concat_vec (pas' j) (zeros' 12 : mword 12))) kalloc_junk)%I
       with "[Hpages Hpage]" as "Hpages".
     { rewrite seq_S. rewrite big_sepL_app.
       iSplitL "Hpages".

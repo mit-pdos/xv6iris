@@ -695,7 +695,7 @@ Section KvmmakeHouse.
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env_at γa γk (avail_sub on K_kvmmake) -∗
     ([∗ list] i ∈ seq 0 64,
-       page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
+       page_filled (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12))) kalloc_junk) -∗
     wp_next (CID0 := CID) b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t : ptree) (pas' : nat -> mword 44),
       sie_cap_gpr KT0 mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
@@ -708,7 +708,7 @@ Section KvmmakeHouse.
       ⌜callee_saved mm mr⌝ -∗
       ⌜kvm_pas_ok pas'⌝ -∗
       ([∗ list] i ∈ seq 0 64,
-         page_own (zero_extend' 64 (concat_vec (pas' i) (zeros' 12 : mword 12)))) -∗
+         page_filled (zero_extend' 64 (concat_vec (pas' i) (zeros' 12 : mword 12))) kalloc_junk) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
