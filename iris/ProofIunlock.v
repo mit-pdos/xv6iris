@@ -556,7 +556,7 @@ Section ProofIunlockMain.
     iMod (ic_swap_park_dep fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k d s dev inum g dn' bm'
             Hdshr with "Hbody Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz")
       as "(Hbody & Htok & Href & Hside)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    iMod ("Hclose" with "[Hbody]") as "_"; [iApply bi.later_intro; iExact "Hbody" |].
     iModIntro.
     iApply (RS.wp_releasesleep_gen_sconf gs gil gisl "inode"%string
               (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks

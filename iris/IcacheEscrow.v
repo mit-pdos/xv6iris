@@ -3512,7 +3512,7 @@ Section IcacheEscrow.
     iMod (ic_shrink_tx_body _ _ _ _ _ _ _ _ _ _ _ _ q q1 q2 Hq
             with "Hbody Hvld Hdep")
       as "(Hvld & Hdep & Htx & Hbody)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    iMod ("Hclose" with "[Hbody]") as "_"; [iApply bi.later_intro; iExact "Hbody" |].
     iModIntro. iFrame "Hvld Hdep Htx".
   Qed.
 
@@ -3535,7 +3535,7 @@ Section IcacheEscrow.
     iMod (ic_grow_tx_body _ _ _ _ _ _ _ _ _ _ _ _ q q1 q2 Hq
             with "Hbody Hvld Hdep Htx")
       as "(Hvld & Hdep & Hbody)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    iMod ("Hclose" with "[Hbody]") as "_"; [iApply bi.later_intro; iExact "Hbody" |].
     iModIntro. iFrame "Hvld Hdep".
   Qed.
 

@@ -1274,7 +1274,7 @@ Section ProofIget.
             iDestruct (wordw_claim_of (KTR := KT0) 4 (i_dev (ientry e))
                          (DfracOwn 1) devT ltac:(lia) with "Hcellp") as "#Hclaim1".
             iMod ("Hclosep" with "[Hcbp Hcellp]") as "_";
-              [ iNext; iApply ("Hcbp" with "Hcellp") |].
+              [ iApply bi.later_intro; iApply ("Hcbp" with "Hcellp") |].
             iModIntro.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x6e)) Rs2 Rs3
                       (mword_of_int 0 : mword 12) N1 (trap_res b + (K - 6))%nat
@@ -1298,7 +1298,7 @@ Section ProofIget.
                       with "Hbody Hgid") as "(Hcell & Hgid & Hcb)".
               iModIntro. iExists devT. iFrame "Hcell". iIntros "Hcell".
               iMod ("Hclose2" with "[Hcb Hcell]") as "_";
-                [ iNext; iApply ("Hcb" with "Hcell") |].
+                [ iApply bi.later_intro; iApply ("Hcb" with "Hcell") |].
               iMod ("Hidback" with "Hgid") as "Hgid".
               iModIntro. iFrame "Hgid". }
             iApply wp_next_off_intro. iIntros "Hcg Hpc Hgid".

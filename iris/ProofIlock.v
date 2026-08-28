@@ -2618,7 +2618,7 @@ Section ProofIlockMain.
                 ltac:(solve_ndisj) Hk with "Hitbl Hsel [Hlv]") as "[]".
         iExists g0. iExact "Hlv". }
     iDestruct "Hok" as "(Hbody & Hdep & Hout)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    iMod ("Hclose" with "[Hbody]") as "_"; [iApply bi.later_intro; iExact "Hbody" |].
     iModIntro.
     iDestruct "Hout" as (vv) "(Hidev & Hinumc & Hvalid & Hpay)".
     iEval (rewrite -Hipe) in "Hidev".

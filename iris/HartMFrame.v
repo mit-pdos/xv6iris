@@ -430,7 +430,7 @@ Section gpr.
          iDestruct "Hsi" as "(Hreg & Hmem & Hdev)";
          iDestruct (reg_valid with "Hreg Hpt") as %Lv;
          iApply fupd_mask_intro; [apply empty_subseteq|];
-         iIntros "Hcl"; iNext; iMod "Hcl" as "_"; iModIntro;
+         iIntros "Hcl"; iApply bi.later_intro; iMod "Hcl" as "_"; iModIntro;
          iSplitL "Hreg Hmem Hdev"; [by iFrame|];
          rewrite hregread_resume_red Lv;
          iApply swp_ret; by iFrame.
@@ -486,7 +486,7 @@ Section gpr.
              iMod (reg_update _ rg _ (regval_into_reg w) with "Hreg Hpt")
                as "[Hreg Hpt]";
              iApply fupd_mask_intro; [apply empty_subseteq|];
-             iIntros "Hcl"; iNext; iMod "Hcl" as "_"; iModIntro;
+             iIntros "Hcl"; iApply bi.later_intro; iMod "Hcl" as "_"; iModIntro;
              iSplitL "Hreg Hmem Hdev";
              [rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg; by iFrame|];
              rewrite hregwrite_resume_red;

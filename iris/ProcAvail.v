@@ -307,7 +307,7 @@ Section ProcAvail.
       apply gset_local_update. set_solver. }
     iEval (rewrite -gset_op auth_frag_op own_op) in "Hf".
     iDestruct "Hf" as "[Hj _]".
-    iMod ("Hclose" with "[Ha]") as "_"; [iNext; iExists (U ∪ {[j]}); iFrame "Ha" |].
+    iMod ("Hclose" with "[Ha]") as "_"; [iApply bi.later_intro; iExists (U ∪ {[j]}); iFrame "Ha" |].
     iModIntro. iExact "Hj".
   Qed.
 

@@ -1022,7 +1022,7 @@ Section CollectAll.
       iIntros "[Hbody Hbodies]".
       rewrite -(difference_difference_l_L E (↑(icEscN .@ k)) (esc_ns ks)).
       iMod ("Hclr" with "Hbodies") as "_".
-      iMod ("Hclk" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+      iMod ("Hclk" with "[Hbody]") as "_"; [iApply bi.later_intro; iExact "Hbody" |].
       done.
   Qed.
 

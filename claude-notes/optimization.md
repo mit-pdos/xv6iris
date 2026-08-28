@@ -966,6 +966,13 @@ site**, matching the 0.64 s/site on `ProofKexecB3`. The converted files span
 2177 s of build, so the whole sweep is worth on the order of a minute and a
 half of tree time.
 
+The `iNext;` sequencing form was swept too: 24 code sites, 18 kept in 10
+files (`FsCrash`, `HartSpan`, `HartSMem` rejected it). Not separately timed —
+it is the same substitution, and 18 sites mostly in cheap files is under the
+noise floor of a shared box. **The `[iNext]` occurrences are PROSE**, the
+notes' own bracket convention for naming a tactic: all 42 are inside comments
+and none is a code site, so a `\biNext\b` sweep must blank comments first.
+
 **Where it is NOT replaceable, `coqc` says so**, which is what makes the sweep
 safe: ~90 files rejected it and were reverted, and they are almost all the
 engine/leaf layer (`WpSmode*`, `UserStep*`, `HartStep*`, `ParkCap`,
