@@ -13690,3 +13690,44 @@ the parked continuation's ∀-quantified resumer ξ′ (the A6.104 handoff's fir
 design problem), and never needs `CtxMorph` transport.
 
 Recorded as a measurement.  Nothing opened.
+
+---
+
+## A6.108 — §0.37′ RECEIVED: Q4 deferred, lane holding
+
+*(Amendment A6.108, fliptree lane.  No source touched; recorded so a fresh
+context does not re-open what the owner has closed.)*
+
+**Owner ruling §0.37′:** Q4 is **deferred**.  `main`'s user-mode WP machinery is
+being reworked and context ownership will get a clearer home after that lands.
+
+**Consequences for this lane, explicitly:**
+
+* **Do NOT take the `upt_res_pt` embedding.**  A6.107 §3 measured it available
+  and cheap — trampoline-confined, never crosses a park, no `CtxMorph`
+  transport needed — and that measurement is **preserved as input to the future
+  decision**, not acted on.  Anyone reading A6.107 §3(g) should read this
+  amendment beside it.
+* **`UptWalkPt` and `UserMemPt` stay RED DELIBERATELY.**  They are two of the
+  nine and are not to be counted as regressions or "fixed" opportunistically.
+* **`lk_floor`'s §0.35′(i) widening (A6.105 §6) is still under owner review**,
+  and with it §0.36′ step 2 (the two-armed `kpt_slot_bytes_pin`), which A6.106
+  §5 deliberately did not open for the same reason.
+
+**State at the hold**, sentinel-backed (`MAKEEXIT=2`, round r21):
+**1100 .vo, RED 9** — `ProofForkretPark`, `ProofKernelvec`, `ProofMain`,
+`ProofSwtch`, `ProofVirtioDiskIntr`, `ProofVirtioDiskRwD`, `UptWalkPt`,
+`UserMemPt`, `WpSconfLock`.  `^Abort` / `^Admitted` / `^Axiom` all 0.  Mirror in
+sync.
+
+**What is landed and waiting for a client**, so the next stretch does not
+rebuild it:
+
+| artifact | file | waiting on |
+|---|---|---|
+| `wp_sd_zero_wpay_frame_s_sconf` | `WpSconfMem` §A6.104 | `WpSconfLock`'s cpu-store family (§0.35′) |
+| `lk_floor` + its two arms | `WpLock` | the widening ruling |
+| `ctx_phys_*_pin_mint_top`, `kptree_publish_top` | `CtxPinMint` §3b, `KptPublish` §6 | §0.36′ steps 1–3 |
+| `ghost_step` + `wp_fence_gs_s_sconf` | `HartBarrier` §5, `WpSconfFencePub` §4 | the same |
+
+Holding for the next ruling.
