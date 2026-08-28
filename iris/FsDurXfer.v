@@ -17,6 +17,21 @@
 (*  EXCLUSIVITY inside this file ([phi_runs_disj]; two full fragments at   *)
 (*  one address are inconsistent, [FsStateDefs.phi_excl]).                 *)
 (*                                                                        *)
+(*  THE TRANSPORT RUNS AT ANY SHARE ABOVE A HALF (durable-disk EV-X):     *)
+(*                                                                        *)
+(*     fs_state Gamma (DfracOwn q) S ==>                                  *)
+(*       fs_state Gamma (DfracOwn q) S * fs_state Gamma' (DfracOwn 1) S    *)
+(*                                                                        *)
+(*  and the [1/2 < q] premise IS the disjointness argument: two shares of *)
+(*  one byte that each exceed a half do not fit inside it, so the mint     *)
+(*  meeting the same block twice is refuted from OWNERSHIP                *)
+(*  ([dfrac_own_gt_half] into [phi_runs_q_disj]) and no pure fact about    *)
+(*  the state -- no [sk_disj], no carve -- is ever materialised.  The      *)
+(*  GHOST column does not take the share: [FsState.fs_ghost] is Phi-free,  *)
+(*  so the link family's validity is read off the source at any [q]        *)
+(*  ([fs_links_valid_tok]) and the fresh family is ONE [own_alloc] at the  *)
+(*  source's own element.                                                  *)
+(*                                                                        *)
 (*  THE SHAPE, bottom up:                                                  *)
 (*                                                                        *)
 (*    1.  A RUN is a (block, offset, bytes) triple; [xr_map] is its flat   *)
@@ -127,6 +142,27 @@ Qed.
 (* ...and the one reading of it the collection runs. *)
 Lemma dfrac_full_pair (dq : dfrac) : ~ ✓ (DfracOwn 1 ⋅ dq).
 Proof. exact (dfrac_full_nvalid dq). Qed.
+
+(* MORE THAN A HALF IS THE TRANSPORT'S WHOLE PREMISE (durable-disk EV-X).
+   [fs_state_xfer] runs at any [DfracOwn q] with [1/2 < q], and this is why:
+   two such shares of ONE byte sum past 1, so the mint meeting the same
+   block twice is refuted from OWNERSHIP and no pure disjointness fact about
+   the state is ever materialised. *)
+Lemma qp_gt_half_double (q : Qp) : (1/2 < q)%Qp -> (1 < q + q)%Qp.
+Proof. intros Hq. rewrite -(Qp.div_2 1). by apply Qp.add_lt_mono. Qed.
+
+Lemma dfrac_own_gt_half (q : Qp) :
+  (1/2 < q)%Qp -> ~ ✓ (DfracOwn q ⋅ DfracOwn q).
+Proof.
+  intros Hq. rewrite dfrac_op_own. intros Hv%dfrac_valid_own.
+  apply (Qp.lt_nge 1 (q + q)); [exact (qp_gt_half_double q Hq) | exact Hv].
+Qed.
+
+Lemma qp_half_lt_1 : (1/2 < 1)%Qp.
+Proof. apply Qp.lt_sum. exists (1/2)%Qp. by rewrite Qp.div_2. Qed.
+
+Lemma qp_half_lt_34 : (1/2 < 3/4)%Qp.
+Proof. apply Qp.lt_sum. exists (1/4)%Qp. compute_done. Qed.
 
 (* ====================================================================== *)
 (*  1.  RUNS                                                               *)
@@ -1058,6 +1094,32 @@ Section FsFoot.
 
 
 
+  (* ...AND THE SAME AT A UNIFORM SHARE (durable-disk EV-X), which is the
+     transport's real entry.  Nothing is re-proved: [fs_footprint Γ dq S] IS
+     the fraction-1 footprint at the constant-share view
+     ([FsState.fs_footprint_gq]), and a full-share run list read there IS
+     the one-share list at [Γ] ([phi_runs_q_at]).  The two PURE readings the
+     transport then takes -- pairwise disjointness off [phi_excl] and the
+     union's place inside the source's own authority off [phi_agree] -- are
+     already share-generic (section 2d). *)
+  Lemma fs_footprint_runs_q Γ (dq : dfrac) S :
+    fs_footprint Γ dq S
+    ⊢ ∃ PM, ⌜xf_shape S PM⌝ ∗ phi_runs_q Γ (xq_at dq (xr_fs S PM)).
+  Proof.
+    rewrite fs_footprint_gq. iIntros "H".
+    iDestruct (fs_footprint_runs (gamma_q Γ dq) S with "H") as (PM) "[%Hs Hr]".
+    iExists PM. iSplitR; [by iPureIntro |].
+    rewrite phi_runs_q_at. iExact "Hr".
+  Qed.
+
+  Lemma fs_footprint_of_runs_q Γ (dq : dfrac) S PM :
+    xf_shape S PM ->
+    phi_runs_q Γ (xq_at dq (xr_fs S PM)) ⊢ fs_footprint Γ dq S.
+  Proof.
+    intros Hs. rewrite phi_runs_q_at fs_footprint_gq.
+    iApply (fs_footprint_of_runs (gamma_q Γ dq) S PM Hs).
+  Qed.
+
   (* ...AND THE WHOLE FOOTPRINT AT QUIESCENCE'S SHARES (durable-disk EV
      stage 5).  [fs_footprint_runs]' twin, and the ONE step the commit's
      mint takes between the collection and [FsDurSnap.snap_mint]: the
@@ -1220,26 +1282,37 @@ Section Xfer.
      byte ties are later read through ([FsDurRead.snap_auth]); nothing is
      computed from [S] and no value is decoded. *)
   Lemma fs_footprint_xfer Γ (Hex : phi_excl Γ) (A : iProp Σ)
-      (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) S (gl gt : gname) :
-    A -∗ fs_footprint Γ (DfracOwn 1) S ==∗
+      (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) (dq : dfrac) S
+      (gl gt : gname) :
+    ~ ✓ (dq ⋅ dq) ->
+    A -∗ fs_footprint Γ dq S ==∗
       ∃ (g : gname) (B : gmap Z (bv 8)),
-        ⌜B ⊆ M⌝ ∗ A ∗ fs_footprint Γ (DfracOwn 1) S ∗ ghost_map_auth g 1 B
+        ⌜B ⊆ M⌝ ∗ A ∗ fs_footprint Γ dq S ∗ ghost_map_auth g 1 B
         ∗ fs_footprint (snap_gamma g gl gt) (DfracOwn 1) S.
   Proof.
-    iIntros "HA Hf".
-    iDestruct (fs_footprint_runs with "Hf") as (PM) "[%Hshape Hr]".
-    iAssert (⌜xr_disj (xr_fs S PM)⌝ ∧ phi_runs Γ (xr_fs S PM))%I
+    intros Hdq. iIntros "HA Hf".
+    iDestruct (fs_footprint_runs_q with "Hf") as (PM) "[%Hshape Hr]".
+    assert (Hok : xq_ok (xq_at dq (xr_fs S PM)))
+      by exact (xq_ok_at dq (xr_fs S PM) Hdq).
+    assert (Hst : xq_strip (xq_at dq (xr_fs S PM)) = xr_fs S PM)
+      by exact (xq_strip_at dq (xr_fs S PM)).
+    iAssert (⌜xr_disj (xr_fs S PM)⌝
+             ∧ phi_runs_q Γ (xq_at dq (xr_fs S PM)))%I
       with "[Hr]" as "[%Hdisj Hr]".
-    { iSplit; [iApply (phi_runs_disj Γ Hex with "Hr") | iExact "Hr"]. }
-    iAssert (⌜xr_union (xr_fs S PM) ⊆ M⌝ ∧ (A ∗ phi_runs Γ (xr_fs S PM)))%I
+    { iSplit; [| iExact "Hr"].
+      iDestruct (phi_runs_q_disj Γ Hex _ Hok with "Hr") as %Hd.
+      iPureIntro. rewrite -Hst. exact Hd. }
+    iAssert (⌜xr_union (xr_fs S PM) ⊆ M⌝
+             ∧ (A ∗ phi_runs_q Γ (xq_at dq (xr_fs S PM))))%I
       with "[HA Hr]" as "[%Hin [HA Hr]]".
-    { iSplit;
-        [iApply (phi_runs_in Γ A M Hag _ Hdisj with "HA Hr") | iFrame]. }
+    { iSplit; [| iFrame].
+      iDestruct (phi_runs_q_in Γ A M Hag _ with "HA Hr") as %Hi.
+      iPureIntro. rewrite -Hst. exact Hi. }
     iMod (fs_footprint_mint S PM gl gt Hshape Hdisj) as (g) "[Hba Hf']".
     iModIntro. iExists g, (xr_union (xr_fs S PM)).
     iSplitR; [by iPureIntro |]. iFrame "HA".
     iSplitL "Hr".
-    { iApply (fs_footprint_of_runs Γ S PM Hshape). iExact "Hr". }
+    { iApply (fs_footprint_of_runs_q Γ dq S PM Hshape). iExact "Hr". }
     iFrame "Hba". iExact "Hf'".
   Qed.
 
@@ -1248,18 +1321,20 @@ Section Xfer.
   (* ---------------------------------------------------------------- *)
 
   Theorem fs_state_xfer Γ (Hex : phi_excl Γ) (A : iProp Σ)
-      (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) S :
-    A -∗ fs_state Γ (DfracOwn 1) S ==∗
+      (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) (q : Qp) S :
+    (1/2 < q)%Qp ->
+    A -∗ fs_state Γ (DfracOwn q) S ==∗
       ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
         ⌜B ⊆ M⌝
         ∗ A
-        ∗ fs_state Γ (DfracOwn 1) S
+        ∗ fs_state Γ (DfracOwn q) S
         ∗ ghost_map_auth g 1 B
         ∗ ghost_map_auth gt 1 (fss_inodes S)
         ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
         ∗ fs_state (snap_gamma g gl gt) (DfracOwn 1) S.
   Proof.
-    iIntros "HA HS". iEval (rewrite fs_state_split fs_ghost_split) in "HS".
+    intros Hq. iIntros "HA HS".
+    iEval (rewrite fs_state_split fs_ghost_split) in "HS".
     iDestruct "HS" as "(Hf & Hl & #Hp)".
     iAssert (⌜∃ f, link_elem_ok (fss_inodes S) f
                    /\ ✓ link_elem (fss_inodes S) f⌝
@@ -1268,7 +1343,8 @@ Section Xfer.
     destruct Hlv as (f & Hfok & Hfv).
     iMod (fs_boot_alloc_at (fss_inodes S) (fss_inodes S) f Hfok Hfv)
       as (gl gt) "(Hta & Htf & Hl')".
-    iMod (fs_footprint_xfer Γ Hex A M Hag S gl gt with "HA Hf")
+    iMod (fs_footprint_xfer Γ Hex A M Hag (DfracOwn q) S gl gt
+            (dfrac_own_gt_half q Hq) with "HA Hf")
       as (g B) "(%Hin & HA & Hf & Hba & Hf')".
     iModIntro. iExists g, gl, gt, B.
     iSplitR; [by iPureIntro |]. iFrame "HA".
@@ -1288,19 +1364,22 @@ Section Xfer.
      element PLUS that fragment -- [FsState.fs_boot_alloc_root_slack] --
      which is why the slack is never a pure clause of anything. *)
   Theorem fs_state_xfer_tok Γ (Hex : phi_excl Γ) (A : iProp Σ)
-      (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) S (r : Z) (v : ity) :
-    A -∗ fs_state Γ (DfracOwn 1) S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
+      (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) (q : Qp) S
+      (r : Z) (v : ity) :
+    (1/2 < q)%Qp ->
+    A -∗ fs_state Γ (DfracOwn q) S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
       ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
         ⌜B ⊆ M⌝
         ∗ A
-        ∗ fs_state Γ (DfracOwn 1) S ∗ own (γlink Γ) (link_tok_elem r v)
+        ∗ fs_state Γ (DfracOwn q) S ∗ own (γlink Γ) (link_tok_elem r v)
         ∗ ghost_map_auth g 1 B
         ∗ ghost_map_auth gt 1 (fss_inodes S)
         ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
         ∗ fs_state (snap_gamma g gl gt) (DfracOwn 1) S
         ∗ own gl (link_tok_elem r v).
   Proof.
-    iIntros "HA HS Ht". iEval (rewrite fs_state_split fs_ghost_split) in "HS".
+    intros Hq. iIntros "HA HS Ht".
+    iEval (rewrite fs_state_split fs_ghost_split) in "HS".
     iDestruct "HS" as "(Hf & Hl & #Hp)".
     iAssert (⌜∃ f, link_elem_ok (fss_inodes S) f
                    /\ ✓ (link_elem (fss_inodes S) f ⋅ link_tok_elem r v)⌝
@@ -1311,7 +1390,8 @@ Section Xfer.
     destruct Hlv as (f & Hfok & Hfv).
     iMod (fs_boot_alloc_root_slack (fss_inodes S) f r v Hfok Hfv)
       as (gl gt) "(Hta & Htf & Hl' & Ht')".
-    iMod (fs_footprint_xfer Γ Hex A M Hag S gl gt with "HA Hf")
+    iMod (fs_footprint_xfer Γ Hex A M Hag (DfracOwn q) S gl gt
+            (dfrac_own_gt_half q Hq) with "HA Hf")
       as (g B) "(%Hin & HA & Hf & Hba & Hf')".
     iModIntro. iExists g, gl, gt, B.
     iSplitR; [by iPureIntro |]. iFrame "HA".
