@@ -1411,6 +1411,26 @@ Section ctx.
   Lemma ctx_dom_unseal (ξ ξ' : CtxId) : ctx_dom ξ ξ' = ctx_dom_def ξ ξ'.
   Proof. unfold ctx_dom. by rewrite (proj2_sig ctx_dom_aux). Qed.
 
+  (* >>> A6.116 §3(2): THE FLOOR TRANSPORTS ALONG DOMINATION, FOR FREE.
+     [ctx_dom]'s body already carries everything: the sender's authority at
+     [B], the relation [B ≤ B'], and the receiver's lower bound at [B'].  So a
+     floor the SENDER could discharge is one the RECEIVER can discharge, and
+     the ξ-indexed half of §0.35′(i) is not an obstacle to payload transport
+     at all -- what a crossing cannot do is CREATE the floor, only carry it.
+
+     This is what makes the lock handle's left arm propagate once anyone
+     has it; A6.116 §3 is then only about where the FIRST one comes from. <<< *)
+  Lemma ctx_floor_dom (ξ ξ' : CtxId) (lo : nat) :
+    ctx_dom ξ ξ' -∗ ctx_floor ξ lo -∗ ctx_dom ξ ξ' ∗ ctx_floor ξ' lo.
+  Proof.
+    rewrite ctx_dom_unseal /ctx_dom_def /ctx_floor.
+    iIntros "(%B & %W & %B' & %D & [Hb Hd] & %HDW & %HBB' & %HWB' & #Hlb') Hfl".
+    iDestruct (llb_valid_q with "Hb Hfl") as %HloB.
+    iSplitR "".
+    - iExists B, W, B', D. iFrame "Hb Hd Hlb'". by iPureIntro.
+    - iApply (llb_le _ B'); [lia|]. by iLeft.
+  Qed.
+
   (* A context-indexed payload that transports along domination.  This is
      the obligation lock payloads pick up in the M3 sweep: any payload
      failing it at SC is a payload the TSO flip would break -- found
