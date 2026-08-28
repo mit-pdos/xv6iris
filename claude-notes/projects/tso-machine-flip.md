@@ -14629,3 +14629,75 @@ is half a transport.
 `ctx_floor_dom` landed, additive, mirror refreshed at r27.  Nothing outside
 this lane's files touched.  (5) is now: the AMO leaf's strengthened export,
 then the `lock_openable_c` threading — with the propagation half already done.
+
+---
+
+## A6.118 — the export's SITE, measured: it is inside the already-red file, which makes the rest of `WpSconfLock` one indivisible unit
+
+*(Amendment A6.118, fliptree lane.  Site measurement for the agreed one-form
+export; no source touched, tree stands at r27 — RED 9, delta 0.)*
+
+### §1. THE AGREED FORM, RECORDED
+
+The AMO leaf hands back **`ctx_floor cur_ctx T`** for each `llb loglen_name T`
+presented, keeping the bare `(∃ K, hart_view_lb K)` conjunct for existing
+callers.  Rationale as ruled: `ctx_floor` is the most composable of the three
+equivalent spellings — persistent, travels for free through `ctx_floor_dom`
+(A6.117), and re-cashes into the stable pair `hart_view_lb K ∗ ⌜T ≤ K⌝` via
+`own_context_floor_view` for consumers that want that shape.  **Nobody exports
+the pair raw.**
+
+### §2. THE SITE, AND WHY IT MAKES THE REST ONE UNIT
+
+The AMO the lock path runs is `WpSconfLock.wp_amoswap_lockopen_s_sconf`
+(`:1397`), whose write obligation is `WpSconfLock.lock_word_amo_mint` (`:350`).
+That obligation already establishes the premise the absorb needs, by
+construction:
+
+```coq
+    (vstep (hart_agent (@cpu_id CIDw)) (S (length log)) log' V)
+```
+
+— the AMO puts this hart's view at `S (length log) = length log'`, i.e. **at
+the log top**, which is exactly `hart_view_lb_get`'s hypothesis.  So
+`llb loglen_name T` ⇝ `⌜T ≤ V' h⌝` ⇝ `ctx_bound_raise` ⇝ `ctx_floor cur_ctx T`
+is a few lines *here* and nowhere else.
+
+One thing it does not yet have: **`own_context`**, which `ctx_bound_raise`
+consumes.  `lock_word_amo_mint`'s telescope has interp and the ledger word but
+no token, so the token must be threaded from the leaf (the store obligations in
+this file already receive it — `wp_store_s_sconf_au_dat` passes
+`TsoCtx.own_context (CID := CIDw) cur_ctx` — so the pattern is in the file,
+one lemma over).
+
+**Consequence for sequencing:** the export lives in `WpSconfLock`, which is
+already red on its `notheld` read.  So the export, the two reads and the
+cpu-store instances are **one indivisible unit** — the file cannot be certified
+part-way, and there is no green boundary between them.  That is not a problem
+(no green file is at risk: `WpSconfLock` has been red since the baseline), but
+it means the next unit is the whole close of the file rather than a step
+inside it.
+
+### §3. THE UNIT, ITEMISED
+
+1. thread `own_context` into `lock_word_amo_mint` and export
+   `ctx_floor cur_ctx T` per presented `llb loglen_name T`;
+2. `notheld` on the completed kit (A6.115) — its floor now comes from (1) at
+   the creator's own acquire, propagating by `ctx_floor_dom` thereafter;
+3. the holder read (already on `lock_cell_read_vis`, A6.111-shaped);
+4. the cpu-store instances on `word_wpay_frame_store_gen_c`'s two arms, with
+   the release arm re-establishing `lk_own_anchored` off the message fragment
+   (A6.114 §4);
+5. `lock_openable_c` threading through `SpecAcquire` and its ~40 callers;
+6. close, then sweep the cone.
+
+(1)–(4) are one file; (5) is the cascade; (6) is the measurement.
+
+### §4. STATE
+
+Mirror in sync at r27.  **RED 9, delta 0**, sentinel-backed.  Every piece the
+unit needs is landed and green: the racy kit and its two `ledger_vis`
+projections (A6.111, A6.115), the cell's anchor invariant (A6.115), the
+floor's free transport (A6.117), the store gate's two arms and its message
+fragment (A6.109, A6.114), the no-migration pins on load/store/racy-load
+(A6.89, A6.109, A6.112), and `lock_openable_c` (A6.112).
