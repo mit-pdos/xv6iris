@@ -1152,7 +1152,7 @@ Section IputTail.
          handed this walk the [false] half ([IcacheRef.frzsel_agree]).  What
          comes out is the payload, the inum's still-unfrozen token and the
          arm's liveness half -- the three the retirement below consumes. *)
-      iDestruct "Harmt" as "[(Hpayl & Hoff & Hlvh & Hpin) | (_ & Hselt & _)]";
+      iDestruct "Harmt" as "[(Hpayl & Hoff & Hlvh & Hpin) | (Hselt & _)]";
         last first.
       { iDestruct (frzsel_agree with "Hself Hselt") as %Hb. discriminate. }
       iDestruct (islot_rest_join k qt icfg_dev inum Hqthalf with "Hrident [Hrest]")
@@ -1188,15 +1188,14 @@ Section IputTail.
            -- which the eviction has just taken out of PARKED -- are together
            the slot's whole unit, and the SELECTOR's two halves retire the
            free arm's bit.  The phase is [FrzOff] throughout (this is the
-           ORDINARY last close, no freeze anywhere), so the receipt and the
-           mirror trade are both [emp] and [frz_close] is the identity. *)
+           ORDINARY last close, no freeze anywhere), so the mirror trade is
+           [emp] and [frz_close] is the identity. *)
         iMod (iref_close_last_store_au (⊤ ∖ ↑minstretN) fsc_ireg fsc_fs icfg_ist icfg_nib
                 Mt k inum qt false FrzOff
                 ltac:(solve_ndisj) ltac:(solve_ndisj) Hinnib HMk
-                with "Hinv Hireg Hhalf Hrtok [Hlvh] Hself Hisl Hru Hoff Hcnt1 [] []")
+                with "Hinv Hireg Hhalf Hrtok [Hlvh] Hself Hisl Hru Hoff Hcnt1 []")
           as "[Hcell Hback2]".
         { iExists ga. iExact "Hlvh". }
-        { rewrite /frz_rcpt_pre. done. }
         { rewrite /frz_mir. done. }
         iModIntro. iExists (iref_word Mt k). iFrame "Hcell". iIntros "Hcell".
         iMod ("Hback2" with "Hcell") as "(Hhalf & Hisl & Hoff & Hcnt0 & _)".
@@ -2399,7 +2398,7 @@ Section IputFreePath.
        against a passed-through zero is [False].  They are the +0x8a close's
        OUTPUTS, not its inputs, and this body now produces them.
 
-       What arrives instead is the three things [ip_free_entry]'s mint
+       What arrives instead is the two things [ip_free_entry]'s mint
        produced at +0x50, and each has exactly one job here:
 
          [ifreeze_pre] -- kept IN HAND from the mint to +0x8a.  It decides
@@ -2408,13 +2407,10 @@ Section IputFreePath.
            park at +0x82 ([IcacheInv.frz_park_pre_reclaim]); it PINS THE
            COUNT there ([IcacheInv.icnt_freeze_forces_one], which is B1's
            whole answer); and it is what the last close steps to [FrzPost].
-         the RECEIPT -- parked in the escrow's frozen alternative at the
-           +0x5e window exit and taken home by the last close.
          the MIRROR's half UP -- what the +0x62 re-park puts in [islot2]'s
            FROZEN PARK, where a foreign [idup] collides with the mass beside
            it (OPEN(2.6b)). *)
     ifreeze_pre rg (bv_unsigned inum) -∗
-    frzown (bv_unsigned inum) -∗
     frzm_h (bv_unsigned inum) true -∗
     (* RULING R-e (iclaim-ledger.md §5⁗⁗): the FREEZE SELECTOR's OFF half,
        which [frz_park_ref1_off] peeled out of [islot2]'s live arm at the
@@ -2477,7 +2473,7 @@ Section IputFreePath.
            Hsp0 Ha0 Hs1v Hs2v Hs3v Hs4v Hlkbelow Hitnotin.
     iIntros "Hcg Hcnt Hpay Hextc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx
              #Hitlk #Hitinv #Hesc Htok Hhalf Hiauth Hipool Hpool %Hcik Hrtok Hgid Hwand
-             #Hslk Hpayl Hlvh Hvb #Hireg Hpre Hrcpt Hmirt Hselo Hru Hbms Hins #Hbmi Hppid
+             #Hslk Hpayl Hlvh Hvb #Hireg Hpre Hmirt Hselo Hru Hbms Hins #Hbmi Hppid
              #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots Hnlz #Hvlb Hcrd Hop Hhpn
              Hra Hs0f Hs1f Hs2f Hs3f Hs4f Hcont".
     (* durable-disk B''-esc: the free pool's own invariant, off the itable
@@ -2615,10 +2611,10 @@ Section IputFreePath.
     iDestruct (word4_pointsto_half_join with "Hvb Hva") as "Hvld".
     iMod (ic_dep_checkout fsc_ic k (DepFrz q icfg_dev inum tid qtx) with "Hictok")
       as "[Hdep Hdepa]".
-    iMod ("Hclose" with "[Hdepa Hfrg Hrident Hrcpt Hsele Htx Hmt Hgida Hpinr]") as "_".
+    iMod ("Hclose" with "[Hdepa Hfrg Hrident Hsele Htx Hmt Hgida Hpinr]") as "_".
     { iApply bi.later_intro.
       iApply (ic_close_out_frz fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k icfg_dev inum q tid qtx
-                with "Hdepa Hfrg Hrident Hrcpt Hsele Htx Hmt Hgida Hpinr"). }
+                with "Hdepa Hfrg Hrident Hsele Htx Hmt Hgida Hpinr"). }
     iModIntro.
     iAssert (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
       with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
@@ -3173,7 +3169,7 @@ Section IputFreePath.
        RECEIPT and nothing else, and the receipt goes home three lines below,
        inside the last close's own phase step. *)
     iDestruct (ic_payload_arm_decide_frz with "Hpre Harmt")
-      as "(Hpre & Hrcpt & Hsele & Hpintx)".
+      as "(Hpre & Hsele & Hpintx)".
     (* the mid-free park's own window closes here: the pin's halves agree and
        the share is home for good (durable-disk B''-tx5) *)
     iMod (ic_pin_exit k tid qtx with "Hhpn Hpintx") as "[Hpinr Htx]".
@@ -3197,8 +3193,8 @@ Section IputFreePath.
            reflexivity |].
         iExact "Haddrs". }
     iMod (ic_close_to_empty_frz fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k vv icfg_dev inum
-            with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hraw Hmt Hpinr Hrcpt")
-      as "(Hbody & Hgidf & Hrcpt)".
+            with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hraw Hmt Hpinr")
+      as "(Hbody & Hgidf)".
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
     iMod ("Hidback" $! icfg_dev inum with "Hgidf Htx") as "Hgidf".
     iModIntro.
@@ -3212,7 +3208,7 @@ Section IputFreePath.
                icnt_half (bv_unsigned inum) 0%nat ∗
                frzm_h (bv_unsigned inum) false)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
-              with "Hcg Hpc [] [] [Hhalf Hfrg Hrslh Hselp Hsele Hisl Hru Hpre Hicnt Hrcpt Hmirt]").
+              with "Hcg Hpc [] [] [Hhalf Hfrg Hrslh Hselp Hsele Hisl Hru Hpre Hicnt Hmirt]").
     { iApply (ipi_8a with "Htext"). }
     { rewrite Hpa8a. iExact "Hclaim86". }
     { rewrite Hpa8a Hstv2.
@@ -3229,7 +3225,7 @@ Section IputFreePath.
       iMod (iref_close_last_freeze_store_au (⊤ ∖ ↑minstretN) fsc_ireg fsc_fs icfg_ist
               icfg_nib Mt2 k inum q bfl rg
               ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib HMk2
-              with "Hitinv Hireg Hhalf Hfrg Hrslh Hsel12 Hisl Hru Hpre Hicnt Hrcpt Hmirt")
+              with "Hitinv Hireg Hhalf Hfrg Hrslh Hsel12 Hisl Hru Hpre Hicnt Hmirt")
         as "[Hcell Hback2]".
       iModIntro. iExists (iref_word Mt2 k). iFrame "Hcell". iIntros "Hcell".
       iMod ("Hback2" with "Hcell") as "(Hhalf & Hisl & Hfzpost & Hcnt0 & Hfzp)".
@@ -3779,7 +3775,7 @@ Section IputFreePath.
        live_gen k (1/2) g1 -∗
        (* ---- WHAT THE MINT LEFT STANDING (iclaim-ledger.md §3.16, A⁗) ----
           §3.14's token slot is gone from this seam: the free path no longer
-          hands the disjunction on unresolved, it hands on the THREE things
+          hands the disjunction on unresolved, it hands on the TWO things
           the mint at +0x50 produced.
 
           [ifreeze_pre] is kept IN HAND all the way to +0x8a -- it decides the
@@ -3787,8 +3783,6 @@ Section IputFreePath.
           ([IcacheEscrow.ic_payload_arm_decide_frz]), it pins the count across
           the lock-free span (B1, [IcacheInv.icnt_freeze_forces_one]) and it
           is what [iref_close_last_freeze_store_au] steps.
-          The RECEIPT is what the +0x5e window exit parks in the escrow's
-          FROZEN alternative, and the last close takes it home.
           The MIRROR's half UP is what [islot2]'s FROZEN PARK selects on --
           the park the re-assembly wand above demands. *)
        (* THE INDEX NAMES THE PARKED SHARE (durable-disk C-6): the mint at
@@ -3797,7 +3791,6 @@ Section IputFreePath.
           exactly that element: two halves of one element are not the
           whole.  The other half is the window's, below. *)
        ifreeze_pre ((rg, (tid, (qtx/2)%Qp)) : frzidx) (bv_unsigned inum) -∗
-       frzown (bv_unsigned inum) -∗
        frzm_h (bv_unsigned inum) true -∗
        (* ...AND THE SELECTOR's OFF HALF (RULING R-e, iclaim-ledger.md §5⁗⁗).
           [frz_park_ref1_off] peeled it out of [islot2]'s live arm at the
@@ -4163,7 +4156,7 @@ Section IputFreePath.
       destruct vld.
       - (* LOADED: the payload leaves with us; the FULL inum cell stays *)
         rewrite /ic_payload_arm.
-        iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh & Hpin) | (_ & Hselt & _)]";
+        iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh & Hpin) | (Hselt & _)]";
           last first.
         { (* RULING R-e, the selector route (rank-6 probe, Stage 1): the
              frozen alternative carries a QUARTER of the slot's freeze
@@ -4693,7 +4686,7 @@ Section IputFreePath.
             ((rg, (tid, (qtx/2)%Qp)) : frzidx)
             ltac:(solve_ndisj) Hnib (fe_nlink_zero (di_nlink dn) Hnl0) Htyne
             with "Hireg Hropen Htxf Hdat Hoff Hcnt1 Hmirf")
-      as "(Hdat & Hpre & Hcnt1 & Hrcpt & Hmirt)".
+      as "(Hdat & Hpre & Hcnt1 & Hmirt)".
     iModIntro.
     iEval (rewrite -Hp1nat) in "Hcnt1".
     (* ===== +0x50 c.sdsp s3,8(sp) ===== *)
@@ -4818,7 +4811,7 @@ Section IputFreePath.
     iApply ("HcB" $! F7 ga dn bm data
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hcg Hcnt Hpay Hextc Hclm Hpc Htok Hhalf Hiauth Hipool Hpool
-                    [%] Hrtok Hgid Hwand Hpayl Hlvh Hpre Hrcpt Hmirt Hself Hvb Hbms Hins
+                    [%] Hrtok Hgid Hwand Hpayl Hlvh Hpre Hmirt Hself Hvb Hbms Hins
                     Hppid Hbslots Hvlb Hcrd Hop Hhpn Hr1 Hr2 Hr3 Hg4 Hg5 Hg6").
     { exact Htyne. }
     { exact (fe_nlink_zero (di_nlink dn) Hnl0). }
@@ -5291,7 +5284,7 @@ Section ProofIput.
       iIntros (M5 g1 dn bm data) "%Htyne %Hnl0 %Hdnwf %Hbmwf %Hdlen %Hadr
                  %Hspd5 %Ha05 %Hs15 %Hs25 %Hs35 %Hs45 %Hhi5
                  Hcg Hcnt Hpay Hextc Hextm Hpc Htok Hhalf Hiauth Hipool Hpool
-                 %Hcik5 Hrtok Hgid Hwand Hpayl Hlvh Hpre Hrcpt Hmirt Hselo Hvb
+                 %Hcik5 Hrtok Hgid Hwand Hpayl Hlvh Hpre Hmirt Hselo Hvb
                  Hbms Hins Hppid Hbslots Hlb Hcrd2 Hop Hhpn
                  Hr24 Hr16 Hr8 Hg4 Hg5 Hg6".
       (* the frame, in the locked block's own [add_vec spd] spelling: the
@@ -5330,7 +5323,7 @@ Section ProofIput.
                 Hspd5 Ha05 Hs15 Hs25 Hs35 Hs45 Hfresh Hitne
                 with "Hcg Hcnt Hpay Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlogc
                       Hitab Hinv Hesc Htok Hhalf Hiauth Hipool Hpool [%] Hrtok
-                      Hgid Hwand Hslk Hpayl Hlvh Hvb Hireg Hpre Hrcpt Hmirt Hselo
+                      Hgid Hwand Hslk Hpayl Hlvh Hvb Hireg Hpre Hmirt Hselo
                       Hru Hbms Hins Hbmi Hppid Hprocs Hdevi Hdgeom Hdlock Hbslots
                       Hnlz Hlb Hcrd2 Hop Hhpn Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 [-]").
       { exact Hcik5. }

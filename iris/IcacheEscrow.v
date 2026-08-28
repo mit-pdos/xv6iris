@@ -1389,11 +1389,12 @@ Section IcacheEscrow.
          since the mint) and the LEFT arm's [ifreeze_off] dies on
          [IcacheRef.ifreeze_excl];
        * at a CHECKOUT ([ic_swap_checkout]) the holder owes the refutation of
-         the RIGHT arm, which its licence pays for
-         ([IgetLic.iname_not_frozen] puts the column at [FrzOff], at which
-         the region's own receipt clause holds [frzown] and
-         [IcacheRef.frzown_excl] closes it) -- DEVIATION 1's obligation,
-         unchanged in kind, recorded at ProofIlock.
+         the RIGHT arm, and RULING R-e pays it from the INVARIANT: the arm
+         carries a QUARTER of the slot's freeze selector, [live_slot]'s
+         frozen alternative holds the slot's whole liveness unit beside the
+         other half, and the deposit the checkout hands straight back carries
+         the caller's own positive slice -- [IcacheInv.frz_slot_kill] in one
+         line, with no licence and no region open (recorded at ProofIlock).
      Every LEFT-only consumer ([ic_payload], [ic_mk_parked], [ic_swap_park],
      the eviction family) keeps its exact signature. *)
   (* ---- THE LOCK-WINDOW PIN, PER ARM (durable-disk B''-tx5) ----
@@ -1477,13 +1478,13 @@ Section IcacheEscrow.
       (* the slot is in NEITHER of iput's two windows (durable-disk
          B''-tx5), LAST so no destructuring pattern above moved *)
       ∗ ic_pin_rest k)
-     (* RULING R-e (iclaim-ledger.md §5⁗⁗): the frozen alternative carries the
-        SELECTOR's quarter beside the receipt.  That quarter is what turns
+     (* RULING R-e (iclaim-ledger.md §5⁗⁗): the frozen alternative IS the
+        SELECTOR's quarter.  That quarter is what turns
         ProofIlock:2422 from an unpayable obligation into one line: with it
         and the live slice inside the deposit [ic_swap_checkout] hands back,
         [IcacheInv.frz_slot_kill] closes -- no lock, no licence, no region
         open, no index. *)
-     ∨ (frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true
+     ∨ (frzsel k ((1/2)/2)%Qp true
         (* THE MID-FREE PARK IS A WINDOW (durable-disk B''-tx5): it names the
            freeing transaction and the share it parked, so the +0x8a
            eviction gets that very share back. *)
@@ -1505,21 +1506,22 @@ Section IcacheEscrow.
     iIntros "[H Ht] Hl Hpin". iLeft. iFrame.
   Qed.
 
-  (* ...and the FROZEN alternative, which is the receipt alone *)
+  (* ...and the FROZEN alternative, which is the selector's quarter and the
+     window's own pin *)
   Lemma ic_payload_arm_frz γfs γi cov logstart k inum g v :
-    frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
+    frzsel k ((1/2)/2)%Qp true -∗
     ic_pin_tx k -∗
     ic_payload_arm γfs γi cov logstart k inum g v.
-  Proof. rewrite /ic_payload_arm. iIntros "H Hs Hpin". iRight. iFrame. Qed.
+  Proof. rewrite /ic_payload_arm. iIntros "Hs Hpin". iRight. iFrame. Qed.
 
   (* THE DECIDER at the free path's two readers (+0x70, +0x8a): the
      [ifreeze_pre] the walk has kept in hand since the mint kills the LEFT
      alternative outright ([ifreeze_excl] -- one exclusive ledger cell, two
-     fragments), so what comes back is the receipt. *)
+     fragments), so what comes back is the frozen tail. *)
   Lemma ic_payload_arm_decide_frz γfs γi cov logstart k inum g v (rg : frzidx) :
     ifreeze_pre rg (bv_unsigned inum) -∗
     ic_payload_arm γfs γi cov logstart k inum g v -∗
-    ifreeze_pre rg (bv_unsigned inum) ∗ frzown (bv_unsigned inum) ∗
+    ifreeze_pre rg (bv_unsigned inum) ∗
     frzsel k ((1/2)/2)%Qp true ∗
     (* ...AND THE WINDOW'S PIN (durable-disk B''-tx5), which is what the
        +0x8a eviction rejoins with the half it has held since the +0x70
@@ -1900,7 +1902,6 @@ Section IcacheEscrow.
         (⌜dv = dev /\ nu = inum⌝ ∗
          iref_frag k qf ∗
          inode_ident k (DfracOwn qf) dev inum ∗
-         frzown (bv_unsigned inum) ∗
          (* RULING R-e: the selector's quarter rides the DepFrz window too --
             it is the same quarter, moving from the mint through the OUT arm
             to [ic_parked]'s frozen tail at the +0x70 park. *)
@@ -2390,12 +2391,12 @@ Section IcacheEscrow.
             FROZEN  -- the arm was the free path's frozen park, so there is
             no payload to hand out at all.  The body goes back UNMOVED, the
             checkout's own [ic_tok] and deposit-descriptor come back
-            untouched, and what the caller gets instead is the standing
-            [frzown] -- which its LICENCE refutes
-            ([IgetLic.iname_not_frozen] puts the column at [FrzOff], at which
-            the region's own receipt clause holds the receipt and
-            [IcacheRef.frzown_excl] closes it).  DEVIATION 1's obligation,
-            unchanged in kind and recorded at ProofIlock. *)
+            untouched, and what the caller gets instead is the arm's QUARTER
+            of the slot's freeze selector, LENT with the wand that puts it
+            back.  RULING R-e is what makes that quarter pay: against
+            [live_slot]'s frozen alternative and the caller's own live slice
+            it is [IcacheInv.frz_slot_kill] in one line.  DEVIATION 1's
+            obligation, unchanged in kind and recorded at ProofIlock. *)
       ((ic_deposit cn k d ∗
         (∃ v : bool,
            i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
@@ -2405,8 +2406,8 @@ Section IcacheEscrow.
         (ic_out_rd γfs γi cov logstart d inum -∗
            ic_escrow_body cn γfs γi cov logstart k))
        ∨ (ic_tok cn k ∗ ic_dep_own k d dev inum ∗
-          frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
-          (frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
+          frzsel k ((1/2)/2)%Qp true ∗
+          (frzsel k ((1/2)/2)%Qp true -∗
              ic_escrow_body cn γfs γi cov logstart k))).
   Proof.
     iIntros (Hdg) "Hbody Htok Hown".
@@ -2420,17 +2421,16 @@ Section IcacheEscrow.
       rewrite /ic_payload_arm.
       iDestruct "Hpay" as "[(Hpay & Hoff & Hhalf & Hpin) | Hrcpt]"; last first.
       { (* THE FROZEN PARK: nothing to check out, and nothing moves.  The
-           receipt is LENT to the caller (whose licence turns it into
-           [False] against the region's own copy) with the wand that puts it
-           back -- the arm cannot simply give it away, being the only home
-           it has while the column reads [FrzPre]. *)
-        iDestruct "Hrcpt" as "(Hrcpt & Hsel & Hpin)".
+           SELECTOR's quarter is LENT to the caller (for whom RULING R-e
+           turns it into [False]) with the wand that puts it back -- the arm
+           cannot simply give it away, being one of the three shares that
+           account for the slot's freeze bit. *)
+        iDestruct "Hrcpt" as "(Hsel & Hpin)".
         iModIntro. iRight.
         iSplitL "Htok"; [iExact "Htok" |].
         iSplitL "Hown"; [iExact "Hown" |].
-        iSplitL "Hrcpt"; [iExact "Hrcpt" |].
         iSplitL "Hsel"; [iExact "Hsel" |].
-        iIntros "Hrcpt Hsel".
+        iIntros "Hsel".
         iLeft. rewrite /ic_parked. iExists dev, inum, v, ga.
         iFrame "Hid Hin Hvld Hmid Hgid".
         rewrite /ic_payload_arm. iRight. iFrame. }
@@ -2489,8 +2489,8 @@ Section IcacheEscrow.
            i_valid (ientry k) ↦₄ valid_word v ∗
            ic_payload γfs γi cov logstart k inum g v))
        ∨ (ic_tok cn k ∗ ic_dep_own k d dev inum ∗
-          frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
-          (frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
+          frzsel k ((1/2)/2)%Qp true ∗
+          (frzsel k ((1/2)/2)%Qp true -∗
              ic_escrow_body cn γfs γi cov logstart k))).
   Proof.
     iIntros (Hdg Hnrd) "Hbody Htok Hown".
@@ -2532,8 +2532,8 @@ Section IcacheEscrow.
            ity_shot g (di_type dn) ∗
            ifreeze_off (bv_unsigned inum)))
        ∨ (ic_tok cn k ∗ ic_dep_own k (DepRd s dev inum g) dev inum ∗
-          frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
-          (frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
+          frzsel k ((1/2)/2)%Qp true ∗
+          (frzsel k ((1/2)/2)%Qp true -∗
              ic_escrow_body cn γfs γi cov logstart k))).
   Proof.
     iIntros "Hbody Htok Hshr #Hshot".
@@ -2542,11 +2542,10 @@ Section IcacheEscrow.
             with "Hbody Htok [Hshr]") as "[Hok | Hfrz]".
     { rewrite /ic_dep_own.
       iSplitR; [iPureIntro; split; reflexivity | iExact "Hshr"]. }
-    2:{ iDestruct "Hfrz" as "(Htok & Hown & Hrcpt & Hsel & Hwand)".
+    2:{ iDestruct "Hfrz" as "(Htok & Hown & Hsel & Hwand)".
         iModIntro. iRight.
         iSplitL "Htok"; [iExact "Htok" |].
         iSplitL "Hown"; [iExact "Hown" |].
-        iSplitL "Hrcpt"; [iExact "Hrcpt" |].
         iSplitL "Hsel"; [iExact "Hsel" | iExact "Hwand"]. }
     iDestruct "Hok" as "(Hdep & Hpay & Hback)".
     iDestruct "Hpay" as (v) "(Hidv & Hinm & Hvld & Hpay)".
@@ -2704,7 +2703,7 @@ Section IcacheEscrow.
       { rewrite /ic_dep_res /ic_dep_own /ic_dep_half /=.
         iDestruct "Hres" as "[[] _]". }
       rewrite /ic_out_frz.
-      iDestruct "Hfrz" as "([%Hdv %Hnu] & Hfr & [Hrd Hrn] & Hrc & Hsel & Htx)".
+      iDestruct "Hfrz" as "([%Hdv %Hnu] & Hfr & [Hrd Hrn] & Hsel & Htx)".
       subst dev' inum'.
       iMod (ic_pin_enter k t qt with "Hpin Htx") as "[Hpin Hhalf]".
       iModIntro.
@@ -2712,7 +2711,7 @@ Section IcacheEscrow.
         [| iFrame "Htok Hfr"; iFrame "Hrd Hrn"; iExact "Hhalf"].
       iLeft. rewrite /ic_parked. iExists dev, inum, v, inhabitant.
       iFrame "Hid Hin Hvld Hmid Hgid".
-      iApply (ic_payload_arm_frz with "Hrc Hsel Hpin").
+      iApply (ic_payload_arm_frz with "Hsel Hpin").
     - iDestruct "Hmid" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
       iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
     - iDestruct "Hvg" as (dev' inum' w) "(_ & _ & Hvld' & _ & _ & _)".
@@ -3269,9 +3268,8 @@ Section IcacheEscrow.
      The free path's last close is ONE atomic store, and its three ledger
      outputs -- the count at zero, the mirror DOWN and the [FrzPost] phase --
      do not exist until it has fired.  So the eviction runs FIRST, on what the
-     frozen park does hold, and hands the RECEIPT back for the close to take
-     home; the pool bundle is assembled afterwards out of what the close
-     produced ([ipool_shape_await] below). *)
+     frozen park does hold; the pool bundle is assembled afterwards out of
+     what the close produced ([ipool_shape_await] below). *)
   Lemma ic_close_to_empty_frz cn γfs γi cov logstart k (v : bool)
       (dev inum : mword 32) :
     ic_id cn k (1/2) true dev inum -∗
@@ -3283,17 +3281,15 @@ Section IcacheEscrow.
     inode_raw (ientry k) -∗
     ic_mid cn k -∗
     ic_pin_rest k -∗
-    frzown (bv_unsigned inum) -∗
     |==> ic_escrow_body cn γfs γi cov logstart k ∗
-         ic_id cn k (1/2) false dev inum ∗
-         frzown (bv_unsigned inum).
+         ic_id cn k (1/2) false dev inum.
   Proof.
-    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hpin Hrc".
+    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hpin".
     iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
       as "[Hgf1 Hgf2]".
     iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
     iModIntro.
-    iSplitR "Hgf2 Hrc"; [| iSplitL "Hgf2"; [iExact "Hgf2" | iExact "Hrc"]].
+    iSplitR "Hgf2"; [| iExact "Hgf2"].
     iApply ic_close_empty. rewrite /ic_empty_arm.
     iExists dev, inum, (valid_word v). iFrame.
   Qed.
@@ -3525,7 +3521,7 @@ Section IcacheEscrow.
   (* ...AND THE FREE PATH'S WINDOW EXIT (IVd, +0x5e), which closes at the
      SECOND alternative.  What goes in is the reference MINUS its two live
      slices -- those are in [islot2]'s frozen park from the +0x62 re-park --
-     plus the freeze RECEIPT the mint produced.  What stays in the freer's
+     plus the SELECTOR's quarter.  What stays in the freer's
      hand is what itrunc needs: the ½ dev and inum cells, the whole valid
      cell, and the payload (B2's dissolution).
 
@@ -3543,21 +3539,21 @@ Section IcacheEscrow.
     ic_deposit cn k (DepFrz qf dev inum t qt) -∗
     iref_frag k qf -∗
     inode_ident k (DfracOwn qf) dev inum -∗
-    frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
+    frzsel k ((1/2)/2)%Qp true -∗
     t ↪[ln_tx icfg_log]{#qt} tt -∗
     ic_mid cn k -∗
     ic_id cn k (1/2) true dev inum -∗
     ic_pin_rest k -∗
     ic_escrow_body cn γfs γi cov logstart k.
   Proof.
-    iIntros "Hdep Hfr Hid Hrc Hsel Htx Hmt Hgid Hpin".
+    iIntros "Hdep Hfr Hid Hsel Htx Hmt Hgid Hpin".
     iRight; iLeft. rewrite /ic_out.
     iExists (DepFrz qf dev inum t qt), dev, inum.
     rewrite (ic_out_rd_none γfs γi cov logstart (DepFrz qf dev inum t qt) inum
                eq_refl).
     iFrame "Hdep Hmt Hgid Hpin". iRight.
     rewrite /ic_out_frz. iSplitR; [iPureIntro; split; reflexivity |].
-    iFrame "Hfr Hid Hrc Hsel Htx".
+    iFrame "Hfr Hid Hsel Htx".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -4138,7 +4134,7 @@ Section IcacheEscrow.
           rewrite /ic_payload_np /ic_unloaded. iFrame "Hraw Hpool Hpend".
       + (* iput's MID-FREE PARK: A WINDOW, and the pin it carries names the
            open transaction whose share it parked (durable-disk B''-tx5). *)
-        iExFalso. iDestruct "Hfrz" as "(_ & _ & Hpin)".
+        iExFalso. iDestruct "Hfrz" as "(_ & Hpin)".
         rewrite /ic_pin_tx. iDestruct "Hpin" as (tp qp) "[_ Hp]".
         iApply (tx_pin_no_ops with "Ha Hp").
     - (* OUT: the write arm is refuted, the read arm gives three quarters,
@@ -4180,7 +4176,7 @@ Section IcacheEscrow.
         destruct d as [| qf dv nu tf qtf | s dv nu g t q | s dv nu g];
           try (rewrite /ic_out_frz; iDestruct "Hfrz" as "[]").
         iExFalso. rewrite /ic_out_frz.
-        iDestruct "Hfrz" as "(_ & _ & _ & _ & _ & Hp)".
+        iDestruct "Hfrz" as "(_ & _ & _ & _ & Hp)".
         iApply (tx_pin_no_ops with "Ha Hp").
     - (* MID: the recycle window holds a POOL row *)
       iDestruct "Hmid" as (dev inum w) "(Hidd & Hidn & Hvld & Hun & Hgid & Hpin)".

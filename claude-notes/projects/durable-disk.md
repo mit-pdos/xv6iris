@@ -5294,24 +5294,57 @@ the rows below and in `design/fs-ghost-state.md`).
     (`log_psi_step`, `log_psi_commit`, `fs_dstep`, `log_ctx_at Ψ`) is the
     same kind of drift and was out of this lane's brief: `log_ctx` carries
     no Ψ today and none of those names exists in the tree.
-- [ ] **Rank 6 — the `frzown` receipt** (probed 2026-08-28: PAYS, form
-  C1 = delete it outright; owner: go).  `frzown_excl` had ONE caller
-  (`ireg_frzown_off_absurd`), which had ONE caller (iput's +0x3a read,
-  `ProofIput.v`), and ruling R-e's selector quarter in the same arm
-  already decides it (`frz_slot_kill`).  Stage 1 (the gate) LANDED at
-  `99ef185a`: the +0x3a refutation runs on the selector, same mask,
-  `solve_ndisj` unaided, +1 s on `ProofIput`; the receipt is inert.
-  Stages 2–5: delete the two lemmas; strip the conjunct from
-  `ic_payload_arm`'s frozen alternative and `ic_out_frz`; `ireg_frzc`'s
-  first conjunct, `ireg_freeze_au`'s output #4, the `frz_rcpt` family;
-  then the ghost (`frzown`, `frzo_boot_*`, `icfg_frzo`, `icfg_alloc`'s
-  `FM`, `frzoUR`/`icache_frzoG`/its `GFunctor` in `xv6Σ`).  Ten files,
-  ~110 mechanical touch points, zero `Spec*.v` changes.  Refuted
-  alternatives: fold into the mirror `frzm` (a ½-½ agreement cannot
-  make an arm absurd), fold `DepFrz` into `DepTx` (kills eight
-  one-line `discriminate` refutations), drop the freeze index (its
-  `.1` is in `SpecIput`, its `.2` is `ireg_fpin`, the corpse's only
-  refuter).
+- [x] **Rank 6 — the `frzown` receipt: DELETED** (form C1).  The freeze
+  RECEIPT is gone from the tree, camera and all.
+
+  **As landed.**  `frzown` bought exactly one fact at exactly one program
+  point — iput's +0x3a window-entering read, through
+  `ireg_frzown_off_absurd`, the sole caller of the sole caller of
+  `frzown_excl` — and RULING R-e's selector quarter, already sitting in
+  the same arm, decides it with `IcacheInv.frz_slot_kill` at the same
+  mask, `solve_ndisj` unaided.  With that one `iMod` re-routed the whole
+  ghost was inert plumbing, and it comes out in four sweeps: the two
+  elimination lemmas; the conjunct out of `IcacheEscrow.ic_payload_arm`'s
+  FROZEN alternative and out of `ic_out_frz` (pins stay LAST in both, so
+  no trailing pattern moved); `InodeRegion.ireg_frzc`'s first conjunct —
+  the clause is now the MIRROR ALONE — with `ireg_freeze_au`'s output #4
+  and `IcacheInv`'s whole `frz_rcpt`/`frz_rcpt_pre` family; then the ghost
+  itself (`frzown`, `frzo_boot_map`/`_valid`/`_split`, the `icfg_frzo`
+  field, `icfg_alloc`'s `FM` argument, `frzoUR`, `icache_frzoG` and its
+  `GFunctor` in `icacheΣ`).
+
+  **What changed statement.**  Ten files, zero `Spec*.v`, no `wp_*`
+  contract, no `fs_crash_seam`/`log_ctx`/`log_op` arity.  Premises or
+  outputs shrank on: `ic_payload_arm_frz`, `_decide_frz`,
+  `ic_close_out_frz`, `ic_close_to_empty_frz`, the three
+  `ic_swap_checkout*` (their frozen outcome's return wand went from two
+  arguments to one), `ireg_frzc_intro`/`_off_acc`/`_off_intro`,
+  `ireg_freeze_au`, `ireg_icnt_frz_acc`, `iref_close_last_store_au`,
+  `iref_close_last_freeze_store_au`, `IcacheBoot.ireg_alloc`,
+  `IcacheRef.icfg_alloc`, and `ProofIput`'s file-local `ip_free_locked` /
+  `ip_entry_exit2`.  `ireg_slot`'s arity, `ireg_slot_intro`'s and the
+  13-name slot pattern did NOT move, so the thirty-odd sites that merely
+  thread the clause through a re-park are untouched.  `icfg` is one gname
+  lighter and `icacheΣ` one functor lighter — a strengthening, and
+  `SystemAdequacy.v`/`SystemAssumptions.v` are byte-identical.  Standalone
+  compile times unchanged (`IcacheEscrow` 23.5 s, `InodeRegion` 17.3 s,
+  `ProofIput` 59.7 s).
+
+  **The mirror `frzm` is now the ONLY resource crossing the region/lock
+  wall**: the escrow's two frozen arms are decided by the slot's freeze
+  SELECTOR (`frzsel`, lock-side) and the walk's own `ifreeze_pre`.  A
+  future reader looking for a second region-side handle on the f column
+  will not find one, and should not add one — R-e's accounting (a whole
+  live unit in `live_slot`'s FRZN alternative against any positive slice)
+  is what refutations off that column are supposed to use.
+
+  Refuted alternatives, still standing: fold the receipt into the mirror
+  `frzm` (a ½-½ agreement cannot make an arm absurd — only an exclusive
+  or an exactly-accounted fractional resource can, and `frzsel` is the
+  latter); fold `DepFrz` into `DepTx` (kills eight one-line
+  `discriminate` refutations off `ic_dep_gname (DepFrz …) = None`); drop
+  the freeze index (its `.1` is in `SpecIput`, its `.2` is `ireg_fpin`,
+  the corpse window's only refuter).
 - [x] **Rank 7 — `icnt` into the reference columns: PROBED AND REFUSED**
   (2026-08-28, owner agreed).  `icnt` is not a copy of the r/rc
   columns: it is the ONLY resource held on both sides of the

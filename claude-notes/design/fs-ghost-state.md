@@ -1089,12 +1089,12 @@ parent side has to know the target's TYPE.
   The pair is in the INDEX and not existential because two halves of one
   element are not the whole: iput's spec names `(tid, q)` and must get that
   element back.
-- `ireg_frzc z f` — the **receipt + mirror** conjunct: `(⌜f is FrzPre⌝ ∨
-  frzown z)` — the receipt `frzown` is region-parked at every phase except
-  `FrzPre`, so "receipt in a thread's hand" ⟺ "this column reads FrzPre"
-  by `frzown_excl` alone — plus the inum-keyed mirror half `∃ b, frzm_h z b
-  ∗ ⌜ireg_frzm_ok b f⌝` (`frzmUR`, ½-½ bool agreement at `icfg_frzm`),
-  whose lock-side half rides `frz_park` (5a).
+- `ireg_frzc z f` — the **mirror** conjunct: the inum-keyed mirror half
+  `∃ b, frzm_h z b ∗ ⌜ireg_frzm_ok b f⌝` (`frzmUR`, ½-½ bool agreement at
+  `icfg_frzm`), whose lock-side half rides `frz_park` (5a).  It is the ONLY
+  handle on the f column outside the region: what decides the escrow's two
+  frozen arms is the slot's freeze SELECTOR (`frzsel`, R-e) and the walk's
+  own `ifreeze_pre`, both lock-side.
 
 ### 3d. The count coupling (`icnt`)
 
@@ -1108,8 +1108,8 @@ region-coupled end to end: `iref_dup/incr/upgrade_store_au` (borrowed-iname
 licences; `iname_not_frozen` + the fused mint table `iname_mint_ok` supply
 the freeze/claim refutations and mint the provenance unit), `iref_close_store_au` (no token), the phase-generic
 `iref_close_last_store_au` and its freeze instance
-`iref_close_last_freeze_store_au` (the FrzPre→FrzPost step, receipt home,
-selector reclaim), and `iref_alloc_store_au` (the recycle's 0→1).
+`iref_close_last_freeze_store_au` (the FrzPre→FrzPost step, selector
+reclaim), and `iref_alloc_store_au` (the recycle's 0→1).
 
 ### 3e. The arm structure (option A) and the registry
 
@@ -1369,9 +1369,9 @@ a proof that OPENS a specific slot names `icEscN .@ k` — which it knows.
 |---|---|
 | `ic_escrow_body cn γfs γi cov ls k` | five arms: `ic_parked` / `ic_out` / `ic_mid_arm` / `ic_empty_arm` / `ic_held`.  **EVERY ARM CARRIES THE LOCK-WINDOW PIN as its last conjunct** (§5c's `icfg_hpn`): `ic_pin_rest k = hpn_full k None` in `ic_out` / `ic_mid_arm` / `ic_empty_arm` / `ic_payload_arm`'s LEFT alternative, `ic_pin_tx k = ∃ t q, hpn_h k (Some (t, q)) ∗ t ↪[ln_tx icfg_log]{#q} tt` in `ic_held` and in `ic_payload_arm`'s FROZEN alternative. |
 | `ic_pin_rest k` / `ic_pin_tx k` | the pin, per arm.  It sits INSIDE the arms and not beside the disjunction, and that is the whole placement argument: a body-level `ic_pin_rest ∨ ic_pin_tx` is refutable at an empty `ln_tx` authority too, but it says nothing about WHICH arm is standing, so it does not refute `ic_held`.  `TxPin.tx_pin_no_ops` under the pin's existential is the refutation; `ic_pin_enter` / `ic_pin_exit` are the two movers, and the exit's `hpn_agree` is what hands the share back AT THE `(t, q)` THE ARM NAMED. |
-| `ic_payload_arm` | the parked payload, and **the whole TAIL is the disjunction, not just a token slot** (A⁗, iclaim-ledger.md §3.16): LEFT is `ic_payload_np ∗ ifreeze_off inum ∗ live_gen k (1/2) g ∗ ic_pin_rest k` (no free in flight), FROZEN is `frzown inum ∗ frzsel k ((1/2)/2) true ∗ ic_pin_tx k` (a freezer is mid-window, and the selector's quarter beside the receipt is what closes `IcacheInv.frz_slot_kill` in one line).  The freer's own phase fragment decides which (`ic_payload_arm_decide_frz`).  `ic_payload` is the checked-out form and `ic_loaded` the loaded bundle, holding the per-inode leg `IcacheEscrow.ic_inode_leg` at fraction 1. |
+| `ic_payload_arm` | the parked payload, and **the whole TAIL is the disjunction, not just a token slot** (A⁗, iclaim-ledger.md §3.16): LEFT is `ic_payload_np ∗ ifreeze_off inum ∗ live_gen k (1/2) g ∗ ic_pin_rest k` (no free in flight), FROZEN is `frzsel k ((1/2)/2) true ∗ ic_pin_tx k` (a freezer is mid-window, and the selector's quarter is what closes `IcacheInv.frz_slot_kill` in one line).  The freer's own phase fragment decides which (`ic_payload_arm_decide_frz`).  `ic_payload` is the checked-out form and `ic_loaded` the loaded bundle, holding the per-inode leg `IcacheEscrow.ic_inode_leg` at fraction 1. |
 | `ic_out cn γfs γi cov ls k` | the checked-out arm: the descriptor `ic_deposit cn k d`, the credential (`ic_dep_res` or the frozen `ic_out_frz`), `ic_mid`, HALF of `ic_id`, and — its LAST conjunct — `ic_out_rd`, which is `ic_rd_arm` at `DepRd` and `emp` at every other descriptor (`ic_out_rd_none`).  Nothing outside `IcacheEscrow.v` names `ic_out`. |
-| `ic_out_frz k d dev inum` | the OUT arm's frozen alternative (the +0x5e window exit): named count fragment + identity fraction + `frzown`, carried by the `DepFrz` constructor. |
+| `ic_out_frz k d dev inum` | the OUT arm's frozen alternative (the +0x5e window exit): named count fragment + identity fraction + the selector's quarter + the parked transaction share, carried by the `DepFrz` constructor. |
 | the close family | `ic_close_to_empty` (+`_late`: the eviction-before-store wand form; `_frz`: the freezer's REF-1 eviction; `_await`: the eviction into `pool_await`). |
 | `ic_id cn k q b dev inum` | fractional identity ghost for the slot's `(dev,inum)` cells.  THREE holders: the escrow arm keeps ½ forever (§13.1e), the itable's `islot2`/`islot_empty` a QUARTER, and `ipool_body` the other quarter — which is what makes the pool's partition speak about the escrows (§5a). |
 | `live_gen k s g` / `live_frac k s` / `iref_frag k q` | fractions of the slot's live/generation cell and reference mass; `live_whole_share_absurd` and `frz_slot_kill` are the overflow lemmas. |
@@ -1390,7 +1390,7 @@ a descriptor the commit meets is one of these.
 | `DepTx s dev inum g t q` | **THE WRITE ARM.**  The caller's generation-named credential plus the transaction whose write lock this is: the OUT arm PARKS the share `t ↪[ln_tx icfg_log]{#q} tt`, so `end_op` — which consumes the whole element — cannot run while any inode of the transaction is write-locked, and a commit refutes the arm outright at an empty `ln_tx` authority (`ic_out_no_write_arm`, core `TxPin.tx_pin_no_ops`).  `(t, q)` are FIELDS: `ic_deposit` is a `ghost_var` whose other half the holder carries, so the descriptor pins the arm's transaction and share to the holder's and the park hands back exactly what the checkout parked (an existentially-keyed share could not: two halves of one element are not the whole). |
 | `IcacheEscrow.ic_tx_dep cn k s dev inum g` | the ½/½ BUNDLE a converted walk actually carries: `∃ t, ic_deposit cn k (DepTx s dev inum g t (1/2)) ∗ t ↪[ln_tx icfg_log]{#(1/2)} tt`.  It stands exactly where a bare `ic_deposit cn k d` stands, at the same arguments, so the walk-stage conjuncts are position-stable and no stage lemma gained a binder; the id is DETERMINED by the residue the holder keeps, which is what lets it be closed existentially at both ends.  **It cannot be used twice at one transaction**: its invariant is "the arm holds `q` and the holder holds `q` beside it", which forces `q = ½` for the two to rejoin into a whole element, so two of them at one `t` claim 2 and the pair is unsatisfiable — the two walks holding two write locks at once carry two `ic_tx_dep_at` at a QUARTER each instead. |
 | `DepRd s dev inum g` | **THE READ ARM.**  `ic_dep_own` at `DepRd` is the write arm's minus the parked share — the credential does not change — and what distinguishes it is what the escrow KEEPS: `ic_rd_arm` is the five pure clauses, the LEG `IcacheEscrow.ic_inode_leg γfs (DfracOwn (3/4)) γi inum n` (`dlinks` beside `inode_owned_era_q` at three quarters — record proxy `dinode_at` included, so a read-locker cannot move a record, `ireg_write_au` takes it) and the two contents holds, at an existential `(dn, bm, data)`.  `ic_inode_leg_shed_to`/`_shed_of` are the leg's own two directions of the reader's quarter, and `ic_inode_leg_rd_agree` the re-identification (the tokens do not split — they are the Φ-free half and stay whole on the arm).  The HOLDER carries `ic_rd_held`: `inode_ok`, `inode_local`, the metadata and addrs CELLS at fraction 1 (the design keeps in-memory cells there) and `FsStateEra.inode_rd_era γfs (DfracOwn (1/4)) inum n`.  `ic_loaded_shed`/`ic_rd_join` are the two directions.  Its two users are `fileread` and `filestat` — the only `ilock` callers holding no transaction. |
-| `DepFrz q dev inum t qt` | iput's freeze window (+0x5e..+0x70), the one checked-out arm that carries no ordinary deposit at all: what it holds is `ic_out_frz` — the reference's count fragment, its identity fraction, the freeze receipt AND the parked share `t ↪[ln_tx icfg_log]{#qt} tt`.  `(t, qt)` are FIELDS for `DepTx`'s reason verbatim (the descriptor is in iput's hand across that window), and the share is what makes `TxPin.tx_pin_no_ops` refute the arm at a commit. |
+| `DepFrz q dev inum t qt` | iput's freeze window (+0x5e..+0x70), the one checked-out arm that carries no ordinary deposit at all: what it holds is `ic_out_frz` — the reference's count fragment, its identity fraction, the freeze selector's quarter AND the parked share `t ↪[ln_tx icfg_log]{#qt} tt`.  `(t, qt)` are FIELDS for `DepTx`'s reason verbatim (the descriptor is in iput's hand across that window), and the share is what makes `TxPin.tx_pin_no_ops` refute the arm at a commit. |
 
 **THE RE-IDENTIFICATION IS THE WHOLE DIFFERENCE BETWEEN THE LOCK ARMS.**  A
 transaction's id is determined by nothing the escrow holds (and two halves
@@ -1468,8 +1468,7 @@ escrow registry), `icfg_lk` (**the ARMED registry**, §5a′ — class
 inside `ipool` under the itable lock), `icfg_pext` (**the pool's
 IN-TRANSITION key**, §5a — the same two places; the class
 `Xv6Cameras.icache_poolG :: ghost_varG Σ (gset Z)` serves both),
-`icfg_icnt` (the count coupling), `icfg_frzo` (the freeze receipt),
-`icfg_frzm` (the freeze mirror), `icfg_hpn` (**the LOCK-WINDOW PIN**, §5b —
+`icfg_icnt` (the count coupling), `icfg_frzm` (the freeze mirror), `icfg_hpn` (**the LOCK-WINDOW PIN**, §5b —
 `Xv6Cameras.hpnUR := gmapUR nat (dfrac_agreeR (leibnizO (option (nat *
 Qp))))`, `icfg_frzm`'s shape at the SLOT key and the pair value; one half
 rides in an escrow arm and the other in the freeing walk's hand, and
@@ -1733,13 +1732,13 @@ and the withdraw CONVERTS — claim + claim-unit in, plain unit +
 
 **iput's freeze window** (ref==1 commit → off-lock deposit):
 `ireg_freeze_au` spends the payload's `ifreeze_off` into `FrzPre rg`,
-parking the lent regime arm (`ireg_fsh`), the receipt story (`ireg_frzc`)
-and the R-e mass: `live_slot` flips to its FRZN alternative holding the
+parking the lent regime arm (`ireg_fsh`), flipping the mirror
+(`ireg_frzc`) and parking the R-e mass: `live_slot` flips to its FRZN alternative holding the
 WHOLE live unit, so any foreign reader's positive share is an instant
 kill (`frz_slot_kill`) — uniform across ClaimK/PlainK/ShotK, no lock, no
 licence.  The freeze pin says the count is exactly 1 and nlink is 0, so
 the +0x8a re-read gives `cnt2 = 1` outright (B1); the last close steps
-`FrzPre→FrzPost` (receipt home, selector quarter reclaimed), the eviction
+`FrzPre→FrzPost` (selector quarter reclaimed), the eviction
 parks `pool_await` while the freer keeps `dinode_at` in hand (B2); the
 deposit writes type 0, fills the rg-indexed escrow, retires the phase to
 `FrzOff`, and hands back `ireg_regime rg` — closing the window and re-arming

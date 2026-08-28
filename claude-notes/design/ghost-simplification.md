@@ -31,19 +31,6 @@ outranks one that only merges invariants.
    into one package.  iget goes back to returning ONE resource — at these
    contracts the post-campaign surface becomes *shorter than pre-campaign*.
    Cost: an IIIe-sized rethread (package defs + iget/iput/idup/ilkc arms).
-3. **SIMP-C (probe-gated, internal): retire the freeze RECEIPT `frzown`.**
-   It predates RULING R-e; post-R-e the two decisions it was minted for are
-   covered elsewhere (foreign readers: `frz_slot_kill` off the live share +
-   the tail's `frzsel` quarter — that is what ProofIlock's landed kill
-   actually uses; the freezer: its own phase fragment).  Its remaining
-   consumer graph is a closed self-maintenance loop (`ireg_frzc`'s receipt
-   half, `ic_frz_park`/`ic_out_frz`'s frozen arms, the +0x8a "receipt
-   home", the deposit threading, boot's `FM` map).  If a satisfiability-
-   first probe confirms no decision needs it, the kill deletes one ambient
-   gname (`icfg_frzo`), one region clause half, one boot argument, and
-   simplifies `ic_frz_park`/`DepFrz`.  No Spec surface — ranked third only
-   because of that.
-
 ## 1. The spec-clause inventory (what the campaign added, and its fate)
 
 | clause | verdict |
@@ -71,14 +58,11 @@ ProofIget/ProofIdup.  Nor can it merge with `frzsel`: the mirror is
 inum-keyed (its region half sits in `ireg_frzc` beside the f-column), the
 selector is slot-keyed (its invariant half sits in `live_slot`, which has
 no inum in scope) — the pair is the two sides of the k-vs-inum keying wall
-(§3.13), not an accident.
+(§3.13), not an accident.  It is also the ONLY resource crossing that wall:
+everything the escrow's frozen arms are decided by (`frzsel`,
+`ifreeze_pre`) is lock-side.
 
-**H1b — the receipt `frzown`: PLAUSIBLE→STRONG, probe-gated** (SIMP-C
-above).  The one honest caveat: the probe must include the satisfiability
-direction (the §5⁗⁗ lesson) — re-prove the +0x8a close and the deposit
-WITHOUT the receipt before touching anything.
-
-**H1c — the freeze pin's count conjunct duplicates R-e's mass: REFUTED.**
+**H1b — the freeze pin's count conjunct duplicates R-e's mass: REFUTED.**
 `live_frzn`'s whole unit excludes *foreign* shares; it does not hand the
 *freezer* `cnt2 = 1` at the +0x82 re-read — that is the icnt agreement's
 `icnt_freeze_forces_one`, B1's actual payout.  Both earn their place.
@@ -157,8 +141,8 @@ Gated increments, each ending at the full three-tops/standing-six gate:
 2. **SIMP-2 (the reference package, IIIe-sized):** SIMP-B across
    SpecIget/SpecIput/SpecIunlockput/SpecIdup/SpecIalloc + the ilkc arms.
    The big contract shortening.
-3. **SIMP-3 (gname diet, probe-first):** frzown retirement (H1b) + `gd`
-   retirement (H4).  `icfg` shrinks 10 → 8 gnames.  Internal.
+3. **SIMP-3 (gname diet, probe-first):** `gd` retirement (H4).  `icfg`
+   shrinks 9 → 8 gnames.  Internal.
 4. **SIMP-4 (optional, largest):** the H2 icnt-into-ledger merge —
    worthwhile only if the exactness probe is clean; otherwise skip.
 

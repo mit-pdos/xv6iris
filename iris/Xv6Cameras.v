@@ -655,12 +655,9 @@ Definition linkUR : ucmra := gmapUR Z (authR linkElemUR).
    exactly "both halves in hand". *)
 Definition icntUR : ucmra := gmapUR Z (dfrac_agreeR (leibnizO nat)).
 
-(* THE FREEZE RECEIPT (iclaim-ledger.md §3.14, as built). *)
-Definition frzoUR : ucmra := gmapUR Z (exclR unitO).
-
-(* THE FREEZE MIRROR (iclaim-ledger.md §3.16 = RULING A⁗).  Complementary to
-   the receipt: the receipt is hand-vs-region exclusivity, the mirror is the
-   region-vs-lock BRANCH SELECTOR the payload disjunction needed. *)
+(* THE FREEZE MIRROR (iclaim-ledger.md §3.16 = RULING A⁗): the region-vs-lock
+   BRANCH SELECTOR the free path's payload disjunction needs, and the only
+   handle on an inum's f column a party outside the region has. *)
 Definition frzmUR : ucmra := gmapUR Z (dfrac_agreeR (leibnizO bool)).
 
 (* THE LOCK-WINDOW PIN (durable-disk B''-tx5), the escrow's per-SLOT twin of
@@ -850,7 +847,6 @@ Class icacheG (Σ : gFunctors) := IcacheG {
      each value parks. *)
   icache_pcrpG :: ghost_mapG Σ Z icorpse;
   icache_cntG :: inG Σ icntUR;
-  icache_frzoG :: inG Σ frzoUR;
   icache_frzmG :: inG Σ frzmUR;
   (* THE LOCK-WINDOW PIN (durable-disk B''-tx5), ambient for [icfg_frzm]'s
      reason verbatim: one half rides in an [IcacheEscrow] arm and the other
@@ -867,7 +863,7 @@ Definition icacheΣ : gFunctors :=
     ghost_varΣ (gset Z);
     ghost_varΣ (gmap Z (nat * Qp));
     ghost_mapΣ Z icorpse;
-    GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR; GFunctor hpnUR;
+    GFunctor icntUR; GFunctor frzmUR; GFunctor hpnUR;
     GFunctor dviewUR;
     GFunctor fviewUR].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
