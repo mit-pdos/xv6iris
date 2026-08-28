@@ -996,3 +996,112 @@ The lane's recommendation is **(2)**, and it is a strictly smaller exception
 than the one the standing rule was written to prevent: no proof in the deferred
 cone is edited, only two statements ABOVE it, and the exact inherited patch is
 already written down in K14b.
+
+---
+
+## K15. BOUNDARY: THE ATOMIC PRESET SWAP IS LANDED — all four shared-table write sites refuted, and the kernel table is now provably never written
+
+*(Exit (2) approved by the coordinator with the owner informed and holding a
+veto, on this reasoning, recorded as instructed: it is a strictly smaller
+exception than the standing rule exists to prevent — **no proof inside the
+§0.37′-deferred cone is edited**; the two statement changes live in files that
+are GREEN and get re-verified; the only things going stale are call sites that
+are already red and unreachable; and K14b records the exact patch the U-mode
+rework applies, including the TransPt five-way strengthening and the restored
+`update_PTE_Bits` witness, so nothing is lost across the deferral.  Exit (1)
+parked goalpost 3's conclusion behind an unrelated deferral; exit (3) was
+measured most expensive.)*
+
+### K15a. THE NUMBER
+
+**1102 `.vo` of 1340 `.v`**, sentinel-backed (`MAKEEXIT=2` + `DONE`, round r31,
+**558 files recompiled**), and the no-`.vo` list is **`diff`-IDENTICAL to the r0
+baseline** — RED-9 held, **red-list delta 0** across a change that moved
+`kpt_body`, `kpt_creds`, `kpt_inv_alloc`'s premise, two pure case lemmas'
+conclusions and four write proofs.  `^Admitted` / `^Abort` / `^Axiom` are 0 in
+every file touched.
+
+### K15b. WHAT LANDED — and it is the step K14a proved had to be atomic
+
+**(1) `kpt_body` carries `⌜kpt_ad_preset root M t⌝`** instead of
+`⌜kpt_tree_spec_gen root M t⌝`.  Every reader that wanted the old spec gets it
+back for one line (`kpt_ad_preset_spec`), which is what keeps the four openers'
+proofs otherwise intact.
+
+**(2) All four shared-table write sites are REFUTED**, not paid:
+
+| site | how |
+|---|---|
+| `KptShare.tlb_res_pt_translateAddr_at` | `kpt_ad_preset_noupd` against `ptree_translateAddr_own`'s third disjunct, whose witness K15 forwarded up from `ptree_translateAddr_cases`; the branch is gone, `t' = t`, and the body comes back with **no** `kpt_lb_canon` and **no** `kpt_tree_spec_gen_set_leaf` |
+| `HartSKpt.kpt_leaf_write_node` | gains `(acc)` and `update_PTE_Bits (autocast m0) acc = Some m0'` — free at the green caller, whose `Hwr` already introduces it — and is now **vacuous**: `m0` is the slot's own word by `ptree_own_path_mem_at`, hence the preset leaf, hence `kpt_leaf_pte_noupd` contradicts.  83 lines of write proof deleted |
+| `TransPt.pt2_tramp_fetch_habs_kcur` (O3cur) | ditto, at the kernel-as-current root |
+| `TransPt.pt2_tramp_fetch_habs_kprev` (O3prev) | ditto, at the kernel-as-previous root |
+
+TransPt's own FIVE-way shape was strengthened first, exactly as K14b said it
+must be: both write arms now carry `update_PTE_Bits (p0c/p0p) acc = Some …`, and
+the witness K13 deliberately dropped at `TransPt.v:201` is restored.  **The two
+arms that write the USER table are untouched** — only the kernel-table arm of
+each lemma is refuted.
+
+**(3) `ptree_translateAddr_own`'s pure disjunct** now forwards the witness too,
+so both of its consumers can refute (`UptTree` and `KptTree`'s dead twin destruct
+it away with a `_`).
+
+**(4) `KptTree.ptree_translateAddr_own_noupd`** — the no-write-back sibling,
+built first try: at a preset leaf the translation only READS, so the tree is at a
+PARAMETRIC fraction and there is **no payer and no `S` currency at all** (the
+conclusion says `σ'.(mem) = σ.(mem)` outright).  This is the artifact that will
+let the exec lane read the table at the SEEN tier and `kpt_body` stop holding it.
+
+**(5) `KptTree.kpt_leaves_preset`** and `kpt_ad_preset_leaves` — the reader's
+`M`-free form of preset, and it is REQUIRED rather than convenient:
+`kpt_lb` pins the table only up to `ptree_canon`, which **erases A/D**, so canon
+agreement with the invariant's tree does NOT transfer presetness to the residue's
+copy.  `kpt_creds` therefore carries `⌜kpt_leaves_preset t⌝` beside its tree.
+
+**(6) `KptShare.tlb_inv_pt_share` is RETIRED.**  K14b measured it has no callers
+and that `KptTree.tlb_inv_pt` is dead; it also could not survive the swap (it
+would have needed the preset fact about the exclusive bundle's own existential
+witnesses, unstatable at that altitude).  Deleted with the reason in place.
+
+> **A MEASUREMENT WORTH KEEPING, because it is why the sweep was cheap.**  Two
+> `tlb_res_pt_intro` callers (`SmodeCorePt:4780`, `WpSconfSfence:434`) SURVIVED
+> the earlier `kpt_creds` restatement untouched — their `iDestruct … as (Bc)
+> "[#Hbdc #Hvlbc]"` happened to match the new two-component shape with only the
+> NAMES stale.  They broke only when the third conjunct arrived.  A destructuring
+> pattern is not a type signature: greenness after a definition change is not
+> evidence that the call site was reviewed.
+
+### K15c. MERGE LIST (cumulative, all boundaries)
+
+`iris/PhysSeen.v`, `iris/KptCtxTravel.v` (NEW); `iris/PtTree.v`,
+`iris/HartSKpt.v`, `iris/KptShare.v`, `iris/SRegime.v`,
+`iris/ProofKvminithart.v`, `iris/KptTree.v`, `iris/Pt2Walk.v`,
+`iris/TransPt.v`, `iris/UserFetchCert.v`, `iris/UptTree.v`,
+`iris/SmodeCorePt.v`, `iris/WpSconfSfence.v`, `iris/_CoqProject`.
+
+### K15d. WHAT REMAINS — the tree drop, now unblocked and fully mapped
+
+`kpt_body` still HOLDS `kptree_own B 2 (DfracOwn 1) t`; nothing writes it any
+more, and the four openers use it only to READ.  To drop it:
+
+1. **`KptShare.tlb_res_pt_translateAddr_at`** → `ptree_translateAddr_own_noupd`
+   at `STier (hart_agent cpu_id)` / `DfracDiscarded`, reading the residue's tree
+   out of `kpt_creds` (`Htk`), with `Hprek` as the `Hnoupd` premise and
+   `kpt_lb_agree` + `kpt_maps_across` to move `Hmaps` from the invariant's `t`
+   to the residue's `tk`.  `S` rides across on `⌜σ'.(mem) = σ.(mem)⌝`.
+2. **`HartSKpt`'s two openers** (`kpt_addr_ok_path`-style at `:640`, and
+   `kpt_leaf_write_node`) → the same switch; `kpt_leaf_write_node` gains
+   `kpt_creds` as a premise (its green caller has it).
+3. **`TransPt`'s two** → the same switch, and this is the ONE place the tree drop
+   costs another statement change in the deferred cone: they must take the seen
+   tree as a premise, since they hold `kpt_inv` but not `kpt_creds`.  Covered by
+   exit (2), and to be added to K14b's inheritance note when it is made.
+4. **`kpt_body`** drops the tree, `kpt_bound` and the `B`; `kpt_inv_alloc`
+   becomes `kpt_ad_preset → kmap_auth M -∗ kpt_unset ==∗ kpt_inv root ∗ kpt_lb t`
+   — two resources, which is very close to what `ProofMain:996` already passes.
+5. **`ProofMain`**: `ptree_own_at_persist` → `ptree_own_at_project` (through
+   `SieCapCtx.sie_cap_gpr_own_ctx_acc`, already used in that file) →
+   `kpt_creds_intro` → `kpt_inv_alloc`; `kvm_bridge` strengthened to
+   `kpt_ad_preset` at the source.  `ProofMainSecondary` takes the deposit's
+   `ctx_parked`/`ctx_floor` pair where it already takes `kpt_creds`.
