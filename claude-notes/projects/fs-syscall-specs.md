@@ -81,11 +81,21 @@ things, and the answer differs:
   line: `coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq
   Kernel -R ../user-rocq User -w -notation-overridden File.v` (the
   `-arg` rows of _CoqProject are coq_makefile flags, not coqc's).
-- [ ] **DECISION (owner) — strengthen `fs_collect_mint` by one
-  conjunct** (name `col_state` in its conclusion so `fs_snap_law_build`
-  can carry the γtop↔snapshot tie).  Wanted by lane W's AU-to-durable
-  story; an R10 change to a landed contract, so it waits for the
-  owner's word.  Lane D did not need it (determinism route).
+- [ ] **DECISION (owner) — the γtop↔snapshot tie for lane W.**
+  ORIGINAL FORM MOOT (2026-08-28): EV-Y retired `fs_collect_mint` and
+  the destructive collection; the commit now COLLECTS
+  `fs_state (fs_gamma_L γfs) (DfracOwn (3/4)) S` reversibly out of the
+  invariants at quiescence and hands it to `FsDurXfer.fs_state_xfer_tok`
+  — the S it transports is assembled FROM the live legs, so the tie
+  lane W wants may now be READABLE at the collection boundary rather
+  than needing any contract strengthened.  Re-derive the ask when lane
+  W starts (probe: can a spec-layer lemma at the quiescent point relate
+  the transported S's `fss_inodes` to the ftop authority's map?); only
+  if not does an R10 question come back to the owner.
+  ALSO NOTED: upstream ruled the simplification order (1d8c8901) —
+  **rank 4 is PARKED and the pinned-/init files stay untouched**, which
+  is consistent with v3's plan (this campaign retires dview itself,
+  hop seam first).
 - [~] **A — the abstract state and carriers.**  Items (i)+(ii) DONE
   2026-08-28 (Opus lane, `iris/FsAbs.v`, 699 lines, zero axioms):
   `absnode`/`anode`/`abs_of` off the landed readings; `nview(_dq)` =
