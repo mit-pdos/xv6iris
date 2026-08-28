@@ -574,100 +574,15 @@ Section RunsQ.
       apply map_union_least; [exact H1 | exact H2].
   Qed.
 
-  (* ---- the CONCATENATION, with the shares existentially bound -------- *)
-
-  (* The shape the collection produces: one object at a time, each at a
-     share of its own, and the list is built as the walk goes.  Stating the
-     share existentially PER OBJECT is what avoids a choice function over
-     the inode map. *)
-  Definition phi_runs_ex Γ (F : list xrun) : iProp Σ :=
-    (∃ l : list xqrun,
-       ⌜xq_strip l = F⌝ ∗ ⌜xq_ok l⌝ ∗ phi_runs_q Γ l)%I.
-
-  Lemma phi_runs_ex_at Γ dq F :
-    ~ ✓ (dq ⋅ dq) -> phi_runs (gamma_q Γ dq) F ⊢ phi_runs_ex Γ F.
-  Proof.
-    intros Hdq. iIntros "H". iExists (xq_at dq F).
-    iSplitR; [iPureIntro; exact (xq_strip_at dq F) |].
-    iSplitR; [iPureIntro; exact (xq_ok_at dq F Hdq) |].
-    rewrite phi_runs_q_at. iExact "H".
-  Qed.
-
-  Lemma gamma_q_1_runs Γ l :
-    phi_runs (gamma_q Γ (DfracOwn 1)) l ⊣⊢ phi_runs Γ l.
-  Proof.
-    rewrite /phi_runs. apply big_opL_proper. intros k r _.
-    rewrite gamma_q_byte_range -byte_range_1 //.
-  Qed.
-
-  Lemma phi_runs_ex_full Γ l : phi_runs Γ l ⊢ phi_runs_ex Γ l.
-  Proof.
-    iIntros "H". iExists (xq_at (DfracOwn 1) l).
-    iSplitR; [iPureIntro; exact (xq_strip_at (DfracOwn 1) l) |].
-    iSplitR;
-      [iPureIntro;
-       exact (xq_ok_at (DfracOwn 1) l (dfrac_full_nvalid (DfracOwn 1))) |].
-    rewrite phi_runs_q_at gamma_q_1_runs. iExact "H".
-  Qed.
-
-  Lemma phi_runs_ex_app Γ F1 F2 :
-    phi_runs_ex Γ F1 ∗ phi_runs_ex Γ F2 ⊢ phi_runs_ex Γ (F1 ++ F2).
-  Proof.
-    iIntros "[H1 H2]".
-    iDestruct "H1" as (l1 Hs1 Hk1) "H1".
-    iDestruct "H2" as (l2 Hs2 Hk2) "H2".
-    iExists (l1 ++ l2).
-    iSplitR; [iPureIntro; rewrite xq_strip_app Hs1 Hs2 // |].
-    iSplitR; [iPureIntro; exact (xq_ok_app l1 l2 Hk1 Hk2) |].
-    rewrite phi_runs_q_app. iFrame.
-  Qed.
-
-  Lemma phi_runs_ex_cons Γ (dq : dfrac) (r : xrun) F :
-    ~ ✓ (dq ⋅ dq) ->
-    byte_range_q Γ dq (xr_blk r) (xr_off r) (xr_bs r) ∗ phi_runs_ex Γ F
-    ⊢ phi_runs_ex Γ (r :: F).
-  Proof.
-    intros Hdq. iIntros "[Hr H]". iDestruct "H" as (l Hs Hk) "H".
-    iExists ((dq, r) :: l).
-    iSplitR; [iPureIntro; rewrite xq_strip_cons Hs // |].
-    iSplitR; [iPureIntro; exact (xq_ok_cons (dq, r) l Hdq Hk) |].
-    rewrite phi_runs_q_cons. iFrame.
-  Qed.
-
-  Lemma phi_runs_ex_concat {A : Type} Γ (xs : list A)
-      (F : A -> list xrun) (Ψ : A -> iProp Σ) :
-    (forall x, Ψ x ⊢ phi_runs_ex Γ (F x)) ->
-    ([∗ list] x ∈ xs, Ψ x) ⊢ phi_runs_ex Γ (concat (F <$> xs)).
-  Proof.
-    intros Hone. induction xs as [| x xs IH].
-    - iIntros "_". iExists []. rewrite phi_runs_q_nil.
-      iSplitR; [by iPureIntro |]. iSplitR; [| done].
-      iPureIntro. intros k r Hk. rewrite lookup_nil in Hk. discriminate.
-    - assert (Hc : concat (F <$> (x :: xs)) = F x ++ concat (F <$> xs))
-        by reflexivity.
-      rewrite Hc big_sepL_cons. iIntros "[Hx Hxs]".
-      iApply phi_runs_ex_app. iSplitL "Hx".
-      + iApply (Hone x with "Hx").
-      + iApply (IH with "Hxs").
-  Qed.
-
-  (* ...and what the transport reads off the whole of it. *)
-  Lemma phi_runs_ex_disj Γ (Hex : phi_excl Γ) F :
-    phi_runs_ex Γ F -∗ ⌜xr_disj F⌝.
-  Proof.
-    iIntros "H". iDestruct "H" as (l Hs Hk) "H".
-    iDestruct (phi_runs_q_disj Γ Hex l Hk with "H") as %Hd.
-    iPureIntro. rewrite -Hs. exact Hd.
-  Qed.
-
-  Lemma phi_runs_ex_in Γ (A : iProp Σ) (M : gmap Z (bv 8))
-      (Hag : phi_agree Γ A M) F :
-    A -∗ phi_runs_ex Γ F -∗ ⌜xr_union F ⊆ M⌝.
-  Proof.
-    iIntros "HA H". iDestruct "H" as (l Hs Hk) "H".
-    iDestruct (phi_runs_q_in Γ A M Hag l with "HA H") as %Hin.
-    iPureIntro. rewrite -Hs. exact Hin.
-  Qed.
+  (* [phi_runs_ex] AND ITS SEVEN LEMMAS -- the run list with a share bound
+     EXISTENTIALLY PER RUN -- are DELETED at EV-X.  They existed because
+     lane H4's collection produced records at fraction 1 beside data legs
+     at each inode's own share; now the commit collects at ONE uniform
+     share and the shape it hands the transport is [xq_at dq l], a
+     one-share list, which [phi_runs_q_at] turns into the constant-share
+     view's own full-share list with no arithmetic at all.  What survives
+     is exactly what the transport reads: [phi_runs_q_disj] and
+     [phi_runs_q_in], both share-generic. *)
 
 End RunsQ.
 
@@ -819,55 +734,12 @@ Section FsRuns.
 
 
 
-  (* ---------------------------------------------------------------- *)
-  (*  3a'. ONE INODE AT THE HOLDER'S OWN SHARE (durable-disk EV        *)
-  (*       stage 5)                                                    *)
-  (*                                                                   *)
-  (*  [FsState.fs_footprint_q]'s inode column, as runs.  The RECORD    *)
-  (*  rides at fraction 1 and the data legs at the bundle's own share,  *)
-  (*  which is exactly what [phi_runs_ex] is for: a share per RUN,      *)
-  (*  existentially bound, so no choice function over the inode map is  *)
-  (*  needed.  The share-generic reading of the data half is free --    *)
-  (*  [gamma_q Γ dq]'s [fsΦ] ignores the dfrac it is handed, so         *)
-  (*  [inode_dat] AT that view IS [inode_dat_q Γ dq].                   *)
-  (* ---------------------------------------------------------------- *)
-
-  Lemma inode_phi_q_runs Γ dq (sb : fs_sb) (i : Z) (n : fs_node) :
-    ~ ✓ (dq ⋅ dq) ->
-    inode_phi_q Γ dq sb i n
-    ⊢ ⌜node_lens n⌝ ∗ phi_runs_ex Γ (xr_inode sb i n).
-  Proof.
-    intros Hdq. rewrite /inode_phi_q -gamma_q_inode_dat /inode_dat.
-    iIntros "[Hr Hd]".
-    iDestruct (inode_dats_runs (gamma_q Γ dq) n with "Hd") as "[%Hlens Hdats]".
-    iSplitR; [by iPureIntro |].
-    iApply (phi_runs_ex_app Γ [xr_rec sb i n] (xr_dats n)).
-    iSplitL "Hr".
-    - iApply phi_runs_ex_full. rewrite -(rec_owned_run Γ sb i n). iExact "Hr".
-    - iApply (phi_runs_ex_at Γ dq (xr_dats n) Hdq with "Hdats").
-  Qed.
-
-  Lemma fs_inodes_phi_q_runs Γ (sb : fs_sb) (I : gmap Z fs_node) :
-    ([∗ map] i ↦ n ∈ I,
-       ∃ dq : dfrac, ⌜~ ✓ (dq ⋅ dq)⌝ ∗ inode_phi_q Γ dq sb i n)
-    ⊢ ⌜forall i n, I !! i = Some n -> node_lens n⌝
-      ∗ phi_runs_ex Γ (xr_inodes sb I).
-  Proof.
-    iIntros "H".
-    iAssert (⌜forall i n, I !! i = Some n -> node_lens n⌝)%I
-      with "[H]" as %Hlens.
-    { iIntros (i n Hi). rewrite (big_sepM_lookup _ _ i n Hi).
-      iDestruct "H" as (dq Hdq) "H".
-      iDestruct (inode_phi_q_runs Γ dq sb i n Hdq with "H") as "[$ _]". }
-    iSplitR; [by iPureIntro |].
-    rewrite big_sepM_map_to_list /xr_inodes.
-    iApply (phi_runs_ex_concat Γ (map_to_list I)
-              (fun p : Z * fs_node => xr_inode sb p.1 p.2) _ _ with "H").
-    Unshelve.
-    intros p. iIntros "H". iDestruct "H" as (dq Hdq) "H".
-    iDestruct (inode_phi_q_runs Γ dq sb p.1 p.2 Hdq with "H") as "[_ $]".
-  Qed.
-
+  (* [gamma_q_inode_dat] moved to [FsStateInode] at EV-X, and
+     [inode_phi_q_runs] / [fs_inodes_phi_q_runs] -- the per-inode runs walk
+     at a share OF ITS OWN -- are deleted with [phi_runs_ex]: the commit's
+     footprint is uniform now, so its whole runs reading is
+     [fs_footprint_runs_q] and the Gamma-generic [fs_inodes_phi_runs]
+     below, read at [gamma_q Γ dq]. *)
 
   (* ---------------------------------------------------------------- *)
   (*  3b.  EVERY INODE                                                 *)
@@ -1118,37 +990,6 @@ Section FsFoot.
   Proof.
     intros Hs. rewrite phi_runs_q_at fs_footprint_gq.
     iApply (fs_footprint_of_runs (gamma_q Γ dq) S PM Hs).
-  Qed.
-
-  (* ...AND THE WHOLE FOOTPRINT AT QUIESCENCE'S SHARES (durable-disk EV
-     stage 5).  [fs_footprint_runs]' twin, and the ONE step the commit's
-     mint takes between the collection and [FsDurSnap.snap_mint]: the
-     metadata objects at fraction 1, the inode column at a share per inode.
-     The full-share instance factors through it by
-     [FsState.fs_footprint_q_1], so nothing is duplicated. *)
-  Lemma fs_footprint_q_runs Γ S :
-    fs_footprint_q Γ S ⊢ ∃ PM, ⌜xf_shape S PM⌝ ∗ phi_runs_ex Γ (xr_fs S PM).
-  Proof.
-    rewrite /fs_footprint_q. iIntros "(Hsb & Hin & Hbm & Hpool)".
-    iDestruct (fs_inodes_phi_q_runs with "Hin") as "[%Hlens Hin]".
-    iDestruct (free_pool_runs with "Hpool") as (PM) "[%Hpm Hpool]".
-    iAssert (⌜length (fss_sbb S) = BSIZE⌝)%I with "[Hsb]" as %Hsbl.
-    { rewrite /blk_owned. iDestruct "Hsb" as "[$ _]". }
-    iExists PM. iSplitR.
-    { iPureIntro. split; [exact Hsbl | split; [exact Hlens | exact Hpm]]. }
-    rewrite /xr_fs.
-    iApply (phi_runs_ex_cons Γ (DfracOwn 1) ((SB_BNO, 0), fss_sbb S) _
-              (dfrac_full_nvalid (DfracOwn 1))).
-    rewrite /blk_owned /xr_blk /xr_off /xr_bs /=.
-    iDestruct "Hsb" as "[_ Hsb]". iDestruct "Hbm" as "[_ Hbm]".
-    iSplitL "Hsb"; [rewrite -byte_range_1; iExact "Hsb" |].
-    iApply (phi_runs_ex_cons Γ (DfracOwn 1)
-              ((sb_bmapstart (fss_sb S), 0), bm_bytes BSIZE (fss_used S)) _
-              (dfrac_full_nvalid (DfracOwn 1))).
-    rewrite /xr_blk /xr_off /xr_bs /=.
-    iSplitL "Hbm"; [rewrite -byte_range_1; iExact "Hbm" |].
-    iApply phi_runs_ex_app. iSplitL "Hin"; [iExact "Hin" |].
-    iApply (phi_runs_ex_full with "Hpool").
   Qed.
 
 End FsFoot.

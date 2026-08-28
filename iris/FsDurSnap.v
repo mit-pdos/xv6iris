@@ -822,7 +822,7 @@ Section Snap.
   (*  and the RUNS row -- the shape of the byte legs, their pairwise     *)
   (*  DISJOINTNESS and the fact that their union sits inside the         *)
   (*  committed view's own flattening -- off                             *)
-  (*  [FsDurXfer.phi_runs_ex_disj] / [phi_runs_ex_in], which are         *)
+  (*  [FsDurXfer.phi_runs_q_disj] / [phi_runs_q_in], which are           *)
   (*  [FsStateDefs.phi_excl] and one [ghost_map_lookup] and nothing      *)
   (*  else.  The fifth is the GEOMETRY, which no resource pins -- an     *)
   (*  authority may hold entries no fragment names.                      *)

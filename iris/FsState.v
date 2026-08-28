@@ -361,49 +361,15 @@ Section FsState.
   Qed.
 
 
-  (* ---------------------------------------------------------------- *)
-  (*  4b.  THE FOOTPRINT AT QUIESCENCE'S SHARES (durable-disk EV        *)
-  (*       stage 5)                                                     *)
-  (*                                                                    *)
-  (*  [fs_footprint] wants every byte at fraction 1, AND A COMMIT'S      *)
-  (*  COLLECTION CANNOT SUPPLY THAT.  A read-locked inode has lent a     *)
-  (*  QUARTER of its data leg to its holder ([FsStateEra.inode_rd_era])  *)
-  (*  and keeps three quarters; three quarters cannot be promoted, and   *)
-  (*  nothing at a commit refutes a read lock -- a read-locking [ilock]  *)
-  (*  opens no transaction, so the empty [LogDefs.ln_tx] authority the   *)
-  (*  commit reads every other window off says nothing about it.  That   *)
-  (*  is why the commit's entry is the MINT and not the transport        *)
-  (*  (durable-fs-plan.md section 4).                                    *)
-  (*                                                                    *)
-  (*  WHAT QUIESCENCE DOES YIELD IS THIS: every inode's record at        *)
-  (*  fraction 1 -- records park region-side always, fs-state.md section *)
-  (*  7's ruling (i) -- beside its data leg at a share OF ITS OWN whose  *)
-  (*  double is invalid, which is exactly the premise cross-inode block  *)
-  (*  disjointness is read off ([FsDurXfer.phi_runs_ex_disj]).  The      *)
-  (*  metadata objects come out of their own invariants at fraction 1,   *)
-  (*  so only the inode column is share-generic.                        *)
-  (*                                                                    *)
-  (*  [fs_footprint_q_1] is the full-share reading, [FsDurXfer.          *)
-  (*  fs_footprint_q_runs] the runs reading the commit's mint factors    *)
-  (*  through, and [FsCollectAll.col_hand_footprint] the assembly.       *)
-  (* ---------------------------------------------------------------- *)
-
-  Definition fs_footprint_q Γ S : iProp Σ :=
-    (blk_owned Γ SB_BNO (fss_sbb S)
-     ∗ ([∗ map] i ↦ n ∈ fss_inodes S,
-          ∃ dq : dfrac, ⌜~ ✓ (dq ⋅ dq)⌝ ∗ inode_phi_q Γ dq (fss_sb S) i n)
-     ∗ blk_owned Γ (sb_bmapstart (fss_sb S)) (bm_bytes BSIZE (fss_used S))
-     ∗ free_pool Γ (sb_size (fss_sb S)) (fss_used S))%I.
-
-  Lemma fs_footprint_q_1 Γ S : fs_footprint Γ (DfracOwn 1) S ⊢ fs_footprint_q Γ S.
-  Proof.
-    rewrite fs_footprint_1 /fs_footprint_q.
-    iIntros "($ & Hin & $ & $)".
-    iApply (big_sepM_impl with "Hin"). iIntros "!>" (i n Hi) "H".
-    iExists (DfracOwn 1).
-    iSplitR; [iPureIntro; exact (dfrac_full_nvalid (DfracOwn 1)) |].
-    rewrite -inode_phi_q_1. iExact "H".
-  Qed.
+  (* [fs_footprint_q] -- EV stage 5's footprint with a share PER INODE,
+     existentially bound with only "the double is invalid" on it -- is
+     DELETED at EV-X.  [fs_state] takes a dfrac now, so the commit collects
+     at ONE uniform share (three quarters: every escrow arm can supply it
+     and every fraction-1 owner can shed to it) and what quiescence yields
+     is [fs_footprint Γ (DfracOwn (3/4)) S] on the nose
+     ([FsCollectAll.col_hand_footprint]).  With it went
+     [FsStateInode.inode_phi_q] and [FsDurXfer]'s whole per-run share
+     vocabulary ([phi_runs_ex] and friends). *)
 
   Lemma fs_state_split Γ dq S :
     fs_state Γ dq S ⊣⊢ fs_footprint Γ dq S ∗ fs_ghost Γ S.
@@ -941,4 +907,4 @@ Section FsState.
 End FsState.
 
 Global Typeclasses Opaque sb_owned fs_inodes fs_state fs_footprint fs_ghost
-                         fs_footprint_q fs_links fs_pure.
+                         fs_links fs_pure.

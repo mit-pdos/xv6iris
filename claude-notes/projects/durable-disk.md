@@ -4882,6 +4882,155 @@ the rows below and in `design/fs-ghost-state.md`).
   collects each inode at 1 or ¾ (EV5's `fs_footprint_q`), so it hands the
   transport `fs_state Γ (DfracOwn ¾) S` (splitting the whole ones); the
   transport is the mint's caller and `fs_state_mint_runs` retires there.
+
+  **AS LANDED — EV-X.  Whole tree green (zero `Error`, `MAKEEXIT=0`),
+  `tools/dethread_check.py` at "0 declarations out of scope", and
+  `iris/SystemAdequacy.v` / `iris/SystemAssumptions.v` byte-identical to
+  main.  Three commits; the first two are the ruling verbatim, the third
+  is as far as the collection can go without becoming an accessor.**
+
+  - **(1) `fs_state Γ dq S`, AND IT COSTS ONE DEFINITION.**  Every BYTE of
+    a file system rides at `dq`; the Φ-FREE column — `link_auth`, the type
+    register, a directory's `ent_toks_x`, i.e. `FsStateInode.inode_ghost`
+    — stays WHOLE.  The predicate is written at
+    `FsStateDefs.gamma_q Γ dq`, the constant-share view whose `fsΦ`
+    discards the dfrac it is handed (moved down from `FsDurXfer`, where
+    lane H4 introduced it, with `gamma_q_byte_range`/`gamma_q_blk_owned`;
+    its inode readings `gamma_q_ind_owned`/`gamma_q_inode_dat`/
+    `gamma_q_inode_phi`/`gamma_q_inode_ghost`/`gamma_q_rec_owned` are in
+    `FsStateInode`).  **`gamma_q_inode_ghost` IS `reflexivity`** —
+    `gamma_q` copies `γlink` and `γtop` — and that one line is the whole
+    content of "the byte legs take the share, the authorities stay whole".
+    `fs_state Γ (DfracOwn 1) S` is the old predicate by `reflexivity` too
+    (`fs_state_1`, `fs_footprint_1`), so the SEVEN consumers moved by a
+    sweep; `fs_state_gq`/`fs_footprint_gq` are the other direction
+    (`gamma_q` is idempotent in its second argument), which is what lets
+    every Γ-generic lemma be read at a share with no new proof.  New
+    beside them: `FsStateDefs.view_shed` and the shed chain
+    (`byte_range_shed`, `blk_owned_shed`, `ind_owned_shed`,
+    `inode_phi_shed`, `free_pool_shed`, `fs_footprint_shed`,
+    `gamma_shed_34`) — ONE DIRECTION ONLY, because a free pool row hides
+    its bytes under an existential and two halves cannot be rejoined
+    without an agreement law; and `rec_owned_q`/`rec_owned_at_q` with
+    `rec_owned_at_shed_to`, since a record now rides at the uniform share
+    too.  RETIRED, all caller-less and superseded by the transport:
+    `FsState.fs_view`, `fs_view_timeless`, `fs_state_mint`,
+    `fs_view_mint`.
+  - **(2) THE TRANSPORT AT `q > 1/2`, AND THE PREMISE IS THE PROOF.**
+    `FsDurXfer.fs_state_xfer`/`_tok` read
+    `(1/2 < q) -> A -∗ fs_state Γ (DfracOwn q) S ==∗ A ∗ fs_state Γ (DfracOwn q) S ∗ fs_state Γ' (DfracOwn 1) S`.
+    `dfrac_own_gt_half` into `phi_runs_q_disj` over `phi_excl` refutes
+    "the mint meets the same block twice" from OWNERSHIP; nothing pure
+    about the state is materialised on the way.  What makes the statement
+    TRUE is that the share stops at `fs_state_split`: `fs_ghost` is
+    Φ-free, so `fs_links_valid_tok` reads the family's slacked validity
+    off a source held at any `q` and the fresh family is one `own_alloc`
+    at the source's own element.  Two new steps, both two rewrites:
+    `fs_footprint_runs_q` / `fs_footprint_of_runs_q`.  The full-ownership
+    transport is the instance at `q = 1` (`qp_half_lt_1`); nothing was
+    duplicated and nothing retired.
+  - **(3) THE COLLECTION YIELDS `fs_state … (DfracOwn ¾)`, AND EV5's WALL
+    IS GONE.**  EV5's finding was about the FRACTION-1 predicate ("¾
+    cannot be promoted"); with the dfrac in the predicate the question is
+    "is there ONE share every arm can supply", and there is.
+    `IcacheEscrow.ic_slot_cover`'s bundle alternative is now stated AT ¾
+    with no existential share and no `~ ✓ (dq ⋅ dq)` row — the unlocked
+    arm sheds its quarter into `ic_lend`'s own frame
+    (`ic_inode_leg_shed_to` out, `_shed_of` back, six lines in
+    `ic_escrow_body_cover`), the read arm already had it.  `col_side` and
+    `col_bundle` follow; the pool's row (`ipool_shape_np_side`), the
+    region's free bundle (`col_region_quiesce_take`) and
+    `col_bundle_of_owned`/`col_bundle_free` shed and DROP the quarter
+    (the collection is destructive, so nothing has to be given back).
+    `col_bundle_phi` sheds the REGION's record — records park region-side
+    at fraction 1 and that does not change; what changes is that the
+    collection takes ¾ of one.  `col_hand_footprint` sheds block 1, the
+    bitmap block and the free pool the same way and its target is
+    `fs_footprint (fs_gamma_L γfs) (DfracOwn (3/4)) (col_state …)`; the
+    new **`FsCollectAll.col_hand_state`** adds the Φ-free half off
+    `col_hand`'s own `fs_links` leg and is
+    `col_hand ⊢ col_auth ∗ (∃ kv, ireg_keep γfs ireg_root kv) ∗ fs_state
+    (fs_gamma_L γfs) (DfracOwn (3/4)) (col_state …)`.  It is not a
+    standing exhibit: `col_hand_mint` goes THROUGH it now
+    (`fs_state_to` supplies the parse, the local clauses and `fs_geom`),
+    so `col_fs_geom`'s and `col_hand_footprint`'s only caller is
+    `col_hand_state`.
+  - **DELETED with it, all caller-less once the source is uniform:**
+    `FsState.fs_footprint_q`/`fs_footprint_q_1`,
+    `FsStateInode.inode_phi_q`/`inode_phi_at_q`/`inode_phi_q_1`/
+    `inode_phi_at_q_1`/`inode_phi_sb_q` and their two `Timeless`
+    instances, and `FsDurXfer`'s whole per-run share vocabulary —
+    `phi_runs_ex` with `_at`/`_full`/`_app`/`_cons`/`_concat`/`_disj`/
+    `_in`, `gamma_q_1_runs`, `inode_phi_q_runs`, `fs_inodes_phi_q_runs`,
+    `fs_footprint_q_runs`.  `xqrun`/`xq_at`/`xq_ok`/`xq_strip`/
+    `phi_runs_q`/`phi_runs_q_disj`/`phi_runs_q_in` SURVIVE: they are what
+    the transport reads.
+  - **THE WALL, AND IT IS NOT ABOUT SHARES.**  The ruling's third item —
+    "the transport is the mint's caller" — is NOT landed, and the reason
+    is a theorem about the collection, not about the proof.  A transport
+    at `q > 1/2` takes MORE THAN HALF of every byte, so a collection that
+    feeds it cannot also keep the invariants' bodies: it has to be an
+    ACCESSOR and take its source back out of the transport (which returns
+    it unchanged).  `FsCollectAll.col_bodies_mint` is destructive by
+    construction — that is exactly what `pure_keep` buys, and it is sound
+    only because the conclusion is PURE — and three of its steps drop
+    resource irreversibly: `big_sepS_union_weak`
+    (`FsCollectAll.v:131`) at the pool/marker/live partition, which
+    `IcacheEscrow.ipool_quiesce_acc` (`IcacheEscrow.v:5693`) states as
+    `region_inums nib = O ∪ X ∪ ic_live_inums ids` and does NOT make
+    disjoint; `col_keeps_root`, which drops every non-root keep-alive
+    fragment; and `col_hand_footprint`, which drops the era's residue
+    (`dinode_at`, `top_frag_q`, the region's proxy authority).  Nor can
+    the fupd be routed around it: `R ⊢ |==> P_dur D ∗ R` is not derivable
+    from a destructive `R ⊢ fs_state Γ ¾ S ∗ True` plus the transport,
+    and `bupd_plainly` only recovers PURE conclusions — which is the
+    route already taken.  So `fs_state_xfer`/`_tok` and
+    `fs_snap_alloc_xfer`/`P_dur_alloc_xfer` are still caller-less, and
+    `snap_mint`'s `sm_runs` still carries the pure `xr_disj`.  **What the
+    next lane needs is `col_bodies_mint` as an accessor**, which means (a)
+    a disjointness row on `ipool_quiesce_acc`'s partition, (b) closing
+    wands for the keep-alive column and the era residue, and (c) the
+    `NoDup` form of `big_sepS_of_list` — after which `col_hand_state` is
+    already the source and `fs_state_xfer` is already the caller.
+  - **THE BOOT SIDE, unchanged and reported as asked.**  For
+    `FsCfgSnap.fs_cfg_alloc_snap` to call the same transport it would need
+    an `fs_state` on its INPUT side, and there is none: its inputs are a
+    byte function `Pb`, `disk_bytes γv` and the PURE `snap_ok S D`, and
+    `RiscvAdequacy`'s `Hproj` is a pure projection, so no era-0 or
+    post-crash resource can be lent to it.  The dfrac does not help there:
+    the obstacle is provenance (lane H5's reason (i) — the era's byte
+    AUTHORITY is minted at the WHOLE home map, so its elements arrive as
+    one flat `∗`) and geometry (reason (ii) — the region wants WHOLE
+    BLOCKS while `fs_state` holds a record as a 64-byte run).  What the
+    boot side WOULD need to call `fs_state_xfer` is a source instance at
+    the SNAPSHOT's names, i.e. `P_dur` lent as a resource rather than
+    projected as a fact — a change to `RiscvAdequacy`'s boot fupd, not to
+    this predicate.
+  - **COSTS.**  No proof grew a typeclass search: the sheds are three-line
+    inductions, the transport's new steps are rewrites, and the one new
+    instance (`GTimeless (gamma_q Γ dq)`) fires only at that head.
+    Measured standalone on the VM after the landing (wall / peak RSS):
+    `FsStateDefs` 1.67 s / 0.66 GB, `FsStateInode` 5.21 s / 0.73 GB,
+    `FsState` 8.66 s / 1.23 GB, `FsDurXfer` 4.74 s / 0.71 GB,
+    `FsCollect` 7.77 s / 1.12 GB, `FsCollectAll` 6.27 s / 0.79 GB,
+    `IcacheEscrow` 23.91 s / 1.15 GB -- every one an order of magnitude
+    under the five-minute red flag, and within noise of EV5's figures for
+    the three files it measured (`FsStateInode` 5.00 s, `FsState` 8.44 s,
+    `FsDurXfer` 5.18 s, `FsCollect` 7.76 s, `FsCollectAll` 6.14 s,
+    `IcacheEscrow` 23.8 s).
+  - **LEFTOVERS FOR A CLEANUP LANE (not touched here, to keep the share
+    sweep mechanical).**  `FsCollect` still carries the pure-carve support
+    that EV5's deletion of `col_snap_bytes` orphaned, all caller-less:
+    `col_bundles_disj` (which MATERIALISES cross-inode block disjointness
+    as a pure fact -- exactly what the ruling wants gone),
+    `col_bundles_used`, `col_bundles_blk`, `col_bundles_ind`,
+    `col_bundles_slot`, `col_bundles_not_meta`, `col_meta_used`,
+    `col_rec_tie`, `col_auth_pure`, `col_view_len`, `col_pool_dom`, and
+    the per-bundle readings only they use (`col_bundle_owns`,
+    `col_bundle_slot`, `col_bundle_data`, `col_bundle_ind`).  Their share
+    was fixed mechanically (a `pose (dq := DfracOwn (3/4))` at each
+    destructuring) rather than deleted; deleting them is a two-hunk
+    change once someone confirms nothing off-tree names them.
 - [ ] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
   and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
   ledger, `CrpPre`; ten `_no_ops` → one): APPROVED (owner, 2026-08-27),

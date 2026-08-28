@@ -170,6 +170,20 @@ steps at its AUs.
 fs_view Γ := ∃ S, ghost_map_auth Γ.γtop 1 S ∗ fs_state Γ S
 ```
 
+> **AS BUILT the predicate takes a SHARE and `fs_view` is retired**
+> (durable-disk EV-X).  `fs_state Γ dq S` puts every BYTE of the file
+> system at `dq` and leaves the ghost column — the link authority, the type
+> register, a directory's entry tokens — WHOLE; `fs_state Γ (DfracOwn 1) S`
+> is the old predicate by `reflexivity` (`fs_state_1`).  It is written at
+> `FsStateDefs.gamma_q Γ dq`, the view whose `fsΦ` is pinned at `dq`, so
+> there is no parallel hierarchy of `_q` definitions and every Γ-generic
+> lemma is read at a share for free.  `fs_view` itself never acquired a
+> caller (the top map's authority travels beside `fs_state`, in
+> `FsDurSnap.fs_snap`) and is deleted, together with `fs_state_mint` /
+> `fs_view_mint` — the real mint ALLOCATES the target's byte map
+> (`FsDurXfer.fs_state_xfer`), so nobody ever holds a footprint at the
+> fresh view to hand in.
+
 - **Durable**: `P_wf := fs_view Γ_D`, held WHOLE inside `crashN`.  `γtop_D`
   is the durable abstract state; mortals never hold its fragments.  What a
   mortal may hold about durability is a PERSISTENT receipt minted from
@@ -1654,7 +1668,7 @@ Five files, 1687 lines, all in `iris/_CoqProject` after `BitmapEnc.v`:
 | `FsStateLink.v` | 327 | the link RA, its law, its two moves, the generic gather/scatter |
 | `FsStateInode.v` | 713 | `fs_node`, `inode_local`, `rec_owned`, `ind_owned`, `inode_phi`, `ent_toks`, `inode_ghost`, `inode_owned`, `dir_owned`, the readings, the encode lemmas |
 | `FsStateBitmap.v` | 172 | `free_pool`, `free_bitmap`, `bitmap_alloc`, `bitmap_free` |
-| `FsState.v` | 311 | `sb_owned`, `fs_inodes`, `fs_state`, `fs_view`, `fs_footprint`, `fs_state_mint` |
+| `FsState.v` | 311 | `sb_owned`, `fs_inodes`, `fs_state Γ dq S`, `fs_footprint Γ dq S`, `fs_state_split`, `fs_footprint_shed` |
 
 Nothing is imported from any `Proof*`/`Spec*`/invariant file; the whole
 stack sits on `FsImg`/`DinodeEnc`/`BitmapEnc`/`FsTree`/`BlockWords` plus
@@ -1691,10 +1705,16 @@ Where the built shape differs from §2, and why:
   `dir_owned Γ sb d n := inode_owned Γ sb d n ∗ ⌜fn_is_dir n = true⌝` is the
   READING.
 - **`inode_owned` is factored as `inode_phi ∗ inode_ghost`** — the Φ-only
-  half and the Φ-free half.  That factoring is what makes `fs_state_mint` a
+  half and the Φ-free half.  That factoring is what makes the mint a
   transport rather than a re-derivation: `fs_state_split` lifts it to
-  `fs_state Γ S ⊣⊢ fs_footprint Γ S ∗ fs_ghost Γ S`, and `fs_ghost` splits
-  again into `fs_links (γlink Γ) I ∗ fs_pure S` (persistent).
+  `fs_state Γ dq S ⊣⊢ fs_footprint Γ dq S ∗ fs_ghost Γ S`, and `fs_ghost`
+  splits again into `fs_links (γlink Γ) I ∗ fs_pure S` (persistent).
+  **THE SHARE STOPS AT THE FACTORING** (durable-disk EV-X): only the
+  footprint takes `dq`; `fs_ghost` is Φ-free and therefore share-free, which
+  is why the link family's slacked validity can be read off a source held at
+  ANY `q` and the transport is provable at `q = 3/4`.  Half a `link_auth` is
+  not half a file system — it is an unusable element — so the authorities
+  never divide.
 - **`fs_state_rec` carries the superblock's raw BYTES** (`fss_sbb`) beside
   the parsed `fs_sb`.  Two reasons: the tree has no superblock ENCODER (only
   `FsImg.fs_parse_sb`), and `fs_footprint` has to be a function of `S`

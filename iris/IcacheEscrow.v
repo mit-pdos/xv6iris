@@ -3927,12 +3927,19 @@ Section IcacheEscrow.
            ([ipool_shape_np]), the same shape [ipool_inv] hands out, so the
            collection reads it exactly there.  ([ic_mid_arm], and PARKED at
            [valid = 0].)
-       (c) LIVE AND LOADED -- the bundle is inside AT A SHARE WHOSE DOUBLE IS
-           INVALID: fraction 1 for an unlocked inode ([ic_loaded]), three
-           quarters for a read-locked one ([ic_rd_arm]).  That premise is
-           exactly what cross-inode block disjointness needs
-           ([FsStateDefs.blk_owned_ne_34] at 3/4, [blk_owned_ne_full] at 1),
-           and it is why the reader's withdrawal is a QUARTER and not a half.
+       (c) LIVE AND LOADED -- the bundle is inside AT THREE QUARTERS.  It
+           used to be lent at a SHARE OF ITS OWN, existentially bound with
+           only [~ ✓ (dq ⋅ dq)] on it: fraction 1 for an unlocked inode
+           ([ic_loaded]), three quarters for a read-locked one
+           ([ic_rd_arm]).  Since EV-X the cover fixes the share at the
+           SMALLER of the two -- the unlocked arm sheds its quarter into
+           the lend's own frame ([ic_inode_leg_shed_to] out,
+           [ic_inode_leg_shed_of] back) -- because what the commit hands
+           the transport is [FsState.fs_state] at ONE uniform share, and
+           three quarters is the largest one every arm can supply.  It is
+           still above a half, which is all cross-inode block
+           disjointness ever needed ([FsStateDefs.blk_owned_ne_34]), and
+           it is why the reader's withdrawal is a QUARTER and not a half.
      THERE IS NO FOURTH ALTERNATIVE (durable-disk B''-tx5), and that is what
      finishes plan section 4's per-slot half.  The residue used to be "live,
      and the escrow holds no bundle at all", inhabited by IPUT'S THREE
@@ -3964,8 +3971,7 @@ Section IcacheEscrow.
        ∨ ic_lend cn γfs γi cov logstart k
            (ic_id cn k (1/2) true dev inum
             ∗ ipool_shape_np γfs γi cov logstart inum)
-       ∨ (∃ (dq : dfrac) (n : fs_node),
-            ⌜~ ✓ (dq ⋅ dq)⌝ ∗
+       ∨ (∃ n : fs_node,
             (* ...AND THIS INODE'S THREE DIRECTORY CLAUSES (durable-disk
                lane E-clauses), which is what the commit's collection
                reads [FsDurSnap.sk_dirloc] off.  Pure, so the closing
@@ -3981,7 +3987,7 @@ Section IcacheEscrow.
                   are one conjunct the collection takes them off a slot
                   without re-associating anything.  See
                   [ic_loaded_lend_owned] below. *)
-               ∗ ic_inode_leg γfs dq γi inum n)))%I.
+               ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi inum n)))%I.
 
   (* the two readings of a bundle at a share the cover's third alternative
      is built from, as accessors, so the proof never unfolds [ic_loaded] or
@@ -4078,8 +4084,12 @@ Section IcacheEscrow.
           iDestruct "Hp" as (dn bm) "[Hload #Hshot]".
           iDestruct (ic_loaded_lend_owned with "Hload")
             as (n) "[%Hdl [Hleg Hback]]".
-          iRight; iRight. iExists (DfracOwn 1), n.
-          iSplitR; [iPureIntro; exact (dfrac_full_nvalid (DfracOwn 1)) |].
+          (* THE UNLOCKED ARM SHEDS ITS QUARTER (durable-disk EV-X): the
+             cover lends the leg at THREE QUARTERS, the same share the
+             read arm has, and the quarter rides in the lend's own frame
+             so the escrow closes with the bundle it was opened with. *)
+          iDestruct (ic_inode_leg_shed_to with "Hleg") as "[Hleg Hn14]".
+          iRight; iRight. iExists n.
           iSplitR; [iPureIntro; exact Hdl |].
           iApply (ic_lend_intro _ _ _ _ _ _ _
                     (i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev
@@ -4089,16 +4099,18 @@ Section IcacheEscrow.
                      ∗ live_gen k (1/2) ga
                      ∗ ic_pin_rest k
                      ∗ ic_mid cn k
+                     ∗ inode_rd_era γfs (DfracOwn (1/4)) inum n
                      ∗ (ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
                           ic_loaded γfs γi cov logstart k inum dn bm))%I
-                    with "[Hgid Hleg] [Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hback] []").
+                    with "[Hgid Hleg] [Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hn14 Hback] []").
           { iFrame "Hgid Hleg". }
-          { iFrame "Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hback". }
-          iIntros "(Hgid & Hleg) (Hidd & Hidn & Hvld & Hoff & Hlv & Hpin & Hmt & Hback)".
+          { iFrame "Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hn14 Hback". }
+          iIntros "(Hgid & Hleg) (Hidd & Hidn & Hvld & Hoff & Hlv & Hpin & Hmt & Hn14 & Hback)".
           iLeft. rewrite /ic_parked. iExists dev, inum, true, ga.
           iFrame "Hidd Hidn Hvld Hmt Hgid".
           rewrite /ic_payload_arm. iLeft. iFrame "Hoff Hlv Hpin".
           rewrite /ic_payload_np. iExists dn, bm. iFrame "Hshot".
+          iDestruct (ic_inode_leg_shed_of with "Hleg Hn14") as "Hleg".
           iApply ("Hback" with "Hleg").
         * (* UNLOADED: the escrow holds a POOL row *)
           iDestruct "Hp" as "[Hun Hpend]".
@@ -4141,8 +4153,7 @@ Section IcacheEscrow.
           cbn [ic_out_rd].
           iDestruct (ic_rd_arm_lend_owned with "Hrd")
             as (n) "[%Hdl [Hleg Hback]]".
-          iRight; iRight. iExists (DfracOwn (3/4)), n.
-          iSplitR; [iPureIntro; exact dfrac_34_nvalid |].
+          iRight; iRight. iExists n.
           iSplitR; [iPureIntro; exact Hdl |].
           iApply (ic_lend_intro _ _ _ _ _ _ _
                     (ic_deposit cn k (DepRd s dv nu g)

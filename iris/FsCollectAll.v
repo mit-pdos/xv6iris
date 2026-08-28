@@ -323,9 +323,7 @@ Section CollectAll.
       (* the pool row's leg IS [col_side]'s conjunct, on the nose
          (durable-disk EV stage 5): nothing is opened at this boundary any
          more *)
-      iRight. iExists (era_node dn0 bm0 data0), (DfracOwn 1).
-      iSplitR;
-        [iPureIntro; exact (FsStateDefs.dfrac_full_nvalid (DfracOwn 1)) |].
+      iRight. iExists (era_node dn0 bm0 data0).
       (* the pool row carries the three directory clauses already
          (durable-disk lane E-clauses); the node is [era_node] of its
          triple, so the transport is one lemma *)
@@ -333,7 +331,9 @@ Section CollectAll.
       { iPureIntro.
         exact (FsStateEra.node_dir_local_of_ok (bv_unsigned w) cov ls
                  icfg_nib dn0 bm0 data0 Hok Hdok Hddix Hdoc). }
-      iExact "Hleg".
+      (* the pool's row is WHOLE; the collection's uniform share is three
+         quarters, so the quarter is shed and dropped (durable-disk EV-X) *)
+      iDestruct (ic_inode_leg_shed_to with "Hleg") as "[$ _]".
     - iLeft. iExact "Hmk".
   Qed.
 
@@ -388,15 +388,14 @@ Section CollectAll.
     - rewrite /ic_lend. iDestruct "Hb" as "[[Hid Hnp] _]".
       iDestruct (ic_id_agree with "Hq Hid") as %(_ & _ & <-).
       iApply (ipool_shape_np_side with "Hnp").
-    - iDestruct "Hc" as (dq n) "[%Hdq [%Hdl Hl]]".
+    - iDestruct "Hc" as (n) "[%Hdl Hl]".
       rewrite /ic_lend. iDestruct "Hl" as "[(Hid & Hleg) _]".
       (* the cover lends the LEG as one conjunct (durable-disk EV stage 4)
          and [col_side] now IS that conjunct (stage 5): the boundary is a
          pass-through, and the two [ic_inode_leg_open]s that used to sit
          here and at [ipool_shape_np_side] are gone. *)
       iDestruct (ic_id_agree with "Hq Hid") as %(_ & _ & <-).
-      rewrite /col_side. iRight. iExists n, dq.
-      iSplitR; [iPureIntro; exact Hdq |].
+      rewrite /col_side. iRight. iExists n.
       iSplitR; [iPureIntro; exact Hdl |]. iExact "Hleg".
   Qed.
 
@@ -495,10 +494,9 @@ Section CollectAll.
     ireg_slot γfs γi z d -∗
       ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ ireg_lnk γfs z d
-      ∗ ∃ (n : fs_node) (dq : dfrac),
-          ⌜~ ✓ (dq ⋅ dq)⌝
-          ∗ ⌜node_dir_local z icfg_nib n⌝
-          ∗ ic_inode_leg γfs dq γi w n.
+      ∗ ∃ n : fs_node,
+          ⌜node_dir_local z icfg_nib n⌝
+          ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi w n.
   Proof.
     intros <-. iIntros "Ht Hs Hr".
     iApply (col_region_quiesce_take with "Ht Hs Hr").
@@ -510,15 +508,14 @@ Section CollectAll.
      collection's own two per-inum legs; this is it at the cache's
      currency, exactly as [col_region_quiesce_take_z] is for the door. *)
   Lemma col_leg_bundle_z (γfs : fs_names) (γi : gname) (z : Z)
-      (w : mword 32) (n : fs_node) (d : dinode) (dq : dfrac)
+      (w : mword 32) (n : fs_node) (d : dinode)
       (m : gmap Z dinode) (I : gmap Z fs_node) :
     bv_unsigned w = z ->
-    ~ ✓ (dq ⋅ dq) ->
     m !! z = Some d ->
     ghost_map_auth γi 1 m -∗
     ghost_map_auth (fs_top γfs) 1 I -∗
     ireg_lnk γfs z d -∗
-    ic_inode_leg γfs dq γi w n -∗
+    ic_inode_leg γfs (DfracOwn (3/4)) γi w n -∗
       ghost_map_auth γi 1 m
       ∗ ghost_map_auth (fs_top γfs) 1 I
       ∗ ⌜I !! z = Some n⌝
@@ -526,8 +523,8 @@ Section CollectAll.
       ∗ fs_link_node (fs_link γfs) z n
       ∗ ∃ kv : ity, ireg_keep γfs z kv.
   Proof.
-    intros <- Hdq Hmd.
-    exact (col_leg_bundle γfs γi w n d dq m I Hdq Hmd).
+    intros <- Hmd.
+    exact (col_leg_bundle γfs γi w n d m I Hmd).
   Qed.
 
   Lemma col_sides_bundles (γfs : fs_names) (γi : gname)
@@ -570,7 +567,7 @@ Section CollectAll.
       rewrite /col_sidez.
       iDestruct (col_region_quiesce_take_z γfs γi z (mword_of_int z) d Hmoi
                    with "Ht Hside Hslot") as
-        "(Ht & Hlnk & %n & %dq & %Hdq & %Hdl & Hleg)".
+        "(Ht & Hlnk & %n & %Hdl & Hleg)".
       iFrame "Ht".
       (* ONE STEP (durable-disk EV stage 5): the slot's whole per-inode leg
          beside what the region kept IS the bundle, the [FsState.fs_links]
@@ -578,8 +575,8 @@ Section CollectAll.
          rests on -- the abstract map's value at this inum IS the leg's
          node, and the record the leg names IS the region's -- are inside
          [FsCollect.col_leg_bundle]. *)
-      iDestruct (col_leg_bundle_z γfs γi z (mword_of_int z) n d dq m I Hmoi
-                   Hdq Hmd with "Hm Hi Hlnk Hleg")
+      iDestruct (col_leg_bundle_z γfs γi z (mword_of_int z) n d m I Hmoi
+                   Hmd with "Hm Hi Hlnk Hleg")
         as "(Hm & Hi & %HIz & Hb & Hle & Hkp)".
       iFrame "Hm Hi".
       iSplitR "Hkp"; [| iExact "Hkp"].
@@ -682,14 +679,13 @@ Section CollectAll.
   (*  2b.  THE HAND'S OWN RUNS (durable-disk lane H4)                      *)
   (*                                                                      *)
   (*  What the mint takes off [FsCollect.col_hand] and what it does NOT.   *)
-  (*  It does not take an [FsState.fs_state]: quiescence never yields one  *)
-  (*  -- the records sit REGION-side at fraction 1 while the data legs are *)
-  (*  each at their own inode's share -- and it does not take a byte tie,  *)
-  (*  a used-set clause or a disjointness clause.  It takes the RUNS: the  *)
-  (*  same byte legs, listed, each with the share it actually arrived at,  *)
-  (*  and everything the transport wants is then read off them            *)
-  (*  ([FsDurXfer.phi_runs_ex_disj] off [phi_excl],                       *)
-  (*  [phi_runs_ex_in] off the era's own authority).                       *)
+  (*  It does not take a byte tie, a used-set clause or a disjointness     *)
+  (*  clause.  It takes the RUNS -- the same byte legs, listed, at the ONE *)
+  (*  share the collection stands at (three quarters; durable-disk EV-X)   *)
+  (*  -- and everything the transport wants is read off them              *)
+  (*  ([FsDurXfer.phi_runs_q_disj] off [phi_excl], [phi_runs_q_in] off the *)
+  (*  era's own authority).  What the collection ASSEMBLES beside that is  *)
+  (*  the whole predicate at that share ([col_hand_state]).                *)
   (* ==================================================================== *)
 
   (* the region's records, re-indexed from (block, slot) to INUM.  The
@@ -726,16 +722,14 @@ Section CollectAll.
   (*  THE ASSEMBLY (durable-disk EV stage 5)                               *)
   (*                                                                      *)
   (*  [col_hand] MINUS THE ERA'S OWN RESIDUE IS AN                         *)
-  (*  [FsState.fs_footprint_q] -- the file system's byte footprint with    *)
-  (*  every inode's data leg at the share its holder actually has.  It is  *)
-  (*  NOT an [FsState.fs_state] and cannot be made one: a read-locked      *)
-  (*  inode's bundle stands at three quarters (of its byte legs AND of its *)
-  (*  [FsState.top_frag]), nothing at a commit refutes a read lock -- a    *)
-  (*  read-locking [ilock] opens no transaction, so the empty [ln_tx]      *)
-  (*  authority says nothing about it -- and three quarters cannot be      *)
-  (*  promoted.  That is why the commit's entry is                         *)
-  (*  [FsDurSnap.fs_snap_alloc_mint] and not [FsDurXfer.fs_state_xfer]     *)
-  (*  (durable-fs-plan.md section 4).                                      *)
+  (*  [FsState.fs_footprint] AT THREE QUARTERS (durable-disk EV-X).  The   *)
+  (*  share is uniform now: the inode legs arrive at 3/4 out of the        *)
+  (*  escrows and the pool ([FsCollect.col_bundle]), and the three things  *)
+  (*  the collection meets at fraction 1 -- block 1, the bitmap block and  *)
+  (*  the free pool -- are SHED down to it here, exactly as the region's   *)
+  (*  records are inside [FsCollect.col_bundle_phi].  EV stage 5's         *)
+  (*  [fs_footprint_q], with a share bound existentially per inode, is     *)
+  (*  deleted with the per-run vocabulary it fed.                          *)
   (*                                                                      *)
   (*  WHAT IS DROPPED HERE, by name, and none of it is part of a file      *)
   (*  system: the era's record PROXY [InodeRegion.dinode_at] and its       *)
@@ -747,7 +741,7 @@ Section CollectAll.
   (*                                                                      *)
   (*  WHAT COMES OUT BESIDE THE FOOTPRINT is exactly what the ghost half   *)
   (*  of a mint is read off: the parse, the per-inode local clauses, the   *)
-  (*  byte authority (for [FsDurXfer.phi_runs_ex_in]), the link family and *)
+  (*  byte authority (for [FsDurXfer.phi_runs_q_in]), the link family and  *)
   (*  the ROOT'S KEEP-ALIVE fragment -- the slack in [FsDurSnap.sk_links], *)
   (*  never spent.                                                         *)
   (* ==================================================================== *)
@@ -761,7 +755,8 @@ Section CollectAll.
       ∗ col_auth γfs Lb C home
       ∗ fs_links (fs_link γfs) I
       ∗ (∃ kv : ity, ireg_keep γfs ireg_root kv)
-      ∗ fs_footprint_q (fs_gamma_L γfs) (col_state sb sbb I used).
+      ∗ fs_footprint (fs_gamma_L γfs) (DfracOwn (3/4))
+          (col_state sb sbb I used).
   Proof.
     iIntros "Hhand".
     iDestruct "Hhand" as "(%Hg & %Hdi & Hau & Hsb & Hbm & Hrec & Hb & Hlk
@@ -800,18 +795,82 @@ Section CollectAll.
       iExact "Hr". }
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     iFrame "Hau Hlk Hkeep".
-    rewrite /fs_footprint_q /col_state /=.
+    (* THE THREE METADATA OBJECTS COME DOWN TO THE UNIFORM SHARE
+       (durable-disk EV-X).  Block 1, the bitmap block and the free pool
+       are all at fraction 1 where the collection meets them; the quarter
+       each sheds is dropped, exactly as the region's records' is inside
+       [FsCollect.col_bundle_phi]. *)
+    iDestruct (blk_owned_shed _ _ _ (gamma_shed_34 _ (fs_gamma_L_frac γfs))
+                 with "Hsbb") as "[Hsbb _]".
+    iDestruct (blk_owned_shed _ _ _ (gamma_shed_34 _ (fs_gamma_L_frac γfs))
+                 with "Hbmb") as "[Hbmb _]".
+    iDestruct (free_pool_shed _ _ _ (gamma_shed_34 _ (fs_gamma_L_frac γfs))
+                 with "Hpool") as "[Hpool _]".
+    rewrite /fs_footprint /col_state /=.
     iFrame "Hsbb Hbmb Hpool".
     iCombine "Hrecs Hb" as "Hpairs". rewrite -big_sepM_sep.
     iApply (big_sepM_impl with "Hpairs"). iIntros "!>" (i n Hi) "[Hr Hbi]".
     iApply (col_bundle_phi γfs γi sb i n with "Hr Hbi").
   Qed.
 
-  (* ...and the whole of it: [FsDurSnap.snap_mint] off the hand.  Two
-     readings that KEEP the hand, then ONE destructive step to the
-     footprint and ONE runs walk ([FsDurXfer.fs_footprint_q_runs]); the
-     per-object cons/concat that used to be written out here is
-     Gamma-generic and lives beside the run vocabulary now. *)
+  (* ==================================================================== *)
+  (*  ...AND THAT IS AN [FsState.fs_state] AT THREE QUARTERS               *)
+  (*  (durable-disk EV-X, and it is what EV5 measured as impossible at     *)
+  (*  fraction 1)                                                         *)
+  (*                                                                      *)
+  (*  EV5's wall was real and is now GONE, not worked around: a            *)
+  (*  read-locked inode's bundle stands at three quarters and cannot be    *)
+  (*  promoted, so quiescence never yields the FRACTION-1 predicate --     *)
+  (*  but [FsState.fs_state] takes a dfrac now, and three quarters is a    *)
+  (*  share every arm can supply and every metadata owner can shed to.     *)
+  (*  The Φ-FREE half does not divide at all: the link authority and the   *)
+  (*  entry tokens come out WHOLE ([FsCollect.col_hand]'s [fs_links]       *)
+  (*  leg), which is the reason a share works here where a carve did not.  *)
+  (*                                                                      *)
+  (*  It is the exact shape [FsDurXfer.fs_state_xfer] consumes, at         *)
+  (*  [q = 3/4 > 1/2] ([FsDurXfer.qp_half_lt_34]).  WHAT STILL STANDS      *)
+  (*  BETWEEN THIS AND THE TRANSPORT BEING THE COMMIT'S CALLER is not the  *)
+  (*  share: it is that a transport at [q > 1/2] necessarily takes MORE    *)
+  (*  THAN HALF of every byte, so the collection that feeds it can no      *)
+  (*  longer be DESTRUCTIVE -- it has to be an accessor and take its       *)
+  (*  source back out of the transport, and three of its steps drop        *)
+  (*  resource irreversibly ([big_sepS_union_weak] at the pool/marker/live *)
+  (*  partition, which [IcacheEscrow.ipool_quiesce_acc] does not make      *)
+  (*  disjoint; [col_keeps_root]; and the era's residue in                 *)
+  (*  [col_hand_footprint]).  That is a lane of its own.                   *)
+  (* ==================================================================== *)
+  Lemma col_hand_state (γfs : fs_names) (γi : gname) (nib : nat)
+      (sb : fs_sb) (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
+      (m : gmap Z dinode) (Lb : gmap Z (bv 8))
+      (C : gmap Z (list (bv 8))) (home : gset Z) :
+    col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m Lb C home
+    ⊢ col_auth γfs Lb C home
+      ∗ (∃ kv : ity, ireg_keep γfs ireg_root kv)
+      ∗ fs_state (fs_gamma_L γfs) (DfracOwn (3/4)) (col_state sb sbb I used).
+  Proof.
+    iIntros "Hhand".
+    iAssert (⌜fs_geom (col_state sb sbb I used)⌝
+             ∧ col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m
+                 Lb C home)%I with "[Hhand]" as "[%Hgeo Hhand]".
+    { iSplit; [iApply (col_fs_geom with "Hhand") | iExact "Hhand"]. }
+    iDestruct (col_hand_footprint with "Hhand")
+      as "(%Hparse & %Hloc & Hau & Hlk & Hkeep & Hfoot)".
+    iFrame "Hau Hkeep".
+    iApply (fs_state_of (fs_gamma_L γfs) (DfracOwn (3/4))
+              (col_state sb sbb I used) with "Hfoot Hlk").
+    rewrite /fs_pure /col_state /=.
+    iSplitR; [by iPureIntro |].
+    iSplitR; [| by iPureIntro].
+    iApply big_sepM_intro. iIntros "!>" (i n Hi).
+    iPureIntro. exact (Hloc i n Hi).
+  Qed.
+
+  (* ...and the whole of it: [FsDurSnap.snap_mint] off the hand.  ONE
+     reading that keeps the hand ([col_snap_shape], the clause no resource
+     pins), then ONE destructive step to the PREDICATE ([col_hand_state]),
+     off which every ghost row of the mint is read ([fs_state_to] gives the
+     parse, the local clauses and [fs_geom]), and ONE runs walk
+     ([FsDurXfer.fs_footprint_runs_q]) at the uniform share. *)
   Lemma col_hand_mint (γfs : fs_names) (γi : gname) (nib : nat) (sb : fs_sb)
       (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
       (m : gmap Z dinode) (Lb : gmap Z (bv 8))
@@ -825,34 +884,52 @@ Section CollectAll.
              ∧ col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m
                  Lb C home)%I with "[Hhand]" as "[%Hsh Hhand]".
     { iSplit; [iApply (col_snap_shape with "Hhand") | iExact "Hhand"]. }
-    iAssert (⌜fs_geom (col_state sb sbb I used)⌝
-             ∧ col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m
-                 Lb C home)%I with "[Hhand]" as "[%Hgeo Hhand]".
-    { iSplit; [iApply (col_fs_geom with "Hhand") | iExact "Hhand"]. }
-    (* ---- THE ASSEMBLY ---- *)
-    iDestruct (col_hand_footprint with "Hhand")
-      as "(%Hparse & %Hloc & Hau & Hlk & Hkeep & Hfoot)".
+    (* ---- THE ASSEMBLY: an [FsState.fs_state] at three quarters, and
+       every ghost row of the mint is read off IT rather than off the hand
+       (durable-disk EV-X) ---- *)
+    iDestruct (col_hand_state with "Hhand") as "(Hau & Hkeep & HS)".
+    iDestruct (fs_state_to with "HS") as "(Hfoot & Hlk & #Hp)".
+    rewrite /fs_pure. iDestruct "Hp" as "(%Hparse & #Hlocs & %Hgeo)".
+    iAssert (⌜forall i n, I !! i = Some n -> inode_local i n⌝)%I
+      with "[]" as %Hloc.
+    { rewrite bi.pure_forall. iIntros (i).
+      rewrite bi.pure_forall. iIntros (n).
+      rewrite bi.pure_impl. iIntros (Hi).
+      iDestruct (big_sepM_lookup _ (fss_inodes (col_state sb sbb I used))
+                   i n Hi with "Hlocs") as %Hx.
+      by iPureIntro. }
     (* ---- the link family's own validity, SLACKED AT THE ROOT ---- *)
     iDestruct "Hkeep" as (kv) "Hkeep".
     rewrite /ireg_keep (bool_decide_eq_true_2 (ireg_root = ireg_root) eq_refl)
             /FsStateLink.link_tok /FsStateLink.link_toks
             /FsStateLink.link_tok_elem /=.
     iDestruct (fs_links_valid_tok with "Hlk Hkeep") as %Hlinks.
-    (* ---- THE RUN LIST, in one call ---- *)
-    iDestruct (fs_footprint_q_runs with "Hfoot") as (PM) "[%Hshape Hex]".
+    (* ---- THE RUN LIST, in one call, at the UNIFORM share ---- *)
+    iDestruct (fs_footprint_runs_q with "Hfoot") as (PM) "[%Hshape Hex]".
+    assert (Hqok : xq_ok (xq_at (DfracOwn (3/4))
+                            (xr_fs (col_state sb sbb I used) PM)))
+      by exact (xq_ok_at _ _ FsStateDefs.dfrac_34_nvalid).
+    assert (Hstr : xq_strip (xq_at (DfracOwn (3/4))
+                               (xr_fs (col_state sb sbb I used) PM))
+                   = xr_fs (col_state sb sbb I used) PM)
+      by exact (xq_strip_at _ _).
     (* ---- and the two readings off it ---- *)
     iAssert (⌜xr_disj (xr_fs (col_state sb sbb I used) PM)⌝
-             ∧ phi_runs_ex (fs_gamma_L γfs)
-                 (xr_fs (col_state sb sbb I used) PM))%I
+             ∧ phi_runs_q (fs_gamma_L γfs)
+                 (xq_at (DfracOwn (3/4))
+                    (xr_fs (col_state sb sbb I used) PM)))%I
       with "[Hex]" as "[%Hdisj Hex]".
     { iSplit; [| iExact "Hex"].
-      iApply (phi_runs_ex_disj (fs_gamma_L γfs) (fs_gamma_L_excl γfs)
-                with "Hex"). }
+      iDestruct (phi_runs_q_disj (fs_gamma_L γfs) (fs_gamma_L_excl γfs) _
+                   Hqok with "Hex") as %Hd.
+      iPureIntro. rewrite -Hstr. exact Hd. }
     iAssert (⌜Lb ⊆ fs_dbytes (col_view C home)⌝
              ∧ col_auth γfs Lb C home)%I with "[Hau]" as "[%Hle Hau]".
     { iSplit; [iApply (col_auth_dbytes with "Hau") | iExact "Hau"]. }
-    iDestruct (phi_runs_ex_in (fs_gamma_L γfs) (col_auth γfs Lb C home) Lb
-                 (col_agree γfs Lb C home) _ with "Hau Hex") as %Hin.
+    iDestruct (phi_runs_q_in (fs_gamma_L γfs) (col_auth γfs Lb C home) Lb
+                 (col_agree γfs Lb C home) _ with "Hau Hex") as %Hin0.
+    assert (Hin : xr_union (xr_fs (col_state sb sbb I used) PM)
+                  ⊆ Lb) by (rewrite -Hstr; exact Hin0).
     iPureIntro. split.
     - exact Hsh.
     - exact Hgeo.

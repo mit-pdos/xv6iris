@@ -48,7 +48,18 @@ that is what makes the `∗` between two inodes of a durable `fs_state`
 mean something, and because the ONE allocator core has to serve the boot
 mint too (§5) and the era's `fsΦ` cannot be `□`-ed.
 
-## 2. The file-system predicate `fs_state Γ S`
+## 2. The file-system predicate `fs_state Γ dq S`
+
+**IT TAKES A SHARE (owner ruling, EV-X).**  Every BYTE of the file system
+rides at `dq` and the ghost column — the link authority, the type register,
+a directory's entry tokens — stays WHOLE; `fs_state Γ (DfracOwn 1) S` is the
+old predicate by `reflexivity`.  It is written at `FsStateDefs.gamma_q Γ dq`,
+the view whose `fsΦ` is pinned at `dq`, so there is no parallel hierarchy of
+`_q` definitions and every Γ-generic lemma reads at a share for free.  The
+share stops at `fs_state_split`: only `fs_footprint` takes it, `fs_ghost` is
+Φ-free.  That is the whole reason the transport below is provable at any
+`q > 1/2` — the link family's slacked validity is read off a source held at
+ANY share.
 
 One definition (`iris/FsState*.v`), used twice.  `S : fs_state_rec` is
 the abstract state (superblock, inode table `fss_inodes : gmap Z
@@ -88,10 +99,16 @@ live directory, unique names).  There is NO cross-inode pure clause:
   gname family is existential.  The cost is two capacity classes
   (`fsLinkG`/`fsTopG`) on `FsCrash`'s sections, which every consumer already
   has out of `Xv6G.xv6G`.  **THE ALLOCATOR IS A RESOURCE TRANSPORT**
-  (`iris/FsDurXfer.v`, lane H): `fs_state Γ S ==∗ fs_state Γ S ∗ fs_state Γ' S`
-  over a fresh `Γ'`, with `phi_excl Γ` and the SOURCE'S OWN AUTHORITY
-  (`phi_agree Γ A M`, satisfied by one `ghost_map_lookup` at either
-  instance) as its premises.  Both ends of a transport are `fs_state`s and
+  (`iris/FsDurXfer.v`, lane H; at a SHARE since EV-X):
+  `fs_state Γ (DfracOwn q) S ==∗ fs_state Γ (DfracOwn q) S ∗ fs_state Γ' (DfracOwn 1) S`
+  for every `q > 1/2`, over a fresh `Γ'`, with `phi_excl Γ` and the SOURCE'S
+  OWN AUTHORITY (`phi_agree Γ A M`, satisfied by one `ghost_map_lookup` at
+  either instance) as its premises.  **The `q > 1/2` premise IS the
+  disjointness argument**: two shares of one byte that each exceed a half do
+  not fit inside it, so "the mint meets the same block twice" is refuted from
+  OWNERSHIP (`dfrac_own_gt_half` into `phi_runs_q_disj`) and no pure
+  disjointness fact about the state is materialised anywhere.  Both ends of
+  a transport are `fs_state`s and
   nothing is computed from `S`; the output map is a SUBSET of the source's,
   which is where a snapshot's IDENTITY comes from.  Its ALLOCATION HALF
   stands alone (`fs_footprint_mint` / `fs_state_mint_runs`, lane H4) and
@@ -368,28 +385,47 @@ more are `FsState.fs_geom` on the instance, one is the WAL's own row (b),
 and every remaining clause — the byte ties, the used-set coupling, both
 disjointness clauses, the local clauses — is derived where it is needed.
 
-**AND THE COLLECTION'S OWN OUTPUT HAS A NAME AT LAST (stage 5 of the
-era-vocabulary unification): `FsState.fs_footprint_q`.**
-`FsCollectAll.col_hand_footprint` is `col_hand ⊢ … ∗ fs_footprint_q
-(fs_gamma_L γfs) (col_state …)` — the file system's byte footprint with
-each inode's DATA leg at the share its holder actually has (the record at
-fraction 1, region-side) — beside the three things the ghost half is read
-off (`col_auth`, `fs_links`, the root's `ireg_keep`) and two pure rows.
-`FsDurXfer.fs_footprint_q_runs` is then the ONE runs call the mint makes.
-`fs_footprint_q_1 : fs_footprint Γ S ⊢ fs_footprint_q Γ S` witnesses that
-this is a weakening of the real thing and not a new notion.
+**AND THE COLLECTION'S OWN OUTPUT IS THE PREDICATE ITSELF, AT A SHARE**
+(EV-X; stage 5's `fs_footprint_q`, with a share bound existentially PER
+INODE, is deleted).  `FsCollectAll.col_hand_footprint` is `col_hand ⊢ … ∗
+fs_footprint (fs_gamma_L γfs) (DfracOwn (3/4)) (col_state …)` beside the
+three things the ghost half is read off (`col_auth`, `fs_links`, the root's
+`ireg_keep`) and two pure rows, and `col_hand_state` is that plus the ghost
+half: `fs_state (fs_gamma_L γfs) (DfracOwn (3/4)) (col_state …)`.
+`FsDurXfer.fs_footprint_runs_q` is the ONE runs call the mint makes.
 
-**AND `fs_state` STILL DOES NOT COME OUT OF A COMMIT — MEASURED, not
-estimated.**  `IcacheEscrow.ic_rd_arm` (a READ-LOCKED inode's arm) lends
-`ic_inode_leg γfs (DfracOwn (3/4)) …` and `FsStateEra.inode_owned_era_q`
-carries `FsState.top_frag_q` at that same share, while
-`FsStateInode.inode_ghost` wants the whole element — so a read-locked inum
-yields neither half of `inode_owned`.  Nothing at a commit refutes a read
-lock: the three windows the commit does refute each park a share of
-`LogDefs.ln_tx`, and a read-locking `ilock` opens no transaction.
-`FsDurXfer.fs_state_xfer`/`_tok` therefore have no caller and cannot
-acquire one; the transport's LIVE half is its allocation half
-(`fs_state_mint_runs`), which takes no resource at all.
+**AND `fs_state` DOES COME OUT OF A COMMIT, AT THREE QUARTERS (EV-X;
+this REPLACES the stage-5 finding above it).**  The old measurement was
+about the FRACTION-1 predicate: `IcacheEscrow.ic_rd_arm` lends
+`ic_inode_leg γfs (DfracOwn (3/4)) …`, three quarters cannot be promoted,
+and nothing at a commit refutes a read lock (the three windows the commit
+does refute each park a share of `LogDefs.ln_tx`; a read-locking `ilock`
+opens no transaction).  With the dfrac IN the predicate the question is
+instead "is there ONE share every arm can supply", and there is: three
+quarters.  `ic_slot_cover`'s bundle alternative and `FsCollect.col_side` /
+`col_bundle` are stated at it — the unlocked arm sheds its quarter into the
+lend's own frame, the pool's and the region's free bundles shed and drop
+theirs — and every metadata object and every region record comes down the
+same way (`FsStateDefs.view_shed`/`gamma_shed_34`,
+`FsStateInode.rec_owned_at_shed_to`, `FsState.fs_footprint_shed`).
+`FsCollectAll.col_hand_state` is `col_hand ⊢ … ∗ fs_state (fs_gamma_L γfs)
+(DfracOwn (3/4)) (col_state …)`, exactly `fs_state_xfer`'s source at
+`q = 3/4`.  `FsState.fs_footprint_q`, `FsStateInode.inode_phi_q` and
+`FsDurXfer`'s whole per-run share vocabulary (`phi_runs_ex` and friends) are
+deleted with it.
+
+**WHAT STILL KEEPS THE TRANSPORT OFF THE COMMIT'S PATH IS NOT THE SHARE.**
+A transport at `q > 1/2` takes MORE THAN HALF of every byte, so the
+collection that feeds it cannot both hand it a source and keep the
+invariants' bodies: it must be an ACCESSOR and take the source back out of
+the transport (which returns it).  `FsCollectAll.col_bodies_mint` is
+destructive by construction — that is what `pure_keep` buys, and it is sound
+only because the conclusion is PURE — and three of its steps drop resource
+irreversibly: `big_sepS_union_weak` at the pool/marker/live partition (which
+`IcacheEscrow.ipool_quiesce_acc` does not make disjoint), `col_keeps_root`,
+and the era's residue in `col_hand_footprint`.  Turning it around is a lane
+of its own; until then the commit's entry stays `P_dur_alloc_mint` over
+`snap_mint`, whose `sm_runs` still carries the pure `xr_disj`.
 
 **THE COLLECTION IS `FsCollectAll.fs_collect_mint`**, and what makes it
 possible is that its conclusion is PURE: an entailment `R ⊢ ⌜φ⌝` yields

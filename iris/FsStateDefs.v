@@ -296,8 +296,11 @@ Section GammaDefs.
   (*  the uniform share the transport takes (durable-disk EV-X).  Stated *)
   (*  once, at the VIEW: [view_shed Γ Γ1 Γ2] says a byte at [Γ] splits   *)
   (*  into one at [Γ1] and one at [Γ2], and every shape above then sheds *)
-  (*  by one three-line induction each.  [gamma_q_shed] is the only      *)
-  (*  instance, and it is [phi_frac] verbatim.                           *)
+  (*  by one three-line induction each.  Both instances are [phi_frac]   *)
+  (*  verbatim: [gamma_q_shed] splits a view already at a share, and     *)
+  (*  [gamma_shed_full] / [gamma_shed_34] split a WHOLE object into two  *)
+  (*  constant-share views -- which is what the commit's collection runs *)
+  (*  on the region's records, block 1, the bitmap and the free pool.    *)
   (*                                                                    *)
   (*  ONE DIRECTION ONLY.  Rejoining is not stated here because the free *)
   (*  pool's element hides its bytes under an existential, so two halves *)
@@ -305,20 +308,42 @@ Section GammaDefs.
   (*  nothing ever needs to: the transport RETURNS its source.           *)
   (* ---------------------------------------------------------------- *)
 
+  (* Stated at [DfracOwn 1] alone, because that is the ONLY dfrac the
+     shapes above ever hand [fsΦ]: [byte_range] passes it down and a share
+     enters only through [gamma_q]. *)
   Definition view_shed (Γ Γ1 Γ2 : fs_view_names) : Prop :=
-    forall (dq : dfrac) (a : Z) (v : bv 8),
-      fsΦ Γ dq a v ⊢ fsΦ Γ1 dq a v ∗ fsΦ Γ2 dq a v.
+    forall (a : Z) (v : bv 8),
+      fsΦ Γ (DfracOwn 1) a v
+      ⊢ fsΦ Γ1 (DfracOwn 1) a v ∗ fsΦ Γ2 (DfracOwn 1) a v.
 
   Lemma gamma_q_shed Γ (Hfr : phi_frac Γ) (q1 q2 : Qp) :
     view_shed (gamma_q Γ (DfracOwn (q1 + q2)))
               (gamma_q Γ (DfracOwn q1)) (gamma_q Γ (DfracOwn q2)).
-  Proof. intros dq a v. rewrite /gamma_q /=. rewrite (Hfr a v q1 q2) //. Qed.
+  Proof. intros a v. rewrite /gamma_q /=. rewrite (Hfr a v q1 q2) //. Qed.
+
+  (* ...and the one every fraction-1 owner runs: a WHOLE object shed into
+     two constant-share views whose shares sum to one.  This is how the
+     commit's collection gets the region's records, block 1 and the bitmap
+     down to the share the transport takes (durable-disk EV-X). *)
+  Lemma gamma_shed_full Γ (Hfr : phi_frac Γ) (q1 q2 : Qp) :
+    (q1 + q2)%Qp = 1%Qp ->
+    view_shed Γ (gamma_q Γ (DfracOwn q1)) (gamma_q Γ (DfracOwn q2)).
+  Proof.
+    intros Hsum a v. rewrite /gamma_q /= -Hsum. rewrite (Hfr a v q1 q2) //.
+  Qed.
+
+  Lemma gamma_shed_34 Γ (Hfr : phi_frac Γ) :
+    view_shed Γ (gamma_q Γ (DfracOwn (3/4))) (gamma_q Γ (DfracOwn (1/4))).
+  Proof.
+    apply (gamma_shed_full Γ Hfr (3/4) (1/4)).
+    exact Qp.three_quarter_quarter.
+  Qed.
 
   Lemma byte_range_shed Γ Γ1 Γ2 (Hs : view_shed Γ Γ1 Γ2) b off bs :
     byte_range Γ b off bs ⊢ byte_range Γ1 b off bs ∗ byte_range Γ2 b off bs.
   Proof.
     rewrite /byte_range /byte_range_q -big_sepL_sep.
-    apply big_sepL_mono. intros k v _. apply Hs.
+    apply big_sepL_mono. intros k v _. apply (Hs _ v).
   Qed.
 
   Lemma blk_owned_shed Γ Γ1 Γ2 (Hs : view_shed Γ Γ1 Γ2) b bs :

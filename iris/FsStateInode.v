@@ -540,6 +540,14 @@ Section RecOwned.
     rewrite /rec_owned /rec_owned_at Hblk Hoff //.
   Qed.
 
+  (* the shed as a WAND (durable-notes: an [⊣⊢] used with [rewrite] inside a
+     proof that holds a tower rewrites the whole proofmode goal) *)
+  Lemma rec_owned_at_shed_to Γ (Hfr : phi_frac Γ) istart z dn :
+    rec_owned_at Γ istart z dn -∗
+    rec_owned_at_q Γ (DfracOwn (3/4)) istart z dn
+    ∗ rec_owned_at_q Γ (DfracOwn (1/4)) istart z dn.
+  Proof. iIntros "H". by iApply (rec_owned_at_split_34 Γ Hfr). Qed.
+
   Lemma rec_owned_sb_q Γ dq sb i dn :
     0 <= i < 2 ^ 32 ->
     rec_owned_q Γ dq sb i dn ⊣⊢ rec_owned_at_q Γ dq (sb_inodestart sb) i dn.
@@ -829,55 +837,13 @@ Section InodeOwned.
     rewrite /inode_phi_at inode_phi_dat (rec_owned_sb Γ sb i (fn_rec n) Hi) //.
   Qed.
 
-  (* ...AND THE SAME TWO AT THE HOLDER'S OWN SHARE (durable-disk EV stage
-     5).  What a commit's collection gathers per inode is NOT [inode_phi]:
-     the RECORD parks region-side at fraction 1 always, while the DATA leg
-     arrives out of THAT inode's own escrow at a share of its own -- 1 for
-     an unlocked inode, 3/4 for a read-locked one, and 3/4 cannot be
-     promoted ([FsDurXfer.dfrac_nvalid_pair] is the arithmetic).  So the
-     footprint quiescence yields is this shape and not the full-share one;
-     [FsState.fs_footprint_q] is the whole-state form and
-     [FsDurXfer.fs_footprint_q_runs] its runs reading.
-
-     [inode_phi_q Γ (DfracOwn 1)] IS [inode_phi Γ] -- [inode_dat_1] is
-     [reflexivity] -- so the full-share reading is free and no consumer of
-     [inode_phi] moves. *)
-  Definition inode_phi_q Γ (dq : dfrac) (sb : fs_sb) (i : Z) (n : fs_node)
-    : iProp Σ :=
-    (rec_owned Γ sb i (fn_rec n) ∗ inode_dat_q Γ dq n)%I.
-
-  Definition inode_phi_at_q Γ (dq : dfrac) (istart z : Z) (n : fs_node)
-    : iProp Σ :=
-    (rec_owned_at Γ istart z (fn_rec n) ∗ inode_dat_q Γ dq n)%I.
-
-  Lemma inode_phi_q_1 Γ sb i n :
-    inode_phi Γ sb i n = inode_phi_q Γ (DfracOwn 1) sb i n.
-  Proof. reflexivity. Qed.
-
-  Lemma inode_phi_at_q_1 Γ istart z n :
-    inode_phi_at Γ istart z n = inode_phi_at_q Γ (DfracOwn 1) istart z n.
-  Proof. reflexivity. Qed.
-
-  Global Instance inode_phi_q_timeless `{!GTimeless Γ} dq sb i n :
-    Timeless (inode_phi_q Γ dq sb i n).
-  Proof. rewrite /inode_phi_q. tl_struct. Qed.
-
-  Global Instance inode_phi_at_q_timeless `{!GTimeless Γ} dq istart z n :
-    Timeless (inode_phi_at_q Γ dq istart z n).
-  Proof. rewrite /inode_phi_at_q. tl_struct. Qed.
-
-  (* the superblock step at a share -- [inode_phi_sb]'s own statement, and
-     the one the collection runs: [FsCollectAll.col_recs_by_inum] hands the
-     record out at the REGION's numbering ([rec_owned_at]) and the bundle
-     hands out the data leg. *)
-  Lemma inode_phi_sb_q Γ dq sb i n :
-    0 <= i < 2 ^ 32 ->
-    inode_phi_at_q Γ dq (sb_inodestart sb) i n ⊣⊢ inode_phi_q Γ dq sb i n.
-  Proof.
-    intros Hi.
-    rewrite /inode_phi_at_q /inode_phi_q
-            (rec_owned_sb Γ sb i (fn_rec n) Hi) //.
-  Qed.
+  (* [inode_phi_q] / [inode_phi_at_q] -- EV stage 5's pair with the RECORD
+     pinned at fraction 1 and only the data leg share-generic -- are DELETED
+     at EV-X.  The transport's source is [FsState.fs_state] at ONE uniform
+     share, so an inode's record rides at that share too and the shape the
+     collection assembles is [inode_phi] at the constant-share view
+     ([gamma_q_inode_phi] below); the region's fraction-1 record is SHED
+     down to it ([rec_owned_at_shed_to]). *)
 
   (* ---------------------------------------------------------------- *)
   (*  3f.  THE SAME SHAPES AT THE CONSTANT-SHARE VIEW (durable-disk     *)
@@ -885,9 +851,13 @@ Section InodeOwned.
   (*       [FsStateDefs])                                               *)
   (*                                                                    *)
   (*  Reading a Gamma-generic byte shape at [gamma_q Γ dq] IS reading it *)
-  (*  at the share [dq].  These four are the whole of the translation,   *)
-  (*  and each is one [rewrite]: it is what lets [FsState.fs_state] take *)
-  (*  a dfrac without a parallel hierarchy of [_q] definitions.          *)
+  (*  at the share [dq], and each translation is one [rewrite]: that is  *)
+  (*  what lets [FsState.fs_state] take a dfrac without a parallel       *)
+  (*  hierarchy of [_q] definitions.  [gamma_q_inode_ghost] -- the       *)
+  (*  Φ-free half, which does NOT move -- sits below with                *)
+  (*  [inode_ghost] itself.  Beside them, the SHED at an inode's bytes   *)
+  (*  ([FsStateDefs.view_shed]), which is how a fraction-1 owner comes    *)
+  (*  down to the share the collection stands at.                        *)
   (* ---------------------------------------------------------------- *)
 
   Lemma gamma_q_ind_owned Γ dq n :
@@ -2138,5 +2108,4 @@ End InodeOwned.
    A SEAL DOES NOT TRAVEL: a file that puts one of these in its
    intuitionistic context must [Require Import FsStateInode] directly. *)
 Global Typeclasses Opaque inode_dat_q inode_dat inode_phi_at
-                         inode_phi_q inode_phi_at_q
                          rec_owned_q rec_owned_at_q.

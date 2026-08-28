@@ -309,14 +309,31 @@ TRANSPORT ARE `fs_state`s, and nothing is computed from `S` but the state
 itself:
 
 ```
-fs_state_xfer_tok Γ (Hex : phi_excl Γ) A M (Hag : phi_agree Γ A M) S r v :
-  A -∗ fs_state Γ S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
+fs_state_xfer_tok Γ (Hex : phi_excl Γ) A M (Hag : phi_agree Γ A M) q S r v :
+  (1/2 < q)%Qp ->
+  A -∗ fs_state Γ (DfracOwn q) S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
     ∃ g gl gt B, ⌜B ⊆ M⌝
-                 ∗ A ∗ fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)
+                 ∗ A ∗ fs_state Γ (DfracOwn q) S
+                 ∗ own (γlink Γ) (link_tok_elem r v)
                  ∗ ghost_map_auth g 1 B ∗ ghost_map_auth gt 1 (fss_inodes S)
-                 ∗ top_frags ∗ fs_state (snap_gamma g gl gt) S
+                 ∗ top_frags ∗ fs_state (snap_gamma g gl gt) (DfracOwn 1) S
                  ∗ own gl (link_tok_elem r v)
 ```
+
+**IT RUNS AT ANY SHARE ABOVE A HALF (durable-disk EV-X), and the `1/2 < q`
+premise IS the disjointness argument.**  Two shares of one byte that each
+exceed a half do not fit inside it, so "the mint meets the same block twice"
+is refuted from OWNERSHIP — `dfrac_own_gt_half` into `phi_runs_q_disj` over
+`phi_excl` — and NO pure fact about the state (no `sk_disj`, no carve, no
+supplied disjointness clause) is materialised on the way.  What makes the
+statement true at all is that the share stops at `fs_state_split`: the GHOST
+column is Φ-free, so the link family's slacked validity is read off the
+source at any `q` (`fs_links_valid_tok`) and the fresh family is ONE
+`own_alloc` at the source's own element.  Its two new steps are
+`fs_footprint_runs_q` / `fs_footprint_of_runs_q`: a footprint at a share IS
+the fraction-1 footprint at `gamma_q Γ dq` (`FsState.fs_footprint_gq`) and a
+full-share run list read there IS the one-share list at `Γ`
+(`phi_runs_q_at`), so §3's runs correspondence is reused verbatim.
 
 Its premises are `phi_excl Γ` and the SOURCE'S OWN AUTHORITY as a
 hypothesis: `phi_agree Γ A M` is `(A ∗ fsΦ Γ dq a v) ⊢ ⌜M !! a = Some v⌝`,
@@ -454,33 +471,46 @@ names it) is a block of `D` that `fs_footprint` does not own, and the
 footprint's flattening is a PROPER subset.  The residue is final: the
 identity stays at `⊆` and `snap_shape` stays carried.
 
-**THE COMMIT'S CALL SITE HAS MOVED (lane H4), AND IT IS THE MINT AND NOT
-THE TRANSPORT.**  Quiescence never yields an `fs_state`: the records sit
-REGION-side at fraction 1 while each inode's data legs arrive at THAT
-inode's own share, existentially bound with the single constraint "the
-double is invalid" (`FsCollect.col_bundle`; `DfracOwn (3/4)` satisfies it —
-`dfrac_34_no_pair` — and cannot be promoted — `phi_no_promote`).  Two
-shapes make such a source legal.
+**QUIESCENCE YIELDS AN `fs_state` AT THREE QUARTERS (durable-disk EV-X;
+this REPLACES lane H4's and EV stage 5's finding that it yields none).**
+The old reading was true of the FRACTION-1 predicate only: a read-locked
+inode's bundle stands at three quarters and cannot be promoted, so the
+collection could not build `fs_state Γ S`.  With the dfrac in the predicate
+the question is not "can it be promoted" but "is there ONE share every arm
+can supply", and there is: three quarters.  `IcacheEscrow.ic_slot_cover`'s
+bundle alternative and `FsCollect.col_side`/`col_bundle` are stated AT it —
+the unlocked arm sheds its quarter into the lend's own frame
+(`ic_inode_leg_shed_to` out, `_shed_of` back), the pool's and the region's
+free bundles shed and drop theirs — and every metadata object comes down the
+same way (`FsStateDefs.view_shed`, `gamma_shed_34`, and
+`FsState.fs_footprint_shed`).  `FsCollectAll.col_hand_state` is the result:
 
-* **THE RUNS CARRY A SHARE PER RUN.**  `FsDurXfer.xqrun`/`xq_at`/
-  `xq_strip`/`xq_ok` and `phi_runs_q`; `phi_runs_ex` is the same list with
-  every share EXISTENTIALLY bound, which is what avoids a choice function
-  over the inode map, and `phi_runs_ex_concat` builds it one object at a
-  time.  `phi_runs_ex_disj` reads the pairwise disjointness off `phi_excl`
-  alone at MIXED shares (`dfrac_nvalid_pair`: two shares whose doubles are
-  invalid do not fit in one byte); `phi_runs_ex_in` reads "their union is
-  inside the source's own map" POINTWISE off `phi_agree`, needing no
-  disjointness on the way in.  The full-share machinery is NOT duplicated:
-  `gamma_q Γ dq` is the view whose `fsΦ` ignores the dfrac it is handed, so
-  every Γ-generic shape reads at a share with no new lemma, and `xr_dats`
-  splits an inode's block legs from its record's.
-* **THE ALLOCATION HALF STANDS ALONE.**  Everything `fs_footprint_xfer`
-  does with its source is read PURE facts off it, so `fs_footprint_mint` /
-  `fs_state_mint_runs` take those facts and NO RESOURCE AT ALL (and
-  `fs_footprint_xfer` is now their composition with the readings, its
-  statement unchanged).  **So the collection never had to become an
-  accessor**: the allocation happens after every invariant has closed, off
-  facts, and there is nothing to hand back.
+```
+col_hand … ⊢ col_auth … ∗ (∃ kv, ireg_keep γfs ireg_root kv)
+             ∗ fs_state (fs_gamma_L γfs) (DfracOwn (3/4)) (col_state …)
+```
+
+which is exactly `fs_state_xfer`'s source at `q = 3/4 > 1/2`.  The Φ-free
+half does not divide at all — the link authority and the entry tokens come
+out WHOLE, off `col_hand`'s own `fs_links` leg — which is why a SHARE works
+here where a carve did not.  With the source uniform, `phi_runs_ex` and the
+whole per-run share vocabulary are deleted: the run list the mint reads is
+`xq_at (DfracOwn (3/4)) (xr_fs S PM)`, a one-share list, and
+`fs_footprint_runs_q` is the single call.
+
+**WHAT STILL STANDS BETWEEN THAT AND THE TRANSPORT BEING THE COMMIT'S
+CALLER, and it is no longer about shares.**  A transport at `q > 1/2` takes
+MORE THAN HALF of every byte, so the collection that feeds it cannot also
+keep the invariants' bodies: it must be an ACCESSOR and take its source back
+out of the transport (which returns it).  `FsCollectAll.col_bodies_mint` is
+destructive by construction — that is what `pure_keep` buys, and it is only
+sound because the conclusion is PURE — and three of its steps drop resource
+irreversibly: `big_sepS_union_weak` at the pool/marker/live partition (which
+`IcacheEscrow.ipool_quiesce_acc` does not make disjoint), `col_keeps_root`,
+and the era's residue in `col_hand_footprint` (`dinode_at`, `top_frag_q`,
+the region's proxy authority).  Making it an accessor is a lane of its own;
+until then the commit's entry stays `FsDurSnap.P_dur_alloc_mint` over
+`snap_mint`, whose `sm_runs` still carries the pure `xr_disj`.
 
 `FsCollectAll.col_hand_mint` is the reading — `col_hand ⊢ ⌜snap_mint …⌝` —
 and `fs_snap_law_build` calls `P_dur_alloc_mint`.  The BOOT mint is a
@@ -634,29 +664,27 @@ proxy authority `ghost_map_auth γi 1 m` (spent on "the record a bundle
 names IS the region's"), and the hand's pure rows, which the caller reads
 first by `pure_keep`'s idiom.
 
-**AND `fs_state` IS NOT DERIVABLE FROM IT, WHICH IS WHY `fs_state_xfer`
-STILL HAS NO CALLER** (measured at EV stage 5; the plan's stage 5 asked for
-one and this is the answer).  Three lines of Coq say it:
+**AND `fs_state` AT FRACTION 1 IS NOT DERIVABLE FROM IT** (measured at EV
+stage 5; SUPERSEDED at EV-X, which made the predicate share-aware rather
+than trying to promote the share).  Three lines of Coq said it:
 `IcacheEscrow.ic_rd_arm` — a READ-LOCKED inode's escrow arm — lends
 `ic_inode_leg γfs (DfracOwn (3/4)) γi inum n` (`ic_rd_arm_lend_owned`), and
 `FsStateEra.inode_owned_era_q` carries `top_frag_q Γ dq` at THAT SAME `dq`,
 while `FsStateInode.inode_ghost` wants the whole `top_frag`.  So a
-read-locked inum yields neither `inode_phi` nor `inode_ghost`, hence no
-`inode_owned` and no `fs_state`.  Nothing at a commit refutes the arm: the
-three windows the commit does refute each park a positive share of
-`LogDefs.ln_tx` (`ic_out_no_write_arm`, `ic_pin_tx_no_ops`,
-`ic_out_frz_no_ops`), and a read-locking `ilock` opens no transaction —
-which is exactly why `ic_slot_cover`'s bundle alternative is stated at a
-share in the first place.  `fs_state_xfer`/`_tok` and
-`fs_snap_alloc_xfer`/`P_dur_alloc_xfer` therefore stay as they are: the
-transport's LIVE half is its allocation half, which takes no resource at
-all.
+read-locked inum yields neither `inode_phi` nor `inode_ghost` at fraction 1.
+Nothing at a commit refutes the arm: the three windows the commit does
+refute each park a positive share of `LogDefs.ln_tx`
+(`ic_out_no_write_arm`, `ic_pin_tx_no_ops`, `ic_out_frz_no_ops`), and a
+read-locking `ilock` opens no transaction.  **What EV-X changed is the
+TARGET, not the arm**: `fs_state Γ (DfracOwn (3/4)) S` IS derivable
+(`col_hand_state`), and `top_frag` is not part of `fs_state` at all — the
+abstract fragment rides with the escrow arm and with `fs_snap`, never inside
+the predicate, so a read-locked inum costs the collection nothing.
 
-**THE RUNS WALK IS ONE CALL NOW.**  `FsDurXfer.fs_footprint_q_runs` is
-`fs_footprint_runs`' share-generic twin (`fs_footprint_q Γ S ⊢ ∃ PM,
-⌜xf_shape S PM⌝ ∗ phi_runs_ex Γ (xr_fs S PM)`), over `inode_phi_q_runs` /
-`fs_inodes_phi_q_runs` and the one-line `gamma_q_inode_dat`
-(`inode_dat (gamma_q Γ dq) n ⊣⊢ inode_dat_q Γ dq n`).  `col_hand_mint` is
+**THE RUNS WALK IS ONE CALL NOW.**  `FsDurXfer.fs_footprint_runs_q` is
+`fs_footprint_runs`' share-generic twin (`fs_footprint Γ dq S ⊢ ∃ PM,
+⌜xf_shape S PM⌝ ∗ phi_runs_q Γ (xq_at dq (xr_fs S PM))`), and it is two
+rewrites: `FsState.fs_footprint_gq` and `phi_runs_q_at`.  `col_hand_mint` is
 now two pure readings that keep the hand, that one assembly step, that one
 runs call, and `phi_runs_ex_disj` / `phi_runs_ex_in` — no per-object
 cons/concat anywhere in the collection.
