@@ -646,9 +646,13 @@ Section Lock.
       (dq : dfrac) (f : nat -> bv 8) (ts : nat -> nat)
       (own : agent -> option nat) (lo t K : nat) :
     own (hart_agent cpu_id) = Some t ->
-    (lo <= K)%nat ->
+    (* A6.111: two-armed -- the reader either passed the floor or WROTE it.
+       [t = lo] is the creator's case: [initlock]'s store is the mint store,
+       so its own anchor IS the floor. *)
+    ((lo <= K)%nat \/ t = lo) ->
     tso_interp_at riscv_eraGS g -∗
     TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) K -∗
+    TsoCtx.ledger_vis (hart_agent cpu_id) K lo -∗
     ([∗ list] j ∈ seq 0 8,
        TsoCtx.phys_ledger_wpay (pa_add (lock_cpu lk) j) dq (f j) (ts j)
          (TsoMemPa.TsWin (lock_cpu lk) 8 j lkcpu_z lkcpu_cp own lo)) -∗
@@ -669,10 +673,10 @@ Section Lock.
                 lkcpu_cp h' k <> lkcpu_cp (hart_agent cpu_id) k).
     { intros h' Hne. rewrite /lkcpu_cp (agent_cpus_ptr_hart cpu_id).
       apply nth_byte_ne. exact (agent_cpus_ptr_ne h' cpu_id Hne). }
-    iIntros "Hint #HK Hb".
+    iIntros "Hint #HK #Hfv Hb".
     iApply (TsoCtx.ledger_read_racy_word_ok g (lock_cpu lk) 8%nat dq f ts
               lkcpu_z lkcpu_cp own lo t K (m := 64) (cpus_ptr cpu_id)
-              ltac:(lia) Hown HloK Hcpw Hzk Hinj with "Hint HK Hb").
+              ltac:(lia) Hown HloK Hcpw Hzk Hinj with "Hint HK Hfv Hb").
   Qed.
 
   (* [s] -- the lock's NAME -- rather than a bare rank: [is_lock] already

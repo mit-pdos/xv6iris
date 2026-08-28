@@ -1342,8 +1342,18 @@ Section floor_window.
      induction stopped at the floor: at [t = Bm] the floor message is
      visible ([Bm <= tv]) and writes every byte, so the scan halts there
      and never asks [win_ok] about anything below. *)
+  (* >>> A6.111 (§0.36′(a) at the lock tier + §0.38′'s received-or-wrote
+     reading; owner informed, veto standing).  THE PREMISE IS THE FLOOR
+     MESSAGE'S VISIBILITY, NOT THE READER'S VIEW.  [Bm <= tv] was only ever
+     used to prove [visibleb h tv log Bm = true] in the two base cases below
+     -- the step case never mentions it -- and [visibleb] has TWO arms: below
+     the view, or authored by the reader.  A hart that WROTE the floor (the
+     creator of a lock: [initlock]'s [sd x0] IS the mint store, so its own
+     anchor and the floor coincide) has the second arm at EVERY view, and
+     needs no receipt.  [visibleb_below] recovers the old premise, so this is
+     a strict weakening. <<< *)
   Lemma read_down_win_fl (h : agent) (tv Bm t j : nat) :
-    win_ok_fl Bm -> (j < n)%nat -> (Bm <= tv)%nat -> (Bm <= t)%nat ->
+    win_ok_fl Bm -> (j < n)%nat -> visibleb h tv log Bm = true -> (Bm <= t)%nat ->
     (forall k, (k < n)%nat -> is_Some (log_byte img log Bm (pa_add a k))) ->
     read_down img log h tv (pa_add a j) t
     = match find_top h tv t with
@@ -1356,7 +1366,7 @@ Section floor_window.
       have HB : Bm = 0%nat by lia.
       rewrite HB in Hfl.
       rewrite read_down_0 find_top_0.
-      have Hv : visibleb h tv log 0 = true by (apply visibleb_below; lia).
+      have Hv : visibleb h tv log 0 = true by (rewrite -HB; exact Htv).
       rewrite Hv.
       have [b0 Hb0] := Hfl 0%nat ltac:(lia).
       rewrite Hb0. move: Hb0. rewrite /log_byte. by move => _.
@@ -1364,7 +1374,7 @@ Section floor_window.
       + (* the floor itself: it is visible and it writes every byte *)
         rewrite read_down_S find_top_S.
         have Hv : visibleb h tv log (S t) = true
-          by (apply visibleb_below; lia).
+          by (rewrite -HB; exact Htv).
         rewrite Hv.
         rewrite HB in Hfl.
         have [b0 Hb0] := Hfl 0%nat ltac:(lia).
@@ -1395,7 +1405,7 @@ Section floor_window.
   (* ------------------------------------------------------------------ *)
   Lemma racy_read_window_fl (h : agent) (tv Bm t : nat) :
     win_ok_fl Bm ->
-    (Bm <= tv)%nat ->
+    visibleb h tv log Bm = true ->
     (forall k, (k < n)%nat -> is_Some (log_byte img log Bm (pa_add a k))) ->
     (Bm <= t)%nat ->
     (t <= length log)%nat ->
@@ -1441,7 +1451,7 @@ Section floor_window.
   Lemma racy_read_window_pin_fl_at (h : agent) (tv Bm t : nat)
       (Wf : agent -> (nat -> option (bv 8)) -> Prop) :
     win_ok_fl Bm -> wpin_fl Bm Wf ->
-    (Bm <= tv)%nat -> (Bm <= t)%nat -> (t <= length log)%nat ->
+    visibleb h tv log Bm = true -> (Bm <= t)%nat -> (t <= length log)%nat ->
     visibleb h tv log t = true ->
     (forall j, (j < n)%nat -> is_Some (log_byte img log Bm (pa_add a j))) ->
     (forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j))) ->
@@ -1476,7 +1486,7 @@ Section floor_window.
     wpin_fl Bm
       (fun j f => (forall k, (k < n)%nat -> f k = Some (z k))
                \/ (forall k, (k < n)%nat -> f k = Some (cp j k))) ->
-    (Bm <= tv)%nat -> (Bm <= t)%nat -> (t <= length log)%nat ->
+    visibleb h tv log Bm = true -> (Bm <= t)%nat -> (t <= length log)%nat ->
     visibleb h tv log t = true ->
     (forall j, (j < n)%nat -> is_Some (log_byte img log Bm (pa_add a j))) ->
     (forall j, (j < n)%nat -> log_byte img log t (pa_add a j) = Some (z j)) ->
@@ -1525,7 +1535,8 @@ Section floor_window.
                              /\ is_Some (msg_byte m (pa_add a 0))).
   Proof.
     move => Hw Htv Hlen Hsome Hno.
-    apply (racy_read_window_fl h tv Bm Bm Hw Htv Hsome ltac:(lia) Hlen
+    apply (racy_read_window_fl h tv Bm Bm Hw
+             ltac:(apply visibleb_below; lia) Hsome ltac:(lia) Hlen
              ltac:(apply visibleb_below; lia) Hsome).
     (* the anchor: [own_last_fl] at [Bm] for every byte of the window.
        [win_ok] carries "writes byte 0" to "writes byte j", so the ONE
@@ -1977,23 +1988,32 @@ Section assemble.
      it is the only thing the relativisation costs it.  The two final
      premises are WORD-level and both true of the lock ([cpus_ptr]
      injective and never 0). *)
+  (* A6.111: the reader's floor evidence, two-armed.  [Hfv] is the floor
+     message's visibility -- by the view for a hart that RECEIVED the handle,
+     by authorship for the one that WROTE it -- and [Hanc] says the anchor is
+     reachable the same way: through the window's own clause once the view has
+     passed the floor, or because the anchor IS the floor (the creator's case,
+     [t = lo], since [initlock]'s store is the mint store). *)
   Lemma win_assemble_not_mine (h : agent) (t tv : nat) :
     own h = Some t ->
-    (lo <= tv)%nat ->
+    visibleb h tv log lo = true ->
+    ((lo <= tv)%nat \/ t = lo) ->
     (exists k, (k < n)%nat /\ z k <> cp h k) ->
     (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
     exists k, (k < n)%nat /\ tso_read img log h tv (pa_add base k) <> Some (cp h k).
   Proof.
-    move => Hown Htv Hzk Hinj.
+    move => Hown Hfv Hanc Hzk Hinj.
     have Hge : (lo <= t)%nat
       by (have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov 0%nat Hn;
           by have [? _] := H3 h t Hown).
     have Hlen : (t <= length log)%nat
       by (have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov 0%nat Hn;
           by have [_ [? _]] := H3 h t Hown).
-    have Hvis : visibleb h tv log t = true
-      by (have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov 0%nat Hn;
-          have [_ [_ [Hv _]]] := H3 h t Hown; exact (Hv tv Htv)).
+    have Hvis : visibleb h tv log t = true.
+    { case: Hanc => [Htv|Hteq].
+      - have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov 0%nat Hn.
+        have [_ [_ [Hv _]]] := H3 h t Hown. exact (Hv tv Htv).
+      - by rewrite Hteq. }
     have Hz : forall j, (j < n)%nat ->
                 log_byte img log t (pa_add base j) = Some (z j).
     { move => j Hj. have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov j Hj.
@@ -2005,7 +2025,7 @@ Section assemble.
                    is_Some (log_byte img log lo (pa_add base j))
       by move => j Hj; rewrite (win_assemble_floor j Hj); by eexists.
     exact (lkcpu_not_mine_fl_at img log base n Hn h tv lo t z cp
-             win_assemble_win_ok win_assemble_wpin Htv Hge Hlen Hvis
+             win_assemble_win_ok win_assemble_wpin Hfv Hge Hlen Hvis
              Hsome Hz Ho Hzk Hinj).
   Qed.
 End assemble.

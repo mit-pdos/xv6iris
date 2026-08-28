@@ -2802,6 +2802,26 @@ Section ctx.
     iSplit; by iPureIntro.
   Qed.
 
+  (* A6.111: the projection to the machine's own predicate, BOTH ARMS.  It
+     is the shape [TsoMemPa]'s window lemmas now take, and it is why the
+     creator of a lock needs no receipt: its arm is [visibleb_own], which
+     holds at every view. *)
+  Lemma ledger_vis_visibleb `{CID : CpuId} (g : gstate) (B t : nat) :
+    tso_interp_at riscv_eraGS g -∗
+    ledger_vis (hart_agent cpu_id) B t -∗
+    ⌜forall tv : nat, (B ≤ tv)%nat ->
+       visibleb (hart_agent cpu_id) tv g.(glog) t = true⌝.
+  Proof.
+    iIntros "Hint Hvis".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    iDestruct "Hvis" as "[%HtB | (%i & %mg & %Hti & Hi & %Htid)]".
+    - iPureIntro. intros tv Htv. apply visibleb_below. lia.
+    - iDestruct (ghost_map_lookup with "Hm Hi") as %HLi.
+      iPureIntro. intros tv _. rewrite Hti.
+      apply (visibleb_own _ _ _ _ mg); [by rewrite -HLM | done].
+  Qed.
+
   Lemma ledger_vis_mono (h : agent) (B B' t : nat) :
     (B ≤ B')%nat -> ledger_vis h B t -∗ ledger_vis h B' t.
   Proof.
@@ -4841,8 +4861,23 @@ Section ctx.
     (* MY own-last record AT OR ABOVE THE FLOOR: where my last write to
        this window is.  The MINTER's own entry is the floor itself. *)
     own (hart_agent cpu_id) = Some t ->
-    (* MY RECEIPT dominates the floor *)
-    (lo <= K)%nat ->
+    (* >>> A6.111 (§0.36′(a)'s author arm at the lock tier, composed with
+       §0.38′'s received-or-wrote reading; owner informed, veto standing).
+       THE RECEIPT DOMINATING THE FLOOR IS NOW ONE OF TWO ARMS.  A hart that
+       RECEIVED the handle passes the floor by its view ([lo ≤ K], the old
+       premise); the hart that WROTE the floor -- the lock's creator, whose
+       [initlock] store IS the mint store, so its own anchor and the floor
+       coincide -- passes it by AUTHORSHIP, at every view and with no
+       receipt.  The pure half below is the ANCHOR's reachability and the
+       resource half is the FLOOR's visibility; [ledger_vis] is exactly the
+       two-armed predicate and needed no inventing (A6.110 §4).
+
+       FORBIDDEN REASONING, recorded in place: "the creator will have taken
+       some other lock in between, and any AMO upgrades every right-arm
+       handle at once" is TRUE ([hart_view_lb_get] does it, and `sys_pipe`'s
+       [filealloc] does in fact intervene) but must never be the story -- it
+       makes [initlock]'s contract depend on what its caller does next. <<< *)
+    ((lo <= K)%nat \/ t = lo) ->
     (* the clear word is not mine ... *)
     (exists k, (k < n)%nat /\ z k <> cp (hart_agent cpu_id) k) ->
     (* ... and no other agent's word is mine.  BOTH premises are
@@ -4853,6 +4888,7 @@ Section ctx.
        exists k, (k < n)%nat /\ cp h' k <> cp (hart_agent cpu_id) k) ->
     tso_interp_at riscv_eraGS g -∗
     view_lb view_name loglen_name (hart_agent cpu_id) K -∗
+    ledger_vis (hart_agent cpu_id) K lo -∗
     ([∗ list] j ∈ seq 0 n,
        phys_ledger_wpay (pa_add base j) dq (f j) (ts j)
          (TsWin base n j z cp own lo)) -∗
@@ -4860,7 +4896,7 @@ Section ctx.
        tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add base k)
        <> Some (cp (hart_agent cpu_id) k)⌝.
   Proof.
-    iIntros (Hn Hown HloK Hzk Hinj) "Hint #HK Hb".
+    iIntros (Hn Hown HloK Hzk Hinj) "Hint #HK #Hfv Hb".
     iDestruct "Hint"
       as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
     iDestruct (view_auth_valid with "Hvw HK") as %HKtvs.
@@ -4875,9 +4911,14 @@ Section ctx.
       iDestruct (ghost_map_lookup with "Hauth Hej") as %HTMj.
       iPureIntro.
       exact (ts_ok_win _ _ _ _ _ _ (Htie _ _ HTMj) eq_refl). }
+    iDestruct (ledger_vis_visibleb g K lo with "[$Hauth $Hm $Hlen $Hvw //] Hfv")
+      as %Hfvis.
     iPureIntro. intros tv Htv.
     exact (win_assemble_not_mine g.(gimg) g.(glog) base n z cp own lo Hn Hcov
-             (hart_agent cpu_id) t tv Hown ltac:(lia) Hzk Hinj).
+             (hart_agent cpu_id) t tv Hown
+             (Hfvis tv ltac:(lia))
+             ltac:(destruct HloK as [Hle|Heq]; [left; lia | by right])
+             Hzk Hinj).
   Qed.
 
   (* (5) THE "NO EVIDENCE" GATE (tso-machine-flip.md A6.74 §(3)'s third kit
@@ -4983,13 +5024,14 @@ Section ctx.
       (own : agent -> option nat) (lo t K : nat) {m : N} (cpw : bv m) :
     (0 < n)%nat ->
     own (hart_agent cpu_id) = Some t ->
-    (lo <= K)%nat ->
+    ((lo <= K)%nat \/ t = lo) ->
     (forall k, (k < n)%nat -> nth_byte cpw k = cp (hart_agent cpu_id) k) ->
     (exists k, (k < n)%nat /\ z k <> cp (hart_agent cpu_id) k) ->
     (forall h', h' <> hart_agent cpu_id ->
        exists k, (k < n)%nat /\ cp h' k <> cp (hart_agent cpu_id) k) ->
     tso_interp_at riscv_eraGS g -∗
     view_lb view_name loglen_name (hart_agent cpu_id) K -∗
+    ledger_vis (hart_agent cpu_id) K lo -∗
     ([∗ list] j ∈ seq 0 n,
        phys_ledger_wpay (pa_add base j) dq (f j) (ts j)
          (TsWin base n j z cp own lo)) -∗
@@ -4997,9 +5039,9 @@ Section ctx.
        tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv base
          (N.of_nat n) w -> w <> cpw⌝.
   Proof.
-    iIntros (Hn Hown HloK Hcpw Hzk Hinj) "Hint #HK Hb".
+    iIntros (Hn Hown HloK Hcpw Hzk Hinj) "Hint #HK #Hfv Hb".
     iDestruct (ledger_read_racy_ok g base n dq f ts z cp own lo t K
-                 Hn Hown HloK Hzk Hinj with "Hint HK Hb") as %Hex.
+                 Hn Hown HloK Hzk Hinj with "Hint HK Hfv Hb") as %Hex.
     iPureIntro. intros tv Htv w Hrd ->.
     destruct (Hex tv Htv) as (k & Hk & Hne). apply Hne.
     rewrite (Hrd k ltac:(lia)). by rewrite (Hcpw k Hk).
