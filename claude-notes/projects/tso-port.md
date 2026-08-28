@@ -3792,3 +3792,25 @@ flip workspace's _CoqProject with the ruling recorded in place and a
 reverse-dependency check that every consumer of a commented file is
 itself commented).  The deferred tier is re-ported after the cutover
 lands, as its own effort.
+
+### 0.25′ OWNER RULING (2026-08-27): the THREE-CASE CONFIDENCE GATE, and
+what it unlocks
+
+The goal, stated by the owner: confidence that the context formulation
+works for the three tricky synchronization cases — (1) the spinlock's
+racy internals (the M4 window/floor kit: the notheld exclusion read,
+the holder's own-write reads, the lock word), (2) the boot barrier
+variables (started, and first via the park protocol), (3) lock-free
+page-table sharing with concurrent A/D write-back.  ONCE ALL THREE
+ARE PROVEN UNDER TSO in the flip workspace, partial replay of the
+M-leg conversion onto `main` MAY BEGIN — this refines 0.23′: the
+three-case gate unlocks *starting* the main replay (the Σ statements
+those cases exercise are the ones a cutover surprise would reopen,
+and the gate is exactly the evidence they will not); the full
+main-moves-once discipline of 0.23′ still governs the remainder.
+Status at ruling time: (3) is proven in its concurrency core (walker
++ A/D + the secondaries' sharing chain green; hart 0's publication
+site is mechanical wiring behind M4); (1) is one in-flight tranche
+from done (the atomic unit; all kit proven); (2)'s consumer half is
+green and its producer half + the park port are the remaining real
+work.
