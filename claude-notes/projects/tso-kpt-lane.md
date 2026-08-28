@@ -852,3 +852,147 @@ And two side facts that change the plan:
 > anyway.  Recommended: take step 3 for `KptShare:484` (fully verifiable — its
 > consumer `SRegime.res_absorb` is green) and hold the other three until the
 > §0.37′ rework lands, or until the owner accepts unverified edits in that cone.
+
+---
+
+## K14. THE STANDING RULE AND STEPS 4–5 ARE THE SAME QUESTION — steps 4–5 are GATED ON the three deferred-cone sites, not merely adjacent to them
+
+*(Coordinator ruling, standing: NO blind edits in the §0.37′-deferred cone; take
+step 3 at `KptShare:484` alone; leave the three write sites untouched with an
+inheritance note.  This amendment carries out the note and records the
+measurement that the rest of the instruction cannot be carried out under it.)*
+
+### K14a. THE MEASUREMENT — why step 3 alone does not exist
+
+Step 3 at `KptShare:484` refutes `tlb_res_pt_translateAddr_at`'s write branch.
+The refuter is K13's `kpt_ad_preset_noupd`, and it needs `kpt_ad_preset root M t`
+for **the tree the invariant is holding** — `M` and `t` are bound by
+`kpt_body`'s own existential (`KptShare.v:435`:
+`iDestruct "Hbody" as (t M B) "(Ht & #Hlbt & #Hbd & HM & %Hspec)"`), so the fact
+can only arrive as a conjunct OF `kpt_body`.  There is no per-call spelling: a
+premise on `tlb_res_pt_translateAddr_at` would have to quantify over the
+invariant's own witnesses, and a premise about the CLAIM
+(`kmap_at vpn ppn pc`) is not enough — the claim pins the leaf only up to the
+A/D variant, which is exactly the slack being removed.
+
+And `kpt_body` cannot carry it while any writer stands, because **each writer
+re-establishes the body at a MODIFIED tree**:
+
+```coq
+  (* KptShare.v, inside tlb_res_pt_translateAddr_at *)
+  assert (Hspec' : kpt_tree_spec_gen root_ppn M t').      (* t' = the written tree *)
+  … apply (kpt_tree_spec_gen_set_leaf root_ppn M t vpn (ppn, pc) p2 p1 …)
+  iMod ("Hclose" with "[Ht HM]") … iExists t', M, B …
+```
+
+`kpt_ad_preset root M t'` is FALSE when the write fires (that is what the A/D
+slack was FOR).  So a writer can only re-establish a preset body if its own
+write branch is refuted first — i.e. **the swap and the four refutations are one
+atomic step, not four independent ones.**
+
+> **THEREFORE: `kpt_body` carrying `kpt_ad_preset` requires ALL FOUR write sites
+> refuted; three of them are the deferred-cone sites the standing rule protects;
+> so step 3 at `KptShare:484` alone is not a smaller piece of the same work — it
+> does not exist as a separate piece at all.  Steps 4 and 5 inherit that gate:
+> `kpt_body` cannot drop the tree, `kpt_inv_alloc` keeps its A6.71 arity, and
+> `ProofMain:996` stays red.**
+
+Nothing was edited for this amendment.  The tree stands at K13's boundary,
+**1102 `.vo` of 1340, RED-9, red-list delta 0** (r18, `MAKEEXIT=2`), unchanged.
+
+### K14b. THE INHERITANCE NOTE — the three sites, and the exact statements the U-mode rework picks up
+
+All three open `KptShare.kpt_inv` and write the shared kernel table's leaf A/D
+bits.  Each needs its write branch REFUTED (not re-proved) once `kpt_body`
+carries `⌜kpt_ad_preset root M t⌝`; the refuter is
+`KptTree.kpt_ad_preset_noupd` (landed, K13), against the strengthened third
+disjunct of `KptTree.ptree_translateAddr_cases` (landed, K13).
+
+**(i) `HartSKpt.kpt_leaf_write_node` (`HartSKpt.v:871`, writes at `:968`).**
+Consumers: `HartSKpt:1221` (GREEN) and `Pt2WalkPt:1018`, `Pt2WalkPt:1361` (RED).
+Its statement does NOT carry the machine's side condition — the callers hold it
+and merely use this lemma to perform the write.  **The exact statement the
+rework inherits** is the present one plus an access parameter and one premise:
+
+```coq
+  Lemma kpt_leaf_write_node (root_ppn : mword 44) (t0 : ptree) (vpn : mword 27)
+      (ppn : mword 44) (kp : kperm) (p2 p1 : mword 64) (a0 d0 : mword 1)
+      (m0 m0' : mword 64)
+      (acc : MemoryAccessType mem_payload) :            (* NEW *)
+    ptree_maps t0 vpn p2 p1 (pte_set_ad (mk_pte ppn (kperm_flags kp)) a0 d0) ->
+    (exists a d : mword 1, m0' = pte_set_ad (mk_pte ppn (kperm_flags kp)) a d) ->
+    update_PTE_Bits (m0 : mword 64) acc = Some m0' ->    (* NEW *)
+    kmap_at vpn ppn kp -∗ kpt_lb t0 -∗ kpt_inv root_ppn -∗
+    wpte_obl_at (pt_addr0 p1 vpn) m0
+      (mwrite_req8_con (pt_addr0 p1 vpn) (autocast (T := mword) m0')) True.
+```
+
+The new premise is FREE at the green caller: `HartSKpt`'s `Hwr` iAssert
+(`~:1212`) already introduces `⌜update_PTE_Bits (autocast w) acc = Some w'⌝`
+before applying it.  With it and a preset body the whole lemma is vacuous —
+`m0` is the tree's leaf by `ptree_own_path_mem_at`, hence
+`kpt_leaf_pte_of vpn (ppn,kp)`, hence `kpt_leaf_pte_noupd` contradicts the
+premise.
+
+**(ii)/(iii) `TransPt.pt2_tramp_fetch_habs_kcur` (`TransPt.v:1139`, writes at
+`:1336`) and `pt2_tramp_fetch_habs_kprev` (`:1446`, writes at `:1691`).**
+Consumers: `UservecExitPt:412` and `UserretEntryPt:341` (both RED, §0.37′).
+They reach the tree through `iInv "Hkinv"` (`:1240`, `:1550`) inside
+`tlb_inv_pt2_kcur` (`:577`) / `tlb_inv_pt2_kprev` (`:687`).
+
+**These two need one thing MORE than (i), and it is a consequence of K13's own
+landing that must not be forgotten:** their write arms come from `TransPt`'s own
+FIVE-way `Hshape` (destructured at `:885`, `:1275`, `:1583`), and at
+`TransPt.v:201` K13 deliberately **DROPS** the `update_PTE_Bits` witness while
+forwarding `ptree_translate_miss_core`'s strengthened disjunct into it:
+
+```coq
+  (* TransPt.v:201, as K13 left it -- green, and lossy on purpose *)
+  destruct Hshape as [Ho2 | (a1 & d1 & _ & Ho3)];
+    [ left; exact Ho2 | right; exists a1, d1; exact Ho3 ].
+```
+
+So the rework must first STRENGTHEN `TransPt`'s own five-way shape the way K13
+strengthened `KptTree`'s three-way one (carry
+`update_PTE_Bits (p0 : mword 64) acc = Some (pte_set_ad p0 a1 d1)` in both write
+arms), replace the `_` above with the witness, and only then refute.  That
+strengthening changes the statements consumed at `UservecExitPt:412` /
+`UserretEntryPt:341` — which is precisely why it is deferred.
+
+**Not a site, but record it so the rework does not chase it:**
+`KptTree.tlb_inv_pt` is DEAD — its producer `tlb_inv_pt_intro` (`:654`) is
+applied only inside `tlb_inv_pt_translateAddr_at` (`:1289`), which has no
+consumers, and `KptShare.tlb_inv_pt_share` has no callers.  So the fifth
+`kpt_tree_spec_gen_set_leaf` site (`KptTree:1418`) is dead code and needs no
+refutation; it can simply be deleted when the exclusive bundle is retired.
+
+### K14c. WHAT THE OWNER MAY WANT TO DECIDE
+
+The lane's chain is complete except for this one gate, and the gate is a
+COLLISION between two standing rulings, not a missing proof:
+
+* §0.36′(a) says the shared kernel table is consumed by its author with no
+  publication — which forces it to the seen tier at `DfracDiscarded`, which is
+  what makes the Svadu write-back impossible and the preset fact necessary.
+* §0.37′ defers the U-mode tier — which is where three of the four write sites'
+  consumers live.
+
+Three ways out, in order of cost:
+
+1. **Wait for §0.37′'s rework** and hand it K14b.  Zero risk, zero progress.
+2. **Allow the two STATEMENT changes** in `HartSKpt.kpt_leaf_write_node` and
+   `TransPt`'s five-way shape, leaving their RED consumers stale (they are
+   already red; `Pt2WalkPt`, `UservecExitPt`, `UserretEntryPt` are all behind
+   `UserMemPt`/`WpSconfLock`).  Both edited FILES are green and would be
+   verified; only the unreachable call sites go stale, and K14b is exactly the
+   patch the rework would apply.  This is what closes steps 4–5 in this tree.
+3. **Split `kpt_inv`** into a written kernel table (for the trampoline window)
+   and a read-only one (for the walk) — measured as the most expensive and NOT
+   recommended: it doubles the root, the `kmap_auth` and the snapshot, and the
+   trampoline entry is an ordinary `M` entry (`KptTree`'s own note), so the two
+   would have to agree entry-by-entry.
+
+The lane's recommendation is **(2)**, and it is a strictly smaller exception
+than the one the standing rule was written to prevent: no proof in the deferred
+cone is edited, only two statements ABOVE it, and the exact inherited patch is
+already written down in K14b.
