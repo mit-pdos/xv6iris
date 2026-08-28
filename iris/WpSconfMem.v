@@ -1032,6 +1032,12 @@ Section WpSconfMem.
        (uint ea < 274877906944)%Z ->
        (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
        ktier_pin ktd ppn ea ->
+       (* A6.112: the no-migration pin, third and last of the family (A6.89
+          put it on [_dat], A6.109 on the store).  The racy READ needs it for
+          the same reason the acquire store did: [lkcpu_read_not_mine]'s
+          conclusion is about THIS hart's [struct cpu] pointer, and the
+          obligation's [CIDw] is ∀-bound.  Both existing callers ignore it. *)
+       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
        kmap_at (svpn_of ea) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
        tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
@@ -1238,7 +1244,7 @@ Section WpSconfMem.
                        exists v : mword (8*width),
                          tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
                            (pa_of ppn ea) (Z.to_N width) v /\ P v⌝)%I as %Hrb.
-            { iApply (Hload CID img sigma log V ppn Hcan Hoff Hid
+            { iApply (Hload CID img sigma log V ppn Hcan Hoff Hid Hs
                         with "Hk Hmem Htso Hctx Hbw"). }
             iMod ("Hcl" with "Hbw") as "HT".
             iMod "Hb1" as "_".

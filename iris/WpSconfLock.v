@@ -193,7 +193,7 @@ Section WpSconfLock.
            tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
              (pa_of ppn ea) (Z.to_N 4) v /\ True⌝.
   Proof.
-    intros CIDw img sigma log V ppn Hcan Hoff Hid.
+    intros CIDw img sigma log V ppn Hcan Hoff Hid _.
     iIntros "#Hk Hmem Htso Hctx _".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
@@ -735,7 +735,7 @@ Section WpSconfLock.
            tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
              (pa_of ppn ea) (Z.to_N 8) v /\ True⌝.
   Proof.
-    intros CIDw img sigma log V ppn Hcan Hoff Hid.
+    intros CIDw img sigma log V ppn Hcan Hoff Hid _.
     iIntros "#Hk Hmem Htso Hctx _".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V

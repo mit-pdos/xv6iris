@@ -1200,6 +1200,63 @@ Section Lock.
            ((▷ lock_inv γ lk s R lo ={E ∖ ↑lockN, E}=∗ True)   (* put it back *)
             ∧ (D ={E ∖ ↑lockN, E}=∗ True)))%I.               (* or destroy it *)
 
+  (* >>> A6.112: THE OPENER WHOSE FLOOR IS ALREADY ABSORBED.
+
+     [lock_openable] carries [lk_floor] -- the ratified disjunction (§0.38′),
+     which is what makes a lock's CREATION provable.  A racy READ needs
+     strictly more: [lkcpu_read_not_mine] wants the floor's visibility, and
+     of [lk_floor]'s two arms only the LEFT one ([ctx_floor], against
+     [own_context]) delivers it to a hart that did not write the floor.
+
+     So the reads take this opener, whose floor conjunct is the left arm
+     outright.  It is produced by the crossing upgrade (the AMO that carried
+     the handle here), and free at [lo = 0] for every boot-static lock
+     ([ctx_floor_0]).  [lock_openable_of_c] is the one-way weakening, so
+     nothing that only OPENS a lock has to care which it holds. <<< *)
+  Definition lock_openable_c (γ : gname) (lk : mword 64) (s : string)
+      (R : CtxId → iProp Σ) (D : iProp Σ) : iProp Σ :=
+    (∃ lo : nat,
+       TsoCtx.ctx_floor cur_ctx lo ∗
+       □ ∀ (E : coPset) (T : iProp Σ),
+           ⌜↑lockN ⊆ E⌝ -∗ (T -∗ D -∗ False) -∗ T ={E, E ∖ ↑lockN}=∗
+           ▷ lock_inv γ lk s R lo ∗ T ∗
+           ((▷ lock_inv γ lk s R lo ={E ∖ ↑lockN, E}=∗ True)
+            ∧ (D ={E ∖ ↑lockN, E}=∗ True)))%I.
+
+  Global Instance lock_openable_c_persistent γ lk s R D :
+    Persistent (lock_openable_c γ lk s R D).
+  Proof. apply _. Qed.
+
+  Lemma lock_openable_of_c γ lk s R D :
+    lock_openable_c γ lk s R D -∗ lock_openable γ lk s R D.
+  Proof.
+    iIntros "(%lo & #Hf & #Ho)". iExists lo. iFrame "Ho".
+    by iApply lk_floor_of_ctx.
+  Qed.
+
+  Lemma lock_openable_c_parts γ lk s R D :
+    lock_openable_c γ lk s R D -∗
+    ∃ lo : nat,
+      TsoCtx.ctx_floor cur_ctx lo ∗
+      □ ∀ (E : coPset) (T : iProp Σ),
+          ⌜↑lockN ⊆ E⌝ -∗ (T -∗ D -∗ False) -∗ T ={E, E ∖ ↑lockN}=∗
+          ▷ lock_inv γ lk s R lo ∗ T ∗
+          ((▷ lock_inv γ lk s R lo ={E ∖ ↑lockN, E}=∗ True)
+           ∧ (D ={E ∖ ↑lockN, E}=∗ True)).
+  Proof. by iIntros "$". Qed.
+
+  (* the boot-static producer: floor 0 is free, so every lock whose owner
+     cell is an era-image cell has this opener for nothing (A6.101). *)
+  Lemma lock_openable_c_inv_0 γ lk s R :
+    inv lockN (lock_inv γ lk s R 0) -∗ lock_openable_c γ lk s R False.
+  Proof.
+    iIntros "#Hi". iExists 0%nat. iSplitR; [ iApply TsoCtx.ctx_floor_0 | ].
+    iIntros "!>" (E T HE) "_ HT".
+    iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
+    iModIntro. iFrame "Hbody HT".
+    iSplit; [iExact "Hclose" | iIntros "%Hf0"; destruct Hf0].
+  Qed.
+
   (* A6.109: the projection every leaf uses -- [iDestruct (… with "Hlock")]
      leaves the intuitionistic handle in place, so a proof that both FORWARDS
      the opener and opens it itself keeps one name for each. *)
