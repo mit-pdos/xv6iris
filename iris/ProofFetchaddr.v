@@ -557,10 +557,11 @@ Section ProofFetchaddr.
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
     (* ---- the ONE borrow out of [proc_priv] ---- *)
     iDestruct (proc_priv_sz_bound with "Hpriv") as %Hszb.
+    (* copyin is taken at its MEMORY-INDEXED contract, at the block's own
+       image: it writes no user memory and the page it may fault in was
+       already in the lazy view, so [us_M U] comes back on the nose and the
+       block re-closes at it. *)
     iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
-    (* copyin is stated at the ∃-weakened image (it may fault a page in), so
-       the block is rebuilt at whatever comes back. *)
-    iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
     (* ---- +0x14: c.ld a1,72(a0) -- a1 := p->sz (and it STAYS there: it is
        copyin's new [psz] argument, xv6 4f2fc8b) ---- *)
     assert (Hszaddr : add_vec (A !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p)
@@ -657,8 +658,7 @@ Section ProofFetchaddr.
       iIntros (CID15 Hk15 mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U))⌝)%I as "#Hxr";
         [iPureIntro; apply uptd_ext_sz_refl|].
-      iDestruct (proc_pt_any_ptm with "Hpt") as (Mo) "Hpt".
-        iDestruct ("Hpback" $! (pv_upt (us_V U)) Mo with "Hxr Hszc Hptc Hpt") as "Hpriv".
+      iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) with "Hxr Hszc Hptc Hpt") as "Hpriv".
       iDestruct (cpu_own_transport CID10 CID15 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf (pv_upt (us_V U)) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
@@ -780,8 +780,7 @@ Section ProofFetchaddr.
         iIntros (CID17 Hk17 mf) "[%Hcsf %Hfa0] Hcg Hpc".
         iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U))⌝)%I as "#Hxr";
           [iPureIntro; apply uptd_ext_sz_refl|].
-        iDestruct (proc_pt_any_ptm with "Hpt") as (Mo) "Hpt".
-        iDestruct ("Hpback" $! (pv_upt (us_V U)) Mo with "Hxr Hszc Hptc Hpt") as "Hpriv".
+        iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) with "Hxr Hszc Hptc Hpt") as "Hpriv".
         iDestruct (cpu_own_transport CID10 CID17 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
         iApply ("Hcont" $! mf (pv_upt (us_V U)) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
@@ -924,7 +923,8 @@ Section ProofFetchaddr.
         iEval (rewrite -HA7a2) in "Hbuf".
         (* ---- copyin(p->pagetable, p->sz, ip, addr, 8) ---- *)
         iDestruct (cpu_own_transport CID10 CID19 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-        iApply (Copyin.wp_copyin_sconf KT1 γa A7 (pv_upt (us_V U)) (pv_sz (us_V U)) 8%nat
+        iApply (Copyin.wp_copyin_sconf_mem KT1 γa A7 (pv_upt (us_V U)) (us_M U)
+                  (pv_sz (us_V U)) 8%nat
                   (fun j => nth_byte (oldv : mword 64) j) (av - 4)%nat 0%nat eb p b
                   _ HK50 HA7a0 HA7a1 HA7len fa_len8 Hszb38 fa_n0
                   with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
@@ -936,8 +936,7 @@ Section ProofFetchaddr.
         iEval (rewrite HA7a2) in "Hbuf".
         iDestruct ("Hipback" $! dst_new with "Hbuf") as (wnew) "Hip".
         iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
-        iDestruct (proc_pt_any_ptm with "Hpt") as (Mo) "Hpt".
-        iDestruct ("Hpback" $! P' Mo with "Hxe Hszc Hptc Hpt") as "Hpriv".
+        iDestruct ("Hpback" $! P' (us_M U) with "Hxe Hszc Hptc Hpt") as "Hpriv".
         (* the frame and the callee-saved set survived copyin *)
         assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 4)
           by (rewrite (callee_saved_lookup Hcsr csp_rs1 ltac:(vm_compute; reflexivity)); exact HA7sp).
@@ -957,7 +956,7 @@ Section ProofFetchaddr.
                   sign_extend' 64 (sub_vec (subrange_vec_dec (zero_reg : mword 64) 31 0 : mword 32)
                                            (subrange_vec_dec sv 31 0 : mword 32)) = rv /\
                   (rv = (mword_of_int 0 : mword 64) \/ rv = (mword_of_int (-1) : mword 64))).
-        { destruct Hret as [H0 | H1].
+        { destruct Hret as [[H0 _] | H1].
           - exists (mword_of_int 0 : mword 64), (mword_of_int 0 : mword 64). rewrite H0.
             split; [apply bv_eq; vm_compute; reflexivity|].
             split; [apply bv_eq; vm_compute; reflexivity| left; reflexivity].

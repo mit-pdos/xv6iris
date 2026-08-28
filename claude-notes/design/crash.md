@@ -429,6 +429,17 @@ and every arity are untouched.  `fs_recovery_det` pins the delivered `D`
 to the one `fs_boot_pure` names, so the abstract state comes out of the
 RESOURCE and no state-determinacy theorem is needed.
 
+**WHO SPENDS IT.**  `SystemAdequacy.xv6_boot_era` — which NAMES `P_fs_lend`
+rather than carrying an abstract `Rb`, because this is where the resource
+is consumed.  It splits the conjunct off with
+`RiscvAdequacy.power_boot_res_lend` (`power_boot_res … Rb g ⊢ Rb (v_disk …)
+∗ power_boot_res … (fun _ => emp) g`, pure reassociation, every row placed
+by `iExact` — a bare `iFrame` there delta-unfolds `disk_img_bytes`),
+unpacks `P_dur`, and hands `FsDurSnap.fs_snap` down through
+`BootShared.boot_shared_alloc` to `FsCfgSnap.fs_cfg_alloc_snap`, which
+reads `snap_ok` off it.  `boot_shared_alloc` keeps `Rb` abstract and is
+called at `emp`.
+
 Two placement rules the shape forces, both measured:
 `power_boot_res`'s new conjunct sits BETWEEN `swap_lb` and `crash_inv`,
 not last, because `BootShared.power_boot_res_unpack` spells the final

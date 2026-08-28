@@ -123,6 +123,59 @@ instantiation, before any sync linking:
    `uv_cap` premise on the true branch → the sync trap-exit reshape
    onto the return channel (umode side).
 
+## THE proc_pt_any ELIMINATION CAMPAIGN (owner-ruled)
+
+`proc_pt_any` is a spec smell: a file whose contract holds it cannot
+say what happens to the process state.  EVERY instance gets converted
+to the memory-indexed form and `proc_pt_any` is DELETED at the end.
+The conversion is INCREMENTAL and BOTTOM-UP — a caller cannot be
+converted before its callees, since its proof must thread the callee's
+named image.  Fault-only paths become same-`M` by `SpecVmfault`'s
+`proc_ptm` theorem; genuine writers get their precise M-effect specs
+(win 2) as they convert.  The tiers, bottom-up: vm.c leaves
+(copyin/copyout/copyinstr/walkaddr) → fetch/arg layer → either_copy →
+file/pipe/console read-write → syscall dispatch → exec cone → usertrap
+arms → the residue crossings (`ut_res_pt_open/close`, allocproc,
+freeproc, kexit) → delete `proc_pt_any` (and `proc_pt_at_any`).  The
+full per-declaration inventory and DAG is the session sweep log
+§L1-INV; the per-entry M-effect worklist is §B4.
+
+THREE RULES THE CAMPAIGN RUNS ON:
+
+- **A leaf's `_mem` form is the PRIMITIVE; its `proc_pt_any` form is a
+  five-line corollary** (`ProcPtOwn.proc_pt_ptm` in, `proc_ptm_pt` out —
+  `ProofCopyin.wp_copyin_sconf` is the recipe).  When a leaf's last
+  ∃-caller converts, DELETE the corollary rather than keep it.
+- **Re-alting a copy loop to the lazy view is mechanical** once the loop
+  names its source bytes: swap `proc_pt_acc_rep0` / `proc_pt_rebuild` /
+  `proc_pt_page_acc(_vmfault)` / `wp_vmfault_sconf` for their `proc_ptm`
+  twins, and hand the borrowed page over NAMED, rejoining with
+  `ByteBuf.bb_join3_fn` rather than the existential `bb_join3` — an
+  existential join is what stops a read-only borrow from closing at the
+  image it opened at.
+- **Converting a callee's post breaks its callers even when their own
+  specs do not move, and the fix is a SUBSTITUTION.**  Delete the `M'`
+  binder at the `iIntros` and textually replace
+  `upd_usM (us_upt U P') M'` by `us_upt U P'` through the file; the
+  caller's own ∃-weakened post then closes by unification at
+  `M' := us_M U` and needs no edit.  That is what lets one tier convert
+  without dragging the tier above it in.
+
+STATE: tiers 0 (vm.c leaves) and 1 (fetch/arg) are DONE.
+`wp_copyinstr_sconf_mem` exists and copyinstr's ∃-twin is deleted;
+`wp_fetchaddr_sconf` / `wp_fetchstr_sconf` / `wp_argstr_sconf` are
+same-`M`.  The frontier is TIER 2, `either_copy` — both its callees are
+converted, its copyIN arm becomes same-`M` and its copyOUT arm becomes
+PRECISE at `umem_write`'s window.  Two entries are ready out of order:
+`ProofUsertrapArms.ut_d0`'s vmfault arm (the last caller of
+`wp_vmfault_sconf`), and the six fs-syscall specs
+(`SpecSysChdir`/`Mkdir`/`Mknod`/`Unlink`/`Link`/`Open`), whose proofs are
+already same-`M` internally, so dropping their `∀ M'` costs no proof
+step.  `SpecUvmclear` and `SpecProcFreepagetable` are the two leaves with
+no `_mem` form; the exec and residue tiers must write them first.
+`SpecUvmunmap.wp_uvmunmap_sconf` has no caller at all and is deletable
+today.
+
 ## The ledger
 
 1. **Re-key the residue's conjunct** from the ∀-state `uexec_wp` to the

@@ -281,12 +281,16 @@ Section SystemBoot.
      MINTS both inside the era fupd, off the era's own disk, and hands the
      class back existentially; only the camera ([fileGpreS]) is a functor
      constraint. *)
-  (* [Rb] IS THE RESOURCE THE POWER ARM LENDS THIS BOOT (durable-disk
-     BT-1), a parameter rather than a constant: this era only carries it to
-     [boot_shared_alloc], which drops it for now.  BT-3 is where the boot
-     mint starts reading the epoch off it. *)
-  Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
-      (Rb : (Z -> bv 8) -> iProp Σ) :
+  (* WHAT THE POWER ARM LENDS THIS BOOT IS THE CRASH PREDICATE'S OWN EPOCH
+     (durable-disk BT-3).  It was a client parameter at BT-1, carried and
+     dropped; it is NAMED here now, because this is where it is SPENT: the
+     era splits it off [power_boot_res], pins its committed map to its own
+     with [FsCrash.fs_recovery_det], and unpacks it -- and the abstract
+     state the whole boot mint is configured at is the one that comes OUT
+     of that resource, not one an existential in [fs_boot_pure] chose.
+     That is what makes the durability claim's [snap_ok] a READING at every
+     era and a premise of nothing. *)
+  Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z) :
     boot_facts g ->
     (* THE PROJECTION THE POWER THEOREM PROVES AT THIS ERA, AND IT IS THE
        WHOLE OF WHAT THIS BOOT KNOWS ABOUT ITS DISK (durable-disk lane
@@ -318,7 +322,8 @@ Section SystemBoot.
        from it below and rides [first_tok] to forkret's first arm. *)
     riscv_crash_pred = P_fs_any cov (FsImg.sb_logstart sb) ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES
-      (fun dk => mirror_of (fs_blocks dk)) Rb g
+      (fun dk => mirror_of (fs_blocks dk))
+      (P_fs_lend cov (FsImg.sb_logstart sb)) g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
          WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
@@ -337,7 +342,28 @@ Section SystemBoot.
     (* parameter and [S]'s comes out of its own superblock, and           *)
     (* [FsImg.sbo_logstart] pins both at 2.                               *)
     (* ================================================================ *)
-    destruct Hpure as (Hext & D & Hrec & Hhwf & S & Hsnok).
+    (* THE PURE EXPORT'S OWN [S] IS NOT USED (durable-disk BT-3).
+       [fs_boot_pure] still carries [exists S, snap_ok S D] -- it is the
+       theorem's durability claim and [FirstTok] reads it -- but the boot
+       takes its state off the LENT EPOCH below, so nothing here has to
+       identify two abstract states and no determinacy theorem is needed.
+       What the projection is still indispensable for is [D] itself: it is
+       what [fs_recovery_det] pins the lent map to. *)
+    destruct Hpure as (Hext & D & Hrec & Hhwf & _).
+    (* ---- THE LENT EPOCH, OFF [power_boot_res]'s CLIENT CONJUNCT ---- *)
+    iDestruct (power_boot_res_lend with "Hres") as "[Hlend Hres]".
+    iEval (rewrite /P_fs_lend) in "Hlend".
+    iDestruct "Hlend" as (D0) "[%Hrec0 Hdur]".
+    (* the identification, and it is one step: recovery is a FUNCTION of the
+       physical disk, so the map the crash predicate's epoch stands at IS
+       the map this boot's own projection names. *)
+    pose proof (fs_recovery_det _ _ _ _ _ Hrec0 Hrec) as HD0. subst D0.
+    (* ...and the state comes out of the resource. *)
+    iEval (rewrite /P_dur) in "Hdur".
+    iDestruct "Hdur" as (gsn gln gtn S) "Hdursnap".
+    iDestruct (fs_snap_read_ok_keep _ _ _ _ _
+                 (fs_recovery_blocks_full _ _ _ _ Hrec) with "Hdursnap")
+      as "[%Hsnok Hdursnap]".
     pose proof (sk_bytes Hsnok) as Hsnb.
     pose proof (sk_sbok Hsnb) as Hsbok.
     pose proof (FsImg.sbo_logstart _ Hsbok) as Hls'.
@@ -368,6 +394,13 @@ Section SystemBoot.
       { rewrite Hlseq. intros i b Hi.
         exact (fs_rec_view_slot _ D cov _ i b Hrec Hhwf Hi). }
       split; [exact Hcovin | rewrite Hlseq; exact Hlogsub]. }
+    (* THE EPOCH, RESPELLED AT THE MINT'S OWN LEDGER: [fs_rec_view] cut to
+       the home set IS the committed map ([fs_recovery_restrict]), so this
+       is a rewrite and not a transport. *)
+    assert (HDeq : fs_restrict Pb
+                     (fs_home_set cov (FsImg.sb_logstart (fss_sb S))) = D).
+    { rewrite Hlseq. exact (fs_recovery_restrict _ D cov _ Hrec Hhwf). }
+    iEval (rewrite -HDeq) in "Hdursnap".
     (* THE SEAM, ASSEMBLED FROM THE SLOT EQUATION and put in the
        intuitionistic context: it rides [FirstTok.first_boot_persist] from
        here to forkret's first arm.  Both directions are the identity once
@@ -379,7 +412,8 @@ Section SystemBoot.
     { rewrite Hlseq /fs_crash_seam. iModIntro.
       rewrite Hcp. iSplitL; iIntros "H"; iExact "H". }
     iMod (boot_shared_alloc g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
-            S Pb Rb Hbf Hbundle with "Hres")
+            S Pb (fun _ => emp)%I gsn gln gtn Hbf Hbundle
+            with "Hdursnap Hres")
       as (Hfd Hir Hpav Hbs HF γd γv Rspent)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
@@ -613,8 +647,9 @@ Proof.
               costs no new pure premise) and closes the accessor, so the
               record keeps its own and the era gets a copy.  Its [D] is
               pinned to the boot's own by [fs_recovery_det], which is why
-              no state-determinacy theorem is needed.  [boot_shared_alloc]
-              still drops it; BT-3 hands it to the mint. *)
+              no state-determinacy theorem is needed.  [xv6_boot_era]
+              splits it off [power_boot_res] and hands its contents to the
+              mint (durable-disk BT-3). *)
            (P_fs_lend cov (FsImg.sb_logstart sb))
            ltac:(intros γd γsw γreg γst Er gen dk;
                  exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
@@ -637,7 +672,7 @@ Proof.
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & ->).
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov _
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov
             Hbf Hpure Hcovin Hlogsub Hls2 _).
   reflexivity.
 Qed.

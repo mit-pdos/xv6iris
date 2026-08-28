@@ -1024,7 +1024,7 @@ Section ProofSysUnlinkBody.
               su_maxpath_lt (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbP]").
     { iEval (rewrite HM6a1). iExact "HbP". }
-    iIntros (CID9 Hq9 mas P1 Mas1 bp1) "%Hcsas %Hupt1 Hcg Hown Hpc Hpriv HbP %Hfsr1".
+    iIntros (CID9 Hq9 mas P1 bp1) "%Hcsas %Hupt1 Hcg Hown Hpc Hpriv HbP %Hfsr1".
     iEval (rewrite HM6a1) in "HbP".
     assert (Hpc16 : ret_pc (M6 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x16)) by (rewrite HM6ra; pcw).
@@ -1073,7 +1073,7 @@ Section ProofSysUnlinkBody.
       (* THE PROCESS BLOCK, OPENED for the walk. *)
       (* three-way now: [FirstTok.first_tok] parks beside the reference and
          is handed straight back at the rejoins below. *)
-      iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (upd_usM (us_upt U P1) Mas1) with "Hpriv")
+      iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1) with "Hpriv")
         as "[Hpnc [Href Hftok]]".
       iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
       iDestruct "Hpnc" as "[Hpidq Hofiles]".
@@ -1103,7 +1103,7 @@ Section ProofSysUnlinkBody.
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (BeginOp.wp_begin_op_sconf (CID := CID12) gs jx gl fsc_bio icfg_log fsc_fs fsc_cov
                 fsc_logst icfg_dev pid (DfracOwn (1/4)) N0 (K - 30)%nat eb b lks
-                (upd_usM (us_upt U P1) Mas1) ltac:(exact Kbo) Hj Hgl (Hlb "log"%string)
+                (us_upt U P1) ltac:(exact Kbo) Hj Hgl (Hlb "log"%string)
                 with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
@@ -1192,7 +1192,7 @@ Section ProofSysUnlinkBody.
  pk1 bp1 bnm0
                 MAXOPBLOCKS Sb0 pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                 N3 (K - 30)%nat eb b lks
-                (upd_usM (us_upt U P1) Mas1) ltac:(exact Knp) HdevR Hnib0 Hgeom
+                (us_upt U P1) ltac:(exact Knp) HdevR Hnib0 Hgeom
                 Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
                 (proj2 (su_len_range pk1 Hpk1))
                 ltac:(exact (su_walk_need_closes _)) Hj Hgl
@@ -1268,7 +1268,7 @@ Section ProofSysUnlinkBody.
         iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
         iCombine "Hpidq Hofiles" as "Hpnc".
         iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
-        iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (upd_usM (us_upt U P1) Mas1)
+        iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)
                      with "[Hpnc Href Hftok]") as "Hpriv";
           [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
         (* the path buffer, rejoined and renamed *)
@@ -1280,7 +1280,7 @@ Section ProofSysUnlinkBody.
         iDestruct (cpu_own_transport CID17 CID19 0 eb (proc_addr jx) b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         rewrite (proj1 Hnp) in HN4regs.
-        iApply ("Hseamk" $! CID19 N4 P1 Mas1 n1 Sb1 w1 dpv nf bpf bnm0 bd0 be0
+        iApply ("Hseamk" $! CID19 N4 P1 (us_M U) n1 Sb1 w1 dpv nf bpf bnm0 bd0 be0
                   u4 u5 u6 u27 u30 with "[%] [%] [%] [%] [%] [%] [%]
                   Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
                   Hir1 Hhelddp HopS Htx Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2
@@ -1329,7 +1329,7 @@ Section ProofSysUnlinkBody.
         iApply (Tails.su_tail_b (CID0 := CID19) gs jx gl pd pav pu
  n1 pid (DfracOwn (1/4))
                   m N4 sp0 K eb b lks u4 u5 u6 u27 u30 bd0 bnf bpf be0
-                  (upd_usM (us_upt U P1) Mas1) ltac:(exact Keo) K30 Kpop Hgeom Hj Hgl Hlkempty
+                  (us_upt U P1) ltac:(exact Keo) K30 Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) HN4sp HN4thr HN4s2 HN4s3 Hal
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hlog Hseam Hgen
                         Hpidq Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hf3 Hf4
@@ -1345,7 +1345,7 @@ Section ProofSysUnlinkBody.
         iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
         iCombine "Hpidq Hofiles" as "Hpnc".
         iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
-        iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (upd_usM (us_upt U P1) Mas1)
+        iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)
                      with "[Hpnc Href Hftok]") as "Hpriv";
           [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
         iEval (rewrite -su_slots2) in "Hir2".

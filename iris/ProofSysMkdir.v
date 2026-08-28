@@ -1009,7 +1009,7 @@ Section ProofSysMkdirBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM7a1). iExact "Hbuf". }
-    iIntros (CID11 Hq11 mas P' Mas bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr".
+    iIntros (CID11 Hq11 mas P' bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr".
     iEval (rewrite HM7a1) in "Hbuf".
     assert (Hpc1a : ret_pc (M7 !!! Regidx Rra : mword 64)
                     = mword_of_int (MD + 0x1a)) by (rewrite HM7ra; pcw).
@@ -1269,7 +1269,7 @@ Section ProofSysMkdirBody.
            retires the descriptor in the ghost step that parks the payload
            and hands the whole token back. *)
         destruct (Hiregb inum ltac:(lia)) as [Hibcov Hiblog].
-        iDestruct (proc_priv_bare_acc gf pj pid (upd_usM (us_upt U P') Mas) with "Hpriv")
+        iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
           as "[Hpbare Hpback]".
         iDestruct (cpu_own_transport CID18 CID20 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -1277,7 +1277,7 @@ Section ProofSysMkdirBody.
                   pd pav pu gil gisl
  kk qi ss gy inum dn bm un1
                   pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks
-                  (upd_usM (us_upt U P') Mas) ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
+                  (us_upt U P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                   Hibcov Hiblog ltac:(lia) Hcovb
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
                   (Hlb "log"%string)
@@ -1330,7 +1330,7 @@ Section ProofSysMkdirBody.
         iApply (EndOp.wp_end_op_sconf (CID := CID22) gs j gl fsc_uart fsc_disk fsc_dlock pd pav pu
                   fsc_bio icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n2 pid (DfracOwn (1/4))
                   P1 (K - 18)%nat eb b lks
-                  (upd_usM (us_upt U P') Mas) ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
+                  (us_upt U P') ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                         Hpbare Hprocs Hdev Hgeo Hdlk Hop").
         { rewrite Heb /trap_csrs_ext. done. }
@@ -1406,14 +1406,14 @@ Section ProofSysMkdirBody.
         iDestruct (md_buf_join (pa_stk sp0 18) bf pk Hpk with "Hbufk Hbufrest")
           as "Hbytes2".
         iDestruct (md_bytes_name (pa_stk sp0 18) 128 with "Hbytes2") as (bf1) "Hbuf".
-        iDestruct (proc_priv_bare_acc gf pj pid (upd_usM (us_upt U P') Mas) with "Hpriv")
+        iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
           as "[Hpbare Hpback]".
         iDestruct (cpu_own_transport CID18 CID19 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (md_m1_tail (CID0 := CID19) gs j gl pd pav pu fsc_fs
  un1 pid (DfracOwn (1/4))
                   m mcr sp0 K eb b lks bf1
-                  (upd_usM (us_upt U P') Mas) ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
+                  (us_upt U P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) Hcrsp Hcrthr Hal
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                         Hpbare Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hbuf
@@ -1445,14 +1445,14 @@ Section ProofSysMkdirBody.
                         (sign_extend' 64 (mword_of_int 38 : mword 13))
                       = mword_of_int (MD + 0x40)) by pcw.
       iEval (rewrite Htg40) in "Hpc".
-      iDestruct (proc_priv_bare_acc gf pj pid (upd_usM (us_upt U P') Mas) with "Hpriv")
+      iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
         as "[Hpbare Hpback]".
       iDestruct (cpu_own_transport CID11 CID12 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (md_m1_tail (CID0 := CID12) gs j gl pd pav pu fsc_fs
  MAXOPBLOCKS pid (DfracOwn (1/4))
                 m mas sp0 K eb b lks bf
-                (upd_usM (us_upt U P') Mas) ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
+                (us_upt U P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                 ltac:(reflexivity) Hassp Hasthr Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hbuf

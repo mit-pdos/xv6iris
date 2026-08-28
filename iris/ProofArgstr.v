@@ -388,7 +388,7 @@ Section ProofArgstr.
               _ Hn HKfs HA3a2 Hmax31
               with "Hcg Hcpu Htext Hpc Hpriv Henv Hbuf").
     all: try lkbelow.
-    iIntros (CID14 Hk14 mr P' M' buf_new) "%Hcsr %Hext Hcg Hcpu Hpc Hpriv Hbuf %Hret".
+    iIntros (CID14 Hk14 mr P' buf_new) "%Hcsr %Hext Hcg Hcpu Hpc Hpriv Hbuf %Hret".
     iEval (rewrite HA3a1) in "Hbuf".
     assert (Hpc1c : ret_pc (A3 !!! Regidx Rra) = mword_of_int (KernelSyms.argstr + 0x1c))
       by (rewrite HA3ra; apply bv_eq; vm_compute; reflexivity).
@@ -556,7 +556,7 @@ Section ProofArgstr.
        plain instructions have moved the hart to [CID20]. *)
     iDestruct (cpu_own_transport CID14 CID20 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID20 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! T5 P' M' buf_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
+    iApply ("Hcont" $! T5 P' buf_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
     { unfold callee_saved.
       split; [exact HT5sp|].
       split; [exact HT5s0|].

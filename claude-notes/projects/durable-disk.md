@@ -5424,17 +5424,75 @@ the rows below and in `design/fs-ghost-state.md`).
   Both `P_fs_swap`'s close and the adequacy site place every conjunct by
   name; BT-3, which grows the same post again, must keep doing so.
 
-  WHAT BT-3 NEEDS (not started).  `fs_cfg_alloc_snap` takes the epoch and
-  reads `snap_ok` off it by `P_dur_tie_keep`, with `dblk_full D` from
-  `fs_recovery_blocks_full`.  The pieces are in place: the lent epoch
-  arrives at `boot_shared_alloc` as `P_fs_lend cov (sb_logstart sb)
-  (v_disk (g.(gdev).(dvirtio)))`; `xv6_boot_era` already destructures
-  `fs_boot_pure` into its own `D`, and `FsCrash.fs_recovery_det` is the
-  one step that identifies the two, after which `S` comes out of the
-  RESOURCE and `Hbundle`'s `snap_ok` row is derived rather than carried.
-  The re-binding of `S`/`D` inside `xv6_boot_era` is the whole of the
-  risk; `fs_boot_snap_wf`'s shape need not move at BT-3 (BT-6, which
-  would drop its `snap_ok` row, stays not-run).
+  **AS LANDED — BT-B (stage BT-3; BT-4 and BT-5 NOT RUN, see below).**
+  The mint CONSUMES the channel.  `FsCfgSnap.fs_cfg_alloc_snap` has no
+  `snap_ok` premise: it takes three gnames and the epoch UNPACKED at the
+  state it stands at — `FsDurSnap.fs_snap (FsDurBytes.snap_gamma gsn gln
+  gtn) gsn (fs_restrict Pb (fs_home_set cov (sb_logstart (fss_sb S)))) S`,
+  the last `-∗` before the fupd — and reads the tie off it with
+  `fs_snap_read_ok`, `dblk_full` being the mint's own `HlPb` read through
+  `fs_restrict_lookup_Some`.  The mint's BODY is unchanged past that line.
+  UNPACKED, not `P_dur`: `P_dur` closes the state existentially while every
+  configuration tie in the postcondition is spelled at `S`, so caller and
+  mint have to be talking about ONE resource — that is what removes the
+  need for a state-determinacy theorem (the three deleted `snap_bytes_*_inj`
+  stay deleted).
+
+  `RiscvAdequacy.power_boot_res_lend` is the one new lemma below the
+  theorem: `power_boot_res … Rb g ⊢ Rb (v_disk …) ∗ power_boot_res …
+  (fun _ => emp) g`, pure reassociation with every one of the
+  twenty-four rows placed by `iExact` (a bare `iFrame` delta-unfolds
+  `disk_img_bytes`).  `xv6_boot_era` loses its `Rb` PARAMETER — it names
+  `FsCrash.P_fs_lend cov (sb_logstart sb)`, because this is where the
+  resource is spent — splits it off, pins the lent `D` with
+  `fs_recovery_det`, unpacks `P_dur`, reads `snap_ok`, and respells the
+  epoch at the mint's ledger by `fs_recovery_restrict` (`iEval (rewrite
+  -HDeq)`).  `boot_shared_alloc` gains the three gnames and the epoch as a
+  premise and threads both to the mint; its `Rb` stays abstract and is
+  instantiated at `emp`.  `fs_boot_pure`'s `∃ S, snap_ok S D` is now used
+  by nothing in the era — `S` comes out of the RESOURCE — and survives only
+  as the theorem's durability claim and as what `FirstTok` reads.
+  `fs_boot_snap_wf` is untouched (BT-6 stays not-run).  The three theorem
+  statements and `SystemAssumptions.v` are byte-identical; `make
+  audit-only` is at the thirteen-entry baseline by name; standalone times
+  are unmoved (`FsCfgSnap` 7.1 s, `BootShared` 10.3 s, `SystemAdequacy`
+  6.5 s, `InodeRegion` 17.3 s).
+
+  **BT-4/BT-5 NOT RUN, AND THE REASON IS A PRICE, NOT A WALL.**  After
+  BT-3 the substance of the ruling is already in place — `snap_ok` is
+  handed in nowhere on the boot side and `sk_disj` is derived inside
+  `fs_snap_read_ok` off `phi_excl` at `snap_gamma`, never stated.  What an
+  install would still buy is exactly ONE call: `FsBoot.big_sepS_carve` in
+  `FsCfgSnap.ipool_alloc_of_snap`, the boot side's last consumer of
+  `snap_blk_set_disj`.  Against that, two obligations the probe did not
+  price (both written up in `design/durable-fs-plan.md` §5):
+
+  - `fs_footprint` is ALL-OR-NOTHING and owns each record as a 64-byte
+    RUN, so an install at the era's home set swallows the inode region's
+    blocks with the payloads.  BT-4 and BT-5 are therefore ONE change:
+    there is no install that leaves `ireg_alloc`'s whole-block input
+    alone.
+  - The install's residue is `phi_map Γ (Mh ∖ xr_union (xr_fs S PM))`
+    while `FsCfgKits.fs_kit_fsinit_ghost` hands `fsinit` a `[∗ set] b ∈
+    fsc_cov ∖ Rspent` of BLOCKS.  Reconciling them needs either the map
+    equality `xr_union (xr_fs S PM) = fs_dbytes (fs_restrict Pb spent)`
+    (both directions) or a block-level pre-split plus the one-directional
+    `xr_union (xr_fs S PM) ⊆ fs_dbytes (fs_restrict Pb spent)` — "every
+    byte the footprint owns lies in a spent block" — which needs each
+    run's offset+width bound and re-does the same
+    `sk_own_used`/`snap_names_cov` accounting the peels already do.
+
+  So the residual work is a change of CARRIER inside `FsCfgSnap.v` (a
+  `Prop` for one lemma call versus a `∗` shape), and nothing above
+  `FsCfgSnap` moves either way.  Whoever runs it should treat BT-4+BT-5 as
+  a single lane and budget the two obligations above first; the pieces
+  that DO exist and are ready are `FsDurSnap.fs_home_install_era` /
+  `fs_state_install_era`, `FsDurXfer.fs_footprint_install_facts` (all
+  three pure inputs off the epoch the mint now holds),
+  `FsDurXfer.fs_dbytes_lookup_Some`'s block decomposition for the coverage
+  lemma, and `InodeRegion.ireg_recs_blk` for the region's re-gluing.
+  `FsDurAlloc.blk_ledger_cut` does NOT become caller-less — era 0's
+  `fs_state_of_ledger` still uses it.
 - [ ] **Rank 4 — the `dview`/`fview` ghosts and the pinned-lookup island**:
   PARKED (owner: leave for now; the fs-syscall-specs port decides).
 

@@ -599,10 +599,15 @@ between the opening and the closing; `fs_snap_law_build` calls it.  The
 destructive chain it replaces — `pure_keep`/`pure_keep_wand`,
 `col_bodies_mint`, `col_hand_mint`, `col_hand_state`,
 `col_hand_footprint` — is deleted.  The BOOT mint is a
-separate rewrite and still consumes `snap_ok`: `FsCfgSnap.fs_cfg_alloc_snap`
-never builds `fs_state (fs_gamma_L γfs) S` at all (which is why
-`fs_state_of_ledger_era` has no caller); it distributes the pieces straight
-into region/bitmap/escrow/pool off the pure tie.  `fs_state_xfer_tok` HAS
+separate rewrite and READS `snap_ok` off the epoch it is handed:
+`FsCfgSnap.fs_cfg_alloc_snap` takes the durable snapshot unpacked at its own
+state (`fs_snap (snap_gamma …) g D S`, `D = fs_restrict Pb (fs_home_set cov
+ls)`) and runs `fs_snap_read_ok` on it — so every clause it spends,
+`sk_disj` included, is read off the SOURCE'S OWN exclusivity inside that
+lemma and no pure tie is handed in.  It never builds
+`fs_state (fs_gamma_L γfs) S` (which is why `fs_state_of_ledger_era` has no
+caller); it distributes the pieces straight into region/bitmap/escrow/pool
+off the reading.  `fs_state_xfer_tok` HAS
 its caller since EV-Y (`P_dur_alloc_xfer` under
 `FsCollectAll.fs_collect_dur`); `fs_state_xfer`, the token-free form, is
 the exhibit that the spare fragment is the only difference.
@@ -656,7 +661,10 @@ is a function of the map and its gname family is existential, so the
 two sections, which every consumer has out of `Xv6G.xv6G`.  What a reader
 takes off it: `FsCrash.fs_commit_receipt` ("the disk recovers to a `D`, and
 `D` IS a file system") and `P_fs_dur_acc` (the snapshot lent out with a wand
-back — the channel the boot mint will take).  `P_fs_alloc` takes era 0's epoch as a
+back — the channel the boot mint TAKES: `P_fs_swap` clones the epoch through
+it into `P_fs_lend`, `RiscvAdequacy`'s `Rb` carries it to the era, and
+`SystemAdequacy.xv6_boot_era` splits it off `power_boot_res`
+(`power_boot_res_lend`) and hands it down).  `P_fs_alloc` takes era 0's epoch as a
 RESOURCE, `⊢ |==> P_dur D0` (lane H5): the crash predicate does not know how
 a file system is built out of bytes, and **nothing at or below it takes
 `snap_ok` as a premise any more**.
@@ -864,12 +872,17 @@ deleted; what survives is the rule:
 * Deposited client fupds moving durable resources, and per-transaction
   deferred WRITE SETS in the WAL's ledger; plan §8.
 
-**THE BOOT MINT CONSUMES THIS SIDE (lane E-mint).**  The era's file-system
-instance is no longer decoded out of `fs.img`: `FsCfgSnap.fs_cfg_alloc_snap`
-mints it from `FsDurSnap.snap_ok S (fs_restrict (fs_blocks dk)
-(fs_home_set cov ls))` — the same pure tie the commit re-establishes — and
+**THE BOOT MINT CONSUMES THIS SIDE (lane E-mint; the input is the EPOCH
+since durable-disk BT).**  The era's file-system instance is no longer
+decoded out of `fs.img`: `FsCfgSnap.fs_cfg_alloc_snap` takes the previous
+era's own snapshot as a RESOURCE — `fs_snap (snap_gamma gsn gln gtn) gsn
+(fs_restrict Pb (fs_home_set cov ls)) S`, lent at the PowerOn arm — reads
+`snap_ok S D` off it by `FsDurSnap.fs_snap_read_ok` (the WAL's `dblk_full`
+row is the mint's own block-width premise read through `fs_restrict`), and
 distributes it into the region, the pool, the bitmap and `ftop_inv` exactly
-as before.  `FsCfgSnap.snap_rec_decode` is the ONE bridge (`sk_rec` against
+as before.  **`snap_ok` is handed IN nowhere on the boot side**: the state
+`S` the whole era is configured at is the one that comes OUT of that
+resource, which is why no state-determinacy theorem is needed anywhere.  `FsCfgSnap.snap_rec_decode` is the ONE bridge (`sk_rec` against
 `FsDurImg.img_rec_in_blk`, closed by `rec_in_blk_inj`); above it nothing
 reads the block function except through `snap_bytes`' clauses, and every
 peel of the boot ledger is `snap_names_cov` closed by the used-set coupling
