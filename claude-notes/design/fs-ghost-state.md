@@ -12,8 +12,7 @@ THE DURABLE SIDE IS §2b — the snapshot inside the crash predicate, over its
 own ghost names, of which nothing outside the crash predicate ever holds a
 piece.  Its design is [`durable-fs-plan.md`](durable-fs-plan.md) (the
 design of record); the predicate both instances share is
-[`fs-state.md`](fs-state.md) §0–§2 and §7; what is still open on it is
-[`../projects/durable-disk.md`](../projects/durable-disk.md).
+[`fs-state.md`](fs-state.md) §0–§2 and §7.
 
 TWO PACKAGES ORGANIZE THE CLIENT SURFACE, named here once so that the
 sections below can spell each in one row:

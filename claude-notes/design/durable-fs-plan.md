@@ -5,7 +5,9 @@ of machine-checked refutations (archived with their lane reports in
 [`../completed/durable-disk-2026-08-23-to-25.md`](../completed/durable-disk-2026-08-23-to-25.md);
 the Coq files that held them are deleted and §8 below carries their
 lessons).  The live worklist is
-[`../projects/durable-disk.md`](../projects/durable-disk.md).  This file
+[`../projects/durable-disk.md`](../projects/durable-disk.md), a stub
+carrying the residue; the lane history is in
+[`../completed/`](../completed/).  This file
 is where the durable side's design lives; [`fs-state.md`](fs-state.md)
 §0–§2 (the guiding rule and the nested predicate) and §7 (as-built notes)
 remain the reference for the predicate itself.

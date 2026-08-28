@@ -250,8 +250,8 @@ stays open — honestly open, not vacuously closed.
 
 ### The split crash predicate (ruled 2026-08-22): `fr_D` is the interface; recovery is logically invisible
 
-Refines the ruling above; worklist stages E–I in
-`projects/durable-disk.md`. Five decisions:
+Refines the ruling above (the stages E–I it was written against are in
+`completed/durable-disk-byteview.md`). Five decisions:
 
 1. **`P_fs` is the WAL's half and the FS's half, sharing the committed
    map `D` through one binder in the `crashN` body** (`∃ dk D, frags dk ∗

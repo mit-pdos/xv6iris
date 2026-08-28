@@ -190,7 +190,7 @@ section could not predict:
   byte view at the CRASHED disk, so recovery really does move each home
   block. That arm holds the `fsblock` and calls `fsblock_update`.
 The per-consumer detail is `fs-ghost-state.md` §1 and
-`projects/durable-disk.md` item 1c.
+`completed/durable-disk-2026-08-23-to-25.md` item 1c.
 
 ## The bio rework (Ψ-parametric; bio never reads Ψ)
 

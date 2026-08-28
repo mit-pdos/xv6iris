@@ -939,7 +939,7 @@ not.
 > fragments.  §12.3's `diblk_bytes_inj` survives only where a whole block
 > is still decoded (`ireg_read`, `ireg_read_blk`, `ireg_withdraw`).
 > Whether the run TRAVELS with a checked-out record is open and ruled on in
-> [`../projects/durable-disk.md`](../projects/durable-disk.md) item 2b-inode-1.
+> [`../completed/durable-disk-2026-08-23-to-25.md`](../completed/durable-disk-2026-08-23-to-25.md) item 2b-inode-1.
 
 §10.5 left one thing open: who owns the dinode blocks, so that `ilock` can
 conclude the pool entry it takes describes the dinode the block actually
@@ -4258,7 +4258,7 @@ keep-alive token; the borrow is `FsStateEra.ent_toks_borrow`, one
 `blk_holes_zero bm data` (an `inode_ok` conjunct).  **The root clause is
 GONE from `ireg_slot`** (2b-inode-6, step 6a); (L1) is not, and its three
 surviving readers are listed in fs-ghost-state §3b.  The rest of the
-deletions are `claude-notes/projects/durable-disk.md`, item 2b-inode-5
+deletions are `claude-notes/completed/durable-disk-2026-08-23-to-25.md`, item 2b-inode-5
 step 6.
 
 §19 ended by naming Part 2 "the soundness obligation, and the only route
