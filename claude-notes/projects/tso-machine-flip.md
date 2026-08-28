@@ -13873,3 +13873,147 @@ cannot be *certified* green until §3 is settled; its substrate — (a), (b), (c
 
 Mirror refreshed at this boundary.  Holding item (2) for a ruling on §3;
 continuing to prepare the cpu-store family's two instances on (b) meanwhile.
+
+---
+
+## A6.110 — THE CREATOR CASE, MEASURED: (a) is right, the arm is one premise wide, and the resource is `ledger_vis`
+
+*(Amendment A6.110, fliptree lane.  Report-only, closing the gap in A6.109 §3
+before the crossing-absorb question goes to the owner.  Nothing opened; no file
+outside this lane's set inspected for anything but reading.)*
+
+### §1. THE QUESTION
+
+Under A6.109 §3's crossing-absorb fix, what covers the **creator's own first
+acquire** of a dynamic lock it just made?  `pipealloc` `initlock`s `pi->lock`
+and the creating thread may itself be the first to acquire it, with `holding()`
+preceding that acquire's AMO.  No crossing has occurred for that handle.
+
+### §2. THE ANSWER: (a), AND IT IS STRUCTURAL
+
+**The floor message of a lock is the creator's own store, and `visibleb`'s
+own-author arm is unconditional in the reader's view.**  That is the whole
+story, and the model layer was built for it — `TsoMemPa.v:1433` says so in as
+many words:
+
+> *"…what makes the AUTHOR of the mint store no special case: it satisfies
+> `own_last_fl Bm h a Bm` by the equality `S i = Bm`."*
+
+What the creator has, exactly, after `ProofInitlock`:
+
+* the window is `TsWin ea 8 j z cp (fun _ => Some lo) lo` — **`own h = Some lo`
+  for every `h`, and the floor is `lo` itself**, so for the creator the
+  own-anchor `t` and the floor `lo` coincide;
+* `lo = S (length glog)` at the store, and `ledger_store_win_wpay_ok` already
+  returns `ledger_msg_at (length glog) (PWMsg … (hart_agent cpu_id))` — the
+  store's own-message fragment, persistent, at index `lo - 1`.
+
+### §3. WHERE THE FLOOR PREMISE IS ACTUALLY USED — ONE PLACE, AND IT IS NOT A VIEW BOUND
+
+`lo ≤ K` travels down eight lemmas and is *consumed* in exactly one:
+
+```
+  lkcpu_read_not_mine (WpLock)          lo ≤ K
+    → ledger_read_racy_word_ok (TsoCtx)
+      → ledger_read_racy_ok               ltac:(lia) : lo ≤ tv
+        → win_assemble_not_mine (TsoMemPa)
+          → lkcpu_not_mine_fl_at
+            → racy_read_window_pin_fl_at
+              → racy_read_window_fl       Htv used ONLY at line 1420
+                → read_down_win_fl        ◄── HERE, and only in the BASE CASE
+```
+
+In `read_down_win_fl` (TsoMemPa.v:1345) the premise `Bm ≤ tv` is used **twice,
+both in the floor base case, and both only to prove**
+
+```coq
+    visibleb h tv log Bm = true      (* by visibleb_below; lia *)
+```
+
+(lines 1359 and 1366–1367).  **The step case — everything above the floor —
+never mentions it.**  The lemma's own comment states the role precisely: *"at
+`t = Bm` the floor message is visible (`Bm ≤ tv`) and writes every byte, so the
+scan halts there."*  The scan needs the floor message to be **visible**, not the
+view to have **passed** it.
+
+So the arm is a one-premise weakening:
+
+```coq
+    (Bm <= tv)%nat                 ↦    visibleb h tv log Bm = true
+```
+
+strictly weaker (`visibleb_below` derives it), and the eight lemmas above
+restate mechanically with no proof restructuring.  One caveat, worth stating
+because it is the only place the swap is not purely syntactic:
+`win_assemble_not_mine` currently gets its own-anchor visibility
+`visibleb h tv log t` out of the *window's* clause, which is itself
+floor-conditioned (`Hv tv Htv`, TsoMemPa.v:1996).  So the swap replaces
+`lo ≤ tv` with **two** `visibleb` premises — at the floor and at the anchor —
+which for the creator are the same fact, because `t = lo`.
+
+### §4. AND THE RESOURCE ALREADY EXISTS, WITH THE RIGHT TWO DISJUNCTS
+
+The reader-side premise this needs is not new.  It is `TsoCtx.ledger_vis`:
+
+```coq
+  Definition ledger_vis (h : agent) (B t : nat) : iProp Σ :=      (* TsoCtx.v:2787 *)
+    (⌜(t ≤ B)%nat⌝ ∨ ∃ i m, ⌜t = S i⌝ ∗ ledger_msg_at i m ∗ ⌜pm_tid m = h⌝)%I.
+```
+
+`ledger_vis (hart_agent cpu_id) K lo` beside `view_lb … K` **is** the two-armed
+floor premise: the left disjunct is today's `lo ≤ K`, the right disjunct is
+"the floor message is mine" — the creator's arm, verbatim.  It is persistent,
+it is already what `lk_cpu_pay_vis` carries one field over, and it is the exact
+shape `visibleb`'s two arms consume.
+
+> **SEVENTH INSTANCE.**  A6.98, A6.100, A6.102, A6.104, A6.105, A6.106's two,
+> and now this.  *The creator's arm did not need inventing; it needed noticing.*
+
+### §5. SO: IS THE CROSSING-ABSORB RULING COMPLETE WITH (a) INCLUDED?
+
+**Yes, and it is not complete without it.**  With (a) the two cases partition
+exactly, and the partition is exhaustive by construction:
+
+| how the hart got the handle | what pays the floor |
+|---|---|
+| **received** it (§0.16′ — every distribution is a crossing, every crossing an AMO) | the crossing's log-top receipt ⇒ `ctx_floor` ⇒ `ledger_vis`'s LEFT arm |
+| **created** it (`initlock`; the floor is its own store) | the store's own-message fragment ⇒ `ledger_vis`'s RIGHT arm |
+
+There is no third case: a hart holding `is_lock` either made the lock or was
+given it.  (a) is therefore not an optimisation — **it is the creator case, and
+without it the creator's own first acquire is unprovable.**
+
+### §6. ON (b), AND WHY IT IS SOUND BUT MUST NOT BE THE STORY
+
+(b) is **true**, and the mechanism is already in the tree:
+`TsoCtx.hart_view_lb_get` takes an AMO's log-top view plus `llb loglen_name T`
+and returns `hart_view_lb (gtv cpu_id) ∗ ⌜T ≤ gtv cpu_id⌝`.  Since
+`llb loglen_name lo` says `lo` is a real log position, **any** AMO by the
+creator after the lock's creation upgrades **every** right-arm handle it holds,
+all at once.  In the concrete code the creator is in fact covered:
+`sys_pipe`'s `filealloc` acquires `ftable.lock` between `pipealloc` and any
+`piperead`/`pipewrite`.
+
+But the coordinator's instinct is right and worth recording as the rule: **a
+proof that leans on (b) is leaning on the callers' happening to take a lock in
+between.**  It would make `initlock`'s contract depend on what its caller does
+next, which is exactly the kind of coupling this port has been removing.  (b)
+should be recorded as *why the window (a) closes is narrow in practice* — the
+creator needs its own arm only between `initlock` and its next AMO — and never
+as the reason the case is covered.
+
+### §7. (c) — NOTHING HIDDEN
+
+There is nothing in this lane's `SpecAcquire` spelling that covers the creator.
+The floor reaches the `notheld` read only through `lock_openable`'s hoisted
+`lk_floor` (A6.109 §2c), and `lk_floor`'s right arm carries no author
+information at all — which is precisely the gap §4 closes by carrying
+`ledger_vis` instead.
+
+### §8. STATE
+
+No source touched this pass.  Tree stands at A6.109's boundary — **RED 9,
+delta 0**, sentinel-backed at r22.  `WpSconfLock`'s remaining blocker is
+unchanged and is the lemma A6.109 §3 named.  The §3 swap and the §4 premise are
+both in this lane's files (`TsoMemPa`, `TsoCtx`, `WpLock`, `WpSconfLock`) and
+are ready to open on a ruling.
