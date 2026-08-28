@@ -180,6 +180,13 @@ Require Import InodeRegion.
 Require Import FsState.
 Require Import FsBytesGamma.
 Require Import LogDefs.       (* [fs_home_set] -- [ic_loaded_open]'s row *)
+(* THE TRANSACTION PIN (rank 5).  Every park below that keeps a share of an
+   open transaction's [ln_tx] element -- [ic_dep_own]'s write arm and its
+   reading [ic_dep_side], [ic_out_frz]'s freeze window, the slot pin
+   [ic_pin_tx], and section 5c's two pool ledgers -- spells it with this one
+   vocabulary, and every refutation the commit reads off them is an instance
+   of [TxPin.tx_pin_no_ops]. *)
+Require Import TxPin.
 Require Import FsStateEra.
 Require Import EscrowDefs.
 Require Import EscrowInode.   (* OPTION A: pool_pending, reg_full *)
@@ -1416,7 +1423,7 @@ Section IcacheEscrow.
 
   Definition ic_pin_tx (k : nat) : iProp Σ :=
     (∃ (t : nat) (q : Qp),
-       hpn_h k (Some (t, q)) ∗ t ↪[ln_tx icfg_log]{#q} tt)%I.
+       hpn_h k (Some (t, q)) ∗ tx_pin icfg_log t q)%I.
 
   Global Instance ic_pin_rest_timeless k : Timeless (ic_pin_rest k).
   Proof. rewrite /ic_pin_rest. tl_struct. Qed.
@@ -1434,8 +1441,7 @@ Section IcacheEscrow.
   Proof.
     iIntros "Ha Hpin". rewrite /ic_pin_tx.
     iDestruct "Hpin" as (t q) "[_ Htx]".
-    iDestruct (ghost_map_lookup with "Ha Htx") as %Hbad.
-    rewrite lookup_empty in Hbad. discriminate.
+    iApply (tx_pin_no_ops with "Ha Htx").
   Qed.
 
   (* THE PIN'S OWN MOVERS, as the two windows use them.  ENTER: the arm at
@@ -1448,7 +1454,7 @@ Section IcacheEscrow.
     ic_pin_rest k -∗ t ↪[ln_tx icfg_log]{#q} tt ==∗
     ic_pin_tx k ∗ hpn_h k (Some (t, q)).
   Proof.
-    iIntros "Hp Htx". rewrite /ic_pin_rest /ic_pin_tx.
+    iIntros "Hp Htx". rewrite /ic_pin_rest /ic_pin_tx /tx_pin.
     iMod (hpn_full_update _ _ (Some (t, q)) with "Hp") as "Hp".
     rewrite hpn_split. iDestruct "Hp" as "[Hp1 Hp2]".
     iModIntro. iSplitR "Hp2"; [| iExact "Hp2"].
@@ -1459,7 +1465,7 @@ Section IcacheEscrow.
     hpn_h k (Some (t, q)) -∗ ic_pin_tx k ==∗
     ic_pin_rest k ∗ t ↪[ln_tx icfg_log]{#q} tt.
   Proof.
-    iIntros "Hh Hpin". rewrite /ic_pin_tx /ic_pin_rest.
+    iIntros "Hh Hpin". rewrite /ic_pin_tx /ic_pin_rest /tx_pin.
     iDestruct "Hpin" as (t' q') "[Hh' Htx]".
     iDestruct (hpn_agree with "Hh Hh'") as %Heq.
     inversion Heq as [Heq']. subst t' q'.
@@ -1641,7 +1647,7 @@ Section IcacheEscrow.
        gives back exactly the share the checkout took. *)
     | DepTx s dv nu g t q =>
         (⌜dv = dev /\ nu = inum⌝ ∗ inode_shr_gen_bare k s dev inum g ∗
-         t ↪[ln_tx icfg_log]{#q} tt)%I
+         tx_pin icfg_log t q)%I
     (* THE READ ARM (durable-fs-plan.md section 3): the write arm's
        credential VERBATIM.  What distinguishes the arm is not it but what
        the escrow KEEPS beside it -- [ic_rd_arm], the bundle's three
@@ -1788,7 +1794,7 @@ Section IcacheEscrow.
 
   Definition ic_dep_side (d : ic_dep) : iProp Σ :=
     match d with
-    | DepTx _ _ _ _ t q => t ↪[ln_tx icfg_log]{#q} tt
+    | DepTx _ _ _ _ t q => tx_pin icfg_log t q
     | _ => emp%I
     end.
 
@@ -1892,7 +1898,7 @@ Section IcacheEscrow.
             what makes the commit refute this arm ([ic_out_frz_no_ops]) and
             the descriptor is what pins it to the share the freer must get
             back.  LAST, so no destructuring pattern above moved. *)
-         t ↪[ln_tx icfg_log]{#qt} tt)%I
+         tx_pin icfg_log t qt)%I
     | _ => False%I
     end.
 
@@ -1910,8 +1916,7 @@ Section IcacheEscrow.
   Proof.
     iIntros "Ha Hfrz". rewrite /ic_out_frz.
     iDestruct "Hfrz" as "(_ & _ & _ & _ & _ & Htx)".
-    iDestruct (ghost_map_lookup with "Ha Htx") as %Hbad.
-    rewrite lookup_empty in Hbad. discriminate.
+    iApply (tx_pin_no_ops with "Ha Htx").
   Qed.
 
   (* WHAT THE ARM KEEPS BESIDE THE CREDENTIAL, keyed by the descriptor: the
@@ -3872,8 +3877,7 @@ Section IcacheEscrow.
   Proof.
     iIntros "Ha Hown". rewrite /ic_dep_own.
     iDestruct "Hown" as "[_ [_ Htx]]".
-    iDestruct (ghost_map_lookup with "Ha Htx") as %Hbad.
-    rewrite lookup_empty in Hbad. discriminate.
+    iApply (tx_pin_no_ops with "Ha Htx").
   Qed.
 
   (* ...as the collection meets it: the OUT arm beside a write-armed
