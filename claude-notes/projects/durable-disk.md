@@ -5035,6 +5035,68 @@ the rows below and in `design/fs-ghost-state.md`).
   and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
   ledger, `CrpPre`; ten `_no_ops` → one): APPROVED (owner, 2026-08-27),
   runs AFTER EV completes (EV stage 4 rewrites the same escrow bodies).
+  - **Rank 5 — as landed (R5a, stages 0–4).**  **THE PER-INUM SINGLE PIN
+    IS REFUTED**, and the counterexamples are machine-visible in the tree:
+    two pins stand at ONE inum at ONE moment three times over —
+    `ProofCreateFreshTy.v:246–248/307/319` takes and returns BOTH the
+    child's `DepTx` share and the claim box's `ireg_cpin` at the same
+    transaction; `EscrowDeposit.v:157` returns `ireg_fpin rg` and the
+    transit ledger's share in ONE postcondition; iput's +0x70..+0x8a
+    window has the slot pin and the f column up together.  A single-valued
+    per-inum ghost map cannot hold two pins at one key, and a multi-valued
+    one would re-create the re-identification problem the seven existing
+    devices already solve.  Three of the eight parks are not inum-keyed at
+    all (`ic_dep_side`/`ic_out_frz`/`ic_pin_tx` are keyed by SLOT,
+    `ireg_parked` by a fresh ARM ID), and `fs-ghost-state.md` §5a′ already
+    argues inum-keying the registry is impossible.
+  - **WHAT UNIFIED INSTEAD: the ATOM and two combinators, in the new leaf
+    `iris/TxPin.v` (cone 0).**  `tx_pin γ t q` (= `t ↪[ln_tx γ]{#q} tt`),
+    `tx_pin_o γ (o : option (nat * Qp))` for a column or descriptor that
+    may be empty, `tx_pins γ (M : gmap K (nat * Qp))` for a ledger, plus
+    `tx_pin_no_ops` / `tx_pin_o_no_ops` / `tx_pins_no_ops`, three explicit
+    `Timeless` instances, `tx_pin_split` / `tx_pin_join_q` restated from
+    `LogInv`, and `tx_pin_elem` (the bridge to the raw element).  The file
+    is **γ-parametric, never `icfg_log`-ambient** — it has no `icfg` in
+    scope — and **not `Typeclasses Opaque`**: seven downstream `Timeless`
+    instances are one-line `apply _`/`tl_struct` and `ic_dep_side_of_tx`
+    is a Leibniz equality between propositions closed by `reflexivity`.
+  - **The eight parks now read as instances.**  `IcacheEscrow`:
+    `ic_dep_own`'s `DepTx` arm and `ic_dep_side` (which IS
+    `tx_pin_o icfg_log (ic_dep_side_tx d)` since the projection was hoisted
+    here from `SpecIunlockput`), `ic_out_frz`'s last conjunct, `ic_pin_tx`,
+    `ipool_transit` (= `tx_pins icfg_log`), `crp_row`'s `CrpPre`.
+    `InodeRegion`: `ireg_fpin`, `ireg_parked`, and `ireg_cpin` through a new
+    PURE projection `cty_pin : ctyUR -> option (nat * Qp)`.  Nine copies of
+    the `ghost_map_lookup` / `lookup_empty` / `discriminate` idiom, plus
+    `ireg_clean_acc`'s unnamed tenth (the armed registry IS a `tx_pins`
+    ledger at `fst <$> A`), collapse to three.  `ipool_corpse_no_ops` keeps
+    its `map_ind` (its conclusion is `map_Forall (= CrpDep)`, not `= ∅`),
+    and `ireg_cpin_no_ops` / `ireg_fsh_no_ops` keep their statements AND
+    their pure premises — `ireg_claim_ok` / `ireg_frz_ok` are what kill the
+    `ExclBot` arm, which the pin says nothing about.
+  - **The seven re-identification devices all stay** (`hpn_h`, `ic_deposit`,
+    `iclaim`, `ifreeze_pre`/`_post`, `ipool_tkey`, `crp_elem`,
+    `ireg_armed`): each solves a different problem and none is deletable.
+    `Xv6Cameras.v` was NOT touched — a `txidx := (nat * Qp)` unification
+    there is cone 897 for zero proof content.
+  - **Statements: only one contract's home moved.**  `ic_dep_side_tx` and
+    `ic_dep_side_of_tx` now live in `IcacheEscrow`; the latter is restated
+    as `ic_dep_side d = tx_pin icfg_log t q`.  `SpecIunlockput`'s two
+    contracts keep `ic_dep_side_tx d = Some (tid, qtx)` verbatim.  All
+    twelve `rewrite /ic_dep_side` sites outside the file closed unchanged;
+    the one line the move cost is `ProofIunlockput`'s return leg, which
+    takes an `iEval (rewrite -tx_pin_elem)` before folding the descriptor
+    back in (iput's post hands the element back RAW).
+  - **NOTHING GOT SLOWER** (`rocq compile`, same VM, `.lia.cache` cleared):
+    `IcacheEscrow` 24.98 → 23.74 s (1148 → 1148 MB), `InodeRegion`
+    20.12 → 17.71 s (1109 → 1113 MB), `TxPin` 1.0 s.  Whole tree green at
+    every stage; `SystemAdequacy.v`/`SystemAssumptions.v` byte-identical.
+  - **STAGE 5 IS NOT LANDED** (it overlaps EV-X at `FsCollectAll`): delete
+    `ic_pin_tx_no_ops`, `ic_out_frz_no_ops`, `ic_dep_own_tx_no_ops`,
+    `crp_row_no_ops` and `ipool_transit_no_ops`, and call the generic forms
+    at their consumers (`ic_escrow_body_cover`, `ipool_corpse_no_ops`,
+    `ipool_quiesce_acc`).  The five bodies are already one line each, so
+    the deletion is mechanical.
 - [ ] **Small leftovers** (APPROVED, one lane after rank 5): `FsDurBytes`'s
   three dead lemmas and `inode_link_tok_nz`; the caller-less
   `img_fs_snap_alloc`/`img_boot_P_fs_dur`; `eo_minst`/`lm_install`

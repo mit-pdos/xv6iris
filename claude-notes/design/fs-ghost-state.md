@@ -281,6 +281,75 @@ log SLOTS, so the map does not move (`eo_home_restrict_upd`) — one `iEval`
 rewrite at `eo_loop`'s back edge, beside row (b).  `eo_commit` and `eo_loop`
 each carry it as one SPATIAL premise (lane H2; it used to be a pure one).
 
+## 2c. The TRANSACTION PIN — one vocabulary for the eight parks (`TxPin.v`)
+
+Eight predicates spread over the icache escrow, the inode region and the two
+pool ledgers park the SAME atom — a positive share of an open transaction's
+`ln_tx` element — for the length of a window, so that the commit, which holds
+that map's authority EMPTY, can refute the window's state outright.  `TxPin.v`
+is the atom and its two combinators, and every one of those refutations is an
+instance of one of three laws:
+
+| name | body | what it is the shape of |
+|---|---|---|
+| `tx_pin γ t q` | `t ↪[ln_tx γ]{#q} tt` | the atom.  `(t, q)` are always FIELDS of whatever records the park, never existentials inside it: two halves of one element are not the whole, so a walk that lent a share must get THAT element back. |
+| `tx_pin_o γ (o : option (nat * Qp))` | `tx_pin` at `Some`, `emp` at `None` | a descriptor or a column that MAY be empty — `ic_dep_side` (a `DepRd` parks nothing), `ireg_cpin` (an unclaimed c column parks nothing). |
+| `tx_pins γ (M : gmap K (nat * Qp))` | `[∗ map] p ∈ M, tx_pin γ p.1 p.2` | a LEDGER of parks — `ipool_transit` over the in-transit inums, the armed registry's rows over the arm ids (at `fst <$> A`). |
+
+`tx_pin_no_ops` / `tx_pin_o_no_ops` / `tx_pins_no_ops` are the three
+refutations (`... -∗ False`, `⌜o = None⌝`, `⌜M = ∅⌝`).  Beside them:
+`tx_pin_split` / `tx_pin_join_q` (`LogInv.log_tx_split` / `log_tx_join_q` at
+the new name), `tx_pin_elem` (the bridge to the raw element, for handing one
+to a `LogInv` lemma), and three explicit `Timeless` instances.
+
+**THE INVENTORY — where the eight parks are, and what re-identifies each.**
+The park is never enough by itself: the walk that lent the share must be able
+to point at the element it lent, and each park has its own device for that.
+
+| park | file | key | re-identification device |
+|---|---|---|---|
+| `ic_dep_own`'s `DepTx` arm / its reading `ic_dep_side d = tx_pin_o icfg_log (ic_dep_side_tx d)` | `IcacheEscrow.v` | icache SLOT | `ic_deposit` (a `ghost_var`; the descriptor is in the holder's hand) |
+| `ic_out_frz`'s last conjunct (iput's +0x5e..+0x70 freeze window) | `IcacheEscrow.v` | SLOT | the same `ic_deposit`; `DepFrz` carries `(t, q)` as fields |
+| `ic_pin_tx k` (at `ic_held` and at `ic_payload_arm`'s FROZEN alternative) | `IcacheEscrow.v` | SLOT | `IcacheRef.hpn_h` — a ½-½ `frac_agree` cell, `hpn_agree` |
+| `ipool_transit T` = `tx_pins icfg_log T` | `IcacheEscrow.v` | INUM (map) | the paired `ghost_var icfg_ptrn` halves (`ipool_tkey`) |
+| `crp_row _ _ (CrpPre t q)` | `IcacheEscrow.v` | INUM (map) | `EscrowDefs.crp_elem` — a `ghost_map` element carried OFF-lock |
+| `ireg_fpin rg` (inside `ireg_fsh`) | `InodeRegion.v` | INUM | `ifreeze_pre`/`ifreeze_post`; the index `rg.2` carries the pair |
+| `ireg_cpin c` = `tx_pin_o icfg_log (cty_pin c)` | `InodeRegion.v` | INUM | `IcacheRef.iclaim` + `link_claim_agree`; `ctyval`'s second field |
+| `ireg_parked e` (the armed registry) | `InodeRegion.v` | ARM ID | `ireg_armed k t q S` — the whole `ghost_map` element at `icfg_lk` |
+
+**WHY THERE IS NO SINGLE PER-INUM PIN, and why the seven devices stay.**
+Three of the eight are keyed by an icache SLOT and one by a fresh ARM ID, not
+by an inum at all (§5a′ argues separately that inum-keying the registry is
+impossible: "no other walk holds this inode" is the inode LOCK's property,
+invisible at `ftopN`).  And even at the inum, two pins stand at one key at one
+moment, three times over: `ProofCreateFreshTy` takes and returns BOTH the
+child's `DepTx` share and the claim box's `ireg_cpin` at the same
+transaction; `EscrowDeposit.ireg_free_deposit_au` returns `ireg_fpin rg` AND
+the transit ledger's share in one postcondition; iput's +0x70..+0x8a window
+has the slot pin and the f column up together.  A single-valued per-inum ghost
+map cannot hold two pins at one key, and a multi-valued one would re-create
+exactly the re-identification problem the seven devices already solve.  Nor is
+everything parked a share: `crp_row CrpDep` is an `imark`, `ireg_fsh` parks
+`ireg_regime rg.1` beside the pin, `ic_pin_rest k = hpn_full k None` parks
+nothing.  So the ATOM unifies and the DEVICES stay.
+
+**TWO REFUTATIONS NEED STRICTLY MORE THAN THE PIN**, which is why they keep
+their pure premises: `ireg_cpin_no_ops` takes `ireg_claim_ok c f d` and
+`ireg_fsh_no_ops` takes `ireg_frz_ok f n d` — the pin reads `None` at an
+`ExclBot` column and says nothing about it; the claim/freeze pin is what kills
+that arm.  And `ipool_corpse_no_ops` keeps its own `map_ind`: its conclusion
+is `map_Forall (= CrpDep)`, not `= ∅`.
+
+**TWO PROPERTIES OF THE FILE ARE LOAD-BEARING, not style.**  It is
+**γ-parametric** (`tx_pin (γ : log_names) t q`) and never `icfg_log`-ambient:
+it is a pure leaf with no `icfg` in scope, and naming an ambient class field
+there is durable-notes' memory bomb, not an error.  And `tx_pin` is **not**
+`Typeclasses Opaque`: seven downstream `Timeless` instances are one-line
+`apply _`/`tl_struct` (a seal makes `ghost_map_elem`'s own instance
+unreachable), and `IcacheEscrow.ic_dep_side_of_tx` states a LEIBNIZ equality
+between propositions — `ic_dep_side d = tx_pin icfg_log t q` — discharged by
+`reflexivity`.
+
 ## 2b. The durable side — the snapshot inside the crash predicate
 
 ONE copy of the file-system predicate over its OWN ghost names, describing
@@ -972,8 +1041,9 @@ parent side has to know the target's TYPE.
   claimed.  It says nothing about `v`'s transaction pair — what constrains
   that is `ireg_cpin`.
 - `ireg_cpin c` — the **claim box's parked transaction share**, the c-column
-  twin of `IcacheEscrow.ic_pin_tx`: `v.2.1 ↪[ln_tx icfg_log]{#(v.2.2)} tt`
-  at `c = Some (Excl v)`, `emp` at `None`.  A claim box stands from
+  twin of `IcacheEscrow.ic_pin_tx`: `tx_pin_o icfg_log (cty_pin c)` (§2c),
+  where the pure `cty_pin` reads `Some v.2` at `c = Some (Excl v)` and `None`
+  otherwise.  A claim box stands from
   ialloc's type-write to the claimant's own `ilock` fill, and that whole
   window is inside ONE transaction, so at a commit `ireg_cpin_no_ops` reads
   `c = None` off an empty `ln_tx` authority.  It rides in `ireg_fsh`'s
@@ -988,7 +1058,7 @@ parent side has to know the target's TYPE.
 - `ireg_fsh f` — the **regime shelter + the freeze window's parked share**
   (G′ and C-6), the f half of `ireg_shp`: `True` at `FrzOff`,
   `ireg_regime rg.1` (= `if rg.1 then ireg_open else ireg_boot`) **∗
-  `ireg_fpin rg`** (= `rg.2.1 ↪[ln_tx icfg_log]{#(rg.2.2)} tt`) at both
+  `ireg_fpin rg`** (= `tx_pin icfg_log rg.2.1 rg.2.2`, §2c) at both
   window phases — the mint parks both, the deposit extracts and RETURNS both
   (agreement with the freer's own phase fragment selects them).  The regime
   half is ireclaim's boot round-trip made ghost-complete; the share is the
@@ -1226,7 +1296,7 @@ ones some open transaction has said it is in the middle of writing.
 | piece | meaning |
 |---|---|
 | `ireg_armed k t q S` | `k ↪[icfg_lk] (t, q, S)` — the arm RECEIPT: arm id `k` belongs to transaction `t`, has parked `q` of `t`'s token, and has SUSPENDED the well-formedness row of every inum in `S`.  The whole element, hence exclusive; it names its own set and its own share, so no lemma below has to guess either. |
-| `ireg_parked e` | `e.1.1 ↪[ln_tx icfg_log]{#(e.1.2)} tt` — what an arm parks: a POSITIVE share of its transaction's `LogInv.log_tx` element. |
+| `ireg_parked e` | `TxPin.tx_pin icfg_log e.1.1 e.1.2` (§2c) — what an arm parks: a POSITIVE share of its transaction's `LogInv.log_tx` element.  The whole row `[∗ map] e ∈ A, ireg_parked e` IS a `tx_pins` ledger at `fst <$> A`, which is how `ireg_clean_acc` refutes it in one line. |
 | `ftop_clean I A` | the pure row: every inum the map names and no armed entry names satisfies `inode_local` at the map's value for it.  `ftop_clean_empty` is the empty-registry reading, and `ftop_alloc` takes it at boot (off `FsCfgBoot.img_nodes_local`, which is conjunct (14) `fs_region_bare` of the image's well-formedness). |
 | `ireg_arm` / `ireg_arm_more` / `ireg_disarm` / `ireg_release` | arm at a bare `t ↪[ln_tx icfg_log]{#q} tt` (NO freshness argument — the ghost step SEES `A`, so `fresh (dom A)` is a key nobody holds), widen the suspended set, re-prove the row for one inum, hand the share back.  `ireg_arm_tx`/`ireg_release_tx` are the whole-token readings. |
 | `ireg_top_retag` | THE mover of the abstract map — 17 sites in 10 files — and it REQUIRES `inode_local i n'` of the new node.  Free at sixteen of them: `FsStateEra.inode_local_of_ok_rec` assembles it from the four facts the site's `ic_loaded`/`inode_owned_era` re-pack already names. |
