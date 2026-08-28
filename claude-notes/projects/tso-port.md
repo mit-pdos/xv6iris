@@ -3880,3 +3880,31 @@ separate travelers; the 0.18′ stamp-tie comment (T ≤ t_release,
 content with the scheduler's resume as its second and primary
 customer.  Implementation: fliptree, lock/scheduler tier, after the
 M4 flip re-application (same files).
+
+### 0.28′ OWNER RULING (2026-08-27): the trap-handler capability
+"problem" dissolves — invariants are context-free; finish making them
+invariants
+
+The owner's correction, upheld on measurement: an inv is a
+context-free persistent proposition, and every WP is proven with the
+context as a section variable — the handler's ∀-context contract was
+never special.  The bundle's context-sensitivity was two removable
+artifacts: (1) the constant-embedding payload spelling (each mention
+site elaborating the payload at ITS ambient, making the "same"
+is_lock two different propositions) — fixed by finishing the M3
+λ-conversion on the straggler payloads (console/uart/ticks); (2) a
+few NAKED discarded points-tos that were mis-homed per the 0.26′
+invariant principle: the virtio ring-pointer cells are read only
+under vdisk_lock and MOVE INTO THAT LOCK'S PAYLOAD (claimable at
+acquire, standard); the devsw entries' lock-free readers all thread
+the fs-initialization token, so they move BEHIND THAT TOKEN's
+invariant as data-beside-a-stamp, claims discharged by the
+bound-domination the token already implies.  No ancestry induction,
+no new machinery.  CONSEQUENCE: the internalized transport
+certificate (caps_morph) RETIRES — with handles closed and cells
+re-homed, the bundle holds nothing context-indexed to transport.
+The stvec framing is also corrected for the record: the register
+flips at every mode crossing (uservec/kernelvec); "installed once"
+refers to the per-CPU interrupt resource carrying the handler's
+spec.  What remains is mechanical: the straggler λ-conversions, the
+two re-homings, the certificate's removal.
