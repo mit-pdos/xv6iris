@@ -1774,18 +1774,6 @@ Section IcacheLink.
   Global Instance frzown_timeless z : Timeless (frzown z).
   Proof. apply _. Qed.
 
-  (* THE ONE LAW: two receipts at one inum is [Excl] against itself.  This is
-     what the region's clause turns into "the freezer holds it ⟹ the column
-     is [FrzPre]", and what makes the parked arm's disjunction decidable at
-     iput+0x8a. *)
-  Lemma frzown_excl (z : Z) : frzown z -∗ frzown z -∗ False.
-  Proof.
-    rewrite /frzown. iIntros "H1 H2".
-    iDestruct (own_valid_2 with "H1 H2") as %Hv.
-    rewrite singleton_op singleton_valid in Hv.
-    by apply exclusive_l in Hv.
-  Qed.
-
   (* ===================================================================== *)
   (*  THE FREEZE MIRROR [frzm] (iclaim-ledger.md §3.16 / RULING A⁗)         *)
   (* ===================================================================== *)

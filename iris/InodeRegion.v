@@ -4486,51 +4486,7 @@ Section InodeRegion.
     iModIntro. iFrame "Hfz Hmir". iPureIntro. exact Hiff.
   Qed.
 
-  (* THE PAYLOAD-SLOT DECIDER (ZZProbeFrz P2, S1a): a thread holding the
-     mirror's [false] half knows this inum's column is not [FrzPre], so the
-     region's own RECEIPT clause is on its [frzown] arm -- and a second
-     receipt, wherever it came from, is one [Excl] too many.
-
-     THIS IS WHAT LETS ip_free_entry's WINDOW-ENTERING READ (+0x3a) TAKE THE
-     PAYLOAD's TOKEN.  The parked arm's tail is a disjunction since §3.14
-     (DEVIATION 1) and A⁗ widened it further; its FROZEN alternative is the
-     receipt, and at REF-1 the walk decides [islot2]'s own frozen park LEFT
-     out of its live mass ([IcacheInv.live_whole_share_absurd]) and then feeds
-     the resulting [false] half to this lemma.  Out comes [ifreeze_off], which
-     is exactly what the mint at +0x50 consumes. *)
-  Lemma ireg_frzown_off_absurd (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) :
-    ↑iregN ⊆ E ->
-    bv_unsigned inum < 16 * Z.of_nat nib ->
-    ireg_inv γi γfs inodestart nib -∗
-    frzm_h (bv_unsigned inum) false -∗
-    frzown (bv_unsigned inum) ={E}=∗ False.
-  Proof.
-    iIntros (HE Hin) "#Hinv Hmir Hrc".
-    pose proof (islot_lt inum) as Hsl.
-    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
-                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
-    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
-    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
-    iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
-                with "Hblks") as "[Hblk Hback]".
-    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
-    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
-                with "Hsls") as "[Hslot Hslback]".
-    iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%rl & %cl & %fz & %cn & Hla & %Hlok & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
-    iDestruct "Hfrcp" as "[Hrc' Hmr]".
-    iDestruct "Hmr" as (b0) "[Hmr %Hmok]".
-    iDestruct (frzm_agree with "Hmr Hmir") as %->.
-    iDestruct "Hrc'" as "[%Hpre | Hrc']".
-    { rewrite /ireg_frzm_ok Hpre in Hmok. discriminate Hmok. }
-    iExFalso. iApply (frzown_excl with "Hrc Hrc'").
-  Qed.
-
-  (* ...AND B1's PIN READ (iclaim-ledger.md §3.16, the +0x82 re-acquire).
+  (* B1's PIN READ (iclaim-ledger.md §3.16, the +0x82 re-acquire).
 
      The freezer re-takes the itable lock at iput+0x82 and [islot2]'s live arm
      hands it [icnt_half z (Pos.to_nat cnt2)] -- about the map AS IT IS NOW,
