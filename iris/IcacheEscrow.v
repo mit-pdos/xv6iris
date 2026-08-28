@@ -581,6 +581,229 @@ Section IcacheEscrow.
     intros _. pose proof (di_nlink_nonneg dn). lia.
   Qed.
 
+  (* ==================================================================== *)
+  (*  THE PER-INODE ESCROWED LEG                                          *)
+  (*  (durable-disk EV, the era-vocabulary unification, stage 4)          *)
+  (* ==================================================================== *)
+
+  (* EVERYTHING A SLOT HOLDS OF ONE INODE, AT A SHARE -- AND IT IS EXACTLY
+     THE PIECE THE COMMIT'S COLLECTION ASSEMBLES.  [FsState]'s per-inum
+     conjunct is [FsStateInode.inode_owned] = [inode_phi] beside
+     [inode_ghost], and 2b-inode-1/4's rulings (fs-state.md section 7) put
+     its four parts in three hands:
+
+       - the RECORD's bytes and this inum's link AUTHORITY are region-side
+         ([InodeRegion.ireg_recs] at [FsStateInode.rec_owned_at],
+         [InodeRegion.ireg_lnk_at] around [FsStateLink.link_auth]) and never
+         travel;
+       - the DATA LEG -- [FsStateInode.inode_dat_q], which is [inode_phi]
+         MINUS its record -- and this inode's entry TOKENS
+         ([FsStateInode.ent_toks_x], the Φ-free half's other piece) are
+         HERE, in whichever escrow arm or pool row owns the inum;
+       - the era's own two, the record PROXY [dinode_at] and the abstract
+         fragment [FsState.top_frag], ride with the leg and are RESIDUE to
+         the collection, which consumes neither.
+
+     So the pair is what every arm carries and what [ic_slot_cover]'s third
+     alternative lends, and naming it ONCE is what lets the collection take
+     it off a slot without re-associating anything.  The three readings
+     below -- [ic_inode_leg_phi_at], [ic_inode_leg_ghost] and their join
+     [ic_inode_leg_owned] -- are the whole of the translation into the
+     collection's own vocabulary; each one is the leg beside what the REGION
+     kept.
+
+     IT SITS IN [dlinks]' CONJUNCT POSITION in all three arms (durable-notes,
+     "replacing one conjunct of a big payload: bundle the pair in the old
+     one's position"), and [dlinks γfs (bv_unsigned inum) dn bm data] IS
+     [ent_toks_x _ (bv_unsigned inum) (era_node dn bm data)] -- one unfold --
+     so no arm's textual order moved and the arity dropped by one.
+     [ic_inode_leg_era_open]/[_era_intro] are the two directions at the
+     era's own [(dn, bm, data)] triple. *)
+  Definition ic_inode_leg (γfs : fs_names) (dq : dfrac) (γi : gname)
+      (inum : mword 32) (n : fs_node) : iProp Σ :=
+    (FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n
+     ∗ inode_owned_era_q γfs dq γi inum n)%I.
+
+  Global Instance ic_inode_leg_timeless γfs dq γi inum n :
+    Timeless (ic_inode_leg γfs dq γi inum n).
+  Proof. rewrite /ic_inode_leg. tl_struct. Qed.
+
+  (* SEALED THE DAY IT IS WRITTEN (durable-notes, the [iFrame]-up-to-delta
+     rule): it rides inside [ic_loaded] and [ipool_alloc], whose framing
+     searches this file runs constantly, and unsealed it would cost each of
+     them the era bundle's four conjuncts on top of what they already walk.
+     [rewrite /ic_inode_leg] and the declared [Timeless] instance still
+     work, and the four openers below are what the proofs use. *)
+  Local Typeclasses Opaque ic_inode_leg.
+
+  Lemma ic_inode_leg_open γfs dq γi (inum : mword 32) n :
+    ic_inode_leg γfs dq γi inum n -∗
+      FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n
+      ∗ inode_owned_era_q γfs dq γi inum n.
+  Proof. rewrite /ic_inode_leg. iIntros "[H1 H2]". iFrame. Qed.
+
+  Lemma ic_inode_leg_intro γfs dq γi (inum : mword 32) n :
+    FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n -∗
+    inode_owned_era_q γfs dq γi inum n -∗
+    ic_inode_leg γfs dq γi inum n.
+  Proof.
+    rewrite /ic_inode_leg. iIntros "H1 H2".
+    iSplitL "H1"; [iExact "H1" | iExact "H2"].
+  Qed.
+
+  Lemma ic_inode_leg_era_open γfs dq γi (inum : mword 32) dn bm data :
+    ic_inode_leg γfs dq γi inum (era_node dn bm data) -∗
+      dlinks γfs (bv_unsigned inum) dn bm data
+      ∗ inode_owned_era_q γfs dq γi inum (era_node dn bm data).
+  Proof. rewrite /ic_inode_leg /dlinks. iIntros "[H1 H2]". iFrame. Qed.
+
+  Lemma ic_inode_leg_era_intro γfs dq γi (inum : mword 32) dn bm data :
+    dlinks γfs (bv_unsigned inum) dn bm data -∗
+    inode_owned_era_q γfs dq γi inum (era_node dn bm data) -∗
+    ic_inode_leg γfs dq γi inum (era_node dn bm data).
+  Proof.
+    rewrite /ic_inode_leg /dlinks. iIntros "H1 H2".
+    iSplitL "H1"; [iExact "H1" | iExact "H2"].
+  Qed.
+
+  (* the leg's own pure reading: [inode_local] is the era bundle's last
+     conjunct and a consumer that only wants it should not have to open the
+     pair. *)
+  Lemma ic_inode_leg_local γfs dq γi (inum : mword 32) n :
+    ic_inode_leg γfs dq γi inum n -∗ ⌜inode_local (bv_unsigned inum) n⌝.
+  Proof.
+    rewrite /ic_inode_leg /inode_owned_era_q.
+    iIntros "(_ & _ & _ & _ & $)".
+  Qed.
+
+  (* THE READER'S QUARTER, AT THE LEG.  [FsStateEra.inode_owned_era_shed_to]
+     is about the era bundle alone; the entry TOKENS do not split (they are
+     the Φ-free half and stay whole on the arm), so the leg's shed is the
+     bundle's beside an untouched token conjunct.  [ic_loaded_shed] and
+     [ic_rd_join] are these two and the cells. *)
+  Lemma ic_inode_leg_shed_to γfs γi (inum : mword 32) n :
+    ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
+    ic_inode_leg γfs (DfracOwn (3/4)) γi inum n
+    ∗ inode_rd_era γfs (DfracOwn (1/4)) inum n.
+  Proof.
+    rewrite /ic_inode_leg. iIntros "[Hte Hn]".
+    iDestruct (inode_owned_era_shed_to with "Hn") as "[Hn34 Hn14]".
+    iSplitR "Hn14"; [| iExact "Hn14"].
+    iSplitL "Hte"; [iExact "Hte" | iExact "Hn34"].
+  Qed.
+
+  (* the read arm's re-identification, at the leg: the era's abstract
+     fragment is inside the bundle, so the pin travels with the leg and
+     [ic_rd_join] never opens it. *)
+  Lemma ic_inode_leg_rd_agree γfs dq1 dq2 γi (inum : mword 32) n1 n2 :
+    ic_inode_leg γfs dq1 γi inum n1 -∗
+    inode_rd_era γfs dq2 inum n2 -∗ ⌜n1 = n2⌝.
+  Proof.
+    rewrite /ic_inode_leg. iIntros "[_ Hn] Hrd".
+    iApply (inode_rd_era_agree with "Hn Hrd").
+  Qed.
+
+  Lemma ic_inode_leg_shed_of γfs γi (inum : mword 32) n :
+    ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗
+    inode_rd_era γfs (DfracOwn (1/4)) inum n -∗
+    ic_inode_leg γfs (DfracOwn 1) γi inum n.
+  Proof.
+    rewrite /ic_inode_leg. iIntros "[Hte Hn34] Hn14".
+    iSplitL "Hte"; [iExact "Hte" |].
+    iApply (inode_owned_era_shed_of with "Hn34 Hn14").
+  Qed.
+
+  (* ---- WHAT THE COLLECTION TAKES OFF A LEG ---------------------------- *)
+
+  (* (i) THE Φ HALF.  The leg's data leg beside the REGION's own record run
+     at this inum IS [FsStateInode.inode_phi_at] -- the geometry-free
+     reading, which is what [FsCollectAll.col_recs_by_inum] hands in (the
+     inode region has no superblock, only [icfg_ist] and a plain [Z]).  The
+     era's two residue pieces come out beside it and the collection consumes
+     neither; the tokens come out because they are the OTHER half's input,
+     [ic_inode_leg_ghost]'s. *)
+  Lemma ic_inode_leg_phi_at γfs γi (inum : mword 32) (n : fs_node)
+      (istart : Z) :
+    ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
+    FsStateInode.rec_owned_at (fs_gamma_L γfs) istart (bv_unsigned inum)
+      (fn_rec n) -∗
+    FsStateInode.inode_phi_at (fs_gamma_L γfs) istart (bv_unsigned inum) n
+    ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n
+    ∗ ⌜inode_local (bv_unsigned inum) n⌝
+    ∗ dinode_at γi inum (fn_rec n)
+    ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n.
+  Proof.
+    rewrite /ic_inode_leg /inode_owned_era_q /FsStateInode.inode_phi_at.
+    rewrite -(FsStateInode.inode_dat_1 (fs_gamma_L γfs) n).
+    iIntros "(Hte & Hd & Hb & Ht & %Hloc) Hrec".
+    iSplitL "Hrec Hb"; [iSplitL "Hrec"; [iExact "Hrec" | iExact "Hb"] |].
+    iSplitL "Hte"; [iExact "Hte" |].
+    iSplitR; [by iPureIntro |].
+    iSplitL "Hd"; [iExact "Hd" | iExact "Ht"].
+  Qed.
+
+  (* (ii) THE Φ-FREE HALF, and it is [FsStateInode.inode_ghost_of] with the
+     leg supplying both of that lemma's inputs it can supply: the entry
+     TOKENS and [inode_local].  What it cannot supply is the region's
+     per-inum AUTHORITY and the type agreement [fn_ity_ok] -- the collection
+     reads the second off [InodeRegion.ireg_reg_ok] when it peels
+     [ireg_lnk_at], which is where the first comes from too. *)
+  Lemma ic_inode_leg_ghost γfs γi (inum : mword 32) (n : fs_node) v :
+    fn_ity_ok n v ->
+    ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
+    FsStateLink.link_auth (fs_gamma_L γfs) (bv_unsigned inum) (fn_mult n) v -∗
+    FsStateInode.inode_ghost (fs_gamma_L γfs) (bv_unsigned inum) n
+    ∗ FsStateInode.inode_dat (fs_gamma_L γfs) n
+    ∗ dinode_at γi inum (fn_rec n)
+    ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n.
+  Proof.
+    intros Hv.
+    rewrite /ic_inode_leg /inode_owned_era_q.
+    rewrite -(FsStateInode.inode_dat_1 (fs_gamma_L γfs) n).
+    iIntros "(Hte & Hd & Hb & Ht & %Hloc) Hla".
+    iSplitR "Hb Hd Ht".
+    { iApply (FsStateInode.inode_ghost_of _ (bv_unsigned inum) n v Hv Hloc
+                with "Hla Hte"). }
+    iSplitL "Hb"; [iExact "Hb" |].
+    iSplitL "Hd"; [iExact "Hd" | iExact "Ht"].
+  Qed.
+
+  (* (iii) THE TWO TOGETHER, at the superblock the state is stated over: a
+     slot's whole leg, the region's record run and the region's link
+     authority ADD UP TO [FsState]'s own per-inum conjunct, with the era's
+     residue left over.  [FsStateInode.inode_phi_sb]'s range premise is free
+     here -- [bv_unsigned] of a [mword 32] is in [0, 2^32) by construction --
+     which is the honest reading of "an inum is a 32-bit word". *)
+  Lemma ic_inode_leg_owned γfs γi (inum : mword 32) (n : fs_node)
+      (sb : FsImg.fs_sb) v :
+    fn_ity_ok n v ->
+    ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
+    FsStateInode.rec_owned_at (fs_gamma_L γfs) (FsImg.sb_inodestart sb)
+      (bv_unsigned inum) (fn_rec n) -∗
+    FsStateLink.link_auth (fs_gamma_L γfs) (bv_unsigned inum) (fn_mult n) v -∗
+    FsStateInode.inode_owned (fs_gamma_L γfs) sb (bv_unsigned inum) n
+    ∗ dinode_at γi inum (fn_rec n)
+    ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n.
+  Proof.
+    intros Hv.
+    (* the range premise, proved with the proofmode context still EMPTY --
+       [lia] in a nine-conjunct Iris context is the hygiene rule's case *)
+    assert (Hrng : 0 <= bv_unsigned inum < 2 ^ 32).
+    { pose proof (bv_unsigned_in_range 32 inum) as H.
+      unfold bv_modulus in H. exact H. }
+    iIntros "Hleg Hrec Hla".
+    iDestruct (ic_inode_leg_phi_at with "Hleg Hrec")
+      as "(Hphi & Hte & %Hloc & Hd & Ht)".
+    rewrite /FsStateInode.inode_owned.
+    rewrite -(FsStateInode.inode_phi_sb (fs_gamma_L γfs) sb
+                (bv_unsigned inum) n Hrng).
+    iSplitR "Hd Ht".
+    { iSplitL "Hphi"; [iExact "Hphi" |].
+      iApply (FsStateInode.inode_ghost_of _ (bv_unsigned inum) n v Hv Hloc
+                with "Hla Hte"). }
+    iSplitL "Hd"; [iExact "Hd" | iExact "Ht"].
+  Qed.
+
   Definition ipool_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (∃ (dn0 : dinode) (bm0 : blkmap) (data0 : nat -> list (bv 8)),
@@ -589,8 +812,12 @@ Section IcacheEscrow.
        ⌜dir_dots_ix (bv_unsigned inum) dn0 data0⌝ ∗
        ⌜dir_orphan_clean dn0 data0⌝ ∗
        ⌜dir_uniq dn0 data0⌝ ∗
-       dlinks γfs (bv_unsigned inum) dn0 bm0 data0 ∗
-       inode_owned_era γfs γi inum (era_node dn0 bm0 data0) ∗
+       (* THE PER-INODE ESCROWED LEG (durable-disk EV stage 4), in [dlinks]'
+          own conjunct position and absorbing the era bundle beside it: the
+          entry TOKENS and [FsStateEra.inode_owned_era_q] at fraction 1, i.e.
+          exactly what the commit's collection takes off this inum.
+          [ic_inode_leg_era_open]/[_era_intro] are the two directions. *)
+       ic_inode_leg γfs (DfracOwn 1) γi inum (era_node dn0 bm0 data0) ∗
        (* ...AND THE CONTENTS HOLD, TIED (namei-pinned-lookup.md §9 W2).  The
           tie is DEFINITIONAL (Revision 1): the abstract entry map is a
           function of the record and the bytes this arm already owns, so the
@@ -819,16 +1046,17 @@ Section IcacheEscrow.
        ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
        ⌜dir_orphan_clean dn data⌝ ∗
        ⌜dir_uniq dn data⌝ ∗
-       dlinks γfs (bv_unsigned inum) dn bm data ∗
-       (* THE OWNERSHIP IS THE ERA BUNDLE (durable-disk 2b-inode-3), at this
-          payload's own node.  It CONTAINS what three conjuncts used to say
-          separately -- [dinode_at], [ind_res] and [inode_blocks] -- and
-          adds the era's abstract value [top_frag], which is what a holder
-          retags at its writes ([InodeRegion.ireg_top_retag]).  A consumer
-          that wants the old shape back applies [ic_loaded_open], an
-          ordinary entailment; see [ipool_alloc]'s note for why [inode_ok]
-          stays a conjunct rather than being derived. *)
-       inode_owned_era γfs γi inum (era_node dn bm data) ∗
+       (* THE OWNERSHIP IS THE PER-INODE ESCROWED LEG (durable-disk EV
+          stage 4), which is [dlinks] and the era bundle (durable-disk
+          2b-inode-3) as ONE conjunct at this payload's own node.  The
+          bundle CONTAINS what three conjuncts used to say separately --
+          [dinode_at], [ind_res] and [inode_blocks] -- and adds the era's
+          abstract value [top_frag], which is what a holder retags at its
+          writes ([InodeRegion.ireg_top_retag]).  A consumer that wants the
+          old shape back applies [ic_loaded_open], an ordinary entailment;
+          see [ipool_alloc]'s note for why [inode_ok] stays a conjunct
+          rather than being derived. *)
+       ic_inode_leg γfs (DfracOwn 1) γi inum (era_node dn bm data) ∗
        inode_meta (ientry k) dn ∗
        inode_addrs (ientry k) (bm_cells bm) ∗
        (* ...AND THE CONTENTS HOLD, TIED, the twin of [ipool_alloc]'s: see
@@ -893,8 +1121,10 @@ Section IcacheEscrow.
        ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
        ⌜dir_orphan_clean dn data⌝ ∗
        ⌜dir_uniq dn data⌝ ∗
-       dlinks γfs (bv_unsigned inum) dn bm data ∗
-       inode_owned_era_q γfs (DfracOwn (3/4)) γi inum (era_node dn bm data) ∗
+       (* the leg at THREE QUARTERS -- the same conjunct [ic_loaded] carries
+          at 1, which is what makes [ic_loaded_shed]/[ic_rd_join] a fraction
+          move and nothing else *)
+       ic_inode_leg γfs (DfracOwn (3/4)) γi inum (era_node dn bm data) ∗
        dv_ride (bv_unsigned inum) (dv_of dn data) ∗
        fv_ride (bv_unsigned inum) (fv_of dn data))%I.
 
@@ -941,11 +1171,11 @@ Section IcacheEscrow.
   Proof.
     rewrite /ic_loaded /ic_rd_arm /ic_rd_held. iIntros "H".
     iDestruct "H" as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
-    iDestruct (inode_owned_era_local with "Hn") as %Hloc.
-    iDestruct (inode_owned_era_shed_to with "Hn") as "[Hn34 Hn14]".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha & Hv & Hw)".
+    iDestruct (ic_inode_leg_local with "Hleg") as %Hloc.
+    iDestruct (ic_inode_leg_shed_to with "Hleg") as "[Hleg34 Hn14]".
     iSplitR "Hm Ha Hn14".
-    - iExists dn, bm, data. iFrame "Hl Hn34 Hv Hw".
+    - iExists dn, bm, data. iFrame "Hleg34 Hv Hw".
       iSplitR; [iPureIntro; exact Hok |].
       iSplitR; [iPureIntro; exact Hdok |].
       iSplitR; [iPureIntro; exact Hddix |].
@@ -969,9 +1199,9 @@ Section IcacheEscrow.
     rewrite /ic_rd_arm /ic_rd_held /ic_loaded.
     iIntros "Harm Hheld".
     iDestruct "Harm" as (dn' bm' data')
-      "(%Hok' & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn34 & Hv & Hw)".
+      "(%Hok' & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hv & Hw)".
     iDestruct "Hheld" as (data) "(%Hok & %Hloc & Hm & Ha & Hn14)".
-    iDestruct (inode_rd_era_agree with "Hn34 Hn14") as %Hnode.
+    iDestruct (ic_inode_leg_rd_agree with "Hleg Hn14") as %Hnode.
     destruct (era_node_pair_inj cov logstart dn' dn bm' bm data' data
                 Hok' Hok Hnode) as [<- <-].
     (* the HELD quarter is at the holder's [data], the arm's residue at its
@@ -986,9 +1216,8 @@ Section IcacheEscrow.
     iSplitR; [iPureIntro; exact Hddix |].
     iSplitR; [iPureIntro; exact Hdoc |].
     iSplitR; [iPureIntro; exact Hduq |].
-    iFrame "Hl".
-    iSplitL "Hn34 Hn14";
-      [iApply (inode_owned_era_shed_of with "Hn34 Hn14") |].
+    iSplitL "Hleg Hn14";
+      [iApply (ic_inode_leg_shed_of with "Hleg Hn14") |].
     iFrame "Hm Ha Hv Hw".
   Qed.
 
@@ -1989,9 +2218,9 @@ Section IcacheEscrow.
     rewrite /ic_loaded.
     iExists data. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
     iSplitR; [done |]. iSplitR; [done |].
-    iSplitL "Hl"; [iExact "Hl" |].
     iSplitR "Hm Ha Hv Hw".
-    { iApply (inode_owned_era_era_node_of γfs γi inum dn bm data Hsh Hloc
+    { iApply (ic_inode_leg_era_intro with "Hl").
+      iApply (inode_owned_era_era_node_of γfs γi inum dn bm data Hsh Hloc
                 with "Hd Hr Hb Ht"). }
     iSplitL "Hm"; [iExact "Hm" |]. iSplitL "Ha"; [iExact "Ha" |].
     iSplitL "Hv"; [iExact "Hv" | iExact "Hw"].
@@ -2049,7 +2278,8 @@ Section IcacheEscrow.
   Proof.
     iIntros "H". rewrite /ic_loaded /ic_loaded_flat_body.
     iDestruct "H" as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha & Hv & Hw)".
+    iDestruct (ic_inode_leg_era_open with "Hleg") as "[Hl Hn]".
     pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
     iDestruct (inode_owned_era_local with "Hn") as %Hloc.
     iDestruct (inode_owned_era_era_node_to γfs γi inum dn bm data Hsh with "Hn")
@@ -2907,7 +3137,7 @@ Section IcacheEscrow.
         [| iDestruct "Hpay" as "[[Hr Hp] _]"; iFrame "Hr"; iExact "Hp" ].
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
-        "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hera & Hmeta &
+        "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hmeta &
           Haddrs & Hdv & Hfv)".
       pose proof Hok as Hok'.
       destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
@@ -2926,7 +3156,10 @@ Section IcacheEscrow.
       iSplitR; [iPureIntro; exact Hddix |].
       iSplitR; [iPureIntro; exact Hdoc |].
       iSplitR; [iPureIntro; exact Hduq |].
-      iSplitL "Hdlk"; [iExact "Hdlk" |]. iFrame. }
+      (* the eviction hands the LEG straight across: the loaded arm's and
+         the pool's allocated arm's are the same conjunct at the same
+         fraction (durable-disk EV stage 4), so nothing is opened here *)
+      iFrame. }
     (* the two right-hand conjuncts go out structurally: [iFrame "Hgf2
        Hpool"] would search the [ic_escrow_body] conjunct -- five arms, each
        an existential over [ic_payload]/[inode_raw] -- for each of the two
@@ -3723,12 +3956,15 @@ Section IcacheEscrow.
             ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝ ∗
             ic_lend cn γfs γi cov logstart k
               (ic_id cn k (1/2) true dev inum
-               ∗ inode_owned_era_q γfs dq γi inum n
-               (* ...AND THIS INODE'S LINK TOKENS (durable-disk C-8), which
+               (* ...AND THE WHOLE PER-INODE LEG (durable-disk EV stage 4),
+                  which is [FsStateEra.inode_owned_era_q] at [dq] beside
+                  THIS INODE'S LINK TOKENS (durable-disk C-8) -- the tokens
                   are what the collection's [FsState.fs_links] leg needs
-                  beside the region's per-inum authority.  See
+                  beside the region's per-inum authority, and since the two
+                  are one conjunct the collection takes them off a slot
+                  without re-associating anything.  See
                   [ic_loaded_lend_owned] below. *)
-               ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n)))%I.
+               ∗ ic_inode_leg γfs dq γi inum n)))%I.
 
   (* the two readings of a bundle at a share the cover's third alternative
      is built from, as accessors, so the proof never unfolds [ic_loaded] or
@@ -3755,23 +3991,20 @@ Section IcacheEscrow.
          [FsStateEra.inode_owned_era_q] carries only [inode_local] -- which
          cannot state [DirView.dir_ok] at all (it has no region width). *)
       ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝
-      ∗ (inode_owned_era_q γfs (DfracOwn 1) γi inum n
-       ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n)
-      ∗ ((inode_owned_era_q γfs (DfracOwn 1) γi inum n
-          ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
+      ∗ ic_inode_leg γfs (DfracOwn 1) γi inum n
+      ∗ (ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
            ic_loaded γfs γi cov logstart k inum dn bm).
   Proof.
     rewrite /ic_loaded. iIntros "H".
     iDestruct "H" as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
-    rewrite /dlinks. iRename "Hl" into "Hte".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha & Hv & Hw)".
     iExists (era_node dn bm data).
     iSplitR.
     { iPureIntro.
       exact (FsStateEra.node_dir_local_of_ok (bv_unsigned inum) cov logstart
                icfg_nib dn bm data Hok Hdok Hddix Hdoc). }
-    rewrite -inode_owned_era_1. iFrame "Hn Hte". iIntros "[Hn Hte]".
-    iExists data. rewrite /dlinks. iFrame "Hte Hn Hm Ha Hv Hw".
+    iFrame "Hleg". iIntros "Hleg".
+    iExists data. iFrame "Hleg Hm Ha Hv Hw".
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
@@ -3784,23 +4017,20 @@ Section IcacheEscrow.
     ∃ n : fs_node,
       (* ...and the read arm's own copy of the three, for the same reason *)
       ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝
-      ∗ (inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
-       ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n)
-      ∗ ((inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
-          ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
+      ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi inum n
+      ∗ (ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗
            ic_rd_arm γfs γi cov logstart inum).
   Proof.
     rewrite /ic_rd_arm. iIntros "H".
     iDestruct "H" as (dn bm data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hv & Hw)".
-    rewrite /dlinks. iRename "Hl" into "Hte".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hv & Hw)".
     iExists (era_node dn bm data).
     iSplitR.
     { iPureIntro.
       exact (FsStateEra.node_dir_local_of_ok (bv_unsigned inum) cov logstart
                icfg_nib dn bm data Hok Hdok Hddix Hdoc). }
-    iFrame "Hn Hte". iIntros "[Hn Hte]".
-    iExists dn, bm, data. rewrite /dlinks. iFrame "Hte Hn Hv Hw".
+    iFrame "Hleg". iIntros "Hleg".
+    iExists dn, bm, data. iFrame "Hleg Hv Hw".
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
@@ -3830,7 +4060,7 @@ Section IcacheEscrow.
         * (* LOADED: the bundle is inside at 1 *)
           iDestruct "Hp" as (dn bm) "[Hload #Hshot]".
           iDestruct (ic_loaded_lend_owned with "Hload")
-            as (n) "[%Hdl [[Hn Hte] Hback]]".
+            as (n) "[%Hdl [Hleg Hback]]".
           iRight; iRight. iExists (DfracOwn 1), n.
           iSplitR; [iPureIntro; exact (dfrac_full_nvalid (DfracOwn 1)) |].
           iSplitR; [iPureIntro; exact Hdl |].
@@ -3842,19 +4072,17 @@ Section IcacheEscrow.
                      ∗ live_gen k (1/2) ga
                      ∗ ic_pin_rest k
                      ∗ ic_mid cn k
-                     ∗ ((inode_owned_era_q γfs (DfracOwn 1) γi inum n
-                         ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs)
-                             (bv_unsigned inum) n) -∗
+                     ∗ (ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
                           ic_loaded γfs γi cov logstart k inum dn bm))%I
-                    with "[Hgid Hn Hte] [Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hback] []").
-          { iFrame "Hgid Hn Hte". }
+                    with "[Hgid Hleg] [Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hback] []").
+          { iFrame "Hgid Hleg". }
           { iFrame "Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hback". }
-          iIntros "(Hgid & Hn & Hte) (Hidd & Hidn & Hvld & Hoff & Hlv & Hpin & Hmt & Hback)".
+          iIntros "(Hgid & Hleg) (Hidd & Hidn & Hvld & Hoff & Hlv & Hpin & Hmt & Hback)".
           iLeft. rewrite /ic_parked. iExists dev, inum, true, ga.
           iFrame "Hidd Hidn Hvld Hmt Hgid".
           rewrite /ic_payload_arm. iLeft. iFrame "Hoff Hlv Hpin".
           rewrite /ic_payload_np. iExists dn, bm. iFrame "Hshot".
-          iApply ("Hback" with "[$Hn $Hte]").
+          iApply ("Hback" with "Hleg").
         * (* UNLOADED: the escrow holds a POOL row *)
           iDestruct "Hp" as "[Hun Hpend]".
           rewrite /ic_unloaded. iDestruct "Hun" as "[Hraw Hpool]".
@@ -3895,7 +4123,7 @@ Section IcacheEscrow.
           iFrame "Ha". iExists dev, inum.
           cbn [ic_out_rd].
           iDestruct (ic_rd_arm_lend_owned with "Hrd")
-            as (n) "[%Hdl [[Hn Hte] Hback]]".
+            as (n) "[%Hdl [Hleg Hback]]".
           iRight; iRight. iExists (DfracOwn (3/4)), n.
           iSplitR; [iPureIntro; exact dfrac_34_nvalid |].
           iSplitR; [iPureIntro; exact Hdl |].
@@ -3904,19 +4132,17 @@ Section IcacheEscrow.
                      ∗ ic_dep_res k (DepRd s dv nu g) dev inum
                      ∗ ic_mid cn k
                      ∗ ic_pin_rest k
-                     ∗ ((inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
-                         ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs)
-                             (bv_unsigned inum) n) -∗
+                     ∗ (ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗
                           ic_rd_arm γfs γi cov logstart inum))%I
-                    with "[Hgid Hn Hte] [Hdep Hres Hmt Hpin Hback] []").
-          { iFrame "Hgid Hn Hte". }
+                    with "[Hgid Hleg] [Hdep Hres Hmt Hpin Hback] []").
+          { iFrame "Hgid Hleg". }
           { iFrame "Hdep Hres Hmt Hpin Hback". }
-          iIntros "(Hgid & Hn & Hte) (Hdep & Hres & Hmt & Hpin & Hback)".
+          iIntros "(Hgid & Hleg) (Hdep & Hres & Hmt & Hpin & Hback)".
           iRight; iLeft. rewrite /ic_out.
           iExists (DepRd s dv nu g), dev, inum.
           iFrame "Hdep Hmt Hgid". iSplitL "Hres"; [iLeft; iExact "Hres" |].
-          cbn [ic_out_rd]. iSplitL "Hn Hte Hback";
-            [iApply ("Hback" with "[$Hn $Hte]") | iExact "Hpin"].
+          cbn [ic_out_rd]. iSplitL "Hleg Hback";
+            [iApply ("Hback" with "Hleg") | iExact "Hpin"].
       + (* the FROZEN alternative: [DepFrz], iput's +0x5e window -- and it
            parks its transaction's share in its own fields (B''-tx5) *)
         destruct d as [| qf dv nu tf qtf | s dv nu g t q | s dv nu g];
@@ -4013,7 +4239,7 @@ Section IcacheEscrow.
     rewrite /ic_payload_np. destruct v.
     - iIntros "Hpay".
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
-      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & _ & _ & _ & Hmeta & _)".
+      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & _ & _ & Hmeta & _)".
       rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
       iExists (di_size dn). iExact "Hsz".
     - iIntros "[Hu _]". iApply (ic_unloaded_size with "Hu").

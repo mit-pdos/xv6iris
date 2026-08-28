@@ -1156,7 +1156,11 @@ Section IlockLoad.
          [icnt_half z 0] for an inum whose count is 1. *)
       rewrite /ipool_shape_np. iDestruct "Hpool" as "[Hal | Hmk]".
       - iDestruct "Hal" as (dn0 bm0 data0)
-          "(%Hok0 & %Hdok0 & %Hddix0 & %Hdoc0 & %Hduq0 & Hdlk0 & Hera & Hdv & Hfv)".
+          "(%Hok0 & %Hdok0 & %Hddix0 & %Hdoc0 & %Hduq0 & Hleg0 & Hdv & Hfv)".
+        (* durable-disk EV stage 4: the arm's ownership is the per-inode
+           LEG, so the fill opens it into the link tokens and the era bundle
+           before taking the bundle apart. *)
+        iDestruct (ic_inode_leg_era_open with "Hleg0") as "[Hdlk0 Hera]".
         (* durable-disk 2b-inode-3: the pool's allocated arm owns the era
            bundle; the fill takes it apart into the three resources it used
            to hold separately plus the abstract value. *)

@@ -1259,9 +1259,11 @@ Section IcacheBootPool.
     iSplitR; [iPureIntro; exact Hddix |].
     iSplitR; [iPureIntro; exact Hdoc |].
     iSplitR; [iPureIntro; exact Hduq |].
-    iSplitL "Hdlk"; [iExact "Hdlk" |].
     iSplitR "Hdv Hfv".
-    { iApply (inode_owned_era_era_node_of γfs γi inum dn bm data Hsh Hloc
+    { (* the pool row's allocated arm carries the per-inode LEG (durable-disk
+         EV stage 4): the link tokens and the era bundle as ONE conjunct *)
+      iApply (ic_inode_leg_era_intro with "Hdlk").
+      iApply (inode_owned_era_era_node_of γfs γi inum dn bm data Hsh Hloc
                 with "Hdn Hind Hblk Htop"). }
     iFrame "Hdv Hfv".
   Qed.

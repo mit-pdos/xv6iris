@@ -319,8 +319,11 @@ Section CollectAll.
     iIntros "[Halloc | (Hmk & _ & _)]".
     - rewrite /ipool_alloc.
       iDestruct "Halloc" as (dn0 bm0 data0)
-        "(%Hok & %Hdok & %Hddix & %Hdoc & _ & Hdl & Hn & _ & _)".
-      rewrite /dlinks. iRename "Hdl" into "Hte".
+        "(%Hok & %Hdok & %Hddix & %Hdoc & _ & Hleg & _ & _)".
+      (* the pool row's leg is [col_side]'s pair in ONE conjunct
+         (durable-disk EV stage 4); [col_side] still spells the pair out,
+         so this open is the boundary *)
+      iDestruct (IcacheEscrow.ic_inode_leg_open with "Hleg") as "[Hte Hn]".
       iRight. iExists (era_node dn0 bm0 data0), (DfracOwn 1).
       iSplitR;
         [iPureIntro; exact (FsStateDefs.dfrac_full_nvalid (DfracOwn 1)) |].
@@ -331,7 +334,7 @@ Section CollectAll.
       { iPureIntro.
         exact (FsStateEra.node_dir_local_of_ok (bv_unsigned w) cov ls
                  icfg_nib dn0 bm0 data0 Hok Hdok Hddix Hdoc). }
-      rewrite -inode_owned_era_1. iFrame "Hn Hte".
+      iFrame "Hn Hte".
     - iLeft. iExact "Hmk".
   Qed.
 
@@ -387,7 +390,10 @@ Section CollectAll.
       iDestruct (ic_id_agree with "Hq Hid") as %(_ & _ & <-).
       iApply (ipool_shape_np_side with "Hnp").
     - iDestruct "Hc" as (dq n) "[%Hdq [%Hdl Hl]]".
-      rewrite /ic_lend. iDestruct "Hl" as "[(Hid & Hn & Hte) _]".
+      rewrite /ic_lend. iDestruct "Hl" as "[(Hid & Hleg) _]".
+      (* the cover lends the LEG as one conjunct (durable-disk EV stage 4);
+         [col_side] still spells the pair out, so this open is the boundary *)
+      iDestruct (IcacheEscrow.ic_inode_leg_open with "Hleg") as "[Hte Hn]".
       iDestruct (ic_id_agree with "Hq Hid") as %(_ & _ & <-).
       rewrite /col_side. iRight. iExists n, dq.
       iSplitR; [iPureIntro; exact Hdq |].
