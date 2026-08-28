@@ -291,18 +291,45 @@ things, and the answer differs:
      bomb** (durable-notes' rule, hit once here on `SpecNparEra`'s
      `inode_held_ty_at` section: 420 s and an OOM kill, against 3 s with
      `SpecNameiTr.NameiTrDefs`'s list).
-  REMAINING (lane A-iii): **the RELATIVE START**, scoped out and not
-  attempted — see `SpecNparEra`'s header.  It is not an arm but a
-  CONTRACT-SHAPE change: a relative walk starts at `p->cwd`, whose inum no
-  landed reading exposes (`inode_held` hides it existentially,
-  `SpecNameiTr`'s Q-c records the gap), so the trace premise would have to
-  become a fupd universally quantified over the start inum — which is
-  exactly the shape `mknod_walk_pre_era` already has, so the change is
-  statable, but it also brings back `ProofNamex`'s 361-line myproc/idup arm
-  that all four era proofs currently refute from `pfun 0 = SLASH`.  Sizing
-  measured: `diff ProofNamex ProofNamexTr` is 1766 changed lines (1432
-  deletions = the npar arms + the relative start, ~334 additions = the
-  trace rows).
+  **THE RELATIVE START: DONE 2026-08-28** (Opus lane, two commits, both
+  green on the mirror with the whole tree rebuilt, zero admits).  New leaf
+  `iris/FsAbsStart.v`: `ex_start` / `ep_start`, the trace DEFERRED IN THE
+  START INUM —
+  `∀ r, ⌜pl !! 0 = Some SLASH -> r = ROOTINO⌝ ={⊤}=∗ P 0 r ∗ hops 0`,
+  over the full family and over the parent prefix — plus the two head
+  lemmas (`bview_head_slash`, `..._intro`) and the receipts
+  `ex_start_of_pair` / `ep_start_of_pair` (the landed absolute pair BUILDS
+  the deferred form, so nothing weakened).  All four era contracts and
+  `SpecCreateAU` drop `pfun 0 = SLASH` and trade their two trace premises
+  for that one.  AS-LANDED FINDINGS:
+  1. **Q-c was not a gap in the cwd's reading.**  The blocker on record
+     was that no landed predicate exposes `p->cwd`'s inum.  The CALLER
+     never needs it: idup's postcondition hands the WALK a package whose
+     own existential witness is the slot's inum, so the proof opens it
+     (into `SpecNameiTr.inode_held_at`, the era loop invariant's own
+     currency) and fires the caller's one shot there.  No `cwd_ref_at`
+     was written, none is needed, and `ProcInv.v` was not touched.
+  2. **Extending the era proofs in place beat re-deriving from
+     `ProofNamex`** and the reason is structural: the myproc/idup arm is
+     npar-agnostic (it sits before the `a1` test), so it splices into
+     both era proofs unchanged, while re-deriving would have meant redoing
+     the era adaptation (the fire point) and the npar one (parent-prefix
+     index arithmetic).  288 lines spliced per proof; exactly TWO changes
+     at the join (build the starting reference at its inum; fire the
+     deferred trace, at ROOTINO on the absolute arm and at idup's inum on
+     the relative one, where the tie is refuted by `bview_head_slash`
+     rather than used).  The absolute arms are otherwise line for line
+     what they were.  Compile: `ProofNamexEra` 177 s, `ProofNparEra`
+     149 s, both first try.
+  3. **The fire is `iApply fupd_wp; iMod …; iModIntro`** at the
+     instruction boundary before the loop entry — the same idiom the hop
+     fire uses 2000 lines up, so no new proofmode machinery.
+  4. **The consumer side needed no invention**: `ep_start γfs P Pmiss pl`
+     at a FIXED `pl` IS `FsAbsEraMknod.mknod_walk_pre_era` at that `pl`
+     (same quantifier, same tie, same family), so
+     `FsAbsNparMknod.np_start_of_mknod` is one `iMod` and
+     `np_rootino_agree`.  The one-shot now travels DOWN unfired instead of
+     being fired at ROOTINO in the syscall.
 - [~] **W — the first increment's AU specs.**  mknod STATEMENT DONE
   2026-08-28 (Fable lane, `iris/SpecSysMknodAU.v`, 856 lines, green,
   zero admits — a statement file; the proof is a later Opus lane):
@@ -331,6 +358,20 @@ things, and the answer differs:
   the tree layer or waits for a cross-syscall pin producer?
   Gotchas: `FsImg` must be `Require`d not `Import`ed at syscall
   altitude; stdpp `last` = `list_basics.last` in this import mix.
+  **THE ret-0 ESCAPE IS RETIRED 2026-08-28** (Opus lane, same session as
+  the relative start above, strengthened IN PLACE — statement and seal in
+  one commit, as those two files are the campaign's own with no external
+  consumers).  `SpecCreateAU` now takes `FsAbsStart.ep_start` and has no
+  absolute-path premise, so `ProofSysMknodAU` calls ONE create contract
+  for every fetched string: the `destruct` on the first byte and the
+  300-line landed-create branch under it are DELETED, and
+  `mknod_arms_era`'s ret-0 arm is `mknod_post_ok_era` alone.  A `ret = 0`
+  is a receipt unconditionally, which is what makes the theorem say
+  anything about init: `mknod("console", …)` instantiates with
+  `pl !! 0 ≠ Some SLASH`, the walk starts at `idup(p->cwd)` and `P 0`
+  fires at the cwd's own inum — ROOTINO for init, but the contract never
+  has to know that.  `mknod_post_fail_era` KEEPS its "whole bundle back"
+  disjunct: that one is the argstr failure and is honest.
   WRITE STATEMENT DONE 2026-08-28 (Fable lane, `iris/SpecSysWriteAU.v`,
   810 lines, green): `delta_write` reuses `FsBlocks.blk_splice` (the
   splice IS the landed one; `delta_write_chain` = a chained run is one
