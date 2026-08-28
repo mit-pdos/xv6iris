@@ -12344,3 +12344,139 @@ to the fliptree sources).  **Red-list delta: 0.**  `^Abort` / `^Admitted` /
 
 *Every remaining red is now behind one of these four rulings, and no
 buildable item is left on the frontier.*
+
+### A6.96 §0.35′'s MECHANISM IS LANDED AT ITS CORE — AND THE SURFACE MOVE IS
+### PRICED AT ZERO CHURN, BLOCKED ONLY ON A PRIMITIVE CLAUSE (iii) NAMES BUT
+### THE TREE DOES NOT HAVE
+
+Opening the authorized tranche.  **The mechanism's core is built and green;
+the surface move is measured and was written out in full, then CLOSED BACK to
+green because its second half needs one primitive that does not exist yet.**
+This is an interim report at a green boundary, as asked.
+
+#### (1) LANDED: THE BOUND-RELATION, IN FOUR LINES
+
+`TsoCtx` gains, additively:
+
+```coq
+  Definition ctx_floor (ξ : CtxId) (lo : nat) : iProp Σ := llb (ctx_bound_name ξ) lo.
+
+  Lemma own_context_floor_view `{CID : CpuId} (ξ : CtxId) (lo : nat) :
+    own_context ξ -∗ ctx_floor ξ lo -∗
+    own_context ξ ∗ ∃ K, view_lb view_name loglen_name (hart_agent cpu_id) K ∗ ⌜lo ≤ K⌝.
+```
+
+**That second lemma is the object four sites wanted** (A6.89 §(7), A6.92 §(3),
+A6.95 §(3), §0.27′): it produces exactly the two premises each of them stopped
+at — a view receipt and the relation against the floor — and it produces them
+from resources every kernel thread already carries.  The proof is the token's
+own `B ≤ K` chained with `llb_valid`'s `lo ≤ B`; the token is threaded, not
+consumed.
+
+> **AND IT NAMES NO HART, WHICH IS THE POINT.**  `llb (ctx_bound_name ξ) lo`
+> is a fact about the THREAD OF CONTROL, and a thread carries its context
+> across every migration — so a floor claimed here survives a `wp_next`
+> crossing, a park and a resume.  That is precisely what the two refuted
+> spellings could not do: the strengthened `locked` token (A6.89 §(5)) and
+> the lock word's author receipt (A6.92 §(3)) were both HART-relative and
+> both died on a crossing.  **§0.35′'s answer is to move the fact one axis
+> over**, and the axis it moves to is the one the port has been building
+> since M2.
+
+#### (2) THE SURFACE MOVE IS PRICED AT ZERO CHURN — MEASURED, NOT ESTIMATED
+
+The tranche was priced at "~160 `is_lock` sites".  **Measured:**
+
+```
+  files mentioning is_lock            : 136
+  of those, files that do NOT bind CurCtx : 0
+```
+
+So `is_lock` can take its context as an AMBIENT implicit and **not one
+mention site moves** — the same trick, and for the same reason, as the M1
+notation flip ("converted spec text reads as before").  The `~160 sites` price
+was for the wrong shape.
+
+**And the floor needs no new ghost.**  `lk_cpu_pay`'s window already carries a
+floor `lo`, existentially bound inside `lk_cpu_cell_ex` — which is exactly why
+A6.89 §(7) could not state its premise.  PINNING it as a parameter
+(`lk_cpu_cell_ex lo …` → `lk_cpu_res lo …` → `lock_body … lo` →
+`lock_inv … lo`) and closing with
+
+```coq
+  Definition is_lock `{XI : CurCtx} γ lk s R : iProp Σ :=
+    (∃ lo, lock_name lk s ∗ inv lockN (lock_inv γ lk s R lo) ∗ TsoCtx.ctx_floor cur_ctx lo)%I.
+```
+
+gives §0.35′(i) verbatim — persistent, ξ-indexed, `lo ≤ B_ξ` internal, `lo`
+never in the exported type — **with no new RA and no functor change**:
+agreement on `lo` is free, because the invariant was allocated once.  The
+whole of this was written out (definitions, the three `is_lock_*`
+projections, `lock_openable`, `lock_finisher`, the creators) before it was
+reverted, so the spelling is known to be the right one.
+
+#### (3) WHAT STOPPED IT: CLAUSE (iii)'s ABSORB DOES NOT EXIST YET
+
+§0.35′(iii) says acquire is *"the AMO's log-top receipt + an ABSORB of the
+context bound (B_ξ rises to K)"*.  **There is no such primitive in the tree.**
+The nearest, `TsoCtxAbsorbLb.ctx_absorb_lb`, is a PAYLOAD transport —
+
+```coq
+    own_context ξ' -∗ hart_view_lb K -∗ ctx_parked ξ T -∗ R ξ ==∗
+    own_context ξ' ∗ ctx_parked ξ T ∗ R ξ'
+```
+
+— it moves facts from a parked context to the running one and **never raises
+`B_ξ`**.  Nothing else does either.
+
+Where it bites is the CREATOR, not the acquirer: `lk_cpu_fresh lo lk` comes
+out of `initlock`'s store-then-mint at `lo = S (length glog)`, and a PLAIN
+STORE does not advance the writer's own bound (that is store buffering — the
+byte is registered DIRTY, not under `B`).  So `ctx_floor cur_ctx lo` is not
+free at creation, and every `newlock` owes it.  §0.35′ answers this for the
+OTHER harts (boot locks ride the started deposit; dynamic locks travel the
+fd/fork crossings) but hart 0, which creates the boot locks, has to raise its
+own bound past its own store.
+
+**The primitive is small and sound, and it is the next thing to build:**
+
+```coq
+  Lemma ctx_bound_raise `{CID : CpuId} (ξ : CtxId) (K : nat) :
+    own_context ξ -∗ hart_view_lb K ==∗ own_context ξ ∗ ctx_floor ξ K.
+```
+
+Soundness is by inspection of `own_context_def`: the clean arm's facts are
+`llb … t` with `t ≤ B ≤ K`, so they survive; the dirty entries' justification
+`dirty_ok … B k` is MONOTONE in `B` (its arms are "`t ≤ B`" or "my own
+message"), so it survives; and the token's own `B ≤ K` becomes `K ≤ K`.  The
+update is one `mono_nat_own_update`.  With it, hart 0 mints every boot lock's
+floor at its next AMO (`acquire` takes the view to the log top — A6.92 §(2)),
+and clause (iii) is then literally true.
+
+> **THIS IS NOT A CONTRADICTION OF §0.35′'s TEXT** — it is the ruling's own
+> clause (iii) read as an instruction rather than as an existing fact.  Per
+> the tranche's stopping rule the instance is characterized rather than
+> guessed at, and the tranche was closed back to green rather than left open.
+
+#### (4) THE NUMBER
+
+**1100 of 1296, RED 9 — the A6.93 set, held**, sentinel-backed
+(`MAKEEXIT=2`) over the `TsoCtx` addition.  **Red-list delta: 0.**  `WpLock`
+was restored byte-identical to its green text (verified by `diff`), so the
+surface move leaves no residue; the `TsoCtx` addition is purely additive and
+cost no green file.  `md5sum kernel-rocq/*.v user-rocq/*.v` unchanged
+(`edd91972b6bc1b944fd98a2cc2363815`).  `^Abort` / `^Admitted` / `^Axiom` all
+0.  Mirror refreshed at this boundary.
+
+#### (5) THE TRANCHE'S REMAINING ORDER, RE-PRICED
+
+0. **`ctx_bound_raise`** (§(3)) — one lemma in `TsoCtx`, self-contained, and
+   the prerequisite for every creator.  **Build this first.**
+1. the surface move (§(2)) — known spelling, zero mention-site churn; the
+   work is the creators' floor (now free, given 0) and threading `lo` through
+   `lock_openable` into `WpSconfLock`'s leaves and `ProofAcquire`/`Release`/
+   `Holding`.
+2. the holder read on the racy kit + the `notheld` route — `own_context_floor_view`
+   is already in place, so its two missing premises are now available.
+3. the DMA AU leaf + both virtio files (A6.95 §(4): ready, needs only the tie).
+4. §0.27′ proper → `ProofSwtch`.
