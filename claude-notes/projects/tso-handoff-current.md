@@ -50,15 +50,18 @@ files — do not confuse with the fliptree.
 
 **LOCK LANE** (running at checkpoint time; agent context in this
 session only — a fresh agent CANNOT resume it, only re-derive):
-currently inside WpSconfLock's indivisible unit: (1) ctx_floor export at
-the AMO write node (route through lock_word_amo_mint per A6.118; the
-node exposes tso_interp — HartSMem:5044; token from iDestruct Hcap at
-:1458; re-cut the stale pre-flip write-node text), (2) notheld read
-(drafted; lk_cpu_cell_ex_pay + lk_own_ok_some landed in WpLock; expect a
-window-spelling bridge: lk_cpu_pay's ∃t vs lkcpu_read_not_mine's ts
-function), (3) holder read on the racy kit (retire lk_wex/lock_word_ex's
-held arm citing A6.92), (4) cpu-store instances on the gate's two arms
-(release re-establishes lk_own_anchored off the message fragment).
+inside WpSconfLock's indivisible unit.  DONE (r29 certified for the
+TsoCtx/WpLock halves; the WpSconfLock pieces compile in-file): the
+∃-form window swap (ledger_read_racy_ok/_word_ok/lkcpu_read_not_mine
+take [∗list] j, ∃tj — the ts-function spelling was the outlier),
+lk_cpu_cell_ex_pay + lk_own_ok_some, and BOTH READS — notheld
+(lock_cell_read_notheld → wp_ld_lkcpu_notheld_gen → the _s_sconf leaf
+on lock_openable_c, A6.92's refuted premise retired in place) and the
+holder read.  Design note: an existential crossing an atomic update
+must be pinned outside it or carried whole through it — hand the whole
+lock_body through Res (the A6.109 lo-hoist one level up).  REMAINING in
+the unit: (4) the cpu-store generic (compile sits at WpSconfLock:1249)
+and the AMO node re-cut with the ctx_floor export (A6.118's routing).
 Then: (5) lock_openable_c threading through SpecAcquire's ~40 callers;
 (6) close WpSconfLock + sweep the cone (~160 files); DMA AU leaf +
 virtio pair (A6.95: ready, datum phys_word2, claims from
