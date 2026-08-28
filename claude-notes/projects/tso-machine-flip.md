@@ -14701,3 +14701,24 @@ projections (A6.111, A6.115), the cell's anchor invariant (A6.115), the
 floor's free transport (A6.117), the store gate's two arms and its message
 fragment (A6.109, A6.114), the no-migration pins on load/store/racy-load
 (A6.89, A6.109, A6.112), and `lock_openable_c` (A6.112).
+
+### §5 (addendum, unit in flight) — WHERE THE EXPORT ATTACHES, corrected
+
+Opening the unit turned up one thing worth recording before it lands:
+**`WpSconfLock.lock_word_amo_mint` (`:350`) has no client.**  `grep` finds the
+declaration and nothing else, and `wp_amoswap_lockopen_s_sconf`'s proof runs to
+`Qed` (`:1688`) without it — the AMO's write is discharged inside
+`swp_execute_AMOSWAP_S_ex_mode`'s own obligation, via `lock_word_flat_bytes`
+and the `Htrobl` node, not through the mint lemma A6.89 built for it.
+
+Tenth instance of the lane's recurring shape, and this time it is convenient
+rather than costly: `lock_word_amo_mint`'s post already carries the AMO's
+view-at-the-log-top (`vstep … (S (length log))`), so it is the natural home for
+the agreed `ctx_floor cur_ctx T` export — but the export must be attached where
+the write is ACTUALLY discharged, and the token (`Hctx`, out of
+`iDestruct "Hcap"` at `:1458`) is in scope there.  So the unit's step (1) is:
+attach the absorb at the leaf's real write step, and either retire
+`lock_word_amo_mint` or make it the vehicle by routing the write through it.
+Deciding between those two is the first thing the unit settles; routing through
+it is preferred, since that is what it was built for and it keeps the absorb
+next to the view fact that licenses it.
