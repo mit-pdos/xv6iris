@@ -14131,3 +14131,90 @@ partition A6.110 §5 recorded, and the first half is now green.
 Mirror refreshed.  `WpSconfLock` remains the only file this lane is holding
 open; its `notheld` read is now the *first* consumer of the completed kit and
 is next, together with (2) and the cpu-store instances.
+
+---
+
+## A6.112 — the notheld read's substrate lands, and the queue's order INVERTS: (3) depends on (2)
+
+*(Amendment A6.112, fliptree lane.  Interim report at a green boundary.)*
+
+### §1. THE NUMBER
+
+**RED 9 — unchanged, 558 files recompiled**, sentinel-backed (`MAKEEXIT=2`,
+round r24).  **Red-list delta 0.**
+
+### §2. THE ORDERING FINDING
+
+I set out to close the `notheld` read first, as queued.  It does not close
+first, and the reason is structural rather than incidental:
+
+> **`notheld` needs `lk_floor`'s LEFT arm, and only the crossing upgrade
+> produces it.**  A6.111 gave the racy kit its two-armed floor premise, and
+> A6.110 §5 said the arms partition by *created* vs *received*.  For a hart
+> that RECEIVED the handle, the arm it must present at the read is
+> `ctx_floor` — and `lock_openable` carries `lk_floor`, the disjunction.
+> There is no way from the disjunction to the left arm at the read: that
+> conversion **is** the absorb, and the absorb needs the AMO of the crossing
+> that delivered the handle, which happened earlier and elsewhere.
+
+So the queue's (2) and (3) are ordered the other way: **(2) the crossing
+upgrade is what turns the reads on**, and (3) is its first consumer.  The
+creator's arm (A6.111) is not affected — it covers exactly the hart no
+crossing can reach — but it is the *minority* case, and every boot-static lock
+in the tree goes through the left arm.
+
+### §3. WHAT LANDED, AND IT IS WHAT BOTH (2) AND (3) NEED
+
+**(a) The no-migration pin on the racy READ** — `wp_load_s_sconf_au_exv`'s
+obligation gains
+
+```coq
+       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
+```
+
+the third and last of the family (A6.89 put it on `_dat`, A6.109 on the
+store).  The racy read needs it for the same reason the acquire store did:
+`lkcpu_read_not_mine`'s conclusion is about *this* hart's `struct cpu`
+pointer, and the obligation's `CIDw` is ∀-bound.  Both existing callers ignore
+it.
+
+**(b) `WpLock.lock_openable_c`** — the opener whose floor conjunct is the left
+arm outright, with
+
+```coq
+  Lemma lock_openable_of_c    : lock_openable_c … -∗ lock_openable …   (* one-way weakening *)
+  Lemma lock_openable_c_parts : … (the projection, as A6.109's)
+  Lemma lock_openable_c_inv_0 : inv lockN (lock_inv γ lk s R 0) -∗ lock_openable_c γ lk s R False
+```
+
+The last one is the boot-static producer and it is free: floor 0 is
+`ctx_floor_0`, so **every lock whose owner cell is an era-image cell has this
+opener for nothing**.  That is A6.101's floor-0 route paying for the third
+time — it bought the creation (A6.101), the handle (§0.38′), and now the read.
+
+Both are additive: nothing that merely *opens* a lock has to care which opener
+it holds, which is why 558 files recompiled and none moved.
+
+### §4. WHAT (2) IS, NOW THAT IT IS FIRST
+
+The upgrade rides the `CtxMorph` re-index that acquire/release already
+perform on payloads (`R : CtxId → iProp`), licensed by the receipt
+`SpecAcquire` already exports (A6.111 §4).  Concretely: a payload containing a
+nested `is_lock` crosses at an AMO whose log-top view dominates any floor
+already installed, so `hart_view_lb_get` + `ctx_bound_raise` turn that handle's
+`lk_floor` right arm into `ctx_floor` — i.e. `lock_openable` ⇝
+`lock_openable_c` — for the receiving context.
+
+The cascade to watch, measured: the public notheld lemma
+(`wp_cld_lkcpu_lockopen_notheld_s_sconf`) must take `lock_openable_c`, so
+`SpecAcquire`'s contract gains the same, and its ~40 callers inherit it.  For
+every boot-static lock that obligation is `lock_openable_c_inv_0` — free — but
+the *shape* still has to be threaded, and that threading is (2)'s real cost.
+Sized, not opened; it is the next unit and wants its own boundary.
+
+### §5. STATE
+
+Mirror refreshed.  `WpSconfLock` remains the single file held open, unchanged
+in status since the baseline; its `notheld` read is now blocked on (2) alone,
+with every piece it needs — the kit (A6.111), the pin (§3a) and the opener
+(§3b) — landed and green.
