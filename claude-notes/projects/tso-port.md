@@ -3853,3 +3853,30 @@ capture bug in the port's history violated this; every fix restored
 it.  (b) READ-BEFORE-WRITE KALLOC CLIENTS ARE KERNEL BUGS: the 0.26′
 sweep FLAGS any such client rather than proving around it — none are
 expected to exist.
+
+### 0.27′ OWNER RULING (2026-08-27): resume freshness comes from
+p->lock — the lock invariant ties the parked stamp to the release
+write's timestamp
+
+The owner's design, verbatim in spirit: when a thread calls sched(),
+the scheduler's RELEASE of p->lock lands after the park's
+publication, so the release write's timestamp t_rel dominates the
+suspended context's stamp T — and the LOCK INVARIANT states that tie
+(⌜T ≤ t_rel⌝, with t_rel available as the lock word's own ledger
+element timestamp under the M4 contract).  Any CPU's scheduler that
+later acquires p->lock drains to view ≥ t_rel, opens the invariant,
+and manufactures the resume premise T ≤ K INSIDE the acquire, where
+both halves are in hand — exporting the parked token RESUME-READY
+(parked T ∗ view ≥ K ∗ ⌜T ≤ K⌝) as one bundle the switch consumes.
+Refinement: the process record publishes RELATIONALLY — a parameter
+U ("every stamp parked here ≤ U"), instantiated by the free arm at
+the lock element's timestamp — keeping the internal stamps
+existential/migratable and the published fact monotone, per the
+0.26′ invariant principle (bound-relations, never identities or
+absolute positions).  This SUPERSEDES A6.90's characterized
+"valid_context publishes its stamp + wp_swtch takes a receipt" as
+separate travelers; the 0.18′ stamp-tie comment (T ≤ t_release,
+"load-bearing at cutover for non-draining paths") becomes invariant
+content with the scheduler's resume as its second and primary
+customer.  Implementation: fliptree, lock/scheduler tier, after the
+M4 flip re-application (same files).
