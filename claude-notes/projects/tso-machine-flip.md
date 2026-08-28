@@ -13347,3 +13347,172 @@ The tranche closed everything it could close without touching a read:
   alternative was measured and refused** (§2): writer-side floors close only
   for boot-static locks, at the price of an interp-needing mint threaded
   through twelve call sites, and never close for the two dynamic ones.
+
+---
+
+## A6.106 — §0.36′: THE PUBLISHER'S FENCE IS THE WRONG FENCE. The walker-gate cascade is ONE gate, and both of its arms are already in the tree
+
+*(Amendment A6.106, fliptree lane, on the owner's "§0.36′ → ProofMain, measure
+the walker-gate cascade before opening".  §0.35′(i)'s widening stays with the
+owner; nothing below touches `lk_floor`.)*
+
+### §1. THE MEASUREMENT THAT REORDERS THE TRANCHE
+
+`ProofMain` is red at `kpt_inv_alloc` (line 996) for an arity reason — A6.71
+gave the publication a bound `B` and the call still passes the tree there — but
+the arity is not the problem.  **The problem is that the bound has no
+producer**, and measuring why turned up a hard fact:
+
+> **`main` HAS NO DRAINING FENCE — AND THE ONE IT HAS IS THE WRONG KIND.**
+> `KptPublish.kptree_publish` needs `drained g`, i.e.
+> `own_pub h glog ≤ gtv h`.  A6.72 recorded that the site now exists:
+> `WpSconfFencePub.wp_fence_pub_s_sconf`, which runs `pub_step` at a fence.
+> That leaf requires `FENCE (fm, 3, 3, …)` — `fence rw,rw`.  **The instruction
+> actually in the kernel image at `main+0xac` is `fence rw,w`**
+> (`ProofMain.mn_grp_started`: `pred = 3`, `succ = 1`; the proof's own comment
+> says *"it is rw,w, not rw,rw: nothing after it reads"*).  Its barrier kind is
+> `Barrier_RISCV_rw_w`, and `RiscvLang.fence_drains` is **false** for it — the
+> drain set is W→R edges only.  `HartBarrier.wp_hart_barrier` requires
+> `fence_drains bk = true` because it *advances the view*; a `rw,w` barrier
+> advances nothing.
+
+So A6.72's "THE SITE EXISTS NOW" is true of the leaf and false of the binary.
+There is no other fence on hart 0's boot arm at all.  This is A6.90's finding
+("main has no draining fence") holding one tier up, and it is now load-bearing
+twice.
+
+### §2. WHAT THE MINT ACTUALLY WANTED, AND THE FIX IT NAMES ITSELF
+
+`CtxPinMint`'s own header says it: *"the caller's only real premise is that `B`
+is AT OR ABOVE THE LOG TOP: a publisher that has drained has exactly that, and
+its own view IS such a `B`."*  The drain is **one** way to name such a `B`.
+**The log top is another, and it costs nothing** — `CtxPinMint.tso_interp_ts_le`
+(§1 of that very file) already proves `t ≤ length glog` for every element in the
+map, which is precisely `ledger_pin_mint`'s obligation.
+
+Landed, green, first try, both files:
+
+```coq
+  (* CtxPinMint §3b -- no drain, no own_context, no premise but [v ∈ Sv] *)
+  Lemma ctx_phys_pin_mint_top       … ∃ t, phys_ledger_pin a 1 v t (length g.(glog)) Sv
+  Lemma ctx_phys_bytes_pin_mint_top …
+  Lemma ctx_phys_word_pin_mint_top  … phys_ledger_word_pin a 1 w (length g.(glog)) Sf
+
+  (* KptPublish §6 *)
+  Lemma pt_slots_publish_top / pt_page_publish_top / ptree_own_publish_top
+  Lemma kptree_publish_top (g) (xi) (lvl) (t) :
+    … ptree_own_at (UTier xi) lvl 1 t ==∗
+    … ∗ ptree_own_at (KTier (length g.(glog))) lvl 1 t ∗ llb loglen_name (length g.(glog)).
+```
+
+`pt_kids_publish` is **reused verbatim** — it was already P/Q-generic, which is
+why the drain-free arm is four small lemmas and not a second file.  The `llb`
+comes from `TsoCtx.tso_interp_loglen_llb`, which A6.105 added yesterday for the
+lock floor: the same receipt, the second tranche.
+
+**What it deliberately does not hand back is `hart_view_lb`.**  That is the
+whole of §0.36′'s remaining question, and it is A6.105's finding again: a
+publisher's own view is behind its own buffered stores, so it can shoot
+`kpt_bound B` but cannot hold `view_lb … B`.
+
+### §3. THE CASCADE, MEASURED: IT IS ONE GATE
+
+`kpt_creds` is `∃ B, kpt_bound B ∗ view_lb … (hart_agent cpu_id) B`.  Ten files
+mention it.  **It is destructed in five places and consumed in one.**
+
+| site | what it is |
+|---|---|
+| `SRegime.v:1565` (`kpt_swp_translate`) | **the only genuine consumption** — hands `B`, `kpt_bound`, `view_lb` to `HartSKpt.swp_translate_kpt`, and re-seals at `:1584` |
+| `KptShare.v:362`, `SmodeCorePt.v:4776`, `WpSconfSfence.v:402` | re-pack: open, then immediately `tlb_res_pt_intro` again |
+| `ProofKvminithart.v:238` | constructive: mints `tlb_res_pt` for the first time at `csrw satp` |
+
+The funnel below the one consumption:
+
+```
+SRegime.kpt_swp_translate → HartSKpt.swp_translate_kpt
+   → kpt_pte2_obl / kpt_pte1_obl / kpt_leaf_obl
+      → HartSKpt.kpt_path_obl            (HartSKpt.v:257)   ◄── THE GATE
+         → HartSKpt.kpt_slot_bytes_pin   (HartSKpt.v:124)   ◄── the narrow waist
+            → TsoCtx.ledger_read_pin_bytes_ok → ledger_read_pin_ok (TsoCtx.v:4770)
+```
+
+`kpt_slot_bytes_pin` is where the `view_lb` is *spent*.  Everything else — the
+eight threading files (`WpSFrames`, `WpIntrInv`, `SmodeCorePt`, `SpecKvminithart`,
+`SpecMainSecondary`, `ProofMainSecondary`, …) — is opaque `iFrame`.  Also
+recorded: `KptShare.v:361`'s `iAssert kpt_creds as "#Hcreds"` is **dead**, and
+`Pt2WalkPt`'s two `swp_translate_kpt_*_slot` lemmas take no receipt at all (they
+read the flat cache), so the pinned route exists only under `swp_translate_kpt`.
+
+**A two-armed `kpt_creds` therefore costs one gate and zero threading files** —
+provided the arity does not move, which is A6.105's lesson applied again.
+
+### §4. AND HART 0'S ARM IS ALSO ALREADY BUILT
+
+I expected the obstruction to be that `ledger_read_pin_ok` concludes at a
+**∀-quantified agent** while hart 0's own-write forwarding is single-agent.  It
+is not an obstruction, because what the walk actually owes is
+
+```coq
+  Definition fobl_ram img log tv pa n w : Prop :=          (* HartMFetch.v:589 *)
+    ∀ tv', (tv <= tv')%nat -> (tv' <= length log)%nat ->
+      tso_read_bytes img log (hart_agent cpu_id) tv' pa n w.
+```
+
+— **at `hart_agent cpu_id`**.  `ledger_read_pin_ok`'s ∀-agent form is *stronger
+than needed* ("agent-generic on purpose", says its comment).  And the hart-indexed
+discharge exists, at the ctx tier, with no receipt, no pin and no drain:
+
+```coq
+  Lemma ctx_phys_load_bytes_ok (g) (ξ) (a) (n) (w) (dq) :        (* TsoCtx.v:4026 *)
+    … own_context ξ -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n), ctx_phys_pointsto ξ (pa_add a j) dq (nth_byte w j)) -∗
+    ⌜∀ tv', (g.(gtv) cpu_id <= tv')%nat ->
+       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv' a n w⌝.
+```
+
+That **is** ruling §0.36′ clause (1) — "hart 0 rides the ctx tower's own-write
+arm" — as a lemma, at the exact shape the gate consumes.
+
+> **SIXTH INSTANCE OF THE LANE'S RECURRING SHAPE, and now it is a pattern worth
+> planning around.**  A6.98 (`lo` hidden in a cell), A6.100 (the timestamp hidden
+> in a ctx word), A6.102 (`boot_cran_ledger_at0_word`, eighteen amendments
+> early), A6.104 (`ledger_store_win_wpay_ok`, complete with no client), A6.105
+> (`hart_view_lb_get`, written for the park protocol), and now BOTH arms of
+> §0.36′'s gate.  *In this port the expensive step has not once been building
+> the law.  It has been noticing the law is already built.*
+
+### §5. THE PLAN §0.36′ NOW REDUCES TO — and the one piece that is genuinely new
+
+1. **The residue goes two-armed, arity fixed.**  `KptShare.tlb_res_pt` keeps its
+   shape and its last conjunct becomes `published ∨ boot-exclusive`, the second
+   arm carrying `ptree_own_at (UTier ξ) 2 dq t ∗ own_context ξ`.  Eight
+   threading files cost nothing (A6.105's rule).
+2. **The gate goes two-armed.**  `HartSKpt.kpt_slot_bytes_pin` gets a ctx-tier
+   twin off `ctx_phys_load_bytes_ok`; `kpt_path_obl` takes the disjunction.
+   This is the ONE real edit in the walker.
+3. **The publication moves to `main+0xac`** and runs `kptree_publish_top`.
+4. **THE ONE NEW PIECE:** `kptree_publish_top` needs the live interp, so it
+   needs a leaf that exposes it — and `wp_fence_pub_s_sconf` will not do, because
+   `HartBarrier.pub_step` *hands the client the drain fact and the view receipt*,
+   and `wp_hart_barrier` requires `fence_drains bk = true` to advance the view.
+   A `rw,w` barrier needs the weaker obligation — a ghost step against the live
+   interp with **no** drain and **no** receipt — and a barrier leaf at any
+   `bk`.  That is a new `HartBarrier` sibling plus its `WpSconfFencePub` lift;
+   the existing proofs are its template and the drain is the only thing removed.
+5. **The secondaries** buy the `view_lb` off the `started` flag read
+   (`ctx_bound_raise` + monotonicity).  Already structured: it is a *premise* at
+   `SpecMainSecondary.v:179` → `ProofMainSecondary.v:640` → `SpecKvminithart.v:103`,
+   so nothing above it moves.
+
+### §6. THE NUMBER
+
+**1100 .vo, RED 9 — the A6.104/A6.105 set, held**, sentinel-backed
+(`MAKEEXIT=2`, round r20).  **Red-list delta 0**; the two landings are purely
+additive (no existing statement moved) and both compiled first try.
+`^Abort` / `^Admitted` / `^Axiom` all 0.  `kernel-rocq`/`user-rocq` untouched.
+Mirror refreshed.
+
+Steps (1)–(3) and (5) are measured and mechanical; step (4) is the only piece
+that has to be written rather than found, and it is a deletion from an existing
+proof rather than a new argument.  Not opened: the owner has §0.35′(i), and
+step (2) changes a gate that the same ruling's shape will touch.
