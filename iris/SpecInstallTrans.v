@@ -280,7 +280,7 @@ Definition wp_install_trans_sconf_body
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (R : nat -> iProp Σ) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (R : nat -> iProp Σ) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.install_trans in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -347,7 +347,7 @@ Definition wp_install_trans_sconf_body
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   (* NOT [log_ctx]: this helper holds no lock -- see LogInv.log_frozen *)
   log_frozen logstart dev -∗
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -446,7 +446,7 @@ Definition wp_install_trans_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       (* the in-memory header, unchanged (lh.n := 0 is the CALLER's store) *)
       lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
       ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
@@ -489,9 +489,9 @@ Module Type INSTALL_TRANS.
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (R : nat -> iProp Σ) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (R : nat -> iProp Σ) (lks : gset string) (Upr : ustate),
       wp_install_trans_sconf_body γs j γl γu γd γk pd pav pu bn γfs γpr
                                   cov logstart dev recovering n W Lw
                                   home Xv Xexc L D
-                                  pidv dq m K eb b R lks Vpr.
+                                  pidv dq m K eb b R lks Upr.
 End INSTALL_TRANS.

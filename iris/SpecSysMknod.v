@@ -168,7 +168,7 @@ Definition wp_sys_mknod_sconf_body
     (ns : nat)                                          (* the iref ledger     *)
     (dqb dqs dqbs dqn : dfrac)
     (v0 v1 v2 : mword 64)                    (* syscall arguments 0 / 1 / 2 *)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_mknod in
@@ -205,9 +205,9 @@ Definition wp_sys_mknod_sconf_body
      The VALUES do not reach the postcondition -- [major] and [minor] are
      consumed inside create and the inode is dropped -- so all the caller
      owes is that the words exist. *)
-  pv_tf V !! tf_arg_idx 0 = Some v0 ->
-  pv_tf V !! tf_arg_idx 1 = Some v1 ->
-  pv_tf V !! tf_arg_idx 2 = Some v2 ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
+  pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
   sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD: the depth is pinned at ZERO, so
      [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
@@ -255,16 +255,18 @@ Definition wp_sys_mknod_sconf_body
   procs_inv gs -∗
   (* ---- the process, whole, and the reference allowance ---- *)
   iref_slots ns -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_mknod sleeps (begin_op,
      argstr's fault path, create and end_op all park), so it can return on
      another hart whatever SIE was doing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
+  (* the image moves: the copy leaves may fault a page in, and copyout
+     writes user memory -- milestone J item 1's ∃-weakened staging *)
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -286,7 +288,7 @@ Definition wp_sys_mknod_sconf_body
          interval could not support (FsSyscalls.v's note (S3)). *)
       ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
-      proc_priv γf pj pid (upd_upt V P') -∗
+      proc_priv γf pj pid (upd_usM (us_upt U P') M') -∗
       ⌜sys_mknod_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -300,11 +302,11 @@ Module Type SYSMKNOD.
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v0 v1 v2 : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_mknod_sconf_body γf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn
-                              v0 v1 v2 pid V m K eb b lks.
+                              v0 v1 v2 pid U m K eb b lks.
 End SYSMKNOD.

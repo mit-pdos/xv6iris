@@ -402,9 +402,9 @@ Section ProofFileread.
   Lemma wp_fileread_sconf 
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate) (fn : fread_names)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
-    : wp_fileread_sconf_body γf γs j γlp k q st fn pidv V m K eb n b lks.
+    : wp_fileread_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn Heb Hbelow.
@@ -632,8 +632,9 @@ Section ProofFileread.
       iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-      assert (HVid : upd_upt V (pv_upt V) = V) by apply fr_upd_upt_id.
-      iApply ("Hcont" $! mf (mword_of_int (-1)) (pv_upt V)
+      assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
+          by (rewrite us_upt_id; apply upd_usM_id).
+      iApply ("Hcont" $! mf (mword_of_int (-1)) (pv_upt (us_V U)) (us_M U)
                 with "[%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                       [Hpriv] [Henv]").
       { exact Hcsf. }
@@ -930,8 +931,9 @@ Section ProofFileread.
         iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-        assert (HVid : upd_upt V (pv_upt V) = V) by apply fr_upd_upt_id.
-        iApply ("Hcont" $! mf (mword_of_int (-1)) (pv_upt V)
+        assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
+          by (rewrite us_upt_id; apply upd_usM_id).
+        iApply ("Hcont" $! mf (mword_of_int (-1)) (pv_upt (us_V U)) (us_M U)
                   with "[%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                         [Hpriv] [Henv]").
         { exact Hcsf. }
@@ -1094,12 +1096,14 @@ Section ProofFileread.
         iDestruct (cpu_own_transport CID CID17 0%nat eb pj b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iApply (Piperead.wp_piperead_sconf fsc_kalloc γf γs j γlp (fp_lock pn) (fp_pipe pn)
-                  (fc_wbool Cf) q Q2 (K - 6)%nat eb pidv V n b
+                  (fc_wbool Cf) q Q2 (K - 6)%nat eb pidv U n b
                   _ Hj Hgs Hlens HQ2a2 (fr_n_range n Hn) (fr_av_pipe K HK) Heb
                   with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs").
         all: try lkbelow.
         { iEval (rewrite HQ2a0). iExact "Hpipe". }
-        iIntros (CIDpr Hspr mf P') "%Hcspr %Hupt %Hretpr Hcg Hcnt Hpc Hpref Hpriv".
+        (* the pipe's copyout writes user memory, so piperead's post binds a
+           fresh image ([SpecPiperead], mirroring [SpecPipewrite]). *)
+        iIntros (CIDpr Hspr mf P' Mpr) "%Hcspr %Hupt %Hretpr Hcg Hcnt Hpc Hpref Hpriv".
         assert (Hpc6a : ret_pc (Q2 !!! Regidx Rra) = mword_of_int (FR + 0x70)).
         { rewrite HQ2ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc6a) in "Hpc".
@@ -1178,7 +1182,7 @@ Section ProofFileread.
         iDestruct (cpu_own_transport CIDpr CIDe 0%nat eb pj b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-        iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P'
+        iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P' Mpr
                   with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hiru Hoh Hrlv]
                         Hpriv [Henv]").
@@ -1572,8 +1576,9 @@ Section ProofFileread.
                 iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-                assert (HVid : upd_upt V (pv_upt V) = V) by apply fr_upd_upt_id.
-                iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt V)
+                assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
+          by (rewrite us_upt_id; apply upd_usM_id).
+                iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) (us_M U)
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 [Hpriv] [Hslot]").
@@ -1654,14 +1659,14 @@ Section ProofFileread.
                              with "Hcnt") as "Hcnt".
                 iApply (Consoleread.wp_consoleread_sconf fsc_kalloc γf γs j γlp
                           (frn_cons fn)
-                          E2 (K - 6)%nat eb pidv V n b
+                          E2 (K - 6)%nat eb pidv U n b
                           lks Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn)
                           (fr_av_cons K HK) Heb
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hconslk Hpriv Hkenv
                                 Hprocs").
                 all: try lkbelow.
-                iIntros (CIDcr Hscr mf r P') "%Hcscr %Hupt %Hrr %Hra0 Hcg Hcnt Hpc
+                iIntros (CIDcr Hscr mf r P' Mcr) "%Hcscr %Hupt %Hrr %Hra0 Hcg Hcnt Hpc
                                               Hpriv".
                 assert (Hpc96 : ret_pc (E2 !!! Regidx Rra) = mword_of_int (FR + 0x9c)).
                 { rewrite HE2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1741,7 +1746,7 @@ Section ProofFileread.
                 iDestruct (cpu_own_transport CIDcr CIDe 0%nat eb pj b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-                iApply ("Hcont" $! mfin (mword_of_int r) P'
+                iApply ("Hcont" $! mfin (mword_of_int r) P' Mcr
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv [Hslot]").
@@ -1812,8 +1817,9 @@ Section ProofFileread.
              iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
              iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-             assert (HVid : upd_upt V (pv_upt V) = V) by apply fr_upd_upt_id.
-             iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt V)
+             assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
+          by (rewrite us_upt_id; apply upd_usM_id).
+             iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) (us_M U)
                        with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                              [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                              [Hpriv] [Henv]").
@@ -2002,7 +2008,7 @@ Section ProofFileread.
                exact (HB7thr c Hcs N2 N8 N9 N18 N19). }
              (* THE PID QUARTER, lent out of the block for the length of the
                 ilock call and closed again the instant it returns. *)
-             iDestruct (proc_priv_core_bare_acc pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
+             iDestruct (proc_priv_core_bare_acc pj pidv U with "Hpriv") as "[Hppid Hpivbk]".
              iDestruct (cpu_own_transport CID CID72 0%nat eb pj b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
              (* SpecIlock v4 names the share's GENERATION (design 17.3 (A));
@@ -2019,7 +2025,7 @@ Section ProofFileread.
  inm
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb b
-                       _ V (fr_av_ilock K HK) eq_refl
+                       _ U (fr_av_ilock K HK) eq_refl
                        ltac:(intros _; exists ty0; reflexivity)
                        Hik Hlg Hist Hibcov Hinlt Hj Hgs
                        ltac:(rewrite HI2a0; exact Hipk) Hbelow
@@ -2295,8 +2301,7 @@ Section ProofFileread.
  (fc_ip Cf)
                        bml data dnl
                        true (Z.to_nat (bv_unsigned v)) (Z.to_nat n)
-                       (fun _ => (mword_of_int 0 : mword 8)) V
-                       pidv (DfracOwn (1/4)) (DfracOwn (1/2))
+                       (fun _ => (mword_of_int 0 : mword 8)) (upd_usM U _) pidv (DfracOwn (1/4)) (DfracOwn (1/2))
                        J6 (K - 6)%nat eb b
                        _ (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb
                        Hoff32 Hjoint32 Hj Hgs
@@ -2307,7 +2312,7 @@ Section ProofFileread.
              all: try lkbelow.
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
-             iIntros (CIDrd Hsrd mrd tot P') "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
+             iIntros (CIDrd Hsrd mrd tot P' Mrd) "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
                                               Hpriv Hbslot".
              assert (Hpc42 : ret_pc (J6 !!! Regidx Rra) = mword_of_int (FR + 0x48)).
              { rewrite HJ6ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2465,7 +2470,7 @@ Section ProofFileread.
                   rewrite /N2 upd_ne; [| regne].
                   rewrite /N1 upd_ne; [| regne].
                   exact (HM1thr c Hcs N2n N8 N9 N18 N19). }
-                iDestruct (proc_priv_core_bare_acc pj pidv (upd_upt V P') with "Hpriv")
+                iDestruct (proc_priv_core_bare_acc pj pidv (upd_usM (us_upt U P') Mrd) with "Hpriv")
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID82 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2475,7 +2480,7 @@ Section ProofFileread.
                           (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj b
-                          lks (upd_upt V P') (fr_av_iunlock K HK) eq_refl Hik
+                          lks (upd_usM (us_upt U P') Mrd) (fr_av_iunlock K HK) eq_refl Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
@@ -2544,7 +2549,7 @@ Section ProofFileread.
                 iDestruct (cpu_own_transport CIDiu CIDe 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-                iApply ("Hcont" $! mfin (mrd !!! Regidx Ra0) P'
+                iApply ("Hcont" $! mfin (mrd !!! Regidx Ra0) P' Mrd
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv
@@ -2753,7 +2758,7 @@ Section ProofFileread.
                   rewrite /N2 upd_ne; [| regne].
                   rewrite /N1 upd_ne; [| regne].
                   exact (HM4thr c Hcs N2n N8 N9 N18 N19). }
-                iDestruct (proc_priv_core_bare_acc pj pidv (upd_upt V P') with "Hpriv")
+                iDestruct (proc_priv_core_bare_acc pj pidv (upd_usM (us_upt U P') Mrd) with "Hpriv")
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID92 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2763,7 +2768,7 @@ Section ProofFileread.
                           (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj b
-                          lks (upd_upt V P') (fr_av_iunlock K HK) eq_refl Hik
+                          lks (upd_usM (us_upt U P') Mrd) (fr_av_iunlock K HK) eq_refl Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
@@ -2832,7 +2837,7 @@ Section ProofFileread.
                 iDestruct (cpu_own_transport CIDiu CIDe 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-                iApply ("Hcont" $! mfin (mword_of_int (Z.of_nat tot)) P'
+                iApply ("Hcont" $! mfin (mword_of_int (Z.of_nat tot)) P' Mrd
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv

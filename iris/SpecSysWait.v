@@ -88,14 +88,14 @@ Notation sys_wait_stack := ((4 + K_kwait)%nat) (only parsing).
 Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    (pid : mword 32) (V : pprivate) (v0 : mword 64) :=
+    (pid : mword 32) (U : ustate) (v0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_wait in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* the syscall argument, out of the trapframe page [proc_priv] carries *)
-  pv_tf V !! tf_arg_idx 0 = Some v0 ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
   (sys_wait_stack <= av)%nat ->
   (* the PARKING premise, inherited from kwait: everything that sleeps has it *)
   eb = true ->
@@ -105,16 +105,18 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   procs_inv γs -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   kalloc_env γa None -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   wp_next b pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (P' : uptd) (rv : mword 32),
+  (* the image moves: the copy leaves may fault a page in, and copyout
+     writes user memory -- milestone J item 1's ∃-weakened staging *)
+    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (M' : gmap Z (bv 8)),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
-      ⌜ uptd_ext_sz (pv_sz V) (pv_upt V) P' ⌝ -∗
+      ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pid (upd_upt V P') -∗
+      proc_priv γf pj pid (upd_usM (us_upt U P') M') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -123,6 +125,6 @@ Module Type SYSWAIT.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-      (pid : mword 32) (V : pprivate) (v0 : mword 64),
-      wp_sys_wait_sconf_body γa γf γw γs j γl m av eb b lks pid V v0.
+      (pid : mword 32) (U : ustate) (v0 : mword 64),
+      wp_sys_wait_sconf_body γa γf γw γs j γl m av eb b lks pid U v0.
 End SYSWAIT.

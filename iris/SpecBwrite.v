@@ -69,7 +69,7 @@ Definition wp_bwrite_sconf_body
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (bs bsd : list (bv 8)) (b : bool)
-    (Q : iProp Σ) (lks : gset string) (Vpr : pprivate) :=
+    (Q : iProp Σ) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bwrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -102,7 +102,7 @@ Definition wp_bwrite_sconf_body
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn V -∗
   (* the caller's own pid cell, agreeing with the handle's (holdingsleep) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle rw's sleeps thread through *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -152,7 +152,7 @@ Definition wp_bwrite_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       (* the write-through: the handle's disk value is now its bytes *)
       bio_hold0 bn V k pidv dev bno bs bs -∗
       (* THE RECEIPT, under ONE later -- rw's own postcondition shape (the
@@ -173,7 +173,7 @@ Module Type BWRITE.
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (bs bsd : list (bv 8)) (b : bool)
-      (Q : iProp Σ) (lks : gset string) (Vpr : pprivate),
+      (Q : iProp Σ) (lks : gset string) (Upr : ustate),
       wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb bs bsd b Q lks Vpr.
+                           pidv dev bno dq m K eb bs bsd b Q lks Upr.
 End BWRITE.

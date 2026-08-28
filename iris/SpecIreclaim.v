@@ -190,7 +190,7 @@ Definition wp_ireclaim_sconf_body
     (pd pav pu : mword 64)
     (pidv : mword 32) (dq dqb dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ireclaim in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -277,7 +277,7 @@ Definition wp_ireclaim_sconf_body
   (* itrunc's bitmap, through iput *)
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* the caller's own pid cell (bread's / begin_op's acquiresleep records it) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle and the disk fabric *)
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
@@ -310,7 +310,7 @@ Definition wp_ireclaim_sconf_body
       sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       bslots 3 -∗
       iref_slot -∗
       (* the boot-shelter token, returned unspent (fs-fragments.md §7.12): the
@@ -330,8 +330,8 @@ Module Type IRECLAIM.
       (pd pav pu : mword 64)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_ireclaim_sconf_body γs j γl pd pav pu
 
- pidv dq dqb dqs dqn m K eb b lks Vpr.
+ pidv dq dqb dqs dqn m K eb b lks Upr.
 End IRECLAIM.

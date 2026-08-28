@@ -196,9 +196,9 @@ Section ProofFilestat.
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fstat_names)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_filestat_sconf_body γf γs j γlp k q st fn pidv V m K eb b lks.
+    : wp_filestat_sconf_body γf γs j γlp k q st fn pidv U m K eb b lks.
   Proof.
     cbv beta delta [wp_filestat_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb Hbelow.
@@ -680,7 +680,7 @@ Section ProofFilestat.
         rewrite /Q2 upd_ne; [| regne].
         exact (HQ1thr c Hcs N2 N8 N9 N18 N20). }
       (* THE PID QUARTER, lent for the length of the ilock call *)
-      iDestruct (proc_priv_core_bare_acc pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
+      iDestruct (proc_priv_core_bare_acc pj pidv U with "Hpriv") as "[Hppid Hpivbk]".
       iDestruct (cpu_own_transport CID10 CID19 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)); the
@@ -695,7 +695,7 @@ Section ProofFilestat.
  inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb b
-                _ V (fst_av_ilock K HK) eq_refl
+                _ U (fst_av_ilock K HK) eq_refl
                 ltac:(intros _; exists tysh; reflexivity)
                 Hik Hlg Hist Hibcov Hinlt Hj Hgs
                 ltac:(rewrite HQ3a0; exact Hipk)
@@ -989,7 +989,7 @@ Section ProofFilestat.
         rewrite /J2 upd_ne; [| regne].
         rewrite /J1 upd_ne; [| regne].
         exact (Hmstthr c Hcs N2 N8 N9 N18 N19 N20). }
-      iDestruct (proc_priv_core_bare_acc pj pidv V with "Hpriv") as "[Hppid Hpivbk2]".
+      iDestruct (proc_priv_core_bare_acc pj pidv U with "Hpriv") as "[Hppid Hpivbk2]".
       iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Iunlock.wp_iunlock_dep_sconf γs
@@ -998,7 +998,7 @@ Section ProofFilestat.
                 icfg_dev inm
                 dnl bml
                 pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj b lks
-                V (fst_av_iunlock K HK) eq_refl Hik
+                U (fst_av_iunlock K HK) eq_refl Hik
                 ltac:(rewrite HJ2a0; exact Hipk)
                 (* iunlock's bound is "sleep lock"(6); filestat's own is
                    "bcache"(4), and [locks_below_mono] weakens it. *)
@@ -1096,6 +1096,7 @@ Section ProofFilestat.
       (* the copy accessor, taken once and closed once *)
       iDestruct (proc_priv_core_sz_bound with "Hpriv") as %Hszb.
       iDestruct (proc_priv_core_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
+      iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
       (* +0x42 ld a1,72(s2) -- a1 := p->sz, copyout's NEW [psz] argument.
          The two cells are read HERE and nowhere else: the contract itself no
          longer mentions [p_sz] / [p_pagetable] (SpecCopyout.v's header), so
@@ -1105,12 +1106,12 @@ Section ProofFilestat.
         by (rgne; rewrite HU3s2; reflexivity).
       iEval (rewrite -Hsza) in "Hszc".
       iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FST + 0x42)) Ra1 Rs2
-                (mword_of_int 72 : mword 12) U3 (K - 10)%nat (pv_sz V) b
+                (mword_of_int 72 : mword 12) U3 (K - 10)%nat (pv_sz (us_V U)) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] Hszc").
       { iApply (fsti_42 with "Htext"). }
       iIntros (CID30 Hs30) "Hcg Hpc Hszc". iEval (rewrite Hsza) in "Hszc".
-      set (U4 := <[Regidx Ra1 := regval_into_reg (pv_sz V)]> U3).
+      set (U4 := <[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> U3).
       assert (HU4s2 : U4 !!! Regidx Rs2 = pj)
         by (rewrite /U4 upd_ne; [exact HU3s2 | vm_compute; discriminate]).
       assert (Hpp46 : add_vec_int (mword_of_int (FST + 0x42) : mword 64) 4
@@ -1124,13 +1125,13 @@ Section ProofFilestat.
       iEval (rewrite -Hpta) in "Hptc".
       iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FST + 0x46)) Ra0 Rs2
                 (mword_of_int 80 : mword 12) U4 (K - 10)%nat
-                (page_base (ud_root (pv_upt V))) b
+                (page_base (ud_root (pv_upt (us_V U)))) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] Hptc").
       { iApply (fsti_46 with "Htext"). }
       iIntros (CID30b Hs30b) "Hcg Hpc Hptc". iEval (rewrite Hpta) in "Hptc".
       set (U5 := <[Regidx Ra0 := regval_into_reg
-                    (page_base (ud_root (pv_upt V)))]> U4).
+                    (page_base (ud_root (pv_upt (us_V U))))]> U4).
       assert (Hpp4a : add_vec_int (mword_of_int (FST + 0x46) : mword 64) 4
                       = mword_of_int (FST + 0x4a))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -1152,10 +1153,10 @@ Section ProofFilestat.
       assert (HU6ra : U6 !!! Regidx Rra
                       = add_vec_int (mword_of_int (FST + 0x4a) : mword 64) 4)
         by (rewrite /U6; apply upd_eq).
-      assert (HU6a0 : U6 !!! Regidx Ra0 = page_base (ud_root (pv_upt V))).
+      assert (HU6a0 : U6 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U)))).
       { rewrite /U6 upd_ne; [| vm_compute; discriminate].
         rewrite /U5; apply upd_eq. }
-      assert (HU6a1 : U6 !!! Regidx Ra1 = pv_sz V).
+      assert (HU6a1 : U6 !!! Regidx Ra1 = pv_sz (us_V U)).
       { rewrite /U6 upd_ne; [| vm_compute; discriminate].
         rewrite /U5 upd_ne; [| vm_compute; discriminate].
         rewrite /U4; apply upd_eq. }
@@ -1198,14 +1199,15 @@ Section ProofFilestat.
       iEval (rewrite -HU6a3) in "Hbuf".
       iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Copyout.wp_copyout_sconf KT1 fsc_kalloc U6 (pv_upt V) (pv_sz V) 24%nat fbytes (DfracOwn 1)
+      iApply (Copyout.wp_copyout_sconf KT1 fsc_kalloc U6 (pv_upt (us_V U)) (pv_sz (us_V U)) 24%nat fbytes (DfracOwn 1)
                 (K - 10)%nat 0%nat eb pj b lks
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
                 with "Hcg Hcnt Htext Hpc Hpt Hkenv Hbuf").
       all: try lkbelow.
       iIntros (CID32 Hs32 mco P') "Hcg Hcnt Hpc Hpt Hbuf %Hcsco %Hext %Hret".
       iEval (rewrite HU6a3) in "Hbuf".
-      iDestruct ("Hpback" $! P' ltac:(exact Hext) with "Hszc Hptc Hpt") as "Hpriv".
+      iDestruct (proc_pt_any_ptm with "Hpt") as (Mo) "Hpt".
+      iDestruct ("Hpback" $! P' Mo ltac:(exact Hext) with "Hszc Hptc Hpt") as "Hpriv".
       assert (Hpc4e : ret_pc (U6 !!! Regidx Rra) = mword_of_int (FST + 0x4e)).
       { rewrite HU6ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc4e) in "Hpc".
@@ -1402,8 +1404,9 @@ Section ProofFilestat.
       iDestruct (cpu_own_transport CID10 CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-      assert (HVid : upd_upt V (pv_upt V) = V) by apply fst_upd_upt_id.
-      iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt V)
+      assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
+          by (rewrite us_upt_id; apply upd_usM_id).
+      iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) (us_M U)
                 with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                       [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                       [Hpriv] [Henv]").

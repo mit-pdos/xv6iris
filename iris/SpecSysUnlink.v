@@ -288,15 +288,17 @@ Definition sys_unlink_ret (r : mword 64) : Prop :=
 Definition sys_unlink_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (gf : gname) (pj : mword 64) (pid : mword 32) (V : pprivate)
+    (gf : gname) (pj : mword 64) (pid : mword 32) (U : ustate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (eb b : bool)
     (lks : gset string) (dqb dqs dqbs : dfrac)
  : iProp Σ :=
-  (∀ (mf : regfile) (P' : uptd),
+  (* the image moves: argstr's fetchstr faults user pages in -- milestone J
+     item 1's ∃-weakened staging *)
+  (∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -311,7 +313,7 @@ Definition sys_unlink_closer
       (* the allowance, whole: see the header's reference ledger *)
       iref_slots sys_unlink_slots -∗
       (* the process block, at the same everything but the page table *)
-      proc_priv gf pj pid (upd_upt V P') -∗
+      proc_priv gf pj pid (upd_usM (us_upt U P') M') -∗
       ⌜sys_unlink_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang))%I.
 
@@ -324,7 +326,7 @@ Definition wp_sys_unlink_sconf_body
     (pd pav pu : mword 64)
     (dqb dqs dqbs : dfrac)
     (v0 : mword 64)                           (* syscall argument 0         *)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_unlink in
@@ -359,7 +361,7 @@ Definition wp_sys_unlink_sconf_body
   (* the single [argstr] call reads syscall argument 0 out of the trapframe
      page [proc_priv] carries.  Nothing is assumed about it: argstr checks
      the string itself. *)
-  pv_tf V !! tf_arg_idx 0 = Some v0 ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
   sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
      premise here: the depth is pinned at ZERO, so [CpuOwn.cpu_own_zero_empty]
@@ -408,14 +410,14 @@ Definition wp_sys_unlink_sconf_body
   procs_inv gs -∗
   (* ---- the process, and the reference allowance the walk needs ---- *)
   iref_slots sys_unlink_slots -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_unlink parks in every
      one of its ten distinct callees, so it can return on another hart
      whatever SIE was doing.
      Vacuous at [true], so consuming it costs the caller nothing. *)
   (* the return continuation, named: see [sys_unlink_closer] above *)
   wp_next true pj (fun (CID : CpuId) =>
-    sys_unlink_closer (CID := CID) γf pj pid V m ret_tgt K eb b lks
+    sys_unlink_closer (CID := CID) γf pj pid U m ret_tgt K eb b lks
                       dqb dqs dqbs) -∗
   WP (Loop : expr riscv_lang).
 
@@ -427,11 +429,11 @@ Module Type SYSUNLINK.
       (pd pav pu : mword 64)
       (dqb dqs dqbs : dfrac)
       (v0 : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_unlink_sconf_body γf gs j gl pd pav pu
 
- dqb dqs dqbs v0 pid V
+ dqb dqs dqbs v0 pid U
                                m K eb b lks.
 End SYSUNLINK.

@@ -64,7 +64,7 @@ Import Defs.
 
 Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-    (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_getpid in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* myproc's push_off transient increment stays in int range *)
@@ -74,7 +74,7 @@ Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdsl
   sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  proc_priv γf p pid V -∗
+  proc_priv γf p pid U -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\
@@ -82,7 +82,7 @@ Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdsl
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid V -∗
+      proc_priv γf p pid U -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -90,6 +90,6 @@ Module Type SYSGETPID.
   Parameter wp_sys_getpid_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_sys_getpid_sconf_body γf m av n eb p pid V b lks.
+      (pid : mword 32) (U : ustate) (b : bool) (lks : gset string),
+      wp_sys_getpid_sconf_body γf m av n eb p pid U b lks.
 End SYSGETPID.

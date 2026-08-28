@@ -257,7 +257,7 @@ Definition wp_sys_mkdir_friendly_body
     (ns : nat)
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)                                       (* syscall argument 0 *)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_mkdir in
   let pj := proc_addr j in
@@ -267,7 +267,7 @@ Definition wp_sys_mkdir_friendly_body
   (create_slots <= ns)%nat ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  pv_tf V !! tf_arg_idx 0 = Some v ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
@@ -283,18 +283,20 @@ Definition wp_sys_mkdir_friendly_body
      persistent, and every caller already holds it. *)
   procs_inv γs -∗
   fs_res ns dqb dqs dqbs dqn -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
+  (* the image moves: argstr's fetchstr faults user pages in -- milestone J
+     item 1's ∃-weakened staging *)
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜ns' = ns⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
       fs_res ns' dqb dqs dqbs dqn -∗
-      proc_priv γf pj pid (upd_upt V P') -∗
+      proc_priv γf pj pid (upd_usM (us_upt U P') M') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -311,10 +313,10 @@ Module FsSysMkdir (M : SYSMKDIR).
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
       wp_sys_mkdir_friendly_body γf γs j γl ns
-                                 dqb dqs dqbs dqn v pid V m K b lks.
+                                 dqb dqs dqbs dqn v pid U m K b lks.
   Proof.
     unfold wp_sys_mkdir_friendly_body. cbv zeta.
     intros HK Hg Hns Hj Hgs Htf.
@@ -356,7 +358,7 @@ Module FsSysMkdir (M : SYSMKDIR).
     iApply (M.wp_sys_mkdir_sconf γf γs j γl
  pd pav pu
 
- ns dqb dqs dqbs dqn v pid V m K true
+ ns dqb dqs dqbs dqn v pid U m K true
               b lks
               HK Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus Hprg Hns Hj Hgs
@@ -368,12 +370,12 @@ Module FsSysMkdir (M : SYSMKDIR).
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDn) "%Hgd".
-    iIntros (mf ns' P')
+    iIntros (mf ns' P' M')
       "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbn Hsbi Hsbs Hsbb %Hns' Hir
        Hpriv %Hret".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
                  with "Hcont") as "Hcont".
-    iApply ("Hcont" $! mf ns' P'
+    iApply ("Hcont" $! mf ns' P' M'
               with "[%] [%] [%] [%] Hcg Hown Hpc
                     [Hbsl Hsbn Hsbi Hsbs Hsbb Hir] Hpriv").
     - exact Hret.
@@ -431,7 +433,7 @@ Definition wp_sys_chdir_friendly_body
     (γs : list gname) (j : nat) (γl : gname)
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_chdir in
   let pj := proc_addr j in
@@ -440,7 +442,7 @@ Definition wp_sys_chdir_friendly_body
   FsReady.fs_geom_ok ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  pv_tf V !! tf_arg_idx 0 = Some v ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
@@ -451,17 +453,18 @@ Definition wp_sys_chdir_friendly_body
      persistent, and every caller already holds it. *)
   procs_inv γs -∗
   fs_res 2 dqb dqs dqbs dqn -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (P' : uptd),
+  (* the image moves: argstr's fetchstr faults user pages in *)
+  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
       (* THE LEDGER IS RESTORED AT THE LITERAL 2 -- the composability half *)
       fs_res 2 dqb dqs dqbs dqn -∗
-      sys_chdir_post γf pj pid (upd_upt V P')
+      sys_chdir_post γf pj pid (upd_usM (us_upt U P') M')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -475,10 +478,10 @@ Module FsSysChdir (M : SYSCHDIR).
       (γs : list gname) (j : nat) (γl : gname)
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
       wp_sys_chdir_friendly_body γf γs j γl
-                                 dqb dqs dqbs dqn v pid V m K b lks.
+                                 dqb dqs dqbs dqn v pid U m K b lks.
   Proof.
     unfold wp_sys_chdir_friendly_body. cbv zeta.
     intros HK Hg Hj Hgs Htf.
@@ -511,7 +514,7 @@ Module FsSysChdir (M : SYSCHDIR).
     iApply (M.wp_sys_chdir_sconf γf γs j γl
  pd pav pu
 
- dqb dqs v pid V m K true b lks
+ dqb dqs v pid U m K true b lks
               HK Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hib Hj Hgs eq_refl Htf
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlogc
@@ -520,11 +523,11 @@ Module FsSysChdir (M : SYSCHDIR).
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDn) "%Hgd".
-    iIntros (mf P')
+    iIntros (mf P' M')
       "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbb Hsbi Hir Hpost".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
                  with "Hcont") as "Hcont".
-    iApply ("Hcont" $! mf P'
+    iApply ("Hcont" $! mf P' M'
               with "[%] [%] Hcg Hown Hpc
                     [Hbsl Hsbn Hsbi Hsbs Hsbb Hir] Hpost").
     - exact Hcs.

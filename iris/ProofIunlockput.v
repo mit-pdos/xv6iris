@@ -100,11 +100,11 @@ Section ProofIunlockputMain.
       (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_iunlockput_dep_gen_body gs j gl pd pav pu
                                  gil gisl
  k qi s gy d inum dn' bm' n Sb crb cru
-                                 crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr.
+                                 crz e0 tid qtx pidv dq dqb dqs m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_iunlockput_dep_gen_body].
     intros pcE ip pj ret_tgt HK Hdsh Hk Hcrb Hcru Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
@@ -265,7 +265,7 @@ Section ProofIunlockputMain.
     assert (Hfresh_sl : locks_below lks "sleep lock")
       by lkbelow.
     iApply (IU.wp_iunlock_dep_sconf gs gil gisl k s gy d icfg_dev inum
-              dn' bm' pidv dq R4 (K - 4)%nat eb pj b lks Vpr
+              dn' bm' pidv dq R4 (K - 4)%nat eb pj b lks Upr
               ltac:(lia) Hdsh Hk ltac:(rewrite HR4a0; exact Hipe)
               Hfresh_sl
               with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk Hstok Hppid
@@ -357,7 +357,7 @@ Section ProofIunlockputMain.
     iEval (rewrite -ireg_regime_true) in "Hropen".
     iApply (IP.wp_iput_gen gs j gl pd pav pu gil gisl
 
-              k (qi + s)%Qp inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs R6 (K - 4)%nat eb b lks Vpr true
+              k (qi + s)%Qp inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs R6 (K - 4)%nat eb b lks Upr true
               ltac:(lia) Hk Hcrb Hcru
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl ltac:(rewrite HR6a0; exact Hipe)
@@ -597,11 +597,11 @@ Section ProofIunlockputMain.
       (n : nat) (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_iunlockput_dep_sconf_body gs j gl pd pav pu
                                    gil gisl
  k qi s gy d inum
-                                   dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks Vpr.
+                                   dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_iunlockput_dep_sconf_body].
     intros pcE ip pj ret_tgt HK Hdsh Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
@@ -615,7 +615,7 @@ Section ProofIunlockputMain.
     iApply (wp_iunlockput_dep_gen gs j gl pd pav pu gil gisl
 
               k qi s gy d inum dn' bm' n Sb0 false false false e00 tid qtx
-              pidv dq dqb dqs m K eb b lks Vpr
+              pidv dq dqb dqs m K eb b lks Upr
               HK Hdsh Hk ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh Hdside
@@ -652,11 +652,11 @@ Section ProofIunlockputMain.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_iunlockput_tx_sconf_body gs j gl pd pav pu
                                   gil gisl
  k qi s gy inum dn' bm' n
-                                  pidv dq dqb dqs m K eb b lks Vpr.
+                                  pidv dq dqb dqs m K eb b lks Upr.
   Proof.
     apply wp_iunlockput_tx_of_dep_sconf. intros d tid qtx.
     apply wp_iunlockput_dep_sconf.
@@ -671,11 +671,11 @@ Section ProofIunlockputMain.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_iunlockput_tx_gen_body gs j gl pd pav pu
                                 gil gisl
  k qi s gy inum dn' bm' n Sb crb cru
-                                crz e0 pidv dq dqb dqs m K eb b lks Vpr.
+                                crz e0 pidv dq dqb dqs m K eb b lks Upr.
   Proof.
     apply wp_iunlockput_tx_of_dep_gen. intros d tid qtx.
     apply wp_iunlockput_dep_gen.

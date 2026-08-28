@@ -226,7 +226,7 @@ End SpecFdalloc.
 Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γf : gname) (k : nat) (D : gset nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-    (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fdalloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* a0 is the file to install *)
@@ -240,16 +240,16 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the block SPLIT at the fd table: fdalloc needs the core only to reach
      myproc's tier, and the array in whatever loan state the caller left it *)
-  proc_priv_core p pid V -∗
-  proc_ofiles_owe γf (pv_fdg V) p (pv_ofile V) D -∗
+  proc_priv_core p pid U -∗
+  proc_ofiles_owe γf (pv_fdg (us_V U)) p (pv_ofile (us_V U)) D -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv_core p pid V -∗
-      fdalloc_post γf p V D k (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      proc_priv_core p pid U -∗
+      fdalloc_post γf p (us_V U) D k (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -257,6 +257,6 @@ Module Type FDALLOC.
   Parameter wp_fdalloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_fdalloc_sconf_body γf k D m av n eb p pid V b lks.
+      (pid : mword 32) (U : ustate) (b : bool) (lks : gset string),
+      wp_fdalloc_sconf_body γf k D m av n eb p pid U b lks.
 End FDALLOC.

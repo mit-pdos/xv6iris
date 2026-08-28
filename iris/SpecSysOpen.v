@@ -240,24 +240,24 @@ Section SpecSysOpen.
 
      Both arms hand the fd unit back: see the header's file-table ledger. *)
   Definition sys_open_post (γf : gname) (p : mword 64) (pid : mword 32)
-      (W : pprivate) (r : mword 64) : iProp Σ :=
+      (UW : ustate) (r : mword 64) : iProp Σ :=
     ((* FAILURE, on any of the seven arms.  The descriptor array is EXACTLY
         as it came in: no arm that installed a descriptor can fail after
         doing so -- fdalloc is the last thing that can refuse. *)
-     ⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid W
+     ⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid UW
      ∨
      (* SUCCESS.  The LEAST free descriptor now names the new file, and the
         returned a0 is that descriptor.  Which file slot it is is
         existential: the file table is not the caller's to name. *)
      ∃ (fd : nat) (l : list nat) (k : nat),
        ⌜r = (mword_of_int (Z.of_nat fd) : mword 64) /\
-        fd_frees (pv_ofile W) = fd :: l⌝ ∗
-       proc_priv γf p pid (upd_ofile W fd (fnode k)))
+        fd_frees (pv_ofile (us_V UW)) = fd :: l⌝ ∗
+       proc_priv γf p pid (us_ofile UW fd (fnode k)))
     (* THE fd-STATE FRAGMENT BUNDLE, in and out.  Only the success arm spends
        it: the descriptor fdalloc opened has to be retyped from [FdClosed] to
        the new file's type ([ProcInv.proc_priv_settle]).  Every failure arm
        hands it straight back -- none of them installed a descriptor. *)
-    ∗ fd_frags_any (pv_fdg W) ∗ fd_slot.
+    ∗ fd_frags_any (pv_fdg (us_V UW)) ∗ fd_slot.
 
 End SpecSysOpen.
 
@@ -271,7 +271,7 @@ Definition wp_sys_open_sconf_body
     (ns : nat)                                          (* the iref ledger     *)
     (dqb dqs dqbs dqn : dfrac)
     (v vom : mword 64)                       (* syscall arguments 0 and 1   *)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_open in
@@ -308,8 +308,8 @@ Definition wp_sys_open_sconf_body
      (omode) out of the trapframe page [proc_priv] carries.  Nothing is
      assumed about either: argstr checks the string and the walk reads
      [omode] as a plain int. *)
-  pv_tf V !! tf_arg_idx 0 = Some v ->
-  pv_tf V !! tf_arg_idx 1 = Some vom ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some vom ->
   sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, exactly as sys_mkdir: the depth is pinned at
      ZERO, so [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order
@@ -362,19 +362,21 @@ Definition wp_sys_open_sconf_body
   (* ---- the process, whole, and the two allowances ---- *)
   iref_slots ns -∗
   fd_slot -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   (* the descriptor-state fragments -- spent on the descriptor open returns *)
-  fd_frags_any (pv_fdg V) -∗
+  fd_frags_any (pv_fdg (us_V U)) -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_open sleeps in create,
      in namei, in ilock, in itrunc and in the two op brackets, so it can
      return on another hart whatever SIE was doing.  Vacuous at [true], so
      consuming it costs the caller nothing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
+  (* the image moves: the copy leaves may fault a page in, and copyout
+     writes user memory -- milestone J item 1's ∃-weakened staging *)
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -398,7 +400,7 @@ Definition wp_sys_open_sconf_body
       ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
       (* the descriptor table, the fd unit and the return value *)
-      sys_open_post γf pj pid (upd_upt V P')
+      sys_open_post γf pj pid (upd_usM (us_upt U P') M')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -412,11 +414,11 @@ Module Type SYSOPEN.
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v vom : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_open_sconf_body γfl γf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v vom
-                             pid V m K eb b lks.
+                             pid U m K eb b lks.
 End SYSOPEN.

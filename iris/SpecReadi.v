@@ -245,7 +245,7 @@ Definition wp_readi_sconf_body
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode)
     (user : bool) (off n : nat) (dst_olds : nat -> bv 8)
-    (V : pprivate)
+    (U : ustate)
     (pidv : mword 32) (dq dqd : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
@@ -373,9 +373,9 @@ Definition wp_readi_sconf_body
      first caller, is what found it.  [SpecWritei.v] still has the same
      shape -- see claude-notes/design/file-table.md.) *)
   (if user
-   then proc_priv_core pj pidv V
+   then proc_priv_core pj pidv U
    else ([∗ list] i ∈ seq 0 n, pa_add dst i ↦ₘ[ktb] dst_olds i) ∗
-        proc_priv_bare pj pidv V) -∗
+        proc_priv_bare pj pidv U) -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -394,9 +394,12 @@ Definition wp_readi_sconf_body
      [eb = false] is reachable the [b] form would promise the caller it
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (tot : nat) (P' : uptd),
+  (* THE USER ARM'S IMAGE MOVES: either_copyout writes user memory, so the
+     block comes back at a NEW [M'] (milestone J item 1's ∃-weakened staging;
+     the precise window is win-2 work).  The kernel arm's does not. *)
+  ∀ (mf : regfile) (tot : nat) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       (* never more than the clamped count *)
       ⌜(tot <= rd_clamp (di_size dn) off n)%nat⌝ -∗
       (* THE TWO ARMS.  The "bmap returned 0" break is dead under
@@ -422,10 +425,10 @@ Definition wp_readi_sconf_body
          fraction goes back the way it came -- with the kernel arm's buffer,
          or inside the user arm's block. *)
       (if user
-       then proc_priv_core pj pidv (upd_upt V P')
+       then proc_priv_core pj pidv (upd_usM (us_upt U P') M')
        else ([∗ list] i ∈ seq 0 n,
               pa_add dst i ↦ₘ[ktb] rd_delivered data dst_olds off tot i) ∗
-            proc_priv_bare pj pidv V) -∗
+            proc_priv_bare pj pidv U) -∗
       bslot -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -440,12 +443,12 @@ Module Type READI.
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode)
       (user : bool) (off n : nat) (dst_olds : nat -> bv 8)
-      (V : pprivate)
+      (U : ustate)
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_readi_sconf_body ktb γs j γl pd pav pu γf
  ip bm data dn
-                          user off n dst_olds V
+                          user off n dst_olds U
                           pidv dq dqd m K eb b lks.
 End READI.

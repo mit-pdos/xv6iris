@@ -55,6 +55,10 @@ Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import FsImg.
 Require Import Xv6Cameras.
+Require Import LogDefs.       (* [fs_restrict] -- the ERA's home map as a
+                                 [gmap]; already in this file's cone through
+                                 [FsDurBytes], so the Require costs no build
+                                 edge *)
 Require Import FsDurBytes.    (* the byte-map flattening, and [snap_gamma]
                                  -- the durable family's record, which sits
                                  there because [FsDurRead] needs it too *)
@@ -972,6 +976,115 @@ Section FsFoot.
     iApply (fs_footprint_of_runs (gamma_q Γ dq) S PM Hs).
   Qed.
 
+  (* ================================================================== *)
+  (*  3e.  THE INSTALL (durable-disk BT-0, the boot-side transport)       *)
+  (*                                                                     *)
+  (*  THE BOOT DOES NOT MINT; IT INSTALLS.  [fs_footprint_mint] below     *)
+  (*  allocates a FRESH family at the flattening of a source's runs --    *)
+  (*  which is what a commit needs, because its output family must be     *)
+  (*  new.  The boot's problem is the mirror image: the era's byte        *)
+  (*  authority ALREADY EXISTS, its elements are already in hand as ONE   *)
+  (*  FLAT MAP ([FsBoot.fs_boot_ghosts]' home blocks, flattened by        *)
+  (*  [FsDurBytes.fs_dbytes_set_blocks]), and what is wanted is the file  *)
+  (*  system's [∗] shape at that same family, plus whatever the file      *)
+  (*  system does not claim.                                             *)
+  (*                                                                     *)
+  (*  [phi_runs_union] IS AN [⊣⊢], so that costs no allocation and no     *)
+  (*  carve: the flat map splits into the footprint and a REMAINDER at a  *)
+  (*  MAP VALUE the durable source determines, [xr_union (xr_fs S PM)],   *)
+  (*  and not at any geometric fact about the file system.  The three     *)
+  (*  pure inputs are all READINGS off that source -- [fs_footprint_runs] *)
+  (*  for [xf_shape], [phi_runs_disj] off its exclusivity for [xr_disj],  *)
+  (*  [phi_runs_in] off its authority for the inclusion -- which is what  *)
+  (*  [fs_footprint_install_facts] (section 4) packages.  Nothing here    *)
+  (*  needs a ghost class, so both lemmas are Gamma-generic and the       *)
+  (*  boot's own instance ([FsBytesGamma.fs_gamma_L], a DIFFERENT         *)
+  (*  [ghost_map] class path from [diskImgG]) reads them unchanged.       *)
+  (* ================================================================== *)
+
+  (* the era's flat map, split at a submap.  [phi_map] is a [big_sepM], so
+     this is [map_difference_union] and nothing else. *)
+  Lemma phi_map_install Γ (M Mh : gmap Z (bv 8)) :
+    M ⊆ Mh -> phi_map Γ Mh ⊣⊢ phi_map Γ M ∗ phi_map Γ (Mh ∖ M).
+  Proof.
+    intros Hsub.
+    assert (Hd : M ##ₘ Mh ∖ M).
+    { apply map_disjoint_difference_r. reflexivity. }
+    rewrite /phi_map -{1}(map_difference_union M Mh Hsub).
+    rewrite big_sepM_union; [done | exact Hd].
+  Qed.
+
+  Lemma fs_footprint_install Γ S (PM : gmap Z (list (bv 8)))
+      (Mh : gmap Z (bv 8)) :
+    xf_shape S PM -> xr_disj (xr_fs S PM) ->
+    xr_union (xr_fs S PM) ⊆ Mh ->
+    phi_map Γ Mh
+    ⊢ fs_footprint Γ (DfracOwn 1) S
+      ∗ phi_map Γ (Mh ∖ xr_union (xr_fs S PM)).
+  Proof.
+    intros Hshape Hdisj Hsub.
+    rewrite (phi_map_install Γ (xr_union (xr_fs S PM)) Mh Hsub).
+    rewrite -(phi_runs_union Γ (xr_fs S PM) Hdisj).
+    iIntros "[Hr $]".
+    iApply (fs_footprint_of_runs Γ S PM Hshape with "Hr").
+  Qed.
+
+  (* NON-VACUITY, Gamma-generically: at a REAL footprint the three premises
+     hold -- [fs_footprint_runs] gives the shape, the source's own
+     exclusivity the disjointness, and the union is trivially inside itself
+     -- so the install fires and gives the footprint back with an EMPTY
+     remainder.  The premise set is therefore not merely satisfiable, it is
+     satisfied by the very predicate the install produces. *)
+  Lemma fs_footprint_install_nonvac Γ (Hex : phi_excl Γ) S :
+    fs_footprint Γ (DfracOwn 1) S
+    ⊢ ∃ PM Mh, ⌜xf_shape S PM /\ xr_disj (xr_fs S PM)
+                 /\ xr_union (xr_fs S PM) ⊆ Mh
+                 /\ Mh ∖ xr_union (xr_fs S PM) = ∅⌝
+               ∗ phi_map Γ Mh.
+  Proof.
+    iIntros "Hf".
+    iDestruct (fs_footprint_runs with "Hf") as (PM) "[%Hshape Hr]".
+    iAssert (⌜xr_disj (xr_fs S PM)⌝ ∧ phi_runs Γ (xr_fs S PM))%I
+      with "[Hr]" as "[%Hdisj Hr]".
+    { iSplit; [iApply (phi_runs_disj Γ Hex with "Hr") | iExact "Hr"]. }
+    iExists PM, (xr_union (xr_fs S PM)).
+    iSplitR.
+    { iPureIntro. split; [exact Hshape |]. split; [exact Hdisj |].
+      split; [reflexivity | apply map_difference_diag]. }
+    rewrite (phi_runs_union Γ _ Hdisj). iExact "Hr".
+  Qed.
+
+  (* THE ERA'S HOME BLOCKS AS ONE FLAT MAP (durable-disk BT-0).  The boot's
+     [Mh] is not written down anywhere: it is the flattening of the era's
+     own home map, and [FsDurBytes.fs_dbytes_set_blocks] is the bridge.
+     Stated here in [phi_map]'s spelling, which is the install's input. *)
+  Lemma phi_map_set_blocks Γ (Pb : Z -> list (bv 8)) (home : gset Z) :
+    (forall b, b ∈ home -> length (Pb b) = BSIZE) ->
+    phi_map Γ (fs_dbytes (fs_restrict Pb home))
+    ⊣⊢ ([∗ set] b ∈ home, blk_owned Γ b (Pb b)).
+  Proof.
+    intros Hlen. rewrite /phi_map.
+    exact (fs_dbytes_set_blocks Γ Pb home Hlen).
+  Qed.
+
+  (* ...and the two composed, which is the shape the boot mint calls: the
+     era's home blocks in, the file system's footprint plus the bytes it
+     does not claim out. *)
+  Lemma fs_home_install Γ (Pb : Z -> list (bv 8)) (home : gset Z)
+      S (PM : gmap Z (list (bv 8))) :
+    (forall b, b ∈ home -> length (Pb b) = BSIZE) ->
+    xf_shape S PM -> xr_disj (xr_fs S PM) ->
+    xr_union (xr_fs S PM) ⊆ fs_dbytes (fs_restrict Pb home) ->
+    ([∗ set] b ∈ home, blk_owned Γ b (Pb b))
+    ⊢ fs_footprint Γ (DfracOwn 1) S
+      ∗ phi_map Γ (fs_dbytes (fs_restrict Pb home)
+                   ∖ xr_union (xr_fs S PM)).
+  Proof.
+    intros Hlen Hshape Hdisj Hsub.
+    rewrite -(phi_map_set_blocks Γ Pb home Hlen).
+    exact (fs_footprint_install Γ S PM _ Hshape Hdisj Hsub).
+  Qed.
+
 End FsFoot.
 
 (* ====================================================================== *)
@@ -1012,6 +1125,63 @@ Section Xfer.
   Proof.
     intros dq a v. rewrite /snap_gamma /=.
     iIntros "[Ha Hv]". iApply (ghost_map_lookup with "Ha Hv").
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  4a''.  WHERE THE INSTALL'S PURE PREMISES COME FROM (BT-0)        *)
+  (*                                                                   *)
+  (*  [fs_footprint_install] (section 3e) takes three pure inputs, and  *)
+  (*  this is the witness that NONE of them is a fact anybody has to    *)
+  (*  state, maintain or hand in: all three are READ off the DURABLE    *)
+  (*  SOURCE the boot is lent -- the epoch's own footprint and the byte *)
+  (*  authority beside it ([FsDurSnap.fs_snap]'s first two conjuncts).  *)
+  (*  The shape comes off the predicate ([fs_footprint_runs]), the      *)
+  (*  disjointness off the source's exclusivity ([snap_gamma_excl], two *)
+  (*  full fragments at one address are inconsistent), and the union's  *)
+  (*  place inside the epoch's map off its authority                    *)
+  (*  ([snap_gamma_agree], one [ghost_map_lookup]).  The source is not  *)
+  (*  moved: every reading is pure, so the epoch is given back whole.   *)
+  (* ---------------------------------------------------------------- *)
+  Lemma fs_footprint_install_facts (g gl gt : gname) (B : gmap Z (bv 8))
+      (S : fs_state_rec) :
+    ghost_map_auth g 1 B -∗
+    fs_footprint (snap_gamma g gl gt) (DfracOwn 1) S -∗
+    ∃ PM, ⌜xf_shape S PM /\ xr_disj (xr_fs S PM)
+           /\ xr_union (xr_fs S PM) ⊆ B⌝.
+  Proof.
+    iIntros "Hba Hf".
+    iDestruct (fs_footprint_runs with "Hf") as (PM) "[%Hshape Hr]".
+    iAssert (⌜xr_disj (xr_fs S PM)⌝
+             ∧ phi_runs (snap_gamma g gl gt) (xr_fs S PM))%I
+      with "[Hr]" as "[%Hdisj Hr]".
+    { iSplit;
+        [iApply (phi_runs_disj _ (snap_gamma_excl g gl gt) with "Hr")
+        | iExact "Hr"]. }
+    iDestruct (phi_runs_in (snap_gamma g gl gt) (ghost_map_auth g 1 B) B
+                 (snap_gamma_agree g gl gt B) _ Hdisj with "Hba Hr") as %Hin.
+    iPureIntro. exists PM. split; [exact Hshape | split; [exact Hdisj | exact Hin]].
+  Qed.
+
+  (* ...AND THE WHOLE INSTANCE (durable-disk BT-0).  It lives HERE rather
+     than beside [fs_footprint_install] because [fs_ghost] owns the link
+     family's fragments, so it needs [fsLinkG] -- and only that: the
+     lemma is Gamma-generic and mentions no byte class at all, so the
+     era instantiates it at [FsBytesGamma.fs_gamma_L] unchanged.  The
+     ghost half is HANDED IN rather than installed: [fs_ghost] mentions
+     no [fsΦ] ([FsState]'s section header), so there is nothing in it for
+     a byte map to supply. *)
+  Lemma fs_state_install Γ S (PM : gmap Z (list (bv 8)))
+      (Mh : gmap Z (bv 8)) :
+    xf_shape S PM -> xr_disj (xr_fs S PM) ->
+    xr_union (xr_fs S PM) ⊆ Mh ->
+    phi_map Γ Mh ∗ fs_ghost Γ S
+    ⊢ fs_state Γ (DfracOwn 1) S ∗ phi_map Γ (Mh ∖ xr_union (xr_fs S PM)).
+  Proof.
+    intros Hshape Hdisj Hsub. iIntros "[HM Hg]".
+    iDestruct (fs_footprint_install Γ S PM Mh Hshape Hdisj Hsub with "HM")
+      as "[Hf Hr]".
+    iSplitR "Hr"; [| iExact "Hr"].
+    rewrite fs_state_split. iSplitL "Hf"; [iExact "Hf" | iExact "Hg"].
   Qed.
 
   (* ---------------------------------------------------------------- *)

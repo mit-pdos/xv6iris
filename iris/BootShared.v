@@ -1110,9 +1110,14 @@ Section BootAlloc.
      form ([reg_pointsto_at], [kmap_auth], [uart_frag], [hart_full], ...) IS
      that form at [riscv_eraGS] BY DELTA (RiscvPtsto §"the era's names"), so
      the unpacking is pure conversion and there is nothing to prove. *)
-  Lemma power_boot_res_unpack (g : gstate) (ndisk : nat) :
+  (* [Rb] IS THE CLIENT'S OWN LENT RESOURCE (durable-disk BT-1), threaded
+     rather than fixed: adequacy chooses it, this file only carries it.  It
+     is the LAST conjunct on both sides, so nothing above moved and the
+     proof is still one [iExact]. *)
+  Lemma power_boot_res_unpack (Rb : (Z -> bv 8) -> iProp Σ)
+      (g : gstate) (ndisk : nat) :
     power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk
-      (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) g ⊢
+      (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) Rb g ⊢
       ([∗ list] c ∈ enum CPU, boot_reg_res (CID := c) (g.(gregs) c)) ∗
       boot_raw_bytes g ∗
       kmap_auth kmap_M0 ∗
@@ -1148,6 +1153,8 @@ Section BootAlloc.
       log_mirror_half (FsCrash.mirror_of
          (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))) ∗
       swap_lb (S gen_id) ∗
+      (* the client's lent resource, straight through *)
+      Rb (v_disk (g.(gdev).(dvirtio))) ∗
       crash_inv ∗ gen_cert.
   Proof. iIntros "H". iExact "H". Qed.
 
@@ -1248,7 +1255,13 @@ Section BootAlloc.
   (* ------------------------------------------------------------------ *)
   Lemma boot_shared_alloc (g : gstate) (ndisk : nat)
       (sb : fs_sb) (nib : nat) (cov : gset Z)
-      (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) :
+      (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8))
+      (* THE CLIENT'S LENT RESOURCE (durable-disk BT-1).  It arrives on
+         [power_boot_res] and this fupd DROPS it: the boot mint does not
+         read it yet (BT-3 is where [fs_cfg_alloc_snap] starts taking the
+         epoch).  Threading it now is what keeps the change to the audited
+         cone's spine one commit of its own. *)
+      (Rb : (Z -> bv 8) -> iProp Σ) :
     boot_facts g ->
     (* THE ERA'S DISK CARRIES A FILE SYSTEM (durable-disk lane E-himg).  It
        is a hypothesis about THIS era's disk, and it has to be: the mint
@@ -1260,7 +1273,7 @@ Section BootAlloc.
        [SystemAdequacy.fs_boot_pure] delivers into this fupd. *)
     fs_boot_snap_wf (v_disk (g.(gdev).(dvirtio))) ndisk S Pb sb nib cov ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk
-      (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) g
+      (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) Rb g
     ={⊤}=∗ ∃ (HFd : fdslotG Σ) (HIr : irefslotG Σ) (HPav : pavG Σ)
              (HBs : bioslotG Σ)
              (HF : fileG Σ) (γd : uart_names) (γv : disk_names)
@@ -1370,10 +1383,14 @@ Section BootAlloc.
     destruct Hbf' as (Hpow & Hin & Hmemf & Hregsf & Hu0 & Hp0 & Hv0' & _).
     destruct Hv0' as (v0 & Hv0).
     iIntros "H".
-    iDestruct (power_boot_res_unpack g ndisk with "H") as
+    iDestruct (power_boot_res_unpack Rb g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hstrans & Hsie & Hspp & Hspie &
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
-        #Hcinv & #Hcert)".
+        HRb & #Hcinv & #Hcert)".
+    (* DROPPED, for now: nothing in this fupd reads the lent resource yet.
+       BT-3 hands it to [FsCfgSnap.fs_cfg_alloc_snap], which will read
+       [snap_ok] off the epoch instead of taking it as a premise. *)
+    iClear "HRb".
     (* ---- the claims bundle FIRST: both image halves need it ---- *)
     iMod (kmap_static_claims_intro with "Hkfrags") as "#Hcl".
     (* ---- the image: text persisted, data persisted up to [rodata_end] ---- *)

@@ -168,7 +168,7 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
   cpu_own lvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
-  proc_pt P -∗
+  proc_pt_any P -∗
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -176,7 +176,7 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
-    proc_pt P' -∗
+    proc_pt_any P' -∗
     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜uptd_ext_sz szv P P'⌝ -∗

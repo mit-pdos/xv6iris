@@ -281,7 +281,12 @@ Section SystemBoot.
      MINTS both inside the era fupd, off the era's own disk, and hands the
      class back existentially; only the camera ([fileGpreS]) is a functor
      constraint. *)
-  Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z) :
+  (* [Rb] IS THE RESOURCE THE POWER ARM LENDS THIS BOOT (durable-disk
+     BT-1), a parameter rather than a constant: this era only carries it to
+     [boot_shared_alloc], which drops it for now.  BT-3 is where the boot
+     mint starts reading the epoch off it. *)
+  Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
+      (Rb : (Z -> bv 8) -> iProp Σ) :
     boot_facts g ->
     (* THE PROJECTION THE POWER THEOREM PROVES AT THIS ERA, AND IT IS THE
        WHOLE OF WHAT THIS BOOT KNOWS ABOUT ITS DISK (durable-disk lane
@@ -313,7 +318,7 @@ Section SystemBoot.
        from it below and rides [first_tok] to forkret's first arm. *)
     riscv_crash_pred = P_fs_any cov (FsImg.sb_logstart sb) ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES
-      (fun dk => mirror_of (fs_blocks dk)) g
+      (fun dk => mirror_of (fs_blocks dk)) Rb g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
          WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
@@ -374,7 +379,7 @@ Section SystemBoot.
     { rewrite Hlseq /fs_crash_seam. iModIntro.
       rewrite Hcp. iSplitL; iIntros "H"; iExact "H". }
     iMod (boot_shared_alloc g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
-            S Pb Hbf Hbundle with "Hres")
+            S Pb Rb Hbf Hbundle with "Hres")
       as (Hfd Hir Hpav Hbs HF γd γv Rspent)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
@@ -598,6 +603,19 @@ Proof.
               variable in the same fupd, so the era boots already holding a
               true picture and the swap receipt. *)
            (fun dk => mirror_of (fs_blocks dk))
+           (* THE LENT RESOURCE (durable-disk BT-2): THE CRASH PREDICATE'S
+              OWN EPOCH, at the map the machine's disk recovers to.  This
+              is the whole boot-side transport: [P_fs_swap] runs at the
+              PowerOn arm with [crashN] open and the fixed disk auth in
+              hand -- the one place [dk] is the MACHINE's -- takes the
+              epoch out through [FsCrash.P_fs_dur_acc], clones it with
+              [FsDurSnap.P_dur_clone] (the transport at [q = 1], which
+              costs no new pure premise) and closes the accessor, so the
+              record keeps its own and the era gets a copy.  Its [D] is
+              pinned to the boot's own by [fs_recovery_det], which is why
+              no state-determinacy theorem is needed.  [boot_shared_alloc]
+              still drops it; BT-3 hands it to the mint. *)
+           (P_fs_lend cov (FsImg.sb_logstart sb))
            ltac:(intros γd γsw γreg γst Er gen dk;
                  exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
                           (FsImg.sb_logstart sb) dk Er gen))
@@ -619,8 +637,8 @@ Proof.
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & ->).
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
-            Hpure Hcovin Hlogsub Hls2 _).
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov _
+            Hbf Hpure Hcovin Hlogsub Hls2 _).
   reflexivity.
 Qed.
 

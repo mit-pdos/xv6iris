@@ -124,14 +124,14 @@ Section ProofIunlockMain.
       (dev inum : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (b : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr KT1 mf K b p -∗
         cpu_own 0 eb p b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare p pidv Vpr -∗
+        proc_priv_bare p pidv Upr -∗
         inode_shr_gen k s dev inum g -∗
         ic_dep_side d -∗
         WP (Loop : expr riscv_lang))%I.
@@ -143,9 +143,9 @@ Section ProofIunlockMain.
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_iunlock_dep_sconf_body gs gil gisl k s g d
-                                dev inum dn' bm' pidv dq m K eb p b lks Vpr.
+                                dev inum dn' bm' pidv dq m K eb p b lks Upr.
   Proof.
     cbv beta delta [wp_iunlock_dep_sconf_body].
     intros pcE ip ret_tgt HK Hdshr Hk Ha0 Hfresh.
@@ -159,7 +159,7 @@ Section ProofIunlockMain.
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
     iEval (rewrite Hipe) in "Hvalid".
-    iAssert (iul_cont (CID0 := CID) k s g d dev inum pidv dq m K eb p b lks Vpr)%I
+    iAssert (iul_cont (CID0 := CID) k s g d dev inum pidv dq m K eb p b lks Upr)%I
       with "[Hcont]" as "Hcont"; [rewrite /iul_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi sp,sp,-32 ===== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1 : mword 64)
@@ -373,7 +373,7 @@ Section ProofIunlockMain.
                  with "Hcont") as "Hcont".
     iApply (HS.wp_holdingsleep_gen_sconf gil gisl "inode"%string
               (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) s R6 p pidv (K - 4)%nat eb b lks
- Vpr ltac:(lia)
+ Upr ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
     all: try lkbelow.
@@ -800,9 +800,9 @@ Section ProofIunlockMain.
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_iunlock_tx_sconf_body gs gil gisl k s g dev
-                               inum dn' bm' pidv dq m K eb p b lks Vpr.
+                               inum dn' bm' pidv dq m K eb p b lks Upr.
   Proof.
     apply wp_iunlock_tx_of_dep. intros d.
     apply wp_iunlock_dep_sconf.

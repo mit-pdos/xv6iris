@@ -88,7 +88,7 @@ Definition wp_begin_op_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.begin_op in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -115,7 +115,7 @@ Definition wp_begin_op_sconf_body
   kernel_text -∗ pc_is pcE -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* threaded, never read: see the header note *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle threaded through the two sleeps *)
   procs_inv γs -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: begin_op PARKS (its retry
@@ -130,7 +130,7 @@ Definition wp_begin_op_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       (* THE reservation: a full-budget operation *)
       log_op γ MAXOPBLOCKS -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -145,7 +145,7 @@ Module Type BEGIN_OP.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev
-                             pidv dq m K eb b lks Vpr.
+                             pidv dq m K eb b lks Upr.
 End BEGIN_OP.

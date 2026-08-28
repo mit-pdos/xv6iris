@@ -95,9 +95,19 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
+(* THE PARENT'S IMAGE IS NAMED, AND COMES BACK ON THE NOSE.  uvmcopy only
+   READS the parent -- the loop's memmove copies OUT of it -- so unlike
+   every other function at this altitude it is image-preserving on that
+   side, and saying so is what lets fork's caller keep [SpecKfork]'s "the
+   parent comes back verbatim".  The CHILD stays ∃-weakened
+   ([proc_pt_any]): its bytes become the parent's, which is a statement
+   about contents that only the memory-indexed contract below makes.
+   The bridge between the two is [ProofUvmcopy.uc_lazy_at] /
+   [uc_lazy_of] -- the va-keyed [M] is the sz-relative view restricted to
+   [uva_dom Pold], hence recoverable. *)
 Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
-    (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
+    (Pold Pnew : uptd) (Mold : gmap Z (bv 8)) (K : nat) (eb : bool) (p : mword 64)
     (ilvl : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmcopy in
   let sz := mm !!! Regidx (mword_of_int 12) in
@@ -127,8 +137,8 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : 
   cpu_own ilvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
-  proc_pt Pold -∗
-  proc_pt Pnew -∗
+  proc_pt Pold Mold -∗
+  proc_pt_any Pnew -∗
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
@@ -136,12 +146,12 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : 
     cpu_own ilvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
-    (* the parent's table comes back verbatim *)
-    proc_pt Pold -∗
+    (* the parent's table AND its image come back verbatim *)
+    proc_pt Pold Mold -∗
     ( (* out of memory (kalloc or mappages): the child is rolled back to
          exactly the table we were given *)
       (⌜mr !!! Regidx (mword_of_int 10) = (mword_of_int (-1) : mword 64)⌝ ∗
-       proc_pt Pnew)
+       proc_pt_any Pnew)
       ∨ (* the child now mirrors the parent over the run *)
       (∃ P' : uptd,
          ⌜mr !!! Regidx (mword_of_int 10) = (mword_of_int 0 : mword 64)⌝ ∗
@@ -156,7 +166,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : 
                 P'.(ud_um) !! vpn_at vpn0 i = Some w' /\
                 w' = pte_set_ad (uvm_pte (pte_flags10 w) r) a d
             end⌝ ∗
-         proc_pt P') ) -∗
+         proc_pt_any P') ) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -253,7 +263,8 @@ Module Type UVMCOPY.
   Parameter wp_uvmcopy_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
-      (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
+      (Pold Pnew : uptd) (Mold : gmap Z (bv 8))
+      (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string),
-      wp_uvmcopy_sconf_body γa mm Pold Pnew K eb p ilvl b lks.
+      wp_uvmcopy_sconf_body γa mm Pold Pnew Mold K eb p ilvl b lks.
 End UVMCOPY.

@@ -629,7 +629,7 @@ Section ProofNamexTrMain.
       (pl : list (bv 8)) (eb : bool)
       (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
       (n : nat) (Sb : gset Z)
-      (pidv : mword 32) (dq dqb dqs dqpv : dfrac) (fuel : nat) (CIDl : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (pidv : mword 32) (dq dqb dqs dqpv : dfrac) (fuel : nat) (CIDl : CpuId) (lks : gset string) (Upr : ustate) : iProp Σ :=
     (* THE GROWING SET (fs-sysfile GR-2b, retrofit 6).  [Sb] is the caller's,
        fixed; [Scur] is the loop's running set, existentially fresh at every
        turn because each iteration's iunlockput returns a set it chose.  The
@@ -686,8 +686,8 @@ Section ProofNamexTrMain.
      iref_slots 1 -∗
      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-     proc_priv_bare (proc_addr j) pidv Vpr -∗
-     inode_held (pv_cwd Vpr) -∗
+     proc_priv_bare (proc_addr j) pidv Upr -∗
+     inode_held (pv_cwd (us_V Upr)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
      bslots 3 -∗
@@ -706,7 +706,7 @@ Section ProofNamexTrMain.
      wp_next (CID0 := CIDl) true (proc_addr j) (fun CIDc : CpuId =>
        namex_era_post (CID := CIDc) (proc_addr j) pv nb ret_tgt pl m K b eb lks
 
-                     plen pfun n Sb P Pmiss pidv dq dqb dqs dqpv Vpr) -∗
+                     plen pfun n Sb P Pmiss pidv dq dqb dqs dqpv Upr) -∗
      WP (Loop : expr riscv_lang))%I.
 
   Definition nx_rest_body
@@ -715,7 +715,7 @@ Section ProofNamexTrMain.
       (Scur : gset Z) (pl : list (bv 8)) (kk : nat) (dcur : Z)
       (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ) (eb : bool)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
-      (CIDt : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (CIDt : CpuId) (lks : gset string) (Upr : ustate) : iProp Σ :=
     (∀ (Mt : regfile) (nf' : nat -> bv 8),
      ⌜nx_regs m sp0 (pa_add pv e) ipv nb
         (m !!! Regidx Ra1 : mword 64) Mt⌝ -∗
@@ -743,8 +743,8 @@ Section ProofNamexTrMain.
      iref_slots 1 -∗
      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-     proc_priv_bare (proc_addr j) pidv Vpr -∗
-     inode_held (pv_cwd Vpr) -∗
+     proc_priv_bare (proc_addr j) pidv Upr -∗
+     inode_held (pv_cwd (us_V Upr)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf' i) -∗
      bslots 3 -∗
@@ -771,11 +771,11 @@ Section ProofNamexTrMain.
       (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_namex_era_body gs j gl pd pav pu
  gf
  plen pfun nfun n Sb P Pmiss
-                       pidv dq dqb dqs dqpv m K eb b lks Vpr.
+                       pidv dq dqb dqs dqpv m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_namex_era_body].
     intros pcE pjv pv nb ret_tgt pl L
@@ -2190,7 +2190,7 @@ Section ProofNamexTrMain.
                (fun CIDl : CpuId =>
                   nx_loop_body j b K m sp0 pv nb ret_tgt plen L pfun pl eb
 
-                               P Pmiss n Sb pidv dq dqb dqs dqpv fuel CIDl lks Vpr))%I
+                               P Pmiss n Sb pidv dq dqb dqs dqpv fuel CIDl lks Upr))%I
       with "[]" as "Hloop".
     { (* ---- local disequality helpers, used all through the body ---- *)
       assert (Hcsne : forall c r : mword 5,
@@ -2463,7 +2463,7 @@ Section ProofNamexTrMain.
                                           Scur pl (length es0) dcur P Pmiss
                                           eb
  pidv dq dqb dqs dqpv
-                                          CIDt lks Vpr))%I
+                                          CIDt lks Upr))%I
                  with "[IHl Hcont]" as "Hrest".
                { iIntros (CIDt Hst Mt nf') "%Hregt %Hviewt Hcg Hcnt Hextc Hclmc Hpc
                           Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
@@ -2628,7 +2628,7 @@ Section ProofNamexTrMain.
                    iApply (IL.wp_ilock_tx_sconf gs j gl pd pav pu
                              gilk gislk
                              ik (iq/2)%Qp gsh PlainK iinum pidv dq dqs
-                             V2 (K - 12)%nat eb b lks Vpr
+                             V2 (K - 12)%nat eb b lks Upr
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
                              ltac:(lkbelow)
                              with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hitbl Hesck
@@ -2852,7 +2852,7 @@ Section ProofNamexTrMain.
 
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
-                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Vpr
+                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Upr
                                Kiup Hik HbW ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
@@ -3199,7 +3199,7 @@ Section ProofNamexTrMain.
                                    bml datl dnl dnl
                                    nf' false (mword_of_int 0 : mword 32)
                                    pidv dq (DfracOwn (1/2)) (DfracOwn 1)
-                                   GA4 (K - 12)%nat eb b lks Vpr
+                                   GA4 (K - 12)%nat eb b lks Upr
                                    Kdl Htyd Hlg Hbwf Hbcov Hszb Hholesl Hdio
                                    (* ---- THE LICENCE PREMISE, AND THIS IS
                                       THE SITE WHERE THE USER'S INVARIANT IS
@@ -3478,7 +3478,7 @@ Section ProofNamexTrMain.
  ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
-                                     GB3 (K - 12)%nat eb b lks Vpr
+                                     GB3 (K - 12)%nat eb b lks Upr
                                      Kiup Hik HbW ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
@@ -3738,7 +3738,7 @@ Section ProofNamexTrMain.
  ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
-                                     GC3 (K - 12)%nat eb b lks Vpr
+                                     GC3 (K - 12)%nat eb b lks Upr
                                      Kiup Hik HbW ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
@@ -3982,7 +3982,7 @@ Section ProofNamexTrMain.
 
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
-                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Vpr
+                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Upr
                                Kiup Hik HbW ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs

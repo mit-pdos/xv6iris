@@ -12,18 +12,18 @@
 (*                                                                         *)
 (* THE ENTRY CONDITIONS are the pure facts an INITIALIZER (exec, forkret's  *)
 (* park) establishes when it writes the trapframe and loads the image, and  *)
-(* they are spelled against the SLOT's own vocabulary -- [tf_resume_pc V0]  *)
+(* they are spelled against the SLOT's own vocabulary -- [tf_resume_pc (us_V U0)]  *)
 (* and [tf_w V0 tf_sp_idx], not the Umode tier's [m]/[sp0].  They mirror    *)
 (* [USpecSync.wp_sync_start_body]'s premise set exactly, one for one:       *)
 (*                                                                         *)
-(*   Hlay  sync_layout (pv_upt V0)                                          *)
-(*   Htext uimg_sub SyncInstrs.sync_bytes M0                                *)
+(*   Hlay  sync_layout (pv_upt (us_V U0))                                          *)
+(*   Htext uimg_sub SyncInstrs.sync_bytes (us_M U0)                                *)
 (*   Hsp   -- NOT a premise: it is DISCHARGED by [tf_resume_gpr_sp], which  *)
 (*            is the whole point of keying the slot on the trapframe.       *)
-(*   Hst   uv_stack (pv_upt V0) M0 (tf_w V0 tf_sp_idx) 32                   *)
+(*   Hst   uv_stack (pv_upt (us_V U0)) (us_M U0) (tf_w (us_V U0) tf_sp_idx) 32                   *)
 (*                                                                         *)
 (* plus the one condition that is about the slot rather than about sync's   *)
-(* body: the resume pc IS the ELF entry, [tf_resume_pc V0 = SyncSyms.start].*)
+(* body: the resume pc IS the ELF entry, [tf_resume_pc (us_V U0) = SyncSyms.start].*)
 (* [wp_sync_start_body] asks for no alignment fact on the entry pc (its     *)
 (* first instruction's fetch fact comes from [sync_layout] through          *)
 (* [sync_layout_fetch]), so none is carried.                                *)
@@ -65,14 +65,14 @@ Section USyncKernel.
      may resume on any hart), and [UProofSync.wp_sync_start] takes [CIDp]
      as an explicit leading binder for exactly the same reason. *)
 
-  Lemma sync_uexec_slot (V0 : pprivate) (M0 : gmap Z (bv 8)) :
-    tf_resume_pc V0 = (mword_of_int SyncSyms.start : mword 64) ->
-    sync_layout (pv_upt V0) ->
-    uimg_sub SyncInstrs.sync_bytes M0 ->
-    uv_stack (pv_upt V0) M0 (tf_w V0 tf_sp_idx) 32 ->
-    □ (∀ C : ucfg, ⌜loop_ok C (pv_upt V0)⌝ -∗
-         uv_cap C (pv_upt V0) (xv6_sys_protocol C (pv_upt V0))) ⊢
-    uexec_slot V0 M0.
+  Lemma sync_uexec_slot (U0 : ustate) :
+    tf_resume_pc (us_V U0) = (mword_of_int SyncSyms.start : mword 64) ->
+    sync_layout (pv_upt (us_V U0)) ->
+    uimg_sub SyncInstrs.sync_bytes (us_M U0) ->
+    uv_stack (pv_upt (us_V U0)) (us_M U0) (tf_w (us_V U0) tf_sp_idx) 32 ->
+    □ (∀ C : ucfg, ⌜loop_ok C (pv_upt (us_V U0))⌝ -∗
+         uv_cap C (pv_upt (us_V U0)) (xv6_sys_protocol C (pv_upt (us_V U0)))) ⊢
+    uexec_slot U0.
   Proof.
     intros Hentry Hlay Htext Hst.
     iIntros "#Hcap".
@@ -81,19 +81,19 @@ Section USyncKernel.
     iIntros (h C Rut b ms_v sc_v stval_v sepc_v)
             "%Hlo %Hmso Hhw Hmi Hwi Hregs Hpt Hcfg Hrut Hhdl".
     (* the assumed trap capability, at THIS round's config *)
-    iAssert (uv_cap C (pv_upt V0) (xv6_sys_protocol C (pv_upt V0)))
+    iAssert (uv_cap C (pv_upt (us_V U0)) (xv6_sys_protocol C (pv_upt (us_V U0))))
       as "#Hcap0".
     { iApply "Hcap". iPureIntro. exact Hlo. }
     (* cross the seam: the slot's spatial premises become the verified
        tier's threading bundle at the same concrete state *)
-    iDestruct (uexec_state_uv_cap_gpr (CID := h) C (pv_upt V0)
-                 (xv6_sys_protocol C (pv_upt V0)) M0 (tf_resume_gpr b V0)
-                 ms_v sc_v stval_v sepc_v (tf_resume_pc V0) Hmso
+    iDestruct (uexec_state_uv_cap_gpr (CID := h) C (pv_upt (us_V U0))
+                 (xv6_sys_protocol C (pv_upt (us_V U0))) (us_M U0) (tf_resume_gpr b (us_V U0))
+                 ms_v sc_v stval_v sepc_v (tf_resume_pc (us_V U0)) Hmso
                  with "Hcap0 Hhw Hmi Hwi Hregs Hpt Hcfg") as "(Hcg & Hpc)".
     iEval (rewrite Hentry) in "Hpc".
     (* [Hrut] and [Hhdl] stay in the spatial context, unused -- see header *)
-    iApply (wp_sync_start C (pv_upt V0) h M0 (tf_resume_gpr b V0)
-              (tf_w V0 tf_sp_idx) Hlay Htext (tf_resume_gpr_sp b V0) Hst
+    iApply (wp_sync_start C (pv_upt (us_V U0)) h (us_M U0) (tf_resume_gpr b (us_V U0))
+              (tf_w (us_V U0) tf_sp_idx) Hlay Htext (tf_resume_gpr_sp b (us_V U0)) Hst
               with "Hcg Hpc").
   Qed.
 

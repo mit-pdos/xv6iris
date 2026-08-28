@@ -5383,6 +5383,58 @@ the rows below and in `design/fs-ghost-state.md`).
   thirteen entries).  Stages BT-0..BT-5 per the probe; BT-6 (dropping
   `snap_ok` from `fs_boot_snap_wf`) NOT run — a derived pure export
   carried to `FirstTok` is exactly what the ruling permits.
+
+  **AS LANDED — BT-A (stages BT-0, BT-1, BT-2).**  The channel is open
+  and the epoch crosses it; nothing consumes it yet.  BT-0 put the
+  INSTALL below the theorem: `FsDurXfer.fs_footprint_install` /
+  `fs_state_install` split a flat `phi_map` into the file system's
+  footprint and a remainder at `xr_union (xr_fs S PM)` — a map value the
+  DURABLE SOURCE determines, with all three pure inputs read off that
+  source by `fs_footprint_install_facts`, so H5's reason (i) is refuted
+  without a disjointness carve.  Its one new bridge is
+  `FsDurBytes.fs_dbytes_set_blocks` (`[∗ set] b ∈ home, blk_owned` IS the
+  flattening of `fs_restrict Pb home`, by `fs_restrict_dom` +
+  `big_sepM_dom`; the length premise is verbatim `fs_boot_ghosts`' third
+  hypothesis), and `FsDurSnap` section 9b instantiates the pair at the
+  era's own view (`fs_home_install_era`, `fs_state_install_era`) in a
+  section carrying `fsLogG` and NOT `diskImgG`.  BT-1 gave
+  `RiscvAdequacy` a client parameter `Rb : (Z -> bv 8) -> iProp Σ` on
+  `Hswap`'s post and `power_boot_res`, threaded through
+  `BootShared.power_boot_res_unpack` / `boot_shared_alloc` and
+  `SystemAdequacy.xv6_boot_era`, at `emp`.  BT-2 filled it:
+  `FsCrash.P_fs_lend cov ls dk = ∃ D, ⌜fs_recovery (fs_blocks dk) D cov
+  ls⌝ ∗ P_dur D`, produced inside `P_fs_swap` by `P_fs_dur_acc` +
+  `FsDurSnap.P_dur_clone` (`P_dur_alloc_xfer` at `q = 1`; no new pure
+  premise — `snap_shape` and `B ⊆ fs_dbytes D` are conjuncts of
+  `fs_snap`/`snap_auth`) + closing the accessor.  `boot_shared_alloc`
+  `iClear`s it for now.  `P_fs`, `hdr_wf` and every arity are untouched;
+  the three theorem statements and `SystemAssumptions.v` are
+  byte-identical, and `make audit-only` is at the thirteen-entry baseline
+  by name.
+
+  TWO PLACEMENT FACTS THE NEXT STAGE INHERITS.  (a) `Rb`'s conjunct sits
+  BETWEEN `swap_lb` and `crash_inv` in `power_boot_res`, not last:
+  `power_boot_res_unpack` spells the final three rows as the single
+  bundle `gen_cert`, and appending after it re-associates the bundle, so
+  the unpack stops being one `iExact`.  (b) NOTHING on this path may
+  close with a bare `iFrame`.  `P_fs_named`'s body owns
+  `disk_img_bytes γd 0 (disk_read dk0 0 XV6_DISK_BYTES)` — a 2,048,000
+  element `big_sepL` behind a `Definition` — and `iFrame` resolves up to
+  delta: it took `SystemAdequacy.v` from 7 s to unbounded at 32 GB RSS.
+  Both `P_fs_swap`'s close and the adequacy site place every conjunct by
+  name; BT-3, which grows the same post again, must keep doing so.
+
+  WHAT BT-3 NEEDS (not started).  `fs_cfg_alloc_snap` takes the epoch and
+  reads `snap_ok` off it by `P_dur_tie_keep`, with `dblk_full D` from
+  `fs_recovery_blocks_full`.  The pieces are in place: the lent epoch
+  arrives at `boot_shared_alloc` as `P_fs_lend cov (sb_logstart sb)
+  (v_disk (g.(gdev).(dvirtio)))`; `xv6_boot_era` already destructures
+  `fs_boot_pure` into its own `D`, and `FsCrash.fs_recovery_det` is the
+  one step that identifies the two, after which `S` comes out of the
+  RESOURCE and `Hbundle`'s `snap_ok` row is derived rather than carried.
+  The re-binding of `S`/`D` inside `xv6_boot_era` is the whole of the
+  risk; `fs_boot_snap_wf`'s shape need not move at BT-3 (BT-6, which
+  would drop its `snap_ok` row, stays not-run).
 - [ ] **Rank 4 — the `dview`/`fview` ghosts and the pinned-lookup island**:
   PARKED (owner: leave for now; the fs-syscall-specs port decides).
 

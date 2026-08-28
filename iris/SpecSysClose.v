@@ -91,13 +91,13 @@ Section SpecSysClose.
      own ([FdSlots.fd_st_move] needs both halves).  The failure arm hands it
      straight back untouched -- it closed nothing. *)
   Definition sys_close_post (γf : gname) (p : mword 64) (pid : mword 32)
-      (V : pprivate) (v : mword 64) (r : mword 64) : iProp Σ :=
-    (⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile V) = None⌝ ∗
-       proc_priv γf p pid V ∗ fd_frags_any (pv_fdg V)
+      (U : ustate) (v : mword 64) (r : mword 64) : iProp Σ :=
+    (⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile (us_V U)) = None⌝ ∗
+       proc_priv γf p pid U ∗ fd_frags_any (pv_fdg (us_V U))
      ∨ ∃ (fd : nat) (fv : mword 64),
-         ⌜r = (zero_reg : mword 64) /\ arg_fd v (pv_ofile V) = Some (fd, fv)⌝ ∗
-         proc_priv γf p pid (upd_ofile V fd (zero_reg : mword 64)) ∗
-         fd_frags_any (pv_fdg V))%I.
+         ⌜r = (zero_reg : mword 64) /\ arg_fd v (pv_ofile (us_V U)) = Some (fd, fv)⌝ ∗
+         proc_priv γf p pid (us_ofile U fd (zero_reg : mword 64)) ∗
+         fd_frags_any (pv_fdg (us_V U)))%I.
 
 End SpecSysClose.
 
@@ -106,12 +106,12 @@ Definition wp_sys_close_sconf_body
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
      (γl γf : gname) (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
+    (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_close in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* sys_close reads syscall argument 0, out of the trapframe page
      [proc_priv] carries *)
-  pv_tf V !! tf_arg_idx 0 = Some v ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
   (* push_off's transient noff increment stays in int range *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (sys_close_stack <= av)%nat ->
@@ -159,9 +159,9 @@ Definition wp_sys_close_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γl γf -∗
   panic_env -∗
-  proc_priv γf p pid V -∗
+  proc_priv γf p pid U -∗
   (* the descriptor-state fragments: what the retype below is paid out of *)
-  fd_frags_any (pv_fdg V) -∗
+  fd_frags_any (pv_fdg (us_V U)) -∗
   (* THE CLOSING ENVIRONMENT.  sys_close closes a descriptor of unknown type,
      so it owns both of fileclose's bundles and hands over whichever the
      type selects ([SpecFileclose.fileclose_env_split]); the other is
@@ -186,7 +186,7 @@ Definition wp_sys_close_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
-      sys_close_post γf p pid V v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      sys_close_post γf p pid U v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       (* the whole environment back: the page count may have moved (the
          descriptor may have held a pipe's last end), which is why the pipe
          bundle returns under an existential *)
@@ -202,6 +202,6 @@ Module Type SYSCLOSE.
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
        (γl γf : gname) (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_sys_close_sconf_body γl γf fn on m av n eb p v pid V b lks.
+      (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string),
+      wp_sys_close_sconf_body γl γf fn on m av n eb p v pid U b lks.
 End SYSCLOSE.

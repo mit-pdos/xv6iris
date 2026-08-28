@@ -141,7 +141,7 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
-  proc_pt P -∗
+  proc_pt_any P -∗
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
@@ -151,7 +151,7 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
     ⌜callee_saved mm mr⌝ -∗
     ( (* out of memory: rolled back to exactly the table we were given *)
       (⌜mr !!! Regidx (mword_of_int 10) = (mword_of_int 0 : mword 64)⌝ ∗
-       proc_pt P)
+       proc_pt_any P)
       ∨ (* the map gained precisely the run, at precisely the permission *)
       (∃ P' : uptd,
          ⌜uptd_ext P P'⌝ ∗
@@ -171,7 +171,7 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
             mr !!! Regidx (mword_of_int 10) = oldsz)
            \/ ((uint oldsz <= uint newsz)%Z /\
                mr !!! Regidx (mword_of_int 10) = newsz) ⌝ ∗
-         proc_pt P') ) -∗
+         proc_pt_any P') ) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

@@ -446,7 +446,7 @@ Definition wp_kexec_sconf_body
     (na : nat) (avf : nat -> mword 64)                  (* argv[0 .. na]       *)
     (alen : nat -> nat) (aslen : nat -> nat)            (* strlen / owned len  *)
     (afun : nat -> nat -> bv 8)                         (* the argument bytes  *)
-    (pidv : mword 32) (V : pprivate)
+    (pidv : mword 32) (U : ustate)
     (dqb dqs dqa dqpv dqas : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
@@ -549,7 +549,7 @@ Definition wp_kexec_sconf_body
   (* THE PROCESS'S PRIVATE BLOCK.  p->pid, p->cwd and the cwd reference namei
      needs are all inside it (ProcInv.proc_priv_cwd_pid); so are the p->name
      bytes safestrcpy writes and the trapframe words the commit block writes. *)
-  proc_priv gf pj pidv V -∗
+  proc_priv gf pj pidv U -∗
   (* EVERY BYTE RUN KEXEC IS HANDED IS FRACTIONAL, because kexec only READS
      all three of them.  That is the tree's rule -- a byte run the callee only
      READS takes the caller's fraction, a run it WRITES stays whole -- and here
@@ -582,10 +582,15 @@ Definition wp_kexec_sconf_body
      has nothing to do with SIE.  Spelled [b] the two coincided at the only
      instance the deleted [b = true] premise admitted. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (V' : pprivate)
+  (* THE MOVED IMAGE.  kexec REPLACES the address space -- a second table,
+     the program loaded into it, the old one freed -- so the block comes
+     back at a NEW image, ∃-weakened here exactly as the other
+     memory-writing contracts' posts are (milestone J item 1's staging).
+     What the image IS (the ELF's bytes below [szv']) is win-2 work. *)
+  ∀ (mf : regfile) (U' : ustate)
     (entry spv szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗
-      ⌜kexec_ok V V' (mf !!! Regidx (mword_of_int 10 : mword 5))
+      ⌜kexec_ok (us_V U) (us_V U') (mf !!! Regidx (mword_of_int 10 : mword 5))
                 entry spv szv' na alen⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -595,7 +600,7 @@ Definition wp_kexec_sconf_body
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       kalloc_env fsc_kalloc None -∗
-      proc_priv gf pj pidv V' -∗
+      proc_priv gf pj pidv U' -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
       ([∗ list] i ∈ seq 0 na,
@@ -615,12 +620,12 @@ Module Type KEXEC.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen aslen : nat -> nat) (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_kexec_sconf_body gs jp gl pd pav pu
  gf
  plen pfun na avf alen aslen afun
-                          pidv V dqb dqs dqa dqpv dqas m K eb b lks.
+                          pidv U dqb dqs dqa dqpv dqas m K eb b lks.
 End KEXEC.

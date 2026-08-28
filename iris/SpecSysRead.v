@@ -272,7 +272,7 @@ Definition wp_sys_read_sconf_body
  (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (fn : fread_names)                           (* the file system's ghosts *)
-    (pidv : mword 32) (V : pprivate)
+    (pidv : mword 32) (U : ustate)
     (v v2 : mword 64)                            (* syscall arguments 0, 2  *)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_read in
@@ -286,9 +286,9 @@ Definition wp_sys_read_sconf_body
      carries.  Argument 1 (the user destination) is fetched but never
      inspected here -- it goes straight to fileread, whose callees are total
      in it -- so only its EXISTENCE has to be assumed. *)
-  pv_tf V !! tf_arg_idx 0 = Some v ->
-  (exists v1 : mword 64, pv_tf V !! tf_arg_idx 1 = Some v1) ->
-  pv_tf V !! tf_arg_idx 2 = Some v2 ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
+  (exists v1 : mword 64, pv_tf (us_V U) !! tf_arg_idx 1 = Some v1) ->
+  pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
   (* NO NUMERIC PREMISE.  [SpecFileread] takes [-2^31 <= n < 2^31] and a
      trapframe word satisfies that unconditionally ([sys_rw_count_range]),
      so this contract asks its caller for NOTHING about the count -- which is
@@ -314,7 +314,7 @@ Definition wp_sys_read_sconf_body
      call: [kernel_data] above mints the literal, and this is the console
      bundle printk needs.  Persistent, and syscall already holds it. *)
   panic_env -∗
-  proc_priv γf pj pidv V -∗
+  proc_priv γf pj pidv U -∗
   kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   (* ...and the file system in the form that does NOT name a file, plus the
@@ -330,15 +330,17 @@ Definition wp_sys_read_sconf_body
   (* THE CROSSING IS THE LITERAL [true]: fileread parks, and a park moves the
      hart with interrupts off, so the crossing has nothing to do with SIE. *)
   wp_next true pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd),
+  (* the image moves: the copy leaves may fault a page in, and copyout
+     writes user memory -- milestone J item 1's ∃-weakened staging *)
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      ⌜sys_read_ret V v (sys_rw_count v2) r⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜sys_read_ret (us_V U) v (sys_rw_count v2) r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pidv (upd_upt V P') -∗
+      proc_priv γf pj pidv (upd_usM (us_upt U P') M') -∗
       kalloc_env fsc_kalloc None -∗
       (* the file system, back.  fileread's own postcondition returns the
          superblock fraction and the slot unit; everything else in the bundle
@@ -358,8 +360,8 @@ Module Type SYSREAD.
  (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_sys_read_sconf_body γf γs j γlp fn pidv V v v2 m av eb b lks.
+      wp_sys_read_sconf_body γf γs j γlp fn pidv U v v2 m av eb b lks.
 End SYSREAD.

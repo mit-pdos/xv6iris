@@ -188,7 +188,7 @@ Definition wp_ialloc_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate)
+    (b : bool) (lks : gset string) (Upr : ustate)
     (t : nat) (qt : Qp) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
@@ -263,7 +263,7 @@ Definition wp_ialloc_sconf_body
      [Print Assumptions] at the gate targets. *)
   ireg_open -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle and the disk fabric *)
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
@@ -307,7 +307,7 @@ Definition wp_ialloc_sconf_body
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       bslots 2 -∗
       (if alloc
        then (* SUCCESS: iget's postcondition verbatim, at the claimed inum *)
@@ -382,7 +382,7 @@ Definition wp_ialloc_gen_body
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate)
+    (b : bool) (lks : gset string) (Upr : ustate)
     (t : nat) (qt : Qp) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
@@ -457,7 +457,7 @@ Definition wp_ialloc_gen_body
      [Print Assumptions] at the gate targets. *)
   ireg_open -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle and the disk fabric *)
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
@@ -505,7 +505,7 @@ Definition wp_ialloc_gen_body
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       bslots 2 -∗
       (if alloc
        then (* SUCCESS: iget's postcondition verbatim, at the claimed inum *)
@@ -547,11 +547,11 @@ Module Type IALLOC.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
       (t : nat) (qt : Qp),
       wp_ialloc_gen_body γs j γl pd pav pu
  ty u Sb
-                         pidv dq dqs dqn m K eb b lks Vpr t qt.
+                         pidv dq dqs dqn m K eb b lks Upr t qt.
 
   Parameter wp_ialloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
@@ -562,9 +562,9 @@ Module Type IALLOC.
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
       (t : nat) (qt : Qp),
       wp_ialloc_sconf_body γs j γl pd pav pu
  ty u
-                           pidv dq dqs dqn m K eb b lks Vpr t qt.
+                           pidv dq dqs dqn m K eb b lks Upr t qt.
 End IALLOC.

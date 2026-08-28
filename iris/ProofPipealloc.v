@@ -132,8 +132,8 @@ Section ProofPipealloc.
       (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool)
-      (lks : gset string) (pidv : mword 32) (Vpr : pprivate)
-    : wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p K b lks pidv Vpr.
+      (lks : gset string) (pidv : mword 32) (Upr : ustate)
+    : wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p K b lks pidv Upr.
   Proof.
     cbv beta delta [wp_pipealloc_sconf_body].
     (* [Hbelow] is the ORDER premise pipealloc's whole cone needs: the LOWEST
@@ -356,7 +356,7 @@ Section ProofPipealloc.
         (* the block comes back BEFORE the post, so a caller that leaves the
            post as its trailing goal -- which every arm below does -- does not
            have to open a bullet for it. *)
-        proc_priv_bare p pidv Vpr -∗
+        proc_priv_bare p pidv Upr -∗
         iref_slot -∗
         pipealloc_post γf γk on pf0 pf1 res -∗
         WP (Loop : expr riscv_lang)))%I).
@@ -562,7 +562,7 @@ Section ProofPipealloc.
         fd_slot -∗
         PF1 -∗
         kalloc_avail γk on -∗
-        proc_priv_bare p pidv Vpr -∗
+        proc_priv_bare p pidv Upr -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)))%I).
     set (T4C := (wp_next (CID0 := CID) true p (fun (CIDu : CpuId) =>
@@ -587,7 +587,7 @@ Section ProofPipealloc.
         (∃ w : mword 64, pf0 ↦₈[KT1] w) -∗
         PF1 -∗
         kalloc_avail γk on -∗
-        proc_priv_bare p pidv Vpr -∗
+        proc_priv_bare p pidv Upr -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert (EPI ∧ T8)%I with "[Hepi]" as "HK1".
@@ -738,7 +738,7 @@ Section ProofPipealloc.
                      with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDt CIDt5 eb p ltac:(ext_chain Hbf)
                      with "Hextm") as "Hextm".
-        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp _ inhabitant on U4 n eb p (K - 6)%nat b lks pidv Vpr
+        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp _ inhabitant on U4 n eb p (K - 6)%nat b lks pidv Upr
                   ltac:(lia) Hnoffpos HU4a0 Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hftab Hpe Href1 Hpbare Hiru []").
         all: try lkbelow.
@@ -818,7 +818,7 @@ Section ProofPipealloc.
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDu CIDu1 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
-      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp _ inhabitant on V1 n eb p (K - 6)%nat b lks pidv Vpr
+      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp _ inhabitant on V1 n eb p (K - 6)%nat b lks pidv Upr
                 ltac:(lia) Hnoffpos HV1a0 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hftab Hpe Href0 Hpbare Hiru []").
       all: try lkbelow.

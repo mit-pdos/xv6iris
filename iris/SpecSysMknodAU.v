@@ -662,7 +662,7 @@ Definition wp_sys_mknod_au_frame
     (ns : nat)                                          (* the iref ledger     *)
     (dqb dqs dqbs dqn : dfrac)
     (v0 v1 v2 : mword 64)                    (* syscall arguments 0 / 1 / 2 *)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (EXTRA : iProp Σ) (ARMS : mword 64 -> iProp Σ) :=
@@ -690,9 +690,9 @@ Definition wp_sys_mknod_au_frame
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
-  pv_tf V !! tf_arg_idx 0 = Some v0 ->
-  pv_tf V !! tf_arg_idx 1 = Some v1 ->
-  pv_tf V !! tf_arg_idx 2 = Some v2 ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
+  pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   trap_csrs_ext KT1 eb -∗
@@ -721,13 +721,13 @@ Definition wp_sys_mknod_au_frame
   kalloc_env fsc_kalloc None -∗
   procs_inv gs -∗
   iref_slots ns -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (ns' : nat) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -740,7 +740,7 @@ Definition wp_sys_mknod_au_frame
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
-      proc_priv γf pj pid (upd_upt V P') -∗
+      proc_priv γf pj pid (us_upt U P') -∗
       (* the armed post on the returned a0 (implies [sys_mknod_ret]) *)
       ARMS (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -760,7 +760,7 @@ Definition wp_sys_mknod_au_body
     (ns : nat)
     (dqb dqs dqbs dqn : dfrac)
     (v0 v1 v2 : mword 64)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (P Pmiss : nat -> Z -> iProp Σ)
@@ -769,7 +769,7 @@ Definition wp_sys_mknod_au_body
   let ma := dev_arg v1 in
   let mi := dev_arg v2 in
   wp_sys_mknod_au_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-    v0 v1 v2 pid V m K eb b lks
+    v0 v1 v2 pid U m K eb b lks
     (mknod_au_pre Γfs ma mi P Pmiss Φok Φex)
     (mknod_arms Γfs ma mi P Pmiss Φok Φex).
 
@@ -791,7 +791,7 @@ Definition wp_sys_mknod_au_stable_body
     (ns : nat)
     (dqb dqs dqbs dqn : dfrac)
     (v0 v1 v2 : mword 64)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (q : Qp) (avc : aview) (ds : list Z) (pl0 : list (bv 8))
@@ -804,7 +804,7 @@ Definition wp_sys_mknod_au_stable_body
   arun avc FsImg.ROOTINO ps0 ds ->
   (ds !!! length ps0) ∉ take (length ps0) ds ->
   wp_sys_mknod_au_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-    v0 v1 v2 pid V m K eb b lks
+    v0 v1 v2 pid U m K eb b lks
     (apn_pins Γfs q avc ds ps0 0%nat
      ∗ acre_commit Γfs ∅ (ADev ma mi) Φok
      ∗ dlookup_commit Γfs ∅ Φex)%I
@@ -824,13 +824,13 @@ Module Type SYSMKNOD_AU.
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v0 v1 v2 : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ),
       wp_sys_mknod_au_body γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-        v0 v1 v2 pid V m K eb b lks P Pmiss Φok Φex.
+        v0 v1 v2 pid U m K eb b lks P Pmiss Φok Φex.
 
   (* owed as a DERIVATION from [wp_sys_mknod_au] + the agreement seeds
      above, never as a second walk (doc section 2, "a COROLLARY of the AU
@@ -845,11 +845,11 @@ Module Type SYSMKNOD_AU.
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v0 v1 v2 : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (q : Qp) (avc : aview) (ds : list Z) (pl0 : list (bv 8))
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ),
       wp_sys_mknod_au_stable_body γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-        v0 v1 v2 pid V m K eb b lks q avc ds pl0 Φok Φex.
+        v0 v1 v2 pid U m K eb b lks q avc ds pl0 Φok Φex.
 End SYSMKNOD_AU.

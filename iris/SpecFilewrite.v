@@ -561,7 +561,7 @@ Definition wp_filewrite_sconf_body
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
     (fn : fwrite_names)                          (* the heavy arms' ghosts  *)
-    (pidv : mword 32) (V : pprivate)
+    (pidv : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filewrite in
   let pj := proc_addr j in
@@ -605,7 +605,7 @@ Definition wp_filewrite_sconf_body
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
   file_ref γf k q st -∗
   (* ambient, because three of the four arms copy FROM user memory *)
-  proc_priv_core pj pidv V -∗
+  proc_priv_core pj pidv U -∗
   kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
@@ -617,16 +617,18 @@ Definition wp_filewrite_sconf_body
      [b = true] at the only constructible instance, so this is not a change of
      strength today; it is the spelling the eb-generic sweep needs. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (r : mword 64) (P' : uptd),
+    (* the image moves: the copy leaf may fault a page in, and copyout
+       writes user memory -- milestone J item 1's ∃-weakened staging *)
+  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜filewrite_ret n r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q st -∗
-      proc_priv_core pj pidv (upd_upt V P') -∗
+      proc_priv_core pj pidv (upd_usM (us_upt U P') M') -∗
       filewrite_env_out fn st -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -638,7 +640,7 @@ Module Type FILEWRITE.
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fwrite_names)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
-      wp_filewrite_sconf_body γf γs j γlp k q st fn pidv V m K eb n b lks.
+      wp_filewrite_sconf_body γf γs j γlp k q st fn pidv U m K eb n b lks.
 End FILEWRITE.

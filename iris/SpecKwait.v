@@ -142,7 +142,7 @@ Notation K_kwait := (62%nat) (only parsing).
 Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
-    (pid : mword 32) (V : pprivate) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kwait in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -167,16 +167,18 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
   (* copyout's lazy faulting and freeproc's kfree chain both live here *)
   kalloc_env γa None -∗
   (* the caller's own private block: copyout reads p->pagetable and p->sz *)
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   wp_next b pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (P' : uptd) (rv : mword 32),
+    (* the image moves: the copy leaf may fault a page in, and copyout
+       writes user memory -- milestone J item 1's ∃-weakened staging *)
+    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (M' : gmap Z (bv 8)),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
-      ⌜ uptd_ext_sz (pv_sz V) (pv_upt V) P' ⌝ -∗
+      ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pid (upd_upt V P') -∗
+      proc_priv γf pj pid (upd_usM (us_upt U P') M') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -185,6 +187,6 @@ Module Type KWAIT.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
-      (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_kwait_sconf_body γa γf γw γs j γl m av eb b pid V lks.
+      (pid : mword 32) (U : ustate) (lks : gset string),
+      wp_kwait_sconf_body γa γf γw γs j γl m av eb b pid U lks.
 End KWAIT.

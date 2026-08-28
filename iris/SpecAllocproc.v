@@ -162,13 +162,13 @@ Definition allocproc_post
      procs_avail op)
   ∨ (* --- found: a0 = &proc[j], j's lock HELD, the private block built --- *)
     (∃ (j : nat) (γl : gname) (ch : mword 64) (pid : mword 32)
-       (V : pprivate) (root tfp : mword 44) (ks : mword 64)
+       (U : ustate) (root tfp : mword 44) (ks : mword 64)
        (rest : list (mword 64)) (nc : nat),
        ⌜ rv = proc_addr j /\
          (j < NPROC)%nat /\ γs !! j = Some γl /\
-         pv_upt V = upt_desc root tfp /\
-         pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
-         pv_cwd V = (zero_reg : mword 64) /\
+         pv_upt (us_V U) = upt_desc root tfp /\
+         pv_ofile (us_V U) = replicate NOFILE (zero_reg : mword 64) /\
+         pv_cwd (us_V U) = (zero_reg : mword 64) /\
          length rest = 12%nat /\ (nc <= K_allocproc)%nat ⌝ ∗
        proc_held cpu_id j γl USED ch ∗
        (* proc j's HART TAG, whole.  A not-RUNNING proc keeps both halves in
@@ -182,7 +182,7 @@ Definition allocproc_post
           this [V] to hand back.  The caller closes the construction window
           when it installs a working directory ([proc_priv_split_cwd]);
           kfork does it at its [sd a0,336(s4)]. *)
-       proc_priv_nocwd γf (proc_addr j) pid V ∗
+       proc_priv_nocwd γf (proc_addr j) pid U ∗
        (* THE DESCRIPTOR-STATE FRAGMENTS, minted here with the block: this
           is the one function that chooses a process's [pv_fdg]
           ([ProcInv.proc_dormant_unused]), so it is the one place the
@@ -191,7 +191,7 @@ Definition allocproc_post
           into [UsertrapRes.ut_own], where every fd operation spends it.
           A FAILURE TAIL simply drops it -- the name dies with the
           incarnation that never started. *)
-       fd_frags_any (pv_fdg V) ∗
+       fd_frags_any (pv_fdg (us_V U)) ∗
        (* THE SLOT IS NOW ALLOCATED.  Persistent, minted here out of
           [procs_avail]'s authority, and what the caller hands to
           [SchedCtx.proc_slots_park] when it releases the slot at USED or

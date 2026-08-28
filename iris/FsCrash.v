@@ -2212,6 +2212,30 @@ Section fs_crash.
     iPureIntro. exact Hwf.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  WHAT A BOOT IS LENT (durable-disk BT-2).                           *)
+  (*                                                                     *)
+  (*  A NAME, because [RiscvAdequacy]'s [Rb] parameter is instantiated at *)
+  (*  it and the instantiation has to be spellable at the adequacy site   *)
+  (*  without unfolding anything.  It is the accessor's output with the   *)
+  (*  wand already closed: the committed map the machine's own disk       *)
+  (*  recovers to, and a WHOLE EPOCH standing at it.                      *)
+  (*                                                                     *)
+  (*  [D] IS PINNED, not merely existential: [fs_recovery_det] makes it a *)
+  (*  function of [fs_blocks dk], so the boot's own [fs_boot_pure] names  *)
+  (*  the same map and no state-determinacy theorem is needed -- the      *)
+  (*  abstract state comes out of the RESOURCE.  That is the whole reason *)
+  (*  this crosses at [P_fs_swap] and not inside an era: only the PowerOn *)
+  (*  arm holds the fixed disk auth, so only there is [dk] the machine's. *)
+  (* ------------------------------------------------------------------ *)
+  Definition P_fs_lend (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : iProp Σ :=
+    (∃ D : gmap Z (list (bv 8)),
+       ⌜fs_recovery (fs_blocks dk) D cov ls⌝ ∗ P_dur D)%I.
+
+  Global Instance P_fs_lend_timeless cov ls dk :
+    Timeless (P_fs_lend cov ls dk).
+  Proof. rewrite /P_fs_lend. apply _. Qed.
+
   (* -------------------------------------------------------------------- *)
   (* 3a'. THE PURE PROJECTION (stage H0, claude-notes/projects/             *)
   (*      durable-disk.md): what a holder of the DURABLE AUTH -- and only    *)
@@ -2337,7 +2361,13 @@ Section fs_crash.
          disk_img_auth_sized γd N dk ∗
          ▷ P_fs_named γd N γsw γreg γst cov ls ∗
          ghost_var (era_mirror_name E) (1/2) (mirror_of (fs_blocks dk)) ∗
-         mono_nat_lb_own γsw (S gen)).
+         mono_nat_lb_own γsw (S gen) ∗
+         (* ...AND THE EPOCH, LENT (durable-disk BT-2).  The record keeps
+            its own; what leaves is a CLONE ([FsDurSnap.P_dur_clone], a
+            fresh family minted by the transport off the record's, with the
+            record's handed straight back), so nothing the crash predicate
+            owns is spent and no arity of [P_fs] moves. *)
+         P_fs_lend cov ls dk).
   Proof.
     iIntros "#Hreg #Hst Hsa Ha HM HP". iMod "HP".
     rewrite /P_fs_named. iDestruct "HP" as (dk0) "(Hfr & %Hext & HPr)".
@@ -2349,6 +2379,14 @@ Section fs_crash.
                  (eq_sym Hrd) Hext with "HPr") as "HPr".
     rewrite /P_fs_rec_named. iDestruct "HPr" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
+    (* THE LOAN (durable-disk BT-2), taken through the accessor and given
+       back in the same breath: [P_fs_dur_acc] hands the epoch out with the
+       record's own recovery fact, [P_dur_clone] mints the era's copy off
+       it, and the wand puts the record's back.  [P_fs] is not touched. *)
+    iDestruct (P_fs_dur_acc γs cov ls dk with "HPfs")
+      as (Dl) "(%Hrecl & Hdur0 & Hback)".
+    iMod (P_dur_clone Dl with "Hdur0") as "[Hdur0 Hlend]".
+    iDestruct ("Hback" with "Hdur0") as "HPfs".
     rewrite /P_fs. iDestruct "HPfs" as (r) "(Hh & %Hwf & Harm & Hdur)".
     (* the two halves: one stays with the era, one goes into the arm *)
     iEval (rewrite -Qp.half_half) in "HM".
@@ -2372,8 +2410,22 @@ Section fs_crash.
       iFrame "Hdur". iExact "Harm". }
     iDestruct (P_fs_rec_agree γsw γreg γst cov ls N dk dk0
                  Hrd Hext with "HPr") as "HPr".
-    iModIntro. iModIntro. iFrame "Hsa Ha HMe Hswlb".
-    iNext. iExists dk0. iFrame "Hfr HPr". iPureIntro. exact Hext.
+    (* NO BARE [iFrame] HERE (durable-notes.md, "[iFrame] resolves its
+       instances up to delta"): [P_fs_named]'s body owns
+       [disk_img_bytes γd 0 (disk_read dk0 0 N)], a big_sepL of [N] bytes
+       behind a [Definition], and the post now also carries an EXISTENTIAL
+       ([P_fs_lend]) that framing would try to instantiate.  Placed by name.
+       Measured at the caller: a bare [iFrame] over this shape took
+       SystemAdequacy.v from 7 s to unbounded at 32 GB. *)
+    iModIntro. iModIntro.
+    iSplitL "Hsa"; [iExact "Hsa" |].
+    iSplitL "Ha"; [iExact "Ha" |].
+    iSplitL "Hfr HPr".
+    { iNext. iExists dk0. iFrame "Hfr HPr". iPureIntro. exact Hext. }
+    iSplitL "HMe"; [iExact "HMe" |].
+    iSplitR "Hlend"; [iExact "Hswlb" |].
+    rewrite /P_fs_lend. iExists Dl.
+    iSplitR; [iPureIntro; exact Hrecl | iExact "Hlend"].
   Qed.
 
   (* THE SILVER LINING (durable-disk 1a): with the era's mirror born true,

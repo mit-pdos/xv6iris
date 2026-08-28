@@ -57,16 +57,106 @@ H below moved the mint from the park's ambient world to the PARKER, but the
   the verified-fork story needs (the parent owes the child a WP).  Details
   in `../design/user-wp-slot.md`.
 
+## MILESTONE J (PLANNED, owner to review): boundary-row circulation
+
+Supersedes the residue-row mechanics of milestone G while keeping its
+return channel and lane H's park delivery.  The slot is STORAGE-FREE
+(see the placement ruling below); V and M are named BY BINDERS at the
+seams, never by storage.  Landable GREEN under the generic
+instantiation, before any sync linking:
+
+1. **M-exposure refactor — RULED (owner): no `_at` flavor, no
+   ∃-closed wrapper.  `proc_priv` ITSELF takes `M` as an argument**
+   (`proc_priv γf pa pid V M`, the page contents as the named
+   `umem_own`-shaped view; same for `proc_priv_nopt`/`_bare`/core),
+   and every referring site changes.  The three wins this buys:
+   (1) the WP ties to `proc_priv` freely — the slot's key names the
+   block's own `V M`; (2) syscall specs become PRECISE — they can
+   speak about arguments in `V`, the return value into a0, and how
+   the syscall reads or writes `M`; (3) most kernel functions taking
+   `proc_priv` do not change `V`/`M`, and their signatures now SAY so
+   — preservation of WP preconditions by signature, no machinery.
+   STAGING for green: first the signature sweep with memory-writing
+   functions' posts ∃-weakened (`∃ M', proc_priv … V' M'` — today's
+   information content made explicit), then per-function precise
+   M-effects (copyout's written window, vmfault's zero page — the
+   win-2 spec-writing, incremental).  SWEPT (uncommitted, full gate +
+   audit green): 214 files; decisions — `proc_priv_nopt` carries NO
+   `M` (the bytes ride `proc_pt P M`;
+   `proc_priv V M ⊣⊢ proc_priv_nopt V ∗ proc_pt (pv_upt V) M`);
+   `proc_pt_any := ∃ M, proc_pt P M` is the ∃-weakened tier for the
+   sub-`proc_priv` copy cone and dormant arms.  The ∃-weakened set
+   (the win-2 worklist, full list in the sweep log) includes the copy
+   cone, `wp_syscall_sconf`, `wp_piperead_sconf`, the kexec trio, and
+   `ut_own_priv`'s closer (now `∀ V' M'`).  One precise crossing
+   landed already: `wp_uvmcopy_sconf` names the PARENT's image and
+   returns it on the nose (the va-keyed `M` is recoverable from the
+   sz-relative `proc_ptm` view because `umem_lazy`'s existential half
+   is a submap pinned by its domain — reusable lemmas in
+   ProofUvmcopy).  (Noted alternative — `M` as a
+   `pprivate` field `pv_mem`, mirroring `pv_tf` — set aside per the
+   ruling; the argument form is what syscall specs will be written
+   against.)  The residue's ∃-prefix gains `M` directly.
+2. **Delete `ut_own`'s slot row and its accessors** (`uwp_acc`,
+   `run_open`); `Rut` returns to the plain bare form (the hole trick
+   dies); the park channel's closer row is re-typed KEYED under the
+   binders it already receives (`V'` is an argument; `M'` joins).
+3. **Boundary rows**: slotted residue VARIANTS
+   (`∃ N V av M, ⟨rows⟩ ∗ S V M`, the shape functional `S` chosen by
+   the boundary) — usertrap's pre takes `S := uexec_ret sc_v`
+   (cause-indexed, coupled to the `sc_v` its boundary already names);
+   its arms' posts and the composed `wp_uservec_pt` post carry the
+   PRECISE slot at the final key, PLUS the agreement equations
+   (`mf = tf_resume_gpr b V'`, `ret_pc uepc = tf_resume_pc V'`, memory
+   = the named `M'`); the loop applies the keyed slot from the round's
+   post.  The paired return channel refines so the returned WP is
+   bound by the trap state at the frame's own binders.
+4. **Item 3 has TWO halves** (identified this round): the RESTORE
+   agreement (userret reads the tf words — already exposed at
+   `wp_userret_pt`'s level) and the SAVE agreement (the returned WP is
+   machine-keyed at trap time; uservec's save walk manufactures
+   `V_trap` with tf-derived state = trapped state, licensing the
+   conversion to tf-keying).  Both look provable from what those
+   proofs do internally; the work is exposing them at the composed
+   post.
+5. Then the userinit probe re-applies; expected next wall: the
+   `uv_cap` premise on the true branch → the sync trap-exit reshape
+   onto the return channel (umode side).
+
 ## The ledger
 
 1. **Re-key the residue's conjunct** from the ∀-state `uexec_wp` to the
    trapframe-keyed slot at `ut_own`'s own `V` (and an `M` per item 2).
    Localized by design to `UsertrapRes.v` plus the dispatcher's deposit
-   obligations (the accessor's closer is the deposit channel).  Two
-   rulings to get from the owner before starting:
-   - PLACEMENT: whether the conjunct stays in `ut_own` or becomes a
-     `proc_priv` field proper (deferred, not rejected — it IS a
-     per-process WP; the accessor seam localizes the move either way).
+   obligations (the accessor's closer is the deposit channel).  One
+   ruling obtained, one open:
+   - PLACEMENT — RULED, twice revised, now SETTLED (owner): the slot
+     is STORAGE-FREE — never a conjunct of `proc_priv` OR `ut_own`.
+     Follow the lifetime: running during user execution; in usertrap's
+     proof context (cause-shaped) from trap entry to deposit — a
+     mid-excursion park's closure captures the context, and the slot
+     types are hart-free, so no stored row is needed for
+     park-survival; at a concrete just-built key from deposit to sret;
+     and delivered at process creation through the park channel
+     (kfork's lane-H premise / userinit).  Storing it in the block
+     would ERASE the discriminating knowledge (which scause, which
+     ret) the surrounding proof holds for free, and would thread a
+     conjunct through 216 `proc_priv` consumers none of which may
+     touch it.  Instead: EXPLICIT BOUNDARY ROWS on the trap chain —
+     `usertrap`'s precondition gains the cause-indexed
+     `uexec_ret sc_v V M` (its boundary already names `sc_v`); its
+     arms' posts, and the composed round's post, carry the PRECISE
+     slot at the final key; userret's application site consumes it
+     from the round's post.  `ut_own`'s slot row and its accessors
+     are DELETED, not moved.  What survives of the earlier ruling is
+     M-NAMING (item 2): the block's page-contents existential becomes
+     a named `M` so the rows are stateable, and the trap-chain
+     boundaries get SLOTTED VARIANTS of the residue whose `∃ V M`
+     scope includes the row (a phase-form beside
+     `ut_res`/`parked`/`bare`, seen only by the trap chain).  Costs
+     accepted: boundary-spec surgery on uservec/usertrap/userret, and
+     the run-site agreement (item 3) becomes unavoidable even for the
+     generic era once the rows are keyed.
    - THE `sp_idx` TIER QUESTION: `UexecSlot.v` deliberately does not
      import `UmodeAbi` (`tf_resume_gpr_sp` is stated at
      `Regidx (mword_of_int 2)`, convertible with `sp_idx`).  If the
@@ -101,6 +191,73 @@ H below moved the mint from the park's ambient world to the PARKER, but the
    proof obligation inside item 5.  Raw material on the process side:
    `usys_ret`'s `∀ ret` continuation (the syscall case) and
    `uv_intr_wp`'s resume wand (the identity case).
+
+   **THE SYSCALL SHAPE (owner-specified).**  At an ecall, the u-mode
+   proof returns a UNIVERSALLY QUANTIFIED WP: forall a0, resuming with
+   the rest of `V` and `M` exactly the same is ok — spelled over the
+   BUMPED trapframe, `uexec_slot_sc V M := ∀ r, uexec_slot
+   (V[epc := epc+4][a0 := r]) M` — and, for buffer-filling syscalls
+   later, additionally universal over the updated memory region.  So
+   usertrap DISTINGUISHES trap kinds: a transparent trap (device
+   interrupt) returns the PRECISE `uexec_slot V M`, deposited at trap
+   entry and untouched; a syscall trap returns the sc shape, carried
+   through the dispatch IN THE PROOF (a mid-syscall park's closure
+   captures it; residue-residence is only needed across user
+   execution), and the dispatcher instantiates it at its concrete ret
+   — holding the precise slot at exactly the `V'` it built — before
+   userret.  NO SHAPE DISJUNCTION IN `proc_priv` (owner ruling): the
+   disjunction's discriminant is the trap cause, which `proc_priv` has
+   no business knowing — the multiplexing lives at USERTRAP'S BOUNDARY,
+   which already takes `sc_v` as an argument: a cause-indexed family
+   `uexec_ret sc V M := if sc = ecall then uexec_slot_sc V M else
+   uexec_slot V M` in usertrap's precondition, correlated with the
+   frame's actual cause by the user-side trap arms (they know theirs
+   concretely).  `proc_priv` holds ONE row — its home state, the
+   precise `uexec_slot V M` (transitionally the ∀-state form until the
+   run-site agreement lands; a sequential type change, never a
+   disjunction) — and is HOLED throughout the kernel excursion, so the
+   mid-syscall closers (copyout, a0/epc writes) face no slot
+   obligations at all; the cause-shaped WP travels in usertrap's proof
+   context (mid-syscall parks capture it in the closure), and the
+   deposit back into `proc_priv` happens where the shape is precise
+   again — immediately on the transparent arm, at
+   instantiation-at-ret on the syscall arm.  Sync fits entirely:
+   sync = the sc shape, exit's return is never consumed.
+
+   **VMFAULT REPRESENTATION WART.**  "Zero-fill vmfault is transparent"
+   requires the process-visible `M` to be the sz-region view with
+   unbacked pages reading as zeros (fault-invisible); today `umem_own`
+   pins `dom M = uva_dom pt`, so a fault EXTENDS `M`.  A representation
+   change on the `user_pt_inv`/umode side, deferred until a faulting
+   program forces it (sync never faults).  RESOLVED BY RULING (owner): the
+   wart was a representation mismatch, not a missing proof —
+   `SpecVmfault`'s `proc_ptm` form already proves vmfault preserves
+   `M` at the sz-region view (`umem_lazy`; unbacked pages read as
+   zeros).  `proc_priv`'s boundary conjunct becomes
+   `proc_ptm (pv_upt V) (uint (pv_sz V)) M` (sz is already in `V`),
+   making copyin and every fault-only path same-`M` by the existing
+   theorem; the ∃-weakened worklist shrinks to the genuine writers;
+   the mapped-domain view stays at the sub-`proc_priv` tier.  Lands
+   together with the USTATE RECORD (owner ruling):
+   `Record ustate := { us_V : pprivate; us_M : gmap Z (bv 8) }`,
+   `proc_priv γf pa pid (U : ustate)` — future user-visible state
+   (fd view, PID) becomes FIELDS, never arity changes; the slot
+   re-keys on the record.
+
+   **THE FORK CLAUSE (owner-specified).**  fork's spec will require the
+   u-mode proof to deposit TWO WPs at the ecall: one requiring return
+   value 0 (the child) and one handling the non-zero return (the
+   parent), everything else — `M`, the other registers — identical.
+   The kernel-side seam already exists: kfork's "parking a child
+   consumes a `uexec_wp`" premise takes the child half (replacing
+   today's generic mint in sys_fork's proof), and the parent half is
+   the slot returned through the ecall's return channel.  In the
+   trapframe+image keying: `V_child` = the parent's `V` modulo the a0
+   word (plus fresh `pv_upt`/pid), and the child's image is the SAME
+   va-keyed `M` (fork copies pages; the va view is address-space
+   independent).  The parent continuation must also cover the failure
+   arm (`a0 = -1`, no child, child WP not consumed); the kernel's spec
+   selects the arm.
 
 5. **Discharge `uv_cap` from the kernel** (usertrap/userret round trip +
    per-syscall kernel specs) — the step that turns `sync_uexec_slot`'s

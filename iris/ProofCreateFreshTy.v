@@ -152,7 +152,7 @@ Definition create_fresh_ty_body
     (qc : Qp)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (Ma : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) : Prop :=
+    (b : bool) (lks : gset string) (Upr : ustate) : Prop :=
   let pj := proc_addr j in
   (* ---- ialloc's and ilock's own geometry, verbatim ---- *)
   (K_ialloc <= K)%nat ->
@@ -193,11 +193,12 @@ Definition create_fresh_ty_body
      (ty' : mword 16) (u' : nat) (Sb' : gset Z)
      (pidv' : mword 32) (dq' dqs' dqn' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
-     (lks' : gset string) (Vpr' : pprivate) (t' : nat) (qt' : Qp),
+     (lks' : gset string) (Upr' : ustate)
+     (t' : nat) (qt' : Qp),
      wp_ialloc_gen_body (CID := CIDa) γs' j' γl' pd' pav' pu'
 
  ty' u' Sb' pidv' dq' dqs' dqn'
-                        m' K' eb' b' lks' Vpr' t' qt') ->
+                        m' K' eb' b' lks' Upr' t' qt') ->
   (forall `{CIDl : CpuId}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (pd' pav' pu' : mword 64)
@@ -206,11 +207,11 @@ Definition create_fresh_ty_body
      (inum' : mword 32)
      (pidv' : mword 32) (dq' dqs' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
-     (lks' : gset string) (Vpr' : pprivate),
+     (lks' : gset string) (Upr' : ustate),
      wp_ilock_dep_sconf_body (CID := CIDl) γs' j' γl' pd' pav' pu'
                              gil' gisl'
                              k' s' g' d' o' inum' pidv' dq' dqs'
-                             m' K' eb' b' lks' Vpr') ->
+                             m' K' eb' b' lks' Upr') ->
   (* ================= THE SPAN ================= *)
   sie_cap_gpr KT1 Ma K b pj -∗
   cpu_own 0 eb pj b lks -∗
@@ -236,7 +237,7 @@ Definition create_fresh_ty_body
   is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   bslots 3 -∗
   iref_slot -∗
   (* THE PARENT'S OWN [dev] CELL: the [lw a0,0(s1)] at +0xa6 reads it, and
@@ -257,7 +258,7 @@ Definition create_fresh_ty_body
       cpu_own 0 eb pj b lks -∗
       sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       bslots 3 -∗
       i_dev (ientry kd) ↦₄{dqp} icfg_dev -∗
       (if alloc
@@ -397,10 +398,10 @@ Lemma create_fresh_ty :
       (u : nat) (Sb : gset Z) (t : nat) (qt : Qp) (qc : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       create_fresh_ty_body γs j γl pd pav pu
  ty kd dqp
-                           u Sb t qt qc pidv dq dqs dqn Ma K eb b lks Vpr.
+                           u Sb t qt qc pidv dq dqs dqn Ma K eb b lks Upr.
 Proof.
   intros.
   cbv beta delta [create_fresh_ty_body]. cbv zeta.
@@ -490,7 +491,7 @@ Proof.
   iDestruct (cpu_own_transport CID CID3 0%nat eb (proc_addr j) b
                ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
   iApply (Hia CID3 γs j γl pd pav pu
-            ty u Sb pidv dq dqs dqn A3 K eb b lks Vpr
+            ty u Sb pidv dq dqs dqn A3 K eb b lks Upr
             t qc
             HKia Hlg Hist Hiregb Hn1 Hn2 Hn3 Htynz Htyk Hpkc Hj Hgs HA3a0 HA3a1 Heb
             Hbelow
@@ -592,7 +593,7 @@ Proof.
     iApply (Hil CID7 γs j γl pd pav pu gilc gislc
               kslot (q/2)%Qp gsh
               (DepTx (q/2)%Qp icfg_dev inum gsh t qt) (ClaimK ty t qc) inum pidv dq dqs
-              B1 K eb b lks Vpr
+              B1 K eb b lks Upr
               HKil eq_refl ltac:(discriminate)
               Hkslt Hlg Hist Hcblk Hinb Hj Hgs HB1a0 ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc Hireg

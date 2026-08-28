@@ -208,7 +208,7 @@ Definition wp_ilock_dep_sconf_body
     (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ilock in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -348,7 +348,7 @@ Definition wp_ilock_dep_sconf_body
   (* sb.inodestart, read once *)
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle *)
   procs_inv gs -∗
   (* the disk fabric *)
@@ -372,7 +372,7 @@ Definition wp_ilock_dep_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslot -∗
       (* THE LOCK IS HELD ... *)
@@ -463,7 +463,7 @@ Definition wp_ilock_tx_sconf_body
     (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ilock in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -565,7 +565,7 @@ Definition wp_ilock_tx_sconf_body
   (* sb.inodestart, read once *)
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle *)
   procs_inv gs -∗
   (* the disk fabric *)
@@ -609,7 +609,7 @@ Definition wp_ilock_tx_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslot -∗
       (* THE LOCK IS HELD ... *)
@@ -696,14 +696,14 @@ Lemma wp_ilock_tx_of_dep
     (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :
+    (b : bool) (lks : gset string) (Upr : ustate) :
   (forall d : ic_dep,
      wp_ilock_dep_sconf_body gs j gl pd pav pu gil gisl
  k s g d o inum
-                             pidv dq dqs m K eb b lks Vpr) ->
+                             pidv dq dqs m K eb b lks Upr) ->
   wp_ilock_tx_sconf_body gs j gl pd pav pu gil gisl
  k s g o inum
-                         pidv dq dqs m K eb b lks Vpr.
+                         pidv dq dqs m K eb b lks Upr.
 Proof.
   cbv beta delta [wp_ilock_tx_sconf_body wp_ilock_dep_sconf_body].
   intros Hgen pcE ip pj ret_tgt HK Hk Hgeom Hst Hcov Hinlt Hj Hgl Ha0 Hbelow.
@@ -742,10 +742,10 @@ Module Type ILOCK.
       (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_ilock_dep_sconf_body gs j gl pd pav pu gil gisl
  k s g d o inum
-                              pidv dq dqs m K eb b lks Vpr.
+                              pidv dq dqs m K eb b lks Upr.
   (* THE TRANSACTIONAL FORM (durable-disk B''-tx).  Same C function, same
      proof; what selects it is whether the caller brings [LogInv.log_tx].
      [ProofIlock] defines it by [wp_ilock_tx_of_dep]. *)
@@ -757,8 +757,8 @@ Module Type ILOCK.
       (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_ilock_tx_sconf_body gs j gl pd pav pu gil gisl
  k s g o inum
-                             pidv dq dqs m K eb b lks Vpr.
+                             pidv dq dqs m K eb b lks Upr.
 End ILOCK.

@@ -1152,12 +1152,12 @@ Section ProofInitlog.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
       (bs_sb : list (bv 8)) (sbrec : fs_sb)
     : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γpr
                             cov logstart dev sb bs_hdr Xv M L D
                             vlock vname vcpu v_start v_dev v_nc v_n
-                            pidv dq dqs m K eb b lks Vpr bs_sb sbrec.
+                            pidv dq dqs m K eb b lks Upr bs_sb sbrec.
   Proof.
     cbv beta delta [wp_initlog_sconf_body].
     intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Hbnd Hndup Hin Hpk
@@ -1752,7 +1752,7 @@ Section ProofInitlog.
     iApply (Bread.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               T3 (K - 6)%nat eb b
-              _ Vpr HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1
+              _ Upr HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1
               Hbelow
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hs1u").
@@ -1910,7 +1910,7 @@ Section ProofInitlog.
     assert (HKbl : (K_brelse <= K - 6)%nat) by (lia).
     iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk pidv dev
               (mword_of_int logstart : mword 32) dq B2 (K - 6)%nat eb pj
-              bs_hdr bsd0 d0 b _ Vpr HKbl HA HB2a0
+              bs_hdr bsd0 d0 b _ Upr HKbl HA HB2a0
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
     all: try lkbelow.
@@ -2117,7 +2117,7 @@ Section ProofInitlog.
               (fun i : nat =>
                  log_mirror_half (lm_install M ((hdr_dec bs_hdr).2)
                                     (fun k : nat => ys !!! k) i))
-              _ Vpr HKit Hgeomok Hj Hgl
+              _ Upr HKit Hgeomok Hj Hgl
               HC2a0 Hshapeg Hnodupg Hwok' HLwg HDg Hexcg
               Hbelow Hpkg
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv [] Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hcells Hbrow Hxo HLauth HDauth
@@ -2350,7 +2350,7 @@ Section ProofInitlog.
                    (lm_install M ((hdr_dec bs_hdr).2)
                       (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1))
                    (log_hdr_bno logstart) bs'))%I
-              _ Vpr HKwh Hgeomok Hj Hgl Hshape0
+              _ Upr HKwh Hgeomok Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hmirn]").
     all: try lkbelow.

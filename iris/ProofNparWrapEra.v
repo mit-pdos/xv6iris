@@ -123,11 +123,11 @@ Section ProofNparWrapEraMain.
       (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
     : wp_npar_wrap_era_body gs j gl pd pav pu
  gf
  plen pfun nfun n Sb P Pmiss
-                            pidv dq dqb dqs dqpv m K eb b lks Vpr.
+                            pidv dq dqb dqs dqpv m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_npar_wrap_era_body].
     intros pcE pjv pv nb ret_tgt pl L
@@ -313,7 +313,7 @@ Section ProofNparWrapEraMain.
     iApply (NX.wp_npar_era gs j gl pd pav pu
  gf
               plen pfun nfun n Sb P Pmiss pidv dq dqb dqs dqpv R5 (K - 2)%nat eb b
-              _ Vpr Knx Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+              _ Upr Knx Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hpfun0 Hbud Hj Hgs
               ltac:(rewrite HR5a1; exact npar_a1_false)
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl

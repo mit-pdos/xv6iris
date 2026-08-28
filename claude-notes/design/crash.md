@@ -405,6 +405,39 @@ The client's picture function reaches the machine layer as a parameter
 pair — `LogDefs.log_mirror_born` — to `initlog`. There is no boot swap
 and no whole-variable form left: **no write on the boot path re-bases
 `fr_D`**, which is decision 3 made literal.
+
+**`Hswap` ALSO CARRIES A RESOURCE OUT (durable-disk BT).**  Beside `Mof`
+the machine layer takes a second client parameter
+`Rb : (Z -> bv 8) -> iProp Σ`, `Hswap`'s post gains `∗ Rb dk` and
+`power_boot_res` gains `Rb (v_disk g')`.  `Rb` is as abstract as `Mof`:
+no FS constant appears, and `RiscvAdequacy` never looks inside it.
+**This is the only channel there is, and the reason is the identification
+gate, not convenience.**  `Hproj`'s output is a `Prop`, so nothing
+resource-shaped can leave it; `Hboot` sees the crash predicate only as
+the opaque field `riscv_crash_pred`; and `P_fs_named` closes its disk
+image existentially, so no era can prove its `dk0` is the machine's `dk`
+— only the PowerOn arm holds the fixed auth.  Lending must therefore
+happen AT the arm.  The FS instantiates `Rb` at
+`FsCrash.P_fs_lend cov ls dk = ∃ D, ⌜fs_recovery (fs_blocks dk) D cov ls⌝
+∗ FsDurSnap.P_dur D`, produced inside `P_fs_swap` by `P_fs_dur_acc`
+(take the epoch, with the record's own recovery fact) + `P_dur_clone`
+(mint the era's copy off it, `P_dur_alloc_xfer` at `q = 1`, which costs
+no new pure premise — `snap_shape` and `B ⊆ fs_dbytes D` are conjuncts of
+`fs_snap`/`snap_auth` already) + closing the accessor's wand.  The record
+keeps its own epoch; the era gets a clone; `P_fs`'s definition, `hdr_wf`
+and every arity are untouched.  `fs_recovery_det` pins the delivered `D`
+to the one `fs_boot_pure` names, so the abstract state comes out of the
+RESOURCE and no state-determinacy theorem is needed.
+
+Two placement rules the shape forces, both measured:
+`power_boot_res`'s new conjunct sits BETWEEN `swap_lb` and `crash_inv`,
+not last, because `BootShared.power_boot_res_unpack` spells the final
+three rows as the single bundle `gen_cert` and appending after it
+re-associates the bundle (the unpack must stay one `iExact`); and
+nothing on this path may close with a bare `iFrame` — `P_fs_named`'s body
+owns `disk_img_bytes γd 0 (disk_read dk0 0 N)`, a big-op of `N` bytes
+behind a `Definition`, and framing delta-unfolds it (SystemAdequacy.v:
+7 s → unbounded at 32 GB).
 ### The previous shape (superseded 2026-08-22): per-era, re-minted at every boot
 
 Kept for the reasoning it records — the stranded-fragment problem is real and

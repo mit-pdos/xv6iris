@@ -857,6 +857,56 @@ Section Snap.
   Qed.
 
   (* ================================================================== *)
+  (*  6b'. THE EPOCH IS LENDABLE (durable-disk BT-2)                     *)
+  (*                                                                    *)
+  (*  [P_dur D ==∗ P_dur D ∗ P_dur D], and it is NOT a duplication of a  *)
+  (*  linear resource: the second epoch is a FRESH gname family minted   *)
+  (*  by the transport off the first ([P_dur_alloc_xfer] at [q = 1]),    *)
+  (*  and the first comes back untouched because everything the          *)
+  (*  transport does to a source is READ PURE FACTS off it.              *)
+  (*                                                                    *)
+  (*  NO NEW PREMISE, and that is the point.  Both of the transport's    *)
+  (*  pure inputs are literal conjuncts of [fs_snap]: [snap_shape S D]   *)
+  (*  is its last row, and [B ⊆ fs_dbytes D] is [FsDurRead.snap_auth]'s  *)
+  (*  own.  Its two resource inputs are the epoch's byte authority (as   *)
+  (*  the [phi_agree] source, [snap_gamma_agree]) and its exclusivity    *)
+  (*  ([snap_gamma_excl]).                                              *)
+  (*                                                                    *)
+  (*  THIS IS THE BOOT-SIDE TRANSPORT'S HINGE: the crash predicate keeps *)
+  (*  its own epoch across the power cycle and the era gets a CLONE, so  *)
+  (*  "lent, returned" is realized at the one site that can do it        *)
+  (*  ([FsCrash.P_fs_swap], at the PowerOn arm).                          *)
+  (*                                                                    *)
+  (*  NO BARE [iFrame] AT THE CLOSE (durable-disk H2's landing note):    *)
+  (*  two byte authorities are in context at once here -- the source's   *)
+  (*  [g] and the fresh family's -- and [P_dur]'s head conjunct is a     *)
+  (*  byte authority, so a bare [iFrame] would unify the wrong gname.    *)
+  (*  Every conjunct is placed by name.                                  *)
+  (* ================================================================== *)
+  Lemma P_dur_clone D : P_dur D ==∗ P_dur D ∗ P_dur D.
+  Proof.
+    iIntros "HD". rewrite {1}/P_dur.
+    iDestruct "HD" as (g gl gt S) "Hs".
+    rewrite /fs_snap. iDestruct "Hs" as "(Hba & Hta & Htf & HS & Hlk & %Hsh)".
+    rewrite /snap_auth. iDestruct "Hba" as (B) "[Hba %Hin]".
+    iDestruct "Hlk" as (kv) "Hlk".
+    iMod (P_dur_alloc_xfer (snap_gamma g gl gt) (snap_gamma_excl g gl gt)
+            (ghost_map_auth g 1 B) B (snap_gamma_agree g gl gt B) 1%Qp S D kv
+            qp_half_lt_1 Hsh Hin with "Hba HS Hlk")
+      as "(Hba & HS & Hlk & Hnew)".
+    iModIntro. iSplitR "Hnew"; [| iExact "Hnew"].
+    rewrite /P_dur. iExists g, gl, gt, S. rewrite /fs_snap.
+    iSplitL "Hba".
+    { rewrite /snap_auth. iExists B. iSplitL "Hba"; [iExact "Hba" |].
+      iPureIntro. exact Hin. }
+    iSplitL "Hta"; [iExact "Hta" |].
+    iSplitL "Htf"; [iExact "Htf" |].
+    iSplitL "HS"; [iExact "HS" |].
+    iSplitL "Hlk"; [iExists kv; iExact "Hlk" |].
+    iPureIntro. exact Hsh.
+  Qed.
+
+  (* ================================================================== *)
   (*  7b.  THE READING (durable-disk lane H3)                            *)
   (*                                                                    *)
   (*  [snap_ok S D] OFF THE SNAPSHOT'S OWN RESOURCES.  Nothing is        *)
@@ -1552,3 +1602,86 @@ Proof.
     apply (sk_dombelow Hb b).
     exists (P b). apply fs_restrict_lookup_Some. split; [exact Hh | reflexivity].
 Qed.
+
+(* ===================================================================== *)
+(*  9b. THE ERA'S HOME BLOCKS, AS THE INSTALL'S INPUT (durable-disk BT-0) *)
+(*                                                                       *)
+(*  THE BOOT-SIDE TRANSPORT'S ONE NEW BRIDGE.  [FsBoot.fs_boot_ghosts]    *)
+(*  hands the era [[∗ set] b ∈ home, fsblock (fs_bytes γfs) b (Dv b)] --  *)
+(*  the era's byte authority is minted at the WHOLE home map -- while     *)
+(*  [FsDurXfer.fs_footprint_install] wants ONE FLAT [gmap] of bytes.      *)
+(*  They are the same resource: [FsDurBytes.fs_dbytes_set_blocks] is the  *)
+(*  flattening ([LogDefs.fs_restrict]'s domain IS [home]) and             *)
+(*  [FsBytesGamma.gamma_blk_owned] the vocabulary.                        *)
+(*                                                                       *)
+(*  ITS OWN SECTION, WITH THE ERA'S CLASSES AND NOT [diskImgG].  The two  *)
+(*  [ghost_mapG Σ Z (bv 8)] instance paths must never be resolved in one  *)
+(*  binder group ([FsDurBytes]' header): everything above binds           *)
+(*  [diskImgG] for the SNAPSHOT's byte map, this binds [fsLogG] for the   *)
+(*  ERA's.  Nothing here names both, and neither predicate sends          *)
+(*  typeclass search anywhere -- [fsblock] and [fs_gamma_L] each fix      *)
+(*  their class at their own definition.                                  *)
+(*                                                                       *)
+(*  NON-VACUITY: the length premise is verbatim [fs_boot_ghosts]' third   *)
+(*  hypothesis, so the era cannot exist without it, and                   *)
+(*  [FsDurBytes.fs_dbytes_set_blocks_cover] says the flattening really    *)
+(*  covers each home block (neither side is [emp] for a non-empty home).  *)
+(* ===================================================================== *)
+
+Section EraHome.
+  (* the ERA's classes, and deliberately NOT [diskImgG]; [fsLinkG] is
+     [fs_ghost]'s, for the link family the state carries. *)
+  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !fsLinkG Σ}.
+
+  Lemma fs_home_blocks_phi_map (γfs : fs_names) (Pb : Z -> list (bv 8))
+      (home : gset Z) :
+    (forall b, b ∈ home -> length (Pb b) = BSIZE) ->
+    ([∗ set] b ∈ home, fsblock (fs_bytes γfs) b (Pb b))
+    ⊣⊢ phi_map (fs_gamma_L γfs) (fs_dbytes (fs_restrict Pb home)).
+  Proof.
+    intros Hlen.
+    rewrite (phi_map_set_blocks (fs_gamma_L γfs) Pb home Hlen).
+    apply big_sepS_proper. intros b Hb.
+    symmetry. exact (gamma_blk_owned γfs b (Pb b)).
+  Qed.
+
+  (* THE COMPOSITE THE BOOT MINT CALLS, and the witness that BT-0's two
+     halves fit: the era's home blocks in; the file system's whole byte
+     footprint at the era's own view, plus the bytes the file system does
+     not claim, out.  Nothing is allocated and nothing is carved -- the
+     split is at [xr_union (xr_fs S PM)], a map value the DURABLE source
+     determines and whose three pure inputs that source supplies
+     ([FsDurXfer.fs_footprint_install_facts]). *)
+  Lemma fs_home_install_era (γfs : fs_names) (Pb : Z -> list (bv 8))
+      (home : gset Z) (S : fs_state_rec) (PM : gmap Z (list (bv 8))) :
+    (forall b, b ∈ home -> length (Pb b) = BSIZE) ->
+    xf_shape S PM -> xr_disj (xr_fs S PM) ->
+    xr_union (xr_fs S PM) ⊆ fs_dbytes (fs_restrict Pb home) ->
+    ([∗ set] b ∈ home, fsblock (fs_bytes γfs) b (Pb b))
+    ⊢ fs_footprint (fs_gamma_L γfs) (DfracOwn 1) S
+      ∗ phi_map (fs_gamma_L γfs)
+          (fs_dbytes (fs_restrict Pb home) ∖ xr_union (xr_fs S PM)).
+  Proof.
+    intros Hlen Hshape Hdisj Hsub.
+    rewrite (fs_home_blocks_phi_map γfs Pb home Hlen).
+    exact (fs_footprint_install (fs_gamma_L γfs) S PM _ Hshape Hdisj Hsub).
+  Qed.
+
+  (* ...and the whole instance, with the ghost half handed in. *)
+  Lemma fs_state_install_era (γfs : fs_names) (Pb : Z -> list (bv 8))
+      (home : gset Z) (S : fs_state_rec) (PM : gmap Z (list (bv 8))) :
+    (forall b, b ∈ home -> length (Pb b) = BSIZE) ->
+    xf_shape S PM -> xr_disj (xr_fs S PM) ->
+    xr_union (xr_fs S PM) ⊆ fs_dbytes (fs_restrict Pb home) ->
+    ([∗ set] b ∈ home, fsblock (fs_bytes γfs) b (Pb b))
+    ∗ fs_ghost (fs_gamma_L γfs) S
+    ⊢ fs_state (fs_gamma_L γfs) (DfracOwn 1) S
+      ∗ phi_map (fs_gamma_L γfs)
+          (fs_dbytes (fs_restrict Pb home) ∖ xr_union (xr_fs S PM)).
+  Proof.
+    intros Hlen Hshape Hdisj Hsub.
+    rewrite (fs_home_blocks_phi_map γfs Pb home Hlen).
+    exact (fs_state_install (fs_gamma_L γfs) S PM _ Hshape Hdisj Hsub).
+  Qed.
+
+End EraHome.

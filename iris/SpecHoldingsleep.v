@@ -46,7 +46,7 @@ Import Defs.
    at the untracked instance. *)
 Definition wp_holdingsleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holdingsleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -64,7 +64,7 @@ Definition wp_holdingsleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId
   (* the holder's bundle (returned untouched) *)
   sleeplocked_q γsl q slk pidv -∗
   (* the caller's own pid, agreeing with the lock's pid field *)
-  proc_priv_bare p pidv Vpr -∗
+  proc_priv_bare p pidv Upr -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\
@@ -73,7 +73,7 @@ Definition wp_holdingsleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       sleeplocked_q γsl q slk pidv -∗
-      proc_priv_bare p pidv Vpr -∗
+      proc_priv_bare p pidv Upr -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -81,7 +81,7 @@ Definition wp_holdingsleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId
    existing caller (brelse, bwrite) says [sleeplocked] and knows no [q]. *)
 Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holdingsleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -93,7 +93,7 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   sleeplocked γsl slk pidv -∗
-  proc_priv_bare p pidv Vpr -∗
+  proc_priv_bare p pidv Upr -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\
@@ -102,17 +102,17 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       sleeplocked γsl slk pidv -∗
-      proc_priv_bare p pidv Vpr -∗
+      proc_priv_bare p pidv Upr -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type HOLDINGSLEEP.
   Parameter wp_holdingsleep_gen_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_holdingsleep_gen_sconf_body γl γsl s R H q m p pidv av eb b lks Vpr.
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate),
+      wp_holdingsleep_gen_sconf_body γl γsl s R H q m p pidv av eb b lks Upr.
   Parameter wp_holdingsleep_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb b lks Vpr.
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate),
+      wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb b lks Upr.
 End HOLDINGSLEEP.

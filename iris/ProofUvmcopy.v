@@ -311,6 +311,96 @@ Section UvmcopyDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* =================================================================== *)
+  (*  THE va-KEYED IMAGE, ACROSS THE sz-RELATIVE VIEW.                    *)
+  (* =================================================================== *)
+  (* The public contract names the parent's image at [proc_pt]'s own
+     va-keyed [umem_own] tier; the loop below runs at [proc_ptm], the
+     sz-relative view that also records a 0 at every live-but-unmapped va
+     ([UserPtTree.umem_lazy]).  The two are not the same map -- which is
+     the "vmfault representation wart" of design/user-wp-slot.md -- but the
+     va-keyed one is RECOVERABLE from the lazy one: [umem_lazy]'s own
+     existential half is a submap of the view whose domain is exactly
+     [uva_dom P], and a submap is pinned by its domain.  So the parent's
+     image survives the round trip on the nose, which is what lets uvmcopy
+     say "the parent comes back verbatim" at the named tier.
+       [umem_lazy_intro]'s proof, with [Mp] fixed to the caller's map
+     instead of chosen. *)
+  Local Lemma uc_umem_dom (P : uptd) (M : gmap Z (bv 8)) :
+    umem_own P M -∗ ⌜dom M = uva_dom P⌝.
+  Proof. rewrite /umem_own. iIntros "[%H _]". iPureIntro. exact H. Qed.
+
+  Local Lemma uc_lazy_at (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    umem_own P M -∗ ∃ Mz : gmap Z (bv 8), ⌜M ⊆ Mz⌝ ∗ umem_lazy P sz Mz.
+  Proof.
+    iIntros "Hm". iDestruct "Hm" as "[%Hdom Hm]".
+    assert (Hmp : forall va, is_Some (M !! va) <-> uva_mapped P va).
+    { intros va. rewrite <- elem_of_dom. rewrite Hdom. apply elem_of_uva_dom. }
+    assert (Hgz : forall va, is_Some (gset_to_gmap (bv_0 8) (live_set sz) !! va)
+                             <-> uva_live sz va).
+    { intros va. rewrite <- elem_of_dom. rewrite dom_gset_to_gmap.
+      apply elem_of_live_set. }
+    iExists (M ∪ gset_to_gmap (bv_0 8) (live_set sz)).
+    iSplitR; [iPureIntro; apply map_union_subseteq_l |].
+    iExists M.
+    iSplitR; [iPureIntro; apply map_union_subseteq_l |].
+    iSplitR.
+    { iPureIntro. intros va. rewrite lookup_union_is_Some.
+      rewrite (Hmp va) (Hgz va). reflexivity. }
+    iSplitR.
+    { iPureIntro. intros va Hnm Hlv.
+      rewrite lookup_union_r; [| apply not_elem_of_dom; rewrite Hdom;
+                                 intros Hin; apply Hnm; by apply elem_of_uva_dom].
+      apply lookup_gset_to_gmap_Some.
+      split; [ by apply elem_of_live_set | reflexivity]. }
+    iSplitR; [iPureIntro; exact Hdom |]. iExact "Hm".
+  Qed.
+
+  (* ...and back.  Two submaps of the same view with the same domain ARE
+     the same map, and [umem_own]'s own domain law supplies the second
+     half, so the map that comes out is the one that went in. *)
+  Local Lemma uc_lazy_of (P : uptd) (sz : Z) (M Mz : gmap Z (bv 8)) :
+    M ⊆ Mz -> dom M = uva_dom P ->
+    umem_lazy P sz Mz -∗ umem_own P M.
+  Proof.
+    intros Hsub Hdom. iIntros "H".
+    iDestruct "H" as (Mp) "(%Hsub2 & _ & _ & [%Hdom2 Hm])".
+    assert (HMp : Mp = M).
+    { apply map_eq. intros i. destruct (M !! i) as [x |] eqn:Ex.
+      - assert (Hi : is_Some (Mp !! i))
+          by (apply elem_of_dom; rewrite Hdom2 -Hdom; apply elem_of_dom; by exists x).
+        destruct Hi as [y Hy]. rewrite Hy.
+        pose proof (lookup_weaken _ _ _ _ Hy Hsub2) as H1.
+        pose proof (lookup_weaken _ _ _ _ Ex Hsub) as H2.
+        rewrite H1 in H2. by injection H2 as ->.
+      - apply not_elem_of_dom. rewrite Hdom2 -Hdom.
+        apply not_elem_of_dom. exact Ex. }
+    subst Mp. rewrite /umem_own.
+    iSplitR; [iPureIntro; exact Hdom |]. iExact "Hm".
+  Qed.
+
+  Local Lemma uc_ptm_at (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_pt P M -∗
+    ⌜dom M = uva_dom P⌝ ∗ ∃ Mz : gmap Z (bv 8), ⌜M ⊆ Mz⌝ ∗ proc_ptm P sz Mz.
+  Proof.
+    rewrite /proc_pt /proc_ptm. iIntros "(%Hwf & Ht & Hm)".
+    iDestruct (uc_umem_dom with "Hm") as "%Hdom".
+    iSplitR; [iPureIntro; exact Hdom |].
+    iDestruct (uc_lazy_at P sz M with "Hm") as (Mz) "[%Hsub Hm]".
+    iExists Mz. iSplitR; [iPureIntro; exact Hsub |].
+    iSplitR; [iPureIntro; exact Hwf |]. iFrame "Ht Hm".
+  Qed.
+
+  Local Lemma uc_pt_of (P : uptd) (sz : Z) (M Mz : gmap Z (bv 8)) :
+    M ⊆ Mz -> dom M = uva_dom P ->
+    proc_ptm P sz Mz -∗ proc_pt P M.
+  Proof.
+    intros Hsub Hdom. rewrite /proc_pt /proc_ptm.
+    iIntros "(%Hwf & Ht & Hm)".
+    iSplitR; [iPureIntro; exact Hwf |]. iFrame "Ht".
+    iApply (uc_lazy_of P sz M Mz Hsub Hdom with "Hm").
+  Qed.
+
   (* SpecUvmcopy's post disjunction, at an abstract return value *)
   Definition uc_pay (Pold Pnew : uptd) (sznew : Z)
       (Mold Mnew : gmap Z (bv 8)) (vpn0 : mword 27) (n : nat)
@@ -431,14 +521,14 @@ Section ProofUvmcopy.
     uptd_ext Pnew Pj ->
     (forall v, v ∉ vpn_run vpn0 j -> Pj.(ud_um) !! v = Pnew.(ud_um) !! v) ->
     (forall i, (i < j)%nat -> Pnew.(ud_um) !! vpn_at vpn0 i = None) ->
-    proc_pt (uptd_del_run Pj vpn0 j) ⊢ proc_pt Pnew.
+    proc_pt_any (uptd_del_run Pj vpn0 j) ⊢ proc_pt_any Pnew.
   Proof.
     intros (Hr & Ht & Hsub) Hout Hfr.
     assert (Hum : um_del_run Pj.(ud_um) vpn0 j = Pnew.(ud_um))
       by exact (um_del_run_restore_sub Pnew.(ud_um) Pj.(ud_um) vpn0 j Hsub
                   (uc_dom_sub Pnew.(ud_um) Pj.(ud_um) vpn0 j Hout) Hfr).
-    assert (Heq : proc_pt (uptd_del_run Pj vpn0 j) ⊣⊢ proc_pt Pnew).
-    { apply proc_pt_data_irrel; unfold uptd_del_run;
+    assert (Heq : proc_pt_any (uptd_del_run Pj vpn0 j) ⊣⊢ proc_pt_any Pnew).
+    { apply proc_pt_any_data_irrel; unfold uptd_del_run;
         cbn [ud_root ud_tfp ud_um]; assumption. }
     rewrite Heq. reflexivity.
   Qed.
@@ -2507,9 +2597,10 @@ Section ProofUvmcopy.
      live region at that size. *)
   Lemma wp_uvmcopy_sconf
       (γa : gname) (mm : regfile)
-      (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
+      (Pold Pnew : uptd) (Mold_va : gmap Z (bv 8))
+      (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_uvmcopy_sconf_body γa mm Pold Pnew K eb p ilvl b lks.
+    : wp_uvmcopy_sconf_body γa mm Pold Pnew Mold_va K eb p ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmcopy_sconf_body].
     intros pcE sz vpn0 n ret_tgt HK Hilvl Htp Hroot Hrootn Hszb Hfresh Hbelow.
@@ -2521,8 +2612,11 @@ Section ProofUvmcopy.
     assert (Hlive : forall a : Z, (0 <= a < 4096 * Z.of_nat n)%Z ->
               uva_live (uint sz) a /\ uva_live (uint sz) a).
     { intros a Ha. rewrite /uva_live. rewrite <- Hnpz. split; exact Ha. }
-    iEval (rewrite (proc_pt_ptm Pold (uint sz))) in "Hpo".
-    iDestruct "Hpo" as (Mold) "Hpo".
+    (* the parent's NAMED image, lifted to the loop's sz-relative view and
+       pinned for the way back -- see [uc_ptm_at] / [uc_pt_of]. *)
+    iDestruct (uc_ptm_at Pold (uint sz) Mold_va with "Hpo")
+      as "[%Hdomold Hpo]".
+    iDestruct "Hpo" as (Mold) "[%Hsubold Hpo]".
     iEval (rewrite (proc_pt_ptm Pnew (uint sz))) in "Hpt".
     iDestruct "Hpt" as (Mnew) "Hpt".
     iApply (wp_uvmcopy_mem_sconf γa mm Pold Pnew (uint sz) (uint sz) Mold Mnew
@@ -2534,7 +2628,7 @@ Section ProofUvmcopy.
     iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpo Hpay".
     iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpo] [Hpay]").
     { exact Hcs. }
-    { iApply (proc_ptm_pt with "Hpo"). }
+    { iApply (uc_pt_of Pold (uint sz) Mold_va Mold Hsubold Hdomold with "Hpo"). }
     iDestruct "Hpay" as "[(%Hz & Hp) | Hs]".
     - iLeft. iSplitR; [iPureIntro; exact Hz |].
       iApply (proc_ptm_pt with "Hp").

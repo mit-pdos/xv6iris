@@ -507,20 +507,20 @@ Section KforkRes.
      applied to the child in that window needs this shape.  It does not touch
      [p->cwd], which is why it is a twin and not a weakening. *)
   Lemma proc_priv_nocwd_tf_upd (γf : gname) (pa : mword 64) (pid : mword 32)
-      (V : pprivate) :
-    proc_priv_nocwd γf pa pid V -∗
-    p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) ∗
-    tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+      (U : ustate) :
+    proc_priv_nocwd γf pa pid U -∗
+    p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt (us_V U))) ∗
+    tf_page (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) ∗
     (∀ ws' : list (mword 64),
-       p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) -∗
-       tf_page (ud_tfp (pv_upt V)) ws' -∗
-       proc_priv_nocwd γf pa pid (upd_pt V (pv_upt V) ws')).
+       p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt (us_V U))) -∗
+       tf_page (ud_tfp (pv_upt (us_V U))) ws' -∗
+       proc_priv_nocwd γf pa pid (us_pt U (pv_upt (us_V U)) ws')).
   Proof.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
-    rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    rewrite /proc_ptm_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iFrame "Htfc Htfp".
     iIntros (ws') "Htfc Htfp".
-    rewrite /proc_priv_nocwd /proc_pt_at.
+    rewrite /proc_priv_nocwd /proc_ptm_at.
     cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
@@ -528,12 +528,12 @@ Section KforkRes.
   Qed.
 
   Lemma proc_priv_nocwd_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32)
-      (V : pprivate) :
-    proc_priv_nocwd γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
+      (U : ustate) :
+    proc_priv_nocwd γf pa pid U -∗ ⌜page_valid (page_base (ud_tfp (pv_upt (us_V U))))⌝.
   Proof.
     iIntros "(_ & _ & _ & _ & Hpt & _)".
-    rewrite /proc_pt_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
-    iDestruct (proc_pt_wf_get with "Hptt") as "%Hwf".
+    rewrite /proc_ptm_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
+    iDestruct (proc_ptm_wf with "Hptt") as "%Hwf".
     iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
   Qed.
 
@@ -549,12 +549,12 @@ Section KforkRes.
      conjunct.  The trapframe-copy loop's exit test needs it (see
      [kfk_tf_inj]) and so does [SpecFreeproc.fp_tf]. *)
   Lemma proc_priv_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32)
-      (V : pprivate) :
-    proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
+      (U : ustate) :
+    proc_priv γf pa pid U -∗ ⌜page_valid (page_base (ud_tfp (pv_upt (us_V U))))⌝.
   Proof.
     iIntros "[(_ & _ & _ & _ & Hpt & _) _]".
-    rewrite /proc_pt_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
-    iDestruct (proc_pt_wf_get with "Hptt") as "%Hwf".
+    rewrite /proc_ptm_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
+    iDestruct (proc_ptm_wf with "Hptt") as "%Hwf".
     iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
   Qed.
 
@@ -667,10 +667,10 @@ Section KforkFreeproc.
      has never had a working directory -- allocproc left the cell at 0 and
      uvmcopy failed before the [sd a0,336(s4)] -- so the deficit block is
      exactly what the caller holds. *)
-  Lemma kfk_of_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
-    pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
-    pv_cwd V = (zero_reg : mword 64) ->
-    proc_priv_nocwd γf pa pid V -∗
+  Lemma kfk_of_priv (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
+    pv_ofile (us_V U) = replicate NOFILE (zero_reg : mword 64) ->
+    pv_cwd (us_V U) = (zero_reg : mword 64) ->
+    proc_priv_nocwd γf pa pid U -∗
     fd_slots FDSPARE -∗
     iref_slots (1 + IREFSPARE) -∗
     (* ...and the bio allowance, back on the same argument as the stack: a
@@ -681,24 +681,28 @@ Section KforkFreeproc.
     (* the child's kernel stack, back: allocproc handed it out with the slot
        and freeproc's block is where it goes when the slot is given up *)
     kstack_free pa -∗
-    SpecFreeproc.fp_rest pa V pid ∗
-    SpecFreeproc.fp_pt pa (pv_sz V) (Some (pv_upt V)) ∗
-    SpecFreeproc.fp_tf pa (Some (ud_tfp (pv_upt V), pv_tf V)).
+    SpecFreeproc.fp_rest pa (us_V U) pid ∗
+    SpecFreeproc.fp_pt pa (pv_sz (us_V U)) (Some (pv_upt (us_V U))) ∗
+    SpecFreeproc.fp_tf pa (Some (ud_tfp (pv_upt (us_V U)), pv_tf (us_V U))).
   Proof.
     intros Hof Hcwd.
     iIntros "Hpv Hsp Hir Hbs Hctx Hkst".
     iDestruct (proc_priv_nocwd_tfp_valid with "Hpv") as "%Hpv".
     iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
-    iDestruct (proc_ofiles_null_split γf (pv_fdg V) pa (pv_ofile V) Hof with "Ho")
+    iDestruct (proc_ofiles_null_split γf (pv_fdg (us_V U)) pa (pv_ofile (us_V U)) Hof with "Ho")
       as "[Hcells Hunits]".
-    rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    rewrite /proc_ptm_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     rewrite /SpecFreeproc.fp_rest /SpecFreeproc.fp_pt /SpecFreeproc.fp_tf.
     cbn [fst snd].
     iSplitR "Hpg Hptt Htfc Htfp".
     { iSplitR; [iPureIntro; split_and!; [exact Hof | exact Hcwd | exact Hszb]|].
       iFrame "Hpid Hf Hcells Hunits Hsp Hir Hbs Hkst Hctx". }
     iSplitL "Hpg Hptt".
-    { iFrame "Hpg Hptt". iPureIntro. split; [exact Hbel | exact Hszb]. }
+    { (* [SpecFreeproc.fp_pt] is at the MAPPED tier ([proc_pt_any]); the
+         block's conjunct is the lazy view, and [proc_ptm_pt] is the
+         crossing (see ProcPtOwn §5c'). *)
+      iDestruct (proc_ptm_pt with "Hptt") as "Hptt".
+      iFrame "Hpg Hptt". iPureIntro. split; [exact Hbel | exact Hszb]. }
     iFrame "Htfc Htfp". iPureIntro. exact Hpv.
   Qed.
 

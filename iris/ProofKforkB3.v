@@ -189,6 +189,17 @@ Lemma kfk_childV_0 (V0 : pprivate) (Vp_of : list (mword 64)) :
   kfk_childV V0 Vp_of 0 = V0.
 Proof. unfold kfk_childV. rewrite kfk_ofile_at_0. by destruct V0. Qed.
 
+(* the same at the record: kfork's child state is the child's [ustate] with
+   the first [i] descriptor slots copied from the parent.  The IMAGE is
+   untouched -- the child's pages are uvmcopy's business, not the fd
+   loop's. *)
+Definition kfk_childU (U0 : ustate) (Vp_of : list (mword 64)) (i : nat) : ustate :=
+  upd_usV U0 (kfk_childV (us_V U0) Vp_of i).
+
+Lemma kfk_childU_0 (U0 : ustate) (Vp_of : list (mword 64)) :
+  kfk_childU U0 Vp_of 0 = U0.
+Proof. rewrite /kfk_childU /upd_usV kfk_childV_0. by destruct U0. Qed.
+
 Lemma kfk_childV_full (V0 : pprivate) (Vp_of : list (mword 64)) :
   length Vp_of = NOFILE -> length (pv_ofile V0) = NOFILE ->
   pv_ofile (kfk_childV V0 Vp_of NOFILE) = Vp_of.
@@ -262,11 +273,11 @@ Section KforkB3Proof.
      [ProofAllocproc.ap_tail]; see claude-notes/completed/kerneltrap.md.) *)
   Lemma kfkb3_fd_loop
       (γl γf : gname) (pme npa : mword 64) (pid_p pid_c : mword 32)
-      (Vp V0 : pprivate) (m0 : regfile) (rsv K n : nat) (eb b : bool)
+      (Up U0 : ustate) (m0 : regfile) (rsv K n : nat) (eb b : bool)
       (sp0v s00v : mword 64) (lks : gset string) :
     (22 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
-    pv_ofile V0 = replicate NOFILE (zero_reg : mword 64) ->
+    pv_ofile (us_V U0) = replicate NOFILE (zero_reg : mword 64) ->
     (* the scan's only lock-touching callee is filedup, whose own bound is
        at "ftable" (1) -- nothing else in this block acquires. *)
     locks_below lks "ftable" ->
@@ -286,23 +297,23 @@ Section KforkB3Proof.
           sie_cap_gpr KT1 Mx (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme b lks -∗
           pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
-          proc_priv γf pme pid_p Vp -∗
-          proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
-          fd_frags_any (pv_fdg V0) -∗
+          proc_priv γf pme pid_p Up -∗
+          proc_priv_nocwd γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) NOFILE) -∗
+          fd_frags_any (pv_fdg (us_V U0)) -∗
           WP (Loop : expr riscv_lang)) -∗
       sie_cap_gpr KT1 M (rsv + (K - 8))%nat b pme -∗
       cpu_own n eb pme b lks -∗
       pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
-      proc_priv γf pme pid_p Vp -∗
-      proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
-      fd_frags_any (pv_fdg V0) -∗
+      proc_priv γf pme pid_p Up -∗
+      proc_priv_nocwd γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) i) -∗
+      fd_frags_any (pv_fdg (us_V U0)) -∗
       WP (Loop : expr riscv_lang)).
   Proof.
     intros HK Hn HV0 Hbelow.
     iIntros "#Htext #Hft".
     assert (HK14 : (14 <= (rsv + (K - 8)))%nat)
       by (pose proof (kfkb3_stack K HK); lia).
-    assert (HlenV0 : length (pv_ofile V0) = NOFILE)
+    assert (HlenV0 : length (pv_ofile (us_V U0)) = NOFILE)
       by (rewrite HV0 length_replicate; reflexivity).
     (* ================================================================= *)
     (*  THE FUEL-INDUCTED BODY, entered at +0x96 with [fuel] turns left.  *)
@@ -324,16 +335,16 @@ Section KforkB3Proof.
               sie_cap_gpr KT1 Mx (rsv + (K - 8))%nat b pme -∗
               cpu_own n eb pme b lks -∗
               pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
-              proc_priv γf pme pid_p Vp -∗
-              proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
-              fd_frags_any (pv_fdg V0) -∗
+              proc_priv γf pme pid_p Up -∗
+              proc_priv_nocwd γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) NOFILE) -∗
+              fd_frags_any (pv_fdg (us_V U0)) -∗
               WP (Loop : expr riscv_lang)) -∗
           sie_cap_gpr KT1 M (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme b lks -∗
           pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
-          proc_priv γf pme pid_p Vp -∗
-          proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
-          fd_frags_any (pv_fdg V0) -∗
+          proc_priv γf pme pid_p Up -∗
+          proc_priv_nocwd γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) i) -∗
+          fd_frags_any (pv_fdg (us_V U0)) -∗
           WP (Loop : expr riscv_lang)))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -354,9 +365,9 @@ Section KforkB3Proof.
           sie_cap_gpr KT1 Mt (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme b lks -∗
           pc_is (mword_of_int (KF + 0x8e) : mword 64) -∗
-          proc_priv γf pme pid_p Vp -∗
-          proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) (S i)) -∗
-          fd_frags_any (pv_fdg V0) -∗
+          proc_priv γf pme pid_p Up -∗
+          proc_priv_nocwd γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) (S i)) -∗
+          fd_frags_any (pv_fdg (us_V U0)) -∗
           WP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
       { iIntros (CIDta Hsta Mt) "%Hregst Hcg Hown Hpc Hpv Hpv2 Hcfrag".
@@ -480,8 +491,8 @@ Section KforkB3Proof.
       (*  THE BODY, +0x96 .. +0xa2, at index [i].                          *)
       (* ================================================================= *)
       iDestruct (proc_priv_ofile_len with "Hpv") as "%HlenVp".
-      destruct (lookup_lt_is_Some_2 (pv_ofile Vp) i ltac:(rewrite HlenVp; lia)) as [v Hv].
-      iDestruct (proc_priv_ofile γf pme pid_p Vp i v Hv with "Hpv") as "[[Hcell Hpay] Hback]".
+      destruct (lookup_lt_is_Some_2 (pv_ofile (us_V Up)) i ltac:(rewrite HlenVp; lia)) as [v Hv].
+      iDestruct (proc_priv_ofile γf pme pid_p Up i v Hv with "Hpv") as "[[Hcell Hpay] Hback]".
       (* ---- +0x96: c.ld a0,0(s1) ---- *)
       assert (Haddr : add_vec (M !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 0 : mword 12))
                      = p_ofile pme i) by (rewrite Hs1; apply addv_sext0).
@@ -534,14 +545,18 @@ Section KforkB3Proof.
         iEval (rewrite Htgt8e) in "Hpc".
         iDestruct ("Hback" $! v with "[Hcell Hpay]") as "Hpv".
         { rewrite /ofile_slot. iFrame "Hcell Hpay". }
-        iEval (rewrite (upd_ofile_id _ _ _ Hv)) in "Hpv".
-        assert (HV0i : pv_ofile V0 !! i = Some (zero_reg : mword 64)).
+        iEval (rewrite (us_ofile_id _ _ _ Hv)) in "Hpv".
+        assert (HV0i : pv_ofile (us_V U0) !! i = Some (zero_reg : mword 64)).
         { rewrite HV0. apply lookup_replicate. split; [reflexivity | lia]. }
-        assert (Hvz' : pv_ofile Vp !! i = Some (zero_reg : mword 64))
+        assert (Hvz' : pv_ofile (us_V Up) !! i = Some (zero_reg : mword 64))
           by (rewrite Hv Hvz; reflexivity).
-        assert (HeqVV0 : pv_ofile Vp !! i = pv_ofile V0 !! i) by (rewrite Hvz' HV0i; reflexivity).
-        iEval (rewrite (kfk_childV_step_null V0 (pv_ofile Vp) i HlenVp HlenV0 Hi HeqVV0))
-          in "Hpv2".
+        assert (HeqVV0 : pv_ofile (us_V Up) !! i = pv_ofile (us_V U0) !! i) by (rewrite Hvz' HV0i; reflexivity).
+        assert (HstepU : kfk_childU U0 (pv_ofile (us_V Up)) i
+                         = kfk_childU U0 (pv_ofile (us_V Up)) (S i)).
+        { rewrite /kfk_childU
+            (kfk_childV_step_null (us_V U0) (pv_ofile (us_V Up)) i
+               HlenVp HlenV0 Hi HeqVV0). reflexivity. }
+        iEval (rewrite HstepU) in "Hpv2".
         iDestruct (cpu_own_transport CIDk CIDm n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
         iSpecialize ("Htail" $! CIDm with "[%]"); [wp_next_chain|].
@@ -565,11 +580,11 @@ Section KforkB3Proof.
         iEval (rewrite Hpp9a) in "Hpc".
         (* the child's slot [i] is null: open it, it owns exactly the one
            [FdSlots.fd_slot] unit filedup's precondition wants. *)
-        assert (Hvc : pv_ofile (kfk_childV V0 (pv_ofile Vp) i) !! i = Some (zero_reg : mword 64)).
+        assert (Hvc : pv_ofile (kfk_childV (us_V U0) (pv_ofile (us_V Up)) i) !! i = Some (zero_reg : mword 64)).
         { unfold kfk_childV. cbn [pv_ofile pv_fdg].
-          rewrite (kfk_ofile_at_lookup_i (pv_ofile Vp) (pv_ofile V0) i HlenVp Hi).
+          rewrite (kfk_ofile_at_lookup_i (pv_ofile (us_V Up)) (pv_ofile (us_V U0)) i HlenVp Hi).
           rewrite HV0. apply lookup_replicate. split; [reflexivity | lia]. }
-        iDestruct (proc_priv_nocwd_ofile γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) i
+        iDestruct (proc_priv_nocwd_ofile γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) i) i
                      (zero_reg : mword 64) Hvc with "Hpv2") as "[Hslot2 Hback2]".
         iDestruct (ofile_slot_null with "Hslot2") as "(Hcell2 & Hfds & Hst2)".
         (* ---- +0x9a: jal ra,filedup ---- *)
@@ -656,7 +671,7 @@ Section KforkB3Proof.
         (* THE CHILD'S RETYPE, and it is what kfork spends the child's own
            fragment bundle on: the array holds only the authority, so opening
            the child's descriptor takes both halves ([FdSlots.fd_st_move]). *)
-        iDestruct (fd_frags_any_acc (pv_fdg (kfk_childV V0 (pv_ofile Vp) i)) i
+        iDestruct (fd_frags_any_acc (pv_fdg (kfk_childV (us_V U0) (pv_ofile (us_V Up)) i)) i
                      ltac:(unfold NOFILE in *; lia) with "Hcfrag")
           as (stq) "[Hcfr Hcfrback]".
         iMod (fd_st_move _ i FdClosed stq stf with "Hst2 Hcfr")
@@ -665,15 +680,19 @@ Section KforkB3Proof.
         iDestruct (ofile_slot_file γf _ npa i k (q/2)%Qp stf Hk Hty
                      with "Hcell2 Hslotb Hst2") as "Hslot2".
         iDestruct ("Hback2" $! (fnode k) with "Hslot2") as "Hpv2".
-        assert (Hvfn : pv_ofile Vp !! i = Some (fnode k)) by (rewrite Hv Hfn; reflexivity).
-        iEval (rewrite (kfk_childV_step V0 (pv_ofile Vp) i (fnode k) HlenVp HlenV0 Hvfn Hi))
-          in "Hpv2".
+        assert (Hvfn : pv_ofile (us_V Up) !! i = Some (fnode k)) by (rewrite Hv Hfn; reflexivity).
+        assert (HstepK : us_ofile (kfk_childU U0 (pv_ofile (us_V Up)) i) i (fnode k)
+                         = kfk_childU U0 (pv_ofile (us_V Up)) (S i)).
+        { rewrite /kfk_childU /us_ofile /upd_usV /=
+            (kfk_childV_step (us_V U0) (pv_ofile (us_V Up)) i (fnode k)
+               HlenVp HlenV0 Hvfn Hi). reflexivity. }
+        iEval (rewrite HstepK) in "Hpv2".
         (* close the parent's slot back: it names the SAME file it always did *)
         iEval (rewrite Hfn) in "Hcell".
         iDestruct (ofile_slot_file γf _ pme i k (q/2)%Qp stf Hk Hty
                      with "Hcell Hslota Hst") as "Hslot".
         iDestruct ("Hback" $! (fnode k) with "Hslot") as "Hpv".
-        iEval (rewrite (upd_ofile_id _ _ _ Hvfn)) in "Hpv".
+        iEval (rewrite (us_ofile_id _ _ _ Hvfn)) in "Hpv".
         (* ---- +0xa2: c.j -> +0x8e ---- *)
         iApply (wp_cj_s_sconf (mword_of_int (KF + 0xa2))
                   (sign_extend' 21 (concat_vec (mword_of_int 2038 : mword 11) ('b"0")))

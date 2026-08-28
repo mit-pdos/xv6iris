@@ -264,7 +264,7 @@ Definition wp_dirlookup_sconf_body
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
     (pidv : mword 32) (dq dqd dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlookup in
   let pj := proc_addr j in
   let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -366,7 +366,7 @@ Definition wp_dirlookup_sconf_body
   (* ---- poff: a 4-byte cell, or nothing ---- *)
   (if hasp then pf ↦₄[KT1] pofv else emp) -∗
   (* ---- the caller's own pid cell (bread's acquiresleep records it) ---- *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
@@ -409,7 +409,7 @@ Definition wp_dirlookup_sconf_body
       inode_map fsc_fs ip bm -∗
       inode_blocks fsc_fs bm data -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       bslot -∗
       (* ...AND THE BORROW, BACK VERBATIM ON BOTH ARMS *)
       IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
@@ -455,8 +455,8 @@ Module Type DIRLOOKUP.
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_dirlookup_sconf_body γs j γl pd pav pu
  γf ip dinum bm data dn dr
-                              fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
+                              fn hasp pofv pidv dq dqd dqn m K eb b lks Upr.
 End DIRLOOKUP.

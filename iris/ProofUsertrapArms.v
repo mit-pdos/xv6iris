@@ -155,16 +155,16 @@ Section UtArmsCommon.
      proofmode's [IntoSep] search is keyed on the head of the hypothesis, and
      [trap_csrs_ext false] is not syntactically a [∗]: destructuring it
      directly is a coin flip on whether resolution unfolds the definition. *)
-  Lemma ua_hold_off (N : ut_names) (V : pprivate) (lks : gset string) :
-    ut_hold Rsys N V false lks -∗
+  Lemma ua_hold_off (N : ut_names) (U : ustate) (lks : gset string) :
+    ut_hold Rsys N U false lks -∗
       cpu_own 0%nat false (un_pj N) false lks ∗ trap_csrs KT1 ∗
-      cpu_claim (un_pj N) ∗ ut_env Rsys N V.
+      cpu_claim (un_pj N) ∗ ut_env Rsys N U.
   Proof. iIntros "H". iExact "H". Qed.
 
-  Lemma ua_hold_on (N : ut_names) (V : pprivate) (lks : gset string) :
+  Lemma ua_hold_on (N : ut_names) (U : ustate) (lks : gset string) :
     cpu_own 0%nat false (un_pj N) false lks -∗ trap_csrs KT1 -∗
-    cpu_claim (un_pj N) -∗ ut_env Rsys N V -∗
-    ut_hold Rsys N V false lks.
+    cpu_claim (un_pj N) -∗ ut_env Rsys N U -∗
+    ut_hold Rsys N U false lks.
   Proof.
     iIntros "Hcpu Hcsrs Hclm Henv". rewrite /ut_hold.
     iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -217,14 +217,14 @@ Section Ut56.
      cell through [ProcInv.proc_priv_pid] -- the same quarter
      SpecAcquiresleep / SpecHoldingsleep take -- given straight back, so the
      process record does not move and [ut_a6] is applied at the SAME [V]. *)
-  Lemma ut_56 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_56 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
-    ud_tfp (pv_upt V) = ud_tfp pt ->
+    ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
     add_vec (un_ks N) (mword_of_int 4096) = ksp ->
     m0 !!! Regidx csp_rs1 = ksp ->
     m !!! Regidx csp_rs1 = pa_stk ksp 4 ->
@@ -235,7 +235,7 @@ Section Ut56.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x56)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
-    ut_hold Rsys N V false lks -∗
+    ut_hold Rsys N U false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -248,7 +248,7 @@ Section Ut56.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
-    iDestruct (ua_hold_off Rsys N V with "Hhold") as
+    iDestruct (ua_hold_off Rsys N U with "Hhold") as
       "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     (* depth 0 forces the held set empty, so the printk / killed / setkilled
        order premises need no hypothesis of this lemma's own. *)
@@ -595,14 +595,14 @@ Section Ut56.
                    = mword_of_int (UT + 0xa6)) by pcw.
     iEval (rewrite Hpa6) in "Hpc".
     (* ---- the bundle back together, and on to +0xa6 ---- *)
-    iDestruct ("Hownback" $! V with "Hpv Hufr Hsy") as "Hown".
-    iApply (T.ut_a6 Rsys N V pt ksp m0 S1 av nx false
+    iDestruct ("Hownback" $! U with "Hpv Hufr Hsy") as "Hown".
+    iApply (T.ut_a6 Rsys N U pt ksp m0 S1 av nx false
               mie_v menvcfg0 lks
               Hwf' Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
               Hmiev Hmenvv
               with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
     all: try lkbelow.
-    iApply (ua_hold_on Rsys N V with "Hcpu [-Hclm Hown] Hclm [-]").
+    iApply (ua_hold_on Rsys N U with "Hcpu [-Hclm Hown] Hclm [-]").
     - rewrite /trap_csrs.
       iSplitL "Hsepc"; [iExists ep; iExact "Hsepc"|].
       iSplitL "Hscause"; [iExists sc; iExact "Hscause"|].
@@ -642,14 +642,14 @@ Section UtD0.
      alone, so the [bnez] falls through and the code joins the
      unexpected-scause arm; the right arm returns the backed page, so it is
      taken and the code joins +0xa6 -- with the process record MOVED. *)
-  Lemma ut_d0 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_d0 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
-    ud_tfp (pv_upt V) = ud_tfp pt ->
+    ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
     add_vec (un_ks N) (mword_of_int 4096) = ksp ->
     m0 !!! Regidx csp_rs1 = ksp ->
     m !!! Regidx csp_rs1 = pa_stk ksp 4 ->
@@ -660,7 +660,7 @@ Section UtD0.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xd0)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
-    ut_hold Rsys N V false lks -∗
+    ut_hold Rsys N U false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -673,7 +673,7 @@ Section UtD0.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
-    iDestruct (ua_hold_off Rsys N V with "Hhold") as
+    iDestruct (ua_hold_off Rsys N U with "Hhold") as
       "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     (* depth 0 forces the held set empty, so the printk / killed / setkilled
        order premises need no hypothesis of this lemma's own. *)
@@ -778,14 +778,14 @@ Section UtD0.
       by (rgne; rewrite HM4s1; reflexivity).
     iEval (rewrite -Haddrsz) in "Hsz".
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0xde)) Ra1 Rs1
-              (mword_of_int 72 : mword 12) M4 nx (pv_sz V) false
+              (mword_of_int 72 : mword 12) M4 nx (pv_sz (us_V U)) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hsz [-]").
     { iApply (uti_0de with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hsz".
     iEval (rewrite Haddrsz) in "Hsz".
-    set (M5 := <[Regidx Ra1 := regval_into_reg (pv_sz V)]> M4).
-    change (<[Regidx Ra1 := regval_into_reg (pv_sz V)]> M4) with M5.
+    set (M5 := <[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> M4).
+    change (<[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> M4) with M5.
     assert (Hpe0 : add_vec_int (mword_of_int (UT + 0xde) : mword 64) 2
                    = mword_of_int (UT + 0xe0)) by pcw.
     iEval (rewrite Hpe0) in "Hpc".
@@ -806,16 +806,16 @@ Section UtD0.
     iEval (rewrite -Haddrpg) in "Hpgt".
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0xe0)) Ra0 Rs1
               (mword_of_int 80 : mword 12) M5 nx
-              (page_base (ud_root (pv_upt V))) false
+              (page_base (ud_root (pv_upt (us_V U)))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hpgt [-]").
     { iApply (uti_0e0 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpgt".
     iEval (rewrite Haddrpg) in "Hpgt".
     set (M6 := <[Regidx Ra0 := regval_into_reg
-                   (page_base (ud_root (pv_upt V)))]> M5).
+                   (page_base (ud_root (pv_upt (us_V U))))]> M5).
     change (<[Regidx Ra0 := regval_into_reg
-               (page_base (ud_root (pv_upt V)))]> M5) with M6.
+               (page_base (ud_root (pv_upt (us_V U))))]> M5) with M6.
     assert (Hpe2 : add_vec_int (mword_of_int (UT + 0xe0) : mword 64) 2
                    = mword_of_int (UT + 0xe2)) by pcw.
     iEval (rewrite Hpe2) in "Hpc".
@@ -835,9 +835,9 @@ Section UtD0.
                     (sign_extend' 64 (mword_of_int 2092560 : mword 21))
                   = mword_of_int KernelSyms.vmfault) by pcw.
     iEval (rewrite Hvf) in "Hpc".
-    assert (HM7a0 : M7 !!! Regidx Ra0 = page_base (ud_root (pv_upt V))).
+    assert (HM7a0 : M7 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U)))).
     { rewrite /M7 upd_ne; [| reg_neq]. rewrite /M6 upd_eq. reflexivity. }
-    assert (HM7a1 : M7 !!! Regidx Ra1 = pv_sz V).
+    assert (HM7a1 : M7 !!! Regidx Ra1 = pv_sz (us_V U)).
     { rewrite /M7 upd_ne; [| reg_neq]. rewrite /M6 upd_ne; [| reg_neq].
       rewrite /M5 upd_eq. reflexivity. }
     assert (HM7a2 : M7 !!! Regidx Ra2 = st).
@@ -858,9 +858,9 @@ Section UtD0.
     (* THE PIN, which is all [VMFAULT]'s un-shed raw-map premise costs -- the
        one premise the psz bump did NOT shed. *)
     assert (HP7a0 : tp_pin M7 !!! Regidx Ra0
-                    = page_base (ud_root (pv_upt V)))
+                    = page_base (ud_root (pv_upt (us_V U))))
       by (rewrite (ua_pin_lookup M7 Ra0 ltac:(reg_neq)); exact HM7a0).
-    assert (HP7a1 : tp_pin M7 !!! Regidx Ra1 = pv_sz V)
+    assert (HP7a1 : tp_pin M7 !!! Regidx Ra1 = pv_sz (us_V U))
       by (rewrite (ua_pin_lookup M7 Ra1 ltac:(reg_neq)); exact HM7a1).
     assert (HP7a2 : tp_pin M7 !!! Regidx Ra2 = st)
       by (rewrite (ua_pin_lookup M7 Ra2 ltac:(reg_neq)); exact HM7a2).
@@ -872,7 +872,10 @@ Section UtD0.
       by (rewrite (ua_pin_lookup M7 Rs1 ltac:(reg_neq)); exact HM7s1).
     assert (HcsP7 : ut_cs m0 (tp_pin M7)) by exact (ua_pin_cs m0 M7 HcsM7).
     iEval (rewrite <- (ua_pin_sie_cap_gpr M7 nx false (un_pj N))) in "Hcg".
-    iApply (VM.wp_vmfault_sconf (fsc_kalloc) (tp_pin M7) (pv_upt V) (pv_sz V) nx
+    (* vmfault MAY BACK A PAGE, so what it hands back is a fresh image: the
+       call is at the ∃-weakened [proc_pt_any] and each arm re-names it. *)
+    iDestruct (proc_ptm_pt with "Hppt") as "Hppt".
+    iApply (VM.wp_vmfault_sconf (fsc_kalloc) (tp_pin M7) (pv_upt (us_V U)) (pv_sz (us_V U)) nx
               0%nat false (un_pj N) false lks
               ltac:(lia) (rget_tp M7) HP7a0 HP7a1 Hszb
               ltac:(vm_compute; reflexivity)
@@ -927,16 +930,17 @@ Section UtD0.
                           (concat_vec (mword_of_int 1975 : mword 11) ('b"0"))))
                      = mword_of_int (UT + 0x56)) by pcw.
       iEval (rewrite Hp56) in "Hpc".
-      iDestruct ("Hpvback" $! (pv_upt V) ltac:(apply uptd_ext_sz_refl)
+      iDestruct (proc_pt_any_ptm with "Hppt") as (Mv) "Hppt".
+      iDestruct ("Hpvback" $! (pv_upt (us_V U)) Mv ltac:(apply uptd_ext_sz_refl)
                    with "Hsz Hpgt Hppt") as "Hpv".
-      rewrite upd_upt_id.
-      iDestruct ("Hownback" $! V with "Hpv Hufr Hsy") as "Hown".
-      iApply (ut_56 Rsys N V pt ksp m0 mr av nx
+      rewrite us_upt_id.
+      iDestruct ("Hownback" $! (upd_usM U Mv) with "Hpv Hufr Hsy") as "Hown".
+      iApply (ut_56 Rsys N (upd_usM U Mv) pt ksp m0 mr av nx
                 mie_v menvcfg0 lks
                 Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
-      iApply (ua_hold_on Rsys N V with "Hcpu Hcsrs Hclm [-]").
+      iApply (ua_hold_on Rsys N (upd_usM U Mv) with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
     - (* ---- vmfault backed a page: the [bnez] is taken, to +0xa6 ---- *)
       iDestruct "Hvs" as (r) "(%Hra0 & %Hrpv & %Hszlt & %Hunone & Hppt)".
@@ -960,30 +964,31 @@ Section UtD0.
       iEval (rewrite Hpa6) in "Hpc".
       (* THE DESCRIPTOR GREW, so the record moves -- and [uptd_insert] keeps
          [ud_tfp], so [ut_a6]'s premise is a projection. *)
-      set (Pd := uptd_insert (pv_upt V)
+      set (Pd := uptd_insert (pv_upt (us_V U))
                    (svpn_of (and_vec (tp_pin M7 !!! Regidx Ra2)
                                (mword_of_int (-4096)))) r).
-      change (uptd_insert (pv_upt V)
+      change (uptd_insert (pv_upt (us_V U))
                 (svpn_of (and_vec (tp_pin M7 !!! Regidx Ra2)
                             (mword_of_int (-4096)))) r) with Pd.
-      assert (Hextd : uptd_ext_sz (pv_sz V) (pv_upt V) Pd).
+      assert (Hextd : uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pd).
       { rewrite /Pd. apply uptd_ext_sz_insert; [exact Hunone |].
         apply svpn_of_pgd_below.
         - rewrite -uint_unsigned. exact Hszb.
         - rewrite -!uint_unsigned. exact Hszlt. }
-      iDestruct ("Hpvback" $! Pd Hextd with "Hsz Hpgt Hppt") as "Hpv".
-      set (V' := upd_upt V Pd).
-      change (upd_upt V Pd) with V'.
+      iDestruct (proc_pt_any_ptm with "Hppt") as (Mv) "Hppt".
+      iDestruct ("Hpvback" $! Pd Mv Hextd with "Hsz Hpgt Hppt") as "Hpv".
+      set (V' := upd_upt (us_V U) Pd).
+      change (upd_upt (us_V U) Pd) with V'.
       assert (HV'tfp : ud_tfp (pv_upt V') = ud_tfp pt).
       { rewrite /V' /Pd. exact Htfpe. }
-      iDestruct ("Hownback" $! V' with "Hpv Hufr Hsy") as "Hown".
-      iApply (T.ut_a6 Rsys N V' pt ksp m0 mr av nx false
+      iDestruct ("Hownback" $! (MkUstate V' Mv) with "Hpv Hufr Hsy") as "Hown".
+      iApply (T.ut_a6 Rsys N (MkUstate V' Mv) pt ksp m0 mr av nx false
                 mie_v menvcfg0 lks
                 Hwf' Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       all: try lkbelow.
-      iApply (ua_hold_on Rsys N V' with "Hcpu Hcsrs Hclm [-]").
+      iApply (ua_hold_on Rsys N (MkUstate V' Mv) with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
   Qed.
 
@@ -1009,13 +1014,13 @@ Section UtE8.
      (kexit never returns).  No premise about s2 is needed here either; it
      was set from devintr's return value at +0x3e and [ut_fa] only branches
      on it. *)
-  Lemma ut_e8 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_e8 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
-    ud_tfp (pv_upt V) = ud_tfp pt ->
+    ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
     add_vec (un_ks N) (mword_of_int 4096) = ksp ->
     m0 !!! Regidx csp_rs1 = ksp ->
     m !!! Regidx csp_rs1 = pa_stk ksp 4 ->
@@ -1026,7 +1031,7 @@ Section UtE8.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xea)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
-    ut_hold Rsys N V false lks -∗
+    ut_hold Rsys N U false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -1039,7 +1044,7 @@ Section UtE8.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
-    iDestruct (ua_hold_off Rsys N V with "Hhold") as
+    iDestruct (ua_hold_off Rsys N U with "Hhold") as
       "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     (* depth 0 forces the held set empty, so the printk / killed / setkilled
        order premises need no hypothesis of this lemma's own. *)
@@ -1128,12 +1133,12 @@ Section UtE8.
                           (concat_vec (mword_of_int 6 : mword 8) ('b"0"))))
                      = mword_of_int (UT + 0xfc)) by pcw.
       iEval (rewrite Hpfc) in "Hpc".
-      iApply (T.ut_fa Rsys N V pt ksp m0 mf av nx false
+      iApply (T.ut_fa Rsys N U pt ksp m0 mf av nx false
                 mie_v menvcfg0 lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
-      iApply (ua_hold_on Rsys N V with "Hcpu Hcsrs Hclm [-]").
+      iApply (ua_hold_on Rsys N U with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
     - (* KILLED: fall through to +0xf2's [c.j +0xf6], then kexit(-1). *)
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (UT + 0xf0))
@@ -1209,12 +1214,12 @@ Section UtE8.
       iDestruct (kstack_closer_frame (un_pj N) ksp av 4 ltac:(lia)
                    with "Hkcl Hfr") as "Hkcl4".
       iEval (rewrite -Hnx -HKsp) in "Hkcl4".
-      iApply (T.ut_kexit Rsys N V
+      iApply (T.ut_kexit Rsys N U
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K1)
                 nx false lks Hwf' ltac:(lia) ltac:(lkbelow)
                 with "Htext Hpc Hcg Hkcl4 [-]").
-      iApply (ua_hold_on Rsys N V with "Hcpu Hcsrs Hclm [-]").
+      iApply (ua_hold_on Rsys N U with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
   Qed.
 

@@ -94,7 +94,7 @@ Section SpecFreeproc.
     match opt with
     | None   => p_pagetable pa ↦₈ (zero_reg : mword 64)
     | Some P => (p_pagetable pa ↦₈ page_base P.(ud_root) ∗
-                 proc_pt P ∗
+                 proc_pt_any P ∗
                  ⌜um_below szv P.(ud_um) /\ (uint szv <= uvm_maxsz)%Z⌝)
     end%I.
 
@@ -201,10 +201,11 @@ Section SpecFreeproc.
     iExists V, pid.
     (* both [page_valid]s come out of the table: the trapframe's from
        [proc_pt_wf], the root's from the tree's node claim. *)
-    rewrite /proc_pt_at.
-    iDestruct "Hpt" as "(Hpg & Htf & Hpt)".
+    rewrite /proc_pt_at_any /proc_pt_at.
+    iDestruct "Hpt" as (Mz) "(Hpg & Htf & Hpt)".
     iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
     iDestruct (proc_pt_root_valid with "Hpt") as %Hroot.
+    iDestruct (proc_pt_forget with "Hpt") as "Hpt".
     rewrite /fp_rest /fp_pt /fp_tf.
     iSplitL "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx".
     { iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx". iPureIntro. exact Hpure. }
