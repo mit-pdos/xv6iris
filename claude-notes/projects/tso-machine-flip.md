@@ -12566,3 +12566,92 @@ whole-tree rebuild.  `md5sum kernel-rocq/*.v user-rocq/*.v` unchanged
 3. **the DMA leaf + both virtio files** — A6.95 §(4): ready, needed only the
    tie, which case 3 now gives against `U`.
 4. **§0.27′ proper** → `ProofSwtch` (case 4).
+
+### A6.98 THE SURFACE MOVE IS WRITTEN AND COMPILES — AND IT CANNOT CLOSE
+### BEFORE STEP (2): THE CREATOR'S FLOOR IS BOUGHT WITH THE ACQUIRE'S RECEIPT
+
+Green boundary, interim report.  **`WpLock` was carried all the way through
+§0.35′(i) in the approved spelling and COMPILES** — the surface is validated,
+not merely designed.  It was then reverted, because its consumers cannot
+discharge what it now asks of them until step (2) exists.  That ordering is
+the finding.
+
+#### (1) THE SURFACE MOVE IS PROVEN TO WORK, AND EVERY ARITY SURVIVED
+
+`WpLock.v` green with the whole of it (text kept at
+`…/scratchpad/WpLock.v.surface-move`):
+
+| piece | shape |
+|---|---|
+| `lk_cpu_cell_ex lo lk v ex` | the floor PINNED, `own` still ∃ |
+| `lk_cpu_cell` / `lk_cpu_fresh` / `lk_cpu_res` | `lo` threaded, three `_free`/`_win`/`_held` laws follow |
+| `lock_body` / `lock_inv` (+`_open`/`_close`) | `lo` threaded |
+| `is_lock` | **ambient ξ**, `∃ lo, lock_name ∗ inv lockN (lock_inv … lo) ∗ ctx_floor cur_ctx lo` — arity unchanged |
+| `is_lock_inv` | now EXHIBITS `∃ lo, inv … lo ∗ ctx_floor cur_ctx lo` |
+| `lock_openable` | **ambient ξ**, hands the floor out beside the body — arity unchanged |
+| `lock_finisher` | `∀ lo` INSIDE the wand; `_destroy`'s `Out` gets `∃ lo, lk_cpu_fresh lo lk` — arity unchanged |
+| `lock_inv_alloc` / `newlock_d` | `lo` threaded, **no floor owed** (they hand back the bare invariant) |
+| `newlock` / `newlock_delayed` | one new premise `TsoCtx.ctx_floor cur_ctx lo` |
+
+**A6.97 §(2)'s prediction held exactly**: the three definitions that would have
+moved seventeen green files kept their arities, and the only signature change
+in the whole file is the one premise on the two handle-returning creators.
+
+> **AND THE DISTINCTION THAT FELL OUT IS WORTH THE LINE.**  A creator that
+> hands back the bare INVARIANT owes nothing; only a creator that hands back a
+> HANDLE owes a floor.  *The floor is a property of the handle, not of the
+> lock* — which is §0.35′'s own sentence ("we'll pass around knowledge of
+> is_lock in some way that ensures that any core trying to grab a lock is
+> necessarily above lo") read as a type.
+
+#### (2) WHY IT CANNOT CLOSE YET, AND IT IS AN ORDERING FACT
+
+The consumers break where the new premise lands.  `initlock`'s post is
+`lk_cpu_fresh lk`, and the `lo` it must now expose is its own
+store-then-mint's position, `S (length glog)` — **which the writer's own
+bound has not passed**, because a plain store is buffered.  So `newlock`'s
+caller cannot produce `ctx_floor cur_ctx lo` on the spot; it has to BUY it.
+
+The purchase is fully identified and every primitive for it now exists:
+
+```
+  initlock's post carries      llb loglen_name lo          (lo is a legal log position)
+  the next AMO gives           hart_view_lb K ∗ ⌜lo ≤ K⌝   (TsoCtx.hart_view_lb_get)
+  ctx_bound_raise gives        ctx_floor ξ K               (A6.97 §(1))
+  ctx_floor_le gives           ctx_floor ξ lo              (lo ≤ K)
+```
+
+**Four steps, no gaps** — but the second is the ACQUIRE'S EXPORT, which is
+step (2).  So the creators' floor is downstream of step (2), and step (1)
+cannot be swept to green before it.
+
+> **THIS IS NOT A CONTRADICTION OF §0.35′** — it is the ruling's own clause
+> (iii) fixing the build order.  "The author's floor is bought with a receipt,
+> the same receipt everyone else pays with" (A6.97) says, read as an ordering,
+> that **the receipt's producer must be built before the floor's consumers**.
+> The coordinator's queue put the surface first because the surface looked
+> like the expensive half; measured, the surface is the cheap half and its
+> obligation is the expensive one.
+
+#### (3) THE RECOMMENDATION: MERGE (1) AND (2), ACQUIRE'S EXPORT FIRST
+
+One tranche, in this order:
+
+1. **`SpecAcquire`'s export** — `(∃ K, hart_view_lb K)` becomes
+   `∃ K, hart_view_lb K ∗ ⌜lo ≤ K⌝` for the acquired lock's floor, off the
+   AMO's `hart_view_lb_get`.  This is also step (2)'s own prerequisite (the
+   `notheld` read consumes the same pair) — **one piece serves both**.
+2. **`initlock`'s post** — expose `lo` and carry `llb loglen_name lo`.
+3. **the surface move** — §(1)'s validated text, re-applied verbatim.
+4. **the creators** — each `newlock` site buys its floor through §(2)'s chain.
+5. then the holder read + `notheld`, the DMA leaf, §0.27′.
+
+#### (4) THE NUMBER
+
+**1100 of 1296, RED 9 — the A6.93 set, held**, sentinel-backed
+(`MAKEEXIT=2`).  **Red-list delta: 0.**  `WpLock` restored byte-identical to
+its green text (verified by `diff`); the two `TsoCtx` additions from A6.96 /
+A6.97 remain and cost no green file.  `md5sum kernel-rocq/*.v user-rocq/*.v`
+unchanged (`edd91972b6bc1b944fd98a2cc2363815`).  `^Abort` / `^Admitted` /
+`^Axiom` all 0.  Mirror unchanged from A6.97's boundary (the only diff since
+is the reverted file, restored).
