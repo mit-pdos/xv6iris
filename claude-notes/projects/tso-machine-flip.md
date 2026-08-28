@@ -13065,3 +13065,77 @@ Roughly eighty lines, no new machinery, no ruling needed.
 > work is a single long dependent chain (leaf → `initlock` → surface → six
 > callers → `newlock` → the two reads), and it wants one uninterrupted run
 > rather than another pass that opens it and closes it back.
+
+### A6.104 STAGE A LANDED — THE FLOOR-FRAMING STORE LEAF IS BUILT AND GREEN,
+### AND ITS GATE HAD BEEN WAITING IN `TsoCtx` WITH NO CLIENT
+
+Stage A of the two-stage plan.  **Both pieces compile and the boundary holds**;
+Stage B (the dependent chain) is next and is now unblocked at its head.
+
+#### (1) WHAT LANDED — TWO LEMMAS, `WpSconfMem`
+
+```coq
+  Local Lemma word_wpay_frame_store_c {CIDw : CpuId} … :
+    (∀ j, j < 8 → nth_byte zero_reg j = z j) →
+    gen_heap_interp σ.(mem) -∗ tso_interp_of … log V -∗
+    ([∗ list] j ∈ seq 0 8, ∃ t, phys_ledger_wpay (pa_add a j) _ (nth_byte vold j) t
+                                  (TsWin a 8 j z cp own lo)) ==∗
+    … ∗ ([∗ list] j ∈ seq 0 8, phys_ledger_wpay … (S (length log))
+                                  (TsWin a 8 j z cp own' lo))
+
+  Lemma wp_sd_zero_wpay_frame_s_sconf … :   (* `sd x0`, window in at lo, out at lo *)
+```
+
+The window goes **in at floor `lo` and comes back out at `lo`**, with only
+`own` moved — the twin of `wp_sd_zero_wpay_s_sconf`, which MINTS at its own
+store's position.  That is the whole difference the floor-0 route turns on:
+a `.bss` lock's owner field is an era-image cell, so its window is minted at
+`0` before `initlock` runs, and `initlock`'s `sd x0` must FRAME that floor
+rather than set a new one — which makes `ctx_floor ξ 0` free at every
+boot-static handle and breaks A6.101's bootstrap.
+
+#### (2) NOTHING NEW UNDERNEATH — THE GATE WAS ALREADY THERE
+
+`TsoCtx.ledger_store_win_wpay_ok` is the gate, it has been in the tree since
+the M4 unit, and **`grep` finds it had no client at all** outside `TsoCtx`'s
+own file.  Its two arms were written for exactly these two stores, and
+`WpLock`'s comment names the pairing: *"acquire's store writes the author's own
+word and REVOKES its entry (second arm); release's writes the clear word and
+RESTORES it (the first)."*  All Stage A added is the leaf plumbing — the
+`wp_store_s_sconf_au_dat` call and the x0 premise from
+`wp_sd_zero_wpay_s_sconf`, and the interp bookkeeping (`tso_interp_of_pin`,
+the `gs_of` bridge, the `vstep` monotonicity triple) from
+`WpSconfLock.lock_word_store_plain` (A6.89).  **Both models were followed
+verbatim and both went in first try.**
+
+> **FOURTH INSTANCE OF THE LANE'S RECURRING SHAPE, AND THE SHARPEST.**  A6.98's
+> `lo` was existential inside the cell; A6.100's timestamp was hidden inside
+> the ctx word; A6.102's exposing combinator was written eighteen amendments
+> early; here the GATE ITSELF was complete, correct, and unreachable for want
+> of eighty lines of leaf.  *In a proof this size the expensive step is
+> usually not building the law but noticing the law is already built.*
+
+#### (3) AND IT UNBLOCKS TWO TRANCHES, NOT ONE
+
+The same leaf is what `WpSconfLock`'s cpu-store family needs (A6.92 left
+`wp_sd_lkcpu_lockopen_gen` and its two exchanges at the pre-flip
+`lock_cpu lk ↦₈ _` because nothing exposed this gate).  So Stage B's
+`initlock` step and its `WpSconfLock` cpu-store step are the same artifact in
+its two arms.
+
+#### (4) THE NUMBER
+
+**1100 of 1296, RED 9 — the A6.93 set, held**, sentinel-backed
+(`MAKEEXIT=2`) over a whole-tree rebuild (`WpSconfMem` is a deep dependency).
+**Red-list delta: 0**, and the addition is purely additive — no existing
+statement moved, no green file cost.  `md5sum kernel-rocq/*.v user-rocq/*.v`
+unchanged (`edd91972b6bc1b944fd98a2cc2363815`).  `^Abort` / `^Admitted` /
+`^Axiom` all 0.  Mirror refreshed.
+
+#### (5) STAGE B, HEAD UNBLOCKED
+
+`SpecInitlock` floor-parametric + `ProofInitlock` on the new leaf → the parked
+surface verbatim → four static callers' exposing-combinator routing + two
+dynamic callers' purchase chain → `newlock`'s premise → `notheld` + holder
+reads (racy-kit redo, `lk_wex` retired) → `WpSconfLock`'s cpu-store family on
+the same leaf → close `WpSconfLock`, sweep the cone.
