@@ -14476,3 +14476,156 @@ Both acknowledged, neither started:
 
 Mirror refreshed at r26.  `WpSconfLock` unchanged in status; its two reads now
 need only the floor.
+
+---
+
+## A6.116 — (5) MEASURED: the bare receipt is half the transport, confirmed from two lanes; and the crossing upgrade needs a ruling on WHERE the absorb sits
+
+*(Amendment A6.116, fliptree lane.  Measurement, no source touched; tree stands
+at r26 — RED 9, delta 0.  Characterize-and-stop on a genuine design question,
+per the standing rule.)*
+
+### §1. TWO LANES, ONE FINDING
+
+The KPT lane reports from its own boundary (`tso-kpt-lane.md` K10–K11) that
+`SpecAcquire`'s exported `(∃ K, hart_view_lb K)` has **K existential and tied
+to nothing**, and that every absorb-side consumer needs the stable PAIR
+`hart_view_lb K ∗ ⌜T ≤ K⌝`, whose tie is derivable **only inside the AMO leaf**
+(`hart_view_lb_get` wants the interp and the log-top fact, both in scope there
+and nowhere else).
+
+I reached the same wall from the lock side while opening (5), and it corrects
+A6.111 §4: I recorded acquire's receipt as *"the same predicate
+`ctx_bound_raise` consumes"* and said there was nothing to build.  **The
+predicate is the same; the export is half of what a consumer needs.**  It is
+enough for the KPT lane's `ctx_resume`/`ctx_exchange` (which supply their own
+`T` from `ctx_parked_llb`, at a site that still has the interp) and not enough
+for a floor upgrade against a specific `lo` outside the leaf.
+
+### §2. WHY THAT BLOCKS (5) AS SPECIFIED
+
+The upgrade wants: `llb loglen_name lo` (the handle's right arm) ⇝
+`ctx_floor cur_ctx lo`.  That is `hart_view_lb_get` + `ctx_bound_raise`, and
+`hart_view_lb_get`'s premise is `length glog ≤ gtv cpu_id` — an AMO fact,
+available only inside the leaf.  So **the absorb must run where both the AMO
+and the floor value `lo` are in scope.**  Enumerating where that can be, for
+the read that needs it (`notheld`, which runs BEFORE its own lock's AMO):
+
+* **At this lock's own AMO** — too late; `holding()` precedes it.  This is
+  A6.109 §3, unchanged.
+* **At the crossing acquire's AMO, on the payload** — the payload `R ξ` *is*
+  withdrawn at that AMO, so `lo` is in scope there in principle.  But `R` is
+  abstract (`CtxId → iProp`) and acquire cannot reach inside it; only the
+  payload's own `CtxMorph` instance can, and `CtxMorph`'s obligation
+  (`ctx_dom ξ ξ' -∗ R ξ ==∗ ctx_dom ξ ξ' ∗ R ξ'`) carries **no absorb
+  capability** — which is exactly why every nested handle transports by
+  dropping to the right arm today.
+* **Exporting a stable pair from the leaf** (the KPT lane's fix) — sound, and
+  the right fix for consumers that name their own `T`.  For a *nested handle*
+  the `T` is the inner lock's `lo`, which the leaf does not know unless the
+  payload tells it.
+
+### §3. SO THE QUESTION, PRECISELY
+
+**Where does the absorb sit for a handle that arrives inside a payload?**  Two
+shapes, both real, neither cheap enough to pick unilaterally:
+
+1. **Strengthen `CtxMorph`** to carry the crossing's absorb capability —
+   `ctx_dom ξ ξ' -∗ absorb -∗ R ξ ==∗ …` — so a payload containing `is_lock`
+   re-establishes the left arm as part of its own transport.  Correct and
+   local to the class, but it moves every payload instance in the tree, and
+   the M3 λ-conversion (already queued from the intr lane) touches the same
+   four trap-path payloads.  These two should probably be one pass.
+2. **Give `ctx_dom` the bound relation directly** — `ctx_dom_def` already
+   carries `⌜(B ≤ B')%nat⌝` and `mono_nat_lb_own (ctx_bound_name ξ') B'`, i.e.
+   the receiving context's bound dominates the sender's.  If that suffices to
+   carry `ctx_floor ξ lo ⇝ ctx_floor ξ' lo`, then the left arm transports for
+   **free** and the only question left is where it is first established —
+   which is the creator, and the creator is where the KPT lane's own route
+   points.  **This is the one to measure first**; it is a `grep` and a
+   two-line lemma, not a design change.
+
+### §4. THE KPT LANE'S ROUTE MAY SERVE THE CREATOR CASES
+
+They routed hart 0 around the same gap with an **author-side fact projected
+from `own_context` OUTSIDE the leaf** (`PhysSeen.phys_seen_at`).  That is the
+same shape as this lane's creator arm (A6.111: the floor message is mine,
+`ledger_vis`'s right disjunct) and the same shape as A6.115's cell anchor.
+Three independent uses of "the writer rides its own write, projected out of the
+token" now exist; if §3's option 2 fails, the honest next move is to look at
+whether that projection generalises rather than to strengthen `CtxMorph`.
+
+### §5. WHAT I AM DOING
+
+Measuring §3 option 2 first — `ctx_dom`'s bound relation against
+`ctx_floor` — because it is cheap and would collapse the question.  If it
+closes, (5) is a two-line lemma plus the `lock_openable_c` threading and I
+proceed as queued.  If it refuses, the choice between §3(1) and §4 is an owner
+question and I will bring it with both priced rather than pick one.
+
+**Correction to A6.111 §4 stands recorded here**: acquire's export is real and
+useful, but "nothing to build" was wrong — the pair, not the bare receipt, is
+what the transport needs.
+
+---
+
+## A6.117 — A6.116 §3 option 2 MEASURED AND LANDED: the floor transports for free; only its ORIGIN is left
+
+*(Amendment A6.117, fliptree lane, closing A6.116's measurement.)*
+
+### §1. THE NUMBER
+
+**RED 9 — unchanged, 1027 files recompiled**, sentinel-backed (`MAKEEXIT=2`,
+round r27).  **Red-list delta 0.**
+
+### §2. THE RESULT: OPTION 2 HOLDS, AND IT IS TEN LINES
+
+```coq
+  Lemma ctx_floor_dom (ξ ξ' : CtxId) (lo : nat) :          (* TsoCtx *)
+    ctx_dom ξ ξ' -∗ ctx_floor ξ lo -∗ ctx_dom ξ ξ' ∗ ctx_floor ξ' lo.
+```
+
+`ctx_dom`'s body already carried every ingredient — the sender's authority at
+`B`, the relation `⌜B ≤ B'⌝`, and `mono_nat_lb_own (ctx_bound_name ξ') B'` —
+so `llb_valid_q` then `llb_le` is the whole proof.  **A floor the sender could
+discharge is one the receiver can discharge.**
+
+So the ξ-indexed half of §0.35′(i) is *not* an obstacle to payload transport:
+a crossing carries the left arm without `CtxMorph` being touched, and
+A6.116 §3 option 1 (strengthening the class) is **not needed for propagation**.
+
+### §3. WHAT IS ACTUALLY LEFT, AND IT IS SMALLER THAN §3 MADE IT LOOK
+
+Only the **origin**: somewhere, once per lock, `llb loglen_name lo` must become
+`ctx_floor ξ lo`, and that step needs an AMO with `lo` in scope
+(`hart_view_lb_get`, interp + log-top, leaf-only — the KPT lane's K10–K11
+finding).  After that one step, `ctx_floor_dom` moves it everywhere the handle
+goes, for free and forever.
+
+The candidates for that one step, now that propagation is free:
+
+1. **The creator's own next AMO.**  It holds `llb loglen_name lo` from
+   `initlock`'s post and takes an AMO at its next `acquire` of anything.  The
+   absorb is `hart_view_lb_get` + `ctx_bound_raise` inside that leaf, and the
+   handle is in scope because the creating *thread* still holds it.  This is
+   NOT route (b): (b) argued the creator's read is *covered* by an intervening
+   AMO it does not own; this uses the creator's own acquire, in its own proof,
+   as the place the transport is *manufactured* — and the creator's own reads
+   before it are covered by A6.111's author arm, which owes nothing.
+2. **`initlock` itself**, if the store leaf is given a following absorb — but
+   `initlock` performs no AMO, so this needs one to be added to the C code.
+   Refused: the port does not change the kernel.
+3. The crossing (A6.116 §3 option 1) — now unnecessary for propagation, and
+   more expensive than (1).
+
+**(1) is the one to build**, and it is a leaf-local change to acquire's AMO
+step plus a strengthened export: the AMO leaf should hand back
+`ctx_floor cur_ctx T` (or the KPT lane's stable pair) for the `T`s whose `llb`
+it was given, rather than the bare `∃K, hart_view_lb K` that A6.116 §1 showed
+is half a transport.
+
+### §4. STATE
+
+`ctx_floor_dom` landed, additive, mirror refreshed at r27.  Nothing outside
+this lane's files touched.  (5) is now: the AMO leaf's strengthened export,
+then the `lock_openable_c` threading — with the propagation half already done.
