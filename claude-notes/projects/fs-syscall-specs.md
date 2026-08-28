@@ -225,21 +225,84 @@ things, and the answer differs:
      THIS lend.  `FsAbsSeam` had to weaken to `lend_reads` because
      `dv_half` rides a file too; the era fragment carries the type, so
      `FsAbs` section 4 and section 4a' both instantiate.
-  REMAINING (lane A-iii): **the NAMEIPARENT walk.**  It is NOT a question
-  about the lend — the fire is shared by both sides of namex's `a1` test
-  and would be copied verbatim.  What is missing is (i) an npar-generic
-  trace CONTRACT: nameiparent fires L−1 hops and returns the PARENT, so
-  the success arm is `P (L−1) iL` beside the UNFIRED last hop and the
-  `nameiparent_of` name clause, and (ii) namex's two npar exits proven
-  carrying the trace rows — `L_par` (+0x84, iunlock and return the
-  parent) and the nameiparent-of-"/" iput (+0x140's fall-through), which
-  `ProofNamexTr` REFUTES from `Ha1` at its three use sites (2290, 3884,
-  and the 4985 `Hpfun0`).  Sizing measured: `diff ProofNamex ProofNamexTr`
-  is 1766 changed lines (1432 deletions = the npar arms + the relative
-  start, ~334 additions = the trace rows), so the npar-generic trace
-  proof is a re-derivation from `ProofNamex.v` (6088 lines) rather than a
-  patch of `ProofNamexEra`, and the three new exits' trace arms are
-  genuinely new proof content.  Lane-sized, not spike-sized.
+  **THE NAMEIPARENT WALK LANDED, 2026-08-28** (Opus lane; eight new files,
+  all EC2-green, zero `Admitted`, and `Print Assumptions` on the whole cone
+  is BYTE-IDENTICAL to `LinkNamexEra`'s — `resv_matches`, `resv_is_valid`,
+  funext).  Files and what each seals:
+  - `FsAbsNpar.v` — THE PARENT-PREFIX VOCABULARY.  `np_elems pl :=
+    removelast (path_elems pl)`, which is `SpecSysMknodAU.mknod_parent_elems`
+    definitionally; `ep_hop`/`ep_hops_from` = `FsAbs.ax_hop`/`ax_hops_from`
+    at `FsAbsEra.elend` over that shorter list, by `reflexivity`; the peel
+    `ep_hops_cons`; and `np_dead`, the death arm.  A leaf, not an append to
+    `FsAbsEra.v`, for the mirror's reason (it forbids touching a tracked
+    file) — fuse when `FsAbsEra.v` is next edited.
+  - `SpecNparEra.v` / `ProofNparEra.v` / `LinkNparEra.v` — namex at the
+    nameiparent side, `a1 <> 0`, absolute paths.  Plus
+    `SpecNparWrapEra.v` / `ProofNparWrapEra.v` / `LinkNparWrapEra.v` —
+    nameiparent's own contract over it, so a create-side caller never
+    reaches past the wrapper.
+  - `FsAbsNparMknod.v` — THE ACCEPTANCE TEST, discharged:
+    `np_pre_of_mknod` (lane W's `mknod_walk_pre_era` one-shot fired at the
+    fetched path and at `ROOTINO`, supplying the contract's two trace
+    premises) and `np_dead_to_mknod`.
+  AS-LANDED FINDINGS:
+  1. **The trace premise HAD to be the parent prefix, not the full family
+     with the last hop unfired.**  The earlier sketch (success arm =
+     `P (L−1) iL` beside an UNFIRED last hop over `path_elems pl`) is
+     UNSUPPLIABLE: producing that extra hop is a real fupd obligation and
+     lane W's caller has no directory to discharge it against.  Over
+     `removelast (path_elems pl)` the discharge is `reflexivity`, because
+     that list IS `mknod_parent_elems`.
+  2. **The frozen `⌜k < L⌝` death shape cannot express two REACHABLE
+     nameiparent deaths**, and `np_dead` splits the bound accordingly.
+     LEFT (`k <= length ps`): namex runs the type test (+0x54) and the
+     nlink guard (+0x7a) at EVERY level including the PARENT's own, and
+     "nameiparent of /" (+0x140's iput) is the same shape at `k = 0` with
+     an empty family.  RIGHT (`k < length ps`): a dirlookup miss can only
+     happen strictly inside the prefix, because dirlookup is reached only
+     after the walk has decided the element is not the last one.
+  3. **`mknod_walk_dead_era` does NOT cover the walk's failures**, and
+     `np_dead_to_mknod` is honest about it: at `k = length ps` the walk
+     hands back `P (length ps) d`, which is `mknod_post_fail`'s THIRD fold
+     arm (`∃ d, P Lp d ∗ acre_commit ∗ (… ∨ dlookup_commit)`) and not
+     `mknod_walk_dead_era`.  mknod's post is dischargeable as it stands;
+     the predicate alone is not the whole story.
+  4. **The `destruct npar` splits were PINNED, not eliminated.**  Deriving
+     from `ProofNamex.v` (not from `ProofNamexEra`, per the sizing below)
+     and opening with `pose (npar := true); assert (Hnpe : npar = true);
+     clearbody npar` keeps all three case splits and their bullets exactly
+     as landed; each namei branch closes with `discriminate Hnpe`.  Total
+     new proof content: three nameiparent facts (`Hklep`, `Hkltp`/`Hdropp`,
+     and the `es0`-nonempty invariant conjunct) and the two exits' trace
+     rows.  133 s to compile, so no split was needed.
+  5. **+0x140 needed a NEW INVARIANT CONJUNCT.**  On the namei side that
+     exit is the success return; here it is "nameiparent of /", and the
+     failure arm is indexed by the parent prefix — so the proof must know
+     `es0 = []` there.  Carried as a second conjunct INSIDE the existing
+     `⌜path_elems pl = es0 ++ …⌝` premise ("a level that consumed an
+     element leaves another one behind"), so no call site's `[%]` count and
+     no bullet list moved.
+  6. **`lia` fails inside this file's proofmode context on a goal with NAT
+     SUBTRACTION** — measured, on `n <= n + S m - 1`, "Cannot find
+     witness", while the same goal closes instantly at the top level.  This
+     is the reason `ProofNamex` has its `nx_wi_*` family; the two index
+     bounds are hoisted the same way (`np_removelast_len_ge` / `_gt`).
+  7. **Understating a `Context` binder list is still a 255 GB memory
+     bomb** (durable-notes' rule, hit once here on `SpecNparEra`'s
+     `inode_held_ty_at` section: 420 s and an OOM kill, against 3 s with
+     `SpecNameiTr.NameiTrDefs`'s list).
+  REMAINING (lane A-iii): **the RELATIVE START**, scoped out and not
+  attempted — see `SpecNparEra`'s header.  It is not an arm but a
+  CONTRACT-SHAPE change: a relative walk starts at `p->cwd`, whose inum no
+  landed reading exposes (`inode_held` hides it existentially,
+  `SpecNameiTr`'s Q-c records the gap), so the trace premise would have to
+  become a fupd universally quantified over the start inum — which is
+  exactly the shape `mknod_walk_pre_era` already has, so the change is
+  statable, but it also brings back `ProofNamex`'s 361-line myproc/idup arm
+  that all four era proofs currently refute from `pfun 0 = SLASH`.  Sizing
+  measured: `diff ProofNamex ProofNamexTr` is 1766 changed lines (1432
+  deletions = the npar arms + the relative start, ~334 additions = the
+  trace rows).
 - [~] **W — the first increment's AU specs.**  mknod STATEMENT DONE
   2026-08-28 (Fable lane, `iris/SpecSysMknodAU.v`, 856 lines, green,
   zero admits — a statement file; the proof is a later Opus lane):

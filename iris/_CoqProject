@@ -1349,3 +1349,11 @@ SpecNameiEra.v
 ProofNameiEra.v
 LinkNameiEra.v
 FsAbsEraMknod.v
+FsAbsNpar.v
+FsAbsNparMknod.v
+SpecNparEra.v
+ProofNparEra.v
+LinkNparEra.v
+SpecNparWrapEra.v
+ProofNparWrapEra.v
+LinkNparWrapEra.v
