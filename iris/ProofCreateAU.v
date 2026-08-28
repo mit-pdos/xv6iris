@@ -1752,7 +1752,7 @@ Section ProofCreateMain.
   Definition cr_cont_body
       (γf : gname)
       (plen : nat) (pfun : nat -> bv 8) (pv : mword 64)
-      (ty major minor : mword 16) (V : pprivate)
+      (ty major minor : mword 16) (U : ustate)
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
@@ -1773,7 +1773,7 @@ Section ProofCreateMain.
        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
-       proc_priv γf (proc_addr j) pidv V -∗
+       proc_priv γf (proc_addr j) pidv U -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots 3 -∗
        ⌜if ok then (S ns' = ns)%nat else ns' = ns⌝ -∗
@@ -2120,7 +2120,7 @@ Section ProofCreateMain.
       (pd pav pu : mword 64)
       (γf : gname)
       (plen : nat) (pfun : nat -> bv 8) (pv : mword 64)
-      (ty major minor : mword 16) (V : pprivate)
+      (ty major minor : mword 16) (U : ustate)
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
@@ -2217,7 +2217,7 @@ Section ProofCreateMain.
        sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
        bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-       proc_priv γf (proc_addr j) pidv V -∗
+       proc_priv γf (proc_addr j) pidv U -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots 3 -∗
        iref_slots (ns - 1) -∗
@@ -2241,7 +2241,7 @@ Section ProofCreateMain.
          (fun CIDc : CpuId =>
             cr_cont_body γf
  plen pfun pv ty major minor
-                         V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
+                         U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                          ret_tgt CIDc P Pmiss Φok Φex) -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -2276,7 +2276,7 @@ Section ProofCreateMain.
       (pd pav pu : mword 64)
       (γf : gname)
       (plen : nat) (pfun : nat -> bv 8) (pv : mword 64)
-      (ty major minor : mword 16) (V : pprivate)
+      (ty major minor : mword 16) (U : ustate)
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
@@ -2463,9 +2463,9 @@ Section ProofCreateMain.
        sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
        bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-       proc_priv_bare (proc_addr j) pidv V -∗
-       (proc_priv_bare (proc_addr j) pidv V -∗
-          proc_priv γf (proc_addr j) pidv V) -∗
+       proc_priv_bare (proc_addr j) pidv U -∗
+       (proc_priv_bare (proc_addr j) pidv U -∗
+          proc_priv γf (proc_addr j) pidv U) -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots 3 -∗
        iref_slots (ns - 2) -∗
@@ -2484,7 +2484,7 @@ Section ProofCreateMain.
          (fun CIDc : CpuId =>
             cr_cont_body γf
  plen pfun pv ty major minor
-                         V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
+                         U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                          ret_tgt CIDc P Pmiss Φok Φex) -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -2499,7 +2499,7 @@ Section ProofCreateMain.
       (γf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (ty major minor : mword 16)
-      (V : pprivate)
+      (U : ustate)
       (u : nat) (Sb : gset Z)
       (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
@@ -2561,7 +2561,7 @@ Section ProofCreateMain.
     sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-    proc_priv γf (proc_addr j) pidv V -∗
+    proc_priv γf (proc_addr j) pidv U -∗
     ([∗ list] i ∈ seq 0 (S plen),
        pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ[KT1] pfun i) -∗
     procs_inv γs -∗
@@ -2587,7 +2587,7 @@ Section ProofCreateMain.
       cr_alloc_body γs j γl pd pav pu γf
 
                     plen pfun (m !!! Regidx Ra0 : mword 64)
-                    ty major minor V u Sb ns pidv dqb dqs dqbs dqn m
+                    ty major minor U u Sb ns pidv dqb dqs dqbs dqn m
                     (m !!! Regidx csp_rs1 : mword 64)
                     (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks CIDa
                     P Pmiss Φok Φex) -∗
@@ -2595,7 +2595,7 @@ Section ProofCreateMain.
     wp_next true (proc_addr j) (fun CIDc : CpuId =>
       cr_cont_body γf
  plen pfun (m !!! Regidx Ra0 : mword 64)
-                   ty major minor V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
+                   ty major minor U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                    (ret_pc (m !!! Regidx Rra : mword 64)) CIDc
                    P Pmiss Φok Φex) -∗
     WP (Loop : expr riscv_lang).
@@ -2901,7 +2901,7 @@ Section ProofCreateMain.
     iEval (rewrite {1}Hnsplit iref_slots_op) in "Hislots".
     iDestruct "Hislots" as "[Hisl2 Hislr]".
     (* ---- the running process: the BLOCK and the cwd reference ---- *)
-    iDestruct (proc_priv_bare_cref γf (proc_addr j) pidv V with "Hpriv")
+    iDestruct (proc_priv_bare_cref γf (proc_addr j) pidv U with "Hpriv")
       as "(Hppid & Hcref & Hpclose)".
     iDestruct (cwd_ref_held with "Hcref") as "Hcref".
     iEval (rewrite -HR7a0) in "Hpath".
@@ -2915,7 +2915,7 @@ Section ProofCreateMain.
  γf
               plen pfun nf0 u Sb P Pmiss
               pidv (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
-              R7 (K - 10)%nat eb b lks V
+              R7 (K - 10)%nat eb b lks U
               ltac:(exact HKnp) Hroot Hnib0 Hlg Hsize
               Hbms0 Hbmsc Hbmsl Hist0 Hcovb Hiregb Hcstr Hplen31 Hslash
               ltac:(exact (cr_walk_need _ u Hu)) Hj Hgs
@@ -3019,7 +3019,7 @@ Section ProofCreateMain.
       iDestruct (cr_esc_acc kd Hkd with "Hesc") as "#Hescd".
       iDestruct (ic_sleeplocks_lookup fsc_ic kd Hkd with "Hslks") as (gild gisld) "#Hslkd".
       iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
-      iDestruct (proc_priv_bare_acc γf (proc_addr j) pidv V with "Hpriv")
+      iDestruct (proc_priv_bare_acc γf (proc_addr j) pidv U with "Hpriv")
         as "[Hppid Hppback]".
       (* ===== +0x26 jal ilock (a0 is STILL dp -- not reloaded) ========= *)
       assert (Htgil : add_vec (mword_of_int (CK + 0x26) : mword 64)
@@ -3061,7 +3061,7 @@ Section ProofCreateMain.
                 (DepTx (qd/2)%Qp icfg_dev dind gd t (1/2)) PlainK
  dind
                 pidv (DfracOwn (1/4)) dqs Q2 (K - 10)%nat eb b lks
-                V ltac:(exact HKil) eq_refl ltac:(discriminate)
+                U ltac:(exact HKil) eq_refl ltac:(discriminate)
                 Hkd Hlg Hist0 Hdblk Hdib' Hj Hgs HQ2a0
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescd Hiregi
                       Hslkd Hshr [Htp] Hrud Hsbi Hppid Hprocs Hdevi Hgeom Hdlk Hbs1").
@@ -3201,7 +3201,7 @@ Section ProofCreateMain.
                   kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp icfg_dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
                   false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                   G2 (K - 10)%nat eb b lks
-                  V ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
+                  U ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HG2a0 ltac:(lkbelow) eq_refl
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -3496,7 +3496,7 @@ Section ProofCreateMain.
                   false (mword_of_int 0 : mword 32)
                   pidv (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1)
                   D4 (K - 10)%nat eb b lks
-                  V ltac:(exact HKdlu) Htydir Hlg Hbmwf Hbmcov Hszcap Hholesl
+                  U ltac:(exact HKdlu) Htydir Hlg Hbmwf Hbmcov Hszcap Hholesl
                   ltac:(exact (Hdok Hdz))
                   ltac:(left; exact (cr_nl0z dnl Hnl0))
                   ltac:(exact Hdoc)
@@ -3694,7 +3694,7 @@ Section ProofCreateMain.
  kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp icfg_dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
                     false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                     F3 (K - 10)%nat eb b lks
-                    V ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
+                    U ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                     ltac:(exact Hn1ip) Hj Hgs HF3a0 ltac:(lkbelow) eq_refl
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -3782,7 +3782,7 @@ Section ProofCreateMain.
                     gilc gislc kslot (qq/2)%Qp gc
                     (DepTx (qq/2)%Qp icfg_dev cinum gc t (1/2)) PlainK
  cinum pidv (DfracOwn (1/4)) dqs F5 (K - 10)%nat eb b lks
-                    V ltac:(exact HKil) eq_refl ltac:(discriminate)
+                    U ltac:(exact HKil) eq_refl ltac:(discriminate)
                     Hkslot Hlg Hist0 Hcblk Hcinb Hj Hgs HF5a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc
                           Hiregi Hslkc Hcshr [Htp] Hruc Hsbi Hppid Hprocs Hdevi Hgeom
@@ -3848,9 +3848,9 @@ Section ProofCreateMain.
                        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
                        sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
                        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
-                       proc_priv_bare (proc_addr j) pidv V -∗
-                       (proc_priv_bare (proc_addr j) pidv V -∗
-                          proc_priv γf (proc_addr j) pidv V) -∗
+                       proc_priv_bare (proc_addr j) pidv U -∗
+                       (proc_priv_bare (proc_addr j) pidv U -∗
+                          proc_priv γf (proc_addr j) pidv U) -∗
                        ([∗ list] i ∈ seq 0 (S plen),
                           pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ[KT1] pfun i) -∗
                        bslots 3 -∗
@@ -3867,7 +3867,7 @@ Section ProofCreateMain.
                          (fun CIDc : CpuId =>
                             cr_cont_body γf
  plen pfun
-                              (m !!! Regidx Ra0 : mword 64) ty major minor V u Sb
+                              (m !!! Regidx Ra0 : mword 64) ty major minor U u Sb
                               ns pidv dqb dqs dqbs dqn m K eb b lks j ret_tgt
                               CIDc P Pmiss Φok Φex) -∗
                        WP (Loop : expr riscv_lang)))%I
@@ -3932,7 +3932,7 @@ Section ProofCreateMain.
  kslot (qq/2)%Qp (qq/2)%Qp gc (DepTx (qq/2)%Qp icfg_dev cinum gc t (1/2)%Qp) cinum dnc bmc
                       n2 Sb2 false false false ec _ _ pidv (DfracOwn (1/4)) dqb dqs
                       B2 (K - 10)%nat eb b lks
-                      V ltac:(exact HKiup) eq_refl Hkslot ltac:(discriminate)
+                      U ltac:(exact HKiup) eq_refl Hkslot ltac:(discriminate)
                       ltac:(discriminate)
                       Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
                       ltac:(exact Hn2ip) Hj Hgs HB2a0 ltac:(lkbelow) eq_refl
@@ -4232,7 +4232,7 @@ Section ProofCreateMain.
                   kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp icfg_dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
                   false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                   J2 (K - 10)%nat eb b lks
-                  V ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
+                  U ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HJ2a0 ltac:(lkbelow) eq_refl
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -4610,7 +4610,7 @@ Section ProofCreateMain.
       (pd pav pu : mword 64)
       (γf : gname)
       (plen : nat) (pfun : nat -> bv 8) (pv : mword 64)
-      (ty major minor : mword 16) (V : pprivate)
+      (ty major minor : mword 16) (U : ustate)
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
@@ -4678,7 +4678,7 @@ Section ProofCreateMain.
        wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
          cr_fail_body γs j γl pd pav pu γf
 
-                      plen pfun pv ty major minor V u Sb ns pidv
+                      plen pfun pv ty major minor U u Sb ns pidv
                       dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                       kd qd gd γil γisl dind dn bm data nf nsl t CIDf
                       P Pmiss Φok Φex)) -∗
@@ -4693,7 +4693,7 @@ Section ProofCreateMain.
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDa : CpuId =>
       cr_alloc_body γs j γl pd pav pu γf
 
-                    plen pfun pv ty major minor V u Sb ns pidv dqb dqs dqbs dqn
+                    plen pfun pv ty major minor U u Sb ns pidv dqb dqs dqbs dqn
                     m sp0 ret_tgt K eb b lks CIDa P Pmiss Φok Φex).
   Proof.
     intros HK Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0
@@ -4758,7 +4758,7 @@ Section ProofCreateMain.
     assert (Hns1 : (1 + (ns - 2))%nat = (ns - 1)%nat) by exact (cr_ns_1 ns Hns).
     iEval (rewrite -Hns1 iref_slots_op) in "Hisl".
     iDestruct "Hisl" as "[Hisl1 Hislr]".
-    iDestruct (proc_priv_bare_acc γf (proc_addr j) pidv V with "Hpriv")
+    iDestruct (proc_priv_bare_acc γf (proc_addr j) pidv U with "Hpriv")
       as "[Hppid Hppback]".
     iDestruct (cpu_own_transport CIDa CIDA1 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -4787,7 +4787,7 @@ Section ProofCreateMain.
     iApply (create_fresh_ty γs j γl pd pav pu
  ty kd (DfracOwn (1/2))
               q1 Sb1 t (1/4)%Qp (1/4)%Qp
-              pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks V
+              pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks (upd_usM U _)
               ltac:(exact HKia) ltac:(exact HKil) Hlg Hist0 Hiregb Hni1 Hni2
               Hni3 Htynz Htyk Hpkc Hj Hgs Hroot A20 A9 Hkdlt Heb ltac:(lkbelow)
               (fun CIDx : CpuId => IA.wp_ialloc_gen (CID := CIDx))
@@ -5012,7 +5012,7 @@ Section ProofCreateMain.
                 pidv
                 (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                 W3 (K - 10)%nat eb b lks
-                V ltac:(exact HKiu)
+                U ltac:(exact HKiu)
                 ltac:(intros _; exact (cr_in_union_sing Sb1 _))
                 Hlg Hist0 Hcblk Hcblog Hcinb
                 ltac:(exact (di_type_stable_eq _ _
@@ -5336,7 +5336,7 @@ Section ProofCreateMain.
                   pidv (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1) dqs
                   dqb dqbs (DfracOwn (1/2))
                   X4 (K - 10)%nat eb b lks
-                  V ltac:(exact HKdlk) Htydir Hbmcov Hszcap
+                  U ltac:(exact HKdlk) Htydir Hbmcov Hszcap
                   ltac:(exact (Hdok Hdz))
                   (* THE RELAYED LICENCE (§7.5.6, row 5).  LEFT disjunct,
                      earned by the same [sysfile.c:269] guard the found half
@@ -5759,7 +5759,7 @@ Section ProofCreateMain.
  kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp icfg_dev dind gd t (1/4)%Qp) dind dn' bm'
                        n' Sb' false true false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                        Y2 (K - 10)%nat eb b lks
-                       V ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) Hcruu
+                       U ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) Hcruu
                        Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                        ltac:(exact Hipn') Hj Hgs HY2a0 ltac:(lkbelow) eq_refl
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
@@ -6150,7 +6150,7 @@ Section ProofCreateMain.
                 kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp icfg_dev dind gd t (1/2)%Qp) dind dn bm (S q1) Sb1
                 false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                 Z2 (K - 10)%nat eb b lks
-                V ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) ltac:(discriminate)
+                U ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) ltac:(discriminate)
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                 ltac:(exact Hn1ip) Hj Hgs HZ2a0 ltac:(lkbelow) eq_refl
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -6322,7 +6322,7 @@ Section ProofCreateMain.
       (pd pav pu : mword 64)
       (γf : gname)
       (plen : nat) (pfun : nat -> bv 8) (pv : mword 64)
-      (ty major minor : mword 16) (V : pprivate)
+      (ty major minor : mword 16) (U : ustate)
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
@@ -6366,7 +6366,7 @@ Section ProofCreateMain.
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
       cr_fail_body γs j γl pd pav pu γf
 
-                   plen pfun pv ty major minor V u Sb ns pidv
+                   plen pfun pv ty major minor U u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
                    kd qd gd γil γisl dind dn bm data nf nsl t CIDf
                    P Pmiss Φok Φex).
@@ -6505,7 +6505,7 @@ Section ProofCreateMain.
               (cr_ity ty (bv_unsigned dind)) pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G2 (K - 10)%nat eb b lks
-              V ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
+              U ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
               Hlg Hist0 Hcblk Hcblog Hcinb Hstab
               ltac:(exact (cr_setf_type_nz dnc major minor _ Htyz))
               Hdec
@@ -6664,7 +6664,7 @@ Section ProofCreateMain.
               (bool_decide (fsc_bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum icfg_ist]})))
               true false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
               G4 (K - 10)%nat eb b lks
-              V ltac:(exact HKiup) eq_refl Hkslt
+              U ltac:(exact HKiup) eq_refl Hkslt
               ltac:(exact (cr_crb_honest (Sb4 ∪ {[IBLOCK cinum icfg_ist]})
                              fsc_bmapstart))
               ltac:(intros _; exact (cr_in_union_sing Sb4
@@ -6892,7 +6892,7 @@ Section ProofCreateMain.
               kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp icfg_dev dind gd t (1/4)%Qp) dind dn' bm'
               n5 Sb5 false false false e1 _ _ pidv (DfracOwn (1/4)) dqb dqs
               G6 (K - 10)%nat eb b lks
-              V ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) ltac:(discriminate)
+              U ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0 ltac:(lkbelow) eq_refl
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -7047,7 +7047,7 @@ Section ProofCreateMain.
       (pd pav pu : mword 64)
       (γf : gname)
       (plen : nat) (pfun : nat -> bv 8)
-      (ty major minor : mword 16) (V : pprivate)
+      (ty major minor : mword 16) (U : ustate)
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
@@ -7057,7 +7057,7 @@ Section ProofCreateMain.
     wp_create_au_body γs j γl pd pav pu
  γf
  plen pfun ty major minor
-                      V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks
+                      U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks
                       P Pmiss Φok Φex.
   Proof.
     rewrite /wp_create_au_body.
@@ -7082,7 +7082,7 @@ Section ProofCreateMain.
       as %[Hal10 Hal9].
     iApply (cr_found_half γs j γl pd pav pu
  γf
- plen pfun ty major minor V u Sb ns pidv
+ plen pfun ty major minor U u Sb ns pidv
               dqb dqs dqbs dqn m K eb b lks P Pmiss Φok Φex
               HK Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc
               Hbmsl Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hslash Hty
@@ -7095,7 +7095,7 @@ Section ProofCreateMain.
     iApply (cr_alloc_half γs j γl pd pav pu
  γf
  plen pfun (m !!! Regidx Ra0 : mword 64)
-              ty major minor V u Sb ns pidv dqb dqs dqbs dqn m
+              ty major minor U u Sb ns pidv dqb dqs dqbs dqn m
               (m !!! Regidx csp_rs1 : mword 64)
               (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
               P Pmiss Φok Φex
@@ -7108,7 +7108,7 @@ Section ProofCreateMain.
     iApply (cr_fail_half γs j γl pd pav pu
  γf
  plen pfun (m !!! Regidx Ra0 : mword 64)
-              ty major minor V u Sb ns pidv dqb dqs dqbs dqn m
+              ty major minor U u Sb ns pidv dqb dqs dqbs dqn m
               (m !!! Regidx csp_rs1 : mword 64)
               (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
               kd qd gd γil γisl dind dn bm data nf nsl t

@@ -200,7 +200,7 @@ Definition wp_create_au_body
  (γf : gname)           (* kalloc, ftable, printk *)
     (plen : nat) (pfun : nat -> bv 8)                 (* the PATH buffer     *)
     (ty major minor : mword 16)                       (* a1, a2, a3          *)
-    (V : pprivate)                                    (* the running process *)
+    (U : ustate)                                    (* the running process *)
     (u : nat) (Sb : gset Z)                           (* THE OP-WIDE LEDGER  *)
     (ns : nat)                                        (* the iref ledger     *)
     (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
@@ -272,7 +272,7 @@ Definition wp_create_au_body
   sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  proc_priv γf pj pidv V -∗
+  proc_priv γf pj pidv U -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
@@ -306,7 +306,7 @@ Definition wp_create_au_body
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
-      proc_priv γf pj pidv V -∗
+      proc_priv γf pj pidv U -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       bslots 3 -∗
       ⌜if ok then (S ns' = ns)%nat else ns' = ns⌝ -∗
@@ -340,7 +340,7 @@ Module Type CREATE_AU.
  (γf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (ty major minor : mword 16)
-      (V : pprivate)
+      (U : ustate)
       (u : nat) (Sb : gset Z)
       (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
@@ -351,6 +351,6 @@ Module Type CREATE_AU.
       wp_create_au_body γs j γl pd pav pu
  γf
  plen pfun ty major minor
-                        V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks
+                        U u Sb ns pidv dqb dqs dqbs dqn m K eb b lks
                         P Pmiss Φok Φex.
 End CREATE_AU.
