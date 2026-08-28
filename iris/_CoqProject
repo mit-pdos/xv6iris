@@ -1301,6 +1301,7 @@ LinkSysOpen.v
 SpecUserretClosed.v
 ProofUserretClosed.v
 LogDefs.v
+TxPin.v
 ProcDefs.v
 BioDefs.v
 Xv6Cameras.v
