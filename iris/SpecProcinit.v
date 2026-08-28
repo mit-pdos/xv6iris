@@ -128,7 +128,7 @@ Section SpecProcinit.
   Definition lk_fresh `{XI : CurCtx} (lk : mword 64) (s : string) : iProp Σ :=
     (lk ↦₄ (mword_of_int 0 : mword 32) ∗
      lock_name lk s ∗
-     WpLock.lk_cpu_fresh lk)%I.
+     WpLock.lk_cpu_ready lk)%I.
 
   (* ---- one process, before ---- *)
   (* [p_state] and [p_kstack] are the only two private cells procinit
@@ -242,7 +242,7 @@ Section ProcinitProcsInv.
   Lemma lk_fresh_pieces (lk : mword 64) (s : string) :
     lk_fresh lk s -∗
     lock_name lk s ∗ lk ↦₄ (mword_of_int 0 : mword 32) ∗
-    WpLock.lk_cpu_fresh lk.
+    WpLock.lk_cpu_ready lk.
   Proof. rewrite /lk_fresh /lk_cpu /lock_cpu. iIntros "($ & $ & $)". Qed.
 
   (* what is left of one process once its lock word and name have gone into

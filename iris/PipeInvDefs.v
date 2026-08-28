@@ -600,7 +600,9 @@ Section PipeInv.
      re-freeable, so it has to survive to pipeclose. *)
   Definition is_pipe (γl : gname) (γp : pipe_names) (pi : mword 64) : iProp Σ :=
     (⌜page_valid pi⌝ ∗
-     inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> ∨ pipe_dead γl γp))%I.
+     ∃ lo : nat,
+       inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> lo ∨ pipe_dead γl γp) ∗
+       WpLock.lk_floor cur_ctx lo)%I.
 
   Global Instance is_pipe_persistent γl γp pi : Persistent (is_pipe γl γp pi).
   Proof. apply _. Qed.
@@ -614,8 +616,14 @@ Section PipeInv.
 
   Lemma is_pipe_valid γl γp pi : is_pipe γl γp pi -∗ ⌜page_valid pi⌝.
   Proof. rewrite /is_pipe. by iIntros "[$ _]". Qed.
+  (* A6.105: the lock's FLOOR rides inside [is_pipe], exactly as it rides
+     inside [is_lock] -- [is_pipe]'s arity is unchanged and no client of the
+     pipe ever names [lo]. *)
   Lemma is_pipe_inv γl γp pi :
-    is_pipe γl γp pi -∗ inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> ∨ pipe_dead γl γp).
+    is_pipe γl γp pi -∗
+    ∃ lo : nat,
+      inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> lo ∨ pipe_dead γl γp) ∗
+      WpLock.lk_floor cur_ctx lo.
   Proof. rewrite /is_pipe. by iIntros "[_ $]". Qed.
 
   (* what acquire / holding / release take.  The credential is left to the
@@ -623,7 +631,10 @@ Section PipeInv.
   Lemma is_pipe_openable γl γp pi :
     is_pipe γl γp pi -∗
     lock_openable γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp).
-  Proof. iIntros "H". iApply lock_openable_of_dead. by iApply is_pipe_inv. Qed.
+  Proof.
+    iIntros "H". iDestruct (is_pipe_inv with "H") as (lo) "[Hi Hf]".
+    iApply (lock_openable_of_dead with "Hi Hf").
+  Qed.
 
   (* ---- what a [struct file] of type FD_PIPE carries, ADDRESS-KEYED ----
 

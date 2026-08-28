@@ -745,33 +745,110 @@ Section Lock.
   Definition lk_own_ok (ex : option CPU) (own : agent -> option nat) : Prop :=
     forall h : agent, own h = None -> exists i : CPU, ex = Some i /\ h = hart_agent i.
 
-  Definition lk_cpu_cell_ex (lk : mword 64) (v : mword 64)
+  (* >>> §0.35′(i): THE FLOOR IS PINNED, NOT EXISTENTIAL.  The window's mint
+     position was ∃-bound here, which is exactly why A6.89 §(7)'s [notheld]
+     read could not state its premise: [lo] was invisible outside the
+     invariant, so no leaf could ask for [⌜lo ≤ K⌝] and no handle could carry
+     it.  Pinning it as a PARAMETER is the surface half of the ruling; the
+     handle then carries [TsoCtx.ctx_floor ξ lo] for THIS [lo] and the reads
+     discharge against it ([TsoCtx.own_context_floor_view]).
+     [own] stays existential: it is per-agent bookkeeping the reads consume
+     through [lk_own_ok], not something a handle can name. <<< *)
+  Definition lk_cpu_cell_ex (lo : nat) (lk : mword 64) (v : mword 64)
       (ex : option CPU) : iProp Σ :=
-    (∃ (own : agent -> option nat) (lo : nat),
+    (∃ (own : agent -> option nat),
        ⌜lk_own_ok ex own⌝ ∗
        match ex with
        | Some i => lk_cpu_pay_vis (hart_agent i) lk v own lo
        | None => lk_cpu_pay lk v own lo
        end)%I.
 
-  Definition lk_cpu_cell (lk : mword 64) (v : mword 64) : iProp Σ :=
-    lk_cpu_cell_ex lk v None.
+  Definition lk_cpu_cell (lo : nat) (lk : mword 64) (v : mword 64) : iProp Σ :=
+    lk_cpu_cell_ex lo lk v None.
 
   (* the held cell forgets its author fragment and becomes an ordinary
      one, at the cost of the exactness the holder had *)
-  Lemma lk_cpu_cell_ex_forget lk v ex :
-    lk_cpu_cell_ex lk v ex ⊢ lk_cpu_cell lk v ∨ ⌜is_Some ex⌝.
+  Lemma lk_cpu_cell_ex_forget lo lk v ex :
+    lk_cpu_cell_ex lo lk v ex ⊢ lk_cpu_cell lo lk v ∨ ⌜is_Some ex⌝.
   Proof.
-    iIntros "(%own & %lo & %Hok & Hb)". destruct ex as [i|].
+    iIntros "(%own & %Hok & Hb)". destruct ex as [i|].
     - iRight. iPureIntro. by eexists.
-    - iLeft. iExists own, lo. by iFrame "Hb".
+    - iLeft. iExists own. by iFrame "Hb".
   Qed.
 
   (* what [initlock]'s post hands over and every creator takes: the
      window payload at the CLEAR word, plus the address claim the ledger
      cells do not carry. *)
-  Definition lk_cpu_fresh (lk : mword 64) : iProp Σ :=
-    (lk_addr_claim (lock_cpu lk) 8 ∗ lk_cpu_cell lk (zero_reg : mword 64))%I.
+  (* >>> A6.105: THE CELL AT AN ARBITRARY VALUE, which is what [initlock]
+     takes IN.  §0.35′'s floor-0 route needs the owner field's window minted
+     BEFORE the `sd x0` (off the era image, at floor 0) and the store to FRAME
+     that floor -- so [initlock]'s precondition is this at the cell's OLD
+     value and its postcondition is [lk_cpu_fresh] = this at the clear word.
+     Same proposition, one argument apart. <<< *)
+  Definition lk_cpu_at (lo : nat) (lk : mword 64) (v : mword 64) : iProp Σ :=
+    (lk_addr_claim (lock_cpu lk) 8 ∗ lk_cpu_cell lo lk v)%I.
+
+  Definition lk_cpu_fresh (lo : nat) (lk : mword 64) : iProp Σ :=
+    lk_cpu_at lo lk (zero_reg : mword 64).
+
+  Lemma lk_cpu_fresh_at (lo : nat) (lk : mword 64) :
+    lk_cpu_fresh lo lk ⊣⊢ lk_cpu_at lo lk (zero_reg : mword 64).
+  Proof. reflexivity. Qed.
+
+  (* >>> A6.105: THE FLOOR RIDES WITH THE CELL, and that is what keeps the
+     whole creator sweep to a rename.  A creator needs two things to hand
+     back a HANDLE -- the owner cell at some floor, and THIS context's claim
+     to have passed that floor -- and no client ever names the floor itself.
+     So they travel bundled, existentially, exactly as [lo] travels inside
+     [is_lock]: every spec that said [lk_cpu_fresh lk] says [lk_cpu_ready lk]
+     and keeps its arity, and [newlock] takes this in place of the cell plus
+     a separate [ctx_floor] premise.
+     A6.97's rule for the third time: a parameter no consumer NAMES does not
+     belong in the arity. <<< *)
+  (* >>> A6.105: THE FLOOR CERTIFICATE HAS TWO ARMS, and the second is the
+     one a CREATOR can actually buy.
+
+     Ruling §0.35'(i) puts [ctx_floor ξ lo] inside the handle so that every
+     read can discharge its floor against [own_context].  That arm is free at
+     [lo = 0] -- a boot lock's cell is an era-image cell -- but at a DYNAMIC
+     lock it is unbuyable, and for the same reason A6.101 gave one level
+     down: the creator's own [sd] is BUFFERED, so the store that made the
+     floor never advances the storer's own view, and no fence or AMO stands
+     between [initlock]'s store and the handle's construction.  Measured,
+     not guessed: [ctx_bound_raise] wants [hart_view_lb lo] and the creator
+     has no receipt at [lo].
+
+     The right arm is what it DOES have: "[lo] is a real log position"
+     ([TsoGhost.llb loglen_name lo], handed out by the store leaf beside the
+     window).  Paired with an AMO's log-top view it yields the left arm on
+     the spot -- [TsoCtx.hart_view_lb_get] then [ctx_bound_raise] -- which is
+     ruling §0.35'(iii)'s ABSORB, verbatim, at the first acquire.  So the
+     floor is bought by the READER that needs it exact, not by the writer
+     that cannot.
+
+     The handle stays ξ-indexed (the left arm names [cur_ctx]), so §0.16''s
+     crossing discipline is unchanged; what moves is WHERE the purchase
+     happens. <<< *)
+  Definition lk_floor (ξ : TsoCtx.CtxId) (lo : nat) : iProp Σ :=
+    (TsoCtx.ctx_floor ξ lo ∨ TsoGhost.llb loglen_name lo)%I.
+
+  Global Instance lk_floor_persistent ξ lo : Persistent (lk_floor ξ lo).
+  Proof. apply _. Qed.
+
+  Lemma lk_floor_0 ξ : ⊢ lk_floor ξ 0.
+  Proof. iLeft. iApply TsoCtx.ctx_floor_0. Qed.
+
+  Lemma lk_floor_of_ctx ξ lo : TsoCtx.ctx_floor ξ lo -∗ lk_floor ξ lo.
+  Proof. iIntros "H". by iLeft. Qed.
+
+  Lemma lk_floor_of_llb ξ lo : TsoGhost.llb loglen_name lo -∗ lk_floor ξ lo.
+  Proof. iIntros "H". by iRight. Qed.
+
+  Definition lk_cpu_ready_at (lk : mword 64) (v : mword 64) : iProp Σ :=
+    (∃ lo : nat, lk_cpu_at lo lk v ∗ lk_floor cur_ctx lo)%I.
+
+  Definition lk_cpu_ready (lk : mword 64) : iProp Σ :=
+    lk_cpu_ready_at lk (zero_reg : mword 64).
 
   (* >>> A6.89: THE WORD'S TWIN OF [lk_cpu_fresh], AND IT IS OWED FOR THE
      SAME REASON ONE FIELD OVER.  Release's [sw x0] leaves a LEDGER word
@@ -814,13 +891,13 @@ Section Lock.
      (A6.84 §(2)) -- but it does not have to: [kfree] wants only the page's
      FUTURE, and a wpay cell has one.  The claim supplies the mapping the
      cell dropped; the payload supplies the fraction and the element. *)
-  Lemma lk_cpu_fresh_free (lk : mword 64) :
-    lk_cpu_fresh lk ⊢
+  Lemma lk_cpu_fresh_free (lo : nat) (lk : mword 64) :
+    lk_cpu_fresh lo lk ⊢
     [∗ list] j ∈ seq 0 8,
       TsoCtx.mem_free (KTR := KT0) (pa_add (lock_cpu lk) j) (DfracOwn 1).
   Proof.
-    rewrite /lk_cpu_fresh /lk_cpu_cell /lk_cpu_cell_ex /lk_cpu_pay.
-    iIntros "[#Hcl (%own & %lo & _ & Hp)]".
+    rewrite /lk_cpu_fresh /lk_cpu_at /lk_cpu_cell /lk_cpu_cell_ex /lk_cpu_pay.
+    iIntros "[#Hcl (%own & _ & Hp)]".
     iDestruct (lk_addr_claim_bytes with "Hcl") as "#Hb".
     change (Z.to_nat 8) with 8%nat.
     iApply (big_sepL_impl with "Hp"). iIntros "!>" (k j Hk) "(%t & Hw)".
@@ -831,15 +908,15 @@ Section Lock.
     by iApply TsoCtx.phys_ledger_wpay_free.
   Qed.
 
-  Definition lk_cpu_res (st : lock_state) (lk : mword 64) (r : string) : iProp Σ :=
-    (lk_cpu_cell_ex lk (lk_cpu_val st) (lk_ex st) ∗ lk_cpu_frag st r)%I.
+  Definition lk_cpu_res (lo : nat) (st : lock_state) (lk : mword 64) (r : string) : iProp Σ :=
+    (lk_cpu_cell_ex lo lk (lk_cpu_val st) (lk_ex st) ∗ lk_cpu_frag st r)%I.
 
   (* the leaves strip this under [>] inside the step engine's callback, and
      [st] is a VARIABLE there, so the match is stuck and the structural
      instances cannot see the two branches.  Stated once, here. *)
   Global Instance lk_cpu_frag_timeless st r : Timeless (lk_cpu_frag st r).
   Proof. destruct st as [[i []]|]; apply _. Qed.
-  Global Instance lk_cpu_res_timeless st lk r : Timeless (lk_cpu_res st lk r).
+  Global Instance lk_cpu_res_timeless lo st lk r : Timeless (lk_cpu_res lo st lk r).
   Proof. apply _. Qed.
 
   (* THE OWNER CELL, NAMED (§6 amendment A6.8).  The SC-era file stated the
@@ -861,19 +938,19 @@ Section Lock.
      failures at the leaves that read and write this cell
      ([WpSconfLock]) are that entry. *)
   (* the free / window form: the whole cell at 0 and no fragment. *)
-  Lemma lk_cpu_res_free (lk : mword 64) (r : string) :
-    lk_cpu_res None lk r ⊣⊢ lk_cpu_cell lk (zero_reg : mword 64).
+  Lemma lk_cpu_res_free (lo : nat) (lk : mword 64) (r : string) :
+    lk_cpu_res lo None lk r ⊣⊢ lk_cpu_cell lo lk (zero_reg : mword 64).
   Proof. rewrite /lk_cpu_res /lk_cpu_cell /=. apply bi.sep_emp. Qed.
-  Lemma lk_cpu_res_win (i : CPU) (lk : mword 64) (r : string) :
-    lk_cpu_res (Some (i, false)) lk r ⊣⊢ lk_cpu_cell lk (zero_reg : mword 64).
+  Lemma lk_cpu_res_win (lo : nat) (i : CPU) (lk : mword 64) (r : string) :
+    lk_cpu_res lo (Some (i, false)) lk r ⊣⊢ lk_cpu_cell lo lk (zero_reg : mword 64).
   Proof. rewrite /lk_cpu_res /lk_cpu_cell /=. apply bi.sep_emp. Qed.
   (* THE HELD FORM CARRIES MORE THAN THE OTHER TWO, and that is the
      author-fragment point (A6.78 §(2)): the holder's own read of the
      cell must be EXACT, so the held cell keeps the store's message
      fragment beside every byte. *)
-  Lemma lk_cpu_res_held (i : CPU) (lk : mword 64) (r : string) :
-    lk_cpu_res (Some (i, true)) lk r ⊣⊢
-    lk_cpu_cell_ex lk (cpus_ptr i) (Some i) ∗ lk_in i r.
+  Lemma lk_cpu_res_held (lo : nat) (i : CPU) (lk : mword 64) (r : string) :
+    lk_cpu_res lo (Some (i, true)) lk r ⊣⊢
+    lk_cpu_cell_ex lo lk (cpus_ptr i) (Some i) ∗ lk_in i r.
   Proof. rewrite /lk_cpu_res /=. reflexivity. Qed.
 
   (* A6.66 THE PARKED-RECORD FREE ARM (tso-port.md §0.18′, ported from the
@@ -928,29 +1005,31 @@ Section Lock.
      [iDestruct] shape exactly what it was before the M4 flip -- the leaf
      peels the claims off once with [lock_inv_open] and hands them back
      with [lock_inv_close], and nothing else about it moves. *)
+  (* §0.35′(i): the body is stated AT the lock's floor [lo]; the handle
+     carries the matching [TsoCtx.ctx_floor ξ lo]. *)
   Definition lock_body (γ : gname) (lk : mword 64) (s : string)
-      (R : CtxId → iProp Σ) : iProp Σ :=
+      (R : CtxId → iProp Σ) (lo : nat) : iProp Σ :=
     (∃ (v : mword 32) (st : lock_state),
         lock_word_ex (lk_wex st) lk v ∗
-        lk_cpu_res st lk s ∗
+        lk_cpu_res lo st lk s ∗
         lock_auth γ st ∗
         (⌜st = None⌝ ∗ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ lock_frag γ None ∗
            lock_pay R
          ∨ ⌜st ≠ None⌝ ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝))%I.
 
   Definition lock_inv (γ : gname) (lk : mword 64) (s : string)
-      (R : CtxId → iProp Σ) : iProp Σ :=
-    (lock_body γ lk s R ∗
+      (R : CtxId → iProp Σ) (lo : nat) : iProp Σ :=
+    (lock_body γ lk s R lo ∗
      lk_addr_claim lk 4 ∗ lk_addr_claim (lock_cpu lk) 8)%I.
 
-  Lemma lock_inv_open γ lk s R :
-    lock_inv γ lk s R ⊢
-    lock_body γ lk s R ∗ lk_addr_claim lk 4 ∗ lk_addr_claim (lock_cpu lk) 8.
+  Lemma lock_inv_open γ lk s R lo :
+    lock_inv γ lk s R lo ⊢
+    lock_body γ lk s R lo ∗ lk_addr_claim lk 4 ∗ lk_addr_claim (lock_cpu lk) 8.
   Proof. by rewrite /lock_inv. Qed.
 
-  Lemma lock_inv_close γ lk s R :
+  Lemma lock_inv_close γ lk s R lo :
     lk_addr_claim lk 4 -∗ lk_addr_claim (lock_cpu lk) 8 -∗
-    lock_body γ lk s R -∗ lock_inv γ lk s R.
+    lock_body γ lk s R lo -∗ lock_inv γ lk s R lo.
   Proof. rewrite /lock_inv. iIntros "#H4 #H8 $". by iFrame "H4 H8". Qed.
 
   (* the lock's NAME: [lk->name] (the 8-byte pointer field at +8) holds the
@@ -1001,12 +1080,29 @@ Section Lock.
     iModIntro. iExists p. by iFrame "Hfp Hs".
   Qed.
 
-  (* a lock is its (immutable) name plus the invariant over its two words. *)
+  (* >>> §0.35′(i): A LOCK HANDLE IS CONTEXT-RELATIVE.
+     Still PERSISTENT, but ξ-indexed, and carrying INTERNALLY the fact that
+     this context's bound has passed the lock's floor.  [lo] is existential,
+     so it never appears in the exported type and NO MENTION SITE MOVES --
+     measured (A6.96 §(2)), all 136 files that name [is_lock] already bind a
+     [CurCtx], so the index is AMBIENT and the arity change is invisible.
+
+     WHAT THE FLOOR BUYS is the premise four separate reads could not state
+     (A6.89 §(7), A6.92 §(3), A6.95 §(3), §0.27′): a holder of the handle
+     produces [view_lb … K ∗ ⌜lo ≤ K⌝] out of its own running token
+     ([TsoCtx.own_context_floor_view]).  WHAT IT COSTS is that a handle can
+     no longer be CONJURED: a core that merely discovers the address of a
+     freshly kalloc'd pipe page has no floor for it and cannot acquire -- it
+     must RECEIVE the handle through a real crossing (§0.16′), which is the
+     ruling's own soundness argument. <<< *)
   Definition is_lock (γ : gname) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) : iProp Σ :=
-    (lock_name lk s ∗ inv lockN (lock_inv γ lk s R))%I.
+    (∃ lo : nat,
+       lock_name lk s ∗ inv lockN (lock_inv γ lk s R lo) ∗
+       lk_floor cur_ctx lo)%I.
 
-  Global Instance is_lock_persistent γ lk s R : Persistent (is_lock γ lk s R).
+  Global Instance is_lock_persistent γ lk s R :
+    Persistent (is_lock γ lk s R).
   Proof. apply _. Qed.
 
   (* PERFORMANCE, and it is a big one: WITHOUT this seal, every [iIntros "#Hlk"]
@@ -1027,12 +1123,23 @@ Section Lock.
      [Typeclasses Opaque] above means an [iDestruct]/[iFrame] elsewhere can no
      longer take it apart, which is the point: it must come through here. *)
   Lemma is_lock_name γ lk s R : is_lock γ lk s R -∗ lock_name lk s.
-  Proof. rewrite /is_lock. iIntros "[$ _]". Qed.
-  Lemma is_lock_inv γ lk s R : is_lock γ lk s R -∗ inv lockN (lock_inv γ lk s R).
-  Proof. rewrite /is_lock. iIntros "[_ $]". Qed.
-  Lemma is_lock_intro γ lk s R :
-    lock_name lk s -∗ inv lockN (lock_inv γ lk s R) -∗ is_lock γ lk s R.
-  Proof. rewrite /is_lock. iIntros "#Hn #Hi". by iFrame "Hn Hi". Qed.
+  Proof. rewrite /is_lock. iIntros "(% & $ & _)". Qed.
+  (* the invariant projection EXHIBITS the floor: a leaf that opens the body
+     needs the [lo] it was allocated at, and that same [lo] is what its read
+     discharges against. *)
+  Lemma is_lock_inv γ lk s R :
+    is_lock γ lk s R -∗
+    ∃ lo : nat, inv lockN (lock_inv γ lk s R lo) ∗ lk_floor cur_ctx lo.
+  Proof.
+    rewrite /is_lock. iIntros "(%lo & _ & #Hi & #Hf)".
+    iExists lo. by iFrame "Hi Hf".
+  Qed.
+  Lemma is_lock_intro γ lk s R lo :
+    lock_name lk s -∗ inv lockN (lock_inv γ lk s R lo) -∗
+    lk_floor cur_ctx lo -∗ is_lock γ lk s R.
+  Proof.
+    rewrite /is_lock. iIntros "#Hn #Hi #Hf". iExists lo. by iFrame "Hn Hi Hf".
+  Qed.
 
   (* ---- THE OPENING INTERFACE ------------------------------------------
 
@@ -1066,12 +1173,19 @@ Section Lock.
 
      The mask is universally quantified so this file needs no [minstretN]; the
      leaves instantiate it at [⊤ ∖ ↑minstretN]. *)
+  (* >>> §0.35′(i), AND THE ARITY DOES NOT MOVE (A6.97 §(2)).  The opener
+     takes its context AMBIENT, exactly as [is_lock] does, and HANDS THE
+     FLOOR OUT beside the body -- [lo] is the lock's, but it is existential
+     at every consumer that does not discharge a read against it, and the
+     two that do are being rewritten anyway.  Writing [lo] into the arity
+     instead would have moved seventeen further green files for nothing. <<< *)
   Definition lock_openable (γ : gname) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) (D : iProp Σ) : iProp Σ :=
     (□ ∀ (E : coPset) (T : iProp Σ),
          ⌜↑lockN ⊆ E⌝ -∗ (T -∗ D -∗ False) -∗ T ={E, E ∖ ↑lockN}=∗
-         ▷ lock_inv γ lk s R ∗ T ∗
-         ((▷ lock_inv γ lk s R ={E ∖ ↑lockN, E}=∗ True)      (* put it back *)
+         ∃ lo : nat,
+         ▷ lock_inv γ lk s R lo ∗ lk_floor cur_ctx lo ∗ T ∗
+         ((▷ lock_inv γ lk s R lo ={E ∖ ↑lockN, E}=∗ True)   (* put it back *)
           ∧ (D ={E ∖ ↑lockN, E}=∗ True)))%I.               (* or destroy it *)
 
   Global Instance lock_openable_persistent γ lk s R D :
@@ -1080,19 +1194,24 @@ Section Lock.
 
   (* a permanent [inv]: nothing has to be refuted, and no disposal is
      possible. *)
-  Lemma lock_openable_inv γ lk s R :
-    inv lockN (lock_inv γ lk s R) ⊢ lock_openable γ lk s R False.
+  Lemma lock_openable_inv γ lk s R lo :
+    inv lockN (lock_inv γ lk s R lo) -∗ lk_floor cur_ctx lo -∗
+    lock_openable γ lk s R False.
   Proof.
-    iIntros "#Hi !>" (E T HE) "_ HT".
+    iIntros "#Hi #Hf !>" (E T HE) "_ HT".
     iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
-    iModIntro. iFrame "Hbody HT".
-    iSplit; [iExact "Hclose" | iIntros "%Hf"; destruct Hf].
+    iModIntro. iExists lo. iFrame "Hbody Hf HT".
+    iSplit; [iExact "Hclose" | iIntros "%Hf0"; destruct Hf0].
   Qed.
 
   (* the bridge every existing lock user rides: today's lock IS the permanent
      instance of the generic one. *)
-  Lemma is_lock_openable γ lk s R : is_lock γ lk s R ⊢ lock_openable γ lk s R False.
-  Proof. iIntros "H". iApply lock_openable_inv. by iApply is_lock_inv. Qed.
+  Lemma is_lock_openable γ lk s R :
+    is_lock γ lk s R ⊢ lock_openable γ lk s R False.
+  Proof.
+    iIntros "H". iDestruct (is_lock_inv with "H") as (lo) "[#Hi #Hf]".
+    iApply (lock_openable_inv with "Hi Hf").
+  Qed.
 
   (* the refutation obligation is vacuous for a lock that cannot die. *)
   Lemma lock_refute_False (T : iProp Σ) : ⊢ T -∗ False -∗ False.
@@ -1111,14 +1230,15 @@ Section Lock.
 
      [D] must be timeless: the dead branch is refuted UNDER a later, and there
      is no step to take there. *)
-  Lemma lock_openable_of_dead γ lk s R D `{!Timeless D} :
-    inv lockN (lock_inv γ lk s R ∨ D) ⊢ lock_openable γ lk s R D.
+  Lemma lock_openable_of_dead γ lk s R D lo `{!Timeless D} :
+    inv lockN (lock_inv γ lk s R lo ∨ D) -∗ lk_floor cur_ctx lo -∗
+    lock_openable γ lk s R D.
   Proof.
-    iIntros "#Hi !>" (E T HE) "Hrefute HT".
+    iIntros "#Hi #Hf !>" (E T HE) "Hrefute HT".
     iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
     rewrite bi.later_or. iDestruct "Hbody" as "[Hlive | >Hdead]".
     2:{ iExFalso. iApply ("Hrefute" with "HT Hdead"). }
-    iModIntro. iFrame "Hlive HT".
+    iModIntro. iExists lo. iFrame "Hlive Hf HT".
     iSplit.
     - iIntros "Hb". iApply "Hclose". by iLeft.
     - iIntros "Hd". iApply "Hclose". iRight. by iNext.
@@ -1137,16 +1257,20 @@ Section Lock.
      Pieces, not a reassembled [lock_inv]: a destroying caller needs the ghost
      state (that is what it turns into a certificate) and a closing one can
      rebuild the body from them.  The two canonical instances are below. *)
+  (* §0.35′(i) / A6.97 §(2): the floor is ∀-QUANTIFIED INSIDE the wand, not
+     added to the arity -- the finisher is handed whichever [lo] the leaf's
+     open produced, and no consumer of [lock_finisher] names it. *)
   Definition lock_finisher (γ : gname) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) (D Out : iProp Σ)
       (E : coPset) : iProp Σ :=
-    ( ((▷ lock_inv γ lk s R ={E ∖ ↑lockN, E}=∗ True)
+    ( ∀ lo : nat,
+      ((▷ lock_inv γ lk s R lo ={E ∖ ↑lockN, E}=∗ True)
        ∧ (D ={E ∖ ↑lockN, E}=∗ True)) -∗
       lock_auth γ None -∗ lock_frag γ None -∗
       (* A6.89: the LEDGER word plus its claim, not the ctx word.  See
          [lock_word_fresh]: release cannot hand back a ctx cell. *)
       lock_word_fresh lk -∗
-      lk_cpu_fresh lk -∗
+      lk_cpu_fresh lo lk -∗
       lock_pay R -∗
       |={E ∖ ↑lockN, E}=> Out)%I.
 
@@ -1154,7 +1278,7 @@ Section Lock.
      merely still has other holders -- [D] is not used, only not taken. *)
   Lemma lock_finisher_close γ lk s R D E : ⊢ lock_finisher γ lk s R D emp E.
   Proof.
-    iIntros "[Hclose _] Hauth Hfrag [#Hc4 Hword] [#Hc8 Hcpu] HR".
+    iIntros (lo) "[Hclose _] Hauth Hfrag [#Hc4 Hword] [#Hc8 Hcpu] HR".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
     iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8".
     iExists (mword_of_int 0 : mword 32), None.
@@ -1168,15 +1292,18 @@ Section Lock.
      multiply-owned object needs: the last holder to let go has necessarily
      already surrendered its share of the certificate into [R], and [R] is
      only in hand at this instant (see PipeInv.pipe_res_dead). *)
+  (* the destroy arm's [Out] cannot mention [lo] (it is chosen by the caller,
+     before the open), so the owner cell leaves EXISTENTIALLY floored -- which
+     is all its one consumer wants: [lk_cpu_fresh_free] is floor-generic. *)
   Lemma lock_finisher_destroy γ lk s R D Out E :
     (lock_frag γ None -∗ lock_pay R ==∗ D ∗ Out) -∗
     lock_finisher γ lk s R D
-      (lock_word_fresh lk ∗ lk_cpu_fresh lk ∗ Out) E.
+      (lock_word_fresh lk ∗ (∃ lo : nat, lk_cpu_fresh lo lk) ∗ Out) E.
   Proof.
-    iIntros "Hcomplete [_ Hdispose] Hauth Hfrag Hword Hcpu HR".
+    iIntros "Hcomplete" (lo) "[_ Hdispose] Hauth Hfrag Hword Hcpu HR".
     iMod ("Hcomplete" with "Hfrag HR") as "[HD HOut]".
     iMod ("Hdispose" with "HD") as "_".
-    iModIntro. by iFrame "Hword Hcpu HOut".
+    iModIntro. iFrame "Hword HOut". by iExists lo.
   Qed.
 
   (* [mem_pointsto]'s and [word4_pointsto]'s [Timeless] instances now live in
@@ -1195,12 +1322,12 @@ Section Lock.
   (* A6.66: the free arm is now the parked record, so the creator DEPOSITS
      (honestly -- see [lock_pay_intro]) instead of wrapping the payload in a
      bare existential.  The token is taken and handed straight back. *)
-  Lemma lock_inv_alloc `{CID : CpuId} (lk : mword 64) (s : string)
+  Lemma lock_inv_alloc `{CID : CpuId} (lo : nat) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) `{!CtxMorph R} :
     own_context cur_ctx -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lk_cpu_fresh lk -∗
-    R cur_ctx ==∗ own_context cur_ctx ∗ ∃ γ : gname, lock_inv γ lk s R.
+    lk_cpu_fresh lo lk -∗
+    R cur_ctx ==∗ own_context cur_ctx ∗ ∃ γ : gname, lock_inv γ lk s R lo.
   Proof.
     iIntros "Hrun Hword [#Hc8 Hcpu] HR".
     iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
@@ -1221,12 +1348,12 @@ Section Lock.
      lock state is chosen FIRST, so [R] and [D] may both mention it -- which
      they do for any object whose dead state parks the lock's own state
      fragment (PipeInv.pipe_dead). *)
-  Lemma newlock_d `{CID : CpuId} E (lk : mword 64) (s : string) :
+  Lemma newlock_d `{CID : CpuId} E (lo : nat) (lk : mword 64) (s : string) :
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lk_cpu_fresh lk ==∗
+    lk_cpu_fresh lo lk ==∗
     ∃ γ : gname, ∀ (R : CtxId → iProp Σ) (D : iProp Σ),
       ⌜CtxMorph R⌝ -∗ own_context cur_ctx -∗
-      R cur_ctx ={E}=∗ own_context cur_ctx ∗ inv lockN (lock_inv γ lk s R ∨ D).
+      R cur_ctx ={E}=∗ own_context cur_ctx ∗ inv lockN (lock_inv γ lk s R lo ∨ D).
   Proof.
     iIntros "Hword [#Hc8 Hcpu]".
     iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
@@ -1236,7 +1363,7 @@ Section Lock.
     iModIntro. iExists γ. iIntros (R D) "%HmR Hrun HR".
     iMod (lock_pay_intro (CtxMorph0 := HmR) R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
-    iApply (inv_alloc lockN E (lock_inv γ lk s R ∨ D)).
+    iApply (inv_alloc lockN E (lock_inv γ lk s R lo ∨ D)).
     iNext. iLeft. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None.
     iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
@@ -1245,22 +1372,29 @@ Section Lock.
 
   (* a FREE physical lock plus the resource it protects and its name become a
      (permanent) lock. *)
+  (* §0.35′(i)/(iii): a creator that hands back a HANDLE owes the floor, and
+     it buys it with a receipt like everyone else ([TsoCtx.ctx_bound_raise] at
+     the caller's next acquire).  A creator that hands back the bare INVARIANT
+     ([lock_inv_alloc], [newlock_d]) owes nothing: the floor is a property of
+     the handle, not of the lock. *)
   Lemma newlock `{CID : CpuId} E (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) `{!CtxMorph R} :
     lock_name lk s -∗
     own_context cur_ctx -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lk_cpu_fresh lk -∗
+    lk_cpu_ready lk -∗
     R cur_ctx ={E}=∗ own_context cur_ctx ∗ ∃ γ : gname, is_lock γ lk s R.
   Proof.
-    iIntros "#Hnm Hrun Hword Hcpu HR".
-    iMod (lock_inv_alloc lk s R with "Hrun Hword Hcpu HR") as "[Hrun Hbody]".
+    iIntros "#Hnm Hrun Hword Hready HR".
+    rewrite /lk_cpu_ready /lk_cpu_ready_at.
+    iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
+    iMod (lock_inv_alloc lo lk s R with "Hrun Hword Hcpu HR") as "[Hrun Hbody]".
     iDestruct "Hbody" as (γ) "Hbody".
     iFrame "Hrun".
-    iMod (inv_alloc lockN E (lock_inv γ lk s R) with "[Hbody]") as "#Hinv";
+    iMod (inv_alloc lockN E (lock_inv γ lk s R lo) with "[Hbody]") as "#Hinv";
       [ by iNext | ].
     iModIntro. iExists γ.
-    iApply (is_lock_intro with "Hnm Hinv").
+    iApply (is_lock_intro with "Hnm Hinv Hfl").
   Qed.
 
   (* [newlock] with the two halves SEPARATED: the ghost name is chosen first
@@ -1276,12 +1410,14 @@ Section Lock.
   Lemma newlock_delayed `{CID : CpuId} E (lk : mword 64) (s : string) :
     lock_name lk s -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lk_cpu_fresh lk ==∗
+    lk_cpu_ready lk ==∗
     ∃ γ : gname, ∀ R : CtxId → iProp Σ,
       ⌜CtxMorph R⌝ -∗ own_context cur_ctx -∗
       R cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
   Proof.
-    iIntros "#Hnm Hword [#Hc8 Hcpu]".
+    iIntros "#Hnm Hword Hready".
+    rewrite /lk_cpu_ready /lk_cpu_ready_at.
+    iDestruct "Hready" as (lo) "[[#Hc8 Hcpu] #Hfl]".
     iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
     iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
                      : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
@@ -1289,12 +1425,12 @@ Section Lock.
     iModIntro. iExists γ. iIntros (R) "%HmR Hrun HR".
     iMod (lock_pay_intro (CtxMorph0 := HmR) R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
-    iMod (inv_alloc lockN E (lock_inv γ lk s R) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
+    iMod (inv_alloc lockN E (lock_inv γ lk s R lo) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None.
       iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
       iLeft. iFrame "Hf HR". done. }
-    iModIntro. iApply (is_lock_intro with "Hnm Hinv").
+    iModIntro. iApply (is_lock_intro with "Hnm Hinv Hfl").
   Qed.
 
 End Lock.

@@ -148,7 +148,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
        ready to be sealed into an [is_lock]. *)
     clk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name clk "cons"%string -∗
-    WpLock.lk_cpu_fresh clk -∗
+    WpLock.lk_cpu_ready clk -∗
     (* and back out initialized: [WpLock.newlock]'s raw material, which is
        what lets a boot assembly mint [UartTxInv.is_txlock]
        ([WpLock.newlock] over [UartTxInv.tx_res]). *)

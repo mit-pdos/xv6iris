@@ -208,13 +208,17 @@ Section ProofInitlock.
     { iApply (ini_0e with "Htext"). }
     { iEval (rewrite Hea_cpu). iExact "Hcpu". }
     iIntros (CID7 Hs7) "Hcg Hpc #Hleafclaim Hcpay".
+    (* A6.105: the leaf now hands the floor's LOG-POSITION receipt out beside
+       the window -- the writer's half of §0.35′(iii).  See WpLock.lk_floor. *)
     iEval (rewrite Hea_cpu) in "Hcpay".
     (* assemble the creators' resource: the claim beside the payload *)
-    iAssert (WpLock.lk_cpu_fresh lk) with "[Hcpay]" as "Hcpu".
-    { rewrite /WpLock.lk_cpu_fresh /WpLock.lk_cpu_cell /WpLock.lk_cpu_cell_ex.
+    iDestruct "Hcpay" as (lo) "[#Hlb Hcpay]".
+    iAssert (WpLock.lk_cpu_fresh lo lk) with "[Hcpay]" as "Hcpu".
+    { rewrite /WpLock.lk_cpu_fresh /WpLock.lk_cpu_at
+              /WpLock.lk_cpu_cell /WpLock.lk_cpu_cell_ex.
       iSplitR; [ iExact "Hcclaim" | ].
-      iDestruct "Hcpay" as (lo) "Hp".
-      iExists (fun _ => Some lo), lo.
+      iDestruct "Hcpay" as "Hp".
+      iExists (fun _ => Some lo).
       iSplitR.
       { iPureIntro. intros h Hh. discriminate. }
       rewrite /WpLock.lk_cpu_pay.
@@ -296,6 +300,11 @@ Section ProofInitlock.
        pointer just stored -- sealing it into [lock_name] is the caller's
        call, not ours (SpecInitlock.v). *)
     iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    (* A6.105: bundle the window with its floor certificate; the RIGHT arm is
+       what the creator has, and the first acquire's AMO buys the left one. *)
+    iAssert (WpLock.lk_cpu_ready lk) with "[Hcpu]" as "Hcpu".
+    { rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
+      iExists lo. iFrame "Hcpu". iApply WpLock.lk_floor_of_llb. iExact "Hlb". }
     iApply ("Hcont" $! R5 with "Hcg Hpc [%] Hlock Hname Hcpu").
     (* callee_saved m R5 *)
     assert (Hthread : forall c : mword 5, c <> csp_rs1 -> c <> mword_of_int 8 -> c <> mword_of_int 1 ->

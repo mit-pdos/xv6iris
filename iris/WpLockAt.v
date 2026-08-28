@@ -69,16 +69,20 @@ Section LockAt.
     lock_name lk s -∗
     own_context cur_ctx -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    WpLock.lk_cpu_fresh lk -∗
+    WpLock.lk_cpu_ready lk -∗
     R cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
   Proof.
-    iIntros "[Ha Hf] #Hnm Hrun Hword Hcpu HR".
+    iIntros "[Ha Hf] #Hnm Hrun Hword Hready HR".
+    (* A6.105: the floor travels bundled with the cell; unbundle it here and
+       hand it to [is_lock_intro], which is where the handle's floor lives. *)
+    rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
+    iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
     iMod (lock_pay_intro R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
     iDestruct (WpLock.lk_addr_claim_of4 lk (DfracOwn 1) (mword_of_int 0 : mword 32)
                  with "Hword") as "#Hc4".
     iDestruct "Hcpu" as "[#Hc8 Hcell]".
-    iMod (inv_alloc lockN E (lock_inv γ lk s R)
+    iMod (inv_alloc lockN E (lock_inv γ lk s R lo)
             with "[Hword Hcell Ha Hf HR]") as "#Hinv".
     { iNext. rewrite /lock_inv. iFrame "Hc4 Hc8".
       iExists (mword_of_int 0 : mword 32), None.
@@ -86,7 +90,7 @@ Section LockAt.
       rewrite lk_cpu_res_free. iFrame "Hword Ha".
       iSplitL "Hcell"; [ iExact "Hcell" | ].
       iLeft. iFrame "Hf HR". done. }
-    iModIntro. iApply (is_lock_intro with "Hnm Hinv").
+    iModIntro. iApply (is_lock_intro with "Hnm Hinv Hfl").
   Qed.
 
 End LockAt.

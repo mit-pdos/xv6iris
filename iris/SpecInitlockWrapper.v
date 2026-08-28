@@ -100,7 +100,7 @@ Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId
     (* the name field is written once and then DISCARDED: what comes back is
        the persistent [lock_name], ready to be sealed into [is_lock]. *)
     lock_name lk s -∗
-    WpLock.lk_cpu_fresh lk -∗
+    WpLock.lk_cpu_ready lk -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

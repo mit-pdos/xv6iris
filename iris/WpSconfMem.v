@@ -2908,7 +2908,10 @@ Section WpSconfMem.
          has no other source for [lk_addr_claim]; the leaf already holds
          it as ["Hclaim"] and it is persistent, so this costs nothing. *)
       wordw_claim (KTR := KT0) 8 ea -∗
-      (∃ lo : nat, [∗ list] j ∈ seq 0 8,
+      (* A6.105: the floor's LOG-POSITION receipt travels with the window --
+         the writer's half of ruling §0.35'(iii); see SmodeCorePt. *)
+      (∃ lo : nat, TsoGhost.llb loglen_name lo ∗
+         [∗ list] j ∈ seq 0 8,
          TsoCtx.phys_ledger_wpay (pa_add ea j) (DfracOwn 1) (z8 j) lo
            (TsoMemPa.TsWin ea 8 j z8 cp (fun _ => Some lo) lo)) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -2940,12 +2943,14 @@ Section WpSconfMem.
     iApply (wp_store_s_sconf_au_dat (ktd := KT0) 8 false pc
               (mword_of_int 0 : mword 5) rs1 imm m n (zero_reg : mword 64)
               (∃ (pl : Arch.pa) (lo : nat), ⌜pl = ea⌝ ∗
+                 TsoGhost.llb loglen_name lo ∗
                  [∗ list] j ∈ seq 0 8,
                    TsoCtx.phys_ledger_wpay (pa_add pl j) (DfracOwn 1) (z8 j) lo
                      (TsoMemPa.TsWin pl 8 j z8 cp (fun _ => Some lo) lo))%I
               (⊤ ∖ ↑minstretN) b
               (wordw_pointsto (KTR := KT0) 8 ea (DfracOwn 1) vold)
               (∃ (pl : Arch.pa) (lo : nat), ⌜pl = ea⌝ ∗
+                 TsoGhost.llb loglen_name lo ∗
                  [∗ list] j ∈ seq 0 8,
                    TsoCtx.phys_ledger_wpay (pa_add pl j) (DfracOwn 1) (z8 j) lo
                      (TsoMemPa.TsWin pl 8 j z8 cp (fun _ => Some lo) lo))%I
@@ -2960,16 +2965,17 @@ Section WpSconfMem.
       iEval (rewrite (wordw8_ctx (KTR2 := KT0))) in "Hbw".
       iMod (SmodeCorePt.word_pointsto_wpay_mint_c (KTR := KT0) img sigma log V
               ea ppn vold (zero_reg : mword 64) cp Hcan Hoff
-              with "Hk Hmem Htso Hbw") as "(Hmem & Htso & Hpay)".
+              with "Hk Hmem Htso Hbw") as "(Hmem & Htso & #Hlb & Hpay)".
       iModIntro. iFrame "Hmem Htso Hctx".
       iExists (pa_of ppn ea), (S (length log)).
-      iSplitR; [ iPureIntro; exact (ktier_pin_id ppn ea Hid) | iExact "Hpay" ]. }
+      iSplitR; [ iPureIntro; exact (ktier_pin_id ppn ea Hid) | ].
+      iFrame "Hlb". iExact "Hpay". }
     { iModIntro. iFrame "Hbytes". iIntros "Hp". by iModIntro. }
     iIntros (CID1 Hs1) "Hcg Hpc Hp".
-    iDestruct "Hp" as (pl lo) "[-> Hp]".
+    iDestruct "Hp" as (pl lo) "(-> & #Hlb & Hp)".
     iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hclaim [Hp]").
     { iPureIntro. exact Hs1. }
-    { iExists lo. iExact "Hp". }
+    { iExists lo. iFrame "Hlb". iExact "Hp". }
   Qed.
 
 

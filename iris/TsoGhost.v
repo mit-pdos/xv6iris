@@ -158,6 +158,22 @@ Section ghosts.
     - iClear "H2". iApply (llb_le with "H1"). lia.
   Qed.
 
+  (* >>> A6.105: THE RECEIPT A WRITER CAN ACTUALLY BUY.  A hart's own
+     buffered store never advances its own view, so a lock's CREATOR can
+     never certify [ctx_floor ξ lo] for the floor its own store just made
+     (A6.101's bootstrap, one level up).  What it CAN take off the
+     interpretation is this: "[lo] is a real log position".  Paired with an
+     AMO's log-top view at the first acquire ([TsoCtx.hart_view_lb_get] +
+     [ctx_bound_raise]) that is exactly ruling §0.35'(iii)'s ABSORB, so the
+     floor is bought by the READER instead of the writer. <<< *)
+  Lemma llb_get γll n :
+    mono_nat_auth_own γll 1 n -∗ mono_nat_auth_own γll 1 n ∗ llb γll n.
+  Proof.
+    iIntros "Ha".
+    iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb".
+    iFrame "Ha". by iLeft.
+  Qed.
+
   Lemma llb_valid γll n K :
     mono_nat_auth_own γll 1 n -∗ llb γll K -∗ ⌜(K ≤ n)%nat⌝.
   Proof.

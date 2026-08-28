@@ -1616,6 +1616,18 @@ Section ctx.
   (* the parked stamp's own log-length receipt, exported off the token
      ([TsoCtxTwin2.ctx_parked_llb]) -- what the proc-lock payload carries
      to the acquire leaf *)
+  (* A6.105: the log-length receipt straight off the interpretation -- the
+     one resource a store leaf can hand out beside a freshly minted window,
+     and the right half of [WpLock.lk_floor]. *)
+  Lemma tso_interp_loglen_llb (g : gstate) :
+    tso_interp_at riscv_eraGS g -∗
+    tso_interp_at riscv_eraGS g ∗ llb loglen_name (length g.(glog)).
+  Proof.
+    iIntros "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
+    iDestruct (llb_get with "Hlen") as "[Hlen #Hlb]".
+    iFrame "Hlb". iExists TM, LM. iFrame "Hts Hm Hlen Hv". by iPureIntro.
+  Qed.
+
   Lemma ctx_parked_llb ξ T :
     ctx_parked ξ T -∗ ctx_parked ξ T ∗ llb loglen_name T.
   Proof.

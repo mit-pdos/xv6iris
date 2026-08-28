@@ -412,6 +412,19 @@ Section TsoBundle.
           (ram_lo <= SailStdpp.Operators_mwords.uint a < ram_hi)%Z ->
           is_Some (img !! a)⌝)%I.
 
+  (* A6.105: the log-length receipt, straight off the interpretation.  It is
+     the one thing a WRITER can take away about the position its own store
+     just occupied -- see [TsoGhost.llb_get]'s note. *)
+  Lemma tso_interp_of_loglen_llb (E : riscvEraGS)
+      (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg) (V : agent -> nat) :
+    tso_interp_of E img mem log V -∗
+    tso_interp_of E img mem log V ∗ llb (era_loglen_name E) (length log).
+  Proof.
+    iIntros "(%TM & %LM & Hts & %Hd & %Htie & Hm & %HLM & Hlen & Hv & Hpure)".
+    iDestruct (llb_get with "Hlen") as "[Hlen #Hlb]".
+    iFrame "Hlb". iExists TM, LM. iFrame "Hts Hm Hlen Hv Hpure". by iPureIntro.
+  Qed.
+
   (* [viewUR] is a [discrete_funUR], so its [≡] IS pointwise equality --
      which is why the bundle can be re-indexed by a pointwise-equal view
      function without functional extensionality. *)

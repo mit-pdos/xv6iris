@@ -739,6 +739,11 @@ Section SmodeCorePt.
       (log ++ [PWMsg (snap_of (pa_of ppn va) 8 vnew) (hart_agent cpu_id)])%list
       (vstep (hart_agent cpu_id) (V (hart_agent cpu_id))
          (log ++ [PWMsg (snap_of (pa_of ppn va) 8 vnew) (hart_agent cpu_id)])%list V) ∗
+    (* A6.105: the store's own position, certified as a REAL LOG POSITION.
+       The writer cannot certify [ctx_floor] for it (its own buffered store
+       never advances its view), but this receipt plus an AMO's log-top view
+       is exactly ruling §0.35'(iii)'s absorb at the first acquire. *)
+    TsoGhost.llb RiscvPtsto.loglen_name (S (length log)) ∗
     ([∗ list] j ∈ seq 0 8,
        TsoCtx.phys_ledger_wpay (pa_add (pa_of ppn va) j) (DfracOwn 1)
          (nth_byte vnew j) (S (length log))
@@ -792,11 +797,13 @@ Section SmodeCorePt.
             ltac:(vm_compute; discriminate) eq_refl eq_refl eq_refl
             Htvmono Htvtop with "Hm Htso Hb")
       as "(Hm & Htso & Hb)".
-    iModIntro. iFrame "Hm Hb".
     rewrite -(tso_interp_of_at_gs riscv_eraGS img
                 (write_bytes σ.(mem) pa 8 vnew) log' V'
                 σ.(sregs) σ.(mdev) Hpin').
-    iExact "Htso".
+    iDestruct (tso_interp_of_loglen_llb with "Htso") as "[Htso #Hlb]".
+    iModIntro. iFrame "Hm Htso Hb".
+    rewrite /RiscvPtsto.loglen_name.
+    iApply (TsoGhost.llb_le with "Hlb"). rewrite /log' length_app /=. lia.
   Qed.
 
   (* =================================================================== *)

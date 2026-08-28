@@ -1650,13 +1650,13 @@ Definition park_globals `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fil
     !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (ξ : CtxId) (γs : list gname) (γw γft γf γtl : gname) : iProp Σ :=
   (procs_inv (XI := ξ) γs ∗
-   is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res (XI := ξ) }> ∗
+   is_lock (XI := ξ) γw wait_lock_addr "wait_lock"%string <{ wait_res (XI := ξ) }> ∗
    is_ftable (XI := ξ) γft γf ∗
    console_caps (XI := ξ) fsc_uart ∗
    console_ready (XI := ξ) ∗
    is_tickslock (XI := ξ) γtl ∗
    (∃ γp : gname,
-      is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res (XI := ξ) }>) ∗
+      is_lock (XI := ξ) γp alp_pid_lock "nextpid"%string <{ nextpid_res (XI := ξ) }>) ∗
    (∃ ip : mword 64,
       ctx_word_pointsto ξ (mword_of_int KernelSyms.initproc : mword 64)
         DfracDiscarded ip))%I.

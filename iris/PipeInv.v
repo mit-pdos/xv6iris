@@ -271,10 +271,14 @@ Section PipeInv.
      [bwin_any_free] on each REGISTERED window; the owner window is already
      free bytes ([WpLock.lk_cpu_fresh_free]). *)
   (* what release hands back, reassembled into what kfree wants. *)
+  (* A6.105: takes the BUNDLED form -- the floor certificate is dropped on the
+     floor here, which is right: a page being freed has no readers left. *)
   Lemma pipe_bytes_page_own (pi : mword 64) (v : mword 32) :
-    pi ↦₄ v -∗ WpLock.lk_cpu_fresh pi -∗ pipe_bytes pi -∗ page_own pi.
+    pi ↦₄ v -∗ WpLock.lk_cpu_ready pi -∗ pipe_bytes pi -∗ page_own pi.
   Proof.
-    iIntros "Hw Hcpu Hb".
+    iIntros "Hw Hready Hb".
+    rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
+    iDestruct "Hready" as (lo) "[Hcpu _]".
     iDestruct "Hb" as (vname nr nw ro wo bs) "(Hnm & Hnr & Hnw & Hro & Hwo & %Hlen & Hdat & Hslack)".
     iDestruct (WpLock.lk_cpu_fresh_free with "Hcpu") as "Hcpu".
     rewrite /page_own /pipe_slack.
@@ -365,7 +369,7 @@ Section PipeInv.
     length bs = PIPESIZE ->
     lock_name_field pi ↦₈ vname -∗
     pi ↦₄ (mword_of_int 0 : mword 32) -∗
-    WpLock.lk_cpu_fresh pi -∗
+    WpLock.lk_cpu_ready pi -∗
     a_pnread pi ↦₄ (mword_of_int 0 : mword 32) -∗
     a_pnwrite pi ↦₄ (mword_of_int 0 : mword 32) -∗
     a_popen pi false ↦₄ (mword_of_int 1 : mword 32) -∗
@@ -376,9 +380,13 @@ Section PipeInv.
     ={E}=∗ own_context cur_ctx ∗ ∃ (γl : gname) (γp : pipe_names),
              is_pipe γl γp pi ∗ pipe_ref γp false 1 ∗ pipe_ref γp true 1.
   Proof.
-    iIntros (Hpv Hlen) "Hnm Hword Hcpu Hnr Hnw Hro Hwo Hdata Hslack Hrun".
+    iIntros (Hpv Hlen) "Hnm Hword Hready Hnr Hnw Hro Hwo Hdata Hslack Hrun".
+    (* A6.105: unbundle the floor that travels with the owner cell; it becomes
+       [is_pipe]'s floor below. *)
+    rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
+    iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
     (* the lock's state gname FIRST: [pipe_dead] mentions it. *)
-    iMod (newlock_d E pi with "Hword Hcpu") as (γl) "Hmake".
+    iMod (newlock_d E lo pi with "Hword Hcpu") as (γl) "Hmake".
     iMod pipe_ends_alloc as (γp) "(Hrd & Hwr & Hm0 & Hm1)".
     (* A6.67: the DELAYED form takes [CtxMorph] as a pure premise and the
        running token beside the payload (A6.66); both come straight back. *)
@@ -393,7 +401,7 @@ Section PipeInv.
       iSplit; [iPureIntro; exact pipe_count_ok_00 | done]. }
     iModIntro. iFrame "Hrun". iExists γl, γp.
     rewrite /is_pipe. iFrame "Hrd Hwr".
-    iSplit; [done|]. iExact "Hlk".
+    iSplit; [done|]. iExists lo. iFrame "Hlk Hfl".
   Qed.
 
 End PipeInv.

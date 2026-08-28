@@ -42,6 +42,21 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   ctx_string_all name DfracDiscarded s -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
+  (* >>> A6.105 (§0.35′ / A6.101's bootstrap, RESOLVED THE OTHER WAY): the
+     owner field still arrives as an ORDINARY CTX WORD, and what changed is
+     the FLOOR CERTIFICATE the post hands back.
+
+     A ctx word hides its element's timestamp, which forces the store-then-
+     MINT order and with it a floor at [initlock]'s OWN store position.  The
+     creator cannot certify [ctx_floor ξ] for that position -- its store is
+     buffered, so its own view never reaches it (A6.101 one level up) -- and
+     the caller-mints-the-window alternative was measured and is worse: it
+     pushes an interp-needing mint into all twelve [initlock] callers and
+     still refuses at the two dynamic ones.  So the post hands back
+     [WpLock.lk_cpu_ready], whose floor certificate is [WpLock.lk_floor]'s
+     RIGHT arm -- "[lo] is a real log position", off the store leaf -- and
+     the first acquire's AMO converts it to the left arm (§0.35′(iii)'s
+     absorb).  Every caller's premise is unchanged. <<< *)
   c_cpu ↦₈ vcpu -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
@@ -56,7 +71,7 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
        whose lock is static seals it with [lock_name_intro] and forgets it;
        one that will free the object keeps it. *)
     c_name ↦₈ name -∗
-    WpLock.lk_cpu_fresh lk -∗
+    WpLock.lk_cpu_ready lk -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
