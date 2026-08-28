@@ -301,6 +301,63 @@ Section ctx.
     own_context ξ = own_context_def ξ.
   Proof. unfold own_context. by rewrite (proj2_sig own_context_aux). Qed.
 
+  (* ================================================================== *)
+  (* §0.35′(i): THE CONTEXT FLOOR -- "my context's bound has passed [lo]". *)
+  (*                                                                      *)
+  (* This is the whole of the bound-relation the owner's ruling adds, and  *)
+  (* it is one line: [llb] on the context's OWN bound name.  PERSISTENT    *)
+  (* and MONOTONE, so a handle may carry it, a crossing may copy it, and   *)
+  (* nothing has to give it back.                                         *)
+  (*                                                                      *)
+  (* WHAT IT IS NOT, and this is the point A6.89/A6.92 paid for: it names  *)
+  (* NO HART.  [llb (ctx_bound_name ξ) lo] is a fact about the THREAD OF   *)
+  (* CONTROL ξ, and a thread carries its context across every migration,   *)
+  (* so a floor claimed here survives a [wp_next] crossing, a park and a   *)
+  (* resume.  That is exactly what the two refuted spellings could not do  *)
+  (* -- the strengthened [locked] token (A6.89 §(5)) and the lock word's   *)
+  (* author receipt (A6.92 §(3)) were both HART-relative and both died on  *)
+  (* a crossing.  §0.35′'s answer is to move the fact one axis over.      *)
+  (* ================================================================== *)
+  Definition ctx_floor (ξ : CtxId) (lo : nat) : iProp Σ :=
+    llb (ctx_bound_name ξ) lo.
+
+  Global Instance ctx_floor_persistent ξ lo : Persistent (ctx_floor ξ lo).
+  Proof. rewrite /ctx_floor. apply _. Qed.
+  Global Instance ctx_floor_timeless ξ lo : Timeless (ctx_floor ξ lo).
+  Proof. rewrite /ctx_floor. apply _. Qed.
+
+  Lemma ctx_floor_0 ξ : ⊢ ctx_floor ξ 0.
+  Proof. rewrite /ctx_floor. apply llb_0. Qed.
+
+  Lemma ctx_floor_le ξ lo lo' : (lo' ≤ lo)%nat -> ctx_floor ξ lo -∗ ctx_floor ξ lo'.
+  Proof. rewrite /ctx_floor. apply llb_le. Qed.
+
+  (* >>> THE READ-SIDE CASH-IN, AND IT IS THE OBJECT FOUR SITES WANTED.
+     A6.89 §(7) (the [notheld] owner-cell read), A6.92 §(3) (the lock
+     word), A6.95 §(3) (the virtio queue words) and §0.27′ (the park
+     stamp) all stopped at the same two missing premises: a view receipt
+     [view_lb … K] and the relation [⌜lo ≤ K⌝] against a floor that was
+     existential inside an invariant.  With the floor carried on the
+     HANDLE and the running token in hand, both fall out in four lines --
+     the token's own [B ≤ K] chained with [llb_valid]'s [lo ≤ B].
+     The token is THREADED, not consumed: the conclusion's view receipt is
+     persistent and the token comes straight back. <<< *)
+  Lemma own_context_floor_view `{CID : CpuId} (ξ : CtxId) (lo : nat) :
+    own_context ξ -∗ ctx_floor ξ lo -∗
+    own_context ξ ∗ ∃ K : nat,
+      view_lb view_name loglen_name (hart_agent cpu_id) K ∗ ⌜(lo ≤ K)%nat⌝.
+  Proof.
+    iIntros "Hrun #Hfl".
+    iEval (rewrite own_context_unseal /own_context_def) in "Hrun".
+    iDestruct "Hrun" as (B K W D) "(Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
+    iDestruct "Hat" as "[Hb Hd]".
+    iDestruct (llb_valid with "Hb Hfl") as %HloB.
+    iSplitL.
+    { iEval (rewrite own_context_unseal /own_context_def).
+      iExists B, K, W, D. iFrame "Hb Hd HK HW Hoks". by iPureIntro. }
+    iExists K. iFrame "HK". iPureIntro. lia.
+  Qed.
+
   (* THE PARKED TOKEN ([TsoCtxTwin2.ctx_parked]): a thread of control
      not running anywhere -- ξ's authorities with no hart tie.  The
      bound IS the stamp: park raised it past every dirty entry (the
