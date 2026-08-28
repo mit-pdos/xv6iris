@@ -11662,3 +11662,158 @@ single error moved from `:995` (`kstack_bank_intro`, fixed) to `:996`
    item it owes.
 5. `ProofForkret`'s threading, the virtio pair, and the two U-mode files
    under §0.24′.
+
+### A6.91 `ProofForkret` IS GREEN — THE FIRST RED-LIST REDUCTION OF THE LANE,
+### AND THE LAST OF ITS FOUR DRIFTS WAS A MISSING TYPECLASS TWIN IN `TsoCtx`
+
+Executing the coordinator's tranche (§0.27′; then the threading files; then the
+U-mode pair), in the fliptree on the GCP VM under `flock`.  **RED 11 → RED 10.**
+
+#### (1) §0.27′ IS NOT OPEN, IT IS BUILD-ORDER GATED — AND THE GATE IS
+#### MEASURED, NOT GUESSED
+
+`ProofSwtch:157` is one line: `ctx_resume XIt Tt Tt` fed by the deleted shim
+`hart_view_lb_any`.  §0.27′ says what replaces it — the record publishes a
+relational bound `U`, and the resumer's `p->lock` acquire manufactures
+`T ≤ K` inside the acquire.  **Both halves were traced; one exists and one
+cannot yet.**
+
+- **The RECEIPT half is already built and already threaded.**
+  `SpecAcquire`'s post carries `(∃ K : nat, hart_view_lb K)` (its own comment:
+  *"the scheduler chain threads it from here to swtch, retiring the shim's
+  `hart_view_lb_any`"*), and `ProofScheduler` / `ProofSched` / `ProofSleep` /
+  `ProofYield` — all GREEN — already carry it to the `wp_swtch_sconf` call.
+- **The missing half is the pure tie `U ≤ K`**, and §0.27′ names its only
+  source: `⌜T ≤ t_rel⌝` in the lock invariant, *"with `t_rel` available as the
+  lock word's own ledger element timestamp under the M4 contract"*.  That
+  timestamp is minted by `wp_amoswap_lockopen_s_sconf` — **one of
+  `WpSconfLock`'s three unbuilt leaves** (A6.89 §(7)).  It does not exist, so
+  nothing can export it.
+- **And stating the tie moves the exported lock surface.**  §0.27′ has `U`
+  *"instantiated by the FREE ARM at the lock element's timestamp"*, so the
+  acquire's post must read `∃ K U, hart_view_lb K ∗ ⌜U ≤ K⌝ ∗ R U cur_ctx` —
+  i.e. the payload type becomes `nat → CtxId → iProp`, at ~160 `is_lock`
+  mention sites, while `WpSconfLock` is mid-tranche and red.
+
+> **So §0.27′ is downstream of the M4 second half, not of the owner.**  It is
+> not one of the three questions with the owner and it needs no ruling; it
+> needs the AMO gate first.  Writing its surface now would be opening a
+> tranche with no way to close it — the discipline A6.84 reverted for.
+> **Characterized and stopped; nothing was spelled.**
+
+#### (2) `ProofForkret`: FOUR DRIFTS, THREE OF THEM THREADING AND ONE A REAL BUG
+
+| # | drift | fix |
+|---|---|---|
+| 1 | `tlb_res_pt` grew a NINTH conjunct (`KptShare.kpt_creds`, A6.70's canon-pin credential), and `fkr_kpt_of_res` destructed eight | 9-way pattern, and the reassembly spelled with explicit `iSplit`s — framing by name reorders once the tail is three persistent conjuncts |
+| 2 | `forkret_closer` takes the resumer's FIVE ghost names (`γs γw γft γf γtl`), the file threaded one | the two block lemmas and the theorem take them; `wp_forkret_gen_body`'s own parameter list is the spec of record |
+| 3 | the closer's first argument is now `UsertrapRes.park_globals`, which `wp_forkret_gen_body` already takes as its 6th premise and the proof did not intro | one premise on each block lemma, one name in three `iIntros`, one name in three `with`-strings |
+| 4 | **`Persistent` fails on a freshly discarded ctx word** | §(3) — a missing instance in `TsoCtx` |
+
+Plus one signature drift that is only reported at `End ForkretProof.`:
+`usertrap_res_bare_park`'s `CurCtx` was left to auto-generalization, which
+hoists it to the FRONT of the telescope while the module type fixes it AFTER
+`GEN`.  **Name the binder and place it.**  *The error ("Signature components
+for field … do not match") names the field and not the binder, and reads like
+a body mismatch.*
+
+#### (3) THE BUG: `Class CurKtier` IS NOT TRANSPARENT, AND TWO TOWERS WERE
+#### MISSING THEIR `ktier`-TYPED TWIN
+
+`iMod (ctx_word4_pointsto_persist with "Hf1") as "#Hfirst0"` — the seal of
+`FirstTok.first_done`, a line that has been there since before the flip —
+failed with
+
+```
+  iIntuitionistic: (first_addr ↦₄□ mword_of_int 0)%I not persistent
+```
+
+although `TsoCtx.ctx_word4_pointsto_discarded_persistent` and
+`ctx_pointsto_discarded_persistent` both exist and are `Global`.  Unfolding
+by hand narrowed it to the BYTE: `pa_add first_addr j ↦ₘ□ _` is not
+persistent either.  **The cause is that `Class CurKtier := cur_ktier : ktier`
+is not declared transparent to typeclass unification** — `CurCtx` is (there is
+an explicit `Global Typeclasses Transparent CurCtx` with a note saying every
+`Persistent (is_lock … <{P}>)` resolution dies without it), and `CurKtier`
+never got the same treatment.  An instance stated at `(KTR : CurKtier)`
+therefore does not fire on a goal whose tier argument is `ktier`-typed.
+
+**Every other tower in the tree already carries the workaround** —
+`RiscvPtsto.word4_pointsto_discarded_persistent'`,
+`TsoCtx.ctx_string_pointsto_discarded_persistent'`, each with the comment
+*"the `ktier`-typed twins, for the same reason as the word towers'"*.  The
+BYTE and the 4-BYTE WORD did not.  Two instances added beside the string
+family's, with the diagnosis written above them.
+
+> **AND THE SYMPTOM IS WHY THIS IS WORTH A PARAGRAPH.**  The failure is
+> remote (a file five layers up), late (a tactic, not a type error), and
+> points at the wrong thing (a proposition that IS persistent, at an instance
+> that IS in scope).  *When a `Persistent`/`Timeless` instance is present and
+> does not fire, suspect the CLASS's transparency before the instance* — a
+> singleton class is definitionally its carrier, and typeclass unification
+> will not unfold it unless told to.  The cheap global alternative
+> (`Typeclasses Transparent CurKtier`) was NOT taken: the tree's established
+> answer for this class is the `'`-twin, and adding transparency to a class
+> that indexes every memory tower is a whole-tree resolution change that
+> wants its own round.
+
+#### (4) `ProofUserretClosed` IS NOT THREADING — IT IS THE LAST UN-FLIPPED TIER
+#### BOUNDARY, AND A FORGET WILL NOT DO
+
+`SpecUserret`'s 31 trapframe premises are the RAW physical word
+(`tf_pa tfp 40 ↦ₚ₈ vra`, and its header says so: *"as physical words
+(`↦ₚ₈`)"*), while `ProcInv.tf_words` — below it in the dependency order — is
+`TsoCtx.ctx_phys_word_pointsto XI`.  So `ProofUserretClosed` opens the
+trapframe at the ctx tier and must feed the raw one:
+
+```
+  iSpecialize: cannot instantiate (tf_pa (ud_tfp pt) 40 ↦ₚ₈ u40 -∗ …)
+  with (ctx_phys_word_pointsto XI (tf_pa (ud_tfp pt) 40) (DfracOwn 1) u40)
+```
+
+**A forget is available and is the wrong move**: the chain
+`ctx_phys_word_pointsto → phys_ledger_word → phys_word_pointsto` exists, but
+`wp_userret_user` hands the words BACK through its closer, and a raw cell
+cannot re-enter the ctx tower without a drain (A6.84 §(2)).  So the honest
+fix is to flip `SpecUserret`'s trapframe slots to the ctx tier, which is a
+tranche in the userret cone (`SpecUserret`, `UserretUser`, `ProofUserret`,
+`LinkUserret*` — all currently GREEN, so it is a tranche that must close in
+one pass).  **Characterized and stopped**, not started: it is the same U-mode
+boundary as the coordinator's item (3), and it is bigger than "threading".
+
+`ProofForkretPark` was checked and left alone: with §(2)'s names and
+`park_globals` already threaded correctly at its call site, it now fails on
+`sie_cap_gpr KT1 m av false (proc_addr j)` refusing to instantiate a premise
+that PRINTS identically — A6.63''/§0.20′'s CpuId re-park hazard at the park's
+own ξ/hart crossing, which is the checkpoint's design problem 1.  Not opened.
+
+#### (5) THE NUMBER, AND IT MOVED
+
+**1099 of 1296, RED 10** — sentinel-backed (`MAKEEXIT=2`).  **`ProofForkret`
+leaves the red list**; the remaining ten are `ProofForkretPark`,
+`ProofKernelvec`, `ProofMain`, `ProofSwtch`, `ProofUserretClosed`,
+`ProofVirtioDiskIntr`, `ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`,
+`WpSconfLock`.  **Red-list delta: −1, and nothing added.**  An intermediate
+whole-tree round after §(3)'s `TsoCtx` change (which rebuilds essentially
+everything) held the baseline exactly, so the two new instances cost no green
+file.  `md5sum kernel-rocq/*.v user-rocq/*.v` unchanged
+(`edd91972b6bc1b944fd98a2cc2363815`).  `^Abort` / `^Admitted` / `^Axiom` all
+0.  Mirror refreshed at this boundary.
+
+#### (6) THE FRONTIER
+
+1. **`WpSconfLock`'s three unbuilt leaves** — the AMO gate, the cpu-store
+   tranche, and (behind the owner) the `notheld` floor channel.  **§0.27′ now
+   queues BEHIND the AMO gate**, so this file is the gate on two frontier
+   items rather than one.
+2. **`ProofUserretClosed`** — §(4): flip `SpecUserret`'s trapframe slots to
+   the ctx tier, in one pass over the userret cone.
+3. **`ProofForkretPark`** — the park's own ξ/hart crossing (checkpoint design
+   problem 1).
+4. With the owner: the `notheld` floor channel, `intr_handler_spec`'s
+   layering, `ProofMain`'s publication credential (`sfence.vma` as a draining
+   node being the cheapest direction).
+5. `UptWalkPt` / `UserMemPt` under §0.24′ — both now measured as the same
+   raw-vs-ctx boundary as §(4) (`UserMemPt:427` wants
+   `pa_add pa x ↦ₚ b` and holds `ctx_phys_pointsto XI …`), so they are ONE
+   tranche with it, not three.
