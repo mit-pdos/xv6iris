@@ -260,12 +260,10 @@ Section EscrowDeposit.
     iDestruct (ireg_shp_split with "Hfdisj") as "[Hfsh Hcpin]".
     iAssert (ireg_regime rg.1 ∗ ireg_fpin rg)%I with "[Hfsh]" as "[Hgreg Hfpin]".
     { iApply (ireg_fsh_post_acc rg with "Hfsh"). }
-    (* THE FREEZE RECEIPT RIDES THROUGH (iclaim-ledger.md §3.14 as built):
-       the deposit runs at [FrzPost] and leaves [FrzOff], and neither is
-       [FrzPre], so the slot's receipt clause is on its [frzown] arm both
-       sides and this mover neither takes nor returns it. *)
+    (* THE MIRROR RIDES THROUGH: the deposit runs at [FrzPost] and leaves
+       [FrzOff], and neither is [FrzPre], so the bit is DOWN both sides. *)
     iDestruct (ireg_frzc_off_acc (bv_unsigned inum) (Some (Excl (FrzPost rg)))
-                 ltac:(reflexivity) with "Hfrcp") as "[Hrcpt Hmr]".
+                 ltac:(reflexivity) with "Hfrcp") as "Hmr".
     (* RULING R's (R2), PAID BY THE DEPOSIT (§5'.2, landed by 7a-wire).  This
        is the deposit's own type-0 write, it runs at [FrzPost], and the freeze
        pin puts the in-core count at ZERO there ([Hcn0]) -- so (R1) collapses
@@ -332,9 +330,9 @@ Section EscrowDeposit.
       iPureIntro. intros w Hw. destruct (decide (w = bv_unsigned inum)) as [->|Hne].
       - rewrite lookup_insert. done.
       - rewrite lookup_insert_ne; [exact (Hcovr w Hw) | congruence]. }
-    iMod ("Hclose" with "[Ha Hreg Hrecb Hdn Hla Hep Hlnk Hslback Hback Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark Hcpin]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hrecb Hdn Hla Hep Hlnk Hslback Hback Hrh1 Hrh2 Hcnt Hmr Hpark Hcpin]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hrecb Hdn Hla Hep Hlnk Hslback Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark Hcpin]").
+      iApply ("Hback" $! m' with "[%] [Hrecb Hdn Hla Hep Hlnk Hslback Hrh1 Hrh2 Hcnt Hmr Hpark Hcpin]").
       { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
         destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
@@ -355,16 +353,16 @@ Section EscrowDeposit.
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
       iSplitL "Hrecb"; [iExact "Hrecb" |].
-      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hlnk Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark Hcpin]").
+      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hlnk Hrh1 Hrh2 Hcnt Hmr Hpark Hcpin]").
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) dn' cl rl
                 (Some (Excl FrzOff)) cn
                 Hlok' Hclm' Hfrz'
-                with "Hla Hep Hlnk Hdisj Hcnt [Hcpin] [Hrcpt Hmr]").
+                with "Hla Hep Hlnk Hdisj Hcnt [Hcpin] [Hmr]").
       { iApply (ireg_shp_intro cl (Some (Excl FrzOff)) with "[] Hcpin").
         iApply ireg_fsh_off. }
       { iApply (ireg_frzc_off_intro (bv_unsigned inum) (Some (Excl FrzOff))
-                  ltac:(reflexivity) with "Hrcpt Hmr"). }
+                  ltac:(reflexivity) with "Hmr"). }
       iRight. iSplitR; [iPureIntro; exact Hz |].
       iSplitL "Hdn"; [iExact "Hdn" |].
       iSplitL "Hrh1"; [iExists ge, gr; iExact "Hrh1" |].

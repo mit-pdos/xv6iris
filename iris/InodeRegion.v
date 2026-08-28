@@ -1720,52 +1720,38 @@ Section InodeRegion.
      [dinode_at] -- re-establish [ireg_claim_ok] for free.  [ireg_ep] stays
      outside, so the destructuring pattern is [(ledger…arm) Hep] rather than
      the old [(ledger) [Hep arm]]. *)
-  (* ---- THE RECEIPT + MIRROR CONJUNCT (§3.14 as built, §3.16's A⁗) ------
+  (* ---- THE MIRROR CONJUNCT (§3.16's A⁗) -------------------------------
 
-     ONE conjunct of [ireg_slot], carrying the two complementary handles on
-     the f column that the free path's payload disjunction needs:
-
-       * the RECEIPT ([frzown z], §3.14): parked here at EVERY phase but
-         [FrzPre], so "a thread holds the receipt" IS "this inum reads
-         [FrzPre]", by [frzown_excl] alone.  Hand-vs-region EXCLUSIVITY.
-       * the MIRROR ([frzm_h z b] + [ireg_frzm_ok b f], §3.16): the region's
-         half of a 1/2-1/2 bool whose other half rides under the ITABLE LOCK
-         ([IcacheEscrow.islot2]'s live arm / the free pool's bundle), so a
-         lock holder can READ the column without opening the region and,
-         crucially, the arm can SELECT on it.  Region-vs-lock BRANCH
-         SELECTION.
-
-     They are packaged as ONE conjunct on purpose: [ireg_slot]'s arity and
-     [ireg_slot_intro]'s are then unchanged by A⁗, so the thirty-odd sites
-     that merely thread the receipt clause through a re-park are untouched
-     and only the four that OPEN it (the mint, the phase step, the retire,
-     boot) move. *)
+     ONE conjunct of [ireg_slot]: the region's half of a 1/2-1/2 bool whose
+     other half rides under the ITABLE LOCK ([IcacheEscrow.islot2]'s live arm
+     / the free pool's bundle), pinned to the f column by [ireg_frzm_ok].  A
+     lock holder can therefore READ the column without opening the region
+     and, crucially, an arm can SELECT on it.  Region-vs-lock BRANCH
+     SELECTION, and the only handle on the f column a party outside the
+     region has. *)
   Definition ireg_frzc (z : Z) (f : frzUR) : iProp Σ :=
-    ((⌜frz_preb f = true⌝ ∨ frzown z)
-     ∗ (∃ b : bool, frzm_h z b ∗ ⌜ireg_frzm_ok b f⌝))%I.
+    (∃ b : bool, frzm_h z b ∗ ⌜ireg_frzm_ok b f⌝)%I.
 
   Global Instance ireg_frzc_timeless z f : Timeless (ireg_frzc z f).
   Proof. rewrite /ireg_frzc. apply _. Qed.
 
   Lemma ireg_frzc_intro (z : Z) (f : frzUR) (b : bool) :
     ireg_frzm_ok b f ->
-    (⌜frz_preb f = true⌝ ∨ frzown z) -∗ frzm_h z b -∗ ireg_frzc z f.
+    frzm_h z b -∗ ireg_frzc z f.
   Proof.
-    intros Hok. iIntros "Hr Hb". rewrite /ireg_frzc. iFrame "Hr".
+    intros Hok. iIntros "Hb". rewrite /ireg_frzc.
     iExists b. iFrame "Hb". iPureIntro. exact Hok.
   Qed.
 
   (* THE RIDE-THROUGH PAIR.  Every mover in the tree but the mint and the
      [FrzPre -> FrzPost] step leaves the column OFF [FrzPre] at both ends, and
-     for those the conjunct is a two-line peel-and-repark: the receipt is on
-     its [frzown] arm and the mirror's bit is DOWN, at the old column and at
-     the new one alike. *)
+     for those the conjunct is a one-line peel-and-repark: the mirror's bit is
+     DOWN, at the old column and at the new one alike. *)
   Lemma ireg_frzc_off_acc (z : Z) (f : frzUR) :
     frz_preb f = false ->
-    ireg_frzc z f -∗ frzown z ∗ frzm_h z false.
+    ireg_frzc z f -∗ frzm_h z false.
   Proof.
-    intros Hne. iIntros "[Hr Hm]".
-    iSplitL "Hr"; [iDestruct "Hr" as "[%Hbad | $]"; congruence |].
+    intros Hne. iIntros "Hm".
     iDestruct "Hm" as (b) "[Hb %Hok]".
     destruct b; [| iExact "Hb"].
     rewrite /ireg_frzm_ok Hne in Hok. discriminate Hok.
@@ -1773,11 +1759,10 @@ Section InodeRegion.
 
   Lemma ireg_frzc_off_intro (z : Z) (f : frzUR) :
     frz_preb f = false ->
-    frzown z -∗ frzm_h z false -∗ ireg_frzc z f.
+    frzm_h z false -∗ ireg_frzc z f.
   Proof.
-    intros Hne. iIntros "Hr Hb".
-    iApply (ireg_frzc_intro _ _ false (ireg_frzm_ok_false f Hne) with "[Hr] Hb").
-    iRight. iExact "Hr".
+    intros Hne. iIntros "Hb".
+    iApply (ireg_frzc_intro _ _ false (ireg_frzm_ok_false f Hne) with "Hb").
   Qed.
 
   (* ---- THE FREEZE's BOOT-SHELTER CLAUSE, PHASE-INDEXED ----------------
@@ -1906,8 +1891,8 @@ Section InodeRegion.
   Qed.
 
   (* ---- THE LEDGER AUTHORITY, BUNDLED WITH THE r COLUMN's CLAUSE --------
-     (iclaim-ledger.md §5', RULING R -- packaged exactly as A⁗ packaged the
-     receipt and the mirror into [ireg_frzc], and for the same reason.)
+     (iclaim-ledger.md §5', RULING R -- packaged into ONE conjunct exactly as
+     A⁗ packaged the mirror into [ireg_frzc], and for the same reason.)
 
      The rc column is EXISTENTIAL here rather than one more binder of
      [ireg_slot]'s ∃, so [ireg_slot]'s destructuring pattern and
@@ -2659,24 +2644,13 @@ Section InodeRegion.
            duration and takes it back at the deposit.  Disjunctive rather
            than an implication so the slot stays timeless. *)
         ∗ ireg_shp c f
-        (* THE FREEZE RECEIPT's CLAUSE (iclaim-ledger.md §3.14 as built).
-           The region parks [IcacheRef.frzown z] at EVERY phase except
-           [FrzPre]; the mint ([ireg_freeze_au]) hands it to the freezer and
-           the [FrzPre -> FrzPost] step takes it back.  So "the receipt is
-           in a thread's hand" IS "this inum's column reads [FrzPre]", by
-           [frzown_excl] alone.
-           WHY IT EXISTS.  A‴ has the free path's freeze token travel with
-           the PAYLOAD (checked out at ilock, parked at iput+0x70, out again
-           at +0x8a), which makes the parked arm's token conjunct a
-           disjunction the +0x8a opener has to resolve -- and the walk has
-           nothing to resolve it with, because the token IS the thing it
-           parked.  With the receipt the walk parks THIS instead and keeps
-           [ifreeze_pre] in hand, so the arm's other disjunct dies on
-           [ifreeze_excl] with no region open at all.  Disjunctive rather
-           than an implication so the slot stays timeless, exactly like the
-           two shelter clauses above.
-           A⁗ (§3.16) ADDED THE MIRROR beside it, inside the same conjunct:
-           see [ireg_frzc]. *)
+        (* THE FREEZE MIRROR's CLAUSE (iclaim-ledger.md §3.16, A⁗).  The
+           region's half of a 1/2-1/2 bool, pinned to the f column; the other
+           half rides under the ITABLE LOCK, so a lock holder READS the column
+           without opening the region and [IcacheEscrow.islot2]'s live arm
+           SELECTS on it.  The mint ([ireg_freeze_au]) is the one site that
+           flips it, holding both the lock and the region -- which is exactly
+           what [frzm_update] demands.  See [ireg_frzc]. *)
         ∗ ireg_frzc z f
      (* OPTION A (walk reg-fold): the per-inum registry element rides INSIDE
         the arm, coupled to pending-ness.  A NON-pending slot (in/marked)
@@ -4313,11 +4287,6 @@ Section InodeRegion.
     frzm_h (bv_unsigned inum) false ={E}=∗
     dinode_at γi inum dn ∗
     ifreeze_pre rg (bv_unsigned inum) ∗ icnt_half (bv_unsigned inum) 1%nat ∗
-    (* THE FREEZE RECEIPT (iclaim-ledger.md §3.14 as built): the token the
-       free path parks in the payload's token slot at iput+0x70 while it
-       keeps [ifreeze_pre] in its own hand.  Returned to the region by the
-       [FrzPre -> FrzPost] step at +0x8a. *)
-    frzown (bv_unsigned inum) ∗
     (* ...and the mirror's lock half, UP (ZZProbeFrz P6: one bupd) *)
     frzm_h (bv_unsigned inum) true.
   Proof.
@@ -4367,20 +4336,13 @@ Section InodeRegion.
       by (rewrite (proj2 Ht2); exact I).
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    (* THE RECEIPT COMES OUT HERE (iclaim-ledger.md §3.14 as built): the old
-       column is [FrzOff], so the slot's clause is on its [frzown] arm, and
-       the NEW column is [FrzPre], at which the clause's own LEFT arm is
-       free.  So the mint hands the receipt to the freezer at no cost, and
-       "the freezer holds it" is from now on equivalent to "this inum reads
-       [FrzPre]" ([frzown_excl]). *)
-    iDestruct "Hfrcp" as "[[%Hbad | Hrcpt] Hmr]"; [discriminate Hbad |].
     (* THE MIRROR FLIPS HERE (ZZProbeFrz P6).  The old column is [FrzOff], so
        the region's clause pins its bit DOWN; both halves are in hand at this
        one instant, so [frzm_update] fires and both come out UP -- the
        region's re-parked at the new [FrzPre] column (where [ireg_frzm_ok] is
        [ireg_frzm_ok_true]) and the caller's handed back for the frozen-park
        disjunct of [islot2]'s live arm. *)
-    iDestruct "Hmr" as (b0) "[Hmr %Hmok]".
+    iDestruct "Hfrcp" as (b0) "[Hmr %Hmok]".
     iDestruct (frzm_agree with "Hmr Hmir") as %<-.
     assert (Hb0 : b0 = false) by exact Hmok.
     subst b0.
@@ -4411,10 +4373,9 @@ Section InodeRegion.
                   with "[Hsh Hfpin] [Hfdisj]").
         - iApply (ireg_fsh_pre rg with "Hsh Hfpin").
         - iDestruct (ireg_shp_split with "Hfdisj") as "[_ $]". }
-      { iApply (ireg_frzc_intro _ _ true (ireg_frzm_ok_true rg) with "[] Hmr").
-        iLeft. iPureIntro. reflexivity. }
+      { iApply (ireg_frzc_intro _ _ true (ireg_frzm_ok_true rg) with "Hmr"). }
       iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; exact Ht2 | iExact "Hmk"] | iExact "Hrf"]. }
-    iModIntro. rewrite /ifreeze_pre. iFrame "Hdn Hpre Hhalf Hrcpt Hmir".
+    iModIntro. rewrite /ifreeze_pre. iFrame "Hdn Hpre Hhalf Hmir".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -4430,9 +4391,7 @@ Section InodeRegion.
          and this lemma turns that into [False] -- so the arm is on the park
          and the mint's two live slices come home (S1b);
        * at the mint (+0x50) the walk has ALREADY decided the arm LEFT out of
-         its own live mass, with no open at all (ZZProbeFrz P1'), and this is
-         what then refutes the payload slot's [frzown] arm (S1a) -- through
-         [ireg_frzc]'s own two conjuncts, at the [false] bit.
+         its own live mass, with no open at all (ZZProbeFrz P1').
 
      Nothing moves, so no phase premise and no shelter clause: the slot goes
      back exactly as it came out. *)
@@ -4463,26 +4422,25 @@ Section InodeRegion.
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%rl & %cl & %fz & %cn & Hla & %Hlok & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %->.
-    iDestruct "Hfrcp" as "[Hrc Hmr]".
-    iDestruct "Hmr" as (b0) "[Hmr %Hmok]".
+    iDestruct "Hfrcp" as (b0) "[Hmr %Hmok]".
     iDestruct (frzm_agree with "Hmr Hmir") as %<-.
     assert (Hiff : b0 = frz_ispre ph) by exact Hmok.
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hrc Hmr]")
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hmr]")
       as "_".
     { iNext. iExists mrg. iFrame "Ha Hreg".
-      iApply ("Hback" $! mrg with "[%] [Hfsb Harm Hla Hep Hlnk Hslback Hcnt Hfdisj Hrc Hmr]");
+      iApply ("Hback" $! mrg with "[%] [Hfsb Harm Hla Hep Hlnk Hslback Hcnt Hfdisj Hmr]");
         [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hrc Hmr]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hmr]").
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 cl rl (Some (Excl ph)) cn Hlok Hclm Hfrz
-                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj [Hrc Hmr] Harm").
-      iApply (ireg_frzc_intro _ _ b0 Hmok with "Hrc Hmr"). }
+                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj [Hmr] Harm").
+      iApply (ireg_frzc_intro _ _ b0 Hmok with "Hmr"). }
     iModIntro. iFrame "Hfz Hmir". iPureIntro. exact Hiff.
   Qed.
 

@@ -1047,10 +1047,9 @@ Section IcacheBootRegion.
            inum -- which is what makes [FsCollect.col_region_slot_acc]'s
            reading non-vacuous at the very first commit. *)
         { iApply ireg_shp_none. iApply ireg_fsh_off. }
-        (* ...and the RECEIPT's clause is on its [frzown] arm, because boot
-           freezes nothing (iclaim-ledger.md §3.14 as built) *)
+        (* ...and the MIRROR's bit is DOWN, because boot freezes nothing *)
         { iApply (ireg_frzc_off_intro z (Some (Excl FrzOff))
-                    ltac:(reflexivity) with "Hrcpt Hmir"). }
+                    ltac:(reflexivity) with "Hmir"). }
         iLeft. iSplitR "Hrf";
           [iLeft; iSplitR; [iPureIntro; left; exact Hty |];
            iSplitL "Hfrag"; [iExact "Hfrag" |];
@@ -1079,10 +1078,9 @@ Section IcacheBootRegion.
            inum -- which is what makes [FsCollect.col_region_slot_acc]'s
            reading non-vacuous at the very first commit. *)
         { iApply ireg_shp_none. iApply ireg_fsh_off. }
-        (* ...and the RECEIPT's clause is on its [frzown] arm, because boot
-           freezes nothing (iclaim-ledger.md §3.14 as built) *)
+        (* ...and the MIRROR's bit is DOWN, because boot freezes nothing *)
         { iApply (ireg_frzc_off_intro z (Some (Excl FrzOff))
-                    ltac:(reflexivity) with "Hrcpt Hmir"). }
+                    ltac:(reflexivity) with "Hmir"). }
         iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; split; [exact Hty | reflexivity] | iExact "Hmk"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"]. }
     rewrite big_sepS_sep.
     iDestruct "Hall" as "[Hslots Hout]".
