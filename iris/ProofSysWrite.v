@@ -812,13 +812,13 @@ Section ProofSysWrite.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
-      iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U)) (us_M U)
+      iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
                 with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_refl. }
       { left. split; [reflexivity | exact Hnone]. }
       { exact Hmfa0. }
-      { rewrite us_upt_id upd_usM_id. iExact "Hpriv". }
+      { rewrite us_upt_id. iExact "Hpriv". }
       { iApply (filewrite_fs_env_out with "Henv"). }
     - (* ================= SUCCESS: the descriptor resolved ============= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & _ & Hfcell)".

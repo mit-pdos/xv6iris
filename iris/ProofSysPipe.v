@@ -409,6 +409,30 @@ Qed.
 Lemma sp_upd_upt_id (V : pprivate) : upd_upt V (pv_upt V) = V.
 Proof. by destruct V. Qed.
 
+(* THE TWO COPYOUTS' WINDOWS COMPOSE.  The second run's base [add_vec_int
+   dst 4] is the ENTRY address [dst] pinned forward by the first run's own
+   length (campaign idiom 3), so [UserPtTree.umem_wr_app] applies with no
+   no-wrap side condition.  [bs] is left for the CALLER to name (rather than
+   built here), so the term it passes on to compose the window is the exact
+   term it later hands to the syscall's own postcondition -- no separate
+   equation to bridge them.  [k] is unconstrained: this covers the pair's
+   full write (k = 4) and a partial second run (k = its own prefix) alike. *)
+Lemma sp_umem_compose (M0 : gmap Z (bv 8)) (dst : mword 64)
+    (src0 src1 bs : nat -> bv 8) (k : nat) (M1 M2 : gmap Z (bv 8)) :
+  (forall i, (i < 4)%nat -> src0 i = bs i) ->
+  (forall i, src1 i = bs (4 + i)%nat) ->
+  M1 = umem_wr M0 dst 4 src0 ->
+  M2 = umem_wr M1 (add_vec_int dst 4) k src1 ->
+  M2 = umem_wr M0 dst (4 + k)%nat bs.
+Proof.
+  intros Hb0 Hb1 -> ->.
+  rewrite <- (umem_wr_app M0 dst 4 k bs).
+  assert (Heq0 : umem_wr M0 dst 4 src0 = umem_wr M0 dst 4 bs)
+    by (apply umem_wr_ext; exact Hb0).
+  rewrite Heq0.
+  apply umem_wr_ext. intros i _. exact (Hb1 i).
+Qed.
+
 Module SysPipeProof (Myproc : MYPROC) (Argaddr : ARGADDR) (Pipealloc : PIPEALLOC)
                     (Fdalloc : FDALLOC) (Fileclose : FILECLOSE) (Copyout : COPYOUT)
   : SYSPIPE.
@@ -1192,14 +1216,16 @@ Section ProofSysPipe.
        hypotheses wide) buys nothing but pays O(|goal|) anyway.  [pose] adds
        the same transparent local definition without the search. *)
     pose (EPI := (wp_next true p (fun (CIDe : CpuId) =>
-      (* the image moves: sys_pipe's two copyouts may fault a page in, so
-         the exit is taken at whatever image the arm reached. *)
-      ∀ (mj : regfile) (P' : uptd) (Mo : gmap Z (bv 8)) (res : mword 64),
+      (* THE IMAGE MOVES, AND THE MOVE IS A WINDOW AT [v] (SpecSysPipe.v's
+         note): every exit reaches here with the run [v .. v+d) written and
+         nothing else touched, [d] and [bs] chosen per arm. *)
+      ∀ (mj : regfile) (P' : uptd) (d : nat) (bs : nat -> bv 8) (res : mword 64),
         ⌜ mj !!! Regidx csp_rs1 = pa_stk sp0 8
           /\ mj !!! Regidx Ra5 = res
           /\ (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                 r <> Rs0 -> r <> Rs1 -> mj !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+        ⌜ (d <= 8)%nat ⌝ -∗
         sie_cap_gpr KT1 mj (av - 8)%nat b p -∗
         cpu_own 0%nat eb p b lks -∗
         trap_csrs_ext KT1 eb -∗
@@ -1219,11 +1245,11 @@ Section ProofSysPipe.
         (∃ lo hi : mword 32,
            word4_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) lo ∗
            word4_pointsto (KTR := KT1) (pa_add (pa_stk sp0 8) 4) (DfracOwn 1) hi) -∗
-        sys_pipe_post γf p pid (upd_usM (us_upt U P') Mo) res -∗
+        sys_pipe_post γf p pid (upd_usM (us_upt U P') (umem_wr (us_M U) v d bs)) res -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hb1 Hb2 Hb3 Hb4]" as "Hepi".
     { rewrite /EPI.
-      iIntros (CIDE HsE mj P' Mo res) "(%Hjsp & %Hja5 & %Hjthr) %Hext Hcg Hcpu Hextc Hextm Hpc Hiru Hpenv Hfenv Hrest Hslot8 Hpost".
+      iIntros (CIDE HsE mj P' d bs res) "(%Hjsp & %Hja5 & %Hjthr) %Hext %Hd8 Hcg Hcpu Hextc Hextm Hpc Hiru Hpenv Hfenv Hrest Hslot8 Hpost".
       iDestruct "Hrest" as (w5 w6 w7) "(Hb5 & Hb6 & Hb7)".
       iDestruct "Hslot8" as (lo hi) "[Hlo Hhi]".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal8 with "Hlo Hhi") as "Hb8".
@@ -1241,8 +1267,8 @@ Section ProofSysPipe.
       iDestruct (cpu_claim_ext_transport CIDE CID23 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf P' Mo with "[%] [%] Hcg Hcpu Hextc Hextm Hpc [Hpost] Hiru Hpenv Hfenv");
-        [exact Hcsf | exact Hext |].
+      iApply ("Hcont" $! mf P' d bs with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc [Hpost] Hiru Hpenv Hfenv");
+        [exact Hcsf | exact Hext | exact Hd8 |].
       by rewrite Hfa0. }
     (* ================================================================= *)
     (*  +0x0a  jal ra,myproc                                             *)
@@ -1573,10 +1599,12 @@ Section ProofSysPipe.
       iDestruct (cpu_claim_ext_transport CID34 CID36 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hepi" $! CID36 with "[%]"); [wp_next_chain|].
-      iApply ("Hepi" $! W1 (pv_upt (us_V U)) (us_M U) (mword_of_int (-1) : mword 64)
-                with "[%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").
+      (* nothing ran, so the window is EMPTY -- [d := 0], any [bs] does *)
+      iApply ("Hepi" $! W1 (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8) (mword_of_int (-1) : mword 64)
+                with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").
       { split; [exact HW1sp|]. split; [exact HW1a5 | exact HthrW1]. }
       { apply uptd_ext_refl. }
+      { lia. }
       { by iExists on. }
       { iExists v, w6, w7. iFrame "Hb5 Hb6 Hb7". }
       { iExists (word_lo u8), (word_hi u8). iFrame "Hlo Hhi". }
@@ -1584,7 +1612,7 @@ Section ProofSysPipe.
          whole [sys_pipe_post] searches inside [proc_priv] for a place to put
          an [fd_slot] -- 16 ofile slots and a 4096-byte trapframe page deep --
          and does not come back. *)
-      rewrite /sys_pipe_post us_upt_id upd_usM_id.
+      rewrite /sys_pipe_post us_upt_id. cbn [umem_wr]. rewrite upd_usM_id.
       iSplitR "Hfrag Hua Hub";
         [| iSplitL "Hfrag"; [iExact "Hfrag"
          | iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]]].
@@ -1786,12 +1814,14 @@ Section ProofSysPipe.
       (* the block, back into [proc_priv] *)
       iDestruct ("Hpback" with "Hpbare Hfenv") as "[Hpriv Hfenv]".
       iSpecialize ("Hepi" $! CID44 with "[%]"); [wp_next_chain|].
-      iApply ("Hepi" $! Mr (pv_upt (us_V U)) (us_M U) (mword_of_int (-1) : mword 64)
-                with "[%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").
+      (* nothing ran, so the window is EMPTY -- [d := 0], any [bs] does *)
+      iApply ("Hepi" $! Mr (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8) (mword_of_int (-1) : mword 64)
+                with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").
       { split; [rewrite (Hmrcs csp_rs1 ltac:(vm_compute; reflexivity)); exact HY0sp|].
         split; [exact Hmra5|].
         intros r Hr N2 N8 N9. rewrite (Hmrcs r Hr). apply HthrY0; assumption. }
       { apply uptd_ext_refl. }
+      { lia. }
       { iExact "Hpenv". }
       { iExists v, (fnode k0), (fnode k1). iFrame "Hb5 Hb6 Hb7". }
       { iExists (word_lo u8), (trunc32 (Y0 !!! Regidx Ra0)). iFrame "Hlo Hhi". }
@@ -1799,7 +1829,7 @@ Section ProofSysPipe.
          whole [sys_pipe_post] searches inside [proc_priv] for a place to put
          an [fd_slot] -- 16 ofile slots and a 4096-byte trapframe page deep --
          and does not come back. *)
-      rewrite /sys_pipe_post us_upt_id upd_usM_id.
+      rewrite /sys_pipe_post us_upt_id. cbn [umem_wr]. rewrite upd_usM_id.
       iSplitR "Hfrag Hua Hub";
         [| iSplitL "Hfrag"; [iExact "Hfrag"
          | iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]]].
@@ -2038,8 +2068,9 @@ Section ProofSysPipe.
       (* the block, back into [proc_priv] *)
       iDestruct ("Hpback" with "Hpbare Hfenv") as "[Hpriv Hfenv]".
       iSpecialize ("Hepi" $! CID54 with "[%]"); [wp_next_chain|].
-      iApply ("Hepi" $! Mr (pv_upt (us_V U)) (us_M U) (mword_of_int (-1) : mword 64)
-                with "[%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").
+      (* nothing ran, so the window is EMPTY -- [d := 0], any [bs] does *)
+      iApply ("Hepi" $! Mr (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8) (mword_of_int (-1) : mword 64)
+                with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").
       { split.
         { rewrite (Hmrcs csp_rs1 ltac:(vm_compute; reflexivity)).
           rewrite (HF2thr csp_rs1 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)). exact HF1sp. }
@@ -2048,6 +2079,7 @@ Section ProofSysPipe.
         assert (N15 : r <> Ra5) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
         rewrite (HF2thr r N15 N15). apply HthrF1; assumption. }
       { apply uptd_ext_refl. }
+      { lia. }
       { iExact "Hpenv". }
       { iExists v, (fnode k0'), (fnode k1). iFrame "Hb5 Hb6 Hb7". }
       { iExists (trunc32 (U0 !!! Regidx Ra0)), (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)).
@@ -2056,7 +2088,7 @@ Section ProofSysPipe.
          whole [sys_pipe_post] searches inside [proc_priv] for a place to put
          an [fd_slot] -- 16 ofile slots and a 4096-byte trapframe page deep --
          and does not come back. *)
-      rewrite /sys_pipe_post us_upt_id upd_usM_id.
+      rewrite /sys_pipe_post us_upt_id. cbn [umem_wr]. rewrite upd_usM_id.
       iSplitR "Hfrag Hua Hub";
         [| iSplitL "Hfrag"; [iExact "Hfrag"
          | iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]]].
@@ -2162,8 +2194,10 @@ Section ProofSysPipe.
       apply list_lookup_insert. by rewrite length_insert. }
     (* the copy accessor, taken ONCE and closed once *)
     iDestruct (proc_priv_sz_bound with "Hpriv") as %Hszb.
+    (* [Hpt] STAYS memory-indexed -- [Hpback] already accepts [proc_ptm] on
+       the way back, so there is no need to forget the image down to
+       [proc_pt_any] and re-derive it before each copyout call. *)
     iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
-    iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
     (* +0x50 c.li a4,4 -- the length argument, now in a4 *)
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x50)) Ra4 (mword_of_int 4 : mword 6)
               (mword_of_int (Z.of_nat 4) : mword 64) U0 (av - 8)%nat b
@@ -2298,6 +2332,14 @@ Section ProofSysPipe.
       rewrite /A3 upd_ne; [| vm_compute; discriminate].
       rewrite /A2 upd_ne; [| vm_compute; discriminate].
       rewrite /A1; apply upd_eq. }
+    (* a2 still holds [v] (the DESTINATION, set at A3 and untouched since):
+       the memory-indexed contract exposes it as [dstva], where the old one
+       did not. *)
+    assert (HA6a2 : A6 !!! Regidx Ra2 = v).
+    { rewrite /A6 upd_ne; [| vm_compute; discriminate].
+      rewrite /A5 upd_ne; [| vm_compute; discriminate].
+      rewrite /A4 upd_ne; [| vm_compute; discriminate].
+      rewrite /A3; apply upd_eq. }
     assert (HA6sp : A6 !!! Regidx csp_rs1 = pa_stk sp0 8).
     { rewrite /A6 upd_ne; [| vm_compute; discriminate].
       rewrite /A5 upd_ne; [| vm_compute; discriminate].
@@ -2335,15 +2377,18 @@ Section ProofSysPipe.
     iEval (rewrite -HA6a3) in "Hbufhi".
     iDestruct (cpu_own_transport CID48 CID60 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Copyout.wp_copyout_sconf KT1 γa A6
+    iApply (Copyout.wp_copyout_sconf_mem KT1 γa A6
               (pv_upt (upd_ofile (upd_ofile (us_V U) fd0 (fnode k0)) fd1 (fnode k1)))
+              (us_M U)
               (pv_sz (upd_ofile (upd_ofile (us_V U) fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) j)
               (DfracOwn 1) (av - 8)%nat 0%nat eb p b lks
               Hav52 HA6a0 HA6a1 HA6a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henva Hbufhi").
     all: try lkbelow.
-    iIntros (CID61 Hcr61 B0 Pa) "Hcg Hcpu Hpc Hpt Hbufhi %HcsB0 %Hext1 %Hret1".
+    iIntros (CID61 Hcr61 B0 Pa M1) "Hcg Hcpu Hpc Hpt Hbufhi %HcsB0 %Hext1 %Hret1".
+    (* the window's base is [A6]'s a2, i.e. [v] (HA6a2) *)
+    rewrite HA6a2 in Hret1.
     iEval (rewrite HA6a3) in "Hbufhi".
     iDestruct (word4_pointsto_intro _ _ _ Halhi with "Hbufhi") as "Hhi".
     assert (Hpc62 : ret_pc (A6 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x62))
@@ -2371,15 +2416,17 @@ Section ProofSysPipe.
        never contains a T7C occurrence to find. *)
     pose (T7C := (wp_next true p (fun (CIDt : CpuId) =>
       (* the image moves: the copyout this tail is branched to from may
-         already have faulted a page in, so the block arrives at the
-         image its copyout reached, not the entry one. *)
-      ∀ (Mt : regfile) (P' : uptd) (Mo : gmap Z (bv 8)),
+         already have faulted a page in, so the block arrives at whatever
+         WINDOW that copyout (or the pair) reached -- see EPI's note, which
+         this tail forwards unchanged. *)
+      ∀ (Mt : regfile) (P' : uptd) (d : nat) (bs : nat -> bv 8),
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8
           /\ Mt !!! Regidx Rs0 = sp0
           /\ Mt !!! Regidx Rs1 = p
           /\ (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                 r <> Rs0 -> r <> Rs1 -> Mt !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+        ⌜ (d <= 8)%nat ⌝ -∗
         sie_cap_gpr KT1 Mt (av - 8)%nat b p -∗
         cpu_own 0%nat eb p b lks -∗
         trap_csrs_ext KT1 eb -∗
@@ -2390,7 +2437,8 @@ Section ProofSysPipe.
         (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
         fileclose_fs_env_nopid fn 0%nat eb p -∗
         proc_priv γf p pid
-          (upd_usM (upd_usV U (upd_upt (upd_ofile (upd_ofile (us_V U) fd0 (fnode k0)) fd1 (fnode k1)) P')) Mo) -∗
+          (upd_usM (upd_usV U (upd_upt (upd_ofile (upd_ofile (us_V U) fd0 (fnode k0)) fd1 (fnode k1)) P'))
+             (umem_wr (us_M U) v d bs)) -∗
         (* the fd-state fragments: this tail nulls both descriptors again, so
            it retypes both back to [FdClosed] and needs them *)
         fd_frags_any (pv_fdg (us_V U)) -∗
@@ -2408,7 +2456,7 @@ Section ProofSysPipe.
        SHARE the epilogue rather than split it. *)
     iAssert (EPI ∧ T7C)%I with "[Hepi]" as "HK".
     { iSplit; [iExact "Hepi"|]. rewrite /T7C.
-      iIntros (CIDT HsT Mt P' Mo) "(%Htsp & %Hts0 & %Hts1 & %Htthr) %Hxt Hcg Hcpu
+      iIntros (CIDT HsT Mt P' d bs) "(%Htsp & %Hts0 & %Hts1 & %Htthr) %Hxt %Hd8 Hcg Hcpu
                        Hextc Hextm Hpc
                        Hiru Hpenv Hfenv Hpriv Hfrag Hua Hub Hb5 Hb6 Hb7 Hlo Hhi".
       assert (Hlk1'' : pv_ofile (upd_ofile (upd_upt (upd_ofile (upd_ofile (us_V U) fd0 (fnode k0))
@@ -2441,7 +2489,8 @@ Section ProofSysPipe.
         by (rewrite /E1 upd_ne; [exact Hts1 | vm_compute; discriminate]).
       (* +0x84 .. +0x8c: p->ofile[fd0] = 0 *)
       iDestruct (proc_priv_ofile γf p pid
-                   (upd_usM (upd_usV U (upd_upt (upd_ofile (upd_ofile (us_V U) fd0 (fnode k0)) fd1 (fnode k1)) P')) Mo)
+                   (upd_usM (upd_usV U (upd_upt (upd_ofile (upd_ofile (us_V U) fd0 (fnode k0)) fd1 (fnode k1)) P'))
+                      (umem_wr (us_M U) v d bs))
                    fd0 (fnode k0) Hlk0' with "Hpriv") as "[Hslot Hback]".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]";
         [by exfalso; apply (fnode_ne_zero k0 Hk0lt)|].
@@ -2492,7 +2541,8 @@ Section ProofSysPipe.
       (* +0x94 .. +0x9c: p->ofile[fd1] = 0 *)
       iDestruct (proc_priv_ofile γf p pid
                    (upd_usM (upd_usV U (upd_ofile (upd_upt (upd_ofile (upd_ofile (us_V U) fd0 (fnode k0)) fd1 (fnode k1)) P')
-                              fd0 (zero_reg : mword 64))) Mo)
+                              fd0 (zero_reg : mword 64)))
+                      (umem_wr (us_M U) v d bs))
                    fd1 (fnode k1) Hlk1'' with "Hpriv") as "[Hslot1 Hback1]".
       iDestruct "Hslot1" as "[Hcell1 [[%Hz1 _] | Href1']]";
         [by exfalso; apply (fnode_ne_zero k1 Hk1lt)|].
@@ -2574,13 +2624,14 @@ Section ProofSysPipe.
       iDestruct (cpu_claim_ext_transport CID66 CID67 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hepi" $! CID67 with "[%]"); [wp_next_chain|].
-      iApply ("Hepi" $! Mr P' Mo (mword_of_int (-1) : mword 64)
-                with "[%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").
+      iApply ("Hepi" $! Mr P' d bs (mword_of_int (-1) : mword 64)
+                with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").
       { split.
         { rewrite (Hmrcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HE4sp. }
         split; [exact Hmra5|].
         intros r Hr N2 N8 N9. rewrite (Hmrcs r Hr). apply HthrE4; assumption. }
       { exact Hxt. }
+      { exact Hd8. }
       { iExact "Hpenv". }
       { iExists v, (fnode k0'), (fnode k1'). iFrame "Hb5 Hb6 Hb7". }
       { iExists (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)),
@@ -2591,7 +2642,7 @@ Section ProofSysPipe.
          | iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]]].
       iLeft. iSplitR; [done|]. iExact "Hpriv". }
     (* +0x62 blt a0,x0 -- did the first copyout fail? *)
-    destruct Hret1 as [Hco0|Hcom1].
+    destruct Hret1 as [[Hco0 HM1s]|[Hcom1 (d1 & Hd1 & HM1f)]].
     2:{ (* ===== copyout(&fd0) failed: null both descriptors, close both ===== *)
       iApply (wp_blt_x0_taken_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x62))
                 (mword_of_int 30 : mword 13) Ra0 B0 (av - 8)%nat b
@@ -2606,8 +2657,10 @@ Section ProofSysPipe.
                      = mword_of_int (KernelSyms.sys_pipe + 0x80))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hbt3) in "Hpc".
-      iDestruct (proc_pt_any_ptm with "Hpt") as (Ma) "Hpt".
-      iDestruct ("Hpback" $! Pa Ma with "[%] Hszc Hptc Hpt") as "Hpriv"; [exact Hext1|].
+      (* [Hpt] is already memory-indexed at [M1] -- no need to forget it
+         and re-derive it. *)
+      iDestruct ("Hpback" $! Pa M1 with "[%] Hszc Hptc Hpt") as "Hpriv"; [exact Hext1|].
+      iEval (rewrite HM1f) in "Hpriv".
       iDestruct "HK" as "[_ Ht7c]".
       iDestruct (cpu_own_transport CID61 CID68 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
@@ -2618,12 +2671,34 @@ Section ProofSysPipe.
       iDestruct (cpu_claim_ext_transport CID34 CID68 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Ht7c" $! CID68 with "[%]"); [wp_next_chain|].
-      iApply ("Ht7c" $! B0 Pa Ma with "[%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv Hpriv Hfrag Hu0 Hu1 Hb5 Hb6 Hb7 Hlo Hhi").
+      iApply ("Ht7c" $! B0 Pa d1
+                (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) j)
+                with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv Hpriv Hfrag Hu0 Hu1 Hb5 Hb6 Hb7 Hlo Hhi").
       { split; [exact HB0sp|]. split; [exact HB0s0|].
         split; [exact HB0s1 | exact HthrB0]. }
       { exact (uptd_ext_sz_ext _ _ _ Hext1). }
+      { lia. }
       { by iExists on. } }
     (* ===== the first copyout succeeded: do the second ===== *)
+    (* THE COMPOSED WINDOW'S BYTES, named ONCE: whichever of the two exits
+       below is taken hands this SAME [bsc] to [sp_umem_compose] and then
+       on to the postcondition, differing only in the length ([sp_umem_
+       compose]'s [k] is unconstrained). *)
+    pose (bsc := fun i : nat =>
+      if (i <? 4)%nat
+      then nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) i
+      else nth_byte (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) (i - 4)%nat).
+    assert (Hbsc0 : forall i : nat, (i < 4)%nat ->
+              nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) i = bsc i).
+    { intros i Hi. rewrite /bsc.
+      assert (Hlt : (i <? 4)%nat = true) by (apply Nat.ltb_lt; exact Hi).
+      rewrite Hlt. reflexivity. }
+    assert (Hbsc1 : forall i : nat,
+              nth_byte (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) i
+              = bsc (4 + i)%nat).
+    { intros i. rewrite /bsc.
+      assert (Hge : (4 + i <? 4)%nat = false) by (apply Nat.ltb_ge; lia).
+      rewrite Hge. f_equal. lia. }
     iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x62))
               (mword_of_int 30 : mword 13) Ra0 B0 (av - 8)%nat b
               ltac:(vm_compute; discriminate)
@@ -2700,6 +2775,16 @@ Section ProofSysPipe.
       rewrite /C3 upd_ne; [| vm_compute; discriminate].
       rewrite /C2 upd_ne; [| vm_compute; discriminate].
       rewrite /C1 upd_ne; [exact HB0s1 | vm_compute; discriminate]. }
+    (* the second copyout's DESTINATION, [+0x70]'s [c.add a2,a2,a4] --
+       [fdarray + 4], ADJACENT to the first run's base [v]: this is what
+       lets the two windows compose with [UserPtTree.umem_wr_app]. *)
+    assert (HC3a2 : C3 !!! Regidx Ra2 = v) by (rewrite /C3; apply upd_eq).
+    assert (HC3a4 : C3 !!! Regidx Ra4 = (mword_of_int (Z.of_nat 4) : mword 64)).
+    { rewrite /C3 upd_ne; [| vm_compute; discriminate].
+      rewrite /C2 upd_ne; [| vm_compute; discriminate].
+      rewrite /C1; apply upd_eq. }
+    assert (HC4a2 : C4 !!! Regidx Ra2 = add_vec_int v 4).
+    { rewrite /C4 upd_eq. rgne. rgne. rewrite HC3a2 HC3a4. reflexivity. }
     (* +0x72 c.ld a1,72(s1) -- a1 := p->sz, copyout's [psz] argument again *)
     assert (Hszb2 : add_vec (rget C4 Rs1) (sign_extend' 64 (mword_of_int 72 : mword 12))
                     = p_sz p) by (rgne; rewrite HC4s1; reflexivity).
@@ -2783,6 +2868,13 @@ Section ProofSysPipe.
       rewrite /C3 upd_ne; [| vm_compute; discriminate].
       rewrite /C2 upd_ne; [| vm_compute; discriminate].
       rewrite /C1; apply upd_eq. }
+    (* a2 still holds [v+4]: the memory-indexed contract exposes it as
+       [dstva], where the old one did not. *)
+    assert (HC7a2 : C7 !!! Regidx Ra2 = add_vec_int v 4).
+    { rewrite /C7 upd_ne; [| vm_compute; discriminate].
+      rewrite /C6 upd_ne; [| vm_compute; discriminate].
+      rewrite /C5 upd_ne; [| vm_compute; discriminate].
+      exact HC4a2. }
     assert (HC7sp : C7 !!! Regidx csp_rs1 = pa_stk sp0 8).
     { rewrite /C7 upd_ne; [| vm_compute; discriminate].
       rewrite /C6 upd_ne; [| vm_compute; discriminate].
@@ -2821,14 +2913,16 @@ Section ProofSysPipe.
     iEval (rewrite -HC7a3) in "Hbuflo".
     iDestruct (cpu_own_transport CID61 CID75 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Copyout.wp_copyout_sconf KT1 γa C7 Pa
+    iApply (Copyout.wp_copyout_sconf_mem KT1 γa C7 Pa M1
               (pv_sz (upd_ofile (upd_ofile (us_V U) fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) j)
               (DfracOwn 1) (av - 8)%nat 0%nat eb p b lks
               Hav52 HC7a0 HC7a1 HC7a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henvb Hbuflo").
     all: try lkbelow.
-    iIntros (CID76 Hcr76 D0 Pb) "Hcg Hcpu Hpc Hpt Hbuflo %HcsD0 %Hext2 %Hret2".
+    iIntros (CID76 Hcr76 D0 Pb M2) "Hcg Hcpu Hpc Hpt Hbuflo %HcsD0 %Hext2 %Hret2".
+    (* the window's base is [C7]'s a2, i.e. [v+4] (HC7a2) *)
+    rewrite HC7a2 in Hret2.
     iEval (rewrite HC7a3) in "Hbuflo".
     iDestruct (word4_pointsto_intro _ _ _ Hallo with "Hbuflo") as "Hlo".
     assert (Hpc7a : ret_pc (C7 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x7a))
@@ -2875,11 +2969,16 @@ Section ProofSysPipe.
     { intros r Hr N2 N8 N9.
       assert (N15 : r <> Ra5) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
       rewrite /D1 upd_ne; [| congruence]. apply HthrD0; assumption. }
-    iDestruct (proc_pt_any_ptm with "Hpt") as (Mb) "Hpt".
-    iDestruct ("Hpback" $! Pb Mb with "[%] Hszc Hptc Hpt") as "Hpriv"; [exact Hextb|].
+    iDestruct ("Hpback" $! Pb M2 with "[%] Hszc Hptc Hpt") as "Hpriv"; [exact Hextb|].
     (* +0x7c bge a0,x0 -- both copies landed? *)
-    destruct Hret2 as [Hs0|Hsm1].
+    destruct Hret2 as [[Hs0 HM2s]|[Hsm1 (d2 & Hd2 & HM2f)]].
     - (* ============ SUCCESS: return 0 ============ *)
+      (* both runs landed: the composed window is the full 8 bytes *)
+      pose proof (sp_umem_compose (us_M U) v
+                    (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) j)
+                    (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) j)
+                    bsc 4%nat M1 M2 Hbsc0 Hbsc1 HM1s HM2s) as HM2comp.
+      iEval (rewrite HM2comp) in "Hpriv".
       iApply (wp_bgez_taken_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x7c))
                 (mword_of_int 94 : mword 13) Ra0 D1 (av - 8)%nat b
                 ltac:(vm_compute; discriminate)
@@ -2901,10 +3000,11 @@ Section ProofSysPipe.
       iDestruct (cpu_claim_ext_transport CID34 CID78 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hepi" $! CID78 with "[%]"); [wp_next_chain|].
-      iApply ("Hepi" $! D1 Pb Mb (zero_reg : mword 64)
-                with "[%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hu0 Hu1]").
+      iApply ("Hepi" $! D1 Pb (4 + 4)%nat bsc (zero_reg : mword 64)
+                with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hu0 Hu1]").
       { split; [exact HD1sp|]. split; [exact HD1a5 | exact HthrD1]. }
       { exact (uptd_ext_sz_ext _ _ _ Hextb). }
+      { lia. }
       { by iExists on. }
       { iExists v, (fnode k0), (fnode k1). iFrame "Hb5 Hb6 Hb7". }
       { iExists (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)),
@@ -2917,6 +3017,13 @@ Section ProofSysPipe.
       iSplitR; [iPureIntro; split; [reflexivity | exact Hfr1']|].
       rewrite -sp_us_upt_ofile_comm. iExact "Hpriv".
     - (* ============ copyout(&fd1) failed: the shared tail ============ *)
+      (* the second run landed only a [d2 <= 4] prefix: the composed window
+         is [4 + d2] -- idiom 4, re-instantiating the count already in hand *)
+      pose proof (sp_umem_compose (us_M U) v
+                    (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) j)
+                    (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) j)
+                    bsc d2 M1 M2 Hbsc0 Hbsc1 HM1s HM2f) as HM2comp.
+      iEval (rewrite HM2comp) in "Hpriv".
       iApply (wp_bgez_fall_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x7c))
                 (mword_of_int 94 : mword 13) Ra0 D1 (av - 8)%nat b
                 ltac:(vm_compute; discriminate)
@@ -2935,10 +3042,12 @@ Section ProofSysPipe.
       iDestruct (cpu_claim_ext_transport CID34 CID79 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Ht7c" $! CID79 with "[%]"); [wp_next_chain|].
-      iApply ("Ht7c" $! D1 Pb Mb with "[%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv Hpriv Hfrag Hu0 Hu1 Hb5 Hb6 Hb7 Hlo Hhi").
+      iApply ("Ht7c" $! D1 Pb (4 + d2)%nat bsc
+                with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv Hpriv Hfrag Hu0 Hu1 Hb5 Hb6 Hb7 Hlo Hhi").
       { split; [exact HD1sp|]. split; [exact HD1s0|].
         split; [exact HD1s1 | exact HthrD1]. }
       { exact (uptd_ext_sz_ext _ _ _ Hextb). }
+      { lia. }
       { by iExists on. }
   Qed.
 

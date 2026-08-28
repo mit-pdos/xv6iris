@@ -313,20 +313,19 @@ Section ProofSysRead.
   (* =================================================================== *)
   Lemma wp_sys_read_sconf
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (fn : fread_names) (pidv : mword 32) (U : ustate) (v v2 : mword 64)
+      (fn : fread_names) (pidv : mword 32) (U : ustate) (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_sys_read_sconf_body γf γs j γlp fn pidv U v v2 m av eb b lks.
+    : wp_sys_read_sconf_body γf γs j γlp fn pidv U v v1 v2 m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_read_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq Heb.
     (* every budget, or [lia] cannot see past [fileread_stack] -- it is an
        expression, not a literal, on purpose (SpecSysRead.v). *)
-    
+
     (* the push_off bound, with [2^31] evaluated by hand: [lia] cannot reduce
        a power (durable-notes.md). *)
     assert (Hnoff : (Z.of_nat 0 + 1 < 2 ^ 31)%Z)
       by (change (2 ^ 31)%Z with 2147483648%Z; lia).
-    destruct Harg1 as [v1 Harg1].
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).
@@ -788,14 +787,18 @@ Section ProofSysRead.
      iDestruct (cpu_own_transport CID17 CID21 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
-      (* nothing ran, so the page table is its own extension *)
-      iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U)) (us_M U)
-                with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
+      (* nothing ran, so the page table is its own extension and the window
+         is empty: [d := 0], any [bs] closes [umem_wr _ _ 0 _ = M] on the
+         nose. *)
+      iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
+                0%nat (fun _ => bv_0 8)
+                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_refl. }
       { left. split; [reflexivity | exact Hnone]. }
+      { apply Z.le_max_l. }
       { exact Hmfa0. }
-      { rewrite us_upt_id upd_usM_id. iExact "Hpriv". }
+      { rewrite us_upt_id. cbn [umem_wr]. rewrite upd_usM_id. iExact "Hpriv". }
       { iApply (fileread_fs_env_out with "Henv"). }
     - (* ================= SUCCESS: the descriptor resolved ============= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & _ & Hfcell)".
@@ -858,6 +861,7 @@ Section ProofSysRead.
       assert (Hpp38 : add_vec_int (mword_of_int (KernelSyms.sys_read + 0x34) : mword 64) 4
                       = mword_of_int (KernelSyms.sys_read + 0x38)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp38) in "Hpc".
+      assert (HS2a1 : S2 !!! Regidx Ra1 = v1) by (rewrite /S2 upd_eq; reflexivity).
       assert (HS2a2 : S2 !!! Regidx Ra2 = (mword_of_int (sys_rw_count v2) : mword 64))
         by (rewrite /S2 upd_ne; [exact HS1a2 | reg_neq]).
       assert (HS2s0 : S2 !!! Regidx Rs0 = sp0)
@@ -883,6 +887,8 @@ Section ProofSysRead.
       assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.sys_read + 0x38) : mword 64) 4
                       = mword_of_int (KernelSyms.sys_read + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3c) in "Hpc".
+      assert (HS3a1 : S3 !!! Regidx Ra1 = v1)
+        by (rewrite /S3 upd_ne; [exact HS2a1 | reg_neq]).
       assert (HS3a2 : S3 !!! Regidx Ra2 = (mword_of_int (sys_rw_count v2) : mword 64))
         by (rewrite /S3 upd_ne; [exact HS2a2 | reg_neq]).
       assert (HS3s0 : S3 !!! Regidx Rs0 = sp0)
@@ -909,6 +915,8 @@ Section ProofSysRead.
         by (rewrite /S4 upd_eq; reflexivity).
       assert (HS4a0 : S4 !!! Regidx Ra0 = fv).
       { rewrite /S4 upd_ne; [| reg_neq]. rewrite /S3 upd_eq. reflexivity. }
+      assert (HS4a1 : S4 !!! Regidx Ra1 = v1)
+        by (rewrite /S4 upd_ne; [exact HS3a1 | reg_neq]).
       assert (HS4a2 : S4 !!! Regidx Ra2 = (mword_of_int (sys_rw_count v2) : mword 64))
         by (rewrite /S4 upd_ne; [exact HS3a2 | reg_neq]).
       assert (HS4sp : S4 !!! Regidx csp_rs1 = pa_stk sp0 6)
@@ -940,9 +948,13 @@ Section ProofSysRead.
                    ltac:(apply not_elem_of_empty) Hlkk Hkk Hty
                    with "[Howe] Href Hauth") as "Howe".
       { rewrite (union_empty_r_L {[fd]}). iExact "Howe". }
+      (* the contract's window is at [v1], the syscall's own argument 1;
+         fileread's own [addr] IS [S4 !!! Regidx Ra1], and [HS4a1] is the
+         proof that this is [v1]. *)
+      iEval (rewrite HS4a1) in "Hcore".
       iDestruct (proc_priv_join γf pj pidv
                    (upd_usM (us_upt U P')
-                      (umem_wr (us_M U) (S4 !!! Regidx Ra1) dw bsw))
+                      (umem_wr (us_M U) v1 dw bsw))
                    with "[Hcore] [Howe]")
         as "Hpriv".
       { iExact "Hcore". }
@@ -978,10 +990,12 @@ Section ProofSysRead.
       iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mg rv P' with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").
+      iApply ("Hcont" $! mg rv P' dw bsw
+                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").
       { exact Hcsg. }
       { exact Hupt. }
       { right. exists fd, fv. split; [exact Hsome | exact Hrvok]. }
+      { exact Hdwle. }
       { exact Hmga0. }
   Qed.
 

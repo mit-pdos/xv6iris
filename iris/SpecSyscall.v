@@ -147,6 +147,63 @@ Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Import Defs.
 
+(* ===================================================================== *)
+(*  WHICH USER BYTES A SYSCALL CAN HAVE MOVED.                            *)
+(* ===================================================================== *)
+(* The dispatch hands back a fresh [U'] and, until this predicate, said
+   nothing whatever about the image inside it.  That is the [proc_pt_any]
+   smell one tier up -- a contract that cannot say what happened to the
+   process state -- and at THIS altitude the answer is a function of the
+   syscall NUMBER, which the ENTRY state already determines.
+
+   [sysc_num V] is the number the dispatch itself reads: [p->trapframe->a7],
+   trapframe word 21 = [tf_arg_idx 7], as a SIGNED 32-bit value because the C
+   reads it into an [int] and tests [num > 0 && num < NELEM(syscalls)].  The
+   [ld a5,168(s2)] at +0x16 and the [addiw a3,a5,0] at +0x1a are where that
+   reading comes from.
+
+   [sysc_window] names, for the four entries that write user memory through
+   copyout, WHICH ARGUMENT the write is based at -- and the argument is the
+   trapframe word itself, since argaddr does no more than return it.
+
+   WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NEVER AN IMAGE.  A
+   caller learns that nothing outside the run [arg .. arg+d) moved, which is
+   what it can act on ([UserPtTree.umem_wr_lookup_out]); which bytes landed
+   there is the ENTRY's own contract to say, and the console and pipe arms
+   cannot say it at all.
+
+   TWO ENTRIES MOVE THE ADDRESS SPACE ITSELF and a window is the wrong
+   shape for them.  [sbrk] gets the three arms its own contract has --
+   nothing, a zero-extension to the new size, or a deletion of the run above
+   it -- keyed to the size in the OUTGOING record; [exec] replaces the
+   address space outright and is unconstrained here, its image being
+   [SpecKexec]'s to pin. *)
+Definition sysc_num (V : pprivate) : Z :=
+  bv_signed (subrange_vec_dec (pv_tf V !!! tf_arg_idx 7) 31 0 : mword 32).
+
+Definition sysc_window (n : Z) : option nat :=
+  if decide (n = 3) then Some 0%nat        (* wait  -- int *status     *)
+  else if decide (n = 4) then Some 0%nat   (* pipe  -- int fd[2]       *)
+  else if decide (n = 5) then Some 1%nat   (* read  -- char *buf       *)
+  else if decide (n = 8) then Some 1%nat   (* fstat -- struct stat *st *)
+  else None.
+
+Definition sysc_sbrk_img (M M' : gmap Z (bv 8)) (szv' : mword 64) : Prop :=
+  M' = M
+  \/ M' = umem_grow M (uint szv')
+  \/ exists np : nat,
+       M' = umem_del M (uint (ProcPtOwn.pgroundup szv')) (4096 * np).
+
+Definition sysc_mem_ok (V V' : pprivate) (M M' : gmap Z (bv 8)) : Prop :=
+  if decide (sysc_num V = 7) then True                    (* exec *)
+  else if decide (sysc_num V = 12) then                   (* sbrk *)
+    sysc_sbrk_img M M' (pv_sz V')
+  else match sysc_window (sysc_num V) with
+       | Some i => exists (d : nat) (bs : nat -> bv 8),
+                     M' = umem_wr M (pv_tf V !!! tf_arg_idx i) d bs
+       | None   => M' = M
+       end.
+
 (* syscall's own frame is 4 slots; below it the deepest table entry, which is
    sys_exit at [K_sys_exit] = 4 + kexit's 74.  Written as an expression, not
    a literal, so a change to kexit's budget cannot silently leave this one
@@ -245,14 +302,19 @@ Definition wp_syscall_sconf_body
      out of the PERSISTENT [is_kstack] alone -- which is why this change
      stops here and reaches neither [SpecUsertrap] nor [SpecUservec]. *)
   (wp_next true pj (fun (CID : CpuId) =>
-    (* ...AND THE IMAGE MOVES.  The dispatch reaches entries that write user
-       memory (read/pipe/exec/sbrk), and at the [umem_own] representation
-       even a copyin can extend it (a fault backs a page), so the block
-       comes back at a FRESH image -- milestone J item 1's ∃-weakened
-       staging, exactly as every leaf contract in the copy cone binds it.
-       Which image it is (the buffer window read() filled) is win-2. *)
+    (* ...AND THE IMAGE MOVES, BY AN AMOUNT THE TABLE INDEX DETERMINES.
+       The dispatch reaches entries that write user memory (wait, pipe,
+       read, fstat through copyout; sbrk and exec through the address space
+       itself), and [sysc_mem_ok] below says which of those happened.  A
+       copyin's page fault is NOT one of them: at the lazy [proc_ptm] view
+       backing a page moves no byte ([SpecVmfault]), which is what lets the
+       sixteen remaining entries read [us_M U' = us_M U] on the nose. *)
     ∀ (mf : regfile) (U' : ustate),
       ⌜ callee_saved m mf ⌝ -∗
+      (* ...AND WHICH USER BYTES CAN HAVE MOVED, by table index -- see
+         [sysc_mem_ok] above.  Sixteen of the twenty-two entries touch no
+         user memory at all and this reads [us_M U' = us_M U] for them. *)
+      ⌜ sysc_mem_ok (us_V U) (us_V U') (us_M U) (us_M U') ⌝ -∗
       (* THE TRAPFRAME PAGE IS THE ONE THING THAT CANNOT MOVE.  Everything
          else in the record may: [pv_tf] always does (the a0 slot is the
          return value), and sbrk / exec / chdir / open move the rest. *)

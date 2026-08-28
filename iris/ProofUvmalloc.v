@@ -2712,39 +2712,6 @@ Section ProofUvmalloc.
               with "Hcg Hcnt Htext Hpc Hpt Henv Hk3 Hk5 Hk8 Hepi").
   Qed.
 
-  (* ...and the EXISTENTIAL-[M] corollary: every current caller speaks it,
-     and none of them cares what the new pages read as. *)
-  Lemma wp_uvmalloc_sconf
-      (γa : gname) (mm : regfile)
-      (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string)
-    : wp_uvmalloc_sconf_body γa mm P xperm K eb p b lks.
-  Proof.
-    cbv beta delta [wp_uvmalloc_sconf_body].
-    intros pcE oldsz newsz vpn0 n ret_tgt HK Htp Hroot Hxp Hxrng Hperm
-           Hobd Hnbd Hfr Hbelow.
-    iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hcont".
-    iEval (rewrite (proc_pt_ptm P (uint oldsz))) in "Hpt".
-    iDestruct "Hpt" as (Mv) "Hpt".
-    iApply (wp_uvmalloc_mem_sconf γa mm P Mv xperm K eb p b lks
-              HK Htp Hroot Hxp Hxrng Hperm Hobd Hnbd Hfr Hbelow
-              with "Hcg Hcnt Htext Hpc Hpt Henv").
-    rewrite /wp_next. iIntros (CIDx) "%Hsx".
-    iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; exact Hsx|].
-    iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpay".
-    iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpay]"); [exact Hcs |].
-    iDestruct "Hpay" as "[(%Hz & Hp) | Hs]".
-    - iLeft. iSplitR; [iPureIntro; exact Hz |].
-      iApply (proc_ptm_pt with "Hp").
-    - iRight. iDestruct "Hs" as (P' rsz) "(%Hx & %Hd & %Hl & %Hr & %Ha & Hp)".
-      iExists P'.
-      iSplitR; [iPureIntro; exact Hx |].
-      iSplitR; [iPureIntro; exact Hd |].
-      iSplitR; [iPureIntro; exact Hl |].
-      iSplitR.
-      { iPureIntro. rewrite Ha. exact Hr. }
-      iApply (proc_ptm_pt with "Hp").
-  Qed.
 
 End ProofUvmalloc.
 

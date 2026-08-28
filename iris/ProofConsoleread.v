@@ -262,12 +262,6 @@ Section CrBodies.
     cur = pa_add dst (Z.to_nat (n - nc))
     /\ umem_wrote Ment Mo dst (Z.to_nat (n - nc)).
 
-  Lemma cr_win_0 (Ment : gmap Z (bv 8)) (dst : mword 64) (n : Z) :
-    cr_win Ment Ment dst n.
-  Proof.
-    exists 0%nat. split; [apply Z.le_max_l | apply umem_wrote_0].
-  Qed.
-
   Lemma cr_win_of_run (Ment Mo : gmap Z (bv 8)) (dst cur : mword 64) (n nc : Z) :
     cr_run Ment Mo dst cur n nc -> (0 <= n - nc <= Z.max 0 n)%Z ->
     cr_win Ment Mo dst n.

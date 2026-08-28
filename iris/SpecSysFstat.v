@@ -49,9 +49,12 @@
      its non-nullity comes from the frame's own geometry
      ([StackOwn.stack_own_sp_nonzero]), not from an assumption.
 
-   * ARGADDR RUNS BEFORE ARGFD, and its result is never checked.  A bad
-     user address is filestat's (i.e. copyout's) problem, not this
-     function's -- copyout's contract is total in the destination.
+   * ARGADDR RUNS BEFORE ARGFD, and its result is never checked -- no
+     branch depends on it.  A bad user address is filestat's (i.e.
+     copyout's) problem, not this function's -- copyout's contract is
+     total in the destination.  Its word is still named ([v1]) below,
+     because the postcondition's window sits at it, not because this
+     function inspects it.
 
    ==== THE DESCRIPTOR ENVIRONMENT, AND WHY IT IS NOT A WAND ==============
 
@@ -98,7 +101,11 @@
    The process block comes back at an EXTENDED page table, filestat's
    [uptd_ext]; on the failure arm nothing ran and [P'] is [pv_upt V] itself
    ([ProcPtOwn.uptd_ext_refl]).  The descriptor array is UNCHANGED: sys_fstat
-   only borrows the reference and puts it straight back. *)
+   only borrows the reference and puts it straight back.
+
+   THE MEMORY IS A WINDOW AT [v1], filestat's own -- this contract carries
+   it through unweakened rather than restating it, since sys_fstat writes
+   nothing of its own.  See the [wp_next] comment below for the shape. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -191,7 +198,7 @@ Definition wp_sys_fstat_sconf_body
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (fn : fstat_names)                           (* the file system's ghosts *)
     (pidv : mword 32) (U : ustate)
-    (v : mword 64)                               (* syscall argument 0      *)
+    (v v1 : mword 64)                            (* syscall arguments 0, 1  *)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_fstat in
   let pj := proc_addr j in
@@ -201,11 +208,12 @@ Definition wp_sys_fstat_sconf_body
   γs !! j = Some γlp ->
   length γs = NPROC ->
   (* the two syscall arguments, out of the trapframe page [proc_priv]
-     carries.  Argument 1 (the stat buffer) is fetched but never inspected
-     here -- it goes straight to copyout, whose contract is total in the
-     destination -- so only argument 0's word has to be named. *)
+     carries.  Argument 1 (the stat buffer, [v1]) is fetched but never
+     inspected here -- it goes straight to copyout, whose contract is total
+     in the destination -- yet it IS named, because the postcondition's
+     window sits at it. *)
   pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
-  (exists v1 : mword 64, pv_tf (us_V U) !! tf_arg_idx 1 = Some v1) ->
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
   (* PARKING PREMISE (hart-generic scheduler protocol): filestat's ilock
      sleeps, so this syscall parks. *)
   eb = true ->
@@ -224,17 +232,28 @@ Definition wp_sys_fstat_sconf_body
      hart with interrupts off, so the crossing has nothing to do with SIE
      (SpecFilestat.v's note, and SpecSyscall.v's pinned index above). *)
   wp_next true pj (fun (CID : CpuId) =>
-    (* the image moves: the copy leaf may fault a page in, and copyout
-       writes user memory -- milestone J item 1's ∃-weakened staging *)
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
+    (* THE IMAGE MOVES, AND THE MOVE IS A WINDOW AT [v1].  sys_fstat's only
+       write to user memory is filestat's one copyout of the 24-byte stat
+       struct, so this contract's window is filestat's own, carried through
+       UNWEAKENED: the entry image with the run [v1 .. v1+d) overwritten and
+       nothing else touched.
+
+       WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE: a
+       prefix length [d <= 24] (copyout can fault part-way through the
+       struct) and the struct's BYTES [bs].  On the failure arm nothing
+       ran, so [d] is instantiated to [0] and the window is empty.  A
+       caller reads its own untouched bytes back with
+       [UserPtTree.umem_wr_lookup_out]. *)
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜sys_fstat_ret (us_V U) v r⌝ -∗
+      ⌜(d <= 24)%nat⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pidv (upd_usM (us_upt U P') M') -∗
+      proc_priv γf pj pidv (upd_usM (us_upt U P') (umem_wr (us_M U) v1 d bs)) -∗
       kalloc_env fsc_kalloc None -∗
       (* the file system, back.  filestat's own postcondition returns the
          superblock fraction and the slot unit; everything else in the bundle
@@ -253,7 +272,7 @@ Module Type SYSFSTAT.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fstat_names)
       (pidv : mword 32) (U : ustate)
-      (v : mword 64)
+      (v v1 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_sys_fstat_sconf_body γf γs j γlp fn pidv U v m av eb b lks.
+      wp_sys_fstat_sconf_body γf γs j γlp fn pidv U v v1 m av eb b lks.
 End SYSFSTAT.

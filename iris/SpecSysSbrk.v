@@ -98,12 +98,19 @@ Definition sbrk_eager (v1 : mword 64) : Prop :=
 (* ===================================================================== *)
 (*  WHAT sys_sbrk DID.                                                    *)
 (* ===================================================================== *)
+(* [M] / [M'] are threaded exactly as [growproc_ok]'s are: the EAGER arm
+   inherits growproc's own image equation, the LAZY arm states its own
+   (raising [p->sz] with the table untouched exposes exactly the newly-
+   readable zeros, [UserPtTree.umem_grow] -- the same move as growproc's
+   GREW arm, over a range the table never backs), and FAILED moves
+   nothing.  See [growproc_ok]'s header for why the lazy [proc_ptm] view
+   makes every one of these an equation. *)
 Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
-    (P' : uptd) (szv' r : mword 64) : Prop :=
+    (P' : uptd) (szv' r : mword 64) (M M' : gmap Z (bv 8)) : Prop :=
   (* FAILED -- and failure is total: neither half of the address space
      moved.  All three failure arms (growproc's, and the lazy path's
      TRAPFRAME test) return before writing anything. *)
-  (r = (mword_of_int (-1) : mword 64) /\ P' = pv_upt V /\ szv' = pv_sz V)
+  (r = (mword_of_int (-1) : mword 64) /\ P' = pv_upt V /\ szv' = pv_sz V /\ M' = M)
   \/
   (* SUCCEEDED -- the answer is the OLD size, which is sbrk's contract with
      userspace, and one of the two paths ran. *)
@@ -112,14 +119,17 @@ Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
         this is its own postcondition at a return value of 0. *)
      ( (sbrk_eager v1 \/ (sint (sbrk_arg v0) < 0)%Z) /\
        growproc_ok (pv_sz V) (sbrk_arg v0) (pv_upt V) P' szv'
-                   (mword_of_int 0 : mword 64) )
+                   (mword_of_int 0 : mword 64) M M' )
      \/
      (* LAZY: the size alone moves, the table does not, and the new size is
-        inside the user region.  vmfault backs the pages on demand. *)
+        inside the user region.  vmfault backs the pages on demand; at the
+        lazy view they are already zero in [M], which is what [umem_grow]
+        exposes. *)
      ( ~ sbrk_eager v1 /\ (0 <= sint (sbrk_arg v0))%Z /\
        P' = pv_upt V /\
        (uint (pv_sz V) + sint (sbrk_arg v0) <= uvm_maxsz)%Z /\
-       szv' = add_vec (pv_sz V) (sbrk_arg v0) ) )).
+       szv' = add_vec (pv_sz V) (sbrk_arg v0) /\
+       M' = umem_grow M (uint szv') ) )).
 
 Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
@@ -139,12 +149,12 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   proc_priv γf p pid U -∗
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
-    (* the image moves: the copy leaf may fault a page in, and copyout
-       writes user memory -- milestone J item 1's ∃-weakened staging *)
+    (* sys_sbrk's whole effect on user memory is [p->sz] moving, on either
+       path; see [sys_sbrk_ok]'s header. *)
   ∀ (mf : regfile) (P' : uptd) (szv' : mword 64) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       ⌜sys_sbrk_ok (us_V U) v0 v1 P' szv'
-         (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
+         (mf !!! Regidx (mword_of_int 10 : mword 5)) (us_M U) M'⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗

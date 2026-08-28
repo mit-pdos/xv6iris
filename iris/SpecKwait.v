@@ -95,7 +95,18 @@
    only thing kwait does to the caller's own address space is copyout's
    lazy faulting, so the post is [proc_priv] at [upd_upt V P'] with
    [uptd_ext_sz], exactly as fetchaddr's is.  On the three arms that never
-   call copyout, [P' = pv_upt V]. *)
+   call copyout, [P' = pv_upt V].
+
+   WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE.  The only
+   write kwait can make to user memory is copyout's: the found zombie's
+   four-byte [xstate] at [addr], and only when [addr <> 0].  The post
+   therefore carries [umem_wr (us_M U) addr d bs] for some [d <= 4] and some
+   [bs] -- [bs] cannot be pinned to the child's exit status here, because
+   nothing in the tree ties a pid to a private block ([fs-syscall-specs]
+   territory, not this contract's).  The [addr = 0] arm, the no-zombie-child
+   arm, and copyout's own failure prefix all move nothing: they instantiate
+   [d := 0], where [umem_wr M addr 0 bs = M] on the nose.  A caller reads its
+   own untouched bytes back with [UserPtTree.umem_wr_lookup_out]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -146,6 +157,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
   let pcE : mword 64 := mword_of_int KernelSyms.kwait in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  let addr := m !!! Regidx (mword_of_int 10 : mword 5) in
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (K_kwait <= av)%nat ->
@@ -169,16 +181,24 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
   (* the caller's own private block: copyout reads p->pagetable and p->sz *)
   proc_priv γf pj pid U -∗
   wp_next b pj (fun (CID : CpuId) =>
-    (* the image moves: the copy leaf may fault a page in, and copyout
-       writes user memory -- milestone J item 1's ∃-weakened staging *)
-    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (M' : gmap Z (bv 8)),
+    (* THE ONLY THING kwait WRITES IS THE FOUR-BYTE EXIT STATUS, AT [addr],
+       AND ONLY WHEN [addr <> 0].  [d] is the count copyout actually placed
+       ([d = 0] on the [addr = 0] arm, on the no-zombie-child arm, and on
+       copyout's own failure prefix; [d <= 4] on the success arm, where
+       [sizeof(pp->xstate) = 4]).  [bs] is left existential because nothing
+       in the tree ties a pid to the private exit-status word a zombie
+       carried -- that is a [fs-syscall-specs]-tier claim, not this one's.
+       A caller reads its own untouched bytes back with
+       [UserPtTree.umem_wr_lookup_out]. *)
+    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (bs : nat -> bv 8),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
+      ⌜ (d <= 4)%nat ⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pid (upd_usM (us_upt U P') M') -∗
+      proc_priv γf pj pid (upd_usM (us_upt U P') (umem_wr (us_M U) addr d bs)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

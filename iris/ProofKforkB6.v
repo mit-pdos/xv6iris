@@ -983,22 +983,30 @@ Section KforkPrologue.
       iDestruct (KvmSpec.kalloc_env_at_env with "Henv'") as "#Henvb".
       (* THE PARENT IS READ-ONLY, AND ITS IMAGE IS NAMED THROUGH THE CALL --
          which is what lets [SpecKfork] keep "the parent comes back
-         verbatim".  Only the CHILD's table goes in ∃-weakened: uvmcopy
-         fills it, so what comes back is a new image either way. *)
-      (* the parent's memory conjunct is the block's LAZY view; uvmcopy's
-         public contract is at the MAPPED one and hands it back verbatim, so
-         the crossing is the BORROW ([ProcPtOwn.proc_ptm_acc_pt]) and the
-         parent's own image survives it. *)
-      iDestruct (proc_ptm_acc_pt with "HPpt") as (MPp) "[HPpt HPback]".
+         verbatim".  The [_mem] contract's parent side is already the
+         block's own LAZY view (no borrow needed: it hands the same
+         [proc_ptm] back verbatim, at the same index, so [HPpt] survives
+         the call unchanged).  The CHILD's table goes in at the size
+         uvmcopy is about to copy -- [pv_sz Up], not the child's own
+         (zero) size -- because the [_mem] contract's one added premise
+         asks that the copied region be live in BOTH tables; [proc_pt_ptm]
+         holds at every size, so widening the empty child's view costs
+         nothing, and the child's bytes outside the run don't exist yet
+         either way. *)
       iDestruct (proc_ptm_pt with "HCpt") as "HCpt".
-      iApply (Uvmcopy.wp_uvmcopy_sconf fsc_kalloc N5p (pv_upt (us_V Up)) (pv_upt Vc) MPp (trap_res b + K1)%nat eb pme (S lvl) false
+      iDestruct (proc_pt_any_ptm (pv_upt Vc) (uint (pv_sz (us_V Up)))
+                   with "HCpt") as (MC0) "HCpt".
+      iApply (Uvmcopy.wp_uvmcopy_mem_sconf fsc_kalloc N5p (pv_upt (us_V Up)) (pv_upt Vc)
+                (uint (pv_sz (us_V Up))) (uint (pv_sz (us_V Up))) (us_M Up) MC0
+                (trap_res b + K1)%nat eb pme (S lvl) false
                 ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) HN5ptp HN5pa0 HN5pa1 HszbP
                 ltac:(intros i _; rewrite HCempty; apply lookup_empty)
+                ltac:(rewrite HN5pa2 (uvm_np_live (pv_sz (us_V Up)));
+                      intros a Ha; unfold uva_live; lia)
                 with "Hcg Hcpu Htext Hpc HPpt HCpt Henvb").
       all: try lkbelow.
       iIntros (CID19 Hs19 mf9) "Hcg Hcpu Hpc %HcsD HPpt Hpost9".
-      iDestruct ("HPback" with "HPpt") as "HPpt".
       assert (Hpc2c : ret_pc (N5p !!! Regidx Rra) = mword_of_int (KF + 0x2c))
         by (rewrite HN5pra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc2c) in "Hpc".
@@ -1046,6 +1054,11 @@ Section KforkPrologue.
         iDestruct ("HPwand" $! (pv_upt (us_V Up)) (pv_sz (us_V Up)) (pv_tf (us_V Up)) (us_M Up)
                      with "[%] [%] [%] [%] HPsz HPpg HPpt HPtf HPtfpg") as "HPpriv".
         { reflexivity. } { reflexivity. } { exact HszbP. } { exact HbelP. }
+        (* uvmcopy failed: the child's table is exactly what it was handed,
+           at the size the call was opened at (the parent's); [HCwand]
+           wants it back at the child's OWN (still zero) size -- [np->sz]
+           was never stored to on this path -- so re-view it there. *)
+        iDestruct (proc_ptm_pt with "HCpt") as "HCpt".
         iDestruct (proc_pt_any_ptm with "HCpt") as (MCo) "HCpt".
         iDestruct ("HCwand" $! (pv_upt Vc) (pv_sz Vc) (pv_tf Vc) MCo
                      with "[%] [%] [%] [%] HCsz HCpg HCpt HCtf HCtfpg") as "HCpriv".
@@ -1310,8 +1323,15 @@ Section KforkPrologue.
         iDestruct ("HPwand" $! (pv_upt (us_V Up)) (pv_sz (us_V Up)) (pv_tf (us_V Up)) (us_M Up)
                      with "[%] [%] [%] [%] HPsz HPpg HPpt HPtf HPtfpg") as "HPpriv".
         { reflexivity. } { reflexivity. } { exact HszbP. } { exact HbelP. }
-        (* the child's image is the ∃-weakened one uvmcopy filled *)
-        iDestruct (proc_pt_any_ptm with "HCpt") as (MCs) "HCpt".
+        (* the child's image is now PRECISE: uvmcopy filled it with the
+           parent's bytes over the copied run, on the nose (the [_mem]
+           contract's [umem_write Mnew 0 (4096*n) (Mold !!! .)]).  The
+           call was opened at exactly the size [np->sz] is about to
+           become, so [HCwand] closes on it directly -- no re-view.  Only
+           the NAME [MCs] is existential here, not the image itself. *)
+        iAssert (∃ Mc : gmap Z (bv 8), proc_ptm P' (uint (pv_sz (us_V Up))) Mc)%I
+          with "[HCpt]" as (MCs) "HCpt".
+        { iExists _. iFrame "HCpt". }
         iDestruct ("HCwand" $! P' (pv_sz (us_V Up)) (pv_tf Vc) MCs
                      with "[%] [%] [%] [%] HCsz HCpg HCpt HCtf HCtfpg") as "HCpriv".
         { exact Hroot2. } { exact Htf2. } { exact HszbP. } { exact HbelC'. }

@@ -72,11 +72,14 @@
 
    WHAT THIS CONTRACT DOES NOT SAY, and why:
 
-   * NOTHING ABOUT THE USER'S ARRAY.  [SpecCopyout] deliberately does not
-     record what the user pages end up holding ([proc_pt] owns them with
-     existential contents), so no resource here could carry "fdarray[0] =
-     fd0".  Stating it needs a contents-indexed refinement of [proc_pt]; the
-     limitation is copyout's, not sys_pipe's.
+   * NOT WHICH BYTES LAND AT [fdarray].  The postcondition names the WINDOW
+     precisely ([UserPtTree.umem_wr] at [v], length [d <= 8]) but leaves the
+     bytes [bs] existential, so no resource here reads as "fdarray[0] =
+     fd0" -- even though [SpecCopyout.wp_copyout_sconf_mem]'s own contract
+     could support pinning [bs] to the little-endian encoding of [fd0] /
+     [fd1].  That is a strictly stronger statement than any other syscall
+     in this tree carries and is left to whoever wants it
+     (SpecFilestat.v's note, on the same choice).
    * NOTHING ABOUT THE DESCRIPTORS' CONTENTS.  The two [file_ref]s land
      inside [proc_priv], and [ProcInv.ofile_slot] quantifies the [fcontent]
      existentially -- so the post can say descriptor [fd0] names ftable slot
@@ -258,17 +261,29 @@ Definition wp_sys_pipe_sconf_body
      sys_pipe can return on another hart.  The cost is the CALLER's: it must
      supply its continuation hart-generically. *)
   wp_next true p (fun (CID : CpuId) =>
-  (* the image moves: the copies fault user pages in and write them --
-     milestone J item 1's ∃-weakened staging *)
-    ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
+  (* THE IMAGE MOVES, AND THE MOVE IS A WINDOW AT [v].  sys_pipe's only
+     writes to user memory are its two copyouts, of [fd0] at [v] and [fd1]
+     at [v+4], and the two runs are ADJACENT ([UserPtTree.umem_wr_app]), so
+     the pair composes into ONE window: the entry image with the run
+     [v .. v+d) overwritten and nothing else touched.
+
+     WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE: a
+     prefix length [d <= 8] (either copyout can fault part-way) and the
+     BYTES [bs].  On the two early failure arms (pipealloc / fdalloc)
+     neither copyout ran, so [d] is instantiated to [0]; if the first
+     copyout fails, [d] is its own prefix (<= 4); if only the second does,
+     [d] is [4] plus its prefix.  A caller reads its own untouched bytes
+     back with [UserPtTree.umem_wr_lookup_out]. *)
+    ∀ (mf : regfile) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜(d <= 8)%nat⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
-      sys_pipe_post γf p pid (upd_usM (us_upt U P') M')
+      sys_pipe_post γf p pid (upd_usM (us_upt U P') (umem_wr (us_M U) v d bs))
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       iref_slot -∗
       (* the environment back; the page count has moved if either close was

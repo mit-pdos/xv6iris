@@ -29,10 +29,12 @@ at the sanctioned 13 assumptions, tracked dumps unchanged):
   `destruct (decide …)`) and `USyncKernel.sync_uexec_slot` (sync's
   entry deposit; `uv_cap` is its one assumption) are IN THE TREE with
   no kernel consumer yet.
-- The `proc_pt_any` ELIMINATION CAMPAIGN is through tier 3 (see the
-  DAG in §2): 157 → 129 occurrences; readers-into-user-memory state
-  the `umem_wr` window as an EQUATION, writers-from-user-memory are
-  same-`M`.
+- The `proc_pt_any` ELIMINATION CAMPAIGN is through tiers 0–6 (§2).
+  EVERY CONTRACT in the tree is now precise or honestly ∃: readers
+  into user memory state the `umem_wr` window as an equation, writers
+  from user memory are same-`M`, sbrk/growproc are equations on the
+  image at every arm, and all five ∃-twins are GONE.  What is left is
+  tier 7, the kill, in §2's own checkpoint sequence.
 
 ## §0 Operating rules (hard-won; violating these cost real time)
 
@@ -79,7 +81,7 @@ phase splits and table-moving specs are keyed on it.  `uvis_tf` keeps
 the full 36-word list (kernel words 0/1/2/4 are dead weight in the
 key; epc, word 3, is user-visible); a later refinement may restrict.
 
-## §2 The `proc_pt_any` elimination campaign (owner-ruled), tiers 4–7
+## §2 The `proc_pt_any` elimination campaign (owner-ruled), tier 7
 
 `proc_pt_any` is a spec smell — a contract holding it cannot say what
 happens to the process state.  Bottom-up conversion (callees first),
@@ -88,45 +90,65 @@ image (`umem_wr`/`umem_grow`/shrunk view); "same-M" = caller's image
 back; "GENUINE ∃" = the function really replaces the address space,
 inlined `∃ M, proc_pt P M` at the very end.
 
-**DONE: tiers 0–3.**  Deleted so far: copyinstr's ∃-twin,
-`wp_copyin_sconf`(+body+proof), `wp_vmfault_sconf`,
-`wp_uvmunmap_sconf` (+`BarePt.uptg_proc_pt`),
-`either_copyout_post_any`.  Landed shapes to imitate:
-`either_copyout_post` (window equation, `nat` prefix existential on
-failure only), readi's post (NO existential — the failure arm's count
-re-instantiated to cover the partial chunk), device-sourced bytes as a
-length + byte FUNCTION (`d : nat`, `bs : nat -> bv 8`), never a gmap.
-Remaining `wp_copyout_sconf` (∃-twin) callers: `ProofSysPipe` ×2,
-`ProofKwait` ×1 (tier 4), `ProofKexecC` ×2 (tier 5).  Remaining
-`_mem`-less leaves: `uvmclear` (tier 5 writes it; same-M — clearing
-PTE_U moves neither domain nor PPN, the `uva_*_set_same` algebra is
-the recipe), `proc_freepagetable` (tier 7; callers give the table
-away, the honest form may stay ∃).
+**DONE: tiers 0–6.**  Every ∃-twin in the tree is deleted —
+copyinstr's, `wp_copyin_sconf`, `wp_vmfault_sconf`,
+`wp_uvmunmap_sconf` (+`BarePt.uptg_proc_pt`), `either_copyout_post_any`,
+and then `wp_copyout_sconf`, `wp_uvmalloc_sconf`,
+`wp_uvmdealloc_sconf`, `wp_uvmclear_sconf`, `wp_uvmcopy_sconf` (with
+`ProofUvmcopy`'s ~90-line private `uc_*` bridge, which existed only to
+prove one of them).  The caller-less companions are gone too
+(`umem_wrote_of`, `cr_win_0`, `ProcPtOwn.proc_pt_page_acc_vmfault`).
 
-**TIER 4 — syscall dispatch (unblocked, next after §1):**
-`SpecSysRead`/`SysFstat` inherit the `∀ d bs` window (their proofs
-already re-form the block at `umem_wr (us_M U) (S4 !!! Ra1) dw bsw`);
-`SpecSysWrite` drops `∀ M'`; `ProofSysPipe` ×2 + `ProofKwait` ×1 move
-to `wp_copyout_sconf_mem`; `SpecSysSbrk`/`SpecGrowproc`+proofs become
-PRECISE at `umem_grow` (uvmalloc/uvmdealloc `_mem` forms exist);
-`SpecSysWait`/`SpecKwait`; capstone: `wp_syscall_sconf` re-keyed so
-the dispatcher's post threads each arm's own effect.
-**TIER 5 — exec cone:** first `SpecUvmclear`'s `_mem` form; then
-ProofKexecB2/B3/C/D/Seam/Tail re-spell their crossings; kexec's post
-is honestly ∃ for now — its PRECISE form (image = the loaded
-segments) is also the future exec-deposit prerequisite for
-sync-linking, so consider doing it precisely here.
-**TIER 6:** `ProofUservec.wp_uservec_pt` (1 occurrence).
-**TIER 7 — residue crossings, then the kill:**
-`ut_res_pt_open/close` family (7 across
-SpecUsertrap/ProofUsertrap/UtResFits/UsertrapRes),
-`SpecFreeproc.fp_pt` + dormant ZOMBIE arms,
-`ProofKforkParts.kfk_of_priv`, `ProofKforkB6.kfk_prologue`, `BarePt`,
-`proc_freepagetable` — each becomes an inline `∃ M, proc_pt P M` at
-its own site; FINALLY delete `proc_pt_any`/`proc_pt_at_any` and their
-~22-lemma family in `ProcPtOwn` (re-base survivors on `proc_ptm`).
-**Loose ends:** `umem_wrote_of`, `cr_win_0` (unused 2-line API
-companions), `ProcPtOwn.proc_pt_page_acc_vmfault` (caller-less).
+Landed shapes to imitate: `either_copyout_post` (window equation,
+`nat` prefix existential on failure only), readi's post (NO existential
+— the failure arm's count re-instantiated to cover the partial chunk),
+device-sourced bytes as a length + byte FUNCTION (`d : nat`,
+`bs : nat -> bv 8`), never a gmap.
+
+**The syscall layer, as landed.**  `sys_read`/`sys_fstat` inherit their
+callee's WINDOW at the syscall's own buffer argument (which is now a
+NAMED parameter of the contract, not merely assumed to exist);
+`sys_write` is same-`M`; `sys_pipe` composes its two 4-byte copyouts
+into one `d <= 8` window at the fd array (`umem_wr_app`, adjacent runs);
+`kwait`/`sys_wait` state a `d <= 4` window at the status pointer, with
+`d = 0` on the null-pointer and no-child arms; `growproc_ok` and
+`sys_sbrk_ok` gained `(M M' : gmap Z (bv 8))` and pin the image on
+EVERY arm (`umem_grow` on a grow, `umem_del` on a shrink, unchanged on
+failure and `n = 0`).  The lazy path needed a primitive nothing in the
+tree had — grow the lazy view by SIZE ALONE, table standing still —
+now `ProcPtOwn.umem_lazy_grow_sz` / `proc_ptm_grow_sz` over
+`UserPtTree.pgroundup_mono` / `uva_live_mono`.
+
+**The capstone, as landed.**  `SpecSyscall.sysc_mem_ok V V' M M'` says
+WHICH USER BYTES a syscall can have moved, keyed by `sysc_num V` (the
+a7 word, trapframe index `tf_arg_idx 7`, read signed at 32 bits exactly
+as the C does).  `sysc_window` is the table of the four copyout entries
+and the argument each bases its window at (wait→0, pipe→0, read→1,
+fstat→1); sbrk gets `sysc_sbrk_img`'s three arms; exec is
+unconstrained, its image being `SpecKexec`'s to pin; the other sixteen
+read `M' = M`.  It rides `sysc_hcont_ty` / `sysc_epilogue_tail` /
+`sysc_ret_tail` as a pure premise, and `sysc_arm_goal` gained
+`sysc_num (us_V U) = Z.of_nat k` so an arm can select its own branch.
+Three discharge lemmas serve all 22 arms: `sysc_mem_ok_quiet`,
+`sysc_mem_ok_window` (over the table, so one lemma covers all four
+windows) and `sysc_mem_ok_sbrk`.
+
+**TIER 7 — the kill, in three GREEN CHECKPOINTS** (owner-ruled: go to
+the full kill, but gate each stage).  ① is landed.
+
+- ① **the ∃-twins and the precise contracts** — above.
+- ② **contracts stop reading at a named ∃.**  Nine occurrences in five
+  files, every one honestly existential: `SpecFreeproc.fp_pt`,
+  `SpecKexecB2` ×2, `SpecProcFreepagetable`, `SpecUsertrap`'s
+  `ut_res_pt_open`/`_close` pair, and `ProcDefs`' two dormant-ZOMBIE
+  arms.  Each becomes an inline `∃ M, proc_pt P M` at its own site.
+- ③ **the kill.**  The ~65 remaining proof-internal occurrences
+  (`proc_pt_any_ptm` / `_wf_get` steps in the kexec and uvm cones, the
+  trap residue, `BarePt`, `ProofKforkParts`), then delete
+  `proc_pt_any` / `proc_pt_at_any` and re-base the ~15-lemma family in
+  `ProcPtOwn` on `proc_ptm`.  **Owner's guardrail: if a survivor turns
+  out to be the same lemma under a new spelling, and most of the family
+  does, STOP AND REPORT the tally rather than churn through it.**
 
 **Conversion idioms (the campaign's learned rules):**
 1. A leaf's `_mem` form is the PRIMITIVE; its `proc_pt_any` form is a
@@ -146,6 +168,13 @@ companions), `ProcPtOwn.proc_pt_page_acc_vmfault` (caller-less).
 4. When a writer's post already carries a count, spend the failure
    arm's existential by RE-INSTANTIATING that count (readi), not by
    adding a second one.
+5. OPEN THE ∃ AT THE CALLEE'S OWN UNREDUCED SIZE TERM.  A `_mem` leaf
+   states its index as a `let` over its own register file (copyout's
+   `uint szv`, uvmalloc's `uint (mm !!! Ra1)`); opening `proc_pt_any` at
+   a size that is only PROPOSITIONALLY equal to it (`pgroundup szv`,
+   tied by a hypothesis) fails `iSpecialize` with idiom 2's tell.
+   `proc_pt_ptm` holds at EVERY `sz`, so the index is free — pick the
+   callee's own term and the unification is definitional.
 
 ## §3 After the campaign: the road to a verified process in SystemAdequacy
 

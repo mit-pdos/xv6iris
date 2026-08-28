@@ -221,9 +221,13 @@ Definition wp_sys_write_sconf_body
   ConsoleInv.devsw_table -∗
   (* THE CROSSING IS THE LITERAL [true]: filewrite parks. *)
   wp_next true pj (fun (CID : CpuId) =>
-  (* the image moves: the copy leaves may fault a page in, and copyout
-     writes user memory -- milestone J item 1's ∃-weakened staging *)
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
+  (* write() does not write user memory -- filewrite only READS the user
+     source ([SpecFilewrite.wp_filewrite_sconf]'s post is already SAME-M --
+     no [upd_usM] at all), so this contract hands the image back on the
+     nose.  The page table may still have GROWN: a copyin can fault a page
+     in on the way to reading the source bytes, which is exactly what [P']
+     and [uptd_ext] are for. *)
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜sys_write_ret (us_V U) v (sys_rw_count v2) r⌝ -∗
@@ -231,7 +235,7 @@ Definition wp_sys_write_sconf_body
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pidv (upd_usM (us_upt U P') M') -∗
+      proc_priv γf pj pidv (us_upt U P') -∗
       kalloc_env fsc_kalloc None -∗
       (* the file system, back *)
       filewrite_fs_out fn -∗

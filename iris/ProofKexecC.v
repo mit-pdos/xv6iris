@@ -823,7 +823,14 @@ Section KexecCSetup.
       by (apply (um_covered_pground szv P.(ud_um) Hmaxszv Hcov)).
     assert (Hbelow_pground : um_below (pgroundup szv) P.(ud_um))
       by (apply (um_below_mono szv (pgroundup szv) P.(ud_um) Hpground_ge Hbelow)).
-    iApply (Uvmalloc.wp_uvmalloc_sconf fsc_kalloc Y P 4 (K - 68)%nat eb
+    (* ---- uvmalloc's [_mem] contract wants the memory view at [oldsz],   *)
+    (* which its statement computes as [Y !!! Ra1] -- open at THAT term    *)
+    (* (not the propositionally-equal [pgroundup szv]) so it unifies with  *)
+    (* the callee's own [let] on the nose.  Fold back once the call        *)
+    (* returns -- kexec's own image stays honestly existential, so nothing *)
+    (* past the adapter below reads [M0] itself. ---- *)
+    iDestruct (proc_pt_any_ptm P (uint (Y !!! Regidx Ra1)) with "Hpt") as (M0) "Hpt".
+    iApply (Uvmalloc.wp_uvmalloc_mem_sconf fsc_kalloc Y P M0 4 (K - 68)%nat eb
               (proc_addr jp) eb ∅ ltac:(lia) HYtp HYa0 HYa3
               ltac:(lia) uvm_perm_ok_22
               ltac:(rewrite HYa1 uint_unsigned; exact Hmaxpground)
@@ -855,6 +862,9 @@ Section KexecCSetup.
       exact HYs11. }
     iDestruct "Hpost" as "[(%HMua0 & Hptback) | Hsucc]".
     - (* ==================== FAILURE: uvmalloc returned 0 ==================== *)
+      (* the rolled-back view is the one uvmalloc was handed; fold it back
+         to the ∃-weakened tier, the shape [kxc_bad_1d6] still wants. *)
+      iDestruct (proc_ptm_pt with "Hptback") as "Hptback".
       (* ---- +0x1d2: c.mv s4,a0 (dead on this arm -- overwritten below by  *)
       (* the tail's own reload -- but the instruction still executes.) ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KXC + 0x1d2)) Rs2 Ra0
@@ -945,7 +955,20 @@ Section KexecCSetup.
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc Hptback Hka Hbm Hins Hpriv
                       Hpath Hargv Hargs Hbs Hirs Hframeat Hcont").
     - (* ==================== SUCCESS: uvmalloc returned newsz ==================== *)
-      iDestruct "Hsucc" as (P') "(%Hext & %Hdomeq & %Hleaf & %HMua0c & Hptnew)".
+      iDestruct "Hsucc" as (P' rsz) "(%Hext & %Hdomeq & %Hleaf & %Hrszc & %Hrszeq & Hptnew)".
+      (* the [_mem] contract splits the old [HMua0c] disjunction (which case,
+         pinning [rsz]) from the register equation ([Hrszeq]); recombine
+         them into the shape the rest of this block already speaks, and
+         fold [Hptnew] back to the ∃-weakened tier -- nothing below this
+         adapter reads the grown view itself. *)
+      assert (HMua0c : ((uint (Y !!! Regidx Ra2) < uint (Y !!! Regidx Ra1))%Z /\
+                        Mu !!! Regidx Ra0 = Y !!! Regidx Ra1)
+                       \/ ((uint (Y !!! Regidx Ra1) <= uint (Y !!! Regidx Ra2))%Z /\
+                           Mu !!! Regidx Ra0 = Y !!! Regidx Ra2)).
+      { destruct Hrszc as [[Hlt Heq] | [Hle Heq]].
+        - left. split; [exact Hlt | rewrite Hrszeq; exact Heq].
+        - right. split; [exact Hle | rewrite Hrszeq; exact Heq]. }
+      iDestruct (proc_ptm_pt with "Hptnew") as "Hptnew".
       (* ---- newsz = PGROUNDUP(szv) + 8192 never wraps and always exceeds  *)
       (* oldsz, which both resolves [HMua0c]'s disjunction (ruling out the  *)
       (* "shrink" arm) and gives the [a0 <> 0] the branch test needs. ---- *)
@@ -1171,7 +1194,13 @@ Section KexecCSetup.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID15 CID22 eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-      iApply (Uvmclear.wp_uvmclear_sconf Z1 P' (uvm_pte (Z.lor 4 18) rleaf)
+      (* uvmclear's [_mem] contract is same-[M] at ANY size index -- clearing
+         PTE_U moves neither the domain nor a page's ppn, so the choice of
+         [sz] below is free; [uint sz1] is what is already in scope. Open
+         the ∃-weakened table to it and fold back once the call returns. *)
+      iDestruct (proc_pt_any_ptm P' (uint sz1) with "Hptnew") as (Muc) "Hptnew".
+      iApply (Uvmclear.wp_uvmclear_mem_sconf Z1 P' (uint sz1) Muc
+                (uvm_pte (Z.lor 4 18) rleaf)
                 (K - 68)%nat eb (proc_addr jp)
                 ltac:(lia) ltac:(rewrite Hroot'; exact HZ1a0)
                 ltac:(rewrite HZ1a1 uint_unsigned; rewrite uvm_maxsz_lit in Hmaxpground;
@@ -1182,6 +1211,7 @@ Section KexecCSetup.
                 ltac:(rewrite HZ1a1; exact Hleafeq) Hpermok
                 with "Hcg Htext Hpc Hptnew").
       iIntros (CID23 Hs23 Z2) "Hcg Hpc %Hcsz2 Hptcl".
+      iDestruct (proc_ptm_pt with "Hptcl") as "Hptcl".
       assert (Hpc200 : ret_pc (Z1 !!! Regidx Rra) = mword_of_int (KXC + 0x200))
         by (rewrite HZ1ra; pcw).
       iEval (rewrite Hpc200) in "Hpc".
@@ -3092,14 +3122,24 @@ Section KexecCLoop.
       iDestruct "Hargc" as "[Hargc1 Hargc2]".
       iDestruct (cpu_own_transport CID0 CID18 0%nat eb (proc_addr jp) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (Copyout.wp_copyout_sconf KT0 fsc_kalloc Z2 P sz1 (S (alen c)) (afun c) dqas
+      (* copyout's [_mem] contract needs the memory view at [sz1]; open the
+         ∃-weakened table to it, and fold back once the call returns -- the
+         [M'] half of [copyout_wrote] is discarded, kexec is building a NEW
+         address space and its own contract stays honestly existential in
+         the image. *)
+      iDestruct (proc_pt_any_ptm P (uint sz1) with "Hpt") as (M0) "Hpt".
+      iApply (Copyout.wp_copyout_sconf_mem KT0 fsc_kalloc Z2 P M0 sz1 (S (alen c)) (afun c) dqas
                 (K - 68)%nat 0%nat eb (proc_addr jp) eb ∅
                 ltac:(lia) HZ2a0 HZ2a1
                 ltac:(rewrite HZ2a4; f_equal; lia)
                 ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)
                 Hsz1max38 ltac:(lia) (locks_below_empty _)
                 with "Hcg Hcnt Htext Hpc Hpt Hka Hargc1").
-      iIntros (CID19 Hs19 T13 Pfinal2) "Hcg Hcnt Hpc Hpt Hargc1 %Hcs2 %Hextsz %Hco_res".
+      iIntros (CID19 Hs19 T13 Pfinal2 M0') "Hcg Hcnt Hpc Hpt Hargc1 %Hcs2 %Hextsz %Hco_wrote".
+      iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
+      assert (Hco_res : T13 !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
+                        \/ T13 !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)).
+      { destruct Hco_wrote as [[Ha0 _] | [Ha0 _]]; [left | right]; exact Ha0. }
       iCombine "Hargc1 Hargc2" as "Hargc".
       iEval (rewrite -big_sepL_app -Hsplit) in "Hargc".
       (* ---- the page table: [uptd_ext_sz] transports [um_below]/[um_covered]
@@ -4735,14 +4775,24 @@ Section KexecCClose.
         change (2 ^ 38)%Z with 274877906944%Z. lia. }
       iDestruct (cpu_own_transport CID0 CID15 0%nat eb (proc_addr jp) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (Copyout.wp_copyout_sconf KT1 fsc_kalloc X12 P sz1 (8 * S c)%nat ufun (DfracOwn 1)
+      (* copyout's [_mem] contract needs the memory view at [sz1]; open the
+         ∃-weakened table to it, and fold back once the call returns -- the
+         [M'] half of [copyout_wrote] is discarded, kexec is building a NEW
+         address space and its own contract stays honestly existential in
+         the image. *)
+      iDestruct (proc_pt_any_ptm P (uint sz1) with "Hpt") as (M0) "Hpt".
+      iApply (Copyout.wp_copyout_sconf_mem KT1 fsc_kalloc X12 P M0 sz1 (8 * S c)%nat ufun (DfracOwn 1)
                 (K - 68)%nat 0%nat eb (proc_addr jp) eb ∅
                 ltac:(lia) HX12a0 HX12a1
                 ltac:(rewrite HX12a4; f_equal; lia)
                 ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)
                 Hsz1max38 ltac:(lia) (locks_below_empty _)
                 with "Hcg Hcnt Htext Hpc Hpt Hka Hubytes").
-      iIntros (CID16 Hs16c X13 P2) "Hcg Hcnt Hpc Hpt Hubytes %Hcs %Hextsz %Hco_res".
+      iIntros (CID16 Hs16c X13 P2 M0') "Hcg Hcnt Hpc Hpt Hubytes %Hcs %Hextsz %Hco_wrote".
+      iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
+      assert (Hco_res : X13 !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
+                        \/ X13 !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)).
+      { destruct Hco_wrote as [[Ha0 _] | [Ha0 _]]; [left | right]; exact Ha0. }
       iEval (rewrite HX12a3) in "Hubytes".
       (* the page table moved; the invariant travels by name *)
       assert (Hext2 : uptd_ext P P2) by (eapply uptd_ext_sz_ext; exact Hextsz).

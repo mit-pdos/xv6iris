@@ -10,9 +10,12 @@
        return newsz;
      }
 
-   STATED AT THE [proc_pt] ALTITUDE, over uvmunmap's contract: the user map
-   loses the run of [uvmd_np oldsz newsz] vpns starting at PGROUNDUP(newsz),
-   and their pages go back to kalloc.
+   STATED AT THE MEMORY-INDEXED [proc_ptm] ALTITUDE, and at that one only,
+   over uvmunmap's contract: the user map loses the run of
+   [uvmd_np oldsz newsz] vpns starting at PGROUNDUP(newsz), their pages go
+   back to kalloc, and the process's view loses exactly those bytes
+   ([umem_del]).  The ∃-[M] corollary this file used to carry beside it is
+   gone -- every caller names the image it hands in.
 
    ONE POSTCONDITION, TWO ARMS.  The two C branches differ only in what they
    RETURN; both leave the table at [uptd_del_run P (svpn_of (pgroundup
@@ -49,44 +52,6 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
-
-Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile)
-    (P : uptd) (K : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.uvmdealloc in
-  let oldsz := mm !!! Regidx (mword_of_int 11) in
-  let newsz := mm !!! Regidx (mword_of_int 12) in
-  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-  (* 4-slot frame + uvmunmap's 22 *)
-  (26 <= K)%nat ->
-  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
-  (* the OLD size names a page inside the user region.  Nothing is asked of
-     [newsz]: on the arm where it matters it is below [oldsz] and so inherits
-     this bound, and on the arm where it does not, [uvmd_np]'s guard makes
-     the run empty -- which is what lets growproc call this at the wrapped
-     [sz + n] an [sbrk] with a big negative argument computes. *)
-  (uint oldsz <= uvm_maxsz)%Z ->
-  (* order premise at the lowest rank this cone reaches. *)
-  locks_below lks "kmem" ->
-  sie_cap_gpr KT1 mm K b p -∗
-  cpu_own 0%nat eb p b lks -∗
-  kernel_text -∗
-  pc_is pcE -∗
-  proc_pt_any P -∗
-  kalloc_env γa None -∗
-  wp_next b p (fun (CID : CpuId) =>
-    ∀ (mr : regfile),
-    sie_cap_gpr KT1 mr K b p -∗
-    cpu_own 0%nat eb p b lks -∗
-    pc_is ret_tgt -∗
-    ⌜callee_saved mm mr⌝ -∗
-    ⌜ ((uint newsz >= uint oldsz)%Z /\
-        mr !!! Regidx (mword_of_int 10) = oldsz)
-      \/ ((uint newsz < uint oldsz)%Z /\
-          mr !!! Regidx (mword_of_int 10) = newsz) ⌝ -∗
-    proc_pt_any (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)) -∗
-    WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
 
 (* ===================================================================== *)
 (*  THE MEMORY-INDEXED CONTRACT.                                          *)
@@ -139,9 +104,4 @@ Module Type UVMDEALLOC.
       (P : uptd) (M : gmap Z (bv 8)) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),
       wp_uvmdealloc_mem_sconf_body γa mm P M K eb p b lks.
-  Parameter wp_uvmdealloc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile)
-      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_uvmdealloc_sconf_body γa mm P K eb p b lks.
 End UVMDEALLOC.

@@ -1165,28 +1165,6 @@ Section ProofUvmdealloc.
     { iExists _. iExact "Hgap". }
   Qed.
 
-  (* ...and the EXISTENTIAL-[M] corollary, which is what the callers that
-     do not care about the bytes still speak. *)
-  Lemma wp_uvmdealloc_sconf
-      (γa : gname) (mm : regfile)
-      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_uvmdealloc_sconf_body γa mm P K eb p b lks.
-  Proof.
-    cbv beta delta [wp_uvmdealloc_sconf_body].
-    intros pcE oldsz newsz ret_tgt HK Hroot Hob Hlkbelow.
-    iIntros "Hcg Hcpu #Htext Hpc Hpt Henv Hcont".
-    iEval (rewrite (proc_pt_ptm P (uint oldsz))) in "Hpt".
-    iDestruct "Hpt" as (M) "Hpt".
-    iApply (wp_uvmdealloc_mem_sconf γa mm P M K eb p b lks
-              HK Hroot Hob Hlkbelow with "Hcg Hcpu Htext Hpc Hpt Henv").
-    rewrite /wp_next. iIntros (CIDx) "%Hsx".
-    iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; exact Hsx|].
-    iIntros (mr) "Hcg Hcpu Hpc %Hcs %Hres Hpt".
-    iApply ("Hcont" $! mr with "Hcg Hcpu Hpc [%] [%] [Hpt]").
-    - exact Hcs.
-    - exact Hres.
-    - iApply (proc_ptm_pt with "Hpt").
-  Qed.
 
 End ProofUvmdealloc.
 

@@ -273,7 +273,7 @@ Definition wp_sys_read_sconf_body
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (fn : fread_names)                           (* the file system's ghosts *)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)                            (* syscall arguments 0, 2  *)
+    (v v1 v2 : mword 64)                         (* syscall arguments 0, 1, 2 *)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_read in
   let pj := proc_addr j in
@@ -283,11 +283,11 @@ Definition wp_sys_read_sconf_body
   γs !! j = Some γlp ->
   length γs = NPROC ->
   (* the three syscall arguments, out of the trapframe page [proc_priv]
-     carries.  Argument 1 (the user destination) is fetched but never
-     inspected here -- it goes straight to fileread, whose callees are total
-     in it -- so only its EXISTENCE has to be assumed. *)
+     carries.  Argument 1 is the user destination fileread copies into --
+     never inspected here, but it is now the WINDOW's own base address, so
+     it is named, not merely asserted to exist. *)
   pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
-  (exists v1 : mword 64, pv_tf (us_V U) !! tf_arg_idx 1 = Some v1) ->
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
   pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
   (* NO NUMERIC PREMISE.  [SpecFileread] takes [-2^31 <= n < 2^31] and a
      trapframe word satisfies that unconditionally ([sys_rw_count_range]),
@@ -330,17 +330,27 @@ Definition wp_sys_read_sconf_body
   (* THE CROSSING IS THE LITERAL [true]: fileread parks, and a park moves the
      hart with interrupts off, so the crossing has nothing to do with SIE. *)
   wp_next true pj (fun (CID : CpuId) =>
-  (* the image moves: the copy leaves may fault a page in, and copyout
-     writes user memory -- milestone J item 1's ∃-weakened staging *)
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
+  (* THE IMAGE MOVES, AND THE MOVE IS A WINDOW AT ARGUMENT 1.  sys_read hands
+     its own [v1] to fileread as the destination and back unchanged
+     (SpecFileread.wp_fileread_sconf's post), so this contract inherits
+     fileread's WINDOW verbatim: the entry image with the run
+     [v1 .. v1+d) overwritten and nothing else touched.
+
+     WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE.  A
+     caller of sys_read that wants its own untouched bytes back reads them
+     with [UserPtTree.umem_wr_lookup_out], exactly as a caller of fileread
+     does; this contract does not (and cannot, on the console/pipe arms) say
+     more about [bs] than that it is a byte function of the right length. *)
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜sys_read_ret (us_V U) v (sys_rw_count v2) r⌝ -∗
+      ⌜(Z.of_nat d <= Z.max 0 (sys_rw_count v2))%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pidv (upd_usM (us_upt U P') M') -∗
+      proc_priv γf pj pidv (upd_usM (us_upt U P') (umem_wr (us_M U) v1 d bs)) -∗
       kalloc_env fsc_kalloc None -∗
       (* the file system, back.  fileread's own postcondition returns the
          superblock fraction and the slot unit; everything else in the bundle
@@ -361,7 +371,7 @@ Module Type SYSREAD.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)
       (pidv : mword 32) (U : ustate)
-      (v v2 : mword 64)
+      (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_sys_read_sconf_body γf γs j γlp fn pidv U v v2 m av eb b lks.
+      wp_sys_read_sconf_body γf γs j γlp fn pidv U v v1 v2 m av eb b lks.
 End SYSREAD.

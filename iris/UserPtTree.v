@@ -711,11 +711,6 @@ Proof.
   case_decide as Hd; [exfalso; lia |]. f_equal. lia.
 Qed.
 
-(* a one-chunk window, which is what a single [copyout] leaves *)
-Lemma umem_wrote_of (M : gmap Z (bv 8)) (dstva : mword 64) (d : nat)
-    (src : nat -> bv 8) : umem_wrote M (umem_wr M dstva d src) dstva d.
-Proof. by exists src. Qed.
-
 (* WHAT THE CALLER GETS BACK: every byte outside the run, unchanged... *)
 Lemma umem_wrote_out (M M' : gmap Z (bv 8)) (dstva : mword 64) (d : nat)
     (va : Z) :
@@ -818,6 +813,24 @@ Definition pgroundup (sz : Z) : Z := ((sz + 4095) / 4096) * 4096.
 
 (* a va the process may touch -- mapped or not yet faulted in *)
 Definition uva_live (sz : Z) (va : Z) : Prop := (0 <= va < pgroundup sz)%Z.
+
+(* PGROUNDUP IS MONOTONE, hence so is the live region: raising [p->sz] only
+   ever raises the boundary, and never un-lives a va that was live.  This is
+   the arithmetic under sbrk's LAZY path, where the size moves and the table
+   does not -- see [ProcPtOwn.umem_lazy_grow_sz]. *)
+Lemma pgroundup_mono (sz sz' : Z) :
+  (sz <= sz')%Z -> (pgroundup sz <= pgroundup sz')%Z.
+Proof.
+  intros Hle. unfold pgroundup.
+  apply Z.mul_le_mono_nonneg_r; [lia | apply Z.div_le_mono; lia].
+Qed.
+
+Lemma uva_live_mono (sz sz' a : Z) :
+  (sz <= sz')%Z -> uva_live sz a -> uva_live sz' a.
+Proof.
+  intros Hle Hlv. unfold uva_live in *.
+  pose proof (pgroundup_mono sz sz' Hle). lia.
+Qed.
 
 (* THE PAGE OF A LIVE va IS LIVE.  vmfault maps the page of a va it has
    already checked against [p->sz]; this is what says every va of that page

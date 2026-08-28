@@ -4109,6 +4109,68 @@ Section ProcPt.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (* GROWING THE SIZE ALONE, WITH THE TABLE STANDING STILL.               *)
+  (*                                                                     *)
+  (* xv6's LAZY sbrk path calls no leaf at all: it stores a larger        *)
+  (* [p->sz] and lets vmfault back the pages on demand.  At the lazy view *)
+  (* that is already a complete description of what happened -- the newly *)
+  (* live vas read as zero, which is exactly [umem_grow]'s left-biased    *)
+  (* union over the WHOLE live set -- so the SAME backed witness [Mp] the *)
+  (* old view owns re-certifies at the larger size, and no ownership      *)
+  (* moves.  [uva_live] is monotone in [sz]                               *)
+  (* ([UserPtTree.uva_live_mono]), which is the whole content.            *)
+  (*                                                                     *)
+  (* Contrast [umem_lazy_grow] below, uvmalloc's step: that one grows by  *)
+  (* one FRESHLY MAPPED page and is stated as a delta over the old live   *)
+  (* set, so it needs to name the vpn.  This one does not, because        *)
+  (* [umem_grow] is a union over the whole live set rather than a delta.  *)
+  (* ------------------------------------------------------------------ *)
+  Lemma umem_lazy_grow_sz (P : uptd) (sz sz' : Z) (M : gmap Z (bv 8)) :
+    (sz <= sz')%Z ->
+    umem_lazy P sz M -∗ umem_lazy P sz' (umem_grow M sz').
+  Proof.
+    intros Hle. iIntros "H". iDestruct "H" as (Mp) "(%Hsub & %Hdm & %Hlz & Hm)".
+    iExists Mp. iSplitR.
+    { iPureIntro. etransitivity; [exact Hsub | apply map_union_subseteq_l]. }
+    iSplitR.
+    { iPureIntro. intros va. unfold umem_grow.
+      rewrite lookup_union_is_Some (Hdm va).
+      assert (Hg : is_Some (gset_to_gmap (bv_0 8) (live_set sz') !! va)
+                   <-> uva_live sz' va).
+      { rewrite <- elem_of_dom, dom_gset_to_gmap. apply elem_of_live_set. }
+      rewrite Hg. split.
+      - intros [[Hc | Hc] | Hc].
+        + left; exact Hc.
+        + right; exact (uva_live_mono sz sz' va Hle Hc).
+        + right; exact Hc.
+      - intros [Hc | Hc]; [left; left; exact Hc | right; exact Hc]. }
+    iSplitR.
+    { iPureIntro. intros va Hnmv Hlvv'. unfold umem_grow.
+      destruct (decide (uva_live sz va)) as [Hlo | Hlo].
+      - rewrite (lookup_union_Some_l M _ va (bv_0 8) (Hlz va Hnmv Hlo)).
+        reflexivity.
+      - assert (Hnone : M !! va = None).
+        { destruct (M !! va) as [bb |] eqn:Hb; [| reflexivity].
+          exfalso. destruct (proj1 (Hdm va) ltac:(eauto)) as [Hm0 | Hlo'];
+            [exact (Hnmv Hm0) | exact (Hlo Hlo')]. }
+        rewrite (lookup_union_r M _ va Hnone).
+        apply lookup_gset_to_gmap_Some.
+        split; [apply elem_of_live_set; exact Hlvv' | reflexivity]. }
+    iExact "Hm".
+  Qed.
+
+  (* ...and the same step on the whole parked address space.  This is what
+     sbrk's lazy arm re-indexes its [proc_priv] block with. *)
+  Lemma proc_ptm_grow_sz (P : uptd) (sz sz' : Z) (M : gmap Z (bv 8)) :
+    (sz <= sz')%Z ->
+    proc_ptm P sz M -∗ proc_ptm P sz' (umem_grow M sz').
+  Proof.
+    intros Hle. rewrite /proc_ptm. iIntros "(%Hwf & Ht & Hm)".
+    iSplitR; [iPureIntro; exact Hwf |]. iFrame "Ht".
+    iApply (umem_lazy_grow_sz P sz sz' M Hle with "Hm").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (* GROWING THE SIZE by one page.  A page that becomes live but is not   *)
   (* backed reads as zero, so the view gains exactly that page's vas at   *)
   (* 0 -- no ownership moves.  uvmalloc does this and THEN faults the     *)
@@ -5451,26 +5513,6 @@ Section ProcPt.
                (um_ppns P.(ud_um)) (pte_ppn w) Hin).
     iSplitR; [iPureIntro; exact Hwf |].
     iFrame "Ht Hp Hrest".
-  Qed.
-
-  (* the instance the vmfault-success arm hands on: the page just faulted
-     in is [r] itself, since [page_base] of the leaf's ppn roundtrips
-     through [page_valid]. *)
-  Lemma proc_pt_page_acc_vmfault (P : uptd) (vpn : mword 27) (r : mword 64) :
-    page_valid r ->
-    kmap_static_claims -∗ proc_pt_any (uptd_insert P vpn r) -∗
-      page_own r ∗ (page_own r -∗ proc_pt_any (uptd_insert P vpn r)).
-  Proof.
-    intros Hval.
-    assert (Hl : (uptd_insert P vpn r).(ud_um) !! vpn = Some (vmfault_pte r)).
-    { unfold uptd_insert. cbn [ud_um]. apply lookup_insert. }
-    assert (Hpb : page_base (pte_ppn (vmfault_pte r)) = r).
-    { rewrite pte_ppn_vmfault. exact (page_base_of_valid r Hval). }
-    (* rewrite FORWARD in the instance -- [rewrite <- Hpb] in the goal would
-       also hit the [r] inside [uptd_insert]. *)
-    pose proof (proc_pt_page_acc (uptd_insert P vpn r) vpn (vmfault_pte r) Hl)
-      as Hacc.
-    rewrite Hpb in Hacc. exact Hacc.
   Qed.
 
   (* the root page itself is owned inside [pt_frame] (every node of
