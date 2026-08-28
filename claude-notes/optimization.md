@@ -357,8 +357,8 @@ interleaved, 2–3 reps.
 term at each leaf (1016 sites, zero `iPoseProof`), so it never enters `Δ`.
 
 `tools/instr_subgoal.py` does the edit; see
-`claude-notes/projects/instr-subgoal-sweep.md` for the recipe, the traps and
-what is left.
+`claude-notes/completed/instr-subgoal-sweep.md` for the recipe and the traps.
+The sweep itself is DONE — the rule applies to what you WRITE next.
 
 The limit is the same as "pose late"'s: an `instr` used inside a Löb/induction
 body is re-derived on every iteration. That is one extra `iApply` per iteration

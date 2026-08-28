@@ -1,10 +1,20 @@
 # The instr-subgoal sweep
 
-**Status (2026-08-22).** The discipline is settled and measured over 63 files;
-`ProofPipealloc.v` is the reference conversion (`baabee94`). What is left is
-the tail: 157 files still pose their instruction facts. The rule itself lives in
-[`../optimization.md`](../optimization.md) under "Do not pose instruction facts
-AT ALL"; this file is the RECIPE and the SCOREBOARD.
+**ARCHIVED 2026-08-28: THE SWEEP IS COMPLETE** (§5 has the from-scratch
+rebuild that says so; the tree's own oracle —
+`grep -n 'with "Ht") as\|with "Htext") as' iris/` — finds no per-instruction
+pose left, only the sanctioned composite-continuation and `kernel_text_intro`
+sites).  The two DELIBERATE exclusions are rulings, not remaining work: the
+pc-generic composite leaves keep their `instr … -∗` premises, and `UProof*.v`
+does not participate.
+
+**This file is still the RECIPE**, and a new proof must follow it —
+`tools/instr_subgoal.py` is the tool.  The rule lives in
+[`../optimization.md`](../optimization.md) under "Do not pose instruction
+facts AT ALL"; read §1–§3 here for how, and §4 for what it was worth
+(−46 % wall / −61 % `Qed` / −69 % proof term on the reference conversion,
+`ProofPipealloc.v` at `baabee94`).  Any per-file count below is a snapshot
+taken while the sweep ran and is not the state of the tree.
 
 ## 1. The discipline, in one line
 

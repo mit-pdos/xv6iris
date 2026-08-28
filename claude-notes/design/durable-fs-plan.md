@@ -5,7 +5,9 @@ of machine-checked refutations (archived with their lane reports in
 [`../completed/durable-disk-2026-08-23-to-25.md`](../completed/durable-disk-2026-08-23-to-25.md);
 the Coq files that held them are deleted and §8 below carries their
 lessons).  The live worklist is
-[`../projects/durable-disk.md`](../projects/durable-disk.md).  This file
+[`../projects/durable-disk.md`](../projects/durable-disk.md), a stub
+carrying the residue; the lane history is in
+[`../completed/`](../completed/).  This file
 is where the durable side's design lives; [`fs-state.md`](fs-state.md)
 §0–§2 (the guiding rule and the nested predicate) and §7 (as-built notes)
 remain the reference for the predicate itself.
@@ -113,9 +115,9 @@ live directory, unique names).  There is NO cross-inode pure clause:
   ENTRY** since EV-Y (`FsDurSnap.P_dur_alloc_xfer` over
   `fs_state_xfer_tok`); its allocation half `fs_footprint_mint` stands
   alone and is what `fs_footprint_xfer` runs after it has read its three
-  facts.  Lane H4's readings-only entry (`snap_mint`,
-  `fs_snap_alloc_mint`, `P_dur_alloc_mint`, `fs_state_mint_runs`) is
-  DELETED at EV-Y.
+  facts.  A readings-only entry — one that takes a PACKAGE of pure facts,
+  the runs' pairwise disjointness among them — is what this replaced, and
+  it must not come back (§8).
   The value-first form survives at ONE producer, era 0's image
   (`iris/FsDurAlloc.v`, lane H5), because there is no source instance to
   read anything off.
@@ -155,23 +157,22 @@ live directory, unique names).  There is NO cross-inode pure clause:
   logged value.  A thread that modified a buffer in place and did not
   `log_write` cannot release it.  This — not inode locks — is what makes
   "the WAL copies the cached buffer at commit time" safe.
-- **`begin_op`** (TO BUILD): allocates a transaction id `t` and hands the
-  caller the exclusive token `t ↪[γtx] ()` INSIDE the transaction token
-  `log_op` (its existential closure stays: `log_op γ u = ∃ …, t ↪ () ∗ …`).
-  The authority `γtx` sits in the WAL's lock invariant (`LogInv.log_state`)
-  beside the table of open transactions.  **`end_op`** consumes the FULL
-  share (fraction 1) and the WAL deletes `t`.  Because the retire step is
+- **`begin_op`** allocates a transaction id `t` and hands the caller the
+  exclusive element inside the transaction token:
+  `LogInv.log_tx γ = ∃ t, t ↪[ln_tx γ] ()`, and `log_op γ u = log_opb γ u ∗
+  log_tx γ`.  The authority `ln_tx γ` sits in the WAL's lock resource
+  (`LogInv.log_res`, tied to the ledger by CARDINALITY, so the id stays
+  existential and no client ever names it).  **`end_op`** consumes the FULL
+  element and the WAL deletes `t`.  Because the retire step is
   resource-shaped, the ending transaction never has to NAME what it
-  touched — `SpecEndOp`'s closed token survives (lane 4c's finding 5 does
-  not bite); the only ABI change is that the token is FRACTIONAL while a
-  lock is held (§3 `ilock`), so contracts spanning a held lock carry
-  that form.
-- **`ilock i`** (ONE spec; the lock-side half TO BUILD in lane B′):
-  withdraws `i`'s bundle from its escrow.  With a transaction share it
-  withdraws everything and the escrow's "out for writing" arm PARKS a
-  share of the transaction's token `t ↪[γtx] ()` (so `end_op`, which
-  needs the whole token, cannot run while any inode of the transaction
-  is write-locked); without one (`fileread`, `filestat`, lookups outside
+  touched; the only shape a client sees beyond the whole element is the
+  FRACTIONAL one a park holds while a lock is held (`TxPin.tx_pin γ t q`,
+  §3 `ilock`), so contracts spanning a held lock carry that form.
+- **`ilock i`** (ONE spec) withdraws `i`'s bundle from its escrow.  With a
+  transaction share it withdraws everything and the escrow's "out for
+  writing" arm PARKS a share of the transaction's element (`TxPin.tx_pin`,
+  so `end_op`, which needs the whole element, cannot run while any inode of
+  the transaction is write-locked); without one (`fileread`, `filestat`, lookups outside
   a transaction) it withdraws a ¼ fraction of the byte elements and the
   "out for reading" arm keeps ¾ plus the rest of the bundle (§4 says why
   ¼).  **`iunlock i`**: deposits the bundle CLEAN (`inode_local`, as
@@ -185,7 +186,7 @@ live directory, unique names).  There is NO cross-inode pure clause:
   id so no freshness of the transaction is needed — a walk that has
   parked shares in escrows can still arm).  Only `create`'s mkdir child (`nlink = 1`
   flushed before its dot entries) needs it in this kernel.  `ftop_inv`'s
-  row "every unarmed inum's node is `inode_local`" plus an empty `γtx`
+  row "every unarmed inum's node is `inode_local`" plus an empty `ln_tx`
   authority yields `snap_local` of the abstract state
   (`IregClean.ireg_snap_local_acc`/`_of_ops`).  A read-locker cannot move
   a record because `ireg_write_au` takes the exclusive proxy `dinode_at`
@@ -252,8 +253,10 @@ live directory, unique names).  There is NO cross-inode pure clause:
   the current snapshot stands at it, so what the machine would recover to IS
   a file system.  The snapshot's STATE is EXISTENTIAL in the law — the WAL
   cannot name the file system's abstract state — and that costs nothing,
-  because the state is DETERMINED by the map (`snap_bytes_node_inj`,
-  `snap_bytes_sb_inj`, `snap_bytes_used_agree`).  NO caller of any WAL
+  because nothing downstream has to identify it with a second one: every
+  consumer of a snapshot takes the epoch itself and binds `S` out of it
+  (which is why the three state-determinacy lemmas the design once needed
+  are deleted and must not come back).  NO caller of any WAL
   function supplies anything at the call site; the only fupd in the
   durability story is the machine's disk-interface permit, which the WAL
   discharges.
@@ -271,11 +274,12 @@ refuted, §8), and every such state
 belongs to an inode that is LOCKED.  So the commit RECONSTRUCTS it from
 the file system's own invariants at the one moment they are all clean:
 
-- **No inode is write-locked and no inode is armed** — at commit the
-  WAL's `γtx` authority is empty, so no share of any transaction id
-  exists: no escrow "out for writing" arm (it parks a share,
-  `IcacheEscrow.ic_out_no_write_arm`) and no armed entry (it parks a
-  share, `IregClean.ireg_snap_local_acc`).  Every inode is either unlocked or
+- **No inode is write-locked and no inode is armed** — at commit the WAL's
+  `ln_tx` authority is EMPTY, so no share of any transaction id exists, and
+  every park in the file system is a share of one (`TxPin.tx_pin`, refuted
+  wholesale by `tx_pin_no_ops`/`_o_no_ops`/`tx_pins_no_ops`): no escrow
+  "out for writing" arm, no armed entry, no in-transit pool row, no corpse.
+  Every inode is either unlocked or
   read-locked, and every node of the abstract map is `inode_local`
   (`IregClean`).
 - **Every inode's validity predicate is inside the invariants.**  An
@@ -296,26 +300,30 @@ the file system's own invariants at the one moment they are all clean:
   lookups) has withdrawn only a ¼ FRACTION of its byte elements; the
   escrow keeps ¾ and the rest of the bundle.  A transactional `ilock`
   withdraws everything.
-- **Collected, they ARE `fs_state` over `L`.**  Opening those invariants
-  at the commit's ghost step and ∗-ing the bundles gives, against the
-  byte authority in `fs_bytes_inv`: the bytes at every record slot and
-  data block by AGREEMENT (any fraction suffices), the used set and the
-  free blocks' bytes off `bitmap_inv`, `inode_local` of every inode off
-  its bundle, and cross-inode block DISJOINTNESS from separation logic —
-  two full elements at one address are inconsistent, and so are two ¾
-  elements (¾ + ¾ > 1), which is why the reader's share is ¼ and not ½.
-  That is `snap_ok S L` for the abstract `S` the `ftop_inv` authority
-  holds; the allocator clones it.  The same collection lemma is what
-  §5's boot mint runs in the other direction.
+- **Collected, they ARE `fs_state (fs_gamma_L γfs) (DfracOwn ¾) S`.**
+  Opening those invariants at the commit's ghost step and ∗-ing the bundles
+  gives exactly the transport's source at ¾ — the records and the metadata
+  objects shed a quarter, the read arms have already kept theirs — and
+  `FsCollectAll.col_bodies_acc` is that, AS AN ACCESSOR: it yields the
+  predicate beside a closing wand that rebuilds every one of the six
+  invariant bodies.  The accessor shape is forced by the transport's `q >
+  1/2`: a transport takes more than half of every byte, so a collection
+  that feeds it cannot also keep the bodies unless it takes its source back
+  out — which the transport returns unchanged.  ¾ and not ½ for the same
+  arithmetic (¾ + ¾ > 1 refutes two owners; ½ + ½ does not), which is also
+  why a read-locker's share is ¼.
 
 There is NO cross-inode pure clause anywhere and no obligation on any
-writer beyond owning the bytes it writes.  `FsDurSnap.snap_bytes` still
-STATES its used-set coupling clauses (`sk_own_used`, `sk_disj`) and its
-three cut clauses, because the VALUE-FIRST allocator
-(`FsDurAlloc.fs_state_of_ledger`, `blk_ledger_cut`, `ledger_carve`) needs
-them to SPLIT a linear ledger, and era 0 has nothing else.  NOTHING CARRIES
-THEM: at a commit they are read off the era's ∗, at a snapshot off the
-epoch's own (`FsDurSnap.fs_snap_read_ok`).
+writer beyond owning the bytes it writes.  **NOTHING PURE ABOUT THE STATE
+CROSSES AT A COMMIT**: two rows travel and neither is about disjointness —
+`snap_shape` (the one clause no resource pins) and "the source's byte map
+lies inside the committed view's flattening" (`col_auth_dbytes`), which is
+where the epoch's identity comes from.  `FsDurSnap.snap_bytes` still STATES
+its used-set coupling (`sk_own_used`, `sk_disj`) and its cut clauses,
+because the VALUE-FIRST allocator (`FsDurAlloc.fs_state_of_ledger`,
+`blk_ledger_cut`, `ledger_carve`) needs them to SPLIT a linear ledger and
+era 0 has nothing else; every other consumer READS them off resources
+(`FsDurSnap.fs_snap_read_ok`) and none of them is ever maintained.
 
 **THE VALUE-FIRST ALLOCATOR IS A MISTAKE, AND THE TRANSPORT THAT REPLACES
 IT IS BUILT (lane H, `iris/FsDurXfer.v`).**  The carve is an artifact of
@@ -672,26 +680,16 @@ the footprint is every consumer of the bundle's data-block accessors);
 the commit's collection lemma opens five invariant families at one ghost
 step.  Nothing is owed at a `log_write` beyond the bytes it writes.
 
-DELETED at lane H5, all caller-less: `FsDurSnap`'s `fs_state_of_ledger_era`,
-`blk_ledger_of_home`, `fs_state_xfer_era`/`_snap`, `fs_bytes_auth`/
-`fs_gamma_L_agree`, `dsnap_step_id`/`_trans`, `fs_snap_alloc_xfer`/
-`P_dur_alloc_xfer`, the one-block FRAME family (`snap_untouched`/`_but`/
-`_of_free`/`_of_own`, `snap_bytes_frame`, `snap_ok_frame`) and the three
-state-injectivity lemmas (`snap_bytes_sb_inj`/`_node_inj`/`_used_agree`);
-and twenty-six image-routing lemmas out of `FsCfgBoot` (§8 keeps their
-lessons).
-
-Deleted once consumers are re-pointed: `FsDurWire`'s `P_wf_dec`/`Psi_dec`/
-`kinds_of_state`/`dwire_geom`/`psi_*` (the rejected pure-kinds tie),
-(DONE at S2: `RiscvPtsto.fs_dur_names` in whole — `fdn_link`/`fdn_top`/
-`fdn_bmap`/`fdn_ist`/`fdn_nin` — and both fixed-layer fields
-`riscv_dview_name`/`riscv_fsdur`, with the `Pc`-arity sweep through
-`RiscvAdequacy`/`SystemAdequacy` it needed, plus `FsDurBytes.fs_gamma_D`), `FsDurLedger`'s fold family
-(its entry constructors are era-side content — keep if consumed).  ALREADY
-GONE: `LogInv.log_psi_*` and the parked `Ψ D₀ Dc`;
-`LogDefs.fs_dview`/`fs_dstep` and `FsDurImg`'s resource-MOVING image
-conversion `fs_dur_of_image`/`fs_dur_view_of_image` (the boot mint runs the
-allocator core at the era's own view, not through an image conversion).
+WHAT IS NOT IN THE TREE, stated once so nobody reintroduces it: a parked
+client payload in the log and its laws; a fixed-layer durable byte view or
+durable-ghost bundle; a pure whole-state well-formedness predicate and its
+per-op preservation lemmas; a per-write accumulation of the snapshot tie
+and the one-block frame family it needed; a pure kinds/decode tie over the
+durable bytes; state-determinacy lemmas for the snapshot; and the old
+per-holder link ledger.  Every one of them is refuted or superseded in §8,
+and the Coq files that held them are deleted.  The blow-by-blow of which
+lemma went at which step is history and lives in
+[`../completed/`](../completed/), not here.
 
 ## 7. The vacuity discipline (why the tie cannot silently go empty)
 
@@ -721,14 +719,23 @@ compiles".
 - Pure decode ties over bytes with a KIND MAP: rejected by the owner
   (re-imports pure role/disjointness reasoning) and twice found
   unsatisfiable/degenerate at xv6's layout.
-- The pure delta LEDGER with a fold over an updated durable body: closed
-  (`FsDurLedger.dled_fold_body`) but needed cross-write "hands" and the
-  geometry equations; superseded by snapshots, where nothing is updated.
-- Reading the exported `snap_ok S D` off the snapshot's RESOURCES, and
-  sourcing the commit's transport from the quiescent collection: refuted
-  — `fs_snap`'s resource half does not mention `D` at
-  all, and the collection's bundles are at a three-quarter share that
-  cannot be promoted to the full element `fs_state` wants.  §4 has both.
+- The pure delta LEDGER with a fold over an updated durable body: closed,
+  but needed cross-write "hands" and the geometry equations; superseded by
+  snapshots, where nothing is updated (the file that held it is deleted).
+- Reading `snap_ok S D` off a snapshot's RESOURCES with no identity
+  resource: refuted — `fs_snap`'s resource half does not mention `D` at all,
+  so a reading needs the epoch's byte AUTHORITY beside it, which is what
+  `FsDurRead.snap_auth` is (§2).  With it the reading is
+  `fs_snap_read_ok`, and it is how BOTH consumers get the tie.
+- "The collection cannot feed the transport, because a three-quarter share
+  cannot be promoted to the full element `fs_state` wants": refuted by
+  putting the SHARE IN THE PREDICATE.  `fs_state Γ dq S` at `dq = ¾` is
+  what the collection yields and what the transport takes, and the whole
+  question "is there ONE share every arm can supply" answers yes.  What the
+  collection then had to become is an ACCESSOR — a transport at `q > 1/2`
+  takes more than half of every byte, so a collection that feeds it cannot
+  also keep the invariants' bodies unless it takes its source back out
+  (§4).
 - A per-`log_write` accumulation of the bytes-match fact (`snap_bytes` as
   the WAL's parked payload, re-proven by every writer): refuted —
   `itrunc`'s window holds a record naming blocks whose

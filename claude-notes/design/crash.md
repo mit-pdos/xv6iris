@@ -177,20 +177,6 @@ per-milestone record):
 
 ## The durable disk: ONE fixed gname, owned by the crash predicate (ruled 2026-08-22)
 
-> **BANNER (durable-disk S2).  THE FIXED-LAYER ROSTER IS FIVE GNAMES AND NO
-> BUNDLE.**  `riscv_dview_name` (the committed BYTE view `γ_D`) and
-> `riscv_fsdur : fs_dur_names` are DELETED from `riscvFixedGS`, and
-> `RiscvPtsto.fs_dur_names` with them.  Everything below that reads them as
-> live — the bundle rule, the `HPc`-hands-the-record-back-existentially
-> argument, `Γ_D` as a `MkFsView` at those gnames, `P_fs`'s `γv` parameter —
-> is the PRE-SNAPSHOT design.  Under lane CE's snapshot ruling the durable
-> half of `FsCrash.P_fs` is `FsDurSnap.P_dur (fr_D r)`, a function of the
-> committed map over its OWN existentially bound ghost names, so no client
-> names a durable instance and nothing read either field.  `P_fs` /
-> `P_fs_rec_named` / `P_fs_named` lost `γv` and `Γd`; `Pc` is four gnames;
-> `boot_fixedGS` takes seven arguments.  `fs_crash_seam` is arity-free and
-> did not move.
-
 **Ruling (owner, 2026-08-22), replacing the per-era re-minted image below.**
 Three principles, in order of force:
 
@@ -205,40 +191,35 @@ Three principles, in order of force:
 2. **One fixed-layer gname `γdisk` for the durable bytes.** The machine layer
    (`state_interp`) holds `● v_disk` at it; PowerOn preserves `v_disk`, so
    the auth is simply still right in the new era — nothing is re-minted and
-   nothing is re-associated. **The FIXED-layer gname roster is six gnames
-   plus ONE BUNDLE**
-   (`RiscvPtsto.riscvFixedGS`; every one of them is a `Pc`/`HPc`/`Hproj`/
-   `Hswap`/`boot_fixedGS` argument in `RiscvAdequacy` and rides the
-   `boot_fixedGS` seam equation into the boot cone): `riscv_gen_name`,
-   `riscv_start_name`, `riscv_registry_name`, `riscv_disk_name` (+ its
-   `riscv_disk_size`), `riscv_swap_name`, `riscv_dview_name` — the
-   COMMITTED BYTE VIEW `γD` (`fs-state.md` §1's `Φ_D`), which rides
-   `riscv_disk_name`'s own `DiskImg.diskImgG`, the tree's unique
-   `ghost_mapG Σ Z (bv 8)`, so it costs no new functor — and
-   `riscv_fsdur : fs_dur_names`, `Γ_D`'s two remaining gnames
-   (`fdn_link`, `fdn_top`) as ONE record field. **The BUNDLE RULE (ruled
-   for 2c): a positional name per ghost does not scale past two; a record
-   keeps the five hooks at one extra argument however many durable ghosts
-   `Γ_D` turns out to need.** `fs_dur_names` is declared in `RiscvPtsto.v`
-   itself and names no file system — two gnames and nothing else, exactly
-   as `riscv_crash_pred` is an arbitrary client `iProp` there.
+   nothing is re-associated. **The FIXED-layer roster is FIVE gnames and no
+   bundle** (`RiscvPtsto.riscvFixedGS`; every one of them is a
+   `Pc`/`HPc`/`Hproj`/`Hswap`/`boot_fixedGS` argument in `RiscvAdequacy` and
+   rides the `boot_fixedGS` seam equation into the boot cone):
+   `riscv_gen_name`, `riscv_start_name`, `riscv_registry_name`,
+   `riscv_disk_name` (+ its `riscv_disk_size`) and `riscv_swap_name`,
+   beside the client's opaque `riscv_crash_pred : iProp Σ`.
 
-   **Adequacy does NOT allocate the bundle; the CLIENT does, and `HPc`
-   hands the record back existentially** (`|==> ∃ Γd, Pc … Γd`). Forced:
-   the link family's camera `FsStateLink.linkUR = gmapUR Z (authR natUR)`
-   has no authority over which keys exist, so `own g ε ⤳ own g (link_elem I)`
-   is refuted by the frame `{[0 := ● 5]}` — a family adequacy minted at the
-   unit could never be filled. The machine layer therefore never names a
-   file-system camera at all. (`riscv_dview_name`'s own map IS minted here,
-   EMPTY — the machine layer cannot compute the image's committed view and
-   must not name it — and `FsCrash.P_fs_alloc` fills it
-   at `fs_dbytes D₀` in the same update.) The crash predicate `P_fs` owns the `◯`
-   fragments (all of them, forever). Auth/frag agreement IS the tie:
-   `disk_tie`, `fs_tie_interp` and the `dk`-indexing of `riscv_crash_pred`
-   go away; whoever opens `crashN` with the auth in scope learns
-   `dk = v_disk`. `P_fs` is then a proposition about THE disk, meaningful in
-   every era, carrying whatever durable ghost state the FS keeps (history,
-   committed view, eventually the tree and file contents).
+   **THERE IS NO FIXED-LAYER DURABLE VIEW, and that is what the snapshot
+   buys.**  A committed BYTE view at a fixed gname, plus a record of the
+   file system's own durable ghosts hanging off `riscvFixedGS`, is exactly
+   what the design used to need and no longer has: the durable half of
+   `FsCrash.P_fs` is `FsDurSnap.P_dur (fr_D r)`, a function of the committed
+   MAP over its own EXISTENTIALLY BOUND ghost names, so no client can name a
+   durable instance and the machine layer names no file-system camera at
+   all.  That is not a tidying — it is forced twice over.  First, a family
+   camera keyed by inum has no authority over which keys exist, so
+   `own g ε ⤳ own g (link_elem I)` is refuted by the frame `{[0 := ● 5]}`: a
+   family adequacy minted at the unit could never be filled, so adequacy
+   must not allocate one.  Second, an epoch that is DROPPED and re-allocated
+   at every commit cannot have a fixed name.  `P_fs` therefore takes four
+   gnames and no bundle, and `fs_crash_seam` is arity-free.
+
+   The crash predicate owns the `◯` fragments of the durable disk (all of
+   them, forever).  Auth/frag agreement IS the tie: whoever opens `crashN`
+   with the auth in scope learns `dk = v_disk`, so `P_fs` is a proposition
+   about THE disk, meaningful in every era, carrying whatever durable state
+   the FS keeps (the history, the committed view, the snapshot itself).
+
 3. **The adequacy theorem assumes exactly one thing about the disk: era 0's
    `v_disk g = fsimg_dk`.** The proof establishes `P_fs` from `fs.img` once
    (`HPc`), and `P_fs` is the loop invariant across eras: every PowerOn
@@ -269,8 +250,8 @@ stays open — honestly open, not vacuously closed.
 
 ### The split crash predicate (ruled 2026-08-22): `fr_D` is the interface; recovery is logically invisible
 
-Refines the ruling above; worklist stages E–I in
-`projects/durable-disk.md`. Five decisions:
+Refines the ruling above (the stages E–I it was written against are in
+`completed/durable-disk-byteview.md`). Five decisions:
 
 1. **`P_fs` is the WAL's half and the FS's half, sharing the committed
    map `D` through one binder in the `crashN` body** (`∃ dk D, frags dk ∗
@@ -318,15 +299,17 @@ Refines the ruling above; worklist stages E–I in
    era knows the committed view BY VALUE
    (`FsCrash.fs_recovery_of_mirror`) — and no bio-layer fact is ever
    needed inside a permit.
-5. **The durable committed view is WELL FORMED, and that is the FS half's
-   own statement** — the property every reachable committed state has and
-   every commit preserves, re-established per OP at `end_op` under
-   group-commit quiescence (`out = 0`), because mid-batch logged views are
-   DELIBERATELY inconsistent (a bitmap bit is set before the inode points
-   at the block). There is nothing special about `fs.img` beyond being the
-   base case of the poweroff/poweron loop invariant: adequacy constructs
-   the entire `P_fs` for it at init time, off `fsimg_wf`. What the
-   property IS, and how the commit re-establishes it, is
+5. **The durable committed view IS a file system, and that is the FS
+   half's own statement** — not as a maintained pure predicate but as a
+   RESOURCE: one copy of the file-system predicate over the committed map,
+   re-founded at every group commit out of what the collection assembles at
+   quiescence (`out = 0`).  It is re-founded there rather than per op
+   because mid-batch logged views are DELIBERATELY inconsistent (a bitmap
+   bit is set before the inode points at the block).  There is nothing
+   special about `fs.img` beyond being the base case of the
+   poweroff/poweron loop invariant: adequacy constructs the entire `P_fs`
+   for it at init time, era 0's epoch included, off the image's own
+   well-formedness.  The design is
    [`durable-fs-plan.md`](durable-fs-plan.md).
 
 ### The FS half of the crash predicate: a SNAPSHOT of the committed map
@@ -349,26 +332,24 @@ collects at quiescence, the boot point — is
 [`durable-fs-plan.md`](durable-fs-plan.md), the design of record, with the
 ghost inventory in [`fs-ghost-state.md`](fs-ghost-state.md).
 
-### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
-
-> Superseded in its commit mechanism (2026-08-25): the durable snapshot is
-> RE-ALLOCATED per commit, never updated — see [`durable-fs-plan.md`](durable-fs-plan.md),
-> the design of record.  The log's contract and the era instance stand.
+### The FS side of the contract: bytes + two AUs, and nested SL predicates
 
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of
-`P_disk`, the lent auth, row (b), H2a stand).  The design of record is
-[`fs-state.md`](fs-state.md): the file system is one family of nested
-separation-logic predicates `fs_state Γ S` (inodes own their record bytes
-and their data blocks, directories own their entries with link TOKENS,
-the free bitmap owns the free blocks), instantiated at a durable view
-`Γ_D` (inside `crashN`, whole) and a logged view `Γ_L` (in the log's
-parked client payload, piecewise checked out).  There is no pure
-whole-state well-formedness, no abstract target state, no per-op
-finalize; the commit is the log lending the `γD` auth to a client-composed
-basic update (the debt).  The log exposes byte-keyed `fs_L`, a parked
-opaque payload, and two logically-atomic AUs — nothing else.  The
-byte-view worklist that preceded this ruling is archived with its history
-in [`../completed/durable-disk-byteview.md`](../completed/durable-disk-byteview.md).
+`P_disk`, row (b) and custody at birth stand).  The file system is one
+family of nested separation-logic predicates `fs_state Γ dq S` — inodes own
+their record bytes and their data blocks, directories own their entries
+with link TOKENS, the free bitmap owns the free blocks — instantiated at a
+DURABLE view (fresh names inside a snapshot, held whole in `crashN`) and at
+the ERA's logged view (distributed across the era's invariants, piecewise
+checked out).  There is no pure whole-state well-formedness, no abstract
+target state and no per-op finalize.  What the log exposes is byte-keyed
+ownership and two logically-atomic points, and NOTHING else: its lock
+resource carries no client proposition, and the commit does not lend a
+durable authority to a client-composed update — the file system builds the
+next snapshot itself, at the one ghost step where its invariants are open,
+and the WAL swaps the registry over.  The predicate is
+[`fs-state.md`](fs-state.md); the durable side and the commit are
+[`durable-fs-plan.md`](durable-fs-plan.md), the design of record.
 
 ### Custody at birth: the PowerOn arm's two client hooks (landed 2026-08-23)
 

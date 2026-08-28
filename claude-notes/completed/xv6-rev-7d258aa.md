@@ -1,16 +1,24 @@
-# `XV6_REV` 31f115a -> 7d258aa: DONE, awaiting a rebase onto main
+# ARCHIVED 2026-08-28 — `XV6_REV` 31f115a -> 7d258aa, landed
 
-**STATUS: the bump is complete and the tree is green** — all 1313 `iris/*.v`
-build on the GCP VM.  It is NOT pushed: concurrent proof work lands on main
-first, so this has to be rebased and re-confirmed.  §4c is the recipe for that
-and the one hazard it carries.  Everything below is the record of how it was
-done and what bit; read §2, §4b-quater and §4b-sexies before the next bump.
+The bump landed on main (`6fc996654`) and has since been superseded twice
+over; the pin is `45071c7`.  §4c's "what remains: the rebase" is done, and
+every offset map and file-by-file cost below is about a revision the tree
+left behind — **do not read any number here as current**.
 
+**READ THIS FILE BEFORE THE NEXT BUMP ANYWAY**, for four bump-independent
+lessons the playbook does not carry: §2 (the `relayout_map.py` register-index
+defect, and the three-line audit that catches its class), §4b-quater (the
+five ways a scripted rename fails, including the sticky anchor), §4b-sexies
+(a 15-minute file is a WRONG proof, not a slow one — the `-time` last-line
+trick) and §4b-septies (the REGISTER value vs SLOT value distinction a
+narrowed spill range forces).  [`../xv6-bump-playbook.md`](../xv6-bump-playbook.md)
+points at them.
 
-The bump is IN PROGRESS.  This file is the state: what landed, what the
-remaining work is, and — most importantly — the maps that were derived by hand
-and must NOT be re-derived with the tools, because on this bump the tools get
-them wrong.
+---
+
+This file is the record of the bump: what landed, and — most importantly —
+the maps that were derived BY HAND and must NOT be re-derived with the
+tools, because on this bump the tools got them wrong.
 
 Read [`../xv6-bump-playbook.md`](../xv6-bump-playbook.md) first; this file is
 only the instance.

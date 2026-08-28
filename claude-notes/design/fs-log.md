@@ -190,7 +190,7 @@ section could not predict:
   byte view at the CRASHED disk, so recovery really does move each home
   block. That arm holds the `fsblock` and calls `fsblock_update`.
 The per-consumer detail is `fs-ghost-state.md` §1 and
-`projects/durable-disk.md` item 1c.
+`completed/durable-disk-2026-08-23-to-25.md` item 1c.
 
 ## The bio rework (Ψ-parametric; bio never reads Ψ)
 
@@ -329,135 +329,131 @@ the abstract target state and the per-op finalize obligation outright, so
 both moves (`log_state_pend_mono`, `log_state_fin`) are the identity and
 `pend` survives only as the name of what the ledger's union is.
 
-### The log's FS-agnostic interface, as it stands (durable-disk 1d/1d')
+### The log's FS-facing interface
 
-The interface of record is [`fs-state.md`](fs-state.md) §5: byte-keyed
-`fs_L`, an opaque parked client payload, two logically-atomic AUs, and
-nothing else. All of it is LANDED:
+The WAL is FILE-SYSTEM-AGNOSTIC in the strong sense: its lock resource
+carries no client proposition, its context names no client payload, and
+`end_op` has no FS-facing premise and no FS-facing postcondition.  A
+`log_write` proves nothing about the file system, so nothing
+file-system-shaped is threaded through the ~90 files that name `log_ctx`
+and that context is arity-fixed.
 
-* **LANDED** — `end_op` has **no FS-facing premise at all**. 1b deleted
-  `FsCrash.end_op_pres`; 1d deletes `LogInv.end_op_fin` (row (a)'s per-op
-  finalize) with its 30 call sites, the `Ob : gset fsobj` writer
-  declaration on all four `SpecLogWrite` forms, the object component of
-  `op_entry`, and `FsObj*`/`FsWfImg`.
-* **LANDED** — the log layer can NAME the committed view it would index a
-  payload by: `LogDefs.lm_committed M cov ls` (1a's `fs_recovery_of_mirror`
-  term, moved down with `fs_restrict` / `fs_install` so the log does not
-  have to import the crash layer), `LogDefs.lm_logged L cov ls` (the view a
-  commit installs), and `LogDefs.lm_committed_clean` — the bridge that
-  turns row (b) at the empty batch into `lm_committed M' = lm_logged L`,
-  which is exactly what an `end_op` re-deposit needs to re-park a payload.
-* **LANDED** — the parked payload, `log_write`'s payload AU and the commit's
-  client-prepared durable step (below).
+What the log DOES expose is byte-keyed ownership plus two logically-atomic
+points; the client side of it is [`fs-state.md`](fs-state.md) §5 and
+[`durable-fs-plan.md`](durable-fs-plan.md) §3.
 
-#### The parked payload and its one law
+- **The logged byte view.**  `FsBlocks.fs_bytes γfs` is a byte-keyed
+  `ghost_map`; clients hold FULL elements (`fsblock` for a block,
+  `byte_range` for a run) and owning a range IS the permission to write it.
+  The AUTH lives in the invariant `FsBlocks.fs_bytes_inv` at `fsbN` (a child
+  of `logN`), whose body `fs_bytes_body` also holds the bio-side cache map
+  `C` and the pure rows that tie the two (`bytes_tie`, `bytes_dom`).  A
+  commit freezes `L` by holding that authority.
+- **The transaction token.**  `LogInv.log_tx γ = ∃ t, t ↪[ln_tx γ] ()`,
+  minted by `begin_op` inside `log_op` and consumed WHOLE by `end_op`.  The
+  id is existential and no client names it: `log_res` ties the ledger to the
+  open transactions by CARDINALITY, not identity, so an ending transaction
+  never has to say what it touched.  A SHARE of the element is the one thing
+  every file-system-side park spells — `TxPin.tx_pin γ t q` with
+  `tx_pin_o` (a column that may be empty) and `tx_pins` (a ledger) — and the
+  three refutations `tx_pin_no_ops` / `tx_pin_o_no_ops` / `tx_pins_no_ops`
+  against an EMPTY `ln_tx` authority are what "no transaction is open" buys
+  at a commit.  Eight parks in the tree are instances; none of them adds a
+  ghost family.
+- **`log_ctx`'s four FS-facing conjuncts.**  It is the only persistent
+  bundle `wp_end_op` holds, so anything the commit must reach has to be in
+  it: `fs_bytes_at γfs home` (the byte view's invariant),
+  `SbPark.sb_parked γfs` (block 1, OWNED), `LogSnapLaw.snap_law` (the file
+  system's own commit law), and `FsBlocks.exc_sealed` (recovery is over).
+  All four are resources or persistent laws; none is a payload the log
+  re-indexes at a write.
 
-`Ψ : gmap Z (list (bv 8)) → iProp Σ`, indexed by the **committed view
-alone**. `LogInv.log_state Ψ …` parks `Ψ (lm_committed M cov logstart)`
-beside the era's mirror half and row (b); `log_res Ψ …` is the lock's
-resource; `log_ctx_at Ψ γ bn γfs cov ls dev` is the Ψ-named context and
+#### Block 1 is owned, and "never logged" is a refutation
 
-    log_ctx γ bn γfs cov ls dev := ∃ Ψ, log_ctx_at Ψ γ bn γfs cov ls dev
+`SbPark.sb_park γfs sb` is an invariant at `sbN` holding block 1's bytes at
+FRACTION 1 with their parse; `sb_parked γfs = ∃ sb, ⌜fs_sb_ok sb⌝ ∗ sb_park`
+is the arity-free form `log_ctx` carries, and `initlog` allocates it.  Two
+placement facts:
 
-keeps the arity the **78 files** that thread the log's context already
-have — `SpecKexec.fs_fabric`, `FsReady.fs_ready`, `UsertrapRes` and every
-syscall contract among them, none of which has any business naming a
-file-system payload. The four clients that must name `Ψ` (`log_write`'s AU
-callers, `begin_op`, `end_op`, `sys_sync`) open the existential IN THEIR
-OWN PROOF, which is sound because only one log lock is ever allocated;
-`log_ctx_of_at` recovers the plain form for everything else they call.
-The boot chooses the witness (`ProofInitlog`: `Ψ := fun _ => emp`), so no
-boot-chain threading exists at all.
+- **`sbN` is a SIBLING of `fsbN`, not a child** (`fsbN_sbN_disj`): the
+  commit holds the byte view open while the collection reads block 1, so the
+  disjointness a committer needs is from `fsbN`, not from `logN`.
+- **The share is 1, not `DfracDiscarded`.**  The collection hands block 1 to
+  the durable predicate as an ordinary `∗`-conjunct, and the used-set
+  coupling is read off that conjunction — a discarded share would not
+  refute a read-locked inode's ¾.
 
-**Why the committed view alone.** The logged view needs no index: the
-payload's content is pinned to `L` by the byte ELEMENTS it holds against
-the log's auth (1c), and an `L` index would make every `log_write`'s AU
-RE-INDEX the payload, which no client can do for an arbitrary `Ψ` — so the
-eleven suppliers could not frame it and the interface could not be proven
-Ψ-parametrically at all. With the `D₀` index the payload goes in and comes
-back UNCHANGED at a `log_write` and moves at the COMMIT and nowhere else,
-which is where `γD` moves too.
+With the full fraction, "block 1 is never logged" is a REFUTATION rather
+than a premise: `log_write`'s byte-range window is at fraction 1 too, so a
+write to `SB_BNO` would put two full owners on one byte
+(`SbPark.sb_parked_bno_ne`).  `LogInv.log_state` carries the resulting row
+on the batch's write set, and `FsCrash.hdr_wf` carries it on the on-disk
+header, so it survives a power cycle.  It is load-bearing because `fsinit`
+reads the superblock off the RAW disk before `initlog` runs while the boot
+mint's snapshot describes the RECOVERED view: the two are one record only
+if recovery leaves block 1 alone.
 
-**THE LAW TAKES THE BYTE-VIEW AUTH AS AN INPUT AND GIVES IT BACK, and that
-is what makes it dischargeable at all.** The tempting shape,
-`□ (∀ M L, Ψ (lm_committed M) ==∗ Ψ (lm_logged L))`, is unprovable for any
-payload with real content: quantified over an arbitrary logged view with
-nothing else in hand, the client cannot know that `L` is the view its own
-elements describe, and the debt it owes is specific to that view. So:
+#### The commit's law: the file system builds its own epoch
 
-    LogInv.log_psi_commit Ψ γfs cov ls :=
-      □ (∀ M L Lb,
-           (ghost_map_auth (fs_bytes γfs) 1 Lb
-            ∗ ⌜FsBlocks.bytes_home_at Lb L (fs_home_set cov ls)⌝
-            ∗ Ψ (lm_committed M cov ls))
-           ==∗
-           (ghost_map_auth (fs_bytes γfs) 1 Lb
-            ∗ Ψ (lm_logged L cov ls)
-            ∗ LogDefs.fs_dstep (lm_committed M cov ls) (lm_logged L cov ls)))
+`LogSnapLaw.snap_law γ γfs cov logstart` is PERSISTENT, supplied by the file
+system and parked in `log_ctx`.  Given the byte authority at `L` and an
+EMPTY `ln_tx` authority it yields `FsDurSnap.P_dur` at the committed map and
+hands both authorities straight back.  It moves no durable resource: the
+epoch is ALLOCATED out of what the collection assembles at that instant
+([`durable-fs-plan.md`](durable-fs-plan.md) §4), which is why the WAL never
+allocates a file system from a value it cannot check and only swaps the
+registry over (`FsDurSnap.dsnap_step_xfer`).
 
-`bytes_home_at Lb L home` is `bytes_dom Lb home` plus "every home block's
-entry of `L` is a whole block whose bytes are `Lb`'s", i.e. exactly what
-pins `Lb` to the byte flattening of `L` on the home set; the committer
-derives it with `FsBlocks.fs_bytes_home_of` from the invariant's parked
-halves and the cache auth it holds. `log_psi_commit` is PERSISTENT, and
-that is not a weakening: the LINEARITY stage 2's debt needs lives inside
-`Ψ D₀`, which this update consumes; what is uniform is only the right to
-spend it at a commit, which the log must have in every batch.
+- **It is ARITY-FREE**, exactly as `sb_parked` is: the mask it runs in is
+  closed over (`∃ N, ⌜↑fsbN ## N⌝ ∗ snap_law_at … N`), with the one fact a
+  holder needs beside it — a committer is holding `fsbN` open, so the mask
+  it can offer is everything but `fsbN`.  `snap_law_run` is that reading at
+  `⊤ ∖ ↑fsbN`.
+- **Its premises are the rows of `FsBlocks.fs_bytes_body`**, spelled in
+  `LogSnapLaw` rather than as `FsCollect.col_auth`: that file sits BELOW
+  `LogInv`, which sits below the inode region, and spelling the rows keeps
+  `log_ctx`'s cone clear of the file system's.
+- **IT IS RUN BEFORE THE LOCK IS RELEASED, and that placement is forced.**
+  It needs the transaction authority, which lives inside `log_res` — behind
+  the log lock, which `end_op` releases before the commit body runs.  So the
+  committer runs it in the accounting critical section, at the one instant
+  the ledger is provably empty (`ProofEndOp.eo_snap_law_of_auth`, then
+  `eo_open_snap_law` at the opened batch), and carries the epoch down IN THE
+  WALK'S HAND: `eo_commit`/`eo_loop` take `P_dur` as a hypothesis-position
+  argument.  It survives the fuel induction because every fill writes a log
+  SLOT, so the map the epoch stands at is literally the same term at the
+  back edge (`eo_home_restrict_upd`).
+- A PURE conclusion would have crossed the lock release as a Coq hypothesis
+  for free; a resource has to be carried.  That is the price of having the
+  file system, rather than the WAL, build the epoch.
 
-`LogInv.log_psi_spend` is the crossing: holding the batch (hence `L`
-frozen by the checked-out cache auth), open `logN`, lend the byte auth,
-spend the law, close. `ProofEndOp`'s committer does it ONCE per batch, at
-mask ⊤ at the top of `eo_commit` — where `L` is final and `log.lock` is
-not held (that is what the committing flag buys). The COPY LOOP carries the
-payload at its parked index instead, as a resource at a FIXED map `D0` with
-the pure tie `D0 = lm_committed Mc cov logstart`; every fill writes a log
-SLOT, so `LogDefs.lm_committed_upd_ne` re-establishes the tie in one line
-at the back edge.
+#### The exception set, and why recovery needs no clean image
 
-#### The commit's prepared step
+`FsBlocks.exc_*` is the one window in which the byte view and the cache
+disagree.  At a PowerOn on a DIRTY header the era's `L` is minted at the
+COMMITTED view — the home blocks with the on-disk batch installed — while
+`C` and the physical disk still read the CRASHED bytes, so `bytes_tie` is
+false at exactly the home blocks the header's write set names.  That set is
+a ghost:
 
-    LogDefs.fs_dstep D D' :=
-      ∀ g : gname, ghost_map_auth g 1 (fs_dbytes D) -∗ fs_dview g (fs_dbytes D)
-                   ==∗ ghost_map_auth g 1 (fs_dbytes D') ∗ fs_dview g (fs_dbytes D')
+    exc_auth gX X   the invariant's authority (a one-key ghost map)
+    exc_own  gX X   the boot thread's own copy, shrunk one block per install
+    exc_sealed gX   tt ↪[gX]□ ∅ — a DISCARDED element, hence persistent
 
-`fs_dview` is `P_wf`'s body and `fs_dbytes` the byte flattening; both moved
-DOWN from `FsCrash.v` to `LogDefs.v` so the log can STATE the step (the log
-layer may not import the crash layer), and `FsCrash.v` re-exports `LogDefs`,
-so no reading of `fs_dview` moved. `FsCrash.fs_commit_L_sector0_rec` and
-`fs_commit_L_seq_permit` take the step as a SPATIAL argument at the caller's
-off-header view — `fs_dstep (fs_restrict V home) (fs_restrict (dv_of_D L)
-home)`, one term for both landing orders — and LEND `γD`'s auth and `P_wf`
-to it at the commit instant. The unconditional re-base is the TRIVIAL
-witness a Ψ-free client supplies (`LogDefs.fs_dstep_rebase`), not something
-the permit performs, and it is a PARAMETER of this stage: once `P_wf`
-becomes `fs_view Γ_D` it stops holding, which is the point.
+`fs_bytes_body` carries `bytes_tie_exc L C X` (the tie, off `X`), `X ⊆ home`,
+and `bytes_exc_val L Xv X` (on `X`, `L` holds the LOGGED value, named by a
+function fixed at allocation — which is what lets the recovering install
+restore the tie without owning the byte run).  PowerOn mints `X` at the
+header's write set, `install_trans` shrinks it, and `initlog` SEALS it empty
+and puts the seal in `log_ctx`.  Every reader of the byte view above the WAL
+takes the seal and immediately turns it into `X = ∅`
+(`exc_sealed_empty`), so no reader's shape changed and `initlog` carries no
+clean-image premise: the header decodes to whatever it decodes to, the copy
+loop is live, and `install_trans` installs every entry.
 
-**The gname is universally quantified, and that is forced.** `γD` is
-`FsCrash.fcn_view` of a record `P_fs` binds EXISTENTIALLY, so no client can
-name it. Stage 2's hoist of `fcn_view` into `RiscvPtsto.riscvFixedGS`
-(the worklist's `Pc`/`HPc`/`Hproj`/`Hswap`/`boot_fixedGS` move) is what
-turns this binder into a parameter and the step into the client's debt at
-the real durable name.
-
-#### `log_write`'s payload AU
-
-`SpecLogWrite.wp_log_write_au_body` gains a `Ψ` parameter, takes
-`log_ctx_at Ψ …`, and its closing wand gains
-
-    … -∗ fsblock (fs_bytes γfs) (uint bno) bs -∗
-    ∀ D₀ : gmap Z (list (bv 8)), Ψ D₀ ={Efs, ⊤}=∗ Ψ D₀ ∗ Φfsb
-
-— the payload in and out at the SAME index, because a `log_write` writes no
-disk block and so does not move the committed view. `D₀` is `∀`-bound
-because it is `log_state`'s own `lm_committed M cov logstart`, which no
-caller can name; a stage-2 client uses the crossing to move its checked-out
-pieces' shadow and to compose one per-object durable step into the debt
-inside `Ψ D₀`. The other three forms (`_gene`, `_gen`, `_sconf`) keep the
-plain `log_ctx` and open the existential in their own derivations, so no
-landed caller of theirs moves. `lw_au_lb0` gained a `Ψ` argument and frames
-the payload, which is what keeps the five AU suppliers (ialloc's
-`ireg_claim_au`, iupdate's three region steps, bfree's and balloc's bitmap
-steps, iput's deposit) byte-stable.
+`SpecFsinit` still carries `hdr_n bs_hdr = 0`, and that is a different fact
+about a different function: `fsinit` cannot own the pending home blocks'
+byte elements across the call.
 
 #### `log_write` at BYTE-RANGE granularity (durable-disk 2b-0)
 
@@ -574,36 +570,51 @@ locks — matching the code); re-acquires, deposits, cmt := 0.
     rewrites equal content; bwrite (home disk := L); extract bref, flip
     Ψd→Ψc + γdirty→false; bunpin; brelse ×2. Then lh.n := 0, W := [],
     which RESTORES the big-op's all-false form and frees units.
-- **initlog / recovery**: staged. Stages 1–3 give initlog a clean-image
-  precondition (⌜on-disk header n = 0⌝ — true after mkfs) and construct
-  log_res + bio_init's pool inputs from the boot-side disk_block mint (the
-  recorded-open mkfs-image mint, completed/crash.md). Real recovery
-  (install from a committed on-disk log) is stage 4 — it is the consumer
-  of `P_fs`'s crash-receipt.
-- **sys_sync**: proven, with an EMPTY contract (`SpecSysSync.v`). The
-  durability receipt it should return needs D-side client views and is
-  item 5 of the stage-4 list below.
+- **initlog / recovery**: REAL, and general in `n`
+  (`SpecInitlog`/`ProofInitlog`). There is no clean-image premise: the
+  header decodes to whatever it decodes to, `read_head`'s copy loop is live,
+  `install_trans(1)` installs every entry, and the closing `write_head`
+  clears a header that said `n`. What replaces the premise is
+  `FsCrash.hdr_wf` spelled at the header block (the count is within
+  `LOGBLOCKS`, the write set is duplicate-free, every entry is covered,
+  outside the log region and not block 1), carried across the power cycle by
+  the crash predicate itself. What `initlog` ASSEMBLES into `log_ctx` is the
+  "log" spinlock at the given gname (a FILL, not a mint: the four gnames
+  arrive as `LogDefs.log_free_tok`), block 1's park, the file system's law —
+  the ONE `□`-wand premise the FS adds to this contract, taking the park —
+  and the exception set's SEAL, taken the instant the last install empties
+  it. `SpecFsinit` keeps `hdr_n = 0` for its own reason: `fsinit` cannot own
+  the pending home blocks' byte elements across the call.
+- **sys_sync**: proven, with an EMPTY contract (`SpecSysSync.v`) — the
+  postcondition is the process bundle and `return 0`. That is the honest
+  state of the interface, not a gap in the proof: what the function DOES is
+  wait, and a waiting statement is only worth making once the thing waited
+  for can be NAMED. The two missing pieces are below (the stage-4 list,
+  item 5).
 
-## Stage 4 — the crash side (recorded now, built with recovery)
+## The crash side
 
-What `P_fs` is FOR: `∃ D, dur_auth γD D ∗ Pcontent D ∗ tie(P, D)` where
-`tie` says recovery(P) = D. Every physical write's permit
-(`▷P_fs ==∗ ▷P_fs`, spent at the DMA completion — the M5b seam) must
-re-establish the tie: log-area writes at on-disk n = 0 don't change
-recovery; write_head with n > 0 moves D atomically to L|W (the committer's
-receipts — the frozen γL facts for W and the log area — are what prove it);
-install writes rewrite home blocks to their logged values (recovery
-unchanged); the final write_head clears. Mid-batch L-inconsistency never
-matters: D only ever jumps between batch boundaries, where outstanding = 0.
-FS-level consistency of D (`Pcontent`) stays PARAMETRIC in the log layer;
-when the FS layer above wants it, each op's end_op can carry a composable
-"my delta preserves Pcontent" wand — xv6's ops are serializable under
-their inode/bitmap locks, so the batch composes them.
+The design of record is [`crash.md`](crash.md) (the crash predicate, the
+generations, custody at birth) and
+[`durable-fs-plan.md`](durable-fs-plan.md) (the durable snapshot and the
+commit).  In one paragraph, from the log's side: `FsCrash.P_fs` owns the
+physical byte fragments, the pure record `⌜fs_recovery (fs_blocks dk) D⌝ ∧
+hdr_wf ∧ history`, the era's custody arm, and the durable epoch
+`FsDurSnap.P_dur D`.  Every physical write's permit runs at the DMA
+completion and must re-establish that record: log-area fills do not change
+what recovery produces; `write_head` at `n > 0` is THE COMMIT POINT and
+moves `D` to `L` on the home set; installs rewrite home blocks to their
+logged values (recovery unchanged); the closing `write_head` clears and
+PRESERVES `D` through per-block caught-up receipts.  Mid-batch
+inconsistency of `L` never matters, because `D` only ever jumps at a batch
+boundary, where `outstanding = 0`.  FS-level consistency is not a
+parameter any more and not a per-op wand: it is the snapshot the commit's
+law re-founds at that same instant.
 
-### The stage-4 architecture (PROPOSED, to pin down before any code)
+### The rulings the crash side rests on
 
-The two forks recorded earlier are resolved by one load-bearing finding
-plus one dissolution; the whole shape follows.
+All landed; kept here because each one closes a question that is easy to
+re-open, and because the log layer is where three of them bite.
 
 **The finding that forces everything: client-visible disk fragments
 cannot live at the fixed `γdur`.** Today bio's pool/escrow/handles hold
@@ -785,7 +796,10 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
 5. **sys_sync** = a persistent receipt: the record carries a fixed
    mono-list of committed D's; commit appends; sys_sync's post is a
    lower-bound receipt that the caller's pre-call writes are durable.
-   - **WHAT A RECEIPT CAN HONESTLY NAME** (phase D2's analysis, not built).
+   - **WHAT A RECEIPT CAN HONESTLY NAME** (phase D2's analysis; the
+     data-indexed READ permit it was written against is SUPERSEDED — see
+     the note at the end of this item — but everything it says about the
+     receipt still stands, and none of it is built).
      `fs_commit_permit`'s `Q` today is `∃ D, fs_receipt_any D` with `D`
      unnamed, because the new durable state is
      `fs_install (fs_blocks dk) ls Ws (fs_restrict (fs_blocks dk) home)` and
@@ -853,22 +867,27 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
      own writes are durable" is not a log-layer statement: two ops in one
      batch may write the same block, so a caller's content claim is
      genuinely stale after another op's `log_write`, and what is durable is
-     the batch's FINAL content. Composing the receipt above with the FS
-     layer's own per-op knowledge is where that gets closed — the same place
-     `Pcontent` lives (item 6).
-6. **FS-level consistency stays parametric** (the record carries raw
-   maps; `Pcontent D` and the per-op composable wands remain the future
-   fs.c layer's business). Disk writes are SECTOR-atomic, not block-atomic
-   (`completed/sector-atomic-disk.md`, landed 2026-08-22): every WAL
-   landing is per sector and the commit rides the header's sector 0.
-
-Cost inventory (all contained): the era image ghost + boot mint seam
-(DiskPtsto/VirtioProto/boot bundle); the γdur auth-only sweep (rw's
-`disk_block` re-keyed to the era gname — one seam equation today, so
-mostly mechanical); the permit→tag reshape at `virtio_proto_step` /
-`wp_disk_loop`; the state_interp `ghost_var` conjunct; `P_fs` + the boot
-token; bwrite's spec gains the tag argument (threaded to rw); initlog's
-recovery spec/proof; sys_sync's receipt (the function itself is proven).
+     the batch's FINAL content.  Composing the receipt with the FS layer's
+     own per-op knowledge is where that gets closed, and that layer now
+     exists: the durable snapshot IS the FS-level statement about `D`
+     (`durable-fs-plan.md`), so what a receipt has to carry is the tie
+     between a caller's writes and the commit that installed the snapshot,
+     not a `Pcontent` predicate of its own.
+   - **THE D2 PERMIT IS SUPERSEDED.**  The analysis above was written when
+     recovery's writes had to RE-BASE `fr_D`, which is why it reached for a
+     data-indexed READ permit.  Nothing re-bases `fr_D` any more: the era's
+     mirror is born true of the physical disk at PowerOn (`crash.md`,
+     "Custody at birth") and the durable snapshot crosses the power cycle
+     inside the crash predicate, so recovery's installs are the ORDINARY
+     value-chained permits and its closing `write_head` the ORDINARY
+     preserving clear.  What is left of D2 is a TRACE-LEVEL completeness
+     claim — "the batch I asked for is durable" — and it defers with
+     `sys_sync`, on the two pieces named above (a partial slot record on
+     `LogInv.log_mirror_at`, and a faithful commit counter with the
+     committer's receipt deposited beside it).
+6. **Disk writes are SECTOR-atomic, not block-atomic**
+   (`completed/sector-atomic-disk.md`): every WAL landing is per sector, and
+   the commit is atomic because it rides the header's sector 0.
 
 ## Decision record (rejected shapes)
 

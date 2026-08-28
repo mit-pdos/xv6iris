@@ -1,14 +1,14 @@
 # fs-state — the file system as nested separation-logic predicates, at two views
 
-DESIGN OF RECORD for the durable-disk project (ruled by the owner,
-2026-08-23, over a review of what stages E–G of the previous worklist had
-landed).  Worklist: [`../projects/durable-disk.md`](../projects/durable-disk.md).
-The crash-side mechanics it sits on: [`crash.md`](crash.md).  The previous,
-superseded approach (a byte-level committed view, pure whole-state
-well-formedness, per-op preservation lemmas, an object-granular pending
-ledger) is archived with its history in
-[`../completed/durable-disk-byteview.md`](../completed/durable-disk-byteview.md);
-nobody reads that for guidance.
+THE REFERENCE FOR THE PREDICATE ITSELF — what `fs_state` is, what it owns,
+and the rules it is built to (§0's local reasoning above all).  The DURABLE
+SIDE's design of record, which reads this one, is
+[`durable-fs-plan.md`](durable-fs-plan.md); the ghost inventory is
+[`fs-ghost-state.md`](fs-ghost-state.md) and the crash-side mechanics are
+[`crash.md`](crash.md).  A byte-level committed view, whole-state pure
+well-formedness, per-op preservation lemmas and an object-granular pending
+ledger were all refuted and must not come back; the reasons are
+`durable-fs-plan.md` §8.
 
 ## 0. The guiding rule: LOCAL reasoning
 
@@ -57,8 +57,8 @@ instantiated TWICE with the same definitions:
   `P_dur D` closes all of them — which is exactly what makes the durable
   half of `FsCrash.P_fs` a function of `D` alone and lets a commit DROP one
   epoch and allocate the next.  Nothing outside `crashN` names any of them.
-  The whole instance lives inside
-  `crashN` (`P_wf`, §4); no mortal ever holds a piece of it (ruling 1).
+  The whole instance lives inside `crashN`, as `FsCrash.P_fs`'s last
+  conjunct; no mortal ever holds a piece of it (ruling 1).
 - **`Γ_L`, the logged (in-era) view.**  `Φ_L a v := a ↪[fs_L] v`, the FULL
   element of the era's byte-keyed logged view whose auth the log owns
   (§5).  `γlink_L`, `γtop_L` are era-minted and die with the era — correct,
@@ -75,31 +75,33 @@ what lets `free_bitmap`'s argument in §2 run, and it is why the bio layer's
 agreement share moves to a bio-side map (§5).
 
 **Functoriality in `Γ`.**  Every non-`Φ` component of `Γ` is an
-allocatable ghost, the ghost components live INSIDE the nested structure
-(never in a side invariant), and there is ONE mint lemma
-
-```
-fs_state_mint : fs_state Γ_D S -∗ (footprint S at Φ_L) ==∗ fs_state Γ_D S ∗ fs_state Γ_L S
-```
-
-that walks the durable instance and allocates `Γ_L`'s ghosts to match
-(for each directory, as many fresh link tokens as it holds entries with
-tokens, drawn from freshly allocated `link_auth`s).  There is no image
-decoding at boot: `FsCfgSnap.fs_cfg_alloc_snap` is handed the previous era's
-own epoch (`FsDurSnap.fs_snap` at the committed map, lent at the PowerOn
-arm) and reads everything it spends off it — see
-[`durable-fs-plan.md`](durable-fs-plan.md) §5.
+allocatable ghost and lives INSIDE the nested structure, never in a side
+invariant.  That is what makes one instance reachable from another by a
+RESOURCE TRANSPORT rather than by a re-derivation: `FsDurXfer.fs_state_xfer`
+takes `fs_state Γ (DfracOwn q) S` at any `q > 1/2`, ALLOCATES a fresh `Γ'`
+— the byte map at the flattening of the source's own runs, the link family
+and the abstract map at the source's own elements — and returns the source
+untouched.  Nothing is computed from `S`, and the disjointness the fresh
+byte map needs is READ off the source's own exclusivity inside the lemma
+(two shares of one byte that each exceed a half do not fit inside it), so
+no pure fact about the state is materialised anywhere.  Both the commit and
+the boot run that one transport; see
+[`durable-fs-plan.md`](durable-fs-plan.md) §4 and §5.  There is no image
+decoding at boot: `FsCfgSnap.fs_cfg_alloc_snap` is handed the previous
+era's own epoch (`FsDurSnap.fs_snap` at the committed map, lent at the
+PowerOn arm) and reads everything it spends off it.
 
 ## 2. The nested predicates
 
 ```
-fs_state   Γ S        := sb_owned Γ S.sb ∗ fs_inodes Γ S.inodes ∗ free_bitmap Γ S.free
+fs_state   Γ dq S     := (at Γ' := FsStateDefs.gamma_q Γ dq — every byte at dq, §4)
+                         sb_owned Γ' S.sb ∗ fs_inodes Γ' S.inodes ∗ free_bitmap Γ' S.free
                          ∗ ⌜fs_geom S⌝                         (* §7: the map-vs-superblock rows *)
 fs_inodes  Γ I        := [∗ map] i ↦ n ∈ I, inode_owned Γ i n          (* the one ∗-iteration *)
 inode_owned Γ i n     := rec_owned Γ i n.rec
                          ∗ [∗ k ∈ slots n] blk_owned Γ (addr n k) (blocks n k)
                          ∗ (ind_owned Γ n when the indirect block exists)
-                         ∗ link_auth Γ i (nlink n.rec)
+                         ∗ link_auth Γ i (nlink n.rec) (type of n.rec)   (* §6½ *)
                          ∗ ⌜local clauses⌝
 rec_owned  Γ i dn     := byte_range Γ (IBLOCK i) (64·slot i) (dinode_bytes dn)
 blk_owned  Γ b bs     := byte_range Γ b 0 bs                   (length bs = BSIZE)
@@ -169,34 +171,41 @@ steps at its AUs.
 
 ## 4. The two views and the top
 
-```
-fs_view Γ := ∃ S, ghost_map_auth Γ.γtop 1 S ∗ fs_state Γ S
-```
+`fs_state Γ dq S` is the whole predicate AT A SHARE: every BYTE of the file
+system rides at `dq`, and the ghost column — the link authority with its
+type register, a directory's entry tokens, i.e. `FsStateInode.inode_ghost` —
+stays WHOLE.  `fs_state Γ (DfracOwn 1) S` is the fraction-1 predicate by
+`reflexivity` (`fs_state_1`).  It is written at `FsStateDefs.gamma_q Γ dq`,
+the view whose `fsΦ` is pinned at `dq`, so there is no parallel hierarchy of
+`_q` definitions and every Γ-generic lemma is read at a share with no new
+proof (`fs_state_gq`: `gamma_q` is idempotent in its second argument).  The
+share stops at `fs_state_split` — `fs_footprint` takes it, `fs_ghost` is
+Φ-free and stays whole, because half a `link_auth` is not half a file
+system but an unusable element — and that is exactly what makes the
+transport of §1 provable at any `q > 1/2`.
 
-> **AS BUILT the predicate takes a SHARE and `fs_view` is retired**
-> (durable-disk EV-X).  `fs_state Γ dq S` puts every BYTE of the file
-> system at `dq` and leaves the ghost column — the link authority, the type
-> register, a directory's entry tokens — WHOLE; `fs_state Γ (DfracOwn 1) S`
-> is the old predicate by `reflexivity` (`fs_state_1`).  It is written at
-> `FsStateDefs.gamma_q Γ dq`, the view whose `fsΦ` is pinned at `dq`, so
-> there is no parallel hierarchy of `_q` definitions and every Γ-generic
-> lemma is read at a share for free.  `fs_view` itself never acquired a
-> caller (the top map's authority travels beside `fs_state`, in
-> `FsDurSnap.fs_snap`) and is deleted, together with `fs_state_mint` /
-> `fs_view_mint` — the real mint ALLOCATES the target's byte map
-> (`FsDurXfer.fs_state_xfer`), so nobody ever holds a footprint at the
-> fresh view to hand in.
+**The abstract map's AUTHORITY is not part of `fs_state`**; it travels
+beside it — inside `FsDurSnap.fs_snap` on the durable side, inside
+`InodeRegion.ftop_inv` on the era's.  What a holder of a checked-out inode
+holds is the FRAGMENT `top_frag_q Γ dq i n`, which is how it updates the top
+at its AU.  A read-locker holds a QUARTER of it, and that one line is what
+makes a read lock a read lock: every mover of the abstract map
+(`InodeRegion.ireg_top_retag`) needs the whole element, so a read-locker
+cannot retag, and the escrow's read arm keeps its own node pinned to the
+holder's by ghost-map agreement.
 
 - **Durable**: the committed map's own instance, `FsDurSnap.P_dur D` —
   `fs_state` over fresh existential names, re-allocated at each commit and
   held whole inside `FsCrash.P_fs`.  Mortals never hold its fragments; what
   a mortal may hold about durability is a PERSISTENT receipt minted at the
   commit (the contents layer's sync receipts, `crash.md`).
-- **Logged**: `fs_view Γ_L`, whose body lives in the log's parked payload
-  (§5) so that it is at hand at every `log_write` and at commit, MINUS the
-  pieces currently checked out.  A holder of `inode_owned Γ_L i n` also
-  holds the fragment `i ↪[γtop_L] n`, which is how it updates the top at
-  its AU (auth in the payload + its own fragment).
+- **Logged**: the era's instance at `FsBytesGamma.fs_gamma_L`, DISTRIBUTED
+  across the era's own invariants and the pieces currently checked out —
+  records in the inode region, a cached inode's remaining pieces in its
+  slot escrow, uncached inodes in the pool, free blocks in the bitmap
+  invariant, the abstract map's authority in `ftop_inv`
+  ([`durable-fs-plan.md`](durable-fs-plan.md) §2 lists every leg).  The
+  commit is what puts it back together (§4 there), for one ghost step.
 - The shape is the same at both views; only where the body sits and the
   piecewise checkout differ.  That is what makes a later userspace layer
   compatible: a program owning file `f` holds `f ↪[γtop_L] n`, reached
@@ -206,197 +215,122 @@ fs_view Γ := ∃ S, ghost_map_auth Γ.γtop 1 S ∗ fs_state Γ S
 ## 4½. The durable side: a SNAPSHOT, and where its design lives
 
 The durable instance is re-allocated per commit out of what the commit
-collects at quiescence, and never updated in place.  So there is no
-durable write permission for a writer to hold, no deferred justification
-to discharge, and no `P_wf` body carrying its own byte map: a writer's
-durable obligation is the pure snapshot tie re-established at the commit,
-and `FsCrash.P_fs`'s durable conjunct is `FsDurSnap.P_dur` of the
-committed map alone.  The design of record is
-[`durable-fs-plan.md`](durable-fs-plan.md) — §4a for the tie a batch
-accumulates, §5 for the boot point — and the ghost inventory is
+collects at quiescence, and never updated in place.  So a writer holds no
+durable write permission, owes no deferred justification and re-establishes
+nothing about the durable side at its own step: `FsCrash.P_fs`'s durable
+conjunct is `FsDurSnap.P_dur` of the committed map ALONE, and it moves only
+at the commit, by the transport of §1.  The design of record is
+[`durable-fs-plan.md`](durable-fs-plan.md) — §4 for the collection at
+quiescence, §5 for the boot point — and the ghost inventory is
 [`fs-ghost-state.md`](fs-ghost-state.md).  §0–§2 above and §7 below remain
 the reference for the predicate itself.
 
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
-The log exposes, and knows, only this:
+The WAL's own design is [`fs-log.md`](fs-log.md) and its client-facing
+contracts are [`durable-fs-plan.md`](durable-fs-plan.md) §3.  What the file
+system sees is this, and nothing else:
 
-- **The logged byte view `fs_L`**, a byte-keyed `ghost_map`: the log holds
-  the AUTH in `log_state`; clients hold FULL elements (`Φ_L`).  `L` cannot
-  move without the log (freeze-by-auth during commit, as today).
-- **Bio's agreement share moves out of `fs_L`.**  Today the client and the
-  bio machinery each hold ½ of one block element so that `bread` can
-  return `bytes = L(b)` by agreement without the log lock.  With the
-  client owning the full element, bio holds halves of a bio-side cache
-  map `γcache`, tied to `L` inside a log-layer INVARIANT
-  `inv logN (auth L ∗ auth C ∗ ⌜C = L on cached blocks⌝)` that
-  `log_write` opens under its lock and a `bread` client opens to turn
-  `bytes = C(b)` into `bytes = L(b)`.  One-time re-plumb of `FsBlocks` and
-  the bio `Ψ` instantiation; the price of exclusive ownership.
-- **A parked client payload `Ψ D₀ Dc`** in `log_state`, Ψ-parametric
-  exactly as `bio_view` is for bio: the log stores it, never reads it, and
-  indexes it by BOTH views it knows by value — the committed one
-  `D₀ = lm_committed M cov ls` (which the era's born-true mirror gives it,
-  H2a) and the CURRENT LOGGED one `Dc = lm_logged L cov ls`.  Both are
-  functions of binders `log_state` already has.  It is parked in the log,
-  not in a separate FS invariant, because whatever the committer needs at
-  the commit instant must already be in the log's hands (the last-ending
-  operation cannot know it is last), and `log.lock` already serializes
-  every `log_write`.
+- **The logged byte view `fs_L`**, a byte-keyed `ghost_map`
+  (`FsBlocks.fs_bytes`).  The log holds the AUTH inside the byte view's own
+  invariant (`FsBlocks.fs_bytes_inv`, namespace `fsbN` under `logN`);
+  clients hold FULL elements (`fsblock` for a whole block, `byte_range` for
+  a run).  Owning the elements of a byte range IS the permission to write
+  that range, and `L` cannot move without the log — the commit freezes it
+  by holding the auth.
+- **Bio's agreement share is a bio-side map.**  The client owns the whole
+  `fs_L` element, so bio holds halves of its own cache map `C`, tied to `L`
+  by the pure rows of `FsBlocks.fs_bytes_body` (`bytes_tie`, `bytes_dom`);
+  a `bread` client opens the invariant to turn `bytes = C(b)` into
+  `bytes = L(b)`.  The escrow is parametric in a `BioDefs.bio_view` record
+  which the log layer instantiates as `FsBlocks.fs_view`; bio never reads
+  it.
+- **THE LOG'S LOCK RESOURCE CARRIES NO CLIENT PROPOSITION.**  There is no
+  parked client payload, no payload index and no client law about a write:
+  a `log_write` proves nothing about the file system, so nothing
+  file-system-shaped is threaded through the ~75 files that name
+  `log_ctx`, and that context is arity-fixed.  What it carries besides its
+  lock and its geometry is four rows, each a resource or a persistent law
+  rather than a payload: `FsBlocks.fs_bytes_at` (the byte view's
+  invariant), `SbPark.sb_parked` (block 1, owned outright — see below),
+  `LogSnapLaw.snap_law` (the commit's law), and `FsBlocks.exc_sealed`
+  (recovery is over, so `bytes_tie` holds at every home block).
+- **The transaction token.**  `begin_op` mints
+  `LogInv.log_tx γ = ∃ t, t ↪[ln_tx γ] ()` inside `log_op`; `end_op`
+  consumes the whole element and the WAL deletes `t`.  The id is
+  EXISTENTIAL and no client names it — `log_res` ties the ledger to the
+  open transactions by CARDINALITY, not identity.  A SHARE of that element
+  is what every file-system-side park spells, through the one atom
+  `TxPin.tx_pin γ t q` and its two combinators; an empty `ln_tx` authority
+  refutes all of them at once (`tx_pin_no_ops`/`_o_no_ops`/`tx_pins_no_ops`),
+  which is what "no transaction is open" buys the commit.
+- **`log_write b`** takes a transaction token, the caller's byte elements
+  for the range it changes (`SpecLogWrite.wp_log_write_au_range_body` is
+  the form the whole-function proof proves; every other form is derived
+  from it), and — for an inode record or a data block — the owning inode's
+  write receipt.  It moves `L` at those bytes and does nothing else.
+- **`end_op` has no FS-facing premise and no FS-facing postcondition.**
+  An operation's entire contribution is the sequence of LOCAL steps at its
+  own AUs (§3); there is no per-op finalize and no picture anyone must
+  name.
 
-  **The second index is forced, and the Ψ-free AU forms die with it.**  A
-  `D₀`-only index was ruled on the grounds that the payload's `Γ_L`
-  content pins `L` by the byte ELEMENTS it holds against the log's auth,
-  and that an `L` index would make every `log_write`'s AU RE-INDEX the
-  payload — which no client can do for an arbitrary `Ψ`.  The first half
-  is FALSE (the payload holds no such elements; see the commit law below);
-  the second is TRUE and is the price paid.
+**Block 1 is owned, not assumed** (`iris/SbPark.v`).  `sb_park γfs sb` is
+an invariant at `sbN` holding the superblock block's bytes at fraction 1
+together with their parse; `sb_parked` is the arity-free form `log_ctx`
+carries.  `sbN` is a SIBLING of `fsbN`, not a child, because the commit
+holds the byte view open while the collection reads block 1.  Two things
+ride on the full fraction: the collection can hand block 1 to the durable
+predicate as an ordinary `∗`-conjunct, and "block 1 is never logged"
+becomes a REFUTATION rather than a premise — `log_write`'s window is at
+fraction 1 too, so a write to `SB_BNO` meets two full owners of one byte
+(`SbPark.sb_parked_bno_ne`).  `LogInv.log_state` and `FsCrash.hdr_wf` both
+carry the resulting row, so it survives a power cycle.
 
-  `Ψ` is packaged EXISTENTIALLY in the log's context — `log_ctx_at Ψ …` is
-  the Ψ-named form and `log_ctx … := ∃ Ψ, log_ctx_at Ψ …` — so the 78 files
-  that thread the log's context keep their arity and none of them ever
-  names a file-system payload; a client that must name `Ψ` opens the
-  existential in its own proof, and the BOOT picks the witness.
-- **`log_write(b)`'s AU**:
-  `fs_L-elements for the bytes that change ∗ (∀ D₀ Dc, Ψ D₀ Dc ={E}=∗
-  Ψ D₀ (<[b := bs']> Dc) ∗ Q)`.  The COMMITTED index does not move — a
-  `log_write` writes no disk block — and the LOGGED one does, at exactly
-  the block written; both are `∀`-bound because they are the log's own
-  parked indices, which no caller can name.
-  **`Ψ D₀ Dc ==∗ Ψ D₀ (<[b := bs']> Dc)` is not provable at an arbitrary
-  `Ψ`**, so it is a PREMISE of the two AU adapters whose input has no
-  payload move (`SpecLogWrite.lw_au_lb0` / `lw_au_rec`; `lw_au_whole`
-  relays one and needs none) and of the three
-  forms that used to be Ψ-free (`wp_log_write_gen` / `_gene` / `_sconf`,
-  which now take `log_ctx_at Ψ …`).  A supplier discharges it by handing
-  the log its own durable step through the log's SECOND law:
+**The commit's law is what the file system parks in the WAL**
+(`iris/LogSnapLaw.v`).  It is PERSISTENT and FILE-SYSTEM-SUPPLIED: given
+the byte authority at `L` and "no transaction is open", it yields the next
+durable epoch `FsDurSnap.P_dur` at the committed map and hands both
+authorities straight back.  It moves no durable resource — the epoch is
+ALLOCATED, out of what the collection assembles at that instant
+([`durable-fs-plan.md`](durable-fs-plan.md) §4) — and it is arity-free: the
+mask it runs in is closed over, with the one fact a committer needs beside
+it (that mask misses `fsbN`, which the committer is holding open).  It is
+supplied once, at `initlog`, as a `□`-wand taking block 1's park; nothing
+else of the file system crosses into the WAL.
 
-  ```
-  log_psi_step Ψ := □ (∀ D₀ Dc Dc', Ψ D₀ Dc -∗ fs_dstep γD Dc Dc' ==∗ Ψ D₀ Dc')
-  ```
-
-  — which is `LogDefs.fs_dstep_trans` read on the payload, and is the whole
-  of what the log assumes about its client at a write.
-  The client opens whatever it likes inside (its own invariants, the
-  parked `fs_view Γ_L` body) to move its pieces, its top fragment and the
-  debt.  Since the log learns the checked-out buffer's bytes equal `L(b)`
-  on every byte (via `γcache`), and the writer's stores touched only its
-  range, the update needs elements only for the bytes that differ —
-  byte-range ownership works above a block-granular device.
-- **The commit law, and the prepared step it RETURNS.**  The commit's own
-  update is consumed by the log's permit at mask `∅`, so it must be a basic
-  update the client prepared in advance (the debt).  What prepares it is
-  one of the two persistent laws `log_ctx_at` carries:
-
-  ```
-  log_psi_commit Ψ := □ (∀ D₀ Dc, Ψ D₀ Dc ==∗ Ψ Dc Dc ∗ fs_dstep γD D₀ Dc)
-  ```
-
-  — hand out the accumulated debt, re-park the identity.  It needs neither
-  a lent byte auth nor a home-set tie nor a `logN` crossing; all three died
-  with the `D₀`-only index, and `FsBlocks.bytes_home_at` /
-  `fs_bytes_home_of` are DELETED.  `LogInv.log_psi_spend` is now a
-  three-line corollary rather than an invariant crossing.
-
-  where `fs_dstep γD D D' := γD_auth (bytes D) -∗ P_wf(bytes D) ==∗
-  γD_auth (bytes D') ∗ P_wf(bytes D')` (the gname is a PARAMETER since
-  2c-pre; the log spells it ambiently at `riscv_dview_name`).  Its two
-  laws — `LogDefs.fs_dstep_id` and `fs_dstep_trans` — are the whole of
-  the debt's algebra and are body-free, so they survive the flip.
-
-  **WHY THE LAW CANNOT LEND THE LOG'S BYTE-VIEW AUTH INSTEAD.**  A law of
-  the naive shape `□ (∀ M L, Ψ (lm_committed M) ==∗ Ψ (lm_logged L))` is
-  NOT provable for a real payload: quantified over an arbitrary `L` with
-  nothing else in hand, the client cannot know that `L` is the view its own
-  elements describe.  Lending the byte AUTH was meant to fix that — and it
-  cannot: a lent auth teaches the client `L` only at addresses whose
-  ELEMENT it holds, and the payload holds none.  The inode region's record
-  runs live behind `iregN` (§7's ruling (i)), `γtop_L`'s authority behind
-  `ftopN`, the bitmap and the free pool behind `bitmapN`, and a cached
-  inode's data blocks are handed OUT of the icache escrow to whoever holds
-  its sleeplock — which `readi` takes with no operation open, so even at
-  group quiescence they are unreachable at any mask.  Widening the law to a
-  fupd recovers the three invariant-parked pieces and not the fourth.  That
-  is what forces the payload's SECOND index: the equation the client cannot
-  prove becomes definitional, because every `log_write` re-indexes.
-  `log_write`'s ghost step does it with `LogDefs.lm_logged_insert_home`,
-  whose home-membership premise is the contract's own two (covered, and not
-  the log's own storage), so the log needs no new premise.
-
-  The permit LENDS `γD`'s auth AND `P_wf` to the returned step for the
-  instant — the same move the machine layer makes when it lends `γdisk` to
-  `P_fs` (`crash.md`, stage A3) — and that is forced: moving
-  `ghost_map_auth γD 1 B` needs the ELEMENTS of `B`, and those may not be
-  owned by anything mortal (crash.md principle 1), so they are `P_wf`'s.
-  The log proves `D' = L|home` internally (row (b), `log_mirror_tie_body`).
-
-  **THE BOOT'S PAYLOAD IS THE DEBT ITSELF**: `ProofInitlog` picks
-  `Ψ D₀ Dc := LogDefs.fs_dstep riscv_dview_name D₀ Dc`, parks it at the
-  identity (`fs_dstep_id`, off `lm_committed_clean` at the clean header and
-  row (b) at the empty batch) and proves the two laws by `fs_dstep_id` and
-  `fs_dstep_trans`.  Nothing in the boot chain threads a `Ψ`.
-  While `P_wf` is a bare byte map the SUPPLIERS' half is still stage 1's
-  declared parameter: they discharge the write premise with
-  `LogInv.log_psi_write_rebase`, i.e. `log_psi_step` fed
-  `LogDefs.fs_dstep_rebase`.  That corollary is honest on exactly
-  `fs_dstep_rebase`'s terms and dies with it; each supplier replaces its
-  use by its own composed `Γ_D` step when `P_wf` carries content.
-- **`end_op`**: no FS-specific premise at all.
-
-`FsCrash.end_op_pres`, `fs_commit_pres`, `LogInv.end_op_fin`, the
-`∀ V Ws` / `∀ F L pend` shapes, the object ledger in `op_entry`, `FsObj*`,
-`FsWfImg`, `log_row_a*` and `FsWf.fs_durable_wf` were REJECTED because
-they leaked the log's internals upward and, being quantified over pictures
-no caller can name, were not dischargeable by any arm (they were green
-only as placeholders).  **They are all DELETED in the tree** — the last of
-them by durable-disk 1d, which also deleted their 30 + 6 gate call sites;
-`end_op` now takes no FS-facing premise at all.
-
-§5 is LANDED IN FULL (durable-disk 1d/1d'/2c-pre/3a): the payload's second
-index, the two laws, the retirement of the Ψ-free `log_write` forms and the
-commit's spend are all code.  The durable gname is landed:
-`γD` is `RiscvPtsto.riscv_dview_name`, a `riscvFixedGS` field, so
-`fs_dstep γD D D'` is the client's debt AT THE REAL DURABLE NAME.
-`LogDefs.v` takes the gname as an argument; `log_psi_commit`,
-`log_psi_spend` and `FsCrash.fs_commit_L_sector0_rec` spell it AMBIENTLY
-as `riscv_dview_name`, the way every file already spells
-`riscv_disk_name`, so `log_ctx_at` and `fs_crash_seam` keep their arities.
+**The exception set is why recovery needs no clean-image premise**
+(`FsBlocks.exc_*`).  At a PowerOn on a dirty header the era's `L` is minted
+at the COMMITTED view while the cache and the physical disk still read the
+crashed bytes, so `bytes_tie` is false at exactly the home blocks the
+on-disk header names.  That set is a ghost the boot mints at the header's
+write set, the recovering `install_trans` shrinks one block at a time, and
+`initlog` SEALS empty (`exc_seal`, a discarded element, hence persistent).
+Every reader of the byte view takes the seal and immediately turns it into
+`X = ∅`, so no reader above the WAL changed shape.
 
 ## 6. What this supersedes in the tree
 
-The stage-F/G pure layer (`FsWf.v`, `FsEff*.v`, `FsOp*.v`, `FsObj*.v`,
-`FsWfImg.v`, ≈15k lines) proved whole-state preservation of whole-state
-pure predicates, which this design never states.  What survives is the
-ENCODING vocabulary each `*_owned` predicate uses for its own tie
+A whole-state PURE layer — predicates like `fs_durable_wf` over the entire
+file system, with preservation lemmas per operation — is not part of this
+design and no longer exists in the tree (`FsWf.v`, `FsEff*.v`, `FsOp*.v`,
+`FsObj*.v`, `FsWfImg.v`, ≈15k lines, all deleted).  What survives of it is
+the ENCODING vocabulary each `*_owned` predicate uses for its own tie
 (`dinode_bytes`/`fs_dinode`, `dirent`/`dir_view`, `bm_bytes`, the indirect
-block, from `FsImg.v`/`DinodeEnc.v`/`BitmapEnc.v`/`FsTree.v`), and the
-local facts (a dirent insert keeps names unique; a truncate frees every
-owned block; …), which become lemmas beside the predicate that uses them.
+block, from `FsImg.v`/`DinodeEnc.v`/`BitmapEnc.v`/`FsTree.v`) and the local
+facts (a dirent insert keeps names unique; a truncate frees every owned
+block), each a lemma beside the predicate that uses it.
 
-**ALL OF IT IS NOW DELETED** (2026-08-27; `FsObj*.v`/`FsWfImg.v` had gone
-earlier).  The condition above — deleted once the `Γ`-predicates replace
-their consumers — turned out to be vacuous: the layer had no consumers
-left to replace.  `FsEff*.v`/`FsOp*.v` (17 files, 13.2k lines) formed a
-closed island nothing else required, outside the cone of every top-level
-theorem; and inside `FsWf.v` only `dv_of_D` was reachable from a live
-caller, so `fs_durable_wf_view`, `fs_durable_wf_body`, the agreement /
-extensionality suite and the mkfs discharge went with them (1019 → 47
-lines).  Note the trap that hid this: a single dead-code pass reports
-none of it, because the island and the suite reference each other — it
-takes the FIXPOINT (unreachable from any live root), not one pass.
-`FsWf.v` IS GONE TOO.  What it had left after the deletion was one
-two-line definition, `dv_of_D` — the junk-tolerant totalisation of a finite
-block map — under a name that described what the file used to be, with a
-comment six times the length of its code.  `dv_of_D` moved DOWN into
-`LogDefs.v`, beside `fs_home_set`, `fs_restrict`/`fs_install` and
-`fs_dbytes`, which are there for exactly the reason it now is: the log
-names the value it parks the client's payload at, and the log layer may not
-import the crash layer.  Two things fell out of the move — `lm_logged` had
-been spelling `dv_of_D` out by hand (its comment said so, because `dv_of_D`
-"lives ABOVE this file"), and is now written through it, so a crash-layer
-proof holding `fs_restrict (dv_of_D L) …` closes syntactically instead of
-by delta.  Its readers (`FsCollect`, `FsCrash`, `LogSnapLaw`, `ProofEndOp`)
-reach it through `LogDefs`, which they all already had.
+Two rules that deletion left behind:
+
+- **A dead-code sweep must take the FIXPOINT, not one pass.**  A closed
+  island whose members reference each other reports as live on every single
+  pass; what identifies it is unreachability from any LIVE ROOT.
+- **`dv_of_D` — the junk-tolerant totalisation of a finite block map — lives
+  in `LogDefs.v`**, beside `fs_home_set`, `fs_restrict`/`fs_install` and
+  `fs_dbytes`, for the reason all of them are there: the log names the value
+  it commits at, and the log layer may not import the crash layer.
+  `lm_logged` is written through it, so a crash-layer proof holding
+  `fs_restrict (dv_of_D L) …` closes syntactically rather than by delta.
 
 
 ## 6½. Link counts and types are ONE RA: the type register (RULING, lane G5)
@@ -454,54 +388,53 @@ The rmdir arm (`c` in `dp`, both locked):
 `dirlink`), `unlink` returns the entry's fragment at `nlink--`, `itrunc`
 returns `.`/`..` before the type-0 write.
 
-Snapshot: `sk_links` is `✓ type_elem S` — each inode's authority from
-its own record and `..`, each dirent's fragment from its target's type
-(the one cross-inode read at the VALUE level, in one place; lane H
-deletes it).  Read off the collected resources at a commit; allocated and
-distributed at boot.  What dies: `DirLinks.v`, the `wl/wdu/wdt/g/p`
-columns, `dir_par_tie`, the `fl` index, G2's per-holder tags and
-re-tagging, G3's `ups` counter, G4's `p`-column repair
-(`g4-superseded-ptie`).  `iris/FsParRefute.v` records why a
-type-conditional half in the parent's bundle cannot be stated.
+The family's validity is never a maintained clause and never a sweep: it
+is READ off whichever instance owns the family (`FsState.fs_links_valid`,
+`fs_links_valid_tok`), which is the only place the cross-inode fact
+"#fragments ≤ multiplicity everywhere" is ever produced.  The durable
+snapshot's `sk_links` row is that reading with ONE SPARE FRAGMENT at the
+root: `ent_tokenless` exempts a self record, so the root's `".."` carries
+no token and its `nlink = 1` would otherwise be unaccounted for.  The
+region parks that spare as `InodeRegion.ireg_keep`, the commit hands it to
+the transport beside the predicate, and "the root is allocated" is a
+reading of the RA's law (`ireg_lnk_root_alive`) rather than a clause.
+`FsState.fs_boot_alloc_root_slack` is the one `own_alloc` that produces
+family and slack together.
 
-**ALL OF IT IS DEAD AS OF LANE G6**, whole tree green at the three-entry
-baseline.  `DirLinks.v` and `IregDirBit.v` are off `_CoqProject` (sources
-kept, headers pointing here); `IcacheEscrow.dlinks` is
-`FsStateInode.ent_toks_x` alone; `Xv6Cameras.linkElemUR0` is `c`/`r` and
-`IcacheRef`'s element `c`/`r`/`f`/`rc`; `ilink`/`ilinkd`/`ilinkdp`/
-`iparent`/`igrey`/`ilink_fl` and `DirView.dlc_*` are deleted, and with them
-`InodeRegion`'s (L1), (T1) `ireg_dir_ok`, (T1') `ireg_dir_wl0`,
-`ireg_par_ok` and `ireg_link_grey`; `SpecIupdate`'s two link bodies lost the
-`fl` parameter and the three flavour premises (`InodeRegion.ireg_write_link_fl`
-/`_unlink_fl` are `ireg_write_link_reg`/`_unlink_reg`); the boot's stage-B
-mint (`IcacheBoot.link_boot_mint_w`) and its two image premises went with
-them.  The BOOT WALL those objects put in front of a post-crash mint is
-closed with them: the old ledger's columns were not a function of the
-image's bytes, so no boot could produce them.  The two pure `mword 16` increment facts `DirLinks` happened
-to hold live on as `InodeRegion.nlink_add1_le`/`_nz_eq`.
+A per-holder link LEDGER, with its `wl/wdu/wdt/g/p` columns, its parent tie
+and its flavour index, does not exist and must not come back: its columns
+were not a function of the image's bytes, so no boot could produce them —
+which is the boot wall the register above was designed to remove.  A
+type-CONDITIONAL half in the parent's bundle cannot be stated at all; the
+`.`-self-fragment is what ties a directory's `..` data to its type
+instead.
 
-## 7. As built — stage 2a (`FsState*.v`, 2026-08-23)
+## 7. As built: where each piece lives, and where the build differs from §2
 
-Five files, 1687 lines, all in `iris/_CoqProject` after `BitmapEnc.v`:
+Five files, all in `iris/_CoqProject` after `BitmapEnc.v`:
 
-| file | lines | holds |
-|---|---|---|
-| `FsStateDefs.v` | 164 | the record `fs_view_names` (`fsΦ`/`γlink`/`γtop`), `byte_range`, `blk_owned`, `phi_excl`, `GTimeless` |
-| `FsStateLink.v` | 327 | the link RA, its law, its two moves, the generic gather/scatter |
-| `FsStateInode.v` | 713 | `fs_node`, `inode_local`, `rec_owned`, `ind_owned`, `inode_phi`, `ent_toks`, `inode_ghost`, `inode_owned`, `dir_owned`, the readings, the encode lemmas |
-| `FsStateBitmap.v` | 172 | `free_pool`, `free_bitmap`, `bitmap_alloc`, `bitmap_free` |
-| `FsState.v` | 311 | `sb_owned`, `fs_inodes`, `fs_state Γ dq S`, `fs_footprint Γ dq S`, `fs_state_split`, `fs_footprint_shed` |
+| file | holds |
+|---|---|
+| `FsStateDefs.v` | the record `fs_view_names` (`fsΦ`/`γlink`/`γtop`), `gamma_q`, `byte_range`, `blk_owned`, `phi_excl`, `GTimeless`, the shed chain |
+| `FsStateLink.v` | the link/type RA, its law, its moves, the generic gather/scatter |
+| `FsStateInode.v` | `fs_node`, `inode_local`, `rec_owned`, `ind_owned`, `inode_phi`, `ent_toks`/`ent_toks_x`, `inode_ghost`, `inode_owned`, `dir_owned`, the readings, the encode lemmas |
+| `FsStateBitmap.v` | `free_pool`, `free_bitmap`, `bitmap_alloc`, `bitmap_free` |
+| `FsState.v` | `sb_owned`, `fs_inodes`, `fs_geom`, `fs_state Γ dq S`, `fs_footprint Γ dq S`, `fs_state_split`, `fs_footprint_shed`, the family allocators |
 
 Nothing is imported from any `Proof*`/`Spec*`/invariant file; the whole
 stack sits on `FsImg`/`DinodeEnc`/`BitmapEnc`/`FsTree`/`BlockWords` plus
 plain Iris.
 
-**The RA.** `linkUR := gmapUR Z (authR natUR)` — one auth-of-nat per inum,
-all inums in ONE ghost-map element at `γlink`.  `natUR`'s `op` is `+` and
-its `≼` is `≤`, so the law IS `auth_both_valid_discrete` + `nat_included`;
-`k` separate tokens compose because `◯ 1 ⋅ ◯ 1 = ◯ 2`.  One camera keyed by
-inum (rather than one gname per inum) is what lets `fs_state_mint` allocate
-every auth AND every token of the new instance in a single `own_alloc`.  No
+**The RA.** `Xv6Cameras.fsLinkUR := gmapUR Z (authR (gmultisetUR ity))` —
+one auth-of-multiset-of-types per inum, all inums in ONE element at `γlink`
+(§6½ says what the multiset MEANS: the count and the type are one register,
+`link_reps n ty` being `n` copies of one value).  The law is
+`auth_both_valid_discrete` plus multiset inclusion, and `k` separate tokens
+compose because a multiset's `op` is disjoint union.  One camera keyed by
+inum (rather than one gname per inum) is what lets the transport allocate
+every auth AND every token of the fresh instance in a single `own_alloc`
+off the source's own element (`FsState.fs_boot_alloc_at`,
+`fs_boot_alloc_root_slack`).  No
 existing class serves (the tree's unique `ghost_mapG Σ Z (bv 8)` is the byte
 view's and must not be duplicated), so there are two new CAPACITY-ONLY
 classes, `fsLinkG` and `fsTopG` (`ghost_mapG Σ Z fs_node`).  `fsLinkG` is
@@ -568,13 +501,16 @@ Where the built shape differs from §2, and why:
   `FsTree.file_bytes` is a different function (over a raw `data` map) that
   it is defined in terms of.  `dir_entries n` is `∅` for a non-directory,
   which is what makes `ent_toks` vacuous there.
-- **The mint's gnames come out existentially.**  `own_alloc` cannot target a
-  given gname, so
-  `fs_state_mint ΓD ΓL S : fs_state ΓD S -∗ fs_footprint ΓL S ==∗ ∃ gl gt,
-  fs_state ΓD S ∗ fs_state (MkFsView (fsΦ ΓL) gl gt) S` — `ΓL` carries only
-  the target `fsΦ`, its gname fields being unread (`fs_footprint_gname`).
-  `fs_view_mint` is the same with `γtop`'s auth allocated at `S`'s inode map
-  and one `top_frag` handed back per inode (§4).
+- **The transport's target gnames come out existentially, all three of
+  them.**  `own_alloc` cannot target a given gname, so
+  `FsDurXfer.fs_state_xfer` yields `∃ g gl gt, … ∗ fs_state (snap_gamma g gl
+  gt) (DfracOwn 1) S` beside the source, the fresh byte authority
+  (`ghost_map_auth g 1 B` with `B` the flattening of the source's own runs,
+  hence a SUBSET of the source's map — which is where a snapshot's identity
+  comes from), the abstract map's authority at `fss_inodes S` and one
+  `top_frag` per inode.  `fs_state_xfer_tok` is the same with a spare link
+  fragment riding along, which is what the inode region's keep-alive token
+  at the root needs (no directory entry accounts for it).
 - **What `fs_state` does NOT carry, and why the durable snapshot does.**
   `snap_shape`'s surviving clause — every block of the committed map lies
   below `sb_size (fss_sb S)` — is a fact about `D` and cannot be a reading:
@@ -711,7 +647,7 @@ without touching `DirLinks.v`.
   readi/writei/bmap/itrunc's contracts.**
 - **ONE MOVER.**  `inode_owned_era_retag`: hand back the new node's
   FOOTPRINT, retag the two ghosts.  Both authorities are LENT (the
-  region's from `iregN`, the top's from the log's parked payload), so a
+  region's from `iregN`, the top's from `ftopN`), so a
   walk holds neither and both arrive at the AU.  `_split`, `_rec_upd` (at
   `fn_addrs_kept`), `_blk_acc` (one block out and back, ghosts untouched,
   returner quantified over the NEW contents) and `_trunc` (the `fn_blk = ∅`
@@ -796,61 +732,36 @@ Two things 2b should know before it starts:
 
 ### 2c-img: the DURABLE instance, and where it comes from
 
-`Γ_D` is `FsDurBytes.fs_gamma_D g Γd` — `MkFsView (λ a v, a ↪[g] v)
-(fdn_link Γd) (fdn_top Γd)`, with `g` the fixed layer's
-`RiscvPtsto.riscv_dview_name` and `Γd` its `riscv_fsdur` bundle.  Same
-record, same `phi_excl`/`GTimeless`, as `FsBytesGamma.fs_gamma_L`; what
-differs is only which byte map's full element `fsΦ` is.
+**There is no fixed-layer durable view.**  A snapshot's Γ is
+`FsDurBytes.snap_gamma g gl gt` at three FRESH gnames, existentially closed
+inside `FsDurSnap.P_dur`; it is the same record with the same
+`phi_excl`/`GTimeless` as `FsBytesGamma.fs_gamma_L`, and all that differs is
+which byte map's full element `fsΦ` is.  Nothing outside `crashN` ever names
+one of the three.
 
-- **THE FLAT BLOB AND THE NESTED STATE ARE ONE LEMMA.**  `P_fs_alloc`
-  fills `γD` with `LogDefs.fs_dbytes D` — block `b`'s `i`th byte at
-  `b·BSIZE + i` — and `FsDurBytes.fs_dbelems_dbytes` says those elements
-  ARE one `blk_owned Γ_D b bs` per entry of `D`, under
-  `∀ b bs, D !! b = Some bs → length bs = BSIZE`.  The premise is what
-  makes the flattening injective (a block starts at a multiple of the
-  stride and is no longer than it), and it is the premise of every lemma
-  about `fs_dbytes`: without it the fold silently overwrites.
-- **THE IMAGE IS DECODED IN EXACTLY ONE PLACE**, `FsDurImg.fs_dur_of_image`,
-  generic in `FsCfgBoot.fs_boot_image_wf` and naming no literal image.  It
-  returns `γtop`'s auth, `fs_state Γ_D (img_state …)` and an EXPLICIT
-  residual — the home blocks the footprint does not cover.  The residual is
-  not slack: the footprint is a function of `S` only up to the free pool's
-  existential CONTENTS, so no `⊣⊢` between the elements and the state can
-  be stated, and returning the leftover is what keeps the tie honest
-  without a domain sweep.
-- **THE Γ IS FUNCTORIAL, AND THE TREE HALF-SAYS SO NOW.**
-  `FsStateEra.inode_blocks_era`/`ind_res_era` and
-  `FsImgBridge.img_inode_blocks_res` are stated at `fs_gamma_L` but say
-  nothing about it, so they hold at ANY `Γ`.  Until they are restated
-  Γ-generically, `FsDurImg.fs_dur_bundle` makes `Γ_D` an instance of
-  `fs_gamma_L` (fill `fs_bytes`/`fs_link`/`fs_top` with the durable
-  gnames; the two cache-side fields are never read) and
-  `fs_gamma_L (fs_dur_bundle g Γd) = fs_gamma_D g Γd` by `reflexivity`.
-
-  **HALF OF THE PROPER FIX IS DONE (2c-body).**  The three lemmas' `Γ`
-  reaches them only through `InodeInv`'s
-  `inode_blocks`/`ind_res`/`blk_res`/`ind_blk`, and those four USED to be
-  stated over `fsblock (fs_bytes γfs)`.  Since stage 3 of the
-  era-vocabulary unification their bodies ARE `blk_owned`/`blk_owned_q` at
-  `fs_gamma_L γfs`, so what is left of the Γ-generic restatement is
-  abstracting the `γfs` argument into a `Γ` one — a change of ARITY on
-  four definitions in a file with 358 dependents, not a change of shape,
-  and the `fsblock`-facing lemma statements (which is what the walk files
-  see) are already isolated behind
-  `blk_res_run`/`blk_res_q_run`/`ind_blk_nz`/`ind_blk_q_nz`.  A new leaf
-  file is still the wrong answer: it cannot serve both `FsStateEra` and
-  `FsImgBridge` (siblings, neither in the other's cone) without
-  duplicating `inode_blocks_of_slots`/`_of_blocks`, the near-duplicate
-  family the guiding principle forbids.  Do the arity move when a
-  supplier's `Γ_D` step actually needs the instance, not before.
-- **TWO IMAGE FACTS THE `Γ`-PREDICATES NEED AND `fs_boot_image_wf` DOES
-  NOT CARRY**, both premises today and both recorded in
-  `projects/durable-disk.md` item 2c: a FREE record's `inode_local`
-  (nothing constrains a type-0 record's `size`/`addrs`, so `inl_size` and
-  `inl_covers` fail — `FsDurImg.fs_region_bare` is the sweep), and
-  `✓ link_elem` at the image map.  On the second, W9's structural half IS
-  proved (`img_dir_entries_empty`: the image has exactly ONE directory,
-  the root), which reduces the whole family to one inclusion in
-  `fsLinkUR` — `FsDurImg.img_link_valid`.  What is left is the ticket
-  bridge, and the reason it is not free is that `FsImg.fs_rec_ticket` and
-  `FsStateInode.ent_tokenless` exempt different records.
+- **THE FLAT BLOB AND THE NESTED BLOCKS ARE ONE LEMMA.**
+  `FsDurBytes.fs_dbytes_blocks` says the elements of the flattening
+  `LogDefs.fs_dbytes D` — block `b`'s `i`th byte at `b·BSIZE + i` — ARE one
+  `blk_owned Γ b bs` per entry of `D`, under `∀ b bs, D !! b = Some bs →
+  length bs = BSIZE`.  That premise is what makes the flattening injective
+  (a block starts at a multiple of the stride and is no longer than it), and
+  it is the premise of every lemma about `fs_dbytes`: without it the fold
+  silently overwrites.  `fs_dbytes_set_blocks` is the same equation against a
+  `[∗ set]` over a home set at a total block view, which is the shape the
+  ERA's byte half arrives in.
+- **THE IMAGE IS DECODED IN EXACTLY ONE PLACE, AND ONLY FOR ERA 0.**
+  `FsDurImg.img_snap_ok` turns `FsCfgBoot.fs_boot_image_wf` alone into
+  `snap_ok (img_state …) (fs_restrict … home)`, and `img_P_dur_alloc` carves
+  the epoch out of that by the value-first allocator (`iris/FsDurAlloc.v`) —
+  the tree's ONE call of it, because era 0 is the one producer with no
+  source instance to mint from.  Every later boot re-founds the file system
+  from the previous era's own epoch through the transport (§1), so no image
+  decoder is on that path at all.
+- **The two image facts the `Γ`-predicates need beyond the parse** are
+  conjuncts of `fs_boot_image_wf` itself, not premises anyone threads: a FREE
+  record's `inode_local` (nothing constrains a type-0 record's `size`/`addrs`
+  — `FsImg.fs_region_bare` is the sweep) and `✓ link_elem` at the image map,
+  which reduces to one inclusion in `fsLinkUR` because the image has exactly
+  ONE directory (`FsDurImg.img_link_valid`).  Both are discharged at the
+  literal mkfs image in `SystemAdequacy.fsimg_image_wf`/`fsimg_snap_ok`, so
+  nothing about the file system is assumed there.

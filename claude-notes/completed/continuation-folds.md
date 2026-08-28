@@ -1,3 +1,15 @@
+# ARCHIVED 2026-08-28 — the continuation-fold survey, finished
+
+Every instance the survey found is folded; the "Remaining, ranked" table is
+empty and the last row (`ProofIput.ip_free_locked`) landed.  What is worth
+reading here is the METHOD and the NEGATIVE RESULTS — the `≥ 19 -∗` bar, and
+the files that look like instances and are not — so that nobody re-runs a
+measurement this file already recorded as worthless.  The rule itself lives
+in [`../optimization.md`](../optimization.md); apply it when WRITING a new
+whole-function walk, which is the only place it is still worth anything.
+
+---
+
 # Continuation folds — the worklist
 
 **The lever** is optimization.md's "Fold block continuations into named
@@ -86,15 +98,12 @@ identifiers and big literal arguments that cost nothing structurally.
 Attribute carrier cost with `coqc -time` per enclosing `Lemma` (the
 `Chars` offsets are BYTES).
 
-## Remaining, ranked — bytes removable × the cost of the lemma that CARRIES them
+## The sweep's own ranking — bytes removable × the cost of the lemma that CARRIES them
 
 A tree-wide sweep (continuations ≥1000 B, ≥6 top-level rows so an
-already-named body does not count, in files ≥20 s) leaves 28 candidates; with
-the carrying lemma's own `coqc -time` cost against them, only four are worth
-anything:
-
-| candidate | bytes × lemma | note |
-|---|---|---|
+already-named body does not count, in files ≥20 s) left 28 candidates; with
+the carrying lemma's own `coqc -time` cost against them, four were worth
+anything, and all four are in the Landed table above.  **NOTHING IS LEFT.**
 
 Everything else on the ≥1 kB list fails on the carrying lemma being cheap, and
 `WpSconfCsr.wp_csrr_sstatus_s_sconf` is the cautionary one: **89.5 % share, the

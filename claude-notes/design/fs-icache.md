@@ -939,7 +939,7 @@ not.
 > fragments.  §12.3's `diblk_bytes_inj` survives only where a whole block
 > is still decoded (`ireg_read`, `ireg_read_blk`, `ireg_withdraw`).
 > Whether the run TRAVELS with a checked-out record is open and ruled on in
-> [`../projects/durable-disk.md`](../projects/durable-disk.md) item 2b-inode-1.
+> [`../completed/durable-disk-2026-08-23-to-25.md`](../completed/durable-disk-2026-08-23-to-25.md) item 2b-inode-1.
 
 §10.5 left one thing open: who owns the dinode blocks, so that `ilock` can
 conclude the pool entry it takes describes the dinode the block actually
@@ -4258,7 +4258,7 @@ keep-alive token; the borrow is `FsStateEra.ent_toks_borrow`, one
 `blk_holes_zero bm data` (an `inode_ok` conjunct).  **The root clause is
 GONE from `ireg_slot`** (2b-inode-6, step 6a); (L1) is not, and its three
 surviving readers are listed in fs-ghost-state §3b.  The rest of the
-deletions are `claude-notes/projects/durable-disk.md`, item 2b-inode-5
+deletions are `claude-notes/completed/durable-disk-2026-08-23-to-25.md`, item 2b-inode-5
 step 6.
 
 §19 ended by naming Part 2 "the soundness obligation, and the only route
@@ -5308,6 +5308,19 @@ than as work.
 ### §20.16.2's trace but NOT §20.16.3's wall.  `c = None` goes from FALSE to
 ### MERELY UNDISCHARGED; row 2(b) closes at the two guarded sites and stays
 ### open at two unguarded ones; the minimal carrier is one file and it is free
+
+> **THE CARRIER §20.17.7 RECOMMENDS NO LONGER EXISTS.**  `DirLinks.v` and
+> the whole `wl`/`wdu`/`wdt`/`g`/`p` ledger it belonged to are DELETED; link
+> counts and types are ONE counting RA per inode
+> (`Xv6Cameras.fsLinkUR`, `fs-state.md` §6½), a directory's entries hold
+> fragments of their TARGET's register inside `FsStateInode.ent_toks_x`, and
+> an orphan's `".."` is TOKENLESS by construction rather than by a grey
+> disjunct with an `nlink = 0` side condition.  Read §20.17 for the BINARY
+> analysis — which sites are guarded, which are not, and why a walker's
+> `c = None` is not discharged by the guards — and for the standing rule it
+> ends on (a fact a walker needs about a record it has just locked must be
+> carried by the payload, not by a lemma about the ledger).  Its per-file
+> costings are void.
 
 The kernel is now pinned at upstream `9da28f5`, which put an `nlink == 0`
 guard immediately after `ilock` in BOTH walkers:

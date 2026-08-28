@@ -9,8 +9,8 @@ read those six as "depends on nothing else".
 Layers below: [`fs-log.md`](fs-log.md) (the logged view `fsblock`, the bio
 handles, `log_write`) and [`fs-inode.md`](fs-inode.md) (`blkmap_wf`,
 `balloc`'s contract). The predicate itself is stage 2 of
-[`fs-state.md`](fs-state.md); [`../projects/durable-disk.md`](../projects/durable-disk.md)
-item 2b is the worklist entry.
+[`fs-state.md`](fs-state.md), and the durable side's design of record is
+[`durable-fs-plan.md`](durable-fs-plan.md).
 
 ## The geometry
 

@@ -61,30 +61,35 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   phasing (the tree is red across the port — read §6 before starting).
 - **[`adequacy.md`](design/adequacy.md)** — whole-system adequacy, and the TRACE INVARIANT hook `Hphi`: how a pure consequence of any Iris invariant is exported to every state of the CSL-free execution, which conjunct of `state_interp` each kind of fact comes from, and what `wp_strong_adequacy` still leaves on the table.
 - **[`durable-fs-plan.md`](design/durable-fs-plan.md)** — THE DESIGN OF
-  RECORD for the durable file system, in one place: the three disk
-  views, the file-system predicate at two instances, the WAL's
-  client-facing contracts (`begin_op`/`end_op` with a transaction token,
-  ONE `ilock` with a write arm parking a share of it and a read arm
-  keeping ¾ of the bytes, `log_write` owing nothing but its bytes), the
-  commit that COLLECTS the predicate over `L` from the FS invariants at
-  quiescence and allocates a fresh snapshot from it, boot as the same
-  allocator's second call site, and why every earlier mechanism died —
-  including the per-write payload.
-- **[`fs-state.md`](design/fs-state.md)** — the PREDICATE itself: the view
-  record `Γ`, byte-level ownership on both the durable and logged sides,
-  `inode_owned`/`free_bitmap`/`fs_state` as nested predicates
-  with link TOKENS and no whole-state pure clauses, "in flight, not
-  inconsistent", the log's FS-agnostic interface (§0–§2, §7).  The durable
-  side's design is `durable-fs-plan.md`'s.
+  RECORD for the durable file system, in one place: the three disk views,
+  the share-taking predicate at two instances, the WAL's client-facing
+  contracts (`begin_op`/`end_op` with a transaction token, ONE `ilock`
+  with a write arm parking a share of it and a read arm keeping ¾ of the
+  bytes, `log_write` owing nothing but its bytes), the commit that
+  COLLECTS the predicate at quiescence as an ACCESSOR and hands it to the
+  RESOURCE TRANSPORT, boot as that same transport's second call site (the
+  epoch is lent out of the crash predicate at the PowerOn arm), and §8's
+  list of what was refuted.
+- **[`fs-state.md`](design/fs-state.md)** — the PREDICATE itself:
+  `fs_state Γ dq S` (every byte at `dq`, the authority column whole), the
+  view record `Γ`, `inode_owned`/`free_bitmap` as nested predicates with
+  link TOKENS and no whole-state pure clauses, the ONE transport that
+  reaches a fresh instance from an old one, "in flight, not inconsistent",
+  the link/type register (§6½), and the log's FS-facing interface (§5).
+  The durable side's design is `durable-fs-plan.md`'s.
 - **[`fs-ghost-state.md`](design/fs-ghost-state.md)** — the reference
   INVENTORY of every file-system ghost: per piece its RA, its HOME, what a
-  fragment means, who mints/spends it — the log's transaction token and
-  block-1 park, the region's armed registry, the pool split and its
-  partition, the per-slot escrows' write/read arms, the durable snapshot
-  and what the commit collects.
-- **[`crash.md`](design/crash.md)** — power, crashes and generations: the ghost
-  power thread, generation-indexed loop expressions, the fixed/era `riscvGS`
-  split, the crash-spanning disk invariant.
+  fragment means, who mints/spends it — the log's transaction token and the
+  ONE pin atom (`TxPin`) every park is an instance of, block 1's park, the
+  region's armed registry, the pool split and its partition, the per-slot
+  escrows' write/read arms, the durable snapshot, what the commit collects
+  and what the boot is lent.
+- **[`crash.md`](design/crash.md)** — power, crashes and generations: the
+  ghost power thread, generation-indexed loop expressions, the fixed/era
+  `riscvGS` split, the crash-spanning disk invariant, and the PowerOn arm's
+  two client hooks — `Hproj` (a pure fact into each boot) and `Hswap`,
+  which also carries a RESOURCE out, the durable epoch the next era's file
+  system is re-founded from.
 - **[`device.md`](design/device.md)** — the memory-mapped device model (16550
   UART + PLIC + virtio-mmio disk), the device ghosts, the bus-master/DMA-lease
   story, the S-mode instruction-level UART access layer.
@@ -123,9 +128,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   predicate, the two-ended fractional reference algebra, `PageFields.v` (carving
   a kalloc'd page into typed struct fields — reusable), and page reclamation.
 - **[`fs-log.md`](design/fs-log.md)** — the FS block layer: the three
-  block-content states, the `γL` logged-view ghost and its commit discipline,
-  the Ψ-parametric bio escrow, the bread/bwrite/brelse contracts, `log_res` and
-  the begin_op/end_op/log_write specs, and the stage-4 crash plan.
+  block-content states, the logged byte view and its commit discipline, the
+  view-record-parametric bio escrow, the bread/bwrite/brelse contracts,
+  `log_res` and the begin_op/end_op/log_write specs, and the WAL's four
+  FS-facing rows — the byte view, block 1's park, the commit law, and the
+  exception set that makes recovery need no clean image.
 - **[`fs-inode.md`](design/fs-inode.md)** — the inode layer: `struct inode`'s
   geometry read off `bmap`'s instructions, the pure `blkmap` model, the two
   resources (`inode_map`, `inode_blocks`) and why `balloc`'s fresh block is
@@ -144,6 +151,10 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`fs-friendly.md`](design/fs-friendly.md)** — the friendly, client-facing
   file-system layer above the syscall proofs: what a caller should be able to
   say, and the staging that gets there.
+- **[`ghost-simplification.md`](design/ghost-simplification.md)** — the
+  standing list of what the file-system ghost state may still shed, and —
+  more usefully — of what has been PROBED AND REFUSED, so nobody re-opens
+  it.  One item is open (`gd`, SIMP-3).
 - **[`fs-fragments.md`](design/fs-fragments.md)** — the fragment algebra and
   the tree layer, the DESIGN OF RECORD for F1/F1.5: rulings R1–R12 (including
   the standing constraint that (L6) must NEVER be stated) over a verification
@@ -151,8 +162,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-Eight remain open; each file's top banner says precisely what is left (the
-first four were audited against the tree 2026-08-22):
+Six are open and one is a finished project's residue stub; each file's top
+banner says precisely what is left.  Audited against the tree 2026-08-28,
+when four more moved to [`completed/`](completed/).
 
 - **[`user-wp-slot.md`](projects/user-wp-slot.md)** — the PER-PROCESS
   user-execution WP slot, step 3: making a verified process run IN PLACE
@@ -162,56 +174,36 @@ first four were audited against the tree 2026-08-22):
   the two rulings to get before the residue re-key and the deliberately
   undesigned deposit-covering formulation.
 
-- **[`xv6-rev-7d258aa.md`](projects/xv6-rev-7d258aa.md)** — the `XV6_REV` bump
-  31f115a -> 7d258aa: DONE and green, awaiting a rebase onto main.  The
-  hand-derived scheduler and kexec offset maps (the tools get both wrong on
-  this one), three `relayout` defects and the audits that catch their classes,
-  the REGISTER-value vs SLOT-value distinction that a narrowed spill range
-  forces, and how to tell a wrong proof from a slow one.
-
-- **[`durable-disk.md`](projects/durable-disk.md)** — WORKLIST for xv6
-  correctness across crashes incl. FS consistency.  Design of record:
-  `design/durable-fs-plan.md` (snapshot commits: the durable FS predicate is
-  re-allocated per commit, never updated; a locked-inode registry keyed on
-  transaction ids gives "all inodes clean at commit").  **THE THEOREM IS
-  TRUE**: `SystemAdequacy.xv6_power_adequacy` assumes the file system's
-  image at `g`'s own disk ONCE and nothing about any later era, and
-  `SystemAdequacy`'s two corollaries discharge that at the literal mkfs
-  image and conclude, at EVERY reachable state of every power cycle, that
-  the physical disk still recovers to a committed view that IS a file
-  system.  Landed: the log's contract, the nested predicate, the whole era
-  instance, the durable allocator, the COMMIT's snapshot step, the boot
-  mint READING THE SNAPSHOT (`FsCfgSnap.fs_cfg_alloc_snap`), the WAL's
-  EXCEPTION SET for the dirty-header recovery window (`initlog` seals it
-  into `LogInv.log_ctx`, so no reader of the byte view above the WAL
-  changed), and the boot chain's snapshot-side premise
-  (`FsCfgBoot.fs_boot_snap_wf`, with `FirstTok`'s `_of_snap` producers).
-  What is LEFT: lane H (the value-first allocator is a mistake to clean up)
-  and the caller-less image routing in `FsCfgBoot`/`FsCfgSnap`.
-  Lanes A–H in the file.
-  History in `completed/durable-disk-2026-08-23-to-25.md`.
-- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
-  crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`
-  (today both carry a clean-image premise), `sys_sync`'s empty
-  postcondition, and the phase-D2 read-data-indexed-permit decision. The
-  boot composition's wiring is done; it inherits the clean-image premise.
+- **[`durable-disk.md`](projects/durable-disk.md)** — FINISHED; the file is
+  a 76-line stub carrying only the residue.  xv6 is correct across crashes
+  including FS consistency: `SystemAdequacy.xv6_power_adequacy` assumes the
+  image at `g`'s own disk ONCE and nothing about any later era, and its two
+  corollaries discharge that at the literal mkfs image and conclude, at
+  EVERY reachable state of every power cycle, that the physical disk still
+  recovers to a committed view that IS a file system.  Read
+  `design/durable-fs-plan.md` for the design; the stub is worth opening
+  only for what is left (Rank 4 parked, BT-4/5 priced and not run, three
+  design-level items nobody has proposed, four cosmetic leftovers).
+- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4, and
+  ONE item is left of the four: **`sys_sync`'s postcondition**, which is
+  empty and honestly so (`SpecSysSync.v` says why).  Real `n > 0` recovery,
+  the boot composition and the D2 permit are all closed by the durable-disk
+  lanes; the body's live-sounding passages about them are history and the
+  banner says so.  What the receipt needs is named: a partial slot record on
+  `LogInv.log_mirror_at`, and a faithful commit counter with the committer's
+  receipt deposited beside it.
 - **[`sp-migration.md`](projects/sp-migration.md)** — owning memory at a
   NON-IDENTITY kernel va: the settled design (ktier-indexed `↦ₘ[kt]`,
   `kpt_on` witness, `KtierLe` inference) and the KSTACK campaign are
   LANDED (K4 via `ParkCap.v`); what is NEXT is the `instr` ktier sweep
   (~330 statement-identical files) and the uservec/userret trampoline-fetch
   project that consumes `TrampText.tramp_text_mint`.
-- **[`instr-subgoal-sweep.md`](projects/instr-subgoal-sweep.md)** — the
-  performance discipline that replaced posing instruction facts: close the
-  leaf's `instr` premise as a `[]` subgoal from `kernel_text` instead. Measured
-  −46 % wall / −61 % `Qed` / −69 % proof term on the reference conversion. The
-  file is the mechanical recipe, the traps, and the scoreboard for the
-  remaining 214 files.
-- **[`continuation-folds.md`](projects/continuation-folds.md)** — the tree-wide
-  survey for optimization.md's "fold the block continuation" lever: where the
-  shape still occurs, what each instance is worth, and the expensive files that
-  are NOT instances. ProofSysUnlink (−13.4 %) and the kexec cone (−7.8 %) are
-  landed; `ProofPrintk`'s fourteen lemmas are the richest one left.
+- **[`fs-syscall-specs.md`](projects/fs-syscall-specs.md)** — the
+  file-system BEHAVIOUR specification: what each syscall does to the
+  abstract state.  Design: `design/fs-syscall-specs.md`.  It is what
+  durable-disk handed its per-syscall durability statements to, and it owns
+  the port of `namei-pinned-lookup.md`'s results (its lane P).
+
 - **[`device-conformance.md`](projects/device-conformance.md)** — the
   device semantics differentially tested against QEMU: one bare-metal image
   run on both machines, the model side EXHIBITING one execution by
@@ -229,16 +221,22 @@ first four were audited against the tree 2026-08-22):
   them, and the seven `*Pinned*`/`DirViewPin` rows of `iris/_CoqProject` are
   commented out (source kept). The banner lists them and says who ports
   them. M2 (`dvrt`, the pin through the trap seam) and stage C (threading
-  `proc_ptm` through kexec) are gated on the owner's call. §10 is the
-  long-run tree-level direction.
+  `proc_ptm` through kexec) are gated on the owner's call — which is why the
+  file is PAUSED rather than finished; note that stage C's actual content is
+  being executed under `user-wp-slot.md`'s `proc_pt_any` campaign, and
+  nothing has said so in either file. §10 is the long-run tree-level
+  direction.
 
 ## `completed/` — finished projects, archived for reference
 
-`durable-disk-byteview.md` (the byte-view attempt) and
-`durable-disk-2026-08-23-to-25.md` (the rulings/refutations/lane reports
-of the SL redesign) are NOT finished projects: they are the archived
-history of the live durable-disk effort; `projects/durable-disk.md` is
-current and `design/durable-fs-plan.md` is the design.
+Three files carry the durable-disk project's history, oldest first:
+`durable-disk-byteview.md` (the byte-view attempt),
+`durable-disk-2026-08-23-to-25.md` (the SL redesign's rulings and
+refutations) and `durable-disk-2026-08-26-to-28.md` (the lanes, the
+simplification campaign and the boot-side transport, to the finish).  Read
+a lane's spec THROUGH its "AS LANDED" paragraph — several specs were
+refuted by the lane that ran them.  The design is
+`design/durable-fs-plan.md`.
 
 Kept for their durable design notes, gotchas and reusable recipes; `ls` them.
 **Nobody reads these for current guidance**, so they are the one place a
@@ -268,6 +266,16 @@ of a fact that must survive several openings of an invariant, and nothing
 persistent is needed), the ring window is a pigeonhole over descriptor
 heads instead of a count of triples, why the receipt has exactly two arms,
 and why a one-shot accessor needs a read-only twin.
+
+Three arrived on 2026-08-28 with the durable-disk archive, all audited
+against the tree first: `instr-subgoal-sweep.md` (the sweep is DONE — the
+tree's own oracle grep finds no per-instruction pose left — but the file is
+still the RECIPE a new proof must follow, and `tools/instr_subgoal.py` is
+the tool), `continuation-folds.md` (every instance folded; read it for the
+METHOD and for the files that look like instances and are not, so nobody
+re-measures what it already priced at zero), and `xv6-rev-7d258aa.md` (the
+bump landed and has been superseded twice, but four of its lessons are
+bump-independent and `xv6-bump-playbook.md` now points at them).
 
 `panic.md` is the one to open before proving any arm that ends in a `jal
 panic` — `forkret`'s `if (first)` is the only such arm left. It carries the arm
