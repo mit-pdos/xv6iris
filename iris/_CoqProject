@@ -1367,3 +1367,8 @@ LinkCreateAU.v
 SpecSysMknodAUEra.v
 ProofSysMknodAU.v
 LinkSysMknodAU.v
+
+# fs-syscall-specs lane P: the era-0 /init pins, re-derived on the abstract
+# state (the port the banner of claude-notes/projects/namei-pinned-lookup.md
+# asks for).  A LEAF, like every consumer of FsImgCheck -- nothing requires it.
+FsInitPin.v

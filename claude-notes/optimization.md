@@ -1065,6 +1065,44 @@ surfaces the next dependency layer.; reach for `iNext`
     sub-second): a disagreement now surfaces at `Qed` as a kernel conversion
     failure with no goal in view. Put `vm_compute. reflexivity.` back on the
     one failing lemma to see it.
+- **A CONSTRUCTOR IS INJECTIVE AT VARIABLES — NEVER AT A FILE'S CONTENTS.**
+  Measured 2026-08-28 on `iris/FsInitPin.v` (fs-syscall-specs lane P), by
+  `coqc -time` plus truncation probes. The lemma wanted was
+
+  ```coq
+  file_bytes (fs_data_of fsimg_P (fs_dinode fsimg_P fsimg_sb 7)) <size>
+  = ElfUser.init_elf                       (* 35,976 bytes *)
+  ```
+
+  off `FsImgCheck.fsimg_init_at`, i.e. `Some (NFile X) = Some (NFile Y)` with
+  `Y` the literal. **Both obvious spellings — `injection H` and `exact H`
+  through a projection `nfile_bytes` — ran past 15 minutes and never
+  finished**, while every other sentence in the file was 0.00 s and its first
+  two sections compiled in 35 s. The reason is `FsImgCheck.v`'s own header
+  rule one level down: conversion is free to unfold `FsTree.file_bytes`
+  instead of the projection, and `file_bytes` is quadratic in the file size
+  and rebuilds the block once per byte.
+  The fix is to prove injectivity **at variables**, where the variable is
+  rigid so the projection is the only thing conversion can unfold, and then
+  close the instance by transitivity through the term both sides already
+  share:
+  ```coq
+  Definition nfile_bytes (o : option fsnode) : list (bv 8) :=
+    match o with Some (NFile b) => b | _ => [] end.
+  Lemma nfile_inj (b b' : list (bv 8)) :
+    Some (NFile b) = Some (NFile b') -> b = b'.
+  Proof. intros H. exact (f_equal nfile_bytes H). Qed.
+  (* instance: apply nfile_inj; transitivity (node_at P sb i); ... *)
+  ```
+  **>15 min → 5.5 s for the whole file.** The same rule retired an
+  `injection` on a row carrying those bytes (`Some_inj` instead). Read it as
+  the converse of the `vm_eq` rule above: there the kernel SHOULD reduce and
+  you make it do so once; here it should not reduce at all and you must give
+  it a shape where it cannot start. And note the diagnostic trap that cost
+  most of the time — **`coqc`'s output is block-buffered when redirected**,
+  and `stdbuf` does not help (OCaml buffers internally), so the log's last
+  line is not where the compile is. Use `script -q -e -c "coqc -time …" log`
+  (a pty) or, better, bisect with `head -N file.v` probes.
 - **AND MEASURE ON A QUIET VM.** Three of those five variants first read as
   regressions of 20–30 % (25 s → 31 s on the same file), purely because another
   tree was building; the same variants re-measured at load 9 were within 2 %.

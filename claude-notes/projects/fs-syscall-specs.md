@@ -354,13 +354,53 @@ things, and the answer differs:
   `file_ref`'s index) — the descriptor arms of these specs speak THAT
   carrier and can tie fd → inum → the §2 abstract node directly; the
   campaign does not mint its own fd ghost.
-- [ ] **P — the /init pin port (after D; independent of S0).**  Era 0's
-  exec-of-`/init` re-derived on the spec abstract state from era-0
-  snapshot facts (era 0's snapshot IS the mkfs image: `fs_boot_pure` +
-  `FsImgCheck.fsimg_init_path`/`fsimg_root_type`), replacing the
-  disabled `dv_pin`/`fv_pin` route.  Done when the boot chain's
-  commented pin consumers could be re-enabled against it (whether to
-  re-enable is the owner's call).
+- [x] **P — the /init pin port (after D; independent of S0).**  DONE
+  2026-08-28 (Opus lane, `iris/FsInitPin.v`, 505 lines, EC2-green in
+  **5.5 s**, zero `Admitted`, and `Print Assumptions` on all three
+  theorems is **EMPTY** — only Rocq's own `PrimInt63`/`PrimString`
+  primitives, so the pins carry NO logical axiom, not even funext).
+  NOTHING WAS RE-ENABLED: the boot chain is untouched and no file
+  requires this one (it is an `FsImgCheck` consumer, hence a leaf).
+  THE ERA-0 PREMISE, in its exact landed spelling:
+  `SystemAdequacy.fsimg_snap_ok : snap_ok (img_state fsimg_P fsimg_sb
+  fsimg_nib) (fs_restrict fsimg_P (fs_home_set fsimg_cov (sb_logstart
+  fsimg_sb)))` — unchanged by durable-disk BT-3, which this file is
+  stated against.  That map is named `era0_D`.
+  THE TWO PINS, both ROUTE (b) (pure in `era0_D`, quantified over EVERY
+  `S` with `snap_ok S era0_D`, hence eternal for era 0 and persistent
+  for free):
+  - `era0_init_path_pin S : snap_ok S era0_D -> apath_at (abs_view
+    (fss_inodes S)) ROOTINO init_path = Some INIT_INO` (`INIT_INO := 7`,
+    `init_path := [fname_init]`);
+  - `era0_init_content_pin S : snap_ok S era0_D -> abs_view (fss_inodes
+    S) !! INIT_INO = Some (MkAnode (AFile init_bytes) 1)` with
+    `init_bytes := ElfUser.init_elf` (= `SpecKexecPinned.init_bytes`,
+    `fv_of init_dn init_data`, by `init_bytes_elf`).
+  Plus `era0_root_row`, `era0_dur_root`/`era0_dur_init` (the `dur_node`
+  certificates), and `era0_init_arun : arun (abs_view (fss_inodes S))
+  ROOTINO init_path [ROOTINO; INIT_INO]` — **exactly the premise
+  `FsAbsPins.apr_walk` takes**, which is the composition point with lane
+  A(iii)'s live walk.  ROUTE (a) is section 6: `astate_era0_init_path`
+  and `nview_era0_init` (a client share of inum 7 IS /init's bytes, via
+  `astate_nview`), for a consumer holding the founded authority.
+  WHY THE SNAPSHOT STATE IS THE PLACE TO STAND: the snapshot mint
+  reaches `FsState.fs_boot_alloc_root_slack` AT `fss_inodes S`, so the
+  founded `astate` is `abs_view (fss_inodes S)` on the nose.
+  GAP (transport, not a missing lemma): nothing at `boot_shared_alloc`'s
+  altitude says THIS era's `D` is the image's — `S` and the snapshot
+  arrive as parameters, era-generic.  Post-BT-3 the producer of the pins'
+  premise is `FsDurSnap.fs_snap_read_ok_keep` (non-destructive) off the
+  epoch the mint takes; what is still owed at era 0 is
+  `fs_recovery_det` + `fsimg_snap_ok` identifying that epoch's map with
+  `era0_D`.  BT-3 also removed the `Rb` slot as a delivery channel (`Rb`
+  is now named at `FsCrash.P_fs_lend`).
+  MEASURED GOTCHA, recorded in optimization.md and in the file's §3
+  header: `injection`/`exact` against an equation carrying the
+  35,976-byte `init_elf` literal DOES NOT FINISH (>15 min, both
+  spellings) — conversion unfolds `FsTree.file_bytes`, which is
+  quadratic in the file size.  Prove `Some (NFile b) = Some (NFile b')
+  -> b = b'` AT VARIABLES and close the instance by transitivity through
+  `node_at`.  That one change took the file from >15 min to 5.5 s.
 - [ ] **Y — sys_sync (gated on durable lane F).**  The `flushed`
   receipt (persistent snapshot certificate copy, plan 4⁹.3) + the
   `wp_sys_sync` parallel form (R10), per doc §5 principle 2's derivation
